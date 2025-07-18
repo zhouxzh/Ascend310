@@ -1,16 +1,3 @@
-import comp from "D:/Github/Ascend310/src/.vuepress/.temp/pages/book/index.html.vue"
-const data = JSON.parse("{\"path\":\"/book/\",\"title\":\"昇腾310B\",\"lang\":\"zh-CN\",\"frontmatter\":{\"gitInclude\":[]},\"headers\":[],\"readingTime\":{\"minutes\":0.01,\"words\":3},\"filePathRelative\":\"book/README.md\"}")
+import comp from "/Users/hehaocheng/WebstormProjects/Ascend310/src/.vuepress/.temp/pages/book/index.html.vue"
+const data = JSON.parse("{\"path\":\"/book/\",\"title\":\"昇腾310B\",\"lang\":\"zh-CN\",\"frontmatter\":{},\"headers\":[],\"git\":{\"createdTime\":1752741756000,\"updatedTime\":1752741756000,\"contributors\":[{\"name\":\"zhouxzh\",\"username\":\"zhouxzh\",\"email\":\"zhouxzh@gdut.edu.cn\",\"commits\":1,\"url\":\"https://github.com/zhouxzh\"}]},\"readingTime\":{\"minutes\":0.01,\"words\":3},\"filePathRelative\":\"book/README.md\",\"localizedDate\":\"2025年7月17日\"}")
 export { comp, data }
-
-if (import.meta.webpackHot) {
-  import.meta.webpackHot.accept()
-  if (__VUE_HMR_RUNTIME__.updatePageData) {
-    __VUE_HMR_RUNTIME__.updatePageData(data)
-  }
-}
-
-if (import.meta.hot) {
-  import.meta.hot.accept(({ data }) => {
-    __VUE_HMR_RUNTIME__.updatePageData(data)
-  })
-}

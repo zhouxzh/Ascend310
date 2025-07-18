@@ -1,1 +1,1 @@
-export const sidebarData = {"/":["",{"text":"昇腾310B","prefix":"book/","collapsible":true,"children":["","chapter0","chapter8","chapter2","chapter6","chapter7","chapter3","chapter4","chapter5","chapter1"]},"portfolio"]};
+export const sidebarData = {"/":["","portfolio",{"text":"昇腾310B","prefix":"book/","collapsible":true,"children":["","chapter0","chapter1","chapter7","chapter3","chapter2","chapter5","chapter8","chapter6","chapter4"]}]};

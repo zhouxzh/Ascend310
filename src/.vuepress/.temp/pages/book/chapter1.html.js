@@ -1,16 +1,3 @@
-import comp from "D:/Github/Ascend310/src/.vuepress/.temp/pages/book/chapter1.html.vue"
-const data = JSON.parse("{\"path\":\"/book/chapter1.html\",\"title\":\"第一章\",\"lang\":\"zh-cn\",\"frontmatter\":{\"title\":\"第一章\",\"author\":[\"周贤中\"],\"date\":\"2025-03-30T00:00:00.000Z\",\"subject\":\"Markdown\",\"keywords\":[\"Ascend\"],\"lang\":\"zh-cn\",\"gitInclude\":[]},\"headers\":[],\"readingTime\":{\"minutes\":0.07,\"words\":20},\"filePathRelative\":\"book/chapter1.md\",\"localizedDate\":\"2025年3月30日\"}")
+import comp from "/Users/hehaocheng/WebstormProjects/Ascend310/src/.vuepress/.temp/pages/book/chapter1.html.vue"
+const data = JSON.parse("{\"path\":\"/book/chapter1.html\",\"title\":\"第一章：初步使用开发板\",\"lang\":\"zh-cn\",\"frontmatter\":{\"title\":\"第一章：初步使用开发板\",\"author\":[\"周贤中\"],\"date\":\"2025-03-30T00:00:00.000Z\",\"subject\":\"Markdown\",\"keywords\":[\"Ascend\"],\"lang\":\"zh-cn\"},\"headers\":[{\"level\":3,\"title\":\"所需配件\",\"slug\":\"所需配件\",\"link\":\"#所需配件\",\"children\":[]},{\"level\":3,\"title\":\"下载开发板的系统镜像\",\"slug\":\"下载开发板的系统镜像\",\"link\":\"#下载开发板的系统镜像\",\"children\":[]},{\"level\":3,\"title\":\"刷写系统到TF卡\",\"slug\":\"刷写系统到tf卡\",\"link\":\"#刷写系统到tf卡\",\"children\":[]},{\"level\":3,\"title\":\"启动开发板（Ubuntu）\",\"slug\":\"启动开发板-ubuntu\",\"link\":\"#启动开发板-ubuntu\",\"children\":[]}],\"git\":{\"createdTime\":1752741756000,\"updatedTime\":1752741756000,\"contributors\":[{\"name\":\"zhouxzh\",\"username\":\"zhouxzh\",\"email\":\"zhouxzh@gdut.edu.cn\",\"commits\":1,\"url\":\"https://github.com/zhouxzh\"}]},\"readingTime\":{\"minutes\":6.33,\"words\":1899},\"filePathRelative\":\"book/chapter1.md\",\"localizedDate\":\"2025年3月30日\"}")
 export { comp, data }
-
-if (import.meta.webpackHot) {
-  import.meta.webpackHot.accept()
-  if (__VUE_HMR_RUNTIME__.updatePageData) {
-    __VUE_HMR_RUNTIME__.updatePageData(data)
-  }
-}
-
-if (import.meta.hot) {
-  import.meta.hot.accept(({ data }) => {
-    __VUE_HMR_RUNTIME__.updatePageData(data)
-  })
-}

@@ -6,6 +6,7 @@ heroImage: /logo.png
 bgImageStyle:
   background-attachment: fixed
 heroText: 昇腾310B——理论与实践
+#heroText：从零探索昇腾NPU系列教程——香橙派OrangePi Ai Pro开发板部分
 tagline: 前沿技术课程
 actions:
   - text: 作者简介
