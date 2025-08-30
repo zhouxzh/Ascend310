@@ -1,3 +1,3 @@
-import comp from "/Users/hehaocheng/WebstormProjects/Ascend310/src/.vuepress/.temp/pages/book/chapter7.html.vue"
+import comp from "C:/Users/hhc00/iCloudDrive/Desktop/Ascend310/src/.vuepress/.temp/pages/book/chapter7.html.vue"
 const data = JSON.parse("{\"path\":\"/book/chapter7.html\",\"title\":\"第七章\",\"lang\":\"zh-cn\",\"frontmatter\":{\"title\":\"第七章\",\"author\":[\"周贤中\"],\"date\":\"2025-03-30T00:00:00.000Z\",\"subject\":\"Markdown\",\"keywords\":[\"Ascend\"],\"lang\":\"zh-cn\"},\"headers\":[],\"git\":{\"createdTime\":1752741756000,\"updatedTime\":1752741756000,\"contributors\":[{\"name\":\"zhouxzh\",\"username\":\"zhouxzh\",\"email\":\"zhouxzh@gdut.edu.cn\",\"commits\":1,\"url\":\"https://github.com/zhouxzh\"}]},\"readingTime\":{\"minutes\":0.07,\"words\":20},\"filePathRelative\":\"book/chapter7.md\",\"localizedDate\":\"2025年3月30日\"}")
 export { comp, data }
