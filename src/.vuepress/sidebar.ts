@@ -10,7 +10,6 @@ export default sidebar({
       collapsible: true,
       children: [
         "README.md",
-        "chapter0.md",
         "chapter1.md",
         "chapter2.md",
         "chapter3.md",
@@ -18,7 +17,27 @@ export default sidebar({
         "chapter5.md", 
         "chapter6.md",
         "chapter7.md",
-        "chapter8.md"
+        "chapter8.md",
+        "chapter9.md",
+        "chapter10.md"
+      ]
+    },
+    {
+      text: "实践案例",
+      icon: "experiment",
+      prefix: "/experiment/",
+      collapsible: true,
+      children: [
+        "README.md",
+        "case1.md",
+        "case2.md",
+        "case3.md",
+        "case4.md",
+        "case5.md",
+        "case6.md",
+        "case7.md",
+        "case8.md",
+        "case9.md"
       ]
     },
     {
