@@ -133,7 +133,7 @@ OrangePi AIpro(8T)开发板是香橙派联合华为精心打造的高性能AI开
 4. 等待软件格式化完成，并点击确定![格式化完成](img1/fmtfin.png)
 
 #### 刷写系统到TF卡（以Ubuntu为例）
-> 此处以Ubuntu为例
+> 此处以刷写Ubuntu为例
 1. 打开balenaEther，选择“从文件烧录”![balenaEther](img1/ether1.png)
 2. 选择好要烧录的镜像文件（**.img**格式），再选择目标磁盘为TF卡对应的位置，如图中名称为“SDXC Card”的位置，选中并选择“选定1”。![选择磁盘](img1/chooseether.png)
 3. 点击“现在烧录！”，耐心等待烧录完成。![烧录过程](img1/dd.png)
@@ -144,7 +144,7 @@ OrangePi AIpro(8T)开发板是香橙派联合华为精心打造的高性能AI开
 由于板上并不自带有eMMC模块，若要想使用需要额外购买香橙派的eMMC模块，此处暂时不列入参考，若需使用，请查阅香橙派的用户手册。
 
 #### 刷写系统到SSD
-开发板带有M.2接口，可以使用SSD作为启动设备。但SSD需要自行准备，且根据香橙派
+开发板带有M.2接口，可以使用SSD作为启动设备。但SSD需要自行准备，且根据香橙派的兼容性说明，该开发版仅支持少数品牌的SSD，因此不推荐使用SSD作为系统安装位置。
 
 #### 调整设备启动方式的拨码开关
 开发板支持多种启动方式，包括TF卡、eMMC以及M.2 SSD，当这些存储设备都同时存在时，需要让开发板选定一个存储设备作为启动来源。
@@ -162,18 +162,22 @@ OrangePi AIpro(8T)开发板是香橙派联合华为精心打造的高性能AI开
 ### 启动开发板（Ubuntu）
 - 图形化界面
 1. 将系统刷写完成的TF卡从读卡器中取出，插入开发板的TF卡插槽中，并确保两个启动开关的位置均在右边，接入HDMI数据线到靠近USB3.0接口的HDMI0接口，然后将Type-C电源线插入开发板最边缘的TYPE-C供电口，等待风扇的声音变小以及屏幕出现系统登录界面。
+![HDMI0](img1/HDMI0.png)
+![TYPE-C Power](img1/typecp.png)
 ![登录](img1/beforelogin.png)
 2. 进入登录界面后，将键盘接入开发板的USB接口中，默认的登录用户名是```HwHiAiUser```，输入该账户的密码```Mind@123```,登录进入系统。
 ![桌面](img1/logingui.png)
+> 若无法登陆请检查输入的密码是否正确，大小写以及符号是否正确
 默认账户表格：
 | 用户名 | 密码 |
-| :---: | :--: |
+| :---: | :---: |
 | root | Mind@123 |
 | HwHiAiUser | Mind@123 |
 
 - 串口界面
 1. 使用USB2TTL模块，与开发板的GPIO口进行连线![开发板串口](img1/gpio_ttl.png)，开发板的TX（GPIO8）接入USB2TTL模块的RX接口，开发板的RX（GPIO10）则接入模块的TX接口，并连接好GND接地，在Windows电脑下可以使用PUTTY连接串口。
-2. 使用开发板自带的Micro USB接口进行串口调试，该方法更为方便，只需要一根Micro USB数据线，接入电脑后打开设备管理器查询对应的串口，然后使用PUTTY进行链接即可。
+2. 使用开发板自带的Micro USB接口进行串口调试，该方法更为方便，只需要一根Micro USB数据线，接入电脑后打开设备管理器查询对应的串口，然后使用PUTTY进行链接即可。![MicroUSB串口](img1/microusbser.png)
+
 以Micro USB接口为例：
 1. 使用Micro USB数据线连接开发板和电脑
 2. 打开电脑的设备管理器，选择端口，寻找开发板对应的串口端口号![端口号](img1/ttl.png)
@@ -182,17 +186,77 @@ OrangePi AIpro(8T)开发板是香橙派联合华为精心打造的高性能AI开
 ![串口](img1/serial.png)
 ![登录成功](img1/login.png)
 
+### WIFI天线安装指南
+开发版的wifi天线如左侧红色矩形框内所示
+![wifiant](img1/wifiant.png)
+将其对准开发版的天线接口安装牢固即可，注意不要将天线贴到开发版的背面，也需要注意天线下方的导电胶布也不要接触开发版，否则有可能导致PCB短路烧坏开发版。
+
 ### Ubuntu Xfce桌面使用说明
 目前系统仅支持Ubuntu 22.04 - Jammy系统，内核版本为Linux 5.10
 #### 当前版本适配情况
 请详见香橙派官方的用户手册，有部分功能仅支持使用官方程序进行测试，无法直接从系统中调用，在使用过程中需注意这些限制。
 
-#### HDMI口使用
-开发板有两个HDMI2.0 接口，目前只有HDMI0 支持显示Linux 系统的桌面，当Linux 系统的桌面系统关闭时，HDMI0 和HDMI1 还可以用于NVR 二次开
-发场景输出图片。
+#### 板载LED灯
+开发版上有两个绿色的LED灯，一个为电源指示灯，另一个为Linux内核指示灯。
+![电源指示灯](img1/powerindicator.png)
+![内核指示灯](img1/linuxindicator.png)
+Linux内核指示灯由GPIO4_14控制，默认情况下则在Linux启动后该灯就会点亮，如需要修改该灯的点亮条件，需要修改内核DTS文件并重新编译Linux系统。
 
-#### 音频使用
-Linux 内核没有适配耳机和HDMI 等的ALSA 音频驱动，此部分驱动还在开 发中，目前只能通过音频样例代码来测试耳机、HDMI 的音频播放和板载MIC 的录音功能。或者自行购买Linux系统免驱的USB外置声卡，经测试可以正常使用。
+#### 有线网络连接
+1. 将网线一端连接开发版的网口，另一端连接交换机/路由器
+2. 在Ubuntu系统中打开终端（terminal），输入```ip a s eth0```，ip地址显示在输出的inet一列
+
+#### 使用无线网络连接
+- 使用nmcli连接，首先```nmcli dev wifi```扫描WIFI，然后使用```sudo nmcli dev wifi connect wifi_name password wifi_passwd```（将wifi_name和wifi_passwd替换为实际的SSID和密码，不支持中文），连接成功后使用```ip a s wlan0```查看wifi地址。
+- 使用nmtui连接，在终端输入```sudo nmtui```后即可使用键盘对图形界面进行操作，包括连接网络、断开网络、设置静态IP地址等。
+
+### HDMI口使用
+开发板有两个HDMI2.0接口，目前只有HDMI0支持显示Linux系统的桌面，当Linux系统的桌面系统关闭时，HDMI0和HDMI1还可以用于NVR二次开发场景输出图片。
+
+#### 使用HDMI VDP模式
+1. 将显示器连接至HDMI0接口，登陆进入系统
+2. 打开终端，输入如下命令：
+```bash
+sudo -i
+cd /opt/opi_test/hdmi0_pic
+./update_dt.sh
+```
+3. 等待系统重启后，注意此时HDMI接口不会再有输出，使用远程ssh或者串口登陆系统，输入如下命令：
+```bash
+sudo -i
+cd /opt/opt_test/hdmi0_pic
+./test.sh
+```
+可以发现显示屏会输出一张图片，若需要使用hdmi1输出，则只需要将上文的hdmi0修改为hdmi1。
+
+#### 恢复HDMI DRM模式
+进入终端，输入如下命令：
+```bash
+sudo -i
+cd /opt/opi_test/hdmi_desktop
+./update_dt.sh
+```
+等系统重启后即可。
+
+### USB摄像头使用
+将USB摄像头插入开发版的USB3.0接口中，然后输入如下命令查询摄像头：
+```bash
+sudo apt-get update
+sudo apt-get install -y v4l-utils
+sudo v4l2-ctl --list-devices
+```
+接着安装fswebcam```sudo apt-get install -y fswebcam```，就可以使用fswebcam进行拍照。
+
+或者使用内置的USBCamera测试代码，运行如下命令，获得一张yuv格式的图片：
+```bash
+sudo -i
+cd /opt/opi_test/USBCamera
+./main /dev/video0
+```
+使用ffplay查看```ffplay -pix_fmt yuyv422 -video_size 1280*720 out.yuv```
+
+### 音频使用
+Linux内核没有适配耳机和HDMI等的ALSA音频驱动，此部分驱动还在开发中，目前只能通过音频样例代码来测试耳机、HDMI的音频播放和板载MIC的录音功能。或者自行购买Linux系统免驱的USB外置声卡，经测试可以正常使用。
 
 ### GPIO口的引脚顺序
 如图，单号引脚和双号引脚分别在一排。
@@ -200,9 +264,6 @@ Linux 内核没有适配耳机和HDMI 等的ALSA 音频驱动，此部分驱动�
 ![GPIO2](img2/gpio2.png)
 
 注意事项： 
-1. 40 pin 接口中总共有26 个GPIO 口，但8 号和10 号引脚默认是用于调试串
-   口功能的，并且这两个引脚和Micro USB 调试串口是连接在一起的，所以这两个
-   引脚请不要设置为GPIO 等功能。
+1. 40 pin 接口中总共有26 个GPIO 口，但8 号和10 号引脚默认是用于调试串口功能的，并且这两个引脚和Micro USB 调试串口是连接在一起的，所以这两个引脚请不要设置为GPIO 等功能。
 2. 所有的GPIO 口的电压都是3.3v。
-3. 40 pin 接口中27 号和28 号引脚只有I2C 的功能，没有GPIO 等其他复用功
-   能，另外这两个引脚的电压默认都为1.8v。
+3. 40pin接口中27号和28号引脚只有I2C的功能，没有GPIO等其他复用功能，另外这两个引脚的电压默认都为1.8v。
