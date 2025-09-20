@@ -257,6 +257,29 @@ cd /opt/opi_test/USBCamera
 
 ### 音频使用
 Linux内核没有适配耳机和HDMI等的ALSA音频驱动，此部分驱动还在开发中，目前只能通过音频样例代码来测试耳机、HDMI的音频播放和板载MIC的录音功能。或者自行购买Linux系统免驱的USB外置声卡，经测试可以正常使用。
+若想要使用USB音频，需要将自行准备的USB声卡或者USB接口的耳机连接至USB3.0接口，使用```arecord -l```命令查看录音设备的编号，得到编号后，即可开始测试。
+```bash
+sudo -i
+cd /opt/opi_test/USBAudio
+./main plughw:0 # 录制音频
+over # 结束录制
+```
+若需要播放音频，则使用```ffplay -ar 44100 -ac 2 -f s16le audio.pcm```
+
+开发版具有3.5MM的接口，但是如前文所述，目前Linux系统内核并无驱动，使用3.5MM接口播放与录制需要使用指定的测试程序。
+播放：
+```bash
+sudo -i
+cd /opt/opi_test/audio
+./sample_audio play 2 qzgy_48k_16_mono_30s.pcm
+```
+录音：
+```bash
+sudo -i
+cd /opt/opi_test/audio
+./sample_audio capture test.pcm # 录音
+./sample_audio play 2 test.pcm # 播放
+```
 
 ### GPIO口的引脚顺序
 如图，单号引脚和双号引脚分别在一排。
@@ -264,6 +287,34 @@ Linux内核没有适配耳机和HDMI等的ALSA音频驱动，此部分驱动还�
 ![GPIO2](img2/gpio2.png)
 
 注意事项： 
-1. 40 pin 接口中总共有26 个GPIO 口，但8 号和10 号引脚默认是用于调试串口功能的，并且这两个引脚和Micro USB 调试串口是连接在一起的，所以这两个引脚请不要设置为GPIO 等功能。
-2. 所有的GPIO 口的电压都是3.3v。
+1. 40pin接口中总共有26个GPIO口，但8号和10号引脚默认是用于调试串口功能的，并且这两个引脚和Micro USB调试串口是连接在一起的，所以这两个引脚请不要设置为GPIO等功能。
+2. 所有的GPIO口的电压都是3.3v。
 3. 40pin接口中27号和28号引脚只有I2C的功能，没有GPIO等其他复用功能，另外这两个引脚的电压默认都为1.8v。
+
+#### GPIO测试工具
+目前开发板的系统镜像已经预装了gpio_operate工具，该工具可用于设置GPIO管脚的输入与输出方向，也可将每个GPIO管脚独立的设为0或1。
+查阅该工具的帮助：
+```bash
+sudo -i
+gpio_operate -h
+```
+查询GPIO管脚方向
+使用`gpio_operate get_direction gpio_group gpio_pin`，其中gpio_group
+是GPIO口对应的分组，取值在[0,8]之间，gpio_pin则是GPIO口的管脚号，取值[0,31]之间，例如GPIO1_01，获取其方向的代码为`gpio_operate get_direction 1 01`，得到的结果如图所示，value为0是输入方向，value为1则为输出方向，如此处GPIO1_01的方向为输入方向。
+![gpio方向](img1/gpio_direction.png)
+若需要修改GPIO的管脚方向，则使用另一条命令`gpio_operate set_direction gpio_group gpio_pin direction`，gpio_group、gpio_pin和direction的定义与上文一致，只需要根据需要将gpio口修改为需要的方向即可。
+另外还能通过这个工具查询和设置GPIO管脚的电平信号，`gpio_operate get_value gpio_group gpio_pin`用于查询管脚的状态为高电平（1）亦或是低电平（0），如`gpio_operate get_value 1 01`，得到的value为1，说明是高电平，若value值是0，则说明是低电平。
+![gpio状态](img1/gpio_status.png)
+同时，也可以使用`gpio_operate set_value gpio_group gpio_pin value`来设置默认的管脚电平，注意设置管脚值前，请确保已将GPIO管脚的方向设置为输出！
+
+#### SPI测试
+开发板具有SPI功能，且Ubuntu系统默认配置了SPI的Master功能，SPI总线为SPI0，SDO对应的GPIO为19（GPIO2_27），SDI对应的GPIO为21（GPIO2_28），SCLK对应的GPIO为23（GPIO2_25），CS（片选）对应的GPIO为24（GPIO2_26）。
+查看ubuntu系统中存在的spi设备`ls /dev/spidev*`
+![SPI设备](spidevices.png)
+
+首先测试一下SPI在未连接MISO（SDI）和MOSI（SDO）两个管脚情况下的输出，在终端输入`sudo spidev_test -v -D /dev/spidev0.0`，得到如下结果
+![spidev结果](spidev1.png)
+可以发现TX和RX的结果不尽相同，说明此时开发板已经调用SPI接口的驱动在向外发送数据，但是没收到数据，接下来我们使用杜邦线将SDI和SDO连接，构成一个回环，再次运行上述命令,可以发现TX和RX的数据一致，说明SPI的发送和接收功能正常，可以通过spidev命令调用SPI接口了。
+
+#### wiringOP
+这是一个高性能的GPIO
