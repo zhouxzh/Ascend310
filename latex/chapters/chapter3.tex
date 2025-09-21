@@ -1,0 +1,349 @@
+昇腾310B在通用算子覆盖广度上已能满足大多数推理任务，但在以下场景，自定义算子（Custom
+Op）能显著提升功能完备性与性能确定性：模型含未支持/半支持算子、复合算子频繁导致访存过多、需要业务特化（如阈值/形态学/后处理融合）、或内置实现对特定尺寸/布局性能欠佳。第三章将给出``为什么、怎么做、如何验证与上线''的完整路径。
+
+\section{算子开发概述}\label{ux7b97ux5b50ux5f00ux53d1ux6982ux8ff0}
+
+\begin{itemize}
+\tightlist
+\item
+  目标与收益：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    功能补齐：覆盖模型图中未支持或语义差异较大的算子；
+  \item
+    性能确定性：融合多算子、减少GM\textless-\textgreater UB搬运与中间落地、利用向量化内核；
+  \item
+    工程可维护：以``算子契约''形式固化输入/输出/属性与边界行为，便于回归与复用。
+  \end{itemize}
+\item
+  执行形态：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    AI Core（推荐）：基于 TBE/TE/TIK 运行于 NPU 核心，适合数值密集型；
+  \item
+    AICPU（可选）：C/C++ 在 AICPU/Host
+    侧执行，适合控制流/轻量处理（注意H2D/D2H成本）。
+  \end{itemize}
+\item
+  产物要素：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    算子描述（op info/proto）：声明
+    op\_type、inputs/outputs、dtype\_format 组合、属性与形状推断；
+  \item
+    算子实现（Kernel）：TE/TIK 计算+调度或 AICPU C++ 实现；
+  \item
+    注册与打包：产物按规范放入 OPP 目录，ATC/Runtime 可发现与加载。
+  \end{itemize}
+\end{itemize}
+
+\section{开发的理论基础}\label{ux5f00ux53d1ux7684ux7406ux8bbaux57faux7840}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  硬件与存储层次：
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  GM（Global Memory）：容量大、带宽高；
+\item
+  UB（Unified Buffer）：片上高速缓存，容量有限；
+\item
+  DMA：GM↔UB 的数据搬运，偏好大块连续传输；
+\item
+  向量/标量单元：支持vadd/vmul/vmax等，需数据对齐（常见16/32）。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{1}
+\tightlist
+\item
+  计算表达与调度：
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  TE（Tensor Expression）描述计算公式；Schedule 负责
+  tile/并行/向量化/缓存；
+\item
+  TIK 提供更贴近硬件的 DSL，便于精细控制 DMA 与 UB 管理；
+\item
+  目标：以较少的GM往返在UB内完成尽可能多的计算，提升算子算子效率与吞吐。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{2}
+\tightlist
+\item
+  算子契约（Operator Contract）：
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  输入/输出张量的
+  shape、dtype、layout（NCHW/NC1HWC0等）、属性（如alpha、mode）；
+\item
+  广播与对齐规则、边界行为（溢出/饱和/舍入）、精度策略（FP16/FP32混合）；
+\item
+  动态shape与静态shape：实现需覆盖契约内的形状组合并保证UB不溢出。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{3}
+\tightlist
+\item
+  数值与精度：
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  FP16 常用于 310B 推理通路；必要时在关键步骤采用临时 FP32 计算再回写；
+\item
+  误差控制：选择合适的舍入策略，避免饱和/下溢导致NAN/INF。
+\end{itemize}
+
+\section{开发流程（AI Core
+路线）}\label{ux5f00ux53d1ux6d41ux7a0bai-core-ux8defux7ebf}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  环境准备与约束
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  安装 CANN/Toolkit 并确认 \passthrough{\lstinline!atc --version!}
+  正常；
+\item
+  设置环境变量：\passthrough{\lstinline!ASCEND\_INSTALL\_PATH!}、\passthrough{\lstinline!ASCEND\_OPP\_PATH!}；
+\item
+  目标芯片：\passthrough{\lstinline!soc\_version=Ascend310B!}；优先使用
+  FP16 与硬件友好布局（如NC1HWC0）。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{1}
+\tightlist
+\item
+  定义算子信息（op info/proto）
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  声明 \passthrough{\lstinline!op\_type!}、inputs/outputs
+  名称与数量、可支持的 \passthrough{\lstinline!dtype\_format!}
+  组合、属性与默认值；
+\item
+  提供形状推断规则（静态或依据属性/输入维度计算）。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{2}
+\tightlist
+\item
+  编写算子实现（TE/TBE/TIK）
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  计算表达（示例：Add+ReLU 融合伪代码）：
+\end{itemize}
+
+\begin{lstlisting}
+# y = relu(x1 + x2)
+import te.lang.cce as tbe
+from te import tvm
+
+def add_relu_compute(x1, x2):
+        y = tbe.vadd(x1, x2)
+        z = tbe.vmaxs(y, tvm.const(0.0, x1.dtype))
+        return z
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  调度要点：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Tile 到 UB 容量可承载的块大小；
+  \item
+    连续向量访问，减少非对齐；
+  \item
+    合并搬运，避免频繁小块 DMA；
+  \item
+    小尺寸路径避免调度开销超过计算开销。
+  \end{itemize}
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{3}
+\tightlist
+\item
+  编译与注册
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  使用 Toolkit 提供的编译入口生成 kernel 与元数据；
+\item
+  将实现与描述文件放入 \passthrough{\lstinline!ASCEND\_OPP\_PATH!} 下
+  custom 目录（如
+  \passthrough{\lstinline!op\_impl/custom/ai\_core/tbe!}、\passthrough{\lstinline!op\_proto/custom!}）。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{4}
+\tightlist
+\item
+  与 ATC 集成
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  转换模型时指定 \passthrough{\lstinline!--soc\_version=Ascend310B!}；
+\item
+  确保 OPP 路径可被 ATC 读取，必要时调整
+  \passthrough{\lstinline!--op\_select\_implmode!}；
+\item
+  转换日志中应能看到自定义算子被匹配与编译。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{5}
+\tightlist
+\item
+  运行时部署
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  目标环境包含同版本 OPP（含 custom 产物）；
+\item
+  设置环境变量使 Runtime 能定位到自定义实现；
+\item
+  按常规 ACL 流程加载 OM 并执行推理。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{6}
+\tightlist
+\item
+  验证与度量
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  功能：与 NumPy/ONNX
+  参考实现对齐，随机多组张量比较（平均绝对/相对误差、边界样本）；
+\item
+  性能：Warmup≥3 次，采样≥50 次，统计 avg/p95/FPS；
+\item
+  资源：Profiling 检查 MemCopy 占比、Kernel 占比、Idle；
+\item
+  兼容：覆盖不同 shape/dtype/layout 组合。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{7}
+\tightlist
+\item
+  打包与版本化
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  输出 \passthrough{\lstinline!op\_contract.yaml!}（契约）与
+  \passthrough{\lstinline!benchmark.json!}（性能）；
+\item
+  目录建议：
+\end{itemize}
+
+\begin{lstlisting}
+op_pkg/<op_type>/<version>/
+    ├─ op_proto/custom/
+    ├─ op_impl/custom/ai_core/tbe/
+    ├─ tests/
+    └─ docs/
+\end{lstlisting}
+
+\section{常见问题与排查}\label{ux5e38ux89c1ux95eeux9898ux4e0eux6392ux67e5}
+
+\begin{itemize}
+\tightlist
+\item
+  ATC 提示 Unsupported Op：检查 op 描述是否生效、路径与
+  \passthrough{\lstinline!soc\_version!} 是否匹配；
+\item
+  运行时回退（fallback）：确认 \passthrough{\lstinline!dtype\_format!}
+  覆盖到当前张量组合；
+\item
+  性能无提升：检查是否出现额外 layout 转换、tile 过小造成 DMA 频繁；
+\item
+  精度异常：核对归一化/广播规则、溢出与舍入策略，必要时局部切 FP32；
+\item
+  动态 shape OOM：缩小 tile 或分桶处理，保证 UB 与工作区不溢出。
+\end{itemize}
+
+\section{章节小结}\label{ux7ae0ux8282ux5c0fux7ed3}
+
+自定义算子是 310B
+场景下实现``功能补齐与性能确定性''的关键手段。遵循``明确契约 → 正确调度
+→ 可观测验证 →
+规范打包''的路径，选择计算/访存比例合适、出现频繁的目标起步，先易后难、以基线与回归保障质量与收益的可持续。
+
+\section{实践任务}\label{ux5b9eux8df5ux4efbux52a1}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  选择你项目中的一个复合算子（例如归一化+阈值），写出算子契约草案（IO/attr/dtype\_format/边界）。
+\item
+  基于 TE 写出该算子的计算表达伪代码，并说明预期的 tile 与向量化策略。
+\item
+  在开发环境完成编译注册，将产物放入 OPP custom 目录并用一个最小模型验证
+  ATC 识别。
+\item
+  设计功能与性能验证脚本：随机张量对齐、Warmup/采样策略、输出 avg/p95
+  与资源占比。
+\item
+  生成 \passthrough{\lstinline!op\_contract.yaml!} 与
+  \passthrough{\lstinline!benchmark.json!}，并归档到
+  \passthrough{\lstinline!op\_pkg/<op\_type>/<version>/!}。
+\end{enumerate}

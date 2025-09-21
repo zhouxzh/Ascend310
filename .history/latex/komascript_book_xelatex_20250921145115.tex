@@ -1,0 +1,78 @@
+% KOMA-Script scrbook template for XeLaTeX
+% Encoding: UTF-8
+% Usage:
+%   xelatex -interaction=nonstopmode -halt-on-error komascript_book_xelatex.tex
+% Or use pandoc: pandoc src/book/chapter1.md --template=latex/komascript_book_xelatex.tex -o output/book.tex
+\documentclass[fontsize=12pt, paper=a4, oneside, openany]{scrbook}
+
+% XeLaTeX and CJK
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{bookmark}
+\usepackage{longtable}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\usepackage{geometry}
+\usepackage{caption}
+\usepackage{titling}
+
+% Page geometry
+\geometry{a4paper, left=28mm, right=28mm, top=30mm, bottom=30mm}
+
+% Fonts (adjust if you have other preferred fonts)
+% \setmainfont{Noto Serif}
+% \setsansfont{Noto Sans}
+% \setmonofont{Source Code Pro}
+\xeCJKsetup{CJKmath=true}
+% \setCJKmainfont{Noto Sans CJK SC}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue,
+    pdftitle={Ascend310 Book},
+    pdfauthor={周贤中}
+}
+
+% KOMA options
+\KOMAoptions{chapterprefix=true, headings=big}
+\setkomafont{disposition}{\normalfont\bfseries}
+
+% Header/Footer
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[LO]{\leftmark}
+\fancyhead[RE]{\rightmark}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Title
+\title{Ascend310 实战手册}
+\author{周贤中}
+\date{\today}
+
+% Pandoc: allow metadata variables
+% pandoc will replace variables like $title$, $author$ if provided
+\providecommand{\booktitle}{$if(title)$$title$$else$Ascend310 实战手册$endif$}
+
+\begin{document}
+\frontmatter
+\maketitle
+\tableofcontents
+\mainmatter
+
+% Include body (pandoc can replace) or input a single compiled file
+input{output/chapter1.tex}
+
+\backmatter
+\chapter*{致谢}
+感谢关注与贡献者。
+
+\end{document}

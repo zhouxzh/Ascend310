@@ -1,0 +1,198 @@
+\contentsline {chapter}{\numberline {1}昇腾310B边缘计算基础}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}什么是云计算？}{1}{section.1.1}%
+\contentsline {section}{\numberline {1.2}什么是边缘计算？}{1}{section.1.2}%
+\contentsline {section}{\numberline {1.3}边缘计算 vs 云计算？}{2}{section.1.3}%
+\contentsline {section}{\numberline {1.4}何时采用边缘计算？}{3}{section.1.4}%
+\contentsline {subsection}{\numberline {1.4.1}工程实现关键差异速览}{4}{subsection.1.4.1}%
+\contentsline {subsection}{\numberline {1.4.2}价值协同总结}{4}{subsection.1.4.2}%
+\contentsline {section}{\numberline {1.5}章节小结}{4}{section.1.5}%
+\contentsline {section}{\numberline {1.6}实践任务}{5}{section.1.6}%
+\contentsline {chapter}{\numberline {2}CANN 软件栈核心与模型转换全流程}{6}{chapter.2}%
+\contentsline {section}{\numberline {2.1}章节总览}{6}{section.2.1}%
+\contentsline {section}{\numberline {2.2}CANN 软件栈分层与数据流}{6}{section.2.2}%
+\contentsline {section}{\numberline {2.3}环境一致性与安装验证}{7}{section.2.3}%
+\contentsline {section}{\numberline {2.4}模型准备与输入规范统一}{7}{section.2.4}%
+\contentsline {section}{\numberline {2.5}ATC 模型转换详解}{7}{section.2.5}%
+\contentsline {subsection}{\numberline {2.5.1}自定义算子加载}{8}{subsection.2.5.1}%
+\contentsline {subsection}{\numberline {2.5.2}日志与告警}{8}{subsection.2.5.2}%
+\contentsline {section}{\numberline {2.6}OM 文件结构解读}{9}{section.2.6}%
+\contentsline {subsection}{\numberline {2.6.1}解析与统计脚本要点}{9}{subsection.2.6.1}%
+\contentsline {section}{\numberline {2.7}ACL 推理编程模型}{9}{section.2.7}%
+\contentsline {subsection}{\numberline {2.7.1}C 语言最小示例（核心片段）}{9}{subsection.2.7.1}%
+\contentsline {subsection}{\numberline {2.7.2}Python 封装思路}{10}{subsection.2.7.2}%
+\contentsline {section}{\numberline {2.8}性能与初步调优策略}{10}{section.2.8}%
+\contentsline {section}{\numberline {2.9}常见错误分类与排查路径}{11}{section.2.9}%
+\contentsline {section}{\numberline {2.10}质量保障与自动化流水线}{11}{section.2.10}%
+\contentsline {subsection}{\numberline {2.10.1}精度对齐示例指标}{11}{subsection.2.10.1}%
+\contentsline {section}{\numberline {2.11}Dump / Profiling / 调试手段}{12}{section.2.11}%
+\contentsline {section}{\numberline {2.12}动态 Shape 策略与内存规划}{12}{section.2.12}%
+\contentsline {section}{\numberline {2.13}精度验证流程与脚本要点}{12}{section.2.13}%
+\contentsline {section}{\numberline {2.14}安全与合规考量}{12}{section.2.14}%
+\contentsline {section}{\numberline {2.15}章节小结}{13}{section.2.15}%
+\contentsline {section}{\numberline {2.16}实践任务}{13}{section.2.16}%
+\contentsline {chapter}{\numberline {3}昇腾310B算子开发基础}{14}{chapter.3}%
+\contentsline {section}{\numberline {3.1}算子开发概述}{14}{section.3.1}%
+\contentsline {section}{\numberline {3.2}开发的理论基础}{14}{section.3.2}%
+\contentsline {section}{\numberline {3.3}开发流程（AI Core 路线）}{15}{section.3.3}%
+\contentsline {section}{\numberline {3.4}常见问题与排查}{16}{section.3.4}%
+\contentsline {section}{\numberline {3.5}章节小结}{17}{section.3.5}%
+\contentsline {section}{\numberline {3.6}实践任务}{17}{section.3.6}%
+\contentsline {chapter}{\numberline {4}典型模型部署实践}{18}{chapter.4}%
+\contentsline {section}{\numberline {4.1}章节总览}{18}{section.4.1}%
+\contentsline {section}{\numberline {4.2}统一部署工作流与契约化}{18}{section.4.2}%
+\contentsline {section}{\numberline {4.3}图像分类：ResNet / MobileNet}{18}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}模型导出}{18}{subsection.4.3.1}%
+\contentsline {section}{\numberline {4.4}目标检测：YOLO / FasterRCNN}{19}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}输入尺寸与 Letterbox}{19}{subsection.4.4.1}%
+\contentsline {section}{\numberline {4.5}OCR：文本检测 + 识别 Pipeline}{19}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}结构}{19}{subsection.4.5.1}%
+\contentsline {section}{\numberline {4.6}NLP：BERT 推理优化}{19}{section.4.6}%
+\contentsline {subsection}{\numberline {4.6.1}序列长度策略}{19}{subsection.4.6.1}%
+\contentsline {section}{\numberline {4.7}多模型 Pipeline 串联}{20}{section.4.7}%
+\contentsline {section}{\numberline {4.8}工程目录与脚本标准}{20}{section.4.8}%
+\contentsline {section}{\numberline {4.9}性能基线方法与统计置信}{21}{section.4.9}%
+\contentsline {section}{\numberline {4.10}常见问题诊断深度版}{21}{section.4.10}%
+\contentsline {section}{\numberline {4.11}章节小结}{21}{section.4.11}%
+\contentsline {section}{\numberline {4.12}实践任务}{21}{section.4.12}%
+\contentsline {chapter}{\numberline {5}性能与算子优化初阶}{22}{chapter.5}%
+\contentsline {section}{\numberline {5.1}章节总览}{22}{section.5.1}%
+\contentsline {section}{\numberline {5.2}性能拆解与衡量框架}{22}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Profiling 工具与时间线解读}{22}{section.5.3}%
+\contentsline {section}{\numberline {5.4}瓶颈模式与处置策略矩阵}{22}{section.5.4}%
+\contentsline {section}{\numberline {5.5}Layout / 内存访问优化}{23}{section.5.5}%
+\contentsline {section}{\numberline {5.6}精度与性能的层级折衷}{23}{section.5.6}%
+\contentsline {section}{\numberline {5.7}内存管理专题}{24}{section.5.7}%
+\contentsline {section}{\numberline {5.8}并行与流水线}{24}{section.5.8}%
+\contentsline {section}{\numberline {5.9}自定义算子开发与评估}{24}{section.5.9}%
+\contentsline {section}{\numberline {5.10}优化案例：Add + ReLU 融合}{25}{section.5.10}%
+\contentsline {section}{\numberline {5.11}性能报告与回归模板}{25}{section.5.11}%
+\contentsline {section}{\numberline {5.12}章节小结}{25}{section.5.12}%
+\contentsline {section}{\numberline {5.13}实践任务}{25}{section.5.13}%
+\contentsline {section}{\numberline {5.14}昇腾310B自定义算子开发全流程}{26}{section.5.14}%
+\contentsline {subsection}{\numberline {5.14.1}开发概述}{26}{subsection.5.14.1}%
+\contentsline {subsection}{\numberline {5.14.2}开发的理论基础}{26}{subsection.5.14.2}%
+\contentsline {subsection}{\numberline {5.14.3}开发流程（AI Core 为例）}{27}{subsection.5.14.3}%
+\contentsline {subsection}{\numberline {5.14.4}AICPU 路线（可选）}{28}{subsection.5.14.4}%
+\contentsline {subsection}{\numberline {5.14.5}常见问题与排错}{28}{subsection.5.14.5}%
+\contentsline {subsection}{\numberline {5.14.6}本章小结}{28}{subsection.5.14.6}%
+\contentsline {chapter}{\numberline {6}系统工程与高可用部署}{29}{chapter.6}%
+\contentsline {section}{\numberline {6.1}章节总览}{29}{section.6.1}%
+\contentsline {section}{\numberline {6.2}部署形态与演进路线}{29}{section.6.2}%
+\contentsline {section}{\numberline {6.3}进程与线程模型设计}{29}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}基本原理}{29}{subsection.6.3.1}%
+\contentsline {subsection}{\numberline {6.3.2}线程池建议}{29}{subsection.6.3.2}%
+\contentsline {section}{\numberline {6.4}任务调度与优先级控制}{30}{section.6.4}%
+\contentsline {section}{\numberline {6.5}配置管理与热更新}{30}{section.6.5}%
+\contentsline {section}{\numberline {6.6}日志体系与追踪}{31}{section.6.6}%
+\contentsline {section}{\numberline {6.7}指标监控与探针}{31}{section.6.7}%
+\contentsline {section}{\numberline {6.8}高可用与自愈机制}{31}{section.6.8}%
+\contentsline {section}{\numberline {6.9}异常分类与处理矩阵}{32}{section.6.9}%
+\contentsline {section}{\numberline {6.10}版本、灰度与回滚}{32}{section.6.10}%
+\contentsline {section}{\numberline {6.11}安全与访问控制}{32}{section.6.11}%
+\contentsline {section}{\numberline {6.12}审计与合规}{32}{section.6.12}%
+\contentsline {section}{\numberline {6.13}示例：两模型多进程结构}{32}{section.6.13}%
+\contentsline {section}{\numberline {6.14}章节小结}{33}{section.6.14}%
+\contentsline {section}{\numberline {6.15}实践任务}{33}{section.6.15}%
+\contentsline {chapter}{\numberline {7}项目实战方法论与交付模板}{34}{chapter.7}%
+\contentsline {section}{\numberline {7.1}章节总览}{34}{section.7.1}%
+\contentsline {section}{\numberline {7.2}需求澄清 Canvas}{34}{section.7.2}%
+\contentsline {section}{\numberline {7.3}指标分层与优先级}{34}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Baseline 策略与控制变量法}{35}{section.7.4}%
+\contentsline {section}{\numberline {7.5}评测集设计原则}{35}{section.7.5}%
+\contentsline {section}{\numberline {7.6}迭代计划与看板}{36}{section.7.6}%
+\contentsline {section}{\numberline {7.7}资产沉淀文档体系}{36}{section.7.7}%
+\contentsline {section}{\numberline {7.8}交付目录与不可变产物}{37}{section.7.8}%
+\contentsline {section}{\numberline {7.9}上线前综合 Checklist}{37}{section.7.9}%
+\contentsline {section}{\numberline {7.10}验收、回归与漂移监测}{38}{section.7.10}%
+\contentsline {section}{\numberline {7.11}风险管理与决策日志}{38}{section.7.11}%
+\contentsline {section}{\numberline {7.12}章节小结}{38}{section.7.12}%
+\contentsline {section}{\numberline {7.13}实践任务}{38}{section.7.13}%
+\contentsline {chapter}{\numberline {8}合实战案例集}{39}{chapter.8}%
+\contentsline {section}{\numberline {8.1}章节总览}{39}{section.8.1}%
+\contentsline {section}{\numberline {8.2}案例统一模板（标准化规范）}{39}{section.8.2}%
+\contentsline {section}{\numberline {8.3}案例目录结构规范}{39}{section.8.3}%
+\contentsline {section}{\numberline {8.4}例概览与重点}{40}{section.8.4}%
+\contentsline {section}{\numberline {8.5}案例 1：人脸打卡机}{40}{section.8.5}%
+\contentsline {subsection}{\numberline {8.5.1}场景}{40}{subsection.8.5.1}%
+\contentsline {subsection}{\numberline {8.5.2}指标}{41}{subsection.8.5.2}%
+\contentsline {subsection}{\numberline {8.5.3}模型链路}{41}{subsection.8.5.3}%
+\contentsline {subsection}{\numberline {8.5.4}性能优化}{41}{subsection.8.5.4}%
+\contentsline {subsection}{\numberline {8.5.5}metrics 示例}{41}{subsection.8.5.5}%
+\contentsline {section}{\numberline {8.6}案例 2：实时跟踪（检测 + 关联）}{42}{section.8.6}%
+\contentsline {subsection}{\numberline {8.6.1}流程}{42}{subsection.8.6.1}%
+\contentsline {subsection}{\numberline {8.6.2}难点}{42}{subsection.8.6.2}%
+\contentsline {subsection}{\numberline {8.6.3}优化}{42}{subsection.8.6.3}%
+\contentsline {subsection}{\numberline {8.6.4}评估指标}{42}{subsection.8.6.4}%
+\contentsline {section}{\numberline {8.7}案例 3：智能电子琴（音频）}{42}{section.8.7}%
+\contentsline {subsection}{\numberline {8.7.1}流程}{42}{subsection.8.7.1}%
+\contentsline {subsection}{\numberline {8.7.2}优化点}{42}{subsection.8.7.2}%
+\contentsline {subsection}{\numberline {8.7.3}指标}{42}{subsection.8.7.3}%
+\contentsline {section}{\numberline {8.8}结果记录与差异报告}{42}{section.8.8}%
+\contentsline {section}{\numberline {8.9}自动化与复现保障}{43}{section.8.9}%
+\contentsline {section}{\numberline {8.10}指标可视化建议}{43}{section.8.10}%
+\contentsline {section}{\numberline {8.11}通用问题经验库}{43}{section.8.11}%
+\contentsline {section}{\numberline {8.12}扩展方向}{44}{section.8.12}%
+\contentsline {section}{\numberline {8.13}贡献工作流}{44}{section.8.13}%
+\contentsline {section}{\numberline {8.14}章节小结}{44}{section.8.14}%
+\contentsline {section}{\numberline {8.15}实践任务}{44}{section.8.15}%
+\contentsline {chapter}{\numberline {9}附录与工具箱}{45}{chapter.9}%
+\contentsline {section}{\numberline {9.1}章节总览}{45}{section.9.1}%
+\contentsline {section}{\numberline {9.2}常见报错速查}{45}{section.9.2}%
+\contentsline {section}{\numberline {9.3}模型转换参数模板合集}{46}{section.9.3}%
+\contentsline {subsection}{\numberline {9.3.1}分类模型 (ResNet)}{46}{subsection.9.3.1}%
+\contentsline {subsection}{\numberline {9.3.2}YOLO 动态分辨率}{46}{subsection.9.3.2}%
+\contentsline {subsection}{\numberline {9.3.3}INT8 量化（示例）}{46}{subsection.9.3.3}%
+\contentsline {section}{\numberline {9.4}性能与质量 Checklist（执行勾项）}{47}{section.9.4}%
+\contentsline {section}{\numberline {9.5}术语表（扩展）}{47}{section.9.5}%
+\contentsline {section}{\numberline {9.6}推荐资源与外部引用}{48}{section.9.6}%
+\contentsline {section}{\numberline {9.7}贡献指南摘要}{48}{section.9.7}%
+\contentsline {section}{\numberline {9.8}FAQ}{48}{section.9.8}%
+\contentsline {section}{\numberline {9.9}License 与引用}{49}{section.9.9}%
+\contentsline {section}{\numberline {9.10}版本路线回顾}{49}{section.9.10}%
+\contentsline {section}{\numberline {9.11}实践任务}{49}{section.9.11}%
+\contentsline {chapter}{\numberline {10}导读与准备工作}{50}{chapter.10}%
+\contentsline {section}{\numberline {10.1}章节总览}{50}{section.10.1}%
+\contentsline {section}{\numberline {10.2}全书主线结构}{50}{section.10.2}%
+\contentsline {section}{\numberline {10.3}读者路径矩阵}{50}{section.10.3}%
+\contentsline {section}{\numberline {10.4}硬件准备与兼容性}{50}{section.10.4}%
+\contentsline {section}{\numberline {10.5}软件与工具栈细化}{51}{section.10.5}%
+\contentsline {section}{\numberline {10.6}仓库目录与命名约定}{51}{section.10.6}%
+\contentsline {section}{\numberline {10.7}最小可行环境验证 (MVE)}{52}{section.10.7}%
+\contentsline {section}{\numberline {10.8}全局术语与约定}{52}{section.10.8}%
+\contentsline {section}{\numberline {10.9}协作工作流与质量闸门}{52}{section.10.9}%
+\contentsline {section}{\numberline {10.10}学习与实践建议}{53}{section.10.10}%
+\contentsline {section}{\numberline {10.11}常见初学误区与规避}{53}{section.10.11}%
+\contentsline {section}{\numberline {10.12}章节小结}{53}{section.10.12}%
+\contentsline {section}{\numberline {10.13}实践任务}{53}{section.10.13}%
+\contentsline {chapter}{\numberline {11}案例0}{54}{chapter.11}%
+\contentsline {section}{\numberline {11.1}昇腾310B开发板介绍}{54}{section.11.1}%
+\contentsline {subsection}{\numberline {11.1.1}开发板详细视图}{55}{subsection.11.1.1}%
+\contentsline {subsection}{\numberline {11.1.2}开发板硬件规格}{58}{subsection.11.1.2}%
+\contentsline {subsection}{\numberline {11.1.3}所需配件}{58}{subsection.11.1.3}%
+\contentsline {subsection}{\numberline {11.1.4}下载开发板的系统镜像}{68}{subsection.11.1.4}%
+\contentsline {subsubsection}{\nonumberline Ubuntu}{70}{subsubsection*.12}%
+\contentsline {subsubsection}{\nonumberline openEuler}{71}{subsubsection*.14}%
+\contentsline {subsubsection}{\nonumberline 使用md5校验下载的文件}{73}{subsubsection*.16}%
+\contentsline {subsection}{\numberline {11.1.5}刷写系统到TF卡}{75}{subsection.11.1.5}%
+\contentsline {subsubsection}{\nonumberline 下载并安装必要的工具}{75}{subsubsection*.18}%
+\contentsline {subsubsection}{\nonumberline 格式化TF卡}{75}{subsubsection*.20}%
+\contentsline {subsubsection}{\nonumberline 刷写系统到TF卡（以Ubuntu为例）}{78}{subsubsection*.22}%
+\contentsline {subsubsection}{\nonumberline 刷写系统到eMMC}{80}{subsubsection*.24}%
+\contentsline {subsubsection}{\nonumberline 刷写系统到SSD}{81}{subsubsection*.26}%
+\contentsline {subsubsection}{\nonumberline 调整设备启动方式的拨码开关}{81}{subsubsection*.28}%
+\contentsline {subsection}{\numberline {11.1.6}启动开发板（Ubuntu）}{82}{subsection.11.1.6}%
+\contentsline {subsection}{\numberline {11.1.7}WIFI天线安装指南}{86}{subsection.11.1.7}%
+\contentsline {subsection}{\numberline {11.1.8}Ubuntu Xfce桌面使用说明}{87}{subsection.11.1.8}%
+\contentsline {subsubsection}{\nonumberline 板载LED灯}{87}{subsubsection*.30}%
+\contentsline {subsubsection}{\nonumberline 有线网络连接}{88}{subsubsection*.32}%
+\contentsline {subsubsection}{\nonumberline 使用无线网络连接}{88}{subsubsection*.34}%
+\contentsline {subsection}{\numberline {11.1.9}HDMI口使用}{88}{subsection.11.1.9}%
+\contentsline {subsubsection}{\nonumberline 使用HDMI VDP模式}{88}{subsubsection*.36}%
+\contentsline {subsubsection}{\nonumberline 恢复HDMI DRM模式}{89}{subsubsection*.38}%
+\contentsline {subsection}{\numberline {11.1.10}USB摄像头使用}{89}{subsection.11.1.10}%
+\contentsline {subsection}{\numberline {11.1.11}音频使用}{89}{subsection.11.1.11}%
+\contentsline {subsection}{\numberline {11.1.12}GPIO口的引脚顺序}{90}{subsection.11.1.12}%
+\contentsline {subsubsection}{\nonumberline GPIO测试工具}{91}{subsubsection*.40}%
+\contentsline {subsubsection}{\nonumberline SPI测试}{93}{subsubsection*.42}%
+\contentsline {subsubsection}{\nonumberline wiringOP}{93}{subsubsection*.44}%
+\providecommand \tocbasic@end@toc@file {}\tocbasic@end@toc@file 

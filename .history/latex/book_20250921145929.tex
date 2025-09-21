@@ -1,0 +1,74 @@
+% /d:/Github/Ascend310/latex/book.tex
+% KOMA-Script (scrbook) XeLaTeX 模板
+% 正文将从 output/*.tex 自动读取（需要启用 --shell-escape 以生成包含清单）
+% 编译示例（Windows / Linux/macOS 均适用）:
+%   xelatex --shell-escape book.tex
+
+\documentclass[fontsize=12pt,chapterprefix=true,oneside=false]{scrbook}
+
+% 字体与中文支持
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\setmainfont{TeX Gyre Pagella} % 英文字体，可替换
+\setCJKmainfont{SimSun}        % 中文字体，请根据系统修改（如：SimHei/SimSun/Songti SC/思源宋体）
+
+% 页面与超链接
+\usepackage[a4paper,inner=3cm,outer=3cm,top=3cm,bottom=3cm]{geometry}
+\usepackage{microtype}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+
+% 常用宏
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+
+% 自动生成 output/_includes.tex：尝试执行 Linux/macOS bash 命令 与 Windows PowerShell 命令（只要其中一条成功即可）
+% 注意：需要启用 --shell-escape 以允许 TeX 调用外部命令
+\makeatletter
+% 先移除旧文件（避免旧的残留）
+\immediate\write18{\detokenize{rm -f "output/_includes.tex" 2>/dev/null || del "output\\_includes.tex" 2>nul || true}}
+% Linux / macOS (bash)
+\immediate\write18{\detokenize{bash -lc "for f in output/*.tex; do [ -f \"\$f\" ] || continue; printf '\\\\input{%s\\\\n' \"\$f\"; done > output/_includes.tex" 2>/dev/null || true}}
+% Windows PowerShell
+\immediate\write18{\detokenize{powershell -Command "Get-ChildItem -Path output -Filter '*.tex' -File | ForEach-Object { '\\\\input{'+($_.FullName -replace '\\\\','/')+'}' } | Out-File -Encoding utf8 output\\_includes.tex" 2>$null || true}}
+\makeatother
+
+% 如果 output/_includes.tex 不存在，用户可以手动创建或确保 output 目录有 *.tex 文件
+\IfFileExists{output/_includes.tex}{}{
+    \PackageWarning{book}{output/_includes.tex not found; no files will be included. Make sure you ran xelatex with --shell-escape and that output/*.tex exist.}
+}
+
+% 文档信息
+\title{示例书名}
+\author{作者名}
+\date{\today}
+
+\begin{document}
+
+\frontmatter
+\maketitle
+\cleardoublepage
+\tableofcontents
+\cleardoublepage
+
+\mainmatter
+% 正文从 output/*.tex 自动引入（由上面的 shell 命令生成 output/_includes.tex）
+\IfFileExists{output/_includes.tex}{
+    \input{output/_includes.tex}
+}{
+    % 如果没有生成包含文件，可以在这里放置占位内容或提示
+    \chapter{说明}
+    本模板期望将正文文件放到 output/ 目录下，文件名以 .tex 结尾。编译时请启用 shell-escape：
+    
+    xelatex --shell-escape book.tex
+    
+    该运行会自动生成 output/_includes.tex，该文件包含若干 \string\input{output/xxx.tex} 行并被本文件输入。
+}
+
+\backmatter
+\cleardoublepage
+\chapter*{致谢}
+感谢使用本模板。
+
+\end{document}

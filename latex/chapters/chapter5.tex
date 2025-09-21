@@ -1,0 +1,495 @@
+\section{章节总览}\label{ux7ae0ux8282ux603bux89c8}
+
+本章聚焦``定位 → 解释 → 改善''闭环：从性能分析模型、Profiling
+工具、瓶颈模式分类、布局与精度策略、内存与并行调度、到自定义算子开发与验证标准，提供工程可落地方法。目标是让读者具备：A)
+定量证明问题；B) 选择低风险优化策略；C) 保证功能与性能回归一致性。
+
+\section{性能拆解与衡量框架}\label{ux6027ux80fdux62c6ux89e3ux4e0eux8861ux91cfux6846ux67b6}
+
+总时延公式：\passthrough{\lstinline!T\_total = T\_pre + T\_h2d + T\_infer + T\_d2h + T\_post + T\_idle!}。
+吞吐上限受制于 \passthrough{\lstinline!max(T\_component)!}；需收集： -
+平均/分位数 (p50/p95)； - 波动系数 CV=std/mean（\textgreater0.15
+需进一步剖析）； - 稳定性：长跑 1h 是否存在漂移 (内存泄漏或热降频)。
+对比优化前后必须保留固定随机种子和数据集，消除噪声。
+
+\section{Profiling
+工具与时间线解读}\label{profiling-ux5de5ux5177ux4e0eux65f6ux95f4ux7ebfux89e3ux8bfb}
+
+关键观测元素： \textbar{} 轨迹 \textbar{} 意义 \textbar{} 异常信号
+\textbar{} \textbar{} ---- \textbar{} ---- \textbar{} --------
+\textbar{} \textbar{} Stream Timeline \textbar{} 内核调度顺序 \textbar{}
+大量空洞 gap \textbar{} \textbar{} MemCopy \textbar{} H2D/D2H 开销
+\textbar{} 频繁小块拷贝 \textbar{} \textbar{} Task Kernel \textbar{}
+算子执行 \textbar{} 个别算子异常拖长 \textbar{} \textbar{} Sync/Wait
+\textbar{} Host 等待 \textbar{} Wait 占比高 \textbar{}
+
+使用策略： 1. 先全量 Profile → 定位热点范围； 2. 二次局部
+Profile（过滤特定算子类型）； 3. 导出 JSON → 自动解析器归档：算子耗时
+TOPK，Copy 占比，Idle 时间。
+
+\section{瓶颈模式与处置策略矩阵}\label{ux74f6ux9888ux6a21ux5f0fux4e0eux5904ux7f6eux7b56ux7565ux77e9ux9635}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1176}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2353}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2353}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2941}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1176}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+模式
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+识别特征
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+定量指标
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+处置优先级
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+策略
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+调度空洞 & Timeline gap 多 & Idle \textgreater{} 10\% & 高 & 合并小算子
+/ 预加载数据 \\
+访存受限 & 算子耗时与内存带宽正相关 & 算子内核利用率低 & 中 & Layout
+变换 / Tile 分块 \\
+H2D 瓶颈 & MemCopy 比例高 & H2D\textgreater20\% & 高 &
+合并/异步/Pin/AIPP 下沉 \\
+后处理拖慢 & Post\textgreater25\% & NMS/Decode 长 & 中 & 并行化 / Device
+化 \\
+量化退化 & INT8 未获收益 & 时延差\textless10\% & 低 &
+重新校准/混合精度 \\
+单 Stream 阻塞 & 单流串行 & Stream=1 & 中 & 多流/流水线 \\
+\end{longtable}
+
+优先处理``结构性收益''\textgreater``微优化''，避免局部手工 hack
+影响可维护性。
+
+\section{Layout /
+内存访问优化}\label{layout-ux5185ux5b58ux8bbfux95eeux4f18ux5316}
+
+常见格式：NCHW（框架常用）、NHWC（部分算子优化）、NC1HWC0（硬件友好对齐），转换策略：在数据首次落地时转换一次；若前后模型不同布局，以中间标准布局连接，减少重复重排。
+对齐：通道/宽高按 16/32 边界对齐可提升访存一致性；小通道 (\textless16)
+可考虑 \passthrough{\lstinline!--enable\_small\_channel!}
+以加载优化内核。 缓存复用：多模型共享中间 Buffer（需尺寸与 dtype
+一致），通过分配表管理生命周期。
+
+\section{精度与性能的层级折衷}\label{ux7cbeux5ea6ux4e0eux6027ux80fdux7684ux5c42ux7ea7ux6298ux8877}
+
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+精度层级 & 描述 & 性能收益 & 风险 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+FP32 & 基准 & - & 内存带宽/算力高 \\
+FP16 & 半精度 & 1.2\textasciitilde1.6x & 累积误差 \\
+INT8 对称 & 量化整型 & 1.5\textasciitilde2.2x & 量化噪声 \\
+混合精度 & 局部高精度 & 中等 & 实现复杂 \\
+\end{longtable}
+
+量化流程要点： 1. 收集代表性校准集（覆盖光照/尺度/类别分布）； 2.
+校准统计（MinMax / KL）； 3. 评估 Top1/Top5
+差异、关键指标差异（mAP/F1）。 误差定位：Dump 中间张量（FP32 vs INT8）→
+层级误差分布 → 定位失真层（常见：激活饱和/尺度不均衡）。
+
+\section{内存管理专题}\label{ux5185ux5b58ux7ba1ux7406ux4e13ux9898}
+
+策略： 1. 长期 Buffer：模型 I/O、常量 Workspace； 2. 短期 Buffer：Batch
+临时中间； 3. 建立内存池（按 size class 分类
+1KB/4KB/16KB/64KB/大块），分配 → 归还； 4. 避免频繁
+\passthrough{\lstinline!aclrtMalloc/Free!}：使用池化接口封装； 5.
+监控：每 60s 记录一次池使用率与系统剩余内存，突增后回收未引用对象； 6.
+大对象对齐：按 512B/4KB 对齐减少碎片。
+
+\section{并行与流水线}\label{ux5e76ux884cux4e0eux6d41ux6c34ux7ebf}
+
+多 Stream：将独立算子或多模型分离到不同 Stream 并行调度；注意 Host
+侧同步点过多会抵消收益。Pipeline：Pre → Infer → Post 分线程队列，目标是
+In-Flight 帧数达到平衡（过多增加延迟，过少利用率低）。
+自适应调度：定期评估每阶段平均耗时，动态调整线程池大小（PID 控制思想）。
+
+\section{自定义算子开发与评估}\label{ux81eaux5b9aux4e49ux7b97ux5b50ux5f00ux53d1ux4e0eux8bc4ux4f30}
+
+决策条件： \textbar{} 条件 \textbar{} 必须满足至少一项 \textbar{}
+\textbar{} ---- \textbar{} ---------------- \textbar{} \textbar{}
+复合算子频繁出现 \textbar{} 合并降低访存 \textbar{} \textbar{}
+内置实现回退 Host \textbar{} 存在高额拷贝 \textbar{} \textbar{}
+内核模式不适配输入规模 \textbar{} 小尺寸性能差 \textbar{}
+
+流程：需求分析 → JSON 定义(\passthrough{\lstinline!op\_type!}, attr,
+inputs/outputs) → Kernel C++ 模板 (向量化 / Tile) → 编译注册 → ATC 识别
+→ 功能单测（随机张量对比）→ 性能对比（3 次 Warmup + 50 次统计）。
+评估表： \textbar{} 版本 \textbar{} 输入规模 \textbar{} 平均耗时(us)
+\textbar{} P95(us) \textbar{} 访存次数 \textbar{} 速度提升 \textbar{}
+备注 \textbar{} \textbar{} ---- \textbar{} -------- \textbar{}
+----------- \textbar{} ------- \textbar{} -------- \textbar{} --------
+\textbar{} ---- \textbar{}
+
+\section{优化案例：Add + ReLU
+融合}\label{ux4f18ux5316ux6848ux4f8badd-relu-ux878dux5408}
+
+原始：Add → ReLU 两个算子各自读写内存； 融合：单 Kernel 计算
+\passthrough{\lstinline!out = relu(a+b)!}：减少一次读写；
+收益估算：内存带宽主导场景中延迟≈(T\_add + T\_relu - 重叠)，实际提升
+10\textasciitilde25\%。 验证：随机输入 100 次 → 检查数值一致（允许 1e-6
+FP16 差异）→ Benchmark 对比。
+
+\section{性能报告与回归模板}\label{ux6027ux80fdux62a5ux544aux4e0eux56deux5f52ux6a21ux677f}
+
+\begin{lstlisting}
+{
+    "commit": "<git-sha>",
+    "model": "resnet50_fp16",
+    "batch": 1,
+    "avg_latency_ms": 5.87,
+    "p95_latency_ms": 6.24,
+    "throughput_fps": 170.3,
+    "h2d_ms_ratio": 0.11,
+    "post_ms_ratio": 0.05,
+    "memory_peak_mb": 486,
+    "temperature_c_range": "54-58",
+    "profiling_date": "2025-09-04T10:21:00Z"
+}
+\end{lstlisting}
+
+自动化：CI 中若 \passthrough{\lstinline!avg\_latency\_ms!} 高于基线 5\%
+→ 标红注释。
+
+\section{章节小结}\label{ux7ae0ux8282ux5c0fux7ed3}
+
+性能优化不等于盲调：应以数据驱动 +
+分层定位为前提，先解决架构级与内存/拷贝问题，再考虑算子级微调与自定义算子开发。量化收益需伴随精度风险评估，内存与并行策略需要可观测支撑。
+
+\section{实践任务}\label{ux5b9eux8df5ux4efbux52a1}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  对一个部署模型收集 Profiling JSON，输出前 5 算子耗时与占比表。
+\item
+  实现 H2D 合并：将 3 个连续小拷贝合并为单次，比较平均时延改善。
+\item
+  尝试 INT8 量化：输出精度与性能对比（Top1/Latency/FPS）。
+\item
+  编写一个 Add+ReLU 融合算子伪代码 + 预期性能提升估算。
+\item
+  生成基线性能报告，并设定 CI 回归阈值策略文本说明。
+\end{enumerate}
+
+\section{昇腾310B自定义算子开发全流程}\label{ux6607ux817e310bux81eaux5b9aux4e49ux7b97ux5b50ux5f00ux53d1ux5168ux6d41ux7a0b}
+
+本节面向 Ascend 310B
+推理场景，给出``什么时候需要自定义算子、用什么方法开发、如何编译注册、怎样验证与上线''的系统指引。读完后，你应能独立完成一个简单自定义算子的端到端落地。
+
+\subsection{开发概述}\label{ux5f00ux53d1ux6982ux8ff0}
+
+\begin{itemize}
+\tightlist
+\item
+  目标：当模型中存在``内置算子不支持/性能欠佳/需要业务特化融合''的场景，通过自定义算子（Custom
+  Op）补齐功能或获得确定性性能收益。
+\item
+  实现形态：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    AI Core（TBE/TE/TIK，运行于 NPU
+    核心，适合数值密集型向量/矩阵计算）。
+  \item
+    AICPU（C++/CPU 实现，在 Host/AICPU
+    执行，适合控制流或少量数据处理，注意 H2D/D2H 开销）。
+  \end{itemize}
+\item
+  产物：算子描述（op info/proto）、算子实现（AI Core: Python
+  实现并编译为内核；AICPU: C++ so）、注册与打包（放入 OPP 路径），以及
+  ATC 与运行时可识别的元数据。
+\item
+  适配 310B：选择
+  \passthrough{\lstinline!soc\_version=Ascend310B!}，优先 FP16
+  数据通路；对齐 NC1HWC0 等硬件友好布局；小通道/小尺寸注意 tile 策略。
+\end{itemize}
+
+\subsection{开发的理论基础}\label{ux5f00ux53d1ux7684ux7406ux8bbaux57faux7840}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  硬件/内存模型（简要）：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    GM(Global Memory)：大容量全局显存，带宽高、时延高；
+  \item
+    UB(Unified Buffer)：片上高速缓冲，容量有限，需 tile 分块搬运；
+  \item
+    Vector/Scalar 单元：提供 vadd/vmul/vmax
+    等向量指令，需保证数据对齐（通常以 16/32 对齐）。
+  \item
+    DMA：GM 与 UB 之间的数据搬运，批量大块优于频繁小块。
+  \end{itemize}
+\item
+  计算表达与调度：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    TE（Tensor Expression）：描述计算公式与算子图（compute）；
+  \item
+    Schedule：描述分块(tilling)、并行、缓存、向量化等执行计划；
+  \item
+    TIK DSL：更接近硬件指令级的编程接口，适合精细控制。
+  \end{itemize}
+\item
+  算子契约（Operator Contract）：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    输入/输出张量的 shape、dtype、format（如
+    NCHW/NC1HWC0）、属性（attr）；
+  \item
+    广播/对齐规则、边界行为（溢出/饱和/舍入）、精度策略（FP16/FP32
+    混合）。
+  \end{itemize}
+\item
+  形状推断与动态 shape：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    ATC 需要根据 op 描述完成 shape infer；
+  \item
+    动态尺寸需在实现中处理 tile 策略切换并保证 UB 不溢出。
+  \end{itemize}
+\end{enumerate}
+
+\subsection{开发流程（AI Core
+为例）}\label{ux5f00ux53d1ux6d41ux7a0bai-core-ux4e3aux4f8b}
+
+以下流程以一个``Add+ReLU 融合''示例说明，读者可据此扩展到实际业务算子。
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  环境准备
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  确保 CANN/Toolkit 已安装，能使用
+  \passthrough{\lstinline!atc!}、Profiling 等工具；
+\item
+  设置环境变量：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!ASCEND\_INSTALL\_PATH!} 指向 Toolkit 根；
+  \item
+    \passthrough{\lstinline!ASCEND\_OPP\_PATH!} 指向 OPP 包路径（custom
+    算子将被放置于此）；
+  \item
+    \passthrough{\lstinline!soc\_version=Ascend310B!}（ATC/编译时指定）。
+  \end{itemize}
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{1}
+\tightlist
+\item
+  定义算子信息（op info/proto）
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  指定：\passthrough{\lstinline!op\_type!}、inputs/outputs
+  名称、dtype/format 组合、属性列表、融合类型等；
+\item
+  作用：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    供 ATC 做图解析、形状推断与算子选择；
+  \item
+    供运行时校验输入输出与 kernel 适配。
+  \end{itemize}
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{2}
+\tightlist
+\item
+  编写算子实现（TE/TBE）
+\end{enumerate}
+
+\begin{itemize}
+\item
+  计算表达： ```python \# 伪代码：y = relu(x1 + x2) import te.lang.cce
+  as tbe from te import tvm
+
+  def add\_relu\_compute(x1, x2): y = tbe.vadd(x1, x2) z = tbe.vmaxs(y,
+  tvm.const(0.0, x1.dtype)) return z ```
+\item
+  调度策略（示例要点）：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    选择合适的 tile 以满足 UB 容量；
+  \item
+    将连续内存访问向量化，减少非对齐访问；
+  \item
+    尽量合并搬运，减少 GM\textless-\textgreater UB 往返；
+  \item
+    小尺寸场景避免过度拆分导致调度开销占比过高。
+  \end{itemize}
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{3}
+\tightlist
+\item
+  编译与注册
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  使用官方提供的 TBE
+  编译入口生成内核与元数据（具体命令因版本而异，遵循已安装 Toolkit
+  的说明）；
+\item
+  将生成的实现文件/元数据放入
+  \passthrough{\lstinline!ASCEND\_OPP\_PATH!} 下的 custom 目录（如
+  \passthrough{\lstinline!op\_impl/custom/ai\_core/tbe!}、\passthrough{\lstinline!op\_proto/custom!}）。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{4}
+\tightlist
+\item
+  与 ATC 集成
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  在模型转换时指定 \passthrough{\lstinline!--soc\_version=Ascend310B!}；
+\item
+  确保 ATC 能从 \passthrough{\lstinline!ASCEND\_OPP\_PATH!} 读取到你的
+  op 描述与实现信息；
+\item
+  若需要限制实现选择，可使用
+  \passthrough{\lstinline!--op\_select\_implmode!} 配合算子实现指示。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{5}
+\tightlist
+\item
+  运行时部署与加载
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  运行环境中需要包含同样的 OPP 目录（含 custom 实现）；
+\item
+  应用进程启动时配置环境变量，使 Runtime 能定位自定义算子实现；
+\item
+  按常规 ACL 流程加载 OM 并执行推理。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{6}
+\tightlist
+\item
+  验证与度量
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  功能正确性：与参考实现（NumPy/ONNXRuntime）对齐，随机多组张量比较（均值绝对误差、相对误差、边界样本）。
+\item
+  性能评估：Warmup 3 次 + 采样 50 次，输出
+  avg/p95/FPS；对比内置算子或未融合版本；
+\item
+  资源占用：Profiling 检查 MemCopy 占比、Kernel 占比、Idle；
+\item
+  兼容性：不同 shape/dtype/format 组合覆盖测试。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{7}
+\tightlist
+\item
+  文档与产物归档
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  输出
+  \passthrough{\lstinline!op\_contract.yaml!}（IO/Attr/格式/边界规则）；
+\item
+  输出
+  \passthrough{\lstinline!benchmark.json!}（avg/p95、对比基线、硬件/版本信息）；
+\item
+  产物目录：\passthrough{\lstinline!op\_pkg/<op\_type>/<version>/\{op\_proto, op\_impl, tests, docs\}!}。
+\end{itemize}
+
+\subsection{AICPU 路线（可选）}\label{aicpu-ux8defux7ebfux53efux9009}
+
+\begin{itemize}
+\tightlist
+\item
+  适用：控制流、轻量数据处理或暂不需在 NPU 上运行的功能性算子；
+\item
+  实现：C/C++ 编写，遵循 AICPU 接口，注册到相应目录生成动态库；
+\item
+  注意：Host 执行会引入 H2D/D2H；若在性能关键路径，优先 AI Core 版本。
+\end{itemize}
+
+\subsection{常见问题与排错}\label{ux5e38ux89c1ux95eeux9898ux4e0eux6392ux9519}
+
+\begin{itemize}
+\tightlist
+\item
+  ATC 提示 Unsupported Op：检查 op info 是否被正确放置且生效；确认
+  \passthrough{\lstinline!soc\_version!} 与路径；
+\item
+  运行时 Fallback：确认实现 dtype/format 与模型一致；必要时扩充
+  \passthrough{\lstinline!dtype\_format!} 组合；
+\item
+  性能未达预期：增大 tile、减少小块 DMA、合并计算、检查是否出现额外
+  layout 转换；
+\item
+  精度差异：检查饱和/舍入策略、对齐与广播规则、数据范围（FP16 溢出）。
+\end{itemize}
+
+\subsection{本章小结}\label{ux672cux7ae0ux5c0fux7ed3}
+
+自定义算子是 310B
+场景下``功能补齐与性能确定性''的关键手段。核心抓手包括：明确契约（IO/格式/属性）、用
+TE/TIK 描述计算并设计合理调度、放在 OPP 中正确注册、生效于 ATC
+与运行时、用可度量的基线进行功能/性能回归。建议从``融合与复合算子''起步，优先选择计算密集、访存友好的目标，循序渐进积累模板与脚手架，以降低维护成本。

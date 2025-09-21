@@ -1,0 +1,2 @@
+pandoc ../src/book/README.md --top-level-division=chapter --lua-filter=remove-numbering.lua -t latex -o chapters/chapter0.tex
+pandoc ../src/book/chapter1.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex -o chapters/chapter1.tex

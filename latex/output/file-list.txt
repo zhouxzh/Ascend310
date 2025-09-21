@@ -1,9 +1,0 @@
-../src/book/README.md
-../src/book/chapter1.md
-../src/book/chapter2.md
-../src/book/chapter3.md
-../src/book/chapter4.md
-../src/book/chapter5.md
-../src/book/chapter6.md
-../src/book/chapter7.md
-../src/book/chapter8.md

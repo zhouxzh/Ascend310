@@ -1,0 +1,206 @@
+% !TEX program = xelatex
+% 使用 XeLaTeX 编译
+\documentclass[fontsize=12pt, paper=a4, twoside, openright, DIV=calc]{scrbook}
+
+% 基本设置
+\usepackage[UTF8]{ctex} % 中文支持
+\usepackage{fontspec} % 字体设置
+\usepackage{xeCJK} % 中日韩文字支持
+
+% 设置开源中文字体（在 Windows 上常见名称），并提供回退
+\IfFontExistsTF{Source Han Serif SC}{
+  \setCJKmainfont[BoldFont={Source Han Serif SC Bold}]{Source Han Serif SC}
+}{
+  \IfFontExistsTF{Source Han Serif CN}{
+    \setCJKmainfont[BoldFont={Source Han Serif CN Bold}]{Source Han Serif CN}
+  }{
+    % 回退到系统宋体（若未安装思源）
+    \setCJKmainfont{SimSun}
+  }
+}
+
+\IfFontExistsTF{Source Han Sans SC}{
+  \setCJKsansfont[BoldFont={Source Han Sans SC Bold}]{Source Han Sans SC}
+}{
+  \IfFontExistsTF{Source Han Sans CN}{
+    \setCJKsansfont[BoldFont={Source Han Sans CN Bold}]{Source Han Sans CN}
+  }{
+    % 回退到系统黑体
+    \setCJKsansfont{SimHei}
+  }
+}
+
+% 可选：定义 \kai 和 \hei 命令以匹配你文档中的用法
+\IfFontExistsTF{XiaowuWenkai-Regular}{
+  \newCJKfontfamily\kaifont{XiaowuWenkai-Regular}
+  \newcommand{\kai}{\kaifont}
+}{
+  \newCJKfontfamily\kaifont{KaiTi}
+  \newcommand{\kai}{\kaifont}
+}
+\newCJKfontfamily\heifont{SimHei}
+\newcommand{\hei}{\heifont}
+
+% 页面布局和外观设置
+\usepackage[automark,headsepline]{scrlayer-scrpage} % 页眉页脚
+\clearpairofpagestyles
+\ohead{\headmark} % 页眉显示章节名
+\ofoot[\pagemark]{\pagemark} % 页脚显示页码
+
+% 数学相关包
+\usepackage{amsmath, amssymb, amsthm}
+
+% 图形和颜色
+\usepackage{graphicx}
+\usepackage{xcolor}
+\definecolor{mainblue}{RGB}{0, 90, 156}
+
+% 超链接设置
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=mainblue,
+    citecolor=mainblue,
+    urlcolor=mainblue,
+    pdftitle={中文书籍模板},
+    pdfauthor={作者名}
+}
+
+% 定理环境设置
+\newtheoremstyle{break}
+  {\topsep}{\topsep}%
+  {\itshape}{}%
+  {\bfseries}{}%
+  {\newline}{}%
+\theoremstyle{break}
+\newtheorem{theorem}{定理}[chapter]
+\newtheorem{lemma}[theorem]{引理}
+\newtheorem{proposition}[theorem]{命题}
+\newtheorem{corollary}[theorem]{推论}
+\newtheorem{definition}[theorem]{定义}
+\newtheorem{example}[theorem]{例子}
+\newtheorem{remark}[theorem]{注记}
+
+% 文档信息
+\title{中文书籍标题}
+\author{作者姓名}
+\date{\today}
+
+% 文档内容开始
+\begin{document}
+
+% 封面页
+\maketitle
+
+% 前言页
+\frontmatter
+
+% 摘要
+\begin{abstract}
+这是一段中文摘要内容。本文档是一个使用XeLaTeX和KOMA-Script scrbook类制作的中文书籍模板，采用了开源中文字体。模板包含了书籍排版常用的各种元素和设置，适合撰写中文书籍、论文或报告。
+\end{abstract}
+
+% 目录
+\tableofcontents
+
+% 主内容开始
+\mainmatter
+
+% 第一章
+\chapter{引言}
+
+\section{第一节}
+
+这是一段示例文本，使用思源宋体显示。XeLaTeX 结合开源中文字体可以产生高质量的中文排版效果。\textbf{这是粗体文字}，\textit{这是斜体文字}。
+
+{\kai 这是使用霞鹜文楷字体的文本，适合用于强调或特殊内容。}
+
+{\hei 这是使用思源黑体的文本，适合用于标题或强调内容。}
+
+\subsection{小节}
+
+数学公式示例：爱因斯坦的质能方程 $E = mc^2$，以及行内公式 $\int_a^b f(x) dx$。
+
+多行公式示例：
+\begin{equation}
+\frac{\partial u}{\partial t} = \alpha \nabla^2 u
+\end{equation}
+
+\section{第二节}
+
+\subsection{列表环境}
+
+无序列表示例：
+\begin{itemize}
+\item 第一项
+\item 第二项
+\item 第三项
+\end{itemize}
+
+有序列表示例：
+\begin{enumerate}
+\item 第一项
+\item 第二项
+\item 第三项
+\end{enumerate}
+
+\subsection{表格环境}
+
+表格示例：
+\begin{table}[htbp]
+\centering
+\caption{示例表格}
+\begin{tabular}{|c|c|c|}
+\hline
+姓名 & 年龄 & 职业 \\
+\hline
+张三 & 25 & 工程师 \\
+李四 & 30 & 教师 \\
+王五 & 28 & 医生 \\
+\hline
+\end{tabular}
+\end{table}
+
+% 第二章
+\chapter{主要内容}
+
+\section{定理环境示例}
+
+\begin{definition}[可微函数]
+设函数 $f: U \subseteq \mathbb{R}^n \to \mathbb{R}$，如果存在线性映射 $A: \mathbb{R}^n \to \mathbb{R}$ 使得
+\[
+f(x + h) = f(x) + A(h) + o(\|h\|)
+\]
+则称 $f$ 在点 $x$ 处可微。
+\end{definition}
+
+\begin{theorem}[中值定理]
+如果函数 $f(x)$ 在闭区间 $[a, b]$ 上连续，在开区间 $(a, b)$ 内可导，则存在一点 $c \in (a, b)$ 使得
+\[
+f'(c) = \frac{f(b) - f(a)}{b - a}
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+这是定理的证明过程。可以使用罗尔定理来证明中值定理。
+\end{proof}
+
+\begin{example}
+这是一个例子环境，用于展示示例内容。
+\end{example}
+
+% 参考文献
+\backmatter
+\chapter{参考文献}
+
+\nocite{*} % 显示所有参考文献，即使未被引用
+\bibliographystyle{plain} % 参考文献样式
+\bibliography{references} % 参考文献数据库
+
+% 附录
+\appendix
+\chapter{附录标题}
+
+这里是附录内容。
+
+\end{document}

@@ -1,0 +1,293 @@
+\section{章节总览}\label{ux7ae0ux8282ux603bux89c8}
+
+本章通过九个真实应用场景串联前面章节的知识：模型选择、转换、部署、性能与稳定性验证、迭代优化。所有案例采用统一模板，支持快速复制与对比评估。强调``结构化指标
++ 自动化脚本 + 可视化反馈''。
+
+\section{案例统一模板（标准化规范）}\label{ux6848ux4f8bux7edfux4e00ux6a21ux677fux6807ux51c6ux5316ux89c4ux8303}
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+区块 & 内容要点 & 产出文件 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+场景描述 & 背景/输入/目标 & README.md\#scene \\
+指标目标 & 延迟/FPS/精度/资源 & requirement.yaml \\
+模型选择 & 候选对比 + 取舍 & model\_card*.md \\
+数据准备 & 采集/标注/增强 & data\_prep.md \\
+转换部署 & 导出→ATC 参数 & atc.sh / export.py \\
+运行脚本 & 启动/参数/日志路径 & run.sh / run.ps1 \\
+性能结果 & metrics.json (基线/优化) & metrics/*.json \\
+质量验证 & 精度/漂移检查 & accuracy.json \\
+风险改进 & 已知问题/迭代计划 & roadmap.md \\
+\end{longtable}
+
+\section{案例目录结构规范}\label{ux6848ux4f8bux76eeux5f55ux7ed3ux6784ux89c4ux8303}
+
+\begin{lstlisting}
+experiments/caseX/
+  README.md
+  requirement.yaml
+  models/         # onnx / om / signatures
+  scripts/
+    export.py
+    atc.sh
+    run_infer.py
+    benchmark.py
+  data/           # 样本(或下载指令)
+  metrics/
+    baseline.json
+    optimized.json
+  logs/
+  eval/
+    accuracy.json
+    drift.json
+  assets/         # 截图/示意图
+\end{lstlisting}
+
+\section{例概览与重点}\label{ux4f8bux6982ux89c8ux4e0eux91cdux70b9}
+
+\begin{longtable}[]{@{}lllll@{}}
+\toprule\noalign{}
+序 & 名称 & 关键技术点 & 指标核心 & 风险要素 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+1 & 人脸打卡机 & 人脸检测+比对+活体 & 识别成功率/伪拒率 & 光照/遮挡 \\
+2 & 实时跟踪 & 检测+多目标关联 & 跟踪稳定度(IDF1) & 遮挡/抖动 \\
+3 & 智能电子琴 & 音频节拍识别+分类 & 识别延迟/准确率 & 噪声/延迟 \\
+4 & 掌纹识别 & ROI 提取+特征匹配 & 误识率/拒识率 & 采集姿态 \\
+5 & 数据采集仪 & 传感融合+缓存上传 & 数据丢失率 & 网络波动 \\
+6 & 智能小车 & 目标检测+路径策略 & 决策延迟 & 传感器同步 \\
+7 & 智能相册 & 分类+聚类+去重 & 聚类纯度 & 相似干扰 \\
+8 & 手势识别 & 时序建模(TSM) & 手势准确率/FPS & 动作模糊 \\
+9 & 聊天机器人 & NLP 推理+缓存 & 响应时延/意图准确 & 语料漂移 \\
+\end{longtable}
+
+下列示例详细展开前三个具代表性的模式。
+
+\section{案例
+1：人脸打卡机}\label{ux6848ux4f8b-1ux4ebaux8138ux6253ux5361ux673a}
+
+\subsection{场景}\label{ux573aux666f}
+
+摄像头实时输入，人脸检测→关键点对齐→特征提取→特征库比对→授权决策→事件上报。
+
+\subsection{指标}\label{ux6307ux6807}
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+指标 & 目标 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+平均识别时延 & \textless{} 120ms & 从帧采集到结果 \\
+最大 P95 & \textless{} 150ms & 抖动控制 \\
+误识率(FAR) & \textless{} 0.001 & 安全性 \\
+拒识率(FRR) & \textless{} 0.02 & 体验 \\
+\end{longtable}
+
+\subsection{模型链路}\label{ux6a21ux578bux94feux8def}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  人脸检测 (RetinaFace)；
+\item
+  5 点关键点仿射对齐；
+\item
+  ArcFace 特征 512D；
+\item
+  向量归一化 + 余弦相似度；
+\item
+  阈值自适应（基于滑动窗口均值校正）。
+\end{enumerate}
+
+\subsection{性能优化}\label{ux6027ux80fdux4f18ux5316}
+
+\begin{itemize}
+\tightlist
+\item
+  批量特征比对：向量库转矩阵，使用 SIMD/BLAS；
+\item
+  缓存：最近识别通过用户特征缓存，减少重复比对；
+\item
+  光照增强：低光阈值触发 Gamma/直方图均衡。
+\end{itemize}
+
+\subsection{metrics 示例}\label{metrics-ux793aux4f8b}
+
+\begin{lstlisting}
+{
+  "avg_latency_ms": 98.4,
+  "p95_latency_ms": 121.3,
+  "fps": 10.1,
+  "face_detect_ms": 42.1,
+  "feature_ms": 18.7,
+  "match_ms": 5.2,
+  "false_accept_rate": 0.0008,
+  "false_reject_rate": 0.017
+}
+\end{lstlisting}
+
+\section{案例 2：实时跟踪（检测 +
+关联）}\label{ux6848ux4f8b-2ux5b9eux65f6ux8ddfux8e2aux68c0ux6d4b-ux5173ux8054}
+
+\subsection{流程}\label{ux6d41ux7a0b}
+
+帧采集 → 目标检测 → 外观特征提取 → 卡尔曼预测 → 匈牙利匹配 → 轨迹输出。
+
+\subsection{难点}\label{ux96beux70b9}
+
+遮挡/丢失：轨迹生命周期管理（状态：Tentative → Confirmed → Lost →
+Removed）。
+
+\subsection{优化}\label{ux4f18ux5316}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  检测降频：每 N 帧做一次全检测，中间帧仅跟踪预测；
+\item
+  多线程：检测与跟踪解耦；
+\item
+  ReID 模型轻量化（裁剪通道）。
+\end{enumerate}
+
+\subsection{评估指标}\label{ux8bc4ux4f30ux6307ux6807}
+
+IDF1、MOTA、FP/FN、IDSW（身份切换）。
+
+\section{案例
+3：智能电子琴（音频）}\label{ux6848ux4f8b-3ux667aux80fdux7535ux5b50ux7434ux97f3ux9891}
+
+\subsection{流程}\label{ux6d41ux7a0b-1}
+
+音频采集 16kHz → 窗口分帧 FFT → 频谱/梅尔特征 → 分类模型（音符/节奏）→
+校准节拍输出。
+
+\subsection{优化点}\label{ux4f18ux5316ux70b9}
+
+FFT
+批处理使用向量库；低延迟滑动窗口；模型输出置信度平滑（指数滑动平均）。
+
+\subsection{指标}\label{ux6307ux6807-1}
+
+节拍延迟 \textless{} 80ms；识别准确率 \textgreater{} 95\%。
+
+\section{结果记录与差异报告}\label{ux7ed3ux679cux8bb0ux5f55ux4e0eux5deeux5f02ux62a5ux544a}
+
+基线与优化版本差异自动生成：
+
+\begin{longtable}[]{@{}lllll@{}}
+\toprule\noalign{}
+指标 & baseline & optimized & 差异 & 状态 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+avg\_latency\_ms & 112.5 & 98.4 & -12.5\% & ✅ \\
+p95\_latency\_ms & 140.3 & 121.3 & -13.5\% & ✅ \\
+false\_accept\_rate & 0.0012 & 0.0008 & 改善 & ✅ \\
+\end{longtable}
+
+\section{自动化与复现保障}\label{ux81eaux52a8ux5316ux4e0eux590dux73b0ux4fddux969c}
+
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+机制 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Hash 校验 & onnx/om/脚本确保未篡改 \\
+repeatable seed & 设定随机种子统一实验 \\
+benchmark.py & 统一输出 metrics.json \\
+drift 检测 & 周期性对比指标偏差 \\
+一键脚本 & run.sh + run.ps1 支持跨平台 \\
+\end{longtable}
+
+\section{指标可视化建议}\label{ux6307ux6807ux53efux89c6ux5316ux5efaux8bae}
+
+\begin{itemize}
+\tightlist
+\item
+  时间序列：Latency / FPS / 温度。
+\item
+  箱线图：不同优化阶段的时延分布。
+\item
+  堆叠条：阶段占比（检测/特征/比对）。
+\item
+  散点：光照水平 vs 识别准确度。
+\end{itemize}
+
+\section{通用问题经验库}\label{ux901aux7528ux95eeux9898ux7ecfux9a8cux5e93}
+
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+问题 & 案例 & 根因 & 处理 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+相机丢帧 & 1/2 & 帧率不稳 & 缓冲+限速 \\
+模型加载慢 & 全部 & 冷启动未预热 & 预加载预热10次 \\
+OCR 错字 & 新增 & 图像模糊 & 降噪/锐化 \\
+跟踪漂移 & 2 & 过度遮挡 & reinit + 短期外观缓存 \\
+\end{longtable}
+
+\section{扩展方向}\label{ux6269ux5c55ux65b9ux5411}
+
+\begin{itemize}
+\tightlist
+\item
+  多模态融合（视觉+语音指令）。
+\item
+  硬件加速协同（NPU + DSP 解码）。
+\item
+  大模型边缘裁剪（蒸馏 + 量化 + 分层推理）。
+\end{itemize}
+
+\section{贡献工作流}\label{ux8d21ux732eux5de5ux4f5cux6d41}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Fork → 分支：\passthrough{\lstinline!case/<name>!}；
+\item
+  新建目录遵循模板；
+\item
+  提交包含：README、metrics、脚本、model\_card；
+\item
+  CI 自动校验格式与 hash；
+\item
+  PR 模板填写：动机/数据/指标/风险。
+\end{enumerate}
+
+\section{章节小结}\label{ux7ae0ux8282ux5c0fux7ed3}
+
+案例是知识的验证与反哺：通过统一模板与自动化度量，形成可延展的案例库，帮助新模型与新任务快速落地并保障质量。
+
+\section{实践任务}\label{ux5b9eux8df5ux4efbux52a1}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  搭建 case1 目录，生成 baseline metrics。
+\item
+  实现 face detection + feature 比对流程，并输出 FAR/FRR。
+\item
+  将一次优化（裁剪/量化）前后差异写入 diff 表。
+\item
+  编写 benchmark.py：支持
+  \passthrough{\lstinline!--repeat N --output metrics.json!}。
+\item
+  增加 drift 检测脚本（比较两次 metrics 差异，阈值报警）。
+\end{enumerate}

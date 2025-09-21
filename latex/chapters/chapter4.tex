@@ -1,0 +1,191 @@
+\section{章节总览}\label{ux7ae0ux8282ux603bux89c8}
+
+本章以``统一流程 → 四类典型任务（分类/检测/OCR/NLP）→ 多模型 Pipeline →
+工程化目录与脚本 → 性能基线采集 →
+问题诊断''逻辑展开，强调``可复现、可量化、可演进''的部署范式。所有示例策略均可推广到后续复杂场景（多输入、多分辨率、流式/批式混合）。
+
+\section{统一部署工作流与契约化}\label{ux7edfux4e00ux90e8ux7f72ux5de5ux4f5cux6d41ux4e0eux5951ux7ea6ux5316}
+
+标准六步：模型选择 → 框架导出 ONNX → ATC 转换（参数冻结）→
+推理引擎封装（I/O 契约）→ 运行形态编排 → 验证（精度 + 性能）。
+核心产物： \textbar{} 文件 \textbar{} 作用 \textbar{} \textbar{} ----
+\textbar{} ---- \textbar{} \textbar{} export.py \textbar{} 导出 \& 简化
+ONNX \textbar{} \textbar{} atc.sh \textbar{} 标准化转换命令 \textbar{}
+\textbar{} config.yaml \textbar{} 输入/归一化/颜色/阈值 \textbar{}
+\textbar{} signature.json \textbar{} 模型输入输出字段与 dtype \textbar{}
+\textbar{} metrics.json \textbar{} 性能统计（avg/p95/memory） \textbar{}
+
+输入预处理必须模块化，业务层仅提供原始图像对象；可在 AIPP
+中下沉部分（色彩空间、均值/方差），减少 Host 侧拷贝和转换。
+
+\section{图像分类：ResNet /
+MobileNet}\label{ux56feux50cfux5206ux7c7bresnet-mobilenet}
+
+\subsection{模型导出}\label{ux6a21ux578bux5bfcux51fa}
+
+PyTorch →
+ONNX：\passthrough{\lstinline!torch.onnx.export(model, dummy, opset\_version=13, dynamic\_axes=None)!}；确保去掉训练专属层（Dropout,
+BN 置 eval）。 \#\#\# 预处理一致性 1. Resize: 保持短边 256 → CenterCrop
+224。 2. Normalize: mean/std 与训练保持一致。 3. Layout:
+NCHW；若原始图像为 HWC(RGB) → 转 BGR/或保持一致并在 config 标记。 \#\#\#
+转换要点
+\passthrough{\lstinline!--precision\_mode=allow\_fp32\_to\_fp16!}；若需
+INT8：先做离线标定导出校准表，再加量化参数。 \#\#\# 推理后处理 Softmax →
+ArgTopK → LabelMap。为避免数值不稳定：FP16 logits 可先转 FP32 再
+softmax。 \#\#\# 性能采集 Warmup 5 次，采集 100 次：记录 avg, p50, p95,
+max；统计预处理耗时占比：\passthrough{\lstinline!pre\_ms / total\_ms!}，超过
+25\% 提示 AIPP 下沉或批处理优化。
+
+\section{目标检测：YOLO /
+FasterRCNN}\label{ux76eeux6807ux68c0ux6d4byolo-fasterrcnn}
+
+\subsection{输入尺寸与
+Letterbox}\label{ux8f93ux5165ux5c3aux5bf8ux4e0e-letterbox}
+
+Letterbox 使图像等比例缩放 +
+填充，保持方形输入。部署需重现训练阶段相同逻辑，否则框坐标偏移。保存
+\passthrough{\lstinline!scale!} 与 \passthrough{\lstinline!pad!}
+用于反算原始坐标。 \#\#\# 多输出解析 YOLOv5s OM
+输出通常包含一个或多个特征拼接张量：\passthrough{\lstinline!(num\_boxes, attributes)!}；后处理：过滤
+conf \textgreater{} 阈值 → 按类合并 → NMS。 \#\#\# NMS 实现决策
+\textbar{} 方案 \textbar{} 优点 \textbar{} 缺点 \textbar{} \textbar{}
+---- \textbar{} ---- \textbar{} ---- \textbar{} \textbar{} CPU Python
+\textbar{} 简单 \textbar{} 高开销，多框场景慢 \textbar{} \textbar{} CPU
+C++ SIMD \textbar{} 中等复杂 \textbar{} 仍需 D2H 拷贝 \textbar{}
+\textbar{} Device Kernel \textbar{} 减少拷贝 \textbar{} 实现复杂
+\textbar{} 先评估 D2H + CPU NMS 占比，\textgreater15\% 再考虑下沉。
+\#\#\# 动态尺度支持 转换阶段可生成多尺度 OM 或使用动态
+shape；推荐：统计输入分辨率 → 选择 3 桶（640/704/768）提升命中率。
+
+\section{OCR：文本检测 + 识别
+Pipeline}\label{ocrux6587ux672cux68c0ux6d4b-ux8bc6ux522b-pipeline}
+
+\subsection{结构}\label{ux7ed3ux6784}
+
+检测模型（DB） → 文本框多边形 → 透视裁剪 → 识别模型（CRNN / SVTR）。
+\#\#\# 难点与策略 \textbar{} 环节 \textbar{} 风险 \textbar{} 对策
+\textbar{} \textbar{} ---- \textbar{} ---- \textbar{} ---- \textbar{}
+\textbar{} 多边形裁剪 \textbar{} 仿射失真 \textbar{} 统一仿射矩阵 +
+padding \textbar{} \textbar{} 长短文本差异 \textbar{} 序列长度不均
+\textbar{} 动态 Batch 分组（长度分桶） \textbar{} \textbar{} 识别延迟
+\textbar{} 串行处理 \textbar{} 检测与上一批识别并行 \textbar{}
+\textbar{} 字典映射 \textbar{} 乱码/对齐 \textbar{} 固定 vocab + 版本号
+\textbar{} \#\#\# CTC 解码 贪心：移除重复与 blank；大规模需 Beam
+Search（权衡性能）。
+
+\section{NLP：BERT 推理优化}\label{nlpbert-ux63a8ux7406ux4f18ux5316}
+
+\subsection{序列长度策略}\label{ux5e8fux5217ux957fux5ea6ux7b56ux7565}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  静态最大长度（简单，浪费算力）。
+\item
+  Bucketing：按输入长短分类（32/64/128/256），多 OM。
+\item
+  动态 shape：需评估内存分配抖动；提前预热各常见长度。 \#\#\# FP16
+  注意点 LayerNorm/Softmax 数值范围敏感；若发现精度下降：保持部分算子
+  FP32（通过混合精度策略或模型修改）。 \#\#\# 性能指标
+  tokens/s、avg\_latency\_ms（batch=1 与
+  batch\textgreater1）、内存占用；观察自注意力占比，必要时进行剪枝（去除冗余
+  head）或蒸馏。
+\end{enumerate}
+
+\section{多模型 Pipeline
+串联}\label{ux591aux6a21ux578b-pipeline-ux4e32ux8054}
+
+案例：检测 → 裁剪 → 分类。 \textbar{} Stage \textbar{} 输入/输出
+\textbar{} 并行策略 \textbar{} 指标采集 \textbar{} \textbar{} -----
+\textbar{} -------- \textbar{} -------- \textbar{} -------- \textbar{}
+\textbar{} Detector \textbar{} 原始帧 → 框 \textbar{} 批处理+单模型
+\textbar{} 时延/框数 \textbar{} \textbar{} Cropper \textbar{} 帧+框 →
+Patch 列表 \textbar{} 多线程 CPU \textbar{} 单 Patch 平均耗时 \textbar{}
+\textbar{} Classifier \textbar{} Patch → TopK 类别 \textbar{} 合批
+(N≤32) \textbar{} FPS/准确率 \textbar{} \#\#\# 优化要点 1. Buffer
+池：重用图像与 Patch 内存，避免频繁 malloc。 2. 批量裁剪：收集一定数量
+Patch 再统一预处理。 3. 超时控制：某帧超过阈值后续结果丢弃，保持实时性。
+4. 滑窗统计：最近 60s FPS、平均队列深度。
+
+\section{工程目录与脚本标准}\label{ux5de5ux7a0bux76eeux5f55ux4e0eux811aux672cux6807ux51c6}
+
+\begin{lstlisting}
+deploy/
+  classify/
+    export.py
+    atc.sh
+    config.yaml
+  detect/
+    export.py
+    atc.sh
+  ocr/
+    export_det.py
+    export_rec.py
+    atc_det.sh
+    atc_rec.sh
+runtime/
+  core/acl_session.cpp
+  preprocess/
+  postprocess/
+  pipelines/
+tests/
+  data/
+  benchmark/
+docs/
+  model_cards/
+\end{lstlisting}
+
+版本归档要求： \textbar{} 产物 \textbar{} 检查点 \textbar{} \textbar{}
+---- \textbar{} ------- \textbar{} \textbar{} *.om \textbar{} 与 atc.log
+hash 对应 \textbar{} \textbar{} signature.json \textbar{}
+与运行时动态查询一致 \textbar{} \textbar{} metrics.json \textbar{}
+包含时间戳/commit\_sha \textbar{} \textbar{} model\_card.md \textbar{}
+模型来源/License/精度 \textbar{}
+
+\section{性能基线方法与统计置信}\label{ux6027ux80fdux57faux7ebfux65b9ux6cd5ux4e0eux7edfux8ba1ux7f6eux4fe1}
+
+推荐： 1. Warmup 5\textasciitilde10 次； 2. 收集 ≥200 次稳定样本； 3.
+计算 avg, p50, p95, p99； 4.
+计算置信区间：\passthrough{\lstinline!mean ± 1.96 * (std/sqrt(n))!}； 5.
+记录环境：芯片序列号/温度区间/电源模式/版本矩阵。 差异判定：新版本 avg
+降低 \textgreater5\% 或 p95 上升 \textgreater8\% 触发报警分析。
+
+\section{常见问题诊断深度版}\label{ux5e38ux89c1ux95eeux9898ux8bcaux65adux6df1ux5ea6ux7248}
+
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+问题 & 表现 & 诊断步骤 & 修复 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+输出全 0 & logits 恒定 & Dump 中间 tensor & 校验预处理/权重损坏 \\
+检测框偏移 & 坐标不准 & 可视化缩放/Pad 参数 & 修正 letterbox 逆变换 \\
+OCR 乱码 & 字符错位 & 对比 index→char 映射 & 统一 vocab \& 排序 \\
+BERT 性能差 & tokens/s 低 & 分析长度分布 & 分桶/裁剪长度 \\
+Pipeline 堵塞 & 帧延迟增长 & 监控队列深度 & 降帧/扩线程池 \\
+内存持续上涨 & long run OOM & 内存快照/工具 & 释放缓存/池化 \\
+\end{longtable}
+
+\section{章节小结}\label{ux7ae0ux8282ux5c0fux7ed3}
+
+本章提供四类典型任务部署详解，并抽象了跨任务可复用的脚手架与性能度量方法。重点在于``输入契约统一''、``阶段解耦''、``可观察性内建''。掌握后可进入性能与算子优化专题。
+
+\section{实践任务}\label{ux5b9eux8df5ux4efbux52a1}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  部署 ResNet50：输出 Top5 及概率、提交 metrics.json。
+\item
+  部署 YOLOv5s：5 张测试图片生成可视化结果（描述框坐标与类别统计）。
+\item
+  构建 OCR 双模型流水线：统计单帧平均文本块数 + 平均识别耗时。
+\item
+  BERT：对 3 组长度(32/64/128) 测 tokens/s 与时延差异，生成对比表。
+\item
+  Pipeline 检测→分类：实现批裁剪 + Buffer
+  池，比较优化前后平均时延下降百分比。
+\end{enumerate}

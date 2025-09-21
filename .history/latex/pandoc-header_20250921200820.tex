@@ -1,0 +1,9 @@
+% 为 Pandoc 片段提供安全的宏定义，避免 Undefined control sequence
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{textcomp}
+
+% 保证只有在未定义时才提供，避免覆盖模板已有定义
+\providecommand{\passthrough}[1]{#1}
+\providecommand{\pandocbounded}[1]{#1}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
