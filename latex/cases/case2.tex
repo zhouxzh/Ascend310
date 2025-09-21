@@ -1,0 +1,332 @@
+\chapter{案例2：边缘端实时目标跟踪}\label{ux6848ux4f8b2ux8fb9ux7f18ux7aefux5b9eux65f6ux76eeux6807ux8ddfux8e2a}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\section{项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+
+本项目展示如何在昇腾310B上部署一个高效的实时目标跟踪系统。系统能够在视频流中自动检测并持续跟踪指定目标（如人员、车辆、特定物体等），即使目标发生遮挡、形变或快速移动，也能保持稳定的跟踪效果。
+
+该项目结合了深度学习目标检测和传统跟踪算法的优势，在保证跟踪精度的同时，实现了边缘设备上的实时推理，为安防监控、智能交通、机器人导航等应用场景提供了技术基础。
+
+\section{内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
+
+\subsection{硬件准备}\label{ux786cux4ef6ux51c6ux5907}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{核心计算单元}: 昇腾310B开发者套件
+\item
+  \textbf{图像采集}: 高清USB摄像头或IP摄像头
+\item
+  \textbf{显示设备}: HDMI显示器，用于实时查看跟踪效果
+\item
+  \textbf{存储设备}: 高速SD卡或USB存储设备，用于保存跟踪视频
+\item
+  \textbf{网络设备 (可选)}: 以太网连接，用于远程监控
+\item
+  \textbf{电源}: 稳定的电源供应
+\end{itemize}
+
+\emph{硬件连接示意图}
+
+\begin{lstlisting}
+昇腾310B ── USB摄像头
+    │
+    ├── HDMI显示器
+    ├── 网络连接
+    └── 电源适配器
+\end{lstlisting}
+
+\subsection{软件环境}\label{ux8f6fux4ef6ux73afux5883}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{操作系统}: Ubuntu 20.04 LTS
+\item
+  \textbf{CANN版本}: 7.0.RC1 或更高
+\item
+  \textbf{Python版本}: 3.8.10
+\item
+  \textbf{核心依赖库}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!opencv-python!}: 图像处理和视频读取
+  \item
+    \passthrough{\lstinline!numpy!}: 数值计算
+  \item
+    \passthrough{\lstinline!torch!}: 深度学习框架
+  \item
+    \passthrough{\lstinline!torchvision!}: 计算机视觉工具
+  \item
+    \passthrough{\lstinline!pillow!}: 图像处理
+  \item
+    \passthrough{\lstinline!matplotlib!}: 数据可视化
+  \end{itemize}
+\end{itemize}
+
+\emph{环境安装脚本 (\passthrough{\lstinline!setup\_env.sh!})}
+
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+# 更新系统
+sudo apt update && sudo apt upgrade -y
+
+# 安装Python依赖
+pip3 install opencv-python numpy torch torchvision pillow matplotlib
+
+# 安装CANN开发套件
+# (此处应包含具体的CANN安装步骤)
+
+echo "环境安装完成!"
+\end{lstlisting}
+
+\subsection{数据集准备}\label{ux6570ux636eux96c6ux51c6ux5907}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{目标检测数据集}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{COCO数据集}: 用于预训练目标检测模型
+  \item
+    \textbf{自定义数据集}: 根据具体应用场景收集的目标图像
+  \end{itemize}
+\item
+  \textbf{跟踪数据集}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{MOT Challenge}: 多目标跟踪基准数据集
+  \item
+    \textbf{LaSOT}: 大规模单目标跟踪数据集
+  \item
+    \textbf{自建跟踪序列}: 针对特定场景的视频序列
+  \end{itemize}
+\item
+  \textbf{数据预处理 (\passthrough{\lstinline!preprocess\_data.py!})}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    视频帧提取
+  \item
+    目标标注格式转换
+  \item
+    数据增强（翻转、缩放、亮度调整）
+  \item
+    训练/验证集划分
+  \end{itemize}
+\end{itemize}
+
+\subsection{模型训练与选择}\label{ux6a21ux578bux8badux7ec3ux4e0eux9009ux62e9}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{目标检测模型}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{YOLOv8}: 最新的YOLO系列，速度和精度平衡
+  \item
+    \textbf{SSD MobileNet}: 轻量级检测模型，适合边缘设备
+  \item
+    \textbf{RetinaNet}: 单阶段检测器，处理小目标效果好
+  \end{itemize}
+\item
+  \textbf{跟踪算法选择}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{DeepSORT}: 结合外观特征的多目标跟踪
+  \item
+    \textbf{ByteTrack}: 基于简单关联的高性能跟踪算法
+  \item
+    \textbf{FairMOT}: 端到端的检测与跟踪联合训练
+  \end{itemize}
+\item
+  \textbf{训练流程}:
+
+  \begin{enumerate}
+  \def\labelenumi{\arabic{enumi}.}
+  \tightlist
+  \item
+    使用预训练检测模型作为backbone
+  \item
+    在自定义数据集上fine-tune
+  \item
+    集成跟踪算法
+  \item
+    端到端优化跟踪性能
+  \end{enumerate}
+\end{itemize}
+
+\subsection{模型部署}\label{ux6a21ux578bux90e8ux7f72}
+
+\begin{itemize}
+\item
+  \textbf{模型转换流程}: ```bash \# 1. PyTorch模型转ONNX python3
+  convert\_to\_onnx.py --model yolov8s.pt --output yolov8s.onnx
+
+  \# 2. ONNX转昇腾.om格式 atc --model=yolov8s.onnx --framework=5
+  --output=yolov8s\\
+  --input\_format=NCHW --input\_shape=``images:1,3,640,640''\\
+  --soc\_version=Ascend310B1 ```
+\item
+  \textbf{实时跟踪主程序 (\passthrough{\lstinline!tracking\_app.py!})}:
+  ```python \# 核心流程示例
+
+  \begin{enumerate}
+  \def\labelenumi{\arabic{enumi}.}
+  \tightlist
+  \item
+    初始化昇腾推理引擎
+  \item
+    加载检测和跟踪模型
+  \item
+    打开视频流
+  \item
+    循环处理每一帧:
+
+    \begin{itemize}
+    \tightlist
+    \item
+      目标检测
+    \item
+      跟踪算法更新
+    \item
+      绘制跟踪轨迹
+    \item
+      显示结果
+    \end{itemize}
+  \item
+    保存跟踪结果 ```
+  \end{enumerate}
+\end{itemize}
+
+\subsection{3D打印结构件}\label{dux6253ux5370ux7ed3ux6784ux4ef6}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{摄像头云台 (\passthrough{\lstinline!camera\_gimbal.stl!})}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    支持水平360°、垂直±45°旋转
+  \item
+    可配合步进电机实现自动跟踪
+  \end{itemize}
+\item
+  \textbf{设备保护外壳
+  (\passthrough{\lstinline!protective\_case.stl!})}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    防尘防水设计
+  \item
+    散热孔布局优化
+  \end{itemize}
+\item
+  \textbf{安装支架 (\passthrough{\lstinline!mounting\_bracket.stl!})}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    适配标准三脚架接口
+  \item
+    多角度调节机构
+  \end{itemize}
+\end{itemize}
+
+\emph{3D打印参数建议}: - \textbf{材料}: PETG (强度高，耐温性好) -
+\textbf{层高}: 0.15mm (保证精度) - \textbf{填充率}: 30\%
+(强度与重量平衡)
+
+\subsection{用户手册}\label{ux7528ux6237ux624bux518c}
+
+\subsubsection{快速开始}\label{ux5febux901fux5f00ux59cb}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{硬件连接}: 按照连接图组装硬件
+\item
+  \textbf{环境配置}: 运行 \passthrough{\lstinline!setup\_env.sh!}
+  安装依赖
+\item
+  \textbf{模型下载}: 下载预训练模型文件
+\item
+  \textbf{启动跟踪}:
+  \passthrough{\lstinline!python3 tracking\_app.py --source 0!}
+\end{enumerate}
+
+\subsubsection{高级配置}\label{ux9ad8ux7ea7ux914dux7f6e}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{跟踪参数调优}: 修改 \passthrough{\lstinline!config.yaml!}
+  中的跟踪阈值
+\item
+  \textbf{多目标跟踪}: 启用 \passthrough{\lstinline!--multi-target!}
+  参数
+\item
+  \textbf{结果保存}: 使用 \passthrough{\lstinline!--save-video!}
+  保存跟踪视频
+\end{itemize}
+
+\subsubsection{性能优化}\label{ux6027ux80fdux4f18ux5316}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{推理加速}: 启用混合精度推理
+\item
+  \textbf{内存优化}: 调整批处理大小
+\item
+  \textbf{延迟优化}: 减少后处理步骤
+\end{itemize}
+
+\section{源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
+
+\begin{lstlisting}
+tracking_project/
+├── models/
+│   ├── detection/      # 检测模型
+│   ├── tracking/       # 跟踪算法
+│   └── utils/         # 工具函数
+├── data/
+│   ├── datasets/      # 训练数据
+│   └── pretrained/    # 预训练模型
+├── configs/           # 配置文件
+├── scripts/           # 训练和转换脚本
+└── demo/             # 演示程序
+\end{lstlisting}
+
+\section{效果演示}\label{ux6548ux679cux6f14ux793a}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{单目标跟踪}: 视频中展示对人员的持续跟踪
+\item
+  \textbf{多目标跟踪}: 同时跟踪多个车辆或行人
+\item
+  \textbf{遮挡处理}: 目标被遮挡后重新出现的跟踪恢复
+\item
+  \textbf{实时性能}: FPS指标和延迟统计
+\end{itemize}

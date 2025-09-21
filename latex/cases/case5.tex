@@ -1,0 +1,599 @@
+\chapter{案例5：智能数据采集仪}\label{ux6848ux4f8b5ux667aux80fdux6570ux636eux91c7ux96c6ux4eea}
+
+\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+
+本项目基于昇腾310B平台，构建一个多功能的智能数据采集与分析系统。该系统能够同时连接多种传感器，实时采集环境数据，并利用AI算法进行智能分析、异常检测和趋势预测，为环境监测、智慧农业、工业4.0等应用场景提供强有力的数据支撑。
+
+与传统数据采集设备相比，本系统具备边缘AI处理能力，能够在本地进行数据预处理、特征提取和初步分析，大大减少了数据传输量和云端处理负担，实现了真正的边缘智能化数据采集。
+
+\section{2. 内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
+
+\subsection{2.1. 硬件准备}\label{ux786cux4ef6ux51c6ux5907}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{核心计算单元}: 昇腾310B开发者套件
+\item
+  \textbf{数据采集模块}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{环境传感器}:
+
+    \begin{itemize}
+    \tightlist
+    \item
+      DHT22 (温湿度传感器)
+    \item
+      BMP280 (气压传感器)
+    \item
+      TSL2561 (光照强度传感器)
+    \item
+      MQ-2 (烟雾气体传感器)
+    \item
+      DS18B20 (防水温度传感器)
+    \end{itemize}
+  \item
+    \textbf{运动传感器}:
+
+    \begin{itemize}
+    \tightlist
+    \item
+      MPU6050 (六轴陀螺仪加速度计)
+    \item
+      HMC5883L (电子罗盘)
+    \end{itemize}
+  \item
+    \textbf{电气参数}:
+
+    \begin{itemize}
+    \tightlist
+    \item
+      ACS712 (电流传感器)
+    \item
+      电压分压电路
+    \end{itemize}
+  \end{itemize}
+\item
+  \textbf{通信接口}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    I2C总线扩展板
+  \item
+    SPI接口模块
+  \item
+    RS485通信模块
+  \item
+    LoRa无线模块 (长距离通信)
+  \end{itemize}
+\item
+  \textbf{显示与交互}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    3.5寸TFT彩屏
+  \item
+    旋转编码器
+  \item
+    多功能按键
+  \end{itemize}
+\item
+  \textbf{存储设备}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    高速SD卡 (32GB+)
+  \item
+    实时时钟模块 (DS3231)
+  \end{itemize}
+\end{itemize}
+
+\emph{系统架构图}
+
+\begin{lstlisting}
+   传感器阵列
+   ┌─────────────┐
+   │DHT22│BMP280│
+   │TSL  │ MQ-2 │ ← I2C/SPI总线
+   │MPU  │DS18B │
+   └──────┬──────┘
+          │
+     ┌────▼────┐
+     │昇腾310B │ ← AI处理单元
+     └────┬────┘
+          │
+   ┌──────┼──────┐
+   │      │      │
+  显示屏  存储卡  LoRa模块
+\end{lstlisting}
+
+\subsection{2.2. 软件环境}\label{ux8f6fux4ef6ux73afux5883}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{操作系统}: Ubuntu 20.04 LTS
+\item
+  \textbf{CANN版本}: 7.0.RC1
+\item
+  \textbf{Python版本}: 3.8.10
+\item
+  \textbf{硬件接口库}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!RPi.GPIO!}: GPIO控制 (兼容库)
+  \item
+    \passthrough{\lstinline!smbus!}: I2C通信
+  \item
+    \passthrough{\lstinline!spidev!}: SPI通信
+  \item
+    \passthrough{\lstinline!pyserial!}: 串口通信
+  \end{itemize}
+\item
+  \textbf{数据处理库}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!numpy!}: 数值计算
+  \item
+    \passthrough{\lstinline!pandas!}: 数据分析
+  \item
+    \passthrough{\lstinline!scipy!}: 科学计算
+  \item
+    \passthrough{\lstinline!matplotlib!}: 数据可视化
+  \end{itemize}
+\item
+  \textbf{机器学习库}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!scikit-learn!}: 传统机器学习
+  \item
+    \passthrough{\lstinline!tensorflow-lite!}: 轻量级深度学习
+  \end{itemize}
+\item
+  \textbf{数据库}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!sqlite3!}: 本地数据存储
+  \item
+    \passthrough{\lstinline!influxdb!}: 时序数据库 (可选)
+  \end{itemize}
+\item
+  \textbf{通信协议}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!mqtt!}: 物联网通信
+  \item
+    \passthrough{\lstinline!modbus!}: 工业通信协议
+  \end{itemize}
+\end{itemize}
+
+\emph{环境安装脚本 (\passthrough{\lstinline!setup\_daq.sh!})}
+
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+# 更新系统
+sudo apt update && sudo apt upgrade -y
+
+# 安装系统依赖
+sudo apt install -y python3-dev python3-pip i2c-tools
+
+# 启用I2C和SPI接口
+sudo raspi-config nonint do_i2c 0
+sudo raspi-config nonint do_spi 0
+
+# 安装Python依赖
+pip3 install numpy pandas scipy matplotlib scikit-learn
+pip3 install RPi.GPIO smbus spidev pyserial
+pip3 install paho-mqtt pymodbus
+
+echo "数据采集系统环境配置完成!"
+\end{lstlisting}
+
+\subsection{2.3.
+传感器集成与数据采集}\label{ux4f20ux611fux5668ux96c6ux6210ux4e0eux6570ux636eux91c7ux96c6}
+
+\begin{itemize}
+\item
+  \textbf{传感器驱动开发}: ```python \# 传感器基类设计 class SensorBase:
+  def \textbf{init}(self, address, bus\_type=`i2c'): self.address =
+  address self.bus\_type = bus\_type self.init\_sensor()
+
+\begin{lstlisting}
+  def init_sensor(self):
+      """传感器初始化"""
+      pass
+
+  def read_data(self):
+      """读取传感器数据"""
+      pass
+
+  def calibrate(self):
+      """传感器校准"""
+      pass
+\end{lstlisting}
+
+  \# 具体传感器实现 class DHT22Sensor(SensorBase): def read\_data(self):
+  return \{ `temperature': self.read\_temperature(), `humidity':
+  self.read\_humidity(), `timestamp': time.time() \} ```
+\item
+  \textbf{数据采集调度}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{多线程采集}: 不同传感器独立线程
+  \item
+    \textbf{采样频率控制}: 根据传感器特性设置不同采样率
+  \item
+    \textbf{数据同步}: 时间戳同步和数据对齐
+  \item
+    \textbf{异常处理}: 传感器故障检测和恢复
+  \end{itemize}
+\item
+  \textbf{数据质量控制}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{异常值检测}: 基于统计方法的异常值识别
+  \item
+    \textbf{数据校准}: 定期校准传感器偏差
+  \item
+    \textbf{缺失值处理}: 插值和补齐策略
+  \item
+    \textbf{噪声过滤}: 数字滤波和平滑处理
+  \end{itemize}
+\end{itemize}
+
+\subsection{2.4.
+智能数据分析}\label{ux667aux80fdux6570ux636eux5206ux6790}
+
+\begin{itemize}
+\item
+  \textbf{实时数据处理}: ```python \# 数据处理管道 class DataProcessor:
+  def \textbf{init}(self): self.filters = {[}{]} self.analyzers = {[}{]}
+
+\begin{lstlisting}
+  def add_filter(self, filter_func):
+      self.filters.append(filter_func)
+
+  def add_analyzer(self, analyzer):
+      self.analyzers.append(analyzer)
+
+  def process(self, raw_data):
+      # 1. 数据过滤
+      filtered_data = raw_data
+      for filter_func in self.filters:
+          filtered_data = filter_func(filtered_data)
+
+      # 2. 特征提取
+      features = self.extract_features(filtered_data)
+
+      # 3. 智能分析
+      results = {}
+      for analyzer in self.analyzers:
+          results.update(analyzer.analyze(features))
+
+      return results
+\end{lstlisting}
+
+  ```
+\item
+  \textbf{异常检测算法}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{统计方法}: 3σ准则、箱线图方法
+  \item
+    \textbf{机器学习方法}: Isolation Forest、One-Class SVM
+  \item
+    \textbf{深度学习方法}: AutoEncoder异常检测
+  \item
+    \textbf{时序分析}: ARIMA模型、LSTM网络
+  \end{itemize}
+\item
+  \textbf{趋势预测}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{短期预测}: 基于滑动窗口的线性回归
+  \item
+    \textbf{中期预测}: 季节性分解和ARIMA模型
+  \item
+    \textbf{长期预测}: LSTM神经网络
+  \item
+    \textbf{置信区间}: 预测结果的不确定性量化
+  \end{itemize}
+\end{itemize}
+
+\subsection{2.5.
+边缘AI模型部署}\label{ux8fb9ux7f18aiux6a21ux578bux90e8ux7f72}
+
+\begin{itemize}
+\item
+  \textbf{模型选择与训练}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{异常检测模型}: 基于历史数据训练异常检测器
+  \item
+    \textbf{预测模型}: 时间序列预测模型训练
+  \item
+    \textbf{分类模型}: 环境状态分类器
+  \item
+    \textbf{回归模型}: 传感器数值预测
+  \end{itemize}
+\item
+  \textbf{模型优化}: ```bash \# 模型转换和优化 \# 1. TensorFlow模型转换
+  python3 convert\_tf\_to\_tflite.py --input model.pb --output
+  model.tflite
+
+  \# 2. 模型量化 python3 quantize\_model.py --input model.tflite
+  --output model\_quantized.tflite
+
+  \# 3. 昇腾模型转换 atc --model=model.onnx --framework=5
+  --output=daq\_model\\
+  --input\_format=NCHW --input\_shape=``input:1,10,1''\\
+  --soc\_version=Ascend310B1 ```
+\item
+  \textbf{实时推理}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{流式处理}: 实时数据流分析
+  \item
+    \textbf{批处理}: 定时批量数据分析
+  \item
+    \textbf{混合模式}: 关键数据实时处理，历史数据批处理
+  \end{itemize}
+\end{itemize}
+
+\subsection{2.6.
+数据存储与管理}\label{ux6570ux636eux5b58ux50a8ux4e0eux7ba1ux7406}
+
+\begin{itemize}
+\item
+  \textbf{本地存储策略}: ```python \# 数据存储管理 class DataStorage:
+  def \textbf{init}(self, db\_path): self.db\_path = db\_path
+  self.init\_database()
+
+\begin{lstlisting}
+  def init_database(self):
+      # 创建数据表
+      self.create_sensor_data_table()
+      self.create_analysis_results_table()
+      self.create_system_logs_table()
+
+  def store_sensor_data(self, sensor_id, data, timestamp):
+      # 存储传感器原始数据
+      pass
+
+  def store_analysis_result(self, analysis_type, result, timestamp):
+      # 存储分析结果
+      pass
+\end{lstlisting}
+
+  ```
+\item
+  \textbf{数据压缩与归档}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{实时数据}: 高频采样，短期保存
+  \item
+    \textbf{历史数据}: 降采样压缩，长期归档
+  \item
+    \textbf{分析结果}: 关键指标永久保存
+  \item
+    \textbf{日志数据}: 定期清理和归档
+  \end{itemize}
+\end{itemize}
+
+\subsection{2.7.
+用户界面与可视化}\label{ux7528ux6237ux754cux9762ux4e0eux53efux89c6ux5316}
+
+\begin{itemize}
+\item
+  \textbf{实时监控界面}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{仪表盘显示}: 关键传感器数值
+  \item
+    \textbf{趋势图表}: 历史数据趋势
+  \item
+    \textbf{告警提示}: 异常情况及时提醒
+  \item
+    \textbf{系统状态}: 设备运行状态监控
+  \end{itemize}
+\item
+  \textbf{数据可视化}: ```python \# 数据可视化模块 class DataVisualizer:
+  def \textbf{init}(self): self.fig, self.axes = plt.subplots(2, 2,
+  figsize=(12, 8))
+
+\begin{lstlisting}
+  def update_real_time_plot(self, data):
+      # 更新实时数据图表
+      pass
+
+  def generate_daily_report(self, date):
+      # 生成日报图表
+      pass
+
+  def create_trend_analysis(self, sensor_type, time_range):
+      # 创建趋势分析图
+      pass
+\end{lstlisting}
+
+  ```
+\end{itemize}
+
+\subsection{2.8. 3D打印结构件}\label{dux6253ux5370ux7ed3ux6784ux4ef6}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{传感器安装支架 (\passthrough{\lstinline!sensor\_mount.stl!})}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    模块化传感器安装座
+  \item
+    防护罩设计
+  \item
+    线缆管理槽
+  \end{itemize}
+\item
+  \textbf{主机保护外壳 (\passthrough{\lstinline!main\_enclosure.stl!})}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    IP65防护等级
+  \item
+    散热孔设计
+  \item
+    标准DIN导轨安装
+  \end{itemize}
+\item
+  \textbf{显示屏支架 (\passthrough{\lstinline!display\_mount.stl!})}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    角度可调设计
+  \item
+    防眩光遮光罩
+  \item
+    按键操作区域
+  \end{itemize}
+\end{itemize}
+
+\emph{3D打印建议}: - \textbf{材料}: ABS或PETG (耐候性好) -
+\textbf{层高}: 0.2mm - \textbf{填充率}: 30\% - \textbf{后处理}:
+打磨和喷涂保护层
+
+\subsection{2.9. 用户手册}\label{ux7528ux6237ux624bux518c}
+
+\subsubsection{2.9.1 系统部署}\label{ux7cfbux7edfux90e8ux7f72}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{硬件组装}: 按照接线图连接传感器和模块
+\item
+  \textbf{软件安装}: 运行环境配置脚本
+\item
+  \textbf{传感器校准}: 校准各个传感器的基准值
+\item
+  \textbf{系统测试}: 验证数据采集和通信功能
+\end{enumerate}
+
+\subsubsection{2.9.2 日常操作}\label{ux65e5ux5e38ux64cdux4f5c}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{启动系统}: 开机自检和传感器状态检查
+\item
+  \textbf{实时监控}: 查看当前环境参数
+\item
+  \textbf{历史查询}: 检索历史数据和分析结果
+\item
+  \textbf{参数配置}: 调整采样频率和告警阈值
+\end{enumerate}
+
+\subsubsection{2.9.3 维护保养}\label{ux7ef4ux62a4ux4fddux517b}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{定期校准}: 每月校准传感器精度
+\item
+  \textbf{数据备份}: 定期备份重要数据
+\item
+  \textbf{清洁维护}: 清洁传感器和外壳
+\item
+  \textbf{软件更新}: 更新系统软件和AI模型
+\end{enumerate}
+
+\subsubsection{2.9.4 故障排除}\label{ux6545ux969cux6392ux9664}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{传感器故障}: 检查连接和供电
+\item
+  \textbf{通信异常}: 检查网络和协议配置
+\item
+  \textbf{数据异常}: 验证传感器校准和环境因素
+\end{itemize}
+
+\section{3. 源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
+
+\begin{lstlisting}
+smart_daq/
+├── src/
+│   ├── sensors/             # 传感器驱动
+│   ├── data_processing/     # 数据处理
+│   ├── ai_analysis/        # AI分析模块
+│   ├── storage/            # 数据存储
+│   ├── communication/      # 通信模块
+│   └── ui/                 # 用户界面
+├── models/
+│   ├── anomaly_detection/  # 异常检测模型
+│   ├── prediction/         # 预测模型
+│   └── classification/     # 分类模型
+├── data/
+│   ├── raw/               # 原始数据
+│   ├── processed/         # 处理后数据
+│   └── analysis/          # 分析结果
+├── configs/
+│   ├── sensors.yaml       # 传感器配置
+│   ├── ai_models.yaml     # AI模型配置
+│   └── system.yaml        # 系统配置
+└── hardware/
+    ├── 3d_models/         # 3D打印文件
+    ├── pcb_design/        # PCB设计文件
+    └── assembly_guide/    # 组装指南
+\end{lstlisting}
+
+\section{4. 效果演示}\label{ux6548ux679cux6f14ux793a}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{多传感器同步采集}: 展示多种传感器数据的实时采集
+\item
+  \textbf{异常检测演示}: 模拟异常情况的自动检测和告警
+\item
+  \textbf{趋势预测展示}: 基于历史数据的未来趋势预测
+\item
+  \textbf{智能分析报告}: 自动生成的数据分析和建议报告
+\end{itemize}

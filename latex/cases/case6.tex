@@ -1,0 +1,588 @@
+\chapter{案例6：智能小车}\label{ux6848ux4f8b6ux667aux80fdux5c0fux8f66}
+
+\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+
+本项目基于昇腾310B平台，构建一个具备自主导航、障碍物避让、自动循迹等功能的智能小车。该小车集成了计算机视觉、路径规划、运动控制等多项AI技术，能够在复杂环境中自主行驶，为无人驾驶、服务机器人、智能巡检等应用领域提供技术验证平台。
+
+相比传统的遥控小车，智能小车具备环境感知、决策规划和自主执行的能力，代表了移动机器人技术的发展方向。本项目将详细介绍从硬件搭建、软件开发到AI算法部署的完整实现过程。
+
+\section{2. 内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
+
+\subsection{2.1. 硬件准备}\label{ux786cux4ef6ux51c6ux5907}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{核心计算单元}: 昇腾310B开发者套件
+\item
+  \textbf{底盘系统}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{驱动方式}: 四轮差速驱动
+  \item
+    \textbf{电机}: 直流减速电机 × 4 (12V, 100RPM)
+  \item
+    \textbf{编码器}: 增量式光电编码器 × 4
+  \item
+    \textbf{轮胎}: 全向轮或麦克纳姆轮
+  \end{itemize}
+\item
+  \textbf{传感器系统}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{视觉传感器}: USB摄像头 (1080p 30fps)
+  \item
+    \textbf{激光雷达}: RPLiDAR A1 或 A2 (可选)
+  \item
+    \textbf{超声波传感器}: HC-SR04 × 6 (前后左右)
+  \item
+    \textbf{IMU}: MPU6050 (姿态检测)
+  \item
+    \textbf{GPS模块}: NEO-8M (户外定位)
+  \end{itemize}
+\item
+  \textbf{控制系统}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{主控板}: 树莓派4B 或 专用控制板
+  \item
+    \textbf{电机驱动}: L298N驱动模块 × 2
+  \item
+    \textbf{舵机}: SG90 (摄像头云台)
+  \end{itemize}
+\item
+  \textbf{电源系统}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{主电池}: 12V 锂电池组 (5000mAh)
+  \item
+    \textbf{辅助电源}: 5V/3.3V稳压模块
+  \item
+    \textbf{电源管理}: 充电保护电路
+  \end{itemize}
+\end{itemize}
+
+\emph{智能小车系统架构}
+
+\begin{lstlisting}
+     摄像头 + 云台
+          │
+    ┌─────▼─────┐
+    │  昇腾310B │ ← AI决策中心
+    └─────┬─────┘
+          │
+    ┌─────▼─────┐
+    │ 主控制器  │ ← 运动控制
+    └─────┬─────┘
+          │
+  ┌───────┼───────┐
+  │       │       │
+ 传感器   电机    电源系统
+ 阵列    驱动
+\end{lstlisting}
+
+\subsection{2.2. 软件环境}\label{ux8f6fux4ef6ux73afux5883}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{操作系统}: Ubuntu 20.04 LTS
+\item
+  \textbf{CANN版本}: 7.0.RC1
+\item
+  \textbf{Python版本}: 3.8.10
+\item
+  \textbf{机器人框架}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!ROS2 Foxy!}: 机器人操作系统
+  \item
+    \passthrough{\lstinline!rospy!}: Python ROS接口
+  \item
+    \passthrough{\lstinline!tf2!}: 坐标变换库
+  \end{itemize}
+\item
+  \textbf{计算机视觉}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!opencv-python!}: 图像处理
+  \item
+    \passthrough{\lstinline!ultralytics!}: YOLOv8目标检测
+  \item
+    \passthrough{\lstinline!apriltag!}: AprilTag标签识别
+  \end{itemize}
+\item
+  \textbf{路径规划}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!scipy!}: 科学计算
+  \item
+    \passthrough{\lstinline!numpy!}: 数值计算
+  \item
+    \passthrough{\lstinline!matplotlib!}: 路径可视化
+  \end{itemize}
+\item
+  \textbf{硬件控制}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!RPi.GPIO!}: GPIO控制
+  \item
+    \passthrough{\lstinline!pyserial!}: 串口通信
+  \item
+    \passthrough{\lstinline!smbus!}: I2C通信
+  \end{itemize}
+\end{itemize}
+
+\emph{环境配置脚本 (\passthrough{\lstinline!setup\_smartcar.sh!})}
+
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+# ROS2安装
+sudo apt update
+sudo apt install curl gnupg2 lsb-release
+curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add -
+sudo sh -c 'echo "deb [arch=$(dpkg --print-architecture)] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2-latest.list'
+sudo apt update
+sudo apt install ros-foxy-desktop
+
+# Python依赖安装
+pip3 install opencv-python ultralytics scipy numpy matplotlib
+pip3 install RPi.GPIO pyserial smbus rospkg
+
+echo "智能小车环境配置完成!"
+\end{lstlisting}
+
+\subsection{2.3.
+计算机视觉系统}\label{ux8ba1ux7b97ux673aux89c6ux89c9ux7cfbux7edf}
+
+\begin{itemize}
+\item
+  \textbf{目标检测与识别}: ```python \# YOLO目标检测类 class
+  ObjectDetector: def \textbf{init}(self, model\_path): self.model =
+  YOLO(model\_path) self.target\_classes = {[}`person', `car',
+  `traffic\_light', `stop\_sign'{]}
+
+\begin{lstlisting}
+  def detect_objects(self, image):
+      results = self.model(image)
+      detections = []
+
+      for result in results:
+          for box in result.boxes:
+              if box.cls in self.target_classes:
+                  detections.append({
+                      'class': self.target_classes[box.cls],
+                      'confidence': box.conf,
+                      'bbox': box.xyxy,
+                      'distance': self.estimate_distance(box)
+                  })
+
+      return detections
+\end{lstlisting}
+
+  ```
+\item
+  \textbf{车道线检测}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{图像预处理}: 灰度化、高斯滤波、边缘检测
+  \item
+    \textbf{ROI提取}: 感兴趣区域设定
+  \item
+    \textbf{Hough变换}: 直线检测
+  \item
+    \textbf{拟合优化}: 车道线拟合和平滑
+  \end{itemize}
+\item
+  \textbf{深度估计}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{单目深度估计}: 基于物体大小的距离估算
+  \item
+    \textbf{双目视觉} (可选): 立体视觉深度计算
+  \item
+    \textbf{传感器融合}: 结合超声波和视觉信息
+  \end{itemize}
+\end{itemize}
+
+\subsection{2.4.
+路径规划与导航}\label{ux8defux5f84ux89c4ux5212ux4e0eux5bfcux822a}
+
+\begin{itemize}
+\item
+  \textbf{全局路径规划}: ```python \# A*路径规划算法 class AStarPlanner:
+  def \textbf{init}(self, grid\_map): self.grid\_map = grid\_map
+  self.open\_set = {[}{]} self.closed\_set = set()
+
+\begin{lstlisting}
+  def plan_path(self, start, goal):
+      # A*算法实现
+      current = start
+      path = []
+
+      while current != goal:
+          # 搜索最优路径
+          current = self.find_best_node()
+          path.append(current)
+
+          if self.is_goal_reached(current, goal):
+              break
+
+      return self.smooth_path(path)
+
+  def smooth_path(self, path):
+      # 路径平滑处理
+      return smoothed_path
+\end{lstlisting}
+
+  ```
+\item
+  \textbf{局部路径规划}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{DWA算法}: 动态窗口法避障
+  \item
+    \textbf{人工势场法}: 基于势场的路径规划
+  \item
+    \textbf{RRT算法}: 快速随机树路径搜索
+  \end{itemize}
+\item
+  \textbf{SLAM建图} (可选):
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{激光SLAM}: 基于激光雷达的地图构建
+  \item
+    \textbf{视觉SLAM}: 基于摄像头的视觉SLAM
+  \item
+    \textbf{多传感器融合}: 激光雷达 + 视觉 + IMU
+  \end{itemize}
+\end{itemize}
+
+\subsection{2.5.
+运动控制系统}\label{ux8fd0ux52a8ux63a7ux5236ux7cfbux7edf}
+
+\begin{itemize}
+\item
+  \textbf{底层运动控制}: ```python \# 差速驱动控制器 class
+  DifferentialDriveController: def \textbf{init}(self, wheel\_base,
+  wheel\_radius): self.wheel\_base = wheel\_base self.wheel\_radius =
+  wheel\_radius self.max\_speed = 1.0 \# m/s
+
+\begin{lstlisting}
+  def velocity_to_wheel_speeds(self, linear_vel, angular_vel):
+      # 将线速度和角速度转换为左右轮速度
+      left_speed = linear_vel - angular_vel * self.wheel_base / 2
+      right_speed = linear_vel + angular_vel * self.wheel_base / 2
+
+      # 速度限制
+      left_speed = self.limit_speed(left_speed)
+      right_speed = self.limit_speed(right_speed)
+
+      return left_speed, right_speed
+
+  def execute_motion(self, left_speed, right_speed):
+      # 发送速度指令到电机驱动器
+      self.set_motor_speeds(left_speed, right_speed)
+\end{lstlisting}
+
+  ```
+\item
+  \textbf{PID控制器}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{位置控制}: PID位置控制器
+  \item
+    \textbf{速度控制}: PID速度控制器
+  \item
+    \textbf{姿态控制}: PID姿态稳定控制
+  \end{itemize}
+\item
+  \textbf{轨迹跟踪}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{Pure Pursuit}: 纯跟踪算法
+  \item
+    \textbf{Stanley控制器}: Stanley横向控制
+  \item
+    \textbf{MPC控制}: 模型预测控制
+  \end{itemize}
+\end{itemize}
+
+\subsection{2.6. AI决策系统}\label{aiux51b3ux7b56ux7cfbux7edf}
+
+\begin{itemize}
+\item
+  \textbf{行为决策树}: ```python \# 智能行为决策系统 class
+  BehaviorPlanner: def \textbf{init}(self): self.behaviors = \{
+  `follow\_lane': self.follow\_lane\_behavior, `avoid\_obstacle':
+  self.avoid\_obstacle\_behavior, `stop\_for\_traffic':
+  self.stop\_for\_traffic\_behavior, `explore':
+  self.exploration\_behavior \}
+
+\begin{lstlisting}
+  def make_decision(self, sensor_data, current_state):
+      # 根据传感器数据和当前状态做出决策
+      if self.detect_obstacle(sensor_data):
+          return 'avoid_obstacle'
+      elif self.detect_traffic_sign(sensor_data):
+          return 'stop_for_traffic'
+      elif self.lane_detected(sensor_data):
+          return 'follow_lane'
+      else:
+          return 'explore'
+\end{lstlisting}
+
+  ```
+\item
+  \textbf{强化学习} (高级功能):
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{Q-Learning}: 基于值函数的学习
+  \item
+    \textbf{Deep Q-Network}: 深度Q网络
+  \item
+    \textbf{Policy Gradient}: 策略梯度方法
+  \end{itemize}
+\end{itemize}
+
+\subsection{2.7.
+模型部署与优化}\label{ux6a21ux578bux90e8ux7f72ux4e0eux4f18ux5316}
+
+\begin{itemize}
+\item
+  \textbf{模型转换流程}: ```bash \# YOLOv8模型转换 \# 1. PyTorch转ONNX
+  yolo export model=yolov8n.pt format=onnx
+
+  \# 2. ONNX转昇腾模型 atc --model=yolov8n.onnx --framework=5
+  --output=yolov8n\_car\\
+  --input\_format=NCHW --input\_shape=``images:1,3,640,640''\\
+  --soc\_version=Ascend310B1 --out\_nodes=``output0:0'' ```
+\item
+  \textbf{实时推理优化}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{模型量化}: INT8量化减少计算量
+  \item
+    \textbf{图优化}: 算子融合和内存优化
+  \item
+    \textbf{并行处理}: 多线程并行推理
+  \end{itemize}
+\end{itemize}
+
+\subsection{2.8. 安全系统}\label{ux5b89ux5168ux7cfbux7edf}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{紧急制动系统}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{超声波触发}: 近距离障碍物检测
+  \item
+    \textbf{视觉确认}: 摄像头二次确认
+  \item
+    \textbf{硬件保护}: 硬件级别的紧急停止
+  \end{itemize}
+\item
+  \textbf{故障检测}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{传感器健康监测}: 实时检测传感器状态
+  \item
+    \textbf{通信故障检测}: 网络和串口通信监控
+  \item
+    \textbf{电源监控}: 电池电量和电压监测
+  \end{itemize}
+\end{itemize}
+
+\subsection{2.9. 3D打印结构件}\label{dux6253ux5370ux7ed3ux6784ux4ef6}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{底盘框架 (\passthrough{\lstinline!chassis\_frame.stl!})}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    轻量化设计
+  \item
+    模块化安装孔
+  \item
+    线缆走线槽
+  \end{itemize}
+\item
+  \textbf{传感器安装座 (\passthrough{\lstinline!sensor\_mounts.stl!})}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    摄像头云台支架
+  \item
+    超声波传感器固定座
+  \item
+    激光雷达安装底座
+  \end{itemize}
+\item
+  \textbf{保护外壳 (\passthrough{\lstinline!protective\_covers.stl!})}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    控制板保护罩
+  \item
+    电池仓外壳
+  \item
+    防撞缓冲器
+  \end{itemize}
+\end{itemize}
+
+\emph{3D打印规格}: - \textbf{材料}: PLA (原型) 或 ABS (实用) -
+\textbf{层高}: 0.2mm - \textbf{填充率}: 25\% (结构件) / 15\% (外壳)
+
+\subsection{2.10. 用户手册}\label{ux7528ux6237ux624bux518c}
+
+\subsubsection{2.10.1 硬件组装}\label{ux786cux4ef6ux7ec4ux88c5}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{底盘组装}: 安装电机、轮子和编码器
+\item
+  \textbf{传感器安装}: 固定摄像头、超声波等传感器
+\item
+  \textbf{电路连接}: 按照接线图连接所有电子模块
+\item
+  \textbf{系统测试}: 验证各个子系统功能
+\end{enumerate}
+
+\subsubsection{2.10.2 软件配置}\label{ux8f6fux4ef6ux914dux7f6e}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{环境安装}: 运行环境配置脚本
+\item
+  \textbf{ROS配置}: 配置ROS节点和话题
+\item
+  \textbf{参数标定}: 标定传感器和运动参数
+\item
+  \textbf{地图构建}: 构建环境地图 (如需要)
+\end{enumerate}
+
+\subsubsection{2.10.3 操作指南}\label{ux64cdux4f5cux6307ux5357}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{手动模式}: 遥控器控制小车运动
+\item
+  \textbf{半自动模式}: 人工指定目标点自动导航
+\item
+  \textbf{全自动模式}: 完全自主探索和导航
+\item
+  \textbf{调试模式}: 实时查看传感器数据和算法状态
+\end{enumerate}
+
+\subsubsection{2.10.4 维护保养}\label{ux7ef4ux62a4ux4fddux517b}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{定期检查}: 检查轮子、电机和传感器
+\item
+  \textbf{软件更新}: 更新算法和模型
+\item
+  \textbf{电池保养}: 正确充放电保护电池
+\item
+  \textbf{故障排除}: 常见问题解决方案
+\end{enumerate}
+
+\section{3. 源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
+
+\begin{lstlisting}
+smart_car/
+├── src/
+│   ├── perception/          # 感知模块
+│   │   ├── camera/         # 摄像头处理
+│   │   ├── lidar/          # 激光雷达
+│   │   └── ultrasonic/     # 超声波传感器
+│   ├── planning/           # 规划模块
+│   │   ├── global_planner/ # 全局路径规划
+│   │   ├── local_planner/  # 局部路径规划
+│   │   └── behavior/       # 行为规划
+│   ├── control/            # 控制模块
+│   │   ├── motion_control/ # 运动控制
+│   │   └── safety/         # 安全控制
+│   └── utils/              # 工具模块
+├── models/
+│   ├── detection/          # 目标检测模型
+│   ├── segmentation/       # 图像分割模型
+│   └── rl_models/          # 强化学习模型
+├── configs/
+│   ├── sensors.yaml        # 传感器配置
+│   ├── motion.yaml         # 运动参数配置
+│   └── behavior.yaml       # 行为配置
+├── launch/
+│   └── smartcar.launch.py  # ROS启动文件
+└── hardware/
+    ├── 3d_models/          # 3D打印文件
+    ├── pcb_design/         # 电路设计
+    └── assembly/           # 组装指南
+\end{lstlisting}
+
+\section{4. 效果演示}\label{ux6548ux679cux6f14ux793a}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{自动循迹}: 沿着地面标线自动行驶
+\item
+  \textbf{障碍物避让}: 检测并绕过静态和动态障碍物
+\item
+  \textbf{目标跟踪}: 跟随指定目标人员或物体
+\item
+  \textbf{自主导航}: 在已知地图中自主导航到目标点
+\item
+  \textbf{智能巡检}: 按照预设路线进行巡逻检查
+\end{itemize}

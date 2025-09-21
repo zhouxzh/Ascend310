@@ -1,0 +1,220 @@
+\section{\#
+案例1：智能人脸识别打卡机}\label{ux6848ux4f8b1ux667aux80fdux4ebaux8138ux8bc6ux522bux6253ux5361ux673a}
+
+\section{项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+
+本项目旨在利用昇腾310B的强大AI算力，构建一个功能完整、响应迅速的智能人脸识别打卡系统。系统通过USB摄像头实时捕捉视频流，检测画面中的人脸，并与预先注册的员工/学生人脸数据库进行比对，完成身份验证和自动记录考勤。
+
+该项目不仅是一个功能性的应用，更是一个端到端的AI实践案例，涵盖了从硬件选型、软件环境搭建、数据准备、模型训练与优化，到最终在边缘设备上部署的全过程。
+
+\section{内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
+
+\subsection{硬件准备}\label{ux786cux4ef6ux51c6ux5907}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{核心计算单元}: 昇腾310B开发者套件
+\item
+  \textbf{图像采集}: USB摄像头 (推荐罗技C920或同等规格)
+\item
+  \textbf{显示设备 (可选)}: HDMI显示器，用于实时预览或UI展示
+\item
+  \textbf{外设}: 键盘、鼠标
+\item
+  \textbf{电源}: 为昇腾310B开发板提供稳定供电
+\item
+  \textbf{连接线}: HDMI线, USB-C数据线等
+\end{itemize}
+
+\emph{附：硬件连接示意图} \textgreater{}
+(此处可插入一张图片，清晰展示所有硬件的连接方式)
+
+\subsection{软件环境}\label{ux8f6fux4ef6ux73afux5883}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{操作系统}: Ubuntu 20.04 或 openEuler
+\item
+  \textbf{CANN版本}: 7.0或更高
+\item
+  \textbf{Python版本}: 3.8.x
+\item
+  \textbf{主要依赖库}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!opencv-python!}: 用于图像和视频处理
+  \item
+    \passthrough{\lstinline!numpy!}: 用于数值计算
+  \item
+    \passthrough{\lstinline!scikit-learn!}: 用于评估模型性能
+  \item
+    \passthrough{\lstinline!onnxruntime!}: 用于运行ONNX模型
+  \item
+    \passthrough{\lstinline!PyQt5!} (可选): 用于构建图形用户界面
+  \end{itemize}
+\end{itemize}
+
+\emph{附：一键安装环境脚本 (\passthrough{\lstinline!install\_env.sh!})}
+
+\begin{lstlisting}[language=bash]
+# 示例脚本
+sudo apt update
+sudo apt install -y python3-pip python3-opencv
+pip3 install numpy scikit-learn onnxruntime
+# ... 其他依赖安装命令
+\end{lstlisting}
+
+\subsection{数据集准备}\label{ux6570ux636eux96c6ux51c6ux5907}
+
+\begin{itemize}
+\item
+  \textbf{数据集来源}:
+
+  \begin{enumerate}
+  \def\labelenumi{\arabic{enumi}.}
+  \tightlist
+  \item
+    \textbf{公开数据集}: 如LFW (Labeled Faces in the
+    Wild)、CASIA-WebFace等。
+  \item
+    \textbf{自建数据集}:
+    推荐！使用摄像头为每位用户（员工/学生）拍摄多张、多角度、不同光照和表情的人脸照片。
+  \end{enumerate}
+\item
+  \textbf{数据组织结构}:
+
+\begin{lstlisting}
+datasets/
+├── zhang_san/
+│   ├── 001.jpg
+│   ├── 002.jpg
+│   └── ...
+├── li_si/
+│   ├── 001.jpg
+│   ├── 002.jpg
+│   └── ...
+└── ...
+\end{lstlisting}
+\item
+  \textbf{预处理脚本 (\passthrough{\lstinline!preprocess.py!})}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    人脸检测与对齐
+  \item
+    图像增强（旋转、裁剪、调整亮度等）
+  \item
+    划分训练集和验证集
+  \end{itemize}
+\end{itemize}
+
+\subsection{模型训练}\label{ux6a21ux578bux8badux7ec3}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{模型选择}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{人脸检测}: MTCNN 或 RetinaFace
+  \item
+    \textbf{人脸识别}: ArcFace, CosFace, 或 MobileFaceNet
+    (推荐，因其轻量高效)
+  \end{itemize}
+\item
+  \textbf{训练流程}:
+
+  \begin{enumerate}
+  \def\labelenumi{\arabic{enumi}.}
+  \tightlist
+  \item
+    使用预处理好的数据集进行模型训练。
+  \item
+    调整超参数（学习率、批大小等）以获得最佳性能。
+  \item
+    在验证集上评估模型准确率、召回率等指标。
+  \end{enumerate}
+\item
+  \textbf{模型导出}:
+  将训练好的PyTorch或TensorFlow模型转换为昇腾亲和的ONNX格式。
+\end{itemize}
+
+\subsection{模型部署}\label{ux6a21ux578bux90e8ux7f72}
+
+\begin{itemize}
+\item
+  \textbf{模型转换}: 使用ATC (Ascend Tensor Compiler)
+  工具将ONNX模型转换为昇腾310B支持的\passthrough{\lstinline!.om!}离线模型。
+
+\begin{lstlisting}[language=bash]
+atc --model=./face_recognition.onnx --framework=5 --output=./face_recognition --input_format=NCHW --input_shape="data:1,3,112,112" --soc_version=Ascend310B1
+\end{lstlisting}
+\item
+  \textbf{部署代码 (\passthrough{\lstinline!main.py!})}:
+
+  \begin{enumerate}
+  \def\labelenumi{\arabic{enumi}.}
+  \tightlist
+  \item
+    初始化CANN和ACL (Ascend Computing Language) 资源。
+  \item
+    加载\passthrough{\lstinline!.om!}离线模型。
+  \item
+    循环读取摄像头帧。
+  \item
+    对每一帧进行人脸检测和识别推理。
+  \item
+    将识别结果与数据库比对，输出姓名。
+  \item
+    在画面上绘制矩形框和姓名，并记录打卡时间。
+  \end{enumerate}
+\end{itemize}
+
+\subsection{3D打印结构件}\label{dux6253ux5370ux7ed3ux6784ux4ef6}
+
+为了方便地将摄像头固定在合适的位置，我们设计了专用的摄像头支架和设备保护外壳。
+- \textbf{文件列表}: - \passthrough{\lstinline!camera\_holder.stl!}:
+摄像头支架模型文件 - \passthrough{\lstinline!device\_case.stl!}:
+设备外壳模型文件 - \textbf{打印建议}: - \textbf{材料}: PLA 或 PETG -
+\textbf{层高}: 0.2mm - \textbf{填充率}: 20\%
+
+\subsection{用户手册}\label{ux7528ux6237ux624bux518c}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{硬件组装}:
+  参照\passthrough{\lstinline!2.1!}节的连接图连接好所有硬件。
+\item
+  \textbf{环境配置}:
+  运行\passthrough{\lstinline!install\_env.sh!}脚本安装所有软件依赖。
+\item
+  \textbf{人脸注册}:
+  运行\passthrough{\lstinline!register\_face.py!}脚本，根据提示输入姓名，并拍摄多张人脸照片进行注册。
+\item
+  \textbf{启动系统}:
+  运行\passthrough{\lstinline!main.py!}启动人脸识别打卡程序。
+\item
+  \textbf{查看记录}:
+  打卡记录将保存在\passthrough{\lstinline!attendance.csv!}文件中。
+\end{enumerate}
+
+\section{源代码}\label{ux6e90ux4ee3ux7801}
+
+\begin{quote}
+(此处未来可替换为GitHub仓库链接或详细的文件树)
+\end{quote}
+
+\section{效果演示}\label{ux6548ux679cux6f14ux793a}
+
+\begin{quote}
+(此处可插入系统运行时的截图或GIF动图，例如摄像头实时识别人脸的画面)
+\end{quote}

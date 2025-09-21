@@ -1,0 +1,21 @@
+pandoc ../src/book/README.md --top-level-division=chapter --lua-filter=remove-numbering.lua -t latex -o chapters/chapter0.tex
+pandoc ../src/book/chapter1.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex -o chapters/chapter1.tex
+pandoc ../src/book/chapter2.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex -o chapters/chapter2.tex
+pandoc ../src/book/chapter3.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex -o chapters/chapter3.tex
+pandoc ../src/book/chapter4.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex -o chapters/chapter4.tex
+pandoc ../src/book/chapter5.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex -o chapters/chapter5.tex
+pandoc ../src/book/chapter6.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex -o chapters/chapter6.tex
+pandoc ../src/book/chapter7.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex -o chapters/chapter7.tex
+pandoc ../src/book/chapter8.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex -o chapters/chapter8.tex
+pandoc ../src/book/chapter9.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex -o chapters/chapter9.tex
+pandoc ../src/book/chapter10.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex -o chapters/chapter10.tex
+pandoc ../src/experiment/case0.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case0.tex
+pandoc ../src/experiment/case1.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case1.tex
+pandoc ../src/experiment/case2.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case2.tex
+pandoc ../src/experiment/case3.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case3.tex
+pandoc ../src/experiment/case4.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case4.tex
+pandoc ../src/experiment/case5.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case5.tex
+pandoc ../src/experiment/case6.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case6.tex
+pandoc ../src/experiment/case7.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case7.tex
+pandoc ../src/experiment/case8.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case8.tex
+pandoc ../src/experiment/case9.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case9.tex

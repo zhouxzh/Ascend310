@@ -1,11 +1,4 @@
----
-title: "第1讲：初步使用开发板"
-author: [周贤中]
-date: 2025-03-30
-subject: "Markdown"
-keywords: [Ascend]
-lang: "zh-cn"
-
+# 案例0：初步使用开发板
 ---
 ## 昇腾310B开发板介绍
 
