@@ -55,6 +55,7 @@ export default hopeTheme({
     figure: true,
     gfm: true,
     imgLazyload: true,
+    obsidianImgSize: true,
     imgSize: true,
     include: true,
     mark: true,

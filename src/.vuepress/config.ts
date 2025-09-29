@@ -1,5 +1,7 @@
+import { viteBundler } from '@vuepress/bundler-vite'
 import { defineUserConfig } from "vuepress";
 import { hopeTheme } from "vuepress-theme-hope";
+import { markdownImagePlugin } from '@vuepress/plugin-markdown-image'
 
 import theme from "./theme.js";
 
@@ -10,6 +12,11 @@ export default defineUserConfig({
   title: "主页",
   description: "vuepress-theme-hope 的文档演示",
 
+  bundler: viteBundler({
+    viteOptions: {},
+    vuePluginOptions: {},
+  }),
+
   theme: hopeTheme({
     markdown: {
       mermaid: true,
@@ -17,5 +24,11 @@ export default defineUserConfig({
   }),
   // 和 PWA 一起启用
   // shouldPrefetch: false,
+  plugins: [
+    //markdownImagePlugin({
+      // size: true,
+      // obsidianSize: true,
+    // }),
+  ],
 });
 

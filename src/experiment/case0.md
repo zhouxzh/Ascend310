@@ -323,7 +323,13 @@ gpio_operate -h
 ![spidev结果](img0/spidev1.png)
 可以发现TX和RX的结果不尽相同，说明此时开发板已经调用SPI接口的驱动在向外发送数据，但是没收到数据，接下来我们使用杜邦线将SDI和SDO连接，构成一个回环，再次运行上述命令,可以发现TX和RX的数据一致，说明SPI的发送和接收功能正常，可以通过spidev命令调用SPI接口了。
 
+
 #### wiringOP
 这是一个高性能的GPIO访问库，可以通过该库便捷访问和控制GPIO接口。
 
-##### 
+##### 安装wiringOP
+在安装wiringOP之前，需要确定系统中存在`/etc/orangepi-release`这个文件，且文件的内容为
+```
+BOARD=orangepiaipro
+```
+![orangepi-release](img0/orangepi-release.png)
