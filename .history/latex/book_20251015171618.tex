@@ -34,35 +34,18 @@
 \usepackage{calc} % 提供增强的计算功能
 % 为 Pandoc 片段提供安全的宏定义，避免 Undefined control sequence
 \usepackage{graphicx}
-\usepackage{textcomp}
-
 \usepackage{listings}
-
-\definecolor{lightgray}{rgb}{0.95,0.95,0.95}
-\definecolor{darkblue}{rgb}{0.0,0.0,0.6}
-\definecolor{cyan}{rgb}{0.0,0.6,0.6}
-\definecolor{purple}{rgb}{0.58,0,0.82}
-\definecolor{orange}{rgb}{0.8,0.4,0}
+\usepackage{textcomp}
 
 \lstset{
     language=Python,
-    backgroundcolor=\color{lightgray},
     basicstyle=\ttfamily\small,
-    keywordstyle=\color{darkblue}\bfseries,
-    commentstyle=\color{cyan},
-    stringstyle=\color{purple},
-    numberstyle=\tiny\color{gray},
+    keywordstyle=\color{blue},
+    commentstyle=\color{green},
+    stringstyle=\color{red},
     breaklines=true,
-    postbreak=\raisebox{0ex}[0ex][0ex]{\ensuremath{\color{red}\hookrightarrow\space}},
-    numbers=left,
-    numbersep=5pt,
-    stepnumber=1,
-    showspaces=false,
-    showstringspaces=false,
-    showtabs=false,
-    tabsize=4,
-    frame=lines,
-    captionpos=b
+    postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+    numbers=left
 }
 \providecommand{\passthrough}[1]{#1}
 % 保证只有在未定义时才提供，避免覆盖模板已有定义

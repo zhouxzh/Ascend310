@@ -134,6 +134,8 @@ INPUT c:/texlive/2025/texmf-dist/tex/latex/tools/array.sty
 INPUT c:/texlive/2025/texmf-dist/tex/latex/tools/array.sty
 INPUT c:/texlive/2025/texmf-dist/tex/latex/tools/calc.sty
 INPUT c:/texlive/2025/texmf-dist/tex/latex/tools/calc.sty
+INPUT c:/texlive/2025/texmf-dist/tex/latex/base/textcomp.sty
+INPUT c:/texlive/2025/texmf-dist/tex/latex/base/textcomp.sty
 INPUT c:/texlive/2025/texmf-dist/tex/latex/listings/listings.sty
 INPUT c:/texlive/2025/texmf-dist/tex/latex/listings/listings.sty
 INPUT c:/texlive/2025/texmf-dist/tex/latex/listings/lstpatch.sty
@@ -147,8 +149,9 @@ INPUT c:/texlive/2025/texmf-dist/tex/latex/listings/listings.cfg
 INPUT c:/texlive/2025/texmf-dist/tex/latex/listings/listings.cfg
 INPUT c:/texlive/2025/texmf-dist/tex/xelatex/xecjk/xeCJK-listings.sty
 INPUT c:/texlive/2025/texmf-dist/tex/xelatex/xecjk/xeCJK-listings.sty
-INPUT c:/texlive/2025/texmf-dist/tex/latex/base/textcomp.sty
-INPUT c:/texlive/2025/texmf-dist/tex/latex/base/textcomp.sty
+INPUT c:/texlive/2025/texmf-dist/tex/latex/listings/lstlang1.sty
+INPUT c:/texlive/2025/texmf-dist/tex/latex/listings/lstlang1.sty
+INPUT c:/texlive/2025/texmf-dist/tex/latex/listings/lstlang1.sty
 INPUT c:/texlive/2025/texmf-dist/tex/latex/enumitem/enumitem.sty
 INPUT c:/texlive/2025/texmf-dist/tex/latex/enumitem/enumitem.sty
 INPUT c:/texlive/2025/texmf-dist/tex/latex/hyperref/hyperref.sty
@@ -274,6 +277,12 @@ INPUT chapters/chapter1.tex
 INPUT ./chapters/chapter2.tex
 INPUT ./chapters/chapter2.tex
 INPUT chapters/chapter2.tex
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmmi6.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmsy6.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam7.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm7.tfm
+INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmr6.tfm
 INPUT ./chapters/chapter3.tex
 INPUT ./chapters/chapter3.tex
 INPUT chapters/chapter3.tex
@@ -502,6 +511,9 @@ INPUT ./cases/img0/spidevices.png
 INPUT ./cases/img0/spidev1.png
 INPUT ./cases/img0/spidev1.png
 INPUT ./cases/img0/spidev1.png
+INPUT ./cases/img0/orangepi-release.png
+INPUT ./cases/img0/orangepi-release.png
+INPUT ./cases/img0/orangepi-release.png
 INPUT ./cases/case1.tex
 INPUT ./cases/case1.tex
 INPUT cases/case1.tex
@@ -520,7 +532,6 @@ INPUT cases/case5.tex
 INPUT ./cases/case6.tex
 INPUT ./cases/case6.tex
 INPUT cases/case6.tex
-INPUT c:/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmtt10.tfm
 INPUT ./cases/case7.tex
 INPUT ./cases/case7.tex
 INPUT cases/case7.tex

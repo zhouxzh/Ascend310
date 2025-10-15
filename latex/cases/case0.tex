@@ -479,4 +479,18 @@ gpio_operate -h
 
 \subsubsection{wiringOP}\label{wiringop}
 
-这是一个高性能的GPIO
+这是一个高性能的GPIO访问库，可以通过该库便捷访问和控制GPIO接口。
+
+\paragraph{安装wiringOP}\label{ux5b89ux88c5wiringop}
+
+在安装wiringOP之前，需要确定系统中存在\passthrough{\lstinline!/etc/orangepi-release!}这个文件，且文件的内容为
+
+\begin{lstlisting}
+BOARD=orangepiaipro
+\end{lstlisting}
+
+\begin{figure}
+\centering
+\pandocbounded{\includegraphics[keepaspectratio,alt={orangepi-release}]{cases/img0/orangepi-release.png}}
+\caption{orangepi-release}
+\end{figure}

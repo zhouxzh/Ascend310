@@ -20,3 +20,4 @@ pandoc ../src/experiment/case7.md --top-level-division=chapter --syntax-highligh
 pandoc ../src/experiment/case8.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case8.tex
 pandoc ../src/experiment/case9.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case9.tex
 xelatex book
+xelatex book
