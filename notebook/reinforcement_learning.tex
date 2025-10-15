@@ -1,0 +1,1978 @@
+\documentclass[11pt]{ctexart}
+\setCJKmainfont{Noto Serif CJK SC}
+\setCJKsansfont{Noto Sans CJK SC}
+\setCJKmonofont{Noto Sans Mono CJK SC}
+\author{周贤中}
+\date{\today}
+
+    \usepackage[breakable]{tcolorbox}
+    \usepackage{parskip} % Stop auto-indenting (to mimic markdown behaviour)
+    
+
+    % Basic figure setup, for now with no caption control since it's done
+    % automatically by Pandoc (which extracts ![](path) syntax from Markdown).
+    \usepackage{graphicx}
+    % Keep aspect ratio if custom image width or height is specified
+    \setkeys{Gin}{keepaspectratio}
+    % Maintain compatibility with old templates. Remove in nbconvert 6.0
+    \let\Oldincludegraphics\includegraphics
+    % Ensure that by default, figures have no caption (until we provide a
+    % proper Figure object with a Caption API and a way to capture that
+    % in the conversion process - todo).
+    \usepackage{caption}
+    \DeclareCaptionFormat{nocaption}{}
+    \captionsetup{format=nocaption,aboveskip=0pt,belowskip=0pt}
+
+    \usepackage{float}
+    \floatplacement{figure}{H} % forces figures to be placed at the correct location
+    \usepackage{xcolor} % Allow colors to be defined
+    \usepackage{enumerate} % Needed for markdown enumerations to work
+    \usepackage{geometry} % Used to adjust the document margins
+    \usepackage{amsmath} % Equations
+    \usepackage{amssymb} % Equations
+    \usepackage{textcomp} % defines textquotesingle
+    % Hack from http://tex.stackexchange.com/a/47451/13684:
+    \AtBeginDocument{%
+        \def\PYZsq{\textquotesingle}% Upright quotes in Pygmentized code
+    }
+    \usepackage{upquote} % Upright quotes for verbatim code
+    \usepackage{eurosym} % defines \euro
+
+    \usepackage{iftex}
+    \ifPDFTeX
+        \usepackage[T1]{fontenc}
+        \IfFileExists{alphabeta.sty}{
+              \usepackage{alphabeta}
+          }{
+              \usepackage[mathletters]{ucs}
+              \usepackage[utf8x]{inputenc}
+          }
+    \else
+        \usepackage{fontspec}
+        \usepackage{unicode-math}
+    \fi
+
+    \usepackage{fancyvrb} % verbatim replacement that allows latex
+    \usepackage{grffile} % extends the file name processing of package graphics
+                         % to support a larger range
+    \makeatletter % fix for old versions of grffile with XeLaTeX
+    \@ifpackagelater{grffile}{2019/11/01}
+    {
+      % Do nothing on new versions
+    }
+    {
+      \def\Gread@@xetex#1{%
+        \IfFileExists{"\Gin@base".bb}%
+        {\Gread@eps{\Gin@base.bb}}%
+        {\Gread@@xetex@aux#1}%
+      }
+    }
+    \makeatother
+    \usepackage[Export]{adjustbox} % Used to constrain images to a maximum size
+    \adjustboxset{max size={0.9\linewidth}{0.9\paperheight}}
+
+    % The hyperref package gives us a pdf with properly built
+    % internal navigation ('pdf bookmarks' for the table of contents,
+    % internal cross-reference links, web links for URLs, etc.)
+    \usepackage{hyperref}
+    % The default LaTeX title has an obnoxious amount of whitespace. By default,
+    % titling removes some of it. It also provides customization options.
+    \usepackage{titling}
+    \usepackage{longtable} % longtable support required by pandoc >1.10
+    \usepackage{booktabs}  % table support for pandoc > 1.12.2
+    \usepackage{array}     % table support for pandoc >= 2.11.3
+    \usepackage{calc}      % table minipage width calculation for pandoc >= 2.11.1
+    \usepackage[inline]{enumitem} % IRkernel/repr support (it uses the enumerate* environment)
+    \usepackage[normalem]{ulem} % ulem is needed to support strikethroughs (\sout)
+                                % normalem makes italics be italics, not underlines
+    \usepackage{soul}      % strikethrough (\st) support for pandoc >= 3.0.0
+    \usepackage{mathrsfs}
+    
+
+    
+    % Colors for the hyperref package
+    \definecolor{urlcolor}{rgb}{0,.145,.698}
+    \definecolor{linkcolor}{rgb}{.71,0.21,0.01}
+    \definecolor{citecolor}{rgb}{.12,.54,.11}
+
+    % ANSI colors
+    \definecolor{ansi-black}{HTML}{3E424D}
+    \definecolor{ansi-black-intense}{HTML}{282C36}
+    \definecolor{ansi-red}{HTML}{E75C58}
+    \definecolor{ansi-red-intense}{HTML}{B22B31}
+    \definecolor{ansi-green}{HTML}{00A250}
+    \definecolor{ansi-green-intense}{HTML}{007427}
+    \definecolor{ansi-yellow}{HTML}{DDB62B}
+    \definecolor{ansi-yellow-intense}{HTML}{B27D12}
+    \definecolor{ansi-blue}{HTML}{208FFB}
+    \definecolor{ansi-blue-intense}{HTML}{0065CA}
+    \definecolor{ansi-magenta}{HTML}{D160C4}
+    \definecolor{ansi-magenta-intense}{HTML}{A03196}
+    \definecolor{ansi-cyan}{HTML}{60C6C8}
+    \definecolor{ansi-cyan-intense}{HTML}{258F8F}
+    \definecolor{ansi-white}{HTML}{C5C1B4}
+    \definecolor{ansi-white-intense}{HTML}{A1A6B2}
+    \definecolor{ansi-default-inverse-fg}{HTML}{FFFFFF}
+    \definecolor{ansi-default-inverse-bg}{HTML}{000000}
+
+    % common color for the border for error outputs.
+    \definecolor{outerrorbackground}{HTML}{FFDFDF}
+
+    % commands and environments needed by pandoc snippets
+    % extracted from the output of `pandoc -s`
+    \providecommand{\tightlist}{%
+      \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+    \DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+    % Add ',fontsize=\small' for more characters per line
+    \newenvironment{Shaded}{}{}
+    \newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{{#1}}}}
+    \newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{{#1}}}
+    \newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+    \newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+    \newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+    \newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{{#1}}}}
+    \newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{{#1}}}
+    \newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+    \newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{{#1}}}
+    \newcommand{\RegionMarkerTok}[1]{{#1}}
+    \newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+    \newcommand{\NormalTok}[1]{{#1}}
+
+    % Additional commands for more recent versions of Pandoc
+    \newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{{#1}}}
+    \newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{{#1}}}
+    \newcommand{\ImportTok}[1]{{#1}}
+    \newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{{#1}}}}
+    \newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+    \newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+    \newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{{#1}}}
+    \newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{{#1}}}}
+    \newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{{#1}}}
+    \newcommand{\BuiltInTok}[1]{{#1}}
+    \newcommand{\ExtensionTok}[1]{{#1}}
+    \newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{{#1}}}
+    \newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{{#1}}}
+    \newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+    \newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+
+
+    % Define a nice break command that doesn't care if a line doesn't already
+    % exist.
+    \def\br{\hspace*{\fill} \\* }
+    % Math Jax compatibility definitions
+    \def\gt{>}
+    \def\lt{<}
+    \let\Oldtex\TeX
+    \let\Oldlatex\LaTeX
+    \renewcommand{\TeX}{\textrm{\Oldtex}}
+    \renewcommand{\LaTeX}{\textrm{\Oldlatex}}
+    % Document parameters
+    % Document title
+    \title{强化学习------学习笔记}
+    
+    
+    
+    
+    
+    
+    
+% Pygments definitions
+\makeatletter
+\def\PY@reset{\let\PY@it=\relax \let\PY@bf=\relax%
+    \let\PY@ul=\relax \let\PY@tc=\relax%
+    \let\PY@bc=\relax \let\PY@ff=\relax}
+\def\PY@tok#1{\csname PY@tok@#1\endcsname}
+\def\PY@toks#1+{\ifx\relax#1\empty\else%
+    \PY@tok{#1}\expandafter\PY@toks\fi}
+\def\PY@do#1{\PY@bc{\PY@tc{\PY@ul{%
+    \PY@it{\PY@bf{\PY@ff{#1}}}}}}}
+\def\PY#1#2{\PY@reset\PY@toks#1+\relax+\PY@do{#2}}
+
+\@namedef{PY@tok@w}{\def\PY@tc##1{\textcolor[rgb]{0.73,0.73,0.73}{##1}}}
+\@namedef{PY@tok@c}{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.24,0.48,0.48}{##1}}}
+\@namedef{PY@tok@cp}{\def\PY@tc##1{\textcolor[rgb]{0.61,0.40,0.00}{##1}}}
+\@namedef{PY@tok@k}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\@namedef{PY@tok@kp}{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\@namedef{PY@tok@kt}{\def\PY@tc##1{\textcolor[rgb]{0.69,0.00,0.25}{##1}}}
+\@namedef{PY@tok@o}{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\@namedef{PY@tok@ow}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.67,0.13,1.00}{##1}}}
+\@namedef{PY@tok@nb}{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\@namedef{PY@tok@nf}{\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,1.00}{##1}}}
+\@namedef{PY@tok@nc}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,1.00}{##1}}}
+\@namedef{PY@tok@nn}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,1.00}{##1}}}
+\@namedef{PY@tok@ne}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.80,0.25,0.22}{##1}}}
+\@namedef{PY@tok@nv}{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\@namedef{PY@tok@no}{\def\PY@tc##1{\textcolor[rgb]{0.53,0.00,0.00}{##1}}}
+\@namedef{PY@tok@nl}{\def\PY@tc##1{\textcolor[rgb]{0.46,0.46,0.00}{##1}}}
+\@namedef{PY@tok@ni}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.44,0.44,0.44}{##1}}}
+\@namedef{PY@tok@na}{\def\PY@tc##1{\textcolor[rgb]{0.41,0.47,0.13}{##1}}}
+\@namedef{PY@tok@nt}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\@namedef{PY@tok@nd}{\def\PY@tc##1{\textcolor[rgb]{0.67,0.13,1.00}{##1}}}
+\@namedef{PY@tok@s}{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\@namedef{PY@tok@sd}{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\@namedef{PY@tok@si}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.64,0.35,0.47}{##1}}}
+\@namedef{PY@tok@se}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.67,0.36,0.12}{##1}}}
+\@namedef{PY@tok@sr}{\def\PY@tc##1{\textcolor[rgb]{0.64,0.35,0.47}{##1}}}
+\@namedef{PY@tok@ss}{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\@namedef{PY@tok@sx}{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\@namedef{PY@tok@m}{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\@namedef{PY@tok@gh}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,0.50}{##1}}}
+\@namedef{PY@tok@gu}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.50,0.00,0.50}{##1}}}
+\@namedef{PY@tok@gd}{\def\PY@tc##1{\textcolor[rgb]{0.63,0.00,0.00}{##1}}}
+\@namedef{PY@tok@gi}{\def\PY@tc##1{\textcolor[rgb]{0.00,0.52,0.00}{##1}}}
+\@namedef{PY@tok@gr}{\def\PY@tc##1{\textcolor[rgb]{0.89,0.00,0.00}{##1}}}
+\@namedef{PY@tok@ge}{\let\PY@it=\textit}
+\@namedef{PY@tok@gs}{\let\PY@bf=\textbf}
+\@namedef{PY@tok@gp}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,0.50}{##1}}}
+\@namedef{PY@tok@go}{\def\PY@tc##1{\textcolor[rgb]{0.44,0.44,0.44}{##1}}}
+\@namedef{PY@tok@gt}{\def\PY@tc##1{\textcolor[rgb]{0.00,0.27,0.87}{##1}}}
+\@namedef{PY@tok@err}{\def\PY@bc##1{{\setlength{\fboxsep}{\string -\fboxrule}\fcolorbox[rgb]{1.00,0.00,0.00}{1,1,1}{\strut ##1}}}}
+\@namedef{PY@tok@kc}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\@namedef{PY@tok@kd}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\@namedef{PY@tok@kn}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\@namedef{PY@tok@kr}{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\@namedef{PY@tok@bp}{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\@namedef{PY@tok@fm}{\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,1.00}{##1}}}
+\@namedef{PY@tok@vc}{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\@namedef{PY@tok@vg}{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\@namedef{PY@tok@vi}{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\@namedef{PY@tok@vm}{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\@namedef{PY@tok@sa}{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\@namedef{PY@tok@sb}{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\@namedef{PY@tok@sc}{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\@namedef{PY@tok@dl}{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\@namedef{PY@tok@s2}{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\@namedef{PY@tok@sh}{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\@namedef{PY@tok@s1}{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\@namedef{PY@tok@mb}{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\@namedef{PY@tok@mf}{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\@namedef{PY@tok@mh}{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\@namedef{PY@tok@mi}{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\@namedef{PY@tok@il}{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\@namedef{PY@tok@mo}{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\@namedef{PY@tok@ch}{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.24,0.48,0.48}{##1}}}
+\@namedef{PY@tok@cm}{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.24,0.48,0.48}{##1}}}
+\@namedef{PY@tok@cpf}{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.24,0.48,0.48}{##1}}}
+\@namedef{PY@tok@c1}{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.24,0.48,0.48}{##1}}}
+\@namedef{PY@tok@cs}{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.24,0.48,0.48}{##1}}}
+
+\def\PYZbs{\char`\\}
+\def\PYZus{\char`\_}
+\def\PYZob{\char`\{}
+\def\PYZcb{\char`\}}
+\def\PYZca{\char`\^}
+\def\PYZam{\char`\&}
+\def\PYZlt{\char`\<}
+\def\PYZgt{\char`\>}
+\def\PYZsh{\char`\#}
+\def\PYZpc{\char`\%}
+\def\PYZdl{\char`\$}
+\def\PYZhy{\char`\-}
+\def\PYZsq{\char`\'}
+\def\PYZdq{\char`\"}
+\def\PYZti{\char`\~}
+% for compatibility with earlier versions
+\def\PYZat{@}
+\def\PYZlb{[}
+\def\PYZrb{]}
+\makeatother
+
+
+    % For linebreaks inside Verbatim environment from package fancyvrb.
+    \makeatletter
+        \newbox\Wrappedcontinuationbox
+        \newbox\Wrappedvisiblespacebox
+        \newcommand*\Wrappedvisiblespace {\textcolor{red}{\textvisiblespace}}
+        \newcommand*\Wrappedcontinuationsymbol {\textcolor{red}{\llap{\tiny$\m@th\hookrightarrow$}}}
+        \newcommand*\Wrappedcontinuationindent {3ex }
+        \newcommand*\Wrappedafterbreak {\kern\Wrappedcontinuationindent\copy\Wrappedcontinuationbox}
+        % Take advantage of the already applied Pygments mark-up to insert
+        % potential linebreaks for TeX processing.
+        %        {, <, #, %, $, ' and ": go to next line.
+        %        _, }, ^, &, >, - and ~: stay at end of broken line.
+        % Use of \textquotesingle for straight quote.
+        \newcommand*\Wrappedbreaksatspecials {%
+            \def\PYGZus{\discretionary{\char`\_}{\Wrappedafterbreak}{\char`\_}}%
+            \def\PYGZob{\discretionary{}{\Wrappedafterbreak\char`\{}{\char`\{}}%
+            \def\PYGZcb{\discretionary{\char`\}}{\Wrappedafterbreak}{\char`\}}}%
+            \def\PYGZca{\discretionary{\char`\^}{\Wrappedafterbreak}{\char`\^}}%
+            \def\PYGZam{\discretionary{\char`\&}{\Wrappedafterbreak}{\char`\&}}%
+            \def\PYGZlt{\discretionary{}{\Wrappedafterbreak\char`\<}{\char`\<}}%
+            \def\PYGZgt{\discretionary{\char`\>}{\Wrappedafterbreak}{\char`\>}}%
+            \def\PYGZsh{\discretionary{}{\Wrappedafterbreak\char`\#}{\char`\#}}%
+            \def\PYGZpc{\discretionary{}{\Wrappedafterbreak\char`\%}{\char`\%}}%
+            \def\PYGZdl{\discretionary{}{\Wrappedafterbreak\char`\$}{\char`\$}}%
+            \def\PYGZhy{\discretionary{\char`\-}{\Wrappedafterbreak}{\char`\-}}%
+            \def\PYGZsq{\discretionary{}{\Wrappedafterbreak\textquotesingle}{\textquotesingle}}%
+            \def\PYGZdq{\discretionary{}{\Wrappedafterbreak\char`\"}{\char`\"}}%
+            \def\PYGZti{\discretionary{\char`\~}{\Wrappedafterbreak}{\char`\~}}%
+        }
+        % Some characters . , ; ? ! / are not pygmentized.
+        % This macro makes them "active" and they will insert potential linebreaks
+        \newcommand*\Wrappedbreaksatpunct {%
+            \lccode`\~`\.\lowercase{\def~}{\discretionary{\hbox{\char`\.}}{\Wrappedafterbreak}{\hbox{\char`\.}}}%
+            \lccode`\~`\,\lowercase{\def~}{\discretionary{\hbox{\char`\,}}{\Wrappedafterbreak}{\hbox{\char`\,}}}%
+            \lccode`\~`\;\lowercase{\def~}{\discretionary{\hbox{\char`\;}}{\Wrappedafterbreak}{\hbox{\char`\;}}}%
+            \lccode`\~`\:\lowercase{\def~}{\discretionary{\hbox{\char`\:}}{\Wrappedafterbreak}{\hbox{\char`\:}}}%
+            \lccode`\~`\?\lowercase{\def~}{\discretionary{\hbox{\char`\?}}{\Wrappedafterbreak}{\hbox{\char`\?}}}%
+            \lccode`\~`\!\lowercase{\def~}{\discretionary{\hbox{\char`\!}}{\Wrappedafterbreak}{\hbox{\char`\!}}}%
+            \lccode`\~`\/\lowercase{\def~}{\discretionary{\hbox{\char`\/}}{\Wrappedafterbreak}{\hbox{\char`\/}}}%
+            \catcode`\.\active
+            \catcode`\,\active
+            \catcode`\;\active
+            \catcode`\:\active
+            \catcode`\?\active
+            \catcode`\!\active
+            \catcode`\/\active
+            \lccode`\~`\~
+        }
+    \makeatother
+
+    \let\OriginalVerbatim=\Verbatim
+    \makeatletter
+    \renewcommand{\Verbatim}[1][1]{%
+        %\parskip\z@skip
+        \sbox\Wrappedcontinuationbox {\Wrappedcontinuationsymbol}%
+        \sbox\Wrappedvisiblespacebox {\FV@SetupFont\Wrappedvisiblespace}%
+        \def\FancyVerbFormatLine ##1{\hsize\linewidth
+            \vtop{\raggedright\hyphenpenalty\z@\exhyphenpenalty\z@
+                \doublehyphendemerits\z@\finalhyphendemerits\z@
+                \strut ##1\strut}%
+        }%
+        % If the linebreak is at a space, the latter will be displayed as visible
+        % space at end of first line, and a continuation symbol starts next line.
+        % Stretch/shrink are however usually zero for typewriter font.
+        \def\FV@Space {%
+            \nobreak\hskip\z@ plus\fontdimen3\font minus\fontdimen4\font
+            \discretionary{\copy\Wrappedvisiblespacebox}{\Wrappedafterbreak}
+            {\kern\fontdimen2\font}%
+        }%
+
+        % Allow breaks at special characters using \PYG... macros.
+        \Wrappedbreaksatspecials
+        % Breaks at punctuation characters . , ; ? ! and / need catcode=\active
+        \OriginalVerbatim[#1,codes*=\Wrappedbreaksatpunct]%
+    }
+    \makeatother
+
+    % Exact colors from NB
+    \definecolor{incolor}{HTML}{303F9F}
+    \definecolor{outcolor}{HTML}{D84315}
+    \definecolor{cellborder}{HTML}{CFCFCF}
+    \definecolor{cellbackground}{HTML}{F7F7F7}
+
+    % prompt
+    \makeatletter
+    \newcommand{\boxspacing}{\kern\kvtcb@left@rule\kern\kvtcb@boxsep}
+    \makeatother
+    \newcommand{\prompt}[4]{
+        {\ttfamily\llap{{\color{#2}[#3]:\hspace{3pt}#4}}\vspace{-\baselineskip}}
+    }
+    
+
+    
+    % Prevent overflowing lines due to hard-to-break entities
+    \sloppy
+    % Setup hyperref package
+    \hypersetup{
+      breaklinks=true,  % so long urls are correctly broken across lines
+      colorlinks=true,
+      urlcolor=urlcolor,
+      linkcolor=linkcolor,
+      citecolor=citecolor,
+      }
+    % Slightly bigger margins than the latex defaults
+    
+    \geometry{verbose,tmargin=1in,bmargin=1in,lmargin=1in,rmargin=1in}
+    
+    
+
+\begin{document}
+    
+    \maketitle
+    
+    
+
+    
+
+《强化学习导论》（Reinforcement Learning An Introduction by Richard
+Sutton and Andrew
+Barto）是强化学习领域的奠基性著作，系统阐述了该领域的核心概念、算法及应用体系。这本教材是萨顿和巴托合著的经典教材，系统阐释了强化学习的核心概念与算法。全书通过三大板块展开：从马尔可夫决策过程的基础理论，到动态规划、蒙特卡洛等核心方法，再到函数逼近、神经网络融合等前沿进展。该书以通俗语言解析复杂理论，被公认为AI领域的必读著作，适合具备概率统计基础的读者通过实践深入研习。
+
+    \hypertarget{ux5341ux81c2ux6d4bux8bd5ux5e73ux53f0}{%
+\section{十臂测试平台}\label{ux5341ux81c2ux6d4bux8bd5ux5e73ux53f0}}
+
+什么是十臂测试平台（10-armed Testbed）？
+这是一个在强化学习中非常经典和重要的概念性工具，主要用于测试、比较和可视化不同决策算法的性能。
+想象你走进一个赌场，面前有10台老虎机。每台老虎机的赢钱概率和奖金分布都不一样，但你不知道具体哪台好哪台坏。你的目标是通过有限次数的拉杆，尽可能获得最多的总奖金。
+
+这就是强化学习中的一个核心困境：\textbf{``探索-利用''的权衡}。 *
+\textbf{利用}：选择你\textbf{目前认为}能给最多奖励的那台机器。 *
+\textbf{探索}：尝试你\textbf{目前不太了解}的机器，以收集更多信息，可能发现奖励更高的机器。
+
+``十臂测试平台''就是将上述比喻具体化和数字化，以便进行实验。
+
+它通常包含以下要素：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{10个动作}：你有10个``拉杆''动作可选（动作\(a=1,...,10,\)）。
+\item
+  \textbf{随机奖励}：每个动作 \(a\)
+  都对应一个固定的、但对你隐藏的奖励概率分布\(q_*(a)\)。这里设定这个分布为正态分布（均值\((q_*(a)\)，方差1）。\(q_*(a)\)
+  是每个动作的``真实价值''，在实验开始时被\textbf{随机生成}（例如，从一个均值为0，方差为1的正态分布中采样），如下图所示。
+\item
+  \textbf{交互过程}：在每一步\(t\)，你选择一个动作\(A_t\)（比如，拉动第5个拉杆），环境会从这个动作对应的奖励分布中\textbf{采样}一个奖励
+  \(R_t\) 给你。
+\item
+  \textbf{算法的目标}：你运行的算法（如ε-贪婪）需要根据历史交互数据
+  \((A_1, R_1, A_2, R_2, ...)\) 来学习并做出决策，以最大化累计奖励。
+\end{enumerate}
+
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{2}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{k+kn}{import} \PY{n+nn}{numpy} \PY{k}{as} \PY{n+nn}{np}
+\PY{k+kn}{import} \PY{n+nn}{seaborn} \PY{k}{as} \PY{n+nn}{sns}
+\PY{k+kn}{import} \PY{n+nn}{matplotlib}\PY{n+nn}{.}\PY{n+nn}{pyplot} \PY{k}{as} \PY{n+nn}{plt}
+\PY{k+kn}{import} \PY{n+nn}{pandas} \PY{k}{as} \PY{n+nn}{pd}
+\PY{k+kn}{import} \PY{n+nn}{matplotlib}\PY{n+nn}{.}\PY{n+nn}{font\PYZus{}manager} \PY{k}{as} \PY{n+nn}{fm}
+
+\PY{c+c1}{\PYZsh{} 生成10个动作的真实价值 q*(a)，从均值0，方差1的正态分布中采样}
+\PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{seed}\PY{p}{(}\PY{l+m+mi}{42}\PY{p}{)}  \PY{c+c1}{\PYZsh{} 设置随机种子以便重现}
+\PY{n}{means} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{l+m+mi}{10}\PY{p}{)}
+
+\PY{c+c1}{\PYZsh{} 为每个动作生成样本数据（例如，每个动作10000个样本）}
+\PY{n}{n\PYZus{}samples} \PY{o}{=} \PY{l+m+mi}{10000}
+\PY{n}{data} \PY{o}{=} \PY{p}{[}\PY{p}{]}
+\PY{k}{for} \PY{n}{i}\PY{p}{,} \PY{n}{mean} \PY{o+ow}{in} \PY{n+nb}{enumerate}\PY{p}{(}\PY{n}{means}\PY{p}{)}\PY{p}{:}
+    \PY{n}{samples} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{n}{mean}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{n}{n\PYZus{}samples}\PY{p}{)}
+    \PY{k}{for} \PY{n}{sample} \PY{o+ow}{in} \PY{n}{samples}\PY{p}{:}
+        \PY{n}{data}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{p}{\PYZob{}}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{action}\PY{l+s+s1}{\PYZsq{}}\PY{p}{:} \PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Action }\PY{l+s+si}{\PYZob{}}\PY{n}{i}\PY{o}{+}\PY{l+m+mi}{1}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{reward}\PY{l+s+s1}{\PYZsq{}}\PY{p}{:} \PY{n}{sample}\PY{p}{\PYZcb{}}\PY{p}{)}
+
+\PY{c+c1}{\PYZsh{} 创建DataFrame}
+\PY{n}{df} \PY{o}{=} \PY{n}{pd}\PY{o}{.}\PY{n}{DataFrame}\PY{p}{(}\PY{n}{data}\PY{p}{)}
+
+\PY{c+c1}{\PYZsh{} 创建图形}
+\PY{n}{plt}\PY{o}{.}\PY{n}{figure}\PY{p}{(}\PY{n}{figsize}\PY{o}{=}\PY{p}{(}\PY{l+m+mi}{12}\PY{p}{,} \PY{l+m+mi}{6}\PY{p}{)}\PY{p}{)}
+
+\PY{c+c1}{\PYZsh{} 绘制小提琴图}
+\PY{n}{sns}\PY{o}{.}\PY{n}{violinplot}\PY{p}{(}\PY{n}{x}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{action}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{y}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{reward}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{data}\PY{o}{=}\PY{n}{df}\PY{p}{)}
+
+\PY{c+c1}{\PYZsh{} 在每个violin上方标注均值 q*(a)}
+\PY{k}{for} \PY{n}{i}\PY{p}{,} \PY{n}{mean} \PY{o+ow}{in} \PY{n+nb}{enumerate}\PY{p}{(}\PY{n}{means}\PY{p}{)}\PY{p}{:}
+    \PY{c+c1}{\PYZsh{} 计算该动作的样本最大值}
+    \PY{n}{action\PYZus{}data} \PY{o}{=} \PY{n}{df}\PY{p}{[}\PY{n}{df}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{action}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]} \PY{o}{==} \PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Action }\PY{l+s+si}{\PYZob{}}\PY{n}{i}\PY{o}{+}\PY{l+m+mi}{1}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}\PY{p}{[}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{reward}\PY{l+s+s1}{\PYZsq{}}\PY{p}{]}
+    \PY{c+c1}{\PYZsh{} 在平均值上方标注均值}
+    \PY{n}{plt}\PY{o}{.}\PY{n}{text}\PY{p}{(}\PY{n}{i}\PY{p}{,} \PY{n}{action\PYZus{}data}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{p}{)}\PY{p}{,} \PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{q*(}\PY{l+s+si}{\PYZob{}}\PY{n}{i}\PY{o}{+}\PY{l+m+mi}{1}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{)=}\PY{l+s+si}{\PYZob{}}\PY{n}{mean}\PY{l+s+si}{:}\PY{l+s+s1}{.2f}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{ha}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{center}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{va}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{bottom}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+
+\PY{c+c1}{\PYZsh{} Add title and labels}
+\PY{n}{plt}\PY{o}{.}\PY{n}{title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Violin plot of reward distributions (10\PYZhy{}armed Testbed)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Action}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Reward}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{tight\PYZus{}layout}\PY{p}{(}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_2_0.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    \hypertarget{varepsilon-ux8d2aux5a6aux7b97ux6cd5}{%
+\subsection{\texorpdfstring{\(\varepsilon\)-贪婪算法}{\textbackslash varepsilon-贪婪算法}}\label{varepsilon-ux8d2aux5a6aux7b97ux6cd5}}
+
+\textbf{\(\varepsilon\)-贪婪算法}是一个在强化学习和多臂赌博机问题中非常经典且重要的算法，用于平衡\textbf{探索}
+和\textbf{利用} 这一对核心矛盾。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{ux6838ux5fc3ux95eeux9898ux63a2ux7d22ux4e0eux5229ux7528ux7684ux6743ux8861}{%
+\subsubsection{核心问题：探索与利用的权衡}\label{ux6838ux5fc3ux95eeux9898ux63a2ux7d22ux4e0eux5229ux7528ux7684ux6743ux8861}}
+
+想象一下你走进一个你有过几次经验的赌场，里面有10台老虎机（也叫``多臂赌博机''）。
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{利用}：你会倾向于玩那台在过去给你带来最多收益的老虎机。因为你\textbf{利用}了已有的知识，希望获得最大化的即时回报。
+\item
+  \textbf{探索}：但你可能也会想：``万一另一台老虎机其实更好，只是我还没发现呢？''
+  于是你花一些钱去尝试其他老虎机，这就是\textbf{探索}。
+\end{itemize}
+
+如果只利用不探索，你可能会陷入局部最优，错过真正回报最高的选择。如果只探索不利用，你就无法最大化你的累计收益，因为你总是在``交学费''尝试新东西。
+
+\textbf{\(\varepsilon\)-贪婪算法}就是为了优雅地解决这个问题而诞生的。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{ux7b97ux6cd5ux601dux60f3}{%
+\subsubsection{算法思想}\label{ux7b97ux6cd5ux601dux60f3}}
+
+\(\varepsilon\)-贪婪算法的思想非常简单直接：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  设定一个小的概率值 \(\varepsilon\) (例如
+  0.1，即10\%)。这个值控制了探索的强度。
+\item
+  在每次需要选择行动时，生成一个0到1之间的随机数：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{以 \(1-\varepsilon\)
+    的概率（大概率）}：选择\textbf{当前认为最好}的行动（即``贪婪''行动）。这是\textbf{利用}。
+  \item
+    \textbf{以 \(\varepsilon\)
+    的概率（小概率）}：\textbf{随机}选择一个行动（包括当前认为最好的那个）。这是\textbf{探索}。
+  \end{itemize}
+\end{enumerate}
+
+这里的 \(\varepsilon\) 就像一个``探索开关''，\(\varepsilon\)
+越大，探索就越频繁。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{ux7b97ux6cd5ux6d41ux7a0b}{%
+\subsubsection{算法流程}\label{ux7b97ux6cd5ux6d41ux7a0b}}
+
+我们以一个有10个臂的老虎机问题为例：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{初始化}：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    为每个臂 \(a\) 初始化价值估计 \(q(a)\)，例如设为0。
+  \item
+    初始化每个臂被选择的次数 \(N(a) = 0\)。
+  \item
+    设定探索概率 \(\varepsilon\) (0 \textless{} \(\varepsilon\)
+    \textless{} 1)。
+  \end{itemize}
+\item
+  \textbf{循环} (对于每一步 \(t=1, 2, 3, ...\))：
+
+  \begin{enumerate}
+  \def\labelenumii{\alph{enumii}.}
+  \item
+    \textbf{选择行动}：
+
+    \begin{itemize}
+    \tightlist
+    \item
+      生成一个随机数 \(p \sim Uniform(0,1)\)。
+    \item
+      如果 \(p < \varepsilon\)：
+
+      \begin{itemize}
+      \tightlist
+      \item
+        \textbf{探索}：从所有臂中\textbf{随机}选择一个臂 \(A_t\)。
+      \end{itemize}
+    \item
+      否则：
+
+      \begin{itemize}
+      \tightlist
+      \item
+        \textbf{利用}：选择当前价值估计最高的臂
+        \(A_t = \arg\max_a Q(a)\) (如果多个臂价值相同，则随机选一个)。
+      \end{itemize}
+    \end{itemize}
+  \item
+    \textbf{执行行动}：拉动选择的臂 \(A_t\)，获得收益 \(R_t\)。
+  \item
+    \textbf{更新价值估计}：
+
+    \begin{itemize}
+    \tightlist
+    \item
+      更新该臂被选择的次数：\(N(A_t) \leftarrow N(A_t) + 1\)。
+    \item
+      更新该臂的价值估计（采用增量更新的方式）：
+      \(Q(A_t) \leftarrow Q(A_t) + \frac{1}{N(A_t)} [R_t - Q(A_t)]\)
+      这个更新公式的意思是：新的估计 = 旧的估计 + 学习率 × (新回报 -
+      旧的估计)。这里的学习率是 \(1/N(A_t)\)。
+    \end{itemize}
+  \end{enumerate}
+\end{enumerate}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{ux7b97ux6cd5ux7684ux4f18ux7f3aux70b9}{%
+\subsubsection{算法的优缺点}\label{ux7b97ux6cd5ux7684ux4f18ux7f3aux70b9}}
+
+\textbf{优点}： - \textbf{简单易懂}：原理和实现都非常简单。 -
+\textbf{易于调试}：行为可预测，探索频率是固定的。 -
+\textbf{通常很有效}：在很多问题上都能取得不错的效果。
+
+\textbf{缺点}： -
+\textbf{探索是随机的、低效的}：在探索时，它会以同等概率去探索所有非最优的行动，即使某个行动已经明确很差了。它不会``聪明地''去探索更有潜力的行动。
+- \textbf{参数 \(\varepsilon\)
+是固定的}：在实验初期，我们需要大量探索；而在后期，当价值估计已经很准确时，我们可能希望减少探索。固定的
+\(\varepsilon\) 无法适应这个需求。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\hypertarget{ux6539ux8fdbux4e0eux53d8ux4f53}{%
+\subsubsection{改进与变体}\label{ux6539ux8fdbux4e0eux53d8ux4f53}}
+
+为了解决上述缺点，研究者提出了很多改进方法：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{随时间衰减的 \(\varepsilon\)}： 让 \(\varepsilon\)
+  随着时间步数 \(t\) 逐渐减小，例如 \(\varepsilon_t = 1/t\) 或
+  \(\varepsilon_t = 0.99^t\)。这样在初期鼓励探索，后期鼓励利用。
+\item
+  \textbf{上置信界算法}：
+  一种更``聪明''的探索策略，在选择时会考虑价值估计的不确定性。它会优先探索那些要么价值估计很高、要么不确定性很高的行动。公式为：\(A_t = \arg\max_a [Q(a) + c \sqrt{\frac{\ln t}{N(a)}}]\)，其中第二项就是不确定性度量。
+\item
+  \textbf{汤普森采样}：
+  一种基于贝叶斯思想的算法，为每个臂维护一个奖励分布，然后根据这个分布采样来做出选择。它以一种概率化的方式自然地平衡了探索和利用。
+\end{enumerate}
+
+\hypertarget{ux603bux7ed3}{%
+\subsubsection{总结}\label{ux603bux7ed3}}
+
+\(\varepsilon\)-贪婪算法是解决探索-利用困境的一个\textbf{基线方法}和\textbf{强大基准}。它的核心在于以一个固定的、小的概率
+\(\varepsilon\) 进行随机探索，而以 \(1-\varepsilon\)
+的概率进行贪婪利用。虽然它有其局限性，但其简单性和有效性使其成为入门强化学习和解决多臂赌博机问题的首选算法。
+
+    \hypertarget{ux4e00ux4e2aux5178ux578bux7684ux5b9eux9a8cux7ed3ux679c}{%
+\subsubsection{一个典型的实验结果}\label{ux4e00ux4e2aux5178ux578bux7684ux5b9eux9a8cux7ed3ux679c}}
+
+在《强化学习导论》这本教材中，你会看到类似下图的描述：
+
+\begin{quote}
+我们运行一个2000步的实验，重复1000次取平均。 *
+\textbf{贪婪算法（ε=0）}：初期增长快，但很快达到一个较低的平均奖励水平，因为它陷入了局部最优。
+*
+\textbf{ε-贪婪算法（ε=0.01）}：初期比贪婪算法慢，但最终表现更好，因为它有少量探索。
+*
+\textbf{ε-贪婪算法（ε=0.1）}：探索更多，学习更慢，但最终找到了更好的策略，平均奖励最高。
+\end{quote}
+
+\textbf{10-armed
+Testbed（十臂测试平台）是一个标准化的模拟环境，它抽象并简化了强化学习中的核心挑战------``探索-利用''困境。通过在这个可控的平台上测试算法，研究人员可以直观地比较不同算法的性能，理解探索的重要性，并为解决更复杂的现实世界问题打下基础。}
+它是学习强化学习入门时不可或缺的一个概念。
+
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{3}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{c+c1}{\PYZsh{} ε\PYZhy{}贪婪在10臂测试平台上的模拟与绘图}
+\PY{c+c1}{\PYZsh{} 依赖于之前单元格已定义的变量：means, np, plt, sns}
+
+\PY{n}{n\PYZus{}arms} \PY{o}{=} \PY{n+nb}{len}\PY{p}{(}\PY{n}{means}\PY{p}{)}          \PY{c+c1}{\PYZsh{} 应为10}
+\PY{n}{steps} \PY{o}{=} \PY{l+m+mi}{1000}                 \PY{c+c1}{\PYZsh{} 每次实验步数}
+\PY{n}{runs} \PY{o}{=} \PY{l+m+mi}{2000}                  \PY{c+c1}{\PYZsh{} 重复实验次数（取平均）}
+\PY{n}{epsilons} \PY{o}{=} \PY{p}{[}\PY{l+m+mf}{0.0}\PY{p}{,} \PY{l+m+mf}{0.01}\PY{p}{,} \PY{l+m+mf}{0.1}\PY{p}{]}  \PY{c+c1}{\PYZsh{} 要比较的ε值}
+
+\PY{n}{optimal\PYZus{}arm} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{np}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{means}\PY{p}{)}\PY{p}{)}
+
+\PY{c+c1}{\PYZsh{} 用于存放每个ε在每一步的平均回报和选择最优动作的比例}
+\PY{n}{avg\PYZus{}rewards} \PY{o}{=} \PY{p}{\PYZob{}}\PY{n}{eps}\PY{p}{:} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{)} \PY{k}{for} \PY{n}{eps} \PY{o+ow}{in} \PY{n}{epsilons}\PY{p}{\PYZcb{}}
+\PY{n}{optimal\PYZus{}action\PYZus{}rates} \PY{o}{=} \PY{p}{\PYZob{}}\PY{n}{eps}\PY{p}{:} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{)} \PY{k}{for} \PY{n}{eps} \PY{o+ow}{in} \PY{n}{epsilons}\PY{p}{\PYZcb{}}
+
+\PY{k}{for} \PY{n}{eps} \PY{o+ow}{in} \PY{n}{epsilons}\PY{p}{:}
+    \PY{n}{rewards\PYZus{}all} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}chosen} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{)}
+    \PY{k}{for} \PY{n}{run} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{runs}\PY{p}{)}\PY{p}{:}
+        \PY{n}{Q} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}    \PY{c+c1}{\PYZsh{} 价值估计}
+        \PY{n}{N} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}    \PY{c+c1}{\PYZsh{} 每臂被选次数}
+        \PY{k}{for} \PY{n}{t} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{steps}\PY{p}{)}\PY{p}{:}
+            \PY{k}{if} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{rand}\PY{p}{(}\PY{p}{)} \PY{o}{\PYZlt{}} \PY{n}{eps}\PY{p}{:}
+                \PY{c+c1}{\PYZsh{} 探索：随机选择一个臂}
+                \PY{n}{action} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{randint}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}
+            \PY{k}{else}\PY{p}{:}
+                \PY{c+c1}{\PYZsh{} 利用：选择当前估计最优（若并列则随机选择其一）}
+                \PY{n}{best} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{flatnonzero}\PY{p}{(}\PY{n}{Q} \PY{o}{==} \PY{n}{Q}\PY{o}{.}\PY{n}{max}\PY{p}{(}\PY{p}{)}\PY{p}{)}
+                \PY{k}{if} \PY{n}{best}\PY{o}{.}\PY{n}{size} \PY{o}{\PYZgt{}} \PY{l+m+mi}{1}\PY{p}{:}
+                    \PY{n}{action} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{choice}\PY{p}{(}\PY{n}{best}\PY{p}{)}
+                \PY{k}{else}\PY{p}{:}
+                    \PY{n}{action} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{best}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{p}{)}
+            \PY{c+c1}{\PYZsh{} 从真实分布采样奖励（均值为means[action], 方差1）}
+            \PY{n}{reward} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{n}{means}\PY{p}{[}\PY{n}{action}\PY{p}{]}\PY{p}{,} \PY{l+m+mf}{1.0}\PY{p}{)}
+            \PY{c+c1}{\PYZsh{} 增量更新}
+            \PY{n}{N}\PY{p}{[}\PY{n}{action}\PY{p}{]} \PY{o}{+}\PY{o}{=} \PY{l+m+mi}{1}
+            \PY{n}{Q}\PY{p}{[}\PY{n}{action}\PY{p}{]} \PY{o}{+}\PY{o}{=} \PY{p}{(}\PY{n}{reward} \PY{o}{\PYZhy{}} \PY{n}{Q}\PY{p}{[}\PY{n}{action}\PY{p}{]}\PY{p}{)} \PY{o}{/} \PY{n}{N}\PY{p}{[}\PY{n}{action}\PY{p}{]}
+
+            \PY{n}{rewards\PYZus{}all}\PY{p}{[}\PY{n}{run}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{n}{reward}
+            \PY{n}{optimal\PYZus{}chosen}\PY{p}{[}\PY{n}{run}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{l+m+mi}{1} \PY{k}{if} \PY{n}{action} \PY{o}{==} \PY{n}{optimal\PYZus{}arm} \PY{k}{else} \PY{l+m+mi}{0}
+
+    \PY{c+c1}{\PYZsh{} 对所有重复实验取平均}
+    \PY{n}{avg\PYZus{}rewards}\PY{p}{[}\PY{n}{eps}\PY{p}{]} \PY{o}{=} \PY{n}{rewards\PYZus{}all}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}action\PYZus{}rates}\PY{p}{[}\PY{n}{eps}\PY{p}{]} \PY{o}{=} \PY{n}{optimal\PYZus{}chosen}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)} \PY{o}{*} \PY{l+m+mf}{100.0}  \PY{c+c1}{\PYZsh{} 转为百分比}
+
+\PY{c+c1}{\PYZsh{} 绘图：两个子图，上：平均回报；下：选择最优动作的百分比}
+\PY{n}{fig}\PY{p}{,} \PY{n}{axes} \PY{o}{=} \PY{n}{plt}\PY{o}{.}\PY{n}{subplots}\PY{p}{(}\PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{n}{figsize}\PY{o}{=}\PY{p}{(}\PY{l+m+mi}{12}\PY{p}{,} \PY{l+m+mi}{10}\PY{p}{)}\PY{p}{,} \PY{n}{sharex}\PY{o}{=}\PY{k+kc}{True}\PY{p}{)}
+
+\PY{n}{colors} \PY{o}{=} \PY{p}{\PYZob{}}\PY{l+m+mf}{0.0}\PY{p}{:} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:blue}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{l+m+mf}{0.01}\PY{p}{:} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:orange}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{l+m+mf}{0.1}\PY{p}{:} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:green}\PY{l+s+s1}{\PYZsq{}}\PY{p}{\PYZcb{}}
+\PY{k}{for} \PY{n}{eps} \PY{o+ow}{in} \PY{n}{epsilons}\PY{p}{:}
+    \PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}rewards}\PY{p}{[}\PY{n}{eps}\PY{p}{]}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{n}{colors}\PY{p}{[}\PY{n}{eps}\PY{p}{]}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward vs Steps for different ε (10\PYZhy{}armed Testbed)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{k}{for} \PY{n}{eps} \PY{o+ow}{in} \PY{n}{epsilons}\PY{p}{:}
+    \PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{optimal\PYZus{}action\PYZus{}rates}\PY{p}{[}\PY{n}{eps}\PY{p}{]}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{n}{colors}\PY{p}{[}\PY{n}{eps}\PY{p}{]}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Step}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZpc{}}\PY{l+s+s1}{ Optimal Action}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Percent Optimal Action vs Steps}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{tight\PYZus{}layout}\PY{p}{(}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_5_0.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    \hypertarget{ux957fux671fux8868ux73b0}{%
+\paragraph{长期表现}\label{ux957fux671fux8868ux73b0}}
+
+对于长期运行，我们发现\(\varepsilon=0.01\)的表现比其他两个参数要好，运行的结果如下图所示。
+经过计算发现\(\varepsilon=0.01\)的最终受益比\(\varepsilon=0.1\)大概多0.1。
+
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{4}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{c+c1}{\PYZsh{} ε\PYZhy{}贪婪在10臂测试平台上的模拟与绘图}
+\PY{c+c1}{\PYZsh{} 依赖于之前单元格已定义的变量：means, np, plt, sns}
+
+\PY{n}{n\PYZus{}arms} \PY{o}{=} \PY{n+nb}{len}\PY{p}{(}\PY{n}{means}\PY{p}{)}          \PY{c+c1}{\PYZsh{} 应为10}
+\PY{n}{steps} \PY{o}{=} \PY{l+m+mi}{10000}                 \PY{c+c1}{\PYZsh{} 每次实验步数}
+\PY{n}{runs} \PY{o}{=} \PY{l+m+mi}{2000}                  \PY{c+c1}{\PYZsh{} 重复实验次数（取平均）}
+\PY{n}{epsilons} \PY{o}{=} \PY{p}{[}\PY{l+m+mf}{0.0}\PY{p}{,} \PY{l+m+mf}{0.01}\PY{p}{,} \PY{l+m+mf}{0.1}\PY{p}{]}  \PY{c+c1}{\PYZsh{} 要比较的ε值}
+
+\PY{n}{optimal\PYZus{}arm} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{np}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{means}\PY{p}{)}\PY{p}{)}
+
+\PY{c+c1}{\PYZsh{} 用于存放每个ε在每一步的平均回报和选择最优动作的比例}
+\PY{n}{avg\PYZus{}rewards} \PY{o}{=} \PY{p}{\PYZob{}}\PY{n}{eps}\PY{p}{:} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{)} \PY{k}{for} \PY{n}{eps} \PY{o+ow}{in} \PY{n}{epsilons}\PY{p}{\PYZcb{}}
+\PY{n}{optimal\PYZus{}action\PYZus{}rates} \PY{o}{=} \PY{p}{\PYZob{}}\PY{n}{eps}\PY{p}{:} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{)} \PY{k}{for} \PY{n}{eps} \PY{o+ow}{in} \PY{n}{epsilons}\PY{p}{\PYZcb{}}
+
+\PY{k}{for} \PY{n}{eps} \PY{o+ow}{in} \PY{n}{epsilons}\PY{p}{:}
+    \PY{n}{rewards\PYZus{}all} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}chosen} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{)}
+    \PY{k}{for} \PY{n}{run} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{runs}\PY{p}{)}\PY{p}{:}
+        \PY{n}{Q} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}    \PY{c+c1}{\PYZsh{} 价值估计}
+        \PY{n}{N} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}    \PY{c+c1}{\PYZsh{} 每臂被选次数}
+        \PY{k}{for} \PY{n}{t} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{steps}\PY{p}{)}\PY{p}{:}
+            \PY{k}{if} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{rand}\PY{p}{(}\PY{p}{)} \PY{o}{\PYZlt{}} \PY{n}{eps}\PY{p}{:}
+                \PY{c+c1}{\PYZsh{} 探索：随机选择一个臂}
+                \PY{n}{action} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{randint}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}
+            \PY{k}{else}\PY{p}{:}
+                \PY{c+c1}{\PYZsh{} 利用：选择当前估计最优（若并列则随机选择其一）}
+                \PY{n}{best} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{flatnonzero}\PY{p}{(}\PY{n}{Q} \PY{o}{==} \PY{n}{Q}\PY{o}{.}\PY{n}{max}\PY{p}{(}\PY{p}{)}\PY{p}{)}
+                \PY{k}{if} \PY{n}{best}\PY{o}{.}\PY{n}{size} \PY{o}{\PYZgt{}} \PY{l+m+mi}{1}\PY{p}{:}
+                    \PY{n}{action} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{choice}\PY{p}{(}\PY{n}{best}\PY{p}{)}
+                \PY{k}{else}\PY{p}{:}
+                    \PY{n}{action} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{best}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{p}{)}
+            \PY{c+c1}{\PYZsh{} 从真实分布采样奖励（均值为means[action], 方差1）}
+            \PY{n}{reward} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{n}{means}\PY{p}{[}\PY{n}{action}\PY{p}{]}\PY{p}{,} \PY{l+m+mf}{1.0}\PY{p}{)}
+            \PY{c+c1}{\PYZsh{} 增量更新}
+            \PY{n}{N}\PY{p}{[}\PY{n}{action}\PY{p}{]} \PY{o}{+}\PY{o}{=} \PY{l+m+mi}{1}
+            \PY{n}{Q}\PY{p}{[}\PY{n}{action}\PY{p}{]} \PY{o}{+}\PY{o}{=} \PY{p}{(}\PY{n}{reward} \PY{o}{\PYZhy{}} \PY{n}{Q}\PY{p}{[}\PY{n}{action}\PY{p}{]}\PY{p}{)} \PY{o}{/} \PY{n}{N}\PY{p}{[}\PY{n}{action}\PY{p}{]}
+
+            \PY{n}{rewards\PYZus{}all}\PY{p}{[}\PY{n}{run}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{n}{reward}
+            \PY{n}{optimal\PYZus{}chosen}\PY{p}{[}\PY{n}{run}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{l+m+mi}{1} \PY{k}{if} \PY{n}{action} \PY{o}{==} \PY{n}{optimal\PYZus{}arm} \PY{k}{else} \PY{l+m+mi}{0}
+
+    \PY{c+c1}{\PYZsh{} 对所有重复实验取平均}
+    \PY{n}{avg\PYZus{}rewards}\PY{p}{[}\PY{n}{eps}\PY{p}{]} \PY{o}{=} \PY{n}{rewards\PYZus{}all}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}action\PYZus{}rates}\PY{p}{[}\PY{n}{eps}\PY{p}{]} \PY{o}{=} \PY{n}{optimal\PYZus{}chosen}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)} \PY{o}{*} \PY{l+m+mf}{100.0}  \PY{c+c1}{\PYZsh{} 转为百分比}
+
+\PY{c+c1}{\PYZsh{} 绘图：两个子图，上：平均回报；下：选择最优动作的百分比}
+\PY{n}{fig}\PY{p}{,} \PY{n}{axes} \PY{o}{=} \PY{n}{plt}\PY{o}{.}\PY{n}{subplots}\PY{p}{(}\PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{n}{figsize}\PY{o}{=}\PY{p}{(}\PY{l+m+mi}{12}\PY{p}{,} \PY{l+m+mi}{10}\PY{p}{)}\PY{p}{,} \PY{n}{sharex}\PY{o}{=}\PY{k+kc}{True}\PY{p}{)}
+
+\PY{n}{colors} \PY{o}{=} \PY{p}{\PYZob{}}\PY{l+m+mf}{0.0}\PY{p}{:} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:blue}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{l+m+mf}{0.01}\PY{p}{:} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:orange}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{l+m+mf}{0.1}\PY{p}{:} \PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:green}\PY{l+s+s1}{\PYZsq{}}\PY{p}{\PYZcb{}}
+\PY{k}{for} \PY{n}{eps} \PY{o+ow}{in} \PY{n}{epsilons}\PY{p}{:}
+    \PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}rewards}\PY{p}{[}\PY{n}{eps}\PY{p}{]}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{n}{colors}\PY{p}{[}\PY{n}{eps}\PY{p}{]}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward vs Steps for different ε (10\PYZhy{}armed Testbed)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{k}{for} \PY{n}{eps} \PY{o+ow}{in} \PY{n}{epsilons}\PY{p}{:}
+    \PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{optimal\PYZus{}action\PYZus{}rates}\PY{p}{[}\PY{n}{eps}\PY{p}{]}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{n}{colors}\PY{p}{[}\PY{n}{eps}\PY{p}{]}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Step}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZpc{}}\PY{l+s+s1}{ Optimal Action}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Percent Optimal Action vs Steps}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{tight\PYZus{}layout}\PY{p}{(}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_7_0.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{5}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{k}{for} \PY{n}{eps} \PY{o+ow}{in} \PY{n}{epsilons}\PY{p}{:}
+    \PY{n+nb}{print}\PY{p}{(}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps}\PY{l+s+si}{:}\PY{l+s+s1}{\PYZlt{}5}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{ Average Reward (last 100 steps): }\PY{l+s+si}{\PYZob{}}\PY{n}{avg\PYZus{}rewards}\PY{p}{[}\PY{n}{eps}\PY{p}{]}\PY{p}{[}\PY{o}{\PYZhy{}}\PY{l+m+mi}{100}\PY{p}{:}\PY{p}{]}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{p}{)}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+ε=0.0   Average Reward (last 100 steps): 1.041017443648106
+ε=0.01  Average Reward (last 100 steps): 1.5490114626827483
+ε=0.1   Average Reward (last 100 steps): 1.4566875572194726
+    \end{Verbatim}
+
+    \hypertarget{ux5341ux81c2ux6d4bux8bd5ux5e73ux53f0ux7684ux975eux5e73ux7a33ux95eeux9898}{%
+\subsection{十臂测试平台的非平稳问题}\label{ux5341ux81c2ux6d4bux8bd5ux5e73ux53f0ux7684ux975eux5e73ux7a33ux95eeux9898}}
+
+在十臂测试平台的非平稳版本中，动作的真实价值 \(q_*(a)\)
+随时间发生变化。一个常见的设定是：初始时所有拉杆的 \(q_*(a)\)
+相同，随后每个拉杆的真实价值独立地做随机游走（增量服从均值为 0、方差为
+0.01 的正态分布）。此时随时间的 \(q_*(a)\) 曲线会像下图那样不断漂移。
+
+在这种环境下，使用基于样本均值的更新（即学习率为 \(1/N(a)\)
+的增量更新）并不合适，因为过去的观测会随着时间变得过时。为更好地跟踪非平稳目标，我们改用固定步长的指数加权更新：
+
+\[
+Q_{n+1} = Q_n + \alpha\,[R_n - Q_n], \qquad \alpha \in (0,1].
+\]
+
+这里的固定步长 \(\alpha\)
+相当于对历史奖励做指数衰减加权，最近的奖励权重更大，因此能够更快地响应真实价值的变化。一般经验：
+
+\begin{itemize}
+\tightlist
+\item
+  \(\alpha\) 越大，估计对新观测响应越快，但方差也越大（不稳定性增加）。
+\item
+  \(\alpha\) 越小，估计平滑但对突发变化反应慢。
+\end{itemize}
+
+选择合适的 \(\alpha\)
+需要在跟踪速度和估计方差之间权衡。常用的直观解释是：固定步长的更新相当于对最近约
+\(1/\alpha\) 步的观测给予较大权重（有效记忆窗）。
+
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{6}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{c+c1}{\PYZsh{} 模拟并绘制非平稳10臂测试平台中每个动作真实价值 q*(a) 的随机游走曲线}
+\PY{c+c1}{\PYZsh{} 依赖已在笔记本中导入的 np, plt, sns}
+
+\PY{n}{rw\PYZus{}steps} \PY{o}{=} \PY{l+m+mi}{10000}           \PY{c+c1}{\PYZsh{} 演化步数（可调整）}
+\PY{n}{sigma\PYZus{}rw} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{sqrt}\PY{p}{(}\PY{l+m+mf}{0.01}\PY{p}{)}  \PY{c+c1}{\PYZsh{} 随机游走的标准差（方差为0.01）}
+\PY{n}{n\PYZus{}arms} \PY{o}{=} \PY{l+m+mi}{10}               \PY{c+c1}{\PYZsh{} 臂数（笔记本中已有 n\PYZus{}arms，可重用）}
+
+\PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{seed}\PY{p}{(}\PY{l+m+mi}{123}\PY{p}{)}       \PY{c+c1}{\PYZsh{} 为可复现性设种子（可移除以获得不同轨迹）}
+
+\PY{c+c1}{\PYZsh{} 初始化所有动作的初始真实价值相等（例如都为0）}
+\PY{n}{q} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}
+\PY{n}{q\PYZus{}history} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{rw\PYZus{}steps}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}\PY{p}{)}
+
+\PY{k}{for} \PY{n}{t} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{rw\PYZus{}steps}\PY{p}{)}\PY{p}{:}
+    \PY{c+c1}{\PYZsh{} 每个动作独立做一次正态噪声随机游走增量}
+    \PY{n}{q} \PY{o}{+}\PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{l+m+mf}{0.0}\PY{p}{,} \PY{n}{sigma\PYZus{}rw}\PY{p}{,} \PY{n}{size}\PY{o}{=}\PY{n}{n\PYZus{}arms}\PY{p}{)}
+    \PY{n}{q\PYZus{}history}\PY{p}{[}\PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{n}{q}
+
+\PY{c+c1}{\PYZsh{} 绘图：每个动作一条线}
+\PY{n}{plt}\PY{o}{.}\PY{n}{figure}\PY{p}{(}\PY{n}{figsize}\PY{o}{=}\PY{p}{(}\PY{l+m+mi}{12}\PY{p}{,} \PY{l+m+mi}{6}\PY{p}{)}\PY{p}{)}
+\PY{n}{palette} \PY{o}{=} \PY{n}{sns}\PY{o}{.}\PY{n}{color\PYZus{}palette}\PY{p}{(}\PY{l+s+s2}{\PYZdq{}}\PY{l+s+s2}{tab10}\PY{l+s+s2}{\PYZdq{}}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}
+\PY{k}{for} \PY{n}{a} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}\PY{p}{:}
+    \PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{q\PYZus{}history}\PY{p}{[}\PY{p}{:}\PY{p}{,} \PY{n}{a}\PY{p}{]}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Action }\PY{l+s+si}{\PYZob{}}\PY{n}{a}\PY{o}{+}\PY{l+m+mi}{1}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{n}{palette}\PY{p}{[}\PY{n}{a}\PY{p}{]}\PY{p}{,} \PY{n}{linewidth}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{)}
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Non\PYZhy{}stationary 10\PYZhy{}armed Testbed: \PYZdl{}q\PYZus{}*(a)\PYZdl{} random walk over time}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Step}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{q*(a)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{n}{loc}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{upper left}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{ncol}\PY{o}{=}\PY{l+m+mi}{2}\PY{p}{,} \PY{n}{fontsize}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{small}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{grid}\PY{p}{(}\PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.3}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{tight\PYZus{}layout}\PY{p}{(}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{show}\PY{p}{(}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_10_0.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    针对非平稳 10 臂测试平台，使用 ε-贪婪 + 固定步长 α的模拟程序算法如下：
+
+\begin{itemize}
+\tightlist
+\item
+  准备阶段：加载 q\_history（每步的真实 q*(a) 随时间变化），并设置超参数
+  α、ε（这里以 eps\_use 表示）、runs\_sim（独立试验次数）和
+  T（实际模拟步数，取 steps 与 q\_history 长度的最小值）。
+\item
+  外层循环（重复 runs\_sim 次独立试验）：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    每次试验初始化估计值 Q\_est 为全零（长度为 n\_arms）。
+  \item
+    时间步循环 t = 0 .. T-1：
+
+    \begin{itemize}
+    \tightlist
+    \item
+      以概率 ε 进行探索：随机选择一个动作；否则进行利用：选择当前 Q\_est
+      最大的动作（若并列则在并列动作中随机选择）。
+    \item
+      根据当前时刻的真实值 q\_history{[}t, action{]}，从正态分布
+      N(q\_history{[}t, action{]}, 1) 中采样得到 reward\_t。
+    \item
+      使用固定步长 α 做增量更新：Q\_est{[}action{]} += α * (reward\_t -
+      Q\_est{[}action{]})，以便对非平稳目标快速响应。
+    \item
+      记录本步的 reward（存入
+      rewards\_all\_nonstat）并判断所选动作是否等于当时真实 q\_history
+      的最优臂（将结果记录到 optimal\_chosen\_nonstat）。
+    \end{itemize}
+  \end{itemize}
+\item
+  多次试验后：对 runs\_sim 次试验在每个时间步上取平均，得到
+  avg\_reward\_nonstat（平均回报随时间）和
+  percent\_optimal\_nonstat（每步选择最优动作的百分比）。
+\item
+  可视化：绘制两张子图，分别展示随时间变化的平均回报和选择最优动作的百分比，用以评估在非平稳环境下不同参数（α、ε）下算法的跟踪能力与性能。
+\end{itemize}
+
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{7}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{c+c1}{\PYZsh{} 在非平稳10臂测试平台上，用 ε\PYZhy{}贪婪（固定步长α）跟踪并绘制平均回报与\PYZpc{}最优动作随时间的曲线}
+\PY{c+c1}{\PYZsh{} 使用笔记本已有变量：q\PYZus{}history, n\PYZus{}arms, steps, eps (作为ε)}
+\PY{c+c1}{\PYZsh{} 注意避免覆盖已有重要变量名，使用局部变量名 Q\PYZus{}est 等}
+
+\PY{n}{alpha} \PY{o}{=} \PY{l+m+mf}{0.1}
+\PY{n}{eps\PYZus{}use} \PY{o}{=} \PY{n}{eps}  \PY{c+c1}{\PYZsh{} 使用笔记本中已有的 eps（例如 0.1）}
+\PY{n}{runs\PYZus{}sim} \PY{o}{=} \PY{l+m+mi}{500}  \PY{c+c1}{\PYZsh{} 为了速度/可视化平滑，选取一定数量的独立试验；可根据需要增大}
+\PY{n}{T} \PY{o}{=} \PY{n+nb}{min}\PY{p}{(}\PY{n}{steps}\PY{p}{,} \PY{n}{q\PYZus{}history}\PY{o}{.}\PY{n}{shape}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{p}{)}
+
+\PY{n}{rewards\PYZus{}all\PYZus{}nonstat} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs\PYZus{}sim}\PY{p}{,} \PY{n}{T}\PY{p}{)}\PY{p}{)}
+\PY{n}{optimal\PYZus{}chosen\PYZus{}nonstat} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs\PYZus{}sim}\PY{p}{,} \PY{n}{T}\PY{p}{)}\PY{p}{)}
+
+\PY{k}{for} \PY{n}{run\PYZus{}idx} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{runs\PYZus{}sim}\PY{p}{)}\PY{p}{:}
+    \PY{n}{Q\PYZus{}est} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}  \PY{c+c1}{\PYZsh{} 估计值，针对每个试验独立初始化}
+    \PY{k}{for} \PY{n}{t} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{T}\PY{p}{)}\PY{p}{:}
+        \PY{c+c1}{\PYZsh{} 选择动作（ε\PYZhy{}贪婪）}
+        \PY{k}{if} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{rand}\PY{p}{(}\PY{p}{)} \PY{o}{\PYZlt{}} \PY{n}{eps\PYZus{}use}\PY{p}{:}
+            \PY{n}{action\PYZus{}t} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{randint}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}
+        \PY{k}{else}\PY{p}{:}
+            \PY{n}{best\PYZus{}idxs} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{flatnonzero}\PY{p}{(}\PY{n}{Q\PYZus{}est} \PY{o}{==} \PY{n}{Q\PYZus{}est}\PY{o}{.}\PY{n}{max}\PY{p}{(}\PY{p}{)}\PY{p}{)}
+            \PY{n}{action\PYZus{}t} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{choice}\PY{p}{(}\PY{n}{best\PYZus{}idxs}\PY{p}{)}\PY{p}{)} \PY{k}{if} \PY{n}{best\PYZus{}idxs}\PY{o}{.}\PY{n}{size} \PY{o}{\PYZgt{}} \PY{l+m+mi}{1} \PY{k}{else} \PY{n+nb}{int}\PY{p}{(}\PY{n}{best\PYZus{}idxs}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{p}{)}
+
+        \PY{c+c1}{\PYZsh{} 环境按当前时刻的真实 q*(a)（来自 q\PYZus{}history）采样奖励，方差1}
+        \PY{n}{reward\PYZus{}t} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{n}{q\PYZus{}history}\PY{p}{[}\PY{n}{t}\PY{p}{,} \PY{n}{action\PYZus{}t}\PY{p}{]}\PY{p}{,} \PY{l+m+mf}{1.0}\PY{p}{)}
+
+        \PY{c+c1}{\PYZsh{} 固定步长的增量更新（用于非平稳情况）}
+        \PY{n}{Q\PYZus{}est}\PY{p}{[}\PY{n}{action\PYZus{}t}\PY{p}{]} \PY{o}{+}\PY{o}{=} \PY{n}{alpha} \PY{o}{*} \PY{p}{(}\PY{n}{reward\PYZus{}t} \PY{o}{\PYZhy{}} \PY{n}{Q\PYZus{}est}\PY{p}{[}\PY{n}{action\PYZus{}t}\PY{p}{]}\PY{p}{)}
+
+        \PY{n}{rewards\PYZus{}all\PYZus{}nonstat}\PY{p}{[}\PY{n}{run\PYZus{}idx}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{n}{reward\PYZus{}t}
+
+        \PY{c+c1}{\PYZsh{} 每个时刻的最优动作由 q\PYZus{}history 当时刻的最大值决定}
+        \PY{n}{optimal\PYZus{}action\PYZus{}at\PYZus{}t} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{np}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{q\PYZus{}history}\PY{p}{[}\PY{n}{t}\PY{p}{]}\PY{p}{)}\PY{p}{)}
+        \PY{n}{optimal\PYZus{}chosen\PYZus{}nonstat}\PY{p}{[}\PY{n}{run\PYZus{}idx}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{l+m+mi}{1} \PY{k}{if} \PY{n}{action\PYZus{}t} \PY{o}{==} \PY{n}{optimal\PYZus{}action\PYZus{}at\PYZus{}t} \PY{k}{else} \PY{l+m+mi}{0}
+
+\PY{c+c1}{\PYZsh{} 对多次试验取平均}
+\PY{n}{avg\PYZus{}reward\PYZus{}nonstat} \PY{o}{=} \PY{n}{rewards\PYZus{}all\PYZus{}nonstat}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+\PY{n}{percent\PYZus{}optimal\PYZus{}nonstat} \PY{o}{=} \PY{n}{optimal\PYZus{}chosen\PYZus{}nonstat}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)} \PY{o}{*} \PY{l+m+mf}{100.0}
+
+\PY{c+c1}{\PYZsh{} 绘图（上：平均回报；下：\PYZpc{}最优动作）}
+\PY{n}{fig}\PY{p}{,} \PY{n}{ax} \PY{o}{=} \PY{n}{plt}\PY{o}{.}\PY{n}{subplots}\PY{p}{(}\PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{n}{figsize}\PY{o}{=}\PY{p}{(}\PY{l+m+mi}{12}\PY{p}{,} \PY{l+m+mi}{8}\PY{p}{)}\PY{p}{,} \PY{n}{sharex}\PY{o}{=}\PY{k+kc}{True}\PY{p}{)}
+
+\PY{n}{ax}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}reward\PYZus{}nonstat}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:blue}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps\PYZus{}use}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, α=}\PY{l+s+si}{\PYZob{}}\PY{n}{alpha}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{ax}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{ax}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Non\PYZhy{}stationary 10\PYZhy{}armed Testbed: Average Reward over Time}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{ax}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{n}{ax}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{percent\PYZus{}optimal\PYZus{}nonstat}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:orange}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps\PYZus{}use}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, α=}\PY{l+s+si}{\PYZob{}}\PY{n}{alpha}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{ax}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Step}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{ax}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZpc{}}\PY{l+s+s1}{ Optimal Action}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{ax}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Non\PYZhy{}stationary 10\PYZhy{}armed Testbed: }\PY{l+s+s1}{\PYZpc{}}\PY{l+s+s1}{ Optimal Action over Time}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{ax}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{tight\PYZus{}layout}\PY{p}{(}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{show}\PY{p}{(}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_12_0.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    \hypertarget{ux4e50ux89c2ux521dux59cbux503c}{%
+\subsection{乐观初始值}\label{ux4e50ux89c2ux521dux59cbux503c}}
+
+\hypertarget{ux4ec0ux4e48ux662fux5f3aux5316ux5b66ux4e60ux4e2dux7684ux4e50ux89c2ux521dux59cbux503c}{%
+\subsubsection{什么是强化学习中的``乐观初始值''？}\label{ux4ec0ux4e48ux662fux5f3aux5316ux5b66ux4e60ux4e2dux7684ux4e50ux89c2ux521dux59cbux503c}}
+
+在基于样本均值或增量更新的动作价值估计中，所谓``乐观初始值''是指将每个动作的初始估计
+\(Q_1(a)\) 设得比真实期望更高（例如把所有 \(Q_1(a)\) 初始化为一个较大的
+\(Q_0\)），这样未被尝试的动作在初期显得格外有吸引力，能够在没有显式
+ε-随机探索的情况下驱动算法优先尝试各个动作以``验证''这些乐观估计；当观测到的回报低于
+\(Q_0\) 时，相应动作的估计会下降，从而自然地产生探索行为。
+
+\hypertarget{ux5728ux5341ux81c2ux6d4bux8bd5ux5e73ux53f0ux4e0aux7684ux4f5cux7528ux4e0eux673aux5236}{%
+\subsubsection{在十臂测试平台上的作用与机制}\label{ux5728ux5341ux81c2ux6d4bux8bd5ux5e73ux53f0ux4e0aux7684ux4f5cux7528ux4e0eux673aux5236}}
+
+在十臂测试平台中，将每个动作的初始估计 \(Q_1(a)\) 设为较大的 \(Q_0\)
+会使算法（尤其是纯贪婪
+ε=0）在早期主动遍历各臂以验证这些乐观估计：每次尝试若观测回报低于
+\(Q_0\)，该臂的估计值会随之下降，反之则被保留为候选优选。此法的优点在于可以在零或很小
+ε
+的情形下实现有效的早期探索，减少随机探索带来的短期回报波动，且实现非常简单
+------
+只需调整初始化而无需引入额外的概率机制。缺点是它依赖于对奖励尺度的合理假设：若
+\(Q_0\) 设得过高，会导致过度探索和较长时间的试错成本；若 \(Q_0\)
+太低，则难以产生显著效果；在非平稳环境中，乐观初始值的益处会很快被后续更新覆盖，甚至引入滞后与高方差问题。相比基于不确定性的策略，乐观初始化更为经验化和粗糙，通常作为一种简单的启发式手段与衰减
+ε、固定步长 α 等方法配合使用以取得更稳健的效果。
+
+\hypertarget{ux4e50ux89c2ux521dux59cbux503cux4e0e-ux3b5-ux8d2aux5a6aux8870ux51cf-ux3b5ux7684ux6bd4ux8f83}{%
+\subsubsection{乐观初始值与 ε-贪婪、衰减
+ε的比较}\label{ux4e50ux89c2ux521dux59cbux503cux4e0e-ux3b5-ux8d2aux5a6aux8870ux51cf-ux3b5ux7684ux6bd4ux8f83}}
+
+乐观初始值与 ε-贪婪和衰减 ε 在探索机制上有所不同。固定 ε 的
+ε-贪婪通过以恒定概率随机选择动作来保证均匀的探索，而乐观初始化则通过人为抬高未尝试动作的初始估计诱导算法在早期优先尝试这些动作，从而在实验初期能部分替代或补充固定
+ε 的作用；相比之下，衰减 ε
+则是在时间上可控地从强探索过渡到强利用，适合需要在早期大量探索并在后期稳定利用的场景，因此在可控性和长期表现上通常比单纯依赖乐观初始值更稳健。
+
+在十臂测试平台中的实践应用中，如果问题是平稳且希望简单实现早期探索，可以尝试将初始值
+\(Q_0\) 设为 1 到 5（具体取决于奖励尺度），并可与很小的 ε（甚至
+ε=0）配合使用，通过观察早期的平均回报与优化曲线来调整 \$Q\_\(0\)
+以避免过度试错；如果问题是非平稳，则应优先使用固定步长 α（如 0.1
+或更小）并配合适度的 ε 或衰减 ε 而非依赖乐观初始值。
+
+乐观初始值是一种通过把 \(Q_1(a)\)
+设高来诱导探索的简单技巧，在静态的多臂问题（如标准十臂测试平台）上能显著提高早期探索效率；但选择合适的初始值依赖于奖励尺度，且在非平稳环境中效果有限或不合适。常与
+ε-贪婪、衰减 ε 或固定步长更新结合使用，根据具体问题权衡使用。
+
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{8}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{k+kn}{import} \PY{n+nn}{numpy} \PY{k}{as} \PY{n+nn}{np}
+\PY{k+kn}{import} \PY{n+nn}{matplotlib}\PY{n+nn}{.}\PY{n+nn}{pyplot} \PY{k}{as} \PY{n+nn}{plt}
+
+
+\PY{c+c1}{\PYZsh{} 生成10个动作的真实价值 q*(a)，从均值0，方差1的正态分布中采样}
+\PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{seed}\PY{p}{(}\PY{l+m+mi}{42}\PY{p}{)}  \PY{c+c1}{\PYZsh{} 设置随机种子以便重现}
+\PY{n}{n\PYZus{}arms} \PY{o}{=} \PY{l+m+mi}{10} \PY{c+c1}{\PYZsh{} 动作数}
+\PY{n}{means} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}        
+\PY{n}{optimal\PYZus{}arm} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{np}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{means}\PY{p}{)}\PY{p}{)}
+
+\PY{k}{def} \PY{n+nf}{run\PYZus{}epsilon\PYZus{}greedy}\PY{p}{(}\PY{n}{eps}\PY{o}{=}\PY{l+m+mf}{0.0}\PY{p}{,} \PY{n}{Q1}\PY{o}{=}\PY{l+m+mf}{0.0}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.1}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{)}\PY{p}{:}
+\PY{+w}{    }\PY{l+s+sd}{\PYZdq{}\PYZdq{}\PYZdq{}}
+\PY{l+s+sd}{    eps: ε值}
+\PY{l+s+sd}{    Q1: 初始 Q 值（默认0.0，可设为乐观初始值）}
+\PY{l+s+sd}{    alpha: 步长}
+\PY{l+s+sd}{    steps：每次运行的步数}
+\PY{l+s+sd}{    runs：用于平均的独立运行次数}
+\PY{l+s+sd}{    对于给定的 eps 值和初始 Q 值 Q1，运行 ε\PYZhy{}贪婪算法。}
+\PY{l+s+sd}{    返回：avg\PYZus{}rewards（长度为 steps），optimal\PYZus{}action\PYZus{}rates（长度为 steps，百分比）}
+\PY{l+s+sd}{    \PYZdq{}\PYZdq{}\PYZdq{}}
+    \PY{n}{rewards\PYZus{}all} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}chosen} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{)}
+    \PY{k}{for} \PY{n}{run} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{runs}\PY{p}{)}\PY{p}{:}
+        \PY{n}{Q} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)} \PY{o}{+} \PY{n}{Q1}  \PY{c+c1}{\PYZsh{} 使用乐观/指定初始值 }
+        \PY{n}{N} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}
+        \PY{k}{for} \PY{n}{t} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{steps}\PY{p}{)}\PY{p}{:}
+            \PY{k}{if} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{rand}\PY{p}{(}\PY{p}{)} \PY{o}{\PYZlt{}} \PY{n}{eps}\PY{p}{:}
+                \PY{n}{action} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{randint}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}
+            \PY{k}{else}\PY{p}{:}
+                \PY{n}{best} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{flatnonzero}\PY{p}{(}\PY{n}{Q} \PY{o}{==} \PY{n}{Q}\PY{o}{.}\PY{n}{max}\PY{p}{(}\PY{p}{)}\PY{p}{)}
+                \PY{n}{action} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{choice}\PY{p}{(}\PY{n}{best}\PY{p}{)}\PY{p}{)} \PY{k}{if} \PY{n}{best}\PY{o}{.}\PY{n}{size} \PY{o}{\PYZgt{}} \PY{l+m+mi}{1} \PY{k}{else} \PY{n+nb}{int}\PY{p}{(}\PY{n}{best}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{p}{)}
+            \PY{n}{reward} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{n}{means}\PY{p}{[}\PY{n}{action}\PY{p}{]}\PY{p}{,} \PY{l+m+mf}{1.0}\PY{p}{)}
+            \PY{n}{N}\PY{p}{[}\PY{n}{action}\PY{p}{]} \PY{o}{+}\PY{o}{=} \PY{l+m+mi}{1}
+            \PY{n}{Q}\PY{p}{[}\PY{n}{action}\PY{p}{]} \PY{o}{+}\PY{o}{=} \PY{n}{alpha} \PY{o}{*} \PY{p}{(}\PY{n}{reward} \PY{o}{\PYZhy{}} \PY{n}{Q}\PY{p}{[}\PY{n}{action}\PY{p}{]}\PY{p}{)}
+
+            \PY{n}{rewards\PYZus{}all}\PY{p}{[}\PY{n}{run}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{n}{reward}
+            \PY{n}{optimal\PYZus{}chosen}\PY{p}{[}\PY{n}{run}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{l+m+mi}{1} \PY{k}{if} \PY{n}{action} \PY{o}{==} \PY{n}{optimal\PYZus{}arm} \PY{k}{else} \PY{l+m+mi}{0}
+
+    \PY{n}{avg\PYZus{}rewards\PYZus{}single} \PY{o}{=} \PY{n}{rewards\PYZus{}all}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}action\PYZus{}rates\PYZus{}single} \PY{o}{=} \PY{n}{optimal\PYZus{}chosen}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)} \PY{o}{*} \PY{l+m+mf}{100.0}
+    \PY{k}{return} \PY{n}{avg\PYZus{}rewards\PYZus{}single}\PY{p}{,} \PY{n}{optimal\PYZus{}action\PYZus{}rates\PYZus{}single}
+
+\PY{c+c1}{\PYZsh{} 绘图：两个子图，上：平均回报；下：选择最优动作的百分比}
+\PY{n}{fig}\PY{p}{,} \PY{n}{axes} \PY{o}{=} \PY{n}{plt}\PY{o}{.}\PY{n}{subplots}\PY{p}{(}\PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{n}{figsize}\PY{o}{=}\PY{p}{(}\PY{l+m+mi}{12}\PY{p}{,} \PY{l+m+mi}{10}\PY{p}{)}\PY{p}{,} \PY{n}{sharex}\PY{o}{=}\PY{k+kc}{True}\PY{p}{)}
+
+\PY{n}{eps} \PY{o}{=} \PY{l+m+mf}{0.1}
+\PY{n}{Q1} \PY{o}{=} \PY{l+m+mf}{0.0}
+\PY{n}{avg\PYZus{}rewards}\PY{p}{,} \PY{n}{optimal\PYZus{}action\PYZus{}rates} \PY{o}{=} \PY{n}{run\PYZus{}epsilon\PYZus{}greedy}\PY{p}{(}\PY{n}{eps}\PY{p}{,} \PY{n}{Q1}\PY{o}{=}\PY{n}{Q1}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}rewards}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZdl{}Q\PYZus{}1\PYZdl{}=}\PY{l+s+si}{\PYZob{}}\PY{n}{Q1}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:blue}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{optimal\PYZus{}action\PYZus{}rates}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZdl{}Q\PYZus{}1\PYZdl{}=}\PY{l+s+si}{\PYZob{}}\PY{n}{Q1}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:blue}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+
+\PY{n}{eps} \PY{o}{=} \PY{l+m+mf}{0.0}
+\PY{n}{Q1} \PY{o}{=} \PY{l+m+mf}{5.0}
+\PY{n}{avg\PYZus{}rewards}\PY{p}{,} \PY{n}{optimal\PYZus{}action\PYZus{}rates} \PY{o}{=} \PY{n}{run\PYZus{}epsilon\PYZus{}greedy}\PY{p}{(}\PY{n}{eps}\PY{p}{,} \PY{n}{Q1}\PY{o}{=}\PY{n}{Q1}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}rewards}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZdl{}Q\PYZus{}1\PYZdl{}=}\PY{l+s+si}{\PYZob{}}\PY{n}{Q1}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:green}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{optimal\PYZus{}action\PYZus{}rates}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZdl{}Q\PYZus{}1\PYZdl{}=}\PY{l+s+si}{\PYZob{}}\PY{n}{Q1}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:green}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+
+
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward vs Steps for 10\PYZhy{}armed Testbed}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Step}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZpc{}}\PY{l+s+s1}{ Optimal Action}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Percent Optimal Action vs Steps}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{tight\PYZus{}layout}\PY{p}{(}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_14_0.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    上图展示了使用固定步长（α=0.1）算法对2000次独立实验结果求平均后的曲线。对于采用乐观初始值（如
+Q1=5）的情形，早期出现明显的振荡与尖峰；由于已对2000次运行求平均，这些波动并非随机噪声，而是乐观初始化引发的系统性动态：初始估计值过高促使算法在早期大量尝试这些动作，随后在观测到较低回报时迅速下调估计，从而产生显著的短期波动。该现象是可解释且与探索机制密切相关。
+
+    \hypertarget{ux4e0aux7f6eux4fe1ux754cupper-confidence-bound-ucbux52a8ux4f5cux9009ux62e9}{%
+\subsection{上置信界（Upper-Confidence-Bound,
+UCB）动作选择}\label{ux4e0aux7f6eux4fe1ux754cupper-confidence-bound-ucbux52a8ux4f5cux9009ux62e9}}
+
+上置信界（UCB）动作选择的思想是根据动作的估计价值以及这些估计的不确定性或方差来选择动作。
+UCB
+算法通过选择估计值高或不确定性大的动作来平衡探索与利用，从而鼓励对那些较少被选择的动作进行探索。
+其中一个有效计算上置信界的公式为：
+\[A_t = \arg\max_a\left[Q_t(a)+c\sqrt{\frac{\ln t}{N_t(a)}}\right]\]
+
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{9}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{c+c1}{\PYZsh{} 上置信界（UCB）方法实现与演示}
+\PY{c+c1}{\PYZsh{} 说明（注释内为中文）：UCB 在每一步选择使得 Q(a) + c * sqrt( ln t / N(a) ) 最大的动作，}
+\PY{c+c1}{\PYZsh{} 其中第二项为不确定性项，c 控制探索强度。若某臂尚未被尝试，则优先尝试（UCB 设为 +inf）。}
+
+\PY{k+kn}{import} \PY{n+nn}{numpy} \PY{k}{as} \PY{n+nn}{np}
+\PY{k+kn}{import} \PY{n+nn}{matplotlib}\PY{n+nn}{.}\PY{n+nn}{pyplot} \PY{k}{as} \PY{n+nn}{plt}
+
+
+\PY{c+c1}{\PYZsh{} 生成10个动作的真实价值 q*(a)，从均值0，方差1的正态分布中采样}
+\PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{seed}\PY{p}{(}\PY{l+m+mi}{42}\PY{p}{)}  \PY{c+c1}{\PYZsh{} 设置随机种子以便重现}
+\PY{n}{n\PYZus{}arms} \PY{o}{=} \PY{l+m+mi}{10} \PY{c+c1}{\PYZsh{} 动作数}
+\PY{n}{means} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}        
+\PY{n}{optimal\PYZus{}arm} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{np}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{means}\PY{p}{)}\PY{p}{)}
+
+\PY{k}{def} \PY{n+nf}{run\PYZus{}ucb}\PY{p}{(}\PY{n}{c}\PY{o}{=}\PY{l+m+mf}{2.0}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{)}\PY{p}{:}
+    \PY{n}{rewards\PYZus{}all} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}chosen} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{)}
+    \PY{k}{for} \PY{n}{run} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{runs}\PY{p}{)}\PY{p}{:}
+        \PY{n}{Q} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}      \PY{c+c1}{\PYZsh{} 价值估计}
+        \PY{n}{N} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}      \PY{c+c1}{\PYZsh{} 选择计数}
+        \PY{k}{for} \PY{n}{t} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{steps}\PY{p}{)}\PY{p}{:}
+            \PY{c+c1}{\PYZsh{} 若还有未被尝试的臂，优先尝试它们（保证初始覆盖）}
+            \PY{k}{if} \PY{p}{(}\PY{n}{N} \PY{o}{==} \PY{l+m+mi}{0}\PY{p}{)}\PY{o}{.}\PY{n}{any}\PY{p}{(}\PY{p}{)}\PY{p}{:}
+                \PY{c+c1}{\PYZsh{} 选择第一个未被尝试的臂（也可以随机未尝试臂）}
+                \PY{n}{action} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{np}\PY{o}{.}\PY{n}{flatnonzero}\PY{p}{(}\PY{n}{N} \PY{o}{==} \PY{l+m+mi}{0}\PY{p}{)}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{p}{)}
+            \PY{k}{else}\PY{p}{:}
+                \PY{c+c1}{\PYZsh{} 计算 UCB 值并选择最大者}
+                \PY{n}{confidence} \PY{o}{=} \PY{n}{c} \PY{o}{*} \PY{n}{np}\PY{o}{.}\PY{n}{sqrt}\PY{p}{(}\PY{n}{np}\PY{o}{.}\PY{n}{log}\PY{p}{(}\PY{n}{t} \PY{o}{+} \PY{l+m+mi}{1}\PY{p}{)} \PY{o}{/} \PY{n}{N}\PY{p}{)}
+                \PY{n}{ucb\PYZus{}values} \PY{o}{=} \PY{n}{Q} \PY{o}{+} \PY{n}{confidence}
+                \PY{n}{action} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{np}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{ucb\PYZus{}values}\PY{p}{)}\PY{p}{)}
+
+            \PY{n}{reward} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{n}{means}\PY{p}{[}\PY{n}{action}\PY{p}{]}\PY{p}{,} \PY{l+m+mf}{1.0}\PY{p}{)}
+            \PY{n}{N}\PY{p}{[}\PY{n}{action}\PY{p}{]} \PY{o}{+}\PY{o}{=} \PY{l+m+mi}{1}
+            \PY{c+c1}{\PYZsh{} 使用样本均值增量更新（也可用固定步长）}
+            \PY{n}{Q}\PY{p}{[}\PY{n}{action}\PY{p}{]} \PY{o}{+}\PY{o}{=} \PY{p}{(}\PY{n}{reward} \PY{o}{\PYZhy{}} \PY{n}{Q}\PY{p}{[}\PY{n}{action}\PY{p}{]}\PY{p}{)} \PY{o}{/} \PY{n}{N}\PY{p}{[}\PY{n}{action}\PY{p}{]}
+
+            \PY{n}{rewards\PYZus{}all}\PY{p}{[}\PY{n}{run}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{n}{reward}
+            \PY{n}{optimal\PYZus{}chosen}\PY{p}{[}\PY{n}{run}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{l+m+mi}{1} \PY{k}{if} \PY{n}{action} \PY{o}{==} \PY{n}{optimal\PYZus{}arm} \PY{k}{else} \PY{l+m+mi}{0}
+
+    \PY{n}{avg\PYZus{}rewards\PYZus{}ucb} \PY{o}{=} \PY{n}{rewards\PYZus{}all}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+    \PY{n}{percent\PYZus{}optimal\PYZus{}ucb} \PY{o}{=} \PY{n}{optimal\PYZus{}chosen}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)} \PY{o}{*} \PY{l+m+mf}{100.0}
+    \PY{k}{return} \PY{n}{avg\PYZus{}rewards\PYZus{}ucb}\PY{p}{,} \PY{n}{percent\PYZus{}optimal\PYZus{}ucb}
+
+\PY{c+c1}{\PYZsh{} 运行并绘图（示例：c=2）}
+\PY{n}{avg\PYZus{}ucb}\PY{p}{,} \PY{n}{opt\PYZus{}ucb} \PY{o}{=} \PY{n}{run\PYZus{}ucb}\PY{p}{(}\PY{n}{c}\PY{o}{=}\PY{l+m+mf}{2.0}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{)}
+
+\PY{n}{eps} \PY{o}{=} \PY{l+m+mf}{0.1}
+\PY{n}{Q1} \PY{o}{=} \PY{l+m+mf}{0.0}
+\PY{n}{avg\PYZus{}greedy}\PY{p}{,} \PY{n}{opt\PYZus{}greedy} \PY{o}{=} \PY{n}{run\PYZus{}epsilon\PYZus{}greedy}\PY{p}{(}\PY{n}{eps}\PY{p}{,} \PY{n}{Q1}\PY{o}{=}\PY{n}{Q1}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{)}
+
+\PY{n}{fig}\PY{p}{,} \PY{n}{axes} \PY{o}{=} \PY{n}{plt}\PY{o}{.}\PY{n}{subplots}\PY{p}{(}\PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{n}{figsize}\PY{o}{=}\PY{p}{(}\PY{l+m+mi}{12}\PY{p}{,} \PY{l+m+mi}{8}\PY{p}{)}\PY{p}{,} \PY{n}{sharex}\PY{o}{=}\PY{k+kc}{True}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}ucb}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{UCB (c=2)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:purple}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}greedy}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ε\PYZhy{}greedy \PYZdl{}Q\PYZus{}1\PYZdl{}=}\PY{l+s+si}{\PYZob{}}\PY{n}{Q1}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:blue}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{UCB Performance on 10\PYZhy{}armed Testbed}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{opt\PYZus{}ucb}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{UCB (c=2)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:purple}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{opt\PYZus{}greedy}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZdl{}Q\PYZus{}1\PYZdl{}=}\PY{l+s+si}{\PYZob{}}\PY{n}{Q1}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, ε=}\PY{l+s+si}{\PYZob{}}\PY{n}{eps}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:blue}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Step}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZpc{}}\PY{l+s+s1}{ Optimal Action}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{tight\PYZus{}layout}\PY{p}{(}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{show}\PY{p}{(}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_17_0.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    从上图可见，UCB 在许多情形下表现良好，参数 c 用于控制探索强度，c
+越大探索越强（常见取值如 1、2、5，可通过实验对比选择）。 由于 UCB
+会优先尝试不确定或较少被选择的臂，在平稳环境中通常表现突出；
+而在非平稳场景下，常需结合折扣或固定步长更新，或采用滑动窗口统计等机制，以维持对漂移的跟踪能力。
+但将UCB其直接推广到更广泛的强化学习场景并不容易：一方面，它对非平稳环境不敏感；另一方面，在状态空间极大时扩展性受限。
+
+    \hypertarget{ux68afux5ea6ux8d4cux535aux673agradient-banditux7b97ux6cd5}{%
+\subsection{梯度赌博机（Gradient
+Bandit）算法}\label{ux68afux5ea6ux8d4cux535aux673agradient-banditux7b97ux6cd5}}
+
+本节我们考虑为每个动作 \(a\) 学习一个数值偏好（preference），记为
+\(H_t(a)\)。 偏好越大，采取这个动作的可能性就越大。
+我们计算这个概率一般采用softmax分布（例如Gibbs或者玻尔兹曼分布）：
+\[\Pr{\{A_t=a\}}=\frac{e^{H_t(a)}}{\sum_{b=1}^k e^{H_t(b)}}=\pi_t(a)\]
+如果只有两个动作，那么softmax分布等价于sigmoid:
+\[\Pr{\{A_t=a\}}=\frac{1}{1+ e^{-H_t(a)}}\]
+参考随机梯度下降法，我们可以得到一个新的算法。
+对于每一步，选择了一个动作\(A_t\)和得到一个收益\(R_t\)后，新的动作偏好可以由以下公式计算得到：
+\[H_{t+1}(A_t) = H_t(A_t) + \alpha (R_t - \hat{R}_t)(1-\pi_t(A_t))\]
+对于其他\(a\ne A_t\)，我们有：
+\[H_{t+1}(a) = H_t(a) - \alpha (R_t - \hat{R}_t)\pi_t(a)\]
+
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{10}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{c+c1}{\PYZsh{} Gradient bandit algorithm (Gradient Bandit / REINFORCE\PYZhy{}style) for 10\PYZhy{}armed testbed}
+\PY{c+c1}{\PYZsh{} 依赖笔记本中已存在的变量：np, plt, n\PYZus{}arms, means, optimal\PYZus{}arm}
+\PY{c+c1}{\PYZsh{} 使用方法示例：avg\PYZus{}g\PYZus{}baseline, opt\PYZus{}g\PYZus{}baseline = run\PYZus{}gradient\PYZus{}bandit(alpha=0.1, baseline=True, runs=2000, steps=1000)}
+
+\PY{k}{def} \PY{n+nf}{\PYZus{}softmax}\PY{p}{(}\PY{n}{x}\PY{p}{)}\PY{p}{:}
+    \PY{n}{x} \PY{o}{=} \PY{n}{x} \PY{o}{\PYZhy{}} \PY{n}{np}\PY{o}{.}\PY{n}{max}\PY{p}{(}\PY{n}{x}\PY{p}{)}  \PY{c+c1}{\PYZsh{} numeric stability}
+    \PY{n}{ex} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{exp}\PY{p}{(}\PY{n}{x}\PY{p}{)}
+    \PY{k}{return} \PY{n}{ex} \PY{o}{/} \PY{n}{np}\PY{o}{.}\PY{n}{sum}\PY{p}{(}\PY{n}{ex}\PY{p}{)}
+
+\PY{k}{def} \PY{n+nf}{run\PYZus{}gradient\PYZus{}bandit}\PY{p}{(}\PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.1}\PY{p}{,} \PY{n}{baseline}\PY{o}{=}\PY{k+kc}{True}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{)}\PY{p}{:}
+\PY{+w}{    }\PY{l+s+sd}{\PYZdq{}\PYZdq{}\PYZdq{}}
+\PY{l+s+sd}{    alpha: 学习率 (步长) 用于偏好 H 的更新}
+\PY{l+s+sd}{    baseline: 是否使用回报基线（每次试验内的平均回报）}
+\PY{l+s+sd}{    runs: 独立重复试验次数（用于求平均）}
+\PY{l+s+sd}{    steps: 每次试验的时间步长}
+\PY{l+s+sd}{    返回：}
+\PY{l+s+sd}{      avg\PYZus{}rewards: 每个时间步的平均回报（长度 steps）}
+\PY{l+s+sd}{      percent\PYZus{}optimal: 每个时间步选择最优动作的百分比（长度 steps）}
+\PY{l+s+sd}{    \PYZdq{}\PYZdq{}\PYZdq{}}
+    \PY{n}{rewards\PYZus{}all} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}chosen} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{runs}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{)}
+
+    \PY{k}{for} \PY{n}{run} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{runs}\PY{p}{)}\PY{p}{:}
+        \PY{n}{H} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}         \PY{c+c1}{\PYZsh{} 偏好}
+        \PY{n}{avg\PYZus{}r} \PY{o}{=} \PY{l+m+mf}{0.0}                  \PY{c+c1}{\PYZsh{} 试验内的回报均值（baseline）}
+        \PY{k}{for} \PY{n}{t} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{steps}\PY{p}{)}\PY{p}{:}
+            \PY{n}{pi} \PY{o}{=} \PY{n}{\PYZus{}softmax}\PY{p}{(}\PY{n}{H}\PY{p}{)}
+            \PY{n}{action} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{choice}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{,} \PY{n}{p}\PY{o}{=}\PY{n}{pi}\PY{p}{)}
+            \PY{n}{reward} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{n}{means}\PY{p}{[}\PY{n}{action}\PY{p}{]}\PY{p}{,} \PY{l+m+mf}{1.0}\PY{p}{)}
+
+            \PY{n}{baseline\PYZus{}val} \PY{o}{=} \PY{n}{avg\PYZus{}r} \PY{k}{if} \PY{n}{baseline} \PY{k}{else} \PY{l+m+mf}{0.0}
+
+            \PY{c+c1}{\PYZsh{} 向量化的偏好更新： H += alpha * (R \PYZhy{} baseline) * (I[a] \PYZhy{} pi)}
+            \PY{n}{one\PYZus{}hot} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{)}
+            \PY{n}{one\PYZus{}hot}\PY{p}{[}\PY{n}{action}\PY{p}{]} \PY{o}{=} \PY{l+m+mf}{1.0}
+            \PY{n}{H} \PY{o}{+}\PY{o}{=} \PY{n}{alpha} \PY{o}{*} \PY{p}{(}\PY{n}{reward} \PY{o}{\PYZhy{}} \PY{n}{baseline\PYZus{}val}\PY{p}{)} \PY{o}{*} \PY{p}{(}\PY{n}{one\PYZus{}hot} \PY{o}{\PYZhy{}} \PY{n}{pi}\PY{p}{)}
+
+            \PY{c+c1}{\PYZsh{} 更新试验内平均回报（用于下一步的 baseline）}
+            \PY{n}{avg\PYZus{}r} \PY{o}{+}\PY{o}{=} \PY{p}{(}\PY{n}{reward} \PY{o}{\PYZhy{}} \PY{n}{avg\PYZus{}r}\PY{p}{)} \PY{o}{/} \PY{p}{(}\PY{n}{t} \PY{o}{+} \PY{l+m+mi}{1}\PY{p}{)}
+
+            \PY{n}{rewards\PYZus{}all}\PY{p}{[}\PY{n}{run}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{n}{reward}
+            \PY{n}{optimal\PYZus{}chosen}\PY{p}{[}\PY{n}{run}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{l+m+mi}{1} \PY{k}{if} \PY{n}{action} \PY{o}{==} \PY{n}{optimal\PYZus{}arm} \PY{k}{else} \PY{l+m+mi}{0}
+
+    \PY{n}{avg\PYZus{}rewards} \PY{o}{=} \PY{n}{rewards\PYZus{}all}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+    \PY{n}{percent\PYZus{}optimal} \PY{o}{=} \PY{n}{optimal\PYZus{}chosen}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{axis}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)} \PY{o}{*} \PY{l+m+mf}{100.0}
+    \PY{k}{return} \PY{n}{avg\PYZus{}rewards}\PY{p}{,} \PY{n}{percent\PYZus{}optimal}
+
+\PY{c+c1}{\PYZsh{} 快速演示与绘图：比较带 baseline 与不带 baseline 的效果}
+\PY{n}{fig}\PY{p}{,} \PY{n}{axes} \PY{o}{=} \PY{n}{plt}\PY{o}{.}\PY{n}{subplots}\PY{p}{(}\PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{n}{figsize}\PY{o}{=}\PY{p}{(}\PY{l+m+mi}{12}\PY{p}{,} \PY{l+m+mi}{8}\PY{p}{)}\PY{p}{,} \PY{n}{sharex}\PY{o}{=}\PY{k+kc}{True}\PY{p}{)}
+
+\PY{n}{runs\PYZus{}demo} \PY{o}{=} \PY{l+m+mi}{2000}
+\PY{n}{steps\PYZus{}demo} \PY{o}{=} \PY{l+m+mi}{1000}
+
+\PY{n}{alph} \PY{o}{=} \PY{l+m+mf}{0.1}
+\PY{n}{avg\PYZus{}b}\PY{p}{,} \PY{n}{opt\PYZus{}b} \PY{o}{=} \PY{n}{run\PYZus{}gradient\PYZus{}bandit}\PY{p}{(}\PY{n}{alpha}\PY{o}{=}\PY{n}{alph}\PY{p}{,} \PY{n}{baseline}\PY{o}{=}\PY{k+kc}{True}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{n}{runs\PYZus{}demo}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{n}{steps\PYZus{}demo}\PY{p}{)}
+\PY{n}{avg\PYZus{}nb}\PY{p}{,} \PY{n}{opt\PYZus{}nb} \PY{o}{=} \PY{n}{run\PYZus{}gradient\PYZus{}bandit}\PY{p}{(}\PY{n}{alpha}\PY{o}{=}\PY{n}{alph}\PY{p}{,} \PY{n}{baseline}\PY{o}{=}\PY{k+kc}{False}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{n}{runs\PYZus{}demo}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{n}{steps\PYZus{}demo}\PY{p}{)}
+
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}b}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Gradient (α=}\PY{l+s+si}{\PYZob{}}\PY{n}{alph}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, baseline=True)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{blue}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}nb}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Gradient (α=}\PY{l+s+si}{\PYZob{}}\PY{n}{alph}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, baseline=False)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{orange}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.8}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{opt\PYZus{}b}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Baseline=True, α=}\PY{l+s+si}{\PYZob{}}\PY{n}{alph}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{blue}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{opt\PYZus{}nb}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Baseline=False, α=}\PY{l+s+si}{\PYZob{}}\PY{n}{alph}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{orange}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.8}\PY{p}{)}
+
+\PY{n}{alph} \PY{o}{=} \PY{l+m+mf}{0.4}
+\PY{n}{avg\PYZus{}b}\PY{p}{,} \PY{n}{opt\PYZus{}b} \PY{o}{=} \PY{n}{run\PYZus{}gradient\PYZus{}bandit}\PY{p}{(}\PY{n}{alpha}\PY{o}{=}\PY{n}{alph}\PY{p}{,} \PY{n}{baseline}\PY{o}{=}\PY{k+kc}{True}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{n}{runs\PYZus{}demo}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{n}{steps\PYZus{}demo}\PY{p}{)}
+\PY{n}{avg\PYZus{}nb}\PY{p}{,} \PY{n}{opt\PYZus{}nb} \PY{o}{=} \PY{n}{run\PYZus{}gradient\PYZus{}bandit}\PY{p}{(}\PY{n}{alpha}\PY{o}{=}\PY{n}{alph}\PY{p}{,} \PY{n}{baseline}\PY{o}{=}\PY{k+kc}{False}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{n}{runs\PYZus{}demo}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{n}{steps\PYZus{}demo}\PY{p}{)}
+
+\PY{c+c1}{\PYZsh{} \PYZsq{}tab:yellow\PYZsq{} is not a valid matplotlib color; replace with a standard color name}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}b}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Gradient (α=}\PY{l+s+si}{\PYZob{}}\PY{n}{alph}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, baseline=True)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{green}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}nb}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Gradient (α=}\PY{l+s+si}{\PYZob{}}\PY{n}{alph}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{, baseline=False)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{gold}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.8}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{opt\PYZus{}b}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Baseline=True, α=}\PY{l+s+si}{\PYZob{}}\PY{n}{alph}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{green}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{opt\PYZus{}nb}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Baseline=False, α=}\PY{l+s+si}{\PYZob{}}\PY{n}{alph}\PY{l+s+si}{\PYZcb{}}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{gold}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.8}\PY{p}{)}
+
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Gradient Bandit on 10\PYZhy{}armed Testbed}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Step}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZpc{}}\PY{l+s+s1}{ Optimal Action}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{tight\PYZus{}layout}\PY{p}{(}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{show}\PY{p}{(}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_20_0.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    上图是在10臂测试平台上，使用梯度带臂算法（Gradient Bandit /
+REINFORCE-style）时，比较使用回报基线（baseline）与不使用回报基线的效果。可以看出，使用回报基线的算法在收敛速度和最终性能上都优于不使用回报基线的算法。
+
+    \hypertarget{pytorch-ux5b9eux73b0ux7684-ux3b5-ux8d2aux5a6aucbux4e0eux68afux5ea6ux8d4cux535aux673a}{%
+\subsection{PyTorch 实现的
+ε-贪婪、UCB与梯度赌博机}\label{pytorch-ux5b9eux73b0ux7684-ux3b5-ux8d2aux5a6aucbux4e0eux68afux5ea6ux8d4cux535aux673a}}
+
+\hypertarget{ux3b5-ux8d2aux5a6aucbux4e0eux68afux5ea6ux8d4cux535aux673aux7b97ux6cd5ux5bf9ux6bd4}{%
+\subsubsection{ε-贪婪、UCB与梯度赌博机算法对比}\label{ux3b5-ux8d2aux5a6aucbux4e0eux68afux5ea6ux8d4cux535aux673aux7b97ux6cd5ux5bf9ux6bd4}}
+
+ε-贪婪是一种直接且直观的方法：以概率 \(1-\varepsilon\)
+选择当前估计最优的动作，以概率 \(\varepsilon\)
+随机探索。价值估计的更新可以采用样本均值
+\[Q_{n+1}(a)=Q_n(a)+\frac{1}{N(a)}\big(R_n-Q_n(a)\big)\] 或使用固定步长
+\[Q_{n+1}(a)=Q_n(a)+\alpha\big(R_n-Q_n(a)\big)\]
+以适应非平稳环境。ε-贪婪的优点在于实现和理解都非常简单，参数少，易于并行化和调试；缺点在于探索是均匀随机的------它不会优先探索``不确定性更大''或``潜在回报更高''的动作，因此在有大量臂或奖励分布差异明显时可能浪费探索预算。ε
+的选取决定了探索频率：较大的 ε
+助于早期发现好臂但会降低短期回报，常见实践包括用衰减的 ε
+随时间减小，或结合乐观初始值以在早期诱导探索而减少随机性。
+
+上置信界（UCB）方法通过在估计值上加一个与不确定性成比例的置信项来选择动作，常见形式为
+\[A_t=\arg\max_a\Big[Q_t(a)+c\sqrt{\frac{\ln t}{N_t(a)}}\Big].\] UCB
+的探索是有目的的：它优先去尝试那些既可能好又不确切的臂，理性地平衡利用与探索，从理论上在平稳多臂环境中有渐近的上界保证。优点是探索较有效、样本利用率高，缺点是在非平稳场景下易失效（因置信项依赖于累计计数
+\(N_t(a)\)），且需要设定常数 \(c\)
+来调节探索强度；在实现上需要在每步计算置信项（\(O(k)\)），对臂数很大时需注意计算成本与数值稳定性。
+
+梯度赌博机（Gradient Bandit）直接对策略进行参数化：为每个动作维护偏好
+\(H(a)\)，通过 softmax 得到采样概率
+\(\pi(a)\)，然后基于回报做随机梯度上升，常用更新为
+\[H_{t+1}(A_t)=H_t(A_t)+\alpha\,(R_t-\hat R_t)\,(1-\pi_t(A_t)),\quad H_{t+1}(a)=H_t(a)-\alpha\,(R_t-\hat R_t)\,\pi_t(a)\ (a\ne A_t),\]
+或向量化为
+\(H_{t+1}=H_t+\alpha(R_t-\hat R_t)(e_{A_t}-\pi_t)\)。梯度方法的优势在于它直接优化策略、天然输出概率化策略，便于与函数逼近和策略梯度框架（如
+REINFORCE、Actor-Critic）对接；使用 baseline（如试验内平均回报
+\(\hat R_t\)）能显著降低方差并稳定学习。它的缺点是通常对学习率
+\(\alpha\) 比较敏感，更新的方差仍比价值基方法高，且 softmax
+采样会在极端偏好下导致概率饱和，需数值稳定处理（如减去最大值）与可能的正则化或剪裁。
+
+从探索行为与样本效率角度比较，UCB 在平稳问题上往往比
+ε-贪婪更高效，因为它以不确定性驱动探索；ε-贪婪更为鲁棒、实现更简单且容易用乐观初始值补偿早期探索；梯度方法则适用于需要概率策略、可微的策略表示或后续要与神经网络连用的场景，但在纯粹的多臂测试床上它的方差和对α的敏感度需要仔细调参。若问题是非平稳的，应优先选择使用固定步长的
+ε-贪婪或在 UCB/梯度方法中引入折扣、滑窗或重置机制；对于
+UCB，可考虑使用衰减计数或基于时间窗口的置信估计以提高对漂移的响应。
+
+在复杂度和工程实现上，ε-贪婪每步选择代价低（查找最大或随机选择，若并行批量化可非常高效），UCB
+每步需要计算置信项（\(O(k)\)）且需维护计数，梯度赌博机需要计算 softmax
+并做指数运算（\(O(k)\)），在使用 PyTorch
+时这三者都能被张量化以并行运行大量独立试验；但要注意设备管理、dtype、随机数种子与可复现性，GPU
+加速尤其对 runs 很大时更为划算，而对小规模实验 PyTorch 的调度开销可能让
+NumPy 实现更快。
+
+在超参数调优与实践建议上，ε-贪婪 的 ε 值常从 0.01--0.1
+试起，若希望早期探索更强可以用衰减策略或乐观初始值；UCB 的 \(c\) 常在
+1--5 之间调试，值越大探索越强；梯度赌博机的 α
+一般比价值算法的步长要小心选择，常从 0.01 开始并结合 baseline
+使用以降低方差。无论哪种算法，先在小规模 runs/steps 做 smoke test
+检查概率归一性、偏好或估计的边界行为、以及在极端参数下是否发生饱和或发散，是高质量实验流程的必备步骤。
+
+总体而言，如果目标是快速对比基线算法且关注实现简单性，ε-贪婪（配合乐观初始或衰减
+ε）是首选；若问题是平稳且追求高样本效率与理论保证，UCB
+常是更好的选择；若希望输出概率策略、后期与神经网络或策略梯度方法结合，梯度赌博机提供最自然的接入点。实验时可把三者放在同一组真实值与随机种子下做并行比较，记录平均回报与
+\% 最优动作随时间的曲线，从而在特定问题上做出有数据支持的选择。
+下面以教科书式的叙述说明：用 PyTorch
+实现这些多臂/策略算法（ε-贪婪、UCB、梯度赌博机）带来的主要优点与缺点，并给出若干实践层面的注意与缓解建议。
+
+\hypertarget{pytorchux5b9eux73b0ux7684ux4f18ux7f3aux70b9}{%
+\subsubsection{Pytorch实现的优缺点}\label{pytorchux5b9eux73b0ux7684ux4f18ux7f3aux70b9}}
+
+PyTorch
+首先提供的是高性能的张量计算引擎，能够把大量独立重复试验（runs）或并行样本的计算向量化并迁移到
+GPU，从而在做大规模仿真实验时显著缩短运行时间。相比逐步的 Python
+循环，张量化实现能把相同逻辑在数千次试验上一次性并行执行，利用 SIMD/GPU
+并行的吞吐优势，这对做参数扫描与统计平均尤其重要。
+
+其次，PyTorch 的自动微分和模块化 API
+使得从简单的带臂基线算法平滑过渡到带函数逼近的策略梯度、Actor--Critic
+或神经网络策略变得自然和低成本：你可以把偏好/策略用神经网络参数化，直接调用优化器来训练，这在研究中非常方便。
+
+再者，PyTorch
+提供统一的设备管理（CPU/GPU）、随机种子控制接口和成熟的序列化（保存/加载模型）机制，这有助于实验可移植性、复现和结果保存。框架周边的生态（profiler、tensorboard、集成优化器、数据并行工具）也方便进行性能调优与实验管理。
+
+最后，PyTorch
+社区和文档丰富，对于遇到数值、并行或调参问题时，查找资料和示例也更容易，这对工程化实验非常有利。
+
+PyTorch 并不是万能的：对于小规模、教学演示或快速探索性实验，引入 PyTorch
+的依赖和调度开销反而会使单次运行更慢。框架的启动、张量在 CPU/GPU
+之间拷贝、以及某些小规模操作的调度延迟，会让短小实验的延时变大。
+
+在实现复杂性上，使用 PyTorch 要额外管理
+dtype、device（CPU/GPU）、随机性（torch 与 numpy
+的种子）以及可能的非确定性操作。特别是在 GPU 上，某些实现（例如 cuDNN
+的某些内核）默认是非确定性的，要严格复现结果需要额外设置并接受性能折中。若不小心还可能引入隐蔽错误：比如无意间在不同试验间复用张量导致状态共享、或在向量化实现时出现维度/广播错误而难以调试。
+
+内存消耗是另一项需要注意的代价：把大量 runs
+和步长打包到一个大张量会占用大量 GPU/CPU
+内存，必要时必须使用批次或分块策略。并且，默认的浮点精度（float32）在某些极端累积计算中可能带来数值稳定性问题，改用
+float64 会进一步增加内存与计算开销。
+
+最后，框架升级、API 变化或 CUDA 兼容问题可能造成环境维护成本，比起单纯用
+NumPy 的``零依赖''脚本需要更多的运维注意。
+
+在使用 PyTorch 实现这些算法时，首先在小规模上做 smoke test（和已知的
+NumPy 实现或手算结果比对），确保逻辑与指标一致，再把实现向量化或搬到
+GPU。若追求可复现性，请同时设置
+torch.manual\_seed、numpy.random.seed，并在需要严格确定性时开启
+torch.backends.cudnn.deterministic=True 与
+torch.use\_deterministic\_algorithms(True)（但要注意这可能降低性能或限制某些操作）。
+
+内存管理方面，避免一次性把非常大的 runs×steps 张量全放到
+GPU，使用按批次的向量化或把 runs
+拆分成若干批次来累积统计量。向量化实现时要小心不要共用可变张量；对每个独立试验应使用独立的状态张量或在循环中重置状态。对
+softmax、指数等敏感操作采用数值稳定技巧（例如减去最大值），并在梯度方法中对
+learning rate 做充分的网格搜索与早期监控，必要时引入梯度裁剪或 L2
+正则化以防偏好爆炸。
+
+在追求性能时，使用 profiler
+先定位瓶颈（是数据拷贝、随机采样、还是张量操作），并尽量把数据生成、采样与更新保持在同一
+device 上以避免往返拷贝。对于需要严格可重复的结果，在 GPU
+上可能需要放弃某些最快但非确定性内核，或在关键实验中转回 CPU
+以得到可比的确定性基线。
+
+如果你的目标是做严肃的、可扩展的实验（大量
+runs、参数搜索、或计划把策略与神经网络结合），那么用 PyTorch
+实现这些算法的收益明显且长期价值高：你获得了可扩展性、GPU
+加速和与深度模型无缝集成的能力。相反，如果你的目的只是教学演示、小规模验证或快速原型，并不打算扩展到函数逼近或大规模统计，采用轻量的
+NumPy 实现会更简洁、可读且更易于即时交互。选择时把实验规模、是否需要
+GPU、可复现性要求以及后续扩展路径都纳入考虑。
+
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{1}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{c+c1}{\PYZsh{} Batch\PYZhy{}parallel implementations for bandit algorithms using PyTorch}
+\PY{c+c1}{\PYZsh{} Add `batch` parameter: at each outer loop iteration we run `batch` independent runs in parallel}
+\PY{k+kn}{import} \PY{n+nn}{torch}
+\PY{k+kn}{import} \PY{n+nn}{numpy} \PY{k}{as} \PY{n+nn}{np}
+\PY{k+kn}{import} \PY{n+nn}{matplotlib}\PY{n+nn}{.}\PY{n+nn}{pyplot} \PY{k}{as} \PY{n+nn}{plt}
+
+\PY{k}{def} \PY{n+nf}{run\PYZus{}epsilon\PYZus{}greedy\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{epsilon}\PY{o}{=}\PY{l+m+mf}{0.1}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{100}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{k+kc}{None}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cpu}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}\PY{p}{:}
+\PY{+w}{    }\PY{l+s+sd}{\PYZdq{}\PYZdq{}\PYZdq{}Batch\PYZhy{}parallel epsilon\PYZhy{}greedy using PyTorch.}
+\PY{l+s+sd}{    Runs are processed in chunks of size `batch` to reduce Python loop overhead.}
+\PY{l+s+sd}{    \PYZdq{}\PYZdq{}\PYZdq{}}
+    \PY{k}{if} \PY{n+nb}{isinstance}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{p}{(}\PY{n+nb}{list}\PY{p}{,} \PY{n}{np}\PY{o}{.}\PY{n}{ndarray}\PY{p}{)}\PY{p}{)}\PY{p}{:}
+        \PY{n}{means} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{tensor}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+    \PY{k}{else}\PY{p}{:}
+        \PY{n}{means} \PY{o}{=} \PY{n}{means}\PY{o}{.}\PY{n}{to}\PY{p}{(}\PY{n}{device}\PY{p}{)}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)}
+
+    \PY{k}{if} \PY{n}{seed} \PY{o+ow}{is} \PY{o+ow}{not} \PY{k+kc}{None}\PY{p}{:}
+        \PY{n}{torch}\PY{o}{.}\PY{n}{manual\PYZus{}seed}\PY{p}{(}\PY{n}{seed}\PY{p}{)}
+        \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{seed}\PY{p}{(}\PY{n+nb}{int}\PY{p}{(}\PY{n}{seed}\PY{p}{)}\PY{p}{)}
+
+    \PY{n}{n\PYZus{}arms} \PY{o}{=} \PY{n}{means}\PY{o}{.}\PY{n}{shape}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}
+    \PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}acc} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+
+    \PY{n}{optimal\PYZus{}arm} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{torch}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{means}\PY{p}{)}\PY{o}{.}\PY{n}{item}\PY{p}{(}\PY{p}{)}\PY{p}{)}
+
+    \PY{c+c1}{\PYZsh{} process runs in batches}
+    \PY{k}{for} \PY{n}{start} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{n}{runs}\PY{p}{,} \PY{n}{batch}\PY{p}{)}\PY{p}{:}
+        \PY{n}{b} \PY{o}{=} \PY{n+nb}{min}\PY{p}{(}\PY{n}{batch}\PY{p}{,} \PY{n}{runs} \PY{o}{\PYZhy{}} \PY{n}{start}\PY{p}{)}
+        \PY{c+c1}{\PYZsh{} Q: shape (b, n\PYZus{}arms)}
+        \PY{n}{Q} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+        \PY{n}{N} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+
+        \PY{n}{rewards\PYZus{}all} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+        \PY{n}{optimal\PYZus{}chosen} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+
+        \PY{k}{for} \PY{n}{t} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{steps}\PY{p}{)}\PY{p}{:}
+            \PY{c+c1}{\PYZsh{} epsilon\PYZhy{}greedy selection for b runs}
+            \PY{n}{prob} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{rand}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+            \PY{n}{explore\PYZus{}mask} \PY{o}{=} \PY{n}{prob} \PY{o}{\PYZlt{}} \PY{n+nb}{float}\PY{p}{(}\PY{n}{epsilon}\PY{p}{)}
+
+            \PY{c+c1}{\PYZsh{} greedy actions}
+            \PY{n}{maxv}\PY{p}{,} \PY{n}{\PYZus{}} \PY{o}{=} \PY{n}{Q}\PY{o}{.}\PY{n}{max}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{)}
+            \PY{c+c1}{\PYZsh{} candidates mask (b, n\PYZus{}arms)}
+            \PY{n}{eq\PYZus{}mask} \PY{o}{=} \PY{n}{Q} \PY{o}{==} \PY{n}{maxv}\PY{o}{.}\PY{n}{unsqueeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}
+            \PY{c+c1}{\PYZsh{} for tie\PYZhy{}breaking, choose random among ties}
+            \PY{c+c1}{\PYZsh{} produce random indices for ties}
+            \PY{n}{rand\PYZus{}idx} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{randint}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{,} \PY{p}{(}\PY{n}{b}\PY{p}{,}\PY{p}{)}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+            \PY{n}{greedy\PYZus{}actions} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{where}\PY{p}{(}\PY{n}{eq\PYZus{}mask}\PY{o}{.}\PY{n}{any}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{)}\PY{p}{,}
+                                          \PY{p}{(}\PY{n}{eq\PYZus{}mask}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)} \PY{o}{*} \PY{n}{torch}\PY{o}{.}\PY{n}{arange}\PY{p}{(}\PY{n}{n\PYZus{}arms}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)}\PY{p}{)}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{)}\PY{o}{.}\PY{n}{long}\PY{p}{(}\PY{p}{)}\PY{p}{,}
+                                          \PY{n}{rand\PYZus{}idx}\PY{p}{)}
+            \PY{c+c1}{\PYZsh{} naive tie\PYZhy{}break above may be non\PYZhy{}ideal; fallback to argmax}
+            \PY{n}{greedy\PYZus{}actions} \PY{o}{=} \PY{n}{greedy\PYZus{}actions}\PY{o}{.}\PY{n}{long}\PY{p}{(}\PY{p}{)}
+
+            \PY{c+c1}{\PYZsh{} random actions where explore\PYZus{}mask is True}
+            \PY{n}{random\PYZus{}actions} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{randint}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{,} \PY{p}{(}\PY{n}{b}\PY{p}{,}\PY{p}{)}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+
+            \PY{n}{actions} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{where}\PY{p}{(}\PY{n}{explore\PYZus{}mask}\PY{p}{,} \PY{n}{random\PYZus{}actions}\PY{p}{,} \PY{n}{greedy\PYZus{}actions}\PY{p}{)}
+
+            \PY{c+c1}{\PYZsh{} sample rewards: for each run i, sample from N(means[action\PYZus{}i], 1)}
+            \PY{n}{means\PYZus{}expanded} \PY{o}{=} \PY{n}{means}\PY{p}{[}\PY{n}{actions}\PY{p}{]}
+            \PY{n}{rewards} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{n}{means\PYZus{}expanded}\PY{p}{,} \PY{n}{torch}\PY{o}{.}\PY{n}{ones\PYZus{}like}\PY{p}{(}\PY{n}{means\PYZus{}expanded}\PY{p}{)}\PY{p}{)}
+
+            \PY{c+c1}{\PYZsh{} update N and Q (vectorized)}
+            \PY{n}{idx} \PY{o}{=} \PY{n}{actions}\PY{o}{.}\PY{n}{unsqueeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}
+            \PY{n}{N}\PY{o}{.}\PY{n}{scatter\PYZus{}add\PYZus{}}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{idx}\PY{p}{,} \PY{n}{torch}\PY{o}{.}\PY{n}{ones}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,}\PY{l+m+mi}{1}\PY{p}{)}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}\PY{p}{)}
+
+            \PY{c+c1}{\PYZsh{} sample average: Q += (reward \PYZhy{} Q)/N for the selected action}
+            \PY{c+c1}{\PYZsh{} compute incremental update only for selected actions}
+            \PY{n}{old\PYZus{}Q} \PY{o}{=} \PY{n}{Q}\PY{o}{.}\PY{n}{gather}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{idx}\PY{p}{)}\PY{o}{.}\PY{n}{squeeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}
+            \PY{n}{new\PYZus{}Q} \PY{o}{=} \PY{n}{old\PYZus{}Q} \PY{o}{+} \PY{p}{(}\PY{n}{rewards} \PY{o}{\PYZhy{}} \PY{n}{old\PYZus{}Q}\PY{p}{)} \PY{o}{/} \PY{n}{N}\PY{o}{.}\PY{n}{gather}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{idx}\PY{p}{)}\PY{o}{.}\PY{n}{squeeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}
+            \PY{n}{Q}\PY{o}{.}\PY{n}{scatter\PYZus{}}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{idx}\PY{p}{,} \PY{n}{new\PYZus{}Q}\PY{o}{.}\PY{n}{unsqueeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}\PY{p}{)}
+
+            \PY{n}{rewards\PYZus{}all}\PY{p}{[}\PY{p}{:}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{n}{rewards}
+            \PY{n}{optimal\PYZus{}chosen}\PY{p}{[}\PY{p}{:}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{p}{(}\PY{n}{actions} \PY{o}{==} \PY{n}{optimal\PYZus{}arm}\PY{p}{)}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)}
+
+        \PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{+}\PY{o}{=} \PY{n}{rewards\PYZus{}all}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+        \PY{n}{optimal\PYZus{}acc} \PY{o}{+}\PY{o}{=} \PY{n}{optimal\PYZus{}chosen}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+
+    \PY{n}{avg\PYZus{}rewards} \PY{o}{=} \PY{p}{(}\PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{/} \PY{p}{(}\PY{p}{(}\PY{n}{runs} \PY{o}{+} \PY{n}{batch} \PY{o}{\PYZhy{}} \PY{l+m+mi}{1}\PY{p}{)}\PY{o}{/}\PY{o}{/}\PY{n}{batch}\PY{p}{)}\PY{p}{)}\PY{o}{.}\PY{n}{cpu}\PY{p}{(}\PY{p}{)}\PY{o}{.}\PY{n}{numpy}\PY{p}{(}\PY{p}{)}
+    \PY{n}{percent\PYZus{}optimal} \PY{o}{=} \PY{p}{(}\PY{n}{optimal\PYZus{}acc} \PY{o}{/} \PY{p}{(}\PY{p}{(}\PY{n}{runs} \PY{o}{+} \PY{n}{batch} \PY{o}{\PYZhy{}} \PY{l+m+mi}{1}\PY{p}{)}\PY{o}{/}\PY{o}{/}\PY{n}{batch}\PY{p}{)} \PY{o}{*} \PY{l+m+mf}{100.0}\PY{p}{)}\PY{o}{.}\PY{n}{cpu}\PY{p}{(}\PY{p}{)}\PY{o}{.}\PY{n}{numpy}\PY{p}{(}\PY{p}{)}
+    \PY{k}{return} \PY{n}{avg\PYZus{}rewards}\PY{p}{,} \PY{n}{percent\PYZus{}optimal}
+
+
+\PY{k}{def} \PY{n+nf}{run\PYZus{}optimistic\PYZus{}initialization\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.1}\PY{p}{,} \PY{n}{Q1}\PY{o}{=}\PY{l+m+mi}{5}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{100}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{k+kc}{None}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cpu}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}\PY{p}{:}
+\PY{+w}{    }\PY{l+s+sd}{\PYZdq{}\PYZdq{}\PYZdq{}Batch\PYZhy{}parallel epsilon\PYZhy{}greedy using PyTorch.}
+\PY{l+s+sd}{    Runs are processed in chunks of size `batch` to reduce Python loop overhead.}
+\PY{l+s+sd}{    \PYZdq{}\PYZdq{}\PYZdq{}}
+    \PY{k}{if} \PY{n+nb}{isinstance}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{p}{(}\PY{n+nb}{list}\PY{p}{,} \PY{n}{np}\PY{o}{.}\PY{n}{ndarray}\PY{p}{)}\PY{p}{)}\PY{p}{:}
+        \PY{n}{means} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{tensor}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+    \PY{k}{else}\PY{p}{:}
+        \PY{n}{means} \PY{o}{=} \PY{n}{means}\PY{o}{.}\PY{n}{to}\PY{p}{(}\PY{n}{device}\PY{p}{)}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)}
+
+    \PY{k}{if} \PY{n}{seed} \PY{o+ow}{is} \PY{o+ow}{not} \PY{k+kc}{None}\PY{p}{:}
+        \PY{n}{torch}\PY{o}{.}\PY{n}{manual\PYZus{}seed}\PY{p}{(}\PY{n}{seed}\PY{p}{)}
+        \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{seed}\PY{p}{(}\PY{n+nb}{int}\PY{p}{(}\PY{n}{seed}\PY{p}{)}\PY{p}{)}
+
+    \PY{n}{n\PYZus{}arms} \PY{o}{=} \PY{n}{means}\PY{o}{.}\PY{n}{shape}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}
+    \PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}acc} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+
+    \PY{n}{optimal\PYZus{}arm} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{torch}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{means}\PY{p}{)}\PY{o}{.}\PY{n}{item}\PY{p}{(}\PY{p}{)}\PY{p}{)}
+
+    \PY{c+c1}{\PYZsh{} process runs in batches}
+    \PY{k}{for} \PY{n}{start} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{n}{runs}\PY{p}{,} \PY{n}{batch}\PY{p}{)}\PY{p}{:}
+        \PY{n}{b} \PY{o}{=} \PY{n+nb}{min}\PY{p}{(}\PY{n}{batch}\PY{p}{,} \PY{n}{runs} \PY{o}{\PYZhy{}} \PY{n}{start}\PY{p}{)}
+        \PY{c+c1}{\PYZsh{} Q: shape (b, n\PYZus{}arms) initialized optimistically to Q1}
+        \PY{n}{Q} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{full}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}\PY{p}{,} \PY{n+nb}{float}\PY{p}{(}\PY{n}{Q1}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+        \PY{n}{N} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+
+        \PY{n}{rewards\PYZus{}all} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+        \PY{n}{optimal\PYZus{}chosen} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+
+        \PY{k}{for} \PY{n}{t} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{steps}\PY{p}{)}\PY{p}{:}
+            \PY{c+c1}{\PYZsh{} choose greedy action per run, breaking ties uniformly at random}
+            \PY{n}{maxvals} \PY{o}{=} \PY{n}{Q}\PY{o}{.}\PY{n}{max}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{keepdim}\PY{o}{=}\PY{k+kc}{True}\PY{p}{)}\PY{o}{.}\PY{n}{values}
+            \PY{n}{eq\PYZus{}mask} \PY{o}{=} \PY{n}{Q} \PY{o}{==} \PY{n}{maxvals}  \PY{c+c1}{\PYZsh{} (b, n\PYZus{}arms) boolean mask of ties per run}
+
+            \PY{c+c1}{\PYZsh{} sample random numbers for arms and mask non\PYZhy{}tie positions so argmax picks uniformly among ties}
+            \PY{n}{rand} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{rand}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+            \PY{n}{rand\PYZus{}masked} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{where}\PY{p}{(}\PY{n}{eq\PYZus{}mask}\PY{p}{,} \PY{n}{rand}\PY{p}{,} \PY{n}{torch}\PY{o}{.}\PY{n}{full\PYZus{}like}\PY{p}{(}\PY{n}{rand}\PY{p}{,} \PY{o}{\PYZhy{}}\PY{l+m+mf}{1.0}\PY{p}{)}\PY{p}{)}
+            \PY{n}{actions} \PY{o}{=} \PY{n}{rand\PYZus{}masked}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{)}
+
+            \PY{c+c1}{\PYZsh{} sample rewards: for each run i, sample from N(means[action\PYZus{}i], 1)}
+            \PY{n}{means\PYZus{}expanded} \PY{o}{=} \PY{n}{means}\PY{p}{[}\PY{n}{actions}\PY{p}{]}
+            \PY{n}{rewards} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{n}{means\PYZus{}expanded}\PY{p}{,} \PY{n}{torch}\PY{o}{.}\PY{n}{ones\PYZus{}like}\PY{p}{(}\PY{n}{means\PYZus{}expanded}\PY{p}{)}\PY{p}{)}
+
+            \PY{c+c1}{\PYZsh{} update N and Q (vectorized)}
+            \PY{n}{idx} \PY{o}{=} \PY{n}{actions}\PY{o}{.}\PY{n}{unsqueeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}
+            \PY{n}{N}\PY{o}{.}\PY{n}{scatter\PYZus{}add\PYZus{}}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{idx}\PY{p}{,} \PY{n}{torch}\PY{o}{.}\PY{n}{ones}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,}\PY{l+m+mi}{1}\PY{p}{)}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}\PY{p}{)}
+
+            \PY{c+c1}{\PYZsh{} fixed step\PYZhy{}size}
+            \PY{n}{old\PYZus{}Q} \PY{o}{=} \PY{n}{Q}\PY{o}{.}\PY{n}{gather}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{idx}\PY{p}{)}\PY{o}{.}\PY{n}{squeeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}
+            \PY{n}{new\PYZus{}Q} \PY{o}{=} \PY{n}{old\PYZus{}Q} \PY{o}{+} \PY{n+nb}{float}\PY{p}{(}\PY{n}{alpha}\PY{p}{)} \PY{o}{*} \PY{p}{(}\PY{n}{rewards} \PY{o}{\PYZhy{}} \PY{n}{old\PYZus{}Q}\PY{p}{)}
+            \PY{n}{Q}\PY{o}{.}\PY{n}{scatter\PYZus{}}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{idx}\PY{p}{,} \PY{n}{new\PYZus{}Q}\PY{o}{.}\PY{n}{unsqueeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}\PY{p}{)}
+
+            \PY{n}{rewards\PYZus{}all}\PY{p}{[}\PY{p}{:}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{n}{rewards}
+            \PY{n}{optimal\PYZus{}chosen}\PY{p}{[}\PY{p}{:}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{p}{(}\PY{n}{actions} \PY{o}{==} \PY{n}{optimal\PYZus{}arm}\PY{p}{)}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)}
+
+        \PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{+}\PY{o}{=} \PY{n}{rewards\PYZus{}all}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+        \PY{n}{optimal\PYZus{}acc} \PY{o}{+}\PY{o}{=} \PY{n}{optimal\PYZus{}chosen}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+
+    \PY{n}{avg\PYZus{}rewards} \PY{o}{=} \PY{p}{(}\PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{/} \PY{p}{(}\PY{p}{(}\PY{n}{runs} \PY{o}{+} \PY{n}{batch} \PY{o}{\PYZhy{}} \PY{l+m+mi}{1}\PY{p}{)}\PY{o}{/}\PY{o}{/}\PY{n}{batch}\PY{p}{)}\PY{p}{)}\PY{o}{.}\PY{n}{cpu}\PY{p}{(}\PY{p}{)}\PY{o}{.}\PY{n}{numpy}\PY{p}{(}\PY{p}{)}
+    \PY{n}{percent\PYZus{}optimal} \PY{o}{=} \PY{p}{(}\PY{n}{optimal\PYZus{}acc} \PY{o}{/} \PY{p}{(}\PY{p}{(}\PY{n}{runs} \PY{o}{+} \PY{n}{batch} \PY{o}{\PYZhy{}} \PY{l+m+mi}{1}\PY{p}{)}\PY{o}{/}\PY{o}{/}\PY{n}{batch}\PY{p}{)} \PY{o}{*} \PY{l+m+mf}{100.0}\PY{p}{)}\PY{o}{.}\PY{n}{cpu}\PY{p}{(}\PY{p}{)}\PY{o}{.}\PY{n}{numpy}\PY{p}{(}\PY{p}{)}
+    \PY{k}{return} \PY{n}{avg\PYZus{}rewards}\PY{p}{,} \PY{n}{percent\PYZus{}optimal}
+
+\PY{k}{def} \PY{n+nf}{run\PYZus{}ucb\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{c}\PY{o}{=}\PY{l+m+mf}{2.0}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{100}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{k+kc}{None}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cpu}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}\PY{p}{:}
+\PY{+w}{    }\PY{l+s+sd}{\PYZdq{}\PYZdq{}\PYZdq{}Batch\PYZhy{}parallel UCB using PyTorch.}
+\PY{l+s+sd}{    Each batch simulates `b` runs in parallel.}
+\PY{l+s+sd}{    \PYZdq{}\PYZdq{}\PYZdq{}}
+    \PY{k}{if} \PY{n+nb}{isinstance}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{p}{(}\PY{n+nb}{list}\PY{p}{,} \PY{n}{np}\PY{o}{.}\PY{n}{ndarray}\PY{p}{)}\PY{p}{)}\PY{p}{:}
+        \PY{n}{means} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{tensor}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+    \PY{k}{else}\PY{p}{:}
+        \PY{n}{means} \PY{o}{=} \PY{n}{means}\PY{o}{.}\PY{n}{to}\PY{p}{(}\PY{n}{device}\PY{p}{)}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)}
+
+    \PY{k}{if} \PY{n}{seed} \PY{o+ow}{is} \PY{o+ow}{not} \PY{k+kc}{None}\PY{p}{:}
+        \PY{n}{torch}\PY{o}{.}\PY{n}{manual\PYZus{}seed}\PY{p}{(}\PY{n}{seed}\PY{p}{)}
+        \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{seed}\PY{p}{(}\PY{n+nb}{int}\PY{p}{(}\PY{n}{seed}\PY{p}{)}\PY{p}{)}
+
+    \PY{n}{n\PYZus{}arms} \PY{o}{=} \PY{n}{means}\PY{o}{.}\PY{n}{shape}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}
+    \PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}acc} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}arm} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{torch}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{means}\PY{p}{)}\PY{o}{.}\PY{n}{item}\PY{p}{(}\PY{p}{)}\PY{p}{)}
+
+    \PY{k}{for} \PY{n}{start} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{n}{runs}\PY{p}{,} \PY{n}{batch}\PY{p}{)}\PY{p}{:}
+        \PY{n}{b} \PY{o}{=} \PY{n+nb}{min}\PY{p}{(}\PY{n}{batch}\PY{p}{,} \PY{n}{runs} \PY{o}{\PYZhy{}} \PY{n}{start}\PY{p}{)}
+        \PY{n}{Q} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+        \PY{n}{N} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+
+        \PY{n}{rewards\PYZus{}all} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+        \PY{n}{optimal\PYZus{}chosen} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+
+        \PY{k}{for} \PY{n}{t} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{steps}\PY{p}{)}\PY{p}{:}
+            \PY{c+c1}{\PYZsh{} if any N==0, choose one untried arm (we choose the first untried per run)}
+            \PY{n}{untried} \PY{o}{=} \PY{p}{(}\PY{n}{N} \PY{o}{==} \PY{l+m+mi}{0}\PY{p}{)}\PY{o}{.}\PY{n}{any}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{)}
+            \PY{n}{actions} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{empty}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{long}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+            \PY{k}{if} \PY{n}{untried}\PY{o}{.}\PY{n}{any}\PY{p}{(}\PY{p}{)}\PY{p}{:}
+                \PY{c+c1}{\PYZsh{} for runs with untried arms, pick the first untried}
+                \PY{n}{first\PYZus{}untried} \PY{o}{=} \PY{p}{(}\PY{n}{N} \PY{o}{==} \PY{l+m+mi}{0}\PY{p}{)}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)} \PY{o}{*} \PY{n}{torch}\PY{o}{.}\PY{n}{arange}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)}
+                \PY{n}{actions} \PY{o}{=} \PY{n}{first\PYZus{}untried}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{)}\PY{o}{.}\PY{n}{long}\PY{p}{(}\PY{p}{)}
+            \PY{c+c1}{\PYZsh{} for others compute UCB}
+            \PY{n}{tried\PYZus{}mask} \PY{o}{=} \PY{o}{\PYZti{}}\PY{n}{untried}
+            \PY{k}{if} \PY{n}{tried\PYZus{}mask}\PY{o}{.}\PY{n}{any}\PY{p}{(}\PY{p}{)}\PY{p}{:}
+                \PY{n}{t\PYZus{}idx} \PY{o}{=} \PY{n}{tried\PYZus{}mask}\PY{o}{.}\PY{n}{nonzero}\PY{p}{(}\PY{n}{as\PYZus{}tuple}\PY{o}{=}\PY{k+kc}{False}\PY{p}{)}\PY{o}{.}\PY{n}{squeeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}
+                \PY{n}{Nt} \PY{o}{=} \PY{n}{N}\PY{p}{[}\PY{n}{t\PYZus{}idx}\PY{p}{]}
+                \PY{n}{Qt} \PY{o}{=} \PY{n}{Q}\PY{p}{[}\PY{n}{t\PYZus{}idx}\PY{p}{]}
+                \PY{n}{confidence} \PY{o}{=} \PY{n}{c} \PY{o}{*} \PY{n}{torch}\PY{o}{.}\PY{n}{sqrt}\PY{p}{(}\PY{n}{torch}\PY{o}{.}\PY{n}{log}\PY{p}{(}\PY{n}{torch}\PY{o}{.}\PY{n}{tensor}\PY{p}{(}\PY{n}{t} \PY{o}{+} \PY{l+m+mf}{1.0}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}\PY{p}{)} \PY{o}{/} \PY{n}{Nt}\PY{p}{)}
+                \PY{n}{ucb\PYZus{}values} \PY{o}{=} \PY{n}{Qt} \PY{o}{+} \PY{n}{confidence}
+                \PY{n}{actions\PYZus{}tried} \PY{o}{=} \PY{n}{ucb\PYZus{}values}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{)}
+                \PY{n}{actions}\PY{p}{[}\PY{n}{tried\PYZus{}mask}\PY{p}{]} \PY{o}{=} \PY{n}{actions\PYZus{}tried}
+
+            \PY{n}{rewards} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{n}{means}\PY{p}{[}\PY{n}{actions}\PY{p}{]}\PY{p}{,} \PY{n}{torch}\PY{o}{.}\PY{n}{ones}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,}\PY{p}{)}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}\PY{p}{)}
+            \PY{n}{idx} \PY{o}{=} \PY{n}{actions}\PY{o}{.}\PY{n}{unsqueeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}
+            \PY{n}{N}\PY{o}{.}\PY{n}{scatter\PYZus{}add\PYZus{}}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{idx}\PY{p}{,} \PY{n}{torch}\PY{o}{.}\PY{n}{ones}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,}\PY{l+m+mi}{1}\PY{p}{)}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}\PY{p}{)}
+            \PY{n}{old\PYZus{}Q} \PY{o}{=} \PY{n}{Q}\PY{o}{.}\PY{n}{gather}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{idx}\PY{p}{)}\PY{o}{.}\PY{n}{squeeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}
+            \PY{n}{new\PYZus{}Q} \PY{o}{=} \PY{n}{old\PYZus{}Q} \PY{o}{+} \PY{p}{(}\PY{n}{rewards} \PY{o}{\PYZhy{}} \PY{n}{old\PYZus{}Q}\PY{p}{)} \PY{o}{/} \PY{n}{N}\PY{o}{.}\PY{n}{gather}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{idx}\PY{p}{)}\PY{o}{.}\PY{n}{squeeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}
+            \PY{n}{Q}\PY{o}{.}\PY{n}{scatter\PYZus{}}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{idx}\PY{p}{,} \PY{n}{new\PYZus{}Q}\PY{o}{.}\PY{n}{unsqueeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}\PY{p}{)}
+
+            \PY{n}{rewards\PYZus{}all}\PY{p}{[}\PY{p}{:}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{n}{rewards}
+            \PY{n}{optimal\PYZus{}chosen}\PY{p}{[}\PY{p}{:}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{p}{(}\PY{n}{actions} \PY{o}{==} \PY{n}{optimal\PYZus{}arm}\PY{p}{)}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)}
+
+        \PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{+}\PY{o}{=} \PY{n}{rewards\PYZus{}all}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+        \PY{n}{optimal\PYZus{}acc} \PY{o}{+}\PY{o}{=} \PY{n}{optimal\PYZus{}chosen}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+
+    \PY{n}{avg\PYZus{}rewards} \PY{o}{=} \PY{p}{(}\PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{/} \PY{p}{(}\PY{p}{(}\PY{n}{runs} \PY{o}{+} \PY{n}{batch} \PY{o}{\PYZhy{}} \PY{l+m+mi}{1}\PY{p}{)}\PY{o}{/}\PY{o}{/}\PY{n}{batch}\PY{p}{)}\PY{p}{)}\PY{o}{.}\PY{n}{cpu}\PY{p}{(}\PY{p}{)}\PY{o}{.}\PY{n}{numpy}\PY{p}{(}\PY{p}{)}
+    \PY{n}{percent\PYZus{}optimal} \PY{o}{=} \PY{p}{(}\PY{n}{optimal\PYZus{}acc} \PY{o}{/} \PY{p}{(}\PY{p}{(}\PY{n}{runs} \PY{o}{+} \PY{n}{batch} \PY{o}{\PYZhy{}} \PY{l+m+mi}{1}\PY{p}{)}\PY{o}{/}\PY{o}{/}\PY{n}{batch}\PY{p}{)} \PY{o}{*} \PY{l+m+mf}{100.0}\PY{p}{)}\PY{o}{.}\PY{n}{cpu}\PY{p}{(}\PY{p}{)}\PY{o}{.}\PY{n}{numpy}\PY{p}{(}\PY{p}{)}
+    \PY{k}{return} \PY{n}{avg\PYZus{}rewards}\PY{p}{,} \PY{n}{percent\PYZus{}optimal}
+
+
+\PY{k}{def} \PY{n+nf}{run\PYZus{}gradient\PYZus{}bandit\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.1}\PY{p}{,} \PY{n}{baseline}\PY{o}{=}\PY{k+kc}{True}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{100}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{k+kc}{None}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cpu}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}\PY{p}{:}
+\PY{+w}{    }\PY{l+s+sd}{\PYZdq{}\PYZdq{}\PYZdq{}Batch\PYZhy{}parallel Gradient Bandit implementation.}
+\PY{l+s+sd}{    Runs are processed in chunks of size `batch`.}
+\PY{l+s+sd}{    \PYZdq{}\PYZdq{}\PYZdq{}}
+    \PY{k}{if} \PY{n+nb}{isinstance}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{p}{(}\PY{n+nb}{list}\PY{p}{,} \PY{n}{np}\PY{o}{.}\PY{n}{ndarray}\PY{p}{)}\PY{p}{)}\PY{p}{:}
+        \PY{n}{means} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{tensor}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+    \PY{k}{else}\PY{p}{:}
+        \PY{n}{means} \PY{o}{=} \PY{n}{means}\PY{o}{.}\PY{n}{to}\PY{p}{(}\PY{n}{device}\PY{p}{)}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)}
+
+    \PY{k}{if} \PY{n}{seed} \PY{o+ow}{is} \PY{o+ow}{not} \PY{k+kc}{None}\PY{p}{:}
+        \PY{n}{torch}\PY{o}{.}\PY{n}{manual\PYZus{}seed}\PY{p}{(}\PY{n}{seed}\PY{p}{)}
+        \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{seed}\PY{p}{(}\PY{n+nb}{int}\PY{p}{(}\PY{n}{seed}\PY{p}{)}\PY{p}{)}
+
+    \PY{n}{n\PYZus{}arms} \PY{o}{=} \PY{n}{means}\PY{o}{.}\PY{n}{shape}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}
+    \PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}acc} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{n}{steps}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+    \PY{n}{optimal\PYZus{}arm} \PY{o}{=} \PY{n+nb}{int}\PY{p}{(}\PY{n}{torch}\PY{o}{.}\PY{n}{argmax}\PY{p}{(}\PY{n}{means}\PY{p}{)}\PY{o}{.}\PY{n}{item}\PY{p}{(}\PY{p}{)}\PY{p}{)}
+
+    \PY{k}{for} \PY{n}{start} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{n}{runs}\PY{p}{,} \PY{n}{batch}\PY{p}{)}\PY{p}{:}
+        \PY{n}{b} \PY{o}{=} \PY{n+nb}{min}\PY{p}{(}\PY{n}{batch}\PY{p}{,} \PY{n}{runs} \PY{o}{\PYZhy{}} \PY{n}{start}\PY{p}{)}
+        \PY{n}{H} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+        \PY{n}{avg\PYZus{}r} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+
+        \PY{n}{rewards\PYZus{}all} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+        \PY{n}{optimal\PYZus{}chosen} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{steps}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+
+        \PY{k}{for} \PY{n}{t} \PY{o+ow}{in} \PY{n+nb}{range}\PY{p}{(}\PY{n}{steps}\PY{p}{)}\PY{p}{:}
+            \PY{c+c1}{\PYZsh{} softmax per run}
+            \PY{n}{H\PYZus{}shift} \PY{o}{=} \PY{n}{H} \PY{o}{\PYZhy{}} \PY{n}{H}\PY{o}{.}\PY{n}{max}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{keepdim}\PY{o}{=}\PY{k+kc}{True}\PY{p}{)}\PY{o}{.}\PY{n}{values}
+            \PY{n}{ex} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{exp}\PY{p}{(}\PY{n}{H\PYZus{}shift}\PY{p}{)}
+            \PY{n}{pi} \PY{o}{=} \PY{n}{ex} \PY{o}{/} \PY{n}{ex}\PY{o}{.}\PY{n}{sum}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{keepdim}\PY{o}{=}\PY{k+kc}{True}\PY{p}{)}
+
+            \PY{c+c1}{\PYZsh{} sample actions for b runs}
+            \PY{n}{actions} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{multinomial}\PY{p}{(}\PY{n}{pi}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{)}\PY{o}{.}\PY{n}{squeeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}
+
+            \PY{n}{rewards} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{n}{means}\PY{p}{[}\PY{n}{actions}\PY{p}{]}\PY{p}{,} \PY{n}{torch}\PY{o}{.}\PY{n}{ones}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,}\PY{p}{)}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}\PY{p}{)}
+
+            \PY{n}{baseline\PYZus{}val} \PY{o}{=} \PY{n}{avg\PYZus{}r} \PY{k}{if} \PY{n}{baseline} \PY{k}{else} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros\PYZus{}like}\PY{p}{(}\PY{n}{avg\PYZus{}r}\PY{p}{)}
+
+            \PY{c+c1}{\PYZsh{} one\PYZhy{}hot}
+            \PY{n}{one\PYZus{}hot} \PY{o}{=} \PY{n}{torch}\PY{o}{.}\PY{n}{zeros}\PY{p}{(}\PY{p}{(}\PY{n}{b}\PY{p}{,} \PY{n}{n\PYZus{}arms}\PY{p}{)}\PY{p}{,} \PY{n}{dtype}\PY{o}{=}\PY{n}{torch}\PY{o}{.}\PY{n}{float32}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{n}{device}\PY{p}{)}
+            \PY{n}{one\PYZus{}hot}\PY{o}{.}\PY{n}{scatter\PYZus{}}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{,} \PY{n}{actions}\PY{o}{.}\PY{n}{unsqueeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)}\PY{p}{,} \PY{l+m+mf}{1.0}\PY{p}{)}
+
+            \PY{n}{H} \PY{o}{+}\PY{o}{=} \PY{n+nb}{float}\PY{p}{(}\PY{n}{alpha}\PY{p}{)} \PY{o}{*} \PY{p}{(}\PY{n}{rewards} \PY{o}{\PYZhy{}} \PY{n}{baseline\PYZus{}val}\PY{p}{)}\PY{o}{.}\PY{n}{unsqueeze}\PY{p}{(}\PY{l+m+mi}{1}\PY{p}{)} \PY{o}{*} \PY{p}{(}\PY{n}{one\PYZus{}hot} \PY{o}{\PYZhy{}} \PY{n}{pi}\PY{p}{)}
+
+            \PY{n}{avg\PYZus{}r} \PY{o}{+}\PY{o}{=} \PY{p}{(}\PY{n}{rewards} \PY{o}{\PYZhy{}} \PY{n}{avg\PYZus{}r}\PY{p}{)} \PY{o}{/} \PY{p}{(}\PY{n}{t} \PY{o}{+} \PY{l+m+mi}{1}\PY{p}{)}
+
+            \PY{n}{rewards\PYZus{}all}\PY{p}{[}\PY{p}{:}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{n}{rewards}
+            \PY{n}{optimal\PYZus{}chosen}\PY{p}{[}\PY{p}{:}\PY{p}{,} \PY{n}{t}\PY{p}{]} \PY{o}{=} \PY{p}{(}\PY{n}{actions} \PY{o}{==} \PY{n}{optimal\PYZus{}arm}\PY{p}{)}\PY{o}{.}\PY{n}{float}\PY{p}{(}\PY{p}{)}
+
+        \PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{+}\PY{o}{=} \PY{n}{rewards\PYZus{}all}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+        \PY{n}{optimal\PYZus{}acc} \PY{o}{+}\PY{o}{=} \PY{n}{optimal\PYZus{}chosen}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{n}{dim}\PY{o}{=}\PY{l+m+mi}{0}\PY{p}{)}
+
+    \PY{n}{avg\PYZus{}rewards} \PY{o}{=} \PY{p}{(}\PY{n}{avg\PYZus{}rewards\PYZus{}acc} \PY{o}{/} \PY{p}{(}\PY{p}{(}\PY{n}{runs} \PY{o}{+} \PY{n}{batch} \PY{o}{\PYZhy{}} \PY{l+m+mi}{1}\PY{p}{)}\PY{o}{/}\PY{o}{/}\PY{n}{batch}\PY{p}{)}\PY{p}{)}\PY{o}{.}\PY{n}{cpu}\PY{p}{(}\PY{p}{)}\PY{o}{.}\PY{n}{numpy}\PY{p}{(}\PY{p}{)}
+    \PY{n}{percent\PYZus{}optimal} \PY{o}{=} \PY{p}{(}\PY{n}{optimal\PYZus{}acc} \PY{o}{/} \PY{p}{(}\PY{p}{(}\PY{n}{runs} \PY{o}{+} \PY{n}{batch} \PY{o}{\PYZhy{}} \PY{l+m+mi}{1}\PY{p}{)}\PY{o}{/}\PY{o}{/}\PY{n}{batch}\PY{p}{)} \PY{o}{*} \PY{l+m+mf}{100.0}\PY{p}{)}\PY{o}{.}\PY{n}{cpu}\PY{p}{(}\PY{p}{)}\PY{o}{.}\PY{n}{numpy}\PY{p}{(}\PY{p}{)}
+    \PY{k}{return} \PY{n}{avg\PYZus{}rewards}\PY{p}{,} \PY{n}{percent\PYZus{}optimal}
+
+\PY{n}{means} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{l+m+mi}{10}\PY{p}{)}
+\PY{n}{avg\PYZus{}e}\PY{p}{,} \PY{n}{opt\PYZus{}e} \PY{o}{=} \PY{n}{run\PYZus{}epsilon\PYZus{}greedy\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{epsilon}\PY{o}{=}\PY{l+m+mf}{0.1}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{200}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{l+m+mi}{42}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cuda}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{avg\PYZus{}o}\PY{p}{,} \PY{n}{opt\PYZus{}o} \PY{o}{=} \PY{n}{run\PYZus{}optimistic\PYZus{}initialization\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{Q1}\PY{o}{=}\PY{l+m+mi}{5}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.1}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{200}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{l+m+mi}{42}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cuda}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{avg\PYZus{}u}\PY{p}{,} \PY{n}{opt\PYZus{}u} \PY{o}{=} \PY{n}{run\PYZus{}ucb\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{c}\PY{o}{=}\PY{l+m+mf}{2.0}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{200}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{l+m+mi}{42}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cuda}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{avg\PYZus{}g}\PY{p}{,} \PY{n}{opt\PYZus{}g} \PY{o}{=} \PY{n}{run\PYZus{}gradient\PYZus{}bandit\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.1}\PY{p}{,} \PY{n}{baseline}\PY{o}{=}\PY{k+kc}{True}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{200}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{l+m+mi}{42}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cuda}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+
+\PY{c+c1}{\PYZsh{} Plot results}
+\PY{n}{fig}\PY{p}{,} \PY{n}{axes} \PY{o}{=} \PY{n}{plt}\PY{o}{.}\PY{n}{subplots}\PY{p}{(}\PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{n}{figsize}\PY{o}{=}\PY{p}{(}\PY{l+m+mi}{12}\PY{p}{,} \PY{l+m+mi}{8}\PY{p}{)}\PY{p}{,} \PY{n}{sharex}\PY{o}{=}\PY{k+kc}{True}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}e}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ε\PYZhy{}greedy Q1=5, ε=0.1, α=0.1}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:green}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}o}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{optimistic init Q1=5, ε=0.0, α=0.1}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:blue}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}u}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{UCB (c=2)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:purple}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{avg\PYZus{}g}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Gradient Bandit (α=0.1)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:orange}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Comparison: ε\PYZhy{}greedy (optimistic init) vs UCB}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{0}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{opt\PYZus{}e}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ε\PYZhy{}greedy Q1=5, ε=0.1, α=0.1}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:green}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{opt\PYZus{}o}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{optimistic init Q1=5, ε=0.0, α=0.1}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:blue}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{opt\PYZus{}u}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{UCB (c=2)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:purple}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{opt\PYZus{}g}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+sa}{f}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Gradient Bandit (α=0.1)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{color}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{tab:orange}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Step}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{set\PYZus{}ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{\PYZpc{}}\PY{l+s+s1}{ Optimal Action}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{axes}\PY{p}{[}\PY{l+m+mi}{1}\PY{p}{]}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{tight\PYZus{}layout}\PY{p}{(}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{show}\PY{p}{(}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_23_0.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    \hypertarget{ux53c2ux6570ux5206ux6790}{%
+\subsection{参数分析}\label{ux53c2ux6570ux5206ux6790}}
+
+参数敏感性研究（parameter
+study）在实验科学与算法工程中扮演着核心角色：它不是简单地寻找``最优参数''，而是系统地揭示算法在不同参数设置下的行为规律和鲁棒性。通过在受控条件下改变一个或若干超参数，并记录关键性能指标随之变化的曲线与分布，研究者可以理解哪些参数主导性能波动、哪些参数在宽阈值内都能稳定工作、以及不同参数组合对收敛速度、方差和最终性能的影响。这样一种认识既能指导合理的超参数选择，也能为理论分析与模型改进提供直观证据。
+
+良好的参数研究以明确的问题和度量为起点：首先要定义评估目标，是希望最大化长期平均回报、最快达到可接受性能、降低结果方差，还是保证在非平稳环境中的跟踪能力。只有把目标量化为可比较的指标，才能把参数变化导致的行为差异转化为可解释的证据。其次，要固定除被研究参数外的其他条件，包括随机种子策略、训练集和评估协议，以避免混淆因素干扰结论。实验设计上既要考虑单参数扫描以揭示单因子效应，也要考虑有限的多参数网格或随机搜索以捕捉交互效应；这两类方法互为补充，前者便于绘制直观曲线与阈值，后者则更符合高维超参数空间的实际情形。
+
+统计显著性与重复性是参数研究的生命线。单次运行往往被高方差误导，因此必须通过多次独立重复试验收集样本分布，采用均值、置信区间或箱线图等统计手段报告结果，并在必要时进行显著性检验来判断不同设置之间是否存在可靠差异。同时，应当报告结果的方差或不确定性，因为一个在均值上略优但方差极大的配置在实际部署中可能并不理想。为便于他人复现，应记录实验的完整配置（包括随机种子、库版本与硬件信息）并尽量提供可复现的运行脚本或环境说明。
+
+在展示与解释参数研究结果时，可视化工具发挥重要作用。通过绘制平均性能随参数变化的曲线、用带阴影的置信区间显示实验波动、以及用热力图或等高线展现多参数空间的性能表面，读者可以直观把握参数对行为的定性与定量影响。除此之外，分析收敛轨迹、学习速率与稳态行为以及对极端值的敏感性也能帮助发现潜在的稳定性问题或数值病态，例如学习率过大会导致发散或概率策略的快速饱和，而步长过小则令响应迟缓。
+
+计算资源与实验效率是现实工程不得不考虑的制约因素。全面的参数搜索在高维空间里代价高昂，因此常用的策略包括先进行粗粒度扫描找到感兴趣区域，再在该区域进行细粒度搜索；或者使用随机搜索、贝叶斯优化等更为样本高效的方法以减少评估次数。批量化与并行化实验可以显著缩短总体耗时，但同时应权衡内存与
+I/O 开销；在使用 GPU
+或分布式资源时，还需留心不同运行环境下的确定性差异对结果可复现性的影响。
+
+参数研究的最终价值在于把经验观察转化为可操作的建议与理论洞见。通过系统地记录哪些参数范围能保证稳定性能、哪些参数会触发相变式的行为（例如从收敛到发散），研究者可以为后续的自动调参策略、默认配置选择或算法改进提供依据。良好的参数研究不仅告诉我们``哪个设置最好''，更重要的是说明``为什么在该设置下性能提升''以及``该设置在何种环境下仍然可靠''，从而把实验结果变成可推广的知识而非孤立的调参经验。
+
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{19}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{c+c1}{\PYZsh{} Parameter Study}
+\PY{k+kn}{from} \PY{n+nn}{tqdm} \PY{k+kn}{import} \PY{n}{tqdm}
+\PY{n}{means} \PY{o}{=} \PY{n}{np}\PY{o}{.}\PY{n}{random}\PY{o}{.}\PY{n}{normal}\PY{p}{(}\PY{l+m+mi}{0}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{l+m+mi}{10}\PY{p}{)}
+\PY{c+c1}{\PYZsh{} use a float base so negative exponents produce valid float values (avoids ValueError)}
+\PY{n}{avg\PYZus{}greedy\PYZus{}list} \PY{o}{=} \PY{p}{[}\PY{p}{]}
+\PY{n}{epsilon\PYZus{}list} \PY{o}{=} \PY{p}{[}\PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{128}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{64}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{32}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{16}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{8}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{4}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{2}\PY{p}{]}
+\PY{k}{for} \PY{n}{epsilon} \PY{o+ow}{in} \PY{n}{tqdm}\PY{p}{(}\PY{n}{epsilon\PYZus{}list}\PY{p}{)}\PY{p}{:}
+    \PY{n}{avg\PYZus{}greedy}\PY{p}{,} \PY{n}{opt\PYZus{}greedy} \PY{o}{=} \PY{n}{run\PYZus{}epsilon\PYZus{}greedy\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{epsilon}\PY{o}{=}\PY{n}{epsilon}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{200}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{l+m+mi}{42}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cuda}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+    \PY{n}{avg\PYZus{}greedy\PYZus{}list}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{n}{avg\PYZus{}greedy}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{p}{)}\PY{p}{)}
+
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{epsilon\PYZus{}list}\PY{p}{,} \PY{n}{avg\PYZus{}greedy\PYZus{}list}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xscale}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{log}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{epsilon}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward (1000 steps)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Parameter Study: ε\PYZhy{}greedy on 10\PYZhy{}armed Testbed}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+100\%|██████████| 7/7 [00:18<00:00,  2.65s/it]
+100\%|██████████| 7/7 [00:18<00:00,  2.65s/it]
+    \end{Verbatim}
+
+            \begin{tcolorbox}[breakable, size=fbox, boxrule=.5pt, pad at break*=1mm, opacityfill=0]
+\prompt{Out}{outcolor}{19}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+Text(0.5, 1.0, 'Parameter Study: ε-greedy on 10-armed Testbed')
+\end{Verbatim}
+\end{tcolorbox}
+        
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_25_2.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{20}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{n}{avg\PYZus{}optimistic\PYZus{}list} \PY{o}{=} \PY{p}{[}\PY{p}{]}
+\PY{n}{Q1\PYZus{}list} \PY{o}{=} \PY{p}{[}\PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{128}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{64}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{32}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{16}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{8}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{4}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{4}\PY{p}{,} \PY{l+m+mi}{8}\PY{p}{,} \PY{l+m+mi}{16}\PY{p}{]}
+\PY{k}{for} \PY{n}{Q1} \PY{o+ow}{in} \PY{n}{tqdm}\PY{p}{(}\PY{n}{Q1\PYZus{}list}\PY{p}{)}\PY{p}{:}
+    \PY{n}{avg\PYZus{}optimistic}\PY{p}{,} \PY{n}{opt\PYZus{}optimistic} \PY{o}{=} \PY{n}{run\PYZus{}optimistic\PYZus{}initialization\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{Q1}\PY{o}{=}\PY{n}{Q1}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{l+m+mf}{0.1}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{200}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{l+m+mi}{42}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cuda}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+    \PY{n}{avg\PYZus{}optimistic\PYZus{}list}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{n}{avg\PYZus{}optimistic}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{p}{)}\PY{p}{)}
+
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{Q1\PYZus{}list}\PY{p}{,} \PY{n}{avg\PYZus{}optimistic\PYZus{}list}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xscale}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{log}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Q1}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward (1000 steps)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Parameter Study: optimistic initialization on 10\PYZhy{}armed Testbed}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+100\%|██████████| 12/12 [00:23<00:00,  1.99s/it]
+    \end{Verbatim}
+
+            \begin{tcolorbox}[breakable, size=fbox, boxrule=.5pt, pad at break*=1mm, opacityfill=0]
+\prompt{Out}{outcolor}{20}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+Text(0.5, 1.0, 'Parameter Study: optimistic initialization on 10-armed Testbed')
+\end{Verbatim}
+\end{tcolorbox}
+        
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_26_2.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{18}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{n}{avg\PYZus{}ucb\PYZus{}list} \PY{o}{=} \PY{p}{[}\PY{p}{]}
+\PY{n}{c\PYZus{}list} \PY{o}{=} \PY{p}{[}\PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{128}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{64}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{32}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{16}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{8}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{4}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{4}\PY{p}{]}
+\PY{k}{for} \PY{n}{c} \PY{o+ow}{in} \PY{n}{tqdm}\PY{p}{(}\PY{n}{c\PYZus{}list}\PY{p}{)}\PY{p}{:}
+    \PY{n}{avg\PYZus{}ucb}\PY{p}{,} \PY{n}{opt\PYZus{}ucb} \PY{o}{=} \PY{n}{run\PYZus{}ucb\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{c}\PY{o}{=}\PY{n}{c}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{200}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{l+m+mi}{42}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cuda}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+    \PY{n}{avg\PYZus{}ucb\PYZus{}list}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{n}{avg\PYZus{}ucb}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{p}{)}\PY{p}{)}
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{c\PYZus{}list}\PY{p}{,} \PY{n}{avg\PYZus{}ucb\PYZus{}list}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xscale}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{log}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{c}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward (1000 steps)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Parameter Study: UCB on 10\PYZhy{}armed Testbed}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+100\%|██████████| 10/10 [00:34<00:00,  3.44s/it]
+    \end{Verbatim}
+
+            \begin{tcolorbox}[breakable, size=fbox, boxrule=.5pt, pad at break*=1mm, opacityfill=0]
+\prompt{Out}{outcolor}{18}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+Text(0.5, 1.0, 'Parameter Study: UCB on 10-armed Testbed')
+\end{Verbatim}
+\end{tcolorbox}
+        
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_27_2.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{17}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{n}{avg\PYZus{}gradient\PYZus{}list} \PY{o}{=} \PY{p}{[}\PY{p}{]}
+\PY{n}{alpha\PYZus{}list} \PY{o}{=} \PY{p}{[}\PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{128}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{64}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{32}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{16}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{8}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{4}\PY{p}{,} \PY{l+m+mi}{1}\PY{o}{/}\PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{1}\PY{p}{,} \PY{l+m+mi}{2}\PY{p}{,} \PY{l+m+mi}{4}\PY{p}{]}
+\PY{k}{for} \PY{n}{alpha} \PY{o+ow}{in} \PY{n}{tqdm}\PY{p}{(}\PY{n}{alpha\PYZus{}list}\PY{p}{)}\PY{p}{:}
+    \PY{n}{avg\PYZus{}gradient}\PY{p}{,} \PY{n}{opt\PYZus{}gradient} \PY{o}{=} \PY{n}{run\PYZus{}gradient\PYZus{}bandit\PYZus{}torch\PYZus{}batch}\PY{p}{(}\PY{n}{means}\PY{p}{,} \PY{n}{alpha}\PY{o}{=}\PY{n}{alpha}\PY{p}{,} \PY{n}{baseline}\PY{o}{=}\PY{k+kc}{True}\PY{p}{,} \PY{n}{runs}\PY{o}{=}\PY{l+m+mi}{2000}\PY{p}{,} \PY{n}{steps}\PY{o}{=}\PY{l+m+mi}{1000}\PY{p}{,} \PY{n}{batch}\PY{o}{=}\PY{l+m+mi}{200}\PY{p}{,} \PY{n}{seed}\PY{o}{=}\PY{l+m+mi}{42}\PY{p}{,} \PY{n}{device}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{cuda}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+    \PY{n}{avg\PYZus{}gradient\PYZus{}list}\PY{o}{.}\PY{n}{append}\PY{p}{(}\PY{n}{avg\PYZus{}gradient}\PY{o}{.}\PY{n}{mean}\PY{p}{(}\PY{p}{)}\PY{p}{)}  
+
+\PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{alpha\PYZus{}list}\PY{p}{,} \PY{n}{avg\PYZus{}gradient\PYZus{}list}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xscale}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{log}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{alpha}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward (1000 steps)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Parameter Study: Gradient Bandit on 10\PYZhy{}armed Testbed}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+100\%|██████████| 10/10 [00:27<00:00,  2.71s/it]
+    \end{Verbatim}
+
+            \begin{tcolorbox}[breakable, size=fbox, boxrule=.5pt, pad at break*=1mm, opacityfill=0]
+\prompt{Out}{outcolor}{17}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+Text(0.5, 1.0, 'Parameter Study: Gradient Bandit on 10-armed Testbed')
+\end{Verbatim}
+\end{tcolorbox}
+        
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_28_2.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    \begin{tcolorbox}[breakable, size=fbox, boxrule=1pt, pad at break*=1mm,colback=cellbackground, colframe=cellborder]
+\prompt{In}{incolor}{22}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+\PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{epsilon\PYZus{}list}\PY{p}{,} \PY{n}{avg\PYZus{}greedy\PYZus{}list}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{ε\PYZhy{}greedy}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{marker}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{o}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{Q1\PYZus{}list}\PY{p}{,} \PY{n}{avg\PYZus{}optimistic\PYZus{}list}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Optimistic Init}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{marker}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{o}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{c\PYZus{}list}\PY{p}{,} \PY{n}{avg\PYZus{}ucb\PYZus{}list}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{UCB}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{marker}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{o}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{plot}\PY{p}{(}\PY{n}{alpha\PYZus{}list}\PY{p}{,} \PY{n}{avg\PYZus{}gradient\PYZus{}list}\PY{p}{,} \PY{n}{label}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Gradient Bandit}\PY{l+s+s1}{\PYZsq{}}\PY{p}{,} \PY{n}{marker}\PY{o}{=}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{o}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xscale}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{log}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{xlabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Hyperparameter (log scale)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{ylabel}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Average Reward (1000 steps)}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{title}\PY{p}{(}\PY{l+s+s1}{\PYZsq{}}\PY{l+s+s1}{Parameter Study: Bandit Algorithms on 10\PYZhy{}armed Testbed}\PY{l+s+s1}{\PYZsq{}}\PY{p}{)}
+\PY{n}{plt}\PY{o}{.}\PY{n}{legend}\PY{p}{(}\PY{p}{)}
+\end{Verbatim}
+\end{tcolorbox}
+
+            \begin{tcolorbox}[breakable, size=fbox, boxrule=.5pt, pad at break*=1mm, opacityfill=0]
+\prompt{Out}{outcolor}{22}{\boxspacing}
+\begin{Verbatim}[commandchars=\\\{\}]
+<matplotlib.legend.Legend at 0x7d4ebeda5f90>
+\end{Verbatim}
+\end{tcolorbox}
+        
+    \begin{center}
+    \adjustimage{max size={0.9\linewidth}{0.9\paperheight}}{reinforcement_learning_files/reinforcement_learning_29_1.png}
+    \end{center}
+    { \hspace*{\fill} \\}
+    
+    参数敏感性研究（即英文里的 ``parameter
+study''）在算法研究与工程化实验中具有核心地位；它不仅是为找到某个``最优''参数，更重要的是系统揭示算法对超参数的依赖关系、鲁棒性范围以及可能的相变行为。开展参数分析时，应把被研究的量化目标（例如长期平均回报、收敛速度或结果方差）明确定义，并固定除目标参数之外的其他条件，包括随机种子（seed）、设备（device，如
+CPU/GPU）与评估协议，只有这样才能把参数变化引起的性能差异归因于参数本身而不是外部噪声。为了获得可靠结论，单次运行往往不够，必须通过多次独立重复试验收集样本分布，用均值与置信区间或箱线图等统计量报告结果，这样才能同时把平均性能与不确定性呈现出来；如果只看均值而忽略方差，往往会误判在实际部署中不稳定但均值稍优的设置。可视化在参数分析中发挥重要的解释性作用：单参数的曲线图、带阴影的置信区间、以及多参数时的热力图或等高线能够直观地展示哪些参数区域是稳健的，哪些会导致性能突变；此外，分析收敛轨迹与极端值行为有助于发现数值不稳定或学习率过大的迹象。资源与效率约束也须并列考虑：穷尽式的网格搜索在高维超参数空间代价巨大，因此常用粗到细的分阶段扫描、随机搜索或样本高效的贝叶斯优化策略来缩小候选区域；当使用框架（例如
+PyTorch）并行化或批处理（batch）大量 runs 时，应权衡内存占用和 I/O
+开销，并确保并行实现不会在独立试验之间错误共享可变状态。最终，优质的参数分析应当把经验观察转化为可操作的建议：说明在哪些参数范围内算法能稳定工作、在哪些条件下需要谨慎调小学习率或引入
+baseline、以及在非平稳环境中应优先采用固定步长或衰减机制，从而把孤立的调参结果升华为可复用的实验知识，而不是单纯的``调参技巧''。
+
+
+    % Add a bibliography block to the postdoc
+    
+    
+    
+\end{document}
