@@ -333,3 +333,70 @@ gpio_operate -h
 BOARD=orangepiaipro
 ```
 ![orangepi-release](img0/orangepi-release.png)
+
+其后安装git
+```
+sudo apt update
+sudo apt install git
+```
+
+利用git从Github中下载wiringOP的源码，并在下载完成后进行编译安装
+```
+git clone https://github.com/orangepi-xunlong/wiringOP.git -b next
+sudo apt-get install -y gcc make build-essential
+cd wiringOP
+sudo ./build clean
+sudo ./build
+```
+如果提示无法连接，如下图所示
+![无法连接](img0/unabletoc.png.png)
+则尝试以下代码
+```
+git clone https://gh-proxy.com/https://github.com/orangepi-xunlong/wiringOP.git -b next
+sudo apt-get install -y gcc make build-essential
+cd wiringOP
+sudo ./build clean
+sudo ./build
+```
+
+安装完成后使用`gpio readall`验证是否能读取GPIO接口状态，若能正常读取，则说明wiringOP库安装成功，反之请重新尝试安装。
+
+##### wiringOP-Python
+这是wiringOP库的Python版本，支持直接在Python中调用
+安装过程
+```
+sudo -i
+
+apt update
+git clone --recursive https://gh-proxy.com/https://github.com/orangepi-xunlong/wiringOP-Python -b next
+cd wiringOP-Python
+
+nano .git/config
+#修改 submodule "wiringOP"的url为 https://gh-proxy.com/https://github.com/orangepi-xunlong/wiringOP ，ctrl+x保存文件
+
+git submodule update --init --remote
+pip install swig==4.0.0 setuptools
+python3 generate-bindings.py > bindings.i
+python3 setup.py install
+```
+安装完成后，使用`python3 -c "import wiringpi; help(wiringpi)"`检查该库是否能够正常调用，按q退出。
+
+### npu-smi相关指令
+#### 风扇控制
+OrangePi AiPro的风扇是由pwm进行控制，电源为12V，因此我们可以通过调整pwm的输出频率，来间接调整风扇的转速。
+
+查询风扇的运转模式（PWM模式）
+`sudo npu-smi info -t pwm-mode`
+输出auto是自动模式，manual则是手动模式。在默认情况下，风扇的运转模式为自动模式，不需要手动调节，如果想要手动调整风扇的转速，需要先将pwm模式修改为手动模式`sudo npu-smi set -t pwm-mode -d 0`
+
+使用`sudo npu-smi info -t pwm-duty-ratio`可以查询风扇的调速比
+
+调整风扇转速`sudo npu-smi set -t pwm-duty-ratio -d 100`，该命令中-d参数后面的数字即是pwm的调速比，可以通过调整调速比来控制风扇的转速。可以输入的数字范围在[0-100]之间，必须是整数，100是风扇全速运转，0则是风扇停止运转。
+
+#### 核心控制
+开发板使用的泰山CPU共有四个核心，主频均为1.5GHz，在一般情况下，有一个核心会被分给NPU核心，用于cpu与npu之间的通讯，使用`sudo npu-smi info -t cpu-num-cfg -i 0 -c 0`可以查看CPU核心的分配情况。
+
+`htop`命令，类似于Windows系统的任务管理器，可以查看CPU和内存的使用情况，在默认情况下CPU3被用于与npu通信，因此当其他核心被占满时，CPU3的占用率会有显著区别。
+如果不想使用Ascend 310B的npu核心，可以使用`sudo npu-smi set -t cpu-num-cfg -i 0 -c 0 -v 0:4:0`将NPU关闭。
+
+> 查询Ai CPU的占用情况，使用`sudo npu-smi info -t usages -i 0 -c 0`可以查询。
