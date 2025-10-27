@@ -135,7 +135,7 @@ OrangePi AIpro(8T)开发板是香橙派联合华为精心打造的高性能AI开
 
 #### 刷写系统到TF卡（以Ubuntu为例）
 
-> 此处以刷写Ubuntu为例
+> 此处以刷写Ubuntu为例，balenaEther需要1.19.25版本及以下！
 
 1. 打开balenaEther，选择“从文件烧录”![balenaEther](img0/ether1.png)
 2. 选择好要烧录的镜像文件（**.img**格式），再选择目标磁盘为TF卡对应的位置，如图中名称为“SDXC Card”的位置，选中并选择“选定1”。![选择磁盘](img0/chooseether.png)
@@ -192,6 +192,26 @@ OrangePi AIpro(8T)开发板是香橙派联合华为精心打造的高性能AI开
 4. 等待出现```Ubuntu 22.04.3 LTS orangepiaipro ttyAM0```字样，输入登录的用户名HwHiAiUser并回车，然后输入密码Mind@123并回车，注意在输入密码的时候屏幕并不会显示任何东西，登陆后的界面如图所示。
 ![串口](img0/serial.png)
 ![登录成功](img0/login.png)
+
+#### 设置SWAP交换分区
+开发板虽然有8G/16G的运存，但是有些应用（例如ATC模型转换工具）需要较大的内存，在这种情况下我们可以通过设置SWAP交换分区来扩展系统能使用的最大内存容量。需要注意的是，SWAP分区是设置在TF卡或者eMMC而不是内存中，因此其交换速率远低于内存，简单来说就是模型在SWAP分区中加载速度会变慢。
+
+首先运行`sudo swapoff /swapfile`将原有的swap分区关闭
+
+然后使用`sudo fallocate -l 16G /swapfile`来在系统根目录创建一个swap文件。
+> 在创建swap文件的时候，需要注意系统的剩余空间大于所创建文件的大小
+
+修改文件权限`sudo chmod 600 /swapfile`
+
+设置为swap空间`sudo mkswap /swapfile`
+
+启用swap空间`sudo swapon /swapfile`
+
+最后通过`free -h`可以查看swap空间的使用情况。
+
+最后，在/etc/fstab中加入以下命令，在开机时自动挂载swap分区。
+`/swapfile none swap sw 0 0`
+使用一行命令添加`echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab`
 
 ### WIFI天线安装指南
 开发版的wifi天线如左侧红色矩形框内所示
@@ -400,3 +420,4 @@ OrangePi AiPro的风扇是由pwm进行控制，电源为12V，因此我们可以
 如果不想使用Ascend 310B的npu核心，可以使用`sudo npu-smi set -t cpu-num-cfg -i 0 -c 0 -v 0:4:0`将NPU关闭。
 
 > 查询Ai CPU的占用情况，使用`sudo npu-smi info -t usages -i 0 -c 0`可以查询。
+
