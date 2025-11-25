@@ -1,0 +1,41 @@
+digraph demo {
+	rankdir=TB;
+	node [shape=box];
+
+	subgraph cluster_a {
+		label="Cluster A";
+		style="rounded,filled";
+		color="#ccccff";
+		fillcolor="#eeeeff";
+
+		a1 [label="A1"];
+		a2 [label="A2"];
+
+		// 作为 A 的“中心锚点”
+		a_center [label="" shape=point width=0.01 style=invis];
+	}
+
+	subgraph cluster_b {
+		label="Cluster B";
+		style="rounded,filled";
+		color="#ffcccc";
+		fillcolor="#ffeeee";
+
+		b1 [label="B1"];
+		b2 [label="B2"];
+
+		// 作为 B 的“中心锚点”
+		b_center [label="" shape=point width=0.01 style=invis];
+	}
+
+
+
+	// 从 cluster_a 到 cluster_b 的“中间箭头”
+	a_center -> b_center [
+		penwidth=2
+		color="#333333"
+		arrowhead=normal
+		arrowsize=1.2
+		constraint=true
+	];
+}

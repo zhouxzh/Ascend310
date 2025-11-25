@@ -1,0 +1,150 @@
+digraph CANN_Architecture {
+    rankdir=TB;
+    fontsize=12;
+    fontname="Microsoft YaHei";
+    node [shape=box fontname="Microsoft YaHei" fontsize=11];
+    labelloc="t";
+    label="Ascend CANN 异构计算软件栈与生态层次图";
+
+    // 顶层应用与框架
+    subgraph cluster_app {
+        label="异构AI应用层";
+        style=rounded;
+        color="#aaaaaa";
+
+        app_infer   [label="推理应用"];
+        app_train   [label="AI框架与训练"];
+        mindspore   [label="MindSpore"];
+        pytorch     [label="PyTorch"];
+        tensorflow  [label="TensorFlow"];
+        caffe       [label="Caffe"];
+        mindstudio  [label="MindStudio\n全流程开发平台"];
+
+        app_train -> mindspore;
+        app_train -> pytorch;
+        app_train -> tensorflow;
+        app_train -> caffe;
+    }
+
+    // AscendCL 接口
+    subgraph cluster_ascendcl {
+        label="AscendCL 接口 (算子/模型/应用开发接口)";
+        style=rounded;
+        color="#bbbbbb";
+
+        ascendcl [label="AscendCL API"];
+    }
+
+    // 服务层
+    subgraph cluster_service {
+        label="异腾计算服务层 (Service Layer)";
+        style=rounded;
+        color="#c8c8c8";
+
+        aol_lib [label="异腾算子库 (AOL)"];
+        nnu_lib [label="NNU 库"];
+        aoe     [label="异腾调优引擎 (AOE)"];
+        opat    [label="OPAT\nOperator Auto Tune"];
+        amct    [label="AMCT\nModel Compression"];
+        sgat    [label="SGAT\nSubGraph Auto Tune"];
+        gdat    [label="GDAT\nGradient Auto Tune"];
+        adaptor [label="框架适配器\n(Framework Adaptor)"];
+
+        aoe -> opat;
+        aoe -> amct;
+        aoe -> sgat;
+        aoe -> gdat;
+    }
+
+    // 编译层
+    subgraph cluster_compilation {
+        label="异腾计算编译层 (Compilation Layer)";
+        style=rounded;
+        color="#d5d5d5";
+
+        atc        [label="ATC\nAscend Tensor Compiler"];
+        graph_comp [label="图编译器 (Graph Compiler)"];
+        tbe        [label="TBE (DSL/TIK)\nTensor Boost Engine"];
+    }
+
+    // 执行层
+    subgraph cluster_execution {
+        label="异腾计算执行层 (Execution Layer)";
+        style=rounded;
+        color="#e2e2e2";
+
+        runtime    [label="运行管理器 (Runtime)"];
+        hccl       [label="HCCL\n通信库"];
+        graph_exec [label="图执行器 (Graph Executor)"];
+        aipp       [label="AIPP\n预处理执行"];
+        dvpp       [label="DVPP\n视频图像处理"];
+        exec_ext   [label="..."];
+
+        runtime    -> hccl;
+        graph_exec -> aipp;
+        graph_exec -> dvpp;
+    }
+
+    // 基础层
+    subgraph cluster_base {
+        label="异腾计算基础层 (Base Layer)";
+        style=rounded;
+        color="#efefef";
+
+        abl      [label="ABL\nAscend Base Layer"];
+        os       [label="OS"];
+        svm      [label="SVM"];
+        vm       [label="VM"];
+        hdc      [label="HDC"];
+        base_ext [label="..."];
+
+        abl -> os;
+        abl -> svm;
+        abl -> vm;
+        abl -> hdc;
+    }
+
+    // 芯片资源
+    subgraph cluster_hardware {
+        label="异腾芯片计算资源 (Processors)";
+        style=rounded;
+        color="#dddddd";
+
+        ascend310 [label="Ascend310"];
+        ascend710 [label="Ascend710"];
+        ascend910 [label="Ascend910"];
+        hw_more   [label="..."];
+    }
+
+    // 层间主链路（简单自上而下）
+    app_infer   -> ascendcl;
+    mindspore   -> adaptor;
+    pytorch     -> adaptor;
+    tensorflow  -> adaptor;
+    caffe       -> adaptor;
+    mindstudio  -> ascendcl;
+
+    ascendcl -> aol_lib;
+    ascendcl -> nnu_lib;
+    ascendcl -> aoe;
+    ascendcl -> adaptor;
+
+    aol_lib -> atc;
+    nnu_lib -> atc;
+    aoe     -> atc;
+    adaptor -> atc;
+
+    atc        -> graph_comp;
+    graph_comp -> tbe;
+
+    tbe        -> runtime;
+    tbe        -> graph_exec;
+
+    runtime    -> abl;
+    graph_exec -> abl;
+
+    abl -> ascend310;
+    abl -> ascend710;
+    abl -> ascend910;
+    abl -> hw_more;
+}

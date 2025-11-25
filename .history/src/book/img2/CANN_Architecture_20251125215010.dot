@@ -1,0 +1,152 @@
+digraph CANN_Architecture {
+    rankdir=TB;
+    fontsize=12;
+    fontname="Microsoft YaHei";
+    node [shape=box fontname="Microsoft YaHei" fontsize=11 style=filled];
+    edge [color="#555555"];
+    labelloc="t";
+    label="Ascend CANN 异构计算软件栈与生态层次图";
+
+    // 顶层应用与框架
+    subgraph cluster_app {
+        label="异构AI应用层";
+        style="rounded,filled";
+        color="#8888aa";
+        fillcolor="#eef1ff";
+
+        node [style=invis];
+        app_width [label="", width=3.5, height=0.1];
+
+        infer [label="推理应用" fillcolor="#ffffff"];
+        train [label="训练应用" fillcolor="#ffffff"];
+        {rank=same; app_width; infer; train}
+    }
+
+    // CANN 软件栈
+    subgraph cluster_cann {
+        label="昇腾计算软件栈 (CANN)";
+        style="rounded,filled";
+        color="#999966";
+        fillcolor="#f7f7e5";
+
+    // AscendCL 接口
+    subgraph cluster_ascendcl {
+        label="昇腾计算语言（AscendCL）接口 ";
+        style="rounded,filled";
+        color="#66a0b8";
+        fillcolor="#e5f3f7";
+
+        ascendcl [label="算子/模型/应用开发接口" fillcolor="#ffffff"];
+    }
+    // 服务层
+    subgraph cluster_service {
+        label="异腾计算服务层 (Service Layer)";
+        style="rounded,filled";
+        color="#5c9d63";
+        fillcolor="#ecf7ed";
+
+        aol_lib [label="异腾算子库 (AOL)"          fillcolor="#ffffff"];
+        nn_lib [label="NN 库"                    fillcolor="#ffffff"];
+        blas_lib [label="BLAS 库"                    fillcolor="#ffffff"];
+        dvpp_lib [label="DVPP 库"                 fillcolor="#ffffff"];
+        aipp_lib [label="AIPP 库"                 fillcolor="#ffffff"];
+        hccl_lib  [label="HCCL 库"                 fillcolor="#ffffff"];
+        fussion   [label="算子融合引擎 \n(Fusion Engine)" fillcolor="#ffffff"];
+
+        aoe     [label="异腾调优引擎 (AOE)"        fillcolor="#d7f2da"];
+        opat    [label="OPAT\nOperator Auto Tune"  fillcolor="#d7f2da"];
+        amct    [label="AMCT\nModel Compression"   fillcolor="#d7f2da"];
+        sgat    [label="SGAT\nSubGraph Auto Tune"  fillcolor="#d7f2da"];
+        gdat    [label="GDAT\nGradient Auto Tune"  fillcolor="#d7f2da"];
+        adaptor [label="框架适配器\n(Framework Adaptor)" fillcolor="#e1bdbdff"];
+
+        aol_lib -> nn_lib;
+        aol_lib -> blas_lib;
+        aol_lib -> dvpp_lib;
+        aol_lib -> aipp_lib;
+        aol_lib -> hccl_lib;
+        aol_lib -> fussion;
+
+        aoe -> opat;
+        aoe -> amct;
+        aoe -> sgat;
+        aoe -> gdat;
+
+    }
+    // 编译层
+    subgraph cluster_compilation {
+        label="异腾计算编译层 (Compilation Layer)";
+        style="rounded,filled";
+        color="#b8893a";
+        fillcolor="#fdf4e3";
+
+        atc        [label="ATC\nAscend Tensor Compiler" fillcolor="#ffffff"];
+        graph_comp [label="图编译器 \n Graph Compiler"   fillcolor="#fff4d4"];
+        tbe        [label="TBE (DSL/TIK)\nTensor Boost Engine" fillcolor="#fff4d4"];
+
+        atc -> graph_comp;
+        atc -> tbe;
+    }
+    // 执行层
+    subgraph cluster_execution {
+        label="异腾计算执行层 (Execution Layer)";
+        style="rounded,filled";
+        color="#c26363";
+        fillcolor="#fdeeee";
+
+        ace [label="昇腾计算执行器（ACE）\nAscend Computing Engine" fillcolor="#b85f5fff"];
+        runtime    [label="Runtime \n 运行管理器"      fillcolor="#ffe3e3"];
+        hccl       [label="HCCL\n通信库"             fillcolor="#ffe3e3"];
+        graph_exec [label="Graph Executor\n图执行器" fillcolor="#ffe3e3"];
+        aipp       [label="AIPP\n预处理执行"         fillcolor="#ffe3e3"];
+        dvpp       [label="DVPP\n视频图像处理"       fillcolor="#ffe3e3"];
+
+        ace -> runtime;
+        ace -> hccl;
+        ace -> graph_exec;
+        ace -> aipp;
+        ace -> dvpp;
+        ace -> exec_ext;
+    }
+    // 基础层
+    subgraph cluster_base {
+        label="异腾计算基础层 (Base Layer)";
+        style="rounded,filled";
+        color="#777777";
+        fillcolor="#f2f2f2";
+        
+
+        abl      [label="ABL\n昇腾基础层" fillcolor="#ffffff"];
+        os       [label="OS"                    fillcolor="#ffffff"];
+        svm      [label="SVM"                   fillcolor="#ffffff"];
+        vm       [label="VM"                    fillcolor="#ffffff"];
+        hdc      [label="HDC"                   fillcolor="#ffffff"];
+
+        abl -> os;
+        abl -> svm;
+        abl -> vm;
+        abl -> hdc;
+    }
+    }
+
+    // 芯片资源
+    subgraph cluster_hardware {
+        label="异腾芯片计算资源处理器 (Processors)";
+        style="rounded,filled";
+        color="#444c7a";
+        fillcolor="#e5e6f5";
+
+        ascend310 [label="Ascend310" fillcolor="#ffffff"];
+        ascend710 [label="Ascend710" fillcolor="#ffffff"];
+        ascend910 [label="Ascend910" fillcolor="#ffffff"];
+    }
+
+    // 层间主链路（简单自上而下）
+    {infer, train} -> ascendcl [style=invis];
+    ascendcl -> {aol_lib, aoe} [style=invis];
+    sgat -> atc [style=invis];
+    {graph_comp, tbe} -> ace [style=invis];
+    {graph_exec,aipp} -> abl [style=invis];
+    {os,svm,vm,hdc} -> {ascend310, ascend710, ascend910} [style=invis];
+
+}

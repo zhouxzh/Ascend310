@@ -1,95 +1,83 @@
-\section{章节总览}\label{ux7ae0ux8282ux603bux89c8}
-
 本章系统阐述 Ascend CANN 软件栈的分层结构、模型从框架格式到 OM
 的转换原理、转换工具 ATC 的关键参数、OM 文件组织结构、AscendCL (ACL)
-推理编程模型、精度与性能验证方法以及工程级质量保障流水线建设。阅读完成后应满足：
-1. 能解释 Driver / Runtime / Compiler / Toolkit / ACL
-各组件职责及交互边界。 2. 能为任意主流视觉模型编写一份无二义性的 ATC
-转换命令并说明参数意义。 3. 能通过脚本解析 OM
-模型的输入输出信息、算子统计与内存占用估算。 4. 能以 C 或 Python
-写出健壮的最小推理程序（含异常处理与资源释放）。 5.
-能定位转换/推理常见错误，给出复现、分析与修复路径。 6. 能构建``转换 →
-精度对齐 → 性能基线 → 回归监测''的自动流水线。
+推理编程模型、精度与性能验证方法以及工程级质量保障流水线建设。
 
-\section{CANN
-软件栈分层与数据流}\label{cann-ux8f6fux4ef6ux6808ux5206ux5c42ux4e0eux6570ux636eux6d41}
+\section{CANN异构计算架构}\label{cannux5f02ux6784ux8ba1ux7b97ux67b6ux6784}
 
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1667}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1667}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3333}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3333}}@{}}
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-层级
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-组件
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-核心职责
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-典型交互
-\end{minipage} \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-硬件抽象 & Driver & 设备初始化、资源枚举、功耗/温度接口 & npu-smi /
-Runtime \\
-运行时 & Runtime & 上下文(Context)管理、Stream/Task 调度、内存分配 & ACL
-/ Compiler \\
-编译优化 & Graph Compiler &
-图解析、拓扑排序、算子匹配、内存复用、算子融合 & ATC / Runtime \\
-工具链 & Toolkit & ATC 转换、Profiling、Dump、可视化、日志 & 开发者 \\
-API 层 & AscendCL & C 接口封装：模型管理 / 内存 / 数据传输 / 执行 &
-应用 \\
-\end{longtable}
+昇腾AI异构计算架构CANN（Compute Architecture for Neural
+Networks）是面向基于达芬奇架构的昇腾处理器的全栈软件体系。 作为承接主流
+AI 框架与通用模型格式、向下对接异构硬件与运行时的中枢层，CANN
+构建了覆盖模型表示、转换编译、图优化、调度执行与可观测分析的端到端技术链路，实现语义一致性、性能最优化与诊断可控性的协同统一，从而系统地释放昇腾处理器的算力与能效潜力。
 
-数据流（框架模型 → OM → 推理）核心阶段： 1. 前端导出：PyTorch →
-ONNX（维度常量化、算子展开）。 2. ATC 编译：图解析 → Shape Infer →
-算子选择 → Kernel 排布 → 内存映射 → 生成 OM（二进制 + 元数据段）。 3.
-运行加载：aclmdlLoadFromFile 读取 OM Header，分配 Device
-内存，构建执行计划（Task 列表）。 4. 推理执行：Host 侧准备输入 → H2D
-拷贝 → Runtime 提交 Task → 硬件执行 → D2H 拷贝 → 后处理。
+\subsection{CANN异构计算与人工智能}\label{cannux5f02ux6784ux8ba1ux7b97ux4e0eux4ebaux5de5ux667aux80fd}
 
-\section{环境一致性与安装验证}\label{ux73afux5883ux4e00ux81f4ux6027ux4e0eux5b89ux88c5ux9a8cux8bc1}
+异构计算与人工智能是相互促进的关系。深度学习训练与推理负载由高密度线性代数（向量/矩阵乘）、张量算子融合链、非规整控制流（条件/循环）、以及高带宽低延迟的数据搬移共同构成，表现出算子类型多样性、数据复用模式差异与访存/算力不均衡等特征。单一通用处理器在算力利用率、内存层次效率与能效上难以同时达到最优。
+针对边缘计算场景的典型 SoC（如 昇腾310B、RK3588、Jetson Nano
+等）普遍采用低功耗约束下设计的 ARM
+通用核，其单核与整体算力在受限功耗窗口内更偏向控制与轻量任务，难以在纯
+CPU
+路径上满足大规模张量运算所需的高吞吐与低时延深度学习推理需求；因此需要通过集成专用
+NPU/加速器进行算子下沉与数据流协同，以弥补通用核在向量化宽度、片上带宽与能效曲线上的结构性不足。
+异构体系通过在同一系统中组合通用 CPU 与专用
+NPU，辅以分层内存与高吞吐互连，依据算子粒度、数据局部性与精度需求执行跨设备调度：密集算子下沉至矩阵/张量专用单元，控制与调度逻辑保留在通用核，数据流经由优化的流水与对齐策略减少跨域搬运成本。结果是在单位功耗与芯片面积约束下提升有效吞吐、降低端到端推理时延并改进能效曲线的可扩展性。该协同范式构成
+CANN
+设计的理论基础：通过抽象统一语义表示与针对性后端优化，将模型图中不同类别算子映射到最合适执行单元，实现性能、能效与可诊断性三者的统筹平衡。
 
-环境差异是隐性失败根源，建议形成``安装后自检''脚本，校验以下要点： 1.
-版本矩阵：固件/Driver/CANN/ATC 必须在官方 Release Note 支持组合内。 2.
-环境变量：\passthrough{\lstinline!ASCEND\_INSTALL\_PATH!}
-指向安装根；\passthrough{\lstinline!LD\_LIBRARY\_PATH!} 中包含
-\passthrough{\lstinline!driver!} 与
-\passthrough{\lstinline!runtime/lib64!}；Python 绑定需在
-\passthrough{\lstinline!PYTHONPATH!} 中。 3.
-设备可见：\passthrough{\lstinline!npu-smi info!} 返回芯片型号
-\passthrough{\lstinline!Ascend310B!} 且状态正常，无
-\passthrough{\lstinline!Fault!} 标记。 4.
-转换工具：\passthrough{\lstinline!atc --version!}
-输出版本与期望匹配；\passthrough{\lstinline!atc --help!}
-能正常列出参数。 5. 运行权限：当前用户具备访问
-\passthrough{\lstinline!/dev/davinci*!}
-设备节点读写权限（若无，加入相应用户组或 udev 规则）。 6. Python
-依赖：\passthrough{\lstinline!numpy!}, \passthrough{\lstinline!onnx!},
-\passthrough{\lstinline!onnxruntime!} (精度对齐),
-\passthrough{\lstinline!pyyaml!}, 自编写工具包。
+\subsection{CANN与CUDA}\label{cannux4e0ecuda}
 
-\section{模型准备与输入规范统一}\label{ux6a21ux578bux51c6ux5907ux4e0eux8f93ux5165ux89c4ux8303ux7edfux4e00}
+CANN是面向华为昇腾达芬奇架构昇腾处理器，聚焦深度学习推理与训练的算子图优化、编译调度及可观测性闭环，而CUDA（Compute
+Unified Device Architecture）则是针对 NVIDIA GPU
+的通用并行计算平台与编程模型，覆盖 GPGPU 与 AI
+复合场景。二者均体现``软硬件协同加速''范式，但在抽象层次、硬件耦合与生态策略上形成差异化路径。
+CANN与CUDA二者的共同点主要体现在，它们都是通过软硬件协同，把模型或并行程序转化为底层设备能理解的指令，从而提升运行速度和效率。同时这两种计算平台都提供了内存管理、算子或内核调用、性能分析、调试和日志等工具，帮助开发者更方便地开发和诊断问题。它们都支持自定义算子或内核插件，方便针对特定需求进行优化或替换实现。此外，CANN与CUDA都能通过性能分析、数据导出和分级日志等方式，降低了定位性能瓶颈和对齐精度的难度。
+在设计理念上，CANN 与 CUDA 展现出显著的差异。CUDA 作为面向广义并行计算与
+HPC/图形及 AI 统一生态的平台，强调线程块与网格（Block/Grid）以及 SIMT
+并行范式，开发者需显式组织核函数、流（Stream）、事件（Event）和内存管理，实现灵活的并行与资源重叠。而
+CANN 则专注于模型图语义，突出图级算子融合、AIPP
+预处理下沉和全局内存复用，通过任务列表与算子调度策略有效治理动态形状与内存复用，降低推理工程的不确定性。在精度策略方面，CANN
+内置 FP16 与 INT8
+的混合精度及校准链路，适应端到端推理与训练的工程质量要求；而 CUDA
+虽然基础类型丰富，但精度管理更多依赖于上层库如 cuDNN 和 TensorRT
+的组合。硬件结构上，CANN紧密耦合于达芬奇架构的矩阵单元、向量单元及片上分层内存，优化模型推理的能效与性能；CUDA
+则绑定于 NVIDIA 的 SM、Tensor Core
+及多级缓存体系，着重提升访存效率与线程调度。生态成熟度上，CUDA 自 2007
+年以来积累了庞大的社区与库支持，形成了全球主流的开发者生态；CANN
+虽处于快速迭代阶段，但聚焦国产化替代与特定行业应用，推动本地生态建设。编程灵活度方面，CUDA
+需要开发者具备底层并行划分与核函数开发能力，提供极高的灵活性；CANN
+则通过贴近主流框架的算子开发工具（TBE）与高层接口，降低了入门门槛，但在底层调度上牺牲了一定的自由度。整体而言，二者在抽象层次、硬件耦合与生态策略上形成了各自鲜明的技术路径，反映了其服务对象与应用场景的根本差异。
 
-\begin{longtable}[]{@{}lll@{}}
-\toprule\noalign{}
-项 & 说明 & 决策标准 \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-边界 Shape & 静态 or 动态 & 场景多尺寸/Batch 波动？ \\
-Layout & NCHW / NHWC & 上游预处理 \& 算子最佳实现 \\
-颜色空间 & RGB / BGR / YUV & 原始采集格式 + 算子期望 \\
-归一化 & mean/std / scale & 训练环节定义必须完全对齐 \\
-精度策略 & FP16 / INT8 & 性能目标 \& 可接受精度损失 \\
-Quant 校准集 & 代表性样本 & 覆盖亮度/场景/尺寸多样性 \\
-\end{longtable}
+\subsection{CANN的架构}\label{cannux7684ux67b6ux6784}
 
-核心风险：训练与部署输入不一致（尺寸拉伸方式、通道顺序、归一化顺序、色彩空间转换位置）。必须输出``输入契约文件''（JSON/YAML）标注：\passthrough{\lstinline!shape!}、\passthrough{\lstinline!dtype!}、\passthrough{\lstinline!layout!}、\passthrough{\lstinline!color\_space!}、\passthrough{\lstinline!mean/std!}、\passthrough{\lstinline!range!}、\passthrough{\lstinline!precision\_mode!}。
+CANN
+通过提供分层清晰的编程与运行时结构，以覆盖训练与推理的``全场景''、贴近主流框架的``低门槛''以及面向昇腾硬件深度优化的``高性能''为核心特性，支撑用户在昇腾平台上快速构建与部署各类
+AI 应用与业务。从整体上看，CANN
+可以抽象为一个自下而上递进的五层架构（计算语言接口、计算服务层、计算编译引擎、计算执行引擎与计算基础层），如图\ref{fig:architecture}所示：
+
+\begin{figure}
+\centering
+\includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={CANN架构图}]{chapters/img2/CANN_Architecture.png}
+\caption{CANN架构图}\label{fig:architecture}
+\end{figure}
+
+各层通过稳定的接口与数据流协议进行解耦协同，在保证语义一致性的前提下最大化发挥底层算力与能效潜力。
+
+在工程实践中，CANN
+的核心价值可以概括为在``模型---编译---执行---诊断''的完整链路上实现软硬件协同与语义稳定：通过构建对主流深度学习框架高度兼容的前端接口，最大限度降低模型迁移与语义对齐成本，在图级优化阶段则依托算子融合、内存复用以及混合精度策略的协同设计，系统性提升吞吐能力、推理时延以及功耗效率；与此同时，借助自定义算子机制与实现优先级调度策略，使新结构能够快速接入并在多实现版本之间灵活切换，从而在不同硬件代际与不同业务场景下充分挖掘底层计算资源的潜力，并在运行时通过分级日志、Profiling
+时间线与精度 Dump
+等手段构建起闭环的可观测体系。在大规模、复杂模型的工程化路径中，首先需要完成面向硬件架构的感知建模，在导出阶段显式固化张量形状与算子语义，为后续编译与部署奠定稳定的语义基础；随后在模型转换阶段，以``转换即优化''为原则，围绕
+precision\_mode、op\_select\_implmode 与 AIPP
+等关键配置项进行显式调优，使图优化与算子选型在编译期前置完成，其中精度策略以
+FP16 为主，并辅以具有代表性的校准数据集对 INT8
+量化误差进行严格控制，以在性能与精度之间取得可工程化的平衡。对于动态形状问题，可以采用分桶与
+Padding 结合的方式，并在必要时生成多份 OM
+模型，以在一定范围内换取更可控的峰值资源占用与时延方差；在内存与带宽层面，则通过将预处理逻辑尽可能下沉到设备侧、合并数据搬移操作，并配合
+Pinned 内存与多 Stream 并行传输技术，显著降低 H2D/D2H
+的时间占比，从系统视角优化整体流水线的调度效率。针对在实际 Profiling
+中暴露出的性能瓶颈算子，需要开展有针对性的算子重写与图重构，并充分利用实现优先级机制在不同
+Kernel
+之间进行策略化选择，以进一步榨取底层硬件的计算与访存潜力；最终，通过围绕``转换---精度对齐---Benchmark---回归监测''构建自动化流水线，将模型转换、性能评估与精度验证纳入统一的持续反馈闭环，在
+Ascend 310B
+等专用加速平台上沉淀出可复用的优化经验与差异化性能优势，不仅在算力利用率与综合成本上形成工程级竞争力，也为大模型与行业应用场景的规模化加速落地提供坚实的基础设施支撑。
 
 \section{ATC
 模型转换详解}\label{atc-ux6a21ux578bux8f6cux6362ux8be6ux89e3}
