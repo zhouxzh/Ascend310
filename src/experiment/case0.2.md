@@ -1,1 +1,0 @@
-# Ascend 310 NPU 超频
