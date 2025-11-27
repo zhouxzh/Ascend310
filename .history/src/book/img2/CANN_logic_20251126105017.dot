@@ -1,0 +1,140 @@
+digraph CANN_Stack {
+    rankdir=TB;
+    fontsize=12;
+    fontname="Microsoft YaHei";
+    node [shape=box fontname="Microsoft YaHei" fontsize=11 style=filled];
+    edge [color="#666666"];
+    labelloc="t";
+    label="Ascend CANN 软件栈（应用/芯片使能/计算资源）与系统管理";
+
+    // 布局容器：左侧主列 + 右侧系统管理列
+    subgraph cluster_left {
+        label="";
+        color="#ffffff";
+        style="invis";
+
+        // 应用层
+        subgraph cluster_app {
+            label="应用";
+            style="rounded,filled";
+            color="#8888aa";
+            fillcolor="#eef1ff";
+
+            app_infer   [label="推理APP" fillcolor="#ffffff"];
+            app_framework [label="AI框架\n(MindSpore/TensorFlow/Caffe)" fillcolor="#d9e8ff"];
+            app_blas    [label="Blas 加速库" fillcolor="#f0f8ff"];
+            app_automl  [label="AutoML" fillcolor="#f0fff0"];
+            app_modeltool [label="模型小型化工具" fillcolor="#fff8dc"];
+            app_mindstudio [label="MindStudio工具链" fillcolor="#ffd7a8"];
+        }
+
+        // 芯片使能层（核心中间块）
+        subgraph cluster_enable {
+            label="芯片使能";
+            style="rounded,filled";
+            color="#5c9d63";
+            fillcolor="#ecf7ed";
+
+            // AscendCL接口
+            ascendcl [label="AscendCL" fillcolor="#ffffff"];
+
+            // 图优化与编译
+            ge_fe   [label="融合和编译 (FE)" fillcolor="#ffffff"];
+            ge_core [label="图引擎 (GE)" fillcolor="#d7f2da"];
+            aicpu   [label="AICPU引擎 (AICPU E)" fillcolor="#ffffff"];
+            hccl    [label="集合通信引擎 (HCCL)" fillcolor="#f7ffe0"];
+
+            // 算子编程和算子库
+            tbe     [label="张量加速引擎 (TBE)" fillcolor="#fff4d4"];
+            kernel_lib [label="算子库" fillcolor="#fff4d4"];
+
+            // 运行与预处理
+            runtime [label="运行管理器 (runtime)" fillcolor="#ffffff"];
+            dvpp    [label="数字视频预处理 (DVPP)" fillcolor="#fff5f5"];
+
+            // 任务调度（条目）
+            task    [label="任务调度器 (Task Schedule)" fillcolor="#ffffff"];
+        }
+
+        // 计算资源层（底部块）
+        subgraph cluster_compute {
+            label="计算资源";
+            style="rounded,filled";
+            color="#777777";
+            fillcolor="#f2f2f2";
+
+            driver   [label="Driver" fillcolor="#ffffff"];
+            os       [label="OS" fillcolor="#ffffff"];
+
+            aicore   [label="AICore" fillcolor="#ffffff"];
+            aicpu_hw [label="AICPU" fillcolor="#ffffff"];
+            dvpp_hw  [label="DVPP硬件" fillcolor="#ffffff"];
+
+            pcie     [label="PCIe" fillcolor="#ffffff"];
+            hccs     [label="HCCS" fillcolor="#ffffff"];
+            roce     [label="RoCE" fillcolor="#ffffff"];
+        }
+    }
+
+    // 右侧系统管理纵向列
+    subgraph cluster_sysmgr {
+        label="系统管理";
+        style="rounded,filled";
+        color="#444c7a";
+        fillcolor="#e5e6f5";
+
+        sys_boot     [label="系统启动" fillcolor="#ffffff"];
+        sys_monitor  [label="系统监控" fillcolor="#ffffff"];
+        sys_config   [label="系统配置" fillcolor="#ffffff"];
+        sys_power    [label="低功耗管理" fillcolor="#ffffff"];
+        sys_log      [label="日志管理" fillcolor="#ffffff"];
+        sys_perf     [label="性能管理" fillcolor="#ffffff"];
+        sys_fault    [label="故障管理" fillcolor="#ffffff"];
+        sys_device   [label="设备管理" fillcolor="#ffffff"];
+    }
+
+    // 语义连接（非强约束，仅表达层次）
+    app_infer -> ascendcl;
+    app_framework -> ascendcl;
+    app_blas -> ascendcl;
+    app_automl -> ascendcl;
+    app_modeltool -> ascendcl;
+    app_mindstudio -> ascendcl;
+
+    ascendcl -> ge_core;
+    ascendcl -> tbe;
+    ascendcl -> runtime;
+
+    ge_fe   -> ge_core;
+    ge_core -> aicpu;
+    ge_core -> hccl;
+
+    tbe     -> kernel_lib;
+    runtime -> dvpp;
+
+    // 栈向下
+    ge_core  -> task;
+    runtime  -> task;
+    tbe      -> task;
+
+    // 计算资源承载
+    task     -> driver;
+    driver   -> os;
+
+    os -> aicore;
+    os -> aicpu_hw;
+    os -> dvpp_hw;
+
+    os -> pcie;
+    os -> hccs;
+    os -> roce;
+
+    // 系统管理与运行关联（虚线）
+    sys_monitor -> sys_log [style=invis];
+    sys_log     -> sys_perf [style=invis];
+    sys_perf    -> sys_fault [style=invis];
+    sys_fault   -> sys_config [style=invis];
+    sys_config  -> sys_device [style=invis];
+    sys_device  -> sys_boot   [style=invis];
+    sys_boot    -> sys_power  [style=invis];
+    }

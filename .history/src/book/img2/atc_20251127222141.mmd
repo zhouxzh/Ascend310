@@ -1,0 +1,75 @@
+flowchart TB
+    %% 顶部：框架与解析器
+    subgraph F["框架输入"]
+        Caffe[Caffe]
+        TF[TensorFlow]
+        ONNX[ONNX]
+        MS[MindSpore]
+        OpDesc[基于 Ascend IR 定义的\n单算子描述文件]
+    end
+
+    subgraph atc_tools["ATC工具"]
+        subgraph P["解析器"]
+            CaffeParser[Caffe Parser]
+            TFParser[TF Parser]
+            ONNXParser[ONNX Parser]
+        end
+
+        %% 框架到解析器映射
+        Caffe --> CaffeParser
+        TF --> TFParser
+        ONNX --> ONNXParser
+
+        %% 统一中间图
+        IR[统一中间IR Graph]
+        CaffeParser --> IR
+        TFParser --> IR
+        ONNXParser --> IR
+        MS --> IR
+
+        %% Graph Optimizer 主流程
+        subgraph GO["Graph Optimizer"]
+            GP[图准备]
+            GPart[图拆分]
+            GOpt[图优化]
+            GComp[图编译]
+            GP --> GPart --> GOpt --> GComp
+        end
+
+        IR --> GO
+
+        %% 侧边：单算子描述与编译链路
+        subgraph OP["单算子链路"]
+            OpCompile[单算子编译]
+            OpDesc --> OpCompile
+        end
+    end
+
+    %% 产物：离线模型 OM
+    OM[离线模型（.om）]
+    GComp --> OM
+
+    %% 下游执行
+    Infer[执行推理]
+    KernelVerify[执行单算子验证]
+    OM --> Infer
+    OM --> KernelVerify
+
+    OpCompile --> OM
+
+    %% 美化
+    classDef head fill:#d9e8ff,stroke:#7aa3e5,stroke-width:1px,color:#1f3b5b;
+    classDef parser fill:#eaf2ff,stroke:#7aa3e5,stroke-width:1px,color:#1f3b5b;
+    classDef ir fill:#e6f7ff,stroke:#4db3ff,stroke-width:1px,color:#0b3a5b;
+    classDef go fill:#fff3d6,stroke:#d8a657,stroke-width:1px,color:#4a3b19;
+    classDef om fill:#fff0cc,stroke:#d8a657,stroke-width:1px,color:#4a3b19;
+    classDef exec fill:#e8ffe8,stroke:#76c776,stroke-width:1px,color:#1f3b1f;
+    classDef op fill:#dff7f0,stroke:#59c3a6,stroke-width:1px,color:#18493f;
+
+    class Caffe,TF,ONNX,MS head
+    class CaffeParser,TFParser,ONNXParser parser
+    class IR ir
+    class GP,GPart,GOpt,GComp go
+    class OM om
+    class Infer,KernelVerify exec
+    class OpDesc,OpCompile op
