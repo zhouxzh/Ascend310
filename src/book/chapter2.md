@@ -82,179 +82,314 @@ CANN 通过提供分层清晰的编程与运行时结构，以覆盖训练与推
 
 昇腾张量编译器（Ascend Tensor Compiler，ATC）是 CANN 异构计算体系中的模型转换组件，支持将主流开源框架导出的网络模型以及基于 Ascend IR 的单算子描述文件（JSON）编译为昇腾 AI 处理器可执行的离线模型（.om）。如图下图所示，ATC 在转换过程中会执行算子调度优化、权重重排与内存复用等关键步骤，对原始深度学习模型进行面向部署场景的系统化调优，从而在昇腾硬件上实现高吞吐、低时延的高效执行。
 
-![ATC流程图](img2\atc.png){#fig:atc_flow width=90%}
+![ATC框架图](img2\atc.png){#fig:atc width=90%}
 
+从上面的流程图我们可以看到，ATC 工具聚焦模型到设备可执行体的“转换即优化”闭环：一方面，它能够将开源框架导出的网络模型解析为中间态 IR Graph，经由图准备、拆分与融合、形状推理、内存复用与算子选型等编译步骤，生成适配昇腾处理器的离线模型（OM），并在板端通过 AscendCL 接口加载执行，从语义到性能实现端到端落地；另一方面，ATC 也支持基于 Ascend IR 的单算子 JSON 直接编译为离线 OM，用于在设备侧进行算子级功能验证与精度对齐，帮助开发者快速定位与迭代关键算子实现，在图级与算子级两条路径上形成统一的工程化编译能力。
 
-典型命令（以 ResNet50 为例，支持 FP16）：
-```
-atc \
-  --model=resnet50.onnx \
-  --framework=5 \
-  --output=resnet50_fp16 \
-  --input_format=NCHW \
-  --input_shape="input:1,3,224,224" \
-  --soc_version=Ascend310B \
-  --precision_mode=allow_fp32_to_fp16 \
-  --op_select_implmode=high_performance \
-  --log=info \
-  --insert_op_conf=aipp.cfg
-```
-关键参数说明：
+#### onnx格式介绍
+ONNX（Open Neural Network Exchange）是一种针对深度学习所设计的开放式文件格式，用于存储训练好的模型。它使得不同的人工智能框架（如PyTorch、TensorFlow、mindspore等）可以采用相同格式存储模型数据并交互。ONNX的规范包含计算图模型的定义，以及内置运算符的定义和标准数据类型。
+
+ONNX的核心价值在于解决了AI生态系统中“碎片化”的问题。在没有ONNX之前，开发者如果想将一个在PyTorch中训练好的模型部署到移动端推理引擎上，通常需要进行繁琐的代码重写或复杂的格式转换。ONNX提供了一种中间表达（Intermediate Representation, IR），充当了不同框架之间的“通用语”。
+
+一个标准的ONNX模型文件（通常以`.onnx`为后缀）主要包含以下几个部分：
+1.  **Model Proto**：顶层结构，包含模型的元数据（如版本信息、生产者信息）和计算图（Graph）。
+2.  **Graph Proto**：描述了模型的计算逻辑，由一系列节点（Node）、输入（Input）、输出（Output）和初始化器（Initializer，即权重数据）组成。
+3.  **Node Proto**：代表计算图中的一个操作（Operator），如Conv、Relu、Add等。每个节点包含操作类型、输入输出张量的名称以及属性（Attribute，如卷积的步长、填充等）。
+4.  **Tensor Proto**：用于存储权重数据或常量的具体数值和形状信息。
+
+**ATC对ONNX的支持情况**
+虽然ONNX旨在成为通用的AI模型交换标准，但CANN的ATC工具并非支持ONNX规范中的所有算子和特性。ATC对ONNX的支持主要集中在CV（计算机视觉）和NLP（自然语言处理）领域的常用算子，对于一些较新或较冷门的算子，可能会出现不支持的情况。
+
+具体来说，ATC对ONNX的支持限制主要体现在以下几个方面：
+1.  **算子覆盖率**：ATC支持绝大多数主流的CNN和Transformer类算子（如Conv, MatMul, Relu, Softmax等）。但对于部分非标准或特定框架自定义的算子（Custom Ops），ATC无法直接解析，需要开发者通过TBE（Tensor Boost Engine）开发自定义算子并注册到CANN中。
+2.  **动态控制流**：ONNX中的动态控制流（如`If`, `Loop`, `Scan`）在静态图编译中处理较为复杂。虽然ATC支持部分控制流算子，但在某些复杂嵌套场景下可能会导致编译失败或性能下降，通常建议在导出模型时尽量将控制流展开（Unroll）或转为静态图结构。
+3.  **数据类型限制**：虽然ONNX支持多种数据类型（如Double, Int64等），但昇腾AI处理器主要针对FP16和INT8进行了硬件加速优化。对于FP64（Double）类型，ATC通常不支持或需要强制转为FP32/FP16处理；对于Int64类型的索引或计数，部分算子可能要求转为Int32。
+4.  **动态Shape支持**：虽然ATC支持动态Batch和动态分辨率，但对于模型内部中间层出现的完全动态且无法推导的Shape，可能会导致编译报错。
+
+因此，在进行模型转换前，建议开发者查阅华为昇腾社区发布的《CANN 算子清单》，确认模型中使用的ONNX算子版本（Opset Version）是否在当前CANN版本的支持范围内。如果遇到不支持的算子，通常的解决路径包括：修改模型结构以替换为等价的支持算子、在ONNX导出阶段进行算子简化（使用`onnx-simplifier`工具）、或者开发自定义算子。
+
+### ATC工具使用流程
+
+使用ATC工具进行模型转换的使用流程如下图所示：
+![ATC流程图](img2\atc_flow.png){#fig:atc_flow width=90%}
+在开始模型转换之前，首先需要在开发环境中安装与 CANN 软件包版本相匹配的版本，并确保 ATC 可执行文件的路径可用。接下来，准备待转换的模型文件或基于 Ascend IR 的单算子 JSON，并将其上传到开发环境中可访问的目录。最后，使用 ATC 执行转换，并根据实际业务需求和输入规范配置相关参数。如果需要将预处理步骤（如色彩空间转换、归一化和尺度调整）下沉到设备侧，可以同时提供并启用 AIPP（Artificial Intelligence Pre-Processing）配置。AIPP是昇腾处理器内置的硬件级图像预处理模块，负责将上游（如 DVPP）输出的对齐后YUV420SP图像在设备侧完成色域转换（如YUV图像格式转换为RGB或者BGR图像格式）、归一化（减均值/乘系数/尺度放大）与抠图（在指定起始点裁剪到模型输入尺寸），从而把原始图像规范化为模型所需的输入格式与数值范围。由于昇腾310B在推理及训练中常以DVPP输出YUV420SP图片格式，这种图像格式是有损图像颜色编码格式，常用为YUV420SP_UV、YUV420SP_VU两种格式，不直接提供RGB图片。AIPP能将YUV420SP类型图像无缝转化为模型期望的RGB/BGR图像格式，并在同一数据流中完成裁剪与数值处理，避免将预处理放在CPU侧导致的多次拷贝与额外时延，提升端到端吞吐与能效。
+
+####  模型转换-以ResNet50为例
+ResNet-50 由多级残差单元堆叠形成 50 层卷积网络，通过跨层跳连缓解深层退化与梯度消失，使其在 ImageNet 等大规模数据集上具备稳定的特征表达与分类精度，因此常被选作各类视觉任务的通用骨干。要在昇腾 310B 上部署该模型，需要借助 ATC 将 ONNX 版本转换为 OM，可参考华为昇腾官方示例仓库（https://github.com/Ascend/samples/tree/master/inference/modelInference/sampleResnetQuickStart）。为方便快速复现，可按以下步骤从零搭建工程：
+
+1. 在昇腾 310B 的 `Documents` 目录创建 `sample_resnet_quick_start`，并划分 `data`、`model`、`out`、`src` 四个子目录用于存放测试图片、模型、脚本与源码：
+  ```bash
+  cd ~/Documents
+  mkdir -p sample_resnet_quick_start/{data,model,out,src}
+  cd sample_resnet_quick_start
+  ```
+2. 下载示例图片至 `data` 目录：
+  ```bash
+  cd ~/Documents/sample_resnet_quick_start/data
+  wget https://obs-9be7.obs.cn-east-2.myhuaweicloud.com/models/aclsample/dog1_1024_683.jpg
+  ```
+3. 进入 `model` 目录获取 ResNet-50 ONNX 模型：
+  ```bash
+  cd ~/Documents/sample_resnet_quick_start/model
+  wget https://obs-9be7.obs.cn-east-2.myhuaweicloud.com/003_Atc_Models/resnet50/resnet50.onnx
+  ```
+4. 设置编译并行度后执行典型 ATC 命令，生成适配昇腾 310B4 的 OM 文件：
+  ```bash
+  export TE_PARALLEL_COMPILER=1
+  export MAX_COMPILE_CORE_NUMBER=1
+  atc \
+    --model=resnet50.onnx \
+    --framework=5 \
+    --output=resnet50 \
+    --input_shape="actual_input_1:1,3,224,224" \
+    --soc_version=Ascend310B4
+  ```
+**关键参数说明**
 | 参数 | 作用 | 注意事项 |
 | ---- | ---- | -------- |
-| `--framework` | 输入框架类型 (5=ONNX) | 与实际导出一致，否则形状推理异常 |
-| `--input_shape` | 静态 shape 指定 | 多输入以逗号分隔 `in1:1,3,224,224;in2:1,128` |
-| `--dynamic_batch_size` | 动态 Batch | 与 `--input_shape` 不能混用静态冲突 |
-| `--dynamic_image_size` | 动态分辨率 | YOLO 等多尺度部署 |
-| `--precision_mode` | 精度策略 | `allow_mix_precision`、`allow_fp32_to_fp16` |
-| `--soc_version` | 硬件目标 | 与实际芯片匹配；310B 与 310P 不可混淆 |
-| `--insert_op_conf` | AIPP(预处理) | 可下沉色彩空间转换、均值/方差 |
-| `--op_select_implmode` | 算子实现优先级 | `high_precision` vs `high_performance` |
-| `--input_format` | 模型输入排布 | 与 `--input_shape` 一致性检查 |
-| `--output_type` | 输出 dtype | 常用于 INT8 推理后转 FP32 便于后处理 |
-| `--enable_small_channel` | 小通道优化 | 某些轻量网络加速 |
+| `--framework` | 指定原始模型框架 | 0=Caffe，1=MindSpore，3=TensorFlow，5=ONNX，需与导出框架一致 |
+| `--input_shape` | 定义静态输入 Shape | 按 `"name:n,c,h,w"` 写法，字符串需加引号；动态改用区间或配合动态参数 |
+| `--dynamic_batch_size` | 设置可选 Batch 列表 | 以 `"1,4,8"` 形式填写；与同一输入的完全静态 shape 互斥 |
+| `--dynamic_image_size` | 配置多分辨率输入 | `"h1,w1;h2,w2"`，常用于多尺度检测；需与模型实际支持一致 |
+| `--precision_mode` | 控制混合精度策略 | 常用值：`force_fp16`、`allow_mix_precision`、`allow_fp32_to_fp16`，需兼顾精度 |
+| `--soc_version` | 选择目标芯片 | 例：`Ascend310B4`，可通过 `npu-smi info` 查询；310B/P 区分清楚 |
+| `--insert_op_conf` | 下沉 AIPP/自定义算子 | 指定 JSON/YAML，支持色域转换、归一化等预处理 |
+| `--op_select_implmode` | 算子实现优先级 | 支持 `high_performance`(默认)、`high_precision` 等，可配合 `--optypelist_for_implmode` |
+| `--input_format` | 声明输入数据排布 | 如 `NCHW`、`NHWC`；需与模型导出及 `--input_shape` 保持一致 |
+| `--output_type` | 重指定输出 dtype | 可设全局 `FP16`/`FP32`，或按 `node:idx:FP32` 精细配置，便于后处理 |
+| `--enable_small_channel` | 小通道优化开关 | 取值 0/1，轻量网络或低通道数场景启用可减时延 |
+| `--model` | 指定待转换模型文件 | 支持 `.onnx`、`.pb`、`.prototxt` 等类型，路径需可访问 |
+| `--output` | 设置 OM 输出前缀 | 不需写后缀；默认位置在当前目录，可结合 `--output_type` 使用 |
+| `--dynamic_dims` | 定义多维动态组合 | `"d1_1,d1_2;d2_1,d2_2"` 格式；用于多输入或非 Batch 维变动 |
+| `--enable_single_stream` | 强制单流执行 | `true/false`；在推理序列化或调试稳定性时启用 |
+| `--dump_mode` | 导出模型结构 JSON | 配合 `--mode=1` 使用，`1` 开启；便于排查 Shape 与算子信息 |
 
-### 自定义算子加载
-1. 定义 JSON 描述（输入输出、属性）。
-2. 编写 Kernel 源码并使用官方编译脚本生成 `.so`。
-3. ATC 阶段通过 `--optypelist_for_impl` 或 `--soc_version` + JSON 注册；运行时放置在 `ASCEND_OPP_PATH` 对应目录。
-
-### 日志与告警
-常见告警分类：
-- 未使用节点 (prune) → 确认是否为训练辅助算子 (e.g., Dropout)。
-- 算子降级 → 检查是否 fallback 到 Host；对性能敏感需重写/替换结构。
-- 精度截断 → 记录发生算子，评估对最终指标影响；必要时关闭相关优化策略。
-
-## OM 文件结构解读
-OM 通常包含：
-1. Header：魔数、版本、输入输出 Tensor 数、DataType、Format。
-2. Graph Meta：节点拓扑、算子类型列表、权重偏移指针。
-3. Weights Segment：连续存放常量权重与常量张量。
-4. Task List：调度指令列表（Kernel Launch / MemCopy / Event）。
-5. AIPP 配置（可选）：预处理算子参数表。
-
-### 解析与统计脚本要点
-- 调用 `aclmdlQuerySize` 得到模型工作内存与权重内存需求。
-- 利用 `aclmdlGetInputIndexByName` / `aclmdlGetInputDims` 获取 IO 维度与 dtype。
-- 自建表格：`{op_type: count}` 用于识别热点类型（后续优化参考）。
-
-## ACL 推理编程模型
-典型生命周期：
-1. 初始化：`aclInit` → `aclrtSetDevice` → `aclrtCreateContext` → (可选) 创建 Stream。
-2. 模型：`aclmdlLoadFromFile` → 查询 IO 描述 → 预分配 Device Buffer。
-3. 数据准备：Host 侧申请内存（Pinned 优先）→ 格式/归一化 → H2D 拷贝。
-4. 执行：`aclmdlExecute` 或 异步 `aclmdlExecuteAsync` + Stream 同步。
-5. 输出处理：D2H 拷贝 → 解码 / Softmax / NMS。
-6. 资源释放：`aclmdlUnload` → Free buffers → Destroy Context → `aclFinalize`。
-
-### C 语言最小示例（核心片段）
-```
-// 省略错误检查宏定义 ERR_CHK
-aclInit(NULL);
-aclrtSetDevice(0);
-aclrtContext ctx; aclrtCreateContext(&ctx, 0);
-uint32_t modelId; size_t wSize, rSize;
-aclmdlLoadFromFile("resnet50_fp16.om", &modelId);
-aclmdlDesc *desc = aclmdlCreateDesc();
-aclmdlGetDesc(desc, modelId);
-// 输入准备
-void *hostIn = malloc(3*224*224*2); // FP16
-void *devIn; aclrtMalloc(&devIn, 3*224*224*2, ACL_MEM_MALLOC_NORMAL_ONLY);
-aclrtMemcpy(devIn, 3*224*224*2, hostIn, 3*224*224*2, ACL_MEMCPY_HOST_TO_DEVICE);
-aclmdlDataset *input = aclmdlCreateDataset();
-aclDataBuffer *inBuf = aclCreateDataBuffer(devIn, 3*224*224*2);
-aclmdlAddDatasetBuffer(input, inBuf);
-// 输出
-size_t outSize = 1000 * 2; // FP16 logits
-void *devOut; aclrtMalloc(&devOut, outSize, ACL_MEM_MALLOC_NORMAL_ONLY);
-aclmdlDataset *output = aclmdlCreateDataset();
-aclDataBuffer *outBuf = aclCreateDataBuffer(devOut, outSize);
-aclmdlAddDatasetBuffer(output, outBuf);
-aclmdlExecute(modelId, input, output);
-// 回拷
-void *hostOut = malloc(outSize);
-aclrtMemcpy(hostOut, outSize, devOut, outSize, ACL_MEMCPY_DEVICE_TO_HOST);
-// 解析 softmax ...
-// 清理省略
+如果对于参数有任何的疑惑，可以通过命令查询atc的参数作用：
+```bash
+atc --help
 ```
 
-### Python 封装思路
-官方 Python 包接口层次相似，建议封装 `ModelSession` 类：
+成果转换模型后，我们可以看到命令窗口有如下输出：
+
+```bash
+ATC start working now, please wait for a moment.
+...
+ATC run success, welcome to the next use.
+  ```
+
+
+#### 注意事项
+1. 在昇腾310B上将 ONNX 模型转换为 OM 时若出现 `BrokenPipeError: [Errno 32] Broken pipe`，通常是编译阶段内存不足导致进程被系统终止。可参照以下两类方案缓解：
+
+- **扩展可用内存**
+  ```bash
+  dd if=/dev/zero of=/swapfile bs=1M count=8192
+  chmod 600 /swapfile
+  swapon /swapfile
+  ```
+  并在 `/etc/fstab` 中新增：
+  ```
+  /swapfile swap swap defaults 0 0
+  ```
+
+- **降低编译资源占用**
+  ```bash
+  export TE_PARALLEL_COMPILER=1      # 限制算子最大并行编译进程数
+  export MAX_COMPILE_CORE_NUMBER=1   # 限制图编译占用的 CPU 核数
+  ```
+  方便起见，我们可以采用第二种方案，可以有效解决内存不足的问题。
+
+2. 若无法确认当前设备的 `soc_version`，可在安装驱动的昇腾310B上执行 `npu-smi info` 查询，示例如下：  
+```bash
++--------------------------------------------------------------------------------------------------------+
+| npu-smi 23.0.0                                   Version: 23.0.0                                       |
++-------------------------------+-----------------+------------------------------------------------------+
+| NPU     Name                  | Health          | Power(W)     Temp(C)           Hugepages-Usage(page) |
+| Chip    Device                | Bus-Id          | AICore(%)    Memory-Usage(MB)                        |
++===============================+=================+======================================================+
+| 0       310B4                 | Alarm           | 0.0          58                15    / 15            |
+| 0       0                     | NA              | 0            2500 / 7545                             |
++===============================+=================+======================================================+
 ```
-class ModelSession:
-    def __init__(self, om_path):
-        self.model_id = load(om_path)
-        self.desc = query(self.model_id)
-        self._alloc_io_buffers()
-    def infer(self, np_input: np.ndarray):
-        # preprocess -> copy H2D -> execute -> copy D2H -> postprocess
-        return logits
-    def __del__(self):
-        self._release()
-```
+请在查询结果的 `Name` 值前追加 `Ascend` 前缀：若 `Name` 为 `310B4`，则需配置 `soc_version=Ascend310B4`。
 
-## 性能与初步调优策略
-| 问题 | 诊断信号 | 初级优化 | 进阶优化 |
-| ---- | -------- | -------- | -------- |
-| 时延波动大 | P95 >> P50 | 固定 Batch / 预热 | Stream 并行 + Pin 内存 |
-| 吞吐不足 | 利用率低 | FP16 | 多实例并行 |
-| 拷贝过多 | H2D 大占比 | 合并预处理 | AIPP 下沉 |
-| 算子退化 | 日志 Fallback | 替换模型结构 | 自定义算子 |
+3. 模型转换完成后会生成一份 JSON 文件，用作 ATC 编译日志的结构化摘要，集中记录当前会话（session_and_graph_id=0_0）内图级与 UB 级融合规则的触发统计。具体而言，graph_fusion 字段逐条给出各图融合 Pass 的匹配次数与实际生效次数（match_times 与 effect_times），可据此识别潜在的优化空档；ub_fusion 字段在上述统计基础上新增 repository_hit_times，用以衡量算子库模板的命中情况。实践中，可重点关注 effect_times 低于 match_times 的 Pass，分析是否因算子属性、精度模式或实现优先级等因素造成融合未落地，并据此调整 ATC 参数或模型图结构，以复现并提升性能优化效果。 
 
-关键早期收集指标：平均时延、P95、H2D+Pre 占比、推理核心阶段占比、内存峰值。
+### 模型推理工具msame工具概览
+在完成 ATC 转换得到 `.om` 模型后，最快验证部署链路是否畅通的方式就是调用华为昇腾提供的模型推理工具 msame。该工具封装了 OM 加载、设备内存初始化、输入二进制数据映射以及推理调度等通用流程，无需额外编写 AscendCL 程序即可直接对接 ATC 输出的模型，只需准备好与模型输入规格匹配的 `.bin` 文件和基础运行时环境，即可在命令行下完成端到端推理验证。通过 msame，开发者能够快速检查模型是否成功落地、输出是否合理，并以最小成本排除输入格式或环境配置类问题，为后续集成到自研应用或高层框架之前提供低门槛的功能性回归手段。
 
-## 常见错误分类与排查路径
-| 场景 | 日志/现象 | 根因类型 | 排查步骤 | 修复 |
-| ---- | -------- | -------- | -------- | ---- |
-| ATC Unsupported Op | E190xx | 模型含新算子 | onnxsim → 拆解 | 替换/重写 |
-| 动态 Shape OOM | 执行时内存溢出 | 最大分辨率超预算 | 统计输入分布 | 分桶/裁剪 |
-| 精度下降 | Top1 -5% | 归一化差异 | 离线对齐脚本 | 修正预处理 |
-| 输出 NAN | logits 异常 | 上溢/量化尺度错误 | Dump 中间 Tensor | 重新校准 |
-| 设备不可见 | aclInit 失败 | Driver 未加载 | dmesg & npu-smi | 重装驱动 |
+msame 的设计目标是将 OM 模型的快速验证能力标准化，覆蓋单输入、多输入和循环执行等常见推理形态，支持在相同模型与不同输入数据组合之间做对比试验，同时允许选择 TXT 或 BIN 格式导出结果，以便于人工审查或自动化脚本解析。在已正确安装 CANN Runtime 的环境中，msame 会自动完成与设备的上下文绑定、内存申请和任务提交，将推理过程抽象成简单的命令行参数；这不仅适用于初步确认模型可运行，也可用于小批量性能评估、数据一致性校验以及在定位性能或精度问题时的基准对照，从而在模型转换与实际业务部署之间搭建起轻量而高效的桥梁。
 
-## 质量保障与自动化流水线
-流水线阶段：
-1. Export：框架导出 + ONNX Simplify + 模型签名(`inputs/name/dtype/layout/mean/std`).
-2. Convert：ATC 命令模板参数化（YAML → 渲染）。
-3. Validate：ONNXRuntime vs OM 输出差异 (L1/L2/TopK 差异率 < 阈值)。
-4. Benchmark：Warmup N + Run M，记录 JSON `{avg, p50, p95, memory}`。
-5. Archive：产物归档（om, atc.log, metrics.json, signature.json）。
-6. Regression：新提交对比基线差异，超阈值报警。
+#### msame工具的获取与构建
+1. 通过 `git clone https://gitee.com/ascend/tools.git` 拉取仓库，或下载 ZIP 包后解压到开发环境。
+2. 进入 `msame` 子目录：
+  ```bash
+  cd ./tools/msame
+  ```
+3. 配置 CANN 环境变量（以下路径请按实际安装位置调整）：
+  ```bash
+  export DDK_PATH=/usr/local/Ascend/ascend-toolkit/latest
+  export NPU_HOST_LIB=/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub
+  ```
+4. 运行构建脚本生成可执行文件：
+  ```bash
+  ./build.sh g++
+  ```
+5. 构建成功后会在 `out` 目录生成二进制文件 `msame`，将其复制到工程目录 `sample_resnet_quick_start` 中备用。
 
-### 精度对齐示例指标
-| 指标 | 计算方式 | 推荐阈值 |
-| ---- | -------- | -------- |
-| Top1 差异 | abs(top1_acc_onnx - top1_acc_om) | ≤0.2% |
-| 平均 L1 | mean(|y_onnx - y_om|) | ≤1e-3 (FP16) |
-| 最大相对误差 | max(|d|/|ref|) | ≤1e-2 |
+  + 常用参数速览
+    | 参数 | 说明 |
+    | --- | --- |
+    | `--model` | OM 文件路径 |
+    | `--input` | 输入 `bin` 文件或目录，支持多输入 |
+    | `--output` | 推理结果存放目录 |
+    | `--outfmt` | 输出格式：`TXT` / `BIN` |
+    | `--loop` | 重复推理次数（1–100） |
+    | `--profiler` / `--dump` | 性能分析或 Dump，互斥 |
+    | `--device` | 设备 ID，默认 0 |
+    | `--dymBatch` / `--dymHW` / `--dymDims` / `--dymShape` | 对应 ATC 动态配置的实际取值 |
+    | `--outputSize` | 动态 Shape 场景下手动申请输出内存 |
+    | `--debug` | 打印模型描述信息 |
+    | `--help` | 查看全部参数 |
 
-## Dump / Profiling / 调试手段
-| 工具 | 使用时机 | 价值 | 代价 |
-| ---- | -------- | ---- | ---- |
-| Dump 中间 Tensor | 精度异常 | 对齐中间层 | I/O 与存储占用 |
-| Profiling Timeline | 性能不达标 | 定位瓶颈 | 额外开销 (W%) |
-| 日志级别升高 (`--log=debug`) | 转换失败 | 细粒度错误码 | 噪声多 |
-| 校准数据捕获 | INT8 偏差大 | 重新校准 | 需准备代表性样本 |
+  + 使用注意
+    - 运行账号需具备当前目录的执行与写入权限。
+    - `TXT` 输出不适用于部分动态 Shape，可改用 `BIN`。
+    - 配置 `NPU_HOST_LIB` 时应指向 `runtime/lib64/stub` 目录，运行阶段通过 `LD_LIBRARY_PATH` 链接实际依赖。
+    - profiler 与 dump 不可同时开启；动态 shape 时需同步设置合适的输出内存大小。
 
-Dump 配置：通过环境变量或 JSON 指定层名称白名单，避免全量 Dump 导致性能与空间压力。
+#### 图片预处理
+由于 msame 工具不具备图像预处理能力，输入必须是已转换好的 `.bin` 文件。因为之前在模型转换时未显式指定精度，ResNet50 默认接受 FP32 格式的输入；同样地，未设置输入内存布局时 ATC 会采用默认的 NCHW。NCHW 表示批次 N、通道 C、空间高度 H 与宽度 W，意味着同一张图片的三个颜色通道会按通道优先的顺序依次排布，再展开到空间维度。这与 TensorFlow 常见的 NHWC（通道在最后）相对。`sampleResnetQuickStart.py` 中的 `image_rgb.transpose([2, 0, 1])` 正是将 OpenCV 读取的 HWC 布局转换为 CHW，并配合外层批次维得到符合要求的 NCHW。是否必须使用 NCHW 取决于模型导出时的约定。PyTorch 与 CANN 默认使用 NCHW，因此常见的 `resnet50.onnx`/`resnet50.om` 都在此布局下训练与推理。只要导出模型为 NCHW，推理阶段同样必须以 NCHW 喂入数据，否则通道错位会导致结果异常。当然，也可以导出为 NHWC，只需在模型与预处理两端同时调整即可。
+由于刚才我们从华为云哪里获取的测试图片“dog1_1024_683.jpg”如下：
 
-## 动态 Shape 策略与内存规划
-多分辨率/Batch 场景建议：
-1. 分桶：统计历史尺寸 → 选 3~5 个“代表桶” → ATC 生成多 OM；运行时按最近桶选择。
-2. Padding：对齐到 32/64 边界，减少算子内部分支；记录真实尺寸用于后处理。
-3. 内存预估：最大桶内存 + 安全冗余 15% 作为部署阈值，超出触发降级。
+![resnet测试图片](img2/dog1_1024_683.jpg){#fig:dog width=90%}
 
-## 精度验证流程与脚本要点
-流程：采样输入集（校准集或验证集子集）→ ONNXRuntime 前向 → Ascend 前向 → 指标聚合 → 报告。
-脚本关键：
-1. 随机种子固定；
-2. 输入预处理完全共用函数；
-3. 支持逐层 Dump 比对（差异 > 阈值 输出层名）。
+由于这个图片是jpg格式的，因此为了可以利用这个图片推理，我们第一步需要对图片进行预处理，具体过程如何：
+1. 在src文件目录创建一个预处理的python文件“make_bin_resnet224_float32.py”如下：
+  ```python make_bin_resnet224_float32.py
+  from PIL import Image
+  import numpy as np
 
-## 安全与合规考量
-- 模型资产：带版权或敏感权重需加密存储（考虑文件系统权限+传输校验 hash）。
-- 日志脱敏：避免输出用户数据路径/片段；开关化控制。
-- Dump 数据：限定开发模式，生产禁用；数据自动过期删除策略（时间或数量）。
+  # 加载图像并转换为 RGB
+  img = Image.open('data/dog1_1024_683.jpg').convert('RGB')
+  # 使用双线性插值缩放到 256x256
+  img = img.resize((256, 256), Image.BILINEAR)
+  # 计算 224x224 中心裁剪的坐标
+  left = (256 - 224) // 2
+  top = (256 - 224) // 2
+  # 执行中心裁剪
+  img = img.crop((left, top, left + 224, top + 224))
+
+  # 转换为 [0, 1] 范围的 float32 数组
+  arr = np.array(img).astype(np.float32) / 255.0
+  # 定义归一化常量
+  mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+  std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+  # 按通道进行归一化
+  arr = (arr - mean) / std
+
+  # 调整为 NCHW 格式并添加批次维度
+  arr = arr.transpose(2, 0, 1)[None, :, :, :]
+  # 保存为二进制文件
+  arr.tofile('data/dog1_224_float32.bin')
+  # 打印缓冲区大小（字节数）
+  print('bytes:', arr.nbytes)
+  ```
+  
+2. 在shell中运行这个python文件：
+  ```bash
+  python src/make_bin_resnet224_float32.py
+  ```
+  该脚本在导出 `.bin` 输入前会完成：将示例图像缩放到 256×256 后再做 224×224 中心裁剪；把像素转换为 NCHW 排布的 `float32` 缓冲区并写入文件；整个过程中先除以 255 将数值归一化到 [0,1]，再按通道减去 `[0.485, 0.456, 0.406]`、除以 `[0.229, 0.224, 0.225]` 标准差，以对齐 ResNet 在 ImageNet 上的训练预处理，从而避免因均值或方差失配导致的输出偏移，最终在`data`文件夹内得到 `dog1_224_float32.bin`。
+
+3. 快速运行——单输入文件
+  运行下面这个命令：
+  ```bash
+  ./msame --model "./model/resnet50.om" --input "./data/dog1_224_float32.bin" --output "./out" --outfmt BIN
+  ```
+  运行成功后，我们会得到以下的信息：
+  ```bash
+  [INFO] acl init success
+  [INFO] open device 0 success
+  [INFO] create context success
+  [INFO] create stream success
+  [INFO] get run mode success
+  [INFO] load model ./model/resnet50.om success
+  [INFO] create model description success
+  [INFO] get input dynamic gear count success
+  [INFO] create model output success
+  ./out/20251213_11_6_52_564388
+  [INFO] start to process file:./data/dog1_224_float32.bin
+  [INFO] model execute success
+  Inference time: 6.811ms
+  [INFO] get max dynamic batch size success
+  [INFO] output data success
+  Inference average time: 6.811000 ms
+  [INFO] destroy model input success
+  [INFO] unload model success, model Id is 1
+  [INFO] pid: 98299 Execute sample success
+  [INFO] end to destroy stream
+  [INFO] end to destroy context
+  [INFO] end to reset device is 0
+  [INFO] end to finalize acl
+  ```
+  + 该日志显示推理流程已完整走通：ACL 初始化、设备上下文、模型加载、输入输出申请均返回 `success`，`Inference time`/`Inference average time` 给出单次与平均耗时，路径 `./out/20251213_11_6_52_564388` 指向本次推理结果目录。该输出目录遵循“YYYYMMDD_H_M_S_microsec”命名：`20251213` 表示日期（2025-12-13），`11_6_52` 为时分秒，`564388` 为微秒级序列号，用于区分同日多次推理结果。
+  + 若选择 `--outfmt BIN`，可用 `numpy.fromfile('./out/.../resnet50_output_0.bin', dtype=np.float32).reshape(1, 1000)` 读取并执行 `np.argsort` 获取 TopK；使用 `softmax` 还原概率后结合 ImageNet label 映射即可解读分类结果。
+  + 若选择 `--outfmt TXT`，直接 `cat ./out/.../resnet50_output_0.txt | head` 快速查看前若干输出值，同样可以配合脚本解析为 TopK 概率。
+
+
+4. 后处理  
+  无论 msame 的 `--outfmt` 选择 `BIN` 还是 `TXT`，得到的都是形如 `1×1000` 的分类 logits，需要结合 ImageNet 标签映射再做一次后处理才能输出可读结果。以下示例脚本演示如何解析 `BIN` 文件、执行 softmax 并打印 Top-K 概率。  
+
+  + 先下载 `imagenet_class_index.json`（可来自 Kaggle 或 GitHub）放到 `src` 目录，然后创建 `src/postprocess_resnet50.py`：  
+  ```python
+  # src/postprocess_resnet50.py
+  import os
+  import argparse
+  import json
+  import numpy as np
+
+  parser = argparse.ArgumentParser(description="将ResNet50的 BIN 输出解码为ImageNet标签。")
+  parser.add_argument("--bin", required=True, help="msame 输出BIN文件的路径。")
+  parser.add_argument("--topk", type=int, default=5, help="需要打印的最高置信度数量。")
+  args = parser.parse_args()
+
+  logits = np.fromfile(args.bin, dtype=np.float32).reshape(1, -1)
+  probs = np.exp(logits - logits.max(axis=-1, keepdims=True))
+  probs = probs / probs.sum(axis=-1, keepdims=True)
+  probs = probs[0]
+
+  labels_path = os.path.join("src", "imagenet_class_index.json")
+  if not os.path.exists(labels_path):
+      raise FileNotFoundError("请先将imagenet_class_index.json下载到src目录。")
+
+  with open(labels_path, "r", encoding="utf-8") as f:
+      data = json.load(f)
+  labels = [data[str(i)][1] for i in range(len(data))]
+
+  topk = np.argsort(probs)[::-1][:args.topk]
+  print(f"Decoded {args.bin} (Top-{args.topk})")
+  for rank, idx in enumerate(topk, start=1):
+      label = labels[idx] if idx < len(labels) else f"cls_{idx}"
+      print(f"{rank:>2d}: class={idx:<4d} prob={probs[idx]:.6f} label={label}")
+  ```
+
+  + 执行脚本：  
+  ```bash
+  python ./src/postprocess_resnet50.py --bin out/20251213_11_6_52_564388/resnet50_output_0.bin
+  ```
+  + 示例输出：  
+  ```bash
+  Decoded out/20251213_11_6_52_564388/resnet50_output_0.bin (Top-5)
+   1: class=162  prob=0.964885 label=beagle
+   2: class=161  prob=0.023230 label=basset
+   3: class=166  prob=0.006107 label=Walker_hound
+   4: class=167  prob=0.004985 label=English_foxhound
+   5: class=164  prob=0.000334 label=bluetick
+  ```
+
+
+
 
 ## 章节小结
 本章从宏观分层、转换编译、OM 结构、ACL 编程、性能与精度保障、调试工具、自动化流水线到动态 Shape 与安全实践建立了闭环。掌握这些内容后即可进入后续“边缘系统架构与部署实践”章节，扩展到多模型、多进程及系统级优化。

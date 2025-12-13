@@ -1,0 +1,34 @@
+digraph ATC_Flow_Steps {
+	rankdir=TB;
+	fontname="Microsoft YaHei";
+	labelloc="t"; label="ATC模型转换流程";
+	node [shape=box fontname="Microsoft YaHei" fontsize=12 style=filled];
+	edge [color="#555555" arrowsize=0.8];
+
+	// 主线流程 (竖向)
+    label=""; style=invis;
+    start [label="开始" shape=circle width=0.8 style=filled fillcolor="#666666" fontcolor="#ffffff"];
+    env   [label="环境准备" fillcolor="#d9e8ff" color="#7aa3e5"];
+    model [label="模型准备\n或单算子描述文件(json格式)准备" fillcolor="#d9e8ff" color="#7aa3e5"];
+    convert [label="ATC模型转换" fillcolor="#d9e8ff" color="#7aa3e5"];
+    end   [label="结束" shape=circle width=0.8 style=filled fillcolor="#666666" fontcolor="#ffffff"];
+    start -> env -> model -> convert -> end;
+
+	// 环境准备详细说明（右侧并列）
+    env_detail [label="获取ATC工具\n设置环境变量" fillcolor="#eef4ff" color="#7aa3e5"];
+
+	// 可选配置 (AIPP) 虚线框
+    aipp [label="AIPP配置（可选）" fillcolor="#e6fcff" style="filled" color="#59b3c3"];
+
+	// 对齐：让 env_detail 与 env 同一层，aipp 与 convert 同一层
+	{rank=same env env_detail}
+
+	// 侧向连接
+	env -> env_detail [color="#7aa3e5" arrowhead=normal];
+
+	{rank=same convert aipp}
+	convert -> aipp   [style=dashed color="#59b3c3" arrowhead=normal];
+
+	// 样式微调（无实际语义）
+	graph [pad=0.3 splines=true];
+}

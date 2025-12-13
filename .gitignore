@@ -210,3 +210,5 @@ node_modules
 # Ignore VuePress temporary build files (directory and all nested contents)
 src/.vuepress/.temp/
 src/.vuepress/.temp/**
+
+.history/
