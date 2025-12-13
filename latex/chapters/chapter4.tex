@@ -1,176 +1,331 @@
-\section{章节总览}\label{ux7ae0ux8282ux603bux89c8}
+昇腾310B在通用算子覆盖广度上已能满足大多数推理任务，但在以下场景，自定义算子（Custom
+Op）能显著提升功能完备性与性能确定性：模型含未支持/半支持算子、复合算子频繁导致访存过多、需要业务特化（如阈值/形态学/后处理融合）、或内置实现对特定尺寸/布局性能欠佳。第三章将给出``为什么、怎么做、如何验证与上线''的完整路径。
 
-本章以``统一流程 → 四类典型任务（分类/检测/OCR/NLP）→ 多模型 Pipeline →
-工程化目录与脚本 → 性能基线采集 →
-问题诊断''逻辑展开，强调``可复现、可量化、可演进''的部署范式。所有示例策略均可推广到后续复杂场景（多输入、多分辨率、流式/批式混合）。
+\section{算子开发概述}\label{ux7b97ux5b50ux5f00ux53d1ux6982ux8ff0}
 
-\section{统一部署工作流与契约化}\label{ux7edfux4e00ux90e8ux7f72ux5de5ux4f5cux6d41ux4e0eux5951ux7ea6ux5316}
+\begin{itemize}
+\tightlist
+\item
+  目标与收益：
 
-标准六步：模型选择 → 框架导出 ONNX → ATC 转换（参数冻结）→
-推理引擎封装（I/O 契约）→ 运行形态编排 → 验证（精度 + 性能）。
-核心产物： \textbar{} 文件 \textbar{} 作用 \textbar{} \textbar{} ----
-\textbar{} ---- \textbar{} \textbar{} export.py \textbar{} 导出 \& 简化
-ONNX \textbar{} \textbar{} atc.sh \textbar{} 标准化转换命令 \textbar{}
-\textbar{} config.yaml \textbar{} 输入/归一化/颜色/阈值 \textbar{}
-\textbar{} signature.json \textbar{} 模型输入输出字段与 dtype \textbar{}
-\textbar{} metrics.json \textbar{} 性能统计（avg/p95/memory） \textbar{}
+  \begin{itemize}
+  \tightlist
+  \item
+    功能补齐：覆盖模型图中未支持或语义差异较大的算子；
+  \item
+    性能确定性：融合多算子、减少GM\textless-\textgreater UB搬运与中间落地、利用向量化内核；
+  \item
+    工程可维护：以``算子契约''形式固化输入/输出/属性与边界行为，便于回归与复用。
+  \end{itemize}
+\item
+  执行形态：
 
-输入预处理必须模块化，业务层仅提供原始图像对象；可在 AIPP
-中下沉部分（色彩空间、均值/方差），减少 Host 侧拷贝和转换。
+  \begin{itemize}
+  \tightlist
+  \item
+    AI Core（推荐）：基于 TBE/TE/TIK 运行于 NPU 核心，适合数值密集型；
+  \item
+    AICPU（可选）：C/C++ 在 AICPU/Host
+    侧执行，适合控制流/轻量处理（注意H2D/D2H成本）。
+  \end{itemize}
+\item
+  产物要素：
 
-\section{图像分类：ResNet /
-MobileNet}\label{ux56feux50cfux5206ux7c7bresnet-mobilenet}
+  \begin{itemize}
+  \tightlist
+  \item
+    算子描述（op info/proto）：声明
+    op\_type、inputs/outputs、dtype\_format 组合、属性与形状推断；
+  \item
+    算子实现（Kernel）：TE/TIK 计算+调度或 AICPU C++ 实现；
+  \item
+    注册与打包：产物按规范放入 OPP 目录，ATC/Runtime 可发现与加载。
+  \end{itemize}
+\end{itemize}
 
-\subsection{模型导出}\label{ux6a21ux578bux5bfcux51fa}
+\section{开发的理论基础}\label{ux5f00ux53d1ux7684ux7406ux8bbaux57faux7840}
 
-PyTorch →
-ONNX：\passthrough{\lstinline!torch.onnx.export(model, dummy, opset\_version=13, dynamic\_axes=None)!}；确保去掉训练专属层（Dropout,
-BN 置 eval）。 \#\#\# 预处理一致性 1. Resize: 保持短边 256 → CenterCrop
-224。 2. Normalize: mean/std 与训练保持一致。 3. Layout:
-NCHW；若原始图像为 HWC(RGB) → 转 BGR/或保持一致并在 config 标记。 \#\#\#
-转换要点
-\passthrough{\lstinline!--precision\_mode=allow\_fp32\_to\_fp16!}；若需
-INT8：先做离线标定导出校准表，再加量化参数。 \#\#\# 推理后处理 Softmax →
-ArgTopK → LabelMap。为避免数值不稳定：FP16 logits 可先转 FP32 再
-softmax。 \#\#\# 性能采集 Warmup 5 次，采集 100 次：记录 avg, p50, p95,
-max；统计预处理耗时占比：\passthrough{\lstinline!pre\_ms / total\_ms!}，超过
-25\% 提示 AIPP 下沉或批处理优化。
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\tightlist
+\item
+  硬件与存储层次：
+\end{enumerate}
 
-\section{目标检测：YOLO /
-FasterRCNN}\label{ux76eeux6807ux68c0ux6d4byolo-fasterrcnn}
+\begin{itemize}
+\tightlist
+\item
+  GM（Global Memory）：容量大、带宽高；
+\item
+  UB（Unified Buffer）：片上高速缓存，容量有限；
+\item
+  DMA：GM↔UB 的数据搬运，偏好大块连续传输；
+\item
+  向量/标量单元：支持vadd/vmul/vmax等，需数据对齐（常见16/32）。
+\end{itemize}
 
-\subsection{输入尺寸与
-Letterbox}\label{ux8f93ux5165ux5c3aux5bf8ux4e0e-letterbox}
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{1}
+\tightlist
+\item
+  计算表达与调度：
+\end{enumerate}
 
-Letterbox 使图像等比例缩放 +
-填充，保持方形输入。部署需重现训练阶段相同逻辑，否则框坐标偏移。保存
-\passthrough{\lstinline!scale!} 与 \passthrough{\lstinline!pad!}
-用于反算原始坐标。 \#\#\# 多输出解析 YOLOv5s OM
-输出通常包含一个或多个特征拼接张量：\passthrough{\lstinline!(num\_boxes, attributes)!}；后处理：过滤
-conf \textgreater{} 阈值 → 按类合并 → NMS。 \#\#\# NMS 实现决策
-\textbar{} 方案 \textbar{} 优点 \textbar{} 缺点 \textbar{} \textbar{}
----- \textbar{} ---- \textbar{} ---- \textbar{} \textbar{} CPU Python
-\textbar{} 简单 \textbar{} 高开销，多框场景慢 \textbar{} \textbar{} CPU
-C++ SIMD \textbar{} 中等复杂 \textbar{} 仍需 D2H 拷贝 \textbar{}
-\textbar{} Device Kernel \textbar{} 减少拷贝 \textbar{} 实现复杂
-\textbar{} 先评估 D2H + CPU NMS 占比，\textgreater15\% 再考虑下沉。
-\#\#\# 动态尺度支持 转换阶段可生成多尺度 OM 或使用动态
-shape；推荐：统计输入分辨率 → 选择 3 桶（640/704/768）提升命中率。
+\begin{itemize}
+\tightlist
+\item
+  TE（Tensor Expression）描述计算公式；Schedule 负责
+  tile/并行/向量化/缓存；
+\item
+  TIK 提供更贴近硬件的 DSL，便于精细控制 DMA 与 UB 管理；
+\item
+  目标：以较少的GM往返在UB内完成尽可能多的计算，提升算子算子效率与吞吐。
+\end{itemize}
 
-\section{OCR：文本检测 + 识别
-Pipeline}\label{ocrux6587ux672cux68c0ux6d4b-ux8bc6ux522b-pipeline}
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{2}
+\tightlist
+\item
+  算子契约（Operator Contract）：
+\end{enumerate}
 
-\subsection{结构}\label{ux7ed3ux6784}
+\begin{itemize}
+\tightlist
+\item
+  输入/输出张量的
+  shape、dtype、layout（NCHW/NC1HWC0等）、属性（如alpha、mode）；
+\item
+  广播与对齐规则、边界行为（溢出/饱和/舍入）、精度策略（FP16/FP32混合）；
+\item
+  动态shape与静态shape：实现需覆盖契约内的形状组合并保证UB不溢出。
+\end{itemize}
 
-检测模型（DB） → 文本框多边形 → 透视裁剪 → 识别模型（CRNN / SVTR）。
-\#\#\# 难点与策略 \textbar{} 环节 \textbar{} 风险 \textbar{} 对策
-\textbar{} \textbar{} ---- \textbar{} ---- \textbar{} ---- \textbar{}
-\textbar{} 多边形裁剪 \textbar{} 仿射失真 \textbar{} 统一仿射矩阵 +
-padding \textbar{} \textbar{} 长短文本差异 \textbar{} 序列长度不均
-\textbar{} 动态 Batch 分组（长度分桶） \textbar{} \textbar{} 识别延迟
-\textbar{} 串行处理 \textbar{} 检测与上一批识别并行 \textbar{}
-\textbar{} 字典映射 \textbar{} 乱码/对齐 \textbar{} 固定 vocab + 版本号
-\textbar{} \#\#\# CTC 解码 贪心：移除重复与 blank；大规模需 Beam
-Search（权衡性能）。
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi})}
+\setcounter{enumi}{3}
+\tightlist
+\item
+  数值与精度：
+\end{enumerate}
 
-\section{NLP：BERT 推理优化}\label{nlpbert-ux63a8ux7406ux4f18ux5316}
+\begin{itemize}
+\tightlist
+\item
+  FP16 常用于 310B 推理通路；必要时在关键步骤采用临时 FP32 计算再回写；
+\item
+  误差控制：选择合适的舍入策略，避免饱和/下溢导致NAN/INF。
+\end{itemize}
 
-\subsection{序列长度策略}\label{ux5e8fux5217ux957fux5ea6ux7b56ux7565}
+\section{开发流程（AI Core
+路线）}\label{ux5f00ux53d1ux6d41ux7a0bai-core-ux8defux7ebf}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  静态最大长度（简单，浪费算力）。
-\item
-  Bucketing：按输入长短分类（32/64/128/256），多 OM。
-\item
-  动态 shape：需评估内存分配抖动；提前预热各常见长度。 \#\#\# FP16
-  注意点 LayerNorm/Softmax 数值范围敏感；若发现精度下降：保持部分算子
-  FP32（通过混合精度策略或模型修改）。 \#\#\# 性能指标
-  tokens/s、avg\_latency\_ms（batch=1 与
-  batch\textgreater1）、内存占用；观察自注意力占比，必要时进行剪枝（去除冗余
-  head）或蒸馏。
+  环境准备与约束
 \end{enumerate}
 
-\section{多模型 Pipeline
-串联}\label{ux591aux6a21ux578b-pipeline-ux4e32ux8054}
+\begin{itemize}
+\tightlist
+\item
+  安装 CANN/Toolkit 并确认 \passthrough{\lstinline!atc --version!}
+  正常；
+\item
+  设置环境变量：\passthrough{\lstinline!ASCEND\_INSTALL\_PATH!}、\passthrough{\lstinline!ASCEND\_OPP\_PATH!}；
+\item
+  目标芯片：\passthrough{\lstinline!soc\_version=Ascend310B!}；优先使用
+  FP16 与硬件友好布局（如NC1HWC0）。
+\end{itemize}
 
-案例：检测 → 裁剪 → 分类。 \textbar{} Stage \textbar{} 输入/输出
-\textbar{} 并行策略 \textbar{} 指标采集 \textbar{} \textbar{} -----
-\textbar{} -------- \textbar{} -------- \textbar{} -------- \textbar{}
-\textbar{} Detector \textbar{} 原始帧 → 框 \textbar{} 批处理+单模型
-\textbar{} 时延/框数 \textbar{} \textbar{} Cropper \textbar{} 帧+框 →
-Patch 列表 \textbar{} 多线程 CPU \textbar{} 单 Patch 平均耗时 \textbar{}
-\textbar{} Classifier \textbar{} Patch → TopK 类别 \textbar{} 合批
-(N≤32) \textbar{} FPS/准确率 \textbar{} \#\#\# 优化要点 1. Buffer
-池：重用图像与 Patch 内存，避免频繁 malloc。 2. 批量裁剪：收集一定数量
-Patch 再统一预处理。 3. 超时控制：某帧超过阈值后续结果丢弃，保持实时性。
-4. 滑窗统计：最近 60s FPS、平均队列深度。
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{1}
+\tightlist
+\item
+  定义算子信息（op info/proto）
+\end{enumerate}
 
-\section{工程目录与脚本标准}\label{ux5de5ux7a0bux76eeux5f55ux4e0eux811aux672cux6807ux51c6}
+\begin{itemize}
+\tightlist
+\item
+  声明 \passthrough{\lstinline!op\_type!}、inputs/outputs
+  名称与数量、可支持的 \passthrough{\lstinline!dtype\_format!}
+  组合、属性与默认值；
+\item
+  提供形状推断规则（静态或依据属性/输入维度计算）。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{2}
+\tightlist
+\item
+  编写算子实现（TE/TBE/TIK）
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  计算表达（示例：Add+ReLU 融合伪代码）：
+\end{itemize}
 
 \begin{lstlisting}
-deploy/
-  classify/
-    export.py
-    atc.sh
-    config.yaml
-  detect/
-    export.py
-    atc.sh
-  ocr/
-    export_det.py
-    export_rec.py
-    atc_det.sh
-    atc_rec.sh
-runtime/
-  core/acl_session.cpp
-  preprocess/
-  postprocess/
-  pipelines/
-tests/
-  data/
-  benchmark/
-docs/
-  model_cards/
+# y = relu(x1 + x2)
+import te.lang.cce as tbe
+from te import tvm
+
+def add_relu_compute(x1, x2):
+        y = tbe.vadd(x1, x2)
+        z = tbe.vmaxs(y, tvm.const(0.0, x1.dtype))
+        return z
 \end{lstlisting}
 
-版本归档要求： \textbar{} 产物 \textbar{} 检查点 \textbar{} \textbar{}
----- \textbar{} ------- \textbar{} \textbar{} *.om \textbar{} 与 atc.log
-hash 对应 \textbar{} \textbar{} signature.json \textbar{}
-与运行时动态查询一致 \textbar{} \textbar{} metrics.json \textbar{}
-包含时间戳/commit\_sha \textbar{} \textbar{} model\_card.md \textbar{}
-模型来源/License/精度 \textbar{}
+\begin{itemize}
+\tightlist
+\item
+  调度要点：
 
-\section{性能基线方法与统计置信}\label{ux6027ux80fdux57faux7ebfux65b9ux6cd5ux4e0eux7edfux8ba1ux7f6eux4fe1}
+  \begin{itemize}
+  \tightlist
+  \item
+    Tile 到 UB 容量可承载的块大小；
+  \item
+    连续向量访问，减少非对齐；
+  \item
+    合并搬运，避免频繁小块 DMA；
+  \item
+    小尺寸路径避免调度开销超过计算开销。
+  \end{itemize}
+\end{itemize}
 
-推荐： 1. Warmup 5\textasciitilde10 次； 2. 收集 ≥200 次稳定样本； 3.
-计算 avg, p50, p95, p99； 4.
-计算置信区间：\passthrough{\lstinline!mean ± 1.96 * (std/sqrt(n))!}； 5.
-记录环境：芯片序列号/温度区间/电源模式/版本矩阵。 差异判定：新版本 avg
-降低 \textgreater5\% 或 p95 上升 \textgreater8\% 触发报警分析。
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{3}
+\tightlist
+\item
+  编译与注册
+\end{enumerate}
 
-\section{常见问题诊断深度版}\label{ux5e38ux89c1ux95eeux9898ux8bcaux65adux6df1ux5ea6ux7248}
+\begin{itemize}
+\tightlist
+\item
+  使用 Toolkit 提供的编译入口生成 kernel 与元数据；
+\item
+  将实现与描述文件放入 \passthrough{\lstinline!ASCEND\_OPP\_PATH!} 下
+  custom 目录（如
+  \passthrough{\lstinline!op\_impl/custom/ai\_core/tbe!}、\passthrough{\lstinline!op\_proto/custom!}）。
+\end{itemize}
 
-\begin{longtable}[]{@{}llll@{}}
-\toprule\noalign{}
-问题 & 表现 & 诊断步骤 & 修复 \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-输出全 0 & logits 恒定 & Dump 中间 tensor & 校验预处理/权重损坏 \\
-检测框偏移 & 坐标不准 & 可视化缩放/Pad 参数 & 修正 letterbox 逆变换 \\
-OCR 乱码 & 字符错位 & 对比 index→char 映射 & 统一 vocab \& 排序 \\
-BERT 性能差 & tokens/s 低 & 分析长度分布 & 分桶/裁剪长度 \\
-Pipeline 堵塞 & 帧延迟增长 & 监控队列深度 & 降帧/扩线程池 \\
-内存持续上涨 & long run OOM & 内存快照/工具 & 释放缓存/池化 \\
-\end{longtable}
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{4}
+\tightlist
+\item
+  与 ATC 集成
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  转换模型时指定 \passthrough{\lstinline!--soc\_version=Ascend310B!}；
+\item
+  确保 OPP 路径可被 ATC 读取，必要时调整
+  \passthrough{\lstinline!--op\_select\_implmode!}；
+\item
+  转换日志中应能看到自定义算子被匹配与编译。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{5}
+\tightlist
+\item
+  运行时部署
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  目标环境包含同版本 OPP（含 custom 产物）；
+\item
+  设置环境变量使 Runtime 能定位到自定义实现；
+\item
+  按常规 ACL 流程加载 OM 并执行推理。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{6}
+\tightlist
+\item
+  验证与度量
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  功能：与 NumPy/ONNX
+  参考实现对齐，随机多组张量比较（平均绝对/相对误差、边界样本）；
+\item
+  性能：Warmup≥3 次，采样≥50 次，统计 avg/p95/FPS；
+\item
+  资源：Profiling 检查 MemCopy 占比、Kernel 占比、Idle；
+\item
+  兼容：覆盖不同 shape/dtype/layout 组合。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{7}
+\tightlist
+\item
+  打包与版本化
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  输出 \passthrough{\lstinline!op\_contract.yaml!}（契约）与
+  \passthrough{\lstinline!benchmark.json!}（性能）；
+\item
+  目录建议：
+\end{itemize}
+
+\begin{lstlisting}
+op_pkg/<op_type>/<version>/
+    ├─ op_proto/custom/
+    ├─ op_impl/custom/ai_core/tbe/
+    ├─ tests/
+    └─ docs/
+\end{lstlisting}
+
+\section{常见问题与排查}\label{ux5e38ux89c1ux95eeux9898ux4e0eux6392ux67e5}
+
+\begin{itemize}
+\tightlist
+\item
+  ATC 提示 Unsupported Op：检查 op 描述是否生效、路径与
+  \passthrough{\lstinline!soc\_version!} 是否匹配；
+\item
+  运行时回退（fallback）：确认 \passthrough{\lstinline!dtype\_format!}
+  覆盖到当前张量组合；
+\item
+  性能无提升：检查是否出现额外 layout 转换、tile 过小造成 DMA 频繁；
+\item
+  精度异常：核对归一化/广播规则、溢出与舍入策略，必要时局部切 FP32；
+\item
+  动态 shape OOM：缩小 tile 或分桶处理，保证 UB 与工作区不溢出。
+\end{itemize}
 
 \section{章节小结}\label{ux7ae0ux8282ux5c0fux7ed3}
 
-本章提供四类典型任务部署详解，并抽象了跨任务可复用的脚手架与性能度量方法。重点在于``输入契约统一''、``阶段解耦''、``可观察性内建''。掌握后可进入性能与算子优化专题。
+自定义算子是 310B
+场景下实现``功能补齐与性能确定性''的关键手段。遵循``明确契约 → 正确调度
+→ 可观测验证 →
+规范打包''的路径，选择计算/访存比例合适、出现频繁的目标起步，先易后难、以基线与回归保障质量与收益的可持续。
 
 \section{实践任务}\label{ux5b9eux8df5ux4efbux52a1}
 
@@ -178,14 +333,17 @@ Pipeline 堵塞 & 帧延迟增长 & 监控队列深度 & 降帧/扩线程池 \\
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  部署 ResNet50：输出 Top5 及概率、提交 metrics.json。
+  选择你项目中的一个复合算子（例如归一化+阈值），写出算子契约草案（IO/attr/dtype\_format/边界）。
 \item
-  部署 YOLOv5s：5 张测试图片生成可视化结果（描述框坐标与类别统计）。
+  基于 TE 写出该算子的计算表达伪代码，并说明预期的 tile 与向量化策略。
 \item
-  构建 OCR 双模型流水线：统计单帧平均文本块数 + 平均识别耗时。
+  在开发环境完成编译注册，将产物放入 OPP custom 目录并用一个最小模型验证
+  ATC 识别。
 \item
-  BERT：对 3 组长度(32/64/128) 测 tokens/s 与时延差异，生成对比表。
+  设计功能与性能验证脚本：随机张量对齐、Warmup/采样策略、输出 avg/p95
+  与资源占比。
 \item
-  Pipeline 检测→分类：实现批裁剪 + Buffer
-  池，比较优化前后平均时延下降百分比。
+  生成 \passthrough{\lstinline!op\_contract.yaml!} 与
+  \passthrough{\lstinline!benchmark.json!}，并归档到
+  \passthrough{\lstinline!op\_pkg/<op\_type>/<version>/!}。
 \end{enumerate}
