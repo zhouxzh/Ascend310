@@ -1,5 +1,5 @@
 ---
-title: "第3讲：昇腾310B算子开发基础"
+title: "第3讲：昇腾PyTorch扩展迁移基础"
 author: [周贤中]
 date: 2025-09-04
 subject: "Markdown"
@@ -7,119 +7,145 @@ keywords: [边缘计算, 算子]
 lang: zh-cn
 ---
 
-昇腾310B在通用算子覆盖广度上已能满足大多数推理任务，但在以下场景，自定义算子（Custom Op）能显著提升功能完备性与性能确定性：模型含未支持/半支持算子、复合算子频繁导致访存过多、需要业务特化（如阈值/形态学/后处理融合）、或内置实现对特定尺寸/布局性能欠佳。第三章将给出“为什么、怎么做、如何验证与上线”的完整路径。
+## PyTorch简介
 
-## 算子开发概述
+PyTorch 是一个以动态计算图著称的深度学习框架，核心由灵活的张量运算和自动微分系统构成。其 eager execution 模式让调试、可视化与原型迭代更加直观；TorchScript 则支持图模式部署，兼顾性能与可移植性。配合丰富的 torchvision、torchaudio、torchtext 等生态包，用户可以快速在计算机视觉、语音、自然语言处理等任务上构建端到端管线。-+-+-+-+-+
 
-- 目标与收益：
-	- 功能补齐：覆盖模型图中未支持或语义差异较大的算子；
-	- 性能确定性：融合多算子、减少GM<->UB搬运与中间落地、利用向量化内核；
-	- 工程可维护：以“算子契约”形式固化输入/输出/属性与边界行为，便于回归与复用。
-- 执行形态：
-	- AI Core（推荐）：基于 TBE/TE/TIK 运行于 NPU 核心，适合数值密集型；
-	- AICPU（可选）：C/C++ 在 AICPU/Host 侧执行，适合控制流/轻量处理（注意H2D/D2H成本）。
-- 产物要素：
-	- 算子描述（op info/proto）：声明 op_type、inputs/outputs、dtype_format 组合、属性与形状推断；
-	- 算子实现（Kernel）：TE/TIK 计算+调度或 AICPU C++ 实现；
-	- 注册与打包：产物按规范放入 OPP 目录，ATC/Runtime 可发现与加载。
+## Ascend Extension for PyTorch 概览
 
-## 开发的理论基础
+Ascend Extension for PyTorch是华为昇腾面向PyTorch用户提供的深度学习适配框架。通过该插件，PyTorch可无缝调用昇腾AI处理器的算力，继承原生PyTorch生态接口，同时针对昇腾NPU在算子、通信和调度上的特性做了深度优化。项目源码可在官方仓库查阅，更多社区资讯可前往昇腾社区获取。
 
-1) 硬件与存储层次：
-- GM（Global Memory）：容量大、带宽高；
-- UB（Unified Buffer）：片上高速缓存，容量有限；
-- DMA：GM↔UB 的数据搬运，偏好大块连续传输；
-- 向量/标量单元：支持vadd/vmul/vmax等，需数据对齐（常见16/32）。
+## 架构速览
 
-2) 计算表达与调度：
-- TE（Tensor Expression）描述计算公式；Schedule 负责 tile/并行/向量化/缓存；
-- TIK 提供更贴近硬件的 DSL，便于精细控制 DMA 与 UB 管理；
-- 目标：以较少的GM往返在UB内完成尽可能多的计算，提升算子算子效率与吞吐。
+整体架构可概括为“PyTorch前端 + torch_npu中间层 + 昇腾算子后端”。图1展示了其分层设计：PyTorch前端将动态图、自动微分、优化器等能力暴露给开发者；`torch_npu` 负责对接CANN算子库、通信库以及运行时；底层由昇腾AI处理器提供硬件加速。理解这一层次关系有助于在故障排查时迅速定位问题。
 
-3) 算子契约（Operator Contract）：
-- 输入/输出张量的 shape、dtype、layout（NCHW/NC1HWC0等）、属性（如alpha、mode）；
-- 广播与对齐规则、边界行为（溢出/饱和/舍入）、精度策略（FP16/FP32混合）；
-- 动态shape与静态shape：实现需覆盖契约内的形状组合并保证UB不溢出。
+## 核心能力纵览
 
-4) 数值与精度：
-- FP16 常用于 310B 推理通路；必要时在关键步骤采用临时 FP32 计算再回写；
-- 误差控制：选择合适的舍入策略，避免饱和/下溢导致NAN/INF。
+插件在多个维度增强了PyTorch在昇腾平台的体验：
 
-## 开发流程（AI Core 路线）
+- **算子与生态适配**：基于开源PyTorch实现对昇腾AI处理器的深度定制，持续补齐主流算子与第三方库，保证常见模型脚本可直接迁移。
+- **训练基础设施**：保持动态图、自动微分、优化器与Profiling等特性，与原生PyTorch保持一致，降低学习成本。
+- **自定义算子扩展**：为算子开发者提供接口，可在PyTorch框架内快速集成自研算子。
+- **分布式通信**：内置Broadcast、AllReduce等集合通信原语，覆盖单机多卡与多机多卡场景。
+- **推理链路**：模型可导出ONNX，再借助离线转换工具生成适配昇腾的推理模型，便于训练—推理一体化交付。
 
-1. 环境准备与约束
-- 安装 CANN/Toolkit 并确认 `atc --version` 正常；
-- 设置环境变量：`ASCEND_INSTALL_PATH`、`ASCEND_OPP_PATH`；
-- 目标芯片：`soc_version=Ascend310B`；优先使用 FP16 与硬件友好布局（如NC1HWC0）。
+## 环境准备
 
-2. 定义算子信息（op info/proto）
-- 声明 `op_type`、inputs/outputs 名称与数量、可支持的 `dtype_format` 组合、属性与默认值；
-- 提供形状推断规则（静态或依据属性/输入维度计算）。
+本章以Atlas 800T A2训练服务器为例。部署流程包括：安装匹配版本的驱动与固件，参考《CANN 软件安装指南》（商用/社区版）进行离线安装，安装方式选择“在物理机上安装”，业务场景选择“训练&推理&开发调试”。操作系统需满足兼容性要求，可通过兼容性查询助手确认。完成基础环境后，按照《Ascend Extension for PyTorch 软件安装指南》部署PyTorch及 `torch_npu` 插件。
 
-3. 编写算子实现（TE/TBE/TIK）
-- 计算表达（示例：Add+ReLU 融合伪代码）：
-```
-# y = relu(x1 + x2)
-import te.lang.cce as tbe
-from te import tvm
+## 脚本迁移示例：MNIST CNN
 
-def add_relu_compute(x1, x2):
-		y = tbe.vadd(x1, x2)
-		z = tbe.vmaxs(y, tvm.const(0.0, x1.dtype))
-		return z
-```
-- 调度要点：
-	- Tile 到 UB 容量可承载的块大小；
-	- 连续向量访问，减少非对齐；
-	- 合并搬运，避免频繁小块 DMA；
-	- 小尺寸路径避免调度开销超过计算开销。
+下面的示例演示如何把一个GPU版MNIST卷积网络脚本迁移到昇腾NPU。示例采用自动迁移与混合精度策略，适合快速体验。
 
-4. 编译与注册
-- 使用 Toolkit 提供的编译入口生成 kernel 与元数据；
-- 将实现与描述文件放入 `ASCEND_OPP_PATH` 下 custom 目录（如 `op_impl/custom/ai_core/tbe`、`op_proto/custom`）。
+### 基准脚本
 
-5. 与 ATC 集成
-- 转换模型时指定 `--soc_version=Ascend310B`；
-- 确保 OPP 路径可被 ATC 读取，必要时调整 `--op_select_implmode`；
-- 转换日志中应能看到自定义算子被匹配与编译。
+首先准备原始GPU脚本 `train.py`：
 
-6. 运行时部署
-- 目标环境包含同版本 OPP（含 custom 产物）；
-- 设置环境变量使 Runtime 能定位到自定义实现；
-- 按常规 ACL 流程加载 OM 并执行推理。
+```python
+import time
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+import torchvision
 
-7. 验证与度量
-- 功能：与 NumPy/ONNX 参考实现对齐，随机多组张量比较（平均绝对/相对误差、边界样本）；
-- 性能：Warmup≥3 次，采样≥50 次，统计 avg/p95/FPS；
-- 资源：Profiling 检查 MemCopy 占比、Kernel 占比、Idle；
-- 兼容：覆盖不同 shape/dtype/layout 组合。
+device = torch.device('cuda:0')
 
-8. 打包与版本化
-- 输出 `op_contract.yaml`（契约）与 `benchmark.json`（性能）；
-- 目录建议：
-```
-op_pkg/<op_type>/<version>/
-	├─ op_proto/custom/
-	├─ op_impl/custom/ai_core/tbe/
-	├─ tests/
-	└─ docs/
+class CNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(1, 16, 3, 1, 1),
+            nn.MaxPool2d(2),
+            nn.Conv2d(16, 32, 3, 1, 1),
+            nn.MaxPool2d(2),
+            nn.Flatten(),
+            nn.Linear(32 * 7 * 7, 16),
+            nn.ReLU(),
+            nn.Linear(16, 10)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+train_data = torchvision.datasets.MNIST(
+    root='mnist',
+    download=True,
+    train=True,
+    transform=torchvision.transforms.ToTensor()
+)
+
+batch_size = 64
+model = CNN().to(device)
+train_dataloader = DataLoader(train_data, batch_size=batch_size)
+loss_func = nn.CrossEntropyLoss().to(device)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+epochs = 10
+
+for epoch in range(epochs):
+    for imgs, labels in train_dataloader:
+        imgs = imgs.to(device)
+        labels = labels.to(device)
+        outputs = model(imgs)
+        loss = loss_func(outputs, labels)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+torch.save({
+    'epoch': epochs,
+    'arch': CNN,
+    'state_dict': model.state_dict(),
+    'optimizer': optimizer.state_dict(),
+}, 'checkpoint.pth.tar')
 ```
 
-## 常见问题与排查
+### 启用昇腾算力
 
-- ATC 提示 Unsupported Op：检查 op 描述是否生效、路径与 `soc_version` 是否匹配；
-- 运行时回退（fallback）：确认 `dtype_format` 覆盖到当前张量组合；
-- 性能无提升：检查是否出现额外 layout 转换、tile 过小造成 DMA 频繁；
-- 精度异常：核对归一化/广播规则、溢出与舍入策略，必要时局部切 FP32；
-- 动态 shape OOM：缩小 tile 或分桶处理，保证 UB 与工作区不溢出。
+将运行设备切换到NPU，并引入 `torch_npu` 自动迁移工具。若使用Atlas训练系列（如Atlas 800T），建议开启混合精度；Atlas A2/A3系列可按需求决定。
 
-## 章节小结
-自定义算子是 310B 场景下实现“功能补齐与性能确定性”的关键手段。遵循“明确契约 → 正确调度 → 可观测验证 → 规范打包”的路径，选择计算/访存比例合适、出现频繁的目标起步，先易后难、以基线与回归保障质量与收益的可持续。
+```python
+import torch_npu
+from torch_npu.npu import amp
+from torch_npu.contrib import transfer_to_npu
 
-## 实践任务
-1. 选择你项目中的一个复合算子（例如归一化+阈值），写出算子契约草案（IO/attr/dtype_format/边界）。
-2. 基于 TE 写出该算子的计算表达伪代码，并说明预期的 tile 与向量化策略。
-3. 在开发环境完成编译注册，将产物放入 OPP custom 目录并用一个最小模型验证 ATC 识别。
-4. 设计功能与性能验证脚本：随机张量对齐、Warmup/采样策略、输出 avg/p95 与资源占比。
-5. 生成 `op_contract.yaml` 与 `benchmark.json`，并归档到 `op_pkg/<op_type>/<version>/`。
+device = torch.device('npu:0')
+transfer_to_npu(model)
+```
 
+若未启用自动迁移，可参考《PyTorch 训练模型迁移调优指南》的“手工迁移”章节逐一调整算子。
+
+### 配置AMP与GradScaler
+
+在模型与优化器定义完成后，实例化 `GradScaler` 用于自动Loss Scale管理：
+
+```python
+loss_func = nn.CrossEntropyLoss().to(device)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+scaler = amp.GradScaler()
+```
+
+### NPU训练主循环
+
+将原循环替换为包含 `amp.autocast()` 与 `GradScaler` 的版本，实现混合精度训练以及自动unscale。
+
+```python
+for epoch in range(epochs):
+    for imgs, labels in train_dataloader:
+        imgs = imgs.to(device)
+        labels = labels.to(device)
+        with amp.autocast():
+            outputs = model(imgs)
+            loss = loss_func(outputs, labels)
+        optimizer.zero_grad()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+```
+
+### 启动训练与产出
+
+执行 `python3 train.py` 即可启动在昇腾NPU上的训练。生成的 `checkpoint.pth.tar` 权重文件意味着迁移流程完成。Atlas训练系列需要混合精度支持才能充分发挥算力；若在Atlas A2/A3平台，可根据模型稳定性决定是否启用AMP。
+
+## 进阶阅读
+
+更多迁移调优技巧可参见《PyTorch 训练模型迁移调优指南》。若计划扩展到大模型或多模态场景，可进一步阅读如下材料：分布式训练可参考《分布式训练加速库迁移指南》，大语言模型可结合MindSpeed LLM套件文档，多模态任务可查阅MindSpeed MM迁移指南，而强化学习/多模态联训可阅读MindSpeed RL使用指南。

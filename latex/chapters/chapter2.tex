@@ -154,51 +154,523 @@ AIPP（Artificial Intelligence
 Pre-Processing）配置。AIPP是昇腾处理器内置的硬件级图像预处理模块，负责将上游（如
 DVPP）输出的对齐后YUV420SP图像在设备侧完成色域转换（如YUV图像格式转换为RGB或者BGR图像格式）、归一化（减均值/乘系数/尺度放大）与抠图（在指定起始点裁剪到模型输入尺寸），从而把原始图像规范化为模型所需的输入格式与数值范围。由于昇腾310B在推理及训练中常以DVPP输出YUV420SP图片格式，这种图像格式是有损图像颜色编码格式，常用为YUV420SP\_UV、YUV420SP\_VU两种格式，不直接提供RGB图片。AIPP能将YUV420SP类型图像无缝转化为模型期望的RGB/BGR图像格式，并在同一数据流中完成裁剪与数值处理，避免将预处理放在CPU侧导致的多次拷贝与额外时延，提升端到端吞吐与能效。
 
-典型命令（以 ResNet50 为例，支持 FP16）：
+\subsubsection{模型转换-以ResNet50为例}\label{ux6a21ux578bux8f6cux6362-ux4ee5resnet50ux4e3aux4f8b}
 
-\begin{lstlisting}
+ResNet-50 由多级残差单元堆叠形成 50
+层卷积网络，通过跨层跳连缓解深层退化与梯度消失，使其在 ImageNet
+等大规模数据集上具备稳定的特征表达与分类精度，因此常被选作各类视觉任务的通用骨干。要在昇腾
+310B 上部署该模型，需要借助 ATC 将 ONNX 版本转换为
+OM，可参考华为昇腾官方示例仓库（https://github.com/Ascend/samples/tree/master/inference/modelInference/sampleResnetQuickStart）。为方便快速复现，可按以下步骤从零搭建工程：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  在昇腾 310B 的 \passthrough{\lstinline!Documents!} 目录创建
+  \passthrough{\lstinline!sample\_resnet\_quick\_start!}，并划分
+  \passthrough{\lstinline!data!}、\passthrough{\lstinline!model!}、\passthrough{\lstinline!out!}、\passthrough{\lstinline!src!}
+  四个子目录用于存放测试图片、模型、脚本与源码：
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+cd ~/Documents
+mkdir -p sample_resnet_quick_start/{data,model,out,src}
+cd sample_resnet_quick_start
+\end{lstlisting}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{1}
+\tightlist
+\item
+  下载示例图片至 \passthrough{\lstinline!data!} 目录：
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+cd ~/Documents/sample_resnet_quick_start/data
+wget https://obs-9be7.obs.cn-east-2.myhuaweicloud.com/models/aclsample/dog1_1024_683.jpg
+\end{lstlisting}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{2}
+\tightlist
+\item
+  进入 \passthrough{\lstinline!model!} 目录获取 ResNet-50 ONNX 模型：
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+cd ~/Documents/sample_resnet_quick_start/model
+wget https://obs-9be7.obs.cn-east-2.myhuaweicloud.com/003_Atc_Models/resnet50/resnet50.onnx
+\end{lstlisting}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{3}
+\tightlist
+\item
+  设置编译并行度后执行典型 ATC 命令，生成适配昇腾 310B4 的 OM 文件：
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+export TE_PARALLEL_COMPILER=1
+export MAX_COMPILE_CORE_NUMBER=1
 atc \
   --model=resnet50.onnx \
   --framework=5 \
-  --output=resnet50_fp16 \
-  --input_format=NCHW \
-  --input_shape="input:1,3,224,224" \
-  --soc_version=Ascend310B \
-  --precision_mode=allow_fp32_to_fp16 \
-  --op_select_implmode=high_performance \
-  --log=info \
-  --insert_op_conf=aipp.cfg
+  --output=resnet50 \
+  --input_shape="actual_input_1:1,3,224,224" \
+  --soc_version=Ascend310B4
 \end{lstlisting}
 
-关键参数说明： \textbar{} 参数 \textbar{} 作用 \textbar{} 注意事项
-\textbar{} \textbar{} ---- \textbar{} ---- \textbar{} --------
+\textbf{关键参数说明} \textbar{} 参数 \textbar{} 作用 \textbar{}
+注意事项 \textbar{} \textbar{} ---- \textbar{} ---- \textbar{} --------
 \textbar{} \textbar{} \passthrough{\lstinline!--framework!} \textbar{}
-输入框架类型 (5=ONNX) \textbar{} 与实际导出一致，否则形状推理异常
-\textbar{} \textbar{} \passthrough{\lstinline!--input\_shape!}
-\textbar{} 静态 shape 指定 \textbar{} 多输入以逗号分隔
-\passthrough{\lstinline!in1:1,3,224,224;in2:1,128!} \textbar{}
-\textbar{} \passthrough{\lstinline!--dynamic\_batch\_size!} \textbar{}
-动态 Batch \textbar{} 与 \passthrough{\lstinline!--input\_shape!}
-不能混用静态冲突 \textbar{} \textbar{}
-\passthrough{\lstinline!--dynamic\_image\_size!} \textbar{} 动态分辨率
-\textbar{} YOLO 等多尺度部署 \textbar{} \textbar{}
-\passthrough{\lstinline!--precision\_mode!} \textbar{} 精度策略
-\textbar{}
-\passthrough{\lstinline!allow\_mix\_precision!}、\passthrough{\lstinline!allow\_fp32\_to\_fp16!}
+指定原始模型框架 \textbar{}
+0=Caffe，1=MindSpore，3=TensorFlow，5=ONNX，需与导出框架一致 \textbar{}
+\textbar{} \passthrough{\lstinline!--input\_shape!} \textbar{}
+定义静态输入 Shape \textbar{} 按
+\passthrough{\lstinline!"name:n,c,h,w"!}
+写法，字符串需加引号；动态改用区间或配合动态参数 \textbar{} \textbar{}
+\passthrough{\lstinline!--dynamic\_batch\_size!} \textbar{} 设置可选
+Batch 列表 \textbar{} 以 \passthrough{\lstinline!"1,4,8"!}
+形式填写；与同一输入的完全静态 shape 互斥 \textbar{} \textbar{}
+\passthrough{\lstinline!--dynamic\_image\_size!} \textbar{}
+配置多分辨率输入 \textbar{}
+\passthrough{\lstinline!"h1,w1;h2,w2"!}，常用于多尺度检测；需与模型实际支持一致
+\textbar{} \textbar{} \passthrough{\lstinline!--precision\_mode!}
+\textbar{} 控制混合精度策略 \textbar{}
+常用值：\passthrough{\lstinline!force\_fp16!}、\passthrough{\lstinline!allow\_mix\_precision!}、\passthrough{\lstinline!allow\_fp32\_to\_fp16!}，需兼顾精度
 \textbar{} \textbar{} \passthrough{\lstinline!--soc\_version!}
-\textbar{} 硬件目标 \textbar{} 与实际芯片匹配；310B 与 310P 不可混淆
-\textbar{} \textbar{} \passthrough{\lstinline!--insert\_op\_conf!}
-\textbar{} AIPP(预处理) \textbar{} 可下沉色彩空间转换、均值/方差
+\textbar{} 选择目标芯片 \textbar{}
+例：\passthrough{\lstinline!Ascend310B4!}，可通过
+\passthrough{\lstinline!npu-smi info!} 查询；310B/P 区分清楚 \textbar{}
+\textbar{} \passthrough{\lstinline!--insert\_op\_conf!} \textbar{} 下沉
+AIPP/自定义算子 \textbar{} 指定 JSON/YAML，支持色域转换、归一化等预处理
 \textbar{} \textbar{} \passthrough{\lstinline!--op\_select\_implmode!}
-\textbar{} 算子实现优先级 \textbar{}
-\passthrough{\lstinline!high\_precision!} vs
-\passthrough{\lstinline!high\_performance!} \textbar{} \textbar{}
-\passthrough{\lstinline!--input\_format!} \textbar{} 模型输入排布
-\textbar{} 与 \passthrough{\lstinline!--input\_shape!} 一致性检查
-\textbar{} \textbar{} \passthrough{\lstinline!--output\_type!}
-\textbar{} 输出 dtype \textbar{} 常用于 INT8 推理后转 FP32 便于后处理
-\textbar{} \textbar{} \passthrough{\lstinline!--enable\_small\_channel!}
-\textbar{} 小通道优化 \textbar{} 某些轻量网络加速 \textbar{}
+\textbar{} 算子实现优先级 \textbar{} 支持
+\passthrough{\lstinline!high\_performance!}(默认)、\passthrough{\lstinline!high\_precision!}
+等，可配合 \passthrough{\lstinline!--optypelist\_for\_implmode!}
+\textbar{} \textbar{} \passthrough{\lstinline!--input\_format!}
+\textbar{} 声明输入数据排布 \textbar{} 如
+\passthrough{\lstinline!NCHW!}、\passthrough{\lstinline!NHWC!}；需与模型导出及
+\passthrough{\lstinline!--input\_shape!} 保持一致 \textbar{} \textbar{}
+\passthrough{\lstinline!--output\_type!} \textbar{} 重指定输出 dtype
+\textbar{} 可设全局
+\passthrough{\lstinline!FP16!}/\passthrough{\lstinline!FP32!}，或按
+\passthrough{\lstinline!node:idx:FP32!} 精细配置，便于后处理 \textbar{}
+\textbar{} \passthrough{\lstinline!--enable\_small\_channel!} \textbar{}
+小通道优化开关 \textbar{} 取值 0/1，轻量网络或低通道数场景启用可减时延
+\textbar{} \textbar{} \passthrough{\lstinline!--model!} \textbar{}
+指定待转换模型文件 \textbar{} 支持
+\passthrough{\lstinline!.onnx!}、\passthrough{\lstinline!.pb!}、\passthrough{\lstinline!.prototxt!}
+等类型，路径需可访问 \textbar{} \textbar{}
+\passthrough{\lstinline!--output!} \textbar{} 设置 OM 输出前缀
+\textbar{} 不需写后缀；默认位置在当前目录，可结合
+\passthrough{\lstinline!--output\_type!} 使用 \textbar{} \textbar{}
+\passthrough{\lstinline!--dynamic\_dims!} \textbar{} 定义多维动态组合
+\textbar{} \passthrough{\lstinline!"d1\_1,d1\_2;d2\_1,d2\_2"!}
+格式；用于多输入或非 Batch 维变动 \textbar{} \textbar{}
+\passthrough{\lstinline!--enable\_single\_stream!} \textbar{}
+强制单流执行 \textbar{}
+\passthrough{\lstinline!true/false!}；在推理序列化或调试稳定性时启用
+\textbar{} \textbar{} \passthrough{\lstinline!--dump\_mode!} \textbar{}
+导出模型结构 JSON \textbar{} 配合 \passthrough{\lstinline!--mode=1!}
+使用，\passthrough{\lstinline!1!} 开启；便于排查 Shape 与算子信息
+\textbar{}
+
+如果对于参数有任何的疑惑，可以通过命令查询atc的参数作用：
+
+\begin{lstlisting}[language=bash]
+atc --help
+\end{lstlisting}
+
+成果转换模型后，我们可以看到命令窗口有如下输出：
+
+\begin{lstlisting}[language=bash]
+ATC start working now, please wait for a moment.
+...
+ATC run success, welcome to the next use.
+\end{lstlisting}
+
+\subsubsection{注意事项}\label{ux6ce8ux610fux4e8bux9879}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  在昇腾310B上将 ONNX 模型转换为 OM 时若出现
+  \passthrough{\lstinline!BrokenPipeError: [Errno 32] Broken pipe!}，通常是编译阶段内存不足导致进程被系统终止。可参照以下两类方案缓解：
+\end{enumerate}
+
+\begin{itemize}
+\item
+  \textbf{扩展可用内存}
+
+\begin{lstlisting}[language=bash]
+dd if=/dev/zero of=/swapfile bs=1M count=8192
+chmod 600 /swapfile
+swapon /swapfile
+\end{lstlisting}
+
+  并在 \passthrough{\lstinline!/etc/fstab!} 中新增：
+
+\begin{lstlisting}
+/swapfile swap swap defaults 0 0
+\end{lstlisting}
+\item
+  \textbf{降低编译资源占用}
+
+\begin{lstlisting}[language=bash]
+export TE_PARALLEL_COMPILER=1      # 限制算子最大并行编译进程数
+export MAX_COMPILE_CORE_NUMBER=1   # 限制图编译占用的 CPU 核数
+\end{lstlisting}
+
+  方便起见，我们可以采用第二种方案，可以有效解决内存不足的问题。
+\end{itemize}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{1}
+\tightlist
+\item
+  若无法确认当前设备的
+  \passthrough{\lstinline!soc\_version!}，可在安装驱动的昇腾310B上执行
+  \passthrough{\lstinline!npu-smi info!} 查询，示例如下：\\
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
++--------------------------------------------------------------------------------------------------------+
+| npu-smi 23.0.0                                   Version: 23.0.0                                       |
++-------------------------------+-----------------+------------------------------------------------------+
+| NPU     Name                  | Health          | Power(W)     Temp(C)           Hugepages-Usage(page) |
+| Chip    Device                | Bus-Id          | AICore(%)    Memory-Usage(MB)                        |
++===============================+=================+======================================================+
+| 0       310B4                 | Alarm           | 0.0          58                15    / 15            |
+| 0       0                     | NA              | 0            2500 / 7545                             |
++===============================+=================+======================================================+
+\end{lstlisting}
+
+请在查询结果的 \passthrough{\lstinline!Name!} 值前追加
+\passthrough{\lstinline!Ascend!} 前缀：若 \passthrough{\lstinline!Name!}
+为 \passthrough{\lstinline!310B4!}，则需配置
+\passthrough{\lstinline!soc\_version=Ascend310B4!}。
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{2}
+\tightlist
+\item
+  模型转换完成后会生成一份 JSON 文件，用作 ATC
+  编译日志的结构化摘要，集中记录当前会话（session\_and\_graph\_id=0\_0）内图级与
+  UB 级融合规则的触发统计。具体而言，graph\_fusion 字段逐条给出各图融合
+  Pass 的匹配次数与实际生效次数（match\_times 与
+  effect\_times），可据此识别潜在的优化空档；ub\_fusion
+  字段在上述统计基础上新增
+  repository\_hit\_times，用以衡量算子库模板的命中情况。实践中，可重点关注
+  effect\_times 低于 match\_times 的
+  Pass，分析是否因算子属性、精度模式或实现优先级等因素造成融合未落地，并据此调整
+  ATC 参数或模型图结构，以复现并提升性能优化效果。
+\end{enumerate}
+
+\subsection{模型推理工具msame工具概览}\label{ux6a21ux578bux63a8ux7406ux5de5ux5177msameux5de5ux5177ux6982ux89c8}
+
+在完成 ATC 转换得到 \passthrough{\lstinline!.om!}
+模型后，最快验证部署链路是否畅通的方式就是调用华为昇腾提供的模型推理工具
+msame。该工具封装了 OM
+加载、设备内存初始化、输入二进制数据映射以及推理调度等通用流程，无需额外编写
+AscendCL 程序即可直接对接 ATC 输出的模型，只需准备好与模型输入规格匹配的
+\passthrough{\lstinline!.bin!}
+文件和基础运行时环境，即可在命令行下完成端到端推理验证。通过
+msame，开发者能够快速检查模型是否成功落地、输出是否合理，并以最小成本排除输入格式或环境配置类问题，为后续集成到自研应用或高层框架之前提供低门槛的功能性回归手段。
+
+msame 的设计目标是将 OM
+模型的快速验证能力标准化，覆蓋单输入、多输入和循环执行等常见推理形态，支持在相同模型与不同输入数据组合之间做对比试验，同时允许选择
+TXT 或 BIN 格式导出结果，以便于人工审查或自动化脚本解析。在已正确安装
+CANN Runtime 的环境中，msame
+会自动完成与设备的上下文绑定、内存申请和任务提交，将推理过程抽象成简单的命令行参数；这不仅适用于初步确认模型可运行，也可用于小批量性能评估、数据一致性校验以及在定位性能或精度问题时的基准对照，从而在模型转换与实际业务部署之间搭建起轻量而高效的桥梁。
+
+\subsubsection{msame工具的获取与构建}\label{msameux5de5ux5177ux7684ux83b7ux53d6ux4e0eux6784ux5efa}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  通过
+  \passthrough{\lstinline!git clone https://gitee.com/ascend/tools.git!}
+  拉取仓库，或下载 ZIP 包后解压到开发环境。
+\item
+  进入 \passthrough{\lstinline!msame!} 子目录：
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+cd ./tools/msame
+\end{lstlisting}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{2}
+\tightlist
+\item
+  配置 CANN 环境变量（以下路径请按实际安装位置调整）：
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+export DDK_PATH=/usr/local/Ascend/ascend-toolkit/latest
+export NPU_HOST_LIB=/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub
+\end{lstlisting}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{3}
+\tightlist
+\item
+  运行构建脚本生成可执行文件：
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+./build.sh g++
+\end{lstlisting}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{4}
+\tightlist
+\item
+  构建成功后会在 \passthrough{\lstinline!out!} 目录生成二进制文件
+  \passthrough{\lstinline!msame!}，将其复制到工程目录
+  \passthrough{\lstinline!sample\_resnet\_quick\_start!} 中备用。
+\end{enumerate}
+
+\begin{itemize}
+\item
+  常用参数速览 \textbar{} 参数 \textbar{} 说明 \textbar{} \textbar{} ---
+  \textbar{} --- \textbar{} \textbar{} \passthrough{\lstinline!--model!}
+  \textbar{} OM 文件路径 \textbar{} \textbar{}
+  \passthrough{\lstinline!--input!} \textbar{} 输入
+  \passthrough{\lstinline!bin!} 文件或目录，支持多输入 \textbar{}
+  \textbar{} \passthrough{\lstinline!--output!} \textbar{}
+  推理结果存放目录 \textbar{} \textbar{}
+  \passthrough{\lstinline!--outfmt!} \textbar{}
+  输出格式：\passthrough{\lstinline!TXT!} /
+  \passthrough{\lstinline!BIN!} \textbar{} \textbar{}
+  \passthrough{\lstinline!--loop!} \textbar{} 重复推理次数（1--100）
+  \textbar{} \textbar{} \passthrough{\lstinline!--profiler!} /
+  \passthrough{\lstinline!--dump!} \textbar{} 性能分析或 Dump，互斥
+  \textbar{} \textbar{} \passthrough{\lstinline!--device!} \textbar{}
+  设备 ID，默认 0 \textbar{} \textbar{}
+  \passthrough{\lstinline!--dymBatch!} /
+  \passthrough{\lstinline!--dymHW!} /
+  \passthrough{\lstinline!--dymDims!} /
+  \passthrough{\lstinline!--dymShape!} \textbar{} 对应 ATC
+  动态配置的实际取值 \textbar{} \textbar{}
+  \passthrough{\lstinline!--outputSize!} \textbar{} 动态 Shape
+  场景下手动申请输出内存 \textbar{} \textbar{}
+  \passthrough{\lstinline!--debug!} \textbar{} 打印模型描述信息
+  \textbar{} \textbar{} \passthrough{\lstinline!--help!} \textbar{}
+  查看全部参数 \textbar{}
+\item
+  使用注意
+
+  \begin{itemize}
+  \tightlist
+  \item
+    运行账号需具备当前目录的执行与写入权限。
+  \item
+    \passthrough{\lstinline!TXT!} 输出不适用于部分动态 Shape，可改用
+    \passthrough{\lstinline!BIN!}。
+  \item
+    配置 \passthrough{\lstinline!NPU\_HOST\_LIB!} 时应指向
+    \passthrough{\lstinline!runtime/lib64/stub!} 目录，运行阶段通过
+    \passthrough{\lstinline!LD\_LIBRARY\_PATH!} 链接实际依赖。
+  \item
+    profiler 与 dump 不可同时开启；动态 shape
+    时需同步设置合适的输出内存大小。
+  \end{itemize}
+\end{itemize}
+
+\subsubsection{图片预处理}\label{ux56feux7247ux9884ux5904ux7406}
+
+由于 msame 工具不具备图像预处理能力，输入必须是已转换好的
+\passthrough{\lstinline!.bin!}
+文件。因为之前在模型转换时未显式指定精度，ResNet50 默认接受 FP32
+格式的输入；同样地，未设置输入内存布局时 ATC 会采用默认的 NCHW。NCHW
+表示批次 N、通道 C、空间高度 H 与宽度
+W，意味着同一张图片的三个颜色通道会按通道优先的顺序依次排布，再展开到空间维度。这与
+TensorFlow 常见的
+NHWC（通道在最后）相对。\passthrough{\lstinline!sampleResnetQuickStart.py!}
+中的 \passthrough{\lstinline!image\_rgb.transpose([2, 0, 1])!} 正是将
+OpenCV 读取的 HWC 布局转换为 CHW，并配合外层批次维得到符合要求的
+NCHW。是否必须使用 NCHW 取决于模型导出时的约定。PyTorch 与 CANN 默认使用
+NCHW，因此常见的
+\passthrough{\lstinline!resnet50.onnx!}/\passthrough{\lstinline!resnet50.om!}
+都在此布局下训练与推理。只要导出模型为 NCHW，推理阶段同样必须以 NCHW
+喂入数据，否则通道错位会导致结果异常。当然，也可以导出为
+NHWC，只需在模型与预处理两端同时调整即可。
+由于刚才我们从华为云哪里获取的测试图片``dog1\_1024\_683.jpg''如下：
+
+\begin{figure}
+\centering
+\includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={resnet测试图片}]{chapters/img2/dog1_1024_683.jpg}
+\caption{resnet测试图片}\label{fig:dog}
+\end{figure}
+
+由于这个图片是jpg格式的，因此为了可以利用这个图片推理，我们第一步需要对图片进行预处理，具体过程如何：
+1.
+在src文件目录创建一个预处理的python文件``make\_bin\_resnet224\_float32.py''如下：
+```python make\_bin\_resnet224\_float32.py from PIL import Image import
+numpy as np
+
+\# 加载图像并转换为 RGB img =
+Image.open(`data/dog1\_1024\_683.jpg').convert(`RGB') \#
+使用双线性插值缩放到 256x256 img = img.resize((256, 256),
+Image.BILINEAR) \# 计算 224x224 中心裁剪的坐标 left = (256 - 224) // 2
+top = (256 - 224) // 2 \# 执行中心裁剪 img = img.crop((left, top, left +
+224, top + 224))
+
+\# 转换为 {[}0, 1{]} 范围的 float32 数组 arr =
+np.array(img).astype(np.float32) / 255.0 \# 定义归一化常量 mean =
+np.array({[}0.485, 0.456, 0.406{]}, dtype=np.float32) std =
+np.array({[}0.229, 0.224, 0.225{]}, dtype=np.float32) \#
+按通道进行归一化 arr = (arr - mean) / std
+
+\# 调整为 NCHW 格式并添加批次维度 arr = arr.transpose(2, 0, 1){[}None,
+:, :, :{]} \# 保存为二进制文件 arr.tofile(`data/dog1\_224\_float32.bin')
+\# 打印缓冲区大小（字节数） print(`bytes:', arr.nbytes) ```
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{1}
+\tightlist
+\item
+  在shell中运行这个python文件：
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+python src/make_bin_resnet224_float32.py
+\end{lstlisting}
+
+该脚本在导出 \passthrough{\lstinline!.bin!}
+输入前会完成：将示例图像缩放到 256×256 后再做 224×224
+中心裁剪；把像素转换为 NCHW 排布的 \passthrough{\lstinline!float32!}
+缓冲区并写入文件；整个过程中先除以 255 将数值归一化到
+{[}0,1{]}，再按通道减去
+\passthrough{\lstinline![0.485, 0.456, 0.406]!}、除以
+\passthrough{\lstinline![0.229, 0.224, 0.225]!} 标准差，以对齐 ResNet 在
+ImageNet
+上的训练预处理，从而避免因均值或方差失配导致的输出偏移，最终在\passthrough{\lstinline!data!}文件夹内得到
+\passthrough{\lstinline!dog1\_224\_float32.bin!}。
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{2}
+\tightlist
+\item
+  快速运行------单输入文件 运行下面这个命令：
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+./msame --model "./model/resnet50.om" --input "./data/dog1_224_float32.bin" --output "./out" --outfmt BIN
+\end{lstlisting}
+
+运行成功后，我们会得到以下的信息：
+\passthrough{\lstinline!bash   [INFO] acl init success   [INFO] open device 0 success   [INFO] create context success   [INFO] create stream success   [INFO] get run mode success   [INFO] load model ./model/resnet50.om success   [INFO] create model description success   [INFO] get input dynamic gear count success   [INFO] create model output success   ./out/20251213\_11\_6\_52\_564388   [INFO] start to process file:./data/dog1\_224\_float32.bin   [INFO] model execute success   Inference time: 6.811ms   [INFO] get max dynamic batch size success   [INFO] output data success   Inference average time: 6.811000 ms   [INFO] destroy model input success   [INFO] unload model success, model Id is 1   [INFO] pid: 98299 Execute sample success   [INFO] end to destroy stream   [INFO] end to destroy context   [INFO] end to reset device is 0   [INFO] end to finalize acl!}
++ 该日志显示推理流程已完整走通：ACL
+初始化、设备上下文、模型加载、输入输出申请均返回
+\passthrough{\lstinline!success!}，\passthrough{\lstinline!Inference time!}/\passthrough{\lstinline!Inference average time!}
+给出单次与平均耗时，路径
+\passthrough{\lstinline!./out/20251213\_11\_6\_52\_564388!}
+指向本次推理结果目录。该输出目录遵循``YYYYMMDD\_H\_M\_S\_microsec''命名：\passthrough{\lstinline!20251213!}
+表示日期（2025-12-13），\passthrough{\lstinline!11\_6\_52!}
+为时分秒，\passthrough{\lstinline!564388!}
+为微秒级序列号，用于区分同日多次推理结果。 + 若选择
+\passthrough{\lstinline!--outfmt BIN!}，可用
+\passthrough{\lstinline!numpy.fromfile('./out/.../resnet50\_output\_0.bin', dtype=np.float32).reshape(1, 1000)!}
+读取并执行 \passthrough{\lstinline!np.argsort!} 获取 TopK；使用
+\passthrough{\lstinline!softmax!} 还原概率后结合 ImageNet label
+映射即可解读分类结果。 + 若选择
+\passthrough{\lstinline!--outfmt TXT!}，直接
+\passthrough{\lstinline!cat ./out/.../resnet50\_output\_0.txt | head!}
+快速查看前若干输出值，同样可以配合脚本解析为 TopK 概率。
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{3}
+\tightlist
+\item
+  后处理\\
+  无论 msame 的 \passthrough{\lstinline!--outfmt!} 选择
+  \passthrough{\lstinline!BIN!} 还是
+  \passthrough{\lstinline!TXT!}，得到的都是形如
+  \passthrough{\lstinline!1×1000!} 的分类 logits，需要结合 ImageNet
+  标签映射再做一次后处理才能输出可读结果。以下示例脚本演示如何解析
+  \passthrough{\lstinline!BIN!} 文件、执行 softmax 并打印 Top-K 概率。
+\end{enumerate}
+
+\begin{itemize}
+\tightlist
+\item
+  先下载 \passthrough{\lstinline!imagenet\_class\_index.json!}（可来自
+  Kaggle 或 GitHub）放到 \passthrough{\lstinline!src!} 目录，然后创建
+  \passthrough{\lstinline!src/postprocess\_resnet50.py!}：\\
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+# src/postprocess_resnet50.py
+import os
+import argparse
+import json
+import numpy as np
+
+parser = argparse.ArgumentParser(description="将ResNet50的 BIN 输出解码为ImageNet标签。")
+parser.add_argument("--bin", required=True, help="msame 输出BIN文件的路径。")
+parser.add_argument("--topk", type=int, default=5, help="需要打印的最高置信度数量。")
+args = parser.parse_args()
+
+logits = np.fromfile(args.bin, dtype=np.float32).reshape(1, -1)
+probs = np.exp(logits - logits.max(axis=-1, keepdims=True))
+probs = probs / probs.sum(axis=-1, keepdims=True)
+probs = probs[0]
+
+labels_path = os.path.join("src", "imagenet_class_index.json")
+if not os.path.exists(labels_path):
+    raise FileNotFoundError("请先将imagenet_class_index.json下载到src目录。")
+
+with open(labels_path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+labels = [data[str(i)][1] for i in range(len(data))]
+
+topk = np.argsort(probs)[::-1][:args.topk]
+print(f"Decoded {args.bin} (Top-{args.topk})")
+for rank, idx in enumerate(topk, start=1):
+    label = labels[idx] if idx < len(labels) else f"cls_{idx}"
+    print(f"{rank:>2d}: class={idx:<4d} prob={probs[idx]:.6f} label={label}")
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  执行脚本：\\
+\end{itemize}
+
+\begin{lstlisting}[language=bash]
+python ./src/postprocess_resnet50.py --bin out/20251213_11_6_52_564388/resnet50_output_0.bin
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  示例输出：\\
+\end{itemize}
+
+\begin{lstlisting}[language=bash]
+Decoded out/20251213_11_6_52_564388/resnet50_output_0.bin (Top-5)
+ 1: class=162  prob=0.964885 label=beagle
+ 2: class=161  prob=0.023230 label=basset
+ 3: class=166  prob=0.006107 label=Walker_hound
+ 4: class=167  prob=0.004985 label=English_foxhound
+ 5: class=164  prob=0.000334 label=bluetick
+\end{lstlisting}
 
 \section{章节小结}\label{ux7ae0ux8282ux5c0fux7ed3}
 
