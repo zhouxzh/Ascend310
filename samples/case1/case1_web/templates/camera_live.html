@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+
+{% block title %}摄像头实时识别 - 人脸识别考勤系统{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-video me-2"></i>摄像头实时识别
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="video-container mb-3">
+                            <div id="videoPlaceholder" class="video-placeholder text-center">
+                                <i class="fas fa-video" style="font-size: 4rem; color: #667eea;"></i>
+                                <h5 class="mt-3">点击"启动摄像头"开始实时识别</h5>
+                                <p class="text-muted">系统将自动检测和识别人脸，并记录考勤</p>
+                            </div>
+                            <img id="videoFeed" src="" alt="Video Feed" style="display: none; width: 100%; border-radius: 10px;">
+                        </div>
+                        
+                        <div class="text-center">
+                            <button id="startBtn" class="btn btn-primary btn-lg me-3">
+                                <i class="fas fa-play me-2"></i>启动摄像头
+                            </button>
+                            <button id="stopBtn" class="btn btn-danger btn-lg" style="display: none;">
+                                <i class="fas fa-stop me-2"></i>停止摄像头
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-info-circle me-2"></i>实时识别状态
+                                </h5>
+                                <div id="statusInfo">
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-clock me-2"></i>等待启动摄像头...
+                                    </div>
+                                </div>
+                                
+                                <h6 class="mt-4">
+                                    <i class="fas fa-users me-2"></i>已注册用户 (<span id="userCount">0</span>)
+                                </h6>
+                                <div id="userList" class="mt-2">
+                                    <!-- 用户列表将在这里动态加载 -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card border-0 shadow-sm mt-3">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-clock me-2"></i>考勤消息
+                                </h6>
+                                <div id="attendanceInfo">
+                                    <div class="alert alert-secondary">
+                                        <i class="fas fa-info-circle me-2"></i>暂无考勤信息
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card border-0 shadow-sm mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-lightbulb me-2"></i>使用提示
+                                </h5>
+                                <ul class="list-unstyled">
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        保持人脸正对摄像头
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        确保光线充足
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        避免快速移动
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        系统每2秒进行一次识别
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.video-container {
+    position: relative;
+    background: #f8f9fa;
+    border-radius: 10px;
+    overflow: hidden;
+    min-height: 400px;
+}
+
+.video-placeholder {
+    padding: 100px 20px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+}
+
+#videoFeed {
+    max-width: 100%;
+    height: auto;
+}
+
+.user-item {
+    padding: 8px 12px;
+    margin: 4px 0;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 8px;
+    font-size: 0.9em;
+}
+
+.recognition-result {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+
+<script>
+let isStreaming = false;
+let recognitionInterval = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadUserList();
+    
+    document.getElementById('startBtn').addEventListener('click', startCamera);
+    document.getElementById('stopBtn').addEventListener('click', stopCamera);
+});
+
+function startCamera() {
+    fetch('/start_camera', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            isStreaming = true;
+            document.getElementById('videoFeed').src = '/video_feed';
+            document.getElementById('videoFeed').style.display = 'block';
+            document.getElementById('videoPlaceholder').style.display = 'none';
+            
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('stopBtn').style.display = 'inline-block';
+            
+            updateStatus('success', '摄像头已启动，正在进行实时识别...');
+            
+            // 开始轮询识别结果
+            startRecognitionPolling();
+        } else {
+            updateStatus('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        updateStatus('error', '启动摄像头失败');
+    });
+}
+
+function stopCamera() {
+    fetch('/stop_camera', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            isStreaming = false;
+            document.getElementById('videoFeed').style.display = 'none';
+            document.getElementById('videoPlaceholder').style.display = 'block';
+            
+            document.getElementById('startBtn').style.display = 'inline-block';
+            document.getElementById('stopBtn').style.display = 'none';
+            
+            updateStatus('info', '摄像头已停止');
+            
+            // 停止轮询识别结果
+            stopRecognitionPolling();
+            
+            // 清空考勤信息
+            updateAttendanceInfo('暂无考勤信息', 'secondary');
+        } else {
+            updateStatus('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        updateStatus('error', '停止摄像头失败');
+    });
+}
+
+function updateStatus(type, message) {
+    const statusInfo = document.getElementById('statusInfo');
+    const alertClass = type === 'success' ? 'alert-success' : 
+                      type === 'error' ? 'alert-danger' : 'alert-info';
+    const icon = type === 'success' ? 'fas fa-check-circle' : 
+                 type === 'error' ? 'fas fa-exclamation-circle' : 'fas fa-info-circle';
+    
+    statusInfo.innerHTML = `
+        <div class="alert ${alertClass} recognition-result">
+            <i class="${icon} me-2"></i>${message}
+        </div>
+    `;
+}
+
+function loadUserList() {
+    fetch('/get_users')
+    .then(response => response.json())
+    .then(data => {
+        const userList = document.getElementById('userList');
+        const userCount = document.getElementById('userCount');
+        
+        userCount.textContent = data.users.length;
+        
+        if (data.users.length === 0) {
+            userList.innerHTML = '<p class="text-muted small">暂无已注册用户</p>';
+        } else {
+            userList.innerHTML = data.users.map(user => 
+                `<div class="user-item">
+                    <i class="fas fa-user me-2"></i>${user.name} 
+                    <span class="text-muted">(${user.image_count}张图片)</span>
+                </div>`
+            ).join('');
+        }
+    })
+    .catch(error => {
+        console.error('Error loading users:', error);
+    });
+}
+
+function startRecognitionPolling() {
+    // 每2秒获取一次识别结果
+    recognitionInterval = setInterval(function() {
+        if (isStreaming) {
+            fetch('/get_recognition_results')
+            .then(response => response.json())
+            .then(data => {
+                if (data.results && data.results.length > 0) {
+                    // 显示最新的识别结果
+                    const latestResult = data.results[0];
+                    if (latestResult.attendance_message) {
+                        const alertType = latestResult.attendance_logged ? 'success' : 'warning';
+                        updateAttendanceInfo(latestResult.attendance_message, alertType);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching recognition results:', error);
+            });
+        }
+    }, 2000);
+}
+
+function stopRecognitionPolling() {
+    if (recognitionInterval) {
+        clearInterval(recognitionInterval);
+        recognitionInterval = null;
+    }
+}
+
+function updateAttendanceInfo(message, type) {
+    const attendanceInfo = document.getElementById('attendanceInfo');
+    const alertClass = type === 'success' ? 'alert-success' : 
+                      type === 'warning' ? 'alert-warning' : 
+                      type === 'danger' ? 'alert-danger' : 'alert-secondary';
+    const icon = type === 'success' ? 'fas fa-check-circle' : 
+                 type === 'warning' ? 'fas fa-exclamation-triangle' : 
+                 type === 'danger' ? 'fas fa-exclamation-circle' : 'fas fa-info-circle';
+    
+    attendanceInfo.innerHTML = `
+        <div class="alert ${alertClass}">
+            <i class="${icon} me-2"></i>${message}
+        </div>
+    `;
+}
+
+// 页面卸载时停止摄像头
+window.addEventListener('beforeunload', function() {
+    if (isStreaming) {
+        stopCamera();
+    }
+});
+</script>
+{% endblock %}

@@ -8,42 +8,6 @@ lang: zh-cn
 ---
 
 本章系统阐述 Ascend CANN 软件栈的分层结构、模型从框架格式到 OM 的转换原理、转换工具 ATC 的关键参数、OM 文件组织结构、AscendCL (ACL) 推理编程模型、精度与性能验证方法以及工程级质量保障流水线建设。
-<!-- 
-## CANN 软件栈分层与数据流
-| 层级 | 组件 | 核心职责 | 典型交互 |
-| ---- | ---- | -------- | -------- |
-| 硬件抽象 | Driver | 设备初始化、资源枚举、功耗/温度接口 | npu-smi / Runtime |
-| 运行时 | Runtime | 上下文(Context)管理、Stream/Task 调度、内存分配 | ACL / Compiler |
-| 编译优化 | Graph Compiler | 图解析、拓扑排序、算子匹配、内存复用、算子融合 | ATC / Runtime |
-| 工具链 | Toolkit | ATC 转换、Profiling、Dump、可视化、日志 | 开发者 |
-| API 层 | AscendCL | C 接口封装：模型管理 / 内存 / 数据传输 / 执行 | 应用 |
-
-数据流（框架模型 → OM → 推理）核心阶段：
-1. 前端导出：PyTorch → ONNX（维度常量化、算子展开）。
-2. ATC 编译：图解析 → Shape Infer → 算子选择 → Kernel 排布 → 内存映射 → 生成 OM（二进制 + 元数据段）。
-3. 运行加载：aclmdlLoadFromFile 读取 OM Header，分配 Device 内存，构建执行计划（Task 列表）。
-4. 推理执行：Host 侧准备输入 → H2D 拷贝 → Runtime 提交 Task → 硬件执行 → D2H 拷贝 → 后处理。
-
-## 环境一致性与安装验证
-环境差异是隐性失败根源，建议形成“安装后自检”脚本，校验以下要点：
-1. 版本矩阵：固件/Driver/CANN/ATC 必须在官方 Release Note 支持组合内。
-2. 环境变量：`ASCEND_INSTALL_PATH` 指向安装根；`LD_LIBRARY_PATH` 中包含 `driver` 与 `runtime/lib64`；Python 绑定需在 `PYTHONPATH` 中。
-3. 设备可见：`npu-smi info` 返回芯片型号 `Ascend310B` 且状态正常，无 `Fault` 标记。
-4. 转换工具：`atc --version` 输出版本与期望匹配；`atc --help` 能正常列出参数。
-5. 运行权限：当前用户具备访问 `/dev/davinci*` 设备节点读写权限（若无，加入相应用户组或 udev 规则）。
-6. Python 依赖：`numpy`, `onnx`, `onnxruntime` (精度对齐), `pyyaml`, 自编写工具包。
-
-## 模型准备与输入规范统一
-| 项 | 说明 | 决策标准 |
-| -- | ---- | -------- |
-| 边界 Shape | 静态 or 动态 | 场景多尺寸/Batch 波动？ |
-| Layout | NCHW / NHWC | 上游预处理 & 算子最佳实现 |
-| 颜色空间 | RGB / BGR / YUV | 原始采集格式 + 算子期望 |
-| 归一化 | mean/std / scale | 训练环节定义必须完全对齐 |
-| 精度策略 | FP16 / INT8 | 性能目标 & 可接受精度损失 |
-| Quant 校准集 | 代表性样本 | 覆盖亮度/场景/尺寸多样性 |
-
-核心风险：训练与部署输入不一致（尺寸拉伸方式、通道顺序、归一化顺序、色彩空间转换位置）。必须输出“输入契约文件”（JSON/YAML）标注：`shape`、`dtype`、`layout`、`color_space`、`mean/std`、`range`、`precision_mode`。 -->
 
 ## CANN异构计算架构
 
@@ -62,18 +26,86 @@ CANN与CUDA二者的共同点主要体现在，它们都是通过软硬件协同
 
 ### CANN的架构
 
-CANN 通过提供分层清晰的编程与运行时结构，以覆盖训练与推理的“全场景”、贴近主流框架的“低门槛”以及面向昇腾硬件深度优化的“高性能”为核心特性，支撑用户在昇腾平台上快速构建与部署各类 AI 应用与业务。从整体上看，CANN 可以抽象为一个自上而下递进的五层架构（计算语言接口、计算服务层、计算编译引擎、计算执行引擎与计算基础层），如图\ref{fig:architecture}所示。各层通过稳定的接口与数据流协议进行解耦协同，在保证语义一致性的前提下最大化发挥底层算力与能效潜力。 
+CANN 通过提供分层清晰的编程与运行时结构，以覆盖训练与推理的“全场景”、贴近主流框架的“低门槛”以及面向昇腾硬件深度优化的“高性能”为核心特性，支撑用户在昇腾平台上快速构建与部署各类 AI 应用与业务。从整体上看，CANN 可以抽象为一个自上而下递进的五层架构（计算语言接口、计算服务层、计算编译引擎、计算执行引擎与计算基础层），如图\ref{fig:architecture}所示。各层通过稳定的接口与数据流协议进行解耦协同，在保证语义一致性的前提下最大化发挥底层算力与能效潜力。
+
 ![CANN架构图](img2\CANN_Architecture.png){#fig:architecture width=90%}
 
 在分层结构上，CANN可抽象为五个层次：上层的计算语言接口——AscendCL接口负责设备与上下文管理、流与内存控制、模型与算子的加载执行，以及媒体与图管理等通用API，为应用提供稳定的编程入口；其下的昇腾计算服务层汇聚神经网络与线性代数库，承载算子与子图的自动调优、梯度优化与模型压缩，并通过框架适配器降低迁移成本；昇腾计算编译层的编译引擎通过图编译器与TBE算子开发支持，把前端计算图转化为在NPU可执行的模型与内核，实现图级语义到后端实现的精准映射；下一层的昇腾执行引擎面向运行时，负责模型与算子的调度执行，并内置数字视觉与AI预处理、集合通信等能力以提升端到端效率；最下层的昇腾计算基础层提供共享虚拟内存、设备虚拟化与主机—设备通信等底座服务，保证跨设备数据流与资源管理的可靠性与可扩展性。
 
 与此相辅的是三层逻辑架构：应用层承载具体业务与开发者工具，芯片使能层开放解决方案能力并驱动基于计算图的业务流运行，计算资源层则聚焦数据处理与运算执行，形成从业务到硬件的清晰闭环。这个CANN的三层逻辑结构如下图\ref{fig:cann_logic}所示:
-![CANN架构图](img2\CANN_logic.png){#fig:cann_logic width=90%}
 
+![CANN架构图](img2\CANN_logic.png){#fig:cann_logic width=90%}
 
 在技术特性上，CANN通过对计算图的编译与优化，将密集算子与数据流合理分配到异构单元上执行，显著提升吞吐与时延表现，并在能效上取得可工程化的优势；同时提供贴近主流框架的易用接口与完善的工具链，降低入门与迁移门槛，使开发者能够快速完成部署与调优。生态方面，CANN构建了面向个人、高校、科研与企业的赋能体系，并与开源社区协同，支持多种框架与推理引擎在异构硬件上的高效运行。依托这些能力，开发者可以深入调用运行时与图编译能力，释放底层硬件潜力，在性能与成本维度形成差异化竞争力。 
 
 在工程实践中，CANN 的核心价值可以概括为在“模型—编译—执行—诊断”的完整链路上实现软硬件协同与语义稳定：通过构建对主流深度学习框架高度兼容的前端接口，最大限度降低模型迁移与语义对齐成本，在图级优化阶段则依托算子融合、内存复用以及混合精度策略的协同设计，系统性提升吞吐能力、推理时延以及功耗效率；与此同时，借助自定义算子机制与实现优先级调度策略，使新结构能够快速接入并在多实现版本之间灵活切换，从而在不同硬件代际与不同业务场景下充分挖掘底层计算资源的潜力，并在运行时通过分级日志、Profiling 时间线与精度 Dump 等手段构建起闭环的可观测体系。在大规模、复杂模型的工程化路径中，首先需要完成面向硬件架构的感知建模，在导出阶段显式固化张量形状与算子语义，为后续编译与部署奠定稳定的语义基础；随后在模型转换阶段，以“转换即优化”为原则，围绕 precision_mode、op_select_implmode 与 AIPP 等关键配置项进行显式调优，使图优化与算子选型在编译期前置完成，其中精度策略以 FP16 为主，并辅以具有代表性的校准数据集对 INT8 量化误差进行严格控制，以在性能与精度之间取得可工程化的平衡。对于动态形状问题，可以采用分桶与 Padding 结合的方式，并在必要时生成多份 OM 模型，以在一定范围内换取更可控的峰值资源占用与时延方差；在内存与带宽层面，则通过将预处理逻辑尽可能下沉到设备侧、合并数据搬移操作，并配合 Pinned 内存与多 Stream 并行传输技术，显著降低 H2D/D2H 的时间占比，从系统视角优化整体流水线的调度效率。针对在实际 Profiling 中暴露出的性能瓶颈算子，需要开展有针对性的算子重写与图重构，并充分利用实现优先级机制在不同 Kernel 之间进行策略化选择，以进一步榨取底层硬件的计算与访存潜力；最终，通过围绕“转换—精度对齐—Benchmark—回归监测”构建自动化流水线，将模型转换、性能评估与精度验证纳入统一的持续反馈闭环，在 Ascend 310B 等专用加速平台上沉淀出可复用的优化经验与差异化性能优势，不仅在算力利用率与综合成本上形成工程级竞争力，也为大模型与行业应用场景的规模化加速落地提供坚实的基础设施支撑。
+
+### CANN的快速安装
+
+本节给出 CANN 软件的极速安装示例。若需更完整的操作指导，请按实际环境选择对应安装场景并参考[官方说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html)。推荐优先使用 Conda 在线安装：无需额外依赖，可直接获取最新版本。  
+
+#### 安装前准备
+
+- 确认目标设备已正确安装 NPU 驱动与固件，我们可以直接用命令'npu-smi'查看输出信息，如果有输出信息，证明NPU驱动与固件已经安装。一般来说，对了昇腾310B的产品，系统都自带有NPU驱动以及固件的。  
+- 推荐使用在线安装（Conda）方式，无需安装前置依赖，可直接安装最新版本的软件包。
+- 若不采用 Conda 在线安装，需要提前准备 Python 环境及 `pip3`，当前支持 Python 3.7.x–3.11.4。  
+- 离线安装时，请先下载所需 CANN 软件包并上传至任意可访问路径后再执行安装。
+
+#### 安装命令与依赖说明
+- 安装 Toolkit 开发套件  
+  ```bash
+  conda config --add channels https://repo.huaweicloud.com/ascend/repos/conda/
+  conda install ascend::cann-toolkit
+  ```
+  若出现如下错误：
+  ```bash
+  EnvironmentNotWritableError: The current user does not have write permissions to the target environment.
+  environment location: /usr/local/miniconda3
+  uid: 1000
+  gid: 1000
+  ```
+  通常是因为 Miniconda 安装在 `/usr/local`，目录权限归属 root，而日常使用的账号（如 `HwHiAiUser`）无写入权限。可按两种方式处理：其一使用 `su` 切换 root 再安装；其二直接将目录所有权授予当前用户，命令如下：
+  ```bash
+  sudo chown -R HwHiAiUser /usr/local/miniconda3/
+  ```
+  完成后重新执行安装命令。整个安装过程大概会持续几分钟，请耐心等待。  
+
+- 配置环境变量
+  ```bash
+  source /usr/local/miniconda3/Ascend/ascend-toolkit/set_env.sh
+  ```
+
+- 安装 Kernels 算子包（310B 平台）
+  ```bash
+  conda install ascend::cann-kernels-310b
+  ```
+
+安装后配置
+
+- 安装业务运行时所需的 Python 第三方库（使用非 root 用户时保留 --user 参数）
+  ```bash
+  pip3 install --user \
+    attrs cython 'numpy>=1.19.2,<=1.24.0' decorator sympy cffi pyyaml pathlib2 \
+    psutil protobuf==3.20.0 scipy requests absl-py --user
+  ```
+
+- 说明
+  - 若使用 root 用户，请去掉上述命令中的 `--user`。
+  - 以上依赖版本范围适配常见环境；如出现冲突，请根据实际 Python/操作系统版本调整。
+
+### CANN的离线安装
+
+CANN的离线安装有两种方式，一个是利用deb包，利用dpkg进行安装，例如安装CANN版本8.3.RC1
+- 使用 deb 包离线安装（示例：8.3.RC1，310B）：
+```bash
+sudo dpkg -i Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.deb
+```
+
+- 使用 run 包离线安装：
+```bash
+sudo chmod +x Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
+sudo ./Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
+```
 
 
 ## ATC模型转换详解
@@ -82,7 +114,7 @@ CANN 通过提供分层清晰的编程与运行时结构，以覆盖训练与推
 
 昇腾张量编译器（Ascend Tensor Compiler，ATC）是 CANN 异构计算体系中的模型转换组件，支持将主流开源框架导出的网络模型以及基于 Ascend IR 的单算子描述文件（JSON）编译为昇腾 AI 处理器可执行的离线模型（.om）。如图下图所示，ATC 在转换过程中会执行算子调度优化、权重重排与内存复用等关键步骤，对原始深度学习模型进行面向部署场景的系统化调优，从而在昇腾硬件上实现高吞吐、低时延的高效执行。
 
-![ATC框架图](img2\atc.png){#fig:atc width=90%}
+![ATC框架图](img2\atc.png){#fig:atc width=70%}
 
 从上面的流程图我们可以看到，ATC 工具聚焦模型到设备可执行体的“转换即优化”闭环：一方面，它能够将开源框架导出的网络模型解析为中间态 IR Graph，经由图准备、拆分与融合、形状推理、内存复用与算子选型等编译步骤，生成适配昇腾处理器的离线模型（OM），并在板端通过 AscendCL 接口加载执行，从语义到性能实现端到端落地；另一方面，ATC 也支持基于 Ascend IR 的单算子 JSON 直接编译为离线 OM，用于在设备侧进行算子级功能验证与精度对齐，帮助开发者快速定位与迭代关键算子实现，在图级与算子级两条路径上形成统一的工程化编译能力。
 
@@ -111,7 +143,9 @@ ONNX的核心价值在于解决了AI生态系统中“碎片化”的问题。�
 ### ATC工具使用流程
 
 使用ATC工具进行模型转换的使用流程如下图所示：
-![ATC流程图](img2\atc_flow.png){#fig:atc_flow width=90%}
+
+![ATC流程图](img2\atc_flow.png){#fig:atc_flow width=70%}
+
 在开始模型转换之前，首先需要在开发环境中安装与 CANN 软件包版本相匹配的版本，并确保 ATC 可执行文件的路径可用。接下来，准备待转换的模型文件或基于 Ascend IR 的单算子 JSON，并将其上传到开发环境中可访问的目录。最后，使用 ATC 执行转换，并根据实际业务需求和输入规范配置相关参数。如果需要将预处理步骤（如色彩空间转换、归一化和尺度调整）下沉到设备侧，可以同时提供并启用 AIPP（Artificial Intelligence Pre-Processing）配置。AIPP是昇腾处理器内置的硬件级图像预处理模块，负责将上游（如 DVPP）输出的对齐后YUV420SP图像在设备侧完成色域转换（如YUV图像格式转换为RGB或者BGR图像格式）、归一化（减均值/乘系数/尺度放大）与抠图（在指定起始点裁剪到模型输入尺寸），从而把原始图像规范化为模型所需的输入格式与数值范围。由于昇腾310B在推理及训练中常以DVPP输出YUV420SP图片格式，这种图像格式是有损图像颜色编码格式，常用为YUV420SP_UV、YUV420SP_VU两种格式，不直接提供RGB图片。AIPP能将YUV420SP类型图像无缝转化为模型期望的RGB/BGR图像格式，并在同一数据流中完成裁剪与数值处理，避免将预处理放在CPU侧导致的多次拷贝与额外时延，提升端到端吞吐与能效。
 
 ####  模型转换-以ResNet50为例
@@ -199,7 +233,8 @@ ATC run success, welcome to the next use.
   ```
   方便起见，我们可以采用第二种方案，可以有效解决内存不足的问题。
 
-2. 若无法确认当前设备的 `soc_version`，可在安装驱动的昇腾310B上执行 `npu-smi info` 查询，示例如下：  
+2. 若无法确认当前设备的 `soc_version`，可在安装驱动的昇腾310B上执行 `npu-smi info` 查询，示例如下： 
+
 ```bash
 +--------------------------------------------------------------------------------------------------------+
 | npu-smi 23.0.0                                   Version: 23.0.0                                       |
@@ -211,6 +246,7 @@ ATC run success, welcome to the next use.
 | 0       0                     | NA              | 0            2500 / 7545                             |
 +===============================+=================+======================================================+
 ```
+
 请在查询结果的 `Name` 值前追加 `Ascend` 前缀：若 `Name` 为 `310B4`，则需配置 `soc_version=Ascend310B4`。
 
 3. 模型转换完成后会生成一份 JSON 文件，用作 ATC 编译日志的结构化摘要，集中记录当前会话（session_and_graph_id=0_0）内图级与 UB 级融合规则的触发统计。具体而言，graph_fusion 字段逐条给出各图融合 Pass 的匹配次数与实际生效次数（match_times 与 effect_times），可据此识别潜在的优化空档；ub_fusion 字段在上述统计基础上新增 repository_hit_times，用以衡量算子库模板的命中情况。实践中，可重点关注 effect_times 低于 match_times 的 Pass，分析是否因算子属性、精度模式或实现优先级等因素造成融合未落地，并据此调整 ATC 参数或模型图结构，以复现并提升性能优化效果。 
@@ -266,6 +302,7 @@ msame 的设计目标是将 OM 模型的快速验证能力标准化，覆蓋单�
 
 由于这个图片是jpg格式的，因此为了可以利用这个图片推理，我们第一步需要对图片进行预处理，具体过程如何：
 1. 在src文件目录创建一个预处理的python文件“make_bin_resnet224_float32.py”如下：
+
   ```python make_bin_resnet224_float32.py
   from PIL import Image
   import numpy as np
@@ -297,17 +334,22 @@ msame 的设计目标是将 OM 模型的快速验证能力标准化，覆蓋单�
   ```
   
 2. 在shell中运行这个python文件：
+
   ```bash
   python src/make_bin_resnet224_float32.py
   ```
+  
   该脚本在导出 `.bin` 输入前会完成：将示例图像缩放到 256×256 后再做 224×224 中心裁剪；把像素转换为 NCHW 排布的 `float32` 缓冲区并写入文件；整个过程中先除以 255 将数值归一化到 [0,1]，再按通道减去 `[0.485, 0.456, 0.406]`、除以 `[0.229, 0.224, 0.225]` 标准差，以对齐 ResNet 在 ImageNet 上的训练预处理，从而避免因均值或方差失配导致的输出偏移，最终在`data`文件夹内得到 `dog1_224_float32.bin`。
 
 3. 快速运行——单输入文件
   运行下面这个命令：
+
   ```bash
   ./msame --model "./model/resnet50.om" --input "./data/dog1_224_float32.bin" --output "./out" --outfmt BIN
   ```
+
   运行成功后，我们会得到以下的信息：
+
   ```bash
   [INFO] acl init success
   [INFO] open device 0 success
@@ -333,6 +375,7 @@ msame 的设计目标是将 OM 模型的快速验证能力标准化，覆蓋单�
   [INFO] end to reset device is 0
   [INFO] end to finalize acl
   ```
+
   + 该日志显示推理流程已完整走通：ACL 初始化、设备上下文、模型加载、输入输出申请均返回 `success`，`Inference time`/`Inference average time` 给出单次与平均耗时，路径 `./out/20251213_11_6_52_564388` 指向本次推理结果目录。该输出目录遵循“YYYYMMDD_H_M_S_microsec”命名：`20251213` 表示日期（2025-12-13），`11_6_52` 为时分秒，`564388` 为微秒级序列号，用于区分同日多次推理结果。
   + 若选择 `--outfmt BIN`，可用 `numpy.fromfile('./out/.../resnet50_output_0.bin', dtype=np.float32).reshape(1, 1000)` 读取并执行 `np.argsort` 获取 TopK；使用 `softmax` 还原概率后结合 ImageNet label 映射即可解读分类结果。
   + 若选择 `--outfmt TXT`，直接 `cat ./out/.../resnet50_output_0.txt | head` 快速查看前若干输出值，同样可以配合脚本解析为 TopK 概率。

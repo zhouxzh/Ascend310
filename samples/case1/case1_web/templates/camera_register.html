@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}摄像头注册 - 人脸识别考勤系统{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-camera me-2"></i>摄像头注册人脸
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="video-container mb-3">
+                            <div id="videoPlaceholder" class="video-placeholder text-center">
+                                <i class="fas fa-camera" style="font-size: 4rem; color: #667eea;"></i>
+                                <h5 class="mt-3">点击"启动摄像头"开始注册</h5>
+                                <p class="text-muted">请确保人脸清晰可见，系统将自动检测人脸</p>
+                            </div>
+                            <img id="videoFeed" src="" alt="Video Feed" style="display: none; width: 100%; border-radius: 10px;">
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="userName" class="form-label">
+                                        <i class="fas fa-user me-2"></i>姓名
+                                    </label>
+                                    <input type="text" class="form-control" id="userName" placeholder="请输入要注册的姓名" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">操作</label>
+                                    <div>
+                                        <button id="startBtn" class="btn btn-primary me-2">
+                                            <i class="fas fa-play me-2"></i>启动摄像头
+                                        </button>
+                                        <button id="stopBtn" class="btn btn-secondary me-2" style="display: none;">
+                                            <i class="fas fa-stop me-2"></i>停止摄像头
+                                        </button>
+                                        <button id="captureBtn" class="btn btn-success" style="display: none;">
+                                            <i class="fas fa-camera me-2"></i>捕获人脸
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-info-circle me-2"></i>注册状态
+                                </h5>
+                                <div id="statusInfo">
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-clock me-2"></i>等待启动摄像头...
+                                    </div>
+                                </div>
+                                
+                                <div id="captureHistory" style="display: none;">
+                                    <h6 class="mt-3">
+                                        <i class="fas fa-history me-2"></i>捕获记录
+                                    </h6>
+                                    <div id="captureList">
+                                        <!-- 捕获记录将在这里显示 -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card border-0 shadow-sm mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-lightbulb me-2"></i>注册建议
+                                </h5>
+                                <ul class="list-unstyled">
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        保持人脸正对摄像头
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        确保光线充足，避免阴影
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        表情自然，眼睛睁开
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        可以多次捕获不同角度
+                                    </li>
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        建议捕获3-5张照片
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.video-container {
+    position: relative;
+    background: #f8f9fa;
+    border-radius: 10px;
+    overflow: hidden;
+    min-height: 400px;
+}
+
+.video-placeholder {
+    padding: 100px 20px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+}
+
+#videoFeed {
+    max-width: 100%;
+    height: auto;
+}
+
+.capture-item {
+    padding: 8px 12px;
+    margin: 4px 0;
+    background: rgba(40, 167, 69, 0.1);
+    border-radius: 8px;
+    font-size: 0.9em;
+    border-left: 3px solid #28a745;
+}
+
+.status-animation {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+</style>
+
+<script>
+let isStreaming = false;
+let captureCount = 0;
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('startBtn').addEventListener('click', startCamera);
+    document.getElementById('stopBtn').addEventListener('click', stopCamera);
+    document.getElementById('captureBtn').addEventListener('click', captureface);
+});
+
+function startCamera() {
+    fetch('/start_camera', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            isStreaming = true;
+            document.getElementById('videoPlaceholder').style.display = 'none';
+            document.getElementById('videoFeed').style.display = 'block';
+            document.getElementById('videoFeed').src = '/video_feed?' + new Date().getTime();
+            
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('stopBtn').style.display = 'inline-block';
+            document.getElementById('captureBtn').style.display = 'inline-block';
+            
+            updateStatus('success', '摄像头已启动，请输入姓名后点击"捕获人脸"');
+        } else {
+            updateStatus('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        updateStatus('error', '启动摄像头失败');
+    });
+}
+
+function stopCamera() {
+    fetch('/stop_camera', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            isStreaming = false;
+            document.getElementById('videoFeed').style.display = 'none';
+            document.getElementById('videoPlaceholder').style.display = 'block';
+            
+            document.getElementById('startBtn').style.display = 'inline-block';
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('captureBtn').style.display = 'none';
+            
+            updateStatus('info', '摄像头已停止');
+        } else {
+            updateStatus('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        updateStatus('error', '停止摄像头失败');
+    });
+}
+
+function captureface() {
+    const userName = document.getElementById('userName').value.trim();
+    
+    if (!userName) {
+        updateStatus('error', '请先输入姓名');
+        document.getElementById('userName').focus();
+        return;
+    }
+    
+    if (!isStreaming) {
+        updateStatus('error', '请先启动摄像头');
+        return;
+    }
+    
+    // 禁用按钮防止重复点击
+    const captureBtn = document.getElementById('captureBtn');
+    captureBtn.disabled = true;
+    captureBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>捕获中...';
+    
+    updateStatus('info', '正在捕获人脸，请保持不动...');
+    
+    fetch('/capture_face', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            name: userName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            captureCount++;
+            updateStatus('success', data.message);
+            addCaptureRecord(userName, captureCount);
+            
+            // 如果是第一次捕获，显示捕获历史区域
+            if (captureCount === 1) {
+                document.getElementById('captureHistory').style.display = 'block';
+            }
+        } else {
+            updateStatus('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        updateStatus('error', '捕获人脸失败');
+    })
+    .finally(() => {
+        // 重新启用按钮
+        captureBtn.disabled = false;
+        captureBtn.innerHTML = '<i class="fas fa-camera me-2"></i>捕获人脸';
+    });
+}
+
+function updateStatus(type, message) {
+    const statusInfo = document.getElementById('statusInfo');
+    const alertClass = type === 'success' ? 'alert-success' : 
+                      type === 'error' ? 'alert-danger' : 'alert-info';
+    const icon = type === 'success' ? 'fas fa-check-circle' : 
+                 type === 'error' ? 'fas fa-exclamation-circle' : 'fas fa-info-circle';
+    
+    statusInfo.innerHTML = `
+        <div class="alert ${alertClass} status-animation">
+            <i class="${icon} me-2"></i>${message}
+        </div>
+    `;
+}
+
+function addCaptureRecord(name, count) {
+    const captureList = document.getElementById('captureList');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    const recordHtml = `
+        <div class="capture-item">
+            <i class="fas fa-camera me-2"></i>
+            ${name} - 第${count}次捕获
+            <br>
+            <small class="text-muted">${timestamp}</small>
+        </div>
+    `;
+    
+    captureList.insertAdjacentHTML('afterbegin', recordHtml);
+}
+
+// 页面卸载时停止摄像头
+window.addEventListener('beforeunload', function() {
+    if (isStreaming) {
+        stopCamera();
+    }
+});
+
+// 回车键快速捕获
+document.getElementById('userName').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && isStreaming) {
+        captureface();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}考勤配置{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-cog"></i> 考勤配置管理
+                </h4>
+            </div>
+            <div class="card-body">
+                <!-- 当前配置显示 -->
+                <div class="alert alert-info" id="currentConfig">
+                    <h5><i class="fas fa-info-circle"></i> 当前配置</h5>
+                    <p class="mb-0">再次打卡间隔时间: <span id="currentInterval">8</span> 小时</p>
+                </div>
+
+                <!-- 配置修改表单 -->
+                <form id="configForm">
+                    <div class="mb-3">
+                        <label for="intervalHours" class="form-label">
+                            <i class="fas fa-clock"></i> 再次打卡间隔时间（小时）
+                        </label>
+                        <input type="number" class="form-control" id="intervalHours" 
+                               min="0.1" max="24" step="0.1" value="8" required>
+                        <div class="form-text">
+                            设置用户再次打卡的最小间隔时间，范围：0.1-24小时
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="button" class="btn btn-secondary me-md-2" onclick="loadConfig()">
+                            <i class="fas fa-sync-alt"></i> 重置
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 保存配置
+                        </button>
+                    </div>
+                </form>
+
+                <!-- 状态消息 -->
+                <div id="statusMessage" class="mt-3" style="display: none;"></div>
+
+                <!-- 使用说明 -->
+                <div class="mt-4">
+                    <h5><i class="fas fa-question-circle"></i> 使用说明</h5>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> 间隔时间控制用户重复打卡的频率</li>
+                        <li><i class="fas fa-check text-success"></i> 设置较短的间隔适用于多次打卡场景</li>
+                        <li><i class="fas fa-check text-success"></i> 设置较长的间隔适用于每日一次打卡</li>
+                        <li><i class="fas fa-check text-success"></i> 配置立即生效，无需重启服务</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 页面加载时获取当前配置
+document.addEventListener('DOMContentLoaded', function() {
+    loadConfig();
+});
+
+// 加载当前配置
+function loadConfig() {
+    fetch('/attendance_config')
+        .then(response => response.json())
+        .then(data => {
+            if (data.interval_hours !== undefined) {
+                document.getElementById('currentInterval').textContent = data.interval_hours;
+                document.getElementById('intervalHours').value = data.interval_hours;
+            }
+        })
+        .catch(error => {
+            console.error('加载配置失败:', error);
+            showMessage('加载配置失败', 'danger');
+        });
+}
+
+// 保存配置
+document.getElementById('configForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const intervalHours = parseFloat(document.getElementById('intervalHours').value);
+    
+    if (intervalHours <= 0 || intervalHours > 24) {
+        showMessage('间隔时间必须在0.1-24小时之间', 'danger');
+        return;
+    }
+    
+    fetch('/attendance_config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            interval_hours: intervalHours
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            document.getElementById('currentInterval').textContent = data.interval_hours;
+        } else {
+            showMessage(data.error || '保存失败', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('保存配置失败:', error);
+        showMessage('保存配置失败', 'danger');
+    });
+});
+
+// 显示状态消息
+function showMessage(message, type) {
+    const statusDiv = document.getElementById('statusMessage');
+    statusDiv.className = `alert alert-${type}`;
+    statusDiv.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}`;
+    statusDiv.style.display = 'block';
+    
+    // 3秒后自动隐藏
+    setTimeout(() => {
+        statusDiv.style.display = 'none';
+    }, 3000);
+}
+</script>
+{% endblock %}

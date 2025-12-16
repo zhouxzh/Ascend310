@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - 人脸识别考勤系统{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body text-center p-5">
+                <div class="mb-4">
+                    <i class="fas fa-user-check" style="font-size: 4rem; color: #667eea;"></i>
+                </div>
+                <h1 class="card-title mb-4">人脸识别考勤系统</h1>
+                <p class="card-text lead mb-5">
+                    基于深度学习的智能人脸识别考勤系统，支持人脸注册、识别和考勤记录管理。
+                </p>
+                
+                <div class="row g-4">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-search mb-3" style="font-size: 2rem; color: #667eea;"></i>
+                                <h5 class="card-title">图片识别</h5>
+                                <p class="card-text">上传照片进行人脸识别，快速确认身份</p>
+                                <a href="{{ url_for('recognize') }}" class="btn btn-primary">
+                                    <i class="fas fa-upload me-2"></i>上传识别
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-video mb-3" style="font-size: 2rem; color: #dc3545;"></i>
+                                <h5 class="card-title">实时识别</h5>
+                                <p class="card-text">使用摄像头进行实时人脸识别和考勤</p>
+                                <a href="{{ url_for('camera_live') }}" class="btn btn-danger">
+                                    <i class="fas fa-video me-2"></i>摄像头识别
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-user-plus mb-3" style="font-size: 2rem; color: #28a745;"></i>
+                                <h5 class="card-title">用户注册</h5>
+                                <p class="card-text">注册新用户的人脸信息到系统数据库</p>
+                                <div class="btn-group-vertical w-100">
+                                    <a href="{{ url_for('register') }}" class="btn btn-success btn-sm mb-2">
+                                        <i class="fas fa-upload me-2"></i>上传注册
+                                    </a>
+                                    <a href="{{ url_for('camera_register') }}" class="btn btn-outline-success btn-sm">
+                                        <i class="fas fa-video me-2"></i>摄像头注册
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-users mb-3" style="font-size: 2rem; color: #ffc107;"></i>
+                                <h5 class="card-title">用户管理</h5>
+                                <p class="card-text">管理已注册用户，查看和删除用户信息</p>
+                                <a href="{{ url_for('user_management') }}" class="btn btn-warning">
+                                    <i class="fas fa-cog me-2"></i>管理用户
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row g-4 mt-4">
+                    <div class="col-lg-6">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-clipboard-list mb-3" style="font-size: 2rem; color: #17a2b8;"></i>
+                                <h5 class="card-title">考勤记录</h5>
+                                <p class="card-text">查看历史考勤记录和统计信息</p>
+                                <a href="{{ url_for('attendance') }}" class="btn btn-info">
+                                    <i class="fas fa-list me-2"></i>查看记录
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-cog mb-3" style="font-size: 2rem; color: #6c757d;"></i>
+                                <h5 class="card-title">考勤配置</h5>
+                                <p class="card-text">设置再次打卡的间隔时间和其他考勤参数</p>
+                                <a href="{{ url_for('attendance_config_page') }}" class="btn btn-secondary">
+                                    <i class="fas fa-cog me-2"></i>配置设置
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-info-circle me-2"></i>系统特性
+                </h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                基于MTCNN的高精度人脸检测
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                MobileFaceNet轻量级特征提取
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                支持多种图片格式上传
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                实时考勤记录和管理
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                响应式Web界面设计
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                基于Ascend NPU加速推理
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

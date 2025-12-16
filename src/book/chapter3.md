@@ -6,14 +6,12 @@ subject: "Markdown"
 keywords: [边缘计算, 算子]
 lang: zh-cn
 ---
+PyTorch 是以动态计算图著称的深度学习框架，核心由灵活的张量运算与自动微分系统构成。eager execution 让调试、可视化和原型迭代更直观，而 TorchScript 则提供图模式部署以兼顾性能与可移植性。配合丰富的 TorchVision、TorchAudio、TorchText 等生态包，开发者可以在视觉、语音、自然语言处理等任务上快速搭建端到端方案。
 
-## PyTorch简介
+Ascend Extension for PyTorch 是华为昇腾为 PyTorch 用户提供的深度适配插件，使 PyTorch 能无缝调用昇腾 AI 处理器算力，沿用原生接口并针对算子、通信与调度做深度优化。项目源码可在官方仓库获取，更多动态可关注昇腾社区。
 
-PyTorch 是一个以动态计算图著称的深度学习框架，核心由灵活的张量运算和自动微分系统构成。其 eager execution 模式让调试、可视化与原型迭代更加直观；TorchScript 则支持图模式部署，兼顾性能与可移植性。配合丰富的 torchvision、torchaudio、torchtext 等生态包，用户可以快速在计算机视觉、语音、自然语言处理等任务上构建端到端管线。-+-+-+-+-+
+虽然当前已有 CANN、MindSpore 等优秀深度学习框架，但在 PyTorch 广泛应用的背景下，先基于 PyTorch 学习并借助昇腾插件迁移至昇腾 310B，既能降低学习门槛，又可减少适配成本、缩短开发周期。
 
-## Ascend Extension for PyTorch 概览
-
-Ascend Extension for PyTorch是华为昇腾面向PyTorch用户提供的深度学习适配框架。通过该插件，PyTorch可无缝调用昇腾AI处理器的算力，继承原生PyTorch生态接口，同时针对昇腾NPU在算子、通信和调度上的特性做了深度优化。项目源码可在官方仓库查阅，更多社区资讯可前往昇腾社区获取。
 
 ## 架构速览
 
@@ -146,6 +144,256 @@ for epoch in range(epochs):
 
 执行 `python3 train.py` 即可启动在昇腾NPU上的训练。生成的 `checkpoint.pth.tar` 权重文件意味着迁移流程完成。Atlas训练系列需要混合精度支持才能充分发挥算力；若在Atlas A2/A3平台，可根据模型稳定性决定是否启用AMP。
 
+## 训练模型迁移调优指南
+
+本章面向已经具备 PyTorch 训练实战的工程师与研究者，默认读者能够使用 Python 构建与调试模型，熟悉数据并行、分布式训练与性能分析，并能在 GPU 平台上复现基线结果。我们聚焦三个核心问题：如何以最小改动将现有模型迁移到昇腾 310B，如何验证精度与性能一致性，以及在调试定位时应遵循怎样的思路。
+
+PyTorch 以动态计算图、灵活的张量运算和自动微分能力著称，配合 TorchVision、TorchAudio、TorchText 等生态包，在视觉、语音、自然语言任务上具备极高生产力。Ascend Extension for PyTorch（`torch_npu`）让这些能力顺畅延伸至昇腾 310B：它继承原生接口、深度适配 CANN 算子与通信库，并针对调度链路做专项优化，使开发者既能保留熟悉的 Python 体验，又能释放昇腾 AI 处理器的高吞吐算力。官方源码托管于昇腾社区，读者可结合本章的“了解架构—评估可行—迁移落地—调试验收”流程查阅示例与最佳实践，快速形成一套可复用的 VuePress 电子书写作模版。
+
+### 模型选取策略
+
+优先选择维护活跃、版本清晰的参考实现：PyTorch 官方仓库（Vision、Text 等子项目）、Meta Research 的 Detectron/Detectron2、OpenMMLab 的 MMDetection 与 MMPose，都能提供稳定的脚本基础。大模型可参考 HuggingFace、Megatron-LM、Llama-Factory 等仓库，并结合本章给出的 Megatron-LM 迁移要点。
+
+### 约束与已知限制
+
+迁移前要确认：模型在原平台（通常是 GPU）可稳定训练，能够输出精度和性能基线；本地已按照《Ascend Extension for PyTorch 软件安装指南》完成 NPU 驱动、固件、CANN Toolkit/Kernels/NNAL 以及 `torch_npu` 的部署。已知限制包括：`torch.nn.parallel.DataParallel` 需切换为 `DistributedDataParallel`；APEX 的 FusedAdam 只能手工迁移；bmtrain 框架尚未支持；bitsandbytes 仅提供 NF4 量化/反量化能力；colossai HybridAdam、xFormers 的 FlashAttentionScore 需替换或额外适配；`grouped_gemm` 暂不可用，`composer` 虽可安装但缺少 NPU 适配。提前知悉这些边界可以避免后续返工。
+
+### 环境搭建
+
+以 Atlas 800T A2 训练服务器为例：安装匹配的驱动与固件，参考《CANN 软件安装指南》（商用/社区版）在物理机上离线部署软件，业务场景选择“训练&推理&开发调试”，操作系统兼容性可在官方助手查询。完成基础环境后，按照《Ascend Extension for PyTorch 软件安装指南》配置 PyTorch 及 `torch_npu`。
+
+## 可行性分析
+
+PyTorch Analyse 工具提供了一次“体检”能力，帮助快速评估算子、API 和第三方库在昇腾平台的支持度。它包含四种模式：第三方库扫描用于定位不支持的 API；训练脚本 API 分析用于输出不兼容的 torch/cuda 调用及调优建议；动态 shape 分析识别需要特殊处理的输入维度；亲和 API 模式列出可替换为 NPU 友好接口的候选。若分析结果显示仍有算子缺失，可以在脚本里寻找等价替换，或参考《CANN Ascend C/TBE&AI CPU 算子开发指南》补齐，也可在昇腾社区提交需求。
+
+## 迁移流程概览
+
+整体流程分三条主线：脚本迁移、环境与启动配置、关键特性适配。实际操作可按“脚本→环境→特性”的顺序逐步验证；若过程中遇到问题，再依序排查即可。以下分别介绍三种迁移方式。
+
+### 自动迁移（推荐）
+
+自动迁移只需在脚本中导入 `transfer_to_npu`，运行时会自动把 CUDA 接口替换为 NPU 接口，非常适合快速验证。注意 `channel_last` 目前尚未适配，可改用 `contiguous`；若脚本在 `init_process_group` 后通过字符串判断 `nccl`，需要改写为 `hccl`；`torch.jit.script` 与自动迁移的动态特性冲突，此类脚本建议改用工具迁移。示例：
+
+```python
+import torch
+import torch_npu  # PyTorch<=2.4 时需要显式导入
+from torch_npu.contrib import transfer_to_npu
+```
+
+引入后按常规方式启动训练；能正常打印迭代日志意味着训练链路已迁移成功，能保存权重则表明推理/导出路径也可复用。若仍有 CUDA 接口报错，可结合 PyTorch Analyse 的报告定位未适配的 API。
+
+### 工具迁移
+
+当代码规模较大或需要生成迁移报告时，可使用 `Ascend-cann-toolkit` 提供的 `pytorch_gpu2npu.sh`。先根据《CANN 软件安装指南》部署 toolkit，再安装 `pandas>=1.2.4`、`libcst`、`prettytable`、`jedi` 等依赖，进入 `ascend-toolkit/latest/tools/ms_fmk_transplt/` 目录执行：
+
+```bash
+./pytorch_gpu2npu.sh -i /home/train -o /home/out -v 2.1.0 [-s] [distributed -m /home/train/train.py -t model]
+```
+
+`-i/-o/-v` 分别指定输入目录、输出目录与 PyTorch 版本；`-s` 允许通过环境变量 `DEVICE_ID` 指定设备；`distributed` 可在迁移阶段生成多卡脚本，并要求提供入口脚本 `-m` 与模型变量 `-t`（默认 `model`）。工具会输出转换后的脚本树、日志、算子清单以及 `run_distributed_npu.sh`，只需将其中的 `please input your shell script here` 替换成实际训练命令，即可启动多卡作业。
+
+### 手工迁移
+
+对于结构高度定制的脚本，可以选择手工迁移。典型步骤是引入 `torch_npu`、将设备切换为 NPU、逐步替换 CUDA API，并在多卡场景下切换通信后端至 HCCL：
+
+```python
+# 迁移前
+device = torch.device('cuda:{}'.format(local_rank))
+model.to(device)
+
+# 迁移后
+device = torch.device('npu:{}'.format(local_rank))
+model.to(device)
+```
+
+常见替换还包括 `torch.cuda.set_device`→`torch_npu.npu.set_device`、`model.cuda()`→`model.npu()`、`tensor.cuda(non_blocking=True)`→`tensor.npu(non_blocking=True)` 等。其余接口可对照《API 参考》或“常见 PyTorch 迁移替换接口”章节逐一处理。
+
+## 脚本迁移示例：MNIST CNN
+
+以下示例展示如何把一个 GPU 版 MNIST CNN 脚本迁移到昇腾 NPU，并启用混合精度训练。
+
+### 基准脚本
+
+```python
+import time
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+import torchvision
+
+device = torch.device('cuda:0')
+
+class CNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(1, 16, 3, 1, 1),
+            nn.MaxPool2d(2),
+            nn.Conv2d(16, 32, 3, 1, 1),
+            nn.MaxPool2d(2),
+            nn.Flatten(),
+            nn.Linear(32 * 7 * 7, 16),
+            nn.ReLU(),
+            nn.Linear(16, 10)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+train_data = torchvision.datasets.MNIST(
+    root='mnist',
+    download=True,
+    train=True,
+    transform=torchvision.transforms.ToTensor()
+)
+
+batch_size = 64
+model = CNN().to(device)
+train_dataloader = DataLoader(train_data, batch_size=batch_size)
+loss_func = nn.CrossEntropyLoss().to(device)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+epochs = 10
+
+for epoch in range(epochs):
+    for imgs, labels in train_dataloader:
+        imgs = imgs.to(device)
+        labels = labels.to(device)
+        outputs = model(imgs)
+        loss = loss_func(outputs, labels)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+torch.save({
+    'epoch': epochs,
+    'arch': CNN,
+    'state_dict': model.state_dict(),
+    'optimizer': optimizer.state_dict(),
+}, 'checkpoint.pth.tar')
+```
+
+### 启用昇腾算力
+
+在 NPU 脚本中，将设备切换为 `torch.device('npu:0')`，并导入 `torch_npu`、`amp` 以及 `transfer_to_npu`：
+
+```python
+import torch_npu
+from torch_npu.npu import amp
+from torch_npu.contrib import transfer_to_npu
+
+device = torch.device('npu:0')
+transfer_to_npu(model)
+loss_func = nn.CrossEntropyLoss().to(device)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+scaler = amp.GradScaler()
+```
+
+### 混合精度训练循环
+
+```python
+for epoch in range(epochs):
+    for imgs, labels in train_dataloader:
+        imgs = imgs.to(device)
+        labels = labels.to(device)
+        with amp.autocast():
+            outputs = model(imgs)
+            loss = loss_func(outputs, labels)
+        optimizer.zero_grad()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+```
+
+执行 `python3 train.py` 即可在昇腾 NPU 上完成训练，生成的 `checkpoint.pth.tar` 说明迁移流程已闭环。Atlas 训练系列建议启用混合精度以充分发挥算力；Atlas A2/A3 则可根据模型稳定性酌情选择。
+
+## 调试方法
+
+### 打印与同步
+
+调试前可以在关键节点插入同步打印，确保日志与真正的执行顺序一致：
+
+```python
+print(torch.npu.synchronize(), "debug message")
+print(inputs.shape, inputs.dtype)
+```
+
+### `pdb` 断点
+
+在脚本中引入 `pdb`，通过 `pdb.set_trace()` 或 `breakpoint()` 设置断点，命令行可用 `n` 单步、`p var` 查看变量，用于快速定位 Python 级别的问题。
+
+### `gdb` 调试
+
+若出现 coredump，可按以下步骤处理：设置 `ulimit -c unlimited` 以启用 core 文件，使用 `sysctl -w kernel.core_pattern=core-%e.%p.%h.%t` 指定命名规则；当进程崩溃后，运行 `gdb python3 core.xxx`，通过 `bt`、`info break` 等命令查看堆栈和断点信息。
+
+### Hook 定位
+
+对需要跟踪的模块注册正反向 hook，可迅速锁定出错算子：
+
+```python
+def hook_func(name, module):
+    def hook_function(module, inputs, outputs):
+        print(name)
+    return hook_function
+
+for name, module in model.named_modules():
+    if module is not None:
+        module.register_forward_hook(hook_func('[forward]:' + name, module))
+        module.register_backward_hook(hook_func('[backward]:' + name, module))
+```
+
+## 模型保存
+
+`torch.save(model.state_dict(), path)` 可生成 `.pth/.pt` 文件，专注于权重参数，适合在线推理或导出 ONNX；`.pth.tar` 以字典形式同时保存 epoch、损失、模型和优化器状态，便于断点续训。保存前建议创建明确的路径：
+
+```python
+save_pt_path = "state_dict_model.pt"
+torch.save(model.state_dict(), save_pt_path)
+
+checkpoint_path = "checkpoint.pth.tar"
+torch.save({
+    'epoch': epoch,
+    'loss': loss,
+    'state_dict': model.state_dict(),
+    'optimizer': optimizer.state_dict(),
+}, checkpoint_path)
+```
+
+恢复时记得重新构建模型与优化器，再调用 `load_state_dict`，并在推理前执行 `model.eval()` 关闭 Dropout、BatchNorm 的训练分支。
+
+## 导出 ONNX
+
+PyTorch 官方 `torch.onnx.export` 接口可将 `.pth/.pt` 或 `.pth.tar` 权重转换为 ONNX，然后使用 ATC 编译为 `.om` 文件以适配昇腾 AI 处理器。导出前请确保已调用 `model.eval()`、构造与训练一致的输入输出形状，并根据需要设置 `opset_version` 和动态轴：
+
+```python
+import torch
+import torch.onnx
+
+model = ToyModel()
+model.load_state_dict(torch.load('state_dict_model.pt', map_location='cuda'), strict=False)
+model.eval()
+dummy_input = torch.randn(20, 10)
+
+torch.onnx.export(
+    model,
+    dummy_input,
+    "model.onnx",
+    input_names=["input"],
+    output_names=["output"],
+    opset_version=11,
+    dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}}
+)
+```
+
+若使用 `.pth.tar`，可通过整理 `state_dict` 的前缀来对齐节点名称，再执行同样的导出流程。编译阶段建议保持与训练一致的 `--op_select_implmode` 以避免精度差异。
+
+## 自定义算子导出提示
+
+使用 `torch_npu` 自定义算子时，需要在导出脚本中 `import torch_npu.onnx` 并确保调用形式为 `torch_npu.xxx`（而非 `torch.xxx`）。Inplace 或 out 形式的算子需要改为常规版本，例如 `torch_npu.npu_silu_(input)` 可替换为 `input = torch_npu.npu_silu(input)`。若模型继承 `torch.autograd.Function` 并带有自定义正反向，需要重新实现或提供 `symbolic` 函数；`npu_conv2d/npu_conv3d` 在部分版本会触发 `allow_tf32` 相关报错，可参考《常见问题》章节的解决方案。
+
+## 精度调试流程
+
+大模型迁移往往受到硬件差异、超参设置和数据质量的共同影响。昇腾 NPU 与主流 AI 处理器在浮点舍入模式（新增 A 模式、O 模式）和计算顺序上存在差异，但实验显示只要训练过程稳定，这些差异对最终收敛影响有限。例如，在 LLaMA2-1B 上人为注入 ±1% 的无偏误差，1000 步后的 Loss 仍可控；在 LLaMA2-7B 的对比实验中，主流处理器与 NPU 在 8000 步内的 Loss 差异保持在 0.6% 以内，参数余弦相似度高达 0.965。实际案例也表明：调低学习率、关闭 Dropout 或修复分布式库的同步 Bug，往往即可让 Loss 曲线重新对齐，甚至在 Qwen-1.8B 等模型上获得更好的表现。调试过程可按照“保证训练稳定→比较 Loss 趋势→检查超参→定位算子差异”的顺序推进。
+
 ## 进阶阅读
 
-更多迁移调优技巧可参见《PyTorch 训练模型迁移调优指南》。若计划扩展到大模型或多模态场景，可进一步阅读如下材料：分布式训练可参考《分布式训练加速库迁移指南》，大语言模型可结合MindSpeed LLM套件文档，多模态任务可查阅MindSpeed MM迁移指南，而强化学习/多模态联训可阅读MindSpeed RL使用指南。
+若希望进一步深入，可查阅《PyTorch 训练模型迁移调优指南》；分布式训练建议阅读《分布式训练加速库迁移指南》；大模型和多模态场景可结合《MindSpeed LLM 迁移指南》《MindSpeed MM 迁移调优指南》；强化学习或多模态联训可参考《MindSpeed RL 使用指南》。这些资料与本章内容互补，能帮助读者构建完整的昇腾 310B 迁移实践体系。

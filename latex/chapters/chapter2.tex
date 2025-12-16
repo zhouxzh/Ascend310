@@ -52,12 +52,22 @@ CANN
 通过提供分层清晰的编程与运行时结构，以覆盖训练与推理的``全场景''、贴近主流框架的``低门槛''以及面向昇腾硬件深度优化的``高性能''为核心特性，支撑用户在昇腾平台上快速构建与部署各类
 AI 应用与业务。从整体上看，CANN
 可以抽象为一个自上而下递进的五层架构（计算语言接口、计算服务层、计算编译引擎、计算执行引擎与计算基础层），如图\ref{fig:architecture}所示。各层通过稳定的接口与数据流协议进行解耦协同，在保证语义一致性的前提下最大化发挥底层算力与能效潜力。
+
+\begin{figure}
+\centering
 \includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={CANN架构图}]{chapters/img2/CANN_Architecture.png}
+\caption{CANN架构图}\label{fig:architecture}
+\end{figure}
 
 在分层结构上，CANN可抽象为五个层次：上层的计算语言接口------AscendCL接口负责设备与上下文管理、流与内存控制、模型与算子的加载执行，以及媒体与图管理等通用API，为应用提供稳定的编程入口；其下的昇腾计算服务层汇聚神经网络与线性代数库，承载算子与子图的自动调优、梯度优化与模型压缩，并通过框架适配器降低迁移成本；昇腾计算编译层的编译引擎通过图编译器与TBE算子开发支持，把前端计算图转化为在NPU可执行的模型与内核，实现图级语义到后端实现的精准映射；下一层的昇腾执行引擎面向运行时，负责模型与算子的调度执行，并内置数字视觉与AI预处理、集合通信等能力以提升端到端效率；最下层的昇腾计算基础层提供共享虚拟内存、设备虚拟化与主机---设备通信等底座服务，保证跨设备数据流与资源管理的可靠性与可扩展性。
 
 与此相辅的是三层逻辑架构：应用层承载具体业务与开发者工具，芯片使能层开放解决方案能力并驱动基于计算图的业务流运行，计算资源层则聚焦数据处理与运算执行，形成从业务到硬件的清晰闭环。这个CANN的三层逻辑结构如下图\ref{fig:cann_logic}所示:
+
+\begin{figure}
+\centering
 \includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={CANN架构图}]{chapters/img2/CANN_logic.png}
+\caption{CANN架构图}\label{fig:cann_logic}
+\end{figure}
 
 在技术特性上，CANN通过对计算图的编译与优化，将密集算子与数据流合理分配到异构单元上执行，显著提升吞吐与时延表现，并在能效上取得可工程化的优势；同时提供贴近主流框架的易用接口与完善的工具链，降低入门与迁移门槛，使开发者能够快速完成部署与调优。生态方面，CANN构建了面向个人、高校、科研与企业的赋能体系，并与开源社区协同，支持多种框架与推理引擎在异构硬件上的高效运行。依托这些能力，开发者可以深入调用运行时与图编译能力，释放底层硬件潜力，在性能与成本维度形成差异化竞争力。
 
@@ -91,7 +101,7 @@ Ascend IR 的单算子描述文件（JSON）编译为昇腾 AI
 
 \begin{figure}
 \centering
-\includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={ATC框架图}]{chapters/img2/atc.png}
+\includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={ATC框架图}]{chapters/img2/atc.png}
 \caption{ATC框架图}\label{fig:atc}
 \end{figure}
 
@@ -144,7 +154,13 @@ Version）是否在当前CANN版本的支持范围内。如果遇到不支持的
 \subsection{ATC工具使用流程}\label{atcux5de5ux5177ux4f7fux7528ux6d41ux7a0b}
 
 使用ATC工具进行模型转换的使用流程如下图所示：
-\includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={ATC流程图}]{chapters/img2/atc_flow.png}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={ATC流程图}]{chapters/img2/atc_flow.png}
+\caption{ATC流程图}\label{fig:atc_flow}
+\end{figure}
+
 在开始模型转换之前，首先需要在开发环境中安装与 CANN
 软件包版本相匹配的版本，并确保 ATC
 可执行文件的路径可用。接下来，准备待转换的模型文件或基于 Ascend IR
@@ -336,7 +352,7 @@ export MAX_COMPILE_CORE_NUMBER=1   # 限制图编译占用的 CPU 核数
 \item
   若无法确认当前设备的
   \passthrough{\lstinline!soc\_version!}，可在安装驱动的昇腾310B上执行
-  \passthrough{\lstinline!npu-smi info!} 查询，示例如下：\\
+  \passthrough{\lstinline!npu-smi info!} 查询，示例如下：
 \end{enumerate}
 
 \begin{lstlisting}[language=bash]
@@ -518,6 +534,7 @@ NHWC，只需在模型与预处理两端同时调整即可。
 由于这个图片是jpg格式的，因此为了可以利用这个图片推理，我们第一步需要对图片进行预处理，具体过程如何：
 1.
 在src文件目录创建一个预处理的python文件``make\_bin\_resnet224\_float32.py''如下：
+
 ```python make\_bin\_resnet224\_float32.py from PIL import Image import
 numpy as np
 
@@ -574,24 +591,56 @@ ImageNet
 \end{lstlisting}
 
 运行成功后，我们会得到以下的信息：
-\passthrough{\lstinline!bash   [INFO] acl init success   [INFO] open device 0 success   [INFO] create context success   [INFO] create stream success   [INFO] get run mode success   [INFO] load model ./model/resnet50.om success   [INFO] create model description success   [INFO] get input dynamic gear count success   [INFO] create model output success   ./out/20251213\_11\_6\_52\_564388   [INFO] start to process file:./data/dog1\_224\_float32.bin   [INFO] model execute success   Inference time: 6.811ms   [INFO] get max dynamic batch size success   [INFO] output data success   Inference average time: 6.811000 ms   [INFO] destroy model input success   [INFO] unload model success, model Id is 1   [INFO] pid: 98299 Execute sample success   [INFO] end to destroy stream   [INFO] end to destroy context   [INFO] end to reset device is 0   [INFO] end to finalize acl!}
-+ 该日志显示推理流程已完整走通：ACL
-初始化、设备上下文、模型加载、输入输出申请均返回
-\passthrough{\lstinline!success!}，\passthrough{\lstinline!Inference time!}/\passthrough{\lstinline!Inference average time!}
-给出单次与平均耗时，路径
-\passthrough{\lstinline!./out/20251213\_11\_6\_52\_564388!}
-指向本次推理结果目录。该输出目录遵循``YYYYMMDD\_H\_M\_S\_microsec''命名：\passthrough{\lstinline!20251213!}
-表示日期（2025-12-13），\passthrough{\lstinline!11\_6\_52!}
-为时分秒，\passthrough{\lstinline!564388!}
-为微秒级序列号，用于区分同日多次推理结果。 + 若选择
-\passthrough{\lstinline!--outfmt BIN!}，可用
-\passthrough{\lstinline!numpy.fromfile('./out/.../resnet50\_output\_0.bin', dtype=np.float32).reshape(1, 1000)!}
-读取并执行 \passthrough{\lstinline!np.argsort!} 获取 TopK；使用
-\passthrough{\lstinline!softmax!} 还原概率后结合 ImageNet label
-映射即可解读分类结果。 + 若选择
-\passthrough{\lstinline!--outfmt TXT!}，直接
-\passthrough{\lstinline!cat ./out/.../resnet50\_output\_0.txt | head!}
-快速查看前若干输出值，同样可以配合脚本解析为 TopK 概率。
+
+\begin{lstlisting}[language=bash]
+[INFO] acl init success
+[INFO] open device 0 success
+[INFO] create context success
+[INFO] create stream success
+[INFO] get run mode success
+[INFO] load model ./model/resnet50.om success
+[INFO] create model description success
+[INFO] get input dynamic gear count success
+[INFO] create model output success
+./out/20251213_11_6_52_564388
+[INFO] start to process file:./data/dog1_224_float32.bin
+[INFO] model execute success
+Inference time: 6.811ms
+[INFO] get max dynamic batch size success
+[INFO] output data success
+Inference average time: 6.811000 ms
+[INFO] destroy model input success
+[INFO] unload model success, model Id is 1
+[INFO] pid: 98299 Execute sample success
+[INFO] end to destroy stream
+[INFO] end to destroy context
+[INFO] end to reset device is 0
+[INFO] end to finalize acl
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  该日志显示推理流程已完整走通：ACL
+  初始化、设备上下文、模型加载、输入输出申请均返回
+  \passthrough{\lstinline!success!}，\passthrough{\lstinline!Inference time!}/\passthrough{\lstinline!Inference average time!}
+  给出单次与平均耗时，路径
+  \passthrough{\lstinline!./out/20251213\_11\_6\_52\_564388!}
+  指向本次推理结果目录。该输出目录遵循``YYYYMMDD\_H\_M\_S\_microsec''命名：\passthrough{\lstinline!20251213!}
+  表示日期（2025-12-13），\passthrough{\lstinline!11\_6\_52!}
+  为时分秒，\passthrough{\lstinline!564388!}
+  为微秒级序列号，用于区分同日多次推理结果。
+\item
+  若选择 \passthrough{\lstinline!--outfmt BIN!}，可用
+  \passthrough{\lstinline!numpy.fromfile('./out/.../resnet50\_output\_0.bin', dtype=np.float32).reshape(1, 1000)!}
+  读取并执行 \passthrough{\lstinline!np.argsort!} 获取 TopK；使用
+  \passthrough{\lstinline!softmax!} 还原概率后结合 ImageNet label
+  映射即可解读分类结果。
+\item
+  若选择 \passthrough{\lstinline!--outfmt TXT!}，直接
+  \passthrough{\lstinline!cat ./out/.../resnet50\_output\_0.txt | head!}
+  快速查看前若干输出值，同样可以配合脚本解析为 TopK 概率。
+\end{itemize}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
