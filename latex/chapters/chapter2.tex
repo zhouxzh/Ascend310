@@ -89,6 +89,121 @@ Kernel
 Ascend 310B
 等专用加速平台上沉淀出可复用的优化经验与差异化性能优势，不仅在算力利用率与综合成本上形成工程级竞争力，也为大模型与行业应用场景的规模化加速落地提供坚实的基础设施支撑。
 
+\subsection{CANN的快速安装}\label{cannux7684ux5febux901fux5b89ux88c5}
+
+本节给出 CANN
+软件的极速安装示例。若需更完整的操作指导，请按实际环境选择对应安装场景并参考\href{https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html}{官方说明}。推荐优先使用
+Conda 在线安装：无需额外依赖，可直接获取最新版本。
+
+\subsubsection{安装前准备}\label{ux5b89ux88c5ux524dux51c6ux5907}
+
+\begin{itemize}
+\tightlist
+\item
+  确认目标设备已正确安装 NPU
+  驱动与固件，我们可以直接用命令'npu-smi'查看输出信息，如果有输出信息，证明NPU驱动与固件已经安装。一般来说，对了昇腾310B的产品，系统都自带有NPU驱动以及固件的。\\
+\item
+  推荐使用在线安装（Conda）方式，无需安装前置依赖，可直接安装最新版本的软件包。
+\item
+  若不采用 Conda 在线安装，需要提前准备 Python 环境及
+  \passthrough{\lstinline!pip3!}，当前支持 Python 3.7.x--3.11.4。\\
+\item
+  离线安装时，请先下载所需 CANN
+  软件包并上传至任意可访问路径后再执行安装。
+\end{itemize}
+
+\subsubsection{安装命令与依赖说明}\label{ux5b89ux88c5ux547dux4ee4ux4e0eux4f9dux8d56ux8bf4ux660e}
+
+\begin{itemize}
+\item
+  安装 Toolkit 开发套件
+
+\begin{lstlisting}[language=bash]
+conda config --add channels https://repo.huaweicloud.com/ascend/repos/conda/
+conda install ascend::cann-toolkit
+\end{lstlisting}
+
+  若出现如下错误：
+
+\begin{lstlisting}[language=bash]
+EnvironmentNotWritableError: The current user does not have write permissions to the target environment.
+environment location: /usr/local/miniconda3
+uid: 1000
+gid: 1000
+\end{lstlisting}
+
+  通常是因为 Miniconda 安装在
+  \passthrough{\lstinline!/usr/local!}，目录权限归属
+  root，而日常使用的账号（如
+  \passthrough{\lstinline!HwHiAiUser!}）无写入权限。可按两种方式处理：其一使用
+  \passthrough{\lstinline!su!} 切换 root
+  再安装；其二直接将目录所有权授予当前用户，命令如下：
+
+\begin{lstlisting}[language=bash]
+sudo chown -R HwHiAiUser /usr/local/miniconda3/
+\end{lstlisting}
+
+  完成后重新执行安装命令。整个安装过程大概会持续几分钟，请耐心等待。
+\item
+  配置环境变量
+
+\begin{lstlisting}[language=bash]
+source /usr/local/miniconda3/Ascend/ascend-toolkit/set_env.sh
+\end{lstlisting}
+\item
+  安装 Kernels 算子包（310B 平台）
+
+\begin{lstlisting}[language=bash]
+conda install ascend::cann-kernels-310b
+\end{lstlisting}
+\end{itemize}
+
+安装后配置
+
+\begin{itemize}
+\item
+  安装业务运行时所需的 Python 第三方库（使用非 root 用户时保留 --user
+  参数）
+
+\begin{lstlisting}[language=bash]
+pip3 install --user \
+  attrs cython 'numpy>=1.19.2,<=1.24.0' decorator sympy cffi pyyaml pathlib2 \
+  psutil protobuf==3.20.0 scipy requests absl-py --user
+\end{lstlisting}
+\item
+  说明
+
+  \begin{itemize}
+  \tightlist
+  \item
+    若使用 root 用户，请去掉上述命令中的
+    \passthrough{\lstinline!--user!}。
+  \item
+    以上依赖版本范围适配常见环境；如出现冲突，请根据实际
+    Python/操作系统版本调整。
+  \end{itemize}
+\end{itemize}
+
+\subsection{CANN的离线安装}\label{cannux7684ux79bbux7ebfux5b89ux88c5}
+
+CANN的离线安装有两种方式，一个是利用deb包，利用dpkg进行安装，例如安装CANN版本8.3.RC1
+- 使用 deb 包离线安装（示例：8.3.RC1，310B）：
+
+\begin{lstlisting}[language=bash]
+sudo dpkg -i Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.deb
+\end{lstlisting}
+
+\begin{itemize}
+\tightlist
+\item
+  使用 run 包离线安装：
+\end{itemize}
+
+\begin{lstlisting}[language=bash]
+sudo chmod +x Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
+sudo ./Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
+\end{lstlisting}
+
 \section{ATC模型转换详解}\label{atcux6a21ux578bux8f6cux6362ux8be6ux89e3}
 
 \subsection{ATC工具介绍}\label{atcux5de5ux5177ux4ecbux7ecd}
