@@ -2,15 +2,15 @@
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
-\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+\section{1. 项目简介}\label{1-ux9879ux76eeux7b80ux4ecb}
 
-本项目通过结合计算机视觉和音频处理技术，创造了一种全新的交互式音乐体验。系统利用昇腾310B的AI算力，实时识别用户的手势或特定图像标记，并将其转换为相应的音符和音效，从而实现''隔空弹琴''的神奇效果。
+本项目通过结合计算机视觉和音频处理技术，创造了一种全新的交互式音乐体验。系统利用昇腾310B的AI算力，实时识别用户的手势或特定图像标记，并将其转换为相应的音符和音效，从而实现"隔空弹琴"的神奇效果。
 该项目不仅展示了AI在艺术创作领域的应用潜力，也为音乐教育、娱乐互动和无障碍音乐演奏提供了创新的解决方案。无论是音乐爱好者还是技术探索者，都能从这个项目中获得乐趣和启发。
 项目的源代码可以从\href{https://github.com/zhouxzh/Ascend310/tree/main/samples/case3}{这里}下载。
 
-\section{2. 内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
+\section{2. 内容大纲}\label{2-ux5185ux5bb9ux5927ux7eb2}
 
-\subsection{2.1. 硬件准备}\label{ux786cux4ef6ux51c6ux5907}
+\subsection{2.1. 硬件准备}\label{21-ux786cux4ef6ux51c6ux5907}
 
 \begin{itemize}
 \tightlist
@@ -52,7 +52,7 @@
  音响设备  LED灯  显示器
 \end{lstlisting}
 
-\subsection{2.2. 软件环境}\label{ux8f6fux4ef6ux73afux5883}
+\subsection{2.2. 软件环境}\label{22-ux8f6fux4ef6ux73afux5883}
 
 \begin{itemize}
 \tightlist
@@ -120,7 +120,7 @@ echo "智能电子琴环境安装完成!"
 \end{lstlisting}
 
 \subsection{2.3.
-手势识别与音符映射}\label{ux624bux52bfux8bc6ux522bux4e0eux97f3ux7b26ux6620ux5c04}
+手势识别与音符映射}\label{23-ux624bux52bfux8bc6ux522bux4e0eux97f3ux7b26ux6620ux5c04}
 
 \begin{itemize}
 \item
@@ -139,7 +139,19 @@ echo "智能电子琴环境安装完成!"
   \end{itemize}
 \item
   \textbf{音符映射系统}:
-  \passthrough{\lstinline!python   \# 手势到音符的映射示例   gesture\_to\_note = \{       'one\_finger': 'C4',      \# 1个手指 = C调       'two\_fingers': 'D4',     \# 2个手指 = D调       'three\_fingers': 'E4',   \# 3个手指 = E调       'four\_fingers': 'F4',    \# 4个手指 = F调       'five\_fingers': 'G4',    \# 5个手指 = G调       'fist': 'REST',          \# 握拳 = 休止符       'palm\_open': 'CHORD'     \# 张开手掌 = 和弦   \}!}
+
+\begin{lstlisting}[language=Python]
+# 手势到音符的映射示例
+gesture_to_note = {
+    'one_finger': 'C4',      # 1个手指 = C调
+    'two_fingers': 'D4',     # 2个手指 = D调
+    'three_fingers': 'E4',   # 3个手指 = E调
+    'four_fingers': 'F4',    # 4个手指 = F调
+    'five_fingers': 'G4',    # 5个手指 = G调
+    'fist': 'REST',          # 握拳 = 休止符
+    'palm_open': 'CHORD'     # 张开手掌 = 和弦
+}
+\end{lstlisting}
 \item
   \textbf{高级识别功能}:
 
@@ -155,10 +167,9 @@ echo "智能电子琴环境安装完成!"
 \end{itemize}
 
 \subsection{2.4.
-模型训练与优化}\label{ux6a21ux578bux8badux7ec3ux4e0eux4f18ux5316}
+模型训练与优化}\label{24-ux6a21ux578bux8badux7ec3ux4e0eux4f18ux5316}
 
 \begin{itemize}
-\tightlist
 \item
   \textbf{手势识别模型}:
 
@@ -203,7 +214,7 @@ echo "智能电子琴环境安装完成!"
 \end{itemize}
 
 \subsection{2.5.
-音频合成与处理}\label{ux97f3ux9891ux5408ux6210ux4e0eux5904ux7406}
+音频合成与处理}\label{25-ux97f3ux9891ux5408ux6210ux4e0eux5904ux7406}
 
 \begin{itemize}
 \item
@@ -220,7 +231,17 @@ echo "智能电子琴环境安装完成!"
   \end{itemize}
 \item
   \textbf{音效处理}:
-  \passthrough{\lstinline!python   \# 音效处理管道示例   audio\_pipeline = [       'reverb',           \# 混响效果       'equalizer',        \# 均衡器       'compressor',       \# 压缩器       'delay',           \# 延迟效果       'chorus'           \# 合唱效果   ]!}
+
+\begin{lstlisting}[language=Python]
+# 音效处理管道示例
+audio_pipeline = [
+    'reverb',           # 混响效果
+    'equalizer',        # 均衡器
+    'compressor',       # 压缩器
+    'delay',           # 延迟效果
+    'chorus'           # 合唱效果
+]
+\end{lstlisting}
 \item
   \textbf{实时音频流处理}:
 
@@ -235,10 +256,10 @@ echo "智能电子琴环境安装完成!"
   \end{itemize}
 \end{itemize}
 
-\subsection{2.6. 3D打印结构件}\label{dux6253ux5370ux7ed3ux6784ux4ef6}
+\subsection{2.6.
+3D打印结构件}\label{26-3dux6253ux5370ux7ed3ux6784ux4ef6}
 
 \begin{itemize}
-\tightlist
 \item
   \textbf{摄像头支架} (\passthrough{\lstinline!camera\_stand.stl!}):
 
@@ -277,13 +298,23 @@ echo "智能电子琴环境安装完成!"
   \end{itemize}
 \end{itemize}
 
-\emph{3D打印建议}: - \textbf{材料选择}: ABS (强度好，适合结构件) -
-\textbf{层高设置}: 0.2mm - \textbf{填充密度}: 25\% - \textbf{支撑设置}:
-针对悬垂结构添加支撑
+\emph{3D打印建议}:
 
-\subsection{2.7. 用户手册}\label{ux7528ux6237ux624bux518c}
+\begin{itemize}
+\tightlist
+\item
+  \textbf{材料选择}: ABS (强度好，适合结构件)
+\item
+  \textbf{层高设置}: 0.2mm
+\item
+  \textbf{填充密度}: 25\%
+\item
+  \textbf{支撑设置}: 针对悬垂结构添加支撑
+\end{itemize}
 
-\subsubsection{2.7.1 快速上手}\label{ux5febux901fux4e0aux624b}
+\subsection{2.7. 用户手册}\label{27-ux7528ux6237ux624bux518c}
+
+\subsubsection{2.7.1 快速上手}\label{271-ux5febux901fux4e0aux624b}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -300,7 +331,7 @@ echo "智能电子琴环境安装完成!"
   \textbf{手势训练}: 跟随屏幕提示学习基本手势
 \end{enumerate}
 
-\subsubsection{2.7.2 演奏模式}\label{ux6f14ux594fux6a21ux5f0f}
+\subsubsection{2.7.2 演奏模式}\label{272-ux6f14ux594fux6a21ux5f0f}
 
 \begin{itemize}
 \tightlist
@@ -314,7 +345,7 @@ echo "智能电子琴环境安装完成!"
   \textbf{教学模式}: 逐步学习手势和音符对应关系
 \end{itemize}
 
-\subsubsection{2.7.3 高级功能}\label{ux9ad8ux7ea7ux529fux80fd}
+\subsubsection{2.7.3 高级功能}\label{273-ux9ad8ux7ea7ux529fux80fd}
 
 \begin{itemize}
 \tightlist
@@ -328,7 +359,7 @@ echo "智能电子琴环境安装完成!"
   \textbf{录音回放}: 保存演奏为音频文件
 \end{itemize}
 
-\subsubsection{2.7.4 故障排除}\label{ux6545ux969cux6392ux9664}
+\subsubsection{2.7.4 故障排除}\label{274-ux6545ux969cux6392ux9664}
 
 \begin{itemize}
 \tightlist
@@ -340,7 +371,7 @@ echo "智能电子琴环境安装完成!"
   \textbf{程序崩溃}: 查看日志文件排查错误
 \end{itemize}
 
-\section{3. 源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
+\section{3. 源代码结构}\label{3-ux6e90ux4ee3ux7801ux7ed3ux6784}
 
 \begin{lstlisting}
 smart_piano/
@@ -360,7 +391,7 @@ smart_piano/
 └── 3d_models/               # 3D打印文件
 \end{lstlisting}
 
-\section{4. 效果演示}\label{ux6548ux679cux6f14ux793a}
+\section{4. 效果演示}\label{4-ux6548ux679cux6f14ux793a}
 
 \begin{itemize}
 \tightlist

@@ -55,21 +55,9 @@
 
 \subsection*{全书结构（初版规划）}\label{全书结构初版规划}
 
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+\begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-模块
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-章节标题
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-内容聚焦
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-读者收益
-\end{minipage} \\
+模块 & 章节标题 & 内容聚焦 & 读者收益 \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
@@ -178,7 +166,7 @@ Part 9 & 附录与工具 & FAQ、性能Checklist、脚手架模板、术语表 &
 \item
   多模型串联（检测→裁剪→分类）Pipeline设计
 \item
-  精度 vs.~性能：Batch、FP16、算子融合、降采样策略
+  精度 vs. 性能：Batch、FP16、算子融合、降采样策略
 \end{itemize}
 
 \begin{enumerate}
@@ -234,7 +222,7 @@ Part 9 & 附录与工具 & FAQ、性能Checklist、脚手架模板、术语表 &
 \item
   需求澄清 \& 场景指标设定（Latency / FPS / Accuracy / Power）
 \item
-  Baseline快速验证：裁剪 vs.~重构 vs.~迁移
+  Baseline快速验证：裁剪 vs. 重构 vs. 迁移
 \item
   评测体系：功能、性能、稳定性、可维护性
 \item
@@ -287,27 +275,25 @@ Part 9 & 附录与工具 & FAQ、性能Checklist、脚手架模板、术语表 &
 \subsection*{实践驱动与开源协作}\label{实践驱动与开源协作}
 
 本书所有示例代码、脚本、案例与附录工具均开源托管于本仓库。欢迎通过 Issue
-/ PR 反馈问题、提交改进、补充案例或翻译。我们鼓励： - 增补新模型 /
-新任务的部署范式 - 分享自定义算子优化经验 - 提交性能测试报告（含硬件信息
-+ 指标） - 翻译与文档校对
+/ PR 反馈问题、提交改进、补充案例或翻译。我们鼓励：
+
+\begin{itemize}
+\tightlist
+\item
+  增补新模型 / 新任务的部署范式
+\item
+  分享自定义算子优化经验
+\item
+  提交性能测试报告（含硬件信息 + 指标）
+\item
+  翻译与文档校对
+\end{itemize}
 
 \subsection*{如何使用本书}\label{如何使用本书}
 
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+\begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-读者类型
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-推荐阅读路径
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-目标
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-补充建议
-\end{minipage} \\
+读者类型 & 推荐阅读路径 & 目标 & 补充建议 \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
@@ -338,9 +324,12 @@ AI应用开发者 & Part2 → Part4 → Part7 → Part8 & 快速场景落地 &
 
 \subsection*{许可证与引用}\label{许可证与引用}
 
-本书内容采用 Apache 2.0 许可证。引用本书内容请注明： \textgreater{}
+本书内容采用 Apache 2.0 许可证。引用本书内容请注明：
+
+\begin{quote}
 《昇腾310B实战：从入门到精通边缘计算与人工智能》（GitHub:
 zhouxzh/Ascend310）
+\end{quote}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 

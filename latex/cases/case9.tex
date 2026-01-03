@@ -1,14 +1,14 @@
 \chapter{案例9：智能聊天机器人}\label{ux6848ux4f8b9ux667aux80fdux804aux5929ux673aux5668ux4eba}
 
-\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+\section{1. 项目简介}\label{1-ux9879ux76eeux7b80ux4ecb}
 
 本项目基于昇腾310B平台，构建一个能够在边缘设备上运行的智能聊天机器人。该机器人集成了自然语言处理、语音识别、语音合成等多项AI技术，能够与用户进行自然流畅的对话交互，为智能客服、教育辅助、老人陪护、智能助手等应用场景提供解决方案。
 
 相比云端聊天机器人，边缘端部署具有响应速度快、隐私保护好、离线可用等优势。本项目将展示如何在资源受限的边缘设备上部署和优化大语言模型，实现高效的对话服务。
 
-\section{2. 内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
+\section{2. 内容大纲}\label{2-ux5185ux5bb9ux5927ux7eb2}
 
-\subsection{2.1. 硬件准备}\label{ux786cux4ef6ux51c6ux5907}
+\subsection{2.1. 硬件准备}\label{21-ux786cux4ef6ux51c6ux5907}
 
 \begin{itemize}
 \tightlist
@@ -91,7 +91,7 @@
  显示交互 存储系统 网络通信
 \end{lstlisting}
 
-\subsection{2.2. 软件环境}\label{ux8f6fux4ef6ux73afux5883}
+\subsection{2.2. 软件环境}\label{22-ux8f6fux4ef6ux73afux5883}
 
 \begin{itemize}
 \tightlist
@@ -195,302 +195,362 @@ echo "智能聊天机器人环境配置完成!"
 \end{lstlisting}
 
 \subsection{2.3.
-语言模型选择与优化}\label{ux8bedux8a00ux6a21ux578bux9009ux62e9ux4e0eux4f18ux5316}
+语言模型选择与优化}\label{23-ux8bedux8a00ux6a21ux578bux9009ux62e9ux4e0eux4f18ux5316}
 
 \begin{itemize}
 \item
   \textbf{模型选择策略}:
-  \passthrough{\lstinline!python   \# 适合边缘设备的语言模型   model\_options = \{       "chinese\_models": [           "baichuan2-7b-chat",      \# 百川2-7B对话模型           "chatglm2-6b",            \# ChatGLM2-6B           "qwen-7b-chat",           \# 通义千问7B           "internlm-chat-7b"        \# InternLM-7B       ],       "multilingual\_models": [           "llama2-7b-chat",         \# LLaMA2-7B对话版           "mistral-7b-instruct",    \# Mistral-7B指令版           "vicuna-7b-v1.5"          \# Vicuna-7B       ],       "lightweight\_models": [           "phi-2",                  \# Microsoft Phi-2           "stablelm-3b-4e1t",       \# StableLM-3B           "opt-2.7b"                \# OPT-2.7B       ]   \}!}
+
+\begin{lstlisting}[language=Python]
+# 适合边缘设备的语言模型
+model_options = {
+    "chinese_models": [
+        "baichuan2-7b-chat",      # 百川2-7B对话模型
+        "chatglm2-6b",            # ChatGLM2-6B
+        "qwen-7b-chat",           # 通义千问7B
+        "internlm-chat-7b"        # InternLM-7B
+    ],
+    "multilingual_models": [
+        "llama2-7b-chat",         # LLaMA2-7B对话版
+        "mistral-7b-instruct",    # Mistral-7B指令版
+        "vicuna-7b-v1.5"          # Vicuna-7B
+    ],
+    "lightweight_models": [
+        "phi-2",                  # Microsoft Phi-2
+        "stablelm-3b-4e1t",       # StableLM-3B
+        "opt-2.7b"                # OPT-2.7B
+    ]
+}
+\end{lstlisting}
 \item
-  \textbf{模型量化与压缩}: ```python \# 模型量化配置 from transformers
-  import AutoModelForCausalLM, AutoTokenizer from transformers import
-  BitsAndBytesConfig
+  \textbf{模型量化与压缩}:
 
-  \# 4-bit量化配置 quantization\_config = BitsAndBytesConfig(
-  load\_in\_4bit=True, bnb\_4bit\_compute\_dtype=torch.float16,
-  bnb\_4bit\_use\_double\_quant=True, bnb\_4bit\_quant\_type=``nf4'' )
+\begin{lstlisting}[language=Python]
+# 模型量化配置
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import BitsAndBytesConfig
 
-  \# 加载量化模型 model = AutoModelForCausalLM.from\_pretrained(
-  ``baichuan2-7b-chat'', quantization\_config=quantization\_config,
-  device\_map=``auto'', trust\_remote\_code=True ) ```
+# 4-bit量化配置
+quantization_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.float16,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_quant_type="nf4"
+)
+
+# 加载量化模型
+model = AutoModelForCausalLM.from_pretrained(
+    "baichuan2-7b-chat",
+    quantization_config=quantization_config,
+    device_map="auto",
+    trust_remote_code=True
+)
+\end{lstlisting}
 \item
-  \textbf{LoRA微调}: ```python \# LoRA参数高效微调 from peft import
-  get\_peft\_model, LoraConfig, TaskType
+  \textbf{LoRA微调}:
 
-  \# LoRA配置 lora\_config = LoraConfig( task\_type=TaskType.CAUSAL\_LM,
-  inference\_mode=False, r=16, \# LoRA秩 lora\_alpha=32, \# LoRA缩放参数
-  lora\_dropout=0.1, \# Dropout率 target\_modules={[}``q\_proj'',
-  ``v\_proj'', ``k\_proj'', ``o\_proj''{]} )
+\begin{lstlisting}[language=Python]
+# LoRA参数高效微调
+from peft import get_peft_model, LoraConfig, TaskType
 
-  \# 应用LoRA model = get\_peft\_model(base\_model, lora\_config) ```
+# LoRA配置
+lora_config = LoraConfig(
+    task_type=TaskType.CAUSAL_LM,
+    inference_mode=False,
+    r=16,                    # LoRA秩
+    lora_alpha=32,          # LoRA缩放参数
+    lora_dropout=0.1,       # Dropout率
+    target_modules=["q_proj", "v_proj", "k_proj", "o_proj"]
+)
+
+# 应用LoRA
+model = get_peft_model(base_model, lora_config)
+\end{lstlisting}
 \end{itemize}
 
 \subsection{2.4.
-对话管理系统}\label{ux5bf9ux8bddux7ba1ux7406ux7cfbux7edf}
+对话管理系统}\label{24-ux5bf9ux8bddux7ba1ux7406ux7cfbux7edf}
 
 \begin{itemize}
 \item
-  \textbf{对话状态跟踪}: ```python \# 对话状态管理器 class
-  DialogueStateManager: def \textbf{init}(self):
-  self.conversation\_history = {[}{]} self.user\_context = \{\}
-  self.current\_topic = None self.dialogue\_state = ``greeting''
+  \textbf{对话状态跟踪}:
 
-\begin{lstlisting}
-  def update_state(self, user_input, bot_response):
-      # 更新对话历史
-      self.conversation_history.append({
-          "user": user_input,
-          "bot": bot_response,
-          "timestamp": time.time(),
-          "state": self.dialogue_state
-      })
-
-      # 更新对话状态
-      self.dialogue_state = self.predict_next_state(user_input)
-
-      # 提取用户信息
-      user_info = self.extract_user_context(user_input)
-      self.user_context.update(user_info)
-
-  def get_context_prompt(self):
-      # 生成包含上下文的提示词
-      context = ""
-      if self.conversation_history:
-          recent_turns = self.conversation_history[-3:]  # 最近3轮对话
-          for turn in recent_turns:
-              context += f"用户: {turn['user']}\n助手: {turn['bot']}\n"
-
-      return context
+\begin{lstlisting}[language=Python]
+# 对话状态管理器
+class DialogueStateManager:
+    def __init__(self):
+        self.conversation_history = []
+        self.user_context = {}
+        self.current_topic = None
+        self.dialogue_state = "greeting"
+        
+    def update_state(self, user_input, bot_response):
+        # 更新对话历史
+        self.conversation_history.append({
+            "user": user_input,
+            "bot": bot_response,
+            "timestamp": time.time(),
+            "state": self.dialogue_state
+        })
+        
+        # 更新对话状态
+        self.dialogue_state = self.predict_next_state(user_input)
+        
+        # 提取用户信息
+        user_info = self.extract_user_context(user_input)
+        self.user_context.update(user_info)
+    
+    def get_context_prompt(self):
+        # 生成包含上下文的提示词
+        context = ""
+        if self.conversation_history:
+            recent_turns = self.conversation_history[-3:]  # 最近3轮对话
+            for turn in recent_turns:
+                context += f"用户: {turn['user']}\n助手: {turn['bot']}\n"
+        
+        return context
 \end{lstlisting}
-
-  ```
 \item
-  \textbf{意图识别与槽填充}: ```python \# 意图识别系统 class
-  IntentRecognizer: def \textbf{init}(self): self.intent\_classifier =
-  self.load\_intent\_model() self.slot\_extractor =
-  self.load\_slot\_model()
+  \textbf{意图识别与槽填充}:
 
-\begin{lstlisting}
-  def recognize_intent(self, user_input):
-      # 预处理用户输入
-      processed_input = self.preprocess_text(user_input)
-
-      # 意图分类
-      intent_probs = self.intent_classifier.predict(processed_input)
-      intent = max(intent_probs, key=intent_probs.get)
-
-      # 槽位提取
-      slots = self.slot_extractor.extract(processed_input)
-
-      return {
-          "intent": intent,
-          "confidence": intent_probs[intent],
-          "slots": slots
-      }
+\begin{lstlisting}[language=Python]
+# 意图识别系统
+class IntentRecognizer:
+    def __init__(self):
+        self.intent_classifier = self.load_intent_model()
+        self.slot_extractor = self.load_slot_model()
+        
+    def recognize_intent(self, user_input):
+        # 预处理用户输入
+        processed_input = self.preprocess_text(user_input)
+        
+        # 意图分类
+        intent_probs = self.intent_classifier.predict(processed_input)
+        intent = max(intent_probs, key=intent_probs.get)
+        
+        # 槽位提取
+        slots = self.slot_extractor.extract(processed_input)
+        
+        return {
+            "intent": intent,
+            "confidence": intent_probs[intent],
+            "slots": slots
+        }
 \end{lstlisting}
-
-  ```
 \item
-  \textbf{多轮对话管理}: ```python \# 多轮对话控制器 class
-  MultiTurnDialogueController: def \textbf{init}(self, language\_model):
-  self.language\_model = language\_model self.state\_manager =
-  DialogueStateManager() self.intent\_recognizer = IntentRecognizer()
+  \textbf{多轮对话管理}:
 
-\begin{lstlisting}
-  def generate_response(self, user_input):
-      # 意图识别
-      intent_result = self.intent_recognizer.recognize_intent(user_input)
-
-      # 获取对话上下文
-      context = self.state_manager.get_context_prompt()
-
-      # 构建完整提示词
-      full_prompt = self.build_prompt(context, user_input, intent_result)
-
-      # 生成回复
-      response = self.language_model.generate(
-          full_prompt,
-          max_length=512,
-          temperature=0.7,
-          do_sample=True
-      )
-
-      # 更新对话状态
-      self.state_manager.update_state(user_input, response)
-
-      return response
+\begin{lstlisting}[language=Python]
+# 多轮对话控制器
+class MultiTurnDialogueController:
+    def __init__(self, language_model):
+        self.language_model = language_model
+        self.state_manager = DialogueStateManager()
+        self.intent_recognizer = IntentRecognizer()
+        
+    def generate_response(self, user_input):
+        # 意图识别
+        intent_result = self.intent_recognizer.recognize_intent(user_input)
+        
+        # 获取对话上下文
+        context = self.state_manager.get_context_prompt()
+        
+        # 构建完整提示词
+        full_prompt = self.build_prompt(context, user_input, intent_result)
+        
+        # 生成回复
+        response = self.language_model.generate(
+            full_prompt,
+            max_length=512,
+            temperature=0.7,
+            do_sample=True
+        )
+        
+        # 更新对话状态
+        self.state_manager.update_state(user_input, response)
+        
+        return response
 \end{lstlisting}
-
-  ```
 \end{itemize}
 
 \subsection{2.5.
-语音交互系统}\label{ux8bedux97f3ux4ea4ux4e92ux7cfbux7edf}
+语音交互系统}\label{25-ux8bedux97f3ux4ea4ux4e92ux7cfbux7edf}
 
 \begin{itemize}
 \item
-  \textbf{语音识别(ASR)}: ```python \# 实时语音识别系统 class
-  SpeechRecognitionSystem: def \textbf{init}(self): self.recognizer =
-  sr.Recognizer() self.microphone = sr.Microphone() self.is\_listening =
-  False
+  \textbf{语音识别(ASR)}:
 
-\begin{lstlisting}
-  def continuous_recognition(self, callback):
-      """持续语音识别"""
-      with self.microphone as source:
-          self.recognizer.adjust_for_ambient_noise(source)
-
-      def listen_continuously():
-          while self.is_listening:
-              try:
-                  with self.microphone as source:
-                      # 监听音频
-                      audio = self.recognizer.listen(source, timeout=1, phrase_time_limit=5)
-
-                  # 识别语音
-                  text = self.recognizer.recognize_google(audio, language='zh-CN')
-                  callback(text)
-
-              except sr.WaitTimeoutError:
-                  pass
-              except sr.UnknownValueError:
-                  pass
-              except sr.RequestError as e:
-                  print(f"语音识别服务错误: {e}")
-
-      # 启动监听线程
-      listen_thread = threading.Thread(target=listen_continuously)
-      listen_thread.daemon = True
-      listen_thread.start()
+\begin{lstlisting}[language=Python]
+# 实时语音识别系统
+class SpeechRecognitionSystem:
+    def __init__(self):
+        self.recognizer = sr.Recognizer()
+        self.microphone = sr.Microphone()
+        self.is_listening = False
+        
+    def continuous_recognition(self, callback):
+        """持续语音识别"""
+        with self.microphone as source:
+            self.recognizer.adjust_for_ambient_noise(source)
+        
+        def listen_continuously():
+            while self.is_listening:
+                try:
+                    with self.microphone as source:
+                        # 监听音频
+                        audio = self.recognizer.listen(source, timeout=1, phrase_time_limit=5)
+                    
+                    # 识别语音
+                    text = self.recognizer.recognize_google(audio, language='zh-CN')
+                    callback(text)
+                    
+                except sr.WaitTimeoutError:
+                    pass
+                except sr.UnknownValueError:
+                    pass
+                except sr.RequestError as e:
+                    print(f"语音识别服务错误: {e}")
+        
+        # 启动监听线程
+        listen_thread = threading.Thread(target=listen_continuously)
+        listen_thread.daemon = True
+        listen_thread.start()
 \end{lstlisting}
-
-  ```
 \item
-  \textbf{语音合成(TTS)}: ```python \# 语音合成系统 class
-  TextToSpeechSystem: def \textbf{init}(self): self.tts\_engine =
-  pyttsx3.init() self.configure\_voice()
+  \textbf{语音合成(TTS)}:
 
-\begin{lstlisting}
-  def configure_voice(self):
-      # 配置语音参数
-      voices = self.tts_engine.getProperty('voices')
-
-      # 选择中文语音
-      for voice in voices:
-          if 'chinese' in voice.name.lower() or 'zh' in voice.id.lower():
-              self.tts_engine.setProperty('voice', voice.id)
-              break
-
-      # 设置语速和音量
-      self.tts_engine.setProperty('rate', 150)    # 语速
-      self.tts_engine.setProperty('volume', 0.8)  # 音量
-
-  def speak(self, text):
-      """异步语音播放"""
-      def speak_async():
-          self.tts_engine.say(text)
-          self.tts_engine.runAndWait()
-
-      speak_thread = threading.Thread(target=speak_async)
-      speak_thread.daemon = True
-      speak_thread.start()
+\begin{lstlisting}[language=Python]
+# 语音合成系统
+class TextToSpeechSystem:
+    def __init__(self):
+        self.tts_engine = pyttsx3.init()
+        self.configure_voice()
+        
+    def configure_voice(self):
+        # 配置语音参数
+        voices = self.tts_engine.getProperty('voices')
+        
+        # 选择中文语音
+        for voice in voices:
+            if 'chinese' in voice.name.lower() or 'zh' in voice.id.lower():
+                self.tts_engine.setProperty('voice', voice.id)
+                break
+        
+        # 设置语速和音量
+        self.tts_engine.setProperty('rate', 150)    # 语速
+        self.tts_engine.setProperty('volume', 0.8)  # 音量
+    
+    def speak(self, text):
+        """异步语音播放"""
+        def speak_async():
+            self.tts_engine.say(text)
+            self.tts_engine.runAndWait()
+        
+        speak_thread = threading.Thread(target=speak_async)
+        speak_thread.daemon = True
+        speak_thread.start()
 \end{lstlisting}
-
-  ```
 \item
-  \textbf{语音增强与降噪}: ```python \# 音频预处理和增强 class
-  AudioPreprocessor: def \textbf{init}(self): self.sample\_rate = 16000
+  \textbf{语音增强与降噪}:
 
-\begin{lstlisting}
-  def noise_reduction(self, audio_data):
-      # 谱减法降噪
-      import scipy.signal
-
-      # 计算功率谱
-      f, t, Sxx = scipy.signal.spectrogram(audio_data, self.sample_rate)
-
-      # 噪声估计和抑制
-      noise_power = np.mean(Sxx[:, :10], axis=1, keepdims=True)  # 假设前10帧为噪声
-      enhanced_Sxx = Sxx - 0.5 * noise_power
-      enhanced_Sxx = np.maximum(enhanced_Sxx, 0.1 * Sxx)  # 保留10%原信号
-
-      # 重构音频
-      enhanced_audio = scipy.signal.istft(enhanced_Sxx, self.sample_rate)[1]
-
-      return enhanced_audio
+\begin{lstlisting}[language=Python]
+# 音频预处理和增强
+class AudioPreprocessor:
+    def __init__(self):
+        self.sample_rate = 16000
+        
+    def noise_reduction(self, audio_data):
+        # 谱减法降噪
+        import scipy.signal
+        
+        # 计算功率谱
+        f, t, Sxx = scipy.signal.spectrogram(audio_data, self.sample_rate)
+        
+        # 噪声估计和抑制
+        noise_power = np.mean(Sxx[:, :10], axis=1, keepdims=True)  # 假设前10帧为噪声
+        enhanced_Sxx = Sxx - 0.5 * noise_power
+        enhanced_Sxx = np.maximum(enhanced_Sxx, 0.1 * Sxx)  # 保留10%原信号
+        
+        # 重构音频
+        enhanced_audio = scipy.signal.istft(enhanced_Sxx, self.sample_rate)[1]
+        
+        return enhanced_audio
 \end{lstlisting}
-
-  ```
 \end{itemize}
 
 \subsection{2.6.
-知识库与检索增强}\label{ux77e5ux8bc6ux5e93ux4e0eux68c0ux7d22ux589eux5f3a}
+知识库与检索增强}\label{26-ux77e5ux8bc6ux5e93ux4e0eux68c0ux7d22ux589eux5f3a}
 
 \begin{itemize}
 \item
-  \textbf{本地知识库构建}: ```python \# 知识库管理系统 class
-  KnowledgeBase: def \textbf{init}(self, db\_path): self.db\_path =
-  db\_path self.embedding\_model =
-  SentenceTransformer(`all-MiniLM-L6-v2') self.vector\_index =
-  faiss.IndexFlatIP(384) \# 向量维度 self.knowledge\_store = {[}{]}
+  \textbf{本地知识库构建}:
 
-\begin{lstlisting}
-  def add_knowledge(self, text, metadata=None):
-      # 生成文本嵌入
-      embedding = self.embedding_model.encode([text])
-
-      # 添加到向量索引
-      self.vector_index.add(embedding)
-
-      # 存储原始文本和元数据
-      self.knowledge_store.append({
-          'text': text,
-          'metadata': metadata or {},
-          'id': len(self.knowledge_store)
-      })
-
-  def search_similar(self, query, k=5):
-      # 查询向量化
-      query_embedding = self.embedding_model.encode([query])
-
-      # 向量检索
-      scores, indices = self.vector_index.search(query_embedding, k)
-
-      # 返回相关知识
-      results = []
-      for score, idx in zip(scores[0], indices[0]):
-          if idx < len(self.knowledge_store):
-              knowledge_item = self.knowledge_store[idx]
-              knowledge_item['score'] = float(score)
-              results.append(knowledge_item)
-
-      return results
+\begin{lstlisting}[language=Python]
+# 知识库管理系统
+class KnowledgeBase:
+    def __init__(self, db_path):
+        self.db_path = db_path
+        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+        self.vector_index = faiss.IndexFlatIP(384)  # 向量维度
+        self.knowledge_store = []
+        
+    def add_knowledge(self, text, metadata=None):
+        # 生成文本嵌入
+        embedding = self.embedding_model.encode([text])
+        
+        # 添加到向量索引
+        self.vector_index.add(embedding)
+        
+        # 存储原始文本和元数据
+        self.knowledge_store.append({
+            'text': text,
+            'metadata': metadata or {},
+            'id': len(self.knowledge_store)
+        })
+    
+    def search_similar(self, query, k=5):
+        # 查询向量化
+        query_embedding = self.embedding_model.encode([query])
+        
+        # 向量检索
+        scores, indices = self.vector_index.search(query_embedding, k)
+        
+        # 返回相关知识
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < len(self.knowledge_store):
+                knowledge_item = self.knowledge_store[idx]
+                knowledge_item['score'] = float(score)
+                results.append(knowledge_item)
+        
+        return results
 \end{lstlisting}
-
-  ```
 \item
-  \textbf{检索增强生成(RAG)}: ```python \# RAG对话系统 class RAGChatBot:
-  def \textbf{init}(self, language\_model, knowledge\_base):
-  self.language\_model = language\_model self.knowledge\_base =
-  knowledge\_base
+  \textbf{检索增强生成(RAG)}:
 
-\begin{lstlisting}
-  def generate_with_knowledge(self, user_query):
-      # 检索相关知识
-      relevant_knowledge = self.knowledge_base.search_similar(user_query, k=3)
-
-      # 构建包含知识的提示词
-      knowledge_context = ""
-      for item in relevant_knowledge:
-          knowledge_context += f"知识: {item['text']}\n"
-
-      prompt = f"""基于以下知识回答用户问题:
+\begin{lstlisting}[language=Python]
+# RAG对话系统
+class RAGChatBot:
+    def __init__(self, language_model, knowledge_base):
+        self.language_model = language_model
+        self.knowledge_base = knowledge_base
+        
+    def generate_with_knowledge(self, user_query):
+        # 检索相关知识
+        relevant_knowledge = self.knowledge_base.search_similar(user_query, k=3)
+        
+        # 构建包含知识的提示词
+        knowledge_context = ""
+        for item in relevant_knowledge:
+            knowledge_context += f"知识: {item['text']}\n"
+        
+        prompt = f"""基于以下知识回答用户问题:
 \end{lstlisting}
-
-  \{knowledge\_context\}
 \end{itemize}
 
-用户问题: \{user\_query\} 助手回答:``\,``\,''
+\{knowledge\_context\}
+
+用户问题: \{user\_query\} 助手回答:"""
 
 \begin{lstlisting}
         # 生成回复
@@ -501,123 +561,153 @@ echo "智能聊天机器人环境配置完成!"
 \end{lstlisting}
 
 \subsection{2.7.
-模型部署与推理优化}\label{ux6a21ux578bux90e8ux7f72ux4e0eux63a8ux7406ux4f18ux5316}
+模型部署与推理优化}\label{27-ux6a21ux578bux90e8ux7f72ux4e0eux63a8ux7406ux4f18ux5316}
 
 \begin{itemize}
 \item
-  \textbf{昇腾模型转换}: ```bash \# 语言模型转换流程 \# 1.
-  PyTorch模型转ONNX (需要特殊处理Transformer架构) python3
-  convert\_llm\_to\_onnx.py\\
-  --model\_path ./chatbot\_model\\
-  --output\_path ./chatbot\_model.onnx\\
-  --seq\_length 512
+  \textbf{昇腾模型转换}:
 
-  \# 2. ONNX转昇腾格式 (可能需要分块处理) atc
-  --model=chatbot\_encoder.onnx --framework=5\\
-  --output=chatbot\_encoder\_ascend\\
-  --input\_format=ND\\
-  --input\_shape=``input\_ids:1,512;attention\_mask:1,512''\\
-  --soc\_version=Ascend310B1 ```
-\item
-  \textbf{推理加速策略}: ```python \# 推理优化管理器 class
-  InferenceOptimizer: def \textbf{init}(self, model): self.model = model
-  self.kv\_cache = \{\} \# 键值缓存 self.generation\_config = \{
-  ``max\_new\_tokens'': 512, ``temperature'': 0.7, ``top\_p'': 0.9,
-  ``do\_sample'': True, ``pad\_token\_id'': 0 \}
+\begin{lstlisting}[language=bash]
+# 语言模型转换流程
+# 1. PyTorch模型转ONNX (需要特殊处理Transformer架构)
+python3 convert_llm_to_onnx.py \
+    --model_path ./chatbot_model \
+    --output_path ./chatbot_model.onnx \
+    --seq_length 512
 
-\begin{lstlisting}
-  def generate_with_cache(self, input_ids, attention_mask):
-      # 使用KV缓存加速生成
-      with torch.no_grad():
-          outputs = self.model.generate(
-              input_ids=input_ids,
-              attention_mask=attention_mask,
-              **self.generation_config,
-              use_cache=True,
-              past_key_values=self.kv_cache.get("past_key_values")
-          )
-
-      # 更新缓存
-      self.kv_cache["past_key_values"] = outputs.past_key_values
-
-      return outputs
+# 2. ONNX转昇腾格式 (可能需要分块处理)
+atc --model=chatbot_encoder.onnx --framework=5 \
+    --output=chatbot_encoder_ascend \
+    --input_format=ND \
+    --input_shape="input_ids:1,512;attention_mask:1,512" \
+    --soc_version=Ascend310B1
 \end{lstlisting}
+\item
+  \textbf{推理加速策略}:
 
-  ```
+\begin{lstlisting}[language=Python]
+# 推理优化管理器
+class InferenceOptimizer:
+    def __init__(self, model):
+        self.model = model
+        self.kv_cache = {}  # 键值缓存
+        self.generation_config = {
+            "max_new_tokens": 512,
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "do_sample": True,
+            "pad_token_id": 0
+        }
+    
+    def generate_with_cache(self, input_ids, attention_mask):
+        # 使用KV缓存加速生成
+        with torch.no_grad():
+            outputs = self.model.generate(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                **self.generation_config,
+                use_cache=True,
+                past_key_values=self.kv_cache.get("past_key_values")
+            )
+        
+        # 更新缓存
+        self.kv_cache["past_key_values"] = outputs.past_key_values
+        
+        return outputs
+\end{lstlisting}
 \end{itemize}
 
 \subsection{2.8.
-Web界面与API服务}\label{webux754cux9762ux4e0eapiux670dux52a1}
+Web界面与API服务}\label{28-webux754cux9762ux4e0eapiux670dux52a1}
 
 \begin{itemize}
 \item
-  \textbf{WebSocket实时通信}: ```python \# WebSocket聊天服务 from
-  fastapi import FastAPI, WebSocket from fastapi.staticfiles import
-  StaticFiles
+  \textbf{WebSocket实时通信}:
 
-  app = FastAPI()
+\begin{lstlisting}[language=Python]
+# WebSocket聊天服务
+from fastapi import FastAPI, WebSocket
+from fastapi.staticfiles import StaticFiles
 
-  class ChatWebSocketManager: def \textbf{init}(self):
-  self.active\_connections = {[}{]} self.chatbot = ChatBot() \#
-  聊天机器人实例
+app = FastAPI()
 
-\begin{lstlisting}
-  async def connect(self, websocket: WebSocket):
-      await websocket.accept()
-      self.active_connections.append(websocket)
+class ChatWebSocketManager:
+    def __init__(self):
+        self.active_connections = []
+        self.chatbot = ChatBot()  # 聊天机器人实例
+    
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+    
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+    
+    async def handle_message(self, websocket: WebSocket, message: str):
+        # 生成回复
+        response = await self.chatbot.generate_response(message)
+        
+        # 发送回复
+        await websocket.send_text(response)
 
-  def disconnect(self, websocket: WebSocket):
-      self.active_connections.remove(websocket)
+manager = ChatWebSocketManager()
 
-  async def handle_message(self, websocket: WebSocket, message: str):
-      # 生成回复
-      response = await self.chatbot.generate_response(message)
-
-      # 发送回复
-      await websocket.send_text(response)
+@app.websocket("/ws/chat")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            message = await websocket.receive_text()
+            await manager.handle_message(websocket, message)
+    except Exception as e:
+        print(f"WebSocket错误: {e}")
+    finally:
+        manager.disconnect(websocket)
 \end{lstlisting}
-
-  manager = ChatWebSocketManager()
-
-  @app.websocket(``/ws/chat'') async def websocket\_endpoint(websocket:
-  WebSocket): await manager.connect(websocket) try: while True: message
-  = await websocket.receive\_text() await
-  manager.handle\_message(websocket, message) except Exception as e:
-  print(f''WebSocket错误: \{e\}``) finally:
-  manager.disconnect(websocket) ```
 \item
-  \textbf{RESTful API接口}: ```python \# REST API服务 from fastapi
-  import FastAPI, HTTPException from pydantic import BaseModel
+  \textbf{RESTful API接口}:
 
-  class ChatRequest(BaseModel): message: str session\_id: str = None
-  context: dict = None
+\begin{lstlisting}[language=Python]
+# REST API服务
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
-  class ChatResponse(BaseModel): response: str session\_id: str
-  confidence: float timestamp: float
+class ChatRequest(BaseModel):
+    message: str
+    session_id: str = None
+    context: dict = None
 
-  @app.post(``/api/chat'', response\_model=ChatResponse) async def
-  chat\_endpoint(request: ChatRequest): try: \# 处理聊天请求 response =
-  await chatbot\_service.process\_message( message=request.message,
-  session\_id=request.session\_id, context=request.context )
+class ChatResponse(BaseModel):
+    response: str
+    session_id: str
+    confidence: float
+    timestamp: float
 
-\begin{lstlisting}
-      return ChatResponse(
-          response=response["text"],
-          session_id=response["session_id"],
-          confidence=response["confidence"],
-          timestamp=time.time()
-      )
-
-  except Exception as e:
-      raise HTTPException(status_code=500, detail=str(e))
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat_endpoint(request: ChatRequest):
+    try:
+        # 处理聊天请求
+        response = await chatbot_service.process_message(
+            message=request.message,
+            session_id=request.session_id,
+            context=request.context
+        )
+        
+        return ChatResponse(
+            response=response["text"],
+            session_id=response["session_id"],
+            confidence=response["confidence"],
+            timestamp=time.time()
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 \end{lstlisting}
-
-  ```
 \end{itemize}
 
-\subsection{2.9. 用户手册}\label{ux7528ux6237ux624bux518c}
+\subsection{2.9. 用户手册}\label{29-ux7528ux6237ux624bux518c}
 
-\subsubsection{2.9.1 系统部署}\label{ux7cfbux7edfux90e8ux7f72}
+\subsubsection{2.9.1 系统部署}\label{291-ux7cfbux7edfux90e8ux7f72}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -632,7 +722,7 @@ Web界面与API服务}\label{webux754cux9762ux4e0eapiux670dux52a1}
   \textbf{服务启动}: 启动聊天机器人服务
 \end{enumerate}
 
-\subsubsection{2.9.2 功能配置}\label{ux529fux80fdux914dux7f6e}
+\subsubsection{2.9.2 功能配置}\label{292-ux529fux80fdux914dux7f6e}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -647,7 +737,7 @@ Web界面与API服务}\label{webux754cux9762ux4e0eapiux670dux52a1}
   \textbf{安全设置}: 配置内容过滤和安全策略
 \end{enumerate}
 
-\subsubsection{2.9.3 使用指南}\label{ux4f7fux7528ux6307ux5357}
+\subsubsection{2.9.3 使用指南}\label{293-ux4f7fux7528ux6307ux5357}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -662,7 +752,7 @@ Web界面与API服务}\label{webux754cux9762ux4e0eapiux670dux52a1}
   \textbf{个性化设置}: 个人偏好和习惯配置
 \end{enumerate}
 
-\subsubsection{2.9.4 维护管理}\label{ux7ef4ux62a4ux7ba1ux7406}
+\subsubsection{2.9.4 维护管理}\label{294-ux7ef4ux62a4ux7ba1ux7406}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -677,7 +767,7 @@ Web界面与API服务}\label{webux754cux9762ux4e0eapiux670dux52a1}
   \textbf{数据备份}: 备份对话历史和用户数据
 \end{enumerate}
 
-\section{3. 源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
+\section{3. 源代码结构}\label{3-ux6e90ux4ee3ux7801ux7ed3ux6784}
 
 \begin{lstlisting}
 intelligent_chatbot/
@@ -723,7 +813,7 @@ intelligent_chatbot/
     └── monitoring/        # 监控配置
 \end{lstlisting}
 
-\section{4. 效果演示}\label{ux6548ux679cux6f14ux793a}
+\section{4. 效果演示}\label{4-ux6548ux679cux6f14ux793a}
 
 \begin{itemize}
 \tightlist

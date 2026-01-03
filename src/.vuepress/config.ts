@@ -18,6 +18,13 @@ export default defineUserConfig({
   }),
 
   theme: hopeTheme({
+    // 添加这行即可启用数学公式（默认使用 MathJax）
+    plugins: {
+      mdEnhance: {
+        mathjax: true,
+      },
+    },
+    
     markdown: {
       mermaid: true,
     },

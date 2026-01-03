@@ -1,14 +1,14 @@
 \chapter{案例7：智能相册}\label{ux6848ux4f8b7ux667aux80fdux76f8ux518c}
 
-\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+\section{1. 项目简介}\label{1-ux9879ux76eeux7b80ux4ecb}
 
 本项目基于昇腾310B平台，构建一个智能化的照片管理和检索系统。系统利用先进的计算机视觉和深度学习技术，能够自动识别照片中的人脸、物体、场景等信息，并根据这些特征对照片进行智能分类、标签化和索引，为用户提供便捷高效的照片管理体验。
 
 与传统的相册管理软件相比，智能相册具备自动化程度高、检索精准、个性化推荐等特点，能够帮助用户快速找到目标照片，发现遗忘的美好回忆，甚至自动生成精彩的照片集锦和回忆录。
 
-\section{2. 内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
+\section{2. 内容大纲}\label{2-ux5185ux5bb9ux5927ux7eb2}
 
-\subsection{2.1. 硬件准备}\label{ux786cux4ef6ux51c6ux5907}
+\subsection{2.1. 硬件准备}\label{21-ux786cux4ef6ux51c6ux5907}
 
 \begin{itemize}
 \tightlist
@@ -78,7 +78,7 @@
  显示设备 存储系统 网络备份
 \end{lstlisting}
 
-\subsection{2.2. 软件环境}\label{ux8f6fux4ef6ux73afux5883}
+\subsection{2.2. 软件环境}\label{22-ux8f6fux4ef6ux73afux5883}
 
 \begin{itemize}
 \tightlist
@@ -172,35 +172,37 @@ echo "智能相册环境配置完成!"
 \end{lstlisting}
 
 \subsection{2.3.
-智能识别与分析}\label{ux667aux80fdux8bc6ux522bux4e0eux5206ux6790}
+智能识别与分析}\label{23-ux667aux80fdux8bc6ux522bux4e0eux5206ux6790}
 
 \begin{itemize}
 \item
-  \textbf{人脸识别系统}: ```python \# 人脸识别和聚类 class
-  FaceRecognitionSystem: def \textbf{init}(self): self.detector =
-  MTCNN() \# 人脸检测 self.recognizer = FaceNet() \# 人脸特征提取
-  self.clusterer = DBSCAN() \# 人脸聚类
+  \textbf{人脸识别系统}:
 
-\begin{lstlisting}
-  def detect_faces(self, image):
-      # 检测图像中的所有人脸
-      faces = self.detector.detect(image)
-      face_embeddings = []
-
-      for face in faces:
-          # 提取人脸特征向量
-          embedding = self.recognizer.extract_features(face)
-          face_embeddings.append(embedding)
-
-      return faces, face_embeddings
-
-  def cluster_faces(self, all_embeddings):
-      # 对所有人脸进行聚类，识别同一个人
-      clusters = self.clusterer.fit_predict(all_embeddings)
-      return clusters
+\begin{lstlisting}[language=Python]
+# 人脸识别和聚类
+class FaceRecognitionSystem:
+    def __init__(self):
+        self.detector = MTCNN()  # 人脸检测
+        self.recognizer = FaceNet()  # 人脸特征提取
+        self.clusterer = DBSCAN()  # 人脸聚类
+    
+    def detect_faces(self, image):
+        # 检测图像中的所有人脸
+        faces = self.detector.detect(image)
+        face_embeddings = []
+        
+        for face in faces:
+            # 提取人脸特征向量
+            embedding = self.recognizer.extract_features(face)
+            face_embeddings.append(embedding)
+        
+        return faces, face_embeddings
+    
+    def cluster_faces(self, all_embeddings):
+        # 对所有人脸进行聚类，识别同一个人
+        clusters = self.clusterer.fit_predict(all_embeddings)
+        return clusters
 \end{lstlisting}
-
-  ```
 \item
   \textbf{物体识别系统}:
 
@@ -216,29 +218,31 @@ echo "智能相册环境配置完成!"
     \textbf{品牌logo识别}: 识别商标和品牌标识
   \end{itemize}
 \item
-  \textbf{场景理解}: ```python \# 场景分类和描述生成 class
-  SceneAnalyzer: def \textbf{init}(self): self.scene\_classifier =
-  ResNet50(pretrained=True) self.caption\_model = BLIP() \# 图像描述生成
+  \textbf{场景理解}:
 
-\begin{lstlisting}
-  def analyze_scene(self, image):
-      # 场景分类
-      scene_type = self.classify_scene(image)
-
-      # 生成自然语言描述
-      caption = self.caption_model.generate_caption(image)
-
-      # 提取关键信息
-      metadata = self.extract_metadata(image)
-
-      return {
-          'scene_type': scene_type,
-          'caption': caption,
-          'metadata': metadata
-      }
+\begin{lstlisting}[language=Python]
+# 场景分类和描述生成
+class SceneAnalyzer:
+    def __init__(self):
+        self.scene_classifier = ResNet50(pretrained=True)
+        self.caption_model = BLIP()  # 图像描述生成
+    
+    def analyze_scene(self, image):
+        # 场景分类
+        scene_type = self.classify_scene(image)
+        
+        # 生成自然语言描述
+        caption = self.caption_model.generate_caption(image)
+        
+        # 提取关键信息
+        metadata = self.extract_metadata(image)
+        
+        return {
+            'scene_type': scene_type,
+            'caption': caption,
+            'metadata': metadata
+        }
 \end{lstlisting}
-
-  ```
 \item
   \textbf{情感分析}:
 
@@ -254,40 +258,43 @@ echo "智能相册环境配置完成!"
 \end{itemize}
 
 \subsection{2.4.
-智能分类与标签}\label{ux667aux80fdux5206ux7c7bux4e0eux6807ux7b7e}
+智能分类与标签}\label{24-ux667aux80fdux5206ux7c7bux4e0eux6807ux7b7e}
 
 \begin{itemize}
 \item
-  \textbf{自动分类系统}: ```python \# 智能照片分类器 class
-  PhotoClassifier: def \textbf{init}(self): self.categories = \{
-  `people': {[}`family', `friends', `portrait', `group'{]}, `events':
-  {[}`wedding', `birthday', `graduation', `travel'{]}, `places':
-  {[}`home', `office', `restaurant', `nature'{]}, `activities':
-  {[}`sports', `cooking', `reading', `shopping'{]} \}
+  \textbf{自动分类系统}:
 
-\begin{lstlisting}
-  def classify_photo(self, image, metadata):
-      results = {}
-
-      # 基于人脸数量分类
-      face_count = len(metadata['faces'])
-      if face_count == 1:
-          results['type'] = 'portrait'
-      elif face_count > 1:
-          results['type'] = 'group'
-
-      # 基于场景分类
-      scene = metadata['scene_type']
-      results['scene'] = scene
-
-      # 基于时间分类
-      timestamp = metadata['timestamp']
-      results['time_period'] = self.get_time_period(timestamp)
-
-      return results
+\begin{lstlisting}[language=Python]
+# 智能照片分类器
+class PhotoClassifier:
+    def __init__(self):
+        self.categories = {
+            'people': ['family', 'friends', 'portrait', 'group'],
+            'events': ['wedding', 'birthday', 'graduation', 'travel'],
+            'places': ['home', 'office', 'restaurant', 'nature'],
+            'activities': ['sports', 'cooking', 'reading', 'shopping']
+        }
+    
+    def classify_photo(self, image, metadata):
+        results = {}
+        
+        # 基于人脸数量分类
+        face_count = len(metadata['faces'])
+        if face_count == 1:
+            results['type'] = 'portrait'
+        elif face_count > 1:
+            results['type'] = 'group'
+        
+        # 基于场景分类
+        scene = metadata['scene_type']
+        results['scene'] = scene
+        
+        # 基于时间分类
+        timestamp = metadata['timestamp']
+        results['time_period'] = self.get_time_period(timestamp)
+        
+        return results
 \end{lstlisting}
-
-  ```
 \item
   \textbf{智能标签生成}:
 
@@ -317,43 +324,45 @@ echo "智能相册环境配置完成!"
 \end{itemize}
 
 \subsection{2.5.
-智能检索系统}\label{ux667aux80fdux68c0ux7d22ux7cfbux7edf}
+智能检索系统}\label{25-ux667aux80fdux68c0ux7d22ux7cfbux7edf}
 
 \begin{itemize}
 \item
-  \textbf{多模态检索}: ```python \# 多模态照片检索引擎 class
-  PhotoSearchEngine: def \textbf{init}(self): self.text\_encoder =
-  CLIP.load\_text\_encoder() self.image\_encoder =
-  CLIP.load\_image\_encoder() self.vector\_db = FaissIndex()
+  \textbf{多模态检索}:
 
-\begin{lstlisting}
-  def search_by_text(self, query_text):
-      # 文本转向量
-      text_embedding = self.text_encoder.encode(query_text)
-
-      # 向量检索
-      similar_indices = self.vector_db.search(text_embedding, k=50)
-
-      return self.get_photos_by_indices(similar_indices)
-
-  def search_by_image(self, query_image):
-      # 图像转向量
-      image_embedding = self.image_encoder.encode(query_image)
-
-      # 相似图像检索
-      similar_indices = self.vector_db.search(image_embedding, k=50)
-
-      return self.get_photos_by_indices(similar_indices)
-
-  def search_by_face(self, face_image):
-      # 人脸检索
-      face_embedding = self.face_recognizer.extract_features(face_image)
-      similar_faces = self.face_db.search(face_embedding)
-
-      return self.get_photos_with_faces(similar_faces)
+\begin{lstlisting}[language=Python]
+# 多模态照片检索引擎
+class PhotoSearchEngine:
+    def __init__(self):
+        self.text_encoder = CLIP.load_text_encoder()
+        self.image_encoder = CLIP.load_image_encoder()
+        self.vector_db = FaissIndex()
+    
+    def search_by_text(self, query_text):
+        # 文本转向量
+        text_embedding = self.text_encoder.encode(query_text)
+        
+        # 向量检索
+        similar_indices = self.vector_db.search(text_embedding, k=50)
+        
+        return self.get_photos_by_indices(similar_indices)
+    
+    def search_by_image(self, query_image):
+        # 图像转向量
+        image_embedding = self.image_encoder.encode(query_image)
+        
+        # 相似图像检索
+        similar_indices = self.vector_db.search(image_embedding, k=50)
+        
+        return self.get_photos_by_indices(similar_indices)
+    
+    def search_by_face(self, face_image):
+        # 人脸检索
+        face_embedding = self.face_recognizer.extract_features(face_image)
+        similar_faces = self.face_db.search(face_embedding)
+        
+        return self.get_photos_with_faces(similar_faces)
 \end{lstlisting}
-
-  ```
 \item
   \textbf{智能筛选器}:
 
@@ -371,34 +380,36 @@ echo "智能相册环境配置完成!"
 \end{itemize}
 
 \subsection{2.6.
-自动整理与推荐}\label{ux81eaux52a8ux6574ux7406ux4e0eux63a8ux8350}
+自动整理与推荐}\label{26-ux81eaux52a8ux6574ux7406ux4e0eux63a8ux8350}
 
 \begin{itemize}
 \item
-  \textbf{重复照片检测}: ```python \# 重复和相似照片检测 class
-  DuplicateDetector: def \textbf{init}(self): self.hasher = ImageHash()
-  self.similarity\_threshold = 0.85
+  \textbf{重复照片检测}:
 
-\begin{lstlisting}
-  def find_duplicates(self, photo_list):
-      duplicates = []
-
-      for i, photo1 in enumerate(photo_list):
-          for j, photo2 in enumerate(photo_list[i+1:], i+1):
-              similarity = self.calculate_similarity(photo1, photo2)
-
-              if similarity > self.similarity_threshold:
-                  duplicates.append((i, j, similarity))
-
-      return duplicates
-
-  def suggest_best_photo(self, duplicate_group):
-      # 从重复照片中推荐最佳的一张
-      best_photo = max(duplicate_group, key=self.quality_score)
-      return best_photo
+\begin{lstlisting}[language=Python]
+# 重复和相似照片检测
+class DuplicateDetector:
+    def __init__(self):
+        self.hasher = ImageHash()
+        self.similarity_threshold = 0.85
+    
+    def find_duplicates(self, photo_list):
+        duplicates = []
+        
+        for i, photo1 in enumerate(photo_list):
+            for j, photo2 in enumerate(photo_list[i+1:], i+1):
+                similarity = self.calculate_similarity(photo1, photo2)
+                
+                if similarity > self.similarity_threshold:
+                    duplicates.append((i, j, similarity))
+        
+        return duplicates
+    
+    def suggest_best_photo(self, duplicate_group):
+        # 从重复照片中推荐最佳的一张
+        best_photo = max(duplicate_group, key=self.quality_score)
+        return best_photo
 \end{lstlisting}
-
-  ```
 \item
   \textbf{智能相册生成}:
 
@@ -428,25 +439,36 @@ echo "智能相册环境配置完成!"
 \end{itemize}
 
 \subsection{2.7.
-用户界面设计}\label{ux7528ux6237ux754cux9762ux8bbeux8ba1}
+用户界面设计}\label{27-ux7528ux6237ux754cux9762ux8bbeux8ba1}
 
 \begin{itemize}
 \item
-  \textbf{Web界面开发}: ```python \# Flask Web应用 from flask import
-  Flask, render\_template, request, jsonify
+  \textbf{Web界面开发}:
 
-  app = Flask(\textbf{name})
+\begin{lstlisting}[language=Python]
+# Flask Web应用
+from flask import Flask, render_template, request, jsonify
 
-  @app.route(`/') def index(): return render\_template(`gallery.html')
+app = Flask(__name__)
 
-  @app.route(`/search', methods={[}`POST'{]}) def search\_photos():
-  query = request.json.get(`query') results =
-  photo\_search\_engine.search\_by\_text(query) return jsonify(results)
+@app.route('/')
+def index():
+    return render_template('gallery.html')
 
-  @app.route(`/upload', methods={[}`POST'{]}) def upload\_photos():
-  files = request.files.getlist(`photos') for file in files: \#
-  处理上传的照片 process\_uploaded\_photo(file) return
-  jsonify(\{`status': `success'\}) ```
+@app.route('/search', methods=['POST'])
+def search_photos():
+    query = request.json.get('query')
+    results = photo_search_engine.search_by_text(query)
+    return jsonify(results)
+
+@app.route('/upload', methods=['POST'])
+def upload_photos():
+    files = request.files.getlist('photos')
+    for file in files:
+        # 处理上传的照片
+        process_uploaded_photo(file)
+    return jsonify({'status': 'success'})
+\end{lstlisting}
 \item
   \textbf{移动端适配}:
 
@@ -462,25 +484,29 @@ echo "智能相册环境配置完成!"
 \end{itemize}
 
 \subsection{2.8.
-模型部署与优化}\label{ux6a21ux578bux90e8ux7f72ux4e0eux4f18ux5316}
+模型部署与优化}\label{28-ux6a21ux578bux90e8ux7f72ux4e0eux4f18ux5316}
 
 \begin{itemize}
 \item
-  \textbf{模型转换与部署}: ```bash \# 模型转换流程 \# 1.
-  人脸识别模型转换 atc --model=facenet.onnx --framework=5
-  --output=facenet\_ascend\\
-  --input\_format=NCHW --input\_shape=``input:1,3,160,160''\\
-  --soc\_version=Ascend310B1
+  \textbf{模型转换与部署}:
 
-  \# 2. 物体检测模型转换 atc --model=yolov8.onnx --framework=5
-  --output=yolov8\_ascend\\
-  --input\_format=NCHW --input\_shape=``images:1,3,640,640''\\
-  --soc\_version=Ascend310B1
+\begin{lstlisting}[language=bash]
+# 模型转换流程
+# 1. 人脸识别模型转换
+atc --model=facenet.onnx --framework=5 --output=facenet_ascend \
+    --input_format=NCHW --input_shape="input:1,3,160,160" \
+    --soc_version=Ascend310B1
 
-  \# 3. 场景分类模型转换 atc --model=resnet50.onnx --framework=5
-  --output=resnet50\_ascend\\
-  --input\_format=NCHW --input\_shape=``input:1,3,224,224''\\
-  --soc\_version=Ascend310B1 ```
+# 2. 物体检测模型转换
+atc --model=yolov8.onnx --framework=5 --output=yolov8_ascend \
+    --input_format=NCHW --input_shape="images:1,3,640,640" \
+    --soc_version=Ascend310B1
+
+# 3. 场景分类模型转换
+atc --model=resnet50.onnx --framework=5 --output=resnet50_ascend \
+    --input_format=NCHW --input_shape="input:1,3,224,224" \
+    --soc_version=Ascend310B1
+\end{lstlisting}
 \item
   \textbf{性能优化策略}:
 
@@ -498,22 +524,46 @@ echo "智能相册环境配置完成!"
 \end{itemize}
 
 \subsection{2.9.
-数据管理与安全}\label{ux6570ux636eux7ba1ux7406ux4e0eux5b89ux5168}
+数据管理与安全}\label{29-ux6570ux636eux7ba1ux7406ux4e0eux5b89ux5168}
 
 \begin{itemize}
 \item
-  \textbf{数据库设计}: ```sql -- 照片信息表 CREATE TABLE photos ( id
-  INTEGER PRIMARY KEY, filename TEXT NOT NULL, filepath TEXT NOT NULL,
-  timestamp DATETIME, gps\_latitude REAL, gps\_longitude REAL,
-  image\_hash TEXT, analysis\_status INTEGER DEFAULT 0 );
+  \textbf{数据库设计}:
 
-  -- 人脸信息表 CREATE TABLE faces ( id INTEGER PRIMARY KEY, photo\_id
-  INTEGER, person\_id INTEGER, bbox TEXT, embedding BLOB, confidence
-  REAL, FOREIGN KEY (photo\_id) REFERENCES photos (id) );
+\begin{lstlisting}[language=SQL]
+-- 照片信息表
+CREATE TABLE photos (
+    id INTEGER PRIMARY KEY,
+    filename TEXT NOT NULL,
+    filepath TEXT NOT NULL,
+    timestamp DATETIME,
+    gps_latitude REAL,
+    gps_longitude REAL,
+    image_hash TEXT,
+    analysis_status INTEGER DEFAULT 0
+);
 
-  -- 标签信息表 CREATE TABLE tags ( id INTEGER PRIMARY KEY, photo\_id
-  INTEGER, tag\_name TEXT, tag\_type TEXT, confidence REAL, FOREIGN KEY
-  (photo\_id) REFERENCES photos (id) ); ```
+-- 人脸信息表
+CREATE TABLE faces (
+    id INTEGER PRIMARY KEY,
+    photo_id INTEGER,
+    person_id INTEGER,
+    bbox TEXT,
+    embedding BLOB,
+    confidence REAL,
+    FOREIGN KEY (photo_id) REFERENCES photos (id)
+);
+
+-- 标签信息表
+CREATE TABLE tags (
+    id INTEGER PRIMARY KEY,
+    photo_id INTEGER,
+    tag_name TEXT,
+    tag_type TEXT,
+    confidence REAL,
+    FOREIGN KEY (photo_id) REFERENCES photos (id)
+);
+\end{lstlisting}
 \item
   \textbf{隐私保护}:
 
@@ -530,9 +580,9 @@ echo "智能相册环境配置完成!"
   \end{itemize}
 \end{itemize}
 
-\subsection{2.10. 用户手册}\label{ux7528ux6237ux624bux518c}
+\subsection{2.10. 用户手册}\label{210-ux7528ux6237ux624bux518c}
 
-\subsubsection{2.10.1 系统安装}\label{ux7cfbux7edfux5b89ux88c5}
+\subsubsection{2.10.1 系统安装}\label{2101-ux7cfbux7edfux5b89ux88c5}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -547,7 +597,7 @@ echo "智能相册环境配置完成!"
   \textbf{模型下载}: 下载预训练AI模型
 \end{enumerate}
 
-\subsubsection{2.10.2 照片导入}\label{ux7167ux7247ux5bfcux5165}
+\subsubsection{2.10.2 照片导入}\label{2102-ux7167ux7247ux5bfcux5165}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -562,7 +612,7 @@ echo "智能相册环境配置完成!"
   \textbf{网络同步}: 从云存储同步照片
 \end{enumerate}
 
-\subsubsection{2.10.3 智能分析}\label{ux667aux80fdux5206ux6790}
+\subsubsection{2.10.3 智能分析}\label{2103-ux667aux80fdux5206ux6790}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -577,7 +627,7 @@ echo "智能相册环境配置完成!"
   \textbf{质量评估}: 评估和筛选高质量照片
 \end{enumerate}
 
-\subsubsection{2.10.4 检索使用}\label{ux68c0ux7d22ux4f7fux7528}
+\subsubsection{2.10.4 检索使用}\label{2104-ux68c0ux7d22ux4f7fux7528}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -592,7 +642,7 @@ echo "智能相册环境配置完成!"
   \textbf{高级筛选}: 使用多种条件组合筛选
 \end{enumerate}
 
-\section{3. 源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
+\section{3. 源代码结构}\label{3-ux6e90ux4ee3ux7801ux7ed3ux6784}
 
 \begin{lstlisting}
 smart_album/
@@ -631,7 +681,7 @@ smart_album/
     └── integration_tests/ # 集成测试
 \end{lstlisting}
 
-\section{4. 效果演示}\label{ux6548ux679cux6f14ux793a}
+\section{4. 效果演示}\label{4-ux6548ux679cux6f14ux793a}
 
 \begin{itemize}
 \tightlist

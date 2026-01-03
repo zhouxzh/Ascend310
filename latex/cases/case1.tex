@@ -60,6 +60,7 @@
 \subsection{数据集准备}\label{ux6570ux636eux96c6ux51c6ux5907}
 
 \begin{itemize}
+\tightlist
 \item
   \textbf{数据集来源}:
 
@@ -125,6 +126,7 @@ datasets/
 \subsection{模型部署}\label{ux6a21ux578bux90e8ux7f72}
 
 \begin{itemize}
+\tightlist
 \item
   \textbf{模型转换}: 使用ATC (Ascend Tensor Compiler)
   工具将ONNX模型转换为昇腾310B支持的\passthrough{\lstinline!.om!}离线模型。
@@ -153,13 +155,35 @@ atc --model=./models/mobilefacenet.onnx --framework=5 --output=./models/mobilefa
   \end{enumerate}
 \end{itemize}
 
-\subsection{3D打印结构件}\label{dux6253ux5370ux7ed3ux6784ux4ef6}
+\subsection{3D打印结构件}\label{3dux6253ux5370ux7ed3ux6784ux4ef6}
 
 为了方便地将摄像头固定在合适的位置，我们设计了专用的摄像头支架和设备保护外壳。
-- \textbf{文件列表}: - \passthrough{\lstinline!camera\_holder.stl!}:
-摄像头支架模型文件 - \passthrough{\lstinline!device\_case.stl!}:
-设备外壳模型文件 - \textbf{打印建议}: - \textbf{材料}: PLA 或 PETG -
-\textbf{层高}: 0.2mm - \textbf{填充率}: 20\%
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{文件列表}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!camera\_holder.stl!}: 摄像头支架模型文件
+  \item
+    \passthrough{\lstinline!device\_case.stl!}: 设备外壳模型文件
+  \end{itemize}
+\item
+  \textbf{打印建议}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{材料}: PLA 或 PETG
+  \item
+    \textbf{层高}: 0.2mm
+  \item
+    \textbf{填充率}: 20\%
+  \end{itemize}
+\end{itemize}
 
 \section{Web应用}\label{webux5e94ux7528}
 
@@ -194,79 +218,199 @@ atc --model=./models/mobilefacenet.onnx --framework=5 --output=./models/mobilefa
 \end{itemize}
 
 \section{📱
-Web界面详细介绍}\label{webux754cux9762ux8be6ux7ec6ux4ecbux7ecd}
+Web界面详细介绍}\label{iphone-webux754cux9762ux8be6ux7ec6ux4ecbux7ecd}
 
-\subsection{1. 主页 (/)}\label{ux4e3bux9875}
+\subsection{1. 主页 (/)}\label{1-ux4e3bux9875-}
 
-\textbf{功能概述页面} - 系统介绍和功能导航 - 卡片式布局展示各功能模块 -
-快速访问入口： - 人脸识别（摄像头/图片上传） -
-用户注册（摄像头/图片上传） - 用户管理 - 考勤记录 - 考勤配置
+\textbf{功能概述页面}
 
-\subsection{2. 人脸识别模块}\label{ux4ebaux8138ux8bc6ux522bux6a21ux5757}
+\begin{itemize}
+\tightlist
+\item
+  系统介绍和功能导航
+\item
+  卡片式布局展示各功能模块
+\item
+  快速访问入口：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    人脸识别（摄像头/图片上传）
+  \item
+    用户注册（摄像头/图片上传）
+  \item
+    用户管理
+  \item
+    考勤记录
+  \item
+    考勤配置
+  \end{itemize}
+\end{itemize}
+
+\subsection{2.
+人脸识别模块}\label{2-ux4ebaux8138ux8bc6ux522bux6a21ux5757}
 
 \subsubsection{2.1 实时摄像头识别
-(/camera\_live)}\label{ux5b9eux65f6ux6444ux50cfux5934ux8bc6ux522b-camera_live}
+(/camera\_live)}\label{21-ux5b9eux65f6ux6444ux50cfux5934ux8bc6ux522b-camera_live}
 
-\textbf{实时人脸识别和考勤} - \textbf{摄像头控制}: 启动/停止摄像头按钮 -
-\textbf{实时视频流}: 显示摄像头画面和识别框 - \textbf{用户列表}:
-显示所有已注册用户 - \textbf{考勤信息}: 实时显示考勤结果和状态 -
-\textbf{使用提示}: 详细的操作说明
+\textbf{实时人脸识别和考勤}
 
-\textbf{功能特点}: - 实时人脸检测和识别 - 自动考勤记录 - 防重复打卡机制
-- 识别结果实时反馈
+\begin{itemize}
+\tightlist
+\item
+  \textbf{摄像头控制}: 启动/停止摄像头按钮
+\item
+  \textbf{实时视频流}: 显示摄像头画面和识别框
+\item
+  \textbf{用户列表}: 显示所有已注册用户
+\item
+  \textbf{考勤信息}: 实时显示考勤结果和状态
+\item
+  \textbf{使用提示}: 详细的操作说明
+\end{itemize}
+
+\textbf{功能特点}:
+
+\begin{itemize}
+\tightlist
+\item
+  实时人脸检测和识别
+\item
+  自动考勤记录
+\item
+  防重复打卡机制
+\item
+  识别结果实时反馈
+\end{itemize}
 
 \subsubsection{2.2 图片上传识别
-(/recognize)}\label{ux56feux7247ux4e0aux4f20ux8bc6ux522b-recognize}
+(/recognize)}\label{22-ux56feux7247ux4e0aux4f20ux8bc6ux522b-recognize}
 
-\textbf{静态图片人脸识别} - \textbf{图片上传}: 支持拖拽上传或点击选择 -
-\textbf{格式支持}: PNG, JPG, JPEG, GIF, BMP - \textbf{实时预览}:
-上传后立即显示图片 - \textbf{识别结果}: 显示识别到的人员信息 -
-\textbf{考勤记录}: 自动记录考勤状态
+\textbf{静态图片人脸识别}
 
-\subsection{3. 用户注册模块}\label{ux7528ux6237ux6ce8ux518cux6a21ux5757}
+\begin{itemize}
+\tightlist
+\item
+  \textbf{图片上传}: 支持拖拽上传或点击选择
+\item
+  \textbf{格式支持}: PNG, JPG, JPEG, GIF, BMP
+\item
+  \textbf{实时预览}: 上传后立即显示图片
+\item
+  \textbf{识别结果}: 显示识别到的人员信息
+\item
+  \textbf{考勤记录}: 自动记录考勤状态
+\end{itemize}
+
+\subsection{3.
+用户注册模块}\label{3-ux7528ux6237ux6ce8ux518cux6a21ux5757}
 
 \subsubsection{3.1 摄像头注册
-(/camera\_register)}\label{ux6444ux50cfux5934ux6ce8ux518c-camera_register}
+(/camera\_register)}\label{31-ux6444ux50cfux5934ux6ce8ux518c-camera_register}
 
-\textbf{实时摄像头人脸注册} - \textbf{姓名输入}: 输入待注册人员姓名 -
-\textbf{实时拍摄}: 摄像头实时画面 - \textbf{多角度采集}:
-建议采集多个角度的人脸 - \textbf{质量检测}: 自动检测人脸质量 -
-\textbf{批量保存}: 一次性保存多张人脸图片
+\textbf{实时摄像头人脸注册}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{姓名输入}: 输入待注册人员姓名
+\item
+  \textbf{实时拍摄}: 摄像头实时画面
+\item
+  \textbf{多角度采集}: 建议采集多个角度的人脸
+\item
+  \textbf{质量检测}: 自动检测人脸质量
+\item
+  \textbf{批量保存}: 一次性保存多张人脸图片
+\end{itemize}
 
 \subsubsection{3.2 图片上传注册
-(/register)}\label{ux56feux7247ux4e0aux4f20ux6ce8ux518c-register}
+(/register)}\label{32-ux56feux7247ux4e0aux4f20ux6ce8ux518c-register}
 
-\textbf{批量图片上传注册} - \textbf{批量上传}: 支持同时上传多张图片 -
-\textbf{人脸检测}: 自动检测图片中的人脸 - \textbf{质量筛选}:
-过滤低质量人脸图片 - \textbf{预览确认}: 注册前预览所有人脸 -
-\textbf{一键注册}: 批量处理所有图片
+\textbf{批量图片上传注册}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{批量上传}: 支持同时上传多张图片
+\item
+  \textbf{人脸检测}: 自动检测图片中的人脸
+\item
+  \textbf{质量筛选}: 过滤低质量人脸图片
+\item
+  \textbf{预览确认}: 注册前预览所有人脸
+\item
+  \textbf{一键注册}: 批量处理所有图片
+\end{itemize}
 
 \subsection{4. 用户管理
-(/user\_management)}\label{ux7528ux6237ux7ba1ux7406-user_management}
+(/user\_management)}\label{4-ux7528ux6237ux7ba1ux7406-user_management}
 
-\textbf{完整的用户管理功能} - \textbf{用户列表}: 显示所有已注册用户 -
-\textbf{用户详情}: 查看用户的所有人脸图片 - \textbf{删除用户}:
-删除不需要的用户及其数据 - \textbf{统计信息}: 显示用户总数和注册时间 -
-\textbf{搜索功能}: 快速查找特定用户
+\textbf{完整的用户管理功能}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{用户列表}: 显示所有已注册用户
+\item
+  \textbf{用户详情}: 查看用户的所有人脸图片
+\item
+  \textbf{删除用户}: 删除不需要的用户及其数据
+\item
+  \textbf{统计信息}: 显示用户总数和注册时间
+\item
+  \textbf{搜索功能}: 快速查找特定用户
+\end{itemize}
 
 \subsection{5. 考勤记录
-(/attendance)}\label{ux8003ux52e4ux8bb0ux5f55-attendance}
+(/attendance)}\label{5-ux8003ux52e4ux8bb0ux5f55-attendance}
 
-\textbf{考勤数据管理} - \textbf{记录列表}: 显示所有考勤记录 -
-\textbf{时间排序}: 按时间倒序显示最新记录 - \textbf{统计信息}: -
-今日打卡人数 - 总打卡次数 - 注册人员总数 - \textbf{数据导出}:
-支持CSV格式导出 - \textbf{筛选功能}: 按日期、人员筛选记录
+\textbf{考勤数据管理}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{记录列表}: 显示所有考勤记录
+\item
+  \textbf{时间排序}: 按时间倒序显示最新记录
+\item
+  \textbf{统计信息}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    今日打卡人数
+  \item
+    总打卡次数
+  \item
+    注册人员总数
+  \end{itemize}
+\item
+  \textbf{数据导出}: 支持CSV格式导出
+\item
+  \textbf{筛选功能}: 按日期、人员筛选记录
+\end{itemize}
 
 \subsection{6. 考勤配置
-(/attendance\_config)}\label{ux8003ux52e4ux914dux7f6e-attendance_config}
+(/attendance\_config)}\label{6-ux8003ux52e4ux914dux7f6e-attendance_config}
 
-\textbf{灵活的考勤参数配置} - \textbf{重复打卡间隔}:
-设置0.1-24小时的间隔时间 - \textbf{实时保存}: 配置修改后立即生效 -
-\textbf{参数验证}: 自动验证配置参数的有效性 - \textbf{默认设置}:
-提供合理的默认配置
+\textbf{灵活的考勤参数配置}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{重复打卡间隔}: 设置0.1-24小时的间隔时间
+\item
+  \textbf{实时保存}: 配置修改后立即生效
+\item
+  \textbf{参数验证}: 自动验证配置参数的有效性
+\item
+  \textbf{默认设置}: 提供合理的默认配置
+\end{itemize}
 
 \section{🔧
-Web应用技术架构}\label{webux5e94ux7528ux6280ux672fux67b6ux6784}
+Web应用技术架构}\label{wrench-webux5e94ux7528ux6280ux672fux67b6ux6784}
 
 \subsection{后端技术栈}\label{ux540eux7aefux6280ux672fux6808}
 

@@ -85,7 +85,6 @@ echo "环境安装完成!"
 \subsection{数据集准备}\label{ux6570ux636eux96c6ux51c6ux5907}
 
 \begin{itemize}
-\tightlist
 \item
   \textbf{目标检测数据集}:
 
@@ -127,7 +126,6 @@ echo "环境安装完成!"
 \subsection{模型训练与选择}\label{ux6a21ux578bux8badux7ec3ux4e0eux9009ux62e9}
 
 \begin{itemize}
-\tightlist
 \item
   \textbf{目标检测模型}:
 
@@ -173,46 +171,35 @@ echo "环境安装完成!"
 
 \begin{itemize}
 \item
-  \textbf{模型转换流程}: ```bash \# 1. PyTorch模型转ONNX python3
-  convert\_to\_onnx.py --model yolov8s.pt --output yolov8s.onnx
+  \textbf{模型转换流程}:
 
-  \# 2. ONNX转昇腾.om格式 atc --model=yolov8s.onnx --framework=5
-  --output=yolov8s\\
-  --input\_format=NCHW --input\_shape=``images:1,3,640,640''\\
-  --soc\_version=Ascend310B1 ```
+\begin{lstlisting}[language=bash]
+# 1. PyTorch模型转ONNX
+python3 convert_to_onnx.py --model yolov8s.pt --output yolov8s.onnx
+
+# 2. ONNX转昇腾.om格式
+atc --model=yolov8s.onnx --framework=5 --output=yolov8s \
+    --input_format=NCHW --input_shape="images:1,3,640,640" \
+    --soc_version=Ascend310B1
+\end{lstlisting}
 \item
   \textbf{实时跟踪主程序 (\passthrough{\lstinline!tracking\_app.py!})}:
-  ```python \# 核心流程示例
 
-  \begin{enumerate}
-  \def\labelenumi{\arabic{enumi}.}
-  \tightlist
-  \item
-    初始化昇腾推理引擎
-  \item
-    加载检测和跟踪模型
-  \item
-    打开视频流
-  \item
-    循环处理每一帧:
-
-    \begin{itemize}
-    \tightlist
-    \item
-      目标检测
-    \item
-      跟踪算法更新
-    \item
-      绘制跟踪轨迹
-    \item
-      显示结果
-    \end{itemize}
-  \item
-    保存跟踪结果 ```
-  \end{enumerate}
+\begin{lstlisting}[language=Python]
+# 核心流程示例
+1. 初始化昇腾推理引擎
+2. 加载检测和跟踪模型
+3. 打开视频流
+4. 循环处理每一帧:
+   - 目标检测
+   - 跟踪算法更新
+   - 绘制跟踪轨迹
+   - 显示结果
+5. 保存跟踪结果
+\end{lstlisting}
 \end{itemize}
 
-\subsection{3D打印结构件}\label{dux6253ux5370ux7ed3ux6784ux4ef6}
+\subsection{3D打印结构件}\label{3dux6253ux5370ux7ed3ux6784ux4ef6}
 
 \begin{itemize}
 \tightlist
@@ -249,9 +236,17 @@ echo "环境安装完成!"
   \end{itemize}
 \end{itemize}
 
-\emph{3D打印参数建议}: - \textbf{材料}: PETG (强度高，耐温性好) -
-\textbf{层高}: 0.15mm (保证精度) - \textbf{填充率}: 30\%
-(强度与重量平衡)
+\emph{3D打印参数建议}:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{材料}: PETG (强度高，耐温性好)
+\item
+  \textbf{层高}: 0.15mm (保证精度)
+\item
+  \textbf{填充率}: 30\% (强度与重量平衡)
+\end{itemize}
 
 \subsection{用户手册}\label{ux7528ux6237ux624bux518c}
 

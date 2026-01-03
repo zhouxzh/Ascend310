@@ -7,46 +7,49 @@
 \section{性能拆解与衡量框架}\label{ux6027ux80fdux62c6ux89e3ux4e0eux8861ux91cfux6846ux67b6}
 
 总时延公式：\passthrough{\lstinline!T\_total = T\_pre + T\_h2d + T\_infer + T\_d2h + T\_post + T\_idle!}。
-吞吐上限受制于 \passthrough{\lstinline!max(T\_component)!}；需收集： -
-平均/分位数 (p50/p95)； - 波动系数 CV=std/mean（\textgreater0.15
-需进一步剖析）； - 稳定性：长跑 1h 是否存在漂移 (内存泄漏或热降频)。
-对比优化前后必须保留固定随机种子和数据集，消除噪声。
+吞吐上限受制于 \passthrough{\lstinline!max(T\_component)!}；需收集：
+
+\begin{itemize}
+\tightlist
+\item
+  平均/分位数 (p50/p95)；
+\item
+  波动系数 CV=std/mean（\textgreater0.15 需进一步剖析）；
+\item
+  稳定性：长跑 1h 是否存在漂移 (内存泄漏或热降频)。
+  对比优化前后必须保留固定随机种子和数据集，消除噪声。
+\end{itemize}
 
 \section{Profiling
 工具与时间线解读}\label{profiling-ux5de5ux5177ux4e0eux65f6ux95f4ux7ebfux89e3ux8bfb}
 
 关键观测元素： \textbar{} 轨迹 \textbar{} 意义 \textbar{} 异常信号
-\textbar{} \textbar{} ---- \textbar{} ---- \textbar{} --------
-\textbar{} \textbar{} Stream Timeline \textbar{} 内核调度顺序 \textbar{}
-大量空洞 gap \textbar{} \textbar{} MemCopy \textbar{} H2D/D2H 开销
-\textbar{} 频繁小块拷贝 \textbar{} \textbar{} Task Kernel \textbar{}
-算子执行 \textbar{} 个别算子异常拖长 \textbar{} \textbar{} Sync/Wait
-\textbar{} Host 等待 \textbar{} Wait 占比高 \textbar{}
+\textbar{} \textbar{} -\/-\/-\/- \textbar{} -\/-\/-\/- \textbar{}
+-\/-\/-\/-\/-\/-\/-\/- \textbar{} \textbar{} Stream Timeline \textbar{}
+内核调度顺序 \textbar{} 大量空洞 gap \textbar{} \textbar{} MemCopy
+\textbar{} H2D/D2H 开销 \textbar{} 频繁小块拷贝 \textbar{} \textbar{}
+Task Kernel \textbar{} 算子执行 \textbar{} 个别算子异常拖长 \textbar{}
+\textbar{} Sync/Wait \textbar{} Host 等待 \textbar{} Wait 占比高
+\textbar{}
 
-使用策略： 1. 先全量 Profile → 定位热点范围； 2. 二次局部
-Profile（过滤特定算子类型）； 3. 导出 JSON → 自动解析器归档：算子耗时
-TOPK，Copy 占比，Idle 时间。
+使用策略：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  先全量 Profile → 定位热点范围；
+\item
+  二次局部 Profile（过滤特定算子类型）；
+\item
+  导出 JSON → 自动解析器归档：算子耗时 TOPK，Copy 占比，Idle 时间。
+\end{enumerate}
 
 \section{瓶颈模式与处置策略矩阵}\label{ux74f6ux9888ux6a21ux5f0fux4e0eux5904ux7f6eux7b56ux7565ux77e9ux9635}
 
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1176}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2353}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2353}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2941}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1176}}@{}}
+\begin{longtable}[]{@{}lllll@{}}
 \toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-模式
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-识别特征
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-定量指标
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-处置优先级
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-策略
-\end{minipage} \\
+模式 & 识别特征 & 定量指标 & 处置优先级 & 策略 \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
@@ -68,7 +71,7 @@ H2D 瓶颈 & MemCopy 比例高 & H2D\textgreater20\% & 高 &
 影响可维护性。
 
 \section{Layout /
-内存访问优化}\label{layout-ux5185ux5b58ux8bbfux95eeux4f18ux5316}
+内存访问优化}\label{layout--ux5185ux5b58ux8bbfux95eeux4f18ux5316}
 
 常见格式：NCHW（框架常用）、NHWC（部分算子优化）、NC1HWC0（硬件友好对齐），转换策略：在数据首次落地时转换一次；若前后模型不同布局，以中间标准布局连接，减少重复重排。
 对齐：通道/宽高按 16/32 边界对齐可提升访存一致性；小通道 (\textless16)
@@ -91,19 +94,42 @@ INT8 对称 & 量化整型 & 1.5\textasciitilde2.2x & 量化噪声 \\
 混合精度 & 局部高精度 & 中等 & 实现复杂 \\
 \end{longtable}
 
-量化流程要点： 1. 收集代表性校准集（覆盖光照/尺度/类别分布）； 2.
-校准统计（MinMax / KL）； 3. 评估 Top1/Top5
-差异、关键指标差异（mAP/F1）。 误差定位：Dump 中间张量（FP32 vs INT8）→
-层级误差分布 → 定位失真层（常见：激活饱和/尺度不均衡）。
+量化流程要点：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  收集代表性校准集（覆盖光照/尺度/类别分布）；
+\item
+  校准统计（MinMax / KL）；
+\item
+  评估 Top1/Top5 差异、关键指标差异（mAP/F1）。 误差定位：Dump
+  中间张量（FP32 vs INT8）→ 层级误差分布 →
+  定位失真层（常见：激活饱和/尺度不均衡）。
+\end{enumerate}
 
 \section{内存管理专题}\label{ux5185ux5b58ux7ba1ux7406ux4e13ux9898}
 
-策略： 1. 长期 Buffer：模型 I/O、常量 Workspace； 2. 短期 Buffer：Batch
-临时中间； 3. 建立内存池（按 size class 分类
-1KB/4KB/16KB/64KB/大块），分配 → 归还； 4. 避免频繁
-\passthrough{\lstinline!aclrtMalloc/Free!}：使用池化接口封装； 5.
-监控：每 60s 记录一次池使用率与系统剩余内存，突增后回收未引用对象； 6.
-大对象对齐：按 512B/4KB 对齐减少碎片。
+策略：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  长期 Buffer：模型 I/O、常量 Workspace；
+\item
+  短期 Buffer：Batch 临时中间；
+\item
+  建立内存池（按 size class 分类 1KB/4KB/16KB/64KB/大块），分配 → 归还；
+\item
+  避免频繁
+  \passthrough{\lstinline!aclrtMalloc/Free!}：使用池化接口封装；
+\item
+  监控：每 60s 记录一次池使用率与系统剩余内存，突增后回收未引用对象；
+\item
+  大对象对齐：按 512B/4KB 对齐减少碎片。
+\end{enumerate}
 
 \section{并行与流水线}\label{ux5e76ux884cux4e0eux6d41ux6c34ux7ebf}
 
@@ -115,7 +141,8 @@ In-Flight 帧数达到平衡（过多增加延迟，过少利用率低）。
 \section{自定义算子开发与评估}\label{ux81eaux5b9aux4e49ux7b97ux5b50ux5f00ux53d1ux4e0eux8bc4ux4f30}
 
 决策条件： \textbar{} 条件 \textbar{} 必须满足至少一项 \textbar{}
-\textbar{} ---- \textbar{} ---------------- \textbar{} \textbar{}
+\textbar{} -\/-\/-\/- \textbar{}
+-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/- \textbar{} \textbar{}
 复合算子频繁出现 \textbar{} 合并降低访存 \textbar{} \textbar{}
 内置实现回退 Host \textbar{} 存在高额拷贝 \textbar{} \textbar{}
 内核模式不适配输入规模 \textbar{} 小尺寸性能差 \textbar{}
@@ -125,12 +152,13 @@ inputs/outputs) → Kernel C++ 模板 (向量化 / Tile) → 编译注册 → AT
 → 功能单测（随机张量对比）→ 性能对比（3 次 Warmup + 50 次统计）。
 评估表： \textbar{} 版本 \textbar{} 输入规模 \textbar{} 平均耗时(us)
 \textbar{} P95(us) \textbar{} 访存次数 \textbar{} 速度提升 \textbar{}
-备注 \textbar{} \textbar{} ---- \textbar{} -------- \textbar{}
------------ \textbar{} ------- \textbar{} -------- \textbar{} --------
-\textbar{} ---- \textbar{}
+备注 \textbar{} \textbar{} -\/-\/-\/- \textbar{} -\/-\/-\/-\/-\/-\/-\/-
+\textbar{} -\/-\/-\/-\/-\/-\/-\/-\/-\/-\/- \textbar{}
+-\/-\/-\/-\/-\/-\/- \textbar{} -\/-\/-\/-\/-\/-\/-\/- \textbar{}
+-\/-\/-\/-\/-\/-\/-\/- \textbar{} -\/-\/-\/- \textbar{}
 
 \section{优化案例：Add + ReLU
-融合}\label{ux4f18ux5316ux6848ux4f8badd-relu-ux878dux5408}
+融合}\label{ux4f18ux5316ux6848ux4f8badd--relu-ux878dux5408}
 
 原始：Add → ReLU 两个算子各自读写内存； 融合：单 Kernel 计算
 \passthrough{\lstinline!out = relu(a+b)!}：减少一次读写；
@@ -337,12 +365,20 @@ FP16 差异）→ Benchmark 对比。
 \end{enumerate}
 
 \begin{itemize}
+\tightlist
 \item
-  计算表达： ```python \# 伪代码：y = relu(x1 + x2) import te.lang.cce
-  as tbe from te import tvm
+  计算表达：
 
-  def add\_relu\_compute(x1, x2): y = tbe.vadd(x1, x2) z = tbe.vmaxs(y,
-  tvm.const(0.0, x1.dtype)) return z ```
+\begin{lstlisting}[language=Python]
+# 伪代码：y = relu(x1 + x2)
+import te.lang.cce as tbe
+from te import tvm
+
+def add_relu_compute(x1, x2):
+        y = tbe.vadd(x1, x2)
+        z = tbe.vmaxs(y, tvm.const(0.0, x1.dtype))
+        return z
+\end{lstlisting}
 \item
   调度策略（示例要点）：
 

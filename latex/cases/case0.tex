@@ -11,43 +11,19 @@ USB（串口打印调试功能）、两个MIPI摄像头、一个MIPI屏等，预
 AIoT各个行业。 OrangePi
 AIpro(8T)支持Ubuntu、openEuler操作系统，满足大多数AI算法原型验证、推理应用开发的需求。
 
-\begin{figure}
-\centering
 \pandocbounded{\includegraphics[keepaspectratio,alt={产品图}]{cases/img0/aipro.png}}
-\caption{产品图}
-\end{figure}
 
 \subsection{开发板详细视图}\label{ux5f00ux53d1ux677fux8be6ux7ec6ux89c6ux56fe}
 
-\begin{figure}
-\centering
 \pandocbounded{\includegraphics[keepaspectratio,alt={正面视图}]{cases/img0/4.png}}
-\caption{正面视图}
-\end{figure}
 
-\begin{figure}
-\centering
 \pandocbounded{\includegraphics[keepaspectratio,alt={背面试图}]{cases/img0/5.png}}
-\caption{背面试图}
-\end{figure}
 
-\begin{figure}
-\centering
 \pandocbounded{\includegraphics[keepaspectratio,alt={正面标注视图}]{cases/img0/1.png}}
-\caption{正面标注视图}
-\end{figure}
 
-\begin{figure}
-\centering
 \pandocbounded{\includegraphics[keepaspectratio,alt={背面标注视图}]{cases/img0/2.png}}
-\caption{背面标注视图}
-\end{figure}
 
-\begin{figure}
-\centering
 \pandocbounded{\includegraphics[keepaspectratio,alt={GPIO接口定义}]{cases/img0/3.png}}
-\caption{GPIO接口定义}
-\end{figure}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -61,20 +37,12 @@ AIpro(8T)支持Ubuntu、openEuler操作系统，满足大多数AI算法原型验
   \textbf{TF卡}\\
   容量最小为32GB，速率为Class10级以上的闪迪品牌的TF卡，如下图所示。建议使用64G及以上的TF卡，以避免在开发过程中出现磁盘空间不足的问题。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={tf卡}]{cases/img0/tf.jpg}}
-  \caption{tf卡}
-  \end{figure}
 \item
   \textbf{TF卡读卡器}\\
   用于读写TF卡，刷写系统，建议选择速率为USB3.0以上的，减少系统刷写的等待时间。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={读卡器}]{cases/img0/reader.jpg}}
-  \caption{读卡器}
-  \end{figure}
 \item
   \textbf{HDMI线或HDMI转mini-HDMI线}\\
   主要取决于显示器的接口类型该开发板的视频输出接口为标准HDMI接口。
@@ -85,127 +53,71 @@ AIpro(8T)支持Ubuntu、openEuler操作系统，满足大多数AI算法原型验
   \textbf{电源}\\
   该开发板的电源输入为PD 20V，需要搭配支持PD协议20V挡位的65W电源适配器。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={PD电源}]{cases/img0/power.png}}
-  \caption{PD电源}
-  \end{figure}
 \item
   \textbf{USB接口的鼠标以及键盘}\\
   在无远程访问的条件下对开发板进行本地调试。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={鼠标}]{cases/img0/mouse.png}}
-  \caption{鼠标}
-  \end{figure}
 \item
   \textbf{金属配套外壳}\\
   用于保护开发板硬件。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={外壳}]{cases/img0/cover.png}}
-  \caption{外壳}
-  \end{figure}
 \item
   \textbf{12V散热风扇以及散热鳍块}\\
   开发板的风扇接口为2pin，输出电压为12v，支持PWM调速。由于该开发板的CPU发热较大，强烈建议安装主动扇热设备。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={风扇}]{cases/img0/fan.png}}
-  \caption{风扇}
-  \end{figure}
 \item
   \textbf{Type-C转USB 3.0转接线（可选）}\\
   OrangePi AIPro开发板具有一个Type-C接口，协议为USB3.0（不支持USB
   2.0），可外接支持USB3.0以上协议的外置设备。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={转接线}]{cases/img0/otg.png}}
-  \caption{转接线}
-  \end{figure}
 \item
   \textbf{M.2接口 2280规格的PCIe Nvme SSD（可选）}\\
   开发板的背部设计有M.2接口，可外接一个M.2的SSD作为开发板的系统盘或者存储。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={nvme ssd}]{cases/img0/nvme.png}}
-  \caption{nvme ssd}
-  \end{figure}
 \item
   \textbf{M.2接口 2280规格的Sata Ngff SSD（可选）}\\
   同样，开发板的M.2接口不仅支持PCIe协议，也支持Sata协议，因此也可以使用Sata协议的SSD。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={ngff ssd}]{cases/img0/ngff.png}}
-  \caption{ngff ssd}
-  \end{figure}
 \item
   \textbf{香橙派的eMMC模块（可选）}\\
   eMMC（嵌入式多媒体卡）是一种集成了闪存和控制器的低成本存储解决方案，主要用于智能手机、平板电脑和低端笔记本电脑等消费电子产品。其读写速度适中（100-400MB/s），比传统机械硬盘快但不及固态硬盘（SSD），具有体积小、功耗低和易于集成的特点。开发板支持使用eMMC模块作为存储，但需要额外购置eMMC模块。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={emmc正面}]{cases/img0/emmc1.png}}
-  \caption{emmc正面}
-  \end{figure}
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={emmc背面}]{cases/img0/emmc2.png}}
-  \caption{emmc背面}
-  \end{figure}
 \item
   \textbf{USB摄像头模块（可选）}\\
   可用于图像识别、视频通话等多方面用途。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={摄像头}]{cases/img0/camera.png}}
-  \caption{摄像头}
-  \end{figure}
 \item
   \textbf{网线（可选）}\\
   开发板自带有wifi模块可用于连接wifi，若需要更稳定的网络连接，建议使用网线连接。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={网线}]{cases/img0/cable.png}}
-  \caption{网线}
-  \end{figure}
 \item
   \textbf{树莓派IMX219型号摄像头（MIPI-CSI）（可选）}\\
   开发板带有两个MIPI-CSI接口，可以兼容树莓派的MIPI摄像头，无需占用USB接口。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={MIPI-CSI摄像头}]{cases/img0/csi.png}}
-  \caption{MIPI-CSI摄像头}
-  \end{figure}
 \item
   \textbf{树莓派5寸MIPI LCD显示屏（可选）}\\
   开发板带有一个MIPI-DSI显示输出接口，可以直接驱动MIPI的显示屏，而无需外接显示器。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={MIPI显示器}]{cases/img0/dsi.png}}
-  \caption{MIPI显示器}
-  \end{figure}
 \item
   \textbf{Micro USB数据线（可选）}\\
   开发板自带了CH343P芯片，将UART转发为Micro
   USB接口，若需要使用串口对开发板进行调试，则需要使用Micro USB数据线。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={Micro USB数据线}]{cases/img0/microusb.png}}
-  \caption{Micro USB数据线}
-  \end{figure}
 \end{enumerate}
 
 \section{操作系统安装}\label{ux64cdux4f5cux7cfbux7edfux5b89ux88c5}
@@ -215,19 +127,11 @@ AIpro(8T)支持Ubuntu、openEuler操作系统，满足大多数AI算法原型验
 
 首先，打开香橙派官网的\href{http://www.orangepi.cn/html/hardWare/computerAndMicrocontrollers/service-and-support/Orange-Pi-AIpro.html}{技术支持界面}。
 
-\begin{figure}
-\centering
 \pandocbounded{\includegraphics[keepaspectratio,alt={技术支持页面}]{cases/img0/技术支持.png}}
-\caption{技术支持页面}
-\end{figure}
 
 向下滑动网页，找到官方镜像部分，分为Ubuntu和openEuler两个部分，两个系统都是官方为我们编译完成的，且预装了部分昇腾NPU的应用环境以及软件，非常方便新手用户上手使用。
 
-\begin{figure}
-\centering
 \pandocbounded{\includegraphics[keepaspectratio,alt={官方镜像}]{cases/img0/官方镜像.png}}
-\caption{官方镜像}
-\end{figure}
 
 \subsection{Ubuntu}\label{ubuntu}
 
@@ -250,7 +154,7 @@ AIpro(8T)支持Ubuntu、openEuler操作系统，满足大多数AI算法原型验
   \begin{itemize}
   \tightlist
   \item
-    一种文件名带有Desktop的，是带有GUI图形化界面的。\\
+    一种文件名带有Desktop的，是带有GUI图形化界面的。
   \item
     另一种文件名带有minimal的，是不具有图形化界面的，只有命令行界面。建议新学习的用户使用带有desktop的镜像。\\
     \pandocbounded{\includegraphics[keepaspectratio,alt={选择镜像}]{cases/img0/chooseubuntu.png}}
@@ -288,21 +192,29 @@ AIpro(8T)支持Ubuntu、openEuler操作系统，满足大多数AI算法原型验
 \item
   \textbf{Windows}：在文件夹内按住 \textbf{Shift}
   并右键，选择``在终端（Powershell/命令提示符）中打开''。运行：
-  \passthrough{\lstinline!powershell  certutil -hashfile opiaipro\_ubuntu22.04\_desktop\_aarch64\_20241128.img.xz md5!}
+
+\begin{lstlisting}
+certutil -hashfile opiaipro_ubuntu22.04_desktop_aarch64_20241128.img.xz md5
+\end{lstlisting}
+
   将输出的 MD5 与
   \passthrough{\lstinline!opiaipro\_ubuntu22.04\_desktop\_aarch64\_20241128.img.xz.sha!}
   中的值对比。\\
   \pandocbounded{\includegraphics[keepaspectratio,alt={终端}]{cases/img0/shell.png}}
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={md5校验}]{cases/img0/md5.png}}
-  \caption{md5校验}
-  \end{figure}
 \item
-  \textbf{Ubuntu}： \passthrough{\lstinline!bash  md5sum <filename>!}
+  \textbf{Ubuntu}：
+
+\begin{lstlisting}[language=bash]
+md5sum <filename>
+\end{lstlisting}
 \item
-  \textbf{macOS}： \passthrough{\lstinline!bash  md5 <filename>!}
+  \textbf{macOS}：
+
+\begin{lstlisting}[language=bash]
+md5 <filename>
+\end{lstlisting}
 \end{itemize}
 
 若校验值一致，可进行下一步操作；若不一致，请重新下载。
@@ -338,24 +250,16 @@ AIpro(8T)支持Ubuntu、openEuler操作系统，满足大多数AI算法原型验
 \item
   \textbf{将TF卡插入读卡器中，并将读卡器插入电脑。}
 \item
-  \textbf{打开 }SD Card Formatter** 软件。**\\
+  \textbf{打开 \textbf{SD Card Formatter} 软件。}\\
   \pandocbounded{\includegraphics[keepaspectratio,alt={TF卡格式化}]{cases/img0/SDFmt.png}}
 \item
-  \textbf{点击右下角的 }Format** 按键，格式化TF卡。**
+  \textbf{点击右下角的 \textbf{Format} 按键，格式化TF卡。}
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={格式化}]{cases/img0/fmt.png}}
-  \caption{格式化}
-  \end{figure}
 
   警告内容是关于格式化操作会清除TF卡上原有的所有数据，此处选是。
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={warning}]{cases/img0/warning.png}}
-  \caption{warning}
-  \end{figure}
 \item
   \textbf{等待软件格式化完成，并点击确定。}\\
   \pandocbounded{\includegraphics[keepaspectratio,alt={格式化完成}]{cases/img0/fmtfin.png}}
@@ -400,11 +304,7 @@ AIpro(8T)支持Ubuntu、openEuler操作系统，满足大多数AI算法原型验
 开发板支持多种启动方式，包括TF卡、eMMC以及M.2
 SSD，当这些存储设备都同时存在时，需要让开发板选定一个存储设备作为启动来源。
 
-\begin{figure}
-\centering
 \pandocbounded{\includegraphics[keepaspectratio,alt={boot开关}]{cases/img0/bootswitch.png}}
-\caption{boot开关}
-\end{figure}
 
 两个开关都有左、右两种状态，因此共有4种状态，但是目前开发板仅使用3种模式，对应的参数表如下：
 
@@ -432,37 +332,22 @@ Boot1开关 & Boot2开关 & 启动设备 \\
 \item
   \textbf{将系统刷写完成的TF卡从读卡器中取出，插入开发板的TF卡插槽中，并确保两个启动开关的位置均在右边，接入HDMI数据线到靠近USB3.0接口的HDMI0接口，然后将Type-C电源线插入开发板最边缘的TYPE-C供电口，等待风扇的声音变小以及屏幕出现系统登录界面。}
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={HDMI0}]{cases/img0/HDMI0.png}}
-  \caption{HDMI0}
-  \end{figure}
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={TYPE-C Power}]{cases/img0/typecp.png}}
-  \caption{TYPE-C Power}
-  \end{figure}
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={登录}]{cases/img0/beforelogin.png}}
-  \caption{登录}
-  \end{figure}
 \item
   \textbf{进入登录界面后，将键盘接入开发板的USB接口中，默认的登录用户名是\passthrough{\lstinline!HwHiAiUser!}，输入该账户的密码\passthrough{\lstinline!Mind@123!},登录进入系统。}
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={桌面}]{cases/img0/logingui.png}}
-  \caption{桌面}
-  \end{figure}
 
   若无法登陆请检查输入的密码是否正确，大小写以及符号是否正确
 
   默认账户表格： \textbar{} 用户名 \textbar{} 密码 \textbar{} \textbar{}
-  :---: \textbar{} :---: \textbar{} \textbar{} root \textbar{} Mind@123
-  \textbar{} \textbar{} HwHiAiUser \textbar{} Mind@123 \textbar{}
+  :-\/-\/-: \textbar{} :-\/-\/-: \textbar{} \textbar{} root \textbar{}
+  Mind@123 \textbar{} \textbar{} HwHiAiUser \textbar{} Mind@123
+  \textbar{}
 \end{enumerate}
 
 \subsection{串口界面}\label{ux4e32ux53e3ux754cux9762}
@@ -480,13 +365,15 @@ Boot1开关 & Boot2开关 & 启动设备 \\
   \pandocbounded{\includegraphics[keepaspectratio,alt={MicroUSB串口}]{cases/img0/microusbser.png}}
 \end{enumerate}
 
-以Micro USB接口为例： 1. \textbf{使用Micro USB数据线连接开发板和电脑} 2.
-\textbf{打开电脑的设备管理器，选择端口，寻找开发板对应的串口端口号}\\
-\pandocbounded{\includegraphics[keepaspectratio,alt={端口号}]{cases/img0/ttl.png}}
+以Micro USB接口为例：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
-\setcounter{enumi}{2}
+\item
+  \textbf{使用Micro USB数据线连接开发板和电脑}
+\item
+  \textbf{打开电脑的设备管理器，选择端口，寻找开发板对应的串口端口号}\\
+  \pandocbounded{\includegraphics[keepaspectratio,alt={端口号}]{cases/img0/ttl.png}}
 \item
   \textbf{打开串口调试软件（PUTTY）}\\
   \pandocbounded{\includegraphics[keepaspectratio,alt={PUTTY}]{cases/img0/putty.png}}，将Connection
@@ -495,17 +382,9 @@ Boot1开关 & Boot2开关 & 启动设备 \\
 \item
   \textbf{等待出现\passthrough{\lstinline!Ubuntu 22.04.3 LTS orangepiaipro ttyAM0!}字样，输入登录的用户名HwHiAiUser并回车，然后输入密码Mind@123并回车，注意在输入密码的时候屏幕并不会显示任何东西，登陆后的界面如图所示。}
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={串口}]{cases/img0/serial.png}}
-  \caption{串口}
-  \end{figure}
 
-  \begin{figure}
-  \centering
   \pandocbounded{\includegraphics[keepaspectratio,alt={登录成功}]{cases/img0/login.png}}
-  \caption{登录成功}
-  \end{figure}
 \end{enumerate}
 
 \subsection{设置SWAP交换分区}\label{ux8bbeux7f6eswapux4ea4ux6362ux5206ux533a}

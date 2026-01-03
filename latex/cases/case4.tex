@@ -1,14 +1,14 @@
 \chapter{案例4：智能掌纹识别机}\label{ux6848ux4f8b4ux667aux80fdux638cux7eb9ux8bc6ux522bux673a}
 
-\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+\section{1. 项目简介}\label{1-ux9879ux76eeux7b80ux4ecb}
 
 本项目基于昇腾310B平台，构建一个高精度的掌纹识别系统。掌纹识别作为一种新兴的生物识别技术，具有纹理丰富、难以伪造、非接触式采集等优势，在门禁控制、金融支付、身份验证等领域有着广阔的应用前景。
 
 相比传统的指纹识别，掌纹包含更多的特征信息，包括主线、皱纹、纹理方向等，能够提供更高的识别精度和更强的防伪能力。本项目将从掌纹图像采集、特征提取、模式匹配到系统部署的全流程进行详细介绍。
 
-\section{2. 内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
+\section{2. 内容大纲}\label{2-ux5185ux5bb9ux5927ux7eb2}
 
-\subsection{2.1. 硬件准备}\label{ux786cux4ef6ux51c6ux5907}
+\subsection{2.1. 硬件准备}\label{21-ux786cux4ef6ux51c6ux5907}
 
 \begin{itemize}
 \tightlist
@@ -72,7 +72,7 @@
     └─────────┘
 \end{lstlisting}
 
-\subsection{2.2. 软件环境}\label{ux8f6fux4ef6ux73afux5883}
+\subsection{2.2. 软件环境}\label{22-ux8f6fux4ef6ux73afux5883}
 
 \begin{itemize}
 \tightlist
@@ -147,7 +147,7 @@ echo "掌纹识别系统环境配置完成!"
 \end{lstlisting}
 
 \subsection{2.3.
-掌纹图像预处理}\label{ux638cux7eb9ux56feux50cfux9884ux5904ux7406}
+掌纹图像预处理}\label{23-ux638cux7eb9ux56feux50cfux9884ux5904ux7406}
 
 \begin{itemize}
 \item
@@ -165,28 +165,29 @@ echo "掌纹识别系统环境配置完成!"
     \textbf{质量检测}: 自动评估图像质量，不合格则重新采集
   \end{itemize}
 \item
-  \textbf{预处理管道}: ```python \# 掌纹预处理流程 def
-  preprocess\_palmprint(image): \# 1. 手掌区域分割 palm\_region =
-  segment\_palm(image)
+  \textbf{预处理管道}:
 
-\begin{lstlisting}
-  # 2. ROI提取 (感兴趣区域)
-  roi = extract_roi(palm_region)
-
-  # 3. 图像增强
-  enhanced = enhance_contrast(roi)
-  enhanced = reduce_noise(enhanced)
-
-  # 4. 几何校正
-  normalized = geometric_correction(enhanced)
-
-  # 5. 尺寸标准化
-  resized = resize_to_standard(normalized)
-
-  return resized
+\begin{lstlisting}[language=Python]
+# 掌纹预处理流程
+def preprocess_palmprint(image):
+    # 1. 手掌区域分割
+    palm_region = segment_palm(image)
+    
+    # 2. ROI提取 (感兴趣区域)
+    roi = extract_roi(palm_region)
+    
+    # 3. 图像增强
+    enhanced = enhance_contrast(roi)
+    enhanced = reduce_noise(enhanced)
+    
+    # 4. 几何校正
+    normalized = geometric_correction(enhanced)
+    
+    # 5. 尺寸标准化
+    resized = resize_to_standard(normalized)
+    
+    return resized
 \end{lstlisting}
-
-  ```
 \item
   \textbf{图像质量评估}:
 
@@ -202,7 +203,7 @@ echo "掌纹识别系统环境配置完成!"
 \end{itemize}
 
 \subsection{2.4.
-特征提取与匹配}\label{ux7279ux5f81ux63d0ux53d6ux4e0eux5339ux914d}
+特征提取与匹配}\label{24-ux7279ux5f81ux63d0ux53d6ux4e0eux5339ux914d}
 
 \begin{itemize}
 \item
@@ -234,30 +235,30 @@ echo "掌纹识别系统环境配置完成!"
     \textbf{多尺度融合}: 结合不同尺度的特征信息
   \end{itemize}
 \item
-  \textbf{特征匹配算法}: ```python \# 掌纹匹配流程 def
-  match\_palmprint(query\_features, database\_features): \# 1.
-  特征归一化 query\_norm = normalize\_features(query\_features) db\_norm
-  = normalize\_features(database\_features)
+  \textbf{特征匹配算法}:
 
-\begin{lstlisting}
-  # 2. 相似度计算
-  similarity = cosine_similarity(query_norm, db_norm)
-
-  # 3. 阈值判断
-  if similarity > MATCH_THRESHOLD:
-      return True, similarity
-  else:
-      return False, similarity
+\begin{lstlisting}[language=Python]
+# 掌纹匹配流程
+def match_palmprint(query_features, database_features):
+    # 1. 特征归一化
+    query_norm = normalize_features(query_features)
+    db_norm = normalize_features(database_features)
+    
+    # 2. 相似度计算
+    similarity = cosine_similarity(query_norm, db_norm)
+    
+    # 3. 阈值判断
+    if similarity > MATCH_THRESHOLD:
+        return True, similarity
+    else:
+        return False, similarity
 \end{lstlisting}
-
-  ```
 \end{itemize}
 
 \subsection{2.5.
-模型训练与优化}\label{ux6a21ux578bux8badux7ec3ux4e0eux4f18ux5316}
+模型训练与优化}\label{25-ux6a21ux578bux8badux7ec3ux4e0eux4f18ux5316}
 
 \begin{itemize}
-\tightlist
 \item
   \textbf{数据集构建}:
 
@@ -299,18 +300,21 @@ echo "掌纹识别系统环境配置完成!"
 \end{itemize}
 
 \subsection{2.6.
-系统部署与集成}\label{ux7cfbux7edfux90e8ux7f72ux4e0eux96c6ux6210}
+系统部署与集成}\label{26-ux7cfbux7edfux90e8ux7f72ux4e0eux96c6ux6210}
 
 \begin{itemize}
 \item
-  \textbf{模型部署流程}: ```bash \# 1. 模型转换 python3
-  convert\_model.py --input palmprint\_model.pth --output
-  palmprint\_model.onnx
+  \textbf{模型部署流程}:
 
-  \# 2. 昇腾模型转换 atc --model=palmprint\_model.onnx --framework=5
-  --output=palmprint\_model\\
-  --input\_format=NCHW --input\_shape=``input:1,3,224,224''\\
-  --soc\_version=Ascend310B1 ```
+\begin{lstlisting}[language=bash]
+# 1. 模型转换
+python3 convert_model.py --input palmprint_model.pth --output palmprint_model.onnx
+
+# 2. 昇腾模型转换
+atc --model=palmprint_model.onnx --framework=5 --output=palmprint_model \
+    --input_format=NCHW --input_shape="input:1,3,224,224" \
+    --soc_version=Ascend310B1
+\end{lstlisting}
 \item
   \textbf{系统架构设计}:
 
@@ -327,10 +331,10 @@ echo "掌纹识别系统环境配置完成!"
   \end{itemize}
 \end{itemize}
 
-\subsection{2.7. 3D打印结构件}\label{dux6253ux5370ux7ed3ux6784ux4ef6}
+\subsection{2.7.
+3D打印结构件}\label{27-3dux6253ux5370ux7ed3ux6784ux4ef6}
 
 \begin{itemize}
-\tightlist
 \item
   \textbf{掌纹采集支架
   (\passthrough{\lstinline!palmprint\_scanner.stl!})}:
@@ -370,12 +374,21 @@ echo "掌纹识别系统环境配置完成!"
   \end{itemize}
 \end{itemize}
 
-\emph{3D打印规格}: - \textbf{材料}: PETG (化学稳定性好) - \textbf{层高}:
-0.15mm (精细结构) - \textbf{填充率}: 40\% (强度要求)
+\emph{3D打印规格}:
 
-\subsection{2.8. 用户手册}\label{ux7528ux6237ux624bux518c}
+\begin{itemize}
+\tightlist
+\item
+  \textbf{材料}: PETG (化学稳定性好)
+\item
+  \textbf{层高}: 0.15mm (精细结构)
+\item
+  \textbf{填充率}: 40\% (强度要求)
+\end{itemize}
 
-\subsubsection{2.8.1 系统部署}\label{ux7cfbux7edfux90e8ux7f72}
+\subsection{2.8. 用户手册}\label{28-ux7528ux6237ux624bux518c}
+
+\subsubsection{2.8.1 系统部署}\label{281-ux7cfbux7edfux90e8ux7f72}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -391,7 +404,7 @@ echo "掌纹识别系统环境配置完成!"
 \end{enumerate}
 
 \subsubsection{2.8.2
-用户注册流程}\label{ux7528ux6237ux6ce8ux518cux6d41ux7a0b}
+用户注册流程}\label{282-ux7528ux6237ux6ce8ux518cux6d41ux7a0b}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -411,7 +424,7 @@ echo "掌纹识别系统环境配置完成!"
 \end{enumerate}
 
 \subsubsection{2.8.3
-身份验证流程}\label{ux8eabux4efdux9a8cux8bc1ux6d41ux7a0b}
+身份验证流程}\label{283-ux8eabux4efdux9a8cux8bc1ux6d41ux7a0b}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -428,7 +441,7 @@ echo "掌纹识别系统环境配置完成!"
   \textbf{结果输出}: 显示验证结果和置信度
 \end{enumerate}
 
-\subsubsection{2.8.4 系统维护}\label{ux7cfbux7edfux7ef4ux62a4}
+\subsubsection{2.8.4 系统维护}\label{284-ux7cfbux7edfux7ef4ux62a4}
 
 \begin{itemize}
 \tightlist
@@ -442,7 +455,7 @@ echo "掌纹识别系统环境配置完成!"
   \textbf{系统更新}: 定期更新模型和软件
 \end{itemize}
 
-\section{3. 源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
+\section{3. 源代码结构}\label{3-ux6e90ux4ee3ux7801ux7ed3ux6784}
 
 \begin{lstlisting}
 palmprint_system/
@@ -466,7 +479,7 @@ palmprint_system/
     └── circuit_diagrams/    # 电路连接图
 \end{lstlisting}
 
-\section{4. 效果演示}\label{ux6548ux679cux6f14ux793a}
+\section{4. 效果演示}\label{4-ux6548ux679cux6f14ux793a}
 
 \begin{itemize}
 \tightlist

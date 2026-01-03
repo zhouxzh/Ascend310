@@ -42,33 +42,53 @@ CANN 通过提供分层清晰的编程与运行时结构，以覆盖训练与推
 
 ### CANN的快速安装
 
-本节给出 CANN 软件的极速安装示例。若需更完整的操作指导，请按实际环境选择对应安装场景并参考[官方说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html)。推荐优先使用 Conda 在线安装：无需额外依赖，可直接获取最新版本。  
+本节给出 CANN 软件的极速安装示例。若需更完整的操作指导，请按实际环境选择对应安装场景并参考[官方说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html)，推荐优先使用离线安装。  
 
 #### 安装前准备
 
-- 确认目标设备已正确安装 NPU 驱动与固件，我们可以直接用命令'npu-smi'查看输出信息，如果有输出信息，证明NPU驱动与固件已经安装。一般来说，对了昇腾310B的产品，系统都自带有NPU驱动以及固件的。  
-- 推荐使用在线安装（Conda）方式，无需安装前置依赖，可直接安装最新版本的软件包。
-- 若不采用 Conda 在线安装，需要提前准备 Python 环境及 `pip3`，当前支持 Python 3.7.x–3.11.4。  
-- 离线安装时，请先下载所需 CANN 软件包并上传至任意可访问路径后再执行安装。
+- 驱动与固件检查
+  - 在目标设备执行 `npu-smi info`；若能正常输出设备信息，说明 NPU 驱动与固件已安装。
+  - 对于昇腾 310B 产品/开发板，系统通常预置相关驱动与固件。
+
+- 环境准备
+  - 推荐采用离线安装；需预先准备 Python 与 `pip3`。
+  - 当前支持 Python 3.7.x–3.11.4。
+  - 昇腾310B开发板一般已预装 Miniconda 与 `pip3`，可直接使用。
+
+- 安装介质获取
+  - 先下载所需 CANN 软件包并上传到可访问路径后再执行安装。
+  - 例如 CANN 8.3.RC1 可从：https://www.hiascend.com/developer/download/community/result?module=cann&cann=8.3.RC1 获取；其他版本可在页面切换。
+  - 确保 CANN Toolkit 与 CANN Kernels 版本严格匹配（同一发行号）。
+  - 建议优先使用 .run 安装包；昇腾 310B 开发板为 AArch64 架构，请选择 aarch64 对应包。以 8.3.RC1 为例：
+    - Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
+    - Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run
+  - 若版本不同，请将文件名中的版本号替换为实际下载的版本。
 
 #### 安装命令与依赖说明
+安装 CANN 可使用 root 或默认账户 HwHiAiUser。推荐以 root 安装；若使用 HwHiAiUser，需在所有安装与文件操作命令前加 sudo。
+下面以 root 用户为例，详细介绍 CANN 的安装过程：
+
+- 切换到 root：
+  ```bash
+  su -
+  # 输入 root 密码后继续执行安装
+  ```
+
+- 命令示例
+  - 以 root 执行：
+    ```bash
+    ./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
+    ```
+  - 以 HwHiAiUser 执行：
+    ```bash
+    sudo ./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
+    ```
 - 安装 Toolkit 开发套件  
   ```bash
-  conda config --add channels https://repo.huaweicloud.com/ascend/repos/conda/
-  conda install ascend::cann-toolkit
+  chmod +x Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run 
+  ./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
   ```
-  若出现如下错误：
-  ```bash
-  EnvironmentNotWritableError: The current user does not have write permissions to the target environment.
-  environment location: /usr/local/miniconda3
-  uid: 1000
-  gid: 1000
-  ```
-  通常是因为 Miniconda 安装在 `/usr/local`，目录权限归属 root，而日常使用的账号（如 `HwHiAiUser`）无写入权限。可按两种方式处理：其一使用 `su` 切换 root 再安装；其二直接将目录所有权授予当前用户，命令如下：
-  ```bash
-  sudo chown -R HwHiAiUser /usr/local/miniconda3/
-  ```
-  完成后重新执行安装命令。整个安装过程大概会持续几分钟，请耐心等待。  
+  整个安装过程大概会持续十几分钟，甚至更长，请耐心等待。  
 
 - 配置环境变量
   ```bash
@@ -77,36 +97,21 @@ CANN 通过提供分层清晰的编程与运行时结构，以覆盖训练与推
 
 - 安装 Kernels 算子包（310B 平台）
   ```bash
-  conda install ascend::cann-kernels-310b
+  chmod +x Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
+  ./Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run --install
   ```
-
-安装后配置
 
 - 安装业务运行时所需的 Python 第三方库（使用非 root 用户时保留 --user 参数）
   ```bash
-  pip3 install --user \
+  pip3 install \
     attrs cython 'numpy>=1.19.2,<=1.24.0' decorator sympy cffi pyyaml pathlib2 \
-    psutil protobuf==3.20.0 scipy requests absl-py --user
+    psutil protobuf==3.20.0 scipy requests absl-py
   ```
 
 - 说明
-  - 若使用 root 用户，请去掉上述命令中的 `--user`。
-  - 以上依赖版本范围适配常见环境；如出现冲突，请根据实际 Python/操作系统版本调整。
-
-### CANN的离线安装
-
-CANN的离线安装有两种方式，一个是利用deb包，利用dpkg进行安装，例如安装CANN版本8.3.RC1
-- 使用 deb 包离线安装（示例：8.3.RC1，310B）：
-```bash
-sudo dpkg -i Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.deb
-```
-
-- 使用 run 包离线安装：
-```bash
-sudo chmod +x Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
-sudo ./Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
-```
-
+  - 若使用非 root 用户，请在上述命令末尾追加 `--user`。
+  - 依赖版本范围已覆盖常见环境，若发生冲突，请按实际 Python/OS 版本调整。
+  - 安装完成后，可将 CANN 环境变量追加到 `~/.bashrc` 以便自动加载；昇腾 310B 开发板的系统镜像通常已预置该配置。 
 
 ## ATC模型转换详解
 

@@ -1,0 +1,54 @@
+digraph SLP {
+  rankdir=TB;
+  splines=true;
+  charset="UTF-8";
+  fontname="Microsoft YaHei";
+  node [shape=circle, fontname="Microsoft YaHei"];
+  edge [fontname="Microsoft YaHei"];
+
+  // 输入层
+  {
+    rank=same;
+    subgraph cluster_inputs {
+      label="输入（8维）";
+      style=dashed;
+      color="#cccccc";
+
+      // 数值特征
+      longitude [label="经度"];
+      latitude [label="纬度"];
+      housingMedianAge [label="房龄中位数"];
+      totalRooms [label="房间总数"];
+      totalBedrooms [label="卧室总数"];
+      population [label="人口"];
+      households [label="家庭数"];
+      medianIncome [label="收入中位数"];
+
+      // 偏置
+      bias [label="偏置", shape=diamond, style=filled, fillcolor="#f5f5f5"];
+    }
+  }
+
+  // 输出感知机
+subgraph cluster_output {
+    label="线性神经网络";
+    labelloc="b";
+    labeljust="c";
+    style=dashed;
+    color="#cccccc";
+    y [label="ŷ（房价中位数）= f(Σ w_i x_i + b)", shape=circle, style=filled, fillcolor="#eef7ff"];
+}
+
+  // 加权连接：保留 8 个数值特征到 y 的边
+  longitude -> y [label="w_经度"];
+  latitude -> y [label="w_纬度"];
+  housingMedianAge -> y [label="w_房龄"];
+  totalRooms -> y [label="w_房间"];
+  totalBedrooms -> y [label="w_卧室"];
+  population -> y [label="w_人口"];
+  households -> y [label="w_家庭"];
+  medianIncome -> y [label="w_收入"];
+
+  // 偏置边保持不变
+  bias -> y [label="b"];
+}

@@ -51,23 +51,17 @@ CANN 则专注于模型图语义，突出图级算子融合、AIPP
 CANN
 通过提供分层清晰的编程与运行时结构，以覆盖训练与推理的``全场景''、贴近主流框架的``低门槛''以及面向昇腾硬件深度优化的``高性能''为核心特性，支撑用户在昇腾平台上快速构建与部署各类
 AI 应用与业务。从整体上看，CANN
-可以抽象为一个自上而下递进的五层架构（计算语言接口、计算服务层、计算编译引擎、计算执行引擎与计算基础层），如图\ref{fig:architecture}所示。各层通过稳定的接口与数据流协议进行解耦协同，在保证语义一致性的前提下最大化发挥底层算力与能效潜力。
+可以抽象为一个自上而下递进的五层架构（计算语言接口、计算服务层、计算编译引擎、计算执行引擎与计算基础层），如图\textbackslash ref\{fig:architecture\}所示。各层通过稳定的接口与数据流协议进行解耦协同，在保证语义一致性的前提下最大化发挥底层算力与能效潜力。
 
-\begin{figure}
-\centering
-\includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={CANN架构图}]{chapters/img2/CANN_Architecture.png}
-\caption{CANN架构图}\label{fig:architecture}
-\end{figure}
+\pandocbounded{\includegraphics[keepaspectratio,alt={CANN架构图}]{chapters/img2/CANN_Architecture.png}}\{\#fig:architecture
+width=90\%\}
 
 在分层结构上，CANN可抽象为五个层次：上层的计算语言接口------AscendCL接口负责设备与上下文管理、流与内存控制、模型与算子的加载执行，以及媒体与图管理等通用API，为应用提供稳定的编程入口；其下的昇腾计算服务层汇聚神经网络与线性代数库，承载算子与子图的自动调优、梯度优化与模型压缩，并通过框架适配器降低迁移成本；昇腾计算编译层的编译引擎通过图编译器与TBE算子开发支持，把前端计算图转化为在NPU可执行的模型与内核，实现图级语义到后端实现的精准映射；下一层的昇腾执行引擎面向运行时，负责模型与算子的调度执行，并内置数字视觉与AI预处理、集合通信等能力以提升端到端效率；最下层的昇腾计算基础层提供共享虚拟内存、设备虚拟化与主机---设备通信等底座服务，保证跨设备数据流与资源管理的可靠性与可扩展性。
 
-与此相辅的是三层逻辑架构：应用层承载具体业务与开发者工具，芯片使能层开放解决方案能力并驱动基于计算图的业务流运行，计算资源层则聚焦数据处理与运算执行，形成从业务到硬件的清晰闭环。这个CANN的三层逻辑结构如下图\ref{fig:cann_logic}所示:
+与此相辅的是三层逻辑架构：应用层承载具体业务与开发者工具，芯片使能层开放解决方案能力并驱动基于计算图的业务流运行，计算资源层则聚焦数据处理与运算执行，形成从业务到硬件的清晰闭环。这个CANN的三层逻辑结构如下图\textbackslash ref\{fig:cann\_logic\}所示:
 
-\begin{figure}
-\centering
-\includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={CANN架构图}]{chapters/img2/CANN_logic.png}
-\caption{CANN架构图}\label{fig:cann_logic}
-\end{figure}
+\pandocbounded{\includegraphics[keepaspectratio,alt={CANN架构图}]{chapters/img2/CANN_logic.png}}\{\#fig:cann\_logic
+width=90\%\}
 
 在技术特性上，CANN通过对计算图的编译与优化，将密集算子与数据流合理分配到异构单元上执行，显著提升吞吐与时延表现，并在能效上取得可工程化的优势；同时提供贴近主流框架的易用接口与完善的工具链，降低入门与迁移门槛，使开发者能够快速完成部署与调优。生态方面，CANN构建了面向个人、高校、科研与企业的赋能体系，并与开源社区协同，支持多种框架与推理引擎在异构硬件上的高效运行。依托这些能力，开发者可以深入调用运行时与图编译能力，释放底层硬件潜力，在性能与成本维度形成差异化竞争力。
 
@@ -92,58 +86,107 @@ Ascend 310B
 \subsection{CANN的快速安装}\label{cannux7684ux5febux901fux5b89ux88c5}
 
 本节给出 CANN
-软件的极速安装示例。若需更完整的操作指导，请按实际环境选择对应安装场景并参考\href{https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html}{官方说明}。推荐优先使用
-Conda 在线安装：无需额外依赖，可直接获取最新版本。
+软件的极速安装示例。若需更完整的操作指导，请按实际环境选择对应安装场景并参考\href{https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html}{官方说明}，推荐优先使用离线安装。
 
 \subsubsection{安装前准备}\label{ux5b89ux88c5ux524dux51c6ux5907}
 
 \begin{itemize}
-\tightlist
 \item
-  确认目标设备已正确安装 NPU
-  驱动与固件，我们可以直接用命令'npu-smi'查看输出信息，如果有输出信息，证明NPU驱动与固件已经安装。一般来说，对了昇腾310B的产品，系统都自带有NPU驱动以及固件的。\\
+  驱动与固件检查
+
+  \begin{itemize}
+  \tightlist
+  \item
+    在目标设备执行
+    \passthrough{\lstinline!npu-smi info!}；若能正常输出设备信息，说明
+    NPU 驱动与固件已安装。
+  \item
+    对于昇腾 310B 产品/开发板，系统通常预置相关驱动与固件。
+  \end{itemize}
 \item
-  推荐使用在线安装（Conda）方式，无需安装前置依赖，可直接安装最新版本的软件包。
+  环境准备
+
+  \begin{itemize}
+  \tightlist
+  \item
+    推荐采用离线安装；需预先准备 Python 与
+    \passthrough{\lstinline!pip3!}。
+  \item
+    当前支持 Python 3.7.x--3.11.4。
+  \item
+    昇腾310B开发板一般已预装 Miniconda 与
+    \passthrough{\lstinline!pip3!}，可直接使用。
+  \end{itemize}
 \item
-  若不采用 Conda 在线安装，需要提前准备 Python 环境及
-  \passthrough{\lstinline!pip3!}，当前支持 Python 3.7.x--3.11.4。\\
-\item
-  离线安装时，请先下载所需 CANN
-  软件包并上传至任意可访问路径后再执行安装。
+  安装介质获取
+
+  \begin{itemize}
+  \tightlist
+  \item
+    先下载所需 CANN 软件包并上传到可访问路径后再执行安装。
+  \item
+    例如 CANN 8.3.RC1
+    可从：\url{https://www.hiascend.com/developer/download/community/result?module=cann&cann=8.3.RC1}
+    获取；其他版本可在页面切换。
+  \item
+    确保 CANN Toolkit 与 CANN Kernels 版本严格匹配（同一发行号）。
+  \item
+    建议优先使用 .run 安装包；昇腾 310B 开发板为 AArch64 架构，请选择
+    aarch64 对应包。以 8.3.RC1 为例：
+
+    \begin{itemize}
+    \tightlist
+    \item
+      Ascend-cann-kernels-310b\_8.3.RC1\_linux-aarch64.run
+    \item
+      Ascend-cann-toolkit\_8.3.RC1\_linux-aarch64.run
+    \end{itemize}
+  \item
+    若版本不同，请将文件名中的版本号替换为实际下载的版本。
+  \end{itemize}
 \end{itemize}
 
 \subsubsection{安装命令与依赖说明}\label{ux5b89ux88c5ux547dux4ee4ux4e0eux4f9dux8d56ux8bf4ux660e}
 
+安装 CANN 可使用 root 或默认账户 HwHiAiUser。推荐以 root 安装；若使用
+HwHiAiUser，需在所有安装与文件操作命令前加 sudo。 下面以 root
+用户为例，详细介绍 CANN 的安装过程：
+
 \begin{itemize}
+\item
+  切换到 root：
+
+\begin{lstlisting}[language=bash]
+su -
+# 输入 root 密码后继续执行安装
+\end{lstlisting}
+\item
+  命令示例
+
+  \begin{itemize}
+  \tightlist
+  \item
+    以 root 执行：
+
+\begin{lstlisting}[language=bash]
+./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
+\end{lstlisting}
+  \item
+    以 HwHiAiUser 执行：
+
+\begin{lstlisting}[language=bash]
+sudo ./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
+\end{lstlisting}
+  \end{itemize}
 \item
   安装 Toolkit 开发套件
 
 \begin{lstlisting}[language=bash]
-conda config --add channels https://repo.huaweicloud.com/ascend/repos/conda/
-conda install ascend::cann-toolkit
+chmod +x Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run 
+./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
 \end{lstlisting}
 
-  若出现如下错误：
-
-\begin{lstlisting}[language=bash]
-EnvironmentNotWritableError: The current user does not have write permissions to the target environment.
-environment location: /usr/local/miniconda3
-uid: 1000
-gid: 1000
-\end{lstlisting}
-
-  通常是因为 Miniconda 安装在
-  \passthrough{\lstinline!/usr/local!}，目录权限归属
-  root，而日常使用的账号（如
-  \passthrough{\lstinline!HwHiAiUser!}）无写入权限。可按两种方式处理：其一使用
-  \passthrough{\lstinline!su!} 切换 root
-  再安装；其二直接将目录所有权授予当前用户，命令如下：
-
-\begin{lstlisting}[language=bash]
-sudo chown -R HwHiAiUser /usr/local/miniconda3/
-\end{lstlisting}
-
-  完成后重新执行安装命令。整个安装过程大概会持续几分钟，请耐心等待。
+  整个安装过程大概会持续十几分钟，甚至更长，请耐心等待。
 \item
   配置环境变量
 
@@ -154,21 +197,17 @@ source /usr/local/miniconda3/Ascend/ascend-toolkit/set_env.sh
   安装 Kernels 算子包（310B 平台）
 
 \begin{lstlisting}[language=bash]
-conda install ascend::cann-kernels-310b
+chmod +x Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
+./Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run --install
 \end{lstlisting}
-\end{itemize}
-
-安装后配置
-
-\begin{itemize}
 \item
-  安装业务运行时所需的 Python 第三方库（使用非 root 用户时保留 --user
+  安装业务运行时所需的 Python 第三方库（使用非 root 用户时保留 -\/-user
   参数）
 
 \begin{lstlisting}[language=bash]
-pip3 install --user \
+pip3 install \
   attrs cython 'numpy>=1.19.2,<=1.24.0' decorator sympy cffi pyyaml pathlib2 \
-  psutil protobuf==3.20.0 scipy requests absl-py --user
+  psutil protobuf==3.20.0 scipy requests absl-py
 \end{lstlisting}
 \item
   说明
@@ -176,33 +215,17 @@ pip3 install --user \
   \begin{itemize}
   \tightlist
   \item
-    若使用 root 用户，请去掉上述命令中的
+    若使用非 root 用户，请在上述命令末尾追加
     \passthrough{\lstinline!--user!}。
   \item
-    以上依赖版本范围适配常见环境；如出现冲突，请根据实际
-    Python/操作系统版本调整。
+    依赖版本范围已覆盖常见环境，若发生冲突，请按实际 Python/OS
+    版本调整。
+  \item
+    安装完成后，可将 CANN 环境变量追加到
+    \passthrough{\lstinline!\~/.bashrc!} 以便自动加载；昇腾 310B
+    开发板的系统镜像通常已预置该配置。
   \end{itemize}
 \end{itemize}
-
-\subsection{CANN的离线安装}\label{cannux7684ux79bbux7ebfux5b89ux88c5}
-
-CANN的离线安装有两种方式，一个是利用deb包，利用dpkg进行安装，例如安装CANN版本8.3.RC1
-- 使用 deb 包离线安装（示例：8.3.RC1，310B）：
-
-\begin{lstlisting}[language=bash]
-sudo dpkg -i Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.deb
-\end{lstlisting}
-
-\begin{itemize}
-\tightlist
-\item
-  使用 run 包离线安装：
-\end{itemize}
-
-\begin{lstlisting}[language=bash]
-sudo chmod +x Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
-sudo ./Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
-\end{lstlisting}
 
 \section{ATC模型转换详解}\label{atcux6a21ux578bux8f6cux6362ux8be6ux89e3}
 
@@ -214,11 +237,8 @@ Ascend IR 的单算子描述文件（JSON）编译为昇腾 AI
 处理器可执行的离线模型（.om）。如图下图所示，ATC
 在转换过程中会执行算子调度优化、权重重排与内存复用等关键步骤，对原始深度学习模型进行面向部署场景的系统化调优，从而在昇腾硬件上实现高吞吐、低时延的高效执行。
 
-\begin{figure}
-\centering
-\includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={ATC框架图}]{chapters/img2/atc.png}
-\caption{ATC框架图}\label{fig:atc}
-\end{figure}
+\pandocbounded{\includegraphics[keepaspectratio,alt={ATC框架图}]{chapters/img2/atc.png}}\{\#fig:atc
+width=70\%\}
 
 从上面的流程图我们可以看到，ATC
 工具聚焦模型到设备可执行体的``转换即优化''闭环：一方面，它能够将开源框架导出的网络模型解析为中间态
@@ -237,30 +257,47 @@ ONNX的核心价值在于解决了AI生态系统中``碎片化''的问题。在�
 Representation, IR），充当了不同框架之间的``通用语''。
 
 一个标准的ONNX模型文件（通常以\passthrough{\lstinline!.onnx!}为后缀）主要包含以下几个部分：
-1. \textbf{Model
-Proto}：顶层结构，包含模型的元数据（如版本信息、生产者信息）和计算图（Graph）。
-2. \textbf{Graph
-Proto}：描述了模型的计算逻辑，由一系列节点（Node）、输入（Input）、输出（Output）和初始化器（Initializer，即权重数据）组成。
-3. \textbf{Node
-Proto}：代表计算图中的一个操作（Operator），如Conv、Relu、Add等。每个节点包含操作类型、输入输出张量的名称以及属性（Attribute，如卷积的步长、填充等）。
-4. \textbf{Tensor Proto}：用于存储权重数据或常量的具体数值和形状信息。
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Model
+  Proto}：顶层结构，包含模型的元数据（如版本信息、生产者信息）和计算图（Graph）。
+\item
+  \textbf{Graph
+  Proto}：描述了模型的计算逻辑，由一系列节点（Node）、输入（Input）、输出（Output）和初始化器（Initializer，即权重数据）组成。
+\item
+  \textbf{Node
+  Proto}：代表计算图中的一个操作（Operator），如Conv、Relu、Add等。每个节点包含操作类型、输入输出张量的名称以及属性（Attribute，如卷积的步长、填充等）。
+\item
+  \textbf{Tensor Proto}：用于存储权重数据或常量的具体数值和形状信息。
+\end{enumerate}
 
 \textbf{ATC对ONNX的支持情况}
 虽然ONNX旨在成为通用的AI模型交换标准，但CANN的ATC工具并非支持ONNX规范中的所有算子和特性。ATC对ONNX的支持主要集中在CV（计算机视觉）和NLP（自然语言处理）领域的常用算子，对于一些较新或较冷门的算子，可能会出现不支持的情况。
 
-具体来说，ATC对ONNX的支持限制主要体现在以下几个方面： 1.
-\textbf{算子覆盖率}：ATC支持绝大多数主流的CNN和Transformer类算子（如Conv,
-MatMul, Relu,
-Softmax等）。但对于部分非标准或特定框架自定义的算子（Custom
-Ops），ATC无法直接解析，需要开发者通过TBE（Tensor Boost
-Engine）开发自定义算子并注册到CANN中。 2.
-\textbf{动态控制流}：ONNX中的动态控制流（如\passthrough{\lstinline!If!},
-\passthrough{\lstinline!Loop!},
-\passthrough{\lstinline!Scan!}）在静态图编译中处理较为复杂。虽然ATC支持部分控制流算子，但在某些复杂嵌套场景下可能会导致编译失败或性能下降，通常建议在导出模型时尽量将控制流展开（Unroll）或转为静态图结构。
-3. \textbf{数据类型限制}：虽然ONNX支持多种数据类型（如Double,
-Int64等），但昇腾AI处理器主要针对FP16和INT8进行了硬件加速优化。对于FP64（Double）类型，ATC通常不支持或需要强制转为FP32/FP16处理；对于Int64类型的索引或计数，部分算子可能要求转为Int32。
-4.
-\textbf{动态Shape支持}：虽然ATC支持动态Batch和动态分辨率，但对于模型内部中间层出现的完全动态且无法推导的Shape，可能会导致编译报错。
+具体来说，ATC对ONNX的支持限制主要体现在以下几个方面：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{算子覆盖率}：ATC支持绝大多数主流的CNN和Transformer类算子（如Conv,
+  MatMul, Relu,
+  Softmax等）。但对于部分非标准或特定框架自定义的算子（Custom
+  Ops），ATC无法直接解析，需要开发者通过TBE（Tensor Boost
+  Engine）开发自定义算子并注册到CANN中。
+\item
+  \textbf{动态控制流}：ONNX中的动态控制流（如\passthrough{\lstinline!If!},
+  \passthrough{\lstinline!Loop!},
+  \passthrough{\lstinline!Scan!}）在静态图编译中处理较为复杂。虽然ATC支持部分控制流算子，但在某些复杂嵌套场景下可能会导致编译失败或性能下降，通常建议在导出模型时尽量将控制流展开（Unroll）或转为静态图结构。
+\item
+  \textbf{数据类型限制}：虽然ONNX支持多种数据类型（如Double,
+  Int64等），但昇腾AI处理器主要针对FP16和INT8进行了硬件加速优化。对于FP64（Double）类型，ATC通常不支持或需要强制转为FP32/FP16处理；对于Int64类型的索引或计数，部分算子可能要求转为Int32。
+\item
+  \textbf{动态Shape支持}：虽然ATC支持动态Batch和动态分辨率，但对于模型内部中间层出现的完全动态且无法推导的Shape，可能会导致编译报错。
+\end{enumerate}
 
 因此，在进行模型转换前，建议开发者查阅华为昇腾社区发布的《CANN
 算子清单》，确认模型中使用的ONNX算子版本（Opset
@@ -270,11 +307,8 @@ Version）是否在当前CANN版本的支持范围内。如果遇到不支持的
 
 使用ATC工具进行模型转换的使用流程如下图所示：
 
-\begin{figure}
-\centering
-\includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={ATC流程图}]{chapters/img2/atc_flow.png}
-\caption{ATC流程图}\label{fig:atc_flow}
-\end{figure}
+\pandocbounded{\includegraphics[keepaspectratio,alt={ATC流程图}]{chapters/img2/atc_flow.png}}\{\#fig:atc\_flow
+width=70\%\}
 
 在开始模型转换之前，首先需要在开发环境中安装与 CANN
 软件包版本相匹配的版本，并确保 ATC
@@ -291,7 +325,7 @@ ResNet-50 由多级残差单元堆叠形成 50
 层卷积网络，通过跨层跳连缓解深层退化与梯度消失，使其在 ImageNet
 等大规模数据集上具备稳定的特征表达与分类精度，因此常被选作各类视觉任务的通用骨干。要在昇腾
 310B 上部署该模型，需要借助 ATC 将 ONNX 版本转换为
-OM，可参考华为昇腾官方示例仓库（https://github.com/Ascend/samples/tree/master/inference/modelInference/sampleResnetQuickStart）。为方便快速复现，可按以下步骤从零搭建工程：
+OM，可参考华为昇腾官方示例仓库（\href{https://github.com/Ascend/samples/tree/master/inference/modelInference/sampleResnetQuickStart）。为方便快速复现，可按以下步骤从零搭建工程：}{https://github.com/Ascend/samples/tree/master/inference/modelInference/sampleResnetQuickStart）。为方便快速复现，可按以下步骤从零搭建工程：}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -355,12 +389,12 @@ atc \
 \end{lstlisting}
 
 \textbf{关键参数说明} \textbar{} 参数 \textbar{} 作用 \textbar{}
-注意事项 \textbar{} \textbar{} ---- \textbar{} ---- \textbar{} --------
-\textbar{} \textbar{} \passthrough{\lstinline!--framework!} \textbar{}
-指定原始模型框架 \textbar{}
-0=Caffe，1=MindSpore，3=TensorFlow，5=ONNX，需与导出框架一致 \textbar{}
-\textbar{} \passthrough{\lstinline!--input\_shape!} \textbar{}
-定义静态输入 Shape \textbar{} 按
+注意事项 \textbar{} \textbar{} -\/-\/-\/- \textbar{} -\/-\/-\/-
+\textbar{} -\/-\/-\/-\/-\/-\/-\/- \textbar{} \textbar{}
+\passthrough{\lstinline!--framework!} \textbar{} 指定原始模型框架
+\textbar{} 0=Caffe，1=MindSpore，3=TensorFlow，5=ONNX，需与导出框架一致
+\textbar{} \textbar{} \passthrough{\lstinline!--input\_shape!}
+\textbar{} 定义静态输入 Shape \textbar{} 按
 \passthrough{\lstinline!"name:n,c,h,w"!}
 写法，字符串需加引号；动态改用区间或配合动态参数 \textbar{} \textbar{}
 \passthrough{\lstinline!--dynamic\_batch\_size!} \textbar{} 设置可选
@@ -575,10 +609,10 @@ export NPU_HOST_LIB=/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub
 
 \begin{itemize}
 \item
-  常用参数速览 \textbar{} 参数 \textbar{} 说明 \textbar{} \textbar{} ---
-  \textbar{} --- \textbar{} \textbar{} \passthrough{\lstinline!--model!}
-  \textbar{} OM 文件路径 \textbar{} \textbar{}
-  \passthrough{\lstinline!--input!} \textbar{} 输入
+  常用参数速览 \textbar{} 参数 \textbar{} 说明 \textbar{} \textbar{}
+  -\/-\/- \textbar{} -\/-\/- \textbar{} \textbar{}
+  \passthrough{\lstinline!--model!} \textbar{} OM 文件路径 \textbar{}
+  \textbar{} \passthrough{\lstinline!--input!} \textbar{} 输入
   \passthrough{\lstinline!bin!} 文件或目录，支持多输入 \textbar{}
   \textbar{} \passthrough{\lstinline!--output!} \textbar{}
   推理结果存放目录 \textbar{} \textbar{}
@@ -640,35 +674,47 @@ NCHW，因此常见的
 NHWC，只需在模型与预处理两端同时调整即可。
 由于刚才我们从华为云哪里获取的测试图片``dog1\_1024\_683.jpg''如下：
 
-\begin{figure}
-\centering
-\includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={resnet测试图片}]{chapters/img2/dog1_1024_683.jpg}
-\caption{resnet测试图片}\label{fig:dog}
-\end{figure}
+\pandocbounded{\includegraphics[keepaspectratio,alt={resnet测试图片}]{chapters/img2/dog1_1024_683.jpg}}\{\#fig:dog
+width=90\%\}
 
 由于这个图片是jpg格式的，因此为了可以利用这个图片推理，我们第一步需要对图片进行预处理，具体过程如何：
-1.
-在src文件目录创建一个预处理的python文件``make\_bin\_resnet224\_float32.py''如下：
 
-```python make\_bin\_resnet224\_float32.py from PIL import Image import
-numpy as np
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  在src文件目录创建一个预处理的python文件``make\_bin\_resnet224\_float32.py''如下：
+\end{enumerate}
 
-\# 加载图像并转换为 RGB img =
-Image.open(`data/dog1\_1024\_683.jpg').convert(`RGB') \#
-使用双线性插值缩放到 256x256 img = img.resize((256, 256),
-Image.BILINEAR) \# 计算 224x224 中心裁剪的坐标 left = (256 - 224) // 2
-top = (256 - 224) // 2 \# 执行中心裁剪 img = img.crop((left, top, left +
-224, top + 224))
+\begin{lstlisting}[language=Python]
+from PIL import Image
+import numpy as np
 
-\# 转换为 {[}0, 1{]} 范围的 float32 数组 arr =
-np.array(img).astype(np.float32) / 255.0 \# 定义归一化常量 mean =
-np.array({[}0.485, 0.456, 0.406{]}, dtype=np.float32) std =
-np.array({[}0.229, 0.224, 0.225{]}, dtype=np.float32) \#
-按通道进行归一化 arr = (arr - mean) / std
+# 加载图像并转换为 RGB
+img = Image.open('data/dog1_1024_683.jpg').convert('RGB')
+# 使用双线性插值缩放到 256x256
+img = img.resize((256, 256), Image.BILINEAR)
+# 计算 224x224 中心裁剪的坐标
+left = (256 - 224) // 2
+top = (256 - 224) // 2
+# 执行中心裁剪
+img = img.crop((left, top, left + 224, top + 224))
 
-\# 调整为 NCHW 格式并添加批次维度 arr = arr.transpose(2, 0, 1){[}None,
-:, :, :{]} \# 保存为二进制文件 arr.tofile(`data/dog1\_224\_float32.bin')
-\# 打印缓冲区大小（字节数） print(`bytes:', arr.nbytes) ```
+# 转换为 [0, 1] 范围的 float32 数组
+arr = np.array(img).astype(np.float32) / 255.0
+# 定义归一化常量
+mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+# 按通道进行归一化
+arr = (arr - mean) / std
+
+# 调整为 NCHW 格式并添加批次维度
+arr = arr.transpose(2, 0, 1)[None, :, :, :]
+# 保存为二进制文件
+arr.tofile('data/dog1_224_float32.bin')
+# 打印缓冲区大小（字节数）
+print('bytes:', arr.nbytes)
+\end{lstlisting}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -776,7 +822,7 @@ Inference average time: 6.811000 ms
 \item
   先下载 \passthrough{\lstinline!imagenet\_class\_index.json!}（可来自
   Kaggle 或 GitHub）放到 \passthrough{\lstinline!src!} 目录，然后创建
-  \passthrough{\lstinline!src/postprocess\_resnet50.py!}：\\
+  \passthrough{\lstinline!src/postprocess\_resnet50.py!}：
 \end{itemize}
 
 \begin{lstlisting}[language=Python]
@@ -814,7 +860,7 @@ for rank, idx in enumerate(topk, start=1):
 \begin{itemize}
 \tightlist
 \item
-  执行脚本：\\
+  执行脚本：
 \end{itemize}
 
 \begin{lstlisting}[language=bash]
@@ -824,7 +870,7 @@ python ./src/postprocess_resnet50.py --bin out/20251213_11_6_52_564388/resnet50_
 \begin{itemize}
 \tightlist
 \item
-  示例输出：\\
+  示例输出：
 \end{itemize}
 
 \begin{lstlisting}[language=bash]

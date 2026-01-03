@@ -15,6 +15,7 @@
     "@vuepress/bundler-vite": "2.0.0-rc.24",
     "@vuepress/bundler-webpack": "2.0.0-rc.24",
     "@vuepress/plugin-markdown-image": "2.0.0-rc.112",
+    "baseline-browser-mapping": "^2.9.9",
     "katex": "^0.16.22",
     "mathjax-full": "^3.2.2",
     "mermaid": "^11.12.0",
