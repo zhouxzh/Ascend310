@@ -693,7 +693,7 @@ def train_epoch(model, loader, criterion, optimizer):
 def validate(model, loader, criterion):
     model.eval() # 设置为评估模式
     total_loss = 0
-    with torch.no_grad(): # 验证时不计算梯度，节省内存和计算资源
+    with torch.no_grad(): # 验证阶段不需要计算梯度
         for batch_x, batch_y in tqdm(loader, desc="Val", leave=False):
             batch_x = batch_x.to(device)
             batch_y = batch_y.to(device)
@@ -713,7 +713,7 @@ for epoch in t:
     val_loss = validate(model, val_loader, criterion)
     train_losses.append(train_loss)
     val_losses.append(val_loss)
-    # 在进度条上实时显示当前损失和学习率
+    # 在进度条右侧实时显示当前损失和学习率
     t.set_postfix(train_loss=f"{train_loss:.4f}", val_loss=f"{val_loss:.4f}", lr=f'{optimizer.param_groups[0]["lr"]:.6f}')
 
 print(f"\nValidation Loss: {val_losses[-1]:.4f}")
@@ -852,7 +852,6 @@ class LeNet(nn.Module):
         # 这里的 16*4*4 是经过两次卷积和池化后的特征图大小展平后的维度
         # 原始 28x28 -> conv1(5x5) -> 24x24 -> pool(2x2) -> 12x12
         # -> conv2(5x5) -> 8x8 -> pool(2x2) -> 4x4
-        # 最终特征图大小为 16通道 * 4 * 4
         self.fc1 = nn.Linear(16 * 4 * 4, 120)
         # 全连接层：输入120，输出84
         self.fc2 = nn.Linear(120, 84)
@@ -1051,3 +1050,85 @@ FP16（半精度浮点数）在表示范围和精度上存在显著限制，这�
 最后值得注意的一点是模型精度转换（FP32 转 FP16）与设备传输的操作顺序。代码实现上通常有两种方式：一种是先在 CPU 端将模型转换为半精度，再传输至 NPU，写法为 `model = LeNet().half().to(device)`；另一种是先将模型传输至 NPU，再进行精度转换，写法为 `model = LeNet().to(device).half()`。
 虽然这两种写法最终得到的模型状态一致，但在昇腾 310B 的 `torch_npu` 环境下，其底层执行流程存在差异。实测表明，由于 NPU 涉及图编译过程，**优先在 CPU 端完成精度转换（即第一种写法）可以显著减少图编译的开销**，从而缩短程序的整体启动时间。不过，一旦编译完成进入稳定运行阶段，两者的计算效率差异则微乎其微。
 
+## torch_npu插件兼容性测试套件
+
+
+为了全面评估 `torch_npu` 在昇腾 310B 上的算子支持度与数值稳定性，我们在 [`samples/chapter3/test`](https://github.com/zhouxzh/Ascend310/tree/main/samples/chapter3/test) 目录下提供了一套兼容性测试脚本。这些测试旨在帮助开发者快速验证当前环境（CANN 版本 + PyTorch 版本 + 硬件）是否满足模型迁移的基本要求，并识别潜在的算子不支持或精度异常问题。
+
+### 测试目标与验证维度
+
+在利用 `torch_npu` 插件开发神经网络应用时，我们注意到该插件在昇腾 310B 上的兼容性仍有提升空间。面对复杂的网络结构或特定的算子组合，图编译阶段偶尔会出现不稳定的情况。此外，部分算子在特定精度下的表现也需关注，例如 `Sigmoid` 激活函数在 FP16 精度下可能引发模型收敛异常。鉴于此，针对 AlexNet、VGG、ResNet 等经典网络中常用的核心算子进行全面测试显得尤为必要。为此，我们开发了一套轻量级的测试套件。
+
+本测试套件的首要目标是验证核心算子在昇腾 NPU 上的支持度与执行稳定性。通过覆盖卷积（`Conv2d`）、全连接（`Linear`）、矩阵乘法（`MatMul`）等深度学习中最基础且关键的算子，旨在检查这些指令能否被正确分发至 NPU 后端并顺利执行。这不仅有助于判断当前软硬件环境是否具备运行复杂模型的基础能力，对于快速排查因算子缺失或版本不兼容导致的运行时错误也至关重要。
+
+其次，精度对齐是评估迁移质量的关键指标。测试脚本通过对比同一组输入数据在 NPU 与 CPU 上的计算结果，严格量化两者之间的数值差异。通常情况下，在 FP32 精度下，我们期望误差控制在极小的范围内（如小于 1e-4），以确保模型迁移后推理与训练结果的可靠性。这种对比验证能有效发现因硬件架构差异或算子实现细节不同而引发的数值漂移问题。
+
+最后，测试还致力于探索不同边界条件下的表现。这包括验证 FP16、FP32 等不同数据类型的兼容性，特别是针对昇腾 310B 对 FP64（双精度）支持有限的特性进行实测，以及评估在不同 Tensor 形状和维度下算子的内存占用与计算效率。通过这些多维度的测试，开发者可以更清晰地了解硬件的性能边界与最佳实践配置。
+
+### 测试套件结构详解
+
+本测试套件基于 `pytest` 框架构建，针对不同精度（FP16/FP32）进行了分层验证，主要包含以下核心组成部分：
+
+**1. 测试环境配置 (`conftest.py`)**
+
+`conftest.py` 脚本负责构建稳健的测试环境。它利用 pytest 的钩子函数（Hooks）机制，实现了一套实时日志记录系统。针对嵌入式开发板在长时间批量测试中可能出现的网络波动或系统挂起导致终端输出丢失的问题，该脚本定义了 `pytest_runtest_setup` 和 `pytest_runtest_logreport` 等钩子。这些钩子确保在每个测试用例开始和结束时，立即将测试节点 ID 及运行结果（PASSED/FAILED）写入 `pytest_realtime_log.txt` 文件。为了防止系统崩溃导致数据丢失，写入操作调用了 `os.fsync` 强制刷新磁盘。此外，`pytest_terminal_summary` 会在测试结束时统计并输出通过、失败及跳过的用例总数，生成详尽且持久化的测试报告，极大便利了无人值守场景下的故障排查。
+
+**2. 基础算子运算测试 (`test_float16_ops.py` / `test_float32_ops.py`)**
+
+基础算子测试剥离了复杂的神经网络层封装，直接验证深度学习中最底层的张量加法（`Add`）和矩阵乘法（`MatMul`）。这两个脚本分别对应 FP16（半精度）和 FP32（单精度），旨在直接检验昇腾 NPU 硬件底层的算术逻辑单元（ALU）与矩阵计算单元（Cube Core）的计算正确性。通过绕过 `nn.Module` 等高层抽象，这些测试作为排查底层硬件故障或驱动问题的最小功能单元，有助于区分框架层面的算子映射错误与硬件层面的计算异常。
+
+*   **`test_float32_ops.py`**：关注高精度计算的一致性。它在 CPU 和 NPU 上执行相同的 FP32 运算，要求两者误差控制在极小范围内（如加法 1e-4，矩阵乘法 1e-3），确保 NPU 单精度计算路径的数值稳定。
+*   **`test_float16_ops.py`**：针对边缘计算常用的半精度推理场景。采用“CPU FP32 计算作为真值”的策略，即在 CPU 上使用高精度 FP32 运算，NPU 使用 FP16 运算，最后将 NPU 结果转回 FP32 进行对比。这种方式既验证了 NPU 的半精度计算能力，又通过放宽容差（1e-2）合理包容了精度量化带来的正常误差。
+
+**3. 神经网络层测试 (`test_nn_layers_float16.py` / `test_nn_layers_float32.py`)**
+
+这是测试套件的核心，旨在全面验证常用深度学习算子在昇腾 NPU 上的表现。测试覆盖了特征提取与分类的关键组件：
+*   **核心层**：`nn.Linear` 和 `nn.Conv2d` 的测试用例涵盖了 LeNet、AlexNet、VGG 及 ResNet 等经典架构的典型参数配置（输入尺寸、卷积核大小、步长及填充）。
+*   **激活与归一化**：囊括 `ReLU`、`Sigmoid`、`Tanh`、`LeakyReLU`、`GELU`、`Softmax` 等激活函数及 `BatchNorm2d`，确保非线性变换与数据分布调整的准确性。
+*   **池化与辅助层**：验证 `AvgPool2d` 和 `MaxPool2d` 的基本功能及 `count_include_pad`、`ceil_mode` 等特定参数，同时包含 `Dropout` 和 `Flatten` 的行为验证。
+
+为了适应不同场景，套件提供了双重验证策略：
+*   **`test_nn_layers_float32.py`**：侧重高精度数值一致性，要求 NPU 结果与 CPU 基准误差极小（1e-3），确保推理精确度。
+*   **`test_nn_layers_float16.py`**：模拟混合精度推理，输入和模型转为半精度在 NPU 执行，结果转回 FP32 对比。考虑到量化损失，容差适度放宽（1e-2 至 1e-1），重点验证低精度模式下的逻辑正确性与功能完备性。
+此外，为防止嵌入式设备内存溢出（OOM），每个测试类均实现了 `teardown_method`，在用例执行后自动清理 NPU 缓存。
+
+### 测试结果摘要
+
+运行该测试套件前，请确保在 `npu` 虚拟环境中已安装 pytest：
+```bash
+pip3 install pytest
+```
+随后在终端进入相应的 `test` 文件夹并运行：
+```bash
+pytest -v ./
+```
+在昇腾 310B（CANN 8.3.RC1 + PyTorch 2.8.0）环境下，典型测试结果如下：
+
+```text
+============================= test session starts ==============================
+...
+FAILED test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16_default_behavior[3-1-1]
+FAILED test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16_default_behavior[3-2-1]
+FAILED test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[True-3-1-1]
+FAILED test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[True-3-2-1]
+FAILED test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32_default_behavior[2-2-0]
+FAILED test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32_default_behavior[3-2-0]
+FAILED test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32_default_behavior[3-2-1]
+FAILED test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[False-2-2-0]
+FAILED test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[False-3-2-0]
+FAILED test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[False-3-2-1]
+FAILED test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[True-2-2-0]
+FAILED test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[True-3-2-0]
+FAILED test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[True-3-2-1]
+=================== 76 passed, 13 failed in 123.45s ====================
+```
+
+测试日志显示，绝大多数基础算子（Add, MatMul）和核心网络层（Linear, Conv2d, BatchNorm, Activations）在 FP16 和 FP32 模式下均通过验证，证明 NPU 基本计算功能正常。但测试也暴露了两个显著异常，需重点关注：
+
+- FP16 平均池化层 (AvgPool) 的边界精度问题
+在 `test_nn_layers_float16.py` 的测试中，`AvgPool2d` 算子表现出特定的边界精度异常，具体体现为当 `kernel_size=3` 且 `padding=1` 时测试均告失败，而 `kernel_size=2` 且无填充时则能顺利通过。这一现象表明 NPU 在处理半精度（FP16）池化边界填充（Padding）时，累加计算的精度损失可能超出了预设容差范围，或者底层硬件对 Padding 区域“0”值的处理逻辑与 CPU 存在微小差异。因此，开发者在推理代码中若使用 FP16 模式且包含带 Padding 的奇数核 AvgPool 层，需特别警惕潜在的精度下降风险。
+
+- FP32 最大池化层 (MaxPool) 的系统性失效
+在 `test_nn_layers_float32.py` 中，所有 `MaxPool2d` 测试用例（共 9 个）全部失败，与 FP16 模式下全部通过的表现形成鲜明对比，这揭示了一个严重的系统性故障。FP16 正常而 FP32 全面失败，极可能是当前版本 CANN 驱动或 PyTorch 插件在 FP32 格式 MaxPool 算子实现上存在 Bug，亦或是数据排布未对齐导致计算错误甚至产生 NaN/Inf。鉴于此为高优先级阻碍性问题（Blocker），建议暂时避免在 NPU 上使用 FP32 格式的 MaxPool，或将其回退至 CPU 执行，直至驱动版本修复。
+
+开发者在迁移自定义模型前，建议优先运行此测试套件以排查环境潜在问题。
