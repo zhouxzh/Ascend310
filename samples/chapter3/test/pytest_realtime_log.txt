@@ -1,0 +1,209 @@
+Test Session Started at 2026-01-02 11:40:12.095847
+[2026-01-02 11:40:22.427296] STARTING: test_float16_ops.py::TestFloat16Ops::test_float16_add
+[2026-01-02 11:41:09.339165] FINISHED: test_float16_ops.py::TestFloat16Ops::test_float16_add - PASSED
+[2026-01-02 11:41:09.348307] STARTING: test_float16_ops.py::TestFloat16Ops::test_float16_matmul
+[2026-01-02 11:41:09.821216] FINISHED: test_float16_ops.py::TestFloat16Ops::test_float16_matmul - PASSED
+[2026-01-02 11:41:09.828416] STARTING: test_float32_ops.py::TestFloat32Ops::test_float32_add
+[2026-01-02 11:41:10.267318] FINISHED: test_float32_ops.py::TestFloat32Ops::test_float32_add - PASSED
+[2026-01-02 11:41:10.275727] STARTING: test_float32_ops.py::TestFloat32Ops::test_float32_matmul
+[2026-01-02 11:41:10.719309] FINISHED: test_float32_ops.py::TestFloat32Ops::test_float32_matmul - PASSED
+[2026-01-02 11:41:10.726460] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[120-84]
+[2026-01-02 11:41:11.310065] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[120-84] - PASSED
+[2026-01-02 11:41:11.319793] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[84-10]
+[2026-01-02 11:41:11.767658] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[84-10] - PASSED
+[2026-01-02 11:41:11.774532] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[4096-4096]
+[2026-01-02 11:41:12.579744] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[4096-4096] - PASSED
+[2026-01-02 11:41:12.588578] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[4096-1000]
+[2026-01-02 11:41:13.152574] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[4096-1000] - PASSED
+[2026-01-02 11:41:13.159270] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[2048-1000]
+[2026-01-02 11:41:13.639814] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[2048-1000] - PASSED
+[2026-01-02 11:41:13.648403] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[512-1000]
+[2026-01-02 11:41:14.105483] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_linear_float16[512-1000] - PASSED
+[2026-01-02 11:41:14.111932] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[3-6-5-1-0]
+[2026-01-02 11:41:15.480905] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[3-6-5-1-0] - PASSED
+[2026-01-02 11:41:15.489271] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[6-16-5-1-0]
+[2026-01-02 11:41:16.764838] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[6-16-5-1-0] - PASSED
+[2026-01-02 11:41:16.773803] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[3-64-3-1-1]
+[2026-01-02 11:41:18.078261] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[3-64-3-1-1] - PASSED
+[2026-01-02 11:41:18.085694] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[64-128-3-1-1]
+[2026-01-02 11:41:19.376741] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[64-128-3-1-1] - PASSED
+[2026-01-02 11:41:19.383891] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[3-96-11-4-2]
+[2026-01-02 11:41:20.688442] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[3-96-11-4-2] - PASSED
+[2026-01-02 11:41:20.695091] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[256-384-3-1-1]
+[2026-01-02 11:41:22.068863] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[256-384-3-1-1] - PASSED
+[2026-01-02 11:41:22.075661] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[64-64-1-1-0]
+[2026-01-02 11:41:22.963539] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[64-64-1-1-0] - PASSED
+[2026-01-02 11:41:22.969600] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[64-256-1-1-0]
+[2026-01-02 11:41:24.281675] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[64-256-1-1-0] - PASSED
+[2026-01-02 11:41:24.288417] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[64-64-7-2-3]
+[2026-01-02 11:41:25.606055] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_conv2d_float16[64-64-7-2-3] - PASSED
+[2026-01-02 11:41:25.614142] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[64]
+[2026-01-02 11:41:26.639874] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[64] - PASSED
+[2026-01-02 11:41:26.647398] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[128]
+[2026-01-02 11:41:27.619667] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[128] - PASSED
+[2026-01-02 11:41:27.631873] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[256]
+[2026-01-02 11:41:28.620566] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[256] - PASSED
+[2026-01-02 11:41:28.627783] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[512]
+[2026-01-02 11:41:29.604440] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[512] - PASSED
+[2026-01-02 11:41:29.611889] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[1024]
+[2026-01-02 11:41:30.611302] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[1024] - PASSED
+[2026-01-02 11:41:30.620734] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[2048]
+[2026-01-02 11:41:31.649101] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_batchnorm_float16[2048] - PASSED
+[2026-01-02 11:41:31.656312] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_relu_float16
+[2026-01-02 11:41:32.072507] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_relu_float16 - PASSED
+[2026-01-02 11:41:32.079445] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_sigmoid_float16
+[2026-01-02 11:41:32.494998] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_sigmoid_float16 - PASSED
+[2026-01-02 11:41:32.500115] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_tanh_float16
+[2026-01-02 11:41:32.925247] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_tanh_float16 - PASSED
+[2026-01-02 11:41:32.931711] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_leaky_relu_float16
+[2026-01-02 11:41:33.353009] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_leaky_relu_float16 - PASSED
+[2026-01-02 11:41:33.357908] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_softmax_float16
+[2026-01-02 11:41:34.189544] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_softmax_float16 - PASSED
+[2026-01-02 11:41:34.197145] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_gelu_float16
+[2026-01-02 11:41:34.618911] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_gelu_float16 - PASSED
+[2026-01-02 11:41:34.623476] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16_default_behavior[2-2-0]
+[2026-01-02 11:41:35.173976] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16_default_behavior[2-2-0] - PASSED
+[2026-01-02 11:41:35.182528] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16_default_behavior[3-1-1]
+[2026-01-02 11:41:43.472636] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16_default_behavior[3-1-1] - FAILED
+[2026-01-02 11:41:43.482161] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16_default_behavior[3-2-1]
+[2026-01-02 11:41:44.163209] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16_default_behavior[3-2-1] - FAILED
+[2026-01-02 11:41:44.169745] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[False-2-2-0]
+[2026-01-02 11:41:44.181938] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[False-2-2-0] - PASSED
+[2026-01-02 11:41:44.186267] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[False-3-1-1]
+[2026-01-02 11:41:44.197716] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[False-3-1-1] - PASSED
+[2026-01-02 11:41:44.202090] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[False-3-2-1]
+[2026-01-02 11:41:44.211759] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[False-3-2-1] - PASSED
+[2026-01-02 11:41:44.217654] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[True-2-2-0]
+[2026-01-02 11:41:44.227352] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[True-2-2-0] - PASSED
+[2026-01-02 11:41:44.233835] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[True-3-1-1]
+[2026-01-02 11:41:44.786906] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[True-3-1-1] - FAILED
+[2026-01-02 11:41:44.791793] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[True-3-2-1]
+[2026-01-02 11:41:44.945060] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_avgpool_float16[True-3-2-1] - FAILED
+[2026-01-02 11:41:44.949867] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_dropout_float16[0.5]
+[2026-01-02 11:41:44.956407] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_dropout_float16[0.5] - PASSED
+[2026-01-02 11:41:44.960600] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_dropout_float16[0.2]
+[2026-01-02 11:41:44.967834] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_dropout_float16[0.2] - PASSED
+[2026-01-02 11:41:44.971942] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_flatten_float16[input_shape0]
+[2026-01-02 11:41:44.982908] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_flatten_float16[input_shape0] - PASSED
+[2026-01-02 11:41:44.987325] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_flatten_float16[input_shape1]
+[2026-01-02 11:41:44.993264] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_flatten_float16[input_shape1] - PASSED
+[2026-01-02 11:41:44.999315] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_flatten_float16[input_shape2]
+[2026-01-02 11:41:45.007037] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_flatten_float16[input_shape2] - PASSED
+[2026-01-02 11:41:45.011155] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16_default_behavior[2-2-0]
+[2026-01-02 11:41:45.483346] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16_default_behavior[2-2-0] - PASSED
+[2026-01-02 11:41:45.489038] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16_default_behavior[3-2-0]
+[2026-01-02 11:41:45.966758] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16_default_behavior[3-2-0] - PASSED
+[2026-01-02 11:41:45.972298] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16_default_behavior[3-2-1]
+[2026-01-02 11:41:46.455226] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16_default_behavior[3-2-1] - PASSED
+[2026-01-02 11:41:46.460883] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[False-2-2-0]
+[2026-01-02 11:41:46.509299] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[False-2-2-0] - PASSED
+[2026-01-02 11:41:46.514125] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[False-3-2-0]
+[2026-01-02 11:41:46.564483] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[False-3-2-0] - PASSED
+[2026-01-02 11:41:46.569237] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[False-3-2-1]
+[2026-01-02 11:41:46.621853] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[False-3-2-1] - PASSED
+[2026-01-02 11:41:46.628766] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[True-2-2-0]
+[2026-01-02 11:41:47.141850] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[True-2-2-0] - PASSED
+[2026-01-02 11:41:47.147707] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[True-3-2-0]
+[2026-01-02 11:41:47.635531] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[True-3-2-0] - PASSED
+[2026-01-02 11:41:47.643593] STARTING: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[True-3-2-1]
+[2026-01-02 11:41:48.128435] FINISHED: test_nn_layers_float16.py::TestNNLayersFloat16::test_maxpool_float16[True-3-2-1] - PASSED
+[2026-01-02 11:41:48.134622] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[120-84]
+[2026-01-02 11:41:48.575681] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[120-84] - PASSED
+[2026-01-02 11:41:48.583597] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[84-10]
+[2026-01-02 11:41:49.016526] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[84-10] - PASSED
+[2026-01-02 11:41:49.022397] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[4096-4096]
+[2026-01-02 11:41:49.805968] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[4096-4096] - PASSED
+[2026-01-02 11:41:49.814534] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[4096-1000]
+[2026-01-02 11:41:50.340774] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[4096-1000] - PASSED
+[2026-01-02 11:41:50.347337] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[2048-1000]
+[2026-01-02 11:41:50.825868] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[2048-1000] - PASSED
+[2026-01-02 11:41:50.834324] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[512-1000]
+[2026-01-02 11:41:51.275338] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_linear_float32[512-1000] - PASSED
+[2026-01-02 11:41:51.282031] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[3-6-5-1-0]
+[2026-01-02 11:41:52.206857] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[3-6-5-1-0] - PASSED
+[2026-01-02 11:41:52.215469] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[6-16-5-1-0]
+[2026-01-02 11:41:53.119386] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[6-16-5-1-0] - PASSED
+[2026-01-02 11:41:53.126378] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[3-64-3-1-1]
+[2026-01-02 11:41:54.059250] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[3-64-3-1-1] - PASSED
+[2026-01-02 11:41:54.068320] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[64-128-3-1-1]
+[2026-01-02 11:41:54.988154] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[64-128-3-1-1] - PASSED
+[2026-01-02 11:41:54.997582] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[3-96-11-4-2]
+[2026-01-02 11:41:55.935081] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[3-96-11-4-2] - PASSED
+[2026-01-02 11:41:55.942103] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[256-384-3-1-1]
+[2026-01-02 11:41:56.949141] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[256-384-3-1-1] - PASSED
+[2026-01-02 11:41:56.958470] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[64-64-1-1-0]
+[2026-01-02 11:41:57.875595] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[64-64-1-1-0] - PASSED
+[2026-01-02 11:41:57.882394] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[64-256-1-1-0]
+[2026-01-02 11:41:58.783237] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[64-256-1-1-0] - PASSED
+[2026-01-02 11:41:58.792465] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[64-64-7-2-3]
+[2026-01-02 11:41:59.714041] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_conv2d_float32[64-64-7-2-3] - PASSED
+[2026-01-02 11:41:59.721517] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[64]
+[2026-01-02 11:42:00.653117] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[64] - PASSED
+[2026-01-02 11:42:00.660831] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[128]
+[2026-01-02 11:42:01.561499] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[128] - PASSED
+[2026-01-02 11:42:01.570074] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[256]
+[2026-01-02 11:42:02.482225] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[256] - PASSED
+[2026-01-02 11:42:02.492615] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[512]
+[2026-01-02 11:42:03.406863] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[512] - PASSED
+[2026-01-02 11:42:03.413473] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[1024]
+[2026-01-02 11:42:04.342067] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[1024] - PASSED
+[2026-01-02 11:42:04.350401] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[2048]
+[2026-01-02 11:42:05.296976] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_batchnorm_float32[2048] - PASSED
+[2026-01-02 11:42:05.305686] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_relu_float32
+[2026-01-02 11:42:05.710247] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_relu_float32 - PASSED
+[2026-01-02 11:42:05.714751] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_sigmoid_float32
+[2026-01-02 11:42:06.123021] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_sigmoid_float32 - PASSED
+[2026-01-02 11:42:06.127379] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_tanh_float32
+[2026-01-02 11:42:06.532700] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_tanh_float32 - PASSED
+[2026-01-02 11:42:06.537166] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_leaky_relu_float32
+[2026-01-02 11:42:06.946695] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_leaky_relu_float32 - PASSED
+[2026-01-02 11:42:06.952894] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_softmax_float32
+[2026-01-02 11:42:07.585059] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_softmax_float32 - PASSED
+[2026-01-02 11:42:07.590508] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_gelu_float32
+[2026-01-02 11:42:07.997301] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_gelu_float32 - PASSED
+[2026-01-02 11:42:08.005656] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32_default_behavior[2-2-0]
+[2026-01-02 11:42:08.488637] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32_default_behavior[2-2-0] - PASSED
+[2026-01-02 11:42:08.494637] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32_default_behavior[3-1-1]
+[2026-01-02 11:42:08.966780] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32_default_behavior[3-1-1] - PASSED
+[2026-01-02 11:42:08.974259] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32_default_behavior[3-2-1]
+[2026-01-02 11:42:09.460270] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32_default_behavior[3-2-1] - PASSED
+[2026-01-02 11:42:09.466352] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[False-2-2-0]
+[2026-01-02 11:42:10.007237] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[False-2-2-0] - PASSED
+[2026-01-02 11:42:10.015397] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[False-3-1-1]
+[2026-01-02 11:42:10.522920] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[False-3-1-1] - PASSED
+[2026-01-02 11:42:10.529309] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[False-3-2-1]
+[2026-01-02 11:42:11.029979] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[False-3-2-1] - PASSED
+[2026-01-02 11:42:11.038006] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[True-2-2-0]
+[2026-01-02 11:42:11.047272] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[True-2-2-0] - PASSED
+[2026-01-02 11:42:11.053482] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[True-3-1-1]
+[2026-01-02 11:42:11.065515] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[True-3-1-1] - PASSED
+[2026-01-02 11:42:11.069976] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[True-3-2-1]
+[2026-01-02 11:42:11.081530] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_avgpool_float32[True-3-2-1] - PASSED
+[2026-01-02 11:42:11.085812] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_dropout_float32[0.5]
+[2026-01-02 11:42:11.091616] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_dropout_float32[0.5] - PASSED
+[2026-01-02 11:42:11.095543] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_dropout_float32[0.2]
+[2026-01-02 11:42:11.102663] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_dropout_float32[0.2] - PASSED
+[2026-01-02 11:42:11.106568] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_flatten_float32[input_shape0]
+[2026-01-02 11:42:11.114056] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_flatten_float32[input_shape0] - PASSED
+[2026-01-02 11:42:11.118170] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_flatten_float32[input_shape1]
+[2026-01-02 11:42:11.123879] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_flatten_float32[input_shape1] - PASSED
+[2026-01-02 11:42:11.129519] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_flatten_float32[input_shape2]
+[2026-01-02 11:42:11.135538] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_flatten_float32[input_shape2] - PASSED
+[2026-01-02 11:42:11.141407] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32_default_behavior[2-2-0]
+[2026-01-02 11:42:11.992259] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32_default_behavior[2-2-0] - FAILED
+[2026-01-02 11:42:11.996939] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32_default_behavior[3-2-0]
+[2026-01-02 11:42:12.179911] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32_default_behavior[3-2-0] - FAILED
+[2026-01-02 11:42:12.184517] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32_default_behavior[3-2-1]
+[2026-01-02 11:42:12.367989] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32_default_behavior[3-2-1] - FAILED
+[2026-01-02 11:42:12.372586] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[False-2-2-0]
+[2026-01-02 11:42:12.551394] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[False-2-2-0] - FAILED
+[2026-01-02 11:42:12.557897] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[False-3-2-0]
+[2026-01-02 11:42:12.742784] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[False-3-2-0] - FAILED
+[2026-01-02 11:42:12.747380] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[False-3-2-1]
+[2026-01-02 11:42:12.934506] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[False-3-2-1] - FAILED
+[2026-01-02 11:42:12.940839] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[True-2-2-0]
+[2026-01-02 11:42:13.118243] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[True-2-2-0] - FAILED
+[2026-01-02 11:42:13.124870] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[True-3-2-0]
+[2026-01-02 11:42:13.303318] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[True-3-2-0] - FAILED
+[2026-01-02 11:42:13.307842] STARTING: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[True-3-2-1]
+[2026-01-02 11:42:13.488179] FINISHED: test_nn_layers_float32.py::TestNNLayersFloat32::test_maxpool_float32[True-3-2-1] - FAILED
