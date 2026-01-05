@@ -1,0 +1,67 @@
+digraph AlexNet {
+    charset="utf-8";
+    rankdir=TB;
+    newrank=true; 
+    
+    // 尝试使用更通用的中文字体设置
+    node [fontname="Microsoft YaHei, SimHei, sans-serif", fontsize=10, shape=box, style="filled,rounded", fillcolor="#E1F5FE"];
+    edge [fontname="Microsoft YaHei, SimHei, sans-serif", fontsize=10];
+    graph [fontname="Microsoft YaHei, SimHei, sans-serif"];
+
+        
+        // 定义 Conv-ReLU-Pool 结构 (Block A) - 独立 Cluster
+        subgraph cluster_block_conv_pool {
+            label = "模块 A\n(卷积-ReLU-池化)";
+            style = filled;
+            color = "#EEEEEE";
+            node [fillcolor=white];
+            c1 [label="卷积"];
+            r1 [label="ReLU"];
+            p1 [label="平均池化"];
+            c1 -> r1 -> p1;
+        }
+
+        // 定义 FC-ReLU-Dropout 结构 (Block B) - 独立 Cluster
+        subgraph cluster_block_fc {
+            label = "模块 B\n(全连接-ReLU-Dropout)";
+            style = filled;
+            color = "#EEEEEE";
+            node [fillcolor=white];
+            f1 [label="全连接"];
+            r2 [label="ReLU"];
+            d1 [label="Dropout"];
+            f1 -> r2 -> d1;
+        }
+
+
+    // 主网络流程
+    subgraph cluster_main {
+        label = "AlexNet 主流程";
+        fontsize = 12;
+        style = dashed;
+        color = gray;
+
+        Input [label="输入\n32x32", shape=ellipse, fillcolor="#FFF9C4"];
+        
+        // 使用简化的 Block 表示
+        L1 [label="第1层\n(模块 A)\n11x11, 96"];
+        L2 [label="第2层\n(模块 A)\n5x5, 256"];
+        L3 [label="第3层\n(卷积+ReLU)\n3x3, 384"];
+        L4 [label="第4层\n(卷积+ReLU)\n3x3, 384"];
+        L5 [label="第5层\n(模块 A)\n3x3, 256"];
+        
+        Flatten [label="展平", shape=parallelogram, fillcolor="#F8BBD0"];
+        
+        L6 [label="第6层\n(模块 B)\n4096"];
+        L7 [label="第7层\n(模块 B)\n4096"];
+        L8 [label="第8层\n(全连接+Softmax)\n10"];
+        
+        Output [label="输出", shape=ellipse, fillcolor="#FFF9C4"];
+
+        Input -> L1 -> L2 -> L3 -> L4 -> L5 -> Flatten -> L6 -> L7 -> L8 -> Output;
+    }
+
+    // 强制对齐：Block A 顶部对齐 Layer 1 (上半部分)，Block B 顶部对齐 Layer 6 (下半部分)
+    { rank=same; L1; c1; }
+    { rank=same; L6; f1; }
+}
