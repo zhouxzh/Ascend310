@@ -298,5 +298,139 @@ OrangePi AIpro(8T)开发板是香橙派联合华为精心打造的高性能AI开
    
    ![登录成功](img0/login.png)
 
+
+## 网络连接
+
+### 无线网络连接 (WiFi)
+
+开发板板载了WiFi模块，可以通过命令行工具`nmcli`轻松连接无线网络。
+
+1. **扫描WiFi**
+   ```bash
+   nmcli dev wifi list
+   ```
+
+2. **连接WiFi**
+   将`<SSID>`替换为你的WiFi名称，`<PASSWORD>`替换为密码。
+   ```bash
+   nmcli dev wifi connect <SSID> password <PASSWORD>
+   ```
+
+3. **查看连接状态**
+   ```bash
+   nmcli connection show
+   ```
+
+### 有线网络连接
+
+如果有线网络可用，直接插入网线即可。可以通过以下命令查看IP地址：
+```bash
+ip addr
+```
+或者
+```bash
+ifconfig
+```
+
+## 远程连接 (SSH)
+
+为了方便开发，通常我们会使用个人电脑通过SSH远程连接到开发板。
+
+1. **获取开发板IP地址**
+   使用上述`ip addr`命令获取开发板的IP地址（通常在`wlan0`或`eth0`接口下）。
+
+2. **使用SSH客户端连接**
+   在你的个人电脑终端（Windows可以使用CMD、PowerShell或Putty，Mac/Linux使用Terminal）中输入：
+   ```bash
+   ssh HwHiAiUser@<开发板IP地址>
+   ```
+   例如：
+   ```bash
+   ssh HwHiAiUser@192.168.1.100
+   ```
+   默认密码为：`Mind@123`
+
+## 验证开发环境
+
+系统启动并连接网络后，我们需要验证昇腾AI处理器的状态以及开发环境是否正常。
+
+1. **查看NPU状态**
+   使用`npu-smi`工具查看NPU的详细信息，包括温度、功耗、算力利用率等。
+   ```bash
+   npu-smi info
+   ```
+   如果能看到类似以下的输出，说明NPU工作正常：
+   ```text
+   +------------------------------------------------------------------------------------------------+
+   | npu-smi 23.0.0                       Version: 23.0.0                                           |
+   |------------------------------------------------------------------------------------------------|
+   | NPU     Name                         Health   Power(W)     Temp(C)           Hugepages-Usage(page) |
+   | Chip    Device                       Bus-Id   AICore(%)    Memory-Usage(MB)                        |
+   |================================================================================================|
+   | 0       310B4                        OK       12.8         45                0    / 0              |
+   | 0       0                            0000:00:00.0 0            2433 / 7564                         |
+   |================================================================================================|
+   ```
+
+2. **检查CANN环境**
+   官方镜像通常已预装CANN（Compute Architecture for Neural Networks）。可以通过检查环境变量或运行简单命令来确认。
+   通常环境变量设置在`.bashrc`中，尝试执行：
+   ```bash
+   echo $ASCEND_HOME_PATH
+   ```
+   或者检查编译器版本：
+   ```bash
+   c++ --version
+   ```
+
 ### 设置SWAP交换分区
-开发板虽然有8G/16G的运存，但是有些应用（例如ATC模型转换工具）需要较大的内存，在这种情况下我们可以通过设置SWAP交换分区来扩展系统能使用的最大内存容量。需要注意的是，SWAP分区是设置在TF卡或者eMMC而不是
+开发板虽然有8G/16G的运存，但是有些应用（例如ATC模型转换工具）需要较大的内存，在这种情况下我们可以通过设置SWAP交换分区来扩展系统能使用的最大内存容量。
+
+1. **创建交换文件**
+   
+   首先，使用`fallocate`命令创建一个指定大小的文件（例如12GB）。如果你的存储空间允许，建议设置得大一些，以防模型转换时内存不足。
+   ```bash
+   sudo fallocate -l 12G /swapfile
+   ```
+   
+   如果提示`fallocate`失败，可以使用`dd`命令：
+   ```bash
+   sudo dd if=/dev/zero of=/swapfile bs=1G count=12
+   ```
+
+2. **设置权限**
+   
+   出于安全考虑，需要修改文件的权限，仅允许root用户读写。
+   ```bash
+   sudo chmod 600 /swapfile
+   ```
+
+3. **设置交换区**
+   
+   将文件格式化为交换分区格式。
+   ```bash
+   sudo mkswap /swapfile
+   ```
+
+4. **启用交换区**
+   
+   启用该交换文件。
+   ```bash
+   sudo swapon /swapfile
+   ```
+
+5. **持久化设置**
+   
+   为了防止重启后失效，需要将其写入`/etc/fstab`文件中。
+   ```bash
+   sudo nano /etc/fstab
+   ```
+   在文件末尾添加以下内容：
+   ```text
+   /swapfile none swap sw 0 0
+   ```
+   保存并退出（Ctrl+O, Enter, Ctrl+X）。
+
+## 结语
+
+至此，你的昇腾310B开发板（OrangePi AIpro）已经完成了基本的环境搭建。接下来，你可以进入[案例1：智能打卡机](./case1.md)的学习，开始你的第一个AI应用开发之旅。
