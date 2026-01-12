@@ -308,49 +308,34 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
    
    输入密码登录进入桌面环境。
    
-   ![桌面](img0/logingui.png){#fig:logingui width=70%}
+   ![桌面](img0/logingui.png)  
+   
+   若无法登陆请检查输入的密码是否正确，大小写以及符号是否正确
 
-### 方式二：串口调试启动
+   默认账户表格：
+   | 用户名 | 密码 |
+   | :---: | :---: |
+   | root | Mind@123 |
+   | HwHiAiUser | Mind@123 |
 
-若没有显示器，可通过串口连接开发板进行操作。
+### 串口界面
+1. **使用USB2TTL模块，与开发板的GPIO口进行连线**  
+   ![开发板串口](img0/gpio_ttl.png)，开发板的TX（GPIO8）接入USB2TTL模块的RX接口，开发板的RX（GPIO10）则接入模块的TX接口，并连接好GND接地，在Windows电脑下可以使用PUTTY连接串口。
+2. **使用开发板自带的Micro USB接口进行串口调试，该方法更为方便，只需要一根Micro USB数据线，接入电脑后打开设备管理器查询对应的串口，然后使用PUTTY进行链接即可。**  
+   ![MicroUSB串口](img0/microusbser.png)
 
-#### 方法A：使用USB转TTL模块
-1. 准备USB转TTL模块。
-2. 连接线序：
-   - 模块 RX <--> 开发板 TX (GPIO8)
-   - 模块 TX <--> 开发板 RX (GPIO10)
-   - 模块 GND <--> 开发板 GND
+以Micro USB接口为例：
+1. **使用Micro USB数据线连接开发板和电脑**
+2. **打开电脑的设备管理器，选择端口，寻找开发板对应的串口端口号**  
+   ![端口号](img0/ttl.png)
 
-   ![开发板串口](img0/gpio_ttl.png){#fig:gpio_ttl width=50%}
-
-#### 方法B：使用Micro USB接口（推荐）
-开发板集成了串口转USB芯片，直接使用Micro USB数据线连接电脑即可。
-
-![MicroUSB串口](img0/microusbser.png){#fig:microusbser width=50%}
-
-**操作步骤（以Micro USB为例）：**
-
-1. 使用Micro USB线连接开发板和电脑。
-2. 打开电脑“设备管理器”，查看“端口（COM和LPT）”，找到对应的COM口号（例如COM3）。
-
-   ![端口号](img0/ttl.png){#fig:ttl width=50%}
-
-3. 打开串口调试工具（如PuTTY、MobaXterm）。
-   - **Connection type**: Serial
-   - **Serial line**: 输入查到的COM口号
-   - **Speed (Baud rate)**: **115200**
-
-   ![PUTTY](img0/putty.png){#fig:putty width=50%}
-
-4. 点击“Open”。上电启动开发板，终端会显示启动日志。
-5. 待出现登录提示 `orangepiaipro login:` 或类似字样时，输入用户名 `HwHiAiUser` 和密码 `Mind@123` 登录（输入密码时不会显示字符）。
+3. **打开串口调试软件（PUTTY）**  
+   ![PUTTY](img0/putty.png)，将Connection Type选择为```Serial```，然后在Serial Line处将端口号修改为设备管理器中查到的端口号，如作者此处端口号为```COM3```，此外，还需要将Speed从9600修改为115200，最后点击Open打开串口。
+4. **等待出现```Ubuntu 22.04.3 LTS orangepiaipro ttyAM0```字样，输入登录的用户名HwHiAiUser并回车，然后输入密码Mind@123并回车，注意在输入密码的时候屏幕并不会显示任何东西，登陆后的界面如图所示。**  
 
    ![串口](img0/serial.png){#fig:serial width=70%}  
 
    ![登录成功](img0/login.png){#fig:login width=70%}
 
-### 后续配置：设置SWAP交换分区
-
-虽然开发板配备了8GB/16GB内存，但在运行某些大型应用（如ATC模型转换工具）时，可能会遇到内存不足的情况。建议配置SWAP交换分区以扩展虚拟内存。
-
-*（注：SWAP分区将占用TF卡或系统盘的空间，请确保磁盘空间充足。）*
+### 设置SWAP交换分区
+开发板虽然有8G/16G的运存，但是有些应用（例如ATC模型转换工具）需要较大的内存，在这种情况下我们可以通过设置SWAP交换分区来扩展系统能使用的最大内存容量。需要注意的是，SWAP分区是设置在TF卡或者eMMC而不是
