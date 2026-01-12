@@ -286,13 +286,13 @@ OrangePi AIpro(8T)开发板是香橙派联合华为精心打造的高性能AI开
    ![MicroUSB串口](img0/microusbser.png)
 
 以Micro USB接口为例：
-1. **使用Micro USB数据线连接开发板和电脑**
+1. **使用Micro USB数据线连接开发板和电脑，此时请不要给开发板上电。**
 2. **打开电脑的设备管理器，选择端口，寻找开发板对应的串口端口号**  
    ![端口号](img0/ttl.png)
 
 3. **打开串口调试软件（PUTTY）**  
    ![PUTTY](img0/putty.png)，将Connection Type选择为```Serial```，然后在Serial Line处将端口号修改为设备管理器中查到的端口号，如作者此处端口号为```COM3```，此外，还需要将Speed从9600修改为115200，最后点击Open打开串口。
-4. **等待出现```Ubuntu 22.04.3 LTS orangepiaipro ttyAM0```字样，输入登录的用户名HwHiAiUser并回车，然后输入密码Mind@123并回车，注意在输入密码的时候屏幕并不会显示任何东西，登陆后的界面如图所示。**  
+4. **给开发板通电，等待出现```Ubuntu 22.04.3 LTS orangepiaipro ttyAM0```字样，输入登录的用户名HwHiAiUser并回车，然后输入密码Mind@123并回车，注意在输入密码的时候屏幕并不会显示任何东西，登陆后的界面如图所示。**  
 
    ![串口](img0/serial.png)  
    
