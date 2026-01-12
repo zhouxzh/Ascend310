@@ -1,5 +1,5 @@
 ---
-title: "第2讲：CANN 软件栈核心与模型转换全流程"
+title: "第2讲：CANN软件栈核心组件解析"
 author: [周贤中]
 date: 2025-09-04
 subject: "Markdown"
@@ -28,13 +28,13 @@ CANN与CUDA二者的共同点主要体现在，它们都是通过软硬件协同
 
 CANN 通过提供分层清晰的编程与运行时结构，以覆盖训练与推理的“全场景”、贴近主流框架的“低门槛”以及面向昇腾硬件深度优化的“高性能”为核心特性，支撑用户在昇腾平台上快速构建与部署各类 AI 应用与业务。从整体上看，CANN 可以抽象为一个自上而下递进的五层架构（计算语言接口、计算服务层、计算编译引擎、计算执行引擎与计算基础层），如图\ref{fig:architecture}所示。各层通过稳定的接口与数据流协议进行解耦协同，在保证语义一致性的前提下最大化发挥底层算力与能效潜力。
 
-![CANN架构图](img2\CANN_Architecture.png){#fig:architecture width=90%}
+![CANN架构图](img2\CANN_Architecture.png){#fig:architecture width=100%}
 
 在分层结构上，CANN可抽象为五个层次：上层的计算语言接口——AscendCL接口负责设备与上下文管理、流与内存控制、模型与算子的加载执行，以及媒体与图管理等通用API，为应用提供稳定的编程入口；其下的昇腾计算服务层汇聚神经网络与线性代数库，承载算子与子图的自动调优、梯度优化与模型压缩，并通过框架适配器降低迁移成本；昇腾计算编译层的编译引擎通过图编译器与TBE算子开发支持，把前端计算图转化为在NPU可执行的模型与内核，实现图级语义到后端实现的精准映射；下一层的昇腾执行引擎面向运行时，负责模型与算子的调度执行，并内置数字视觉与AI预处理、集合通信等能力以提升端到端效率；最下层的昇腾计算基础层提供共享虚拟内存、设备虚拟化与主机—设备通信等底座服务，保证跨设备数据流与资源管理的可靠性与可扩展性。
 
 与此相辅的是三层逻辑架构：应用层承载具体业务与开发者工具，芯片使能层开放解决方案能力并驱动基于计算图的业务流运行，计算资源层则聚焦数据处理与运算执行，形成从业务到硬件的清晰闭环。这个CANN的三层逻辑结构如下图\ref{fig:cann_logic}所示:
 
-![CANN架构图](img2\CANN_logic.png){#fig:cann_logic width=90%}
+![CANN逻辑图](img2\CANN_logic.png){#fig:cann_logic width=90%}
 
 在技术特性上，CANN通过对计算图的编译与优化，将密集算子与数据流合理分配到异构单元上执行，显著提升吞吐与时延表现，并在能效上取得可工程化的优势；同时提供贴近主流框架的易用接口与完善的工具链，降低入门与迁移门槛，使开发者能够快速完成部署与调优。生态方面，CANN构建了面向个人、高校、科研与企业的赋能体系，并与开源社区协同，支持多种框架与推理引擎在异构硬件上的高效运行。依托这些能力，开发者可以深入调用运行时与图编译能力，释放底层硬件潜力，在性能与成本维度形成差异化竞争力。 
 
@@ -46,26 +46,14 @@ CANN 通过提供分层清晰的编程与运行时结构，以覆盖训练与推
 
 #### 安装前准备
 
-- 驱动与固件检查
-  - 在目标设备执行 `npu-smi info`；若能正常输出设备信息，说明 NPU 驱动与固件已安装。
-  - 对于昇腾 310B 产品/开发板，系统通常预置相关驱动与固件。
+- 驱动与固件检查：在目标设备上执行 `npu-smi info`，如果能够正常显示设备信息，则表明 NPU 驱动和固件已经正确安装。对于昇腾 310B 产品或开发板，系统一般会预装所需的驱动和固件，无需额外手动配置。
 
-- 环境准备
-  - 推荐采用离线安装；需预先准备 Python 与 `pip3`。
-  - 当前支持 Python 3.7.x–3.11.4。
-  - 昇腾310B开发板一般已预装 Miniconda 与 `pip3`，可直接使用。
+- 环境准备：推荐采用离线安装方式，安装前需确保系统已准备好 Python 环境并可使用 `pip3`，当前 CANN 支持 Python 3.7.x 至 3.11.4 版本。对于昇腾 310B 开发板，通常已预装 Miniconda 和 `pip3`，可直接满足依赖，无需额外配置。
 
-- 安装介质获取
-  - 先下载所需 CANN 软件包并上传到可访问路径后再执行安装。
-  - 例如 CANN 8.3.RC1 可从：https://www.hiascend.com/developer/download/community/result?module=cann&cann=8.3.RC1 获取；其他版本可在页面切换。
-  - 确保 CANN Toolkit 与 CANN Kernels 版本严格匹配（同一发行号）。
-  - 建议优先使用 .run 安装包；昇腾 310B 开发板为 AArch64 架构，请选择 aarch64 对应包。以 8.3.RC1 为例：
-    - Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
-    - Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run
-  - 若版本不同，请将文件名中的版本号替换为实际下载的版本。
+- 安装介质获取：在安装前，需先从华为昇腾官网下载所需的 CANN 软件包，并将其上传到目标设备的可访问路径。以 CANN 8.3.RC1 版本为例，可通过[官网](https://www.hiascend.com/developer/download/community/result?module=cann&cann=8.3.RC1) 获取相应安装包，其他版本可在页面切换选择。请确保下载的 CANN Toolkit 和 CANN Kernels 版本号完全一致（即同一发行号），以避免兼容性问题。推荐优先选择 .run 格式的安装包，且昇腾 310B 开发板为 AArch64 架构，需下载 aarch64 对应的包。例如 8.3.RC1 版本包括 Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run 和 Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run。如果实际下载的版本号不同，请将文件名中的版本号替换为对应的实际版本。
 
 #### 安装命令与依赖说明
-安装 CANN 可使用 root 或默认账户 HwHiAiUser。推荐以 root 安装；若使用 HwHiAiUser，需在所有安装与文件操作命令前加 sudo。
+安装 CANN 可使用 root 或默认账户 HwHiAiUser。推荐以 root 安装，不推荐用其他用户进行安装，因为容易发生权限问题。
 下面以 root 用户为例，详细介绍 CANN 的安装过程：
 
 - 切换到 root：
@@ -74,44 +62,37 @@ CANN 通过提供分层清晰的编程与运行时结构，以覆盖训练与推
   # 输入 root 密码后继续执行安装
   ```
 
-- 命令示例
-  - 以 root 执行：
-    ```bash
-    ./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
-    ```
-  - 以 HwHiAiUser 执行：
-    ```bash
-    sudo ./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
-    ```
-- 安装 Toolkit 开发套件  
+- 命令示例, 以 root 执行：
+  ```bash
+  ./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
+  ```
+
+- 安装 Toolkit 开发套件:  
   ```bash
   chmod +x Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run 
   ./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
   ```
   整个安装过程大概会持续十几分钟，甚至更长，请耐心等待。  
 
-- 配置环境变量
+- 配置环境变量:
   ```bash
-  source /usr/local/miniconda3/Ascend/ascend-toolkit/set_env.sh
+  source /usr/local/Ascend/ascend-toolkit/set_env.sh
   ```
 
-- 安装 Kernels 算子包（310B 平台）
+- 安装 Kernels 算子包（310B 平台）:
   ```bash
   chmod +x Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
   ./Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run --install
   ```
 
-- 安装业务运行时所需的 Python 第三方库（使用非 root 用户时保留 --user 参数）
+- 安装业务运行时所需的 Python 第三方库:
   ```bash
-  pip3 install \
-    attrs cython 'numpy>=1.19.2,<=1.24.0' decorator sympy cffi pyyaml pathlib2 \
+  pip3 install attrs cython 'numpy>=1.19.2,<=1.24.0' \
+    decorator sympy cffi pyyaml pathlib2 \
     psutil protobuf==3.20.0 scipy requests absl-py
   ```
 
-- 说明
-  - 若使用非 root 用户，请在上述命令末尾追加 `--user`。
-  - 依赖版本范围已覆盖常见环境，若发生冲突，请按实际 Python/OS 版本调整。
-  - 安装完成后，可将 CANN 环境变量追加到 `~/.bashrc` 以便自动加载；昇腾 310B 开发板的系统镜像通常已预置该配置。 
+- 说明: 依赖的版本范围已经覆盖了大多数常见环境，如果遇到依赖冲突，请根据实际的 Python 或操作系统版本进行相应调整。安装完成后，建议将 CANN 的环境变量配置追加到 `~/.bashrc` 文件中，以便每次登录时自动加载。需要注意的是，昇腾 310B 开发板的系统镜像通常已经预置了这些环境变量配置，无需手动设置。
 
 ## ATC模型转换详解
 
@@ -129,6 +110,7 @@ ONNX（Open Neural Network Exchange）是一种针对深度学习所设计的开
 ONNX的核心价值在于解决了AI生态系统中“碎片化”的问题。在没有ONNX之前，开发者如果想将一个在PyTorch中训练好的模型部署到移动端推理引擎上，通常需要进行繁琐的代码重写或复杂的格式转换。ONNX提供了一种中间表达（Intermediate Representation, IR），充当了不同框架之间的“通用语”。
 
 一个标准的ONNX模型文件（通常以`.onnx`为后缀）主要包含以下几个部分：
+
 1.  **Model Proto**：顶层结构，包含模型的元数据（如版本信息、生产者信息）和计算图（Graph）。
 2.  **Graph Proto**：描述了模型的计算逻辑，由一系列节点（Node）、输入（Input）、输出（Output）和初始化器（Initializer，即权重数据）组成。
 3.  **Node Proto**：代表计算图中的一个操作（Operator），如Conv、Relu、Add等。每个节点包含操作类型、输入输出张量的名称以及属性（Attribute，如卷积的步长、填充等）。
@@ -138,6 +120,7 @@ ONNX的核心价值在于解决了AI生态系统中“碎片化”的问题。�
 虽然ONNX旨在成为通用的AI模型交换标准，但CANN的ATC工具并非支持ONNX规范中的所有算子和特性。ATC对ONNX的支持主要集中在CV（计算机视觉）和NLP（自然语言处理）领域的常用算子，对于一些较新或较冷门的算子，可能会出现不支持的情况。
 
 具体来说，ATC对ONNX的支持限制主要体现在以下几个方面：
+
 1.  **算子覆盖率**：ATC支持绝大多数主流的CNN和Transformer类算子（如Conv, MatMul, Relu, Softmax等）。但对于部分非标准或特定框架自定义的算子（Custom Ops），ATC无法直接解析，需要开发者通过TBE（Tensor Boost Engine）开发自定义算子并注册到CANN中。
 2.  **动态控制流**：ONNX中的动态控制流（如`If`, `Loop`, `Scan`）在静态图编译中处理较为复杂。虽然ATC支持部分控制流算子，但在某些复杂嵌套场景下可能会导致编译失败或性能下降，通常建议在导出模型时尽量将控制流展开（Unroll）或转为静态图结构。
 3.  **数据类型限制**：虽然ONNX支持多种数据类型（如Double, Int64等），但昇腾AI处理器主要针对FP16和INT8进行了硬件加速优化。对于FP64（Double）类型，ATC通常不支持或需要强制转为FP32/FP16处理；对于Int64类型的索引或计数，部分算子可能要求转为Int32。
@@ -149,7 +132,7 @@ ONNX的核心价值在于解决了AI生态系统中“碎片化”的问题。�
 
 使用ATC工具进行模型转换的使用流程如下图所示：
 
-![ATC流程图](img2\atc_flow.png){#fig:atc_flow width=70%}
+![ATC流程图](img2\atc_flow.png){#fig:atc_flow width=40%}
 
 在开始模型转换之前，首先需要在开发环境中安装与 CANN 软件包版本相匹配的版本，并确保 ATC 可执行文件的路径可用。接下来，准备待转换的模型文件或基于 Ascend IR 的单算子 JSON，并将其上传到开发环境中可访问的目录。最后，使用 ATC 执行转换，并根据实际业务需求和输入规范配置相关参数。如果需要将预处理步骤（如色彩空间转换、归一化和尺度调整）下沉到设备侧，可以同时提供并启用 AIPP（Artificial Intelligence Pre-Processing）配置。AIPP是昇腾处理器内置的硬件级图像预处理模块，负责将上游（如 DVPP）输出的对齐后YUV420SP图像在设备侧完成色域转换（如YUV图像格式转换为RGB或者BGR图像格式）、归一化（减均值/乘系数/尺度放大）与抠图（在指定起始点裁剪到模型输入尺寸），从而把原始图像规范化为模型所需的输入格式与数值范围。由于昇腾310B在推理及训练中常以DVPP输出YUV420SP图片格式，这种图像格式是有损图像颜色编码格式，常用为YUV420SP_UV、YUV420SP_VU两种格式，不直接提供RGB图片。AIPP能将YUV420SP类型图像无缝转化为模型期望的RGB/BGR图像格式，并在同一数据流中完成裁剪与数值处理，避免将预处理放在CPU侧导致的多次拷贝与额外时延，提升端到端吞吐与能效。
 
@@ -184,6 +167,7 @@ ResNet-50 由多级残差单元堆叠形成 50 层卷积网络，通过跨层跳
     --soc_version=Ascend310B4
   ```
 **关键参数说明**
+
 | 参数 | 作用 | 注意事项 |
 | ---- | ---- | -------- |
 | `--framework` | 指定原始模型框架 | 0=Caffe，1=MindSpore，3=TensorFlow，5=ONNX，需与导出框架一致 |
@@ -241,15 +225,14 @@ ATC run success, welcome to the next use.
 2. 若无法确认当前设备的 `soc_version`，可在安装驱动的昇腾310B上执行 `npu-smi info` 查询，示例如下： 
 
 ```bash
-+--------------------------------------------------------------------------------------------------------+
-| npu-smi 23.0.0                                   Version: 23.0.0                                       |
-+-------------------------------+-----------------+------------------------------------------------------+
-| NPU     Name                  | Health          | Power(W)     Temp(C)           Hugepages-Usage(page) |
-| Chip    Device                | Bus-Id          | AICore(%)    Memory-Usage(MB)                        |
-+===============================+=================+======================================================+
-| 0       310B4                 | Alarm           | 0.0          58                15    / 15            |
-| 0       0                     | NA              | 0            2500 / 7545                             |
-+===============================+=================+======================================================+
+npu-smi 23.0.0  Version: 23.0.0
++-----------+--------+--------+-------+-------------------+
+| NPU Name  | Health | Power  | Temp  | Hugepages-Usage   |
+| Chip      | Bus-Id | AICore | Mem   |                   |
++===========+========+========+=======+===================+
+| 0 310B4   | Alarm  | 0.0W   | 58C   | 15 / 15           |
+| 0 0       | NA     | 0%     | 2500/7545MB             |
++-----------+--------+--------+-------+-------------------+
 ```
 
 请在查询结果的 `Name` 值前追加 `Ascend` 前缀：若 `Name` 为 `310B4`，则需配置 `soc_version=Ascend310B4`。
@@ -279,6 +262,7 @@ msame 的设计目标是将 OM 模型的快速验证能力标准化，覆蓋单�
 5. 构建成功后会在 `out` 目录生成二进制文件 `msame`，将其复制到工程目录 `sample_resnet_quick_start` 中备用。
 
   + 常用参数速览
+
     | 参数 | 说明 |
     | --- | --- |
     | `--model` | OM 文件路径 |
@@ -294,10 +278,7 @@ msame 的设计目标是将 OM 模型的快速验证能力标准化，覆蓋单�
     | `--help` | 查看全部参数 |
 
   + 使用注意
-    - 运行账号需具备当前目录的执行与写入权限。
-    - `TXT` 输出不适用于部分动态 Shape，可改用 `BIN`。
-    - 配置 `NPU_HOST_LIB` 时应指向 `runtime/lib64/stub` 目录，运行阶段通过 `LD_LIBRARY_PATH` 链接实际依赖。
-    - profiler 与 dump 不可同时开启；动态 shape 时需同步设置合适的输出内存大小。
+    运行 msame 工具时，需确保当前账号拥有目录的执行和写入权限。对于部分动态 Shape 场景，建议选择 BIN 格式输出而非 TXT，以保证兼容性。配置 NPU_HOST_LIB 时应指向 runtime/lib64/stub 目录，并在运行阶段通过 LD_LIBRARY_PATH 正确链接所需依赖库。此外，profiler 和 dump 功能不可同时启用；如涉及动态 Shape，需同步设置合适的输出内存大小以确保推理顺利进行。
 
 #### 图片预处理
 由于 msame 工具不具备图像预处理能力，输入必须是已转换好的 `.bin` 文件。因为之前在模型转换时未显式指定精度，ResNet50 默认接受 FP32 格式的输入；同样地，未设置输入内存布局时 ATC 会采用默认的 NCHW。NCHW 表示批次 N、通道 C、空间高度 H 与宽度 W，意味着同一张图片的三个颜色通道会按通道优先的顺序依次排布，再展开到空间维度。这与 TensorFlow 常见的 NHWC（通道在最后）相对。`sampleResnetQuickStart.py` 中的 `image_rgb.transpose([2, 0, 1])` 正是将 OpenCV 读取的 HWC 布局转换为 CHW，并配合外层批次维得到符合要求的 NCHW。是否必须使用 NCHW 取决于模型导出时的约定。PyTorch 与 CANN 默认使用 NCHW，因此常见的 `resnet50.onnx`/`resnet50.om` 都在此布局下训练与推理。只要导出模型为 NCHW，推理阶段同样必须以 NCHW 喂入数据，否则通道错位会导致结果异常。当然，也可以导出为 NHWC，只需在模型与预处理两端同时调整即可。
@@ -308,7 +289,7 @@ msame 的设计目标是将 OM 模型的快速验证能力标准化，覆蓋单�
 由于这个图片是jpg格式的，因此为了可以利用这个图片推理，我们第一步需要对图片进行预处理，具体过程如何：
 1. 在src文件目录创建一个预处理的python文件“make_bin_resnet224_float32.py”如下：
 
-  ```python make_bin_resnet224_float32.py
+  ```python
   from PIL import Image
   import numpy as np
 

@@ -7,8 +7,8 @@ export default hopeTheme({
   hostname: "https://vuepress-theme-hope-docs-demo.netlify.app",
 
   author: {
-    name: "Mr.Hope",
-    url: "https://mister-hope.com",
+    name: "Xianzhong Zhou",
+    url: "https://zhouxzh.github.io/Ascend310/book/",
   },
 
   logo: "logo.png",
@@ -53,7 +53,7 @@ export default hopeTheme({
     component: true,
     demo: true,
     figure: true,
-    gfm: true,
+    // gfm: true,
     imgLazyload: true,
     obsidianImgSize: true,
     imgSize: true,
@@ -87,6 +87,8 @@ export default hopeTheme({
       // 或者安装 mathjax-full
       // type: "mathjax",
     },
+
+    // math: true,
 
     // 如果你需要幻灯片，安装 @vuepress/plugin-revealjs 并取消下方注释
     // revealjs: {

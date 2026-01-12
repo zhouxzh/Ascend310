@@ -1,14 +1,14 @@
 \chapter{案例6：智能小车}\label{ux6848ux4f8b6ux667aux80fdux5c0fux8f66}
 
-\section{1. 项目简介}\label{1-ux9879ux76eeux7b80ux4ecb}
+\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
 
 本项目基于昇腾310B平台，构建一个具备自主导航、障碍物避让、自动循迹等功能的智能小车。该小车集成了计算机视觉、路径规划、运动控制等多项AI技术，能够在复杂环境中自主行驶，为无人驾驶、服务机器人、智能巡检等应用领域提供技术验证平台。
 
 相比传统的遥控小车，智能小车具备环境感知、决策规划和自主执行的能力，代表了移动机器人技术的发展方向。本项目将详细介绍从硬件搭建、软件开发到AI算法部署的完整实现过程。
 
-\section{2. 内容大纲}\label{2-ux5185ux5bb9ux5927ux7eb2}
+\section{2. 内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
 
-\subsection{2.1. 硬件准备}\label{21-ux786cux4ef6ux51c6ux5907}
+\subsection{2.1. 硬件准备}\label{ux786cux4ef6ux51c6ux5907}
 
 \begin{itemize}
 \tightlist
@@ -89,7 +89,7 @@
  阵列    驱动
 \end{lstlisting}
 
-\subsection{2.2. 软件环境}\label{22-ux8f6fux4ef6ux73afux5883}
+\subsection{2.2. 软件环境}\label{ux8f6fux4ef6ux73afux5883}
 
 \begin{itemize}
 \tightlist
@@ -169,35 +169,34 @@ echo "智能小车环境配置完成!"
 \end{lstlisting}
 
 \subsection{2.3.
-计算机视觉系统}\label{23-ux8ba1ux7b97ux673aux89c6ux89c9ux7cfbux7edf}
+计算机视觉系统}\label{ux8ba1ux7b97ux673aux89c6ux89c9ux7cfbux7edf}
 
 \begin{itemize}
 \item
-  \textbf{目标检测与识别}:
+  \textbf{目标检测与识别}: ```python \# YOLO目标检测类 class
+  ObjectDetector: def \textbf{init}(self, model\_path): self.model =
+  YOLO(model\_path) self.target\_classes = {[}`person', `car',
+  `traffic\_light', `stop\_sign'{]}
 
-\begin{lstlisting}[language=Python]
-# YOLO目标检测类
-class ObjectDetector:
-    def __init__(self, model_path):
-        self.model = YOLO(model_path)
-        self.target_classes = ['person', 'car', 'traffic_light', 'stop_sign']
-    
-    def detect_objects(self, image):
-        results = self.model(image)
-        detections = []
-        
-        for result in results:
-            for box in result.boxes:
-                if box.cls in self.target_classes:
-                    detections.append({
-                        'class': self.target_classes[box.cls],
-                        'confidence': box.conf,
-                        'bbox': box.xyxy,
-                        'distance': self.estimate_distance(box)
-                    })
-        
-        return detections
+\begin{lstlisting}
+  def detect_objects(self, image):
+      results = self.model(image)
+      detections = []
+
+      for result in results:
+          for box in result.boxes:
+              if box.cls in self.target_classes:
+                  detections.append({
+                      'class': self.target_classes[box.cls],
+                      'confidence': box.conf,
+                      'bbox': box.xyxy,
+                      'distance': self.estimate_distance(box)
+                  })
+
+      return detections
 \end{lstlisting}
+
+  ```
 \item
   \textbf{车道线检测}:
 
@@ -227,39 +226,36 @@ class ObjectDetector:
 \end{itemize}
 
 \subsection{2.4.
-路径规划与导航}\label{24-ux8defux5f84ux89c4ux5212ux4e0eux5bfcux822a}
+路径规划与导航}\label{ux8defux5f84ux89c4ux5212ux4e0eux5bfcux822a}
 
 \begin{itemize}
 \item
-  \textbf{全局路径规划}:
+  \textbf{全局路径规划}: ```python \# A*路径规划算法 class AStarPlanner:
+  def \textbf{init}(self, grid\_map): self.grid\_map = grid\_map
+  self.open\_set = {[}{]} self.closed\_set = set()
 
-\begin{lstlisting}[language=Python]
-# A*路径规划算法
-class AStarPlanner:
-    def __init__(self, grid_map):
-        self.grid_map = grid_map
-        self.open_set = []
-        self.closed_set = set()
-    
-    def plan_path(self, start, goal):
-        # A*算法实现
-        current = start
-        path = []
-        
-        while current != goal:
-            # 搜索最优路径
-            current = self.find_best_node()
-            path.append(current)
-            
-            if self.is_goal_reached(current, goal):
-                break
-        
-        return self.smooth_path(path)
-    
-    def smooth_path(self, path):
-        # 路径平滑处理
-        return smoothed_path
+\begin{lstlisting}
+  def plan_path(self, start, goal):
+      # A*算法实现
+      current = start
+      path = []
+
+      while current != goal:
+          # 搜索最优路径
+          current = self.find_best_node()
+          path.append(current)
+
+          if self.is_goal_reached(current, goal):
+              break
+
+      return self.smooth_path(path)
+
+  def smooth_path(self, path):
+      # 路径平滑处理
+      return smoothed_path
 \end{lstlisting}
+
+  ```
 \item
   \textbf{局部路径规划}:
 
@@ -287,35 +283,33 @@ class AStarPlanner:
 \end{itemize}
 
 \subsection{2.5.
-运动控制系统}\label{25-ux8fd0ux52a8ux63a7ux5236ux7cfbux7edf}
+运动控制系统}\label{ux8fd0ux52a8ux63a7ux5236ux7cfbux7edf}
 
 \begin{itemize}
 \item
-  \textbf{底层运动控制}:
+  \textbf{底层运动控制}: ```python \# 差速驱动控制器 class
+  DifferentialDriveController: def \textbf{init}(self, wheel\_base,
+  wheel\_radius): self.wheel\_base = wheel\_base self.wheel\_radius =
+  wheel\_radius self.max\_speed = 1.0 \# m/s
 
-\begin{lstlisting}[language=Python]
-# 差速驱动控制器
-class DifferentialDriveController:
-    def __init__(self, wheel_base, wheel_radius):
-        self.wheel_base = wheel_base
-        self.wheel_radius = wheel_radius
-        self.max_speed = 1.0  # m/s
-    
-    def velocity_to_wheel_speeds(self, linear_vel, angular_vel):
-        # 将线速度和角速度转换为左右轮速度
-        left_speed = linear_vel - angular_vel * self.wheel_base / 2
-        right_speed = linear_vel + angular_vel * self.wheel_base / 2
-        
-        # 速度限制
-        left_speed = self.limit_speed(left_speed)
-        right_speed = self.limit_speed(right_speed)
-        
-        return left_speed, right_speed
-    
-    def execute_motion(self, left_speed, right_speed):
-        # 发送速度指令到电机驱动器
-        self.set_motor_speeds(left_speed, right_speed)
+\begin{lstlisting}
+  def velocity_to_wheel_speeds(self, linear_vel, angular_vel):
+      # 将线速度和角速度转换为左右轮速度
+      left_speed = linear_vel - angular_vel * self.wheel_base / 2
+      right_speed = linear_vel + angular_vel * self.wheel_base / 2
+
+      # 速度限制
+      left_speed = self.limit_speed(left_speed)
+      right_speed = self.limit_speed(right_speed)
+
+      return left_speed, right_speed
+
+  def execute_motion(self, left_speed, right_speed):
+      # 发送速度指令到电机驱动器
+      self.set_motor_speeds(left_speed, right_speed)
 \end{lstlisting}
+
+  ```
 \item
   \textbf{PID控制器}:
 
@@ -342,34 +336,31 @@ class DifferentialDriveController:
   \end{itemize}
 \end{itemize}
 
-\subsection{2.6. AI决策系统}\label{26-aiux51b3ux7b56ux7cfbux7edf}
+\subsection{2.6. AI决策系统}\label{aiux51b3ux7b56ux7cfbux7edf}
 
 \begin{itemize}
 \item
-  \textbf{行为决策树}:
+  \textbf{行为决策树}: ```python \# 智能行为决策系统 class
+  BehaviorPlanner: def \textbf{init}(self): self.behaviors = \{
+  `follow\_lane': self.follow\_lane\_behavior, `avoid\_obstacle':
+  self.avoid\_obstacle\_behavior, `stop\_for\_traffic':
+  self.stop\_for\_traffic\_behavior, `explore':
+  self.exploration\_behavior \}
 
-\begin{lstlisting}[language=Python]
-# 智能行为决策系统
-class BehaviorPlanner:
-    def __init__(self):
-        self.behaviors = {
-            'follow_lane': self.follow_lane_behavior,
-            'avoid_obstacle': self.avoid_obstacle_behavior,
-            'stop_for_traffic': self.stop_for_traffic_behavior,
-            'explore': self.exploration_behavior
-        }
-    
-    def make_decision(self, sensor_data, current_state):
-        # 根据传感器数据和当前状态做出决策
-        if self.detect_obstacle(sensor_data):
-            return 'avoid_obstacle'
-        elif self.detect_traffic_sign(sensor_data):
-            return 'stop_for_traffic'
-        elif self.lane_detected(sensor_data):
-            return 'follow_lane'
-        else:
-            return 'explore'
+\begin{lstlisting}
+  def make_decision(self, sensor_data, current_state):
+      # 根据传感器数据和当前状态做出决策
+      if self.detect_obstacle(sensor_data):
+          return 'avoid_obstacle'
+      elif self.detect_traffic_sign(sensor_data):
+          return 'stop_for_traffic'
+      elif self.lane_detected(sensor_data):
+          return 'follow_lane'
+      else:
+          return 'explore'
 \end{lstlisting}
+
+  ```
 \item
   \textbf{强化学习} (高级功能):
 
@@ -385,22 +376,17 @@ class BehaviorPlanner:
 \end{itemize}
 
 \subsection{2.7.
-模型部署与优化}\label{27-ux6a21ux578bux90e8ux7f72ux4e0eux4f18ux5316}
+模型部署与优化}\label{ux6a21ux578bux90e8ux7f72ux4e0eux4f18ux5316}
 
 \begin{itemize}
 \item
-  \textbf{模型转换流程}:
+  \textbf{模型转换流程}: ```bash \# YOLOv8模型转换 \# 1. PyTorch转ONNX
+  yolo export model=yolov8n.pt format=onnx
 
-\begin{lstlisting}[language=bash]
-# YOLOv8模型转换
-# 1. PyTorch转ONNX
-yolo export model=yolov8n.pt format=onnx
-
-# 2. ONNX转昇腾模型
-atc --model=yolov8n.onnx --framework=5 --output=yolov8n_car \
-    --input_format=NCHW --input_shape="images:1,3,640,640" \
-    --soc_version=Ascend310B1 --out_nodes="output0:0"
-\end{lstlisting}
+  \# 2. ONNX转昇腾模型 atc --model=yolov8n.onnx --framework=5
+  --output=yolov8n\_car\\
+  --input\_format=NCHW --input\_shape=``images:1,3,640,640''\\
+  --soc\_version=Ascend310B1 --out\_nodes=``output0:0'' ```
 \item
   \textbf{实时推理优化}:
 
@@ -415,9 +401,10 @@ atc --model=yolov8n.onnx --framework=5 --output=yolov8n_car \
   \end{itemize}
 \end{itemize}
 
-\subsection{2.8. 安全系统}\label{28-ux5b89ux5168ux7cfbux7edf}
+\subsection{2.8. 安全系统}\label{ux5b89ux5168ux7cfbux7edf}
 
 \begin{itemize}
+\tightlist
 \item
   \textbf{紧急制动系统}:
 
@@ -444,10 +431,10 @@ atc --model=yolov8n.onnx --framework=5 --output=yolov8n_car \
   \end{itemize}
 \end{itemize}
 
-\subsection{2.9.
-3D打印结构件}\label{29-3dux6253ux5370ux7ed3ux6784ux4ef6}
+\subsection{2.9. 3D打印结构件}\label{dux6253ux5370ux7ed3ux6784ux4ef6}
 
 \begin{itemize}
+\tightlist
 \item
   \textbf{底盘框架 (\passthrough{\lstinline!chassis\_frame.stl!})}:
 
@@ -486,21 +473,12 @@ atc --model=yolov8n.onnx --framework=5 --output=yolov8n_car \
   \end{itemize}
 \end{itemize}
 
-\emph{3D打印规格}:
+\emph{3D打印规格}: - \textbf{材料}: PLA (原型) 或 ABS (实用) -
+\textbf{层高}: 0.2mm - \textbf{填充率}: 25\% (结构件) / 15\% (外壳)
 
-\begin{itemize}
-\tightlist
-\item
-  \textbf{材料}: PLA (原型) 或 ABS (实用)
-\item
-  \textbf{层高}: 0.2mm
-\item
-  \textbf{填充率}: 25\% (结构件) / 15\% (外壳)
-\end{itemize}
+\subsection{2.10. 用户手册}\label{ux7528ux6237ux624bux518c}
 
-\subsection{2.10. 用户手册}\label{210-ux7528ux6237ux624bux518c}
-
-\subsubsection{2.10.1 硬件组装}\label{2101-ux786cux4ef6ux7ec4ux88c5}
+\subsubsection{2.10.1 硬件组装}\label{ux786cux4ef6ux7ec4ux88c5}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -515,7 +493,7 @@ atc --model=yolov8n.onnx --framework=5 --output=yolov8n_car \
   \textbf{系统测试}: 验证各个子系统功能
 \end{enumerate}
 
-\subsubsection{2.10.2 软件配置}\label{2102-ux8f6fux4ef6ux914dux7f6e}
+\subsubsection{2.10.2 软件配置}\label{ux8f6fux4ef6ux914dux7f6e}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -530,7 +508,7 @@ atc --model=yolov8n.onnx --framework=5 --output=yolov8n_car \
   \textbf{地图构建}: 构建环境地图 (如需要)
 \end{enumerate}
 
-\subsubsection{2.10.3 操作指南}\label{2103-ux64cdux4f5cux6307ux5357}
+\subsubsection{2.10.3 操作指南}\label{ux64cdux4f5cux6307ux5357}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -545,7 +523,7 @@ atc --model=yolov8n.onnx --framework=5 --output=yolov8n_car \
   \textbf{调试模式}: 实时查看传感器数据和算法状态
 \end{enumerate}
 
-\subsubsection{2.10.4 维护保养}\label{2104-ux7ef4ux62a4ux4fddux517b}
+\subsubsection{2.10.4 维护保养}\label{ux7ef4ux62a4ux4fddux517b}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -560,7 +538,7 @@ atc --model=yolov8n.onnx --framework=5 --output=yolov8n_car \
   \textbf{故障排除}: 常见问题解决方案
 \end{enumerate}
 
-\section{3. 源代码结构}\label{3-ux6e90ux4ee3ux7801ux7ed3ux6784}
+\section{3. 源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
 
 \begin{lstlisting}
 smart_car/
@@ -593,7 +571,7 @@ smart_car/
     └── assembly/           # 组装指南
 \end{lstlisting}
 
-\section{4. 效果演示}\label{4-ux6548ux679cux6f14ux793a}
+\section{4. 效果演示}\label{ux6548ux679cux6f14ux793a}
 
 \begin{itemize}
 \tightlist

@@ -1,7 +1,7 @@
 import { viteBundler } from '@vuepress/bundler-vite'
 import { defineUserConfig } from "vuepress";
-import { hopeTheme } from "vuepress-theme-hope";
-import { markdownImagePlugin } from '@vuepress/plugin-markdown-image'
+// import { hopeTheme } from "vuepress-theme-hope";
+import markdownItAttrs from 'markdown-it-attrs';
 
 import theme from "./theme.js";
 
@@ -17,18 +17,8 @@ export default defineUserConfig({
     vuePluginOptions: {},
   }),
 
-  theme: hopeTheme({
-    // 添加这行即可启用数学公式（默认使用 MathJax）
-    plugins: {
-      mdEnhance: {
-        mathjax: true,
-      },
-    },
-    
-    markdown: {
-      mermaid: true,
-    },
-  }),
+  theme,
+
   // 和 PWA 一起启用
   // shouldPrefetch: false,
   plugins: [
@@ -37,5 +27,8 @@ export default defineUserConfig({
       // obsidianSize: true,
     // }),
   ],
+  extendsMarkdown: (md) => {
+    md.use(markdownItAttrs)
+  },
 });
 

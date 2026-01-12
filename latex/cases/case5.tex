@@ -1,14 +1,14 @@
 \chapter{案例5：智能数据采集仪}\label{ux6848ux4f8b5ux667aux80fdux6570ux636eux91c7ux96c6ux4eea}
 
-\section{1. 项目简介}\label{1-ux9879ux76eeux7b80ux4ecb}
+\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
 
 本项目基于昇腾310B平台，构建一个多功能的智能数据采集与分析系统。该系统能够同时连接多种传感器，实时采集环境数据，并利用AI算法进行智能分析、异常检测和趋势预测，为环境监测、智慧农业、工业4.0等应用场景提供强有力的数据支撑。
 
 与传统数据采集设备相比，本系统具备边缘AI处理能力，能够在本地进行数据预处理、特征提取和初步分析，大大减少了数据传输量和云端处理负担，实现了真正的边缘智能化数据采集。
 
-\section{2. 内容大纲}\label{2-ux5185ux5bb9ux5927ux7eb2}
+\section{2. 内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
 
-\subsection{2.1. 硬件准备}\label{21-ux786cux4ef6ux51c6ux5907}
+\subsection{2.1. 硬件准备}\label{ux786cux4ef6ux51c6ux5907}
 
 \begin{itemize}
 \tightlist
@@ -113,7 +113,7 @@
   显示屏  存储卡  LoRa模块
 \end{lstlisting}
 
-\subsection{2.2. 软件环境}\label{22-ux8f6fux4ef6ux73afux5883}
+\subsection{2.2. 软件环境}\label{ux8f6fux4ef6ux73afux5883}
 
 \begin{itemize}
 \tightlist
@@ -206,41 +206,31 @@ echo "数据采集系统环境配置完成!"
 \end{lstlisting}
 
 \subsection{2.3.
-传感器集成与数据采集}\label{23-ux4f20ux611fux5668ux96c6ux6210ux4e0eux6570ux636eux91c7ux96c6}
+传感器集成与数据采集}\label{ux4f20ux611fux5668ux96c6ux6210ux4e0eux6570ux636eux91c7ux96c6}
 
 \begin{itemize}
 \item
-  \textbf{传感器驱动开发}:
+  \textbf{传感器驱动开发}: ```python \# 传感器基类设计 class SensorBase:
+  def \textbf{init}(self, address, bus\_type=`i2c'): self.address =
+  address self.bus\_type = bus\_type self.init\_sensor()
 
-\begin{lstlisting}[language=Python]
-# 传感器基类设计
-class SensorBase:
-    def __init__(self, address, bus_type='i2c'):
-        self.address = address
-        self.bus_type = bus_type
-        self.init_sensor()
-    
-    def init_sensor(self):
-        """传感器初始化"""
-        pass
-    
-    def read_data(self):
-        """读取传感器数据"""
-        pass
-    
-    def calibrate(self):
-        """传感器校准"""
-        pass
+\begin{lstlisting}
+  def init_sensor(self):
+      """传感器初始化"""
+      pass
 
-# 具体传感器实现
-class DHT22Sensor(SensorBase):
-    def read_data(self):
-        return {
-            'temperature': self.read_temperature(),
-            'humidity': self.read_humidity(),
-            'timestamp': time.time()
-        }
+  def read_data(self):
+      """读取传感器数据"""
+      pass
+
+  def calibrate(self):
+      """传感器校准"""
+      pass
 \end{lstlisting}
+
+  \# 具体传感器实现 class DHT22Sensor(SensorBase): def read\_data(self):
+  return \{ `temperature': self.read\_temperature(), `humidity':
+  self.read\_humidity(), `timestamp': time.time() \} ```
 \item
   \textbf{数据采集调度}:
 
@@ -272,41 +262,38 @@ class DHT22Sensor(SensorBase):
 \end{itemize}
 
 \subsection{2.4.
-智能数据分析}\label{24-ux667aux80fdux6570ux636eux5206ux6790}
+智能数据分析}\label{ux667aux80fdux6570ux636eux5206ux6790}
 
 \begin{itemize}
 \item
-  \textbf{实时数据处理}:
+  \textbf{实时数据处理}: ```python \# 数据处理管道 class DataProcessor:
+  def \textbf{init}(self): self.filters = {[}{]} self.analyzers = {[}{]}
 
-\begin{lstlisting}[language=Python]
-# 数据处理管道
-class DataProcessor:
-    def __init__(self):
-        self.filters = []
-        self.analyzers = []
-    
-    def add_filter(self, filter_func):
-        self.filters.append(filter_func)
-    
-    def add_analyzer(self, analyzer):
-        self.analyzers.append(analyzer)
-    
-    def process(self, raw_data):
-        # 1. 数据过滤
-        filtered_data = raw_data
-        for filter_func in self.filters:
-            filtered_data = filter_func(filtered_data)
-        
-        # 2. 特征提取
-        features = self.extract_features(filtered_data)
-        
-        # 3. 智能分析
-        results = {}
-        for analyzer in self.analyzers:
-            results.update(analyzer.analyze(features))
-        
-        return results
+\begin{lstlisting}
+  def add_filter(self, filter_func):
+      self.filters.append(filter_func)
+
+  def add_analyzer(self, analyzer):
+      self.analyzers.append(analyzer)
+
+  def process(self, raw_data):
+      # 1. 数据过滤
+      filtered_data = raw_data
+      for filter_func in self.filters:
+          filtered_data = filter_func(filtered_data)
+
+      # 2. 特征提取
+      features = self.extract_features(filtered_data)
+
+      # 3. 智能分析
+      results = {}
+      for analyzer in self.analyzers:
+          results.update(analyzer.analyze(features))
+
+      return results
 \end{lstlisting}
+
+  ```
 \item
   \textbf{异常检测算法}:
 
@@ -338,7 +325,7 @@ class DataProcessor:
 \end{itemize}
 
 \subsection{2.5.
-边缘AI模型部署}\label{25-ux8fb9ux7f18aiux6a21ux578bux90e8ux7f72}
+边缘AI模型部署}\label{ux8fb9ux7f18aiux6a21ux578bux90e8ux7f72}
 
 \begin{itemize}
 \item
@@ -356,21 +343,17 @@ class DataProcessor:
     \textbf{回归模型}: 传感器数值预测
   \end{itemize}
 \item
-  \textbf{模型优化}:
+  \textbf{模型优化}: ```bash \# 模型转换和优化 \# 1. TensorFlow模型转换
+  python3 convert\_tf\_to\_tflite.py --input model.pb --output
+  model.tflite
 
-\begin{lstlisting}[language=bash]
-# 模型转换和优化
-# 1. TensorFlow模型转换
-python3 convert_tf_to_tflite.py --input model.pb --output model.tflite
+  \# 2. 模型量化 python3 quantize\_model.py --input model.tflite
+  --output model\_quantized.tflite
 
-# 2. 模型量化
-python3 quantize_model.py --input model.tflite --output model_quantized.tflite
-
-# 3. 昇腾模型转换
-atc --model=model.onnx --framework=5 --output=daq_model \
-    --input_format=NCHW --input_shape="input:1,10,1" \
-    --soc_version=Ascend310B1
-\end{lstlisting}
+  \# 3. 昇腾模型转换 atc --model=model.onnx --framework=5
+  --output=daq\_model\\
+  --input\_format=NCHW --input\_shape=``input:1,10,1''\\
+  --soc\_version=Ascend310B1 ```
 \item
   \textbf{实时推理}:
 
@@ -386,33 +369,31 @@ atc --model=model.onnx --framework=5 --output=daq_model \
 \end{itemize}
 
 \subsection{2.6.
-数据存储与管理}\label{26-ux6570ux636eux5b58ux50a8ux4e0eux7ba1ux7406}
+数据存储与管理}\label{ux6570ux636eux5b58ux50a8ux4e0eux7ba1ux7406}
 
 \begin{itemize}
 \item
-  \textbf{本地存储策略}:
+  \textbf{本地存储策略}: ```python \# 数据存储管理 class DataStorage:
+  def \textbf{init}(self, db\_path): self.db\_path = db\_path
+  self.init\_database()
 
-\begin{lstlisting}[language=Python]
-# 数据存储管理
-class DataStorage:
-    def __init__(self, db_path):
-        self.db_path = db_path
-        self.init_database()
-    
-    def init_database(self):
-        # 创建数据表
-        self.create_sensor_data_table()
-        self.create_analysis_results_table()
-        self.create_system_logs_table()
-    
-    def store_sensor_data(self, sensor_id, data, timestamp):
-        # 存储传感器原始数据
-        pass
-    
-    def store_analysis_result(self, analysis_type, result, timestamp):
-        # 存储分析结果
-        pass
+\begin{lstlisting}
+  def init_database(self):
+      # 创建数据表
+      self.create_sensor_data_table()
+      self.create_analysis_results_table()
+      self.create_system_logs_table()
+
+  def store_sensor_data(self, sensor_id, data, timestamp):
+      # 存储传感器原始数据
+      pass
+
+  def store_analysis_result(self, analysis_type, result, timestamp):
+      # 存储分析结果
+      pass
 \end{lstlisting}
+
+  ```
 \item
   \textbf{数据压缩与归档}:
 
@@ -430,7 +411,7 @@ class DataStorage:
 \end{itemize}
 
 \subsection{2.7.
-用户界面与可视化}\label{27-ux7528ux6237ux754cux9762ux4e0eux53efux89c6ux5316}
+用户界面与可视化}\label{ux7528ux6237ux754cux9762ux4e0eux53efux89c6ux5316}
 
 \begin{itemize}
 \item
@@ -448,32 +429,31 @@ class DataStorage:
     \textbf{系统状态}: 设备运行状态监控
   \end{itemize}
 \item
-  \textbf{数据可视化}:
+  \textbf{数据可视化}: ```python \# 数据可视化模块 class DataVisualizer:
+  def \textbf{init}(self): self.fig, self.axes = plt.subplots(2, 2,
+  figsize=(12, 8))
 
-\begin{lstlisting}[language=Python]
-# 数据可视化模块
-class DataVisualizer:
-    def __init__(self):
-        self.fig, self.axes = plt.subplots(2, 2, figsize=(12, 8))
-    
-    def update_real_time_plot(self, data):
-        # 更新实时数据图表
-        pass
-    
-    def generate_daily_report(self, date):
-        # 生成日报图表
-        pass
-    
-    def create_trend_analysis(self, sensor_type, time_range):
-        # 创建趋势分析图
-        pass
+\begin{lstlisting}
+  def update_real_time_plot(self, data):
+      # 更新实时数据图表
+      pass
+
+  def generate_daily_report(self, date):
+      # 生成日报图表
+      pass
+
+  def create_trend_analysis(self, sensor_type, time_range):
+      # 创建趋势分析图
+      pass
 \end{lstlisting}
+
+  ```
 \end{itemize}
 
-\subsection{2.8.
-3D打印结构件}\label{28-3dux6253ux5370ux7ed3ux6784ux4ef6}
+\subsection{2.8. 3D打印结构件}\label{dux6253ux5370ux7ed3ux6784ux4ef6}
 
 \begin{itemize}
+\tightlist
 \item
   \textbf{传感器安装支架 (\passthrough{\lstinline!sensor\_mount.stl!})}:
 
@@ -512,23 +492,13 @@ class DataVisualizer:
   \end{itemize}
 \end{itemize}
 
-\emph{3D打印建议}:
+\emph{3D打印建议}: - \textbf{材料}: ABS或PETG (耐候性好) -
+\textbf{层高}: 0.2mm - \textbf{填充率}: 30\% - \textbf{后处理}:
+打磨和喷涂保护层
 
-\begin{itemize}
-\tightlist
-\item
-  \textbf{材料}: ABS或PETG (耐候性好)
-\item
-  \textbf{层高}: 0.2mm
-\item
-  \textbf{填充率}: 30\%
-\item
-  \textbf{后处理}: 打磨和喷涂保护层
-\end{itemize}
+\subsection{2.9. 用户手册}\label{ux7528ux6237ux624bux518c}
 
-\subsection{2.9. 用户手册}\label{29-ux7528ux6237ux624bux518c}
-
-\subsubsection{2.9.1 系统部署}\label{291-ux7cfbux7edfux90e8ux7f72}
+\subsubsection{2.9.1 系统部署}\label{ux7cfbux7edfux90e8ux7f72}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -543,7 +513,7 @@ class DataVisualizer:
   \textbf{系统测试}: 验证数据采集和通信功能
 \end{enumerate}
 
-\subsubsection{2.9.2 日常操作}\label{292-ux65e5ux5e38ux64cdux4f5c}
+\subsubsection{2.9.2 日常操作}\label{ux65e5ux5e38ux64cdux4f5c}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -558,7 +528,7 @@ class DataVisualizer:
   \textbf{参数配置}: 调整采样频率和告警阈值
 \end{enumerate}
 
-\subsubsection{2.9.3 维护保养}\label{293-ux7ef4ux62a4ux4fddux517b}
+\subsubsection{2.9.3 维护保养}\label{ux7ef4ux62a4ux4fddux517b}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -573,7 +543,7 @@ class DataVisualizer:
   \textbf{软件更新}: 更新系统软件和AI模型
 \end{enumerate}
 
-\subsubsection{2.9.4 故障排除}\label{294-ux6545ux969cux6392ux9664}
+\subsubsection{2.9.4 故障排除}\label{ux6545ux969cux6392ux9664}
 
 \begin{itemize}
 \tightlist
@@ -585,7 +555,7 @@ class DataVisualizer:
   \textbf{数据异常}: 验证传感器校准和环境因素
 \end{itemize}
 
-\section{3. 源代码结构}\label{3-ux6e90ux4ee3ux7801ux7ed3ux6784}
+\section{3. 源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
 
 \begin{lstlisting}
 smart_daq/
@@ -614,7 +584,7 @@ smart_daq/
     └── assembly_guide/    # 组装指南
 \end{lstlisting}
 
-\section{4. 效果演示}\label{4-ux6548ux679cux6f14ux793a}
+\section{4. 效果演示}\label{ux6548ux679cux6f14ux793a}
 
 \begin{itemize}
 \tightlist

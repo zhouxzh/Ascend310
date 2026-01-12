@@ -51,17 +51,23 @@ CANN 则专注于模型图语义，突出图级算子融合、AIPP
 CANN
 通过提供分层清晰的编程与运行时结构，以覆盖训练与推理的``全场景''、贴近主流框架的``低门槛''以及面向昇腾硬件深度优化的``高性能''为核心特性，支撑用户在昇腾平台上快速构建与部署各类
 AI 应用与业务。从整体上看，CANN
-可以抽象为一个自上而下递进的五层架构（计算语言接口、计算服务层、计算编译引擎、计算执行引擎与计算基础层），如图\textbackslash ref\{fig:architecture\}所示。各层通过稳定的接口与数据流协议进行解耦协同，在保证语义一致性的前提下最大化发挥底层算力与能效潜力。
+可以抽象为一个自上而下递进的五层架构（计算语言接口、计算服务层、计算编译引擎、计算执行引擎与计算基础层），如图\ref{fig:architecture}所示。各层通过稳定的接口与数据流协议进行解耦协同，在保证语义一致性的前提下最大化发挥底层算力与能效潜力。
 
-\pandocbounded{\includegraphics[keepaspectratio,alt={CANN架构图}]{chapters/img2/CANN_Architecture.png}}\{\#fig:architecture
-width=90\%\}
+\begin{figure}
+\centering
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio,alt={CANN架构图}]{chapters/img2/CANN_Architecture.png}
+\caption{CANN架构图}\label{fig:architecture}
+\end{figure}
 
 在分层结构上，CANN可抽象为五个层次：上层的计算语言接口------AscendCL接口负责设备与上下文管理、流与内存控制、模型与算子的加载执行，以及媒体与图管理等通用API，为应用提供稳定的编程入口；其下的昇腾计算服务层汇聚神经网络与线性代数库，承载算子与子图的自动调优、梯度优化与模型压缩，并通过框架适配器降低迁移成本；昇腾计算编译层的编译引擎通过图编译器与TBE算子开发支持，把前端计算图转化为在NPU可执行的模型与内核，实现图级语义到后端实现的精准映射；下一层的昇腾执行引擎面向运行时，负责模型与算子的调度执行，并内置数字视觉与AI预处理、集合通信等能力以提升端到端效率；最下层的昇腾计算基础层提供共享虚拟内存、设备虚拟化与主机---设备通信等底座服务，保证跨设备数据流与资源管理的可靠性与可扩展性。
 
-与此相辅的是三层逻辑架构：应用层承载具体业务与开发者工具，芯片使能层开放解决方案能力并驱动基于计算图的业务流运行，计算资源层则聚焦数据处理与运算执行，形成从业务到硬件的清晰闭环。这个CANN的三层逻辑结构如下图\textbackslash ref\{fig:cann\_logic\}所示:
+与此相辅的是三层逻辑架构：应用层承载具体业务与开发者工具，芯片使能层开放解决方案能力并驱动基于计算图的业务流运行，计算资源层则聚焦数据处理与运算执行，形成从业务到硬件的清晰闭环。这个CANN的三层逻辑结构如下图\ref{fig:cann_logic}所示:
 
-\pandocbounded{\includegraphics[keepaspectratio,alt={CANN架构图}]{chapters/img2/CANN_logic.png}}\{\#fig:cann\_logic
-width=90\%\}
+\begin{figure}
+\centering
+\includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={CANN逻辑图}]{chapters/img2/CANN_logic.png}
+\caption{CANN逻辑图}\label{fig:cann_logic}
+\end{figure}
 
 在技术特性上，CANN通过对计算图的编译与优化，将密集算子与数据流合理分配到异构单元上执行，显著提升吞吐与时延表现，并在能效上取得可工程化的优势；同时提供贴近主流框架的易用接口与完善的工具链，降低入门与迁移门槛，使开发者能够快速完成部署与调优。生态方面，CANN构建了面向个人、高校、科研与企业的赋能体系，并与开源社区协同，支持多种框架与推理引擎在异构硬件上的高效运行。依托这些能力，开发者可以深入调用运行时与图编译能力，释放底层硬件潜力，在性能与成本维度形成差异化竞争力。
 
@@ -92,64 +98,32 @@ Ascend 310B
 
 \begin{itemize}
 \item
-  驱动与固件检查
-
-  \begin{itemize}
-  \tightlist
-  \item
-    在目标设备执行
-    \passthrough{\lstinline!npu-smi info!}；若能正常输出设备信息，说明
-    NPU 驱动与固件已安装。
-  \item
-    对于昇腾 310B 产品/开发板，系统通常预置相关驱动与固件。
-  \end{itemize}
+  驱动与固件检查：在目标设备上执行
+  \passthrough{\lstinline!npu-smi info!}，如果能够正常显示设备信息，则表明
+  NPU 驱动和固件已经正确安装。对于昇腾 310B
+  产品或开发板，系统一般会预装所需的驱动和固件，无需额外手动配置。
 \item
-  环境准备
-
-  \begin{itemize}
-  \tightlist
-  \item
-    推荐采用离线安装；需预先准备 Python 与
-    \passthrough{\lstinline!pip3!}。
-  \item
-    当前支持 Python 3.7.x--3.11.4。
-  \item
-    昇腾310B开发板一般已预装 Miniconda 与
-    \passthrough{\lstinline!pip3!}，可直接使用。
-  \end{itemize}
+  环境准备：推荐采用离线安装方式，安装前需确保系统已准备好 Python
+  环境并可使用 \passthrough{\lstinline!pip3!}，当前 CANN 支持 Python
+  3.7.x 至 3.11.4 版本。对于昇腾 310B 开发板，通常已预装 Miniconda 和
+  \passthrough{\lstinline!pip3!}，可直接满足依赖，无需额外配置。
 \item
-  安装介质获取
-
-  \begin{itemize}
-  \tightlist
-  \item
-    先下载所需 CANN 软件包并上传到可访问路径后再执行安装。
-  \item
-    例如 CANN 8.3.RC1
-    可从：\url{https://www.hiascend.com/developer/download/community/result?module=cann&cann=8.3.RC1}
-    获取；其他版本可在页面切换。
-  \item
-    确保 CANN Toolkit 与 CANN Kernels 版本严格匹配（同一发行号）。
-  \item
-    建议优先使用 .run 安装包；昇腾 310B 开发板为 AArch64 架构，请选择
-    aarch64 对应包。以 8.3.RC1 为例：
-
-    \begin{itemize}
-    \tightlist
-    \item
-      Ascend-cann-kernels-310b\_8.3.RC1\_linux-aarch64.run
-    \item
-      Ascend-cann-toolkit\_8.3.RC1\_linux-aarch64.run
-    \end{itemize}
-  \item
-    若版本不同，请将文件名中的版本号替换为实际下载的版本。
-  \end{itemize}
+  安装介质获取：在安装前，需先从华为昇腾官网下载所需的 CANN
+  软件包，并将其上传到目标设备的可访问路径。以 CANN 8.3.RC1
+  版本为例，可通过\href{https://www.hiascend.com/developer/download/community/result?module=cann&cann=8.3.RC1}{官网}
+  获取相应安装包，其他版本可在页面切换选择。请确保下载的 CANN Toolkit 和
+  CANN Kernels
+  版本号完全一致（即同一发行号），以避免兼容性问题。推荐优先选择 .run
+  格式的安装包，且昇腾 310B 开发板为 AArch64 架构，需下载 aarch64
+  对应的包。例如 8.3.RC1 版本包括
+  Ascend-cann-toolkit\_8.3.RC1\_linux-aarch64.run 和
+  Ascend-cann-kernels-310b\_8.3.RC1\_linux-aarch64.run。如果实际下载的版本号不同，请将文件名中的版本号替换为对应的实际版本。
 \end{itemize}
 
 \subsubsection{安装命令与依赖说明}\label{ux5b89ux88c5ux547dux4ee4ux4e0eux4f9dux8d56ux8bf4ux660e}
 
-安装 CANN 可使用 root 或默认账户 HwHiAiUser。推荐以 root 安装；若使用
-HwHiAiUser，需在所有安装与文件操作命令前加 sudo。 下面以 root
+安装 CANN 可使用 root 或默认账户 HwHiAiUser。推荐以 root
+安装，不推荐用其他用户进行安装，因为容易发生权限问题。 下面以 root
 用户为例，详细介绍 CANN 的安装过程：
 
 \begin{itemize}
@@ -161,25 +135,13 @@ su -
 # 输入 root 密码后继续执行安装
 \end{lstlisting}
 \item
-  命令示例
-
-  \begin{itemize}
-  \tightlist
-  \item
-    以 root 执行：
+  命令示例, 以 root 执行：
 
 \begin{lstlisting}[language=bash]
 ./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
 \end{lstlisting}
-  \item
-    以 HwHiAiUser 执行：
-
-\begin{lstlisting}[language=bash]
-sudo ./Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
-\end{lstlisting}
-  \end{itemize}
 \item
-  安装 Toolkit 开发套件
+  安装 Toolkit 开发套件:
 
 \begin{lstlisting}[language=bash]
 chmod +x Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run 
@@ -188,43 +150,33 @@ chmod +x Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run
 
   整个安装过程大概会持续十几分钟，甚至更长，请耐心等待。
 \item
-  配置环境变量
+  配置环境变量:
 
 \begin{lstlisting}[language=bash]
-source /usr/local/miniconda3/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
 \end{lstlisting}
 \item
-  安装 Kernels 算子包（310B 平台）
+  安装 Kernels 算子包（310B 平台）:
 
 \begin{lstlisting}[language=bash]
 chmod +x Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
 ./Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run --install
 \end{lstlisting}
 \item
-  安装业务运行时所需的 Python 第三方库（使用非 root 用户时保留 -\/-user
-  参数）
+  安装业务运行时所需的 Python 第三方库:
 
 \begin{lstlisting}[language=bash]
-pip3 install \
-  attrs cython 'numpy>=1.19.2,<=1.24.0' decorator sympy cffi pyyaml pathlib2 \
+pip3 install attrs cython 'numpy>=1.19.2,<=1.24.0' \
+  decorator sympy cffi pyyaml pathlib2 \
   psutil protobuf==3.20.0 scipy requests absl-py
 \end{lstlisting}
 \item
-  说明
-
-  \begin{itemize}
-  \tightlist
-  \item
-    若使用非 root 用户，请在上述命令末尾追加
-    \passthrough{\lstinline!--user!}。
-  \item
-    依赖版本范围已覆盖常见环境，若发生冲突，请按实际 Python/OS
-    版本调整。
-  \item
-    安装完成后，可将 CANN 环境变量追加到
-    \passthrough{\lstinline!\~/.bashrc!} 以便自动加载；昇腾 310B
-    开发板的系统镜像通常已预置该配置。
-  \end{itemize}
+  说明:
+  依赖的版本范围已经覆盖了大多数常见环境，如果遇到依赖冲突，请根据实际的
+  Python 或操作系统版本进行相应调整。安装完成后，建议将 CANN
+  的环境变量配置追加到 \passthrough{\lstinline!\~/.bashrc!}
+  文件中，以便每次登录时自动加载。需要注意的是，昇腾 310B
+  开发板的系统镜像通常已经预置了这些环境变量配置，无需手动设置。
 \end{itemize}
 
 \section{ATC模型转换详解}\label{atcux6a21ux578bux8f6cux6362ux8be6ux89e3}
@@ -237,8 +189,11 @@ Ascend IR 的单算子描述文件（JSON）编译为昇腾 AI
 处理器可执行的离线模型（.om）。如图下图所示，ATC
 在转换过程中会执行算子调度优化、权重重排与内存复用等关键步骤，对原始深度学习模型进行面向部署场景的系统化调优，从而在昇腾硬件上实现高吞吐、低时延的高效执行。
 
-\pandocbounded{\includegraphics[keepaspectratio,alt={ATC框架图}]{chapters/img2/atc.png}}\{\#fig:atc
-width=70\%\}
+\begin{figure}
+\centering
+\includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={ATC框架图}]{chapters/img2/atc.png}
+\caption{ATC框架图}\label{fig:atc}
+\end{figure}
 
 从上面的流程图我们可以看到，ATC
 工具聚焦模型到设备可执行体的``转换即优化''闭环：一方面，它能够将开源框架导出的网络模型解析为中间态
@@ -307,8 +262,11 @@ Version）是否在当前CANN版本的支持范围内。如果遇到不支持的
 
 使用ATC工具进行模型转换的使用流程如下图所示：
 
-\pandocbounded{\includegraphics[keepaspectratio,alt={ATC流程图}]{chapters/img2/atc_flow.png}}\{\#fig:atc\_flow
-width=70\%\}
+\begin{figure}
+\centering
+\includegraphics[width=0.4\linewidth,height=\textheight,keepaspectratio,alt={ATC流程图}]{chapters/img2/atc_flow.png}
+\caption{ATC流程图}\label{fig:atc_flow}
+\end{figure}
 
 在开始模型转换之前，首先需要在开发环境中安装与 CANN
 软件包版本相匹配的版本，并确保 ATC
@@ -325,7 +283,7 @@ ResNet-50 由多级残差单元堆叠形成 50
 层卷积网络，通过跨层跳连缓解深层退化与梯度消失，使其在 ImageNet
 等大规模数据集上具备稳定的特征表达与分类精度，因此常被选作各类视觉任务的通用骨干。要在昇腾
 310B 上部署该模型，需要借助 ATC 将 ONNX 版本转换为
-OM，可参考华为昇腾官方示例仓库（\href{https://github.com/Ascend/samples/tree/master/inference/modelInference/sampleResnetQuickStart）。为方便快速复现，可按以下步骤从零搭建工程：}{https://github.com/Ascend/samples/tree/master/inference/modelInference/sampleResnetQuickStart）。为方便快速复现，可按以下步骤从零搭建工程：}
+OM，可参考华为昇腾官方示例仓库（https://github.com/Ascend/samples/tree/master/inference/modelInference/sampleResnetQuickStart）。为方便快速复现，可按以下步骤从零搭建工程：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -388,61 +346,67 @@ atc \
   --soc_version=Ascend310B4
 \end{lstlisting}
 
-\textbf{关键参数说明} \textbar{} 参数 \textbar{} 作用 \textbar{}
-注意事项 \textbar{} \textbar{} -\/-\/-\/- \textbar{} -\/-\/-\/-
-\textbar{} -\/-\/-\/-\/-\/-\/-\/- \textbar{} \textbar{}
-\passthrough{\lstinline!--framework!} \textbar{} 指定原始模型框架
-\textbar{} 0=Caffe，1=MindSpore，3=TensorFlow，5=ONNX，需与导出框架一致
-\textbar{} \textbar{} \passthrough{\lstinline!--input\_shape!}
-\textbar{} 定义静态输入 Shape \textbar{} 按
+\textbf{关键参数说明}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+参数
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+作用
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+注意事项
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!--framework!} & 指定原始模型框架 &
+0=Caffe，1=MindSpore，3=TensorFlow，5=ONNX，需与导出框架一致 \\
+\passthrough{\lstinline!--input\_shape!} & 定义静态输入 Shape & 按
 \passthrough{\lstinline!"name:n,c,h,w"!}
-写法，字符串需加引号；动态改用区间或配合动态参数 \textbar{} \textbar{}
-\passthrough{\lstinline!--dynamic\_batch\_size!} \textbar{} 设置可选
-Batch 列表 \textbar{} 以 \passthrough{\lstinline!"1,4,8"!}
-形式填写；与同一输入的完全静态 shape 互斥 \textbar{} \textbar{}
-\passthrough{\lstinline!--dynamic\_image\_size!} \textbar{}
-配置多分辨率输入 \textbar{}
-\passthrough{\lstinline!"h1,w1;h2,w2"!}，常用于多尺度检测；需与模型实际支持一致
-\textbar{} \textbar{} \passthrough{\lstinline!--precision\_mode!}
-\textbar{} 控制混合精度策略 \textbar{}
-常用值：\passthrough{\lstinline!force\_fp16!}、\passthrough{\lstinline!allow\_mix\_precision!}、\passthrough{\lstinline!allow\_fp32\_to\_fp16!}，需兼顾精度
-\textbar{} \textbar{} \passthrough{\lstinline!--soc\_version!}
-\textbar{} 选择目标芯片 \textbar{}
+写法，字符串需加引号；动态改用区间或配合动态参数 \\
+\passthrough{\lstinline!--dynamic\_batch\_size!} & 设置可选 Batch 列表 &
+以 \passthrough{\lstinline!"1,4,8"!} 形式填写；与同一输入的完全静态
+shape 互斥 \\
+\passthrough{\lstinline!--dynamic\_image\_size!} & 配置多分辨率输入 &
+\passthrough{\lstinline!"h1,w1;h2,w2"!}，常用于多尺度检测；需与模型实际支持一致 \\
+\passthrough{\lstinline!--precision\_mode!} & 控制混合精度策略 &
+常用值：\passthrough{\lstinline!force\_fp16!}、\passthrough{\lstinline!allow\_mix\_precision!}、\passthrough{\lstinline!allow\_fp32\_to\_fp16!}，需兼顾精度 \\
+\passthrough{\lstinline!--soc\_version!} & 选择目标芯片 &
 例：\passthrough{\lstinline!Ascend310B4!}，可通过
-\passthrough{\lstinline!npu-smi info!} 查询；310B/P 区分清楚 \textbar{}
-\textbar{} \passthrough{\lstinline!--insert\_op\_conf!} \textbar{} 下沉
-AIPP/自定义算子 \textbar{} 指定 JSON/YAML，支持色域转换、归一化等预处理
-\textbar{} \textbar{} \passthrough{\lstinline!--op\_select\_implmode!}
-\textbar{} 算子实现优先级 \textbar{} 支持
+\passthrough{\lstinline!npu-smi info!} 查询；310B/P 区分清楚 \\
+\passthrough{\lstinline!--insert\_op\_conf!} & 下沉 AIPP/自定义算子 &
+指定 JSON/YAML，支持色域转换、归一化等预处理 \\
+\passthrough{\lstinline!--op\_select\_implmode!} & 算子实现优先级 & 支持
 \passthrough{\lstinline!high\_performance!}(默认)、\passthrough{\lstinline!high\_precision!}
-等，可配合 \passthrough{\lstinline!--optypelist\_for\_implmode!}
-\textbar{} \textbar{} \passthrough{\lstinline!--input\_format!}
-\textbar{} 声明输入数据排布 \textbar{} 如
+等，可配合 \passthrough{\lstinline!--optypelist\_for\_implmode!} \\
+\passthrough{\lstinline!--input\_format!} & 声明输入数据排布 & 如
 \passthrough{\lstinline!NCHW!}、\passthrough{\lstinline!NHWC!}；需与模型导出及
-\passthrough{\lstinline!--input\_shape!} 保持一致 \textbar{} \textbar{}
-\passthrough{\lstinline!--output\_type!} \textbar{} 重指定输出 dtype
-\textbar{} 可设全局
+\passthrough{\lstinline!--input\_shape!} 保持一致 \\
+\passthrough{\lstinline!--output\_type!} & 重指定输出 dtype & 可设全局
 \passthrough{\lstinline!FP16!}/\passthrough{\lstinline!FP32!}，或按
-\passthrough{\lstinline!node:idx:FP32!} 精细配置，便于后处理 \textbar{}
-\textbar{} \passthrough{\lstinline!--enable\_small\_channel!} \textbar{}
-小通道优化开关 \textbar{} 取值 0/1，轻量网络或低通道数场景启用可减时延
-\textbar{} \textbar{} \passthrough{\lstinline!--model!} \textbar{}
-指定待转换模型文件 \textbar{} 支持
+\passthrough{\lstinline!node:idx:FP32!} 精细配置，便于后处理 \\
+\passthrough{\lstinline!--enable\_small\_channel!} & 小通道优化开关 &
+取值 0/1，轻量网络或低通道数场景启用可减时延 \\
+\passthrough{\lstinline!--model!} & 指定待转换模型文件 & 支持
 \passthrough{\lstinline!.onnx!}、\passthrough{\lstinline!.pb!}、\passthrough{\lstinline!.prototxt!}
-等类型，路径需可访问 \textbar{} \textbar{}
-\passthrough{\lstinline!--output!} \textbar{} 设置 OM 输出前缀
-\textbar{} 不需写后缀；默认位置在当前目录，可结合
-\passthrough{\lstinline!--output\_type!} 使用 \textbar{} \textbar{}
-\passthrough{\lstinline!--dynamic\_dims!} \textbar{} 定义多维动态组合
-\textbar{} \passthrough{\lstinline!"d1\_1,d1\_2;d2\_1,d2\_2"!}
-格式；用于多输入或非 Batch 维变动 \textbar{} \textbar{}
-\passthrough{\lstinline!--enable\_single\_stream!} \textbar{}
-强制单流执行 \textbar{}
-\passthrough{\lstinline!true/false!}；在推理序列化或调试稳定性时启用
-\textbar{} \textbar{} \passthrough{\lstinline!--dump\_mode!} \textbar{}
-导出模型结构 JSON \textbar{} 配合 \passthrough{\lstinline!--mode=1!}
-使用，\passthrough{\lstinline!1!} 开启；便于排查 Shape 与算子信息
-\textbar{}
+等类型，路径需可访问 \\
+\passthrough{\lstinline!--output!} & 设置 OM 输出前缀 &
+不需写后缀；默认位置在当前目录，可结合
+\passthrough{\lstinline!--output\_type!} 使用 \\
+\passthrough{\lstinline!--dynamic\_dims!} & 定义多维动态组合 &
+\passthrough{\lstinline!"d1\_1,d1\_2;d2\_1,d2\_2"!} 格式；用于多输入或非
+Batch 维变动 \\
+\passthrough{\lstinline!--enable\_single\_stream!} & 强制单流执行 &
+\passthrough{\lstinline!true/false!}；在推理序列化或调试稳定性时启用 \\
+\passthrough{\lstinline!--dump\_mode!} & 导出模型结构 JSON & 配合
+\passthrough{\lstinline!--mode=1!} 使用，\passthrough{\lstinline!1!}
+开启；便于排查 Shape 与算子信息 \\
+\end{longtable}
 
 如果对于参数有任何的疑惑，可以通过命令查询atc的参数作用：
 
@@ -505,15 +469,14 @@ export MAX_COMPILE_CORE_NUMBER=1   # 限制图编译占用的 CPU 核数
 \end{enumerate}
 
 \begin{lstlisting}[language=bash]
-+--------------------------------------------------------------------------------------------------------+
-| npu-smi 23.0.0                                   Version: 23.0.0                                       |
-+-------------------------------+-----------------+------------------------------------------------------+
-| NPU     Name                  | Health          | Power(W)     Temp(C)           Hugepages-Usage(page) |
-| Chip    Device                | Bus-Id          | AICore(%)    Memory-Usage(MB)                        |
-+===============================+=================+======================================================+
-| 0       310B4                 | Alarm           | 0.0          58                15    / 15            |
-| 0       0                     | NA              | 0            2500 / 7545                             |
-+===============================+=================+======================================================+
+npu-smi 23.0.0  Version: 23.0.0
++-----------+--------+--------+-------+-------------------+
+| NPU Name  | Health | Power  | Temp  | Hugepages-Usage   |
+| Chip      | Bus-Id | AICore | Mem   |                   |
++===========+========+========+=======+===================+
+| 0 310B4   | Alarm  | 0.0W   | 58C   | 15 / 15           |
+| 0 0       | NA     | 0%     | 2500/7545MB             |
++-----------+--------+--------+-------+-------------------+
 \end{lstlisting}
 
 请在查询结果的 \passthrough{\lstinline!Name!} 值前追加
@@ -609,49 +572,49 @@ export NPU_HOST_LIB=/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub
 
 \begin{itemize}
 \item
-  常用参数速览 \textbar{} 参数 \textbar{} 说明 \textbar{} \textbar{}
-  -\/-\/- \textbar{} -\/-\/- \textbar{} \textbar{}
-  \passthrough{\lstinline!--model!} \textbar{} OM 文件路径 \textbar{}
-  \textbar{} \passthrough{\lstinline!--input!} \textbar{} 输入
-  \passthrough{\lstinline!bin!} 文件或目录，支持多输入 \textbar{}
-  \textbar{} \passthrough{\lstinline!--output!} \textbar{}
-  推理结果存放目录 \textbar{} \textbar{}
-  \passthrough{\lstinline!--outfmt!} \textbar{}
+  常用参数速览
+
+  \begin{longtable}[]{@{}
+    >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+    >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+  \toprule\noalign{}
+  \begin{minipage}[b]{\linewidth}\raggedright
+  参数
+  \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+  说明
+  \end{minipage} \\
+  \midrule\noalign{}
+  \endhead
+  \bottomrule\noalign{}
+  \endlastfoot
+  \passthrough{\lstinline!--model!} & OM 文件路径 \\
+  \passthrough{\lstinline!--input!} & 输入 \passthrough{\lstinline!bin!}
+  文件或目录，支持多输入 \\
+  \passthrough{\lstinline!--output!} & 推理结果存放目录 \\
+  \passthrough{\lstinline!--outfmt!} &
   输出格式：\passthrough{\lstinline!TXT!} /
-  \passthrough{\lstinline!BIN!} \textbar{} \textbar{}
-  \passthrough{\lstinline!--loop!} \textbar{} 重复推理次数（1--100）
-  \textbar{} \textbar{} \passthrough{\lstinline!--profiler!} /
-  \passthrough{\lstinline!--dump!} \textbar{} 性能分析或 Dump，互斥
-  \textbar{} \textbar{} \passthrough{\lstinline!--device!} \textbar{}
-  设备 ID，默认 0 \textbar{} \textbar{}
+  \passthrough{\lstinline!BIN!} \\
+  \passthrough{\lstinline!--loop!} & 重复推理次数（1--100） \\
+  \passthrough{\lstinline!--profiler!} /
+  \passthrough{\lstinline!--dump!} & 性能分析或 Dump，互斥 \\
+  \passthrough{\lstinline!--device!} & 设备 ID，默认 0 \\
   \passthrough{\lstinline!--dymBatch!} /
   \passthrough{\lstinline!--dymHW!} /
   \passthrough{\lstinline!--dymDims!} /
-  \passthrough{\lstinline!--dymShape!} \textbar{} 对应 ATC
-  动态配置的实际取值 \textbar{} \textbar{}
-  \passthrough{\lstinline!--outputSize!} \textbar{} 动态 Shape
-  场景下手动申请输出内存 \textbar{} \textbar{}
-  \passthrough{\lstinline!--debug!} \textbar{} 打印模型描述信息
-  \textbar{} \textbar{} \passthrough{\lstinline!--help!} \textbar{}
-  查看全部参数 \textbar{}
+  \passthrough{\lstinline!--dymShape!} & 对应 ATC 动态配置的实际取值 \\
+  \passthrough{\lstinline!--outputSize!} & 动态 Shape
+  场景下手动申请输出内存 \\
+  \passthrough{\lstinline!--debug!} & 打印模型描述信息 \\
+  \passthrough{\lstinline!--help!} & 查看全部参数 \\
+  \end{longtable}
 \item
-  使用注意
-
-  \begin{itemize}
-  \tightlist
-  \item
-    运行账号需具备当前目录的执行与写入权限。
-  \item
-    \passthrough{\lstinline!TXT!} 输出不适用于部分动态 Shape，可改用
-    \passthrough{\lstinline!BIN!}。
-  \item
-    配置 \passthrough{\lstinline!NPU\_HOST\_LIB!} 时应指向
-    \passthrough{\lstinline!runtime/lib64/stub!} 目录，运行阶段通过
-    \passthrough{\lstinline!LD\_LIBRARY\_PATH!} 链接实际依赖。
-  \item
-    profiler 与 dump 不可同时开启；动态 shape
-    时需同步设置合适的输出内存大小。
-  \end{itemize}
+  使用注意 运行 msame
+  工具时，需确保当前账号拥有目录的执行和写入权限。对于部分动态 Shape
+  场景，建议选择 BIN 格式输出而非 TXT，以保证兼容性。配置 NPU\_HOST\_LIB
+  时应指向 runtime/lib64/stub 目录，并在运行阶段通过 LD\_LIBRARY\_PATH
+  正确链接所需依赖库。此外，profiler 和 dump
+  功能不可同时启用；如涉及动态
+  Shape，需同步设置合适的输出内存大小以确保推理顺利进行。
 \end{itemize}
 
 \subsubsection{图片预处理}\label{ux56feux7247ux9884ux5904ux7406}
@@ -674,17 +637,15 @@ NCHW，因此常见的
 NHWC，只需在模型与预处理两端同时调整即可。
 由于刚才我们从华为云哪里获取的测试图片``dog1\_1024\_683.jpg''如下：
 
-\pandocbounded{\includegraphics[keepaspectratio,alt={resnet测试图片}]{chapters/img2/dog1_1024_683.jpg}}\{\#fig:dog
-width=90\%\}
+\begin{figure}
+\centering
+\includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={resnet测试图片}]{chapters/img2/dog1_1024_683.jpg}
+\caption{resnet测试图片}\label{fig:dog}
+\end{figure}
 
 由于这个图片是jpg格式的，因此为了可以利用这个图片推理，我们第一步需要对图片进行预处理，具体过程如何：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  在src文件目录创建一个预处理的python文件``make\_bin\_resnet224\_float32.py''如下：
-\end{enumerate}
+1.
+在src文件目录创建一个预处理的python文件``make\_bin\_resnet224\_float32.py''如下：
 
 \begin{lstlisting}[language=Python]
 from PIL import Image
@@ -822,7 +783,7 @@ Inference average time: 6.811000 ms
 \item
   先下载 \passthrough{\lstinline!imagenet\_class\_index.json!}（可来自
   Kaggle 或 GitHub）放到 \passthrough{\lstinline!src!} 目录，然后创建
-  \passthrough{\lstinline!src/postprocess\_resnet50.py!}：
+  \passthrough{\lstinline!src/postprocess\_resnet50.py!}：\\
 \end{itemize}
 
 \begin{lstlisting}[language=Python]
@@ -860,7 +821,7 @@ for rank, idx in enumerate(topk, start=1):
 \begin{itemize}
 \tightlist
 \item
-  执行脚本：
+  执行脚本：\\
 \end{itemize}
 
 \begin{lstlisting}[language=bash]
@@ -870,7 +831,7 @@ python ./src/postprocess_resnet50.py --bin out/20251213_11_6_52_564388/resnet50_
 \begin{itemize}
 \tightlist
 \item
-  示例输出：
+  示例输出：\\
 \end{itemize}
 
 \begin{lstlisting}[language=bash]
