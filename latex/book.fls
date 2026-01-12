@@ -1,8 +1,8 @@
-PWD D:/Github/Ascend310/latex
+PWD d:/Github/Ascend310/latex
 INPUT c:/texlive/2025/texmf.cnf
 INPUT c:/texlive/2025/texmf-dist/web2c/texmf.cnf
 INPUT c:/texlive/2025/texmf-var/web2c/xetex/xelatex.fmt
-INPUT book.tex
+INPUT d:/Github/Ascend310/latex/book.tex
 OUTPUT book.log
 INPUT c:/texlive/2025/texmf-dist/tex/latex/koma-script/scrbook.cls
 INPUT c:/texlive/2025/texmf-dist/tex/latex/koma-script/scrbook.cls

@@ -196,10 +196,8 @@
 \contentsline {subsubsection}{\nonumberline 设置启动模式}{145}{subsubsection*.114}%
 \contentsline {section}{\numberline {0.4}启动开发板}{145}{section.0.4}%
 \contentsline {subsection}{\numberline {0.4.1}方式一：图形化界面启动}{145}{subsection.0.4.1}%
-\contentsline {subsection}{\numberline {0.4.2}方式二：串口调试启动}{147}{subsection.0.4.2}%
-\contentsline {subsubsection}{\nonumberline 方法A：使用USB转TTL模块}{147}{subsubsection*.121}%
-\contentsline {subsubsection}{\nonumberline 方法B：使用Micro USB接口（推荐）}{148}{subsubsection*.124}%
-\contentsline {subsection}{\numberline {0.4.3}后续配置：设置SWAP交换分区}{148}{subsection.0.4.3}%
+\contentsline {subsection}{\numberline {0.4.2}串口界面}{147}{subsection.0.4.2}%
+\contentsline {subsection}{\numberline {0.4.3}设置SWAP交换分区}{149}{subsection.0.4.3}%
 \contentsline {chapter}{\numberline {1}案例1：智能打卡机}{151}{chapter.1}%
 \contentsline {section}{\numberline {1.1}项目简介}{151}{section.1.1}%
 \contentsline {section}{\numberline {1.2}内容大纲}{151}{section.1.2}%
@@ -215,11 +213,11 @@
 \contentsline {section}{\numberline {1.4}📱 Web界面详细介绍}{154}{section.1.4}%
 \contentsline {subsection}{\numberline {1.4.1}1. 主页 (/)}{154}{subsection.1.4.1}%
 \contentsline {subsection}{\numberline {1.4.2}2. 人脸识别模块}{154}{subsection.1.4.2}%
-\contentsline {subsubsection}{\nonumberline 2.1 实时摄像头识别 (/camera\_live)}{154}{subsubsection*.131}%
-\contentsline {subsubsection}{\nonumberline 2.2 图片上传识别 (/recognize)}{154}{subsubsection*.133}%
+\contentsline {subsubsection}{\nonumberline 2.1 实时摄像头识别 (/camera\_live)}{154}{subsubsection*.123}%
+\contentsline {subsubsection}{\nonumberline 2.2 图片上传识别 (/recognize)}{154}{subsubsection*.125}%
 \contentsline {subsection}{\numberline {1.4.3}3. 用户注册模块}{154}{subsection.1.4.3}%
-\contentsline {subsubsection}{\nonumberline 3.1 摄像头注册 (/camera\_register)}{154}{subsubsection*.135}%
-\contentsline {subsubsection}{\nonumberline 3.2 图片上传注册 (/register)}{154}{subsubsection*.137}%
+\contentsline {subsubsection}{\nonumberline 3.1 摄像头注册 (/camera\_register)}{154}{subsubsection*.127}%
+\contentsline {subsubsection}{\nonumberline 3.2 图片上传注册 (/register)}{154}{subsubsection*.129}%
 \contentsline {subsection}{\numberline {1.4.4}4. 用户管理 (/user\_management)}{154}{subsection.1.4.4}%
 \contentsline {subsection}{\numberline {1.4.5}5. 考勤记录 (/attendance)}{155}{subsection.1.4.5}%
 \contentsline {subsection}{\numberline {1.4.6}6. 考勤配置 (/attendance\_config)}{155}{subsection.1.4.6}%
@@ -232,147 +230,145 @@
 \contentsline {section}{\numberline {1.6}效果演示}{157}{section.1.6}%
 \contentsline {section}{\numberline {1.7}故障排除}{157}{section.1.7}%
 \contentsline {section}{\numberline {1.8}性能建议}{157}{section.1.8}%
-\contentsline {chapter}{\numberline {2}案例2：}{158}{chapter.2}%
-\contentsline {chapter}{\numberline {3}案例2：边缘端实时目标跟踪}{159}{chapter.3}%
-\contentsline {section}{\numberline {3.1}项目简介}{159}{section.3.1}%
-\contentsline {section}{\numberline {3.2}内容大纲}{159}{section.3.2}%
-\contentsline {subsection}{\numberline {3.2.1}硬件准备}{159}{subsection.3.2.1}%
-\contentsline {subsection}{\numberline {3.2.2}软件环境}{160}{subsection.3.2.2}%
-\contentsline {subsection}{\numberline {3.2.3}数据集准备}{160}{subsection.3.2.3}%
-\contentsline {subsection}{\numberline {3.2.4}模型训练与选择}{161}{subsection.3.2.4}%
-\contentsline {subsection}{\numberline {3.2.5}模型部署}{161}{subsection.3.2.5}%
-\contentsline {subsection}{\numberline {3.2.6}3D打印结构件}{162}{subsection.3.2.6}%
-\contentsline {subsection}{\numberline {3.2.7}用户手册}{162}{subsection.3.2.7}%
-\contentsline {subsubsection}{\nonumberline 快速开始}{162}{subsubsection*.139}%
-\contentsline {subsubsection}{\nonumberline 高级配置}{162}{subsubsection*.141}%
-\contentsline {subsubsection}{\nonumberline 性能优化}{162}{subsubsection*.143}%
-\contentsline {section}{\numberline {3.3}源代码结构}{162}{section.3.3}%
-\contentsline {section}{\numberline {3.4}效果演示}{163}{section.3.4}%
-\contentsline {chapter}{\numberline {4}案例3：}{164}{chapter.4}%
-\contentsline {chapter}{\numberline {5}案例3：智能电子琴}{165}{chapter.5}%
-\contentsline {section}{\numberline {5.1}1. 项目简介}{165}{section.5.1}%
-\contentsline {section}{\numberline {5.2}2. 内容大纲}{165}{section.5.2}%
-\contentsline {subsection}{\numberline {5.2.1}2.1. 硬件准备}{165}{subsection.5.2.1}%
-\contentsline {subsection}{\numberline {5.2.2}2.2. 软件环境}{166}{subsection.5.2.2}%
-\contentsline {subsection}{\numberline {5.2.3}2.3. 手势识别与音符映射}{167}{subsection.5.2.3}%
-\contentsline {subsection}{\numberline {5.2.4}2.4. 模型训练与优化}{167}{subsection.5.2.4}%
-\contentsline {subsection}{\numberline {5.2.5}2.5. 音频合成与处理}{168}{subsection.5.2.5}%
-\contentsline {subsection}{\numberline {5.2.6}2.6. 3D打印结构件}{168}{subsection.5.2.6}%
-\contentsline {subsection}{\numberline {5.2.7}2.7. 用户手册}{168}{subsection.5.2.7}%
-\contentsline {subsubsection}{\nonumberline 2.7.1 快速上手}{168}{subsubsection*.145}%
-\contentsline {subsubsection}{\nonumberline 2.7.2 演奏模式}{169}{subsubsection*.147}%
-\contentsline {subsubsection}{\nonumberline 2.7.3 高级功能}{169}{subsubsection*.149}%
-\contentsline {subsubsection}{\nonumberline 2.7.4 故障排除}{169}{subsubsection*.151}%
-\contentsline {section}{\numberline {5.3}3. 源代码结构}{169}{section.5.3}%
-\contentsline {section}{\numberline {5.4}4. 效果演示}{170}{section.5.4}%
-\contentsline {chapter}{\numberline {6}案例4：智能掌纹识别机}{171}{chapter.6}%
-\contentsline {section}{\numberline {6.1}1. 项目简介}{171}{section.6.1}%
-\contentsline {section}{\numberline {6.2}2. 内容大纲}{171}{section.6.2}%
-\contentsline {subsection}{\numberline {6.2.1}2.1. 硬件准备}{171}{subsection.6.2.1}%
-\contentsline {subsection}{\numberline {6.2.2}2.2. 软件环境}{172}{subsection.6.2.2}%
-\contentsline {subsection}{\numberline {6.2.3}2.3. 掌纹图像预处理}{173}{subsection.6.2.3}%
-\contentsline {subsection}{\numberline {6.2.4}2.4. 特征提取与匹配}{174}{subsection.6.2.4}%
-\contentsline {subsection}{\numberline {6.2.5}2.5. 模型训练与优化}{174}{subsection.6.2.5}%
-\contentsline {subsection}{\numberline {6.2.6}2.6. 系统部署与集成}{175}{subsection.6.2.6}%
-\contentsline {subsection}{\numberline {6.2.7}2.7. 3D打印结构件}{175}{subsection.6.2.7}%
-\contentsline {subsection}{\numberline {6.2.8}2.8. 用户手册}{176}{subsection.6.2.8}%
-\contentsline {subsubsection}{\nonumberline 2.8.1 系统部署}{176}{subsubsection*.153}%
-\contentsline {subsubsection}{\nonumberline 2.8.2 用户注册流程}{176}{subsubsection*.155}%
-\contentsline {subsubsection}{\nonumberline 2.8.3 身份验证流程}{176}{subsubsection*.157}%
-\contentsline {subsubsection}{\nonumberline 2.8.4 系统维护}{176}{subsubsection*.159}%
-\contentsline {section}{\numberline {6.3}3. 源代码结构}{176}{section.6.3}%
-\contentsline {section}{\numberline {6.4}4. 效果演示}{177}{section.6.4}%
-\contentsline {chapter}{\numberline {7}案例5：智能数据采集仪}{178}{chapter.7}%
-\contentsline {section}{\numberline {7.1}1. 项目简介}{178}{section.7.1}%
-\contentsline {section}{\numberline {7.2}2. 内容大纲}{178}{section.7.2}%
-\contentsline {subsection}{\numberline {7.2.1}2.1. 硬件准备}{178}{subsection.7.2.1}%
-\contentsline {subsection}{\numberline {7.2.2}2.2. 软件环境}{179}{subsection.7.2.2}%
-\contentsline {subsection}{\numberline {7.2.3}2.3. 传感器集成与数据采集}{180}{subsection.7.2.3}%
-\contentsline {subsection}{\numberline {7.2.4}2.4. 智能数据分析}{181}{subsection.7.2.4}%
-\contentsline {subsection}{\numberline {7.2.5}2.5. 边缘AI模型部署}{182}{subsection.7.2.5}%
-\contentsline {subsection}{\numberline {7.2.6}2.6. 数据存储与管理}{183}{subsection.7.2.6}%
-\contentsline {subsection}{\numberline {7.2.7}2.7. 用户界面与可视化}{183}{subsection.7.2.7}%
-\contentsline {subsection}{\numberline {7.2.8}2.8. 3D打印结构件}{184}{subsection.7.2.8}%
-\contentsline {subsection}{\numberline {7.2.9}2.9. 用户手册}{184}{subsection.7.2.9}%
-\contentsline {subsubsection}{\nonumberline 2.9.1 系统部署}{184}{subsubsection*.161}%
-\contentsline {subsubsection}{\nonumberline 2.9.2 日常操作}{185}{subsubsection*.163}%
-\contentsline {subsubsection}{\nonumberline 2.9.3 维护保养}{185}{subsubsection*.165}%
-\contentsline {subsubsection}{\nonumberline 2.9.4 故障排除}{185}{subsubsection*.167}%
-\contentsline {section}{\numberline {7.3}3. 源代码结构}{185}{section.7.3}%
-\contentsline {section}{\numberline {7.4}4. 效果演示}{186}{section.7.4}%
-\contentsline {chapter}{\numberline {8}案例6：智能小车}{187}{chapter.8}%
-\contentsline {section}{\numberline {8.1}1. 项目简介}{187}{section.8.1}%
-\contentsline {section}{\numberline {8.2}2. 内容大纲}{187}{section.8.2}%
-\contentsline {subsection}{\numberline {8.2.1}2.1. 硬件准备}{187}{subsection.8.2.1}%
-\contentsline {subsection}{\numberline {8.2.2}2.2. 软件环境}{188}{subsection.8.2.2}%
-\contentsline {subsection}{\numberline {8.2.3}2.3. 计算机视觉系统}{189}{subsection.8.2.3}%
-\contentsline {subsection}{\numberline {8.2.4}2.4. 路径规划与导航}{190}{subsection.8.2.4}%
-\contentsline {subsection}{\numberline {8.2.5}2.5. 运动控制系统}{191}{subsection.8.2.5}%
-\contentsline {subsection}{\numberline {8.2.6}2.6. AI决策系统}{192}{subsection.8.2.6}%
-\contentsline {subsection}{\numberline {8.2.7}2.7. 模型部署与优化}{192}{subsection.8.2.7}%
-\contentsline {subsection}{\numberline {8.2.8}2.8. 安全系统}{193}{subsection.8.2.8}%
-\contentsline {subsection}{\numberline {8.2.9}2.9. 3D打印结构件}{193}{subsection.8.2.9}%
-\contentsline {subsection}{\numberline {8.2.10}2.10. 用户手册}{193}{subsection.8.2.10}%
-\contentsline {subsubsection}{\nonumberline 2.10.1 硬件组装}{193}{subsubsection*.169}%
-\contentsline {subsubsection}{\nonumberline 2.10.2 软件配置}{194}{subsubsection*.171}%
-\contentsline {subsubsection}{\nonumberline 2.10.3 操作指南}{194}{subsubsection*.173}%
-\contentsline {subsubsection}{\nonumberline 2.10.4 维护保养}{194}{subsubsection*.175}%
-\contentsline {section}{\numberline {8.3}3. 源代码结构}{194}{section.8.3}%
-\contentsline {section}{\numberline {8.4}4. 效果演示}{195}{section.8.4}%
-\contentsline {chapter}{\numberline {9}案例7：智能相册}{196}{chapter.9}%
-\contentsline {section}{\numberline {9.1}1. 项目简介}{196}{section.9.1}%
-\contentsline {section}{\numberline {9.2}2. 内容大纲}{196}{section.9.2}%
-\contentsline {subsection}{\numberline {9.2.1}2.1. 硬件准备}{196}{subsection.9.2.1}%
-\contentsline {subsection}{\numberline {9.2.2}2.2. 软件环境}{197}{subsection.9.2.2}%
-\contentsline {subsection}{\numberline {9.2.3}2.3. 智能识别与分析}{198}{subsection.9.2.3}%
-\contentsline {subsection}{\numberline {9.2.4}2.4. 智能分类与标签}{200}{subsection.9.2.4}%
-\contentsline {subsection}{\numberline {9.2.5}2.5. 智能检索系统}{201}{subsection.9.2.5}%
-\contentsline {subsection}{\numberline {9.2.6}2.6. 自动整理与推荐}{202}{subsection.9.2.6}%
-\contentsline {subsection}{\numberline {9.2.7}2.7. 用户界面设计}{202}{subsection.9.2.7}%
-\contentsline {subsection}{\numberline {9.2.8}2.8. 模型部署与优化}{203}{subsection.9.2.8}%
-\contentsline {subsection}{\numberline {9.2.9}2.9. 数据管理与安全}{203}{subsection.9.2.9}%
-\contentsline {subsection}{\numberline {9.2.10}2.10. 用户手册}{204}{subsection.9.2.10}%
-\contentsline {subsubsection}{\nonumberline 2.10.1 系统安装}{204}{subsubsection*.177}%
-\contentsline {subsubsection}{\nonumberline 2.10.2 照片导入}{204}{subsubsection*.179}%
-\contentsline {subsubsection}{\nonumberline 2.10.3 智能分析}{204}{subsubsection*.181}%
-\contentsline {subsubsection}{\nonumberline 2.10.4 检索使用}{204}{subsubsection*.183}%
-\contentsline {section}{\numberline {9.3}3. 源代码结构}{205}{section.9.3}%
-\contentsline {section}{\numberline {9.4}4. 效果演示}{206}{section.9.4}%
-\contentsline {chapter}{\numberline {10}案例8：手势识别}{207}{chapter.10}%
-\contentsline {section}{\numberline {10.1}1. 项目简介}{207}{section.10.1}%
-\contentsline {section}{\numberline {10.2}2. 内容大纲}{207}{section.10.2}%
-\contentsline {subsection}{\numberline {10.2.1}2.1. 硬件准备}{207}{subsection.10.2.1}%
-\contentsline {subsection}{\numberline {10.2.2}2.2. 软件环境}{208}{subsection.10.2.2}%
-\contentsline {subsection}{\numberline {10.2.3}2.3. 手势数据采集与预处理}{209}{subsection.10.2.3}%
-\contentsline {subsection}{\numberline {10.2.4}2.4. 手势识别模型设计}{211}{subsection.10.2.4}%
-\contentsline {subsection}{\numberline {10.2.5}2.5. 模型训练与优化}{212}{subsection.10.2.5}%
-\contentsline {subsection}{\numberline {10.2.6}2.6. 实时识别系统}{213}{subsection.10.2.6}%
-\contentsline {subsection}{\numberline {10.2.7}2.7. 模型部署与优化}{215}{subsection.10.2.7}%
-\contentsline {subsection}{\numberline {10.2.8}2.8. 应用场景集成}{216}{subsection.10.2.8}%
-\contentsline {subsection}{\numberline {10.2.9}2.9. 用户界面与反馈}{216}{subsection.10.2.9}%
-\contentsline {subsection}{\numberline {10.2.10}2.10. 用户手册}{217}{subsection.10.2.10}%
-\contentsline {subsubsection}{\nonumberline 2.10.1 系统部署}{217}{subsubsection*.185}%
-\contentsline {subsubsection}{\nonumberline 2.10.2 手势训练}{217}{subsubsection*.187}%
-\contentsline {subsubsection}{\nonumberline 2.10.3 日常使用}{217}{subsubsection*.189}%
-\contentsline {subsubsection}{\nonumberline 2.10.4 故障排除}{218}{subsubsection*.191}%
-\contentsline {section}{\numberline {10.3}3. 源代码结构}{218}{section.10.3}%
-\contentsline {section}{\numberline {10.4}4. 效果演示}{218}{section.10.4}%
-\contentsline {chapter}{\numberline {11}案例9：智能聊天机器人}{220}{chapter.11}%
-\contentsline {section}{\numberline {11.1}1. 项目简介}{220}{section.11.1}%
-\contentsline {section}{\numberline {11.2}2. 内容大纲}{220}{section.11.2}%
-\contentsline {subsection}{\numberline {11.2.1}2.1. 硬件准备}{220}{subsection.11.2.1}%
-\contentsline {subsection}{\numberline {11.2.2}2.2. 软件环境}{221}{subsection.11.2.2}%
-\contentsline {subsection}{\numberline {11.2.3}2.3. 语言模型选择与优化}{222}{subsection.11.2.3}%
-\contentsline {subsection}{\numberline {11.2.4}2.4. 对话管理系统}{223}{subsection.11.2.4}%
-\contentsline {subsection}{\numberline {11.2.5}2.5. 语音交互系统}{225}{subsection.11.2.5}%
-\contentsline {subsection}{\numberline {11.2.6}2.6. 知识库与检索增强}{227}{subsection.11.2.6}%
-\contentsline {subsection}{\numberline {11.2.7}2.7. 模型部署与推理优化}{229}{subsection.11.2.7}%
-\contentsline {subsection}{\numberline {11.2.8}2.8. Web界面与API服务}{230}{subsection.11.2.8}%
-\contentsline {subsection}{\numberline {11.2.9}2.9. 用户手册}{231}{subsection.11.2.9}%
-\contentsline {subsubsection}{\nonumberline 2.9.1 系统部署}{231}{subsubsection*.193}%
-\contentsline {subsubsection}{\nonumberline 2.9.2 功能配置}{232}{subsubsection*.195}%
-\contentsline {subsubsection}{\nonumberline 2.9.3 使用指南}{232}{subsubsection*.197}%
-\contentsline {subsubsection}{\nonumberline 2.9.4 维护管理}{232}{subsubsection*.199}%
-\contentsline {section}{\numberline {11.3}3. 源代码结构}{232}{section.11.3}%
-\contentsline {section}{\numberline {11.4}4. 效果演示}{233}{section.11.4}%
+\contentsline {chapter}{\numberline {2}案例2：边缘端实时目标跟踪}{158}{chapter.2}%
+\contentsline {section}{\numberline {2.1}项目简介}{158}{section.2.1}%
+\contentsline {section}{\numberline {2.2}内容大纲}{158}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}硬件准备}{158}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}软件环境}{158}{subsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.2.3}数据集准备}{159}{subsection.2.2.3}%
+\contentsline {subsection}{\numberline {2.2.4}模型训练与选择}{160}{subsection.2.2.4}%
+\contentsline {subsection}{\numberline {2.2.5}模型部署}{160}{subsection.2.2.5}%
+\contentsline {subsection}{\numberline {2.2.6}3D打印结构件}{160}{subsection.2.2.6}%
+\contentsline {subsection}{\numberline {2.2.7}用户手册}{161}{subsection.2.2.7}%
+\contentsline {subsubsection}{\nonumberline 快速开始}{161}{subsubsection*.131}%
+\contentsline {subsubsection}{\nonumberline 高级配置}{161}{subsubsection*.133}%
+\contentsline {subsubsection}{\nonumberline 性能优化}{161}{subsubsection*.135}%
+\contentsline {section}{\numberline {2.3}源代码结构}{161}{section.2.3}%
+\contentsline {section}{\numberline {2.4}效果演示}{162}{section.2.4}%
+\contentsline {chapter}{\numberline {3}案例3：智能电子琴}{163}{chapter.3}%
+\contentsline {section}{\numberline {3.1}1. 项目简介}{163}{section.3.1}%
+\contentsline {section}{\numberline {3.2}2. 内容大纲}{163}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}2.1. 硬件准备}{163}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}2.2. 软件环境}{164}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.2.3}2.3. 手势识别与音符映射}{165}{subsection.3.2.3}%
+\contentsline {subsection}{\numberline {3.2.4}2.4. 模型训练与优化}{165}{subsection.3.2.4}%
+\contentsline {subsection}{\numberline {3.2.5}2.5. 音频合成与处理}{166}{subsection.3.2.5}%
+\contentsline {subsection}{\numberline {3.2.6}2.6. 3D打印结构件}{166}{subsection.3.2.6}%
+\contentsline {subsection}{\numberline {3.2.7}2.7. 用户手册}{166}{subsection.3.2.7}%
+\contentsline {subsubsection}{\nonumberline 2.7.1 快速上手}{166}{subsubsection*.137}%
+\contentsline {subsubsection}{\nonumberline 2.7.2 演奏模式}{167}{subsubsection*.139}%
+\contentsline {subsubsection}{\nonumberline 2.7.3 高级功能}{167}{subsubsection*.141}%
+\contentsline {subsubsection}{\nonumberline 2.7.4 故障排除}{167}{subsubsection*.143}%
+\contentsline {section}{\numberline {3.3}3. 源代码结构}{167}{section.3.3}%
+\contentsline {section}{\numberline {3.4}4. 效果演示}{168}{section.3.4}%
+\contentsline {chapter}{\numberline {4}案例4：智能掌纹识别机}{169}{chapter.4}%
+\contentsline {section}{\numberline {4.1}1. 项目简介}{169}{section.4.1}%
+\contentsline {section}{\numberline {4.2}2. 内容大纲}{169}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}2.1. 硬件准备}{169}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}2.2. 软件环境}{170}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.2.3}2.3. 掌纹图像预处理}{171}{subsection.4.2.3}%
+\contentsline {subsection}{\numberline {4.2.4}2.4. 特征提取与匹配}{172}{subsection.4.2.4}%
+\contentsline {subsection}{\numberline {4.2.5}2.5. 模型训练与优化}{172}{subsection.4.2.5}%
+\contentsline {subsection}{\numberline {4.2.6}2.6. 系统部署与集成}{173}{subsection.4.2.6}%
+\contentsline {subsection}{\numberline {4.2.7}2.7. 3D打印结构件}{173}{subsection.4.2.7}%
+\contentsline {subsection}{\numberline {4.2.8}2.8. 用户手册}{174}{subsection.4.2.8}%
+\contentsline {subsubsection}{\nonumberline 2.8.1 系统部署}{174}{subsubsection*.145}%
+\contentsline {subsubsection}{\nonumberline 2.8.2 用户注册流程}{174}{subsubsection*.147}%
+\contentsline {subsubsection}{\nonumberline 2.8.3 身份验证流程}{174}{subsubsection*.149}%
+\contentsline {subsubsection}{\nonumberline 2.8.4 系统维护}{174}{subsubsection*.151}%
+\contentsline {section}{\numberline {4.3}3. 源代码结构}{174}{section.4.3}%
+\contentsline {section}{\numberline {4.4}4. 效果演示}{175}{section.4.4}%
+\contentsline {chapter}{\numberline {5}案例5：智能数据采集仪}{176}{chapter.5}%
+\contentsline {section}{\numberline {5.1}1. 项目简介}{176}{section.5.1}%
+\contentsline {section}{\numberline {5.2}2. 内容大纲}{176}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}2.1. 硬件准备}{176}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}2.2. 软件环境}{177}{subsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.2.3}2.3. 传感器集成与数据采集}{178}{subsection.5.2.3}%
+\contentsline {subsection}{\numberline {5.2.4}2.4. 智能数据分析}{179}{subsection.5.2.4}%
+\contentsline {subsection}{\numberline {5.2.5}2.5. 边缘AI模型部署}{180}{subsection.5.2.5}%
+\contentsline {subsection}{\numberline {5.2.6}2.6. 数据存储与管理}{181}{subsection.5.2.6}%
+\contentsline {subsection}{\numberline {5.2.7}2.7. 用户界面与可视化}{181}{subsection.5.2.7}%
+\contentsline {subsection}{\numberline {5.2.8}2.8. 3D打印结构件}{182}{subsection.5.2.8}%
+\contentsline {subsection}{\numberline {5.2.9}2.9. 用户手册}{182}{subsection.5.2.9}%
+\contentsline {subsubsection}{\nonumberline 2.9.1 系统部署}{182}{subsubsection*.153}%
+\contentsline {subsubsection}{\nonumberline 2.9.2 日常操作}{183}{subsubsection*.155}%
+\contentsline {subsubsection}{\nonumberline 2.9.3 维护保养}{183}{subsubsection*.157}%
+\contentsline {subsubsection}{\nonumberline 2.9.4 故障排除}{183}{subsubsection*.159}%
+\contentsline {section}{\numberline {5.3}3. 源代码结构}{183}{section.5.3}%
+\contentsline {section}{\numberline {5.4}4. 效果演示}{184}{section.5.4}%
+\contentsline {chapter}{\numberline {6}案例6：智能小车}{185}{chapter.6}%
+\contentsline {section}{\numberline {6.1}1. 项目简介}{185}{section.6.1}%
+\contentsline {section}{\numberline {6.2}2. 内容大纲}{185}{section.6.2}%
+\contentsline {subsection}{\numberline {6.2.1}2.1. 硬件准备}{185}{subsection.6.2.1}%
+\contentsline {subsection}{\numberline {6.2.2}2.2. 软件环境}{186}{subsection.6.2.2}%
+\contentsline {subsection}{\numberline {6.2.3}2.3. 计算机视觉系统}{187}{subsection.6.2.3}%
+\contentsline {subsection}{\numberline {6.2.4}2.4. 路径规划与导航}{188}{subsection.6.2.4}%
+\contentsline {subsection}{\numberline {6.2.5}2.5. 运动控制系统}{189}{subsection.6.2.5}%
+\contentsline {subsection}{\numberline {6.2.6}2.6. AI决策系统}{190}{subsection.6.2.6}%
+\contentsline {subsection}{\numberline {6.2.7}2.7. 模型部署与优化}{190}{subsection.6.2.7}%
+\contentsline {subsection}{\numberline {6.2.8}2.8. 安全系统}{191}{subsection.6.2.8}%
+\contentsline {subsection}{\numberline {6.2.9}2.9. 3D打印结构件}{191}{subsection.6.2.9}%
+\contentsline {subsection}{\numberline {6.2.10}2.10. 用户手册}{191}{subsection.6.2.10}%
+\contentsline {subsubsection}{\nonumberline 2.10.1 硬件组装}{191}{subsubsection*.161}%
+\contentsline {subsubsection}{\nonumberline 2.10.2 软件配置}{192}{subsubsection*.163}%
+\contentsline {subsubsection}{\nonumberline 2.10.3 操作指南}{192}{subsubsection*.165}%
+\contentsline {subsubsection}{\nonumberline 2.10.4 维护保养}{192}{subsubsection*.167}%
+\contentsline {section}{\numberline {6.3}3. 源代码结构}{192}{section.6.3}%
+\contentsline {section}{\numberline {6.4}4. 效果演示}{193}{section.6.4}%
+\contentsline {chapter}{\numberline {7}案例7：智能相册}{194}{chapter.7}%
+\contentsline {section}{\numberline {7.1}1. 项目简介}{194}{section.7.1}%
+\contentsline {section}{\numberline {7.2}2. 内容大纲}{194}{section.7.2}%
+\contentsline {subsection}{\numberline {7.2.1}2.1. 硬件准备}{194}{subsection.7.2.1}%
+\contentsline {subsection}{\numberline {7.2.2}2.2. 软件环境}{195}{subsection.7.2.2}%
+\contentsline {subsection}{\numberline {7.2.3}2.3. 智能识别与分析}{196}{subsection.7.2.3}%
+\contentsline {subsection}{\numberline {7.2.4}2.4. 智能分类与标签}{198}{subsection.7.2.4}%
+\contentsline {subsection}{\numberline {7.2.5}2.5. 智能检索系统}{199}{subsection.7.2.5}%
+\contentsline {subsection}{\numberline {7.2.6}2.6. 自动整理与推荐}{200}{subsection.7.2.6}%
+\contentsline {subsection}{\numberline {7.2.7}2.7. 用户界面设计}{200}{subsection.7.2.7}%
+\contentsline {subsection}{\numberline {7.2.8}2.8. 模型部署与优化}{201}{subsection.7.2.8}%
+\contentsline {subsection}{\numberline {7.2.9}2.9. 数据管理与安全}{201}{subsection.7.2.9}%
+\contentsline {subsection}{\numberline {7.2.10}2.10. 用户手册}{202}{subsection.7.2.10}%
+\contentsline {subsubsection}{\nonumberline 2.10.1 系统安装}{202}{subsubsection*.169}%
+\contentsline {subsubsection}{\nonumberline 2.10.2 照片导入}{202}{subsubsection*.171}%
+\contentsline {subsubsection}{\nonumberline 2.10.3 智能分析}{202}{subsubsection*.173}%
+\contentsline {subsubsection}{\nonumberline 2.10.4 检索使用}{202}{subsubsection*.175}%
+\contentsline {section}{\numberline {7.3}3. 源代码结构}{203}{section.7.3}%
+\contentsline {section}{\numberline {7.4}4. 效果演示}{204}{section.7.4}%
+\contentsline {chapter}{\numberline {8}案例8：手势识别}{205}{chapter.8}%
+\contentsline {section}{\numberline {8.1}1. 项目简介}{205}{section.8.1}%
+\contentsline {section}{\numberline {8.2}2. 内容大纲}{205}{section.8.2}%
+\contentsline {subsection}{\numberline {8.2.1}2.1. 硬件准备}{205}{subsection.8.2.1}%
+\contentsline {subsection}{\numberline {8.2.2}2.2. 软件环境}{206}{subsection.8.2.2}%
+\contentsline {subsection}{\numberline {8.2.3}2.3. 手势数据采集与预处理}{207}{subsection.8.2.3}%
+\contentsline {subsection}{\numberline {8.2.4}2.4. 手势识别模型设计}{209}{subsection.8.2.4}%
+\contentsline {subsection}{\numberline {8.2.5}2.5. 模型训练与优化}{210}{subsection.8.2.5}%
+\contentsline {subsection}{\numberline {8.2.6}2.6. 实时识别系统}{211}{subsection.8.2.6}%
+\contentsline {subsection}{\numberline {8.2.7}2.7. 模型部署与优化}{213}{subsection.8.2.7}%
+\contentsline {subsection}{\numberline {8.2.8}2.8. 应用场景集成}{214}{subsection.8.2.8}%
+\contentsline {subsection}{\numberline {8.2.9}2.9. 用户界面与反馈}{214}{subsection.8.2.9}%
+\contentsline {subsection}{\numberline {8.2.10}2.10. 用户手册}{215}{subsection.8.2.10}%
+\contentsline {subsubsection}{\nonumberline 2.10.1 系统部署}{215}{subsubsection*.177}%
+\contentsline {subsubsection}{\nonumberline 2.10.2 手势训练}{215}{subsubsection*.179}%
+\contentsline {subsubsection}{\nonumberline 2.10.3 日常使用}{215}{subsubsection*.181}%
+\contentsline {subsubsection}{\nonumberline 2.10.4 故障排除}{216}{subsubsection*.183}%
+\contentsline {section}{\numberline {8.3}3. 源代码结构}{216}{section.8.3}%
+\contentsline {section}{\numberline {8.4}4. 效果演示}{216}{section.8.4}%
+\contentsline {chapter}{\numberline {9}案例9：智能聊天机器人}{218}{chapter.9}%
+\contentsline {section}{\numberline {9.1}1. 项目简介}{218}{section.9.1}%
+\contentsline {section}{\numberline {9.2}2. 内容大纲}{218}{section.9.2}%
+\contentsline {subsection}{\numberline {9.2.1}2.1. 硬件准备}{218}{subsection.9.2.1}%
+\contentsline {subsection}{\numberline {9.2.2}2.2. 软件环境}{219}{subsection.9.2.2}%
+\contentsline {subsection}{\numberline {9.2.3}2.3. 语言模型选择与优化}{220}{subsection.9.2.3}%
+\contentsline {subsection}{\numberline {9.2.4}2.4. 对话管理系统}{221}{subsection.9.2.4}%
+\contentsline {subsection}{\numberline {9.2.5}2.5. 语音交互系统}{223}{subsection.9.2.5}%
+\contentsline {subsection}{\numberline {9.2.6}2.6. 知识库与检索增强}{225}{subsection.9.2.6}%
+\contentsline {subsection}{\numberline {9.2.7}2.7. 模型部署与推理优化}{227}{subsection.9.2.7}%
+\contentsline {subsection}{\numberline {9.2.8}2.8. Web界面与API服务}{228}{subsection.9.2.8}%
+\contentsline {subsection}{\numberline {9.2.9}2.9. 用户手册}{229}{subsection.9.2.9}%
+\contentsline {subsubsection}{\nonumberline 2.9.1 系统部署}{229}{subsubsection*.185}%
+\contentsline {subsubsection}{\nonumberline 2.9.2 功能配置}{230}{subsubsection*.187}%
+\contentsline {subsubsection}{\nonumberline 2.9.3 使用指南}{230}{subsubsection*.189}%
+\contentsline {subsubsection}{\nonumberline 2.9.4 维护管理}{230}{subsubsection*.191}%
+\contentsline {section}{\numberline {9.3}3. 源代码结构}{230}{section.9.3}%
+\contentsline {section}{\numberline {9.4}4. 效果演示}{231}{section.9.4}%
 \providecommand \tocbasic@end@toc@file {}\tocbasic@end@toc@file 

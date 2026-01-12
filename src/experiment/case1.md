@@ -1,11 +1,4 @@
----
-title: "案例1：智能打卡机"
-author: [周贤中]
-date: 2025-12-16
-subject: "Markdown"
-keywords: [昇腾310B, 人脸识别, 智能打卡系统]
-lang: zh-cn
----
+# 案例1：智能打卡机
 
 ## 项目简介
 
