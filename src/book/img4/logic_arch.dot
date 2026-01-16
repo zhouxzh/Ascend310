@@ -1,0 +1,41 @@
+digraph LogicArchitecture {
+    rankdir=TB;
+    node [shape=box, style=filled, fontname="Noto Serif SC"];
+    edge [fontname="Noto Serif SC"];
+
+    // 应用层
+    "应用程序（APPs）" [color="#c7bfff", fontcolor=black];
+    "pyACL" [color="#ffd9b3", fontcolor=black];
+
+    subgraph cluster_0 {
+        label = "软件栈架构（Software Stack Architecture）";
+        labelloc = "b";
+        color = black;
+        style=filled;
+        fillcolor="#f2f2f2";
+
+        subgraph cluster_1 {
+            label = "AscendCL (Ascend Computing Language)";
+            color = gray;
+            style=filled;
+            fillcolor="#fff7cc";
+            "模型加载" [label="模型加载接口", color="#72bfde", fontcolor=black, fontname="Noto Serif SC"];
+            "算子能力开放" [label="算子调用接口", color="#72bfde", fontcolor=black, fontname="Noto Serif SC"];
+            "Runtime开放" [label="Runtime接口", color="#72bfde", fontcolor=black, fontname="Noto Serif SC"];
+        }
+
+        "GE执行器（Graph Engine Executor）" [label="GE执行器\n(Graph Engine Executor)", color="#d6f5d6", fontcolor=black, fontname="Noto Serif SC"];
+        "运行管理器（Runtime）" [label="运行管理器\n(Runtime)", color="#d6f5d6", fontcolor=black, fontname="Noto Serif SC"];
+        "驱动（Driver）" [label="驱动\n(Driver)", color="#d6f5d6", fontcolor=black, fontname="Noto Serif SC"];
+        "计算资源（AI Core/AI CPU）" [label="计算资源\n(AI Core/AI CPU)", color="#f0bebe", fontcolor=black, fontname="Noto Serif SC"];
+
+        "模型加载" -> "运行管理器（Runtime）";
+        "算子能力开放" -> "GE执行器（Graph Engine Executor）";
+        "GE执行器（Graph Engine Executor）" -> "运行管理器（Runtime）";
+        "运行管理器（Runtime）" -> "驱动（Driver）";
+        "驱动（Driver）" -> "计算资源（AI Core/AI CPU）";
+    }
+
+    "应用程序（APPs）" -> "pyACL";
+    "pyACL" -> {"模型加载","算子能力开放", "Runtime开放"};
+}
