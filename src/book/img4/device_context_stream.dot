@@ -1,0 +1,67 @@
+digraph hardware_hierarchy {
+    rankdir=TB; // 从上到下的布局
+    node [shape=box, style=filled, color=lightblue];
+    
+    // 顶级设备节点
+    subgraph cluster_device {
+        label="Device (NPU)";
+        style=filled;
+        color=lightgrey;
+        fillcolor="#f0f0f0";
+        
+        // 上下文节点
+        subgraph cluster_context {
+            label="Context 1";
+            style=filled;
+            color=lightyellow;
+            fillcolor="#ffffe0";
+            
+            // 流节点
+            subgraph cluster_stream {
+                label="Stream 1";
+                style=filled;
+                color=lightgreen;
+                fillcolor="#f0fff0";
+                
+                // 任务/内核
+                kernel1 [label="Task/Kernel 1", shape=ellipse, color=orange];
+                kernel2 [label="Task/Kernel 2", shape=ellipse, color=orange];
+                kernel3 [label="Task/Kernel 3", shape=ellipse, color=orange];
+                
+                // 流内的连接（可选）
+                kernel1 -> kernel2 [style=dashed];
+                kernel2 -> kernel3 [style=dashed];
+            }
+            
+            // 多个流的情况
+            subgraph cluster_stream2 {
+                label="Stream 2";
+                style=filled;
+                color=lightgreen;
+                fillcolor="#f0fff0";
+                
+                kernel4 [label="Task/Kernel 4", shape=ellipse, color=orange];
+                kernel5 [label="Task/Kernel 5", shape=ellipse, color=orange];
+                
+                kernel4 -> kernel5 [style=dashed];
+            }
+        }
+        
+        // 可以有多个上下文
+        subgraph cluster_context2 {
+            label="Context 2";
+            style=filled;
+            color=lightyellow;
+            fillcolor="#ffffe0";
+            
+            subgraph cluster_stream3 {
+                label="Stream 3";
+                style=filled;
+                color=lightgreen;
+                fillcolor="#f0fff0";
+                
+                kernel6 [label="Task/Kernel 6", shape=ellipse, color=orange];
+            }
+        }
+    }
+}

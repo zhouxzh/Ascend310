@@ -141,6 +141,9 @@
 \chapter*{前言}
 \input{chapters/preface.tex}
 
+% 目录设置：只显示 part 和 chapter，避免出现 0.1、0.2 等
+\setcounter{tocdepth}{1} % 只显示 part 和 chapter
+\renewcommand{\contentsname}{目录} % 目录标题为“目录”
 
 % 目录
 \tableofcontents
@@ -233,5 +236,7 @@
 % \chapter{附录标题}
 
 % 这里是附录内容。
+
+
 
 \end{document}

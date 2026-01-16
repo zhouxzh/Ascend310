@@ -34,7 +34,7 @@ Ascend Extension for PyTorch 是华为昇腾为 PyTorch 用户提供的深度适
 ### CANN环境准备
 
 在昇腾310B开发板上安装PyTorch之前，必须必须安装匹配CANN版本的驱动与固件。
-如果没有安装CANN相关的工具包与驱动，请参考《CANN 软件安装指南》（商用/社区版）(https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html)或者本教程的第二章(https://zhouxzh.github.io/Ascend310/book/chapter2.html)进行离线安装。
+如果没有安装CANN相关的工具包与驱动，请参考[《CANN 软件安装指南》](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html)或者本教程的[第二章](https://zhouxzh.github.io/Ascend310/book/chapter2.html)进行离线安装。
 如果已安装 CANN 相关工具包与驱动，可按执行以下命令获取版本信息:
 ```bash
 cat /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/ascend_toolkit_install.info
@@ -109,28 +109,8 @@ wget https://gitcode.com/Ascend/pytorch/releases/download/v7.2.0-pytorch2.8.0/to
 ```bash
 pip3 install torch_npu-2.8.0-cp311-cp311-manylinux_2_28_aarch64.whl
 ```
-### 简易安装方法
+**注意**：直接使用 `pip install torch_npu` 进行简易安装，可能导致程序与当前环境不兼容，或与已安装的 CANN 版本不完全适配。因此，建议谨慎采用该方式安装 torch_npu 插件。
 
-最简便的方式是直接让 pip 自动管理依赖并匹配版本。首先，使用 conda 创建一个名为 `npu` 的虚拟环境，并指定 Python 版本为 3.11。创建完成后，激活该环境：
-```bash
-conda create -n npu python=3.11 -y
-conda activate npu
-```
-随后，利用 pip 一键安装 `torch_npu` 插件、PyTorch 框架以及本章示例所需的常用软件包。pip 会自动解析依赖关系，匹配出与当前系统最兼容的版本组合（例如 `torch_npu` 2.1 及其对应的 PyTorch 2.1）。执行以下命令即可完成安装：
-```bash
-pip install torch_npu torch torchvision \
-    attrs cython numpy decorator \
-    sympy cffi pyyaml pathlib2 psutil protobuf==3.20.0 scipy requests absl-py \
-    cloudpickle ml-dtypes tornado jinja2 matplotlib tqdm
-```
-安装结束后，终端可能会提示如下错误信息：
-```bash
-ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
-op-compile-tool 0.1.0 requires getopt, which is not installed.
-op-compile-tool 0.1.0 requires inspect, which is not installed.
-op-compile-tool 0.1.0 requires multiprocessing, which is not installed.
-```
-这通常是因为 pip 的依赖解析器误报了 `op-compile-tool` 的依赖缺失。实际上，`getopt`、`inspect` 和 `multiprocessing` 均为 Python 标准库内置模块，无需单独安装。您可以忽略此错误提示，这不会影响后续程序的正常运行。
 ### torch_npu安装后测试
 成功安装torch_npu后，需要对安装后的torch_npu进行简单的测试，以此验证是否安装成功。其中最简单的方法，是直接在命令窗口中输入以下命令：
 ```bash
