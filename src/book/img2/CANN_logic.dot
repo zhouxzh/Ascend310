@@ -1,8 +1,8 @@
 digraph CANN_Stack {
     rankdir=TB;
     fontsize=12;
-    fontname="Microsoft YaHei";
-    node [shape=box fontname="Microsoft YaHei" fontsize=11 style=filled];
+    fontname="Noto Sans SC";
+    node [shape=box fontname="Noto Sans SC" fontsize=11 style=filled];
     edge [color="#666666"];
     labelloc="t";
     label="Ascend CANN 软件栈（应用/芯片使能/计算资源）与系统管理";

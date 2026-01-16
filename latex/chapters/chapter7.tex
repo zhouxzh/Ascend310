@@ -4,6 +4,7 @@
 
 \section{需求澄清 Canvas}\label{ux9700ux6c42ux6f84ux6e05-canvas}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2000}}
@@ -32,11 +33,13 @@ mAP≥0.6 \\
 合规 & 隐私/许可 & 是否需要脱敏？ & 仅上传事件元数据 \\
 成本 & 硬件/云 & ROI 衡量？ & 10 台板卡预算 \\
 \end{longtable}
+}
 
 输出：\passthrough{\lstinline!requirement.yaml!}（版本化），后续所有评审基于此文档。
 
 \section{指标分层与优先级}\label{ux6307ux6807ux5206ux5c42ux4e0eux4f18ux5148ux7ea7}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lllll@{}}
 \toprule\noalign{}
 层级 & 类别 & 指标 & 说明 & 失败后果 \\
@@ -51,6 +54,7 @@ SLO B & 稳定 & Crash/小时 & 可靠性 & 运维成本高 \\
 SLO C & 资源 & 内存峰值/功耗 & 成本约束 & 设备异常/降频 \\
 SLO C & 带宽 & 上行 kbps & 成本/合规 & 费用/拥塞 \\
 \end{longtable}
+}
 
 优先级：先保障 A（体验+功能可用），再稳定 B（质量/稳定），最后优化
 C（资源效率）。
@@ -74,6 +78,7 @@ Baseline 目标：建立 ``最小改动可运行'' 标尺。原则：
 
 \section{评测集设计原则}\label{ux8bc4ux6d4bux96c6ux8bbeux8ba1ux539fux5219}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 原则 & 内容 \\
@@ -87,6 +92,7 @@ Baseline 目标：建立 ``最小改动可运行'' 标尺。原则：
 可扩展 & 新增样本不破坏旧索引 \\
 标注一致 & 标注工具/规范/审校流程 \\
 \end{longtable}
+}
 
 目录示例：
 
@@ -110,6 +116,7 @@ dataset_eval/
 
 四阶段：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 Sprint & 目标 & 核心产出 & 风险控制 \\
@@ -122,12 +129,14 @@ Sprint & 目标 & 核心产出 & 风险控制 \\
 2 & 性能与稳定 & 性能对比表/监控上线 & Watchdog 验证 \\
 3 & 工程交付包装 & Release Notes/脚本 & 灰度计划制定 \\
 \end{longtable}
+}
 
 看板列：Backlog → Doing → Review → Bench → Done；性能/精度任务需进入
 Bench 列执行对比脚本通过后才可 Done。
 
 \section{资产沉淀文档体系}\label{ux8d44ux4ea7ux6c89ux6dc0ux6587ux6863ux4f53ux7cfb}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 文档 & 内容 & 更新频率 \\
@@ -143,6 +152,7 @@ PERF\_REPORT & 基线/优化对比 & 优化后 \\
 CHANGELOG & 可见版本差异 & 每次版本 \\
 RISK\_LOG & 已知风险列表 & 动态 \\
 \end{longtable}
+}
 
 MODEL\_CARD 需包含：数据来源、训练超参摘要、输入契约、已知局限、许可（如
 Apache-2.0）、安全与偏见说明（若涉及识别敏感属性声明避免用途）。
@@ -178,6 +188,7 @@ manifest.json
 \section{上线前综合
 Checklist}\label{ux4e0aux7ebfux524dux7efcux5408-checklist}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 类别 & 检查项 & 通过标准 \\
@@ -194,6 +205,7 @@ Checklist}\label{ux4e0aux7ebfux524dux7efcux5408-checklist}
 配置 & 签名校验一致 & Hash 匹配 \\
 回滚 & 验证上一版本可用 & 切换 \textless{} 30s \\
 \end{longtable}
+}
 
 \section{验收、回归与漂移监测}\label{ux9a8cux6536ux56deux5f52ux4e0eux6f02ux79fbux76d1ux6d4b}
 

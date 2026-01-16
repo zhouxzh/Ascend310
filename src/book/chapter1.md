@@ -171,7 +171,7 @@ lang: zh-cn
 | **高速接口** | 8 lane，支持： SGMII（1.25Gbps） 1000BASE-R（1.25Gbps） USB3.0（5Gbps） SATA 3.0（6Gbps） PCIe Gen3（8Gbps） 向下兼容各接口旧版本 | 同左 |
 | **低速接口** | UART × 5 I2C × 4 SPI × 2 CAN × 4 | 同左 |
 | **典型功耗** | 25W | 21W |
-| **工作环境温度** | -20℃～+103℃（-4℉～+217.4℉） | 同左 |
+| **工作环境温度** | $-20^\circ\text{C} \sim +103^\circ\text{C}$ | 同左 |
 | **结构尺寸** | MXM连接器 82mm × 60mm × 7mm | 同左 |
 
 **20 TOPS版本**在整体性能上全面领先，其AI算力（20 TOPS INT8）和CPU频率（1.6GHz）均高于**8 TOPS版本**（8 TOPS INT8, 1.0GHz），并配备了更灵活、带宽更高的内存（最高12GB, 51.2GB/s）。在视频处理能力上，20 TOPS版本也能支持更多的视频解码与编码路数。
@@ -198,8 +198,8 @@ lang: zh-cn
 | **摄像头接口** | MIPI-CSI x2 | MIPI-CSI ×4 | 8通道 MIPI CSI-2 最多4个摄像头 |
 | **显示输出** | HDMI x2 | HDMI 2.1/eDP/LVDS 最多4路显示输出 8K分辨率 | DP 1.2/HDMI 1.4 4K@30fps |
 | **其他I/O** | UART×5, I2C×4 SPI×2, CAN×4 | I2S/PCM/SPDIF | UART×3, SPI×2 I2S×2, I2C×4 CAN×1, PWM, GPIO |
-| **典型功耗** | 25W | ≤15W | 7-10W |
-| **工作温度** | -20℃～+103℃ | 工业级温控支持 | - |
+| **典型功耗** | 25W | $\leq$ 15W | 7-10W |
+| **工作温度** | -20℃ ～ +103℃ | 工业级温控支持 | - |
 | **封装尺寸** | MXM 82×60×7mm | BGA 27×27mm | 69.6×45mm SO-DIMM连接器 |
 | **工艺制程** | 12nm | 8nm | - |
 

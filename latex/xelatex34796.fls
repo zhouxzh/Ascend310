@@ -1,5 +1,0 @@
-PWD D:/Github/Ascend310/latex
-INPUT c:/texlive/2025/texmf.cnf
-INPUT c:/texlive/2025/texmf-dist/web2c/texmf.cnf
-INPUT c:/texlive/2025/texmf-var/web2c/xetex/xelatex.fmt
-INPUT book.tex

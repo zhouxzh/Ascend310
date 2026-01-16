@@ -2,9 +2,9 @@ digraph MLP {
   rankdir=TB;
   splines=true;
   charset="UTF-8";
-  fontname="Microsoft YaHei";
-  node [shape=circle, fontname="Microsoft YaHei"];
-  edge [fontname="Microsoft YaHei"];
+  fontname="Noto Sans SC";
+  node [shape=circle, fontname="Noto Sans SC"];
+  edge [fontname="Noto Sans SC"];
 
   // 输入层
   {

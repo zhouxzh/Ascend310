@@ -5,6 +5,7 @@
 
 \section{案例统一模板（标准化规范）}\label{ux6848ux4f8bux7edfux4e00ux6a21ux677fux6807ux51c6ux5316ux89c4ux8303}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 区块 & 内容要点 & 产出文件 \\
@@ -22,6 +23,7 @@
 质量验证 & 精度/漂移检查 & accuracy.json \\
 风险改进 & 已知问题/迭代计划 & roadmap.md \\
 \end{longtable}
+}
 
 \section{案例目录结构规范}\label{ux6848ux4f8bux76eeux5f55ux7ed3ux6784ux89c4ux8303}
 
@@ -48,6 +50,7 @@ experiments/caseX/
 
 \section{例概览与重点}\label{ux4f8bux6982ux89c8ux4e0eux91cdux70b9}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lllll@{}}
 \toprule\noalign{}
 序 & 名称 & 关键技术点 & 指标核心 & 风险要素 \\
@@ -65,6 +68,7 @@ experiments/caseX/
 8 & 手势识别 & 时序建模(TSM) & 手势准确率/FPS & 动作模糊 \\
 9 & 聊天机器人 & NLP 推理+缓存 & 响应时延/意图准确 & 语料漂移 \\
 \end{longtable}
+}
 
 下列示例详细展开前三个具代表性的模式。
 
@@ -77,6 +81,7 @@ experiments/caseX/
 
 \subsection{指标}\label{ux6307ux6807}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 指标 & 目标 & 说明 \\
@@ -89,6 +94,7 @@ experiments/caseX/
 误识率(FAR) & \textless{} 0.001 & 安全性 \\
 拒识率(FRR) & \textless{} 0.02 & 体验 \\
 \end{longtable}
+}
 
 \subsection{模型链路}\label{ux6a21ux578bux94feux8def}
 
@@ -184,6 +190,7 @@ FFT
 
 基线与优化版本差异自动生成：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lllll@{}}
 \toprule\noalign{}
 指标 & baseline & optimized & 差异 & 状态 \\
@@ -195,9 +202,11 @@ avg\_latency\_ms & 112.5 & 98.4 & -12.5\% & ✅ \\
 p95\_latency\_ms & 140.3 & 121.3 & -13.5\% & ✅ \\
 false\_accept\_rate & 0.0012 & 0.0008 & 改善 & ✅ \\
 \end{longtable}
+}
 
 \section{自动化与复现保障}\label{ux81eaux52a8ux5316ux4e0eux590dux73b0ux4fddux969c}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 机制 & 说明 \\
@@ -211,6 +220,7 @@ benchmark.py & 统一输出 metrics.json \\
 drift 检测 & 周期性对比指标偏差 \\
 一键脚本 & run.sh + run.ps1 支持跨平台 \\
 \end{longtable}
+}
 
 \section{指标可视化建议}\label{ux6307ux6807ux53efux89c6ux5316ux5efaux8bae}
 
@@ -228,6 +238,7 @@ drift 检测 & 周期性对比指标偏差 \\
 
 \section{通用问题经验库}\label{ux901aux7528ux95eeux9898ux7ecfux9a8cux5e93}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 问题 & 案例 & 根因 & 处理 \\
@@ -240,6 +251,7 @@ drift 检测 & 周期性对比指标偏差 \\
 OCR 错字 & 新增 & 图像模糊 & 降噪/锐化 \\
 跟踪漂移 & 2 & 过度遮挡 & reinit + 短期外观缓存 \\
 \end{longtable}
+}
 
 \section{扩展方向}\label{ux6269ux5c55ux65b9ux5411}
 

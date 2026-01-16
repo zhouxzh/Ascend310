@@ -3,10 +3,9 @@ digraph AlexNet {
     rankdir=TB;
     newrank=true; 
     
-    // 尝试使用更通用的中文字体设置
-    node [fontname="Microsoft YaHei, SimHei, sans-serif", fontsize=10, shape=box, style="filled,rounded", fillcolor="#E1F5FE"];
-    edge [fontname="Microsoft YaHei, SimHei, sans-serif", fontsize=10];
-    graph [fontname="Microsoft YaHei, SimHei, sans-serif"];
+    node [fontname="Noto Sans SC", fontsize=10, shape=box, style="filled,rounded", fillcolor="#E1F5FE"];
+    edge [fontname="Noto Sans SC", fontsize=10];
+    graph [fontname="Noto Sans SC"];
 
         
         // 定义 Conv-ReLU-Pool 结构 (Block A) - 独立 Cluster

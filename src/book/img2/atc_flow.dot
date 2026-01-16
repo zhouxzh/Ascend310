@@ -1,8 +1,8 @@
 digraph ATC_Flow_Steps {
 	rankdir=TB;
-	fontname="Microsoft YaHei";
+	fontname="Noto Sans SC";
 	labelloc="t"; label="ATC模型转换流程";
-	node [shape=box fontname="Microsoft YaHei" fontsize=12 style=filled];
+	node [shape=box fontname="Noto Sans SC" fontsize=12 style=filled];
 	edge [color="#555555" arrowsize=0.8];
 
 	// 主线流程 (竖向)

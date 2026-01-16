@@ -211,8 +211,8 @@ node_modules
 src/.vuepress/.temp/
 src/.vuepress/.temp/**
 
-.history/
 samples/chapter3/*/data/*
 samples/chapter3/*/fusion_result.json
 samples/chapter3/*/ge_check_op.json
 samples/*/*/kernel_meta
+.history/

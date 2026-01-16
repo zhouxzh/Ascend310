@@ -463,6 +463,7 @@ SSD启动。当连接了多种存储设备时，需通过背面的拨码开关�
 
 拨码开关状态说明（ON方向为1/右，相反为0/左，具体请参考板上丝印或下表）：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ccc@{}}
 \toprule\noalign{}
 Boot1 & Boot2 & 启动设备 \\
@@ -475,6 +476,7 @@ Boot1 & Boot2 & 启动设备 \\
 左 & 右 & eMMC \\
 右 & 左 & M.2 SSD \\
 \end{longtable}
+}
 
 \textbf{注意}：切换拨码开关后，必须\textbf{完全断电}（拔掉电源线）再重新上电，新的启动配置才会生效。仅按RESET键重启无效。
 
@@ -569,7 +571,8 @@ Boot1 & Boot2 & 启动设备 \\
   \pandocbounded{\includegraphics[keepaspectratio,alt={MicroUSB串口}]{cases/img0/microusbser.png}}
 \end{enumerate}
 
-以Micro USB接口为例： 1. \textbf{使用Micro USB数据线连接开发板和电脑} 2.
+以Micro USB接口为例： 1. \textbf{使用Micro
+USB数据线连接开发板和电脑，此时请不要给开发板上电。} 2.
 \textbf{打开电脑的设备管理器，选择端口，寻找开发板对应的串口端口号}\\
 \pandocbounded{\includegraphics[keepaspectratio,alt={端口号}]{cases/img0/ttl.png}}
 
@@ -582,7 +585,7 @@ Boot1 & Boot2 & 启动设备 \\
   Type选择为\passthrough{\lstinline!Serial!}，然后在Serial
   Line处将端口号修改为设备管理器中查到的端口号，如作者此处端口号为\passthrough{\lstinline!COM3!}，此外，还需要将Speed从9600修改为115200，最后点击Open打开串口。
 \item
-  \textbf{等待出现\passthrough{\lstinline!Ubuntu 22.04.3 LTS orangepiaipro ttyAM0!}字样，输入登录的用户名HwHiAiUser并回车，然后输入密码Mind@123并回车，注意在输入密码的时候屏幕并不会显示任何东西，登陆后的界面如图所示。}
+  \textbf{给开发板上电，等待出现\passthrough{\lstinline!Ubuntu 22.04.3 LTS orangepiaipro ttyAM0!}字样，输入登录的用户名HwHiAiUser并回车，然后输入密码Mind@123并回车，注意在输入密码的时候屏幕并不会显示任何东西，登陆后的界面如图所示。}
 
   \begin{figure}
   \centering
@@ -597,6 +600,182 @@ Boot1 & Boot2 & 启动设备 \\
   \end{figure}
 \end{enumerate}
 
+\section{网络连接}\label{ux7f51ux7edcux8fdeux63a5}
+
+\subsection{无线网络连接
+(WiFi)}\label{ux65e0ux7ebfux7f51ux7edcux8fdeux63a5-wifi}
+
+开发板板载了WiFi模块，可以通过命令行工具\passthrough{\lstinline!nmcli!}轻松连接无线网络。
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{扫描WiFi}
+
+\begin{lstlisting}[language=bash]
+nmcli dev wifi list
+\end{lstlisting}
+\item
+  \textbf{连接WiFi}
+  将\passthrough{\lstinline!<SSID>!}替换为你的WiFi名称，\passthrough{\lstinline!<PASSWORD>!}替换为密码。
+
+\begin{lstlisting}[language=bash]
+nmcli dev wifi connect <SSID> password <PASSWORD>
+\end{lstlisting}
+\item
+  \textbf{查看连接状态}
+
+\begin{lstlisting}[language=bash]
+nmcli connection show
+\end{lstlisting}
+\end{enumerate}
+
+\subsection{有线网络连接}\label{ux6709ux7ebfux7f51ux7edcux8fdeux63a5}
+
+如果有线网络可用，直接插入网线即可。可以通过以下命令查看IP地址：
+
+\begin{lstlisting}[language=bash]
+ip addr
+\end{lstlisting}
+
+或者
+
+\begin{lstlisting}[language=bash]
+ifconfig
+\end{lstlisting}
+
+\section{远程连接 (SSH)}\label{ux8fdcux7a0bux8fdeux63a5-ssh}
+
+为了方便开发，通常我们会使用个人电脑通过SSH远程连接到开发板。
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{获取开发板IP地址}
+  使用上述\passthrough{\lstinline!ip addr!}命令获取开发板的IP地址（通常在\passthrough{\lstinline!wlan0!}或\passthrough{\lstinline!eth0!}接口下）。
+\item
+  \textbf{使用SSH客户端连接}
+  在你的个人电脑终端（Windows可以使用CMD、PowerShell或Putty，Mac/Linux使用Terminal）中输入：
+
+\begin{lstlisting}[language=bash]
+ssh HwHiAiUser@<开发板IP地址>
+\end{lstlisting}
+
+  例如：
+
+\begin{lstlisting}[language=bash]
+ssh HwHiAiUser@192.168.1.100
+\end{lstlisting}
+
+  默认密码为：\passthrough{\lstinline!Mind@123!}
+\end{enumerate}
+
+\section{验证开发环境}\label{ux9a8cux8bc1ux5f00ux53d1ux73afux5883}
+
+系统启动并连接网络后，我们需要验证昇腾AI处理器的状态以及开发环境是否正常。
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{查看NPU状态}
+  使用\passthrough{\lstinline!npu-smi!}工具查看NPU的详细信息，包括温度、功耗、算力利用率等。
+
+\begin{lstlisting}[language=bash]
+npu-smi info
+\end{lstlisting}
+
+  如果能看到类似以下的输出，说明NPU工作正常：
+
+\begin{lstlisting}
++------------------------------------------------------------------------------------------------+
+| npu-smi 23.0.0                       Version: 23.0.0                                           |
+|------------------------------------------------------------------------------------------------|
+| NPU     Name                         Health   Power(W)     Temp(C)           Hugepages-Usage(page) |
+| Chip    Device                       Bus-Id   AICore(%)    Memory-Usage(MB)                        |
+|================================================================================================|
+| 0       310B4                        OK       12.8         45                0    / 0              |
+| 0       0                            0000:00:00.0 0            2433 / 7564                         |
+|================================================================================================|
+\end{lstlisting}
+\item
+  \textbf{检查CANN环境} 官方镜像通常已预装CANN（Compute Architecture for
+  Neural Networks）。可以通过检查环境变量或运行简单命令来确认。
+  通常环境变量设置在\passthrough{\lstinline!.bashrc!}中，尝试执行：
+
+\begin{lstlisting}[language=bash]
+echo $ASCEND_HOME_PATH
+\end{lstlisting}
+
+  或者检查编译器版本：
+
+\begin{lstlisting}[language=bash]
+c++ --version
+\end{lstlisting}
+\end{enumerate}
+
 \subsection{设置SWAP交换分区}\label{ux8bbeux7f6eswapux4ea4ux6362ux5206ux533a}
 
-开发板虽然有8G/16G的运存，但是有些应用（例如ATC模型转换工具）需要较大的内存，在这种情况下我们可以通过设置SWAP交换分区来扩展系统能使用的最大内存容量。需要注意的是，SWAP分区是设置在TF卡或者eMMC而不是
+开发板虽然有8G/16G的运存，但是有些应用（例如ATC模型转换工具）需要较大的内存，在这种情况下我们可以通过设置SWAP交换分区来扩展系统能使用的最大内存容量。
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{创建交换文件}
+
+  首先，使用\passthrough{\lstinline!fallocate!}命令创建一个指定大小的文件（例如12GB）。如果你的存储空间允许，建议设置得大一些，以防模型转换时内存不足。
+
+\begin{lstlisting}[language=bash]
+sudo fallocate -l 8G /swapfile
+\end{lstlisting}
+
+  如果提示\passthrough{\lstinline!fallocate!}失败，可以使用\passthrough{\lstinline!dd!}命令：
+
+\begin{lstlisting}[language=bash]
+sudo dd if=/dev/zero of=/swapfile bs=1G count=8
+\end{lstlisting}
+\item
+  \textbf{设置权限}
+
+  出于安全考虑，需要修改文件的权限，仅允许root用户读写。
+
+\begin{lstlisting}[language=bash]
+sudo chmod 600 /swapfile
+\end{lstlisting}
+\item
+  \textbf{设置交换区}
+
+  将文件格式化为交换分区格式。
+
+\begin{lstlisting}[language=bash]
+sudo mkswap /swapfile
+\end{lstlisting}
+\item
+  \textbf{启用交换区}
+
+  启用该交换文件。
+
+\begin{lstlisting}[language=bash]
+sudo swapon /swapfile
+\end{lstlisting}
+\item
+  \textbf{持久化设置}
+
+  为了防止重启后失效，需要将其写入\passthrough{\lstinline!/etc/fstab!}文件中。
+
+\begin{lstlisting}[language=bash]
+sudo nano /etc/fstab
+\end{lstlisting}
+
+  在文件末尾添加以下内容：
+
+\begin{lstlisting}
+/swapfile none swap sw 0 0
+\end{lstlisting}
+
+  保存并退出（Ctrl+O, Enter, Ctrl+X）。
+\end{enumerate}
+
+\section{结语}\label{ux7ed3ux8bed}
+
+至此，你的昇腾310B开发板（OrangePi
+AIpro）已经完成了基本的环境搭建。接下来，你可以进入\href{./case1.md}{案例1：智能打卡机}的学习，开始你的第一个AI应用开发之旅。

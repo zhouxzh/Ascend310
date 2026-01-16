@@ -90,6 +90,7 @@ Code 插件或 Ascend Insight 查看）是定位问题的关键。
 \section{常见瓶颈与对策
 Checklist}\label{ux5e38ux89c1ux74f6ux9888ux4e0eux5bf9ux7b56-checklist}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -117,6 +118,7 @@ Checklist}\label{ux5e38ux89c1ux74f6ux9888ux4e0eux5bf9ux7b56-checklist}
 \textbf{FPS 随 Batch 增加不明显} & 内存带宽瓶颈 或 单流阻塞 & 1. 多
 Stream 并发推理2. 优化数据布局 (Layout) \\
 \end{longtable}
+}
 
 \section{核心优化技术详解}\label{ux6838ux5fc3ux4f18ux5316ux6280ux672fux8be6ux89e3}
 

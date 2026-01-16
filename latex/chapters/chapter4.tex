@@ -1,48 +1,50 @@
-PyACL（Python Ascend Computing Language）是 AscendCL（Ascend Computing
-Language）的 Python 绑定版本，它提供了一套用于管理昇腾AI处理器的 Python
-API 库。相较于 C++ 版本的 ACL，PyACL
-大幅降低了开发门槛，允许开发者使用简洁的 Python
-代码实现模型推理、媒体数据处理、算子调用等高性能计算任务。本章将依据官方开发范式，系统讲解
-PyACL 应用开发的全流程。
+AscendCL（Ascend Computing
+Language）是一套用于在昇腾平台上开发深度神经网络应用的 C 语言 API
+库。它提供了运行资源管理、内存管理、模型加载与执行、媒体数据处理等核心功能，充当了统一的
+API 框架，帮助开发者充分利用昇腾 AI
+处理器的硬件算力（如矩阵计算、图像预处理等）。
 
-\section{学习向导}\label{ux5b66ux4e60ux5411ux5bfc}
+然而，直接使用 C/C++ 版本的 AscendCL 进行开发存在一定的挑战。首先，C/C++
+语言本身的指针操作和手动内存管理对开发者要求较高，容易产生内存泄漏或访问越界等难以调试的问题；其次，C++
+代码通常较为冗长，构建和编译流程繁琐，不利于算法的快速原型验证与敏捷迭代。回顾上一章，虽然我们可以尝试将
+PyTorch 移植到昇腾 310B
+开发板上，但受限于硬件架构差异和算子支持度，直接运行原生 PyTorch
+代码往往面临诸多兼容性问题和性能瓶颈。\textbf{因此，对于初学者而言，直接在
+310B 板端运行 PyTorch 并不是最优解，而 PyACL
+则是平衡开发效率与运行性能的最佳选择。}
 
-\subsection{目标读者}\label{ux76eeux6807ux8bfbux8005}
+为了解决上述痛点，PyACL（Python Ascend Computing
+Language）应运而生。作为 AscendCL 的 Python 绑定版本，PyACL 通过 CPython
+封装底层 C
+接口，在保留硬件高性能特性的同时，大幅降低了开发门槛。它允许开发者通过简洁的
+Python 语法调用昇腾处理器的强大能力，无缝衔接主流 AI 框架和数据处理库。
 
-本章适合具备 Python 基础，希望快速在 Ascend 310B
-等昇腾硬件上部署深度学习模型的算法工程师和应用开发者。
+需要特别指出的是，\textbf{昇腾 310B 是一款定位为推理（Inference）的 AI
+处理器，算力与显存资源受限，并不适合进行大规模的模型训练}。在实际应用中，标准的开发流水线如下：
+1. \textbf{模型训练}：在拥有高性能显卡（GPU）或昇腾 910
+训练卡的服务器上，使用 PyTorch 等框架完成模型训练。 2.
+\textbf{模型转换}：使用 ATC
+工具将训练好的模型转换为昇腾专用的离线模型（.om）。 3.
+\textbf{推理部署}：使用 \textbf{PyACL} 在昇腾 310B 上加载 .om
+模型，实现高性能的边缘端推理。
 
-\subsection{核心技能路径}\label{ux6838ux5fc3ux6280ux80fdux8defux5f84}
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  \textbf{环境认知}：理解 Host 与 Device 的概念及内存管理机制。
-\item
-  \textbf{流程掌握}：掌握 ``Init -\textgreater{} Context -\textgreater{}
-  Stream -\textgreater{} Model -\textgreater{} Process -\textgreater{}
-  Release'' 的标准生命周期。
-\item
-  \textbf{高级处理}：学会使用 AIPP/DVPP 进行硬件级图像预处理。
-\item
-  \textbf{调试能力}：掌握错误码分析与使用 PyACL 异常处理机制。
-\end{enumerate}
+本章将依据这一官方开发范式，系统讲解 PyACL 应用开发的全流程。
 
 \section{快速入门}\label{ux5febux901fux5165ux95e8}
 
 \subsection{概述}\label{ux6982ux8ff0}
 
-PyACL 封装了底层 C++ 接口，主要包含以下模块： * \textbf{acl}:
-核心模块，提供初始化、Device 管理、内存管理、模型推理等功能。 *
+PyACL 封装了底层 C语言接口，主要包含以下模块： - \textbf{acl}:
+核心模块，提供初始化、Device 管理、内存管理、模型推理等功能。 -
 \textbf{acl.media}: 媒体数据处理（DVPP），包括 JPEG
-编解码、视频编解码、VPC（图像处理）。 * \textbf{acl.op}:
+编解码、视频编解码、VPC（图像处理）。 - \textbf{acl.op}:
 单算子调用接口。
 
 \subsection{Hello World: 查询 Device
 count}\label{hello-world-ux67e5ux8be2-device-count}
 
-一个最简单的 PyACL 程序，用于查询当前环境可用的 NPU 设备数量。
+一个最简单的 PyACL 程序，用于查询当前环境可用的 NPU
+设备数量，具体的代码如下：
 
 \begin{lstlisting}[language=Python]
 import acl

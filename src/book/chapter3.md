@@ -6,6 +6,7 @@ subject: "Markdown"
 keywords: [边缘计算, 算子]
 lang: zh-cn
 ---
+
 PyTorch 是以动态计算图著称的深度学习框架，核心由灵活的张量运算与自动微分系统构成。eager execution 让调试、可视化和原型迭代更直观，而 TorchScript 则提供图模式部署以兼顾性能与可移植性。配合丰富的 TorchVision、TorchAudio、TorchText 等生态包，开发者可以在视觉、语音、自然语言处理等任务上快速搭建端到端方案。
 
 Ascend Extension for PyTorch 是华为昇腾为 PyTorch 用户提供的深度适配插件，使 PyTorch 能无缝调用昇腾 AI 处理器算力，沿用原生接口并针对算子、通信与调度做深度优化。项目源码可在官方仓库获取，更多动态可关注昇腾社区。
@@ -226,13 +227,13 @@ $$
 
 实践流程（单位统一为 A、V，建议 float32，NPU 上双精度会自动降为 float32）：
 - 采集多组 ($I_i$, $V_i$)，若存在接触电势选用含偏置模型。
-- 初始化参数（启发式：$R≈(\sum I_i V_i)/(\sum I_i^2)，b≈0$）。
-- 随机抽取小批量，计算 $g_R$、$g_b$，按学习率迭代至收敛。
+- 初始化参数（启发式：$R \approx (\sum I_i V_i)/(\sum I_i^2), b \approx 0$）。
+- 随机抽取小批量，计算 $g_R, g_b$，按学习率迭代至收敛。
 - 用 MSE 或 R² 评估拟合，必要时剔除离群点。
 
 下方示例代码在 PyTorch+torch_npu 上实现上述流程。
 ```python
-"""线性回归（V ≈ R·I + b）示例，使用华为昇腾 NPU 设备训练。
+"""线性回归（V $\approx$ R·I + b）示例，使用华为昇腾 NPU 设备训练。
 - 数据：合成电压/电流数据，单位 A/V，含高斯噪声（约 5mV）。
 - 目标：拟合电阻 R（斜率）与偏置 b（截距）。
 - 设备：默认 npu:0，可切换为 CPU。
@@ -252,7 +253,7 @@ torch.manual_seed(0)  # 固定随机种子以确保可复现
 N = 1024  # 样本数
 R_true, b_true = 120.0, 0.02  # 真实电阻（Ω）与偏置（V），用于生成数据的“地真值”
 I = torch.linspace(0.0, 1.0, N).unsqueeze(1)  # 电流张量 [N,1]，范围 0~1 A
-noise_std = 0.005  # 噪声标准差 ≈ 5 mV
+noise_std = 0.005  # 噪声标准差 $\approx$ 5 mV
 noise = noise_std * torch.randn(N, 1)  # 加性高斯噪声，与 V 同形状
 V = R_true * I + b_true + noise  # 生成电压张量 [N,1]，单位 V
 
@@ -260,7 +261,7 @@ I = I.to(device)  # 将数据移至计算设备（NPU/CPU）
 V = V.to(device)
 batch_size = 16  # 小批量大小，影响梯度估计方差与训练稳定性
 
-# 线性模型 V ≈ R·I + b（1 输入 -> 1 输出，带偏置）
+# 线性模型 V $\approx$ R·I + b（1 输入 -> 1 输出，带偏置）
 model = torch.nn.Linear(1, 1, bias=True).to(device)  # 权重即电阻 R，偏置即 b
 opt = torch.optim.SGD(model.parameters(), lr=1e-2)  # 随机梯度下降，学习率 1e-2
 loss_fn = torch.nn.MSELoss()  # 均方误差：衡量预测电压与真实电压的差异
@@ -1063,7 +1064,6 @@ pip install torchvision==0.23.0
 在昇腾310B开发板上运行以上代码，可以得到以下的结果：
 ```bash
   warnings.warn(f"Warning: The {path} owner does not match the current owner.")
-Epochs:   0%|                                                                                      | 0/10 [00:00<?, ?it/s]
 Epochs: 100%|█████████████████████████████| 10/10 [01:51<00:00, 11.15s/it, lr=0.010000, train_acc=0.9782, val_loss=0.9800]
 Saved accuracy & loss curve to: /home/HwHiAiUser/Documents/samples/chapter3/LeNet/accuracy_loss_curve.png
 ```

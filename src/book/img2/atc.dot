@@ -1,8 +1,8 @@
 digraph ATC_Flow {
 	rankdir=TB;
 	fontsize=12;
-	fontname="Microsoft YaHei";
-	node [shape=box fontname="Microsoft YaHei" fontsize=11 style=filled];
+	fontname="Noto Sans SC";
+	node [shape=box fontname="Noto Sans SC" fontsize=11 style=filled];
 	edge [color="#666666"];
 	labelloc="t";
 	label="ATC 流程与图优化";

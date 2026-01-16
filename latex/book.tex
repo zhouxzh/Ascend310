@@ -5,16 +5,32 @@
 % 基本设置
 \usepackage[UTF8]{ctex} % 中文支持
 \usepackage{fontspec} % 字体设置
-\usepackage{xeCJK} % 中日韩文字支持
+% \usepackage{xeCJK} % 中日韩文字支持
 \usepackage[font=small,labelfont=bf]{caption}
 
 % 设置默认字体为无衬线体（思源黑体）
 % 中文/英文字体配对：正文用思源宋体（Noto Serif CJK SC）+ Noto Serif，标题用思源黑体（Noto Sans CJK SC）+ Noto Sans，等宽用 Noto Sans Mono CJK SC
+\setCJKmainfont{Noto Serif CJK SC}[AutoFakeSlant = 0.15]        % 正文字体（衬线 / 宋体样式）
+\setCJKsansfont{Noto Sans CJK SC}[AutoFakeSlant = 0.15] % 无衬线（适合章节标题、图例）
+\setCJKmonofont{Noto Sans Mono CJK SC} % 等宽字体（代码、表格）
 
-\setCJKmainfont{Noto Serif CJK SC}[Scale=MatchLowercase, AutoFakeSlant = 0.15]        % 正文字体（衬线 / 宋体样式）
-\setCJKsansfont{Noto Sans CJK SC}[Scale=MatchLowercase, AutoFakeSlant = 0.15] % 无衬线（适合章节标题、图例）
-\setCJKmonofont{Noto Sans Mono CJK SC}[Scale=MatchLowercase] % 等宽字体（代码、表格）
-
+% ===== 西文字体设置（新增部分） =====
+% 主字体（衬线，搭配 \rmfamily 或默认文本）
+\setmainfont{Noto Serif}[
+    ItalicFont = Noto Serif Italic,      % 使用真正的斜体
+    BoldFont = Noto Serif Bold,
+    BoldItalicFont = Noto Serif Bold Italic
+]
+% 无衬线字体（搭配 \sffamily）
+\setsansfont{Noto Sans}[
+    ItalicFont = Noto Sans Italic,
+    BoldFont = Noto Sans Bold,
+    BoldItalicFont = Noto Sans Bold Italic
+]
+% 等宽字体（搭配 \ttfamily）
+\setmonofont{Noto Sans Mono}[
+    BoldFont = Noto Sans Mono Bold,
+]
 % 页面布局和外观设置
 \usepackage[automark,headsepline]{scrlayer-scrpage} % 页眉页脚
 \clearpairofpagestyles
@@ -51,6 +67,7 @@
     language=Python,
     backgroundcolor=\color{lightgray},
     basicstyle=\ttfamily\small,
+    lineskip=-0.3pt,
     keywordstyle=\color{darkblue}\bfseries,
     commentstyle=\color{cyan},
     stringstyle=\color{purple},
@@ -141,7 +158,7 @@
 \chapter{CANN软件栈核心组件解析}
 \input{chapters/chapter2.tex}
 
-% 第三章
+第三章
 \chapter{昇腾PyTorch扩展迁移基础}
 \input{chapters/chapter3.tex}
 

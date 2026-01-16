@@ -1,8 +1,8 @@
 digraph CANN_Architecture {
     rankdir=TB;
     fontsize=12;
-    fontname="Microsoft YaHei";
-    node [shape=box fontname="Microsoft YaHei" fontsize=11 style=filled];
+    fontname="Noto Sans SC";
+    node [shape=box fontname="Noto Sans SC" fontsize=11 style=filled];
     edge [color="#555555"];
     labelloc="t";
     label="Ascend CANN 异构计算软件栈与生态层次图";
