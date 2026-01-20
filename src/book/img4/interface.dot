@@ -1,0 +1,109 @@
+digraph G {
+    rankdir=TB;
+    fontname="Noto Serif SC";
+    splines=ortho;
+
+    node [fontname="Noto Serif SC", shape=box, style="filled", fillcolor="#90CAF9", color="#90CAF9"];
+    edge [fontname="Noto Serif SC", color="#5e5e5e"];
+
+    // Global Start/End
+    start [label="pyACL 初始化", shape=ellipse];
+    alloc_res [label="申请运行管理资源", shape=hexagon];
+    
+    // Decision
+    decision [label="选择功能模式\n(模型/算子/媒体)", shape=diamond, fillcolor="#FFE0B2", color="#FFE0B2"];
+
+    // Subgraphs for layout grouping
+    
+    // Left Branch: Model Inference
+    subgraph cluster_model {
+        label="模型推理";
+        style=rounded;
+        bgcolor="white";
+        // Penwidth or color for the border if needed
+        color="#707070";
+        
+        model_load [label="加载模型", shape=ellipse];
+        
+        // Group for loop part
+        subgraph cluster_loop {
+            label="多图/多帧循环处理";
+            style=filled;
+            color="#f5c7c7";
+            penwidth=0;
+
+            image_process [label="图像预处理\n(解码/缩放/抠图)", fillcolor="#C5E1A5", color="#C5E1A5"];
+            model_exec [label="执行模型推理"];
+            post_process [label="推理结果后处理", fillcolor="#C5E1A5", color="#C5E1A5"];
+        }
+        
+        model_unload [label="卸载模型", shape=ellipse];
+    }
+
+    // Middle Branch: Operator Invocation
+    subgraph cluster_op {
+        label="单算子调用";
+        style=filled;
+        color="#FFF9C4";
+        penwidth=0;
+        
+        op_load [label="加载单算子", shape=ellipse];
+        op_exec [label="执行单算子"];
+    }
+
+    // Right Branch: Media Processing
+    subgraph cluster_media {
+        label="媒体数据处理";
+        style=filled;
+        color="#E1BEE7";
+        penwidth=0;
+        
+        media_init [label="初始化媒体处理系统", shape=hexagon];
+        media_proc_only [label="执行媒体数据处理\n(编解码/裁剪等)"];
+        media_deinit [label="去初始化媒体处理系统", shape=hexagon];
+    }
+
+    // Global resource release
+    release_res [label="释放运行管理资源", shape=hexagon];
+    end [label="pyACL 去初始化", shape=ellipse];
+
+    // Legend
+    subgraph cluster_legend {
+        rank=same;
+        label="";
+        style=invis;
+        node [shape=box, width=0.5, height=0.2];
+        legend_mandatory [label="必选步骤", fillcolor="#90CAF9", color="#90CAF9"];
+        legend_optional [label="可选步骤", fillcolor="#C5E1A5", color="#C5E1A5"];
+    }
+
+    // Connections
+    start -> alloc_res;
+    alloc_res -> decision;
+
+    // Decision branches
+    decision -> model_load;
+    decision -> op_load;
+    decision -> media_init;
+
+    // Model Inference Flow
+    model_load -> model_exec;
+    model_load -> image_process [style=dashed]; // Optional dependency
+    image_process -> model_exec [style=dashed, constraint=false]; // Visual connection
+    model_exec -> model_unload;
+    model_exec -> post_process [style=dashed]; // Optional
+    
+    // Operator Flow
+    op_load -> op_exec;
+    
+    // Media Flow
+    media_init -> media_proc_only;
+    media_proc_only -> media_deinit;
+
+    // Converge to release
+    model_unload -> release_res;
+    op_exec -> release_res;
+    media_deinit -> release_res;
+
+    release_res -> end;
+}

@@ -58,115 +58,127 @@ PyACL的程序逻辑架构图如下图所示：
 
 在性能优化与调度方面，合理规划 Stream 的数量至关重要。虽然多 Stream 旨在实现并行，但 Device 端的硬件资源（如 AI Core、AI CPU、Vector Core）是有限的。如果进程内过多的 Stream 同时争抢同一类硬件资源，硬件调度器在不同 Stream 间切换的开销可能会抵消并行带来的收益。因此，**最佳实践是按照算子执行引擎来划分 Stream**，例如将 AI Core 密集型任务与 AI CPU 逻辑型任务分发到不同的 Stream 中，从而实现异构硬件的真正的并行。此外，在架构设计上，“单线程多 Stream”的模式通常比“多线程多 Stream”具有微弱的性能优势，因为它避免了 Host 侧操作系统频繁进行线程上下文切换的开销，让 CPU 能更专注于向 NPU 下发任务。
 
-### Hello World: 查询 Device count
-一个最简单的 PyACL 程序，用于查询当前环境可用的 NPU 设备数量，具体的代码如下：
+### PyACL应用开发环境
 
-```python
-import acl
+#### CANN 安装
+要部署 PyACL 的开发环境和运行环境，首先需要安装与目标 CANN 版本匹配的驱动和固件。虽然昇腾 310B 开发板通常预装了基础环境，但为了获得最新的特性支持，建议按照[本教程第二章](https://zhouxzh.github.io/Ascend310/book/chapter2.html)或[《CANN 软件安装指南》](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html)升级至较新的 CANN 版本（如 CANN 8.3）。
 
-def check_device_count():
-    # 1. ACL 初始化
-    ret = acl.init()
-    if ret != 0:
-        print(f"acl init failed, ret={ret}")
-        return
+CANN 软件包安装完成后，**无需额外安装独立的 Python 绑定库**，PyACL 相关模块已包含在 CANN Toolkit 中。但为了确保系统能正确找到 `acl` 模块，必须加载必要的环境变量。
 
-    # 2. 获取 Device 数量
-    count, ret = acl.rt.get_device_count()
-    if ret != 0:
-        print(f"get device count failed, ret={ret}")
-    else:
-        print(f"Found {count} Ascend devices.")
+#### 环境变量配置
 
-    # 3. ACL 去初始化
-    ret = acl.finalize()
-    if ret != 0:
-        print(f"acl finalize failed, ret={ret}")
+如果按照本教程第二章的标准流程安装，通常无需额外操作，CANN 的路径配置脚本可能已自动写入启动文件。在 Miniconda 的 `base` 环境中，您可以直接尝试导入 `acl`。
 
-if __name__ == "__main__":
-    check_device_count()
+如果创建了新的虚拟环境或遇到 `ModuleNotFoundError`，请手动执行以下命令加载环境变量：
+
+```bash
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
 ```
 
+为避免每次打开终端都需要输入该命令，建议将其添加到 `~/.bashrc` 文件末尾。
 
+> **⚠ 注意**：
+> PyACL 组件（`acl.so`）支持的 Python 版本范围通常为 **3.7.5 ~ 3.10**。请确保您的虚拟环境 Python 版本在此区间内。
 
-## PyACL 初始化与运行时管理
+#### 环境验证
 
-### 初始化 (acl.init)
-在使用任何 ACL 功能前，必须调用 `acl.init(config_path)`。即使没有配置文件，也需传入空字符串或指向空 JSON 的路径。
-
-### 运行时三板斧：Device - Context - Stream
-这是 PyACL 开发中最重要的基本概念：
-1.  **Device**：物理设备（NPU 芯片）。使用前需显式 `acl.rt.set_device(device_id)`。
-2.  **Context**：上下文，类似进程空间，管理该 Context 下的所有资源（Stream, Memory, Model）。`set_device` 会自动创建默认 Context，也可以显式创建。
-3.  **Stream**：执行流，类似 GPU 的 Stream。在同一个 Stream 中的任务是顺序执行的，不同 Stream 间可并行。
+为了验证 PyACL 环境是否就绪，我们可以编写一个简单的测试脚本 `check_ascend_device.py`，用于查询当前系统的 NPU 设备数量：
 
 ```python
-# 标准资源申请流程
+import acl  # 导入核心库
+
+# 1. 初始化 ACL 环境
+# 配置文件路径传入空字符串，表示使用默认配置
+ret = acl.init("") 
+if ret != 0:
+    print(f"ACL init failed, ret={ret}")
+    exit(1)
+
+# 2. 获取可用 Ascend 设备数量
+count, ret = acl.rt.get_device_count()
+if ret == 0:
+    print(f"Found {count} Ascend devices.")
+else:
+    print(f"Get device count failed, ret={ret}")
+
+# 3. 去初始化 (释放资源)
+acl.finalize()
+```
+
+运行该脚本：
+
+```bash
+(base) HwHiAiUser@orangepiaipro:~/Documents/samples/chapter4$ python check_ascend_device.py 
+Found 1 Ascend devices.
+```
+该示例代码演示了 PyACL 应用的基础生命周期：包括环境初始化、查询硬件资源（NPU 数量）以及最后的资源释放。对于投影 310B 处理器的开发板，其可用 NPU 设备数量为 1，程序输出结果与硬件实际情况一致。
+
+从上述示例可以看出，环境初始化与资源释放是 PyACL 应用开发的必要环节。在调用任何核心功能接口前，必须先执行 `acl.init(config_path)`。若跳过初始化步骤，后续所有接口调用可能失败并返回错误码（如 `ACL_ERROR_UNINITIALIZED`），导致程序无法正常运行。在没有特殊配置需求时，`acl.init` 可直接传入空字符串或指向空白 JSON 文件的路径。
+
+同样，程序运行结束后必须执行 `acl.finalize()` 以确保资源被正确回收。如果缺少资源释放环节，可能会引发内存泄漏、NPU 算力资源被持续占用或设备状态异常，进而影响后续任务的执行甚至导致系统崩溃。
+
+值得注意的是，对于上述简单的设备查询程序，即使没有显式调用初始化和资源释放接口，程序通常也能够返回正确的结果。例如，我们可以将代码简化为如下一行的命令并在终端执行：
+
+```bash
+python -c "import acl; print(f'Found {acl.rt.get_device_count()[0]} Ascend devices.')"
+```
+
+这种现象的原因主要有两点：
+1. **接口依赖性较低**：`acl.rt.get_device_count` 属于基础的硬件查询接口，在某些版本的驱动实现中，这类轻量级查询操作可能并不严格依赖完整的全局初始化环境即可访问驱动状态。
+2. **操作系统资源回收**：虽然程序没有显式调用 `acl.finalize()`，但当 Python 进程退出时，操作系统会自动关闭相关的文件描述符并回收该进程占用的资源。因此，多次运行该脚本通常不会立刻导致系统资源耗尽或报错。
+
+**但必须强调，这属于非规范用法。** 在涉及模型加载、内存申请或硬件加速（DVPP）等核心功能时，跳过 `acl.init` 可能会导致报错。为了保证程序的健壮性与兼容性，开发者应始终坚持规范的“初始化-业务执行-资源释放”流程。
+
+
+### PyACL接口调用流程
+
+调用 PyACL 接口开发的 AI 应用通常遵循一套标准化的逻辑流程，涵盖从环境初始化、硬件资源申请、业务计算执行到资源销毁的完整生命周期。开发者可以根据业务需求，将模型推理、媒体数据处理（DVPP）或单算子加速等功能进行独立部署或组合使用。
+
+### 运行管理资源生命周期
+PyACL 的资源管理构建在 **Device**、**Context** 与 **Stream** 三个核心概念之上。在应用启动阶段，必须首先调用 `acl.init` 完成全局环境初始化。随后，通过 `acl.rt.set_device` 指定计算所需的物理 NPU 设备。
+
+在昇腾架构中，**Context** 充当了隔离的运行空间，管理着该环境下的所有资源，虽然 `set_device` 会隐式创建默认上下文，但在复杂的多线程任务中，开发者通常需要显式管理 Context 以确保资源隔离。**Stream** 则作为异步任务的执行流，决定了指令在硬件上的下发顺序。应用程序的业务逻辑必须运行在这些资源就绪的基础之上。任务结束后，开发者应严格遵循“先业务、后流、再设备”的逆序原则进行资源释放，最后通过 `acl.finalize` 退出环境，以避免内存泄漏或 NPU 状态异常。
+
+```python
+# 标准资源申请与释放生命周期
+acl.init("")                        # 1. 环境初始化
 device_id = 0
-ret = acl.rt.set_device(device_id) # 隐式创建默认 Context
-context, ret = acl.rt.get_context() # 获取当前 Context 句柄
-stream, ret = acl.rt.create_stream() # 创建 Stream
+acl.rt.set_device(device_id)        # 2. 指定计算设备 (隐式创建 Context)
+stream, _ = acl.rt.create_stream()  # 3. 创建执行流
 
-# ... 执行业务 ...
+# ... 执行核心业务操作 ...
 
-# 标准资源释放流程 (必须逆序释放)
-acl.rt.destroy_stream(stream)
-acl.rt.reset_device(device_id)
-# 注意：reset_device 会自动 destroy 默认 context
+acl.rt.destroy_stream(stream)       # 4. 销毁执行流
+acl.rt.reset_device(device_id)      # 5. 重置设备并释放相关资源
+acl.finalize()                      # 6. 去初始化
 ```
 
-### 内存管理 (Host vs Device)
-昇腾包括 Host（CPU側）和 Device（NPU側）两部分。
-*   `acl.rt.malloc`: 申请 Device 侧内存（大部分模型推理输入输出都在这里）。
-*   `acl.rt.malloc_host`: 申请 Host 侧内存（通常是Pinned Memory，便于快速传输）。
-*   `acl.rt.memcpy`: 内存拷贝，需指定拷贝方向（Host->Host, Host->Device, Device->Host, Device->Device）。
+### 异构内存管理
+由于昇腾 AI 处理器拥有独立的存储单元，应用开发涉及 **Host**（CPU 侧）与 **Device**（NPU 侧）两部分内存。开发者通常面临频繁的数据交互需求：通过 `acl.rt.malloc` 申请 Device 侧内存用于 NPU 计算，或通过 `acl.rt.malloc_host` 申请 Host 内存。数据的流动则依靠 `acl.rt.memcpy` 完成，通过定义传输方向（如 `ACL_MEMCPY_HOST_TO_DEVICE`），将采集到的源数据搬运到 NPU 计算单元，或将计算出的结果拉回 Host 进行后处理。
 
-## 模型推理
+### 模型推理流水线
+模型推理是 PyACL 的核心应用场景，其逻辑流程紧密围绕 **离线模型加载** 与 **数据集封装** 展开。
 
-模型推理是 PyACL 应用的核心，遵循 **OM 模型加载 -> 准备 Dataset -> 执行推理 -> 卸载模型** 的流程。
-
-### 加载模型
-```python
-# 加载离线模型 (.om)
-model_path = "./model/resnet50.om"
-model_id, ret = acl.mdl.load_from_file(model_path) # 返回 model_id 用于后续操作
-```
-
-### 准备 Dataset (核心难点)
-ACL 设计了一套通用的数据结构来描述模型的输入输出：
-*   **aclmdlDesc**: 模型描述，可查询输入输出的个数、Shape、Format、大小。
-*   **aclmdlDataset**: 存放多个输入/输出 Tensor 的集合。
-*   **aclDataBuffer**: 存放单个 Tensor 的数据的 Buffer 地址和大小。
+当 `.om` 模型加载到系统后，系统会分配一个 `model_id`。由于深度学习模型往往包含多个异构的输入（如图像数据、元数据）和输出，PyACL 引入了层级化的封装机制。首先，通过 `aclmdlDesc` 查询模型所需的内存大小和张量信息；其次，为每个输入输出张量申请对应的 Device 内存，并将其封装入轻量级的单元 `aclDataBuffer`；最后，将这些 Buffer 汇聚到 `aclmdlDataset` 容器中。这种结构化设计允许 `acl.mdl.execute` 接口一次性处理复杂的张量集合，从而实现高效的同步或异步推理。
 
 ```python
-# 1. 根据 model_id 获取模型描述
+# 模型推理准备与执行核心逻辑
 model_desc = acl.mdl.create_desc()
-ret = acl.mdl.get_desc(model_desc, model_id)
+acl.mdl.get_desc(model_desc, model_id)
 
-# 2. 准备输入数据集 (假设模型只有1个输入)
+# 动态构建输入数据集 (Dataset / Buffer 模式)
 input_dataset = acl.mdl.create_dataset()
-# 申请 Device 内存存放输入数据
 input_size = acl.mdl.get_input_size_by_index(model_desc, 0)
-input_dev_ptr, ret = acl.rt.malloc(input_size, 2) # 2=ACL_MEM_MALLOC_NORMAL_ONLY
+input_ptr, _ = acl.rt.malloc(input_size, 2) # Normal Memory
+input_buf = acl.create_data_buffer(input_ptr, input_size)
+acl.mdl.add_dataset_buffer(input_dataset, input_buf)
 
-# 将申请的内存封装为 DataBuffer 并加入 Dataset
-input_data_buffer = acl.create_data_buffer(input_dev_ptr, input_size)
-acl.mdl.add_dataset_buffer(input_dataset, input_data_buffer)
-
-# 3. 准备输出数据集 (与输入类似，申请内存接收结果)
-output_dataset = acl.mdl.create_dataset()
-output_size = acl.mdl.get_output_size_by_index(model_desc, 0)
-output_dev_ptr, ret = acl.rt.malloc(output_size, 2)
-output_data_buffer = acl.create_data_buffer(output_dev_ptr, output_size)
-acl.mdl.add_dataset_buffer(output_dataset, output_data_buffer)
-```
-
-### 执行推理
-```python
-# 执行同步推理
+# 执行模型推理，结果将填充至预先准备好的 output_dataset
 ret = acl.mdl.execute(model_id, input_dataset, output_dataset)
 ```
-推理完成后，结果数据位于 `output_dev_ptr` 指向的 Device 内存中，需通过 `acl.rt.memcpy` 拷贝回 Host 进行后处理。
+
+### 扩展功能：单算子与媒体处理
+除了完整的模型推理，PyACL 还支持更为细粒度的操作。如果应用涉及基础线性代数运算（BLAS）或特定的数学计算，开发者可以略过复杂的模型构建过程，直接通过算子调用接口加载并执行单个算子。这种方式更加轻量，适合进行算子级的性能验证或特定的数据变换任务。此外，通过集成的 DVPP 接口，应用可以在硬件层级完成视频编解码与图像预处理，极大地减轻了 CPU 在数据清洗阶段的负担。-+-+-+-+-+
 
 ## DVPP 图像/视频处理
 
