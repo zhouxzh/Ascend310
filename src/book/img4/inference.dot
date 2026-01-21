@@ -1,0 +1,65 @@
+digraph InferenceFlow {
+	rankdir=TB;
+	graph [splines=ortho, nodesep=0.4, ranksep=0.5, compound=true, fontname="Noto Serif SC"];
+	node [shape=box, style="filled,rounded", fontname="Noto Serif SC", fontsize=10, penwidth=1.0];
+	edge [fontname="Noto Serif SC", fontsize=9, color="#555555", arrowsize=0.8];
+
+	// 左侧：开发主流程（紫色系）
+	subgraph cluster_main {
+		label="主流程开发";
+		style="dashed,rounded";
+		color="#8E24AA"; // 边框深紫
+		fontcolor="#8E24AA";
+		bgcolor="#F3E5F5"; // 背景极浅紫
+
+		node [fillcolor="#E1BEE7", color="#8E24AA"]; // 默认节点浅紫
+
+		prepare_env [label="1. 准备环境\n(开发/运行环境)", shape=ellipse]; // 椭圆表示开始
+		create_dir [label="2. 创建目录\nApp/\l├── model/\l├── data/\l└── *.py\l", shape=note, fillcolor="#FFECB3", color="#FBC02D", align=left]; // 文件夹黄色
+		dev_app [label="3. 开发应用\n(转换模型/写脚本)"];
+		run_app [label="4. 运行应用\n(调试/验证)", shape=ellipse]; // 椭圆表示结束
+
+		prepare_env -> create_dir -> dev_app -> run_app;
+	}
+
+	// 右侧大集群：应用运行逻辑（蓝色系）
+	subgraph cluster_logic_wrapper {
+		label="应用运行逻辑 (pyACL接口调用流程)";
+		style="solid,rounded";
+		color="#0277BD"; // 边框深蓝
+		fontcolor="#0277BD";
+		bgcolor="#E1F5FE"; // 背景极浅蓝
+
+		node [fillcolor="#B3E5FC", color="#0277BD", shape=box]; // 默认节点浅蓝
+
+		// 逻辑第一列 (改为普通group，移除cluster_前缀以修复lhead警告)
+		subgraph group_part1 {
+			import_deps [label="1. 导入依赖模块", fillcolor="#E0F7FA"]; 
+			acl_init [label="2. pyACL 初始化\n(acl.init)", shape=component, fillcolor="#B2DFDB", color="#00695C"];
+			req_res [label="3. 资源申请\n(Context/Stream)"];
+			data_trans [label="4. 数据传输\n(Host -> Device)", shape=parallelogram, fillcolor="#C8E6C9", color="#2E7D32"]; // 平行四边形(I/O)
+			
+			import_deps -> acl_init -> req_res -> data_trans;
+		}
+
+		// 逻辑第二列 (改为普通group)
+		subgraph group_part2 {
+			inference [label="5. 模型推理\n(Model Execute)", fillcolor="#FFCCBC", color="#D84315", penwidth=2.0]; // 橙色高亮核心
+			post_process [label="6. 数据后处理\n(查找置信度等)"];
+			release_res [label="7. 资源释放\n(Stream/Context)"];
+			acl_deinit [label="8. pyACL 去初始化\n(acl.finalize)", shape=component, fillcolor="#B2DFDB", color="#00695C"]; // 组件形
+			
+			inference -> post_process -> release_res -> acl_deinit;
+		}
+	}
+
+	// --- 布局对齐 (强制首行对齐) ---
+	{ rank=same; prepare_env; import_deps; inference }
+	
+	// --- 连线 ---
+	// 逻辑流内部跨列连接
+	data_trans -> inference [constraint=false, color="#0277BD", style=dashed];
+
+	// 开发 -> 逻辑关联
+	dev_app -> import_deps [lhead=cluster_logic_wrapper, constraint=false, style=dotted, color="#8E24AA", fontcolor="#8E24AA", xlabel="包含"];
+}

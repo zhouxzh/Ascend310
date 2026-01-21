@@ -1,0 +1,125 @@
+digraph G {
+    rankdir=TB;
+    fontname="Noto Serif SC";
+    splines=ortho; 
+    
+    nodesep=0.5; // 节点水平间距
+    ranksep=0.4; // 层级垂直间距
+
+    // 全局样式
+    node [fontname="Noto Serif SC", fontsize=12, style="filled", penwidth=1, color="#8c8c8c"];
+    edge [fontname="Noto Serif SC", fontsize=10, color="#666666", penwidth=1.2];
+
+    // --- 节点定义 ---
+
+    // 1. 初始化
+    node [shape=note, fillcolor="#E1F5FE", color="#039BE5"]
+    node_acl_init [label="初始化ACL\nacl.init"];
+    node_set_device [label="指定运算Device\nacl.rt.set_device"];
+    
+    // 2. Context 创建
+    node [shape=diamond, fillcolor="#FFF3E0", color="#FB8C00", height=0.7]
+    node_create_ctx_cond [label="显式创建\nContext?"];
+    
+    node [shape=box, fillcolor="#EEEEEE", color="#9E9E9E", style="filled,dashed", height=0.6]
+    node_implicit_ctx [label="使用默认隐式Context", fontcolor="#616161"];
+    
+    node [shape=note, fillcolor="#E1F5FE", color="#039BE5"]
+    node_create_context [label="显式创建Context\nacl.rt.create_context"];
+
+    // 3. Stream 创建
+    node [shape=diamond, fillcolor="#FFF3E0", color="#FB8C00", height=0.7]
+    node_create_cond [label="显式创建\nStream?"];
+
+    node [shape=box, fillcolor="#EEEEEE", color="#9E9E9E", style="filled,dashed", height=0.6]
+    node_implicit_note [label="使用默认隐式Stream", fontcolor="#616161"];
+
+    node [shape=note, fillcolor="#E1F5FE", color="#039BE5"]
+    node_create_stream [label="显式创建Stream\nacl.rt.create_stream"];
+    
+    // 4. 运行逻辑
+    node [shape=note, fillcolor="#E1F5FE", color="#039BE5"]
+    node_get_run_mode [label="获取运行模式(可选)\nacl.rt.get_run_mode"];
+    
+    node [shape=box, fillcolor="#F1F8E9", color="#7CB342", style="dashed", width=2.5]
+    node_app_logic [label="应用程序执行逻辑\n(异步任务按顺序执行)"];
+    
+    // 5. Stream 销毁
+    node [shape=diamond, fillcolor="#FFF3E0", color="#FB8C00", height=0.7]
+    node_destroy_cond [label="显式创建\nStream?"];
+
+    node [shape=box, fillcolor="#EEEEEE", color="#9E9E9E", style="filled,dashed", height=0.6]
+    node_implicit_release [label="隐式释放\n默认Stream", fontcolor="#616161"];
+
+    node [shape=note, fillcolor="#E1F5FE", color="#039BE5"]
+    node_destroy_stream [label="销毁Stream\nacl.rt.destroy_stream"];
+
+    // 6. Context 销毁
+    node [shape=diamond, fillcolor="#FFF3E0", color="#FB8C00", height=0.7]
+    node_destroy_ctx_cond [label="显式创建\nContext?"];
+
+    node [shape=box, fillcolor="#EEEEEE", color="#9E9E9E", style="filled,dashed", height=0.6]
+    node_implicit_ctx_release [label="隐式释放\n默认Context", fontcolor="#616161"];
+
+    node [shape=note, fillcolor="#E1F5FE", color="#039BE5"]
+    node_destroy_context [label="显式销毁Context\nacl.rt.destroy_context"];
+    
+    // 7. 结束
+    node [shape=note, fillcolor="#E1F5FE", color="#039BE5"]
+    node_reset_device [label="释放Device资源\nacl.rt.reset_device"];
+    node_acl_finalize [label="去初始化ACL\nacl.finalize"];
+
+
+    // --- 关系连线与布局 ---
+
+    // Rank 1: Init block
+    { rank=same; node_acl_init; node_set_device }
+    node_acl_init -> node_set_device;
+    node_set_device -> node_create_ctx_cond;
+
+    // Rank 2: Context Decision & Implicit Option (水平排列)
+    { rank=same; node_create_ctx_cond; node_implicit_ctx }
+    node_create_ctx_cond -> node_create_context [xlabel="是"];
+    node_create_ctx_cond -> node_implicit_ctx [xlabel="否", style=dashed, color="#9E9E9E"];
+    
+    // Convergence to Stream Cond
+    node_create_context -> node_create_cond;
+    node_implicit_ctx -> node_create_cond [style=dotted, color="#9E9E9E"];
+
+    // Rank 3: Stream Decision & Implicit Option (水平排列)
+    { rank=same; node_create_cond; node_implicit_note }
+    node_create_cond -> node_create_stream [xlabel="是"];
+    node_create_cond -> node_implicit_note [xlabel="否", style=dashed, color="#9E9E9E"];
+
+    // Rank 4: Logic block (RunMode & AppLogic same rank for width)
+    // 连接到逻辑层
+    node_create_stream -> node_get_run_mode;
+    node_implicit_note -> node_get_run_mode [style=dotted, color="#9E9E9E"];
+
+    { rank=same; node_get_run_mode; node_app_logic }
+    node_get_run_mode -> node_app_logic;
+    
+    node_app_logic -> node_destroy_cond;
+
+    // Rank 5: Stream Destroy & Implicit Release (水平排列)
+    { rank=same; node_destroy_cond; node_implicit_release }
+    node_destroy_cond -> node_destroy_stream [xlabel="是"];
+    node_destroy_cond -> node_implicit_release [xlabel="否", style=dashed, color="#9E9E9E"];
+
+    // Convergence to Context Destroy Cond
+    node_destroy_stream -> node_destroy_ctx_cond;
+    node_implicit_release -> node_destroy_ctx_cond [style=dotted, color="#9E9E9E"];
+
+    // Rank 6: Context Destroy
+    { rank=same; node_destroy_ctx_cond; node_implicit_ctx_release }
+
+    node_destroy_ctx_cond -> node_destroy_context [xlabel="是"];
+    node_destroy_ctx_cond -> node_implicit_ctx_release [xlabel="否", style=dashed, color="#9E9E9E"]; 
+
+    node_destroy_context -> node_reset_device;
+    node_implicit_ctx_release -> node_reset_device [style=dotted, color="#9E9E9E"];
+
+    // Rank 7: Finalize
+    { rank=same; node_reset_device; node_acl_finalize }
+    node_reset_device -> node_acl_finalize;
+}

@@ -28,6 +28,7 @@ export default sidebar({
       collapsible: true,
       children: [
         "README.md",
+        "case0.md",
         "case1.md",
         "case2.md",
         "case3.md",
