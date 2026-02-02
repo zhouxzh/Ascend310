@@ -1,5 +1,5 @@
 ---
-title: "第4讲：PyACL应用开发基础"
+title: "第4章：PyACL应用开发基础"
 author: [周贤中]
 date: 2025-09-04
 subject: "Markdown"
@@ -523,112 +523,834 @@ for image in images:
 7.  **资源释放**：业务完成后，必须按 **“先释放 Stream，再释放 Context，最后重置 Device”** 的逆序释放资源。
 8.  **系统去初始化**：最后调用 `acl.finalize()`，通知系统回收全局资源，结束进程。
 
-### 实例分析（ResNet50） 
+### 实例分析（ResNet-18） 
 
-通过前面的内容，我们已经详细的掌握了昇腾310B的PyACL的开发的基本知识，现在以ResNet50为例，详细讲解PyACL模型推理的详细的开发流程。
-在上一章的内容中，我们已经简单介绍过ResNet的基础知识，我们知道ResNet50就是具有50层的ResNet，ResNet主要是用于图片的分类的，下面分步骤详细介绍整个图片分类的模型推理的开发流程。
+在第三章中，我们初步介绍了 ResNet 的网络结构。本章我们将继续以 ResNet 为例，深入探讨 PyACL 的编程技巧与应用。上一章中，由于昇腾 310B 的 PyTorch 插件主要用于推理加速，且端侧设备训练算力有限，我们选用了较小的 CIFAR-10 数据集。而在本章，我们将采用更贴近实际生产的标准开发流程，并引入 **Tiny-ImageNet** 数据集进行实战演练。我们首先利用 Nvidia 显卡配合 CUDA 和 PyTorch 对 ResNet-18 进行训练，获取模型权重；随后将其转换为 ONNX 模型，并最终转换为昇腾特定的 OM 模型。我们将分别在**昇腾 310B (NPU-8T)**、**昇腾 310B (CPU)**、**树莓派 5B (CPU)** 以及RTX 5090D上进行推理测试，重点对比 OnnxRuntime 与 PyACL 的性能差异，深入分析 NPU 带来的帧率提升。
 
-#### 模型构建
+#### Tiny-ImageNet 数据集简介
 
-首先用 bash 创建一个开发目录并放置示例文件，建议结构如下：
+Tiny-ImageNet 是大规模视觉识别挑战赛 (ILSVRC) 中 ImageNet 数据集的一个微型子集，常被用于深度学习模型的快速原型设计与基准测试。该数据集包含 200 个不同的物体类别，这一数量远超 CIFAR-10 的 10 个类别，从而更具挑战性，能更好地验证模型的泛化能力。在数据规模方面，它拥有 100,000 张训练图片（每个类别 500 张）、10,000 张验证图片（每个类别 50 张）以及 10,000 张测试图片。所有图像的分辨率统一为 64x64 像素，虽然低于标准 ImageNet 的 224x224，但相比 CIFAR-10 的 32x32 分辨率包含了更多细节，非常适合在算力受限的嵌入式设备上进行中等规模的实验。
 
-```text
-resnet50/
-├── model/
-│   └── xxx.om      # 转换后的模型文件
-├── data/
-│   └── xxx.jpg     # 测试数据
-├── main.py         # 主程序（示例）
-└── utils.py        # 辅助脚本（可选）
-```
+在模型选择上，尽管 ResNet-50 或 ResNet-101 拥有更深的网络层数和潜在的更高精度，但在嵌入式 AI 开发场景下，ResNet-18 往往是性能与效率的最佳平衡点。首先，考虑到昇腾 310B 定位为边缘计算设备，ResNet-18 约 11M 的参数量和适中的计算量能够更直观地体现 NPU 在高吞吐场景下的加速优势，避免因网络过大导致的内存瓶颈掩盖推理效率。其次，对于 64x64 分辨率的 Tiny-ImageNet，ResNet-18 已具备足够的特征提取能力，使用过深的网络反而容易导致过拟合且训练耗时过长，不利于教学演示与快速迭代。最后，ResNet-18 作为业界最通用的轻量级骨干网络之一，常被作为衡量树莓派、Jetson 以及 Ascend 等不同端侧硬件性能的经典标尺。
 
-创建该目录结构的命令（在终端粘贴执行）：
+#### ResNet-18 模型训练
 
-```bash
-mkdir -p resnet50/model resnet50/data
-cd resnet50
-```
+如果你希望自行训练模型以便进行测试，可以参考本节的模型训练部分；如果只需体验昇腾 310B 上 PyACL 的推理性能，可直接跳转至下一个小节“PyACL 的推理”。
 
-在前面的章节中，我们已经深入探讨了 CANN 软件栈的核心组件，并以 ResNet50 模型为例，详细解构了如何利用 **ATC（Ascend Tensor Compiler）** 工具将开源框架（如 ONNX）的模型转换为昇腾 AI 处理器专用的 `.om` 离线模型。
+为了进行模型训练，我们需要一台配备 Nvidia 显卡并已正确安装 CUDA 驱动的服务器。本例中，我们使用 GeForce 5090D 显卡。对于图像分类任务，Nvidia GeForce 系列显卡已能很好地满足需求。我们选用 Tiny-ImageNet 数据集进行训练，该数据集相比完整版 ImageNet 体积更小，便于测试和实验。使用 GeForce 5090D 训练一次大约需要 1~2 小时；而若采用完整的 ImageNet 数据集，单卡训练可能需要长达一周的时间。
 
-模型转换是应用开发中至关重要的前置环节，它将通用的深度学习模型“翻译”为高效的硬件指令。关于 ATC 工具的详细操作参数与进阶转换技巧，本章不再赘述。读者可回溯查阅本教程[第二章：CANN软件栈核心组件解析](https://zhouxzh.github.io/Ascend310/book/chapter2.html)的相关内容，或参考昇腾官方的权威文档《[ATC工具使用指南](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/80RC2alpha002/devaids/auxiliarydevtool/atlasatc_16_0003.html)》。
-
-这里我们将第二章已转换好的模型复制到本章示例的 `model/` 目录。参考命令为：
+我们需要从 Hugging Face 下载 Tiny-ImageNet 数据集，为此首先需要使用 pip 安装 Hugging Face 的 CLI 工具。
+如果在下载过程中遇到网络连接问题，建议配置镜像源，例如使用 hf-mirror。
+可以通过以下命令设置环境变量来启用镜像：
 
 ```bash
-cp ../../chapter2/sample_resnet_quick_start/model
-/resnet50.om model/
+export HF_ENDPOINT=https://hf-mirror.com
 ```
-                             
-接着从华为云
 
-得到 `.om` 离线模型后，就相当于拥有了在昇腾硬件上执行推理的“钥匙”。下面将介绍如何用 PyACL 加载该 `.om` 模型，并完成从模型加载、输入准备到推理与结果解析的完整流程。
+为了方便起见，我们可以运行以下命令将该环境变量添加到 `.bashrc` 文件中，使其永久生效：
 
-### ResNet-18
+```bash
+echo 'export HF_ENDPOINT=https://hf-mirror.com' >> ~/.bashrc
+source ~/.bashrc
+```
+为了避免影响服务器上已有的虚拟环境，建议提前安装 Anaconda，并通过以下命令新建独立的环境：
 
-npu:
+```bash
+conda create -n torch
+conda activate torch
+conda install python=3.11
+```
+
+此处选择 Python 3.11 作为示例，实际可根据需求选择合适的版本，但不建议使用过新或过旧的版本，以减少兼容性问题。
+
+随后，使用 pip 安装所需依赖：
+
+```bash
+pip install datasets huggingface_hub torch torchvision timm tensorboard
+```
+
+本例采用的 ResNet-18 模型在结构上做了针对 Tiny-ImageNet 的适配。与标准 ResNet-18 不同，输入层采用 3x3 卷积且 stride=1，移除了原有的 7x7 卷积和最大池化层，以更好地保留 64x64 小尺寸图像的空间信息。此外，模型中增加了 Dropout 层以缓解过拟合，并在损失函数中引入标签平滑（Label Smoothing）。优化器选用带动量和权重衰减的 SGD，并配合多步学习率调度器，进一步提升模型的泛化能力。
+
+数据集的下载和加载通过 Hugging Face 的 `datasets` 库实现。只需一行代码即可自动下载并缓存 Tiny-ImageNet 数据集，无需手动解压和整理文件。示例代码如下：
+
+```python
+from datasets import load_dataset
+dataset = load_dataset('zh-plus/tiny-imagenet', cache_dir='./data')
+```
+
+在数据预处理部分，训练集采用了多种图像增强技术，包括随机裁剪（RandomCrop）、随机水平翻转（RandomHorizontalFlip）、随机旋转（RandomRotation）以及颜色抖动（ColorJitter）。这些增强方法能够人为增加训练样本的多样性，使模型在训练过程中见到更多变化的图像，有效缓解过拟合问题，提高模型的泛化能力。
+
+此外，模型训练过程中采用了 MultiStepLR 学习率调度策略（multistep），即在训练到指定 epoch 时自动降低学习率。这种做法可以让模型在初期快速收敛，在后期以更小的步长微调参数，进一步防止过拟合。图像增强和多步学习率调度的结合，有助于提升模型在验证集和实际应用中的表现。
+
+完成的模型训练代码如下：
+```python
+import os
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from datasets import load_dataset
+from torchvision.transforms import Compose, ToTensor, Normalize, RandomCrop, RandomHorizontalFlip, RandomRotation, ColorJitter # 增加更多增强
+from torch.utils.tensorboard import SummaryWriter # 导入 SummaryWriter
+
+# 自定义 ResNet 模型组件
+class BasicBlock(nn.Module):
+    expansion = 1
+
+    def __init__(self, inplanes, planes, stride=1, downsample=None):
+        super(BasicBlock, self).__init__()
+        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.downsample = downsample
+        self.stride = stride
+
+    def forward(self, x):
+        identity = x
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.conv2(out)
+        out = self.bn2(out)
+        if self.downsample is not None:
+            identity = self.downsample(x)
+        out += identity
+        out = self.relu(out)
+        return out
+
+# 移除 Bottleneck 类，ResNet18 使用 BasicBlock
+class ResNet(nn.Module):
+    def __init__(self, block, layers, num_classes=200):
+        super(ResNet, self).__init__()
+        self.inplanes = 64
+        # 适配 Tiny ImageNet (64x64): 使用 3x3 卷积, stride=1, 移除 MaxPool
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU(inplace=True)
+        # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1) # 移除
+
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.dropout = nn.Dropout(p=0.5) # 增加 Dropout 层
+        self.fc = nn.Linear(512 * block.expansion, num_classes)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def _make_layer(self, block, planes, blocks, stride=1):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                nn.Conv2d(self.inplanes, planes * block.expansion, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * block.expansion),
+            )
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample))
+        self.inplanes = planes * block.expansion
+        for _ in range(1, blocks):
+            layers.append(block(self.inplanes, planes))
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        # x = self.maxpool(x) # 移除
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.dropout(x) # 应用 Dropout
+        x = self.fc(x)
+        return x
+
+def train_resnet18_on_tiny_imagenet():
+    # 定义保存路径
+    data_dir = './data'
+    model_dir = './model'
+    log_dir = './logs/resnet18_tiny_imagenet' # TensorBoard 日志目录
+    os.makedirs(model_dir, exist_ok=True)
+
+    # 初始化 TensorBoard Writer
+    writer = SummaryWriter(log_dir)
+
+    # 加载数据集 (指定 cache_dir)
+    dataset = load_dataset('zh-plus/tiny-imagenet', cache_dir=data_dir) # 加载完整数据集以获取 train 和 valid
+    
+    # 数据预处理 (增加数据增强)
+    # 训练集：增加随机裁剪、水平翻转、旋转和颜色抖动
+    train_transform = Compose([
+        RandomCrop(64, padding=4),
+        RandomHorizontalFlip(),
+        RandomRotation(15), # 增加随机旋转
+        ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1), # 增加颜色抖动
+        ToTensor(),
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
+    # 验证集：仅保持标准化
+    val_transform = Compose([
+        ToTensor(),
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    
+    # 自定义数据集类
+    class TinyImageNetDataset(torch.utils.data.Dataset):
+        def __init__(self, dataset, transform=None):
+            self.dataset = dataset
+            self.transform = transform
+        
+        def __len__(self):
+            return len(self.dataset)
+        
+        def __getitem__(self, idx):
+            item = self.dataset[idx]
+            image = item['image']
+            label = item['label']
+            image = image.convert('RGB')  # 确保图像为RGB格式
+            if self.transform:
+                image = self.transform(image)
+            return image, label
+    
+    # 使用不同的 transform
+    train_dataset = TinyImageNetDataset(dataset['train'], transform=train_transform)
+    val_dataset = TinyImageNetDataset(dataset['valid'], transform=val_transform) # 假设 valid split 存在
+    
+    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True) # 将 batch_size 适当调大一点，例如 64 或 128
+    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False)
+    
+    # 定义模型 (使用自定义 ResNet18: BasicBlock, [2, 2, 2, 2])
+    model = ResNet(BasicBlock, [2, 2, 2, 2], num_classes=200)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    
+    # 损失函数和优化器 (更换为 SGD + Momentum + Weight Decay 以抗过拟合)
+    # 启用标签平滑 (Label Smoothing) 以防止过拟合
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+    # 使用 SGD 替代 Adam，初始学习率设为 0.1，weight_decay=5e-4 用于正则化
+    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+    # 添加学习率调度器，在第 30, 60, 90 epoch 衰减学习率
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 60, 90], gamma=0.1)
+    
+    # 训练循环
+    num_epochs = 150
+    best_acc = 0.0
+    
+    for epoch in range(num_epochs):
+        model.train()
+        running_loss = 0.0
+        correct_train = 0
+        total_train = 0
+        
+        # 移除 tqdm，使用简单的迭代
+        for i, (images, labels) in enumerate(train_loader):
+            images, labels = images.to(device), labels.to(device)
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            
+            running_loss += loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            total_train += labels.size(0)
+            correct_train += (predicted == labels).sum().item()
+            
+            # 记录 iteration 级别的 loss (可选)
+            if i % 100 == 0:
+                writer.add_scalar('Training/Iter_Loss', loss.item(), epoch * len(train_loader) + i)
+            
+        train_loss = running_loss / len(train_loader)
+        train_acc = 100. * correct_train / total_train
+        
+        # 记录 epoch 级别的训练指标
+        writer.add_scalar('Training/Epoch_Loss', train_loss, epoch + 1)
+        writer.add_scalar('Training/Epoch_Accuracy', train_acc, epoch + 1)
+
+        # 更新学习率并记录
+        current_lr = optimizer.param_groups[0]['lr']
+        writer.add_scalar('Training/Learning_Rate', current_lr, epoch + 1)
+        scheduler.step()
+        
+        # 验证阶段
+        model.eval()
+        correct_val = 0
+        total_val = 0
+        
+        with torch.no_grad():
+            for images, labels in val_loader:
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                _, predicted = torch.max(outputs.data, 1)
+                total_val += labels.size(0)
+                correct_val += (predicted == labels).sum().item()
+
+        val_acc = 100. * correct_val / total_val
+        
+        # 记录验证指标
+        writer.add_scalar('Validation/Accuracy', val_acc, epoch + 1)
+        
+        print(f'Epoch {epoch+1}: LR: {current_lr:.6f}, Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%, Val Acc: {val_acc:.2f}%')
+
+        # 保存 Checkpoint (每个 epoch 保存一次)
+        checkpoint_path = os.path.join(model_dir, f'checkpoint_epoch.pth')
+        torch.save({
+            'epoch': epoch + 1,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': train_loss,
+            'val_acc': val_acc
+        }, checkpoint_path)
+        print(f"Checkpoint saved to {checkpoint_path}")
+
+        # 保存为ONNX (每当验证集准确率提升时保存，或者最后保存)
+        if val_acc > best_acc:
+             best_acc = val_acc
+             # 保存最佳模型逻辑...
+    
+    # 关闭 writer
+    writer.close()
+
+    # 保存为ONNX (输入尺寸调整为 64x64)
+    dummy_input = torch.randn(1, 3, 64, 64).to(device)
+    onnx_path = os.path.join(model_dir, 'resnet18_tiny_imagenet.onnx')
+    torch.onnx.export(model, dummy_input, onnx_path, verbose=True)
+    print(f"Model saved as ONNX: {onnx_path}")
+
+if __name__ == '__main__':
+    train_resnet18_on_tiny_imagenet()
+```
+
+为了实时监控模型训练过程中的损失、准确率和学习率变化，代码中集成了 TensorBoard。通过 `SummaryWriter` 将训练和验证指标写入日志文件，用户可在训练过程中通过如下命令启动 TensorBoard：
+
+```bash
+tensorboard --logdir=./logs/resnet18_tiny_imagenet
+```
+
+在浏览器中访问对应端口，即可可视化每个 epoch 的损失、准确率曲线和学习率变化，便于分析模型收敛情况和调参效果。
+模型训练结束后，我们可以在model文件夹下面，找到名为resnet18_tiny_imagenet.onnx的模型文件。
+
+#### 环境配置与模型转换
+
+我们已经训练好了一个准对tiny-ImageNet的ResNet-18的网络，我们已经上传到huggingface的仓库`zhouxzh/resnet18_tiny_imagenet`，因此我们不需要自己进行网络训练。
+
+为了可以顺利的从huggingface下载已经训练好的模型，我们需要使用 pip 安装 Hugging Face 的 CLI 工具。
+```bash
+pip install datasets huggingface_hub
+```
+如果在下载过程中遇到网络连接问题，建议配置镜像源，例如使用 hf-mirror。
+可以通过以下命令设置环境变量来启用镜像：
+
+```bash
+export HF_ENDPOINT=https://hf-mirror.com
+```
+
+为了方便起见，我们可以运行以下命令将该环境变量添加到 `.bashrc` 文件中，使其永久生效：
+
+```bash
+echo 'export HF_ENDPOINT=https://hf-mirror.com' >> ~/.bashrc
+source ~/.bashrc
+```
+
+接下来，我们在昇腾 310B 开发板上构建项目目录。请执行以下命令创建 `resnet18` 文件夹及必要的子目录结构：
+
+```bash
+mkdir -p resnet18
+cd resnet18
+mkdir -p {data,model}
+```
+
+随后，使用 Hugging Face CLI 下载预训练好的 ONNX 模型：
+
+```bash
+hf download zhouxzh/resnet18_tiny_imagenet --local-dir model/
+```
+
+下载完成后，我们需要使用 ATC（Ascend Tensor Compiler）工具将 ONNX 模型转换为昇腾 NPU 专用的 OM（Offline Model）模型。执行如下转换命令：
+
+```bash
+atc --model=model/resnet18_tiny_imagenet.onnx \
+    --framework=5 --output=model/resnet18_tiny_imagenet \
+    --input_shape="input.1:1,3,64,64" \
+    --soc_version=Ascend310B4
+```
+
+#### 核心实现：模型推理脚本
+
+为了在昇腾 310B 上加载 OM 模型并执行推理，我们需要编写一个完整的 Python 脚本。该脚本不仅负责调用底层 PyACL 接口，还需要处理数据的预处理（Preprocessing）与后处理（Postprocessing）。本节将通过解析 `inference_npu.py` 的关键代码片段，深入讲解 PyACL 应用的构建逻辑。
+
+完整的推理代码逻辑被封装在 `AclResource` 类中，它管理着从初始化到资源释放的整个生命周期。
+
+**1. 初始化与模型加载**
+
+在类的 `init` 方法中，我们依次完成系统初始化、Device 指定、Context 创建以及模型加载。值得注意的是，模型加载后，我们需要获取“模型描述”（Model Description），它包含了模型输入输出张量的维度、大小和类型信息，这对于后续申请内存至关重要。
+
+```python
+def init(self):
+    # 1. ACL 全局初始化
+    ret = acl.init()
+    
+    # 2. 指定运算设备 (Device 0)
+    ret = acl.rt.set_device(self.device_id)
+    
+    # 3. 创建 Context 上下文
+    self.context, ret = acl.rt.create_context(self.device_id)
+    
+    # 4. 加载离线模型 (.om)
+    self.model_id, ret = acl.mdl.load_from_file(self.model_path)
+    
+    # 5. 获取模型描述信息 (用于查询输入输出大小)
+    self.model_desc = acl.mdl.create_desc()
+    ret = acl.mdl.get_desc(self.model_desc, self.model_id)
+```
+
+**2. 数据传输与内存管理**
+
+推理的核心在于 `execute` 方法。由于 NPU 无法直接读取 CPU（Host）侧的 Numpy 数组，我们需要显式地进行内存拷贝。
+
+*   **输入准备**：首先通过 `acl.mdl.get_input_size_by_index` 查询模型所需的输入字节数。接着使用 `acl.rt.malloc` 在 Device 侧申请内存，并利用 `acl.rt.memcpy` 将 host 侧预处理好的 Numpy 数据拷贝到 Device 侧。
+*   **Dataset 组装**：PyACL 使用 `Dataset` 和 `DataBuffer` 结构来传递数据。我们需要创建一个 `Dataset` 容器，并将包含 Device 内存地址的 `DataBuffer` 添加进去。
+*   **输出准备**：同样地，根据模型输出大小申请 Device 侧内存，并组装 Output Dataset，用于存放 NPU 计算后的结果。
+
+为了更加清晰地理解 Host 与 Device 之间的数据交互流程，我们可以将上述复杂的 `execute` 函数逻辑简化为以下伪代码：
+
+```python
+def execute(input_data_host):
+    # 1. 准备输入 (Host -> Device)
+    # 申请 NPU 侧内存，并将预处理好的图片数据从 CPU 搬运过去
+    input_size = get_model_input_size()
+    dev_in = acl.malloc_device(input_size)
+    acl.memcpy(dev_in, input_data_host, direction=HOST_TO_DEVICE)
+    
+    # 2. 准备输出 (Device)
+    # 在 NPU 侧申请内存，用于存放模型推理产生的结果
+    output_size = get_model_output_size()
+    dev_out = acl.malloc_device(output_size)
+    
+    # 3. 封装 Dataset
+    # PyACL 要求将内存指针封装为 Dataset 结构才能传入模型
+    input_dataset = create_dataset(dev_in)
+    output_dataset = create_dataset(dev_out)
+
+    # 4. 执行推理 (Inference)
+    # 指挥 NPU 执行计算，结果会写入 dev_out
+    acl.mdl.execute(model_id, input_dataset, output_dataset)
+
+    # 5. 获取结果 (Device -> Host)
+    # 申请 CPU 侧内存，将推理结果从 NPU 搬回，以便 Python 处理
+    host_out = acl.malloc_host(output_size)
+    acl.memcpy(host_out, dev_out, direction=DEVICE_TO_HOST)
+
+    # 6. 资源清理
+    # 释放本次推理申请的 Device 内存
+    acl.free(dev_in)
+    acl.free(dev_out)
+    
+    return host_out
+```
+
+这段伪代码直观地展示了 PyACL 推理的核心特征：**内存不仅需要申请，还需要在 Host 与 Device 之间显式搬运（Memcpy）**。这是与在通用 CPU 上开发程序最大的不同点。
+
+**3. 数据预处理**
+
+模型的输入通常需要特定的格式和分布。这里的 `preprocess` 函数模拟了标准 torchvision 的转换逻辑，但完全使用 Numpy 实现，以减少第三方库依赖。关键步骤包括：
+*   **归一化**：将像素值除以 255 转为浮点，并减去均值除以标准差。
+*   **维度变换**：将图片从 HWC（高宽通道）调整为 PyTorch 默认的 CHW（通道高宽）格式。
+*   **增加 Batch 维度**：模型输入通常是 4 维张量 (N, C, H, W)，因此需要增加 Batch 维度。
+*   **内存连续性**：这一步通过 `np.ascontiguousarray` 确保数据在内存中是连续存储的，这是 C 语言接口正确读取数据的必要条件。
+
+**4. 资源释放**
+
+脚本最后，我们需要显式释放所有持久化资源，防止 NPU 内存泄漏或状态异常。
+
+```python
+def release(self):
+    acl.mdl.destroy_desc(self.model_desc)
+    acl.mdl.unload(self.model_id)     # 卸载模型
+    acl.rt.destroy_context(self.context) # 销毁 Context
+    acl.rt.reset_device(self.device_id)  # 重置 Device
+    acl.finalize()                    # 去初始化
+```
+
+通过将这些模块组合，我们便得到了一个名为 `inference_npu.py` 的完整推理脚本。
+
+```python
+import time
+import numpy as np
+import acl
+from datasets import load_dataset
+import tqdm
+
+import ctypes
+
+data_dir = './data' # 假设 data_dir 已定义，或者根据实际情况保留原变量
+
+# 加载数据集 (指定 cache_dir)
+dataset = load_dataset('zh-plus/tiny-imagenet', split='valid', cache_dir=data_dir) # 只加载 valid 集
+
+# ACL 初始化与资源管理类
+class AclResource:
+    def __init__(self, device_id=0, model_path="model/resnet18_tiny_imagenet.om"):
+        self.device_id = device_id
+        self.model_path = model_path
+        self.model_id = None
+        self.context = None
+        self.stream = None
+        self.input_dataset = None
+        self.output_dataset = None
+        self.model_desc = None
+        
+    def init(self):
+        # ACL 初始化
+        ret = acl.init()
+        if ret != 0: raise RuntimeError("acl init failed")
+        ret = acl.rt.set_device(self.device_id)
+        if ret != 0: raise RuntimeError("set device failed")
+        self.context, ret = acl.rt.create_context(self.device_id)
+        if ret != 0: raise RuntimeError("create context failed")
+        
+        # 加载模型
+        self.model_id, ret = acl.mdl.load_from_file(self.model_path)
+        if ret != 0: raise RuntimeError(f"load model failed, path: {self.model_path}")
+        
+        # 获取模型描述
+        self.model_desc = acl.mdl.create_desc()
+        ret = acl.mdl.get_desc(self.model_desc, self.model_id)
+        
+        print(f"ACL Resource Init Success. Device: {self.device_id}")
+
+    def execute(self, input_numpy):
+        # 准备输入数据 (Host -> Device)
+        # 获取模型输入大小
+        input_size = acl.mdl.get_input_size_by_index(self.model_desc, 0)
+        
+        # 申请 Device 输入内存
+        dev_in_ptr, ret = acl.rt.malloc(input_size, 2) # 2: ACL_MEM_MALLOC_HUGE_FIRST
+        
+        # 拷贝数据 (Host -> Device)
+        # 确保输入是 contiguous 且 float32 (C Type bytes)
+        # 使用 tobytes + bytes_to_ptr 避免 numpy_to_ptr 可能引发的 ImportError 兼容性问题
+        if input_numpy.nbytes != input_size:
+            print(f"Warning: Input size mismatch. Model expects {input_size}, got {input_numpy.nbytes}")
+            
+        input_bytes = input_numpy.tobytes()
+        input_ptr = acl.util.bytes_to_ptr(input_bytes)
+        # acl.rt.memcpy (dst, dest_max, src, count, kind)
+        acl.rt.memcpy(dev_in_ptr, input_size, input_ptr, input_size, 1) # 1: ACL_MEMCPY_HOST_TO_DEVICE
+        
+        # 组装 Input Dataset
+        self.input_dataset = acl.mdl.create_dataset()
+        input_data_buffer = acl.create_data_buffer(dev_in_ptr, input_size)
+        acl.mdl.add_dataset_buffer(self.input_dataset, input_data_buffer)
+
+        # 准备输出数据
+        self.output_dataset = acl.mdl.create_dataset()
+        output_size = acl.mdl.get_output_size_by_index(self.model_desc, 0)
+        dev_out_ptr, ret = acl.rt.malloc(output_size, 2)
+        output_data_buffer = acl.create_data_buffer(dev_out_ptr, output_size)
+        acl.mdl.add_dataset_buffer(self.output_dataset, output_data_buffer)
+
+        # 执行推理
+        ret = acl.mdl.execute(self.model_id, self.input_dataset, self.output_dataset)
+        if ret != 0: print("Model execute failed")
+
+        # 取回结果 (Device -> Host)
+        host_out_buffer, ret = acl.rt.malloc_host(output_size)
+        acl.rt.memcpy(host_out_buffer, output_size, dev_out_ptr, output_size, 2) # 2: ACL_MEMCPY_DEVICE_TO_HOST
+        
+        # 转换为 numpy (假设输出是 float32, batch=1, class=200)
+        out_array = np.frombuffer(ctypes.string_at(host_out_buffer, output_size), dtype=np.float32)
+        
+        # 清理单次推理资源
+        acl.rt.free(dev_in_ptr)
+        acl.rt.free(dev_out_ptr)
+        acl.rt.free_host(host_out_buffer)
+        acl.destroy_data_buffer(input_data_buffer)
+        acl.destroy_data_buffer(output_data_buffer)
+        acl.mdl.destroy_dataset(self.input_dataset)
+        acl.mdl.destroy_dataset(self.output_dataset)
+        
+        return out_array
+
+    def release(self):
+        acl.mdl.destroy_desc(self.model_desc)
+        acl.mdl.unload(self.model_id)
+        acl.rt.destroy_context(self.context)
+        acl.rt.reset_device(self.device_id)
+        acl.finalize()
+
+# 实例化并初始化 ACL 资源
+# 请确保当前路径下有对应的 .om 模型文件
+om_model_path = "model/resnet18_tiny_imagenet.om" 
+acl_resource = AclResource(model_path=om_model_path)
+acl_resource.init()
+
+# 自定义数据预处理函数 (替代 torchvision)
+def preprocess(image):
+    # 将 PIL Image 转换为 numpy 数组
+    img_data = np.array(image).astype('float32') / 255.0
+    
+    # 获取图像尺寸，如果不是 RGB 三通道 (例如灰度图)，需要转换
+    if len(img_data.shape) == 2:
+        img_data = np.stack([img_data]*3, axis=-1)
+    
+    # 归一化参数
+    mean = np.array([0.485, 0.456, 0.406], dtype='float32')
+    std = np.array([0.229, 0.224, 0.225], dtype='float32')
+    
+    # 归一化: (image - mean) / std
+    img_data = (img_data - mean) / std
+    
+    # 调整维度: HWC -> CHW (3, 64, 64)
+    img_data = img_data.transpose(2, 0, 1)
+    
+    # 增加 Batch 维度: (1, 3, 64, 64)
+    img_data = np.expand_dims(img_data, axis=0)
+    
+    # 确保内存连续，这对 C 侧指针拷贝很重要
+    if not img_data.flags['C_CONTIGUOUS']:
+        img_data = np.ascontiguousarray(img_data)
+        
+    return img_data
+
+# 推理计数和计时
+total_images = 0
+correct_count = 0
+start_time = time.time()
+
+print("开始推理...")
+
+# 逐张图片推理
+for item in tqdm.tqdm(dataset):
+    image = item['image'] # 获取 PIL 图像
+    label = item['label'] # 获取真实标签
+    
+    # 预处理
+    input_tensor = preprocess(image)
+    
+    # 推理 (使用 pyACL)
+    # output 是扁平的一维数组，直接使用
+    outputs = acl_resource.execute(input_tensor)
+    
+    # 获取预测结果: argmax 获取概率最大的类别索引
+    predicted_label = np.argmax(outputs)
+    
+    if predicted_label == label:
+        correct_count += 1
+    
+    total_images += 1
+    # if total_images >= 100: break # 可选：用于快速测试
+
+end_time = time.time()
+duration = end_time - start_time
+fps = total_images / duration
+accuracy = correct_count / total_images * 100
+
+# 释放 ACL 资源
+acl_resource.release()
+
+print(f"推理完成。")
+print(f"总图片数: {total_images}")
+print(f"总耗时: {duration:.4f} 秒")
+print(f"推理帧率: {fps:.2f} FPS")
+print(f"正确率: {accuracy:.2f}%")
+```
+
+#### PyACL模型推理结果
+
+在配备 8T 算力的昇腾 310B 设备上，使用 PyACL 框架进行推理的运行日志如下所示：
+
 ```bash
 ACL Resource Init Success. Device: 0
 开始推理...
-100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 10000/10000 [00:36<00:00, 272.89it/s]
+100%|████████████████████████████████████████████████████████████████████████████| 10000/10000 [00:37<00:00, 265.04it/s]
 推理完成。
 总图片数: 10000
-总耗时: 36.6464 秒
-推理帧率: 272.88 FPS
-正确率: 44.86%
+总耗时: 37.7336 秒
+推理帧率: 265.02 FPS
+正确率: 62.45%
 ```
 
+从上述推理结果可以看出，在昇腾 310B（8T 算力版本）开发板上，利用 PyACL 调用 NPU 进行推理，处理 64x64 分辨率图像的帧率高达 265 FPS。这一令人印象深刻的速度不仅验证了 NPU 的加速能力，也表明其完全有能力胜任大多数实时计算场景，甚至在面对高帧率目标跟踪等对时延要求极高的任务时也能游刃有余。
 
+#### 推理结果对比分析
 
-
-
-#### 核心实现：Dataset与DataBuffer
-
-在上述的第5步（模型推理）中，PyACL 并不直接接受原始指针作为参数，而是引入了 `Dataset` 和 `DataBuffer` 的数据结构来管理输入输出。这种设计是为了应对深度学习模型多输入、多输出的异构特性。
-
-1.  **aclDataBuffer（数据缓冲）**：最底层的单元，它封装了 Device 上的内存地址（`ptr`）和数据长度（`size`），代表一个具体的 Tensor（张量）。
-2.  **aclmdlDataset（数据集）**：它是一个容器列表，用于存放多个 `aclDataBuffer`。例如，一个模型有两个输入（图片和元数据），那么输入的 `dataset` 就应该 add 两个 `buffer`。
-
-标准的推理代码实现范式如下：
+为了直观评估昇腾 310B NPU 的加速效果，我们将基于统一的 ResNet-18 ONNX 模型，在多种硬件平台上开展推理性能的横向对比测试。不仅包括高性能的 NVIDIA RTX 5090D 显卡和主流的 Intel Core Ultra 7 155H 笔记本处理器，还纳入了同属嵌入式领域的树莓派 5B，以及昇腾 310B 自身的 CPU 模式。我们将详细记录各平台的推理耗时与帧率 (FPS)，以此作为基准来量化 NPU 带来的性能提升。以下是各平台通用的 OnnxRuntime 推理测试代码：
 
 ```python
-import acl
+import time
+import numpy as np
+import onnxruntime
 
-# ... (初始化与资源申请代码略) ...
+from datasets import load_dataset
+import tqdm
 
-# 1. 加载模型
-# 系统会自动分配 model_id 用于标识该模型
-model_id, ret = acl.mdl.load_from_file("model/resnet50.om")
-model_desc = acl.mdl.create_desc()
-acl.mdl.get_desc(model_desc, model_id)
+data_dir = './data' # 假设 data_dir 已定义，或者根据实际情况保留原变量
 
-# 2. 准备 Dataset (以输入为例)
-# 创建一个空的 Dataset 容器
-input_dataset = acl.mdl.create_dataset()
-# 获取模型第0个输入的所需大小
-input_size = acl.mdl.get_input_size_by_index(model_desc, 0)
+# 加载数据集 (指定 cache_dir)
+dataset = load_dataset('zh-plus/tiny-imagenet', split='valid', cache_dir=data_dir) # 只加载 valid 集
 
-# 申请 Device 侧内存，并将数据拷贝进去 (假设 image_bytes 为预处理后的数据)
-input_ptr, ret = acl.rt.malloc(input_size, 2) # ACL_MEM_MALLOC_HUGE_ONLY
-acl.rt.memcpy(input_ptr, input_size, image_bytes_ptr, input_size, 1) # ACL_MEMCPY_HOST_TO_DEVICE
+# ONNX Runtime 初始化
+onnx_model_path = "model/resnet18_tiny_imagenet.onnx" # 请确保当前路径下有该模型文件
+session = onnxruntime.InferenceSession(onnx_model_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+print(f"当前运行设备 (Providers): {session.get_providers()}") # 打印以确认 CUDA 是否生效
 
-# 创建 Buffer 封装该内存指针
-input_buf = acl.create_data_buffer(input_ptr, input_size)
-# 将 Buffer 添加到 Dataset 中
-acl.mdl.add_dataset_buffer(input_dataset, input_buf)
+input_name = session.get_inputs()[0].name
 
-# 3. 准备 Output Dataset (逻辑同上，需根据模型输出数量创建对应 buffer)
-# ...
+# 自定义数据预处理函数 (替代 torchvision)
+def preprocess(image):
+    # 将 PIL Image 转换为 numpy 数组
+    img_data = np.array(image).astype('float32') / 255.0
+    
+    # 获取图像尺寸，如果不是 RGB 三通道 (例如灰度图)，需要转换
+    if len(img_data.shape) == 2:
+        img_data = np.stack([img_data]*3, axis=-1)
+    
+    # 归一化参数
+    mean = np.array([0.485, 0.456, 0.406], dtype='float32')
+    std = np.array([0.229, 0.224, 0.225], dtype='float32')
+    
+    # 归一化: (image - mean) / std
+    img_data = (img_data - mean) / std
+    
+    # 调整维度: HWC -> CHW (3, 64, 64)
+    img_data = img_data.transpose(2, 0, 1)
+    
+    # 增加 Batch 维度: (1, 3, 64, 64)
+    img_data = np.expand_dims(img_data, axis=0)
+    
+    return img_data
 
-# 4. 执行推理
-# 同步接口，阻塞直到推理完成
-ret = acl.mdl.execute(model_id, input_dataset, output_dataset)
+# 推理计数和计时
+total_images = 0
+correct_count = 0
+start_time = time.time()
 
-# 5. 后处理与资源清理
-# ...
+print("开始推理...")
+
+# 逐张图片推理
+for item in tqdm.tqdm(dataset):
+    image = item['image'] # 获取 PIL 图像
+    label = item['label'] # 获取真实标签
+    
+    # 预处理
+    input_tensor = preprocess(image)
+    
+    # 推理
+    outputs = session.run(None, {input_name: input_tensor})
+    
+    # 获取预测结果: argmax 获取概率最大的类别索引
+    predicted_label = np.argmax(outputs[0])
+    
+    if predicted_label == label:
+        correct_count += 1
+    
+    total_images += 1
+    # if total_images >= 100: break # 可选：用于快速测试
+
+end_time = time.time()
+duration = end_time - start_time
+fps = total_images / duration
+accuracy = correct_count / total_images * 100
+
+print(f"推理完成。")
+print(f"总图片数: {total_images}")
+print(f"总耗时: {duration:.4f} 秒")
+print(f"推理帧率: {fps:.2f} FPS")
+print(f"正确率: {accuracy:.2f}%")
 ```
 
-通过这种层级化的封装，PyACL 能够统一处理简单模型与复杂多输入模型的推理请求，保证了接口的通用性与扩展性。
+为了直观评估昇腾 310B NPU 的加速效果，我们将基于统一的 ResNet-18 ONNX 模型，在多种硬件平台上开展推理性能的横向对比测试。测试对象不仅包括高性能的 NVIDIA RTX 5090D 显卡和主流的 Intel Core Ultra 7 155H 笔记本处理器，还纳入了同属嵌入式领域的树莓派 5B，以及昇腾 310B 自身的 CPU 模式。
+
+所有平台均安装了 OnnxRuntime 进行推理。其中 RTX 5090D 配置了 CUDA 加速，而其他平台（包括树莓派、Intel 笔记本和昇腾 310B 的 CPU 模式）均仅使用 CPU 进行计算。我们将详细记录各平台的推理耗时与帧率 (FPS)，以此作为基准来量化 NPU 带来的性能提升。
+
+以下是各平台的具体测试结果：
+
+**1. Ascend 310B (CPU 模式) + OnnxRuntime:**
+*(规格：4 核 Cortex-A55 @ 1.0GHz)*
+
+```bash
+当前运行设备 (Providers): ['CPUExecutionProvider']
+开始推理...
+100%|█████████████████████████████████████| 10000/10000 [33:11<00:00,  5.02it/s]
+推理完成。
+总图片数: 10000
+总耗时: 1991.7797 秒
+推理帧率: 5.02 FPS
+正确率: 62.43%
+```
+
+**2. Nvidia GeForce 5090D (CUDA) + OnnxRuntime:**
+*(规格：32GB GDDR7, 21760 CUDA Cores)*
+
+```bash
+当前运行设备 (Providers): ['CUDAExecutionProvider', 'CPUExecutionProvider']
+开始推理...
+100%|█████████████████████████████████████| 10000/10000 [00:09<00:00, 1042.40it/s]
+推理完成。
+总图片数: 10000
+总耗时: 9.5939 秒
+推理帧率: 1042.33 FPS
+正确率: 62.43%
+```
+
+**3. Raspberry Pi 5B (CPU) + OnnxRuntime:**
+*(规格：Broadcom BCM2712, 4 核 Cortex-A76 @ 2.4GHz)*
+
+```bash
+当前运行设备 (Providers): ['CPUExecutionProvider']
+开始推理...
+100%|█████████████████████████████████████| 10000/10000 [07:26<00:00, 22.38it/s]
+推理完成。
+总图片数: 10000
+总耗时: 446.7709 秒
+推理帧率: 22.38 FPS
+正确率: 62.43%
+```
+
+**4. Intel Core Ultra 7 155H (CPU) + OnnxRuntime:**
+*(规格：3800 Mhz, 16 核, 22 逻辑处理器)*
+
+```bash
+当前运行设备 (Providers): ['CPUExecutionProvider']
+开始推理...
+100%|█████████████████████████████████████| 10000/10000 [02:41<00:00, 61.91it/s]
+推理完成。
+总图片数: 10000
+总耗时: 161.5301 秒
+推理帧率: 61.91 FPS
+正确率: 62.43%
+```
+
+**多平台 ResNet-18（Tiny-ImageNet）推理性能对比数据：**
+
+| 硬件平台 | 推理框架 | 运行设备 | 帧率 (FPS) | 相对 NPU 性能 (265 FPS) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Ascend 310B NPU** | **PyACL** | **NPU (AI Core)** | **265.02** | **100% (基准)** |
+| Nvidia RTX 5090D | OnnxRuntime | GPU (CUDA) | 1042.33 | ~393% |
+| Intel Core Ultra 7 155H | OnnxRuntime | CPU | 61.91 | ~23% |
+| Raspberry Pi 5B | OnnxRuntime | CPU | 22.38 | ~8.4% |
+| Ascend 310B CPU | OnnxRuntime | CPU (Arm Cortex-A55) | 5.02 | ~1.9% |
+
+通过数据对比，我们可以清晰地看到昇腾 310B NPU 的强大优势：
+*   **对比自身 CPU**：NPU 的推理速度是其 CPU 模式（5.02 FPS）的 **52 倍**，充分证明了专用 AI 加速器的必要性。
+*   **对比树莓派 5B**：虽然同样是 Arm 架构的嵌入式设备，昇腾 310B NPU 的性能是树莓派 5B CPU（22.38 FPS）的 **11 倍**以上。
+*   **对比高性能笔记本 CPU**：即便是最新的 Intel Core Ultra 7 处理器（61.91 FPS），在没有独立显卡加速的情况下，其纯 CPU 推理性能也不及昇腾 310B NPU 的 **1/4**。
+*   **对比旗舰显卡**：虽然 RTX 5090D 展现出了恐怖的 1000+ FPS 性能，但考虑到昇腾 310B 这类边缘设备的低功耗和体积优势，265 FPS 的成绩对于实时的嵌入式应用而言已经绰绰有余。
+
+这一测试结果有力地展示了昇腾 310B 在边缘计算场景下的核心竞争力——**以极低的功耗提供数倍于通用 CPU 的 AI 算力**。
+
 
 ### 扩展功能：单算子与媒体处理
 除了完整的模型推理，PyACL 还支持更为细粒度的操作。如果应用涉及基础线性代数运算（BLAS）或特定的数学计算，开发者可以略过复杂的模型构建过程，直接通过算子调用接口加载并执行单个算子。这种方式更加轻量，适合进行算子级的性能验证或特定的数据变换任务。此外，通过集成的 DVPP 接口，应用可以在硬件层级完成视频编解码与图像预处理，极大地减轻了 CPU 在数据清洗阶段的负担。

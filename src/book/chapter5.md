@@ -1,5 +1,5 @@
 ---
-title: "第5讲：算子开发基础"
+title: "第5章：算子开发基础"
 author: [周贤中]
 date: 2025-09-04
 subject: "Markdown"

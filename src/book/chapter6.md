@@ -1,5 +1,5 @@
 ---
-title: "第6讲：性能分析与优化基础"
+title: "第6章：性能分析与优化基础"
 author: [周贤中]
 date: 2025-09-04
 subject: "Markdown"

@@ -436,19 +436,28 @@ ATC run success, welcome to the next use.
 
 \begin{itemize}
 \item
-  \textbf{扩展可用内存}
+  \textbf{扩展可用内存} 通过创建 Swap
+  交换文件临时扩充虚拟内存，以缓解编译期间的内存压力：
 
 \begin{lstlisting}[language=bash]
 dd if=/dev/zero of=/swapfile bs=1M count=8192
 chmod 600 /swapfile
+mkswap /swapfile
 swapon /swapfile
 \end{lstlisting}
 
-  并在 \passthrough{\lstinline!/etc/fstab!} 中新增：
+  若需永久生效，请在 \passthrough{\lstinline!/etc/fstab!}
+  文件中追加以下配置：
 
 \begin{lstlisting}
 /swapfile swap swap defaults 0 0
 \end{lstlisting}
+
+  \textbf{注意}：如果设备使用 TF (MicroSD) 卡作为主要存储介质，不建议在
+  TF 卡上频繁使用 Swap。Swap
+  分区涉及大量高频读写操作，会极大加速闪存磨损，导致 TF
+  卡寿命缩短或损坏。建议仅在必要时临时开启，或使用 SSD
+  等更耐用的存储介质。
 \item
   \textbf{降低编译资源占用}
 
@@ -559,8 +568,14 @@ export NPU_HOST_LIB=/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub
 \end{enumerate}
 
 \begin{lstlisting}[language=bash]
+# 若脚本缺少执行权限，请先执行 chmod +x build.sh
 ./build.sh g++
 \end{lstlisting}
+
+如果在执行时遇到 \passthrough{\lstinline!Permission denied!}
+报错，说明脚本文件缺少可执行权限，需先运行
+\passthrough{\lstinline!chmod +x build.sh!}
+进行赋权，随后再次执行编译命令。
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -643,7 +658,7 @@ NHWC，只需在模型与预处理两端同时调整即可。
 
 \begin{figure}
 \centering
-\includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={resnet测试图片}]{chapters/img2/dog1_1024_683.jpg}
+\includegraphics[width=0.5\linewidth,height=\textheight,keepaspectratio,alt={resnet测试图片}]{chapters/img2/dog1_1024_683.jpg}
 \caption{resnet测试图片}\label{fig:dog}
 \end{figure}
 

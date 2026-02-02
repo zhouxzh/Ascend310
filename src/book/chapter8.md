@@ -1,5 +1,5 @@
 ---
-title: "第8讲：综合实战案例集介绍"
+title: "第8章：综合实战案例集介绍"
 author: [周贤中]
 date: 2025-09-04
 subject: "Markdown"

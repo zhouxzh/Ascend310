@@ -1,5 +1,5 @@
 ---
-title: "第1讲：昇腾310B边缘计算基础"
+title: "第1章：昇腾310B边缘计算基础"
 author: [周贤中]
 date: 2025-09-04
 subject: "Markdown"

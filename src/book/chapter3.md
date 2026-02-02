@@ -1,5 +1,5 @@
 ---
-title: "第3讲：昇腾PyTorch扩展迁移基础"
+title: "第3章：昇腾PyTorch扩展迁移基础"
 author: [周贤中]
 date: 2025-09-04
 subject: "Markdown"

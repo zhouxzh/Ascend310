@@ -1,5 +1,5 @@
 ---
-title: "第2讲：CANN软件栈核心组件解析"
+title: "第2章：CANN软件栈核心组件解析"
 author: [周贤中]
 date: 2025-09-04
 subject: "Markdown"

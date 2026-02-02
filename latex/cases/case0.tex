@@ -38,7 +38,7 @@ AIpro(8T)支持Ubuntu和openEuler操作系统，能够满足大多数AI算法原
 
 \begin{figure}
 \centering
-\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio,alt={GPIO接口定义}]{cases/img0/3.png}
+\includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={GPIO接口定义}]{cases/img0/3.png}
 \caption{GPIO接口定义}\label{fig:3}
 \end{figure}
 
@@ -305,7 +305,7 @@ certutil -hashfile opiaipro_ubuntu22.04_desktop_aarch64_20241128.img.xz md5
 
   \begin{figure}
   \centering
-  \includegraphics[width=0.5\linewidth,height=\textheight,keepaspectratio,alt={终端}]{cases/img0/shell.png}
+  \includegraphics[width=0.3\linewidth,height=\textheight,keepaspectratio,alt={终端}]{cases/img0/shell.png}
   \caption{终端}\label{fig:shell}
   \end{figure}
 
@@ -545,8 +545,8 @@ Boot1 & Boot2 & 启动设备 \\
 
   \begin{figure}
   \centering
-  \pandocbounded{\includegraphics[keepaspectratio,alt={桌面}]{cases/img0/logingui.png}}
-  \caption{桌面}
+  \includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={桌面}]{cases/img0/logingui.png}
+  \caption{桌面}\label{fig:desktop}
   \end{figure}
 
   若无法登陆请检查输入的密码是否正确，大小写以及符号是否正确
@@ -560,29 +560,51 @@ Boot1 & Boot2 & 启动设备 \\
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
-\tightlist
 \item
-  \textbf{使用USB2TTL模块，与开发板的GPIO口进行连线}\\
-  \pandocbounded{\includegraphics[keepaspectratio,alt={开发板串口}]{cases/img0/gpio_ttl.png}}，开发板的TX（GPIO8）接入USB2TTL模块的RX接口，开发板的RX（GPIO10）则接入模块的TX接口，并连接好GND接地，在Windows电脑下可以使用PUTTY连接串口。
+  \textbf{使用USB2TTL模块，与开发板的GPIO口进行连线}
+
+  \begin{figure}
+  \centering
+  \includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={开发板串口}]{cases/img0/gpio_ttl.png}
+  \caption{开发板串口}\label{fig:gpio_ttl}
+  \end{figure}
+
+  开发板的TX（GPIO8）接入USB2TTL模块的RX接口，开发板的RX（GPIO10）则接入模块的TX接口，并连接好GND接地，在Windows电脑下可以使用PUTTY连接串口。
 \item
   \textbf{使用开发板自带的Micro
   USB接口进行串口调试，该方法更为方便，只需要一根Micro
-  USB数据线，接入电脑后打开设备管理器查询对应的串口，然后使用PUTTY进行链接即可。}\\
-  \pandocbounded{\includegraphics[keepaspectratio,alt={MicroUSB串口}]{cases/img0/microusbser.png}}
+  USB数据线，接入电脑后打开设备管理器查询对应的串口，然后使用PUTTY进行链接即可。}
+
+  \begin{figure}
+  \centering
+  \includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={MicroUSB串口}]{cases/img0/microusbser.png}
+  \caption{MicroUSB串口}\label{fig:microusbser}
+  \end{figure}
 \end{enumerate}
 
 以Micro USB接口为例： 1. \textbf{使用Micro
 USB数据线连接开发板和电脑，此时请不要给开发板上电。} 2.
-\textbf{打开电脑的设备管理器，选择端口，寻找开发板对应的串口端口号}\\
-\pandocbounded{\includegraphics[keepaspectratio,alt={端口号}]{cases/img0/ttl.png}}
+\textbf{打开电脑的设备管理器，选择端口，寻找开发板对应的串口端口号}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={端口号}]{cases/img0/ttl.png}
+\caption{端口号}\label{fig:ttl}
+\end{figure}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \setcounter{enumi}{2}
 \item
-  \textbf{打开串口调试软件（PUTTY）}\\
-  \pandocbounded{\includegraphics[keepaspectratio,alt={PUTTY}]{cases/img0/putty.png}}，将Connection
-  Type选择为\passthrough{\lstinline!Serial!}，然后在Serial
+  \textbf{打开串口调试软件（PUTTY）}
+
+  \begin{figure}
+  \centering
+  \includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={PUTTY}]{cases/img0/putty.png}
+  \caption{PUTTY}\label{fig:putty}
+  \end{figure}
+
+  将Connection Type选择为\passthrough{\lstinline!Serial!}，然后在Serial
   Line处将端口号修改为设备管理器中查到的端口号，如作者此处端口号为\passthrough{\lstinline!COM3!}，此外，还需要将Speed从9600修改为115200，最后点击Open打开串口。
 \item
   \textbf{给开发板上电，等待出现\passthrough{\lstinline!Ubuntu 22.04.3 LTS orangepiaipro ttyAM0!}字样，输入登录的用户名HwHiAiUser并回车，然后输入密码Mind@123并回车，注意在输入密码的时候屏幕并不会显示任何东西，登陆后的界面如图所示。}
