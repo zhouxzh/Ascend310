@@ -1,7 +1,0 @@
-numpy
-opencv-python
-scikit-learn
-mtcnn
-onnxruntime
-Pillow
-tensorflow

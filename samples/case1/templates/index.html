@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Attendance System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { padding-top: 20px; }
+        .nav-link { font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="d-flex justify-content-center py-3">
+            <ul class="nav nav-pills">
+                <li class="nav-item"><a href="/" class="nav-link active" aria-current="page">Home</a></li>
+                <li class="nav-item"><a href="/users_page" class="nav-link">User Management</a></li>
+                <li class="nav-item"><a href="/attendance_page" class="nav-link">Attendance Log</a></li>
+            </ul>
+        </header>
+        
+        <div class="p-5 mb-4 bg-light rounded-3 text-center">
+            <div class="container-fluid py-5">
+                <h1 class="display-5 fw-bold">Ascend Face Attendance</h1>
+                <p class="col-md-8 fs-4 mx-auto">High performance face recognition system powered by Ascend 310B NPU.</p>
+                <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+                    <a href="/attendance_page" class="btn btn-primary btn-lg px-4 gap-3">View Attendance</a>
+                    <a href="/users_page" class="btn btn-outline-secondary btn-lg px-4">Manage Users</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
