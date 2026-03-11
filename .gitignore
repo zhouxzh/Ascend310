@@ -216,6 +216,14 @@ samples/chapter*/*/model/*
 samples/chapter3/*/fusion_result.json
 samples/chapter3/*/ge_check_op.json
 samples/*/*/kernel_meta
+
+# model files
+*.om
+*.onnx
+*.pb
+*.pt
+*.pth
+
 .history/*
 # LaTeX intermediate / build files
 latex/*.aux

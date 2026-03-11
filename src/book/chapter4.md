@@ -1351,11 +1351,68 @@ print(f"正确率: {accuracy:.2f}%")
 
 这一测试结果有力地展示了昇腾 310B 在边缘计算场景下的核心竞争力——**以极低的功耗提供数倍于通用 CPU 的 AI 算力**。
 
+## 图像/视频处理基础
 
-### 扩展功能：单算子与媒体处理
-除了完整的模型推理，PyACL 还支持更为细粒度的操作。如果应用涉及基础线性代数运算（BLAS）或特定的数学计算，开发者可以略过复杂的模型构建过程，直接通过算子调用接口加载并执行单个算子。这种方式更加轻量，适合进行算子级的性能验证或特定的数据变换任务。此外，通过集成的 DVPP 接口，应用可以在硬件层级完成视频编解码与图像预处理，极大地减轻了 CPU 在数据清洗阶段的负担。
+### PyACL：图像与视频处理简介
+此外，通过集成的 DVPP 接口，应用可以在硬件层级完成视频编解码与图像预处理，极大地减轻了 CPU 在数据清洗阶段的负担。
+本节介绍如何使用 PyACL 提供的媒体处理能力对图像/视频做高效预处理与编解码，涵盖 AIPP 与 DVPP 的角色、常见模块、典型流水线与开发注意事项。
 
-## DVPP 图像/视频处理
+#### 概述
+- PyACL 的媒体处理分两类能力：
+    - AIPP（Artificial Intelligence Pre-Processing）：在模型侧（AI Core）或模型运行链路上完成色域转换、裁剪/填充、减均值/乘系数等预处理。AIPP 分静态（在模型转换时固化到 .om）与动态（运行时通过接口设置）两种模式。
+    - DVPP（Digital Vision Pre-Processing）：昇腾硬件上的媒体处理单元，通过 pyACL 的 `acl.media` 接口提供硬件加速的解码、缩放、格式转换等能力（在 Device 侧高效执行）。
+
+#### AIPP vs DVPP（何时用哪个）
+- DVPP 适合做“低级别”的高吞吐预处理：JPEG/视频解码、YUV↔RGB 转换、缩放、裁剪等，优点是速度快、CPU 负载低，但受格式与对齐约束。
+- AIPP 适合做“模型输入级”的精确预处理：统一色域/像素变换、量化/去均值、通道顺序等；可作为补充以满足模型输入精度要求。
+- 常见组合：先用 DVPP 完成解码与粗略 resize/crop，再用 AIPP（静态或动态）做最后的色域和像素级处理保证与模型一致。
+
+#### DVPP 主要功能模块
+- VPC：格式转换（YUV/RGB）、缩放、裁剪、填充等。
+- JPEGD / JPEGE：JPEG 解码 / 编码。
+- VDEC / VENC：视频编码器/解码器（H.264/H.265）。
+- PNGD：PNG 解码（-> RGB）。
+这些能力通过 `acl.media.*` 系列接口（如 dvpp_create_channel_desc/dvpp_create_channel、dvpp_jpeg_decode_async、dvpp_vpc_resize_async 等）访问。
+
+#### 典型处理场景（举例）
+- 视频推理：VDEC 解码 -> DVPP 进行 YUV 格式调整与缩放 -> 若需 RGB 或额外预处理，再由 AIPP 或 VPC 完成 -> 传入模型。
+- 静态图片分类：JPEGD 解码 -> VPC 缩放/裁剪 -> 如需色域/像素变换使用 AIPP（静态或动态）-> 内存拷贝到 Device 模型输入。
+- 单算子/自定义预处理：在 Device 侧通过 DVPP 实现大部分工作，减少 Host 上的 Python/CPU 计算。
+
+#### 开发流程（简要）
+1. 环境准备：确保 CANN、Ascend 驱动与环境变量（set_env.sh）正确加载，Python 版本在支持范围内。
+2. 目录与模型准备：若包含推理，需准备 .om 模型（静态 AIPP 可在 ATC 时配置）。
+3. 初始化 ACL：`acl.init()` -> `acl.rt.set_device()` -> 创建 Context/Stream。
+4. DVPP 通道与缓冲：创建 channel 描述，使用 `acl.media.dvpp_malloc` 或 `acl.rt.malloc` 分配 Device 内存。
+5. 处理流程示例（伪代码）：
+     ```python
+     # 创建 channel 和 stream
+     ch = acl.media.dvpp_create_channel_desc()
+     acl.media.dvpp_create_channel(ch)
+     # 申请输入 Device buffer (Host -> Device)
+     in_dev = acl.media.dvpp_malloc(len(jpeg_bytes))
+     acl.rt.memcpy(in_dev, size, host_ptr, size, ACL_MEMCPY_HOST_TO_DEVICE)
+     # 预测解码后大小并申请输出
+     out_size, _ = acl.media.dvpp_jpeg_predict_dec_size(host_ptr, size, out_cfg)
+     out_dev = acl.media.dvpp_malloc(out_size)
+     # 异步解码并等待
+     acl.media.dvpp_jpeg_decode_async(ch, in_dev, size, out_dev, out_size, out_cfg, stream)
+     acl.rt.synchronize_stream(stream)
+     ```
+6. 后续：对解码结果使用 VPC 进行 resize/format 转换，或配合 AIPP 做最终像素预处理；封装为模型输入 Dataset 并执行推理。
+7. 资源释放：按逆序销毁 stream、context、channel、释放内存并调用 `acl.finalize()`。
+
+#### 注意事项与最佳实践
+- DVPP 输出对分辨率与地址有对齐要求（stride/padding），读取数据时需依据描述信息处理。
+- 使用异步接口（*_async）时必须配合 Stream 与同步机制（record_event / stream_wait_event / synchronize_stream）以确保内存生命周期安全。
+- Host->Device 的异步拷贝源内存应使用页锁定（pinned）内存（`acl.rt.malloc_host`）以保证 DMA 稳定性。
+- 静态 AIPP 在 ATC 转换时固化参数；若需灵活参数，选择动态 AIPP 并在推理前通过 pyACL 接口设置。
+- 优先把耗时的像素级操作下沉到 DVPP/AIPP，避免在 CPU（Python）端逐像素处理以免成为瓶颈。
+
+#### 小结
+在 PyACL 应用中，DVPP 提供高吞吐的硬件级图像/视频预处理能力，AIPP 提供与模型输入严格一致的像素级转换。合理地将两者组合，并配合异步流与事件机制，可以在边缘设备上实现高效、低延迟的图像/视频推理流水线。
+
+### DVPP
 
 DVPP（Digital Vision Pre-Processing）是昇腾处理器的硬件加速引擎，用于处理 JPEG 解码、缩放、抠图等，速度远超 CPU。
 
@@ -1386,6 +1443,8 @@ acl.rt.synchronize_stream(stream) # 等待完成
 关键步骤：创建 `acldvppPicDesc` 描述输入和输出图片的格式、宽高、Stride，然后调用 `acl.media.dvpp_vpc_resize_async`。
 
 ## 单算子调用
+
+除了完整的模型推理，PyACL 还支持更为细粒度的操作。如果应用涉及基础线性代数运算（BLAS）或特定的数学计算，开发者可以略过复杂的模型构建过程，直接通过算子调用接口加载并执行单个算子。这种方式更加轻量，适合进行算子级的性能验证或特定的数据变换任务。
 
 如果不加载整个模型，仅需调用某个特定算子（如 Softmax, MatMul）：
 1.  **acl.op.set_attr**: 设置算子属性。
