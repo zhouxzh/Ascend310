@@ -1,0 +1,12 @@
+cython
+torch
+pycocotools
+numpy
+tensorboard
+timm
+torchvision
+scipy
+pycocotools
+matplotlib
+datasets
+onnxscript

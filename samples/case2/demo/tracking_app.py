@@ -1,135 +1,154 @@
-import cv2
-import yaml
 import argparse
+import os
+import sys
 import time
-import numpy as np
-from models.utils.acl_inference import AclInference
-from models.tracking.deepsort import DeepSORT
-from models.utils.postprocess import non_max_suppression, scale_coords
+from pathlib import Path
 
-def main(config_path):
-    # 加载配置
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
 
-    # 1. 初始化昇腾推理引擎
-    acl_inference = AclInference(config['model']['detection_model'])
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
-    # 2. 加载跟踪算法
-    tracker = DeepSORT(max_age=config['tracking']['max_age'], min_hits=config['tracking']['min_hits'])
+from utils.opencv_runtime import cv2
+from utils.preprocessing import MODEL_DIR, create_video_writer, discover_models, load_labels, open_capture, resolve_model_path
+from tracking.deepsort import DeepSORT
+from utils.postprocessing import detections_to_tracker_inputs, draw_tracks
 
-    # 3. 打开视频流
-    video_source = config['video']['source']
-    cap = cv2.VideoCapture(video_source)
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run real-time SSD detection with simple IOU-based tracking.")
+    parser.add_argument("--device", choices=["cpu", "npu"], default="cpu", help="Inference backend.")
+    parser.add_argument("--device-id", type=int, default=0, help="Ascend device id when --device=npu.")
+    parser.add_argument("--backbone", default="mobilenetv3", help="Model backbone name used for auto-discovery.")
+    parser.add_argument("--model", default="", help="Explicit model path. Overrides --backbone.")
+    parser.add_argument("--model-dir", default=str(MODEL_DIR), help="Directory that stores SSD model files.")
+    parser.add_argument("--source", default="0", help="Camera index or video path.")
+    parser.add_argument("--score-threshold", type=float, default=0.35, help="Minimum confidence for tracking detections.")
+    parser.add_argument("--nms-threshold", type=float, default=0.45, help="NMS IoU threshold for detection.")
+    parser.add_argument("--max-detections", type=int, default=100, help="Maximum detections per frame.")
+    parser.add_argument("--camera-width", type=int, default=640, help="Preferred camera width.")
+    parser.add_argument("--camera-height", type=int, default=480, help="Preferred camera height.")
+    parser.add_argument("--labels", default="", help="Optional label file path. Defaults to COCO labels.")
+    parser.add_argument("--window-name", default="SSD Tracking", help="OpenCV display window name.")
+    parser.add_argument("--save", default="", help="Optional output video path.")
+    parser.add_argument("--no-display", action="store_true", help="Disable cv2.imshow for headless environments.")
+    parser.add_argument("--list-models", action="store_true", help="List available models for the selected device and exit.")
+    parser.add_argument("--track-max-age", type=int, default=30, help="Maximum frames to keep unmatched tracks alive.")
+    parser.add_argument("--track-min-hits", type=int, default=1, help="Minimum matched detections before a track is displayed.")
+    parser.add_argument("--track-iou-threshold", type=float, default=0.3, help="Minimum IoU required to associate detections to tracks.")
+    return parser.parse_args()
+
+def main() -> int:
+    args = parse_args()
+    model_dir = Path(args.model_dir).expanduser().resolve()
+    backend = None
+
+    if args.list_models:
+        available = discover_models(model_dir, args.device)
+        if not available:
+            print(f"No {args.device.upper()} models found in {model_dir}")
+            return 1
+        for backbone, path in available.items():
+            print(f"{backbone}: {path.name}")
+        return 0
+
+    try:
+        labels = load_labels(args.labels)
+        model_path = resolve_model_path(args.model, args.backbone, model_dir, args.device)
+        if args.device == "cpu":
+            try:
+                from ssdlite.cpu_backend import CpuBackend
+            except ImportError:
+                print("CPU backend requires onnxruntime to be installed.")
+                return 1
+            backend = CpuBackend(model_path)
+        elif args.device == "npu":
+            try:
+                from ssdlite.npu_backend import NpuBackend
+            except ImportError:
+                print("NPU backend requires Ascend ACL Python runtime to be installed.")
+                return 1
+            backend = NpuBackend(model_path, device_id=args.device_id)
+        else:
+            print(f"Unsupported device: {args.device}")
+            return 1
+        tracker = DeepSORT(
+            max_age=args.track_max_age,
+            min_hits=args.track_min_hits,
+            iou_threshold=args.track_iou_threshold,
+        )
+    except Exception as exc:
+        print(f"Failed to prepare tracking pipeline: {exc}")
+        return 1
+
+    cap = open_capture(args.source, args.camera_width, args.camera_height)
     if not cap.isOpened():
-        print(f"无法打开视频源: {video_source}")
-        return
+        print(f"Failed to open video source: {args.source}")
+        backend.release()
+        return 1
 
-    # 视频保存设置
-    if config['video']['save_video']:
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        out = cv2.VideoWriter(f"{config['video']['output_dir']}/output.mp4", fourcc, fps, (width, height))
+    writer = None
+    frame_count = 0
+    timing_totals = {
+        "preprocess": 0.0,
+        "inference": 0.0,
+        "decode": 0.0,
+        "draw": 0.0,
+    }
 
-    prev_time = 0
-    img_size = config['model']['input_shape']
+    try:
+        print(f"Using device: {args.device}")
+        print(f"Using model: {model_path}")
+        backend.print_model_io()
+        print("Press 'q' to quit.")
 
-    # 4. 循环处理每一帧
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+        while True:
+            read_start = time.perf_counter()
+            ok, frame = cap.read()
+            read_ms = (time.perf_counter() - read_start) * 1000.0
+            if not ok:
+                print("Video stream ended or camera frame read failed.")
+                break
 
-        # 预处理: 将图像调整为模型输入尺寸
-        img0 = frame.copy()
-        img = letterbox(frame, new_shape=img_size)[0]
-        img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, HWC to CHW
-        img = np.ascontiguousarray(img)
+            detections, profile_ms = backend.infer_with_profile(frame, args.score_threshold, args.nms_threshold, args.max_detections)
+            draw_start = time.perf_counter()
+            tracker_inputs = detections_to_tracker_inputs(detections)
+            tracks = tracker.update(tracker_inputs)
+            frame_count += 1
+            timing_totals["preprocess"] += read_ms + profile_ms["preprocess"]
+            timing_totals["inference"] += profile_ms["inference"]
+            timing_totals["decode"] += profile_ms["decode"]
 
-        # - 目标检测 (使用昇腾NPU)
-        detections_raw = acl_inference.inference([img])
-        
-        # - 后处理
-        pred = detections_raw[0] # 假设第一个输出是检测结果
-        pred = non_max_suppression(pred, config['model']['conf_thres'], config['model']['iou_thres'])
-        
-        detections = []
-        if pred[0] is not None and len(pred[0]):
-            det = pred[0]
-            det[:, :4] = scale_coords(img.shape[1:], det[:, :4], img0.shape).round()
-            for *xyxy, conf, cls in reversed(det):
-                detections.append([*xyxy, conf])
+            avg_timings_ms = {
+                key: timing_totals[key] / frame_count
+                for key in ("preprocess", "inference", "decode", "draw")
+            }
+            avg_frame_ms = sum(avg_timings_ms.values())
+            fps = 1000.0 / max(avg_frame_ms, 1e-6)
+            annotated = draw_tracks(frame, tracks, labels, fps, model_path.name, args.device, len(detections), avg_timings_ms)
+            draw_ms = (time.perf_counter() - draw_start) * 1000.0
+            timing_totals["draw"] += draw_ms
 
-        # - 跟踪算法更新
-        tracked_objects = tracker.update(np.array(detections), frame)
+            if args.save:
+                if writer is None:
+                    capture_fps = cap.get(cv2.CAP_PROP_FPS)
+                    writer = create_video_writer(args.save, capture_fps, annotated.shape)
+                writer.write(annotated)
 
-        # - 绘制跟踪轨迹
-        for obj in tracked_objects:
-            x1, y1, x2, y2 = map(int, obj.bbox)
-            track_id = obj.track_id
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, f"ID: {track_id}", (x1, y1 - 10), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            if not args.no_display:
+                cv2.imshow(args.window_name, annotated)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+    finally:
+        cap.release()
+        if writer is not None:
+            writer.release()
+        if not args.no_display:
+            cv2.destroyAllWindows()
+        backend.release()
 
-        # - 显示结果
-        if config['display']['show_fps']:
-            curr_time = time.time()
-            fps = 1 / (curr_time - prev_time)
-            prev_time = curr_time
-            cv2.putText(frame, f"FPS: {int(fps)}", (10, 30), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        
-        cv2.imshow("Real-time Object Tracking", frame)
+    return 0
 
-        if config['video']['save_video']:
-            out.write(frame)
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    # 5. 释放资源
-    cap.release()
-    if config['video']['save_video']:
-        out.release()
-    cv2.destroyAllWindows()
-    acl_inference.release()
-
-def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True):
-    shape = img.shape[:2]  # current shape [height, width]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape)
-
-    # Scale ratio (new / old)
-    r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
-    if not scaleup:
-        r = min(r, 1.0)
-
-    # Compute padding
-    ratio = r, r  # width, height ratios
-    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
-    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
-    if auto:  # minimum rectangle
-        dw, dh = np.mod(dw, 32), np.mod(dh, 32)  # wh padding
-    elif scaleFill:  # stretch
-        dw, dh = 0.0, 0.0
-        new_unpad = (new_shape[1], new_shape[0])
-        ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]  # width, height ratios
-
-    dw /= 2  # divide padding into 2 sides
-    dh /= 2
-
-    if shape[::-1] != new_unpad:
-        img = cv2.resize(img, new_unpad, interpolation=cv2.INTER_LINEAR)
-    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
-    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-    img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
-    return img, ratio, (dw, dh)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='configs/config.yaml', help='配置文件路径')
-    args = parser.parse_args()
-    main(args.config)
+    raise SystemExit(main())

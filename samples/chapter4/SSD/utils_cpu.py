@@ -20,7 +20,7 @@ def calc_iou(box1, box2):
     """
     # Check if empty
     if box1.size == 0 or box2.size == 0:
-        return np.zeros((box1.shape[0], box2.shape[0]))
+        return np.zeros((box1.shape[0], box2.shape[0])) 
 
     be1 = np.expand_dims(box1, 1) # (N, 1, 4)
     be2 = np.expand_dims(box2, 0) # (1, M, 4)
