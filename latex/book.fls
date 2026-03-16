@@ -542,6 +542,12 @@ INPUT cases/case1.tex
 INPUT ./cases/case2.tex
 INPUT ./cases/case2.tex
 INPUT cases/case2.tex
+INPUT ./cases/img2/流程图.png
+INPUT ./cases/img2/流程图.png
+INPUT ./cases/img2/流程图.png
+INPUT ./cases/img2/主线图.png
+INPUT ./cases/img2/主线图.png
+INPUT ./cases/img2/主线图.png
 INPUT ./cases/case3.tex
 INPUT ./cases/case3.tex
 INPUT cases/case3.tex

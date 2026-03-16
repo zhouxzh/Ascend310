@@ -27,6 +27,8 @@ def parse_args() -> argparse.Namespace:
 	parser.add_argument("--max-detections", type=int, default=100, help="Maximum detections per frame.")
 	parser.add_argument("--camera-width", type=int, default=640, help="Preferred camera width.")
 	parser.add_argument("--camera-height", type=int, default=480, help="Preferred camera height.")
+	parser.add_argument("--camera-fps", type=float, default=0.0, help="Requested camera FPS for live sources. Use 0 to keep the backend default.")
+	parser.add_argument("--camera-mjpeg", action="store_true", help="Request MJPEG camera output to reduce capture latency on some USB cameras.")
 	parser.add_argument("--labels", default="", help="Optional label file path. Defaults to COCO labels.")
 	parser.add_argument("--window-name", default="SSD Detection", help="OpenCV display window name.")
 	parser.add_argument("--save", default="", help="Optional output video path.")
@@ -72,7 +74,13 @@ def main() -> int:
 		print(f"Failed to prepare backend: {exc}")
 		return 1
 
-	cap = open_capture(args.source, args.camera_width, args.camera_height)
+	cap = open_capture(
+		args.source,
+		args.camera_width,
+		args.camera_height,
+		fps=args.camera_fps,
+		use_mjpeg=args.camera_mjpeg,
+	)
 	if not cap.isOpened():
 		print(f"Failed to open video source: {args.source}")
 		backend.release()
@@ -81,6 +89,7 @@ def main() -> int:
 	writer = None
 	frame_count = 0
 	timing_totals = {
+		"read": 0.0,
 		"preprocess": 0.0,
 		"inference": 0.0,
 		"decode": 0.0,
@@ -105,13 +114,14 @@ def main() -> int:
 
 			draw_start = time.perf_counter()
 			frame_count += 1
-			timing_totals["preprocess"] += read_ms + profile_ms["preprocess"]
+			timing_totals["read"] += read_ms
+			timing_totals["preprocess"] += profile_ms["preprocess"]
 			timing_totals["inference"] += profile_ms["inference"]
 			timing_totals["decode"] += profile_ms["decode"]
 
 			avg_timings_ms = {
 				key: timing_totals[key] / frame_count
-				for key in ("preprocess", "inference", "decode", "draw")
+				for key in ("read", "preprocess", "inference", "decode", "draw")
 			}
 			avg_frame_ms = sum(avg_timings_ms.values())
 			fps = 1000.0 / max(avg_frame_ms, 1e-6)

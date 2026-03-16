@@ -17,10 +17,12 @@ def _draw_detection_status(frame, device, model_name, fps, detection_count, avg_
 		f"Detections: {detection_count}",
 	]
 	if avg_timings_ms:
+		read_ms = avg_timings_ms.get("read", 0.0)
 		preprocess_ms = avg_timings_ms.get("preprocess", 0.0)
 		inference_ms = avg_timings_ms.get("inference", 0.0)
 		decode_ms = avg_timings_ms.get("decode", 0.0)
 		draw_ms = avg_timings_ms.get("draw", 0.0)
+		lines.append(f"Read: {read_ms:.1f} ms")
 		lines.append(f"Pre: {preprocess_ms:.1f} ms")
 		lines.append(f"Infer: {inference_ms:.1f} ms")
 		lines.append(f"Decode: {decode_ms:.1f} ms")
@@ -38,10 +40,12 @@ def _draw_tracking_status(frame, device, model_name, fps, detection_count, track
 		f"Detections: {detection_count}  Tracks: {track_count}",
 	]
 	if avg_timings_ms:
+		read_ms = avg_timings_ms.get("read", 0.0)
 		preprocess_ms = avg_timings_ms.get("preprocess", 0.0)
 		inference_ms = avg_timings_ms.get("inference", 0.0)
 		decode_ms = avg_timings_ms.get("decode", 0.0)
 		draw_ms = avg_timings_ms.get("draw", 0.0)
+		lines.append(f"Read: {read_ms:.1f} ms")
 		lines.append(f"Pre: {preprocess_ms:.1f} ms")
 		lines.append(f"Infer: {inference_ms:.1f} ms")
 		lines.append(f"Decode: {decode_ms:.1f} ms")

@@ -204,6 +204,8 @@ python demo/detection_app.py --device npu --list-models
 * `--max-detections`：每帧最多保留的检测框数量
 * `--camera-width`：摄像头期望宽度
 * `--camera-height`：摄像头期望高度
+* `--camera-fps`：请求摄像头输出帧率，`0` 表示保持后端默认行为
+* `--camera-mjpeg`：尝试请求摄像头输出 MJPEG，部分 USB 摄像头可降低读取延迟
 * `--labels`：自定义标签文件，每行一个类别
 * `--save`：输出视频路径
 * `--no-display`：禁用 `cv2.imshow`
@@ -239,6 +241,7 @@ python demo/detection_app.py --device npu --list-models
 * 基于 IOU 的检测框与轨迹关联
 * 使用匈牙利算法做全局匹配
 * 使用 `max_age`、`min_hits` 管理轨迹生命周期
+* 使用类别约束、中心距离补充匹配和轨迹平滑增强稳定性
 
 如果要观察轨迹连续性和 ID 稳定性，实时模式下同样建议优先使用 USB 摄像头。这样更容易看到目标进出画面、短时遮挡和连续运动对跟踪结果的影响。
 
@@ -256,6 +259,24 @@ NPU 摄像头跟踪：
 python demo/tracking_app.py --device npu --source 0
 ```
 
+只跟踪行人：
+
+```bash
+python demo/tracking_app.py --device npu --source 0 --track-classes person
+```
+
+同时跟踪行人和公交车：
+
+```bash
+python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
+```
+
+实时摄像头模式下尝试启用 MJPEG：
+
+```bash
+python demo/tracking_app.py --device npu --source 0 --camera-mjpeg --camera-fps 30
+```
+
 跟踪本地视频：
 
 ```bash
@@ -266,6 +287,12 @@ python demo/tracking_app.py --device cpu --source demo.mp4
 
 ```bash
 python demo/tracking_app.py --device cpu --model models/ssd320_mobilenetv4.onnx --source demo.mp4 --save output/tracking.mp4
+```
+
+通过调参增强轨迹连续性：
+
+```bash
+python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0 --track-size-smoothing 0.85 --track-score-smoothing 0.8
 ```
 
 无界面运行：
@@ -288,12 +315,26 @@ python demo/tracking_app.py --device npu --list-models
 * `--track-max-age`：轨迹在连续多少帧未匹配后删除
 * `--track-min-hits`：轨迹至少匹配多少次后才显示
 * `--track-iou-threshold`：检测框与轨迹关联所需的最小 IOU
+* `--track-center-distance-threshold`：IOU 关联失败后，补充匹配允许的最大归一化中心距离
+* `--track-size-smoothing`：轨迹框宽高的平滑系数，值越大越稳定，但响应更慢
+* `--track-score-smoothing`：轨迹分数的平滑系数，值越大越不容易抖动
+* `--track-classes`：指定只跟踪哪些类别，可使用类别名或类别 id，例如 `person,bus` 或 `1,6`
+
+另外，tracking 入口也支持与 detection 相同的摄像头参数：
+
+* `--camera-width`
+* `--camera-height`
+* `--camera-fps`
+* `--camera-mjpeg`
 
 调参建议：
 
 * 如果轨迹容易断开，可以适当增大 `--track-max-age`
 * 如果误匹配偏多，可以适当增大 `--track-iou-threshold`
 * 如果希望新目标更快显示，可以适当减小 `--track-min-hits`
+* 如果目标移动较快导致 IOU 不足，可以适当增大 `--track-center-distance-threshold`
+* 如果框大小跳变明显，可以适当增大 `--track-size-smoothing`
+* 如果只关心少数类别，优先使用 `--track-classes`，这样不仅减少画面干扰，也能降低解码阶段的无效后处理开销
 
 ### tracking 相关代码位置
 

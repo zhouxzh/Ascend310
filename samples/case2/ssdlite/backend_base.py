@@ -1,11 +1,17 @@
 import time
 from pathlib import Path
 from collections.abc import Mapping, Sequence
+from typing import List, Optional
 
 import numpy as np
 
 from ssdlite.decoder import SSDDecoder, _nms, dboxes300_coco, dboxes320_coco
 from utils.opencv_runtime import cv2
+
+
+PIXEL_SCALE = np.float32(1.0 / 255.0)
+IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(3, 1, 1)
+IMAGENET_INV_STD = (1.0 / np.array([0.229, 0.224, 0.225], dtype=np.float32)).reshape(3, 1, 1)
 
 def infer_input_size_from_model(model_path) -> int:
 	model_name = Path(model_path).name.lower()
@@ -19,17 +25,16 @@ def infer_input_size_from_model(model_path) -> int:
 	)
 
 
-def preprocess_frame(frame: np.ndarray, input_hw: tuple[int, int]) -> np.ndarray:
+def preprocess_frame(frame: np.ndarray, input_hw: tuple[int, int], buffers: Optional[dict[str, np.ndarray]] = None) -> np.ndarray:
 	input_h, input_w = input_hw
-	rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-	resized = cv2.resize(rgb, (input_w, input_h), interpolation=cv2.INTER_LINEAR)
-	image = resized.astype(np.float32) / 255.0
+	resized = cv2.resize(frame, (input_w, input_h), interpolation=cv2.INTER_LINEAR)
+	rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+	image = rgb.astype(np.float32)
+	image *= PIXEL_SCALE
 	image = image.transpose(2, 0, 1)
-
-	mean = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(3, 1, 1)
-	std = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(3, 1, 1)
-	image = (image - mean) / std
-	return np.expand_dims(image, axis=0).astype(np.float32)
+	np.subtract(image, IMAGENET_MEAN, out=image)
+	np.multiply(image, IMAGENET_INV_STD, out=image)
+	return np.expand_dims(image, axis=0)
 
 
 def get_model_spec(input_size: int) -> dict[str, object]:
@@ -171,7 +176,7 @@ def _class_wise_nms(boxes, scores, classes, iou_threshold):
 	)
 
 
-def decode_detections(outputs, frame_shape, score_threshold, nms_threshold, max_detections, ssd_decoder, strict_ssd=False):
+def decode_detections(outputs, frame_shape, score_threshold, nms_threshold, max_detections, ssd_decoder, strict_ssd=False, allowed_class_ids=None):
 	boxes_raw, scores_raw = _find_boxes_scores_outputs(outputs)
 	if boxes_raw is not None and scores_raw is not None:
 		boxes_shape = np.squeeze(boxes_raw).shape
@@ -188,9 +193,11 @@ def decode_detections(outputs, frame_shape, score_threshold, nms_threshold, max_
 				if num_boxes == expected_num_boxes:
 					decoded = ssd_decoder["decoder"].decode_batch(
 						np.asarray(boxes_raw, dtype=np.float32).copy(),
-						np.asarray(scores_raw, dtype=np.float32).copy(),
+						np.asarray(scores_raw, dtype=np.float32),
 						criteria=nms_threshold,
 						max_output=max_detections,
+						score_threshold=score_threshold,
+						allowed_class_ids=allowed_class_ids,
 					)
 					if not decoded:
 						return []
@@ -243,6 +250,9 @@ def decode_detections(outputs, frame_shape, score_threshold, nms_threshold, max_
 
 			boxes = _scale_boxes_to_frame(boxes, frame_shape)
 			keep = scores >= score_threshold
+			if allowed_class_ids is not None:
+				allowed_classes = np.asarray(sorted(set(int(class_id) for class_id in allowed_class_ids)), dtype=np.int64)
+				keep = keep & np.isin(classes, allowed_classes)
 			return _class_wise_nms(boxes[keep], scores[keep], classes[keep], nms_threshold)
 
 	if boxes_raw is not None and scores_raw is not None:
@@ -265,6 +275,9 @@ def decode_detections(outputs, frame_shape, score_threshold, nms_threshold, max_
 					classes = np.ones(scores.shape[0], dtype=np.int64)
 
 				keep = confs >= score_threshold
+				if allowed_class_ids is not None:
+					allowed_classes = np.asarray(sorted(set(int(class_id) for class_id in allowed_class_ids)), dtype=np.int64)
+					keep = keep & np.isin(classes, allowed_classes)
 				return _class_wise_nms(boxes[keep], confs[keep], classes[keep], nms_threshold)
 
 	if isinstance(outputs, Mapping):
@@ -294,6 +307,9 @@ def decode_detections(outputs, frame_shape, score_threshold, nms_threshold, max_
 
 		boxes = _scale_boxes_to_frame(boxes, frame_shape)
 		keep = scores >= score_threshold
+		if allowed_class_ids is not None:
+			allowed_classes = np.asarray(sorted(set(int(class_id) for class_id in allowed_class_ids)), dtype=np.int64)
+			keep = keep & np.isin(classes, allowed_classes)
 		return _class_wise_nms(boxes[keep], scores[keep], classes[keep], nms_threshold)
 
 	raise RuntimeError(f"无法识别模型输出格式: {summarize_outputs(outputs)}")
@@ -313,8 +329,15 @@ class DetectionBackend:
 			"decode": 0.0,
 		}
 
-	def infer(self, frame: np.ndarray, score_threshold: float, nms_threshold: float, max_detections: int) -> list[dict[str, object]]:
-		detections, _ = self.infer_with_profile(frame, score_threshold, nms_threshold, max_detections)
+	def infer(
+		self,
+		frame: np.ndarray,
+		score_threshold: float,
+		nms_threshold: float,
+		max_detections: int,
+		allowed_class_ids: Optional[List[int]] = None,
+	) -> list[dict[str, object]]:
+		detections, _ = self.infer_with_profile(frame, score_threshold, nms_threshold, max_detections, allowed_class_ids=allowed_class_ids)
 		return detections
 
 	def infer_with_profile(
@@ -323,6 +346,7 @@ class DetectionBackend:
 		score_threshold: float,
 		nms_threshold: float,
 		max_detections: int,
+		allowed_class_ids: Optional[List[int]] = None,
 	) -> tuple[list[dict[str, object]], dict[str, float]]:
 		preprocess_start = time.perf_counter()
 		input_tensor = preprocess_frame(frame, self.input_hw)
@@ -341,6 +365,7 @@ class DetectionBackend:
 			max_detections,
 			self.ssd_decoder,
 			self.strict_ssd,
+			allowed_class_ids=allowed_class_ids,
 		)
 		decode_ms = (time.perf_counter() - decode_start) * 1000.0
 

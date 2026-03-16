@@ -7,7 +7,7 @@ from .kalman_filter import KalmanFilter
 class Track:
     """表示单个跟踪目标。"""
 
-    def __init__(self, track_id, initial_detection, trail_size=30):
+    def __init__(self, track_id, initial_detection, trail_size=30, size_smoothing=0.8, score_smoothing=0.7):
         detection = self._normalize_detection(initial_detection)
         self.track_id = track_id
         self.bbox = detection[:4].copy()
@@ -15,12 +15,16 @@ class Track:
         self.class_id = int(detection[5])
         self.trail_size = trail_size
         self.trail = []
+        self.size_smoothing = size_smoothing
+        self.score_smoothing = score_smoothing
         self.kalman_filter = KalmanFilter()
+        self.class_scores = {}
         center_x, center_y = self._bbox_center(self.bbox)
-        self.kalman_filter.x[0, 0] = center_x
-        self.kalman_filter.x[1, 0] = center_y
+        self.width, self.height = self._bbox_size(self.bbox)
+        self.kalman_filter.initialize(center_x, center_y)
         self.time_since_update = 0
         self.hits = 1
+        self._update_class_state(self.class_id, self.score)
         self._append_trail_point(self.bbox)
 
     def predict(self):
@@ -28,8 +32,7 @@ class Track:
         predicted_state = self.kalman_filter.predict()
         center_x = float(predicted_state[0, 0])
         center_y = float(predicted_state[1, 0])
-        width, height = self._bbox_size(self.bbox)
-        self.bbox = self._center_to_bbox(center_x, center_y, width, height)
+        self.bbox = self._center_to_bbox(center_x, center_y, self.width, self.height)
         self.time_since_update += 1
 
     def update(self, detection):
@@ -40,13 +43,19 @@ class Track:
 
         center_x = float(self.kalman_filter.x[0, 0])
         center_y = float(self.kalman_filter.x[1, 0])
-        width, height = self._bbox_size(detection[:4])
-        self.bbox = self._center_to_bbox(center_x, center_y, width, height)
-        self.score = float(detection[4])
-        self.class_id = int(detection[5])
+        detection_width, detection_height = self._bbox_size(detection[:4])
+        self.width = self.size_smoothing * self.width + (1.0 - self.size_smoothing) * detection_width
+        self.height = self.size_smoothing * self.height + (1.0 - self.size_smoothing) * detection_height
+        self.bbox = self._center_to_bbox(center_x, center_y, self.width, self.height)
+        self.score = self.score_smoothing * self.score + (1.0 - self.score_smoothing) * float(detection[4])
+        self._update_class_state(int(detection[5]), float(detection[4]))
         self.time_since_update = 0
         self.hits += 1
         self._append_trail_point(self.bbox)
+
+    def _update_class_state(self, class_id, score):
+        self.class_scores[class_id] = self.class_scores.get(class_id, 0.0) + max(score, 0.0)
+        self.class_id = max(self.class_scores, key=self.class_scores.get)
 
     @staticmethod
     def _normalize_detection(detection):
@@ -92,11 +101,23 @@ class Track:
 class DeepSORT:
     """一个基于 IOU 和简单卡尔曼预测的轻量级多目标跟踪器。"""
 
-    def __init__(self, max_age=30, min_hits=3, iou_threshold=0.3, trail_size=30):
+    def __init__(
+        self,
+        max_age=30,
+        min_hits=3,
+        iou_threshold=0.3,
+        trail_size=30,
+        center_distance_threshold=1.8,
+        size_smoothing=0.8,
+        score_smoothing=0.7,
+    ):
         self.max_age = max_age
         self.min_hits = min_hits
         self.iou_threshold = iou_threshold
         self.trail_size = trail_size
+        self.center_distance_threshold = center_distance_threshold
+        self.size_smoothing = size_smoothing
+        self.score_smoothing = score_smoothing
         self.tracks = []
         self.next_id = 1
 
@@ -120,7 +141,13 @@ class DeepSORT:
 
     def _create_track(self, detection):
         """根据新的检测结果创建轨迹。"""
-        new_track = Track(self.next_id, detection, trail_size=self.trail_size)
+        new_track = Track(
+            self.next_id,
+            detection,
+            trail_size=self.trail_size,
+            size_smoothing=self.size_smoothing,
+            score_smoothing=self.score_smoothing,
+        )
         self.tracks.append(new_track)
         self.next_id += 1
 
@@ -133,24 +160,32 @@ class DeepSORT:
             return [], [], list(range(len(self.tracks)))
 
         iou_matrix = self._calculate_iou_matrix(detections)
-        matched_indices = self._linear_assignment(iou_matrix)
+        class_mask = self._calculate_class_compatibility_matrix(detections)
+        assignment_scores = np.where(class_mask, iou_matrix, -1.0)
+        matched_indices = self._linear_assignment(assignment_scores)
 
         matched = []
         unmatched_detections = set(range(len(detections)))
         unmatched_tracks = set(range(len(self.tracks)))
 
         for track_idx, detection_idx in matched_indices:
-            if iou_matrix[track_idx, detection_idx] < self.iou_threshold:
-                continue
-
-            track = self.tracks[track_idx]
-            detection = detections[detection_idx]
-            if not self._is_class_compatible(track.class_id, int(detection[5])):
+            if assignment_scores[track_idx, detection_idx] < self.iou_threshold:
                 continue
 
             matched.append((track_idx, detection_idx))
             unmatched_tracks.discard(track_idx)
             unmatched_detections.discard(detection_idx)
+
+        if unmatched_tracks and unmatched_detections:
+            fallback_matches = self._match_by_center_distance(
+                detections,
+                sorted(unmatched_tracks),
+                sorted(unmatched_detections),
+            )
+            for track_idx, detection_idx in fallback_matches:
+                matched.append((track_idx, detection_idx))
+                unmatched_tracks.discard(track_idx)
+                unmatched_detections.discard(detection_idx)
 
         return matched, sorted(unmatched_detections), sorted(unmatched_tracks)
 
@@ -158,12 +193,73 @@ class DeepSORT:
         """计算轨迹和检测之间的 IOU 矩阵。"""
         num_tracks = len(self.tracks)
         num_detections = len(detections)
-        iou_matrix = np.zeros((num_tracks, num_detections), dtype=np.float32)
+        if num_tracks == 0 or num_detections == 0:
+            return np.zeros((num_tracks, num_detections), dtype=np.float32)
 
-        for t, track in enumerate(self.tracks):
-            for d, det in enumerate(detections):
-                iou_matrix[t, d] = self._iou(track.bbox, det)
-        return iou_matrix
+        track_boxes = np.asarray([track.bbox[:4] for track in self.tracks], dtype=np.float32)
+        detection_boxes = np.asarray(detections[:, :4], dtype=np.float32)
+
+        top_left = np.maximum(track_boxes[:, None, :2], detection_boxes[None, :, :2])
+        bottom_right = np.minimum(track_boxes[:, None, 2:], detection_boxes[None, :, 2:])
+        overlap_size = np.clip(bottom_right - top_left, 0.0, None)
+        intersection = overlap_size[..., 0] * overlap_size[..., 1]
+
+        track_size = np.clip(track_boxes[:, 2:] - track_boxes[:, :2], 0.0, None)
+        detection_size = np.clip(detection_boxes[:, 2:] - detection_boxes[:, :2], 0.0, None)
+        track_area = track_size[:, 0] * track_size[:, 1]
+        detection_area = detection_size[:, 0] * detection_size[:, 1]
+
+        union = track_area[:, None] + detection_area[None, :] - intersection
+        return intersection / np.maximum(union, 1e-10)
+
+    def _calculate_class_compatibility_matrix(self, detections):
+        track_classes = np.asarray([track.class_id for track in self.tracks], dtype=np.int64)
+        detection_classes = detections[:, 5].astype(np.int64)
+        return (
+            (track_classes[:, None] == -1)
+            | (detection_classes[None, :] == -1)
+            | (track_classes[:, None] == detection_classes[None, :])
+        )
+
+    def _match_by_center_distance(self, detections, unmatched_tracks, unmatched_detections):
+        if not unmatched_tracks or not unmatched_detections:
+            return []
+
+        track_indices = np.asarray(unmatched_tracks, dtype=np.int64)
+        detection_indices = np.asarray(unmatched_detections, dtype=np.int64)
+
+        track_boxes = np.asarray([self.tracks[index].bbox[:4] for index in track_indices], dtype=np.float32)
+        detection_boxes = np.asarray(detections[detection_indices, :4], dtype=np.float32)
+        track_classes = np.asarray([self.tracks[index].class_id for index in track_indices], dtype=np.int64)
+        detection_classes = detections[detection_indices, 5].astype(np.int64)
+
+        track_centers = 0.5 * (track_boxes[:, :2] + track_boxes[:, 2:])
+        detection_centers = 0.5 * (detection_boxes[:, :2] + detection_boxes[:, 2:])
+        center_distance = np.linalg.norm(track_centers[:, None, :] - detection_centers[None, :, :], axis=2)
+
+        track_diagonal = np.linalg.norm(np.clip(track_boxes[:, 2:] - track_boxes[:, :2], 1.0, None), axis=1)
+        detection_diagonal = np.linalg.norm(np.clip(detection_boxes[:, 2:] - detection_boxes[:, :2], 1.0, None), axis=1)
+        reference_scale = np.maximum(track_diagonal[:, None], detection_diagonal[None, :])
+        normalized_distance = center_distance / np.maximum(reference_scale, 1.0)
+
+        class_mask = (
+            (track_classes[:, None] == -1)
+            | (detection_classes[None, :] == -1)
+            | (track_classes[:, None] == detection_classes[None, :])
+        )
+        valid_mask = class_mask & (normalized_distance <= self.center_distance_threshold)
+        if not np.any(valid_mask):
+            return []
+
+        distance_cost = np.where(valid_mask, normalized_distance, self.center_distance_threshold + 1.0)
+        row_ind, col_ind = linear_sum_assignment(distance_cost)
+
+        matched = []
+        for row, col in zip(row_ind, col_ind):
+            if distance_cost[row, col] > self.center_distance_threshold:
+                continue
+            matched.append((int(track_indices[row]), int(detection_indices[col])))
+        return matched
 
     def _iou(self, boxA, boxB):
         """计算两个边界框的交并比。"""

@@ -1,4 +1,3 @@
-import itertools
 from math import sqrt
 
 import numpy as np
@@ -9,48 +8,84 @@ def softmax(x, axis=-1):
     e_x = np.exp(x - x_max)
     return e_x / np.sum(e_x, axis=axis, keepdims=True)
 
+
+def _topk_indices(scores, limit):
+    if limit <= 0 or scores.size <= limit:
+        return np.arange(scores.size, dtype=np.int64)
+    partition = np.argpartition(scores, -limit)[-limit:]
+    return partition[np.argsort(scores[partition])[::-1]]
+
+
+def _empty_decoded_output():
+    return (
+        np.empty((0, 4), dtype=np.float32),
+        np.empty((0,), dtype=np.int64),
+        np.empty((0,), dtype=np.float32),
+    )
+
 def calc_iou(box1, box2):
-    """ Calculation of IoU based on two boxes numpy array,
-        input:
-            box1 (N, 4)
-            box2 (M, 4)
-        output:
-            IoU (N, M)
+    """Compute pairwise IoU for two groups of boxes in ltrb format.
+
+    Args:
+        box1: Array of shape (N, 4).
+        box2: Array of shape (M, 4).
+
+    Returns:
+        Array of shape (N, M).
     """
     if box1.size == 0 or box2.size == 0:
-        return np.zeros((box1.shape[0], box2.shape[0]))
+        return np.zeros((box1.shape[0], box2.shape[0]), dtype=np.float32)
 
-    be1 = np.expand_dims(box1, 1)
-    be2 = np.expand_dims(box2, 0)
+    top_left = np.maximum(box1[:, None, :2], box2[None, :, :2])
+    bottom_right = np.minimum(box1[:, None, 2:], box2[None, :, 2:])
+    overlap_size = np.clip(bottom_right - top_left, 0.0, None)
+    intersection = overlap_size[..., 0] * overlap_size[..., 1]
 
-    lt = np.maximum(be1[:, :, :2], be2[:, :, :2])
-    rb = np.minimum(be1[:, :, 2:], be2[:, :, 2:])
+    box1_size = np.clip(box1[:, 2:] - box1[:, :2], 0.0, None)
+    box2_size = np.clip(box2[:, 2:] - box2[:, :2], 0.0, None)
+    box1_area = box1_size[:, 0] * box1_size[:, 1]
+    box2_area = box2_size[:, 0] * box2_size[:, 1]
 
-    delta = rb - lt
-    delta = np.maximum(delta, 0)
-    intersect = delta[:, :, 0] * delta[:, :, 1]
+    union = box1_area[:, None] + box2_area[None, :] - intersection
+    return intersection / (union + 1e-10)
 
-    delta1 = be1[:, :, 2:] - be1[:, :, :2]
-    area1 = delta1[:, :, 0] * delta1[:, :, 1]
-    delta2 = be2[:, :, 2:] - be2[:, :, :2]
-    area2 = delta2[:, :, 0] * delta2[:, :, 1]
 
-    iou = intersect / (area1 + area2 - intersect + 1e-10)
-    return iou
+def _calc_iou_with_box(boxes, box):
+    """Compute IoU between many boxes and one reference box."""
+    top_left = np.maximum(boxes[:, :2], box[:2])
+    bottom_right = np.minimum(boxes[:, 2:], box[2:])
+    overlap_size = np.clip(bottom_right - top_left, 0.0, None)
+    intersection = overlap_size[:, 0] * overlap_size[:, 1]
 
-def _nms(boxes, scores, iou_threshold):
+    boxes_size = np.clip(boxes[:, 2:] - boxes[:, :2], 0.0, None)
+    box_size = np.clip(box[2:] - box[:2], 0.0, None)
+    boxes_area = boxes_size[:, 0] * boxes_size[:, 1]
+    box_area = box_size[0] * box_size[1]
+
+    union = boxes_area + box_area - intersection
+    return intersection / (union + 1e-10)
+
+
+def _nms(boxes, scores, iou_threshold, presorted=False):
     if len(boxes) == 0:
         return np.empty((0,), dtype=np.int64)
 
-    order = np.argsort(scores)[::-1]
+    if presorted:
+        order = np.arange(scores.size, dtype=np.int64)
+    else:
+        order = np.argsort(scores)[::-1]
+
     keep = []
     while order.size > 0:
         index = order[0]
         keep.append(index)
         if order.size == 1:
             break
-        iou = calc_iou(boxes[order[1:]], boxes[index].reshape(1, 4)).reshape(-1)
-        order = order[np.where(iou <= iou_threshold)[0] + 1]
+
+        remaining = order[1:]
+        iou = _calc_iou_with_box(boxes[remaining], boxes[index])
+        order = remaining[iou <= iou_threshold]
+
     return np.array(keep, dtype=np.int64)
 
 class SSDDecoder(object):
@@ -87,33 +122,66 @@ class SSDDecoder(object):
 
         return bboxes_in, softmax(scores_in, axis=-1)
 
-    def decode_batch(self, bboxes_in, scores_in, criteria=0.45, max_output=200):
+    def decode_batch(self, bboxes_in, scores_in, criteria=0.45, max_output=200, score_threshold=0.05, allowed_class_ids=None):
         bboxes, probs = self.scale_back_batch(bboxes_in, scores_in)
 
         output = []
         for bbox, prob in zip(bboxes, probs):
-            output.append(self.decode_single(bbox, prob, criteria, max_output))
+            output.append(
+                self.decode_single(
+                    bbox,
+                    prob,
+                    criteria,
+                    max_output,
+                    score_threshold=score_threshold,
+                    allowed_class_ids=allowed_class_ids,
+                )
+            )
         return output
 
-    def decode_single(self, bboxes_in, scores_in, criteria, max_output, max_num=200):
+    def decode_single(self, bboxes_in, scores_in, criteria, max_output, max_num=200, score_threshold=0.05, allowed_class_ids=None):
+        if allowed_class_ids is None:
+            class_ids = np.arange(1, scores_in.shape[1], dtype=np.int64)
+        else:
+            class_ids = np.asarray(sorted(set(int(class_id) for class_id in allowed_class_ids)), dtype=np.int64)
+            class_ids = class_ids[(class_ids > 0) & (class_ids < scores_in.shape[1])]
+
+        if class_ids.size == 0:
+            return _empty_decoded_output()
+
+        foreground_scores = scores_in[:, class_ids]
+        if foreground_scores.size == 0:
+            return _empty_decoded_output()
+
+        best_class_indices = np.argmax(foreground_scores, axis=1)
+        best_scores = foreground_scores[np.arange(foreground_scores.shape[0]), best_class_indices]
+        keep_score = best_scores >= score_threshold
+        if not np.any(keep_score):
+            return _empty_decoded_output()
+
+        candidate_boxes = bboxes_in[keep_score, :]
+        candidate_scores = best_scores[keep_score]
+        candidate_labels = class_ids[best_class_indices[keep_score]]
+
+        candidate_limit = max(max_output, max_num)
+        candidate_indices = _topk_indices(candidate_scores, candidate_limit)
+        candidate_boxes = candidate_boxes[candidate_indices]
+        candidate_scores = candidate_scores[candidate_indices]
+        candidate_labels = candidate_labels[candidate_indices]
+
         selected_boxes = []
         selected_scores = []
         selected_labels = []
+        for class_id in np.unique(candidate_labels):
+            class_mask = candidate_labels == class_id
+            class_boxes = candidate_boxes[class_mask]
+            class_scores = candidate_scores[class_mask]
 
-        for class_id in range(1, scores_in.shape[1]):
-            class_scores = scores_in[:, class_id]
-            keep_score = class_scores > 0.05
-            class_boxes = bboxes_in[keep_score, :]
-            class_scores = class_scores[keep_score]
+            class_indices = _topk_indices(class_scores, max_num)
+            class_boxes = class_boxes[class_indices, :]
+            class_scores = class_scores[class_indices]
 
-            if class_scores.size == 0:
-                continue
-
-            top_indices = np.argsort(class_scores)[-max_num:]
-            class_boxes = class_boxes[top_indices, :]
-            class_scores = class_scores[top_indices]
-
-            keep_nms = _nms(class_boxes, class_scores, criteria)
+            keep_nms = _nms(class_boxes, class_scores, criteria, presorted=True)
             if keep_nms.size == 0:
                 continue
 
@@ -122,13 +190,13 @@ class SSDDecoder(object):
             selected_labels.append(np.full(keep_nms.shape, class_id, dtype=np.int64))
 
         if not selected_boxes:
-            return [np.array([]) for _ in range(3)]
+            return _empty_decoded_output()
 
         boxes_out = np.concatenate(selected_boxes, axis=0)
         labels_out = np.concatenate(selected_labels, axis=0)
         scores_out = np.concatenate(selected_scores, axis=0)
 
-        final_indices = np.argsort(scores_out)[-max_output:]
+        final_indices = _topk_indices(scores_out, max_output)
         return boxes_out[final_indices, :], labels_out[final_indices], scores_out[final_indices]
 
 
@@ -141,33 +209,48 @@ class DefaultBoxes(object):
         self.steps = steps
         self.scales = scales
 
-        fk = fig_size / np.array(steps)
+        feature_map_scales = fig_size / np.array(steps, dtype=np.float32)
         self.aspect_ratios = aspect_ratios
 
-        self.default_boxes = []
-        for idx, sfeat in enumerate(self.feat_size):
-            sk1 = scales[idx] / fig_size
-            sk2 = scales[idx + 1] / fig_size
-            sk3 = sqrt(sk1 * sk2)
-            all_sizes = [(sk1, sk1), (sk3, sk3)]
+        default_boxes = []
+        for layer_index, feature_size in enumerate(self.feat_size):
+            layer_sizes = self._build_layer_sizes(layer_index)
+            center_coordinates = self._build_center_coordinates(
+                feature_size,
+                feature_map_scales[layer_index],
+            )
 
-            for alpha in aspect_ratios[idx]:
-                w, h = sk1 * sqrt(alpha), sk1 / sqrt(alpha)
-                all_sizes.append((w, h))
-                all_sizes.append((h, w))
-            for w, h in all_sizes:
-                for i, j in itertools.product(range(sfeat), repeat=2):
-                    cx, cy = (j + 0.5) / fk[idx], (i + 0.5) / fk[idx]
-                    self.default_boxes.append((cx, cy, w, h))
+            repeated_centers = np.tile(center_coordinates, (layer_sizes.shape[0], 1))
+            repeated_sizes = np.repeat(layer_sizes, center_coordinates.shape[0], axis=0)
+            default_boxes.append(np.concatenate((repeated_centers, repeated_sizes), axis=1))
 
-        self.dboxes = np.array(self.default_boxes, dtype=np.float32)
-        self.dboxes = np.clip(self.dboxes, 0.0, 1.0)
+        self.dboxes = np.concatenate(default_boxes, axis=0).astype(np.float32, copy=False)
+        np.clip(self.dboxes, 0.0, 1.0, out=self.dboxes)
 
-        self.dboxes_ltrb = self.dboxes.copy()
-        self.dboxes_ltrb[:, 0] = self.dboxes[:, 0] - 0.5 * self.dboxes[:, 2]
-        self.dboxes_ltrb[:, 1] = self.dboxes[:, 1] - 0.5 * self.dboxes[:, 3]
-        self.dboxes_ltrb[:, 2] = self.dboxes[:, 0] + 0.5 * self.dboxes[:, 2]
-        self.dboxes_ltrb[:, 3] = self.dboxes[:, 1] + 0.5 * self.dboxes[:, 3]
+        self.dboxes_ltrb = np.empty_like(self.dboxes)
+        half_sizes = 0.5 * self.dboxes[:, 2:]
+        self.dboxes_ltrb[:, :2] = self.dboxes[:, :2] - half_sizes
+        self.dboxes_ltrb[:, 2:] = self.dboxes[:, :2] + half_sizes
+
+    def _build_layer_sizes(self, layer_index):
+        base_scale = self.scales[layer_index] / self.fig_size
+        next_scale = self.scales[layer_index + 1] / self.fig_size
+        interpolated_scale = sqrt(base_scale * next_scale)
+
+        layer_sizes = [(base_scale, base_scale), (interpolated_scale, interpolated_scale)]
+        for aspect_ratio in self.aspect_ratios[layer_index]:
+            ratio_sqrt = sqrt(aspect_ratio)
+            width = base_scale * ratio_sqrt
+            height = base_scale / ratio_sqrt
+            layer_sizes.append((width, height))
+            layer_sizes.append((height, width))
+
+        return np.asarray(layer_sizes, dtype=np.float32)
+
+    def _build_center_coordinates(self, feature_size, feature_map_scale):
+        centers = (np.arange(feature_size, dtype=np.float32) + 0.5) / feature_map_scale
+        grid_x, grid_y = np.meshgrid(centers, centers, indexing="xy")
+        return np.stack((grid_x.ravel(), grid_y.ravel()), axis=1)
 
     @property
     def scale_xy(self):
@@ -185,6 +268,7 @@ class DefaultBoxes(object):
 
 
 def dboxes300_coco():
+    """Default boxes for the original SSD300 design described in the SSD paper."""
     figsize = 300
     feat_size = [38, 19, 10, 5, 3, 1]
     steps = [8, 16, 32, 64, 100, 300]
@@ -195,6 +279,7 @@ def dboxes300_coco():
 
 
 def dboxes320_coco(min_ratio=0.1, max_ratio=0.9):
+    """Default boxes for torchvision SSDLite models such as MobileNet-SSD."""
     figsize = 320
     feat_size = [20, 10, 5, 3, 2, 1]
     steps = [figsize / s for s in feat_size]

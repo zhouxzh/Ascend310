@@ -13,9 +13,7 @@
 
 从整体结构看，本案例对应一条标准的视频目标分析流水线：
 
-$$
-	ext{视频输入} \rightarrow \text{目标检测} \rightarrow \text{检测结果后处理} \rightarrow \text{轨迹预测} \rightarrow \text{数据关联} \rightarrow \text{轨迹输出}
-$$
+![程序流程图](img2/流程图.png){#fig:ssd_flow width=70% .center}
 
 本案例选择的实现路线是：
 
@@ -1115,9 +1113,7 @@ for track_idx, detection_idx in matched_indices:
 
 从知识结构上看，本章真正要让读者掌握的，不只是某个脚本的使用方法，而是下面这条主线：
 
-$$
-	ext{检测质量} \rightarrow \text{跟踪观测质量} \rightarrow \text{关联稳定性} \rightarrow \text{轨迹稳定性}
-$$
+![主线图](img2/主线图.png){#fig:ssd_main_line width=70% .center}
 
 理解这条主线之后，读者就能明白：目标跟踪不是一个独立黑盒，而是一套由检测、预测、匹配和管理共同组成的时序识别系统。
 

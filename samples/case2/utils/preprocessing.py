@@ -164,9 +164,14 @@ def parse_source(source):
 	return source
 
 
-def open_capture(source, width=None, height=None):
+def open_capture(source, width=None, height=None, fps=None, use_mjpeg=False):
 	video_source = parse_source(source)
 	cap = cv2.VideoCapture(video_source)
+	if isinstance(video_source, int):
+		if use_mjpeg:
+			cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+		if fps is not None and fps > 0:
+			cap.set(cv2.CAP_PROP_FPS, float(fps))
 	if width:
 		cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
 	if height:

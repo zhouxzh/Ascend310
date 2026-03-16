@@ -1,0 +1,38 @@
+digraph mainline {
+	rankdir=TB;
+	splines=polyline;
+	nodesep=0.3;
+	ranksep=0.4;
+
+	graph [
+		fontname="Noto Sans CJK SC",
+		bgcolor="white",
+		label="跟踪质量主线",
+		labelloc="t",
+		fontsize=18
+	];
+
+	node [
+		shape=box,
+		style="rounded,filled",
+		fontname="Noto Sans CJK SC",
+		fontsize=12,
+		color="#4C78A8",
+		penwidth=1.2,
+		width=2.6,
+		margin="0.16,0.12"
+	];
+
+	edge [
+		color="#4C78A8",
+		penwidth=1.5,
+		arrowsize=0.8
+	];
+
+	detect [label="检测质量", fillcolor="#EAF2FB"];
+	observe [label="跟踪观测质量", fillcolor="#E8F6F0"];
+	associate [label="关联稳定性", fillcolor="#FFF3D6"];
+	track [label="轨迹稳定性", fillcolor="#FCE8E6"];
+
+	detect -> observe -> associate -> track;
+}
