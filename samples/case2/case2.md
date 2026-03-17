@@ -13,7 +13,7 @@
 
 从整体结构看，本案例对应一条标准的视频目标分析流水线：
 
-![程序流程图](img2/流程图.png){#fig:ssd_flow width=70% .center}
+![程序流程图](img2/流程图.png){#fig:ssd_flow width=40% .center}
 
 本案例选择的实现路线是：
 
@@ -1496,7 +1496,7 @@ python demo/tracking_app.py --device npu --source 0 --track-center-distance-thre
 
 从知识结构上看，本章真正要让读者掌握的，不只是某个脚本的使用方法，而是下面这条主线：
 
-![主线图](img2/主线图.png){#fig:ssd_main_line width=70% .center}
+![主线图](img2/主线图.png){#fig:ssd_main_line width=30% .center}
 
 理解这条主线之后，读者就能明白：目标跟踪不是一个独立黑盒，而是一套由检测、预测、匹配和管理共同组成的时序识别系统。
 

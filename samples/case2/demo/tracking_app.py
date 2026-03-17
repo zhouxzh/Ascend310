@@ -130,6 +130,9 @@ def main() -> int:
         backend.release()
         return 1
 
+    # Query camera-reported FPS once and use it to bound displayed FPS.
+    capture_fps = cap.get(cv2.CAP_PROP_FPS)
+
     writer = None
     frame_count = 0
     timing_totals = {
@@ -178,15 +181,21 @@ def main() -> int:
                 for key in ("read", "preprocess", "inference", "decode", "draw")
             }
             avg_frame_ms = sum(avg_timings_ms.values())
-            fps = 1000.0 / max(avg_frame_ms, 1e-6)
+            processing_fps = 1000.0 / max(avg_frame_ms, 1e-6)
+            # If the capture device reports a max FPS (>0), cap the displayed FPS to it.
+            if capture_fps and capture_fps > 1e-3:
+                fps = min(processing_fps, capture_fps)
+            else:
+                fps = processing_fps
             annotated = draw_tracks(frame, tracks, labels, fps, model_path.name, args.device, len(detections), avg_timings_ms)
             draw_ms = (time.perf_counter() - draw_start) * 1000.0
             timing_totals["draw"] += draw_ms
 
             if args.save:
                 if writer is None:
-                    capture_fps = cap.get(cv2.CAP_PROP_FPS)
-                    writer = create_video_writer(args.save, capture_fps, annotated.shape)
+                    # Use camera-reported FPS when available, otherwise fall back to measured fps.
+                    writer_fps = capture_fps if (capture_fps and capture_fps > 1e-3) else fps
+                    writer = create_video_writer(args.save, writer_fps, annotated.shape)
                 writer.write(annotated)
 
             if not args.no_display:

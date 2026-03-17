@@ -7,7 +7,7 @@ digraph tracking_pipeline {
 	graph [
 		fontname="Noto Sans CJK SC",
 		bgcolor="white",
-		label="基于 MobileNet-SSD 与 DeepSORT 的目标跟踪流程",
+		label="MobileNet-SSD + DeepSORT\n目标跟踪流程",
 		labelloc="t",
 		fontsize=18
 	];

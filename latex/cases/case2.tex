@@ -27,7 +27,7 @@
 
 \begin{figure}
 \centering
-\includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={程序流程图}]{cases/img2/流程图.png}
+\includegraphics[width=0.4\linewidth,height=\textheight,keepaspectratio,alt={程序流程图}]{cases/img2/流程图.png}
 \caption{程序流程图}\label{fig:ssd_flow}
 \end{figure}
 
@@ -775,26 +775,37 @@ scale\_xy 和 scale\_wh
 
 \subsubsection{分类分数与 NMS}\label{ux5206ux7c7bux5206ux6570ux4e0e-nms}
 
-在 decode\_single 中，代码对每个类别分别进行处理：
+当前工程版本中的 decode\_single 已经不是``对每个类别都扫描全部
+prior''的基础写法，而是先对每个 prior
+选出一个最佳前景类别，再进入后续筛选和 NMS。其主线思路更接近下面这样：
 
 \begin{lstlisting}[language=Python]
-for class_id in range(1, scores_in.shape[1]):
-    class_scores = scores_in[:, class_id]
-    keep_score = class_scores > 0.05
-    keep_nms = _nms(class_boxes, class_scores, criteria)
+foreground_scores = scores_in[:, class_ids]
+best_class_indices = np.argmax(foreground_scores, axis=1)
+best_scores = foreground_scores[np.arange(foreground_scores.shape[0]), best_class_indices]
+keep_score = best_scores >= score_threshold
+
+candidate_boxes = bboxes_in[keep_score, :]
+candidate_scores = best_scores[keep_score]
+candidate_labels = class_ids[best_class_indices[keep_score]]
 \end{lstlisting}
 
-这段代码体现了 SSD 后处理的两个关键步骤：
+随后，代码再按类别分别执行 NMS。这样做体现了 SSD
+后处理中的三个关键工程点：
 
 \begin{itemize}
 \tightlist
 \item
-  先按类别分数进行阈值筛选。
+  先为每个 prior 找到最可信的前景类别。
 \item
-  再对同一类别的框做 NMS，去掉大量重叠冗余框。
+  再根据阈值筛掉低置信度候选框。
+\item
+  最后只对保留下来的候选框按类别做 NMS。
 \end{itemize}
 
-如果没有这一步，检测器往往会输出大量相互重叠的候选框，无法直接作为跟踪器输入。
+如果仍然采用``每个类别都扫全部 prior''的方式，那么在 COCO
+这类多类别场景里，解码阶段会产生大量无效扫描和重复
+NMS，实时性会明显受影响。
 
 \subsubsection{NMS
 的作用是什么}\label{nms-ux7684ux4f5cux7528ux662fux4ec0ux4e48}
@@ -847,22 +858,29 @@ NMS 的处理逻辑可以概括成下面 4 步：
 \subsubsection{ssdlite 中 \_nms
 的实现解析}\label{ssdlite-ux4e2d-_nms-ux7684ux5b9eux73b0ux89e3ux6790}
 
-ssdlite/decoder.py 中实现的 NMS 函数如下：
+当前工程版本中的 NMS 函数如下：
 
 \begin{lstlisting}[language=Python]
-def _nms(boxes, scores, iou_threshold):
+def _nms(boxes, scores, iou_threshold, presorted=False):
     if len(boxes) == 0:
         return np.empty((0,), dtype=np.int64)
 
-    order = np.argsort(scores)[::-1]
+    if presorted:
+        order = np.arange(scores.size, dtype=np.int64)
+    else:
+        order = np.argsort(scores)[::-1]
+
     keep = []
     while order.size > 0:
         index = order[0]
         keep.append(index)
         if order.size == 1:
             break
-        iou = calc_iou(boxes[order[1:]], boxes[index].reshape(1, 4)).reshape(-1)
-        order = order[np.where(iou <= iou_threshold)[0] + 1]
+
+        remaining = order[1:]
+        iou = _calc_iou_with_box(boxes[remaining], boxes[index])
+        order = remaining[iou <= iou_threshold]
+
     return np.array(keep, dtype=np.int64)
 \end{lstlisting}
 
@@ -878,16 +896,18 @@ if len(boxes) == 0:
 这一步是工程上必不可少的防御式处理。如果当前类别一个候选框都没有，就直接返回空索引，避免后续排序和
 IOU 计算报错。
 
-第二步，按照分数降序排列：
+第二步，确定候选框顺序：
 
 \begin{lstlisting}[language=Python]
-order = np.argsort(scores)[::-1]
+if presorted:
+    order = np.arange(scores.size, dtype=np.int64)
+else:
+    order = np.argsort(scores)[::-1]
 \end{lstlisting}
 
-\passthrough{\lstinline!np.argsort(scores)!}
-会返回分数从小到大排列后的索引，\passthrough{\lstinline![::-1]!}
-再把顺序翻转成从大到小。这样一来，\passthrough{\lstinline!order[0]!}
-就总是当前剩余候选框中分数最高的那个。
+这里多了一个 \passthrough{\lstinline!presorted!}
+参数。其作用是：如果外部已经按分数把候选框排好了，就不必在 NMS
+内部重复排序。这样可以减少一次多余的排序开销。
 
 第三步，循环保留最高分框：
 
@@ -913,7 +933,8 @@ if order.size == 1:
 第五步，计算其余候选框与当前最高分框的 IOU：
 
 \begin{lstlisting}[language=Python]
-iou = calc_iou(boxes[order[1:]], boxes[index].reshape(1, 4)).reshape(-1)
+remaining = order[1:]
+iou = _calc_iou_with_box(boxes[remaining], boxes[index])
 \end{lstlisting}
 
 这一步可以这样理解：
@@ -923,10 +944,10 @@ iou = calc_iou(boxes[order[1:]], boxes[index].reshape(1, 4)).reshape(-1)
 \item
   \passthrough{\lstinline!boxes[index]!} 是当前保留框。
 \item
-  \passthrough{\lstinline!boxes[order[1:]]!} 是除了它以外剩余的候选框。
+  \passthrough{\lstinline!boxes[remaining]!} 是除了它以外剩余的候选框。
 \item
-  \passthrough{\lstinline!calc\_iou(...)!}
-  计算这些候选框与当前保留框之间的重叠程度。
+  \passthrough{\lstinline!\_calc\_iou\_with\_box(...)!}
+  直接计算``多框对单框''的 IOU。
 \end{itemize}
 
 如果某个候选框与保留框的 IOU
@@ -935,22 +956,19 @@ iou = calc_iou(boxes[order[1:]], boxes[index].reshape(1, 4)).reshape(-1)
 第六步，删除 IOU 过高的重复框：
 
 \begin{lstlisting}[language=Python]
-order = order[np.where(iou <= iou_threshold)[0] + 1]
+order = remaining[iou <= iou_threshold]
 \end{lstlisting}
 
-这一行代码是整个 NMS 实现中最关键的语句之一。
+这一行代码是整个 NMS 实现中最关键的语句之一。它表示：
 
 \begin{itemize}
 \tightlist
 \item
-  \passthrough{\lstinline!iou <= iou\_threshold!}
-  表示只保留那些与当前主框重叠不太严重的候选框。
+  只保留那些与当前主框重叠不太严重的候选框。
 \item
-  \passthrough{\lstinline!np.where(...)!} 得到满足条件的索引位置。
-\item
-  之所以要 \passthrough{\lstinline!+ 1!}，是因为前面计算 IOU 时使用的是
-  \passthrough{\lstinline!order[1:]!}，也就是跳过了当前最高分框，所以这里需要把索引映射回原来的
-  \passthrough{\lstinline!order!} 序列。
+  不再通过 \passthrough{\lstinline!np.where(...)+1!}
+  做额外索引映射，而是直接对 \passthrough{\lstinline!remaining!}
+  做布尔筛选。
 \end{itemize}
 
 执行完这一行后，所有与当前主框高度重叠的框都会被移除，剩下的框继续进入下一轮循环。
@@ -1320,8 +1338,8 @@ tracking/kalman\_filter.py
 
 \begin{lstlisting}[language=Python]
 def predict(self):
-    self.x = np.dot(self.F, self.x)
-    self.P = np.dot(np.dot(self.F, self.P), self.F.T) + self.Q
+    self.x = self.F @ self.x
+    self.P = self.F @ self.P @ self.F.T + self.Q
     return self.x
 \end{lstlisting}
 
@@ -1340,11 +1358,14 @@ def predict(self):
 
 \begin{lstlisting}[language=Python]
 def update(self, z):
-    y = z - np.dot(self.H, self.x)
-    S = np.dot(self.H, np.dot(self.P, self.H.T)) + self.R
-    K = np.dot(np.dot(self.P, self.H.T), np.linalg.inv(S))
-    self.x = self.x + np.dot(K, y)
-    self.P = self.P - np.dot(np.dot(K, self.H), self.P)
+    measurement = np.asarray(z, dtype=np.float32).reshape((2, 1))
+    innovation = measurement - self.H @ self.x
+    innovation_covariance = self.H @ self.P @ self.H.T + self.R
+    kalman_gain = np.linalg.solve(innovation_covariance.T, (self.P @ self.H.T).T).T
+    self.x = self.x + kalman_gain @ innovation
+
+    correction = self._identity - kalman_gain @ self.H
+    self.P = correction @ self.P @ correction.T + kalman_gain @ self.R @ kalman_gain.T
 \end{lstlisting}
 
 这段代码中几个量的意义需要讲清楚：
@@ -1352,17 +1373,28 @@ def update(self, z):
 \begin{itemize}
 \tightlist
 \item
-  \passthrough{\lstinline!y!} 是
-  innovation，也叫残差，表示``观测值与预测值之间的差''。
+  \passthrough{\lstinline!innovation!}
+  是残差，表示``观测值与预测值之间的差''。
 \item
-  \passthrough{\lstinline!S!} 是残差协方差，表示当前误差的不确定性。
+  \passthrough{\lstinline!innovation\_covariance!}
+  是残差协方差，表示当前误差的不确定性。
 \item
-  \passthrough{\lstinline!K!}
+  \passthrough{\lstinline!kalman\_gain!}
   是卡尔曼增益，决定``应该更相信模型预测还是更相信当前观测''。
 \end{itemize}
 
-这里最重要的量是卡尔曼增益
-\passthrough{\lstinline!K!}。它并非经验性设定的固定权重，而是由当前状态不确定性与观测噪声共同决定的自适应权重。
+当前实现和基础版相比还多了两点工程优化：
+
+\begin{itemize}
+\tightlist
+\item
+  用 \passthrough{\lstinline!np.linalg.solve!}
+  代替直接求逆，数值更稳定。
+\item
+  用 Joseph form 更新协方差矩阵，更容易保持协方差的对称性和正定性。
+\end{itemize}
+
+这里最重要的量仍然是卡尔曼增益。它并非经验性设定的固定权重，而是由当前状态不确定性与观测噪声共同决定的自适应权重。
 
 可以直观地理解为：
 
@@ -1438,12 +1470,14 @@ self.tracks = [track for track in self.tracks if track.time_since_update <= self
 \subsection{数据关联为什么使用 IOU +
 匈牙利算法}\label{ux6570ux636eux5173ux8054ux4e3aux4ec0ux4e48ux4f7fux7528-iou-ux5308ux7259ux5229ux7b97ux6cd5}
 
-在 \_associate 中，本案例先构造轨迹与检测之间的 IOU
-矩阵，再调用匈牙利算法获得全局最优分配。对应代码思路如下：
+在 \_associate 中，当前工程版本会先构造轨迹与检测之间的 IOU
+矩阵和类别兼容矩阵，再调用匈牙利算法获得全局最优分配。对应代码思路如下：
 
 \begin{lstlisting}[language=Python]
 iou_matrix = self._calculate_iou_matrix(detections)
-matched_indices = self._linear_assignment(iou_matrix)
+class_mask = self._calculate_class_compatibility_matrix(detections)
+assignment_scores = np.where(class_mask, iou_matrix, -1.0)
+matched_indices = self._linear_assignment(assignment_scores)
 \end{lstlisting}
 
 之所以这样设计，是因为当场景中有多条轨迹和多个检测框时，不能只做局部贪心匹配。匈牙利算法的作用在于：
@@ -1458,14 +1492,14 @@ matched_indices = self._linear_assignment(iou_matrix)
   避免一条轨迹同时匹配多个检测框。
 \end{itemize}
 
-本案例还加入了类别兼容性判断：
+本案例还加入了类别兼容矩阵：
 
 \begin{lstlisting}[language=Python]
-if not self._is_class_compatible(track.class_id, int(detection[5])):
-    continue
+class_mask = self._calculate_class_compatibility_matrix(detections)
+assignment_scores = np.where(class_mask, iou_matrix, -1.0)
 \end{lstlisting}
 
-这说明系统不仅看几何位置，还利用类别信息避免``行人轨迹匹配到车辆框''这类明显错误。
+这说明系统不仅看几何位置，还会在进入全局匹配之前，先利用类别信息屏蔽明显不合理的配对关系，避免``行人轨迹匹配到车辆框''这类明显错误。
 
 \subsection{匈牙利算法的发展历史与作者信息}\label{ux5308ux7259ux5229ux7b97ux6cd5ux7684ux53d1ux5c55ux5386ux53f2ux4e0eux4f5cux8005ux4fe1ux606f}
 
@@ -1556,24 +1590,28 @@ linear_sum_assignment(-cost_matrix)
 \item
   先计算每一条轨迹与每一个检测框之间的 IOU。
 \item
-  用这些 IOU 构造一个矩阵。
+  再构造类别兼容矩阵，屏蔽明显不合理的类别组合。
 \item
   调用匈牙利算法得到全局最优分配。
 \item
-  再结合 IOU 阈值和类别兼容条件过滤不合理匹配。
+  对主匹配结果应用 IOU 阈值过滤。
+\item
+  对未匹配目标再执行一轮基于中心距离的补充匹配。
 \end{enumerate}
 
 对应代码主线是：
 
 \begin{lstlisting}[language=Python]
 iou_matrix = self._calculate_iou_matrix(detections)
-matched_indices = self._linear_assignment(iou_matrix)
+class_mask = self._calculate_class_compatibility_matrix(detections)
+assignment_scores = np.where(class_mask, iou_matrix, -1.0)
+matched_indices = self._linear_assignment(assignment_scores)
 
 for track_idx, detection_idx in matched_indices:
-    if iou_matrix[track_idx, detection_idx] < self.iou_threshold:
+    if assignment_scores[track_idx, detection_idx] < self.iou_threshold:
         continue
-    if not self._is_class_compatible(...):
-        continue
+
+fallback_matches = self._match_by_center_distance(...)
 \end{lstlisting}
 
 这段代码说明一个重要事实：匈牙利算法本身只负责``给出最优一一分配''，但它并不直接理解哪些匹配在语义上是合理的。因此，本案例又叠加了两层约束：
@@ -1581,9 +1619,11 @@ for track_idx, detection_idx in matched_indices:
 \begin{itemize}
 \tightlist
 \item
+  类别必须兼容。
+\item
   IOU 必须高于阈值。
 \item
-  类别必须兼容。
+  当 IOU 不足但中心运动关系合理时，还允许进入中心距离补充匹配。
 \end{itemize}
 
 由此可见，匈牙利算法提供的是全局分配框架，而不是完整的业务规则集合。
@@ -1610,7 +1650,7 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
 
 需要说明的是，匈牙利算法并不是万能的。它解决的是``在给定代价矩阵时，如何求最优匹配''，但如果代价矩阵本身构造得不好，算法仍然可能得到错误匹配。
 
-在本案例中，代价矩阵主要由 IOU 构成，因此它会受到以下问题影响：
+在本案例中，主匹配代价矩阵主要由 IOU 构成，因此它会受到以下问题影响：
 
 \begin{itemize}
 \tightlist
@@ -1622,8 +1662,7 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
   遮挡后重新出现时，仅靠 IOU 难以恢复原身份。
 \end{itemize}
 
-这也是为什么完整 DeepSORT
-往往还会引入外观特征和更复杂的关联策略。匈牙利算法负责的是``最优分配''，但``什么样的代价矩阵才合理''仍然是跟踪算法设计的关键。
+这也是为什么当前工程版本又额外加入了``类别兼容矩阵''和``中心距离补充匹配''。匈牙利算法负责的是``最优分配''，但``什么样的代价矩阵才合理''仍然是跟踪算法设计的关键。
 
 \subsection{轨迹生命周期参数如何影响最终效果}\label{ux8f68ux8ff9ux751fux547dux5468ux671fux53c2ux6570ux5982ux4f55ux5f71ux54cdux6700ux7ec8ux6548ux679c}
 
@@ -1760,6 +1799,74 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
   NMS 阈值对重复框抑制效果的影响。
 \end{itemize}
 
+推荐命令：
+
+\begin{lstlisting}[language=bash]
+python demo/detection_app.py --device npu --source 0
+python demo/detection_app.py --device npu --source 0 --backbone mobilenetv2
+python demo/detection_app.py --device npu --source 0 --backbone resnet18
+\end{lstlisting}
+
+实验提示：
+
+\begin{itemize}
+\tightlist
+\item
+  对比 \passthrough{\lstinline!ssd320\_*!} 和
+  \passthrough{\lstinline!ssd300\_*!} 两类模型时，不仅要看
+  FPS，还要同时观察检测框数量和画面稳定性。
+\item
+  当 \passthrough{\lstinline!score-threshold!}
+  较低时，解码后的候选框数会明显增加，后处理负担也会增大。
+\item
+  当 \passthrough{\lstinline!nms-threshold!}
+  较大时，重复框更容易残留，后续 tracking 的输入质量也会受到影响。
+\end{itemize}
+
+\subsection{检测链路的性能拆分实验}\label{ux68c0ux6d4bux94feux8defux7684ux6027ux80fdux62c6ux5206ux5b9eux9a8c}
+
+目标：学会区分摄像头读取、预处理、推理、解码和绘制的性能瓶颈。
+
+可观察：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!Read!}：摄像头或视频流读取时间。
+\item
+  \passthrough{\lstinline!Pre!}：模型输入预处理时间。
+\item
+  \passthrough{\lstinline!Infer!}：模型推理时间。
+\item
+  \passthrough{\lstinline!Decode!}：后处理时间。
+\item
+  \passthrough{\lstinline!Draw!}：检测框或轨迹绘制时间。
+\end{itemize}
+
+推荐命令：
+
+\begin{lstlisting}[language=bash]
+python demo/detection_app.py --device npu --source 0
+python demo/detection_app.py --device npu --source 0 --camera-mjpeg
+python demo/detection_app.py --device npu --source 0 --camera-fps 30
+\end{lstlisting}
+
+实验提示：
+
+\begin{itemize}
+\tightlist
+\item
+  如果 \passthrough{\lstinline!Read!} 明显高于
+  \passthrough{\lstinline!Pre!}，瓶颈更可能在摄像头采集或驱动路径，而不是模型预处理本身。
+\item
+  如果 \passthrough{\lstinline!Decode!} 偏高，可以优先降低
+  \passthrough{\lstinline!max-detections!} 或缩小关注类别范围。
+\item
+  如果启用 \passthrough{\lstinline!--camera-mjpeg!} 后
+  \passthrough{\lstinline!Read!} 下降，说明当前 USB
+  摄像头和驱动组合更适合 MJPEG 模式；如果反而上升，则应恢复默认模式。
+\end{itemize}
+
 \subsection{在检测基础上启用跟踪}\label{ux5728ux68c0ux6d4bux57faux7840ux4e0aux542fux7528ux8ddfux8e2a}
 
 目标：观察轨迹是如何从检测结果中产生的。
@@ -1774,6 +1881,62 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
   当目标短时遮挡时，轨迹是否断裂。
 \item
   当多个目标接近时，是否发生 ID 交换。
+\end{itemize}
+
+推荐命令：
+
+\begin{lstlisting}[language=bash]
+python demo/tracking_app.py --device npu --source 0
+python demo/tracking_app.py --device npu --source 0 --track-classes person
+python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
+\end{lstlisting}
+
+实验提示：
+
+\begin{itemize}
+\tightlist
+\item
+  使用 \passthrough{\lstinline!--track-classes!}
+  后，可以明显减少无关类别进入解码和跟踪流程，便于观察指定目标的轨迹稳定性。
+\item
+  对实时摄像头场景，建议优先用 \passthrough{\lstinline!person!}
+  这类高频类别做实验，更容易观察目标进出画面、遮挡和交叉等现象。
+\end{itemize}
+
+\subsection{类别过滤与解码开销实验}\label{ux7c7bux522bux8fc7ux6ee4ux4e0eux89e3ux7801ux5f00ux9500ux5b9eux9a8c}
+
+目标：理解``只跟踪指定类别''不仅影响画面内容，也影响后处理负载。
+
+可观察：
+
+\begin{itemize}
+\tightlist
+\item
+  指定类别前后，\passthrough{\lstinline!Decode!} 时间是否变化。
+\item
+  指定类别前后，检测框数量和轨迹数量是否更稳定。
+\item
+  不同类别组合对解码开销和跟踪干扰的影响。
+\end{itemize}
+
+推荐命令：
+
+\begin{lstlisting}[language=bash]
+python demo/tracking_app.py --device npu --source 0
+python demo/tracking_app.py --device npu --source 0 --track-classes person
+python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
+\end{lstlisting}
+
+实验提示：
+
+\begin{itemize}
+\tightlist
+\item
+  当只关心少数类别时，优先在解码阶段就做类别过滤，比``先解出全部类别再过滤''更符合实时场景。
+\item
+  如果场景中本来就几乎只有行人，那么
+  \passthrough{\lstinline!--track-classes person!}
+  的主要收益会体现在画面更干净和干扰更少，而不是极大的速度变化。
 \end{itemize}
 
 \subsection{调节 DeepSORT
@@ -1793,7 +1956,489 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
   track\_iou\_threshold
 \end{itemize}
 
+推荐命令：
+
+\begin{lstlisting}[language=bash]
+python demo/tracking_app.py --device npu --source 0 --track-max-age 120
+python demo/tracking_app.py --device npu --source 0 --track-min-hits 3
+python demo/tracking_app.py --device npu --source 0 --track-iou-threshold 0.4
+\end{lstlisting}
+
 实验中应重点解释参数变化背后的原因，而不是只记录结果。
+
+观察重点：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!track-max-age!}
+  过小，目标短时遮挡或漏检后容易断轨。
+\item
+  \passthrough{\lstinline!track-min-hits!}
+  过小，误检更容易形成短暂轨迹。
+\item
+  \passthrough{\lstinline!track-iou-threshold!}
+  过高，快速运动目标更容易匹配失败。
+\end{itemize}
+
+\subsection{调节中心距离与平滑参数}\label{ux8c03ux8282ux4e2dux5fc3ux8dddux79bbux4e0eux5e73ux6ed1ux53c2ux6570}
+
+目标：理解补充匹配与轨迹平滑对稳定性的影响。
+
+可调节：
+
+\begin{itemize}
+\tightlist
+\item
+  track-center-distance-threshold
+\item
+  track-size-smoothing
+\item
+  track-score-smoothing
+\end{itemize}
+
+推荐命令：
+
+\begin{lstlisting}[language=bash]
+python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0
+python demo/tracking_app.py --device npu --source 0 --track-size-smoothing 0.85 --track-score-smoothing 0.8
+python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 1.4 --track-size-smoothing 0.6
+\end{lstlisting}
+
+观察重点：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!track-center-distance-threshold!}
+  增大后，快速运动和短时失配场景下的轨迹更容易续上，但如果过大，也可能提升误匹配概率。
+\item
+  \passthrough{\lstinline!track-size-smoothing!}
+  增大后，框宽高更稳定，但目标尺度变化的响应会更慢。
+\item
+  \passthrough{\lstinline!track-score-smoothing!}
+  增大后，显示分数更平滑，但对置信度突变的响应也更迟缓。
+\end{itemize}
+
+\subsection{组合实验建议}\label{ux7ec4ux5408ux5b9eux9a8cux5efaux8bae}
+
+为了让实验更有层次，可以按下面顺序组织：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  先做 detection 基础实验，理解检测、解码和 NMS 的作用。
+\item
+  再做性能拆分实验，判断瓶颈是在
+  \passthrough{\lstinline!Read!}、\passthrough{\lstinline!Pre!}、\passthrough{\lstinline!Infer!}
+  还是 \passthrough{\lstinline!Decode!}。
+\item
+  然后启用 tracking，观察轨迹生成与 ID 稳定性。
+\item
+  最后再做
+  \passthrough{\lstinline!track-classes!}、中心距离阈值和平滑参数的组合对比。
+\end{enumerate}
+
+这样安排的好处是：
+
+\begin{itemize}
+\tightlist
+\item
+  先把单帧检测问题讲清楚。
+\item
+  再把实时性能问题拆清楚。
+\item
+  最后把时序跟踪问题和参数调优联系起来。
+\end{itemize}
+
+\section{当前工程版本的优化说明}\label{ux5f53ux524dux5de5ux7a0bux7248ux672cux7684ux4f18ux5316ux8bf4ux660e}
+
+前文很多内容是按``教学上的基础实现思路''来讲解的，便于先把检测与跟踪主线讲清楚。当前仓库中的代码在此基础上又做了一轮面向实时性的工程优化，因此实际实现相比前文的基础版描述更进一步。阅读源码时，建议把这一节与前文结合起来看。
+
+\subsection{检测链路中的工程优化}\label{ux68c0ux6d4bux94feux8defux4e2dux7684ux5de5ux7a0bux4f18ux5316}
+
+\subsubsection{解码器不再对所有类别逐类扫描全部
+prior}\label{ux89e3ux7801ux5668ux4e0dux518dux5bf9ux6240ux6709ux7c7bux522bux9010ux7c7bux626bux63cfux5168ux90e8-prior}
+
+在基础版 SSD
+后处理中，一个直观但开销较大的实现方式是：对每个类别都遍历全部
+prior，然后分别做阈值筛选和 NMS。这样做虽然容易理解，但在 COCO
+这类多类别场景里，后处理开销会明显增大。
+
+当前仓库中的 ssdlite/decoder.py 已经改成了更适合实时场景的实现：
+
+\begin{itemize}
+\tightlist
+\item
+  对每个 prior 先在候选前景类别中选出一个最佳类别。
+\item
+  只保留分数超过阈值的候选框。
+\item
+  再按类别分别做 NMS。
+\end{itemize}
+
+这样做的优点是：
+
+\begin{itemize}
+\tightlist
+\item
+  大幅减少无效类别扫描。
+\item
+  降低候选框数量。
+\item
+  避免同一个 prior 在多个类别上重复进入 NMS。
+\end{itemize}
+
+这类优化尤其适合边缘设备，因为它直接减少了解码阶段的 CPU 开销。
+
+\subsubsection{支持在解码阶段按指定类别过滤}\label{ux652fux6301ux5728ux89e3ux7801ux9636ux6bb5ux6309ux6307ux5b9aux7c7bux522bux8fc7ux6ee4}
+
+在当前工程版本中，tracking\_app.py 增加了按类别跟踪的命令行参数：
+
+\begin{lstlisting}[language=bash]
+python demo/tracking_app.py --track-classes person
+python demo/tracking_app.py --track-classes person,bus
+\end{lstlisting}
+
+这里并不是``先把所有检测框都解出来，再在跟踪前简单过滤''，而是把允许的类别一直传递到
+decoder 内部，让解码阶段只关注这些目标类别。这样做的意义在于：
+
+\begin{itemize}
+\tightlist
+\item
+  可以减少不关心类别的后处理开销。
+\item
+  可以降低多类别场景中的误检测干扰。
+\item
+  可以让跟踪器专注于任务相关目标，例如只跟踪行人或公交车。
+\end{itemize}
+
+\subsubsection{default boxes
+的生成做了向量化改写}\label{default-boxes-ux7684ux751fux6210ux505aux4e86ux5411ux91cfux5316ux6539ux5199}
+
+基础版的 default boxes 生成通常会使用多层 Python
+循环去枚举中心点和长宽比，这种写法直观，但初始化时效率较低。
+
+当前实现已经把 DefaultBoxes 中的中心点网格生成和尺寸组合改写成 NumPy
+向量化方式，同时拆分成更清晰的辅助函数：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!\_build\_layer\_sizes!}：负责生成当前特征层的
+  anchor 尺寸集合。
+\item
+  \passthrough{\lstinline!\_build\_center\_coordinates!}：负责生成当前特征层的网格中心点。
+\end{itemize}
+
+这样既提升了代码可读性，也减少了初始化阶段的 Python 循环开销。
+
+\subsubsection{SSD300 与 SSDLite320 使用不同的 default boxes
+设计}\label{ssd300-ux4e0e-ssdlite320-ux4f7fux7528ux4e0dux540cux7684-default-boxes-ux8bbeux8ba1}
+
+当前 decoder.py 中保留了两个明确区分的入口：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!dboxes300\_coco()!}：对应原始 SSD300
+  论文风格的 default boxes 设计。
+\item
+  \passthrough{\lstinline!dboxes320\_coco()!}：对应 torchvision SSDLite
+  / MobileNet-SSD 路径使用的 default boxes 设计。
+\end{itemize}
+
+这并不只是输入尺寸从 \passthrough{\lstinline!300!} 换成
+\passthrough{\lstinline!320!}，而是两种不同模型家族在先验框配置上的区别。把这两个入口拆开写清楚，有助于读者理解``不同
+SSD 变体的 prior boxes 设计并不完全相同''。
+
+\subsubsection{IOU 与 NMS
+的实现做了进一步优化}\label{iou-ux4e0e-nms-ux7684ux5b9eux73b0ux505aux4e86ux8fdbux4e00ux6b65ux4f18ux5316}
+
+在当前工程版本中，decoder.py 里的
+\passthrough{\lstinline!calc\_iou!}、\passthrough{\lstinline!\_calc\_iou\_with\_box!}
+和 \passthrough{\lstinline!\_nms!} 已经做了两类优化：
+
+\begin{itemize}
+\tightlist
+\item
+  用更直接的广播写法计算 IOU，提高可读性并减少中间变量。
+\item
+  在 NMS 中区分``多框对单框''的专用 IOU
+  计算路径，避免重复走更通用但更重的函数。
+\item
+  对已经按分数排序的候选框，不再重复做一次完整排序。
+\end{itemize}
+
+这说明同一个算法模块往往可以分成两种层次来理解：
+
+\begin{itemize}
+\tightlist
+\item
+  原理层：为什么需要 IOU 和 NMS。
+\item
+  工程层：怎样把同样的逻辑写得更适合实时设备。
+\end{itemize}
+
+\subsubsection{预处理与读帧时间被明确分开统计}\label{ux9884ux5904ux7406ux4e0eux8bfbux5e27ux65f6ux95f4ux88abux660eux786eux5206ux5f00ux7edfux8ba1}
+
+在早期实验中，容易把摄像头读取时间和图像预处理时间混在一起看，从而误以为``预处理最慢''。当前版本已经在
+detection\_app.py 和 tracking\_app.py 中把以下时间分开统计：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!Read!}：摄像头或视频流读取时间。
+\item
+  \passthrough{\lstinline!Pre!}：真正的模型输入预处理时间。
+\item
+  \passthrough{\lstinline!Infer!}：模型推理时间。
+\item
+  \passthrough{\lstinline!Decode!}：后处理时间。
+\item
+  \passthrough{\lstinline!Draw!}：绘制与显示时间。
+\end{itemize}
+
+这对边缘设备非常重要，因为摄像头读取、视频解码、模型预处理和模型推理往往处于不同瓶颈路径上，必须分开分析。
+
+\subsubsection{摄像头实时输入增加了更适合实时场景的参数}\label{ux6444ux50cfux5934ux5b9eux65f6ux8f93ux5165ux589eux52a0ux4e86ux66f4ux9002ux5408ux5b9eux65f6ux573aux666fux7684ux53c2ux6570}
+
+当前 detection\_app.py 和 tracking\_app.py 都支持：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!--camera-width!}
+\item
+  \passthrough{\lstinline!--camera-height!}
+\item
+  \passthrough{\lstinline!--camera-fps!}
+\item
+  \passthrough{\lstinline!--camera-mjpeg!}
+\end{itemize}
+
+其中 \passthrough{\lstinline!--camera-mjpeg!} 适用于部分 USB
+摄像头。如果摄像头和驱动支持
+MJPEG，启用后有时可以降低实时读取延迟。但要注意，这类参数是否有效，与具体摄像头、驱动和板端
+OpenCV 构建方式密切相关，因此需要实测。
+
+\subsection{跟踪链路中的工程优化}\label{ux8ddfux8e2aux94feux8defux4e2dux7684ux5de5ux7a0bux4f18ux5316}
+
+\subsubsection{关联前先做类别兼容性约束}\label{ux5173ux8054ux524dux5148ux505aux7c7bux522bux517cux5bb9ux6027ux7ea6ux675f}
+
+基础版多目标跟踪常见的写法是：先对所有轨迹和检测框计算
+IOU，再在匹配完成后排除类别不兼容的结果。当前版本把类别兼容性提前到了关联阶段本身，也就是说：
+
+\begin{itemize}
+\tightlist
+\item
+  不兼容的类别对在进入匈牙利匹配前就会被屏蔽。
+\item
+  这样可以减少无效匹配占用全局分配机会。
+\end{itemize}
+
+这种处理对多类别场景尤其重要，因为它可以有效降低``行人轨迹误匹配到车辆框''这类明显错误。
+
+\subsubsection{IOU
+矩阵改成向量化计算}\label{iou-ux77e9ux9635ux6539ux6210ux5411ux91cfux5316ux8ba1ux7b97}
+
+tracking/deepsort.py 中轨迹和检测之间的 IOU 矩阵，已经从双层 Python
+循环改成了 NumPy 向量化实现。这样做有两个好处：
+
+\begin{itemize}
+\tightlist
+\item
+  匹配阶段速度更快。
+\item
+  代码更容易与``矩阵形式的数据关联''这一概念对应起来。
+\end{itemize}
+
+\subsubsection{增加基于中心距离的补充匹配}\label{ux589eux52a0ux57faux4e8eux4e2dux5fc3ux8dddux79bbux7684ux8865ux5145ux5339ux914d}
+
+仅靠 IOU
+做关联时，如果目标移动较快、检测框尺寸波动较大，或者短时遮挡后重新出现，轨迹容易断开。当前工程版本在
+IOU 关联失败后，又增加了一轮基于中心距离的补充匹配：
+
+\begin{itemize}
+\tightlist
+\item
+  先计算轨迹中心和检测框中心的归一化距离。
+\item
+  再结合类别约束，做一次补充关联。
+\end{itemize}
+
+这样可以提高短时丢检和快速移动场景下的轨迹连续性。
+
+\subsubsection{轨迹框尺寸与分数做了平滑}\label{ux8f68ux8ff9ux6846ux5c3aux5bf8ux4e0eux5206ux6570ux505aux4e86ux5e73ux6ed1}
+
+在 Track.update
+中，当前版本不再每一帧都直接用新检测框完全替换轨迹框，而是对宽高和分数做指数平滑：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!size\_smoothing!}：控制框宽高变化的平滑程度。
+\item
+  \passthrough{\lstinline!score\_smoothing!}：控制置信度显示的平滑程度。
+\end{itemize}
+
+这样做的效果是：
+
+\begin{itemize}
+\tightlist
+\item
+  画面中的框抖动更小。
+\item
+  轨迹框大小变化更连续。
+\item
+  显示分数不容易大起大落。
+\end{itemize}
+
+\subsubsection{轨迹类别不再只看最近一帧}\label{ux8f68ux8ff9ux7c7bux522bux4e0dux518dux53eaux770bux6700ux8fd1ux4e00ux5e27}
+
+当前 Track 类中维护了
+\passthrough{\lstinline!class\_scores!}，会对每个轨迹在历史匹配过程中累计类别分数，再选择当前最可信的类别。这比简单采用``最近一帧的
+class\_id''更稳定，尤其适合检测框偶尔分类波动的场景。
+
+\subsection{卡尔曼滤波器中的工程优化}\label{ux5361ux5c14ux66fcux6ee4ux6ce2ux5668ux4e2dux7684ux5de5ux7a0bux4f18ux5316}
+
+\subsubsection{初始协方差更加符合目标跟踪场景}\label{ux521dux59cbux534fux65b9ux5deeux66f4ux52a0ux7b26ux5408ux76eeux6807ux8ddfux8e2aux573aux666f}
+
+在基础讲解中，常把卡尔曼滤波器写成最简单的形式，例如：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!P = I!}
+\item
+  \passthrough{\lstinline!Q = 0.05 * I!}
+\item
+  \passthrough{\lstinline!R = 0.5 * I!}
+\end{itemize}
+
+这很适合教学起点，但在实际跟踪里往往过于理想化。当前工程版本已经改成更合理的初始化方式：
+
+\begin{itemize}
+\tightlist
+\item
+  位置初始不确定性较小。
+\item
+  速度初始不确定性较大。
+\end{itemize}
+
+这更符合新轨迹刚创建时的实际情况：我们大致知道目标在哪里，但一开始并不知道它运动得有多快。
+
+\subsubsection{过程噪声和观测噪声被显式区分}\label{ux8fc7ux7a0bux566aux58f0ux548cux89c2ux6d4bux566aux58f0ux88abux663eux5f0fux533aux5206}
+
+当前 KalmanFilter
+中把位置过程噪声、速度过程噪声和观测噪声分开定义，而不是用单个常量矩阵草草代替。这样做的好处是：
+
+\begin{itemize}
+\tightlist
+\item
+  参数意义更清楚。
+\item
+  后续调参更方便。
+\item
+  更能贴合``位置观测可信，但速度需要逐步估计''的目标跟踪特点。
+\end{itemize}
+
+\subsubsection{更新阶段使用更稳定的数值形式}\label{ux66f4ux65b0ux9636ux6bb5ux4f7fux7528ux66f4ux7a33ux5b9aux7684ux6570ux503cux5f62ux5f0f}
+
+当前实现中：
+
+\begin{itemize}
+\tightlist
+\item
+  卡尔曼增益计算使用
+  \passthrough{\lstinline!np.linalg.solve!}，而不是直接显式求逆。
+\item
+  协方差更新使用 Joseph form，而不是简单的
+  \passthrough{\lstinline!P = P - KHP!}。
+\end{itemize}
+
+这种改法在数学上更稳定，尤其适合连续多帧递推的视觉跟踪任务，因为协方差矩阵的对称性和正定性更容易保持。
+
+\subsection{tracking\_app.py
+当前支持的实用参数}\label{tracking_app.py-ux5f53ux524dux652fux6301ux7684ux5b9eux7528ux53c2ux6570}
+
+当前 tracking\_app.py 在基础版参数之外，还支持以下跟踪专有参数：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!--track-max-age!}
+\item
+  \passthrough{\lstinline!--track-min-hits!}
+\item
+  \passthrough{\lstinline!--track-iou-threshold!}
+\item
+  \passthrough{\lstinline!--track-center-distance-threshold!}
+\item
+  \passthrough{\lstinline!--track-size-smoothing!}
+\item
+  \passthrough{\lstinline!--track-score-smoothing!}
+\item
+  \passthrough{\lstinline!--track-classes!}
+\end{itemize}
+
+这些参数分别对应：
+
+\begin{itemize}
+\tightlist
+\item
+  轨迹生命周期控制。
+\item
+  IOU 关联阈值。
+\item
+  中心距离补充匹配阈值。
+\item
+  轨迹框和分数的平滑强度。
+\item
+  指定只跟踪哪些类别。
+\end{itemize}
+
+例如，只跟踪行人时，可以使用：
+
+\begin{lstlisting}[language=bash]
+python demo/tracking_app.py --device npu --source 0 --track-classes person
+\end{lstlisting}
+
+如果需要同时跟踪行人和公交车，可以使用：
+
+\begin{lstlisting}[language=bash]
+python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
+\end{lstlisting}
+
+如果希望在快速运动场景中增强补充关联，可以适当提高中心距离阈值，例如：
+
+\begin{lstlisting}[language=bash]
+python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0
+\end{lstlisting}
+
+\subsection{如何理解``教材版''和``工程版''的关系}\label{ux5982ux4f55ux7406ux89e3ux6559ux6750ux7248ux548cux5de5ux7a0bux7248ux7684ux5173ux7cfb}
+
+本案例的一个教学特点是：前文先用更直观的形式讲清算法主线，再在当前工程代码中逐步引入更适合实时边缘设备的优化实现。两者并不是相互冲突，而是两个层次：
+
+\begin{itemize}
+\tightlist
+\item
+  教材版：帮助读者看懂为什么需要这些模块。
+\item
+  工程版：帮助读者理解怎样让这些模块在真实设备上跑得更稳、更快。
+\end{itemize}
+
+因此，建议阅读顺序是：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  先按前文把 MobileNet-SSD、NMS、卡尔曼滤波和数据关联的原理主线理清。
+\item
+  再结合当前仓库代码，对照本节总结理解这些优化为什么能够改善实时效果。
+\end{enumerate}
 
 \section{章节总结}\label{ux7ae0ux8282ux603bux7ed3}
 
@@ -1815,7 +2460,7 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
 
 \begin{figure}
 \centering
-\includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={主线图}]{cases/img2/主线图.png}
+\includegraphics[width=0.3\linewidth,height=\textheight,keepaspectratio,alt={主线图}]{cases/img2/主线图.png}
 \caption{主线图}\label{fig:ssd_main_line}
 \end{figure}
 
