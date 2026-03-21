@@ -1140,7 +1140,7 @@ python demo/detection_app.py --device npu --source 0 --backbone resnet18
 ```bash
 python demo/detection_app.py --device npu --source 0
 python demo/detection_app.py --device npu --source 0 --camera-mjpeg
-python demo/detection_app.py --device npu --source 0 --camera-fps 30
+python demo/detection_app.py --device npu --source 0 --camera-profile 1280x720@60
 ```
 
 实验提示：
@@ -1148,6 +1148,7 @@ python demo/detection_app.py --device npu --source 0 --camera-fps 30
 * 如果 `Read` 明显高于 `Pre`，瓶颈更可能在摄像头采集或驱动路径，而不是模型预处理本身。
 * 如果 `Decode` 偏高，可以优先降低 `max-detections` 或缩小关注类别范围。
 * 如果启用 `--camera-mjpeg` 后 `Read` 下降，说明当前 USB 摄像头和驱动组合更适合 MJPEG 模式；如果反而上升，则应恢复默认模式。
+* 如果请求的分辨率或帧率不是摄像头原生档位，驱动可能发生额外缩放或格式转换，`Read` 往往会明显上升。
 
 ### 在检测基础上启用跟踪
 
@@ -1349,12 +1350,34 @@ python demo/tracking_app.py --track-classes person,bus
 
 当前 detection_app.py 和 tracking_app.py 都支持：
 
-* `--camera-width`
-* `--camera-height`
-* `--camera-fps`
+* `--camera-profile`
 * `--camera-mjpeg`
+* `--no-camera-mjpeg`
+
+其中 `--camera-profile` 用一个参数统一表达摄像头原生采集档位，例如 `1280x720@60`、`1024x576@30` 或 `@30`。这种写法比同时暴露宽、高、FPS 三个独立参数更适合教学，因为读者更容易把“摄像头采集模式”理解成一个完整组合。
 
 其中 `--camera-mjpeg` 适用于部分 USB 摄像头。如果摄像头和驱动支持 MJPEG，启用后有时可以降低实时读取延迟。但要注意，这类参数是否有效，与具体摄像头、驱动和板端 OpenCV 构建方式密切相关，因此需要实测。
+
+此外，当前工程版本已经把 OpenCV 运行时辅助逻辑合并到 `utils/opencv_runtime.py` 中，这个文件现在同时负责：
+
+* OpenCV Qt 字体目录修复
+* 摄像头启动日志与阶段计时
+* V4L2 优先打开实时摄像头
+* 请求较小缓冲区以减轻实时场景中的采集积压
+
+在一组 OrangePi AI Pro / Ascend 310B 的实测中，针对一只支持 `MJPG 1280x720@60` 的 USB 摄像头，启用 V4L2 优先后端和 `buffer=1` 请求后，tracking 的显示 FPS 从约 `20` 提升到了约 `26`。这个结果并不是固定值，但足以说明：在边缘端实时链路中，摄像头读帧路径本身就值得单独优化。
+
+### 进一步提高帧率的建议
+
+如果在完成当前这轮采集优化后，FPS 仍然没有达到目标，可以继续按下面顺序做进一步优化：
+
+* 优先选择摄像头原生支持的 `camera-profile`，避免非原生分辨率触发驱动缩放或格式转换。
+* 如果目标是稳定跟踪帧率，而不是单纯追求更大画面，优先尝试 `1024x576@30`、`800x448@30` 这类更均衡的原生档位。
+* 保留 `MJPEG` 用于高分辨率高帧率场景，但要注意 `Read` 中也包含解码时间，因此是否更快必须实测。
+* 进一步把摄像头采集改成后台线程，只保留最新一帧，减少主线程推理和绘制阻塞导致的帧积压。
+* 如果 `Draw` 时间偏高，可以降低显示窗口尺寸、减少拖尾绘制长度，或在无界面场景下使用 `--no-display`。
+* 如果 `Decode` 时间偏高，可以减小 `max-detections`，或者优先使用 `--track-classes` 限制关注类别。
+* 如果 `Infer` 仍是主要瓶颈，则应从模型侧继续优化，例如切换更轻量骨干、减小输入尺寸，或根据任务需要降低采集分辨率。
 
 ### 跟踪链路中的工程优化
 

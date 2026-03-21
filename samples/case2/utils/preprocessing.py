@@ -8,6 +8,9 @@ MODEL_PATTERNS = {
 	"cpu": re.compile(r"^ssd(?P<size>300|320)_(?P<backbone>.+)\.onnx$"),
 	"npu": re.compile(r"^ssd(?P<size>300|320)_(?P<backbone>.+)\.om$"),
 }
+CAMERA_PROFILE_PATTERN = re.compile(
+	r"^(?:(?P<width>\d+)\s*[x,]\s*(?P<height>\d+))?(?:\s*@\s*(?P<fps>\d+(?:\.\d+)?))?$"
+)
 
 COCO_LABELS = [
 	"background",
@@ -164,18 +167,111 @@ def parse_source(source):
 	return source
 
 
-def open_capture(source, width=None, height=None, fps=None, use_mjpeg=False):
+def parse_camera_profile(camera_profile):
+	if camera_profile is None:
+		return None, None, None
+
+	normalized = str(camera_profile).strip().lower()
+	if not normalized or normalized in {"auto", "default", "native"}:
+		return None, None, None
+
+	fps_only_match = re.fullmatch(r"\d+(?:\.\d+)?", normalized)
+	if fps_only_match:
+		return None, None, float(normalized)
+
+	match = CAMERA_PROFILE_PATTERN.fullmatch(normalized)
+	if not match:
+		raise ValueError(
+			"Camera profile must be 'WIDTHxHEIGHT', 'WIDTHxHEIGHT@FPS', '@FPS', or 'auto'."
+		)
+
+	width = match.group("width")
+	height = match.group("height")
+	fps = match.group("fps")
+	if width is None and fps is None:
+		raise ValueError(
+			"Camera profile must include a resolution, an FPS value, or both."
+		)
+
+	return (
+		int(width) if width is not None else None,
+		int(height) if height is not None else None,
+		float(fps) if fps is not None else None,
+	)
+
+
+
+
+def resolve_camera_capture_request(camera_profile=""):
+	requested_width, requested_height, requested_fps = parse_camera_profile(camera_profile)
+	return requested_width, requested_height, requested_fps
+
+
+def get_capture_stream_info(cap, frame=None):
+	if frame is not None:
+		height, width = frame.shape[:2]
+	else:
+		width = int(round(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0))
+		height = int(round(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0))
+
+	fps = cap.get(cv2.CAP_PROP_FPS)
+	if fps is None or fps <= 1e-3:
+		fps = None
+
+	return width, height, fps
+
+
+def get_capture_backend_name(cap):
+	get_backend_name = getattr(cap, "getBackendName", None)
+	if callable(get_backend_name):
+		try:
+			return get_backend_name()
+		except Exception:
+			return "unknown"
+	return "unknown"
+
+
+def get_capture_buffer_size(cap):
+	buffer_prop = getattr(cv2, "CAP_PROP_BUFFERSIZE", None)
+	if buffer_prop is None:
+		return None
+
+	try:
+		buffer_size = cap.get(buffer_prop)
+	except Exception:
+		return None
+
+	if buffer_size is None or buffer_size < 0:
+		return None
+	return int(round(buffer_size))
+
+
+def open_video_capture(video_source):
+	prefer_v4l2 = isinstance(video_source, int) and hasattr(cv2, "CAP_V4L2")
+	if prefer_v4l2:
+		cap = cv2.VideoCapture(video_source, cv2.CAP_V4L2)
+		if cap.isOpened():
+			return cap
+		cap.release()
+
+	return cv2.VideoCapture(video_source)
+
+
+def open_capture(source, width=None, height=None, fps=None, use_mjpeg=True):
 	video_source = parse_source(source)
-	cap = cv2.VideoCapture(video_source)
+	cap = open_video_capture(video_source)
 	if isinstance(video_source, int):
 		if use_mjpeg:
 			cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-		if fps is not None and fps > 0:
-			cap.set(cv2.CAP_PROP_FPS, float(fps))
+		buffer_prop = getattr(cv2, "CAP_PROP_BUFFERSIZE", None)
+		if buffer_prop is not None:
+			cap.set(buffer_prop, 1)
 	if width:
 		cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
 	if height:
 		cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+	if isinstance(video_source, int) and fps is not None and fps > 0:
+		cap.set(cv2.CAP_PROP_FPS, float(fps))
 	return cap
 
 

@@ -202,10 +202,9 @@ python demo/detection_app.py --device npu --list-models
 * `--score-threshold`：检测置信度阈值
 * `--nms-threshold`：NMS 阈值
 * `--max-detections`：每帧最多保留的检测框数量
-* `--camera-width`：摄像头期望宽度
-* `--camera-height`：摄像头期望高度
-* `--camera-fps`：请求摄像头输出帧率，`0` 表示保持后端默认行为
-* `--camera-mjpeg`：尝试请求摄像头输出 MJPEG，部分 USB 摄像头可降低读取延迟
+* `--camera-profile`：用一个参数指定摄像头采集档位，例如 `1280x720@60`、`1280x720`、`@60` 或 `auto`
+* `--camera-mjpeg`：启用 MJPEG 摄像头输出，实时摄像头默认开启
+* `--no-camera-mjpeg`：关闭 MJPEG 摄像头输出
 * `--labels`：自定义标签文件，每行一个类别
 * `--save`：输出视频路径
 * `--no-display`：禁用 `cv2.imshow`
@@ -218,7 +217,8 @@ python demo/detection_app.py --device npu --list-models
 * `ssdlite/cpu_backend.py`：ONNXRuntime CPU 推理封装
 * `ssdlite/npu_backend.py`：Ascend ACL NPU 推理封装
 * `ssdlite/decoder.py`：SSD 输出解码逻辑
-* `utils/preprocessing.py`：模型发现、标签加载、视频输入、视频写出
+* `utils/opencv_runtime.py`：OpenCV 初始化、摄像头运行时辅助、阶段计时与启动日志
+* `utils/preprocessing.py`：模型发现、标签加载、摄像头参数解析、视频写出
 * `utils/postprocessing.py`：检测结果绘制
 
 ## Tracking
@@ -271,10 +271,10 @@ python demo/tracking_app.py --device npu --source 0 --track-classes person
 python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
 ```
 
-实时摄像头模式下尝试启用 MJPEG：
+实时摄像头模式下指定 60 FPS 采集档位：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0 --camera-mjpeg --camera-fps 30
+python demo/tracking_app.py --device npu --source 0 --camera-profile 1280x720@60
 ```
 
 跟踪本地视频：
@@ -322,10 +322,9 @@ python demo/tracking_app.py --device npu --list-models
 
 另外，tracking 入口也支持与 detection 相同的摄像头参数：
 
-* `--camera-width`
-* `--camera-height`
-* `--camera-fps`
+* `--camera-profile`
 * `--camera-mjpeg`
+* `--no-camera-mjpeg`
 
 调参建议：
 
@@ -342,6 +341,22 @@ python demo/tracking_app.py --device npu --list-models
 * `tracking/deepsort.py`：简化版 DeepSORT 风格跟踪器
 * `tracking/kalman_filter.py`：卡尔曼滤波器
 * `utils/postprocessing.py`：检测结果到跟踪器输入的转换，以及轨迹绘制
+
+## 实时采集说明
+
+当前工程版本把 OpenCV 运行时相关逻辑集中到了 `utils/opencv_runtime.py`，包括：
+
+* Qt 字体目录修复，避免部分环境下 `cv2.imshow` 的字体报错
+* 摄像头启动参数注册与运行时日志输出
+* 首帧读取、阶段计时和显示 FPS 计算
+* V4L2 优先打开摄像头，以及请求较小缓冲区以降低实时延迟
+
+对于实时摄像头输入，建议优先遵循两个原则：
+
+* 只使用摄像头原生支持的 `camera-profile`
+* 在高分辨率高帧率下优先保留 MJPEG 模式
+
+以一台支持 `MJPG 1280x720@60` 的 USB 摄像头为例，板端一次实测中，在启用 V4L2 优先后端与 `buffer=1` 请求后，跟踪链路显示 FPS 从约 `20` 提升到了约 `26`。这个结果会随摄像头、驱动、OpenCV 构建方式和模型负载变化，但可以作为边缘端优化摄像头采集路径的参考。
 
 ## 使用建议
 
