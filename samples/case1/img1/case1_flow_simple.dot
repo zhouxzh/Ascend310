@@ -1,0 +1,62 @@
+digraph FaceAttendanceSystemSimple {
+    // 全局图属性
+    graph [
+        rankdir = TB,
+        fontname = "Microsoft YaHei",
+        fontsize = 14,
+        label = "基于 RetinaFace 与 ArcFace 的智能人脸识别考勤系统流程图（简版）",
+        labelloc = t,
+        splines = spline,
+        nodesep = 0.5,
+        ranksep = 0.5,
+        bgcolor = "#F8F9FA"
+    ]
+
+    // 全局节点属性
+    node [
+        fontname = "Microsoft YaHei",
+        fontsize = 12,
+        style = "filled,rounded",
+        shape = box
+    ]
+
+    // 全局边属性
+    edge [
+        fontname = "Microsoft YaHei",
+        fontsize = 10
+    ]
+
+    // ─── 节点定义 ───
+    Start [shape = oval, fillcolor = "#2C3E50", fontcolor = white, style = filled, label = "系统启动"]
+    End   [shape = oval, fillcolor = "#2C3E50", fontcolor = white, style = filled, label = "系统结束"]
+
+    Init     [fillcolor = "#3498DB", fontcolor = white, label = "系统初始化\n(NPU, 模型加载, 数据库)"]
+    Web      [fillcolor = "#7F8C8D", fontcolor = white, label = "Flask Web 并行服务\n(注册查询/配置管理/视频流)"]
+    
+    Capture  [fillcolor = "#27AE60", fontcolor = white, label = "读取摄像头视频帧"]
+    Detect   [fillcolor = "#8E44AD", fontcolor = white, label = "人脸检测 (RetinaFace)"]
+    Align    [fillcolor = "#16A085", fontcolor = white, label = "人脸对齐与裁剪"]
+    Extract  [fillcolor = "#C0392B", fontcolor = white, label = "特征提取 (ArcFace)"]
+    Match    [fillcolor = "#2980B9", fontcolor = white, label = "特征比对 (数据库查询)"]
+    Record   [fillcolor = "#27AE60", fontcolor = white, label = "记录考勤并绘制结果"]
+    Release  [fillcolor = "#95A5A6", fontcolor = white, label = "系统资源释放"]
+
+    // ─── 流程连接 ───
+    Start -> Init
+    Init -> Web [style = dashed, label = "启动后台服务"]
+    Init -> Capture
+    
+    Capture -> Detect
+    Detect -> Align [label = "检测到人脸"]
+    Detect -> Capture [style = dashed, label = "无人脸"]
+    
+    Align -> Extract
+    Extract -> Match
+    Match -> Record [label = "比对成功且非重复"]
+    Match -> Capture [style = dashed, label = "陌生人/重复打卡"]
+    
+    Record -> Capture [label = "继续运行"]
+    Record -> Release [label = "收到退出信号"]
+    
+    Release -> End
+}
