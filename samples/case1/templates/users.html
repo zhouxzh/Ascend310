@@ -1,30 +1,30 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Management</title>
+    <title>用户管理</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="container">
         <header class="d-flex justify-content-center py-3">
             <ul class="nav nav-pills">
-                <li class="nav-item"><a href="/" class="nav-link">Home</a></li>
-                <li class="nav-item"><a href="/users_page" class="nav-link active">User Management</a></li>
-                <li class="nav-item"><a href="/attendance_page" class="nav-link">Attendance Log</a></li>
+                <li class="nav-item"><a href="/" class="nav-link">首页</a></li>
+                <li class="nav-item"><a href="/users_page" class="nav-link active">用户管理</a></li>
+                <li class="nav-item"><a href="/attendance_page" class="nav-link">考勤记录</a></li>
             </ul>
         </header>
 
         <div class="row">
             <div class="col-md-4">
-                <h3>Add User</h3>
-                <ul class="nav nav-tabs mb-3" id="registerTab" role="tablist">
+                <h3>添加用户</h3>
+                <ul class="nav nav-tabs mb-3" id="registerTab" role="tablist">    
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab">Upload Photo</button>
+                        <button class="nav-link" id="camera-tab" data-bs-toggle="tab" data-bs-target="#camera" type="button" role="tab">摄像头</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="camera-tab" data-bs-toggle="tab" data-bs-target="#camera" type="button" role="tab">Device Camera</button>
+                        <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab">上传照片</button>
                     </li>
                 </ul>
 
@@ -33,49 +33,58 @@
                     <div class="tab-pane fade show active" id="upload" role="tabpanel">
                         <form id="addUserForm">
                             <div class="mb-3">
-                                <label for="userName" class="form-label">Name</label>
+                                <label for="userName" class="form-label">姓名</label>
                                 <input type="text" class="form-control" id="userName" required>
                             </div>
                             <div class="mb-3">
-                                <label for="userImage" class="form-label">Face Image</label>
+                                <label for="userImage" class="form-label">人脸照片</label>
                                 <input type="file" class="form-control" id="userImage" accept="image/*" required>
                             </div>
-                            <button type="submit" class="btn btn-success">Add User</button>
+                            <button type="submit" class="btn btn-success">添加用户</button>
                         </form>
                     </div>
-                    
+
                     <!-- Camera Tab -->
                     <div class="tab-pane fade" id="camera" role="tabpanel">
                          <form id="addCamUserForm">
                             <div class="mb-3">
-                                <label for="camUserName" class="form-label">Name</label>
+                                <label for="camUserName" class="form-label">姓名</label>
                                 <input type="text" class="form-control" id="camUserName" required>
+                            </div>
+                            <div class="mb-3">
+                                <div class="btn-group w-100 mb-2" role="group">
+                                    <button type="button" class="btn btn-outline-primary active" id="btnDeviceCam" onclick="switchToDevice()">设备摄像头</button>
+                                    <button type="button" class="btn btn-outline-primary" id="btnWebCam" onclick="switchToWeb()">浏览器摄像头</button>
+                                </div>
                             </div>
                             <div class="mb-3 text-center bg-black" style="min-height: 240px;">
                                 <img src="/video_feed" class="img-fluid" id="livePreview" style="max-height: 240px;">
+                                <video id="webVideo" autoplay playsinline style="display:none; max-height: 240px; width: 100%;"></video>
+                                <canvas id="webCanvas" style="display:none;"></canvas>
                                 <img src="" class="img-fluid" id="capturedPreview" style="display:none; max-height: 240px;">
                             </div>
                             <div class="mb-3 d-grid gap-2">
-                                <button type="button" class="btn btn-primary" id="btnCapture" onclick="captureFrame()">Capture Frame</button>
-                                <button type="button" class="btn btn-secondary" id="btnRetake" onclick="retakeFrame()" style="display:none;">Retake</button>
+                                <button type="button" class="btn btn-primary" id="btnCapture" onclick="captureFrame()">抓取画面</button>
+                                <button type="button" class="btn btn-secondary" id="btnRetake" onclick="retakeFrame()" style="display:none;">重新抓取</button>
                             </div>
                             <input type="hidden" id="tempPath" name="temp_path">
-                            <button type="submit" class="btn btn-success" id="btnRegisterCam" disabled>Add User</button>
+                            <input type="hidden" id="webImageData" name="web_image_data">
+                            <button type="submit" class="btn btn-success" id="btnRegisterCam" disabled>添加用户</button>
                         </form>
                     </div>
                 </div>
-                
+
                 <div id="addResult" class="mt-3"></div>
             </div>
             <div class="col-md-8">
-                <h3>Registered Users</h3>
+                <h3>已注册用户</h3>
                 <table class="table table-striped">
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Name</th>
-                            <th>Registered At</th>
-                            <th>Action</th>
+                            <th>姓名</th>
+                            <th>注册时间</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="usersTableBody">
@@ -87,6 +96,45 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let currentCameraMode = 'device'; // 默认使用设备摄像头
+        let webStream = null;
+
+        // 初始化浏览器摄像头
+        function initWebCamera() {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    webStream = stream;
+                    document.getElementById('webVideo').srcObject = stream;
+                })
+                .catch(err => console.error("浏览器摄像头错误:", err));
+        }
+
+        // 切换到设备摄像头
+        function switchToDevice() {
+            currentCameraMode = 'device';
+            document.getElementById('btnDeviceCam').classList.add('active');
+            document.getElementById('btnWebCam').classList.remove('active');
+            document.getElementById('livePreview').style.display = 'block';
+            document.getElementById('webVideo').style.display = 'none';
+            if (webStream) {
+                webStream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        // 切换到浏览器摄像头
+        function switchToWeb() {
+            currentCameraMode = 'web';
+            document.getElementById('btnWebCam').classList.add('active');
+            document.getElementById('btnDeviceCam').classList.remove('active');
+            document.getElementById('livePreview').style.display = 'none';
+            document.getElementById('webVideo').style.display = 'block';
+            initWebCamera();
+        }
+
+        // 页面加载时初始化浏览器摄像头
+        document.addEventListener('DOMContentLoaded', function() {
+            initWebCamera();
+        });
         // Load Users
         function loadUsers() {
             fetch('/api/users?t=' + new Date().getTime())
@@ -95,7 +143,7 @@
                     const tbody = document.getElementById('usersTableBody');
                     tbody.innerHTML = '';
                     if (data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="4" class="text-center">No users found</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center">暂无用户</td></tr>';
                         return;
                     }
                     data.forEach(user => {
@@ -104,7 +152,7 @@
                             <td>${user.id}</td>
                             <td>${user.name}</td>
                             <td>${user.created_at}</td>
-                            <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})">Delete</button></td>
+                            <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})">删除</button></td>
                         `;
                         tbody.appendChild(tr);
                     });
@@ -127,8 +175,16 @@
             e.preventDefault();
             const formData = new FormData();
             formData.append('name', document.getElementById('camUserName').value);
-            formData.append('temp_path', document.getElementById('tempPath').value);
-            
+
+            const tempPath = document.getElementById('tempPath').value;
+            const webImageData = document.getElementById('webImageData').value;
+
+            if (tempPath) {
+                formData.append('temp_path', tempPath);
+            } else if (webImageData) {
+                formData.append('image_base64', webImageData);
+            }
+
             registerUser(formData, 'addCamUserForm');
         });
 
@@ -140,67 +196,77 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('User added successfully!');
+                    alert('用户添加成功！');
                     loadUsers();
                     document.getElementById(formId).reset();
                     if(formId === 'addCamUserForm') retakeFrame();
                 } else {
-                    alert('Error: ' + data.error);
+                    alert('错误: ' + data.error);
                 }
             });
         }
 
         // Camera Logic
         function captureFrame() {
-            fetch('/api/camera/capture', { method: 'POST' })
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) {
-                    document.getElementById('tempPath').value = data.temp_path;
-                    document.getElementById('livePreview').style.display = 'none';
-                    const cap = document.getElementById('capturedPreview');
-                    cap.src = '/video_feed'; // Trick to refresh? No, need static serve or base64. 
-                    // Actually /video_feed is stream. 
-                    // We should serve the temp file or just stop updating live preview?
-                    // Better: The API didn't return image url.
-                    // Let's assume we can serve it via a static route or just trust it captured.
-                    // Or simpler: Pause the live view? No.
-                    
-                    // Let's serve the temp file?
-                    // app.py config['UPLOAD_FOLDER'] is 'uploads'
-                    // We need a route to serve uploads? Or simpler: use data url if API returned it.
-                    // But API returned path.
-                    
-                    // For now, let's just hide live preview and show a "Captured" placeholder or nothing.
-                    // Or better, change the livePreview src to static image?
-                    // We haven't exposed uploads folder.
-                    
-                    // Quick fix: Just hide live and show "Captured".
-                    document.getElementById('livePreview').style.display = 'none';
-                    document.getElementById('capturedPreview').style.display = 'block';
-                    document.getElementById('capturedPreview').src = "/uploads/" + data.temp_path; 
-                    
-                    document.getElementById('btnCapture').style.display = 'none';
-                    document.getElementById('btnRetake').style.display = 'inline-block';
-                    document.getElementById('btnRegisterCam').disabled = false;
-                } else {
-                    alert("Capture failed: " + data.error);
+            if (currentCameraMode === 'device') {
+                fetch('/api/camera/capture', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        document.getElementById('tempPath').value = data.temp_path;
+                        document.getElementById('webImageData').value = '';
+                        document.getElementById('livePreview').style.display = 'none';
+                        document.getElementById('webVideo').style.display = 'none';
+                        const cap = document.getElementById('capturedPreview');
+                        cap.style.display = 'block';
+                        cap.src = "/uploads/" + data.temp_path;
+                        document.getElementById('btnCapture').style.display = 'none';
+                        document.getElementById('btnRetake').style.display = 'inline-block';
+                        document.getElementById('btnRegisterCam').disabled = false;
+                    } else {
+                        alert("抓取失败: " + data.error);
+                    }
+                });
+            } else {
+                const video = document.getElementById('webVideo');
+                const canvas = document.getElementById('webCanvas');
+                if (!video.srcObject) {
+                    alert("浏览器摄像头不可用");
+                    return;
                 }
-            });
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                const dataURL = canvas.toDataURL('image/jpeg');
+                document.getElementById('webImageData').value = dataURL;
+                document.getElementById('tempPath').value = '';
+                document.getElementById('webVideo').style.display = 'none';
+                const cap = document.getElementById('capturedPreview');
+                cap.style.display = 'block';
+                cap.src = dataURL;
+                document.getElementById('btnCapture').style.display = 'none';
+                document.getElementById('btnRetake').style.display = 'inline-block';
+                document.getElementById('btnRegisterCam').disabled = false;
+            }
         }
 
         function retakeFrame() {
-            document.getElementById('livePreview').style.display = 'block';
+            if (currentCameraMode === 'device') {
+                document.getElementById('livePreview').style.display = 'block';
+            } else {
+                document.getElementById('webVideo').style.display = 'block';
+            }
             document.getElementById('capturedPreview').style.display = 'none';
             document.getElementById('btnCapture').style.display = 'inline-block';
             document.getElementById('btnRetake').style.display = 'none';
             document.getElementById('btnRegisterCam').disabled = true;
             document.getElementById('tempPath').value = '';
+            document.getElementById('webImageData').value = '';
         }
 
         // Delete User
         function deleteUser(id) {
-            if(confirm('Are you sure?')) {
+            if(confirm('确定要删除该用户吗？')) {
                 fetch(`/api/users/${id}`, { method: 'DELETE' })
                 .then(response => response.json())
                 .then(data => {

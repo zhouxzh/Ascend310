@@ -223,6 +223,7 @@ samples/*/*/kernel_meta
 *.pb
 *.pt
 *.pth
+*.zip
 
 .history/*
 # LaTeX intermediate / build files

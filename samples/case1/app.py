@@ -13,7 +13,7 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Global objects
+# 全局对象
 face_system = None
 video_camera = None
 
@@ -23,7 +23,7 @@ def get_face_system():
         try:
             face_system = FaceSystem()
         except Exception as e:
-            print(f"Error initializing FaceSystem: {e}")
+            print(f"初始化人脸系统失败: {e}")
             face_system = None
     return face_system
 
@@ -35,7 +35,7 @@ def get_video_camera():
             try:
                 video_camera = VideoCamera(fs)
             except Exception as e:
-                print(f"Error initializing Camera: {e}")
+                print(f"初始化摄像头失败: {e}")
     return video_camera
 
 @app.route('/uploads/<path:filename>')
@@ -65,32 +65,32 @@ def list_users():
             result.append(u_dict)
         return jsonify(result)
     except Exception as e:
-        print(f"Error listing users: {e}")
+        print(f"获取用户列表失败: {e}")
         return jsonify([])
 
 @app.route('/api/camera/capture', methods=['POST'])
 def capture_from_device():
     cam = get_video_camera()
     if cam is None:
-        return jsonify({"error": "Camera not available"}), 503
-    
+        return jsonify({"error": "摄像头不可用"}), 503
+
     frame = cam.get_snapshot()
     if frame is None:
-        return jsonify({"error": "Failed to capture frame"}), 500
-        
-    # Save to temp file
+        return jsonify({"error": "抓取画面失败"}), 500
+
+    # 保存到临时文件
     filename = f"capture_{int(time.time())}.jpg"
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     cv2.imwrite(filepath, frame)
-    
+
     return jsonify({"success": True, "temp_path": filename})
 
 @app.route('/api/users', methods=['POST'])
 def add_user():
     name = request.form.get('name')
     img = None
-    
-    # Check if using uploaded file or captured frame
+
+    # 检查是使用上传文件、抓拍的画面还是 base64 数据
     if 'image' in request.files and request.files['image'].filename != '':
         file = request.files['image']
         filename = f"{int(time.time())}_{file.filename}"
@@ -103,17 +103,24 @@ def add_user():
         if os.path.exists(filepath):
             img = cv2.imread(filepath)
         else:
-            return jsonify({"error": "Captured file not found"}), 400
+            return jsonify({"error": "抓拍文件未找到"}), 400
+    elif 'image_base64' in request.form:
+        data = request.form['image_base64']
+        if ',' in data:
+            data = data.split(',')[1]
+        img_data = base64.b64decode(data)
+        nparr = np.frombuffer(img_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     else:
-         return jsonify({"error": "No image provided"}), 400
+         return jsonify({"error": "未提供图片"}), 400
 
     if img is None:
-        return jsonify({"error": "Invalid image"}), 400
+        return jsonify({"error": "无效的图片"}), 400
 
     fs = get_face_system()
     if fs is None:
-        return jsonify({"error": "Face system not initialized"}), 500
-    
+        return jsonify({"error": "人脸系统未初始化"}), 500
+
     try:
         faces = fs.detect(img)
         if len(faces) > 0:
@@ -125,15 +132,15 @@ def add_user():
             face_img = img[y1:y2, x1:x2]
         else:
             face_img = img
-        
+
         embedding = fs.get_embedding(face_img)
         embedding_blob = embedding.tobytes()
-        
+
         user_id = database.add_user(name, embedding_blob)
-        print(f"User added: {name} (ID: {user_id})")
+        print(f"用户已添加: {name} (ID: {user_id})")
         return jsonify({"success": True, "user_id": user_id})
     except Exception as e:
-        print(f"Error adding user: {e}")
+        print(f"添加用户失败: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
@@ -143,10 +150,10 @@ def delete_user(user_id):
 
 @app.route('/api/clockin', methods=['POST'])
 def clockin():
-    # Manual clockin (upload or client-side camera)
+    # 手动打卡（上传或客户端摄像头）
     img = None
     filepath = "unknown"
-    
+
     if 'image' in request.files:
         file = request.files['image']
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], f"clockin_{int(time.time())}.jpg")
@@ -160,9 +167,9 @@ def clockin():
         nparr = np.frombuffer(img_data, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         filepath = "client_camera"
-    
+
     if img is None:
-        return jsonify({"error": "No image data"}), 400
+        return jsonify({"error": "无图片数据"}), 400
 
     fs = get_face_system()
     
@@ -224,14 +231,14 @@ def gen(camera):
 def video_feed():
     cam = get_video_camera()
     if cam is None:
-        return "Camera not available", 503
+        return "摄像头不可用", 503
     return Response(gen(cam),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
     database.init_db()
     get_face_system()
-    # Initialize camera on start if available
+    # 启动时初始化摄像头（如果可用）
     get_video_camera()
-    
+
     app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
