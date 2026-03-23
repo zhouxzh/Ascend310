@@ -82,6 +82,7 @@
                     <thead>
                         <tr>
                             <th>ID</th>
+                            <th>头像</th>
                             <th>姓名</th>
                             <th>注册时间</th>
                             <th>操作</th>
@@ -130,11 +131,6 @@
             document.getElementById('webVideo').style.display = 'block';
             initWebCamera();
         }
-
-        // 页面加载时初始化浏览器摄像头
-        document.addEventListener('DOMContentLoaded', function() {
-            initWebCamera();
-        });
         // Load Users
         function loadUsers() {
             fetch('/api/users?t=' + new Date().getTime())
@@ -150,7 +146,8 @@
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
                             <td>${user.id}</td>
-                            <td>${user.name}</td>
+                            <td><img src="/uploads/${user.avatar}" style="width:50px;height:50px;object-fit:cover;border-radius:50%;" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Ccircle fill=%22%23ddd%22 cx=%2225%22 cy=%2225%22 r=%2225%22/%3E%3C/svg%3E'"></td>
+                            <td><span id="name-${user.id}">${user.name || '未命名'}</span> <button class="btn btn-link btn-sm p-0" onclick="editName(${user.id}, '${user.name || ''}')">✏️</button></td>
                             <td>${user.created_at}</td>
                             <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})">删除</button></td>
                         `;
@@ -268,6 +265,22 @@
         function deleteUser(id) {
             if(confirm('确定要删除该用户吗？')) {
                 fetch(`/api/users/${id}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) loadUsers();
+                });
+            }
+        }
+
+        // Edit User Name
+        function editName(id, currentName) {
+            const newName = prompt('请输入新姓名:', currentName);
+            if (newName !== null && newName.trim() !== '') {
+                fetch(`/api/users/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name: newName.trim()})
+                })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) loadUsers();

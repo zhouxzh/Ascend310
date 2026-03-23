@@ -136,7 +136,12 @@ def add_user():
         embedding = fs.get_embedding(face_img)
         embedding_blob = embedding.tobytes()
 
-        user_id = database.add_user(name, embedding_blob)
+        # 保存头像
+        avatar_filename = f"avatar_{int(time.time())}.jpg"
+        avatar_path = os.path.join(app.config['UPLOAD_FOLDER'], avatar_filename)
+        cv2.imwrite(avatar_path, face_img)
+
+        user_id = database.add_user(name, embedding_blob, avatar_filename)
         print(f"用户已添加: {name} (ID: {user_id})")
         return jsonify({"success": True, "user_id": user_id})
     except Exception as e:
@@ -147,6 +152,14 @@ def add_user():
 def delete_user(user_id):
     database.delete_user(user_id)
     return jsonify({"success": True})
+
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+def update_user(user_id):
+    name = request.json.get('name')
+    if name:
+        database.update_user_name(user_id, name)
+        return jsonify({"success": True})
+    return jsonify({"error": "姓名不能为空"}), 400
 
 @app.route('/api/clockin', methods=['POST'])
 def clockin():
