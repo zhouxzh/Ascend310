@@ -1,0 +1,6 @@
+# Python 3.11
+aiohttp
+aiortc
+av
+numpy
+opencv-python-headless

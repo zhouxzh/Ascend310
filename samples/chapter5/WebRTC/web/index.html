@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ascend 310B aiortc WebRTC Sender</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">Python Sender</p>
+      <h1>昇腾 310B 经 Python aiortc 推流</h1>
+      <p class="lead">
+        这个页面只负责接收来自昇腾 310B 发送端的远端视频。默认帧源是
+        服务端内置的 <code>AscendVideoTrack</code> 演示实现，用来验证 aiortc 信令、
+        RTP 发送和浏览器接收链路；接入真实 NPU 输出时，替换服务端帧生成逻辑即可。
+      </p>
+    </section>
+
+    <section class="panel controls">
+      <div class="control-grid">
+        <label class="field">
+          <span>分辨率</span>
+          <select id="resolution">
+            <option value="1920x1080" selected>1920 x 1080</option>
+            <option value="1600x900">1600 x 900</option>
+            <option value="1280x720">1280 x 720</option>
+            <option value="1024x768">1024 x 768</option>
+            <option value="960x540">960 x 540</option>
+            <option value="854x480">854 x 480</option>
+            <option value="800x600">800 x 600</option>
+            <option value="640x480">640 x 480</option>
+            <option value="640x360">640 x 360</option>
+            <option value="320x240">320 x 240</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>帧率</span>
+          <select id="fps">
+            <option value="15">15 fps</option>
+            <option value="24">24 fps</option>
+            <option value="30" selected>30 fps</option>
+            <option value="60">60 fps</option>
+            <option value="90">90 fps</option>
+            <option value="120">120 fps</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="button-row">
+        <button id="start" type="button">开始接收</button>
+        <button id="stop" type="button" class="ghost">停止</button>
+      </div>
+
+      <dl class="status-grid">
+        <div>
+          <dt>HTTP 服务</dt>
+          <dd id="serverStatus">检查中</dd>
+        </div>
+        <div>
+          <dt>运行目标</dt>
+          <dd id="runtimeStatus">检查中</dd>
+        </div>
+        <div>
+          <dt>PeerConnection</dt>
+          <dd id="peerStatus">未建立</dd>
+        </div>
+        <div>
+          <dt>接收码率</dt>
+          <dd id="bitrateStatus">-</dd>
+        </div>
+        <div>
+          <dt>视频帧率</dt>
+          <dd id="fpsStatus">-</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="panel video-panel">
+      <header>
+        <h2>昇腾 310B 推流接收画面</h2>
+        <p>这里显示的是 Python 发送端的远端视频，不是浏览器本地采集画面。</p>
+        <p id="videoDimensions" class="video-dimensions">Source: - | Display: -</p>
+      </header>
+      <div class="video-stage">
+        <video id="remoteVideo" autoplay playsinline></video>
+        <div id="fpsOverlay" class="fps-overlay">- fps</div>
+      </div>
+    </section>
+
+    <section class="panel log-panel">
+      <div class="log-header">
+        <h2>运行日志</h2>
+        <button id="clearLog" type="button" class="ghost">清空日志</button>
+      </div>
+      <pre id="logOutput" class="log-output"></pre>
+    </section>
+  </main>
+
+  <script type="module" src="/client.js"></script>
+</body>
+</html>

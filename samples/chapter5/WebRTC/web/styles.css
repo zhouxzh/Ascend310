@@ -1,0 +1,245 @@
+:root {
+  color-scheme: light;
+  --bg: #edf2f4;
+  --panel-edge: #d8e0e6;
+  --text: #12212f;
+  --muted: #566472;
+  --accent: #0a7ea4;
+  --accent-strong: #025d7a;
+  --shadow: 0 18px 38px rgba(18, 33, 47, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(10, 126, 164, 0.14), transparent 30%),
+    linear-gradient(180deg, #f7fafc 0%, var(--bg) 100%);
+  color: var(--text);
+}
+
+.shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 40px 0 56px;
+}
+
+.hero {
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent-strong);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 1.05;
+}
+
+.lead {
+  margin: 16px 0 0;
+  max-width: 72ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--panel-edge);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+.controls,
+.video-panel,
+.log-panel {
+  padding: 20px;
+}
+
+.controls {
+  margin-bottom: 20px;
+}
+
+.control-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field span {
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+select,
+button {
+  border-radius: 14px;
+  border: 1px solid #bfd0db;
+  padding: 12px 14px;
+  font: inherit;
+}
+
+select {
+  background: #fff;
+  color: var(--text);
+}
+
+button {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(2, 93, 122, 0.16);
+}
+
+button.ghost {
+  background: #eff5f8;
+  color: var(--text);
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 20px 0 0;
+}
+
+.status-grid div {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #f4f8fa;
+}
+
+.status-grid dt {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.status-grid dd {
+  margin: 8px 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.video-panel header h2,
+.log-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.video-panel header p {
+  margin: 8px 0 16px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.video-dimensions {
+  margin: -4px 0 16px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 0.9rem;
+}
+
+.video-stage {
+  position: relative;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 18px;
+  background: #07111b;
+  border: 1px solid #0f2741;
+}
+
+.fps-overlay {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: rgba(7, 17, 27, 0.82);
+  color: #00e676;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(0, 230, 118, 0.35);
+  pointer-events: none;
+  z-index: 2;
+}
+
+video {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  border-radius: 12px;
+  background: #07111b;
+  border: 1px solid #0f2741;
+  object-fit: contain;
+}
+
+.log-panel {
+  margin-top: 20px;
+}
+
+.log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.log-output {
+  margin: 16px 0 0;
+  padding: 16px;
+  min-height: 220px;
+  max-height: 340px;
+  overflow: auto;
+  border-radius: 16px;
+  background: #0e1720;
+  color: #d8ecff;
+  border: 1px solid #183149;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 860px) {
+  .control-grid,
+  .status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shell {
+    width: min(100% - 20px, 1120px);
+    padding-top: 24px;
+  }
+}
