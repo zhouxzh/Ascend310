@@ -3,7 +3,7 @@
 在昇腾 310B 上运行：
     export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH"
     export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:$PYTHONPATH"
-    python docs/check_cann.py
+    python samples/chapter5/check_cann.py
 
 预期输出：
     ACL init OK  soc=Ascend310B4  cann=8.3.RC1

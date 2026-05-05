@@ -8,7 +8,7 @@
   • key_frame_interval（GOP）必须在 [1, 65536] 范围内
   • 输入必须是 NV12 格式，宽度按 16 对齐（stride）
 
-    python docs/venc_minimal.py
+    python samples/chapter5/venc/venc_minimal.py
 """
 
 import ctypes

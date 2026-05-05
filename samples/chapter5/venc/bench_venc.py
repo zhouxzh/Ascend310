@@ -2,7 +2,7 @@
 
 分辨率扫描 480p → 4K, GOP=30 (I/P 混合), 确定性测试帧。
 
-    python docs/bench_venc.py
+    python samples/chapter5/venc/bench_venc.py
 """
 
 from __future__ import annotations

@@ -6,7 +6,7 @@ CANN 自带的 acllite 封装了 DVPP 通道管理、stride 对齐、Stream 同�
 在昇腾 310B 上运行：
     export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH"
     export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:/usr/local/Ascend/thirdpart/aarch64/acllite:$PYTHONPATH"
-    python docs/vpc_acllite_demo.py
+    python samples/chapter5/vpc/vpc_acllite_demo.py
 
 预期输出：
     Resize        OK  640x480 → 320x240   size=115200

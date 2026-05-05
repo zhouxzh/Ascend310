@@ -3,7 +3,7 @@
 在昇腾 310B 上运行：
     export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH"
     export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:$PYTHONPATH"
-    python docs/jpeg_minimal.py
+    python samples/chapter5/jpeg/jpeg_minimal.py
 
 预期输出：
     JPEGE OK  640x480 NV12 → 13360 bytes JPEG

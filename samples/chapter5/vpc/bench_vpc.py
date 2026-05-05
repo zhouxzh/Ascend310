@@ -2,7 +2,7 @@
 
 分辨率扫描 480p → 4K, NV12 → ½ 缩放, 确定性测试帧。
 
-    python docs/bench_vpc.py
+    python samples/chapter5/vpc/bench_vpc.py
 """
 
 from __future__ import annotations

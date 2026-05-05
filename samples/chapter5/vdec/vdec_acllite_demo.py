@@ -5,7 +5,7 @@ CANN 自带的 acllite 封装了 VDEC 的回调线程、通道创建、帧队列
 在昇腾 310B 上运行：
     export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH"
     export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:/usr/local/Ascend/thirdpart/aarch64/acllite:$PYTHONPATH"
-    python docs/vdec_acllite_demo.py
+    python samples/chapter5/vdec/vdec_acllite_demo.py
 
 预期输出：
     libx264: BGR 640x480 → H.264 ~168KB OK

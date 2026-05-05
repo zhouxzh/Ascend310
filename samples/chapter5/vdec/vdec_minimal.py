@@ -8,7 +8,7 @@
   • 输入必须是完整的 H.264 NAL 单元，不能是裸 Annex-B 随机字节
   • 输出是 NV12 格式，与 VENC 输入格式相同
 
-    python docs/vdec_minimal.py
+    python samples/chapter5/vdec/vdec_minimal.py
 """
 
 import ctypes
