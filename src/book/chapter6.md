@@ -1,5 +1,5 @@
 ---
-title: "第5章：算子开发实战"
+title: "第6章：算子开发实战"
 author: [周贤中]
 date: 2025-09-04
 subject: "Markdown"
