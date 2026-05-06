@@ -23,7 +23,7 @@ AscendCL（Ascend Computing Language）是一套用于在昇腾平台上开发�
 ## PyACL的基本概念
 PyACL 封装了底层 C语言接口，主要包含以下模块：
 - **acl**: 核心模块，提供初始化、Device 管理、内存管理、模型推理等功能。
-- **acl.media**: 媒体数据处理（DVPP），包括 JPEG 编解码、视频编解码、VPC（图像处理）。
+- **acl.media**: 媒体数据处理（DVPP），包括 JPEG 编解码、视频编解码、VPC（图像处理）。详见[第5章](chapter5.md)。
 - **acl.op**: 单算子调用接口。
 
 ### PyACL的逻辑架构
@@ -78,7 +78,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 为避免每次打开终端都需要输入该命令，建议将其添加到 `~/.bashrc` 文件末尾。
 
 > **⚠ 注意**：
-> PyACL 组件（`acl.so`）支持的 Python 版本范围通常为 **3.7.5 ~ 3.10**。请确保您的虚拟环境 Python 版本在此区间内。
+> PyACL 组件（`acl.so`）支持的 Python 版本范围通常为 **3.8 ~ 3.11**。请确保您的虚拟环境 Python 版本在此区间内。
 
 #### 环境验证
 
@@ -111,7 +111,7 @@ acl.finalize()
 (base) HwHiAiUser@orangepiaipro:~/Documents/samples/chapter4$ python check_ascend_device.py 
 Found 1 Ascend devices.
 ```
-该示例代码演示了 PyACL 应用的基础生命周期：包括环境初始化、查询硬件资源（NPU 数量）以及最后的资源释放。对于投影 310B 处理器的开发板，其可用 NPU 设备数量为 1，程序输出结果与硬件实际情况一致。
+该示例代码演示了 PyACL 应用的基础生命周期：包括环境初始化、查询硬件资源（NPU 数量）以及最后的资源释放。对于昇腾 310B 处理器的开发板，其可用 NPU 设备数量为 1，程序输出结果与硬件实际情况一致。
 
 从上述示例可以看出，环境初始化与资源释放是 PyACL 应用开发的必要环节。在调用任何核心功能接口前，必须先执行 `acl.init(config_path)`。若跳过初始化步骤，后续所有接口调用可能失败并返回错误码（如 `ACL_ERROR_UNINITIALIZED`），导致程序无法正常运行。在没有特殊配置需求时，`acl.init` 可直接传入空字符串或指向空白 JSON 文件的路径。
 
@@ -164,8 +164,8 @@ PyACL 的资源管理构建在 **Device**、**Context** 与 **Stream** 三个核
 
 1.  **ACL 初始化 (`acl.init`)**：这是所有 AscendCL 操作的起点。必须在进程启动的最开始调用，用于初始化 ACL 的全局配置。
 2.  **资源申请 (`set_device/create_context/create_stream`)**：开发者通过 `acl.rt.set_device` 锁定物理硬件资源。如果应用没有显式调用 `acl.rt.create_context` 或 `acl.rt.create_stream`，系统在调用 `set_device` 后会自动创建并关联**默认 Context** 与**默认 Stream**。但在生产环境或多线程并发场景下，建议显式创建这些资源，以实现更好的逻辑隔离和任务异步调度。Stream 作为任务执行队列，负责管理指令在硬件上的下发顺序。
-4.  **业务执行 (Execution)**：在此阶段，应用进行模型加载、数据预处理、推理计算等核心逻辑。所有的计算任务（Kernel）都会被下发到之前创建的 Stream 中。
-5.  **资源销毁**：业务完成后，必须按特定顺序释放资源。对于**显式创建**的资源，应首先调用 `acl.rt.destroy_stream` 销毁 Stream，再调用 `acl.rt.destroy_context` 销毁 Context。最后调用 `acl.rt.reset_device` 重置设备以彻底释放 Device 资源。需要特别说明的是，若未显式创建 Context 与 Stream（即使用系统默认资源），开发者**不能**调用相应的销毁接口；在这种情况下，直接调用 `reset_device` 即可隐式地销毁关联的默认 Context 与 Stream 资源。
+3.  **业务执行 (Execution)**：在此阶段，应用进行模型加载、数据预处理、推理计算等核心逻辑。所有的计算任务（Kernel）都会被下发到之前创建的 Stream 中。
+4.  **资源销毁**：业务完成后，必须按特定顺序释放资源。对于**显式创建**的资源，应首先调用 `acl.rt.destroy_stream` 销毁 Stream，再调用 `acl.rt.destroy_context` 销毁 Context。最后调用 `acl.rt.reset_device` 重置设备以彻底释放 Device 资源。需要特别说明的是，若未显式创建 Context 与 Stream（即使用系统默认资源），开发者**不能**调用相应的销毁接口；在这种情况下，直接调用 `reset_device` 即可隐式地销毁关联的默认 Context 与 Stream 资源。
 5.  **ACL 去初始化 (`acl.finalize`)**：这是进程退出的最后一步，用于彻底清理全局资源。开发者应严格遵循“先业务、再流、后设备”的逆序原则进行资源释放，最后调用此接口退出环境，以避免内存泄漏或设备状态异常。
 
 **关键点总结：**
@@ -217,7 +217,7 @@ ret = acl.finalize()
 
 ### 异构内存管理
 
-由于昇腾 AI 处理器拥有独立的存储单元，应用开发涉及 **Host**（CPU 侧）与 **Device**（NPU 侧）两部分内存。开发者通常面临频繁的数据交互需求：通过 `acl.rt.malloc` 申请 Device 侧内存用于 NPU 计算，或通过 `acl.rt.malloc_host` 申请 Host 内存。数据的流动则依靠 `acl.rt.memcpy` 完成，通过定义传输方向，将采集到的源数据搬运到 NPU 计算单元，或将计算出的结果拉回 Host 进行后处理。内存数据的流动方向一共有四种，分别是Host之间，Host到Device，Device之间以及Device到Device，分别对应`ACL_MEMCPY_HOST_TO_HOST`,，具体的流程图如下图所示：
+由于昇腾 AI 处理器拥有独立的存储单元，应用开发涉及 **Host**（CPU 侧）与 **Device**（NPU 侧）两部分内存。开发者通常面临频繁的数据交互需求：通过 `acl.rt.malloc` 申请 Device 侧内存用于 NPU 计算，或通过 `acl.rt.malloc_host` 申请 Host 内存。数据的流动则依靠 `acl.rt.memcpy` 完成，通过定义传输方向，将采集到的源数据搬运到 NPU 计算单元，或将计算出的结果拉回 Host 进行后处理。内存数据的流动方向一共有四种：Host 到 Host、Host 到 Device、Device 到 Host 以及 Device 到 Device，分别对应 `ACL_MEMCPY_HOST_TO_HOST`、`ACL_MEMCPY_HOST_TO_DEVICE`、`ACL_MEMCPY_DEVICE_TO_HOST` 和 `ACL_MEMCPY_DEVICE_TO_DEVICE`。具体的流程图如下图所示：
 
 ![资源申请与释放流程图](img4/memory.png){fig:pyacl_memory width=100% .center}
 
@@ -418,11 +418,11 @@ PyACL 提供了四种不同粒度的同步等待机制，以适应从简单的�
 **对 PyACL 开发的启示：**
 
 基于上述硬件数据，我们在开发中必须遵循以下“生存法则”：
-*   **不要信任 CPU 的浮点计算能力**：任何涉及图像 Pixels 遍历的操作（如 Resize, Color Convert, Normalize）若写在 CPU (Python) 端，必将导致帧率骤降。**必须使用 DVPP 硬件加速**。
+*   **不要信任 CPU 的浮点计算能力**：任何涉及图像 Pixels 遍历的操作（如 Resize, Color Convert, Normalize）若写在 CPU (Python) 端，必将导致帧率骤降。**必须使用 DVPP 硬件加速**（详见[第5章](chapter5.md)）。
 *   **Python 代码仅做胶水**：Python 逻辑应仅限于流程控制、参数配置和极少量的后处理。业务主体必须由底层的 C++ 算子或 NPU 模型承担。
 *   **异步是救命稻草**：由于 CPU 处理每一行 Python 代码都比其他平台慢，因此更不能让 CPU 傻傻等待 NPU（同步）。只有利用 `stream_wait_event` 让 CPU 快速把任务分发完并脱身，才能掩盖 A55 核心性能不足的缺陷。
 
-**1. 优先策略：全链路异步与细粒度同步**
+##### 1. 优先策略：全链路异步与细粒度同步
 
 在昇腾 310B 平台上，由于 CPU 算力相对有限，最理想的流水线策略是实施“全链路异步”设计，即让 CPU 专注于指令分发，而将繁重的计算负载全权交由 NPU 负责。开发者应尽量避免使用 `acl.rt.memcpy` 等同步阻塞接口，转而全面采用 `acl.rt.memcpy_async` 配合 Event 机制。这种方法的核心原则在于，凡是能通过 Device 侧 `stream_wait_event` 解决的任务依赖，绝不让 Host 侧的 CPU 介入干预。例如，在典型的多级推理流水线中，我们可以安排 Stream A 负责视频解码（DVPP），Stream B 负责模型推理。当 Stream A 完成解码任务后，只需在流中记录一个 Event，而 Stream B 仅需等待该 Event 触发即可启动推理。整个交互过程中，CPU 仅需极低开销下发几条控制指令，完全无需挂起等待解码结束，从而能腾出宝贵算力去处理复杂的业务逻辑或网络通信，实现真正的软硬件解耦与并行。
 
@@ -442,7 +442,7 @@ acl.rt.stream_wait_event(stream_infer, event_decode_done)
 acl.mdl.execute_async(..., stream_infer)
 ```
 
-**2. 数据传输优化：Host Pinned Memory 的强制管理**
+##### 2. 数据传输优化：Host Pinned Memory 的强制管理
 
 实现异步传输的高性能前提是 Host 侧内存的稳定性。在使用 `acl.rt.memcpy_async` 进行 Host 到 Device 的数据搬运时，源端的 Host 内存**必须**是通过 `acl.rt.malloc_host` 申请的页锁定内存（Pinned Memory）。普通的 `malloc` 申请的内存可能会被操作系统分页机制换出到磁盘交换区，导致 DMA 控制器无法安全、准确地访问数据。此外，内存的生命周期管理至关重要。在释放 Host 侧指针之前，必须通过 `acl.rt.synchronize_stream` 等手段确保所有涉及该内存块的 Stream 任务都已彻底执行完毕。如果过早释放内存，NPU 正尝试读取数据时地址已失效，将导致读取到野指针数据，引发难以复现的推理错误或系统崩溃。
 
@@ -464,7 +464,7 @@ acl.rt.synchronize_stream(stream)
 acl.rt.free_host(host_ptr)
 ```
 
-**3. 多 Stream 协作范式：生产者-消费者模型**
+##### 3. 多 Stream 协作范式：生产者-消费者模型
 
 构建基于生产者-消费者模型的多 Stream 协作机制，是挖掘 310B 硬件潜能、提升应用帧率（FPS）的关键手段。具体的实施路径是将通过 Stream 的划分将任务解耦为“预处理”、“推理”和“后处理”等独立阶段，通过 Event 机制实现流水线衔接。这种模式下，前一个阶段完成后记录 Event，后一个阶段感应 Event 并启动，就像工厂流水线一样运转。其最大优势在于避免了 CPU 使用 `while` 循环去轮询 NPU 的状态，极大降低了 CPU 占用率。对于昇腾 310B 这类嵌入式 SoC 而言，节省下来的 CPU 开销意味着开发者可以在 Python 层运行更复杂的逻辑判断，从而提升整个系统的智能化水平。
 
@@ -488,11 +488,11 @@ for image in images:
     post_process(stream_c)
 ```
 
-**4. 避免滥用全局同步与调试建议**
+##### 4. 避免滥用全局同步与调试建议
 
 在追求高性能的同时，必须警惕对同步接口的滥用。最典型的反模式是在每一帧的处理循环中都调用 `acl.rt.synchronize_device()`，这种做法相当于强制将所有并行的流水线“拍扁”为串行执行，完全浪费了 NPU 的并行处理能力。全局同步应当被严格限制在程序初始化（确保设备状态复位）、调试阶段（精确定位错误发生的算子）或进程退出阶段（安全回收所有资源）。对于开发者而言，调试异步程序确实存在挑战，因为报错行往往滞后于实际错误发生点。因此，建议遵循“从同步到异步”的演进路线：在开发初期，全部使用同步接口（如 `synchronize_stream`）确保逻辑正确性和内存安全；进入性能调优阶段后，再逐步替换为异步接口并引入 Event 机制，配合 Profiling 工具观察流水线中的空隙（Bubble），逐步压榨硬件性能。
 
-**小结**
+##### 小结
 
 掌握 PyACL 同步机制的核心在于理解**“控制流（CPU）与数据流（NPU）的分离”**。在昇腾 310B 开发中，优秀的架构设计应当是：Host 线程像一个从容的指挥官，通过 Event 编排好各 Stream 的协作顺序后便抽身而去，留给 NPU 硬件去并行处理繁重的数据搬运与计算任务。合理使用 `stream_wait_event` 实现 Device 内部的依赖隔离，仅在必须获取最终结果时使用 `synchronize_stream` 回收数据，是在边缘端实现高性能推理的黄金法则。
 
@@ -535,9 +535,10 @@ Tiny-ImageNet 是大规模视觉识别挑战赛 (ILSVRC) 中 ImageNet 数据集�
 
 #### ResNet-18 模型训练
 
-如果你希望自行训练模型以便进行测试，可以参考本节的模型训练部分；如果只需体验昇腾 310B 上 PyACL 的推理性能，可直接跳转至下一个小节“PyACL 的推理”。
+> **⚠ 注意：本节训练代码需在配备 NVIDIA 显卡的 GPU 服务器上运行，不在昇腾 310B 开发板上执行。**
+> 如果只需体验昇腾 310B 上 PyACL 的推理性能，可直接跳转至 [环境配置与模型转换](#环境配置与模型转换)。
 
-为了进行模型训练，我们需要一台配备 Nvidia 显卡并已正确安装 CUDA 驱动的服务器。本例中，我们使用 GeForce 5090D 显卡。对于图像分类任务，Nvidia GeForce 系列显卡已能很好地满足需求。我们选用 Tiny-ImageNet 数据集进行训练，该数据集相比完整版 ImageNet 体积更小，便于测试和实验。使用 GeForce 5090D 训练一次大约需要 1~2 小时；而若采用完整的 ImageNet 数据集，单卡训练可能需要长达一周的时间。
+如果你希望自行训练模型以便进行测试，可以参考本节的模型训练部分。我们需要一台配备 Nvidia 显卡并已正确安装 CUDA 驱动的服务器。本例中，我们使用 GeForce 5090D 显卡。对于图像分类任务，Nvidia GeForce 系列显卡已能很好地满足需求。我们选用 Tiny-ImageNet 数据集进行训练，该数据集相比完整版 ImageNet 体积更小，便于测试和实验。使用 GeForce 5090D 训练一次大约需要 1~2 小时；而若采用完整的 ImageNet 数据集，单卡训练可能需要长达一周的时间。
 
 我们需要从 Hugging Face 下载 Tiny-ImageNet 数据集，为此首先需要使用 pip 安装 Hugging Face 的 CLI 工具。
 如果在下载过程中遇到网络连接问题，建议配置镜像源，例如使用 hf-mirror。
@@ -843,7 +844,9 @@ tensorboard --logdir=./logs/resnet18_tiny_imagenet
 
 #### 环境配置与模型转换
 
-我们已经训练好了一个准对tiny-ImageNet的ResNet-18的网络，我们已经上传到huggingface的仓库`zhouxzh/resnet18_tiny_imagenet`，因此我们不需要自己进行网络训练。
+我们已经训练好了一个针对 Tiny-ImageNet 的 ResNet-18 网络，并上传到了 HuggingFace 仓库 [`zhouxzh/resnet18_tiny_imagenet`](https://huggingface.co/zhouxzh/resnet18_tiny_imagenet)，因此不需要自行训练。
+
+> 完整的可运行代码位于 [`samples/chapter4/resnet18/`](../samples/chapter4/resnet18/) 目录下，可直接参考使用。
 
 为了可以顺利的从huggingface下载已经训练好的模型，我们需要使用 pip 安装 Hugging Face 的 CLI 工具。
 ```bash
@@ -1046,7 +1049,7 @@ class AclResource:
             
         input_bytes = input_numpy.tobytes()
         input_ptr = acl.util.bytes_to_ptr(input_bytes)
-        # acl.rt.memcpy (dst, dest_max, src, count, kind)
+        # acl.rt.memcpy (dst, dest_size, src, src_size, kind)
         acl.rt.memcpy(dev_in_ptr, input_size, input_ptr, input_size, 1) # 1: ACL_MEMCPY_HOST_TO_DEVICE
         
         # 组装 Input Dataset
@@ -1271,9 +1274,7 @@ print(f"推理帧率: {fps:.2f} FPS")
 print(f"正确率: {accuracy:.2f}%")
 ```
 
-为了直观评估昇腾 310B NPU 的加速效果，我们将基于统一的 ResNet-18 ONNX 模型，在多种硬件平台上开展推理性能的横向对比测试。测试对象不仅包括高性能的 NVIDIA RTX 5090D 显卡和主流的 Intel Core Ultra 7 155H 笔记本处理器，还纳入了同属嵌入式领域的树莓派 5B，以及昇腾 310B 自身的 CPU 模式。
-
-所有平台均安装了 OnnxRuntime 进行推理。其中 RTX 5090D 配置了 CUDA 加速，而其他平台（包括树莓派、Intel 笔记本和昇腾 310B 的 CPU 模式）均仅使用 CPU 进行计算。我们将详细记录各平台的推理耗时与帧率 (FPS)，以此作为基准来量化 NPU 带来的性能提升。
+所有平台均安装了 OnnxRuntime 进行推理。其中 RTX 5090D 配置了 CUDA 加速，而其他平台（包括树莓派、Intel 笔记本和昇腾 310B 的 CPU 模式）均仅使用 CPU 进行计算。
 
 以下是各平台的具体测试结果：
 
@@ -1350,3 +1351,60 @@ print(f"正确率: {accuracy:.2f}%")
 *   **对比旗舰显卡**：虽然 RTX 5090D 展现出了恐怖的 1000+ FPS 性能，但考虑到昇腾 310B 这类边缘设备的低功耗和体积优势，265 FPS 的成绩对于实时的嵌入式应用而言已经绰绰有余。
 
 这一测试结果有力地展示了昇腾 310B 在边缘计算场景下的核心竞争力——**以极低的功耗提供数倍于通用 CPU 的 AI 算力**。
+
+## 目标检测推理
+
+在图像分类之外，目标检测（Object Detection）是 PyACL 推理的另一个重要应用场景。与分类任务仅输出类别标签不同，目标检测需要同时预测物体的**边界框（Bounding Box）**和**类别**，对模型结构和后处理逻辑都提出了更高的要求。
+
+本章在 [`samples/chapter4/`](../samples/chapter4/) 下提供了两种主流目标检测模型的 PyACL 推理实现：
+
+### SSD300（ResNet-50 主干）
+
+SSD（Single Shot MultiBox Detector）是一种单阶段目标检测器，以 ResNet-50 为主干网络，输入尺寸 300×300，在 COCO 2017 数据集上训练和评估。
+
+| 文件 | 说明 |
+|------|------|
+| `train_cuda.py` | GPU 训练入口 |
+| `inference_npu.py` | PyACL 加载 .om 模型进行 NPU 推理 |
+| `inference_cuda.py` | GPU 推理（对比基准） |
+| `inference_cpu.py` | CPU 推理 |
+
+代码位于 [`samples/chapter4/SSD/`](../samples/chapter4/SSD/)。
+
+### SSDLite320（MobileNet 主干）
+
+SSDLite 是 SSD 的轻量化变体，将标准卷积替换为深度可分离卷积（Depthwise Separable Convolution），大幅降低参数量和计算量。本实现以 MobileNetV3 为主干，输入尺寸 320×320，同样在 COCO 2017 上训练。
+
+| 文件 | 说明 |
+|------|------|
+| `train_ddp.py` | 多卡 DDP 训练入口 |
+| `inference_npu.py` | PyACL NPU 推理 |
+| `inference_cuda.py` | GPU 推理（对比基准） |
+| `inference_cpu.py` | CPU 推理 |
+
+代码位于 [`samples/chapter4/SSDLite/`](../samples/chapter4/SSDLite/)。
+
+### 推理流程对比
+
+目标检测的 PyACL 推理流程与 ResNet-18 分类基本一致：**模型加载 → 数据预处理 → NPU 推理 → 后处理**。关键区别在于：
+
+- **模型输出**：分类模型输出单一概率向量（`[1, 200]`），目标检测模型输出多个张量（边界框坐标 + 类别置信度）。
+- **后处理**：分类只需 `argmax`，目标检测需要 Decode 边界框 + NMS（非极大值抑制）去除重叠检测框。
+- **评估指标**：分类用准确率（Accuracy），目标检测用 mAP（mean Average Precision）。
+
+完整代码及使用说明详见各子目录下的 README 文件。
+
+## 总结
+
+本章系统讲解了 PyACL 应用开发的基础知识，从运行资源管理到模型推理的全链路流程。PyACL 的核心价值在于：以 Python 的简洁语法驱动昇腾 NPU 的高性能计算，将 C/C++ 的指针操作和手动内存管理封装为 `acl.rt.malloc`、`acl.rt.memcpy`、`acl.mdl.execute` 等简洁接口，极大降低了昇腾 AI 处理器的开发门槛。
+
+在运行时资源方面，Device、Context、Stream 构成的三级资源模型是 PyACL 的骨架。理解它们的层级关系与生命周期——申请按 `Device → Context → Stream` 顺序，释放按逆序——是写出健壮 PyACL 程序的前提。在此基础上，异构内存管理（Host 与 Device 间的四种拷贝路径）与同步等待机制（Event、Stream Sync、Stream Wait Event、Device Sync 四种粒度）构成了性能优化的核心手段。特别是在昇腾 310B 这类 CPU 算力较弱（Cortex-A55）的边缘设备上，**全链路异步 + Event 驱动的多 Stream 协作**是榨干 NPU 性能的关键策略。
+
+在应用实践层面，本章通过 ResNet-18（图像分类）和 SSD/SSDLite（目标检测）两个经典场景，完整演示了"GPU 训练 → ONNX 导出 → ATC 转换 → PyACL NPU 推理"的标准开发流水线。跨平台对比数据表明，即便使用相同的 ONNX 模型，昇腾 310B NPU 的推理速度（265 FPS）远超其自身 CPU 模式（5 FPS）和树莓派 5B（22 FPS），充分验证了专用 AI 加速器在边缘场景下的不可替代性。
+
+回顾全章，PyACL 的精髓可归纳为三条原则：
+1. **资源按序管理**：初始化 → Device → Context → Stream → 业务执行 → 逆序释放，缺一不可。
+2. **内存显式搬运**：Host 与 Device 内存相互隔离，数据必须通过 `memcpy` 显式传输，这与纯 CPU 编程截然不同。
+3. **异步优先于同步**：在边缘端弱 CPU 的约束下，必须用 `stream_wait_event` 将依赖关系卸载到 Device 侧，让 CPU 专注于指令分发而非空等。
+
+掌握了这些基础概念与 API 后，下一章将进一步深入 DVPP（数字视觉预处理）模块，探索如何利用昇腾 310B 的硬件编解码与图像处理能力，构建完整的视频流 AI 应用。
