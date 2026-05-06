@@ -250,9 +250,19 @@ latex/*.vrb
 latex/*.xdv
 latex/*.dvi
 latex/*.ps
+latex/*.pdf
 latex/_minted-*/
 latex/_build/
 latex/_build/**
 latex/*.fmt
 latex/*.fdb
-latex/*.aux
+
+# Jupyter Notebook generated files
+notebook/*.aux
+notebook/*.fdb_latexmk
+notebook/*.fls
+notebook/*.log
+notebook/*.out
+notebook/*.xdv
+notebook/*.pdf
+notebook/*.html
