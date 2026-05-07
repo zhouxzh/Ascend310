@@ -1,357 +1,493 @@
-# 案例6：智能小车
+# 案例6：智能小车视觉感知
 
 ## 1. 项目简介
 
-本项目基于昇腾310B平台，构建一个具备自主导航、障碍物避让、自动循迹等功能的智能小车。该小车集成了计算机视觉、路径规划、运动控制等多项AI技术，能够在复杂环境中自主行驶，为无人驾驶、服务机器人、智能巡检等应用领域提供技术验证平台。
+本项目基于昇腾 310B 平台，构建一个智能小车的视觉感知系统。系统结合
+**经典计算机视觉**和**深度学习**两种方法：使用 OpenCV 的 Canny 边缘
+检测 + Hough 变换进行车道线检测，使用 ResNet18 卷积神经网络在 NPU 上
+进行驾驶场景分类。两种方法互补——几何特征（车道线）用经典 CV 提取，
+语义理解（场景类型）交给深度学习。
 
-相比传统的遥控小车，智能小车具备环境感知、决策规划和自主执行的能力，代表了移动机器人技术的发展方向。本项目将详细介绍从硬件搭建、软件开发到AI算法部署的完整实现过程。
+与旧版案例6不同，本项目不涉及机器人硬件（底盘、电机、激光雷达等），
+而是聚焦于昇腾 310B 最擅长的部分：**摄像头画面的实时 AI 理解**。这
+也是真实自动驾驶系统中"感知层"的核心功能。
+
+### 与已有案例的关系
+
+| 案例 | 领域 | NPU 任务 | 方法特点 |
+|------|------|----------|----------|
+| 案例2 | 目标检测 + 跟踪 | SSD 检测 | 纯深度学习 |
+| **案例6** | **智能小车感知** | **ResNet18 场景分类** | **经典 CV + 深度学习混合** |
+| 案例7 | 智能相册 | ResNet50 特征提取 | 批量索引 + FAISS 检索 |
+| 案例8 | 手势识别 | MobileNetV3 分类 | 训练 → 转换 → 部署 |
+
+案例6是全书第一个**显式结合经典 CV 与深度学习**的案例，展示了在实际
+工程中如何选择合适的技术方案——不是所有问题都需要神经网络。
 
 ## 2. 内容大纲
 
 ### 2.1. 硬件准备
 
-- **核心计算单元**: 昇腾310B开发者套件
-- **底盘系统**:
-  - **驱动方式**: 四轮差速驱动
-  - **电机**: 直流减速电机 × 4 (12V, 100RPM)
-  - **编码器**: 增量式光电编码器 × 4
-  - **轮胎**: 全向轮或麦克纳姆轮
-- **传感器系统**:
-  - **视觉传感器**: USB摄像头 (1080p 30fps)
-  - **激光雷达**: RPLiDAR A1 或 A2 (可选)
-  - **超声波传感器**: HC-SR04 × 6 (前后左右)
-  - **IMU**: MPU6050 (姿态检测)
-  - **GPS模块**: NEO-8M (户外定位)
-- **控制系统**:
-  - **主控板**: 树莓派4B 或 专用控制板
-  - **电机驱动**: L298N驱动模块 × 2
-  - **舵机**: SG90 (摄像头云台)
-- **电源系统**:
-  - **主电池**: 12V 锂电池组 (5000mAh)
-  - **辅助电源**: 5V/3.3V稳压模块
-  - **电源管理**: 充电保护电路
+本项目只需要：
 
-*智能小车系统架构*
-```
-     摄像头 + 云台
-          │
-    ┌─────▼─────┐
-    │  昇腾310B │ ← AI决策中心
-    └─────┬─────┘
-          │
-    ┌─────▼─────┐
-    │ 主控制器  │ ← 运动控制
-    └─────┬─────┘
-          │
-  ┌───────┼───────┐
-  │       │       │
- 传感器   电机    电源系统
- 阵列    驱动
+- **昇腾 310B 开发者套件**：核心计算单元，运行场景分类模型
+- **USB 摄像头**（可选）：用于实时画面采集，也可以用测试图片
+- **显示屏**（可选）：用于浏览器访问 Gradio 界面
+
+无需任何机器人硬件。车道线检测和场景分类都是纯视觉任务，在 310B +
+摄像头组合上即可完整运行。
+
+硬件架构如图所示：
+
+```mermaid
+flowchart LR
+    subgraph INPUT["输入"]
+        CAM["USB 摄像头\n或测试图片"]
+    end
+
+    subgraph COMPUTE["计算平台"]
+        CPU["CPU\n· 车道线检测 (OpenCV)\n· 图像预处理"]
+        NPU["昇腾 310B NPU\n· ResNet18 场景分类\n· OM 离线模型"]
+    end
+
+    subgraph OUTPUT["输出"]
+        UI["Gradio Web 界面\n· 车道线叠加显示\n· 场景标签 + 驾驶建议"]
+    end
+
+    CAM -->|"图像帧"| CPU
+    CPU -->|"车道线结果"| UI
+    CPU -->|"预处理张量"| NPU
+    NPU -->|"场景分类结果"| UI
 ```
 
 ### 2.2. 软件环境
 
-- **操作系统**: Ubuntu 20.04 LTS
-- **CANN版本**: 7.0.RC1
-- **Python版本**: 3.8.10
-- **机器人框架**:
-    - `ROS2 Foxy`: 机器人操作系统
-    - `rospy`: Python ROS接口
-    - `tf2`: 坐标变换库
-- **计算机视觉**:
-    - `opencv-python`: 图像处理
-    - `ultralytics`: YOLOv8目标检测
-    - `apriltag`: AprilTag标签识别
-- **路径规划**:
-    - `scipy`: 科学计算
-    - `numpy`: 数值计算
-    - `matplotlib`: 路径可视化
-- **硬件控制**:
-    - `RPi.GPIO`: GPIO控制
-    - `pyserial`: 串口通信
-    - `smbus`: I2C通信
+#### 操作系统与框架
 
-*环境配置脚本 (`setup_smartcar.sh`)*
+| 层级 | 软件 | 版本 | 用途 |
+|------|------|------|------|
+| 操作系统 | Ubuntu | 20.04 / 22.04 LTS | 运行环境 |
+| CANN | Ascend Toolkit | 7.0+ | NPU 驱动与 ATC 转换工具 |
+| Python | CPython | 3.8 ~ 3.10 | 应用开发语言 |
+| 深度学习 | PyTorch + torchvision | 2.0+ | ResNet18 模型 / CPU 推理回退 |
+| 图像处理 | OpenCV | 4.8+ | 车道线检测 + 图像预处理 |
+| Web | Gradio | 4.0+ | 感知结果展示界面 |
+
+#### 环境准备
+
 ```bash
-#!/bin/bash
-# ROS2安装
-sudo apt update
-sudo apt install curl gnupg2 lsb-release
-curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add -
-sudo sh -c 'echo "deb [arch=$(dpkg --print-architecture)] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2-latest.list'
-sudo apt update
-sudo apt install ros-foxy-desktop
-
-# Python依赖安装
-pip3 install opencv-python ultralytics scipy numpy matplotlib
-pip3 install RPi.GPIO pyserial smbus rospkg
-
-echo "智能小车环境配置完成!"
+# 一键安装依赖并导出模型
+bash setup.sh
 ```
 
-### 2.3. 计算机视觉系统
+`setup.sh` 依次完成：系统包安装 → Python 依赖安装 → ONNX 模型导出（如
+有 CANN 则继续转换为 OM）。
 
-- **目标检测与识别**:
-    ```python
-    # YOLO目标检测类
-    class ObjectDetector:
-        def __init__(self, model_path):
-            self.model = YOLO(model_path)
-            self.target_classes = ['person', 'car', 'traffic_light', 'stop_sign']
-        
-        def detect_objects(self, image):
-            results = self.model(image)
-            detections = []
-            
-            for result in results:
-                for box in result.boxes:
-                    if box.cls in self.target_classes:
-                        detections.append({
-                            'class': self.target_classes[box.cls],
-                            'confidence': box.conf,
-                            'bbox': box.xyxy,
-                            'distance': self.estimate_distance(box)
-                        })
-            
-            return detections
-    ```
+如果只想在开发机上导出 ONNX：
 
-- **车道线检测**:
-    - **图像预处理**: 灰度化、高斯滤波、边缘检测
-    - **ROI提取**: 感兴趣区域设定
-    - **Hough变换**: 直线检测
-    - **拟合优化**: 车道线拟合和平滑
+```bash
+python3 prepare_models.py --onnx-only
+```
 
-- **深度估计**:
-    - **单目深度估计**: 基于物体大小的距离估算
-    - **双目视觉** (可选): 立体视觉深度计算
-    - **传感器融合**: 结合超声波和视觉信息
+#### Python 依赖说明
 
-### 2.4. 路径规划与导航
+| 包 | 用途 | 必需？ |
+|:---|:---|:---|
+| `gradio` | Web 界面框架 | ✓ |
+| `torch` + `torchvision` | ResNet18 模型定义、CPU 推理回退 | ✓ |
+| `opencv-python` | 车道线检测（Canny/Hough）、图像缩放 | ✓ |
+| `numpy` | 数值计算、softmax | ✓ |
+| `Pillow` | Gradio 图像格式转换 | ✓ |
+| `onnx` | ONNX 模型校验（仅 prepare_models.py） | 仅转换 |
+| `acl` (CANN 自带) | NPU 推理，随 CANN 安装 | 仅推理 |
 
-- **全局路径规划**:
-    ```python
-    # A*路径规划算法
-    class AStarPlanner:
-        def __init__(self, grid_map):
-            self.grid_map = grid_map
-            self.open_set = []
-            self.closed_set = set()
-        
-        def plan_path(self, start, goal):
-            # A*算法实现
-            current = start
-            path = []
-            
-            while current != goal:
-                # 搜索最优路径
-                current = self.find_best_node()
-                path.append(current)
-                
-                if self.is_goal_reached(current, goal):
-                    break
-            
-            return self.smooth_path(path)
-        
-        def smooth_path(self, path):
-            # 路径平滑处理
-            return smoothed_path
-    ```
+### 2.3. 车道线检测原理
 
-- **局部路径规划**:
-    - **DWA算法**: 动态窗口法避障
-    - **人工势场法**: 基于势场的路径规划
-    - **RRT算法**: 快速随机树路径搜索
+车道线检测是一个经典的计算机视觉问题。车道线本质上是图像中的**直线**
+或**平滑曲线**，具有明显的边缘特征和固定的几何约束（位于画面下半部
+分，大致呈八字形）。这些特征使得经典 CV 方法——Canny 边缘检测 +
+Hough 直线变换——比深度学习更直接有效。
 
-- **SLAM建图** (可选):
-    - **激光SLAM**: 基于激光雷达的地图构建
-    - **视觉SLAM**: 基于摄像头的视觉SLAM
-    - **多传感器融合**: 激光雷达 + 视觉 + IMU
+#### 为什么不用深度学习做车道线检测
 
-### 2.5. 运动控制系统
+| 方法 | 优势 | 劣势 |
+|------|------|------|
+| **经典 CV (Canny + Hough)** | 无需训练数据、速度快、可解释、参数可调 | 对复杂场景（阴影、弯道）敏感 |
+| 深度学习 (UNet / LaneNet) | 对复杂场景鲁棒 | 需要标注数据、模型大、OM 转换复杂 |
 
-- **底层运动控制**:
-    ```python
-    # 差速驱动控制器
-    class DifferentialDriveController:
-        def __init__(self, wheel_base, wheel_radius):
-            self.wheel_base = wheel_base
-            self.wheel_radius = wheel_radius
-            self.max_speed = 1.0  # m/s
-        
-        def velocity_to_wheel_speeds(self, linear_vel, angular_vel):
-            # 将线速度和角速度转换为左右轮速度
-            left_speed = linear_vel - angular_vel * self.wheel_base / 2
-            right_speed = linear_vel + angular_vel * self.wheel_base / 2
-            
-            # 速度限制
-            left_speed = self.limit_speed(left_speed)
-            right_speed = self.limit_speed(right_speed)
-            
-            return left_speed, right_speed
-        
-        def execute_motion(self, left_speed, right_speed):
-            # 发送速度指令到电机驱动器
-            self.set_motor_speeds(left_speed, right_speed)
-    ```
+对于昇腾 310B 上的智能小车应用，经典 CV 是更合理的选择：不需要额外
+的标注数据，不占用 NPU 资源（NPU 留给场景分类），处理速度极快。
 
-- **PID控制器**:
-    - **位置控制**: PID位置控制器
-    - **速度控制**: PID速度控制器
-    - **姿态控制**: PID姿态稳定控制
+#### 检测流水线
 
-- **轨迹跟踪**:
-    - **Pure Pursuit**: 纯跟踪算法
-    - **Stanley控制器**: Stanley横向控制
-    - **MPC控制**: 模型预测控制
+```mermaid
+flowchart TD
+    INPUT["输入图像\nBGR (H, W, 3)"] --> GRAY["cv2.cvtColor\nBGR → Grayscale"]
+    GRAY --> BLUR["cv2.GaussianBlur\n降噪 (5×5)"]
+    BLUR --> CANNY["cv2.Canny\n边缘检测\n阈值 50/150"]
+    CANNY --> ROI["ROI Mask\n保留画面下部 40%\n(道路区域)"]
+    ROI --> HOUGH["cv2.HoughLinesP\n概率 Hough 变换\n提取线段"]
+    HOUGH --> FILTER["斜率过滤\n|slope| ≥ 0.4\n分离左右车道"]
+    FILTER --> FIT["加权线性回归\n拟合完整车道线"]
+    FIT --> DRAW["cv2.addWeighted\n叠加到原图"]
+```
 
-### 2.6. AI决策系统
+每一步的实现都在 [lane_detector.py](samples/case6/lane_detector.py) 的
+`LaneDetector` 类中。关键步骤说明：
 
-- **行为决策树**:
-    ```python
-    # 智能行为决策系统
-    class BehaviorPlanner:
-        def __init__(self):
-            self.behaviors = {
-                'follow_lane': self.follow_lane_behavior,
-                'avoid_obstacle': self.avoid_obstacle_behavior,
-                'stop_for_traffic': self.stop_for_traffic_behavior,
-                'explore': self.exploration_behavior
-            }
-        
-        def make_decision(self, sensor_data, current_state):
-            # 根据传感器数据和当前状态做出决策
-            if self.detect_obstacle(sensor_data):
-                return 'avoid_obstacle'
-            elif self.detect_traffic_sign(sensor_data):
-                return 'stop_for_traffic'
-            elif self.lane_detected(sensor_data):
-                return 'follow_lane'
-            else:
-                return 'explore'
-    ```
+1. **Canny 边缘检测**：检测图像中亮度剧烈变化的位置（车道线通常是白色或
+   黄色的，与深色路面形成强烈对比）
 
-- **强化学习** (高级功能):
-    - **Q-Learning**: 基于值函数的学习
-    - **Deep Q-Network**: 深度Q网络
-    - **Policy Gradient**: 策略梯度方法
+2. **ROI 蒙版**：只保留图像下半部分（通常是路面区域），过滤掉天空、建筑
+   物等干扰
 
-### 2.7. 模型部署与优化
+3. **Hough 直线变换**：将边缘图中的点映射到参数空间，找到共线的点群——即
+   直线段。概率 Hough 变换 (`HoughLinesP`) 直接返回线段端点，比标准
+   Hough 变换更高效
 
-- **模型转换流程**:
-    ```bash
-    # YOLOv8模型转换
-    # 1. PyTorch转ONNX
-    yolo export model=yolov8n.pt format=onnx
-    
-    # 2. ONNX转昇腾模型
-    atc --model=yolov8n.onnx --framework=5 --output=yolov8n_car \
-        --input_format=NCHW --input_shape="images:1,3,640,640" \
-        --soc_version=Ascend310B1 --out_nodes="output0:0"
-    ```
+4. **斜率过滤**：根据斜率的正负号分离左右车道线（左车道斜率为负，右车道
+   斜率为正），并过滤掉接近水平的线段
 
-- **实时推理优化**:
-    - **模型量化**: INT8量化减少计算量
-    - **图优化**: 算子融合和内存优化
-    - **并行处理**: 多线程并行推理
+5. **车道线拟合**：用加权线性回归将多个短线段合并为一条完整的车道线。
+   以 y 为自变量（车道线接近垂直），以线段长度为权重
 
-### 2.8. 安全系统
+6. **叠加绘制**：用 `cv2.addWeighted` 将车道线半透明叠加到原图上，并在
+   两条车道线之间填充绿色区域标记可行驶车道
 
-- **紧急制动系统**:
-    - **超声波触发**: 近距离障碍物检测
-    - **视觉确认**: 摄像头二次确认
-    - **硬件保护**: 硬件级别的紧急停止
+### 2.4. 驾驶场景分类
 
-- **故障检测**:
-    - **传感器健康监测**: 实时检测传感器状态
-    - **通信故障检测**: 网络和串口通信监控
-    - **电源监控**: 电池电量和电压监测
+车道线检测告诉小车"路在哪里"，但还需要知道"是什么路"——高速公路还是
+城市街道？前方是否有交叉口？这需要语义层面的理解。
 
-### 2.9. 3D打印结构件
+本项目使用 ResNet18 对 5 种典型驾驶场景进行分类：
 
-- **底盘框架 (`chassis_frame.stl`)**:
-    - 轻量化设计
-    - 模块化安装孔
-    - 线缆走线槽
+| # | 场景 | 特征 | 驾驶建议 |
+|---|------|------|----------|
+| 0 | 高速公路 | 多车道、护栏、路牌 | 保持车道，注意车速 |
+| 1 | 城市道路 | 建筑、行人、路边停车 | 注意行人和交叉口 |
+| 2 | 交叉路口 | 路口、交通灯、斑马线 | 减速观察 |
+| 3 | 停车场 | 车位线、密集车辆 | 低速行驶 |
+| 4 | 隧道 | 昏暗、墙壁、灯光 | 开启车灯 |
 
-- **传感器安装座 (`sensor_mounts.stl`)**:
-    - 摄像头云台支架
-    - 超声波传感器固定座
-    - 激光雷达安装底座
+#### 为什么选择 ResNet18
 
-- **保护外壳 (`protective_covers.stl`)**:
-    - 控制板保护罩
-    - 电池仓外壳
-    - 防撞缓冲器
+| 模型 | 参数量 | 310B 推理 | 适用性 |
+|------|--------|-----------|--------|
+| **ResNet18** | 11.7M | ~12ms | 推荐：轻量、torchvision 内置 |
+| ResNet50 | 25.6M | ~25ms | 更准但更慢，案例7已使用 |
+| MobileNetV3-Small | 2.5M | ~5ms | 案例8已使用，精度略低 |
+| EfficientNet-B0 | 5.3M | ~10ms | 也可用 |
 
-*3D打印规格*:
-- **材料**: PLA (原型) 或 ABS (实用)
-- **层高**: 0.2mm
-- **填充率**: 25% (结构件) / 15% (外壳)
+选择 ResNet18 的理由：
+- **与已有案例差异化**：案例7用 ResNet50 做特征提取，案例8用
+  MobileNetV3-Small 做手势分类，这里用 ResNet18 做场景分类——三种
+  不同的模型架构
+- **5 分类任务足够**：不需要 ResNet50 的 2048 维特征，ResNet18 的
+  512 维全连接层足够
+- **torchvision 内置**：与案例7相同，权重自动从 PyTorch CDN 获取
 
-### 2.10. 用户手册
+#### 场景分类流程
 
-#### 2.10.1 硬件组装
-1. **底盘组装**: 安装电机、轮子和编码器
-2. **传感器安装**: 固定摄像头、超声波等传感器
-3. **电路连接**: 按照接线图连接所有电子模块
-4. **系统测试**: 验证各个子系统功能
+```mermaid
+flowchart TD
+    INPUT["输入图像\nBGR (H, W, 3)"] --> RESIZE["cv2.resize\n→ 224×224"]
+    RESIZE --> RGB["cv2.cvtColor\nBGR → RGB"]
+    RGB --> NORM["归一化\npixel/255 → (pixel-mean)/std\nImageNet 统计值"]
+    NORM --> TENSOR["→ NCHW (1, 3, 224, 224)"]
+    TENSOR --> CHECK{"NPU 可用?"}
 
-#### 2.10.2 软件配置
-1. **环境安装**: 运行环境配置脚本
-2. **ROS配置**: 配置ROS节点和话题
-3. **参数标定**: 标定传感器和运动参数
-4. **地图构建**: 构建环境地图 (如需要)
+    CHECK -->|"✓ OM 模型"| NPU_INFER["NPU 推理\nacl.mdl.execute()"]
+    CHECK -->|"✗ 回退"| CPU_INFER["CPU 推理\ntorch model()"]
 
-#### 2.10.3 操作指南
-1. **手动模式**: 遥控器控制小车运动
-2. **半自动模式**: 人工指定目标点自动导航
-3. **全自动模式**: 完全自主探索和导航
-4. **调试模式**: 实时查看传感器数据和算法状态
+    NPU_INFER --> SOFTMAX["Softmax → 概率分布"]
+    CPU_INFER --> SOFTMAX
 
-#### 2.10.4 维护保养
-1. **定期检查**: 检查轮子、电机和传感器
-2. **软件更新**: 更新算法和模型
-3. **电池保养**: 正确充放电保护电池
-4. **故障排除**: 常见问题解决方案
+    SOFTMAX --> OUTPUT["输出\n场景类别 + 置信度 + 驾驶建议"]
+```
+
+预处理步骤与案例7、案例8完全一致：缩放、色彩转换、ImageNet 归一化、
+维度重排。
+
+### 2.5. 模型转换与昇腾部署
+
+```mermaid
+flowchart TD
+    subgraph EXPORT["1. ONNX 导出（开发机 / 昇腾设备）"]
+        TORCH["torchvision\nresnet18(IMAGENET1K_V1)\nmodel.fc = Linear(512, 5)"]
+        ONNX["resnet18_scene.onnx\n输入 (1, 3, 224, 224)\n输出 (1, 5)"]
+    end
+
+    subgraph CONVERT["2. ATC 转换（昇腾设备）"]
+        OM["resnet18_scene.om\nAscend 离线模型 ~45MB"]
+    end
+
+    subgraph DEPLOY["3. 推理部署"]
+        APP["app.py → SceneClassifier\n→ AscendModel.execute()"]
+    end
+
+    TORCH -->|"torch.onnx.export()\nopset=11"| ONNX
+    ONNX -->|"atc --framework=5\n--soc_version=Ascend310B4"| OM
+    OM -->|"acl.mdl.execute()"| APP
+```
+
+#### 步骤 1：导出 ONNX
+
+```bash
+python3 prepare_models.py --onnx-only
+```
+
+这一步构建 ResNet18 模型，将原本 1000 类的 ImageNet 分类头替换为 5 类
+驾驶场景分类头，然后用固定输入形状 `(1, 3, 224, 224)` 导出 ONNX。
+
+#### 步骤 2：ATC 转换
+
+```bash
+# 在昇腾设备上运行
+python3 prepare_models.py
+```
+
+等效的 atc 命令：
+
+```bash
+atc --model=models/resnet18_scene.onnx \
+    --framework=5 \
+    --output=models/resnet18_scene \
+    --soc_version=Ascend310B4 \
+    --input_format=NCHW \
+    --input_shape=input:1,3,224,224
+```
+
+#### 关于训练权重
+
+本项目的 `prepare_models.py` 会生成一个基线 `.pth` 文件（ImageNet 骨干
++ 随机初始化的 5 类分类头）。**这个基线模型的预测是随机的**——要获得有
+意义的场景分类结果，需要在驾驶场景数据集上训练。
+
+这是因为：
+- 手动标注 5 类驾驶场景数据集超出了本书的范围
+- 训练流程已在案例8中完整演示（HaGRID + MobileNetV3-Small）
+- 读者可以参考案例8的 `train.py` 模式，用驾驶场景数据集（如
+  [BDD100K](https://bdd-data.berkeley.edu/)、
+  [KITTI](http://www.cvlibs.net/datasets/kitti/)）自行训练
+
+CPU 回退模式下，`SceneClassifier` 会自动检测 `.pth` 文件，加载训练好的
+权重。如果只有基线模型，会在启动时打印警告。
+
+### 2.6. Web 界面
+
+```mermaid
+flowchart TD
+    subgraph UI["Gradio Blocks 界面"]
+        TAB1["🛣️ 道路感知 (Tab 1)"]
+        TAB2["⚙️ 系统信息 (Tab 2)"]
+    end
+
+    subgraph TAB1_DETAIL["感知 Tab"]
+        UPLOAD["gr.Image\n上传道路图像"] --> PERCEIVE["perceive()"]
+        PERCEIVE --> LANE["LaneDetector.detect()\n车道线检测 (CPU)"]
+        PERCEIVE --> SCENE["SceneClassifier.classify()\n场景分类 (NPU/CPU)"]
+        LANE --> OVERLAY["车道线叠加图"]
+        SCENE --> REPORT["Markdown 感知报告\n场景 + 置信度 + 驾驶建议"]
+    end
+
+    subgraph TAB2_DETAIL["信息 Tab"]
+        SYS["系统信息\n模型状态 / 后端 / 参数"]
+    end
+
+    TAB1 --> TAB1_DETAIL
+    TAB2 --> TAB2_DETAIL
+```
+
+#### 两个页签
+
+1. **道路感知**：上传道路图像（或使用示例图片），系统同时执行车道线检测
+   和场景分类。左侧显示输入图像，右侧显示感知报告（车道检测状态、场景
+   标签、置信度进度条、Top-3 预测、驾驶建议），下方显示车道线叠加效果图。
+
+2. **系统信息**：展示当前推理后端（NPU/CPU）、模型文件状态、5 类场景列
+   表及驾驶建议、车道线检测参数（Canny 阈值、Hough 阈值等）。
+
+#### 双后端
+
+与案例7、案例8相同，`SceneClassifier` 使用懒加载 + 自动后端检测：
+
+```python
+_classifier = None
+
+def get_classifier():
+    global _classifier
+    if _classifier is None:
+        _classifier = SceneClassifier()  # 自动检测 NPU/CPU
+    return _classifier
+```
+
+### 2.7. 用户手册
+
+#### 2.7.1 部署
+
+1. 将项目代码拷贝到昇腾 310B 设备
+2. 运行 `bash setup.sh` 安装依赖并导出模型
+3. 启动服务：`python3 app.py`
+4. 浏览器打开 `http://<设备IP>:7860`
+
+#### 2.7.2 使用
+
+1. 在「道路感知」页签上传一张包含道路的图像
+2. 观察车道线检测结果——绿色线条应覆盖路面上的车道标线
+3. 查看右侧的场景分类结果和驾驶建议
+4. 如果车道线检测不理想，可以在 [config.py](samples/case6/config.py) 中
+   调整参数
+
+#### 2.7.3 调整车道线参数
+
+| 参数 | 默认值 | 调高效果 | 调低效果 |
+|------|--------|----------|----------|
+| `CANNY_LOW/HIGH` | 50 / 150 | 减少边缘噪点 | 检测更多边缘 |
+| `HOUGH_THRESHOLD` | 50 | 只保留强直线 | 检测弱直线 |
+| `HOUGH_MIN_LINE_LEN` | 40 | 过滤短线段 | 保留短线段 |
+| `HOUGH_MAX_LINE_GAP` | 100 | 容忍更大断连 | 不连接断裂线 |
+| `ROI_TOP` | 0.6 | ROI 更小（忽略远处） | ROI 更大（包含远处） |
+
+#### 2.7.4 故障排除
+
+| 问题 | 可能原因 | 解决方法 |
+|------|---------|---------|
+| 车道线检测不到 | 图像中无清晰车道线 | 使用有标线的道路图像，调整 Canny 阈值 |
+| 车道线位置偏差大 | 弯道 / 虚线 | Hough 直线模型对弯道敏感，可以降低 `HOUGH_THRESHOLD` |
+| 场景分类随机 | 未加载训练权重 | 需要在驾驶场景数据集上训练，或使用案例8的模式训练 |
+| NPU 初始化失败 | CANN 环境未配置 | `source /usr/local/Ascend/ascend-toolkit/set_env.sh` |
+| ATC 转换失败 | soc_version 不匹配 | `npu-smi info` 查看版本 |
+
+#### 2.7.5 如何训练场景分类模型
+
+参考案例8的 `train.py` 模式：
+1. 准备驾驶场景数据集（按 5 个类别分文件夹存放图像）
+2. 修改案例8的 `train.py`，将模型替换为 ResNet18，类别数改为 5
+3. 训练完成后将 `.pth` 文件放到 `models/resnet18_scene.pth`
+4. 运行 `python3 prepare_models.py --force` 重新导出 ONNX/OM
+
+#### 2.7.6 与案例2的配合
+
+案例2提供了完整的 SSD 目标检测 + DeepSORT 跟踪。读者可以将案例2的
+`ssdlite/` 模块集成到本案中，实现：
+
+1. **车道线检测**（本案，经典 CV）
+2. **目标检测**（案例2，SSD on NPU）——检测行人、车辆、交通标志
+3. **场景分类**（本案，ResNet18 on NPU）——判断道路类型
+4. **目标跟踪**（案例2，DeepSORT）——跟踪移动物体
+
+这四项共同构成一个完整的智能小车视觉感知栈。
 
 ## 3. 源代码结构
 
+```text
+case6/
+├── app.py                 # Gradio Web 界面入口
+├── lane_detector.py        # 经典 CV 车道线检测
+├── scene_classifier.py     # NPU/CPU 双后端场景分类
+├── config.py               # 配置常量
+├── prepare_models.py       # ONNX 导出 & ATC OM 转换
+├── setup.sh                # 一键环境安装
+├── requirements.txt        # Python 依赖列表
+├── data/
+│   └── .gitkeep
+├── models/                 # 模型文件目录 (.pth / .onnx / .om)
+└── README.md               # 快速开始指南
 ```
-smart_car/
-├── src/
-│   ├── perception/          # 感知模块
-│   │   ├── camera/         # 摄像头处理
-│   │   ├── lidar/          # 激光雷达
-│   │   └── ultrasonic/     # 超声波传感器
-│   ├── planning/           # 规划模块
-│   │   ├── global_planner/ # 全局路径规划
-│   │   ├── local_planner/  # 局部路径规划
-│   │   └── behavior/       # 行为规划
-│   ├── control/            # 控制模块
-│   │   ├── motion_control/ # 运动控制
-│   │   └── safety/         # 安全控制
-│   └── utils/              # 工具模块
-├── models/
-│   ├── detection/          # 目标检测模型
-│   ├── segmentation/       # 图像分割模型
-│   └── rl_models/          # 强化学习模型
-├── configs/
-│   ├── sensors.yaml        # 传感器配置
-│   ├── motion.yaml         # 运动参数配置
-│   └── behavior.yaml       # 行为配置
-├── launch/
-│   └── smartcar.launch.py  # ROS启动文件
-└── hardware/
-    ├── 3d_models/          # 3D打印文件
-    ├── pcb_design/         # 电路设计
-    └── assembly/           # 组装指南
+
+模块间的调用关系：
+
+```mermaid
+flowchart TB
+    APP["app.py\nGradio 界面入口"] --> LD["lane_detector.py\nLaneDetector\n· detect()\n· draw_overlay()"]
+    APP --> SC["scene_classifier.py\nSceneClassifier\n· classify()\n· preprocess()"]
+    APP --> CFG["config.py\n· SCENE_CLASSES\n· IMAGE_SIZE\n· 车道线参数"]
+
+    SC --> AR["AscendResource\nacl.init / device / context"]
+    SC --> AM["AscendModel\nacl.mdl.execute()"]
+    SC --> TORCH["torchvision\nresnet18(IMAGENET1K_V1)"]
+
+    LD --> CV["cv2\nCanny / Hough / GaussianBlur"]
+
+    PREP["prepare_models.py\n模型转换"] --> TORCH
+    PREP --> CFG
+
+    AR --> ACL["acl (CANN)"]
+    AM --> ACL
 ```
+
+与之前案例的继承关系：
+
+- `AscendResource` / `AscendModel` 沿用案例8的同一套模式
+- `config.py` 的结构与案例7/案例8一致（`BASE_DIR` + `os.path.join`）
+- `app.py` 的 Gradio 懒加载模式与案例7/案例8/案例9一致
+- `prepare_models.py` 的 ONNX → ATC 流程与案例7/案例8一致
+- `LaneDetector` 是本书第一个纯经典 CV 类——无需任何模型文件，纯
+  OpenCV 实现
+- 本项目**不需要**训练脚本——场景分类头尚未训练，但推理框架完整，参考
+  案例8即可完成训练
 
 ## 4. 效果演示
 
-- **自动循迹**: 沿着地面标线自动行驶
-- **障碍物避让**: 检测并绕过静态和动态障碍物
-- **目标跟踪**: 跟随指定目标人员或物体
-- **自主导航**: 在已知地图中自主导航到目标点
-- **智能巡检**: 按照预设路线进行巡逻检查
+### 预期效果
+
+| 功能 | 预期表现 | 备注 |
+|------|---------|------|
+| 车道线检测 | 清晰标线检测率 > 90% | 对弯道、虚线、阴影敏感 |
+| 场景分类 (已训练) | 5 类准确率 > 85% | 需要训练，基线模型随机 |
+| 端到端处理时间 | 车道线 <5ms + 推理 ~12ms (NPU) | 总计 ~20ms |
+| 车道线检测范围 | 画面下部 40% 区域 | ROI 参数可调 |
+
+### 性能指标
+
+| 指标 | NPU (Ascend 310B) | CPU (PyTorch) |
+|------|-------------------|---------------|
+| 车道线检测 | <5 ms | <5 ms |
+| 场景分类 | 10-15 ms | 25-40 ms |
+| 模型大小 (.om) | ~45 MB | N/A |
+
+### 浏览器中的效果
+
+Gradio 界面在浏览器中的预期布局：
+
+```
+┌──────────────────────────────────────────────────────┐
+│  🚗 智能小车视觉感知                                   │
+│  车道线检测 (经典 CV) + 驾驶场景分类 (ResNet18 on NPU) │
+├──────────────────────────────────────────────────────┤
+│  [🛣️ 道路感知]  [⚙️ 系统信息]                         │
+│                                                      │
+│  ┌──────────────────────┬────────────────────────┐   │
+│  │                      │  📊 感知结果             │   │
+│  │                      │                        │   │
+│  │   输入道路图像         │  🛣️ 车道线检测          │   │
+│  │   (上传或拍摄)         │  - 左车道: ✓  右车道: ✓  │   │
+│  │                      │  - Hough 线段数: 47     │   │
+│  │                      │                        │   │
+│  │                      │  🏷️ 驾驶场景分类         │   │
+│  └──────────────────────┤  - 城市道路 (urban)      │   │
+│                         │  置信度: 87.3%          │   │
+│  ┌──────────────────────┤  ██████████████░░░      │   │
+│  │                      │  💡 注意行人和交叉口      │   │
+│  │  车道线叠加结果        │                        │   │
+│  │  (绿色线条 + 填充区域)  │  📊 Top-3 预测          │   │
+│  │                      │  → 城市道路: 87.3%       │   │
+│  │                      │    高速公路: 8.1%        │   │
+│  │                      │    交叉路口: 3.2%        │   │
+│  │                      │                        │   │
+│  │                      │  ⏱ 总耗时: 17.3 ms      │   │
+│  │                      │  🖥 推理后端: NPU         │   │
+│  └──────────────────────┴────────────────────────┘   │
+└──────────────────────────────────────────────────────┘
+```
+
+### 如何验证系统正常工作
+
+1. 打开浏览器访问 `http://127.0.0.1:7860`
+2. 切换到「道路感知」页签
+3. 上传一张包含清晰车道线的道路图像
+4. 确认车道线叠加图中出现绿色车道线标记
+5. 确认右侧感知报告中显示场景分类结果（如未训练则显示随机结果，这是
+   预期行为）
+6. 切换到「系统信息」页签，确认后端状态和参数显示正确
+7. 在昇腾设备上，确认后端显示"NPU (Ascend 310B)"

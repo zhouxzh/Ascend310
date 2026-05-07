@@ -1,0 +1,12 @@
+faiss-cpu>=1.7.0,<2.0
+gradio>=4.0,<6.0
+jieba>=0.42
+numpy>=1.21,<2.0
+opencv-python>=4.8
+Pillow>=9.0
+requests>=2.25
+sentence-transformers>=2.2,<4.0
+SpeechRecognition>=3.10
+torch>=2.0
+torchvision>=0.15
+transformers>=4.30

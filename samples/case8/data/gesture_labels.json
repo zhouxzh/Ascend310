@@ -1,0 +1,12 @@
+[
+    {"id": 0, "en": "call",        "cn": "打电话",   "emoji": "📞"},
+    {"id": 1, "en": "dislike",     "cn": "不喜欢",   "emoji": "👎"},
+    {"id": 2, "en": "fist",        "cn": "握拳",     "emoji": "✊"},
+    {"id": 3, "en": "like",        "cn": "点赞",     "emoji": "👍"},
+    {"id": 4, "en": "ok",          "cn": "OK",       "emoji": "👌"},
+    {"id": 5, "en": "palm",        "cn": "手掌",     "emoji": "✋"},
+    {"id": 6, "en": "peace",       "cn": "剪刀手",   "emoji": "✌️"},
+    {"id": 7, "en": "rock",        "cn": "摇滚",     "emoji": "🤘"},
+    {"id": 8, "en": "stop",        "cn": "停止",     "emoji": "🛑"},
+    {"id": 9, "en": "no_gesture",  "cn": "无手势",   "emoji": "🫥"}
+]

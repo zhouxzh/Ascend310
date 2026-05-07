@@ -1,5 +1,5 @@
 ---
-title: "第7章：项目实战方法论与交付模板"
+title: "第8章：项目实战方法论与交付模板"
 author: [周贤中]
 date: 2025-09-04
 subject: "Markdown"
