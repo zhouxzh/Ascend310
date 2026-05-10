@@ -1,9 +1,9 @@
 """End-to-end test for DVPP camera pipeline: V4L2 MJPEG → JPEGD → VENC → WebRTC."""
+import argparse
 import asyncio
 import json
 import logging
 import os
-import signal
 import subprocess
 import sys
 import time
@@ -18,7 +18,7 @@ logging.basicConfig(
 logger = logging.getLogger("e2e_test")
 
 
-async def test_offer(port: int, width: int, height: int, fps: int,
+async def _run_offer(port: int, width: int, height: int, fps: int,
                      duration: float = 10.0) -> tuple[bool, float]:
     pc = RTCPeerConnection()
     pc.addTransceiver("video", direction="recvonly")
@@ -80,24 +80,53 @@ async def test_offer(port: int, width: int, height: int, fps: int,
 
 
 async def main():
-    port = 8090
+    parser = argparse.ArgumentParser(
+        description="DVPP camera pipeline end-to-end test",
+    )
+    parser.add_argument(
+        "--python",
+        default=os.environ.get(
+            "E2E_PYTHON",
+            os.path.expanduser("~/.conda/envs/mediapipe/bin/python"),
+        ),
+        help="Path to Python interpreter on the target device",
+    )
+    parser.add_argument(
+        "--cwd",
+        default=os.environ.get("E2E_CWD", os.path.expanduser("~/Documents/WebRTC")),
+        help="Working directory on the target device for server.py",
+    )
+    parser.add_argument(
+        "--cann-toolkit",
+        default=os.environ.get(
+            "E2E_CANN_TOOLKIT", "/usr/local/Ascend/ascend-toolkit/latest"
+        ),
+        help="Path to CANN toolkit installation",
+    )
+    parser.add_argument("--port", type=int, default=8090)
+    parser.add_argument("--width", type=int, default=1920)
+    parser.add_argument("--height", type=int, default=1080)
+    parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--duration", type=float, default=12.0)
+    args = parser.parse_args()
+
     env = os.environ.copy()
     env["LD_LIBRARY_PATH"] = (
-        "/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:"
+        f"{args.cann_toolkit}/aarch64-linux/lib64:"
         "/usr/local/Ascend/driver/lib64"
     )
-    env["PYTHONPATH"] = "/usr/local/Ascend/ascend-toolkit/latest/python/site-packages"
+    env["PYTHONPATH"] = f"{args.cann_toolkit}/python/site-packages"
 
     server = subprocess.Popen(
         [
-            "/home/HwHiAiUser/.conda/envs/mediapipe/bin/python",
+            args.python,
             "server.py",
             "--source", "dvpp_camera",
             "--hardware-encode",
-            "--port", str(port),
+            "--port", str(args.port),
             "--log-level", "INFO",
         ],
-        cwd="/home/HwHiAiUser/Documents/WebRTC",
+        cwd=args.cwd,
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -107,7 +136,8 @@ async def main():
 
     success = False
     try:
-        success, elapsed = await test_offer(port, 1920, 1080, 30, duration=12.0)
+        success, elapsed = await _run_offer(
+            args.port, args.width, args.height, args.fps, duration=args.duration)
     finally:
         server.terminate()
         try:

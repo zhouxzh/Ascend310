@@ -1,5 +1,6 @@
 import asyncio
 import fractions
+import io
 import logging
 import math
 import time
@@ -9,14 +10,6 @@ import av
 import numpy as np
 from aiortc import MediaStreamTrack
 from aiortc.mediastreams import MediaStreamError
-
-try:
-    import cv2
-
-    _HAS_CV2 = True
-except ImportError:
-    cv2 = None  # type: ignore
-    _HAS_CV2 = False
 
 try:
     from webrtc_app.v4l2_capture import V4l2MjpegCapture
@@ -73,10 +66,10 @@ class AscendVideoTrack(MediaStreamTrack):
         self._start: float | None = None
         self._timestamp = 0
         self._frame_index = 0
-        self._camera: object | None = None
         self._camera_closed = False
-        self._capture: object | None = None   # V4l2MjpegCapture for dvpp_camera
-        self._jpegd: object | None = None     # DvppJpegDecoder for dvpp_camera
+        self._capture: object | None = None
+        self._jpegd: object | None = None
+        self._decode_log_count = 0
 
         if source_type == "usb_camera":
             self._init_usb_camera(camera_device)
@@ -91,72 +84,6 @@ class AscendVideoTrack(MediaStreamTrack):
         source_logger.info(
             "Configured Ascend video track source=%s profile=%sx%s@%s mode=demo",
             self.source_name,
-            self.width,
-            self.height,
-            self.fps,
-        )
-
-    def _init_usb_camera(self, camera_device: str | int) -> None:
-        if not _HAS_CV2:
-            source_logger.warning(
-                "opencv-python-headless not installed, falling back to demo source"
-            )
-            self.source_type = "demo"
-            self._init_demo()
-            return
-
-        device_path = (
-            int(camera_device) if str(camera_device).isdigit() else str(camera_device)
-        )
-        cap = cv2.VideoCapture(device_path, cv2.CAP_V4L2)
-        if not cap.isOpened():
-            source_logger.warning(
-                "Cannot open USB camera device=%s, falling back to demo source",
-                device_path,
-            )
-            self.source_type = "demo"
-            self._init_demo()
-            return
-
-        # Request MJPEG — avoids USB bandwidth bottleneck at 1080p
-        # (YUYV 1080p = 124 MB/s > USB 2.0 limit → 5 fps; MJPEG = ~9 MB/s → 30 fps)
-        mjpeg = cv2.VideoWriter_fourcc(*"MJPG")
-        cap.set(cv2.CAP_PROP_FOURCC, mjpeg)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-        cap.set(cv2.CAP_PROP_FPS, self.fps)
-
-        actual_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        actual_fps = cap.get(cv2.CAP_PROP_FPS)
-
-        # Validate camera produces frames
-        ret, _ = cap.read()
-        if not ret:
-            source_logger.warning(
-                "USB camera device=%s opened but read returned no frame, falling back to demo",
-                device_path,
-            )
-            cap.release()
-            self.source_type = "demo"
-            self._init_demo()
-            return
-
-        if actual_width > 0 and actual_height > 0:
-            self.width = actual_width
-            self.height = actual_height
-        if actual_fps > 0:
-            self.fps = int(actual_fps)
-            self._frame_time = 1 / self.fps
-
-        self._camera = cap
-        self._camera_closed = False
-        self.source_name = USB_SOURCE_NAME
-
-        source_logger.info(
-            "Configured USB camera source=%s device=%s profile=%sx%s@%s",
-            self.source_name,
-            device_path,
             self.width,
             self.height,
             self.fps,
@@ -248,6 +175,57 @@ class AscendVideoTrack(MediaStreamTrack):
             self.fps,
         )
 
+    def _init_usb_camera(self, camera_device: str | int) -> None:
+        """Initialize V4L2 MJPEG capture with CPU decode for software baseline."""
+        if V4l2MjpegCapture is None:
+            source_logger.warning(
+                "PyAV V4L2 capture is not available, falling back to demo source"
+            )
+            self.source_type = "demo"
+            self._init_demo()
+            return
+
+        device_path = (
+            str(camera_device) if not str(camera_device).isdigit()
+            else f"/dev/video{int(camera_device)}"
+        )
+
+        try:
+            capture_impl = V4l2MjpegCapture(
+                device=device_path,
+                width=self.width,
+                height=self.height,
+                fps=self.fps,
+            )
+            capture_impl.start()
+        except Exception as exc:
+            source_logger.warning(
+                "Cannot open USB camera device=%s: %s, falling back to demo source",
+                device_path,
+                exc,
+            )
+            self.source_type = "demo"
+            self._init_demo()
+            return
+
+        self._capture = capture_impl
+        self.source_name = USB_SOURCE_NAME
+        actual_w = self._capture.width
+        actual_h = self._capture.height
+        if actual_w > 0 and actual_h > 0:
+            self.width = actual_w
+            self.height = actual_h
+
+        source_logger.info(
+            "Configured USB camera source=%s device=%s profile=%sx%s@%s "
+            "pipeline=V4L2_MJPEG→CPU_DECODE→RGB",
+            self.source_name,
+            device_path,
+            self.width,
+            self.height,
+            self.fps,
+        )
+
     def _camera_read(self) -> np.ndarray | None:
         """Blocking call — must run in thread executor."""
         if self.source_type == "dvpp_camera":
@@ -259,21 +237,53 @@ class AscendVideoTrack(MediaStreamTrack):
                 return None
             if self._camera_closed or self._jpegd is None:
                 return None
+            t0 = time.perf_counter()
             nv12_flat = self._jpegd.decode(jpeg_bytes)
+            if self._decode_log_count < 5:
+                source_logger.info(
+                    "DVPP decode frame=%d bytes=%d decode_ms=%.1f",
+                    self._decode_log_count + 1,
+                    len(jpeg_bytes),
+                    (time.perf_counter() - t0) * 1000,
+                )
+                self._decode_log_count += 1
             return nv12_flat.reshape(self._jpegd.nv12_shape)
 
-        if self._camera_closed or self._camera is None:
-            return None
-        ret, frame_bgr = self._camera.read()  # type: ignore
-        if not ret or self._camera_closed:
-            return None
-        return cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        if self.source_type == "usb_camera":
+            if self._camera_closed or self._capture is None:
+                return None
+            try:
+                jpeg_bytes = self._capture.read(timeout=2.0)
+            except Exception:
+                return None
+            if self._camera_closed:
+                return None
+            try:
+                t0 = time.perf_counter()
+                with av.open(io.BytesIO(jpeg_bytes), format="mjpeg") as container:
+                    frame = next(container.decode(video=0))
+                rgb = frame.to_ndarray(format="rgb24")
+            except Exception as exc:
+                if self._decode_log_count < 5:
+                    source_logger.warning("USB camera decode failed: %s", exc)
+                    self._decode_log_count += 1
+                return None
+            if self._decode_log_count < 5:
+                source_logger.info(
+                    "USB camera decode frame=%d bytes=%d decode_ms=%.1f",
+                    self._decode_log_count + 1,
+                    len(jpeg_bytes),
+                    (time.perf_counter() - t0) * 1000,
+                )
+                self._decode_log_count += 1
+            return rgb
+        return None
 
     def describe_settings(self) -> dict[str, object]:
         if self.source_type == "dvpp_camera":
             mode = "dvpp-camera-mjpeg+jpegd"
         elif self.source_type == "usb_camera":
-            mode = "usb-camera-v4l2"
+            mode = "usb-camera-mjpeg+cpu-decode"
         else:
             mode = "synthetic-demo"
         return {
@@ -324,20 +334,31 @@ class AscendVideoTrack(MediaStreamTrack):
     async def recv(self) -> av.VideoFrame:
         pts, time_base = await self.next_timestamp()
 
-        if self.source_type in ("usb_camera", "dvpp_camera") and (
-            self._camera is not None or self._capture is not None
-        ):
+        t0 = time.perf_counter()
+        if self.source_type in ("usb_camera", "dvpp_camera") and self._capture is not None:
             loop = asyncio.get_running_loop()
             frame = await loop.run_in_executor(None, self._camera_read)
             if frame is None:
                 raise MediaStreamError("Camera read returned no frame")
-            # DVPP pipeline produces NV12; OpenCV produces RGB
             pixel_format = "nv12" if self.source_type == "dvpp_camera" else "rgb24"
         else:
             frame = self._render_demo_frame()
             pixel_format = "rgb24"
 
         self._frame_index += 1
+
+        # Periodic FPS logging (every 150 frames)
+        if not hasattr(self, '_fps_log_idx'):
+            self._fps_log_idx = 0
+            self._fps_log_start = t0
+        self._fps_log_idx += 1
+        if self._fps_log_idx % 150 == 0:
+            elapsed = t0 - self._fps_log_start
+            source_logger.info(
+                "Track FPS: %.1f  (frames=%d elapsed=%.1fs)",
+                150 / elapsed, self._fps_log_idx, elapsed,
+            )
+            self._fps_log_start = t0
 
         video_frame = av.VideoFrame.from_ndarray(frame, format=pixel_format)
         video_frame.pts = pts
@@ -368,7 +389,4 @@ class AscendVideoTrack(MediaStreamTrack):
         if self._jpegd is not None:
             self._jpegd.destroy()
             self._jpegd = None
-        if self._camera is not None:
-            self._camera.release()  # type: ignore
-            self._camera = None
         super().stop()

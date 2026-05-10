@@ -32,17 +32,19 @@ def _IOC(dir_, typ, nr, size):
 #   sizeof(v4l2_capability) = 104
 #   sizeof(v4l2_format)     = 208  (4 + 4pad + 200)
 #   sizeof(v4l2_requestbuffers) = 20
-#   sizeof(v4l2_buffer)     = 80
+#   sizeof(v4l2_buffer)     = 88
 _VIDIOC_QUERYCAP = _IOC(2, "V", 0, 104)
 _VIDIOC_ENUM_FMT = _IOC(3, "V", 2, 76)
 _VIDIOC_G_FMT    = _IOC(3, "V", 4, 208)
 _VIDIOC_S_FMT    = _IOC(3, "V", 5, 208)
 _VIDIOC_REQBUFS  = _IOC(3, "V", 8, 20)
-_VIDIOC_QUERYBUF = _IOC(3, "V", 9, 80)
-_VIDIOC_QBUF     = _IOC(3, "V", 15, 80)
-_VIDIOC_DQBUF    = _IOC(3, "V", 17, 80)
+_VIDIOC_QUERYBUF = _IOC(3, "V", 9, 88)
+_VIDIOC_QBUF     = _IOC(3, "V", 15, 88)
+_VIDIOC_DQBUF    = _IOC(3, "V", 17, 88)
 _VIDIOC_STREAMON  = _IOC(1, "V", 18, 4)
 _VIDIOC_STREAMOFF = _IOC(1, "V", 19, 4)
+_VIDIOC_G_PARM    = _IOC(3, "V", 21, 204)
+_VIDIOC_S_PARM    = _IOC(3, "V", 22, 204)
 
 # --- v4l2_format layout (208 bytes on aarch64) ---
 _FMT_TYPE_OFFSET = 0
@@ -57,18 +59,18 @@ _PIX_FIELD = 12
 _PIX_BYTESPERLINE = 16
 _PIX_SIZEIMAGE = 20
 
-# --- v4l2_buffer layout (80 bytes on aarch64) ---
+# --- v4l2_buffer layout (88 bytes on aarch64) ---
 _BUF_INDEX = 0
 _BUF_TYPE = 4
 _BUF_BYTESUSED = 8
 _BUF_FLAGS = 12
 _BUF_FIELD = 16
-_BUF_TIMESTAMP = 20   # struct timeval: tv_sec(8) + tv_usec(8)
-_BUF_SEQUENCE = 52
-_BUF_MEMORY = 56
-_BUF_M_OFFSET = 60     # union m, offset member (first 4 bytes of 8-byte union)
-_BUF_LENGTH = 68
-_BUF_SIZE = 80
+_BUF_TIMESTAMP = 24   # struct timeval: tv_sec(8) + tv_usec(8), 8-byte aligned
+_BUF_SEQUENCE = 56
+_BUF_MEMORY = 60
+_BUF_M_OFFSET = 64     # union m, offset member (first 4 bytes of 8-byte union)
+_BUF_LENGTH = 72
+_BUF_SIZE = 88
 
 
 class V4l2RawCapture:
@@ -113,6 +115,7 @@ class V4l2RawCapture:
         self._fd = os.open(self._device, os.O_RDWR)
         try:
             self._set_format()
+            self._set_framerate()
             self._init_mmap()
             self._start_stream()
         except Exception:
@@ -146,6 +149,30 @@ class V4l2RawCapture:
         self._width = actual_w
         self._height = actual_h
         logger.info("V4L2 format set: %dx%d MJPG", actual_w, actual_h)
+
+    def _set_framerate(self) -> None:
+        """Set frame rate via VIDIOC_S_PARM (timeperframe = 1/fps)."""
+        buf = bytearray(204)
+        struct.pack_into("I", buf, 0, _V4L2_BUF_TYPE_VIDEO_CAPTURE)
+
+        try:
+            fcntl.ioctl(self._fd, _VIDIOC_G_PARM, buf)
+        except OSError:
+            logger.warning("VIDIOC_G_PARM not supported, using driver default fps")
+            return
+
+        # timeperframe: numerator at offset 12, denominator at offset 16
+        struct.pack_into("II", buf, 12, 1, self._fps)
+        try:
+            fcntl.ioctl(self._fd, _VIDIOC_S_PARM, buf)
+        except OSError:
+            logger.warning("VIDIOC_S_PARM not supported, using driver default fps")
+            return
+
+        num = struct.unpack_from("I", buf, 12)[0]
+        den = struct.unpack_from("I", buf, 16)[0]
+        actual_fps = den / num if num > 0 else 0
+        logger.info("V4L2 frame rate set: %.1f fps (requested %d)", actual_fps, self._fps)
 
     def _init_mmap(self) -> None:
         buf = bytearray(20)

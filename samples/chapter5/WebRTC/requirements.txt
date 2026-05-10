@@ -3,4 +3,3 @@ aiohttp
 aiortc
 av
 numpy
-opencv-python-headless

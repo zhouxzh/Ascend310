@@ -2,6 +2,7 @@ import logging
 import os
 import queue
 import threading
+import time
 from typing import Iterator, Optional
 
 import av
@@ -32,6 +33,7 @@ _CANN_READY = False
 
 _ACL_INIT_LOCK = threading.Lock()
 _ACL_INITIALIZED = False
+_ACL_CONTEXT = None
 
 
 def _try_import_cann():
@@ -83,13 +85,23 @@ def _try_import_cann():
 
 def _init_acl(device_id: int = 0) -> bool:
     """One-time ACL runtime initialization (thread-safe)."""
-    global _ACL_INITIALIZED
+    global _ACL_CONTEXT, _ACL_INITIALIZED
     if _ACL_INITIALIZED:
+        if _ACL_CONTEXT is not None:
+            ret = _acl_rt.set_context(_ACL_CONTEXT)
+            if ret != ACL_SUCCESS:
+                logger.error("acl.rt.set_context() failed: %s", ret)
+                return False
         return True
     if not _try_import_cann():
         return False
     with _ACL_INIT_LOCK:
         if _ACL_INITIALIZED:
+            if _ACL_CONTEXT is not None:
+                ret = _acl_rt.set_context(_ACL_CONTEXT)
+                if ret != ACL_SUCCESS:
+                    logger.error("acl.rt.set_context() failed: %s", ret)
+                    return False
             return True
         ret = _acl.init()
         if ret != ACL_SUCCESS:
@@ -107,6 +119,7 @@ def _init_acl(device_id: int = 0) -> bool:
         if ret != ACL_SUCCESS:
             logger.error("acl.rt.set_context() failed: %s", ret)
             return False
+        _ACL_CONTEXT = ctx
         _ACL_INITIALIZED = True
         logger.info("ACL initialized  device=%s  soc=%s", device_id, _acl.get_soc_name())
         return True
@@ -117,17 +130,27 @@ def _init_acl(device_id: int = 0) -> bool:
 # ---------------------------------------------------------------------------
 def bgr_to_nv12(bgr: np.ndarray) -> np.ndarray:
     """Convert a BGR (H,W,3) uint8 numpy array to NV12 (H*3/2, W) uint8."""
-    import cv2
     h, w = bgr.shape[:2]
-    # OpenCV I420: Y(h×w) + U(h/4×w) + V(h/4×w) stacked vertically
-    i420 = cv2.cvtColor(bgr, cv2.COLOR_BGR2YUV_I420)
-    y = i420[:h, :w]
-    u_flat = i420[h : h + h // 4, :w].ravel()
-    v_flat = i420[h + h // 4 : h + h // 2, :w].ravel()
-    uv = np.empty(h // 2 * w, dtype=np.uint8)
-    uv[0::2] = u_flat
-    uv[1::2] = v_flat
-    uv = uv.reshape(h // 2, w)
+    if h % 2 != 0 or w % 2 != 0:
+        raise ValueError(f"NV12 requires even width/height, got {w}x{h}")
+
+    b = bgr[..., 0].astype(np.int32)
+    g = bgr[..., 1].astype(np.int32)
+    r = bgr[..., 2].astype(np.int32)
+
+    y = ((66 * r + 129 * g + 25 * b + 128) >> 8) + 16
+    y = np.clip(y, 0, 255).astype(np.uint8)
+
+    b2 = b.reshape(h // 2, 2, w // 2, 2).sum(axis=(1, 3))
+    g2 = g.reshape(h // 2, 2, w // 2, 2).sum(axis=(1, 3))
+    r2 = r.reshape(h // 2, 2, w // 2, 2).sum(axis=(1, 3))
+
+    u_sub = (((-38 * r2 - 74 * g2 + 112 * b2 + 512) >> 10) + 128)
+    v_sub = (((112 * r2 - 94 * g2 - 18 * b2 + 512) >> 10) + 128)
+
+    uv = np.empty((h // 2, w), dtype=np.uint8)
+    uv[:, 0::2] = np.clip(u_sub, 0, 255).astype(np.uint8)
+    uv[:, 1::2] = np.clip(v_sub, 0, 255).astype(np.uint8)
     return np.vstack([y, uv])
 
 
@@ -157,7 +180,12 @@ class CannVenc:
         self._channel_id = channel_id
         self._channel_desc = None
         self._frame_config = None
-        self._ctx = _acl_rt.get_context(0)[1]  # (ret, ctx)
+        self._ctx = _ACL_CONTEXT
+        if self._ctx is None:
+            raise RuntimeError("ACL context is not initialized")
+        ret = _acl_rt.set_context(self._ctx)
+        if ret != ACL_SUCCESS:
+            raise RuntimeError(f"acl.rt.set_context() failed: {ret}")
         self._running = True
 
         # Callback synchronization
@@ -266,6 +294,8 @@ class CannVenc:
         if not self._running:
             raise RuntimeError("VENC channel is closed")
 
+        _acl_rt.set_context(self._ctx)
+
         h = self.height
         w = self.width
         stride = self._stride
@@ -319,12 +349,17 @@ class CannVenc:
         if force_keyframe:
             _acl_media.venc_set_frame_config_force_i_frame(self._frame_config, True)
 
-        # Drain callback queue before sending
+        # Drain callback queue before sending — leftover data indicates a
+        # previous consume failure; log it so silent frame loss is visible.
+        drained = 0
         while not self._cb_queue.empty():
             try:
                 self._cb_queue.get_nowait()
+                drained += 1
             except queue.Empty:
                 break
+        if drained:
+            logger.warning("VENC callback queue drained %d leftover frame(s)", drained)
 
         ret = _acl_media.venc_send_frame(self._channel_desc, pic_desc,
                                           stream_desc, self._frame_config, None)
@@ -387,17 +422,39 @@ class CannH264Encoder(H264Encoder):
         self._venc: Optional[CannVenc] = None
         self._last_width: int = 0
         self._last_height: int = 0
+        self._last_fps: int = 0
+        self._last_timestamp_sec: Optional[float] = None
+        self._perf_log_count: int = 0
 
-    def _ensure_venc(self, width: int, height: int, fps: int = 30):
+    def _estimate_fps(self, frame: av.VideoFrame) -> int:
+        if frame.pts is None or frame.time_base is None:
+            return self._last_fps or 30
+
+        timestamp_sec = float(frame.pts * frame.time_base)
+        if self._last_timestamp_sec is None:
+            self._last_timestamp_sec = timestamp_sec
+            return self._last_fps or 30
+
+        delta = timestamp_sec - self._last_timestamp_sec
+        self._last_timestamp_sec = timestamp_sec
+        if delta <= 0:
+            return self._last_fps or 30
+
+        fps = round(1.0 / delta)
+        return max(1, min(fps, 120))
+
+    def _ensure_venc(self, width: int, height: int, fps: int):
         if (self._venc is not None
                 and self._last_width == width
-                and self._last_height == height):
+                and self._last_height == height
+                and self._last_fps == fps):
             return
         if self._venc is not None:
             self._venc.destroy()
         self._venc = CannVenc(width=width, height=height, fps=fps)
         self._last_width = width
         self._last_height = height
+        self._last_fps = fps
         self.buffer_data = b""
         self.buffer_pts = None
 
@@ -409,25 +466,53 @@ class CannH264Encoder(H264Encoder):
             yield from super()._encode_frame(frame, force_keyframe)
             return
 
-        self._ensure_venc(frame.width, frame.height, fps=30)
+        fps = self._estimate_fps(frame)
+        self._ensure_venc(frame.width, frame.height, fps=fps)
 
         # NV12 passthrough: if frame is already NV12 (from DVPP JPEGD), use directly
         if getattr(frame.format, "name", None) == "nv12":
+            t0 = time.perf_counter()
             nv12 = frame.to_ndarray(format="nv12")
             pre_padded = True
+            convert_ms = (time.perf_counter() - t0) * 1000
         else:
-            img_bgr = frame.to_ndarray(format="bgr24")
-            nv12 = bgr_to_nv12(img_bgr)
+            t0 = time.perf_counter()
+            nv12_frame = frame.reformat(format="nv12")
+            t1 = time.perf_counter()
+            nv12 = nv12_frame.to_ndarray(format="nv12")
             pre_padded = False
+            convert_ms = (time.perf_counter() - t1) * 1000
+            if self._perf_log_count < 5:
+                logger.info(
+                    "VENC input convert frame=%d reformat_ms=%.1f ndarray_ms=%.1f",
+                    self._perf_log_count + 1,
+                    (t1 - t0) * 1000,
+                    convert_ms,
+                )
 
         try:
+            t0 = time.perf_counter()
             encoded = self._venc.encode(nv12, force_keyframe=force_keyframe, pre_padded=pre_padded)
+            encode_ms = (time.perf_counter() - t0) * 1000
         except RuntimeError as exc:
             logger.error("CANN VENC encode failed: %s, falling back to libx264", exc)
             self._venc.destroy()
             self._venc = None
             yield from super()._encode_frame(frame, force_keyframe)
             return
+
+        if self._perf_log_count < 5:
+            logger.info(
+                "VENC encode frame=%d size=%dx%d fps=%d pre_padded=%s encode_ms=%.1f bytes=%d",
+                self._perf_log_count + 1,
+                frame.width,
+                frame.height,
+                fps,
+                pre_padded,
+                encode_ms,
+                len(encoded),
+            )
+            self._perf_log_count += 1
 
         if encoded:
             yield from self._split_bitstream(encoded)

@@ -8,7 +8,7 @@
 - Python 服务、媒体链路验证、浏览器联调、依赖假设和部署行为，都应以昇腾 310B 设备为准。
 - 仓库默认视频源是 [webrtc_app/ascend_source.py](./webrtc_app/ascend_source.py) 里的 `AscendVideoTrack`，支持三种模式：
   - **demo** — 合成演示帧，确保 `aiortc` 和浏览器侧 WebRTC 接收链路始终可验证。
-  - **usb_camera** — 通过 OpenCV/V4L2 接入真实 USB 摄像头，CPU 解码 MJPEG + CPU BGR→NV12 转换。
+  - **usb_camera** — V4L2 MJPEG 直采 → CPU JPEG 解码 → 软件视频帧，作为软件基线对比路径。
   - **dvpp_camera** — V4L2 MJPEG 直采 → DVPP JPEGD 硬件解码 → DVPP VENC 硬件编码，全硬件管线。
 
 当前媒体链路：
@@ -20,7 +20,7 @@
 - `server.py`
   Python WebRTC 服务入口，负责 HTTP 路由、offer/answer 协商、日志和连接关闭。支持 `--source demo|usb_camera|dvpp_camera` 切换视频源。
 - `webrtc_app/ascend_source.py`
-  Ascend 视频源适配层。`AscendVideoTrack` 支持 demo、USB 摄像头和 DVPP 硬件管线三种模式。
+  Ascend 视频源适配层。`AscendVideoTrack` 支持 demo、MJPEG 软件基线和 DVPP 硬件管线三种模式。
 - `webrtc_app/cann_encoder.py`
   CANN VENC 硬件 H.264 编码器。替代 aiortc 的 libx264 软件编码，支持 NV12 直通（跳过 CPU 色彩转换）。
 - `webrtc_app/dvpp_jpegd.py`
@@ -45,6 +45,9 @@
 ### 设备端安装与启动
 
 ```bash
+# 安装 V4L2 工具（USB 摄像头采集必需）
+sudo apt install v4l-utils
+
 conda activate mediapipe  # 或其他含 Python 3.11 的环境
 python -m pip install -r requirements.txt
 ```
@@ -62,10 +65,10 @@ export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:
 python server.py --host 0.0.0.0 --port 8080
 ```
 
-启动 USB 摄像头 + OpenCV（CPU 解码 + CPU BGR→NV12 + 硬件编码）：
+启动 USB 摄像头 + MJPEG 软件基线（V4L2 直采 + CPU JPEG 解码）：
 
 ```bash
-python server.py --source usb_camera --hardware-encode --host 0.0.0.0 --port 8080
+python server.py --source usb_camera --host 0.0.0.0 --port 8080
 ```
 
 启动 USB 摄像头 + DVPP 全硬件管线（推荐，最高性能，硬件编码自动启用）：
@@ -76,11 +79,12 @@ python server.py --source dvpp_camera --host 0.0.0.0 --port 8080
 
 三种模式对比：
 
-| 模式 | `--hardware-encode` | 相机采集 | MJPEG 解码 | 颜色转换 | H.264 编码 | 典型帧率 |
+| 模式 | `--hardware-encode` | 相机采集 | MJPEG 解码 | 颜色转换 | H.264 编码 | 1920x1080 实测帧率 |
 |------|---------------------|---------|-----------|---------|-----------|---------|
-| `demo` | 可选 | 无（合成） | — | — | libx264 / VENC | ~30fps |
-| `usb_camera` | 可选 | OpenCV | CPU | CPU BGR→NV12 | libx264 / VENC | ~15fps |
-| `dvpp_camera` | **自动启用** | V4L2 直采 | DVPP JPEGD | 无 | CANN VENC | ~24fps |
+| `demo` | 否 | 无（合成） | — | — | libx264 | 约 12.8fps |
+| `usb_camera` | 否 | V4L2 直采 | CPU | RGB 帧输出 | libx264 | 约 13.9fps |
+| `usb_camera` | 是 | V4L2 直采 | CPU | PyAV `reformat("nv12")` | CANN VENC | 约 12.1fps |
+| `dvpp_camera` | 自动 | V4L2 直采 | DVPP JPEGD | 无 | CANN VENC | 约 30.0fps |
 
 > `dvpp_camera` 模式下硬件编码自动启用（NV12 帧必须由 VENC 编码）。`demo` 和 `usb_camera` 不加 `--hardware-encode` 则走 CPU libx264。
 
@@ -210,10 +214,43 @@ export PYTHONPATH=”/usr/local/Ascend/ascend-toolkit/latest/python/site-package
 
 两种硬件编码管线的区别：
 
-| 管线 | 路径 | 帧率 |
+| 管线 | 路径 | 1920x1080 实测帧率 |
 |------|------|------|
-| `usb_camera` | OpenCV MJPEG→BGR (CPU) → BGR→NV12 (CPU) → VENC (硬件) → H.264 | ~15fps |
-| `dvpp_camera` | V4L2 MJPEG 直采 (CPU) → JPEGD (硬件) → NV12 → VENC (硬件) → H.264 | ~24fps |
+| `usb_camera` | V4L2 MJPEG 直采 (CPU) → CPU JPEG 解码 → RGB → libx264 | 约 13.9fps |
+| `usb_camera --hardware-encode` | V4L2 MJPEG 直采 (CPU) → CPU JPEG 解码 → PyAV NV12 转换 → VENC | 约 12.1fps |
+| `dvpp_camera` | V4L2 MJPEG 直采 (CPU) → JPEGD (硬件) → NV12 → VENC (硬件) | 约 30.0fps |
+
+### 1920x1080 Bench Notes
+
+测试环境：
+
+- Ascend 310B 设备
+- USB 摄像头：Logitech C922 Pro Stream Webcam
+- V4L2 当前格式：`1920x1080`, `MJPG`, `30 fps`
+- 浏览器接收端通过 WebRTC 拉流，日志中的 `Track FPS` 作为实际链路帧率
+
+关键日志证据：
+
+- `usb_camera` 软件基线：
+  `USB camera decode frame=... decode_ms=26~34`
+  `Track FPS: 13.9`
+- `usb_camera --hardware-encode`：
+  `USB camera decode frame=... decode_ms=26~34`
+  `VENC input convert frame=... reformat_ms=21~24 ndarray_ms=1~3`
+  `VENC encode frame=... encode_ms=11~22`
+  `Track FPS: 12.1`
+- `dvpp_camera`：
+  `DVPP decode frame=... decode_ms=4.9~9.3`
+  `VENC encode frame=... encode_ms=6.5~6.6`
+  `Track FPS: 30.0`
+
+原因解释：
+
+- `demo` 只有合成帧，但默认仍走 `aiortc` 的软件 `libx264`，在 1080p 下编码本身就比较重，所以实测只有约 `12.8fps`。
+- `usb_camera` 的主要瓶颈不是取流，而是 CPU JPEG 解码。单帧解码约 `26~34ms`，再加上后续软件编码或打包开销，稳定在约 `13.9fps`。
+- `usb_camera --hardware-encode` 虽然启用了 VENC，但并没有更快，因为它仍然保留 CPU JPEG 解码，并且还要做一遍 RGB→NV12 转换。现在这个转换已经从原先约 `180ms+` 降到了约 `22~27ms`，但总成本仍高于纯软件路径，所以整体约 `12.1fps`。
+- `dvpp_camera` 明显更快，因为它把最重的两个环节都移出了 CPU：JPEG 解码走 DVPP JPEGD，输出直接是 NV12，VENC 也能直通编码。日志里 JPEGD 单帧约 `5ms`、VENC 单帧约 `6.5ms`，因此整条链路可以稳定在 `30fps`。
+- `dvpp_camera` 的 VENC 日志显示 `1920x1088`，这是正常的硬件对齐现象：VENC 高度 stride 按 16 对齐；摄像头和浏览器看到的有效内容仍是 `1920x1080`。
 
 ### 本仓库的实际协商流程
 
@@ -260,11 +297,11 @@ export PYTHONPATH=”/usr/local/Ascend/ascend-toolkit/latest/python/site-package
 - `_init_demo()`
   demo 模式的初始化，生成 x/y 渐变数组用于合成帧。
 - `_init_usb_camera(device)`
-  打开 `cv2.VideoCapture(device)`，设置并读取实际分辨率/帧率，验证首帧。失败自动回退到 demo 模式。
+  初始化 V4L2 MJPEG 采集并在 CPU 上解码为 `rgb24`，用于和 DVPP 路径做软件基线对比。
 - `_init_dvpp_camera(device)`
   初始化 V4L2 MJPEG 采集 + DVPP JPEGD 硬件解码器。优先使用 `V4l2RawCapture`（~24fps），失败降级到 PyAV（~15fps）。
 - `_camera_read()`
-  阻塞方法，在 `run_in_executor` 中执行。DVPP 模式：V4L2 取 MJPEG → JPEGD 解码 → NV12。OpenCV 模式：BGR 转 RGB。
+  阻塞方法，在 `run_in_executor` 中执行。`usb_camera` 模式：V4L2 取 MJPEG → CPU JPEG 解码 → RGB。DVPP 模式：V4L2 取 MJPEG → JPEGD 解码 → NV12。
 - `describe_settings()`
   返回当前轨道配置（含实际分辨率、帧率、模式），通过 offer 响应回传给接收端。
 - `_render_demo_frame()`
@@ -290,7 +327,7 @@ export PYTHONPATH=”/usr/local/Ascend/ascend-toolkit/latest/python/site-package
   - 仅覆盖 `_encode_frame` 将 libx264 替换为 CANN VENC
   - 检测帧格式：NV12 帧直通 VENC（跳过 BGR→NV12），BGR 帧走 CPU 转换
   - CANN 不可用时自动回退到 CPU libx264
-- `bgr_to_nv12(bgr)` — BGR→NV12 色彩空间转换（CPU），仅 `usb_camera` 模式使用
+- `bgr_to_nv12(bgr)` — BGR→NV12 色彩空间转换（CPU），供非 NV12 帧的硬件编码回退路径使用
 - `_try_import_cann()` / `_init_acl()` — CANN ACL 自动导入、环境配置和设备初始化
 
 ### [web/client.js](./web/client.js)
@@ -327,7 +364,7 @@ export PYTHONPATH=”/usr/local/Ascend/ascend-toolkit/latest/python/site-package
 已有三种模式覆盖了常见场景：
 
 1. **demo** — 纯软件，验证 WebRTC 链路。
-2. **usb_camera** — OpenCV + VENC 硬件编码，适合不需要 DVPP 加速的场景。
+2. **usb_camera** — MJPEG 软件基线，用于和 DVPP 路径做对比。
 3. **dvpp_camera** — V4L2 MJPEG + JPEGD + VENC 全硬件管线，性能最优。
 
 如需接入自定义源：
@@ -341,11 +378,11 @@ export PYTHONPATH=”/usr/local/Ascend/ascend-toolkit/latest/python/site-package
 ## 当前依赖
 
 **服务端（昇腾 310B）**：
+- `v4l-utils` — V4L2 命令行工具和库（USB 摄像头采集必需，`sudo apt install v4l-utils`）
 - `aiohttp` — HTTP 服务和静态页面
 - `aiortc` — Python 侧 WebRTC 能力
 - `av` — 构造 `VideoFrame` 和 V4L2 采集（PyAV）
 - `numpy` — 演示帧生成和 NV12 数据操作
-- `opencv-python-headless` — USB 摄像头采集（仅 `usb_camera` 模式需要）
 - `CANN 8.3.RC1` — 昇腾 ACL/Python API（硬件编码必需，位于 `/usr/local/Ascend/`）
 - `pytest` — 测试框架（仅开发）
 

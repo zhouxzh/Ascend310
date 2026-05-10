@@ -62,9 +62,6 @@ function updateRemoteVideoSize() {
     return;
   }
 
-  elements.remoteVideo.style.width = `${sourceWidth}px`;
-  elements.remoteVideo.style.height = `${sourceHeight}px`;
-
   const displayWidth = Math.round(elements.remoteVideo.getBoundingClientRect().width);
   const displayHeight = Math.round(elements.remoteVideo.getBoundingClientRect().height);
   elements.videoDimensions.textContent =

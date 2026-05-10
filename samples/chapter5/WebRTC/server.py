@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import Optional
 
 from aiohttp import web
-from aiortc import RTCPeerConnection, RTCSessionDescription
+from aiortc import RTCPeerConnection, RTCRtpSender, RTCSessionDescription
 
 from webrtc_app.ascend_source import AscendVideoTrack, DEFAULT_SOURCE_NAME
-from webrtc_app.cann_encoder import CannH264Encoder, _try_import_cann, _CANN_READY
+from webrtc_app import cann_encoder
+from webrtc_app.cann_encoder import CannH264Encoder
 
 
 ROOT = Path(__file__).resolve().parent
@@ -59,6 +60,27 @@ def parse_offer_payload(params: dict[str, object]) -> tuple[RTCSessionDescriptio
     return offer, width, height, fps
 
 
+def _prefer_h264_for_sender(pc: RTCPeerConnection, sender: RTCRtpSender) -> None:
+    h264_codecs = [
+        codec
+        for codec in RTCRtpSender.getCapabilities("video").codecs
+        if codec.mimeType.lower() == "video/h264"
+    ]
+    if not h264_codecs:
+        app_logger.warning("No local H264 codec capability found; cannot prefer CANN VENC")
+        return
+
+    for transceiver in pc.getTransceivers():
+        if transceiver.sender == sender:
+            transceiver.setCodecPreferences(h264_codecs)
+            app_logger.info(
+                "Video transceiver codec preference set to H264 for hardware encoding"
+            )
+            return
+
+    app_logger.warning("Could not find sender transceiver; H264 preference not applied")
+
+
 async def offer(request: web.Request) -> web.Response:
     params = await request.json()
     offer, width, height, fps = parse_offer_payload(params)
@@ -95,7 +117,11 @@ async def offer(request: web.Request) -> web.Response:
             source_type=request.config_dict.get("source_mode", "demo"),
             camera_device=request.config_dict.get("camera_device", 0),
         )
-        pc.addTrack(source_track)
+        sender = pc.addTrack(source_track)
+        source_mode = request.config_dict.get("source_mode", "demo")
+        hardware_encode = bool(request.config_dict.get("hardware_encode", False))
+        if hardware_encode or source_mode == "dvpp_camera":
+            _prefer_h264_for_sender(pc, sender)
 
         @pc.on("connectionstatechange")
         async def on_connectionstatechange() -> None:
@@ -128,10 +154,11 @@ async def offer(request: web.Request) -> web.Response:
     except web.HTTPException:
         raise
     except Exception:
+        source_label = source_track.source_name if source_track is not None else DEFAULT_SOURCE_NAME
         logger.exception(
             "Offer handling failed for PeerConnection %s with source=%s width=%s height=%s fps=%s",
             id(pc),
-            DEFAULT_SOURCE_NAME,
+            source_label,
             width,
             height,
             fps,
@@ -187,10 +214,15 @@ async def on_shutdown(_: web.Application) -> None:
     pcs.clear()
 
 
-def build_app(source_mode: str = "demo", camera_device: str | int = 0) -> web.Application:
+def build_app(
+    source_mode: str = "demo",
+    camera_device: str | int = 0,
+    hardware_encode: bool = False,
+) -> web.Application:
     app = web.Application(middlewares=[error_logging_middleware])
     app["source_mode"] = source_mode
     app["camera_device"] = camera_device
+    app["hardware_encode"] = hardware_encode
     app.on_shutdown.append(on_shutdown)
     app.router.add_get("/", index)
     app.router.add_get("/client.js", client_js)
@@ -281,14 +313,15 @@ def get_local_ip() -> str:
 
 def _patch_h264_encoder():
     """Replace aiortc H264Encoder with CANN VENC encoder."""
-    _try_import_cann()
-    if not _CANN_READY:
+    if not cann_encoder._try_import_cann():
         app_logger.warning(
             "CANN ACL not available, H264 encoding will fall back to CPU libx264"
         )
         return False
+    import aiortc.codecs as codecs_module
     import aiortc.codecs.h264 as h264_module
     h264_module.H264Encoder = CannH264Encoder
+    codecs_module.H264Encoder = CannH264Encoder
     app_logger.info("H264 encoder switched to CANN VENC hardware")
     return True
 
@@ -315,7 +348,11 @@ def main() -> None:
         camera_device = int(camera_device)
 
     web.run_app(
-        build_app(source_mode=args.source, camera_device=camera_device),
+        build_app(
+            source_mode=args.source,
+            camera_device=camera_device,
+            hardware_encode=args.hardware_encode or args.source == "dvpp_camera",
+        ),
         host=args.host,
         port=args.port,
         access_log=app_logger,

@@ -23,7 +23,7 @@ body {
 }
 
 .shell {
-  width: min(1120px, calc(100% - 32px));
+  width: min(calc(100% - 48px), 1480px);
   margin: 0 auto;
   padding: 40px 0 56px;
 }
@@ -197,14 +197,12 @@ button.ghost {
 
 video {
   display: block;
-  width: auto;
+  width: 100%;
   height: auto;
-  max-width: none;
-  max-height: none;
+  max-width: 100%;
   border-radius: 12px;
   background: #07111b;
   border: 1px solid #0f2741;
-  object-fit: contain;
 }
 
 .log-panel {
@@ -239,7 +237,7 @@ video {
   }
 
   .shell {
-    width: min(100% - 20px, 1120px);
+    width: min(100% - 20px, 1480px);
     padding-top: 24px;
   }
 }
