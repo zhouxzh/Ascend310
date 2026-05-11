@@ -1,464 +1,3339 @@
-昇腾310B作为一款边缘推理芯片，其算子开发与优化是挖掘硬件极致性能的关键。尽管CANN（Compute
-Architecture for Neural
-Networks）已提供丰富的内置算子库，但在面对自定义模型结构、特殊后处理逻辑或对极致性能有着严苛要求时，自定义算子开发（Custom
-Operator
-Development）与系统级优化仍不可或缺。本章将系统性地介绍基于昇腾310B的算子开发流程、核心理论以及优化策略。
+Ascend 310B 芯片内置了 \textbf{DVPP（Digital Vision Pre-Processing）}
+硬件加速引擎，提供视频编解码（VENC/VDEC）、图像处理（VPC）和 JPEG
+编解码能力。本章从基础概念出发，逐步深入到各子模块的 API
+使用、性能调优和实战集成。
 
-\section{算子开发概述：昇腾310B硬件架构与开发路径}\label{ux7b97ux5b50ux5f00ux53d1ux6982ux8ff0ux6607ux817e310bux786cux4ef6ux67b6ux6784ux4e0eux5f00ux53d1ux8defux5f84}
+\section{DVPP 基础概念与编程模型}\label{dvpp-basics}
 
-本节作为算子开发实战的开篇，旨在帮助读者构建完整的知识框架。我们将首先解析昇腾310B处理器基于达芬奇（DaVinci）架构的核心特征，深入其AI
-Core的计算单元与存储层次；随后概述CANN异构计算软件栈；最后横向对比TBE与Ascend
-C这两条主流的算子开发路径，并探讨自定义算子开发的必要性。
+DVPP（Digital Vision Pre-Processing）是 Ascend
+芯片内部的一组\textbf{硬件加速模块}，专门处理图像和视频数据。它独立于
+NPU 的 AI Core（推理引擎），不占用 AI 算力。PyACL 通过
+\passthrough{\lstinline!acl.media!} 接口对外暴露这些能力。
 
-\subsection{昇腾310B处理器与达芬奇架构}\label{ux6607ux817e310bux5904ux7406ux5668ux4e0eux8fbeux82acux5947ux67b6ux6784}
+\begin{quote}
+本节覆盖所有 DVPP
+子模块（VENC、VDEC、VPC、JPEGE、JPEGD）共享的基础概念。初次接触 DVPP
+时，建议先阅读本节，再进入具体子模块的内容。
+\end{quote}
 
-昇腾310B是专门面向边缘计算与推理场景打造的高能效AI处理器。该芯片采用12nm
-FFC工艺制程，在仅5至8W的典型功耗下，提高两个版本------20TOPS@INT8或者8TOPS@INT8的澎湃AI算力，能效比达到惊人的25-40
-TOPS/W。凭借这一优势，它在工业质检、智能电网、智慧交通等对实时性要求极高的场景中展现出了卓越性能。
+\subsection{DVPP
+在芯片中的位置}\label{dvpp-ux5728ux82afux7247ux4e2dux7684ux4f4dux7f6e}
 
-达芬奇（DaVinci）架构是昇腾系列AI处理器的技术基石，其最大的亮点在于极强的可扩展性（Scalable）。针对不同应用场景的算力需求，达芬奇架构衍生出了Tiny、Mini、Lite、Standard、Max等多款版本，全面覆盖从低功耗可穿戴设备到高性能云端数据中心的全场景。其中，昇腾310B采用了针对边缘端与移动端专门优化的DaVinci-mini架构。
-
-达芬奇架构的核心设计理念可概括为：\textbf{``将计算任务分层处理，以最契合的计算单元执行最适合的任务''}。该架构将计算任务精细划分为标量（Scalar）、向量（1D）、矩阵（2D）与立方体（3D）四种类型，并在物理硬件层面相应地例化了三大核心计算单元------Cube
-Unit、Vector Unit与Scalar Unit。
-
-\subsubsection{计算单元的精细分工}\label{ux8ba1ux7b97ux5355ux5143ux7684ux7cbeux7ec6ux5206ux5de5}
-
-\textbf{Cube Unit（立方体计算单元）}
-是达芬奇架构的标志性设计，更是提供高密度算力的引擎。它专为深度神经网络量身定制，主要承担矩阵乘法、卷积运算及全连接层等计算密集型（Compute-bound）任务。依靠极高的数据复用率，Cube
-Unit有效突破了内存带宽的限制。在昇腾310B中，其运行频率可达1.224GHz，是释放全周期算力的关键所在。
-
-\textbf{Vector Unit（向量计算单元）}
-专门处理向量级运算，工作机制类似于SIMD（单指令多数据流）。其功能涵盖归一化、激活函数、池化、数据格式转换等，广泛服务于计算机视觉（如RPN网络）中常用的基础算子。Vector
-Unit具备极高的执行灵活性，能够无缝兼容并处理多种数据类型与运算模式。
-
-\textbf{Scalar Unit（标量计算单元）}
-类似于经典的RISC微处理器，主要负责控制流管理与基础标量运算。它承担着循环控制、内存地址计算、分支跳转等逻辑任务，是调度统筹整个AI
-Core的``指挥中枢''。
-
-这三大计算单元紧密协同，构建出高度并行的计算流水线。昇腾技术团队在多项典型任务中的实测数据表明，Cube
-Unit占用的执行周期（Cycles）显著大于Vector Unit，这意味着Cube
-Unit的运算潜能得到了充分释放，未受限于Vector
-Unit的调度阻塞，二者实现了优异的负载均衡。
-
-\subsubsection{存储层次与数据搬运机制}\label{ux5b58ux50a8ux5c42ux6b21ux4e0eux6570ux636eux642cux8fd0ux673aux5236}
-
-昇腾310B的存储系统采用了精巧的多级层次结构体系。深入理解这一体系，是突破算子性能瓶颈、实现极致优化的先决条件。
-
-\textbf{全局内存（Global Memory）}
-位于存储架构的最外层，具备最大的容量空间，通常指代片外的板载LPDDR4X内存。昇腾310B普遍配置8-16GB的LPDDR4X，带宽范围在51.2GB/s至408GB/s。尽管容量充裕，但其访存延迟相对较高。因此，在进行算子开发时，应尽可能减少对全局内存的直接读取次数。
-
-\textbf{局部内存（Local Memory）} 集成于AI
-Core内部，属于极低延迟的高速存储区，主要包括L1缓存（L1
-Buffer）与统一缓冲区（Unified
-Buffer，简称UB）。L1缓存专用于暂存高频复用的数据，从而大幅削减跨总线的读写开销。UB则是算子执行时的核心工作台，所有参与计算的数据均需先从全局内存搬移至此，方能被计算单元读取。
-
-\textbf{存储转换引擎（Memory Transfer Engine, MTE）}
-是专为数据搬运与内存重排设计的加速单元。MTE细分为MTE1、MTE2、MTE3等模块，负责高效管理AI
-Core内外不同层级缓冲区之间的数据流动，并能够在搬运过程中硬件加速般地同步完成数据填充（Padding）、转置（Transpose）、Img2Col等格式化操作。
-
-\textbf{总线接口单元（Bus Interface Unit, BIU）} 扮演着AI
-Core与外部存储总线通信的``门户''角色，其主要职责是将AI
-Core发出的各类读写请求精确转化为标准的总线协议交互。
-
-在一个典型的计算流水线中：数据首先通过BIU由全局内存接入，随后经MTE的高效搬运与格式重组，稳妥驻留于L1缓存或UB中。紧接着，Scalar
-Unit发出调度指令，指挥Cube Unit或Vector
-Unit对UB中的数据进行高速运算。处理结束后，输出结果再次交由MTE接管，安全、高效地写回至全局内存，由此形成一个无缝闭环。
-\#\#\#\# 昇腾AI异构计算架构（CANN）
-
-正如上一章在探讨PyACL编程基础时所述，CANN（Compute Architecture for
-Neural
-Networks）是昇腾全面面向AI场景定制的异构计算架构。它在整个计算系统中发挥着承上启下的核心枢纽作用：向上广泛适配MindSpore、PyTorch、TensorFlow等主流AI框架，向下直接调度并深度释放昇腾AI处理器的澎湃算力，是提升硬件计算效率的关键``软件底座''。
-
-为了兼容并蓄不同维度的开发需求，CANN构建了多层次的编程接口与组件体系： -
-\textbf{AscendCL}：统一的应用开发原生接口，旨在屏蔽底层硬件差异，帮助开发者灵活构建从端到云的AI应用。
-- \textbf{Ascend
-C}：基于C++的高性能算子开发语言，允许开发者精细控制底层硬件指令与多级缓存，专为追求极致性能的算子定制而生。
--
-\textbf{TBE}：基于Python的开发框架，侧重于算子逻辑的快速表达与系统化自动调度优化。
-- \textbf{图引擎（Graph
-Engine）}：核心的计算图编译与执行引擎，负责全局网络图的解析、内存复用规划及算子融合优化。
-
-针对算子开发层面，CANN构建了一站式的全流程工具链支持。涵盖了专属算子编译器、功能验证仿真工具，以及深度的性能调优分析器（Profiler），全面辅助开发者打通从代码原型编写、逻辑调试到逼近硬件理论极限的全闭环开发流程。
-
-\subsection{算子开发的两条主流路径}\label{ux7b97ux5b50ux5f00ux53d1ux7684ux4e24ux6761ux4e3bux6d41ux8defux5f84}
-
-针对不同开发需求和性能目标，昇腾CANN提供了两条主要的算子开发路径：\textbf{TBE（快速原型）}
-和 \textbf{Ascend C（深度优化）}。
-
-\subsubsection{TBE：声明式开发，效率优先}\label{tbeux58f0ux660eux5f0fux5f00ux53d1ux6548ux7387ux4f18ux5148}
-
-TBE（Tensor Boost
-Engine）是一种基于Python的算子开发框架，其核心特点在于\textbf{让开发者专注于描述计算逻辑，由系统自动完成底层的复杂优化}。在开发方式上，TBE提供了DSL（Domain-Specific
-Language）编程模式。开发者无需深入了解昇腾底层硬件架构，只需通过几行简洁的Python代码即可描述算子的数学表达式。例如，使用\passthrough{\lstinline!dsl.vadd(input\_x, input\_y)!}即可轻松表达向量加法，随后通过调用\passthrough{\lstinline!dsl.auto\_schedule()!}，TBE会自动接管并完成模式识别、子图切分、调度模板选择以及底层指令映射等一系列流程。
-
-这种声明式开发范式赋予了TBE诸多的优势。首先是开发门槛极低且代码异常简洁，一个完整的加法算子核心逻辑往往只需10行左右即可实现。同时，得益于昇腾官方调度模板的自动优化加持，生成的算子性能稳定可靠，这使其非常适合用于算法的原型验证以及非性能瓶颈算子的快速实现。
-
-然而，TBE的自动化机制也带来了一定的局限。当面对具有极端定制化计算需求或特殊数据流模式的算子时，高度封装的自动调度可能难以将其优化至硬件的理论极致性能。此外，在某些特定的高级算子类型上，当前的DSL语法或许尚未提供完全覆盖的底层支持能力。
-
-\subsubsection{Ascend
-C：命令式开发，性能优先}\label{ascend-cux547dux4ee4ux5f0fux5f00ux53d1ux6027ux80fdux4f18ux5148}
-
-Ascend
-C是一种基于C++的高性能算子开发语言，其核心优势在于赋予了开发者对数据流、指令流以及多核并行执行的精细控制权。在编程模型上，Ascend
-C采用了SPMD（单程序多数据）架构，这意味着所有的AI
-Core将执行同一套代码逻辑，但会根据各自的任务ID去处理被分配的不同数据区间。
-
-在具体的开发过程中，开发者需要显式地设计计算流水线并深度管理多级存储之间的数据搬运。一个典型的Ascend
-C算子实现紧密围绕着三个连续的核心任务展开：首先是``CopyIn''阶段，负责将输入数据从全局内存高效搬运至局部内存；随后进入``Compute''阶段，调用硬件资源执行具体的数学运算；最后是``CopyOut''阶段，将计算所得的结果从局部内存搬运回全局内存，从而完成整个数据流转的闭环。
-
-这种命令式的开发范式实现了灵活性与极致性能的统一。得益于对底层内存读写和流水线编排的精准把控，Ascend
-C能够帮助开发者逼近硬件的理论计算极限，更被广泛应用于搞定大模型场景下如FlashAttention等复杂的性能瓶颈算子。此外，其原生支持CPU模拟调试与中间变量打印，极大地优化了开发体验。然而，获取这种极致性能也意味着较高的开发门槛，开发者必须对昇腾底层硬件架构有透彻的理解。同时，Ascend
-C的代码工程量相对较大，即便是实现一个极简的算子，往往也需要编写数百行代码来完成对底层资源的系统化调度。
-
-\subsubsection{两条路径的协同关系}\label{ux4e24ux6761ux8defux5f84ux7684ux534fux540cux5173ux7cfb}
-
-两条开发路径并非互斥，而是可以根据需求协同使用：
+Ascend 310B4 芯片内部模块：
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{首选TBE DSL}，快速实现性能达标的标准算子
+  \textbf{AI Core × 1}: DaVinci V300（矩阵运算，NPU 推理主力）
 \item
-  \textbf{慎用Ascend
-  C}，在追求极致性能或实现特殊计算模式时，系统化应用优化策略
+  \textbf{CPU × 4}: TaishanV200M（ARM AArch64，动态划分 Control CPU / AI
+  CPU）
 \item
-  \textbf{善用工具链}，坚持数据驱动的性能调优闭环
+  \textbf{DVPP}: 视频/图像硬件加速（独立于 AI Core）
+
+  \begin{itemize}
+  \tightlist
+  \item
+    VENC: 视频编码
+  \item
+    VDEC: 视频解码
+  \item
+    VPC: 图像处理（resize/crop/csc）
+  \item
+    JPEGE: JPEG 编码
+  \item
+    JPEGD: JPEG 解码
+  \end{itemize}
+\item
+  \textbf{TS}: 专用任务调度器（管理 AI Core 和 DVPP 任务派发）
 \end{itemize}
 
-一个典型的开发流程是：先用TBE快速实现算子原型，验证功能正确性；如果性能不达预期，再用Ascend
-C重写核心计算逻辑，通过精细优化达到极致性能。
+\textbf{关键要点}：DVPP 与 AI Core 是芯片上两个独立的硬件域。DVPP 编码
+1080p 视频与 AI Core 执行 YOLO
+推理可以并行运行，二者不竞争同一计算单元。
 
-CANN算子库本身包含了丰富的高性能算子，覆盖了大多数常见场景。但在以下情况下，开发者需要考虑自定义算子：
+\subsection{DVPP 数据流}\label{dvpp-ux6570ux636eux6d41}
 
-\textbf{训练场景下的算子缺失}：将第三方框架（如TensorFlow、PyTorch）的训练脚本迁移到昇腾AI处理器时，遇到框架支持但CANN算子库暂不支持的算子。
+DVPP 接收来自 \textbf{DDR 内存} 的数据，处理后写回 DDR。CPU
+的工作是准备输入描述符、下发任务、接收完成通知------不参与实际数据处理。
 
-\textbf{推理场景下的模型转换}：使用ATC工具将第三方框架模型转换为昇腾离线模型时，遇到不支持的算子。
+数据流五步：(1) CPU 分配设备内存并拷贝数据到设备 → (2) DVPP
+硬件通过内部总线读取 → (3) 处理后将结果写入输出缓冲区 → (4) DVPP
+触发回调通知 CPU → (5) CPU 从设备内存拷回结果。
 
-\textbf{网络性能调优}：发现某算子性能较低，成为网络性能瓶颈，需要重新开发一个高性能算子替换原有算子。例如，一个2048x2048的矩阵乘法算子，经过系统化优化后，性能可从512ms提升至92ms。
+\textbf{核心机制}：DVPP 直接访问 DDR，不经过 CPU
+执行像素级处理。这是它能比 CPU 软件处理快得多的根本原因。
 
-\textbf{应用后处理加速}：应用程序中的某些逻辑涉及数学运算（如查找最大值、数据类型转换），可以封装为自定义算子在AI处理器上执行，利用NPU提升性能。例如，分类应用中查找概率最大的前5个标识，可以开发ArgMax算子实现后处理加速。
+\subsection{子模块概览}\label{dvpp-modules}
 
-\subsection{小结}\label{ux5c0fux7ed3}
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1429}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1429}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1429}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2143}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2143}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1429}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+模块
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+全称
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+功能
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+输入格式
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+输出格式
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+本教程章节
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{VENC} & Video Encoder & 视频编码 & NV12 原始帧 & H.264 / H.265
+码流 & \hyperref[venc]{VENC} \\
+\textbf{VDEC} & Video Decoder & 视频解码 & H.264 / H.265 码流 & NV12
+原始帧 & \hyperref[vdec]{VDEC} \\
+\textbf{VPC} & Video Pre-Processing Core & 图像处理 & NV12 / RGB / BGR &
+NV12 / RGB / BGR & \hyperref[vpc]{VPC} \\
+\textbf{JPEGE} & JPEG Encoder & JPEG 编码 & YUV420SP / YUV422SP & JPEG
+码流 & \hyperref[jpeg]{JPEG} \\
+\textbf{JPEGD} & JPEG Decoder & JPEG 解码 & JPEG 码流 & YUV420SP /
+YUV444 & \hyperref[jpeg]{JPEG} \\
+\end{longtable}
+}
 
-通过本节的学习，读者应该对昇腾310B的硬件架构、CANN软件栈以及算子开发的两种路径有了整体认识。从下一节开始，我们将从最简单的TBE算子入手，带领读者亲手实现第一个自定义算子，在实践中加深对概念的理解。
+\begin{quote}
+\textbf{PNGD}（PNG 解码器）虽然列在 DVPP 规格中，但在 310B (CANN
+8.3.RC1) 上实测输出缓冲区全零。310B 上 PNG 解码请使用 CPU 方案（Pillow /
+OpenCV）。本教程不含 PNGD 章节。
+\end{quote}
 
-\section{初体验：使用TBE
-DSL快速实现第一个算子（向量加法）}\label{ux521dux4f53ux9a8cux4f7fux7528tbe-dslux5febux901fux5b9eux73b0ux7b2cux4e00ux4e2aux7b97ux5b50ux5411ux91cfux52a0ux6cd5}
+\subsection{AIPP vs
+DVPP（何时用哪个）}\label{aipp-vs-dvppux4f55ux65f6ux7528ux54eaux4e2a}
 
-通过一个最简单的向量加法算子，让读者快速体验TBE开发的完整流程。在VSCode中编写Python脚本，使用TBE
-DSL描述算子逻辑，通过命令行工具编译生成算子文件，并编写简单的测试代码在NPU上运行验证。最后总结TBE的优缺点及适用场景，激发读者进一步学习的兴趣。
+PyACL 的媒体处理分两类能力：
 
-\subsection{算子分析：明确我们要做什么}\label{ux7b97ux5b50ux5206ux6790ux660eux786eux6211ux4eecux8981ux505aux4ec0ux4e48}
+\begin{itemize}
+\tightlist
+\item
+  \textbf{DVPP}：适合执行``低级别''的高吞吐预处理------JPEG/视频解码、YUV
+  与 RGB 转换、缩放、裁剪等。优点是速度快、CPU
+  负载低，但受格式与对齐约束。
+\item
+  \textbf{AIPP}（Artificial Intelligence
+  Pre-Processing）：适合执行``模型输入级''的精确预处理------统一色域/像素变换、量化/去均值、通道顺序等。AIPP
+  分静态（在模型转换时固化到 .om）与动态（运行时通过接口设置）两种模式。
+\end{itemize}
 
-在动手编码之前，先明确我们要开发的算子规格。按照昇腾算子开发的规范，我们需要先进行算子分析。
+\textbf{常见组合}：先用 DVPP 完成解码与粗略 resize/crop，再用
+AIPP（静态或动态）做最后的色域和像素级处理，保证与模型输入要求一致。
 
-\textbf{算子功能}：实现两个向量的加法，数学表达式为：\passthrough{\lstinline!z = x + y!}
+\subsection{H.264 与 H.265 编解码基础}\label{h264-h265-basics}
 
-\textbf{输入输出规格}： -
-输入：两个张量（Tensor）x和y，形状相同，数据类型相同 -
-输出：一个张量z，形状和数据类型与输入相同 -
-数据类型支持：float16、float32、int32 -
-Shape支持：所有形状（本例使用简单的1D向量）
+VENC 和 VDEC 都围绕 H.264/H.265 工作。理解这些编码标准的基本概念，是使用
+DVPP 编解码模块的前提。
 
-\textbf{开发方式选择}：使用TBE DSL方式，主要调用两个接口： -
-\passthrough{\lstinline!tbe.dsl.broadcast!}：处理广播场景（本示例输入shape相同，但保留广播能力）
-- \passthrough{\lstinline!tbe.dsl.vadd!}：执行向量加法
+\textbf{什么是 H.264}
 
-\textbf{算子命名}：算子类型（OpType）采用大驼峰命名''Add''；实现文件名称和函数名称采用小写''add''。
+H.264（也叫
+AVC）是目前全球使用最广泛的视频编码标准。核心思想是去除视频中的冗余：空间冗余通过帧内预测消除，时间冗余通过帧间预测消除，统计冗余通过熵编码消除。
 
-TBE DSL算子的开发流程可以分为四个主要步骤：
+编码后的每一帧按类型分为：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1875}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1875}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1875}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1875}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+帧类型
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+全称
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+大小
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+依赖
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+说明
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{I 帧} (IDR) & Instantaneous Decoder Refresh &
+最大（\textasciitilde80KB@480p） & 无 & 独立解码，不依赖任何其他帧 \\
+\textbf{P 帧} & Predictive & 中等（\textasciitilde5-15KB@480p） & 前一帧
+& 只存与前一帧的差异 \\
+\textbf{B 帧} & Bi-predictive & 最小（\textasciitilde2-5KB@480p） &
+前后帧 & 双向预测，压缩率最高但延迟最大 \\
+\end{longtable}
+}
+
+\begin{quote}
+\textbf{B 帧与实时通信}：B 帧需要参考``未来''帧，引入额外延迟。WebRTC
+和实时视频通话通常\textbf{禁用 B
+帧}（\passthrough{\lstinline!tune=zerolatency!}），只用 I 帧和 P 帧。
+\end{quote}
+
+\textbf{GOP（Group of Pictures）}：一个 I 帧到下一个 I
+帧之间的帧组。GOP=30 表示每 30 帧插入一个 I 帧（30fps
+下每秒一个关键帧）。IDR 帧必须从 IDR 帧开始才能正确解码。
+
+\textbf{NAL 单元与 Annex-B 格式}：H.264 码流由 NAL
+单元组成（SPS、PPS、IDR Slice、Non-IDR Slice、SEI）。Annex-B
+格式用起始码 \passthrough{\lstinline!0x00000001!} 分隔每个 NAL
+单元。VDEC 要求输入必须是 Annex-B 格式。
+
+\textbf{什么是 H.265}
+
+H.265（也叫 HEVC）是 H.264
+的下一代标准，核心目标：\textbf{相同画质下码率减半}。
 
 { % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
-阶段 & 核心任务 & 关键函数/概念 \\
+特性 & H.264 & H.265 \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-算子定义 & 明确输入输出，设计接口 & te.placeholder \\
-计算实现 & 描述算子的数学逻辑 & te.compute, te.lang.cce.vadd \\
-调度编译 & 将计算逻辑映射到硬件 & auto\_schedule, cce\_build\_code \\
-验证测试 & 在NPU上运行并核验结果 & NumPy对比，AscendCL调用 \\
+编码块大小 & 16×16 宏块（固定） & 8×8 到 64×64 CTU（自适应） \\
+帧内预测方向 & 9 种 & 35 种 \\
+压缩率 & 基准 & \textbf{同画质下码率少 50\%} \\
+编码复杂度 & 基准 & \textbf{约 2-5 倍} \\
+浏览器支持 & 100\% & \textgreater95\%（Firefox 不支持 WebRTC H.265） \\
 \end{longtable}
 }
 
-\subsection{完整代码实现}\label{ux5b8cux6574ux4ee3ux7801ux5b9eux73b0}
+\textbf{为什么本章只讲 H.264}：(1) API 统一------CANN VENC/VDEC 对 H.264
+和 H.265 的 API 完全一致，唯一区别是 \passthrough{\lstinline!entype!}
+参数；(2) 码流容易生成------ARM 平台上 libx264 编码远快于 libx265；(3)
+性能结论通用------基准测试得出的拐点对 H.265 同样成立；(4) WebRTC
+标配------aiortc 1.14.0 只有 H.264 和 VP8 编码模块。
 
-\subsubsection{创建工程目录}\label{ux521bux5efaux5de5ux7a0bux76eeux5f55}
+\subsection{ACL 初始化------四步必要步骤}\label{acl-init}
 
-首先在VSCode中连接到昇腾310B开发板（或直接在板子上操作），创建以下目录结构：
+任何使用 DVPP 的 Python
+进程，都必须在开头执行这四个调用，顺序固定不可变：
+
+\begin{lstlisting}[language=Python]
+import acl
+
+ret = acl.init()                    # (1) 初始化 ACL 运行时
+ret = acl.rt.set_device(0)          # (2) 选择 NPU 设备 0
+ctx, ret = acl.rt.create_context(0) # (3) 在设备上创建执行上下文
+ret = acl.rt.set_context(ctx)       # (4) 将上下文绑定到当前线程
+\end{lstlisting}
+
+\textbf{为什么需要 context}：ACL 的
+context（上下文）是\textbf{线程局部}的。每个需要调用 ACL API
+的线程都必须绑定自己的 context。回调线程里必须再调一遍
+\passthrough{\lstinline!set\_context(ctx)!}------主线程的 context
+不会自动传递到回调线程。
+
+\textbf{多线程规则}：一个设备可以创建多个 context，但一个 context
+同时只能绑定一个线程，一个线程同时只能绑定一个 context。同一个 context
+可以在不同时间绑定到不同线程（但不能同时）。
+
+\subsection{通道模型}\label{channel-model}
+
+VENC 和 VDEC 都采用\textbf{通道（Channel）}模型。通道是 DVPP
+硬件资源的抽象------创建一个通道就是向驱动申请一个硬件编码器/解码器实例。
+
+通道创建遵循``描述符 →
+通道''两步模式：先创建通道描述符并设置参数，再调用 create\_channel
+申请硬件资源。描述符只是一组参数配置，create 时才真正向驱动申请资源。
+
+\textbf{DVPP 内部有两种不同的通道模型}：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VENC / VDEC 专用通道
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VPC / JPEG 通用通道
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+创建 API & \passthrough{\lstinline!venc\_create\_channel()!} /
+\passthrough{\lstinline!vdec\_create\_channel()!} &
+\passthrough{\lstinline!dvpp\_create\_channel()!}（无需设置 mode） \\
+异步机制 & \textbf{回调线程}（\passthrough{\lstinline!process\_report!}
+轮询） & \textbf{Stream
+同步}（\passthrough{\lstinline!synchronize\_stream!} 阻塞） \\
+线程模型 & 需要独立回调线程 + Queue & 不需要额外线程 \\
+数据描述 & VENC: pic\_desc→stream\_desc，VDEC: stream\_desc→pic\_desc &
+pic\_desc → pic\_desc（同类型） \\
+\end{longtable}
+}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{VENC/VDEC 回调式}：主线程发送帧后阻塞在
+  Queue.get()，回调线程通过 process\_report 轮询硬件完成事件，触发回调后
+  Queue.put 唤醒主线程
+\item
+  \textbf{VPC/JPEG Stream 式}：主线程下发异步任务后调用
+  synchronize\_stream 阻塞等待，硬件完成时直接通知
+  Stream（无需回调线程）
+\end{itemize}
+
+\textbf{通道复用 vs 创建/销毁}：每次
+\passthrough{\lstinline!创建通道() → 处理 N 帧 → 销毁通道()!}
+的固定开销约
+\textbf{5-10ms}。对于单帧编码场景，创建/销毁的开销远超编解码本身。最佳实践：创建一次通道，连续处理所有帧，最后销毁。
+
+\textbf{通道数是有限的}：Ascend 310B4 的 VENC/VDEC
+硬件实例数量有限（通常每种 1-2 个）。
+
+\subsection{回调线程模型}\label{callback-thread-model}
+
+DVPP
+是\textbf{异步}的：发送工作请求后立即返回，结果通过\textbf{回调}在另一个线程中返回。
+
+异步处理时序：(1) 主线程发送帧请求后立即返回 → (2) 主线程阻塞在
+\passthrough{\lstinline!Queue.get()!} 等待结果 → (3) DVPP 硬件完成处理 →
+(4) 回调线程收到事件 → (5) 回调将结果
+\passthrough{\lstinline!Queue.put()!} → (6) 主线程被唤醒得到结果
+
+\textbf{VENC vs VDEC 回调的关键差异}：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VENC 回调
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VDEC 回调
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+参数顺序 &
+\passthrough{\lstinline!(输入\_pic\_desc, 输出\_stream\_desc)!} &
+\passthrough{\lstinline!(输入\_stream\_desc, 输出\_pic\_desc)!} \\
+读取输出 & \passthrough{\lstinline!获取码流大小/数据()!} &
+\passthrough{\lstinline!获取图片返回码()!} +
+\passthrough{\lstinline!获取图片数据/大小()!} \\
+返回码检查 & 无 & \textbf{必须检查}，非 0 = 解码失败 \\
+销毁输入 & \passthrough{\lstinline!销毁图片描述符(输入)!} &
+\passthrough{\lstinline!销毁码流描述符(输入)!} \\
+销毁输出 & 不需要（调用方管理） &
+\textbf{\passthrough{\lstinline!销毁图片描述符(输出)!}} \\
+\end{longtable}
+}
+
+\textbf{记忆方法}：第一个参数总是``输入''，第二个总是``输出''。VENC
+输入图片→输出码流；VDEC 输入码流→输出图片。
+
+\textbf{为什么用 Queue 而不是 Event}：Queue
+天然适合``生产者（回调线程）→
+消费者（主线程）''模式------支持缓冲（多帧排队）、阻塞等待（\passthrough{\lstinline!Queue.get(timeout=5.0)!}）、线程安全（无需额外锁）。
+
+\textbf{为什么是
+300ms}：\passthrough{\lstinline!process\_report(300ms)!} 阻塞最多 300ms
+等待 DVPP 硬件完成通知。太短（如 10ms）会高频 CPU 轮询，太长（如
+5000ms）会导致销毁通道时等待过久。300ms 是平衡值。
+
+\subsection{DVPP 内存管理}\label{dvpp-ux5185ux5b58ux7ba1ux7406}
+
+DVPP 有两套内存系统，必须正确区分：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1429}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2571}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2571}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1714}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1714}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+操作
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+分配位置
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+访问方式
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+用途
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+释放
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!dvpp\_malloc(大小)!} & \textbf{设备端}（NPU
+片内或 DDR） & 不能被 CPU 直接读写 & DVPP 硬件访问的输入/输出缓冲区 &
+\passthrough{\lstinline!dvpp\_free(ptr)!} \\
+\passthrough{\lstinline!malloc\_host(大小)!} & \textbf{主机端}（系统
+DDR） & CPU 可正常读写 & 回调中临时中转数据 &
+\passthrough{\lstinline!free\_host(ptr)!} \\
+\end{longtable}
+}
+
+数据搬运方向：\passthrough{\lstinline!memcpy(设备内存, 主机数据, 大小)!}
+--- 主机→设备（发送数据给
+DVPP）；\passthrough{\lstinline!memcpy(主机内存, 设备数据, 大小)!} ---
+设备→主机（取回结果）。
+
+\textbf{常见内存错误}：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+错误
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+现象
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+原因
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+忘记 \passthrough{\lstinline!dvpp\_free!} & 内存泄漏 → 后续分配失败 &
+每帧分配但未释放 \\
+忘记 \passthrough{\lstinline!free\_host!} & 主机内存泄漏 &
+回调中分配主机内存后未释放 \\
+在主机上直接读设备指针 & 段错误 / 无效数据 & 设备内存不能直接被 CPU
+访问 \\
+回调中未销毁输入描述符 & 内存泄漏 & VENC pic\_desc / VDEC stream\_desc
+必须由回调销毁 \\
+\end{longtable}
+}
+
+\subsection{描述符模型}\label{ux63cfux8ff0ux7b26ux6a21ux578b}
+
+DVPP 使用两种描述符来描述输入/输出数据：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{pic\_desc（图片描述符）}：描述一帧图像（NV12 / RGB
+  等），包含数据指针、大小、格式、宽高、stride。VDEC
+  专用字段：\passthrough{\lstinline!ret\_code!}（0=解码成功，非0=失败）。
+\item
+  \textbf{stream\_desc（码流描述符）}：描述一段压缩码流（H.264 / H.265 /
+  JPEG），包含数据指针和大小。
+\end{itemize}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+子模块
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+输入描述符
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+输出描述符
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+回调参数顺序
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+VENC & pic\_desc & stream\_desc &
+\passthrough{\lstinline!(input\_pic\_desc, output\_stream\_desc)!} \\
+VDEC & stream\_desc & pic\_desc &
+\passthrough{\lstinline!(input\_stream\_desc, output\_pic\_desc)!} \\
+JPEGE & pic\_desc & stream\_desc & 同 VENC \\
+JPEGD & stream\_desc & pic\_desc & 同 VDEC \\
+\end{longtable}
+}
+
+\subsection{NV12------DVPP 的通用货币}\label{nv12-format}
+
+NV12（也叫 YUV420SP）是 DVPP 所有图像相关模块的首选像素格式。
+
+\textbf{为什么 NV12}：(1) 体积小------每像素 1.5 字节（RGB 是 3
+字节），省 50\% 内存和带宽；(2)
+人眼匹配------利用人对亮度敏感、对色度不敏感的特性，降低色度分辨率；(3)
+硬件原生------VENC/VDEC 硬件内部直接处理 NV12；(4)
+摄像头兼容------大多数摄像头输出 YUV 格式，接近 NV12。
+
+\textbf{内存布局}：NV12 缓冲区 = {[}Y 平面{]}（H×W，每像素 1 字节亮度）+
+{[}UV 交错平面{]}（H/2 × W，每 2 字节一组 U,V）。总字节数 = H × W ×
+3/2。
+
+\textbf{与其他 YUV 格式的区别}：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1935}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1935}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2903}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3226}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+格式
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+全称
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+内存布局
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+DVPP 支持
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{NV12} & YUV420SP & Y 平面 + UV 交错平面 & VENC / VDEC / VPC /
+JPEGE \\
+NV21 & YVU420SP & Y 平面 + VU 交错平面 (U/V 顺序相反) & VDEC / VPC \\
+I420 & YUV420P & Y 平面 + U 平面 + V 平面（3 个独立平面） & VPC
+(部分) \\
+YUYV & YUV422 & YUYV 交错（每 2 像素共享 UV） & --- (需 VPC 转换) \\
+\end{longtable}
+}
+
+\textbf{USB 摄像头输入 → NV12 的路径}：大多数 USB 摄像头输出 YUYV 或
+MJPG，不是 NV12。转换可选 CPU
+路径（\passthrough{\lstinline!cv2.cvtColor + bgr\_to\_nv12()!}）或 VPC
+路径（VPC CSC: YUYV→NV12，但 310B 不支持 CSC）。
+
+\subsection{acllite --- CANN 自带 Python 封装库}\label{acllite}
+
+\textbf{acllite} 是随 CANN Toolkit 安装的 Python 封装库（位于
+\passthrough{\lstinline!/usr/local/Ascend/thirdpart/aarch64/acllite/!}），基于
+DVPP V1（\passthrough{\lstinline!acl.media!}）构建。它将 DVPP
+的通道管理、stride
+对齐、内存拷贝、Stream/回调同步等底层细节封装成了面向对象的 API。
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4667}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+文件
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+类 / 功能
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+对应 DVPP 模块
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!acllite\_resource.py!} &
+\passthrough{\lstinline!AclLiteResource!} --- 简化 ACL 初始化 & 通用 \\
+\passthrough{\lstinline!acllite\_image.py!} &
+\passthrough{\lstinline!AclLiteImage!} --- 图像数据容器（numpy / 文件 /
+DVPP 内存） & 通用 \\
+\passthrough{\lstinline!acllite\_imageproc.py!} &
+\passthrough{\lstinline!AclLiteImageProc!} --- resize / crop / JPEG
+编解码 & VPC / JPEGE / JPEGD \\
+\passthrough{\lstinline!dvpp\_vdec.py!} &
+\passthrough{\lstinline!DvppVdec!} --- H.264/H.265 硬件解码 & VDEC \\
+\end{longtable}
+}
+
+\begin{quote}
+\textbf{VENC 不在 acllite 中}。编码器需使用原始 API（参见
+\hyperref[venc]{VENC --- 硬件视频编码}）。
+\end{quote}
+
+\textbf{快速上手}：
+
+\begin{lstlisting}[language=Python]
+import numpy as np
+from acllite_resource import AclLiteResource
+from acllite_image import AclLiteImage
+from acllite_imageproc import AclLiteImageProc
+
+# (1) ACL 初始化——封装四步必要步骤
+acl_res = AclLiteResource()
+acl_res.init()
+
+# (2) 创建 VPC + JPEG 处理器
+vpc = AclLiteImageProc()
+
+# (3) 准备图像（numpy ndarray → DVPP 内存）
+nv12 = np.vstack([y_plane, uv_plane])
+img = AclLiteImage(nv12, width, height).copy_to_dvpp()
+
+# (4) resize
+resized = vpc.resize(img, 320, 240)
+
+# (5) JPEG 编码
+jpeg = vpc.jpege(resized)
+
+# (6) JPEG 解码
+decoded = vpc.jpegd(jpeg)
+
+# (7) 取回 numpy
+data = decoded.byte_data_to_np_array()  # → np.uint8 一维数组
+
+# (8) 清理
+vpc.destroy()
+# AclLiteResource 在 __del__ 中自动释放 ACL 资源
+\end{lstlisting}
+
+\textbf{AclLiteImage} 统一了不同来源的图像数据：可以从 numpy
+ndarray、文件（.jpg/.png/.yuv）、或 DVPP 设备内存指针构造。通过
+\passthrough{\lstinline!byte\_data\_to\_np\_array()!} 取回 numpy 数组。
+
+\textbf{VDEC 操作速查}：
+
+\begin{lstlisting}[language=Python]
+from dvpp_vdec import DvppVdec
+import constants as const
+
+vdec = DvppVdec(channel_id=0, width=640, height=480,
+                entype=const.ENTYPE_H264_BASE, ctx=ctx)
+vdec.init()
+vdec.process(h264_device_ptr, h264_size, user_data=(0, frame_id))
+ret, img = vdec.read()
+if img:
+    nv12 = img.byte_data_to_np_array()
+vdec.destroy()
+\end{lstlisting}
+
+\textbf{适用场景}：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.4000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.6000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+场景
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+推荐方案
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+快速原型、学习 DVPP & acllite（几行代码完成基础流程） \\
+VPC resize/crop/JPEG 生产代码 & acllite（自动管理资源，代码量少
+80\%） \\
+VDEC 解码 & acllite 或裸 API（看是否需要精细控制） \\
+VENC 编码 & 直接调用 \passthrough{\lstinline!acl.media.venc\_*!} \\
+需要精细控制内存/回调 & 直接调用 \passthrough{\lstinline!acl.media!} \\
+\end{longtable}
+}
+
+\subsection{DVPP V1 与 himpi V2 --- 两套 API
+体系}\label{dvpp-v1-ux4e0e-himpi-v2-ux4e24ux5957-api-ux4f53ux7cfb}
+
+CANN 为 Ascend 310B 提供了两套不同的媒体处理 API：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+& DVPP V1 (\passthrough{\lstinline!acl.media!}) & himpi V2
+(\passthrough{\lstinline!acl.himpi!}) \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+全称 & Digital Vision Pre-Processing & Hi Media Processing Interface \\
+定位 & AscendCL 通用媒体处理 & 专用媒体处理（对标 HiMPP） \\
+通道模型 & VENC/VDEC 专用 + 通用 dvpp 通道 & 统一
+\passthrough{\lstinline!*\_create\_chn!} \\
+310B Python 可用性 & \textbf{大部分可用} & \textbf{通道创建不可用} \\
+\end{longtable}
+}
+
+himpi 的 \passthrough{\lstinline!*\_create\_chn!} 函数需要传入 C
+结构体（如 \passthrough{\lstinline!hi\_vpc\_chn\_attr!}），Python
+侧不支持创建这些结构体。
+
+\textbf{选择指南}：在 310B 上处理媒体数据时：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{VENC/VDEC 编解码} →
+  \passthrough{\lstinline!acl.media.venc\_*!} /
+  \passthrough{\lstinline!vdec\_*!}（唯一选择）
+\item
+  \textbf{VPC resize/crop} →
+  \passthrough{\lstinline!acl.media.dvpp\_vpc\_*\_async!} 或 acllite
+\item
+  \textbf{JPEG 编解码} →
+  \passthrough{\lstinline!acl.media.dvpp\_jpeg\_*\_async!} 或 acllite
+\item
+  \textbf{旋转/翻转/滤波/仿射} → CPU (OpenCV)
+\item
+  \textbf{310P/710 等新硬件} → himpi V2
+\end{itemize}
+
+\subsection{典型 DVPP
+使用模式}\label{ux5178ux578b-dvpp-ux4f7fux7528ux6a21ux5f0f}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{视频推理管道}：VDEC 解码 → VPC YUV 格式调整与缩放 → 若需 RGB
+  或额外预处理，再由 AIPP 完成 → 传入模型
+\item
+  \textbf{静态图片分类}：JPEGD 解码 → VPC 缩放/裁剪 →
+  如需色域/像素变换使用 AIPP → 传入模型
+\item
+  \textbf{全硬件转码}：VDEC（H.264→NV12）→ VPC（resize）→
+  VENC（NV12→H.264），设备内零拷贝
+\end{itemize}
+
+\subsection{开发注意事项}\label{ux5f00ux53d1ux6ce8ux610fux4e8bux9879}
+
+\begin{itemize}
+\tightlist
+\item
+  DVPP
+  输出对分辨率与地址有对齐要求（stride/padding），读取数据时需依据描述信息处理
+\item
+  使用异步接口（\passthrough{\lstinline!*\_async!}）时必须配合 Stream
+  与同步机制
+\item
+  Host→Device
+  的异步拷贝源内存应使用页锁定（pinned）内存（\passthrough{\lstinline!acl.rt.malloc\_host!}）
+\item
+  优先把耗时的像素级操作下沉到 DVPP/AIPP，避免在
+  CPU（Python）端逐像素处理
+\item
+  310B 上
+  \passthrough{\lstinline!dvpp\_vpc\_convert\_color\_async!}（CSC
+  色彩空间转换）不可用
+\end{itemize}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\section{VENC --- 硬件视频编码}\label{venc}
+
+\begin{quote}
+VENC（Video Encoder）将 NV12 原始帧编码为 H.264/H.265
+码流。前置基础：\hyperref[dvpp-basics]{DVPP 基础概念}。
+
+文中所有完整可运行的代码在
+\href{https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter5/}{samples/chapter5/}
+目录下。
+\end{quote}
+
+\subsection{理论背景}\label{ux7406ux8bbaux80ccux666f}
+
+\subsubsection{为什么需要硬件编码}\label{ux4e3aux4ec0ux4e48ux9700ux8981ux786cux4ef6ux7f16ux7801}
+
+H.264 视频编码是计算密集型任务。一块 640×480@30fps 的视频流，纯 CPU
+软件编码（如 libx264）会占用 ARM Cortex-A55 的大量计算资源。对于 Orange
+Pi AI Pro 这样的嵌入式设备，CPU
+资源有限，软件编码不仅影响视频质量（可能因算力不足而降低帧率），还挤占了其他任务的
+CPU 时间。
+
+昇腾 310B 芯片内部集成了 \textbf{VENC（Video Encoder）} 硬件模块，专用于
+H.264/H.265 编码。硬件编码器具有：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{固定功能电路}：编码路径完全硬化，功耗和延迟远低于通用 CPU
+\item
+  \textbf{独立于 AI Core}：不占用 NPU 推理算力
+\item
+  \textbf{实时性保证}：硬件 pipeline 确保编码在固定时间内完成
+\end{itemize}
+
+\subsubsection{CANN / ACL 体系}\label{cann-acl-ux4f53ux7cfb}
+
+CANN（Compute Architecture for Neural
+Networks）是华为昇腾芯片的全栈软件栈，其层级结构如下：
+
+\begin{figure}
+\centering
+\includegraphics[width=0.4\linewidth,height=\textheight,keepaspectratio,alt={CANN/ACL 与 DVPP 的调用层次}]{chapters/img5/cann_acl_dvpp_stack.png}
+\caption{CANN/ACL 与 DVPP 的调用层次}\label{fig:cann_acl_dvpp_stack}
+\end{figure}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{ACL}（Ascend Computing Language）：CANN
+  的核心编程接口，提供设备管理、内存管理、媒体处理等 API
+\item
+  \textbf{DVPP}（Digital Vision
+  Pre-Processing）：数字视觉预处理模块，包含
+  VENC（编码）、VDEC（解码）、VPC（图像处理）、JPEG 编解码等
+\item
+  \textbf{acl.media}：Python 侧对 DVPP 的封装
+\end{itemize}
+
+\subsubsection{VENC 在 DVPP
+中的位置}\label{venc-ux5728-dvpp-ux4e2dux7684ux4f4dux7f6e}
+
+DVPP 各子模块分工详见 \hyperref[dvpp-modules]{子模块概览}。VENC
+的职责：\textbf{NV12 原始帧 → H.264/H.265 码流}。
+
+VDEC 是它的镜像：H.264/H.265 码流 → NV12。两者串联可形成全硬件转码管道。
+
+\subsubsection{NV12 格式}\label{nv12-ux683cux5f0f}
+
+VENC 的输入格式必须是 \textbf{NV12}（YUV420SP）。详见
+\hyperref[nv12-format]{NV12 格式}，这里只强调 VENC 的关键约束：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{总大小}：H × W × 3/2 字节（对比 RGB 的 H × W × 3，节省 50\%）
+\item
+  \textbf{stride 对齐}：VENC 要求宽度对齐到
+  16，未对齐会导致编码画面偏移或绿条。对齐公式：\passthrough{\lstinline!((width + 15) // 16) * 16!}
+\end{itemize}
+
+\subsubsection{编码流程（端到端）}\label{ux7f16ux7801ux6d41ux7a0bux7aefux5230ux7aef}
+
+\begin{figure}
+\centering
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio,alt={VENC 编码端到端流程}]{chapters/img5/venc_encode_flow.png}
+\caption{VENC 编码端到端流程}\label{fig:venc_encode_flow}
+\end{figure}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{环境与架构}\label{ux73afux5883ux4e0eux67b6ux6784}
+
+\subsubsection{硬件}\label{ux786cux4ef6}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{芯片}：Ascend 310B4（Orange Pi AI Pro）
+\item
+  \textbf{VENC 模块}：支持 H.264 Baseline/Main/High，H.265 Main
+\item
+  \textbf{驱动}：\passthrough{\lstinline!drv\_venc!},
+  \passthrough{\lstinline!drv\_h264e!},
+  \passthrough{\lstinline!drv\_h265e!}（通过
+  \passthrough{\lstinline!lsmod | grep venc!} 验证）
+\end{itemize}
+
+\subsubsection{软件}\label{ux8f6fux4ef6}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{CANN 版本}：8.3.RC1
+\item
+  \textbf{安装路径}：\passthrough{\lstinline!/usr/local/Ascend/ascend-toolkit/8.3.RC1/!}
+\item
+  \textbf{Python
+  API}：\passthrough{\lstinline!/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/acl/!}
+\item
+  \textbf{动态库}：\passthrough{\lstinline!/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/!}
+\end{itemize}
+
+\subsubsection{环境变量}\label{ux73afux5883ux53d8ux91cf}
+
+每次使用 CANN Python API 前必须设置：
 
 \begin{lstlisting}[language=bash]
-# 创建工程目录并进入
-mkdir -p add_tbe
-cd add_tbe
-
-# 创建必要的源文件
-touch add.py run.py
+export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH"
+export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:$PYTHONPATH"
 \end{lstlisting}
 
-预期的目录结构如下：
+这两个变量分别解决了：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!libascendcl.so: cannot open shared object file!}
+  --- 动态库找不到
+\item
+  \passthrough{\lstinline!No module named 'acl'!} --- Python 包找不到
+\end{itemize}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{VENC API 详解}\label{venc-api-ux8be6ux89e3}
+
+\subsubsection{ACL 初始化}\label{acl-ux521dux59cbux5316}
+
+4 步固定初始化详见 \hyperref[acl-init]{ACL 初始化}，此处只给出 VENC
+上下文的代码：
+
+\begin{lstlisting}[language=Python]
+import acl
+
+ret = acl.init()                    # (1)
+ret = acl.rt.set_device(0)          # (2)
+ctx, ret = acl.rt.create_context(0) # (3)
+ret = acl.rt.set_context(ctx)       # (4)
+assert ret == 0
+\end{lstlisting}
+
+所有后续的 VENC API 调用都依赖这个上下文。
+
+\subsubsection{VENC 通道模型}\label{venc-ux901aux9053ux6a21ux578b}
+
+通道模型详见 \hyperref[channel-model]{通道模型}，这里只列出 VENC 特有的
+API：
+
+\begin{figure}
+\centering
+\includegraphics[width=0.75\linewidth,height=\textheight,keepaspectratio,alt={VENC 通道输入输出模型}]{chapters/img5/venc_channel_model.png}
+\caption{VENC 通道输入输出模型}\label{fig:venc_channel_model}
+\end{figure}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+函数 & 用途 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!venc\_create\_channel\_desc()!} &
+创建通道描述符 \\
+\passthrough{\lstinline!venc\_set\_channel\_desc\_*()!} &
+设置通道参数（见下节） \\
+\passthrough{\lstinline!venc\_create\_channel(desc)!} & 创建通道（返回 0
+即成功） \\
+\passthrough{\lstinline!venc\_send\_frame(...)!} & 发送一帧到编码器 \\
+\passthrough{\lstinline!venc\_create\_frame\_config()!} &
+创建帧配置（控制 force I-frame 等） \\
+\passthrough{\lstinline!venc\_destroy\_channel(desc)!} & 销毁通道 \\
+\passthrough{\lstinline!venc\_destroy\_channel\_desc(desc)!} &
+销毁描述符 \\
+\end{longtable}
+}
+
+\subsubsection{通道参数详解}\label{ux901aux9053ux53c2ux6570ux8be6ux89e3}
+
+创建 VENC
+通道前，必须在描述符上设置编码类型、像素格式、分辨率、GOP、码率等参数。完整参数表及常用值见
+\hyperref[venc-params]{VENC 参数速查表}。
+
+\subsubsection{回调机制}\label{ux56deux8c03ux673aux5236}
+
+回调线程模型详见 \hyperref[callback-thread-model]{回调线程模型}。VENC
+的回调特点：
+
+\begin{itemize}
+\tightlist
+\item
+  参数顺序：\textbf{\passthrough{\lstinline!(input\_pic\_desc, output\_stream\_desc)!}}
+  --- 第一个是输入图片，第二个是输出码流
+\item
+  输入 \passthrough{\lstinline!pic\_desc!}
+  必须由回调销毁（\passthrough{\lstinline!dvpp\_destroy\_pic\_desc!}）
+\item
+  输出 \passthrough{\lstinline!stream\_desc!} 的数据需在回调中通过
+  \passthrough{\lstinline!malloc\_host!} +
+  \passthrough{\lstinline!memcpy!} 拷到主机内存
+\item
+  通过 \passthrough{\lstinline!queue.Queue!}
+  将编码结果传回主线程，实现异步→同步转换
+\end{itemize}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{开发过程与常见问题与调试}\label{ux5f00ux53d1ux8fc7ux7a0bux4e0eux5e38ux89c1ux95eeux9898ux4e0eux8c03ux8bd5}
+
+\subsubsection{问题 \#1：Python 环境找不到 acl
+模块}\label{ux95eeux9898-1python-ux73afux5883ux627eux4e0dux5230-acl-ux6a21ux5757}
+
+\textbf{现象}：
 
 \begin{lstlisting}
-add_tbe/
-├── add.py          # TBE算子实现文件
-├── run.py          # 测试验证脚本
-└── kernel_meta/    # 编译输出目录（自动生成）
+ModuleNotFoundError: No module named 'acl'
 \end{lstlisting}
 
-\subsubsection{编写TBE算子代码（add.py）}\label{ux7f16ux5199tbeux7b97ux5b50ux4ee3ux7801add.py}
+\textbf{根因}：CANN 的 Python 包不在标准
+\passthrough{\lstinline!sys.path!} 中。即使
+\passthrough{\lstinline!conda activate!} 了正确的环境，CANN 的
+site-packages 也不会自动加入搜索路径。
 
-下面是完整的向量加法算子实现代码，我们将逐段解释。
+\textbf{修复}：
 
-\begin{lstlisting}[language=Python]
-import tbe
-from tbe import tvm
-from tbe import dsl
-from tbe.common.utils import para_check
-from tbe.common.utils import shape_util
-
-from functools import reduce
-
-SHAPE_SIZE_LIMIT = 2147483648
-
-# 实现Add算子的计算逻辑
-
-@tbe.common.register.register_op_compute("add",op_mode="static")
-def add_compute(input_x, input_y, output_z, kernel_name="add"):
-    shape_x = shape_util.shape_to_list(input_x.shape) # 将shape转换为list
-    shape_y = shape_util.shape_to_list(input_y.shape) # 将shape转换为list
-    shape_x, shape_y, shape_max = shape_util.broadcast_shapes(shape_x, shape_y,param_name_input1="input_x",param_name_input2="input_y")   # shape_max取shape_x与shape_y的每个维度的大值
-    shape_size = reduce(lambda x, y: x * y, shape_max[:])      
-    if shape_size > SHAPE_SIZE_LIMIT:
-        raise RuntimeError("the shape is too large to calculate")
-
-    input_x = dsl.broadcast(input_x, shape_max)       # 将input_x的shape广播为shape_max
-    input_y = dsl.broadcast(input_y, shape_max)       # 将input_y的shape广播为shape_max
-    res = dsl.vadd(input_x, input_y)        # 执行input_x + input_y
-
-    return res          # 返回计算结果的tensor
-
-# 算子定义函数
-def add(input_x, input_y, output_z, kernel_name="add"):
-    # 获取算子输入tensor的shape与dtype
-    shape_x = input_x.get("shape")      
-    shape_y = input_y.get("shape")
-    check_tuple = ("float16", "float32", "int32")
-    input_data_type = input_x.get("dtype").lower()
-    if input_data_type not in check_tuple:
-        raise RuntimeError("only support %s while dtype is %s" %
-                           (",".join(check_tuple), input_data_type))
-    # shape_max取shape_x与shape_y的每个维度的最大值
-    shape_x, shape_y, shape_max = shape_util.broadcast_shapes(shape_x, shape_y,param_name_input1="input_x",param_name_input2="input_y")  
-    if shape_x[-1] == 1 and shape_y[-1] == 1 and shape_max[-1] == 1: 
-        # 如果shape的长度等于1，就直接赋值，如果shape的长度不等于1，做切片，将最后一个维度舍弃（按照内存排布，最后一个维度为1与没有最后一个维度的数据排布相同，例如2*3=2*3*1，将最后一个为1的维度舍弃，可提升后续的调度效率）。
-        shape_x = shape_x if len(shape_x) == 1 else shape_x[:-1]   
-        shape_y = shape_y if len(shape_y) == 1 else shape_y[:-1]
-        shape_max = shape_max if len(shape_max) == 1 else shape_max[:-1]
-  
-    # 使用TVM的placeholder接口对第一个输入tensor进行占位，返回一个tensor对象
-    data_x = tvm.placeholder(shape_x, name="data_1", dtype=input_data_type)
-    # 使用TVM的placeholder接口对第二个输入tensor进行占位，返回一个tensor对象
-    data_y = tvm.placeholder(shape_y, name="data_2", dtype=input_data_type)
-
-    # 调用compute实现函数
-    res = add_compute(data_x, data_y, output_z, kernel_name)  
-    # 自动调度
-    with tvm.target.cce():
-        schedule = dsl.auto_schedule(res)
-    # 编译配置
-    config = {"name": kernel_name,
-              "tensor_list": (data_x, data_y, res)}
-    dsl.build(schedule, config)
-    
-# 算子调用
-if __name__ == '__main__':
-    input_output_dict = {"shape": (5, 6, 7),"format": "ND","ori_shape": (5, 6, 7),"ori_format": "ND", "dtype": "float16"}
-    add(input_output_dict, input_output_dict, input_output_dict, kernel_name="add")
+\begin{lstlisting}[language=bash]
+export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:$PYTHONPATH"
 \end{lstlisting}
 
-\subsection{代码逐段详解}\label{ux4ee3ux7801ux9010ux6bb5ux8be6ux89e3}
+\textbf{说明}：CANN 的 Python 路径是
+\passthrough{\lstinline!<toolkit>/python/site-packages!}，\textbf{不是}
+\passthrough{\lstinline!<toolkit>/aarch64-linux/python/site-packages!}。\passthrough{\lstinline!aarch64-linux/!}
+下只有动态库（\passthrough{\lstinline!lib64/!}），没有 Python 包。
 
-\subsubsection{导入模块}\label{ux5bfcux5165ux6a21ux5757}
+\begin{quote}
+\textbf{是否在代码中修复？}
+示例脚本遵循``环境变量在进程外设置''的原则，不内置
+\passthrough{\lstinline!sys.path!}
+操作代码。这样可以明确依赖来源，避免隐式修改 Python 搜索路径。
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{问题 \#2：libascendcl.so
+找不到}\label{ux95eeux9898-2libascendcl.so-ux627eux4e0dux5230}
+
+\textbf{现象}：
+
+\begin{lstlisting}
+ImportError: libascendcl.so: cannot open shared object file: No such file or directory
+\end{lstlisting}
+
+\textbf{根因}：即使 \passthrough{\lstinline!import acl!} 成功（因为
+Python 包路径正确），底层 C 扩展仍需要动态库。
+
+\textbf{修复}：
+
+\begin{lstlisting}[language=bash]
+export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH"
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{问题 \#3：venc\_create\_channel 返回 507018 --- bitrate
+单位错误}\label{ux95eeux9898-3venc_create_channel-ux8fd4ux56de-507018-bitrate-ux5355ux4f4dux9519ux8bef}
+
+\textbf{现象}：
+
+\begin{lstlisting}
+RuntimeError: venc_create_channel failed: 507018 (0x7bc8a)
+dmesg: rc_drv_check_bit_rate bit rate set 2000000k error for out of [2k, 614400k]
+\end{lstlisting}
+
+\textbf{根因}：\passthrough{\lstinline!max\_bit\_rate!} 的单位是
+\textbf{kbps}（千比特/秒），不是 bps（比特/秒）。
+
+我传入了 \passthrough{\lstinline!2\_000\_000!}（2 Mbps 以 bps 表示），被
+VENC 驱动解释为 2,000,000 kbps = 2 Gbps，远超上限 614,400 kbps。
+
+\textbf{修复}：
 
 \begin{lstlisting}[language=Python]
-import tbe
-from tbe import tvm
-from tbe import dsl
-from tbe.common.utils import para_check
-from tbe.common.utils import shape_util
-from functools import reduce
+# 错误
+media.venc_set_channel_desc_max_bit_rate(desc, 2_000_000)  # bps → 超出范围
+
+# 正确
+media.venc_set_channel_desc_max_bit_rate(desc, 2_000)       # kbps = 2 Mbps
+\end{lstlisting}
+
+\textbf{dmesg 调试技巧}：VENC
+错误信息会写入内核日志，\passthrough{\lstinline!dmesg | grep -i venc!}
+是排查参数问题的第一手段。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{问题 \#4：venc\_create\_channel 返回 507018 --- GOP 为
+0}\label{ux95eeux9898-4venc_create_channel-ux8fd4ux56de-507018-gop-ux4e3a-0}
+
+\textbf{现象}：
+
+\begin{lstlisting}
+dmesg: rc_check_com_attr gop 0 err, should be in [1 65536]
+dmesg: rc_create_chn check user rc attr err
+\end{lstlisting}
+
+\textbf{根因}：\passthrough{\lstinline!key\_frame\_interval!}（即 GOP
+--- Group of Pictures）未设置，默认值为 0，不在合法范围 {[}1, 65536{]}
+内。
+
+GOP 控制多少个 P/B 帧之间插入一个 I 帧（关键帧）。GOP=30 意味着每 30
+帧一个 I 帧，这在 30fps 下相当于每秒一个关键帧。GOP=0
+对编码器没有意义（永远不产生 I 帧？），因此被拒绝。
+
+\textbf{修复}：
+
+\begin{lstlisting}[language=Python]
+media.venc_set_channel_desc_key_frame_interval(desc, 30)  # GOP=30
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{问题 \#5：venc\_set\_channel\_desc\_channel\_id
+不存在}\label{ux95eeux9898-5venc_set_channel_desc_channel_id-ux4e0dux5b58ux5728}
+
+\textbf{现象}：
+
+\begin{lstlisting}
+AttributeError: module 'acl.media' has no attribute 'venc_set_channel_desc_channel_id'
+\end{lstlisting}
+
+\textbf{根因}：VDEC 有
+\passthrough{\lstinline!vdec\_set\_channel\_desc\_channel\_id!}，但 VENC
+的 API 中\textbf{没有对应的 setter}。VENC 的 channel\_id
+由驱动自动分配，不能手动设置。
+
+这暴露了 CANN API 的一个不对称设计：VDEC 和 VENC
+虽然结构相似，但细节不同，不能简单类比。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{问题 \#6：NumPy
+维度索引错误}\label{ux95eeux9898-6numpy-ux7ef4ux5ea6ux7d22ux5f15ux9519ux8bef}
+
+\textbf{现象}：
+
+\begin{lstlisting}
+ValueError: could not broadcast input array from shape (640,640) into shape (640,)
+\end{lstlisting}
+
+\textbf{根因}：NV12 数据是 2D 数组
+\passthrough{\lstinline!(H*3/2, W)!}，但代码用 1D 线性偏移去索引：
+
+\begin{lstlisting}[language=Python]
+# 错误：nv12_data[src_off : src_off + w] 切出了形状 (w, w) 而非 (w,)
+nv12_padded[off : off + w] = nv12_data[src_off : src_off + w]  # 2D → 1D 广播失败
+\end{lstlisting}
+
+当 \passthrough{\lstinline!src\_off = row * w = 0!}
+时，\passthrough{\lstinline!nv12\_data[0:640]!} 取到的是整个 Y plane
+的前 640 行（即整个 640×640 区域），而不是第 0 行的 640 个像素。
+
+\textbf{修复}：使用 2D 切片明确行列：
+
+\begin{lstlisting}[language=Python]
+nv12_padded_2d = np.zeros(stride * h * 3 // 2, dtype=np.uint8).reshape(-1, stride)
+nv12_src_2d = nv12_data.reshape(-1, w)
+
+# Y plane
+for row in range(h):
+    nv12_padded_2d[row, :w] = nv12_src_2d[row, :w]
+
+# UV plane
+for row in range(h // 2):
+    nv12_padded_2d[h + row, :w] = nv12_src_2d[h + row, :w]
+
+nv12_padded = nv12_padded_2d.ravel()
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{问题 \#7：stride
+对齐}\label{ux95eeux9898-7stride-ux5bf9ux9f50}
+
+VENC 要求输入帧的宽度\textbf{对齐到 16}（硬件约束）。NV12 数据填充时，Y
+plane 每行宽度应为
+\passthrough{\lstinline!aligned\_width!}（stride），UV plane 同理。
+
+\begin{lstlisting}[language=Python]
+self._align = 16
+self._stride = ((width + self._align - 1) // self._align) * self._align
+# 640 → 640 (已对齐)，638 → 640 (补齐)
+\end{lstlisting}
+
+不设置 stride 对齐会导致编码出的画面出现偏移或绿条。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{问题 \#8：NPU Alarm
+状态混淆}\label{ux95eeux9898-8npu-alarm-ux72b6ux6001ux6df7ux6dc6}
+
+\textbf{现象}：
+
+\begin{lstlisting}
+npu-smi info: Health = Alarm
+\end{lstlisting}
+
+该状态容易被误认为 VENC 不可用。但实际测试表明 Alarm 不影响
+VENC（参数正确就能创建成功）。\passthrough{\lstinline!Alarm!}
+可能与其他传感器（温度、电源）有关，不一定反映 DVPP 模块状态。
+
+\textbf{调试建议}：不要仅依据 NPU 全局状态判断模块可用性，应通过
+\passthrough{\lstinline!dmesg!} 获取具体的模块级错误信息。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{练习脚本}\label{ux7ec3ux4e60ux811aux672c}
+
+三个可独立运行的脚本位于
+\href{https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter5/}{\passthrough{\lstinline!samples/chapter5/!}}，建议按顺序阅读理解。
+
+\subsubsection{概览}\label{ux6982ux89c8}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2308}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3846}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3846}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+文件
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+学习内容
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+运行时间
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!check\_cann.py!} & ACL 初始化的 4 个必要调用 &
+\textless1s \\
+\passthrough{\lstinline!venc\_minimal.py!} & 原始 VENC
+API：回调线程、DVPP 内存、发送一帧 & \textasciitilde3s \\
+\passthrough{\lstinline!bench\_venc.py!} &
+\passthrough{\lstinline!CannVenc!} 封装类 + 5 分辨率扫描对比 &
+\textasciitilde20s \\
+\end{longtable}
+}
+
+\begin{quote}
+\textbf{关于 acllite}：CANN 自带的 acllite 库封装了
+VPC、JPEG、VDEC，但\textbf{没有 VENC 封装}。VENC 需直接使用
+\passthrough{\lstinline!acl.media.venc\_*!} API。
+\end{quote}
+
+\begin{lstlisting}[language=bash]
+export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH"
+export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:$PYTHONPATH"
+
+python samples/chapter5/check_cann.py        # → ACL init OK  soc=Ascend310B4
+python samples/chapter5/venc/venc_minimal.py      # → Encoded keyframe: ~135 KB
+python samples/chapter5/venc/bench_venc.py        # → VENC 4.3ms/帧 @480p  CPU 20.8ms  加速 4.9x
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{\texorpdfstring{走读：ACL 初始化 ---
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/check_cann.py}{\texttt{check\_cann.py}}}{走读：ACL 初始化 --- check\_cann.py}}\label{ux8d70ux8bfbacl-ux521dux59cbux5316-check_cann.py}
+
+\begin{lstlisting}[language=Python]
+import acl
+
+ret = acl.init()                    # (1) 初始化 ACL 运行时
+ret = acl.rt.set_device(0)          # (2) 绑定设备 0
+ctx, ret = acl.rt.create_context(0) # (3) 创建执行上下文
+ret = acl.rt.set_context(ctx)       # (4) 绑定上下文到当前线程
+\end{lstlisting}
+
+这四个调用是\textbf{固定的}，顺序不能变。任何使用 CANN 的 Python
+进程都需要它们。
+
+\subsubsection{\texorpdfstring{走读：最小编码 ---
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/venc/venc_minimal.py}{\texttt{venc\_minimal.py}}}{走读：最小编码 --- venc\_minimal.py}}\label{ux8d70ux8bfbux6700ux5c0fux7f16ux7801-venc_minimal.py}
+
+这是理解 VENC 的核心文件。代码分为 5 个阶段：
+
+\textbf{(1) ACL 初始化} --- 与 step1 相同。
+
+\textbf{(2) 回调线程} --- VENC 是异步的：
+
+\begin{lstlisting}[language=Python]
+cb_queue: queue.Queue = queue.Queue(maxsize=8)
+
+def venc_callback(input_pic_desc, output_stream_desc, _user_data):
+    size = media.dvpp_get_stream_desc_size(output_stream_desc)  # 读取编码后大小
+    ptr  = media.dvpp_get_stream_desc_data(output_stream_desc)  # 读取数据指针
+    host_buf = acl.rt.malloc_host(size)        # 分配主机内存
+    acl.rt.memcpy(host_buf, size, ptr, size, ACL_MEMCPY_DEVICE_TO_HOST)
+    cb_queue.put(ctypes.string_at(host_buf, size))  # 拷贝为 Python bytes
+    acl.rt.free_host(host_buf)
+    media.dvpp_destroy_pic_desc(input_pic_desc)     # 回调负责销毁输入
+
+def callback_thread(_args):                  # 独立线程处理回调
+    acl.rt.set_context(ctx)                  # 必须重新绑定上下文
+    while running[0]:
+        acl.rt.process_report(300)           # 300ms 轮询
+\end{lstlisting}
+
+\textbf{(3) 创建通道} --- 设置全部参数后调用
+\passthrough{\lstinline!venc\_create\_channel()!}。 与第 4
+章的参数表一一对应。
+
+\textbf{(4) 发送一帧} --- NV12 padding（16 对齐）→
+\passthrough{\lstinline!dvpp\_malloc!} →
+\passthrough{\lstinline!venc\_send\_frame!} →
+\passthrough{\lstinline!cb\_queue.get()!} 等待结果。
+
+\textbf{(5) 清理} --- 销毁通道、描述符、帧配置，释放 DVPP 内存。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{\texorpdfstring{走读：封装与基准 ---
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/venc/bench_venc.py}{\texttt{bench\_venc.py}}}{走读：封装与基准 --- bench\_venc.py}}\label{ux8d70ux8bfbux5c01ux88c5ux4e0eux57faux51c6-bench_venc.py}
+
+\passthrough{\lstinline!bench\_venc.py!} 将原始 VENC API 封装为可复用的
+\passthrough{\lstinline!CannVenc!} 类，然后做 \textbf{5
+分辨率扫描}对比硬件 vs CPU 编码性能。整个文件 \textasciitilde380
+行，分为 6 个部分。
+
+\textbf{(1) 测试参数}
+
+\begin{lstlisting}[language=Python]
+RESOLUTIONS = [
+    (640, 480),
+    (1280, 720),
+    (1920, 1080),
+    (2560, 1440),      # 2K
+    (3840, 2160),      # 4K
+]
+
+TEST_FRAMES = 90            # 恰好 3 个 GOP（GOP=30 × 3）
+TEST_GOP = 30                # 1 个 I + 29 个 P，模拟真实视频流
+RANDOM_SEED = 42             # 固定种子 → 结果可复现
+WARMUP_FRAMES = 3
+FPS = 30
 \end{lstlisting}
 
 \begin{itemize}
 \tightlist
 \item
-  \passthrough{\lstinline!tbe!}：TBE框架主模块
+  \textbf{90 帧}：3 个完整 GOP，每个 GOP 含 1 个 I 帧 + 29 个 P 帧，I
+  帧占比 3.3\%，与真实视频流一致
 \item
-  \passthrough{\lstinline!tbe.dsl!}：包含DSL计算接口（如vadd）、调度接口和编译接口
+  \textbf{固定种子
+  42}：同一种子下任何机器生成的测试帧内容相同，保证跨运行可复现
 \item
-  \passthrough{\lstinline!tbe.tvm!}：TBE基于TVM框架扩展，可以使用TVM接口
-\item
-  \passthrough{\lstinline!shape\_util!}：提供shape处理工具，如广播shape计算
-\item
-  \passthrough{\lstinline!para\_check!}：参数校验工具
+  \textbf{3 帧预热}：排除首次编码的驱动初始化开销（比旧版 10 帧更精简）
 \end{itemize}
 
-算子计算逻辑（add\_compute）
-这是算子开发的核心，描述''如何计算''。关键点： -
-\passthrough{\lstinline!@register\_op\_compute!}装饰器将函数注册为算子的计算逻辑
--
-\textbf{Shape大小校验}：计算广播后张量的总元素个数，当超出\passthrough{\lstinline!SHAPE\_SIZE\_LIMIT!}阈值时抛出异常
--
-\textbf{数据广播与计算}：先通过\passthrough{\lstinline!dsl.broadcast!}将输入形状广播对齐，再调用\passthrough{\lstinline!dsl.vadd!}执行向量加法（自动识别为element-wise模式）
-
-\subsubsection{算子主函数（add）}\label{ux7b97ux5b50ux4e3bux51fdux6570add}
-
-这是算子的入口函数，负责调度和编译：
-
-\textbf{参数校验}：校验数据类型是否在支持范围内（float16/float32/int32）。
-
-\textbf{Shape切片优化}：如果shape的末尾维度长度为1，则将其直接舍弃。由于内存排布上末尾为1并不影响实际排布（例如2\emph{3}1等同于2*3），舍弃后可有效提升后续的调度效率。
-
-\textbf{TVM占位符}：\passthrough{\lstinline!tvm.placeholder!}创建输入张量的占位符，描述张量的形状和数据类型，但不分配实际数据。
-
-\textbf{自动调度}：\passthrough{\lstinline!dsl.auto\_schedule!}自动完成AST标注、模式识别、子图切分、调度模板选择，并将指令映射到昇腾硬件。
-
-\textbf{编译构建}：\passthrough{\lstinline!dsl.build!}将调度后的计算描述编译为昇腾设备可执行的二进制文件。
-
-\subsection{编译算子}\label{ux7f16ux8bd1ux7b97ux5b50}
-
-在终端执行以下命令编译算子：
-
-\begin{lstlisting}[language=bash]
-python3 add.py
-\end{lstlisting}
-
-编译成功后，会在当前目录生成\passthrough{\lstinline!kernel\_meta/!}文件夹，包含两个文件：
-- \passthrough{\lstinline!add.o!}：算子的二进制目标文件 -
-\passthrough{\lstinline!add.json!}：算子的元信息描述文件
-
-查看生成的文件：
-
-\begin{lstlisting}[language=bash]
-ls kernel_meta/
-# 输出示例：add.o  add.json
-\end{lstlisting}
-
-\subsection{算子验证：在NPU上运行测试}\label{ux7b97ux5b50ux9a8cux8bc1ux5728npuux4e0aux8fd0ux884cux6d4bux8bd5}
-
-编译成功后，我们需要验证算子的正确性。昇腾提供了两种验证方式： -
-\textbf{单算子模型执行}：将算子编译成单算子离线模型（.om文件），通过AscendCL加载执行
-- \textbf{单算子API执行}：直接通过AscendCL的API调用算子
-
-本节采用第一种方式，因为它更接近实际部署场景。
-
-\subsubsection{编写验证代码（run.py）}\label{ux7f16ux5199ux9a8cux8bc1ux4ee3ux7801run.py}
-
-下面是使用AscendCL加载并执行单算子的验证代码：
+\textbf{(2) 确定性测试帧生成}
 
 \begin{lstlisting}[language=Python]
-# run.py
-from tbe import tvm
-from tbe import dsl
-from tbe.common.utils import para_check
-from tbe.common.utils import shape_util
-# 引入testing模块相关接口
-from tbe.common.testing.testing import *
-import numpy as np
-
-@para_check.check_input_type(dict, dict, dict, str)
-def addtest(input_a, input_b, output_d, kernel_name="addtest"):
-    # 进入DSL调试模式，并选择CPU作为运行平台
-    with debug(): 
-        # 获取算子运行的上下文
-        ctx = get_ctx()
-
-        # 获取输入数据的shape与dtype
-        shape_a = shape_util.scalar2tensor_one(input_a.get("shape"))
-        shape_b = shape_util.scalar2tensor_one(input_b.get("shape"))
-        data_type = input_a.get("dtype").lower()
-
-        # 使用numpy定义输入golden数据大小
-        a = tvm.nd.array(np.random.uniform(size=shape_a).astype(data_type), ctx)
-        b = tvm.nd.array(np.random.uniform(size=shape_b).astype(data_type), ctx)
-        # 使用numpy将输出d初始化为全0
-        d = tvm.nd.array(np.zeros(shape_a, dtype=data_type), ctx)
-        
-        # 调用TVM的placeholder接口对输入tensor进行占位，并返回一个tensor对象
-        data_a = tvm.placeholder(shape_a, name="data_1", dtype=data_type)
-        data_b = tvm.placeholder(shape_b, name="data_2", dtype=data_type)
-        # 调用DSL计算接口实现data_a + data_b
-        data_c = dsl.vadd(data_a, data_b)
-    
-        # 中间Tensor数据验证
-        sample = open('samplefile.txt', 'w')
-        # 将中间tensor data_c存入文件samplefile.txt
-        print_tensor(data_c, ofile=sample)
-        # 检查中间tensor data_c的值是否正确
-        assert_allclose(data_c, desired=a.asnumpy() + b.asnumpy(), tol=[1e-7, 1e-7])
-        print("The value of data_c is the same as the expected value.")
-                    
-    # 继续自定义DSL的逻辑撰写,调用DSL接口实现：data_d = data_c + data_b
-        data_d = dsl.vadd(data_c, data_b)
-        # 调用TVM的create_schedule接口，为算子创建调度实例对象，入参为输出tensor的OP列表。
-        s = tvm.create_schedule(data_d.op)
-
-        # 编译生成算子,data_a,data_b,data_d是占位的输入输出列表，AddTest是我们自定义算子的名称
-        build(s, [data_a, data_b, data_d], name="AddTest")           
-
-        # 执行算子,将a,b,d按顺序代入编译出来的DSL算子AddTest
-        run(a, b, d)  # AddTest(a, b, d)
-
-        # 将输出数据d的值打印出来,并预期结果进行比较，看是否相符
-        print("d:", d)
-        tvm.testing.assert_allclose(d.asnumpy(), a.asnumpy() + b.asnumpy() + b.asnumpy())
-        print("The actual output is the same as the expected output.")
-
-# 编写入口函数，调用addtest函数
-if __name__ == "__main__":
-    input_output_dict = {"shape": (2, 3, 4),"format": "ND","ori_shape": (2, 3, 4),"ori_format": "ND", "dtype":"float32"}
-    addtest(input_output_dict, input_output_dict, input_output_dict, kernel_name="addtest")
+def make_test_nv12(n: int, w: int, h: int) -> list[np.ndarray]:
 \end{lstlisting}
 
-\subsubsection{运行验证}\label{ux8fd0ux884cux9a8cux8bc1}
+直接生成 NV12 帧给 VENC------无需 BGR→NV12
+转换，测量的是\textbf{纯编码性能}。每帧包含：
 
-验证代码：
+\begin{itemize}
+\tightlist
+\item
+  \textbf{水平渐变}（R 通道映射为 Y） + \textbf{垂直渐变叠加}
+\item
+  \textbf{正弦移动白条}：模拟时间相关性，防止编码器走 P
+  帧''全零残差''捷径
+\item
+  \textbf{角落棋盘格}：8×8 方块交替，测试空间纹理编码
+\end{itemize}
+
+\passthrough{\lstinline!make\_test\_bgr()!} 生成同样的视觉内容但为 BGR
+格式------给 CPU libx264 用（PyAV 内部转为 YUV）。
+
+\textbf{(3) \passthrough{\lstinline!CannVenc!} 类详解}
+
+将 \passthrough{\lstinline!venc\_minimal.py!} 的原始 API
+封装为可复用的同步接口。
+
+\textbf{\passthrough{\lstinline!\_\_init\_\_!}} --- 通道创建：与
+\passthrough{\lstinline!venc\_minimal.py!} 相同逻辑，额外计算 stride
+对齐（\passthrough{\lstinline!((w+15)//16)*16!}）和输出缓冲区大小。
+
+\textbf{\passthrough{\lstinline!\_venc\_callback!}} --- 编码完成回调：从
+\passthrough{\lstinline!output\_stream\_desc!} 读取编码数据 →
+\passthrough{\lstinline!malloc\_host!} →
+\passthrough{\lstinline!memcpy!} 拷到主机内存 → 放入
+Queue。回调负责销毁输入的 \passthrough{\lstinline!pic\_desc!}。
+
+\textbf{\passthrough{\lstinline!encode(nv12, force\_keyframe)!}} ---
+编码一帧：
+
+\begin{lstlisting}[language=Python]
+# (1) NV12 宽度补齐到 stride（16 对齐）—— VENC 硬件约束
+padded = np.zeros(stride * h * 3 // 2, dtype=np.uint8).reshape(-1, stride)
+src = nv12.reshape(-1, w)
+for r in range(h):                 # Y 平面逐行拷贝
+    padded[r, :w] = src[r, :w]
+for r in range(h // 2):             # UV 平面逐行拷贝
+    padded[h + r, :w] = src[h + r, :w]
+
+# (2) 分配 DVPP 输入内存 + 拷贝 NV12 到设备
+in_buf, _ = media.dvpp_malloc(padded.nbytes)
+acl.rt.memcpy(in_buf, padded.nbytes, padded.ctypes.data, padded.nbytes,
+              ACL_MEMCPY_HOST_TO_DEVICE)
+
+# (3) 构造输入 pic_desc 和输出 stream_desc
+pic = media.dvpp_create_pic_desc()
+media.dvpp_set_pic_desc_data(pic, in_buf)
+media.dvpp_set_pic_desc_format(pic, PIX_FMT_NV12)
+media.dvpp_set_pic_desc_width_stride(pic, stride)    # ← 必须设置 stride
+# ... 输出 out_buf + stream_desc ...
+
+# (4) 可选强制 I 帧
+if force_keyframe:
+    media.venc_set_frame_config_force_i_frame(self._frame_cfg, True)
+
+# (5) 排空回调队列（防止上一帧残留干扰）
+while not self._cb_queue.empty():
+    self._cb_queue.get_nowait()
+
+# (6) 发送编码请求 + 等待回调
+media.venc_send_frame(self._ch_desc, pic, sd, self._frame_cfg, None)
+encoded = self._cb_queue.get(timeout=5.0)
+
+# (7) 清理：释放 DVPP 内存、销毁 stream_desc、恢复 force I-frame 标志
+\end{lstlisting}
+
+\textbf{\passthrough{\lstinline!destroy()!}} --- 先
+\passthrough{\lstinline!venc\_destroy\_channel!} 再停回调线程，与 VDEC
+的销毁顺序要求类似。
+
+\textbf{(4) CPU 编码对比 --- \passthrough{\lstinline!bench\_libx264()!}}
+
+\begin{lstlisting}[language=Python]
+def bench_libx264(frames: list[np.ndarray], bitrate_bps: int) -> tuple:
+    level = "31" if w * h <= 1280 * 720 else "40"   # <=720p → 3.1, >=1080p → 4.0
+    codec = av.CodecContext.create("libx264", "w")
+    codec.bit_rate = bitrate_bps                      # bps（注意与 VENC 的 kbps 区分）
+    codec.options = {"level": level, "tune": "zerolatency"}
+    codec.profile = "Baseline"                        # 与 VENC entype=1 对应
+\end{lstlisting}
+
+参数与 VENC 对齐：Baseline profile、zerolatency tune、相同码率。PyAV
+内部自动将 BGR 转为 YUV420P。
+
+\textbf{(5) 主流程 --- 分辨率扫描}
+
+\begin{lstlisting}[language=Python]
+for w, h in RESOLUTIONS:
+    bitrate_kbps = max(2000, int(w * h * FPS * 0.1 / 1000))
+    bitrate_bps = bitrate_kbps * 1000
+
+    nv12_frames = make_test_nv12(TEST_FRAMES, w, h)    # VENC 用
+    bgr_frames = make_test_bgr(TEST_FRAMES, w, h)      # CPU 用
+
+    # VENC 测量
+    venc = CannVenc(w, h, bitrate=bitrate_kbps)
+    for i in range(WARMUP_FRAMES):                     # 预热
+        venc.encode(nv12_frames[i], force_keyframe=(i == 0))
+    t0 = time.perf_counter()
+    for i in range(TEST_FRAMES):                        # 正式测量
+        venc.encode(nv12_frames[i], force_keyframe=(i % TEST_GOP == 0))
+    venc_fps = TEST_FRAMES / (time.perf_counter() - t0)
+
+    # CPU 测量
+    _, cpu_fps, cpu_ms = bench_libx264(bgr_frames, bitrate_bps)
+
+    speedup = venc_fps / cpu_fps
+\end{lstlisting}
+
+\textbf{码率自适应公式}
+\passthrough{\lstinline!max(2000, w*h*fps*0.1/1000)!} kbps：
+
+\begin{itemize}
+\tightlist
+\item
+  480p：640×480×30×0.1/1000 = 921 → \textbf{2000 kbps}（下限 2 Mbps）
+\item
+  720p：1280×720×30×0.1/1000 = 2764 → \textbf{2764 kbps}
+\item
+  1080p：1920×1080×30×0.1/1000 = 6220 → \textbf{6220 kbps}
+\item
+  4K：3840×2160×30×0.1/1000 = 24883 → \textbf{24883 kbps}
+\end{itemize}
+
+含义：每像素每秒分配 0.1 bit，按分辨率等比缩放。
+
+\textbf{(6) 本文件与 \passthrough{\lstinline!venc\_minimal.py!} 的关系}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+& \passthrough{\lstinline!venc\_minimal.py!} &
+\passthrough{\lstinline!bench\_venc.py!} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+目的 & 教学------展示每个 API 调用 & 基准------评估性能 \\
+帧数 & 1 帧 & 90 帧 × 5 分辨率 \\
+封装 & 裸 API 直接调用 & \passthrough{\lstinline!CannVenc!} 类 \\
+对比 & 无 & 与 libx264 A/B 对比 \\
+内容 & 随机噪声 & 确定性帧（渐变+条+棋盘） \\
+输出 & 打印成功/失败 & 5 行对比表格 \\
+\end{longtable}
+}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{集成到 aiortc}\label{ux96c6ux6210ux5230-aiortc}
+
+VENC 可集成到 aiortc（Python WebRTC 库）替代默认的 libx264 编码器。
+
+\subsubsection{基本思路}\label{ux57faux672cux601dux8def}
+
+通过\textbf{猴子补丁}替换 aiortc 的 H.264 编码器：
+
+\begin{lstlisting}[language=Python]
+import aiortc.codecs.h264 as h264_module
+h264_module.H264Encoder = YourCannEncoder
+\end{lstlisting}
+
+\subsubsection{继承策略}\label{ux7ee7ux627fux7b56ux7565}
+
+推荐\textbf{继承} \passthrough{\lstinline!H264Encoder!}：只需覆盖
+\passthrough{\lstinline!\_encode\_frame()!} 接入 VENC，其余 RTP
+封装（RFC 6184 的 FU-A 分片、STAP-A 聚合等）全部继承。
+
+\passthrough{\lstinline!H264Encoder!} (aiortc) 的继承结构------只需覆盖
+\passthrough{\lstinline!\_encode\_frame()!} 接入 VENC，其余 RTP
+封装全部继承：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!\_encode\_frame()!} → libx264 编码
+  \textbf{{[}待覆盖{]}}
+\item
+  \passthrough{\lstinline!\_packetize()!} → NAL → RTP 分包
+  \textbf{{[}继承{]}}
+\item
+  \passthrough{\lstinline!\_split\_bitstream()!} → Annex-B → NAL 分割
+  \textbf{{[}继承{]}}
+\item
+  其他全部继承
+\end{itemize}
+
+\subsubsection{回退机制}\label{ux56deux9000ux673aux5236}
+
+CANN 不可用时自动回退到 libx264：
+
+\begin{lstlisting}[language=Python]
+class CannH264Encoder(H264Encoder):
+    def _encode_frame(self, frame, force_keyframe):
+        if not _CANN_READY:
+            yield from super()._encode_frame(frame, force_keyframe)
+            return
+        try:
+            # CANN VENC 编码...
+        except RuntimeError:
+            yield from super()._encode_frame(frame, force_keyframe)
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{性能对比与基准测试}\label{ux6027ux80fdux5bf9ux6bd4ux4e0eux57faux51c6ux6d4bux8bd5}
+
+\subsubsection{实测数据：CANN VENC vs
+libx264}\label{ux5b9eux6d4bux6570ux636ecann-venc-vs-libx264}
+
+以下数据在 Orange Pi AI Pro（Ascend 310B4）上实测获得，使用
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/venc/bench_venc.py}{\passthrough{\lstinline!bench\_venc.py!}}
+脚本。
+
+\textbf{测试条件}：GOP=30（I/P 混合），90 帧（3 个完整
+GOP），确定性测试帧，固定种子 42。
+码率按分辨率自动缩放：\passthrough{\lstinline!max(2M, w*h*fps*0.1)!}
+bps。
+
+\textbf{VENC H.264 Resolution Scan: GOP=30, 90
+frames}（数据见下方结果解读表格）
+
+\subsubsection{结果解读}\label{ux7ed3ux679cux89e3ux8bfb}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}lllllll@{}}
+\toprule\noalign{}
+分辨率 & 像素数 & VENC fps & CPU fps & 加速比 & VENC 延迟 & CPU 延迟 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+640×480 & 0.3M & \textbf{235} & 48 & \textbf{4.9x} & 4.3ms & 20.8ms \\
+1280×720 & 0.9M & \textbf{164} & 19 & \textbf{8.6x} & 6.1ms & 52.5ms \\
+1920×1080 & 2.1M & \textbf{91} & 9 & \textbf{9.8x} & 11.0ms & 108.3ms \\
+2560×1440 & 3.7M & \textbf{58} & 7 & \textbf{8.6x} & 17.2ms & 147.2ms \\
+3840×2160 & 8.3M & \textbf{29} & 4 & \textbf{7.7x} & 34.5ms & 265.7ms \\
+\end{longtable}
+}
+
+\textbf{VENC 延迟线性缩放}
+
+将 VENC 延迟与像素数画在坐标上：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.0952}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1905}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1905}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2063}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1587}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1587}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+指标
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+0.3M (480p)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+0.9M (720p)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+2.1M (1080p)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+3.7M (2K)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+8.3M (4K)
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+VENC 延迟 & 4.3ms & 6.1ms & 11.0ms & 17.2ms & 34.5ms \\
+每 MP 延迟 & 14.3 ms/MP & 6.8 ms/MP & 5.2 ms/MP & 4.6 ms/MP & 4.2
+ms/MP \\
+\end{longtable}
+}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{绝对值线性增长}：像素翻倍 \textasciitilde{}
+  延迟翻倍，硬件编码路径没有非线性瓶颈
+\item
+  \textbf{每百万像素延迟递减}：从 14.3ms/MP（480p）降至
+  4.2ms/MP（4K）------高分辨率下硬件利用率更高
+\item
+  \textbf{4K 单帧仅 34.5ms}：在 30fps 场景下，编码仅占帧间隔（33.3ms）的
+  103\%，刚好够单路实时
+\end{itemize}
+
+\textbf{CPU 延迟非线性恶化}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.0952}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1905}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1905}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2063}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1587}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1587}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+指标
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+0.3M (480p)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+0.9M (720p)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+2.1M (1080p)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+3.7M (2K)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+8.3M (4K)
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+CPU 延迟 & 20.8ms & 52.5ms & 108.3ms & 147.2ms & 265.7ms \\
+每 MP 延迟 & 69.3 ms/MP & 58.3 ms/MP & 51.6 ms/MP & 39.8 ms/MP & 32.0
+ms/MP \\
+\end{longtable}
+}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{CPU 每百万像素延迟也递减}（69→32 ms/MP）但起点高得多
+\item
+  \textbf{4K 单帧 265.7ms}：仅为 3.8 fps，无法实时编码
+\item
+  \textbf{2K 开始 CPU 丧失实时性}：147ms/帧 → 6.8 fps，远低于 30fps 要求
+\end{itemize}
+
+加速比在 1080p 达到峰值 9.8x（480p: 4.9x, 720p: 8.6x, 1080p: 9.8x, 2K:
+8.6x, 4K: 7.7x），之后缓慢下降。原因：
+
+\begin{itemize}
+\tightlist
+\item
+  低分辨率：VENC 优势被固定开销（memcpy、回调调度）摊薄
+\item
+  1080p：CPU 已严重吃力（109ms/帧），VENC 仍从容（11ms/帧）→ 差距最大
+\item
+  2K/4K：VENC 延迟增速追近 CPU（两者都进入像素主导区）→ 加速比略降但仍
+  \textgreater7.7x
+\end{itemize}
+
+\textbf{与 VDEC 的对比}
+
+VENC 和 VDEC 在 Ascend 310B4 上的表现截然不同：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2941}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3529}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3529}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+对比维度
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VENC（编码）
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VDEC（解码）
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textless=1080p 表现 & \textbf{全面远超 CPU}（5×\textasciitilde10×） &
+严重落后 CPU（\textasciitilde59ms/帧固定开销） \\
+单帧延迟 @480p & \textbf{4.3ms} & 58.9ms \\
+4K 延迟 & \textbf{34.5ms} & 13.6ms \\
+拐点 & \textbf{无拐点}------所有分辨率都赢 & 2K 才开始领先单线程 CPU \\
+瓶颈 & 纯硬件编码（无调度开销） & Python 回调调度（75\%
+时间在非硬件） \\
+适合场景 & 全分辨率单路实时 & 仅 2K+ 或多路并发 \\
+\end{longtable}
+}
+
+\textbf{根因}：VENC
+的硬件执行时间（编码部分）主导了总耗时，因为编码计算量大（DCT、量化、熵编码）。VDEC
+的解码计算量小得多，总耗时被 Python
+层调度开销（回调线程→Queue→主线程）主导。编码的''重计算''反而成就了 VENC
+的优势------硬件干活，CPU 等着。
+
+\subsubsection{什么场景下使用
+VENC}\label{ux4ec0ux4e48ux573aux666fux4e0bux4f7fux7528-venc}
+
+\textbf{场景决策树}
+
+需要实时视频编码（\textgreater30fps）？
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{是} --- 取决于分辨率：
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textless=480p: CPU 48fps 够用，VENC 235fps 过剩但免费 → 建议
+    VENC（更省 CPU 给推理/分析用）
+  \item
+    720p: CPU 19fps 不够实时 → 必须 VENC
+  \item
+    1080p: CPU 9fps，完全不可用 → 必须 VENC
+  \item
+    2K: CPU 7fps → 必须 VENC
+  \item
+    4K: CPU 4fps → 必须 VENC（且单路刚好 29fps 勉强达到实时）
+  \end{itemize}
+\item
+  \textbf{否}（离线/批处理）→ CPU 可考虑，但 VENC 仍快
+  5\textasciitilde10x
+\end{itemize}
+
+\textbf{典型场景推荐}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2857}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4286}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2857}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+场景
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+推荐方案
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+理由
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{WebRTC 视频通话} & \textbf{VENC} & 480p/720p 实时编码 + CPU
+留给推理 \\
+\textbf{USB 摄像头监控} & \textbf{VENC} & 1080p@30fps CPU 跑不动，VENC
+轻松 \\
+\textbf{多路视频流 (\textgreater2 路)} & \textbf{VENC 必须} & CPU 单路
+720p 就 19fps，多路不可行 \\
+\textbf{4K 录制} & \textbf{VENC} & CPU 4fps，VENC 29fps 刚好实时 \\
+\textbf{本地视频文件转码} & 均可 & 离线场景 CPU 也可，但 VENC 更快 \\
+\textbf{AI 推理 + 视频边车} & \textbf{VENC} & CPU 编码会抢占 NPU 推理的
+host 侧资源 \\
+\textbf{低功耗设备} & \textbf{VENC} & 硬件编码功耗远低于 CPU 全速运行 \\
+\end{longtable}
+}
+
+\textbf{多路并发估算}
+
+以 1080p@30fps 为目标帧率：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+编码器 & 单路 fps & 最多支持路数 & CPU 剩余 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+CPU libx264 & 9 & \textbf{0 路}（不到 30） & 0\% \\
+\textbf{VENC} & 91 & \textbf{3 路}（91/30） & \textasciitilde95\% \\
+\end{longtable}
+}
+
+VENC 的 91fps 吞吐意味着可以同时编码 3 路 1080p@30fps，CPU 几乎空闲。
+
+\textbf{什么情况下 CPU 编码就够了}
+
+只有\textbf{离线批处理}且满足以下全部条件时，CPU 才有意义：
+
+\begin{itemize}
+\tightlist
+\item
+  分辨率 \textless= 480p（CPU 48fps 够用）
+\item
+  不需要实时输出（无帧率硬性要求）
+\item
+  无并发推理任务（CPU 全给编码用）
+\item
+  不想引入 CANN 依赖（如 Docker 环境未安装 CANN）
+\end{itemize}
+
+\textbf{底线}：从 720p 开始，CPU 就达不到 30fps。任何实时视频场景 ---
+尤其是在 Orange Pi 这样的嵌入式 ARM 设备上 --- VENC 都是必要条件。
+
+\subsubsection{验证方法}\label{ux9a8cux8bc1ux65b9ux6cd5}
+
+在 Orange Pi 上分别运行 CPU 和硬件编码服务器，用
+\passthrough{\lstinline!htop!} 观察实时 CPU 占用差异：
 
 \begin{lstlisting}[language=bash]
-# 直接运行
-python3 run.py
+# CPU 编码
+python server.py --source usb_camera
+
+# 硬件编码
+python server.py --source usb_camera --hardware-encode
 \end{lstlisting}
 
-成功输出示例：
+或直接跑基准测试：
+
+\begin{lstlisting}[language=bash]
+export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH"
+export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:$PYTHONPATH"
+python samples/chapter5/venc/bench_venc.py
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{附录}\label{ux9644ux5f55}
+
+\subsubsection{常用调试命令}\label{ux5e38ux7528ux8c03ux8bd5ux547dux4ee4}
+
+\begin{lstlisting}[language=bash]
+# NPU 状态
+npu-smi info
+npu-smi info -t usages -i 0
+
+# VENC 驱动状态
+lsmod | grep venc
+
+# VENC 内核日志（参数错误信息 —— 排查 507018 必用）
+dmesg | grep -i venc | tail -10
+
+# 环境验证（等价于 check_cann.py）
+python samples/chapter5/check_cann.py
+
+# 运行基准测试
+python samples/chapter5/venc/bench_venc.py
+\end{lstlisting}
+
+\subsubsection{参数速查表}\label{ux53c2ux6570ux901fux67e5ux8868}
+
+\subsubsection{VENC 通道参数}\label{venc-params}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+参数 & 函数 & 默认 & 推荐值 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+编码类型 & \passthrough{\lstinline!venc\_set\_channel\_desc\_entype!} &
+--- & 1 (H264) \\
+像素格式 &
+\passthrough{\lstinline!venc\_set\_channel\_desc\_pic\_format!} & --- &
+1 (NV12) \\
+宽度 & \passthrough{\lstinline!venc\_set\_channel\_desc\_pic\_width!} &
+--- & 640 \\
+高度 & \passthrough{\lstinline!venc\_set\_channel\_desc\_pic\_height!} &
+--- & 480 \\
+GOP &
+\passthrough{\lstinline!venc\_set\_channel\_desc\_key\_frame\_interval!}
+& 0 & 30 \\
+帧率 & \passthrough{\lstinline!venc\_set\_channel\_desc\_src\_rate!} &
+--- & 30 \\
+最大码率 (kbps) &
+\passthrough{\lstinline!venc\_set\_channel\_desc\_max\_bit\_rate!} & ---
+& 2000 \\
+码率控制 & \passthrough{\lstinline!venc\_set\_channel\_desc\_rc\_mode!}
+& --- & 2 (CBR) \\
+回调线程 &
+\passthrough{\lstinline!venc\_set\_channel\_desc\_thread\_id!} & --- &
+tid \\
+回调函数 & \passthrough{\lstinline!venc\_set\_channel\_desc\_callback!}
+& --- & cb \\
+\end{longtable}
+}
+
+\textbf{错误码}：0 = ACL\_SUCCESS, 507018 = 参数错误（检查 dmesg）,
+500001 = ACL\_ERROR\_FAILURE, 500004 = ACL\_ERROR\_DRV\_FAILURE
+
+\textbf{编码类型}：0 = H.265 Main, 1 = H.264 Baseline, 2 = H.264 Main, 3
+= H.264 High
+
+\textbf{像素格式}：1 = NV12 (YUV420SP), 12 = RGB888, 13 = BGR888
+
+\textbf{码率控制}：1 = VBR (Variable Bitrate), 2 = CBR (Constant
+Bitrate)
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\section{VDEC --- 硬件视频解码}\label{vdec}
+
+\begin{quote}
+VDEC（Video Decoder）将 H.264/H.265 码流解码为 NV12
+原始帧。前置基础：\hyperref[dvpp-basics]{DVPP 基础概念}。
+\end{quote}
+
+\subsection{VDEC 简介}\label{vdec-ux7b80ux4ecb}
+
+\textbf{VDEC}（Video Decoder）是 DVPP 中的硬件视频解码模块。它将
+H.264/H.265 压缩码流解码为 NV12 原始帧。
+
+\begin{figure}
+\centering
+\includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio,alt={VDEC 通道输入输出模型}]{chapters/img5/vdec_channel_model.png}
+\caption{VDEC 通道输入输出模型}\label{fig:vdec_channel_model}
+\end{figure}
+
+\subsubsection{H.264 与 H.265
+基础}\label{h.264-ux4e0e-h.265-ux57faux7840}
+
+H.264/H.265 的帧类型（I/P/B）、GOP、NAL 单元、Annex-B
+格式等编解码理论知识，详见 \hyperref[h264-h265-basics]{H.264/H.265
+基础}。本文的 VDEC API 和基准测试默认使用 \textbf{H.264 Baseline}。
+
+VDEC 对输入码流只有一个硬性要求：必须是 \textbf{H.264 Annex-B 格式}（带
+\passthrough{\lstinline!0x00000001!} 起始码的 NAL
+单元序列），首帧必须包含 SPS + PPS + IDR。
+
+\subsubsection{典型应用场景}\label{ux5178ux578bux5e94ux7528ux573aux666f}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.4286}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5714}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+场景
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+数据流
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+视频文件回放 & MP4/MKV 文件 → 解封装 → H.264 码流 → \textbf{VDEC} → NV12
+→ 显示 \\
+网络摄像机接收 & RTSP/WebRTC → H.264 码流 → \textbf{VDEC} → NV12 →
+分析/显示 \\
+转码管道 & H.264 → \textbf{VDEC} → NV12 → \textbf{VENC} →
+不同分辨率/码率的 H.264 \\
+\end{longtable}
+}
+
+\subsubsection{与 VENC
+的对称关系}\label{ux4e0e-venc-ux7684ux5bf9ux79f0ux5173ux7cfb}
+
+详见 \hyperref[dvpp-modules]{子模块概览}。
 
 \begin{lstlisting}
-======================== debug enter =======================
-The value of data_c is the same as the expected value.
-/usr/local/Ascend/ascend-toolkit/8.3.RC1/python/site-packages/tbe/tvm/driver/build_module.py:280: UserWarning: target_host parameter is going to be deprecated. Please pass in tvm.target.Target(target, host=target_host) instead.
-  warnings.warn(
-Tensor add_0 is saved to file samplefile.txt.
-d: [[[1.2949324  0.45642793 1.6225115  1.3862249 ]
-  [1.2386332  1.5728098  0.9118807  2.0370739 ]
-  [1.2001383  1.4828949  0.17750879 2.507696  ]]
-
- [[1.2292826  0.23282059 1.1223636  1.6030114 ]
-  [1.6799536  1.7751908  2.5275748  2.190519  ]
-  [2.6027465  1.8843926  2.1372957  1.8606762 ]]]
-The actual output is the same as the expected output.
-======================== debug exit ========================
+VENC: NV12 → [硬件编码] → H.264 码流
+VDEC: H.264 码流 → [硬件解码] → NV12
 \end{lstlisting}
 
-至此，我们完成了第一个TBE
-DSL算子的完整开发流程：从算子分析、代码实现、编译到NPU上验证运行。
+\subsubsection{硬件能力规格（Ascend
+310B4）}\label{ux786cux4ef6ux80fdux529bux89c4ux683cascend-310b4}
 
-\subsection{TBE
-DSL开发的优势与局限}\label{tbe-dslux5f00ux53d1ux7684ux4f18ux52bfux4e0eux5c40ux9650}
+以下基于 CANN 8.3.RC1 + Ascend 310B4 实测和驱动常量定义。
 
-通过本次实战体验，我们可以总结TBE DSL开发的特点：
+\textbf{支持的编码类型}
 
-\subsubsection{优势}\label{ux4f18ux52bf}
+{ % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+编码格式 & Profile & \passthrough{\lstinline!entype!} 值 & 实测 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+H.265 / HEVC & Main & \passthrough{\lstinline!0!} & 支持 \\
+H.264 / AVC & Baseline & \passthrough{\lstinline!1!} & 支持 \\
+H.264 / AVC & Main & \passthrough{\lstinline!2!} & 支持 \\
+H.264 / AVC & High & \passthrough{\lstinline!3!} & 支持 \\
+\end{longtable}
+}
+
+\begin{quote}
+实验中用 H.264 Baseline 码流测试了全部四种
+\passthrough{\lstinline!entype!}，通道创建和
+\passthrough{\lstinline!send\_frame!} 均成功。
+但\textbf{实际解码能否正确输出}取决于输入码流是否匹配所选的
+\passthrough{\lstinline!entype!}。 例如：用 Baseline 码流 +
+\passthrough{\lstinline!entype=H265\_MAIN!} 虽然不会报错，
+但解码结果会是花屏或黑帧（编码标准不匹配）。
+\end{quote}
+
+\textbf{支持的输出像素格式}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+格式 & \passthrough{\lstinline!out\_pic\_format!} 值 & 位深 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+YUV400 & 0 & 8 & 仅亮度 \\
+\textbf{NV12} (YUV420SP) & \textbf{1} & 8 & 推荐使用 \\
+NV21 (YVU420SP) & 2 & 8 & \\
+NV12 4:2:2 & 3 & 8 & \\
+NV21 4:2:2 & 4 & 8 & \\
+NV12 4:4:4 & 5 & 8 & \\
+NV21 4:4:4 & 6 & 8 & \\
+RGB888 & 12 & 8 & \\
+BGR888 & 13 & 8 & \\
+\end{longtable}
+}
+
+\begin{quote}
+位深 10-bit
+理论上支持（\passthrough{\lstinline!vdec\_set\_channel\_desc\_bit\_depth!}），
+但 310B4 驱动在 10-bit 下的实际表现未经充分验证。
+\end{quote}
+
+\textbf{分辨率和帧率约束}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+约束项 & 值 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+最小分辨率 & 128×128 & 理论下限 \\
+最大分辨率 & 4096×4096 & 理论上限，受内存限制 \\
+宽度对齐 & 16 & VDEC 硬件要求 \\
+高度对齐 & 2 & VDEC 硬件要求 \\
+最大帧率 & 60 fps & 与分辨率有关 \\
+参考帧数 & 1-5（默认 5） &
+\passthrough{\lstinline!ref\_frame\_num!}，影响解码缓冲大小 \\
+\end{longtable}
+}
+
+\begin{quote}
+实际可解码的最大分辨率受设备内存和码率限制。 310B4 配备 16GB 内存，单路
+4K@30fps 解码无压力。
+\end{quote}
+
+\textbf{输入码流约束}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+约束项 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+码流格式 & H.264 Annex-B（带 0x00000001 起始码的 NAL 单元） \\
+SPS/PPS & 同一通道上所有帧必须共享一致的 SPS/PPS \\
+首帧要求 & 必须包含 SPS + PPS + IDR，否则 VDEC 拒绝解码 \\
+单次输入上限 & 取决于码流参数，超过约 256KB 可能被 VDEC 丢弃 \\
+帧边界 & 每次 \passthrough{\lstinline!vdec\_send\_frame!}
+应发送完整的一帧（含所有 NAL 单元） \\
+\end{longtable}
+}
+
+\textbf{H.264 Level 与典型应用}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+Level & 最大宏块数 & 典型分辨率@帧率 & 最大码率 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+3.0 & 1620 & 720×480@30 & 10 Mbps \\
+3.1 & 3600 & 1280×720@30 & 14 Mbps \\
+4.0 & 8192 & 1920×1080@30, 2048×1024@30 & 20 Mbps \\
+4.1 & 8192 & 1920×1080@30, 2048×1024@30 & 50 Mbps \\
+4.2 & 8704 & 1920×1080@60 & 50 Mbps \\
+5.0 & 22080 & 2560×1920@30 & 135 Mbps \\
+5.1 & 36864 & 4096×2304@30 & 240 Mbps \\
+\end{longtable}
+}
+
+\begin{quote}
+310B4 VDEC 理论上支持到 Level 5.1。 本章基准测试中，480p 使用 Level
+3.1，1080p 使用 Level 4.0。
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{VDEC 与 VENC
+的关键区别}\label{vdec-ux4e0e-venc-ux7684ux5173ux952eux533aux522b}
+
+VDEC 与 VENC 的关键区别如下表所示（同时参考
+\hyperref[dvpp-modules]{子模块概览} 获取完整的子模块间对比）：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+特性
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VENC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VDEC
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+数据方向 & NV12 → H.264 & H.264 → NV12 \\
+\passthrough{\lstinline!channel\_id!} & 驱动自动分配 &
+\textbf{必须显式设置} \\
+\passthrough{\lstinline!out\_mode!} & 无 &
+\textbf{必须检查和设置}（默认通常为 0） \\
+\passthrough{\lstinline!ref\_frame\_num!} & 无 & 参考帧数量（默认 5） \\
+\passthrough{\lstinline!send\_frame!} 参数 &
+\passthrough{\lstinline!(pic\_desc, stream\_desc)!} &
+\passthrough{\lstinline!(stream\_desc, pic\_desc)!} \\
+回调中销毁对象 & 输入（pic\_desc） &
+输入（stream\_desc）\textbf{和}输出（pic\_desc） \\
+输入有效性要求 & 任意 NV12 均可 & 必须是\textbf{合法的完整 H.264 NAL
+单元} \\
+输出 ret\_code & 无 & 有，\textbf{必须检查}，非 0 表示解码失败 \\
+\passthrough{\lstinline!send\_skipped\_frame!} & 无 &
+\textbf{有}，用于丢帧后通知解码器 \\
+\end{longtable}
+}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{VDEC API 详解}\label{vdec-api-ux8be6ux89e3}
+
+\subsubsection{通道参数}\label{ux901aux9053ux53c2ux6570}
+
+VDEC 通道需设置通道
+ID、编码类型、输出像素格式、分辨率、参考帧数等参数。与 VENC 不同，VDEC
+的 \passthrough{\lstinline!channel\_id!} 必须显式设置。完整参数表见
+\hyperref[vdec-params]{VDEC 参数速查表}。
+
+\subsubsection{回调函数}\label{ux56deux8c03ux51fdux6570}
+
+\begin{lstlisting}[language=Python]
+def vdec_callback(input_stream_desc, output_pic_desc, user_data):
+    """VDEC 解码完成回调——参数顺序与 VENC 相反。"""
+    ret_code = acl.media.dvpp_get_pic_desc_ret_code(output_pic_desc)
+    if ret_code != 0:
+        # 解码失败——丢弃此帧
+        pass
+    else:
+        pic_data = acl.media.dvpp_get_pic_desc_data(output_pic_desc)
+        pic_size = acl.media.dvpp_get_pic_desc_size(output_pic_desc)
+        # ... 拷贝 pic_data 到主机内存 ...
+
+    # 回调负责销毁输入和输出描述符
+    acl.media.dvpp_destroy_stream_desc(input_stream_desc)
+    acl.media.dvpp_destroy_pic_desc(output_pic_desc)
+\end{lstlisting}
+
+与 VENC 的关键区别：
+
+\begin{itemize}
+\tightlist
+\item
+  回调参数顺序相反：VDEC 是
+  \passthrough{\lstinline!(stream\_desc, pic\_desc)!}，VENC 是
+  \passthrough{\lstinline!(pic\_desc, stream\_desc)!}
+\item
+  VDEC 必须检查 \passthrough{\lstinline!pic\_desc!} 的
+  \passthrough{\lstinline!ret\_code!}
+\item
+  VDEC 回调需要销毁 \textbf{两个}描述符（VENC 只销毁输入）
+\end{itemize}
+
+\subsubsection{ret\_code 错误码}\label{ret_code-ux9519ux8befux7801}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+ret\_code & 含义 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+0 & 解码成功 \\
+非 0 & 解码失败------输入码流损坏、帧边界错误或参考帧不足 \\
+\end{longtable}
+}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{acllite DvppVdec}\label{acllite-dvppvdec}
+
+acllite 的 \passthrough{\lstinline!DvppVdec!} 类封装了 VDEC
+的回调线程、通道创建、帧队列。初始化及基本用法见
+\hyperref[acllite]{acllite 封装库}。
+
+\begin{lstlisting}[language=Python]
+from dvpp_vdec import DvppVdec
+import constants as const
+
+vdec = DvppVdec(channel_id=0, width=640, height=480,
+                entype=const.ENTYPE_H264_BASE, ctx=ctx)
+vdec.init()
+vdec.process(h264_data_ptr, h264_size, user_data=(0, frame_id))
+ret, image = vdec.read()  # image 是 AclLiteImage 对象
+if image:
+    nv12 = image.byte_data_to_np_array()
+vdec.destroy()
+\end{lstlisting}
+
+完整脚本见
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/vdec/vdec_acllite_demo.py}{\passthrough{\lstinline!samples/chapter5/vdec/vdec\_acllite\_demo.py!}}。
+
+{ % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+& DvppVdec & 裸 \passthrough{\lstinline!acl.media.vdec\_*!} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+回调线程 & 内部管理 & 手动 \passthrough{\lstinline!start\_thread!} +
+\passthrough{\lstinline!process\_report!} 循环 \\
+帧队列 & \passthrough{\lstinline!Queue.get()!} 阻塞读取 & 需自己建
+Queue \\
+描述符管理 & 自动创建/销毁 & 手动
+\passthrough{\lstinline!dvpp\_create/destroy\_stream\_desc!} \\
+解码结果 & \passthrough{\lstinline!AclLiteImage!}（可直接给 VPC） & 裸
+\passthrough{\lstinline!pic\_desc!} 需手动读取 \\
+\end{longtable}
+}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{练习脚本走读}\label{ux7ec3ux4e60ux811aux672cux8d70ux8bfb}
+
+完整代码见
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/vdec/vdec_minimal.py}{\passthrough{\lstinline!samples/chapter5/vdec/vdec\_minimal.py!}}。程序使用原始
+\passthrough{\lstinline!acl.media!} API 分为 5 个阶段 （理解底层 API
+后再用 DvppVdec 可事半功倍）：
+
+\subsubsection{(1)
+生成测试码流}\label{ux751fux6210ux6d4bux8bd5ux7801ux6d41}
+
+VDEC 需要合法的 H.264 输入，不能使用随机字节。示例使用 libx264
+软件编码一帧作为测试素材：
+
+\begin{lstlisting}[language=Python]
+import av, fractions, numpy as np
+
+codec = av.CodecContext.create("libx264", "w")
+codec.width, codec.height = 640, 480
+codec.pix_fmt = "yuv420p"
+# ... 设置 bit_rate, framerate, time_base ...
+
+bgr = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+rgb_frame = av.VideoFrame.from_ndarray(bgr[..., ::-1], format="rgb24")
+
+h264_data = bytearray()
+for pkt in codec.encode(rgb_frame):   # 编码一帧
+    h264_data += bytes(pkt)
+for pkt in codec.encode(None):        # 排空缓冲区
+    h264_data += bytes(pkt)
+
+h264_arr = np.frombuffer(bytes(h264_data), dtype=np.uint8)
+\end{lstlisting}
+
+\subsubsection{(2) 回调线程}\label{ux56deux8c03ux7ebfux7a0b}
+
+与 VENC 结构相同，但\textbf{回调参数顺序相反}，且必须检查
+\passthrough{\lstinline!ret\_code!}。
+
+\subsubsection{(3) 创建通道}\label{ux521bux5efaux901aux9053}
+
+\begin{lstlisting}[language=Python]
+desc = media.vdec_create_channel_desc()
+media.vdec_set_channel_desc_channel_id(desc, 0)   # ← VDEC 必须设置！
+media.vdec_set_channel_desc_thread_id(desc, tid)
+media.vdec_set_channel_desc_callback(desc, vdec_callback)
+media.vdec_set_channel_desc_entype(desc, ENTYPE_H264_BASE)
+media.vdec_set_channel_desc_out_pic_format(desc, PIX_FMT_NV12)
+media.vdec_set_channel_desc_out_pic_width(desc, W)
+media.vdec_set_channel_desc_out_pic_height(desc, H)
+
+ret = media.vdec_create_channel(desc)
+\end{lstlisting}
+
+\subsubsection{(4)
+发送一帧解码}\label{ux53d1ux9001ux4e00ux5e27ux89e3ux7801}
+
+\begin{lstlisting}[language=Python]
+# 输入：H.264 码流
+in_buf, _ = media.dvpp_malloc(len(h264_arr))
+acl.rt.memcpy(in_buf, len(h264_arr), h264_arr.ctypes.data,
+              len(h264_arr), ACL_MEMCPY_HOST_TO_DEVICE)
+
+stream_desc = media.dvpp_create_stream_desc()
+media.dvpp_set_stream_desc_data(stream_desc, in_buf)
+media.dvpp_set_stream_desc_size(stream_desc, len(h264_arr))
+
+# 输出：NV12 图片
+out_size = W * H * 3 // 2
+out_buf, _ = media.dvpp_malloc(out_size)
+pic_desc = media.dvpp_create_pic_desc()
+media.dvpp_set_pic_desc_data(pic_desc, out_buf)
+media.dvpp_set_pic_desc_size(pic_desc, out_size)
+media.dvpp_set_pic_desc_format(pic_desc, PIX_FMT_NV12)
+
+ret = media.vdec_send_frame(desc, stream_desc, pic_desc, frame_cfg, None)
+\end{lstlisting}
+
+\subsubsection{(5) 清理}\label{ux6e05ux7406}
+
+与 VENC 相同------销毁通道、描述符、帧配置，释放 DVPP 内存。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{\texorpdfstring{附：\texttt{encode\_frames}
+参数详解}{附：encode\_frames 参数详解}}\label{ux9644encode_frames-ux53c2ux6570ux8be6ux89e3}
+
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/vdec/bench_vdec.py}{\passthrough{\lstinline!bench\_vdec.py!}}
+中用于生成测试码流的函数，接收原始帧 + 编码器名 + GOP → 码流 + 统计。
+
+\begin{lstlisting}[language=Python]
+def encode_frames(frames: list[np.ndarray], codec_name: str, gop: int
+                  ) -> tuple[list[bytes], int, int]:
+    import av
+
+    h, w = frames[0].shape[:2]
+    level = "31" if w * h <= 1280 * 720 else "40"
+
+    codec = av.CodecContext.create(codec_name, "w")    # (1)
+    codec.width = w                                     # (2)
+    codec.height = h
+    codec.pix_fmt = "yuv420p"                           # (3)
+    codec.bit_rate = max(2_000_000,                     # (4)
+                         int(w * h * FPS * 0.1))
+    codec.framerate = fractions.Fraction(FPS, 1)        # (5)
+    codec.time_base = fractions.Fraction(1, FPS)        # (6)
+    codec.options = {"level": level,                    # (7)
+                     "tune": "zerolatency"}
+    if codec_name == "libx264":
+        codec.profile = "Baseline"                      # (8)
+
+    for i, bgr in enumerate(frames):
+        frame = av.VideoFrame.from_ndarray(
+            bgr[..., ::-1], format="rgb24")             # (9)
+        frame.pict_type = (                             # (10)
+            av.video.frame.PictureType.I
+            if i % gop == 0
+            else av.video.frame.PictureType.P)
+        data = bytearray()
+        for pkt in codec.encode(frame):                 # (11)
+            data += bytes(pkt)
+        streams.append(bytes(data))
+    tail = bytearray()
+    for pkt in codec.encode(None):                      # (12)
+        tail += bytes(pkt)
+    if tail and streams:
+        streams[-1] += bytes(tail)
+    return streams, i_avg, p_avg
+\end{lstlisting}
+
+\textbf{(1)
+\passthrough{\lstinline!av.CodecContext.create(codec\_name, "w")!}}
+创建编码器实例。\passthrough{\lstinline!codec\_name = "libx264"!} 或
+\passthrough{\lstinline!"libx265"!}，\passthrough{\lstinline!"w"!}
+表示编码模式。 libx264 是 H.264 标准的开源软件实现，运行在 CPU 上。
+此处用它来\textbf{生成测试素材}------先软件编码再硬件解码，正好对应需要对比的两条路径。
+
+\textbf{(2) \passthrough{\lstinline!codec.width / codec.height!}}
+编码帧的尺寸（像素）。必须与实际输入的 numpy 数组尺寸一致。 VDEC
+解码时需传入相同尺寸的
+\passthrough{\lstinline!out\_pic\_width/height!}。
+
+\textbf{(3) \passthrough{\lstinline!codec.pix\_fmt = "yuv420p"!}}
+编码器\textbf{内部}使用的像素格式。libx264 只接受 YUV 格式，
+\passthrough{\lstinline!"yuv420p"!} 是 I420（YUV 4:2:0 planar）。PyAV
+会自动将输入的 \passthrough{\lstinline!rgb24!} 帧 转为
+\passthrough{\lstinline!yuv420p!} 后再送给编码器。
+
+\textbf{(4)
+\passthrough{\lstinline!codec.bit\_rate = max(2\_000\_000, int(w * h * FPS * 0.1))!}}
+目标码率，单位 \textbf{bps}。 - \passthrough{\lstinline!2\_000\_000!} =
+2 Mbps，是最低可用码率，确保小分辨率不会码率过低。 -
+\passthrough{\lstinline!w * h * FPS * 0.1!} = 每像素每秒 0.1
+bps，按分辨率和帧率缩放。 例如 640×480×30×0.1 \textasciitilde{} 0.9 Mbps
+→ 取 2 Mbps；3840×2160×30×0.1 \textasciitilde{} 25 Mbps。 -
+\passthrough{\lstinline!max(...)!} 设置 2 Mbps 码率下限。
+
+码率影响帧大小：码率越高字节越多，但硬件解码速度主要和像素数相关，受码率影响很小。
+
+\textbf{(5) \passthrough{\lstinline!codec.framerate!}}
+目标帧率（fps）。设为 30 表示编码器按 30fps 场景分配比特预算。
+不改变实际编码速度，只影响码率控制算法。
+
+\textbf{(6) \passthrough{\lstinline!codec.time\_base!}}
+时间基准，帧率的倒数。\passthrough{\lstinline!Fraction(1, 30)!}
+表示每帧间隔 1/30 秒。 影响编码后 Packet 的
+\passthrough{\lstinline!pts!}/\passthrough{\lstinline!dts!} 时间戳。
+
+\textbf{(7) \passthrough{\lstinline!codec.options!}} 传递给 libx264
+编码器的底层选项：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!"level"!}：H.264 Level。\textless=720p 用
+  Level 3.1，\textgreater=1080p 用 Level 4.0。 编码的码流中会嵌入 Level
+  标志，VDEC 据此分配解码缓冲区。
+\item
+  \passthrough{\lstinline!"tune": "zerolatency"!}：低延迟调优。\textbf{禁用
+  B 帧}，编码器每收到一帧立即输出，
+  不做多帧缓冲。实时通信必须开启，代价是牺牲约 10-15\% 压缩率。
+\end{itemize}
+
+\textbf{(8) \passthrough{\lstinline!codec.profile = "Baseline"!}} H.264
+\textbf{档次}。三个常用档次：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Baseline}：最简，无 B 帧，适合实时通信和低功耗设备。
+\item
+  \textbf{Main}：比 Baseline 多 B 帧，压缩率高 10-15\%，适合广播电视。
+\item
+  \textbf{High}：在 Main 基础上增加 8×8 变换和量化矩阵，适合高清蓝光。
+\end{itemize}
+
+Baseline 是 WebRTC 强制要求的最低档次，且 VDEC
+\passthrough{\lstinline!entype=1!} 正好对应 Baseline。 注意：libx265
+没有 \passthrough{\lstinline!profile!} 属性（H.265 的 profile 通过
+options 设置），所以加了 \passthrough{\lstinline!if!} 判断。
+
+\textbf{(9)
+\passthrough{\lstinline!av.VideoFrame.from\_ndarray(bgr[..., ::-1], format="rgb24")!}}
+将 numpy BGR 数组转为 PyAV \passthrough{\lstinline!VideoFrame!} 对象。
+\passthrough{\lstinline!bgr[..., ::-1]!}
+把通道反转：\passthrough{\lstinline!BGR → RGB!}。
+
+\textbf{(10)
+\passthrough{\lstinline!frame.pict\_type = I if i \% gop == 0 else P!}}
+按 GOP 间隔设置帧类型。GOP=30 时，帧 0、30、60\ldots{} 为 I 帧，其余为 P
+帧。 这是模拟真实视频流的关键------97\% 的帧是 P 帧，3\% 是 I 帧。
+与旧版全 I 帧（GOP=1）相比，I 帧体积从 \textasciitilde80KB 降至
+\textasciitilde25KB（480p），因为码率预算被 P 帧摊薄。
+
+\textbf{(11) \passthrough{\lstinline!codec.encode(frame)!}}
+将一帧送入编码器，返回编码后的 \passthrough{\lstinline!Packet!}
+列表。每个 Packet 包含 一个或多个 NAL 单元（SPS/PPS/SEI/IDR Slice 等）。
+
+\textbf{(12) \passthrough{\lstinline!codec.encode(None)!}}
+\textbf{排空编码器缓冲区}。传入 \passthrough{\lstinline!None!}
+强制输出所有剩余数据。 排空后的尾 NAL 追加到最后一帧的码流末尾。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{I 帧数量与解码性能}\label{iframe-performance}
+
+\textbf{基准测试中的 I 帧数量}
+
+每 30 帧一个 I 帧。\passthrough{\lstinline!bench\_vdec.py!} 使用
+\passthrough{\lstinline!TEST\_GOP = 30!}，90 帧测试中只有 \textbf{3 个 I
+帧}（帧 0、30、60），其余 87 帧是 P 帧。这是模拟真实视频流的配置。
+
+\begin{lstlisting}
+基准测试码流（GOP=30）：
+  [IDR] [P] [P] ... [P] [IDR] [P] [P] ... [P] [IDR] [P] ...
+   ↑ ~25KB@480p     ↑ ~7KB                     I 帧数 = 3/90 ~ 3%
+
+全 I 帧码流（GOP=1，仅供参考）：
+  [IDR] [IDR] [IDR] ... [IDR]   ← 所有帧都是关键帧
+   ↑ ~80KB@480p 完全相同的大小
+\end{lstlisting}
+
+\textbf{为什么用 GOP=30 而不是全 I 帧}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{真实视频流就是这样的}：WebRTC、RTSP、监控摄像头通常使用
+  GOP=15\textasciitilde60。 GOP=30 表示每秒一个关键帧（30fps
+  下），是实时通信的典型配置。
+\item
+  \textbf{避免误判 VDEC 性能}：全 I 帧测试中每帧都
+  \textasciitilde80KB（480p），VDEC 的硬件并行优势被放大。 而真实流中
+  97\% 的帧是小 P 帧（\textasciitilde7KB），CPU 处理 P
+  帧极快（只需解运动矢量 + 残差）， VDEC 的固定调度开销反而成了瓶颈。
+\item
+  \textbf{全 I 帧曾导致错误结论}：本教程早期版本用 GOP=1 测得 VDEC 在
+  720p 领先 CPU 10\%、 1080p 领先 43\%。切换到 GOP=30 后，VDEC 在
+  \textless=1080p 全面落后于 CPU。 \textbf{全 I
+  帧测试的不是真实场景，测试结果不可用于工程决策。}
+\end{enumerate}
+
+\textbf{I 帧比例对性能的颠覆性影响}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1818}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1818}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1636}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1636}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1091}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+测试模式
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+480p VDEC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+480p CPU
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+1080p VDEC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+1080p CPU
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+拐点
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+GOP=1（全 I 帧） & 240 fps & 410 fps & 97 fps & 68 fps &
+\textbf{720p} \\
+\textbf{GOP=30（I/P 混合）} & \textbf{17 fps} & \textbf{1349 fps} &
+\textbf{17 fps} & \textbf{307 fps} & \textbf{2K} \\
+\end{longtable}
+}
+
+\textbf{GOP 的影响是巨大的}：
+
+\begin{itemize}
+\tightlist
+\item
+  VDEC 在全 I 帧模式下 480p 跑 240fps，混合流下掉到 17fps（\textbf{14×
+  差距}）
+\item
+  原因：全 I 帧模式下每帧数据量大（\textasciitilde80KB），连续发送大包让
+  VDEC 硬件始终处于忙碌状态，调度开销被隐藏
+\item
+  混合流下每帧只有 \textasciitilde8KB（P 帧），VDEC 处理太快反而暴露了
+  Python 回调调度的固定瓶颈
+\end{itemize}
+
+\textbf{帧类型与性能特性}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1569}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2941}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1765}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1961}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1765}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+帧类型
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+每帧大小 (480p)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+解码方式
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VDEC 表现
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+CPU 表现
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+I 帧 (IDR) & \textasciitilde25 KB (GOP=30) & 帧内解码（完整） &
+硬件并行优势 & 需完整逆变换 \\
+P 帧 & \textasciitilde7 KB & 帧间解码（运动矢量 + 残差） &
+\textbf{固定开销主导} & 极快（数据量小） \\
+\end{longtable}
+}
+
+在 GOP=30 混合流中，P 帧占 97\%。P 帧数据量仅为 I 帧的
+\textasciitilde30\%， CPU 解码 P 帧的开销远低于 I 帧（只需解残差），而
+VDEC 每帧仍需经过完整的
+\passthrough{\lstinline!memcpy → send → callback → memcpy → Queue!}
+路径，这部分时间与帧大小关系不大。
+
+\textbf{如何切换测试模式}
+
+修改 \passthrough{\lstinline!bench\_vdec.py!} 顶部的常量即可：
+
+\begin{lstlisting}[language=Python]
+# 当前（GOP=30，I/P 混合——真实视频流）
+TEST_GOP = 30
+
+# 改为（GOP=1，全 I 帧——最坏情况/最大吞吐测试）
+TEST_GOP = 1
+\end{lstlisting}
+
+\passthrough{\lstinline!encode\_frames()!} 会根据
+\passthrough{\lstinline!gop!} 参数自动设置每帧的
+\passthrough{\lstinline!pict\_type!}：
+\passthrough{\lstinline!i \% gop == 0!} 时为 I 帧，否则为 P 帧。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{常见问题与调试}\label{ux5e38ux89c1ux95eeux9898ux4e0eux8c03ux8bd5}
+
+\subsubsection{\texorpdfstring{问题 \#1：\texttt{channel\_id}
+未设置导致通道创建失败}{问题 \#1：channel\_id 未设置导致通道创建失败}}\label{ux95eeux9898-1channel_id-ux672aux8bbeux7f6eux5bfcux81f4ux901aux9053ux521bux5efaux5931ux8d25}
+
+\textbf{现象}：
+
+\begin{lstlisting}
+vdec_create_channel failed: 507018
+\end{lstlisting}
+
+\textbf{根因}：VDEC 与 VENC 不同，\textbf{不会}自动分配
+\passthrough{\lstinline!channel\_id!}。必须显式调用
+\passthrough{\lstinline!vdec\_set\_channel\_desc\_channel\_id(desc, N)!}。
+
+\textbf{修复}：
+
+\begin{lstlisting}[language=Python]
+media.vdec_set_channel_desc_channel_id(desc, 0)
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{问题 \#2：回调参数顺序与 VENC
+相反}\label{ux95eeux9898-2ux56deux8c03ux53c2ux6570ux987aux5e8fux4e0e-venc-ux76f8ux53cd}
+
+\textbf{现象}：在回调中调用
+\passthrough{\lstinline!dvpp\_get\_pic\_desc\_ret\_code!}
+时进程异常终止或返回无效数据。
+
+\textbf{根因}：VENC 回调是
+\passthrough{\lstinline!(input\_pic\_desc, output\_stream\_desc)!}，VDEC
+回调是
+\passthrough{\lstinline!(input\_stream\_desc, output\_pic\_desc)!}。如果按
+VENC 习惯写 VDEC 回调，会把 stream\_desc 当成 pic\_desc 来读。
+
+\textbf{记忆方法}：\textbf{第一个参数总是''输入''，第二个参数总是''输出''}。VENC
+输入是图片、输出是码流；VDEC 输入是码流、输出是图片。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{\texorpdfstring{问题 \#3：未检查 \texttt{ret\_code}
+导致使用损坏帧}{问题 \#3：未检查 ret\_code 导致使用损坏帧}}\label{ux95eeux9898-3ux672aux68c0ux67e5-ret_code-ux5bfcux81f4ux4f7fux7528ux635fux574fux5e27}
+
+\textbf{现象}：解码后的 NV12 数据是花屏或全黑。
+
+\textbf{根因}：\passthrough{\lstinline!dvpp\_get\_pic\_desc\_ret\_code()!}
+返回非 0
+表示解码失败------可能是输入码流不完整、帧边界不对、参考帧丢失。直接使用失败帧的数据会得到损坏画面。
+
+\textbf{修复}：
+
+\begin{lstlisting}[language=Python]
+ret_code = media.dvpp_get_pic_desc_ret_code(pic_desc)
+if ret_code != 0:
+    cb_queue.put(None)  # 跳过此帧
+    return
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{问题 \#4：回调未销毁输出 pic\_desc
+导致内存泄漏}\label{ux95eeux9898-4ux56deux8c03ux672aux9500ux6bc1ux8f93ux51fa-pic_desc-ux5bfcux81f4ux5185ux5b58ux6cc4ux6f0f}
+
+\textbf{现象}：解码多帧后，\passthrough{\lstinline!dvpp\_malloc!}
+返回内存不足。
+
+\textbf{根因}：VDEC 回调负责销毁\textbf{两个}描述符（输入 stream\_desc
+和输出 pic\_desc）。VENC 只需要销毁输入，因为输出的 stream\_desc
+由调用方管理。如果只销毁了 stream\_desc，pic\_desc 及其关联的 DVPP
+内存永远不会释放。
+
+\textbf{修复}：回调 \passthrough{\lstinline!finally!} 块中同时销毁两个：
+
+\begin{lstlisting}[language=Python]
+finally:
+    media.dvpp_destroy_stream_desc(input_stream_desc)
+    media.dvpp_destroy_pic_desc(output_pic_desc)
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{问题 \#5：输入必须用 numpy 包装才能
+memcpy}\label{ux95eeux9898-5ux8f93ux5165ux5fc5ux987bux7528-numpy-ux5305ux88c5ux624dux80fd-memcpy}
+
+\textbf{现象}：
+
+\begin{lstlisting}
+TypeError: acl.rt.memcpy args parse failed
+\end{lstlisting}
+
+\textbf{根因}：\passthrough{\lstinline!acl.rt.memcpy!}
+的源地址参数不接受 Python \passthrough{\lstinline!bytes!}
+对象。必须将其包装为 numpy 数组或 ctypes 指针。
+
+\textbf{修复}：
+
+\begin{lstlisting}[language=Python]
+# 错误
+h264 = b"..."
+acl.rt.memcpy(in_buf, len(h264), h264, len(h264), 1)  # TypeError
+
+# 正确
+h264_arr = np.frombuffer(h264, dtype=np.uint8)
+acl.rt.memcpy(in_buf, len(h264), h264_arr.ctypes.data, len(h264), 1)
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{\texorpdfstring{问题 \#6：\texttt{vdec\_destroy\_channel}
+顺序错误导致阻塞}{问题 \#6：vdec\_destroy\_channel 顺序错误导致阻塞}}\label{ux95eeux9898-6vdec_destroy_channel-ux987aux5e8fux9519ux8befux5bfcux81f4ux963bux585e}
+
+\textbf{现象}：解码多帧后，\passthrough{\lstinline!media.vdec\_destroy\_channel(desc)!}
+永远阻塞，程序卡死。
+
+\textbf{根因}：VDEC 通道销毁时，回调线程必须在
+\passthrough{\lstinline!vdec\_destroy\_channel!}
+调用期间保持运行------驱动需要在销毁过程中通过回调发送最后的清理通知。如果先停止了回调线程，\passthrough{\lstinline!vdec\_destroy\_channel!}
+会无限等待一个永远不会来的回调。
+
+VDEC 的正确销毁顺序与直觉相反：
+
+\begin{lstlisting}[language=Python]
+# 错误：先停线程再销毁通道 → 永远阻塞
+running[0] = False                      # 通知线程停止
+media.vdec_destroy_frame_config(fcfg)    # 销毁帧配置
+media.vdec_destroy_channel(desc)         # 销毁通道 → 等待回调 → 永远阻塞！
+
+# 正确：先销毁通道（需要线程活着），再停线程
+media.vdec_destroy_channel(desc)         # (1) 先销毁通道（此时线程必须活着）
+running[0] = False                      # (2) 通知线程停止
+acl.util.stop_thread(tid)               # (3) 停止回调线程
+media.vdec_destroy_frame_config(fcfg)    # (4) 最后销毁帧配置
+media.vdec_destroy_channel_desc(desc)    # (5) 销毁描述符
+\end{lstlisting}
+
+参考 acllite 的 \passthrough{\lstinline!DvppVdec.destroy()!}
+实现，也是先 \passthrough{\lstinline!vdec\_destroy\_channel!}，再
+\passthrough{\lstinline!\_thread\_join()!}，最后
+\passthrough{\lstinline!vdec\_destroy\_frame\_config!}。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsubsection{问题 \#7：VDEC
+通道复用对码流连续性非常敏感}\label{ux95eeux9898-7vdec-ux901aux9053ux590dux7528ux5bf9ux7801ux6d41ux8fdeux7eedux6027ux975eux5e38ux654fux611f}
+
+\textbf{现象}：通道创建后第一帧解码正常，第二帧
+\passthrough{\lstinline!vdec\_send\_frame!} 返回 0 但回调永不触发。
+
+\textbf{根因}：VDEC
+期望同一通道上解码的帧来自\textbf{同一个编码器实例}，并且按连续视频流顺序送入。也就是所有帧需要共享兼容的
+SPS/PPS（序列参数集/图像参数集），不能把多个互不相关的 IDR
+样本直接拼到同一通道里混跑。
+
+\textbf{验证方法}：用单个 libx264 \passthrough{\lstinline!CodecContext!}
+连续编码所有测试帧，确保 SPS/PPS
+一致，并按同一序列顺序逐帧送入。\passthrough{\lstinline!samples/chapter5/vdec/bench\_vdec.py!}
+已新增``单通道复用''路径，并自动尝试不同
+\passthrough{\lstinline!pipeline\_depth!} 与
+\passthrough{\lstinline!frame\_config!} 策略；在当前 310B
+环境下，只有带显式 \passthrough{\lstinline!EOS!} 的
+\passthrough{\lstinline!depth=4!} 变体能够稳定排空尾部缓存帧。
+
+\textbf{当前结论}：Ascend 310B4 上不能假设``任意 H.264
+样本都能安全复用同一通道''。应先用连续码流验证复用模式，并显式处理解码器尾部
+flush；如果复用路径不稳定，再退回每帧独立通道作为兜底方案。独立通道虽然可靠，但固定创建/销毁开销在
+640×480 下通常远高于纯 CPU 解码。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{性能实测}\label{ux6027ux80fdux5b9eux6d4b}
+
+在 Orange Pi AI Pro（Ascend 310B4）上，使用
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/vdec/bench_vdec.py}{\passthrough{\lstinline!bench\_vdec.py!}}
+进行 H.264 分辨率扫描。 测试参数：GOP=30（I/P 混合，模拟真实视频流），90
+帧（3 个完整 GOP），固定种子可复现。 CPU
+解码对比单线程（\passthrough{\lstinline!thread\_count=1!}）和多线程（\passthrough{\lstinline!thread\_count=0!}，自动使用所有核心）两种模式。
+
+\begin{lstlisting}
+Resolution             VDEC     CPU_mt     CPU_st   vs_mt   vs_st    VD_ms    mt_ms    st_ms  Winner
+---
+640x480             17.0     1349.2      615.0   0.01x  0.03x    58.9ms    0.7ms    1.6ms     CPU  [I25KB P7KB]
+1280x720             16.9      690.8      271.3   0.02x  0.06x    59.3ms    1.4ms    3.7ms     CPU  [I39KB P10KB]
+1920x1080            16.5      307.3      121.2   0.05x  0.14x    60.5ms    3.3ms    8.2ms     CPU  [I92KB P21KB]
+2560x1440           136.5      184.2       71.9   0.74x  1.90x     7.3ms    5.4ms   13.9ms    VDEC  [I159KB P37KB]
+3840x2160            73.5       86.8       33.8   0.85x  2.17x    13.6ms   11.5ms   29.6ms    VDEC  [I292KB P92KB]
+\end{lstlisting}
+
+\subsubsection{VDEC
+单帧耗时分解（720p，参考值）}\label{vdec-ux5355ux5e27ux8017ux65f6ux5206ux89e3720pux53c2ux8003ux503c}
+
+VDEC 每帧总耗时约 59ms，远高于理论的
+\textasciitilde15ms。各阶段耗时如下：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+阶段 & 耗时 & 占比 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+dvpp\_malloc + memcpy(in) & \textasciitilde0.8ms & 1\% & H.264
+码流拷贝到设备 \\
+send → callback（硬件） & \textasciitilde12.6ms & 21\% & 纯硬件解码 \\
+callback + memcpy(out) & \textasciitilde1.2ms & 2\% & NV12
+结果拷回主机 \\
+\textbf{未知开销} & \textbf{\textasciitilde44ms} & \textbf{75\%} &
+回调调度、GIL、Python 队列等 \\
+\end{longtable}
+}
+
+\begin{quote}
+\textbf{关键结论}：\textless=1080p 时，VDEC 每帧 \textasciitilde59ms
+的开销中，硬件解码本身只占 \textasciitilde13ms。 剩余
+\textasciitilde44ms 是 Python 层的调度开销（回调线程 → Queue →
+主线程），这部分与分辨率无关。
+
+2K 以上分辨率时，硬件解码耗时自然增长（7ms@2K →
+14ms@4K），但\textbf{调度开销被摊薄}， 因此吞吐大幅提升。这解释了为什么
+VDEC 在低分辨率下表现异常差、 高分辨率下''恢复正常''。
+\end{quote}
+
+\subsubsection{拐点分析}\label{ux62d0ux70b9ux5206ux6790}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}llllll@{}}
+\toprule\noalign{}
+分辨率 & VDEC fps & CPU (单线程) & CPU (多线程) & vs 单线程 & 推荐 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+640×480 & 17 & 615 & 1349 & 0.03x & CPU \\
+1280×720 & 17 & 271 & 691 & 0.06x & CPU \\
+1920×1080 & 17 & 121 & 307 & 0.14x & CPU \\
+2560×1440 & 137 & 72 & 184 & \textbf{1.90x} & \textbf{VDEC} \\
+3840×2160 & 74 & 34 & 87 & \textbf{2.17x} & \textbf{VDEC} \\
+\end{longtable}
+}
+
+\textbf{VDEC 在 \textless=1080p 下完全不具备竞争力}（仅为 CPU 单线程的
+3\%\textasciitilde14\%）。真正的性能交叉点在
+\textbf{2K（2560×1440）}------2K 时 VDEC 比单线程 CPU 快 90\%，4K 时快
+117\%。
+
+注意：VDEC 在任何分辨率下都\textbf{慢于多线程
+CPU}（\passthrough{\lstinline!vs\_mt!} 始终 \textless{} 1.0）。 Ascend
+310B4 的 VDEC 是硬件解码单元，但数量有限（通常 1 个）， 而现代 ARM CPU
+有 4-8 个核心可以并行解码。单路视频场景下多核 CPU 优势明显。
+
+\subsubsection{关键发现}\label{ux5173ux952eux53d1ux73b0}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{低分辨率 VDEC 有固定调度开销}------480p/720p/1080p 下 VDEC
+  都是 \textasciitilde59ms/帧，与分辨率无关。
+  这说明瓶颈不在硬件解码，而在 Python 回调→队列→主线程的调度路径。
+\item
+  \textbf{高分辨率是 VDEC 的优势区间}------2K
+  以上分辨率，硬件解码耗时自然增加， 固定调度开销被摊薄，VDEC
+  开始领先单线程 CPU。4K 时领先 2.17×。
+\item
+  \textbf{多核 CPU 在单路场景表现最优}------多线程 CPU
+  在所有分辨率下都比 VDEC 快。 只有在\textbf{多路并发}场景（如同时解码 4
+  路 1080p），VDEC 才可能反超。
+\item
+  \textbf{I/P 混合流比全 I 帧流更不利 VDEC}------详见上文
+  \hyperref[iframe-performance]{I 帧数量与解码性能} 的对比分析。全 I
+  帧测试曾误导结论，GOP=30 才是真实场景。
+\item
+  \textbf{零拷贝管道可消除调度开销}------当前实现每次解码都经过
+  \passthrough{\lstinline!memcpy!} + Python Queue。 如果 VDEC
+  输出直接喂给 VENC（设备内存零拷贝），可消除 \textasciitilde46ms
+  的调度+malloc+memcpy 开销。
+\end{enumerate}
+
+\subsubsection{适用场景速查}\label{ux9002ux7528ux573aux666fux901fux67e5}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+分辨率 & 单路实时 & 多路并发（\textgreater=4 路） & 转码管道 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textless= 1080p & CPU 推荐 & CPU 可选 & CPU 推荐 \\
+2K & CPU 可选 & \textbf{VDEC 推荐} & VDEC 可选 \\
+4K & \textbf{VDEC 推荐} & \textbf{VDEC 推荐} & \textbf{VDEC 推荐} \\
+\end{longtable}
+}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{附录}\label{ux9644ux5f55-1}
+
+\subsubsection{常用调试命令}\label{ux5e38ux7528ux8c03ux8bd5ux547dux4ee4-1}
+
+\begin{lstlisting}[language=bash]
+# VDEC 驱动状态
+lsmod | grep vdec
+
+# VDEC 内核日志
+dmesg | grep -i vdec | tail -10
+
+# 运行练习脚本
+python samples/chapter5/vdec/vdec_minimal.py
+\end{lstlisting}
+
+\subsubsection{参数速查表}\label{ux53c2ux6570ux901fux67e5ux8868-1}
+
+\subsubsection{VDEC 通道参数}\label{vdec-params}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+参数 & 函数 & 示例 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+通道 ID &
+\passthrough{\lstinline!vdec\_set\_channel\_desc\_channel\_id!} & 0 \\
+编码类型 & \passthrough{\lstinline!vdec\_set\_channel\_desc\_entype!} &
+1 \\
+输出像素格式 &
+\passthrough{\lstinline!vdec\_set\_channel\_desc\_out\_pic\_format!} &
+1 \\
+输出宽度 &
+\passthrough{\lstinline!vdec\_set\_channel\_desc\_out\_pic\_width!} &
+640 \\
+输出高度 &
+\passthrough{\lstinline!vdec\_set\_channel\_desc\_out\_pic\_height!} &
+480 \\
+输出模式 & \passthrough{\lstinline!vdec\_set\_channel\_desc\_out\_mode!}
+& 0 \\
+参考帧数 &
+\passthrough{\lstinline!vdec\_set\_channel\_desc\_ref\_frame\_num!} &
+5 \\
+位深 & \passthrough{\lstinline!vdec\_set\_channel\_desc\_bit\_depth!} &
+8 \\
+\end{longtable}
+}
+
+\textbf{编码类型}：0 = H.265 Main, 1 = H.264 Baseline, 2 = H.264 Main, 3
+= H.264 High
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\section{VPC --- 硬件图像处理}\label{vpc}
+
+\begin{quote}
+VPC（Video Pre-Processing
+Core）提供硬件加速的缩放、裁剪、色彩空间转换。前置基础：\hyperref[dvpp-basics]{DVPP
+基础概念}。
+\end{quote}
+
+\subsection{VPC 简介}\label{vpc-ux7b80ux4ecb}
+
+\textbf{VPC}（Video Pre-Processing Core）是 DVPP
+中的硬件图像处理模块。它提供三大功能：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+功能 & 说明 & 典型场景 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Resize} & 图像缩放（多种插值算法） & 1080p → 720p 下采样 \\
+\textbf{Crop} & 按指定区域裁剪 & 从画面中提取 ROI 区域 \\
+\textbf{CSC} & 色彩空间转换 & YUYV→NV12、NV12→RGB 等 \\
+\end{longtable}
+}
+
+VPC 在 DVPP 管道中的典型位置：
+
+\begin{lstlisting}
+USB Camera YUYV → [VPC CSC] → NV12 → [VENC] → H.264 → WebRTC
+                        ↑                  ↑
+                   硬件色彩转换          硬件编码
+                   (零CPU占用)          (零CPU占用)
+\end{lstlisting}
+
+\subsubsection{为什么用 VPC 而不是
+OpenCV}\label{ux4e3aux4ec0ux4e48ux7528-vpc-ux800cux4e0dux662f-opencv}
+
+在 Orange Pi AI Pro 上，CPU 做
+\passthrough{\lstinline!cv2.cvtColor(YUYV→BGR)!} +
+\passthrough{\lstinline!cv2.resize(1080p→720p)!} +
+\passthrough{\lstinline!bgr\_to\_nv12()!} 会消耗 ARM Cortex-A55
+的宝贵算力。VPC 完全在硬件中完成这些操作，CPU 只负责下发任务和等待完成。
+
+\subsubsection{硬件能力规格（Ascend
+310B4）}\label{ux786cux4ef6ux80fdux529bux89c4ux683cascend-310b4-1}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+约束项 & 值 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+输入分辨率范围 & 10×6 \textasciitilde{} 8192×8192 \\
+输出分辨率范围 & 10×6 \textasciitilde{} 4096×8192 \\
+宽度对齐 & 2（VPC 自动向下对齐） \\
+高度对齐 & 2 \\
+支持的输入格式 & NV12、NV21、YUV400、YUV422、YUV444 \\
+支持的输出格式 & NV12、NV21、YUV400、YUV422、YUV444 \\
+\end{longtable}
+}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{VPC 与 VENC/VDEC
+的关键区别}\label{vpc-ux4e0e-vencvdec-ux7684ux5173ux952eux533aux522b}
+
+VPC 使用的是 \textbf{通用 DVPP 通道模型}，与 VENC/VDEC
+的专用通道有本质差异：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2609}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.5217}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2174}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+维度
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VENC / VDEC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VPC
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+通道创建 & \passthrough{\lstinline!venc\_create\_channel()!} /
+\passthrough{\lstinline!vdec\_create\_channel()!} &
+\passthrough{\lstinline!dvpp\_create\_channel()!}（无需设置 mode） \\
+异步机制 & \textbf{回调线程}（需
+\passthrough{\lstinline!process\_report!} 轮询） & \textbf{Stream
+同步}（\passthrough{\lstinline!synchronize\_stream!} 等待） \\
+输入类型 & VENC: pic\_desc / VDEC: stream\_desc &
+pic\_desc（始终是图像） \\
+输出类型 & VENC: stream\_desc / VDEC: pic\_desc &
+pic\_desc（始终是图像） \\
+回调函数 & 必须设置 & \textbf{不需要} \\
+回调线程 & 必须启动 & \textbf{不需要} \\
+复杂度 & 高（多线程协调） & 低（同步等待即可） \\
+\end{longtable}
+}
+
+\begin{quote}
+\textbf{310B
+特别注意}：\passthrough{\lstinline!dvpp\_vpc\_convert\_color\_async!}（CSC
+色彩空间转换）在 310B 上\textbf{返回
+ACL\_ERROR\_INVALID\_PARAM}，不可用。\passthrough{\lstinline!himpi.vpc\_convert\_color!}
+需要预创建 himpi 通道（Python 接口受限）。310B 上的 YUYV→NV12
+转换目前只能走 CPU 路径。
+\end{quote}
+
+\subsubsection{通道模型对比}\label{ux901aux9053ux6a21ux578bux5bf9ux6bd4}
+
+\begin{lstlisting}
+VENC/VDEC 专用通道:                VPC 通用通道:
+
+主线程: send_frame → Queue.get   主线程: vpc_xxx_async → synchronize_stream
+             ↑                                  ↑
+回调线程: process_report            (无需回调线程)
+          → callback
+          → Queue.put
+\end{lstlisting}
+
+VPC 的 Stream
+模型更简单------下发异步任务后直接阻塞等待完成，不需要管理额外的线程和队列。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{VPC API 详解}\label{vpc-api-ux8be6ux89e3}
+
+\subsubsection{通用 DVPP
+通道创建}\label{ux901aux7528-dvpp-ux901aux9053ux521bux5efa}
+
+VPC 使用通用的 \passthrough{\lstinline!dvpp\_create\_channel()!}，与
+VENC/VDEC 的专用 API 不同。无需设置 mode（310B 不支持
+\passthrough{\lstinline!DVPP\_CHANNEL\_MODE!}
+常量），也无需创建回调线程：
+
+\begin{lstlisting}[language=Python]
+import acl
+
+# 创建通用 DVPP 通道
+dvpp_channel_desc = acl.media.dvpp_create_channel_desc()
+ret = acl.media.dvpp_create_channel(dvpp_channel_desc)
+
+# 创建 Stream 用于同步等待
+stream, ret = acl.rt.create_stream()
+\end{lstlisting}
+
+\subsubsection{Resize --- 缩放}\label{resize-ux7f29ux653e}
+
+将输入图片缩放到输出尺寸：
+
+\begin{lstlisting}[language=Python]
+# 创建 resize 配置
+resize_config = acl.media.dvpp_create_resize_config()
+# 可选：设置插值算法
+# acl.media.dvpp_set_resize_config_interpolation(resize_config, 0)  # 0=bilinear
+
+ret = acl.media.dvpp_vpc_resize_async(
+    dvpp_channel_desc,    # DVPP 通道描述符
+    input_pic_desc,       # 输入图片描述符（pic_desc）
+    output_pic_desc,      # 输出图片描述符（pic_desc）
+    resize_config,        # 缩放配置
+    stream                # Stream 对象
+)
+acl.rt.synchronize_stream(stream)  # 等待完成
+\end{lstlisting}
+
+\textbf{关键约束}：
+
+\begin{itemize}
+\tightlist
+\item
+  输入/输出 pic\_desc 的宽高必须对齐到 2（VPC 自动处理）
+\item
+  resize 不会改变像素格式------输入 NV12 则输出也是 NV12
+\item
+  如需同时改变格式和尺寸，需串联 CSC + Resize
+\end{itemize}
+
+\subsubsection{Crop --- 裁剪}\label{crop-ux88c1ux526a}
+
+从输入图片中裁剪指定区域：
+
+\begin{lstlisting}[language=Python]
+# 创建 ROI 配置：从 (100, 100) 开始裁剪 224×224
+# dvpp_create_roi_config 接受 4 个位置参数: (left, right, top, bottom)
+crop_area = acl.media.dvpp_create_roi_config(
+    100,    # 左边界偏移
+    323,    # 右边界偏移 (左+宽-1)
+    100,    # 上边界偏移
+    323,    # 下边界偏移 (上+高-1)
+)
+
+ret = acl.media.dvpp_vpc_crop_async(
+    dvpp_channel_desc, input_pic_desc, output_pic_desc, crop_area, stream)
+acl.rt.synchronize_stream(stream)
+\end{lstlisting}
+
+\subsubsection{Crop + Resize ---
+最常用的组合}\label{crop-resize-ux6700ux5e38ux7528ux7684ux7ec4ux5408}
+
+裁剪后缩放到目标尺寸，一次调用完成两个操作：
+
+\begin{lstlisting}[language=Python]
+# 从 1080p 画面中裁剪中心区域，缩放到 720×480
+# 注意：dvpp_create_roi_config 接受 4 个位置参数 (left, right, top, bottom)
+crop_area = acl.media.dvpp_create_roi_config(160, 480, 120, 360)
+
+resize_config = acl.media.dvpp_create_resize_config()
+
+ret = acl.media.dvpp_vpc_crop_resize_async(
+    dvpp_channel_desc,
+    input_pic_desc,       # 1920×1080
+    output_pic_desc,      # 720×480
+    crop_area,
+    resize_config,
+    stream
+)
+acl.rt.synchronize_stream(stream)
+\end{lstlisting}
+
+这是 VPC 最高效的使用方式------crop + resize
+在一个硬件调用中完成，避免中间缓冲区。
+
+\subsubsection{CSC --- 色彩空间转换（310B 不可用）}\label{vpc-csc}
+
+\textbf{结论}：310B (CANN 8.3.RC1)
+上，\passthrough{\lstinline!dvpp\_vpc\_convert\_color\_async!} 返回
+\passthrough{\lstinline!ACL\_ERROR\_INVALID\_PARAM!}（100000），\passthrough{\lstinline!himpi.vpc\_convert\_color!}
+需要 himpi 通道预配置（Python 接口不支持）。CSC 在 310B
+上\textbf{目前不可用}。
+
+\textbf{替代方案}：YUYV→NV12 转换使用
+CPU（\passthrough{\lstinline!cv2.cvtColor + bgr\_to\_nv12!}），resize
+可卸载到 VPC：
+
+\begin{lstlisting}
+USB Camera YUYV → CPU bgr_to_nv12() → NV12 → VPC resize → NV12(720p) → VENC
+                                          ↑                    ↑
+                                     CPU 做色彩转换        VPC 硬件缩放
+\end{lstlisting}
+
+如果未来 CANN 版本在 310B 上开放 CSC 支持，可通过
+\passthrough{\lstinline!dvpp\_vpc\_convert\_color\_async!} 使用与 resize
+完全相同的通道+Stream 模式调用。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{acllite 快速上手}\label{acllite-ux5febux901fux4e0aux624b}
+
+VPC 和 JPEG 操作可使用 acllite 简化调用。环境初始化及
+\passthrough{\lstinline!AclLiteImage!} 用法见 \hyperref[acllite]{acllite
+封装库}。
+
+\begin{lstlisting}[language=Python]
+from acllite_imageproc import AclLiteImageProc
+from acllite_image import AclLiteImage
+
+vpc = AclLiteImageProc()
+
+# Resize
+img = AclLiteImage(nv12_ndarray, 640, 480).copy_to_dvpp()
+resized = vpc.resize(img, 320, 240)
+
+# Crop and Paste
+cropped = vpc.crop_and_paste(img, 640, 480, 224, 224)
+
+# JPEG 编码
+jpeg_img = vpc.jpege(resized)
+
+# JPEG 解码
+decoded = vpc.jpegd(jpeg_img)
+
+vpc.destroy()
+\end{lstlisting}
+
+\begin{quote}
+acllite 不包含 VENC。VENC 需使用原始 API（参见 \hyperref[venc]{VENC ---
+硬件视频编码}）。
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{练习脚本走读}\label{ux7ec3ux4e60ux811aux672cux8d70ux8bfb-1}
+
+完整代码见
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/vpc/vpc_minimal.py}{\passthrough{\lstinline!samples/chapter5/vpc/vpc\_minimal.py!}}。程序使用原始
+\passthrough{\lstinline!acl.media!} API 演示两个核心操作 （理解底层 API
+后再用 acllite 可事半功倍）：
+
+\subsubsection{(1) Resize ---
+硬件缩放}\label{resize-ux786cux4ef6ux7f29ux653e}
+
+\begin{lstlisting}[language=Python]
+# 创建 640×480 测试 NV12 帧
+src_nv12 = make_test_nv12(640, 480)
+
+# 计算 stride 对齐的内存大小
+sw = ((640 + 15) // 16) * 16    # width stride 对齐到 16
+sh = ((480 + 1) // 2) * 2      # height stride 对齐到 2
+in_size = sw * sh * 3 // 2
+
+# 目标 320×240
+out_sw = ((320 + 15) // 16) * 16
+out_sh = ((240 + 1) // 2) * 2
+out_size = out_sw * out_sh * 3 // 2
+
+# 分配设备内存 + 拷贝输入数据
+in_buf, _ = media.dvpp_malloc(in_size)
+out_buf, _ = media.dvpp_malloc(out_size)
+acl.rt.memcpy(in_buf, src_nv12.nbytes, src_nv12.ctypes.data,
+              src_nv12.nbytes, ACL_MEMCPY_HOST_TO_DEVICE)
+
+# 构造输入/输出 pic_desc（含 height_stride）
+in_pic = create_nv12_pic_desc(in_buf, 640, 480, sw, sh)
+out_pic = create_nv12_pic_desc(out_buf, 320, 240, out_sw, out_sh)
+
+# 执行缩放 + 同步等待
+resize_cfg = media.dvpp_create_resize_config()
+media.dvpp_vpc_resize_async(ch_desc, in_pic, out_pic, resize_cfg, stream)
+acl.rt.synchronize_stream(stream)
+
+# 拷回主机内存
+host_buf = np.zeros(out_size, dtype=np.uint8)
+acl.rt.memcpy(host_buf.ctypes.data, out_size, out_buf, out_size,
+              ACL_MEMCPY_DEVICE_TO_HOST)
+\end{lstlisting}
+
+\subsubsection{(2) Crop + Resize ---
+裁剪后缩放}\label{crop-resize-ux88c1ux526aux540eux7f29ux653e}
+
+\begin{lstlisting}[language=Python]
+# 从 640×480 中裁剪中心 320×240，再缩放到 640×480
+crop_area = acl.media.dvpp_create_roi_config()
+acl.media.dvpp_set_roi_config(crop_area,
+    left=160, right=480, top=120, bottom=360)    # 中心 320×240
+
+resize_cfg = acl.media.dvpp_create_resize_config()
+acl.media.dvpp_vpc_crop_resize_async(
+    ch_desc, in_pic_desc, out_pic_desc, crop_area, resize_cfg, stream)
+acl.rt.synchronize_stream(stream)
+\end{lstlisting}
+
+\subsubsection{(3) CSC --- 310B
+不可用}\label{csc-310b-ux4e0dux53efux7528}
+
+310B 上 CSC 需走 CPU。详见 \hyperref[vpc-csc]{CSC 限制}。
+
+\subsubsection{清理}\label{ux6e05ux7406-1}
+
+\begin{lstlisting}[language=Python]
+# 释放 VPC 资源
+acl.media.dvpp_destroy_resize_config(resize_cfg)
+acl.media.dvpp_destroy_roi_config(crop_area)
+acl.media.dvpp_destroy_pic_desc(in_pic)
+acl.media.dvpp_destroy_pic_desc(out_pic)
+acl.media.dvpp_free(in_buf)
+acl.media.dvpp_free(out_buf)
+acl.media.dvpp_destroy_channel(ch_desc)
+acl.media.dvpp_destroy_channel_desc(ch_desc)
+acl.rt.destroy_stream(stream)
+\end{lstlisting}
+
+\subsubsection{与项目的对应关系}\label{ux4e0eux9879ux76eeux7684ux5bf9ux5e94ux5173ux7cfb}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -466,33 +3341,783 @@ DSL开发的优势与局限}\label{tbe-dslux5f00ux53d1ux7684ux4f18ux52bfux4e0eux
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
-优势
+文件
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-说明
+角色
 \end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-\textbf{开发门槛低} &
-使用Python开发，无需深入了解昇腾硬件架构，只需描述数学逻辑 \\
-\textbf{代码简洁} &
-一个完整的加法算子核心代码仅需10行左右，大幅减少开发工作量 \\
-\textbf{自动优化} &
-\passthrough{\lstinline!auto\_schedule!}自动完成指令映射、数据切分、流水线优化，由昇腾官方模板调度，性能稳定可靠 \\
-\textbf{快速验证} & 适合算法原型验证和非性能瓶颈算子的快速实现 \\
+\passthrough{\lstinline!acllite\_imageproc.py!} &
+\textbf{推荐封装}------CANN 自带，resize/crop/JPEG 一键完成 \\
+\passthrough{\lstinline!vpc\_minimal.py!} & 学习用途------直接调用
+\passthrough{\lstinline!acl.media!} API，理解底层机制 \\
+\passthrough{\lstinline!bench\_vpc.py!} & 基准测试------VPC resize vs
+CPU cv2.resize 性能对比 \\
 \end{longtable}
 }
 
-\subsubsection{局限}\label{ux5c40ux9650}
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{性能基准}\label{ux6027ux80fdux57faux51c6}
+
+以下数据使用
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/vpc/bench_vpc.py}{\passthrough{\lstinline!bench\_vpc.py!}}
+在 Orange Pi AI Pro（Ascend 310B4, CANN 8.3.RC1）上实测。
+
+\textbf{测试条件}：NV12 → ½ 缩放（各分辨率缩小一半），60
+帧，确定性测试帧，固定种子 42。
+
+\textbf{VPC Resize: NV12 to 1/2 Scale}（数据见下方结果解读表格）
+
+\subsubsection{结果解读}\label{ux7ed3ux679cux89e3ux8bfb-1}
+
+VPC Resize 与 VENC 不同------\textbf{不是所有分辨率都远超 CPU}。VPC 与
+CPU 在低分辨率下互有胜负（720p VPC 赢，1080p CPU 赢），这是 Stream
+同步的固定开销与硬件加速之间的拉锯：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}llllll@{}}
+\toprule\noalign{}
+分辨率 & 像素数 & VPC fps & CPU fps & 加速比 & 推荐 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+640×480 & 0.3M & \textbf{761} & \textbf{1521} & \textbf{0.50x} & CPU \\
+1280×720 & 0.9M & \textbf{679} & \textbf{573} & \textbf{1.19x} & VPC \\
+1920×1080 & 2.1M & \textbf{273} & \textbf{290} & \textbf{0.94x} & CPU \\
+2560×1440 & 3.7M & \textbf{228} & \textbf{144} & \textbf{1.59x} &
+\textbf{VPC} \\
+3840×2160 & 8.3M & \textbf{110} & \textbf{53} & \textbf{2.07x} &
+\textbf{VPC} \\
+\end{longtable}
+}
+
+\textbf{从 2K（2560×1440）开始 VPC
+稳定领先}（1.6×\textasciitilde2.1×）。低分辨率下互有胜负------VPC
+的固定调度开销（dvpp\_malloc + memcpy + Stream
+同步）在小帧上无法稳定被硬件加速摊薄，720p 虽 VPC
+略快但优势微弱（1.19×），1080p 反而 CPU 略快（0.94×）。
+
+\textbf{VPC vs VENC vs VDEC 性能模式对比}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1277}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.4043}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3404}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1277}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
-局限
+模块
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+低分辨率（\textless=1080p）
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+高分辨率（\textgreater=2K）
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+瓶颈
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{VENC} & 远超 CPU（5×\textasciitilde10×） & 远超
+CPU（8×\textasciitilde10×） & 纯硬件编码计算 \\
+\textbf{VDEC} & 落后 CPU（\textasciitilde59ms 固定开销） & 领先
+CPU（1.9×\textasciitilde2.2×） & Python 回调调度 \\
+\textbf{VPC} & 与 CPU 互有胜负（0.5×\textasciitilde1.2×） & 领先
+CPU（1.6×\textasciitilde2.1×） & Stream 同步开销 \\
+\end{longtable}
+}
+
+\begin{quote}
+VPC 的固定开销比 VDEC 小得多（Stream 同步比回调线程轻量），因此即使在
+720p 也能与 CPU 抗衡，而 VDEC 要到 2K 以上才有竞争力。
+\end{quote}
+
+\subsubsection{CSC 性能（310B
+不支持，仅供参考）}\label{csc-ux6027ux80fd310b-ux4e0dux652fux6301ux4ec5ux4f9bux53c2ux8003}
+
+310B 上 CSC（YUYV→NV12）必须走
+CPU：\passthrough{\lstinline!cv2.cvtColor(YUYV→BGR) + bgr\_to\_nv12()!}。VPC
+只能卸载 resize，CPU 仅做色彩转换。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{常见问题与调试}\label{ux5e38ux89c1ux95eeux9898ux4e0eux8c03ux8bd5-1}
+
+\subsubsection{问题 \#1：310B 不支持
+dvpp\_vpc\_convert\_color\_async}\label{ux95eeux9898-1310b-ux4e0dux652fux6301-dvpp_vpc_convert_color_async}
+
+\textbf{现象}：\passthrough{\lstinline!dvpp\_vpc\_convert\_color\_async!}
+返回 \passthrough{\lstinline!100000!}（ACL\_ERROR\_INVALID\_PARAM）。
+
+\textbf{根因}：该接口仅支持 310P 及以上型号。310B（Atlas 200I A2）的
+CANN 8.3.RC1 版本不支持。
+
+\textbf{修复}：无 VPC 硬件替代方案。YUYV→NV12 使用
+CPU：\passthrough{\lstinline!cv2.cvtColor(YUYV→BGR) + bgr\_to\_nv12()!}。VPC
+仅卸载 resize 部分。
+
+\subsubsection{问题 \#2：pic\_desc 必须设置
+height\_stride}\label{ux95eeux9898-2pic_desc-ux5fc5ux987bux8bbeux7f6e-height_stride}
+
+\textbf{现象}：\passthrough{\lstinline!dvpp\_vpc\_resize\_async!} 返回
+\passthrough{\lstinline!100000!}（ACL\_ERROR\_INVALID\_PARAM）。
+
+\textbf{根因}：\passthrough{\lstinline!dvpp\_set\_pic\_desc\_height\_stride!}
+未设置，且 \passthrough{\lstinline!dvpp\_set\_pic\_desc\_size!}
+使用了未对齐的 \passthrough{\lstinline!W*H*3//2!}。VPC 要求高度 stride
+对齐到 2，宽度 stride 对齐到 16，缓冲区大小按 stride 计算。
+
+\textbf{修复}：
+
+\begin{lstlisting}[language=Python]
+sw = ((w + 15) // 16) * 16   # width stride
+sh = ((h + 1) // 2) * 2     # height stride
+size = sw * sh * 3 // 2      # 按 stride 算总大小
+media.dvpp_set_pic_desc_width_stride(pic, sw)
+media.dvpp_set_pic_desc_height_stride(pic, sh)
+media.dvpp_set_pic_desc_size(pic, size)
+\end{lstlisting}
+
+\subsubsection{问题 \#3：dvpp\_create\_roi\_config 不接受 keyword
+参数}\label{ux95eeux9898-3dvpp_create_roi_config-ux4e0dux63a5ux53d7-keyword-ux53c2ux6570}
+
+\textbf{现象}：\passthrough{\lstinline!dvpp\_create\_roi\_config()!} +
+\passthrough{\lstinline!dvpp\_set\_roi\_config()!} 不存在或报错。
+
+\textbf{根因}：\passthrough{\lstinline!dvpp\_set\_roi\_config!} 在 CANN
+8.3.RC1 的 Python API 中不接受 keyword 参数。正确做法是在
+\passthrough{\lstinline!dvpp\_create\_roi\_config()!} 中直接传入 4
+个位置参数。
+
+\textbf{修复}：
+
+\begin{lstlisting}[language=Python]
+# 正确
+crop_area = acl.media.dvpp_create_roi_config(left, right, top, bottom)
+
+# 错误
+crop_area = acl.media.dvpp_create_roi_config()
+acl.media.dvpp_set_roi_config(crop_area, left, right, top, bottom)
+\end{lstlisting}
+
+\subsubsection{问题 \#4：himpi 通道不可从 Python
+创建}\label{ux95eeux9898-4himpi-ux901aux9053ux4e0dux53efux4ece-python-ux521bux5efa}
+
+\textbf{现象}：\passthrough{\lstinline!himpi.vpc\_create\_chn()!}
+无论传什么参数都报 ``args parse failed''。
+
+\textbf{根因}：himpi 接口是 C 扩展的直接映射，需要 C
+结构体类型的参数，Python
+侧不支持创建这些结构体。\passthrough{\lstinline!vpc\_convert\_color!}
+虽然语法上可以调用，但缺少预配置的 himpi 通道，返回硬件错误
+\passthrough{\lstinline!0xa0078003!}。
+
+\textbf{当前结论}：310B 上的 VPC CSC 不可用。等待 CANN 后续版本在 310B
+上开放 \passthrough{\lstinline!dvpp\_vpc\_convert\_color\_async!} 支持。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{场景推荐}\label{ux573aux666fux63a8ux8350}
+
+\subsubsection{场景决策树}\label{ux573aux666fux51b3ux7b56ux6811}
+
+需要对图像做预处理？
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{仅缩放}（NV12 in → NV12 out）→
+  \passthrough{\lstinline!dvpp\_vpc\_resize\_async!}（简单，Stream
+  同步）
+\item
+  \textbf{仅裁剪} → \passthrough{\lstinline!dvpp\_vpc\_crop\_async!}
+\item
+  \textbf{裁剪 + 缩放} →
+  \passthrough{\lstinline!dvpp\_vpc\_crop\_resize\_async!}（推荐，一次调用）
+\item
+  \textbf{仅色彩转换}（YUYV → NV12）→ 310B 不支持，使用 CPU
+  \passthrough{\lstinline!cv2.cvtColor!} +
+  \passthrough{\lstinline!bgr\_to\_nv12!}
+\item
+  \textbf{色彩转换 + 缩放}（摄像头场景）：
+
+  \begin{enumerate}
+  \def\labelenumi{\arabic{enumi}.}
+  \tightlist
+  \item
+    CPU \passthrough{\lstinline!bgr\_to\_nv12!}（YUYV→NV12）
+  \item
+    VPC \passthrough{\lstinline!dvpp\_vpc\_resize\_async!}（1080p→720p）
+  \end{enumerate}
+\item
+  \textbf{小型图像、非实时} → CPU (cv2) 足够
+\end{itemize}
+
+\subsubsection{典型场景}\label{ux5178ux578bux573aux666f}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2857}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4286}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2857}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+场景
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+推荐方案
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+理由
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+USB 摄像头 → WebRTC & CPU CSC + VPC resize & CSC 走 CPU，resize 卸载到
+VPC \\
+视频文件预处理 & dvpp\_vpc\_crop\_resize\_async &
+单次调用完成裁剪+缩放 \\
+AI 推理前处理 & VPC resize + AIPP CSC & Resize→AI Core 直接推理 \\
+多路视频并发（\textgreater4 路） & \textbf{VPC 必须} & CPU 做多路 resize
+会占满所有核 \\
+\end{longtable}
+}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{附录}\label{ux9644ux5f55-2}
+
+\subsubsection{常用调试命令}\label{ux5e38ux7528ux8c03ux8bd5ux547dux4ee4-2}
+
+\begin{lstlisting}[language=bash]
+# VPC 驱动状态
+lsmod | grep vpc
+
+# VPC 内核日志
+dmesg | grep -i vpc | tail -10
+
+# 运行示例脚本
+python samples/chapter5/vpc/vpc_minimal.py
+
+# 运行基准测试
+python samples/chapter5/vpc/bench_vpc.py
+\end{lstlisting}
+
+\subsubsection{参数速查表}\label{ux53c2ux6570ux901fux67e5ux8868-2}
+
+\textbf{VPC 通道创建}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+参数 & API & 值 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+通道描述符 & \passthrough{\lstinline!dvpp\_create\_channel\_desc()!} &
+--- \\
+创建通道 & \passthrough{\lstinline!dvpp\_create\_channel(ch\_desc)!} &
+ret=0 \\
+创建 Stream & \passthrough{\lstinline!acl.rt.create\_stream()!} &
+ret=0 \\
+\end{longtable}
+}
+
+\textbf{VPC 操作 API}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+操作 & API & 310B 支持 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+缩放 & \passthrough{\lstinline!dvpp\_vpc\_resize\_async!} & 支持 \\
+裁剪 & \passthrough{\lstinline!dvpp\_vpc\_crop\_async!} & 支持 \\
+裁剪+缩放 & \passthrough{\lstinline!dvpp\_vpc\_crop\_resize\_async!} &
+支持 \\
+色域转换 & \passthrough{\lstinline!dvpp\_vpc\_convert\_color\_async!} &
+不支持 \\
+\end{longtable}
+}
+
+\textbf{像素格式}（\passthrough{\lstinline!dvpp\_set\_pic\_desc\_format!}）：1
+= NV12 (YUV420SP), 7 = YUYV (YUV422 interleaved), 12 = RGB888, 13 =
+BGR888
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\section{JPEG --- 硬件编解码}\label{jpeg}
+
+\begin{quote}
+JPEGE / JPEGD 使用与 VPC 相同的 Stream
+同步模型。前置基础：\hyperref[dvpp-basics]{DVPP 基础概念}。
+\end{quote}
+
+\subsection{JPEG 编解码简介}\label{jpeg-ux7f16ux89e3ux7801ux7b80ux4ecb}
+
+DVPP 的 JPEG 编解码子模块：
+
+\begin{lstlisting}
+JPEGE (JPEG Encoder):  NV12 → [硬件编码] → JPEG 码流
+JPEGD (JPEG Decoder):  JPEG 码流 → [硬件解码] → NV12
+\end{lstlisting}
+
+两者串联形成硬件闭环，可验证编解码无损性（测试常用模式）。
+
+\subsubsection{与 VENC
+编码的区别}\label{ux4e0e-venc-ux7f16ux7801ux7684ux533aux522b}
+
+VENC 输出 H.264 码流，但 JPEGE 输出的是\textbf{独立的 JPEG
+图片}------两者有本质不同：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+JPEGE
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VENC
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+输出格式 & JPEG 单帧图片 & H.264 / H.265 视频码流 \\
+帧间关系 & 无（每帧独立） & 有（I/P/B 帧依赖） \\
+输出描述符 & \textbf{裸内存缓冲区} + size 指针 &
+\textbf{stream\_desc}（码流描述符） \\
+编码参数 & quality（1-100） & GOP、码率、帧率、profile \\
+用途 & 截图、快照、缩略图 & 实时视频传输 \\
+\end{longtable}
+}
+
+\subsubsection{硬件能力规格（Ascend
+310B4）}\label{ux786cux4ef6ux80fdux529bux89c4ux683cascend-310b4-2}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+& JPEGE & JPEGD \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+输入格式 & NV12 (YUV420SP)、YUV422SP & JPEG 码流（Baseline） \\
+输出格式 & JPEG 码流 & NV12 (YUV420SP) \\
+分辨率范围 & 32×32 \textasciitilde{} 8192×8192 & 32×32 \textasciitilde{}
+8192×8192 \\
+质量范围 & 1-100 & --- \\
+编码吞吐 & 1080p@256fps & 1080p@512fps \\
+\end{longtable}
+}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{与 VENC/VDEC/VPC
+的关键区别}\label{ux4e0e-vencvdecvpc-ux7684ux5173ux952eux533aux522b}
+
+JPEGE/JPEGD 使用与 VPC 相同的\textbf{通用 dvpp 通道 + Stream 同步}模型：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2069}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3793}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4138}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+维度
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+VENC/VDEC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+JPEGE/JPEGD
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+通道创建 & \passthrough{\lstinline!venc/vdec\_create\_channel()!} &
+\passthrough{\lstinline!dvpp\_create\_channel()!}（无需 mode） \\
+异步机制 & 回调线程 & Stream 同步 \\
+输入描述 & 图片或码流描述符 & \textbf{裸内存指针 + size} \\
+输出描述 & 图片或码流描述符 & JPEGE: \textbf{裸内存 + size 指针}；JPEGD:
+pic\_desc \\
+\end{longtable}
+}
+
+\begin{quote}
+JPEGE 的输出不是
+\passthrough{\lstinline!stream\_desc!}------这是一个常见误区。JPEG
+码流直接写入 \passthrough{\lstinline!dvpp\_malloc!} 分配的缓冲区，通过
+\passthrough{\lstinline!numpy\_to\_ptr!} 封装的 size 指针返回实际大小。
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{JPEGE API 详解}\label{jpege-api-ux8be6ux89e3}
+
+\subsubsection{编码流程}\label{ux7f16ux7801ux6d41ux7a0b}
+
+\begin{lstlisting}
+(1) 创建 jpege_config + 设置质量 → (2) predict_enc_size 预测输出大小
+    → (3) dvpp_malloc 输出缓冲区 → (4) jpeg_encode_async 异步编码
+    → (5) synchronize_stream 等待 → (6) 读取实际 size → (7) memcpy 取回 JPEG 码流
+\end{lstlisting}
+
+\subsubsection{jpege\_config ---
+编码参数}\label{jpege_config-ux7f16ux7801ux53c2ux6570}
+
+\begin{lstlisting}[language=Python]
+jpege_cfg = acl.media.dvpp_create_jpege_config()
+acl.media.dvpp_set_jpege_config_level(jpege_cfg, quality)  # quality: 1-100
+\end{lstlisting}
+
+唯一参数是 \textbf{quality}（1-100），对应 JPEG
+压缩质量。值越大画质越好、文件越大。
+
+\subsubsection{predict\_enc\_size ---
+预测输出大小}\label{predict_enc_size-ux9884ux6d4bux8f93ux51faux5927ux5c0f}
+
+\begin{lstlisting}[language=Python]
+max_size, ret = acl.media.dvpp_jpeg_predict_enc_size(input_pic_desc, jpege_cfg)
+\end{lstlisting}
+
+返回编码后 JPEG
+码流的\textbf{最大可能大小}（通常远大于实际值）。输出缓冲区需按此值分配。
+
+\subsubsection{jpeg\_encode\_async ---
+执行编码}\label{jpeg_encode_async-ux6267ux884cux7f16ux7801}
+
+\begin{lstlisting}[language=Python]
+import numpy as np
+
+# in/out 参数：传入 max_size，编码后返回实际大小
+out_size_arr = np.array([max_size], dtype=np.int32)
+if "bytes_to_ptr" in dir(acl.util):
+    out_size_ptr = acl.util.bytes_to_ptr(out_size_arr.tobytes())
+else:
+    out_size_ptr = acl.util.numpy_to_ptr(out_size_arr)
+
+ret = acl.media.dvpp_jpeg_encode_async(
+    channel_desc,       # dvpp 通道描述符
+    input_pic_desc,     # NV12 输入图片描述符
+    output_buffer,      # 输出缓冲区（dvpp_malloc）
+    out_size_ptr,       # in/out: [max_size] → [actual_size]
+    jpege_cfg,          # 编码配置
+    stream              # Stream 对象
+)
+acl.rt.synchronize_stream(stream)
+
+# 同步后读取实际编码大小
+actual_size = int(out_size_arr[0])
+\end{lstlisting}
+
+\textbf{关键点}：\passthrough{\lstinline!out\_size\_ptr!} 是 Python 层用
+\passthrough{\lstinline!numpy\_to\_ptr!} 封装的指针，指向一个
+\passthrough{\lstinline!int32!}
+数组。编码器写入实际大小后，同步完成即可读取。
+
+\subsubsection{完整编码示例}\label{ux5b8cux6574ux7f16ux7801ux793aux4f8b}
+
+\begin{lstlisting}[language=Python]
+# 准备输入 NV12 pic_desc（略）
+
+jpege_cfg = media.dvpp_create_jpege_config()
+media.dvpp_set_jpege_config_level(jpege_cfg, 85)
+
+max_size, _ = media.dvpp_jpeg_predict_enc_size(in_pic, jpege_cfg)
+out_buf, _ = media.dvpp_malloc(max_size)
+
+out_size_arr = np.array([max_size], dtype=np.int32)
+out_size_ptr = acl.util.numpy_to_ptr(out_size_arr)
+
+media.dvpp_jpeg_encode_async(ch_desc, in_pic, out_buf,
+                              out_size_ptr, jpege_cfg, stream)
+acl.rt.synchronize_stream(stream)
+
+jpeg_size = int(out_size_arr[0])
+jpeg_host = np.zeros(jpeg_size, dtype=np.uint8)
+acl.rt.memcpy(jpeg_host.ctypes.data, jpeg_size, out_buf, jpeg_size,
+              ACL_MEMCPY_DEVICE_TO_HOST)
+# jpeg_host 即为 JPEG 码流，可直接写入 .jpg 文件
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{JPEGD API 详解}\label{jpegd-api-ux8be6ux89e3}
+
+\subsubsection{解码流程}\label{ux89e3ux7801ux6d41ux7a0b}
+
+\begin{lstlisting}
+(1) JPEG 数据拷贝到设备 → (2) get_image_info 获取宽高
+    → (3) predict_dec_size 预测输出大小 → (4) dvpp_malloc + 创建 pic_desc
+    → (5) jpeg_decode_async 异步解码 → (6) synchronize_stream → (7) memcpy 取回 NV12
+\end{lstlisting}
+
+\subsubsection{get\_image\_info --- 获取 JPEG
+信息}\label{get_image_info-ux83b7ux53d6-jpeg-ux4fe1ux606f}
+
+\begin{lstlisting}[language=Python]
+img_w, img_h, img_fmt, ret = acl.media.dvpp_jpeg_get_image_info(
+    jpeg_dev_ptr, jpeg_size)
+\end{lstlisting}
+
+解码前必须调用此函数获取 JPEG 图像的宽度和高度，用于创建输出 pic\_desc。
+
+\subsubsection{predict\_dec\_size ---
+预测输出大小}\label{predict_dec_size-ux9884ux6d4bux8f93ux51faux5927ux5c0f}
+
+\begin{lstlisting}[language=Python]
+out_size, ret = acl.media.dvpp_jpeg_predict_dec_size(
+    jpeg_dev_ptr, jpeg_size, PIX_FMT_NV12)
+\end{lstlisting}
+
+返回解码后 NV12 缓冲区的所需大小。
+
+\subsubsection{jpeg\_decode\_async ---
+执行解码}\label{jpeg_decode_async-ux6267ux884cux89e3ux7801}
+
+\begin{lstlisting}[language=Python]
+ret = acl.media.dvpp_jpeg_decode_async(
+    channel_desc,       # dvpp 通道描述符
+    jpeg_dev_ptr,       # JPEG 数据指针（设备内存）
+    jpeg_size,          # JPEG 数据大小
+    output_pic_desc,    # 输出 NV12 pic_desc
+    stream              # Stream 对象
+)
+acl.rt.synchronize_stream(stream)
+\end{lstlisting}
+
+\subsubsection{完整解码示例}\label{ux5b8cux6574ux89e3ux7801ux793aux4f8b}
+
+\begin{lstlisting}[language=Python]
+# 拷贝 JPEG 到设备内存
+jpeg_dev, _ = media.dvpp_malloc(len(jpeg_data))
+acl.rt.memcpy(jpeg_dev, len(jpeg_data), jpeg_data.ctypes.data,
+              len(jpeg_data), ACL_MEMCPY_HOST_TO_DEVICE)
+
+# 获取图像信息
+w, h, fmt, _ = media.dvpp_jpeg_get_image_info(jpeg_dev, len(jpeg_data))
+
+# 预测 + 解码
+out_size, _ = media.dvpp_jpeg_predict_dec_size(jpeg_dev, len(jpeg_data), PIX_FMT_NV12)
+out_buf, _ = media.dvpp_malloc(out_size)
+out_pic = create_nv12_pic_desc(out_buf, w, h)  # 见 vpc_guide
+
+media.dvpp_jpeg_decode_async(ch_desc, jpeg_dev, len(jpeg_data), out_pic, stream)
+acl.rt.synchronize_stream(stream)
+
+# 取回 NV12
+nv12_host = np.zeros(out_size, dtype=np.uint8)
+acl.rt.memcpy(nv12_host.ctypes.data, out_size, out_buf, out_size,
+              ACL_MEMCPY_DEVICE_TO_HOST)
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{acllite 快速上手}\label{acllite-ux5febux901fux4e0aux624b-1}
+
+acllite 将 JPEG 编解码封装为简洁 API。环境初始化见
+\hyperref[acllite]{acllite 封装库}。
+
+\begin{lstlisting}[language=Python]
+# JPEG 编码
+jpeg_img = vpc.jpege(img)                      # NV12 → JPEG
+jpeg_bytes = jpeg_img.byte_data_to_np_array()
+
+# JPEG 解码
+decoded = vpc.jpegd(jpeg_img)                  # JPEG → NV12
+nv12 = decoded.byte_data_to_np_array()
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{练习脚本走读}\label{ux7ec3ux4e60ux811aux672cux8d70ux8bfb-2}
+
+完整代码见
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/jpeg/jpeg_minimal.py}{\passthrough{\lstinline!samples/chapter5/jpeg/jpeg\_minimal.py!}}。程序使用原始
+\passthrough{\lstinline!acl.media!} API 演示 \textbf{JPEGE → JPEGD
+闭环}（理解底层后再用 acllite）。
+
+\subsubsection{(1) JPEGE ---
+编码一帧}\label{jpege-ux7f16ux7801ux4e00ux5e27}
+
+\begin{lstlisting}[language=Python]
+# 创建 JPEGE 配置
+jpege_cfg = media.dvpp_create_jpege_config()
+media.dvpp_set_jpege_config_level(jpege_cfg, 90)
+
+# 预测编码后最大大小
+max_size, _ = media.dvpp_jpeg_predict_enc_size(in_pic, jpege_cfg)
+
+# 分配输出缓冲区
+out_buf, _ = media.dvpp_malloc(max_size)
+
+# in/out 参数：传 max_size，同步后读 actual_size
+out_size_arr = np.array([max_size], dtype=np.int32)
+out_size_ptr = acl.util.numpy_to_ptr(out_size_arr)
+
+media.dvpp_jpeg_encode_async(ch_desc, in_pic, out_buf,
+                              out_size_ptr, jpege_cfg, stream)
+acl.rt.synchronize_stream(stream)
+
+jpeg_actual = int(out_size_arr[0])  # ← 同步后才能读
+\end{lstlisting}
+
+\subsubsection{(2) JPEGD ---
+解码验证}\label{jpegd-ux89e3ux7801ux9a8cux8bc1}
+
+\begin{lstlisting}[language=Python]
+# 获取 JPEG 信息
+w, h, fmt, _ = media.dvpp_jpeg_get_image_info(jpeg_dev, jpeg_size)
+
+# 预测解码大小
+dec_size, _ = media.dvpp_jpeg_predict_dec_size(jpeg_dev, jpeg_size, PIX_FMT_NV12)
+
+# 创建输出 pic_desc + 解码
+dec_buf, _ = media.dvpp_malloc(dec_size)
+dec_pic = create_pic_desc(dec_buf, w, h)
+
+media.dvpp_jpeg_decode_async(ch_desc, jpeg_dev, jpeg_size, dec_pic, stream)
+acl.rt.synchronize_stream(stream)
+
+# 验证闭环：输入 NV12 大小 = 输出 NV12 大小
+\end{lstlisting}
+
+\subsubsection{310B 实测输出}\label{b-ux5b9eux6d4bux8f93ux51fa}
+
+\begin{lstlisting}
+JPEGE OK  640x480 NV12 → 2097152 bytes JPEG  (quality=90)
+JPEGD OK  2097152 bytes JPEG → 640x480 NV12  size=460800
+闭环验证  PASS  输入=460800 输出=460800
+\end{lstlisting}
+
+\begin{quote}
+JPEG 码流 2MB
+是因为测试帧的渐变+棋盘格纹理压缩率低（确定性生成，非真实照片）。正常照片在
+quality=85 下通常只有几十 KB。
+\end{quote}
+
+\subsubsection{与项目的对应关系}\label{ux4e0eux9879ux76eeux7684ux5bf9ux5e94ux5173ux7cfb-1}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+文件 & 角色 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!jpeg\_minimal.py!} & 学习用途------裸 API
+编解码闭环 \\
+\passthrough{\lstinline!vpc\_acllite\_demo.py!} & acllite 封装------简化
+jpege/jpegd 调用 \\
+\end{longtable}
+}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{场景推荐}\label{ux573aux666fux63a8ux8350-1}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+场景 & 推荐方案 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+WebRTC 截图保存 & \passthrough{\lstinline!vpc.jpege(frame)!} → 写入 .jpg
+文件 \\
+MJPEG 视频流解码 & \passthrough{\lstinline!vpc.jpegd()!} 逐帧解码（配合
+VPC resize） \\
+照片缩略图生成 & VPC resize → JLEGE 编码（全硬件管道） \\
+快速原型 & acllite（三行代码：init → jpege → 写入文件） \\
+追求最小 JPEG 文件 & 裸 API + 精细调 quality 参数 \\
+\end{longtable}
+}
+
+\subsubsection{全硬件截图管道}\label{ux5168ux786cux4ef6ux622aux56feux7ba1ux9053}
+
+\begin{lstlisting}
+WebRTC NV12 帧 → VPC resize(320×240) → JPEGE(quality=80) → JPEG 文件
+                        ↑ 硬件                  ↑ 硬件
+\end{lstlisting}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{常见问题与调试}\label{ux5e38ux89c1ux95eeux9898ux4e0eux8c03ux8bd5-2}
+
+\subsubsection{问题 \#1：JPEGE 输出不是
+stream\_desc}\label{ux95eeux9898-1jpege-ux8f93ux51faux4e0dux662f-stream_desc}
+
+\textbf{现象}：试图用
+\passthrough{\lstinline!dvpp\_get\_stream\_desc\_data!}
+读取编码输出，得到无效数据。
+
+\textbf{根因}：JPEGE 输出写入裸内存缓冲区，不是
+\passthrough{\lstinline!stream\_desc!}。只有 VENC 使用 stream\_desc
+输出。
+
+\textbf{修复}：JPEGE 输出直接 \passthrough{\lstinline!memcpy!} 从
+\passthrough{\lstinline!out\_buf!} 拷出，实际大小从
+\passthrough{\lstinline!out\_size\_ptr!} 读取。
+
+\subsubsection{问题 \#2：out\_size\_ptr
+的同步时序}\label{ux95eeux9898-2out_size_ptr-ux7684ux540cux6b65ux65f6ux5e8f}
+
+\textbf{现象}：\passthrough{\lstinline!synchronize\_stream!} 之前读取
+\passthrough{\lstinline!out\_size\_arr[0]!}，得到的是 max\_size 而非
+actual\_size。
+
+\textbf{根因}：\passthrough{\lstinline!out\_size\_arr!} 是 in/out
+参数，编码器在硬件完成后才写入实际值。
+
+\textbf{修复}：\textbf{必须在
+\passthrough{\lstinline!synchronize\_stream!} 之后}读取
+\passthrough{\lstinline!out\_size\_arr[0]!}。
+
+\subsubsection{问题 \#3：predict\_enc\_size
+返回的值远大于实际}\label{ux95eeux9898-3predict_enc_size-ux8fd4ux56deux7684ux503cux8fdcux5927ux4e8eux5b9eux9645}
+
+\textbf{现象}：\passthrough{\lstinline!predict\_enc\_size!} 返回
+2MB，但编码后只有 30KB。
+
+\textbf{根因}：\passthrough{\lstinline!predict\_enc\_size!}
+返回的是\textbf{最坏情况}的缓冲区大小，不是预测值。JPEG
+的压缩率取决于图像内容。
+
+\textbf{修复}：按 predict 值分配缓冲区（保障不溢出），编码后通过
+\passthrough{\lstinline!out\_size\_arr[0]!} 取实际大小。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{附录}\label{ux9644ux5f55-3}
+
+\subsubsection{参数速查表}\label{ux53c2ux6570ux901fux67e5ux8868-3}
+
+\textbf{JPEGE 编码流程}
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3529}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2941}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3529}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+步骤
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+API
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
 说明
 \end{minipage} \\
@@ -500,54 +4125,568 @@ DSL开发的优势与局限}\label{tbe-dslux5f00ux53d1ux7684ux4f18ux52bfux4e0eux
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-\textbf{自动调度的''黑盒''特性} & Auto
-Schedule对特殊结构的算子可能不够精细，当算子有强性能诉求时，可能无法达到极致性能 \\
-\textbf{灵活性受限} &
-对于具有极端定制化需求或特殊数据流模式的算子，DSL的自动调度可能无法完全满足 \\
-\textbf{高级算子覆盖} & 某些高级算子类型DSL可能尚未完全覆盖 \\
+创建配置 & \passthrough{\lstinline!dvpp\_create\_jpege\_config()!} &
+--- \\
+设置质量 &
+\passthrough{\lstinline!dvpp\_set\_jpege\_config\_level(cfg, 1-100)!} &
+越大画质越好 \\
+预测输出最大大小 &
+\passthrough{\lstinline!dvpp\_jpeg\_predict\_enc\_size(pic, cfg)!} &
+最坏情况 \\
+异步编码 &
+\passthrough{\lstinline!dvpp\_jpeg\_encode\_async(ch, pic, buf, size\_ptr, cfg, stream)!}
+& --- \\
+同步等待 & \passthrough{\lstinline!acl.rt.synchronize\_stream(stream)!}
+& --- \\
 \end{longtable}
 }
 
-\subsection{小结与展望}\label{ux5c0fux7ed3ux4e0eux5c55ux671b}
+\textbf{JPEGD 解码流程}
 
-本节我们通过一个向量加法算子，完整实践了TBE
-DSL开发的四步流程：算子分析、代码实现、编译、验证。你可能会感受到TBE
-DSL带来的便利------用熟悉的Python语言，专注于数学逻辑本身，而将底层复杂的硬件适配交给自动调度完成。
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3529}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2941}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3529}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+步骤
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+API
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+说明
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+获取图像信息 &
+\passthrough{\lstinline!dvpp\_jpeg\_get\_image\_info(ptr, size)!} &
+宽度/高度 \\
+预测输出大小 &
+\passthrough{\lstinline!dvpp\_jpeg\_predict\_dec\_size(ptr, sz, fmt)!} &
+NV12 \\
+异步解码 &
+\passthrough{\lstinline!dvpp\_jpeg\_decode\_async(ch, ptr, sz, pic\_desc, stream)!}
+& --- \\
+同步等待 & \passthrough{\lstinline!acl.rt.synchronize\_stream(stream)!}
+& --- \\
+\end{longtable}
+}
 
-这正体现了TBE的设计哲学：\textbf{将开发者从复杂的硬件指令和内存管理中解放出来，专注于算法本身}。
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
-然而，正如我们在''局限''中提到的，自动调度并非万能。当追求极致性能、或实现特殊计算模式时，我们需要更精细的控制能力。这正是下一节将要学习的\textbf{Ascend
-C开发范式}的用武之地。
+\section{集成实战：WebRTC
+推流性能对比}\label{ux96c6ux6210ux5b9eux6218webrtc-ux63a8ux6d41ux6027ux80fdux5bf9ux6bd4}
 
-在进入下一节之前，建议你亲自动手完成本节示例，并在自己的昇腾310B开发板上跑通验证。这是理解后续更深内容的基础。
+\begin{quote}
+完整可运行的代码位于
+\href{https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter5/WebRTC/}{\passthrough{\lstinline!samples/chapter5/WebRTC/!}}。本节聚焦教材层面的架构解读和关键设计；详细的运行步骤、日志证据、测试指南见该目录下的
+\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/WebRTC/README.md}{README.md}。
+\end{quote}
 
-\section{理解算子开发的核心概念}\label{ux7406ux89e3ux7b97ux5b50ux5f00ux53d1ux7684ux6838ux5fc3ux6982ux5ff5}
+\subsection{项目定位}\label{ux9879ux76eeux5b9aux4f4d}
 
-在动手实践之后，系统讲解算子开发中必须掌握的基础知识。包括算子原型定义（输入输出、属性、数据类型）、算子信息库（.ini文件）的作用与配置方法，以及Tiling（分片计算）的基本思想。这些概念将为后续学习Ascend
-C打下坚实的理论基础。
+WebRTC 综合案例将本章前面学习的 VENC、VDEC、VPC、JPEGD 等 DVPP
+子模块串联为完整的视频推流管道。它由一个 Python WebRTC
+服务端和一个浏览器接收页面组成------服务端在昇腾 310B
+上采集并编码视频，通过 aiortc 发送给浏览器。
 
-\section{深入底层：Ascend
-C算子开发入门}\label{ux6df1ux5165ux5e95ux5c42ascend-cux7b97ux5b50ux5f00ux53d1ux5165ux95e8}
+项目支持\textbf{三种视频源模式}，覆盖从纯软件到全硬件的完整对比：
 
-正式进入Ascend C开发范式。首先介绍Ascend
-C的编程模型（Host-Device协同、Kernel与Tiling）。然后以向量加法为例，详细讲解Ascend
-C的工程结构（C++源文件、CMakeLists.txt），并剖析CopyIn、Compute、CopyOut三段式流水线的代码实现。最后通过命令行编译、运行，并与TBE版本进行对比，体会两种方式的差异。
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.0923}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1385}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1692}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1385}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1692}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2923}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+模式
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+相机采集
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+MJPEG 解码
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+颜色转换
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+H.264 编码
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+1920×1080 实测帧率
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!demo!} & 无（合成演示帧） & --- & --- & libx264
+& 约 12.8fps \\
+\passthrough{\lstinline!usb\_camera!} & V4L2 直采 & CPU (PyAV) & RGB
+帧输出 & libx264 & 约 13.9fps \\
+\passthrough{\lstinline!usb\_camera --hardware-encode!} & V4L2 直采 &
+CPU (PyAV) & PyAV \passthrough{\lstinline!reformat("nv12")!} & CANN VENC
+& 约 12.1fps \\
+\passthrough{\lstinline!dvpp\_camera!} & V4L2 直采 & DVPP JPEGD &
+无（NV12 直通） & CANN VENC & 约 30.0fps \\
+\end{longtable}
+}
 
-\section{从简单到复杂：实现一个需要Tiling的算子（如矩阵加法）}\label{ux4eceux7b80ux5355ux5230ux590dux6742ux5b9eux73b0ux4e00ux4e2aux9700ux8981tilingux7684ux7b97ux5b50ux5982ux77e9ux9635ux52a0ux6cd5}
+\begin{quote}
+\passthrough{\lstinline!dvpp\_camera!} 模式下硬件编码自动启用（NV12
+帧必须走 VENC）。\passthrough{\lstinline!demo!} 和
+\passthrough{\lstinline!usb\_camera!} 不加
+\passthrough{\lstinline!--hardware-encode!} 则走 CPU libx264。
+\end{quote}
 
-当数据量超过AI Core的Local
-Memory容量时，必须引入Tiling技术。本节以一个矩阵加法算子为例，讲解Tiling策略的设计（分块大小计算、多核并行分配），并在Ascend
-C中完整实现带Tiling的算子。同时介绍CPU模拟调试和printf打印等调试技巧，帮助读者应对更复杂的场景。
+\subsection{目录结构与角色分工}\label{ux76eeux5f55ux7ed3ux6784ux4e0eux89d2ux8272ux5206ux5de5}
 
-\section{算子编译、部署与单元测试}\label{ux7b97ux5b50ux7f16ux8bd1ux90e8ux7f72ux4e0eux5355ux5143ux6d4bux8bd5}
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!server.py!} --- 服务入口：HTTP
+  路由、offer/answer、连接管理
+\item
+  \passthrough{\lstinline!webrtc\_app/!}
 
-聚焦算子开发的工程化环节。讲解如何使用ccec编译器将Ascend
-C代码编译成适配昇腾310B的动态链接库（.so文件），并手动部署到CANN算子库中。同时介绍使用AscendCL
-API编写单元测试的方法，验证算子的正确性，确保算子可被上层框架调用。
+  \begin{itemize}
+  \tightlist
+  \item
+    \passthrough{\lstinline!ascend\_source.py!} ---
+    视频源适配层：三种模式的初始化与帧产出
+  \item
+    \passthrough{\lstinline!cann\_encoder.py!} --- CANN VENC 编码器 +
+    aiortc 兼容层
+  \item
+    \passthrough{\lstinline!dvpp\_jpegd.py!} --- DVPP JPEGD
+    硬件解码器（MJPEG → NV12）
+  \item
+    \passthrough{\lstinline!v4l2\_capture.py!} --- PyAV V4L2 MJPEG
+    采集模块
+  \item
+    \passthrough{\lstinline!v4l2\_raw.py!} --- 直接 ioctl + mmap
+    采集（更高帧率，自动优先）
+  \end{itemize}
+\item
+  \passthrough{\lstinline!web/!} --- 浏览器接收页面（HTML/JS/CSS）
+\item
+  \passthrough{\lstinline!test/!} --- pytest 测试套件
+\end{itemize}
 
-\section{算子性能优化初探}\label{ux7b97ux5b50ux6027ux80fdux4f18ux5316ux521dux63a2}
+核心设计原则：\textbf{设备专属逻辑只写在
+\passthrough{\lstinline!webrtc\_app/!}
+内}，\passthrough{\lstinline!server.py!} 只做会话控制和 HTTP
+信令，不承载图像处理逻辑。接入新的视频源只需在
+\passthrough{\lstinline!AscendVideoTrack!} 中添加一个
+\passthrough{\lstinline!\_init\_xxx()!} 分支。
 
-从入门角度介绍性能优化的基本思路。涵盖内存访问优化（充分利用Local
-Memory）、计算与数据传输的流水线重叠（Double
-Buffer）、向量化编程等技巧。并通过一个简单的案例分析，展示如何使用CANN
-Profiling工具采集性能数据，定位瓶颈并进行初步优化。
+\subsection{关键模块走读}\label{ux5173ux952eux6a21ux5757ux8d70ux8bfb}
+
+\subsubsection{\texorpdfstring{\texttt{server.py} ---
+会话控制层}{server.py --- 会话控制层}}\label{server.py-ux4f1aux8bddux63a7ux5236ux5c42}
+
+\passthrough{\lstinline!server.py!} 是整个服务的入口。它不操作 CANN
+API，但有几处与硬件编码路径相关的设计值得注意：
+
+\textbf{H264
+编解码偏好（\passthrough{\lstinline!\_prefer\_h264\_for\_sender!}）}：当启用硬件编码（\passthrough{\lstinline!--hardware-encode!}
+或 \passthrough{\lstinline!dvpp\_camera!} 模式）时，服务端在 offer
+处理中强制将 video transceiver 的编解码偏好设为 H.264。因为 CANN VENC
+只输出 H.264 码流，如果浏览器和 aiortc 协商到
+VP8，硬件编码链路就会断裂------该设置是保证``硬件产出能被对端消费''的关键。
+
+\begin{lstlisting}[language=Python]
+def _prefer_h264_for_sender(pc, sender):
+    h264_codecs = [
+        c for c in RTCRtpSender.getCapabilities("video").codecs
+        if c.mimeType.lower() == "video/h264"
+    ]
+    for transceiver in pc.getTransceivers():
+        if transceiver.sender == sender:
+            transceiver.setCodecPreferences(h264_codecs)
+\end{lstlisting}
+
+\textbf{模式自动推断}：\passthrough{\lstinline!main()!} 在启动时自动合并
+\passthrough{\lstinline!--hardware-encode!} 和
+\passthrough{\lstinline!--source dvpp\_camera!}
+两个条件------任一满足即替换 aiortc 的
+\passthrough{\lstinline!H264Encoder!} 为
+\passthrough{\lstinline!CannH264Encoder!}。对于
+\passthrough{\lstinline!dvpp\_camera!} 模式下产出的 NV12 帧，libx264
+无法直接编码（libx264 只接受 YUV Planar 输入），因此 VENC 是必要条件。
+
+\textbf{连接关闭时先停源再关
+PeerConnection}：\passthrough{\lstinline!close\_peer\_connection()!}
+先调用 \passthrough{\lstinline!source\_track.stop()!} 释放
+\passthrough{\lstinline!/dev/video0!}，再
+\passthrough{\lstinline!await pc.close()!}。这样下一个 offer
+请求到达时可以立即复用摄像头设备。
+
+\subsubsection{\texorpdfstring{\texttt{ascend\_source.py} ---
+视频源适配层}{ascend\_source.py --- 视频源适配层}}\label{ascend_source.py-ux89c6ux9891ux6e90ux9002ux914dux5c42}
+
+\passthrough{\lstinline!AscendVideoTrack!} 继承
+\passthrough{\lstinline!MediaStreamTrack!}，是 aiortc
+获取视频帧的唯一入口。三种模式的差异全部封装在初始化方法和
+\passthrough{\lstinline!\_camera\_read()!} 中。
+
+\textbf{\passthrough{\lstinline!demo!} 模式}：纯软件合成帧------x/y
+颜色渐变 + 正弦移动白条 + 余弦移动白方块，不需要任何外设或 CANN
+依赖。用于验证 aiortc + 浏览器接收链路是否畅通。
+
+\textbf{\passthrough{\lstinline!usb\_camera!} 模式（软件基线）}：V4L2
+MJPEG 采集 → PyAV CPU JPEG 解码 → RGB
+\passthrough{\lstinline!VideoFrame!}。这是为对比 DVPP
+路径准备的软件基线，不依赖 CANN。
+
+\textbf{\passthrough{\lstinline!dvpp\_camera!} 模式（全硬件管线）}：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  V4L2 采集 MJPEG 码流（优先使用
+  \passthrough{\lstinline!V4l2RawCapture!} 直采
+  \textasciitilde24fps，失败降级到 PyAV \textasciitilde15fps）
+\item
+  \passthrough{\lstinline!DvppJpegDecoder!} 硬件解码为 NV12（含 stride
+  对齐）
+\item
+  返回 NV12 \passthrough{\lstinline!VideoFrame!} 给 aiortc →
+  \passthrough{\lstinline!CannH264Encoder!} 直通编码
+\end{enumerate}
+
+\textbf{V4L2
+双后端策略}：\passthrough{\lstinline!\_init\_dvpp\_camera()!} 优先尝试
+\passthrough{\lstinline!v4l2\_raw.py!}（直接 ioctl +
+mmap，帧率更高），失败时降级到
+\passthrough{\lstinline!v4l2\_capture.py!}（基于
+PyAV）。两套后端提供相同的 \passthrough{\lstinline!read(timeout)!}
+接口，上层的 \passthrough{\lstinline!\_camera\_read()!}
+不需要知道用哪个。
+
+\textbf{性能日志}：\passthrough{\lstinline!recv()!} 每 150 帧打印一次
+\passthrough{\lstinline!Track FPS!}，方便在设备端直接观察链路帧率；\passthrough{\lstinline!\_camera\_read()!}
+前 5 帧打印单帧解码耗时。
+
+\subsubsection{\texorpdfstring{\texttt{cann\_encoder.py} --- VENC
+硬件编码 + aiortc
+兼容}{cann\_encoder.py --- VENC 硬件编码 + aiortc 兼容}}\label{cann_encoder.py-venc-ux786cux4ef6ux7f16ux7801-aiortc-ux517cux5bb9}
+
+这是连接 CANN VENC 和 aiortc 的桥接层，包含三个核心组件：
+
+\textbf{\passthrough{\lstinline!CannVenc!}} --- 同步封装 VENC 异步回调
+API。与第 5 章 VENC 教程中的版本相比，WebRTC 版本增加了：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{\passthrough{\lstinline!pre\_padded!} 参数}：JPEGD 输出的 NV12
+  已经是 stride 对齐的（宽度对齐到 16），此时跳过 CPU 侧的 stride
+  重排循环，直接从 \passthrough{\lstinline!dvpp\_malloc!} →
+  \passthrough{\lstinline!memcpy!} →
+  \passthrough{\lstinline!venc\_send\_frame!}。这是实现''NV12
+  零拷贝管道''的关键------整个 JPEGD→VENC 路径上 NV12 的 stride
+  布局始终一致。
+\item
+  \textbf{回调队列残留检测}：\passthrough{\lstinline!encode()!} 发送前
+  drain 回调队列，若有残留帧则
+  warn。这能在日志中暴露''上一帧结果未被消费''的问题，避免静默丢帧。
+\item
+  \textbf{ACL context 线程安全}：每次 \passthrough{\lstinline!encode()!}
+  和回调线程入口都显式
+  \passthrough{\lstinline!set\_context(ctx)!}，确保线程池中的 executor
+  线程也能正常访问 ACL 资源。
+\end{itemize}
+
+\textbf{\passthrough{\lstinline!bgr\_to\_nv12()!}} --- 纯 NumPy 实现的
+BGR→NV12 转换。旧版依赖 OpenCV
+\passthrough{\lstinline!cv2.cvtColor!}，现在完全使用 NumPy
+整数运算（ITU-R BT.601 转换公式），消除了 OpenCV 依赖。在
+\passthrough{\lstinline!dvpp\_camera!} 模式下此函数不会被调用（NV12 已由
+JPEGD 产出）；仅在非 NV12 帧走硬件编码时作为回退路径。
+
+\textbf{\passthrough{\lstinline!CannH264Encoder!}} --- 继承 aiortc 的
+\passthrough{\lstinline!H264Encoder!}，只覆盖
+\passthrough{\lstinline!\_encode\_frame()!}：
+
+\passthrough{\lstinline!H264Encoder!} (aiortc) 的继承结构------只覆盖
+\passthrough{\lstinline!\_encode\_frame()!}，其余 RTP 封装全部继承：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!\_encode\_frame()!} → CANN VENC 编码
+  \textbf{{[}已覆盖{]}}
+\item
+  \passthrough{\lstinline!\_split\_bitstream()!} → Annex-B → NAL 分割
+  \textbf{{[}继承{]}}
+\item
+  \passthrough{\lstinline!\_packetize()!} → NAL → RTP 分包
+  \textbf{{[}继承{]}}
+\item
+  \passthrough{\lstinline!pack()!} → RTP 打包逻辑 \textbf{{[}继承{]}}
+\item
+  其他全部继承
+\end{itemize}
+
+关键设计：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{NV12 直通检测}：检查
+  \passthrough{\lstinline!frame.format.name == "nv12"!}。DVPP 产出的
+  NV12 帧直接调用
+  \passthrough{\lstinline!to\_ndarray!}（零格式转换），传入
+  \passthrough{\lstinline!pre\_padded=True!} 跳过 CPU stride 重排。
+\item
+  \textbf{BGR→NV12 走 PyAV reformat}：非 NV12 帧（如 demo 的 RGB
+  帧）调用 \passthrough{\lstinline!frame.reformat(format="nv12")!}，由
+  PyAV 的 C 实现完成色彩空间转换（比手动
+  \passthrough{\lstinline!bgr\_to\_nv12()!} 快得多），再
+  \passthrough{\lstinline!to\_ndarray!} 取出。
+\item
+  \textbf{FPS 自适应}：\passthrough{\lstinline!\_estimate\_fps()!}
+  从连续帧的 PTS 时间戳差值实时估算实际帧率，据此调整 VENC 的
+  \passthrough{\lstinline!src\_rate!}
+  参数。当实际帧率因采集链路抖动而变化时，VENC 的码率控制能跟随调整。
+\item
+  \textbf{CANN
+  不可用时自动回退}：\passthrough{\lstinline!\_CANN\_READY!} 为 False
+  时走 \passthrough{\lstinline!super().\_encode\_frame()!}（CPU
+  libx264），无缝降级。
+\end{itemize}
+
+\subsubsection{\texorpdfstring{\texttt{dvpp\_jpegd.py} --- DVPP JPEGD
+硬件解码器}{dvpp\_jpegd.py --- DVPP JPEGD 硬件解码器}}\label{dvpp_jpegd.py-dvpp-jpegd-ux786cux4ef6ux89e3ux7801ux5668}
+
+封装了 JPEGD 的完整生命周期：DVPP 通道创建 → JPEG→NV12 解码 →
+输出缓冲区管理。关键设计：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{按需分配}：首次解码时通过
+  \passthrough{\lstinline!dvpp\_jpeg\_get\_image\_info!}
+  获取宽高，\passthrough{\lstinline!dvpp\_jpeg\_predict\_dec\_size!}
+  预测输出大小后分配设备缓冲区。后续帧复用已分配的缓冲区，避免每帧
+  malloc。
+\item
+  \textbf{stride 对齐的 NV12 输出}：JPEGD 输出的 NV12 已按 16
+  宽度对齐，此 stride 布局与 VENC 的
+  \passthrough{\lstinline!pre\_padded=True!} 路径完全匹配。从 JPEGD 到
+  VENC，NV12 数据无需 CPU 做任何重排。
+\item
+  \textbf{线程安全}：\passthrough{\lstinline!decode()!} 入口显式
+  \passthrough{\lstinline!set\_context(ctx)!}，因为此方法在线程池的
+  executor 线程中被调用。
+\end{itemize}
+
+\subsubsection{\texorpdfstring{\texttt{v4l2\_raw.py} --- 高性能 V4L2
+采集}{v4l2\_raw.py --- 高性能 V4L2 采集}}\label{v4l2_raw.py-ux9ad8ux6027ux80fd-v4l2-ux91c7ux96c6}
+
+直接在 Python 中通过 \passthrough{\lstinline!fcntl.ioctl!} +
+\passthrough{\lstinline!mmap!} 操作 V4L2 设备，绕过 PyAV 的封装层。相比
+PyAV 路径（1080p 约 15fps），直接 ioctl 路径可达到摄像头原生帧率（1080p
+约 24fps）。两套后端通过相同的 \passthrough{\lstinline!read(timeout)!}
+接口互换，上层代码无需感知。
+
+\begin{quote}
+\passthrough{\lstinline!v4l2\_raw.py!} 中的
+\passthrough{\lstinline!v4l2\_buffer!} 结构体布局（88 字节）是针对
+aarch64 Linux 的硬编码值。在 x86-64 机器上此模块不可用，自动降级到
+PyAV。
+\end{quote}
+
+\subsection{性能实测（1920×1080）}\label{ux6027ux80fdux5b9eux6d4b19201080}
+
+测试环境：Ascend 310B 设备，Logitech C922 Pro Stream Webcam，V4L2
+\passthrough{\lstinline!1920×1080 MJPG 30fps!}，浏览器接收端通过 WebRTC
+接收视频流。
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1875}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1875}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3438}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2812}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+模式
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+路径
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Track FPS
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+瓶颈分析
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!demo!} & 合成帧 → libx264 → RTP & 12.8 & CPU
+libx264 1080p 编码本身较重 \\
+\passthrough{\lstinline!usb\_camera!} & V4L2 → CPU JPEG 解码 → RGB →
+libx264 → RTP & 13.9 & CPU JPEG 解码单帧 26\textasciitilde34ms \\
+\passthrough{\lstinline!usb\_camera --hardware-encode!} & V4L2 → CPU
+JPEG 解码 → reformat NV12 → VENC → RTP & 12.1 & CPU JPEG
+解码仍占主导，reformat 增加 22\textasciitilde27ms \\
+\passthrough{\lstinline!dvpp\_camera!} & V4L2 → JPEGD 硬件解码 → NV12 →
+VENC → RTP & \textbf{30.0} & JPEGD \textasciitilde5ms + VENC
+\textasciitilde6.5ms = 硬件全速 \\
+\end{longtable}
+}
+
+\textbf{关键结论}：
+
+\begin{itemize}
+\tightlist
+\item
+  VENC
+  单用不解决瓶颈------\passthrough{\lstinline!usb\_camera --hardware-encode!}
+  虽然编码从 \textasciitilde20ms 降至 \textasciitilde11ms，但 CPU JPEG
+  解码（\textasciitilde30ms）和 PyAV
+  reformat（\textasciitilde24ms）仍然在 CPU
+  上，总耗时反而超过纯软件路径。
+\item
+  JPEGD 才是真正的加速器------它把最重的 MJPEG
+  解码（\textasciitilde30ms）从 CPU 卸载到 DVPP
+  硬件（\textasciitilde5ms），同时输出 NV12 直接通
+  VENC，消除了色彩转换环节。
+\item
+  全硬件管道（JPEGD + VENC）才能达到 30fps------两个最重的环节都移出 CPU
+  后，链路帧率不再受 CPU 瓶颈限制。
+\end{itemize}
+
+\subsection{依赖说明}\label{ux4f9dux8d56ux8bf4ux660e}
+
+服务端（昇腾 310B）需要的依赖：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+依赖 & 用途 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!v4l-utils!} & V4L2
+命令行工具和库（\passthrough{\lstinline!sudo apt install!}） \\
+\passthrough{\lstinline!aiohttp!} & HTTP 服务端和静态页面托管 \\
+\passthrough{\lstinline!aiortc!} & Python 侧 WebRTC 实现 \\
+\passthrough{\lstinline!av!} (PyAV) & VideoFrame 构造 + V4L2 采集 \\
+\passthrough{\lstinline!numpy!} & 演示帧生成和 NV12 数据操作 \\
+CANN 8.3.RC1 & ACL Python API（硬件编码必需） \\
+\passthrough{\lstinline!pytest!} & 测试框架（仅开发） \\
+\end{longtable}
+}
+
+\begin{quote}
+旧版依赖的 \passthrough{\lstinline!opencv-python-headless!}
+已移除。usb\_camera 模式和 bgr\_to\_nv12 均已改用 PyAV + NumPy 纯实现。
+\end{quote}
+
+\subsection{关键结论}\label{ux5173ux952eux7ed3ux8bba}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{DVPP 模块不能孤立优化}------只用 VENC 而保留 CPU JPEG
+  解码，链路帧率反而从 13.9 降至 12.1fps。DVPP
+  的收益需要全链路协同才能兑现
+\item
+  \textbf{JPEGD + VENC 是 1080p
+  实时推流的不可或缺组合}------纯软件路径最高只能到
+  \textasciitilde14fps，全硬件管道稳定 30fps
+\item
+  \textbf{NV12 stride 对齐的零拷贝交付}------JPEGD 输出的 stride 对齐
+  NV12 直接匹配 VENC \passthrough{\lstinline!pre\_padded!}
+  输入要求，中间不经过任何 CPU 数据重排
+\item
+  \textbf{CANN
+  不可用时的优雅降级}------\passthrough{\lstinline!CannH264Encoder!}
+  自动回退到 libx264，\passthrough{\lstinline!AscendVideoTrack!} 在
+  CANN/DVPP 不可用时自动回退到 demo 模式
+\end{itemize}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\section{应用调试与常见
+FAQ}\label{ux5e94ux7528ux8c03ux8bd5ux4e0eux5e38ux89c1-faq}
+
+\subsection{调试技巧}\label{ux8c03ux8bd5ux6280ux5de7}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{返回值检查}：所有 ACL 接口均返回 \passthrough{\lstinline!ret!}
+  状态码，\passthrough{\lstinline!0!} 表示成功。非 0
+  需查阅《错误码参考》。
+\item
+  \textbf{日志获取}：设置环境变量
+  \passthrough{\lstinline!export ASCEND\_GLOBAL\_LOG\_LEVEL=1!}（Info
+  级别）查看详细日志，日志默认位置在
+  \passthrough{\lstinline!\~/ascend/log/!}。
+\item
+  \textbf{NPU 状态}：\passthrough{\lstinline!npu-smi info!}
+  查看芯片温度和内存占用。
+\item
+  \textbf{驱动日志}：\passthrough{\lstinline!dmesg | grep -i venc!} /
+  \passthrough{\lstinline!dmesg | grep -i vdec!} /
+  \passthrough{\lstinline!dmesg | grep -i dvpp!} 排查硬件错误。
+\end{itemize}
+
+\subsection{常见问题}\label{ux5e38ux89c1ux95eeux9898}
+
+\textbf{Q: 为什么 \passthrough{\lstinline!acl.mdl.execute!} 报错
+``Memory Check Failed''?} A: 检查
+\passthrough{\lstinline!acl.mdl.get\_input\_size\_by\_index!}
+获取的大小是否与 \passthrough{\lstinline!acl.rt.malloc!}
+的大小严格一致。
+
+\textbf{Q: DVPP 解码后的图像显示异常？} A: DVPP 输出有宽/高对齐要求（如
+128×16 对齐）。读取数据时需要根据 \passthrough{\lstinline!stride!} 跳过
+Padding 数据，而不能简单按 \passthrough{\lstinline!width * height!}
+读取。
+
+\textbf{Q:
+\passthrough{\lstinline!libascendcl.so: cannot open shared object file!}?}
+A: 确认 \passthrough{\lstinline!LD\_LIBRARY\_PATH!} 包含
+\passthrough{\lstinline!/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64!}。
+
+\textbf{Q: \passthrough{\lstinline!No module named 'acl'!}?} A: 确认
+\passthrough{\lstinline!PYTHONPATH!} 包含
+\passthrough{\lstinline!/usr/local/Ascend/ascend-toolkit/latest/python/site-packages!}。
+
+\textbf{Q: VENC 创建通道返回 507018?} A: 常见原因：(1)
+\passthrough{\lstinline!max\_bit\_rate!} 单位是 \textbf{kbps} 而非
+bps（2000 而非 2000000）；(2)
+\passthrough{\lstinline!key\_frame\_interval!}（GOP）为 0，合法范围
+\passthrough{\lstinline![1, 65536]!}。
+
+\textbf{Q: VDEC 解码结果为空帧?} A: 检查回调中的
+\passthrough{\lstinline!ret\_code!}------非 0
+表示解码失败。常见原因：(1) 输入码流不是 Annex-B 格式（缺
+\passthrough{\lstinline!0x00000001!} 起始码）；(2) 首帧缺少 SPS + PPS +
+IDR；(3) \passthrough{\lstinline!entype!} 与输入码流的编码格式不匹配。
+
+\subsection{使用约束}\label{ux4f7fux7528ux7ea6ux675f}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Context 线程安全}：一个 Context
+  可以在多个线程中使用，但需用户保证并发安全。推荐一线程一 Context。
+\item
+  \textbf{Stream 约束}：Stream
+  上的任务按顺序执行，但异步接口下发后需显式
+  \passthrough{\lstinline!synchronize!} 才能确保数据就绪。
+\item
+  \textbf{内存对齐}：DVPP 对内存地址和图片尺寸有严格对齐要求（宽对齐到
+  16，高对齐到 2）。
+\item
+  \textbf{通道数量有限}：Ascend 310B4 的 VENC/VDEC 硬件实例通常每种只有
+  1-2 个。创建通道前确保之前的通道已销毁。
+\end{enumerate}

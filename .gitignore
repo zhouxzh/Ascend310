@@ -250,7 +250,7 @@ latex/*.vrb
 latex/*.xdv
 latex/*.dvi
 latex/*.ps
-latex/*.pdf
+# latex/*.pdf
 latex/_minted-*/
 latex/_build/
 latex/_build/**

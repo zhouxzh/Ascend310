@@ -683,7 +683,7 @@ def callback_thread(_args):                  # 独立线程处理回调
 
 `bench_venc.py` 将原始 VENC API 封装为可复用的 `CannVenc` 类，然后做 **5 分辨率扫描**对比硬件 vs CPU 编码性能。整个文件 ~380 行，分为 6 个部分。
 
-##### (1) 测试参数
+**(1) 测试参数**
 
 ```python
 RESOLUTIONS = [
@@ -705,7 +705,7 @@ FPS = 30
 - **固定种子 42**：同一种子下任何机器生成的测试帧内容相同，保证跨运行可复现
 - **3 帧预热**：排除首次编码的驱动初始化开销（比旧版 10 帧更精简）
 
-##### (2) 确定性测试帧生成
+**(2) 确定性测试帧生成**
 
 ```python
 def make_test_nv12(n: int, w: int, h: int) -> list[np.ndarray]:
@@ -719,7 +719,7 @@ def make_test_nv12(n: int, w: int, h: int) -> list[np.ndarray]:
 
 `make_test_bgr()` 生成同样的视觉内容但为 BGR 格式——给 CPU libx264 用（PyAV 内部转为 YUV）。
 
-##### (3) `CannVenc` 类详解
+**(3) `CannVenc` 类详解**
 
 将 `venc_minimal.py` 的原始 API 封装为可复用的同步接口。
 
@@ -767,7 +767,7 @@ encoded = self._cb_queue.get(timeout=5.0)
 
 **`destroy()`** — 先 `venc_destroy_channel` 再停回调线程，与 VDEC 的销毁顺序要求类似。
 
-##### (4) CPU 编码对比 — `bench_libx264()`
+**(4) CPU 编码对比 — `bench_libx264()`**
 
 ```python
 def bench_libx264(frames: list[np.ndarray], bitrate_bps: int) -> tuple:
@@ -780,7 +780,7 @@ def bench_libx264(frames: list[np.ndarray], bitrate_bps: int) -> tuple:
 
 参数与 VENC 对齐：Baseline profile、zerolatency tune、相同码率。PyAV 内部自动将 BGR 转为 YUV420P。
 
-##### (5) 主流程 — 分辨率扫描
+**(5) 主流程 — 分辨率扫描**
 
 ```python
 for w, h in RESOLUTIONS:
@@ -814,7 +814,7 @@ for w, h in RESOLUTIONS:
 
 含义：每像素每秒分配 0.1 bit，按分辨率等比缩放。
 
-##### (6) 本文件与 `venc_minimal.py` 的关系
+**(6) 本文件与 `venc_minimal.py` 的关系**
 
 | | `venc_minimal.py` | `bench_venc.py` |
 |---|---|---|
@@ -890,7 +890,7 @@ class CannH264Encoder(H264Encoder):
 | 2560×1440 | 3.7M | **58** | 7 | **8.6x** | 17.2ms | 147.2ms |
 | 3840×2160 | 8.3M | **29** | 4 | **7.7x** | 34.5ms | 265.7ms |
 
-##### VENC 延迟线性缩放
+**VENC 延迟线性缩放**
 
 将 VENC 延迟与像素数画在坐标上：
 
@@ -903,7 +903,7 @@ class CannH264Encoder(H264Encoder):
 - **每百万像素延迟递减**：从 14.3ms/MP（480p）降至 4.2ms/MP（4K）——高分辨率下硬件利用率更高
 - **4K 单帧仅 34.5ms**：在 30fps 场景下，编码仅占帧间隔（33.3ms）的 103%，刚好够单路实时
 
-##### CPU 延迟非线性恶化
+**CPU 延迟非线性恶化**
 
 | 指标 | 0.3M (480p) | 0.9M (720p) | 2.1M (1080p) | 3.7M (2K) | 8.3M (4K) |
 |------|------------|------------|-------------|----------|----------|
@@ -920,7 +920,7 @@ class CannH264Encoder(H264Encoder):
 - 1080p：CPU 已严重吃力（109ms/帧），VENC 仍从容（11ms/帧）→ 差距最大
 - 2K/4K：VENC 延迟增速追近 CPU（两者都进入像素主导区）→ 加速比略降但仍 >7.7x
 
-##### 与 VDEC 的对比
+**与 VDEC 的对比**
 
 VENC 和 VDEC 在 Ascend 310B4 上的表现截然不同：
 
@@ -937,7 +937,7 @@ VENC 和 VDEC 在 Ascend 310B4 上的表现截然不同：
 
 #### 什么场景下使用 VENC
 
-##### 场景决策树
+**场景决策树**
 
 需要实时视频编码（>30fps）？
 
@@ -949,7 +949,7 @@ VENC 和 VDEC 在 Ascend 310B4 上的表现截然不同：
   - 4K: CPU 4fps → 必须 VENC（且单路刚好 29fps 勉强达到实时）
 - **否**（离线/批处理）→ CPU 可考虑，但 VENC 仍快 5~10x
 
-##### 典型场景推荐
+**典型场景推荐**
 
 | 场景 | 推荐方案 | 理由 |
 |------|---------|------|
@@ -961,7 +961,7 @@ VENC 和 VDEC 在 Ascend 310B4 上的表现截然不同：
 | **AI 推理 + 视频边车** | **VENC** | CPU 编码会抢占 NPU 推理的 host 侧资源 |
 | **低功耗设备** | **VENC** | 硬件编码功耗远低于 CPU 全速运行 |
 
-##### 多路并发估算
+**多路并发估算**
 
 以 1080p@30fps 为目标帧率：
 
@@ -972,7 +972,7 @@ VENC 和 VDEC 在 Ascend 310B4 上的表现截然不同：
 
 VENC 的 91fps 吞吐意味着可以同时编码 3 路 1080p@30fps，CPU 几乎空闲。
 
-##### 什么情况下 CPU 编码就够了
+**什么情况下 CPU 编码就够了**
 
 只有**离线批处理**且满足以下全部条件时，CPU 才有意义：
 
@@ -1029,7 +1029,7 @@ python samples/chapter5/venc/bench_venc.py
 
 #### 参数速查表
 
-##### VENC 通道参数 {#venc-params}
+#### VENC 通道参数 {#venc-params}
 
 | 参数 | 函数 | 默认 | 推荐值 |
 |------|------|------|--------|
@@ -1091,7 +1091,7 @@ VDEC: H.264 码流 → [硬件解码] → NV12
 
 以下基于 CANN 8.3.RC1 + Ascend 310B4 实测和驱动常量定义。
 
-##### 支持的编码类型
+**支持的编码类型**
 
 | 编码格式 | Profile | `entype` 值 | 实测 |
 |----------|---------|-------------|------|
@@ -1105,7 +1105,7 @@ VDEC: H.264 码流 → [硬件解码] → NV12
 > 例如：用 Baseline 码流 + `entype=H265_MAIN` 虽然不会报错，
 > 但解码结果会是花屏或黑帧（编码标准不匹配）。
 
-##### 支持的输出像素格式
+**支持的输出像素格式**
 
 | 格式 | `out_pic_format` 值 | 位深 | 说明 |
 |------|---------------------|------|------|
@@ -1122,7 +1122,7 @@ VDEC: H.264 码流 → [硬件解码] → NV12
 > 位深 10-bit 理论上支持（`vdec_set_channel_desc_bit_depth`），
 > 但 310B4 驱动在 10-bit 下的实际表现未经充分验证。
 
-##### 分辨率和帧率约束
+**分辨率和帧率约束**
 
 | 约束项 | 值 | 说明 |
 |--------|-----|------|
@@ -1136,7 +1136,7 @@ VDEC: H.264 码流 → [硬件解码] → NV12
 > 实际可解码的最大分辨率受设备内存和码率限制。
 > 310B4 配备 16GB 内存，单路 4K@30fps 解码无压力。
 
-##### 输入码流约束
+**输入码流约束**
 
 | 约束项 | 说明 |
 |--------|------|
@@ -1146,7 +1146,7 @@ VDEC: H.264 码流 → [硬件解码] → NV12
 | 单次输入上限 | 取决于码流参数，超过约 256KB 可能被 VDEC 丢弃 |
 | 帧边界 | 每次 `vdec_send_frame` 应发送完整的一帧（含所有 NAL 单元） |
 
-##### H.264 Level 与典型应用
+**H.264 Level 与典型应用**
 
 | Level | 最大宏块数 | 典型分辨率@帧率 | 最大码率 |
 |-------|-----------|----------------|---------|
@@ -1441,7 +1441,7 @@ Baseline 是 WebRTC 强制要求的最低档次，且 VDEC `entype=1` 正好对�
 
 #### I 帧数量与解码性能 {#iframe-performance}
 
-##### 基准测试中的 I 帧数量
+**基准测试中的 I 帧数量**
 
 每 30 帧一个 I 帧。`bench_vdec.py` 使用 `TEST_GOP = 30`，90 帧测试中只有
 **3 个 I 帧**（帧 0、30、60），其余 87 帧是 P 帧。这是模拟真实视频流的配置。
@@ -1456,7 +1456,7 @@ Baseline 是 WebRTC 强制要求的最低档次，且 VDEC `entype=1` 正好对�
    ↑ ~80KB@480p 完全相同的大小
 ```
 
-##### 为什么用 GOP=30 而不是全 I 帧
+**为什么用 GOP=30 而不是全 I 帧**
 
 1. **真实视频流就是这样的**：WebRTC、RTSP、监控摄像头通常使用 GOP=15~60。
    GOP=30 表示每秒一个关键帧（30fps 下），是实时通信的典型配置。
@@ -1469,7 +1469,7 @@ Baseline 是 WebRTC 强制要求的最低档次，且 VDEC `entype=1` 正好对�
    1080p 领先 43%。切换到 GOP=30 后，VDEC 在 <=1080p 全面落后于 CPU。
    **全 I 帧测试的不是真实场景，测试结果不可用于工程决策。**
 
-##### I 帧比例对性能的颠覆性影响
+**I 帧比例对性能的颠覆性影响**
 
 | 测试模式 | 480p VDEC | 480p CPU | 1080p VDEC | 1080p CPU | 拐点 |
 |----------|----------|---------|-----------|---------|------|
@@ -1482,7 +1482,7 @@ Baseline 是 WebRTC 强制要求的最低档次，且 VDEC `entype=1` 正好对�
 - 原因：全 I 帧模式下每帧数据量大（~80KB），连续发送大包让 VDEC 硬件始终处于忙碌状态，调度开销被隐藏
 - 混合流下每帧只有 ~8KB（P 帧），VDEC 处理太快反而暴露了 Python 回调调度的固定瓶颈
 
-##### 帧类型与性能特性
+**帧类型与性能特性**
 
 | 帧类型 | 每帧大小 (480p) | 解码方式 | VDEC 表现 | CPU 表现 |
 |--------|---------------|---------|----------|---------|
@@ -1493,7 +1493,7 @@ Baseline 是 WebRTC 强制要求的最低档次，且 VDEC `entype=1` 正好对�
 CPU 解码 P 帧的开销远低于 I 帧（只需解残差），而 VDEC 每帧仍需经过完整的
 `memcpy → send → callback → memcpy → Queue` 路径，这部分时间与帧大小关系不大。
 
-##### 如何切换测试模式
+**如何切换测试模式**
 
 修改 `bench_vdec.py` 顶部的常量即可：
 
@@ -1722,7 +1722,7 @@ python samples/chapter5/vdec/vdec_minimal.py
 
 #### 参数速查表
 
-##### VDEC 通道参数 {#vdec-params}
+#### VDEC 通道参数 {#vdec-params}
 
 | 参数 | 函数 | 示例 |
 |------|------|------|
@@ -2050,7 +2050,7 @@ VPC Resize 与 VENC 不同——**不是所有分辨率都远超 CPU**。VPC 与
 
 **从 2K（2560×1440）开始 VPC 稳定领先**（1.6×~2.1×）。低分辨率下互有胜负——VPC 的固定调度开销（dvpp_malloc + memcpy + Stream 同步）在小帧上无法稳定被硬件加速摊薄，720p 虽 VPC 略快但优势微弱（1.19×），1080p 反而 CPU 略快（0.94×）。
 
-##### VPC vs VENC vs VDEC 性能模式对比
+**VPC vs VENC vs VDEC 性能模式对比**
 
 | 模块 | 低分辨率（<=1080p） | 高分辨率（>=2K） | 瓶颈 |
 |------|-------------------|----------------|------|
@@ -2164,7 +2164,7 @@ python samples/chapter5/vpc/bench_vpc.py
 
 #### 参数速查表
 
-##### VPC 通道创建
+**VPC 通道创建**
 
 | 参数 | API | 值 |
 |------|-----|-----|
@@ -2172,7 +2172,7 @@ python samples/chapter5/vpc/bench_vpc.py
 | 创建通道 | `dvpp_create_channel(ch_desc)` | ret=0 |
 | 创建 Stream | `acl.rt.create_stream()` | ret=0 |
 
-##### VPC 操作 API
+**VPC 操作 API**
 
 | 操作 | API | 310B 支持 |
 |------|-----|----------|
@@ -2522,7 +2522,7 @@ WebRTC NV12 帧 → VPC resize(320×240) → JPEGE(quality=80) → JPEG 文件
 
 #### 参数速查表
 
-##### JPEGE 编码流程
+**JPEGE 编码流程**
 
 | 步骤 | API | 说明 |
 |------|-----|------|
@@ -2532,7 +2532,7 @@ WebRTC NV12 帧 → VPC resize(320×240) → JPEGE(quality=80) → JPEG 文件
 | 异步编码 | `dvpp_jpeg_encode_async(ch, pic, buf, size_ptr, cfg, stream)` | — |
 | 同步等待 | `acl.rt.synchronize_stream(stream)` | — |
 
-##### JPEGD 解码流程
+**JPEGD 解码流程**
 
 | 步骤 | API | 说明 |
 |------|-----|------|

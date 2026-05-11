@@ -35,8 +35,8 @@ Python 语法调用昇腾处理器的强大能力，无缝衔接主流 AI 框架
 PyACL 封装了底层 C语言接口，主要包含以下模块： - \textbf{acl}:
 核心模块，提供初始化、Device 管理、内存管理、模型推理等功能。 -
 \textbf{acl.media}: 媒体数据处理（DVPP），包括 JPEG
-编解码、视频编解码、VPC（图像处理）。 - \textbf{acl.op}:
-单算子调用接口。
+编解码、视频编解码、VPC（图像处理）。详见\href{chapter5.md}{第5章}。 -
+\textbf{acl.op}: 单算子调用接口。
 
 \subsection{PyACL的逻辑架构}\label{pyaclux7684ux903bux8f91ux67b6ux6784}
 
@@ -182,8 +182,8 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 \begin{quote}
 \textbf{⚠ 注意}： PyACL 组件（\passthrough{\lstinline!acl.so!}）支持的
-Python 版本范围通常为 \textbf{3.7.5 \textasciitilde{}
-3.10}。请确保您的虚拟环境 Python 版本在此区间内。
+Python 版本范围通常为 \textbf{3.8 \textasciitilde{}
+3.11}。请确保您的虚拟环境 Python 版本在此区间内。
 \end{quote}
 
 \subsubsection{环境验证}\label{ux73afux5883ux9a8cux8bc1}
@@ -222,7 +222,7 @@ Found 1 Ascend devices.
 
 该示例代码演示了 PyACL
 应用的基础生命周期：包括环境初始化、查询硬件资源（NPU
-数量）以及最后的资源释放。对于投影 310B 处理器的开发板，其可用 NPU
+数量）以及最后的资源释放。对于昇腾 310B 处理器的开发板，其可用 NPU
 设备数量为 1，程序输出结果与硬件实际情况一致。
 
 从上述示例可以看出，环境初始化与资源释放是 PyACL
@@ -433,7 +433,11 @@ ret = acl.finalize()
 内存。数据的流动则依靠 \passthrough{\lstinline!acl.rt.memcpy!}
 完成，通过定义传输方向，将采集到的源数据搬运到 NPU
 计算单元，或将计算出的结果拉回 Host
-进行后处理。内存数据的流动方向一共有四种，分别是Host之间，Host到Device，Device之间以及Device到Device，分别对应\passthrough{\lstinline!ACL\_MEMCPY\_HOST\_TO\_HOST!},，具体的流程图如下图所示：
+进行后处理。内存数据的流动方向一共有四种：Host 到 Host、Host 到
+Device、Device 到 Host 以及 Device 到 Device，分别对应
+\passthrough{\lstinline!ACL\_MEMCPY\_HOST\_TO\_HOST!}、\passthrough{\lstinline!ACL\_MEMCPY\_HOST\_TO\_DEVICE!}、\passthrough{\lstinline!ACL\_MEMCPY\_DEVICE\_TO\_HOST!}
+和
+\passthrough{\lstinline!ACL\_MEMCPY\_DEVICE\_TO\_DEVICE!}。具体的流程图如下图所示：
 
 \pandocbounded{\includegraphics[keepaspectratio,alt={资源申请与释放流程图}]{chapters/img4/memory.png}}\{fig:pyacl\_memory
 width=100\% .center\}
@@ -788,7 +792,8 @@ GHz (大) / 1.8 GHz (小) & \textasciitilde{} 5000+ 分 \\
 基于上述硬件数据，我们在开发中必须遵循以下``生存法则''： *
 \textbf{不要信任 CPU 的浮点计算能力}：任何涉及图像 Pixels 遍历的操作（如
 Resize, Color Convert, Normalize）若写在 CPU (Python)
-端，必将导致帧率骤降。\textbf{必须使用 DVPP 硬件加速}。 * \textbf{Python
+端，必将导致帧率骤降。\textbf{必须使用 DVPP
+硬件加速}（详见\href{chapter5.md}{第5章}）。 * \textbf{Python
 代码仅做胶水}：Python
 逻辑应仅限于流程控制、参数配置和极少量的后处理。业务主体必须由底层的 C++
 算子或 NPU 模型承担。 * \textbf{异步是救命稻草}：由于 CPU 处理每一行
@@ -796,7 +801,8 @@ Python 代码都比其他平台慢，因此更不能让 CPU 傻傻等待
 NPU（同步）。只有利用 \passthrough{\lstinline!stream\_wait\_event!} 让
 CPU 快速把任务分发完并脱身，才能掩盖 A55 核心性能不足的缺陷。
 
-\textbf{1. 优先策略：全链路异步与细粒度同步}
+\paragraph{1.
+优先策略：全链路异步与细粒度同步}\label{ux4f18ux5148ux7b56ux7565ux5168ux94feux8defux5f02ux6b65ux4e0eux7ec6ux7c92ux5ea6ux540cux6b65}
 
 在昇腾 310B 平台上，由于 CPU
 算力相对有限，最理想的流水线策略是实施``全链路异步''设计，即让 CPU
@@ -828,7 +834,8 @@ acl.rt.stream_wait_event(stream_infer, event_decode_done)
 acl.mdl.execute_async(..., stream_infer)
 \end{lstlisting}
 
-\textbf{2. 数据传输优化：Host Pinned Memory 的强制管理}
+\paragraph{2. 数据传输优化：Host Pinned Memory
+的强制管理}\label{ux6570ux636eux4f20ux8f93ux4f18ux5316host-pinned-memory-ux7684ux5f3aux5236ux7ba1ux7406}
 
 实现异步传输的高性能前提是 Host 侧内存的稳定性。在使用
 \passthrough{\lstinline!acl.rt.memcpy\_async!} 进行 Host 到 Device
@@ -861,7 +868,8 @@ acl.rt.synchronize_stream(stream)
 acl.rt.free_host(host_ptr)
 \end{lstlisting}
 
-\textbf{3. 多 Stream 协作范式：生产者-消费者模型}
+\paragraph{3. 多 Stream
+协作范式：生产者-消费者模型}\label{ux591a-stream-ux534fux4f5cux8303ux5f0fux751fux4ea7ux8005-ux6d88ux8d39ux8005ux6a21ux578b}
 
 构建基于生产者-消费者模型的多 Stream 协作机制，是挖掘 310B
 硬件潜能、提升应用帧率（FPS）的关键手段。具体的实施路径是将通过 Stream
@@ -894,7 +902,8 @@ for image in images:
     post_process(stream_c)
 \end{lstlisting}
 
-\textbf{4. 避免滥用全局同步与调试建议}
+\paragraph{4.
+避免滥用全局同步与调试建议}\label{ux907fux514dux6ee5ux7528ux5168ux5c40ux540cux6b65ux4e0eux8c03ux8bd5ux5efaux8bae}
 
 在追求高性能的同时，必须警惕对同步接口的滥用。最典型的反模式是在每一帧的处理循环中都调用
 \passthrough{\lstinline!acl.rt.synchronize\_device()!}，这种做法相当于强制将所有并行的流水线``拍扁''为串行执行，完全浪费了
@@ -904,7 +913,7 @@ NPU
 Event 机制，配合 Profiling
 工具观察流水线中的空隙（Bubble），逐步压榨硬件性能。
 
-\textbf{小结}
+\paragraph{小结}\label{ux5c0fux7ed3}
 
 掌握 PyACL
 同步机制的核心在于理解\textbf{``控制流（CPU）与数据流（NPU）的分离''}。在昇腾
@@ -1024,12 +1033,16 @@ Ascend 等不同端侧硬件性能的经典标尺。
 \subsubsection{ResNet-18
 模型训练}\label{resnet-18-ux6a21ux578bux8badux7ec3}
 
-如果你希望自行训练模型以便进行测试，可以参考本节的模型训练部分；如果只需体验昇腾
-310B 上 PyACL 的推理性能，可直接跳转至下一个小节``PyACL 的推理''。
+\begin{quote}
+\textbf{⚠ 注意：本节训练代码需在配备 NVIDIA 显卡的 GPU
+服务器上运行，不在昇腾 310B 开发板上执行。} 如果只需体验昇腾 310B 上
+PyACL 的推理性能，可直接跳转至
+\hyperref[ux73afux5883ux914dux7f6eux4e0eux6a21ux578bux8f6cux6362]{环境配置与模型转换}。
+\end{quote}
 
-为了进行模型训练，我们需要一台配备 Nvidia 显卡并已正确安装 CUDA
-驱动的服务器。本例中，我们使用 GeForce 5090D
-显卡。对于图像分类任务，Nvidia GeForce
+如果你希望自行训练模型以便进行测试，可以参考本节的模型训练部分。我们需要一台配备
+Nvidia 显卡并已正确安装 CUDA 驱动的服务器。本例中，我们使用 GeForce
+5090D 显卡。对于图像分类任务，Nvidia GeForce
 系列显卡已能很好地满足需求。我们选用 Tiny-ImageNet
 数据集进行训练，该数据集相比完整版 ImageNet
 体积更小，便于测试和实验。使用 GeForce 5090D 训练一次大约需要
@@ -1361,7 +1374,15 @@ tensorboard --logdir=./logs/resnet18_tiny_imagenet
 
 \subsubsection{环境配置与模型转换}\label{ux73afux5883ux914dux7f6eux4e0eux6a21ux578bux8f6cux6362}
 
-我们已经训练好了一个准对tiny-ImageNet的ResNet-18的网络，我们已经上传到huggingface的仓库\passthrough{\lstinline!zhouxzh/resnet18\_tiny\_imagenet!}，因此我们不需要自己进行网络训练。
+我们已经训练好了一个针对 Tiny-ImageNet 的 ResNet-18 网络，并上传到了
+HuggingFace 仓库
+\href{https://huggingface.co/zhouxzh/resnet18_tiny_imagenet}{\passthrough{\lstinline!zhouxzh/resnet18\_tiny\_imagenet!}}，因此不需要自行训练。
+
+\begin{quote}
+完整的可运行代码位于
+\href{../samples/chapter4/resnet18/}{\passthrough{\lstinline!samples/chapter4/resnet18/!}}
+目录下，可直接参考使用。
+\end{quote}
 
 为了可以顺利的从huggingface下载已经训练好的模型，我们需要使用 pip 安装
 Hugging Face 的 CLI 工具。
@@ -1604,7 +1625,7 @@ class AclResource:
             
         input_bytes = input_numpy.tobytes()
         input_ptr = acl.util.bytes_to_ptr(input_bytes)
-        # acl.rt.memcpy (dst, dest_max, src, count, kind)
+        # acl.rt.memcpy (dst, dest_size, src, src_size, kind)
         acl.rt.memcpy(dev_in_ptr, input_size, input_ptr, input_size, 1) # 1: ACL_MEMCPY_HOST_TO_DEVICE
         
         # 组装 Input Dataset
@@ -1838,16 +1859,9 @@ print(f"推理帧率: {fps:.2f} FPS")
 print(f"正确率: {accuracy:.2f}%")
 \end{lstlisting}
 
-为了直观评估昇腾 310B NPU 的加速效果，我们将基于统一的 ResNet-18 ONNX
-模型，在多种硬件平台上开展推理性能的横向对比测试。测试对象不仅包括高性能的
-NVIDIA RTX 5090D 显卡和主流的 Intel Core Ultra 7 155H
-笔记本处理器，还纳入了同属嵌入式领域的树莓派 5B，以及昇腾 310B 自身的
-CPU 模式。
-
 所有平台均安装了 OnnxRuntime 进行推理。其中 RTX 5090D 配置了 CUDA
 加速，而其他平台（包括树莓派、Intel 笔记本和昇腾 310B 的 CPU
-模式）均仅使用 CPU 进行计算。我们将详细记录各平台的推理耗时与帧率
-(FPS)，以此作为基准来量化 NPU 带来的性能提升。
+模式）均仅使用 CPU 进行计算。
 
 以下是各平台的具体测试结果：
 
@@ -1959,275 +1973,123 @@ FPS 的成绩对于实时的嵌入式应用而言已经绰绰有余。
 在边缘计算场景下的核心竞争力------\textbf{以极低的功耗提供数倍于通用 CPU
 的 AI 算力}。
 
-\section{图像/视频处理基础}\label{ux56feux50cfux89c6ux9891ux5904ux7406ux57faux7840}
+\section{目标检测推理}\label{ux76eeux6807ux68c0ux6d4bux63a8ux7406}
 
-\subsection{PyACL：图像与视频处理简介}\label{pyaclux56feux50cfux4e0eux89c6ux9891ux5904ux7406ux7b80ux4ecb}
+在图像分类之外，目标检测（Object Detection）是 PyACL
+推理的另一个重要应用场景。与分类任务仅输出类别标签不同，目标检测需要同时预测物体的\textbf{边界框（Bounding
+Box）}和\textbf{类别}，对模型结构和后处理逻辑都提出了更高的要求。
 
-此外，通过集成的 DVPP
-接口，应用可以在硬件层级完成视频编解码与图像预处理，极大地减轻了 CPU
-在数据清洗阶段的负担。 本节介绍如何使用 PyACL
-提供的媒体处理能力对图像/视频做高效预处理与编解码，涵盖 AIPP 与 DVPP
-的角色、常见模块、典型流水线与开发注意事项。
+本章在
+\href{../samples/chapter4/}{\passthrough{\lstinline!samples/chapter4/!}}
+下提供了两种主流目标检测模型的 PyACL 推理实现：
 
-\subsubsection{概述}\label{ux6982ux8ff0}
+\subsection{SSD300（ResNet-50
+主干）}\label{ssd300resnet-50-ux4e3bux5e72}
 
-\begin{itemize}
-\tightlist
-\item
-  PyACL 的媒体处理分两类能力：
+SSD（Single Shot MultiBox Detector）是一种单阶段目标检测器，以 ResNet-50
+为主干网络，输入尺寸 300×300，在 COCO 2017 数据集上训练和评估。
 
-  \begin{itemize}
-  \tightlist
-  \item
-    AIPP（Artificial Intelligence Pre-Processing）：在模型侧（AI
-    Core）或模型运行链路上完成色域转换、裁剪/填充、减均值/乘系数等预处理。AIPP
-    分静态（在模型转换时固化到
-    .om）与动态（运行时通过接口设置）两种模式。
-  \item
-    DVPP（Digital Vision
-    Pre-Processing）：昇腾硬件上的媒体处理单元，通过 pyACL 的
-    \passthrough{\lstinline!acl.media!}
-    接口提供硬件加速的解码、缩放、格式转换等能力（在 Device
-    侧高效执行）。
-  \end{itemize}
-\end{itemize}
+{ % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+文件 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!train\_cuda.py!} & GPU 训练入口 \\
+\passthrough{\lstinline!inference\_npu.py!} & PyACL 加载 .om 模型进行
+NPU 推理 \\
+\passthrough{\lstinline!inference\_cuda.py!} & GPU 推理（对比基准） \\
+\passthrough{\lstinline!inference\_cpu.py!} & CPU 推理 \\
+\end{longtable}
+}
 
-\subsubsection{AIPP vs
-DVPP（何时用哪个）}\label{aipp-vs-dvppux4f55ux65f6ux7528ux54eaux4e2a}
+代码位于
+\href{../samples/chapter4/SSD/}{\passthrough{\lstinline!samples/chapter4/SSD/!}}。
 
-\begin{itemize}
-\tightlist
-\item
-  DVPP 适合做``低级别''的高吞吐预处理：JPEG/视频解码、YUV↔RGB
-  转换、缩放、裁剪等，优点是速度快、CPU 负载低，但受格式与对齐约束。
-\item
-  AIPP
-  适合做``模型输入级''的精确预处理：统一色域/像素变换、量化/去均值、通道顺序等；可作为补充以满足模型输入精度要求。
-\item
-  常见组合：先用 DVPP 完成解码与粗略 resize/crop，再用
-  AIPP（静态或动态）做最后的色域和像素级处理保证与模型一致。
-\end{itemize}
+\subsection{SSDLite320（MobileNet
+主干）}\label{ssdlite320mobilenet-ux4e3bux5e72}
 
-\subsubsection{DVPP
-主要功能模块}\label{dvpp-ux4e3bux8981ux529fux80fdux6a21ux5757}
+SSDLite 是 SSD 的轻量化变体，将标准卷积替换为深度可分离卷积（Depthwise
+Separable Convolution），大幅降低参数量和计算量。本实现以 MobileNetV3
+为主干，输入尺寸 320×320，同样在 COCO 2017 上训练。
 
-\begin{itemize}
-\tightlist
-\item
-  VPC：格式转换（YUV/RGB）、缩放、裁剪、填充等。
-\item
-  JPEGD / JPEGE：JPEG 解码 / 编码。
-\item
-  VDEC / VENC：视频编码器/解码器（H.264/H.265）。
-\item
-  PNGD：PNG 解码（-\textgreater{} RGB）。 这些能力通过
-  \passthrough{\lstinline!acl.media.*!} 系列接口（如
-  dvpp\_create\_channel\_desc/dvpp\_create\_channel、dvpp\_jpeg\_decode\_async、dvpp\_vpc\_resize\_async
-  等）访问。
-\end{itemize}
+{ % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+文件 & 说明 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!train\_ddp.py!} & 多卡 DDP 训练入口 \\
+\passthrough{\lstinline!inference\_npu.py!} & PyACL NPU 推理 \\
+\passthrough{\lstinline!inference\_cuda.py!} & GPU 推理（对比基准） \\
+\passthrough{\lstinline!inference\_cpu.py!} & CPU 推理 \\
+\end{longtable}
+}
 
-\subsubsection{典型处理场景（举例）}\label{ux5178ux578bux5904ux7406ux573aux666fux4e3eux4f8b}
+代码位于
+\href{../samples/chapter4/SSDLite/}{\passthrough{\lstinline!samples/chapter4/SSDLite/!}}。
+
+\subsection{推理流程对比}\label{ux63a8ux7406ux6d41ux7a0bux5bf9ux6bd4}
+
+目标检测的 PyACL 推理流程与 ResNet-18 分类基本一致：\textbf{模型加载 →
+数据预处理 → NPU 推理 → 后处理}。关键区别在于：
 
 \begin{itemize}
 \tightlist
 \item
-  视频推理：VDEC 解码 -\textgreater{} DVPP 进行 YUV 格式调整与缩放
-  -\textgreater{} 若需 RGB 或额外预处理，再由 AIPP 或 VPC 完成
-  -\textgreater{} 传入模型。
+  \textbf{模型输出}：分类模型输出单一概率向量（\passthrough{\lstinline![1, 200]!}），目标检测模型输出多个张量（边界框坐标
+  + 类别置信度）。
 \item
-  静态图片分类：JPEGD 解码 -\textgreater{} VPC 缩放/裁剪 -\textgreater{}
-  如需色域/像素变换使用 AIPP（静态或动态）-\textgreater{} 内存拷贝到
-  Device 模型输入。
+  \textbf{后处理}：分类只需
+  \passthrough{\lstinline!argmax!}，目标检测需要 Decode 边界框 +
+  NMS（非极大值抑制）去除重叠检测框。
 \item
-  单算子/自定义预处理：在 Device 侧通过 DVPP 实现大部分工作，减少 Host
-  上的 Python/CPU 计算。
+  \textbf{评估指标}：分类用准确率（Accuracy），目标检测用 mAP（mean
+  Average Precision）。
 \end{itemize}
 
-\subsubsection{开发流程（简要）}\label{ux5f00ux53d1ux6d41ux7a0bux7b80ux8981}
+完整代码及使用说明详见各子目录下的 README 文件。
 
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  环境准备：确保 CANN、Ascend
-  驱动与环境变量（set\_env.sh）正确加载，Python 版本在支持范围内。
-\item
-  目录与模型准备：若包含推理，需准备 .om 模型（静态 AIPP 可在 ATC
-  时配置）。
-\item
-  初始化 ACL：\passthrough{\lstinline!acl.init()!} -\textgreater{}
-  \passthrough{\lstinline!acl.rt.set\_device()!} -\textgreater{} 创建
-  Context/Stream。
-\item
-  DVPP 通道与缓冲：创建 channel 描述，使用
-  \passthrough{\lstinline!acl.media.dvpp\_malloc!} 或
-  \passthrough{\lstinline!acl.rt.malloc!} 分配 Device 内存。
-\item
-  处理流程示例（伪代码）：
-  \passthrough{\lstinline!python   \# 创建 channel 和 stream   ch = acl.media.dvpp\_create\_channel\_desc()   acl.media.dvpp\_create\_channel(ch)   \# 申请输入 Device buffer (Host -> Device)   in\_dev = acl.media.dvpp\_malloc(len(jpeg\_bytes))   acl.rt.memcpy(in\_dev, size, host\_ptr, size, ACL\_MEMCPY\_HOST\_TO\_DEVICE)   \# 预测解码后大小并申请输出   out\_size, \_ = acl.media.dvpp\_jpeg\_predict\_dec\_size(host\_ptr, size, out\_cfg)   out\_dev = acl.media.dvpp\_malloc(out\_size)   \# 异步解码并等待   acl.media.dvpp\_jpeg\_decode\_async(ch, in\_dev, size, out\_dev, out\_size, out\_cfg, stream)   acl.rt.synchronize\_stream(stream)!}
-\item
-  后续：对解码结果使用 VPC 进行 resize/format 转换，或配合 AIPP
-  做最终像素预处理；封装为模型输入 Dataset 并执行推理。
-\item
-  资源释放：按逆序销毁 stream、context、channel、释放内存并调用
-  \passthrough{\lstinline!acl.finalize()!}。
-\end{enumerate}
+\section{总结}\label{ux603bux7ed3}
 
-\subsubsection{注意事项与最佳实践}\label{ux6ce8ux610fux4e8bux9879ux4e0eux6700ux4f73ux5b9eux8df5}
+本章系统讲解了 PyACL
+应用开发的基础知识，从运行资源管理到模型推理的全链路流程。PyACL
+的核心价值在于：以 Python 的简洁语法驱动昇腾 NPU 的高性能计算，将 C/C++
+的指针操作和手动内存管理封装为
+\passthrough{\lstinline!acl.rt.malloc!}、\passthrough{\lstinline!acl.rt.memcpy!}、\passthrough{\lstinline!acl.mdl.execute!}
+等简洁接口，极大降低了昇腾 AI 处理器的开发门槛。
 
-\begin{itemize}
-\tightlist
-\item
-  DVPP
-  输出对分辨率与地址有对齐要求（stride/padding），读取数据时需依据描述信息处理。
-\item
-  使用异步接口（*\_async）时必须配合 Stream 与同步机制（record\_event /
-  stream\_wait\_event / synchronize\_stream）以确保内存生命周期安全。
-\item
-  Host-\textgreater Device
-  的异步拷贝源内存应使用页锁定（pinned）内存（\passthrough{\lstinline!acl.rt.malloc\_host!}）以保证
-  DMA 稳定性。
-\item
-  静态 AIPP 在 ATC 转换时固化参数；若需灵活参数，选择动态 AIPP
-  并在推理前通过 pyACL 接口设置。
-\item
-  优先把耗时的像素级操作下沉到 DVPP/AIPP，避免在
-  CPU（Python）端逐像素处理以免成为瓶颈。
-\end{itemize}
+在运行时资源方面，Device、Context、Stream 构成的三级资源模型是 PyACL
+的骨架。理解它们的层级关系与生命周期------申请按
+\passthrough{\lstinline!Device → Context → Stream!}
+顺序，释放按逆序------是写出健壮 PyACL
+程序的前提。在此基础上，异构内存管理（Host 与 Device
+间的四种拷贝路径）与同步等待机制（Event、Stream Sync、Stream Wait
+Event、Device Sync 四种粒度）构成了性能优化的核心手段。特别是在昇腾 310B
+这类 CPU 算力较弱（Cortex-A55）的边缘设备上，\textbf{全链路异步 + Event
+驱动的多 Stream 协作}是榨干 NPU 性能的关键策略。
 
-\subsubsection{小结}\label{ux5c0fux7ed3}
+在应用实践层面，本章通过 ResNet-18（图像分类）和
+SSD/SSDLite（目标检测）两个经典场景，完整演示了''GPU 训练 → ONNX 导出 →
+ATC 转换 → PyACL NPU
+推理''的标准开发流水线。跨平台对比数据表明，即便使用相同的 ONNX
+模型，昇腾 310B NPU 的推理速度（265 FPS）远超其自身 CPU 模式（5
+FPS）和树莓派 5B（22 FPS），充分验证了专用 AI
+加速器在边缘场景下的不可替代性。
 
-在 PyACL 应用中，DVPP 提供高吞吐的硬件级图像/视频预处理能力，AIPP
-提供与模型输入严格一致的像素级转换。合理地将两者组合，并配合异步流与事件机制，可以在边缘设备上实现高效、低延迟的图像/视频推理流水线。
+回顾全章，PyACL 的精髓可归纳为三条原则： 1.
+\textbf{资源按序管理}：初始化 → Device → Context → Stream → 业务执行 →
+逆序释放，缺一不可。 2. \textbf{内存显式搬运}：Host 与 Device
+内存相互隔离，数据必须通过 \passthrough{\lstinline!memcpy!}
+显式传输，这与纯 CPU 编程截然不同。 3.
+\textbf{异步优先于同步}：在边缘端弱 CPU 的约束下，必须用
+\passthrough{\lstinline!stream\_wait\_event!} 将依赖关系卸载到 Device
+侧，让 CPU 专注于指令分发而非空等。
 
-\subsection{DVPP}\label{dvpp}
-
-DVPP（Digital Vision
-Pre-Processing）是昇腾处理器的硬件加速引擎，用于处理 JPEG
-解码、缩放、抠图等，速度远超 CPU。
-
-\subsection{JPEGD (JPEG Decode)}\label{jpegd-jpeg-decode}
-
-将 \passthrough{\lstinline!.jpg!} 数据解码为 YUV 格式。
-
-\begin{lstlisting}[language=Python]
-# 1. 创建图片描述信息
-channel_desc = acl.media.dvpp_create_channel_desc()
-acl.media.dvpp_create_channel(channel_desc)
-
-# 2. 准备输入内存 (Host -> Device)
-# 假设 np_jpg_data 是读取的二进制 jpg 数据
-input_dev, _ = acl.media.dvpp_malloc(len(np_jpg_data))
-acl.rt.memcpy(input_dev, len(np_jpg_data), np_jpg_data_ptr, len(np_jpg_data), 1) # 1=Host2Device
-
-# 3. 预测解码后大小并申请输出内存
-output_desc = acl.media.dvpp_create_jped_config()
-output_size, _ = acl.media.dvpp_jpeg_predict_dec_size(np_jpg_data_ptr, len(np_jpg_data), output_desc)
-output_dev, _ = acl.media.dvpp_malloc(output_size)
-
-# 4. 执行异步解码
-acl.media.dvpp_jpeg_decode_async(channel_desc, input_dev, len(np_jpg_data), output_dev, output_size, output_desc, stream)
-acl.rt.synchronize_stream(stream) # 等待完成
-\end{lstlisting}
-
-\subsection{VPC (Vision Preprocessing
-Core)}\label{vpc-vision-preprocessing-core}
-
-处理 Resize、Crop、Padding 等。输入必须是 Device 侧的 YUV 数据。
-关键步骤：创建 \passthrough{\lstinline!acldvppPicDesc!}
-描述输入和输出图片的格式、宽高、Stride，然后调用
-\passthrough{\lstinline!acl.media.dvpp\_vpc\_resize\_async!}。
-
-\section{单算子调用}\label{ux5355ux7b97ux5b50ux8c03ux7528}
-
-除了完整的模型推理，PyACL
-还支持更为细粒度的操作。如果应用涉及基础线性代数运算（BLAS）或特定的数学计算，开发者可以略过复杂的模型构建过程，直接通过算子调用接口加载并执行单个算子。这种方式更加轻量，适合进行算子级的性能验证或特定的数据变换任务。
-
-如果不加载整个模型，仅需调用某个特定算子（如 Softmax, MatMul）： 1.
-\textbf{acl.op.set\_attr}: 设置算子属性。 2.
-\textbf{acl.op.execute\_v2}: 执行算子。
-需注意，算子名称和输入输出格式必须与 CANN 算子库定义一致。
-
-\section{更多特性}\label{ux66f4ux591aux7279ux6027}
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{Profiling}: 通过 \passthrough{\lstinline!acl.prof!}
-  接口控制性能数据采集的起止。
-\item
-  \textbf{Dump}: 运行中导出模型各层的输入输出数据，用于精度比对。
-\item
-  \textbf{AIPP}: 在模型转换时配置静态 AIPP，让硬件自动完成
-  Resize/ColorConvert，PyACL 代码中无需编写相关逻辑。
-\end{itemize}
-
-\section{应用调试与常见
-FAQ}\label{ux5e94ux7528ux8c03ux8bd5ux4e0eux5e38ux89c1-faq}
-
-\subsection{调试技巧}\label{ux8c03ux8bd5ux6280ux5de7}
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{返回值检查}：所有 ACL 接口均返回 \passthrough{\lstinline!ret!}
-  状态码，\passthrough{\lstinline!0!} 表示成功。非 0
-  需查阅《错误码参考》。
-\item
-  \textbf{日志获取}：设置环境变量
-  \passthrough{\lstinline!export ASCEND\_GLOBAL\_LOG\_LEVEL=1!} (Info
-  级别) 查看详细日志，日志默认位置在
-  \passthrough{\lstinline!\~/ascend/log/!}。
-\end{itemize}
-
-\subsection{FAQ}\label{faq}
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{Q: 为什么 \passthrough{\lstinline!acl.mdl.execute!} 报错
-  ``Memory Check Failed''?}
-
-  \begin{itemize}
-  \tightlist
-  \item
-    A: 检查
-    \passthrough{\lstinline!acl.mdl.get\_input\_size\_by\_index!}
-    获取的大小是否与你 \passthrough{\lstinline!acl.rt.malloc!}
-    的大小严格一致。
-  \end{itemize}
-\item
-  \textbf{Q: DVPP 解码后的图片看起来是花的？}
-
-  \begin{itemize}
-  \tightlist
-  \item
-    A: DVPP 输出通常有宽/高对齐要求（如 128x16
-    对齐）。读取数据时需要根据 \passthrough{\lstinline!stride!} 跳过
-    Padding 数据，而不能简单按 \passthrough{\lstinline!width * height!}
-    读取。
-  \end{itemize}
-\end{itemize}
-
-\section{使用约束}\label{ux4f7fux7528ux7ea6ux675f}
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  \textbf{Context 线程安全}：一个 Context
-  可以在多个线程中使用，但需用户保证并发安全。推荐一线程一 Context。
-\item
-  \textbf{Stream 约束}：Stream
-  上的任务按顺序执行，但异步接口下发后需显式
-  \passthrough{\lstinline!synchronize!} 才能确保数据就绪。
-\item
-  \textbf{内存对齐}：DVPP 对内存地址和图片尺寸有严格对齐要求。
-\end{enumerate}
-
-\section{应用样例参考目录}\label{ux5e94ux7528ux6837ux4f8bux53c2ux8003ux76eeux5f55}
-
-昇腾社区提供了丰富的 Sample 仓（Gitee），推荐初学者阅读： *
-\passthrough{\lstinline!sampleResnetQuickStart!}: 最基础的图片分类。 *
-\passthrough{\lstinline!sampleYOLOV7!}: 包含后处理逻辑的目标检测。 *
-\passthrough{\lstinline!sampleJpegDecode!}: 专门展示 DVPP 用法。
+掌握了这些基础概念与 API 后，下一章将进一步深入
+DVPP（数字视觉预处理）模块，探索如何利用昇腾 310B
+的硬件编解码与图像处理能力，构建完整的视频流 AI 应用。

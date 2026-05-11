@@ -1,57 +1,93 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
-cd latex
+readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly LATEX_DIR="$REPO_ROOT/latex"
+readonly PANDOC_FROM="markdown+yaml_metadata_block+tex_math_dollars+pipe_tables+header_attributes+link_attributes"
+
+check_book_heading_levels() {
+    local failed=0
+    local file
+
+    for file in "$REPO_ROOT"/src/book/chapter*.md; do
+        if ! awk '
+            BEGIN { in_fence = 0; in_yaml = 0; found = 0 }
+            NR == 1 && $0 == "---" { in_yaml = 1; next }
+            in_yaml && $0 == "---" { in_yaml = 0; next }
+            in_yaml { next }
+            /^[[:space:]]*(```|~~~)/ { in_fence = !in_fence; next }
+            !in_fence && /^#[[:space:]]+/ {
+                printf "%s:%d:%s\n", FILENAME, NR, $0
+                found = 1
+            }
+            END { exit found ? 1 : 0 }
+        ' "$file"; then
+            failed=1
+        fi
+    done
+
+    if [[ "$failed" -ne 0 ]]; then
+        printf 'error: book chapters are included under explicit \\chapter{} entries in latex/book.tex.\n' >&2
+        printf '       Use "##" as the top-level heading in src/book/chapter*.md, not "#".\n' >&2
+        exit 1
+    fi
+}
+
+convert_markdown() {
+    local input=$1
+    local output=$2
+    local media_dir=$3
+    local resource_path=$4
+
+    pandoc \
+        -f "$PANDOC_FROM" \
+        "$input" \
+        --top-level-division=chapter \
+        --syntax-highlighting=idiomatic \
+        -t latex \
+        --extract-media="$media_dir" \
+        --resource-path="$resource_path" \
+        -o "$output"
+}
+
+check_book_heading_levels
+
+cd "$LATEX_DIR"
+
+mkdir -p chapters cases
 
 # 使用 --syntax-highlighting=idiomatic 替代已废弃的 --idiomatic
-pandoc -f markdown ../src/book/README.md --top-level-division=chapter --lua-filter=remove-numbering.lua --syntax-highlighting=idiomatic -t latex -o chapters/preface.tex
+pandoc \
+    -f "$PANDOC_FROM" \
+    ../src/book/README.md \
+    --top-level-division=chapter \
+    --lua-filter=remove-numbering.lua \
+    --syntax-highlighting=idiomatic \
+    -t latex \
+    --extract-media=chapters/ \
+    --resource-path=../src/book \
+    -o chapters/preface.tex
 
-pandoc -f markdown ../src/book/chapter1.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=chapters/ --resource-path=../src/book -o chapters/chapter1.tex
-pandoc -f markdown ../src/book/chapter2.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=chapters/ --resource-path=../src/book -o chapters/chapter2.tex
-pandoc -f markdown ../src/book/chapter3.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=chapters/ --resource-path=../src/book -o chapters/chapter3.tex
-pandoc -f markdown ../src/book/chapter4.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=chapters/ --resource-path=../src/book -o chapters/chapter4.tex
-pandoc -f markdown ../src/book/chapter5.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=chapters/ --resource-path=../src/book -o chapters/chapter5.tex
-pandoc -f markdown ../src/book/chapter6.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=chapters/ --resource-path=../src/book -o chapters/chapter6.tex
-pandoc -f markdown ../src/book/chapter7.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=chapters/ --resource-path=../src/book -o chapters/chapter7.tex
-pandoc -f markdown ../src/book/chapter8.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=chapters/ --resource-path=../src/book -o chapters/chapter8.tex
-pandoc -f markdown ../src/book/chapter9.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=chapters/ --resource-path=../src/book -o chapters/chapter9.tex
+for chapter in {1..9}; do
+    convert_markdown \
+        "../src/book/chapter${chapter}.md" \
+        "chapters/chapter${chapter}.tex" \
+        "chapters/" \
+        "../src/book"
+done
 
-pandoc -f markdown ../src/experiment/case0.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case0.tex
-pandoc -f markdown ../src/experiment/case1.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case1.tex
-pandoc -f markdown ../src/experiment/case2.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case2.tex
-pandoc -f markdown ../src/experiment/case3.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case3.tex
-pandoc -f markdown ../src/experiment/case4.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case4.tex
-pandoc -f markdown ../src/experiment/case5.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case5.tex
-pandoc -f markdown ../src/experiment/case6.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case6.tex
-pandoc -f markdown ../src/experiment/case7.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case7.tex
-pandoc -f markdown ../src/experiment/case8.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case8.tex
-pandoc -f markdown ../src/experiment/case9.md --top-level-division=chapter --syntax-highlighting=idiomatic -t latex --extract-media=cases/ --resource-path=../src/experiment -o cases/case9.tex
+for case_number in {0..9}; do
+    convert_markdown \
+        "../src/experiment/case${case_number}.md" \
+        "cases/case${case_number}.tex" \
+        "cases/" \
+        "../src/experiment"
+done
 
 python3 replace_block.py chapters/chapter3.tex
-# 修复 Pandoc 生成无标题 longtable 时引入的错误代码
-sed -i 's/\\def\\LTcaptype{none}//g' chapters/preface.tex
-sed -i 's/\\def\\LTcaptype{none}//g' chapters/chapter1.tex
-sed -i 's/\\def\\LTcaptype{none}//g' chapters/chapter2.tex
-sed -i 's/\\def\\LTcaptype{none}//g' chapters/chapter3.tex
-sed -i 's/\\def\\LTcaptype{none}//g' chapters/chapter4.tex
-sed -i 's/\\def\\LTcaptype{none}//g' chapters/chapter5.tex
-sed -i 's/\\def\\LTcaptype{none}//g' chapters/chapter6.tex
-sed -i 's/\\def\\LTcaptype{none}//g' chapters/chapter7.tex
-sed -i 's/\\def\\LTcaptype{none}//g' chapters/chapter8.tex
-sed -i 's/\\def\\LTcaptype{none}//g' chapters/chapter9.tex
 
-sed -i 's/\\def\\LTcaptype{none}//g' cases/case0.tex
-sed -i 's/\\def\\LTcaptype{none}//g' cases/case1.tex
-sed -i 's/\\def\\LTcaptype{none}//g' cases/case2.tex
-sed -i 's/\\def\\LTcaptype{none}//g' cases/case3.tex
-sed -i 's/\\def\\LTcaptype{none}//g' cases/case4.tex
-sed -i 's/\\def\\LTcaptype{none}//g' cases/case5.tex
-sed -i 's/\\def\\LTcaptype{none}//g' cases/case6.tex
-sed -i 's/\\def\\LTcaptype{none}//g' cases/case7.tex
-sed -i 's/\\def\\LTcaptype{none}//g' cases/case8.tex
-sed -i 's/\\def\\LTcaptype{none}//g' cases/case9.tex
+# 修复 Pandoc 生成无标题 longtable 时引入的错误代码
+find chapters cases -name '*.tex' -type f -exec sed -i 's/\\def\\LTcaptype{none}//g' {} +
 
 latexmk -xelatex -interaction=nonstopmode -file-line-error -synctex=1 -halt-on-error book.tex
-
-cd ..
