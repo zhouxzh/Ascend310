@@ -106,8 +106,8 @@ export default hopeTheme({
     // 在启用之前安装 flowchart.ts
     // flowchart: true,
 
-    // 在启用之前安装 mermaid
-    // mermaid: true,
+    // 启用 Mermaid 图表支持
+    mermaid: true,
 
     // playground: {
     //   presets: ["ts", "vue"],

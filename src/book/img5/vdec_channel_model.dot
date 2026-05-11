@@ -1,0 +1,72 @@
+digraph vdec_channel_model {
+    graph [
+        rankdir=LR,
+        bgcolor="transparent",
+        dpi=300,
+        pad=0.25,
+        nodesep=0.65,
+        ranksep=0.75,
+        compound=true
+    ];
+
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Noto Sans CJK SC",
+        fontsize=18,
+        margin="0.18,0.12",
+        penwidth=2
+    ];
+
+    edge [
+        color="#455A64",
+        penwidth=2.3,
+        arrowsize=0.8
+    ];
+
+    input [
+        label="H.264 码流",
+        fillcolor="#E3F2FD",
+        color="#1565C0",
+        fontcolor="#0D47A1"
+    ];
+
+    output [
+        label="NV12 帧",
+        fillcolor="#E8F5E9",
+        color="#2E7D32",
+        fontcolor="#1B5E20"
+    ];
+
+    subgraph cluster_vdec {
+        label="VDEC Channel";
+        labelloc=t;
+        labeljust=c;
+        fontname="Noto Sans CJK SC";
+        fontsize=20;
+        color="#EF6C00";
+        penwidth=2;
+        style="rounded,filled";
+        fillcolor="#FFF8E1";
+        margin=18;
+
+        decoder [
+            label="Decoder Pipeline",
+            fillcolor="#FFF3E0",
+            color="#EF6C00",
+            fontcolor="#E65100"
+        ];
+
+        callback [
+            label="Callback Thread",
+            fillcolor="#FFF3E0",
+            color="#EF6C00",
+            fontcolor="#E65100"
+        ];
+
+        decoder -> callback [style=invis, weight=3];
+    }
+
+    input -> decoder [lhead=cluster_vdec];
+    callback -> output [ltail=cluster_vdec];
+}

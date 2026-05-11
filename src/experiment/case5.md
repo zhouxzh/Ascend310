@@ -105,7 +105,7 @@ python3 prepare_models.py --onnx-only
 
 #### STM32 固件开发
 
-STM32 端的固件代码参考 [stm32_protocol.md](samples/case5/stm32_protocol.md)，
+STM32 端的固件代码参考 [stm32_protocol.md](https://github.com/zhouxzh/Ascend310/blob/master/samples/case5/stm32_protocol.md)，
 包含完整的传感器接线图、UART 数据帧格式、Arduino 示例代码和
 STM32CubeIDE 代码框架。
 
@@ -145,7 +145,7 @@ M0:T=42.5,C=1.25,R=3200|M1:T=38.2,C=0.85,R=2950|M2:T=45.1,C=1.52,R=3100|M3:T=40.
 - 易于扩展——增加新传感器只需增加字段
 
 STM32 固件的完整开发指南（接线图、Arduino 示例、STM32CubeIDE 框架）
-见 [stm32_protocol.md](samples/case5/stm32_protocol.md)。
+见 [stm32_protocol.md](https://github.com/zhouxzh/Ascend310/blob/master/samples/case5/stm32_protocol.md)。
 
 Ascend 310B 端通过 [sensor_reader.py](samples/case5/sensor_reader.py) 的
 `SensorReader` 类读取 UART 数据。当未检测到 STM32 时（`/dev/ttyUSB0`
@@ -448,7 +448,7 @@ flowchart TD
 
 #### 2.10.3 STM32 固件烧录
 
-1. 参考 [stm32_protocol.md](samples/case5/stm32_protocol.md) 中的接线图连接传感器
+1. 参考 [stm32_protocol.md](https://github.com/zhouxzh/Ascend310/blob/master/samples/case5/stm32_protocol.md) 中的接线图连接传感器
 2. 使用 Arduino IDE 或 STM32CubeIDE 编译示例代码
 3. 通过 ST-Link 或 USB-TTL 烧录固件
 4. 用串口助手（115200 baud）确认数据帧格式正确

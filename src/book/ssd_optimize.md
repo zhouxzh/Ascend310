@@ -7,7 +7,7 @@
 atc --model=models/ssd_resnet50.onnx --framework=5 --output=models/ssd_resnet50 --input_shape="input:1,3,300,300" --soc_version=Ascend310B4
 ```
 
-```pyhon
+```python
 def preprocess(image, img_size=300):
     if image.mode != "RGB":
         image = image.convert("RGB")

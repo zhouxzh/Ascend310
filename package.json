@@ -15,7 +15,7 @@
     "@vuepress/bundler-vite": "2.0.0-rc.24",
     "@vuepress/bundler-webpack": "2.0.0-rc.24",
     "@vuepress/plugin-markdown-image": "2.0.0-rc.112",
-    "baseline-browser-mapping": "^2.9.9",
+    "baseline-browser-mapping": "^2.10.29",
     "katex": "^0.16.22",
     "markdown-it-attrs": "^4.3.1",
     "mathjax-full": "^3.2.2",
@@ -26,6 +26,11 @@
     "vuepress-theme-hope": "2.0.0-rc.94"
   },
   "packageManager": "pnpm@10.2.0+sha512.0d27364e0139c6aadeed65ada153135e0ca96c8da42123bd50047f961339dc7a758fc2e944b428f52be570d1bd3372455c1c65fa2e7aa0bfbf931190f9552001",
+  "pnpm": {
+    "overrides": {
+      "caniuse-lite": "1.0.30001792"
+    }
+  },
   "dependencies": {
     "@condorhero/vuepress-plugin-export-pdf-v2": "^3.0.3",
     "install": "^0.13.0",
