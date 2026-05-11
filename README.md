@@ -1,10 +1,10 @@
-# 昇腾310B实战——从入门到精通边缘计算
+# 昇腾310B实战——从入门到精通边缘计算与人工智能
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![VuePress](https://img.shields.io/badge/VuePress-2.0-3aab95)](https://vuejs.press/)
 [![pnpm](https://img.shields.io/badge/pnpm-10-ff6b35)](https://pnpm.io/)
 
-> 基于昇腾310B的边缘计算与AI推理部署开源电子书，理论与实践结合，项目驱动教学。
+> 基于昇腾310B的边缘计算与人工智能推理部署开源教材，理论与实践结合，项目驱动教学。
 
 **作者：** 周贤中 | **邮箱：** zhouxzh@gdut.edu.cn
 
@@ -31,26 +31,47 @@
 
 ## 目录结构
 
+这里只列出主要源码、样例代码和关键构建产物；`node_modules`、VuePress 缓存、LaTeX 中间文件和编辑器临时文件不作为项目结构说明。
+
 ```
 Ascend310/
-├── src/                    # VuePress 文档源码
-│   ├── book/               # 理论教程 (chapter1~9 + 附录)
-│   ├── experiment/         # 实验教程 (case0~9)
-│   └── .vuepress/          # VuePress 主题与插件配置
-├── samples/                # 案例配套源代码
-│   ├── case1/              # 智能人脸识别打卡机
-│   ├── case2/              # 边缘端实时目标跟踪
-│   ├── case3/              # 智能电子琴
-│   ├── chapter2/           # ResNet 快速入门示例
-│   ├── chapter3/           # AlexNet 模型迁移示例
-│   ├── chapter4/           # SSD / SSDLite / ResNet18 PyACL 示例
-│   └── chapter5/           # 算子开发示例
-├── latex/                  # VuePress → LaTeX/PDF 转换工具
-├── notebook/               # Jupyter Notebook 实验
-├── convert-vuepress.sh     # Linux/macOS 文档转换脚本
-├── convert-vuepress.ps1    # Windows 文档转换脚本
-├── deploy.sh               # 部署脚本
-└── package.json            # Node.js 项目配置
+├── README.md                    # 项目总说明
+├── LICENSE
+├── CLAUDE.md                    # 协作与代理说明
+├── package.json                 # VuePress / pnpm 脚本与依赖
+├── pnpm-lock.yaml
+├── tsconfig.json
+├── convert-vuepress.sh          # Markdown -> LaTeX/PDF 转换脚本
+├── deploy.sh                    # VuePress 构建与 GitHub Pages 部署脚本
+├── src/                         # VuePress 文档源码
+│   ├── README.md                # 站点首页
+│   ├── portfolio.md             # 项目展示页
+│   ├── book/                    # 理论教程 Markdown
+│   │   ├── README.md            # 前言 / 理论教程首页
+│   │   ├── chapter1.md ... chapter9.md
+│   │   ├── ssd_optimize.md
+│   │   └── img2/ img3/ img4/ img5/
+│   ├── experiment/              # 实践案例 Markdown
+│   │   ├── README.md
+│   │   ├── case0.md ... case9.md
+│   │   └── img0/ img1/ img2/ img3/
+│   └── .vuepress/               # VuePress 配置、主题、样式与 public 资源
+├── samples/                     # 教程与实践案例配套源码
+│   ├── case1/ ... case9/        # 实践案例源码；Case 0 以文档和图片为主
+│   ├── chapter2/                # ResNet 快速入门示例
+│   ├── chapter3/                # PyTorch / torch_npu 迁移与训练示例
+│   ├── chapter4/                # PyACL 模型推理示例
+│   └── chapter5/                # DVPP / VENC / VDEC / VPC / JPEG / WebRTC 示例
+├── latex/                       # LaTeX 模板、生成结果与转换辅助文件
+│   ├── book.tex                 # 正式 PDF 主控文件
+│   ├── book.pdf                 # 生成的教材 PDF
+│   ├── chapters/                # Pandoc 生成的理论章节 tex 与图片
+│   ├── cases/                   # Pandoc 生成的实验章节 tex 与图片
+│   ├── remove-numbering.lua
+│   └── replace_block.py
+└── notebook/                    # Jupyter Notebook 与导出辅助脚本
+    ├── reinforcement_learning.ipynb
+    └── ipynb2tex.sh
 ```
 
 ---
@@ -61,6 +82,11 @@ Ascend310/
 
 - [Node.js](https://nodejs.org/) >= 18
 - [pnpm](https://pnpm.io/) >= 10
+- Bash：用于运行 `convert-vuepress.sh`，Windows 建议使用 WSL
+- [Pandoc](https://pandoc.org/)：用于 Markdown 转 LaTeX
+- TeX Live / MiKTeX：需包含 XeLaTeX、latexmk、KOMA-Script、xeCJK 等常用宏包
+- Noto 字体族：`Noto Serif CJK SC`、`Noto Sans CJK SC`、`Noto Sans Mono CJK SC`
+- Graphviz：用于将 DOT 图转换为 PNG
 
 ### 安装与运行
 
@@ -74,7 +100,7 @@ pnpm docs:dev
 # 构建静态站点
 pnpm docs:build
 
-# 导出 PDF
+# 导出网页 PDF（基于 VuePress 页面，不是正式教材 PDF）
 pnpm export-pdf
 ```
 
@@ -85,14 +111,92 @@ pnpm export-pdf
 如需生成纸质版或离线 PDF，可使用提供的转换脚本：
 
 ```bash
-# Linux / macOS
-bash convert-vuepress.sh
-
-# Windows (PowerShell)
-.\convert-vuepress.ps1
+./convert-vuepress.sh
 ```
 
-详细说明见 [latex/README.md](latex/README.md)。
+脚本会读取 `src/book` 与 `src/experiment` 下的 Markdown，生成 `latex/chapters/*.tex`、`latex/cases/*.tex`，并通过 `latex/book.tex` 编译出 `latex/book.pdf`。这是正式教材 PDF 的生成入口，详细说明见 [latex/README.md](latex/README.md)。
+
+---
+
+## 双格式写作与转换规范
+
+本项目的正式书稿需要同时满足两条输出链路：
+
+- VuePress：`src` 目录转换为 GitHub Pages 网页。
+- Pandoc + XeLaTeX：Markdown 转换为 LaTeX，再生成正式 PDF。
+
+因此，`src/book` 中的正文 Markdown 必须使用两边都稳定支持的语法。不要依赖只在浏览器中生效的 Vue 组件、HTML 片段或 Mermaid 渲染结果作为正式书稿内容。
+
+### 标题层级
+
+- `src/book/chapter*.md` 不使用一级标题 `#`。这些章节已经在 `latex/book.tex` 中通过 `\chapter{}` 统一组织，正文最高层级从 `##` 开始。
+- 正文标题只使用 `##`、`###`、`####`。不要使用 `#####` 或更深层级。
+- 五级标题在 LaTeX 中容易转换为 run-in 形式的 `\paragraph`，如果后面紧跟代码块、图片或表格，会出现标题贴着代码框上边线、断句异常等问题。
+- 更细的小节标注使用加粗文字，例如 `**(1) 测试参数**`，不要继续增加 Markdown 标题层级。
+- 需要交叉引用的标题使用显式锚点，例如 `## VENC — 硬件视频编码 {#ch5-venc}`。锚点必须全书唯一，避免 LaTeX duplicate label 警告。
+
+### 图片与流程图
+
+- 正式书稿优先插入静态图片，不在 `src/book/chapter*.md` 中保留 Mermaid 作为最终图示。
+- 流程图、结构图统一使用 DOT 源文件生成 PNG。每章图片放在对应目录，例如 Chapter 5 使用 `src/book/img5/`。
+- DOT 源文件与 PNG 成品都应保留在同一图片目录，便于后续维护。
+- PNG 图用于网页和 PDF 两端，生成时按 300 dpi 要求处理：
+
+```bash
+dot -Gdpi=300 -Tpng src/book/img5/example.dot -o src/book/img5/example.png
+```
+
+- 图片文件名使用英文小写、数字、下划线或短横线，避免空格和中文文件名。
+- Markdown 插图采用统一写法：
+
+```markdown
+![VENC 编码端到端流程](img5/venc_encode_flow.png){#fig:venc_encode_flow width=100% .center}
+```
+
+- `#fig:` 标签必须全书唯一；`width` 使用百分比，避免使用 HTML `<img>`。
+
+### Markdown 语法
+
+- Pandoc 输入格式由 `convert-vuepress.sh` 固定为：
+
+```text
+markdown+yaml_metadata_block+tex_math_dollars+pipe_tables+header_attributes+link_attributes
+```
+
+- 表格使用普通 Markdown pipe table。避免合并单元格、复杂嵌套列表、大段 `<br>`、HTML 表格或过宽列。
+- 过宽表格会导致 PDF 中出现 overfull。正式教材中应优先拆成多个小表，或改写为列表。
+- 代码块必须使用 fenced code block，并标注正确语言名，例如 `python`、`bash`、`cpp`、`json`、`text`。不要写错为 `pyhon` 等无效 highlighter 名称。
+- 长代码行、长 URL、长文件路径要主动换行，避免 PDF 右侧溢出。
+- 数学公式使用 `$...$` 或 `$$...$$`。不要依赖只在 KaTeX/VuePress 中可用的自定义 HTML 或浏览器渲染。
+- 正文链接必须使用相对路径，并以 `pnpm docs:build` 不出现 broken links 为准。
+
+### 文字标注
+
+- 正式学术教材正文避免使用 emoji 作为提示符号或状态标记。
+- 不建议直接在正文中使用 `→`、`≥`、`≤`、`✓`、`✗` 等特殊符号；PDF 字体可能缺字。优先使用中文表述，或在数学环境中写成 `$\rightarrow$`、`$\ge$`、`$\le$`。
+- “正确 / 错误 / 注意 / 说明 / 小结”等标注使用文字表达，不用图标替代。
+- 章节中的图题、表题、术语、锚点命名应保持正式、稳定、可引用。
+
+### LaTeX/PDF 版式
+
+- 项目专用 PDF 版式集中维护在 `latex/book.tex`，不要修改外部 KOMA-Script 模板。
+- 当前 PDF 使用 A4、双面排版、`BCOR=6mm` 装订修正、`DIV=11` 版心设置，适合作为正式教材初稿。
+- `latex/chapters/*.tex` 和 `latex/cases/*.tex` 是转换生成文件。正文修改应优先改 `src/book/*.md` 与 `src/experiment/*.md`，再运行转换脚本重新生成。
+
+### 提交前检查
+
+每次修改正式书稿后，至少执行：
+
+```bash
+pnpm docs:build
+./convert-vuepress.sh
+```
+
+检查要求：
+
+- VuePress 构建不应出现 broken links。
+- LaTeX 不应出现 fatal error。
+- duplicate label、missing character、overfull hbox 等警告需要逐项判断；正式发布前应清理到可接受范围。
 
 ---
 
@@ -107,15 +211,17 @@ bash convert-vuepress.sh
 
 ---
 
-## 当前版本
+## 当前状态
 
-**v0.1** — 早期版本，持续更新中。
+**v0.1** — 初稿与转换流程持续审校中。
 
-- [x] 结构规划 + Chapter 1~3 初稿 + Case 0~1 示例
-- [x] Chapter 4~5 初稿
-- [ ] Chapter 6~7 完善
-- [ ] 全案例上线 (Case 0~9)
-- [ ] 附录完善 + 全面审校 (v1.0)
+- [x] 理论教程 Chapter 1~9 Markdown 初稿
+- [x] 实践案例 Case 0~9 Markdown 初稿
+- [x] VuePress 站点构建与 GitHub Pages 部署脚本
+- [x] Pandoc + XeLaTeX 正式 PDF 生成流程
+- [x] Chapter 5 图示改为 DOT 源文件 + PNG 静态图片
+- [ ] 全书学术化文字审校、术语统一与交叉引用校对
+- [ ] 清理 duplicate label、missing character、overfull hbox 等 LaTeX 警告
 
 ---
 
