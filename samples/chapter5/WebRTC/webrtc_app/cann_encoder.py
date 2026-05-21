@@ -9,7 +9,24 @@ import av
 import numpy as np
 from aiortc.codecs.h264 import H264Encoder
 
+
 logger = logging.getLogger("cann_encoder")
+
+VENC_AUTO_BITS_PER_PIXEL = 0.04
+VENC_MIN_BITRATE_KBPS = 500
+VENC_MAX_BITRATE_KBPS = 10_000
+
+
+def estimate_venc_bitrate_kbps(width: int, height: int, fps: int) -> int:
+    """Estimate a practical H.264 VENC bitrate in kbps for the source format."""
+    bitrate = round(width * height * fps * VENC_AUTO_BITS_PER_PIXEL / 1000)
+    return max(VENC_MIN_BITRATE_KBPS, min(bitrate, VENC_MAX_BITRATE_KBPS))
+
+
+def resolve_venc_bitrate_kbps(width: int, height: int, fps: int) -> int:
+    """Resolve VENC bitrate from source dimensions."""
+    return estimate_venc_bitrate_kbps(width, height, fps)
+
 
 # ---------------------------------------------------------------------------
 #  CANN constants  (from CANN acllite/constants.py)
@@ -165,7 +182,7 @@ class CannVenc:
         width: int,
         height: int,
         fps: int = 30,
-        bitrate: int = 2_000,  # kbps (2 Mbps), VENC unit is kbps
+        bitrate: Optional[int] = None,  # kbps; VENC unit is kbps
         entype: int = ENTYPE_H264_BASE,
         channel_id: int = 10,
     ):
@@ -175,7 +192,9 @@ class CannVenc:
         self.width = width
         self.height = height
         self.fps = fps
-        self.bitrate = bitrate
+        if bitrate is not None and bitrate <= 0:
+            raise ValueError(f"bitrate must be positive, got {bitrate}")
+        self.bitrate = bitrate or resolve_venc_bitrate_kbps(width, height, fps)
         self.entype = entype
         self._channel_id = channel_id
         self._channel_desc = None
@@ -423,6 +442,7 @@ class CannH264Encoder(H264Encoder):
         self._last_width: int = 0
         self._last_height: int = 0
         self._last_fps: int = 0
+        self._last_bitrate: int = 0
         self._last_timestamp_sec: Optional[float] = None
         self._perf_log_count: int = 0
 
@@ -444,17 +464,20 @@ class CannH264Encoder(H264Encoder):
         return max(1, min(fps, 120))
 
     def _ensure_venc(self, width: int, height: int, fps: int):
+        bitrate = resolve_venc_bitrate_kbps(width, height, fps)
         if (self._venc is not None
                 and self._last_width == width
                 and self._last_height == height
-                and self._last_fps == fps):
+                and self._last_fps == fps
+                and self._last_bitrate == bitrate):
             return
         if self._venc is not None:
             self._venc.destroy()
-        self._venc = CannVenc(width=width, height=height, fps=fps)
+        self._venc = CannVenc(width=width, height=height, fps=fps, bitrate=bitrate)
         self._last_width = width
         self._last_height = height
         self._last_fps = fps
+        self._last_bitrate = bitrate
         self.buffer_data = b""
         self.buffer_pts = None
 

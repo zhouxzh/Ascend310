@@ -309,8 +309,11 @@ function logAppliedSourceSettings(sourceSettings) {
 
   const requested = sourceSettings.requested ?? {};
   const applied = sourceSettings.applied;
+  const bitrate = applied.bitrate_kbps
+    ? `${applied.bitrate_kbps}kbps/auto`
+    : "unknown";
   log(
-    `Server source=${sourceSettings.source ?? "unknown"} requested=${requested.width ?? "?"}x${requested.height ?? "?"}@${requested.fps ?? "?"} actual=${applied.width ?? "?"}x${applied.height ?? "?"}@${applied.fps ?? "?"} mode=${applied.mode ?? "unknown"}`
+    `Server source=${sourceSettings.source ?? "unknown"} requested=${requested.width ?? "?"}x${requested.height ?? "?"}@${requested.fps ?? "?"} actual=${applied.width ?? "?"}x${applied.height ?? "?"}@${applied.fps ?? "?"} bitrate=${bitrate} mode=${applied.mode ?? "unknown"}`
   );
 }
 

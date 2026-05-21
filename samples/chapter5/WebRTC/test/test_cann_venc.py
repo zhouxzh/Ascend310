@@ -7,6 +7,30 @@ Run on Ascend 310B:
 import numpy as np
 import pytest
 
+from test.conftest import needs_cann
+
+
+def test_estimate_venc_bitrate_scales_with_format():
+    """Auto bitrate should scale conservatively with source format."""
+    pytest.importorskip("av")
+    pytest.importorskip("aiortc")
+    from webrtc_app.cann_encoder import estimate_venc_bitrate_kbps
+
+    assert estimate_venc_bitrate_kbps(320, 240, 15) == 500
+    assert estimate_venc_bitrate_kbps(640, 480, 30) == 500
+    assert estimate_venc_bitrate_kbps(1920, 1080, 30) == 2488
+    assert estimate_venc_bitrate_kbps(1920, 1080, 60) == 4977
+    assert estimate_venc_bitrate_kbps(3840, 2160, 60) == 6000
+
+
+def test_offer_payload_accepts_dimensions_and_fps():
+    pytest.importorskip("aiortc")
+    from server import parse_offer_payload
+
+    payload = {"sdp": "v=0\n", "type": "offer", "width": 1920, "height": 1080, "fps": 60}
+
+    assert parse_offer_payload(payload)[1:] == (1920, 1080, 60)
+
 
 def _nv12_setup():
     from webrtc_app.cann_encoder import bgr_to_nv12
@@ -42,6 +66,7 @@ class TestCannVenc:
             data = venc.encode(nv12, force_keyframe=(i == 0))
             assert isinstance(data, bytes)
 
+    @needs_cann
     def test_different_resolution(self):
         """VENC handles 1280x720 frames."""
         from webrtc_app.cann_encoder import CannVenc, bgr_to_nv12

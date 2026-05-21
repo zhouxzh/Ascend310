@@ -94,6 +94,130 @@ aclrtMalloc(&devBuffer, size, ACL_MEM_MALLOC_HUGE_FIRST);
 流水线模式：三个线程分别处理 Pre, Infer, Post，通过队列传递数据。
 理论吞吐量取决于最慢的阶段：$FPS = 1 / \max(t1, t2, t3)$。
 
+## 自定义算子的编译、部署与单元测试
+
+完成算子开发后，还需要经历编译、部署和测试三个工程化环节，算子才能真正投入生产使用。
+
+### 使用 ccec 编译算子
+
+**ccec**（CCE Compiler）是 Ascend C 算子的专属编译器。它基于 LLVM 框架，将 C++ Kernel 代码编译为昇腾 AI Core 可执行的机器码。
+
+基本编译命令：
+
+```bash
+ccec -std=c++17 --aicore -o libadd_custom.so add_custom.cpp
+```
+
+常用的 ccec 编译选项：
+
+| 选项 | 含义 |
+|:---|:---|
+| `--aicore` | 指定编译目标为 AI Core |
+| `--cpu_mode` | 编译为目标 CPU 的调试版本 |
+| `-O2` / `-O3` | 优化级别（与 GCC 类似） |
+| `-g` | 生成调试信息 |
+| `--cce_lib_path` | 指定 CCE 库文件路径 |
+
+在工程中推荐使用 CMake 管理编译过程，以便处理多文件、多编译选项的复杂场景。
+
+### 部署到 CANN 算子库
+
+编译产物（`.so` 文件）需要部署到 CANN 的算子搜索路径中，才能被 AscendCL 或其他框架调用。部署步骤如下：
+
+1. **放置 .so 文件**：将 `libadd_custom.so` 复制到 CANN 的自定义算子目录：
+
+```bash
+cp libadd_custom.so $HOME/Ascend/ascend-toolkit/latest/opp/vendors/customize/op_impl/ai_core/tbe/custom_impl/
+```
+
+2. **配置 .ini 文件**：将算子的 `.ini` 信息库文件放置到对应的 op_info 目录：
+
+```bash
+cp add_custom.ini $HOME/Ascend/ascend-toolkit/latest/opp/vendors/customize/op_info/custom_impl/
+```
+
+3. **刷新算子缓存**：重新加载 CANN 环境以识别新算子。
+
+部署完成后，其他开发者即可通过 AscendCL API 直接调用你的自定义算子，如同使用内置算子一样。
+
+### 编写 AscendCL 单元测试
+
+部署后的算子需要通过单元测试来验证功能正确性。使用 AscendCL API 编写测试代码的基本流程：
+
+```cpp
+// 伪代码：AscendCL 算子单元测试
+#include "acl/acl.h"
+
+int main() {
+    // 1. ACL 初始化
+    aclInit(nullptr);
+    aclrtSetDevice(0);
+
+    // 2. 准备输入数据（Host → Device）
+    float *input_a = ...;  // host 端输入
+    float *input_b = ...;
+    aclrtMalloc(&dev_a, size, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMemcpy(dev_a, size, input_a, size, ACL_MEMCPY_HOST_TO_DEVICE);
+
+    // 3. 加载自定义算子
+    aclopSetModelDir("path/to/op_models");
+
+    // 4. 执行算子
+    aclopExecute(handle, "Add", ...);
+
+    // 5. 取回结果（Device → Host）并验证
+    aclrtMemcpy(output_host, size, dev_c, size, ACL_MEMCPY_DEVICE_TO_HOST);
+    // ... 与 NumPy 参考结果对比 ...
+
+    // 6. 清理资源
+    aclrtFree(dev_a);
+    aclrtFree(dev_b);
+    aclrtFree(dev_c);
+    aclFinalize();
+}
+```
+
+## 算子级性能优化策略
+
+应用层的优化（AIPP、零拷贝、流水线等）解决的是"系统各部分如何高效协作"的问题，而算子级的优化解决的是"计算本身如何更快"的问题。本节介绍三个最基础也最有效的算子级优化策略。
+
+### 内存访问优化：让数据离计算单元更近
+
+昇腾310B 的存储层级中，越靠近计算单元的内存越快但越小。优化的第一条原则是：**尽可能让数据驻留在 Local Memory 中**。
+
+| 策略 | 做法 | 原理 |
+|:---|:---|:---|
+| **减少 Global Memory 访问** | 将可复用的中间结果保留在 UB 中 | Global Memory 的访问延迟约为 UB 的 10–20 倍 |
+| **合并访存（Coalesced Access）** | 让连续线程访问连续内存地址 | 最大化总线带宽利用率 |
+| **对齐访问** | 数据首地址对齐到 32B 或 64B | 避免跨 Cache Line 的额外开销 |
+
+在 Ascend C 中，开发者通过精确控制 `DataCopy` 的源地址、数据量和频率来实践这些策略。TBE DSL 则通过 `auto_schedule` 的模板来自动优化访存模式。
+
+### Double Buffer：计算与搬运的重叠
+
+如果一次 CopyIn 需要 100μs，一次 Compute 需要 200μs，串行执行总计需要 300μs。但如果使用 **Double Buffer**（双缓冲）技术，可以让 CopyIn 和 Compute 并行进行：
+
+```text
+串行：| CopyIn(tile0) | Compute(tile0) | CopyIn(tile1) | Compute(tile1) |
+并行：| CopyIn(tile0) | CopyIn(tile1)   | CopyIn(tile2)   | ...
+      |               | Compute(tile0)  | Compute(tile1)  | ...
+```
+
+Double Buffer 的核心思想是：在 UB 中分配两套缓冲区（A 区和 B 区）。当 Compute 在处理 A 区的数据时，CopyIn 同时在向 B 区搬运下一个 Tile。两者在时间上重叠，有效隐藏了数据传输延迟。
+
+在 Ascend C 中，Double Buffer 通过 `pipe` 的流水线调度 API 来实现。TBE DSL 的 `auto_schedule` 在遇到大规模数据时也会自动插入 Double Buffer 策略。
+
+### 向量化编程：一次处理多个数据
+
+现代 AI Core 的 Vector Unit 支持 **SIMD 向量化运算**——一条指令同时处理多个数据。例如，昇腾的 Vector Unit 可以一次处理 64 个 float16 或 32 个 float32。
+
+在编码时，应尽量编写可被编译器自动向量化的循环。基本原则：
+- 循环体内无复杂分支
+- 数组访问模式规整（连续步长）
+- 使用标准运算（加减乘除、max/min 等）而非自定义逻辑
+
+> **性能分析的下一步**：以上策略给出了优化的方向，但要精确知道"哪里慢、为什么慢"，需要使用 msprof 进行系统级的 Profiling 分析。本章第 2 节"照妖镜：Profiling 性能分析"已详细介绍了 msprof 的采集命令、Timeline 视图解读和 AI Core Metrics 分析，读者可结合 Profiling 数据来验证优化效果。
+
 ## 实战演练：车辆检测系统的极致优化之路
 
 我们以一个典型的“路面车辆检测”应用为例，场景为处理 1080P 视频流，模型为 YOLOv5s (Input 640x640)。

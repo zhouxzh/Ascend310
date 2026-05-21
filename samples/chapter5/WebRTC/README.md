@@ -77,6 +77,10 @@ python server.py --source usb_camera --host 0.0.0.0 --port 8080
 python server.py --source dvpp_camera --host 0.0.0.0 --port 8080
 ```
 
+服务端会按分辨率和帧率自动估算 VENC 码率，比如 `1920x1080@60`
+约 `4977 kbps`。当前按 USB 摄像头最高 `1080p60` 约束在 `500~6000 kbps`。
+这是建连时的编码器配置，不是运行中的网络自适应降码率。
+
 三种模式对比：
 
 | 模式 | `--hardware-encode` | 相机采集 | MJPEG 解码 | 颜色转换 | H.264 编码 | 1920x1080 实测帧率 |
@@ -303,7 +307,7 @@ export PYTHONPATH=”/usr/local/Ascend/ascend-toolkit/latest/python/site-package
 - `_camera_read()`
   阻塞方法，在 `run_in_executor` 中执行。`usb_camera` 模式：V4L2 取 MJPEG → CPU JPEG 解码 → RGB。DVPP 模式：V4L2 取 MJPEG → JPEGD 解码 → NV12。
 - `describe_settings()`
-  返回当前轨道配置（含实际分辨率、帧率、模式），通过 offer 响应回传给接收端。
+  返回当前轨道配置（含实际分辨率、帧率、自动估算 VENC 码率和模式），通过 offer 响应回传给接收端。
 - `_render_demo_frame()`
   动态彩色演示帧。在未接入真实 310B 输出时保持媒体链路可运行。
 - `recv()`

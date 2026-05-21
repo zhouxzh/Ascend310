@@ -279,7 +279,10 @@ class AscendVideoTrack(MediaStreamTrack):
             return rgb
         return None
 
-    def describe_settings(self) -> dict[str, object]:
+    def describe_settings(
+        self,
+        bitrate_kbps: int | None = None,
+    ) -> dict[str, object]:
         if self.source_type == "dvpp_camera":
             mode = "dvpp-camera-mjpeg+jpegd"
         elif self.source_type == "usb_camera":
@@ -298,6 +301,7 @@ class AscendVideoTrack(MediaStreamTrack):
                 "height": self.height,
                 "fps": self.fps,
                 "mode": mode,
+                "bitrate_kbps": bitrate_kbps,
             },
         }
 

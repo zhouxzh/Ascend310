@@ -12,7 +12,7 @@ from aiortc import RTCPeerConnection, RTCRtpSender, RTCSessionDescription
 
 from webrtc_app.ascend_source import AscendVideoTrack, DEFAULT_SOURCE_NAME
 from webrtc_app import cann_encoder
-from webrtc_app.cann_encoder import CannH264Encoder
+from webrtc_app.cann_encoder import CannH264Encoder, estimate_venc_bitrate_kbps
 
 
 ROOT = Path(__file__).resolve().parent
@@ -22,16 +22,22 @@ pcs: set[RTCPeerConnection] = set()
 app_logger = logging.getLogger("server")
 
 
+def no_store_file_response(path: Path) -> web.FileResponse:
+    response = web.FileResponse(path)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 async def index(_: web.Request) -> web.FileResponse:
-    return web.FileResponse(WEB_DIR / "index.html")
+    return no_store_file_response(WEB_DIR / "index.html")
 
 
 async def client_js(_: web.Request) -> web.FileResponse:
-    return web.FileResponse(WEB_DIR / "client.js")
+    return no_store_file_response(WEB_DIR / "client.js")
 
 
 async def styles_css(_: web.Request) -> web.FileResponse:
-    return web.FileResponse(WEB_DIR / "styles.css")
+    return no_store_file_response(WEB_DIR / "styles.css")
 
 
 async def health(request: web.Request) -> web.Response:
@@ -45,7 +51,9 @@ async def health(request: web.Request) -> web.Response:
     )
 
 
-def parse_offer_payload(params: dict[str, object]) -> tuple[RTCSessionDescription, int, int, int]:
+def parse_offer_payload(
+    params: dict[str, object],
+) -> tuple[RTCSessionDescription, int, int, int]:
     try:
         offer = RTCSessionDescription(sdp=str(params["sdp"]), type=str(params["type"]))
         width = int(params.get("width", 1280))
@@ -96,15 +104,19 @@ async def offer(request: web.Request) -> web.Response:
         pcs.clear()
         await asyncio.sleep(0.3)
 
+    requested_bitrate_kbps = estimate_venc_bitrate_kbps(width, height, fps)
+
     pc = RTCPeerConnection()
     pcs.add(pc)
     logger = logging.getLogger("pc")
     logger.info(
-        "Create PeerConnection %s for Ascend source width=%s height=%s fps=%s",
+        "Create PeerConnection %s for Ascend source width=%s height=%s fps=%s "
+        "auto_bitrate=%s kbps",
         id(pc),
         width,
         height,
         fps,
+        requested_bitrate_kbps,
     )
 
     source_track: Optional[AscendVideoTrack] = None
@@ -138,6 +150,11 @@ async def offer(request: web.Request) -> web.Response:
         await pc.setRemoteDescription(offer)
         answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
+        applied_bitrate_kbps = estimate_venc_bitrate_kbps(
+            source_track.width,
+            source_track.height,
+            source_track.fps,
+        )
 
         logger.info(
             "PeerConnection %s created answer successfully for source=%s",
@@ -148,7 +165,9 @@ async def offer(request: web.Request) -> web.Response:
             {
                 "sdp": pc.localDescription.sdp,
                 "type": pc.localDescription.type,
-                "source_settings": source_track.describe_settings(),
+                "source_settings": source_track.describe_settings(
+                    bitrate_kbps=applied_bitrate_kbps,
+                ),
             }
         )
     except web.HTTPException:
@@ -156,12 +175,14 @@ async def offer(request: web.Request) -> web.Response:
     except Exception:
         source_label = source_track.source_name if source_track is not None else DEFAULT_SOURCE_NAME
         logger.exception(
-            "Offer handling failed for PeerConnection %s with source=%s width=%s height=%s fps=%s",
+            "Offer handling failed for PeerConnection %s with source=%s width=%s "
+            "height=%s fps=%s bitrate=%s",
             id(pc),
             source_label,
             width,
             height,
             fps,
+            requested_bitrate_kbps,
         )
         await close_peer_connection(pc, source_track)
         raise web.HTTPInternalServerError(text="Failed to create WebRTC answer. Check logs/server.log.")

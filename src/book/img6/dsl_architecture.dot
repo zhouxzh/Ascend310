@@ -1,0 +1,146 @@
+digraph dsl_architecture {
+    graph [
+        rankdir=TB,
+        bgcolor="transparent",
+        dpi=300,
+        pad=0.3,
+        nodesep=0.5,
+        ranksep=0.6,
+        label="TBE DSL 体系结构",
+        labelloc=t,
+        fontname="Noto Sans CJK SC",
+        fontsize=22,
+        fontcolor="#1A237E"
+    ];
+
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Noto Sans CJK SC",
+        fontsize=13,
+        margin="0.15,0.10",
+        penwidth=2
+    ];
+
+    edge [
+        color="#37474F",
+        penwidth=2.0,
+        arrowsize=0.7
+    ];
+
+    subgraph cluster_dsl {
+        label="TBE DSL（Python 声明式接口）";
+        fontname="Noto Sans CJK SC";
+        fontsize=15;
+        fontcolor="#1565C0";
+        style="rounded,dashed";
+        color="#1565C0";
+        penwidth=2.5;
+        bgcolor="#E3F2FD";
+        margin=16;
+
+        subgraph cluster_compute {
+            label="计算描述层";
+            fontname="Noto Sans CJK SC";
+            fontsize=13;
+            style="rounded,filled";
+            color="#1E88E5";
+            bgcolor="#BBDEFB";
+
+            compute_api [
+                label="dsl.vadd\ndsl.vmul\ndsl.broadcast\ndsl.conv\ndsl.matmul\n...",
+                fillcolor="#E3F2FD",
+                color="#1565C0",
+                fontcolor="#0D47A1"
+            ];
+        }
+
+        subgraph cluster_schedule {
+            label="调度层";
+            fontname="Noto Sans CJK SC";
+            fontsize=13;
+            style="rounded,filled";
+            color="#0288D1";
+            bgcolor="#B3E5FC";
+
+            schedule_api [
+                label="dsl.auto_schedule\ntvm.create_schedule",
+                fillcolor="#E1F5FE",
+                color="#0277BD",
+                fontcolor="#01579B"
+            ];
+        }
+
+        subgraph cluster_build {
+            label="编译层";
+            fontname="Noto Sans CJK SC";
+            fontsize=13;
+            style="rounded,filled";
+            color="#0288D1";
+            bgcolor="#B3E5FC";
+
+            build_api [
+                label="dsl.build\ncce_build_code",
+                fillcolor="#E1F5FE",
+                color="#0277BD",
+                fontcolor="#01579B"
+            ];
+        }
+    }
+
+    subgraph cluster_tvm {
+        label="TVM 张量计算编译框架";
+        fontname="Noto Sans CJK SC";
+        fontsize=15;
+        fontcolor="#EF6C00";
+        style="rounded,dashed";
+        color="#EF6C00";
+        penwidth=2.5;
+        bgcolor="#FFF3E0";
+        margin=16;
+
+        tvm_core [
+            label="Tensor Expression (TE)\nSchedule Primitives\nCodeGen → CCE Backend",
+            fillcolor="#FFF8E1",
+            color="#F9A825",
+            fontcolor="#E65100"
+        ];
+    }
+
+    subgraph cluster_cce {
+        label="CCE 昇腾硬件后端";
+        fontname="Noto Sans CJK SC";
+        fontsize=15;
+        fontcolor="#C62828";
+        style="rounded,dashed";
+        color="#C62828";
+        penwidth=2.5;
+        bgcolor="#FFEBEE";
+        margin=16;
+
+        cce_core [
+            label="AI Core 指令映射\nCube Unit / Vector Unit / Scalar Unit",
+            fillcolor="#FFCDD2",
+            color="#D32F2F",
+            fontcolor="#B71C1C"
+        ];
+    }
+
+    hardware [
+        label="昇腾310B 硬件（DaVinci-mini）",
+        shape=box,
+        style="rounded,filled",
+        fillcolor="#E8F5E9",
+        color="#2E7D32",
+        fontcolor="#1B5E20",
+        fontsize=14,
+        penwidth=2.5
+    ];
+
+    // Vertical edges showing layered flow
+    compute_api -> schedule_api [style=bold, color="#1565C0"];
+    schedule_api -> build_api [style=bold, color="#1565C0"];
+    build_api -> tvm_core [style=bold, color="#EF6C00"];
+    tvm_core -> cce_core [style=bold, color="#C62828"];
+    cce_core -> hardware [style=bold, color="#2E7D32"];
+}
