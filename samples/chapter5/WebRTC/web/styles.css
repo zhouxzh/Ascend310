@@ -89,6 +89,7 @@ body {
 }
 
 select,
+input,
 button {
   border-radius: 14px;
   border: 1px solid #bfd0db;
@@ -96,7 +97,8 @@ button {
   font: inherit;
 }
 
-select {
+select,
+input {
   background: #fff;
   color: var(--text);
 }

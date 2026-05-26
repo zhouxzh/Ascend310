@@ -21,6 +21,7 @@ def test_estimate_venc_bitrate_scales_with_format():
     assert estimate_venc_bitrate_kbps(1920, 1080, 30) == 2488
     assert estimate_venc_bitrate_kbps(1920, 1080, 60) == 4977
     assert estimate_venc_bitrate_kbps(3840, 2160, 60) == 6000
+    assert estimate_venc_bitrate_kbps(1920, 1080, 30, codec="h265") < estimate_venc_bitrate_kbps(1920, 1080, 30)
 
 
 def test_offer_payload_accepts_dimensions_and_fps():
@@ -29,7 +30,23 @@ def test_offer_payload_accepts_dimensions_and_fps():
 
     payload = {"sdp": "v=0\n", "type": "offer", "width": 1920, "height": 1080, "fps": 60}
 
-    assert parse_offer_payload(payload)[1:] == (1920, 1080, 60)
+    assert parse_offer_payload(payload)[1:] == (1920, 1080, 60, None)
+
+
+def test_offer_payload_accepts_manual_bitrate():
+    pytest.importorskip("aiortc")
+    from server import parse_offer_payload
+
+    payload = {
+        "sdp": "v=0\n",
+        "type": "offer",
+        "width": 1280,
+        "height": 720,
+        "fps": 30,
+        "bitrate_kbps": 1800,
+    }
+
+    assert parse_offer_payload(payload)[1:] == (1280, 720, 30, 1800)
 
 
 def _nv12_setup():

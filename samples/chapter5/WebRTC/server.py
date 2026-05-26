@@ -12,7 +12,13 @@ from aiortc import RTCPeerConnection, RTCRtpSender, RTCSessionDescription
 
 from webrtc_app.ascend_source import AscendVideoTrack, DEFAULT_SOURCE_NAME
 from webrtc_app import cann_encoder
-from webrtc_app.cann_encoder import CannH264Encoder, estimate_venc_bitrate_kbps
+from webrtc_app.cann_encoder import (
+    CannH264Encoder,
+    CannH265Encoder,
+    estimate_venc_bitrate_kbps,
+    get_session_bitrate_override_kbps,
+    set_session_bitrate_override_kbps,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -20,6 +26,8 @@ WEB_DIR = ROOT / "web"
 LOG_DIR = ROOT / "logs"
 pcs: set[RTCPeerConnection] = set()
 app_logger = logging.getLogger("server")
+VIDEO_CODEC_H264 = "h264"
+VIDEO_CODEC_H265 = "h265"
 
 
 def no_store_file_response(path: Path) -> web.FileResponse:
@@ -47,51 +55,120 @@ async def health(request: web.Request) -> web.Response:
             "status": "ok",
             "runtime_target": "ascend-310b",
             "default_source": source_mode,
+            "video_codec": request.config_dict.get("video_codec", VIDEO_CODEC_H264),
         }
     )
 
 
 def parse_offer_payload(
     params: dict[str, object],
-) -> tuple[RTCSessionDescription, int, int, int]:
+) -> tuple[RTCSessionDescription, int, int, int, Optional[int]]:
     try:
         offer = RTCSessionDescription(sdp=str(params["sdp"]), type=str(params["type"]))
         width = int(params.get("width", 1280))
         height = int(params.get("height", 720))
         fps = int(params.get("fps", 30))
+        bitrate_kbps = params.get("bitrate_kbps")
+        if bitrate_kbps in (None, "", 0, "0"):
+            bitrate_kbps = None
+        else:
+            bitrate_kbps = int(bitrate_kbps)
     except (KeyError, TypeError, ValueError) as exc:
         raise web.HTTPBadRequest(text=f"Invalid offer payload: {exc}") from exc
 
     if width <= 0 or height <= 0 or fps <= 0:
         raise web.HTTPBadRequest(text="width, height, and fps must be positive integers.")
+    if bitrate_kbps is not None and bitrate_kbps <= 0:
+        raise web.HTTPBadRequest(text="bitrate_kbps must be a positive integer.")
 
-    return offer, width, height, fps
+    return offer, width, height, fps, bitrate_kbps
 
 
-def _prefer_h264_for_sender(pc: RTCPeerConnection, sender: RTCRtpSender) -> None:
-    h264_codecs = [
+def _offer_has_codec(sdp: str, codec_name: str) -> bool:
+    wanted = codec_name.lower()
+    return any(
+        line.startswith("a=rtpmap:")
+        and line.strip().split(None, 1)[-1].split("/", 1)[0].lower() == wanted
+        for line in sdp.splitlines()
+    )
+
+
+def resolve_offer_bitrate_kbps(
+    width: int,
+    height: int,
+    fps: int,
+    video_codec: str,
+    bitrate_kbps: Optional[int] = None,
+) -> int:
+    if bitrate_kbps is not None:
+        return max(500, min(int(bitrate_kbps), 6000))
+    return estimate_venc_bitrate_kbps(width, height, fps, codec=video_codec)
+
+
+def _local_video_codecs(mime_type: str):
+    return [
         codec
         for codec in RTCRtpSender.getCapabilities("video").codecs
-        if codec.mimeType.lower() == "video/h264"
+        if codec.mimeType.lower() == mime_type.lower()
     ]
-    if not h264_codecs:
-        app_logger.warning("No local H264 codec capability found; cannot prefer CANN VENC")
-        return
+
+
+def _sync_h265_parameters_from_offer(sdp: str) -> dict[str, object]:
+    """Echo browser-offered H265 payload type / fmtp in the answer."""
+    from aiortc.sdp import SessionDescription
+    import aiortc.codecs as codecs_module
+
+    session = SessionDescription.parse(sdp)
+    for media in session.media:
+        if media.kind != "video":
+            continue
+        for codec in media.rtp.codecs:
+            if codec.mimeType.lower() == "video/h265":
+                parameters = dict(codec.parameters)
+                for local_codec in codecs_module.CODECS["video"]:
+                    if local_codec.mimeType.lower() == "video/h265":
+                        local_codec.payloadType = codec.payloadType
+                        local_codec.parameters = parameters
+                return parameters
+    return {}
+
+
+def _prefer_video_codec_for_sender(
+    pc: RTCPeerConnection,
+    sender: RTCRtpSender,
+    mime_type: str,
+) -> None:
+    codecs = _local_video_codecs(mime_type)
+    if not codecs:
+        raise web.HTTPBadRequest(text=f"No local {mime_type} codec capability found.")
 
     for transceiver in pc.getTransceivers():
         if transceiver.sender == sender:
-            transceiver.setCodecPreferences(h264_codecs)
+            transceiver.setCodecPreferences(codecs)
             app_logger.info(
-                "Video transceiver codec preference set to H264 for hardware encoding"
+                "Video transceiver codec preference set to %s",
+                mime_type,
             )
             return
 
-    app_logger.warning("Could not find sender transceiver; H264 preference not applied")
+    raise web.HTTPInternalServerError(text="Could not find sender transceiver.")
 
 
 async def offer(request: web.Request) -> web.Response:
     params = await request.json()
-    offer, width, height, fps = parse_offer_payload(params)
+    offer, width, height, fps, bitrate_kbps = parse_offer_payload(params)
+    video_codec = request.config_dict.get("video_codec", VIDEO_CODEC_H264)
+
+    if video_codec == VIDEO_CODEC_H265 and not _offer_has_codec(offer.sdp, "H265"):
+        raise web.HTTPBadRequest(
+            text=(
+                "Browser offer does not contain video/H265. "
+                "Use a WebRTC HEVC-capable browser."
+            )
+        )
+    if video_codec == VIDEO_CODEC_H265:
+        h265_parameters = _sync_h265_parameters_from_offer(offer.sdp)
+        app_logger.info("H265 offer parameters: %s", h265_parameters)
 
     # Close stale connections first to release /dev/video0 for new offer
     if pcs:
@@ -104,7 +181,13 @@ async def offer(request: web.Request) -> web.Response:
         pcs.clear()
         await asyncio.sleep(0.3)
 
-    requested_bitrate_kbps = estimate_venc_bitrate_kbps(width, height, fps)
+    requested_bitrate_kbps = resolve_offer_bitrate_kbps(
+        width,
+        height,
+        fps,
+        video_codec,
+        bitrate_kbps=bitrate_kbps,
+    )
 
     pc = RTCPeerConnection()
     pcs.add(pc)
@@ -122,6 +205,7 @@ async def offer(request: web.Request) -> web.Response:
     source_track: Optional[AscendVideoTrack] = None
 
     try:
+        set_session_bitrate_override_kbps(bitrate_kbps)
         source_track = AscendVideoTrack(
             width=width,
             height=height,
@@ -132,8 +216,10 @@ async def offer(request: web.Request) -> web.Response:
         sender = pc.addTrack(source_track)
         source_mode = request.config_dict.get("source_mode", "demo")
         hardware_encode = bool(request.config_dict.get("hardware_encode", False))
-        if hardware_encode or source_mode == "dvpp_camera":
-            _prefer_h264_for_sender(pc, sender)
+        if video_codec == VIDEO_CODEC_H265:
+            _prefer_video_codec_for_sender(pc, sender, "video/H265")
+        elif hardware_encode or source_mode == "dvpp_camera":
+            _prefer_video_codec_for_sender(pc, sender, "video/H264")
 
         @pc.on("connectionstatechange")
         async def on_connectionstatechange() -> None:
@@ -150,10 +236,12 @@ async def offer(request: web.Request) -> web.Response:
         await pc.setRemoteDescription(offer)
         answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
-        applied_bitrate_kbps = estimate_venc_bitrate_kbps(
+        applied_bitrate_kbps = resolve_offer_bitrate_kbps(
             source_track.width,
             source_track.height,
             source_track.fps,
+            video_codec,
+            bitrate_kbps=get_session_bitrate_override_kbps(),
         )
 
         logger.info(
@@ -167,6 +255,7 @@ async def offer(request: web.Request) -> web.Response:
                 "type": pc.localDescription.type,
                 "source_settings": source_track.describe_settings(
                     bitrate_kbps=applied_bitrate_kbps,
+                    bitrate_mode="manual" if bitrate_kbps is not None else "auto",
                 ),
             }
         )
@@ -206,6 +295,8 @@ async def close_peer_connection(
             await pc.close()
         except Exception:
             logger.exception("Failed to close PeerConnection %s cleanly", id(pc))
+        finally:
+            set_session_bitrate_override_kbps(None)
 
 
 @web.middleware
@@ -239,11 +330,13 @@ def build_app(
     source_mode: str = "demo",
     camera_device: str | int = 0,
     hardware_encode: bool = False,
+    video_codec: str = VIDEO_CODEC_H264,
 ) -> web.Application:
     app = web.Application(middlewares=[error_logging_middleware])
     app["source_mode"] = source_mode
     app["camera_device"] = camera_device
     app["hardware_encode"] = hardware_encode
+    app["video_codec"] = video_codec
     app.on_shutdown.append(on_shutdown)
     app.router.add_get("/", index)
     app.router.add_get("/client.js", client_js)
@@ -289,6 +382,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         default=os.environ.get("WEBCAM_HARDWARE_ENCODE", "").lower() in ("1", "true", "yes"),
         help="Use CANN VENC hardware H264 encoding instead of CPU libx264.",
+    )
+    parser.add_argument(
+        "--video-codec",
+        default=os.environ.get("WEBRTC_VIDEO_CODEC", VIDEO_CODEC_H264),
+        choices=[VIDEO_CODEC_H264, VIDEO_CODEC_H265],
+        help="Video codec to negotiate. H265 requires WebRTC HEVC browser support.",
     )
     return parser.parse_args()
 
@@ -347,18 +446,81 @@ def _patch_h264_encoder():
     return True
 
 
+def _patch_h265_encoder():
+    """Register H265 and use CANN VENC as the aiortc encoder."""
+    if not cann_encoder._try_import_cann():
+        raise RuntimeError("CANN ACL is required for H265 encoding")
+
+    import aiortc.codecs as codecs_module
+    import aiortc.rtcrtpsender as rtcrtpsender_module
+    from aiortc.rtcrtpparameters import RTCRtcpFeedback, RTCRtpCodecParameters
+
+    h265_exists = any(
+        codec.mimeType.lower() == "video/h265"
+        for codec in codecs_module.CODECS["video"]
+        if not codecs_module.is_rtx(codec)
+    )
+    if not h265_exists:
+        used_pts = {
+            codec.payloadType
+            for codec in codecs_module.CODECS["video"]
+            if codec.payloadType is not None
+        }
+        payload_type = 97
+        while payload_type in used_pts or payload_type + 1 in used_pts:
+            payload_type += 2
+        codecs_module.CODECS["video"].insert(
+            0,
+            RTCRtpCodecParameters(
+                mimeType="video/H265",
+                clockRate=90000,
+                payloadType=payload_type,
+                rtcpFeedback=[
+                    RTCRtcpFeedback(type="nack"),
+                    RTCRtcpFeedback(type="nack", parameter="pli"),
+                    RTCRtcpFeedback(type="goog-remb"),
+                ],
+                parameters={},
+            ),
+        )
+        codecs_module.CODECS["video"].insert(
+            1,
+            RTCRtpCodecParameters(
+                mimeType="video/rtx",
+                clockRate=90000,
+                payloadType=payload_type + 1,
+                parameters={"apt": payload_type},
+            ),
+        )
+
+    original_get_encoder = codecs_module.get_encoder
+
+    def get_encoder(codec):
+        if codec.mimeType.lower() == "video/h265":
+            return CannH265Encoder()
+        return original_get_encoder(codec)
+
+    codecs_module.get_encoder = get_encoder
+    rtcrtpsender_module.get_encoder = get_encoder
+    app_logger.info("H265 codec registered and switched to CANN VENC hardware")
+    return True
+
+
 def main() -> None:
     args = parse_args()
     setup_logging(args.log_level, args.log_file)
     app_logger.info(
-        "Starting server on http://%s:%s with source=%s log level=%s",
+        "Starting server on http://%s:%s with source=%s video_codec=%s log level=%s",
         args.host,
         args.port,
         args.source,
+        args.video_codec,
         args.log_level,
     )
 
-    if args.hardware_encode or args.source == "dvpp_camera":
+    if args.video_codec == VIDEO_CODEC_H265:
+        _patch_h265_encoder()
+    elif args.hardware_encode or args.source == "dvpp_camera":
         _patch_h264_encoder()
 
     local_ip = get_local_ip()
@@ -373,6 +535,7 @@ def main() -> None:
             source_mode=args.source,
             camera_device=camera_device,
             hardware_encode=args.hardware_encode or args.source == "dvpp_camera",
+            video_codec=args.video_codec,
         ),
         host=args.host,
         port=args.port,

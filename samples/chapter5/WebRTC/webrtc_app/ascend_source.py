@@ -282,6 +282,7 @@ class AscendVideoTrack(MediaStreamTrack):
     def describe_settings(
         self,
         bitrate_kbps: int | None = None,
+        bitrate_mode: str = "auto",
     ) -> dict[str, object]:
         if self.source_type == "dvpp_camera":
             mode = "dvpp-camera-mjpeg+jpegd"
@@ -302,6 +303,7 @@ class AscendVideoTrack(MediaStreamTrack):
                 "fps": self.fps,
                 "mode": mode,
                 "bitrate_kbps": bitrate_kbps,
+                "bitrate_mode": bitrate_mode,
             },
         }
 

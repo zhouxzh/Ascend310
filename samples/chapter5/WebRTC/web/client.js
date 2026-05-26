@@ -1,6 +1,7 @@
 const elements = {
   resolution: document.querySelector("#resolution"),
   fps: document.querySelector("#fps"),
+  bitrateKbps: document.querySelector("#bitrateKbps"),
   start: document.querySelector("#start"),
   stop: document.querySelector("#stop"),
   clearLog: document.querySelector("#clearLog"),
@@ -24,7 +25,9 @@ let startInProgress = false;
 let fpsTrackingId = null;
 let fpsTimestamps = [];
 let lastFpsStats = null;
+let lastDecodeStats = null;
 let rvfcSupported = false;
+let serverVideoCodec = "h264";
 
 function log(message) {
   const timestamp = new Date().toLocaleTimeString("zh-CN", { hour12: false });
@@ -72,11 +75,23 @@ function setControlsBusy(isBusy) {
   elements.start.disabled = isBusy;
   elements.resolution.disabled = isBusy;
   elements.fps.disabled = isBusy;
+  elements.bitrateKbps.disabled = isBusy;
 }
 
 function parseResolution(value) {
   const [width, height] = value.split("x").map(Number);
   return { width, height };
+}
+
+function parseBitrateKbps(value) {
+  if (!value || !String(value).trim()) {
+    return null;
+  }
+  const bitrateKbps = Number(value);
+  if (!Number.isFinite(bitrateKbps) || bitrateKbps <= 0) {
+    throw new Error("目标码率必须是正整数。");
+  }
+  return bitrateKbps;
 }
 
 function makeAbortError(message) {
@@ -98,7 +113,8 @@ function assertActiveAttempt(connection, attemptId) {
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    const text = await response.text();
+    throw new Error(text || `${response.status} ${response.statusText}`);
   }
   return response.json();
 }
@@ -106,9 +122,10 @@ async function fetchJson(url, options = {}) {
 async function checkHealth() {
   try {
     const data = await fetchJson("/health");
+    serverVideoCodec = (data.video_codec ?? "h264").toLowerCase();
     setServerStatus(data.status === "ok" ? "在线" : "异常");
     setRuntimeStatus(
-      `${data.runtime_target ?? "unknown"} / ${data.default_source ?? "unknown"}`
+      `${data.runtime_target ?? "unknown"} / ${data.default_source ?? "unknown"} / ${serverVideoCodec}`
     );
   } catch (error) {
     setServerStatus("不可用");
@@ -124,6 +141,7 @@ function stopStats() {
   }
   lastStats = null;
   lastFpsStats = null;
+  lastDecodeStats = null;
   setBitrateStatus("-");
 }
 
@@ -257,6 +275,26 @@ async function readInboundStats(connection) {
       setFpsDisplay(fps);
     }
 
+    const decodeStats = {
+      framesReceived: report.framesReceived ?? 0,
+      framesDecoded: report.framesDecoded ?? 0,
+      keyFramesDecoded: report.keyFramesDecoded ?? 0,
+      framesDropped: report.framesDropped ?? 0,
+      totalDecodeTime: report.totalDecodeTime ?? 0,
+      decoderImplementation: report.decoderImplementation ?? "unknown",
+    };
+    if (
+      !lastDecodeStats ||
+      decodeStats.framesReceived !== lastDecodeStats.framesReceived ||
+      decodeStats.framesDecoded !== lastDecodeStats.framesDecoded ||
+      decodeStats.keyFramesDecoded !== lastDecodeStats.keyFramesDecoded
+    ) {
+      log(
+        `Inbound stats received=${decodeStats.framesReceived} decoded=${decodeStats.framesDecoded} key=${decodeStats.keyFramesDecoded} dropped=${decodeStats.framesDropped} decoder=${decodeStats.decoderImplementation}`
+      );
+      lastDecodeStats = decodeStats;
+    }
+
     lastStats = {
       bytesReceived: report.bytesReceived,
       timestamp: report.timestamp,
@@ -302,6 +340,57 @@ function bindConnectionEvents(connection, attemptId) {
   };
 }
 
+function bindVideoEvents() {
+  elements.remoteVideo.addEventListener("loadedmetadata", () => {
+    log(
+      `Video metadata loaded: ${elements.remoteVideo.videoWidth}x${elements.remoteVideo.videoHeight}`
+    );
+    updateRemoteVideoSize();
+  });
+
+  elements.remoteVideo.addEventListener("playing", () => {
+    log("Video element playing.");
+  });
+
+  elements.remoteVideo.addEventListener("waiting", () => {
+    log("Video element waiting for decoded frames.");
+  });
+
+  elements.remoteVideo.addEventListener("error", () => {
+    const error = elements.remoteVideo.error;
+    log(`Video element error: code=${error?.code ?? "unknown"} message=${error?.message ?? ""}`);
+  });
+
+  elements.remoteVideo.addEventListener("resize", () => {
+    log(
+      `Video element resize: ${elements.remoteVideo.videoWidth}x${elements.remoteVideo.videoHeight}`
+    );
+    updateRemoteVideoSize();
+  });
+}
+
+function getReceiverCodecs(mimeType) {
+  const capabilities = RTCRtpReceiver.getCapabilities?.("video");
+  return (capabilities?.codecs ?? []).filter(
+    (codec) => codec.mimeType.toLowerCase() === mimeType.toLowerCase()
+  );
+}
+
+function applyVideoCodecPreference(transceiver) {
+  if (serverVideoCodec !== "h265") {
+    return;
+  }
+
+  const h265Codecs = getReceiverCodecs("video/H265");
+  if (!h265Codecs.length) {
+    throw new Error(
+      "当前浏览器没有暴露 video/H265 WebRTC 接收能力，无法启动 H.265 模式。"
+    );
+  }
+  transceiver.setCodecPreferences(h265Codecs);
+  log("Browser offer codec preference set to video/H265.");
+}
+
 function logAppliedSourceSettings(sourceSettings) {
   if (!sourceSettings?.applied) {
     return;
@@ -309,8 +398,9 @@ function logAppliedSourceSettings(sourceSettings) {
 
   const requested = sourceSettings.requested ?? {};
   const applied = sourceSettings.applied;
+  const bitrateMode = applied.bitrate_mode ?? "auto";
   const bitrate = applied.bitrate_kbps
-    ? `${applied.bitrate_kbps}kbps/auto`
+    ? `${applied.bitrate_kbps}kbps/${bitrateMode}`
     : "unknown";
   log(
     `Server source=${sourceSettings.source ?? "unknown"} requested=${requested.width ?? "?"}x${requested.height ?? "?"}@${requested.fps ?? "?"} actual=${applied.width ?? "?"}x${applied.height ?? "?"}@${applied.fps ?? "?"} bitrate=${bitrate} mode=${applied.mode ?? "unknown"}`
@@ -332,13 +422,16 @@ async function startConnection() {
 
   const { width, height } = parseResolution(elements.resolution.value);
   const fps = Number(elements.fps.value);
+  const bitrateKbps = parseBitrateKbps(elements.bitrateKbps.value);
 
-  const connection = new RTCPeerConnection();
-  activeConnection = connection;
-  connection.addTransceiver("video", { direction: "recvonly" });
-  bindConnectionEvents(connection, attemptId);
-
+  let connection = null;
   try {
+    connection = new RTCPeerConnection();
+    activeConnection = connection;
+    const transceiver = connection.addTransceiver("video", { direction: "recvonly" });
+    applyVideoCodecPreference(transceiver);
+    bindConnectionEvents(connection, attemptId);
+
     const offer = await connection.createOffer();
     assertActiveAttempt(connection, attemptId);
 
@@ -356,6 +449,7 @@ async function startConnection() {
         width,
         height,
         fps,
+        bitrate_kbps: bitrateKbps,
       }),
     });
     pendingOfferController = null;
@@ -375,7 +469,9 @@ async function startConnection() {
     assertActiveAttempt(connection, attemptId);
 
     startStats(connection);
-    log(`Sent WebRTC offer to Python sender: requested=${width}x${height}@${fps}fps`);
+    log(
+      `Sent WebRTC offer to Python sender: requested=${width}x${height}@${fps}fps bitrate=${bitrateKbps ?? "auto"}`
+    );
     logAppliedSourceSettings(answer.source_settings);
   } catch (error) {
     if (pendingOfferController && pendingOfferController.signal.aborted) {
@@ -383,15 +479,18 @@ async function startConnection() {
     }
 
     if (error.name === "AbortError") {
-      closeConnection(connection);
+      if (connection) closeConnection(connection);
       return;
     }
 
-    if (isActiveAttempt(connection, attemptId)) {
+    if (connection && isActiveAttempt(connection, attemptId)) {
       teardownActiveConnection();
       log(`Start failed: ${error.message}`);
-    } else {
+    } else if (connection) {
       closeConnection(connection);
+    } else {
+      teardownActiveConnection();
+      log(`Start failed: ${error.message}`);
     }
   } finally {
     if (activeAttemptId === attemptId) {
@@ -414,13 +513,7 @@ function bindEvents() {
     elements.logOutput.textContent = "";
   });
 
-  elements.remoteVideo.addEventListener("loadedmetadata", () => {
-    updateRemoteVideoSize();
-  });
-
-  elements.remoteVideo.addEventListener("resize", () => {
-    updateRemoteVideoSize();
-  });
+  bindVideoEvents();
 
   window.addEventListener("beforeunload", () => {
     stopConnection({ logMessage: false });

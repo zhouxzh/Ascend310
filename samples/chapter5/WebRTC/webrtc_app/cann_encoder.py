@@ -9,28 +9,90 @@ import av
 import numpy as np
 from aiortc.codecs.h264 import H264Encoder
 
+from webrtc_app.hevc import packetize_hevc, split_annexb
+
 
 logger = logging.getLogger("cann_encoder")
 
 VENC_AUTO_BITS_PER_PIXEL = 0.04
+VENC_H265_AUTO_RATIO = 0.7
 VENC_MIN_BITRATE_KBPS = 500
-VENC_MAX_BITRATE_KBPS = 10_000
+VENC_MAX_BITRATE_KBPS = 6_000
+_SESSION_BITRATE_OVERRIDE_KBPS: Optional[int] = None
 
 
-def estimate_venc_bitrate_kbps(width: int, height: int, fps: int) -> int:
-    """Estimate a practical H.264 VENC bitrate in kbps for the source format."""
-    bitrate = round(width * height * fps * VENC_AUTO_BITS_PER_PIXEL / 1000)
-    return max(VENC_MIN_BITRATE_KBPS, min(bitrate, VENC_MAX_BITRATE_KBPS))
+def _clamp_venc_bitrate_kbps(bitrate_kbps: int) -> int:
+    return max(VENC_MIN_BITRATE_KBPS, min(bitrate_kbps, VENC_MAX_BITRATE_KBPS))
 
 
-def resolve_venc_bitrate_kbps(width: int, height: int, fps: int) -> int:
-    """Resolve VENC bitrate from source dimensions."""
-    return estimate_venc_bitrate_kbps(width, height, fps)
+def _normalize_video_codec(codec: str) -> str:
+    normalized = codec.lower()
+    if normalized in {"video/h265", "hevc", "h265"}:
+        return "h265"
+    return "h264"
+
+
+def estimate_venc_bitrate_kbps(
+    width: int,
+    height: int,
+    fps: int,
+    codec: str = "h264",
+) -> int:
+    """Estimate a practical VENC bitrate in kbps for the source format."""
+    normalized_codec = _normalize_video_codec(codec)
+    bits_per_pixel = VENC_AUTO_BITS_PER_PIXEL
+    if normalized_codec == "h265":
+        bits_per_pixel *= VENC_H265_AUTO_RATIO
+    bitrate = round(width * height * fps * bits_per_pixel / 1000)
+    return _clamp_venc_bitrate_kbps(bitrate)
+
+
+def resolve_venc_bitrate_kbps(
+    width: int,
+    height: int,
+    fps: int,
+    codec: str = "h264",
+) -> int:
+    """Resolve VENC bitrate from source dimensions and codec."""
+    return estimate_venc_bitrate_kbps(width, height, fps, codec=codec)
+
+
+def _target_bitrate_kbps(target_bitrate_bps: int) -> int:
+    if target_bitrate_bps <= 0:
+        return 0
+    return _clamp_venc_bitrate_kbps(target_bitrate_bps // 1000)
+
+
+def _resolve_venc_bitrate_kbps(
+    width: int,
+    height: int,
+    fps: int,
+    codec: str,
+    target_bitrate_bps: int,
+) -> int:
+    bitrate = resolve_venc_bitrate_kbps(width, height, fps, codec=codec)
+    target_kbps = _target_bitrate_kbps(target_bitrate_bps)
+    if target_kbps:
+        bitrate = min(bitrate, target_kbps)
+    return bitrate
+
+
+def set_session_bitrate_override_kbps(bitrate_kbps: Optional[int]) -> None:
+    global _SESSION_BITRATE_OVERRIDE_KBPS
+    if bitrate_kbps is None:
+        _SESSION_BITRATE_OVERRIDE_KBPS = None
+        return
+    _SESSION_BITRATE_OVERRIDE_KBPS = _clamp_venc_bitrate_kbps(int(bitrate_kbps))
+
+
+def get_session_bitrate_override_kbps() -> Optional[int]:
+    return _SESSION_BITRATE_OVERRIDE_KBPS
 
 
 # ---------------------------------------------------------------------------
 #  CANN constants  (from CANN acllite/constants.py)
 # ---------------------------------------------------------------------------
+ENTYPE_H265_MAIN = 0
 ENTYPE_H264_BASE = 1
 ENTYPE_H264_MAIN = 2
 ENTYPE_H264_HIGH = 3
@@ -194,7 +256,13 @@ class CannVenc:
         self.fps = fps
         if bitrate is not None and bitrate <= 0:
             raise ValueError(f"bitrate must be positive, got {bitrate}")
-        self.bitrate = bitrate or resolve_venc_bitrate_kbps(width, height, fps)
+        codec = "h265" if entype == ENTYPE_H265_MAIN else "h264"
+        self.bitrate = bitrate or resolve_venc_bitrate_kbps(
+            width,
+            height,
+            fps,
+            codec=codec,
+        )
         self.entype = entype
         self._channel_id = channel_id
         self._channel_desc = None
@@ -302,7 +370,7 @@ class CannVenc:
 
     def encode(self, nv12_data: np.ndarray, force_keyframe: bool = False,
                pre_padded: bool = False) -> bytes:
-        """Encode one NV12 frame. Returns H264 Annex-B bitstream bytes.
+        """Encode one NV12 frame. Returns Annex-B bitstream bytes.
 
         Args:
             nv12_data: NV12 numpy array (H*3/2, W) tightly packed, or
@@ -437,6 +505,7 @@ class CannH264Encoder(H264Encoder):
     """
 
     def __init__(self):
+        self._target_bitrate_bps: int = 0
         super().__init__()
         self._venc: Optional[CannVenc] = None
         self._last_width: int = 0
@@ -445,6 +514,14 @@ class CannH264Encoder(H264Encoder):
         self._last_bitrate: int = 0
         self._last_timestamp_sec: Optional[float] = None
         self._perf_log_count: int = 0
+
+    @property
+    def target_bitrate(self) -> int:
+        return self._target_bitrate_bps
+
+    @target_bitrate.setter
+    def target_bitrate(self, bitrate: int) -> None:
+        self._target_bitrate_bps = max(0, int(bitrate))
 
     def _estimate_fps(self, frame: av.VideoFrame) -> int:
         if frame.pts is None or frame.time_base is None:
@@ -464,7 +541,17 @@ class CannH264Encoder(H264Encoder):
         return max(1, min(fps, 120))
 
     def _ensure_venc(self, width: int, height: int, fps: int):
-        bitrate = resolve_venc_bitrate_kbps(width, height, fps)
+        session_bitrate_kbps = get_session_bitrate_override_kbps()
+        if session_bitrate_kbps is not None:
+            bitrate = session_bitrate_kbps
+        else:
+            bitrate = _resolve_venc_bitrate_kbps(
+                width=width,
+                height=height,
+                fps=fps,
+                codec="h264",
+                target_bitrate_bps=self.target_bitrate,
+            )
         if (self._venc is not None
                 and self._last_width == width
                 and self._last_height == height
@@ -539,3 +626,146 @@ class CannH264Encoder(H264Encoder):
 
         if encoded:
             yield from self._split_bitstream(encoded)
+
+
+class CannH265Encoder:
+    """aiortc-compatible H.265 encoder backed by Ascend 310B VENC."""
+
+    def __init__(self):
+        self._target_bitrate_bps: int = 0
+        self.target_bitrate = 0
+        self._venc: Optional[CannVenc] = None
+        self._last_width: int = 0
+        self._last_height: int = 0
+        self._last_fps: int = 0
+        self._last_bitrate: int = 0
+        self._last_timestamp_sec: Optional[float] = None
+        self._perf_log_count: int = 0
+
+    @property
+    def target_bitrate(self) -> int:
+        return self._target_bitrate_bps
+
+    @target_bitrate.setter
+    def target_bitrate(self, bitrate: int) -> None:
+        self._target_bitrate_bps = max(0, int(bitrate))
+
+    def _estimate_fps(self, frame: av.VideoFrame) -> int:
+        if frame.pts is None or frame.time_base is None:
+            return self._last_fps or 30
+
+        timestamp_sec = float(frame.pts * frame.time_base)
+        if self._last_timestamp_sec is None:
+            self._last_timestamp_sec = timestamp_sec
+            return self._last_fps or 30
+
+        delta = timestamp_sec - self._last_timestamp_sec
+        self._last_timestamp_sec = timestamp_sec
+        if delta <= 0:
+            return self._last_fps or 30
+
+        fps = round(1.0 / delta)
+        return max(1, min(fps, 120))
+
+    def _ensure_venc(self, width: int, height: int, fps: int):
+        session_bitrate_kbps = get_session_bitrate_override_kbps()
+        if session_bitrate_kbps is not None:
+            bitrate = session_bitrate_kbps
+        else:
+            bitrate = _resolve_venc_bitrate_kbps(
+                width=width,
+                height=height,
+                fps=fps,
+                codec="h265",
+                target_bitrate_bps=self.target_bitrate,
+            )
+        if (
+            self._venc is not None
+            and self._last_width == width
+            and self._last_height == height
+            and self._last_fps == fps
+            and self._last_bitrate == bitrate
+        ):
+            return
+        if self._venc is not None:
+            self._venc.destroy()
+        self._venc = CannVenc(
+            width=width,
+            height=height,
+            fps=fps,
+            bitrate=bitrate,
+            entype=ENTYPE_H265_MAIN,
+        )
+        self._last_width = width
+        self._last_height = height
+        self._last_fps = fps
+        self._last_bitrate = bitrate
+
+    def _encode_frame(
+        self, frame: av.VideoFrame, force_keyframe: bool
+    ) -> Iterator[bytes]:
+        fps = self._estimate_fps(frame)
+        self._ensure_venc(frame.width, frame.height, fps=fps)
+        if self._venc is None:
+            raise RuntimeError("CANN H265 VENC was not initialized")
+
+        if getattr(frame.format, "name", None) == "nv12":
+            t0 = time.perf_counter()
+            nv12 = frame.to_ndarray(format="nv12")
+            pre_padded = True
+            convert_ms = (time.perf_counter() - t0) * 1000
+        else:
+            t0 = time.perf_counter()
+            nv12_frame = frame.reformat(format="nv12")
+            t1 = time.perf_counter()
+            nv12 = nv12_frame.to_ndarray(format="nv12")
+            pre_padded = False
+            convert_ms = (time.perf_counter() - t1) * 1000
+            if self._perf_log_count < 5:
+                logger.info(
+                    "H265 VENC input convert frame=%d reformat_ms=%.1f ndarray_ms=%.1f",
+                    self._perf_log_count + 1,
+                    (t1 - t0) * 1000,
+                    convert_ms,
+                )
+
+        t0 = time.perf_counter()
+        encoded = self._venc.encode(
+            nv12,
+            force_keyframe=force_keyframe,
+            pre_padded=pre_padded,
+        )
+        encode_ms = (time.perf_counter() - t0) * 1000
+
+        if self._perf_log_count < 5:
+            logger.info(
+                "H265 VENC encode frame=%d size=%dx%d fps=%d pre_padded=%s "
+                "encode_ms=%.1f bytes=%d",
+                self._perf_log_count + 1,
+                frame.width,
+                frame.height,
+                fps,
+                pre_padded,
+                encode_ms,
+                len(encoded),
+            )
+            self._perf_log_count += 1
+
+        if encoded:
+            yield from split_annexb(encoded)
+
+    def encode(
+        self, frame: av.VideoFrame, force_keyframe: bool = False
+    ) -> tuple[list[bytes], int]:
+        from aiortc.mediastreams import VIDEO_TIME_BASE, convert_timebase
+
+        packages = self._encode_frame(frame, force_keyframe)
+        timestamp = convert_timebase(frame.pts, frame.time_base, VIDEO_TIME_BASE)
+        return packetize_hevc(packages), timestamp
+
+    def pack(self, packet) -> tuple[list[bytes], int]:
+        from aiortc.mediastreams import VIDEO_TIME_BASE, convert_timebase
+
+        packages = split_annexb(bytes(packet))
+        timestamp = convert_timebase(packet.pts, packet.time_base, VIDEO_TIME_BASE)
+        return packetize_hevc(packages), timestamp

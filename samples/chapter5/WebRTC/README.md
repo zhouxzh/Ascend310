@@ -1,401 +1,414 @@
 # Ascend 310B aiortc WebRTC Sender
 
-## 仓库定位
+## 这是什么
 
-这个仓库只面向昇腾 310B 运行。
+这是一个跑在昇腾 310B 上的 WebRTC 视频发送端。
 
-- Windows 可以作为编辑代码、同步代码的开发机，也可以运行 `client.py` 作为 WebRTC 接收端。
-- Python 服务、媒体链路验证、浏览器联调、依赖假设和部署行为，都应以昇腾 310B 设备为准。
-- 仓库默认视频源是 [webrtc_app/ascend_source.py](./webrtc_app/ascend_source.py) 里的 `AscendVideoTrack`，支持三种模式：
-  - **demo** — 合成演示帧，确保 `aiortc` 和浏览器侧 WebRTC 接收链路始终可验证。
-  - **usb_camera** — V4L2 MJPEG 直采 → CPU JPEG 解码 → 软件视频帧，作为软件基线对比路径。
-  - **dvpp_camera** — V4L2 MJPEG 直采 → DVPP JPEGD 硬件解码 → DVPP VENC 硬件编码，全硬件管线。
+它的目标很明确：
 
-当前媒体链路：
+- 帧源在 310B 设备侧
+- Python 用 `aiortc` 完成 WebRTC 会话和 RTP 发送
+- 浏览器只负责接收和显示
 
-`Ascend 310B 设备帧源 -> AscendVideoTrack -> aiortc -> aiohttp signaling -> Browser`
+当前媒体链路可以概括为：
 
-## 目录结构
+`Ascend 310B frame source -> AscendVideoTrack -> aiortc -> RTP/WebRTC -> Browser`
+
+HTTP `POST /offer` 只是信令，不在媒体路径里。
+
+## 仓库现状
+
+仓库当前围绕三条视频路径工作：
+
+- `demo`
+  合成演示帧，方便验证 WebRTC 信令和浏览器接收链路
+- `usb_camera`
+  V4L2 MJPEG 采集 -> CPU JPEG 解码 -> `rgb24` -> 软件编码
+- `dvpp_camera`
+  V4L2 MJPEG 采集 -> DVPP JPEGD -> `nv12` -> CANN VENC 硬件编码
+
+编码格式支持：
+
+- `h264`
+  默认格式。可走纯 CPU，也可走 CANN VENC 硬编
+- `h265`
+  只走 CANN VENC 硬编，要求浏览器具备 WebRTC HEVC 接收能力
+
+## 目录
 
 - `server.py`
-  Python WebRTC 服务入口，负责 HTTP 路由、offer/answer 协商、日志和连接关闭。支持 `--source demo|usb_camera|dvpp_camera` 切换视频源。
+  服务入口，负责 HTTP、offer/answer、连接生命周期和编码器切换
 - `webrtc_app/ascend_source.py`
-  Ascend 视频源适配层。`AscendVideoTrack` 支持 demo、MJPEG 软件基线和 DVPP 硬件管线三种模式。
+  视频源适配层，核心类是 `AscendVideoTrack`
 - `webrtc_app/cann_encoder.py`
-  CANN VENC 硬件 H.264 编码器。替代 aiortc 的 libx264 软件编码，支持 NV12 直通（跳过 CPU 色彩转换）。
+  CANN VENC 封装，包含 `CannH264Encoder` 和 `CannH265Encoder`
 - `webrtc_app/dvpp_jpegd.py`
-  DVPP JPEGD 硬件解码器。将 MJPEG 码流硬件解码为 NV12，供 VENC 直接编码。
-- `webrtc_app/v4l2_capture.py`
-  基于 PyAV 的 V4L2 MJPEG 采集模块。
+  DVPP JPEGD 硬件解码
+- `webrtc_app/hevc.py`
+  H.265 RTP 分包
 - `webrtc_app/v4l2_raw.py`
-  直接 ioctl + mmap 的 V4L2 MJPEG 采集模块（更高帧率，自动优先选用）。
-- `web/index.html` / `web/client.js` / `web/styles.css`
-  浏览器接收页面、WebRTC 协商逻辑和样式。
+  直接 ioctl + mmap 的 V4L2 MJPEG 采集
+- `webrtc_app/v4l2_capture.py`
+  基于 PyAV 的 V4L2 MJPEG 采集
+- `web/index.html`
+  浏览器接收页
+- `web/client.js`
+  浏览器侧 WebRTC 协商与状态显示
 - `test/`
-  pytest 测试套件（`test_nv12.py`、`test_cann_venc.py`），在 310B 上运行验证。
-- `sync.ps1`
-  Windows ↔ 310B 代码同步脚本。`push` 推送，`pull` 拉取日志，`-Watch` 自动监听。
-- `AGENTS.md`
-  仓库级协作准则，已明确本项目是 Ascend 310B first。
+  pytest 测试
 
-## 运行方式
+## 环境要求
 
 运行机必须是昇腾 310B。
 
-### 设备端安装与启动
+开发机可以是 Windows、Linux 或 macOS，但浏览器接收效果、设备依赖和性能结论都以 310B 为准。
+
+系统依赖：
 
 ```bash
-# 安装 V4L2 工具（USB 摄像头采集必需）
 sudo apt install v4l-utils
+```
 
-conda activate mediapipe  # 或其他含 Python 3.11 的环境
+Python 环境：
+
+```bash
+conda activate npu
 python -m pip install -r requirements.txt
 ```
 
-先设置 CANN 环境变量（硬件编码必需）：
+如果要跑硬编路径，还需要先设置 CANN 环境变量：
 
 ```bash
 export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH"
 export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:$PYTHONPATH"
 ```
 
-启动 demo 模式（合成帧，CPU 编码）：
+## 快速开始
+
+### 1. 启动纯 CPU 演示路径
 
 ```bash
-python server.py --host 0.0.0.0 --port 8080
+python server.py --source demo --host 0.0.0.0 --port 8080
 ```
 
-启动 USB 摄像头 + MJPEG 软件基线（V4L2 直采 + CPU JPEG 解码）：
+这条路径不需要摄像头，也不需要 CANN。
+
+### 2. 启动纯 CPU 摄像头路径
 
 ```bash
 python server.py --source usb_camera --host 0.0.0.0 --port 8080
 ```
 
-启动 USB 摄像头 + DVPP 全硬件管线（推荐，最高性能，硬件编码自动启用）：
+这条路径是：
+
+`V4L2 MJPEG -> CPU JPEG decode -> aiortc/libx264 -> Browser`
+
+它适合拿来做“纯 CPU 对照组”。
+
+### 3. 启动 H.264 硬编路径
 
 ```bash
-python server.py --source dvpp_camera --host 0.0.0.0 --port 8080
+python server.py --source dvpp_camera --video-codec h264 --host 0.0.0.0 --port 8080
 ```
 
-服务端会按分辨率和帧率自动估算 VENC 码率，比如 `1920x1080@60`
-约 `4977 kbps`。当前按 USB 摄像头最高 `1080p60` 约束在 `500~6000 kbps`。
-这是建连时的编码器配置，不是运行中的网络自适应降码率。
+`dvpp_camera` 会自动走：
 
-三种模式对比：
+`V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.264`
 
-| 模式 | `--hardware-encode` | 相机采集 | MJPEG 解码 | 颜色转换 | H.264 编码 | 1920x1080 实测帧率 |
-|------|---------------------|---------|-----------|---------|-----------|---------|
-| `demo` | 否 | 无（合成） | — | — | libx264 | 约 12.8fps |
-| `usb_camera` | 否 | V4L2 直采 | CPU | RGB 帧输出 | libx264 | 约 13.9fps |
-| `usb_camera` | 是 | V4L2 直采 | CPU | PyAV `reformat("nv12")` | CANN VENC | 约 12.1fps |
-| `dvpp_camera` | 自动 | V4L2 直采 | DVPP JPEGD | 无 | CANN VENC | 约 30.0fps |
-
-> `dvpp_camera` 模式下硬件编码自动启用（NV12 帧必须由 VENC 编码）。`demo` 和 `usb_camera` 不加 `--hardware-encode` 则走 CPU libx264。
-
-指定摄像头设备：
+如果你想保留 `usb_camera` 输入，但只把编码切成 H.264 硬编，也可以：
 
 ```bash
-python server.py --source dvpp_camera --camera-device /dev/video1
+python server.py --source usb_camera --hardware-encode --host 0.0.0.0 --port 8080
 ```
 
-启动后会打印浏览器访问 URL。
+### 4. 启动 H.265 硬编路径
 
-### 浏览器接收（跨平台）
+```bash
+python server.py --source dvpp_camera --video-codec h265 --host 0.0.0.0 --port 8080
+```
+
+H.265 只走 CANN VENC，不存在 CPU H.265 编码路径。
+
+## 浏览器怎么连
+
+浏览器打开：
 
 ```text
-http://<ascend-310b-ip>:8080
+http://<310b-ip>:8080
 ```
 
-页面支持选择分辨率、帧率，显示 PeerConnection 状态、ICE 状态、接收码率和实时帧率。
+页面当前支持：
 
-### 验证步骤
+- 分辨率选择
+- 帧率选择
+- 目标码率下拉
+  - `自动`
+  - `500` 到 `6000 kbps`
 
-1. 在 310B 上启动 `server.py`。
-2. 从浏览器访问设备地址，确认 `/health` 返回 `ok`。
-3. 在浏览器页面选择分辨率和帧率，点击”开始接收”。
-4. 观察远端视频、PeerConnection 状态、ICE 状态、接收码率和帧率。
-5. 查看设备上的 `logs/server.log`，确认没有 offer 处理异常。
-6. 在 310B 上运行 `pytest test/ -v` 验证 VENC 编码器和 NV12 转换。
-7. 运行 `python test/test_dvpp_pipeline.py` 验证 DVPP 全硬件管线端到端。
+页面是接收页，不采集本地摄像头。
 
-## aiortc 基础
+## 目标码率怎么生效
 
-### aiortc 是什么
+页面上的“目标码率”是**建连参数**，不是运行中热调参数。
 
-`aiortc` 是 Python 的 WebRTC 实现库，基于 `asyncio`。它让 Python 代码可以直接扮演 WebRTC 对等端，而不是只能把媒体交给浏览器处理。
+行为是：
 
-在这个仓库里，`aiortc` 不是辅助库，而是发送端核心：
+1. 页面选择分辨率、帧率、目标码率
+2. 页面发 `POST /offer`
+3. 服务端按这次连接的参数创建编码器 / VENC 通道
+4. 断开后重新选择码率，再次连接，会按新的码率重新建通道
 
-- 它创建 `RTCPeerConnection`。
-- 它接收浏览器发来的 SDP offer。
-- 它在 Python 侧挂载视频轨道。
-- 它生成 SDP answer。
-- 它负责 ICE、DTLS、SRTP 和 RTP 发送。
+也就是说：
 
-### 这个仓库里最关键的 aiortc 类
+- 留空或选 `自动`：服务端按分辨率、帧率、编码格式自动估算
+- 选具体值：服务端按该值创建本次连接的 VENC
 
-- `RTCPeerConnection`
-  负责整个 WebRTC 会话对象。代码里在 [server.py](./server.py) 的 `offer()` 中创建。
-- `RTCSessionDescription`
-  用来承载浏览器发来的 offer 和 Python 返回的 answer。
-- `MediaStreamTrack`
-  WebRTC 里的媒体轨道抽象。代码里的 `AscendVideoTrack` 继承它，并通过 `recv()` 一帧一帧向 `aiortc` 提供视频。
+当前不支持在线热调码率。
 
-### 为什么这里用 aiortc
+## H.265 需要注意什么
 
-这个仓库的目标不是“浏览器本地采集”，而是“昇腾 310B 设备端掌握帧源，再通过 WebRTC 发给浏览器”。这正是 `aiortc` 的适用点：
+H.265 的失败时机不是“服务端启动失败”，而是“浏览器发起 offer 时，如果浏览器没带 `video/H265` 能力，服务端返回 `HTTP 400`”。
 
-- 帧在 Python 里生成或接入。
-- 浏览器只负责接收和显示。
-- 设备侧媒体源可以替换，信令和浏览器逻辑基本不需要重写。
+也就是说：
 
-## WebRTC 基础
+- 服务端可以正常启动
+- 浏览器不支持 HEVC 时，点击“开始接收”才会失败
 
-### WebRTC 里什么是标准，什么不是标准
+浏览器页也会在本地先做一层 H.265 能力检查。
 
-WebRTC 标准化了媒体协商和传输能力，但没有强制规定你必须用什么信令协议。
+## 最近在 311 上的实测结果
 
-这个仓库采用的是最小化信令方式：
+下面这些数据来自 `311`（`orangepiaipro`）上 2026-05-26 的最新日志，不是理论值。
 
-- 浏览器通过 HTTP `POST /offer` 发送 offer。
-- Python 服务返回 answer。
-- 没有引入 WebSocket。
-- 没有引入 TURN。
-- 当前也没有额外的 trickle ICE 流程。
+测试分成三类：
 
-### 本仓库涉及到的几个核心概念
+### 1. 纯 CPU
 
-- `SDP`
-  会话描述文本，里面包含编解码能力、媒体方向、ICE 信息等。浏览器创建 offer，Python 创建 answer。
-- `ICE`
-  Interactive Connectivity Establishment，用来找浏览器和设备之间真正可用的网络路径。
-- `DTLS / SRTP`
-  WebRTC 媒体传输的安全层。这里虽然代码没手写这些协议，但它们由 WebRTC 栈自动参与。
-- `Track / Transceiver`
-  浏览器在 [web/client.js](./web/client.js) 里添加 `recvonly` video transceiver，表示“我只接收视频，不负责采集或发送视频”。
-- `RTP`
-  真正承载视频包的传输层。`aiortc` 会把 `MediaStreamTrack.recv()` 产出的帧编码后通过 RTP 送给浏览器。
-
-### VP8 和 H264 有什么不同
-
-这两个都是视频编码格式，但设计目标和工程侧重点不同。
-
-- `VP8`
-  开放、免版税，WebRTC 生态里支持很常见。对纯软件链路比较友好，但在很多嵌入式设备、NPU 板卡或专用媒体硬件上，未必有和 `H264` 一样成熟的硬编码、硬解码和工具链支持。
-- `H264`
-  工业使用更广，浏览器、摄像头、编码芯片、流媒体设备和 SoC 支持通常更成熟。对“设备侧先编码，再通过 WebRTC 发送”的路径更常见，但它涉及专利和授权生态，工程上通常需要更明确地确认平台支持方式。
-
-如果只看这个仓库的目标，即“昇腾 310B 设备产出视频，再送到浏览器”，`H264` 往往比 `VP8` 更值得优先考虑，因为：
-
-- 更容易和现有硬件编码链路对齐。
-- 更容易和设备侧已有的媒体输出格式衔接。
-- 浏览器兼容和 WebRTC 互通通常更成熟。
-
-但这不等于当前仓库已经在用 310B 的 `H264` 硬编码。当前版本还没有做到这一点。
-
-### 当前仓库实际走的编码路径
-
-按当前环境里的 `aiortc 1.14.0`，视频编码能力只包含 `VP8` 和 `H264`。
-
-**默认 CPU 编码路径**（`--source` 不带 `--hardware-encode`）：
-
-- `VP8` 编码走 `libvpx`
-- `H264` 编码走 `libx264`
-
-路径：`AscendVideoTrack -> av.VideoFrame -> aiortc libx264 encoder -> RTP -> Browser`
-
-**昇腾硬件编码路径**（`python server.py --hardware-encode`）：
-
-- 通过 [cann_encoder.py](webrtc_app/cann_encoder.py) 中 `CannH264Encoder` 替换 aiortc 的 `H264Encoder`
-- 调用 CANN ACL VENC API，使用昇腾 310B 片载 H.264 硬编码器
-
-硬件编码需设置 CANN 环境变量：
+命令：
 
 ```bash
-export LD_LIBRARY_PATH=”/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH”
-export PYTHONPATH=”/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:$PYTHONPATH”
+python server.py --source usb_camera --host 0.0.0.0 --port 8080
 ```
 
-两种硬件编码管线的区别：
+路径：
 
-| 管线 | 路径 | 1920x1080 实测帧率 |
-|------|------|------|
-| `usb_camera` | V4L2 MJPEG 直采 (CPU) → CPU JPEG 解码 → RGB → libx264 | 约 13.9fps |
-| `usb_camera --hardware-encode` | V4L2 MJPEG 直采 (CPU) → CPU JPEG 解码 → PyAV NV12 转换 → VENC | 约 12.1fps |
-| `dvpp_camera` | V4L2 MJPEG 直采 (CPU) → JPEGD (硬件) → NV12 → VENC (硬件) | 约 30.0fps |
+`V4L2 MJPEG -> CPU JPEG decode -> RGB -> libx264`
 
-### 1920x1080 Bench Notes
+日志特征：
 
-测试环境：
+- `Configured USB camera source=usb-camera ... CPU_DECODE->RGB`
+- `USB camera decode frame=... decode_ms=20~32`
+- `Track FPS: 14.2 / 14.6 / 15.3 / 14.9 / 15.0 / 15.1`
 
-- Ascend 310B 设备
-- USB 摄像头：Logitech C922 Pro Stream Webcam
-- V4L2 当前格式：`1920x1080`, `MJPG`, `30 fps`
-- 浏览器接收端通过 WebRTC 拉流，日志中的 `Track FPS` 作为实际链路帧率
+结论：
 
-关键日志证据：
+- `1920x1080@60` 请求下，实际只有大约 `15 fps`
+- 主要瓶颈是 CPU JPEG 解码
 
-- `usb_camera` 软件基线：
-  `USB camera decode frame=... decode_ms=26~34`
-  `Track FPS: 13.9`
-- `usb_camera --hardware-encode`：
-  `USB camera decode frame=... decode_ms=26~34`
-  `VENC input convert frame=... reformat_ms=21~24 ndarray_ms=1~3`
-  `VENC encode frame=... encode_ms=11~22`
-  `Track FPS: 12.1`
-- `dvpp_camera`：
-  `DVPP decode frame=... decode_ms=4.9~9.3`
-  `VENC encode frame=... encode_ms=6.5~6.6`
-  `Track FPS: 30.0`
+### 2. H.264 硬编
 
-原因解释：
+命令：
 
-- `demo` 只有合成帧，但默认仍走 `aiortc` 的软件 `libx264`，在 1080p 下编码本身就比较重，所以实测只有约 `12.8fps`。
-- `usb_camera` 的主要瓶颈不是取流，而是 CPU JPEG 解码。单帧解码约 `26~34ms`，再加上后续软件编码或打包开销，稳定在约 `13.9fps`。
-- `usb_camera --hardware-encode` 虽然启用了 VENC，但并没有更快，因为它仍然保留 CPU JPEG 解码，并且还要做一遍 RGB→NV12 转换。现在这个转换已经从原先约 `180ms+` 降到了约 `22~27ms`，但总成本仍高于纯软件路径，所以整体约 `12.1fps`。
-- `dvpp_camera` 明显更快，因为它把最重的两个环节都移出了 CPU：JPEG 解码走 DVPP JPEGD，输出直接是 NV12，VENC 也能直通编码。日志里 JPEGD 单帧约 `5ms`、VENC 单帧约 `6.5ms`，因此整条链路可以稳定在 `30fps`。
-- `dvpp_camera` 的 VENC 日志显示 `1920x1088`，这是正常的硬件对齐现象：VENC 高度 stride 按 16 对齐；摄像头和浏览器看到的有效内容仍是 `1920x1080`。
+```bash
+python server.py --source dvpp_camera --video-codec h264 --host 0.0.0.0 --port 8080
+```
 
-### 本仓库的实际协商流程
+路径：
 
-1. 浏览器创建 `RTCPeerConnection`。
-2. 浏览器调用 `addTransceiver("video", { direction: "recvonly" })`。
-3. 浏览器创建 offer，并设置为本地描述。
-4. 浏览器把 offer、宽高、帧率发到 `POST /offer`。
-5. Python 服务创建新的 `RTCPeerConnection`。
-6. Python 服务创建 `AscendVideoTrack` 并通过 `pc.addTrack(...)` 挂上视频轨道。
-7. Python 服务对浏览器 offer 调用 `setRemoteDescription(...)`。
-8. Python 服务创建 answer，并 `setLocalDescription(...)`。
-9. Python 服务把 answer 返回给浏览器。
-10. 浏览器设置远端描述，随后开始接收远端视频。
+`V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.264`
 
-## 代码解析
+代表日志：
 
-### [server.py](./server.py)
+- `DVPP decode frame=... decode_ms=4.9~9.5`
+- `VENC encode frame=... encode_ms=6.3~6.5`
+- `Track FPS: 59.7 / 60.2 / 60.0 / 59.9 ...`
 
-这是整个服务端入口文件。
+结论：
 
-- `build_app(source_mode, camera_device)`
-  注册主页、静态资源、健康检查和 `/offer` 路由，同时把视频源配置注入到 app 上下文。
-- `health()`
-  返回当前运行目标和已配置的视频源模式，方便确认所连服务状态。
-- `parse_offer_payload()`
-  解析浏览器或客户端发来的 `sdp`、`type`、`width`、`height`、`fps`，并做基础参数校验。
-- `offer()`
-  最关键的信令入口。新请求到达时先关闭所有旧连接（释放 `/dev/video0`），然后创建 `RTCPeerConnection`，通过 `AscendVideoTrack` 挂载视频轨道，完成 answer 生成并返回。
-- `get_local_ip()`
-  通过 UDP 套接字发现本机 LAN IP，启动时打印到控制台。
-- `close_peer_connection()`
-  统一关闭 `RTCPeerConnection` 和源轨道，避免异常后留下悬空连接。
-- `setup_logging()`
-  同时写控制台和 `logs/server.log`，便于在 310B 上看运行日志。
+- `1920x1080@60` 下基本可以稳定在 `60 fps`
+- 目前是这套链路里最稳的配置
 
-`server.py` 是会话控制层和 HTTP 信令层，不承载设备专属图像处理逻辑。
+### 3. H.265 硬编
 
-### [webrtc_app/ascend_source.py](./webrtc_app/ascend_source.py)
+命令：
 
-这是当前仓库最重要的设备适配点。
+```bash
+python server.py --source dvpp_camera --video-codec h265 --host 0.0.0.0 --port 8080
+```
 
-- `AscendVideoTrack`
-  继承 `MediaStreamTrack`，代表 Python 侧视频轨道。通过 `source_type` 参数切换 `"demo"`、`"usb_camera"` 或 `"dvpp_camera"`。
-- `_init_demo()`
-  demo 模式的初始化，生成 x/y 渐变数组用于合成帧。
-- `_init_usb_camera(device)`
-  初始化 V4L2 MJPEG 采集并在 CPU 上解码为 `rgb24`，用于和 DVPP 路径做软件基线对比。
-- `_init_dvpp_camera(device)`
-  初始化 V4L2 MJPEG 采集 + DVPP JPEGD 硬件解码器。优先使用 `V4l2RawCapture`（~24fps），失败降级到 PyAV（~15fps）。
-- `_camera_read()`
-  阻塞方法，在 `run_in_executor` 中执行。`usb_camera` 模式：V4L2 取 MJPEG → CPU JPEG 解码 → RGB。DVPP 模式：V4L2 取 MJPEG → JPEGD 解码 → NV12。
-- `describe_settings()`
-  返回当前轨道配置（含实际分辨率、帧率、自动估算 VENC 码率和模式），通过 offer 响应回传给接收端。
-- `_render_demo_frame()`
-  动态彩色演示帧。在未接入真实 310B 输出时保持媒体链路可运行。
-- `recv()`
-  每次被 `aiortc` 拉取时返回 `av.VideoFrame`。摄像头模式下用 `run_in_executor` 异步读取。
-- `next_timestamp()`
-  用 90kHz 视频时钟控制输出节奏，让帧率与配置值一致。
-- `stop()`
-  停止轨道并释放摄像头资源。
+路径：
 
-接入真实昇腾 310B 输出时，最应该改的就是这里，而不是 `server.py` 的协商逻辑。
+`V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.265`
 
-### [webrtc_app/cann_encoder.py](./webrtc_app/cann_encoder.py)
+代表日志：
 
-昇腾 310B 硬件 H.264 编码器，通过 CANN VENC API 实现。
+- `DVPP decode frame=... decode_ms=4.9~9.2`
+- `H265 VENC encode frame=... encode_ms=6.2~6.6`
+- 稳定样本：`Track FPS` 大约 `57~59`
+- 异常样本：个别运行段会掉到 `35 fps`
 
-- `CannVenc` — 同步封装 CANN VENC 异步回调 API
-  - `create_channel` / `destroy` — VENC 通道生命周期
-  - `encode(nv12, force_keyframe, pre_padded)` — 提交 NV12 帧，返回 H.264 Annex-B 码流。`pre_padded=True` 时跳过 CPU stride 重排（配合 JPEGD 输出）
-- `CannH264Encoder(H264Encoder)` — aiortc 兼容的 H.264 编码器
-  - 继承 aiortc 的 `_packetize`、`pack`、`_split_bitstream`，复用 RTP 分包逻辑
-  - 仅覆盖 `_encode_frame` 将 libx264 替换为 CANN VENC
-  - 检测帧格式：NV12 帧直通 VENC（跳过 BGR→NV12），BGR 帧走 CPU 转换
-  - CANN 不可用时自动回退到 CPU libx264
-- `bgr_to_nv12(bgr)` — BGR→NV12 色彩空间转换（CPU），供非 NV12 帧的硬件编码回退路径使用
-- `_try_import_cann()` / `_init_acl()` — CANN ACL 自动导入、环境配置和设备初始化
+结论：
 
-### [web/client.js](./web/client.js)
+- H.265 的码流更小
+- 但按这次 311 的日志，整体稳定性不如 H.264
+- 如果目标是“1080p60 稳定推流”，当前优先选 H.264
 
-这是浏览器接收端逻辑。
+### 汇总表
 
-- `checkHealth()`
-  页面初始化时检查服务是否在线，并展示运行目标。
-- `startConnection()`
-  创建浏览器侧 `RTCPeerConnection`，生成 offer，向服务端请求 answer，然后设置远端描述。
-- `bindConnectionEvents()`
-  监听 track、PeerConnection 状态和 ICE 状态。
-- `readInboundStats()`
-  定时读取浏览器统计信息，计算接收码率和帧率（stats 回退源）。
-- `startFpsTracking()` / `rvfcCallback()`
-  通过 `requestVideoFrameCallback` 测量实际显示帧率（优先源），实时更新视频浮层和状态栏。
-- `stopConnection()`
-  关闭当前连接并清理页面状态。
+| 模式 | 路径 | 311 上实测表现 |
+|------|------|----------------|
+| 纯 CPU | `usb_camera` + `libx264` | 约 `15 fps` |
+| H.264 硬编 | `dvpp_camera` + CANN VENC | 基本稳定 `60 fps` |
+| H.265 硬编 | `dvpp_camera` + CANN VENC | 通常 `57~59 fps`，个别样本掉到 `35 fps` |
 
-浏览器端没有 `getUserMedia()`，因为这个仓库不是浏览器采集方案。
+当前这台 `311` 的结论很直接：
 
-### [web/index.html](./web/index.html) 和 [web/styles.css](./web/styles.css)
+`H.264 硬编 > H.265 硬编 >>> 纯 CPU`
 
-这两个文件负责展示接收页。
+## 为什么浏览器会显示 1920x1088
 
-- 页面只暴露分辨率和帧率输入，不再暴露本地摄像头枚举。
-- 状态栏里能直接看到 HTTP 服务状态、运行目标、PeerConnection 状态和接收码率。
-- 视频窗口显示的是远端媒体，不是浏览器本地预览。
+这是硬件编码对齐，不是画面真的变成了 `1088` 高。
 
-## 如何接入真实昇腾 310B 输出
+原因是：
 
-建议只在 [webrtc_app/ascend_source.py](./webrtc_app/ascend_source.py) 这条边界上接入真实设备能力。
+- `1080` 不能被 `16` 整除
+- VENC 常把编码面高度补到下一个对齐值，也就是 `1088`
+- 多出来的 `8` 行是 padding，不是有效画面
 
-已有三种模式覆盖了常见场景：
+所以：
 
-1. **demo** — 纯软件，验证 WebRTC 链路。
-2. **usb_camera** — MJPEG 软件基线，用于和 DVPP 路径做对比。
-3. **dvpp_camera** — V4L2 MJPEG + JPEGD + VENC 全硬件管线，性能最优。
+- 摄像头源仍然是 `1920x1080`
+- 编码面可能显示为 `1920x1088`
+- 浏览器有时会把 coded size 显示出来
 
-如需接入自定义源：
+## 验证建议
 
-1. 在 `AscendVideoTrack.__init__` 中添加新的 `source_type` 分支。
-2. 实现对应的 `_init_xxx()` 方法，初始化采集/产出逻辑。
-3. 在 `recv()` 中产出 `av.VideoFrame`（格式建议 `nv12` 以配合 VENC 直通）。
-4. 保持 `next_timestamp()` 发送节奏控制逻辑稳定。
-5. 不要把 ACL、DVPP、CANN 等设备专属细节写进 `server.py` 或浏览器代码。
+如果你要复现实验，建议按下面顺序跑：
+
+1. 纯 CPU
+
+```bash
+python server.py --source usb_camera --host 0.0.0.0 --port 8080
+```
+
+2. H.264 硬编
+
+```bash
+python server.py --source dvpp_camera --video-codec h264 --host 0.0.0.0 --port 8080
+```
+
+3. H.265 硬编
+
+```bash
+python server.py --source dvpp_camera --video-codec h265 --host 0.0.0.0 --port 8080
+```
+
+每次都看：
+
+- 浏览器页里的 `接收码率` 和 `视频帧率`
+- `logs/server.log`
+- `Track FPS`
+- `decode_ms`
+- `encode_ms`
+- 关闭时的 `frames / dropped`
+
+## 常见问题
+
+### `v4l2-ctl --list-devices` 提示权限不足
+
+通常是当前用户没有访问 `/dev/video*` 的权限。
+
+```bash
+sudo usermod -aG video <你的用户名>
+newgrp video
+```
+
+然后重新登录终端。
+
+### 如何确认摄像头的原始 MJPEG 输出没问题
+
+```bash
+v4l2-ctl -d /dev/video0 \
+  --set-fmt-video=width=1920,height=1080,pixelformat=MJPG \
+  --set-parm=60 \
+  --stream-mmap \
+  --stream-count=300 \
+  --stream-to=/dev/null
+```
+
+如果这里就跑不到目标帧率，问题先不在 WebRTC。
+
+### 怎么判断自己是不是走了纯 CPU
+
+如果是纯 CPU，日志里应当看到：
+
+- `source=usb_camera`
+- `CPU_DECODE->RGB`
+- `USB camera decode frame=...`
+
+而不应该看到：
+
+- `H264 encoder switched to CANN VENC hardware`
+- `H265 codec registered and switched to CANN VENC hardware`
+- `CANN VENC channel created`
+
+## 代码怎么接入真实 310B 输出
+
+最应该改的文件是：
+
+- [webrtc_app/ascend_source.py](./webrtc_app/ascend_source.py)
+
+建议保持边界：
+
+1. 在 `AscendVideoTrack` 里新增 source 分支
+2. 用 `_init_xxx()` 初始化真实输入
+3. 在 `recv()` 中产出 `av.VideoFrame`
+4. 尽量输出 `nv12`，方便 VENC 直通
+5. 不要把设备专属逻辑散到 `server.py` 和浏览器代码里
+
+## 当前实现里最关键的文件
+
+### `server.py`
+
+- 管 HTTP 路由
+- 管 `POST /offer`
+- 管 `RTCPeerConnection`
+- 管 H.264 / H.265 编码器注册
+- 管旧连接清理
+
+### `webrtc_app/ascend_source.py`
+
+- 管 demo / usb_camera / dvpp_camera 三条帧源路径
+- 管 `recv()` 输出帧
+- 管帧率节奏和状态回传
+
+### `webrtc_app/cann_encoder.py`
+
+- 管 CANN VENC 通道
+- 管 H.264 / H.265 编码器适配
+- 管自动码率估算和手动目标码率覆盖
+
+### `web/client.js`
+
+- 管浏览器端 `recvonly` 协商
+- 管 H.265 能力检查
+- 管分辨率 / 帧率 / 目标码率建连参数
+- 管接收码率和帧率显示
 
 ## 当前依赖
 
-**服务端（昇腾 310B）**：
-- `v4l-utils` — V4L2 命令行工具和库（USB 摄像头采集必需，`sudo apt install v4l-utils`）
-- `aiohttp` — HTTP 服务和静态页面
-- `aiortc` — Python 侧 WebRTC 能力
-- `av` — 构造 `VideoFrame` 和 V4L2 采集（PyAV）
-- `numpy` — 演示帧生成和 NV12 数据操作
-- `CANN 8.3.RC1` — 昇腾 ACL/Python API（硬件编码必需，位于 `/usr/local/Ascend/`）
-- `pytest` — 测试框架（仅开发）
+- `aiohttp`
+- `aiortc`
+- `av`
+- `numpy`
+- `v4l-utils`
+- `pytest`
+- `CANN 8.3`
 
-## Codex Agents
+## 一句话建议
 
-仓库里保留了本地 agent 配置，语义为 Ascend 310B first。
+如果你现在只是想在 310B 上稳定地把 1080p60 推到浏览器，先用：
 
-- `webrtc_mapper` — 定位真实执行路径
-- `ascend_310b_reviewer` — 检查 Ascend 310B 运行准备度
-- `stream_pipeline_worker` — 小范围实现改动
-- `docs_researcher` — WebRTC、浏览器和部署文档查询
-- `windows_camera_debugger.toml` — 开发机在 Windows、运行机在 Ascend 310B 时的远程连接和部署诊断
+```bash
+python server.py --source dvpp_camera --video-codec h264 --host 0.0.0.0 --port 8080
+```
