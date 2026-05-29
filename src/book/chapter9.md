@@ -7,11 +7,11 @@ keywords: [附录, FAQ, Checklist, 术语, 故障排查, 模板]
 lang: zh-cn
 ---
 
-## 章节总览
+## 章节总览 {#src-book-chapter9-h1}
 
 本附录聚焦“查得快、用得稳”：常见报错速查、转换参数模板、性能/质量 Checklist、术语字典、推荐资源与社区贡献规范。可作为日常开发随手翻阅的工具章节。
 
-## 常见报错速查
+## 常见报错速查 {#src-book-chapter9-h2}
 
 | 分类 | 报错/现象 | 可能原因 | 排查步骤 | 解决建议 |
 | ---- | -------- | -------- | -------- | -------- |
@@ -28,9 +28,9 @@ lang: zh-cn
 | 部署 | 模型加载慢 | 冷启动/IO 慢 | 预热/缓存 | 预加载 + 固态存储 |
 | 安全 | 日志泄露敏感路径 | 直接 print | grep 审计 | 结构化日志脱敏 |
 
-## 模型转换参数模板合集
+## 模型转换参数模板合集 {#src-book-chapter9-h3}
 
-### 分类模型 (ResNet)
+### 分类模型 (ResNet) {#src-book-chapter9-h4}
 
 ```
 atc --model=resnet50.onnx \
@@ -43,7 +43,7 @@ atc --model=resnet50.onnx \
     --log=info
 ```
 
-### YOLO 动态分辨率
+### YOLO 动态分辨率 {#src-book-chapter9-h5}
 
 ```
 atc --model=yolov5s.onnx \
@@ -56,7 +56,7 @@ atc --model=yolov5s.onnx \
     --precision_mode=allow_fp32_to_fp16
 ```
 
-### INT8 量化（示例）
+### INT8 量化（示例） {#src-book-chapter9-h6}
 
 ```
 atc --model=resnet50.onnx \
@@ -70,7 +70,7 @@ atc --model=resnet50.onnx \
     --enable_small_channel=true
 ```
 
-## 性能与质量 Checklist（执行勾项）
+## 性能与质量 Checklist（执行勾项） {#src-book-chapter9-h7}
 
 性能：
 
@@ -98,7 +98,7 @@ atc --model=resnet50.onnx \
 - [ ] 日志无明文密钥
 - [ ] 模型文件 hash 校验通过
 
-## 术语表（扩展）
+## 术语表（扩展） {#src-book-chapter9-h8}
 
 | 术语 | 说明 |
 | ---- | ---- |
@@ -113,7 +113,7 @@ atc --model=resnet50.onnx \
 | Baseline | 初始标准对照性能/精度集 |
 | Drift | 指标随时间未经预期的漂移 |
 
-## 推荐资源与外部引用
+## 推荐资源与外部引用 {#src-book-chapter9-h9}
 
 - Ascend 官方文档入口（安装/算子列表/最佳实践）
 - CANN Release Notes：版本兼容与已知问题。
@@ -121,9 +121,9 @@ atc --model=resnet50.onnx \
 - Open Model Zoo / ModelScope：获取预训练模型与许可信息。
 - 学术资源：算子融合、低比特量化、蒸馏相关论文列表。
 
-## 贡献指南摘要
+## 贡献指南摘要 {#src-book-chapter9-h10}
 
-流程：Fork → 新分支 → 修改/新增 → 本地 lint & 生成脚本 → PR（描述动机/影响面/验证方式）。
+流程：Fork -> 新分支 -> 修改/新增 -> 本地 lint & 生成脚本 -> PR（描述动机/影响面/验证方式）。
 PR 要求：
 | 要素 | 说明 |
 | ---- | ---- |
@@ -133,7 +133,7 @@ PR 要求：
 | 回滚 | 若失败如何恢复 |
 | 关联 Issue | 追踪链接 |
 
-## FAQ
+## FAQ {#src-book-chapter9-h11}
 
 | 问题 | 回答 |
 | ---- | ---- |
@@ -143,12 +143,12 @@ PR 要求：
 | 量化后收益不明显？ | 检查是否 Compute-bound，或激活分布集中导致尺度相近。 |
 | NMS 很慢？ | 合并小框批量处理/降低候选阈值/考虑 Device 版 NMS。 |
 
-## License 与引用
+## License 与引用 {#src-book-chapter9-h12}
 
 本书内容遵循 Apache 2.0 许可证。引用：
 > 《昇腾310B实战：从入门到精通边缘计算与人工智能》（GitHub: zhouxzh/Ascend310）
 
-## 版本路线回顾
+## 版本路线回顾 {#src-book-chapter9-h13}
 
 | 版本 | 内容 | 目标 |
 | ---- | ---- | ---- |
@@ -157,7 +157,7 @@ PR 要求：
 | v0.6 | 案例与工程化 | 贴近实战 |
 | v1.0 | 全面审校发行 | 正式发布 |
 
-## 实践任务
+## 实践任务 {#src-book-chapter9-h14}
 
 1. 为你的项目添加 1 条本地常见错误记录（含根因与解决）。
 2. 复制分类 ATC 模板并改写为检测模型版本（含动态尺寸）。

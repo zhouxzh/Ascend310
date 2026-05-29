@@ -1,7 +1,7 @@
 \chapter{案例 2：基于 MobileNet-SSD 与 DeepSORT
 的目标跟踪教程}\label{ux6848ux4f8b-2ux57faux4e8e-mobilenet-ssd-ux4e0e-deepsort-ux7684ux76eeux6807ux8ddfux8e2aux6559ux7a0b}
 
-\section{教程定位}\label{ux6559ux7a0bux5b9aux4f4d}
+\section{教程定位}\label{src-experiment-case2-h1}
 
 本案例面向昇腾 310B
 平台的开发入门，目标不只是把程序跑起来，而是建立一条完整、清晰、可扩展的目标跟踪知识主线：
@@ -55,7 +55,7 @@
   工程复杂度可控，适合实验训练和工程实践。
 \end{itemize}
 
-\section{实验硬件与运行条件}\label{ux5b9eux9a8cux786cux4ef6ux4e0eux8fd0ux884cux6761ux4ef6}
+\section{实验硬件与运行条件}\label{src-experiment-case2-h2}
 
 本案例既可以在普通 CPU 环境下运行，也可以在昇腾 NPU
 环境下运行。为了完成实时检测与实时跟踪实验，建议准备如下硬件条件：
@@ -88,7 +88,7 @@ NPU；如果运行 \passthrough{\lstinline!npu!} 模式，则还需要本机正�
 Ascend ACL Python 运行时，并准备对应的 \passthrough{\lstinline!.om!}
 模型文件。
 
-\section{本案例支持的骨干网络}\label{ux672cux6848ux4f8bux652fux6301ux7684ux9aa8ux5e72ux7f51ux7edc}
+\section{本案例支持的骨干网络}\label{src-experiment-case2-h3}
 
 当前仓库里的 SSD 模型已经覆盖了两类主干网络：
 
@@ -117,7 +117,7 @@ Ascend ACL Python 运行时，并准备对应的 \passthrough{\lstinline!.om!}
 从工程角度看，MobileNet 系列更强调轻量化和实时性，ResNet
 系列更强调特征表达能力和检测稳定性。两类骨干网络共同构成了本案例中``轻量实时''和``更强表达''两种不同取向的实验基础。
 
-\section{目标跟踪对时序关联的要求}\label{ux76eeux6807ux8ddfux8e2aux5bf9ux65f6ux5e8fux5173ux8054ux7684ux8981ux6c42}
+\section{目标跟踪对时序关联的要求}\label{src-experiment-case2-h4}
 
 目标检测解决的是单帧图像中的两个问题：
 
@@ -147,9 +147,9 @@ ID。
 因此，目标跟踪可以理解为``目标检测在时间维度上的延伸''。检测负责看见目标，跟踪负责维持目标身份。
 
 \section{MobileNet-SSD
-作为检测前端的依据}\label{mobilenet-ssd-ux4f5cux4e3aux68c0ux6d4bux524dux7aefux7684ux4f9dux636e}
+作为检测前端的依据}\label{src-experiment-case2-h5}
 
-\subsection{边缘侧场景的基本要求}\label{ux8fb9ux7f18ux4fa7ux573aux666fux7684ux57faux672cux8981ux6c42}
+\subsection{边缘侧场景的基本要求}\label{src-experiment-case2-h6}
 
 昇腾 310B
 面向边缘智能计算场景。在这类场景中，算法设计通常要同时考虑以下问题：
@@ -169,8 +169,7 @@ ID。
 如果直接选择参数量庞大、结构复杂、后处理繁重的检测器，理解成本与工程调试成本都会显著上升，系统主线反而不易把握。因此，本案例采用轻量、经典且工程路径清晰的
 MobileNet-SSD 组合作为检测前端。
 
-\subsection{MobileNet
-的网络结构}\label{mobilenet-ux7684ux7f51ux7edcux7ed3ux6784}
+\subsection{MobileNet 的网络结构}\label{src-experiment-case2-h7}
 
 MobileNet
 的核心设计思想，是用深度可分离卷积替代标准卷积，从而显著降低参数量与计算量。
@@ -230,12 +229,12 @@ MobileNet 的主要价值体现在以下几个方面：
 \end{itemize}
 
 \subsection{MobileNet v1 至 v4
-的版本演进}\label{mobilenet-v1-ux81f3-v4-ux7684ux7248ux672cux6f14ux8fdb}
+的版本演进}\label{src-experiment-case2-h8}
 
 MobileNet 并非单一网络，而是一个持续演进的轻量级网络家族。v1 至 v4
 的演进，本质上体现为在移动端与边缘侧约束下，对精度、速度与结构表达能力的持续平衡与优化。
 
-\subsubsection{MobileNet v1}\label{mobilenet-v1}
+\subsubsection{MobileNet v1}\label{src-experiment-case2-h9}
 
 MobileNet v1
 是这个家族的起点。它最核心的贡献，就是把深度可分离卷积系统化地应用到整个网络主干中。
@@ -274,7 +273,7 @@ MobileNet v1
   在相同算力下，精度通常不如后续版本
 \end{itemize}
 
-\subsubsection{MobileNet v2}\label{mobilenet-v2}
+\subsubsection{MobileNet v2}\label{src-experiment-case2-h10}
 
 MobileNet v2 的核心改进是引入了 inverted residual 和 linear bottleneck。
 
@@ -308,7 +307,7 @@ residual。
   在线性 bottleneck 中减少非线性带来的信息损失
 \end{itemize}
 
-\subsubsection{MobileNet v3}\label{mobilenet-v3}
+\subsubsection{MobileNet v3}\label{src-experiment-case2-h11}
 
 MobileNet v3 在 v2
 基础上继续优化，它融合了神经网络结构搜索和轻量注意力机制的思想。
@@ -332,7 +331,7 @@ MobileNet v3 在 v2
 的下降。换言之，v3
 的优化目标并非单纯减少计算量，而是在移动端与边缘端设备上取得更优的实际速度与精度平衡。
 
-\subsubsection{MobileNet v4}\label{mobilenet-v4}
+\subsubsection{MobileNet v4}\label{src-experiment-case2-h12}
 
 MobileNet v4
 是更后续的轻量骨干版本，它进一步强化了硬件感知设计，更强调不同算子组合在实际设备上的性能收益。
@@ -358,7 +357,7 @@ MobileNet v4
 系列本身已经具备不同配置路径，用于在更强表达能力与更低计算开销之间进行权衡。
 
 \subsection{MobileNet v1-v4
-的结构对比总结}\label{mobilenet-v1-v4-ux7684ux7ed3ux6784ux5bf9ux6bd4ux603bux7ed3}
+的结构对比总结}\label{src-experiment-case2-h13}
 
 如果按结构演进主线来总结，四个版本的差异可以概括为：
 
@@ -391,7 +390,7 @@ MobileNet v4
 \end{itemize}
 
 \subsection{MobileNet 与 ResNet
-骨干在本案例中的取向差异}\label{mobilenet-ux4e0e-resnet-ux9aa8ux5e72ux5728ux672cux6848ux4f8bux4e2dux7684ux53d6ux5411ux5deeux5f02}
+骨干在本案例中的取向差异}\label{src-experiment-case2-h14}
 
 本案例同时提供 MobileNet 和 ResNet
 两条骨干路线，这样可以更直观地对比不同网络家族的使用取向。
@@ -431,7 +430,7 @@ ResNet 系列的特点是：
   的多个版本
 \end{itemize}
 
-\subsection{SSD 的检测特点}\label{ssd-ux7684ux68c0ux6d4bux7279ux70b9}
+\subsection{SSD 的检测特点}\label{src-experiment-case2-h15}
 
 SSD 是 Single Shot MultiBox Detector
 的缩写，属于典型的一阶段检测器。它的核心特点是：不需要像两阶段检测器那样先生成候选区域，再做分类与回归，而是直接在不同尺度的特征图上预测目标位置和类别。
@@ -475,7 +474,7 @@ SSD 的局限也需要明确说明：
 \end{itemize}
 
 \subsection{MobileNet-SSD
-用于目标跟踪的优缺点}\label{mobilenet-ssd-ux7528ux4e8eux76eeux6807ux8ddfux8e2aux7684ux4f18ux7f3aux70b9}
+用于目标跟踪的优缺点}\label{src-experiment-case2-h16}
 
 在目标跟踪任务中，检测器不是孤立存在的，它会直接影响轨迹质量。MobileNet-SSD
 作为跟踪前端，有以下优点：
@@ -510,9 +509,9 @@ SSD 的局限也需要明确说明：
 的价值不在于``它是最强的检测前端''，而在于``它能以较低复杂度，把检测到跟踪这条主线讲清楚''。
 
 \section{DeepSORT
-作为跟踪后端的选择依据}\label{deepsort-ux4f5cux4e3aux8ddfux8e2aux540eux7aefux7684ux9009ux62e9ux4f9dux636e}
+作为跟踪后端的选择依据}\label{src-experiment-case2-h17}
 
-\subsection{从检测到跟踪，还缺少什么}\label{ux4eceux68c0ux6d4bux5230ux8ddfux8e2aux8fd8ux7f3aux5c11ux4ec0ux4e48}
+\subsection{从检测到跟踪，还缺少什么}\label{src-experiment-case2-h18}
 
 检测器每一帧都输出一组目标框，但这些框之间没有时间关联。要把检测结果变成稳定轨迹，还需要以下机制：
 
@@ -531,7 +530,7 @@ SSD 的局限也需要明确说明：
 DeepSORT 恰好提供了这样一套结构完整的解决框架。
 
 \subsection{DeepSORT
-为什么适合作为入门算法}\label{deepsort-ux4e3aux4ec0ux4e48ux9002ux5408ux4f5cux4e3aux5165ux95e8ux7b97ux6cd5}
+为什么适合作为入门算法}\label{src-experiment-case2-h19}
 
 完整的 DeepSORT 在 SORT
 基础上增加了外观特征建模，因此在目标遮挡、交叉和重识别问题上通常具有更好的稳定性。尽管本案例并未实现完整的工业级
@@ -564,11 +563,11 @@ DeepSORT，但保留了其最核心、最适合入门阶段把握的基本思路
 因此，将 MobileNet-SSD 与 DeepSORT
 组合使用，是一条结构清晰、实现成本适中且便于展开分析的入门路径。
 
-\section{本案例的代码结构与总体流程}\label{ux672cux6848ux4f8bux7684ux4ee3ux7801ux7ed3ux6784ux4e0eux603bux4f53ux6d41ux7a0b}
+\section{本案例的代码结构与总体流程}\label{src-experiment-case2-h20}
 
 本案例的工程代码主要分为三层：
 
-\subsection{入口层}\label{ux5165ux53e3ux5c42}
+\subsection{入口层}\label{src-experiment-case2-h21}
 
 \begin{itemize}
 \tightlist
@@ -578,7 +577,7 @@ DeepSORT，但保留了其最核心、最适合入门阶段把握的基本思路
   demo/tracking\_app.py：先做检测，再做跟踪。
 \end{itemize}
 
-\subsection{检测层}\label{ux68c0ux6d4bux5c42}
+\subsection{检测层}\label{src-experiment-case2-h22}
 
 \begin{itemize}
 \tightlist
@@ -592,7 +591,7 @@ DeepSORT，但保留了其最核心、最适合入门阶段把握的基本思路
   ssdlite/decoder.py：SSD prior boxes、位置解码、类别概率与 NMS。
 \end{itemize}
 
-\subsection{跟踪层}\label{ux8ddfux8e2aux5c42}
+\subsection{跟踪层}\label{src-experiment-case2-h23}
 
 \begin{itemize}
 \tightlist
@@ -627,10 +626,10 @@ DeepSORT，但保留了其最核心、最适合入门阶段把握的基本思路
   在图像上绘制检测结果或轨迹结果。
 \end{enumerate}
 
-\section{检测部分代码解析}\label{ux68c0ux6d4bux90e8ux5206ux4ee3ux7801ux89e3ux6790}
+\section{检测部分代码解析}\label{src-experiment-case2-h24}
 
 \subsection{detection\_app.py
-如何组织检测主流程}\label{detection_app.py-ux5982ux4f55ux7ec4ux7ec7ux68c0ux6d4bux4e3bux6d41ux7a0b}
+如何组织检测主流程}\label{src-experiment-case2-h25}
 
 在 demo/detection\_app.py 中，主程序首先解析参数，然后根据 device
 选择后端，再进入逐帧推理循环。这一设计体现了很清晰的工程结构：入口脚本只负责流程编排，把模型相关细节下沉到
@@ -671,7 +670,7 @@ while True:
 这是一种很清晰的工程拆分方式。
 
 \subsection{backend\_base.py
-如何统一检测后端}\label{backend_base.py-ux5982ux4f55ux7edfux4e00ux68c0ux6d4bux540eux7aef}
+如何统一检测后端}\label{src-experiment-case2-h26}
 
 ssdlite/backend\_base.py 是检测部分最核心的代码之一。它把 CPU 与 NPU
 两种后端统一到同一个抽象接口下。这样设计后，入口脚本就不用关心底层到底是
@@ -722,7 +721,7 @@ detections = decode_detections(
 NMS 后处理后才能得到。
 
 \subsection{preprocess\_frame
-体现了部署输入规范}\label{preprocess_frame-ux4f53ux73b0ux4e86ux90e8ux7f72ux8f93ux5165ux89c4ux8303}
+体现了部署输入规范}\label{src-experiment-case2-h27}
 
 在 backend\_base.py 中，preprocess\_frame 完成了以下操作：
 
@@ -745,18 +744,18 @@ NMS 后处理后才能得到。
 这说明了一个重要的部署原则：模型输入的预处理流程必须与训练阶段的约定保持一致，否则推理结果将发生明显偏移。
 
 \subsection{decoder.py 如何体现 SSD
-的核心思想}\label{decoder.py-ux5982ux4f55ux4f53ux73b0-ssd-ux7684ux6838ux5fc3ux601dux60f3}
+的核心思想}\label{src-experiment-case2-h28}
 
 ssdlite/decoder.py 直接对应了 SSD
 的理论结构，是整条检测链路中的关键部分。
 
-\subsubsection{default boxes}\label{default-boxes}
+\subsubsection{default boxes}\label{src-experiment-case2-h29}
 
 在 DefaultBoxes 类中，代码根据不同特征图尺度和长宽比生成先验框。这正是
 SSD
 的基础：网络并不是直接从零开始生成框，而是在预定义框基础上学习偏移量。
 
-\subsubsection{位置回归的反变换}\label{ux4f4dux7f6eux56deux5f52ux7684ux53cdux53d8ux6362}
+\subsubsection{位置回归的反变换}\label{src-experiment-case2-h30}
 
 在 SSDDecoder.scale\_back\_batch
 中，网络输出的并不是最终框坐标，而是相对于默认框的偏移量。代码中先利用
@@ -773,7 +772,7 @@ scale\_xy 和 scale\_wh
   解码阶段再把这些相对量恢复成图像上的实际边界框。
 \end{itemize}
 
-\subsubsection{分类分数与 NMS}\label{ux5206ux7c7bux5206ux6570ux4e0e-nms}
+\subsubsection{分类分数与 NMS}\label{src-experiment-case2-h31}
 
 当前工程版本中的 decode\_single 已经不是``对每个类别都扫描全部
 prior''的基础写法，而是先对每个 prior
@@ -807,8 +806,7 @@ candidate_labels = class_ids[best_class_indices[keep_score]]
 这类多类别场景里，解码阶段会产生大量无效扫描和重复
 NMS，实时性会明显受影响。
 
-\subsubsection{NMS
-的作用是什么}\label{nms-ux7684ux4f5cux7528ux662fux4ec0ux4e48}
+\subsubsection{NMS 的作用是什么}\label{src-experiment-case2-h32}
 
 NMS 是 Non-Maximum
 Suppression，即非极大值抑制。它的核心作用可以概括为一句话：当多个候选框同时指向同一个目标时，只保留其中最可信的候选框，并删除其余高度重叠的框。
@@ -855,8 +853,8 @@ NMS 的处理逻辑可以概括成下面 4 步：
 因此，NMS
 本质上是在做``去重''。它不是提高分类能力，而是在后处理阶段把重复候选框压缩成更干净的检测结果。
 
-\subsubsection{ssdlite 中 \_nms
-的实现解析}\label{ssdlite-ux4e2d-_nms-ux7684ux5b9eux73b0ux89e3ux6790}
+\subsubsection{ssdlite 中 \_nms 的实现解析
+\{\#src-experiment-case2-h33\}}\label{ssdlite-ux4e2d-_nms-ux7684ux5b9eux73b0ux89e3ux6790-src-experiment-case2-h33}
 
 当前工程版本中的 NMS 函数如下：
 
@@ -982,7 +980,7 @@ return np.array(keep, dtype=np.int64)
 最终返回的不是框本身，而是被保留框在原数组中的索引。后续代码再用这些索引去提取真正的框、分数和类别。
 
 \subsubsection{calc\_iou 为什么是 NMS
-的基础}\label{calc_iou-ux4e3aux4ec0ux4e48ux662f-nms-ux7684ux57faux7840}
+的基础}\label{src-experiment-case2-h34}
 
 NMS 能否正确工作，取决于 IOU 计算是否准确。本案例在 decoder.py 中通过
 calc\_iou 计算两个框集合之间的交并比。其核心思想是：
@@ -1007,8 +1005,7 @@ IOU = \frac{\text{交集面积}}{\text{并集面积}}
 0，说明两个框几乎没有重叠。NMS
 正是利用这一数值来判断``两个候选框是不是在描述同一个目标''。
 
-\subsubsection{NMS
-阈值对结果的影响}\label{nms-ux9608ux503cux5bf9ux7ed3ux679cux7684ux5f71ux54cd}
+\subsubsection{NMS 阈值对结果的影响}\label{src-experiment-case2-h35}
 
 NMS 中最重要的超参数是
 \passthrough{\lstinline!iou\_threshold!}。它决定了``多大程度的重叠应被视为重复''。
@@ -1039,8 +1036,7 @@ NMS 中最重要的超参数是
 
 因此，NMS 阈值本质上是在``去重强度''和``保留相邻目标''之间做权衡。
 
-\subsubsection{NMS
-对跟踪效果的直接影响}\label{nms-ux5bf9ux8ddfux8e2aux6548ux679cux7684ux76f4ux63a5ux5f71ux54cd}
+\subsubsection{NMS 对跟踪效果的直接影响}\label{src-experiment-case2-h36}
 
 NMS
 容易被视为检测模块内部的技术细节，但在目标跟踪系统中，它实际上会直接影响跟踪质量。
@@ -1063,7 +1059,7 @@ NMS
 不是孤立的后处理技巧，而是整个``检测到跟踪''流水线稳定运行的重要保障。
 
 \subsubsection{decode\_single 中 NMS
-的完整上下文}\label{decode_single-ux4e2d-nms-ux7684ux5b8cux6574ux4e0aux4e0bux6587}
+的完整上下文}\label{src-experiment-case2-h37}
 
 在本案例中，NMS 不是单独执行的，而是被放在 decode\_single
 的类别循环中。其完整语义是：
@@ -1085,7 +1081,7 @@ NMS
 NMS''的策略。这样设计的优点是：不同类别之间不会互相抑制。例如一个行人框和一个自行车框即使重叠较大，也不应该因为彼此重叠就被删除。
 
 \subsection{CPU 与 NPU
-后端如何被统一接入}\label{cpu-ux4e0e-npu-ux540eux7aefux5982ux4f55ux88abux7edfux4e00ux63a5ux5165}
+后端如何被统一接入}\label{src-experiment-case2-h38}
 
 本案例中的 ssdlite/cpu\_backend.py 与 ssdlite/npu\_backend.py 都继承自
 DetectionBackend，这意味着它们对外暴露的是同一套接口。这种设计有两层价值：
@@ -1101,7 +1097,7 @@ DetectionBackend，这意味着它们对外暴露的是同一套接口。这种�
 这也体现了一个重要的工程原则：算法主线尽量稳定，硬件适配尽量下沉到后端实现层。
 
 \section{从检测到跟踪：tracking\_app.py
-的桥接作用}\label{ux4eceux68c0ux6d4bux5230ux8ddfux8e2atracking_app.py-ux7684ux6865ux63a5ux4f5cux7528}
+的桥接作用}\label{src-experiment-case2-h39}
 
 如果说 detection\_app.py 用于建立检测流程，那么 tracking\_app.py
 的作用就在于将``检测结果如何转化为轨迹''这一过程完整串联起来。
@@ -1139,10 +1135,9 @@ annotated = draw_tracks(...)
 
 这正是后续轨迹匹配与分类约束所依赖的输入格式。
 
-\section{跟踪部分代码解析}\label{ux8ddfux8e2aux90e8ux5206ux4ee3ux7801ux89e3ux6790}
+\section{跟踪部分代码解析}\label{src-experiment-case2-h40}
 
-\subsection{Track
-类如何表示一条轨迹}\label{track-ux7c7bux5982ux4f55ux8868ux793aux4e00ux6761ux8f68ux8ff9}
+\subsection{Track 类如何表示一条轨迹}\label{src-experiment-case2-h41}
 
 tracking/deepsort.py 中的 Track
 类代表单个目标的历史状态。每条轨迹至少维护了以下信息：
@@ -1170,7 +1165,7 @@ tracking/deepsort.py 中的 Track
 这表明轨迹并不是静态边界框的简单记录，而是一个具有时间属性的状态对象。因此，``检测框''和``轨迹''必须明确区分。
 
 \subsection{predict 和 update
-对应卡尔曼滤波两阶段}\label{predict-ux548c-update-ux5bf9ux5e94ux5361ux5c14ux66fcux6ee4ux6ce2ux4e24ux9636ux6bb5}
+对应卡尔曼滤波两阶段}\label{src-experiment-case2-h42}
 
 Track 类中最核心的两个方法是 predict 和 update。
 
@@ -1201,7 +1196,7 @@ x = [x, y, v_x, v_y]^T
 表示速度。这样做的好处是：数学含义直观，代码实现也容易读懂。
 
 \subsection{kalman\_filter.py
-如何实现线性状态估计}\label{kalman_filter.py-ux5982ux4f55ux5b9eux73b0ux7ebfux6027ux72b6ux6001ux4f30ux8ba1}
+如何实现线性状态估计}\label{src-experiment-case2-h43}
 
 tracking/kalman\_filter.py
 中定义了最基础的卡尔曼滤波器。其状态转移矩阵为：
@@ -1230,7 +1225,7 @@ H =
 
 这一实现虽然经过简化，但其价值十分明确，因为它将``运动预测''与``观测修正''这两个概念直接落实到了矩阵运算之中。
 
-\subsection{卡尔曼滤波器的发展历史与作者信息}\label{ux5361ux5c14ux66fcux6ee4ux6ce2ux5668ux7684ux53d1ux5c55ux5386ux53f2ux4e0eux4f5cux8005ux4fe1ux606f}
+\subsection{卡尔曼滤波器的发展历史与作者信息}\label{src-experiment-case2-h44}
 
 卡尔曼滤波器的提出者是鲁道夫·埃米尔·卡尔曼，英文名 Rudolf Emil
 Kalman。他是匈牙利裔美国数学家和控制理论学者，1960 年发表了著名论文 A
@@ -1291,7 +1286,7 @@ Problems，系统建立了线性动态系统状态估计的现代形式。
   代码实现短小，便于直接对应矩阵运算理解。
 \end{itemize}
 
-\subsection{卡尔曼滤波器到底在解决什么问题}\label{ux5361ux5c14ux66fcux6ee4ux6ce2ux5668ux5230ux5e95ux5728ux89e3ux51b3ux4ec0ux4e48ux95eeux9898}
+\subsection{卡尔曼滤波器到底在解决什么问题}\label{src-experiment-case2-h45}
 
 在目标跟踪里，卡尔曼滤波器要解决的问题可以表述为：当检测器每一帧给出的目标框存在抖动、漏检和噪声时，如何根据历史状态更平滑地估计目标当前位置，并在短时没有观测的情况下继续维持轨迹。
 
@@ -1329,7 +1324,7 @@ z_k = H x_k + v_k
 从工程角度看，这个模型表达的是一个朴素但有效的假设：目标会以相对平滑的方式运动，而检测器给出的观测值只是对真实运动状态的带噪声测量。
 
 \subsection{本案例中的 predict 与 update
-如何对应算法公式}\label{ux672cux6848ux4f8bux4e2dux7684-predict-ux4e0e-update-ux5982ux4f55ux5bf9ux5e94ux7b97ux6cd5ux516cux5f0f}
+如何对应算法公式}\label{src-experiment-case2-h46}
 
 tracking/kalman\_filter.py
 中的两个核心函数正好对应卡尔曼滤波的两个阶段。
@@ -1408,7 +1403,7 @@ def update(self, z):
 
 这也是卡尔曼滤波器的重要优势之一。它并不是简单的滑动平均，而是在概率意义上进行最优线性估计。
 
-\subsection{卡尔曼滤波在本案例中的适用性}\label{ux5361ux5c14ux66fcux6ee4ux6ce2ux5728ux672cux6848ux4f8bux4e2dux7684ux9002ux7528ux6027}
+\subsection{卡尔曼滤波在本案例中的适用性}\label{src-experiment-case2-h47}
 
 对本案例而言，卡尔曼滤波器之所以合适，并不在于目标运动一定严格符合线性高斯模型，而在于它在工程上实现了较好的综合平衡：
 
@@ -1428,7 +1423,7 @@ def update(self, z):
 或粒子滤波，虽然理论上能够处理更复杂的运动模型，但理解成本会显著上升，主线结构反而更不易把握。因此，本案例采用标准卡尔曼滤波具有充分的合理性。
 
 \subsection{DeepSORT.update
-如何体现多目标跟踪主线}\label{deepsort.update-ux5982ux4f55ux4f53ux73b0ux591aux76eeux6807ux8ddfux8e2aux4e3bux7ebf}
+如何体现多目标跟踪主线}\label{src-experiment-case2-h48}
 
 tracking/deepsort.py 中的 DeepSORT.update
 是整条跟踪主线最核心的函数，其执行顺序如下：
@@ -1468,7 +1463,7 @@ self.tracks = [track for track in self.tracks if track.time_since_update <= self
 换言之，跟踪并不是对检测框进行简单编号，而是在连续帧之间持续执行预测、匹配、更新与清理。
 
 \subsection{数据关联为什么使用 IOU +
-匈牙利算法}\label{ux6570ux636eux5173ux8054ux4e3aux4ec0ux4e48ux4f7fux7528-iou-ux5308ux7259ux5229ux7b97ux6cd5}
+匈牙利算法}\label{src-experiment-case2-h49}
 
 在 \_associate 中，当前工程版本会先构造轨迹与检测之间的 IOU
 矩阵和类别兼容矩阵，再调用匈牙利算法获得全局最优分配。对应代码思路如下：
@@ -1501,7 +1496,7 @@ assignment_scores = np.where(class_mask, iou_matrix, -1.0)
 
 这说明系统不仅看几何位置，还会在进入全局匹配之前，先利用类别信息屏蔽明显不合理的配对关系，避免``行人轨迹匹配到车辆框''这类明显错误。
 
-\subsection{匈牙利算法的发展历史与作者信息}\label{ux5308ux7259ux5229ux7b97ux6cd5ux7684ux53d1ux5c55ux5386ux53f2ux4e0eux4f5cux8005ux4fe1ux606f}
+\subsection{匈牙利算法的发展历史与作者信息}\label{src-experiment-case2-h50}
 
 匈牙利算法是解决二分图最优匹配和指派问题的经典算法。它最早由美国数学家哈罗德·W·库恩，英文名
 Harold W. Kuhn，在 1955
@@ -1537,7 +1532,7 @@ problem，即指派问题。它在生产调度、资源分配、路径规划、�
 
 在多目标跟踪中，匈牙利算法的角色就是把``轨迹''和``当前检测框''看成两侧节点，把相似度或代价矩阵看成边权，然后求出全局最优的一一匹配关系。
 
-\subsection{匈牙利算法到底解决什么问题}\label{ux5308ux7259ux5229ux7b97ux6cd5ux5230ux5e95ux89e3ux51b3ux4ec0ux4e48ux95eeux9898}
+\subsection{匈牙利算法到底解决什么问题}\label{src-experiment-case2-h51}
 
 在目标跟踪里，如果只有一条轨迹和一个检测框，那么匹配很简单。但一旦场景中存在多条轨迹和多个检测框，问题就会迅速复杂起来。
 
@@ -1552,7 +1547,7 @@ problem，即指派问题。它在生产调度、资源分配、路径规划、�
 
 这正是多目标跟踪里数据关联的核心。
 
-\subsection{本案例中匈牙利算法是如何被调用的}\label{ux672cux6848ux4f8bux4e2dux5308ux7259ux5229ux7b97ux6cd5ux662fux5982ux4f55ux88abux8c03ux7528ux7684}
+\subsection{本案例中匈牙利算法是如何被调用的}\label{src-experiment-case2-h52}
 
 在 tracking/deepsort.py 中，匈牙利算法的调用被封装在
 \passthrough{\lstinline!\_linear\_assignment!} 中：
@@ -1580,7 +1575,7 @@ linear_sum_assignment(-cost_matrix)
 
 这里需要强调的一点是，同一个优化算法既可以用于最小代价问题，也可以通过简单变换用于最大收益问题。
 
-\subsection{匈牙利算法在本案例中的完整上下文}\label{ux5308ux7259ux5229ux7b97ux6cd5ux5728ux672cux6848ux4f8bux4e2dux7684ux5b8cux6574ux4e0aux4e0bux6587}
+\subsection{匈牙利算法在本案例中的完整上下文}\label{src-experiment-case2-h53}
 
 在 \passthrough{\lstinline!\_associate!} 中，数据关联的整体过程是：
 
@@ -1628,7 +1623,7 @@ fallback_matches = self._match_by_center_distance(...)
 
 由此可见，匈牙利算法提供的是全局分配框架，而不是完整的业务规则集合。
 
-\subsection{匈牙利算法相对于贪心匹配的优势}\label{ux5308ux7259ux5229ux7b97ux6cd5ux76f8ux5bf9ux4e8eux8d2aux5fc3ux5339ux914dux7684ux4f18ux52bf}
+\subsection{匈牙利算法相对于贪心匹配的优势}\label{src-experiment-case2-h54}
 
 一个常见问题在于，为什么不直接选择当前最大 IOU
 的一对进行匹配。该贪心策略看似简单，但存在明显局限：
@@ -1646,7 +1641,7 @@ fallback_matches = self._match_by_center_distance(...)
 匈牙利算法的价值就在于它能从全局角度处理这类一一匹配问题。虽然本案例的匹配度量比较简单，只用了
 IOU，但只要场景中存在多目标竞争，使用全局分配通常都比局部贪心更稳健。
 
-\subsection{匈牙利算法在多目标跟踪中的局限}\label{ux5308ux7259ux5229ux7b97ux6cd5ux5728ux591aux76eeux6807ux8ddfux8e2aux4e2dux7684ux5c40ux9650}
+\subsection{匈牙利算法在多目标跟踪中的局限}\label{src-experiment-case2-h55}
 
 需要说明的是，匈牙利算法并不是万能的。它解决的是``在给定代价矩阵时，如何求最优匹配''，但如果代价矩阵本身构造得不好，算法仍然可能得到错误匹配。
 
@@ -1664,7 +1659,7 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
 
 这也是为什么当前工程版本又额外加入了``类别兼容矩阵''和``中心距离补充匹配''。匈牙利算法负责的是``最优分配''，但``什么样的代价矩阵才合理''仍然是跟踪算法设计的关键。
 
-\subsection{轨迹生命周期参数如何影响最终效果}\label{ux8f68ux8ff9ux751fux547dux5468ux671fux53c2ux6570ux5982ux4f55ux5f71ux54cdux6700ux7ec8ux6548ux679c}
+\subsection{轨迹生命周期参数如何影响最终效果}\label{src-experiment-case2-h56}
 
 本案例中的三组参数具有较强的实验分析价值：
 
@@ -1704,7 +1699,7 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
   iou\_threshold 过低，邻近目标更容易错配。
 \end{itemize}
 
-\section{可视化代码如何帮助理解算法结果}\label{ux53efux89c6ux5316ux4ee3ux7801ux5982ux4f55ux5e2eux52a9ux7406ux89e3ux7b97ux6cd5ux7ed3ux679c}
+\section{可视化代码如何帮助理解算法结果}\label{src-experiment-case2-h57}
 
 在 utils/postprocessing.py 中，draw\_detections 与 draw\_tracks
 分别负责绘制检测结果和跟踪结果。尽管这部分并不直接构成算法主体，但其作用十分重要，因为可视化能够将抽象状态转化为可直接观察的现象。
@@ -1722,9 +1717,9 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
 因此，在调节参数时，不仅能够观察检测框是否正常输出，还能够观察 ID
 是否发生跳变，以及轨迹是否保持连续。
 
-\section{如何评价这个案例方案}\label{ux5982ux4f55ux8bc4ux4ef7ux8fd9ux4e2aux6848ux4f8bux65b9ux6848}
+\section{如何评价这个案例方案}\label{src-experiment-case2-h58}
 
-\subsection{这个方案的优点}\label{ux8fd9ux4e2aux65b9ux6848ux7684ux4f18ux70b9}
+\subsection{这个方案的优点}\label{src-experiment-case2-h59}
 
 作为昇腾 310B 开发教程中的案例，本方案有很强的适配性：
 
@@ -1742,7 +1737,7 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
   既能跑 CPU，也能跑 NPU，便于体现部署层面的思维。
 \end{itemize}
 
-\subsection{这个方案的不足}\label{ux8fd9ux4e2aux65b9ux6848ux7684ux4e0dux8db3}
+\subsection{这个方案的不足}\label{src-experiment-case2-h60}
 
 需要明确的是，本案例并不是为了追求最强跟踪精度：
 
@@ -1758,7 +1753,7 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
   卡尔曼状态建模较简化，更偏向实现可解释性而不是工业最优效果。
 \end{itemize}
 
-\subsection{作为入门案例的合理性}\label{ux4f5cux4e3aux5165ux95e8ux6848ux4f8bux7684ux5408ux7406ux6027}
+\subsection{作为入门案例的合理性}\label{src-experiment-case2-h61}
 
 正因为它没有引入过多复杂部件，目标跟踪的基本问题反而更容易被清晰呈现：
 
@@ -1779,11 +1774,11 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
 当这些基础概念建立起来后，再引入完整 DeepSORT、ByteTrack、OC-SORT
 或更复杂的 ReID 模块，学习曲线会平缓很多。
 
-\section{实验设计}\label{ux5b9eux9a8cux8bbeux8ba1}
+\section{实验设计}\label{src-experiment-case2-h62}
 
 为了把本案例组织成一章完整教程，可以安排以下实验任务：
 
-\subsection{只运行检测链路}\label{ux53eaux8fd0ux884cux68c0ux6d4bux94feux8def}
+\subsection{只运行检测链路}\label{src-experiment-case2-h63}
 
 目标：理解 MobileNet-SSD 的输入输出与后处理。
 
@@ -1823,7 +1818,7 @@ python demo/detection_app.py --device npu --source 0 --backbone resnet18
   较大时，重复框更容易残留，后续 tracking 的输入质量也会受到影响。
 \end{itemize}
 
-\subsection{检测链路的性能拆分实验}\label{ux68c0ux6d4bux94feux8defux7684ux6027ux80fdux62c6ux5206ux5b9eux9a8c}
+\subsection{检测链路的性能拆分实验}\label{src-experiment-case2-h64}
 
 目标：学会区分摄像头读取、预处理、推理、解码和绘制的性能瓶颈。
 
@@ -1870,7 +1865,7 @@ python demo/detection_app.py --device npu --source 0 --camera-profile 1280x720@6
   往往会明显上升。
 \end{itemize}
 
-\subsection{在检测基础上启用跟踪}\label{ux5728ux68c0ux6d4bux57faux7840ux4e0aux542fux7528ux8ddfux8e2a}
+\subsection{在检测基础上启用跟踪}\label{src-experiment-case2-h65}
 
 目标：观察轨迹是如何从检测结果中产生的。
 
@@ -1906,7 +1901,7 @@ python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
   这类高频类别做实验，更容易观察目标进出画面、遮挡和交叉等现象。
 \end{itemize}
 
-\subsection{类别过滤与解码开销实验}\label{ux7c7bux522bux8fc7ux6ee4ux4e0eux89e3ux7801ux5f00ux9500ux5b9eux9a8c}
+\subsection{类别过滤与解码开销实验}\label{src-experiment-case2-h66}
 
 目标：理解``只跟踪指定类别''不仅影响画面内容，也影响后处理负载。
 
@@ -1942,8 +1937,7 @@ python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
   的主要收益会体现在画面更干净和干扰更少，而不是极大的速度变化。
 \end{itemize}
 
-\subsection{调节 DeepSORT
-参数}\label{ux8c03ux8282-deepsort-ux53c2ux6570}
+\subsection{调节 DeepSORT 参数}\label{src-experiment-case2-h67}
 
 目标：理解生命周期管理与关联阈值。
 
@@ -1984,7 +1978,7 @@ python demo/tracking_app.py --device npu --source 0 --track-iou-threshold 0.4
   过高，快速运动目标更容易匹配失败。
 \end{itemize}
 
-\subsection{调节中心距离与平滑参数}\label{ux8c03ux8282ux4e2dux5fc3ux8dddux79bbux4e0eux5e73ux6ed1ux53c2ux6570}
+\subsection{调节中心距离与平滑参数}\label{src-experiment-case2-h68}
 
 目标：理解补充匹配与轨迹平滑对稳定性的影响。
 
@@ -2023,7 +2017,7 @@ python demo/tracking_app.py --device npu --source 0 --track-center-distance-thre
   增大后，显示分数更平滑，但对置信度突变的响应也更迟缓。
 \end{itemize}
 
-\subsection{组合实验建议}\label{ux7ec4ux5408ux5b9eux9a8cux5efaux8bae}
+\subsection{组合实验建议}\label{src-experiment-case2-h69}
 
 为了让实验更有层次，可以按下面顺序组织：
 
@@ -2055,14 +2049,14 @@ python demo/tracking_app.py --device npu --source 0 --track-center-distance-thre
   最后把时序跟踪问题和参数调优联系起来。
 \end{itemize}
 
-\section{当前工程版本的优化说明}\label{ux5f53ux524dux5de5ux7a0bux7248ux672cux7684ux4f18ux5316ux8bf4ux660e}
+\section{当前工程版本的优化说明}\label{src-experiment-case2-h70}
 
 前文很多内容是按``教学上的基础实现思路''来讲解的，便于先把检测与跟踪主线讲清楚。当前仓库中的代码在此基础上又做了一轮面向实时性的工程优化，因此实际实现相比前文的基础版描述更进一步。阅读源码时，建议把这一节与前文结合起来看。
 
-\subsection{检测链路中的工程优化}\label{ux68c0ux6d4bux94feux8defux4e2dux7684ux5de5ux7a0bux4f18ux5316}
+\subsection{检测链路中的工程优化}\label{src-experiment-case2-h71}
 
 \subsubsection{解码器不再对所有类别逐类扫描全部
-prior}\label{ux89e3ux7801ux5668ux4e0dux518dux5bf9ux6240ux6709ux7c7bux522bux9010ux7c7bux626bux63cfux5168ux90e8-prior}
+prior}\label{src-experiment-case2-h72}
 
 在基础版 SSD
 后处理中，一个直观但开销较大的实现方式是：对每个类别都遍历全部
@@ -2095,7 +2089,7 @@ prior，然后分别做阈值筛选和 NMS。这样做虽然容易理解，但�
 
 这类优化尤其适合边缘设备，因为它直接减少了解码阶段的 CPU 开销。
 
-\subsubsection{支持在解码阶段按指定类别过滤}\label{ux652fux6301ux5728ux89e3ux7801ux9636ux6bb5ux6309ux6307ux5b9aux7c7bux522bux8fc7ux6ee4}
+\subsubsection{支持在解码阶段按指定类别过滤}\label{src-experiment-case2-h73}
 
 在当前工程版本中，tracking\_app.py 增加了按类别跟踪的命令行参数：
 
@@ -2118,7 +2112,7 @@ decoder 内部，让解码阶段只关注这些目标类别。这样做的意义
 \end{itemize}
 
 \subsubsection{default boxes
-的生成做了向量化改写}\label{default-boxes-ux7684ux751fux6210ux505aux4e86ux5411ux91cfux5316ux6539ux5199}
+的生成做了向量化改写}\label{src-experiment-case2-h74}
 
 基础版的 default boxes 生成通常会使用多层 Python
 循环去枚举中心点和长宽比，这种写法直观，但初始化时效率较低。
@@ -2138,7 +2132,7 @@ decoder 内部，让解码阶段只关注这些目标类别。这样做的意义
 这样既提升了代码可读性，也减少了初始化阶段的 Python 循环开销。
 
 \subsubsection{SSD300 与 SSDLite320 使用不同的 default boxes
-设计}\label{ssd300-ux4e0e-ssdlite320-ux4f7fux7528ux4e0dux540cux7684-default-boxes-ux8bbeux8ba1}
+设计}\label{src-experiment-case2-h75}
 
 当前 decoder.py 中保留了两个明确区分的入口：
 
@@ -2157,7 +2151,7 @@ decoder 内部，让解码阶段只关注这些目标类别。这样做的意义
 SSD 变体的 prior boxes 设计并不完全相同''。
 
 \subsubsection{IOU 与 NMS
-的实现做了进一步优化}\label{iou-ux4e0e-nms-ux7684ux5b9eux73b0ux505aux4e86ux8fdbux4e00ux6b65ux4f18ux5316}
+的实现做了进一步优化}\label{src-experiment-case2-h76}
 
 在当前工程版本中，decoder.py 里的
 \passthrough{\lstinline!calc\_iou!}、\passthrough{\lstinline!\_calc\_iou\_with\_box!}
@@ -2184,7 +2178,7 @@ SSD 变体的 prior boxes 设计并不完全相同''。
   工程层：怎样把同样的逻辑写得更适合实时设备。
 \end{itemize}
 
-\subsubsection{预处理与读帧时间被明确分开统计}\label{ux9884ux5904ux7406ux4e0eux8bfbux5e27ux65f6ux95f4ux88abux660eux786eux5206ux5f00ux7edfux8ba1}
+\subsubsection{预处理与读帧时间被明确分开统计}\label{src-experiment-case2-h77}
 
 在早期实验中，容易把摄像头读取时间和图像预处理时间混在一起看，从而误以为``预处理最慢''。当前版本已经在
 detection\_app.py 和 tracking\_app.py 中把以下时间分开统计：
@@ -2205,7 +2199,7 @@ detection\_app.py 和 tracking\_app.py 中把以下时间分开统计：
 
 这对边缘设备非常重要，因为摄像头读取、视频解码、模型预处理和模型推理往往处于不同瓶颈路径上，必须分开分析。
 
-\subsubsection{摄像头实时输入增加了更适合实时场景的参数}\label{ux6444ux50cfux5934ux5b9eux65f6ux8f93ux5165ux589eux52a0ux4e86ux66f4ux9002ux5408ux5b9eux65f6ux573aux666fux7684ux53c2ux6570}
+\subsubsection{摄像头实时输入增加了更适合实时场景的参数}\label{src-experiment-case2-h78}
 
 当前 detection\_app.py 和 tracking\_app.py 都支持：
 
@@ -2252,7 +2246,7 @@ OpenCV 构建方式密切相关，因此需要实测。
 FPS 从约 \passthrough{\lstinline!20!} 提升到了约
 \passthrough{\lstinline!26!}。这个结果并不是固定值，但足以说明：在边缘端实时链路中，摄像头读帧路径本身就值得单独优化。
 
-\subsection{进一步提高帧率的建议}\label{ux8fdbux4e00ux6b65ux63d0ux9ad8ux5e27ux7387ux7684ux5efaux8bae}
+\subsection{进一步提高帧率的建议}\label{src-experiment-case2-h79}
 
 如果在完成当前这轮采集优化后，FPS
 仍然没有达到目标，可以继续按下面顺序做进一步优化：
@@ -2285,9 +2279,9 @@ FPS 从约 \passthrough{\lstinline!20!} 提升到了约
   仍是主要瓶颈，则应从模型侧继续优化，例如切换更轻量骨干、减小输入尺寸，或根据任务需要降低采集分辨率。
 \end{itemize}
 
-\subsection{跟踪链路中的工程优化}\label{ux8ddfux8e2aux94feux8defux4e2dux7684ux5de5ux7a0bux4f18ux5316}
+\subsection{跟踪链路中的工程优化}\label{src-experiment-case2-h80}
 
-\subsubsection{关联前先做类别兼容性约束}\label{ux5173ux8054ux524dux5148ux505aux7c7bux522bux517cux5bb9ux6027ux7ea6ux675f}
+\subsubsection{关联前先做类别兼容性约束}\label{src-experiment-case2-h81}
 
 基础版多目标跟踪常见的写法是：先对所有轨迹和检测框计算
 IOU，再在匹配完成后排除类别不兼容的结果。当前版本把类别兼容性提前到了关联阶段本身，也就是说：
@@ -2302,8 +2296,7 @@ IOU，再在匹配完成后排除类别不兼容的结果。当前版本把类�
 
 这种处理对多类别场景尤其重要，因为它可以有效降低``行人轨迹误匹配到车辆框''这类明显错误。
 
-\subsubsection{IOU
-矩阵改成向量化计算}\label{iou-ux77e9ux9635ux6539ux6210ux5411ux91cfux5316ux8ba1ux7b97}
+\subsubsection{IOU 矩阵改成向量化计算}\label{src-experiment-case2-h82}
 
 tracking/deepsort.py 中轨迹和检测之间的 IOU 矩阵，已经从双层 Python
 循环改成了 NumPy 向量化实现。这样做有两个好处：
@@ -2316,7 +2309,7 @@ tracking/deepsort.py 中轨迹和检测之间的 IOU 矩阵，已经从双层 Py
   代码更容易与``矩阵形式的数据关联''这一概念对应起来。
 \end{itemize}
 
-\subsubsection{增加基于中心距离的补充匹配}\label{ux589eux52a0ux57faux4e8eux4e2dux5fc3ux8dddux79bbux7684ux8865ux5145ux5339ux914d}
+\subsubsection{增加基于中心距离的补充匹配}\label{src-experiment-case2-h83}
 
 仅靠 IOU
 做关联时，如果目标移动较快、检测框尺寸波动较大，或者短时遮挡后重新出现，轨迹容易断开。当前工程版本在
@@ -2332,7 +2325,7 @@ IOU 关联失败后，又增加了一轮基于中心距离的补充匹配：
 
 这样可以提高短时丢检和快速移动场景下的轨迹连续性。
 
-\subsubsection{轨迹框尺寸与分数做了平滑}\label{ux8f68ux8ff9ux6846ux5c3aux5bf8ux4e0eux5206ux6570ux505aux4e86ux5e73ux6ed1}
+\subsubsection{轨迹框尺寸与分数做了平滑}\label{src-experiment-case2-h84}
 
 在 Track.update
 中，当前版本不再每一帧都直接用新检测框完全替换轨迹框，而是对宽高和分数做指数平滑：
@@ -2357,15 +2350,15 @@ IOU 关联失败后，又增加了一轮基于中心距离的补充匹配：
   显示分数不容易大起大落。
 \end{itemize}
 
-\subsubsection{轨迹类别不再只看最近一帧}\label{ux8f68ux8ff9ux7c7bux522bux4e0dux518dux53eaux770bux6700ux8fd1ux4e00ux5e27}
+\subsubsection{轨迹类别不再只看最近一帧}\label{src-experiment-case2-h85}
 
 当前 Track 类中维护了
 \passthrough{\lstinline!class\_scores!}，会对每个轨迹在历史匹配过程中累计类别分数，再选择当前最可信的类别。这比简单采用``最近一帧的
 class\_id''更稳定，尤其适合检测框偶尔分类波动的场景。
 
-\subsection{卡尔曼滤波器中的工程优化}\label{ux5361ux5c14ux66fcux6ee4ux6ce2ux5668ux4e2dux7684ux5de5ux7a0bux4f18ux5316}
+\subsection{卡尔曼滤波器中的工程优化}\label{src-experiment-case2-h86}
 
-\subsubsection{初始协方差更加符合目标跟踪场景}\label{ux521dux59cbux534fux65b9ux5deeux66f4ux52a0ux7b26ux5408ux76eeux6807ux8ddfux8e2aux573aux666f}
+\subsubsection{初始协方差更加符合目标跟踪场景}\label{src-experiment-case2-h87}
 
 在基础讲解中，常把卡尔曼滤波器写成最简单的形式，例如：
 
@@ -2391,7 +2384,7 @@ class\_id''更稳定，尤其适合检测框偶尔分类波动的场景。
 
 这更符合新轨迹刚创建时的实际情况：我们大致知道目标在哪里，但一开始并不知道它运动得有多快。
 
-\subsubsection{过程噪声和观测噪声被显式区分}\label{ux8fc7ux7a0bux566aux58f0ux548cux89c2ux6d4bux566aux58f0ux88abux663eux5f0fux533aux5206}
+\subsubsection{过程噪声和观测噪声被显式区分}\label{src-experiment-case2-h88}
 
 当前 KalmanFilter
 中把位置过程噪声、速度过程噪声和观测噪声分开定义，而不是用单个常量矩阵草草代替。这样做的好处是：
@@ -2406,7 +2399,7 @@ class\_id''更稳定，尤其适合检测框偶尔分类波动的场景。
   更能贴合``位置观测可信，但速度需要逐步估计''的目标跟踪特点。
 \end{itemize}
 
-\subsubsection{更新阶段使用更稳定的数值形式}\label{ux66f4ux65b0ux9636ux6bb5ux4f7fux7528ux66f4ux7a33ux5b9aux7684ux6570ux503cux5f62ux5f0f}
+\subsubsection{更新阶段使用更稳定的数值形式}\label{src-experiment-case2-h89}
 
 当前实现中：
 
@@ -2423,7 +2416,7 @@ class\_id''更稳定，尤其适合检测框偶尔分类波动的场景。
 这种改法在数学上更稳定，尤其适合连续多帧递推的视觉跟踪任务，因为协方差矩阵的对称性和正定性更容易保持。
 
 \subsection{tracking\_app.py
-当前支持的实用参数}\label{tracking_app.py-ux5f53ux524dux652fux6301ux7684ux5b9eux7528ux53c2ux6570}
+当前支持的实用参数}\label{src-experiment-case2-h90}
 
 当前 tracking\_app.py 在基础版参数之外，还支持以下跟踪专有参数：
 
@@ -2479,7 +2472,7 @@ python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
 python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0
 \end{lstlisting}
 
-\subsection{如何理解``教材版''和``工程版''的关系}\label{ux5982ux4f55ux7406ux89e3ux6559ux6750ux7248ux548cux5de5ux7a0bux7248ux7684ux5173ux7cfb}
+\subsection{如何理解``教材版''和``工程版''的关系}\label{src-experiment-case2-h91}
 
 本案例的一个教学特点是：前文先用更直观的形式讲清算法主线，再在当前工程代码中逐步引入更适合实时边缘设备的优化实现。两者并不是相互冲突，而是两个层次：
 
@@ -2502,7 +2495,7 @@ python demo/tracking_app.py --device npu --source 0 --track-center-distance-thre
   再结合当前仓库代码，对照本节总结理解这些优化为什么能够改善实时效果。
 \end{enumerate}
 
-\section{章节总结}\label{ux7ae0ux8282ux603bux7ed3}
+\section{章节总结}\label{src-experiment-case2-h92}
 
 本案例展示了一条较为典型的目标跟踪实现路线：
 

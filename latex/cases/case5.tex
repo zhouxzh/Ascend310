@@ -1,6 +1,6 @@
 \chapter{案例5：智能数据采集仪}\label{ux6848ux4f8b5ux667aux80fdux6570ux636eux91c7ux96c6ux4eea}
 
-\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+\section{1. 项目简介}\label{src-experiment-case5-h1}
 
 本项目基于昇腾 310B 平台，结合 \textbf{STM32 嵌入式采集}与\textbf{FPGA
 高速信号
@@ -12,7 +12,7 @@
 本案例是全书第一个\textbf{显式结合嵌入式硬件（STM32 + FPGA）与昇腾 AI}的
 案例，展示了边缘 AI 系统的完整软硬件协同设计流程。
 
-\subsection{与已有案例的关系}\label{ux4e0eux5df2ux6709ux6848ux4f8bux7684ux5173ux7cfb}
+\subsection{与已有案例的关系}\label{src-experiment-case5-h2}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -39,7 +39,8 @@ NPU 任务
 故障分类} & \textbf{STM32+FPGA+NPU 软硬结合} \\
 案例6 & 智能小车感知 & ResNet18 场景分类 & 经典 CV + 深度学习混合 \\
 案例7 & 智能相册 & ResNet50 特征提取 & 批量索引 + FAISS 检索 \\
-案例8 & 手势识别 & MobileNetV3-Small 分类 & 训练 → 转换 → 部署 \\
+案例8 & 手势识别 & MobileNetV3-Small 分类 & 训练 -\textgreater{} 转换
+-\textgreater{} 部署 \\
 \end{longtable}
 }
 
@@ -47,9 +48,9 @@ NPU 任务
 通过梅尔频谱变换转化为二维图像后，就能充分利用 NPU 的图像分类能力------
 这为各种非图像传感器数据的 NPU 处理提供了一种通用范式。
 
-\section{2. 内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
+\section{2. 内容大纲}\label{src-experiment-case5-h3}
 
-\subsection{2.1. 硬件准备}\label{ux786cux4ef6ux51c6ux5907}
+\subsection{2.1. 硬件准备}\label{src-experiment-case5-h4}
 
 本项目需要的硬件分为三个层级：
 
@@ -116,9 +117,9 @@ flowchart TB
     NPU_A --> UI_A
 \end{lstlisting}
 
-\subsection{2.2. 软件环境}\label{ux8f6fux4ef6ux73afux5883}
+\subsection{2.2. 软件环境}\label{src-experiment-case5-h5}
 
-\subsubsection{操作系统与框架}\label{ux64cdux4f5cux7cfbux7edfux4e0eux6846ux67b6}
+\subsubsection{操作系统与框架}\label{src-experiment-case5-h6}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -151,15 +152,16 @@ Web & Gradio & 4.0+ & 监测仪表盘界面 \\
 \end{longtable}
 }
 
-\subsubsection{环境准备}\label{ux73afux5883ux51c6ux5907}
+\subsubsection{环境准备}\label{src-experiment-case5-h7}
 
 \begin{lstlisting}[language=bash]
 # 一键安装依赖并导出模型
 bash setup.sh
 \end{lstlisting}
 
-\passthrough{\lstinline!setup.sh!} 依次完成：系统包安装 → Python
-依赖安装 → ONNX 模型导出（如 有 CANN 则继续转换为 OM）。
+\passthrough{\lstinline!setup.sh!} 依次完成：系统包安装 -\textgreater{}
+Python 依赖安装 -\textgreater{} ONNX 模型导出（如 有 CANN 则继续转换为
+OM）。
 
 如果只想在开发机上导出 ONNX：
 
@@ -167,30 +169,39 @@ bash setup.sh
 python3 prepare_models.py --onnx-only
 \end{lstlisting}
 
-\subsubsection{STM32 固件开发}\label{stm32-ux56faux4ef6ux5f00ux53d1}
+\subsubsection{STM32 固件开发}\label{src-experiment-case5-h8}
 
 STM32 端的固件代码参考
 \href{https://github.com/zhouxzh/Ascend310/blob/master/samples/case5/stm32_protocol.md}{stm32\_protocol.md}，
 包含完整的传感器接线图、UART 数据帧格式、Arduino 示例代码和 STM32CubeIDE
 代码框架。
 
-\subsubsection{Python 依赖说明}\label{python-ux4f9dux8d56ux8bf4ux660e}
+\subsubsection{Python 依赖说明}\label{src-experiment-case5-h9}
 
 { % do not increment counter
-\begin{longtable}[]{@{}lll@{}}
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
 \toprule\noalign{}
-包 & 用途 & 必需？ \\
+\begin{minipage}[b]{\linewidth}\raggedright
+包
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+用途
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+必需？
+\end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-\passthrough{\lstinline!gradio!} & Web 仪表盘框架 & ✓ \\
+\passthrough{\lstinline!gradio!} & Web 仪表盘框架 & 是 \\
 \passthrough{\lstinline!torch!} + \passthrough{\lstinline!torchvision!}
-& EfficientNet-B0 模型定义、CPU 推理回退 & ✓ \\
-\passthrough{\lstinline!opencv-python!} & 频谱图渲染、图像缩放 & ✓ \\
-\passthrough{\lstinline!numpy!} & 数值计算、频谱分析 (FFT/mel) & ✓ \\
+& EfficientNet-B0 模型定义、CPU 推理回退 & 是 \\
+\passthrough{\lstinline!opencv-python!} & 频谱图渲染、图像缩放 & 是 \\
+\passthrough{\lstinline!numpy!} & 数值计算、频谱分析 (FFT/mel) & 是 \\
 \passthrough{\lstinline!pyserial!} & STM32 UART 通信 & 仅硬件模式 \\
-\passthrough{\lstinline!Pillow!} & Gradio 图像格式转换 & ✓ \\
+\passthrough{\lstinline!Pillow!} & Gradio 图像格式转换 & 是 \\
 \passthrough{\lstinline!onnx!} & ONNX 模型校验（仅 prepare\_models.py）
 & 仅转换 \\
 \passthrough{\lstinline!acl!} (CANN 自带) & NPU 推理，随 CANN 安装 &
@@ -198,8 +209,7 @@ STM32 端的固件代码参考
 \end{longtable}
 }
 
-\subsection{2.3. STM32
-低速传感器采集}\label{stm32-ux4f4eux901fux4f20ux611fux5668ux91c7ux96c6}
+\subsection{2.3. STM32 低速传感器采集}\label{src-experiment-case5-h10}
 
 STM32 作为传感器汇聚节点，负责采集四台电机的低速参数：
 
@@ -238,8 +248,7 @@ STM32 时（\passthrough{\lstinline!/dev/ttyUSB0!}
 不存在），自动切换为仿真模式，生成带随机游走和偶发故障注入的模拟数据，
 方便在没有硬件的情况下开发和测试。
 
-\subsection{2.4. FPGA
-高速振动采集}\label{fpga-ux9ad8ux901fux632fux52a8ux91c7ux96c6}
+\subsection{2.4. FPGA 高速振动采集}\label{src-experiment-case5-h11}
 
 振动信号的频率范围远超 STM32 的 ADC 采样能力。电机振动特征频率通常在
 几十 Hz 到 2 kHz 之间，按照奈奎斯特定理，采样率需至少 4 kHz。本项目使用
@@ -277,14 +286,13 @@ Ascend 310B 端通过
   机械松动（0.5\% 概率注入）：多次谐波 + 基底噪声抬高
 \end{itemize}
 
-\subsection{2.5.
-振动频谱分析原理}\label{ux632fux52a8ux9891ux8c31ux5206ux6790ux539fux7406}
+\subsection{2.5. 振动频谱分析原理}\label{src-experiment-case5-h12}
 
 振动信号是一维时间序列，而 NPU 擅长处理二维图像。解决方案是将振动波形
 转换为\textbf{梅尔频谱图
 (mel-spectrogram)}------一种模仿人耳听觉特性的时频 表示。
 
-\subsubsection{为什么用梅尔频谱图}\label{ux4e3aux4ec0ux4e48ux7528ux6885ux5c14ux9891ux8c31ux56fe}
+\subsubsection{为什么用梅尔频谱图}\label{src-experiment-case5-h13}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -319,19 +327,19 @@ GAF 图像 & 2D (time, time) & 2D-CNN & 保留时间相关性，计算复杂 \\
 低频区域（1\textasciitilde10
 倍转速频率）}，而梅尔尺度在低频区有更高的分辨率。
 
-\subsubsection{转换流水线}\label{ux8f6cux6362ux6d41ux6c34ux7ebf}
+\subsubsection{转换流水线}\label{src-experiment-case5-h14}
 
 \begin{lstlisting}
 flowchart TD
     WAVEFORM["振动波形\n4096 点 @ 5kHz\nfloat32 (4096,)"] --> FRAME["分帧\n窗口=256点, 步长=64点\n~60帧"]
     FRAME --> WINDOW["加窗\nHann window\n抑制频谱泄漏"]
-    WINDOW --> FFT["FFT\n每帧 → 129 个频点\n(256/2+1)"]
+    WINDOW --> FFT["FFT\n每帧 -> 129 个频点\n(256/2+1)"]
     FFT --> MEL["Mel 滤波器组\n128 个三角滤波器\n低频密集, 高频稀疏"]
     MEL --> LOG["Log 压缩\nlog(mel_spec + ε)\n模拟人耳对数感知"]
-    LOG --> NORM["归一化\n→ [0, 1]"]
-    NORM --> RESIZE["尺寸调整\n→ 128×128\n中心裁剪/填充"]
-    RESIZE --> CH3["3 通道复制\ngray → RGB\n(128, 128, 3)"]
-    CH3 --> OUTPUT["输出\n→ FaultClassifier\n→ NPU 推理"]
+    LOG --> NORM["归一化\n-> [0, 1]"]
+    NORM --> RESIZE["尺寸调整\n-> 128×128\n中心裁剪/填充"]
+    RESIZE --> CH3["3 通道复制\ngray -> RGB\n(128, 128, 3)"]
+    CH3 --> OUTPUT["输出\n-> FaultClassifier\n-> NPU 推理"]
 \end{lstlisting}
 
 全部实现仅依赖 NumPy（无需 librosa/scipy），在
@@ -341,7 +349,7 @@ flowchart TD
 \passthrough{\lstinline!VibrationProcessor!}
 初始化时预计算一次，后续每次转换仅需矩阵乘法。
 
-\subsubsection{不同故障类型的频谱特征}\label{ux4e0dux540cux6545ux969cux7c7bux578bux7684ux9891ux8c31ux7279ux5f81}
+\subsubsection{不同故障类型的频谱特征}\label{src-experiment-case5-h15}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -371,7 +379,7 @@ flowchart TD
 \end{longtable}
 }
 
-\subsection{2.6. NPU 故障分类}\label{npu-ux6545ux969cux5206ux7c7b}
+\subsection{2.6. NPU 故障分类}\label{src-experiment-case5-h16}
 
 将频谱图输入 EfficientNet-B0 进行 5 类故障分类：
 
@@ -392,7 +400,7 @@ flowchart TD
 }
 
 \subsubsection{为什么选择
-EfficientNet-B0}\label{ux4e3aux4ec0ux4e48ux9009ux62e9-efficientnet-b0}
+EfficientNet-B0}\label{src-experiment-case5-h17}
 
 { % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
@@ -414,32 +422,30 @@ EfficientNet-B0 引入了 MBConv 块和 SE（Squeeze-and-Excitation）注意力
 模块，通过复合缩放策略在深度、宽度、分辨率三个维度上同时优化。5.3M
 参数在 310B 上推理只需约 10ms，完全满足实时监测需求。
 
-\subsubsection{分类流程}\label{ux5206ux7c7bux6d41ux7a0b}
+\subsubsection{分类流程}\label{src-experiment-case5-h18}
 
 \begin{lstlisting}
 flowchart TD
-    INPUT["梅尔频谱图\n(128, 128, 3) float32 [0,1]"] --> RESIZE["cv2.resize\n→ 224×224"]
+    INPUT["梅尔频谱图\n(128, 128, 3) float32 [0,1]"] --> RESIZE["cv2.resize\n-> 224×224"]
     RESIZE --> NORM["ImageNet 归一化\n(pixel-mean)/std"]
-    NORM --> TENSOR["→ NCHW (1, 3, 224, 224)"]
+    NORM --> TENSOR["-> NCHW (1, 3, 224, 224)"]
     TENSOR --> CHECK{"NPU 可用?"}
 
-    CHECK -->|"✓ OM 模型"| NPU_INFER["NPU 推理\nacl.mdl.execute()"]
-    CHECK -->|"✗ 回退"| CPU_INFER["CPU 推理\ntorch model()"]
+    CHECK -->|"是 OM 模型"| NPU_INFER["NPU 推理\nacl.mdl.execute()"]
+    CHECK -->|"否 回退"| CPU_INFER["CPU 推理\ntorch model()"]
 
-    NPU_INFER --> SOFTMAX["Softmax → 概率分布"]
+    NPU_INFER --> SOFTMAX["Softmax -> 概率分布"]
     CPU_INFER --> SOFTMAX
 
     SOFTMAX --> OUTPUT["输出\n故障类别 + 置信度 + 处理建议"]
 \end{lstlisting}
 
-\subsection{2.7. CPU
-趋势分析与异常检测}\label{cpu-ux8d8bux52bfux5206ux6790ux4e0eux5f02ux5e38ux68c0ux6d4b}
+\subsection{2.7. CPU 趋势分析与异常检测}\label{src-experiment-case5-h19}
 
 NPU 负责振动频谱的故障分类，CPU 则负责温度、电流、转速的趋势分析。
 两者互补------频谱检测机械故障，趋势分析检测电气和热异常。
 
-\subsubsection{滑动窗口 + 3σ
-异常检测}\label{ux6ed1ux52a8ux7a97ux53e3-3ux3c3-ux5f02ux5e38ux68c0ux6d4b}
+\subsubsection{滑动窗口 + 3σ 异常检测}\label{src-experiment-case5-h20}
 
 对每个电机的每个参数（温度、电流、转速），维护一个长度为 30 的滑动窗口。
 当新数据点偏离窗口均值超过 3 倍标准差时，触发异常告警：
@@ -453,7 +459,7 @@ if z_score > 3.0:
 3σ 准则假设传感器数据在稳态下服从正态分布。电机在稳定运行时这个假设
 基本成立；但在启停、变速阶段会产生误报------这是已知局限。
 
-\subsubsection{线性趋势预测}\label{ux7ebfux6027ux8d8bux52bfux9884ux6d4b}
+\subsubsection{线性趋势预测}\label{src-experiment-case5-h21}
 
 对窗口内的历史数据做最小二乘线性回归，预测未来 10 步的值是否超过阈值：
 
@@ -468,8 +474,7 @@ if predicted > TEMP_WARN_THRESHOLD:
 \passthrough{\lstinline!AnomalyDetector!} 类中，纯 NumPy
 实现，无需任何模型文件。
 
-\subsection{2.8.
-模型转换与昇腾部署}\label{ux6a21ux578bux8f6cux6362ux4e0eux6607ux817eux90e8ux7f72}
+\subsection{2.8. 模型转换与昇腾部署}\label{src-experiment-case5-h22}
 
 \begin{lstlisting}
 flowchart TD
@@ -483,7 +488,7 @@ flowchart TD
     end
 
     subgraph DEPLOY["3. 推理部署"]
-        APP["app.py → FaultClassifier\n→ AscendModel.execute()"]
+        APP["app.py -> FaultClassifier\n-> AscendModel.execute()"]
     end
 
     TORCH -->|"torch.onnx.export()\nopset=11"| ONNX
@@ -491,7 +496,7 @@ flowchart TD
     OM -->|"acl.mdl.execute()"| APP
 \end{lstlisting}
 
-\subsubsection{步骤 1：导出 ONNX}\label{ux6b65ux9aa4-1ux5bfcux51fa-onnx}
+\subsubsection{步骤 1：导出 ONNX}\label{src-experiment-case5-h23}
 
 \begin{lstlisting}[language=bash]
 python3 prepare_models.py --onnx-only
@@ -500,7 +505,7 @@ python3 prepare_models.py --onnx-only
 构建 EfficientNet-B0 模型，将分类头替换为 5 类故障输出，固定输入形状
 \passthrough{\lstinline!(1, 3, 224, 224)!} 导出 ONNX。
 
-\subsubsection{步骤 2：ATC 转换}\label{ux6b65ux9aa4-2atc-ux8f6cux6362}
+\subsubsection{步骤 2：ATC 转换}\label{src-experiment-case5-h24}
 
 \begin{lstlisting}[language=bash]
 # 在昇腾设备上运行
@@ -518,7 +523,7 @@ atc --model=models/efficientnet_b0_fault.onnx \
     --input_shape=input:1,3,224,224
 \end{lstlisting}
 
-\subsubsection{关于训练权重}\label{ux5173ux4e8eux8badux7ec3ux6743ux91cd}
+\subsubsection{关于训练权重}\label{src-experiment-case5-h25}
 
 本项目的 \passthrough{\lstinline!prepare\_models.py!} 会生成基线
 \passthrough{\lstinline!.pth!} 文件（ImageNet 骨干 + 随机初始化的 5
@@ -542,26 +547,26 @@ Bearing Dataset} --- 帕德博恩大学轴承数据集 -
 \passthrough{\lstinline!python3 prepare\_models.py --force!} 重新导出
 ONNX/OM
 
-\subsection{2.9. Web 仪表盘}\label{web-ux4eeaux8868ux76d8}
+\subsection{2.9. Web 仪表盘}\label{src-experiment-case5-h26}
 
 \begin{lstlisting}
 flowchart TD
     subgraph UI["Gradio Blocks 仪表盘"]
-        TAB1["📋 实时监测\n传感数据 + 异常告警"]
-        TAB2["📈 振动频谱分析\n频谱图 + NPU 故障诊断"]
-        TAB3["⚙️ 系统信息\n模型状态 + 阈值 + 日志"]
+        TAB1[" 实时监测\n传感数据 + 异常告警"]
+        TAB2[" 振动频谱分析\n频谱图 + NPU 故障诊断"]
+        TAB3[" 系统信息\n模型状态 + 阈值 + 日志"]
     end
 
     subgraph TAB1_DETAIL["监测 Tab"]
-        REFRESH["🔄 刷新数据"] --> SENSOR["SensorReader.read()"]
+        REFRESH[" 刷新数据"] --> SENSOR["SensorReader.read()"]
         SENSOR --> ANOMALY["AnomalyDetector.update()"]
-        ANOMALY --> LOG["DataLogger.log() → CSV"]
+        ANOMALY --> LOG["DataLogger.log() -> CSV"]
         ANOMALY --> TABLE["DataFrame\n各电机温度/电流/转速"]
         ANOMALY --> ALERT["Markdown\n告警信息"]
     end
 
     subgraph TAB2_DETAIL["频谱 Tab"]
-        SEL["选择电机"] --> VIB["VibrationProcessor\n波形 → 频谱图"]
+        SEL["选择电机"] --> VIB["VibrationProcessor\n波形 -> 频谱图"]
         VIB --> IMG["频谱图可视化"]
         VIB --> CLS["FaultClassifier\nNPU 故障分类"]
         CLS --> FAULT_MD["诊断报告"]
@@ -588,7 +593,7 @@ flowchart TD
   类故障列表、数据日志统计、 硬件接口配置。
 \end{enumerate}
 
-\subsubsection{双模式运行}\label{ux53ccux6a21ux5f0fux8fd0ux884c}
+\subsubsection{双模式运行}\label{src-experiment-case5-h27}
 
 { % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
@@ -598,15 +603,15 @@ flowchart TD
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-全硬件模式 & ✓ UART 连接 & ✓ SPI 连接 & 生产环境 \\
-半仿真模式 & ✓ UART 连接 & ✗ 仿真振动 & 只有 STM32 \\
-全仿真模式 & ✗ 仿真数据 & ✗ 仿真振动 & 开发/演示 \\
+全硬件模式 & 是 UART 连接 & 是 SPI 连接 & 生产环境 \\
+半仿真模式 & 是 UART 连接 & 否 仿真振动 & 只有 STM32 \\
+全仿真模式 & 否 仿真数据 & 否 仿真振动 & 开发/演示 \\
 \end{longtable}
 }
 
-\subsection{2.10. 用户手册}\label{ux7528ux6237ux624bux518c}
+\subsection{2.10. 用户手册}\label{src-experiment-case5-h28}
 
-\subsubsection{2.10.1 部署}\label{ux90e8ux7f72}
+\subsubsection{2.10.1 部署}\label{src-experiment-case5-h29}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -627,7 +632,7 @@ flowchart TD
   浏览器打开 \passthrough{\lstinline!http://<设备IP>:7860!}
 \end{enumerate}
 
-\subsubsection{2.10.2 使用流程}\label{ux4f7fux7528ux6d41ux7a0b}
+\subsubsection{2.10.2 使用流程}\label{src-experiment-case5-h30}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -644,8 +649,7 @@ flowchart TD
   切换「系统信息」页签，查看模型和日志状态
 \end{enumerate}
 
-\subsubsection{2.10.3 STM32
-固件烧录}\label{stm32-ux56faux4ef6ux70e7ux5f55}
+\subsubsection{2.10.3 STM32 固件烧录}\label{src-experiment-case5-h31}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -664,7 +668,7 @@ flowchart TD
   将 STM32 TX 连接到 Ascend 310B RX（3.3V 电平）
 \end{enumerate}
 
-\subsubsection{2.10.4 调整参数}\label{ux8c03ux6574ux53c2ux6570}
+\subsubsection{2.10.4 调整参数}\label{src-experiment-case5-h32}
 
 { % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
@@ -688,7 +692,7 @@ z-score 阈值 \\
 \end{longtable}
 }
 
-\subsubsection{2.10.5 故障排除}\label{ux6545ux969cux6392ux9664}
+\subsubsection{2.10.5 故障排除}\label{src-experiment-case5-h33}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -719,7 +723,7 @@ UART 数据乱码 & 波特率不匹配 & 确认 STM32 和 Ascend 310B 均使用
 \end{longtable}
 }
 
-\section{3. 源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
+\section{3. 源代码结构}\label{src-experiment-case5-h34}
 
 \begin{lstlisting}
 case5/
@@ -745,7 +749,7 @@ case5/
 \begin{lstlisting}
 flowchart TB
     APP["app.py\nGradio 仪表盘"] --> SR["sensor_reader.py\nSensorReader\nUART读取/仿真传感数据"]
-    APP --> VP["vibration_processor.py\nVibrationProcessor\n波形→频谱图"]
+    APP --> VP["vibration_processor.py\nVibrationProcessor\n波形->频谱图"]
     APP --> FC["fault_classifier.py\nFaultClassifier\nNPU/CPU 故障分类"]
     APP --> AD["anomaly_detector.py\nAnomalyDetector\n3σ异常+趋势预测"]
     APP --> DL["data_logger.py\nDataLogger\nCSV数据记录"]
@@ -756,7 +760,7 @@ flowchart TB
     FC --> TORCH["torchvision\nefficientnet_b0()"]
     VP --> NP["numpy\nFFT + mel filterbank"]
 
-    PREP["prepare_models.py\nONNX → OM"] --> TORCH
+    PREP["prepare_models.py\nONNX -> OM"] --> TORCH
     PREP --> CFG
 \end{lstlisting}
 
@@ -775,8 +779,8 @@ flowchart TB
   \passthrough{\lstinline!app.py!} 的 Gradio
   懒加载模式与案例6/案例7/案例8/案例9一致
 \item
-  \passthrough{\lstinline!prepare\_models.py!} 的 ONNX → ATC
-  流程与案例6/案例7/案例8一致
+  \passthrough{\lstinline!prepare\_models.py!} 的 ONNX -\textgreater{}
+  ATC 流程与案例6/案例7/案例8一致
 \item
   \passthrough{\lstinline!FaultClassifier!} 的双后端模式与案例6的
   \passthrough{\lstinline!SceneClassifier!}、案例8的
@@ -792,9 +796,9 @@ flowchart TB
   本项目\textbf{不需要}训练脚本------故障分类头尚未训练，但推理框架完整
 \end{itemize}
 
-\section{4. 效果演示}\label{ux6548ux679cux6f14ux793a}
+\section{4. 效果演示}\label{src-experiment-case5-h35}
 
-\subsection{预期效果}\label{ux9884ux671fux6548ux679c}
+\subsection{预期效果}\label{src-experiment-case5-h36}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -824,7 +828,7 @@ CSV 日志 & 每秒写入一行多电机数据 & 长期运行建议定期轮转 
 \end{longtable}
 }
 
-\subsection{性能指标}\label{ux6027ux80fdux6307ux6807}
+\subsection{性能指标}\label{src-experiment-case5-h37}
 
 { % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
@@ -841,54 +845,54 @@ CSV 日志 & 每秒写入一行多电机数据 & 长期运行建议定期轮转 
 \end{longtable}
 }
 
-\subsection{浏览器中的效果}\label{ux6d4fux89c8ux5668ux4e2dux7684ux6548ux679c}
+\subsection{浏览器中的效果}\label{src-experiment-case5-h38}
 
 Gradio 仪表盘在浏览器中的预期布局：
 
 \begin{lstlisting}
 ┌──────────────────────────────────────────────────────────────┐
-│  📊 智能数据采集仪 — 多电机状态监测                             │
+│   智能数据采集仪 — 多电机状态监测                             │
 │  STM32 低速传感 + FPGA 高速振动采集 + NPU 故障分类               │
 ├──────────────────────────────────────────────────────────────┤
-│  [📋 实时监测]  [📈 振动频谱分析]  [⚙️ 系统信息]                  │
+│  [ 实时监测]  [ 振动频谱分析]  [ 系统信息]                  │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────────┐│
-│  │ 🔔 告警区域                                               ││
-│  │ ✅ 所有电机运行正常                                         ││
+│  │  告警区域                                               ││
+│  │ [OK] 所有电机运行正常                                         ││
 │  │ 更新时间: 14:32:15  |  数据行数: 245  |  日志大小: 0.05 MB  ││
 │  ├──────────────────────────────────────────────────────────┤│
 │  │      电机1        电机2        电机3        电机4          ││
-│  │  🌡 ✓ 42.5°C    ✓ 38.2°C    ✓ 45.1°C    ✓ 40.3°C      ││
-│  │  ⚡ ✓ 1.25A     ✓ 0.85A     ⚠️ 1.52A    ✓ 0.92A      ││
-│  │  🔄 ✓ 3200RPM   ✓ 2950RPM   ✓ 3100RPM   ✓ 3050RPM    ││
+│  │  温度 是 42.5°C    是 38.2°C    是 45.1°C    是 40.3°C      ││
+│  │  电流 是 1.25A     是 0.85A     注意 1.52A    是 0.92A      ││
+│  │   是 3200RPM   是 2950RPM   是 3100RPM   是 3050RPM    ││
 │  ├──────────────────────────────────────────────────────────┤│
-│  │  [🔄 刷新数据]                                            ││
+│  │  [ 刷新数据]                                            ││
 │  └──────────────────────────────────────────────────────────┘│
 └──────────────────────────────────────────────────────────────┘
 \end{lstlisting}
 
 \begin{lstlisting}
 ┌──────────────────────────────────────────────────────────────┐
-│  [📋 实时监测]  [📈 振动频谱分析]  [⚙️ 系统信息]                  │
+│  [ 实时监测]  [ 振动频谱分析]  [ 系统信息]                  │
 │                                                              │
 │  ┌────────────────────────┬─────────────────────────────────┐│
-│  │  选择电机: [电机1 ▼]    │  🏷️ 故障诊断: 正常运行 (normal)    ││
-│  │  [🔍 分析振动频谱]       │  置信度: 87.3%                    ││
+│  │  选择电机: [电机1 ▼]    │   故障诊断: 正常运行 (normal)    ││
+│  │  [ 分析振动频谱]       │  置信度: 87.3%                    ││
 │  │                        │  ██████████████░░░░              ││
 │  │  ┌────────────────┐    │  振动频谱均匀，各频率分量正常         ││
 │  │  │                │    │                                  ││
-│  │  │   JET 彩色     │    │  📊 Top-3 预测                    ││
-│  │  │   梅尔频谱图    │    │  → 正常运行: 87.3%                ││
+│  │  │   JET 彩色     │    │   Top-3 预测                    ││
+│  │  │   梅尔频谱图    │    │  -> 正常运行: 87.3%                ││
 │  │  │   128×128      │    │    轴承磨损: 6.1%                 ││
 │  │  │                │    │    动平衡不良: 3.2%               ││
 │  │  └────────────────┘    │                                  ││
-│  │  振动梅尔频谱图          │  ⏱ 推理耗时: 12.5 ms              ││
-│  │                        │  🖥 后端: NPU                     ││
+│  │  振动梅尔频谱图          │   推理耗时: 12.5 ms              ││
+│  │                        │   后端: NPU                     ││
 │  └────────────────────────┴─────────────────────────────────┘│
 └──────────────────────────────────────────────────────────────┘
 \end{lstlisting}
 
-\subsection{如何验证系统正常工作}\label{ux5982ux4f55ux9a8cux8bc1ux7cfbux7edfux6b63ux5e38ux5de5ux4f5c}
+\subsection{如何验证系统正常工作}\label{src-experiment-case5-h39}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}

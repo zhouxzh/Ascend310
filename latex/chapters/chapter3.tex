@@ -18,13 +18,13 @@ Ascend Extension for PyTorch 是华为昇腾为 PyTorch
 的支持仍有限，适配与迁移存在诸多问题，因此这里只做 PyTorch 在 310B
 上的基础示例与简要介绍。
 
-\section{架构速览}\label{ux67b6ux6784ux901fux89c8}
+\section{架构速览}\label{src-book-chapter3-h1}
 
 整体架构可概括为``PyTorch前端 + torch\_npu中间层 +
 昇腾算子后端''。图1展示了其分层设计：PyTorch前端将动态图、自动微分、优化器等能力暴露给开发者；\passthrough{\lstinline!torch\_npu!}
 负责对接CANN算子库、通信库以及运行时；底层由昇腾AI处理器提供硬件加速。理解这一层次关系有助于在故障排查时迅速定位问题。
 
-\section{核心能力纵览}\label{ux6838ux5fc3ux80fdux529bux7eb5ux89c8}
+\section{核心能力纵览}\label{src-book-chapter3-h2}
 
 插件在多个维度增强了PyTorch在昇腾平台的体验：
 
@@ -42,9 +42,9 @@ Ascend Extension for PyTorch 是华为昇腾为 PyTorch
   \textbf{推理链路}：模型可导出ONNX，再借助离线转换工具生成适配昇腾的推理模型，便于训练---推理一体化交付。
 \end{itemize}
 
-\section{PyTorch安装教程}\label{pytorchux5b89ux88c5ux6559ux7a0b}
+\section{PyTorch安装教程}\label{src-book-chapter3-h3}
 
-\subsection{CANN环境准备}\label{cannux73afux5883ux51c6ux5907}
+\subsection{CANN环境准备}\label{src-book-chapter3-h4}
 
 在昇腾310B开发板上安装PyTorch之前，必须必须安装匹配CANN版本的驱动与固件。
 如果没有安装CANN相关的工具包与驱动，请参考\href{https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html}{《CANN
@@ -78,7 +78,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 如需持久生效，请将上述命令追加到 \textasciitilde/.bashrc 后执行
 \passthrough{\lstinline!source \~/.bashrc!}。
 
-\subsection{PyTorch二进制软件包安装方法}\label{pytorchux4e8cux8fdbux5236ux8f6fux4ef6ux5305ux5b89ux88c5ux65b9ux6cd5}
+\subsection{PyTorch二进制软件包安装方法}\label{src-book-chapter3-h5}
 
 完成基础环境后，可以参考按照\href{https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0001.html}{Ascend
 Extension for PyTorch
@@ -87,7 +87,7 @@ Extension for PyTorch
 在昇腾310B开发板上安装PyTorch框架和torch\_npu插件的方法有两种，一种是二进制软件包安装，另外一种是源码编译安装。对于初学者来说，推荐使用二进制软件包进行安装。
 PyTorch框架和torch\_npu插件二进制软件包安装的具体方法如下：
 
-\subsubsection{安装PyTorch框架}\label{ux5b89ux88c5pytorchux6846ux67b6}
+\subsubsection{安装PyTorch框架}\label{src-book-chapter3-h6}
 
 由于出厂的 Ubuntu 22.04 系统已预装
 miniconda，我们可以直接利用该环境。预装的 miniconda 通常带有
@@ -154,7 +154,7 @@ python -c "import torch; print(torch.__version__)"
 2.8.0+cpu
 \end{lstlisting}
 
-\subsubsection{安装昇腾torch\_npu插件}\label{ux5b89ux88c5ux6607ux817etorch_npuux63d2ux4ef6}
+\subsubsection{安装昇腾torch\_npu插件}\label{src-book-chapter3-h7}
 
 安装 torch\_npu 时，版本需要与 PyTorch、Python、系统架构以及 CANN
 保持一致。可前往\href{https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0004.html}{华为昇腾
@@ -175,7 +175,7 @@ pip3 install torch_npu-2.8.0-cp311-cp311-manylinux_2_28_aarch64.whl
 进行简易安装，可能导致程序与当前环境不兼容，或与已安装的 CANN
 版本不完全适配。因此，建议谨慎采用该方式安装 torch\_npu 插件。
 
-\subsection{torch\_npu安装后测试}\label{torch_npuux5b89ux88c5ux540eux6d4bux8bd5}
+\subsection{torch\_npu安装后测试}\label{src-book-chapter3-h8}
 
 成功安装torch\_npu后，需要对安装后的torch\_npu进行简单的测试，以此验证是否安装成功。其中最简单的方法，是直接在命令窗口中输入以下命令：
 
@@ -247,7 +247,7 @@ export MAX_COMPILE_CORE_NUMBER=1
 工具时的并行编译内存占用现象一致，降低并行度可显著缓解。 -
 首次运行的编译开销较大，通过以上设置可提高在 8GB 设备上的稳定性。
 
-\section{torch\_npu插件的使用}\label{torch_npuux63d2ux4ef6ux7684ux4f7fux7528}
+\section{torch\_npu插件的使用}\label{src-book-chapter3-h9}
 
 PyTorch 是广泛使用的深度学习框架，基于
 Python，入门友好且生态完善。系统学习可参考李沐的《动手学深度学习》第二版（开源电子书，含配套代码）：\href{https://zh-v2.d2l.ai/index.html}{动手学深度学习}。
@@ -258,7 +258,7 @@ Python，入门友好且生态完善。系统学习可参考李沐的《动手�
 
 下文将结合若干实例，演示 torch\_npu 在昇腾 310B 上的实践要点。
 
-\subsection{线性神经网络实现}\label{ux7ebfux6027ux795eux7ecfux7f51ux7edcux5b9eux73b0}
+\subsection{线性神经网络实现}\label{src-book-chapter3-h10}
 
 为了更清晰地展示基于 CUDA 的 PyTorch 使用与基于
 \passthrough{\lstinline!torch\_npu!}
@@ -266,7 +266,7 @@ Python，入门友好且生态完善。系统学习可参考李沐的《动手�
 回归作为经典统计学习技术，可以视为线性神经网络的实例。这些知识将为在昇腾
 310B 上进行代码移植的其他部分奠定基础。
 
-\subsubsection{一元线性回归}\label{ux4e00ux5143ux7ebfux6027ux56deux5f52}
+\subsubsection{一元线性回归}\label{src-book-chapter3-h11}
 
 线性回归可用于刻画变量间的线性关系。在最简单的一元情形中，大学物理实验的电阻测量就是典型案例。根据欧姆定律可得：
 \[V = I\,R\] 为适应实际中的接触电势/表计零漂，常用含偏置模型：
@@ -407,7 +407,7 @@ R(Ω) = 118.63302612304688  b(V) = 0.7558640241622925
 上耗时接近，主要因为未涉及大规模矩阵/张量计算，计算密度较低，NPU
 的并行优势难以发挥。
 
-\subsubsection{多元线性回归}\label{ux591aux5143ux7ebfux6027ux56deux5f52}
+\subsubsection{多元线性回归}\label{src-book-chapter3-h12}
 
 为了验证昇腾 310B 上 torch\_npu 与 PyTorch
 的兼容性，下面以加州房价数据集的多元线性回归示例继续演示 torch\_npu
@@ -718,7 +718,7 @@ RMSE: $0.77
 \caption{线性神经网络训练结果图}\label{fig:california_housing_linear_network_results}
 \end{figure}
 
-\subsection{多层感知机实现}\label{ux591aux5c42ux611fux77e5ux673aux5b9eux73b0}
+\subsection{多层感知机实现}\label{src-book-chapter3-h13}
 
 我们之所以需要多层感知机（Multilayer Perceptron,
 MPL），是因为线性神经网络的输出仅为输入的加权和，难以刻画现实世界中复杂的非线性关系。以房价预测为例，房屋面积对价格的影响往往存在边际效应，而非简单的线性增长。为了突破这一局限，我们需要构建更深的网络结构。
@@ -961,7 +961,7 @@ RMSE: $0.78
 \caption{多层神经网络训练结果图}\label{fig:california_housing_mlp_results}
 \end{figure}
 
-\subsection{LeNet-5}\label{lenet-5}
+\subsection{LeNet-5}\label{src-book-chapter3-h14}
 
 LeNet-5 是由 Yann LeCun 等人在 1998
 年提出的经典卷积神经网络（CNN），最初用于手写数字识别（MNIST
@@ -1289,7 +1289,7 @@ NPU，再进行精度转换，写法为
 涉及图编译过程，\textbf{优先在 CPU
 端完成精度转换（即第一种写法）可以显著减少图编译的开销}，从而缩短程序的整体启动时间。不过，一旦编译完成进入稳定运行阶段，两者的计算效率差异则微乎其微。
 
-\section{torch\_npu插件兼容性测试套件}\label{torch_npuux63d2ux4ef6ux517cux5bb9ux6027ux6d4bux8bd5ux5957ux4ef6}
+\section{torch\_npu插件兼容性测试套件}\label{src-book-chapter3-h15}
 
 为了全面评估 \passthrough{\lstinline!torch\_npu!} 在昇腾 310B
 上的算子支持度与数值稳定性，我们在
@@ -1298,7 +1298,7 @@ NPU，再进行精度转换，写法为
 版本 + PyTorch 版本 +
 硬件）是否满足模型迁移的基本要求，并识别潜在的算子不支持或精度异常问题。
 
-\subsection{测试目标与验证维度}\label{ux6d4bux8bd5ux76eeux6807ux4e0eux9a8cux8bc1ux7ef4ux5ea6}
+\subsection{测试目标与验证维度}\label{src-book-chapter3-h16}
 
 在利用 \passthrough{\lstinline!torch\_npu!}
 插件开发神经网络应用时，我们注意到该插件在昇腾 310B
@@ -1322,7 +1322,7 @@ NPU 与 CPU 上的计算结果，严格量化两者之间的数值差异。通�
 FP64（双精度）支持有限的特性进行实测，以及评估在不同 Tensor
 形状和维度下算子的内存占用与计算效率。通过这些多维度的测试，开发者可以更清晰地了解硬件的性能边界与最佳实践配置。
 
-\subsection{测试套件结构详解}\label{ux6d4bux8bd5ux5957ux4ef6ux7ed3ux6784ux8be6ux89e3}
+\subsection{测试套件结构详解}\label{src-book-chapter3-h17}
 
 本测试套件基于 \passthrough{\lstinline!pytest!}
 框架构建，针对不同精度（FP16/FP32）进行了分层验证，主要包含以下核心组成部分：
@@ -1395,7 +1395,7 @@ NPU 执行，结果转回 FP32 对比。考虑到量化损失，容差适度放�
 \passthrough{\lstinline!teardown\_method!}，在用例执行后自动清理 NPU
 缓存。
 
-\subsection{测试结果摘要}\label{ux6d4bux8bd5ux7ed3ux679cux6458ux8981}
+\subsection{测试结果摘要}\label{src-book-chapter3-h18}
 
 运行该测试套件前，请确保在 \passthrough{\lstinline!npu!}
 虚拟环境中已安装 pytest：
@@ -1464,9 +1464,9 @@ NPU 基本计算功能正常。但测试也暴露了两个显著异常，需重�
 
 开发者在迁移自定义模型前，建议优先运行此测试套件以排查环境潜在问题。
 
-\section{现代卷积神经网络的移植}\label{ux73b0ux4ee3ux5377ux79efux795eux7ecfux7f51ux7edcux7684ux79fbux690d}
+\section{现代卷积神经网络的移植}\label{src-book-chapter3-h19}
 
-\subsection{AlexNet}\label{alexnet}
+\subsection{AlexNet}\label{src-book-chapter3-h20}
 
 AlexNet 是由 Alex Krizhevsky、Ilya Sutskever 和 Geoffrey Hinton 在 2012
 年提出的卷积神经网络。它在当年的 ImageNet
@@ -1474,7 +1474,7 @@ AlexNet 是由 Alex Krizhevsky、Ilya Sutskever 和 Geoffrey Hinton 在 2012
 错误率降低到了 15.3\%，远超第二名的 26.2\%。AlexNet
 的成功标志着深度学习在计算机视觉领域的统治地位的确立，引发了卷积神经网络（CNN）研究的热潮。
 
-\subsubsection{AlexNet网络结构}\label{alexnetux7f51ux7edcux7ed3ux6784}
+\subsubsection{AlexNet网络结构}\label{src-book-chapter3-h21}
 
 AlexNet 的网络结构比之前的 LeNet 更深、更宽。AlexNet主要包含以下特点：
 1. \textbf{层数}：包含 8 层神经网络，其中前 5 层是卷积层，后 3
@@ -1520,11 +1520,11 @@ AlexNet 网络结构如下图所示：
 
 \begin{figure}
 \centering
-\includegraphics[width=0.5\linewidth,height=\textheight,keepaspectratio,alt={AlexNet}]{chapters/img3/alexnet.png}
+\includegraphics[width=0.45\linewidth,height=0.75\textheight,alt={AlexNet}]{chapters/img3/alexnet.png}
 \caption{AlexNet}\label{fig:alexnet}
 \end{figure}
 
-\subsubsection{AlexNet的代码实现}\label{alexnetux7684ux4ee3ux7801ux5b9eux73b0}
+\subsubsection{AlexNet的代码实现}\label{src-book-chapter3-h22}
 
 为了验证 AlexNet 在昇腾 310B
 上移植的可行性，我们首先建立了一个测试流程。利用
@@ -1754,7 +1754,7 @@ if __name__ == "__main__":
 Epochs: 100%|(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1em}{1em}}@*)| 10/10 [2:26:50<00:00, 881.05s/it, lr=0.010000, train_acc=0.8195, val_acc=0.7798, val_loss=0.6680]
 \end{lstlisting}
 
-\subsubsection{实验结果对比分析}\label{ux5b9eux9a8cux7ed3ux679cux5bf9ux6bd4ux5206ux6790}
+\subsubsection{实验结果对比分析}\label{src-book-chapter3-h23}
 
 为了评估昇腾 310B 在运行 AlexNet
 模型时的实际性能，我们将上述代码部署至昇腾 310B
@@ -1886,14 +1886,14 @@ NPU 并采用半精度加速时，能够很好地保持模型的收敛特性和�
 910 或 GPU 集群）上完成模型训练，随后再将训练好的模型量化或转换至昇腾
 310B 上进行高效的推理部署。
 
-\subsection{VGG}\label{vgg}
+\subsection{VGG}\label{src-book-chapter3-h24}
 
 VGG（Visual Geometry Group）网络是由牛津大学的 Karen Simonyan 和 Andrew
 Zisserman 在 2014 年提出的。它在当年的 ILSVRC
 挑战赛中取得了定位任务第一名和分类任务第二名的优异成绩。VGG
 的主要贡献在于证明了使用小卷积核并增加网络深度能够有效提升模型性能。
 
-\subsubsection{VGG的网络结构}\label{vggux7684ux7f51ux7edcux7ed3ux6784}
+\subsubsection{VGG的网络结构}\label{src-book-chapter3-h25}
 
 VGG 的基本结构特点非常简洁： 1.
 \textbf{统一的小卷积核}：整个网络全部使用 \(3 \times 3\) 的卷积核和
@@ -1905,7 +1905,7 @@ VGG-16 和 VGG-19，分别拥有 16 层和 19 层带权重的层。 3.
 \textbf{通道数翻倍}：在每个池化层之后，特征图的通道数通常会翻倍，直到达到
 512。
 
-\subsubsection{VGG的代码实现}\label{vggux7684ux4ee3ux7801ux5b9eux73b0}
+\subsubsection{VGG的代码实现}\label{src-book-chapter3-h26}
 
 为了灵活构建不同深度的 VGG 网络（如 VGG11, VGG13, VGG16,
 VGG19），代码采用了配置驱动的设计模式。首先，定义一个字典
@@ -2118,7 +2118,7 @@ if __name__ == "__main__":
     plot_metrics(script_dir, train_acc_history, val_acc_history, train_loss_history, val_loss_history)
 \end{lstlisting}
 
-\subsubsection{实验结果分析}\label{ux5b9eux9a8cux7ed3ux679cux5206ux6790}
+\subsubsection{实验结果分析}\label{src-book-chapter3-h27}
 
 在本节的实验设计中，我们仅针对
 FP32（全精度）模式进行了测试与分析，未涵盖
@@ -2181,14 +2181,14 @@ Epochs: 100%|(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1e
 310B 上验证模型逻辑的正确性（哪怕训练慢一点），确信其计算行为与标准 GPU
 是一致的，从而为模型在不同算力平台的部署提供了可靠的验证基准。
 
-\subsection{ResNet}\label{resnet}
+\subsection{ResNet}\label{src-book-chapter3-h28}
 
 ResNet（Residual Network）由何恺明、张祥雨、任少卿和孙剑在 2015
 年提出。它横扫了当年的 ILSVRC 和 COCO 竞赛，囊括了多项冠军。ResNet
 的核心贡献在于解决了深度神经网络随着层数增加而出现的``退化问题''（Degradation
 Problem），使得训练数百层甚至上千层的网络成为可能。
 
-\subsubsection{ResNet的网络结构}\label{resnetux7684ux7f51ux7edcux7ed3ux6784}
+\subsubsection{ResNet的网络结构}\label{src-book-chapter3-h29}
 
 ResNet 的基本结构引入了``残差块''（Residual Block）： 1.
 \textbf{残差学习}：传统的网络试图直接学习目标映射 \(H(x)\)，而 ResNet
@@ -2200,7 +2200,7 @@ Connection）}：通过恒等映射将输入直接加到卷积层的输出上。
 可以构建非常深的网络，常见的版本包括 ResNet-18, ResNet-34, ResNet-50,
 ResNet-101 和 ResNet-152。
 
-\subsubsection{ResNet的代码实现}\label{resnetux7684ux4ee3ux7801ux5b9eux73b0}
+\subsubsection{ResNet的代码实现}\label{src-book-chapter3-h30}
 
 原版 ResNet 是面向 ImageNet 数据集设计的，其标准输入尺寸为
 \(224 \times 224\)。若直接在昇腾 310B 上对 ImageNet
@@ -2472,7 +2472,7 @@ if __name__ == "__main__":
     plot_metrics(script_dir, train_acc_history, val_acc_history, train_loss_history, val_loss_history)
 \end{lstlisting}
 
-\subsubsection{实验结果对比分析}\label{ux5b9eux9a8cux7ed3ux679cux5bf9ux6bd4ux5206ux6790-1}
+\subsubsection{实验结果对比分析}\label{src-book-chapter3-h31}
 
 值得注意的是，本章节仅展示了 ResNet 在 FP32
 全精度模式下的实验结果，未进行 FP16
@@ -2536,7 +2536,7 @@ ResNet 的计算深度较深，导致图编译优化、算子调度以及数据�
 综上所述，虽然昇腾 310B 在 FP32
 训练速度上无法与高端桌面显卡抗衡，但其完备的算子支持和精准的计算结果，使其完全具备承载轻量级微调（Fine-tuning）或小样本学习任务的能力，同时也是验证模型算子兼容性的理想低成本平台。
 
-\section{总结}\label{ux603bux7ed3}
+\section{总结}\label{src-book-chapter3-h32}
 
 昇腾 310B
 在训练任务上展现出了独特的边缘计算优势。首先，它具备完整的边缘微调能力，虽然并不适合从零开始训练大规模深度学习模型，但完全能够胜任小样本学习（Few-shot

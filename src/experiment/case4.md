@@ -1,6 +1,6 @@
 # 案例4：智能掌纹识别机
 
-## 1. 项目简介
+## 1. 项目简介 {#src-experiment-case4-h1}
 
 本项目基于昇腾 310B 平台，构建一个高精度的掌纹识别系统。掌纹识别作为一种
 生物识别技术，具有纹理丰富、难以伪造、非接触式采集等优势，在门禁控制、
@@ -14,7 +14,7 @@
 进行高效的余弦相似度检索，新用户注册时无需重新训练模型，只需将其特征向量
 加入索引即可。
 
-### 与已有案例的关系
+### 与已有案例的关系 {#src-experiment-case4-h2}
 
 | 案例 | 领域 | 模型 | 任务范式 |
 |------|------|------|----------|
@@ -31,15 +31,15 @@
   判别特征空间
 - **案例7** 做的是 1:N 相似照片检索，**案例4** 做的是 1:1 身份验证（含阈值判定）
 
-## 2. 内容大纲
+## 2. 内容大纲 {#src-experiment-case4-h3}
 
-### 2.1. 硬件准备
+### 2.1. 硬件准备 {#src-experiment-case4-h4}
 
 本项目需要的硬件分为三个层级：
 
 | 层级 | 硬件 | 职责 | 要求 |
 |------|------|------|------|
-| 图像采集 | USB 摄像头 | 掌纹图像采集 | ≥5MP 分辨率，支持自动对焦 |
+| 图像采集 | USB 摄像头 | 掌纹图像采集 | >=5MP 分辨率，支持自动对焦 |
 | 照明增强 | 近红外 LED 阵列 (可选) | 增强掌纹纹理对比度 | 850nm 波长，均匀分布 |
 | AI 计算 | 昇腾 310B 开发者套件 | 掌纹特征提取 + 向量检索 | — |
 | 结构件 | 3D 打印外壳 (可选) | 手掌定位 + 环境光隔离 | PETG 材料 |
@@ -49,7 +49,7 @@
 ```mermaid
 flowchart TB
     subgraph INPUT["图像采集"]
-        CAM["USB 摄像头\n≥5MP 自动对焦"]
+        CAM["USB 摄像头\n>=5MP 自动对焦"]
         LED["近红外 LED (可选)\n增强纹理对比度"]
     end
 
@@ -60,9 +60,9 @@ flowchart TB
     end
 
     subgraph UI["Gradio 仪表盘"]
-        ENROLL["📝 注册掌纹\n采集 3-5 张样本"]
-        VERIFY["🔍 身份验证\n实时匹配结果"]
-        ADMIN["⚙️ 系统管理\n用户列表 / 阈值调节"]
+        ENROLL[" 注册掌纹\n采集 3-5 张样本"]
+        VERIFY[" 身份验证\n实时匹配结果"]
+        ADMIN[" 系统管理\n用户列表 / 阈值调节"]
     end
 
     CAM --> CPU_A
@@ -74,9 +74,9 @@ flowchart TB
     FAISS_A --> ADMIN
 ```
 
-### 2.2. 软件环境
+### 2.2. 软件环境 {#src-experiment-case4-h5}
 
-#### 操作系统与框架
+#### 操作系统与框架 {#src-experiment-case4-h6}
 
 | 层级 | 软件 | 版本 | 用途 |
 |------|------|------|------|
@@ -88,14 +88,14 @@ flowchart TB
 | 向量检索 | faiss-cpu | 1.7+ | FAISS 索引与相似度搜索 |
 | Web | Gradio | 4.0+ | 仪表盘界面 |
 
-#### 环境准备
+#### 环境准备 {#src-experiment-case4-h7}
 
 ```bash
 # 一键安装依赖并导出模型
 bash setup.sh
 ```
 
-`setup.sh` 依次完成：系统包安装 → Python 依赖安装 → 模型导出（如有训练好的
+`setup.sh` 依次完成：系统包安装 -> Python 依赖安装 -> 模型导出（如有训练好的
 `.pth` 则导出 ONNX，如有 CANN 则继续转换为 OM）。
 
 如果只想在开发机上导出 ONNX：
@@ -104,39 +104,39 @@ bash setup.sh
 python3 prepare_models.py --onnx-only
 ```
 
-#### Python 依赖说明
+#### Python 依赖说明 {#src-experiment-case4-h8}
 
 | 包 | 用途 | 必需？ |
 |:---|:---|:---|
-| `gradio` | Web 仪表盘框架 | ✓ |
-| `torch` + `torchvision` | GhostNet 模型定义、CPU 推理回退 | ✓ |
-| `opencv-python` | 掌纹预处理、ROI 检测、摄像头采集 | ✓ |
-| `numpy` | 数值计算、特征向量处理 | ✓ |
-| `faiss-cpu` | FAISS 向量索引与检索 | ✓ |
-| `Pillow` | Gradio 图像格式转换 | ✓ |
+| `gradio` | Web 仪表盘框架 | 是 |
+| `torch` + `torchvision` | GhostNet 模型定义、CPU 推理回退 | 是 |
+| `opencv-python` | 掌纹预处理、ROI 检测、摄像头采集 | 是 |
+| `numpy` | 数值计算、特征向量处理 | 是 |
+| `faiss-cpu` | FAISS 向量索引与检索 | 是 |
+| `Pillow` | Gradio 图像格式转换 | 是 |
 | `onnx` | ONNX 模型校验（仅 prepare_models.py） | 仅转换 |
 | `acl` (CANN 自带) | NPU 推理，随 CANN 安装 | 仅推理 |
 
-### 2.3. 掌纹图像预处理
+### 2.3. 掌纹图像预处理 {#src-experiment-case4-h9}
 
 掌纹 ROI（感兴趣区域）检测是整个系统的第一道关口。高质量的 ROI 提取直接影响
 后续特征提取的准确性。
 
-#### 预处理流水线
+#### 预处理流水线 {#src-experiment-case4-h10}
 
 ```mermaid
 flowchart TD
     RAW["摄像头帧\nBGR (H, W, 3)"] --> GRAY["灰度化\ncv2.COLOR_BGR2GRAY"]
-    GRAY --> SEG["手掌分割\nGaussianBlur → Otsu 二值化\n形态学闭/开操作"]
+    GRAY --> SEG["手掌分割\nGaussianBlur -> Otsu 二值化\n形态学闭/开操作"]
     SEG --> CONTOUR["轮廓检测\ncv2.findContours\n取最大轮廓 = 手掌"]
     CONTOUR --> VALLEY["指谷点定位\n凸包缺陷分析\n筛选深度 >3000 的凹陷"]
     VALLEY --> ROI["ROI 提取\n以指谷连线中点为基准\n向下偏移 30% 距离\n提取正方形区域"]
-    ROI --> CLAHE["对比度增强\nBGR → LAB\nCLAHE 应用于 L 通道\nLAB → BGR"]
-    CLAHE --> CHECK["质量检查\nLaplacian 方差\n< 100 → 重新采集"]
+    ROI --> CLAHE["对比度增强\nBGR -> LAB\nCLAHE 应用于 L 通道\nLAB -> BGR"]
+    CLAHE --> CHECK["质量检查\nLaplacian 方差\n< 100 -> 重新采集"]
     CHECK --> OUTPUT["输出\n(224, 224, 3) BGR"]
 ```
 
-#### 关键技术细节
+#### 关键技术细节 {#src-experiment-case4-h11}
 
 **手掌分割**：使用 Otsu 自适应阈值将手掌与背景分离。系统假设手掌比背景亮
 （配合深色背景和 LED 照明）。如果二值化后白色像素超过 50%，则自动反转
@@ -159,18 +159,18 @@ CLAHE（对比度受限的自适应直方图均衡化），然后转换回 BGR�
 全部代码实现在 [palm_preprocessor.py](samples/case4/palm_preprocessor.py) 的
 `PalmPreprocessor` 类中，纯 OpenCV 实现，无需任何模型文件。
 
-#### 预处理失败的处理
+#### 预处理失败的处理 {#src-experiment-case4-h12}
 
 预处理可能因以下原因失败：手掌未在画面中、光照过暗/过亮、手指未张开无法
 定位指谷点、图像模糊等。`PalmPreprocessor.preprocess()` 在失败时返回 `None`
 而非抛出异常，调用方可以优雅地提示用户重新采集。
 
-### 2.4. GhostNet 特征提取
+### 2.4. GhostNet 特征提取 {#src-experiment-case4-h13}
 
 掌纹识别需要一个能将掌纹图像映射到判别性特征空间的模型。本案例选择
 **GhostNet 1.0x** 作为特征提取骨干网络。
 
-#### 为什么选 GhostNet
+#### 为什么选 GhostNet {#src-experiment-case4-h14}
 
 | 对比维度 | GhostNet 1.0x | 其他候选 |
 |----------|---------------|----------|
@@ -180,30 +180,30 @@ CLAHE（对比度受限的自适应直方图均衡化），然后转换回 BGR�
 | 是否已被本书使用 | **否** — 为本书增加模型多样性 | MobileNetV3-Small 已被案例8 使用 |
 | torchvision 内置 | 否 — 独立实现 (~220 行) | ResNet / MobileNet 内置 |
 
-#### GhostNet 架构
+#### GhostNet 架构 {#src-experiment-case4-h15}
 
 ```mermaid
 flowchart TD
-    INPUT["输入\n(1, 3, 224, 224)"] --> STEM["Stem\nConv2d 3→16, stride=2\nBN + ReLU6\n(112×112×16)"]
+    INPUT["输入\n(1, 3, 224, 224)"] --> STEM["Stem\nConv2d 3->16, stride=2\nBN + ReLU6\n(112×112×16)"]
 
-    STEM --> B1["GhostBottleneck ×1\n16 → 16\nstride=1, no SE\n(112×112×16)"]
+    STEM --> B1["GhostBottleneck ×1\n16 -> 16\nstride=1, no SE\n(112×112×16)"]
 
-    B1 --> B2["GhostBottleneck ×2\n16 → 24\nstride=2 下采样\n(56×56×24)"]
+    B1 --> B2["GhostBottleneck ×2\n16 -> 24\nstride=2 下采样\n(56×56×24)"]
 
-    B2 --> B3["GhostBottleneck ×2\n24 → 40\nstride=2, SE\n(28×28×40)"]
+    B2 --> B3["GhostBottleneck ×2\n24 -> 40\nstride=2, SE\n(28×28×40)"]
 
-    B3 --> B4["GhostBottleneck ×4\n40 → 80\nstride=2\n(14×14×80)"]
+    B3 --> B4["GhostBottleneck ×4\n40 -> 80\nstride=2\n(14×14×80)"]
 
-    B4 --> B5["GhostBottleneck ×2\n80 → 112\nstride=1, SE\n(14×14×112)"]
+    B4 --> B5["GhostBottleneck ×2\n80 -> 112\nstride=1, SE\n(14×14×112)"]
 
-    B5 --> B6["GhostBottleneck ×5\n112 → 160\nstride=2, SE\n(7×7×160)"]
+    B5 --> B6["GhostBottleneck ×5\n112 -> 160\nstride=2, SE\n(7×7×160)"]
 
-    B6 --> HEAD["Head\nConv2d 160→960, BN, ReLU6\nAdaptiveAvgPool2d → (1×1)\nConv2d 960→1280\nFlatten → (1280,)"]
+    B6 --> HEAD["Head\nConv2d 160->960, BN, ReLU6\nAdaptiveAvgPool2d -> (1×1)\nConv2d 960->1280\nFlatten -> (1280,)"]
 
     HEAD --> OUTPUT["输出\n1280-dim 特征向量\n(后续 L2 归一化)"]
 ```
 
-#### Ghost 模块原理
+#### Ghost 模块原理 {#src-experiment-case4-h16}
 
 标准卷积同时生成所有输出通道，存在大量冗余。Ghost 模块将卷积拆分为两步：
 
@@ -239,10 +239,10 @@ class GhostModule(nn.Module):
 注意廉价卷积后**不加 ReLU**——这是 GhostNet 论文的设计选择，保留幻影特征图
 的线性特性以保持信息多样性。
 
-#### SE 注意力模块
+#### SE 注意力模块 {#src-experiment-case4-h17}
 
 GhostNet 在部分 Bottleneck 中嵌入 SE (Squeeze-and-Excitation) 注意力模块。
-SE 模块通过全局平均池化 → 压缩 → 扩展 → hard-sigmoid 门控，自适应地调整
+SE 模块通过全局平均池化 -> 压缩 -> 扩展 -> hard-sigmoid 门控，自适应地调整
 各通道的重要性权重。
 
 为保证 ONNX opset 11 兼容性，本实现使用手动 hard-sigmoid (`relu6 / 6`)
@@ -256,7 +256,7 @@ def forward(self, x):
     return x * s
 ```
 
-#### 特征提取模式
+#### 特征提取模式 {#src-experiment-case4-h18}
 
 GhostNet 在特征提取模式下（`num_classes=None`）不包含分类头，直接输出
 1280 维特征向量。`PalmExtractor.extract()` 在得到特征向量后执行 L2 归一化：
@@ -275,13 +275,13 @@ L2 归一化确保了 FAISS `IndexFlatIP` 的内积等价于余弦相似度，�
 `GhostModule`、`SELayer`、`GhostBottleneck`、`GhostNet` 四个类以及工厂函数
 `ghostnet_1x()`。
 
-### 2.5. 对比学习训练
+### 2.5. 对比学习训练 {#src-experiment-case4-h19}
 
 掌纹识别是开集验证问题——系统需要判断两张掌纹是否来自同一个人，而非将掌纹
 分到某个预定义的类别。因此，本案例使用**对比学习 (contrastive learning)**
 而非分类交叉熵来训练模型。
 
-#### 为什么用对比学习
+#### 为什么用对比学习 {#src-experiment-case4-h20}
 
 | 方法 | 适用场景 | 优缺点 |
 |------|----------|--------|
@@ -294,7 +294,7 @@ L2 归一化确保了 FAISS `IndexFlatIP` 的内积等价于余弦相似度，�
 掌纹特征距离远**。训练完成后，新用户注册时只需将其掌纹的特征向量加入 FAISS
 索引，无需任何模型更新。
 
-#### 对比损失函数
+#### 对比损失函数 {#src-experiment-case4-h21}
 
 ```python
 class ContrastiveLoss(nn.Module):
@@ -311,7 +311,7 @@ class ContrastiveLoss(nn.Module):
 - **负样本对**（不同人）：当距离小于 margin 时产生损失，驱动特征向量远离
 - margin 默认为 1.0：意味着负样本对的距离应至少为 1.0
 
-#### 数据集组织
+#### 数据集组织 {#src-experiment-case4-h22}
 
 训练数据按用户分文件夹存放：
 
@@ -334,7 +334,7 @@ PolyU_Palmprint/
 这种方式使得有效训练样本数远超原始图像数——即使只有 100 个用户、每个用户
 10 张图像 (共 1000 张)，也能生成数万个训练对。
 
-#### 训练命令与超参数
+#### 训练命令与超参数 {#src-experiment-case4-h23}
 
 ```bash
 python3 train.py --data-dir /path/to/PolyU_Palmprint
@@ -351,25 +351,25 @@ python3 train.py --data-dir /path/to/PolyU_Palmprint
 （而非图像）85/15 分割以确保无数据泄漏。完整训练脚本在
 [train.py](samples/case4/train.py)。
 
-#### 评估指标
+#### 评估指标 {#src-experiment-case4-h24}
 
 训练过程中计算验证集上的**成对准确率**：对每对掌纹，若其特征向量的欧氏距离
 小于 margin/2 (0.5)，则预测为同一人，与标签比较得出准确率。
 
 训练完成后，最佳模型保存到 `models/ghostnet_palmprint.pth`。
 
-#### 推荐数据集
+#### 推荐数据集 {#src-experiment-case4-h25}
 
 - [PolyU Palmprint Database](https://www4.comp.polyu.edu.hk/~biometrics/) —
   约 600 个手掌，每个 20 张图像（两阶段各 10 张），最经典的掌纹数据集
 - [IITD Palmprint Database](https://www4.comp.polyu.edu.hk/~csajaykr/IITD/Database_Palm.htm) —
   约 460 个手掌，每个 5-6 张图像，包含左右手
 
-> ⚠️ **关于预训练权重**：GhostNet 不在 torchvision 中，无法使用 ImageNet
+> 注意 **关于预训练权重**：GhostNet 不在 torchvision 中，无法使用 ImageNet
 > 预训练权重。模型需要从头开始在掌纹数据集上训练。如果跳过了训练步骤，
 > 模型将使用随机权重，特征提取质量会很差——请务必先训练再使用。
 
-### 2.6. 模型转换与昇腾部署
+### 2.6. 模型转换与昇腾部署 {#src-experiment-case4-h26}
 
 ```mermaid
 flowchart TD
@@ -383,7 +383,7 @@ flowchart TD
     end
 
     subgraph DEPLOY["3. 推理部署"]
-        APP["app.py → PalmExtractor\n→ AscendModel.execute()"]
+        APP["app.py -> PalmExtractor\n-> AscendModel.execute()"]
     end
 
     GHOST -->|"torch.onnx.export()\nopset=11"| ONNX
@@ -391,7 +391,7 @@ flowchart TD
     OM -->|"acl.mdl.execute()"| APP
 ```
 
-#### 步骤 1：导出 ONNX
+#### 步骤 1：导出 ONNX {#src-experiment-case4-h27}
 
 ```bash
 python3 prepare_models.py --onnx-only
@@ -402,7 +402,7 @@ python3 prepare_models.py --onnx-only
 导出后自动进行三项验证：ONNX 模型结构校验、PyTorch vs ONNX Runtime 输出对比
 （确保数值一致性）。
 
-#### 步骤 2：ATC 转换
+#### 步骤 2：ATC 转换 {#src-experiment-case4-h28}
 
 ```bash
 # 在昇腾设备上运行
@@ -422,7 +422,7 @@ atc --model=models/ghostnet_palmprint.onnx \
 
 转换完成后得到约 20MB 的 OM 离线模型文件。
 
-#### ONNX 兼容性注意事项
+#### ONNX 兼容性注意事项 {#src-experiment-case4-h29}
 
 GhostNet 的 ONNX 导出已针对 ATC 兼容性做了两项适配：
 1. **手动 hard-sigmoid**：SELayer 中使用 `F.relu6(x) / 6.0` 替代
@@ -430,15 +430,15 @@ GhostNet 的 ONNX 导出已针对 ATC 兼容性做了两项适配：
 2. **固定输入形状**：不使用动态轴 (`dynamic_axes={}`)，因为 OM 模型要求
    固定的输入输出尺寸
 
-### 2.7. 开集验证系统
+### 2.7. 开集验证系统 {#src-experiment-case4-h30}
 
-#### 系统架构
+#### 系统架构 {#src-experiment-case4-h31}
 
 开集验证的核心流程：
 
 ```
-注册阶段:  掌纹图像 → 预处理 → GhostNet(NPU) → 1280维向量 → FAISS 存储
-验证阶段:  掌纹图像 → 预处理 → GhostNet(NPU) → FAISS 搜索 → 阈值判定
+注册阶段:  掌纹图像 -> 预处理 -> GhostNet(NPU) -> 1280维向量 -> FAISS 存储
+验证阶段:  掌纹图像 -> 预处理 -> GhostNet(NPU) -> FAISS 搜索 -> 阈值判定
 ```
 
 ```mermaid
@@ -456,16 +456,16 @@ flowchart TD
         V3 --> V4["L2 归一化"]
         V4 --> V5["FAISS.search()\nTop-K 检索"]
         V5 --> V6["多数投票\n平均相似度"]
-        V6 --> V7{"相似度 ≥ 阈值?"}
-        V7 -->|"是"| V8["✅ 验证通过"]
-        V7 -->|"否"| V9["❌ 验证失败"]
+        V6 --> V7{"相似度 >= 阈值?"}
+        V7 -->|"是"| V8["[OK] 验证通过"]
+        V7 -->|"否"| V9["[失败] 验证失败"]
     end
 
     E5 -.->|"持久化"| DB[("FAISS 索引\n+ JSON 元数据")]
     DB -.->|"加载"| V5
 ```
 
-#### FAISS 索引设计
+#### FAISS 索引设计 {#src-experiment-case4-h32}
 
 使用 `faiss.IndexFlatIP`（内积索引）存储 L2 归一化后的 1280 维特征向量。
 由于向量已归一化，内积等价于余弦相似度：
@@ -478,7 +478,7 @@ cosine_similarity(a, b) = a · b  (= faiss inner product when ||a||=||b||=1)
 检索 Top-K 个最相似向量，对用户 ID 进行多数投票，取该用户的平均相似度作为
 匹配分数。
 
-#### 多样本注册策略
+#### 多样本注册策略 {#src-experiment-case4-h33}
 
 为什么每个用户需要 3-5 个样本？
 
@@ -492,7 +492,7 @@ cosine_similarity(a, b) = a · b  (= faiss inner product when ||a||=||b||=1)
 中有 4 个属于用户 A、1 个属于用户 B，则认定匹配用户 A，取这 4 个向量的
 平均相似度作为最终分数。
 
-#### 用户删除
+#### 用户删除 {#src-experiment-case4-h34}
 
 FAISS `IndexFlatIP` 不支持直接删除单条记录。删除用户时，系统通过
 `reconstruct()` 方法从索引中取出保留的向量，重建一个新的 FAISS 索引。
@@ -501,14 +501,14 @@ FAISS `IndexFlatIP` 不支持直接删除单条记录。删除用户时，系统
 完整索引管理实现在 [palm_index.py](samples/case4/palm_index.py) 的
 `PalmIndex` 类中。
 
-### 2.8. Web 仪表盘
+### 2.8. Web 仪表盘 {#src-experiment-case4-h35}
 
 ```mermaid
 flowchart TD
     subgraph UI["Gradio Blocks 仪表盘"]
-        TAB1["📝 注册掌纹\n摄像头实时流 → 采集样本 → 保存"]
-        TAB2["🔍 身份验证\n摄像头实时流 → 特征提取 → 匹配判定"]
-        TAB3["⚙️ 系统管理\n用户列表 + 系统状态 + 阈值调节"]
+        TAB1[" 注册掌纹\n摄像头实时流 -> 采集样本 -> 保存"]
+        TAB2[" 身份验证\n摄像头实时流 -> 特征提取 -> 匹配判定"]
+        TAB3[" 系统管理\n用户列表 + 系统状态 + 阈值调节"]
     end
 ```
 
@@ -527,25 +527,25 @@ flowchart TD
    用户 ID 删除。显示系统信息（后端类型、模型信息、索引状态、
    特征维度）。验证阈值可通过滑块实时调节。
 
-#### 事件处理
+#### 事件处理 {#src-experiment-case4-h36}
 
 注册页签的关键事件流：
 
 ```
-[📷 采集掌纹] → capture_enroll_sample()
-  ├── PalmExtractor.extract() → 若失败显示"未检测到有效掌纹"
+[ 采集掌纹] -> capture_enroll_sample()
+  ├── PalmExtractor.extract() -> 若失败显示"未检测到有效掌纹"
   ├── 将 (BGR原图, RGB缩略图) 存入 _enroll_buffer
   └── 更新状态 (已采集数 / 3)
-[✅ 完成注册] → confirm_enrollment()
-  ├── PalmIndex.enroll_multiple() → FAISS 添加
-  ├── PalmIndex.save() → 持久化
+[[OK] 完成注册] -> confirm_enrollment()
+  ├── PalmIndex.enroll_multiple() -> FAISS 添加
+  ├── PalmIndex.save() -> 持久化
   └── 显示注册成功信息
-[🔄 重新采集] → 清空缓冲区，重新开始
+[ 重新采集] -> 清空缓冲区，重新开始
 ```
 
-### 2.9. 用户手册
+### 2.9. 用户手册 {#src-experiment-case4-h37}
 
-#### 2.9.1 部署
+#### 2.9.1 部署 {#src-experiment-case4-h38}
 
 1. 将项目代码拷贝到昇腾 310B 设备
 2. 运行 `bash setup.sh` 安装 Python 依赖
@@ -555,7 +555,7 @@ flowchart TD
 6. 启动服务：`python3 app.py`
 7. 浏览器打开 `http://<设备IP>:7860`
 
-#### 2.9.2 使用流程
+#### 2.9.2 使用流程 {#src-experiment-case4-h39}
 
 1. 打开「注册掌纹」页签，输入用户姓名
 2. 将手掌自然张开放在摄像头前 15-20 cm 处
@@ -565,7 +565,7 @@ flowchart TD
 6. 观察验证结果——通过/失败、相似度分数、Top-5 匹配
 7. 如需调整判定严格程度，在「系统管理」页签调节阈值
 
-#### 2.9.3 采集技巧
+#### 2.9.3 采集技巧 {#src-experiment-case4-h40}
 
 - **光线**：确保手掌光照均匀，避免强烈阴影。推荐使用近红外 LED 补光
 - **背景**：深色、简洁的背景有助于手掌分割。避免背景中有肤色相近的物体
@@ -573,7 +573,7 @@ flowchart TD
 - **距离**：手掌距摄像头 15-20 cm，确保掌纹纹理清晰可见
 - **清洁**：手掌干燥清洁，避免汗渍或污渍影响纹理质量
 
-#### 2.9.4 调整参数
+#### 2.9.4 调整参数 {#src-experiment-case4-h41}
 
 | 参数 | 默认值 | 位置 | 说明 |
 |------|--------|------|------|
@@ -583,7 +583,7 @@ flowchart TD
 | `CLAHE_CLIP_LIMIT` | 2.0 | config.py | CLAHE 对比度限制 |
 | `LAPLACIAN_BLUR_THRESHOLD` | 100.0 | config.py | 图像锐度最低要求 |
 
-#### 2.9.5 故障排除
+#### 2.9.5 故障排除 {#src-experiment-case4-h42}
 
 | 问题 | 可能原因 | 解决方法 |
 |------|---------|---------|
@@ -594,7 +594,7 @@ flowchart TD
 | ATC 转换失败 | soc_version 不匹配 | `npu-smi info` 查看版本 |
 | "请重新放置手掌" | 预处理质量检查未通过 | 确保手掌清晰，避免运动模糊 |
 
-## 3. 源代码结构
+## 3. 源代码结构 {#src-experiment-case4-h43}
 
 ```text
 case4/
@@ -634,7 +634,7 @@ flowchart TB
     TRAIN["train.py\n对比学习训练"] --> GN
     TRAIN --> CFG
 
-    PREP["prepare_models.py\nONNX → OM"] --> GN
+    PREP["prepare_models.py\nONNX -> OM"] --> GN
     PREP --> CFG
 ```
 
@@ -644,16 +644,16 @@ flowchart TB
 - `PalmIndex` 的 FAISS `IndexFlatIP` + JSON 元数据模式与案例7 的
   `PhotoIndex` 一致
 - `train.py` 的训练管道（AdamW + CosineAnnealing）与案例8 一致
-- `prepare_models.py` 的 ONNX → ATC 流程与案例6/案例7/案例8 一致
+- `prepare_models.py` 的 ONNX -> ATC 流程与案例6/案例7/案例8 一致
 - `config.py` 的 `BASE_DIR` + `os.path.join` 结构与所有案例一致
 - `app.py` 的 Gradio 懒加载单例模式与所有案例一致
 - `PalmPreprocessor` 是本案例独有的领域专用预处理模块
 - `GhostNet` (ghostnet.py) 是本案例独有的模型实现（220 行独立代码）
 - 对比学习训练范式（Siamese + ContrastiveLoss）是本案例独有的训练方法
 
-## 4. 效果演示
+## 4. 效果演示 {#src-experiment-case4-h44}
 
-### 预期效果
+### 预期效果 {#src-experiment-case4-h45}
 
 | 功能 | 预期表现 | 备注 |
 |------|---------|------|
@@ -661,10 +661,10 @@ flowchart TB
 | 特征提取 (NPU) | 约 8-10 ms / 张 | GhostNet 5.2M 参数 |
 | 验证准确率 (已训练) | EER < 5%，AUC > 0.97 | 取决于训练数据量和质量 |
 | FAISS 检索 (1000 向量) | < 1 ms | IndexFlatIP 精确搜索 |
-| 端到端验证延迟 | 预处理 ~5ms + NPU ~10ms + 检索 <1ms ≈ 16ms | — |
+| 端到端验证延迟 | 预处理 ~5ms + NPU ~10ms + 检索 <1ms 约等于 16ms | — |
 | 新用户注册 | 3-5 次采集，无需重训模型 | 开集验证的核心优势 |
 
-### 性能指标
+### 性能指标 {#src-experiment-case4-h46}
 
 | 指标 | NPU (Ascend 310B) | CPU (PyTorch) |
 |------|-------------------|---------------|
@@ -673,7 +673,7 @@ flowchart TB
 | FAISS 检索 (1000 向量) | <1 ms | <1 ms |
 | 模型大小 (.om) | ~20 MB | N/A |
 
-### 浏览器中的效果
+### 浏览器中的效果 {#src-experiment-case4-h47}
 
 Gradio 仪表盘在浏览器中的预期布局：
 
@@ -681,21 +681,21 @@ Gradio 仪表盘在浏览器中的预期布局：
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  🖐️ 智能掌纹识别机                                                │
+│  掌纹 智能掌纹识别机                                                │
 │  GhostNet 1.0x 特征提取 + FAISS 向量检索                          │
 ├──────────────────────────────────────────────────────────────────┤
-│  [📝 注册掌纹]  [🔍 身份验证]  [⚙️ 系统管理]                        │
+│  [ 注册掌纹]  [ 身份验证]  [ 系统管理]                        │
 │                                                                  │
 │  ┌──────────────────────┐  ┌─────────────────────────────────┐  │
 │  │                      │  │ 用户姓名: [张三            ]      │  │
 │  │                      │  │                                 │  │
-│  │   摄像头实时预览      │  │ [📷 采集掌纹]                    │  │
-│  │                      │  │ [✅ 完成注册 (≥3 张)]            │  │
-│  │                      │  │ [🔄 重新采集]                    │  │
+│  │   摄像头实时预览      │  │ [ 采集掌纹]                    │  │
+│  │                      │  │ [[OK] 完成注册 (>=3 张)]            │  │
+│  │                      │  │ [ 重新采集]                    │  │
 │  │                      │  │                                 │  │
-│  │                      │  │ ### 📝 注册中: 张三              │  │
+│  │                      │  │ ###  注册中: 张三              │  │
 │  │                      │  │ 已采集: 3 / 3 张                │  │
-│  │                      │  │ ✅ 样本充足，点击完成注册         │  │
+│  │                      │  │ [OK] 样本充足，点击完成注册         │  │
 │  └──────────────────────┘  └─────────────────────────────────┘  │
 │  [缩略图1] [缩略图2] [缩略图3]                                     │
 └──────────────────────────────────────────────────────────────────┘
@@ -705,29 +705,29 @@ Gradio 仪表盘在浏览器中的预期布局：
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  [📝 注册掌纹]  [🔍 身份验证]  [⚙️ 系统管理]                        │
+│  [ 注册掌纹]  [ 身份验证]  [ 系统管理]                        │
 │                                                                  │
 │  ┌──────────────────────┐  ┌─────────────────────────────────┐  │
 │  │                      │  │                                 │  │
-│  │   摄像头实时预览      │  │  ## ✅ 验证通过                   │  │
+│  │   摄像头实时预览      │  │  ## [OK] 验证通过                   │  │
 │  │                      │  │  **用户**: 张三 (a3f4c8d2)       │  │
 │  │                      │  │  **相似度**: 87.3%              │  │
 │  │                      │  │  ██████████████░░░░              │  │
 │  └──────────────────────┘  │                                 │  │
-│                            │  ⏱ 耗时: 15.2 ms                 │  │
+│                            │   耗时: 15.2 ms                 │  │
 │  ┌──────────────────────┐  │                                 │  │
-│  │   掌纹 ROI 预览       │  │  ### 📊 Top-5 匹配               │  │
-│  │                      │  │  → 张三: 87.3% ██████████████░░  │  │
+│  │   掌纹 ROI 预览       │  │  ###  Top-5 匹配               │  │
+│  │                      │  │  -> 张三: 87.3% ██████████████░░  │  │
 │  │                      │  │    李四: 42.1% ██████░░░░░░░░░░  │  │
 │  │                      │  │    王五: 38.5% █████░░░░░░░░░░░  │  │
 │  └──────────────────────┘  │                                 │  │
-│                            │  🖥 后端: NPU | 特征维度: 1280     │  │
-│  [🔍 开始验证]              │                                 │  │
+│                            │   后端: NPU | 特征维度: 1280     │  │
+│  [ 开始验证]              │                                 │  │
 │                            └─────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### 如何验证系统正常工作
+### 如何验证系统正常工作 {#src-experiment-case4-h48}
 
 1. 运行 `python3 app.py`，浏览器打开 `http://127.0.0.1:7860`
 2. 在「注册掌纹」页签，输入姓名，放置手掌，采集 3-5 张样本

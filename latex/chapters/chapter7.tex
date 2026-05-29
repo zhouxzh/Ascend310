@@ -1,9 +1,9 @@
 在完成了模型转换与基础推理应用的开发后，``跑通''只是第一步。在边缘计算场景（如Ascend
 310B）中，资源受到严格限制，如何榨干硬件的每一滴性能，使应用满足实时的时延（Latency）或高并发的吞吐（Throughput）要求，是工程落地的核心挑战。本章将从性能分析的方法论出发，结合具体的视频分析案例，系统讲解从瓶颈定位到极致优化的全过程。
 
-\section{性能优化的全景视角}\label{ux6027ux80fdux4f18ux5316ux7684ux5168ux666fux89c6ux89d2}
+\section{性能优化的全景视角}\label{src-book-chapter7-h1}
 
-\subsection{两个核心指标}\label{ux4e24ux4e2aux6838ux5fc3ux6307ux6807}
+\subsection{两个核心指标}\label{src-book-chapter7-h2}
 
 在谈优化之前，必须明确目标。不同的业务场景对性能的定义不同： *
 \textbf{时延（Latency）}：处理单帧数据所需的时间。对自动驾驶、实时交互类应用至关重要。
@@ -12,8 +12,7 @@
 FPS）}：单位时间内处理的数据量。对视频监控汇聚、离线分析类应用更关键。 *
 \emph{优化目标}：提高并发度，掩盖传输与处理的空隙，满载硬件资源。
 
-\subsection{木桶效应与 Amdahl
-定律}\label{ux6728ux6876ux6548ux5e94ux4e0e-amdahl-ux5b9aux5f8b}
+\subsection{木桶效应与 Amdahl 定律}\label{src-book-chapter7-h3}
 
 AI应用通常是一个异构计算流水线：
 \passthrough{\lstinline!Camera -> Host CPU (预处理) -> PCIe (H2D) -> Device NPU (推理) -> PCIe (D2H) -> Host CPU (后处理)!}
@@ -26,14 +25,12 @@ AI应用通常是一个异构计算流水线：
   \textbf{优化策略}：\textbf{先找瓶颈，再做优化}。盲目优化非瓶颈模块（比如把5ms的推理优化到4ms）对整体性能提升微乎其微。
 \end{itemize}
 
-\section{照妖镜：Profiling
-性能分析}\label{ux7167ux5996ux955cprofiling-ux6027ux80fdux5206ux6790}
+\section{照妖镜：Profiling 性能分析}\label{src-book-chapter7-h4}
 
 昇腾提供了强大的性能分析工具
 MSPROF（Profiling），它还能像``X光''一样透视程序运行的内部细节。
 
-\subsection{采集 Profiling
-数据}\label{ux91c7ux96c6-profiling-ux6570ux636e}
+\subsection{采集 Profiling 数据}\label{src-book-chapter7-h5}
 
 通常我们使用命令行工具 \passthrough{\lstinline!msprof!} 进行采集。
 
@@ -50,7 +47,7 @@ msprof --output=./output --application="./main_app"
 msprof --output=./output --application="./main_app" --task-time=on --aic-metrics=PipeUtilization
 \end{lstlisting}
 
-\subsection{关键视图解读}\label{ux5173ux952eux89c6ux56feux89e3ux8bfb}
+\subsection{关键视图解读}\label{src-book-chapter7-h6}
 
 使用 \passthrough{\lstinline!msprof!} 分析生成的 Timeline 视图（通过 VS
 Code 插件或 Ascend Insight 查看）是定位问题的关键。
@@ -87,8 +84,7 @@ Code 插件或 Ascend Insight 查看）是定位问题的关键。
   \end{itemize}
 \end{enumerate}
 
-\section{常见瓶颈与对策
-Checklist}\label{ux5e38ux89c1ux74f6ux9888ux4e0eux5bf9ux7b56-checklist}
+\section{常见瓶颈与对策 Checklist}\label{src-book-chapter7-h7}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -120,9 +116,9 @@ Stream 并发推理2. 优化数据布局 (Layout) \\
 \end{longtable}
 }
 
-\section{核心优化技术详解}\label{ux6838ux5fc3ux4f18ux5316ux6280ux672fux8be6ux89e3}
+\section{核心优化技术详解}\label{src-book-chapter7-h8}
 
-\subsection{AIPP：将预处理下沉到硬件}\label{aippux5c06ux9884ux5904ux7406ux4e0bux6c89ux5230ux786cux4ef6}
+\subsection{AIPP：将预处理下沉到硬件}\label{src-book-chapter7-h9}
 
 \textbf{AIPP (Artificial Intelligence Pre-Processing)}
 是昇腾芯片特有的硬件加速模块，它直接连接在 AI Core 之前，可以在数据进入
@@ -140,7 +136,7 @@ YUV 图片（体积小）到 Device，由 AIPP 转 RGB（体积大），节省 P
 模型转换时通过 \passthrough{\lstinline!--insert\_op\_conf=aipp.cfg!}
 插入。
 
-\subsection{零拷贝（Zero-Copy）内存管理}\label{ux96f6ux62f7ux8d1dzero-copyux5185ux5b58ux7ba1ux7406}
+\subsection{零拷贝（Zero-Copy）内存管理}\label{src-book-chapter7-h10}
 
 传统流程：\passthrough{\lstinline!Host malloc -> Read Image -> Host 2 Device Copy -> Device Infer!}。
 零拷贝流程：直接申请 \textbf{Device侧可访问的 Host 内存}（或是 Host
@@ -157,20 +153,215 @@ aclrtMalloc(&devBuffer, size, ACL_MEM_MALLOC_HUGE_FIRST);
 Input Header 内存中，可以消除中间的显存拷贝。
 
 \subsection{多级流水线（Multi-Stage
-Pipeline）}\label{ux591aux7ea7ux6d41ux6c34ux7ebfmulti-stage-pipeline}
+Pipeline）}\label{src-book-chapter7-h11}
 
 简单串行模式：\passthrough{\lstinline!Pre -> Infer -> Post!}，总耗时
 \(T = t1 + t2 + t3\)。 流水线模式：三个线程分别处理 Pre, Infer,
 Post，通过队列传递数据。
 理论吞吐量取决于最慢的阶段：\(FPS = 1 / \max(t1, t2, t3)\)。
 
-\section{实战演练：车辆检测系统的极致优化之路}\label{ux5b9eux6218ux6f14ux7ec3ux8f66ux8f86ux68c0ux6d4bux7cfbux7edfux7684ux6781ux81f4ux4f18ux5316ux4e4bux8def}
+\section{自定义算子的编译、部署与单元测试}\label{src-book-chapter7-h12}
+
+完成算子开发后，还需要经历编译、部署和测试三个工程化环节，算子才能真正投入生产使用。
+
+\subsection{使用 ccec 编译算子}\label{src-book-chapter7-h13}
+
+\textbf{ccec}（CCE Compiler）是 Ascend C 算子的专属编译器。它基于 LLVM
+框架，将 C++ Kernel 代码编译为昇腾 AI Core 可执行的机器码。
+
+基本编译命令：
+
+\begin{lstlisting}[language=bash]
+ccec -std=c++17 --aicore -o libadd_custom.so add_custom.cpp
+\end{lstlisting}
+
+常用的 ccec 编译选项：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+选项 & 含义 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!--aicore!} & 指定编译目标为 AI Core \\
+\passthrough{\lstinline!--cpu\_mode!} & 编译为目标 CPU 的调试版本 \\
+\passthrough{\lstinline!-O2!} / \passthrough{\lstinline!-O3!} &
+优化级别（与 GCC 类似） \\
+\passthrough{\lstinline!-g!} & 生成调试信息 \\
+\passthrough{\lstinline!--cce\_lib\_path!} & 指定 CCE 库文件路径 \\
+\end{longtable}
+}
+
+在工程中推荐使用 CMake
+管理编译过程，以便处理多文件、多编译选项的复杂场景。
+
+\subsection{部署到 CANN 算子库}\label{src-book-chapter7-h14}
+
+编译产物（\passthrough{\lstinline!.so!} 文件）需要部署到 CANN
+的算子搜索路径中，才能被 AscendCL 或其他框架调用。部署步骤如下：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{放置 .so 文件}：将 \passthrough{\lstinline!libadd\_custom.so!}
+  复制到 CANN 的自定义算子目录：
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+cp libadd_custom.so $HOME/Ascend/ascend-toolkit/latest/opp/vendors/customize/op_impl/ai_core/tbe/custom_impl/
+\end{lstlisting}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{1}
+\tightlist
+\item
+  \textbf{配置 .ini 文件}：将算子的 \passthrough{\lstinline!.ini!}
+  信息库文件放置到对应的 op\_info 目录：
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+cp add_custom.ini $HOME/Ascend/ascend-toolkit/latest/opp/vendors/customize/op_info/custom_impl/
+\end{lstlisting}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{2}
+\tightlist
+\item
+  \textbf{刷新算子缓存}：重新加载 CANN 环境以识别新算子。
+\end{enumerate}
+
+部署完成后，其他开发者即可通过 AscendCL API
+直接调用你的自定义算子，如同使用内置算子一样。
+
+\subsection{编写 AscendCL 单元测试}\label{src-book-chapter7-h15}
+
+部署后的算子需要通过单元测试来验证功能正确性。使用 AscendCL API
+编写测试代码的基本流程：
+
+\begin{lstlisting}[language={C++}]
+// 伪代码：AscendCL 算子单元测试
+#include "acl/acl.h"
+
+int main() {
+    // 1. ACL 初始化
+    aclInit(nullptr);
+    aclrtSetDevice(0);
+
+    // 2. 准备输入数据（Host -> Device）
+    float *input_a = ...;  // host 端输入
+    float *input_b = ...;
+    aclrtMalloc(&dev_a, size, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMemcpy(dev_a, size, input_a, size, ACL_MEMCPY_HOST_TO_DEVICE);
+
+    // 3. 加载自定义算子
+    aclopSetModelDir("path/to/op_models");
+
+    // 4. 执行算子
+    aclopExecute(handle, "Add", ...);
+
+    // 5. 取回结果（Device -> Host）并验证
+    aclrtMemcpy(output_host, size, dev_c, size, ACL_MEMCPY_DEVICE_TO_HOST);
+    // ... 与 NumPy 参考结果对比 ...
+
+    // 6. 清理资源
+    aclrtFree(dev_a);
+    aclrtFree(dev_b);
+    aclrtFree(dev_c);
+    aclFinalize();
+}
+\end{lstlisting}
+
+\section{算子级性能优化策略}\label{src-book-chapter7-h16}
+
+应用层的优化（AIPP、零拷贝、流水线等）解决的是''系统各部分如何高效协作''的问题，而算子级的优化解决的是''计算本身如何更快''的问题。本节介绍三个最基础也最有效的算子级优化策略。
+
+\subsection{内存访问优化：让数据离计算单元更近}\label{src-book-chapter7-h17}
+
+昇腾310B
+的存储层级中，越靠近计算单元的内存越快但越小。优化的第一条原则是：\textbf{尽可能让数据驻留在
+Local Memory 中}。
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+策略
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+做法
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+原理
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{减少 Global Memory 访问} & 将可复用的中间结果保留在 UB 中 &
+Global Memory 的访问延迟约为 UB 的 10--20 倍 \\
+\textbf{合并访存（Coalesced Access）} & 让连续线程访问连续内存地址 &
+最大化总线带宽利用率 \\
+\textbf{对齐访问} & 数据首地址对齐到 32B 或 64B & 避免跨 Cache Line
+的额外开销 \\
+\end{longtable}
+}
+
+在 Ascend C 中，开发者通过精确控制 \passthrough{\lstinline!DataCopy!}
+的源地址、数据量和频率来实践这些策略。TBE DSL 则通过
+\passthrough{\lstinline!auto\_schedule!} 的模板来自动优化访存模式。
+
+\subsection{Double
+Buffer：计算与搬运的重叠}\label{src-book-chapter7-h18}
+
+如果一次 CopyIn 需要 100μs，一次 Compute 需要 200μs，串行执行总计需要
+300μs。但如果使用 \textbf{Double Buffer}（双缓冲）技术，可以让 CopyIn 和
+Compute 并行进行：
+
+\begin{lstlisting}
+串行：| CopyIn(tile0) | Compute(tile0) | CopyIn(tile1) | Compute(tile1) |
+并行：| CopyIn(tile0) | CopyIn(tile1)   | CopyIn(tile2)   | ...
+      |               | Compute(tile0)  | Compute(tile1)  | ...
+\end{lstlisting}
+
+Double Buffer 的核心思想是：在 UB 中分配两套缓冲区（A 区和 B 区）。当
+Compute 在处理 A 区的数据时，CopyIn 同时在向 B 区搬运下一个
+Tile。两者在时间上重叠，有效隐藏了数据传输延迟。
+
+在 Ascend C 中，Double Buffer 通过 \passthrough{\lstinline!pipe!}
+的流水线调度 API 来实现。TBE DSL 的
+\passthrough{\lstinline!auto\_schedule!} 在遇到大规模数据时也会自动插入
+Double Buffer 策略。
+
+\subsection{向量化编程：一次处理多个数据}\label{src-book-chapter7-h19}
+
+现代 AI Core 的 Vector Unit 支持 \textbf{SIMD
+向量化运算}------一条指令同时处理多个数据。例如，昇腾的 Vector Unit
+可以一次处理 64 个 float16 或 32 个 float32。
+
+在编码时，应尽量编写可被编译器自动向量化的循环。基本原则： -
+循环体内无复杂分支 - 数组访问模式规整（连续步长） -
+使用标准运算（加减乘除、max/min 等）而非自定义逻辑
+
+\begin{quote}
+\textbf{性能分析的下一步}：以上策略给出了优化的方向，但要精确知道''哪里慢、为什么慢''，需要使用
+msprof 进行系统级的 Profiling 分析。本章第 2 节''照妖镜：Profiling
+性能分析''已详细介绍了 msprof 的采集命令、Timeline 视图解读和 AI Core
+Metrics 分析，读者可结合 Profiling 数据来验证优化效果。
+\end{quote}
+
+\section{实战演练：车辆检测系统的极致优化之路}\label{src-book-chapter7-h20}
 
 我们以一个典型的``路面车辆检测''应用为例，场景为处理 1080P
 视频流，模型为 YOLOv5s (Input 640x640)。
 
 \subsection{阶段一：Baseline (Python +
-OpenCV)}\label{ux9636ux6bb5ux4e00baseline-python-opencv}
+OpenCV)}\label{src-book-chapter7-h21}
 
 \begin{itemize}
 \tightlist
@@ -188,7 +379,7 @@ OpenCV)}\label{ux9636ux6bb5ux4e00baseline-python-opencv}
 \end{itemize}
 
 \subsection{阶段二：引入 AIPP 与 C++ (消除 CPU
-计算瓶颈)}\label{ux9636ux6bb5ux4e8cux5f15ux5165-aipp-ux4e0e-c-ux6d88ux9664-cpu-ux8ba1ux7b97ux74f6ux9888}
+计算瓶颈)}\label{src-book-chapter7-h22}
 
 \begin{itemize}
 \tightlist
@@ -215,7 +406,7 @@ OpenCV)}\label{ux9636ux6bb5ux4e00baseline-python-opencv}
 \end{itemize}
 
 \subsection{6.5.3 阶段三：多线程 Pipeline
-(掩盖时延)}\label{ux9636ux6bb5ux4e09ux591aux7ebfux7a0b-pipeline-ux63a9ux76d6ux65f6ux5ef6}
+(掩盖时延)}\label{src-book-chapter7-h23}
 
 \begin{itemize}
 \tightlist
@@ -242,7 +433,7 @@ OpenCV)}\label{ux9636ux6bb5ux4e00baseline-python-opencv}
 \end{itemize}
 
 \subsection{6.5.4 阶段四：Batching 与 异步推理
-(极致吞吐)}\label{ux9636ux6bb5ux56dbbatching-ux4e0e-ux5f02ux6b65ux63a8ux7406-ux6781ux81f4ux541eux5410}
+(极致吞吐)}\label{src-book-chapter7-h24}
 
 \begin{itemize}
 \tightlist
@@ -268,15 +459,15 @@ OpenCV)}\label{ux9636ux6bb5ux4e00baseline-python-opencv}
   \textbf{结论}：相比 Baseline 提升近 5 倍，且 CPU 占用率极低。
 \end{itemize}
 
-\section{章节要点与练习}\label{ux7ae0ux8282ux8981ux70b9ux4e0eux7ec3ux4e60}
+\section{章节要点与练习}\label{src-book-chapter7-h25}
 
-\subsection{总结}\label{ux603bux7ed3}
+\subsection{总结}\label{src-book-chapter7-h26}
 
 性能优化是一个系统工程，而非单一的改代码。 1. \textbf{AMP (Analyze, Map,
 Parallel)}：分析瓶颈，映射到硬件单元，最大化并行度。 2. \textbf{310B
 黄金法则}：少用 CPU 做像素处理，用好 AIPP/DVPP，跑满 NPU 流水线。
 
-\subsection{练习任务}\label{ux7ec3ux4e60ux4efbux52a1}
+\subsection{练习任务}\label{src-book-chapter7-h27}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}

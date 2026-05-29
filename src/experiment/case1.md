@@ -1,6 +1,6 @@
 # 案例 1：基于 RetinaFace 与 ArcFace 的智能人脸识别考勤系统
 
-## 教程定位
+## 教程定位 {#src-experiment-case1-h1}
 
 本案例旨在利用昇腾 310B 的强大 AI 算力，构建一个功能完整、响应迅速的智能人脸识别打卡系统。系统通过 USB 摄像头实时捕捉视频流，检测画面中的人脸，并与预先注册的员工人脸数据库进行比对，完成身份验证和自动记录考勤。
 
@@ -21,7 +21,7 @@
 * 使用 **SQLite** 进行本地数据持久化。
 * 使用 **Python Flask** 提供现代化的 Web 交互界面。
 
-## 实验硬件与运行条件
+## 实验硬件与运行条件 {#src-experiment-case1-h2}
 
 为了完成实时人脸识别与考勤实验，建议准备如下硬件条件：
 
@@ -35,7 +35,7 @@
 * **本地模式**：直接运行 `python3 app.py`，后台线程会自动处理本地 USB 摄像头。
 * **Web 模式**：通过浏览器访问 `http://<开发板IP>:5000` 进行管理和手动打卡。
 
-## 本案例支持的模型结构
+## 本案例支持的模型结构 {#src-experiment-case1-h3}
 
 当前仓库里的模型基于 InsightFace 提供的轻量化版本，经过 `atc` 工具转换为 `.om` 格式：
 
@@ -48,7 +48,7 @@
 
 这两类模型共同构成了“检测-对齐-识别”的经典人脸分析链路。
 
-## 人脸识别系统的核心流水线
+## 人脸识别系统的核心流水线 {#src-experiment-case1-h4}
 
 人脸识别不仅仅是“看一眼”，它包含了一系列精细的图像处理步骤：
 
@@ -57,17 +57,17 @@
 3. **特征提取 (Feature Extraction)**：将图像编码为一个具有高度代表性的固定长度向量（512 维）。
 4. **比对 (Matching)**：计算当前向量与数据库中已知向量的相似度（如余弦相似度）。
 
-## RetinaFace 深度剖析：从“看见”到“看懂”人脸
+## RetinaFace 深度剖析：从“看见”到“看懂”人脸 {#src-experiment-case1-h5}
 
 RetinaFace 不仅仅是一个检测人脸框的工具，它是一个精密的、为解决现实世界中各种复杂人脸检测问题而设计的深度学习模型。要理解它的价值，我们需要先了解它的历史背景和设计哲学。
 
-### RetinaFace 的发展历史与作者信息
+### RetinaFace 的发展历史与作者信息 {#src-experiment-case1-h6}
 
 RetinaFace 模型由 **InsightFace** 团队发布，该团队在人脸识别领域享有盛誉，其开源的 `insightface` 代码库已成为学术界和工业界广泛使用的基准。RetinaFace 的提出，正是在单阶段目标检测器（如 SSD、YOLO）性能大幅提升，但通用检测器在人脸这种特定任务上仍有优化空间的背景下诞生的。
 
 它的设计目标非常明确：创建一个在速度和精度上都达到顶尖水平，并且能同时处理人脸框、关键点乃至 3D 姿态的**一体化解决方案**。它借鉴了通用目标检测器 **RetinaNet** 的核心思想，并针对人脸任务的特性进行了深度定制。
 
-### RetinaFace 到底在解决什么问题？
+### RetinaFace 到底在解决什么问题？ {#src-experiment-case1-h7}
 
 在真实场景中，“找到一张脸”远比想象的复杂。RetinaFace 主要致力于解决以下几个核心挑战：
 
@@ -76,11 +76,11 @@ RetinaFace 模型由 **InsightFace** 团队发布，该团队在人脸识别领�
 3.  **密集场景**：在人群中，大量人脸紧密排列，容易产生漏检或错误的合并检测。
 4.  **实时性要求**：在边缘设备上，检测速度必须足够快，才能支撑实时应用。
 
-### 核心技术解析
+### 核心技术解析 {#src-experiment-case1-h8}
 
 RetinaFace 的强大性能源于其对多个关键技术的巧妙融合。
 
-#### 1. 单阶段检测器与多任务学习
+#### 1. 单阶段检测器与多任务学习 {#src-experiment-case1-h9}
 
 与需要先生成候选区域再进行分类的两阶段检测器（如 Faster R-CNN）不同，RetinaFace 是一个**单阶段（One-Stage）检测器**。它直接在特征图上预测目标的位置和类别，速度更快。更重要的是，它采用**多任务学习（Multi-task Learning）**框架，让一个网络同时完成多项任务：
 
@@ -90,21 +90,21 @@ RetinaFace 的强大性能源于其对多个关键技术的巧妙融合。
 
 这种设计不仅提升了效率，而且关键点定位任务的加入，反过来为模型提供了更丰富的监督信息，有助于更准确地识别人脸区域，尤其是对于部分遮挡的人脸。
 
-#### 2. 特征金字塔网络 (FPN)
+#### 2. 特征金字塔网络 (FPN) {#src-experiment-case1-h10}
 
 为了解决尺度变化问题，RetinaFace 采用了**特征金字塔网络（Feature Pyramid Network, FPN）**。FPN 的思想是“高层特征看语义，底层特征看细节”。它通过自顶向下的路径和横向连接，将高层特征图中丰富的语义信息与底层特征图中高分辨率的细节信息相融合，从而在多个不同尺度的特征图上进行预测。这意味着，大的特征图负责检测小人脸，小的特征图负责检测大人脸，实现了对各种尺寸人脸的“全覆盖”。
 
-#### 3. 上下文感知模块 (SSH)
+#### 3. 上下文感知模块 (SSH) {#src-experiment-case1-h11}
 
 为了进一步增强特征的表达能力，RetinaFace 在 FPN 的每个预测层后都引入了 **SSH（Single Stage Headless）模块**。SSH 模块通过并行的、具有不同大小卷积核的通路来提取特征，并将它们拼接在一起。这就像给模型装上了“广角镜”和“长焦镜”，使其能够同时关注一个区域的局部细节和它周围的上下文信息，从而在复杂背景或人脸密集的情况下做出更鲁棒的判断。
 
-#### 4. 焦点损失 (Focal Loss) 的启示
+#### 4. 焦点损失 (Focal Loss) 的启示 {#src-experiment-case1-h12}
 
 虽然 RetinaFace 的论文没有将焦点损失（Focal Loss）作为其核心创新点，但这个概念对于理解所有现代单阶段检测器至关重要。在人脸检测中，一张图像里绝大部分区域都是背景（负样本），只有极少数区域是人脸（正样本）。这种**正负样本的极端不平衡**会导致模型训练时被大量简单的背景样本主导，而忽略了对困难人脸样本的学习。
 
 Focal Loss 通过一个动态缩放因子，降低了大量简单负样本在损失计算中的权重，使得模型能够更专注于学习那些难以区分的正样本和困难负样本。RetinaFace 正是受益于这种思想，才能在复杂的背景中精准地“聚焦”于人脸。
 
-### 在本案例中的应用
+### 在本案例中的应用 {#src-experiment-case1-h13}
 
 在我们的智能考勤系统中，RetinaFace 作为整个识别流程的“眼睛”，其作用至关重要：
 
@@ -112,11 +112,11 @@ Focal Loss 通过一个动态缩放因子，降低了大量简单负样本在损
 *   **保证实时性能**：通过在昇腾 310B NPU 上的高效推理，它确保了系统能够对视频流进行逐帧处理而不会出现明显卡顿，这是实现“自动打卡”功能的基础。
 *   **鲁棒性保障**：得益于其先进的设计，即使在光线不佳、人员走动或部分遮挡的情况下，系统依然能维持较高的检测成功率。
 
-## ArcFace 深度剖析：让特征在角度空间中更具区分度
+## ArcFace 深度剖析：让特征在角度空间中更具区分度 {#src-experiment-case1-h14}
 
 ArcFace 是人脸识别流程的“大脑”，负责将检测到的人脸图像转化为一个高度浓缩且易于比较的 512 维特征向量（Embedding）。它的成功并非偶然，而是建立在人脸识别损失函数长期演进的基础之上。
 
-### 从 Softmax 到度量学习：损失函数的演进之路
+### 从 Softmax 到度量学习：损失函数的演进之路 {#src-experiment-case1-h15}
 
 在深度学习的早期，人脸识别通常被当作一个多分类问题来处理。例如，在一个包含 1000 个人的数据集中，模型会尝试将输入的人脸图像正确分类到这 1000 个类别中的某一个。这个过程通常使用 **Softmax Loss**。
 
@@ -124,15 +124,15 @@ ArcFace 是人脸识别流程的“大脑”，负责将检测到的人脸图像
 
 为了解决这个问题，研究者们开始探索**度量学习（Metric Learning）**的思想，其核心目标是直接在特征空间中优化距离：最大化类间距离，最小化类内距离。
 
-#### 1. SphereFace (A-Softmax)
+#### 1. SphereFace (A-Softmax) {#src-experiment-case1-h16}
 
 SphereFace 首次提出，在计算角度时应该引入一个**角度间隔（Angular Margin）**。它将传统的 Softmax 中的权重与特征的点积 $W^T x$ 修改为 $\|W\|\|x\|\cos(\theta)$，并通过对权重 $W$ 的归一化，将特征学习过程约束在一个单位超球面上。然后，它在目标类别的角度 $\theta_y$ 上乘以一个整数 $m$，变成了 $\cos(m\theta_y)$。这样一来，分类的决策边界从简单的线性边界变成了角度边界，强制模型学习到角度区分度更强的特征。
 
-#### 2. CosFace (LMCL)
+#### 2. CosFace (LMCL) {#src-experiment-case1-h17}
 
 CosFace 认为 SphereFace 的乘性间隔 $m\theta_y$ 会导致训练不稳定。因此，它提出了一种更简单、更稳定的**加性余弦间隔（Additive Cosine Margin）**。它直接在余弦空间中减去一个常数 $m$，将决策边界从 $\cos(\theta_y)$ 变为 $\cos(\theta_y) - m$。这种方式在实现上更简单，训练过程也更平滑。
 
-### ArcFace 的核心创新：加性角度间隔
+### ArcFace 的核心创新：加性角度间隔 {#src-experiment-case1-h18}
 
 ArcFace (Additive Angular Margin Loss) 结合了前两者的优点，并做出了关键性的改进。它的作者同样来自 **InsightFace** 团队，这保证了从检测到识别的算法思想一脉相承。
 
@@ -150,7 +150,7 @@ ArcFace 认为，无论是在余弦空间还是角度空间进行乘性操作，
 
 上图直观地展示了不同损失函数下的决策边界。可以看到，ArcFace 的决策边界（绿色虚线）相比其他损失函数，对类内样本的约束更强，类间间隔也更大。
 
-### 在本案例中的应用
+### 在本案例中的应用 {#src-experiment-case1-h19}
 
 在本考勤系统中，ArcFace 的作用是赋予系统“认识”人的能力：
 
@@ -158,11 +158,11 @@ ArcFace 认为，无论是在余弦空间还是角度空间进行乘性操作，
 2.  **实现精准比对**：当一个新的人脸被检测到后，系统同样会提取其特征向量。通过计算这个新向量与数据库中所有已注册向量的**余弦相似度**，我们可以快速找到最相似的用户。
 3.  **高可靠性**：由于 ArcFace 学习到的特征具有极强的类内紧凑性和类间分离性，因此即使在光照变化、表情变化甚至轻微遮挡的情况下，识别的准确率和召回率依然非常高，误识率极低。这对于一个严肃的考勤应用至关重要。
 
-## 数据存储与检索深度剖析：边缘场景下的智慧与权衡
+## 数据存储与检索深度剖析：边缘场景下的智慧与权衡 {#src-experiment-case1-h20}
 
 如果说模型是系统的大脑，那么数据存储就是系统的记忆。本案例采用 SQLite 存储用户特征和考勤记录，这个选择背后体现了边缘计算场景下的典型工程权衡。
 
-### 为什么选择 SQLite？
+### 为什么选择 SQLite？ {#src-experiment-case1-h21}
 
 在动辄使用 MySQL、PostgreSQL 或云数据库的时代，选择 SQLite 似乎有些“复古”。但在昇腾 310B 这样的边缘设备上，它却是最合适的选择之一：
 
@@ -171,7 +171,7 @@ ArcFace 认为，无论是在余弦空间还是角度空间进行乘性操作，
 3.  **事务支持**：尽管轻量，SQLite 依然提供了完整的 ACID 事务支持，保证了数据操作的原子性、一致性、隔离性和持久性，确保了考勤数据不会因为意外中断而损坏。
 4.  **Python 内置支持**：Python 的标准库 `sqlite3` 直接提供了对 SQLite 的支持，无需安装任何额外的驱动包，进一步简化了开发。
 
-### 特征向量的存储：BLOB 格式的优与劣
+### 特征向量的存储：BLOB 格式的优与劣 {#src-experiment-case1-h22}
 
 本案例将 512 维的人脸特征向量（一个包含 512 个浮点数的 `numpy` 数组）直接转换为二进制数据，并存储在数据库的 **BLOB (Binary Large Object)** 类型字段中。
 
@@ -195,7 +195,7 @@ def add_user(name, embedding):
 
 *   **数据库“不理解”数据**：对于 SQLite 来说，BLOB 字段里存的只是一堆无意义的二进制数据。它无法理解这是一个 512 维的向量，因此也无法在数据库层面进行任何向量相关的运算，比如计算距离或相似度。
 
-### 当前的检索方案：简单遍历
+### 当前的检索方案：简单遍历 {#src-experiment-case1-h23}
 
 正是由于数据库无法直接操作向量，本案例的识别流程采用了最简单直接的**暴力检索（Brute-force Search）**方案：
 
@@ -206,7 +206,7 @@ def add_user(name, embedding):
 
 这个方案在用户规模较小（如几十人或几百人）时是完全可行的，因为现代 CPU 进行几百次 512 维向量的点积运算耗时极短，远低于视频帧率的间隔。
 
-### 性能瓶颈与未来展望
+### 性能瓶颈与未来展望 {#src-experiment-case1-h24}
 
 然而，当用户规模从几百人扩大到几千人、几万人甚至更多时，上述暴力检索方案的性能瓶颈会立刻显现。每次识别都需要遍历整个数据库，计算量会随着用户数量线性增长，最终导致识别延迟变得无法接受。
 
@@ -219,11 +219,11 @@ def add_user(name, embedding):
 
 因此，本案例采用的 SQLite + BLOB + 暴力检索的方案，是在边缘计算资源受限、用户规模可控的特定场景下的最佳实践。它体现了“**简单、有效、满足当前需求**”的工程设计原则，同时也为未来的系统扩展留下了清晰的演进路径。
 
-## PyACL 深度剖析：与昇腾 NPU 对话的艺术
+## PyACL 深度剖析：与昇腾 NPU 对话的艺术 {#src-experiment-case1-h25}
 
 `ascend_inference.py` 是本案例与昇腾 NPU 硬件沟通的桥梁。它通过 `pyacl` 库，将上层的 Python 指令转化为底层硬件可以理解的指令。理解其工作流程，是掌握昇腾平台开发的关键。
 
-### 什么是 ACL？为什么需要它？
+### 什么是 ACL？为什么需要它？ {#src-experiment-case1-h26}
 
 在深入代码之前，我们先理解一个基本问题：为什么不能直接用 Python 调用 NPU？
 
@@ -237,7 +237,7 @@ ACL 提供了一套标准化的 API 接口，让我们可以用相对高级的�
 
 可以把 ACL 理解为 NPU 的”操作系统接口”，就像我们通过操作系统 API 来使用 CPU 和内存一样。
 
-### 昇腾计算语言 (ACL) 的标准工作流
+### 昇腾计算语言 (ACL) 的标准工作流 {#src-experiment-case1-h27}
 
 在昇腾平台上进行一次完整的模型推理，通常遵循一个非常标准且结构化的流程。这个流程可以被概括为”初始化-执行-释放”三大阶段。
 
@@ -245,7 +245,7 @@ ACL 提供了一套标准化的 API 接口，让我们可以用相对高级的�
 
 <!-- ![ACL Workflow](img/acl_workflow.png){#fig:acl_wf width=80% .center} -->
 
-#### 阶段一：资源初始化（进入餐厅，找座位）
+#### 阶段一：资源初始化（进入餐厅，找座位） {#src-experiment-case1-h28}
 
 1.  **ACL 初始化 (`acl.init`)**: 这是与硬件沟通的第一步。它负责加载底层驱动，建立与硬件的连接。一个进程中只需调用一次。
 
@@ -278,7 +278,7 @@ class AscendSystem:
 
     *比喻*：这就像餐厅的服务员，你点的菜会按顺序送到厨房，厨房按顺序做菜。
 
-#### 阶段二：模型执行（点菜、上菜、吃饭）
+#### 阶段二：模型执行（点菜、上菜、吃饭） {#src-experiment-case1-h29}
 
 3.  **模型加载 (`acl.mdl.load_from_file`)**: 将编译好的 `.om` 离线模型从硬盘加载到 NPU 的内存中。加载后，我们会得到一个模型 ID，后续所有操作都通过这个 ID 来引用该模型。
 
@@ -366,7 +366,7 @@ class AscendSystem:
         return outputs
     ```
 
-#### 阶段三：资源释放（吃完饭，结账离开）
+#### 阶段三：资源释放（吃完饭，结账离开） {#src-experiment-case1-h30}
 
 7.  **资源清理**: 为了避免内存泄漏，所有申请的资源在使用完毕后都必须被显式释放。这包括模型、Device 内存、上下文、流等。最后调用 `acl.finalize` 来断开与硬件的连接。
 
@@ -401,7 +401,7 @@ class AscendSystem:
         acl.finalize()  # 最后关闭 ACL
     ```
 
-### 为什么需要区分 Host 和 Device？
+### 为什么需要区分 Host 和 Device？ {#src-experiment-case1-h31}
 
 对于初学者来说，最困惑的莫过于 Host 和 Device 的概念。让我们用一个更生活化的比喻来理解：
 
@@ -430,7 +430,7 @@ CPU 和 NPU 是两个独立的计算单元，它们之间的内存地址空间**
 这是硬件架构决定的。NPU 为了达到极高的计算性能，使用了专门优化的内存系统（高带宽、低延迟），这套内存系统与 CPU 的内存系统是物理隔离的。虽然这增加了编程的复杂度（需要手动拷贝数据），但换来了数十倍甚至上百倍的计算性能提升。
 
 
-### 从 ONNX 到 OM：模型转换的必要性
+### 从 ONNX 到 OM：模型转换的必要性 {#src-experiment-case1-h32}
 
 你可能会好奇：为什么不能直接用原始的 ONNX 模型，而要转换成 `.om` 格式？
 
@@ -464,7 +464,7 @@ atc --model=det_500m.onnx \
 - `--input_shape`: 指定输入张量的形状
 - `--soc_version`: 目标硬件型号
 
-## Anchor-based 检测深度解析：RetinaFace 如何"看见"人脸
+## Anchor-based 检测深度解析：RetinaFace 如何"看见"人脸 {#src-experiment-case1-h33}
 
 在 `ascend_inference.py` 中，有一段看起来很神秘的代码：
 
@@ -484,7 +484,7 @@ def generate_anchors(self, height, width):
 
 这段代码在生成 **Anchors（锚点）**。要理解它，我们需要先理解目标检测的核心挑战。
 
-### 目标检测的根本问题
+### 目标检测的根本问题 {#src-experiment-case1-h34}
 
 假设你要在一张 640×640 的图片中找到所有人脸。最直接的想法是什么？
 
@@ -494,7 +494,7 @@ def generate_anchors(self, height, width):
 1. 人脸大小不一样，有的 50×50，有的 200×200，一个窗口怎么够？
 2. 即使用多个不同大小的窗口，也需要滑动成千上万次，太慢了！
 
-### Anchor-based 方法的智慧
+### Anchor-based 方法的智慧 {#src-experiment-case1-h35}
 
 Anchor-based 检测器（如 RetinaFace、YOLO、Faster R-CNN）的核心思想是：
 
@@ -502,7 +502,7 @@ Anchor-based 检测器（如 RetinaFace、YOLO、Faster R-CNN）的核心思想�
 
 让我们一步步理解：
 
-#### 第 1 步：特征图的概念
+#### 第 1 步：特征图的概念 {#src-experiment-case1-h36}
 
 当图像经过卷积神经网络后，会得到多个不同尺度的**特征图 (Feature Map)**。
 
@@ -514,7 +514,7 @@ Anchor-based 检测器（如 RetinaFace、YOLO、Faster R-CNN）的核心思想�
 
 *比喻*：原图是一张高清照片，特征图是这张照片的"缩略图"。浅层特征图是"中等缩略图"，深层特征图是"超小缩略图"。
 
-#### 第 2 步：Anchor 的作用
+#### 第 2 步：Anchor 的作用 {#src-experiment-case1-h37}
 
 在每个特征图的每个位置（网格点），我们预先定义几个**候选框（Anchor）**。
 
@@ -526,7 +526,7 @@ Anchor-based 检测器（如 RetinaFace、YOLO、Faster R-CNN）的核心思想�
 1. 这个相框里有没有人脸？（分类）
 2. 如果有，人脸的实际位置相对于相框偏移了多少？（回归）
 
-#### 第 3 步：多尺度检测
+#### 第 3 步：多尺度检测 {#src-experiment-case1-h38}
 
 为什么要用 stride=8/16/32 三个尺度？
 
@@ -544,7 +544,7 @@ Anchor-based 检测器（如 RetinaFace、YOLO、Faster R-CNN）的核心思想�
 
 *比喻*：这就像用三种不同倍率的望远镜同时观察：低倍镜看远处的大物体，高倍镜看近处的小物体。
 
-### 边界框解码：从偏移量到坐标
+### 边界框解码：从偏移量到坐标 {#src-experiment-case1-h39}
 
 模型输出的不是直接的坐标，而是相对于 anchor 的**偏移量**。
 
@@ -567,7 +567,7 @@ def decode_bbox(self, anchors, raw_outputs):
 
 *比喻*：这就像导航。直接说"目的地在北纬 39.9°，东经 116.4°"（绝对坐标）不如说"从你当前位置往北走 500 米，再往东走 200 米"（相对偏移）更容易理解和执行。
 
-### NMS (非极大值抑制)：去除重复检测
+### NMS (非极大值抑制)：去除重复检测 {#src-experiment-case1-h40}
 
 由于有 16800 个 anchor，同一张人脸可能被多个 anchor 同时检测到。NMS 的作用是保留最好的那个，去掉重复的。
 
@@ -584,7 +584,7 @@ indices = cv2.dnn.NMSBoxes(rects, scores.tolist(), threshold, 0.4)
 
 *比喻*：就像选班长，先选出票数最高的，然后把所有和他"太像"的候选人（重复检测）都去掉，再选下一个。
 
-## 余弦相似度：如何判断"两张脸是同一个人"
+## 余弦相似度：如何判断"两张脸是同一个人" {#src-experiment-case1-h41}
 
 在 `app.py` 和 `camera.py` 中，有这样一段关键代码：
 
@@ -599,7 +599,7 @@ if sim > 0.5:  # 阈值
 
 这段代码在做什么？为什么用余弦相似度而不是欧氏距离？
 
-### 特征向量的几何意义
+### 特征向量的几何意义 {#src-experiment-case1-h42}
 
 ArcFace 模型输出的 512 维特征向量，可以理解为 512 维空间中的一个点（或者说从原点出发的一个箭头）。
 
@@ -607,7 +607,7 @@ ArcFace 模型输出的 512 维特征向量，可以理解为 512 维空间中�
 
 **关键问题**：如何衡量两个点（两张脸）的相似度？
 
-### 方法 1：欧氏距离（不推荐）
+### 方法 1：欧氏距离（不推荐） {#src-experiment-case1-h43}
 
 欧氏距离就是两点之间的直线距离：
 
@@ -624,7 +624,7 @@ $$d = \sqrt{\sum_{i=1}^{512} (a_i - b_i)^2}$$
 
 而 A 和 C 的方向差异巨大，但如果 C 的长度恰好合适，欧氏距离可能反而比 A-B 更小。
 
-### 方法 2：余弦相似度（推荐）
+### 方法 2：余弦相似度（推荐） {#src-experiment-case1-h44}
 
 余弦相似度只关心方向，不关心长度：
 
@@ -639,7 +639,7 @@ $$\text{cosine similarity} = \frac{A \cdot B}{||A|| \times ||B||} = \cos(\theta)
 
 *比喻*：想象两个人站在原点，分别指向不同的方向。余弦相似度衡量的是"他们指的方向有多接近"，而不管"他们的手臂伸得有多长"。
 
-### 为什么 ArcFace 适合用余弦相似度？
+### 为什么 ArcFace 适合用余弦相似度？ {#src-experiment-case1-h45}
 
 还记得 ArcFace 的训练目标吗？它在**超球面**上进行优化，强制所有特征向量的长度（模）都归一化到 1。
 
@@ -665,7 +665,7 @@ similarity = dot_product / (norm_product + 1e-6)  # 加 1e-6 防止除零
 
 这是一个防御性编程技巧。虽然理论上向量的模不会是 0，但由于浮点数精度问题，可能出现极小的值。加上一个极小的数（1e-6 = 0.000001）可以避免除零错误，同时不影响正常计算结果。
 
-### 阈值的选择：0.5 的含义
+### 阈值的选择：0.5 的含义 {#src-experiment-case1-h46}
 
 ```python
 threshold = 0.5
@@ -693,7 +693,7 @@ $$\theta = \arccos(0.5) = 60°$$
 
 *比喻*：阈值就像门禁的严格程度。设得高，只有拿着正确钥匙的人才能进（安全但不便）；设得低，钥匙差不多的也能进（方便但不安全）。
 
-## 多线程与实时性：摄像头后台线程的设计
+## 多线程与实时性：摄像头后台线程的设计 {#src-experiment-case1-h47}
 
 在 `camera.py` 中，有一个精妙的多线程设计：
 
@@ -720,7 +720,7 @@ class VideoCamera:
                 self.process_attendance(frame)
 ```
 
-### 为什么需要多线程？
+### 为什么需要多线程？ {#src-experiment-case1-h48}
 
 **问题场景**：如果在主线程中同步处理摄像头，会发生什么？
 
@@ -738,7 +738,7 @@ while True:
 2. 处理帧要等待
 3. 如果有 Web 请求进来，整个系统都会卡住
 
-### 多线程的优势
+### 多线程的优势 {#src-experiment-case1-h49}
 
 **后台线程**持续做两件事：
 1. 以 30 FPS 的速度读取摄像头帧，保存到 `last_frame`
@@ -751,7 +751,7 @@ while True:
 
 *比喻*：这就像餐厅的分工。后厨（后台线程）持续准备食材、做菜，前台（主线程）负责接待客人、上菜。两者并行工作，互不干扰。
 
-### 线程安全：Lock 的作用
+### 线程安全：Lock 的作用 {#src-experiment-case1-h50}
 
 ```python
 with self.lock:
@@ -774,7 +774,7 @@ with self.lock:
 
 *比喻*：Lock 就像卫生间的门锁。有人在用的时候，其他人必须在外面等。
 
-### daemon 线程的含义
+### daemon 线程的含义 {#src-experiment-case1-h51}
 
 ```python
 self.thread.daemon = True
@@ -790,11 +790,11 @@ self.thread.daemon = True
 
 *比喻*：daemon 线程就像保安。老板（主程序）下班了，保安也就下班了，不会一个人留在公司。
 
-## Flask Web 框架：构建轻量级 API 服务
+## Flask Web 框架：构建轻量级 API 服务 {#src-experiment-case1-h52}
 
 `app.py` 使用 Flask 框架构建了整个 Web 服务。Flask 是 Python 中最流行的轻量级 Web 框架之一。
 
-### 什么是 Web 框架？
+### 什么是 Web 框架？ {#src-experiment-case1-h53}
 
 想象你要开一家餐厅。你可以：
 1. **从零开始**：自己建房子、装修、设计菜单、培训服务员...
@@ -806,9 +806,9 @@ Web 框架就是"连锁餐厅的标准化方案"。它提供了：
 - 响应生成（返回 JSON、HTML）
 - 静态文件服务（CSS、JS、图片）
 
-### Flask 的核心概念
+### Flask 的核心概念 {#src-experiment-case1-h54}
 
-#### 1. 路由 (Route)
+#### 1. 路由 (Route) {#src-experiment-case1-h55}
 
 ```python
 @app.route('/api/users', methods=['GET'])
@@ -825,7 +825,7 @@ def list_users():
 
 *比喻*：路由就像餐厅的菜单。客人点"宫保鸡丁"（URL），服务员就知道要让厨师做哪道菜（调用哪个函数）。
 
-#### 2. HTTP 方法
+#### 2. HTTP 方法 {#src-experiment-case1-h56}
 
 ```python
 @app.route('/api/users', methods=['GET'])   # 查询用户
@@ -845,7 +845,7 @@ def list_users():
 - PUT = 更换书籍（用新版替换旧版）
 - DELETE = 销毁书籍（减少藏书）
 
-#### 3. 请求数据的获取
+#### 3. 请求数据的获取 {#src-experiment-case1-h57}
 
 ```python
 @app.route('/api/users', methods=['POST'])
@@ -861,7 +861,7 @@ Flask 的 `request` 对象提供了访问各种请求数据的接口：
 - `request.json`：JSON 格式的请求体
 - `request.args`：URL 查询参数（如 `?page=1&size=10`）
 
-#### 4. 响应的生成
+#### 4. 响应的生成 {#src-experiment-case1-h58}
 
 ```python
 # 返回 JSON
@@ -877,7 +877,7 @@ return send_from_directory('uploads', filename)
 return Response(gen(camera), mimetype='multipart/x-mixed-replace; boundary=frame')
 ```
 
-### MJPEG 视频流：实时传输的技巧
+### MJPEG 视频流：实时传输的技巧 {#src-experiment-case1-h59}
 
 ```python
 def gen(camera):
@@ -904,7 +904,7 @@ def video_feed():
 1. 逐帧生成数据，而不是一次性生成所有帧（节省内存）
 2. 实现"无限流"，持续发送数据直到连接断开
 
-## 图像预处理：为什么需要归一化？
+## 图像预处理：为什么需要归一化？ {#src-experiment-case1-h60}
 
 在 `ascend_inference.py` 中，有这样的预处理代码：
 
@@ -921,7 +921,7 @@ def preprocess_det(self, image):
 
 每一步都有其深刻的原因。
 
-### 第 1 步：缩放到固定尺寸
+### 第 1 步：缩放到固定尺寸 {#src-experiment-case1-h61}
 
 ```python
 img = cv2.resize(image, (640, 640))
@@ -939,7 +939,7 @@ img = cv2.resize(image, (640, 640))
 
 *比喻*：这就像证件照必须是 2 寸（35×45mm）。不管你的脸是圆是方，都要缩放到这个尺寸。
 
-### 第 2 步：归一化 (Normalization)
+### 第 2 步：归一化 (Normalization) {#src-experiment-case1-h62}
 
 ```python
 img -= 127.5  # 减去均值
@@ -969,7 +969,7 @@ img /= 128.0  # 除以标准差
 
 这是一种常见的归一化方法，称为 **零均值归一化**。
 
-### 第 3 步：通道顺序转换
+### 第 3 步：通道顺序转换 {#src-experiment-case1-h63}
 
 ```python
 img = img.transpose(2, 0, 1)  # HWC -> CHW
@@ -991,7 +991,7 @@ img = img.transpose(2, 0, 1)  # HWC -> CHW
 
 *比喻*：这就像不同国家的日期格式。中国用"年-月-日"，美国用"月-日-年"。虽然信息相同，但格式必须匹配。
 
-### 第 4 步：添加 Batch 维度
+### 第 4 步：添加 Batch 维度 {#src-experiment-case1-h64}
 
 ```python
 img = np.expand_dims(img, axis=0)  # (3, 640, 640) -> (1, 3, 640, 640)
@@ -1007,9 +1007,9 @@ img = np.expand_dims(img, axis=0)  # (3, 640, 640) -> (1, 3, 640, 640)
 
 *比喻*：这就像快递。即使你只寄一件商品，也要装在一个箱子里（batch）。箱子上写着"内含 1 件商品"。
 
-## 性能优化策略：让系统跑得更快
+## 性能优化策略：让系统跑得更快 {#src-experiment-case1-h65}
 
-### 1. 内存复用：避免重复分配
+### 1. 内存复用：避免重复分配 {#src-experiment-case1-h66}
 
 在 `AscendModel` 的设计中，输入输出 buffer 在初始化时就分配好了，之后每次推理都复用这些 buffer。
 
@@ -1042,7 +1042,7 @@ def execute_bad(self, input_data):
 
 *比喻*：这就像餐厅的盘子。好的做法是准备一套盘子，用完洗干净继续用。坏的做法是每次都买新盘子，用完就扔，既浪费又慢。
 
-### 2. 批处理：一次处理多张图片
+### 2. 批处理：一次处理多张图片 {#src-experiment-case1-h67}
 
 虽然本案例是单张处理，但如果需要处理大量图片（如批量注册用户），可以使用批处理：
 
@@ -1067,7 +1067,7 @@ results = model.execute([batch])  # 一次性处理 100 张
 
 *比喻*：这就像坐电梯。等人齐了再走（批处理）比每来一个人就开一次（单张处理）效率高得多。
 
-### 3. 异步推理：让 CPU 和 NPU 并行工作
+### 3. 异步推理：让 CPU 和 NPU 并行工作 {#src-experiment-case1-h68}
 
 当前实现是同步的：
 
@@ -1096,7 +1096,7 @@ prepare_next_data()
 acl.rt.synchronize_stream(stream)
 ```
 
-### 4. 模型量化：用更少的位数表示权重
+### 4. 模型量化：用更少的位数表示权重 {#src-experiment-case1-h69}
 
 当前模型使用 FP32（32 位浮点数）。通过量化，可以转换为 FP16 或 INT8：
 
@@ -1118,9 +1118,9 @@ atc --model=det.onnx \
     --insert_op_conf=quant_config.json
 ```
 
-## 实际部署建议
+## 实际部署建议 {#src-experiment-case1-h70}
 
-### 1. 用户规模与检索策略
+### 1. 用户规模与检索策略 {#src-experiment-case1-h71}
 
 | 用户数量 | 检索方法 | 预期延迟 |
 |---------|---------|---------|
@@ -1129,7 +1129,7 @@ atc --model=det.onnx \
 | 1000-10000 | Faiss (IVF) | < 20ms |
 | > 10000 | Faiss (HNSW) 或向量数据库 | < 50ms |
 
-### 2. 防止重复打卡
+### 2. 防止重复打卡 {#src-experiment-case1-h72}
 
 当前实现每 2 秒就会记录一次考勤。实际应用中应该添加去重逻辑：
 
@@ -1160,7 +1160,7 @@ def add_attendance_if_not_recent(user_id, type, image_path, cooldown=60):
     conn.close()
 ```
 
-### 3. 安全性考虑
+### 3. 安全性考虑 {#src-experiment-case1-h73}
 
 **照片攻击防御**：
 
@@ -1182,7 +1182,7 @@ def encrypt_embedding(embedding, key):
     return encrypted
 ```
 
-### 4. 日志与监控
+### 4. 日志与监控 {#src-experiment-case1-h74}
 
 添加详细的日志记录：
 
@@ -1206,7 +1206,7 @@ logger.warning(f"Failed to detect face in frame")
 logger.error(f"NPU inference failed: {error}")
 ```
 
-### 5. 错误处理与降级策略
+### 5. 错误处理与降级策略 {#src-experiment-case1-h75}
 
 ```python
 def get_face_system():
@@ -1221,9 +1221,9 @@ def get_face_system():
     return face_system
 ```
 
-## 常见问题深度解答
+## 常见问题深度解答 {#src-experiment-case1-h76}
 
-### Q1: 为什么摄像头打开失败？
+### Q1: 为什么摄像头打开失败？ {#src-experiment-case1-h77}
 
 **可能原因**：
 
@@ -1257,7 +1257,7 @@ v4l2-ctl --list-devices
 ffplay /dev/video0
 ```
 
-### Q2: 识别率低怎么办？
+### Q2: 识别率低怎么办？ {#src-experiment-case1-h78}
 
 **诊断步骤**：
 
@@ -1281,7 +1281,7 @@ logger.info(f"Similarity scores: {[f'{s:.3f}' for s in all_similarities]}")
 cv2.imwrite('debug_preprocessed.jpg', img * 128 + 127.5)
 ```
 
-### Q3: 推理速度慢怎么办？
+### Q3: 推理速度慢怎么办？ {#src-experiment-case1-h79}
 
 **性能分析**：
 
@@ -1304,13 +1304,13 @@ def profile_inference():
 ```
 
 **优化方向**：
-- 如果检测慢：降低输入分辨率（640→480）
+- 如果检测慢：降低输入分辨率（640->480）
 - 如果识别慢：检查是否正确使用了 NPU
 - 如果数据传输慢：检查是否有不必要的内存拷贝
 
-## 扩展实验建议
+## 扩展实验建议 {#src-experiment-case1-h80}
 
-### 实验 1：添加情绪识别
+### 实验 1：添加情绪识别 {#src-experiment-case1-h81}
 
 在人脸识别的基础上，添加情绪分类（开心、悲伤、愤怒等）：
 
@@ -1319,7 +1319,7 @@ def profile_inference():
 3. 在检测到人脸后，额外进行情绪推理
 4. 在考勤记录中保存情绪信息
 
-### 实验 2：多摄像头支持
+### 实验 2：多摄像头支持 {#src-experiment-case1-h82}
 
 扩展系统支持多个摄像头（如大门、前台、会议室）：
 
@@ -1331,7 +1331,7 @@ cameras = {
 }
 ```
 
-### 实验 3：移动端集成
+### 实验 3：移动端集成 {#src-experiment-case1-h83}
 
 开发移动 App，通过 HTTP API 与服务器通信：
 
@@ -1339,18 +1339,18 @@ cameras = {
 手机拍照 -> Base64 编码 -> POST /api/clockin -> 返回结果
 ```
 
-## 📱 Web 界面详细介绍
+##  Web 界面详细介绍 {#src-experiment-case1-h84}
 
-## 📱 Web 界面详细介绍
+##  Web 界面详细介绍 {#src-experiment-case1-h85}
 
-### 1. 主页 (/)
+### 1. 主页 (/) {#src-experiment-case1-h86}
 
 系统概览与功能导航入口。提供三个主要功能模块的快速访问：
 - 用户管理：注册新用户、查看用户列表
 - 考勤记录：查看打卡历史、手动打卡
 - 实时监控：查看摄像头实时画面
 
-### 2. 用户管理 (/users_page)
+### 2. 用户管理 (/users_page) {#src-experiment-case1-h87}
 
 **用户注册功能**：
 
@@ -1389,7 +1389,7 @@ fetch('/api/users', {method: 'POST', body: formData});
 - 支持删除操作（同时删除考勤记录）
 - 实时更新
 
-### 3. 考勤记录 (/attendance_page)
+### 3. 考勤记录 (/attendance_page) {#src-experiment-case1-h88}
 
 **自动打卡显示**：
 - 实时展示本地摄像头自动识别的打卡记录
@@ -1422,7 +1422,7 @@ fetch('/api/clockin', {
 });
 ```
 
-### 4. 实时视频流 (/video_feed)
+### 4. 实时视频流 (/video_feed) {#src-experiment-case1-h89}
 
 通过 MJPEG 协议提供实时视频流：
 
@@ -1432,19 +1432,19 @@ fetch('/api/clockin', {
 
 浏览器会持续接收视频帧，形成实时监控效果。
 
-## 系统架构总结
+## 系统架构总结 {#src-experiment-case1-h90}
 
-### 数据流向
+### 数据流向 {#src-experiment-case1-h91}
 
 ```
-摄像头 → OpenCV → 人脸检测(NPU) → 人脸裁剪 → 特征提取(NPU) → 相似度计算(CPU) → 数据库
+摄像头 -> OpenCV -> 人脸检测(NPU) -> 人脸裁剪 -> 特征提取(NPU) -> 相似度计算(CPU) -> 数据库
    ↓                                                                              ↓
 后台线程(30 FPS)                                                            考勤记录
    ↓
-MJPEG 流 → Web 浏览器
+MJPEG 流 -> Web 浏览器
 ```
 
-### 关键技术栈
+### 关键技术栈 {#src-experiment-case1-h92}
 
 | 层次 | 技术 | 作用 |
 |-----|------|------|
@@ -1458,7 +1458,7 @@ MJPEG 流 → Web 浏览器
 | 图像处理 | OpenCV | 摄像头、图像操作 |
 | 前端 | HTML5 + Bootstrap | 用户界面 |
 
-### 性能指标
+### 性能指标 {#src-experiment-case1-h93}
 
 在昇腾 310B 上的典型性能：
 
@@ -1471,9 +1471,9 @@ MJPEG 流 → Web 浏览器
 | 视频流帧率 | 30 FPS |
 | 自动打卡间隔 | 2 秒 |
 
-## 学习路径建议
+## 学习路径建议 {#src-experiment-case1-h94}
 
-### 初学者（第 1-2 周）
+### 初学者（第 1-2 周） {#src-experiment-case1-h95}
 
 1. **理解整体流程**：
    - 运行系统，体验各项功能
@@ -1481,8 +1481,8 @@ MJPEG 流 → Web 浏览器
    - 观察日志输出，了解执行过程
 
 2. **修改简单参数**：
-   - 调整识别阈值（0.5 → 0.6）
-   - 修改自动打卡间隔（2 秒 → 5 秒）
+   - 调整识别阈值（0.5 -> 0.6）
+   - 修改自动打卡间隔（2 秒 -> 5 秒）
    - 更改摄像头分辨率
 
 3. **理解核心概念**：
@@ -1490,7 +1490,7 @@ MJPEG 流 → Web 浏览器
    - 什么是余弦相似度？
    - Host 和 Device 的区别
 
-### 进阶学习（第 3-4 周）
+### 进阶学习（第 3-4 周） {#src-experiment-case1-h96}
 
 1. **深入代码细节**：
    - 阅读 `ascend_inference.py`，理解 ACL 工作流
@@ -1507,7 +1507,7 @@ MJPEG 流 → Web 浏览器
    - 实现考勤数据导出（CSV/Excel）
    - 添加用户权限管理
 
-### 高级应用（第 5-8 周）
+### 高级应用（第 5-8 周） {#src-experiment-case1-h97}
 
 1. **性能优化**：
    - 实现批处理推理
@@ -1525,7 +1525,7 @@ MJPEG 流 → Web 浏览器
    - 配置 Nginx 反向代理
    - 使用 Gunicorn 部署
 
-## 总结
+## 总结 {#src-experiment-case1-h98}
 
 本案例展示了如何利用昇腾 310B NPU 构建一个完整的人脸识别考勤系统。通过学习本案例，你应该掌握：
 
@@ -1543,7 +1543,7 @@ MJPEG 流 → Web 浏览器
 - SQLite 数据库操作
 
 **实践经验**：
-- 模型转换（ONNX → OM）
+- 模型转换（ONNX -> OM）
 - 边缘设备部署
 - 实时视频流处理
 - 性能优化策略

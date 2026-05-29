@@ -2,14 +2,14 @@
 的转换原理、转换工具 ATC 的关键参数、OM 文件组织结构、AscendCL (ACL)
 推理编程模型、精度与性能验证方法以及工程级质量保障流水线建设。
 
-\section{CANN异构计算架构}\label{cannux5f02ux6784ux8ba1ux7b97ux67b6ux6784}
+\section{CANN异构计算架构}\label{src-book-chapter2-h1}
 
 昇腾AI异构计算架构CANN（Compute Architecture for Neural
 Networks）是面向基于达芬奇架构的昇腾处理器的全栈软件体系。 作为承接主流
 AI 框架与通用模型格式、向下对接异构硬件与运行时的中枢层，CANN
 构建了覆盖模型表示、转换编译、图优化、调度执行与可观测分析的端到端技术链路，实现语义一致性、性能最优化与诊断可控性的协同统一，从而系统地释放昇腾处理器的算力与能效潜力。
 
-\subsection{CANN异构计算与人工智能}\label{cannux5f02ux6784ux8ba1ux7b97ux4e0eux4ebaux5de5ux667aux80fd}
+\subsection{CANN异构计算与人工智能}\label{src-book-chapter2-h2}
 
 异构计算与人工智能是相互促进的关系。深度学习训练与推理负载由高密度线性代数（向量/矩阵乘）、张量算子融合链、非规整控制流（条件/循环）、以及高带宽低延迟的数据搬移共同构成，表现出算子类型多样性、数据复用模式差异与访存/算力不均衡等特征。单一通用处理器在算力利用率、内存层次效率与能效上难以同时达到最优。
 针对边缘计算场景的典型 SoC（如 昇腾310B、RK3588、Jetson Nano
@@ -23,7 +23,7 @@ NPU，辅以分层内存与高吞吐互连，依据算子粒度、数据局部�
 CANN
 设计的理论基础：通过抽象统一语义表示与针对性后端优化，将模型图中不同类别算子映射到最合适执行单元，实现性能、能效与可诊断性三者的统筹平衡。
 
-\subsection{CANN与CUDA}\label{cannux4e0ecuda}
+\subsection{CANN与CUDA}\label{src-book-chapter2-h3}
 
 CANN是面向华为昇腾达芬奇架构昇腾处理器，聚焦深度学习推理与训练的算子图优化、编译调度及可观测性闭环，而CUDA（Compute
 Unified Device Architecture）则是针对 NVIDIA GPU
@@ -46,7 +46,7 @@ CANN 则专注于模型图语义，突出图级算子融合、AIPP
 需要开发者具备底层并行划分与核函数开发能力，提供极高的灵活性；CANN
 则通过贴近主流框架的算子开发工具（TBE）与高层接口，降低了入门门槛，但在底层调度上牺牲了一定的自由度。整体而言，二者在抽象层次、硬件耦合与生态策略上形成了各自鲜明的技术路径，反映了其服务对象与应用场景的根本差异。
 
-\subsection{CANN的架构}\label{cannux7684ux67b6ux6784}
+\subsection{CANN的架构}\label{src-book-chapter2-h4}
 
 CANN
 通过提供分层清晰的编程与运行时结构，以覆盖训练与推理的``全场景''、贴近主流框架的``低门槛''以及面向昇腾硬件深度优化的``高性能''为核心特性，支撑用户在昇腾平台上快速构建与部署各类
@@ -89,12 +89,12 @@ Kernel
 Ascend 310B
 等专用加速平台上沉淀出可复用的优化经验与差异化性能优势，不仅在算力利用率与综合成本上形成工程级竞争力，也为大模型与行业应用场景的规模化加速落地提供坚实的基础设施支撑。
 
-\subsection{CANN的快速安装}\label{cannux7684ux5febux901fux5b89ux88c5}
+\subsection{CANN的快速安装}\label{src-book-chapter2-h5}
 
 本节给出 CANN
 软件的极速安装示例。若需更完整的操作指导，请按实际环境选择对应安装场景并参考\href{https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html}{官方说明}，推荐优先使用离线安装。
 
-\subsubsection{安装前准备}\label{ux5b89ux88c5ux524dux51c6ux5907}
+\subsubsection{安装前准备}\label{src-book-chapter2-h6}
 
 \begin{itemize}
 \item
@@ -120,7 +120,7 @@ Ascend 310B
   Ascend-cann-kernels-310b\_8.3.RC1\_linux-aarch64.run。如果实际下载的版本号不同，请将文件名中的版本号替换为对应的实际版本。
 \end{itemize}
 
-\subsubsection{安装命令与依赖说明}\label{ux5b89ux88c5ux547dux4ee4ux4e0eux4f9dux8d56ux8bf4ux660e}
+\subsubsection{安装命令与依赖说明}\label{src-book-chapter2-h7}
 
 安装 CANN 可使用 root 或默认账户 HwHiAiUser。推荐以 root
 安装，不推荐用其他用户进行安装，因为容易发生权限问题。 下面以 root
@@ -179,9 +179,9 @@ pip3 install attrs cython 'numpy>=1.19.2,<=1.24.0' \
   开发板的系统镜像通常已经预置了这些环境变量配置，无需手动设置。
 \end{itemize}
 
-\section{ATC模型转换详解}\label{atcux6a21ux578bux8f6cux6362ux8be6ux89e3}
+\section{ATC模型转换详解}\label{src-book-chapter2-h8}
 
-\subsection{ATC工具介绍}\label{atcux5de5ux5177ux4ecbux7ecd}
+\subsection{ATC工具介绍}\label{src-book-chapter2-h9}
 
 昇腾张量编译器（Ascend Tensor Compiler，ATC）是 CANN
 异构计算体系中的模型转换组件，支持将主流开源框架导出的网络模型以及基于
@@ -203,7 +203,7 @@ AscendCL 接口加载执行，从语义到性能实现端到端落地；另一�
 也支持基于 Ascend IR 的单算子 JSON 直接编译为离线
 OM，用于在设备侧进行算子级功能验证与精度对齐，帮助开发者快速定位与迭代关键算子实现，在图级与算子级两条路径上形成统一的工程化编译能力。
 
-\subsubsection{onnx格式介绍}\label{onnxux683cux5f0fux4ecbux7ecd}
+\subsubsection{onnx格式介绍}\label{src-book-chapter2-h10}
 
 ONNX（Open Neural Network
 Exchange）是一种针对深度学习所设计的开放式文件格式，用于存储训练好的模型。它使得不同的人工智能框架（如PyTorch、TensorFlow、mindspore等）可以采用相同格式存储模型数据并交互。ONNX的规范包含计算图模型的定义，以及内置运算符的定义和标准数据类型。
@@ -258,7 +258,7 @@ Representation, IR），充当了不同框架之间的``通用语''。
 算子清单》，确认模型中使用的ONNX算子版本（Opset
 Version）是否在当前CANN版本的支持范围内。如果遇到不支持的算子，通常的解决路径包括：修改模型结构以替换为等价的支持算子、在ONNX导出阶段进行算子简化（使用\passthrough{\lstinline!onnx-simplifier!}工具）、或者开发自定义算子。
 
-\subsection{ATC工具使用流程}\label{atcux5de5ux5177ux4f7fux7528ux6d41ux7a0b}
+\subsection{ATC工具使用流程}\label{src-book-chapter2-h11}
 
 使用ATC工具进行模型转换的使用流程如下图所示：
 
@@ -277,7 +277,7 @@ AIPP（Artificial Intelligence
 Pre-Processing）配置。AIPP是昇腾处理器内置的硬件级图像预处理模块，负责将上游（如
 DVPP）输出的对齐后YUV420SP图像在设备侧完成色域转换（如YUV图像格式转换为RGB或者BGR图像格式）、归一化（减均值/乘系数/尺度放大）与抠图（在指定起始点裁剪到模型输入尺寸），从而把原始图像规范化为模型所需的输入格式与数值范围。由于昇腾310B在推理及训练中常以DVPP输出YUV420SP图片格式，这种图像格式是有损图像颜色编码格式，常用为YUV420SP\_UV、YUV420SP\_VU两种格式，不直接提供RGB图片。AIPP能将YUV420SP类型图像无缝转化为模型期望的RGB/BGR图像格式，并在同一数据流中完成裁剪与数值处理，避免将预处理放在CPU侧导致的多次拷贝与额外时延，提升端到端吞吐与能效。
 
-\subsubsection{模型转换-以ResNet50为例}\label{ux6a21ux578bux8f6cux6362-ux4ee5resnet50ux4e3aux4f8b}
+\subsubsection{模型转换-以ResNet50为例}\label{src-book-chapter2-h12}
 
 ResNet-50 由多级残差单元堆叠形成 50
 层卷积网络，通过跨层跳连缓解深层退化与梯度消失，使其在 ImageNet
@@ -424,7 +424,7 @@ ATC start working now, please wait for a moment.
 ATC run success, welcome to the next use.
 \end{lstlisting}
 
-\subsubsection{注意事项}\label{ux6ce8ux610fux4e8bux9879}
+\subsubsection{注意事项}\label{src-book-chapter2-h13}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -512,7 +512,7 @@ npu-smi 23.0.0  Version: 23.0.0
   ATC 参数或模型图结构，以复现并提升性能优化效果。
 \end{enumerate}
 
-\subsection{模型推理工具msame工具概览}\label{ux6a21ux578bux63a8ux7406ux5de5ux5177msameux5de5ux5177ux6982ux89c8}
+\subsection{模型推理工具msame工具概览}\label{src-book-chapter2-h14}
 
 在完成 ATC 转换得到 \passthrough{\lstinline!.om!}
 模型后，最快验证部署链路是否畅通的方式就是调用华为昇腾提供的模型推理工具
@@ -529,7 +529,7 @@ TXT 或 BIN 格式导出结果，以便于人工审查或自动化脚本解析�
 CANN Runtime 的环境中，msame
 会自动完成与设备的上下文绑定、内存申请和任务提交，将推理过程抽象成简单的命令行参数；这不仅适用于初步确认模型可运行，也可用于小批量性能评估、数据一致性校验以及在定位性能或精度问题时的基准对照，从而在模型转换与实际业务部署之间搭建起轻量而高效的桥梁。
 
-\subsubsection{msame工具的获取与构建}\label{msameux5de5ux5177ux7684ux83b7ux53d6ux4e0eux6784ux5efa}
+\subsubsection{msame工具的获取与构建}\label{src-book-chapter2-h15}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -636,7 +636,7 @@ export NPU_HOST_LIB=/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub
   Shape，需同步设置合适的输出内存大小以确保推理顺利进行。
 \end{itemize}
 
-\subsubsection{图片预处理}\label{ux56feux7247ux9884ux5904ux7406}
+\subsubsection{图片预处理}\label{src-book-chapter2-h16}
 
 由于 msame 工具不具备图像预处理能力，输入必须是已转换好的
 \passthrough{\lstinline!.bin!}
@@ -862,13 +862,13 @@ Decoded out/20251213_11_6_52_564388/resnet50_output_0.bin (Top-5)
  5: class=164  prob=0.000334 label=bluetick
 \end{lstlisting}
 
-\section{章节小结}\label{ux7ae0ux8282ux5c0fux7ed3}
+\section{章节小结}\label{src-book-chapter2-h17}
 
 本章从宏观分层、转换编译、OM 结构、ACL
 编程、性能与精度保障、调试工具、自动化流水线到动态 Shape
 与安全实践建立了闭环。掌握这些内容后即可进入后续``边缘系统架构与部署实践''章节，扩展到多模型、多进程及系统级优化。
 
-\section{实践任务}\label{ux5b9eux8df5ux4efbux52a1}
+\section{实践任务}\label{src-book-chapter2-h18}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}

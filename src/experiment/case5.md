@@ -1,6 +1,6 @@
 # 案例5：智能数据采集仪
 
-## 1. 项目简介
+## 1. 项目简介 {#src-experiment-case5-h1}
 
 本项目基于昇腾 310B 平台，结合 **STM32 嵌入式采集**与**FPGA 高速信号
 处理**，构建一个面向多台小电机的智能数据采集与状态监测系统。系统同时
@@ -11,7 +11,7 @@
 本案例是全书第一个**显式结合嵌入式硬件（STM32 + FPGA）与昇腾 AI**的
 案例，展示了边缘 AI 系统的完整软硬件协同设计流程。
 
-### 与已有案例的关系
+### 与已有案例的关系 {#src-experiment-case5-h2}
 
 | 案例 | 领域 | NPU 任务 | 方法特点 |
 |------|------|----------|----------|
@@ -19,15 +19,15 @@
 | **案例5** | **多电机数据采集** | **EfficientNet-B0 故障分类** | **STM32+FPGA+NPU 软硬结合** |
 | 案例6 | 智能小车感知 | ResNet18 场景分类 | 经典 CV + 深度学习混合 |
 | 案例7 | 智能相册 | ResNet50 特征提取 | 批量索引 + FAISS 检索 |
-| 案例8 | 手势识别 | MobileNetV3-Small 分类 | 训练 → 转换 → 部署 |
+| 案例8 | 手势识别 | MobileNetV3-Small 分类 | 训练 -> 转换 -> 部署 |
 
 案例5的核心创新在于**数据形态转换**：振动信号本身是一维时序数据，但
 通过梅尔频谱变换转化为二维图像后，就能充分利用 NPU 的图像分类能力——
 这为各种非图像传感器数据的 NPU 处理提供了一种通用范式。
 
-## 2. 内容大纲
+## 2. 内容大纲 {#src-experiment-case5-h3}
 
-### 2.1. 硬件准备
+### 2.1. 硬件准备 {#src-experiment-case5-h4}
 
 本项目需要的硬件分为三个层级：
 
@@ -73,9 +73,9 @@ flowchart TB
     NPU_A --> UI_A
 ```
 
-### 2.2. 软件环境
+### 2.2. 软件环境 {#src-experiment-case5-h5}
 
-#### 操作系统与框架
+#### 操作系统与框架 {#src-experiment-case5-h6}
 
 | 层级 | 软件 | 版本 | 用途 |
 |------|------|------|------|
@@ -87,14 +87,14 @@ flowchart TB
 | 串口通信 | pyserial | 3.5+ | STM32 UART 数据读取 |
 | Web | Gradio | 4.0+ | 监测仪表盘界面 |
 
-#### 环境准备
+#### 环境准备 {#src-experiment-case5-h7}
 
 ```bash
 # 一键安装依赖并导出模型
 bash setup.sh
 ```
 
-`setup.sh` 依次完成：系统包安装 → Python 依赖安装 → ONNX 模型导出（如
+`setup.sh` 依次完成：系统包安装 -> Python 依赖安装 -> ONNX 模型导出（如
 有 CANN 则继续转换为 OM）。
 
 如果只想在开发机上导出 ONNX：
@@ -103,26 +103,26 @@ bash setup.sh
 python3 prepare_models.py --onnx-only
 ```
 
-#### STM32 固件开发
+#### STM32 固件开发 {#src-experiment-case5-h8}
 
 STM32 端的固件代码参考 [stm32_protocol.md](https://github.com/zhouxzh/Ascend310/blob/master/samples/case5/stm32_protocol.md)，
 包含完整的传感器接线图、UART 数据帧格式、Arduino 示例代码和
 STM32CubeIDE 代码框架。
 
-#### Python 依赖说明
+#### Python 依赖说明 {#src-experiment-case5-h9}
 
 | 包 | 用途 | 必需？ |
 |:---|:---|:---|
-| `gradio` | Web 仪表盘框架 | ✓ |
-| `torch` + `torchvision` | EfficientNet-B0 模型定义、CPU 推理回退 | ✓ |
-| `opencv-python` | 频谱图渲染、图像缩放 | ✓ |
-| `numpy` | 数值计算、频谱分析 (FFT/mel) | ✓ |
+| `gradio` | Web 仪表盘框架 | 是 |
+| `torch` + `torchvision` | EfficientNet-B0 模型定义、CPU 推理回退 | 是 |
+| `opencv-python` | 频谱图渲染、图像缩放 | 是 |
+| `numpy` | 数值计算、频谱分析 (FFT/mel) | 是 |
 | `pyserial` | STM32 UART 通信 | 仅硬件模式 |
-| `Pillow` | Gradio 图像格式转换 | ✓ |
+| `Pillow` | Gradio 图像格式转换 | 是 |
 | `onnx` | ONNX 模型校验（仅 prepare_models.py） | 仅转换 |
 | `acl` (CANN 自带) | NPU 推理，随 CANN 安装 | 仅推理 |
 
-### 2.3. STM32 低速传感器采集
+### 2.3. STM32 低速传感器采集 {#src-experiment-case5-h10}
 
 STM32 作为传感器汇聚节点，负责采集四台电机的低速参数：
 
@@ -152,7 +152,7 @@ Ascend 310B 端通过 [sensor_reader.py](samples/case5/sensor_reader.py) 的
 不存在），自动切换为仿真模式，生成带随机游走和偶发故障注入的模拟数据，
 方便在没有硬件的情况下开发和测试。
 
-### 2.4. FPGA 高速振动采集
+### 2.4. FPGA 高速振动采集 {#src-experiment-case5-h11}
 
 振动信号的频率范围远超 STM32 的 ADC 采样能力。电机振动特征频率通常在
 几十 Hz 到 2 kHz 之间，按照奈奎斯特定理，采样率需至少 4 kHz。本项目使用
@@ -183,13 +183,13 @@ Ascend 310B 端通过 [vibration_processor.py](samples/case5/vibration_processor
 - 对中不良（0.5% 概率注入）：2×基频峰值异常增大
 - 机械松动（0.5% 概率注入）：多次谐波 + 基底噪声抬高
 
-### 2.5. 振动频谱分析原理
+### 2.5. 振动频谱分析原理 {#src-experiment-case5-h12}
 
 振动信号是一维时间序列，而 NPU 擅长处理二维图像。解决方案是将振动波形
 转换为**梅尔频谱图 (mel-spectrogram)**——一种模仿人耳听觉特性的时频
 表示。
 
-#### 为什么用梅尔频谱图
+#### 为什么用梅尔频谱图 {#src-experiment-case5-h13}
 
 | 方法 | 输入维度 | 适用模型 | 优缺点 |
 |------|----------|----------|--------|
@@ -201,19 +201,19 @@ Ascend 310B 端通过 [vibration_processor.py](samples/case5/vibration_processor
 选择梅尔频谱图的核心理由：**电机故障特征（不平衡、不对中、松动）集中在
 低频区域（1~10 倍转速频率）**，而梅尔尺度在低频区有更高的分辨率。
 
-#### 转换流水线
+#### 转换流水线 {#src-experiment-case5-h14}
 
 ```mermaid
 flowchart TD
     WAVEFORM["振动波形\n4096 点 @ 5kHz\nfloat32 (4096,)"] --> FRAME["分帧\n窗口=256点, 步长=64点\n~60帧"]
     FRAME --> WINDOW["加窗\nHann window\n抑制频谱泄漏"]
-    WINDOW --> FFT["FFT\n每帧 → 129 个频点\n(256/2+1)"]
+    WINDOW --> FFT["FFT\n每帧 -> 129 个频点\n(256/2+1)"]
     FFT --> MEL["Mel 滤波器组\n128 个三角滤波器\n低频密集, 高频稀疏"]
     MEL --> LOG["Log 压缩\nlog(mel_spec + ε)\n模拟人耳对数感知"]
-    LOG --> NORM["归一化\n→ [0, 1]"]
-    NORM --> RESIZE["尺寸调整\n→ 128×128\n中心裁剪/填充"]
-    RESIZE --> CH3["3 通道复制\ngray → RGB\n(128, 128, 3)"]
-    CH3 --> OUTPUT["输出\n→ FaultClassifier\n→ NPU 推理"]
+    LOG --> NORM["归一化\n-> [0, 1]"]
+    NORM --> RESIZE["尺寸调整\n-> 128×128\n中心裁剪/填充"]
+    RESIZE --> CH3["3 通道复制\ngray -> RGB\n(128, 128, 3)"]
+    CH3 --> OUTPUT["输出\n-> FaultClassifier\n-> NPU 推理"]
 ```
 
 全部实现仅依赖 NumPy（无需 librosa/scipy），在
@@ -221,7 +221,7 @@ flowchart TD
 `waveform_to_spectrogram()` 方法中完成。梅尔滤波器组的三角滤波器矩阵在
 `VibrationProcessor` 初始化时预计算一次，后续每次转换仅需矩阵乘法。
 
-#### 不同故障类型的频谱特征
+#### 不同故障类型的频谱特征 {#src-experiment-case5-h15}
 
 | 故障类型 | 频谱表现 | 物理原因 |
 |----------|----------|----------|
@@ -231,7 +231,7 @@ flowchart TD
 | 对中不良 | 2× 转速频率处峰值突出，轴向振动大 | 两轴轴线不共线 |
 | 机械松动 | 多次谐波 (1×~5×) + 基底噪声整体抬高 | 连接刚度不足 |
 
-### 2.6. NPU 故障分类
+### 2.6. NPU 故障分类 {#src-experiment-case5-h16}
 
 将频谱图输入 EfficientNet-B0 进行 5 类故障分类：
 
@@ -243,7 +243,7 @@ flowchart TD
 | 3 | 对中不良 | misalignment | 重新对中安装 |
 | 4 | 机械松动 | looseness | 检查紧固件 |
 
-#### 为什么选择 EfficientNet-B0
+#### 为什么选择 EfficientNet-B0 {#src-experiment-case5-h17}
 
 | 模型 | 参数量 | 310B 推理 | 本书使用情况 |
 |------|--------|-----------|-------------|
@@ -256,30 +256,30 @@ EfficientNet-B0 引入了 MBConv 块和 SE（Squeeze-and-Excitation）注意力
 模块，通过复合缩放策略在深度、宽度、分辨率三个维度上同时优化。5.3M
 参数在 310B 上推理只需约 10ms，完全满足实时监测需求。
 
-#### 分类流程
+#### 分类流程 {#src-experiment-case5-h18}
 
 ```mermaid
 flowchart TD
-    INPUT["梅尔频谱图\n(128, 128, 3) float32 [0,1]"] --> RESIZE["cv2.resize\n→ 224×224"]
+    INPUT["梅尔频谱图\n(128, 128, 3) float32 [0,1]"] --> RESIZE["cv2.resize\n-> 224×224"]
     RESIZE --> NORM["ImageNet 归一化\n(pixel-mean)/std"]
-    NORM --> TENSOR["→ NCHW (1, 3, 224, 224)"]
+    NORM --> TENSOR["-> NCHW (1, 3, 224, 224)"]
     TENSOR --> CHECK{"NPU 可用?"}
 
-    CHECK -->|"✓ OM 模型"| NPU_INFER["NPU 推理\nacl.mdl.execute()"]
-    CHECK -->|"✗ 回退"| CPU_INFER["CPU 推理\ntorch model()"]
+    CHECK -->|"是 OM 模型"| NPU_INFER["NPU 推理\nacl.mdl.execute()"]
+    CHECK -->|"否 回退"| CPU_INFER["CPU 推理\ntorch model()"]
 
-    NPU_INFER --> SOFTMAX["Softmax → 概率分布"]
+    NPU_INFER --> SOFTMAX["Softmax -> 概率分布"]
     CPU_INFER --> SOFTMAX
 
     SOFTMAX --> OUTPUT["输出\n故障类别 + 置信度 + 处理建议"]
 ```
 
-### 2.7. CPU 趋势分析与异常检测
+### 2.7. CPU 趋势分析与异常检测 {#src-experiment-case5-h19}
 
 NPU 负责振动频谱的故障分类，CPU 则负责温度、电流、转速的趋势分析。
 两者互补——频谱检测机械故障，趋势分析检测电气和热异常。
 
-#### 滑动窗口 + 3σ 异常检测
+#### 滑动窗口 + 3σ 异常检测 {#src-experiment-case5-h20}
 
 对每个电机的每个参数（温度、电流、转速），维护一个长度为 30 的滑动窗口。
 当新数据点偏离窗口均值超过 3 倍标准差时，触发异常告警：
@@ -293,7 +293,7 @@ if z_score > 3.0:
 3σ 准则假设传感器数据在稳态下服从正态分布。电机在稳定运行时这个假设
 基本成立；但在启停、变速阶段会产生误报——这是已知局限。
 
-#### 线性趋势预测
+#### 线性趋势预测 {#src-experiment-case5-h21}
 
 对窗口内的历史数据做最小二乘线性回归，预测未来 10 步的值是否超过阈值：
 
@@ -307,7 +307,7 @@ if predicted > TEMP_WARN_THRESHOLD:
 实现在 [anomaly_detector.py](samples/case5/anomaly_detector.py) 的
 `AnomalyDetector` 类中，纯 NumPy 实现，无需任何模型文件。
 
-### 2.8. 模型转换与昇腾部署
+### 2.8. 模型转换与昇腾部署 {#src-experiment-case5-h22}
 
 ```mermaid
 flowchart TD
@@ -321,7 +321,7 @@ flowchart TD
     end
 
     subgraph DEPLOY["3. 推理部署"]
-        APP["app.py → FaultClassifier\n→ AscendModel.execute()"]
+        APP["app.py -> FaultClassifier\n-> AscendModel.execute()"]
     end
 
     TORCH -->|"torch.onnx.export()\nopset=11"| ONNX
@@ -329,7 +329,7 @@ flowchart TD
     OM -->|"acl.mdl.execute()"| APP
 ```
 
-#### 步骤 1：导出 ONNX
+#### 步骤 1：导出 ONNX {#src-experiment-case5-h23}
 
 ```bash
 python3 prepare_models.py --onnx-only
@@ -338,7 +338,7 @@ python3 prepare_models.py --onnx-only
 构建 EfficientNet-B0 模型，将分类头替换为 5 类故障输出，固定输入形状
 `(1, 3, 224, 224)` 导出 ONNX。
 
-#### 步骤 2：ATC 转换
+#### 步骤 2：ATC 转换 {#src-experiment-case5-h24}
 
 ```bash
 # 在昇腾设备上运行
@@ -356,7 +356,7 @@ atc --model=models/efficientnet_b0_fault.onnx \
     --input_shape=input:1,3,224,224
 ```
 
-#### 关于训练权重
+#### 关于训练权重 {#src-experiment-case5-h25}
 
 本项目的 `prepare_models.py` 会生成基线 `.pth` 文件（ImageNet 骨干 +
 随机初始化的 5 类故障分类头）。**基线模型的预测是随机的**——要获得
@@ -377,26 +377,26 @@ atc --model=models/efficientnet_b0_fault.onnx \
 4. 训练完成后将 `.pth` 文件放到 `models/efficientnet_b0_fault.pth`
 5. 运行 `python3 prepare_models.py --force` 重新导出 ONNX/OM
 
-### 2.9. Web 仪表盘
+### 2.9. Web 仪表盘 {#src-experiment-case5-h26}
 
 ```mermaid
 flowchart TD
     subgraph UI["Gradio Blocks 仪表盘"]
-        TAB1["📋 实时监测\n传感数据 + 异常告警"]
-        TAB2["📈 振动频谱分析\n频谱图 + NPU 故障诊断"]
-        TAB3["⚙️ 系统信息\n模型状态 + 阈值 + 日志"]
+        TAB1[" 实时监测\n传感数据 + 异常告警"]
+        TAB2[" 振动频谱分析\n频谱图 + NPU 故障诊断"]
+        TAB3[" 系统信息\n模型状态 + 阈值 + 日志"]
     end
 
     subgraph TAB1_DETAIL["监测 Tab"]
-        REFRESH["🔄 刷新数据"] --> SENSOR["SensorReader.read()"]
+        REFRESH[" 刷新数据"] --> SENSOR["SensorReader.read()"]
         SENSOR --> ANOMALY["AnomalyDetector.update()"]
-        ANOMALY --> LOG["DataLogger.log() → CSV"]
+        ANOMALY --> LOG["DataLogger.log() -> CSV"]
         ANOMALY --> TABLE["DataFrame\n各电机温度/电流/转速"]
         ANOMALY --> ALERT["Markdown\n告警信息"]
     end
 
     subgraph TAB2_DETAIL["频谱 Tab"]
-        SEL["选择电机"] --> VIB["VibrationProcessor\n波形 → 频谱图"]
+        SEL["选择电机"] --> VIB["VibrationProcessor\n波形 -> 频谱图"]
         VIB --> IMG["频谱图可视化"]
         VIB --> CLS["FaultClassifier\nNPU 故障分类"]
         CLS --> FAULT_MD["诊断报告"]
@@ -419,17 +419,17 @@ flowchart TD
 3. **系统信息**：推理后端状态、模型信息、5 类故障列表、数据日志统计、
    硬件接口配置。
 
-#### 双模式运行
+#### 双模式运行 {#src-experiment-case5-h27}
 
 | 模式 | STM32 | FPGA | 适用场景 |
 |------|-------|------|----------|
-| 全硬件模式 | ✓ UART 连接 | ✓ SPI 连接 | 生产环境 |
-| 半仿真模式 | ✓ UART 连接 | ✗ 仿真振动 | 只有 STM32 |
-| 全仿真模式 | ✗ 仿真数据 | ✗ 仿真振动 | 开发/演示 |
+| 全硬件模式 | 是 UART 连接 | 是 SPI 连接 | 生产环境 |
+| 半仿真模式 | 是 UART 连接 | 否 仿真振动 | 只有 STM32 |
+| 全仿真模式 | 否 仿真数据 | 否 仿真振动 | 开发/演示 |
 
-### 2.10. 用户手册
+### 2.10. 用户手册 {#src-experiment-case5-h28}
 
-#### 2.10.1 部署
+#### 2.10.1 部署 {#src-experiment-case5-h29}
 
 1. 将项目代码拷贝到昇腾 310B 设备
 2. 运行 `bash setup.sh` 安装 Python 依赖并导出模型
@@ -438,7 +438,7 @@ flowchart TD
 5. 启动服务：`python3 app.py`
 6. 浏览器打开 `http://<设备IP>:7860`
 
-#### 2.10.2 使用流程
+#### 2.10.2 使用流程 {#src-experiment-case5-h30}
 
 1. 打开「实时监测」页签，观察四台电机的传感数据和告警状态
 2. 在仿真模式下可以看到随机游走的数据变化
@@ -446,7 +446,7 @@ flowchart TD
 4. 观察频谱图——注意不同故障的频谱特征差异
 5. 切换「系统信息」页签，查看模型和日志状态
 
-#### 2.10.3 STM32 固件烧录
+#### 2.10.3 STM32 固件烧录 {#src-experiment-case5-h31}
 
 1. 参考 [stm32_protocol.md](https://github.com/zhouxzh/Ascend310/blob/master/samples/case5/stm32_protocol.md) 中的接线图连接传感器
 2. 使用 Arduino IDE 或 STM32CubeIDE 编译示例代码
@@ -454,7 +454,7 @@ flowchart TD
 4. 用串口助手（115200 baud）确认数据帧格式正确
 5. 将 STM32 TX 连接到 Ascend 310B RX（3.3V 电平）
 
-#### 2.10.4 调整参数
+#### 2.10.4 调整参数 {#src-experiment-case5-h32}
 
 | 参数 | 默认值 | 位置 | 说明 |
 |------|--------|------|------|
@@ -465,7 +465,7 @@ flowchart TD
 | `SAMPLE_RATE` | 5000 Hz | config.py | 振动采样率 |
 | `N_MELS` | 128 | config.py | 梅尔滤波器数量 |
 
-#### 2.10.5 故障排除
+#### 2.10.5 故障排除 {#src-experiment-case5-h33}
 
 | 问题 | 可能原因 | 解决方法 |
 |------|---------|---------|
@@ -476,7 +476,7 @@ flowchart TD
 | 频谱图全黑 | 振动信号幅值太小 | 检查仿真信号生成，调整噪声幅度 |
 | UART 数据乱码 | 波特率不匹配 | 确认 STM32 和 Ascend 310B 均使用 115200 |
 
-## 3. 源代码结构
+## 3. 源代码结构 {#src-experiment-case5-h34}
 
 ```text
 case5/
@@ -502,7 +502,7 @@ case5/
 ```mermaid
 flowchart TB
     APP["app.py\nGradio 仪表盘"] --> SR["sensor_reader.py\nSensorReader\nUART读取/仿真传感数据"]
-    APP --> VP["vibration_processor.py\nVibrationProcessor\n波形→频谱图"]
+    APP --> VP["vibration_processor.py\nVibrationProcessor\n波形->频谱图"]
     APP --> FC["fault_classifier.py\nFaultClassifier\nNPU/CPU 故障分类"]
     APP --> AD["anomaly_detector.py\nAnomalyDetector\n3σ异常+趋势预测"]
     APP --> DL["data_logger.py\nDataLogger\nCSV数据记录"]
@@ -513,7 +513,7 @@ flowchart TB
     FC --> TORCH["torchvision\nefficientnet_b0()"]
     VP --> NP["numpy\nFFT + mel filterbank"]
 
-    PREP["prepare_models.py\nONNX → OM"] --> TORCH
+    PREP["prepare_models.py\nONNX -> OM"] --> TORCH
     PREP --> CFG
 ```
 
@@ -522,16 +522,16 @@ flowchart TB
 - `AscendResource` / `AscendModel` 沿用案例8的同一套模式
 - `config.py` 的结构与案例6/案例7/案例8一致（`BASE_DIR` + `os.path.join`）
 - `app.py` 的 Gradio 懒加载模式与案例6/案例7/案例8/案例9一致
-- `prepare_models.py` 的 ONNX → ATC 流程与案例6/案例7/案例8一致
+- `prepare_models.py` 的 ONNX -> ATC 流程与案例6/案例7/案例8一致
 - `FaultClassifier` 的双后端模式与案例6的 `SceneClassifier`、案例8的
   `GestureClassifier` 一致
 - `SensorReader` 和 `VibrationProcessor` 是本案例独有的硬件接口模块
 - `AnomalyDetector` 是本案例独有的纯 NumPy 统计分析模块，无需模型文件
 - 本项目**不需要**训练脚本——故障分类头尚未训练，但推理框架完整
 
-## 4. 效果演示
+## 4. 效果演示 {#src-experiment-case5-h35}
 
-### 预期效果
+### 预期效果 {#src-experiment-case5-h36}
 
 | 功能 | 预期表现 | 备注 |
 |------|---------|------|
@@ -542,7 +542,7 @@ flowchart TB
 | 端到端延迟 | 传感 <1ms + 频谱 <5ms + 推理 ~10ms | NPU 模式下总计 ~16ms |
 | CSV 日志 | 每秒写入一行多电机数据 | 长期运行建议定期轮转 |
 
-### 性能指标
+### 性能指标 {#src-experiment-case5-h37}
 
 | 指标 | NPU (Ascend 310B) | CPU (PyTorch) |
 |------|-------------------|---------------|
@@ -551,54 +551,54 @@ flowchart TB
 | 故障分类 | 8-12 ms | 20-35 ms |
 | 模型大小 (.om) | ~20 MB | N/A |
 
-### 浏览器中的效果
+### 浏览器中的效果 {#src-experiment-case5-h38}
 
 Gradio 仪表盘在浏览器中的预期布局：
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  📊 智能数据采集仪 — 多电机状态监测                             │
+│   智能数据采集仪 — 多电机状态监测                             │
 │  STM32 低速传感 + FPGA 高速振动采集 + NPU 故障分类               │
 ├──────────────────────────────────────────────────────────────┤
-│  [📋 实时监测]  [📈 振动频谱分析]  [⚙️ 系统信息]                  │
+│  [ 实时监测]  [ 振动频谱分析]  [ 系统信息]                  │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────────┐│
-│  │ 🔔 告警区域                                               ││
-│  │ ✅ 所有电机运行正常                                         ││
+│  │  告警区域                                               ││
+│  │ [OK] 所有电机运行正常                                         ││
 │  │ 更新时间: 14:32:15  |  数据行数: 245  |  日志大小: 0.05 MB  ││
 │  ├──────────────────────────────────────────────────────────┤│
 │  │      电机1        电机2        电机3        电机4          ││
-│  │  🌡 ✓ 42.5°C    ✓ 38.2°C    ✓ 45.1°C    ✓ 40.3°C      ││
-│  │  ⚡ ✓ 1.25A     ✓ 0.85A     ⚠️ 1.52A    ✓ 0.92A      ││
-│  │  🔄 ✓ 3200RPM   ✓ 2950RPM   ✓ 3100RPM   ✓ 3050RPM    ││
+│  │  温度 是 42.5°C    是 38.2°C    是 45.1°C    是 40.3°C      ││
+│  │  电流 是 1.25A     是 0.85A     注意 1.52A    是 0.92A      ││
+│  │   是 3200RPM   是 2950RPM   是 3100RPM   是 3050RPM    ││
 │  ├──────────────────────────────────────────────────────────┤│
-│  │  [🔄 刷新数据]                                            ││
+│  │  [ 刷新数据]                                            ││
 │  └──────────────────────────────────────────────────────────┘│
 └──────────────────────────────────────────────────────────────┘
 ```
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  [📋 实时监测]  [📈 振动频谱分析]  [⚙️ 系统信息]                  │
+│  [ 实时监测]  [ 振动频谱分析]  [ 系统信息]                  │
 │                                                              │
 │  ┌────────────────────────┬─────────────────────────────────┐│
-│  │  选择电机: [电机1 ▼]    │  🏷️ 故障诊断: 正常运行 (normal)    ││
-│  │  [🔍 分析振动频谱]       │  置信度: 87.3%                    ││
+│  │  选择电机: [电机1 ▼]    │   故障诊断: 正常运行 (normal)    ││
+│  │  [ 分析振动频谱]       │  置信度: 87.3%                    ││
 │  │                        │  ██████████████░░░░              ││
 │  │  ┌────────────────┐    │  振动频谱均匀，各频率分量正常         ││
 │  │  │                │    │                                  ││
-│  │  │   JET 彩色     │    │  📊 Top-3 预测                    ││
-│  │  │   梅尔频谱图    │    │  → 正常运行: 87.3%                ││
+│  │  │   JET 彩色     │    │   Top-3 预测                    ││
+│  │  │   梅尔频谱图    │    │  -> 正常运行: 87.3%                ││
 │  │  │   128×128      │    │    轴承磨损: 6.1%                 ││
 │  │  │                │    │    动平衡不良: 3.2%               ││
 │  │  └────────────────┘    │                                  ││
-│  │  振动梅尔频谱图          │  ⏱ 推理耗时: 12.5 ms              ││
-│  │                        │  🖥 后端: NPU                     ││
+│  │  振动梅尔频谱图          │   推理耗时: 12.5 ms              ││
+│  │                        │   后端: NPU                     ││
 │  └────────────────────────┴─────────────────────────────────┘│
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### 如何验证系统正常工作
+### 如何验证系统正常工作 {#src-experiment-case5-h39}
 
 1. 运行 `python3 app.py`，浏览器打开 `http://127.0.0.1:7860`
 2. 在「实时监测」页签确认四台电机的温度/电流/转速数值在合理范围内变化

@@ -1,33 +1,33 @@
 # 案例8：手势识别
 
-## 1. 项目简介
+## 1. 项目简介 {#src-experiment-case8-h1}
 
 本项目基于昇腾 310B 平台，构建一个实时手势识别系统，能够通过摄像头识
 别 10 种常见静态手势。系统采用 MobileNetV3-Small 卷积神经网络，覆盖从
-**模型训练 → ONNX 转换 → OM 部署 → 实时推理** 的完整边缘 AI 工作流。
+**模型训练 -> ONNX 转换 -> OM 部署 -> 实时推理** 的完整边缘 AI 工作流。
 
 与 case1（人脸识别）使用预训练模型不同，本项目是书中第一个完整演示
 "训练-转换-部署"三阶段流程的案例，帮助读者理解在边缘设备上部署自定义
 模型的完整链路。
 
-### 手势列表（10 种）
+### 手势列表（10 种） {#src-experiment-case8-h2}
 
 | # | 手势 | 英文 | 可能用途 |
 |---|------|------|----------|
-| 0 | 👍 点赞 | like | 确认操作、好评 |
-| 1 | 👎 不喜欢 | dislike | 取消操作、差评 |
-| 2 | ✊ 握拳 | fist | 停止、关机 |
-| 3 | ✋ 手掌 | palm | 暂停、停止 |
-| 4 | ✌️ 剪刀手 | peace | 模式切换 |
-| 5 | 👌 OK | ok | 确认、批准 |
-| 6 | 🤘 摇滚 | rock | 特殊功能 |
-| 7 | 📞 打电话 | call | 触发通话 |
-| 8 | 🛑 停止 | stop | 急停 |
-| 9 | 🫥 无手势 | no_gesture | 空闲状态 |
+| 0 | 点赞 点赞 | like | 确认操作、好评 |
+| 1 | 不喜欢 不喜欢 | dislike | 取消操作、差评 |
+| 2 | 握拳 握拳 | fist | 停止、关机 |
+| 3 | 手掌 手掌 | palm | 暂停、停止 |
+| 4 | 剪刀手 剪刀手 | peace | 模式切换 |
+| 5 | OK OK | ok | 确认、批准 |
+| 6 | 摇滚 摇滚 | rock | 特殊功能 |
+| 7 | 打电话 打电话 | call | 触发通话 |
+| 8 | 停止 停止 | stop | 急停 |
+| 9 | 无手势 无手势 | no_gesture | 空闲状态 |
 
-## 2. 内容大纲
+## 2. 内容大纲 {#src-experiment-case8-h3}
 
-### 2.1. 硬件准备
+### 2.1. 硬件准备 {#src-experiment-case8-h4}
 
 相比旧版 case8 中列出的多摄像头阵列、深度摄像头、红外补光等复杂设
 备，本项目只需要：
@@ -63,9 +63,9 @@ flowchart LR
 单一 RGB 摄像头在正常光照下即可达到 90%+ 的识别准确率。深度摄像头会
 增加硬件成本和部署复杂度，对于静态手势分类任务，收益有限。
 
-### 2.2. 软件环境
+### 2.2. 软件环境 {#src-experiment-case8-h5}
 
-#### 操作系统与框架
+#### 操作系统与框架 {#src-experiment-case8-h6}
 
 | 层级 | 软件 | 版本 | 用途 |
 |------|------|------|------|
@@ -76,7 +76,7 @@ flowchart LR
 | 图像处理 | OpenCV | 4.8+ | 图像预处理 |
 | Web | Gradio | 4.0+ | 聊天式 Web 界面 |
 
-#### 环境准备
+#### 环境准备 {#src-experiment-case8-h7}
 
 在昇腾 310B 设备上，运行一键安装脚本：
 
@@ -96,14 +96,14 @@ bash setup.sh
 pip3 install pillow tqdm
 ```
 
-#### Python 依赖说明
+#### Python 依赖说明 {#src-experiment-case8-h8}
 
 | 包 | 用途 | 必需？ |
 |:---|:---|:---|
-| `gradio` | Web 界面框架，内置摄像头组件 (`gr.Image`) | ✓ |
-| `torch` + `torchvision` | MobileNetV3 模型定义、CPU 推理回退 | ✓ |
-| `opencv-python` | 图像缩放、色彩空间转换、归一化 | ✓ |
-| `numpy` | 张量操作、softmax 计算 | ✓ |
+| `gradio` | Web 界面框架，内置摄像头组件 (`gr.Image`) | 是 |
+| `torch` + `torchvision` | MobileNetV3 模型定义、CPU 推理回退 | 是 |
+| `opencv-python` | 图像缩放、色彩空间转换、归一化 | 是 |
+| `numpy` | 张量操作、softmax 计算 | 是 |
 | `Pillow` | 训练时的图像加载 | 仅训练 |
 | `acl` (CANN 自带) | NPU 推理，随 CANN 安装 | 仅推理 |
 
@@ -114,9 +114,9 @@ pip3 install pillow tqdm
 是正常的——这些包只在昇腾设备上通过 CANN 提供。代码已做好检测，这些
 包不可用时自动回退到 CPU 推理，不会报错。
 
-### 2.3. 手势识别原理
+### 2.3. 手势识别原理 {#src-experiment-case8-h9}
 
-#### 为什么选择 MobileNetV3-Small
+#### 为什么选择 MobileNetV3-Small {#src-experiment-case8-h10}
 
 昇腾 310B NPU 最适合运行固定输入输出形状的卷积神经网络。MobileNetV3
 系列是专为移动和边缘设备设计的轻量级 CNN，其中 Small 版本只有 250 万
@@ -126,33 +126,33 @@ pip3 install pillow tqdm
 
 | 模型 | 参数量 | 310B 推理延迟 | 适合 OM 部署 | 备注 |
 |------|--------|--------------|-------------|------|
-| **MobileNetV3-Small** | 2.5M | ~5ms | ✓ | 推荐，轻量高速 |
-| MobileNetV3-Large | 5.5M | ~10ms | ✓ | 精度略高但更慢 |
-| ResNet18 | 11.7M | ~20ms | ✓ | 偏重，延迟边缘 |
-| EfficientNet-B0 | 5.3M | ~12ms | ✓ | 也可用 |
-| ViT-Tiny | 5.7M | ~15ms | △ | Transformer，转换复杂 |
+| **MobileNetV3-Small** | 2.5M | ~5ms | 是 | 推荐，轻量高速 |
+| MobileNetV3-Large | 5.5M | ~10ms | 是 | 精度略高但更慢 |
+| ResNet18 | 11.7M | ~20ms | 是 | 偏重，延迟边缘 |
+| EfficientNet-B0 | 5.3M | ~12ms | 是 | 也可用 |
+| ViT-Tiny | 5.7M | ~15ms | 一般 | Transformer，转换复杂 |
 
-#### 手势识别流程
+#### 手势识别流程 {#src-experiment-case8-h11}
 
 ```mermaid
 flowchart TD
     START["[/摄像头采集帧/]"] --> RESIZE["缩放至 224×224"]
-    RESIZE --> NORM["BGR→RGB → 归一化\nImageNet mean/std"]
+    RESIZE --> NORM["BGR->RGB -> 归一化\nImageNet mean/std"]
     NORM --> TENSOR["转为 NCHW 张量\n(1, 3, 224, 224)"]
     TENSOR --> CHECK{"NPU 可用?"}
 
-    CHECK -->|"✓ OM 模型"| NPU_INFER["NPU 推理\nacl.mdl.execute()"]
-    CHECK -->|"✗ 回退"| CPU_INFER["CPU 推理\ntorch model()"]
+    CHECK -->|"是 OM 模型"| NPU_INFER["NPU 推理\nacl.mdl.execute()"]
+    CHECK -->|"否 回退"| CPU_INFER["CPU 推理\ntorch model()"]
 
-    NPU_INFER --> SOFTMAX["Softmax → 概率分布"]
+    NPU_INFER --> SOFTMAX["Softmax -> 概率分布"]
     CPU_INFER --> SOFTMAX
 
-    SOFTMAX --> FILTER{"max(prob) ≥ 阈值\n(默认 0.70)"}
+    SOFTMAX --> FILTER{"max(prob) >= 阈值\n(默认 0.70)"}
     FILTER -->|"是"| OUTPUT["输出: 手势类别 + 置信度"]
     FILTER -->|"否"| NO_RESULT["输出: 无手势"]
 ```
 
-#### 为什么不是 LSTM / 动态手势
+#### 为什么不是 LSTM / 动态手势 {#src-experiment-case8-h12}
 
 旧版 case8 中使用了 LSTM 做动态手势识别。LSTM 涉及循环结构和变长输入，
 这在 OM 离线模型（静态计算图）上难以高效运行——与 case9 中解释过的
@@ -167,12 +167,12 @@ flowchart TD
 特性。由于篇幅原因，本书仅实现静态手势识别，动态手势的扩展留给读者练
 习。
 
-### 2.4. 模型训练
+### 2.4. 模型训练 {#src-experiment-case8-h13}
 
 训练在 GPU 或 CPU 工作站上完成，不占用昇腾设备。训练好的 `.pth` 权重
 文件再拷贝到昇腾设备上进行转换和部署。
 
-#### 数据集：HaGRID
+#### 数据集：HaGRID {#src-experiment-case8-h14}
 
 [HaGRID](https://github.com/hukenovs/hagrid)（Hand Gesture Recognition
 Image Dataset）是一个开源手势识别数据集，包含 18 类手势、超过 55 万张
@@ -203,7 +203,7 @@ data/hagrid/
 └── no_gesture/    # 无手势 / 背景图片
 ```
 
-#### 训练流程
+#### 训练流程 {#src-experiment-case8-h15}
 
 ```mermaid
 flowchart TD
@@ -214,7 +214,7 @@ flowchart TD
     TRAIN_DS --> AUG["数据增强\n· RandomResizedCrop\n· RandomHorizontalFlip\n· RandomRotation\n· ColorJitter"]
     AUG --> LOADER["DataLoader\nbatch=32"]
 
-    MODEL["MobileNetV3-Small\nImageNet 预训练"] --> HEAD["替换分类头\n1000 → 10 类"]
+    MODEL["MobileNetV3-Small\nImageNet 预训练"] --> HEAD["替换分类头\n1000 -> 10 类"]
     HEAD --> TRAIN_LOOP["训练循环\n· AdamW (lr=1e-3)\n· CosineAnnealingLR\n· CrossEntropyLoss"]
 
     LOADER --> TRAIN_LOOP
@@ -224,7 +224,7 @@ flowchart TD
     VALID --> BEST["保存最佳模型\nmodels/gesture_mobilenetv3.pth"]
 ```
 
-#### 训练命令
+#### 训练命令 {#src-experiment-case8-h16}
 
 ```bash
 # 完整训练（30 epochs，约 30 分钟 / GPU）
@@ -242,7 +242,7 @@ python3 train.py --no-cuda --batch-size 8 --epochs 10
 
 训练完成后，最佳模型权重保存在 `models/gesture_mobilenetv3.pth`。
 
-#### 关键训练参数
+#### 关键训练参数 {#src-experiment-case8-h17}
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
@@ -258,7 +258,7 @@ python3 train.py --no-cuda --batch-size 8 --epochs 10
 - **RandomRotation(15°)**：小角度旋转，容忍手势倾斜
 - **ColorJitter**：亮度、对比度、饱和度抖动，适应不同光照
 
-### 2.5. 模型转换与昇腾部署
+### 2.5. 模型转换与昇腾部署 {#src-experiment-case8-h18}
 
 训练得到的 `.pth` 文件需要通过两次转换才能在 310B NPU 上运行。
 
@@ -277,7 +277,7 @@ flowchart TD
     end
 
     subgraph DEPLOY["4. 推理部署"]
-        APP["app.py → GestureClassifier\n→ AscendModel.execute()"]
+        APP["app.py -> GestureClassifier\n-> AscendModel.execute()"]
     end
 
     PTH -->|"torch.onnx.export()\nopset=11"| ONNX
@@ -285,7 +285,7 @@ flowchart TD
     OM -->|"acl.mdl.execute()"| APP
 ```
 
-#### 步骤 1：导出 ONNX
+#### 步骤 1：导出 ONNX {#src-experiment-case8-h19}
 
 ```bash
 # 仅导出 ONNX（可在工作站上运行，不需要昇腾硬件）
@@ -302,7 +302,7 @@ python3 prepare_models.py --onnx-only
 `export_onnx()` 函数。注意 `dynamic_axes={}` 参数——我们刻意禁用了
 动态形状，确保与 ATC 转换兼容。
 
-#### 步骤 2：ATC 转换 ONNX → OM
+#### 步骤 2：ATC 转换 ONNX -> OM {#src-experiment-case8-h20}
 
 ```bash
 # 在昇腾设备上运行
@@ -334,7 +334,7 @@ atc --model=models/gesture_mobilenetv3.onnx \
 `soc_version` 可通过 `npu-smi info` 查看。如果你的设备显示不同的版本
 号，请修改 `prepare_models.py` 中对应的值。
 
-#### 跳过训练：使用预训练模型
+#### 跳过训练：使用预训练模型 {#src-experiment-case8-h21}
 
 如果你不想自己训练，可以下载预训练好的 `.pth` 文件：
 
@@ -342,9 +342,9 @@ atc --model=models/gesture_mobilenetv3.onnx \
 python3 prepare_models.py --download
 ```
 
-然后直接进入 ONNX → OM 转换。这大幅降低了上手门槛。
+然后直接进入 ONNX -> OM 转换。这大幅降低了上手门槛。
 
-### 2.6. 实时摄像头采集
+### 2.6. 实时摄像头采集 {#src-experiment-case8-h22}
 
 Gradio 的 `gr.Image` 组件内置了摄像头支持，选择 `source="webcam"` 即
 可在浏览器中调用用户的摄像头。结合 `streaming=True` 参数，Gradio 会持
@@ -360,10 +360,10 @@ flowchart LR
 
     subgraph BACKEND["Python 后端"]
         RECEIVE["接收 numpy 帧\n(H, W, 3) BGR"]
-        RECEIVE --> RESIZE["cv2.resize\n→ 224×224"]
-        RESIZE --> RGB["cv2.cvtColor\nBGR→RGB"]
-        RGB --> NORM["归一化\n/255 → mean/std"]
-        NORM --> TENSOR["→ NCHW (1,3,224,224)"]
+        RECEIVE --> RESIZE["cv2.resize\n-> 224×224"]
+        RESIZE --> RGB["cv2.cvtColor\nBGR->RGB"]
+        RGB --> NORM["归一化\n/255 -> mean/std"]
+        NORM --> TENSOR["-> NCHW (1,3,224,224)"]
     end
 
     subgraph INFER["推理"]
@@ -381,9 +381,9 @@ flowchart LR
 2. **色彩转换**：`cv2.cvtColor(image, cv2.COLOR_BGR2RGB)` — OpenCV 的
    BGR 格式转为 RGB
 3. **归一化**：`(pixel / 255 - mean) / std` — 使用 ImageNet 统计值
-4. **维度重排**：HWC → CHW → NCHW — 匹配模型要求的 NCHW 格式
+4. **维度重排**：HWC -> CHW -> NCHW — 匹配模型要求的 NCHW 格式
 
-### 2.7. Web 界面
+### 2.7. Web 界面 {#src-experiment-case8-h23}
 
 本项目使用 Gradio 构建 Web 界面，通过 `gr.Image(source="webcam",
 streaming=True)` 实现完全零前端代码的实时手势识别。
@@ -391,8 +391,8 @@ streaming=True)` 实现完全零前端代码的实时手势识别。
 ```mermaid
 flowchart TD
     subgraph UI["Gradio Blocks 界面"]
-        TAB1["📷 手势识别 (Tab 1)"]
-        TAB2["⚙️ 设置 (Tab 2)"]
+        TAB1[" 手势识别 (Tab 1)"]
+        TAB2[" 设置 (Tab 2)"]
     end
 
     subgraph TAB1_DETAIL["识别 Tab"]
@@ -412,7 +412,7 @@ flowchart TD
     TAB2 --> TAB2_DETAIL
 ```
 
-#### 关键 Gradio 事件流
+#### 关键 Gradio 事件流 {#src-experiment-case8-h24}
 
 1. **摄像头流式推理**：`camera_input.stream(predict_frame, ...)` 每
    0.5 秒触发一次，将最新帧传给后端推理
@@ -421,14 +421,14 @@ flowchart TD
 3. **系统信息**：页面加载时自动获取模型状态（NPU/CPU、模型路径、手势
    列表）
 
-#### 界面布局
+#### 界面布局 {#src-experiment-case8-h25}
 
 - **左栏（2/3 宽度）**：摄像头实时画面，`mirror_webcam=True` 镜像显示，
   符合用户直觉
 - **右栏（1/3 宽度）**：识别结果（Markdown 渲染，含置信度进度条）+ 最
   近 10 次识别历史
 
-#### 双后端切换
+#### 双后端切换 {#src-experiment-case8-h26}
 
 `GestureClassifier` 在初始化时自动检测 NPU 可用性：
 
@@ -447,13 +447,13 @@ class GestureClassifier:
 ```
 
 这意味着：
-- 在昇腾 310B 上 → 自动使用 OM 模型，NPU 推理
-- 在没有昇腾硬件的机器上 → 自动使用 PyTorch，CPU 推理
+- 在昇腾 310B 上 -> 自动使用 OM 模型，NPU 推理
+- 在没有昇腾硬件的机器上 -> 自动使用 PyTorch，CPU 推理
 - 同一份代码，无需修改任何配置
 
-### 2.8. 用户手册
+### 2.8. 用户手册 {#src-experiment-case8-h27}
 
-#### 2.8.1 部署
+#### 2.8.1 部署 {#src-experiment-case8-h28}
 
 1. 将项目代码拷贝到昇腾 310B 设备
 2. 运行 `bash setup.sh` 安装依赖
@@ -462,7 +462,7 @@ class GestureClassifier:
 5. 启动服务：`python3 app.py`
 6. 浏览器打开 `http://<设备IP>:7860`
 
-#### 2.8.2 使用
+#### 2.8.2 使用 {#src-experiment-case8-h29}
 
 1. 在浏览器中授权摄像头权限
 2. 将手放在摄像头前，做出标准手势
@@ -473,7 +473,7 @@ class GestureClassifier:
    - 在设置面板降低置信度阈值
    - 考虑用自己的手势数据重新训练
 
-#### 2.8.3 添加自定义手势
+#### 2.8.3 添加自定义手势 {#src-experiment-case8-h30}
 
 1. 收集新手势的图片（每个新手势至少 200 张）
 2. 放入 `data/hagrid/<new_gesture>/` 目录
@@ -481,7 +481,7 @@ class GestureClassifier:
 4. 运行 `python3 train.py` 重新训练
 5. 运行 `python3 prepare_models.py` 重新转换
 
-#### 2.8.4 故障排除
+#### 2.8.4 故障排除 {#src-experiment-case8-h31}
 
 | 问题 | 可能原因 | 解决方法 |
 |------|---------|---------|
@@ -492,7 +492,7 @@ class GestureClassifier:
 | ATC 转换失败 | soc_version 不匹配 | `npu-smi info` 查看版本，修改 prepare_models.py |
 | CPU 模式下"随机预测" | 未加载训练权重 | 先运行 `prepare_models.py --download` 或 `train.py` |
 
-## 3. 源代码结构
+## 3. 源代码结构 {#src-experiment-case8-h32}
 
 ```text
 case8/
@@ -504,7 +504,7 @@ case8/
 ├── setup.sh               # 一键环境安装
 ├── requirements.txt       # Python 依赖列表
 ├── data/
-│   └── gesture_labels.json  # 手势类别 ID → 中英文映射
+│   └── gesture_labels.json  # 手势类别 ID -> 中英文映射
 ├── models/                   # 模型文件目录 (.pth / .onnx / .om)
 └── README.md                 # 快速开始指南
 ```
@@ -535,30 +535,30 @@ flowchart TB
 - `AscendResource` / `AscendModel` 沿用 case1 的同一套模式
 - `config.py` 的结构与 case9 一致（集中管理常量）
 - `app.py` 的 Gradio 模式与 case9 一致（`gr.Blocks` + lazy init）
-- `prepare_models.py` 的 ONNX → ATC 流程与 case1 一致
+- `prepare_models.py` 的 ONNX -> ATC 流程与 case1 一致
 - `train.py` 是本书第一个训练脚本，展示了数据加载、增强、训练循环的
   完整流程
 
-## 4. 效果演示
+## 4. 效果演示 {#src-experiment-case8-h33}
 
-### 预期效果
+### 预期效果 {#src-experiment-case8-h34}
 
 在正常室内光照条件下，系统对各手势的预期识别准确率：
 
 | 手势 | 预期准确率 | 备注 |
 |------|-----------|------|
-| 👍 点赞 | 95%+ | 特征明显，角度鲁棒 |
-| ✊ 握拳 | 93%+ | 手型独特 |
-| ✋ 手掌 | 94%+ | 特征清晰 |
-| ✌️ 剪刀手 | 92%+ | 需要明确伸出两指 |
-| 👌 OK | 90%+ | 需要手指贴合 |
-| 📞 打电话 | 88%+ | 手型类似握拳 |
-| 👎 不喜欢 | 91%+ | 方向敏感 |
-| 🤘 摇滚 | 87%+ | 需要明确伸出两指 |
-| 🛑 停止 | 93%+ | 与手掌类似，需要上下文 |
-| 🫥 无手势 | 90%+ | 背景多样性影响 |
+| 点赞 点赞 | 95%+ | 特征明显，角度鲁棒 |
+| 握拳 握拳 | 93%+ | 手型独特 |
+| 手掌 手掌 | 94%+ | 特征清晰 |
+| 剪刀手 剪刀手 | 92%+ | 需要明确伸出两指 |
+| OK OK | 90%+ | 需要手指贴合 |
+| 打电话 打电话 | 88%+ | 手型类似握拳 |
+| 不喜欢 不喜欢 | 91%+ | 方向敏感 |
+| 摇滚 摇滚 | 87%+ | 需要明确伸出两指 |
+| 停止 停止 | 93%+ | 与手掌类似，需要上下文 |
+| 无手势 无手势 | 90%+ | 背景多样性影响 |
 
-### 性能指标
+### 性能指标 {#src-experiment-case8-h35}
 
 | 指标 | NPU (Ascend 310B) | CPU (PyTorch) |
 |------|-------------------|---------------|
@@ -567,42 +567,42 @@ flowchart TB
 | 模型大小 (.om) | ~10 MB | N/A |
 | 内存占用 | ~50 MB | ~200 MB |
 
-### 浏览器中的效果
+### 浏览器中的效果 {#src-experiment-case8-h36}
 
 Gradio 界面在浏览器中的预期布局：
 
 ```
 ┌──────────────────────────────────────────────────┐
-│  ✋ 手势识别系统                                  │
+│  手掌 手势识别系统                                  │
 │  MobileNetV3-Small 实时手势分类                   │
 ├────────────────────┬─────────────────────────────┤
-│  📷 手势识别        │  📊 识别结果                 │
+│   手势识别        │   识别结果                 │
 │                    │                             │
-│                    │  👍 点赞 (like)             │
+│                    │  点赞 点赞 (like)             │
 │   [摄像头实时画面]   │  置信度: 94.3%              │
 │                    │  ████████████████░░░        │
 │                    │                             │
 │                    │  - 手掌 (palm): 4.2%        │
 │                    │  - OK (ok): 1.1%            │
 │                    │                             │
-│                    │  ⏱ 推理耗时: 6.2 ms         │
-│                    │  🖥 推理后端: NPU            │
+│                    │   推理耗时: 6.2 ms         │
+│                    │   推理后端: NPU            │
 │                    ├─────────────────────────────┤
-│                    │  📜 识别历史                  │
+│                    │   识别历史                  │
 │                    │  1. 点赞 (94.3%)             │
 │                    │  2. 点赞 (91.7%)             │
 │                    │  3. 无手势 (85.2%)           │
 ├────────────────────┴─────────────────────────────┤
-│  [📷 手势识别]  [⚙️ 设置]                         │
+│  [ 手势识别]  [ 设置]                         │
 └──────────────────────────────────────────────────┘
 ```
 
-### 如何验证系统正常工作
+### 如何验证系统正常工作 {#src-experiment-case8-h37}
 
 1. 打开浏览器访问 `http://127.0.0.1:7860`
 2. 授权摄像头
-3. 对着摄像头做出 👍 点赞手势
+3. 对着摄像头做出 点赞 点赞手势
 4. 观察右侧是否显示"点赞 (like)"且置信度 >80%
-5. 切换到 ✊ 握拳，确认识别结果随之更新
+5. 切换到 握拳 握拳，确认识别结果随之更新
 6. 打开设置面板，将阈值调到 0.95，观察低置信度的预测被过滤
 7. 在昇腾设备上，确认系统信息显示"NPU (Ascend 310B)"

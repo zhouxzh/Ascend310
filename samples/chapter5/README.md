@@ -23,23 +23,21 @@ python samples/chapter5/check_cann.py
 
 | 文件 | 说明 | 运行时间 |
 |------|------|----------|
-| `venc_minimal.py` | 原始 API 示例：回调线程、DVPP 内存、编码一帧 | ~3s |
-| `bench_venc.py` | `CannVenc` 封装类 + 5 分辨率扫描 vs libx264 | ~20s |
+| `venc_minimal.py` | 原始 API 示例：同一帧 NV12 编码为 H.264/H.265 | ~3s |
+| `bench_venc.py` | `CannVenc` 封装类 + H.264/H.265 分辨率扫描 vs CPU | ~20s |
 
 ### [vdec/](vdec/) — VDEC 硬件视频解码
 
 | 文件 | 说明 |
 |------|------|
-| `vdec_minimal.py` | 原始 API 示例：libx264 编码 → VDEC 解码 5 阶段演示 |
-| `vdec_acllite_demo.py` | acllite `DvppVdec` 封装：一行创建、一行解码 |
-| `bench_vdec.py` | 4 分辨率扫描 vs CPU 解码性能对比 |
+| `vdec_minimal.py` | 原始 API 示例：libx264/libx265 生成码流 -> VDEC 解码 |
+| `bench_vdec.py` | H.264/H.265 分辨率扫描 vs CPU 解码性能对比 |
 
 ### [vpc/](vpc/) — VPC 硬件图像处理
 
 | 文件 | 说明 |
 |------|------|
 | `vpc_minimal.py` | 原始 API 示例：Resize / Crop+Resize |
-| `vpc_acllite_demo.py` | acllite 封装：一行 resize / jpege / jpegd |
 | `bench_vpc.py` | VPC resize vs CPU cv2.resize 性能对比 |
 
 ### [jpeg/](jpeg/) — JPEG 硬件编解码
@@ -56,6 +54,5 @@ python samples/chapter5/check_cann.py
 
 1. 先跑 `check_cann.py` 确认环境正常
 2. 从 `*_minimal.py` 开始理解每个子模块的底层 API
-3. 再看 `*_acllite_demo.py` 了解 acllite 高层封装
-4. 最后跑 `bench_*.py` 看性能数据
-5. [WebRTC/](WebRTC/) 是综合实战案例，学完各子模块后再看
+3. 最后跑 `bench_*.py` 看性能数据
+4. [WebRTC/](WebRTC/) 是综合实战案例，学完各子模块后再看。这里已经包含 H.265/HEVC 推流实现与测试。

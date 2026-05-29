@@ -1,4 +1,4 @@
-"""VDEC 硬件 vs CPU 软件解码性能对比 (H.264).
+"""VDEC 硬件 vs CPU 软件解码性能对比 (H.264 / H.265).
 
 分辨率扫描 480p → 4K, GOP=30 (I/P 混合), 确定性测试帧。
 
@@ -11,6 +11,7 @@ import ctypes
 import fractions
 import queue
 import time
+import unicodedata
 
 import numpy as np
 
@@ -52,6 +53,27 @@ PIX_FMT_NV12 = 1
 
 _ACL_CTX = None
 _ACL_READY = False
+
+
+def _display_width(text: object) -> int:
+    """Return terminal display width, treating CJK wide chars as two columns."""
+    width = 0
+    for ch in str(text):
+        width += 2 if unicodedata.east_asian_width(ch) in ("F", "W") else 1
+    return width
+
+
+def _pad(text: object, width: int, align: str = ">") -> str:
+    text = str(text)
+    spaces = max(0, width - _display_width(text))
+    if align == "<":
+        return text + " " * spaces
+    return " " * spaces + text
+
+
+def _print_row(values: list[object], widths: list[int], aligns: list[str]) -> None:
+    print("  ".join(_pad(value, width, align)
+                    for value, width, align in zip(values, widths, aligns)))
 
 
 def _ensure_acl():
@@ -105,6 +127,13 @@ def make_test_frames(n: int, w: int, h: int) -> list[np.ndarray]:
 # 编码（同一组原始帧 → H.264 和 H.265 分别编码）
 # ===================================================================
 
+def _encoder_options(codec_name: str, level: str) -> dict[str, str]:
+    options = {"level": level, "tune": "zerolatency"}
+    if codec_name == "libx265":
+        options["x265-params"] = "log-level=error"
+    return options
+
+
 def encode_frames(frames: list[np.ndarray], codec_name: str, gop: int
                   ) -> tuple[list[bytes], int, int]:
     """把一组 BGR 帧编码为 H.264 或 H.265 码流。
@@ -124,7 +153,7 @@ def encode_frames(frames: list[np.ndarray], codec_name: str, gop: int
     codec.bit_rate = max(2_000_000, int(w * h * FPS * 0.1))
     codec.framerate = fractions.Fraction(FPS, 1)
     codec.time_base = fractions.Fraction(1, FPS)
-    codec.options = {"level": level, "tune": "zerolatency"}
+    codec.options = _encoder_options(codec_name, level)
     # H.265 默认 Main profile, H.264 = Baseline
     if codec_name == "libx264":
         codec.profile = "Baseline"
@@ -138,14 +167,19 @@ def encode_frames(frames: list[np.ndarray], codec_name: str, gop: int
         data = bytearray()
         for pkt in codec.encode(frame):
             data += bytes(pkt)
-        streams.append(bytes(data))
-        (i_sizes if (i % gop == 0) else p_sizes).append(len(data))
+        if data:
+            stream = bytes(data)
+            streams.append(stream)
+            (i_sizes if (i % gop == 0) else p_sizes).append(len(stream))
 
     tail = bytearray()
     for pkt in codec.encode(None):
         tail += bytes(pkt)
-    if tail and streams:
-        streams[-1] += bytes(tail)
+    if tail:
+        if streams:
+            streams[-1] += bytes(tail)
+        else:
+            streams.append(bytes(tail))
 
     i_avg = sum(i_sizes) // len(i_sizes) if i_sizes else 0
     p_avg = sum(p_sizes) // len(p_sizes) if p_sizes else 0
@@ -174,13 +208,14 @@ class CannVdec:
             acl.rt.process_report(300)
 
     def _vdec_callback(self, in_stream, out_pic, _user_data):
+        pic_data = None
         try:
             rc = media.dvpp_get_pic_desc_ret_code(out_pic)
             sz = media.dvpp_get_pic_desc_size(out_pic)
+            pic_data = media.dvpp_get_pic_desc_data(out_pic)
             if rc == 0 and sz > 0:
-                data = media.dvpp_get_pic_desc_data(out_pic)
                 host, _ = acl.rt.malloc_host(sz)
-                acl.rt.memcpy(host, sz, data, sz, ACL_MEMCPY_DEVICE_TO_HOST)
+                acl.rt.memcpy(host, sz, pic_data, sz, ACL_MEMCPY_DEVICE_TO_HOST)
                 self._cb_queue.put(ctypes.string_at(host, sz))
                 acl.rt.free_host(host)
             else:
@@ -188,6 +223,8 @@ class CannVdec:
         except Exception:
             self._cb_queue.put(None)
         finally:
+            if pic_data is not None:
+                media.dvpp_free(pic_data)
             media.dvpp_destroy_stream_desc(in_stream)
             media.dvpp_destroy_pic_desc(out_pic)
 
@@ -254,12 +291,25 @@ def bench_cpu_warm(streams: list[bytes], total_frames: int,
                    ) -> tuple[float, float, float]:
     """CPU decode. thread_count=0 → auto (all cores), =1 → single thread."""
     import av
-    codec = av.CodecContext.create(codec_name, "r")
-    if hasattr(codec, 'thread_count'):
-        codec.thread_count = thread_count
-    for i in range(WARMUP_FRAMES):
-        for _ in codec.decode(av.Packet(streams[i])):
+
+    streams = [stream for stream in streams if stream]
+    total_frames = min(total_frames, len(streams))
+    if total_frames <= 0:
+        raise RuntimeError("encoder produced no non-empty packets")
+
+    def _new_decoder():
+        codec = av.CodecContext.create(codec_name, "r")
+        if hasattr(codec, 'thread_count'):
+            codec.thread_count = thread_count
+        return codec
+
+    warmup_frames = min(WARMUP_FRAMES, total_frames)
+    warmup_codec = _new_decoder()
+    for i in range(warmup_frames):
+        for _ in warmup_codec.decode(av.Packet(streams[i])):
             pass
+
+    codec = _new_decoder()
     t0 = time.perf_counter()
     for i in range(total_frames):
         for _ in codec.decode(av.Packet(streams[i])):
@@ -274,60 +324,75 @@ def bench_cpu_warm(streams: list[bytes], total_frames: int,
 # 主流程
 # ===================================================================
 
+def _benchmark_codec(
+    title: str,
+    encoder_name: str,
+    decoder_name: str,
+    entype: int,
+) -> None:
+    print(f"═══ {title} 分辨率扫描（90 帧，GOP=30）═══")
+    print()
+    widths = [10, 12, 12, 12]
+    aligns = ["<", ">", ">", ">"]
+    _print_row(
+        ["分辨率", "VDEC帧率", "CPU多线程", "CPU单线程"],
+        widths,
+        aligns,
+    )
+    print("─" * (sum(widths) + 2 * (len(widths) - 1)))
+
+    for w, h in RESOLUTIONS:
+        vdec = None
+        try:
+            frames = make_test_frames(TEST_FRAMES, w, h)
+            streams, _, _ = encode_frames(frames, encoder_name, gop=TEST_GOP)
+            streams = [stream for stream in streams if stream]
+            total_frames = min(TEST_FRAMES, len(streams))
+            if total_frames <= 0:
+                raise RuntimeError("encoder produced no non-empty packets")
+            warmup_frames = min(WARMUP_FRAMES, total_frames)
+
+            vdec = CannVdec(w, h, entype=entype)
+            for i in range(warmup_frames):
+                vdec.decode(streams[i])
+            t0 = time.perf_counter()
+            for i in range(total_frames):
+                vdec.decode(streams[i])
+            vdec_t = time.perf_counter() - t0
+            vdec_fps = total_frames / vdec_t
+
+            _, cpu_mt_fps, cpu_mt_ms = bench_cpu_warm(
+                streams, total_frames, decoder_name, thread_count=0
+            )
+            _, cpu_st_fps, cpu_st_ms = bench_cpu_warm(
+                streams, total_frames, decoder_name, thread_count=1
+            )
+
+            _print_row(
+                [
+                    f"{w}x{h}",
+                    f"{vdec_fps:.1f}",
+                    f"{cpu_mt_fps:.1f}",
+                    f"{cpu_st_fps:.1f}",
+                ],
+                widths,
+                aligns,
+            )
+        except Exception as e:
+            _print_row([f"{w}x{h}", f"SKIP ({e})"], [10, 80], ["<", "<"])
+        finally:
+            if vdec is not None:
+                vdec.destroy()
+    print()
+
+
 def main() -> int:
     np.random.seed(RANDOM_SEED)
     _ensure_acl()
-    sep = "─" * 95
 
-    # ============ Section 1: H.264 Resolution Scan ============
-    print("═══ 1. H.264 Resolution Scan: GOP=30, 90 frames ═══")
+    _benchmark_codec("1. H.264", "libx264", "h264", ENTYPE_H264_BASE)
     print()
-    hdr = (f"{'Resolution':<16}  {'VDEC':>9}  {'CPU_mt':>9}  {'CPU_st':>9}"
-           f"  {'vs_mt':>6}  {'vs_st':>6}  {'VD_ms':>7}  {'mt_ms':>7}  {'st_ms':>7}  {'Winner':>6}")
-    print(hdr)
-    print(sep)
-
-    for w, h in RESOLUTIONS:
-        try:
-            frames = make_test_frames(TEST_FRAMES, w, h)
-            streams, i_avg, p_avg = encode_frames(frames, "libx264", gop=TEST_GOP)
-
-            vdec = CannVdec(w, h)
-            for i in range(WARMUP_FRAMES):
-                vdec.decode(streams[i])
-            t0 = time.perf_counter()
-            for i in range(TEST_FRAMES):
-                vdec.decode(streams[i])
-            vdec_t = time.perf_counter() - t0
-            vdec.destroy()
-            vdec_fps = TEST_FRAMES / vdec_t
-            vdec_ms = vdec_t / TEST_FRAMES * 1000
-
-            _, cpu_mt_fps, cpu_mt_ms = bench_cpu_warm(streams, TEST_FRAMES, "h264", thread_count=0)
-            _, cpu_st_fps, cpu_st_ms = bench_cpu_warm(streams, TEST_FRAMES, "h264", thread_count=1)
-
-            speedup_mt = vdec_fps / cpu_mt_fps
-            speedup_st = vdec_fps / cpu_st_fps
-            winner = "VDEC" if speedup_mt > 1.0 or speedup_st > 1.0 else "CPU"
-
-            print(f"{w}x{h:<9}  {vdec_fps:>9.1f}  {cpu_mt_fps:>9.1f}  {cpu_st_fps:>9.1f}"
-                  f"  {speedup_mt:>5.2f}x {speedup_st:>5.2f}x"
-                  f"  {vdec_ms:>6.1f}ms {cpu_mt_ms:>6.1f}ms {cpu_st_ms:>6.1f}ms"
-                  f"  {winner:>6}"
-                  f"  [I{i_avg//1000}KB P{p_avg//1000}KB]")
-        except Exception as e:
-            print(f"{w}x{h:<9}  SKIP ({e})")
-    print()
-
-    # ============ Summary ============
-    print("VDEC 耗时分解 (720p I-frame, 4Mbps, 近似值，仅供参考):")
-    print("  dvpp_malloc + memcpy(in):  ~0.8ms")
-    print("  send → callback (hardware): ~12.6ms  ← 纯硬件解码")
-    print("  callback + memcpy(out):     ~1.2ms")
-    print("  Total:                      ~14.6ms")
-    print("  CPU same frame:              ~2.5ms\n")
-    print("★ Ascend 310B4 VDEC 在 ≤1080p H.264 单路上慢于 CPU。")
-    print("  甜区: 4K / H.265 / 多路并发 / 零拷贝管道。")
+    _benchmark_codec("2. H.265", "libx265", "hevc", ENTYPE_H265_MAIN)
     return 0
 
 

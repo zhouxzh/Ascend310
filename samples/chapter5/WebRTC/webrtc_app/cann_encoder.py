@@ -90,7 +90,7 @@ def get_session_bitrate_override_kbps() -> Optional[int]:
 
 
 # ---------------------------------------------------------------------------
-#  CANN constants  (from CANN acllite/constants.py)
+#  CANN constants
 # ---------------------------------------------------------------------------
 ENTYPE_H265_MAIN = 0
 ENTYPE_H264_BASE = 1

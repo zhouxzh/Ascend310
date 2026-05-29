@@ -16,6 +16,10 @@
 
 HTTP `POST /offer` 只是信令，不在媒体路径里。
 
+详细架构说明、H.265 实现原理和 311 实测分析见教程正文：
+
+- [src/book/chapter5.md](../../../src/book/chapter5.md)
+
 ## 仓库现状
 
 仓库当前围绕三条视频路径工作：
@@ -176,94 +180,13 @@ H.265 的失败时机不是“服务端启动失败”，而是“浏览器发�
 
 浏览器页也会在本地先做一层 H.265 能力检查。
 
-## 最近在 311 上的实测结果
+## 性能结论在哪
 
-下面这些数据来自 `311`（`orangepiaipro`）上 2026-05-26 的最新日志，不是理论值。
+README 只保留运行和排障说明。
 
-测试分成三类：
+311（`orangepiaipro`）上 2026-05-26 的 1080p60 实测数据、H.264/H.265 对比和链路瓶颈分析已经整理到教程正文：
 
-### 1. 纯 CPU
-
-命令：
-
-```bash
-python server.py --source usb_camera --host 0.0.0.0 --port 8080
-```
-
-路径：
-
-`V4L2 MJPEG -> CPU JPEG decode -> RGB -> libx264`
-
-日志特征：
-
-- `Configured USB camera source=usb-camera ... CPU_DECODE->RGB`
-- `USB camera decode frame=... decode_ms=20~32`
-- `Track FPS: 14.2 / 14.6 / 15.3 / 14.9 / 15.0 / 15.1`
-
-结论：
-
-- `1920x1080@60` 请求下，实际只有大约 `15 fps`
-- 主要瓶颈是 CPU JPEG 解码
-
-### 2. H.264 硬编
-
-命令：
-
-```bash
-python server.py --source dvpp_camera --video-codec h264 --host 0.0.0.0 --port 8080
-```
-
-路径：
-
-`V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.264`
-
-代表日志：
-
-- `DVPP decode frame=... decode_ms=4.9~9.5`
-- `VENC encode frame=... encode_ms=6.3~6.5`
-- `Track FPS: 59.7 / 60.2 / 60.0 / 59.9 ...`
-
-结论：
-
-- `1920x1080@60` 下基本可以稳定在 `60 fps`
-- 目前是这套链路里最稳的配置
-
-### 3. H.265 硬编
-
-命令：
-
-```bash
-python server.py --source dvpp_camera --video-codec h265 --host 0.0.0.0 --port 8080
-```
-
-路径：
-
-`V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.265`
-
-代表日志：
-
-- `DVPP decode frame=... decode_ms=4.9~9.2`
-- `H265 VENC encode frame=... encode_ms=6.2~6.6`
-- 稳定样本：`Track FPS` 大约 `57~59`
-- 异常样本：个别运行段会掉到 `35 fps`
-
-结论：
-
-- H.265 的码流更小
-- 但按这次 311 的日志，整体稳定性不如 H.264
-- 如果目标是“1080p60 稳定推流”，当前优先选 H.264
-
-### 汇总表
-
-| 模式 | 路径 | 311 上实测表现 |
-|------|------|----------------|
-| 纯 CPU | `usb_camera` + `libx264` | 约 `15 fps` |
-| H.264 硬编 | `dvpp_camera` + CANN VENC | 基本稳定 `60 fps` |
-| H.265 硬编 | `dvpp_camera` + CANN VENC | 通常 `57~59 fps`，个别样本掉到 `35 fps` |
-
-当前这台 `311` 的结论很直接：
-
-`H.264 硬编 > H.265 硬编 >>> 纯 CPU`
+- [src/book/chapter5.md：集成实战 WebRTC 推流性能对比](../../../src/book/chapter5.md#集成实战webrtc-推流性能对比)
 
 ## 为什么浏览器会显示 1920x1088
 
@@ -354,11 +277,11 @@ v4l2-ctl -d /dev/video0 \
 
 ## 代码怎么接入真实 310B 输出
 
-最应该改的文件是：
+扩展真实输入源时，优先改：
 
 - [webrtc_app/ascend_source.py](./webrtc_app/ascend_source.py)
 
-建议保持边界：
+建议保持下面的边界：
 
 1. 在 `AscendVideoTrack` 里新增 source 分支
 2. 用 `_init_xxx()` 初始化真实输入
@@ -366,34 +289,15 @@ v4l2-ctl -d /dev/video0 \
 4. 尽量输出 `nv12`，方便 VENC 直通
 5. 不要把设备专属逻辑散到 `server.py` 和浏览器代码里
 
-## 当前实现里最关键的文件
+## 关键文件索引
 
-### `server.py`
-
-- 管 HTTP 路由
-- 管 `POST /offer`
-- 管 `RTCPeerConnection`
-- 管 H.264 / H.265 编码器注册
-- 管旧连接清理
-
-### `webrtc_app/ascend_source.py`
-
-- 管 demo / usb_camera / dvpp_camera 三条帧源路径
-- 管 `recv()` 输出帧
-- 管帧率节奏和状态回传
-
-### `webrtc_app/cann_encoder.py`
-
-- 管 CANN VENC 通道
-- 管 H.264 / H.265 编码器适配
-- 管自动码率估算和手动目标码率覆盖
-
-### `web/client.js`
-
-- 管浏览器端 `recvonly` 协商
-- 管 H.265 能力检查
-- 管分辨率 / 帧率 / 目标码率建连参数
-- 管接收码率和帧率显示
+| 文件 | 作用 |
+|------|------|
+| [server.py](./server.py) | HTTP 路由、`POST /offer`、`RTCPeerConnection`、H.264/H.265 编码器注册、旧连接清理 |
+| [webrtc_app/ascend_source.py](./webrtc_app/ascend_source.py) | demo / usb_camera / dvpp_camera 三条帧源路径、`recv()` 输出帧、帧率节奏和状态回传 |
+| [webrtc_app/cann_encoder.py](./webrtc_app/cann_encoder.py) | CANN VENC 通道、H.264/H.265 编码器适配、自动码率估算和手动目标码率覆盖 |
+| [webrtc_app/hevc.py](./webrtc_app/hevc.py) | H.265 Annex-B NAL 解析和 RTP 分包 |
+| [web/client.js](./web/client.js) | 浏览器端 `recvonly` 协商、H.265 能力检查、分辨率 / 帧率 / 目标码率建连参数、接收码率和帧率显示 |
 
 ## 当前依赖
 

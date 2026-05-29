@@ -1,17 +1,17 @@
 \chapter{案例8：手势识别}\label{ux6848ux4f8b8ux624bux52bfux8bc6ux522b}
 
-\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+\section{1. 项目简介}\label{src-experiment-case8-h1}
 
 本项目基于昇腾 310B 平台，构建一个实时手势识别系统，能够通过摄像头识 别
 10 种常见静态手势。系统采用 MobileNetV3-Small 卷积神经网络，覆盖从
-\textbf{模型训练 → ONNX 转换 → OM 部署 → 实时推理} 的完整边缘 AI
-工作流。
+\textbf{模型训练 -\textgreater{} ONNX 转换 -\textgreater{} OM 部署
+-\textgreater{} 实时推理} 的完整边缘 AI 工作流。
 
 与 case1（人脸识别）使用预训练模型不同，本项目是书中第一个完整演示
 ``训练-转换-部署''三阶段流程的案例，帮助读者理解在边缘设备上部署自定义
 模型的完整链路。
 
-\subsection{手势列表（10 种）}\label{ux624bux52bfux5217ux886810-ux79cd}
+\subsection{手势列表（10 种）}\label{src-experiment-case8-h2}
 
 { % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
@@ -21,22 +21,22 @@
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-0 & 👍 点赞 & like & 确认操作、好评 \\
-1 & 👎 不喜欢 & dislike & 取消操作、差评 \\
-2 & ✊ 握拳 & fist & 停止、关机 \\
-3 & ✋ 手掌 & palm & 暂停、停止 \\
-4 & ✌️ 剪刀手 & peace & 模式切换 \\
-5 & 👌 OK & ok & 确认、批准 \\
-6 & 🤘 摇滚 & rock & 特殊功能 \\
-7 & 📞 打电话 & call & 触发通话 \\
-8 & 🛑 停止 & stop & 急停 \\
-9 & 🫥 无手势 & no\_gesture & 空闲状态 \\
+0 & 点赞 点赞 & like & 确认操作、好评 \\
+1 & 不喜欢 不喜欢 & dislike & 取消操作、差评 \\
+2 & 握拳 握拳 & fist & 停止、关机 \\
+3 & 手掌 手掌 & palm & 暂停、停止 \\
+4 & 剪刀手 剪刀手 & peace & 模式切换 \\
+5 & OK OK & ok & 确认、批准 \\
+6 & 摇滚 摇滚 & rock & 特殊功能 \\
+7 & 打电话 打电话 & call & 触发通话 \\
+8 & 停止 停止 & stop & 急停 \\
+9 & 无手势 无手势 & no\_gesture & 空闲状态 \\
 \end{longtable}
 }
 
-\section{2. 内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
+\section{2. 内容大纲}\label{src-experiment-case8-h3}
 
-\subsection{2.1. 硬件准备}\label{ux786cux4ef6ux51c6ux5907}
+\subsection{2.1. 硬件准备}\label{src-experiment-case8-h4}
 
 相比旧版 case8 中列出的多摄像头阵列、深度摄像头、红外补光等复杂设
 备，本项目只需要：
@@ -78,9 +78,9 @@ flowchart LR
 RGB 摄像头在正常光照下即可达到 90\%+ 的识别准确率。深度摄像头会
 增加硬件成本和部署复杂度，对于静态手势分类任务，收益有限。
 
-\subsection{2.2. 软件环境}\label{ux8f6fux4ef6ux73afux5883}
+\subsection{2.2. 软件环境}\label{src-experiment-case8-h5}
 
-\subsubsection{操作系统与框架}\label{ux64cdux4f5cux7cfbux7edfux4e0eux6846ux67b6}
+\subsubsection{操作系统与框架}\label{src-experiment-case8-h6}
 
 { % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
@@ -99,7 +99,7 @@ Web & Gradio & 4.0+ & 聊天式 Web 界面 \\
 \end{longtable}
 }
 
-\subsubsection{环境准备}\label{ux73afux5883ux51c6ux5907}
+\subsubsection{环境准备}\label{src-experiment-case8-h7}
 
 在昇腾 310B 设备上，运行一键安装脚本：
 
@@ -120,7 +120,7 @@ bash setup.sh
 pip3 install pillow tqdm
 \end{lstlisting}
 
-\subsubsection{Python 依赖说明}\label{python-ux4f9dux8d56ux8bf4ux660e}
+\subsubsection{Python 依赖说明}\label{src-experiment-case8-h8}
 
 { % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
@@ -131,12 +131,12 @@ pip3 install pillow tqdm
 \bottomrule\noalign{}
 \endlastfoot
 \passthrough{\lstinline!gradio!} & Web 界面框架，内置摄像头组件
-(\passthrough{\lstinline!gr.Image!}) & ✓ \\
+(\passthrough{\lstinline!gr.Image!}) & 是 \\
 \passthrough{\lstinline!torch!} + \passthrough{\lstinline!torchvision!}
-& MobileNetV3 模型定义、CPU 推理回退 & ✓ \\
+& MobileNetV3 模型定义、CPU 推理回退 & 是 \\
 \passthrough{\lstinline!opencv-python!} & 图像缩放、色彩空间转换、归一化
-& ✓ \\
-\passthrough{\lstinline!numpy!} & 张量操作、softmax 计算 & ✓ \\
+& 是 \\
+\passthrough{\lstinline!numpy!} & 张量操作、softmax 计算 & 是 \\
 \passthrough{\lstinline!Pillow!} & 训练时的图像加载 & 仅训练 \\
 \passthrough{\lstinline!acl!} (CANN 自带) & NPU 推理，随 CANN 安装 &
 仅推理 \\
@@ -152,11 +152,10 @@ CANN 一起部署，Python 通过 \passthrough{\lstinline!import acl!} 调用。
 是正常的------这些包只在昇腾设备上通过 CANN 提供。代码已做好检测，这些
 包不可用时自动回退到 CPU 推理，不会报错。
 
-\subsection{2.3.
-手势识别原理}\label{ux624bux52bfux8bc6ux522bux539fux7406}
+\subsection{2.3. 手势识别原理}\label{src-experiment-case8-h9}
 
 \subsubsection{为什么选择
-MobileNetV3-Small}\label{ux4e3aux4ec0ux4e48ux9009ux62e9-mobilenetv3-small}
+MobileNetV3-Small}\label{src-experiment-case8-h10}
 
 昇腾 310B NPU 最适合运行固定输入输出形状的卷积神经网络。MobileNetV3
 系列是专为移动和边缘设备设计的轻量级 CNN，其中 Small 版本只有 250 万
@@ -172,37 +171,37 @@ MobileNetV3-Small}\label{ux4e3aux4ec0ux4e48ux9009ux62e9-mobilenetv3-small}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-\textbf{MobileNetV3-Small} & 2.5M & \textasciitilde5ms & ✓ &
+\textbf{MobileNetV3-Small} & 2.5M & \textasciitilde5ms & 是 &
 推荐，轻量高速 \\
-MobileNetV3-Large & 5.5M & \textasciitilde10ms & ✓ & 精度略高但更慢 \\
-ResNet18 & 11.7M & \textasciitilde20ms & ✓ & 偏重，延迟边缘 \\
-EfficientNet-B0 & 5.3M & \textasciitilde12ms & ✓ & 也可用 \\
-ViT-Tiny & 5.7M & \textasciitilde15ms & △ & Transformer，转换复杂 \\
+MobileNetV3-Large & 5.5M & \textasciitilde10ms & 是 & 精度略高但更慢 \\
+ResNet18 & 11.7M & \textasciitilde20ms & 是 & 偏重，延迟边缘 \\
+EfficientNet-B0 & 5.3M & \textasciitilde12ms & 是 & 也可用 \\
+ViT-Tiny & 5.7M & \textasciitilde15ms & 一般 & Transformer，转换复杂 \\
 \end{longtable}
 }
 
-\subsubsection{手势识别流程}\label{ux624bux52bfux8bc6ux522bux6d41ux7a0b}
+\subsubsection{手势识别流程}\label{src-experiment-case8-h11}
 
 \begin{lstlisting}
 flowchart TD
     START["[/摄像头采集帧/]"] --> RESIZE["缩放至 224×224"]
-    RESIZE --> NORM["BGR→RGB → 归一化\nImageNet mean/std"]
+    RESIZE --> NORM["BGR->RGB -> 归一化\nImageNet mean/std"]
     NORM --> TENSOR["转为 NCHW 张量\n(1, 3, 224, 224)"]
     TENSOR --> CHECK{"NPU 可用?"}
 
-    CHECK -->|"✓ OM 模型"| NPU_INFER["NPU 推理\nacl.mdl.execute()"]
-    CHECK -->|"✗ 回退"| CPU_INFER["CPU 推理\ntorch model()"]
+    CHECK -->|"是 OM 模型"| NPU_INFER["NPU 推理\nacl.mdl.execute()"]
+    CHECK -->|"否 回退"| CPU_INFER["CPU 推理\ntorch model()"]
 
-    NPU_INFER --> SOFTMAX["Softmax → 概率分布"]
+    NPU_INFER --> SOFTMAX["Softmax -> 概率分布"]
     CPU_INFER --> SOFTMAX
 
-    SOFTMAX --> FILTER{"max(prob) ≥ 阈值\n(默认 0.70)"}
+    SOFTMAX --> FILTER{"max(prob) >= 阈值\n(默认 0.70)"}
     FILTER -->|"是"| OUTPUT["输出: 手势类别 + 置信度"]
     FILTER -->|"否"| NO_RESULT["输出: 无手势"]
 \end{lstlisting}
 
 \subsubsection{为什么不是 LSTM /
-动态手势}\label{ux4e3aux4ec0ux4e48ux4e0dux662f-lstm-ux52a8ux6001ux624bux52bf}
+动态手势}\label{src-experiment-case8-h12}
 
 旧版 case8 中使用了 LSTM 做动态手势识别。LSTM 涉及循环结构和变长输入，
 这在 OM 离线模型（静态计算图）上难以高效运行------与 case9 中解释过的
@@ -216,13 +215,13 @@ CPU 上提取手部 21 个关键点坐标 2. 将连续 N 帧的关键点序列�
 特性。由于篇幅原因，本书仅实现静态手势识别，动态手势的扩展留给读者练
 习。
 
-\subsection{2.4. 模型训练}\label{ux6a21ux578bux8badux7ec3}
+\subsection{2.4. 模型训练}\label{src-experiment-case8-h13}
 
 训练在 GPU 或 CPU 工作站上完成，不占用昇腾设备。训练好的
 \passthrough{\lstinline!.pth!} 权重
 文件再拷贝到昇腾设备上进行转换和部署。
 
-\subsubsection{数据集：HaGRID}\label{ux6570ux636eux96c6hagrid}
+\subsubsection{数据集：HaGRID}\label{src-experiment-case8-h14}
 
 \href{https://github.com/hukenovs/hagrid}{HaGRID}（Hand Gesture
 Recognition Image Dataset）是一个开源手势识别数据集，包含 18
@@ -254,7 +253,7 @@ data/hagrid/
 └── no_gesture/    # 无手势 / 背景图片
 \end{lstlisting}
 
-\subsubsection{训练流程}\label{ux8badux7ec3ux6d41ux7a0b}
+\subsubsection{训练流程}\label{src-experiment-case8-h15}
 
 \begin{lstlisting}
 flowchart TD
@@ -265,7 +264,7 @@ flowchart TD
     TRAIN_DS --> AUG["数据增强\n· RandomResizedCrop\n· RandomHorizontalFlip\n· RandomRotation\n· ColorJitter"]
     AUG --> LOADER["DataLoader\nbatch=32"]
 
-    MODEL["MobileNetV3-Small\nImageNet 预训练"] --> HEAD["替换分类头\n1000 → 10 类"]
+    MODEL["MobileNetV3-Small\nImageNet 预训练"] --> HEAD["替换分类头\n1000 -> 10 类"]
     HEAD --> TRAIN_LOOP["训练循环\n· AdamW (lr=1e-3)\n· CosineAnnealingLR\n· CrossEntropyLoss"]
 
     LOADER --> TRAIN_LOOP
@@ -275,7 +274,7 @@ flowchart TD
     VALID --> BEST["保存最佳模型\nmodels/gesture_mobilenetv3.pth"]
 \end{lstlisting}
 
-\subsubsection{训练命令}\label{ux8badux7ec3ux547dux4ee4}
+\subsubsection{训练命令}\label{src-experiment-case8-h16}
 
 \begin{lstlisting}[language=bash]
 # 完整训练（30 epochs，约 30 分钟 / GPU）
@@ -294,7 +293,7 @@ python3 train.py --no-cuda --batch-size 8 --epochs 10
 训练完成后，最佳模型权重保存在
 \passthrough{\lstinline!models/gesture\_mobilenetv3.pth!}。
 
-\subsubsection{关键训练参数}\label{ux5173ux952eux8badux7ec3ux53c2ux6570}
+\subsubsection{关键训练参数}\label{src-experiment-case8-h17}
 
 { % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
@@ -327,8 +326,7 @@ python3 train.py --no-cuda --batch-size 8 --epochs 10
   \textbf{ColorJitter}：亮度、对比度、饱和度抖动，适应不同光照
 \end{itemize}
 
-\subsection{2.5.
-模型转换与昇腾部署}\label{ux6a21ux578bux8f6cux6362ux4e0eux6607ux817eux90e8ux7f72}
+\subsection{2.5. 模型转换与昇腾部署}\label{src-experiment-case8-h18}
 
 训练得到的 \passthrough{\lstinline!.pth!} 文件需要通过两次转换才能在
 310B NPU 上运行。
@@ -348,7 +346,7 @@ flowchart TD
     end
 
     subgraph DEPLOY["4. 推理部署"]
-        APP["app.py → GestureClassifier\n→ AscendModel.execute()"]
+        APP["app.py -> GestureClassifier\n-> AscendModel.execute()"]
     end
 
     PTH -->|"torch.onnx.export()\nopset=11"| ONNX
@@ -356,7 +354,7 @@ flowchart TD
     OM -->|"acl.mdl.execute()"| APP
 \end{lstlisting}
 
-\subsubsection{步骤 1：导出 ONNX}\label{ux6b65ux9aa4-1ux5bfcux51fa-onnx}
+\subsubsection{步骤 1：导出 ONNX}\label{src-experiment-case8-h19}
 
 \begin{lstlisting}[language=bash]
 # 仅导出 ONNX（可在工作站上运行，不需要昇腾硬件）
@@ -375,8 +373,8 @@ MobileNetV3-Small 模型结构 3. 用
 \passthrough{\lstinline!dynamic\_axes=\{\}!} 参数------我们刻意禁用了
 动态形状，确保与 ATC 转换兼容。
 
-\subsubsection{步骤 2：ATC 转换 ONNX →
-OM}\label{ux6b65ux9aa4-2atc-ux8f6cux6362-onnx-om}
+\subsubsection{步骤 2：ATC 转换 ONNX -\textgreater{}
+OM}\label{src-experiment-case8-h20}
 
 \begin{lstlisting}[language=bash]
 # 在昇腾设备上运行
@@ -419,7 +417,7 @@ atc --model=models/gesture_mobilenetv3.onnx \
 \passthrough{\lstinline!npu-smi info!} 查看。如果你的设备显示不同的版本
 号，请修改 \passthrough{\lstinline!prepare\_models.py!} 中对应的值。
 
-\subsubsection{跳过训练：使用预训练模型}\label{ux8df3ux8fc7ux8badux7ec3ux4f7fux7528ux9884ux8badux7ec3ux6a21ux578b}
+\subsubsection{跳过训练：使用预训练模型}\label{src-experiment-case8-h21}
 
 如果你不想自己训练，可以下载预训练好的 \passthrough{\lstinline!.pth!}
 文件：
@@ -428,10 +426,9 @@ atc --model=models/gesture_mobilenetv3.onnx \
 python3 prepare_models.py --download
 \end{lstlisting}
 
-然后直接进入 ONNX → OM 转换。这大幅降低了上手门槛。
+然后直接进入 ONNX -\textgreater{} OM 转换。这大幅降低了上手门槛。
 
-\subsection{2.6.
-实时摄像头采集}\label{ux5b9eux65f6ux6444ux50cfux5934ux91c7ux96c6}
+\subsection{2.6. 实时摄像头采集}\label{src-experiment-case8-h22}
 
 Gradio 的 \passthrough{\lstinline!gr.Image!} 组件内置了摄像头支持，选择
 \passthrough{\lstinline!source="webcam"!} 即
@@ -449,10 +446,10 @@ flowchart LR
 
     subgraph BACKEND["Python 后端"]
         RECEIVE["接收 numpy 帧\n(H, W, 3) BGR"]
-        RECEIVE --> RESIZE["cv2.resize\n→ 224×224"]
-        RESIZE --> RGB["cv2.cvtColor\nBGR→RGB"]
-        RGB --> NORM["归一化\n/255 → mean/std"]
-        NORM --> TENSOR["→ NCHW (1,3,224,224)"]
+        RECEIVE --> RESIZE["cv2.resize\n-> 224×224"]
+        RESIZE --> RGB["cv2.cvtColor\nBGR->RGB"]
+        RGB --> NORM["归一化\n/255 -> mean/std"]
+        NORM --> TENSOR["-> NCHW (1,3,224,224)"]
     end
 
     subgraph INFER["推理"]
@@ -480,10 +477,11 @@ flowchart LR
   \textbf{归一化}：\passthrough{\lstinline!(pixel / 255 - mean) / std!}
   --- 使用 ImageNet 统计值
 \item
-  \textbf{维度重排}：HWC → CHW → NCHW --- 匹配模型要求的 NCHW 格式
+  \textbf{维度重排}：HWC -\textgreater{} CHW -\textgreater{} NCHW ---
+  匹配模型要求的 NCHW 格式
 \end{enumerate}
 
-\subsection{2.7. Web 界面}\label{web-ux754cux9762}
+\subsection{2.7. Web 界面}\label{src-experiment-case8-h23}
 
 本项目使用 Gradio 构建 Web 界面，通过
 \passthrough{\lstinline!gr.Image(source="webcam", streaming=True)!}
@@ -492,8 +490,8 @@ flowchart LR
 \begin{lstlisting}
 flowchart TD
     subgraph UI["Gradio Blocks 界面"]
-        TAB1["📷 手势识别 (Tab 1)"]
-        TAB2["⚙️ 设置 (Tab 2)"]
+        TAB1[" 手势识别 (Tab 1)"]
+        TAB2[" 设置 (Tab 2)"]
     end
 
     subgraph TAB1_DETAIL["识别 Tab"]
@@ -513,8 +511,7 @@ flowchart TD
     TAB2 --> TAB2_DETAIL
 \end{lstlisting}
 
-\subsubsection{关键 Gradio
-事件流}\label{ux5173ux952e-gradio-ux4e8bux4ef6ux6d41}
+\subsubsection{关键 Gradio 事件流}\label{src-experiment-case8-h24}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -531,7 +528,7 @@ flowchart TD
   列表）
 \end{enumerate}
 
-\subsubsection{界面布局}\label{ux754cux9762ux5e03ux5c40}
+\subsubsection{界面布局}\label{src-experiment-case8-h25}
 
 \begin{itemize}
 \tightlist
@@ -544,7 +541,7 @@ flowchart TD
   最 近 10 次识别历史
 \end{itemize}
 
-\subsubsection{双后端切换}\label{ux53ccux540eux7aefux5207ux6362}
+\subsubsection{双后端切换}\label{src-experiment-case8-h26}
 
 \passthrough{\lstinline!GestureClassifier!} 在初始化时自动检测 NPU
 可用性：
@@ -563,13 +560,13 @@ class GestureClassifier:
         self._init_cpu_backend()        # CPU 回退
 \end{lstlisting}
 
-这意味着： - 在昇腾 310B 上 → 自动使用 OM 模型，NPU 推理 -
-在没有昇腾硬件的机器上 → 自动使用 PyTorch，CPU 推理 -
+这意味着： - 在昇腾 310B 上 -\textgreater{} 自动使用 OM 模型，NPU 推理 -
+在没有昇腾硬件的机器上 -\textgreater{} 自动使用 PyTorch，CPU 推理 -
 同一份代码，无需修改任何配置
 
-\subsection{2.8. 用户手册}\label{ux7528ux6237ux624bux518c}
+\subsection{2.8. 用户手册}\label{src-experiment-case8-h27}
 
-\subsubsection{2.8.1 部署}\label{ux90e8ux7f72}
+\subsubsection{2.8.1 部署}\label{src-experiment-case8-h28}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -590,7 +587,7 @@ class GestureClassifier:
   浏览器打开 \passthrough{\lstinline!http://<设备IP>:7860!}
 \end{enumerate}
 
-\subsubsection{2.8.2 使用}\label{ux4f7fux7528}
+\subsubsection{2.8.2 使用}\label{src-experiment-case8-h29}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -617,8 +614,7 @@ class GestureClassifier:
   \end{itemize}
 \end{enumerate}
 
-\subsubsection{2.8.3
-添加自定义手势}\label{ux6dfbux52a0ux81eaux5b9aux4e49ux624bux52bf}
+\subsubsection{2.8.3 添加自定义手势}\label{src-experiment-case8-h30}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -637,7 +633,7 @@ class GestureClassifier:
   运行 \passthrough{\lstinline!python3 prepare\_models.py!} 重新转换
 \end{enumerate}
 
-\subsubsection{2.8.4 故障排除}\label{ux6545ux969cux6392ux9664}
+\subsubsection{2.8.4 故障排除}\label{src-experiment-case8-h31}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -671,7 +667,7 @@ CPU 模式下''随机预测'' & 未加载训练权重 & 先运行
 \end{longtable}
 }
 
-\section{3. 源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
+\section{3. 源代码结构}\label{src-experiment-case8-h32}
 
 \begin{lstlisting}
 case8/
@@ -683,7 +679,7 @@ case8/
 ├── setup.sh               # 一键环境安装
 ├── requirements.txt       # Python 依赖列表
 ├── data/
-│   └── gesture_labels.json  # 手势类别 ID → 中英文映射
+│   └── gesture_labels.json  # 手势类别 ID -> 中英文映射
 ├── models/                   # 模型文件目录 (.pth / .onnx / .om)
 └── README.md                 # 快速开始指南
 \end{lstlisting}
@@ -723,16 +719,16 @@ flowchart TB
   \passthrough{\lstinline!app.py!} 的 Gradio 模式与 case9
   一致（\passthrough{\lstinline!gr.Blocks!} + lazy init）
 \item
-  \passthrough{\lstinline!prepare\_models.py!} 的 ONNX → ATC 流程与
-  case1 一致
+  \passthrough{\lstinline!prepare\_models.py!} 的 ONNX -\textgreater{}
+  ATC 流程与 case1 一致
 \item
   \passthrough{\lstinline!train.py!}
   是本书第一个训练脚本，展示了数据加载、增强、训练循环的 完整流程
 \end{itemize}
 
-\section{4. 效果演示}\label{ux6548ux679cux6f14ux793a}
+\section{4. 效果演示}\label{src-experiment-case8-h33}
 
-\subsection{预期效果}\label{ux9884ux671fux6548ux679c}
+\subsection{预期效果}\label{src-experiment-case8-h34}
 
 在正常室内光照条件下，系统对各手势的预期识别准确率：
 
@@ -744,20 +740,20 @@ flowchart TB
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-👍 点赞 & 95\%+ & 特征明显，角度鲁棒 \\
-✊ 握拳 & 93\%+ & 手型独特 \\
-✋ 手掌 & 94\%+ & 特征清晰 \\
-✌️ 剪刀手 & 92\%+ & 需要明确伸出两指 \\
-👌 OK & 90\%+ & 需要手指贴合 \\
-📞 打电话 & 88\%+ & 手型类似握拳 \\
-👎 不喜欢 & 91\%+ & 方向敏感 \\
-🤘 摇滚 & 87\%+ & 需要明确伸出两指 \\
-🛑 停止 & 93\%+ & 与手掌类似，需要上下文 \\
-🫥 无手势 & 90\%+ & 背景多样性影响 \\
+点赞 点赞 & 95\%+ & 特征明显，角度鲁棒 \\
+握拳 握拳 & 93\%+ & 手型独特 \\
+手掌 手掌 & 94\%+ & 特征清晰 \\
+剪刀手 剪刀手 & 92\%+ & 需要明确伸出两指 \\
+OK OK & 90\%+ & 需要手指贴合 \\
+打电话 打电话 & 88\%+ & 手型类似握拳 \\
+不喜欢 不喜欢 & 91\%+ & 方向敏感 \\
+摇滚 摇滚 & 87\%+ & 需要明确伸出两指 \\
+停止 停止 & 93\%+ & 与手掌类似，需要上下文 \\
+无手势 无手势 & 90\%+ & 背景多样性影响 \\
 \end{longtable}
 }
 
-\subsection{性能指标}\label{ux6027ux80fdux6307ux6807}
+\subsection{性能指标}\label{src-experiment-case8-h35}
 
 { % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
@@ -774,37 +770,37 @@ flowchart TB
 \end{longtable}
 }
 
-\subsection{浏览器中的效果}\label{ux6d4fux89c8ux5668ux4e2dux7684ux6548ux679c}
+\subsection{浏览器中的效果}\label{src-experiment-case8-h36}
 
 Gradio 界面在浏览器中的预期布局：
 
 \begin{lstlisting}
 ┌──────────────────────────────────────────────────┐
-│  ✋ 手势识别系统                                  │
+│  手掌 手势识别系统                                  │
 │  MobileNetV3-Small 实时手势分类                   │
 ├────────────────────┬─────────────────────────────┤
-│  📷 手势识别        │  📊 识别结果                 │
+│   手势识别        │   识别结果                 │
 │                    │                             │
-│                    │  👍 点赞 (like)             │
+│                    │  点赞 点赞 (like)             │
 │   [摄像头实时画面]   │  置信度: 94.3%              │
 │                    │  ████████████████░░░        │
 │                    │                             │
 │                    │  - 手掌 (palm): 4.2%        │
 │                    │  - OK (ok): 1.1%            │
 │                    │                             │
-│                    │  ⏱ 推理耗时: 6.2 ms         │
-│                    │  🖥 推理后端: NPU            │
+│                    │   推理耗时: 6.2 ms         │
+│                    │   推理后端: NPU            │
 │                    ├─────────────────────────────┤
-│                    │  📜 识别历史                  │
+│                    │   识别历史                  │
 │                    │  1. 点赞 (94.3%)             │
 │                    │  2. 点赞 (91.7%)             │
 │                    │  3. 无手势 (85.2%)           │
 ├────────────────────┴─────────────────────────────┤
-│  [📷 手势识别]  [⚙️ 设置]                         │
+│  [ 手势识别]  [ 设置]                         │
 └──────────────────────────────────────────────────┘
 \end{lstlisting}
 
-\subsection{如何验证系统正常工作}\label{ux5982ux4f55ux9a8cux8bc1ux7cfbux7edfux6b63ux5e38ux5de5ux4f5c}
+\subsection{如何验证系统正常工作}\label{src-experiment-case8-h37}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -814,11 +810,11 @@ Gradio 界面在浏览器中的预期布局：
 \item
   授权摄像头
 \item
-  对着摄像头做出 👍 点赞手势
+  对着摄像头做出 点赞 点赞手势
 \item
   观察右侧是否显示''点赞 (like)``且置信度 \textgreater80\%
 \item
-  切换到 ✊ 握拳，确认识别结果随之更新
+  切换到 握拳 握拳，确认识别结果随之更新
 \item
   打开设置面板，将阈值调到 0.95，观察低置信度的预测被过滤
 \item

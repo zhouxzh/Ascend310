@@ -1,4 +1,4 @@
-"""VENC 硬件 vs CPU 软件编码性能对比 (H.264).
+"""VENC 硬件 vs CPU 软件编码性能对比 (H.264 / H.265).
 
 分辨率扫描 480p → 4K, GOP=30 (I/P 混合), 确定性测试帧。
 
@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import ctypes
 import fractions
+import gc
 import queue
 import time
+import unicodedata
 
 import numpy as np
 
@@ -43,9 +45,31 @@ ACL_MEMCPY_DEVICE_TO_HOST = 2
 
 PIX_FMT_NV12 = 1
 ENTYPE_H264_BASE = 1
+ENTYPE_H265_MAIN = 0
 
 _ACL_CTX = None
 _ACL_READY = False
+
+
+def _display_width(text: object) -> int:
+    """Return terminal display width, treating CJK wide chars as two columns."""
+    width = 0
+    for ch in str(text):
+        width += 2 if unicodedata.east_asian_width(ch) in ("F", "W") else 1
+    return width
+
+
+def _pad(text: object, width: int, align: str = ">") -> str:
+    text = str(text)
+    spaces = max(0, width - _display_width(text))
+    if align == "<":
+        return text + " " * spaces
+    return " " * spaces + text
+
+
+def _print_row(values: list[object], widths: list[int], aligns: list[str]) -> None:
+    print("  ".join(_pad(value, width, align)
+                    for value, width, align in zip(values, widths, aligns)))
 
 
 def _ensure_acl():
@@ -67,53 +91,51 @@ def _ensure_acl():
 
 
 # ===================================================================
-# 测试帧生成（确定性 NV12，可复现）
+# 测试帧生成（确定性 YUV420/NV12，可复现）
 # ===================================================================
 
-def make_test_nv12(n: int, w: int, h: int) -> list[np.ndarray]:
-    """生成 n 帧确定性 NV12 — Y 通道用渐变+移动条，UV 置 128（灰色）。
+def make_test_yuv420_frame(i: int, w: int, h: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """生成一帧确定性 YUV420 测试图像，返回 Y、U、V 三个平面。
 
     与 VDEC 基准测试使用相同的确定性内容策略，保证可复现。
     """
-    frames = []
-    for i in range(n):
-        y = np.zeros((h, w), dtype=np.uint8)
-        # 水平渐变
-        y[:, :] = ((np.arange(w) / w * 255 + i * 4) % 255).astype(np.uint8)[None, :]
-        # 垂直渐变叠加
-        y[:, :] = (y.astype(np.int16) +
-                   ((np.arange(h)[:, None] / h * 127 + i * 3) % 128).astype(np.int16)
-                   ).clip(0, 255).astype(np.uint8)
-        # 移动白条
-        bar_x = int((np.sin(i / 15.0) + 1) * 0.5 * (w - 64))
-        y[:, bar_x:bar_x + 64] = 255
-        # 角落棋盘格
-        xx, yy = np.meshgrid(np.arange(32), np.arange(32))
-        chess = ((xx // 8 + yy // 8) % 2 == 0)
-        y[:32, :32][chess] = 255
-        uv = np.full((h // 2, w), 128, dtype=np.uint8)
-        frames.append(np.vstack([y, uv]))
-    return frames
+    y = np.zeros((h, w), dtype=np.uint8)
+    # 水平渐变
+    y[:, :] = ((np.arange(w) / w * 255 + i * 4) % 255).astype(np.uint8)[None, :]
+    # 垂直渐变叠加
+    y[:, :] = (y.astype(np.int16) +
+               ((np.arange(h)[:, None] / h * 127 + i * 3) % 128).astype(np.int16)
+               ).clip(0, 255).astype(np.uint8)
+    # 移动白条
+    bar_x = int((np.sin(i / 15.0) + 1) * 0.5 * (w - 64))
+    y[:, bar_x:bar_x + 64] = 255
+    # 角落棋盘格
+    xx, yy = np.meshgrid(np.arange(32), np.arange(32))
+    chess = ((xx // 8 + yy // 8) % 2 == 0)
+    y[:32, :32][chess] = 255
+
+    u = np.full((h // 2, w // 2), 128, dtype=np.uint8)
+    v = np.full((h // 2, w // 2), 128, dtype=np.uint8)
+    return y, u, v
 
 
-# ===================================================================
-# 编码测试帧生成（BGR → libx264 用）
-# ===================================================================
+def yuv420_to_nv12(y: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """YUV420 planar → NV12 semi-planar."""
+    h, w = y.shape
+    uv = np.empty((h // 2, w), dtype=np.uint8)
+    uv[:, 0::2] = u
+    uv[:, 1::2] = v
+    return np.vstack([y, uv])
 
-def make_test_bgr(n: int, w: int, h: int) -> list[np.ndarray]:
-    """生成 n 帧确定性 BGR 图像 — 与 make_test_nv12 相同的视觉内容。"""
-    frames = []
-    for i in range(n):
-        bgr = np.zeros((h, w, 3), dtype=np.uint8)
-        bgr[..., 2] = ((np.arange(w) / w * 255 + i * 4) % 255).astype(np.uint8)
-        bgr[..., 1] = ((np.arange(h)[:, None] / h * 255 + i * 3) % 255).astype(np.uint8)
-        bar_x = int((np.sin(i / 15.0) + 1) * 0.5 * (w - 64))
-        bgr[:, bar_x:bar_x + 64, :] = 255
-        xx, yy = np.meshgrid(np.arange(32), np.arange(32))
-        chess = ((xx // 8 + yy // 8) % 2 == 0)
-        bgr[:32, :32][chess] = [255, 0, 0]
-        frames.append(bgr)
-    return frames
+
+def yuv420_to_i420_ndarray(y: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """YUV420 planar → PyAV expects I420 ndarray shape (H*3/2, W)."""
+    h, w = y.shape
+    i420 = np.empty((h * 3 // 2, w), dtype=np.uint8)
+    i420[:h, :] = y
+    i420[h:h + h // 4, :] = u.reshape(h // 4, w)
+    i420[h + h // 4:h + h // 2, :] = v.reshape(h // 4, w)
+    return i420
 
 
 # ===================================================================
@@ -287,38 +309,52 @@ class CannVenc:
 # CPU 编码
 # ===================================================================
 
-def bench_libx264(frames: list[np.ndarray], bitrate_bps: int
-                  ) -> tuple[float, float, float]:
-    """CPU libx264 编码。返回 (elapsed, fps, ms_per_frame)。"""
+def _encoder_options(codec_name: str, level: str) -> dict[str, str]:
+    options = {"level": level, "tune": "zerolatency"}
+    if codec_name == "libx265":
+        options["x265-params"] = "log-level=error"
+    return options
+
+
+def bench_cpu_encode(w: int, h: int, codec_name: str, bitrate_bps: int,
+                     thread_count: int
+                     ) -> tuple[float, float, float]:
+    """CPU 软件编码。返回 (elapsed, fps, ms_per_frame)。"""
     import av
 
-    h, w = frames[0].shape[:2]
     level = "31" if w * h <= 1280 * 720 else "40"
 
-    codec = av.CodecContext.create("libx264", "w")
+    codec = av.CodecContext.create(codec_name, "w")
+    if hasattr(codec, "thread_count"):
+        codec.thread_count = thread_count
     codec.width = w
     codec.height = h
     codec.pix_fmt = "yuv420p"
     codec.bit_rate = bitrate_bps
     codec.framerate = fractions.Fraction(FPS, 1)
     codec.time_base = fractions.Fraction(1, FPS)
-    codec.options = {"level": level, "tune": "zerolatency"}
-    codec.profile = "Baseline"
-
-    rgb_frames = [av.VideoFrame.from_ndarray(b[..., ::-1], format="rgb24")
-                  for b in frames]
+    codec.options = _encoder_options(codec_name, level)
+    if codec_name == "libx264":
+        codec.profile = "Baseline"
 
     for i in range(WARMUP_FRAMES):
-        for _ in codec.encode(rgb_frames[i]):
+        y, u, v = make_test_yuv420_frame(i, w, h)
+        i420 = yuv420_to_i420_ndarray(y, u, v)
+        frame = av.VideoFrame.from_ndarray(i420, format="yuv420p")
+        for _ in codec.encode(frame):
             pass
 
     t0 = time.perf_counter()
-    for i in range(len(frames)):
-        for _ in codec.encode(rgb_frames[i]):
+    for i in range(TEST_FRAMES):
+        y, u, v = make_test_yuv420_frame(i, w, h)
+        i420 = yuv420_to_i420_ndarray(y, u, v)
+        frame = av.VideoFrame.from_ndarray(i420, format="yuv420p")
+        for _ in codec.encode(frame):
             pass
     elapsed = time.perf_counter() - t0
-    fps = len(frames) / elapsed
-    ms = elapsed / len(frames) * 1000
+
+    fps = TEST_FRAMES / elapsed
+    ms = elapsed / TEST_FRAMES * 1000
     return elapsed, fps, ms
 
 
@@ -326,59 +362,71 @@ def bench_libx264(frames: list[np.ndarray], bitrate_bps: int
 # 主流程
 # ===================================================================
 
+def _benchmark_codec(title: str, cpu_codec_name: str, entype: int,
+                     bitrate_scale: float = 1.0) -> None:
+    print(f"═══ {title} 分辨率扫描（90 帧，GOP=30）═══")
+    print()
+    widths = [10, 12, 12, 12]
+    aligns = ["<", ">", ">", ">"]
+    _print_row(
+        ["分辨率", "VENC帧率", "CPU多线程", "CPU单线程"],
+        widths,
+        aligns,
+    )
+    print("─" * (sum(widths) + 2 * (len(widths) - 1)))
+
+    for w, h in RESOLUTIONS:
+        venc = None
+        try:
+            bitrate_kbps = max(2000, int(w * h * FPS * 0.1 / 1000 * bitrate_scale))
+            bitrate_bps = bitrate_kbps * 1000
+
+            venc = CannVenc(w, h, bitrate=bitrate_kbps, entype=entype)
+            for i in range(WARMUP_FRAMES):
+                y, u, v = make_test_yuv420_frame(i, w, h)
+                nv12 = yuv420_to_nv12(y, u, v)
+                venc.encode(nv12, force_keyframe=(i == 0))
+            t0 = time.perf_counter()
+            for i in range(TEST_FRAMES):
+                y, u, v = make_test_yuv420_frame(i, w, h)
+                nv12 = yuv420_to_nv12(y, u, v)
+                venc.encode(nv12, force_keyframe=(i % TEST_GOP == 0))
+            venc_t = time.perf_counter() - t0
+            venc_fps = TEST_FRAMES / venc_t
+
+            _, cpu_mt_fps, _ = bench_cpu_encode(
+                w, h, cpu_codec_name, bitrate_bps, thread_count=0
+            )
+            _, cpu_st_fps, _ = bench_cpu_encode(
+                w, h, cpu_codec_name, bitrate_bps, thread_count=1
+            )
+
+            _print_row(
+                [
+                    f"{w}x{h}",
+                    f"{venc_fps:.1f}",
+                    f"{cpu_mt_fps:.1f}",
+                    f"{cpu_st_fps:.1f}",
+                ],
+                widths,
+                aligns,
+            )
+        except Exception as e:
+            _print_row([f"{w}x{h}", f"SKIP ({e})"], [10, 80], ["<", "<"])
+        finally:
+            if venc is not None:
+                venc.destroy()
+            gc.collect()
+    print()
+
+
 def main() -> int:
     np.random.seed(RANDOM_SEED)
     _ensure_acl()
-    sep = "─" * 95
 
-    print("═══ VENC H.264 Resolution Scan: GOP=30, 90 frames ═══")
+    _benchmark_codec("1. H.264", "libx264", ENTYPE_H264_BASE, bitrate_scale=1.0)
     print()
-    hdr = (f"{'Resolution':<16}  {'VENC':>9}  {'CPU':>9}"
-           f"  {'Speedup':>7}  {'VENC_ms':>7}  {'CPU_ms':>7}"
-           f"  {'Winner':>6}")
-    print(hdr)
-    print(sep)
-
-    for w, h in RESOLUTIONS:
-        try:
-            bitrate_kbps = max(2000, int(w * h * FPS * 0.1 / 1000))
-            bitrate_bps = bitrate_kbps * 1000
-
-            nv12_frames = make_test_nv12(TEST_FRAMES, w, h)
-            bgr_frames = make_test_bgr(TEST_FRAMES, w, h)
-
-            # --- VENC ---
-            venc = CannVenc(w, h, bitrate=bitrate_kbps)
-            for i in range(WARMUP_FRAMES):
-                venc.encode(nv12_frames[i], force_keyframe=(i == 0))
-            t0 = time.perf_counter()
-            for i in range(TEST_FRAMES):
-                venc.encode(nv12_frames[i], force_keyframe=(i % TEST_GOP == 0))
-            venc_t = time.perf_counter() - t0
-            venc.destroy()
-            venc_fps = TEST_FRAMES / venc_t
-            venc_ms = venc_t / TEST_FRAMES * 1000
-
-            # --- CPU libx264 ---
-            _, cpu_fps, cpu_ms = bench_libx264(bgr_frames, bitrate_bps)
-
-            speedup = venc_fps / cpu_fps
-            winner = "VENC" if speedup > 1.0 else "CPU"
-
-            print(f"{w}x{h:<9}  {venc_fps:>9.1f}  {cpu_fps:>9.1f}"
-                  f"  {speedup:>5.2f}x"
-                  f"  {venc_ms:>6.1f}ms {cpu_ms:>6.1f}ms"
-                  f"  {winner:>6}"
-                  f"  [{bitrate_kbps//1000}Mbps]")
-        except Exception as e:
-            print(f"{w}x{h:<9}  SKIP ({e})")
-    print()
-
-    print("结果解读")
-    print("  VENC 硬件编码在所有分辨率下均碾压 CPU（4.9x~9.8x），")
-    print("  延迟与像素数线性增长（4.3ms@480p → 34.5ms@4K），无明显调度瓶颈。")
-    print("  与 VDEC 不同，VENC 没有 ~59ms 的固定延迟门槛——")
-    print("  VENC 是 VDEC 的反面：所有场景都应该用硬件编码。")
+    _benchmark_codec("2. H.265", "libx265", ENTYPE_H265_MAIN, bitrate_scale=0.7)
     return 0
 
 

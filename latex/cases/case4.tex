@@ -1,6 +1,6 @@
 \chapter{案例4：智能掌纹识别机}\label{ux6848ux4f8b4ux667aux80fdux638cux7eb9ux8bc6ux522bux673a}
 
-\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+\section{1. 项目简介}\label{src-experiment-case4-h1}
 
 本项目基于昇腾 310B 平台，构建一个高精度的掌纹识别系统。掌纹识别作为一种
 生物识别技术，具有纹理丰富、难以伪造、非接触式采集等优势，在门禁控制、
@@ -15,7 +15,7 @@ verification)} 问题而非闭集分类问题：系统通过 GhostNet
 进行高效的余弦相似度检索，新用户注册时无需重新训练模型，只需将其特征向量
 加入索引即可。
 
-\subsection{与已有案例的关系}\label{ux4e0eux5df2ux6709ux6848ux4f8bux7684ux5173ux7cfb}
+\subsection{与已有案例的关系}\label{src-experiment-case4-h2}
 
 { % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
@@ -42,9 +42,9 @@ verification)} 问题而非闭集分类问题：系统通过 GhostNet
 \textbf{案例7} 做的是 1:N 相似照片检索，\textbf{案例4} 做的是 1:1
 身份验证（含阈值判定）
 
-\section{2. 内容大纲}\label{ux5185ux5bb9ux5927ux7eb2}
+\section{2. 内容大纲}\label{src-experiment-case4-h3}
 
-\subsection{2.1. 硬件准备}\label{ux786cux4ef6ux51c6ux5907}
+\subsection{2.1. 硬件准备}\label{src-experiment-case4-h4}
 
 本项目需要的硬件分为三个层级：
 
@@ -68,7 +68,8 @@ verification)} 问题而非闭集分类问题：系统通过 GhostNet
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-图像采集 & USB 摄像头 & 掌纹图像采集 & ≥5MP 分辨率，支持自动对焦 \\
+图像采集 & USB 摄像头 & 掌纹图像采集 & \textgreater=5MP
+分辨率，支持自动对焦 \\
 照明增强 & 近红外 LED 阵列 (可选) & 增强掌纹纹理对比度 & 850nm
 波长，均匀分布 \\
 AI 计算 & 昇腾 310B 开发者套件 & 掌纹特征提取 + 向量检索 & --- \\
@@ -81,7 +82,7 @@ AI 计算 & 昇腾 310B 开发者套件 & 掌纹特征提取 + 向量检索 & --
 \begin{lstlisting}
 flowchart TB
     subgraph INPUT["图像采集"]
-        CAM["USB 摄像头\n≥5MP 自动对焦"]
+        CAM["USB 摄像头\n>=5MP 自动对焦"]
         LED["近红外 LED (可选)\n增强纹理对比度"]
     end
 
@@ -92,9 +93,9 @@ flowchart TB
     end
 
     subgraph UI["Gradio 仪表盘"]
-        ENROLL["📝 注册掌纹\n采集 3-5 张样本"]
-        VERIFY["🔍 身份验证\n实时匹配结果"]
-        ADMIN["⚙️ 系统管理\n用户列表 / 阈值调节"]
+        ENROLL[" 注册掌纹\n采集 3-5 张样本"]
+        VERIFY[" 身份验证\n实时匹配结果"]
+        ADMIN[" 系统管理\n用户列表 / 阈值调节"]
     end
 
     CAM --> CPU_A
@@ -106,9 +107,9 @@ flowchart TB
     FAISS_A --> ADMIN
 \end{lstlisting}
 
-\subsection{2.2. 软件环境}\label{ux8f6fux4ef6ux73afux5883}
+\subsection{2.2. 软件环境}\label{src-experiment-case4-h5}
 
-\subsubsection{操作系统与框架}\label{ux64cdux4f5cux7cfbux7edfux4e0eux6846ux67b6}
+\subsubsection{操作系统与框架}\label{src-experiment-case4-h6}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -141,16 +142,17 @@ Web & Gradio & 4.0+ & 仪表盘界面 \\
 \end{longtable}
 }
 
-\subsubsection{环境准备}\label{ux73afux5883ux51c6ux5907}
+\subsubsection{环境准备}\label{src-experiment-case4-h7}
 
 \begin{lstlisting}[language=bash]
 # 一键安装依赖并导出模型
 bash setup.sh
 \end{lstlisting}
 
-\passthrough{\lstinline!setup.sh!} 依次完成：系统包安装 → Python
-依赖安装 → 模型导出（如有训练好的 \passthrough{\lstinline!.pth!} 则导出
-ONNX，如有 CANN 则继续转换为 OM）。
+\passthrough{\lstinline!setup.sh!} 依次完成：系统包安装 -\textgreater{}
+Python 依赖安装 -\textgreater{} 模型导出（如有训练好的
+\passthrough{\lstinline!.pth!} 则导出 ONNX，如有 CANN 则继续转换为
+OM）。
 
 如果只想在开发机上导出 ONNX：
 
@@ -158,7 +160,7 @@ ONNX，如有 CANN 则继续转换为 OM）。
 python3 prepare_models.py --onnx-only
 \end{lstlisting}
 
-\subsubsection{Python 依赖说明}\label{python-ux4f9dux8d56ux8bf4ux660e}
+\subsubsection{Python 依赖说明}\label{src-experiment-case4-h8}
 
 { % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
@@ -168,14 +170,14 @@ python3 prepare_models.py --onnx-only
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-\passthrough{\lstinline!gradio!} & Web 仪表盘框架 & ✓ \\
+\passthrough{\lstinline!gradio!} & Web 仪表盘框架 & 是 \\
 \passthrough{\lstinline!torch!} + \passthrough{\lstinline!torchvision!}
-& GhostNet 模型定义、CPU 推理回退 & ✓ \\
+& GhostNet 模型定义、CPU 推理回退 & 是 \\
 \passthrough{\lstinline!opencv-python!} & 掌纹预处理、ROI
-检测、摄像头采集 & ✓ \\
-\passthrough{\lstinline!numpy!} & 数值计算、特征向量处理 & ✓ \\
-\passthrough{\lstinline!faiss-cpu!} & FAISS 向量索引与检索 & ✓ \\
-\passthrough{\lstinline!Pillow!} & Gradio 图像格式转换 & ✓ \\
+检测、摄像头采集 & 是 \\
+\passthrough{\lstinline!numpy!} & 数值计算、特征向量处理 & 是 \\
+\passthrough{\lstinline!faiss-cpu!} & FAISS 向量索引与检索 & 是 \\
+\passthrough{\lstinline!Pillow!} & Gradio 图像格式转换 & 是 \\
 \passthrough{\lstinline!onnx!} & ONNX 模型校验（仅 prepare\_models.py）
 & 仅转换 \\
 \passthrough{\lstinline!acl!} (CANN 自带) & NPU 推理，随 CANN 安装 &
@@ -183,27 +185,26 @@ python3 prepare_models.py --onnx-only
 \end{longtable}
 }
 
-\subsection{2.3.
-掌纹图像预处理}\label{ux638cux7eb9ux56feux50cfux9884ux5904ux7406}
+\subsection{2.3. 掌纹图像预处理}\label{src-experiment-case4-h9}
 
 掌纹 ROI（感兴趣区域）检测是整个系统的第一道关口。高质量的 ROI
 提取直接影响 后续特征提取的准确性。
 
-\subsubsection{预处理流水线}\label{ux9884ux5904ux7406ux6d41ux6c34ux7ebf}
+\subsubsection{预处理流水线}\label{src-experiment-case4-h10}
 
 \begin{lstlisting}
 flowchart TD
     RAW["摄像头帧\nBGR (H, W, 3)"] --> GRAY["灰度化\ncv2.COLOR_BGR2GRAY"]
-    GRAY --> SEG["手掌分割\nGaussianBlur → Otsu 二值化\n形态学闭/开操作"]
+    GRAY --> SEG["手掌分割\nGaussianBlur -> Otsu 二值化\n形态学闭/开操作"]
     SEG --> CONTOUR["轮廓检测\ncv2.findContours\n取最大轮廓 = 手掌"]
     CONTOUR --> VALLEY["指谷点定位\n凸包缺陷分析\n筛选深度 >3000 的凹陷"]
     VALLEY --> ROI["ROI 提取\n以指谷连线中点为基准\n向下偏移 30% 距离\n提取正方形区域"]
-    ROI --> CLAHE["对比度增强\nBGR → LAB\nCLAHE 应用于 L 通道\nLAB → BGR"]
-    CLAHE --> CHECK["质量检查\nLaplacian 方差\n< 100 → 重新采集"]
+    ROI --> CLAHE["对比度增强\nBGR -> LAB\nCLAHE 应用于 L 通道\nLAB -> BGR"]
+    CLAHE --> CHECK["质量检查\nLaplacian 方差\n< 100 -> 重新采集"]
     CHECK --> OUTPUT["输出\n(224, 224, 3) BGR"]
 \end{lstlisting}
 
-\subsubsection{关键技术细节}\label{ux5173ux952eux6280ux672fux7ec6ux8282}
+\subsubsection{关键技术细节}\label{src-experiment-case4-h11}
 
 \textbf{手掌分割}：使用 Otsu
 自适应阈值将手掌与背景分离。系统假设手掌比背景亮 （配合深色背景和 LED
@@ -230,21 +231,19 @@ BGR。这样做在不引入 色彩伪影的前提下显著增强了掌纹纹理�
 \passthrough{\lstinline!PalmPreprocessor!} 类中，纯 OpenCV
 实现，无需任何模型文件。
 
-\subsubsection{预处理失败的处理}\label{ux9884ux5904ux7406ux5931ux8d25ux7684ux5904ux7406}
+\subsubsection{预处理失败的处理}\label{src-experiment-case4-h12}
 
 预处理可能因以下原因失败：手掌未在画面中、光照过暗/过亮、手指未张开无法
 定位指谷点、图像模糊等。\passthrough{\lstinline!PalmPreprocessor.preprocess()!}
 在失败时返回 \passthrough{\lstinline!None!}
 而非抛出异常，调用方可以优雅地提示用户重新采集。
 
-\subsection{2.4. GhostNet
-特征提取}\label{ghostnet-ux7279ux5f81ux63d0ux53d6}
+\subsection{2.4. GhostNet 特征提取}\label{src-experiment-case4-h13}
 
 掌纹识别需要一个能将掌纹图像映射到判别性特征空间的模型。本案例选择
 \textbf{GhostNet 1.0x} 作为特征提取骨干网络。
 
-\subsubsection{为什么选
-GhostNet}\label{ux4e3aux4ec0ux4e48ux9009-ghostnet}
+\subsubsection{为什么选 GhostNet}\label{src-experiment-case4-h14}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -275,30 +274,30 @@ MobileNet 内置 \\
 \end{longtable}
 }
 
-\subsubsection{GhostNet 架构}\label{ghostnet-ux67b6ux6784}
+\subsubsection{GhostNet 架构}\label{src-experiment-case4-h15}
 
 \begin{lstlisting}
 flowchart TD
-    INPUT["输入\n(1, 3, 224, 224)"] --> STEM["Stem\nConv2d 3→16, stride=2\nBN + ReLU6\n(112×112×16)"]
+    INPUT["输入\n(1, 3, 224, 224)"] --> STEM["Stem\nConv2d 3->16, stride=2\nBN + ReLU6\n(112×112×16)"]
 
-    STEM --> B1["GhostBottleneck ×1\n16 → 16\nstride=1, no SE\n(112×112×16)"]
+    STEM --> B1["GhostBottleneck ×1\n16 -> 16\nstride=1, no SE\n(112×112×16)"]
 
-    B1 --> B2["GhostBottleneck ×2\n16 → 24\nstride=2 下采样\n(56×56×24)"]
+    B1 --> B2["GhostBottleneck ×2\n16 -> 24\nstride=2 下采样\n(56×56×24)"]
 
-    B2 --> B3["GhostBottleneck ×2\n24 → 40\nstride=2, SE\n(28×28×40)"]
+    B2 --> B3["GhostBottleneck ×2\n24 -> 40\nstride=2, SE\n(28×28×40)"]
 
-    B3 --> B4["GhostBottleneck ×4\n40 → 80\nstride=2\n(14×14×80)"]
+    B3 --> B4["GhostBottleneck ×4\n40 -> 80\nstride=2\n(14×14×80)"]
 
-    B4 --> B5["GhostBottleneck ×2\n80 → 112\nstride=1, SE\n(14×14×112)"]
+    B4 --> B5["GhostBottleneck ×2\n80 -> 112\nstride=1, SE\n(14×14×112)"]
 
-    B5 --> B6["GhostBottleneck ×5\n112 → 160\nstride=2, SE\n(7×7×160)"]
+    B5 --> B6["GhostBottleneck ×5\n112 -> 160\nstride=2, SE\n(7×7×160)"]
 
-    B6 --> HEAD["Head\nConv2d 160→960, BN, ReLU6\nAdaptiveAvgPool2d → (1×1)\nConv2d 960→1280\nFlatten → (1280,)"]
+    B6 --> HEAD["Head\nConv2d 160->960, BN, ReLU6\nAdaptiveAvgPool2d -> (1×1)\nConv2d 960->1280\nFlatten -> (1280,)"]
 
     HEAD --> OUTPUT["输出\n1280-dim 特征向量\n(后续 L2 归一化)"]
 \end{lstlisting}
 
-\subsubsection{Ghost 模块原理}\label{ghost-ux6a21ux5757ux539fux7406}
+\subsubsection{Ghost 模块原理}\label{src-experiment-case4-h16}
 
 标准卷积同时生成所有输出通道，存在大量冗余。Ghost 模块将卷积拆分为两步：
 
@@ -343,11 +342,12 @@ class GhostModule(nn.Module):
 注意廉价卷积后\textbf{不加 ReLU}------这是 GhostNet
 论文的设计选择，保留幻影特征图 的线性特性以保持信息多样性。
 
-\subsubsection{SE 注意力模块}\label{se-ux6ce8ux610fux529bux6a21ux5757}
+\subsubsection{SE 注意力模块}\label{src-experiment-case4-h17}
 
 GhostNet 在部分 Bottleneck 中嵌入 SE (Squeeze-and-Excitation)
-注意力模块。 SE 模块通过全局平均池化 → 压缩 → 扩展 → hard-sigmoid
-门控，自适应地调整 各通道的重要性权重。
+注意力模块。 SE 模块通过全局平均池化 -\textgreater{} 压缩
+-\textgreater{} 扩展 -\textgreater{} hard-sigmoid 门控，自适应地调整
+各通道的重要性权重。
 
 为保证 ONNX opset 11 兼容性，本实现使用手动 hard-sigmoid
 (\passthrough{\lstinline!relu6 / 6!}) 而非
@@ -361,7 +361,7 @@ def forward(self, x):
     return x * s
 \end{lstlisting}
 
-\subsubsection{特征提取模式}\label{ux7279ux5f81ux63d0ux53d6ux6a21ux5f0f}
+\subsubsection{特征提取模式}\label{src-experiment-case4-h18}
 
 GhostNet
 在特征提取模式下（\passthrough{\lstinline!num\_classes=None!}）不包含分类头，直接输出
@@ -382,14 +382,13 @@ L2 归一化确保了 FAISS \passthrough{\lstinline!IndexFlatIP!}
 \passthrough{\lstinline!GhostModule!}、\passthrough{\lstinline!SELayer!}、\passthrough{\lstinline!GhostBottleneck!}、\passthrough{\lstinline!GhostNet!}
 四个类以及工厂函数 \passthrough{\lstinline!ghostnet\_1x()!}。
 
-\subsection{2.5.
-对比学习训练}\label{ux5bf9ux6bd4ux5b66ux4e60ux8badux7ec3}
+\subsection{2.5. 对比学习训练}\label{src-experiment-case4-h19}
 
 掌纹识别是开集验证问题------系统需要判断两张掌纹是否来自同一个人，而非将掌纹
 分到某个预定义的类别。因此，本案例使用\textbf{对比学习 (contrastive
 learning)} 而非分类交叉熵来训练模型。
 
-\subsubsection{为什么用对比学习}\label{ux4e3aux4ec0ux4e48ux7528ux5bf9ux6bd4ux5b66ux4e60}
+\subsubsection{为什么用对比学习}\label{src-experiment-case4-h20}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -421,7 +420,7 @@ ArcFace & 开集 & 需要大规模身份标签，实现复杂 \\
 掌纹特征距离远}。训练完成后，新用户注册时只需将其掌纹的特征向量加入
 FAISS 索引，无需任何模型更新。
 
-\subsubsection{对比损失函数}\label{ux5bf9ux6bd4ux635fux5931ux51fdux6570}
+\subsubsection{对比损失函数}\label{src-experiment-case4-h21}
 
 \begin{lstlisting}[language=Python]
 class ContrastiveLoss(nn.Module):
@@ -445,7 +444,7 @@ class ContrastiveLoss(nn.Module):
   margin 默认为 1.0：意味着负样本对的距离应至少为 1.0
 \end{itemize}
 
-\subsubsection{数据集组织}\label{ux6570ux636eux96c6ux7ec4ux7ec7}
+\subsubsection{数据集组织}\label{src-experiment-case4-h22}
 
 训练数据按用户分文件夹存放：
 
@@ -469,7 +468,7 @@ PolyU_Palmprint/
 这种方式使得有效训练样本数远超原始图像数------即使只有 100
 个用户、每个用户 10 张图像 (共 1000 张)，也能生成数万个训练对。
 
-\subsubsection{训练命令与超参数}\label{ux8badux7ec3ux547dux4ee4ux4e0eux8d85ux53c2ux6570}
+\subsubsection{训练命令与超参数}\label{src-experiment-case4-h23}
 
 \begin{lstlisting}[language=bash]
 python3 train.py --data-dir /path/to/PolyU_Palmprint
@@ -494,7 +493,7 @@ python3 train.py --data-dir /path/to/PolyU_Palmprint
 （而非图像）85/15 分割以确保无数据泄漏。完整训练脚本在
 \href{samples/case4/train.py}{train.py}。
 
-\subsubsection{评估指标}\label{ux8bc4ux4f30ux6307ux6807}
+\subsubsection{评估指标}\label{src-experiment-case4-h24}
 
 训练过程中计算验证集上的\textbf{成对准确率}：对每对掌纹，若其特征向量的欧氏距离
 小于 margin/2 (0.5)，则预测为同一人，与标签比较得出准确率。
@@ -502,7 +501,7 @@ python3 train.py --data-dir /path/to/PolyU_Palmprint
 训练完成后，最佳模型保存到
 \passthrough{\lstinline!models/ghostnet\_palmprint.pth!}。
 
-\subsubsection{推荐数据集}\label{ux63a8ux8350ux6570ux636eux96c6}
+\subsubsection{推荐数据集}\label{src-experiment-case4-h25}
 
 \begin{itemize}
 \tightlist
@@ -516,14 +515,13 @@ python3 train.py --data-dir /path/to/PolyU_Palmprint
 \end{itemize}
 
 \begin{quote}
-⚠️ \textbf{关于预训练权重}：GhostNet 不在 torchvision 中，无法使用
+注意 \textbf{关于预训练权重}：GhostNet 不在 torchvision 中，无法使用
 ImageNet
 预训练权重。模型需要从头开始在掌纹数据集上训练。如果跳过了训练步骤，
 模型将使用随机权重，特征提取质量会很差------请务必先训练再使用。
 \end{quote}
 
-\subsection{2.6.
-模型转换与昇腾部署}\label{ux6a21ux578bux8f6cux6362ux4e0eux6607ux817eux90e8ux7f72}
+\subsection{2.6. 模型转换与昇腾部署}\label{src-experiment-case4-h26}
 
 \begin{lstlisting}
 flowchart TD
@@ -537,7 +535,7 @@ flowchart TD
     end
 
     subgraph DEPLOY["3. 推理部署"]
-        APP["app.py → PalmExtractor\n→ AscendModel.execute()"]
+        APP["app.py -> PalmExtractor\n-> AscendModel.execute()"]
     end
 
     GHOST -->|"torch.onnx.export()\nopset=11"| ONNX
@@ -545,7 +543,7 @@ flowchart TD
     OM -->|"acl.mdl.execute()"| APP
 \end{lstlisting}
 
-\subsubsection{步骤 1：导出 ONNX}\label{ux6b65ux9aa4-1ux5bfcux51fa-onnx}
+\subsubsection{步骤 1：导出 ONNX}\label{src-experiment-case4-h27}
 
 \begin{lstlisting}[language=bash]
 python3 prepare_models.py --onnx-only
@@ -557,7 +555,7 @@ python3 prepare_models.py --onnx-only
 导出后自动进行三项验证：ONNX 模型结构校验、PyTorch vs ONNX Runtime
 输出对比 （确保数值一致性）。
 
-\subsubsection{步骤 2：ATC 转换}\label{ux6b65ux9aa4-2atc-ux8f6cux6362}
+\subsubsection{步骤 2：ATC 转换}\label{src-experiment-case4-h28}
 
 \begin{lstlisting}[language=bash]
 # 在昇腾设备上运行
@@ -577,8 +575,7 @@ atc --model=models/ghostnet_palmprint.onnx \
 
 转换完成后得到约 20MB 的 OM 离线模型文件。
 
-\subsubsection{ONNX
-兼容性注意事项}\label{onnx-ux517cux5bb9ux6027ux6ce8ux610fux4e8bux9879}
+\subsubsection{ONNX 兼容性注意事项}\label{src-experiment-case4-h29}
 
 GhostNet 的 ONNX 导出已针对 ATC 兼容性做了两项适配： 1. \textbf{手动
 hard-sigmoid}：SELayer 中使用 \passthrough{\lstinline!F.relu6(x) / 6.0!}
@@ -587,16 +584,15 @@ hard-sigmoid}：SELayer 中使用 \passthrough{\lstinline!F.relu6(x) / 6.0!}
 (\passthrough{\lstinline!dynamic\_axes=\{\}!})，因为 OM 模型要求
 固定的输入输出尺寸
 
-\subsection{2.7.
-开集验证系统}\label{ux5f00ux96c6ux9a8cux8bc1ux7cfbux7edf}
+\subsection{2.7. 开集验证系统}\label{src-experiment-case4-h30}
 
-\subsubsection{系统架构}\label{ux7cfbux7edfux67b6ux6784}
+\subsubsection{系统架构}\label{src-experiment-case4-h31}
 
 开集验证的核心流程：
 
 \begin{lstlisting}
-注册阶段:  掌纹图像 → 预处理 → GhostNet(NPU) → 1280维向量 → FAISS 存储
-验证阶段:  掌纹图像 → 预处理 → GhostNet(NPU) → FAISS 搜索 → 阈值判定
+注册阶段:  掌纹图像 -> 预处理 -> GhostNet(NPU) -> 1280维向量 -> FAISS 存储
+验证阶段:  掌纹图像 -> 预处理 -> GhostNet(NPU) -> FAISS 搜索 -> 阈值判定
 \end{lstlisting}
 
 \begin{lstlisting}
@@ -614,16 +610,16 @@ flowchart TD
         V3 --> V4["L2 归一化"]
         V4 --> V5["FAISS.search()\nTop-K 检索"]
         V5 --> V6["多数投票\n平均相似度"]
-        V6 --> V7{"相似度 ≥ 阈值?"}
-        V7 -->|"是"| V8["✅ 验证通过"]
-        V7 -->|"否"| V9["❌ 验证失败"]
+        V6 --> V7{"相似度 >= 阈值?"}
+        V7 -->|"是"| V8["[OK] 验证通过"]
+        V7 -->|"否"| V9["[失败] 验证失败"]
     end
 
     E5 -.->|"持久化"| DB[("FAISS 索引\n+ JSON 元数据")]
     DB -.->|"加载"| V5
 \end{lstlisting}
 
-\subsubsection{FAISS 索引设计}\label{faiss-ux7d22ux5f15ux8bbeux8ba1}
+\subsubsection{FAISS 索引设计}\label{src-experiment-case4-h32}
 
 使用 \passthrough{\lstinline!faiss.IndexFlatIP!}（内积索引）存储 L2
 归一化后的 1280 维特征向量。 由于向量已归一化，内积等价于余弦相似度：
@@ -636,7 +632,7 @@ cosine_similarity(a, b) = a · b  (= faiss inner product when ||a||=||b||=1)
 检索 Top-K 个最相似向量，对用户 ID
 进行多数投票，取该用户的平均相似度作为 匹配分数。
 
-\subsubsection{多样本注册策略}\label{ux591aux6837ux672cux6ce8ux518cux7b56ux7565}
+\subsubsection{多样本注册策略}\label{src-experiment-case4-h33}
 
 为什么每个用户需要 3-5 个样本？
 
@@ -658,7 +654,7 @@ cosine_similarity(a, b) = a · b  (= faiss inner product when ||a||=||b||=1)
 Top-5 中有 4 个属于用户 A、1 个属于用户 B，则认定匹配用户 A，取这 4
 个向量的 平均相似度作为最终分数。
 
-\subsubsection{用户删除}\label{ux7528ux6237ux5220ux9664}
+\subsubsection{用户删除}\label{src-experiment-case4-h34}
 
 FAISS \passthrough{\lstinline!IndexFlatIP!}
 不支持直接删除单条记录。删除用户时，系统通过
@@ -670,14 +666,14 @@ FAISS \passthrough{\lstinline!IndexFlatIP!}
 完整索引管理实现在 \href{samples/case4/palm_index.py}{palm\_index.py} 的
 \passthrough{\lstinline!PalmIndex!} 类中。
 
-\subsection{2.8. Web 仪表盘}\label{web-ux4eeaux8868ux76d8}
+\subsection{2.8. Web 仪表盘}\label{src-experiment-case4-h35}
 
 \begin{lstlisting}
 flowchart TD
     subgraph UI["Gradio Blocks 仪表盘"]
-        TAB1["📝 注册掌纹\n摄像头实时流 → 采集样本 → 保存"]
-        TAB2["🔍 身份验证\n摄像头实时流 → 特征提取 → 匹配判定"]
-        TAB3["⚙️ 系统管理\n用户列表 + 系统状态 + 阈值调节"]
+        TAB1[" 注册掌纹\n摄像头实时流 -> 采集样本 -> 保存"]
+        TAB2[" 身份验证\n摄像头实时流 -> 特征提取 -> 匹配判定"]
+        TAB3[" 系统管理\n用户列表 + 系统状态 + 阈值调节"]
     end
 \end{lstlisting}
 
@@ -700,25 +696,25 @@ flowchart TD
   特征维度）。验证阈值可通过滑块实时调节。
 \end{enumerate}
 
-\subsubsection{事件处理}\label{ux4e8bux4ef6ux5904ux7406}
+\subsubsection{事件处理}\label{src-experiment-case4-h36}
 
 注册页签的关键事件流：
 
 \begin{lstlisting}
-[📷 采集掌纹] → capture_enroll_sample()
-  ├── PalmExtractor.extract() → 若失败显示"未检测到有效掌纹"
+[ 采集掌纹] -> capture_enroll_sample()
+  ├── PalmExtractor.extract() -> 若失败显示"未检测到有效掌纹"
   ├── 将 (BGR原图, RGB缩略图) 存入 _enroll_buffer
   └── 更新状态 (已采集数 / 3)
-[✅ 完成注册] → confirm_enrollment()
-  ├── PalmIndex.enroll_multiple() → FAISS 添加
-  ├── PalmIndex.save() → 持久化
+[[OK] 完成注册] -> confirm_enrollment()
+  ├── PalmIndex.enroll_multiple() -> FAISS 添加
+  ├── PalmIndex.save() -> 持久化
   └── 显示注册成功信息
-[🔄 重新采集] → 清空缓冲区，重新开始
+[ 重新采集] -> 清空缓冲区，重新开始
 \end{lstlisting}
 
-\subsection{2.9. 用户手册}\label{ux7528ux6237ux624bux518c}
+\subsection{2.9. 用户手册}\label{src-experiment-case4-h37}
 
-\subsubsection{2.9.1 部署}\label{ux90e8ux7f72}
+\subsubsection{2.9.1 部署}\label{src-experiment-case4-h38}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -740,7 +736,7 @@ flowchart TD
   浏览器打开 \passthrough{\lstinline!http://<设备IP>:7860!}
 \end{enumerate}
 
-\subsubsection{2.9.2 使用流程}\label{ux4f7fux7528ux6d41ux7a0b}
+\subsubsection{2.9.2 使用流程}\label{src-experiment-case4-h39}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -761,7 +757,7 @@ flowchart TD
   如需调整判定严格程度，在「系统管理」页签调节阈值
 \end{enumerate}
 
-\subsubsection{2.9.3 采集技巧}\label{ux91c7ux96c6ux6280ux5de7}
+\subsubsection{2.9.3 采集技巧}\label{src-experiment-case4-h40}
 
 \begin{itemize}
 \tightlist
@@ -777,7 +773,7 @@ flowchart TD
   \textbf{清洁}：手掌干燥清洁，避免汗渍或污渍影响纹理质量
 \end{itemize}
 
-\subsubsection{2.9.4 调整参数}\label{ux8c03ux6574ux53c2ux6570}
+\subsubsection{2.9.4 调整参数}\label{src-experiment-case4-h41}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -812,7 +808,7 @@ train.py & 对比损失 margin \\
 \end{longtable}
 }
 
-\subsubsection{2.9.5 故障排除}\label{ux6545ux969cux6392ux9664}
+\subsubsection{2.9.5 故障排除}\label{src-experiment-case4-h42}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -845,7 +841,7 @@ ATC 转换失败 & soc\_version 不匹配 &
 \end{longtable}
 }
 
-\section{3. 源代码结构}\label{ux6e90ux4ee3ux7801ux7ed3ux6784}
+\section{3. 源代码结构}\label{src-experiment-case4-h43}
 
 \begin{lstlisting}
 case4/
@@ -885,7 +881,7 @@ flowchart TB
     TRAIN["train.py\n对比学习训练"] --> GN
     TRAIN --> CFG
 
-    PREP["prepare_models.py\nONNX → OM"] --> GN
+    PREP["prepare_models.py\nONNX -> OM"] --> GN
     PREP --> CFG
 \end{lstlisting}
 
@@ -904,8 +900,8 @@ flowchart TB
   \passthrough{\lstinline!train.py!} 的训练管道（AdamW +
   CosineAnnealing）与案例8 一致
 \item
-  \passthrough{\lstinline!prepare\_models.py!} 的 ONNX → ATC
-  流程与案例6/案例7/案例8 一致
+  \passthrough{\lstinline!prepare\_models.py!} 的 ONNX -\textgreater{}
+  ATC 流程与案例6/案例7/案例8 一致
 \item
   \passthrough{\lstinline!config.py!} 的
   \passthrough{\lstinline!BASE\_DIR!} +
@@ -923,9 +919,9 @@ flowchart TB
   对比学习训练范式（Siamese + ContrastiveLoss）是本案例独有的训练方法
 \end{itemize}
 
-\section{4. 效果演示}\label{ux6548ux679cux6f14ux793a}
+\section{4. 效果演示}\label{src-experiment-case4-h44}
 
-\subsection{预期效果}\label{ux9884ux671fux6548ux679c}
+\subsection{预期效果}\label{src-experiment-case4-h45}
 
 { % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
@@ -941,12 +937,12 @@ flowchart TB
 取决于训练数据量和质量 \\
 FAISS 检索 (1000 向量) & \textless{} 1 ms & IndexFlatIP 精确搜索 \\
 端到端验证延迟 & 预处理 \textasciitilde5ms + NPU \textasciitilde10ms +
-检索 \textless1ms ≈ 16ms & --- \\
+检索 \textless1ms 约等于 16ms & --- \\
 新用户注册 & 3-5 次采集，无需重训模型 & 开集验证的核心优势 \\
 \end{longtable}
 }
 
-\subsection{性能指标}\label{ux6027ux80fdux6307ux6807}
+\subsection{性能指标}\label{src-experiment-case4-h46}
 
 { % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
@@ -963,7 +959,7 @@ FAISS 检索 (1000 向量) & \textless1 ms & \textless1 ms \\
 \end{longtable}
 }
 
-\subsection{浏览器中的效果}\label{ux6d4fux89c8ux5668ux4e2dux7684ux6548ux679c}
+\subsection{浏览器中的效果}\label{src-experiment-case4-h47}
 
 Gradio 仪表盘在浏览器中的预期布局：
 
@@ -971,21 +967,21 @@ Gradio 仪表盘在浏览器中的预期布局：
 
 \begin{lstlisting}
 ┌──────────────────────────────────────────────────────────────────┐
-│  🖐️ 智能掌纹识别机                                                │
+│  掌纹 智能掌纹识别机                                                │
 │  GhostNet 1.0x 特征提取 + FAISS 向量检索                          │
 ├──────────────────────────────────────────────────────────────────┤
-│  [📝 注册掌纹]  [🔍 身份验证]  [⚙️ 系统管理]                        │
+│  [ 注册掌纹]  [ 身份验证]  [ 系统管理]                        │
 │                                                                  │
 │  ┌──────────────────────┐  ┌─────────────────────────────────┐  │
 │  │                      │  │ 用户姓名: [张三            ]      │  │
 │  │                      │  │                                 │  │
-│  │   摄像头实时预览      │  │ [📷 采集掌纹]                    │  │
-│  │                      │  │ [✅ 完成注册 (≥3 张)]            │  │
-│  │                      │  │ [🔄 重新采集]                    │  │
+│  │   摄像头实时预览      │  │ [ 采集掌纹]                    │  │
+│  │                      │  │ [[OK] 完成注册 (>=3 张)]            │  │
+│  │                      │  │ [ 重新采集]                    │  │
 │  │                      │  │                                 │  │
-│  │                      │  │ ### 📝 注册中: 张三              │  │
+│  │                      │  │ ###  注册中: 张三              │  │
 │  │                      │  │ 已采集: 3 / 3 张                │  │
-│  │                      │  │ ✅ 样本充足，点击完成注册         │  │
+│  │                      │  │ [OK] 样本充足，点击完成注册         │  │
 │  └──────────────────────┘  └─────────────────────────────────┘  │
 │  [缩略图1] [缩略图2] [缩略图3]                                     │
 └──────────────────────────────────────────────────────────────────┘
@@ -995,29 +991,29 @@ Gradio 仪表盘在浏览器中的预期布局：
 
 \begin{lstlisting}
 ┌──────────────────────────────────────────────────────────────────┐
-│  [📝 注册掌纹]  [🔍 身份验证]  [⚙️ 系统管理]                        │
+│  [ 注册掌纹]  [ 身份验证]  [ 系统管理]                        │
 │                                                                  │
 │  ┌──────────────────────┐  ┌─────────────────────────────────┐  │
 │  │                      │  │                                 │  │
-│  │   摄像头实时预览      │  │  ## ✅ 验证通过                   │  │
+│  │   摄像头实时预览      │  │  ## [OK] 验证通过                   │  │
 │  │                      │  │  **用户**: 张三 (a3f4c8d2)       │  │
 │  │                      │  │  **相似度**: 87.3%              │  │
 │  │                      │  │  ██████████████░░░░              │  │
 │  └──────────────────────┘  │                                 │  │
-│                            │  ⏱ 耗时: 15.2 ms                 │  │
+│                            │   耗时: 15.2 ms                 │  │
 │  ┌──────────────────────┐  │                                 │  │
-│  │   掌纹 ROI 预览       │  │  ### 📊 Top-5 匹配               │  │
-│  │                      │  │  → 张三: 87.3% ██████████████░░  │  │
+│  │   掌纹 ROI 预览       │  │  ###  Top-5 匹配               │  │
+│  │                      │  │  -> 张三: 87.3% ██████████████░░  │  │
 │  │                      │  │    李四: 42.1% ██████░░░░░░░░░░  │  │
 │  │                      │  │    王五: 38.5% █████░░░░░░░░░░░  │  │
 │  └──────────────────────┘  │                                 │  │
-│                            │  🖥 后端: NPU | 特征维度: 1280     │  │
-│  [🔍 开始验证]              │                                 │  │
+│                            │   后端: NPU | 特征维度: 1280     │  │
+│  [ 开始验证]              │                                 │  │
 │                            └─────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────┘
 \end{lstlisting}
 
-\subsection{如何验证系统正常工作}\label{ux5982ux4f55ux9a8cux8bc1ux7cfbux7edfux6b63ux5e38ux5de5ux4f5c}
+\subsection{如何验证系统正常工作}\label{src-experiment-case4-h48}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}

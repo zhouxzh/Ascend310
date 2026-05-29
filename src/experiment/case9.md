@@ -1,6 +1,6 @@
 # 案例9：边缘智能聊天机器人
 
-## 1. 项目简介
+## 1. 项目简介 {#src-experiment-case9-h1}
 
 本项目基于昇腾310B平台，构建一个可以在边缘设备上运行的智能聊天机器人。系统集成了文本嵌入、RAG（检索增强生成）、语音交互等AI技术，能够在离线环境下回答专业问题，也可接入云端大语言模型提升回复质量。
 
@@ -8,9 +8,9 @@
 
 项目的源代码可以从[这里](https://github.com/zhouxzh/Ascend310/tree/main/samples/case9)下载。
 
-## 2. 内容大纲
+## 2. 内容大纲 {#src-experiment-case9-h2}
 
-### 2.1. 硬件准备
+### 2.1. 硬件准备 {#src-experiment-case9-h3}
 
 - **核心计算单元**: 昇腾310B开发者套件
 - **音频设备**:
@@ -27,10 +27,10 @@
 
 ```mermaid
 flowchart LR
-    MIC[/"🎤 USB 麦克风"/]
-    SPK[/"🔊 USB 音响"/]
-    BROWSER[/"🖥️ 浏览器<br/>Gradio UI"/]
-    CLOUD[/"☁️ 云端 LLM API<br/>(可选)"/]
+    MIC[/"语音 USB 麦克风"/]
+    SPK[/" USB 音响"/]
+    BROWSER[/" 浏览器<br/>Gradio UI"/]
+    CLOUD[/" 云端 LLM API<br/>(可选)"/]
 
     subgraph DEVICE["昇腾310B 开发板"]
         NPU["NPU<br/>文本嵌入推理"]
@@ -47,7 +47,7 @@ flowchart LR
 
 相比原方案中动辄列出"4麦克风阵列、NVMe SSD、触摸屏、锂电池组"等大量外围硬件，本项目的硬件需求非常简洁：一块昇腾310B开发板、一个USB麦克风和音响（或一个USB耳机），足以运行完整的聊天机器人系统。没有昇腾设备也可以——嵌入模型会自动回退到CPU推理。
 
-### 2.2. 软件环境
+### 2.2. 软件环境 {#src-experiment-case9-h4}
 
 - **操作系统**: Ubuntu 20.04 / 22.04 LTS
 - **CANN版本**: 7.0.RC1 或以上（仅NPU推理需要）
@@ -95,11 +95,11 @@ echo "安装完成！启动: python3 app.py"
 - **不再安装 Redis / FastAPI / uvicorn / websockets**——Gradio 一个库覆盖了 Web 界面和 API
 - 语音库标注为可选，没有麦克风也不影响核心功能
 
-### 2.3. 系统架构设计
+### 2.3. 系统架构设计 {#src-experiment-case9-h5}
 
 本节是理解整个项目设计思路的核心。在动手写代码之前，需要先回答一个关键问题：**昇腾310B到底能不能跑大语言模型？**
 
-#### 2.3.1 为什么不在NPU上直接跑LLM
+#### 2.3.1 为什么不在NPU上直接跑LLM {#src-experiment-case9-h6}
 
 昇腾310B的NPU通过OM（Offline Model）格式执行推理。OM是一个**静态计算图**——输入张量的形状和数据类型在模型转换时就固定了，运行时不可改变。
 
@@ -114,24 +114,24 @@ echo "安装完成！启动: python3 app.py"
 - 模型小（all-MiniLM-L6-v2 约90MB），轻松装入NPU内存
 - 推理速度快（NPU上约10ms/条 vs CPU 50-80ms/条）
 
-#### 2.3.2 三层架构设计
+#### 2.3.2 三层架构设计 {#src-experiment-case9-h7}
 
 基于上述分析，本项目采用**三层混合架构**，完整程序流程如下：
 
 ```mermaid
 flowchart TD
     %% ========== 入口 ==========
-    U[/"👤 用户"/]
+    U[/" 用户"/]
     UI{{"输入方式?"}}
 
     U --> UI
-    UI -->|"⌨️ 文本"| TXT["输入消息"]
-    UI -->|"🎤 语音"| MIC["浏览器录音<br/>gr.Audio"]
-    MIC --> WAV["WAV 音频数据<br/>float32→int16"]
+    UI -->|" 文本"| TXT["输入消息"]
+    UI -->|"语音 语音"| MIC["浏览器录音<br/>gr.Audio"]
+    MIC --> WAV["WAV 音频数据<br/>float32->int16"]
     WAV --> ASR["SpeechRecognizer<br/>Google Web Speech API"]
     ASR --> ASR_CHECK{{"识别成功?"}}
     ASR_CHECK -->|"是"| TXT
-    ASR_CHECK -->|"否"| ERR(["❌ 识别错误"])
+    ASR_CHECK -->|"否"| ERR(["[失败] 识别错误"])
     ERR --> U
 
     %% ========== 对话管理 ==========
@@ -144,27 +144,27 @@ flowchart TD
     INTENT -->|"模糊不清"| CLARIFY["CLARIFYING 状态<br/>请用户重述"]
 
     %% ========== RAG 管道 ==========
-    RAG --> ENC["EmbeddingModel.encode()<br/>用户查询 → 384维向量"]
+    RAG --> ENC["EmbeddingModel.encode()<br/>用户查询 -> 384维向量"]
     ENC --> NPU_CHECK{{"NPU 可用?"}}
-    NPU_CHECK -->|"✅ 是"| TOK["Tokenizer<br/>文本→input_ids/attn_mask"]
-    TOK --> H2D["acl.rt.memcpy H2D<br/>numpy→NPU 内存"]
+    NPU_CHECK -->|"[OK] 是"| TOK["Tokenizer<br/>文本->input_ids/attn_mask"]
+    TOK --> H2D["acl.rt.memcpy H2D<br/>numpy->NPU 内存"]
     H2D --> ACL_EXEC["acl.mdl.execute<br/>OM 模型推理"]
-    ACL_EXEC --> D2H["acl.rt.memcpy D2H<br/>NPU 内存→numpy"]
+    ACL_EXEC --> D2H["acl.rt.memcpy D2H<br/>NPU 内存->numpy"]
     D2H --> POOL["Mean Pooling<br/>attention_mask 加权均值"]
-    NPU_CHECK -->|"❌ 否 (回退)"| CPU_ENC["SentenceTransformer<br/>.encode(normalize=True)"]
+    NPU_CHECK -->|"[失败] 否 (回退)"| CPU_ENC["SentenceTransformer<br/>.encode(normalize=True)"]
     POOL --> NORM["L2 归一化<br/>向量/|向量|"]
     CPU_ENC --> NORM
 
     NORM --> FAISS["FAISS IndexFlatIP<br/>.search(query_vec, k=3)"]
-    FAISS --> FILTER{{"相似度 ≥ 阈值<br/>(SIMILARITY_THRESHOLD=0.3)?"}}
+    FAISS --> FILTER{{"相似度 >= 阈值<br/>(SIMILARITY_THRESHOLD=0.3)?"}}
     FILTER -->|"是"| CTX["检索上下文<br/>[{text, score, metadata}]"]
     FILTER -->|"否"| NO_CTX["无匹配知识<br/>context=[]"]
 
     %% ========== 回复生成 ==========
     CTX --> GEN{{"回复模式?"}}
     NO_CTX --> GEN
-    GEN -->|"💻 离线模式"| TPL["模板生成<br/>_generate_template()"]
-    GEN -->|"☁️ 云端模式"| CLOUD_CHECK{{"API Key 已配置?"}}
+    GEN -->|" 离线模式"| TPL["模板生成<br/>_generate_template()"]
+    GEN -->|" 云端模式"| CLOUD_CHECK{{"API Key 已配置?"}}
     CLOUD_CHECK -->|"是"| LLM["_generate_cloud()<br/>构造 System Prompt<br/>+ RAG上下文 + 历史"]
     LLM --> API["POST OpenAI-compatible API<br/>requests.post(endpoint)"]
     API --> API_CHECK{{"API 响应 OK?"}}
@@ -196,7 +196,7 @@ flowchart TD
 | FAISS检索 | CPU | 向量搜索是索引结构的遍历，非矩阵运算，CPU+C++优化就足够快（<1ms） |
 | 回复生成 | CPU | 模板匹配在CPU上是O(1)；云端API走网络，与NPU无关 |
 
-#### 2.3.3 与纯云端/纯边缘方案的对比
+#### 2.3.3 与纯云端/纯边缘方案的对比 {#src-experiment-case9-h8}
 
 | 维度 | 纯云端 | 纯边缘LLM | 本项目（混合） |
 |:---|:---|:---|:---|
@@ -207,23 +207,23 @@ flowchart TD
 | 硬件要求 | 无需NPU | 需大内存+GPU | 升腾310B或普通CPU |
 | 维护成本 | API费用 | 模型更新复杂 | 只更新知识库文本 |
 
-### 2.4. 文本嵌入模型与昇腾部署
+### 2.4. 文本嵌入模型与昇腾部署 {#src-experiment-case9-h9}
 
 本节详细介绍如何在昇腾310B上部署文本嵌入模型，这是整个RAG管道的基石。
 
-#### 2.4.1 什么是文本嵌入
+#### 2.4.1 什么是文本嵌入 {#src-experiment-case9-h10}
 
 文本嵌入（Text Embedding）将一段自然语言文本转换为固定长度的浮点数向量。其核心性质是：**语义相近的文本，在向量空间中距离更近**。
 
 ```
-"昇腾310B是一款边缘AI芯片"  →  [0.12, -0.34, 0.08, ..., 0.21]  (384维)
-"华为Ascend 310B是边缘推理处理器" → [0.13, -0.31, 0.06, ..., 0.19]  ← 余弦相似度 ≈ 0.92
-"今天天气很好适合出去玩"  → [-0.45, 0.28, 0.73, ..., -0.55]  ← 余弦相似度 ≈ 0.03
+"昇腾310B是一款边缘AI芯片"  ->  [0.12, -0.34, 0.08, ..., 0.21]  (384维)
+"华为Ascend 310B是边缘推理处理器" -> [0.13, -0.31, 0.06, ..., 0.19]  ← 余弦相似度 约等于 0.92
+"今天天气很好适合出去玩"  -> [-0.45, 0.28, 0.73, ..., -0.55]  ← 余弦相似度 约等于 0.03
 ```
 
 有了这个性质，"找到知识库里和用户问题最相关的内容"就变成了数学上的向量内积运算。
 
-#### 2.4.2 为什么选择 all-MiniLM-L6-v2
+#### 2.4.2 为什么选择 all-MiniLM-L6-v2 {#src-experiment-case9-h11}
 
 | 候选模型 | 参数量 | 向量维度 | 模型大小 | 推理速度 (CPU) |
 |:---|:---|:---|:---|:---|
@@ -240,14 +240,14 @@ all-MiniLM-L6-v2 是由 Microsoft 的 Sentence-Transformers 团队发布的轻�
 - **多语言支持**：虽然以英文为主训练，但对中文的嵌入质量在轻量模型中排名靠前
 - **生态成熟**：HuggingFace 直接支持，optimum 库可一行代码导出 ONNX
 
-#### 2.4.3 模型转换管线
+#### 2.4.3 模型转换管线 {#src-experiment-case9-h12}
 
 ```mermaid
 flowchart TD
     HF["HuggingFace<br/>all-MiniLM-L6-v2<br/>PyTorch (~90MB)"]
     HF -->|"optimum / torch.onnx.export"| ONNX["ONNX 模型 (~90MB)<br/><br/>inputs:<br/>  input_ids [batch,256] int64<br/>  attention_mask [batch,256] int64<br/>  token_type_ids [batch,256] int64<br/><br/>output:<br/>  sentence_embedding [batch,384] float32"]
     ONNX -->|"atc --framework=5<br/>--soc_version=Ascend310B4"| OM["OM 模型 (~45MB, FP16)<br/>静态计算图"]
-    OM -->|"PyACL 加载 & 执行"| INFER["实时推理<br/><br/>文本 → Tokenizer → numpy<br/>→ NPU H2D → acl.mdl.execute → D2H<br/>→ Mean Pooling → L2 归一化<br/>→ 384维向量"]
+    OM -->|"PyACL 加载 & 执行"| INFER["实时推理<br/><br/>文本 -> Tokenizer -> numpy<br/>-> NPU H2D -> acl.mdl.execute -> D2H<br/>-> Mean Pooling -> L2 归一化<br/>-> 384维向量"]
 ```
 
 ONNX 导出代码（`prepare_models.py` 核心逻辑）：
@@ -298,7 +298,7 @@ atc --model=models/embedding_model.onnx \
 
 转换完成后，`models/` 目录下会生成 `embedding_model.om`（约 45MB，FP16），这就是昇腾 NPU 可以直接执行的格式。
 
-#### 2.4.4 NPU 推理封装
+#### 2.4.4 NPU 推理封装 {#src-experiment-case9-h13}
 
 昇腾的 Python API（PyACL）提供了底层的设备管理、内存拷贝和模型执行接口。`ascend_inference.py` 沿用了案例1中成熟的 `AscendSystem` / `AscendModel` 模式。
 
@@ -313,7 +313,7 @@ class AscendSystem:
         self.stream, ret = acl.rt.create_stream()  # 创建任务流
 ```
 
-初始化顺序是固定的：`acl.init → set_device → create_context → create_stream`。释放时严格反向：`destroy_stream → destroy_context → reset_device → finalize`。
+初始化顺序是固定的：`acl.init -> set_device -> create_context -> create_stream`。释放时严格反向：`destroy_stream -> destroy_context -> reset_device -> finalize`。
 
 **AscendModel** — 加载和执行 OM 模型：
 
@@ -326,14 +326,14 @@ class AscendModel:
         self._init_buffers()                       # 预分配输入/输出内存
 
     def execute(self, input_data_list):
-        # 1. Host → Device: 将 numpy 数组拷贝到 NPU 内存
+        # 1. Host -> Device: 将 numpy 数组拷贝到 NPU 内存
         for i, data in enumerate(input_data_list):
             acl.rt.memcpy(dev_ptr, size, host_ptr, size, 1)  # 1 = H2D
 
         # 2. 执行推理
         acl.mdl.execute(self.model_id, self.input_dataset, self.output_dataset)
 
-        # 3. Device → Host: 将结果拷回主机
+        # 3. Device -> Host: 将结果拷回主机
         for i in range(len(self.output_buffers)):
             acl.rt.memcpy(host_ptr, size, dev_ptr, size, 2)  # 2 = D2H
 ```
@@ -390,31 +390,31 @@ def _normalize(embeddings):
     return embeddings / norms
 ```
 
-### 2.5. 知识库与向量检索
+### 2.5. 知识库与向量检索 {#src-experiment-case9-h14}
 
 有了嵌入模型，下一步是构建知识库并实现高效的向量检索。
 
-#### 2.5.1 RAG 的核心思想
+#### 2.5.1 RAG 的核心思想 {#src-experiment-case9-h15}
 
 RAG（Retrieval-Augmented Generation，检索增强生成）的工作流程：
 
 ```mermaid
 flowchart LR
-    subgraph OFFLINE["① 离线阶段"]
+    subgraph OFFLINE["1 离线阶段"]
         direction LR
         A["知识库文档"] --> B["中文分块<br/>段落/句子切分"]
         B --> C["嵌入编码<br/>EmbeddingModel.encode()"]
         C --> D["存入 FAISS 索引<br/>IndexFlatIP.add()"]
     end
 
-    subgraph ONLINE["② 在线阶段"]
+    subgraph ONLINE["2 在线阶段"]
         direction LR
-        E["用户提问"] --> F["嵌入编码<br/>→ 384维向量"]
+        E["用户提问"] --> F["嵌入编码<br/>-> 384维向量"]
         F --> G["向量检索<br/>FAISS.search(k=3)"]
         G --> H["Top-K 文档块<br/>含相似度分数"]
     end
 
-    subgraph GENERATE["③ 生成阶段"]
+    subgraph GENERATE["3 生成阶段"]
         direction LR
         H --> I["构造 Prompt<br/>上下文 + 提问"]
         I --> J["回复生成模块<br/>模板 / 云端LLM"]
@@ -425,7 +425,7 @@ flowchart LR
 
 RAG 解决的核心问题：**让 AI 的回答有据可查**。没有 RAG 时，模型要么凭空编造（大模型的"幻觉"），要么只能靠训练数据中记住的知识。有了 RAG 后，回答可以被溯源到知识库中的具体文档片段。
 
-#### 2.5.2 中文文本分块策略
+#### 2.5.2 中文文本分块策略 {#src-experiment-case9-h16}
 
 知识库文档需要被切成合适大小的"块"（chunk）。块太大，检索精度下降（一个块里混入太多不相关内容）；块太小，语义不完整。
 
@@ -455,7 +455,7 @@ def _split_text(self, text):
 
 中文分句不使用 jieba 分词，而是通过正则表达式匹配句末标点（`。！？；`）。这比用分词器更轻量，且对中文段落的分句准确度足够。
 
-#### 2.5.3 FAISS 向量索引
+#### 2.5.3 FAISS 向量索引 {#src-experiment-case9-h17}
 
 FAISS（Facebook AI Similarity Search）是 Meta 开源的向量相似度搜索库。核心操作极其简单：
 
@@ -482,7 +482,7 @@ scores, indices = index.search(query_vec, k=3)  # 返回最相似的3个
 
 对于几千到几万条文档的规模，暴力搜索完全够用（<1ms）。当知识库扩大到百万级别时，FAISS 提供了 IVF（倒排索引）、HNSW（图索引）等近似搜索方案，只需改一行代码即可切换。
 
-#### 2.5.4 知识库管理
+#### 2.5.4 知识库管理 {#src-experiment-case9-h18}
 
 `KnowledgeBase` 类提供了完整的增删查改和持久化：
 
@@ -502,9 +502,9 @@ kb.save("data/index.faiss", "data/documents.json")
 kb.load("data/index.faiss", "data/documents.json")
 ```
 
-### 2.6. 对话管理与响应生成
+### 2.6. 对话管理与响应生成 {#src-experiment-case9-h19}
 
-#### 2.6.1 对话状态机
+#### 2.6.1 对话状态机 {#src-experiment-case9-h20}
 
 `DialogueManager` 维护一个简单的四状态机：
 
@@ -519,7 +519,7 @@ stateDiagram-v2
     FAREWELL --> [*]: 对话结束
 
     note right of GREETING: 根据时段返回<br/>不同问候语
-    note right of ACTIVE: 嵌入→检索→回复
+    note right of ACTIVE: 嵌入->检索->回复
     note left of FAREWELL: 再见/拜拜/bye
 ```
 
@@ -528,7 +528,7 @@ stateDiagram-v2
 - 检测到"再见/拜拜/bye"等关键词进入 FAREWELL
 - 其他情况保持在 ACTIVE 状态，走完整的 RAG 处理流程
 
-#### 2.6.2 两级回复生成
+#### 2.6.2 两级回复生成 {#src-experiment-case9-h21}
 
 **默认模式：模板 + RAG 检索上下文**
 
@@ -579,7 +579,7 @@ def _generate_cloud(self, query, context, history):
 - 云端：OpenAI、Azure OpenAI、通义千问、DeepSeek
 - 本地：Ollama、vLLM、llama.cpp server、LocalAI
 
-#### 2.6.3 对话历史管理
+#### 2.6.3 对话历史管理 {#src-experiment-case9-h22}
 
 `ConversationHistory` 是一个固定容量的环形缓冲区：
 
@@ -600,11 +600,11 @@ class ConversationHistory:
 
 保留最近 10 轮对话，云端模式下将最近 4 轮作为上下文发送给 LLM。这样做既维持了多轮对话的连贯性，又控制了 API 调用的 token 消耗。
 
-### 2.7. 语音交互系统
+### 2.7. 语音交互系统 {#src-experiment-case9-h23}
 
 语音交互采用**浏览器端录音 + 服务端识别**的架构。Gradio 的 `Audio` 组件负责在浏览器中通过 `MediaRecorder API` 录制音频，然后将 WAV 数据发送到服务端。服务端的 `SpeechRecognizer` 接收音频文件，调用 Google Web Speech API 完成语音识别。
 
-#### 2.7.1 语音识别
+#### 2.7.1 语音识别 {#src-experiment-case9-h24}
 
 ```python
 class SpeechRecognizer:
@@ -620,7 +620,7 @@ Google Web Speech API 的优势是免费、无需注册、中英文识别准确�
 - **Whisper.cpp** — OpenAI Whisper 的 C++ 移植，在 CPU 上可运行
 - **FunASR** — 阿里达摩院出品，中文识别效果优秀
 
-#### 2.7.2 语音合成
+#### 2.7.2 语音合成 {#src-experiment-case9-h25}
 
 ```python
 class TextToSpeech:
@@ -636,7 +636,7 @@ class TextToSpeech:
 
 pyttsx3 在 Linux 上使用 espeak 作为后端，离线可用、零成本。缺点是中文发音偏机械，自然度不及商业 TTS 服务。如需更好的中文语音效果，可替换为 Piper TTS（开源、离线、中文音色更自然）。
 
-#### 2.7.3 浏览器端录音
+#### 2.7.3 浏览器端录音 {#src-experiment-case9-h26}
 
 Gradio 的 `gr.Audio(sources=["microphone"], type="numpy")` 返回 `(sample_rate, audio_array)`，其中 `audio_array` 是 float32 numpy 数组。需要在服务端将其转换为 WAV 格式，因为 `speech_recognition` 只接受文件路径：
 
@@ -659,16 +659,16 @@ def voice_input_fn(audio):
     return text, text  # 返回识别结果，自动填入聊天输入框
 ```
 
-### 2.8. Web界面与API服务
+### 2.8. Web界面与API服务 {#src-experiment-case9-h27}
 
 本项目使用 **Gradio** 构建 Web 界面。Gradio 是 HuggingFace 出品的 Python 库，专为机器学习模型演示而设计。与 Flask/FastAPI 相比，Gradio 的优势在于：不需要写 HTML/CSS/JS 代码，Python 类定义直接映射为 Web 组件，内置 WebSocket 连接管理、队列系统和错误处理。
 
-#### 2.8.1 界面设计
+#### 2.8.1 界面设计 {#src-experiment-case9-h28}
 
 ```python
 with gr.Blocks(theme=gr.themes.Soft(), title="Ascend 310B 智能聊天机器人") as demo:
     with gr.Tabs():
-        with gr.TabItem("💬 对话"):
+        with gr.TabItem(" 对话"):
             chatbot = gr.Chatbot(height=500)
             msg_box = gr.Textbox(label="输入消息")
             send_btn = gr.Button("发送", variant="primary")
@@ -681,20 +681,20 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Ascend 310B 智能聊天机器人"
             # 语音输入
             audio_in.stop_recording(voice_input_fn, audio_in, [status, msg_box])
 
-        with gr.TabItem("⚙️ 设置"):
+        with gr.TabItem(" 设置"):
             cloud_toggle = gr.Checkbox(label="启用云端 LLM")
             ...
 ```
 
 `gr.Chatbot` 组件内置了聊天气泡样式和自动滚动，交互逻辑只需关注 handler 函数的输入输出映射。
 
-#### 2.8.2 事件流
+#### 2.8.2 事件流 {#src-experiment-case9-h29}
 
 Gradio 的事件驱动模型：
 
 ```mermaid
 flowchart TD
-    subgraph TEXT["⌨️ 文本输入路径"]
+    subgraph TEXT[" 文本输入路径"]
         direction LR
         T1["用户输入文本"] --> T2["msg_box.submit()"]
         T2 --> T3["chat_fn(message, history)"]
@@ -703,7 +703,7 @@ flowchart TD
         T5 --> T6["chatbot 自动刷新"]
     end
 
-    subgraph VOICE["🎤 语音输入路径"]
+    subgraph VOICE["语音 语音输入路径"]
         direction LR
         V1["用户点击录音按钮"] --> V2["audio_in 开始录音"]
         V2 --> V3["松开触发<br/>stop_recording 事件"]
@@ -714,9 +714,9 @@ flowchart TD
     V5 -->|"触发 submit 链"| T2
 ```
 
-### 2.9. 用户手册
+### 2.9. 用户手册 {#src-experiment-case9-h30}
 
-#### 2.9.1 系统部署
+#### 2.9.1 系统部署 {#src-experiment-case9-h31}
 
 1. **克隆代码**：进入 `samples/case9/` 目录
 2. **安装环境**：`bash setup.sh`
@@ -726,7 +726,7 @@ flowchart TD
 
 如果没有昇腾设备，跳过第3步的 ATC 转换即可。系统会自动使用 CPU 模式运行，所有功能不受影响。
 
-#### 2.9.2 配置说明
+#### 2.9.2 配置说明 {#src-experiment-case9-h32}
 
 | 配置项 | 位置 | 说明 |
 |:---|:---|:---|
@@ -736,15 +736,15 @@ flowchart TD
 | 云端 API | 设置面板 | 支持任何 OpenAI 兼容接口（Ollama/vLLM/通义千问等） |
 | 语音开关 | 设置面板 | 关闭后仅文本交互 |
 
-#### 2.9.3 使用指南
+#### 2.9.3 使用指南 {#src-experiment-case9-h33}
 
 - **文本对话**：直接在输入框打字，回车发送
-- **语音输入**：点击 🎤 按钮开始录音，再次点击停止，自动识别并发送
+- **语音输入**：点击 语音 按钮开始录音，再次点击停止，自动识别并发送
 - **知识问答**：询问昇腾310B、CANN、边缘计算、RAG 等相关问题，系统会从知识库检索后回答
 - **云端增强**：在设置面板填入 API Key 并启用，回复质量大幅提升
 - **扩展知识库**：编辑 `data/sample_knowledge.txt` 添加自己的知识条目，重启服务即可生效
 
-#### 2.9.4 维护与扩展
+#### 2.9.4 维护与扩展 {#src-experiment-case9-h34}
 
 - **添加自定义知识**：在 `data/` 目录下创建文本文件，修改 `app.py` 中 `get_knowledge_base()` 的加载逻辑
 - **切换嵌入模型**：修改 `config.py` 中的 `MODEL_NAME`，重新运行 `prepare_models.py`
@@ -752,7 +752,7 @@ flowchart TD
 - **接入离线 ASR**：将 `voice_io.py` 中的 `recognize_google` 替换为 Vosk 或 Whisper
 - **日志监控**：终端输出包含请求日志和检索上下文，方便调试
 
-## 3. 源代码结构
+## 3. 源代码结构 {#src-experiment-case9-h35}
 
 ```
 samples/case9/
@@ -760,15 +760,15 @@ samples/case9/
 ├── ascend_inference.py      # Ascend NPU 推理封装
 │   ├── AscendSystem         #   NPU 设备初始化 / 释放
 │   ├── AscendModel          #   OM 模型加载 / H2D / execute / D2H
-│   ├── EmbeddingModel       #   文本嵌入业务层（tokenize → NPU/CPU → 归一化）
-│   └── create_embedding_model()  # 工厂函数，自动尝试 NPU → 回退 CPU
+│   ├── EmbeddingModel       #   文本嵌入业务层（tokenize -> NPU/CPU -> 归一化）
+│   └── create_embedding_model()  # 工厂函数，自动尝试 NPU -> 回退 CPU
 ├── knowledge_base.py        # RAG 检索引擎
 │   ├── Document             #   文档数据类
 │   └── KnowledgeBase        #   FAISS 索引管理 / 分块 / 检索 / 持久化
 ├── dialogue.py              # 对话管理器
 │   ├── State                #   对话状态枚举
 │   ├── ConversationHistory  #   环形缓冲对话历史
-│   └── DialogueManager      #   意图检测 → RAG → 模板/API 回复
+│   └── DialogueManager      #   意图检测 -> RAG -> 模板/API 回复
 ├── voice_io.py              # 语音交互
 │   ├── SpeechRecognizer     #   语音识别（Google API / 文件）
 │   └── TextToSpeech         #   语音合成（pyttsx3 / espeak）
@@ -790,7 +790,7 @@ flowchart TB
     APP["app.py<br/>Gradio Web 入口"]
 
     subgraph MODULES["核心模块"]
-        EMBED["ascend_inference<br/>EmbeddingModel<br/>文本 → 384维向量"]
+        EMBED["ascend_inference<br/>EmbeddingModel<br/>文本 -> 384维向量"]
         KB["knowledge_base<br/>KnowledgeBase<br/>FAISS 索引管理 & 检索"]
         DIALOG["dialogue<br/>DialogueManager<br/>对话状态机 & 回复生成"]
         VOICE["voice_io<br/>SpeechRecognizer<br/>TextToSpeech<br/>语音识别 & 合成"]
@@ -804,9 +804,9 @@ flowchart TB
     DIALOG --> KB
 ```
 
-## 4. 效果演示
+## 4. 效果演示 {#src-experiment-case9-h36}
 
-### 基础对话 — 离线模板模式
+### 基础对话 — 离线模板模式 {#src-experiment-case9-h37}
 
 ```
 用户: 什么是昇腾310B？
@@ -816,7 +816,7 @@ flowchart TB
   请问还有什么想了解的吗？
 ```
 
-### RAG 检索 — 专业问题
+### RAG 检索 — 专业问题 {#src-experiment-case9-h38}
 
 ```
 用户: CANN的ATC工具怎么用？
@@ -826,15 +826,15 @@ flowchart TB
   请问还有什么想了解的吗？
 ```
 
-### 语音交互
+### 语音交互 {#src-experiment-case9-h39}
 
 ```
 用户: （点击录音按钮）"什么是边缘计算？"
-机器人: （识别文字 → RAG检索 → 返回回复 → TTS朗读）
+机器人: （识别文字 -> RAG检索 -> 返回回复 -> TTS朗读）
        "根据我的知识库，边缘计算是一种将计算和数据存储从云端推到..."
 ```
 
-### 性能指标
+### 性能指标 {#src-experiment-case9-h40}
 
 | 指标 | CPU 模式 | NPU 模式 | 说明 |
 |:---|:---|:---|:---|

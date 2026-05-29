@@ -9,27 +9,27 @@ lang: zh-cn
 
 在完成了模型转换与基础推理应用的开发后，"跑通"只是第一步。在边缘计算场景（如Ascend 310B）中，资源受到严格限制，如何榨干硬件的每一滴性能，使应用满足实时的时延（Latency）或高并发的吞吐（Throughput）要求，是工程落地的核心挑战。本章将从性能分析的方法论出发，结合具体的视频分析案例，系统讲解从瓶颈定位到极致优化的全过程。
 
-## 性能优化的全景视角
+## 性能优化的全景视角 {#src-book-chapter7-h1}
 
-### 两个核心指标
+### 两个核心指标 {#src-book-chapter7-h2}
 在谈优化之前，必须明确目标。不同的业务场景对性能的定义不同：
 *   **时延（Latency）**：处理单帧数据所需的时间。对自动驾驶、实时交互类应用至关重要。
     *   *优化目标*：降低处理流在每一个环节的耗时。
 *   **吞吐量（Throughput / FPS）**：单位时间内处理的数据量。对视频监控汇聚、离线分析类应用更关键。
     *   *优化目标*：提高并发度，掩盖传输与处理的空隙，满载硬件资源。
 
-### 木桶效应与 Amdahl 定律
+### 木桶效应与 Amdahl 定律 {#src-book-chapter7-h3}
 AI应用通常是一个异构计算流水线：
 `Camera -> Host CPU (预处理) -> PCIe (H2D) -> Device NPU (推理) -> PCIe (D2H) -> Host CPU (后处理)`
 
 *   **木桶效应**：整个系统的FPS取决于最慢的环节。如果NPU推理只需5ms（200FPS），但CPU预处理需要40ms（25FPS），那么系统上限主要受限于CPU。
 *   **优化策略**：**先找瓶颈，再做优化**。盲目优化非瓶颈模块（比如把5ms的推理优化到4ms）对整体性能提升微乎其微。
 
-## 照妖镜：Profiling 性能分析
+## 照妖镜：Profiling 性能分析 {#src-book-chapter7-h4}
 
 昇腾提供了强大的性能分析工具 MSPROF（Profiling），它还能像“X光”一样透视程序运行的内部细节。
 
-### 采集 Profiling 数据
+### 采集 Profiling 数据 {#src-book-chapter7-h5}
 通常我们使用命令行工具 `msprof` 进行采集。
 
 **基础命令示例**：
@@ -43,7 +43,7 @@ msprof --output=./output --application="./main_app"
 msprof --output=./output --application="./main_app" --task-time=on --aic-metrics=PipeUtilization
 ```
 
-### 关键视图解读
+### 关键视图解读 {#src-book-chapter7-h6}
 使用 `msprof` 分析生成的 Timeline 视图（通过 VS Code 插件或 Ascend Insight 查看）是定位问题的关键。
 
 1.  **ACL API 耗时**：查看 `aclmdlExecute` 等接口的调用时长。如果调用间隔极大，说明 Host 端调度或预处理太慢。
@@ -54,7 +54,7 @@ msprof --output=./output --application="./main_app" --task-time=on --aic-metrics
     *   **Cube/Vector利用率**：如果利用率低，说明模型算子需要优化（参考第5讲）。
     *   **Memory Bandwidth**：查看 DDR 读写带宽，判断是否是一张“存储受限”的图。
 
-## 常见瓶颈与对策 Checklist
+## 常见瓶颈与对策 Checklist {#src-book-chapter7-h7}
 
 | 现象 (Symptoms) | 潜在原因 (Root Cause) | 优化对策 (Solution) |
 | :--- | :--- | :--- |
@@ -63,9 +63,9 @@ msprof --output=./output --application="./main_app" --task-time=on --aic-metrics
 | **H2D 拷贝耗时长** | 此时输入图像过大 | 1. 使用 **Zero-Copy** 内存分配<br>2. 在 Device 侧做 Resize/Crop (AIPP) |
 | **FPS 随 Batch 增加不明显** | 内存带宽瓶颈 或 单流阻塞 | 1. 多 Stream 并发推理<br>2. 优化数据布局 (Layout) |
 
-## 核心优化技术详解
+## 核心优化技术详解 {#src-book-chapter7-h8}
 
-### AIPP：将预处理下沉到硬件
+### AIPP：将预处理下沉到硬件 {#src-book-chapter7-h9}
 **AIPP (Artificial Intelligence Pre-Processing)** 是昇腾芯片特有的硬件加速模块，它直接连接在 AI Core 之前，可以在数据进入 AI Core 计算前完成以下操作：
 *   **色域转换 (CSC)**：YUV420 -> RGB/BGR (视频处理必备)。
 *   **归一化 (Normalize)**：减均值，除方差 (Mean/Std)。
@@ -77,7 +77,7 @@ msprof --output=./output --application="./main_app" --task-time=on --aic-metrics
 
 **启用方法**：配置 AIPP 配置文件，在 `atc` 模型转换时通过 `--insert_op_conf=aipp.cfg` 插入。
 
-### 零拷贝（Zero-Copy）内存管理
+### 零拷贝（Zero-Copy）内存管理 {#src-book-chapter7-h10}
 传统流程：`Host malloc -> Read Image -> Host 2 Device Copy -> Device Infer`。
 零拷贝流程：直接申请 **Device侧可访问的 Host 内存**（或是 Host 侧可映射的 Device 内存）。
 
@@ -89,16 +89,16 @@ aclrtMalloc(&devBuffer, size, ACL_MEM_MALLOC_HUGE_FIRST);
 ```
 对于视频解码（VDEC）+ 推理（Infer）场景，让 VDEC 直接将结果解码到推理的 Input Header 内存中，可以消除中间的显存拷贝。
 
-### 多级流水线（Multi-Stage Pipeline）
+### 多级流水线（Multi-Stage Pipeline） {#src-book-chapter7-h11}
 简单串行模式：`Pre -> Infer -> Post`，总耗时 $T = t1 + t2 + t3$。
 流水线模式：三个线程分别处理 Pre, Infer, Post，通过队列传递数据。
 理论吞吐量取决于最慢的阶段：$FPS = 1 / \max(t1, t2, t3)$。
 
-## 自定义算子的编译、部署与单元测试
+## 自定义算子的编译、部署与单元测试 {#src-book-chapter7-h12}
 
 完成算子开发后，还需要经历编译、部署和测试三个工程化环节，算子才能真正投入生产使用。
 
-### 使用 ccec 编译算子
+### 使用 ccec 编译算子 {#src-book-chapter7-h13}
 
 **ccec**（CCE Compiler）是 Ascend C 算子的专属编译器。它基于 LLVM 框架，将 C++ Kernel 代码编译为昇腾 AI Core 可执行的机器码。
 
@@ -120,7 +120,7 @@ ccec -std=c++17 --aicore -o libadd_custom.so add_custom.cpp
 
 在工程中推荐使用 CMake 管理编译过程，以便处理多文件、多编译选项的复杂场景。
 
-### 部署到 CANN 算子库
+### 部署到 CANN 算子库 {#src-book-chapter7-h14}
 
 编译产物（`.so` 文件）需要部署到 CANN 的算子搜索路径中，才能被 AscendCL 或其他框架调用。部署步骤如下：
 
@@ -140,7 +140,7 @@ cp add_custom.ini $HOME/Ascend/ascend-toolkit/latest/opp/vendors/customize/op_in
 
 部署完成后，其他开发者即可通过 AscendCL API 直接调用你的自定义算子，如同使用内置算子一样。
 
-### 编写 AscendCL 单元测试
+### 编写 AscendCL 单元测试 {#src-book-chapter7-h15}
 
 部署后的算子需要通过单元测试来验证功能正确性。使用 AscendCL API 编写测试代码的基本流程：
 
@@ -153,7 +153,7 @@ int main() {
     aclInit(nullptr);
     aclrtSetDevice(0);
 
-    // 2. 准备输入数据（Host → Device）
+    // 2. 准备输入数据（Host -> Device）
     float *input_a = ...;  // host 端输入
     float *input_b = ...;
     aclrtMalloc(&dev_a, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -165,7 +165,7 @@ int main() {
     // 4. 执行算子
     aclopExecute(handle, "Add", ...);
 
-    // 5. 取回结果（Device → Host）并验证
+    // 5. 取回结果（Device -> Host）并验证
     aclrtMemcpy(output_host, size, dev_c, size, ACL_MEMCPY_DEVICE_TO_HOST);
     // ... 与 NumPy 参考结果对比 ...
 
@@ -177,11 +177,11 @@ int main() {
 }
 ```
 
-## 算子级性能优化策略
+## 算子级性能优化策略 {#src-book-chapter7-h16}
 
 应用层的优化（AIPP、零拷贝、流水线等）解决的是"系统各部分如何高效协作"的问题，而算子级的优化解决的是"计算本身如何更快"的问题。本节介绍三个最基础也最有效的算子级优化策略。
 
-### 内存访问优化：让数据离计算单元更近
+### 内存访问优化：让数据离计算单元更近 {#src-book-chapter7-h17}
 
 昇腾310B 的存储层级中，越靠近计算单元的内存越快但越小。优化的第一条原则是：**尽可能让数据驻留在 Local Memory 中**。
 
@@ -193,7 +193,7 @@ int main() {
 
 在 Ascend C 中，开发者通过精确控制 `DataCopy` 的源地址、数据量和频率来实践这些策略。TBE DSL 则通过 `auto_schedule` 的模板来自动优化访存模式。
 
-### Double Buffer：计算与搬运的重叠
+### Double Buffer：计算与搬运的重叠 {#src-book-chapter7-h18}
 
 如果一次 CopyIn 需要 100μs，一次 Compute 需要 200μs，串行执行总计需要 300μs。但如果使用 **Double Buffer**（双缓冲）技术，可以让 CopyIn 和 Compute 并行进行：
 
@@ -207,7 +207,7 @@ Double Buffer 的核心思想是：在 UB 中分配两套缓冲区（A 区和 B 
 
 在 Ascend C 中，Double Buffer 通过 `pipe` 的流水线调度 API 来实现。TBE DSL 的 `auto_schedule` 在遇到大规模数据时也会自动插入 Double Buffer 策略。
 
-### 向量化编程：一次处理多个数据
+### 向量化编程：一次处理多个数据 {#src-book-chapter7-h19}
 
 现代 AI Core 的 Vector Unit 支持 **SIMD 向量化运算**——一条指令同时处理多个数据。例如，昇腾的 Vector Unit 可以一次处理 64 个 float16 或 32 个 float32。
 
@@ -218,16 +218,16 @@ Double Buffer 的核心思想是：在 UB 中分配两套缓冲区（A 区和 B 
 
 > **性能分析的下一步**：以上策略给出了优化的方向，但要精确知道"哪里慢、为什么慢"，需要使用 msprof 进行系统级的 Profiling 分析。本章第 2 节"照妖镜：Profiling 性能分析"已详细介绍了 msprof 的采集命令、Timeline 视图解读和 AI Core Metrics 分析，读者可结合 Profiling 数据来验证优化效果。
 
-## 实战演练：车辆检测系统的极致优化之路
+## 实战演练：车辆检测系统的极致优化之路 {#src-book-chapter7-h20}
 
 我们以一个典型的“路面车辆检测”应用为例，场景为处理 1080P 视频流，模型为 YOLOv5s (Input 640x640)。
 
-### 阶段一：Baseline (Python + OpenCV)
+### 阶段一：Baseline (Python + OpenCV) {#src-book-chapter7-h21}
 *   **实现**：使用 OpenCV (`cv2.VideoCapture`, `cv2.resize`) 在 CPU 上读取和缩放，调用 ACL 进行推理，CPU 进行 NMS。
 *   **性能**：25 FPS。
 *   **瓶颈分析**：Profiling 显示 NPU 利用率仅 30%，大量时间消耗在 `cv2.resize` 和 `H2D Copy` 上。CPU 单核 100% 满载。
 
-### 阶段二：引入 AIPP 与 C++ (消除 CPU 计算瓶颈)
+### 阶段二：引入 AIPP 与 C++ (消除 CPU 计算瓶颈) {#src-book-chapter7-h22}
 *   **优化**：
     1.  重构为 C++ 应用。
     2.  不再在 Host 端做 Resize 和 Normalization。
@@ -236,7 +236,7 @@ Double Buffer 的核心思想是：在 UB 中分配两套缓冲区（A 区和 B 
 *   **性能**：55 FPS。
 *   **分析**：CPU 负载降低，但推理变成串行阻塞。
 
-### 6.5.3 阶段三：多线程 Pipeline (掩盖时延)
+### 6.5.3 阶段三：多线程 Pipeline (掩盖时延) {#src-book-chapter7-h23}
 *   **优化**：设计 `Thread_Decode`, `Thread_Infer`, `Thread_Post` 三组线程池。
     *   `Thread_Decode`: 负责视频解码，推入 Queue A。
     *   `Thread_Infer`: 从 Queue A 取图，`aclmdlExecute`，结果推入 Queue B。
@@ -244,7 +244,7 @@ Double Buffer 的核心思想是：在 UB 中分配两套缓冲区（A 区和 B 
 *   **性能**：85 FPS。
 *   **分析**：NPU 利用率提升至 80%，主要受限于单路流解码速度。
 
-### 6.5.4 阶段四：Batching 与 异步推理 (极致吞吐)
+### 6.5.4 阶段四：Batching 与 异步推理 (极致吞吐) {#src-book-chapter7-h24}
 *   **优化**：
     1.  **Batching**：虽然单张图处理快，但一次发送 4 张图 (BatchSize=4) 能分摊 PCIe 通信开销。
     2.  **DVPP VCC**：使用硬件解码器替代 CPU 解码。
@@ -252,14 +252,14 @@ Double Buffer 的核心思想是：在 UB 中分配两套缓冲区（A 区和 B 
 *   **性能**：120+ FPS。
 *   **结论**：相比 Baseline 提升近 5 倍，且 CPU 占用率极低。
 
-## 章节要点与练习
+## 章节要点与练习 {#src-book-chapter7-h25}
 
-### 总结
+### 总结 {#src-book-chapter7-h26}
 性能优化是一个系统工程，而非单一的改代码。
 1.  **AMP (Analyze, Map, Parallel)**：分析瓶颈，映射到硬件单元，最大化并行度。
 2.  **310B 黄金法则**：少用 CPU 做像素处理，用好 AIPP/DVPP，跑满 NPU 流水线。
 
-### 练习任务
+### 练习任务 {#src-book-chapter7-h27}
 1.  **基线跑分**：运行你自己编写的 ResNet/YOLO 应用，记录单幅图片的预处理、推理、后处理平均耗时。
 2.  **Profiling 实战**：使用 `msprof` 抓取一份 Timeline 数据，截图并圈出“推理间隙”最大的位置，分析原因。
 3.  **计算加速比**：假设你的模型推理耗时 10ms，H2D 耗时 5ms，D2H 耗时 2ms。计算串行执行和理想流水线执行的 FPS 理论上限分别是多少？

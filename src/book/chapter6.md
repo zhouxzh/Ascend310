@@ -9,11 +9,11 @@ lang: zh-cn
 
 昇腾310B作为一款边缘推理芯片，其算子开发是挖掘硬件性能的关键环节。尽管CANN（Compute Architecture for Neural Networks）已提供丰富的内置算子库，但在面对自定义模型结构、特殊后处理逻辑或对极致性能有着严苛要求时，自定义算子开发（Custom Operator Development）仍不可或缺。本章将系统性地介绍基于昇腾310B的算子开发流程与核心理论，涵盖 TBE DSL 快速原型、算子原型定义、Ascend C 深度优化以及 Tiling 分片计算等关键主题。
 
-## 算子开发概述：昇腾310B硬件架构与开发路径
+## 算子开发概述：昇腾310B硬件架构与开发路径 {#src-book-chapter6-h1}
 
 本节作为算子开发实战的开篇，旨在帮助读者构建完整的知识框架。我们将首先解析昇腾310B处理器基于达芬奇（DaVinci）架构的核心特征，深入其AI Core的计算单元与存储层次；随后概述CANN异构计算软件栈；最后横向对比TBE与Ascend C这两条主流的算子开发路径，并探讨自定义算子开发的必要性。
 
-### 昇腾310B处理器与达芬奇架构
+### 昇腾310B处理器与达芬奇架构 {#src-book-chapter6-h2}
 
 昇腾310B是专门面向边缘计算与推理场景打造的高能效AI处理器。该芯片采用12nm FFC工艺制程，在仅5至8W的典型功耗下，提高两个版本——20TOPS@INT8或者8TOPS@INT8的澎湃AI算力，能效比达到惊人的25-40 TOPS/W。凭借这一优势，它在工业质检、智能电网、智慧交通等对实时性要求极高的场景中展现出了卓越性能。
 
@@ -21,7 +21,7 @@ lang: zh-cn
 
 达芬奇架构的核心设计理念可概括为：**“将计算任务分层处理，以最契合的计算单元执行最适合的任务”**。该架构将计算任务精细划分为标量（Scalar）、向量（1D）、矩阵（2D）与立方体（3D）四种类型，并在物理硬件层面相应地例化了三大核心计算单元——Cube Unit、Vector Unit与Scalar Unit。
 
-#### 计算单元的精细分工
+#### 计算单元的精细分工 {#src-book-chapter6-h3}
 
 **Cube Unit（立方体计算单元）** 是达芬奇架构的标志性设计，更是提供高密度算力的引擎。它专为深度神经网络量身定制，主要承担矩阵乘法、卷积运算及全连接层等计算密集型（Compute-bound）任务。依靠极高的数据复用率，Cube Unit有效突破了内存带宽的限制。在昇腾310B中，其运行频率可达1.224GHz，是释放全周期算力的关键所在。
 
@@ -31,7 +31,7 @@ lang: zh-cn
 
 这三大计算单元紧密协同，构建出高度并行的计算流水线。昇腾技术团队在多项典型任务中的实测数据表明，Cube Unit占用的执行周期（Cycles）显著大于Vector Unit，这意味着Cube Unit的运算潜能得到了充分释放，未受限于Vector Unit的调度阻塞，二者实现了优异的负载均衡。
 
-#### 存储层次与数据搬运机制
+#### 存储层次与数据搬运机制 {#src-book-chapter6-h4}
 
 昇腾310B的存储系统采用了精巧的多级层次结构体系。深入理解这一体系，是突破算子性能瓶颈、实现极致优化的先决条件。
 
@@ -44,7 +44,7 @@ lang: zh-cn
 **总线接口单元（Bus Interface Unit, BIU）** 扮演着AI Core与外部存储总线通信的“门户”角色，其主要职责是将AI Core发出的各类读写请求精确转化为标准的总线协议交互。
 
 在一个典型的计算流水线中：数据首先通过BIU由全局内存接入，随后经MTE的高效搬运与格式重组，稳妥驻留于L1缓存或UB中。紧接着，Scalar Unit发出调度指令，指挥Cube Unit或Vector Unit对UB中的数据进行高速运算。处理结束后，输出结果再次交由MTE接管，安全、高效地写回至全局内存，由此形成一个无缝闭环。
-#### 昇腾AI异构计算架构（CANN）
+#### 昇腾AI异构计算架构（CANN） {#src-book-chapter6-h5}
 
 正如上一章在探讨PyACL编程基础时所述，CANN（Compute Architecture for Neural Networks）是昇腾全面面向AI场景定制的异构计算架构。它在整个计算系统中发挥着承上启下的核心枢纽作用：向上广泛适配MindSpore、PyTorch、TensorFlow等主流AI框架，向下直接调度并深度释放昇腾AI处理器的澎湃算力，是提升硬件计算效率的关键”软件底座”。（CANN的详细架构、与CUDA对比、安装配置等内容请参见第2章。）
 
@@ -56,11 +56,11 @@ lang: zh-cn
 
 针对算子开发层面，CANN构建了一站式的全流程工具链支持。涵盖了专属算子编译器、功能验证仿真工具，以及深度的性能调优分析器（Profiler），全面辅助开发者打通从代码原型编写、逻辑调试到逼近硬件理论极限的全闭环开发流程。
 
-### 算子开发的两条主流路径
+### 算子开发的两条主流路径 {#src-book-chapter6-h6}
 
 针对不同开发需求和性能目标，昇腾CANN提供了两条主要的算子开发路径：**TBE（快速原型）** 和 **Ascend C（深度优化）**。
 
-#### TBE：声明式开发，效率优先
+#### TBE：声明式开发，效率优先 {#src-book-chapter6-h7}
 
 TBE（Tensor Boost Engine）是一种基于Python的算子开发框架，其核心特点在于**让开发者专注于描述计算逻辑，由系统自动完成底层的复杂优化**。在开发方式上，TBE提供了DSL（Domain-Specific Language）编程模式。开发者无需深入了解昇腾底层硬件架构，只需通过几行简洁的Python代码即可描述算子的数学表达式。例如，使用`dsl.vadd(input_x, input_y)`即可轻松表达向量加法，随后通过调用`dsl.auto_schedule()`，TBE会自动接管并完成模式识别、子图切分、调度模板选择以及底层指令映射等一系列流程。
 
@@ -70,7 +70,7 @@ TBE（Tensor Boost Engine）是一种基于Python的算子开发框架，其核�
 
 > **补充：TBE TIK 模式**。TBE 早期还提供了一种名为 **TIK（Tensor Iterator Kernel）** 的 Python 命令式开发模式，允许开发者手动控制数据搬运与计算流水线，在控制粒度上介于 DSL 与 Ascend C 之间。但随着 Ascend C 的成熟，TIK 已被逐步取代，不再推荐用于新项目。本书不再展开 TIK 相关内容，读者若在存量项目中遇到 TIK 算子，可查阅昇腾官方文档。
 
-#### Ascend C：命令式开发，性能优先
+#### Ascend C：命令式开发，性能优先 {#src-book-chapter6-h8}
 
 Ascend C是一种基于C++的高性能算子开发语言，其核心优势在于赋予了开发者对数据流、指令流以及多核并行执行的精细控制权。在编程模型上，Ascend C采用了SPMD（单程序多数据）架构，这意味着所有的AI Core将执行同一套代码逻辑，但会根据各自的任务ID去处理被分配的不同数据区间。
 
@@ -78,7 +78,7 @@ Ascend C是一种基于C++的高性能算子开发语言，其核心优势在于
 
 这种命令式的开发范式实现了灵活性与极致性能的统一。得益于对底层内存读写和流水线编排的精准把控，Ascend C能够帮助开发者逼近硬件的理论计算极限，更被广泛应用于搞定大模型场景下如FlashAttention等复杂的性能瓶颈算子。此外，其原生支持CPU模拟调试与中间变量打印，极大地优化了开发体验。然而，获取这种极致性能也意味着较高的开发门槛，开发者必须对昇腾底层硬件架构有透彻的理解。同时，Ascend C的代码工程量相对较大，即便是实现一个极简的算子，往往也需要编写数百行代码来完成对底层资源的系统化调度。
 
-#### 两条路径的协同关系
+#### 两条路径的协同关系 {#src-book-chapter6-h9}
 
 两条开发路径并非互斥，而是可以根据需求协同使用：
 
@@ -98,29 +98,29 @@ CANN算子库本身包含了丰富的高性能算子，覆盖了大多数常见�
 
 **应用后处理加速**：应用程序中的某些逻辑涉及数学运算（如查找最大值、数据类型转换），可以封装为自定义算子在AI处理器上执行，利用NPU提升性能。例如，分类应用中查找概率最大的前5个标识，可以开发ArgMax算子实现后处理加速。
 
-### 小结
+### 小结 {#src-book-chapter6-h10}
 
 通过本节的学习，读者应该对昇腾310B的硬件架构、CANN软件栈以及算子开发的两种路径有了整体认识。从下一节开始，我们将从最简单的TBE算子入手，带领读者亲手实现第一个自定义算子，在实践中加深对概念的理解。
 
-## 初体验：使用TBE DSL快速实现第一个算子（向量加法）
+## 初体验：使用TBE DSL快速实现第一个算子（向量加法） {#src-book-chapter6-h11}
 
 通过一个最简单的向量加法算子，让读者快速体验TBE开发的完整流程。在VSCode中编写Python脚本，使用TBE DSL描述算子逻辑，通过命令行工具编译生成算子文件，并编写简单的测试代码在NPU上运行验证。最后总结TBE的优缺点及适用场景，激发读者进一步学习的兴趣。
 
-### TBE DSL 快速概览
+### TBE DSL 快速概览 {#src-book-chapter6-h12}
 
 在动手编写代码之前，有必要先理解 **TBE DSL 到底是什么**。
 
-#### 什么是 DSL？
+#### 什么是 DSL？ {#src-book-chapter6-h13}
 
 **DSL（Domain-Specific Language，领域特定语言）** 是为特定问题域量身定制的编程语言。与通用语言（如 Python、C++）不同，DSL 只关注一个狭窄的领域，用该领域的术语来表达计算意图，从而大幅降低表达复杂度。
 
 TBE DSL 就是昇腾为**算子开发**这一特定领域设计的 Python 内嵌语言。它运行在 Python 环境中，但提供了一套专用于描述张量计算、调度策略和编译选项的 API。
 
-![TBE DSL 体系结构](img6/dsl_architecture.png){#fig:dsl_architecture width=70%}
+![TBE DSL 体系结构](img6/dsl_architecture.png){#fig:dsl_architecture width=62% height=75%}
 
-上图展示了 TBE DSL 的完整体系结构。整个架构自顶向下分为三层：最上层是暴露给开发者的 **Python DSL 接口**（计算描述 → 调度 → 编译），中间层是 **TVM 编译框架** 负责张量表达式的优化与代码生成，底层是 **CCE 硬件后端** 将优化后的计算映射到昇腾310B 的 AI Core 指令。
+上图展示了 TBE DSL 的完整体系结构。整个架构自顶向下分为三层：最上层是暴露给开发者的 **Python DSL 接口**（计算描述 -> 调度 -> 编译），中间层是 **TVM 编译框架** 负责张量表达式的优化与代码生成，底层是 **CCE 硬件后端** 将优化后的计算映射到昇腾310B 的 AI Core 指令。
 
-#### DSL 与 TVM 的关系
+#### DSL 与 TVM 的关系 {#src-book-chapter6-h14}
 
 TBE 基于 **Apache TVM** 框架深度定制。TVM（Tensor Virtual Machine）是一个开源的深度学习编译器框架，它的核心能力是将高层张量计算描述编译为不同硬件后端的可执行代码。TBE 复用了 TVM 的编译基础设施，并将后端替换为昇腾自家的 CCE。
 
@@ -132,7 +132,7 @@ TVM 在算子编译流程中承担三个关键角色：
 | **Schedule Primitives** | 提供低层调度原语（分块、向量化、绑定等），决定计算顺序与并行策略（"怎么算"） | `dsl.auto_schedule()` 自动选择调度模板；也可手动调用 `tvm.create_schedule()` 精细控制 |
 | **CodeGen** | 将优化后的调度翻译为目标硬件指令 | 对接 **CCE Backend**，生成昇腾 AI Core 可执行的二进制码 |
 
-#### 什么是 CCE？
+#### 什么是 CCE？ {#src-book-chapter6-h15}
 
 **CCE（Cube-based Compute Engine）** 是昇腾 CANN 的编译器后端，专为达芬奇架构设计。它的职责是将 TVM 优化后的计算图翻译为 AI Core 可直接执行的指令流，包括：
 
@@ -144,7 +144,7 @@ CCE 的输入是 TVM 产生的优化 IR（中间表示），输出是可在昇�
 
 在 TBE 的声明式范式下，开发者**只需用 TE 描述计算逻辑**，调度部分由 `auto_schedule()` 自动完成。这正是 TBE 与 Ascend C 的根本区别——前者说"算什么"，后者必须亲自说"怎么算"。
 
-#### DSL 的核心 API 分层
+#### DSL 的核心 API 分层 {#src-book-chapter6-h16}
 
 TBE DSL 的 API 按职责分为三层：
 
@@ -156,7 +156,7 @@ TBE DSL 的 API 按职责分为三层：
 
 一个典型的 TBE DSL 算子开发流程就是这三层的顺序调用：先用计算描述层的 API 写出算子的数学表达式，然后交由调度层的 `auto_schedule()` 自动生成硬件执行计划，最后由编译层的 `dsl.build()` 生成可在昇腾设备上运行的二进制文件。这个从声明到编译的完整链路，即为前文 @fig:dsl_architecture 中蓝色箭头所描绘的纵向路径。
 
-#### 声明式 vs 命令式
+#### 声明式 vs 命令式 {#src-book-chapter6-h17}
 
 为了进一步理解 DSL 的定位，这里将其与下一节将要学习的 Ascend C 做个对比：
 
@@ -172,7 +172,7 @@ TBE DSL 的 API 按职责分为三层：
 
 了解了这些基本概念后，我们就可以正式动手了。
 
-### 算子分析：明确我们要做什么
+### 算子分析：明确我们要做什么 {#src-book-chapter6-h18}
 
 在动手编码之前，先明确我们要开发的算子规格。按照昇腾算子开发的规范，我们需要先进行算子分析。
 
@@ -199,9 +199,9 @@ TBE DSL算子的开发流程可以分为四个主要步骤：
 | 调度编译 | 将计算逻辑映射到硬件 | auto_schedule, cce_build_code |
 | 验证测试 | 在NPU上运行并核验结果 | NumPy对比，AscendCL调用 |
 
-### 完整代码实现
+### 完整代码实现 {#src-book-chapter6-h19}
 
-#### 创建工程目录
+#### 创建工程目录 {#src-book-chapter6-h20}
 
 首先在VSCode中连接到昇腾310B开发板（或直接在板子上操作），创建以下目录结构：
 
@@ -223,7 +223,7 @@ add_tbe/
 └── kernel_meta/    # 编译输出目录（自动生成）
 ```
 
-#### 编写TBE算子代码（add.py）
+#### 编写TBE算子代码（add.py） {#src-book-chapter6-h21}
 
 下面是完整的向量加法算子实现代码，我们将逐段解释。
 
@@ -301,9 +301,9 @@ if __name__ == '__main__':
 > ```
 > 请将 `with tvm.target.cce():` 替换为 `with tvm.target.Target("cce", host="cce"):`，这是 CANN 新版 API 的标准写法。
 
-### 代码逐段详解
+### 代码逐段详解 {#src-book-chapter6-h22}
 
-#### 导入模块
+#### 导入模块 {#src-book-chapter6-h23}
 ```python
 import tbe
 from tbe import tvm
@@ -324,7 +324,7 @@ from functools import reduce
 - **Shape大小校验**：计算广播后张量的总元素个数，当超出`SHAPE_SIZE_LIMIT`阈值时抛出异常
 - **数据广播与计算**：先通过`dsl.broadcast`将输入形状广播对齐，再调用`dsl.vadd`执行向量加法（自动识别为element-wise模式）
 
-#### 算子主函数（add）
+#### 算子主函数（add） {#src-book-chapter6-h24}
 这是算子的入口函数，负责调度和编译：
 
 **参数校验**：校验数据类型是否在支持范围内（float16/float32/int32）。
@@ -337,7 +337,7 @@ from functools import reduce
 
 **编译构建**：`dsl.build`将调度后的计算描述编译为昇腾设备可执行的二进制文件。
 
-### 编译算子
+### 编译算子 {#src-book-chapter6-h25}
 
 在终端执行以下命令编译算子：
 
@@ -355,7 +355,7 @@ ls kernel_meta/
 # 输出示例：add.o  add.json
 ```
 
-### 算子验证：在NPU上运行测试
+### 算子验证：在NPU上运行测试 {#src-book-chapter6-h26}
 
 编译成功后，我们需要验证算子的正确性。昇腾提供了两种验证方式：
 - **单算子模型执行**：将算子编译成单算子离线模型（.om文件），通过AscendCL加载执行
@@ -363,7 +363,7 @@ ls kernel_meta/
 
 本节采用第一种方式，因为它更接近实际部署场景。
 
-#### 编写验证代码（run.py）
+#### 编写验证代码（run.py） {#src-book-chapter6-h27}
 
 下面是使用AscendCL加载并执行单算子的验证代码：
 
@@ -443,7 +443,7 @@ if __name__ == "__main__":
 
 > **注意事项**：由于 `tbe.common.testing.testing` 模块的 `build()` 函数内部仍使用旧版 API（将 `target` 和 `target_host` 作为独立参数传入 `tvm.build()`），同样会触发上述废弃警告。解决方案是在 `run.py` 中自定义一个 `build()` 函数来覆盖它，将两个参数合并为 `tvm.target.Target("c", host="llvm")`，从而消除警告。
 
-#### 运行验证
+#### 运行验证 {#src-book-chapter6-h28}
 
 验证代码：
 
@@ -470,7 +470,7 @@ The actual output is the same as the expected output.
 
 至此，我们完成了第一个TBE DSL算子的完整开发流程：从算子分析、代码实现、编译到NPU上验证运行。
 
-#### 性能验证：NPU 真的比 CPU 快吗？
+#### 性能验证：NPU 真的比 CPU 快吗？ {#src-book-chapter6-h29}
 
 成功运行算子只是第一步，一个自然的问题是：**算子跑在 NPU 上到底比 CPU 快多少？**
 
@@ -500,11 +500,11 @@ print(f"CPU time: {t_cpu:.4f}s")
 
 需要强调的是，上述简单计时只适用于初步感受。系统性的性能分析应使用昇腾官方的 **Profiling 工具（msprof）**，它能精确采集 AI Core 执行周期、内存带宽利用率、算子耗时占比等关键指标。Profiling 的具体使用方法将在后续的性能优化章节中详细介绍。
 
-### TBE DSL开发的优势与局限
+### TBE DSL开发的优势与局限 {#src-book-chapter6-h30}
 
 通过本次实战体验，我们可以总结TBE DSL开发的特点：
 
-#### 优势
+#### 优势 {#src-book-chapter6-h31}
 
 | 优势 | 说明 |
 |:---|:---|
@@ -513,7 +513,7 @@ print(f"CPU time: {t_cpu:.4f}s")
 | **自动优化** | `auto_schedule`自动完成指令映射、数据切分、流水线优化，由昇腾官方模板调度，性能稳定可靠 |
 | **快速验证** | 适合算法原型验证和非性能瓶颈算子的快速实现 |
 
-#### 局限
+#### 局限 {#src-book-chapter6-h32}
 
 | 局限 | 说明 |
 |:---|:---|
@@ -521,7 +521,7 @@ print(f"CPU time: {t_cpu:.4f}s")
 | **灵活性受限** | 对于具有极端定制化需求或特殊数据流模式的算子，DSL的自动调度可能无法完全满足 |
 | **高级算子覆盖** | 某些高级算子类型DSL可能尚未完全覆盖 |
 
-### 小结与展望
+### 小结与展望 {#src-book-chapter6-h33}
 
 本节我们通过一个向量加法算子，完整实践了TBE DSL开发的四步流程：算子分析、代码实现、编译、验证。你可能会感受到TBE DSL带来的便利——用熟悉的Python语言，专注于数学逻辑本身，而将底层复杂的硬件适配交给自动调度完成。
 
@@ -531,11 +531,11 @@ print(f"CPU time: {t_cpu:.4f}s")
 
 在进入下一节之前，建议你亲自动手完成本节示例，并在自己的昇腾310B开发板上跑通验证。这是理解后续更深内容的基础。
 
-## 理解算子开发的核心概念
+## 理解算子开发的核心概念 {#src-book-chapter6-h34}
 
 在动手实践之后，本节将系统讲解算子开发中必须掌握的三个核心概念：算子原型定义、算子信息库（.ini 文件）以及 Tiling（分片计算）。无论使用 TBE DSL 还是 Ascend C，这些概念都是绕不开的基础知识。
 
-### 算子原型定义
+### 算子原型定义 {#src-book-chapter6-h35}
 
 一个算子要在 CANN 框架中被正确注册和调用，首先需要明确它的**原型（Prototype）**。算子原型定义了该算子的完整接口契约，包括：
 
@@ -559,7 +559,7 @@ print(f"CPU time: {t_cpu:.4f}s")
 
 **算子类型（OpType）**：每个算子有唯一的类型名称，采用大驼峰命名，如 `Add`、`Conv2D`、`BatchNorm`。这个名称在算子信息库和 AscendCL 调用中均需保持一致。
 
-### 算子信息库（.ini 文件）
+### 算子信息库（.ini 文件） {#src-book-chapter6-h36}
 
 **算子信息库**（Operator Information Library，简称 `.ini` 文件）是 CANN 算子管理体系的核心配置文件。每个自定义算子都需要一个对应的 `.ini` 文件，它的主要作用包括：
 
@@ -597,17 +597,17 @@ shape=dynamic
 
 在 TBE DSL 开发流程中，如果使用 `dsl.build` 编译算子，CANN 会自动生成对应的 `.json` 描述文件，简化了手动编写 `.ini` 的步骤。但在 Ascend C 开发中，手动配置 `.ini` 是必不可少的环节。
 
-### Tiling（分片计算）的基本思想
+### Tiling（分片计算）的基本思想 {#src-book-chapter6-h37}
 
 **Tiling（分片计算）** 是算子开发中最重要的性能优化概念之一。它的核心思想很简单：**当数据量超过 AI Core 的 Local Memory 容量时，将数据切成小块，逐块计算**。
 
-#### 为什么需要 Tiling？
+#### 为什么需要 Tiling？ {#src-book-chapter6-h38}
 
 回顾第6.1节介绍的存储层次：昇腾310B 的每个 AI Core 内部，用于计算的 **Unified Buffer（UB）** 容量有限（通常为 256KB 左右）。而 Global Memory 中的输入数据可能有数十 MB。如果一次加载全部数据到 UB，会直接溢出。
 
 Tiling 的策略是：将输入张量按某个维度切分成多个 **Tile（分片）**，每次只搬运一个 Tile 到 UB，计算完后再搬走结果、加载下一片。这就像用一个小碗吃完一大锅饭——一次一碗，吃完再盛。
 
-#### Tiling 的三个关键参数
+#### Tiling 的三个关键参数 {#src-book-chapter6-h39}
 
 设计 Tiling 策略时，需要确定三个数值：
 
@@ -617,28 +617,28 @@ Tiling 的策略是：将输入张量按某个维度切分成多个 **Tile（分
 | **Tile Count** | 总共需要切分的片数 | 由总数据量 / Tile Size 决定 |
 | **Core Assignment** | 每个 AI Core 处理哪些 Tile | 多核时按 core_id 分配数据区间 |
 
-#### 一个简单的 Tiling 示例
+#### 一个简单的 Tiling 示例 {#src-book-chapter6-h40}
 
 以向量加法为例，假设：
 - 输入向量长度 = 10,000,000（约 38MB float32）
 - UB 容量 = 256KB
-- 每块最多处理 `256KB / (3 tensors × 4 bytes) ≈ 21,000` 个元素（需要同时放下输入 x、y 和输出 z）
+- 每块最多处理 `256KB / (3 tensors × 4 bytes) 约等于 21,000` 个元素（需要同时放下输入 x、y 和输出 z）
 
 则定一个 Tile 处理 20,000 个元素，总共需要 `10,000,000 / 20,000 = 500` 个 Tile。每个 AI Core 处理其中的一部分 Tile，不同 Core 之间完全并行，互不干扰。
 
 在 TBE DSL 中，`auto_schedule` 内部已经集成了自动 Tiling——开发者通常无需手动指定 Tile 大小。这也是 DSL 便利性的体现之一。但在 Ascend C 中，**Tiling 必须由开发者显式设计和编码**——这构成了下一节的核心挑战。
 
-### 小结
+### 小结 {#src-book-chapter6-h41}
 
 本节梳理了算子开发的三大基础设施：**原型定义** 规定了算子的"身份证"信息（输入输出、类型、属性），**算子信息库** 将其注册到 CANN 框架中，而 **Tiling** 则是突破 Local Memory 容量限制的核心技术。这些概念将直接应用于下一节的 Ascend C 实战。
 
-## 深入底层：Ascend C算子开发入门
+## 深入底层：Ascend C算子开发入门 {#src-book-chapter6-h42}
 
 Ascend C 是 CANN 提供的 C++ 高性能算子开发语言。与 TBE DSL 的声明式风格不同，Ascend C 要求开发者**亲自设计数据流和指令流**，换取的回报是**逼近硬件理论极限的性能**。本节将以向量加法为起点，带你进入 Ascend C 的世界。
 
-### Ascend C 的编程模型
+### Ascend C 的编程模型 {#src-book-chapter6-h43}
 
-#### Host-Device 协同
+#### Host-Device 协同 {#src-book-chapter6-h44}
 
 Ascend C 采用经典的 **Host-Device 协同模型**：
 
@@ -647,7 +647,7 @@ Ascend C 采用经典的 **Host-Device 协同模型**：
 
 这种分离意味着开发一个算子需要写两部分代码：一个 Host 侧的主控文件和一个 Device 侧的 Kernel 文件。
 
-#### SPMD 并行模型
+#### SPMD 并行模型 {#src-book-chapter6-h45}
 
 Ascend C 采用 **SPMD（Single Program Multiple Data，单程序多数据）** 架构。所有 AI Core 执行**同一份 Kernel 代码**，但通过内置变量 `block_idx` 获取各自的序号，从而处理不同的数据区间。
 
@@ -662,7 +662,7 @@ uint32_t offset = block_idx * len_per_core;
 // 当前 Core 处理 [offset, offset + len_per_core) 的数据
 ```
 
-#### 三段式流水线
+#### 三段式流水线 {#src-book-chapter6-h46}
 
 每个 AI Core 内部的执行流程被抽象为三个连续阶段，这也是 Ascend C Kernel 代码的标准结构：
 
@@ -672,13 +672,13 @@ uint32_t offset = block_idx * len_per_core;
 | **Compute** | 在 Local Memory 中执行数学运算 | `Add`, `Mul`, `Mads`, `ReduceMax` |
 | **CopyOut** | 将计算结果从 UB 搬运回 Global Memory | `DataCopy` |
 
-需要注意的是，这三个阶段的粒度是**每个 Tile**——在一个 Tiling 循环中，每个 Tile 都要经历完整的 CopyIn → Compute → CopyOut 流程。这恰好对应到上一节 Tiling 概念的实际落地。
+需要注意的是，这三个阶段的粒度是**每个 Tile**——在一个 Tiling 循环中，每个 Tile 都要经历完整的 CopyIn -> Compute -> CopyOut 流程。这恰好对应到上一节 Tiling 概念的实际落地。
 
-#### Kernel 与 Tiling 的关系
+#### Kernel 与 Tiling 的关系 {#src-book-chapter6-h47}
 
 在 Ascend C 中，Kernel 函数本身只描述"对一块数据的计算逻辑"，而 Tiling 参数（分几块、每块多大）由 Host 端计算好后传给 Kernel。这种分工清晰地分离了**计算逻辑**（Kernel 负责）和**数据切分策略**（Host 端的 Tiling 逻辑负责）。
 
-### 工程结构
+### 工程结构 {#src-book-chapter6-h48}
 
 一个标准的 Ascend C 算子工程包含以下文件：
 
@@ -693,11 +693,11 @@ add_ascendc/
 ```
 
 关键文件说明：
-- **add_custom.cpp**：包含 Host 侧的入口函数和 Device 侧的 Kernel 函数。Kernel 函数内部实现 CopyIn → Compute → CopyOut 流水线。
+- **add_custom.cpp**：包含 Host 侧的入口函数和 Device 侧的 Kernel 函数。Kernel 函数内部实现 CopyIn -> Compute -> CopyOut 流水线。
 - **CMakeLists.txt**：配置编译选项，指定依赖的 CANN 库和头文件路径。
 - **add_custom.ini**：算子信息库文件，声明算子接口。
 
-### 向量加法的 Ascend C 实现
+### 向量加法的 Ascend C 实现 {#src-book-chapter6-h49}
 
 下面是一个向量加法的 Ascend C Kernel 实现（完整工程请参见 `samples/chapter6/add_ascendc/`）：
 
@@ -788,11 +788,11 @@ extern "C" __global__ __aicore__ void add_custom(
 - **Tiling 数据**：Host 端计算的 Tiling 参数通过 `GM_ADDR tiling` 传入，`GET_TILING_DATA` 宏将其解包为结构体
 - **__aicore__ 属性**：标记所有运行在 AI Core 上的函数，编译器据此生成 DaVinci 指令
 
-### 编译与运行
+### 编译与运行 {#src-book-chapter6-h50}
 
 Ascend C 内核通过 TBE 框架的 `compile_op` 接口编译，该接口会自动调用 `ccec` 并设置正确的编译选项。编译命令封装在 Python 算子注册脚本中（参见 `samples/chapter6/add_ascendc/add_custom_tbe.py`），最终生成 `kernel_meta/` 目录下的 `.o` 与 `.json` 文件，随后可通过 AscendCL API 加载并执行。
 
-### Ascend C 与 TBE DSL 的对比回顾
+### Ascend C 与 TBE DSL 的对比回顾 {#src-book-chapter6-h51}
 
 经过 Ascend C 的初步体验，我们可以回看第 6.2 节中用 TBE DSL 实现的向量加法：
 
@@ -808,42 +808,42 @@ Ascend C 内核通过 TBE 框架的 `compile_op` 接口编译，该接口会自�
 
 两种方式并非二选一的关系。在实际项目中，**先用 TBE DSL 验证功能正确性，如果性能不达预期，再用 Ascend C 重写核心逻辑**，是最常见的开发流程。
 
-## 从简单到复杂：实现一个需要Tiling的算子（如矩阵加法）
+## 从简单到复杂：实现一个需要Tiling的算子（如矩阵加法） {#src-book-chapter6-h52}
 
 上一节的向量加法示例刻意简化了 Tiling 逻辑（Kernel 只处理单块数据）。本节将以**矩阵加法**为例，完整实现一个带 Tiling 的 Ascend C 算子，让读者真正理解分片计算的工程实现。
 
-### 场景设定
+### 场景设定 {#src-book-chapter6-h53}
 
 - 两个矩阵 A 和 B，尺寸均为 `M × N = 1024 × 2048`，float32 类型
 - 每个矩阵占用 `1024 × 2048 × 4 = 8MB`
 - 昇腾310B 的 UB 容量为 256KB，显然无法一次性容纳
 - 需要设计 Tiling 策略，将矩阵切成小块逐块计算
 
-### Tiling 策略设计
+### Tiling 策略设计 {#src-book-chapter6-h54}
 
-#### 分块大小计算
+#### 分块大小计算 {#src-book-chapter6-h55}
 
 UB 中需要同时存放三块数据：输入 A 的 Tile、输入 B 的 Tile、输出 C 的 Tile。设每个 Tile 大小为 `T` 个 float32（4 字节），则占用的 UB 空间为 `3 × T × 4 = 12T` 字节。考虑到 UB 中还需留出空间给中间变量和指令缓存，一般取 UB 总容量的 60%–80% 作为数据区。
 
 ```text
-UB 数据区上限 ≈ 256KB × 70% ≈ 180KB
-T_max ≈ 180KB / (3 × 4B) ≈ 15,000 个 float32
+UB 数据区上限 约等于 256KB × 70% 约等于 180KB
+T_max 约等于 180KB / (3 × 4B) 约等于 15,000 个 float32
 ```
 
 在实际工程中，为了提高 Cube Unit 的计算效率，Tile 的尺寸通常还需要对齐到 16 或 32 的整数倍。取 `tile_num = 12,288`（即 `16 × 768`）作为一个合适的 Tile 大小。
 
-#### 多核任务分配
+#### 多核任务分配 {#src-book-chapter6-h56}
 
 假设昇腾310B 有 8 个 AI Core，每个 Core 独立处理一部分数据。按行切分是最简单的策略：
 
 ```text
 每 Core 处理行数 = M / core_num = 1024 / 8 = 128 行
-每 Core 需处理的 Tile 数 = (128 × N) / tile_num = (128 × 2048) / 12288 ≈ 22 个 Tile
+每 Core 需处理的 Tile 数 = (128 × N) / tile_num = (128 × 2048) / 12288 约等于 22 个 Tile
 ```
 
-Host 端根据 `block_idx` 计算每个 Core 的数据起始偏移，Kernel 端在 for 循环中逐 Tile 执行 CopyIn → Compute → CopyOut。
+Host 端根据 `block_idx` 计算每个 Core 的数据起始偏移，Kernel 端在 for 循环中逐 Tile 执行 CopyIn -> Compute -> CopyOut。
 
-### 带 Tiling 的 Kernel 伪代码
+### 带 Tiling 的 Kernel 伪代码 {#src-book-chapter6-h57}
 
 ```cpp
 extern "C" __global__ __aicore__ void mat_add_with_tiling(
@@ -881,11 +881,11 @@ extern "C" __global__ __aicore__ void mat_add_with_tiling(
 
 这个骨架代码展示了 Tiling 循环的基本结构。完整工程代码（包含 Host 侧 Tiling 参数计算、边界处理、CMakeLists.txt 等）请参见 `samples/chapter6/mat_add_tiling/`。
 
-### 调试技巧
+### 调试技巧 {#src-book-chapter6-h58}
 
 Ascend C 提供了两种调试手段，对于排查 Tiling 相关问题尤其有用：
 
-#### CPU 模拟调试
+#### CPU 模拟调试 {#src-book-chapter6-h59}
 
 在开发阶段，可以在 CPU 上模拟运行 Kernel，无需烧录到 NPU：
 
@@ -897,7 +897,7 @@ ccec --cpu_mode add_custom.cpp -o add_cpu
 
 CPU 模拟支持断点调试和变量打印，适合在复杂 Bug 定位时使用。
 
-#### printf 打印
+#### printf 打印 {#src-book-chapter6-h60}
 
 在 Kernel 中可以使用 `printf` 打印中间值（仅 CPU 模拟和 Debug 模式支持）：
 
@@ -907,7 +907,7 @@ printf("block_idx=%d, tile=%d, offset=%d\n", block_idx, i, offset);
 
 这在大规模数据中追踪特定 Tile 的行为时非常高效。注意在生产部署的 Release 版本中需要移除或条件编译，避免影响性能。
 
-### 小结与展望
+### 小结与展望 {#src-book-chapter6-h61}
 
 本节通过矩阵加法的 Tiling 实战，展示了 Ascend C 开发中最核心的工程挑战：**如何设计合理的分块策略，使得数据既能塞进有限的 UB，又能最大化 AI Core 的计算效率**。同时介绍了 CPU 模拟调试和 printf 打印两种调试手段。
 

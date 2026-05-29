@@ -1,6 +1,6 @@
 # 案例7：智能相册
 
-## 1. 项目简介
+## 1. 项目简介 {#src-experiment-case7-h1}
 
 本项目基于昇腾 310B 平台，构建一个智能照片管理和检索系统。系统使用
 **ResNet50** 卷积神经网络提取每张照片的 2048 维视觉特征向量，通过
@@ -11,24 +11,24 @@
 离线索引 + 在线检索**模式的案例，帮助读者理解 NPU 如何在"先算后查"的
 场景中发挥作用。
 
-### 三个核心功能
+### 三个核心功能 {#src-experiment-case7-h2}
 
 1. **照片浏览**：按"全部 / 有人脸 / 无人脸"筛选照片库
 2. **相似搜索**：上传一张照片，找出视觉上最相似的 12 张
 3. **批量索引**：一键扫描照片文件夹，提取特征向量，构建 FAISS 索引
 
-### 与已有案例的关系
+### 与已有案例的关系 {#src-experiment-case7-h3}
 
 | 案例 | 领域 | NPU 任务 | 模式 |
 |------|------|----------|------|
-| 案例1 | 人脸识别 | SCRFD 检测 + MobileFaceNet 识别 | 实时摄像头 → Flask API |
+| 案例1 | 人脸识别 | SCRFD 检测 + MobileFaceNet 识别 | 实时摄像头 -> Flask API |
 | **案例7** | **智能相册** | **ResNet50 特征提取** | **批量索引 + FAISS 检索** |
-| 案例8 | 手势识别 | MobileNetV3 分类 | 实时摄像头 → Gradio |
+| 案例8 | 手势识别 | MobileNetV3 分类 | 实时摄像头 -> Gradio |
 | 案例9 | 聊天机器人 | MiniLM 文本嵌入 | 文本 RAG + 云端 LLM |
 
-## 2. 内容大纲
+## 2. 内容大纲 {#src-experiment-case7-h4}
 
-### 2.1. 硬件准备
+### 2.1. 硬件准备 {#src-experiment-case7-h5}
 
 相比旧版案例7中列出的扫描仪、4K 显示器、触摸屏、NAS 网络存储等复杂设
 备，本项目只需要：
@@ -46,7 +46,7 @@ flowchart LR
     end
 
     subgraph COMPUTE["计算平台"]
-        NPU["昇腾 310B NPU\nResNet50 特征提取 → OM"]
+        NPU["昇腾 310B NPU\nResNet50 特征提取 -> OM"]
         CPU["CPU\nOpenCV 人脸计数 + FAISS 检索"]
     end
 
@@ -65,9 +65,9 @@ flowchart LR
 在几十秒内完成全库索引。而且模型权重直接由 PyTorch 官方 CDN 提供，无需
 额外下载第三方模型文件。
 
-### 2.2. 软件环境
+### 2.2. 软件环境 {#src-experiment-case7-h6}
 
-#### 操作系统与框架
+#### 操作系统与框架 {#src-experiment-case7-h7}
 
 | 层级 | 软件 | 版本 | 用途 |
 |------|------|------|------|
@@ -79,7 +79,7 @@ flowchart LR
 | 向量搜索 | FAISS | 1.7+ | 向量相似度检索 |
 | Web | Gradio | 4.0+ | 照片画廊 + 搜索界面 |
 
-#### 环境准备
+#### 环境准备 {#src-experiment-case7-h8}
 
 在昇腾 310B 设备上，运行一键安装脚本：
 
@@ -100,25 +100,25 @@ bash setup.sh
 python3 prepare_models.py --onnx-only
 ```
 
-#### Python 依赖说明
+#### Python 依赖说明 {#src-experiment-case7-h9}
 
 | 包 | 用途 | 必需？ |
 |:---|:---|:---|
-| `gradio` | Web 界面框架，内置 `gr.Gallery` 照片墙组件 | ✓ |
-| `torch` + `torchvision` | ResNet50 模型定义、CPU 特征提取回退 | ✓ |
-| `opencv-python` | 图像缩放、色彩转换、归一化、人脸检测 | ✓ |
-| `numpy` | 特征向量操作、L2 归一化 | ✓ |
-| `faiss-cpu` | 向量相似度搜索（IndexFlatIP） | ✓ |
-| `Pillow` | Gradio 图像格式转换 | ✓ |
+| `gradio` | Web 界面框架，内置 `gr.Gallery` 照片墙组件 | 是 |
+| `torch` + `torchvision` | ResNet50 模型定义、CPU 特征提取回退 | 是 |
+| `opencv-python` | 图像缩放、色彩转换、归一化、人脸检测 | 是 |
+| `numpy` | 特征向量操作、L2 归一化 | 是 |
+| `faiss-cpu` | 向量相似度搜索（IndexFlatIP） | 是 |
+| `Pillow` | Gradio 图像格式转换 | 是 |
 | `onnx` | ONNX 模型校验（仅 prepare_models.py） | 仅转换 |
 | `acl` (CANN 自带) | NPU 推理，随 CANN 安装 | 仅推理 |
 
 `requirements.txt` 文件中已包含所有 pip 可安装的 Python 依赖。`acl` 包
 无需手动安装，它随 CANN 一起部署，Python 通过 `import acl` 调用。
 
-### 2.3. 图像特征提取原理
+### 2.3. 图像特征提取原理 {#src-experiment-case7-h10}
 
-#### 什么是图像特征向量
+#### 什么是图像特征向量 {#src-experiment-case7-h11}
 
 要让计算机判断两张照片是否"相似"，不能直接比较像素——同一物体在不同光
 照、角度、背景下，像素值完全不同。正确的做法是：用一个训练好的深度神经
@@ -126,17 +126,17 @@ python3 prepare_models.py --onnx-only
 相似的图像在向量空间中距离很近。
 
 ```
-照片 A (海滩日落)  →  ResNet50  →  [0.12, -0.34, 0.78, ..., 0.05]  (2048-dim)
-照片 B (海边黄昏)  →  ResNet50  →  [0.11, -0.32, 0.80, ..., 0.04]  (2048-dim)
+照片 A (海滩日落)  ->  ResNet50  ->  [0.12, -0.34, 0.78, ..., 0.05]  (2048-dim)
+照片 B (海边黄昏)  ->  ResNet50  ->  [0.11, -0.32, 0.80, ..., 0.04]  (2048-dim)
                                                ↓
-                                    余弦相似度 ≈ 0.95  (高度相似!)
+                                    余弦相似度 约等于 0.95  (高度相似!)
 
-照片 C (会议室)    →  ResNet50  →  [-0.45, 0.67, -0.12, ..., 0.33]  (2048-dim)
+照片 C (会议室)    ->  ResNet50  ->  [-0.45, 0.67, -0.12, ..., 0.33]  (2048-dim)
                                                ↓
-                              与 A 的余弦相似度 ≈ 0.12  (不相似)
+                              与 A 的余弦相似度 约等于 0.12  (不相似)
 ```
 
-#### 为什么选择 ResNet50
+#### 为什么选择 ResNet50 {#src-experiment-case7-h12}
 
 昇腾 310B NPU 最适合运行固定输入输出形状的卷积神经网络。ResNet50 是计
 算机视觉领域最经典的特征提取骨干网络之一：
@@ -146,7 +146,7 @@ python3 prepare_models.py --onnx-only
 | **ResNet50** | 2048-dim | ~95 MB | ~8ms | 推荐，torchvision 内置 |
 | MobileNetV3-Small | 576-dim | ~10 MB | ~5ms | 案例8已使用，维度较低 |
 | EfficientNet-B0 | 1280-dim | ~20 MB | ~10ms | 也可用 |
-| CLIP ViT-B/32 | 512-dim | ~350 MB | △ | Transformer，OM 转换复杂 |
+| CLIP ViT-B/32 | 512-dim | ~350 MB | 一般 | Transformer，OM 转换复杂 |
 
 选择 ResNet50 的理由：
 
@@ -159,7 +159,7 @@ python3 prepare_models.py --onnx-only
 4. **与案例8差异化**：案例8使用 MobileNetV3-Small 做手势分类，本案使用
    ResNet50 做特征提取——不同的模型、不同的任务类型
 
-#### 去掉分类头：分类模型 → 特征提取器
+#### 去掉分类头：分类模型 -> 特征提取器 {#src-experiment-case7-h13}
 
 torchvision 的 `resnet50` 默认输出 1000 类的分类概率。我们只需要图像的
 "语义表示"，不需要分类结果。做法是将最后一层 `fc`（全连接层）替换为
@@ -169,14 +169,14 @@ torchvision 的 `resnet50` 默认输出 1000 类的分类概率。我们只需�
 import torchvision.models as models
 
 model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
-model.fc = torch.nn.Identity()  # 去掉分类头 → 输出 2048-dim 特征向量
+model.fc = torch.nn.Identity()  # 去掉分类头 -> 输出 2048-dim 特征向量
 model.eval()
 ```
 
 这样模型输入 `(1, 3, 224, 224)` 的图像张量，输出 `(1, 2048)` 的特征
 向量，而不是 `(1, 1000)` 的类别概率。
 
-#### L2 归一化：让内积等于余弦相似度
+#### L2 归一化：让内积等于余弦相似度 {#src-experiment-case7-h14}
 
 FAISS 的 `IndexFlatIP`（内积索引）计算的是向量点积。为了让点积等价于余
 弦相似度，需要先将所有特征向量做 L2 归一化（模长为 1）：
@@ -187,20 +187,20 @@ if norm > 0:
     vec = vec / norm  # 归一化后 |vec| = 1，点积 = 余弦相似度
 ```
 
-#### 图像预处理流程
+#### 图像预处理流程 {#src-experiment-case7-h15}
 
 ```mermaid
 flowchart TD
-    INPUT["输入图像\nBGR (H, W, 3)"] --> RESIZE["cv2.resize\n→ 224×224"]
-    RESIZE --> RGB["cv2.cvtColor\nBGR → RGB"]
-    RGB --> NORM["归一化\npixel/255 → (pixel-mean)/std\nImageNet 统计值"]
-    NORM --> TRANSPOSE["维度重排\nHWC → CHW → NCHW\n(1, 3, 224, 224)"]
+    INPUT["输入图像\nBGR (H, W, 3)"] --> RESIZE["cv2.resize\n-> 224×224"]
+    RESIZE --> RGB["cv2.cvtColor\nBGR -> RGB"]
+    RGB --> NORM["归一化\npixel/255 -> (pixel-mean)/std\nImageNet 统计值"]
+    NORM --> TRANSPOSE["维度重排\nHWC -> CHW -> NCHW\n(1, 3, 224, 224)"]
 ```
 
 预处理代码在 [feature_extractor.py](samples/case7/feature_extractor.py) 的
 `FeatureExtractor.preprocess()` 方法中，与案例8的手势识别预处理完全一致。
 
-### 2.4. 模型转换与昇腾部署
+### 2.4. 模型转换与昇腾部署 {#src-experiment-case7-h16}
 
 torchvision 提供的 ResNet50 权重是 PyTorch 格式，需要通过两次转换才能
 在 310B NPU 上运行。
@@ -217,7 +217,7 @@ flowchart TD
     end
 
     subgraph DEPLOY["3. 推理部署"]
-        APP["app.py → FeatureExtractor\n→ AscendModel.execute()"]
+        APP["app.py -> FeatureExtractor\n-> AscendModel.execute()"]
     end
 
     TORCH -->|"torch.onnx.export()\nopset=11"| ONNX
@@ -225,7 +225,7 @@ flowchart TD
     OM -->|"acl.mdl.execute()"| APP
 ```
 
-#### 步骤 1：导出 ONNX
+#### 步骤 1：导出 ONNX {#src-experiment-case7-h17}
 
 ```bash
 # 仅导出 ONNX（可在开发机上运行，不需要昇腾硬件）
@@ -242,7 +242,7 @@ python3 prepare_models.py --onnx-only
 `export_onnx()` 函数。注意 `dynamic_axes={}` 参数——我们刻意禁用了动态
 形状，确保与 ATC 转换兼容。
 
-#### 步骤 2：ATC 转换 ONNX → OM
+#### 步骤 2：ATC 转换 ONNX -> OM {#src-experiment-case7-h18}
 
 ```bash
 # 在昇腾设备上运行
@@ -273,7 +273,7 @@ atc --model=models/resnet50_feature.onnx \
 
 `soc_version` 通过 `npu-smi info` 自动检测，默认值为 `Ascend310B4`。
 
-#### 与案例8的模型转换对比
+#### 与案例8的模型转换对比 {#src-experiment-case7-h19}
 
 | 对比项 | 案例8 (手势识别) | 案例7 (智能相册) |
 |--------|-----------------|-----------------|
@@ -286,9 +286,9 @@ atc --model=models/resnet50_feature.onnx \
 本案不需要训练脚本——这是案例8已经覆盖的内容。本案展示的是另一种常见的
 边缘 AI 模式：直接使用预训练模型做特征提取，无需微调。
 
-### 2.5. 照片索引与向量检索
+### 2.5. 照片索引与向量检索 {#src-experiment-case7-h20}
 
-#### 整体流程
+#### 整体流程 {#src-experiment-case7-h21}
 
 ```mermaid
 flowchart TD
@@ -307,7 +307,7 @@ flowchart TD
     ADD --> SAVE
 ```
 
-#### PhotoIndex 类设计
+#### PhotoIndex 类设计 {#src-experiment-case7-h22}
 
 [photo_index.py](samples/case7/photo_index.py) 中的 `PhotoIndex` 类管理
 整个照片索引的生命周期：
@@ -317,7 +317,7 @@ flowchart TD
 - `get_all_photos()` / `get_photos_by_face_count()` — 按条件筛选照片
 - `save()` / `load()` — 将 FAISS 索引和元数据持久化到磁盘
 
-#### 为什么用 IndexFlatIP（暴搜）
+#### 为什么用 IndexFlatIP（暴搜） {#src-experiment-case7-h23}
 
 `faiss.IndexFlatIP` 是 FAISS 提供的最简单的索引——不做任何近似或压缩，
 直接计算查询向量与库中所有向量的内积。对于个人照片库（通常几百到几千张），
@@ -330,7 +330,7 @@ flowchart TD
 当照片库增长到数万张以上时，可以将 `IndexFlatIP` 替换为 `IndexIVFFlat`
 或 `IndexHNSWFlat`，在精度和速度之间做权衡。
 
-#### NPU 批量推理的实际情况
+#### NPU 批量推理的实际情况 {#src-experiment-case7-h24}
 
 OM 模型的输入形状固定为 `(1, 3, 224, 224)`（batch size = 1），所以 NPU
 模式下的"批量索引"实际上是逐张调用 `execute()`。对于几百张照片的索引，
@@ -340,14 +340,14 @@ CPU 回退模式反而可以利用 PyTorch 的动态批处理能力——将多�
 `(N, 3, 224, 224)` 的张量，一次前向传播处理整个批次。这是 OM 模型的一
 个已知限制，书中已在多处提及（参见案例8、案例9中的相关讨论）。
 
-#### 人脸检测：为什么只用 Haar Cascade
+#### 人脸检测：为什么只用 Haar Cascade {#src-experiment-case7-h25}
 
 本案例使用 OpenCV 内置的 Haar Cascade 分类器做人脸**计数**，而不是使用
 案例1中的 SCRFD NPU 模型做人脸**识别**：
 
 | 方面 | Haar Cascade (本案) | SCRFD (案例1) |
 |------|---------------------|--------------|
-| 任务 | 数人脸 → 几人 | 检测 + 提取人脸特征 → 是谁 |
+| 任务 | 数人脸 -> 几人 | 检测 + 提取人脸特征 -> 是谁 |
 | 运行位置 | CPU | NPU (OM) |
 | 设置成本 | 零（OpenCV 自带） | 需下载模型 + ATC 转换 |
 | 单张耗时 | <10ms (CPU) | ~5ms (NPU) + 前后处理 |
@@ -356,13 +356,13 @@ CPU 回退模式反而可以利用 PyTorch 的动态批处理能力——将多�
 要完整的人脸识别（标记每个人是谁），读者可以将案例1的 `FaceSystem` 集成
 到本案中——两个案例的 `AscendResource` / `AscendModel` 基础设施是相同的。
 
-#### 持久化
+#### 持久化 {#src-experiment-case7-h26}
 
 FAISS 索引通过 `faiss.write_index()` 保存为二进制文件，照片元数据保存
 为 JSON。这与案例9的知识库持久化模式完全一致。下次启动时，如果检测到已
 有索引文件，会自动加载，无需重新索引。
 
-### 2.6. Web 界面
+### 2.6. Web 界面 {#src-experiment-case7-h27}
 
 本项目使用 Gradio 构建 Web 界面，通过 `gr.Gallery` 实现照片墙展示，
 无需任何前端代码。
@@ -370,9 +370,9 @@ FAISS 索引通过 `faiss.write_index()` 保存为二进制文件，照片元数
 ```mermaid
 flowchart TD
     subgraph UI["Gradio Blocks 界面"]
-        TAB1["📷 照片浏览 (Tab 1)"]
-        TAB2["🔍 相似搜索 (Tab 2)"]
-        TAB3["⚙️ 管理 (Tab 3)"]
+        TAB1[" 照片浏览 (Tab 1)"]
+        TAB2[" 相似搜索 (Tab 2)"]
+        TAB3[" 管理 (Tab 3)"]
     end
 
     subgraph TAB1_DETAIL["浏览 Tab"]
@@ -397,7 +397,7 @@ flowchart TD
     TAB3 --> TAB3_DETAIL
 ```
 
-#### 三个页签
+#### 三个页签 {#src-experiment-case7-h28}
 
 1. **照片浏览**：`gr.Gallery` 以网格形式展示所有已索引的照片，每张照片下
    方标注文件名和人脸数。通过单选按钮筛选"全部 / 有人脸 / 无人脸"。
@@ -410,7 +410,7 @@ flowchart TD
    `gr.Progress` 组件实时显示索引进度。索引完成后展示前 20 张照片预览
    和系统统计信息。
 
-#### 双后端切换
+#### 双后端切换 {#src-experiment-case7-h29}
 
 `FeatureExtractor` 在初始化时自动检测 NPU 可用性：
 
@@ -429,11 +429,11 @@ class FeatureExtractor:
 ```
 
 这意味着：
-- 在昇腾 310B 上 → 自动使用 OM 模型，NPU 特征提取
-- 在没有昇腾硬件的机器上 → 自动使用 PyTorch ResNet50，CPU 推理
+- 在昇腾 310B 上 -> 自动使用 OM 模型，NPU 特征提取
+- 在没有昇腾硬件的机器上 -> 自动使用 PyTorch ResNet50，CPU 推理
 - 同一份代码，无需修改任何配置
 
-#### 懒加载
+#### 懒加载 {#src-experiment-case7-h30}
 
 与案例8、案例9相同，`FeatureExtractor` 和 `PhotoIndex` 使用模块级懒加载：
 
@@ -450,9 +450,9 @@ def get_extractor():
 
 这避免了 import 时的重操作，只在首次使用时初始化模型。
 
-### 2.7. 用户手册
+### 2.7. 用户手册 {#src-experiment-case7-h31}
 
-#### 2.7.1 部署
+#### 2.7.1 部署 {#src-experiment-case7-h32}
 
 1. 将项目代码拷贝到昇腾 310B 设备
 2. 运行 `bash setup.sh` 安装依赖并导出模型
@@ -460,7 +460,7 @@ def get_extractor():
 4. 启动服务：`python3 app.py`
 5. 浏览器打开 `http://<设备IP>:7860`
 
-#### 2.7.2 索引照片
+#### 2.7.2 索引照片 {#src-experiment-case7-h33}
 
 1. 在「管理」页签的"照片目录路径"中输入照片文件夹路径
 2. 点击"开始索引"
@@ -474,7 +474,7 @@ def get_extractor():
 | NPU (Ascend 310B) | ~1-2 秒 |
 | CPU (PyTorch) | ~3-5 秒 |
 
-#### 2.7.3 浏览和搜索
+#### 2.7.3 浏览和搜索 {#src-experiment-case7-h34}
 
 1. 在「照片浏览」页签查看已索引的照片
 2. 使用筛选按钮按人脸数过滤
@@ -484,7 +484,7 @@ def get_extractor():
    - 70-90%：有一定相似性（色彩 / 构图接近）
    - < 70%：视觉差异较大
 
-#### 2.7.4 故障排除
+#### 2.7.4 故障排除 {#src-experiment-case7-h35}
 
 | 问题 | 可能原因 | 解决方法 |
 |------|---------|---------|
@@ -496,7 +496,7 @@ def get_extractor():
 | ATC 转换失败 | soc_version 不匹配 | `npu-smi info` 查看版本，脚本会自动检测 |
 | ONNX 导出失败 | onnx 包未安装 | `pip install onnx` |
 
-#### 2.7.5 扩展建议
+#### 2.7.5 扩展建议 {#src-experiment-case7-h36}
 
 1. **集成人脸识别**：将案例1的 `FaceSystem`（SCRFD + MobileFaceNet）加
    入本案，实现"按人物搜索"和"面孔聚类"
@@ -508,7 +508,7 @@ def get_extractor():
 5. **更大模型**：将 ResNet50 替换为 ResNet101 或 ConvNeXt，获得更强的
    特征表达能力（模型更大，转换方式相同）
 
-## 3. 源代码结构
+## 3. 源代码结构 {#src-experiment-case7-h37}
 
 ```text
 case7/
@@ -557,14 +557,14 @@ flowchart TB
   案例1）
 - `config.py` 的路径管理方式与案例9一致（`BASE_DIR` + `os.path.join`）
 - `app.py` 的 Gradio 模式与案例8/案例9一致（`gr.Blocks` + 懒加载）
-- `prepare_models.py` 的 ONNX → ATC 流程与案例8一致
+- `prepare_models.py` 的 ONNX -> ATC 流程与案例8一致
 - `PhotoIndex` 的 FAISS 持久化模式与案例9的 `KnowledgeBase` 一致
 - 本项目**不需要**训练脚本——直接使用 torchvision 预训练权重，这是与案例8
   最大的区别
 
-## 4. 效果演示
+## 4. 效果演示 {#src-experiment-case7-h38}
 
-### 预期效果
+### 预期效果 {#src-experiment-case7-h39}
 
 在正常使用条件下，系统的各功能预期表现：
 
@@ -575,7 +575,7 @@ flowchart TB
 | 人脸计数 | 正面清晰人脸检测率 > 85% | Haar Cascade 对侧脸/遮挡敏感 |
 | 相似结果相关性 | 同类场景/物体的照片排前面 | 受 ResNet50 ImageNet 训练域影响 |
 
-### 性能指标
+### 性能指标 {#src-experiment-case7-h40}
 
 | 指标 | NPU (Ascend 310B) | CPU (PyTorch) |
 |------|-------------------|---------------|
@@ -585,16 +585,16 @@ flowchart TB
 | 模型大小 (.om) | ~95 MB | N/A |
 | FAISS 索引 (10000 张) | ~80 MB | ~80 MB |
 
-### 浏览器中的效果
+### 浏览器中的效果 {#src-experiment-case7-h41}
 
 Gradio 界面在浏览器中的预期布局：
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  🖼️ 智能相册                                         │
+│   智能相册                                         │
 │  ResNet50 特征提取 + FAISS 向量检索                   │
 ├──────────────────────────────────────────────────────┤
-│  [📷 照片浏览]  [🔍 相似搜索]  [⚙️ 管理]              │
+│  [ 照片浏览]  [ 相似搜索]  [ 管理]              │
 │                                                      │
 │  ┌─────────────────────────────────────────────┐     │
 │  │  筛选: ○ 全部  ◉ 有人脸  ○ 无人脸  [刷新]    │     │
@@ -612,7 +612,7 @@ Gradio 界面在浏览器中的预期布局：
 └──────────────────────────────────────────────────────┘
 ```
 
-### 如何验证系统正常工作
+### 如何验证系统正常工作 {#src-experiment-case7-h42}
 
 1. 打开浏览器访问 `http://127.0.0.1:7860`
 2. 切换到「管理」页签，输入包含一些照片的文件夹路径

@@ -1,9 +1,9 @@
-\section{章节总览}\label{ux7ae0ux8282ux603bux89c8}
+\section{章节总览}\label{src-book-chapter9-h1}
 
 本附录聚焦``查得快、用得稳''：常见报错速查、转换参数模板、性能/质量
 Checklist、术语字典、推荐资源与社区贡献规范。可作为日常开发随手翻阅的工具章节。
 
-\section{常见报错速查}\label{ux5e38ux89c1ux62a5ux9519ux901fux67e5}
+\section{常见报错速查}\label{src-book-chapter9-h2}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -55,9 +55,9 @@ Normalize \& Layout \\
 \end{longtable}
 }
 
-\section{模型转换参数模板合集}\label{ux6a21ux578bux8f6cux6362ux53c2ux6570ux6a21ux677fux5408ux96c6}
+\section{模型转换参数模板合集}\label{src-book-chapter9-h3}
 
-\subsection{分类模型 (ResNet)}\label{ux5206ux7c7bux6a21ux578b-resnet}
+\subsection{分类模型 (ResNet)}\label{src-book-chapter9-h4}
 
 \begin{lstlisting}
 atc --model=resnet50.onnx \
@@ -70,7 +70,7 @@ atc --model=resnet50.onnx \
     --log=info
 \end{lstlisting}
 
-\subsection{YOLO 动态分辨率}\label{yolo-ux52a8ux6001ux5206ux8fa8ux7387}
+\subsection{YOLO 动态分辨率}\label{src-book-chapter9-h5}
 
 \begin{lstlisting}
 atc --model=yolov5s.onnx \
@@ -83,7 +83,7 @@ atc --model=yolov5s.onnx \
     --precision_mode=allow_fp32_to_fp16
 \end{lstlisting}
 
-\subsection{INT8 量化（示例）}\label{int8-ux91cfux5316ux793aux4f8b}
+\subsection{INT8 量化（示例）}\label{src-book-chapter9-h6}
 
 \begin{lstlisting}
 atc --model=resnet50.onnx \
@@ -97,8 +97,7 @@ atc --model=resnet50.onnx \
     --enable_small_channel=true
 \end{lstlisting}
 
-\section{性能与质量
-Checklist（执行勾项）}\label{ux6027ux80fdux4e0eux8d28ux91cf-checklistux6267ux884cux52feux9879}
+\section{性能与质量 Checklist（执行勾项）}\label{src-book-chapter9-h7}
 
 性能：
 
@@ -152,7 +151,7 @@ Checklist（执行勾项）}\label{ux6027ux80fdux4e0eux8d28ux91cf-checklistux626
   模型文件 hash 校验通过
 \end{itemize}
 
-\section{术语表（扩展）}\label{ux672fux8bedux8868ux6269ux5c55}
+\section{术语表（扩展）}\label{src-book-chapter9-h8}
 
 { % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
@@ -175,7 +174,7 @@ Drift & 指标随时间未经预期的漂移 \\
 \end{longtable}
 }
 
-\section{推荐资源与外部引用}\label{ux63a8ux8350ux8d44ux6e90ux4e0eux5916ux90e8ux5f15ux7528}
+\section{推荐资源与外部引用}\label{src-book-chapter9-h9}
 
 \begin{itemize}
 \tightlist
@@ -191,9 +190,10 @@ Drift & 指标随时间未经预期的漂移 \\
   学术资源：算子融合、低比特量化、蒸馏相关论文列表。
 \end{itemize}
 
-\section{贡献指南摘要}\label{ux8d21ux732eux6307ux5357ux6458ux8981}
+\section{贡献指南摘要}\label{src-book-chapter9-h10}
 
-流程：Fork → 新分支 → 修改/新增 → 本地 lint \& 生成脚本 →
+流程：Fork -\textgreater{} 新分支 -\textgreater{} 修改/新增
+-\textgreater{} 本地 lint \& 生成脚本 -\textgreater{}
 PR（描述动机/影响面/验证方式）。 PR 要求： \textbar{} 要素 \textbar{}
 说明 \textbar{} \textbar{} ---- \textbar{} ---- \textbar{} \textbar{}
 标题 \textbar{} 简明说明改动作用 \textbar{} \textbar{} 描述 \textbar{}
@@ -202,7 +202,7 @@ PR（描述动机/影响面/验证方式）。 PR 要求： \textbar{} 要素 \t
 若失败如何恢复 \textbar{} \textbar{} 关联 Issue \textbar{} 追踪链接
 \textbar{}
 
-\section{FAQ}\label{faq}
+\section{FAQ}\label{src-book-chapter9-h11}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -227,13 +227,13 @@ NMS 很慢？ & 合并小框批量处理/降低候选阈值/考虑 Device 版 NM
 \end{longtable}
 }
 
-\section{License 与引用}\label{license-ux4e0eux5f15ux7528}
+\section{License 与引用}\label{src-book-chapter9-h12}
 
 本书内容遵循 Apache 2.0 许可证。引用： \textgreater{}
 《昇腾310B实战：从入门到精通边缘计算与人工智能》（GitHub:
 zhouxzh/Ascend310）
 
-\section{版本路线回顾}\label{ux7248ux672cux8defux7ebfux56deux987e}
+\section{版本路线回顾}\label{src-book-chapter9-h13}
 
 { % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
@@ -250,7 +250,7 @@ v1.0 & 全面审校发行 & 正式发布 \\
 \end{longtable}
 }
 
-\section{实践任务}\label{ux5b9eux8df5ux4efbux52a1}
+\section{实践任务}\label{src-book-chapter9-h14}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
