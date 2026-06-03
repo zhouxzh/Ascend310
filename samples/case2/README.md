@@ -2,10 +2,10 @@
 
 ## 项目说明
 
-这个仓库是一个面向昇腾设备和普通 CPU 环境的视觉实验示例，主代码入口都在 `demo/` 目录中：
+这个仓库是一个面向昇腾设备和普通 CPU 环境的视觉实验示例，主代码入口都在 `scripts/` 目录中：
 
-* `demo/detection_app.py`：实时目标检测入口
-* `demo/tracking_app.py`：在检测结果基础上叠加多目标跟踪的入口
+* `scripts/detection_app.py`：实时目标检测入口
+* `scripts/tracking_app.py`：在检测结果基础上叠加多目标跟踪的入口
 
 运行实时演示时，默认建议准备一只 USB 摄像头，并将其接入运行设备；如果没有摄像头，也可以直接使用本地视频文件作为输入源。
 
@@ -34,11 +34,12 @@
 
 ```text
 case2/
-├── demo/
+├── scripts/
 │   ├── detection_app.py
-│   └── tracking_app.py
-├── models/
+│   ├── tracking_app.py
 │   ├── download_models.py
+│   └── convert_onnx_to_om.py
+├── models/
 │   ├── *.onnx
 │   └── *.om
 ├── ssdlite/
@@ -63,7 +64,7 @@ case2/
 
 ### 1. detection 入口
 
-`demo/detection_app.py` 是当前仓库最核心的运行入口，负责完成整条检测链路：
+`scripts/detection_app.py` 是当前仓库最核心的运行入口，负责完成整条检测链路：
 
 * 解析命令行参数
 * 选择 `cpu` 或 `npu` 推理后端
@@ -79,7 +80,7 @@ case2/
 
 ### 2. tracking 入口
 
-`demo/tracking_app.py` 建立在 detection 链路之上。它会先执行 SSD 检测，再把检测框转换为跟踪器输入，最后输出带有轨迹 ID 的结果。
+`scripts/tracking_app.py` 建立在 detection 链路之上。它会先执行 SSD 检测，再把检测框转换为跟踪器输入，最后输出带有轨迹 ID 的结果。
 
 这个入口的职责可以概括为：
 
@@ -111,35 +112,54 @@ pip install -r requirementstxt
 
 ### 2. 准备模型
 
-模型目录为 `models/`，仓库内已经包含多组 SSD 模型：
+模型目录为 `models/`。当前模型下载脚本默认使用 Hugging Face 仓库 `zhouxzh/SSDLite320`，该仓库目前发布的是 `.onnx` 模型；如果要运行 NPU 模式，需要先在 Ascend 310B 设备上把 `.onnx` 转成 `.om`。
+
+下载默认模型：
+
+```bash
+python scripts/download_models.py
+```
+
+下载仓库中的全部 ONNX 模型：
+
+```bash
+python scripts/download_models.py --onnx
+```
+
+在 Ascend 310B 设备上转换 OM 模型：
+
+```bash
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+python scripts/convert_onnx_to_om.py --soc-version Ascend310B4
+```
+
+如果板端 SoC 版本不是 `Ascend310B4`，请按实际环境修改 `--soc-version`，例如 `Ascend310B1`。转换脚本默认读取 `models/*.onnx`，并把同名 `.om` 文件写回 `models/`。
+脚本会根据文件名自动为 `ssd320_*` 使用 `input:1,3,320,320`，为 `ssd300_*` 使用 `input:1,3,300,300`；如果 ONNX 输入名不是 `input`，可以通过 `--input-name` 或 `--input-shape` 显式指定。
+
+仓库中历史模型文件可能包含：
 
 * `ssd300_*.onnx` / `ssd300_*.om`
 * `ssd320_*.onnx` / `ssd320_*.om`
 
-当前仓库内实际可用的骨干网络包括：
+下载脚本默认模型对应的骨干名是 `mobilenetv3_large_100`。当前仓库内历史模型文件和新下载模型可能包含这些骨干网络：
 
-* MobileNet 系列：`mobilenetv1`、`mobilenetv2`、`mobilenetv3`、`mobilenetv4`
+* MobileNet 系列：`mobilenetv1`、`mobilenetv2`、`mobilenetv3`、`mobilenetv3_large_100`、`mobilenetv4`
 * ResNet 系列：`resnet18`、`resnet34`、`resnet50`、`resnet101`、`resnet151`
 
 命名规则与脚本自动发现逻辑一致：
 
 * CPU 模式优先查找 `.onnx`
 * NPU 模式优先查找 `.om`
-* 可以通过 `--backbone` 指定骨干名，例如 `mobilenetv1`、`mobilenetv4`、`resnet18`、`resnet101`
+* 可以通过 `--backbone` 指定骨干名，例如 `mobilenetv3_large_100`、`mobilenetv4_conv_large`、`resnet18`、`resnet101`
 * 也可以通过 `--model` 直接指定模型路径
 
-如果需要补充模型下载，可使用：
-
-```bash
-python models/download_models.py
-python models/download_models.py --all
-```
+如果只想查看转换命令而不执行 ATC，可使用 `--dry-run`。
 
 ## Detection
 
 ### 功能概览
 
-`demo/detection_app.py` 适合先跑通，因为它只关注单帧检测结果，不涉及轨迹管理。
+`scripts/detection_app.py` 适合先跑通，因为它只关注单帧检测结果，不涉及轨迹管理。
 
 脚本运行时会完成这些步骤：
 
@@ -157,38 +177,38 @@ python models/download_models.py --all
 CPU 摄像头检测：
 
 ```bash
-python demo/detection_app.py --device cpu --source 0
+python scripts/detection_app.py --device cpu --source 0
 ```
 
 NPU 摄像头检测：
 
 ```bash
-python demo/detection_app.py --device npu --source 0
+python scripts/detection_app.py --device npu --source 0
 ```
 
 检测本地视频：
 
 ```bash
-python demo/detection_app.py --device cpu --source demo.mp4
+python scripts/detection_app.py --device cpu --source demo.mp4
 ```
 
 指定模型并保存结果：
 
 ```bash
-python demo/detection_app.py --device cpu --model models/ssd320_mobilenetv4.onnx --source demo.mp4 --score-threshold 0.35 --save output/detection.mp4
+python scripts/detection_app.py --device cpu --model models/ssd320_mobilenetv4_conv_large.onnx --source demo.mp4 --score-threshold 0.35 --save output/detection.mp4
 ```
 
 无界面运行：
 
 ```bash
-python demo/detection_app.py --device cpu --source demo.mp4 --no-display --save output/detection.mp4
+python scripts/detection_app.py --device cpu --source demo.mp4 --no-display --save output/detection.mp4
 ```
 
 列出当前设备可用模型：
 
 ```bash
-python demo/detection_app.py --device cpu --list-models
-python demo/detection_app.py --device npu --list-models
+python scripts/detection_app.py --device cpu --list-models
+python scripts/detection_app.py --device npu --list-models
 ```
 
 ### 常用参数
@@ -212,7 +232,7 @@ python demo/detection_app.py --device npu --list-models
 
 ### detection 相关代码位置
 
-* `demo/detection_app.py`：检测入口
+* `scripts/detection_app.py`：检测入口
 * `ssdlite/backend_base.py`：统一检测后端基类
 * `ssdlite/cpu_backend.py`：ONNXRuntime CPU 推理封装
 * `ssdlite/npu_backend.py`：Ascend ACL NPU 推理封装
@@ -225,7 +245,7 @@ python demo/detection_app.py --device npu --list-models
 
 ### 功能概览
 
-当 detection 跑通后，再看 `demo/tracking_app.py` 会更自然，因为 tracking 的输入就是 detection 的输出。
+当 detection 跑通后，再看 `scripts/tracking_app.py` 会更自然，因为 tracking 的输入就是 detection 的输出。
 
 当前 tracking 流程如下：
 
@@ -250,67 +270,67 @@ python demo/detection_app.py --device npu --list-models
 CPU 摄像头跟踪：
 
 ```bash
-python demo/tracking_app.py --device cpu --source 0
+python scripts/tracking_app.py --device cpu --source 0
 ```
 
 NPU 摄像头跟踪：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0
+python scripts/tracking_app.py --device npu --source 0
 ```
 
 只跟踪行人：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0 --track-classes person
+python scripts/tracking_app.py --device npu --source 0 --track-classes person
 ```
 
 同时跟踪行人和公交车：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
+python scripts/tracking_app.py --device npu --source 0 --track-classes person,bus
 ```
 
 实时摄像头模式下指定 60 FPS 采集档位：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0 --camera-profile 1280x720@60
+python scripts/tracking_app.py --device npu --source 0 --camera-profile 1280x720@60
 ```
 
 跟踪本地视频：
 
 ```bash
-python demo/tracking_app.py --device cpu --source demo.mp4
+python scripts/tracking_app.py --device cpu --source demo.mp4
 ```
 
 指定模型并保存结果：
 
 ```bash
-python demo/tracking_app.py --device cpu --model models/ssd320_mobilenetv4.onnx --source demo.mp4 --save output/tracking.mp4
+python scripts/tracking_app.py --device cpu --model models/ssd320_mobilenetv4_conv_large.onnx --source demo.mp4 --save output/tracking.mp4
 ```
 
 通过调参增强轨迹连续性：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0 --track-size-smoothing 0.85 --track-score-smoothing 0.8
+python scripts/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0 --track-size-smoothing 0.85 --track-score-smoothing 0.8
 ```
 
 无界面运行：
 
 ```bash
-python demo/tracking_app.py --device cpu --source demo.mp4 --no-display --save output/tracking.mp4
+python scripts/tracking_app.py --device cpu --source demo.mp4 --no-display --save output/tracking.mp4
 ```
 
 列出当前设备可用模型：
 
 ```bash
-python demo/tracking_app.py --device cpu --list-models
-python demo/tracking_app.py --device npu --list-models
+python scripts/tracking_app.py --device cpu --list-models
+python scripts/tracking_app.py --device npu --list-models
 ```
 
 ### tracking 专有参数
 
-除了和 detection 共用的模型、输入源、阈值参数外，`demo/tracking_app.py` 还增加了：
+除了和 detection 共用的模型、输入源、阈值参数外，`scripts/tracking_app.py` 还增加了：
 
 * `--track-max-age`：轨迹在连续多少帧未匹配后删除
 * `--track-min-hits`：轨迹至少匹配多少次后才显示
@@ -337,7 +357,7 @@ python demo/tracking_app.py --device npu --list-models
 
 ### tracking 相关代码位置
 
-* `demo/tracking_app.py`：跟踪入口
+* `scripts/tracking_app.py`：跟踪入口
 * `tracking/deepsort.py`：简化版 DeepSORT 风格跟踪器
 * `tracking/kalman_filter.py`：卡尔曼滤波器
 * `utils/postprocessing.py`：检测结果到跟踪器输入的转换，以及轨迹绘制
@@ -362,8 +382,8 @@ python demo/tracking_app.py --device npu --list-models
 
 如果你是第一次接触这个仓库，建议按下面顺序：
 
-1. 先运行 `demo/detection_app.py`，确认模型、摄像头或视频输入正常。
-2. 再运行 `demo/tracking_app.py`，观察 ID 维持和轨迹拖尾效果。
+1. 先运行 `scripts/detection_app.py`，确认模型、摄像头或视频输入正常。
+2. 再运行 `scripts/tracking_app.py`，观察 ID 维持和轨迹拖尾效果。
 3. 最后结合 `case2.md` 阅读算法原理，把检测和跟踪两条链路串起来。
 
 这样理解成本最低，也最符合当前仓库的组织方式。

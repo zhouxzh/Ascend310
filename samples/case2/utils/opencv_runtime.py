@@ -58,19 +58,22 @@ def _ensure_cv2_qt_fonts_dir() -> None:
 	if qt_fonts_dir.is_dir():
 		return
 
-	qt_fonts_dir.parent.mkdir(parents=True, exist_ok=True)
 	try:
+		qt_fonts_dir.parent.mkdir(parents=True, exist_ok=True)
 		qt_fonts_dir.symlink_to(font_dir, target_is_directory=True)
 	except (AttributeError, NotImplementedError, OSError):
-		qt_fonts_dir.mkdir(exist_ok=True)
-		for font_file in font_dir.glob("*.ttf"):
-			link_path = qt_fonts_dir / font_file.name
-			if link_path.exists():
-				continue
-			try:
-				link_path.symlink_to(font_file)
-			except (AttributeError, NotImplementedError, OSError):
-				break
+		try:
+			qt_fonts_dir.mkdir(exist_ok=True)
+			for font_file in font_dir.glob("*.ttf"):
+				link_path = qt_fonts_dir / font_file.name
+				if link_path.exists():
+					continue
+				try:
+					link_path.symlink_to(font_file)
+				except (AttributeError, NotImplementedError, OSError):
+					break
+		except OSError:
+			return
 
 
 _ensure_cv2_qt_fonts_dir()

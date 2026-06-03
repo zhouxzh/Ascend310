@@ -71,21 +71,20 @@ python samples/chapter4/SSD/inference_npu.py
 
 | 文件 | 说明 |
 |------|------|
-| `train_ddp.py` | 多卡 GPU 训练（DDP） |
-| `inference_npu.py` | PyACL NPU 推理 |
-| `inference_cuda.py` | GPU 推理（对比基准） |
-| `inference_cpu.py` | CPU 推理 |
-| `download_models.py` | 模型下载 |
-| `ssdlite/` | 模型定义、Default Boxes、训练/评估逻辑 |
-| `logs/` | 导出的 ONNX 模型（多主干变体） |
+| `scripts/inference_npu.py` | PyACL NPU 推理 |
+| `scripts/inference_cuda.py` | GPU 推理（对比基准） |
+| `scripts/inference_cpu.py` | CPU 推理 |
+| `scripts/download_models.py` | 模型下载 |
+| `scripts/convert_onnx_to_om.py` | ONNX 转 OM（需在 Ascend 设备上运行） |
+| `ssdlite320/` | Default Boxes、Decode、NMS、可视化与评估工具 |
 
 运行：
 ```bash
-# GPU 训练
-python samples/chapter4/SSDLite/train_ddp.py --device cuda --backbone mobilenetv3
+# CPU ONNX 推理
+python samples/chapter4/SSDLite/scripts/inference_cpu.py --backbone mobilenetv4_conv_small
 
 # NPU 推理（需先下载/转换 .om 模型）
-python samples/chapter4/SSDLite/inference_npu.py
+python samples/chapter4/SSDLite/scripts/inference_npu.py --backbone mobilenetv4_conv_small
 ```
 
 ## 学习路线

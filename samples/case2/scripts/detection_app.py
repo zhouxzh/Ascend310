@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser(description="Run real-time SSD detection on CPU or Ascend NPU.")
 	parser.add_argument("--device", choices=["cpu", "npu"], default="cpu", help="Inference backend.")
 	parser.add_argument("--device-id", type=int, default=0, help="Ascend device id when --device=npu.")
-	parser.add_argument("--backbone", default="mobilenetv3", help="Model backbone name used for auto-discovery.")
+	parser.add_argument("--backbone", default="mobilenetv3_large_100", help="Model backbone name used for auto-discovery.")
 	parser.add_argument("--model", default="", help="Explicit model path. Overrides --backbone.")
 	parser.add_argument("--model-dir", default=str(MODEL_DIR), help="Directory that stores SSD model files.")
 	parser.add_argument("--source", default="0", help="Camera index or video path.")

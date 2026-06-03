@@ -1,12 +1,8 @@
-cython
-torch
-pycocotools
 numpy
-tensorboard
-timm
-torchvision
-scipy
+Pillow
+onnxruntime
+datasets
 pycocotools
 matplotlib
-datasets
-onnxscript
+huggingface_hub
+tqdm

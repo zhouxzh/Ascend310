@@ -846,7 +846,7 @@ tensorboard --logdir=./logs/resnet18_tiny_imagenet
 
 我们已经训练好了一个针对 Tiny-ImageNet 的 ResNet-18 网络，并上传到了 HuggingFace 仓库 [`zhouxzh/resnet18_tiny_imagenet`](https://huggingface.co/zhouxzh/resnet18_tiny_imagenet)，因此不需要自行训练。
 
-> 完整的可运行代码位于 [`samples/chapter4/resnet18/`](../samples/chapter4/resnet18/) 目录下，可直接参考使用。
+> 完整的可运行代码位于 [`samples/chapter4/resnet18/`](https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter4/resnet18/) 目录下，可直接参考使用。
 
 为了可以顺利的从huggingface下载已经训练好的模型，我们需要使用 pip 安装 Hugging Face 的 CLI 工具。
 ```bash
@@ -1356,7 +1356,7 @@ print(f"正确率: {accuracy:.2f}%")
 
 在图像分类之外，目标检测（Object Detection）是 PyACL 推理的另一个重要应用场景。与分类任务仅输出类别标签不同，目标检测需要同时预测物体的**边界框（Bounding Box）**和**类别**，对模型结构和后处理逻辑都提出了更高的要求。
 
-本章在 [`samples/chapter4/`](../samples/chapter4/) 下提供了两种主流目标检测模型的 PyACL 推理实现：
+本章在 [`samples/chapter4/`](https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter4/) 下提供了两种主流目标检测模型的 PyACL 推理实现：
 
 ### SSD300（ResNet-50 主干） {#src-book-chapter4-h32}
 
@@ -1369,20 +1369,68 @@ SSD（Single Shot MultiBox Detector）是一种单阶段目标检测器，以 Re
 | `inference_cuda.py` | GPU 推理（对比基准） |
 | `inference_cpu.py` | CPU 推理 |
 
-代码位于 [`samples/chapter4/SSD/`](../samples/chapter4/SSD/)。
+代码位于 [`samples/chapter4/SSD/`](https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter4/SSD/)。
 
 ### SSDLite320（MobileNet 主干） {#src-book-chapter4-h33}
 
-SSDLite 是 SSD 的轻量化变体，将标准卷积替换为深度可分离卷积（Depthwise Separable Convolution），大幅降低参数量和计算量。本实现以 MobileNetV3 为主干，输入尺寸 320×320，同样在 COCO 2017 上训练。
+SSDLite 是 SSD 的轻量化变体，将标准卷积替换为深度可分离卷积（Depthwise Separable Convolution），从而显著降低检测头的参数量和计算量。为了观察不同轻量化骨干网络在昇腾 310B 上的实际表现，本节不再只使用单一 MobileNetV3，而是比较 MobileNetV1、MobileNetV2、MobileNetV3 和 MobileNetV4 的 15 个 SSDLite320 变体。所有模型输入尺寸均为 320×320，输出为 `boxes:1x4x3234` 和 `scores:1x81x3234`，Default Boxes 使用 `min_ratio=0.1`、`max_ratio=0.9`。
+
+本目录只提供部署、转换和评估代码，不包含训练代码。ONNX 模型的训练、导出和 CUDA 侧评估代码位于 [zhouxzh/SSDLite320-MobileNet](https://github.com/zhouxzh/SSDLite320-MobileNet)，如果需要了解训练策略、主干网络配置和 ONNX 导出细节，应到该 GitHub 仓库查找。Ascend 310B 侧的样例代码位于 [`samples/chapter4/SSDLite/`](https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter4/SSDLite/)。
 
 | 文件 | 说明 |
 |------|------|
-| `train_ddp.py` | 多卡 DDP 训练入口 |
-| `inference_npu.py` | PyACL NPU 推理 |
-| `inference_cuda.py` | GPU 推理（对比基准） |
-| `inference_cpu.py` | CPU 推理 |
+| `scripts/inference_npu.py` | PyACL NPU 推理 |
+| `scripts/inference_cpu.py` | ONNX Runtime CPUExecutionProvider 校验 ONNX 接口和后处理 |
+| `scripts/download_models.py` | 下载公开 ONNX/OM 模型 |
+| `scripts/convert_onnx_to_om.py` | ONNX 转 OM（需在 Ascend 设备上运行） |
+| `ssdlite320/` | Default Boxes、Decode、NMS、可视化与评估工具 |
 
-代码位于 [`samples/chapter4/SSDLite/`](../samples/chapter4/SSDLite/)。
+#### 昇腾 310B 评估口径
+
+Ascend 310B 侧的 CPU/NPU 评估报告由本地脚本生成，不作为本仓库的公开文件发布。读者如果需要复现实测数据，可以在准备好 ONNX/OM 模型和验证集后运行：
+
+```bash
+python scripts/inference_cpu.py --all
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+python scripts/inference_npu.py --all --device 0
+```
+
+评估脚本默认使用 `img_size=320`、`dbox_min_ratio=0.1`、`dbox_max_ratio=0.9`。报告中的 `FPS infer` 表示评估循环内单样本预处理、模型执行、输出整理和 decode/NMS 的吞吐；`FPS total` 还包含数据读取、JSON 写入和 COCO 评估等完整流程开销，因此更接近 Python 评估脚本的端到端速度。实际部署时，DVPP 预处理、C++/设备侧后处理、多 Stream 异步流水线等工程优化会进一步影响最终帧率。
+
+从本地评估趋势看，CUDA 侧 ONNX 与 310B NPU OM 的 mAP 基本一致，说明 ONNX 转 OM 后没有出现明显精度损失。310B CPU 侧 ONNX Runtime 也能用于校验精度和后处理逻辑，但速度明显不足，不适合实时目标检测部署。
+
+#### 精度分析
+
+从精度看，MobileNetV4 Hybrid 系列最强。`mobilenetv4_hybrid_large` 的 mAP 为 0.258，AP50 为 0.435，是整体精度最高的模型；`mobilenetv4_hybrid_medium` 的 mAP 同样约为 0.258，AP75 和大目标 APl 甚至略高，且参数量只有 large 的约 28%，因此是高精度场景下更均衡的选择。若要求模型结构更偏卷积、减少 Hybrid 结构中的 MatMul、Transpose、Softmax 等算子，`mobilenetv4_conv_large` 可达到 0.252 mAP，略低于 Hybrid large，但推理速度更快一些。
+
+MobileNetV3 Large 150d 和 MobileNetV4 Conv Medium 属于中高精度区间。`mobilenetv3_large_150d` mAP 为 0.247，精度接近 `mobilenetv4_conv_large`，但参数量和 MACs 更低；`mobilenetv4_conv_medium` mAP 为 0.243，是所有 `FPS infer` 超过 30 FPS 的模型里精度最高的一个。对于边缘端目标检测，这个模型通常比单纯追求最小参数量更有实际价值。
+
+MobileNetV1 和 MobileNetV2 的中等宽度版本处于中等精度区间。`mobilenetv1_125`、`mobilenetv2_140`、`mobilenetv1_100` 的 mAP 分别为 0.233、0.225、0.221，虽然不如 V4/V3 高精度模型，但速度更接近实时。`mobilenetv3_small_100`、`mobilenetv2_050`、`mobilenetv3_small_050` 虽然速度最高，但 mAP 只有 0.140、0.120、0.093；`mobilenetv4_conv_small` 的速度也较高，但 mAP 仅 0.054，不适合作为通用 COCO 检测模型。
+
+还需要注意小目标 AP。即使是最强的 `mobilenetv4_hybrid_large`，APs 也只有 0.076，说明 320×320 输入尺寸和轻量化检测头对小目标并不友好。如果应用场景以远距离行人、小物体、密集目标为主，应优先选择 large/medium 级别模型，并考虑提高输入分辨率或针对业务数据重新训练；如果主要检测中大目标，APl 最高的 `mobilenetv4_hybrid_medium` 和 `mobilenetv4_hybrid_large` 会更合适。
+
+#### 速度分析
+
+在昇腾 310B 上，速度并不只由参数量或 MACs 决定。最小的 `mobilenetv3_small_050` 只有 0.089G MACs，但在 Python/PyACL 评估流程中，它并不会比中等模型快出数量级。这是因为 SSDLite320 的输出规模固定为 3234 个候选框，decode、NMS、数据搬运和 Python 调度开销对所有骨干网络都存在。当模型本身很小时，这些固定开销会成为主要瓶颈，继续缩小 backbone 并不会线性提升端到端帧率。
+
+大模型则更容易受到算子形态和 NPU 编译优化的影响。`mobilenetv4_hybrid_large` 精度最高，但包含更多非纯卷积算子和较多节点，推理吞吐低于中等规模模型；`mobilenetv4_conv_large` 虽然 MACs 达到 4.556G，但以卷积结构为主，在 310B 上更容易获得稳定的算子映射。`mobilenetv4_conv_medium` 是一个典型平衡点：mAP 0.243，速度明显优于许多更大模型，同时精度又明显高于 small 级别模型。
+
+从 CPU/NPU 对比看，越大的模型越能体现 NPU 加速价值；而在小模型上，瓶颈更多转移到 Host 侧后处理、调度和内存路径。这进一步说明，要提升真实应用帧率，除了换更小 backbone，还必须优化预处理、后处理、异步流水线和视频帧调度。
+
+#### 模型选择建议
+
+如果目标是**高精度推理**，优先选择 `mobilenetv4_hybrid_large`；它的整体 mAP 和 AP50 最高，适合离线分析、低帧率告警或对误检漏检比较敏感的场景。如果希望在精度接近的同时降低模型规模和时延，`mobilenetv4_hybrid_medium` 更合适，它只比 large 低约 0.001 mAP，但模型规模小得多。
+
+如果目标是**高帧率推理**，优先选择 `mobilenetv4_conv_medium`。它是本地 310B 评估中进入 30 FPS 级推理吞吐范围的最高精度模型，mAP 达到 0.243，比 `mobilenetv1_100` 高 0.022，比 `mobilenetv3_large_100` 高 0.046。若应用只追求最大检测频率且可以接受明显精度损失，可以选择 `mobilenetv3_small_050` 或 `mobilenetv3_small_100`；但从通用目标检测效果看，它们更适合作为速度上限参考，而不是推荐默认模型。
+
+| 目标视频帧率 | 当前 320×320 SSDLite320 是否支持逐帧检测 | 推荐模型与策略 | 说明 |
+|---|---|---|---|
+| 30 FPS | 按推理循环吞吐可接近或达到；按完整 Python 评估流程仍需优化 | 首选 `mobilenetv4_conv_medium`；若必须更轻，可选 `mobilenetv1_100` | `mobilenetv4_conv_medium` 是 30 FPS 档的最佳精度选择；实际工程需优化预处理、后处理和异步流水线 |
+| 60 FPS | 不支持逐帧检测 | `mobilenetv4_conv_medium` 每 2 帧检测一次，配合跟踪；极限速度可试 `mobilenetv3_small_050` | 当前 SSDLite320 路径无法真实逐帧 60 FPS；用 30 Hz 检测 + 60 Hz 跟踪/显示更现实 |
+| 90 FPS | 不支持逐帧检测 | `mobilenetv4_conv_medium` 每 3 帧检测一次；若目标较简单可试 `mobilenetv3_small_100` | 90 FPS 视频流可保持约 30 Hz 检测频率，其余帧由跟踪器或上一帧检测结果补齐 |
+| 120 FPS | 不支持逐帧检测 | `mobilenetv4_conv_medium` 或 `mobilenetv1_100` 每 4 帧检测一次；若必须逐帧，需要重新设计模型和流水线 | 当前 SSDLite320+Python/PyACL+NMS 结果无法支撑 120 FPS 逐帧检测，需要降低输入尺寸、使用更小检测器、迁移后处理到 C++/设备侧、引入 DVPP 和多 Stream 异步流水线 |
+
+因此，在昇腾 310B 上做 SSDLite320 部署时，可以按业务目标分成两类：追求检测质量时选择 `mobilenetv4_hybrid_large` 或 `mobilenetv4_hybrid_medium`；追求实时帧率时选择 `mobilenetv4_conv_medium`，再通过隔帧检测、目标跟踪、DVPP 预处理和异步流水线把视频系统帧率提高到 60 FPS 以上。不要仅根据参数量选择最小模型，因为过小的 backbone 在精度上损失很大，而在 310B 上的端到端速度提升并不成比例。
 
 ### 推理流程对比 {#src-book-chapter4-h34}
 
@@ -1400,7 +1448,7 @@ SSDLite 是 SSD 的轻量化变体，将标准卷积替换为深度可分离卷�
 
 在运行时资源方面，Device、Context、Stream 构成的三级资源模型是 PyACL 的骨架。理解它们的层级关系与生命周期——申请按 `Device -> Context -> Stream` 顺序，释放按逆序——是写出健壮 PyACL 程序的前提。在此基础上，异构内存管理（Host 与 Device 间的四种拷贝路径）与同步等待机制（Event、Stream Sync、Stream Wait Event、Device Sync 四种粒度）构成了性能优化的核心手段。特别是在昇腾 310B 这类 CPU 算力较弱（Cortex-A55）的边缘设备上，**全链路异步 + Event 驱动的多 Stream 协作**是榨干 NPU 性能的关键策略。
 
-在应用实践层面，本章通过 ResNet-18（图像分类）和 SSD/SSDLite（目标检测）两个经典场景，完整演示了"GPU 训练 -> ONNX 导出 -> ATC 转换 -> PyACL NPU 推理"的标准开发流水线。跨平台对比数据表明，即便使用相同的 ONNX 模型，昇腾 310B NPU 的推理速度（265 FPS）远超其自身 CPU 模式（5 FPS）和树莓派 5B（22 FPS），充分验证了专用 AI 加速器在边缘场景下的不可替代性。
+在应用实践层面，本章通过 ResNet-18（图像分类）和 SSD/SSDLite（目标检测）两个经典场景，完整演示了"GPU 训练 -> ONNX 导出 -> ATC 转换 -> PyACL NPU 推理"的标准开发流水线。跨平台对比数据表明，即便使用相同的 ONNX 模型，昇腾 310B NPU 的 ResNet-18 推理速度（265 FPS）远超其自身 CPU 模式（5 FPS）和树莓派 5B（22 FPS），充分验证了专用 AI 加速器在边缘场景下的不可替代性。对于 SSDLite320 目标检测，`mobilenetv4_hybrid_large` 更适合高精度，`mobilenetv4_conv_medium` 则是在 310B 上兼顾 mAP 与 30 FPS 级检测吞吐的更实用选择。
 
 回顾全章，PyACL 的精髓可归纳为三条原则：
 1. **资源按序管理**：初始化 -> Device -> Context -> Stream -> 业务执行 -> 逆序释放，缺一不可。

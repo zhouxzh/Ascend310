@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Download SSD models from Hugging Face repo zhouxzh/ssd.
+"""Download SSDLite320 models from Hugging Face repo zhouxzh/SSDLite320.
 
 Usage examples:
-  python download_models.py --all
-  python download_models.py --om
-  python download_models.py --onnx
-  python download_models.py
+  python scripts/download_models.py
+  python scripts/download_models.py --onnx
+  python scripts/download_models.py --all
 """
 
 from __future__ import annotations
@@ -20,10 +19,12 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen, urlretrieve
 
 
-DEFAULT_REPO = "zhouxzh/ssd"
-DEFAULT_MODEL = "ssd_mobilenetv3.onnx"
+DEFAULT_REPO = "zhouxzh/SSDLite320"
+DEFAULT_MODEL = "ssd320_mobilenetv3_large_100.onnx"
 DEFAULT_ENDPOINT = os.environ.get("HF_ENDPOINT", "https://hf-mirror.com").rstrip("/")
 SCRIPT_DIR = Path(__file__).resolve().parent
+CASE_DIR = SCRIPT_DIR.parent
+MODEL_DIR = CASE_DIR / "models"
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,8 +47,8 @@ def parse_args() -> argparse.Namespace:
 	)
 	parser.add_argument(
 		"--output-dir",
-		default=str(SCRIPT_DIR),
-		help="Directory to save downloaded files (default: this script's directory).",
+		default=str(MODEL_DIR),
+		help=f"Directory to save downloaded files (default: {MODEL_DIR}).",
 	)
 	return parser.parse_args()
 
@@ -75,7 +76,9 @@ def fetch_repo_files(repo_id: str, endpoint: str) -> list[str]:
 def is_target_model(filename: str) -> bool:
 	name = Path(filename).name
 	patterns = [
+		r"^ssd320_mobilenetv.+\.(onnx|om)$",
 		r"^ssd_mobilenetv.+\.(onnx|om)$",
+		r"^ssd300_resnet\d+.*\.(onnx|om)$",
 		r"^ssd_resnet\d+.+\.(onnx|om)$",
 		r"^ssd_resnet\d+\.(onnx|om)$",
 	]
@@ -150,6 +153,8 @@ def main() -> int:
 			)
 		else:
 			print(f"No model files matched mode '{mode}' in '{args.repo}'.")
+			if mode == "om":
+				print("The current SSDLite320 repository publishes ONNX files. Download ONNX first, then run scripts/convert_onnx_to_om.py on the Ascend device.")
 		return 1
 
 	success = 0

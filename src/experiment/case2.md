@@ -40,13 +40,23 @@
 * 实时演示：接入 USB 摄像头，使用 `--source 0` 作为输入
 * 离线演示：直接读取本地视频文件，例如 `--source demo.mp4`
 
-如果只运行 `cpu` 模式，可以没有昇腾 NPU；如果运行 `npu` 模式，则还需要本机正确安装 Ascend ACL Python 运行时，并准备对应的 `.om` 模型文件。
+如果只运行 `cpu` 模式，可以没有昇腾 NPU；如果运行 `npu` 模式，则还需要本机正确安装 Ascend ACL Python 运行时，并准备对应的 `.om` 模型文件。当前模型下载脚本默认使用 `zhouxzh/SSDLite320`，该仓库发布的是 `.onnx` 模型；在 Ascend 310B 上运行 NPU 模式前，需要使用 `scripts/convert_onnx_to_om.py` 将 ONNX 转成 OM。
+
+常用准备流程如下：
+
+```bash
+python scripts/download_models.py --onnx
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+python scripts/convert_onnx_to_om.py --soc-version Ascend310B4
+```
+
+转换脚本默认读取 `models/*.onnx`，并把同名 `.om` 文件写回 `models/`。如果板端 SoC 版本不是 `Ascend310B4`，需要按实际环境修改 `--soc-version`。
 
 ## 本案例支持的骨干网络 {#src-experiment-case2-h3}
 
 当前仓库里的 SSD 模型已经覆盖了两类主干网络：
 
-* MobileNet 系列：`mobilenetv1`、`mobilenetv2`、`mobilenetv3`、`mobilenetv4`
+* MobileNet 系列：`mobilenetv1`、`mobilenetv2`、`mobilenetv3`、`mobilenetv3_large_100`、`mobilenetv4`
 * ResNet 系列：`resnet18`、`resnet34`、`resnet50`、`resnet101`、`resnet151`
 
 其中：
@@ -190,7 +200,7 @@ MobileNet v4 是更后续的轻量骨干版本，它进一步强化了硬件感�
 * 进一步面向硬件友好的延迟优化
 * 在不同配置下兼顾速度、参数量和表达能力
 
-从本仓库的模型组织可以看出，模型目录中既包含 `mobilenetv4`，也包含 `mobilenetv4_conv_large.onnx` 这样的变体文件。这表明 v4 系列本身已经具备不同配置路径，用于在更强表达能力与更低计算开销之间进行权衡。
+从本仓库的模型组织可以看出，模型目录中既包含 `mobilenetv4`，也包含 `mobilenetv4_conv_large.onnx`、`mobilenetv4_hybrid_medium.onnx` 这样的变体文件。这表明 v4 系列本身已经具备不同配置路径，用于在更强表达能力与更低计算开销之间进行权衡。
 
 ### MobileNet v1-v4 的结构对比总结 {#src-experiment-case2-h13}
 
@@ -306,8 +316,8 @@ DeepSORT 恰好提供了这样一套结构完整的解决框架。
 
 ### 入口层 {#src-experiment-case2-h21}
 
-* demo/detection_app.py：只做实时检测。
-* demo/tracking_app.py：先做检测，再做跟踪。
+* scripts/detection_app.py：只做实时检测。
+* scripts/tracking_app.py：先做检测，再做跟踪。
 
 ### 检测层 {#src-experiment-case2-h22}
 
@@ -337,7 +347,7 @@ DeepSORT 恰好提供了这样一套结构完整的解决框架。
 
 ### detection_app.py 如何组织检测主流程 {#src-experiment-case2-h25}
 
-在 demo/detection_app.py 中，主程序首先解析参数，然后根据 device 选择后端，再进入逐帧推理循环。这一设计体现了很清晰的工程结构：入口脚本只负责流程编排，把模型相关细节下沉到 ssdlite 模块。
+在 scripts/detection_app.py 中，主程序首先解析参数，然后根据 device 选择后端，再进入逐帧推理循环。这一设计体现了很清晰的工程结构：入口脚本只负责流程编排，把模型相关细节下沉到 ssdlite 模块。
 
 主流程的示意代码如下：
 
@@ -654,7 +664,7 @@ NMS 容易被视为检测模块内部的技术细节，但在目标跟踪系统�
 
 如果说 detection_app.py 用于建立检测流程，那么 tracking_app.py 的作用就在于将“检测结果如何转化为轨迹”这一过程完整串联起来。
 
-在 demo/tracking_app.py 中，检测模块与跟踪模块之间的桥接代码如下：
+在 scripts/tracking_app.py 中，检测模块与跟踪模块之间的桥接代码如下：
 
 ```python
 detections, profile_ms = backend.infer_with_profile(...)
@@ -1112,9 +1122,9 @@ fallback_matches = self._match_by_center_distance(...)
 推荐命令：
 
 ```bash
-python demo/detection_app.py --device npu --source 0
-python demo/detection_app.py --device npu --source 0 --backbone mobilenetv2
-python demo/detection_app.py --device npu --source 0 --backbone resnet18
+python scripts/detection_app.py --device npu --source 0
+python scripts/detection_app.py --device npu --source 0 --backbone mobilenetv2_100
+python scripts/detection_app.py --device npu --source 0 --backbone resnet18
 ```
 
 实验提示：
@@ -1138,9 +1148,9 @@ python demo/detection_app.py --device npu --source 0 --backbone resnet18
 推荐命令：
 
 ```bash
-python demo/detection_app.py --device npu --source 0
-python demo/detection_app.py --device npu --source 0 --camera-mjpeg
-python demo/detection_app.py --device npu --source 0 --camera-profile 1280x720@60
+python scripts/detection_app.py --device npu --source 0
+python scripts/detection_app.py --device npu --source 0 --camera-mjpeg
+python scripts/detection_app.py --device npu --source 0 --camera-profile 1280x720@60
 ```
 
 实验提示：
@@ -1163,9 +1173,9 @@ python demo/detection_app.py --device npu --source 0 --camera-profile 1280x720@6
 推荐命令：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0
-python demo/tracking_app.py --device npu --source 0 --track-classes person
-python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
+python scripts/tracking_app.py --device npu --source 0
+python scripts/tracking_app.py --device npu --source 0 --track-classes person
+python scripts/tracking_app.py --device npu --source 0 --track-classes person,bus
 ```
 
 实验提示：
@@ -1186,9 +1196,9 @@ python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
 推荐命令：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0
-python demo/tracking_app.py --device npu --source 0 --track-classes person
-python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
+python scripts/tracking_app.py --device npu --source 0
+python scripts/tracking_app.py --device npu --source 0 --track-classes person
+python scripts/tracking_app.py --device npu --source 0 --track-classes person,bus
 ```
 
 实验提示：
@@ -1209,9 +1219,9 @@ python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
 推荐命令：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0 --track-max-age 120
-python demo/tracking_app.py --device npu --source 0 --track-min-hits 3
-python demo/tracking_app.py --device npu --source 0 --track-iou-threshold 0.4
+python scripts/tracking_app.py --device npu --source 0 --track-max-age 120
+python scripts/tracking_app.py --device npu --source 0 --track-min-hits 3
+python scripts/tracking_app.py --device npu --source 0 --track-iou-threshold 0.4
 ```
 
 实验中应重点解释参数变化背后的原因，而不是只记录结果。
@@ -1235,9 +1245,9 @@ python demo/tracking_app.py --device npu --source 0 --track-iou-threshold 0.4
 推荐命令：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0
-python demo/tracking_app.py --device npu --source 0 --track-size-smoothing 0.85 --track-score-smoothing 0.8
-python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 1.4 --track-size-smoothing 0.6
+python scripts/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0
+python scripts/tracking_app.py --device npu --source 0 --track-size-smoothing 0.85 --track-score-smoothing 0.8
+python scripts/tracking_app.py --device npu --source 0 --track-center-distance-threshold 1.4 --track-size-smoothing 0.6
 ```
 
 观察重点：
@@ -1291,8 +1301,8 @@ python demo/tracking_app.py --device npu --source 0 --track-center-distance-thre
 在当前工程版本中，tracking_app.py 增加了按类别跟踪的命令行参数：
 
 ```bash
-python demo/tracking_app.py --track-classes person
-python demo/tracking_app.py --track-classes person,bus
+python scripts/tracking_app.py --track-classes person
+python scripts/tracking_app.py --track-classes person,bus
 ```
 
 这里并不是“先把所有检测框都解出来，再在跟踪前简单过滤”，而是把允许的类别一直传递到 decoder 内部，让解码阶段只关注这些目标类别。这样做的意义在于：
@@ -1480,19 +1490,19 @@ tracking/deepsort.py 中轨迹和检测之间的 IOU 矩阵，已经从双层 Py
 例如，只跟踪行人时，可以使用：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0 --track-classes person
+python scripts/tracking_app.py --device npu --source 0 --track-classes person
 ```
 
 如果需要同时跟踪行人和公交车，可以使用：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
+python scripts/tracking_app.py --device npu --source 0 --track-classes person,bus
 ```
 
 如果希望在快速运动场景中增强补充关联，可以适当提高中心距离阈值，例如：
 
 ```bash
-python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0
+python scripts/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0
 ```
 
 ### 如何理解“教材版”和“工程版”的关系 {#src-experiment-case2-h91}
