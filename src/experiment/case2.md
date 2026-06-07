@@ -1,4 +1,4 @@
-# 案例 2：基于 MobileNet-SSD 与 DeepSORT 的目标跟踪教程
+# 案例 2：目标跟踪检测
 
 ## 教程定位 {#src-experiment-case2-h1}
 

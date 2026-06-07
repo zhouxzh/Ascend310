@@ -5,12 +5,12 @@ set -e
 
 pnpm run docs:build 
 cd src/.vuepress/dist 
-git init 
+git init -b main
 git add -A 
 git commit -m 'deploy' 
 
-# 将当前分支(HEAD)强制推送到远程的 gh-pages 分支
-git push -f https://github.com/zhouxzh/Ascend310.git master:deploy
+# 将构建产物强制推送到远程 deploy 分支
+git push -f https://github.com/zhouxzh/Ascend310.git main:deploy
 
 echo "Deploy complete."
 

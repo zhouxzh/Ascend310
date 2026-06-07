@@ -1,4 +1,4 @@
-# 案例 1：基于 RetinaFace 与 ArcFace 的智能人脸识别考勤系统
+# 案例 1：智能人脸识别考勤系统
 
 ## 教程定位 {#src-experiment-case1-h1}
 

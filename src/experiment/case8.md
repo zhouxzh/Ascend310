@@ -1,6 +1,6 @@
-# 案例8：基于 HaGRID YOLOv10 的实时手势检测
+# 案例8：实时手势识别
 
-## 1. 项目简介
+## 项目简介
 
 本案例在昇腾310B上实现一个实时手势检测系统。系统从 USB 摄像头读取图
 像，用 HaGRIDv2 提供的 YOLOv10 手势检测模型完成目标检测，再把检测框画
@@ -22,13 +22,13 @@ PyTorch 权重和导出脚本，后续可以单独迁移到模型仓库。
 
 下方架构图说明了本案例的部署关系。PyTorch 到 ONNX 的导出建议在 PC 或
 GPU 工作站完成；310B 侧负责 ATC 转换、OM 推理、摄像头采集和 WebRTC 推
-流。图的 DOT 源文件位于 `src/experiment/img8/case8_system_arch.dot`。
+流。
 
 ![](img8/case8_system_arch.png){#fig:case8_system_arch width=85% .center}
 
 图 1：case8 系统架构。
 
-## 2. 实验环境
+## 实验环境
 
 本案例只需要一块昇腾310B开发板和一个普通 USB 摄像头。摄像头最好支持
 MJPG 输出，因为很多 UVC 摄像头在 YUYV 模式下无法以 1280x720 或
@@ -56,7 +56,7 @@ cd ~/Documents/Ascend310/samples/case8
 本教程中的设备示例 hostname 为 `313`，虚拟环境名为 `npu`。如果你的开发
 板名称或环境不同，只需要替换命令中的对应字段。
 
-## 3. HaGRID 手势检测任务
+## HaGRID 手势检测任务
 
 手势识别可以做成分类任务，也可以做成检测任务。分类任务把已经裁剪好的
 手部图像送入模型，输出一个类别，例如 `ok`、`stop` 或 `like`。这种方式
@@ -89,7 +89,9 @@ HaGRIDv2 对边缘部署很有价值。它不是只在干净背景下拍摄单�
 摄像头可以采集 640x480、1280x720 或 1920x1080，但进入模型前都会等比例
 缩放并填充到 640x640。
 
-表 1 汇总了四个已转换 OM 模型的实测结果。测试在主机 `313` 上执行，命令
+#### 四个 HaGRID YOLOv10 OM 模型的纯推理性能 {#case8-om-benchmark}
+
+下表汇总了四个已转换 OM 模型的实测结果。测试在主机 `313` 上执行，命令
 如下：
 
 ```bash
@@ -102,16 +104,24 @@ python scripts/infer_om_camera.py \
 输入为脚本生成的全零张量，因此结果只代表 OM 后端推理耗时，不包含摄像
 头采集、预处理、后处理、画框、颜色转换和 WebRTC 编码。
 
-| 模型 | 类别数 | OM 大小 | 纯 OM 平均延迟 | 特点与建议 |
-| :--- | ---: | ---: | ---: | :--- |
-| `YOLOv10n_gestures` | 34 | 6.4 MB | 18.29 ms | 默认模型，速度最快，适合实时手势命令检测。 |
-| `YOLOv10n_hands` | 34 | 6.4 MB | 18.41 ms | 标签集合与 `n_gestures` 相同，适合与默认模型对比误检和召回表现。 |
-| `YOLOv10x_gestures` | 34 | 64 MB | 122.61 ms | 模型规模明显更大，适合离线精度对比，不适合每帧 30fps 推理。 |
-| `YOLOv10x_hands` | 48 | 65 MB | 124.64 ms | 类别更多，包含若干左右手细分类；延迟最高，适合精度优先场景。 |
+| 模型简称 | 类别数 | 模型大小 | 推理平均延迟 |
+| :--- | ---: | ---: | ---: |
+| `n_gestures` | 34 | 6.4 MB | 18.29 ms |
+| `n_hands` | 34 | 6.4 MB | 18.41 ms |
+| `x_gestures` | 34 | 64 MB | 122.61 ms |
+| `x_hands` | 48 | 65 MB | 124.64 ms |
 
-表 1：四个 HaGRID YOLOv10 OM 模型在 313 上的纯推理性能。
+表中模型简称均省略 `YOLOv10` 前缀，例如 `n_gestures` 对应
+`YOLOv10n_gestures.om`。
 
-## 4. YOLOv10 与本案例模型
+四个模型的选择建议如下：
+
+- `YOLOv10n_gestures` 是默认模型，速度最快，适合实时手势命令检测。
+- `YOLOv10n_hands` 的标签集合与 `n_gestures` 相同，适合对比误检和召回表现。
+- `YOLOv10x_gestures` 模型规模明显更大，适合离线精度对比，不适合每帧 30fps 推理。
+- `YOLOv10x_hands` 类别更多，包含若干左右手细分类；延迟最高，适合精度优先场景。
+
+## YOLOv10 与本案例模型
 
 YOLOv10 是一种实时目标检测模型。YOLO 系列的基本思想是单阶段检测，也就
 是一次前向计算同时预测目标框、置信度和类别。YOLOv10 论文进一步强调端
@@ -127,10 +137,9 @@ YOLOv10 是一种实时目标检测模型。YOLO 系列的基本思想是单阶�
 可以让教程代码在更换模型时更稳健。对当前 HaGRIDv2 YOLOv10 导出模型而
 言，这一步不是主要性能瓶颈。
 
-## 5. 模型导出与 ATC 转换
+## 模型导出与 ATC 转换
 
-模型准备流程见下方流程图。图的 DOT 源文件保存在
-`src/experiment/img8/case8_model_conversion.dot`。
+模型准备流程见下方流程图。
 
 ![](img8/case8_model_conversion.png){#fig:case8_model_conversion width=85% .center}
 
@@ -248,7 +257,7 @@ class_id   = flat_index % 34
 积计算。遇到这种警告时，应该先 benchmark 生成的 OM 模型，再决定是否需
 要重新导出或简化模型图。
 
-## 6. OM 推理与代码解析
+## OM 推理与代码解析
 
 OM 摄像头推理入口是 `scripts/infer_om_camera.py`。它的默认模型已经设置
 为 `models/YOLOv10n_gestures.om`，所以在 310B 上可以直接运行：
@@ -338,7 +347,7 @@ host 到 device 的输入拷贝、`acl.mdl.execute` 执行和 device 到 host �
 `finalize_on_release=False`，避免某个模块释放时全局 `acl.finalize()` 影
 响其他硬件模块。
 
-## 7. WebRTC 远程推流
+## WebRTC 远程推流
 
 本地 OpenCV 窗口适合调试，远程查看则需要一个面向实时视频的传输方式。
 WebRTC 是浏览器原生支持的实时音视频协议，可以使用 H.264 编码，并通过
@@ -346,8 +355,7 @@ WebRTC 是浏览器原生支持的实时音视频协议，可以使用 H.264 编
 在 Python 服务端建立 PeerConnection，同时把 aiortc 默认的 H.264 编码器
 替换为 Ascend CANN VENC，尽量减少 CPU 编码压力。
 
-下方流程图是 WebRTC 程序的简化流程。DOT 源文件保存在
-`src/experiment/img8/case8_webrtc_pipeline.dot`。
+下方流程图是 WebRTC 程序的简化流程。
 
 ![](img8/case8_webrtc_pipeline.png){#fig:case8_webrtc_pipeline width=85% .center}
 
@@ -406,7 +414,7 @@ WebRTC 验收时，浏览器应能打开视频页面并列出 `models` 目录下
 程，保留旧帧只会让画面延迟越来越大。因此本案例宁愿丢旧帧，也要保持远
 程预览的实时性。
 
-## 8. OpenCV 与 DVPP 采集后端
+## OpenCV 与 DVPP 采集后端
 
 WebRTC 页面中可以选择 OpenCV 或 DVPP 采集后端。OpenCV 是默认路径，流
 程是 `cv2.VideoCapture -> BGR -> 推理/画框 -> NV12 -> CANN VENC`。它的
@@ -433,7 +441,7 @@ v4l2-ctl --device=/dev/video0 --list-formats-ext
 一定按这个模式工作，最终还要看 `/stats` 里的 `actual_fourcc` 和
 `capture_fps`。
 
-## 9. 性能分析与优化
+## 性能分析与优化
 
 实时系统的帧率由最慢环节决定。看到远程 FPS 低时，不应该只看 NPU 推理
 时间。一次完整远程显示至少经过采集、预处理、OM 推理、后处理、画框、颜
@@ -467,7 +475,7 @@ MJPG，以及 `capture_fps` 是否已经达到目标帧率。如果采集只有 
 很难稳定超过 30fps；如果只是远程画面模糊，可以提高 H.264 码率，当前默
 认值是 4000 kbps。
 
-## 10. 完整实验流程
+## 完整实验流程
 
 在 PC 或 GPU 工作站上，先导出 ONNX、标签和元数据：
 
@@ -555,7 +563,7 @@ curl http://313:8080/stats
 `YOLOv10n_gestures.om`、`YOLOv10n_hands.om`、`YOLOv10x_gestures.om` 和
 `YOLOv10x_hands.om`。
 
-## 11. 常见问题
+## 常见问题
 
 如果 ATC 报 `--host_env_os linux is invalid`，说明旧命令中传入了当前
 CANN/OPP 组合不接受的参数。当前 `scripts/atc_convert.sh` 已经不再设置
@@ -584,7 +592,7 @@ for DVPP`、`DVPP JPEGD decode frame`、`jpeg_get_image_info failed` 和
 推理本身，而在推流链路。需要同时观察 `track_fps`、浏览器 getStats 中的
 码率、服务端 `nv12_ms` 和编码器状态。
 
-## 12. 维护建议
+## 维护建议
 
 为了让本案例长期适合作为教程使用，代码结构应保持清晰。可复用逻辑放在
 `hagrid_yolo` 包内，脚本只作为入口；`.pt -> ONNX` 导出脚本继续留在
@@ -595,7 +603,7 @@ for DVPP`、`DVPP JPEGD decode frame`、`jpeg_get_image_info failed` 和
 涉及 CANN、ATC、OM、DVPP 的行为必须在真实 310B 上验证，本地文档环境只
 能做代码编辑、图生成和 Markdown 检查。
 
-## 13. 参考资料
+## 参考资料
 
 1. HaGRID 官方仓库：
    [https://github.com/hukenovs/hagrid](https://github.com/hukenovs/hagrid)
@@ -621,5 +629,3 @@ for DVPP`、`DVPP JPEGD decode frame`、`jpeg_get_image_info failed` 和
     [https://github.com/aiortc/aiortc](https://github.com/aiortc/aiortc)
 12. W3C WebRTC 规范：
     [https://www.w3.org/TR/webrtc/](https://www.w3.org/TR/webrtc/)
-13. Graphviz DOT 语言：
-    [https://graphviz.org/doc/info/lang.html](https://graphviz.org/doc/info/lang.html)

@@ -1,7 +1,6 @@
-\chapter{案例8：基于 HaGRID YOLOv10
-的实时手势检测}\label{ux6848ux4f8b8ux57faux4e8e-hagrid-yolov10-ux7684ux5b9eux65f6ux624bux52bfux68c0ux6d4b}
+\chapter{案例8：实时手势识别}\label{ux6848ux4f8b8ux5b9eux65f6ux624bux52bfux8bc6ux522b}
 
-\section{1. 项目简介}\label{ux9879ux76eeux7b80ux4ecb}
+\section{项目简介}\label{ux9879ux76eeux7b80ux4ecb}
 
 本案例在昇腾310B上实现一个实时手势检测系统。系统从 USB 摄像头读取图
 像，用 HaGRIDv2 提供的 YOLOv10 手势检测模型完成目标检测，再把检测框画
@@ -25,15 +24,13 @@ AscendCL/PyACL 在 NPU 上推理，并把推理结果组织成可远程查看的
 权重和导出脚本，后续可以单独迁移到模型仓库。
 
 下方架构图说明了本案例的部署关系。PyTorch 到 ONNX 的导出建议在 PC 或 GPU
-工作站完成；310B 侧负责 ATC 转换、OM 推理、摄像头采集和 WebRTC 推
-流。图的 DOT 源文件位于
-\passthrough{\lstinline!src/experiment/img8/case8\_system\_arch.dot!}。
+工作站完成；310B 侧负责 ATC 转换、OM 推理、摄像头采集和 WebRTC 推 流。
 
 \includegraphics[width=0.85\linewidth,height=\textheight,keepaspectratio]{cases/img8/case8_system_arch.png}
 
 图 1：case8 系统架构。
 
-\section{2. 实验环境}\label{ux5b9eux9a8cux73afux5883}
+\section{实验环境}\label{ux5b9eux9a8cux73afux5883}
 
 本案例只需要一块昇腾310B开发板和一个普通 USB 摄像头。摄像头最好支持 MJPG
 输出，因为很多 UVC 摄像头在 YUYV 模式下无法以 1280x720 或 1920x1080 达到
@@ -65,7 +62,7 @@ cd ~/Documents/Ascend310/samples/case8
 \passthrough{\lstinline!npu!}。如果你的开发
 板名称或环境不同，只需要替换命令中的对应字段。
 
-\section{3. HaGRID
+\section{HaGRID
 手势检测任务}\label{hagrid-ux624bux52bfux68c0ux6d4bux4efbux52a1}
 
 手势识别可以做成分类任务，也可以做成检测任务。分类任务把已经裁剪好的
@@ -108,7 +105,10 @@ HaGRIDv2 对边缘部署很有价值。它不是只在干净背景下拍摄单�
 摄像头可以采集 640x480、1280x720 或 1920x1080，但进入模型前都会等比例
 缩放并填充到 640x640。
 
-表 1 汇总了四个已转换 OM 模型的实测结果。测试在主机
+\subsubsection{四个 HaGRID YOLOv10 OM
+模型的纯推理性能}\label{case8-om-benchmark}
+
+下表汇总了四个已转换 OM 模型的实测结果。测试在主机
 \passthrough{\lstinline!313!} 上执行，命令 如下：
 
 \begin{lstlisting}[language=bash]
@@ -122,43 +122,43 @@ python scripts/infer_om_camera.py \
 头采集、预处理、后处理、画框、颜色转换和 WebRTC 编码。
 
 { % do not increment counter
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}@{}}
+\begin{longtable}[]{@{}lrrr@{}}
 \toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-模型
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-类别数
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-OM 大小
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-纯 OM 平均延迟
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-特点与建议
-\end{minipage} \\
+模型简称 & 类别数 & 模型大小 & 推理平均延迟 \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-\passthrough{\lstinline!YOLOv10n\_gestures!} & 34 & 6.4 MB & 18.29 ms &
-默认模型，速度最快，适合实时手势命令检测。 \\
-\passthrough{\lstinline!YOLOv10n\_hands!} & 34 & 6.4 MB & 18.41 ms &
-标签集合与 \passthrough{\lstinline!n\_gestures!}
-相同，适合与默认模型对比误检和召回表现。 \\
-\passthrough{\lstinline!YOLOv10x\_gestures!} & 34 & 64 MB & 122.61 ms &
-模型规模明显更大，适合离线精度对比，不适合每帧 30fps 推理。 \\
-\passthrough{\lstinline!YOLOv10x\_hands!} & 48 & 65 MB & 124.64 ms &
-类别更多，包含若干左右手细分类；延迟最高，适合精度优先场景。 \\
+\passthrough{\lstinline!n\_gestures!} & 34 & 6.4 MB & 18.29 ms \\
+\passthrough{\lstinline!n\_hands!} & 34 & 6.4 MB & 18.41 ms \\
+\passthrough{\lstinline!x\_gestures!} & 34 & 64 MB & 122.61 ms \\
+\passthrough{\lstinline!x\_hands!} & 48 & 65 MB & 124.64 ms \\
 \end{longtable}
 }
 
-表 1：四个 HaGRID YOLOv10 OM 模型在 313 上的纯推理性能。
+表中模型简称均省略 \passthrough{\lstinline!YOLOv10!} 前缀，例如
+\passthrough{\lstinline!n\_gestures!} 对应
+\passthrough{\lstinline!YOLOv10n\_gestures.om!}。
 
-\section{4. YOLOv10
+四个模型的选择建议如下：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!YOLOv10n\_gestures!}
+  是默认模型，速度最快，适合实时手势命令检测。
+\item
+  \passthrough{\lstinline!YOLOv10n\_hands!} 的标签集合与
+  \passthrough{\lstinline!n\_gestures!} 相同，适合对比误检和召回表现。
+\item
+  \passthrough{\lstinline!YOLOv10x\_gestures!}
+  模型规模明显更大，适合离线精度对比，不适合每帧 30fps 推理。
+\item
+  \passthrough{\lstinline!YOLOv10x\_hands!}
+  类别更多，包含若干左右手细分类；延迟最高，适合精度优先场景。
+\end{itemize}
+
+\section{YOLOv10
 与本案例模型}\label{yolov10-ux4e0eux672cux6848ux4f8bux6a21ux578b}
 
 YOLOv10 是一种实时目标检测模型。YOLO 系列的基本思想是单阶段检测，也就
@@ -177,11 +177,10 @@ NMS。这不是理论上的必要
 可以让教程代码在更换模型时更稳健。对当前 HaGRIDv2 YOLOv10 导出模型而
 言，这一步不是主要性能瓶颈。
 
-\section{5. 模型导出与 ATC
+\section{模型导出与 ATC
 转换}\label{ux6a21ux578bux5bfcux51faux4e0e-atc-ux8f6cux6362}
 
-模型准备流程见下方流程图。图的 DOT 源文件保存在
-\passthrough{\lstinline!src/experiment/img8/case8\_model\_conversion.dot!}。
+模型准备流程见下方流程图。
 
 \includegraphics[width=0.85\linewidth,height=\textheight,keepaspectratio]{cases/img8/case8_model_conversion.png}
 
@@ -314,7 +313,7 @@ class_id   = flat_index % 34
 积计算。遇到这种警告时，应该先 benchmark 生成的 OM 模型，再决定是否需
 要重新导出或简化模型图。
 
-\section{6. OM
+\section{OM
 推理与代码解析}\label{om-ux63a8ux7406ux4e0eux4ee3ux7801ux89e3ux6790}
 
 OM 摄像头推理入口是
@@ -419,7 +418,7 @@ track 中使用
 \passthrough{\lstinline!finalize\_on\_release=False!}，避免某个模块释放时全局
 \passthrough{\lstinline!acl.finalize()!} 影 响其他硬件模块。
 
-\section{7. WebRTC 远程推流}\label{webrtc-ux8fdcux7a0bux63a8ux6d41}
+\section{WebRTC 远程推流}\label{webrtc-ux8fdcux7a0bux63a8ux6d41}
 
 本地 OpenCV 窗口适合调试，远程查看则需要一个面向实时视频的传输方式。
 WebRTC 是浏览器原生支持的实时音视频协议，可以使用 H.264 编码，并通过
@@ -428,8 +427,7 @@ WebRTC 是浏览器原生支持的实时音视频协议，可以使用 H.264 编
 PeerConnection，同时把 aiortc 默认的 H.264 编码器 替换为 Ascend CANN
 VENC，尽量减少 CPU 编码压力。
 
-下方流程图是 WebRTC 程序的简化流程。DOT 源文件保存在
-\passthrough{\lstinline!src/experiment/img8/case8\_webrtc\_pipeline.dot!}。
+下方流程图是 WebRTC 程序的简化流程。
 
 \includegraphics[width=0.85\linewidth,height=\textheight,keepaspectratio]{cases/img8/case8_webrtc_pipeline.png}
 
@@ -496,7 +494,7 @@ WebRTC 验收时，浏览器应能打开视频页面并列出
 程，保留旧帧只会让画面延迟越来越大。因此本案例宁愿丢旧帧，也要保持远
 程预览的实时性。
 
-\section{8. OpenCV 与 DVPP
+\section{OpenCV 与 DVPP
 采集后端}\label{opencv-ux4e0e-dvpp-ux91c7ux96c6ux540eux7aef}
 
 WebRTC 页面中可以选择 OpenCV 或 DVPP 采集后端。OpenCV 是默认路径，流
@@ -527,8 +525,7 @@ v4l2-ctl --device=/dev/video0 --list-formats-ext
 \passthrough{\lstinline!actual\_fourcc!} 和
 \passthrough{\lstinline!capture\_fps!}。
 
-\section{9.
-性能分析与优化}\label{ux6027ux80fdux5206ux6790ux4e0eux4f18ux5316}
+\section{性能分析与优化}\label{ux6027ux80fdux5206ux6790ux4e0eux4f18ux5316}
 
 实时系统的帧率由最慢环节决定。看到远程 FPS 低时，不应该只看 NPU 推理
 时间。一次完整远程显示至少经过采集、预处理、OM 推理、后处理、画框、颜
@@ -575,7 +572,7 @@ WebRTC 配置中测试，并把 \passthrough{\lstinline!infer\_every\_n!}
 30fps；如果只是远程画面模糊，可以提高 H.264 码率，当前默 认值是 4000
 kbps。
 
-\section{10. 完整实验流程}\label{ux5b8cux6574ux5b9eux9a8cux6d41ux7a0b}
+\section{完整实验流程}\label{ux5b8cux6574ux5b9eux9a8cux6d41ux7a0b}
 
 在 PC 或 GPU 工作站上，先导出 ONNX、标签和元数据：
 
@@ -672,7 +669,7 @@ curl http://313:8080/stats
 \passthrough{\lstinline!YOLOv10n\_gestures.om!}、\passthrough{\lstinline!YOLOv10n\_hands.om!}、\passthrough{\lstinline!YOLOv10x\_gestures.om!}
 和 \passthrough{\lstinline!YOLOv10x\_hands.om!}。
 
-\section{11. 常见问题}\label{ux5e38ux89c1ux95eeux9898}
+\section{常见问题}\label{ux5e38ux89c1ux95eeux9898}
 
 如果 ATC 报
 \passthrough{\lstinline!--host\_env\_os linux is invalid!}，说明旧命令中传入了当前
@@ -709,7 +706,7 @@ python scripts/webrtc_om_app.py --port 8081
 \passthrough{\lstinline!track\_fps!}、浏览器 getStats 中的 码率、服务端
 \passthrough{\lstinline!nv12\_ms!} 和编码器状态。
 
-\section{12. 维护建议}\label{ux7ef4ux62a4ux5efaux8bae}
+\section{维护建议}\label{ux7ef4ux62a4ux5efaux8bae}
 
 为了让本案例长期适合作为教程使用，代码结构应保持清晰。可复用逻辑放在
 \passthrough{\lstinline!hagrid\_yolo!}
@@ -724,7 +721,7 @@ python scripts/webrtc_om_app.py --port 8081
 涉及 CANN、ATC、OM、DVPP 的行为必须在真实 310B 上验证，本地文档环境只
 能做代码编辑、图生成和 Markdown 检查。
 
-\section{13. 参考资料}\label{ux53c2ux8003ux8d44ux6599}
+\section{参考资料}\label{ux53c2ux8003ux8d44ux6599}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -755,6 +752,4 @@ python scripts/webrtc_om_app.py --port 8081
   aiortc GitHub 仓库： \url{https://github.com/aiortc/aiortc}
 \item
   W3C WebRTC 规范： \url{https://www.w3.org/TR/webrtc/}
-\item
-  Graphviz DOT 语言： \url{https://graphviz.org/doc/info/lang.html}
 \end{enumerate}

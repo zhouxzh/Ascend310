@@ -1,6 +1,6 @@
 % !TEX program = xelatex
 % 使用 XeLaTeX 编译
-\documentclass[fontsize=12pt, paper=a4, twoside=true, BCOR=6mm, DIV=11]{scrbook}
+\documentclass[fontsize=12pt, paper=a4, twoside=false, DIV=11]{scrbook}
 
 % 基本设置
 \usepackage[UTF8]{ctex} % 中文支持
@@ -144,10 +144,12 @@
 \begin{document}
 
 % 封面页
+\hypersetup{pageanchor=false}
 \maketitle
 
 % 前言页
 \frontmatter
+\hypersetup{pageanchor=true}
 \chapter*{前言}
 \input{chapters/preface.tex}
 
@@ -202,6 +204,14 @@
 \part{Part II：实验教程}
 
 \setcounter{chapter}{-1}
+% Part II reuses chapter numbers for cases. Give hyperref destinations a
+% separate prefix so PDF TOC links do not jump to Part I chapters.
+\renewcommand{\theHchapter}{case.\arabic{chapter}}
+\renewcommand{\theHsection}{case.\arabic{chapter}.\arabic{section}}
+\renewcommand{\theHsubsection}{case.\arabic{chapter}.\arabic{section}.\arabic{subsection}}
+\renewcommand{\theHsubsubsection}{case.\arabic{chapter}.\arabic{section}.\arabic{subsection}.\arabic{subsubsection}}
+\renewcommand{\theHfigure}{case.\arabic{chapter}.\arabic{figure}}
+\renewcommand{\theHtable}{case.\arabic{chapter}.\arabic{table}}
 
 % 案例0
 \input{cases/case0.tex}
