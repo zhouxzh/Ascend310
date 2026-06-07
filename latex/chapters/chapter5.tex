@@ -216,12 +216,13 @@ H.265（也叫 HEVC）是 H.264
 \end{longtable}
 }
 
-\textbf{为什么本章重点讲 H.264}：H.264
-是本章所有基础示例和基准测试的默认路径，原因是它在 WebRTC
-和教学演示里最稳定、最容易复现。对比来看：(1) CANN VENC/VDEC 对 H.264 和
-H.265 的 API 基本一致，主要差别是 \passthrough{\lstinline!entype!}；(2)
-ARM 平台上 libx264 的测试码流更容易生成；(3) WebRTC 综合案例已经补齐了
-H.265/HEVC 路径，可用于对照理解两种编码的工程差异。
+\textbf{为什么本章仍以 H.264 作为主线}：H.264 在 WebRTC
+和教学演示里最稳定、最容易复现；同时，本章的 VENC/VDEC minimal
+样例、基准脚本和 WebRTC 综合案例都补充了 H.265/HEVC 路径。对比来看：(1)
+CANN VENC/VDEC 对 H.264 和 H.265 的 API 基本一致，主要差别是
+\passthrough{\lstinline!entype!}；(2) ARM 平台上 libx264
+的测试码流更容易生成；(3) H.265 可作为同一套 DVPP API
+的对照路径，用于理解两种编码的工程差异。
 
 \subsection{ACL 初始化------四步必要步骤}\label{acl-init}
 
@@ -1075,8 +1076,8 @@ VENC（参数正确就能创建成功）。\passthrough{\lstinline!Alarm!}
 \endlastfoot
 \passthrough{\lstinline!check\_cann.py!} & ACL 初始化的 4 个必要调用 &
 \textless1s \\
-\passthrough{\lstinline!venc\_minimal.py!} & 原始 VENC
-API：回调线程、DVPP 内存、发送一帧 & \textasciitilde3s \\
+\passthrough{\lstinline!venc\_minimal.py!} & 原始 VENC API：同一帧 NV12
+分别编码为 H.264/H.265 & \textasciitilde3s \\
 \passthrough{\lstinline!bench\_venc.py!} &
 \passthrough{\lstinline!CannVenc!} 封装类 + H.264/H.265 分辨率扫描对比 &
 \textasciitilde20s \\
@@ -1093,8 +1094,8 @@ export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/li
 export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:$PYTHONPATH"
 
 python samples/chapter5/check_cann.py        # -> ACL init OK  soc=Ascend310B4
-python samples/chapter5/venc/venc_minimal.py      # -> Encoded keyframe: ~135 KB
-python samples/chapter5/venc/bench_venc.py        # -> VENC 4.3ms/帧 @480p  CPU 20.8ms  加速 4.9x
+python samples/chapter5/venc/venc_minimal.py      # -> H.264/H.265 关键帧编码结果
+python samples/chapter5/venc/bench_venc.py        # -> H.264/H.265 VENC vs CPU 帧率表
 \end{lstlisting}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
@@ -1117,7 +1118,21 @@ ret = acl.rt.set_context(ctx)       # (4) 绑定上下文到当前线程
 \subsubsection{\texorpdfstring{走读：最小编码 ---
 \href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/venc/venc_minimal.py}{\texttt{venc\_minimal.py}}}{走读：最小编码 --- venc\_minimal.py}}\label{src-book-chapter5-h36}
 
-这是理解 VENC 的核心文件。代码分为 5 个阶段：
+这是理解 VENC 的核心文件。脚本用同一帧确定性 NV12 输入，分别创建 H.264
+Baseline 与 H.265 Main 通道并编码一帧。两个路径的 API
+基本一致，主要差异是 \passthrough{\lstinline!entype!}：
+
+\begin{lstlisting}[language=Python]
+ENTYPE_H265_MAIN = 0
+ENTYPE_H264_BASE = 1
+
+CODECS = [
+    ("H.264 Baseline", ENTYPE_H264_BASE, 2_000),
+    ("H.265 Main", ENTYPE_H265_MAIN, 2_000),
+]
+\end{lstlisting}
+
+代码分为 5 个阶段：
 
 \textbf{(1) ACL 初始化} --- 与 step1 相同。
 
@@ -1141,14 +1156,18 @@ def callback_thread(_args):                  # 独立线程处理回调
         acl.rt.process_report(300)           # 300ms 轮询
 \end{lstlisting}
 
-\textbf{(3) 创建通道} --- 设置全部参数后调用
-\passthrough{\lstinline!venc\_create\_channel()!}。 与第 4
-章的参数表一一对应。
+\textbf{(3) 创建通道} --- 按当前 codec 设置
+\passthrough{\lstinline!entype!}、NV12
+格式、分辨率、GOP、帧率和码率后调用
+\passthrough{\lstinline!venc\_create\_channel()!}。H.264 Baseline 使用
+\passthrough{\lstinline!entype=1!}，H.265 Main 使用
+\passthrough{\lstinline!entype=0!}。
 
-\textbf{(4) 发送一帧} --- NV12 padding（16 对齐）-\textgreater{}
+\textbf{(4) 发送一帧} --- NumPy 生成紧凑 NV12 -\textgreater{} 宽度
+padding 到 16 对齐 -\textgreater{}
 \passthrough{\lstinline!dvpp\_malloc!} -\textgreater{}
 \passthrough{\lstinline!venc\_send\_frame!} -\textgreater{}
-\passthrough{\lstinline!cb\_queue.get()!} 等待结果。
+\passthrough{\lstinline!cb\_queue.get()!} 等待 H.264/H.265 码流结果。
 
 \textbf{(5) 清理} --- 销毁通道、描述符、帧配置，释放 DVPP 内存。
 
@@ -1195,25 +1214,23 @@ FPS = 30
 \textbf{(2) 确定性测试帧生成}
 
 \begin{lstlisting}[language=Python]
-def make_test_nv12(n: int, w: int, h: int) -> list[np.ndarray]:
+def make_test_yuv420_frame(i: int, w: int, h: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 \end{lstlisting}
 
-直接生成 NV12 帧给 VENC------无需 BGR-\textgreater NV12
+直接生成 YUV420 平面，再按测试路径转换：VENC 路径拼成 NV12，CPU 路径拼成
+yuv420p/I420。这样无需 BGR/RGB
 转换，测量的是\textbf{纯编码性能}。每帧包含：
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{水平渐变}（R 通道映射为 Y） + \textbf{垂直渐变叠加}
+  \textbf{水平渐变} + \textbf{垂直渐变叠加}
 \item
   \textbf{正弦移动白条}：模拟时间相关性，防止编码器走 P
   帧''全零残差''捷径
 \item
   \textbf{角落棋盘格}：8×8 方块交替，测试空间纹理编码
 \end{itemize}
-
-\passthrough{\lstinline!make\_test\_bgr()!} 生成同样的视觉内容但为 BGR
-格式------给 CPU libx264 用（PyAV 内部转为 YUV）。
 
 \textbf{(3) \passthrough{\lstinline!CannVenc!} 类详解}
 
@@ -1273,19 +1290,25 @@ encoded = self._cb_queue.get(timeout=5.0)
 \passthrough{\lstinline!venc\_destroy\_channel!} 再停回调线程，与 VDEC
 的销毁顺序要求类似。
 
-\textbf{(4) CPU 编码对比 --- \passthrough{\lstinline!bench\_libx264()!}}
+\textbf{(4) CPU 编码对比 ---
+\passthrough{\lstinline!bench\_cpu\_encode()!}}
 
 \begin{lstlisting}[language=Python]
-def bench_libx264(frames: list[np.ndarray], bitrate_bps: int) -> tuple:
+def bench_cpu_encode(w: int, h: int, codec_name: str, bitrate_bps: int,
+                     thread_count: int) -> tuple:
     level = "31" if w * h <= 1280 * 720 else "40"   # <=720p -> 3.1, >=1080p -> 4.0
-    codec = av.CodecContext.create("libx264", "w")
+    codec = av.CodecContext.create(codec_name, "w")
+    codec.thread_count = thread_count                # 0=自动多线程，1=单线程
     codec.bit_rate = bitrate_bps                      # bps（注意与 VENC 的 kbps 区分）
     codec.options = {"level": level, "tune": "zerolatency"}
-    codec.profile = "Baseline"                        # 与 VENC entype=1 对应
+    if codec_name == "libx264":
+        codec.profile = "Baseline"                    # H.264 与 VENC entype=1 对应
 \end{lstlisting}
 
-参数与 VENC 对齐：Baseline profile、zerolatency tune、相同码率。PyAV
-内部自动将 BGR 转为 YUV420P。
+参数与 VENC 对齐：H.264 使用 Baseline profile、zerolatency
+tune、相同码率。最新脚本不再生成 BGR/RGB 测试帧，而是统一生成 YUV420
+平面：VENC 路径拼成 NV12，CPU 路径拼成 yuv420p/I420 直接交给
+PyAV，避免把颜色转换成本混入编码对比。
 
 \textbf{(5) 主流程 --- 分辨率扫描}
 
@@ -1294,22 +1317,20 @@ for w, h in RESOLUTIONS:
     bitrate_kbps = max(2000, int(w * h * FPS * 0.1 / 1000))
     bitrate_bps = bitrate_kbps * 1000
 
-    nv12_frames = make_test_nv12(TEST_FRAMES, w, h)    # VENC 用
-    bgr_frames = make_test_bgr(TEST_FRAMES, w, h)      # CPU 用
-
     # VENC 测量
-    venc = CannVenc(w, h, bitrate=bitrate_kbps)
+    venc = CannVenc(w, h, bitrate=bitrate_kbps, entype=entype)
     for i in range(WARMUP_FRAMES):                     # 预热
-        venc.encode(nv12_frames[i], force_keyframe=(i == 0))
+        y, u, v = make_test_yuv420_frame(i, w, h)
+        venc.encode(yuv420_to_nv12(y, u, v), force_keyframe=(i == 0))
     t0 = time.perf_counter()
     for i in range(TEST_FRAMES):                        # 正式测量
-        venc.encode(nv12_frames[i], force_keyframe=(i % TEST_GOP == 0))
+        y, u, v = make_test_yuv420_frame(i, w, h)
+        venc.encode(yuv420_to_nv12(y, u, v), force_keyframe=(i % TEST_GOP == 0))
     venc_fps = TEST_FRAMES / (time.perf_counter() - t0)
 
     # CPU 测量
-    _, cpu_fps, cpu_ms = bench_libx264(bgr_frames, bitrate_bps)
-
-    speedup = venc_fps / cpu_fps
+    _, cpu_mt_fps, _ = bench_cpu_encode(w, h, cpu_codec_name, bitrate_bps, thread_count=0)
+    _, cpu_st_fps, _ = bench_cpu_encode(w, h, cpu_codec_name, bitrate_bps, thread_count=1)
 \end{lstlisting}
 
 \textbf{码率自适应公式}
@@ -1344,9 +1365,9 @@ for w, h in RESOLUTIONS:
 目的 & 教学------展示每个 API 调用 & 基准------评估性能 \\
 帧数 & 1 帧 & 90 帧 × 5 分辨率 \\
 封装 & 裸 API 直接调用 & \passthrough{\lstinline!CannVenc!} 类 \\
-对比 & 无 & 与 libx264 A/B 对比 \\
-内容 & 随机噪声 & 确定性帧（渐变+条+棋盘） \\
-输出 & 打印成功/失败 & 5 行对比表格 \\
+对比 & 无 & 与 libx264/libx265 A/B 对比 \\
+内容 & 确定性 NV12 单帧 & 确定性 YUV420 序列（渐变+条+棋盘） \\
+输出 & H.264/H.265 关键帧大小 & H.264/H.265 双表格 \\
 \end{longtable}
 }
 
@@ -1410,152 +1431,101 @@ class CannH264Encoder(H264Encoder):
 
 \subsection{性能对比与基准测试}\label{src-book-chapter5-h42}
 
-\subsubsection{实测数据：CANN VENC vs
-libx264}\label{src-book-chapter5-h43}
+\subsubsection{实测数据：CANN VENC vs CPU
+编码}\label{src-book-chapter5-h43}
 
 以下数据在 Orange Pi AI Pro（Ascend 310B4）上实测获得，使用
 \href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/venc/bench_venc.py}{\passthrough{\lstinline!bench\_venc.py!}}
-脚本。该脚本现在同时支持 H.264 与 H.265；本节表格先展示 H.264 实测结果。
+脚本。该脚本同时覆盖 H.264 与 H.265，并分别测量 CPU
+自动多线程（\passthrough{\lstinline!thread\_count=0!}）和 CPU
+单线程（\passthrough{\lstinline!thread\_count=1!}）。
 
 \textbf{测试条件}：GOP=30（I/P 混合），90 帧（3 个完整
-GOP），确定性测试帧，固定种子 42。
-码率按分辨率自动缩放：\passthrough{\lstinline!max(2M, w*h*fps*0.1)!}
-bps。
+GOP），确定性测试帧，固定种子 42。 码率按分辨率自动缩放：H.264 使用
+\passthrough{\lstinline!max(2M, w*h*fps*0.1)!} bps，H.265 使用 0.7
+倍目标码率。 测试帧统一生成为 YUV420 平面，VENC 路径转为 NV12，CPU
+路径转为 yuv420p/I420，避免额外 BGR/RGB 颜色转换。
 
-\textbf{VENC H.264 Resolution Scan: GOP=30, 90 frames}（H.265
-对照路径已在脚本中补齐）
+\textbf{H.264 Baseline}
+
+\begin{lstlisting}
+分辨率          VENC帧率     CPU多线程     CPU单线程
+────────────────────────────────────────────────────
+640x480            166.4          86.6          46.5
+1280x720            92.8          39.1          21.2
+1920x1080           48.4          13.4           6.0
+2560x1440           21.3          11.0           6.8
+3840x2160           15.8           7.1           3.7
+\end{lstlisting}
+
+\textbf{H.265 Main}
+
+\begin{lstlisting}
+分辨率          VENC帧率     CPU多线程     CPU单线程
+────────────────────────────────────────────────────
+640x480            165.1          31.1          22.9
+1280x720            96.6          18.8          14.7
+1920x1080           50.7           7.3           6.2
+2560x1440           31.1           6.2           5.1
+3840x2160           15.4           2.6           2.2
+\end{lstlisting}
 
 \subsubsection{结果解读}\label{src-book-chapter5-h44}
 
+\textbf{H.264 Baseline}
+
 { % do not increment counter
-\begin{longtable}[]{@{}lllllll@{}}
+\begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
-分辨率 & 像素数 & VENC fps & CPU fps & 加速比 & VENC 延迟 & CPU 延迟 \\
+分辨率 & VENC fps & CPU 单线程 & CPU 多线程 & vs 单线程 & vs 多线程 \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-640×480 & 0.3M & \textbf{235} & 48 & \textbf{4.9x} & 4.3ms & 20.8ms \\
-1280×720 & 0.9M & \textbf{164} & 19 & \textbf{8.6x} & 6.1ms & 52.5ms \\
-1920×1080 & 2.1M & \textbf{91} & 9 & \textbf{9.8x} & 11.0ms & 108.3ms \\
-2560×1440 & 3.7M & \textbf{58} & 7 & \textbf{8.6x} & 17.2ms & 147.2ms \\
-3840×2160 & 8.3M & \textbf{29} & 4 & \textbf{7.7x} & 34.5ms & 265.7ms \\
+640×480 & 166 & 47 & 87 & \textbf{3.58x} & \textbf{1.92x} \\
+1280×720 & 93 & 21 & 39 & \textbf{4.38x} & \textbf{2.37x} \\
+1920×1080 & 48 & 6 & 13 & \textbf{8.07x} & \textbf{3.61x} \\
+2560×1440 & 21 & 7 & 11 & \textbf{3.13x} & \textbf{1.94x} \\
+3840×2160 & 16 & 4 & 7 & \textbf{4.27x} & \textbf{2.23x} \\
 \end{longtable}
 }
 
-\textbf{VENC 延迟线性缩放}
-
-将 VENC 延迟与像素数画在坐标上：
+\textbf{H.265 Main}
 
 { % do not increment counter
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.0952}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1905}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1905}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2063}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1587}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1587}}@{}}
+\begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-指标
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-0.3M (480p)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-0.9M (720p)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-2.1M (1080p)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-3.7M (2K)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-8.3M (4K)
-\end{minipage} \\
+分辨率 & VENC fps & CPU 单线程 & CPU 多线程 & vs 单线程 & vs 多线程 \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-VENC 延迟 & 4.3ms & 6.1ms & 11.0ms & 17.2ms & 34.5ms \\
-每 MP 延迟 & 14.3 ms/MP & 6.8 ms/MP & 5.2 ms/MP & 4.6 ms/MP & 4.2
-ms/MP \\
+640×480 & 165 & 23 & 31 & \textbf{7.21x} & \textbf{5.31x} \\
+1280×720 & 97 & 15 & 19 & \textbf{6.57x} & \textbf{5.14x} \\
+1920×1080 & 51 & 6 & 7 & \textbf{8.18x} & \textbf{6.95x} \\
+2560×1440 & 31 & 5 & 6 & \textbf{6.10x} & \textbf{5.02x} \\
+3840×2160 & 15 & 2 & 3 & \textbf{7.00x} & \textbf{5.92x} \\
 \end{longtable}
 }
 
-\begin{itemize}
-\tightlist
-\item
-  \textbf{绝对值线性增长}：像素翻倍 \textasciitilde{}
-  延迟翻倍，硬件编码路径没有非线性瓶颈
-\item
-  \textbf{每百万像素延迟递减}：从 14.3ms/MP（480p）降至
-  4.2ms/MP（4K）------高分辨率下硬件利用率更高
-\item
-  \textbf{4K 单帧仅 34.5ms}：在 30fps 场景下，编码仅占帧间隔（33.3ms）的
-  103\%，刚好够单路实时
-\end{itemize}
-
-\textbf{CPU 延迟非线性恶化}
-
-{ % do not increment counter
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.0952}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1905}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1905}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2063}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1587}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1587}}@{}}
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-指标
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-0.3M (480p)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-0.9M (720p)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-2.1M (1080p)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-3.7M (2K)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-8.3M (4K)
-\end{minipage} \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-CPU 延迟 & 20.8ms & 52.5ms & 108.3ms & 147.2ms & 265.7ms \\
-每 MP 延迟 & 69.3 ms/MP & 58.3 ms/MP & 51.6 ms/MP & 39.8 ms/MP & 32.0
-ms/MP \\
-\end{longtable}
-}
+\textbf{实时性观察}
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{CPU 每百万像素延迟也递减}（69-\textgreater32
-  ms/MP）但起点高得多
+  H.264：VENC 在 480p、720p、1080p 均超过 30fps；2K/4K 单路未达到
+  30fps，但仍明显快于 CPU。
 \item
-  \textbf{4K 单帧 265.7ms}：仅为 3.8 fps，无法实时编码
+  H.265：VENC 在 480p、720p、1080p、2K 均超过 30fps；4K 约 15fps，仍约为
+  CPU 多线程的 5.9 倍。
 \item
-  \textbf{2K 开始 CPU 丧失实时性}：147ms/帧 -\textgreater{} 6.8
-  fps，远低于 30fps 要求
-\end{itemize}
-
-加速比在 1080p 达到峰值 9.8x（480p: 4.9x, 720p: 8.6x, 1080p: 9.8x, 2K:
-8.6x, 4K: 7.7x），之后缓慢下降。原因：
-
-\begin{itemize}
-\tightlist
-\item
-  低分辨率：VENC 优势被固定开销（memcpy、回调调度）摊薄
-\item
-  1080p：CPU 已严重吃力（109ms/帧），VENC
-  仍从容（11ms/帧）-\textgreater{} 差距最大
-\item
-  2K/4K：VENC 延迟增速追近 CPU（两者都进入像素主导区）-\textgreater{}
-  加速比略降但仍 \textgreater7.7x
+  CPU 多线程比单线程快，但在所有测试点都低于 VENC。H.265
+  软件编码尤其重，CPU 多线程在 1080p 仅约 7fps。
 \end{itemize}
 
 \textbf{与 VDEC 的对比}
 
-VENC 和 VDEC 在 Ascend 310B4 上的表现截然不同：
+VENC 和 VDEC 在 Ascend 310B4 上的表现模式不同：
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -1574,22 +1544,24 @@ VDEC（解码）
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-\textless=1080p 表现 & \textbf{全面远超 CPU}（5×\textasciitilde10×） &
-严重落后 CPU（\textasciitilde59ms/帧固定开销） \\
-单帧延迟 @480p & \textbf{4.3ms} & 58.9ms \\
-4K 延迟 & \textbf{34.5ms} & 13.6ms \\
-拐点 & \textbf{无拐点}------所有分辨率都赢 & 2K 才开始领先单线程 CPU \\
-瓶颈 & 纯硬件编码（无调度开销） & Python 回调调度（75\%
-时间在非硬件） \\
-适合场景 & 全分辨率单路实时 & 仅 2K+ 或多路并发 \\
+H.264 \textless=1080p & \textbf{领先 CPU 多线程} & 落后 CPU \\
+H.265 \textless=1080p & \textbf{大幅领先 CPU 多线程} & 720p 以上领先 CPU
+多线程 \\
+4K 表现 & 仍快于 CPU，但单路低于 30fps & VDEC 约 72fps \\
+拐点 & 无 CPU 交叉拐点，所有点 VENC 更快 & H.264 解码约从 2K
+开始领先单线程 CPU \\
+瓶颈 & 编码计算量大，硬件收益明显 & 解码计算量较小，Python
+回调开销更显著 \\
+适合场景 & 实时推流、录制、转码输出 & 高分辨率/HEVC
+解码、多路或零拷贝管道 \\
 \end{longtable}
 }
 
-\textbf{根因}：VENC
-的硬件执行时间（编码部分）主导了总耗时，因为编码计算量大（DCT、量化、熵编码）。VDEC
-的解码计算量小得多，总耗时被 Python
-层调度开销（回调线程-\textgreater Queue-\textgreater 主线程）主导。编码的''重计算''反而成就了
-VENC 的优势------硬件干活，CPU 等着。
+\textbf{根因}：视频编码计算量大，H.264/H.265 软件编码很快把 ARM CPU
+打满；VENC
+把运动估计、变换、量化、熵编码等重计算交给硬件完成，因此全分辨率都领先
+CPU。VDEC 的解码计算量小得多，Python
+回调、队列和内存搬运的固定开销更容易成为瓶颈。
 
 \subsubsection{什么场景下使用 VENC}\label{src-book-chapter5-h45}
 
@@ -1605,21 +1577,19 @@ VENC 的优势------硬件干活，CPU 等着。
   \begin{itemize}
   \tightlist
   \item
-    \textless=480p: CPU 48fps 够用，VENC 235fps 过剩但免费
-    -\textgreater{} 建议 VENC（更省 CPU 给推理/分析用）
+    \textless=480p: CPU H.264 多线程可超过 30fps，但 VENC 更快且释放 CPU
+    -\textgreater{} 建议 VENC
   \item
-    720p: CPU 19fps 不够实时 -\textgreater{} 必须 VENC
+    720p/1080p: CPU 编码余量不足或不可用 -\textgreater{} 建议 VENC
   \item
-    1080p: CPU 9fps，完全不可用 -\textgreater{} 必须 VENC
+    2K: H.264 VENC 约 21fps，H.265 VENC 约 31fps；需要结合目标帧率选择
   \item
-    2K: CPU 7fps -\textgreater{} 必须 VENC
-  \item
-    4K: CPU 4fps -\textgreater{} 必须 VENC（且单路刚好 29fps
-    勉强达到实时）
+    4K: 单路约 15fps，不满足 30fps；仍明显快于
+    CPU，适合低帧率录制或离线转码
   \end{itemize}
 \item
-  \textbf{否}（离线/批处理）-\textgreater{} CPU 可考虑，但 VENC 仍快
-  5\textasciitilde10x
+  \textbf{否}（离线/批处理）-\textgreater{} CPU 可考虑，但 VENC 通常仍快
+  2×\textasciitilde7×，尤其 H.265 收益更大
 \end{itemize}
 
 \textbf{典型场景推荐}
@@ -1644,10 +1614,11 @@ VENC 的优势------硬件干活，CPU 等着。
 \textbf{WebRTC 视频通话} & \textbf{VENC} & 480p/720p 实时编码 + CPU
 留给推理 \\
 \textbf{USB 摄像头监控} & \textbf{VENC} & 1080p@30fps CPU 跑不动，VENC
-轻松 \\
+可超过实时 \\
 \textbf{多路视频流 (\textgreater2 路)} & \textbf{VENC 必须} & CPU 单路
-720p 就 19fps，多路不可行 \\
-\textbf{4K 录制} & \textbf{VENC} & CPU 4fps，VENC 29fps 刚好实时 \\
+720p H.264 多线程约 39fps，多路余量不足 \\
+\textbf{4K 录制} & \textbf{VENC} & 4K 单路约
+15fps，适合低帧率录制；30fps 需进一步优化或降低分辨率 \\
 \textbf{本地视频文件转码} & 均可 & 离线场景 CPU 也可，但 VENC 更快 \\
 \textbf{AI 推理 + 视频边车} & \textbf{VENC} & CPU 编码会抢占 NPU 推理的
 host 侧资源 \\
@@ -1667,12 +1638,15 @@ host 侧资源 \\
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-CPU libx264 & 9 & \textbf{0 路}（不到 30） & 0\% \\
-\textbf{VENC} & 91 & \textbf{3 路}（91/30） & \textasciitilde95\% \\
+CPU libx264 多线程 & 13 & \textbf{0 路}（不到 30） & 0\% \\
+\textbf{VENC H.264} & 48 & \textbf{1 路}（48/30） & 较高 \\
+\textbf{VENC H.265} & 51 & \textbf{1 路}（51/30） & 较高 \\
 \end{longtable}
 }
 
-VENC 的 91fps 吞吐意味着可以同时编码 3 路 1080p@30fps，CPU 几乎空闲。
+最新单路基准显示，1080p 下 VENC 约 48-51fps，单路 30fps
+有余量，但还不足以稳定支撑 2 路
+1080p@30fps。多路场景应结合实际码率、GOP、输入来源和端到端链路重新测量。
 
 \textbf{什么情况下 CPU 编码就够了}
 
@@ -1681,7 +1655,8 @@ VENC 的 91fps 吞吐意味着可以同时编码 3 路 1080p@30fps，CPU 几乎�
 \begin{itemize}
 \tightlist
 \item
-  分辨率 \textless= 480p（CPU 48fps 够用）
+  分辨率 \textless= 480p（CPU H.264 多线程约 87fps，CPU H.265 多线程约
+  31fps）
 \item
   不需要实时输出（无帧率硬性要求）
 \item
@@ -1690,8 +1665,9 @@ VENC 的 91fps 吞吐意味着可以同时编码 3 路 1080p@30fps，CPU 几乎�
   不想引入 CANN 依赖（如 Docker 环境未安装 CANN）
 \end{itemize}
 
-\textbf{底线}：从 720p 开始，CPU 就达不到 30fps。任何实时视频场景 ---
-尤其是在 Orange Pi 这样的嵌入式 ARM 设备上 --- VENC 都是必要条件。
+\textbf{底线}：从 720p 开始，CPU 编码余量快速下降；1080p
+及以上的实时视频场景，尤其是在 Orange Pi 这样的嵌入式 ARM
+设备上，优先使用 VENC。
 
 \subsubsection{验证方法}\label{src-book-chapter5-h46}
 
@@ -1812,9 +1788,9 @@ H.264/H.265 压缩码流解码为 NV12 原始帧。
 
 H.264/H.265 的帧类型（I/P/B）、GOP、NAL 单元、Annex-B
 格式等编解码理论知识，详见 \hyperref[h264-h265-basics]{H.264/H.265
-基础}。本文的 VDEC API 示例默认使用 \textbf{H.264
-Baseline}，基准脚本同时覆盖 \textbf{H.264 Baseline} 与 \textbf{H.265
-Main}。
+基础}。本文的 VDEC API 示例和基准脚本都覆盖 \textbf{H.264 Baseline} 与
+\textbf{H.265 Main}，便于直接对照两种 codec 的
+\passthrough{\lstinline!entype!} 和码流差异。
 
 VDEC 对输入码流只有一个硬性要求：必须是 \textbf{Annex-B 格式}（带
 \passthrough{\lstinline!0x00000001!} 起始码的 NAL 单元序列）。H.264
@@ -2018,7 +1994,8 @@ VDEC
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-数据方向 & NV12 -\textgreater{} H.264 & H.264 -\textgreater{} NV12 \\
+数据方向 & NV12 -\textgreater{} H.264/H.265 & H.264/H.265
+-\textgreater{} NV12 \\
 \passthrough{\lstinline!channel\_id!} & 驱动自动分配 &
 \textbf{必须显式设置} \\
 \passthrough{\lstinline!out\_mode!} & 无 &
@@ -2029,8 +2006,8 @@ VDEC
 \passthrough{\lstinline!(stream\_desc, pic\_desc)!} \\
 回调中销毁对象 & 输入（pic\_desc） &
 输入（stream\_desc）\textbf{和}输出（pic\_desc） \\
-输入有效性要求 & 任意 NV12 均可 & 必须是\textbf{合法的完整 H.264 NAL
-单元} \\
+输入有效性要求 & 任意合法 NV12 均可 & 必须是\textbf{合法的完整
+H.264/H.265 NAL 单元} \\
 输出 ret\_code & 无 & 有，\textbf{必须检查}，非 0 表示解码失败 \\
 \passthrough{\lstinline!send\_skipped\_frame!} & 无 &
 \textbf{有}，用于丢帧后通知解码器 \\
@@ -2105,27 +2082,32 @@ ret\_code & 含义 \\
 
 \subsubsection{(1) 生成测试码流}\label{src-book-chapter5-h62}
 
-VDEC 需要合法的 H.264 输入，不能使用随机字节。示例使用 libx264
-软件编码一帧作为测试素材：
+VDEC 需要合法的 H.264/H.265 输入，不能使用随机字节。最小样例先用 NumPy
+生成同一帧 I420/YUV420P 测试图，再分别交给
+\passthrough{\lstinline!libx264!} 和 \passthrough{\lstinline!libx265!}
+生成 H.264 Baseline 与 H.265 Main 码流：
 
 \begin{lstlisting}[language=Python]
 import av, fractions, numpy as np
 
-codec = av.CodecContext.create("libx264", "w")
+ENTYPE_H265_MAIN = 0
+ENTYPE_H264_BASE = 1
+
+CODECS = [
+    ("H.264 Baseline", "libx264", "31", ENTYPE_H264_BASE),
+    ("H.265 Main", "libx265", "31", ENTYPE_H265_MAIN),
+]
+
+codec = av.CodecContext.create(ffmpeg_codec, "w")
 codec.width, codec.height = 640, 480
 codec.pix_fmt = "yuv420p"
-# ... 设置 bit_rate, framerate, time_base ...
+# ... 设置 bit_rate, framerate, time_base, options ...
+if ffmpeg_codec == "libx264":
+    codec.profile = "Baseline"
 
-bgr = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
-rgb_frame = av.VideoFrame.from_ndarray(bgr[..., ::-1], format="rgb24")
-
-h264_data = bytearray()
-for pkt in codec.encode(rgb_frame):   # 编码一帧
-    h264_data += bytes(pkt)
-for pkt in codec.encode(None):        # 排空缓冲区
-    h264_data += bytes(pkt)
-
-h264_arr = np.frombuffer(bytes(h264_data), dtype=np.uint8)
+frame = av.VideoFrame.from_ndarray(make_test_i420(640, 480), format="yuv420p")
+stream = b"".join(bytes(pkt) for pkt in codec.encode(frame))
+stream += b"".join(bytes(pkt) for pkt in codec.encode(None))
 \end{lstlisting}
 
 \subsubsection{(2) 回调线程}\label{src-book-chapter5-h63}
@@ -2140,7 +2122,7 @@ desc = media.vdec_create_channel_desc()
 media.vdec_set_channel_desc_channel_id(desc, 0)   # ← VDEC 必须设置！
 media.vdec_set_channel_desc_thread_id(desc, tid)
 media.vdec_set_channel_desc_callback(desc, vdec_callback)
-media.vdec_set_channel_desc_entype(desc, ENTYPE_H264_BASE)
+media.vdec_set_channel_desc_entype(desc, entype)   # H.264=1, H.265=0
 media.vdec_set_channel_desc_out_pic_format(desc, PIX_FMT_NV12)
 media.vdec_set_channel_desc_out_pic_width(desc, W)
 media.vdec_set_channel_desc_out_pic_height(desc, H)
@@ -2151,14 +2133,15 @@ ret = media.vdec_create_channel(desc)
 \subsubsection{(4) 发送一帧解码}\label{src-book-chapter5-h65}
 
 \begin{lstlisting}[language=Python]
-# 输入：H.264 码流
-in_buf, _ = media.dvpp_malloc(len(h264_arr))
-acl.rt.memcpy(in_buf, len(h264_arr), h264_arr.ctypes.data,
-              len(h264_arr), ACL_MEMCPY_HOST_TO_DEVICE)
+# 输入：H.264/H.265 码流
+arr = np.frombuffer(stream, dtype=np.uint8)
+in_buf, _ = media.dvpp_malloc(len(arr))
+acl.rt.memcpy(in_buf, len(arr), arr.ctypes.data,
+              len(arr), ACL_MEMCPY_HOST_TO_DEVICE)
 
 stream_desc = media.dvpp_create_stream_desc()
 media.dvpp_set_stream_desc_data(stream_desc, in_buf)
-media.dvpp_set_stream_desc_size(stream_desc, len(h264_arr))
+media.dvpp_set_stream_desc_size(stream_desc, len(arr))
 
 # 输出：NV12 图片
 out_size = W * H * 3 // 2
@@ -2653,65 +2636,59 @@ flush；如果复用路径不稳定，再退回每帧独立通道作为兜底方
 脚本生成 H.265 测试码流时使用
 \passthrough{\lstinline!libx265!}，并过滤编码器可能返回的空 packet，避免
 CPU HEVC 解码路径把空 packet 当作 EOF。
+当前脚本输出已简化为帧率表：不再打印加速比、单帧耗时、优胜结论和码流大小。
 
 \textbf{H.264 Baseline}
 
 \begin{lstlisting}
-分辨率                  VDEC帧率     CPU多线程     CPU单线程      多线程比      单线程比     VDEC耗时       多线程耗时       单线程耗时      优胜
----
-640x480             16.9     1492.4      610.5   0.01x  0.03x    59.2ms    0.7ms    1.6ms     CPU  [I25KB P7KB]
-1280x720             16.8      693.3      269.7   0.02x  0.06x    59.3ms    1.4ms    3.7ms     CPU  [I39KB P10KB]
-1920x1080            16.5      305.1      119.2   0.05x  0.14x    60.7ms    3.3ms    8.4ms     CPU  [I92KB P21KB]
-2560x1440           132.2      187.2       74.8   0.71x  1.77x     7.6ms    5.3ms   13.4ms    VDEC  [I159KB P37KB]
-3840x2160            71.1       85.8       33.5   0.83x  2.12x    14.1ms   11.7ms   29.8ms    VDEC  [I292KB P92KB]
+分辨率          VDEC帧率     CPU多线程     CPU单线程
+────────────────────────────────────────────────────
+640x480             16.9        1485.9         612.0
+1280x720            16.8         684.6         272.2
+1920x1080           16.5         305.5         119.8
+2560x1440          133.6         189.1          75.9
+3840x2160           71.2          88.5          35.1
 \end{lstlisting}
 
 \textbf{H.265 Main}
 
 \begin{lstlisting}
-分辨率                  VDEC帧率     CPU多线程     CPU单线程      多线程比      单线程比     VDEC耗时       多线程耗时       单线程耗时      优胜
----
-640x480            278.8      328.8      186.7   0.85x  1.49x     3.6ms    3.0ms    5.4ms    VDEC  [I10KB P8KB]
-1280x720            250.0      180.0       96.8   1.39x  2.58x     4.0ms    5.6ms   10.3ms    VDEC  [I8KB P10KB]
-1920x1080           192.8       82.6       42.4   2.33x  4.55x     5.2ms   12.1ms   23.6ms    VDEC  [I16KB P21KB]
-2560x1440           131.1       47.0       23.2   2.79x  5.66x     7.6ms   21.3ms   43.2ms    VDEC  [I37KB P39KB]
-3840x2160            71.2       21.6       10.1   3.30x  7.07x    14.0ms   46.3ms   99.3ms    VDEC  [I77KB P84KB]
+分辨率          VDEC帧率     CPU多线程     CPU单线程
+────────────────────────────────────────────────────
+640x480            275.4         324.9         185.6
+1280x720           250.2         182.2          97.7
+1920x1080          194.6          82.5          42.3
+2560x1440          135.3          46.6          23.4
+3840x2160           71.7          21.2           9.9
 \end{lstlisting}
 
-\subsubsection{VDEC
-单帧耗时分解（720p，参考值）}\label{src-book-chapter5-h77}
+\subsubsection{VDEC 单帧耗时（由帧率反推）}\label{src-book-chapter5-h77}
 
-H.264 路径下，VDEC 每帧总耗时约 59ms，远高于理论的
-\textasciitilde15ms。各阶段耗时如下：
+简化后的 \passthrough{\lstinline!bench\_vdec.py!}
+只打印帧率，不再打印耗时分解。若按 \passthrough{\lstinline!1000 / fps!}
+反推，H.264 低分辨率路径仍能看到明显的固定开销：
 
 { % do not increment counter
-\begin{longtable}[]{@{}llll@{}}
+\begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
-阶段 & 耗时 & 占比 & 说明 \\
+编码 & 640×480 & 1280×720 & 1920×1080 & 2560×1440 & 3840×2160 \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-dvpp\_malloc + memcpy(in) & \textasciitilde0.8ms & 1\% & H.264
-码流拷贝到设备 \\
-send -\textgreater{} callback（硬件） & \textasciitilde12.6ms & 21\% &
-纯硬件解码 \\
-callback + memcpy(out) & \textasciitilde1.2ms & 2\% & NV12
-结果拷回主机 \\
-\textbf{未知开销} & \textbf{\textasciitilde44ms} & \textbf{75\%} &
-回调调度、GIL、Python 队列等 \\
+H.264 VDEC & 59.2ms & 59.5ms & 60.6ms & 7.5ms & 14.0ms \\
+H.265 VDEC & 3.6ms & 4.0ms & 5.1ms & 7.4ms & 13.9ms \\
 \end{longtable}
 }
 
 \begin{quote}
-\textbf{关键结论}：H.264 \textless=1080p 时，VDEC 每帧
-\textasciitilde59ms 的开销中，硬件解码本身只占 \textasciitilde13ms。
-剩余 \textasciitilde44ms 是 Python 层的调度开销（回调线程
--\textgreater{} Queue -\textgreater{} 主线程），这部分与分辨率无关。
+\textbf{关键结论}：H.264 \textless=1080p 时，VDEC 路径稳定在约
+60ms/帧，说明瓶颈主要不是像素计算量。 当前 Python 基准路径每帧都经过
+DVPP 内存分配、回调线程、Queue
+等同步环节，这些固定开销在小分辨率下很难被硬件解码收益摊薄。
 
-2K 以上分辨率时，硬件解码耗时自然增长（7ms@2K -\textgreater{}
-14ms@4K），但\textbf{调度开销被摊薄}， 因此吞吐大幅提升。这解释了为什么
-VDEC 在低分辨率下表现异常差、 高分辨率下''恢复正常''。
+2K 以上分辨率时，H.264 VDEC 吞吐明显回升；H.265 路径则从 480p
+起就没有出现同样的 60ms 固定开销。
 \end{quote}
 
 \subsubsection{拐点分析}\label{src-book-chapter5-h78}
@@ -2721,66 +2698,41 @@ VDEC 在低分辨率下表现异常差、 高分辨率下''恢复正常''。
 { % do not increment counter
 \begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
-分辨率 & VDEC fps & CPU (单线程) & CPU (多线程) & vs 单线程 & 推荐 \\
+分辨率 & VDEC fps & CPU 单线程 & CPU 多线程 & vs 单线程 & vs 多线程 \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-640×480 & 17 & 611 & 1492 & 0.03x & CPU \\
-1280×720 & 17 & 270 & 693 & 0.06x & CPU \\
-1920×1080 & 17 & 119 & 305 & 0.14x & CPU \\
-2560×1440 & 132 & 75 & 187 & \textbf{1.77x} & \textbf{VDEC} \\
-3840×2160 & 71 & 34 & 86 & \textbf{2.12x} & \textbf{VDEC} \\
+640×480 & 17 & 612 & 1486 & 0.03x & 0.01x \\
+1280×720 & 17 & 272 & 685 & 0.06x & 0.02x \\
+1920×1080 & 17 & 120 & 306 & 0.14x & 0.05x \\
+2560×1440 & 134 & 76 & 189 & \textbf{1.76x} & 0.71x \\
+3840×2160 & 71 & 35 & 89 & \textbf{2.03x} & 0.80x \\
 \end{longtable}
 }
 
 \textbf{H.265 Main}
 
 { % do not increment counter
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1143}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1429}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1857}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1857}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1429}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1429}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.0857}}@{}}
+\begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-分辨率
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-VDEC fps
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-CPU (单线程)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-CPU (多线程)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-vs 单线程
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-vs 多线程
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-推荐
-\end{minipage} \\
+分辨率 & VDEC fps & CPU 单线程 & CPU 多线程 & vs 单线程 & vs 多线程 \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-640×480 & 279 & 187 & 329 & \textbf{1.49x} & 0.85x & VDEC/CPU 均可 \\
-1280×720 & 250 & 97 & 180 & \textbf{2.58x} & \textbf{1.39x} &
-\textbf{VDEC} \\
-1920×1080 & 193 & 42 & 83 & \textbf{4.55x} & \textbf{2.33x} &
-\textbf{VDEC} \\
-2560×1440 & 131 & 23 & 47 & \textbf{5.66x} & \textbf{2.79x} &
-\textbf{VDEC} \\
-3840×2160 & 71 & 10 & 22 & \textbf{7.07x} & \textbf{3.30x} &
-\textbf{VDEC} \\
+640×480 & 275 & 186 & 325 & \textbf{1.48x} & 0.85x \\
+1280×720 & 250 & 98 & 182 & \textbf{2.56x} & \textbf{1.37x} \\
+1920×1080 & 195 & 42 & 83 & \textbf{4.60x} & \textbf{2.36x} \\
+2560×1440 & 135 & 23 & 47 & \textbf{5.78x} & \textbf{2.90x} \\
+3840×2160 & 72 & 10 & 21 & \textbf{7.24x} & \textbf{3.38x} \\
 \end{longtable}
 }
 
 H.264 路径下，VDEC 在 \textless=1080p 完全不具备竞争力（仅为 CPU
-单线程的 3\%\textasciitilde14\%）。真正的性能交叉点在
-\textbf{2K（2560×1440）}------2K 时 VDEC 比单线程 CPU 快 77\%，4K 时快
-112\%。
+单线程的 3\%\textasciitilde14\%）。 真正的单线程交叉点在
+\textbf{2K（2560×1440）}：2K 时 VDEC 比单线程 CPU 快 76\%，4K 时快
+103\%。 但在这个单路测试中，CPU 多线程在 H.264 全部分辨率上仍快于 VDEC。
 
 H.265 路径不同：VDEC 在 480p 已经领先单线程 CPU，在 720p
 以上同时领先单线程和多线程 CPU。HEVC 软件解码在 ARM CPU 上明显更重，因此
@@ -2796,38 +2748,49 @@ VDEC 的收益比 H.264 更早出现。
   这说明瓶颈不在硬件解码，而在 Python
   回调-\textgreater 队列-\textgreater 主线程的调度路径。
 \item
-  \textbf{H.264 高分辨率是 VDEC 的优势区间}------2K
-  以上分辨率，硬件解码耗时自然增加， 固定调度开销被摊薄，VDEC
-  开始领先单线程 CPU。4K 时领先 2.17×。
+  \textbf{H.264 高分辨率开始领先单线程 CPU}------2K
+  以上分辨率，固定调度开销被摊薄， VDEC 开始领先单线程 CPU。2K 时领先
+  1.76×，4K 时领先 2.03×；但单路场景下仍慢于 CPU 多线程。
 \item
   \textbf{H.265 是 VDEC 的优势路径}------720p 以上 H.265 VDEC
-  同时领先单线程和多线程 CPU，4K 时对多线程 CPU 也有 3.30× 加速。
+  同时领先单线程和多线程 CPU，4K 时对多线程 CPU 也有 3.38× 加速。
 \item
   \textbf{I/P 混合流比全 I 帧流更不利于 H.264 VDEC}------详见上文
   \hyperref[iframe-performance]{I 帧数量与解码性能} 的对比分析。全 I
   帧测试曾误导结论，GOP=30 才是真实场景。
 \item
-  \textbf{零拷贝管道可消除调度开销}------当前实现每次解码都经过
-  \passthrough{\lstinline!memcpy!} + Python Queue。 如果 VDEC
-  输出直接喂给 VENC（设备内存零拷贝），可消除 \textasciitilde46ms
-  的调度+malloc+memcpy 开销。
+  \textbf{零拷贝管道可减少主机侧开销}------当前基准实现每次解码都经过设备内存分配、D2H
+  \passthrough{\lstinline!memcpy!} 和 Python Queue。 如果 VDEC
+  输出直接喂给 VENC（设备内存零拷贝），可以避免把 NV12
+  帧拷回主机再送回设备。
 \end{enumerate}
 
 \subsubsection{适用场景速查}\label{src-book-chapter5-h80}
 
 { % do not increment counter
-\begin{longtable}[]{@{}llll@{}}
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1860}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2093}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3953}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2093}}@{}}
 \toprule\noalign{}
-分辨率 & 单路实时 & 多路并发（\textgreater=4 路） & 转码管道 \\
+\begin{minipage}[b]{\linewidth}\raggedright
+分辨率
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+单路实时
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+多路并发（\textgreater=4 路）
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+转码管道
+\end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
 H.264 \textless= 1080p & CPU 推荐 & CPU 可选 & CPU 推荐 \\
-H.264 2K & CPU 可选 & \textbf{VDEC 推荐} & VDEC 可选 \\
-H.264 4K & \textbf{VDEC 推荐} & \textbf{VDEC 推荐} & \textbf{VDEC
-推荐} \\
-H.265 480p & VDEC/CPU 均可 & CPU 可选 & VDEC 可选 \\
+H.264 2K/4K & CPU 多线程优先，CPU 资源紧张时可选 VDEC & VDEC 可选 & VDEC
+可选 \\
+H.265 480p & CPU 多线程优先，VDEC 可选 & CPU 可选 & VDEC 可选 \\
 H.265 \textgreater= 720p & \textbf{VDEC 推荐} & \textbf{VDEC 推荐} &
 \textbf{VDEC 推荐} \\
 \end{longtable}
@@ -3300,8 +3263,10 @@ CPU 在低分辨率下互有胜负（720p VPC 赢，1080p CPU 赢），这是 St
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-\textbf{VENC} & 远超 CPU（5×\textasciitilde10×） & 远超
-CPU（8×\textasciitilde10×） & 纯硬件编码计算 \\
+\textbf{VENC} & 领先 CPU 多线程（H.264 约 1.9×\textasciitilde3.6×，H.265
+约 5.3×\textasciitilde7.0×） & 领先 CPU 多线程（H.264 约
+1.9×\textasciitilde2.2×，H.265 约 5.0×\textasciitilde5.9×） &
+纯硬件编码计算 \\
 \textbf{VDEC} & 落后 CPU（\textasciitilde59ms 固定开销） & 领先
 CPU（1.9×\textasciitilde2.2×） & Python 回调调度 \\
 \textbf{VPC} & 与 CPU 互有胜负（0.5×\textasciitilde1.2×） & 领先

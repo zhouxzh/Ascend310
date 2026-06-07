@@ -272,3 +272,10 @@ data/
 weights/
 models/
 logs/
+
+# case8 keeps source helpers and README files inside artifact directories.
+!samples/case8/models/
+!samples/case8/models/README.md
+!samples/case8/weights/
+!samples/case8/weights/README.md
+!samples/case8/weights/export_yolo_to_onnx.py

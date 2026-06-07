@@ -1,0 +1,38 @@
+digraph Case8ModelConversion {
+  graph [
+    rankdir=LR,
+    bgcolor="white",
+    pad="0.18",
+    nodesep="0.35",
+    ranksep="0.45",
+    fontname="Noto Sans CJK SC",
+    labelloc="t",
+    label="case8 model conversion flow"
+  ];
+  node [
+    shape=box,
+    style="rounded,filled",
+    color="#40513b",
+    fillcolor="#f8faf4",
+    fontname="Noto Sans CJK SC",
+    fontsize=12,
+    margin="0.10,0.07"
+  ];
+  edge [
+    color="#40513b",
+    fontname="Noto Sans CJK SC",
+    fontsize=11,
+    arrowsize=0.7
+  ];
+
+  weights [label="YOLOv10 .pt\nweights/"];
+  export [label="export_yolo_to_onnx.py\nstatic 640"];
+  onnx [label="ONNX\nlabels\nmetadata"];
+  validate [label="ONNX Runtime\nCPU check"];
+  atc [label="ATC\nAscend310B4"];
+  om [label="OM\nNPU runtime"];
+
+  weights -> export -> onnx;
+  onnx -> validate [label="optional"];
+  onnx -> atc -> om;
+}

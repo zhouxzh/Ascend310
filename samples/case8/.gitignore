@@ -1,0 +1,12 @@
+# Model artifacts are generated or downloaded outside the source tree.
+/models/*
+/weights/*
+
+!/models/README.md
+!/weights/README.md
+!/weights/export_yolo_to_onnx.py
+
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+/logs/

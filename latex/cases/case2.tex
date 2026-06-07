@@ -86,7 +86,26 @@
 如果只运行 \passthrough{\lstinline!cpu!} 模式，可以没有昇腾
 NPU；如果运行 \passthrough{\lstinline!npu!} 模式，则还需要本机正确安装
 Ascend ACL Python 运行时，并准备对应的 \passthrough{\lstinline!.om!}
-模型文件。
+模型文件。当前模型下载脚本默认使用
+\passthrough{\lstinline!zhouxzh/SSDLite320!}，该仓库发布的是
+\passthrough{\lstinline!.onnx!} 模型；在 Ascend 310B 上运行 NPU
+模式前，需要使用
+\passthrough{\lstinline!scripts/convert\_onnx\_to\_om.py!} 将 ONNX 转成
+OM。
+
+常用准备流程如下：
+
+\begin{lstlisting}[language=bash]
+python scripts/download_models.py --onnx
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+python scripts/convert_onnx_to_om.py --soc-version Ascend310B4
+\end{lstlisting}
+
+转换脚本默认读取 \passthrough{\lstinline!models/*.onnx!}，并把同名
+\passthrough{\lstinline!.om!} 文件写回
+\passthrough{\lstinline!models/!}。如果板端 SoC 版本不是
+\passthrough{\lstinline!Ascend310B4!}，需要按实际环境修改
+\passthrough{\lstinline!--soc-version!}。
 
 \section{本案例支持的骨干网络}\label{src-experiment-case2-h3}
 
@@ -96,7 +115,7 @@ Ascend ACL Python 运行时，并准备对应的 \passthrough{\lstinline!.om!}
 \tightlist
 \item
   MobileNet
-  系列：\passthrough{\lstinline!mobilenetv1!}、\passthrough{\lstinline!mobilenetv2!}、\passthrough{\lstinline!mobilenetv3!}、\passthrough{\lstinline!mobilenetv4!}
+  系列：\passthrough{\lstinline!mobilenetv1!}、\passthrough{\lstinline!mobilenetv2!}、\passthrough{\lstinline!mobilenetv3!}、\passthrough{\lstinline!mobilenetv3\_large\_100!}、\passthrough{\lstinline!mobilenetv4!}
 \item
   ResNet
   系列：\passthrough{\lstinline!resnet18!}、\passthrough{\lstinline!resnet34!}、\passthrough{\lstinline!resnet50!}、\passthrough{\lstinline!resnet101!}、\passthrough{\lstinline!resnet151!}
@@ -352,7 +371,7 @@ MobileNet v4
 
 从本仓库的模型组织可以看出，模型目录中既包含
 \passthrough{\lstinline!mobilenetv4!}，也包含
-\passthrough{\lstinline!mobilenetv4\_conv\_large.onnx!}
+\passthrough{\lstinline!mobilenetv4\_conv\_large.onnx!}、\passthrough{\lstinline!mobilenetv4\_hybrid\_medium.onnx!}
 这样的变体文件。这表明 v4
 系列本身已经具备不同配置路径，用于在更强表达能力与更低计算开销之间进行权衡。
 
@@ -572,9 +591,9 @@ DeepSORT，但保留了其最核心、最适合入门阶段把握的基本思路
 \begin{itemize}
 \tightlist
 \item
-  demo/detection\_app.py：只做实时检测。
+  scripts/detection\_app.py：只做实时检测。
 \item
-  demo/tracking\_app.py：先做检测，再做跟踪。
+  scripts/tracking\_app.py：先做检测，再做跟踪。
 \end{itemize}
 
 \subsection{检测层}\label{src-experiment-case2-h22}
@@ -631,7 +650,7 @@ DeepSORT，但保留了其最核心、最适合入门阶段把握的基本思路
 \subsection{detection\_app.py
 如何组织检测主流程}\label{src-experiment-case2-h25}
 
-在 demo/detection\_app.py 中，主程序首先解析参数，然后根据 device
+在 scripts/detection\_app.py 中，主程序首先解析参数，然后根据 device
 选择后端，再进入逐帧推理循环。这一设计体现了很清晰的工程结构：入口脚本只负责流程编排，把模型相关细节下沉到
 ssdlite 模块。
 
@@ -1102,7 +1121,7 @@ DetectionBackend，这意味着它们对外暴露的是同一套接口。这种�
 如果说 detection\_app.py 用于建立检测流程，那么 tracking\_app.py
 的作用就在于将``检测结果如何转化为轨迹''这一过程完整串联起来。
 
-在 demo/tracking\_app.py 中，检测模块与跟踪模块之间的桥接代码如下：
+在 scripts/tracking\_app.py 中，检测模块与跟踪模块之间的桥接代码如下：
 
 \begin{lstlisting}[language=Python]
 detections, profile_ms = backend.infer_with_profile(...)
@@ -1797,9 +1816,9 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
 推荐命令：
 
 \begin{lstlisting}[language=bash]
-python demo/detection_app.py --device npu --source 0
-python demo/detection_app.py --device npu --source 0 --backbone mobilenetv2
-python demo/detection_app.py --device npu --source 0 --backbone resnet18
+python scripts/detection_app.py --device npu --source 0
+python scripts/detection_app.py --device npu --source 0 --backbone mobilenetv2_100
+python scripts/detection_app.py --device npu --source 0 --backbone resnet18
 \end{lstlisting}
 
 实验提示：
@@ -1841,9 +1860,9 @@ python demo/detection_app.py --device npu --source 0 --backbone resnet18
 推荐命令：
 
 \begin{lstlisting}[language=bash]
-python demo/detection_app.py --device npu --source 0
-python demo/detection_app.py --device npu --source 0 --camera-mjpeg
-python demo/detection_app.py --device npu --source 0 --camera-profile 1280x720@60
+python scripts/detection_app.py --device npu --source 0
+python scripts/detection_app.py --device npu --source 0 --camera-mjpeg
+python scripts/detection_app.py --device npu --source 0 --camera-profile 1280x720@60
 \end{lstlisting}
 
 实验提示：
@@ -1884,9 +1903,9 @@ python demo/detection_app.py --device npu --source 0 --camera-profile 1280x720@6
 推荐命令：
 
 \begin{lstlisting}[language=bash]
-python demo/tracking_app.py --device npu --source 0
-python demo/tracking_app.py --device npu --source 0 --track-classes person
-python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
+python scripts/tracking_app.py --device npu --source 0
+python scripts/tracking_app.py --device npu --source 0 --track-classes person
+python scripts/tracking_app.py --device npu --source 0 --track-classes person,bus
 \end{lstlisting}
 
 实验提示：
@@ -1920,9 +1939,9 @@ python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
 推荐命令：
 
 \begin{lstlisting}[language=bash]
-python demo/tracking_app.py --device npu --source 0
-python demo/tracking_app.py --device npu --source 0 --track-classes person
-python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
+python scripts/tracking_app.py --device npu --source 0
+python scripts/tracking_app.py --device npu --source 0 --track-classes person
+python scripts/tracking_app.py --device npu --source 0 --track-classes person,bus
 \end{lstlisting}
 
 实验提示：
@@ -1956,9 +1975,9 @@ python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
 推荐命令：
 
 \begin{lstlisting}[language=bash]
-python demo/tracking_app.py --device npu --source 0 --track-max-age 120
-python demo/tracking_app.py --device npu --source 0 --track-min-hits 3
-python demo/tracking_app.py --device npu --source 0 --track-iou-threshold 0.4
+python scripts/tracking_app.py --device npu --source 0 --track-max-age 120
+python scripts/tracking_app.py --device npu --source 0 --track-min-hits 3
+python scripts/tracking_app.py --device npu --source 0 --track-iou-threshold 0.4
 \end{lstlisting}
 
 实验中应重点解释参数变化背后的原因，而不是只记录结果。
@@ -1997,9 +2016,9 @@ python demo/tracking_app.py --device npu --source 0 --track-iou-threshold 0.4
 推荐命令：
 
 \begin{lstlisting}[language=bash]
-python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0
-python demo/tracking_app.py --device npu --source 0 --track-size-smoothing 0.85 --track-score-smoothing 0.8
-python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 1.4 --track-size-smoothing 0.6
+python scripts/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0
+python scripts/tracking_app.py --device npu --source 0 --track-size-smoothing 0.85 --track-score-smoothing 0.8
+python scripts/tracking_app.py --device npu --source 0 --track-center-distance-threshold 1.4 --track-size-smoothing 0.6
 \end{lstlisting}
 
 观察重点：
@@ -2094,8 +2113,8 @@ prior，然后分别做阈值筛选和 NMS。这样做虽然容易理解，但�
 在当前工程版本中，tracking\_app.py 增加了按类别跟踪的命令行参数：
 
 \begin{lstlisting}[language=bash]
-python demo/tracking_app.py --track-classes person
-python demo/tracking_app.py --track-classes person,bus
+python scripts/tracking_app.py --track-classes person
+python scripts/tracking_app.py --track-classes person,bus
 \end{lstlisting}
 
 这里并不是``先把所有检测框都解出来，再在跟踪前简单过滤''，而是把允许的类别一直传递到
@@ -2457,19 +2476,19 @@ class\_id''更稳定，尤其适合检测框偶尔分类波动的场景。
 例如，只跟踪行人时，可以使用：
 
 \begin{lstlisting}[language=bash]
-python demo/tracking_app.py --device npu --source 0 --track-classes person
+python scripts/tracking_app.py --device npu --source 0 --track-classes person
 \end{lstlisting}
 
 如果需要同时跟踪行人和公交车，可以使用：
 
 \begin{lstlisting}[language=bash]
-python demo/tracking_app.py --device npu --source 0 --track-classes person,bus
+python scripts/tracking_app.py --device npu --source 0 --track-classes person,bus
 \end{lstlisting}
 
 如果希望在快速运动场景中增强补充关联，可以适当提高中心距离阈值，例如：
 
 \begin{lstlisting}[language=bash]
-python demo/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0
+python scripts/tracking_app.py --device npu --source 0 --track-center-distance-threshold 2.0
 \end{lstlisting}
 
 \subsection{如何理解``教材版''和``工程版''的关系}\label{src-experiment-case2-h91}

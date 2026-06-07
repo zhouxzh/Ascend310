@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HaGRID YOLO WebRTC</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>HaGRID YOLO WebRTC</h1>
+        <p>Ascend 310B · OM · H.264</p>
+      </div>
+      <dl class="top-status">
+        <div>
+          <dt>HTTP</dt>
+          <dd id="serverStatus">检查中</dd>
+        </div>
+        <div>
+          <dt>Peer</dt>
+          <dd id="peerStatus">未建立</dd>
+        </div>
+        <div>
+          <dt>FPS</dt>
+          <dd id="fpsStatus">-</dd>
+        </div>
+        <div>
+          <dt>Bitrate</dt>
+          <dd id="bitrateStatus">-</dd>
+        </div>
+        <div>
+          <dt>NPU</dt>
+          <dd id="npuStatus">-</dd>
+        </div>
+      </dl>
+    </header>
+
+    <section class="workspace">
+      <aside class="controls">
+        <label class="field">
+          <span>OM 模型</span>
+          <select id="model"></select>
+        </label>
+
+        <div class="two-col">
+          <label class="field">
+            <span>模型输入</span>
+            <input id="modelInput" type="text" value="-" readonly>
+          </label>
+          <label class="field">
+            <span>摄像头</span>
+            <input id="source" type="text" value="/dev/video0">
+          </label>
+        </div>
+
+        <div class="two-col">
+          <label class="field">
+            <span>采集分辨率</span>
+            <select id="resolution">
+              <option value="640x480">640 x 480</option>
+              <option value="1280x720" selected>1280 x 720</option>
+              <option value="1920x1080">1920 x 1080</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>采集帧率</span>
+            <select id="fps">
+              <option value="15">15 fps</option>
+              <option value="24">24 fps</option>
+              <option value="30" selected>30 fps</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="two-col">
+          <label class="field">
+            <span>H.264 码率</span>
+            <select id="bitrateKbps">
+              <option value="">自动估算</option>
+              <option value="1000">1000 kbps</option>
+              <option value="2000">2000 kbps</option>
+              <option value="3000">3000 kbps</option>
+              <option value="4000" selected>4000 kbps</option>
+              <option value="6000">6000 kbps</option>
+              <option value="8000">8000 kbps</option>
+              <option value="10000">10000 kbps</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>采集后端</span>
+            <select id="cameraBackend">
+              <option value="opencv" selected>OpenCV</option>
+              <option value="dvpp">DVPP JPEGD</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="two-col">
+          <label class="field">
+            <span>摄像头 FourCC</span>
+            <select id="cameraFourcc">
+              <option value="MJPG" selected>MJPG</option>
+              <option value="YUYV">YUYV</option>
+              <option value="DEFAULT">默认</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>编码器</span>
+            <input id="encoderStatus" type="text" value="-" readonly>
+          </label>
+        </div>
+
+        <div class="three-col">
+          <label class="field">
+            <span>Conf</span>
+            <input id="conf" type="number" min="0.01" max="0.99" step="0.01" value="0.25">
+          </label>
+          <label class="field">
+            <span>IoU</span>
+            <input id="iou" type="number" min="0.01" max="0.99" step="0.01" value="0.45">
+          </label>
+          <label class="field">
+            <span>推理间隔</span>
+            <input id="inferEvery" type="number" min="1" step="1" value="1">
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="start" type="button">开始</button>
+          <button id="stop" type="button" class="secondary">停止</button>
+        </div>
+
+        <dl class="runtime">
+          <div>
+            <dt>Codec</dt>
+            <dd id="codecStatus">H.264</dd>
+          </div>
+          <div>
+            <dt>运行状态</dt>
+            <dd id="runtimeStatus">检查中</dd>
+          </div>
+          <div>
+            <dt>采集/编码</dt>
+            <dd id="pipelineStatus">-</dd>
+          </div>
+          <div>
+            <dt>推理状态</dt>
+            <dd id="inferStatus">-</dd>
+          </div>
+          <div>
+            <dt>检测数量</dt>
+            <dd id="detectionStatus">-</dd>
+          </div>
+          <div>
+            <dt>服务端 FPS</dt>
+            <dd id="trackFpsStatus">-</dd>
+          </div>
+          <div>
+            <dt>画面尺寸</dt>
+            <dd id="videoDimensions">-</dd>
+          </div>
+        </dl>
+      </aside>
+
+      <section class="viewer">
+        <div class="video-stage">
+          <video id="remoteVideo" autoplay playsinline muted></video>
+          <div id="fpsOverlay" class="fps-overlay">- fps</div>
+        </div>
+        <div class="log-header">
+          <h2>日志</h2>
+          <button id="clearLog" type="button" class="secondary compact">清空</button>
+        </div>
+        <pre id="logOutput" class="log-output"></pre>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="/client.js"></script>
+</body>
+</html>

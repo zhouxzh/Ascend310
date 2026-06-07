@@ -1,0 +1,286 @@
+:root {
+  color-scheme: light;
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --panel-muted: #eef2f5;
+  --edge: #cfd8df;
+  --text: #17202a;
+  --muted: #627080;
+  --accent: #0f766e;
+  --accent-dark: #0b5f59;
+  --danger: #b42318;
+  --video: #101820;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  width: min(calc(100% - 28px), 1500px);
+  margin: 0 auto;
+  padding: 18px 0 24px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.topbar p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.top-status,
+.runtime {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.top-status {
+  grid-template-columns: repeat(5, minmax(92px, 1fr));
+  min-width: min(760px, 100%);
+}
+
+.top-status div,
+.runtime div {
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 8px 10px;
+}
+
+dt {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+dd {
+  margin: 4px 0 0;
+  font-weight: 650;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.controls,
+.viewer {
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.controls {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.field span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+select,
+input,
+button {
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid #b9c6cf;
+  padding: 9px 10px;
+  font: inherit;
+}
+
+select,
+input {
+  background: #fff;
+  color: var(--text);
+}
+
+input[readonly] {
+  background: var(--panel-muted);
+}
+
+button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--accent-dark);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+button.secondary {
+  border-color: #b9c6cf;
+  background: #f8fafb;
+  color: var(--text);
+}
+
+button.secondary:hover {
+  background: #edf2f5;
+}
+
+button.compact {
+  width: auto;
+  padding: 7px 10px;
+}
+
+.two-col,
+.three-col {
+  display: grid;
+  gap: 10px;
+}
+
+.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.three-col {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.runtime {
+  grid-template-columns: 1fr;
+}
+
+.viewer {
+  padding: 12px;
+}
+
+.video-stage {
+  position: relative;
+  width: 100%;
+  min-height: 320px;
+  border: 1px solid #243241;
+  border-radius: 8px;
+  background: var(--video);
+  overflow: hidden;
+}
+
+video {
+  display: block;
+  width: 100%;
+  min-height: 320px;
+  max-height: calc(100vh - 250px);
+  object-fit: contain;
+  background: var(--video);
+}
+
+.fps-overlay {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  min-width: 74px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: rgba(16, 24, 32, 0.82);
+  color: #32d583;
+  border: 1px solid rgba(50, 213, 131, 0.48);
+  font-family: "Consolas", "Courier New", monospace;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
+
+.log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 8px;
+}
+
+.log-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.log-output {
+  margin: 0;
+  min-height: 132px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid #233142;
+  background: #111827;
+  color: #dbeafe;
+  padding: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 1050px) {
+  .topbar,
+  .workspace {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .top-status {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .app {
+    width: min(100% - 16px, 1500px);
+    padding-top: 10px;
+  }
+
+  .top-status,
+  .two-col,
+  .three-col,
+  .actions {
+    grid-template-columns: 1fr;
+  }
+
+  video,
+  .video-stage {
+    min-height: 220px;
+  }
+}
