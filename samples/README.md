@@ -16,6 +16,7 @@
 | [`chapter4/`](chapter4/) | 第 4 章 PyACL 应用开发与模型推理 | 包含 ACL 环境验证、ResNet18 推理、SSD300 目标检测、MobileNet-SSDLite320 推理评估与 ONNX 到 OM 转换辅助脚本。 |
 | [`chapter5/`](chapter5/) | 第 5 章 DVPP 媒体处理 | 包含 VENC、VDEC、VPC、JPEG 硬件编解码最小样例和性能测试，并提供 WebRTC 推流综合案例。 |
 | [`chapter6/`](chapter6/) | 第 6 章 自定义算子开发 | 包含 TBE DSL 向量加法、Ascend C 向量加法、带 Tiling 的矩阵加法样例，用于理解算子工程结构和运行流程。 |
+| [`chapter7/`](chapter7/) | 第 7 章 性能分析与优化 | 包含 ResNet18 推理分段计时、ACL Buffer 复用、CPU 预处理、DVPP VPC resize、Queue Pipeline 和 msprof 采集样例。 |
 
 ## 章节目录细分
 
@@ -41,6 +42,7 @@
 | [`chapter6/add_tbe/`](chapter6/add_tbe/) | TBE DSL 向量加法算子样例。 |
 | [`chapter6/add_ascendc/`](chapter6/add_ascendc/) | Ascend C 向量加法算子样例。 |
 | [`chapter6/mat_add_tiling/`](chapter6/mat_add_tiling/) | 带 Tiling 的矩阵加法 Ascend C 算子样例。 |
+| [`chapter7/`](chapter7/) | 性能优化案例教学样例，覆盖本地 CPU/模拟测试和 Ascend 310B 硬件 Profiling。 |
 
 ## 实践案例配套代码
 
@@ -68,4 +70,3 @@
 | `requirements.txt`、`setup.sh` | Python 依赖和环境安装脚本。 |
 | `models/`、`weights/` | 模型文件目录，通常存放 `.pth`、`.onnx`、`.om` 等文件。 |
 | `data/`、`outputs/`、`reports/` | 测试数据、运行输出、评估报告或可视化结果。 |
-
