@@ -17,6 +17,7 @@
 | [`chapter5/`](chapter5/) | 第 5 章 DVPP 媒体处理 | 包含 VENC、VDEC、VPC、JPEG 硬件编解码最小样例和性能测试，并提供 WebRTC 推流综合案例。 |
 | [`chapter6/`](chapter6/) | 第 6 章 自定义算子开发 | 包含 TBE DSL 向量加法、Ascend C 向量加法、带 Tiling 的矩阵加法样例，用于理解算子工程结构和运行流程。 |
 | [`chapter7/`](chapter7/) | 第 7 章 性能分析与优化 | 包含 ResNet18 推理分段计时、ACL Buffer 复用、CPU 预处理、DVPP VPC resize、Queue Pipeline 和 msprof 采集样例。 |
+| [`chapter8/`](chapter8/) | 第 8 章 模型量化与精度性能权衡 | 包含 ResNet18-TinyImageNet 校准清单生成、FP16/INT8 转换入口、输出对齐和多模型性能对比样例。 |
 
 ## 章节目录细分
 
@@ -43,6 +44,7 @@
 | [`chapter6/add_ascendc/`](chapter6/add_ascendc/) | Ascend C 向量加法算子样例。 |
 | [`chapter6/mat_add_tiling/`](chapter6/mat_add_tiling/) | 带 Tiling 的矩阵加法 Ascend C 算子样例。 |
 | [`chapter7/`](chapter7/) | 性能优化案例教学样例，覆盖本地 CPU/模拟测试和 Ascend 310B 硬件 Profiling。 |
+| [`chapter8/`](chapter8/) | 模型量化教学样例，覆盖校准数据清单、FP16 转换、INT8/混合精度转换入口、输出对齐和性能对比。 |
 
 ## 实践案例配套代码
 

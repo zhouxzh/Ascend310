@@ -77,6 +77,12 @@ for chapter in {1..9}; do
         "../src/book"
 done
 
+convert_markdown \
+    "../src/book/appendix.md" \
+    "chapters/appendix.tex" \
+    "chapters/" \
+    "../src/book"
+
 for case_number in {0..9}; do
     convert_markdown \
         "../src/experiment/case${case_number}.md" \

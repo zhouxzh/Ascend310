@@ -1,0 +1,55 @@
+// YOLOv10 总体框架图
+digraph YOLOv10_Overview {
+    rankdir=TB;
+    fontname="Noto Sans CJK SC";
+    node [fontname="Noto Sans CJK SC", fontsize=11];
+    edge [fontname="Noto Sans CJK SC", fontsize=9];
+    splines=ortho;
+    nodesep=0.5;
+    ranksep=0.6;
+
+    input [label="输入图像\n640×640×3", shape=box, style="rounded,filled", fillcolor="#e8f0fe", width=2.5];
+
+    subgraph cluster_backbone {
+        label="骨干网络 Backbone\n增强版 CSPNet · 大核卷积 · 部分自注意力 PSA";
+        fontsize=12; style="rounded,dashed"; color="#1a56db"; bgcolor="#f0f4ff";
+        bb [label="特征提取\n4 个 Stage 逐级下采样\n320→160→80→40→20", shape=box, style="rounded,filled", fillcolor="#dbeafe", width=2.5];
+    }
+
+    subgraph cluster_neck {
+        label="颈部网络 Neck\nPAN 路径聚合 · 空间-通道解耦下采样 · 秩引导设计";
+        fontsize=12; style="rounded,dashed"; color="#047857"; bgcolor="#ecfdf5";
+        nk [label="多尺度特征融合\n自上而下 FPN + 自下而上 PAN\nP3/P4/P5 三层特征输出", shape=box, style="rounded,filled", fillcolor="#d1fae5", width=2.8];
+    }
+
+    subgraph cluster_head {
+        label="检测头 Head\n一致性双重分配 · 无 NMS 推理 · 轻量分类头";
+        fontsize=12; style="rounded,dashed"; color="#b45309"; bgcolor="#fffbeb";
+
+        subgraph cluster_dual {
+            label="双重检测头";
+            fontsize=10; style="rounded,dotted"; color="#92400e"; bgcolor="#fef3c7";
+            o2m [label="一对多头 One-to-Many\n训练阶段：丰富正样本监督", shape=box, style="rounded,filled", fillcolor="#fde68a", width=2.2];
+            o2o [label="一对一头 One-to-One\n推理阶段：直接输出，无需 NMS", shape=box, style="rounded,filled", fillcolor="#fcd34d", width=2.2];
+        }
+
+        cls [label="轻量分类头\n深度可分离卷积", shape=box, style="rounded,dashed,filled", fillcolor="#fbbf24", width=2.0];
+        reg [label="回归头\n边界框坐标回归", shape=box, style="rounded,filled", fillcolor="#fbbf24", width=2.0];
+    }
+
+    output [label="输出\n[x1, y1, x2, y2, score, class_id]\n× 300 个检测结果", shape=box, style="rounded,filled", fillcolor="#e8f0fe", width=3.0];
+
+    input -> bb;
+    bb -> nk;
+    nk -> o2m;
+    nk -> o2o;
+    o2m -> cls;
+    o2m -> reg;
+    o2o -> cls;
+    o2o -> reg;
+    cls -> output;
+    reg -> output;
+
+    { rank=same; o2m; o2o; }
+    { rank=same; cls; reg; }
+}

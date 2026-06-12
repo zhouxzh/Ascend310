@@ -47,9 +47,10 @@ lang: zh-cn
 | Chapter 4 | PyACL 应用开发基础 | ACL运行时、内存管理、模型推理流程 | 掌握C/C++底层应用开发能力 |
 | Chapter 5 | DVPP视频处理基础 | VENC、VDEC、VPC、JPEG媒体处理 | 掌握310B媒体硬件调用与调试方法 |
 | Chapter 6 | 算子开发实战 | TBE DSL流程、310B计算架构、自定义算子 | 理解底层计算原理，具备算子扩展能力 |
-| Chapter 7 | 性能分析与优化基础 | Profiling分析、瓶颈定位、流水线优化 | 掌握性能调优与系统工程化技能 |
-| Chapter 8 | 项目实战方法论与交付模板 | 需求分析、评测体系、标准化交付流程 | 建立规范的AI项目交付方法论 |
-| Chapter 9 | 附录与工具箱 | 错误速查、参数模板、Checklist、FAQ | 提供高效查阅的工具与参考资料 |
+| Chapter 7 | 性能分析与优化案例教学 | Profiling分析、瓶颈定位、AIPP/DVPP、流水线优化 | 掌握性能调优与系统工程化技能 |
+| Chapter 8 | 模型量化与精度性能权衡 | FP16、INT8、校准数据、精度对齐与性能对比 | 学会在精度与性能之间做可验证取舍 |
+| Chapter 9 | 项目交付、评测与回归方法论 | 需求分析、评测体系、标准化交付流程 | 建立规范的AI项目交付方法论 |
+| Appendix A | 工具箱、FAQ 与参数模板 | 错误速查、参数模板、Checklist、FAQ | 提供高效查阅的工具与参考资料 |
 
 ### Part II：实验教程 {#src-book-README-h5}
 
@@ -94,20 +95,26 @@ lang: zh-cn
 - 昇腾310B 硬件架构：存储层级与向量计算单元
 - TBE DSL 开发流程与基础算子实例
 
-**7. 性能分析与优化基础**
+**7. 性能分析与优化案例教学**
 
-- 性能优化全景：时延、吞吐与瓶颈定位
-- Profiling 性能分析：采集与关键视图解读
-- 核心优化技术：AIPP、零拷贝、多 Stream 与流水线
+- 可运行 ResNet18-TinyImageNet 性能基线
+- Profiling 性能分析：采集、分段计时与关键视图解读
+- 核心优化技术：Buffer 复用、AIPP、DVPP 与 Queue Pipeline
 
-**8. 项目实战方法论与交付模板**
+**8. 模型量化与精度性能权衡**
+
+- FP32、FP16、INT8 的区别与适用场景
+- PTQ、QAT、校准数据集与精度对齐
+- ATC 精度模式、量化失败模式与性能对比流程
+
+**9. 项目交付、评测与回归方法论**
 
 - 需求澄清 Canvas 与指标分层
 - Baseline 策略、评测集设计与迭代看板
 - 资产沉淀、交付目录与上线 Checklist
 - 验收、回归与风险管理
 
-**9. 附录与工具箱**
+**附录A. 工具箱、FAQ 与参数模板**
 
 - 常见报错速查表
 - 模型转换参数模板合集 (ResNet, YOLO, INT8)
@@ -142,8 +149,8 @@ lang: zh-cn
 | :-- | :-- | :-- | :-- |
 | 零基础学生 | Chapter 1、Chapter 2、Case 0、Case 1 | 能跑通首个模型 | 结合案例做改动实验 |
 | 嵌入式工程师 | Chapter 4、Chapter 5、Chapter 6、Chapter 7 | 掌握底层开发与优化 | 关注资源管理、媒体处理、算子开发与性能调优 |
-| AI应用开发者 | Chapter 2、Chapter 3、选读 Case 案例 | 快速场景落地 | 重点关注 PyTorch 迁移与部署 |
-| 技术负责人 | Chapter 1、Chapter 7、Chapter 8 | 构建团队方法论 | 制定内部交付标准与模板体系 |
+| AI应用开发者 | Chapter 2、Chapter 3、Chapter 8、选读 Case 案例 | 快速场景落地 | 重点关注 PyTorch 迁移、模型部署与量化评估 |
+| 技术负责人 | Chapter 1、Chapter 7、Chapter 8、Chapter 9 | 构建团队方法论 | 制定内部量化评估、性能验收和交付标准 |
 
 ## 许可证与引用 {#src-book-README-h9}
 本书内容采用 Apache 2.0 许可证。引用本书内容请注明：

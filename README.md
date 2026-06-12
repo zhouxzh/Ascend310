@@ -24,7 +24,7 @@
 
 | 部分 | 内容 | 说明 |
 | :-- | :-- | :-- |
-| **Part I：理论教程** | Chapter 1~9 | 从边缘计算基础到项目交付方法论 |
+| **Part I：理论教程** | Chapter 1~9 + Appendix A | 从边缘计算基础到项目交付方法论，并提供工具速查 |
 | **Part II：实验教程** | Case 0~9 | 十个动手实验，从开发板点亮到聊天机器人 |
 
 ---
@@ -49,6 +49,7 @@ Ascend310/
 │   ├── book/                    # 理论教程 Markdown
 │   │   ├── README.md            # 前言 / 理论教程首页
 │   │   ├── chapter1.md ... chapter9.md
+│   │   ├── appendix.md
 │   │   ├── ssd_optimize.md
 │   │   └── img2/ img3/ img4/ img5/
 │   ├── experiment/              # 实践案例 Markdown
@@ -61,7 +62,10 @@ Ascend310/
 │   ├── chapter2/                # ResNet 快速入门示例
 │   ├── chapter3/                # PyTorch / torch_npu 迁移与训练示例
 │   ├── chapter4/                # PyACL 模型推理示例
-│   └── chapter5/                # DVPP / VENC / VDEC / VPC / JPEG / WebRTC 示例
+│   ├── chapter5/                # DVPP / VENC / VDEC / VPC / JPEG / WebRTC 示例
+│   ├── chapter6/                # 自定义算子开发示例
+│   ├── chapter7/                # 性能分析与优化示例
+│   └── chapter8/                # 模型量化与精度性能对比示例
 ├── latex/                       # LaTeX 模板、生成结果与转换辅助文件
 │   ├── book.tex                 # 正式 PDF 主控文件
 │   ├── book.pdf                 # 生成的教材 PDF
@@ -207,7 +211,7 @@ pnpm docs:build
 | 零基础学生 | Ch1 → Ch2 → Case 0 → Case 1 | 跑通首个模型 |
 | 嵌入式工程师 | Ch4 → Ch5 → Ch6 | 掌握底层开发与优化 |
 | AI应用开发者 | Ch2 → Ch3 → 选读案例 | 快速场景落地 |
-| 技术负责人 | Ch1 → Ch7 → Ch8 | 构建团队方法论 |
+| 技术负责人 | Ch1 → Ch7 → Ch8 → Ch9 | 构建量化评估、性能验收与交付方法论 |
 
 ---
 
@@ -215,7 +219,7 @@ pnpm docs:build
 
 **v0.1** — 初稿与转换流程持续审校中。
 
-- [x] 理论教程 Chapter 1~9 Markdown 初稿
+- [x] 理论教程 Chapter 1~9 与附录 Markdown 初稿
 - [x] 实践案例 Case 0~9 Markdown 初稿
 - [x] VuePress 站点构建与 GitHub Pages 部署脚本
 - [x] Pandoc + XeLaTeX 正式 PDF 生成流程

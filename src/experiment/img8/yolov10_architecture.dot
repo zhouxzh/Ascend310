@@ -1,0 +1,92 @@
+digraph YOLOv10 {
+    rankdir=TB;
+    fontname="Noto Sans CJK SC";
+    node [fontname="Noto Sans CJK SC", fontsize=11];
+    edge [fontname="Noto Sans CJK SC", fontsize=9];
+    compound=true;
+    splines=ortho;
+    nodesep=0.4;
+    ranksep=0.5;
+
+    // ---- Input ----
+    input [label="输入图像\n640×640×3", shape=box, style="rounded,filled", fillcolor="#e8f0fe", width=2.2];
+
+    // ---- Backbone box ----
+    subgraph cluster_backbone {
+        label="骨干网络 Backbone\n增强版 CSPNet + 大核卷积 + 部分自注意力";
+        fontsize=13;
+        style="rounded,dashed";
+        color="#1a56db";
+        bgcolor="#f0f4ff";
+
+        stem [label="Stem\nConv 3×3, s=2\n→ 320×320×C", shape=box, style="rounded,filled", fillcolor="#dbeafe", width=2.0];
+        s1 [label="Stage 1\nC2f + Conv s=2\n→ 160×160×2C", shape=box, style="rounded,filled", fillcolor="#dbeafe", width=2.0];
+        s2 [label="Stage 2\nC2f + Conv s=2\n→ 80×80×4C", shape=box, style="rounded,filled", fillcolor="#dbeafe", width=2.0];
+        s3 [label="Stage 3\nC2f + Conv s=2\n→ 40×40×8C", shape=box, style="rounded,filled", fillcolor="#dbeafe", width=2.0];
+        s4 [label="Stage 4\nC2f + SPPF\n+ PSA 部分自注意力\n+ 大核深度可分离卷积\n→ 20×20×16C", shape=box, style="rounded,filled", fillcolor="#bfdbfe", width=2.5];
+
+        stem -> s1 -> s2 -> s3 -> s4;
+    }
+
+    // ---- Neck box ----
+    subgraph cluster_neck {
+        label="颈部网络 Neck\nPAN 路径聚合 + 空间-通道解耦下采样 + 秩引导设计";
+        fontsize=13;
+        style="rounded,dashed";
+        color="#047857";
+        bgcolor="#ecfdf5";
+
+        fpn [label="自上而下 FPN\n特征金字塔融合", shape=box, style="rounded,filled", fillcolor="#d1fae5", width=2.2];
+        pan [label="自下而上 PAN\n路径聚合增强", shape=box, style="rounded,filled", fillcolor="#d1fae5", width=2.2];
+        ds [label="空间-通道解耦下采样\npool → 1×1 conv", shape=box, style="rounded,dashed,filled", fillcolor="#a7f3d0", width=2.2];
+
+        fpn -> pan -> ds;
+    }
+
+    // ---- Head box ----
+    subgraph cluster_head {
+        label="检测头 Head\n一致性双重分配 + 轻量分类头";
+        fontsize=13;
+        style="rounded,dashed";
+        color="#b45309";
+        bgcolor="#fffbeb";
+
+        subgraph cluster_dualhead {
+            label="双重检测头 (Dual Head)";
+            fontsize=11;
+            style="rounded,dotted";
+            color="#92400e";
+            bgcolor="#fef3c7";
+
+            o2m [label="一对多头\nOne-to-Many\n(训练：丰富正样本监督)", shape=box, style="rounded,filled", fillcolor="#fde68a", width=2.4];
+            o2o [label="一对一头\nOne-to-One\n(推理：无 NMS 直接输出)", shape=box, style="rounded,filled", fillcolor="#fcd34d", width=2.4];
+        }
+
+        cls [label="轻量分类头\n深度可分离卷积\n减少参数与计算量", shape=box, style="rounded,dashed,filled", fillcolor="#fbbf24", width=2.2];
+    }
+
+    // ---- Output ----
+    output [label="输出\n[x1,y1,x2,y2,score,class_id]\n× 300 个检测结果", shape=box, style="rounded,filled", fillcolor="#e8f0fe", width=2.8];
+
+    // ---- Edges ----
+    input -> stem;
+    s4 -> fpn [ltail=cluster_backbone, lhead=cluster_neck];
+    ds -> o2m [ltail=cluster_neck, lhead=cluster_head];
+    ds -> o2o [ltail=cluster_neck, lhead=cluster_head];
+    o2m -> cls;
+    o2o -> cls;
+    cls -> output;
+
+    // ---- Legend ----
+    subgraph cluster_legend {
+        label="图例";
+        fontsize=10;
+        style="rounded";
+        color="#6b7280";
+        bgcolor="#f9fafb";
+
+        leg1 [label="常规模块", shape=box, style="rounded,filled", fillcolor="#dbeafe", width=1.5];
+        leg2 [label="YOLOv10 创新模块", shape=box, style="rounded,dashed,filled", fillcolor="#fcd34d", width=1.5];
+        leg3 [label="仅训练阶段使用", shape=box, style="rounded,filled", fillcolor="#fde68a", width=1.5];
+    }
+}

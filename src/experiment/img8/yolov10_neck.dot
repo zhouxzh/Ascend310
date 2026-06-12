@@ -1,0 +1,69 @@
+// YOLOv10 颈部网络结构图
+digraph YOLOv10_Neck {
+    rankdir=LR;
+    fontname="Noto Sans CJK SC";
+    node [fontname="Noto Sans CJK SC", fontsize=9];
+    edge [fontname="Noto Sans CJK SC", fontsize=8];
+    splines=ortho;
+    nodesep=0.2;
+    ranksep=0.3;
+
+    // ---- 骨干网输入 ----
+    p3 [label="P3\n160×160", shape=box, style="rounded,filled", fillcolor="#dbeafe", width=0.8];
+    p4 [label="P4\n80×80", shape=box, style="rounded,filled", fillcolor="#93c5fd", width=0.8];
+    p5 [label="P5\n40×40", shape=box, style="rounded,filled", fillcolor="#60a5fa", width=0.8];
+    p6 [label="P6\n20×20", shape=box, style="rounded,filled", fillcolor="#3b82f6", fontcolor="white", width=0.8];
+
+    // ---- FPN 通路 ----
+    up1 [label="↑×2", shape=box, style="rounded,filled", fillcolor="#a7f3d0", width=0.45, height=0.3];
+    cat1 [label="拼接\nC2f", shape=box, style="rounded,filled", fillcolor="#6ee7b7", width=0.65];
+    fpn4 [shape=point, width=0.15];
+
+    up2 [label="↑×2", shape=box, style="rounded,filled", fillcolor="#a7f3d0", width=0.45, height=0.3];
+    cat2 [label="拼接\nC2f", shape=box, style="rounded,filled", fillcolor="#6ee7b7", width=0.65];
+    n3 [label="N3\n160×160", shape=box, style="rounded,filled", fillcolor="#bbf7d0", width=0.8];
+
+    edge [style=solid, color="#047857"];
+    p5 -> up1 -> cat1;
+    p4 -> cat1 [style=dashed];
+    cat1 -> fpn4;
+    fpn4 -> up2 -> cat2;
+    p3 -> cat2 [style=dashed];
+    cat2 -> n3;
+
+    // ---- PAN 通路 ----
+    down1 [label="★ 解耦\n下采样", shape=box, style="rounded,dashed,filled", fillcolor="#fde68a", width=0.75];
+    cat3 [label="拼接\nC2f", shape=box, style="rounded,dashed,filled", fillcolor="#fcd34d", width=0.75];
+    n4 [label="N4\n80×80", shape=box, style="rounded,filled", fillcolor="#86efac", width=0.8];
+
+    down2 [label="★ 解耦\n下采样", shape=box, style="rounded,dashed,filled", fillcolor="#fde68a", width=0.75];
+    cat4 [label="拼接\nC2f", shape=box, style="rounded,dashed,filled", fillcolor="#fcd34d", width=0.75];
+    n5 [label="N5\n40×40", shape=box, style="rounded,filled", fillcolor="#4ade80", width=0.8];
+
+    edge [style=solid, color="#0e7490"];
+    n3 -> down1 -> cat3;
+    fpn4 -> cat3 [style=dashed, color="#047857"];
+    cat3 -> n4;
+    n4 -> down2 -> cat4;
+    p6 -> cat4 [style=dashed, color="#6b7280"];
+    cat4 -> n5;
+
+    // ---- 输出 ----
+    head [label="检测头", shape=box, style="rounded,dashed", fillcolor="#fef3c7", width=0.9];
+
+    edge [style=solid, color="#b45309", penwidth=1.2];
+    n3 -> head;
+    n4 -> head;
+    n5 -> head;
+
+    // ---- 布局 ----
+    { rank=same; p3; p4; p5; p6; }
+    { rank=same; up1; }
+    { rank=same; cat1; fpn4; }
+    { rank=same; up2; }
+    { rank=same; cat2; n3; }
+    { rank=same; down1; }
+    { rank=same; cat3; n4; }
+    { rank=same; down2; }
+    { rank=same; cat4; n5; head; }
+}

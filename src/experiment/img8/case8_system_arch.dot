@@ -2,35 +2,45 @@ digraph Case8SystemArch {
   graph [
     rankdir=LR,
     bgcolor="white",
-    pad="0.18",
-    nodesep="0.35",
-    ranksep="0.45",
-    fontname="Noto Sans CJK SC",
-    labelloc="t",
-    label="case8 deployment overview"
+    pad="0.2",
+    nodesep="0.4",
+    ranksep="0.5",
+    fontname="Noto Sans CJK SC"
   ];
   node [
     shape=box,
     style="rounded,filled",
-    color="#415a77",
-    fillcolor="#f7f9fc",
-    fontname="Noto Sans CJK SC",
-    fontsize=12,
-    margin="0.10,0.07"
-  ];
-  edge [
-    color="#415a77",
     fontname="Noto Sans CJK SC",
     fontsize=11,
-    arrowsize=0.7
+    margin="0.12,0.08"
+  ];
+  edge [
+    fontname="Noto Sans CJK SC",
+    fontsize=10,
+    arrowsize=0.8
   ];
 
-  prepare [label="PC / GPU\n.pt -> ONNX\nlabels + metadata"];
-  convert [label="Ascend 310B\nATC\nONNX -> OM"];
-  runtime [label="Ascend 310B runtime\ncamera + ACL OM\npostprocess + draw"];
-  browser [label="Browser\nWebRTC H.264\nlive preview + stats"];
+  subgraph cluster_pc {
+    label="PC / GPU 工作站";
+    fontsize=11; style="rounded,dashed"; color="#1a56db"; bgcolor="#f0f4ff";
+    prepare [label="导出 ONNX\n.pt → ONNX\n生成标签与元数据", fillcolor="#dbeafe", width=2.0];
+  }
 
-  prepare -> convert [label="copy ONNX"];
-  convert -> runtime [label="load OM"];
-  runtime -> browser [label="stream"];
+  subgraph cluster_310b {
+    label="昇腾 310B 开发板";
+    fontsize=11; style="rounded,dashed"; color="#047857"; bgcolor="#ecfdf5";
+
+    convert [label="ATC 转换\nONNX → OM", fillcolor="#d1fae5", width=1.5];
+    runtime [label="OM 推理\n摄像头采集\n后处理 · 画框", fillcolor="#a7f3d0", width=1.6];
+  }
+
+  subgraph cluster_browser {
+    label="远程浏览器";
+    fontsize=11; style="rounded,dashed"; color="#b45309"; bgcolor="#fffbeb";
+    browser [label="WebRTC H.264\n实时预览\n性能指标", fillcolor="#fde68a", width=1.6];
+  }
+
+  prepare -> convert [label="rsync 同步", color="#1a56db"];
+  convert -> runtime [label="加载 OM", color="#047857"];
+  runtime -> browser [label="WebRTC 推流", color="#b45309"];
 }

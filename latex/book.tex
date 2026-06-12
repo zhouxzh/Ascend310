@@ -194,13 +194,13 @@
 \input{chapters/chapter7.tex}
 
 % 第八章
-\chapter{项目实战方法论与交付模板}
+\chapter{模型量化与精度性能权衡}
 \input{chapters/chapter8.tex}
-
+	
 % 第九章
-\chapter{附录与工具箱}
+\chapter{项目交付、评测与回归方法论}
 \input{chapters/chapter9.tex}
-
+	
 \part{Part II：实验教程}
 
 \setcounter{chapter}{-1}
@@ -243,6 +243,14 @@
 % 案例9
 \input{cases/case9.tex}
 
+\appendix
+\renewcommand{\theHchapter}{appendix.\Alph{chapter}}
+\renewcommand{\theHsection}{appendix.\Alph{chapter}.\arabic{section}}
+\renewcommand{\theHsubsection}{appendix.\Alph{chapter}.\arabic{section}.\arabic{subsection}}
+\renewcommand{\theHsubsubsection}{appendix.\Alph{chapter}.\arabic{section}.\arabic{subsection}.\arabic{subsubsection}}
+\chapter{工具箱、FAQ 与参数模板}
+\input{chapters/appendix.tex}
+	
 % 参考文献
 % \backmatter
 % \chapter{参考文献}

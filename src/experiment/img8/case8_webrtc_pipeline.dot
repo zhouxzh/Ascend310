@@ -2,37 +2,44 @@ digraph Case8WebrtcPipeline {
   graph [
     rankdir=LR,
     bgcolor="white",
-    pad="0.18",
+    pad="0.2",
     nodesep="0.35",
-    ranksep="0.45",
-    fontname="Noto Sans CJK SC",
-    labelloc="t",
-    label="case8 WebRTC runtime flow"
+    ranksep="0.5",
+    fontname="Noto Sans CJK SC"
   ];
   node [
     shape=box,
     style="rounded,filled",
-    color="#3a506b",
-    fillcolor="#f7f9fc",
-    fontname="Noto Sans CJK SC",
-    fontsize=12,
-    margin="0.10,0.07"
-  ];
-  edge [
-    color="#3a506b",
     fontname="Noto Sans CJK SC",
     fontsize=11,
-    arrowsize=0.7
+    margin="0.12,0.08"
+  ];
+  edge [
+    fontname="Noto Sans CJK SC",
+    fontsize=9,
+    arrowsize=0.8
   ];
 
-  capture [label="Camera\nOpenCV or DVPP\nBGR frame"];
-  infer [label="YOLO detector\nletterbox 640\nACL OM inference"];
-  draw [label="Postprocess\nscale boxes to original\nBGR -> NV12"];
-  encode [label="CANN VENC\nH.264"];
-  browser [label="Browser\nvideo + stats"];
+  subgraph cluster_310b {
+    label="昇腾 310B 服务端（三线程流水线）";
+    fontsize=11; style="rounded,dashed"; color="#047857"; bgcolor="#ecfdf5";
 
-  capture -> infer [label="latest frame"];
-  infer -> draw [label="detections"];
-  capture -> draw [label="original frame"];
-  draw -> encode -> browser;
+    capture [label="采集线程\nOpenCV / DVPP\n读取摄像头帧", fillcolor="#a7f3d0", width=1.6];
+    infer [label="推理线程\nletterbox 640\nACL OM 推理", fillcolor="#6ee7b7", width=1.5];
+    draw [label="渲染线程\n坐标还原 · 画框\nBGR → NV12", fillcolor="#34d399", width=1.5];
+    encode [label="CANN VENC\nH.264 硬件编码\n（失败则 CPU 回退）", fillcolor="#d1fae5", width=1.7];
+
+    capture -> infer [label="最新帧", color="#047857"];
+    infer -> draw [label="检测结果", color="#047857"];
+    capture -> draw [label="原始帧", style=dashed, color="#6b7280"];
+    draw -> encode [label="NV12", color="#047857"];
+  }
+
+  subgraph cluster_browser {
+    label="远程浏览器";
+    fontsize=11; style="rounded,dashed"; color="#b45309"; bgcolor="#fffbeb";
+    browser [label="WebRTC 接收\nH.264 解码\n实时预览 + 指标", fillcolor="#fde68a", width=1.8];
+  }
+
+  encode -> browser [label="WebRTC H.264 推流", color="#b45309", penwidth=1.2];
 }

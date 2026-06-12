@@ -1,0 +1,77 @@
+// YOLOv10 骨干网络详细结构图（横向布局，适合打印）
+digraph YOLOv10_Backbone {
+    rankdir=LR;
+    fontname="Noto Sans CJK SC";
+    node [fontname="Noto Sans CJK SC", fontsize=9];
+    edge [fontname="Noto Sans CJK SC", fontsize=8];
+    splines=ortho;
+    nodesep=0.3;
+    ranksep=0.35;
+
+    input [label="输入\n640×640×3", shape=box, style="rounded,filled", fillcolor="#e8f0fe", width=1.1, height=0.5];
+
+    subgraph cluster_stem {
+        label="Stem"; fontsize=9; style="rounded"; color="#60a5fa"; bgcolor="#eff6ff";
+        stem [label="Conv 3×3 s=2\n→ 320×320", shape=box, style="rounded,filled", fillcolor="#dbeafe", width=1.2];
+    }
+
+    subgraph cluster_s1 {
+        label="Stage 1"; fontsize=9; style="rounded"; color="#60a5fa"; bgcolor="#eff6ff";
+        s1 [label="C2f → Conv s=2\n→ 160×160\n输出 P3", shape=box, style="rounded,filled", fillcolor="#dbeafe", width=1.3];
+    }
+
+    subgraph cluster_s2 {
+        label="Stage 2"; fontsize=9; style="rounded"; color="#60a5fa"; bgcolor="#eff6ff";
+        s2 [label="C2f → Conv s=2\n→ 80×80\n输出 P4", shape=box, style="rounded,filled", fillcolor="#93c5fd", width=1.2];
+    }
+
+    subgraph cluster_s3 {
+        label="Stage 3"; fontsize=9; style="rounded"; color="#60a5fa"; bgcolor="#eff6ff";
+        s3 [label="C2f → Conv s=2\n→ 40×40\n输出 P5", shape=box, style="rounded,filled", fillcolor="#60a5fa", width=1.2];
+    }
+
+    subgraph cluster_s4 {
+        label="Stage 4：核心创新层"; fontsize=9; style="rounded,dashed"; color="#f59e0b"; bgcolor="#fffbeb";
+        s4_c2f [label="C2f", shape=box, style="rounded,filled", fillcolor="#fef3c7", width=0.9];
+        s4_sppf [label="SPPF\n多尺度池化", shape=box, style="rounded,filled", fillcolor="#fde68a", width=1.1];
+        s4_lkc [label="大核深度可分离卷积\n7×7/9×9 感受野扩张", shape=box, style="rounded,dashed,filled", fillcolor="#fcd34d", width=1.5];
+        s4_psa [label="PSA 部分自注意力\n通道分组·关键区域计算", shape=box, style="rounded,dashed,filled", fillcolor="#fbbf24", width=1.5];
+        s4_out [label="Conv s=2\n→ 20×20\n输出 P6", shape=box, style="rounded,filled", fillcolor="#f59e0b", width=1.2];
+
+        s4_c2f -> s4_sppf -> s4_lkc -> s4_psa -> s4_out;
+    }
+
+    // ---- 输出特征汇集到 Neck ----
+    p3 [label="P3\n160×160\n纹理·边缘", shape=box, style="rounded,filled", fillcolor="#dbeafe", width=1.0];
+    p4 [label="P4\n80×80\n局部形状", shape=box, style="rounded,filled", fillcolor="#93c5fd", width=1.0];
+    p5 [label="P5\n40×40\n语义轮廓", shape=box, style="rounded,filled", fillcolor="#60a5fa", width=1.0];
+    p6 [label="P6\n20×20\n全局抽象", shape=box, style="rounded,filled", fillcolor="#3b82f6", fontcolor="white", width=1.0];
+
+    neck [label="→ 送往 Neck", shape=plaintext, fontsize=10, fontcolor="#047857"];
+
+    // ---- 主流程边 ----
+    edge [style=solid, color="#1f2937"];
+    input -> stem;
+    stem -> s1;
+    s1 -> s2;
+    s2 -> s3;
+    s3 -> s4_c2f;
+
+    // ---- 输出边 ----
+    edge [style=dashed, color="#6b7280"];
+    s1 -> p3;
+    s2 -> p4;
+    s3 -> p5;
+    s4_out -> p6;
+
+    // ---- 汇聚到 Neck ----
+    edge [style=solid, color="#047857", penwidth=1.2];
+    p3 -> neck;
+    p4 -> neck;
+    p5 -> neck;
+    p6 -> neck;
+
+    // ---- 强制横向排列 ----
+    { rank=same; input; stem; s1; s2; s3; s4_c2f; }
+    { rank=same; p3; p4; p5; p6; neck; }
+}

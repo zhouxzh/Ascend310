@@ -18,7 +18,8 @@ export default sidebar({
         "chapter6.md",
         "chapter7.md",
         "chapter8.md",
-        "chapter9.md"
+        "chapter9.md",
+        "appendix.md"
       ]
     },
     {
