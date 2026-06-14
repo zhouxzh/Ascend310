@@ -1,0 +1,99 @@
+digraph quantization_decision_order {
+    graph [
+        rankdir=TB,
+        bgcolor="transparent",
+        dpi=300,
+        pad=0.18,
+        nodesep=0.34,
+        ranksep=0.42
+    ];
+
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Noto Sans CJK SC",
+        fontsize=15,
+        margin="0.15,0.10",
+        penwidth=2,
+        width=2.25
+    ];
+
+    edge [
+        color="#455A64",
+        penwidth=2.0,
+        arrowsize=0.72,
+        fontname="Noto Sans CJK SC",
+        fontsize=12
+    ];
+
+    start [
+        label="先拆解端到端耗时\n采集 / 预处理 / 拷贝\n模型执行 / 后处理 / 传输",
+        fillcolor="#E8EAF6",
+        color="#3949AB",
+        fontcolor="#1A237E"
+    ];
+
+    not_model [
+        label="瓶颈不在模型执行\n先优化对应环节",
+        fillcolor="#ECEFF1",
+        color="#546E7A",
+        fontcolor="#263238"
+    ];
+
+    model [
+        label="模型执行占主要耗时\n量化才值得进入",
+        fillcolor="#E3F2FD",
+        color="#1976D2",
+        fontcolor="#0D47A1"
+    ];
+
+    fp16 [
+        label="先尝试 FP16\n不需要校准\n风险较低",
+        fillcolor="#E8F5E9",
+        color="#2E7D32",
+        fontcolor="#1B5E20"
+    ];
+
+    fp16_check [
+        label="验证 FP16\n输出是否对齐\n速度是否提升",
+        fillcolor="#E8F5E9",
+        color="#2E7D32",
+        fontcolor="#1B5E20"
+    ];
+
+    int8 [
+        label="仍需更高吞吐\n再做 INT8 PTQ",
+        fillcolor="#FFF8E1",
+        color="#F9A825",
+        fontcolor="#E65100"
+    ];
+
+    int8_check [
+        label="验证 INT8\n输出 / 性能 / 完整精度",
+        fillcolor="#FCE4EC",
+        color="#C62828",
+        fontcolor="#B71C1C"
+    ];
+
+    sweep [
+        label="可选\n精度波动时\n做校准样本数 sweep",
+        fillcolor="#F3E5F5",
+        color="#8E24AA",
+        fontcolor="#4A148C",
+        style="rounded,filled,dashed"
+    ];
+
+    { rank=same; not_model; model; }
+    { rank=same; fp16; fp16_check; }
+    { rank=same; int8; int8_check; }
+
+    start -> not_model [label="预处理/拷贝/后处理慢"];
+    start -> model [label="模型执行慢"];
+    model -> fp16 -> fp16_check -> int8 -> int8_check;
+    int8_check -> sweep [
+        label="需要解释时",
+        style=dashed,
+        color="#8E24AA",
+        fontcolor="#4A148C"
+    ];
+}

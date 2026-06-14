@@ -1,5 +1,5 @@
 ---
-title: "第7章：性能分析与优化案例教学"
+title: "第7章：性能分析与优化"
 author: [周贤中]
 date: 2026-06-08
 subject: "Markdown"

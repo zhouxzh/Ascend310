@@ -1,0 +1,62 @@
+digraph quantization_debug_order {
+    graph [
+        rankdir=TB,
+        bgcolor="transparent",
+        dpi=300,
+        pad=0.2,
+        nodesep=0.45,
+        ranksep=0.5
+    ];
+
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Noto Sans CJK SC",
+        fontsize=18,
+        margin="0.18,0.12",
+        penwidth=2
+    ];
+
+    edge [
+        color="#455A64",
+        penwidth=2.1,
+        arrowsize=0.8
+    ];
+
+    fp32 [
+        label="1. FP32 OM\n是否能正常推理",
+        fillcolor="#E8EAF6",
+        color="#3949AB",
+        fontcolor="#1A237E"
+    ];
+
+    fp16 [
+        label="2. FP16 OM\n是否与 FP32 输出对齐",
+        fillcolor="#E3F2FD",
+        color="#1976D2",
+        fontcolor="#0D47A1"
+    ];
+
+    png [
+        label="3. PNG 校准清单\n是否来自当前数据",
+        fillcolor="#E0F2F1",
+        color="#00897B",
+        fontcolor="#004D40"
+    ];
+
+    deploy [
+        label="4. INT8 deploy ONNX\n是否来自当前 AMCT 校准",
+        fillcolor="#FFF8E1",
+        color="#F9A825",
+        fontcolor="#E65100"
+    ];
+
+    val [
+        label="5. val_list.txt\n三份 OM 是否同集横向比较",
+        fillcolor="#FCE4EC",
+        color="#C62828",
+        fontcolor="#B71C1C"
+    ];
+
+    fp32 -> fp16 -> png -> deploy -> val;
+}

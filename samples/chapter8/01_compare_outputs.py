@@ -29,47 +29,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate-model", default=str(DEFAULT_FP16_MODEL), help="Candidate OM model path.")
     parser.add_argument("--device", type=int, default=0, help="Ascend device id.")
     parser.add_argument("--warmup", type=int, default=3, help="Warmup runs for each model.")
-    parser.add_argument("--samples", type=int, default=20, help="Number of calibration samples to compare.")
+    parser.add_argument("--samples", type=int, default=0, help="Max samples to compare (0 = all).")
     parser.add_argument("--topk", type=int, default=5, help="Top-k size for classification comparison.")
     parser.add_argument("--calib-list", default=str(DEFAULT_CALIB_LIST), help="Calibration list path.")
     parser.add_argument("--calib-root", default="", help="Calibration root directory. Defaults to list parent.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT_COMPARE), help="Output JSON report path.")
-    parser.add_argument("--base-npy", default="", help="Optional precomputed reference logits .npy file.")
-    parser.add_argument("--candidate-npy", default="", help="Optional precomputed candidate logits .npy file.")
     return parser.parse_args()
-
-
-def compare_precomputed_outputs(args: argparse.Namespace) -> dict:
-    base_path = resolve_chapter_path(args.base_npy)
-    candidate_path = resolve_chapter_path(args.candidate_npy)
-    base_outputs = np.load(base_path)
-    candidate_outputs = np.load(candidate_path)
-    if base_outputs.shape != candidate_outputs.shape:
-        raise ValueError(f"Shape mismatch: base={base_outputs.shape}, candidate={candidate_outputs.shape}")
-
-    if base_outputs.ndim == 1:
-        base_outputs = base_outputs.reshape(1, -1)
-        candidate_outputs = candidate_outputs.reshape(1, -1)
-    else:
-        base_outputs = base_outputs.reshape(base_outputs.shape[0], -1)
-        candidate_outputs = candidate_outputs.reshape(candidate_outputs.shape[0], -1)
-
-    sample_count = min(args.samples, base_outputs.shape[0])
-    items = []
-    for index, (base, candidate) in enumerate(zip(base_outputs[:sample_count], candidate_outputs[:sample_count])):
-        item = compare_logits(base, candidate, topk=args.topk)
-        item["sample_index"] = index
-        items.append(item)
-
-    return {
-        "case": "02_compare_outputs",
-        "mode": "precomputed_npy",
-        "base_npy": str(base_path),
-        "candidate_npy": str(candidate_path),
-        "topk": args.topk,
-        "summary": summarize_output_diffs(items),
-        "samples": items,
-    }
 
 
 def compare_om_outputs(args: argparse.Namespace) -> dict:
@@ -80,7 +45,7 @@ def compare_om_outputs(args: argparse.Namespace) -> dict:
     calib_list = resolve_chapter_path(args.calib_list)
     calib_root = resolve_chapter_path(args.calib_root) if args.calib_root else calib_list.parent
     require_models([base_model, candidate_model])
-    paths = read_calibration_list(calib_list, root=calib_root, limit=args.samples)
+    paths = read_calibration_list(calib_list, root=calib_root, limit=args.samples or None)
 
     base_recorder = StageRecorder()
     candidate_recorder = StageRecorder()
@@ -122,7 +87,7 @@ def compare_om_outputs(args: argparse.Namespace) -> dict:
                 candidate_runner.release()
 
     return {
-        "case": "02_compare_outputs",
+        "case": "01_compare_outputs",
         "mode": "om_inference",
         "device": args.device,
         "base_model": model_record(base_model),
@@ -141,18 +106,13 @@ def compare_om_outputs(args: argparse.Namespace) -> dict:
 
 def main() -> int:
     args = parse_args()
-    if args.samples <= 0:
-        raise ValueError("--samples must be positive")
+    if args.samples < 0:
+        raise ValueError("--samples must not be negative")
     if args.topk <= 0:
         raise ValueError("--topk must be positive")
     if args.warmup < 0:
         raise ValueError("--warmup must be non-negative")
-    has_base_npy = bool(args.base_npy)
-    has_candidate_npy = bool(args.candidate_npy)
-    if has_base_npy != has_candidate_npy:
-        raise ValueError("--base-npy and --candidate-npy must be used together")
-
-    report = compare_precomputed_outputs(args) if has_base_npy else compare_om_outputs(args)
+    report = compare_om_outputs(args)
     output_path = write_report(resolve_chapter_path(args.output), report)
 
     summary = report["summary"]

@@ -1,0 +1,85 @@
+digraph chapter8_sample_structure {
+    graph [
+        rankdir=LR,
+        bgcolor="transparent",
+        dpi=300,
+        pad=0.25,
+        nodesep=0.55,
+        ranksep=0.8
+    ];
+
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Noto Sans CJK SC",
+        fontsize=17,
+        margin="0.18,0.12",
+        penwidth=2
+    ];
+
+    edge [
+        color="#455A64",
+        penwidth=2.0,
+        arrowsize=0.75,
+        fontname="Noto Sans CJK SC",
+        fontsize=13
+    ];
+
+    data [
+        label="数据读取\n读取图片清单\n解析验证标签\n统一 RGB uint8",
+        fillcolor="#E3F2FD",
+        color="#1976D2",
+        fontcolor="#0D47A1"
+    ];
+
+    preprocess [
+        label="共享预处理\nresize 到 64x64\nHWC -> NCHW\nmean/std 归一化",
+        fillcolor="#E8F5E9",
+        color="#2E7D32",
+        fontcolor="#1B5E20"
+    ];
+
+    runner [
+        label="OM 推理封装\nPyACL 上下文\nH2D / execute / D2H\n资源释放",
+        fillcolor="#FFF3E0",
+        color="#EF6C00",
+        fontcolor="#E65100"
+    ];
+
+    metrics [
+        label="指标计算\nTopK accuracy\nTopK overlap\nlatency 统计",
+        fillcolor="#F3E5F5",
+        color="#8E24AA",
+        fontcolor="#4A148C"
+    ];
+
+    report [
+        label="结构化报告\n模型 hash\n实验参数\nJSON / CSV",
+        fillcolor="#ECEFF1",
+        color="#546E7A",
+        fontcolor="#263238"
+    ];
+
+    amct [
+        label="INT8 PTQ\n生成 config\n校准激活范围\n冻结 deploy ONNX",
+        fillcolor="#FFEBEE",
+        color="#C62828",
+        fontcolor="#B71C1C"
+    ];
+
+    sweep [
+        label="实验编排\nshell 串联\n不同校准样本数\n汇总 summary.csv",
+        fillcolor="#E0F2F1",
+        color="#00897B",
+        fontcolor="#004D40"
+    ];
+
+    data -> preprocess [label="同一输入"];
+    preprocess -> runner [label="同一 tensor"];
+    runner -> metrics [label="logits + timing"];
+    metrics -> report [label="可复查证据"];
+
+    amct -> runner [label="INT8 OM"];
+    sweep -> amct [label="每个样本数重做"];
+    sweep -> report [label="追加汇总"];
+}

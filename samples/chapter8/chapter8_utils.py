@@ -28,15 +28,19 @@ from perf_utils import (  # noqa: E402
 
 
 MODEL_DIR = CHAPTER_DIR / "model"
-CALIBRATION_DIR = CHAPTER_DIR / "calibration"
+DATA_DIR = CHAPTER_DIR / "data"
 OUTPUT_DIR = CHAPTER_DIR / "outputs"
 
-DEFAULT_BASE_MODEL = MODEL_DIR / "resnet18_tiny_imagenet.om"
+DEFAULT_ONNX_MODEL = MODEL_DIR / "resnet18_tiny_imagenet.onnx"
+DEFAULT_FP32_MODEL = MODEL_DIR / "resnet18_tiny_imagenet_fp32.om"
+DEFAULT_BASE_MODEL = DEFAULT_FP32_MODEL
 DEFAULT_FP16_MODEL = MODEL_DIR / "resnet18_tiny_imagenet_fp16.om"
 DEFAULT_INT8_MODEL = MODEL_DIR / "resnet18_tiny_imagenet_int8.om"
-DEFAULT_CALIB_LIST = CALIBRATION_DIR / "calib_list.txt"
+DEFAULT_CALIB_LIST = DATA_DIR / "calib_list.txt"
+DEFAULT_VAL_LIST = DATA_DIR / "val_list.txt"
 DEFAULT_OUTPUT_COMPARE = OUTPUT_DIR / "output_compare.json"
 DEFAULT_PERF_COMPARE = OUTPUT_DIR / "perf_compare.json"
+DEFAULT_ACCURACY_COMPARE = OUTPUT_DIR / "accuracy_compare.json"
 
 
 def resolve_chapter_path(value: str | Path) -> Path:
@@ -76,19 +80,10 @@ def require_models(paths: Iterable[str | Path]) -> None:
         *[f"  - {path}" for path in missing],
         "",
         "Run from samples/chapter8:",
-        "  python3 tools/download_model.py",
-        "  bash tools/convert_fp16_resnet18.sh",
+        "  python tools/download_model.py",
+        "  then convert the missing OM with the ATC command in README.md",
     ]
     raise FileNotFoundError("\n".join(message))
-
-
-def write_text_lines(path: str | Path, lines: Iterable[str]) -> Path:
-    output_path = Path(path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as f:
-        for line in lines:
-            f.write(line.rstrip("\n") + "\n")
-    return output_path
 
 
 def read_calibration_list(
@@ -101,7 +96,7 @@ def read_calibration_list(
     if not list_file.exists():
         raise FileNotFoundError(
             f"Calibration list not found: {list_file}. "
-            "Run `python3 01_collect_calibration_list.py --count 50` first."
+            "Run `python tools/download_tiny_imagenet.py train --per-class 2` first."
         )
 
     base_dir = Path(root) if root is not None else list_file.parent

@@ -1,0 +1,111 @@
+digraph quantization_workflow {
+    graph [
+        rankdir=TB,
+        bgcolor="transparent",
+        dpi=300,
+        pad=0.18,
+        nodesep=0.36,
+        ranksep=0.38
+    ];
+
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Noto Sans CJK SC",
+        fontsize=15,
+        margin="0.14,0.10",
+        penwidth=2,
+        width=2.15
+    ];
+
+    edge [
+        color="#455A64",
+        penwidth=2.0,
+        arrowsize=0.72,
+        fontname="Noto Sans CJK SC",
+        fontsize=12
+    ];
+
+    onnx [
+        label="FP32 ONNX\n训练后模型",
+        fillcolor="#E8EAF6",
+        color="#3949AB",
+        fontcolor="#1A237E"
+    ];
+
+    fp_om [
+        label="ATC 转换\nFP32 / FP16 OM",
+        fillcolor="#E3F2FD",
+        color="#1976D2",
+        fontcolor="#0D47A1"
+    ];
+
+    fp_check [
+        label="FP16 快速验证\n输出对齐 + 性能",
+        fillcolor="#E8F5E9",
+        color="#2E7D32",
+        fontcolor="#1B5E20"
+    ];
+
+    int8_ptq [
+        label="INT8 PTQ\nAMCT 校准",
+        fillcolor="#FFF8E1",
+        color="#F9A825",
+        fontcolor="#E65100"
+    ];
+
+    int8_om [
+        label="ATC 转换\nINT8 OM",
+        fillcolor="#FFF8E1",
+        color="#F9A825",
+        fontcolor="#E65100"
+    ];
+
+    int8_check [
+        label="INT8 快速验证\n输出对齐 + 性能",
+        fillcolor="#E8F5E9",
+        color="#2E7D32",
+        fontcolor="#1B5E20"
+    ];
+
+    accuracy [
+        label="完整验证集\n三模型横向对比",
+        fillcolor="#FCE4EC",
+        color="#C62828",
+        fontcolor="#B71C1C"
+    ];
+
+    deploy [
+        label="精度/性能达标\n进入部署评审",
+        fillcolor="#ECEFF1",
+        color="#546E7A",
+        fontcolor="#263238"
+    ];
+
+    sweep [
+        label="可选实验\n校准样本数 sweep",
+        fillcolor="#F3E5F5",
+        color="#8E24AA",
+        fontcolor="#4A148C",
+        style="rounded,filled,dashed"
+    ];
+
+    { rank=same; onnx; fp_check; }
+    { rank=same; fp_om; int8_ptq; }
+    { rank=same; int8_om; int8_check; }
+    { rank=same; accuracy; deploy; }
+
+    onnx -> fp_om -> fp_check -> int8_ptq -> int8_om -> int8_check -> accuracy -> deploy;
+    accuracy -> sweep [
+        label="精度波动时",
+        style=dashed,
+        color="#8E24AA",
+        fontcolor="#4A148C"
+    ];
+    sweep -> deploy [
+        label="确定校准规模",
+        style=dashed,
+        color="#8E24AA",
+        fontcolor="#4A148C"
+    ];
+}

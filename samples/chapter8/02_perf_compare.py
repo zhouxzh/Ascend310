@@ -155,7 +155,7 @@ def main() -> int:
         )
 
     report = {
-        "case": "03_perf_compare",
+        "case": "02_perf_compare",
         "device": args.device,
         "warmup": args.warmup,
         "runs": args.runs,
