@@ -22,7 +22,8 @@ conda activate npu
 cd ~/Documents/Ascend310/samples/chapter8
 ```
 
-310B 开发板内存有限，运行 ATC 前建议限制并行编译：
+对于 8GB 及以内内存的 Ascend 310B 开发板，运行 ATC 前建议一定限制并行编译。
+12GB 以上内存的开发板如果遇到 ATC 内存不足或编译进程被杀掉，也加上下面两个变量：
 
 ```bash
 export TE_PARALLEL_COMPILER=1

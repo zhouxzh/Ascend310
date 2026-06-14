@@ -1,20 +1,21 @@
 digraph chapter8_sample_structure {
     graph [
-        rankdir=LR,
+        rankdir=TB,
         bgcolor="transparent",
         dpi=300,
         pad=0.25,
-        nodesep=0.55,
-        ranksep=0.8
+        nodesep=0.34,
+        ranksep=0.5
     ];
 
     node [
         shape=box,
         style="rounded,filled",
         fontname="Noto Sans CJK SC",
-        fontsize=17,
-        margin="0.18,0.12",
-        penwidth=2
+        fontsize=15,
+        margin="0.16,0.10",
+        penwidth=2,
+        width=2.1
     ];
 
     edge [
@@ -40,14 +41,14 @@ digraph chapter8_sample_structure {
     ];
 
     runner [
-        label="OM 推理封装\nPyACL 上下文\nH2D / execute / D2H\n资源释放",
+        label="OM 推理封装\nPyACL 上下文\n输入/输出拷贝\n模型执行与资源释放",
         fillcolor="#FFF3E0",
         color="#EF6C00",
         fontcolor="#E65100"
     ];
 
     metrics [
-        label="指标计算\nTopK accuracy\nTopK overlap\nlatency 统计",
+        label="指标计算\nTopK 精度\nTopK 重合度\n耗时统计",
         fillcolor="#F3E5F5",
         color="#8E24AA",
         fontcolor="#4A148C"
@@ -74,9 +75,12 @@ digraph chapter8_sample_structure {
         fontcolor="#004D40"
     ];
 
+    { rank=same; data; preprocess; runner; }
+    { rank=same; metrics; report; amct; sweep; }
+
     data -> preprocess [label="同一输入"];
     preprocess -> runner [label="同一 tensor"];
-    runner -> metrics [label="logits + timing"];
+    runner -> metrics [label="输出 + 耗时"];
     metrics -> report [label="可复查证据"];
 
     amct -> runner [label="INT8 OM"];
