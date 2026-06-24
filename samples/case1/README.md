@@ -300,13 +300,15 @@ FaceSystem.get_embedding(face)
 npu-smi info
 
 # 安装依赖
-pip install flask opencv-python-headless numpy<2.0
+pip install flask
 ```
 
 ### 2. 模型准备
 
 **基本用法**（自动判断，只做必要的步骤）：
 ```bash
+export TE_PARALLEL_COMPILER=1      # 限制算子最大并行编译进程数
+export MAX_COMPILE_CORE_NUMBER=1   # 限制图编译占用的 CPU 核数
 python3 prepare_models.py
 ```
 
