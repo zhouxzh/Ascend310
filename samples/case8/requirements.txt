@@ -1,7 +1,7 @@
 # Minimal runtime helpers for ONNX validation, WebRTC streaming, and Ascend-side preprocessing/postprocessing.
 # CANN/ACL must be installed separately on the Ascend 310B target.
 numpy==1.26.4
-opencv-python==4.8.0.76
+opencv-python==4.11.0.86
 onnxruntime==1.15.1
 aiohttp
 aiortc
