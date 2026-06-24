@@ -27,7 +27,7 @@
 说明如下：
 
 * 如果只运行 `cpu` 模式，可以不连接昇腾 NPU，但仍建议接入 USB 摄像头进行实时演示
-* 如果没有 USB 摄像头，可以通过 `--source demo.mp4` 这类方式改用视频文件输入
+* 如果没有 USB 摄像头，可以通过 `--source demo/vtest.avi` 这类方式改用视频文件输入
 * 如果运行 `npu` 模式，除了模型为 `.om` 之外，还需要本机已经正确安装 Ascend ACL 运行时
 
 ## 目录结构
@@ -54,7 +54,6 @@ case2/
 │   ├── opencv_runtime.py
 │   ├── postprocessing.py
 │   └── preprocessing.py
-├── case2.md
 ├── README.md
 └── requirementstxt
 ```
@@ -93,11 +92,14 @@ case2/
 
 ### 1. 安装依赖
 
-仓库根目录下的依赖文件名当前是 `requirementstxt`，不是常见的 `requirements.txt`。
+仓库根目录下的依赖文件名当前是 `requirements.txt`。
 
 可直接执行：
 
 ```bash
+conda create -n npu
+conda activate npu
+conda install python=3.11
 pip install -r requirementstxt
 ```
 
@@ -155,6 +157,36 @@ python scripts/convert_onnx_to_om.py --soc-version Ascend310B4
 
 如果只想查看转换命令而不执行 ATC，可使用 `--dry-run`。
 
+### 3. 准备测试视频
+
+如果没有 USB 摄像头，可以使用 OpenCV 官方提供的测试视频进行演示。
+
+下载测试视频 `vtest.avi` 到 `demo/` 目录：
+
+```bash
+wget https://raw.githubusercontent.com/opencv/opencv/master/samples/data/vtest.avi -O demo/vtest.avi
+```
+
+> **注意**：国内网络环境下，访问 GitHub 可能需要代理。如果 `wget` 下载失败或速度过慢，可以通过以下方式解决：
+>
+> - 使用代理下载（请将 `http://127.0.0.1:7890` 替换为你实际使用的代理地址）：
+> - 或者在自己的 PC 上通过浏览器下载该视频文件，再用 `scp` 上传到开发板：
+
+```bash
+wget https://gh-proxy.com/raw.githubusercontent.com/opencv/opencv/master/samples/data/vtest.avi -O demo/vtest.avi
+```
+
+```bash
+scp vtest.avi user@board-ip:~/Documents/Ascend310/samples/case2/demo/
+```
+
+下载完成后，即可使用本地视频文件运行检测和跟踪：
+
+```bash
+python scripts/detection_app.py --device npu --source demo/vtest.avi
+python scripts/tracking_app.py --device npu --source demo/vtest.avi
+```
+
 ## Detection
 
 ### 功能概览
@@ -174,34 +206,34 @@ python scripts/convert_onnx_to_om.py --soc-version Ascend310B4
 
 ### 常用命令
 
-CPU 摄像头检测：
-
-```bash
-python scripts/detection_app.py --device cpu --source 0
-```
-
 NPU 摄像头检测：
 
 ```bash
 python scripts/detection_app.py --device npu --source 0
 ```
 
+CPU 摄像头检测（无 NPU 时使用）：
+
+```bash
+python scripts/detection_app.py --device cpu --source 0
+```
+
 检测本地视频：
 
 ```bash
-python scripts/detection_app.py --device cpu --source demo.mp4
+python scripts/detection_app.py --device npu --source demo/vtest.avi
 ```
 
 指定模型并保存结果：
 
 ```bash
-python scripts/detection_app.py --device cpu --model models/ssd320_mobilenetv4_conv_large.onnx --source demo.mp4 --score-threshold 0.35 --save output/detection.mp4
+python scripts/detection_app.py --device npu --model models/ssd320_mobilenetv4_conv_large.om --source demo/vtest.avi --score-threshold 0.35 --no-display --save output/detection.mp4
 ```
 
 无界面运行：
 
 ```bash
-python scripts/detection_app.py --device cpu --source demo.mp4 --no-display --save output/detection.mp4
+python scripts/detection_app.py --device npu --source demo/vtest.avi --no-display --save output/detection.mp4
 ```
 
 列出当前设备可用模型：
@@ -267,16 +299,16 @@ python scripts/detection_app.py --device npu --list-models
 
 ### 常用命令
 
-CPU 摄像头跟踪：
-
-```bash
-python scripts/tracking_app.py --device cpu --source 0
-```
-
 NPU 摄像头跟踪：
 
 ```bash
 python scripts/tracking_app.py --device npu --source 0
+```
+
+CPU 摄像头跟踪（无 NPU 时使用）：
+
+```bash
+python scripts/tracking_app.py --device cpu --source 0
 ```
 
 只跟踪行人：
@@ -300,13 +332,13 @@ python scripts/tracking_app.py --device npu --source 0 --camera-profile 1280x720
 跟踪本地视频：
 
 ```bash
-python scripts/tracking_app.py --device cpu --source demo.mp4
+python scripts/tracking_app.py --device npu --source demo/vtest.avi
 ```
 
 指定模型并保存结果：
 
 ```bash
-python scripts/tracking_app.py --device cpu --model models/ssd320_mobilenetv4_conv_large.onnx --source demo.mp4 --save output/tracking.mp4
+python scripts/tracking_app.py --device npu --model models/ssd320_mobilenetv4_conv_large.om --source demo/vtest.avi --no-display --save output/tracking.mp4
 ```
 
 通过调参增强轨迹连续性：
@@ -318,7 +350,7 @@ python scripts/tracking_app.py --device npu --source 0 --track-center-distance-t
 无界面运行：
 
 ```bash
-python scripts/tracking_app.py --device cpu --source demo.mp4 --no-display --save output/tracking.mp4
+python scripts/tracking_app.py --device npu --source demo/vtest.avi --no-display --save output/tracking.mp4
 ```
 
 列出当前设备可用模型：

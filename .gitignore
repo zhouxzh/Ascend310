@@ -217,6 +217,12 @@ samples/chapter3/*/fusion_result.json
 samples/chapter3/*/ge_check_op.json
 samples/*/*/kernel_meta
 
+# demo video files
+samples/case2/demo/*.avi
+
+# output files
+samples/case2/output/
+
 # model files
 *.om
 *.onnx
