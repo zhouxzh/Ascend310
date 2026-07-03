@@ -44,6 +44,7 @@ convert_markdown() {
         -f "$PANDOC_FROM" \
         "$input" \
         --top-level-division=chapter \
+        --lua-filter=local-md-links.lua \
         --syntax-highlighting=idiomatic \
         -t latex \
         --extract-media="$media_dir" \
@@ -63,6 +64,7 @@ pandoc \
     ../src/book/README.md \
     --top-level-division=chapter \
     --lua-filter=remove-numbering.lua \
+    --lua-filter=local-md-links.lua \
     --syntax-highlighting=idiomatic \
     -t latex \
     --extract-media=chapters/ \

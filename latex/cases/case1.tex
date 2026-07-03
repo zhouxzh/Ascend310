@@ -1546,7 +1546,6 @@ atc --model=det.onnx \
 
 \subsection{1. 用户规模与检索策略}\label{src-experiment-case1-h71}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 用户数量 & 检索方法 & 预期延迟 \\
@@ -1559,7 +1558,6 @@ atc --model=det.onnx \
 1000-10000 & Faiss (IVF) & \textless{} 20ms \\
 \textgreater{} 10000 & Faiss (HNSW) 或向量数据库 & \textless{} 50ms \\
 \end{longtable}
-}
 
 \subsection{2. 防止重复打卡}\label{src-experiment-case1-h72}
 
@@ -1938,7 +1936,6 @@ MJPEG 流 -> Web 浏览器
 
 \subsection{关键技术栈}\label{src-experiment-case1-h92}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 层次 & 技术 & 作用 \\
@@ -1956,13 +1953,11 @@ Web 框架 & Flask & HTTP 服务 \\
 图像处理 & OpenCV & 摄像头、图像操作 \\
 前端 & HTML5 + Bootstrap & 用户界面 \\
 \end{longtable}
-}
 
 \subsection{性能指标}\label{src-experiment-case1-h93}
 
 在昇腾 310B 上的典型性能：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 指标 & 数值 \\
@@ -1977,7 +1972,6 @@ Web 框架 & Flask & HTTP 服务 \\
 视频流帧率 & 30 FPS \\
 自动打卡间隔 & 2 秒 \\
 \end{longtable}
-}
 
 \section{学习路径建议}\label{src-experiment-case1-h94}
 

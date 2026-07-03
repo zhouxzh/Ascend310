@@ -17,7 +17,6 @@ verification)} 问题而非闭集分类问题：系统通过 GhostNet
 
 \subsection{与已有案例的关系}\label{src-experiment-case4-h2}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 案例 & 领域 & 模型 & 任务范式 \\
@@ -33,7 +32,6 @@ verification)} 问题而非闭集分类问题：系统通过 GhostNet
 \textbf{开集身份验证} \\
 案例8 & 手势识别 & MobileNetV3-Small & 闭集手势分类 \\
 \end{longtable}
-}
 
 案例4 与案例7 都使用了 FAISS 进行向量检索，但有关键区别： -
 \textbf{案例7} 使用 ResNet50 的通用 ImageNet 预训练特征，无需额外训练 -
@@ -44,11 +42,10 @@ verification)} 问题而非闭集分类问题：系统通过 GhostNet
 
 \section{2. 内容大纲}\label{src-experiment-case4-h3}
 
-\subsection{2.1. 硬件准备}\label{src-experiment-case4-h4}
+\subsection{硬件准备}\label{src-experiment-case4-h4}
 
 本项目需要的硬件分为三个层级：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -75,7 +72,6 @@ verification)} 问题而非闭集分类问题：系统通过 GhostNet
 AI 计算 & 昇腾 310B 开发者套件 & 掌纹特征提取 + 向量检索 & --- \\
 结构件 & 3D 打印外壳 (可选) & 手掌定位 + 环境光隔离 & PETG 材料 \\
 \end{longtable}
-}
 
 系统架构如图所示：
 
@@ -107,11 +103,10 @@ flowchart TB
     FAISS_A --> ADMIN
 \end{lstlisting}
 
-\subsection{2.2. 软件环境}\label{src-experiment-case4-h5}
+\subsection{软件环境}\label{src-experiment-case4-h5}
 
 \subsubsection{操作系统与框架}\label{src-experiment-case4-h6}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -140,7 +135,6 @@ Python & CPython & 3.8 \textasciitilde{} 3.10 & 应用开发语言 \\
 向量检索 & faiss-cpu & 1.7+ & FAISS 索引与相似度搜索 \\
 Web & Gradio & 4.0+ & 仪表盘界面 \\
 \end{longtable}
-}
 
 \subsubsection{环境准备}\label{src-experiment-case4-h7}
 
@@ -162,7 +156,6 @@ python3 prepare_models.py --onnx-only
 
 \subsubsection{Python 依赖说明}\label{src-experiment-case4-h8}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 包 & 用途 & 必需？ \\
@@ -183,9 +176,8 @@ python3 prepare_models.py --onnx-only
 \passthrough{\lstinline!acl!} (CANN 自带) & NPU 推理，随 CANN 安装 &
 仅推理 \\
 \end{longtable}
-}
 
-\subsection{2.3. 掌纹图像预处理}\label{src-experiment-case4-h9}
+\subsection{掌纹图像预处理}\label{src-experiment-case4-h9}
 
 掌纹 ROI（感兴趣区域）检测是整个系统的第一道关口。高质量的 ROI
 提取直接影响 后续特征提取的准确性。
@@ -238,14 +230,13 @@ BGR。这样做在不引入 色彩伪影的前提下显著增强了掌纹纹理�
 在失败时返回 \passthrough{\lstinline!None!}
 而非抛出异常，调用方可以优雅地提示用户重新采集。
 
-\subsection{2.4. GhostNet 特征提取}\label{src-experiment-case4-h13}
+\subsection{GhostNet 特征提取}\label{src-experiment-case4-h13}
 
 掌纹识别需要一个能将掌纹图像映射到判别性特征空间的模型。本案例选择
 \textbf{GhostNet 1.0x} 作为特征提取骨干网络。
 
 \subsubsection{为什么选 GhostNet}\label{src-experiment-case4-h14}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2857}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4286}}
@@ -272,7 +263,6 @@ MobileNetV3-Small 已被案例8 使用 \\
 torchvision 内置 & 否 --- 独立实现 (\textasciitilde220 行) & ResNet /
 MobileNet 内置 \\
 \end{longtable}
-}
 
 \subsubsection{GhostNet 架构}\label{src-experiment-case4-h15}
 
@@ -382,7 +372,7 @@ L2 归一化确保了 FAISS \passthrough{\lstinline!IndexFlatIP!}
 \passthrough{\lstinline!GhostModule!}、\passthrough{\lstinline!SELayer!}、\passthrough{\lstinline!GhostBottleneck!}、\passthrough{\lstinline!GhostNet!}
 四个类以及工厂函数 \passthrough{\lstinline!ghostnet\_1x()!}。
 
-\subsection{2.5. 对比学习训练}\label{src-experiment-case4-h19}
+\subsection{对比学习训练}\label{src-experiment-case4-h19}
 
 掌纹识别是开集验证问题------系统需要判断两张掌纹是否来自同一个人，而非将掌纹
 分到某个预定义的类别。因此，本案例使用\textbf{对比学习 (contrastive
@@ -390,7 +380,6 @@ learning)} 而非分类交叉熵来训练模型。
 
 \subsubsection{为什么用对比学习}\label{src-experiment-case4-h20}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4167}}
@@ -414,7 +403,6 @@ learning)} 而非分类交叉熵来训练模型。
 三元组 Triplet & 开集 & 三元组挖掘复杂，收敛不稳定 \\
 ArcFace & 开集 & 需要大规模身份标签，实现复杂 \\
 \end{longtable}
-}
 
 对比学习直接优化特征空间中的距离关系：\textbf{同一人的掌纹特征距离近，不同人的
 掌纹特征距离远}。训练完成后，新用户注册时只需将其掌纹的特征向量加入
@@ -474,7 +462,6 @@ PolyU_Palmprint/
 python3 train.py --data-dir /path/to/PolyU_Palmprint
 \end{lstlisting}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 超参数 & 默认值 & 说明 \\
@@ -487,7 +474,6 @@ python3 train.py --data-dir /path/to/PolyU_Palmprint
 \passthrough{\lstinline!--lr!} & 1e-3 & 初始学习率 \\
 \passthrough{\lstinline!margin!} & 1.0 & 对比损失 margin \\
 \end{longtable}
-}
 
 训练使用 AdamW 优化器 + CosineAnnealingLR 学习率调度，训练/验证集按用户
 （而非图像）85/15 分割以确保无数据泄漏。完整训练脚本在
@@ -521,7 +507,7 @@ ImageNet
 模型将使用随机权重，特征提取质量会很差------请务必先训练再使用。
 \end{quote}
 
-\subsection{2.6. 模型转换与昇腾部署}\label{src-experiment-case4-h26}
+\subsection{模型转换与昇腾部署}\label{src-experiment-case4-h26}
 
 \begin{lstlisting}
 flowchart TD
@@ -584,7 +570,7 @@ hard-sigmoid}：SELayer 中使用 \passthrough{\lstinline!F.relu6(x) / 6.0!}
 (\passthrough{\lstinline!dynamic\_axes=\{\}!})，因为 OM 模型要求
 固定的输入输出尺寸
 
-\subsection{2.7. 开集验证系统}\label{src-experiment-case4-h30}
+\subsection{开集验证系统}\label{src-experiment-case4-h30}
 
 \subsubsection{系统架构}\label{src-experiment-case4-h31}
 
@@ -636,7 +622,6 @@ cosine_similarity(a, b) = a · b  (= faiss inner product when ||a||=||b||=1)
 
 为什么每个用户需要 3-5 个样本？
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 样本数 & 优点 & 缺点 \\
@@ -648,7 +633,6 @@ cosine_similarity(a, b) = a · b  (= faiss inner product when ||a||=||b||=1)
 \textbf{3-5} & \textbf{覆盖不同姿态，提高鲁棒性} & 注册稍慢 \\
 \textgreater10 & 极高鲁棒性 & 注册耗时长，存储开销大 \\
 \end{longtable}
-}
 
 验证时，Top-5 个最相似向量中出现最多的用户 ID 即为最佳匹配。例如，若
 Top-5 中有 4 个属于用户 A、1 个属于用户 B，则认定匹配用户 A，取这 4
@@ -666,7 +650,7 @@ FAISS \passthrough{\lstinline!IndexFlatIP!}
 完整索引管理实现在 \href{samples/case4/palm_index.py}{palm\_index.py} 的
 \passthrough{\lstinline!PalmIndex!} 类中。
 
-\subsection{2.8. Web 仪表盘}\label{src-experiment-case4-h35}
+\subsection{Web 仪表盘}\label{src-experiment-case4-h35}
 
 \begin{lstlisting}
 flowchart TD
@@ -712,9 +696,9 @@ flowchart TD
 [ 重新采集] -> 清空缓冲区，重新开始
 \end{lstlisting}
 
-\subsection{2.9. 用户手册}\label{src-experiment-case4-h37}
+\subsection{用户手册}\label{src-experiment-case4-h37}
 
-\subsubsection{2.9.1 部署}\label{src-experiment-case4-h38}
+\subsubsection{部署}\label{src-experiment-case4-h38}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -736,7 +720,7 @@ flowchart TD
   浏览器打开 \passthrough{\lstinline!http://<设备IP>:7860!}
 \end{enumerate}
 
-\subsubsection{2.9.2 使用流程}\label{src-experiment-case4-h39}
+\subsubsection{使用流程}\label{src-experiment-case4-h39}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -757,7 +741,7 @@ flowchart TD
   如需调整判定严格程度，在「系统管理」页签调节阈值
 \end{enumerate}
 
-\subsubsection{2.9.3 采集技巧}\label{src-experiment-case4-h40}
+\subsubsection{采集技巧}\label{src-experiment-case4-h40}
 
 \begin{itemize}
 \tightlist
@@ -773,9 +757,8 @@ flowchart TD
   \textbf{清洁}：手掌干燥清洁，避免汗渍或污渍影响纹理质量
 \end{itemize}
 
-\subsubsection{2.9.4 调整参数}\label{src-experiment-case4-h41}
+\subsubsection{调整参数}\label{src-experiment-case4-h41}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3077}}
@@ -806,11 +789,9 @@ train.py & 对比损失 margin \\
 \passthrough{\lstinline!LAPLACIAN\_BLUR\_THRESHOLD!} & 100.0 & config.py
 & 图像锐度最低要求 \\
 \end{longtable}
-}
 
-\subsubsection{2.9.5 故障排除}\label{src-experiment-case4-h42}
+\subsubsection{故障排除}\label{src-experiment-case4-h42}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3750}}
@@ -839,7 +820,6 @@ ATC 转换失败 & soc\_version 不匹配 &
 ``请重新放置手掌'' & 预处理质量检查未通过 &
 确保手掌清晰，避免运动模糊 \\
 \end{longtable}
-}
 
 \section{3. 源代码结构}\label{src-experiment-case4-h43}
 
@@ -923,7 +903,6 @@ flowchart TB
 
 \subsection{预期效果}\label{src-experiment-case4-h45}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 功能 & 预期表现 & 备注 \\
@@ -940,11 +919,9 @@ FAISS 检索 (1000 向量) & \textless{} 1 ms & IndexFlatIP 精确搜索 \\
 检索 \textless1ms 约等于 16ms & --- \\
 新用户注册 & 3-5 次采集，无需重训模型 & 开集验证的核心优势 \\
 \end{longtable}
-}
 
 \subsection{性能指标}\label{src-experiment-case4-h46}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 指标 & NPU (Ascend 310B) & CPU (PyTorch) \\
@@ -957,7 +934,6 @@ GhostNet 特征提取 & 8-10 ms & 18-25 ms \\
 FAISS 检索 (1000 向量) & \textless1 ms & \textless1 ms \\
 模型大小 (.om) & \textasciitilde20 MB & N/A \\
 \end{longtable}
-}
 
 \subsection{浏览器中的效果}\label{src-experiment-case4-h47}
 

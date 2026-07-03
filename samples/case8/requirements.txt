@@ -1,8 +1,16 @@
-# Minimal runtime helpers for ONNX validation, WebRTC streaming, and Ascend-side preprocessing/postprocessing.
+# Minimal runtime helpers for WebRTC streaming on the Ascend 310B target.
 # CANN/ACL must be installed separately on the Ascend 310B target.
-numpy==1.26.4
-opencv-python==4.11.0.86
-onnxruntime==1.15.1
-aiohttp
-aiortc
-av
+#
+# Verified for the board's Anaconda base environment:
+#   Python 3.9.2, CPython cp39, aarch64, manylinux2014_aarch64 wheels.
+#
+# Force wheel-only installs. If a package has no aarch64 wheel, pip will fail
+# instead of compiling from source on the board.
+--only-binary=:all:
+#
+# numpy/opencv-python are already provided by the board's base environment and
+# are intentionally omitted to avoid upgrading or downgrading them.
+# onnxruntime is only needed for optional ONNX CPU validation, not OM WebRTC.
+aiohttp==3.10.10
+aiortc==1.9.0
+av==12.3.0

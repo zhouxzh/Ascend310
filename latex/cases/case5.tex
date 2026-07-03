@@ -14,7 +14,6 @@
 
 \subsection{与已有案例的关系}\label{src-experiment-case5-h2}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1875}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1875}}
@@ -42,7 +41,6 @@ NPU 任务
 案例8 & 手势识别 & MobileNetV3-Small 分类 & 训练 -\textgreater{} 转换
 -\textgreater{} 部署 \\
 \end{longtable}
-}
 
 案例5的核心创新在于\textbf{数据形态转换}：振动信号本身是一维时序数据，但
 通过梅尔频谱变换转化为二维图像后，就能充分利用 NPU 的图像分类能力------
@@ -50,11 +48,10 @@ NPU 任务
 
 \section{2. 内容大纲}\label{src-experiment-case5-h3}
 
-\subsection{2.1. 硬件准备}\label{src-experiment-case5-h4}
+\subsection{硬件准备}\label{src-experiment-case5-h4}
 
 本项目需要的硬件分为三个层级：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2143}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2143}}
@@ -81,7 +78,6 @@ AI 计算 & 昇腾 310B 开发者套件 & 数据汇聚、NPU 故障分类、Web 
 传感器 & DS18B20 + ACS712 + 霍尔 + ADXL345 & 四类电机参数 & --- \\
 外设 & USB 摄像头 (可选) & 设备外观巡检 & --- \\
 \end{longtable}
-}
 
 硬件架构如图所示：
 
@@ -117,11 +113,10 @@ flowchart TB
     NPU_A --> UI_A
 \end{lstlisting}
 
-\subsection{2.2. 软件环境}\label{src-experiment-case5-h5}
+\subsection{软件环境}\label{src-experiment-case5-h5}
 
 \subsubsection{操作系统与框架}\label{src-experiment-case5-h6}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -150,7 +145,6 @@ Python & CPython & 3.8 \textasciitilde{} 3.10 & 应用开发语言 \\
 串口通信 & pyserial & 3.5+ & STM32 UART 数据读取 \\
 Web & Gradio & 4.0+ & 监测仪表盘界面 \\
 \end{longtable}
-}
 
 \subsubsection{环境准备}\label{src-experiment-case5-h7}
 
@@ -178,7 +172,6 @@ STM32 端的固件代码参考
 
 \subsubsection{Python 依赖说明}\label{src-experiment-case5-h9}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -207,13 +200,11 @@ STM32 端的固件代码参考
 \passthrough{\lstinline!acl!} (CANN 自带) & NPU 推理，随 CANN 安装 &
 仅推理 \\
 \end{longtable}
-}
 
-\subsection{2.3. STM32 低速传感器采集}\label{src-experiment-case5-h10}
+\subsection{STM32 低速传感器采集}\label{src-experiment-case5-h10}
 
 STM32 作为传感器汇聚节点，负责采集四台电机的低速参数：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lllll@{}}
 \toprule\noalign{}
 传感器 & 型号 & 接口 & 参数 & 采样率 \\
@@ -225,7 +216,6 @@ STM32 作为传感器汇聚节点，负责采集四台电机的低速参数：
 电流 & ACS712 & ADC & 电机工作电流 & 1 Hz \\
 转速 & 霍尔传感器 & TIM 输入捕获 & 电机转速 (RPM) & 1 Hz \\
 \end{longtable}
-}
 
 STM32 每秒钟采集一轮数据，打包为 ASCII 文本帧，通过 UART 发送给 Ascend
 310B：
@@ -248,7 +238,7 @@ STM32 时（\passthrough{\lstinline!/dev/ttyUSB0!}
 不存在），自动切换为仿真模式，生成带随机游走和偶发故障注入的模拟数据，
 方便在没有硬件的情况下开发和测试。
 
-\subsection{2.4. FPGA 高速振动采集}\label{src-experiment-case5-h11}
+\subsection{FPGA 高速振动采集}\label{src-experiment-case5-h11}
 
 振动信号的频率范围远超 STM32 的 ADC 采样能力。电机振动特征频率通常在
 几十 Hz 到 2 kHz 之间，按照奈奎斯特定理，采样率需至少 4 kHz。本项目使用
@@ -286,7 +276,7 @@ Ascend 310B 端通过
   机械松动（0.5\% 概率注入）：多次谐波 + 基底噪声抬高
 \end{itemize}
 
-\subsection{2.5. 振动频谱分析原理}\label{src-experiment-case5-h12}
+\subsection{振动频谱分析原理}\label{src-experiment-case5-h12}
 
 振动信号是一维时间序列，而 NPU 擅长处理二维图像。解决方案是将振动波形
 转换为\textbf{梅尔频谱图
@@ -294,7 +284,6 @@ Ascend 310B 端通过
 
 \subsubsection{为什么用梅尔频谱图}\label{src-experiment-case5-h13}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1765}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2941}}
@@ -321,7 +310,6 @@ Ascend 310B 端通过
 \textbf{低频分辨率高（电机故障特征集中在此）} \\
 GAF 图像 & 2D (time, time) & 2D-CNN & 保留时间相关性，计算复杂 \\
 \end{longtable}
-}
 
 选择梅尔频谱图的核心理由：\textbf{电机故障特征（不平衡、不对中、松动）集中在
 低频区域（1\textasciitilde10
@@ -351,7 +339,6 @@ flowchart TD
 
 \subsubsection{不同故障类型的频谱特征}\label{src-experiment-case5-h15}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -377,13 +364,11 @@ flowchart TD
 机械松动 & 多次谐波 (1×\textasciitilde5×) + 基底噪声整体抬高 &
 连接刚度不足 \\
 \end{longtable}
-}
 
-\subsection{2.6. NPU 故障分类}\label{src-experiment-case5-h16}
+\subsection{NPU 故障分类}\label{src-experiment-case5-h16}
 
 将频谱图输入 EfficientNet-B0 进行 5 类故障分类：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 \# & 故障类型 & 英文 & 处理建议 \\
@@ -397,12 +382,10 @@ flowchart TD
 3 & 对中不良 & misalignment & 重新对中安装 \\
 4 & 机械松动 & looseness & 检查紧固件 \\
 \end{longtable}
-}
 
 \subsubsection{为什么选择
 EfficientNet-B0}\label{src-experiment-case5-h17}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 模型 & 参数量 & 310B 推理 & 本书使用情况 \\
@@ -416,7 +399,6 @@ ResNet18 & 11.7M & \textasciitilde12ms & 案例6 \\
 ResNet50 & 25.6M & \textasciitilde25ms & 案例7 \\
 MobileNetV3-Small & 2.5M & \textasciitilde5ms & 案例8 \\
 \end{longtable}
-}
 
 EfficientNet-B0 引入了 MBConv 块和 SE（Squeeze-and-Excitation）注意力
 模块，通过复合缩放策略在深度、宽度、分辨率三个维度上同时优化。5.3M
@@ -440,7 +422,7 @@ flowchart TD
     SOFTMAX --> OUTPUT["输出\n故障类别 + 置信度 + 处理建议"]
 \end{lstlisting}
 
-\subsection{2.7. CPU 趋势分析与异常检测}\label{src-experiment-case5-h19}
+\subsection{CPU 趋势分析与异常检测}\label{src-experiment-case5-h19}
 
 NPU 负责振动频谱的故障分类，CPU 则负责温度、电流、转速的趋势分析。
 两者互补------频谱检测机械故障，趋势分析检测电气和热异常。
@@ -474,7 +456,7 @@ if predicted > TEMP_WARN_THRESHOLD:
 \passthrough{\lstinline!AnomalyDetector!} 类中，纯 NumPy
 实现，无需任何模型文件。
 
-\subsection{2.8. 模型转换与昇腾部署}\label{src-experiment-case5-h22}
+\subsection{模型转换与昇腾部署}\label{src-experiment-case5-h22}
 
 \begin{lstlisting}
 flowchart TD
@@ -547,7 +529,7 @@ Bearing Dataset} --- 帕德博恩大学轴承数据集 -
 \passthrough{\lstinline!python3 prepare\_models.py --force!} 重新导出
 ONNX/OM
 
-\subsection{2.9. Web 仪表盘}\label{src-experiment-case5-h26}
+\subsection{Web 仪表盘}\label{src-experiment-case5-h26}
 
 \begin{lstlisting}
 flowchart TD
@@ -595,7 +577,6 @@ flowchart TD
 
 \subsubsection{双模式运行}\label{src-experiment-case5-h27}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 模式 & STM32 & FPGA & 适用场景 \\
@@ -607,11 +588,10 @@ flowchart TD
 半仿真模式 & 是 UART 连接 & 否 仿真振动 & 只有 STM32 \\
 全仿真模式 & 否 仿真数据 & 否 仿真振动 & 开发/演示 \\
 \end{longtable}
-}
 
-\subsection{2.10. 用户手册}\label{src-experiment-case5-h28}
+\subsection{用户手册}\label{src-experiment-case5-h28}
 
-\subsubsection{2.10.1 部署}\label{src-experiment-case5-h29}
+\subsubsection{部署}\label{src-experiment-case5-h29}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -632,7 +612,7 @@ flowchart TD
   浏览器打开 \passthrough{\lstinline!http://<设备IP>:7860!}
 \end{enumerate}
 
-\subsubsection{2.10.2 使用流程}\label{src-experiment-case5-h30}
+\subsubsection{使用流程}\label{src-experiment-case5-h30}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -649,7 +629,7 @@ flowchart TD
   切换「系统信息」页签，查看模型和日志状态
 \end{enumerate}
 
-\subsubsection{2.10.3 STM32 固件烧录}\label{src-experiment-case5-h31}
+\subsubsection{STM32 固件烧录}\label{src-experiment-case5-h31}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -668,9 +648,8 @@ flowchart TD
   将 STM32 TX 连接到 Ascend 310B RX（3.3V 电平）
 \end{enumerate}
 
-\subsubsection{2.10.4 调整参数}\label{src-experiment-case5-h32}
+\subsubsection{调整参数}\label{src-experiment-case5-h32}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 参数 & 默认值 & 位置 & 说明 \\
@@ -690,11 +669,9 @@ z-score 阈值 \\
 振动采样率 \\
 \passthrough{\lstinline!N\_MELS!} & 128 & config.py & 梅尔滤波器数量 \\
 \end{longtable}
-}
 
-\subsubsection{2.10.5 故障排除}\label{src-experiment-case5-h33}
+\subsubsection{故障排除}\label{src-experiment-case5-h33}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3750}}
@@ -721,7 +698,6 @@ ATC 转换失败 & soc\_version 不匹配 &
 UART 数据乱码 & 波特率不匹配 & 确认 STM32 和 Ascend 310B 均使用
 115200 \\
 \end{longtable}
-}
 
 \section{3. 源代码结构}\label{src-experiment-case5-h34}
 
@@ -800,7 +776,6 @@ flowchart TB
 
 \subsection{预期效果}\label{src-experiment-case5-h36}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2857}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4286}}
@@ -826,11 +801,9 @@ NPU 故障分类 (已训练) & 5 类准确率 \textgreater{} 88\% &
 \textasciitilde10ms & NPU 模式下总计 \textasciitilde16ms \\
 CSV 日志 & 每秒写入一行多电机数据 & 长期运行建议定期轮转 \\
 \end{longtable}
-}
 
 \subsection{性能指标}\label{src-experiment-case5-h37}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 指标 & NPU (Ascend 310B) & CPU (PyTorch) \\
@@ -843,7 +816,6 @@ CSV 日志 & 每秒写入一行多电机数据 & 长期运行建议定期轮转 
 故障分类 & 8-12 ms & 20-35 ms \\
 模型大小 (.om) & \textasciitilde20 MB & N/A \\
 \end{longtable}
-}
 
 \subsection{浏览器中的效果}\label{src-experiment-case5-h38}
 

@@ -348,7 +348,6 @@ atc \
 
 \textbf{关键参数说明}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
@@ -408,7 +407,6 @@ Batch 维变动 \\
 \passthrough{\lstinline!--mode=1!} 使用，\passthrough{\lstinline!1!}
 开启；便于排查 Shape 与算子信息 \\
 \end{longtable}
-}
 
 如果对于参数有任何的疑惑，可以通过命令查询atc的参数作用：
 
@@ -591,7 +589,6 @@ export NPU_HOST_LIB=/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub
 \item
   常用参数速览
 
-  { % do not increment counter
   \begin{longtable}[]{@{}
     >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
     >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -625,7 +622,6 @@ export NPU_HOST_LIB=/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub
   \passthrough{\lstinline!--debug!} & 打印模型描述信息 \\
   \passthrough{\lstinline!--help!} & 查看全部参数 \\
   \end{longtable}
-  }
 \item
   使用注意 运行 msame
   工具时，需确保当前账号拥有目录的执行和写入权限。对于部分动态 Shape

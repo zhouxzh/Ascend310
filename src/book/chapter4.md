@@ -14,6 +14,7 @@ AscendCL（Ascend Computing Language）是一套用于在昇腾平台上开发�
 为了解决上述痛点，PyACL（Python Ascend Computing Language）应运而生。作为 AscendCL 的 Python 绑定版本，PyACL 通过 CPython 封装底层 C 接口，在保留硬件高性能特性的同时，大幅降低了开发门槛。它允许开发者通过简洁的 Python 语法调用昇腾处理器的强大能力，无缝衔接主流 AI 框架和数据处理库。
 
 需要特别指出的是，**昇腾 310B 是一款定位为推理（Inference）的 AI 处理器，算力与显存资源受限，并不适合进行大规模的模型训练**。在实际应用中，标准的开发流水线如下：
+
 1.  **模型训练**：在拥有高性能显卡（GPU）或昇腾 910 训练卡的服务器上，使用 PyTorch 等框架完成模型训练。
 2.  **模型转换**：使用 ATC 工具将训练好的模型转换为昇腾专用的离线模型（.om）。
 3.  **推理部署**：使用 **PyACL** 在昇腾 310B 上加载 .om 模型，实现高性能的边缘端推理。
@@ -22,8 +23,9 @@ AscendCL（Ascend Computing Language）是一套用于在昇腾平台上开发�
 
 ## PyACL的基本概念 {#src-book-chapter4-h1}
 PyACL 封装了底层 C语言接口，主要包含以下模块：
+
 - **acl**: 核心模块，提供初始化、Device 管理、内存管理、模型推理等功能。
-- **acl.media**: 媒体数据处理（DVPP），包括 JPEG 编解码、视频编解码、VPC（图像处理）。详见[第5章](chapter5.md)。
+- **acl.media**: 媒体数据处理（DVPP），包括 JPEG 编解码、视频编解码、VPC（图像处理）。详见[第 5 章](chapter5.md#dvpp-basics)。
 - **acl.op**: 单算子调用接口。
 
 ### PyACL的逻辑架构 {#src-book-chapter4-h2}
@@ -124,6 +126,7 @@ python -c "import acl; print(f'Found {acl.rt.get_device_count()[0]} Ascend devic
 ```
 
 这种现象的原因主要有两点：
+
 1. **接口依赖性较低**：`acl.rt.get_device_count` 属于基础的硬件查询接口，在某些版本的驱动实现中，这类轻量级查询操作可能并不严格依赖完整的全局初始化环境即可访问驱动状态。
 2. **操作系统资源回收**：虽然程序没有显式调用 `acl.finalize()`，但当 Python 进程退出时，操作系统会自动关闭相关的文件描述符并回收该进程占用的资源。因此，多次运行该脚本通常不会立刻导致系统资源耗尽或报错。
 
@@ -169,6 +172,7 @@ PyACL 的资源管理构建在 **Device**、**Context** 与 **Stream** 三个核
 5.  **ACL 去初始化 (`acl.finalize`)**：这是进程退出的最后一步，用于彻底清理全局资源。开发者应严格遵循“先业务、再流、后设备”的逆序原则进行资源释放，最后调用此接口退出环境，以避免内存泄漏或设备状态异常。
 
 **关键点总结：**
+
 *   **顺序至关重要**：资源的申请与释放必须严格遵循层级逻辑。申请资源时，按照 **`Device -> Context -> Stream`** 的顺序依次创建；释放资源时，则必须严格遵循 **`Stream -> Context -> Device`** 的逆序原则。如果先重置了 Device，依附于其上的 Context 和 Stream 将变为非法状态，导致不可预知的系统错误。
 *   **显式 vs 隐式**：虽然隐式创建（直接 `set_device` 后 `create_stream`）代码更少，但为了代码的健壮性和可维护性，推荐在生产环境代码中始终使用**显式创建 Context和Stream** 的流程。
 
@@ -311,6 +315,7 @@ acl.rt.destroy_stream(stream)
 该模式常用于设备内数据重排或多设备间的点对点传输。在昇腾 310B 等单 NPU 平台上，跨设备传输并不常见；在多 NPU 环境下，应通过切换 Context 或使用专用点对点传输接口以减少额外拷贝开销。建议始终配合异步 Stream 并在访问目标缓冲区前调用同步接口（如 synchronize_stream 或 stream_wait_event）以确保数据已就绪，同时注意内存对齐与访问权限，避免 DMA 访问异常。
 
 **通用开发注意事项**
+
 1.  **异步与同步**：异步拷贝接口（`memcpy_async`）必须配合 Stream 以及 `synchronize_stream` 使用，否则无法保证数据一致性。
 2.  **内存类型**：为了提升传输效率，Host 侧供 Device 访问的内存建议始终使用 `acl.rt.malloc_host` 申请。
 3.  **释放顺序**：资源释放应遵循严格的逆序原则——先销毁 Stream，再释放内存，最后重置 Device。
@@ -418,7 +423,8 @@ PyACL 提供了四种不同粒度的同步等待机制，以适应从简单的�
 **对 PyACL 开发的启示：**
 
 基于上述硬件数据，我们在开发中必须遵循以下“生存法则”：
-*   **不要信任 CPU 的浮点计算能力**：任何涉及图像 Pixels 遍历的操作（如 Resize, Color Convert, Normalize）若写在 CPU (Python) 端，必将导致帧率骤降。**必须使用 DVPP 硬件加速**（详见[第5章](chapter5.md)）。
+
+*   **不要信任 CPU 的浮点计算能力**：任何涉及图像 Pixels 遍历的操作（如 Resize, Color Convert, Normalize）若写在 CPU (Python) 端，必将导致帧率骤降。**必须使用 DVPP 硬件加速**（详见[第 5 章](chapter5.md#dvpp-basics)）。
 *   **Python 代码仅做胶水**：Python 逻辑应仅限于流程控制、参数配置和极少量的后处理。业务主体必须由底层的 C++ 算子或 NPU 模型承担。
 *   **异步是救命稻草**：由于 CPU 处理每一行 Python 代码都比其他平台慢，因此更不能让 CPU 傻傻等待 NPU（同步）。只有利用 `stream_wait_event` 让 CPU 快速把任务分发完并脱身，才能掩盖 A55 核心性能不足的缺陷。
 
@@ -968,6 +974,7 @@ def execute(input_data_host):
 **3. 数据预处理**
 
 模型的输入通常需要特定的格式和分布。这里的 `preprocess` 函数模拟了标准 torchvision 的转换逻辑，但完全使用 Numpy 实现，以减少第三方库依赖。关键步骤包括：
+
 *   **归一化**：将像素值除以 255 转为浮点，并减去均值除以标准差。
 *   **维度变换**：将图片从 HWC（高宽通道）调整为 PyTorch 默认的 CHW（通道高宽）格式。
 *   **增加 Batch 维度**：模型输入通常是 4 维张量 (N, C, H, W)，因此需要增加 Batch 维度。
@@ -1345,6 +1352,7 @@ print(f"正确率: {accuracy:.2f}%")
 | Ascend 310B CPU | OnnxRuntime | CPU (Arm Cortex-A55) | 5.02 | ~1.9% |
 
 通过数据对比，我们可以清晰地看到昇腾 310B NPU 的强大优势：
+
 *   **对比自身 CPU**：NPU 的推理速度是其 CPU 模式（5.02 FPS）的 **52 倍**，充分证明了专用 AI 加速器的必要性。
 *   **对比树莓派 5B**：虽然同样是 Arm 架构的嵌入式设备，昇腾 310B NPU 的性能是树莓派 5B CPU（22.38 FPS）的 **11 倍**以上。
 *   **对比高性能笔记本 CPU**：即便是最新的 Intel Core Ultra 7 处理器（61.91 FPS），在没有独立显卡加速的情况下，其纯 CPU 推理性能也不及昇腾 310B NPU 的 **1/4**。
@@ -1451,6 +1459,7 @@ MobileNetV1 和 MobileNetV2 的中等宽度版本处于中等精度区间。`mob
 在应用实践层面，本章通过 ResNet-18（图像分类）和 SSD/SSDLite（目标检测）两个经典场景，完整演示了"GPU 训练 -> ONNX 导出 -> ATC 转换 -> PyACL NPU 推理"的标准开发流水线。跨平台对比数据表明，即便使用相同的 ONNX 模型，昇腾 310B NPU 的 ResNet-18 推理速度（265 FPS）远超其自身 CPU 模式（5 FPS）和树莓派 5B（22 FPS），充分验证了专用 AI 加速器在边缘场景下的不可替代性。对于 SSDLite320 目标检测，`mobilenetv4_hybrid_large` 更适合高精度，`mobilenetv4_conv_medium` 则是在 310B 上兼顾 mAP 与 30 FPS 级检测吞吐的更实用选择。
 
 回顾全章，PyACL 的精髓可归纳为三条原则：
+
 1. **资源按序管理**：初始化 -> Device -> Context -> Stream -> 业务执行 -> 逆序释放，缺一不可。
 2. **内存显式搬运**：Host 与 Device 内存相互隔离，数据必须通过 `memcpy` 显式传输，这与纯 CPU 编程截然不同。
 3. **异步优先于同步**：在边缘端弱 CPU 的约束下，必须用 `stream_wait_event` 将依赖关系卸载到 Device 侧，让 CPU 专注于指令分发而非空等。

@@ -21,22 +21,39 @@ Python 语法调用昇腾处理器的强大能力，无缝衔接主流 AI 框架
 
 需要特别指出的是，\textbf{昇腾 310B 是一款定位为推理（Inference）的 AI
 处理器，算力与显存资源受限，并不适合进行大规模的模型训练}。在实际应用中，标准的开发流水线如下：
-1. \textbf{模型训练}：在拥有高性能显卡（GPU）或昇腾 910
-训练卡的服务器上，使用 PyTorch 等框架完成模型训练。 2.
-\textbf{模型转换}：使用 ATC
-工具将训练好的模型转换为昇腾专用的离线模型（.om）。 3.
-\textbf{推理部署}：使用 \textbf{PyACL} 在昇腾 310B 上加载 .om
-模型，实现高性能的边缘端推理。
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{模型训练}：在拥有高性能显卡（GPU）或昇腾 910
+  训练卡的服务器上，使用 PyTorch 等框架完成模型训练。
+\item
+  \textbf{模型转换}：使用 ATC
+  工具将训练好的模型转换为昇腾专用的离线模型（.om）。
+\item
+  \textbf{推理部署}：使用 \textbf{PyACL} 在昇腾 310B 上加载 .om
+  模型，实现高性能的边缘端推理。
+\end{enumerate}
 
 本章将依据这一官方开发范式，系统讲解 PyACL 应用开发的全流程。
 
 \section{PyACL的基本概念}\label{src-book-chapter4-h1}
 
-PyACL 封装了底层 C语言接口，主要包含以下模块： - \textbf{acl}:
-核心模块，提供初始化、Device 管理、内存管理、模型推理等功能。 -
-\textbf{acl.media}: 媒体数据处理（DVPP），包括 JPEG
-编解码、视频编解码、VPC（图像处理）。详见\href{chapter5.md}{第5章}。 -
-\textbf{acl.op}: 单算子调用接口。
+PyACL 封装了底层 C语言接口，主要包含以下模块：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{acl}: 核心模块，提供初始化、Device
+  管理、内存管理、模型推理等功能。
+\item
+  \textbf{acl.media}: 媒体数据处理（DVPP），包括 JPEG
+  编解码、视频编解码、VPC（图像处理）。详见\hyperref[dvpp-basics]{第 5
+  章}。
+\item
+  \textbf{acl.op}: 单算子调用接口。
+\end{itemize}
 
 \subsection{PyACL的逻辑架构}\label{src-book-chapter4-h2}
 
@@ -242,12 +259,19 @@ Found 1 Ascend devices.
 python -c "import acl; print(f'Found {acl.rt.get_device_count()[0]} Ascend devices.')"
 \end{lstlisting}
 
-这种现象的原因主要有两点： 1.
-\textbf{接口依赖性较低}：\passthrough{\lstinline!acl.rt.get\_device\_count!}
-属于基础的硬件查询接口，在某些版本的驱动实现中，这类轻量级查询操作可能并不严格依赖完整的全局初始化环境即可访问驱动状态。
-2. \textbf{操作系统资源回收}：虽然程序没有显式调用
-\passthrough{\lstinline!acl.finalize()!}，但当 Python
-进程退出时，操作系统会自动关闭相关的文件描述符并回收该进程占用的资源。因此，多次运行该脚本通常不会立刻导致系统资源耗尽或报错。
+这种现象的原因主要有两点：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{接口依赖性较低}：\passthrough{\lstinline!acl.rt.get\_device\_count!}
+  属于基础的硬件查询接口，在某些版本的驱动实现中，这类轻量级查询操作可能并不严格依赖完整的全局初始化环境即可访问驱动状态。
+\item
+  \textbf{操作系统资源回收}：虽然程序没有显式调用
+  \passthrough{\lstinline!acl.finalize()!}，但当 Python
+  进程退出时，操作系统会自动关闭相关的文件描述符并回收该进程占用的资源。因此，多次运行该脚本通常不会立刻导致系统资源耗尽或报错。
+\end{enumerate}
 
 \textbf{但必须强调，这属于非规范用法。}
 在涉及模型加载、内存申请或硬件加速（DVPP）等核心功能时，跳过
@@ -353,16 +377,23 @@ width=100\% .center\}
   (\passthrough{\lstinline!acl.finalize!})}：这是进程退出的最后一步，用于彻底清理全局资源。开发者应严格遵循``先业务、再流、后设备''的逆序原则进行资源释放，最后调用此接口退出环境，以避免内存泄漏或设备状态异常。
 \end{enumerate}
 
-\textbf{关键点总结：} *
-\textbf{顺序至关重要}：资源的申请与释放必须严格遵循层级逻辑。申请资源时，按照
-\textbf{\passthrough{\lstinline!Device -> Context -> Stream!}}
-的顺序依次创建；释放资源时，则必须严格遵循
-\textbf{\passthrough{\lstinline!Stream -> Context -> Device!}}
-的逆序原则。如果先重置了 Device，依附于其上的 Context 和 Stream
-将变为非法状态，导致不可预知的系统错误。 * \textbf{显式 vs
-隐式}：虽然隐式创建（直接 \passthrough{\lstinline!set\_device!} 后
-\passthrough{\lstinline!create\_stream!}）代码更少，但为了代码的健壮性和可维护性，推荐在生产环境代码中始终使用\textbf{显式创建
-Context和Stream} 的流程。
+\textbf{关键点总结：}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{顺序至关重要}：资源的申请与释放必须严格遵循层级逻辑。申请资源时，按照
+  \textbf{\passthrough{\lstinline!Device -> Context -> Stream!}}
+  的顺序依次创建；释放资源时，则必须严格遵循
+  \textbf{\passthrough{\lstinline!Stream -> Context -> Device!}}
+  的逆序原则。如果先重置了 Device，依附于其上的 Context 和 Stream
+  将变为非法状态，导致不可预知的系统错误。
+\item
+  \textbf{显式 vs 隐式}：虽然隐式创建（直接
+  \passthrough{\lstinline!set\_device!} 后
+  \passthrough{\lstinline!create\_stream!}）代码更少，但为了代码的健壮性和可维护性，推荐在生产环境代码中始终使用\textbf{显式创建
+  Context和Stream} 的流程。
+\end{itemize}
 
 以下是 PyACL
 资源申请与释放的标准逻辑示例。这段伪代码展示了在典型应用场景下，如何按照规范的生命周期管理硬件资源：
@@ -568,18 +599,28 @@ acl.rt.destroy_stream(stream)
 stream\_wait\_event）以确保数据已就绪，同时注意内存对齐与访问权限，避免
 DMA 访问异常。
 
-\textbf{通用开发注意事项} 1.
-\textbf{异步与同步}：异步拷贝接口（\passthrough{\lstinline!memcpy\_async!}）必须配合
-Stream 以及 \passthrough{\lstinline!synchronize\_stream!}
-使用，否则无法保证数据一致性。 2.
-\textbf{内存类型}：为了提升传输效率，Host 侧供 Device
-访问的内存建议始终使用 \passthrough{\lstinline!acl.rt.malloc\_host!}
-申请。 3. \textbf{释放顺序}：资源释放应遵循严格的逆序原则------先销毁
-Stream，再释放内存，最后重置 Device。 4.
-\textbf{错误处理}：示例代码为保持简洁略去了错误检查，但在实际开发中，所有
-ACL
-接口调用的返回值（\passthrough{\lstinline!ret!}）都必须进行检查（\passthrough{\lstinline!0!}
-表示成功）。
+\textbf{通用开发注意事项}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{异步与同步}：异步拷贝接口（\passthrough{\lstinline!memcpy\_async!}）必须配合
+  Stream 以及 \passthrough{\lstinline!synchronize\_stream!}
+  使用，否则无法保证数据一致性。
+\item
+  \textbf{内存类型}：为了提升传输效率，Host 侧供 Device
+  访问的内存建议始终使用 \passthrough{\lstinline!acl.rt.malloc\_host!}
+  申请。
+\item
+  \textbf{释放顺序}：资源释放应遵循严格的逆序原则------先销毁
+  Stream，再释放内存，最后重置 Device。
+\item
+  \textbf{错误处理}：示例代码为保持简洁略去了错误检查，但在实际开发中，所有
+  ACL
+  接口调用的返回值（\passthrough{\lstinline!ret!}）都必须进行检查（\passthrough{\lstinline!0!}
+  表示成功）。
+\end{enumerate}
 
 \subsection{同步等待机制}\label{src-book-chapter4-h11}
 
@@ -720,7 +761,6 @@ CPU，因此\textbf{减少 Host 侧（CPU）的阻塞}、把调度压力卸载�
 下表详细对比了昇腾 310B 与树莓派 5、RK3588 以及 NVIDIA Jetson Orin Nano
 在 CPU 规格上的差异：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1667}}
   >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1667}}
@@ -759,7 +799,6 @@ GHz (大) / 1.8 GHz (小) & \textasciitilde{} 5000+ 分 \\
 小核 & 3.6 GHz \textasciitilde{} 5.0 GHz & \textasciitilde{} 45000+
 分 \\
 \end{longtable}
-}
 
 \textbf{数据解读与性能差距分析：}
 
@@ -790,17 +829,25 @@ GHz (大) / 1.8 GHz (小) & \textasciitilde{} 5000+ 分 \\
 
 \textbf{对 PyACL 开发的启示：}
 
-基于上述硬件数据，我们在开发中必须遵循以下``生存法则''： *
-\textbf{不要信任 CPU 的浮点计算能力}：任何涉及图像 Pixels 遍历的操作（如
-Resize, Color Convert, Normalize）若写在 CPU (Python)
-端，必将导致帧率骤降。\textbf{必须使用 DVPP
-硬件加速}（详见\href{chapter5.md}{第5章}）。 * \textbf{Python
-代码仅做胶水}：Python
-逻辑应仅限于流程控制、参数配置和极少量的后处理。业务主体必须由底层的 C++
-算子或 NPU 模型承担。 * \textbf{异步是救命稻草}：由于 CPU 处理每一行
-Python 代码都比其他平台慢，因此更不能让 CPU 傻傻等待
-NPU（同步）。只有利用 \passthrough{\lstinline!stream\_wait\_event!} 让
-CPU 快速把任务分发完并脱身，才能掩盖 A55 核心性能不足的缺陷。
+基于上述硬件数据，我们在开发中必须遵循以下``生存法则''：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{不要信任 CPU 的浮点计算能力}：任何涉及图像 Pixels
+  遍历的操作（如 Resize, Color Convert, Normalize）若写在 CPU (Python)
+  端，必将导致帧率骤降。\textbf{必须使用 DVPP
+  硬件加速}（详见\hyperref[dvpp-basics]{第 5 章}）。
+\item
+  \textbf{Python 代码仅做胶水}：Python
+  逻辑应仅限于流程控制、参数配置和极少量的后处理。业务主体必须由底层的
+  C++ 算子或 NPU 模型承担。
+\item
+  \textbf{异步是救命稻草}：由于 CPU 处理每一行 Python
+  代码都比其他平台慢，因此更不能让 CPU 傻傻等待 NPU（同步）。只有利用
+  \passthrough{\lstinline!stream\_wait\_event!} 让 CPU
+  快速把任务分发完并脱身，才能掩盖 A55 核心性能不足的缺陷。
+\end{itemize}
 
 \paragraph{1.
 优先策略：全链路异步与细粒度同步}\label{src-book-chapter4-h15}
@@ -1537,14 +1584,23 @@ def execute(input_data_host):
 
 模型的输入通常需要特定的格式和分布。这里的
 \passthrough{\lstinline!preprocess!} 函数模拟了标准 torchvision
-的转换逻辑，但完全使用 Numpy 实现，以减少第三方库依赖。关键步骤包括： *
-\textbf{归一化}：将像素值除以 255 转为浮点，并减去均值除以标准差。 *
-\textbf{维度变换}：将图片从 HWC（高宽通道）调整为 PyTorch 默认的
-CHW（通道高宽）格式。 * \textbf{增加 Batch 维度}：模型输入通常是 4
-维张量 (N, C, H, W)，因此需要增加 Batch 维度。 *
-\textbf{内存连续性}：这一步通过
-\passthrough{\lstinline!np.ascontiguousarray!}
-确保数据在内存中是连续存储的，这是 C 语言接口正确读取数据的必要条件。
+的转换逻辑，但完全使用 Numpy 实现，以减少第三方库依赖。关键步骤包括：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{归一化}：将像素值除以 255 转为浮点，并减去均值除以标准差。
+\item
+  \textbf{维度变换}：将图片从 HWC（高宽通道）调整为 PyTorch 默认的
+  CHW（通道高宽）格式。
+\item
+  \textbf{增加 Batch 维度}：模型输入通常是 4 维张量 (N, C, H,
+  W)，因此需要增加 Batch 维度。
+\item
+  \textbf{内存连续性}：这一步通过
+  \passthrough{\lstinline!np.ascontiguousarray!}
+  确保数据在内存中是连续存储的，这是 C 语言接口正确读取数据的必要条件。
+\end{itemize}
 
 \textbf{4. 资源释放}
 
@@ -1921,7 +1977,6 @@ BCM2712, 4 核 Cortex-A76 @ 2.4GHz)}
 
 \textbf{多平台 ResNet-18（Tiny-ImageNet）推理性能对比数据：}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1954,18 +2009,26 @@ Raspberry Pi 5B & OnnxRuntime & CPU & 22.38 & \textasciitilde8.4\% \\
 Ascend 310B CPU & OnnxRuntime & CPU (Arm Cortex-A55) & 5.02 &
 \textasciitilde1.9\% \\
 \end{longtable}
-}
 
-通过数据对比，我们可以清晰地看到昇腾 310B NPU 的强大优势： *
-\textbf{对比自身 CPU}：NPU 的推理速度是其 CPU 模式（5.02 FPS）的
-\textbf{52 倍}，充分证明了专用 AI 加速器的必要性。 * \textbf{对比树莓派
-5B}：虽然同样是 Arm 架构的嵌入式设备，昇腾 310B NPU 的性能是树莓派 5B
-CPU（22.38 FPS）的 \textbf{11 倍}以上。 * \textbf{对比高性能笔记本
-CPU}：即便是最新的 Intel Core Ultra 7 处理器（61.91
-FPS），在没有独立显卡加速的情况下，其纯 CPU 推理性能也不及昇腾 310B NPU
-的 \textbf{1/4}。 * \textbf{对比旗舰显卡}：虽然 RTX 5090D 展现出了恐怖的
-1000+ FPS 性能，但考虑到昇腾 310B 这类边缘设备的低功耗和体积优势，265
-FPS 的成绩对于实时的嵌入式应用而言已经绰绰有余。
+通过数据对比，我们可以清晰地看到昇腾 310B NPU 的强大优势：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{对比自身 CPU}：NPU 的推理速度是其 CPU 模式（5.02 FPS）的
+  \textbf{52 倍}，充分证明了专用 AI 加速器的必要性。
+\item
+  \textbf{对比树莓派 5B}：虽然同样是 Arm 架构的嵌入式设备，昇腾 310B NPU
+  的性能是树莓派 5B CPU（22.38 FPS）的 \textbf{11 倍}以上。
+\item
+  \textbf{对比高性能笔记本 CPU}：即便是最新的 Intel Core Ultra 7
+  处理器（61.91 FPS），在没有独立显卡加速的情况下，其纯 CPU
+  推理性能也不及昇腾 310B NPU 的 \textbf{1/4}。
+\item
+  \textbf{对比旗舰显卡}：虽然 RTX 5090D 展现出了恐怖的 1000+ FPS
+  性能，但考虑到昇腾 310B 这类边缘设备的低功耗和体积优势，265 FPS
+  的成绩对于实时的嵌入式应用而言已经绰绰有余。
+\end{itemize}
 
 这一测试结果有力地展示了昇腾 310B
 在边缘计算场景下的核心竞争力------\textbf{以极低的功耗提供数倍于通用 CPU
@@ -1986,7 +2049,6 @@ Box）}和\textbf{类别}，对模型结构和后处理逻辑都提出了更高�
 SSD（Single Shot MultiBox Detector）是一种单阶段目标检测器，以 ResNet-50
 为主干网络，输入尺寸 300×300，在 COCO 2017 数据集上训练和评估。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 文件 & 说明 \\
@@ -2000,7 +2062,6 @@ NPU 推理 \\
 \passthrough{\lstinline!inference\_cuda.py!} & GPU 推理（对比基准） \\
 \passthrough{\lstinline!inference\_cpu.py!} & CPU 推理 \\
 \end{longtable}
-}
 
 代码位于
 \href{https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter4/SSD/}{\passthrough{\lstinline!samples/chapter4/SSD/!}}。
@@ -2023,7 +2084,6 @@ MobileNetV1、MobileNetV2、MobileNetV3 和 MobileNetV4 的 15 个 SSDLite320
 ONNX 导出细节，应到该 GitHub 仓库查找。Ascend 310B 侧的样例代码位于
 \href{https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter4/SSDLite/}{\passthrough{\lstinline!samples/chapter4/SSDLite/!}}。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -2047,7 +2107,6 @@ OM（需在 Ascend 设备上运行） \\
 \passthrough{\lstinline!ssdlite320/!} & Default
 Boxes、Decode、NMS、可视化与评估工具 \\
 \end{longtable}
-}
 
 \subsubsection{昇腾 310B
 评估口径}\label{ux6607ux817e-310b-ux8bc4ux4f30ux53e3ux5f84}
@@ -2152,7 +2211,6 @@ AP50
 \passthrough{\lstinline!mobilenetv3\_small\_050!} 或
 \passthrough{\lstinline!mobilenetv3\_small\_100!}；但从通用目标检测效果看，它们更适合作为速度上限参考，而不是推荐默认模型。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -2196,7 +2254,6 @@ SSDLite320+Python/PyACL+NMS 结果无法支撑 120 FPS
 逐帧检测，需要降低输入尺寸、使用更小检测器、迁移后处理到
 C++/设备侧、引入 DVPP 和多 Stream 异步流水线 \\
 \end{longtable}
-}
 
 因此，在昇腾 310B 上做 SSDLite320
 部署时，可以按业务目标分成两类：追求检测质量时选择
@@ -2259,15 +2316,23 @@ NPU 推理''的标准开发流水线。跨平台对比数据表明，即便使�
 更适合高精度，\passthrough{\lstinline!mobilenetv4\_conv\_medium!} 则是在
 310B 上兼顾 mAP 与 30 FPS 级检测吞吐的更实用选择。
 
-回顾全章，PyACL 的精髓可归纳为三条原则： 1.
-\textbf{资源按序管理}：初始化 -\textgreater{} Device -\textgreater{}
-Context -\textgreater{} Stream -\textgreater{} 业务执行 -\textgreater{}
-逆序释放，缺一不可。 2. \textbf{内存显式搬运}：Host 与 Device
-内存相互隔离，数据必须通过 \passthrough{\lstinline!memcpy!}
-显式传输，这与纯 CPU 编程截然不同。 3.
-\textbf{异步优先于同步}：在边缘端弱 CPU 的约束下，必须用
-\passthrough{\lstinline!stream\_wait\_event!} 将依赖关系卸载到 Device
-侧，让 CPU 专注于指令分发而非空等。
+回顾全章，PyACL 的精髓可归纳为三条原则：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{资源按序管理}：初始化 -\textgreater{} Device -\textgreater{}
+  Context -\textgreater{} Stream -\textgreater{} 业务执行
+  -\textgreater{} 逆序释放，缺一不可。
+\item
+  \textbf{内存显式搬运}：Host 与 Device 内存相互隔离，数据必须通过
+  \passthrough{\lstinline!memcpy!} 显式传输，这与纯 CPU 编程截然不同。
+\item
+  \textbf{异步优先于同步}：在边缘端弱 CPU 的约束下，必须用
+  \passthrough{\lstinline!stream\_wait\_event!} 将依赖关系卸载到 Device
+  侧，让 CPU 专注于指令分发而非空等。
+\end{enumerate}
 
 掌握了这些基础概念与 API 后，下一章将进一步深入
 DVPP（数字视觉预处理）模块，探索如何利用昇腾 310B

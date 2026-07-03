@@ -1206,7 +1206,6 @@ if __name__ == "__main__":
 以下是昇腾 PyTorch 插件支持的 PyTorch 版本与其对应的 TorchVision
 版本对照表：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 PyTorch 版本 & TorchVision 版本 \\
@@ -1219,7 +1218,6 @@ PyTorch 版本 & TorchVision 版本 \\
 2.7.1 & 0.22.0 \\
 2.8.0 & 0.23.0 \\
 \end{longtable}
-}
 
 例如，若当前环境安装的是 PyTorch 2.8.0，则需安装 TorchVision 0.19.0：
 
@@ -1819,7 +1817,6 @@ Epochs: 100%|(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1e
 
 详细的实验数据对比汇总如下表所示：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1429}}
   >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1429}}
@@ -1857,7 +1854,6 @@ Epochs: 100%|(*@\textcolor{gray}{\rule{1em}{1em}}@*)(*@\textcolor{gray}{\rule{1e
 \textbf{GeForce 5090D} & FP32 (全精度) & 11.0 min & 0.55 min & 96.88\% &
 82.52\% & 0.7670 \\
 \end{longtable}
-}
 
 首先，从训练速度来看，虽然昇腾 310B
 的训练耗时明显长于桌面级高性能显卡，但这完全符合其硬件定位。昇腾 310B

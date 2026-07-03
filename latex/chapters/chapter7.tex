@@ -9,7 +9,7 @@ Face 仓库 \passthrough{\lstinline!zhouxzh/resnet18\_tiny\_imagenet!}
 200 类分类结果。它的绝对 FPS 不能等同于标准 ImageNet 224x224
 ResNet18，但内存生命周期、数据搬运、预处理下沉和流水线分析方法是通用的。
 
-\section{7.1 性能优化先从可测量开始}\label{src-book-chapter7-h1}
+\section{性能优化先从可测量开始}\label{src-book-chapter7-h1}
 
 性能优化的第一步不是改代码，而是把问题拆成可观测的阶段。边缘 AI
 应用通常包含以下链路：
@@ -20,7 +20,6 @@ ResNet18，但内存生命周期、数据搬运、预处理下沉和流水线分
 
 本章统一记录以下指标：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 指标 & 含义 & 适合回答的问题 \\
@@ -34,7 +33,6 @@ p95 & 95 分位耗时 & 是否存在长尾卡顿 \\
 FPS & 单位时间处理帧数 & 吞吐量是否达标 \\
 加速比 & 优化前耗时 / 优化后耗时 & 单项优化是否值得保留 \\
 \end{longtable}
-}
 
 测试时需要遵守三个规则：
 
@@ -51,11 +49,10 @@ FPS & 单位时间处理帧数 & 吞吐量是否达标 \\
   阻塞。
 \end{enumerate}
 
-\section{7.2 第 7 章样例目录}\label{src-book-chapter7-h2}
+\section{第 7 章样例目录}\label{src-book-chapter7-h2}
 
 本章代码位于 \passthrough{\lstinline!samples/chapter7/!}：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -93,7 +90,6 @@ Queue Pipeline \\
 AIPP 配置示例 \\
 \passthrough{\lstinline!model/!} & 第 7 章模型和 AIPP 配置目录 \\
 \end{longtable}
-}
 
 阅读本章时，建议先进入第 7 章样例目录，后续命令都默认在这个目录下执行：
 
@@ -121,10 +117,9 @@ python3 tools/download_model.py
 python3 01_baseline_resnet_sync.py --runs 100
 \end{lstlisting}
 
-\section{7.3 工具箱：从轻量计时到系统
-Profiling}\label{src-book-chapter7-h3}
+\section{工具箱：从轻量计时到系统 Profiling}\label{src-book-chapter7-h3}
 
-\subsection{7.3.1 Python 分段计时}\label{src-book-chapter7-h4}
+\subsection{Python 分段计时}\label{src-book-chapter7-h4}
 
 \passthrough{\lstinline!perf\_counter()!} 适合做应用层粗粒度计时。第 7
 章的样例通过 \passthrough{\lstinline!StageRecorder!}
@@ -143,7 +138,7 @@ Profiling}\label{src-book-chapter7-h3}
 这种计时不能替代硬件
 Profiling，但它有两个优势：代码改动小，能快速判断优化是否有方向。
 
-\subsection{7.3.2 msprof：观察 ACL API、Memcpy 和 NPU
+\subsection{msprof：观察 ACL API、Memcpy 和 NPU
 Timeline}\label{src-book-chapter7-h5}
 
 \passthrough{\lstinline!msprof!} 是 CANN 提供的性能采集工具。它能记录
@@ -159,7 +154,6 @@ bash tools/profile_with_msprof.sh --name baseline -- \
 
 采集后重点观察：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -184,9 +178,8 @@ Stream Timeline & NPU 计算任务之间是否有大片空白 & NPU 在等待 Ho
 AI Core Metrics & Pipe 利用率是否低 & 模型算子、Batch
 或输入尺寸需要继续分析 \\
 \end{longtable}
-}
 
-\subsection{7.3.3 npu-smi：确认设备状态}\label{src-book-chapter7-h6}
+\subsection{npu-smi：确认设备状态}\label{src-book-chapter7-h6}
 
 \passthrough{\lstinline!npu-smi info!}
 用于确认设备是否在线、温度是否异常、功耗是否接近限制。性能测试前后都应记录一次，避免把降频、设备异常或其他进程占用误判为代码问题。
@@ -195,7 +188,7 @@ AI Core Metrics & Pipe 利用率是否低 & 模型算子、Batch
 npu-smi info
 \end{lstlisting}
 
-\subsection{7.3.4 msame /
+\subsection{msame /
 ais\_bench：独立测模型上限}\label{src-book-chapter7-h7}
 
 当应用端到端 FPS 不理想时，可以用 \passthrough{\lstinline!msame!} 或
@@ -219,7 +212,7 @@ ais_bench --model model/resnet18_tiny_imagenet.om --batchsize 1
 的命令行参数可能略有差异；如果本机未安装该工具，可以跳过本节，继续使用本章
 Python 分段计时脚本观察端到端瓶颈。
 
-\subsection{7.3.5 ATC/AIPP 与
+\subsection{ATC/AIPP 与
 DVPP：把图像工作下沉到设备侧}\label{src-book-chapter7-h8}
 
 AIPP 能在模型输入侧完成颜色格式处理和归一化，减少 Host CPU
@@ -247,7 +240,7 @@ DVPP 适合处理视频编解码、JPEG 编解码、VPC resize/crop 等媒体任
 章已经介绍 DVPP API，本章只关心它在性能优化中的角色：减少 CPU
 图像处理负担，并让数据尽量早地进入设备侧流水线。
 
-\section{7.4 案例一：建立同步推理基线}\label{src-book-chapter7-h9}
+\section{案例一：建立同步推理基线}\label{src-book-chapter7-h9}
 
 先运行基线：
 
@@ -272,7 +265,6 @@ acl.rt.memcpy(host_out, output_size, output_ptr, output_size, ACL_MEMCPY_DEVICE_
 
 基线需要记录以下阶段：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 阶段 & 含义 \\
@@ -291,13 +283,12 @@ Dataset \\
 等轻量后处理 \\
 \passthrough{\lstinline!end\_to\_end!} & 单帧端到端耗时 \\
 \end{longtable}
-}
 
 如果 \passthrough{\lstinline!alloc\_dataset!} 和
 \passthrough{\lstinline!free\_dataset!}
 占比明显，说明优化方向不是模型，而是资源生命周期。
 
-\section{7.5 案例二：复用 ACL Buffer 和
+\section{案例二：复用 ACL Buffer 和
 Dataset}\label{src-book-chapter7-h10}
 
 推理服务通常会长时间运行，输入输出张量大小也是固定的。因此更合理的做法是在模型加载后一次性创建输入输出
@@ -333,7 +324,7 @@ python3 02_buffer_reuse_benchmark.py --runs 100
 如果模型很小，Buffer
 复用的收益会特别明显；如果模型本身很大，收益占比会下降，但仍然能减少长尾抖动。
 
-\section{7.6 案例三：CPU
+\section{案例三：CPU
 预处理为什么容易成为瓶颈}\label{src-book-chapter7-h11}
 
 很多边缘视觉应用在 NPU 推理前会做 resize、颜色转换、归一化和 HWC 到 CHW
@@ -349,7 +340,6 @@ python3 03_cpu_preprocess_benchmark.py --runs 100 --resolution 1920x1080
 
 脚本比较两种方式：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 方式 & 特点 \\
@@ -362,7 +352,6 @@ python3 03_cpu_preprocess_benchmark.py --runs 100 --resolution 1920x1080
 \passthrough{\lstinline!workspace\_reuse!} &
 预先创建工作区，循环中复用数组 \\
 \end{longtable}
-}
 
 这个案例的学习重点不是把 CPU 预处理调到极致，而是理解何时应该停止优化
 CPU。若预处理耗时已经接近或超过模型执行耗时，应优先考虑：
@@ -378,7 +367,7 @@ CPU。若预处理耗时已经接近或超过模型执行耗时，应优先考�
   使用视频链路时，让 VDEC/JPEGD 的输出直接衔接 VPC 或模型输入。
 \end{enumerate}
 
-\section{7.7 案例四：DVPP VPC resize 与 CPU
+\section{案例四：DVPP VPC resize 与 CPU
 resize}\label{src-book-chapter7-h12}
 
 脚本 \passthrough{\lstinline!04\_dvpp\_resize\_vs\_cpu.py!} 生成 NV12
@@ -404,7 +393,7 @@ D2H，因此测到的是一个完整调用成本，而不是 VPC 内核的裸耗
   是否存在多余的 H2D/D2H 拷贝。
 \end{enumerate}
 
-\section{7.8 案例五：AIPP
+\section{案例五：AIPP
 把归一化下沉到模型输入侧}\label{src-book-chapter7-h13}
 
 前面的基线脚本使用 CPU 完成 resize、归一化和 HWC 到 CHW 转换，然后把
@@ -489,8 +478,7 @@ ATC
 是离线转换步骤，第一次编译可能明显慢于普通推理脚本。如果转换耗时异常，应先检查板端负载、可用内存、CANN
 日志和 AIPP 配置，再重新运行转换脚本。
 
-\section{7.9 案例六：串行流程与 Queue
-Pipeline}\label{src-book-chapter7-h14}
+\section{案例六：串行流程与 Queue Pipeline}\label{src-book-chapter7-h14}
 
 串行流程的单帧耗时为：
 
@@ -519,13 +507,12 @@ python3 05_pipeline_queue_demo.py --frames 100
 流水线优化的目标不是降低单帧端到端延迟，而是提高稳态吞吐。它会引入队列等待，因此
 p95 latency 可能上升；如果业务目标是交互式低延迟，需要谨慎扩大队列深度。
 
-\section{7.10 作者实测结果}\label{src-book-chapter7-h15}
+\section{作者实测结果}\label{src-book-chapter7-h15}
 
 本节记录作者在一台 Ascend 310B
 设备上得到的实测数据。读者自己的板端温度、CANN
 版本、设备健康状态和后台进程不同，绝对数值会有差异；更重要的是复现实验方法和观察相对趋势。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -552,14 +539,12 @@ Python &
 \passthrough{\lstinline!Alarm!}，温度约 61 C，测试前后内存约 2939-3003 /
 7545 MB \\
 \end{longtable}
-}
 
 以下表格由
 \passthrough{\lstinline!samples/chapter7/tools/summarize\_metrics.py!}
 汇总远端 JSON 指标生成。由于测试时设备状态为
 \passthrough{\lstinline!Alarm!}，数据更适合作为章节教学样例和相对趋势参考；正式项目验收应在设备健康状态正常、无其他进程干扰时重新跑完整评测。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1034}}
   >{\raggedright\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1034}}
@@ -625,7 +610,6 @@ Post 串行 \\
 Queue Pipeline & \passthrough{\lstinline!simulate\_queue\_pipeline!} &
 8.1233 & 157.4201 & 123.1021 & 200 & 1.868 & 三段线程通过 Queue 解耦 \\
 \end{longtable}
-}
 
 从这组数据可以得到五个结论：
 
@@ -702,9 +686,8 @@ bash tools/profile_with_msprof.sh --name baseline-remote-latest -- \
     --runs 20 --output outputs/baseline_msprof_remote_latest.json
 \end{lstlisting}
 
-\section{7.11 调优 Checklist}\label{src-book-chapter7-h16}
+\section{调优 Checklist}\label{src-book-chapter7-h16}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -733,9 +716,8 @@ DVPP、AIPP、C++/NumPy 工作区复用 \\
 Pipeline FPS 不升反降 & 队列太深或阶段不均衡 &
 缩小队列、调整线程数、重新划分阶段 \\
 \end{longtable}
-}
 
-\section{7.12 练习任务}\label{src-book-chapter7-h17}
+\section{练习任务}\label{src-book-chapter7-h17}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -763,7 +745,7 @@ Pipeline FPS 不升反降 & 队列太深或阶段不均衡 &
   归一化下沉前后的端到端耗时和输出差异。
 \end{enumerate}
 
-\section{7.13 小结}\label{src-book-chapter7-h18}
+\section{小结}\label{src-book-chapter7-h18}
 
 Ascend 310B
 性能优化的核心是先定位瓶颈，再把瓶颈映射到合适的硬件或软件策略。小模型场景中，内存申请、同步和

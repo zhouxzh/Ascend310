@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dot -Tpng -Gdpi=300 /home/zhong/Documents/Ascend310/samples/case1/img1/case1_flow.dot -o /home/zhong/Documents/Ascend310/samples/case1/img1/case1_flow.png)"
+    ]
+  }
+}

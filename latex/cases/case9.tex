@@ -10,7 +10,7 @@
 
 \section{2. 内容大纲}\label{src-experiment-case9-h2}
 
-\subsection{2.1. 硬件准备}\label{src-experiment-case9-h3}
+\subsection{硬件准备}\label{src-experiment-case9-h3}
 
 \begin{itemize}
 \tightlist
@@ -73,7 +73,7 @@ flowchart LR
 相比原方案中动辄列出''4麦克风阵列、NVMe
 SSD、触摸屏、锂电池组''等大量外围硬件，本项目的硬件需求非常简洁：一块昇腾310B开发板、一个USB麦克风和音响（或一个USB耳机），足以运行完整的聊天机器人系统。没有昇腾设备也可以------嵌入模型会自动回退到CPU推理。
 
-\subsection{2.2. 软件环境}\label{src-experiment-case9-h4}
+\subsection{软件环境}\label{src-experiment-case9-h4}
 
 \begin{itemize}
 \tightlist
@@ -163,12 +163,11 @@ accelerate / peft} 作为运行时依赖------这些加起来超过
 uvicorn / websockets}------Gradio 一个库覆盖了 Web 界面和 API -
 语音库标注为可选，没有麦克风也不影响核心功能
 
-\subsection{2.3. 系统架构设计}\label{src-experiment-case9-h5}
+\subsection{系统架构设计}\label{src-experiment-case9-h5}
 
 本节是理解整个项目设计思路的核心。在动手写代码之前，需要先回答一个关键问题：\textbf{昇腾310B到底能不能跑大语言模型？}
 
-\subsubsection{2.3.1
-为什么不在NPU上直接跑LLM}\label{src-experiment-case9-h6}
+\subsubsection{为什么不在NPU上直接跑LLM}\label{src-experiment-case9-h6}
 
 昇腾310B的NPU通过OM（Offline
 Model）格式执行推理。OM是一个\textbf{静态计算图}------输入张量的形状和数据类型在模型转换时就固定了，运行时不可改变。
@@ -192,7 +191,7 @@ Embedding）是NPU的''甜点区''：
   推理速度快（NPU上约10ms/条 vs CPU 50-80ms/条）
 \end{itemize}
 
-\subsubsection{2.3.2 三层架构设计}\label{src-experiment-case9-h7}
+\subsubsection{三层架构设计}\label{src-experiment-case9-h7}
 
 基于上述分析，本项目采用\textbf{三层混合架构}，完整程序流程如下：
 
@@ -267,7 +266,6 @@ flowchart TD
 
 \textbf{每一层的职责和设计考量}：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -291,12 +289,9 @@ FAISS检索 & CPU &
 向量搜索是索引结构的遍历，非矩阵运算，CPU+C++优化就足够快（\textless1ms） \\
 回复生成 & CPU & 模板匹配在CPU上是O(1)；云端API走网络，与NPU无关 \\
 \end{longtable}
-}
 
-\subsubsection{2.3.3
-与纯云端/纯边缘方案的对比}\label{src-experiment-case9-h8}
+\subsubsection{与纯云端/纯边缘方案的对比}\label{src-experiment-case9-h8}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -324,13 +319,12 @@ FAISS检索 & CPU &
 硬件要求 & 无需NPU & 需大内存+GPU & 升腾310B或普通CPU \\
 维护成本 & API费用 & 模型更新复杂 & 只更新知识库文本 \\
 \end{longtable}
-}
 
-\subsection{2.4. 文本嵌入模型与昇腾部署}\label{src-experiment-case9-h9}
+\subsection{文本嵌入模型与昇腾部署}\label{src-experiment-case9-h9}
 
 本节详细介绍如何在昇腾310B上部署文本嵌入模型，这是整个RAG管道的基石。
 
-\subsubsection{2.4.1 什么是文本嵌入}\label{src-experiment-case9-h10}
+\subsubsection{什么是文本嵌入}\label{src-experiment-case9-h10}
 
 文本嵌入（Text
 Embedding）将一段自然语言文本转换为固定长度的浮点数向量。其核心性质是：\textbf{语义相近的文本，在向量空间中距离更近}。
@@ -343,10 +337,9 @@ Embedding）将一段自然语言文本转换为固定长度的浮点数向量�
 
 有了这个性质，``找到知识库里和用户问题最相关的内容''就变成了数学上的向量内积运算。
 
-\subsubsection{2.4.2 为什么选择
+\subsubsection{为什么选择
 all-MiniLM-L6-v2}\label{src-experiment-case9-h11}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lllll@{}}
 \toprule\noalign{}
 候选模型 & 参数量 & 向量维度 & 模型大小 & 推理速度 (CPU) \\
@@ -363,7 +356,6 @@ bge-large-zh-v1.5 & 326M & 1024 & \textasciitilde1.3 GB &
 text2vec-large-chinese & 326M & 1024 & \textasciitilde1.3 GB &
 \textasciitilde150ms \\
 \end{longtable}
-}
 
 all-MiniLM-L6-v2 是由 Microsoft 的 Sentence-Transformers
 团队发布的轻量级嵌入模型。它用知识蒸馏技术将 BERT 的 12 层压缩到 6
@@ -375,7 +367,7 @@ tokens 输入，384 维向量输出，完美匹配 OM 静态图 -
 \textbf{多语言支持}：虽然以英文为主训练，但对中文的嵌入质量在轻量模型中排名靠前
 - \textbf{生态成熟}：HuggingFace 直接支持，optimum 库可一行代码导出 ONNX
 
-\subsubsection{2.4.3 模型转换管线}\label{src-experiment-case9-h12}
+\subsubsection{模型转换管线}\label{src-experiment-case9-h12}
 
 \begin{lstlisting}
 flowchart TD
@@ -436,7 +428,7 @@ ATC 推导失败 -
 \passthrough{\lstinline!embedding\_model.om!}（约
 45MB，FP16），这就是昇腾 NPU 可以直接执行的格式。
 
-\subsubsection{2.4.4 NPU 推理封装}\label{src-experiment-case9-h13}
+\subsubsection{NPU 推理封装}\label{src-experiment-case9-h13}
 
 昇腾的 Python
 API（PyACL）提供了底层的设备管理、内存拷贝和模型执行接口。\passthrough{\lstinline!ascend\_inference.py!}
@@ -551,11 +543,11 @@ def _normalize(embeddings):
     return embeddings / norms
 \end{lstlisting}
 
-\subsection{2.5. 知识库与向量检索}\label{src-experiment-case9-h14}
+\subsection{知识库与向量检索}\label{src-experiment-case9-h14}
 
 有了嵌入模型，下一步是构建知识库并实现高效的向量检索。
 
-\subsubsection{2.5.1 RAG 的核心思想}\label{src-experiment-case9-h15}
+\subsubsection{RAG 的核心思想}\label{src-experiment-case9-h15}
 
 RAG（Retrieval-Augmented Generation，检索增强生成）的工作流程：
 
@@ -588,7 +580,7 @@ RAG 解决的核心问题：\textbf{让 AI 的回答有据可查}。没有 RAG
 时，模型要么凭空编造（大模型的''幻觉''），要么只能靠训练数据中记住的知识。有了
 RAG 后，回答可以被溯源到知识库中的具体文档片段。
 
-\subsubsection{2.5.2 中文文本分块策略}\label{src-experiment-case9-h16}
+\subsubsection{中文文本分块策略}\label{src-experiment-case9-h16}
 
 知识库文档需要被切成合适大小的''块''（chunk）。块太大，检索精度下降（一个块里混入太多不相关内容）；块太小，语义不完整。
 
@@ -620,7 +612,7 @@ def _split_text(self, text):
 中文分句不使用 jieba
 分词，而是通过正则表达式匹配句末标点（\passthrough{\lstinline!。！？；!}）。这比用分词器更轻量，且对中文段落的分句准确度足够。
 
-\subsubsection{2.5.3 FAISS 向量索引}\label{src-experiment-case9-h17}
+\subsubsection{FAISS 向量索引}\label{src-experiment-case9-h17}
 
 FAISS（Facebook AI Similarity Search）是 Meta
 开源的向量相似度搜索库。核心操作极其简单：
@@ -651,7 +643,7 @@ O(N×384)。 - \textbf{IP}：Inner Product（内积）。配合 L2
 提供了
 IVF（倒排索引）、HNSW（图索引）等近似搜索方案，只需改一行代码即可切换。
 
-\subsubsection{2.5.4 知识库管理}\label{src-experiment-case9-h18}
+\subsubsection{知识库管理}\label{src-experiment-case9-h18}
 
 \passthrough{\lstinline!KnowledgeBase!} 类提供了完整的增删查改和持久化：
 
@@ -671,9 +663,9 @@ kb.save("data/index.faiss", "data/documents.json")
 kb.load("data/index.faiss", "data/documents.json")
 \end{lstlisting}
 
-\subsection{2.6. 对话管理与响应生成}\label{src-experiment-case9-h19}
+\subsection{对话管理与响应生成}\label{src-experiment-case9-h19}
 
-\subsubsection{2.6.1 对话状态机}\label{src-experiment-case9-h20}
+\subsubsection{对话状态机}\label{src-experiment-case9-h20}
 
 \passthrough{\lstinline!DialogueManager!} 维护一个简单的四状态机：
 
@@ -696,7 +688,7 @@ stateDiagram-v2
 检测到''再见/拜拜/bye''等关键词进入 FAREWELL - 其他情况保持在 ACTIVE
 状态，走完整的 RAG 处理流程
 
-\subsubsection{2.6.2 两级回复生成}\label{src-experiment-case9-h21}
+\subsubsection{两级回复生成}\label{src-experiment-case9-h21}
 
 \textbf{默认模式：模板 + RAG 检索上下文}
 
@@ -749,7 +741,7 @@ def _generate_cloud(self, query, context, history):
 OpenAI、通义千问、DeepSeek - 本地：Ollama、vLLM、llama.cpp
 server、LocalAI
 
-\subsubsection{2.6.3 对话历史管理}\label{src-experiment-case9-h22}
+\subsubsection{对话历史管理}\label{src-experiment-case9-h22}
 
 \passthrough{\lstinline!ConversationHistory!}
 是一个固定容量的环形缓冲区：
@@ -772,7 +764,7 @@ class ConversationHistory:
 保留最近 10 轮对话，云端模式下将最近 4 轮作为上下文发送给
 LLM。这样做既维持了多轮对话的连贯性，又控制了 API 调用的 token 消耗。
 
-\subsection{2.7. 语音交互系统}\label{src-experiment-case9-h23}
+\subsection{语音交互系统}\label{src-experiment-case9-h23}
 
 语音交互采用\textbf{浏览器端录音 + 服务端识别}的架构。Gradio 的
 \passthrough{\lstinline!Audio!} 组件负责在浏览器中通过
@@ -780,7 +772,7 @@ LLM。这样做既维持了多轮对话的连贯性，又控制了 API 调用的
 数据发送到服务端。服务端的 \passthrough{\lstinline!SpeechRecognizer!}
 接收音频文件，调用 Google Web Speech API 完成语音识别。
 
-\subsubsection{2.7.1 语音识别}\label{src-experiment-case9-h24}
+\subsubsection{语音识别}\label{src-experiment-case9-h24}
 
 \begin{lstlisting}[language=Python]
 class SpeechRecognizer:
@@ -797,7 +789,7 @@ Google Web Speech API
 --- OpenAI Whisper 的 C++ 移植，在 CPU 上可运行 - \textbf{FunASR} ---
 阿里达摩院出品，中文识别效果优秀
 
-\subsubsection{2.7.2 语音合成}\label{src-experiment-case9-h25}
+\subsubsection{语音合成}\label{src-experiment-case9-h25}
 
 \begin{lstlisting}[language=Python]
 class TextToSpeech:
@@ -816,7 +808,7 @@ pyttsx3 在 Linux 上使用 espeak
 服务。如需更好的中文语音效果，可替换为 Piper
 TTS（开源、离线、中文音色更自然）。
 
-\subsubsection{2.7.3 浏览器端录音}\label{src-experiment-case9-h26}
+\subsubsection{浏览器端录音}\label{src-experiment-case9-h26}
 
 Gradio 的
 \passthrough{\lstinline!gr.Audio(sources=["microphone"], type="numpy")!}
@@ -844,14 +836,14 @@ def voice_input_fn(audio):
     return text, text  # 返回识别结果，自动填入聊天输入框
 \end{lstlisting}
 
-\subsection{2.8. Web界面与API服务}\label{src-experiment-case9-h27}
+\subsection{Web界面与API服务}\label{src-experiment-case9-h27}
 
 本项目使用 \textbf{Gradio} 构建 Web 界面。Gradio 是 HuggingFace 出品的
 Python 库，专为机器学习模型演示而设计。与 Flask/FastAPI 相比，Gradio
 的优势在于：不需要写 HTML/CSS/JS 代码，Python 类定义直接映射为 Web
 组件，内置 WebSocket 连接管理、队列系统和错误处理。
 
-\subsubsection{2.8.1 界面设计}\label{src-experiment-case9-h28}
+\subsubsection{界面设计}\label{src-experiment-case9-h28}
 
 \begin{lstlisting}[language=Python]
 with gr.Blocks(theme=gr.themes.Soft(), title="Ascend 310B 智能聊天机器人") as demo:
@@ -878,7 +870,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Ascend 310B 智能聊天机器人"
 组件内置了聊天气泡样式和自动滚动，交互逻辑只需关注 handler
 函数的输入输出映射。
 
-\subsubsection{2.8.2 事件流}\label{src-experiment-case9-h29}
+\subsubsection{事件流}\label{src-experiment-case9-h29}
 
 Gradio 的事件驱动模型：
 
@@ -904,9 +896,9 @@ flowchart TD
     V5 -->|"触发 submit 链"| T2
 \end{lstlisting}
 
-\subsection{2.9. 用户手册}\label{src-experiment-case9-h30}
+\subsection{用户手册}\label{src-experiment-case9-h30}
 
-\subsubsection{2.9.1 系统部署}\label{src-experiment-case9-h31}
+\subsubsection{系统部署}\label{src-experiment-case9-h31}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -927,9 +919,8 @@ flowchart TD
 如果没有昇腾设备，跳过第3步的 ATC 转换即可。系统会自动使用 CPU
 模式运行，所有功能不受影响。
 
-\subsubsection{2.9.2 配置说明}\label{src-experiment-case9-h32}
+\subsubsection{配置说明}\label{src-experiment-case9-h32}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -956,9 +947,8 @@ all-MiniLM-L6-v2，可换其他 sentence-transformers 模型 \\
 兼容接口（Ollama/vLLM/通义千问等） \\
 语音开关 & 设置面板 & 关闭后仅文本交互 \\
 \end{longtable}
-}
 
-\subsubsection{2.9.3 使用指南}\label{src-experiment-case9-h33}
+\subsubsection{使用指南}\label{src-experiment-case9-h33}
 
 \begin{itemize}
 \tightlist
@@ -978,7 +968,7 @@ all-MiniLM-L6-v2，可换其他 sentence-transformers 模型 \\
   添加自己的知识条目，重启服务即可生效
 \end{itemize}
 
-\subsubsection{2.9.4 维护与扩展}\label{src-experiment-case9-h34}
+\subsubsection{维护与扩展}\label{src-experiment-case9-h34}
 
 \begin{itemize}
 \tightlist
@@ -1084,7 +1074,6 @@ flowchart TB
 
 \subsection{性能指标}\label{src-experiment-case9-h40}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 指标 & CPU 模式 & NPU 模式 & 说明 \\
@@ -1100,7 +1089,6 @@ FAISS 检索 (1000条) & \textless{} 1ms & \textless{} 1ms & IndexFlatIP \\
 端到端响应 (云端LLM) & 1-3s & 1-3s & 取决于网络和API \\
 语音识别延迟 & 1-2s & 1-2s & Google Web Speech API \\
 \end{longtable}
-}
 
 关键观察：NPU 对嵌入计算有约 4-5x
 的加速，这对批量入库知识库时效果明显。端到端延迟的主要瓶颈在云端 API
