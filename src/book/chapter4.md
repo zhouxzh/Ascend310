@@ -1370,14 +1370,39 @@ print(f"正确率: {accuracy:.2f}%")
 
 SSD（Single Shot MultiBox Detector）是一种单阶段目标检测器，以 ResNet-50 为主干网络，输入尺寸 300×300，在 COCO 2017 数据集上训练和评估。
 
+本节 SSD300 模型文件统一采用 `ssd300_{backbone}.onnx` / `ssd300_{backbone}.om` 命名，例如 `ssd300_resnet50.onnx` 和 `ssd300_resnet50.om`。其中 `ssd300_` 表示模型输入尺寸为 300×300，用来和后续输入尺寸为 320×320 的 `ssd320_` SSDLite320 模型区分。预训练 ONNX/OM 模型发布在 Hugging Face 仓库 `zhouxzh/SSD300`，下载脚本默认使用 `https://hf-mirror.com` 镜像，也可以通过 `HF_ENDPOINT` 或 `--endpoint` 指定其他镜像。
+
 | 文件 | 说明 |
 |------|------|
 | `train_cuda.py` | GPU 训练入口 |
 | `inference_npu.py` | PyACL 加载 .om 模型进行 NPU 推理 |
 | `inference_cuda.py` | GPU 推理（对比基准） |
 | `inference_cpu.py` | CPU 推理 |
+| `download_models.py` | 从 `zhouxzh/SSD300` 下载 `ssd300_*` ONNX/OM 模型 |
 
 代码位于 [`samples/chapter4/SSD/`](https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter4/SSD/)。
+
+常用命令如下：
+
+```bash
+cd samples/chapter4/SSD
+
+# 默认从 https://hf-mirror.com 下载 models/ssd300_resnet50.onnx
+python download_models.py --onnx --backbone resnet50
+
+# 开发板可直接下载仓库中发布的 OM 模型
+export HF_ENDPOINT=https://hf-mirror.com
+python download_models.py --om --backbone resnet50
+
+# CPU ONNX 推理
+python inference_cpu.py --backbone resnet50
+
+# Ascend 310B NPU 快速烟测，默认读取 models/ssd300_resnet50.om
+python inference_npu.py --device 0 --limit 20 --skip-map
+
+# 全量 COCO 验证集评估
+python inference_npu.py --device 0
+```
 
 ### SSDLite320（MobileNet 主干） {#src-book-chapter4-h33}
 

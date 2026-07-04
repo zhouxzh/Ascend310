@@ -311,17 +311,12 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
    | root | Mind@123 |
    | HwHiAiUser | Mind@123 |
 
-### 串口界面 {#src-experiment-case0-h17}
-1. **使用USB2TTL模块，与开发板的GPIO口进行连线**  
+### 方式二：串口登录 {#src-experiment-case0-h17}
 
-   ![开发板串口](img0/gpio_ttl.png){#fig:gpio_ttl width=70% .center}
-   
-   开发板的TX（GPIO8）接入USB2TTL模块的RX接口，开发板的RX（GPIO10）则接入模块的TX接口，并连接好GND接地，在Windows电脑下可以使用PUTTY连接串口。
-2. **使用开发板自带的Micro USB接口进行串口调试，该方法更为方便，只需要一根Micro USB数据线，接入电脑后打开设备管理器查询对应的串口，然后使用PUTTY进行链接即可。**  
+如果暂时没有显示器、键盘和鼠标，也可以通过串口登录开发板。建议初学者使用开发板自带的Micro USB接口，该方法不需要额外接线，只需要一根Micro USB数据线，接入电脑后打开设备管理器查询对应的串口，然后使用PUTTY进行连接即可。
 
-   ![MicroUSB串口](img0/microusbser.png){#fig:microusbser width=70% .center}
+![MicroUSB串口](img0/microusbser.png){#fig:microusbser width=70% .center}
 
-以Micro USB接口为例：
 1. **使用Micro USB数据线连接开发板和电脑，此时请不要给开发板上电。**
 2. **打开电脑的设备管理器，选择端口，寻找开发板对应的串口端口号**
 
@@ -358,6 +353,27 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
 3. **查看连接状态**
    ```bash
    nmcli connection show
+   ```
+
+如果不熟悉命令参数，也可以使用`nmtui`提供的终端图形界面连接WiFi：
+
+1. **打开NetworkManager终端界面**
+   ```bash
+   sudo nmtui
+   ```
+   接着就会出现如下的界面：
+   ![nmtui](img0/nmtui.png)
+2. **选择无线网络**
+   在界面中选择`Activate a connection`，进入连接列表后选择需要连接的WiFi名称。
+   ![nmtui2](img0/nmtui2.png)
+3. **输入密码并连接**
+   按提示输入WiFi密码，确认后等待连接状态变为已连接。完成后选择`Back`返回，再选择`Quit`退出。
+   ![nmtui3](img0/nmtui3.png)
+
+4. **确认网络状态**
+   ```bash
+   nmcli connection show
+   ip addr
    ```
 
 ### 有线网络连接 {#src-experiment-case0-h20}
@@ -421,54 +437,6 @@ ifconfig
    ```bash
    c++ --version
    ```
-
-### 设置SWAP交换分区 {#src-experiment-case0-h23}
-开发板虽然有8G/16G的运存，但是有些应用（例如ATC模型转换工具）需要较大的内存，在这种情况下我们可以通过设置SWAP交换分区来扩展系统能使用的最大内存容量。
-
-1. **创建交换文件**
-   
-   首先，使用`fallocate`命令创建一个指定大小的文件（例如12GB）。如果你的存储空间允许，建议设置得大一些，以防模型转换时内存不足。
-   ```bash
-   sudo fallocate -l 8G /swapfile
-   ```
-   
-   如果提示`fallocate`失败，可以使用`dd`命令：
-   ```bash
-   sudo dd if=/dev/zero of=/swapfile bs=1G count=8
-   ```
-
-2. **设置权限**
-   
-   出于安全考虑，需要修改文件的权限，仅允许root用户读写。
-   ```bash
-   sudo chmod 600 /swapfile
-   ```
-
-3. **设置交换区**
-   
-   将文件格式化为交换分区格式。
-   ```bash
-   sudo mkswap /swapfile
-   ```
-
-4. **启用交换区**
-   
-   启用该交换文件。
-   ```bash
-   sudo swapon /swapfile
-   ```
-
-5. **持久化设置**
-   
-   为了防止重启后失效，需要将其写入`/etc/fstab`文件中。
-   ```bash
-   sudo nano /etc/fstab
-   ```
-   在文件末尾添加以下内容：
-   ```text
-   /swapfile none swap sw 0 0
-   ```
-   保存并退出（Ctrl+O, Enter, Ctrl+X）。
 
 ## 结语 {#src-experiment-case0-h24}
 

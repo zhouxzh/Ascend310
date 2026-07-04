@@ -74,14 +74,14 @@ def get_category_names(dataset):
 def find_latest_checkpoint(backbone):
     """
     Find the latest checkpoint for the given backbone in the checkpoints/ directory.
-    Assumes filename format: ssd_{backbone}_{epoch}.pth
+    Assumes filename format: ssd300_{backbone}_{epoch}.pth
     """
     model_dir = "checkpoints"
     if not os.path.exists(model_dir):
         return None, 0
     
-    # Pattern to match: ssd_{backbone}_{epoch}.pth
-    pattern = re.compile(rf"ssd_{backbone}_(\d+)\.pth")
+    # Pattern to match: ssd300_{backbone}_{epoch}.pth
+    pattern = re.compile(rf"ssd300_{backbone}_(\d+)\.pth")
     
     max_epoch = -1
     latest_checkpoint = None
@@ -138,4 +138,5 @@ if __name__ == "__main__":
     
     # Let's import export_onnx_model from ssd.train as well to keep the flow
 
-    export_onnx_model(ssd_model, args.device, onnx_path=f"models/ssd_{args.backbone}.onnx")
+    os.makedirs("models", exist_ok=True)
+    export_onnx_model(ssd_model, args.device, onnx_path=f"models/ssd300_{args.backbone}.onnx")

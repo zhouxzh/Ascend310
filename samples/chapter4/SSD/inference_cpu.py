@@ -259,7 +259,8 @@ if __name__ == "__main__":
     val_dataset = load_coco_val()
 
     # 2. 准备 ONNX 模型路径
-    onnx_model_path = f"models/ssd_{args.backbone}.onnx"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    onnx_model_path = os.path.join(script_dir, "models", f"ssd300_{args.backbone}.onnx")
 
     # 3. 准备解码工具
     dboxes = dboxes300_coco()

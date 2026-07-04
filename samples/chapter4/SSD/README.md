@@ -2,6 +2,30 @@
 
 This repository provides a script and recipe to train the SSD300 v1.1 model to achieve state of the art accuracy, and is tested and maintained by NVIDIA.
 
+## Ascend310 quick use
+
+In this book repository, SSD300 deployment files use the explicit `ssd300_{backbone}` naming convention. For example, the default ResNet-50 files are `models/ssd300_resnet50.onnx` and `models/ssd300_resnet50.om`. The `ssd300_` prefix means the detector input size is 300x300, which keeps it distinct from the SSDLite320 `ssd320_` models.
+
+Prebuilt ONNX/OM models are published in the Hugging Face repository `zhouxzh/SSD300`. The download script uses `https://hf-mirror.com` by default and can be overridden with `HF_ENDPOINT` or `--endpoint`.
+
+```bash
+# Download the default ONNX model.
+python download_models.py --onnx --backbone resnet50
+
+# On the Ascend 310B board, download the prebuilt OM model directly.
+export HF_ENDPOINT=https://hf-mirror.com
+python download_models.py --om --backbone resnet50
+
+# CPU ONNX inference.
+python inference_cpu.py --backbone resnet50
+
+# Ascend NPU smoke test. The default model is models/ssd300_resnet50.om.
+python inference_npu.py --device 0 --limit 20 --skip-map
+
+# Full COCO validation run.
+python inference_npu.py --device 0
+```
+
 ## Table Of Contents
 - [Model overview](#model-overview)
     * [Model architecture](#model-architecture)
@@ -782,4 +806,3 @@ March 2019
 ## Known issues
 
 There are no known issues with this model.
-

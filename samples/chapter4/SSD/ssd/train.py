@@ -232,7 +232,7 @@ def train(args, train_loader, val_loader, coco_gt, category_names=None, resume_c
 
         # 保存检查点
         os.makedirs("checkpoints", exist_ok=True)
-        torch.save(ssd_model.state_dict(), f"checkpoints/ssd_{args.backbone}_{epoch}.pth")
+        torch.save(ssd_model.state_dict(), f"checkpoints/ssd300_{args.backbone}_{epoch}.pth")
 
     writer.close()
     return ssd_model

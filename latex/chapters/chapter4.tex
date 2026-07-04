@@ -2049,9 +2049,29 @@ Box）}和\textbf{类别}，对模型结构和后处理逻辑都提出了更高�
 SSD（Single Shot MultiBox Detector）是一种单阶段目标检测器，以 ResNet-50
 为主干网络，输入尺寸 300×300，在 COCO 2017 数据集上训练和评估。
 
-\begin{longtable}[]{@{}ll@{}}
+本节 SSD300 模型文件统一采用
+\passthrough{\lstinline!ssd300\_\{backbone\}.onnx!} /
+\passthrough{\lstinline!ssd300\_\{backbone\}.om!} 命名，例如
+\passthrough{\lstinline!ssd300\_resnet50.onnx!} 和
+\passthrough{\lstinline!ssd300\_resnet50.om!}。其中
+\passthrough{\lstinline!ssd300\_!} 表示模型输入尺寸为
+300×300，用来和后续输入尺寸为 320×320 的
+\passthrough{\lstinline!ssd320\_!} SSDLite320 模型区分。预训练 ONNX/OM
+模型发布在 Hugging Face 仓库
+\passthrough{\lstinline!zhouxzh/SSD300!}，下载脚本默认使用
+\passthrough{\lstinline!https://hf-mirror.com!} 镜像，也可以通过
+\passthrough{\lstinline!HF\_ENDPOINT!} 或
+\passthrough{\lstinline!--endpoint!} 指定其他镜像。
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
 \toprule\noalign{}
-文件 & 说明 \\
+\begin{minipage}[b]{\linewidth}\raggedright
+文件
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+说明
+\end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
@@ -2061,10 +2081,35 @@ SSD（Single Shot MultiBox Detector）是一种单阶段目标检测器，以 Re
 NPU 推理 \\
 \passthrough{\lstinline!inference\_cuda.py!} & GPU 推理（对比基准） \\
 \passthrough{\lstinline!inference\_cpu.py!} & CPU 推理 \\
+\passthrough{\lstinline!download\_models.py!} & 从
+\passthrough{\lstinline!zhouxzh/SSD300!} 下载
+\passthrough{\lstinline!ssd300\_*!} ONNX/OM 模型 \\
 \end{longtable}
 
 代码位于
 \href{https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter4/SSD/}{\passthrough{\lstinline!samples/chapter4/SSD/!}}。
+
+常用命令如下：
+
+\begin{lstlisting}[language=bash]
+cd samples/chapter4/SSD
+
+# 默认从 https://hf-mirror.com 下载 models/ssd300_resnet50.onnx
+python download_models.py --onnx --backbone resnet50
+
+# 开发板可直接下载仓库中发布的 OM 模型
+export HF_ENDPOINT=https://hf-mirror.com
+python download_models.py --om --backbone resnet50
+
+# CPU ONNX 推理
+python inference_cpu.py --backbone resnet50
+
+# Ascend 310B NPU 快速烟测，默认读取 models/ssd300_resnet50.om
+python inference_npu.py --device 0 --limit 20 --skip-map
+
+# 全量 COCO 验证集评估
+python inference_npu.py --device 0
+\end{lstlisting}
 
 \subsection{SSDLite320（MobileNet 主干）}\label{src-book-chapter4-h33}
 

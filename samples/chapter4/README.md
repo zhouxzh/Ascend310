@@ -58,13 +58,22 @@ python samples/chapter4/resnet18/inference_npu.py
 | `download_models.py` | 下载预训练模型 |
 | `ssd/` | 模型定义、训练/评估逻辑、数据流水线 |
 
+SSD300 模型统一使用 `ssd300_{backbone}.onnx` / `ssd300_{backbone}.om` 命名，例如 `ssd300_resnet50.onnx`。`ssd300_` 表示输入尺寸为 300×300，用来和 SSDLite320 的 `ssd320_` 模型区分。模型默认从 Hugging Face 仓库 `zhouxzh/SSD300` 下载，脚本默认使用 `https://hf-mirror.com` 镜像。
+
 运行：
 ```bash
+# 下载 ONNX 模型
+python samples/chapter4/SSD/download_models.py --onnx --backbone resnet50
+
+# 在 Ascend 310B 开发板上直接下载 OM 模型
+export HF_ENDPOINT=https://hf-mirror.com
+python samples/chapter4/SSD/download_models.py --om --backbone resnet50
+
 # GPU 训练
 python samples/chapter4/SSD/train_cuda.py --device cuda --data /path/to/coco
 
-# NPU 推理（需先运行 download_models.py 获取 .om 模型）
-python samples/chapter4/SSD/inference_npu.py
+# NPU 快速烟测，默认读取 samples/chapter4/SSD/models/ssd300_resnet50.om
+python samples/chapter4/SSD/inference_npu.py --device 0 --limit 20 --skip-map
 ```
 
 ### [SSDLite/](SSDLite/) — MobileNet-SSDLite320 目标检测（COCO）

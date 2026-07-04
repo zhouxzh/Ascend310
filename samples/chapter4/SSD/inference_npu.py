@@ -16,9 +16,10 @@ ACL_MEMCPY_HOST_TO_DEVICE = 1
 ACL_MEMCPY_DEVICE_TO_HOST = 2
 
 
-def _check_ret(ret, msg):
+def _check_ret(result, msg):
+    ret = result[-1] if isinstance(result, tuple) else result
     if ret != 0:
-        raise RuntimeError(f"{msg} failed, ret={ret}")
+        raise RuntimeError(f"{msg} failed, ret={result}")
 
 
 class AclModelRunner:
@@ -143,23 +144,26 @@ class AclModelRunner:
 
         outputs = []
         for idx, out in enumerate(self.output_buffers):
-            host_out = np.zeros(out["size"], dtype=np.uint8)
-            host_out_ptr = acl.util.numpy_to_ptr(host_out)
+            host_ptr, ret = acl.rt.malloc_host(out["size"])
+            _check_ret(ret, f"acl.rt.malloc_host output[{idx}]")
+            try:
+                ret = acl.rt.memcpy(
+                    host_ptr,
+                    out["size"],
+                    out["ptr"],
+                    out["size"],
+                    ACL_MEMCPY_DEVICE_TO_HOST,
+                )
+                _check_ret(ret, f"acl.rt.memcpy device_to_host output[{idx}]")
 
-            ret = acl.rt.memcpy(
-                host_out_ptr,
-                out["size"],
-                out["ptr"],
-                out["size"],
-                ACL_MEMCPY_DEVICE_TO_HOST,
-            )
-            _check_ret(ret, f"acl.rt.memcpy device_to_host output[{idx}]")
-
-            tensor = np.frombuffer(host_out.tobytes(), dtype=np.float32)
-            shape = self.output_shapes[idx]
-            if shape is not None and int(np.prod(shape)) == tensor.size:
-                tensor = tensor.reshape(shape)
-            outputs.append(tensor)
+                output_bytes = acl.util.ptr_to_bytes(host_ptr, out["size"])
+                tensor = np.frombuffer(output_bytes, dtype=np.float32).copy()
+                shape = self.output_shapes[idx]
+                if shape is not None and int(np.prod(shape)) == tensor.size:
+                    tensor = tensor.reshape(shape)
+                outputs.append(tensor)
+            finally:
+                acl.rt.free_host(host_ptr)
 
         return outputs
 
@@ -305,12 +309,28 @@ def get_gt_data(item, orig_w, orig_h):
     return boxes.astype(np.float32), labels.astype(np.int64)
 
 
+def get_category_names(val_dataset):
+    objects_feature = val_dataset.features.get("objects")
+    category_feature = None
+
+    if isinstance(objects_feature, dict):
+        category_feature = objects_feature.get("category")
+    elif hasattr(objects_feature, "feature"):
+        inner_feature = objects_feature.feature
+        if isinstance(inner_feature, dict):
+            category_feature = inner_feature.get("category")
+
+    names = getattr(category_feature, "names", None)
+    if names:
+        return ["background"] + list(names)
+    return None
+
+
 def visualize_validation_predictions(args, runner, encoder, val_dataset):
     print("正在选取前 10 个样本进行连续推理和可视化...")
-    indices = range(10)
+    indices = range(min(10, len(val_dataset)))
 
-    cats = val_dataset.features["objects"]["category"].feature.names
-    cats = ["background"] + cats
+    cats = get_category_names(val_dataset)
 
     save_folder = f"viz_results/inference/{args.backbone}"
     os.makedirs(save_folder, exist_ok=True)
@@ -345,7 +365,7 @@ def visualize_validation_predictions(args, runner, encoder, val_dataset):
         print(f"已处理图片 ID: {image_id}, 结果保存至 {save_path}")
 
 
-def evaluate_dataset(val_dataset, runner, encoder, gt_file):
+def evaluate_dataset(val_dataset, runner, encoder, gt_file, skip_map=False):
     print("\n开始评估全量数据集 mAP 和 推理帧率 ...")
     results = []
 
@@ -398,7 +418,9 @@ def evaluate_dataset(val_dataset, runner, encoder, gt_file):
     with open(res_file, "w") as f:
         json.dump(results, f)
 
-    if os.path.exists(gt_file):
+    if skip_map:
+        print("已跳过 COCO mAP 计算。")
+    elif os.path.exists(gt_file):
         try:
             print(f"正在使用 {gt_file} 计算 mAP ...")
             coco_gt = COCO(gt_file)
@@ -424,12 +446,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--backbone", default="resnet50", help="backbone name")
     parser.add_argument("--device", type=int, default=0, help="Ascend device id")
-    parser.add_argument("--model", default="", help="OM model path, e.g. models/ssd_resnet50.om")
+    parser.add_argument("--model", default="", help="OM model path, e.g. models/ssd300_resnet50.om")
+    parser.add_argument("--limit", type=int, default=0, help="Only evaluate the first N samples. 0 means all samples.")
+    parser.add_argument("--skip-map", action="store_true", help="Skip COCO mAP calculation for quick smoke tests.")
     args = parser.parse_args()
 
     val_dataset = load_coco_val()
+    if args.limit > 0:
+        val_dataset = val_dataset.select(range(min(args.limit, len(val_dataset))))
 
-    om_model_path = args.model if args.model else f"models/ssd_{args.backbone}.om"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    om_model_path = args.model if args.model else os.path.join(script_dir, "models", f"ssd300_{args.backbone}.om")
 
     dboxes = dboxes300_coco()
     encoder = Encoder(dboxes)
@@ -445,7 +472,7 @@ if __name__ == "__main__":
 
         gt_file = "coco_gt_temp.json"
         get_coco_ground_truth(val_dataset)
-        evaluate_dataset(val_dataset, runner, encoder, gt_file)
+        evaluate_dataset(val_dataset, runner, encoder, gt_file, skip_map=args.skip_map)
     except Exception as e:
         print(f"执行失败: {e}")
         exit(1)
