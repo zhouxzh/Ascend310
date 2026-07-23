@@ -1,0 +1,5 @@
+numpy>=1.23
+onnx>=1.15
+onnxruntime>=1.17
+tflite>=2.10
+flatbuffers>=23.5

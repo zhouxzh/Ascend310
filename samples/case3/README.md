@@ -1,176 +1,153 @@
-# 案例 3：智能电子琴
+# Case 3：智能电子琴与实时 DDSP
 
-## 项目说明
+本目录是 Ascend 310B 智能电子琴案例的可运行代码仓库，包含 MIDI 键盘、实时
+DDSP 音频原型、DDSP-VST 模型导出工具、Ascend OM 转换与精度/速度测试脚本，
+以及电子琴结构件。详细设计和板端实测数据已分类到 [doc/](doc/README.md)。
 
-本项目是智能电子琴的软件与硬件配套仓库，结合计算机视觉与音频处理技术，利用昇腾 310B 的 AI 算力实现手势识别与音符映射，创造"隔空弹琴"的交互式音乐体验。
+## 功能
 
-当前仓库包含两个核心部分：
+- 使用 `midi.py` 枚举 MIDI 设备并提供可视化钢琴键盘。
+- 使用 `realtime_ddsp.py` 通过 ONNX Runtime CPU 或 PyACL/OM 将 MIDI 实时合成为音频。
+- 将 11 个 DDSP-VST TFLite 音色导出为状态化 ONNX。
+- 在 Ascend 310B 开发板上转换、验证和基准测试 FP16/混合精度 OM。
+- 提供 FreeCAD、STEP 和 STL 电子琴结构件。
 
-- **软件**：[midi.py](midi.py) — 基于 pygame 的 MIDI 钢琴键盘程序，支持鼠标点击和计算机键盘演奏
-- **硬件**：[model3/](model3/) — 电子琴 3D 打印结构件的 CAD 模型（FreeCAD / STEP / STL 格式）
+## 快速开始
 
-如需阅读偏理论和教学化的完整讲解，可结合仓库里的 `src/experiment/case3.md` 一起阅读。
+### MIDI 键盘
 
-## 硬件要求
+```bash
+python -m pip install pygame
+python midi.py --list
+python midi.py --output
+```
 
-运行本案例时，建议准备以下硬件环境：
+### ONNX 导出
 
-- 昇腾 310B 开发者套件
-- USB 摄像头（推荐 1080p 30fps）
-- USB 音响或蓝牙音箱
-- 3D 打印机（用于打印电子琴外壳结构件）
+```bash
+python -m pip install -r requirements-onnx.txt
+python tools/export_ddsp_vst_onnx.py \
+  --tflite models/ddsp_vst/Violin.tflite \
+  --output models/ddsp_vst/Violin.onnx
+```
 
-说明如下：
+### 实时 DDSP 冒烟测试
 
-- 仅运行 `midi.py` 体验 MIDI 键盘功能，无需昇腾 NPU，普通 Linux/Windows/macOS 主机即可
-- 完整的手势识别 + 音频合成链路需要昇腾 310B 及 CANN 环境
-- 3D 打印文件可独立使用，配合 PLA/ABS 材料打印后组装
+在 Ubuntu 或 Ascend 开发板上，实时声卡输出还需要系统 PortAudio 运行库。板端
+Python 程序统一使用 Anaconda `base`：
+
+```bash
+sudo apt install -y libportaudio2
+
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate base
+python -m pip install -r requirements-realtime.txt
+```
+
+`libportaudio2` 是 `sounddevice` 的系统动态库；只有安装 Python `sounddevice` 包
+而没有该动态库时，程序会报 `OSError: PortAudio library not found`。`mido` 用于
+读取 MIDI 文件，`python-rtmidi` 用于连接实体 MIDI 键盘。
+
+```bash
+python realtime_ddsp.py --demo --duration 2 --output violin_demo.wav
+```
+
+实时播放、MIDI 文件渲染和声卡选择见
+[实时 DDSP 文档](doc/realtime-ddsp.md)。
+
+## Ascend 开发板
+
+ATC、ACL、`ais_bench` 和 `npu-smi` 必须在真实 Ascend 310B 开发板上运行。本地
+工作区只用于编辑、ONNX CPU 验证和报告整理。板端测试程序使用 Anaconda
+`base` 环境，并在执行前加载对应 CANN 的 `set_env.sh`。
+
+MIDI-DDSP Studio 提供实时演奏、MIDI-DDSP 播放与渲染、OM 实验和设备检查四个
+Web 工作区。前端在开发电脑编译，开发板只运行 FastAPI 服务和静态资源；板端依赖
+需由用户手动安装。完整步骤见 [MIDI-DDSP Studio Web 界面](doc/webui.md)。
+
+常用入口：
+
+```bash
+# ONNX -> OM
+bash tools/convert_onnx_to_om.sh --help
+
+# Ascend 8T 全模型转换、精度和速度测试
+bash tools/run_all_ascend8t_models.sh --help
+
+# 在 Ascend 20T 上测试预编译 OM
+bash tools/run_ascend20t_prebuilt_models.sh --help
+
+# 在 Ascend 板端通过 PyACL/OM 实时播放（模型扩展名会自动选择后端）
+python realtime_ddsp.py --play-midi midi/ode-to-joy-violin.mid \
+  --model models/om/ascend8t2/Violin_mixed_float16.om \
+  --device-id 0 --audio-device 1 --sample-rate 48000 \
+  --prebuffer 6 --max-voices 8 --output-gain-db 24
+```
+
+转换参数、声卡设置和各开发板实测结果分别见
+[OM 转换与验证](doc/om-deployment.md)、
+[Ascend 音频输出](doc/audio-output.md) 和
+[板端实测结果](doc/benchmark-results.md)。
+遇到 SSH、声卡、ATC、OOM 或跨板兼容问题时，先查
+[测试故障排查记录](doc/troubleshooting.md)。
+
+## 测试
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+硬件相关行为还必须在目标开发板上验证；本地测试不替代 OM 加载、NPU 推理或
+实际声卡播放测试。
 
 ## 目录结构
 
 ```text
 case3/
-├── midi.py                   # MIDI 钢琴键盘主程序
-└── model3/                   # 3D CAD 模型
-    ├── zuizhongban.FCStd     # FreeCAD 源文件（最终版装配体）
-    ├── 电子琴静音版/          # STEP 零件文件（15 个）
-    │   ├── 装配体1.STEP      #   完整装配体
-    │   ├── 壳体.STEP         #   外壳
-    │   ├── 壳体-2.STEP       #   外壳（第二版）
-    │   ├── 白键.STEP         #   白键
-    │   ├── 黑键.STEP         #   黑键
-    │   ├── 盖子.STEP         #   盖子
-    │   ├── 盖子2.STEP        #   盖子（第二版）
-    │   ├── 支架.STEP         #   支撑结构
-    │   ├── 支座.STEP         #   支撑座
-    │   ├── 链接轴.STEP       #   连接轴
-    │   ├── 链接轴2.STEP      #   连接轴（第二版）
-    │   ├── 1.STEP            #   键机构零件
-    │   ├── 1_3.STEP          #   键机构零件
-    │   ├── 1_4.STEP          #   键机构零件
-    │   └── 2.STEP            #   键机构零件
-    └── 静音版/               # STL 3D 打印文件（13 个）
-        └── 装配体1 - *.STL   #   装配体分片，可直接切片打印
+├── midi.py                     # MIDI 键盘应用
+├── realtime_ddsp.py            # 实时 MIDI -> DDSP 音频原型
+├── pyacl_ddsp.py                # PyACL 静态 OM 加载、推理和资源管理
+├── requirements-onnx.txt       # ONNX 导出依赖
+├── requirements-realtime.txt   # 实时音频依赖
+├── requirements-webui.txt      # Web UI 完整 Python 依赖入口
+├── tools/                      # 导出、转换、同步、测试和报告工具
+├── tests/                      # 本地单元测试
+├── models/                     # TFLite、ONNX 和 OM 模型（默认不提交）
+├── reports/                    # 精度、速度和环境报告（默认不提交）
+├── midi/                       # MIDI 测试素材
+├── midi_wav/                   # WAV 测试素材
+├── model3/                     # FreeCAD、STEP 和 STL 结构件
+└── doc/                        # 分类后的详细文档
 ```
 
-## 软件说明 — midi.py
+## 模型
 
-### 功能概览
+当前 DDSP-VST 音色包括 Bassoon、Clarinet、Flute、Melodica、Saxophone、Sitar、
+Trombone、Trumpet、Tuba、Violin 和 Vowels。模型接口为单步状态化推理：
 
-[midi.py](midi.py) 是一个功能完善的 MIDI 键盘应用程序，基于 `pygame` 和 `pygame.midi` 实现。支持三种运行模式：
-
-| 模式 | 参数 | 说明 |
-| :--- | :--- | :--- |
-| 输出模式（演奏） | `--output` | 绘制两八度钢琴键盘（F3 起共 24 个音符），支持鼠标点击和键盘按键演奏 |
-| 输入模式（监听） | `--input` | 监听 MIDI 输入设备，将收到的 MIDI 事件打印到控制台 |
-| 设备列表 | `--list` | 枚举并打印系统上所有可用的 MIDI 设备 |
-
-### 核心功能
-
-**输出模式（钢琴键盘演奏）**：
-
-- 两八度键盘渲染，包含 14 个白键和 10 个黑键
-- 鼠标点击演奏：垂直位置决定力度（42 ~ 127）
-- 计算机键盘映射：Tab ~ Backslash 对应白键，1 ~ Backspace 对应黑键
-- 键间阴影状态机，模拟真实钢琴键的视觉反馈
-- 默认使用教堂风琴音色（乐器编号 19）
-
-**键状态机**：
-
-`Key` 类维护一个三比特状态机（自身按下 / 右侧白键按下 / 右侧黑键按下），最多 8 种状态组合。工厂函数 `key_class()` 根据键类型（黑键、右侧无黑键的白键、右侧有黑键的白键）动态生成 `Key` 子类，为每种状态组合分配对应的子图像矩形，实现键与键之间的阴影变化。
-
-**Keyboard 布局算法**：
-
-`_add_keys()` 方法按钢琴标准布局水平放置键：
-- 白键宽 42 像素，黑键宽 22 像素
-- 黑键在相邻白键上居中偏移 11 像素
-- 根据前一个键的类型自动选择键类（`WhiteKey` / `WhiteKeyLeft` / `WhiteKeyCenter` / `WhiteKeyRight`），确保阴影关系正确
-
-### 使用方法
-
-**列出 MIDI 设备**：
-
-```bash
-python3 midi.py --list
+```text
+输入：state[512], f0_scaled[1], pw_scaled[1]
+输出：amplitude[1], harmonics[60], noise_amps[65], state_out[512]
 ```
 
-**演奏模式**（需系统安装 MIDI 合成器，如 TiMidity++）：
+该模型只预测合成控制量；谐波振荡和噪声 FFT 合成在模型外执行。模型来源、算子
+结构和导出流程见 [DDSP 模型导出](doc/model-export.md)。
 
-```bash
-python3 midi.py --output
-# 或指定设备 ID
-python3 midi.py --output 0
-```
+## 文档
 
-**监听模式**：
-
-```bash
-python3 midi.py --input
-# 或指定设备 ID
-python3 midi.py --input 1
-```
-
-### 依赖安装
-
-```bash
-pip install pygame
-```
-
-**Linux 下安装 MIDI 合成器**（可选，用于输出模式）：
-
-```bash
-sudo apt install timidity timidity-interfaces-extra
-```
-
-## 3D 打印说明
-
-### 模型来源
-
-所有 CAD 文件位于 [model3/](model3/) 目录。原始设计文件为 `zuizhongban.FCStd`（FreeCAD 格式），`电子琴静音版/` 中的 STEP 文件为各零件的通用交换格式，`静音版/` 中的 STL 文件已做好分片，可直接导入切片软件进行 3D 打印。
-
-### 打印建议
-
-| 参数 | 建议值 |
+| 文档 | 内容 |
 | :--- | :--- |
-| 材料 | ABS（强度好，适合结构件）或 PLA（易打印） |
-| 层高 | 0.2 mm |
-| 填充密度 | 25% |
-| 支撑 | 针对悬垂结构添加支撑 |
+| [项目概览](doc/overview.md) | 项目范围、硬件和系统链路 |
+| [MIDI 键盘应用](doc/midi-app.md) | MIDI 设备、键盘交互和使用方法 |
+| [3D 打印硬件](doc/hardware.md) | CAD/STL、打印和装配 |
+| [DDSP 模型导出](doc/model-export.md) | TFLite、ONNX 和训练参考 |
+| [实时 DDSP](doc/realtime-ddsp.md) | 合成、播放和实时架构 |
+| [Ascend 音频输出](doc/audio-output.md) | 3.5mm、USB 声卡、蓝牙 A2DP/HFP 与漫步者喇叭 |
+| [OM 转换与验证](doc/om-deployment.md) | ATC、精度验证和日志判定 |
+| [板端实测结果](doc/benchmark-results.md) | 8T、8T2 和 20T 实测数据 |
+| [MIDI-DDSP Studio Web 界面](doc/webui.md) | 四个工作区、板端依赖、构建同步与启动方法 |
+| [测试故障排查](doc/troubleshooting.md) | 测试期间的问题、证据、处理方法和结论 |
+| [Upstream 参考仓库](doc/upstream-repositories.md) | 第三方源码清单、提交号和保留规则 |
 
-### 装配说明
-
-主要零件及装配关系：
-
-1. **壳体** — 电子琴主体外壳，容纳所有内部组件
-2. **白键 / 黑键** — 琴键，通过链接轴安装到壳体上
-3. **支架 / 支座** — 支撑结构，固定键机构
-4. **链接轴** — 琴键的旋转轴
-5. **盖子** — 封闭外壳顶部
-
-完整装配体可参考 `装配体1.STEP` 文件。
-
-## 完整项目全景
-
-本书案例 3 描述的是一个完整的手势识别智能电子琴系统。当前仓库提供的是其中的软件原型（MIDI 键盘）和硬件结构（3D 模型）。完整系统链路如下：
-
-```
-USB 摄像头 → 手势识别 (MediaPipe / 自定义模型) → 昇腾 310B 推理
-    → 音符映射 → MIDI 合成 / 音频输出 → 音响设备
-                                              → LED 灯光反馈
-```
-
-在此基础上扩展时，可参考以下方向：
-
-- 集成 MediaPipe 或自定义手势分类模型，实现手势到音符的映射
-- 将手势识别模型转换为 OM 格式，部署到昇腾 310B 进行推理加速
-- 在 `midi.py` 的基础上增加手势输入通道，替代鼠标/键盘输入
-- 结合音频处理库（pyaudio、librosa）实现实时音效处理
-
-## 使用建议
-
-如果你是第一次接触这个案例，建议按下面顺序：
-
-1. 先运行 `python3 midi.py --list` 确认 MIDI 环境正常
-2. 再运行 `python3 midi.py --output` 体验钢琴键盘功能
-3. 查看 `model3/` 中的 3D 模型，了解电子琴的物理结构设计
-4. 最后结合 `src/experiment/case3.md` 阅读完整项目方案，理解手势识别 + 昇腾推理的总体设计
+本案例对应的书稿源文件为
+[`src/experiment/case3.md`](../../src/experiment/case3.md)。

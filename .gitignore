@@ -223,6 +223,12 @@ samples/case2/demo/*.avi
 # output files
 samples/case2/output/
 
+# Temporary upstream sources used while developing case 3.
+samples/case3/_upstream/
+
+# Local datasets used by case 3.
+samples/case3/datasets/
+
 # model files
 *.om
 *.onnx
