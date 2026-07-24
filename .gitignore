@@ -206,7 +206,8 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 node_modules
-node_modules
+*.tsbuildinfo
+**/.mscbackup/
 # Ignore VuePress temporary build files (directory and all nested contents)
 src/.vuepress/.temp/
 src/.vuepress/.temp/**
@@ -284,6 +285,12 @@ data/
 weights/
 models/
 logs/
+
+# case3 tracks only the model layout documentation. Model binaries, weights,
+# conversion logs, and generated reports remain ignored.
+!samples/case3/models/
+samples/case3/models/*
+!samples/case3/models/README.md
 
 # case8 keeps source helpers and README files inside artifact directories.
 !samples/case8/models/

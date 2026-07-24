@@ -5,7 +5,8 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 MODELS_DIR="$ROOT_DIR/models/ddsp_vst"
-OM_DIR="$ROOT_DIR/models/om/ascend8t/all_models"
+OM_DIR="$ROOT_DIR/models/om"
+CONVERSION_DIR="$ROOT_DIR/models/conversion_logs/ddsp_vst"
 REPORT_DIR="$ROOT_DIR/reports/ascend8t/all_models"
 STEPS=1024
 SEED=20260721
@@ -154,6 +155,7 @@ export NUMEXPR_NUM_THREADS=1
 
 mkdir -p \
     "$OM_DIR" \
+    "$CONVERSION_DIR" \
     "$REPORT_DIR/references" \
     "$REPORT_DIR/precision" \
     "$REPORT_DIR/benchmarks" \
@@ -254,10 +256,10 @@ run_references() {
 conversion_valid() {
     local model_path="$1"
     local mode="$2"
-    local prefix="$3"
-    local om_file="$prefix.om"
-    local summary="$prefix.atc.summary.txt"
-    local source_hash_file="$prefix.source.sha256"
+    local om_file="$3"
+    local artifact_prefix="$4"
+    local summary="$artifact_prefix.atc.summary.txt"
+    local source_hash_file="$artifact_prefix.source.sha256"
     [[ -s "$om_file" && -s "$summary" && -s "$source_hash_file" ]] || return 1
     grep -Fqx 'ATC_EXIT_CODE=0' "$summary" || return 1
     grep -Fqx 'OM_UPDATED=yes' "$summary" || return 1
@@ -292,32 +294,36 @@ invoke_conversion() {
 run_one_conversion() {
     local model_path="$1"
     local mode="$2"
-    local model tag prefix status
+    local model tag artifact_prefix om_file status
     model="$(basename "${model_path%.onnx}")"
     tag="$mode"
-    prefix="$OM_DIR/${model}_${tag}"
-    if [[ "$FORCE" -eq 0 ]] && conversion_valid "$model_path" "$mode" "$prefix"; then
+    artifact_prefix="$CONVERSION_DIR/${model}_${tag}"
+    om_file="$OM_DIR/${model}_${tag}.om"
+    if [[ "$FORCE" -eq 0 ]] && conversion_valid \
+        "$model_path" "$mode" "$om_file" "$artifact_prefix"; then
         log_status convert "$model" "$mode" skipped valid
         return 0
     fi
 
     echo "[convert] $model $mode"
-    invoke_conversion "$model_path" "$mode" "$prefix"
+    invoke_conversion "$model_path" "$mode" "$artifact_prefix"
     status=$?
     if [[ "$status" -ge 128 ]]; then
-        cp -f "$prefix.atc.log" "$REPORT_DIR/failures/${model}_${mode}.attempt1.atc.log" 2>/dev/null || true
-        cp -f "$prefix.atc.summary.txt" "$REPORT_DIR/failures/${model}_${mode}.attempt1.atc.summary.txt" 2>/dev/null || true
+        cp -f "$artifact_prefix.atc.log" "$REPORT_DIR/failures/${model}_${mode}.attempt1.atc.log" 2>/dev/null || true
+        cp -f "$artifact_prefix.atc.summary.txt" "$REPORT_DIR/failures/${model}_${mode}.attempt1.atc.summary.txt" 2>/dev/null || true
         free -h > "$REPORT_DIR/failures/${model}_${mode}.attempt1.memory.txt"
         dmesg --ctime > "$REPORT_DIR/failures/${model}_${mode}.attempt1.dmesg.txt" 2>/dev/null || true
         log_status convert "$model" "$mode" retry "exit=$status"
         sleep 30
-        invoke_conversion "$model_path" "$mode" "$prefix"
+        invoke_conversion "$model_path" "$mode" "$artifact_prefix"
         status=$?
     fi
     if [[ "$status" -eq 0 ]]; then
-        sha256sum "$model_path" | awk '{print $1}' > "$prefix.source.sha256"
+        mv -f "$artifact_prefix.om" "$om_file"
+        sha256sum "$model_path" | awk '{print $1}' > "$artifact_prefix.source.sha256"
     fi
-    if [[ "$status" -eq 0 ]] && conversion_valid "$model_path" "$mode" "$prefix"; then
+    if [[ "$status" -eq 0 ]] && conversion_valid \
+        "$model_path" "$mode" "$om_file" "$artifact_prefix"; then
         log_status convert "$model" "$mode" success generated
         return 0
     fi
@@ -420,7 +426,8 @@ run_one_precision() {
     om="$OM_DIR/${model}_${mode}.om"
     report="$REPORT_DIR/precision/${model}_${mode}_precision_${STEPS}.json"
     log="$REPORT_DIR/precision/${model}_${mode}.precision.log"
-    if ! conversion_valid "$model_path" "$mode" "$OM_DIR/${model}_${mode}"; then
+    if ! conversion_valid "$model_path" "$mode" "$om" \
+        "$CONVERSION_DIR/${model}_${mode}"; then
         log_status precision "$model" "$mode" blocked invalid_om
         return 1
     fi
@@ -471,7 +478,8 @@ run_one_benchmark() {
     model="$(basename "${model_path%.onnx}")"
     om="$OM_DIR/${model}_${mode}.om"
     log="$REPORT_DIR/benchmarks/${model}_${mode}.ais_bench.log"
-    if ! conversion_valid "$model_path" "$mode" "$OM_DIR/${model}_${mode}"; then
+    if ! conversion_valid "$model_path" "$mode" "$om" \
+        "$CONVERSION_DIR/${model}_${mode}"; then
         log_status benchmark "$model" "$mode" blocked invalid_om
         return 1
     fi
@@ -516,7 +524,8 @@ run_summary() {
 }
 
 write_artifact_manifest() {
-    find "$OM_DIR" "$REPORT_DIR" -type f ! -name SHA256SUMS.txt -print0 \
+    find "$OM_DIR" "$CONVERSION_DIR" "$REPORT_DIR" \
+        -type f ! -name SHA256SUMS.txt -print0 \
         | sort -z \
         | xargs -0 sha256sum > "$REPORT_DIR/SHA256SUMS.txt"
 }

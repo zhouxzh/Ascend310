@@ -1,19 +1,24 @@
-import { Box, Cable, CheckCircle2, Cpu, Headphones, RefreshCw, Server, TriangleAlert, XCircle } from 'lucide-react'
+import { Box, Cable, CheckCircle2, Cpu, Headphones, Mic2, RefreshCw, Server, TriangleAlert, XCircle } from 'lucide-react'
 import { formatBytes } from '../api'
 import { PanelHeader, StatusPill } from '../components/ui'
-import type { AudioDevice, Catalog, MidiPort, SystemStatus } from '../types'
+import type { AudioDevice, AudioInput, Catalog, MidiPort, SystemStatus } from '../types'
+import SpeakerView from './SpeakerView'
 
 interface Props {
   status: SystemStatus
   catalog: Catalog
   audioDevices: AudioDevice[]
+  speakerOutputs: AudioDevice[]
+  audioInputs: AudioInput[]
   midiPorts: MidiPort[]
   audioError: string | null
+  audioInputError: string | null
   midiError: string | null
   onRefresh: () => Promise<void>
 }
 
-export default function DevicesView({ status, catalog, audioDevices, midiPorts, audioError, midiError, onRefresh }: Props) {
+export default function DevicesView({ status, catalog, audioDevices, speakerOutputs, audioInputs, midiPorts, audioError, audioInputError, midiError, onRefresh }: Props) {
+  const captureInputs = audioInputs.filter((input) => input.type === 'capture' && input.available)
   return (
     <div className="devices-workspace">
       <section className="panel device-overview">
@@ -21,9 +26,22 @@ export default function DevicesView({ status, catalog, audioDevices, midiPorts, 
         <div className="device-summary-grid">
           <div className="device-summary"><span className="summary-icon"><Cpu size={22} /></span><div><small>ASCEND NPU</small><strong>{status.npu.available ? '310B4' : '不可用'}</strong></div><StatusPill tone={status.npu.health_alarm ? 'warn' : status.npu.available ? 'ok' : 'error'}>{status.npu.health_alarm ? 'Alarm' : status.npu.available ? 'Ready' : 'Offline'}</StatusPill></div>
           <div className="device-summary"><span className="summary-icon teal"><Headphones size={22} /></span><div><small>AUDIO OUTPUT</small><strong>{audioDevices.length}</strong></div><StatusPill tone={audioDevices.length ? 'ok' : 'error'}>{audioDevices.length ? 'Ready' : 'Missing'}</StatusPill></div>
+          <div className="device-summary"><span className="summary-icon teal"><Mic2 size={22} /></span><div><small>AUDIO INPUT</small><strong>{captureInputs.length}</strong></div><StatusPill tone={captureInputs.length ? 'ok' : 'warn'}>{captureInputs.length ? 'Capture' : 'No capture'}</StatusPill></div>
           <div className="device-summary"><span className="summary-icon amber"><Cable size={22} /></span><div><small>MIDI INPUT</small><strong>{midiPorts.length}</strong></div><StatusPill tone={midiPorts.length ? 'ok' : 'neutral'}>{midiPorts.length ? 'Connected' : 'None'}</StatusPill></div>
-          <div className="device-summary"><span className="summary-icon graphite"><Box size={22} /></span><div><small>MODEL FILES</small><strong>{catalog.live_models.length + catalog.midi_ddsp_models.length}</strong></div><StatusPill tone="ok">Indexed</StatusPill></div>
+          <div className="device-summary"><span className="summary-icon graphite"><Box size={22} /></span><div><small>MODEL FILES</small><strong>{catalog.ddsp_vst_models.length + catalog.midi_ddsp_models.length}</strong></div><StatusPill tone="ok">Indexed</StatusPill></div>
         </div>
+      </section>
+
+      <SpeakerView status={status} audioDevices={speakerOutputs} onRefresh={onRefresh} />
+
+      <section className="panel output-panel">
+        <PanelHeader title="音频输入 / Effect 条件" action={<Mic2 size={18} />} />
+        {audioInputError && <div className="inline-error"><TriangleAlert size={17} />{audioInputError}</div>}
+        <div className="device-list">
+          {audioInputs.map((input) => <div className="device-list-row" key={input.id}><div><strong>{input.name}</strong><small>{input.host_api}</small></div><span>{input.type}</span><StatusPill tone={input.available ? 'ok' : 'neutral'}>{input.available ? 'Capture' : 'Monitor'}</StatusPill></div>)}
+          {!audioInputs.length && !audioInputError && <div className="empty-list">未发现音频输入</div>}
+        </div>
+        {!captureInputs.length && <div className="inline-warning"><TriangleAlert size={17} />DDSP-VST Effect 未就绪：无真实 capture source</div>}
       </section>
 
       <section className="panel dependency-panel">
@@ -60,7 +78,7 @@ export default function DevicesView({ status, catalog, audioDevices, midiPorts, 
       <section className="panel model-inventory">
         <PanelHeader title="模型目录" action={<Box size={18} />} />
         <div className="inventory-table">
-          {[...catalog.live_models, ...catalog.midi_ddsp_models].map((model) => (
+          {[...catalog.ddsp_vst_models, ...catalog.midi_ddsp_models].map((model) => (
             <div className="inventory-row" key={model.id}><strong>{model.name}</strong><span>{'backend' in model ? model.backend.toUpperCase() : model.component}</span><span>{model.precision}</span><span>{formatBytes(model.size_bytes)}</span></div>
           ))}
         </div>

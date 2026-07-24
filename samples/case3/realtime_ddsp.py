@@ -18,11 +18,13 @@ Examples:
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from collections import deque
+from dataclasses import dataclass, replace
 from collections.abc import Callable
 import math
 from pathlib import Path
 import queue
+import sys
 import threading
 import time
 from typing import Union
@@ -53,6 +55,51 @@ class EnvelopeSettings:
 
 
 DEFAULT_ENVELOPE = EnvelopeSettings()
+
+
+@dataclass(frozen=True)
+class DdspVstSettings:
+    """Runtime controls exposed by the original DDSP-VST Synth plug-in."""
+
+    pitch_shift: float = 0.0
+    harmonic_gain: float = 1.0
+    noise_gain: float = 1.0
+    output_gain_db: float = 0.0
+    attack: float = DEFAULT_ENVELOPE.attack
+    decay: float = DEFAULT_ENVELOPE.decay
+    sustain: float = DEFAULT_ENVELOPE.sustain
+    release: float = DEFAULT_ENVELOPE.release
+    input_pitch: float = 0.0
+    input_gain: float = 0.0
+    reverb_size: float = 0.4
+    reverb_damping: float = 0.1
+    reverb_wet: float = 0.0
+
+    @property
+    def envelope(self) -> EnvelopeSettings:
+        return EnvelopeSettings(
+            attack=self.attack,
+            decay=self.decay,
+            sustain=self.sustain,
+            release=self.release,
+        )
+
+
+DDSP_VST_PARAMETER_RANGES = {
+    "pitch_shift": (-24.0, 24.0),
+    "harmonic_gain": (0.0, 1.0),
+    "noise_gain": (0.0, 1.0),
+    "output_gain_db": (-60.0, 0.0),
+    "attack": (0.01, 3.0),
+    "decay": (0.0, 3.0),
+    "sustain": (0.0, 1.0),
+    "release": (0.01, 5.0),
+    "input_pitch": (-0.5, 0.5),
+    "input_gain": (-0.5, 0.5),
+    "reverb_size": (0.0, 1.0),
+    "reverb_damping": (0.0, 1.0),
+    "reverb_wet": (0.0, 1.0),
+}
 
 
 def midi_to_frequency(note: float, pitch_bend: int = 8192) -> float:
@@ -407,6 +454,18 @@ class PolyphonicMidiState:
         with self._lock:
             self._all_notes_off_locked()
 
+    def update_envelope(self, settings: EnvelopeSettings) -> None:
+        """Apply new ADSR values to current and future voices."""
+        with self._lock:
+            self.envelope = settings
+            for voice in self._voices.values():
+                if voice.adsr is None:
+                    continue
+                voice.adsr.attack = max(settings.attack, 1e-5)
+                voice.adsr.decay = max(settings.decay, 1e-5)
+                voice.adsr.sustain = float(np.clip(settings.sustain, 0.0, 1.0))
+                voice.adsr.release = max(settings.release, 1e-5)
+
     @property
     def active_notes(self) -> list[int]:
         with self._lock:
@@ -453,7 +512,8 @@ class OnnxControlsModel:
             import onnxruntime as ort
         except ImportError as exc:
             raise RuntimeError(
-                "ONNX Runtime is required. Install requirements-onnx.txt first."
+                "ONNX Runtime is an optional local dependency and is not "
+                "included in the Ascend board requirements.txt."
             ) from exc
         session_options = ort.SessionOptions()
         session_options.intra_op_num_threads = 1
@@ -513,10 +573,20 @@ class OnnxControlsModel:
 class PyAclControlsModel:
     """Stateful adapter around the static DDSP PyACL model runner."""
 
-    def __init__(self, model_path: Path, device_id: int = 0) -> None:
+    def __init__(
+        self,
+        model_path: Path,
+        device_id: int = 0,
+        *,
+        keep_runtime: bool = False,
+    ) -> None:
         from pyacl_ddsp import PyAclModelRunner
 
-        self.runner = PyAclModelRunner(model_path, device_id=device_id)
+        self.runner = PyAclModelRunner(
+            model_path,
+            device_id=device_id,
+            keep_runtime=keep_runtime,
+        )
         self.state = np.zeros(512, dtype=np.float32)
         self.backend_name = "om-pyacl"
 
@@ -554,7 +624,11 @@ ControlsModel = Union[OnnxControlsModel, PyAclControlsModel]
 
 
 def create_controls_model(
-    model_path: Path, backend: str = "auto", device_id: int = 0
+    model_path: Path,
+    backend: str = "auto",
+    device_id: int = 0,
+    *,
+    keep_acl_runtime: bool = False,
 ) -> ControlsModel:
     """Select a control-model backend explicitly or from the file extension."""
     suffix = model_path.suffix.lower()
@@ -572,7 +646,11 @@ def create_controls_model(
     if backend == "om":
         if suffix != ".om":
             raise ValueError("The OM backend requires a .om model")
-        return PyAclControlsModel(model_path, device_id=device_id)
+        return PyAclControlsModel(
+            model_path,
+            device_id=device_id,
+            keep_runtime=keep_acl_runtime,
+        )
     raise ValueError(f"Unsupported model backend: {backend}")
 
 
@@ -693,6 +771,133 @@ class LinearResampler:
         return output.astype(np.float32)
 
 
+class _SmoothedValue:
+    def __init__(self, value: float) -> None:
+        self.current = float(value)
+        self.target = float(value)
+        self.step = 0.0
+        self.remaining = 0
+
+    def set_target(self, value: float, samples: int) -> None:
+        self.target = float(value)
+        self.remaining = max(0, int(samples))
+        if self.remaining == 0:
+            self.current = self.target
+            self.step = 0.0
+        else:
+            self.step = (self.target - self.current) / self.remaining
+
+    def next(self) -> float:
+        if self.remaining > 0:
+            self.current += self.step
+            self.remaining -= 1
+            if self.remaining == 0:
+                self.current = self.target
+        return self.current
+
+
+class JuceFreeverb:
+    """Stereo FreeVerb topology and parameter mapping used by JUCE Reverb."""
+
+    COMB_TUNINGS = (1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617)
+    ALLPASS_TUNINGS = (556, 441, 341, 225)
+    STEREO_SPREAD = 23
+
+    def __init__(self, sample_rate: int, settings: DdspVstSettings) -> None:
+        self.sample_rate = int(sample_rate)
+        scale = self.sample_rate / 44_100.0
+        self.comb_buffers = [
+            [
+                np.zeros(max(1, round((size + channel * self.STEREO_SPREAD) * scale)))
+                for size in self.COMB_TUNINGS
+            ]
+            for channel in range(2)
+        ]
+        self.allpass_buffers = [
+            [
+                np.zeros(max(1, round((size + channel * self.STEREO_SPREAD) * scale)))
+                for size in self.ALLPASS_TUNINGS
+            ]
+            for channel in range(2)
+        ]
+        self.comb_indices = [[0] * len(self.COMB_TUNINGS) for _ in range(2)]
+        self.allpass_indices = [[0] * len(self.ALLPASS_TUNINGS) for _ in range(2)]
+        self.comb_filter_store = [
+            [0.0] * len(self.COMB_TUNINGS) for _ in range(2)
+        ]
+        self.room = _SmoothedValue(self._room(settings.reverb_size))
+        self.damping = _SmoothedValue(self._damping(settings.reverb_damping))
+        self.wet = _SmoothedValue(settings.reverb_wet)
+
+    @staticmethod
+    def _room(value: float) -> float:
+        return float(value) * 0.28 + 0.7
+
+    @staticmethod
+    def _damping(value: float) -> float:
+        return float(value) * 0.4
+
+    def update(self, settings: DdspVstSettings) -> None:
+        smoothing_samples = max(1, round(self.sample_rate * 0.01))
+        self.room.set_target(self._room(settings.reverb_size), smoothing_samples)
+        self.damping.set_target(
+            self._damping(settings.reverb_damping), smoothing_samples
+        )
+        self.wet.set_target(settings.reverb_wet, smoothing_samples)
+
+    def reset(self) -> None:
+        for channels in (self.comb_buffers, self.allpass_buffers):
+            for channel in channels:
+                for buffer in channel:
+                    buffer.fill(0.0)
+        self.comb_indices = [[0] * len(self.COMB_TUNINGS) for _ in range(2)]
+        self.allpass_indices = [[0] * len(self.ALLPASS_TUNINGS) for _ in range(2)]
+        self.comb_filter_store = [
+            [0.0] * len(self.COMB_TUNINGS) for _ in range(2)
+        ]
+
+    def process(self, dry: np.ndarray) -> np.ndarray:
+        dry = np.asarray(dry, dtype=np.float32).reshape(-1)
+        output = np.empty((dry.size, 2), dtype=np.float32)
+        if self.wet.current <= 1e-7 and self.wet.target <= 1e-7:
+            output[:, 0] = dry
+            output[:, 1] = dry
+            return output
+
+        for sample_index, dry_sample in enumerate(dry):
+            room = self.room.next()
+            damping = self.damping.next()
+            wet = self.wet.next() * 3.0
+            filter_input = float(dry_sample) * 0.015
+            channel_values = [0.0, 0.0]
+            for channel in range(2):
+                value = 0.0
+                for comb_index, buffer in enumerate(self.comb_buffers[channel]):
+                    index = self.comb_indices[channel][comb_index]
+                    delayed = float(buffer[index])
+                    filtered = delayed * (1.0 - damping) + (
+                        self.comb_filter_store[channel][comb_index] * damping
+                    )
+                    self.comb_filter_store[channel][comb_index] = filtered
+                    buffer[index] = filter_input + filtered * room
+                    self.comb_indices[channel][comb_index] = (index + 1) % buffer.size
+                    value += delayed
+                for allpass_index, buffer in enumerate(
+                    self.allpass_buffers[channel]
+                ):
+                    index = self.allpass_indices[channel][allpass_index]
+                    delayed = float(buffer[index])
+                    buffer[index] = value + delayed * 0.5
+                    value = delayed - value
+                    self.allpass_indices[channel][allpass_index] = (
+                        index + 1
+                    ) % buffer.size
+                channel_values[channel] = value
+            output[sample_index, 0] = dry_sample + wet * channel_values[0]
+            output[sample_index, 1] = dry_sample + wet * channel_values[1]
+        return output
+
+
 class VoiceRenderer:
     """DDSP state and synthesizers for one active MIDI note."""
 
@@ -707,11 +912,18 @@ class VoiceRenderer:
         self.harmonic.reset()
         self.noise.reset()
 
-    def render(self, snapshot: MidiVoiceSnapshot) -> np.ndarray:
+    def render(
+        self,
+        snapshot: MidiVoiceSnapshot,
+        settings: DdspVstSettings = DdspVstSettings(),
+    ) -> np.ndarray:
+        bend_semitones = (snapshot.pitch_bend - 8192.0) / 4096.0
+        shifted_note = snapshot.note + bend_semitones + settings.pitch_shift
+        f0_scaled = shifted_note / 127.0 - settings.input_pitch
         if snapshot.finished:
             _, self.state = self.controls_model.predict_from_state(
                 self.state,
-                midi_to_scaled(snapshot.note, snapshot.pitch_bend),
+                f0_scaled,
                 0.0,
             )
             self.harmonic.previous_amplitudes.fill(0.0)
@@ -725,23 +937,23 @@ class VoiceRenderer:
             self.noise.reset()
             return np.zeros(MODEL_HOP_SIZE, dtype=np.float32)
 
-        f0_scaled = midi_to_scaled(snapshot.note, snapshot.pitch_bend)
         pw_scaled = float(
-            np.clip(
-                snapshot.envelope
-                * snapshot.velocity
-                * snapshot.volume
-                * snapshot.expression,
-                0.0,
-                1.0,
-            )
+            snapshot.envelope
+            * snapshot.velocity
+            * snapshot.volume
+            * snapshot.expression
+            - settings.input_gain
         )
         controls, self.state = self.controls_model.predict_from_state(
             self.state, f0_scaled, pw_scaled
         )
-        f0_hz = midi_to_frequency(snapshot.note, snapshot.pitch_bend)
-        harmonic = self.harmonic.render(controls.amplitude, controls.harmonics, f0_hz)
-        noise = self.noise.render(controls.noise_amps)
+        f0_hz = 440.0 * 2.0 ** ((shifted_note - 69.0) / 12.0)
+        harmonic = self.harmonic.render(
+            controls.amplitude * settings.harmonic_gain,
+            controls.harmonics,
+            f0_hz,
+        )
+        noise = self.noise.render(controls.noise_amps * settings.noise_gain)
         return (harmonic + noise).astype(np.float32, copy=False)
 
 
@@ -790,14 +1002,18 @@ class RealtimeSynthEngine:
         self,
         model_path: Path,
         output_sample_rate: int = 48_000,
-        max_voices: int = 8,
+        max_voices: int = 1,
         envelope: EnvelopeSettings = DEFAULT_ENVELOPE,
         output_gain_db: float = 0.0,
         backend: str = "auto",
         device_id: int = 0,
+        keep_acl_runtime: bool = False,
     ):
         self.controls_model = create_controls_model(
-            model_path, backend=backend, device_id=device_id
+            model_path,
+            backend=backend,
+            device_id=device_id,
+            keep_acl_runtime=keep_acl_runtime,
         )
         print(
             f"[MODEL] backend={self.controls_model.backend_name}, "
@@ -811,8 +1027,44 @@ class RealtimeSynthEngine:
         self.voice_gain = PolyphonicGainSmoother()
         self.resampler = LinearResampler(MODEL_SAMPLE_RATE, output_sample_rate)
         self.output_sample_rate = output_sample_rate
-        self.output_gain_db = float(output_gain_db)
-        self.output_gain = 10.0 ** (self.output_gain_db / 20.0)
+        self._settings_lock = threading.Lock()
+        self.settings = DdspVstSettings(
+            output_gain_db=float(output_gain_db),
+            attack=envelope.attack,
+            decay=envelope.decay,
+            sustain=envelope.sustain,
+            release=envelope.release,
+        )
+        self.reverb = JuceFreeverb(output_sample_rate, self.settings)
+
+    @property
+    def output_gain_db(self) -> float:
+        with self._settings_lock:
+            return self.settings.output_gain_db
+
+    @property
+    def output_gain(self) -> float:
+        return 10.0 ** (self.output_gain_db / 20.0)
+
+    def update_parameters(self, values: dict[str, float]) -> DdspVstSettings:
+        unknown = set(values) - set(DDSP_VST_PARAMETER_RANGES)
+        if unknown:
+            raise ValueError(f"Unknown DDSP-VST parameters: {sorted(unknown)}")
+        normalized: dict[str, float] = {}
+        for name, value in values.items():
+            value = float(value)
+            minimum, maximum = DDSP_VST_PARAMETER_RANGES[name]
+            if not math.isfinite(value) or not minimum <= value <= maximum:
+                raise ValueError(f"{name} must be in [{minimum}, {maximum}]")
+            normalized[name] = value
+        with self._settings_lock:
+            self.settings = replace(self.settings, **normalized)
+            settings = self.settings
+        if {"attack", "decay", "sustain", "release"} & set(normalized):
+            self.midi.update_envelope(settings.envelope)
+        if {"reverb_size", "reverb_damping", "reverb_wet"} & set(normalized):
+            self.reverb.update(settings)
+        return settings
 
     def reset(self) -> None:
         self.controls_model.reset()
@@ -820,11 +1072,14 @@ class RealtimeSynthEngine:
             voice.reset()
         self.voice_gain.reset()
         self.resampler.reset()
+        self.reverb.reset()
 
     def close(self) -> None:
         self.controls_model.close()
 
     def render_model_frame(self) -> np.ndarray:
+        with self._settings_lock:
+            settings = self.settings
         snapshots = self.midi.next_snapshots()
         if not snapshots:
             self.voice_gain.reset()
@@ -834,23 +1089,27 @@ class RealtimeSynthEngine:
         rendered_voices = 0
         for snapshot in snapshots:
             voice = self.voices[snapshot.slot]
-            mixed += voice.render(snapshot)
+            mixed += voice.render(snapshot, settings)
             if not snapshot.finished:
                 rendered_voices += 1
         return self.voice_gain.process(mixed, rendered_voices)
 
     def render_output_block(self) -> np.ndarray:
         output = self.resampler.process(self.render_model_frame())
-        if self.output_gain != 1.0:
-            output = output * self.output_gain
+        gain = self.output_gain
+        if gain != 1.0:
+            output = output * gain
+        output = self.reverb.process(output)
         return np.clip(output, -1.0, 1.0).astype(np.float32, copy=False)
 
 
 def write_wav(path: Path, samples: np.ndarray, sample_rate: int) -> None:
+    samples = np.asarray(samples, dtype=np.float32)
+    channels = 1 if samples.ndim == 1 else int(samples.shape[1])
     samples = np.clip(samples, -1.0, 1.0)
     pcm = (samples * 32767.0).astype("<i2").tobytes()
     with wave.open(str(path), "wb") as handle:
-        handle.setnchannels(1)
+        handle.setnchannels(channels)
         handle.setsampwidth(2)
         handle.setframerate(sample_rate)
         handle.writeframes(pcm)
@@ -987,6 +1246,7 @@ class LivePlayer:
         self.underruns = 0
         self.overruns = 0
         self.max_render_ms = 0.0
+        self.render_times_ms: deque[float] = deque(maxlen=1000)
         self.worker = threading.Thread(target=self._render_loop, daemon=True)
 
     def _render_loop(self) -> None:
@@ -1014,6 +1274,7 @@ class LivePlayer:
                 with self._stats_lock:
                     self.rendered_blocks += 1
                     self.max_render_ms = max(self.max_render_ms, elapsed_ms)
+                    self.render_times_ms.append(elapsed_ms)
         except BaseException as exc:
             with self._stats_lock:
                 self._worker_error = exc
@@ -1036,7 +1297,17 @@ class LivePlayer:
                 had_underrun = True
             else:
                 self.space_available.set()
-                outdata[:, :] = block[:, np.newaxis]
+                block = np.asarray(block, dtype=np.float32)
+                if block.ndim == 1:
+                    outdata[:, :] = block[:, np.newaxis]
+                elif self.output_channels == 1:
+                    outdata[:, 0] = np.mean(block, axis=1)
+                else:
+                    outdata.fill(0.0)
+                    channels = min(self.output_channels, block.shape[1])
+                    outdata[:, :channels] = block[:, :channels]
+                    if self.output_channels > channels:
+                        outdata[:, channels:] = block[:, :1]
                 with self._stats_lock:
                     self.played_blocks += 1
         if had_underrun:
@@ -1087,7 +1358,7 @@ class LivePlayer:
         except ImportError as exc:
             raise RuntimeError(
                 "Live audio requires sounddevice and python-rtmidi. "
-                "Install requirements-realtime.txt."
+                "Install requirements.txt."
             ) from exc
         self.output_channels, device_name = self._select_output_channels(sd)
         print(
@@ -1241,9 +1512,21 @@ def query_midi_devices() -> list[dict[str, object]]:
         import mido
     except ImportError as exc:
         raise RuntimeError("Install mido and python-rtmidi first.") from exc
+
+    if sys.platform.startswith("linux") and not Path("/dev/snd/seq").exists():
+        raise RuntimeError(
+            "Physical MIDI input is unavailable: ALSA sequencer device "
+            "/dev/snd/seq is missing"
+        )
+
+    try:
+        names = mido.get_input_names()
+    except Exception as exc:
+        raise RuntimeError(f"Unable to enumerate MIDI input devices: {exc}") from exc
+
     return [
         {"id": str(index), "index": index, "name": name}
-        for index, name in enumerate(mido.get_input_names())
+        for index, name in enumerate(names)
     ]
 
 
@@ -1258,7 +1541,7 @@ def query_audio_devices() -> list[dict[str, object]]:
     try:
         import sounddevice as sd
     except ImportError as exc:
-        raise RuntimeError("Install requirements-realtime.txt first.") from exc
+        raise RuntimeError("Install requirements.txt first.") from exc
     result: list[dict[str, object]] = []
     for index, device in enumerate(sd.query_devices()):
         if device["max_output_channels"] > 0:
@@ -1350,7 +1633,7 @@ def run_live(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Real-time MIDI-DDSP using ONNX Runtime or Ascend PyACL"
+        description="Real-time DDSP-VST Synth using ONNX Runtime or Ascend PyACL"
     )
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL)
     parser.add_argument(
@@ -1397,8 +1680,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-voices",
         type=int,
-        default=8,
-        help="Maximum simultaneous notes; extra notes use oldest-voice stealing",
+        default=1,
+        help="Maximum simultaneous notes; the Google Synth default is monophonic",
     )
     parser.add_argument("--attack", type=float, default=DEFAULT_ENVELOPE.attack)
     parser.add_argument("--decay", type=float, default=DEFAULT_ENVELOPE.decay)
@@ -1447,8 +1730,8 @@ def main() -> int:
         raise ValueError("--tail cannot be negative")
     if args.audio_latency_ms <= 0:
         raise ValueError("--audio-latency-ms must be positive")
-    if not math.isfinite(args.output_gain_db) or not -60.0 <= args.output_gain_db <= 36.0:
-        raise ValueError("--output-gain-db must be finite and between -60 and 36")
+    if not math.isfinite(args.output_gain_db) or not -60.0 <= args.output_gain_db <= 0.0:
+        raise ValueError("--output-gain-db must be finite and between -60 and 0")
     audio_device = parse_audio_device(args.audio_device)
     audio_latency_seconds = args.audio_latency_ms / 1000.0
     envelope = EnvelopeSettings(

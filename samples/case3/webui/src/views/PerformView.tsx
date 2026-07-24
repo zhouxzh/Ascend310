@@ -3,7 +3,7 @@ import { Gauge, KeyboardMusic, Octagon, Play, Radio, SlidersHorizontal, Volume2 
 import { api, websocketUrl } from '../api'
 import Piano from '../components/Piano'
 import { Field, Metric, Notice, PanelHeader, StatusPill, Stepper } from '../components/ui'
-import type { AudioDevice, Catalog, LiveStatus, MidiPort, SystemStatus } from '../types'
+import type { AudioDevice, Catalog, DdspVstParameters, DdspVstStatus, MidiPort, SystemStatus } from '../types'
 
 interface Props {
   status: SystemStatus
@@ -14,100 +14,123 @@ interface Props {
 }
 
 const KEYBOARD_MAP: Record<string, number> = {
-  a: 0,
-  w: 1,
-  s: 2,
-  e: 3,
-  d: 4,
-  f: 5,
-  t: 6,
-  g: 7,
-  y: 8,
-  h: 9,
-  u: 10,
-  j: 11,
-  k: 12,
-  o: 13,
-  l: 14,
-  p: 15,
-  ';': 16,
+  a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8,
+  h: 9, u: 10, j: 11, k: 12, o: 13, l: 14, p: 15, ';': 16,
+}
+
+const DEFAULT_PARAMETERS: DdspVstParameters = {
+  pitch_shift: 0,
+  harmonic_gain: 1,
+  noise_gain: 1,
+  output_gain_db: 0,
+  attack: 0.1,
+  decay: 0,
+  sustain: 1,
+  release: 1.2,
+  input_pitch: 0,
+  input_gain: 0,
+  reverb_size: 0.4,
+  reverb_damping: 0.1,
+  reverb_wet: 0,
 }
 
 export default function PerformView({ status, catalog, audioDevices, midiPorts, onRefresh }: Props) {
   const preferredModel = useMemo(
-    () => catalog.live_models.find((model) => model.instrument.toLowerCase() === 'violin' && model.backend === 'om' && model.precision === 'mixed_float16')
-      ?? catalog.live_models.find((model) => model.instrument.toLowerCase() === 'violin')
-      ?? catalog.live_models.find((model) => model.backend === 'om' && model.precision === 'mixed_float16')
-      ?? catalog.live_models[0],
-    [catalog.live_models],
+    () => catalog.ddsp_vst_models.find((model) => model.instrument.toLowerCase() === 'violin' && model.precision === 'mixed_float16')
+      ?? catalog.ddsp_vst_models.find((model) => model.precision === 'mixed_float16')
+      ?? catalog.ddsp_vst_models[0],
+    [catalog.ddsp_vst_models],
   )
   const [modelId, setModelId] = useState(preferredModel?.id ?? '')
   const [audioDeviceId, setAudioDeviceId] = useState('')
   const [midiPort, setMidiPort] = useState('')
   const [octave, setOctave] = useState(4)
   const [velocity, setVelocity] = useState(100)
-  const [voices, setVoices] = useState(8)
-  const [gain, setGain] = useState(0)
-  const [attack, setAttack] = useState(0.1)
-  const [release, setRelease] = useState(1.2)
-  const [sustain, setSustain] = useState(false)
-  const [liveStatus, setLiveStatus] = useState<LiveStatus>(status.live)
+  const [voices, setVoices] = useState(1)
+  const [advanced, setAdvanced] = useState(false)
+  const [parameters, setParameters] = useState<DdspVstParameters>(DEFAULT_PARAMETERS)
+  const [pitchBend, setPitchBend] = useState(0)
+  const [sustainPedal, setSustainPedal] = useState(false)
+  const [synthStatus, setSynthStatus] = useState<DdspVstStatus>(status.ddsp_vst)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [socketState, setSocketState] = useState<'offline' | 'connecting' | 'online'>('offline')
   const socketRef = useRef<WebSocket | null>(null)
   const pressedKeys = useRef(new Map<string, number>())
 
+  const modelOptions = useMemo(
+    () => advanced ? catalog.ddsp_vst_models : catalog.ddsp_vst_models.filter((model) => model.precision === 'mixed_float16'),
+    [advanced, catalog.ddsp_vst_models],
+  )
+
   useEffect(() => {
     if (!modelId && preferredModel) setModelId(preferredModel.id)
   }, [modelId, preferredModel])
 
-  useEffect(() => setLiveStatus(status.live), [status.live])
+  useEffect(() => {
+    if (!advanced && modelOptions.length && !modelOptions.some((model) => model.id === modelId)) {
+      setModelId(modelOptions[0].id)
+    }
+  }, [advanced, modelId, modelOptions])
+
+  useEffect(() => setSynthStatus(status.ddsp_vst), [status.ddsp_vst])
 
   useEffect(() => {
-    if (!liveStatus.running) {
+    if (!synthStatus.running) {
       socketRef.current?.close()
       socketRef.current = null
       setSocketState('offline')
       return
     }
     setSocketState('connecting')
-    const socket = new WebSocket(websocketUrl('/api/v1/live/events'))
+    const socket = new WebSocket(websocketUrl('/api/v1/ddsp-vst/events'))
     socketRef.current = socket
     socket.onopen = () => setSocketState('online')
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data)
-      if (message.event === 'status') setLiveStatus(message.data)
+      if (message.event === 'status') setSynthStatus(message.data)
       if (message.event === 'error') setError(message.message)
     }
     socket.onclose = () => setSocketState('offline')
     return () => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ event: 'all_notes_off' }))
+      }
       socket.close()
       if (socketRef.current === socket) socketRef.current = null
     }
-  }, [liveStatus.running])
+  }, [synthStatus.running])
 
   const send = useCallback((message: Record<string, unknown>) => {
     const socket = socketRef.current
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message))
   }, [])
 
-  const noteOn = useCallback((note: number, noteVelocity: number) => send({ event: 'note_on', note, velocity: noteVelocity }), [send])
+  const setParameter = useCallback((name: keyof DdspVstParameters, value: number) => {
+    setParameters((current) => ({ ...current, [name]: value }))
+    send({ event: 'parameters', values: { [name]: value } })
+  }, [send])
+
+  const noteOn = useCallback((note: number, noteVelocity: number) => {
+    send({ event: 'note_on', note, velocity: noteVelocity })
+  }, [send])
   const noteOff = useCallback((note: number) => send({ event: 'note_off', note }), [send])
 
   useEffect(() => {
     const isTyping = (target: EventTarget | null) => target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement
     const down = (event: KeyboardEvent) => {
-      if (event.repeat || isTyping(event.target) || !(event.key.toLowerCase() in KEYBOARD_MAP)) return
-      const note = (octave + 1) * 12 + KEYBOARD_MAP[event.key.toLowerCase()]
-      pressedKeys.current.set(event.key.toLowerCase(), note)
+      const key = event.key.toLowerCase()
+      if (event.repeat || isTyping(event.target) || !(key in KEYBOARD_MAP)) return
+      const note = (octave + 1) * 12 + KEYBOARD_MAP[key]
+      pressedKeys.current.set(key, note)
       noteOn(note, velocity)
       event.preventDefault()
     }
     const up = (event: KeyboardEvent) => {
-      const note = pressedKeys.current.get(event.key.toLowerCase())
+      const key = event.key.toLowerCase()
+      const note = pressedKeys.current.get(key)
       if (note === undefined) return
-      pressedKeys.current.delete(event.key.toLowerCase())
+      pressedKeys.current.delete(key)
       noteOff(note)
       event.preventDefault()
     }
@@ -122,8 +145,10 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
   useEffect(() => {
     const releaseBrowserInput = () => {
       pressedKeys.current.clear()
-      setSustain(false)
+      setSustainPedal(false)
+      setPitchBend(0)
       send({ event: 'all_notes_off' })
+      send({ event: 'pitch_bend', value: 0 })
     }
     const visibilityChanged = () => {
       if (document.visibilityState === 'hidden') releaseBrowserInput()
@@ -140,7 +165,7 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
     setBusy(true)
     setError('')
     try {
-      const next = await api.startLive({
+      const next = await api.startDdspVst({
         model_id: modelId,
         audio_device_id: audioDeviceId || null,
         midi_port: midiPort || null,
@@ -148,14 +173,10 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
         prebuffer: 6,
         max_voices: voices,
         audio_latency_ms: 80,
-        output_gain_db: gain,
-        attack,
-        decay: 0,
-        sustain: 1,
-        release,
+        ...parameters,
         device_id: 0,
       })
-      setLiveStatus(next)
+      setSynthStatus(next)
       await onRefresh()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -169,7 +190,7 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
     setError('')
     try {
       send({ event: 'all_notes_off' })
-      setLiveStatus(await api.stopLive())
+      setSynthStatus(await api.stopDdspVst())
       await onRefresh()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -179,113 +200,129 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
   }
 
   function toggleSustain() {
-    const next = !sustain
-    setSustain(next)
+    const next = !sustainPedal
+    setSustainPedal(next)
     send({ event: 'sustain', enabled: next })
   }
 
-  const metrics = liveStatus.metrics
-  const unavailable = catalog.live_models.length === 0 || audioDevices.length === 0
+  function changePitchBend(value: number) {
+    setPitchBend(value)
+    send({ event: 'pitch_bend', value })
+  }
+
+  const metrics = synthStatus.metrics
+  const unavailable = catalog.ddsp_vst_models.length === 0 || audioDevices.length === 0
 
   return (
     <div className="workspace perform-workspace">
       <section className="panel performance-stage">
         <PanelHeader
-          title="实时演奏"
-          subtitle={preferredModel ? `${preferredModel.instrument} · ${liveStatus.backend ?? preferredModel.backend.toUpperCase()}` : '未发现可用模型'}
+          title="DDSP-VST Synth"
+          subtitle={preferredModel ? `${preferredModel.instrument} · ${synthStatus.backend ?? 'OM'}` : '未发现可用模型'}
           action={
             <div className="transport-actions">
-              <StatusPill tone={liveStatus.running && socketState === 'online' ? 'ok' : socketState === 'connecting' ? 'warn' : 'neutral'}>
-                <Radio size={13} /> {liveStatus.running ? socketState : '待机'}
+              <StatusPill tone={synthStatus.running && socketState === 'online' ? 'ok' : socketState === 'connecting' ? 'warn' : 'neutral'}>
+                <Radio size={13} /> {synthStatus.running ? socketState : '待机'}
               </StatusPill>
-              <button className={`primary-button ${liveStatus.running ? 'danger-button' : ''}`} type="button" disabled={busy || (!liveStatus.running && unavailable)} onClick={liveStatus.running ? stop : start}>
-                {liveStatus.running ? <Octagon size={18} /> : <Play size={18} fill="currentColor" />}
-                {busy ? '处理中' : liveStatus.running ? '停止' : '启动引擎'}
+              <button className={`primary-button ${synthStatus.running ? 'danger-button' : ''}`} type="button" disabled={busy || (!synthStatus.running && unavailable)} onClick={synthStatus.running ? stop : start}>
+                {synthStatus.running ? <Octagon size={18} /> : <Play size={18} fill="currentColor" />}
+                {busy ? '处理中' : synthStatus.running ? '停止' : '启动 Synth'}
               </button>
             </div>
           }
         />
 
         {error && <Notice tone="error">{error}</Notice>}
-        {unavailable && !error && (
-          <Notice tone="error">
-            {catalog.live_models.length === 0 ? '未发现可用的实时模型。' : '未发现可用的音频输出设备。'}
-          </Notice>
-        )}
+        {unavailable && !error && <Notice tone="error">{catalog.ddsp_vst_models.length === 0 ? '未发现 DDSP-VST OM。' : '未发现可用音频输出。'}</Notice>}
 
         <div className="performance-readout">
           <div className="note-display">
             <KeyboardMusic size={22} />
-            <div>
-              <span>ACTIVE NOTES</span>
-              <strong>{liveStatus.active_notes.length ? liveStatus.active_notes.join(' · ') : '—'}</strong>
-            </div>
+            <div><span>ACTIVE NOTES</span><strong>{synthStatus.active_notes.length ? synthStatus.active_notes.join(' · ') : '—'}</strong></div>
           </div>
           <div className="metrics-row compact-metrics">
-            <Metric label="声部" value={liveStatus.active_notes.length} />
-            <Metric label="最大推理" value={(metrics?.max_render_ms ?? 0).toFixed(2)} unit="ms" tone="teal" />
+            <Metric label="声部" value={synthStatus.active_notes.length} />
+            <Metric label="P95 推理" value={(metrics?.p95_render_ms ?? 0).toFixed(2)} unit="ms" tone="teal" />
             <Metric label="缓冲" value={metrics?.buffered_blocks ?? 0} />
             <Metric label="下溢" value={metrics?.underruns ?? 0} tone={(metrics?.underruns ?? 0) > 0 ? 'red' : undefined} />
           </div>
         </div>
 
-        <Piano octave={octave} velocity={velocity} activeNotes={liveStatus.active_notes} disabled={!liveStatus.running || socketState !== 'online'} onNoteOn={noteOn} onNoteOff={noteOff} />
+        <Piano octave={octave} velocity={velocity} activeNotes={synthStatus.active_notes} disabled={!synthStatus.running || socketState !== 'online'} onNoteOn={noteOn} onNoteOff={noteOff} />
 
         <div className="performance-controls">
-          <div className="control-block">
-            <span>OCTAVE</span>
-            <Stepper value={octave} min={1} max={7} onChange={setOctave} label="八度" />
-          </div>
-          <label className="control-block range-block">
-            <span>VELOCITY <strong>{velocity}</strong></span>
-            <input type="range" min="1" max="127" value={velocity} onChange={(event) => setVelocity(Number(event.target.value))} />
-          </label>
-          <button type="button" className={`sustain-button ${sustain ? 'is-active' : ''}`} onClick={toggleSustain} disabled={!liveStatus.running}>
-            SUSTAIN
-          </button>
+          <div className="control-block"><span>OCTAVE</span><Stepper value={octave} min={1} max={7} onChange={setOctave} label="八度" /></div>
+          <label className="control-block range-block"><span>VELOCITY <strong>{velocity}</strong></span><input type="range" min="1" max="127" value={velocity} onChange={(event) => setVelocity(Number(event.target.value))} /></label>
+          <label className="control-block range-block"><span>PITCH BEND <strong>{pitchBend}</strong></span><input type="range" min="-8192" max="8191" value={pitchBend} onChange={(event) => changePitchBend(Number(event.target.value))} onPointerUp={() => changePitchBend(0)} /></label>
+          <button type="button" className={`sustain-button ${sustainPedal ? 'is-active' : ''}`} onClick={toggleSustain} disabled={!synthStatus.running}>SUSTAIN</button>
         </div>
       </section>
 
-      <aside className="panel settings-panel">
-        <PanelHeader title="音源设置" action={<SlidersHorizontal size={18} />} />
+      <aside className="panel settings-panel synth-settings">
+        <PanelHeader title="Synth 参数" action={<SlidersHorizontal size={18} />} />
         <div className="form-grid single-column">
           <Field label="模型">
-            <select value={modelId} onChange={(event) => setModelId(event.target.value)} disabled={liveStatus.running}>
-              {catalog.live_models.map((model) => <option value={model.id} key={model.id}>{model.instrument} · {model.backend.toUpperCase()} · {model.precision}</option>)}
+            <select value={modelId} onChange={(event) => setModelId(event.target.value)} disabled={synthStatus.running}>
+              {modelOptions.map((model) => <option value={model.id} key={model.id}>{model.instrument} · {model.precision === 'mixed_float16' ? 'Mixed' : 'FP16'}</option>)}
             </select>
           </Field>
           <Field label="音频输出">
-            <select value={audioDeviceId} onChange={(event) => setAudioDeviceId(event.target.value)} disabled={liveStatus.running}>
+            <select value={audioDeviceId} onChange={(event) => setAudioDeviceId(event.target.value)} disabled={synthStatus.running}>
               <option value="">系统默认</option>
               {audioDevices.map((device) => <option value={device.id} key={device.id}>{device.name}</option>)}
             </select>
           </Field>
           <Field label="MIDI 输入">
-            <select value={midiPort} onChange={(event) => setMidiPort(event.target.value)} disabled={liveStatus.running}>
-              <option value="">仅触控与电脑键盘</option>
+            <select value={midiPort} onChange={(event) => setMidiPort(event.target.value)} disabled={synthStatus.running}>
+              <option value="">触控与电脑键盘</option>
               {midiPorts.map((port) => <option value={port.name} key={port.id}>{port.name}</option>)}
             </select>
           </Field>
-          <Field label="最大声部">
-            <Stepper value={voices} min={1} max={16} onChange={setVoices} label="最大声部" />
-          </Field>
-          <Field label={`输出增益 ${gain > 0 ? '+' : ''}${gain} dB`}>
-            <input type="range" min="-24" max="30" value={gain} onChange={(event) => setGain(Number(event.target.value))} />
-          </Field>
-          <Field label={`Attack ${attack.toFixed(2)} s`}>
-            <input type="range" min="0.01" max="1" step="0.01" value={attack} onChange={(event) => setAttack(Number(event.target.value))} />
-          </Field>
-          <Field label={`Release ${release.toFixed(2)} s`}>
-            <input type="range" min="0.05" max="3" step="0.05" value={release} onChange={(event) => setRelease(Number(event.target.value))} />
-          </Field>
+
+          <div className="setting-group-title">音色</div>
+          <ParameterSlider label="Pitch Shift" value={parameters.pitch_shift} min={-24} max={24} step={1} suffix=" st" onChange={(value) => setParameter('pitch_shift', value)} />
+          <ParameterSlider label="Harmonics" value={parameters.harmonic_gain} min={0} max={1} step={0.01} onChange={(value) => setParameter('harmonic_gain', value)} />
+          <ParameterSlider label="Noise" value={parameters.noise_gain} min={0} max={1} step={0.01} onChange={(value) => setParameter('noise_gain', value)} />
+          <ParameterSlider label="Output Gain" value={parameters.output_gain_db} min={-60} max={0} step={1} suffix=" dB" onChange={(value) => setParameter('output_gain_db', value)} />
+
+          <div className="setting-group-title">包络</div>
+          <ParameterSlider label="Attack" value={parameters.attack} min={0.01} max={3} step={0.01} suffix=" s" onChange={(value) => setParameter('attack', value)} />
+          <ParameterSlider label="Decay" value={parameters.decay} min={0} max={3} step={0.01} suffix=" s" onChange={(value) => setParameter('decay', value)} />
+          <ParameterSlider label="Sustain" value={parameters.sustain} min={0} max={1} step={0.01} onChange={(value) => setParameter('sustain', value)} />
+          <ParameterSlider label="Release" value={parameters.release} min={0.01} max={5} step={0.01} suffix=" s" onChange={(value) => setParameter('release', value)} />
+
+          <div className="setting-group-title">混响</div>
+          <ParameterSlider label="Size" value={parameters.reverb_size} min={0} max={1} step={0.01} onChange={(value) => setParameter('reverb_size', value)} />
+          <ParameterSlider label="Damping" value={parameters.reverb_damping} min={0} max={1} step={0.01} onChange={(value) => setParameter('reverb_damping', value)} />
+          <ParameterSlider label="Wet" value={parameters.reverb_wet} min={0} max={1} step={0.01} onChange={(value) => setParameter('reverb_wet', value)} />
+
+          <button type="button" className="secondary-button advanced-toggle" onClick={() => setAdvanced((value) => !value)}>{advanced ? '收起高级设置' : '高级设置'}</button>
+          {advanced && <>
+            <Field label="最大声部"><Stepper value={voices} min={1} max={8} onChange={setVoices} label="最大声部" /></Field>
+            <ParameterSlider label="Input Pitch" value={parameters.input_pitch} min={-0.5} max={0.5} step={0.01} onChange={(value) => setParameter('input_pitch', value)} />
+            <ParameterSlider label="Input Gain" value={parameters.input_gain} min={-0.5} max={0.5} step={0.01} onChange={(value) => setParameter('input_gain', value)} />
+          </>}
         </div>
-        <div className="settings-footer">
-          <Volume2 size={17} />
-          <span>48 kHz · 80 ms</span>
-          <Gauge size={17} />
-          <span>{voices} voices</span>
-        </div>
+        <div className="settings-footer"><Volume2 size={17} /><span>48 kHz · 80 ms</span><Gauge size={17} /><span>{voices} voice{voices > 1 ? 's' : ''}</span></div>
       </aside>
     </div>
+  )
+}
+
+interface ParameterSliderProps {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  suffix?: string
+  onChange: (value: number) => void
+}
+
+function ParameterSlider({ label, value, min, max, step, suffix = '', onChange }: ParameterSliderProps) {
+  return (
+    <Field label={`${label} ${Number.isInteger(step) ? value : value.toFixed(2)}${suffix}`}>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} />
+    </Field>
   )
 }

@@ -23,23 +23,13 @@
 
 板端只有约 7.4 GiB 内存且没有 swap。ATC 使用默认并发和
 `TE_PARALLEL_COMPILER=4` 时均被内核 OOM killer 终止，退出码为 137；内核日志
-明确记录被杀死的进程为 `atc.bin`。将 TBE 编译限制为单进程后转换成功：
+明确记录被杀死的进程为 `atc.bin`。将 TBE 编译限制为单进程后转换成功。当前统一
+通过批量脚本写入合并后的模型目录：
 
 ```bash
 cd ~/Documents/case3
 
-TE_PARALLEL_COMPILER=1 OMP_NUM_THREADS=1 \
-  bash tools/convert_onnx_to_om.sh \
-  --model models/ddsp_vst/Violin.onnx \
-  --output models/om/ascend8t/Violin_force_fp16 \
-  --soc-version Ascend310B4
-
-TE_PARALLEL_COMPILER=1 OMP_NUM_THREADS=1 \
-  bash tools/convert_onnx_to_om.sh \
-  --model models/ddsp_vst/Violin.onnx \
-  --output models/om/ascend8t/Violin_mixed_float16 \
-  --soc-version Ascend310B4 \
-  --precision-mode-v2 mixed_float16
+bash tools/run_all_ascend8t_models.sh --phase convert
 ```
 
 两次成功转换的摘要都为 `ATC_EXIT_CODE=0`、`OM_UPDATED=yes`、
@@ -70,11 +60,12 @@ NRMSE 均低于 FP16。8T 上 FP16 的误差指标与此前 20T 实测完全一�
 `310B4 + CANN 8.3.RC1` 在限制编译并发后可以成功生成并运行该混合精度模型；由于
 芯片型号和 CANN 版本同时变化，不能仅根据这次对比把改善归因于其中某一个因素。
 
-完整产物位于：
+这组早期单模型 OM 后来被全音色批次中的同名 8T 模型替代，不再重复保存在
+`models/om/`。完整诊断记录位于：
 
 ```text
-models/om/ascend8t/                    # OM、ATC 日志和兼容性摘要
-reports/ascend8t/                      # 环境、OOM 证据、精度 JSON 和 SHA256 清单
+reports/model_conversion/legacy_ascend8t_violin/ # 早期 ATC 日志和摘要
+reports/ascend8t/                               # 环境、OOM 证据和精度报告
 ```
 
 ## Ascend 8T 全部音色模型批量实测
@@ -151,7 +142,8 @@ Python 输入组织、输出复制和状态回灌的 5 次平均单帧延迟中�
 批量结果位于：
 
 ```text
-models/om/ascend8t/all_models/          # 22 个 OM、ATC 日志和源哈希
+models/om/                              # 22 个 DDSP-VST 与 4 个 MIDI-DDSP OM
+models/conversion_logs/ddsp_vst/        # 22 份 ATC 日志、摘要和源哈希
 reports/ascend8t/all_models/            # 参考、精度、速度、环境和汇总
 reports/ascend8t/all_models/summary.md  # 人工可读汇总
 reports/ascend8t/all_models/summary.csv # 逐模型表格
@@ -203,11 +195,12 @@ FP16 使用 ATC 默认精度模式，混合精度显式使用
 模型、算子、长时间推理、精度和稳定性仍需分别测试。`npu-smi` 的
 `Health: Alarm` 也被保留在环境记录中，没有因本次短推理成功而忽略。
 
-完整产物位于：
+这两份兼容性测试 OM 与 canonical 8T 模型用途重复，合并目录时已删除；原始日志和
+运行证据保留在：
 
 ```text
-models/om/ascend8t2/          # 两份 OM、ATC 原始日志和兼容性摘要
-reports/ascend8t2/            # 环境、dry-run、ais_bench 日志和 SHA256 清单
+reports/model_conversion/legacy_ascend8t2_violin/ # ATC 原始日志和摘要
+reports/ascend8t2/                              # 环境、dry-run 和 ais_bench 证据
 ```
 
 ## Ascend 20T 同脚本重测结果
@@ -253,8 +246,8 @@ FP16 OM，也不能生成 `mixed_float16` OM。此前 2026-07-20 的混合精度
 完整证据位于：
 
 ```text
-models/om/ascend20t_retest/Violin_force_fp16.atc.log
-models/om/ascend20t_retest/Violin_mixed_float16.atc.log
+reports/ascend20t_retest/Violin_force_fp16.atc.log
+reports/ascend20t_retest/Violin_mixed_float16.atc.log
 reports/ascend20t_retest/environment.txt
 reports/ascend20t_retest/retest_summary.txt
 reports/ascend20t_retest/SHA256SUMS.txt
@@ -311,12 +304,11 @@ reports/cross_soc/summary.md              # 汇总结论
 
 ## 20T 全模型 FP16 与混合精度对比
 
-2026-07-21 将当前 `models/om/fp16` 和 `models/om/mixed_precision` 中的 22 个
-OM 全部同步到正式模型目录：
+2026-07-21 将当时按 `fp16` 和 `mixed_precision` 分目录保存的 22 个 OM 全部
+同步到 20T。当前这些模型已经合并到单一的 `models/om/` 目录：
 
 ```text
-ascend20t:~/Documents/case3/models/om/fp16/
-ascend20t:~/Documents/case3/models/om/mixed_precision/
+ascend20t:~/Documents/case3/models/om/
 ```
 
 独立测试副本和工具位于

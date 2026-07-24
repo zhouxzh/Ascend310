@@ -1,217 +1,206 @@
-# 案例3：智能电子琴
+# 案例3：Ascend 310B MIDI-DDSP 智能电子琴
 
 ---
+
 ## 1. 项目简介 {#src-experiment-case3-h1}
 
-本项目通过结合计算机视觉和音频处理技术，创造了一种全新的交互式音乐体验。系统利用昇腾310B的AI算力，实时识别用户的手势或特定图像标记，并将其转换为相应的音符和音效，从而实现"隔空弹琴"的神奇效果。
-该项目不仅展示了AI在艺术创作领域的应用潜力，也为音乐教育、娱乐互动和无障碍音乐演奏提供了创新的解决方案。无论是音乐爱好者还是技术探索者，都能从这个项目中获得乐趣和启发。
-项目的源代码可以从[这里](https://github.com/zhouxzh/Ascend310/tree/main/samples/case3)下载。
+本案例在 Ascend 310B 开发板上实现一个可通过浏览器操作的 MIDI 音乐工作台。系统接收
+触摸屏钢琴、电脑键盘、实体 MIDI 键盘或 MIDI 文件输入，使用 PyACL 调用 OM 模型预测
+DDSP 合成参数，再由 CPU 端音频合成器生成波形并发送到板载、USB 或蓝牙音频输出。
 
-## 2. 内容大纲 {#src-experiment-case3-h2}
+案例代码位于 [`samples/case3`](../../samples/case3/README.md)。当前实现不包含摄像头或
+手势识别，也不存在 `smart_piano.py`。主要入口是 Web 服务
+`python scripts/run_webui.py`，命令行引擎则由 `realtime_ddsp.py` 和
+`midi_ddsp_realtime.py` 提供。
 
-### 2.1. 硬件准备 {#src-experiment-case3-h3}
+## 2. 系统组成 {#src-experiment-case3-h2}
 
-- **核心计算单元**: 昇腾310B开发者套件
-- **图像采集**: 高分辨率USB摄像头 (推荐1080p 30fps)
-- **音频输出**: 
-  - USB音响或蓝牙音箱
-  - 3.5mm耳机接口
-  - HDMI音频输出
-- **显示设备**: 触摸屏显示器 (可选，用于虚拟键盘显示)
-- **LED指示灯**: RGB LED灯带，用于视觉反馈
-- **电源**: 稳定的12V电源适配器
+### 2.1 硬件 {#src-experiment-case3-h3}
 
-*硬件系统架构图*
+- Ascend 310B 开发板及其现有 CANN/PyACL 环境；
+- 显示器和触摸屏，用于打开板端 Web 界面；
+- 可选的 USB MIDI 键盘；
+- USB 喇叭、已连接的蓝牙音箱或板载音频输出；
+- 与开发板处于同一可信局域网的电脑或移动设备。
+
+蓝牙设备建议通过系统图形界面完成配对。不同型号设备的 A2DP/HFP 配置可能不同，
+Web 页面只枚举系统已经连接并暴露出来的 PulseAudio 输出，不负责蓝牙配对。
+
+### 2.2 软件边界 {#src-experiment-case3-h4}
+
+开发电脑负责编辑代码、导出 ONNX、构建 React 前端和执行不依赖硬件的单元测试。
+ATC 转换、OM 推理、PyACL、`ais_bench` 和 `npu-smi` 只能在真实 Ascend 310B 开发板
+上运行。
+
+板端使用已有的 Anaconda `base`、CANN 和 PyACL。Python 运行依赖集中在
+`requirements.txt`；ONNX/TensorFlow 导出依赖集中在本地专用的
+`requirements-export.txt`，不安装到开发板。
+
+## 3. 两条 DDSP 模型链路 {#src-experiment-case3-h5}
+
+本案例包含两套接口不同、用途不同的模型。
+
+### 3.1 DDSP-VST 实时演奏 {#src-experiment-case3-h6}
+
+DDSP-VST 模型是单步状态化控制网络。每 20 ms 接收一次 MIDI 音高、力度和上一帧
+512 维 GRU 状态，输出幅度、60 个谐波系数、65 个噪声系数及下一帧状态：
+
+```text
+inputs:  state[512], f0_scaled[1], pw_scaled[1]
+outputs: amplitude[1], harmonics[60], noise_amps[65], state_out[512]
 ```
-        摄像头
-           │
-      ┌────▼────┐
-      │昇腾310B │
-      └────┬────┘
-           │
-    ┌──────┼──────┐
-    │      │      │
- 音响设备  LED灯  显示器
+
+`realtime_ddsp.py` 为每个活动音符维护独立的模型状态和振荡器相位，并把各声部混合到
+音频 FIFO。Web 的“DDSP-VST”页面、触控钢琴、电脑键盘和实体 MIDI 都使用这条链路。
+页面默认采用 Google Synth 的单音语义，2-8 声部扩展和 FP16 模型放在高级设置中。
+
+当前运行目录保留 11 种音色的 FP16 与 Mixed OM，共 22 个 DDSP-VST OM。官方音色
+包括 Bassoon、Clarinet、Flute、Melodica、Saxophone、Sitar、Trombone、Trumpet、
+Tuba、Violin 和 Vowels，不包含钢琴音色。
+
+### 3.2 MIDI-DDSP 文件播放 {#src-experiment-case3-h7}
+
+MIDI-DDSP 使用 Expression 与 Synthesis 两级网络：
+
+1. Expression Generator 根据音高、音符时长和乐器 ID 生成 expression controls；
+2. Synthesis Generator 根据逐帧 conditioning 生成 DDSP 合成参数。
+
+stateful v2 将双向上下文、自回归 decoder 和 Timbre 网络拆成 8 个带显式状态或精确
+halo 的 Mixed OM，并由一个版本化 manifest 统一选择。旧版两个组件各自的 FP16/Mixed
+OM 只保留为迁移兼容。Web 的“MIDI-DDSP”页面先完整渲染并缓存 WAV，再播放或下载。
+
+当前 MIDI-DDSP checkpoint 是单声部模型。单轨和弦返回 `polyphonic_track`，不再静默
+提取最高声部。多轨文件仅在每轨均为单声部且 General MIDI program 可映射到 13 种
+URMP 乐器时逐轨渲染、保存 stem 并混音。
+
+### 3.3 模型外音频合成 {#src-experiment-case3-h8}
+
+两套 OM 都只预测 DDSP 参数。谐波振荡、噪声滤波、声部混合和 WAV/声卡输出由 CPU
+代码完成。MIDI-DDSP 使用 Google 实现对应的 Harmonic、FilteredNoise 和 Reverb
+语义；逐乐器混响资产包含 20 组 16 kHz、48,000 点 IR，运行时使用 2,048 点分区 FFT
+卷积并叠加干声。DDSP-VST 按插件顺序执行控制 OM、谐波/噪声增益、合成、输出增益和
+JUCE/FreeVerb 风格混响。
+
+## 4. Web 工作台 {#src-experiment-case3-h9}
+
+MIDI-DDSP Studio 采用 React、TypeScript 和 Vite 构建浏览器端，采用 FastAPI、
+Uvicorn 和 WebSocket 提供板端服务。开发电脑生成 `webui/dist/`，开发板只运行 Python
+服务和静态资源。
+
+界面包含四个工作区：
+
+| 工作区 | 功能 |
+| :--- | :--- |
+| DDSP-VST | 使用状态化 OM 接收触控、电脑键盘和实体 MIDI 事件 |
+| MIDI-DDSP | 使用 stateful v2 模型包完整渲染、缓存并播放 MIDI 文件 |
+| 实验 | 运行白名单内的一次 OM 验证和短基准测试 |
+| 设备 | 查看 NPU、模型、音频与 MIDI 状态，并测试 PulseAudio 输出和左右声道 |
+
+所有会占用 NPU 或声卡的操作共享同一个资源协调器。同一时间只允许一个 DDSP-VST Synth、
+MIDI 播放、扬声器测试或实验任务运行；资源占用时 API 返回 `409 busy`。浏览器失焦、
+触摸取消、WebSocket 断开和停止操作都会释放活动音符，避免产生持续音。
+
+本轮不实现 DDSP-VST Effect。设备页会把真实 `capture` 与 PulseAudio `monitor`
+分开显示；只有真实 USB/HFP 输入可见、特征模型完成 ONNX/OM 对齐、20 ms 连续推理和
+双工声卡测试通过后，才增加 Effect 的运行入口。
+
+## 5. 运行步骤 {#src-experiment-case3-h10}
+
+### 5.1 开发电脑构建并同步 {#src-experiment-case3-h11}
+
+在 Windows 开发电脑的 `samples/case3` 目录执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/deploy_midi_ddsp_webui.ps1
 ```
 
-### 2.2. 软件环境 {#src-experiment-case3-h4}
+脚本执行前端生产构建，然后同步静态资源、Python 运行模块、受控测试工具、文档和 MIDI
+输入文件。它不会在开发板上安装、升级或删除软件，也不会修改 shell 启动文件或系统
+服务。
 
-- **操作系统**: Ubuntu 20.04 LTS
-- **CANN版本**: 7.0.RC1
-- **Python版本**: 3.8.10
-- **音频处理库**:
-    - `pygame`: 音频播放和MIDI处理
-    - `pyaudio`: 实时音频处理
-    - `librosa`: 音频分析
-    - `mido`: MIDI文件操作
-- **计算机视觉库**:
-    - `opencv-python`: 图像处理
-    - `mediapipe`: 手势识别
-    - `numpy`: 数值计算
-- **界面开发**:
-    - `tkinter`: GUI界面
-    - `matplotlib`: 波形可视化
+### 5.2 板端环境检查 {#src-experiment-case3-h12}
 
-*快速安装脚本 (`install_piano.sh`)*
+板端依赖由用户手动安装。环境或文件布局变化后可以运行只读检查：
+
 ```bash
-#!/bin/bash
-# 更新包管理器
-sudo apt update
-
-# 安装音频依赖
-sudo apt install -y python3-pyaudio portaudio19-dev
-
-# 安装Python包
-pip3 install pygame librosa mido opencv-python mediapipe numpy tkinter matplotlib
-
-# 安装MIDI支持
-sudo apt install -y timidity timidity-interfaces-extra
-
-echo "智能电子琴环境安装完成!"
+cd /home/HwHiAiUser/Documents/case3
+python scripts/check_webui_env.py
 ```
 
-### 2.3. 手势识别与音符映射 {#src-experiment-case3-h5}
+检查器验证当前 conda 环境、CANN 环境变量、Python 包和前端产物，不设置环境变量。
 
-- **手势识别方案**:
-    - **静态手势**: 识别手指数量对应不同音符
-    - **动态手势**: 手部移动轨迹控制音调变化
-    - **双手协作**: 左手控制和弦，右手控制旋律
-    - **手势速度**: 识别手势速度控制音符强度
+### 5.3 启动服务 {#src-experiment-case3-h13}
 
-- **音符映射系统**:
-    ```python
-    # 手势到音符的映射示例
-    gesture_to_note = {
-        'one_finger': 'C4',      # 1个手指 = C调
-        'two_fingers': 'D4',     # 2个手指 = D调
-        'three_fingers': 'E4',   # 3个手指 = E调
-        'four_fingers': 'F4',    # 4个手指 = F调
-        'five_fingers': 'G4',    # 5个手指 = G调
-        'fist': 'REST',          # 握拳 = 休止符
-        'palm_open': 'CHORD'     # 张开手掌 = 和弦
-    }
-    ```
-
-- **高级识别功能**:
-    - **音量控制**: 通过手与摄像头的距离控制音量
-    - **音效切换**: 特定手势切换乐器音色
-    - **节拍控制**: 双手拍击节奏控制节拍器
-
-### 2.4. 模型训练与优化 {#src-experiment-case3-h6}
-
-- **手势识别模型**:
-    - **基础方案**: 使用MediaPipe的预训练手部识别模型
-    - **自定义方案**: 训练专门的手势分类模型
-    - **数据集构建**: 收集多角度、多光照条件下的手势数据
-
-- **模型训练流程**:
-    1. **数据收集**: 使用摄像头收集各种手势样本
-    2. **数据标注**: 为每个手势分配对应的音符标签
-    3. **模型训练**: 使用CNN或Transformer架构训练分类器
-    4. **模型评估**: 在测试集上验证识别准确率
-    5. **模型优化**: 针对昇腾310B进行量化和加速
-
-- **实时优化策略**:
-    - **帧率控制**: 平衡识别精度和实时性
-    - **噪声过滤**: 减少误识别和抖动
-    - **延迟补偿**: 最小化从手势到发声的延迟
-
-### 2.5. 音频合成与处理 {#src-experiment-case3-h7}
-
-- **音频合成方案**:
-    - **MIDI合成**: 使用MIDI格式生成标准乐器音色
-    - **波形合成**: 直接生成音频波形，支持自定义音色
-    - **采样回放**: 预录制真实乐器采样进行回放
-
-- **音效处理**:
-    ```python
-    # 音效处理管道示例
-    audio_pipeline = [
-        'reverb',           # 混响效果
-        'equalizer',        # 均衡器
-        'compressor',       # 压缩器
-        'delay',           # 延迟效果
-        'chorus'           # 合唱效果
-    ]
-    ```
-
-- **实时音频流处理**:
-    - **低延迟设计**: 优化音频缓冲区大小
-    - **多线程处理**: 分离音频生成和播放线程
-    - **动态加载**: 按需加载音色库
-
-### 2.6. 3D打印结构件 {#src-experiment-case3-h8}
-
-- **摄像头支架** (`camera_stand.stl`):
-    - 高度可调节设计 (50-80cm)
-    - 角度微调机构 (±30°)
-    - 防震减振设计
-
-- **设备一体化外壳** (`piano_case.stl`):
-    - 集成散热风扇位
-    - LED灯带安装槽
-    - 音响设备安装位
-
-- **用户交互面板** (`control_panel.stl`):
-    - 物理按键布局
-    - 旋钮和滑块安装位
-    - 显示屏保护框
-
-*3D打印建议*:
-- **材料选择**: ABS (强度好，适合结构件)
-- **层高设置**: 0.2mm
-- **填充密度**: 25%
-- **支撑设置**: 针对悬垂结构添加支撑
-
-### 2.7. 用户手册 {#src-experiment-case3-h9}
-
-#### 2.7.1 快速上手 {#src-experiment-case3-h10}
-1. **环境配置**: 运行安装脚本配置软件环境
-2. **硬件连接**: 按照连接图组装所有硬件
-3. **校准摄像头**: 调整摄像头角度和高度
-4. **启动程序**: `python3 smart_piano.py`
-5. **手势训练**: 跟随屏幕提示学习基本手势
-
-#### 2.7.2 演奏模式 {#src-experiment-case3-h11}
-- **自由演奏模式**: 随意手势即兴演奏
-- **跟随演奏模式**: 根据屏幕提示演奏指定曲目
-- **录制模式**: 录制演奏过程并回放
-- **教学模式**: 逐步学习手势和音符对应关系
-
-#### 2.7.3 高级功能 {#src-experiment-case3-h12}
-- **乐器切换**: 手势控制切换钢琴、小提琴、吉他等音色
-- **和弦演奏**: 双手配合演奏复杂和弦
-- **节拍器**: 内置节拍器辅助练习
-- **录音回放**: 保存演奏为音频文件
-
-#### 2.7.4 故障排除 {#src-experiment-case3-h13}
-- **手势识别不准确**: 检查光照条件和摄像头角度
-- **音频延迟**: 调整音频缓冲区设置
-- **程序崩溃**: 查看日志文件排查错误
-
-## 3. 源代码结构 {#src-experiment-case3-h14}
-
+```bash
+cd /home/HwHiAiUser/Documents/case3
+python scripts/run_webui.py
 ```
-smart_piano/
-├── src/
-│   ├── gesture_recognition/    # 手势识别模块
-│   ├── audio_synthesis/       # 音频合成模块
-│   ├── ui/                   # 用户界面
-│   └── utils/                # 工具函数
+
+程序默认监听 `0.0.0.0:8765`，并打印板端本地地址与局域网地址。服务没有登录功能，
+只适合可信局域网。
+
+## 6. 音频输出测试 {#src-experiment-case3-h14}
+
+USB 喇叭通常会直接出现在 PulseAudio 输出列表中。蓝牙音箱必须先在系统图形界面中
+连接，并在 `pactl list short sinks` 中出现对应 `bluez_sink`，才能进入 Web 下拉菜单。
+
+“设备”页的音频输出测试使用选中的 sink 播放短正弦测试音，可以检查输出路径和左右声道。仓库
+`midi_wav/` 只保留两份 48 kHz、16-bit 硬件试听夹具：单声道
+`ode-to-joy-violin-mono-loud.wav` 和立体声
+`ode-to-joy-violin-stereo-loud.wav`。
+
+设备页的扬声器测试只能确认是否发声和声道路由，不能替代麦克风、声压计或硬件回环进行音质与
+电气测量。
+
+## 7. OM 验证与报告 {#src-experiment-case3-h15}
+
+DDSP-VST 和 legacy MIDI-DDSP OM 位于 `models/om/`；stateful v2 的 8 个组件位于
+`models/midi_ddsp/bundles/<bundle-id>/` 并由 manifest 锁定。不再按 8T、8T2 或 20T
+重复存放。Ascend 20T 已验证可以运行 8T 生成的同一批旧 OM，因此保留 8T 产物及其
+校验值即可；新模型仍需完成单独的板端转换和 A/B 验收。
+
+转换日志保存在 `models/conversion_logs/`，运行和性能报告保存在 `reports/`。Web 实验
+任务只调用仓库内白名单脚本，不接受浏览器传入任意路径或 shell 命令。已知设备上的
+`npu-smi` `Health: Alarm` 作为警告显示；只要设备可见且实际 OM 推理成功，就不单独
+阻断操作。
+
+## 8. 代码结构 {#src-experiment-case3-h16}
+
+```text
+samples/case3/
+├── midi.py
+├── realtime_ddsp.py
+├── pyacl_ddsp.py
+├── midi_ddsp_realtime.py
+├── pyacl_midi_ddsp.py
+├── midi_ddsp_webui/
+├── webui/
+├── scripts/
+├── tools/
+├── tests/
 ├── models/
-│   ├── gesture_classifier.onnx  # 手势识别模型
-│   └── pretrained/           # 预训练模型
-├── audio/
-│   ├── samples/              # 音频采样
-│   └── midi/                # MIDI文件
-├── configs/
-│   └── piano_config.yaml    # 配置文件
-└── 3d_models/               # 3D打印文件
+├── reports/
+├── midi/
+├── midi_wav/
+├── model3/
+└── doc/
 ```
 
-## 4. 效果演示 {#src-experiment-case3-h15}
+根目录的四个音频/PyACL 模块同时被命令行和 Web 后端导入，因此保留在仓库根目录。
+`scripts/` 只放板端启动和环境检查入口；`tools/` 保存模型导出、ATC 转换、部署、验证和
+报告工具。
 
-- **基础演奏**: 展示单手手势演奏简单旋律
-- **和弦演奏**: 双手配合演奏和弦进行
-- **音色切换**: 实时切换不同乐器音色
-- **教学演示**: 跟随模式学习演奏《小星星》等简单曲目
+## 9. 验收与限制 {#src-experiment-case3-h17}
+
+本地测试验证参数校验、任务互斥、MIDI 上传限制、断线释放、报告解析和前端交互；硬件
+行为仍必须在目标开发板上验收。板端至少检查：
+
+- DDSP-VST 默认单音下的触控钢琴、电脑键盘和实体 MIDI 输入；
+- DDSP-VST 实时演奏以及 MIDI-DDSP 文件播放/渲染；
+- USB 与已连接蓝牙输出；
+- 暂停、继续、停止和断线后的音符释放；
+- 一次 OM 验证、短基准测试和任务失败后的重新启动。
+
+当前项目不实现摄像头手势识别或 DDSP-VST Effect；DDSP-VST 官方模型没有钢琴音色；
+MIDI-DDSP 不支持单轨和弦。新 stateful v2 只有通过 TensorFlow/ONNX/OM 数值对齐和板端
+A/B 后才能替换 legacy 模型。这些限制应在试听和性能结论中明确说明。

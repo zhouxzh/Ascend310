@@ -1,90 +1,78 @@
 # 项目概览
 
-> 本文档中的命令默认从 `case3` 仓库根目录执行。[返回文档索引](README.md)。
+> 命令默认从 `case3` 根目录执行。[返回文档索引](README.md)。
 
-## 项目说明
+## 项目边界
 
-本项目是智能电子琴的软件与硬件配套仓库，结合计算机视觉与音频处理技术，利用昇腾 310B 的 AI 算力实现手势识别与音符映射，创造"隔空弹琴"的交互式音乐体验。
+本项目是在 Ascend 310B 上运行的 MIDI-DDSP 音乐工作台。输入来自触控钢琴、电脑
+键盘、实体 MIDI 或 MIDI 文件；神经网络在 NPU 上预测 DDSP 控制参数；CPU 合成器
+生成音频并输出到板载、USB 或已连接的蓝牙设备。
 
-当前仓库包含以下核心部分：
+当前代码不包含摄像头或手势识别。案例名称中的“智能电子琴”指 MIDI 输入、神经音色
+模型、实时音频和触控 Web 界面的组合，不应写成尚未实现的隔空手势系统。
 
-- **软件**：[midi.py](../midi.py) — 基于 pygame 的 MIDI 钢琴键盘程序，支持鼠标点击和计算机键盘演奏
-- **实时音频**：[realtime_ddsp.py](../realtime_ddsp.py) — MIDI/控制量到 DDSP 音频的实时原型
-- **模型工具**：`models/` 与 `tools/` — DDSP-VST 模型、ONNX 导出、OM 转换和精度/速度测试
-- **硬件**：[model3/](../model3/) — 电子琴 3D 打印结构件的 CAD 模型（FreeCAD / STEP / STL 格式）
-- **文档与报告**：`doc/` 与 `reports/` — 操作说明、板端环境和实测结果
+## 核心模块
 
-如需阅读偏理论和教学化的完整讲解，可结合
-[`src/experiment/case3.md`](../../../src/experiment/case3.md) 一起阅读。
+- [midi.py](../midi.py)：Pygame MIDI 设备和键盘窗口。
+- [realtime_ddsp.py](../realtime_ddsp.py)：DDSP-VST OM 实时演奏与文件播放引擎。
+- [midi_ddsp_realtime.py](../midi_ddsp_realtime.py)：MIDI-DDSP 版本化模型包、完整渲染缓存和播放会话。
+- `pyacl_ddsp.py` / `pyacl_midi_ddsp.py`：两套模型的 PyACL 后端。
+- `midi_ddsp_webui/`：FastAPI、任务调度、设备枚举和扬声器测试。
+- `webui/`：React/TypeScript 触控工作台。
+- `tools/`：ONNX 导出、ATC 转换、板端验证、部署和报告工具。
+- `model3/`：FreeCAD、STEP 和 STL 电子琴结构件。
 
-## 硬件要求
+## 硬件
 
-运行本案例时，建议准备以下硬件环境：
+- Ascend 310B 开发板和现有 CANN/PyACL 环境；
+- 显示器与触摸屏，或同一局域网内的浏览器设备；
+- 可选的 USB MIDI 键盘；
+- USB 喇叭、系统已连接的蓝牙音箱或板载音频输出；
+- 可选的 3D 打印设备，用于制作 `model3/` 中的结构件。
 
-- 昇腾 310B 开发者套件
-- USB 摄像头（推荐 1080p 30fps）
-- USB 音响或蓝牙音箱
-- 3D 打印机（用于打印电子琴外壳结构件）
+仅运行 `midi.py` 的窗口和本地模拟测试不需要 NPU。ATC、OM、PyACL、`ais_bench`
+和 `npu-smi` 必须在真实 Ascend 310B 开发板上执行。
 
-说明如下：
-
-- 仅运行 `midi.py` 体验 MIDI 键盘功能，无需昇腾 NPU，普通 Linux/Windows/macOS 主机即可
-- 完整的手势识别 + 音频合成链路需要昇腾 310B 及 CANN 环境
-- 3D 打印文件可独立使用，配合 PLA/ABS 材料打印后组装
-
-## 原始 MIDI 与硬件资产
+## 系统链路
 
 ```text
-case3/
-├── midi.py                   # MIDI 钢琴键盘主程序
-└── model3/                   # 3D CAD 模型
-    ├── zuizhongban.FCStd     # FreeCAD 源文件（最终版装配体）
-    ├── 电子琴静音版/          # STEP 零件文件（15 个）
-    │   ├── 装配体1.STEP      #   完整装配体
-    │   ├── 壳体.STEP         #   外壳
-    │   ├── 壳体-2.STEP       #   外壳（第二版）
-    │   ├── 白键.STEP         #   白键
-    │   ├── 黑键.STEP         #   黑键
-    │   ├── 盖子.STEP         #   盖子
-    │   ├── 盖子2.STEP        #   盖子（第二版）
-    │   ├── 支架.STEP         #   支撑结构
-    │   ├── 支座.STEP         #   支撑座
-    │   ├── 链接轴.STEP       #   连接轴
-    │   ├── 链接轴2.STEP      #   连接轴（第二版）
-    │   ├── 1.STEP            #   键机构零件
-    │   ├── 1_3.STEP          #   键机构零件
-    │   ├── 1_4.STEP          #   键机构零件
-    │   └── 2.STEP            #   键机构零件
-    └── 静音版/               # STL 3D 打印文件（13 个）
-        └── 装配体1 - *.STL   #   装配体分片，可直接切片打印
+触控钢琴 / 电脑键盘 / 实体 MIDI
+                |
+                v
+       DDSP-VST 实时引擎 ------> PyACL / 单音色 OM
+                |                         |
+                +-----------+-------------+
+                            v
+MIDI 文件 -> MIDI-DDSP 会话 -> stateful v2 模型包
+                            |
+                            v
+                    CPU DDSP 音频合成
+                            |
+                            v
+              板载 / USB / 蓝牙音频输出
 ```
 
+Web 工作台将这两条模型链路分别放在“DDSP-VST”和“MIDI-DDSP”页面，另外提供“实验”
+和“设备”页面；扬声器测试已合并到设备页。所有 NPU/声卡任务共享资源锁。
 
+## 模型和报告
 
-## 完整项目全景
+`models/om/` 保存 DDSP-VST 与 legacy MIDI-DDSP OM；stateful v2 的 8 个组件统一位于
+`models/midi_ddsp/bundles/<bundle-id>/`。模型
+二进制、权重、ONNX、转换日志和运行报告默认不提交；`models/README.md` 记录目录约定，
+模型 SHA256 清单保存在 `models/manifests/`。
 
-本书案例 3 描述的是一个完整的手势识别智能电子琴系统。当前仓库已经提供 MIDI
-键盘、DDSP 实时音频、Ascend 模型工具和硬件结构，但摄像头手势识别仍属于待集成
-的系统环节。完整系统链路如下：
+Ascend 20T 已验证可以运行 8T 生成的同一批 OM，因此仓库不再保存按开发板重复的
+运行时模型。历史实验和兼容性证据保留在 `reports/`。
 
-```
-USB 摄像头 → 手势识别 (MediaPipe / 自定义模型) → 昇腾 310B 推理
-    → 音符映射 → MIDI 合成 / 音频输出 → 音响设备
-                                              → LED 灯光反馈
-```
+## 使用顺序
 
-在此基础上扩展时，可参考以下方向：
+1. 运行 `python scripts/check_webui_env.py` 检查现有板端环境。
+2. 运行 `python scripts/run_webui.py`，使用程序打印的局域网地址打开界面。
+3. 在“设备”页的扬声器测试中确认目标输出可以发声。
+4. 在“DDSP-VST”页面测试状态化 Synth 实时输入。
+5. 在“MIDI-DDSP”页面测试 MIDI 文件播放和 WAV 渲染。
+6. 在“实验”和“设备”页面检查 OM、性能、NPU 和依赖状态。
 
-- 集成 MediaPipe 或自定义手势分类模型，实现手势到音符的映射
-- 将手势识别模型转换为 OM 格式，部署到昇腾 310B 进行推理加速
-- 在 `midi.py` 的基础上增加手势输入通道，替代鼠标/键盘输入
-- 结合音频处理库（pyaudio、librosa）实现实时音效处理
-
-## 使用建议
-
-如果你是第一次接触这个案例，建议按下面顺序：
-
-1. 先运行 `python3 midi.py --list` 确认 MIDI 环境正常
-2. 再运行 `python3 midi.py --output` 体验钢琴键盘功能
-3. 查看 `model3/` 中的 3D 模型，了解电子琴的物理结构设计
-4. 最后结合 [`src/experiment/case3.md`](../../../src/experiment/case3.md) 阅读完整项目方案，理解手势识别 + 昇腾推理的总体设计
+书稿中的案例说明见
+[`src/experiment/case3.md`](../../../src/experiment/case3.md)。

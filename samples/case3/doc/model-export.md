@@ -1,12 +1,13 @@
-# MIDI-DDSP 实时移植：第一阶段（TFLite → ONNX）
+# DDSP-VST 模型导出：TFLite → ONNX
 
 > 本文档中的命令默认从 `case3` 仓库根目录执行。[返回文档索引](README.md)。
 
-本目录现在额外包含一个面向实时音频的模型准备流程。它参考
-[`magenta/midi-ddsp`](https://github.com/magenta/midi-ddsp) 的 DDSP 控制量，
-并采用 [`magenta/ddsp-vst`](https://github.com/magenta/ddsp-vst) 的状态化
+本文只说明 [`magenta/ddsp-vst`](https://github.com/magenta/ddsp-vst) 的状态化
 实时接口：每 20 ms 输入一次 `f0_scaled`、`pw_scaled` 和 512 维 GRU 状态，
 输出幅度、60 个谐波系数、65 个噪声系数和下一时刻状态。
+
+它不是 MIDI-DDSP 的 Expression/Synthesis 双模型。MIDI-DDSP checkpoint、ONNX 和
+OM 的准备流程见 [MIDI-DDSP 模型导出](midi-ddsp-export.md)。
 
 钢琴模型训练代码和数据现已迁移到独立仓库；`case3` 不再保存数据集、训练循环、
 训练损失或通用 DDSP 训练仓库，只接收训练仓库导出的模型并完成 ONNX、OM、
@@ -19,7 +20,7 @@
 ## 安装本阶段依赖
 
 ```bash
-python -m pip install -r requirements-onnx.txt
+python -m pip install -r requirements-export.txt
 ```
 
 ## 导出并验证小提琴模型

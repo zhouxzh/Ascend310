@@ -26,6 +26,9 @@ OUTPUT_SHAPES = {
     "state_out": (512,),
 }
 
+_PERSISTENT_RUNTIME_LOCK = threading.Lock()
+_PERSISTENT_RUNTIMES: dict[tuple[int, int], dict[str, Any]] = {}
+
 
 def _check_ret(result: Any, operation: str) -> None:
     ret = result[-1] if isinstance(result, tuple) else result
@@ -61,6 +64,7 @@ class PyAclModelRunner:
         device_id: int = 0,
         *,
         acl_module: Any | None = None,
+        keep_runtime: bool = False,
     ) -> None:
         if device_id < 0:
             raise ValueError("device_id must be non-negative")
@@ -80,6 +84,8 @@ class PyAclModelRunner:
         self.acl = acl_module
         self.model_path = model_path
         self.device_id = int(device_id)
+        self.keep_runtime = bool(keep_runtime)
+        self._persistent_runtime_key = (id(self.acl), self.device_id)
         self.context = None
         self.model_id = None
         self.model_desc = None
@@ -101,13 +107,10 @@ class PyAclModelRunner:
             raise
 
     def _initialize(self) -> None:
-        ret = self.acl.init()
-        if ret not in (0, 100002):
-            _check_ret(ret, "acl.init")
-        self._acl_initialized = True
-
-        _check_ret(self.acl.rt.set_device(self.device_id), "acl.rt.set_device")
-        self._device_set = True
+        if self.keep_runtime:
+            self._acquire_persistent_runtime()
+        else:
+            self._initialize_owned_runtime()
 
         self.context, ret = self.acl.rt.create_context(self.device_id)
         _check_ret((self.context, ret), "acl.rt.create_context")
@@ -124,6 +127,35 @@ class PyAclModelRunner:
         )
         self._prepare_inputs()
         self._prepare_outputs()
+
+    def _initialize_owned_runtime(self) -> None:
+        ret = self.acl.init()
+        if ret not in (0, 100002):
+            _check_ret(ret, "acl.init")
+        self._acl_initialized = True
+
+        _check_ret(self.acl.rt.set_device(self.device_id), "acl.rt.set_device")
+        self._device_set = True
+
+    def _acquire_persistent_runtime(self) -> None:
+        with _PERSISTENT_RUNTIME_LOCK:
+            if self._persistent_runtime_key in _PERSISTENT_RUNTIMES:
+                return
+            ret = self.acl.init()
+            if ret not in (0, 100002):
+                _check_ret(ret, "acl.init")
+            try:
+                _check_ret(
+                    self.acl.rt.set_device(self.device_id),
+                    "acl.rt.set_device",
+                )
+            except BaseException:
+                self.acl.finalize()
+                raise
+            _PERSISTENT_RUNTIMES[self._persistent_runtime_key] = {
+                "acl": self.acl,
+                "device_id": self.device_id,
+            }
 
     def _prepare_inputs(self) -> None:
         self.input_dataset = self.acl.mdl.create_dataset()
@@ -328,10 +360,10 @@ class PyAclModelRunner:
         if self.context is not None:
             cleanup(self.acl.rt.destroy_context, self.context)
             self.context = None
-        if self._device_set:
+        if self._device_set and not self.keep_runtime:
             cleanup(self.acl.rt.reset_device, self.device_id)
             self._device_set = False
-        if self._acl_initialized:
+        if self._acl_initialized and not self.keep_runtime:
             cleanup(self.acl.finalize)
             self._acl_initialized = False
 
@@ -350,3 +382,28 @@ class PyAclModelRunner:
             self.close(suppress_errors=True)
         except BaseException:
             pass
+
+
+def shutdown_persistent_runtimes(*, suppress_errors: bool = False) -> None:
+    """Release process-level ACL runtimes after all long-lived sessions stop."""
+    with _PERSISTENT_RUNTIME_LOCK:
+        states = list(_PERSISTENT_RUNTIMES.values())
+        _PERSISTENT_RUNTIMES.clear()
+    errors: list[BaseException] = []
+    for state in states:
+        acl = state["acl"]
+        device_id = int(state["device_id"])
+        for operation, argument in (
+            (acl.rt.reset_device, device_id),
+            (acl.finalize, None),
+        ):
+            try:
+                result = operation() if argument is None else operation(argument)
+                _check_ret(result, operation.__name__)
+            except BaseException as exc:
+                errors.append(exc)
+    if errors and not suppress_errors:
+        raise RuntimeError(
+            "Persistent PyACL cleanup failed: "
+            + "; ".join(str(error) for error in errors)
+        )

@@ -14,6 +14,7 @@ from pyacl_ddsp import (
     INPUT_SHAPES,
     OUTPUT_SHAPES,
     PyAclModelRunner,
+    shutdown_persistent_runtimes,
 )
 from realtime_ddsp import create_controls_model
 
@@ -201,6 +202,7 @@ class FakeAcl:
         self.context_calls: list[tuple[int, str]] = []
         self.device_id = None
         self.finalize_count = 0
+        self.init_count = 0
         self.reset_count = 0
         self.unload_count = 0
         self.destroy_context_count = 0
@@ -214,8 +216,8 @@ class FakeAcl:
         self._next_pointer += 1
         return self._next_pointer
 
-    @staticmethod
-    def init() -> int:
+    def init(self) -> int:
+        self.init_count += 1
         return 0
 
     def finalize(self) -> int:
@@ -283,6 +285,31 @@ class PyAclModelRunnerTest(unittest.TestCase):
                 )
         finally:
             runner.close()
+
+    def test_persistent_runtime_survives_sequential_model_sessions(self) -> None:
+        acl = FakeAcl()
+        first = PyAclModelRunner(
+            self.model_path,
+            acl_module=acl,
+            keep_runtime=True,
+        )
+        first.close()
+        second = PyAclModelRunner(
+            self.model_path,
+            acl_module=acl,
+            keep_runtime=True,
+        )
+        second.close()
+
+        self.assertEqual(acl.init_count, 1)
+        self.assertEqual(acl.unload_count, 2)
+        self.assertEqual(acl.destroy_context_count, 2)
+        self.assertEqual(acl.reset_count, 0)
+        self.assertEqual(acl.finalize_count, 0)
+
+        shutdown_persistent_runtimes()
+        self.assertEqual(acl.reset_count, 1)
+        self.assertEqual(acl.finalize_count, 1)
 
     def test_auto_backend_rejects_unknown_model_extension(self) -> None:
         with self.assertRaisesRegex(ValueError, "Cannot infer model backend"):

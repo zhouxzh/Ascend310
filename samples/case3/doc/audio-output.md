@@ -248,7 +248,8 @@ pactl set-default-sink \
 本轮已经确认 M25 的枚举、48 kHz 双声道 PulseAudio sink、硬件音量控制和
 PortAudio 双声道实时传输。首次实时 DDSP 无声还包含软件输出过低的问题：原始波形
 峰值只有 `-32.5 dBFS`，程序又错误地优先选择了单声道。修复后使用双声道和
-`--output-gain-db 24`，峰值提高到 `-8.5 dBFS` 且没有削波；短 MIDI 测试中
+旧版本的 `--output-gain-db 24` 测试把峰值提高到 `-8.5 dBFS` 且没有削波；当前
+DDSP-VST 插件语义改为 `-60..0 dB`，该正增益只作为历史诊断记录。短 MIDI 测试中
 `underruns=0`、`overruns=0`。实际听音反馈仍待现场确认。
 
 ### 漫步者 M16 Pro USB 喇叭

@@ -17,6 +17,10 @@ import time
 from typing import Callable, Iterable
 from uuid import uuid4
 
+import numpy as np
+
+from .midi_analysis import analyze_midi
+
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORT_ROOT = ROOT / "reports" / "webui"
@@ -41,6 +45,8 @@ INSTRUMENTS = (
 
 TERMINAL_STATES = {"succeeded", "failed", "cancelled"}
 ACTIVE_STATES = {"queued", "preparing", "running", "paused", "stopping"}
+MIDI_DDSP_REVERB_SHA256 = "ecbc733bc9a17516dc00897e64eaae70114aa79ed97e2bbc59dedb334f356058"
+MIDI_DDSP_SOURCE_COMMIT = "d7af42704a63b47267ae6a1bc0fee1ed7dc5c855"
 
 
 def utc_timestamp() -> str:
@@ -99,23 +105,40 @@ def scan_midi_files() -> list[dict[str, object]]:
             files.extend(folder.glob("*.midi"))
     result = []
     for path in sorted(set(files), key=lambda item: item.name.lower()):
-        result.append(
-            {
-                "id": _file_id("midi", path),
-                "name": path.name,
-                "size_bytes": path.stat().st_size,
-                "uploaded": UPLOAD_ROOT in path.parents,
-                "path": str(path.resolve()),
-            }
-        )
+        item: dict[str, object] = {
+            "id": _file_id("midi", path),
+            "name": path.name,
+            "size_bytes": path.stat().st_size,
+            "uploaded": UPLOAD_ROOT in path.parents,
+            "path": str(path.resolve()),
+        }
+        try:
+            item.update(analyze_midi(path).public())
+        except Exception as exc:
+            item.update(
+                {
+                    "note_count": 0,
+                    "track_count": 0,
+                    "max_polyphony": 0,
+                    "duration_seconds": 0.0,
+                    "monophonic": False,
+                    "midi_ddsp_mode": "invalid",
+                    "midi_ddsp_supported": False,
+                    "unsupported_code": "invalid_midi",
+                    "unsupported_reason": str(exc),
+                    "programs": [],
+                    "tracks": [],
+                }
+            )
+        result.append(item)
     return result
 
 
-def scan_live_models() -> list[dict[str, object]]:
+def scan_ddsp_vst_models() -> list[dict[str, object]]:
     paths: list[Path] = []
     om_root = ROOT / "models" / "om"
     if om_root.is_dir():
-        paths.extend(om_root.glob("**/*.om"))
+        paths.extend(om_root.glob("*.om"))
     result = []
     for path in sorted(paths, key=lambda item: item.name.lower()):
         if "midi_ddsp" in path.name.lower():
@@ -124,7 +147,7 @@ def scan_live_models() -> list[dict[str, object]]:
         instrument = stem.split("_force_fp16")[0].split("_mixed_float16")[0]
         result.append(
             {
-                "id": _file_id("live", path),
+                "id": _file_id("ddspvst", path),
                 "name": path.name,
                 "instrument": instrument,
                 "backend": path.suffix.lower().lstrip("."),
@@ -137,12 +160,17 @@ def scan_live_models() -> list[dict[str, object]]:
 
 
 def scan_midi_ddsp_models() -> list[dict[str, object]]:
-    root = ROOT / "models" / "midi_ddsp" / "om"
+    root = ROOT / "models" / "om"
     if not root.is_dir():
         return []
     result = []
-    for path in sorted(root.glob("**/*.om"), key=lambda item: item.name.lower()):
-        component = "expression" if "expression" in path.name else "synthesis"
+    for path in sorted(root.glob("midi_ddsp_*.om"), key=lambda item: item.name.lower()):
+        if "expression" in path.name:
+            component = "expression"
+        elif "synthesis" in path.name:
+            component = "synthesis"
+        else:
+            continue
         result.append(
             {
                 "id": _file_id("mddsp", path),
@@ -156,29 +184,180 @@ def scan_midi_ddsp_models() -> list[dict[str, object]]:
     return result
 
 
+def _load_midi_ddsp_bundle(path: Path) -> dict[str, object]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if int(data.get("schema_version", 0)) != 1:
+        raise ValueError(f"Unsupported MIDI-DDSP bundle schema: {path}")
+    if data.get("source_commit") != MIDI_DDSP_SOURCE_COMMIT:
+        raise ValueError(f"Unexpected MIDI-DDSP source commit in {path}")
+    components = data.get("components")
+    if not isinstance(components, dict) or not components:
+        raise ValueError(f"MIDI-DDSP bundle has no components: {path}")
+    resolved_components: dict[str, dict[str, object]] = {}
+    for name, raw in components.items():
+        if not isinstance(raw, dict) or not isinstance(raw.get("file"), str):
+            raise ValueError(f"Invalid component {name!r} in {path}")
+        component_path = (path.parent / str(raw["file"])).resolve()
+        if not component_path.is_file():
+            raise FileNotFoundError(component_path)
+        expected_sha = str(raw.get("sha256", ""))
+        actual_sha = hashlib.sha256(component_path.read_bytes()).hexdigest()
+        if expected_sha and actual_sha != expected_sha:
+            raise ValueError(f"SHA256 mismatch for {component_path}")
+        resolved_components[str(name)] = {
+            **raw,
+            "path": str(component_path),
+            "sha256": actual_sha,
+            "size_bytes": component_path.stat().st_size,
+        }
+    return {
+        "id": str(data["id"]),
+        "name": str(data["name"]),
+        "architecture": str(data["architecture"]),
+        "precision": str(data.get("precision", "mixed_float16")),
+        "recommended": bool(data.get("recommended", False)),
+        "quality_status": str(data.get("quality_status", "unverified")),
+        "source_commit": str(data["source_commit"]),
+        "seed": int(data.get("seed", 20260724)),
+        "manifest": str(path.resolve()),
+        "components": resolved_components,
+    }
+
+
+def _legacy_midi_ddsp_bundles() -> list[dict[str, object]]:
+    models = scan_midi_ddsp_models()
+    bundles: list[dict[str, object]] = []
+    for precision in ("mixed_float16", "force_fp16"):
+        expression = next(
+            (
+                item
+                for item in models
+                if item["component"] == "expression" and item["precision"] == precision
+            ),
+            None,
+        )
+        synthesis = next(
+            (
+                item
+                for item in models
+                if item["component"] == "synthesis" and item["precision"] == precision
+            ),
+            None,
+        )
+        if expression is None or synthesis is None:
+            continue
+        bundles.append(
+            {
+                "id": f"google-urmp-legacy-{precision}",
+                "name": f"Google URMP legacy ({precision})",
+                "architecture": "legacy-static-v1",
+                "precision": precision,
+                "recommended": False,
+                "quality_status": "context_resets",
+                "source_commit": MIDI_DDSP_SOURCE_COMMIT,
+                "seed": 20260724,
+                "manifest": None,
+                "components": {
+                    "expression": expression,
+                    "synthesis": synthesis,
+                },
+            }
+        )
+    return bundles
+
+
+def scan_midi_ddsp_bundles() -> list[dict[str, object]]:
+    bundles: list[dict[str, object]] = []
+    bundle_root = ROOT / "models" / "midi_ddsp" / "bundles"
+    if bundle_root.is_dir():
+        for manifest in sorted(bundle_root.glob("*/manifest.json")):
+            try:
+                bundles.append(_load_midi_ddsp_bundle(manifest))
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
+    bundles.extend(_legacy_midi_ddsp_bundles())
+    if not any(bundle["recommended"] for bundle in bundles):
+        for bundle in bundles:
+            if bundle["precision"] == "mixed_float16":
+                bundle["recommended"] = True
+                break
+    return bundles
+
+
+def scan_midi_ddsp_reverb_assets() -> list[dict[str, object]]:
+    path = ROOT / "models" / "om" / "midi_ddsp_reverb_ir.npz"
+    if not path.is_file():
+        return []
+    return [
+        {
+            "id": _file_id("mddsp-ir", path),
+            "name": path.name,
+            "sha256": MIDI_DDSP_REVERB_SHA256,
+            "size_bytes": path.stat().st_size,
+            "instrument_count": len(INSTRUMENTS),
+            "checkpoint_instrument_count": 20,
+            "sample_rate": 16_000,
+            "samples_per_instrument": 48_000,
+            "path": str(path.resolve()),
+        }
+    ]
+
+
+def validate_midi_ddsp_reverb_asset(path: Path) -> str:
+    if not path.is_file():
+        raise FileNotFoundError(f"MIDI-DDSP reverb asset is missing: {path}")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if digest != MIDI_DDSP_REVERB_SHA256:
+        raise ValueError(
+            f"MIDI-DDSP reverb SHA256 mismatch: {digest}; "
+            f"expected {MIDI_DDSP_REVERB_SHA256}"
+        )
+    try:
+        with np.load(path, allow_pickle=False) as data:
+            responses = np.asarray(data["impulse_responses"], dtype=np.float32)
+            sample_rate = int(data["sample_rate"])
+            add_dry = bool(int(data["add_dry"]))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise ValueError(f"Invalid MIDI-DDSP reverb asset: {exc}") from exc
+    if responses.shape != (20, 48_000):
+        raise ValueError(f"Unexpected MIDI-DDSP reverb shape: {responses.shape}")
+    if sample_rate != 16_000 or not add_dry:
+        raise ValueError("Unexpected MIDI-DDSP reverb metadata")
+    if not np.all(np.isfinite(responses)) or np.any(responses[:, 0] != 0.0):
+        raise ValueError("MIDI-DDSP reverb values are invalid")
+    return digest
+
+
 def catalog() -> dict[str, object]:
     return {
         "midi_files": scan_midi_files(),
-        "live_models": scan_live_models(),
+        "ddsp_vst_models": scan_ddsp_vst_models(),
         "midi_ddsp_models": scan_midi_ddsp_models(),
+        "midi_ddsp_bundles": scan_midi_ddsp_bundles(),
+        "midi_ddsp_reverb_assets": scan_midi_ddsp_reverb_assets(),
         "instruments": [
             {"id": index, "name": name, "verified": True}
             for index, name in enumerate(INSTRUMENTS)
-        ]
-        + [
-            {"id": index, "name": f"Advanced {index}", "verified": False}
-            for index in range(13, 20)
         ],
     }
 
 
 def public_catalog() -> dict[str, object]:
     data = catalog()
+
+    def sanitize(value: object) -> object:
+        if isinstance(value, dict):
+            return {
+                key: sanitize(item)
+                for key, item in value.items()
+                if key not in {"path", "manifest"}
+            }
+        if isinstance(value, list):
+            return [sanitize(item) for item in value]
+        return value
+
     return {
-        key: [
-            {field: value for field, value in item.items() if field != "path"}
-            for item in items
-        ]
+        key: sanitize(items)
         for key, items in data.items()
     }
 
@@ -422,6 +601,7 @@ class JobManager:
         if os.name != "nt":
             kwargs["start_new_session"] = True
         process: subprocess.Popen[str] | None = None
+        final_state = "failed"
         try:
             job.state = "preparing"
             job.updated_at = utc_timestamp()
@@ -456,15 +636,15 @@ class JobManager:
                     self._publish(job, "log")
             job.exit_code = process.wait()
             if job.state == "stopping":
-                job.state = "cancelled"
+                final_state = "cancelled"
             elif job.exit_code == 0:
-                job.state = "succeeded"
+                final_state = "succeeded"
                 job.progress = 1.0
             else:
-                job.state = "failed"
+                final_state = "failed"
             self._attach_report(job)
         except BaseException as exc:
-            job.state = "failed"
+            final_state = "failed"
             job.message = str(exc)
         finally:
             if process is not None and process.stdout is not None:
@@ -472,6 +652,7 @@ class JobManager:
             job.process = None
             job.updated_at = utc_timestamp()
             self.coordinator.release(job.id)
+            job.state = final_state
             self._persist(job)
             self._publish(job)
 
@@ -485,7 +666,16 @@ class JobManager:
             job.metadata.update(
                 {
                     key: event[key]
-                    for key in ("notes", "frames", "blocks", "duration_seconds")
+                    for key in (
+                        "notes",
+                        "frames",
+                        "blocks",
+                        "duration_seconds",
+                        "source_track_count",
+                        "selected_track_index",
+                        "selected_track_name",
+                        "melody_extracted",
+                    )
                     if key in event
                 }
             )

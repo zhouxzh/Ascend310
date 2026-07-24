@@ -9,8 +9,11 @@
 | :--- | :--- |
 | [项目概览](overview.md) | 项目边界、硬件要求、目录结构和完整系统链路 |
 | [MIDI 键盘应用](midi-app.md) | `midi.py` 功能、键盘映射、设备枚举和依赖 |
+| [MIDI 测试曲目与来源](midi-test-tracks.md) | 当前测试曲目、MuseScore 下载来源和 ONNX 试听输出约定 |
 | [3D 打印硬件](hardware.md) | CAD/STL 文件、打印参数和装配关系 |
-| [DDSP 模型导出](model-export.md) | TFLite 到 ONNX、模型契约及训练项目调研 |
+| [DDSP-VST 模型导出](model-export.md) | 状态化音色模型的 TFLite 到 ONNX 流程 |
+| [MIDI-DDSP 模型导出](midi-ddsp-export.md) | checkpoint 到 Expression/Synthesis ONNX 的流程与产物 |
+| [MIDI-DDSP 与 DDSP-VST 对比](midi-ddsp-vs-ddsp-vst.md) | 两条移植路线的程序入口、模型契约、实时性和适用场景差异 |
 | [实时 DDSP](realtime-ddsp.md) | ONNX/PyACL 后端、MIDI 实时播放和缓冲架构 |
 | [Ascend 音频输出](audio-output.md) | 板载 3.5mm、官方样例、USB 声卡、蓝牙 A2DP/HFP 和漫步者喇叭 |
 | [OM 转换与验证](om-deployment.md) | ATC 转换、日志检查和 FP16 精度验证 |

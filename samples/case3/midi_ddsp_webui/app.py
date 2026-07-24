@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import json
 from pathlib import Path
 import queue
@@ -13,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
+from pyacl_ddsp import shutdown_persistent_runtimes
 from realtime_ddsp import query_audio_devices, query_midi_devices
 
 from .core import (
@@ -30,52 +32,83 @@ from .core import (
     resolve_artifact,
     resolve_catalog_item,
     system_status,
+    validate_midi_ddsp_reverb_asset,
 )
-from .live import LiveSessionController
+from .live import DdspVstSessionController
+from .midi_analysis import MidiValidationError, analyze_midi
+from .speaker import SpeakerTestController, query_audio_inputs, query_speaker_outputs
 
 
 MAX_MIDI_BYTES = 10 * 1024 * 1024
 WEB_DIST = ROOT / "webui" / "dist"
 
-app = FastAPI(title="MIDI-DDSP Studio API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    yield
+    if ddsp_vst.running:
+        ddsp_vst.stop()
+    if speaker.running:
+        speaker.stop()
+    shutdown_persistent_runtimes(suppress_errors=True)
+
+
+app = FastAPI(title="MIDI-DDSP Studio API", version="0.1.0", lifespan=lifespan)
 coordinator = ResourceCoordinator()
 jobs = JobManager(coordinator)
-live = LiveSessionController(coordinator)
+ddsp_vst = DdspVstSessionController(coordinator)
+speaker = SpeakerTestController(coordinator)
 
 
 class ApiModel(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 
-class LiveStartRequest(ApiModel):
+class DdspVstStartRequest(ApiModel):
     model_id: str
     audio_device_id: Optional[str] = None
     midi_port: Optional[str] = None
     sample_rate: int = Field(48_000, ge=8_000, le=192_000)
     prebuffer: int = Field(6, ge=1, le=64)
-    max_voices: int = Field(8, ge=1, le=32)
+    max_voices: int = Field(1, ge=1, le=8)
     audio_latency_ms: float = Field(80.0, gt=0, le=1000)
-    output_gain_db: float = Field(0.0, ge=-60, le=36)
-    attack: float = Field(0.10, gt=0, le=10)
-    decay: float = Field(0.0, ge=0, le=10)
+    pitch_shift: float = Field(0.0, ge=-24, le=24)
+    harmonic_gain: float = Field(1.0, ge=0, le=1)
+    noise_gain: float = Field(1.0, ge=0, le=1)
+    output_gain_db: float = Field(0.0, ge=-60, le=0)
+    attack: float = Field(0.10, ge=0.01, le=3)
+    decay: float = Field(0.0, ge=0, le=3)
     sustain: float = Field(1.0, ge=0, le=1)
-    release: float = Field(1.20, gt=0, le=20)
+    release: float = Field(1.20, ge=0.01, le=5)
+    input_pitch: float = Field(0.0, ge=-0.5, le=0.5)
+    input_gain: float = Field(0.0, ge=-0.5, le=0.5)
+    reverb_size: float = Field(0.4, ge=0, le=1)
+    reverb_damping: float = Field(0.1, ge=0, le=1)
+    reverb_wet: float = Field(0.0, ge=0, le=1)
     device_id: int = Field(0, ge=0, le=63)
 
 
 class MidiDdspJobRequest(ApiModel):
     mode: Literal["play", "render"] = "play"
     midi_id: str
-    expression_model_id: str
-    synthesis_model_id: str
-    instrument_id: int = Field(0, ge=0, le=19)
+    model_bundle_id: str
+    instrument_id: int = Field(0, ge=0, le=12)
+    seed: int = Field(20260724, ge=0, le=2_147_483_647)
     audio_device_id: Optional[str] = None
     sample_rate: int = Field(48_000, ge=8_000, le=192_000)
     prebuffer: int = Field(6, ge=1, le=64)
     audio_latency_ms: float = Field(80.0, gt=0, le=1000)
-    output_gain_db: float = Field(24.0, ge=-60, le=36)
-    tail_seconds: float = Field(0.5, ge=0, le=20)
+    output_gain_db: float = Field(0.0, ge=-60, le=0)
+    tail_seconds: float = Field(2.0, ge=0, le=20)
     device_id: int = Field(0, ge=0, le=63)
+
+
+class SpeakerTestRequest(ApiModel):
+    audio_device_id: str = Field(min_length=1, max_length=256)
+    channel_mode: Literal["left", "both", "right"] = "both"
+    frequency_hz: float = Field(440.0, ge=100.0, le=4_000.0)
+    level_db: float = Field(-18.0, ge=-50.0, le=-3.0)
+    duration_seconds: float = Field(3.0, ge=0.5, le=10.0)
 
 
 def _http_error(exc: BaseException) -> HTTPException:
@@ -83,6 +116,11 @@ def _http_error(exc: BaseException) -> HTTPException:
         return HTTPException(status_code=409, detail=str(exc))
     if isinstance(exc, KeyError):
         return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, MidiValidationError):
+        return HTTPException(
+            status_code=422,
+            detail={"code": exc.code, "message": str(exc)},
+        )
     return HTTPException(status_code=400, detail=str(exc))
 
 
@@ -98,7 +136,8 @@ def _require_board() -> None:
 def get_status() -> dict[str, object]:
     return {
         **system_status(coordinator.owner),
-        "live": live.status(),
+        "ddsp_vst": ddsp_vst.status(),
+        "speaker_test": speaker.status(),
         "job_count": len(jobs.list()),
     }
 
@@ -111,8 +150,25 @@ def get_catalog() -> dict[str, object]:
 @app.get("/api/v1/audio-devices")
 def get_audio_devices() -> dict[str, object]:
     try:
-        return {"available": True, "devices": query_audio_devices(), "error": None}
-    except RuntimeError as exc:
+        return {
+            "available": True,
+            "devices": query_speaker_outputs(query_audio_devices),
+            "error": None,
+        }
+    except Exception as exc:
+        return {"available": False, "devices": [], "error": str(exc)}
+
+
+@app.get("/api/v1/audio-inputs")
+def get_audio_inputs() -> dict[str, object]:
+    try:
+        inputs = query_audio_inputs()
+        return {
+            "available": any(item["available"] for item in inputs),
+            "devices": inputs,
+            "error": None,
+        }
+    except Exception as exc:
         return {"available": False, "devices": [], "error": str(exc)}
 
 
@@ -120,14 +176,63 @@ def get_audio_devices() -> dict[str, object]:
 def get_midi_ports() -> dict[str, object]:
     try:
         return {"available": True, "ports": query_midi_devices(), "error": None}
-    except RuntimeError as exc:
+    except Exception as exc:
         return {"available": False, "ports": [], "error": str(exc)}
 
 
-@app.post("/api/v1/live/start")
-async def start_live(payload: LiveStartRequest) -> dict[str, object]:
+@app.get("/api/v1/speaker-test/status")
+def get_speaker_test_status() -> dict[str, object]:
+    return speaker.status()
+
+
+@app.get("/api/v1/speaker-outputs")
+def get_speaker_outputs() -> dict[str, object]:
     try:
-        item = resolve_catalog_item("live_models", payload.model_id)
+        return {
+            "available": True,
+            "devices": query_speaker_outputs(query_audio_devices),
+            "error": None,
+        }
+    except Exception as exc:
+        return {"available": False, "devices": [], "error": str(exc)}
+
+
+@app.post("/api/v1/speaker-test/start")
+async def start_speaker_test(payload: SpeakerTestRequest) -> dict[str, object]:
+    try:
+        devices = query_speaker_outputs(query_audio_devices)
+        device = next(
+            item for item in devices if item["id"] == payload.audio_device_id
+        )
+        config = payload.model_dump()
+        config.update(
+            {
+                "device_name": device["name"],
+                "audio_backend": device.get("backend", "portaudio"),
+                "pulse_sink": device.get("sink_name"),
+                "max_output_channels": device["max_output_channels"],
+                "default_sample_rate": device["default_sample_rate"],
+            }
+        )
+        return await asyncio.to_thread(speaker.start, config)
+    except StopIteration as exc:
+        raise HTTPException(status_code=404, detail="Audio device not found") from exc
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/v1/speaker-test/stop")
+async def stop_speaker_test() -> dict[str, object]:
+    try:
+        return await asyncio.to_thread(speaker.stop)
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/v1/ddsp-vst/start")
+async def start_ddsp_vst(payload: DdspVstStartRequest) -> dict[str, object]:
+    try:
+        item = resolve_catalog_item("ddsp_vst_models", payload.model_id)
         config = payload.model_dump()
         config.update(
             {
@@ -135,21 +240,36 @@ async def start_live(payload: LiveStartRequest) -> dict[str, object]:
                 "backend": "om",
             }
         )
+        if payload.audio_device_id:
+            device = next(
+                output
+                for output in query_speaker_outputs(query_audio_devices)
+                if output["id"] == payload.audio_device_id
+            )
+            config.update(
+                {
+                    "audio_backend": device.get("backend", "portaudio"),
+                    "pulse_sink": device.get("sink_name"),
+                    "audio_device_name": device["name"],
+                }
+            )
         _require_board()
-        return await asyncio.to_thread(live.start, config)
+        return await asyncio.to_thread(ddsp_vst.start, config)
+    except StopIteration as exc:
+        raise HTTPException(status_code=404, detail="Audio device not found") from exc
     except HTTPException:
         raise
     except BaseException as exc:
         raise _http_error(exc) from exc
 
 
-@app.post("/api/v1/live/stop")
-async def stop_live() -> dict[str, object]:
-    return await asyncio.to_thread(live.stop)
+@app.post("/api/v1/ddsp-vst/stop")
+async def stop_ddsp_vst() -> dict[str, object]:
+    return await asyncio.to_thread(ddsp_vst.stop)
 
 
-@app.websocket("/api/v1/live/events")
-async def live_events(websocket: WebSocket) -> None:
+@app.websocket("/api/v1/ddsp-vst/events")
+async def ddsp_vst_events(websocket: WebSocket) -> None:
     await websocket.accept()
     source = f"browser-{uuid4().hex[:10]}"
     try:
@@ -157,27 +277,39 @@ async def live_events(websocket: WebSocket) -> None:
             try:
                 message = await asyncio.wait_for(websocket.receive_json(), timeout=0.5)
             except asyncio.TimeoutError:
-                await websocket.send_json({"event": "status", "data": live.status()})
+                await websocket.send_json({"event": "status", "data": ddsp_vst.status()})
                 continue
             event = message.get("event")
             try:
                 if event == "note_on":
-                    live.note_on(source, int(message["note"]), int(message.get("velocity", 100)))
+                    ddsp_vst.note_on(source, int(message["note"]), int(message.get("velocity", 100)))
                 elif event == "note_off":
-                    live.note_off(source, int(message["note"]))
+                    ddsp_vst.note_off(source, int(message["note"]))
                 elif event == "sustain":
-                    live.sustain(source, bool(message.get("enabled")))
+                    ddsp_vst.sustain(source, bool(message.get("enabled")))
+                elif event == "pitch_bend":
+                    ddsp_vst.pitch_bend(int(message.get("value", 0)))
+                elif event == "parameters":
+                    values = message.get("values")
+                    if not isinstance(values, dict):
+                        raise ValueError("parameters event requires an object")
+                    ddsp_vst.update_parameters(values)
                 elif event == "all_notes_off":
-                    live.release_source(source)
+                    ddsp_vst.release_source(source)
                 elif event != "ping":
-                    raise ValueError(f"Unknown live event: {event}")
-                await websocket.send_json({"event": "status", "data": live.status()})
+                    raise ValueError(f"Unknown DDSP-VST event: {event}")
+                await websocket.send_json({"event": "status", "data": ddsp_vst.status()})
+            except WebSocketDisconnect:
+                break
             except BaseException as exc:
-                await websocket.send_json({"event": "error", "message": str(exc)})
+                try:
+                    await websocket.send_json({"event": "error", "message": str(exc)})
+                except (WebSocketDisconnect, RuntimeError):
+                    break
     except WebSocketDisconnect:
         pass
     finally:
-        live.release_source(source)
+        ddsp_vst.release_source(source)
 
 
 @app.post("/api/v1/midi-files")
@@ -203,6 +335,14 @@ async def upload_midi(
     except BaseException:
         target.unlink(missing_ok=True)
         raise
+    try:
+        analyze_midi(target)
+    except Exception as exc:
+        target.unlink(missing_ok=True)
+        error = exc if isinstance(exc, MidiValidationError) else MidiValidationError(
+            "invalid_midi", f"Invalid MIDI file: {exc}"
+        )
+        raise _http_error(error) from exc
     item = next(item for item in catalog()["midi_files"] if item["path"] == str(target.resolve()))
     result = {key: value for key, value in item.items() if key != "path"}
     result["original_name"] = filename
@@ -214,21 +354,40 @@ def start_midi_ddsp_job(payload: MidiDdspJobRequest) -> dict[str, object]:
     _require_board()
     try:
         midi = resolve_catalog_item("midi_files", payload.midi_id)
-        expression = resolve_catalog_item("midi_ddsp_models", payload.expression_model_id)
-        synthesis = resolve_catalog_item("midi_ddsp_models", payload.synthesis_model_id)
-        if expression["component"] != "expression" or synthesis["component"] != "synthesis":
-            raise ValueError("Expression and synthesis model roles do not match")
+        bundle = resolve_catalog_item("midi_ddsp_bundles", payload.model_bundle_id)
+        if not bool(midi.get("midi_ddsp_supported")):
+            raise MidiValidationError(
+                str(midi.get("unsupported_code") or "unsupported_midi"),
+                str(midi.get("unsupported_reason") or "MIDI file is not supported"),
+            )
+        if (
+            midi.get("midi_ddsp_mode") == "multitrack"
+            and bundle["architecture"] == "legacy-static-v1"
+        ):
+            raise MidiValidationError(
+                "stateful_multitrack_required",
+                "Multi-track synthesis requires the stateful MIDI-DDSP bundle",
+            )
+        reverb_ir = ROOT / "models" / "om" / "midi_ddsp_reverb_ir.npz"
+        reverb_sha256 = validate_midi_ddsp_reverb_asset(reverb_ir)
+        audio_output = None
+        if payload.mode == "play" and payload.audio_device_id not in (None, ""):
+            audio_output = next(
+                output
+                for output in query_speaker_outputs(query_audio_devices)
+                if output["id"] == payload.audio_device_id
+            )
         command = [
             sys.executable,
             str(ROOT / "midi_ddsp_realtime.py"),
             "--midi",
             str(midi["path"]),
-            "--expression-om",
-            str(expression["path"]),
-            "--synthesis-om",
-            str(synthesis["path"]),
             "--instrument-id",
             str(payload.instrument_id),
+            "--seed",
+            str(payload.seed),
+            "--cache-dir",
+            str(REPORT_ROOT / "cache"),
             "--device-id",
             str(payload.device_id),
             "--sample-rate",
@@ -241,6 +400,8 @@ def start_midi_ddsp_job(payload: MidiDdspJobRequest) -> dict[str, object]:
             str(payload.output_gain_db),
             "--tail-seconds",
             str(payload.tail_seconds),
+            "--reverb-ir",
+            str(reverb_ir),
             "--output",
             "{job_dir}/output.wav",
             "--report",
@@ -248,19 +409,46 @@ def start_midi_ddsp_job(payload: MidiDdspJobRequest) -> dict[str, object]:
             "--json-events",
             "--web-control",
         ]
+        if bundle["architecture"] == "legacy-static-v1":
+            components = bundle["components"]
+            command.extend(
+                [
+                    "--expression-om",
+                    str(components["expression"]["path"]),
+                    "--synthesis-om",
+                    str(components["synthesis"]["path"]),
+                ]
+            )
+        else:
+            command.extend(["--model-bundle", str(bundle["manifest"])])
         if payload.mode == "render":
             command.append("--render-only")
-        elif payload.audio_device_id not in (None, ""):
-            command.extend(["--audio-device", str(payload.audio_device_id)])
+        elif audio_output is not None and audio_output.get("backend") == "pulse":
+            command.extend(
+                [
+                    "--pulse-sink",
+                    str(audio_output["sink_name"]),
+                    "--pulse-device-name",
+                    str(audio_output["name"]),
+                ]
+            )
+        elif audio_output is not None:
+            command.extend(["--audio-device", str(audio_output["id"])])
         job = jobs.start(
             f"midi-ddsp-{payload.mode}",
             command,
             metadata={
                 "midi_name": midi["name"],
-                "expression_model": expression["name"],
-                "synthesis_model": synthesis["name"],
+                "model_bundle_id": bundle["id"],
+                "model_bundle": bundle["name"],
+                "model_architecture": bundle["architecture"],
+                "quality_status": bundle["quality_status"],
                 "instrument_id": payload.instrument_id,
+                "seed": payload.seed,
                 "mode": payload.mode,
+                "reverb": "google-midi-ddsp-original",
+                "reverb_ir_sha256": reverb_sha256,
+                "audio_output": audio_output["name"] if audio_output else "default",
             },
         )
         return job.public()
@@ -348,12 +536,6 @@ def get_artifact(artifact_id: str) -> FileResponse:
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Artifact not found") from exc
     return FileResponse(path, filename=path.name)
-
-
-@app.on_event("shutdown")
-def shutdown() -> None:
-    if live.running:
-        live.stop()
 
 
 if (WEB_DIST / "assets").is_dir():

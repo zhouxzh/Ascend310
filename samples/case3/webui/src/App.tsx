@@ -2,29 +2,36 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import { Activity, Cpu, FlaskConical, KeyboardMusic, RefreshCw, Waves } from 'lucide-react'
 import { api, websocketUrl } from './api'
 import { Notice, StatusPill } from './components/ui'
-import type { AudioDevice, BenchmarkSummary, Catalog, Job, MidiPort, SystemStatus } from './types'
+import type { AudioDevice, AudioInput, BenchmarkSummary, Catalog, Job, MidiPort, SystemStatus } from './types'
 
-type Tab = 'perform' | 'midi-ddsp' | 'lab' | 'devices'
+type Tab = 'midi-ddsp' | 'ddsp-vst' | 'lab' | 'devices'
 
-const PerformView = lazy(() => import('./views/PerformView'))
 const MidiDdspView = lazy(() => import('./views/MidiDdspView'))
+const PerformView = lazy(() => import('./views/PerformView'))
 const LabView = lazy(() => import('./views/LabView'))
 const DevicesView = lazy(() => import('./views/DevicesView'))
 
-const NAVIGATION: { id: Tab; label: string; icon: typeof KeyboardMusic }[] = [
-  { id: 'perform', label: '演奏', icon: KeyboardMusic },
+const NAVIGATION: { id: Tab; label: string; icon: typeof Waves }[] = [
   { id: 'midi-ddsp', label: 'MIDI-DDSP', icon: Waves },
+  { id: 'ddsp-vst', label: 'DDSP-VST', icon: KeyboardMusic },
   { id: 'lab', label: '实验', icon: FlaskConical },
   { id: 'devices', label: '设备', icon: Cpu },
 ]
 
+function errorMessage(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause)
+}
+
 export default function App() {
-  const [tab, setTab] = useState<Tab>('perform')
+  const [tab, setTab] = useState<Tab>('midi-ddsp')
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [catalog, setCatalog] = useState<Catalog | null>(null)
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([])
+  const [speakerOutputs, setSpeakerOutputs] = useState<AudioDevice[]>([])
+  const [audioInputs, setAudioInputs] = useState<AudioInput[]>([])
   const [midiPorts, setMidiPorts] = useState<MidiPort[]>([])
   const [audioError, setAudioError] = useState<string | null>(null)
+  const [audioInputError, setAudioInputError] = useState<string | null>(null)
   const [midiError, setMidiError] = useState<string | null>(null)
   const [jobs, setJobs] = useState<Job[]>([])
   const [summary, setSummary] = useState<BenchmarkSummary | null>(null)
@@ -34,26 +41,31 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextStatus, nextCatalog, audio, midi, jobResponse, benchmark] = await Promise.all([
+      const [nextStatus, nextCatalog, audio, inputs, speakerAudio, midi, jobResponse, benchmark] = await Promise.all([
         api.status(),
         api.catalog(),
-        api.audioDevices(),
-        api.midiPorts(),
+        api.audioDevices().catch((cause) => ({ available: false, devices: [], error: errorMessage(cause) })),
+        api.audioInputs().catch((cause) => ({ available: false, devices: [], error: errorMessage(cause) })),
+        api.speakerOutputs().catch((cause) => ({ available: false, devices: [], error: errorMessage(cause) })),
+        api.midiPorts().catch((cause) => ({ available: false, ports: [], error: errorMessage(cause) })),
         api.jobs(),
         api.benchmark(),
       ])
       setStatus(nextStatus)
       setCatalog(nextCatalog)
       setAudioDevices(audio.devices)
+      setSpeakerOutputs(speakerAudio.devices)
+      setAudioInputs(inputs.devices)
       setMidiPorts(midi.ports)
       setAudioError(audio.error)
+      setAudioInputError(inputs.error)
       setMidiError(midi.error)
       setJobs(jobResponse.jobs)
       setSummary(benchmark.summary)
       setError('')
       setRefreshedAt(new Date())
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setError(errorMessage(cause))
     } finally {
       setLoading(false)
     }
@@ -112,7 +124,7 @@ export default function App() {
         <nav>
           {NAVIGATION.map((item) => {
             const Icon = item.icon
-            return <button type="button" className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)} key={item.id}><Icon size={20} /><span>{item.label}</span></button>
+            return <button type="button" aria-label={item.label} className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)} key={item.id}><Icon size={20} /><span>{item.label}</span></button>
           })}
         </nav>
         <div className="rail-footer">
@@ -136,10 +148,10 @@ export default function App() {
 
         <main className="content-area">
           <Suspense fallback={<Notice tone="loading">正在载入工作区</Notice>}>
-            {tab === 'perform' && <PerformView status={status} catalog={catalog} audioDevices={audioDevices} midiPorts={midiPorts} onRefresh={refresh} />}
             {tab === 'midi-ddsp' && <MidiDdspView catalog={catalog} audioDevices={audioDevices} jobs={jobs} onRefresh={refresh} />}
+            {tab === 'ddsp-vst' && <PerformView status={status} catalog={catalog} audioDevices={audioDevices} midiPorts={midiPorts} onRefresh={refresh} />}
             {tab === 'lab' && <LabView jobs={jobs} summary={summary} onRefresh={refresh} />}
-            {tab === 'devices' && <DevicesView status={status} catalog={catalog} audioDevices={audioDevices} midiPorts={midiPorts} audioError={audioError} midiError={midiError} onRefresh={refresh} />}
+            {tab === 'devices' && <DevicesView status={status} catalog={catalog} audioDevices={audioDevices} speakerOutputs={speakerOutputs} audioInputs={audioInputs} midiPorts={midiPorts} audioError={audioError} audioInputError={audioInputError} midiError={midiError} onRefresh={refresh} />}
           </Suspense>
         </main>
 
@@ -153,7 +165,7 @@ export default function App() {
       <nav className="bottom-nav">
         {NAVIGATION.map((item) => {
           const Icon = item.icon
-          return <button type="button" className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)} key={item.id}><Icon size={20} /><span>{item.label}</span></button>
+          return <button type="button" aria-label={item.label} className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)} key={item.id}><Icon size={20} /><span>{item.label}</span></button>
         })}
       </nav>
     </div>

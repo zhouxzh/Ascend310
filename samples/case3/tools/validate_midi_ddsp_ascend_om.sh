@@ -4,7 +4,7 @@ set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-MODEL_DIR="${MODEL_DIR:-$ROOT_DIR/models/midi_ddsp/om/ascend8t2}"
+MODEL_DIR="${MODEL_DIR:-$ROOT_DIR/models/om}"
 REPORT_DIR="${REPORT_DIR:-$ROOT_DIR/reports/ascend8t2/midi_ddsp/runtime}"
 
 die() {
@@ -49,7 +49,7 @@ activate_existing_environment
 python -c 'import ais_bench' >/dev/null 2>&1 || \
     die "ais_bench is not available in the existing conda environment"
 
-mapfile -t models < <(find "$MODEL_DIR" -maxdepth 1 -type f -name '*.om' | sort)
+mapfile -t models < <(find "$MODEL_DIR" -maxdepth 1 -type f -name 'midi_ddsp_*.om' | sort)
 [[ "${#models[@]}" -gt 0 ]] || die "no OM models found in $MODEL_DIR"
 
 printf 'model\texit_code\tstatus\n' > "$REPORT_DIR/runtime_status.tsv"
@@ -79,10 +79,10 @@ done
     echo "python=$(python --version 2>&1)"
     echo "model_dir=$(realpath "$MODEL_DIR")"
     echo
-    find "$MODEL_DIR" -maxdepth 1 -type f -name '*.om' \
+    find "$MODEL_DIR" -maxdepth 1 -type f -name 'midi_ddsp_*.om' \
         -printf '%f\t%s bytes\n' | sort
     echo
-    find "$MODEL_DIR" -maxdepth 1 -type f -name '*.om' -print0 \
+    find "$MODEL_DIR" -maxdepth 1 -type f -name 'midi_ddsp_*.om' -print0 \
         | sort -z | xargs -0 -r sha256sum
 } > "$REPORT_DIR/artifacts.txt"
 

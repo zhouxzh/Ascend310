@@ -6,12 +6,18 @@
 ONNX Runtime CPU，`.om` 使用 Ascend PyACL。MIDI 状态和音频输出在独立线程中
 运行，模型每 20 ms 更新一次；谐波振荡器、噪声滤波和重采样仍在 CPU 完成。
 
+Web“DDSP-VST”工作区以 Google Synth 的单音模式为默认值，Mixed OM 默认显示；FP16
+和 2-8 声部扩展位于高级设置。运行时可更新 Pitch Shift、Harmonics、Noise、Output
+Gain、ADSR、Input Pitch、Input Gain、Reverb Size、Damping 和 Wet。模型与音频输出
+只能在停止会话后切换。模型控制、谐波/噪声增益、合成、输出增益和 JUCE/FreeVerb
+风格混响按此顺序执行。
+
 ## 安装依赖
 
-普通 Python 依赖定义在 `requirements-realtime.txt`：
+板端 Python 依赖统一定义在 `requirements.txt`：
 
 ```text
-onnxruntime / numpy / scipy / soundfile
+numpy
 mido
 python-rtmidi
 sounddevice
@@ -27,7 +33,7 @@ sudo apt install -y libportaudio2
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate base
 cd ~/Documents/case3
-python -m pip install -r requirements-realtime.txt
+python -m pip install -r requirements.txt
 ```
 
 依赖用途：
@@ -35,7 +41,7 @@ python -m pip install -r requirements-realtime.txt
 | 依赖 | 用途 | 缺失时的典型现象 |
 | :--- | :--- | :--- |
 | `libportaudio2` | PortAudio 系统运行库，负责实时声卡 I/O | `OSError: PortAudio library not found` |
-| `sounddevice` | Python 到 PortAudio 的接口 | `Install requirements-realtime.txt first` |
+| `sounddevice` | Python 到 PortAudio 的接口 | `Install requirements.txt first` |
 | `mido` | 解析 MIDI 文件和 MIDI 消息 | `MIDI playback requires mido` |
 | `python-rtmidi` | 连接实体 MIDI 键盘 | `--live` 无法打开 MIDI port |
 | `onnxruntime` | 在 CPU 上运行 DDSP-VST ONNX 控制模型 | 模型会话创建失败或模块不存在 |
@@ -53,7 +59,7 @@ python -m pip install -r requirements-realtime.txt
 安装后先验证导入和声卡枚举：
 
 ```bash
-python -c "import mido, onnxruntime, sounddevice; print('realtime dependencies OK')"
+python -c "import mido, rtmidi, sounddevice; print('realtime dependencies OK')"
 python realtime_ddsp.py --list-audio
 ```
 
@@ -83,19 +89,19 @@ python realtime_ddsp.py --midi-file test_violin.mid --output test_violin.wav
 python realtime_ddsp.py --list-midi
 
 # 连接 MIDI 键盘并实时播放
-python realtime_ddsp.py --live --midi-port "你的 MIDI 设备名称" --max-voices 8
+python realtime_ddsp.py --live --midi-port "你的 MIDI 设备名称" --max-voices 1
 
 # 直接从声卡实时播放 MIDI 文件，不生成 WAV
-python realtime_ddsp.py --play-midi test_violin.mid --prebuffer 6 --max-voices 8
+python realtime_ddsp.py --play-midi test_violin.mid --prebuffer 6 --max-voices 1
 
 # 换成长笛音色实时播放；其他音色只需替换 --model 路径
 python realtime_ddsp.py --play-midi test_violin.mid \
-  --model models/ddsp_vst/Flute.onnx --prebuffer 6 --max-voices 8
+  --model models/ddsp_vst/Flute.onnx --prebuffer 6 --max-voices 1
 
 # Ascend 板端使用 OM；--backend auto 会根据 .om 自动选择 PyACL
 python realtime_ddsp.py --play-midi test_violin.mid \
-  --model models/om/ascend8t2/Violin_mixed_float16.om \
-  --device-id 0 --prebuffer 6 --max-voices 8
+  --model models/om/Violin_mixed_float16.om \
+  --device-id 0 --prebuffer 6 --max-voices 1
 
 # 查看可用声卡，必要时用 --audio-device 指定设备编号
 python realtime_ddsp.py --list-audio
@@ -110,25 +116,23 @@ amixer -c Device set PCM 70% unmute
 # 先从上一条 --list-audio 输出中确认 M25 的 PortAudio 编号 N
 python realtime_ddsp.py \
   --play-midi midi/ode-to-joy-violin.mid \
-  --model models/om/ascend8t2/Violin_mixed_float16.om \
+  --model models/om/Violin_mixed_float16.om \
   --device-id 0 \
   --audio-device N \
   --sample-rate 48000 \
   --prebuffer 6 \
-  --max-voices 8 \
+  --max-voices 1 \
   --audio-latency-ms 80 \
-  --output-gain-db 24
+  --output-gain-db 0
 ```
 
 当 `--audio-device` 选择 `USB Composite Device: Audio (hw:1,0)` 时，程序直接
 访问 ALSA 硬件，PulseAudio sink 音量不参与；应使用 `amixer -c Device set PCM`
 调整 M25 硬件音量。设备编号会在重启或插拔后变化，不能永久固定为 `1`。
 
-`--output-gain-db` 在重采样后施加软件增益，并在写入声卡前限幅到 `[-1, 1]`。
-原始 Ode to Joy DDSP 输出实测平均 `-48.6 dBFS`、峰值 `-32.5 dBFS`，在 M25
-硬件音量 40% 时基本不可听。使用 `--output-gain-db 24` 后平均为 `-24.6 dBFS`、
-峰值为 `-8.5 dBFS`，没有削波。不同模型和 MIDI 的幅度可能不同，增加增益时应
-从较小值逐步提高，听到失真时立即降低。
+`--output-gain-db` 在重采样后施加软件增益，并在写入声卡前限幅到 `[-1, 1]`，当前
+插件语义范围为 `-60..0 dB`。历史测试曾在旧版本额外使用 `+24 dB` 软件增益；该值
+不再是当前默认或允许范围，音量应优先在模型参数、系统 mixer 和功放侧正确设置。
 
 2026-07-21 的短 MIDI 板端实测结果为：
 
@@ -152,14 +156,15 @@ PyACL 后端按模型描述中的名称映射 3 个输入和 4 个输出，I/O �
 播放结束后，终端统计中的 `underruns=0` 和 `overruns=0` 表示本次音频 FIFO 没有
 下溢或上溢。它们只能说明实时传输连续，最终音质仍需实际听音确认。
 
-当前原型已经支持多声部：启动时按照 `--max-voices` 创建固定声部槽位，每个槽位
+引擎允许在高级模式使用多声部：启动时按照 `--max-voices` 创建固定声部槽位，每个槽位
 长期保留自己的 GRU 状态、谐波相位和噪声合成器；MIDI 音符只在槽位之间分配，
 不再为每个 note-on 重建模型状态。超过上限时优先回收已经释放的声部。复调混音
 仍采用 `1/N` 归一化，但增益会跨帧平滑，避免声部数变化造成瞬时音量跳变。
 `test_violin.mid` 可以用于单声部连续性验证，后续也可以替换为和弦 MIDI 文件。
 相同音高在 release 阶段再次 note-on 时会复用原声部及当前 ADSR 电平，避免包络
 从零重启形成音量凹陷。不要为了降低 NPU 负载把带 release 尾音的旋律固定为
-`--max-voices 1`；新音符会持续抢占尚未结束的声部，听起来像周期性卡顿。
+`--max-voices 1` 是 Google Synth 默认语义；若专门播放带重叠 release 的 MIDI 文件，
+可在高级设置增加声部，但这仍不是原生复音乐器模型。
 
 ### OM 实时实测和连贯性判定
 
@@ -179,10 +184,10 @@ PyACL 后端按模型描述中的名称映射 3 个输入和 4 个输出，I/O �
 ```bash
 python realtime_ddsp.py \
   --play-midi midi/ode-to-joy-violin.mid \
-  --model models/om/ascend8t2/Violin_mixed_float16.om \
+  --model models/om/Violin_mixed_float16.om \
   --device-id 0 --audio-device 1 --sample-rate 48000 \
   --prebuffer 6 --max-voices 4 --audio-latency-ms 80 \
-  --output-gain-db 24 --attack 0.03 --release 0.35
+  --output-gain-db 0 --attack 0.03 --release 0.35
 ```
 
 这是试听参数，不代表模型精度指标；设备编号仍需以当次 `--list-audio` 为准。

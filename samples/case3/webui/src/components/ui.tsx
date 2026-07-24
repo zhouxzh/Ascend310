@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { AlertCircle, CheckCircle2, LoaderCircle, Minus, Plus } from 'lucide-react'
+import { AlertCircle, CheckCircle2, LoaderCircle, Minus, Plus, TriangleAlert } from 'lucide-react'
 
 export function StatusPill({
   tone,
@@ -117,10 +117,16 @@ export function Notice({
   tone,
   children,
 }: {
-  tone: 'loading' | 'error' | 'success'
+  tone: 'loading' | 'error' | 'success' | 'warn'
   children: ReactNode
 }) {
-  const Icon = tone === 'loading' ? LoaderCircle : tone === 'error' ? AlertCircle : CheckCircle2
+  const Icon = tone === 'loading'
+    ? LoaderCircle
+    : tone === 'error'
+      ? AlertCircle
+      : tone === 'warn'
+        ? TriangleAlert
+        : CheckCircle2
   return (
     <div className={`notice notice-${tone}`}>
       <Icon size={18} className={tone === 'loading' ? 'spin' : ''} />

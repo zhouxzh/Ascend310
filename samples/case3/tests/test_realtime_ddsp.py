@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import time
+import inspect
+import threading
 import unittest
+from unittest.mock import patch
 from types import SimpleNamespace
 
 import numpy as np
@@ -9,11 +12,17 @@ import numpy as np
 from realtime_ddsp import (
     Adsr,
     DEFAULT_ENVELOPE,
+    DdspVstSettings,
+    JuceFreeverb,
     MODEL_HOP_SIZE,
     LivePlayer,
     PolyphonicGainSmoother,
     PolyphonicMidiState,
     RealtimeSynthEngine,
+    VoiceRenderer,
+    MidiVoiceSnapshot,
+    ModelControls,
+    query_midi_devices,
 )
 
 
@@ -66,6 +75,22 @@ def wait_until(predicate, timeout: float = 0.2) -> bool:
     return predicate()
 
 
+class MidiDeviceQueryTest(unittest.TestCase):
+    def test_missing_linux_alsa_sequencer_is_reported_cleanly(self) -> None:
+        with patch("realtime_ddsp.sys.platform", "linux"), patch(
+            "realtime_ddsp.Path.exists", return_value=False
+        ):
+            with self.assertRaisesRegex(RuntimeError, "/dev/snd/seq is missing"):
+                query_midi_devices()
+
+    def test_rtmidi_initialization_error_is_normalized(self) -> None:
+        with patch("realtime_ddsp.sys.platform", "win32"), patch(
+            "mido.get_input_names", side_effect=SystemError("backend failed")
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Unable to enumerate MIDI"):
+                query_midi_devices()
+
+
 class LivePlayerTest(unittest.TestCase):
     def test_default_envelope_matches_ddsp_vst_and_ramps_over_frames(self) -> None:
         self.assertEqual(DEFAULT_ENVELOPE.attack, 0.10)
@@ -103,19 +128,91 @@ class LivePlayerTest(unittest.TestCase):
 
 
 class PolyphonicSynthesisTest(unittest.TestCase):
-    def test_output_gain_is_applied_and_clipped(self) -> None:
+    def test_output_gain_is_applied_before_stereo_reverb(self) -> None:
         engine = RealtimeSynthEngine.__new__(RealtimeSynthEngine)
-        engine.output_gain = 2.0
+        engine._settings_lock = threading.Lock()
+        engine.settings = DdspVstSettings(output_gain_db=-6.0)
         engine.resampler = SimpleNamespace(process=lambda samples: samples)
+        engine.reverb = SimpleNamespace(
+            process=lambda samples: np.repeat(samples[:, None], 2, axis=1)
+        )
         engine.render_model_frame = lambda: np.array(
             [-0.75, -0.25, 0.25, 0.75], dtype=np.float32
         )
 
         output = engine.render_output_block()
 
-        np.testing.assert_array_equal(
-            output, np.array([-1.0, -0.5, 0.5, 1.0], dtype=np.float32)
+        expected = np.array([-0.75, -0.25, 0.25, 0.75], dtype=np.float32) * (
+            10.0 ** (-6.0 / 20.0)
         )
+        np.testing.assert_allclose(output[:, 0], expected, atol=1e-7)
+        np.testing.assert_allclose(output[:, 1], expected, atol=1e-7)
+
+    def test_ddsp_vst_engine_defaults_to_google_monophonic_mode(self) -> None:
+        default = inspect.signature(RealtimeSynthEngine).parameters["max_voices"].default
+        self.assertEqual(default, 1)
+
+    def test_voice_renderer_applies_plugin_control_order(self) -> None:
+        class FakeControls:
+            backend_name = "fake"
+
+            def predict_from_state(self, state, f0_scaled, pw_scaled):
+                self.inputs = (f0_scaled, pw_scaled)
+                return (
+                    ModelControls(
+                        amplitude=0.8,
+                        harmonics=np.ones(60, dtype=np.float32) / 60.0,
+                        noise_amps=np.ones(65, dtype=np.float32),
+                    ),
+                    state,
+                )
+
+        controls = FakeControls()
+        voice = VoiceRenderer(controls)
+        voice.harmonic = SimpleNamespace(
+            previous_amplitudes=np.zeros(60, dtype=np.float32),
+            render=lambda amplitude, harmonics, f0_hz: np.full(
+                MODEL_HOP_SIZE, amplitude + f0_hz / 1000.0, dtype=np.float32
+            ),
+        )
+        voice.noise = SimpleNamespace(
+            render=lambda magnitudes: np.full(
+                MODEL_HOP_SIZE, float(magnitudes[0]), dtype=np.float32
+            )
+        )
+        snapshot = MidiVoiceSnapshot(
+            slot=0,
+            note=69,
+            velocity=1.0,
+            pitch_bend=8192,
+            volume=1.0,
+            expression=1.0,
+            envelope=1.0,
+        )
+        settings = DdspVstSettings(
+            pitch_shift=12,
+            harmonic_gain=0.5,
+            noise_gain=0.25,
+            input_pitch=0.1,
+            input_gain=0.2,
+        )
+
+        output = voice.render(snapshot, settings)
+
+        self.assertAlmostEqual(controls.inputs[0], 81 / 127 - 0.1)
+        self.assertAlmostEqual(controls.inputs[1], 0.8)
+        expected_f0 = 880.0
+        np.testing.assert_allclose(output, 0.4 + expected_f0 / 1000.0 + 0.25)
+
+    def test_freeverb_bypass_is_stereo_and_wet_output_is_finite(self) -> None:
+        dry = np.linspace(-0.2, 0.2, 1024, dtype=np.float32)
+        reverb = JuceFreeverb(16_000, DdspVstSettings())
+        bypass = reverb.process(dry)
+        self.assertEqual(bypass.shape, (1024, 2))
+        np.testing.assert_array_equal(bypass[:, 0], dry)
+        reverb.update(DdspVstSettings(reverb_wet=0.5))
+        wet = reverb.process(dry)
+        self.assertTrue(np.all(np.isfinite(wet)))
 
     def test_released_voice_slot_is_reused_without_reallocating_all_slots(self) -> None:
         midi = PolyphonicMidiState(max_voices=2)

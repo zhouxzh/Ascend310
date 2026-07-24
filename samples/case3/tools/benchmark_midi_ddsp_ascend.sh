@@ -4,7 +4,7 @@ set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-MODEL_DIR="${MODEL_DIR:-$ROOT_DIR/models/midi_ddsp/om/ascend8t2}"
+MODEL_DIR="${MODEL_DIR:-$ROOT_DIR/models/om}"
 ONNX_DIR="${ONNX_DIR:-$ROOT_DIR/models/midi_ddsp/onnx}"
 REPORT_DIR="${REPORT_DIR:-$ROOT_DIR/reports/ascend8t2/midi_ddsp/benchmark}"
 ACCURACY_RUNS="${ACCURACY_RUNS:-5}"

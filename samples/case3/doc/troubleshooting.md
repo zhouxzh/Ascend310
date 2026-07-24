@@ -194,8 +194,8 @@ aplay -Dhw:ascend310b -f S16_LE -r 48000 -t wav \
 
 ## WAV 格式相同但播放结果不同
 
-已知正常的官方文件 `tianlu.wav` 是 PCM、S16_LE、48 kHz、单声道。最初的
-`ode-to-joy-violin.wav` 是 PCM、S16_LE、48 kHz、双声道。两者采样率和位深相同，
+已知正常的官方文件 `tianlu.wav` 是 PCM、S16_LE、48 kHz、单声道。当前保留的
+`ode-to-joy-violin-stereo-loud.wav` 是 PCM、S16_LE、48 kHz、双声道。两者采样率和位深相同，
 但声道数不同，因此不能说格式完全相同。
 
 检查命令：
@@ -291,14 +291,15 @@ python realtime_ddsp.py \
   --audio-device 1 \
   --sample-rate 48000 \
   --prebuffer 6 \
-  --max-voices 8 \
+  --max-voices 1 \
   --audio-latency-ms 80 \
-  --output-gain-db 24
+  --output-gain-db 0
 ```
 
 设备编号 `1` 只是本轮枚举结果，重启或插拔后要通过 `--list-audio` 重新确认。
-`+24 dB` 后离线测得平均 `-24.6 dBFS`、峰值 `-8.5 dBFS`，没有削波。短 MIDI
-实时验证结果为双声道、`underruns=0`、`overruns=0`、最大渲染 5.77 ms。
+旧版本使用 `+24 dB` 后曾测得平均 `-24.6 dBFS`、峰值 `-8.5 dBFS`；当前插件语义
+限制为 `-60..0 dB`，不再用正软件增益补偿音量。应调节系统 mixer、音箱物理音量和
+模型参数，并检查削波指标。
 
 已知 WAV 的直接 ALSA 验证命令为：
 
@@ -306,12 +307,12 @@ python realtime_ddsp.py \
 python realtime_ddsp.py \
   --midi-file midi/ode-to-joy-violin.mid \
   --model models/ddsp_vst/Violin.onnx \
-  --output /tmp/ode-to-joy-ddsp-gain24.wav \
+  --output /tmp/ode-to-joy-ddsp.wav \
   --sample-rate 48000 \
-  --max-voices 8 \
-  --output-gain-db 24
+  --max-voices 1 \
+  --output-gain-db 0
 
-aplay -Dplughw:CARD=Device,DEV=0 /tmp/ode-to-joy-ddsp-gain24.wav
+aplay -Dplughw:CARD=Device,DEV=0 /tmp/ode-to-joy-ddsp.wav
 ```
 
 如果直接 ALSA 播放时报 `Device or resource busy`，先确认是否有 PulseAudio 或其他
@@ -397,14 +398,14 @@ ATC 进程。原始结论见
 TE_PARALLEL_COMPILER=1 OMP_NUM_THREADS=1 \
   bash tools/convert_onnx_to_om.sh \
   --model models/ddsp_vst/Violin.onnx \
-  --output models/om/ascend8t/Violin_mixed_float16 \
+  --output reports/model_conversion/manual/Violin_mixed_float16 \
   --soc-version Ascend310B4 \
   --precision-mode-v2 mixed_float16
 ```
 
 限制为单进程后，11 个音色的 FP16 和 mixed_float16 共 22 个 OM 全部转换成功。
 OOM 证据保存在 `reports/ascend8t/dmesg_after_*_oom.txt`，首次失败摘要保存在
-`models/om/ascend8t/*_oom.atc.summary.txt`。遇到退出码 137 时应先查 `dmesg` 和
+`reports/model_conversion/legacy_ascend8t_violin/*_oom.atc.summary.txt`。遇到退出码 137 时应先查 `dmesg` 和
 内存，不要直接切换精度模式掩盖问题。
 
 ## 8T2 驱动与 CANN 不匹配
