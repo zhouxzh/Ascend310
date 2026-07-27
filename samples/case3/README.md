@@ -17,16 +17,15 @@
 
 DDSP-VST 每 20 ms 根据音高、力度和 GRU 状态预测谐波/噪声控制量。MIDI-DDSP
 先从音符序列生成 expression controls，再由 synthesis 网络生成 DDSP 参数。stateful v2
-把双向上下文和自回归状态显式跨块传递；旧 32-note/64-frame 双 OM 只保留为迁移兼容。
+把双向上下文和自回归状态显式跨块传递。
 两条链路都在模型外执行音频合成，因此 ONNX/OM 只包含神经网络参数预测部分。
 
 ## Web 工作台
 
-MIDI-DDSP Studio 使用 React + TypeScript + Vite 前端和 FastAPI 后端，包含四个工作区：
+MIDI-DDSP Studio 使用 React + TypeScript + Vite 前端和 FastAPI 后端，包含三个工作区：
 
 - **DDSP-VST**：状态化 OM 实时 Synth，默认单音，支持插件音色、包络和混响参数。
 - **MIDI-DDSP**：使用版本锁定的模型包完整渲染并缓存 WAV，再播放或下载。
-- **实验**：执行白名单内的 OM 验证和短基准测试。
 - **设备**：查看 NPU、模型、音频与 MIDI 状态，并测试 PulseAudio 输出和左右声道。
 
 DDSP-VST Effect 本轮不提供启动入口。设备页只区分真实 `capture` 与 PulseAudio
@@ -48,7 +47,20 @@ python scripts/run_webui.py
 - `requirements-export.txt`：开发电脑上的 ONNX 导出和本地测试依赖；不要安装到开发板。
 - PyACL 由 CANN 提供，`ais_bench` 由开发板现有基准环境提供，不从 PyPI 安装。
 
-板端缺少依赖时由用户手动安装，部署脚本不会执行 `pip`、`conda` 或系统包管理命令。
+香橙派上的 Anaconda 安装在管理员所有的 `/usr/local/miniconda3`，普通
+`HwHiAiUser` 用户不能直接写入该目录。因此板端 Python 依赖统一安装到当前用户的
+`~/.local/`，必须在激活 `base` 后使用 `--user`：
+
+```bash
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate base
+cd /home/HwHiAiUser/Documents/case3
+python -m pip install --user -r requirements.txt
+```
+
+使用 `python -m pip` 可以确保调用的是当前 `base` 环境对应的 Python；不要使用
+`sudo pip`，避免以 root 身份修改 Anaconda 或产生另一套包。部署脚本不会执行
+`pip`、`conda` 或系统包管理命令，板端缺少依赖时由用户手动运行以上命令。
 
 ## 常用命令
 
@@ -115,10 +127,12 @@ case3/
 根目录中的四个 Python 模块是可直接运行的 CLI 和 Web 后端公共模块，因此不移动到
 `scripts/`；`scripts/` 只保存很薄的板端启动入口和环境检查器。
 
-`models/om/` 保存 DDSP-VST OM、legacy MIDI-DDSP OM 和原版混响 IR。stateful v2 的
-8 个相互匹配组件统一放入 `models/midi_ddsp/bundles/<bundle-id>/`，由 manifest 锁定，
+`models/om/` 保存 DDSP-VST OM 和原版混响 IR。stateful v2 的
+batch `1/2/4/8` 共 32 个相互匹配组件统一放入
+`models/midi_ddsp/bundles/<bundle-id>/`，由 manifest 锁定，
 浏览器不能分别组合 Expression 与 Synthesis 文件。混响 checkpoint 含 20 组 IR，
 产品只展示论文支持的乐器 ID 0-12。
+MIDI-DDSP bundle 固定使用 `precision_mode_v2=origin`；GRU 已展开为基础算子。
 Ascend 20T 已验证可以运行 8T 生成的同一批 OM，因此不保留按开发板重复的模型副本。
 
 ## 测试
@@ -144,12 +158,11 @@ npm run build
 | [MIDI-DDSP 导出](doc/midi-ddsp-export.md) | TensorFlow 基准、stateful v2 ONNX/OM 和逐张量对齐 |
 | [两套模型对比](doc/midi-ddsp-vs-ddsp-vst.md) | 接口、实时性和适用场景差异 |
 | [DDSP-VST 实时播放](doc/realtime-ddsp.md) | 实时合成、缓冲和音频输出 |
-| [MIDI-DDSP 播放](doc/midi-ddsp-realtime.md) | 完整渲染缓存、单声部校验、多轨 stem 和限制 |
+| [MIDI-DDSP 播放](doc/midi-ddsp-realtime.md) | 完整渲染缓存、复音声部化、多 voice stem 和原版混响 |
 | [Ascend 音频输出](doc/audio-output.md) | 板载、USB、蓝牙和扬声器测试 |
 | [OM 转换与验证](doc/om-deployment.md) | ATC、校验值和日志判定 |
 | [板端实测结果](doc/benchmark-results.md) | DDSP-VST 板端结果 |
-| [MIDI-DDSP OM 实测](doc/midi-ddsp-benchmark.md) | 双模型精度、随机性和性能 |
-| [Web 工作台](doc/webui.md) | 四个工作区、构建、同步和启动 |
+| [Web 工作台](doc/webui.md) | 三个工作区、构建、同步和启动 |
 | [故障排查](doc/troubleshooting.md) | SSH、音频、ATC、OM 和兼容问题 |
 | [第三方参考仓库](doc/upstream-repositories.md) | 固定提交和保留规则 |
 

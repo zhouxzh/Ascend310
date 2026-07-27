@@ -198,33 +198,39 @@ def main() -> int:
         synthesis.sample_rate,
         use_angular_cumsum=True,
     )
-    processed_parameters = processor.get_controls(
-        {
-            "amplitudes": raw_parameters["amplitudes"],
-            "harmonic_distribution": raw_parameters["harmonic_distribution"],
-            "noise_magnitudes": raw_parameters["noise_magnitudes"],
-            "f0_hz": raw_parameters["f0_hz"],
-        },
-        verbose=False,
-    )
-
     noise_rng = np.random.default_rng(args.seed)
     white_noise_values: list[np.ndarray] = []
-    original_uniform = tf.random.uniform
+    noise_synth = processor.filtered_noise
+    original_noise_get_signal = noise_synth.get_signal
 
-    def deterministic_uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None, name=None):
-        del seed, name
-        dimensions = tuple(int(item) for item in tf.TensorShape(shape).as_list())
-        upper = 1.0 if maxval is None else float(maxval)
-        values = noise_rng.uniform(float(minval), upper, dimensions).astype(np.float32)
+    def deterministic_noise_signal(magnitudes):
+        dimensions = (int(magnitudes.shape[0]), noise_synth.n_samples)
+        values = noise_rng.uniform(-1.0, 1.0, dimensions).astype(np.float32)
         white_noise_values.append(values)
-        return tf.convert_to_tensor(values, dtype=dtype)
+        return _ddsp.core.frequency_filter(
+            tf.convert_to_tensor(values),
+            magnitudes,
+            window_size=noise_synth.window_size,
+        )
 
-    tf.random.uniform = deterministic_uniform
+    noise_synth.get_signal = deterministic_noise_signal
     try:
+        processed_parameters = processor.get_controls(
+            {
+                "amplitudes": raw_parameters["amplitudes"],
+                "harmonic_distribution": raw_parameters["harmonic_distribution"],
+                "noise_magnitudes": raw_parameters["noise_magnitudes"],
+                "f0_hz": raw_parameters["f0_hz"],
+            },
+            verbose=False,
+        )
         dry_audio = processor.get_signal(processed_parameters)
     finally:
-        tf.random.uniform = original_uniform
+        noise_synth.get_signal = original_noise_get_signal
+    if len(white_noise_values) != 1:
+        raise RuntimeError(
+            f"Expected one FilteredNoise input, captured {len(white_noise_values)}"
+        )
     wet_audio = synthesis.reverb_module(
         dry_audio,
         reverb_number=tf.constant([args.instrument_id], dtype=tf.int64),

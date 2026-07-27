@@ -168,6 +168,10 @@ def query_speaker_outputs(
                         or properties.get("device.description")
                         or sink_name
                     )
+                    is_bluetooth = (
+                        sink_name.startswith("bluez_")
+                        or str(properties.get("device.bus", "")).lower() == "bluetooth"
+                    )
                     outputs.append(
                         {
                             "id": f"pulse:{sink_name}",
@@ -179,6 +183,7 @@ def query_speaker_outputs(
                             "max_output_channels": channels,
                             "default_sample_rate": sample_rate,
                             "is_default": sink_name == default_sink,
+                            "is_bluetooth": is_bluetooth,
                             "state": str(sink.get("state", "UNKNOWN")).lower(),
                         }
                     )
@@ -205,6 +210,7 @@ def query_speaker_outputs(
                 **device,
                 "backend": "portaudio",
                 "is_default": str(device.get("name", "")).lower() in {"default", "pulse"},
+                "is_bluetooth": False,
                 "state": "available",
             }
         )

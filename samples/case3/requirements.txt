@@ -1,10 +1,21 @@
 # Python dependencies required by the Ascend board runtime and Web UI.
+
+# Numeric runtime used by DDSP synthesis and audio processing.
 numpy>=1.22,<2
+scipy>=1.8,<2
+
+# MIDI file/message API. Required for .mid analysis, rendering and playback.
 mido>=1.3,<2
+
+# Mido backend for physical USB MIDI input ports. The installed package is
+# named python-rtmidi, while the Python import name is rtmidi.
 python-rtmidi>=1.5,<2
+
+# Audio output and the legacy local MIDI utility.
 sounddevice>=0.4,<1
 pygame>=2.5,<3
 
+# Web service runtime.
 fastapi>=0.115,<1
 pydantic>=2.5,<3
 uvicorn>=0.32,<1

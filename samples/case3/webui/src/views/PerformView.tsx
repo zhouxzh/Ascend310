@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Gauge, KeyboardMusic, Octagon, Play, Radio, SlidersHorizontal, Volume2 } from 'lucide-react'
 import { api, websocketUrl } from '../api'
-import Piano from '../components/Piano'
+import { audioDeviceLabel, isBluetoothOutput } from '../audio'
+import Piano, { DEFAULT_PIANO_KEY_COUNT, noteLabel, pianoNoteRange } from '../components/Piano'
 import { Field, Metric, Notice, PanelHeader, StatusPill, Stepper } from '../components/ui'
-import type { AudioDevice, Catalog, DdspVstParameters, DdspVstStatus, MidiPort, SystemStatus } from '../types'
+import type { AudioDevice, Catalog, DdspVstParameters, DdspVstStatus, LatencyProfile, MidiPort, SystemStatus } from '../types'
 
 interface Props {
   status: SystemStatus
@@ -22,8 +23,9 @@ const DEFAULT_PARAMETERS: DdspVstParameters = {
   pitch_shift: 0,
   harmonic_gain: 1,
   noise_gain: 1,
-  output_gain_db: 0,
-  attack: 0.1,
+  output_gain_db: -18,
+  velocity_curve: 0.55,
+  attack: 0.02,
   decay: 0,
   sustain: 1,
   release: 1.2,
@@ -33,6 +35,20 @@ const DEFAULT_PARAMETERS: DdspVstParameters = {
   reverb_damping: 0.1,
   reverb_wet: 0,
 }
+
+const WIRED_SAMPLE_RATE = 48000
+const BLUETOOTH_SAMPLE_RATE = 44100
+const LATENCY_CONFIG: Record<LatencyProfile, { prebuffer: number; latencyMs: number; label: string }> = {
+  low: { prebuffer: 1, latencyMs: 15, label: '低延时' },
+  balanced: { prebuffer: 2, latencyMs: 20, label: '均衡' },
+  safe: { prebuffer: 3, latencyMs: 60, label: '稳定' },
+}
+
+const VELOCITY_CURVES = [
+  { value: 0.55, label: '轻触增强' },
+  { value: 1, label: '线性' },
+  { value: 1.4, label: '宽动态' },
+] as const
 
 export default function PerformView({ status, catalog, audioDevices, midiPorts, onRefresh }: Props) {
   const preferredModel = useMemo(
@@ -47,6 +63,7 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
   const [octave, setOctave] = useState(4)
   const [velocity, setVelocity] = useState(100)
   const [voices, setVoices] = useState(1)
+  const [latencyProfile, setLatencyProfile] = useState<LatencyProfile>('balanced')
   const [advanced, setAdvanced] = useState(false)
   const [parameters, setParameters] = useState<DdspVstParameters>(DEFAULT_PARAMETERS)
   const [pitchBend, setPitchBend] = useState(0)
@@ -62,10 +79,59 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
     () => advanced ? catalog.ddsp_vst_models : catalog.ddsp_vst_models.filter((model) => model.precision === 'mixed_float16'),
     [advanced, catalog.ddsp_vst_models],
   )
+  const selectedAudioDevice = useMemo(
+    () => audioDevices.find((device) => device.id === audioDeviceId) ?? null,
+    [audioDeviceId, audioDevices],
+  )
+  const selectedModel = useMemo(
+    () => catalog.ddsp_vst_models.find((model) => model.id === modelId) ?? preferredModel,
+    [catalog.ddsp_vst_models, modelId, preferredModel],
+  )
+  const selectedMidiPort = useMemo(
+    () => midiPorts.find((port) => (port.port ?? port.name) === midiPort) ?? null,
+    [midiPort, midiPorts],
+  )
+  const keyboardKeyCount = selectedMidiPort?.key_count ?? DEFAULT_PIANO_KEY_COUNT
+  const keyboardRange = pianoNoteRange(octave, keyboardKeyCount)
+  const keyboardName = selectedMidiPort
+    ? [selectedMidiPort.manufacturer, selectedMidiPort.model].filter(Boolean).join(' ') || selectedMidiPort.name
+    : '触控键盘'
+  const bluetoothOutputSelected = Boolean(selectedAudioDevice && isBluetoothOutput(selectedAudioDevice))
+  const outputSampleRate = bluetoothOutputSelected
+    ? selectedAudioDevice?.default_sample_rate || BLUETOOTH_SAMPLE_RATE
+    : WIRED_SAMPLE_RATE
+  const audioLatencyMs = bluetoothOutputSelected
+    ? latencyProfile === 'safe' ? 300 : 220
+    : LATENCY_CONFIG[latencyProfile].latencyMs
+  const pitchMin = selectedModel?.pitch_min_note
+  const pitchMax = selectedModel?.pitch_max_note
+  const displayPitchMin = pitchMin === undefined ? undefined : Math.ceil(pitchMin)
+  const displayPitchMax = pitchMax === undefined ? undefined : Math.floor(pitchMax)
+  const outOfRangeNotes = pitchMin === undefined || pitchMax === undefined
+    ? []
+    : synthStatus.active_notes.filter((note) => note < pitchMin || note > pitchMax)
 
   useEffect(() => {
     if (!modelId && preferredModel) setModelId(preferredModel.id)
   }, [modelId, preferredModel])
+
+  useEffect(() => {
+    const configuredPort = status.ddsp_vst.config?.midi_port
+    if (status.ddsp_vst.running) {
+      setMidiPort(typeof configuredPort === 'string' ? configuredPort : '')
+      const configuredAudio = status.ddsp_vst.config?.audio_device_id
+      setAudioDeviceId(typeof configuredAudio === 'string' ? configuredAudio : '')
+      const configuredLatency = status.ddsp_vst.config?.latency_profile
+      if (configuredLatency === 'low' || configuredLatency === 'balanced' || configuredLatency === 'safe') {
+        setLatencyProfile(configuredLatency)
+      }
+      const configuredVoices = status.ddsp_vst.config?.max_voices
+      if (typeof configuredVoices === 'number') setVoices(configuredVoices)
+      if (status.ddsp_vst.parameters) setParameters(status.ddsp_vst.parameters)
+    } else if (!midiPort && midiPorts.length === 1) {
+      setMidiPort(midiPorts[0].port ?? midiPorts[0].name)
+    }
+  }, [midiPort, midiPorts, status.ddsp_vst.config, status.ddsp_vst.parameters, status.ddsp_vst.running])
 
   useEffect(() => {
     if (!advanced && modelOptions.length && !modelOptions.some((model) => model.id === modelId)) {
@@ -74,6 +140,10 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
   }, [advanced, modelId, modelOptions])
 
   useEffect(() => setSynthStatus(status.ddsp_vst), [status.ddsp_vst])
+
+  useEffect(() => {
+    if (bluetoothOutputSelected && latencyProfile === 'low') setLatencyProfile('balanced')
+  }, [bluetoothOutputSelected, latencyProfile])
 
   useEffect(() => {
     if (!synthStatus.running) {
@@ -169,10 +239,9 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
         model_id: modelId,
         audio_device_id: audioDeviceId || null,
         midi_port: midiPort || null,
-        sample_rate: 48000,
-        prebuffer: 6,
+        sample_rate: outputSampleRate,
+        latency_profile: latencyProfile,
         max_voices: voices,
-        audio_latency_ms: 80,
         ...parameters,
         device_id: 0,
       })
@@ -234,21 +303,31 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
 
         {error && <Notice tone="error">{error}</Notice>}
         {unavailable && !error && <Notice tone="error">{catalog.ddsp_vst_models.length === 0 ? '未发现 DDSP-VST OM。' : '未发现可用音频输出。'}</Notice>}
+        {bluetoothOutputSelected && !error && <Notice tone="warn">蓝牙输出已切换为更高缓冲；实时演奏想要更低延迟，建议使用 USB 或有线声卡。</Notice>}
+        {outOfRangeNotes.length > 0 && <Notice tone="warn">当前音符 {outOfRangeNotes.join('、')} 超出 {selectedModel?.instrument} 的训练音域。</Notice>}
 
         <div className="performance-readout">
           <div className="note-display">
             <KeyboardMusic size={22} />
             <div><span>ACTIVE NOTES</span><strong>{synthStatus.active_notes.length ? synthStatus.active_notes.join(' · ') : '—'}</strong></div>
+            <div className="keyboard-profile">
+              <span>MIDI CONTROLLER</span>
+              <strong>{keyboardName}</strong>
+              <small>{keyboardKeyCount}键 · {noteLabel(keyboardRange.first)}-{noteLabel(keyboardRange.last)}</small>
+              <small>力度 {metrics?.midi_velocity_last ?? '—'} → {metrics?.midi_velocity_mapped_last ?? '—'}</small>
+            </div>
           </div>
           <div className="metrics-row compact-metrics">
-            <Metric label="声部" value={synthStatus.active_notes.length} />
-            <Metric label="P95 推理" value={(metrics?.p95_render_ms ?? 0).toFixed(2)} unit="ms" tone="teal" />
-            <Metric label="缓冲" value={metrics?.buffered_blocks ?? 0} />
+            <Metric label="总延时" value={(metrics?.estimated_total_latency_ms ?? 0).toFixed(0)} unit="ms" tone="teal" />
+            <Metric label="P95 渲染" value={(metrics?.p95_render_ms ?? 0).toFixed(2)} unit="ms" />
+            <Metric label="队列" value={(metrics?.queue_latency_ms ?? 0).toFixed(0)} unit="ms" />
+            <Metric label="设备" value={(metrics?.device_latency_ms ?? 0).toFixed(0)} unit="ms" />
+            <Metric label="Sink" value={(metrics?.sink_latency_ms ?? 0).toFixed(0)} unit="ms" />
             <Metric label="下溢" value={metrics?.underruns ?? 0} tone={(metrics?.underruns ?? 0) > 0 ? 'red' : undefined} />
           </div>
         </div>
 
-        <Piano octave={octave} velocity={velocity} activeNotes={synthStatus.active_notes} disabled={!synthStatus.running || socketState !== 'online'} onNoteOn={noteOn} onNoteOff={noteOff} />
+        <Piano octave={octave} keyCount={keyboardKeyCount} velocity={velocity} activeNotes={synthStatus.active_notes} recommendedMin={pitchMin} recommendedMax={pitchMax} disabled={!synthStatus.running || socketState !== 'online'} onNoteOn={noteOn} onNoteOff={noteOff} />
 
         <div className="performance-controls">
           <div className="control-block"><span>OCTAVE</span><Stepper value={octave} min={1} max={7} onChange={setOctave} label="八度" /></div>
@@ -266,18 +345,54 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
               {modelOptions.map((model) => <option value={model.id} key={model.id}>{model.instrument} · {model.precision === 'mixed_float16' ? 'Mixed' : 'FP16'}</option>)}
             </select>
           </Field>
+          {displayPitchMin !== undefined && displayPitchMax !== undefined && <div className="model-range">
+            <span>训练音域</span>
+            <strong>MIDI {displayPitchMin}-{displayPitchMax}</strong>
+            {selectedModel?.pitch_min_hz !== undefined && selectedModel.pitch_max_hz !== undefined && <small>{selectedModel.pitch_min_hz.toFixed(0)}-{selectedModel.pitch_max_hz.toFixed(0)} Hz</small>}
+          </div>}
           <Field label="音频输出">
             <select value={audioDeviceId} onChange={(event) => setAudioDeviceId(event.target.value)} disabled={synthStatus.running}>
               <option value="">系统默认</option>
-              {audioDevices.map((device) => <option value={device.id} key={device.id}>{device.name}</option>)}
+              {audioDevices.map((device) => <option value={device.id} key={device.id}>{audioDeviceLabel(device)}</option>)}
             </select>
           </Field>
+          <div className="field">
+            <span>延时模式</span>
+            <div className="segmented latency-profile" role="group" aria-label="延时模式">
+              {(Object.keys(LATENCY_CONFIG) as LatencyProfile[]).map((profile) => (
+                <button
+                  type="button"
+                  className={latencyProfile === profile ? 'is-active' : ''}
+                  disabled={synthStatus.running || (bluetoothOutputSelected && profile === 'low')}
+                  onClick={() => setLatencyProfile(profile)}
+                  key={profile}
+                >
+                  {LATENCY_CONFIG[profile].label}
+                </button>
+              ))}
+            </div>
+          </div>
           <Field label="MIDI 输入">
             <select value={midiPort} onChange={(event) => setMidiPort(event.target.value)} disabled={synthStatus.running}>
               <option value="">触控与电脑键盘</option>
-              {midiPorts.map((port) => <option value={port.name} key={port.id}>{port.name}</option>)}
+              {midiPorts.map((port) => <option value={port.port ?? port.name} key={port.id}>{port.name}{port.key_count ? ` · ${port.key_count}键` : ''}</option>)}
             </select>
           </Field>
+          <div className="field">
+            <span>力度响应</span>
+            <div className="segmented velocity-profile" role="group" aria-label="力度响应">
+              {VELOCITY_CURVES.map((curve) => (
+                <button
+                  type="button"
+                  className={parameters.velocity_curve === curve.value ? 'is-active' : ''}
+                  onClick={() => setParameter('velocity_curve', curve.value)}
+                  key={curve.value}
+                >
+                  {curve.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="setting-group-title">音色</div>
           <ParameterSlider label="Pitch Shift" value={parameters.pitch_shift} min={-24} max={24} step={1} suffix=" st" onChange={(value) => setParameter('pitch_shift', value)} />
@@ -303,7 +418,7 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
             <ParameterSlider label="Input Gain" value={parameters.input_gain} min={-0.5} max={0.5} step={0.01} onChange={(value) => setParameter('input_gain', value)} />
           </>}
         </div>
-        <div className="settings-footer"><Volume2 size={17} /><span>48 kHz · 80 ms</span><Gauge size={17} /><span>{voices} voice{voices > 1 ? 's' : ''}</span></div>
+        <div className="settings-footer"><Volume2 size={17} /><span>{outputSampleRate / 1000} kHz · {audioLatencyMs} ms · {bluetoothOutputSelected ? 'A2DP' : `${LATENCY_CONFIG[latencyProfile].prebuffer} blocks`}</span><Gauge size={17} /><span>{voices} voice{voices > 1 ? 's' : ''}</span></div>
       </aside>
     </div>
   )

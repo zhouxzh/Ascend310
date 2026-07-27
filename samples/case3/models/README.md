@@ -5,10 +5,9 @@ by board, precision, or test run:
 
 ```text
 models/
-|-- om/                     # 22 DDSP-VST OMs, 4 MIDI-DDSP OMs, and reverb IR
+|-- om/                     # 22 DDSP-VST OMs and the MIDI-DDSP reverb IR
 |-- conversion_logs/
 |   |-- ddsp_vst/           # Ascend 8T ATC logs, summaries, and source hashes
-|   `-- midi_ddsp/          # Ascend 8T ATC logs and summaries
 |-- ddsp_vst/               # DDSP-VST TFLite, ONNX, and metadata
 |-- midi_ddsp/              # MIDI-DDSP weights, ONNX, and references
 `-- manifests/
@@ -20,9 +19,10 @@ CANN 8.3.RC1. The same OMs were verified on the 20T board, so no second copy is
 kept for that board. Historical compatibility and failed-conversion evidence
 is retained under `reports/`, not in the runtime model directory.
 
-Both FP16 and `mixed_float16` files remain because benchmark and comparison
-tasks use both precision modes. The original ONNX, TFLite, weights, and
-reference files are not duplicated in `models/om/`.
+Both DDSP-VST FP16 and `mixed_float16` files remain because DDSP-VST benchmark
+and comparison tasks use both precision modes. MIDI-DDSP runtime components are
+stored in origin stateful bundles under `models/midi_ddsp/bundles/`. The original
+ONNX, TFLite, weights, and reference files are not duplicated in `models/om/`.
 
 `models/om/midi_ddsp_reverb_ir.npz` contains the 20 checkpoint-derived,
 48,000-sample MIDI-DDSP impulse responses. Its SHA256 is

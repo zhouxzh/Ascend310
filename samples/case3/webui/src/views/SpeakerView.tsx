@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AudioLines, CircleStop, Play, Speaker, Timer, Volume2 } from 'lucide-react'
 import { api } from '../api'
+import { audioDeviceLabel, isBluetoothOutput } from '../audio'
 import { Field, Metric, Notice, PanelHeader, Segmented, StatusPill, Stepper } from '../components/ui'
 import type { AudioDevice, SpeakerChannelMode, SpeakerTestStatus, SystemStatus } from '../types'
 
@@ -167,7 +168,7 @@ export default function SpeakerView({ status, audioDevices, onRefresh }: Props) 
             <select value={deviceId} onChange={(event) => setDeviceId(event.target.value)} disabled={testStatus.running}>
               {audioDevices.map((device) => (
                 <option value={device.id} key={device.id}>
-                  {device.name}{device.is_default ? '（默认）' : ''}
+                  {audioDeviceLabel(device)}
                 </option>
               ))}
             </select>
@@ -187,7 +188,7 @@ export default function SpeakerView({ status, audioDevices, onRefresh }: Props) 
         </div>
         <div className="settings-footer">
           <Volume2 size={17} />
-          <span>{selectedDevice?.host_api ?? 'Audio'}</span>
+          <span>{selectedDevice ? (isBluetoothOutput(selectedDevice) ? 'Bluetooth' : selectedDevice.host_api) : 'Audio'}</span>
           <Timer size={17} />
           <span>{duration} seconds</span>
         </div>

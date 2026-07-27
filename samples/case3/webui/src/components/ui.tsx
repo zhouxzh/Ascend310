@@ -92,10 +92,12 @@ export function Segmented<T extends string>({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   value: T
   options: { value: T; label: string }[]
   onChange: (value: T) => void
+  disabled?: boolean
 }) {
   return (
     <div className="segmented">
@@ -105,6 +107,7 @@ export function Segmented<T extends string>({
           className={value === option.value ? 'is-active' : ''}
           key={option.value}
           onClick={() => onChange(option.value)}
+          disabled={disabled}
         >
           {option.label}
         </button>

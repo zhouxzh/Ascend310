@@ -137,6 +137,7 @@ class SpeakerOutputCatalogTest(unittest.TestCase):
         self.assertEqual(outputs[0]["name"], "EDIFIER M16 Pro")
         self.assertEqual(outputs[0]["backend"], "pulse")
         self.assertTrue(outputs[0]["is_default"])
+        self.assertTrue(outputs[0]["is_bluetooth"])
         self.assertEqual(outputs[0]["default_sample_rate"], 44_100)
 
     def test_audio_inputs_distinguish_capture_from_monitor(self) -> None:

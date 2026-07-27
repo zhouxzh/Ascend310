@@ -3,16 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 import asyncio
 import importlib
+import json
 import sys
 import tempfile
 import time
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import mido
 import midi_ddsp_webui.core as core
 from midi_ddsp_webui.core import JobManager, ResourceBusyError, ResourceCoordinator
-from midi_ddsp_webui.live import InputRouter
+from midi_ddsp_webui.live import InputRouter, resolve_latency_profile
 from fastapi import HTTPException
 from pydantic import ValidationError
 from realtime_ddsp import PolyphonicMidiState
@@ -57,23 +59,29 @@ class CatalogTest(unittest.TestCase):
         om_root = root / "models" / "om"
         midi_root.mkdir(parents=True)
         om_root.mkdir(parents=True)
+        metadata_root = root / "models" / "ddsp_vst"
+        metadata_root.mkdir(parents=True)
+        (metadata_root / "metadata.json").write_text(
+            '{"Violin": {"pitch_min_note": 56.63, "pitch_max_note": 74.44, '
+            '"pitch_min_hz": 215.39, "pitch_max_hz": 602.44}}',
+            encoding="utf-8",
+        )
         (midi_root / "fixture.mid").write_bytes(midi_bytes())
-        for name in (
-            "Violin_mixed_float16.om",
-            "midi_ddsp_expression_notes32_mixed_float16.om",
-            "midi_ddsp_synthesis_params_frames64_mixed_float16.om",
-        ):
-            (om_root / name).write_bytes(b"fixture")
+        (om_root / "Violin_mixed_float16.om").write_bytes(b"fixture")
         core.ROOT = root
+        core.clear_catalog_cache()
 
     def tearDown(self) -> None:
         core.ROOT = self.original_root
+        core.clear_catalog_cache()
         self.temp_dir.cleanup()
 
     def test_public_catalog_does_not_expose_server_paths(self) -> None:
         data = core.public_catalog()
         self.assertGreaterEqual(len(data["midi_files"]), 1)
-        for group in ("midi_files", "ddsp_vst_models", "midi_ddsp_models", "midi_ddsp_bundles"):
+        self.assertNotIn("midi_ddsp_models", data)
+        self.assertEqual(data["midi_ddsp_bundles"], [])
+        for group in ("midi_files", "ddsp_vst_models", "midi_ddsp_bundles"):
             for item in data[group]:
                 self.assertNotIn("path", item)
                 self.assertNotIn("manifest", item)
@@ -84,6 +92,18 @@ class CatalogTest(unittest.TestCase):
         models = core.public_catalog()["ddsp_vst_models"]
         self.assertGreaterEqual(len(models), 1)
         self.assertTrue(all(model["backend"] == "om" for model in models))
+        violin = next(model for model in models if model["instrument"] == "Violin")
+        self.assertAlmostEqual(violin["pitch_min_note"], 56.63)
+        self.assertAlmostEqual(violin["pitch_max_hz"], 602.44)
+
+    def test_catalog_reuses_cache_until_cleared(self) -> None:
+        with patch.object(core, "scan_ddsp_vst_models", wraps=core.scan_ddsp_vst_models) as scan:
+            core.catalog(refresh=True)
+            core.catalog()
+            self.assertEqual(scan.call_count, 1)
+            core.clear_catalog_cache()
+            core.catalog()
+            self.assertEqual(scan.call_count, 2)
 
     def test_catalog_ids_resolve_only_known_items(self) -> None:
         item = core.catalog()["midi_files"][0]
@@ -92,23 +112,93 @@ class CatalogTest(unittest.TestCase):
         with self.assertRaises(KeyError):
             core.resolve_catalog_item("midi_files", "midi-not-found")
 
-    def test_benchmark_summary_parses_json_without_exposing_path(self) -> None:
-        with tempfile.TemporaryDirectory() as folder:
-            core.ROOT = Path(folder)
-            summary_path = Path(folder) / "reports" / "run" / "midi_ddsp" / "result" / "summary.json"
-            summary_path.parent.mkdir(parents=True)
-            summary_path.write_text('{"rows": [{"component": "expression"}]}', encoding="utf-8")
-            try:
-                summary = core.load_benchmark_summary()
-                self.assertIsNotNone(summary)
-                assert summary is not None
-                self.assertEqual(summary["name"], "summary.json")
-                self.assertNotIn("path", summary)
-            finally:
-                core.ROOT = Path(self.temp_dir.name)
+    def test_catalog_accepts_schema_two_voice_batches(self) -> None:
+        bundle_root = core.ROOT / "models" / "midi_ddsp" / "bundles" / "batched"
+        bundle_root.mkdir(parents=True)
+        component = bundle_root / "component.om"
+        component.write_bytes(b"batch fixture")
+        import hashlib
+        import json
 
+        (bundle_root / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "id": "batched",
+                    "name": "Batched fixture",
+                    "architecture": "stateful-v2",
+                    "source_commit": core.MIDI_DDSP_SOURCE_COMMIT,
+                    "voice_batch_sizes": [1, 2, 4, 8],
+                    "components": {
+                        "fixture": {
+                            "file": component.name,
+                            "sha256": hashlib.sha256(component.read_bytes()).hexdigest(),
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        core.clear_catalog_cache()
+        bundle = next(
+            item
+            for item in core.public_catalog()["midi_ddsp_bundles"]
+            if item["id"] == "batched"
+        )
+        self.assertEqual(bundle["voice_batch_sizes"], [1, 2, 4, 8])
+
+    def test_catalog_rejects_non_origin_bundle(self) -> None:
+        bundle_root = core.ROOT / "models" / "midi_ddsp" / "bundles" / "unsupported"
+        bundle_root.mkdir(parents=True)
+        component = bundle_root / "component.om"
+        component.write_bytes(b"unsupported fixture")
+        import hashlib
+        import json
+
+        (bundle_root / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 3,
+                    "id": "unsupported",
+                    "name": "Unsupported fixture",
+                    "architecture": "stateful-v2",
+                    "source_commit": core.MIDI_DDSP_SOURCE_COMMIT,
+                    "onnx_dtype": "float32",
+                    "precision": "unsupported",
+                    "voice_batch_sizes": [1],
+                    "components": {
+                        "fixture": {
+                            "file": component.name,
+                            "sha256": hashlib.sha256(component.read_bytes()).hexdigest(),
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        core.clear_catalog_cache()
+        self.assertEqual(core.public_catalog()["midi_ddsp_bundles"], [])
 
 class ApiValidationTest(unittest.TestCase):
+    @staticmethod
+    def _voice_analysis() -> dict[str, object]:
+        return {
+            "analysis_id": "a" * 64,
+            "algorithm": {
+                "id": "partitura-chew-wu-contig-v1",
+                "commit": "427ff875bd5a49a0eec894fdd7c6631ed7f597ea",
+            },
+            "groups": [
+                {
+                    "id": "track-0-channel-1-program-40",
+                    "voices": [
+                        {"id": "track-0-channel-1-program-40-voice-1"},
+                        {"id": "track-0-channel-1-program-40-voice-2"},
+                    ],
+                }
+            ],
+        }
+
     def test_public_routes_use_ddsp_vst_name_only(self) -> None:
         paths = {route.path for route in web_app.app.routes}
         self.assertIn("/api/v1/ddsp-vst/start", paths)
@@ -149,6 +239,31 @@ class ApiValidationTest(unittest.TestCase):
             web_app.DdspVstStartRequest(model_id="known-model", max_voices=0)
         with self.assertRaises(ValidationError):
             web_app.DdspVstStartRequest(model_id="known-model", reverb_wet=1.1)
+        with self.assertRaises(ValidationError):
+            web_app.DdspVstStartRequest(model_id="known-model", latency_profile="fast")
+        with self.assertRaises(ValidationError):
+            web_app.DdspVstStartRequest(model_id="known-model", velocity_curve=0.2)
+
+    def test_latency_profiles_are_device_aware_and_keep_legacy_values(self) -> None:
+        balanced = resolve_latency_profile({"latency_profile": "balanced"})
+        self.assertEqual(balanced["prebuffer"], 2)
+        self.assertEqual(balanced["audio_latency_ms"], 20.0)
+
+        bluetooth = resolve_latency_profile(
+            {
+                "latency_profile": "balanced",
+                "is_bluetooth": True,
+                "audio_device_sample_rate": 44_100,
+            }
+        )
+        self.assertEqual(bluetooth["sample_rate"], 44_100)
+        self.assertEqual(bluetooth["audio_latency_ms"], 220.0)
+        with self.assertRaisesRegex(ValueError, "Bluetooth"):
+            resolve_latency_profile({"latency_profile": "low", "is_bluetooth": True})
+
+        legacy = resolve_latency_profile({"prebuffer": 6, "audio_latency_ms": 80.0})
+        self.assertEqual(legacy["prebuffer"], 6)
+        self.assertEqual(legacy["audio_latency_ms"], 80.0)
 
     def test_midi_ddsp_rejects_positive_output_gain(self) -> None:
         with self.assertRaises(ValidationError):
@@ -157,6 +272,124 @@ class ApiValidationTest(unittest.TestCase):
                 model_bundle_id="known-bundle",
                 output_gain_db=0.1,
             )
+
+    def test_voice_analysis_endpoint_returns_algorithm_and_voices(self) -> None:
+        expected = self._voice_analysis()
+        with patch.object(
+            web_app,
+            "resolve_catalog_item",
+            return_value={"path": "fixture.mid"},
+        ), patch.object(web_app, "analyze_midi_voices", return_value=expected):
+            actual = web_app.get_midi_voices("midi-fixture")
+        self.assertEqual(actual, expected)
+
+    def test_midi_ddsp_rejects_stale_or_incomplete_voice_assignment(self) -> None:
+        analysis = self._voice_analysis()
+        payload = web_app.MidiDdspJobRequest(
+            midi_id="midi-fixture",
+            model_bundle_id="bundle-fixture",
+            voice_analysis_id="0" * 64,
+            voice_instruments={
+                "track-0-channel-1-program-40-voice-1": 0,
+                "track-0-channel-1-program-40-voice-2": 1,
+            },
+        )
+        midi = {
+            "path": "fixture.mid",
+            "name": "fixture.mid",
+            "midi_ddsp_supported": True,
+        }
+        bundle = {
+            "id": "bundle-fixture",
+            "manifest": "manifest.json",
+            "name": "Origin",
+            "architecture": "stateful-v2",
+            "quality_status": "validated",
+        }
+
+        def resolve(group: str, _item_id: str) -> dict[str, object]:
+            return midi if group == "midi_files" else bundle
+
+        with patch.object(web_app, "_require_board"), patch.object(
+            web_app, "resolve_catalog_item", side_effect=resolve
+        ), patch.object(web_app, "analyze_midi_voices", return_value=analysis):
+            with self.assertRaises(HTTPException) as raised:
+                web_app.start_midi_ddsp_job(payload)
+        self.assertEqual(raised.exception.detail["code"], "voice_analysis_stale")
+
+        payload.voice_analysis_id = str(analysis["analysis_id"])
+        payload.voice_instruments.pop(
+            "track-0-channel-1-program-40-voice-2"
+        )
+        with patch.object(web_app, "_require_board"), patch.object(
+            web_app, "resolve_catalog_item", side_effect=resolve
+        ), patch.object(web_app, "analyze_midi_voices", return_value=analysis):
+            with self.assertRaises(HTTPException) as raised:
+                web_app.start_midi_ddsp_job(payload)
+        self.assertEqual(
+            raised.exception.detail["code"], "voice_assignment_mismatch"
+        )
+
+    def test_midi_ddsp_forwards_compact_complete_voice_assignment(self) -> None:
+        analysis = self._voice_analysis()
+        mapping = {
+            "track-0-channel-1-program-40-voice-1": 0,
+            "track-0-channel-1-program-40-voice-2": 2,
+        }
+        payload = web_app.MidiDdspJobRequest(
+            midi_id="midi-fixture",
+            model_bundle_id="bundle-fixture",
+            force_render=True,
+            voice_analysis_id=str(analysis["analysis_id"]),
+            voice_instruments=mapping,
+        )
+        midi = {
+            "path": "fixture.mid",
+            "name": "fixture.mid",
+            "midi_ddsp_supported": True,
+            "midi_ddsp_mode": "polyphonic",
+            "voice_count": 2,
+        }
+        bundle = {
+            "id": "bundle-fixture",
+            "manifest": "manifest.json",
+            "name": "Origin",
+            "architecture": "stateful-v2",
+            "quality_status": "validated",
+        }
+
+        def resolve(group: str, _item_id: str) -> dict[str, object]:
+            return midi if group == "midi_files" else bundle
+
+        fake_job = SimpleNamespace(public=lambda: {"id": "job-fixture"})
+        with patch.object(web_app, "_require_board"), patch.object(
+            web_app, "resolve_catalog_item", side_effect=resolve
+        ), patch.object(
+            web_app, "analyze_midi_voices", return_value=analysis
+        ), patch.object(
+            web_app, "validate_midi_ddsp_reverb_asset", return_value="reverb-sha"
+        ), patch.object(web_app.jobs, "start", return_value=fake_job) as start:
+            actual = web_app.start_midi_ddsp_job(payload)
+
+        self.assertEqual(actual, {"id": "job-fixture"})
+        command = start.call_args.args[1]
+        self.assertIn("--force-render", command)
+        mapping_index = command.index("--voice-instruments-json") + 1
+        self.assertEqual(
+            command[mapping_index],
+            json.dumps(mapping, sort_keys=True, separators=(",", ":")),
+        )
+        metadata = start.call_args.kwargs["metadata"]
+        self.assertTrue(metadata["force_render"])
+        self.assertEqual(metadata["instrument_ids"], [0, 2])
+        self.assertEqual(metadata["voice_instruments"], mapping)
+        self.assertEqual(metadata["instrument_mode"], "per_voice")
+
+    def test_ddsp_vst_uses_safe_default_output_gain(self) -> None:
+        request = web_app.DdspVstStartRequest(model_id="known-model")
+        self.assertEqual(request.output_gain_db, -18.0)
+        self.assertEqual(request.attack, 0.02)
+        self.assertEqual(request.velocity_curve, 0.55)
 
     def test_corrupt_reverb_asset_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
@@ -241,6 +474,38 @@ class ResourceCoordinatorTest(unittest.TestCase):
 
 
 class JobManagerTest(unittest.TestCase):
+    def test_job_stores_structured_heartbeat_and_monotonic_progress(self) -> None:
+        job = core.Job(id="progress", kind="midi-ddsp-play", progress=0.4)
+        JobManager._apply_web_event(
+            job,
+            '{"event":"heartbeat","stage":"pitch_context",'
+            '"stage_progress":0.5,"overall_progress":0.45,'
+            '"completed":4,"total":8,"voice_batch_index":1,'
+            '"voice_batch_count":1,"elapsed_seconds":12.0,'
+            '"eta_seconds":15.0,"heartbeat_at":123.0}',
+        )
+        self.assertEqual(job.progress, 0.45)
+        self.assertEqual(job.progress_detail["stage"], "pitch_context")
+        self.assertEqual(job.progress_detail["voice_batch_count"], 1)
+        JobManager._apply_web_event(
+            job,
+            '{"event":"progress","overall_progress":0.2,"total":1}',
+        )
+        self.assertEqual(job.progress, 0.45)
+
+    def test_pause_is_rejected_before_playback_stage(self) -> None:
+        coordinator = ResourceCoordinator()
+        manager = JobManager(coordinator)
+        job = core.Job(
+            id="rendering",
+            kind="midi-ddsp-play",
+            state="running",
+            progress_detail={"stage": "dsp_reverb"},
+        )
+        manager._jobs[job.id] = job
+        with self.assertRaisesRegex(RuntimeError, "only be paused during playback"):
+            manager.pause(job.id)
+
     def test_job_captures_progress_and_releases_resource(self) -> None:
         original_job_root = core.JOB_ROOT
         with tempfile.TemporaryDirectory() as folder:
@@ -303,6 +568,13 @@ class InputRouterTest(unittest.TestCase):
             midi.events,
             [("on", 64, 90), ("sustain", True), ("off", 64), ("sustain", False)],
         )
+
+    def test_hardware_velocity_is_available_for_live_diagnostics(self) -> None:
+        midi = FakeMidiState()
+        router = InputRouter(midi)
+        router.hardware_message(SimpleNamespace(type="note_on", note=60, velocity=18))
+        router.hardware_message(SimpleNamespace(type="note_on", note=64, velocity=92))
+        self.assertEqual(router.hardware_velocity_snapshot(), [18, 92])
 
 
 class StructuredMidiControlTest(unittest.TestCase):

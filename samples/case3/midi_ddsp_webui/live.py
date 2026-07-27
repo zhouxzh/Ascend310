@@ -3,12 +3,13 @@ from __future__ import annotations
 from dataclasses import asdict
 from pathlib import Path
 from collections import deque
-import queue
+import os
+import re
 import shutil
 import subprocess
 import threading
 import time
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -16,10 +17,70 @@ from realtime_ddsp import (
     EnvelopeSettings,
     LivePlayer,
     RealtimeSynthEngine,
+    open_midi_input,
     parse_audio_device,
+    shape_midi_velocity,
 )
 
 from .core import ResourceCoordinator
+
+
+LATENCY_PROFILES: dict[str, dict[str, float | int]] = {
+    "low": {"prebuffer": 1, "audio_latency_ms": 15.0},
+    "balanced": {"prebuffer": 2, "audio_latency_ms": 20.0},
+    "safe": {"prebuffer": 3, "audio_latency_ms": 60.0},
+}
+
+
+def resolve_latency_profile(config: dict[str, object]) -> dict[str, object]:
+    """Resolve a UI latency profile while preserving legacy numeric clients."""
+    resolved = dict(config)
+    raw_profile = resolved.get("latency_profile")
+    if raw_profile in (None, ""):
+        return resolved
+    profile = str(raw_profile)
+    if profile not in LATENCY_PROFILES:
+        raise ValueError(f"Unknown latency profile: {profile}")
+
+    if bool(resolved.get("is_bluetooth")):
+        if profile == "low":
+            raise ValueError("Bluetooth audio does not support the low latency profile")
+        resolved["sample_rate"] = int(
+            resolved.get("audio_device_sample_rate") or 44_100
+        )
+        resolved["prebuffer"] = 2 if profile == "balanced" else 3
+        resolved["audio_latency_ms"] = 220.0 if profile == "balanced" else 300.0
+    else:
+        resolved.update(LATENCY_PROFILES[profile])
+    return resolved
+
+
+_PULSE_LATENCY_RE = re.compile(r"(Buffer|Sink) Latency:\s*(\d+) usec")
+
+
+def _pulse_latencies_for_pid(process_id: int) -> tuple[float, float]:
+    if shutil.which("pactl") is None:
+        return 0.0, 0.0
+    try:
+        result = subprocess.run(
+            ["pactl", "list", "sink-inputs"],
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return 0.0, 0.0
+    if result.returncode != 0:
+        return 0.0, 0.0
+
+    pid_marker = f'application.process.id = "{process_id}"'
+    for section in re.split(r"(?=Sink Input #)", result.stdout):
+        if pid_marker not in section:
+            continue
+        values = {name: int(value) / 1_000_000.0 for name, value in _PULSE_LATENCY_RE.findall(section)}
+        return values.get("Buffer", 0.0), values.get("Sink", 0.0)
+    return 0.0, 0.0
 
 
 class PulseLivePlayer:
@@ -31,11 +92,17 @@ class PulseLivePlayer:
         sink_name: str,
         device_name: str,
         output_latency_seconds: float,
+        before_render: Callable[[int], None] | None = None,
     ) -> None:
         self.engine = engine
         self.sink_name = sink_name
         self.device_name = device_name
         self.output_latency_seconds = max(0.001, float(output_latency_seconds))
+        self.device_latency_seconds = self.output_latency_seconds
+        self.sink_latency_seconds = 0.0
+        self.pulse_buffer_latency_seconds = 0.0
+        self.frame_period = 320 / 16_000
+        self.before_render = before_render
         self.stop_event = threading.Event()
         self._stats_lock = threading.Lock()
         self._worker_error: BaseException | None = None
@@ -45,9 +112,54 @@ class PulseLivePlayer:
         self.overruns = 0
         self.max_render_ms = 0.0
         self.render_times_ms: deque[float] = deque(maxlen=1000)
-        self.blocks: queue.Queue[np.ndarray] = queue.Queue()
+        self.write_times_ms: deque[float] = deque(maxlen=1000)
+        self.pipe_capacity_bytes = 0
+        self._last_latency_query = 0.0
         self.process: subprocess.Popen[bytes] | None = None
         self.worker = threading.Thread(target=self._render_loop, daemon=True)
+
+    @property
+    def buffered_blocks(self) -> int:
+        return 0
+
+    @property
+    def queue_latency_seconds(self) -> float:
+        bytes_per_second = self.engine.output_sample_rate * 2 * 4
+        return self.pipe_capacity_bytes / bytes_per_second if bytes_per_second else 0.0
+
+    def _bound_stdin_pipe(self) -> None:
+        process = self.process
+        if process is None or process.stdin is None or os.name != "posix":
+            return
+        try:
+            import fcntl
+
+            block_bytes = round(
+                self.engine.output_sample_rate * self.frame_period * 2 * 4
+            )
+            try:
+                fcntl.fcntl(process.stdin.fileno(), fcntl.F_SETPIPE_SZ, block_bytes)
+            except OSError:
+                pass
+            self.pipe_capacity_bytes = int(
+                fcntl.fcntl(process.stdin.fileno(), fcntl.F_GETPIPE_SZ)
+            )
+        except (AttributeError, ImportError, OSError):
+            self.pipe_capacity_bytes = 0
+
+    def refresh_audio_latencies(self) -> None:
+        now = time.monotonic()
+        if now - self._last_latency_query < 1.0:
+            return
+        self._last_latency_query = now
+        process = self.process
+        if process is None:
+            return
+        buffer_latency, sink_latency = _pulse_latencies_for_pid(process.pid)
+        if buffer_latency > 0.0:
+            self.pulse_buffer_latency_seconds = buffer_latency
+        if sink_latency > 0.0:
+            self.sink_latency_seconds = sink_latency
 
     def start(self) -> None:
         if shutil.which("paplay") is None:
@@ -68,7 +180,9 @@ class PulseLivePlayer:
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
+            bufsize=0,
         )
+        self._bound_stdin_pipe()
         self.worker.start()
         time.sleep(0.02)
         self.raise_worker_error()
@@ -79,6 +193,7 @@ class PulseLivePlayer:
                 else ""
             )
             raise RuntimeError(error or "paplay failed to open the selected output")
+        self.refresh_audio_latencies()
         print(
             f"[AUDIO] device={self.device_name}, channels=2, "
             f"sample_rate={self.engine.output_sample_rate}, backend=PulseAudio"
@@ -90,18 +205,32 @@ class PulseLivePlayer:
             if process is None or process.stdin is None:
                 raise RuntimeError("PulseAudio output process is not ready")
             while not self.stop_event.is_set():
+                with self._stats_lock:
+                    frame_index = self.rendered_blocks
+                if self.before_render is not None:
+                    self.before_render(frame_index)
                 started = time.monotonic()
                 block = self.engine.render_output_block()
                 elapsed_ms = (time.monotonic() - started) * 1000.0
                 block = np.asarray(block, dtype=np.float32)
                 if block.ndim == 1:
                     block = np.repeat(block[:, None], 2, axis=1)
-                process.stdin.write(block[:, :2].astype("<f4", copy=False).tobytes())
+                payload = memoryview(
+                    block[:, :2].astype("<f4", copy=False).tobytes()
+                )
+                write_started = time.monotonic()
+                while payload and not self.stop_event.is_set():
+                    written = process.stdin.write(payload)
+                    if written is None or written <= 0:
+                        raise BrokenPipeError("paplay stdin closed")
+                    payload = payload[written:]
+                write_ms = (time.monotonic() - write_started) * 1000.0
                 with self._stats_lock:
                     self.rendered_blocks += 1
                     self.played_blocks += 1
                     self.max_render_ms = max(self.max_render_ms, elapsed_ms)
                     self.render_times_ms.append(elapsed_ms)
+                    self.write_times_ms.append(write_ms)
         except (BrokenPipeError, OSError) as exc:
             if not self.stop_event.is_set():
                 with self._stats_lock:
@@ -142,6 +271,9 @@ class InputRouter:
         self._lock = threading.Lock()
         self._notes: dict[str, set[int]] = {}
         self._sustain_sources: set[str] = set()
+        self._pending_note_on: deque[float] = deque()
+        self.midi_to_render_times_ms: deque[float] = deque(maxlen=1000)
+        self.hardware_velocities: deque[int] = deque(maxlen=1000)
 
     def note_on(self, source: str, note: int, velocity: int) -> None:
         with self._lock:
@@ -149,6 +281,7 @@ class InputRouter:
             self._notes.setdefault(source, set()).add(note)
             if not was_active:
                 self.midi_state.note_on(note, velocity)
+                self._pending_note_on.append(time.monotonic())
 
     def note_off(self, source: str, note: int) -> None:
         with self._lock:
@@ -182,10 +315,29 @@ class InputRouter:
             self._sustain_sources.clear()
             self.midi_state.all_notes_off()
 
+    def mark_render_started(self, _frame_index: int) -> None:
+        now = time.monotonic()
+        with self._lock:
+            while self._pending_note_on:
+                self.midi_to_render_times_ms.append(
+                    (now - self._pending_note_on.popleft()) * 1000.0
+                )
+
+    def latency_snapshot(self) -> list[float]:
+        with self._lock:
+            return list(self.midi_to_render_times_ms)
+
+    def hardware_velocity_snapshot(self) -> list[int]:
+        with self._lock:
+            return list(self.hardware_velocities)
+
     def hardware_message(self, message: Any) -> None:
         message_type = getattr(message, "type", "")
         if message_type == "note_on" and int(getattr(message, "velocity", 0)) > 0:
-            self.note_on("hardware-midi", int(message.note), int(message.velocity))
+            velocity = int(message.velocity)
+            with self._lock:
+                self.hardware_velocities.append(velocity)
+            self.note_on("hardware-midi", int(message.note), velocity)
         elif message_type in {"note_off", "note_on"}:
             self.note_off("hardware-midi", int(message.note))
         elif message_type == "control_change" and int(message.control) == 64:
@@ -217,6 +369,7 @@ class DdspVstSessionController:
         player: LivePlayer | PulseLivePlayer | None = None
         port = None
         try:
+            config = resolve_latency_profile(config)
             model_path = Path(str(config["model_path"]))
             envelope = EnvelopeSettings(
                 attack=float(config.get("attack", 0.10)),
@@ -242,6 +395,7 @@ class DdspVstSessionController:
                         "harmonic_gain",
                         "noise_gain",
                         "output_gain_db",
+                        "velocity_curve",
                         "attack",
                         "decay",
                         "sustain",
@@ -263,6 +417,7 @@ class DdspVstSessionController:
                     sink_name=str(config["pulse_sink"]),
                     device_name=str(config.get("audio_device_name", "PulseAudio")),
                     output_latency_seconds=latency_seconds,
+                    before_render=router.mark_render_started,
                 )
             else:
                 player = LivePlayer(
@@ -274,16 +429,11 @@ class DdspVstSessionController:
                         else str(config["audio_device_id"])
                     ),
                     output_latency_seconds=latency_seconds,
+                    before_render=router.mark_render_started,
                 )
             midi_port = config.get("midi_port")
             if midi_port:
-                try:
-                    import mido
-                except ImportError as exc:
-                    raise RuntimeError(
-                        "Physical MIDI requires mido and python-rtmidi"
-                    ) from exc
-                port = mido.open_input(str(midi_port), callback=router.hardware_message)
+                port = open_midi_input(str(midi_port), router.hardware_message)
             player.start()
             with self._lock:
                 self.engine = engine
@@ -367,11 +517,31 @@ class DdspVstSessionController:
         with self._lock:
             engine = self.engine
             player = self.player
+            router = self.router
+            port = self.port
             config = dict(self.config)
         if engine is None or player is None:
             return {"running": False, "active_notes": [], "config": config}
+        refresh_latencies = getattr(player, "refresh_audio_latencies", None)
+        if refresh_latencies is not None:
+            refresh_latencies()
+        elif time.monotonic() - getattr(player, "_last_latency_query", 0.0) >= 1.0:
+            player._last_latency_query = time.monotonic()
+            buffer_latency, sink_latency = _pulse_latencies_for_pid(os.getpid())
+            if buffer_latency > 0.0:
+                player.pulse_buffer_latency_seconds = buffer_latency
+            if sink_latency > 0.0:
+                player.sink_latency_seconds = sink_latency
         with player._stats_lock:
             render_times = list(player.render_times_ms)
+            write_times = list(getattr(player, "write_times_ms", ()))
+            queue_latency_ms = player.queue_latency_seconds * 1000.0
+            device_latency_ms = player.device_latency_seconds * 1000.0
+            pulse_buffer_latency_ms = player.pulse_buffer_latency_seconds * 1000.0
+            sink_latency_ms = player.sink_latency_seconds * 1000.0
+            resampler_latency_ms = (
+                engine.resampler.algorithmic_latency_seconds * 1000.0
+            )
             metrics = {
                 "rendered_blocks": player.rendered_blocks,
                 "played_blocks": player.played_blocks,
@@ -383,8 +553,45 @@ class DdspVstSessionController:
                     if render_times
                     else 0.0
                 ),
-                "buffered_blocks": player.blocks.qsize(),
+                "buffered_blocks": player.buffered_blocks,
+                "queue_latency_ms": queue_latency_ms,
+                "device_latency_ms": device_latency_ms,
+                "pulse_buffer_latency_ms": pulse_buffer_latency_ms,
+                "sink_latency_ms": sink_latency_ms,
+                "resampler_latency_ms": resampler_latency_ms,
+                "estimated_total_latency_ms": (
+                    queue_latency_ms
+                    + max(device_latency_ms, pulse_buffer_latency_ms)
+                    + sink_latency_ms
+                    + resampler_latency_ms
+                ),
+                "write_block_p95_ms": (
+                    float(np.quantile(write_times, 0.95)) if write_times else 0.0
+                ),
             }
+        midi_times = router.latency_snapshot() if router is not None else []
+        metrics["midi_to_render_p95_ms"] = (
+            float(np.quantile(midi_times, 0.95)) if midi_times else 0.0
+        )
+        metrics["audio_path_latency_ms"] = metrics["estimated_total_latency_ms"]
+        metrics["estimated_total_latency_ms"] += metrics["midi_to_render_p95_ms"]
+        velocities = router.hardware_velocity_snapshot() if router is not None else []
+        if velocities:
+            raw_velocity = velocities[-1]
+            metrics["midi_velocity_last"] = raw_velocity
+            metrics["midi_velocity_min"] = min(velocities)
+            metrics["midi_velocity_max"] = max(velocities)
+            metrics["midi_velocity_p50"] = float(np.quantile(velocities, 0.5))
+            metrics["midi_velocity_mapped_last"] = round(
+                shape_midi_velocity(raw_velocity / 127.0, engine.settings.velocity_curve)
+                * 127.0
+            )
+        with engine._output_stats_lock:
+            metrics["output_peak"] = engine.output_peak
+            metrics["clipped_samples"] = engine.clipped_samples
+        if port is not None:
+            metrics["midi_connected"] = bool(getattr(port, "connected", True))
+            metrics["midi_reconnects"] = int(getattr(port, "reconnect_count", 0))
         return {
             "running": True,
             "active_notes": engine.midi.active_notes,

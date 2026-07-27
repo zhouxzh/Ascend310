@@ -33,8 +33,12 @@ sudo apt install -y libportaudio2
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate base
 cd ~/Documents/case3
-python -m pip install -r requirements.txt
+python -m pip install --user -r requirements.txt
 ```
+
+板端 Anaconda 安装在管理员所有的 `/usr/local/miniconda3`。普通 `HwHiAiUser` 用户
+没有该目录的写权限，因此必须使用 `--user` 安装到 `~/.local/`。不要使用 `sudo pip`；
+`python -m pip` 用于确保依赖安装给当前激活的 `base` Python。
 
 依赖用途：
 
@@ -212,8 +216,9 @@ PortAudio underflow、callback 时间抖动、块边界跳变、活动音符期�
 
 `--midi-file` 是离线渲染到 WAV，`--play-midi` 是实时送入声卡，两者不能同时
 使用。实时播放采用和 MIDI 键盘相同的 `RealtimeSynthEngine`、20ms 帧和 FIFO；
-`--prebuffer 6` 会预留约 120ms 音频，适合先保证播放连续性，确认设备稳定后可
-降到 3 以降低延迟。后台渲染线程在 FIFO 满时等待，声卡每消费一块就立即唤醒
+`--prebuffer 6` 会预留约 120ms 音频，只适合排查不稳定设备。Web 工作台默认采用
+`balanced` 档，即 2 个控制帧与 20ms 设备缓冲；`low` 使用 1 帧/15ms，`safe`
+使用 3 帧/60ms。后台渲染线程在 FIFO 满时等待，声卡每消费一块就立即唤醒
 线程补充下一块，不会因为预缓冲帧累计 deadline 而周期性停顿。默认使用系统
 声卡，也可以指定。播放器会在启动前检查设备支持的输出通道数；例如某些
 WASAPI 设备只接受原生 4 通道布局，此时程序会自动用 4 通道打开声卡，并把
@@ -222,6 +227,10 @@ WASAPI 设备只接受原生 4 通道布局，此时程序会自动用 4 通道�
 ```bash
 python realtime_ddsp.py --play-midi test_violin.mid --audio-device 3 --sample-rate 44100
 ```
+
+16 kHz 模型输出采用与 JUCE `WindowedSincInterpolator` 同类的 100-crossing Hann
+窗化 sinc 重采样。该滤波器有 6.25ms 算法延时，但能避免线性插值造成的高频衰减
+和镜像失真。
 
 ## 参考 `ddsp-realtime` 的实时结构
 

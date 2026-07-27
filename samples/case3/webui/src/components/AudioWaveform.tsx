@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react'
 import { artifactUrl } from '../api'
 import type { Artifact } from '../types'
 
-export default function AudioWaveform({ artifact }: { artifact?: Artifact }) {
+export default function AudioWaveform({
+  artifact,
+  compact = false,
+  showControls = true,
+}: {
+  artifact?: Artifact
+  compact?: boolean
+  showControls?: boolean
+}) {
   const [levels, setLevels] = useState<number[]>([])
 
   useEffect(() => {
@@ -10,6 +18,7 @@ export default function AudioWaveform({ artifact }: { artifact?: Artifact }) {
       setLevels([])
       return
     }
+    setLevels([])
     let cancelled = false
     const load = async () => {
       const response = await fetch(artifactUrl(artifact.id))
@@ -33,20 +42,20 @@ export default function AudioWaveform({ artifact }: { artifact?: Artifact }) {
         await context.close()
       }
     }
-    load().catch(() => !cancelled && setLevels([]))
+    load().catch(() => undefined)
     return () => {
       cancelled = true
     }
   }, [artifact])
 
   return (
-    <div className="audio-preview">
+    <div className={`audio-preview ${compact ? 'compact' : ''}`}>
       <div className="waveform" aria-label="音频波形">
         {(levels.length ? levels : Array.from({ length: 96 }, () => 0.05)).map((level, index) => (
           <span key={index} style={{ height: `${Math.max(5, level * 100)}%` }} />
         ))}
       </div>
-      {artifact && <audio controls src={artifactUrl(artifact.id)} preload="metadata" />}
+      {artifact && showControls && <audio controls src={artifactUrl(artifact.id)} preload="metadata" />}
     </div>
   )
 }

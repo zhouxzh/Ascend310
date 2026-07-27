@@ -21,9 +21,13 @@ import argparse
 from collections import deque
 from dataclasses import dataclass, replace
 from collections.abc import Callable
+import errno
 import math
+import os
 from pathlib import Path
 import queue
+import re
+import select
 import sys
 import threading
 import time
@@ -31,6 +35,7 @@ from typing import Union
 import wave
 
 import numpy as np
+from scipy.signal.windows import hann
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -65,6 +70,7 @@ class DdspVstSettings:
     harmonic_gain: float = 1.0
     noise_gain: float = 1.0
     output_gain_db: float = 0.0
+    velocity_curve: float = 1.0
     attack: float = DEFAULT_ENVELOPE.attack
     decay: float = DEFAULT_ENVELOPE.decay
     sustain: float = DEFAULT_ENVELOPE.sustain
@@ -90,6 +96,7 @@ DDSP_VST_PARAMETER_RANGES = {
     "harmonic_gain": (0.0, 1.0),
     "noise_gain": (0.0, 1.0),
     "output_gain_db": (-60.0, 0.0),
+    "velocity_curve": (0.25, 2.0),
     "attack": (0.01, 3.0),
     "decay": (0.0, 3.0),
     "sustain": (0.0, 1.0),
@@ -106,6 +113,12 @@ def midi_to_frequency(note: float, pitch_bend: int = 8192) -> float:
     """Convert a MIDI note and the standard +/-2 semitone bend to Hertz."""
     bend_semitones = (pitch_bend - 8192.0) / 4096.0
     return 440.0 * 2.0 ** ((note - 69.0 + bend_semitones) / 12.0)
+
+
+def shape_midi_velocity(velocity: float, curve: float) -> float:
+    """Apply a gamma curve while preserving silence and full-scale velocity."""
+    normalized = float(np.clip(velocity, 0.0, 1.0))
+    return normalized ** float(curve)
 
 
 def midi_to_scaled(note: float, pitch_bend: int) -> float:
@@ -747,7 +760,7 @@ class NoiseSynthesizer:
 
 
 class LinearResampler:
-    """Streaming linear resampler with one source-sample look-behind."""
+    """Legacy streaming linear resampler used by the MIDI-DDSP path."""
 
     def __init__(self, source_rate: int, target_rate: int):
         self.source_rate = source_rate
@@ -765,10 +778,114 @@ class LinearResampler:
         source = np.concatenate(
             [np.asarray([self.previous], dtype=np.float32), block]
         )
-        positions = np.arange(output_size, dtype=np.float64) * self.source_rate / self.target_rate
+        positions = (
+            np.arange(output_size, dtype=np.float64)
+            * self.source_rate
+            / self.target_rate
+        )
         output = np.interp(positions, np.arange(source.size), source)
         self.previous = float(block[-1]) if block.size else self.previous
         return output.astype(np.float32)
+
+
+class WindowedSincResampler:
+    """Stateful 100-crossing Hann-windowed sinc resampler.
+
+    The kernel and 100-sample source-domain latency follow JUCE's
+    WindowedSincInterpolator, which is used by Magenta's DDSP-VST.  The delay
+    makes the filter causal, so a complete output block can be produced without
+    reading samples from the next DDSP control frame.
+    """
+
+    NUM_CROSSINGS = 100
+    TABLE_POINTS_PER_CROSSING = 100
+    HISTORY_SIZE = NUM_CROSSINGS * 2
+    _lookup_table: np.ndarray | None = None
+
+    def __init__(self, source_rate: int, target_rate: int):
+        self.source_rate = int(source_rate)
+        self.target_rate = int(target_rate)
+        if self.source_rate <= 0 or self.target_rate <= 0:
+            raise ValueError("Resampler sample rates must be positive")
+        self.history = np.zeros(self.HISTORY_SIZE, dtype=np.float32)
+        self._plans: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+
+    @classmethod
+    def _table(cls) -> np.ndarray:
+        if cls._lookup_table is None:
+            table_size = cls.NUM_CROSSINGS * cls.TABLE_POINTS_PER_CROSSING
+            positions = np.linspace(
+                0.0, cls.NUM_CROSSINGS, table_size + 1, dtype=np.float64
+            )
+            window = hann(table_size * 2 + 1, sym=True)[table_size:]
+            cls._lookup_table = (np.sinc(positions) * window).astype(np.float32)
+        return cls._lookup_table
+
+    @property
+    def algorithmic_latency_seconds(self) -> float:
+        return self.NUM_CROSSINGS / float(self.source_rate)
+
+    def reset(self) -> None:
+        self.history.fill(0.0)
+
+    def prepare(self, input_size: int) -> None:
+        """Precompute the fixed-rate phase kernels outside the render thread."""
+        self._plan(int(input_size))
+
+    def _plan(self, input_size: int) -> tuple[np.ndarray, np.ndarray]:
+        cached = self._plans.get(input_size)
+        if cached is not None:
+            return cached
+
+        output_size = round(input_size * self.target_rate / self.source_rate)
+        ratio = self.source_rate / float(self.target_rate)
+        positions = (
+            np.arange(output_size, dtype=np.float64) * ratio - self.NUM_CROSSINGS
+        )
+        centers = np.floor(positions).astype(np.int64)
+        offsets = np.arange(
+            -self.NUM_CROSSINGS + 1,
+            self.NUM_CROSSINGS + 1,
+            dtype=np.int64,
+        )
+        source_indices = centers[:, None] + offsets[None, :]
+        distances = positions[:, None] - source_indices
+
+        table_positions = (
+            np.abs(distances) * self.TABLE_POINTS_PER_CROSSING
+        )
+        lower = np.floor(table_positions).astype(np.int64)
+        maximum = self.NUM_CROSSINGS * self.TABLE_POINTS_PER_CROSSING
+        lower = np.clip(lower, 0, maximum)
+        upper = np.minimum(lower + 1, maximum)
+        fraction = table_positions - lower
+        table = self._table()
+        weights = table[lower] + fraction * (table[upper] - table[lower])
+        weights[table_positions >= maximum] = 0.0
+
+        indices = source_indices + self.HISTORY_SIZE
+        plan = (
+            indices.astype(np.int32, copy=False),
+            weights.astype(np.float32, copy=False),
+        )
+        self._plans[input_size] = plan
+        return plan
+
+    def process(self, block: np.ndarray) -> np.ndarray:
+        block = np.asarray(block, dtype=np.float32).reshape(-1)
+        if block.size == 0:
+            return np.zeros(0, dtype=np.float32)
+        indices, weights = self._plan(block.size)
+        source = np.concatenate((self.history, block))
+        output = np.einsum(
+            "ij,ij->i",
+            source[indices],
+            weights,
+            optimize=True,
+            dtype=np.float32,
+        )
+        self.history[:] = source[-self.HISTORY_SIZE :]
+        return output.astype(np.float32, copy=False)
 
 
 class _SmoothedValue:
@@ -937,9 +1054,13 @@ class VoiceRenderer:
             self.noise.reset()
             return np.zeros(MODEL_HOP_SIZE, dtype=np.float32)
 
+        shaped_velocity = shape_midi_velocity(
+            snapshot.velocity,
+            settings.velocity_curve,
+        )
         pw_scaled = float(
             snapshot.envelope
-            * snapshot.velocity
+            * shaped_velocity
             * snapshot.volume
             * snapshot.expression
             - settings.input_gain
@@ -1025,9 +1146,13 @@ class RealtimeSynthEngine:
             VoiceRenderer(self.controls_model) for _ in range(self.max_voices)
         ]
         self.voice_gain = PolyphonicGainSmoother()
-        self.resampler = LinearResampler(MODEL_SAMPLE_RATE, output_sample_rate)
+        self.resampler = WindowedSincResampler(MODEL_SAMPLE_RATE, output_sample_rate)
+        self.resampler.prepare(MODEL_HOP_SIZE)
         self.output_sample_rate = output_sample_rate
         self._settings_lock = threading.Lock()
+        self._output_stats_lock = threading.Lock()
+        self.output_peak = 0.0
+        self.clipped_samples = 0
         self.settings = DdspVstSettings(
             output_gain_db=float(output_gain_db),
             attack=envelope.attack,
@@ -1073,6 +1198,9 @@ class RealtimeSynthEngine:
         self.voice_gain.reset()
         self.resampler.reset()
         self.reverb.reset()
+        with self._output_stats_lock:
+            self.output_peak = 0.0
+            self.clipped_samples = 0
 
     def close(self) -> None:
         self.controls_model.close()
@@ -1100,7 +1228,13 @@ class RealtimeSynthEngine:
         if gain != 1.0:
             output = output * gain
         output = self.reverb.process(output)
-        return np.clip(output, -1.0, 1.0).astype(np.float32, copy=False)
+        output = np.asarray(output, dtype=np.float32)
+        peak = float(np.max(np.abs(output), initial=0.0))
+        clipped = int(np.count_nonzero(np.abs(output) > 1.0))
+        with self._output_stats_lock:
+            self.output_peak = max(self.output_peak, peak)
+            self.clipped_samples += clipped
+        return output.astype(np.float32, copy=False)
 
 
 def write_wav(path: Path, samples: np.ndarray, sample_rate: int) -> None:
@@ -1237,6 +1371,10 @@ class LivePlayer:
         self.before_render = before_render
         self.output_device = output_device
         self.output_latency_seconds = max(float(output_latency_seconds), 0.001)
+        self.device_latency_seconds = self.output_latency_seconds
+        self.sink_latency_seconds = 0.0
+        self.pulse_buffer_latency_seconds = 0.0
+        self._last_latency_query = 0.0
         self.output_channels = 1
         self.frame_period = MODEL_HOP_SIZE / MODEL_SAMPLE_RATE
         self._stats_lock = threading.Lock()
@@ -1248,6 +1386,14 @@ class LivePlayer:
         self.max_render_ms = 0.0
         self.render_times_ms: deque[float] = deque(maxlen=1000)
         self.worker = threading.Thread(target=self._render_loop, daemon=True)
+
+    @property
+    def buffered_blocks(self) -> int:
+        return self.blocks.qsize()
+
+    @property
+    def queue_latency_seconds(self) -> float:
+        return self.buffered_blocks * self.frame_period
 
     def _render_loop(self) -> None:
         try:
@@ -1401,6 +1547,10 @@ class LivePlayer:
                 callback=self._audio_callback,
             )
             self.stream.start()
+            actual_latency = getattr(self.stream, "latency", self.output_latency_seconds)
+            if isinstance(actual_latency, (tuple, list)):
+                actual_latency = actual_latency[-1]
+            self.device_latency_seconds = max(float(actual_latency), 0.0)
         except Exception:
             self._stop_worker()
             raise
@@ -1507,6 +1657,256 @@ def play_midi_file(
         engine.close()
 
 
+RAW_MIDI_PREFIX = "raw:"
+RAW_MIDI_PATTERN = re.compile(r"midiC(?P<card>\d+)D(?P<device>\d+)")
+
+
+def _midi_device_profile(name: str) -> dict[str, object]:
+    normalized = " ".join(name.casefold().split())
+    if "tiny" in normalized and (
+        "midiplus" in normalized or "tiny midi" in normalized or normalized == "tiny"
+    ):
+        return {
+            "manufacturer": "MIDIPLUS",
+            "model": "TINY",
+            "key_count": 32,
+        }
+    return {}
+
+
+def _alsa_card_names() -> dict[int, str]:
+    cards_path = Path("/proc/asound/cards")
+    try:
+        lines = cards_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return {}
+
+    names: dict[int, str] = {}
+    for index, line in enumerate(lines):
+        match = re.match(r"^\s*(\d+)\s+\[[^]]+\]:.*?\s-\s(.+)$", line)
+        if match is None:
+            continue
+        card = int(match.group(1))
+        name = match.group(2).strip()
+        if index + 1 < len(lines):
+            description = lines[index + 1].strip().split(" at ", 1)[0].strip()
+            if description:
+                name = description
+        names[card] = name
+    return names
+
+
+def _query_raw_midi_devices() -> list[dict[str, object]]:
+    card_names = _alsa_card_names()
+    devices: list[tuple[int, int, Path]] = []
+    for path in Path("/dev/snd").glob("midiC*D*"):
+        match = RAW_MIDI_PATTERN.fullmatch(path.name)
+        if match is not None:
+            devices.append((int(match.group("card")), int(match.group("device")), path))
+
+    result: list[dict[str, object]] = []
+    for index, (card, device, path) in enumerate(sorted(devices)):
+        port = f"{RAW_MIDI_PREFIX}{path}"
+        name = card_names.get(card, f"MIDI card {card}, device {device}")
+        result.append(
+            {
+                "id": port,
+                "index": index,
+                "name": name,
+                "port": port,
+                "backend": "raw",
+                **_midi_device_profile(name),
+            }
+        )
+    return result
+
+
+class RawMidiInput:
+    """Read a Linux raw MIDI device and recover from USB re-enumeration."""
+
+    RECONNECT_INTERVAL_SECONDS = 0.25
+
+    def __init__(
+        self,
+        path: Path,
+        callback: Callable[[object], None],
+        device_name: str | None = None,
+    ) -> None:
+        try:
+            import mido
+        except ImportError as exc:
+            raise RuntimeError("Raw MIDI input requires mido.") from exc
+
+        self.path = path
+        self.device_name = device_name
+        self.callback = callback
+        self._parser_factory = mido.Parser
+        self.parser = self._parser_factory()
+        self.stop_event = threading.Event()
+        self._fd_lock = threading.Lock()
+        self.fd: int | None = None
+        self.reconnect_count = 0
+        self.last_error: str | None = None
+        if not self._open_available(initial=True):
+            raise RuntimeError(
+                f"Unable to open raw MIDI input {path}: "
+                f"{self.last_error or 'device is unavailable'}"
+            )
+        self.worker = threading.Thread(target=self._read_loop, daemon=True)
+        self.worker.start()
+
+    @property
+    def connected(self) -> bool:
+        with self._fd_lock:
+            return self.fd is not None
+
+    def _candidate_paths(self) -> list[Path]:
+        candidates = [self.path]
+        if self.device_name:
+            for device in _query_raw_midi_devices():
+                if str(device.get("name")) != self.device_name:
+                    continue
+                port = str(device.get("port", ""))
+                if port.startswith(RAW_MIDI_PREFIX):
+                    candidate = Path(port[len(RAW_MIDI_PREFIX) :])
+                    if candidate not in candidates:
+                        candidates.append(candidate)
+        return candidates
+
+    def _open_available(self, initial: bool = False) -> bool:
+        errors: list[str] = []
+        for candidate in self._candidate_paths():
+            try:
+                fd = os.open(candidate, os.O_RDONLY | os.O_NONBLOCK)
+            except OSError as exc:
+                errors.append(f"{candidate}: {exc}")
+                continue
+            with self._fd_lock:
+                if self.stop_event.is_set():
+                    os.close(fd)
+                    return False
+                self.fd = fd
+                self.path = candidate
+                self.last_error = None
+                if not initial:
+                    self.reconnect_count += 1
+            self.parser = self._parser_factory()
+            return True
+        with self._fd_lock:
+            self.last_error = "; ".join(errors) or "device is unavailable"
+        return False
+
+    def _current_fd(self) -> int | None:
+        with self._fd_lock:
+            return self.fd
+
+    def _fd_matches_path(self, fd: int) -> bool:
+        try:
+            opened = os.fstat(fd)
+            current = os.stat(self.path)
+        except OSError:
+            return False
+        return (opened.st_dev, opened.st_ino) == (current.st_dev, current.st_ino)
+
+    def _disconnect(self, fd: int, reason: str) -> None:
+        with self._fd_lock:
+            if self.fd != fd:
+                return
+            self.fd = None
+            self.last_error = reason
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        self.parser = self._parser_factory()
+
+    def _read_loop(self) -> None:
+        while not self.stop_event.is_set():
+            fd = self._current_fd()
+            if fd is None:
+                if self._open_available():
+                    continue
+                self.stop_event.wait(self.RECONNECT_INTERVAL_SECONDS)
+                continue
+            try:
+                if not self._fd_matches_path(fd):
+                    self._disconnect(fd, "MIDI device path was replaced")
+                    continue
+                readable, _, _ = select.select([fd], [], [], 0.1)
+                if not readable:
+                    continue
+                data = os.read(fd, 256)
+                if not data:
+                    self._disconnect(fd, "MIDI device disconnected")
+                    continue
+                self.parser.feed(data)
+                for message in self.parser:
+                    self.callback(message)
+            except OSError as exc:
+                if self.stop_event.is_set():
+                    return
+                if exc.errno in {
+                    errno.EBADF,
+                    errno.ENODEV,
+                    errno.ENOENT,
+                    errno.ENXIO,
+                    errno.EIO,
+                }:
+                    self._disconnect(fd, str(exc))
+                    continue
+                self.stop_event.wait(0.05)
+
+    def close(self) -> None:
+        self.stop_event.set()
+        fd = self._current_fd()
+        if fd is not None:
+            self._disconnect(fd, "MIDI input closed")
+        if self.worker.ident is not None:
+            self.worker.join(timeout=1.0)
+
+
+def open_midi_input(
+    port: str | None,
+    callback: Callable[[object], None],
+) -> object:
+    if port is not None and port.startswith(RAW_MIDI_PREFIX):
+        device_name = next(
+            (
+                str(device["name"])
+                for device in _query_raw_midi_devices()
+                if str(device.get("port")) == port
+            ),
+            None,
+        )
+        return RawMidiInput(
+            Path(port[len(RAW_MIDI_PREFIX) :]),
+            callback,
+            device_name=device_name,
+        )
+
+    if sys.platform.startswith("linux") and not Path("/dev/snd/seq").exists():
+        devices = _query_raw_midi_devices()
+        if not devices:
+            raise RuntimeError(
+                "Physical MIDI input is unavailable: ALSA sequencer device "
+                "/dev/snd/seq is missing and no raw MIDI device was found"
+            )
+        if port is not None:
+            raise RuntimeError(f"Unknown raw MIDI input: {port}")
+        return RawMidiInput(
+            Path(str(devices[0]["port"])[len(RAW_MIDI_PREFIX) :]), callback
+        )
+
+    try:
+        import mido
+    except ImportError as exc:
+        raise RuntimeError("Physical MIDI input requires mido and python-rtmidi.") from exc
+    try:
+        return mido.open_input(port, callback=callback)
+    except Exception as exc:
+        raise RuntimeError(f"Unable to open MIDI input {port or 'default'}: {exc}") from exc
+
+
 def query_midi_devices() -> list[dict[str, object]]:
     try:
         import mido
@@ -1514,9 +1914,12 @@ def query_midi_devices() -> list[dict[str, object]]:
         raise RuntimeError("Install mido and python-rtmidi first.") from exc
 
     if sys.platform.startswith("linux") and not Path("/dev/snd/seq").exists():
+        devices = _query_raw_midi_devices()
+        if devices:
+            return devices
         raise RuntimeError(
             "Physical MIDI input is unavailable: ALSA sequencer device "
-            "/dev/snd/seq is missing"
+            "/dev/snd/seq is missing and no raw MIDI device was found"
         )
 
     try:
@@ -1525,7 +1928,14 @@ def query_midi_devices() -> list[dict[str, object]]:
         raise RuntimeError(f"Unable to enumerate MIDI input devices: {exc}") from exc
 
     return [
-        {"id": str(index), "index": index, "name": name}
+        {
+            "id": str(index),
+            "index": index,
+            "name": name,
+            "port": name,
+            "backend": "rtmidi",
+            **_midi_device_profile(name),
+        }
         for index, name in enumerate(names)
     ]
 
@@ -1590,10 +2000,6 @@ def run_live(
     backend: str = "auto",
     device_id: int = 0,
 ) -> None:
-    try:
-        import mido
-    except ImportError as exc:
-        raise RuntimeError("Live MIDI requires mido and python-rtmidi.") from exc
     engine = RealtimeSynthEngine(
         model_path,
         sample_rate,
@@ -1611,11 +2017,7 @@ def run_live(
     )
     port = None
     try:
-        port = (
-            mido.open_input(midi_port, callback=engine.midi.handle_message)
-            if midi_port
-            else mido.open_input(callback=engine.midi.handle_message)
-        )
+        port = open_midi_input(midi_port, engine.midi.handle_message)
         player.start()
         print("[LIVE] Running. Press Ctrl+C to stop.")
         try:

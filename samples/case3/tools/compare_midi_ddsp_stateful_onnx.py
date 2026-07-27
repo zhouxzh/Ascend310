@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a stateful ONNX bundle and compare it with a full TensorFlow reference."""
+"""Compare a stateful ONNX or OM bundle with a full TensorFlow reference."""
 
 from __future__ import annotations
 
@@ -16,15 +16,45 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from midi_ddsp_realtime import MidiToken, build_frame_features
-from midi_ddsp_webui.stateful_midi_ddsp import StatefulMidiDdspInference
-from tools.export_midi_ddsp_onnx import output_metrics
+from midi_ddsp_webui.model_bundle import load_runtime_bundle
+from midi_ddsp_webui.stateful_midi_ddsp import (
+    BatchedStatefulMidiDdspInference,
+    StatefulMidiDdspInference,
+)
+
+
+def output_metrics(reference: np.ndarray, actual: np.ndarray) -> dict[str, object]:
+    reference = np.asarray(reference, dtype=np.float64)
+    actual = np.asarray(actual, dtype=np.float64)
+    diff = actual - reference
+    reference_norm = float(np.linalg.norm(reference.ravel()))
+    actual_norm = float(np.linalg.norm(actual.ravel()))
+    cosine_denominator = reference_norm * actual_norm
+    cosine = (
+        float(np.dot(reference.ravel(), actual.ravel()) / cosine_denominator)
+        if cosine_denominator
+        else 1.0
+    )
+    return {
+        "shape": list(actual.shape),
+        "finite": bool(np.isfinite(actual).all()),
+        "max_abs_error": float(np.max(np.abs(diff))),
+        "mean_abs_error": float(np.mean(np.abs(diff))),
+        "nrmse": float(
+            np.linalg.norm(diff.ravel()) / max(reference_norm, 1e-12)
+        ),
+        "cosine_similarity": cosine,
+    }
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--export-manifest", type=Path, required=True)
+    bundle = parser.add_mutually_exclusive_group(required=True)
+    bundle.add_argument("--export-manifest", type=Path)
+    bundle.add_argument("--runtime-manifest", type=Path)
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--report", type=Path)
+    parser.add_argument("--voice-batch-size", type=int, default=1)
     return parser.parse_args()
 
 
@@ -71,19 +101,34 @@ class OnnxBundle:
             raise ValueError("Export manifest is not a stateful-v2 bundle")
         self.expression_block = int(data["expression_block"])
         self.synthesis_block = int(data["synthesis_block"])
-        self.timbre_halo = int(data["timbre_halo"])
-        self.components = {
-            name: OnnxComponent(raw, self.manifest_path.parent / str(raw["file"]))
-            for name, raw in data["components"].items()
-        }
+        self.timbre_max_frames = int(data["timbre_max_frames"])
+        self.component_sets: dict[int, dict[str, OnnxComponent]] = {}
+        for export_name, raw in data["components"].items():
+            batch_size = int(raw.get("voice_batch_size", 1))
+            logical_name = str(raw.get("logical_name", export_name))
+            self.component_sets.setdefault(batch_size, {})[logical_name] = OnnxComponent(
+                raw, self.manifest_path.parent / str(raw["file"])
+            )
+        self.components = self.component_sets[1]
+        self.voice_batch_sizes = tuple(sorted(self.component_sets))
 
-    def component(self, name: str) -> OnnxComponent:
-        return self.components[name]
+    def component(self, name: str, voice_batch_size: int = 1) -> OnnxComponent:
+        return self.component_sets[voice_batch_size][name]
+
+    def runtime_session(self, _device_id: int):
+        return nullcontext()
 
 
 def main() -> int:
     args = parse_args()
-    bundle = OnnxBundle(args.export_manifest)
+    if args.runtime_manifest is not None:
+        bundle = load_runtime_bundle(args.runtime_manifest)
+        manifest_path = args.runtime_manifest
+        runtime = "om"
+    else:
+        bundle = OnnxBundle(args.export_manifest)
+        manifest_path = args.export_manifest
+        runtime = "onnx"
     with np.load(args.reference, allow_pickle=False) as data:
         note_pitch = np.asarray(data["note_pitch"], dtype=np.int64)[0]
         note_length = np.asarray(data["note_length"], dtype=np.float32)[0, :, 0]
@@ -95,8 +140,22 @@ def main() -> int:
         seed = int(
             json.loads(args.reference.with_name("manifest.json").read_text(encoding="utf-8"))["seed"]
         )
-        inference = StatefulMidiDdspInference(bundle, seed=seed)
-        actual = inference.run(tokens, build_frame_features, instrument_id)
+        if args.voice_batch_size == 1:
+            inference = StatefulMidiDdspInference(bundle, seed=seed)
+            actual_members = [
+                inference.run(tokens, build_frame_features, instrument_id)
+            ]
+        else:
+            inference = BatchedStatefulMidiDdspInference(
+                bundle, args.voice_batch_size
+            )
+            actual_members = inference.run(
+                [tokens] * args.voice_batch_size,
+                build_frame_features,
+                [instrument_id] * args.voice_batch_size,
+                [seed] * args.voice_batch_size,
+            )
+        actual = actual_members[0]
         expected = {
             "expression_controls": np.asarray(data["expression_controls_clipped"])[0],
             "f0_hz": np.asarray(data["raw__f0_hz"])[0],
@@ -116,7 +175,10 @@ def main() -> int:
     metrics = {
         name: output_metrics(expected[name], observed[name]) for name in expected
     }
-    sampled_bins_match = bool(np.array_equal(expected_bins, actual.sampled_bins))
+    sampled_bins_match = all(
+        np.array_equal(expected_bins, member.sampled_bins)
+        for member in actual_members
+    )
     thresholds = {
         "expression_controls": 0.002,
         "f0_hz": 1e-5,
@@ -124,18 +186,25 @@ def main() -> int:
         "harmonic_distribution": 0.008,
         "noise_magnitudes": 0.015,
     }
-    passed = sampled_bins_match and all(
+    batch_members_match = all(
+        member.metrics["tensor_sha256"] == actual.metrics["tensor_sha256"]
+        for member in actual_members
+    )
+    passed = sampled_bins_match and batch_members_match and all(
         metrics[name]["nrmse"] <= threshold
         for name, threshold in thresholds.items()
     )
     report = {
-        "export_manifest": str(args.export_manifest.resolve()),
+        "runtime": runtime,
+        "voice_batch_size": args.voice_batch_size,
+        "bundle_manifest": str(manifest_path.resolve()),
         "reference": str(args.reference.resolve()),
         "metrics": metrics,
         "sampled_bins_match": sampled_bins_match,
         "thresholds": thresholds,
         "component_timings_ms": actual.metrics["component_timings_ms"],
         "tensor_sha256": actual.metrics["tensor_sha256"],
+        "batch_members_match": batch_members_match,
         "passed": passed,
     }
     report_path = args.report or args.reference.with_name("stateful_onnx_comparison.json")

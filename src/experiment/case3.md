@@ -36,6 +36,11 @@ ATC 转换、OM 推理、PyACL、`ais_bench` 和 `npu-smi` 只能在真实 Ascen
 `requirements.txt`；ONNX/TensorFlow 导出依赖集中在本地专用的
 `requirements-export.txt`，不安装到开发板。
 
+香橙派的 Anaconda 安装在管理员所有的 `/usr/local/miniconda3`。普通
+`HwHiAiUser` 用户应先激活 `base`，再使用
+`python -m pip install --user -r requirements.txt` 将板端依赖安装到 `~/.local/`；
+不要使用 `sudo pip` 修改管理员安装的 Anaconda。
+
 ## 3. 两条 DDSP 模型链路 {#src-experiment-case3-h5}
 
 本案例包含两套接口不同、用途不同的模型。
@@ -65,9 +70,11 @@ MIDI-DDSP 使用 Expression 与 Synthesis 两级网络：
 1. Expression Generator 根据音高、音符时长和乐器 ID 生成 expression controls；
 2. Synthesis Generator 根据逐帧 conditioning 生成 DDSP 合成参数。
 
-stateful v2 将双向上下文、自回归 decoder 和 Timbre 网络拆成 8 个带显式状态或精确
-halo 的 Mixed OM，并由一个版本化 manifest 统一选择。旧版两个组件各自的 FP16/Mixed
-OM 只保留为迁移兼容。Web 的“MIDI-DDSP”页面先完整渲染并缓存 WAV，再播放或下载。
+stateful v2 将双向上下文、自回归 decoder 和 Timbre 网络拆成 8 个 origin FP32 OM，并由一个
+版本化 manifest 统一选择。GRU 展开为基础算子，decoder 显式传递状态；Timbre 使用最多 65,536 帧的
+整段输入和 `valid_frames` 掩码，保持官方跨时间轴的全曲归一化。MIDI-DDSP 只使用已经
+通过 TensorFlow/ONNX/OM 固定夹具对齐的 origin bundle。Web 的“MIDI-DDSP”页面先完整
+渲染并缓存 WAV，再播放或下载。
 
 当前 MIDI-DDSP checkpoint 是单声部模型。单轨和弦返回 `polyphonic_track`，不再静默
 提取最高声部。多轨文件仅在每轨均为单声部且 General MIDI program 可映射到 13 种
@@ -87,17 +94,16 @@ MIDI-DDSP Studio 采用 React、TypeScript 和 Vite 构建浏览器端，采用 
 Uvicorn 和 WebSocket 提供板端服务。开发电脑生成 `webui/dist/`，开发板只运行 Python
 服务和静态资源。
 
-界面包含四个工作区：
+界面包含三个工作区：
 
 | 工作区 | 功能 |
 | :--- | :--- |
 | DDSP-VST | 使用状态化 OM 接收触控、电脑键盘和实体 MIDI 事件 |
 | MIDI-DDSP | 使用 stateful v2 模型包完整渲染、缓存并播放 MIDI 文件 |
-| 实验 | 运行白名单内的一次 OM 验证和短基准测试 |
 | 设备 | 查看 NPU、模型、音频与 MIDI 状态，并测试 PulseAudio 输出和左右声道 |
 
 所有会占用 NPU 或声卡的操作共享同一个资源协调器。同一时间只允许一个 DDSP-VST Synth、
-MIDI 播放、扬声器测试或实验任务运行；资源占用时 API 返回 `409 busy`。浏览器失焦、
+MIDI 播放或扬声器测试运行；资源占用时 API 返回 `409 busy`。浏览器失焦、
 触摸取消、WebSocket 断开和停止操作都会释放活动音符，避免产生持续音。
 
 本轮不实现 DDSP-VST Effect。设备页会把真实 `capture` 与 PulseAudio `monitor`
@@ -154,13 +160,11 @@ USB 喇叭通常会直接出现在 PulseAudio 输出列表中。蓝牙音箱必�
 
 ## 7. OM 验证与报告 {#src-experiment-case3-h15}
 
-DDSP-VST 和 legacy MIDI-DDSP OM 位于 `models/om/`；stateful v2 的 8 个组件位于
+DDSP-VST OM 位于 `models/om/`；stateful v2 的 8 个组件位于
 `models/midi_ddsp/bundles/<bundle-id>/` 并由 manifest 锁定。不再按 8T、8T2 或 20T
-重复存放。Ascend 20T 已验证可以运行 8T 生成的同一批旧 OM，因此保留 8T 产物及其
-校验值即可；新模型仍需完成单独的板端转换和 A/B 验收。
+重复存放。新模型仍需完成单独的板端转换和 A/B 验收。
 
-转换日志保存在 `models/conversion_logs/`，运行和性能报告保存在 `reports/`。Web 实验
-任务只调用仓库内白名单脚本，不接受浏览器传入任意路径或 shell 命令。已知设备上的
+转换日志保存在 `models/conversion_logs/`，运行和性能报告保存在 `reports/`。已知设备上的
 `npu-smi` `Health: Alarm` 作为警告显示；只要设备可见且实际 OM 推理成功，就不单独
 阻断操作。
 

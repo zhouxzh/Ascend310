@@ -11,15 +11,14 @@ MIDI file
   -> Expression forward/backward context + autoregressive decoder
   -> six note controls expanded to 250 Hz frames
   -> Synthesis precondition + forward/backward context
-  -> stateful top-p F0 decoder + timbre network with exact halo
-  -> Harmonic + deterministic FilteredNoise
-  -> per-instrument IR partitioned FFT reverb + dry
+  -> stateful top-p F0 decoder + full-song masked timbre network
+  -> up to 3 CPU workers: Harmonic + deterministic FilteredNoise + IR reverb
   -> complete WAV cache
   -> optional resample and playback
 ```
 
 stateful v2 把 Expression、Synthesis context 和 F0 decoder 状态显式传入/传出。Timbre
-网络每次输出 64 个有效帧，左右各使用 124 帧 halo；最后一块真实帧之外强制清零，
+F0 网络每次输出 64 个有效帧并显式传递状态。Timbre 网络使用最多 65,536 帧的整段输入和 `valid_frames` 掩码，保证每层全曲归一化与官方实现一致；真实帧之外始终清零，
 不会把 Dense bias 或乐器 embedding 产生的伪帧当作未来上下文。
 
 F0 使用官方 `top-p=0.95` 采样，外部 Gumbel 张量由默认种子 `20260724` 生成。休止帧
@@ -29,14 +28,17 @@ F0 为 0 Hz。产品默认先生成完整 WAV 并按 MIDI、模型包、乐器�
 ## MIDI 输入规则
 
 - 单轨单声部：允许用户选择任意受支持的 URMP 乐器 ID 0-12；
-- 多轨且每轨单声部：仅 stateful v2 支持，按每轨 General MIDI program 映射乐器，
-  保存 `stem-track-XX.wav` 后混音；
-- 单轨和弦或任意轨道内部复音：返回 `422 polyphonic_track`；
-- 无法映射到 13 种乐器的多轨文件：返回 `422 unsupported_program`；
+- 多轨或轨道内部复音：仅 stateful v2 支持；每条复音轨按音符重叠关系拆成
+  最少数量的单音 voice，再按静态 batch `1/2/4/8` 推理并混音；
+- 播放模式只同步生成最终 `output.wav`；独立渲染模式额外保存每个 stem；
+- 页面选择的渲染音色统一应用到全部 voice，并选择对应的逐乐器混响 IR；MIDI 文件中
+  的 General MIDI program 仅作为分析元数据，不覆盖用户选择；
+- legacy 模型仍只接受整体单声部 MIDI；
 - 损坏或无音符文件：上传时删除临时文件并返回 `422`。
 
-程序不再自动提取 Melody/Lead 或最高活动声部。钢琴曲目可用于复音兼容性检查，但
-不能作为本轮原版单声部音质验收输入。
+程序不再自动提取 Melody/Lead 或最高活动声部。自动声部化保留全部音符，并优先把
+后续音符分配给音高最近的空闲 voice，以减少声部跳跃。该方式是在官方单声部模型外
+组织多 voice，不会把当前 URMP 模型变成钢琴模型。
 
 ## CPU DSP 与混响
 
@@ -56,12 +58,10 @@ F0 为 0 Hz。产品默认先生成完整 WAV 并按 MIDI、模型包、乐器�
 
 ## 模型包
 
-Web API 只接受 `model_bundle_id`。一个 stateful v2 manifest 同时锁定 8 个组件的文件、
+Web API 只接受 `model_bundle_id`。新版 stateful v2 manifest 同时锁定 batch `1/2/4/8`
+的 32 个组件文件、
 输入输出、状态尺寸、源码提交、checkpoint/ONNX/OM SHA256 和 ATC 记录。不能从不同
 导出批次分别选择 Expression 和 Synthesis。
-
-旧模型会显示为 `legacy-static-v1` 和 `quality_status=context_resets`。它仍可用于迁移
-排错，但每 32 个音符和 64 帧重置上下文，不作为最终音质结果，也不支持多轨 stem。
 
 ## 命令行
 
@@ -70,7 +70,7 @@ stateful v2 离线渲染：
 ```bash
 python midi_ddsp_realtime.py \
   --midi midi/ode-to-joy-violin.mid \
-  --model-bundle models/midi_ddsp/bundles/google-urmp-stateful-v2-mixed_float16/manifest.json \
+  --model-bundle models/midi_ddsp/bundles/google-urmp-stateful-v2-batched-origin/manifest.json \
   --instrument-id 0 \
   --seed 20260724 \
   --render-only \
@@ -89,16 +89,23 @@ python midi_ddsp_realtime.py \
 - MIDI、模型包、全部组件、混响资产 SHA256；
 - 架构、源码提交、种子和状态连续性；
 - 各组件推理次数、平均/中位/P95/最大耗时；
+- `render_wall_seconds`、`playback_wall_seconds`、`total_wall_seconds` 和实时率；
+- batch 大小、模型加载、NPU、DSP、重采样、混音和写盘耗时；
 - expression、F0、amplitude、harmonics、noise 张量 SHA256；
 - stem 轨道、乐器、派生种子、峰值、RMS、削波和边界连续性；
 - 缓存键、命中状态、最终 WAV 峰值/RMS、underrun 和 overrun。
+
+渲染进度通过每秒限频的 `WEBUI_EVENT` 和独立心跳发送。固定阶段为准备、加载模型、
+表现生成、音高与上下文、音色参数、DSP/混响、混音、写入缓存和播放；事件同时包含
+总进度、阶段进度、批次、工作量、已用时间和 ETA。报告与缓存会在播放开始前写入，
+因此停止播放不会丢失已经完成的渲染。
 
 ## 验收
 
 本地先完成 [stateful v2 导出与对齐](midi-ddsp-export.md)。板端再使用
 `midi/ode-to-joy-violin.mid` 验证：
 
-- Mixed OM 完成整首渲染，速度低于音频时长；
+- 已验证 origin OM 完成整首渲染，速度低于音频时长；
 - 无周期性块接缝、活动音符静音和默认削波；
 - 完整渲染播放的 underrun/overrun 为 0；
 - 停止或失败后资源锁、OM、NPU 和声卡可立即再次使用；
@@ -107,3 +114,8 @@ python midi_ddsp_realtime.py \
 2026-07-22 的旧 32/64 OM 测试曾达到 Synthesis 约 55 ms/128 ms block 且无声卡
 下溢，但该结果只证明旧静态 OM 可运行，不能证明完整歌曲与官方 TensorFlow 音质一致。
 原始历史报告继续保存在 `reports/ascend8t2/midi_ddsp/`，不作为 stateful v2 验收结果。
+
+2026-07-24 在 `ascend8t` 上的最终固定种子渲染为 35.0 秒，墙钟时间 25.70 秒；
+Synthesis P95 为 45.40 ms，混响 P95 为 0.79 ms。干声峰值 `0.0062185`，湿声峰值
+`0.0643837`，削波、underrun 和 overrun 均为 0。额外 2 秒仅作为混响零输入尾部，
+不会送入 timbre 全曲归一化。

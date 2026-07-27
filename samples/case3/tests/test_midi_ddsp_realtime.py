@@ -2,22 +2,35 @@ from __future__ import annotations
 
 from pathlib import Path
 import math
+import pickle
+from types import SimpleNamespace
 import tempfile
+import threading
 import unittest
+from unittest.mock import patch
 
 import mido
 import numpy as np
 
 from midi_ddsp_realtime import (
+    _angular_cumsum,
+    _linear_frame_resample,
+    _run_isolated_voice_batch,
+    _should_read_cache,
+    _window_frame_resample,
+    _render_stateful_audio,
     FrameFeatures,
     MidiDdspRenderer,
+    MidiDdspHarmonicSynthesizer,
     MidiNote,
     MidiToken,
+    RenderProgress,
     StreamingFftReverb,
     build_frame_features,
     build_tokens,
     exp_sigmoid,
     parse_midi_details,
+    plan_voice_batches,
 )
 from midi_ddsp_webui.midi_analysis import MidiValidationError
 from tools.export_midi_ddsp_reverb import (
@@ -27,6 +40,215 @@ from tools.export_midi_ddsp_reverb import (
 
 
 class MidiDdspRealtimeHelpersTest(unittest.TestCase):
+    def test_force_render_bypasses_an_existing_cache(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            cache_wav = Path(folder) / "render.wav"
+            cache_report = Path(folder) / "render.json"
+            cache_wav.write_bytes(b"wav")
+            cache_report.write_text("{}", encoding="utf-8")
+            self.assertTrue(_should_read_cache(False, cache_wav, cache_report))
+            self.assertFalse(_should_read_cache(True, cache_wav, cache_report))
+
+    def test_chunked_harmonic_render_matches_whole_array_reference(self) -> None:
+        rng = np.random.default_rng(20260726)
+        frame_count = 252
+        f0 = rng.uniform(110.0, 880.0, frame_count).astype(np.float32)
+        amplitudes = rng.uniform(0.01, 0.5, frame_count).astype(np.float32)
+        distribution = rng.uniform(0.0, 1.0, (frame_count, 60)).astype(np.float32)
+        harmonic_numbers = np.arange(1, 61, dtype=np.float32)
+        frequencies = f0[:, None] * harmonic_numbers[None, :]
+        reference_distribution = distribution.copy()
+        reference_distribution[frequencies >= 8_000.0] = 0.0
+        totals = reference_distribution.sum(axis=1, keepdims=True)
+        reference_distribution = np.divide(
+            reference_distribution,
+            totals,
+            out=np.zeros_like(reference_distribution),
+            where=totals > 1e-7,
+        )
+        frequency_envelopes = _linear_frame_resample(frequencies, 64)
+        amplitude_envelopes = _window_frame_resample(
+            amplitudes[:, None] * reference_distribution, 64
+        )
+        phases = _angular_cumsum(
+            (frequency_envelopes * np.float32(2.0 * np.pi))
+            / np.float32(16_000.0)
+        )
+        reference = np.sum(
+            np.sin(phases) * amplitude_envelopes,
+            axis=1,
+            dtype=np.float32,
+        )
+
+        actual = MidiDdspHarmonicSynthesizer().render(
+            f0, amplitudes, distribution
+        )
+
+        np.testing.assert_array_equal(actual, reference)
+
+    def test_isolated_batch_worker_forwards_progress_and_removes_result(self) -> None:
+        class FakeProcess:
+            def __init__(self) -> None:
+                self.stdout = iter(
+                    [
+                        'MIDI_DDSP_BATCH_EVENT {"component":"synthesis_timbre_b4",'
+                        '"completed":2,"total":3}\n',
+                        "worker diagnostic\n",
+                    ]
+                )
+
+            def wait(self, timeout=None):
+                return 0
+
+            def poll(self):
+                return 0
+
+        with tempfile.TemporaryDirectory() as folder:
+            result_path = Path(folder) / "batch.pkl"
+            expected = {
+                "parameters": ["voice-0"],
+                "component_timings": {},
+                "model_load_timings": {},
+                "wall_seconds": 1.25,
+            }
+            with result_path.open("wb") as handle:
+                pickle.dump(expected, handle)
+            progress = []
+            args = SimpleNamespace(
+                midi=Path(folder) / "input.mid",
+                model_bundle=Path(folder) / "manifest.json",
+                instrument_id=2,
+                seed=7,
+                device_id=0,
+            )
+            with patch("midi_ddsp_realtime.subprocess.Popen", return_value=FakeProcess()):
+                actual = _run_isolated_voice_batch(
+                    args,
+                    0,
+                    1,
+                    4,
+                    result_path,
+                    lambda component, completed, total: progress.append(
+                        (component, completed, total)
+                    ),
+                )
+
+            self.assertEqual(actual, expected)
+            self.assertEqual(progress, [("synthesis_timbre_b4", 2, 3)])
+            self.assertFalse(result_path.exists())
+
+    def test_isolated_batch_accepts_fsynced_result_after_cann_cleanup_crash(self) -> None:
+        class CleanupCrashProcess:
+            stdout = iter(())
+
+            @staticmethod
+            def wait(timeout=None):
+                return -11
+
+            @staticmethod
+            def poll():
+                return -11
+
+        with tempfile.TemporaryDirectory() as folder:
+            result_path = Path(folder) / "batch.pkl"
+            expected = {
+                "parameters": ["voice-0"],
+                "component_timings": {"timbre": [1.0]},
+                "model_load_timings": {"timbre": [2.0]},
+                "wall_seconds": 3.0,
+            }
+            with result_path.open("wb") as handle:
+                pickle.dump(expected, handle)
+            args = SimpleNamespace(
+                midi=Path(folder) / "input.mid",
+                model_bundle=Path(folder) / "manifest.json",
+                instrument_id=0,
+                seed=7,
+                device_id=0,
+            )
+            with patch(
+                "midi_ddsp_realtime.subprocess.Popen",
+                return_value=CleanupCrashProcess(),
+            ):
+                actual = _run_isolated_voice_batch(
+                    args,
+                    0,
+                    1,
+                    4,
+                    result_path,
+                    lambda *_args: None,
+                )
+        self.assertEqual(actual, expected)
+
+    def test_stateful_dsp_honors_render_cancellation(self) -> None:
+        parameters = SimpleNamespace(
+            f0_hz=np.full((2, 1), 440.0, dtype=np.float32),
+            amplitudes=np.zeros((2, 1), dtype=np.float32),
+            harmonic_distribution=np.zeros((2, 60), dtype=np.float32),
+            noise_magnitudes=np.zeros((2, 65), dtype=np.float32),
+        )
+        cancelled = threading.Event()
+        cancelled.set()
+        with self.assertRaisesRegex(InterruptedError, "cancelled"):
+            _render_stateful_audio(
+                parameters, None, seed=7, cancel_event=cancelled
+            )
+
+    def test_voice_batch_planning_uses_smallest_fitting_static_batch(self) -> None:
+        self.assertEqual(plan_voice_batches(7, (1, 2, 4, 8)), [(0, 7, 8)])
+        self.assertEqual(
+            plan_voice_batches(10, (1, 2, 4, 8)),
+            [(0, 8, 8), (8, 10, 2)],
+        )
+        self.assertEqual(
+            plan_voice_batches(3, (1,)),
+            [(0, 1, 1), (1, 2, 1), (2, 3, 1)],
+        )
+        self.assertEqual(
+            plan_voice_batches(7, (1, 2, 4, 8), requested_batch_size=4),
+            [(0, 4, 4), (4, 7, 4)],
+        )
+
+    def test_render_progress_never_moves_backwards(self) -> None:
+        with patch("midi_ddsp_realtime.emit_web_event") as emit:
+            progress = RenderProgress(enabled=True, playback_expected=False)
+            progress.update("pitch_context", 0.9, force=True)
+            progress.update("expression", 0.1, force=True)
+            progress.update("writing_cache", 1.0, force=True)
+            progress.close()
+        values = [
+            call.kwargs["overall_progress"]
+            for call in emit.call_args_list
+            if len(call.args) >= 2 and call.args[1] == "progress"
+        ]
+        self.assertGreaterEqual(len(values), 3)
+        self.assertEqual(values, sorted(values))
+        self.assertEqual(values[-1], 1.0)
+
+    def test_additional_reverb_tail_is_not_sent_through_the_model(self) -> None:
+        parameters = SimpleNamespace(
+            f0_hz=np.zeros((2, 1), dtype=np.float32),
+            amplitudes=np.full((2, 1), -30.0, dtype=np.float32),
+            harmonic_distribution=np.full((2, 60), -30.0, dtype=np.float32),
+            noise_magnitudes=np.full((2, 65), -30.0, dtype=np.float32),
+        )
+        audio, _metrics = _render_stateful_audio(
+            parameters, None, seed=7, tail_samples=32
+        )
+        self.assertEqual(audio.size, 2 * 64 + 32)
+        np.testing.assert_array_equal(audio[-32:], np.zeros(32, dtype=np.float32))
+
+    def test_angular_cumsum_preserves_phase_across_chunk_boundaries(self) -> None:
+        increments = np.tile(
+            np.asarray([[0.01, 0.02]], dtype=np.float32), (2_005, 1)
+        )
+        actual = _angular_cumsum(increments, chunk_size=1_000)
+        expected = np.mod(
+            np.cumsum(increments, axis=0, dtype=np.float32),
+            np.float32(2.0 * np.pi),
+        )
+        np.testing.assert_allclose(actual, expected, rtol=0.0, atol=2e-4)
+
     def test_parse_midi_rejects_polyphony_instead_of_discarding_harmony(self) -> None:
         midi = mido.MidiFile(type=1, ticks_per_beat=480)
         tempo = mido.MidiTrack()

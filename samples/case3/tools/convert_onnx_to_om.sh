@@ -15,6 +15,7 @@ PRECISION_MODE=""
 PRECISION_MODE_V2=""
 LOG_FILE=""
 SUMMARY_FILE=""
+KEEP_DTYPE_FILE=""
 DRY_RUN=0
 
 usage() {
@@ -38,6 +39,8 @@ Options:
                         Legacy ATC precision mode, for example allow_mix_precision.
   --precision-mode-v2 VALUE
                         ATC precision mode v2, for example mixed_float16.
+  --keep-dtype-file PATH
+                        Keep listed ONNX operators at their original dtype.
   --log-file PATH       Captured ATC output log.
                         Default: <output>.atc.log
   --summary-file PATH   Compatibility summary.
@@ -105,6 +108,11 @@ while [[ $# -gt 0 ]]; do
             PRECISION_MODE_V2="$2"
             shift 2
             ;;
+        --keep-dtype-file)
+            require_value "$1" "${2:-}"
+            KEEP_DTYPE_FILE="$2"
+            shift 2
+            ;;
         --log-file)
             require_value "$1" "${2:-}"
             LOG_FILE="$2"
@@ -131,6 +139,12 @@ done
 
 if [[ -n "$PRECISION_MODE" && -n "$PRECISION_MODE_V2" ]]; then
     die "use only one of --precision-mode and --precision-mode-v2"
+fi
+if [[ -n "$KEEP_DTYPE_FILE" ]]; then
+    [[ -n "$PRECISION_MODE" || -n "$PRECISION_MODE_V2" ]] \
+        || die "--keep-dtype-file requires a precision mode"
+    [[ -f "$KEEP_DTYPE_FILE" ]] || die "keep_dtype file not found: $KEEP_DTYPE_FILE"
+    KEEP_DTYPE_FILE="$(realpath "$KEEP_DTYPE_FILE")"
 fi
 
 [[ -f "$MODEL" ]] || die "ONNX model not found: $MODEL"
@@ -189,11 +203,14 @@ source_cann_env() {
     source "$cann_script"
 }
 
-activate_conda_base
-source_cann_env
-
-ATC_BIN="$(command -v atc || true)"
-[[ -n "$ATC_BIN" ]] || die "atc not found after sourcing CANN environment"
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    ATC_BIN="${ATC_BIN:-atc}"
+else
+    activate_conda_base
+    source_cann_env
+    ATC_BIN="$(command -v atc || true)"
+    [[ -n "$ATC_BIN" ]] || die "atc not found after sourcing CANN environment"
+fi
 
 ATC_COMMAND=(
     "$ATC_BIN"
@@ -211,6 +228,9 @@ if [[ -n "$PRECISION_MODE" ]]; then
 fi
 if [[ -n "$PRECISION_MODE_V2" ]]; then
     ATC_COMMAND+=("--precision_mode_v2=$PRECISION_MODE_V2")
+fi
+if [[ -n "$KEEP_DTYPE_FILE" ]]; then
+    ATC_COMMAND+=("--keep_dtype=$KEEP_DTYPE_FILE")
 fi
 
 print_command() {
@@ -243,6 +263,10 @@ trap 'rm -f "$MARKER"' EXIT
     echo "SoC version: $SOC_VERSION"
     echo "Precision mode: ${PRECISION_MODE:-ATC default}"
     echo "Precision mode v2: ${PRECISION_MODE_V2:-ATC default}"
+    echo "Keep dtype file: ${KEEP_DTYPE_FILE:-none}"
+    if [[ -n "$KEEP_DTYPE_FILE" ]]; then
+        echo "Keep dtype SHA256: $(sha256sum "$KEEP_DTYPE_FILE" | awk '{print $1}')"
+    fi
     print_command
 } >"$LOG_FILE"
 
@@ -269,7 +293,7 @@ if [[ ${#DETAIL_LOGS[@]} -gt 0 ]]; then
 fi
 
 OPERATOR_PATTERN='unsupported|not supported|not support|No parser is registered for Op|No supported Ops kernel|No OpKernel|failed to select kernel|select.*kernel.*failed|op type.*not registered|cannot find.*op|EZ300[0-9]|E19010'
-ERROR_PATTERN='(^|[^[:alpha:]])(ERROR|FATAL)([^[:alpha:]]|$)|Traceback|ATC run failed|E[0-9]{4,}'
+ERROR_PATTERN='(^|[^[:alpha:]])(ERROR|FATAL)([^[:alpha:]]|$)|Traceback|ATC run failed|(^|[^[:alnum:]_])E[0-9]{4,}([^[:alnum:]_]|$)'
 
 OPERATOR_MATCHES="$(grep -EinH -m 200 "$OPERATOR_PATTERN" "${SCAN_FILES[@]}" 2>/dev/null || true)"
 ERROR_MATCHES="$(grep -EinH -m 200 "$ERROR_PATTERN" "${SCAN_FILES[@]}" 2>/dev/null || true)"
@@ -288,6 +312,10 @@ fi
     echo "INPUT_SHAPE=$INPUT_SHAPE"
     echo "PRECISION_MODE=${PRECISION_MODE:-ATC default}"
     echo "PRECISION_MODE_V2=${PRECISION_MODE_V2:-ATC default}"
+    echo "KEEP_DTYPE_FILE=${KEEP_DTYPE_FILE:-none}"
+    if [[ -n "$KEEP_DTYPE_FILE" ]]; then
+        echo "KEEP_DTYPE_SHA256=$(sha256sum "$KEEP_DTYPE_FILE" | awk '{print $1}')"
+    fi
     echo
     echo "DETAIL_LOGS_CREATED=${#DETAIL_LOGS[@]}"
     if [[ ${#DETAIL_LOGS[@]} -gt 0 ]]; then

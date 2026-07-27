@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 import hashlib
 import importlib.util
@@ -10,12 +11,14 @@ import platform
 import queue
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import threading
 import time
 from typing import Callable, Iterable
 from uuid import uuid4
+import zipfile
 
 import numpy as np
 
@@ -47,6 +50,12 @@ TERMINAL_STATES = {"succeeded", "failed", "cancelled"}
 ACTIVE_STATES = {"queued", "preparing", "running", "paused", "stopping"}
 MIDI_DDSP_REVERB_SHA256 = "ecbc733bc9a17516dc00897e64eaae70114aa79ed97e2bbc59dedb334f356058"
 MIDI_DDSP_SOURCE_COMMIT = "d7af42704a63b47267ae6a1bc0fee1ed7dc5c855"
+CATALOG_CACHE_TTL_SECONDS = 300.0
+NPU_STATUS_CACHE_TTL_SECONDS = 15.0
+_CATALOG_CACHE_LOCK = threading.Lock()
+_CATALOG_CACHE: tuple[tuple[str, str], float, dict[str, object]] | None = None
+_NPU_STATUS_CACHE_LOCK = threading.Lock()
+_NPU_STATUS_CACHE: tuple[float, dict[str, object]] | None = None
 
 
 def utc_timestamp() -> str:
@@ -120,6 +129,7 @@ def scan_midi_files() -> list[dict[str, object]]:
                     "note_count": 0,
                     "track_count": 0,
                     "max_polyphony": 0,
+                    "voice_count": 0,
                     "duration_seconds": 0.0,
                     "monophonic": False,
                     "midi_ddsp_mode": "invalid",
@@ -135,16 +145,34 @@ def scan_midi_files() -> list[dict[str, object]]:
 
 
 def scan_ddsp_vst_models() -> list[dict[str, object]]:
-    paths: list[Path] = []
     om_root = ROOT / "models" / "om"
-    if om_root.is_dir():
-        paths.extend(om_root.glob("*.om"))
-    result = []
-    for path in sorted(paths, key=lambda item: item.name.lower()):
+    if not om_root.is_dir():
+        return []
+
+    def model_priority(path: Path) -> tuple[int, str]:
+        parent = path.parent
+        if parent == om_root:
+            return (0, path.name.lower())
+        if parent.name in {"mixed_precision", "fp16"}:
+            return (1, path.name.lower())
+        if "all_models" in path.parts:
+            return (2, path.as_posix().lower())
+        return (3, path.as_posix().lower())
+
+    selected: dict[tuple[str, str], Path] = {}
+    for path in sorted(om_root.rglob("*.om"), key=model_priority):
         if "midi_ddsp" in path.name.lower():
             continue
         stem = path.stem
         instrument = stem.split("_force_fp16")[0].split("_mixed_float16")[0]
+        key = (instrument, _precision(path))
+        selected.setdefault(key, path)
+
+    result = []
+    for path in sorted(selected.values(), key=lambda item: item.name.lower()):
+        stem = path.stem
+        instrument = stem.split("_force_fp16")[0].split("_mixed_float16")[0]
+        metadata = _load_ddsp_vst_metadata(instrument)
         result.append(
             {
                 "id": _file_id("ddspvst", path),
@@ -154,45 +182,65 @@ def scan_ddsp_vst_models() -> list[dict[str, object]]:
                 "precision": _precision(path),
                 "size_bytes": path.stat().st_size,
                 "path": str(path.resolve()),
+                **metadata,
             }
         )
     return result
 
 
-def scan_midi_ddsp_models() -> list[dict[str, object]]:
-    root = ROOT / "models" / "om"
-    if not root.is_dir():
-        return []
-    result = []
-    for path in sorted(root.glob("midi_ddsp_*.om"), key=lambda item: item.name.lower()):
-        if "expression" in path.name:
-            component = "expression"
-        elif "synthesis" in path.name:
-            component = "synthesis"
-        else:
-            continue
-        result.append(
-            {
-                "id": _file_id("mddsp", path),
-                "name": path.name,
-                "component": component,
-                "precision": _precision(path),
-                "size_bytes": path.stat().st_size,
-                "path": str(path.resolve()),
-            }
-        )
+def _load_ddsp_vst_metadata(instrument: str) -> dict[str, float]:
+    metadata_root = ROOT / "models" / "ddsp_vst"
+    raw: dict[str, object] = {}
+    tflite_path = metadata_root / f"{instrument}.tflite"
+    if tflite_path.is_file():
+        try:
+            with zipfile.ZipFile(tflite_path) as archive:
+                raw = json.loads(archive.read("metadata.json").decode("utf-8"))
+        except (KeyError, OSError, ValueError, zipfile.BadZipFile):
+            raw = {}
+    if not raw:
+        metadata_path = metadata_root / "metadata.json"
+        try:
+            all_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            candidate = all_metadata.get(instrument, {})
+            if isinstance(candidate, dict):
+                raw = candidate
+        except (OSError, ValueError):
+            raw = {}
+
+    fields = {
+        "pitch_min_note": "mean_min_pitch_note",
+        "pitch_max_note": "mean_max_pitch_note",
+        "pitch_min_hz": "mean_min_pitch_note_hz",
+        "pitch_max_hz": "mean_max_pitch_note_hz",
+        "power_min_db": "mean_min_power_note",
+        "power_max_db": "mean_max_power_note",
+    }
+    result: dict[str, float] = {}
+    for public_name, source_name in fields.items():
+        value = raw.get(public_name, raw.get(source_name))
+        if isinstance(value, (int, float)) and np.isfinite(value):
+            result[public_name] = float(value)
     return result
 
 
 def _load_midi_ddsp_bundle(path: Path) -> dict[str, object]:
     data = json.loads(path.read_text(encoding="utf-8"))
-    if int(data.get("schema_version", 0)) != 1:
+    schema_version = int(data.get("schema_version", 0))
+    if schema_version not in {1, 2, 3}:
         raise ValueError(f"Unsupported MIDI-DDSP bundle schema: {path}")
     if data.get("source_commit") != MIDI_DDSP_SOURCE_COMMIT:
         raise ValueError(f"Unexpected MIDI-DDSP source commit in {path}")
+    if data.get("architecture") != "stateful-v2":
+        raise ValueError(f"Unsupported MIDI-DDSP bundle architecture in {path}")
     components = data.get("components")
     if not isinstance(components, dict) or not components:
         raise ValueError(f"MIDI-DDSP bundle has no components: {path}")
+    voice_batch_sizes = tuple(
+        sorted(int(value) for value in data.get("voice_batch_sizes", [1]))
+    )
+    if not voice_batch_sizes or voice_batch_sizes[0] != 1:
+        raise ValueError(f"MIDI-DDSP bundle must include voice batch 1: {path}")
     resolved_components: dict[str, dict[str, object]] = {}
     for name, raw in components.items():
         if not isinstance(raw, dict) or not isinstance(raw.get("file"), str):
@@ -210,60 +258,23 @@ def _load_midi_ddsp_bundle(path: Path) -> dict[str, object]:
             "sha256": actual_sha,
             "size_bytes": component_path.stat().st_size,
         }
+    precision = str(data.get("precision", "origin"))
+    if precision != "origin":
+        raise ValueError(f"MIDI-DDSP bundle must use origin precision: {path}")
     return {
         "id": str(data["id"]),
         "name": str(data["name"]),
         "architecture": str(data["architecture"]),
-        "precision": str(data.get("precision", "mixed_float16")),
+        "precision": precision,
+        "onnx_dtype": str(data.get("onnx_dtype", "float32")),
         "recommended": bool(data.get("recommended", False)),
         "quality_status": str(data.get("quality_status", "unverified")),
         "source_commit": str(data["source_commit"]),
         "seed": int(data.get("seed", 20260724)),
+        "voice_batch_sizes": list(voice_batch_sizes),
         "manifest": str(path.resolve()),
         "components": resolved_components,
     }
-
-
-def _legacy_midi_ddsp_bundles() -> list[dict[str, object]]:
-    models = scan_midi_ddsp_models()
-    bundles: list[dict[str, object]] = []
-    for precision in ("mixed_float16", "force_fp16"):
-        expression = next(
-            (
-                item
-                for item in models
-                if item["component"] == "expression" and item["precision"] == precision
-            ),
-            None,
-        )
-        synthesis = next(
-            (
-                item
-                for item in models
-                if item["component"] == "synthesis" and item["precision"] == precision
-            ),
-            None,
-        )
-        if expression is None or synthesis is None:
-            continue
-        bundles.append(
-            {
-                "id": f"google-urmp-legacy-{precision}",
-                "name": f"Google URMP legacy ({precision})",
-                "architecture": "legacy-static-v1",
-                "precision": precision,
-                "recommended": False,
-                "quality_status": "context_resets",
-                "source_commit": MIDI_DDSP_SOURCE_COMMIT,
-                "seed": 20260724,
-                "manifest": None,
-                "components": {
-                    "expression": expression,
-                    "synthesis": synthesis,
-                },
-            }
-        )
-    return bundles
 
 
 def scan_midi_ddsp_bundles() -> list[dict[str, object]]:
@@ -275,12 +286,18 @@ def scan_midi_ddsp_bundles() -> list[dict[str, object]]:
                 bundles.append(_load_midi_ddsp_bundle(manifest))
             except (OSError, ValueError, KeyError, TypeError):
                 continue
-    bundles.extend(_legacy_midi_ddsp_bundles())
     if not any(bundle["recommended"] for bundle in bundles):
-        for bundle in bundles:
-            if bundle["precision"] == "mixed_float16":
-                bundle["recommended"] = True
-                break
+        validated = next(
+            (
+                bundle
+                for bundle in bundles
+                if bundle["quality_status"] == "om_validated"
+            ),
+            None,
+        )
+        if validated is not None:
+            validated["recommended"] = True
+            return bundles
     return bundles
 
 
@@ -328,11 +345,20 @@ def validate_midi_ddsp_reverb_asset(path: Path) -> str:
     return digest
 
 
-def catalog() -> dict[str, object]:
+def clear_catalog_cache() -> None:
+    global _CATALOG_CACHE
+    with _CATALOG_CACHE_LOCK:
+        _CATALOG_CACHE = None
+
+
+def _catalog_cache_key() -> tuple[str, str]:
+    return (str(ROOT.resolve()), str(UPLOAD_ROOT.resolve()))
+
+
+def _build_catalog() -> dict[str, object]:
     return {
         "midi_files": scan_midi_files(),
         "ddsp_vst_models": scan_ddsp_vst_models(),
-        "midi_ddsp_models": scan_midi_ddsp_models(),
         "midi_ddsp_bundles": scan_midi_ddsp_bundles(),
         "midi_ddsp_reverb_assets": scan_midi_ddsp_reverb_assets(),
         "instruments": [
@@ -340,6 +366,20 @@ def catalog() -> dict[str, object]:
             for index, name in enumerate(INSTRUMENTS)
         ],
     }
+
+
+def catalog(*, refresh: bool = False) -> dict[str, object]:
+    global _CATALOG_CACHE
+    key = _catalog_cache_key()
+    now = time.monotonic()
+    with _CATALOG_CACHE_LOCK:
+        if not refresh and _CATALOG_CACHE is not None:
+            cached_key, created_at, data = _CATALOG_CACHE
+            if cached_key == key and now - created_at < CATALOG_CACHE_TTL_SECONDS:
+                return copy.deepcopy(data)
+        data = _build_catalog()
+        _CATALOG_CACHE = (key, time.monotonic(), data)
+        return copy.deepcopy(data)
 
 
 def public_catalog() -> dict[str, object]:
@@ -356,10 +396,7 @@ def public_catalog() -> dict[str, object]:
             return [sanitize(item) for item in value]
         return value
 
-    return {
-        key: sanitize(items)
-        for key, items in data.items()
-    }
+    return {key: sanitize(items) for key, items in data.items()}
 
 
 def resolve_catalog_item(group: str, item_id: str) -> dict[str, object]:
@@ -392,18 +429,80 @@ def command_probe(args: list[str], timeout: float = 5.0) -> dict[str, object]:
     }
 
 
+def npu_status(board: bool) -> dict[str, object]:
+    global _NPU_STATUS_CACHE
+    if not board:
+        return {"available": False, "exit_code": None, "output": "board only"}
+    now = time.monotonic()
+    with _NPU_STATUS_CACHE_LOCK:
+        if _NPU_STATUS_CACHE is not None:
+            created_at, data = _NPU_STATUS_CACHE
+            if now - created_at < NPU_STATUS_CACHE_TTL_SECONDS:
+                return dict(data)
+        data = command_probe(["npu-smi", "info"], timeout=8.0)
+        _NPU_STATUS_CACHE = (time.monotonic(), data)
+        return dict(data)
+
+
+def local_ipv4_addresses() -> list[str]:
+    addresses: list[str] = []
+
+    def add(value: str) -> None:
+        address = value.strip()
+        if not address or address == "0.0.0.0" or address in addresses:
+            return
+        addresses.append(address)
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as connection:
+            connection.connect(("1.1.1.1", 80))
+            add(str(connection.getsockname()[0]))
+    except OSError:
+        pass
+
+    for hostname in {socket.gethostname(), platform.node()}:
+        if not hostname:
+            continue
+        try:
+            _name, _aliases, host_addresses = socket.gethostbyname_ex(hostname)
+            for address in host_addresses:
+                add(address)
+        except OSError:
+            pass
+
+    if os.name != "nt" and shutil.which("hostname") is not None:
+        try:
+            result = subprocess.run(
+                ["hostname", "-I"],
+                text=True,
+                capture_output=True,
+                timeout=2.0,
+                check=False,
+            )
+            if result.returncode == 0:
+                for address in result.stdout.split():
+                    if "." in address:
+                        add(address)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+    routed = [address for address in addresses if not address.startswith("127.")]
+    loopback = [address for address in addresses if address.startswith("127.")]
+    ordered = routed + loopback
+    return ordered or ["127.0.0.1"]
+
+
 def system_status(active_owner: str | None = None) -> dict[str, object]:
     board = is_ascend_board()
-    npu = (
-        command_probe(["npu-smi", "info"], timeout=8.0)
-        if board
-        else {"available": False, "exit_code": None, "output": "board only"}
-    )
+    ip_addresses = local_ipv4_addresses()
+    npu = npu_status(board)
     output = str(npu.get("output", ""))
     health_alarm = "Health" in output and "Alarm" in output
     return {
         "time": utc_timestamp(),
         "hostname": platform.node(),
+        "primary_ip": ip_addresses[0],
+        "ip_addresses": ip_addresses,
         "platform": platform.platform(),
         "machine": platform.machine(),
         "python": sys.version.split()[0],
@@ -449,6 +548,7 @@ class Job:
     created_at: str = field(default_factory=utc_timestamp)
     updated_at: str = field(default_factory=utc_timestamp)
     progress: float = 0.0
+    progress_detail: dict[str, object] | None = None
     message: str = ""
     exit_code: int | None = None
     command: list[str] = field(default_factory=list)
@@ -463,6 +563,7 @@ class Job:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "progress": self.progress,
+            "progress_detail": self.progress_detail,
             "message": self.message,
             "exit_code": self.exit_code,
             "metadata": self.metadata,
@@ -505,6 +606,11 @@ class JobManager:
                     created_at=str(data.get("created_at", utc_timestamp())),
                     updated_at=str(data.get("updated_at", utc_timestamp())),
                     progress=float(data.get("progress", 0.0)),
+                    progress_detail=(
+                        dict(data["progress_detail"])
+                        if isinstance(data.get("progress_detail"), dict)
+                        else None
+                    ),
                     message=str(data.get("message", "")),
                     exit_code=data.get("exit_code"),
                     metadata=dict(data.get("metadata", {})),
@@ -679,9 +785,47 @@ class JobManager:
                     if key in event
                 }
             )
-        if event.get("event") == "progress":
-            total = max(1, int(event.get("total", 1)))
-            job.progress = min(1.0, float(event.get("played", event.get("rendered", 0))) / total)
+        event_name = event.get("event")
+        if event_name in {"progress", "heartbeat"}:
+            detail_keys = (
+                "stage",
+                "stage_progress",
+                "overall_progress",
+                "completed",
+                "total",
+                "voice_batch_index",
+                "voice_batch_count",
+                "component",
+                "activity",
+                "elapsed_seconds",
+                "eta_seconds",
+                "heartbeat_at",
+                "paused",
+            )
+            detail = {
+                key: event[key]
+                for key in detail_keys
+                if key in event
+            }
+            if detail:
+                job.progress_detail = detail
+            if "overall_progress" in event:
+                job.progress = max(
+                    job.progress,
+                    min(1.0, max(0.0, float(event["overall_progress"]))),
+                )
+            elif event_name == "progress":
+                total = max(1, int(event.get("total", 1)))
+                legacy_progress = float(
+                    event.get("played", event.get("rendered", 0))
+                ) / total
+                job.progress = max(job.progress, min(1.0, legacy_progress))
+            if event_name == "progress":
+                job.message = str(event.get("activity") or event.get("stage") or "")
+        if event_name == "rendered":
+            JobManager._attach_report(job)
+            job.metadata["rendered"] = True
+            job.metadata["cache_hit"] = bool(event.get("cache_hit", False))
 
     @staticmethod
     def _attach_report(job: Job) -> None:
@@ -699,10 +843,11 @@ class JobManager:
         if action in {"pause", "resume"}:
             if os.name == "nt" or not hasattr(signal, "SIGUSR1"):
                 raise RuntimeError("pause and resume require Linux signals")
-            os.killpg(
-                os.getpgid(process.pid),
-                signal.SIGUSR1 if action == "pause" else signal.SIGUSR2,
-            )
+            control_signal = signal.SIGUSR1 if action == "pause" else signal.SIGUSR2
+            if job.kind == "midi-ddsp-wav-playback":
+                os.kill(process.pid, control_signal)
+            else:
+                os.killpg(os.getpgid(process.pid), control_signal)
             job.state = "paused" if action == "pause" else "running"
         elif action == "stop":
             job.state = "stopping"
@@ -717,13 +862,17 @@ class JobManager:
 
     def pause(self, job_id: str) -> Job:
         job = self.get(job_id)
+        if job.kind == "midi-ddsp-wav-playback":
+            return self._signal(job, "pause")
         if job.kind != "midi-ddsp-play":
             raise RuntimeError("only MIDI-DDSP playback jobs can be paused")
+        if not job.progress_detail or job.progress_detail.get("stage") != "playback":
+            raise RuntimeError("MIDI-DDSP can only be paused during playback")
         return self._signal(job, "pause")
 
     def resume(self, job_id: str) -> Job:
         job = self.get(job_id)
-        if job.kind != "midi-ddsp-play":
+        if job.kind not in {"midi-ddsp-play", "midi-ddsp-wav-playback"}:
             raise RuntimeError("only MIDI-DDSP playback jobs can be resumed")
         return self._signal(job, "resume")
 
@@ -741,23 +890,3 @@ def resolve_artifact(artifact_id: str) -> Path:
     if JOB_ROOT.resolve() not in path.parents or not path.is_file():
         raise KeyError(artifact_id)
     return path
-
-
-def load_benchmark_summary() -> dict[str, object] | None:
-    candidates = sorted(
-        (ROOT / "reports").glob("**/midi_ddsp/**/summary.json"),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
-    if not candidates:
-        candidates = sorted(
-            (ROOT / "reports").glob("**/midi_ddsp/**/summary.md"),
-            key=lambda path: path.stat().st_mtime,
-            reverse=True,
-        )
-    if not candidates:
-        return None
-    path = candidates[0]
-    if path.suffix == ".json":
-        return {"name": path.name, "format": "json", "data": json.loads(path.read_text(encoding="utf-8"))}
-    return {"name": path.name, "format": "markdown", "data": path.read_text(encoding="utf-8")}

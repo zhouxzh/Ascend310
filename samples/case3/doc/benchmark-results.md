@@ -415,20 +415,3 @@ reports/ascend20t/all_models_runtime/SHA256SUMS.txt            # 结果文件哈
 cd ~/Documents/case3_ascend20t_all_models
 bash tools/run_ascend20t_prebuilt_models.sh --force
 ```
-
-## MIDI-DDSP FP16 与混合精度实测
-
-MIDI-DDSP 的 Expression 和 Synthesis parameters 网络已在 `ascend8t2` 上完成
-FP16 与 `mixed_float16` 的精度、重复性、纯 NPU 速度和 PyACL 端到端速度测试。
-4 个 OM 均成功推理且没有 NaN/Inf，但混合精度在两个网络上分别比 FP16 慢
-13.47% 和 3.23%。
-
-Synthesis 网络包含随机采样，运行间波动与对 TensorFlow/ONNX 参考的误差处于
-同一量级，因此不能把它的逐点差异全部解释为精度损失。完整测试口径、数值表、
-复现命令和原始报告路径见 [MIDI-DDSP OM 精度与速度实测](midi-ddsp-benchmark.md)。
-
-MIDI-DDSP OM 的实时 MIDI 文件播放已经在 `ascend8t2` 和漫步者 M25 上完成：
-使用 `midi/ode-to-joy-violin.mid`、混合精度 Expression/Synthesis OM、48 kHz
-双声道输出，262/262 个音频块播放完成，`underruns=0`、`overruns=0`。Synthesis
-块中位渲染时间为 55.17 ms，块时长为 128 ms。完整链路和限制见
-[MIDI-DDSP OM 实时 MIDI 合成测试](midi-ddsp-realtime.md)。

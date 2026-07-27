@@ -1,11 +1,13 @@
 import type {
   AudioDevice,
+  BluetoothAudioActionResponse,
+  BluetoothAudioState,
   AudioInput,
-  BenchmarkSummary,
   Catalog,
   Job,
   DdspVstStatus,
   MidiFile,
+  MidiVoiceAnalysis,
   MidiPort,
   SpeakerTestStatus,
   SystemStatus,
@@ -21,14 +23,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   })
   if (!response.ok) {
     let detail = `${response.status} ${response.statusText}`
+    let code: string | undefined
     try {
       const body = await response.json()
       if (typeof body.detail === 'string') detail = body.detail
-      else if (body.detail?.message) detail = body.detail.message
+      else if (body.detail?.message) {
+        detail = body.detail.message
+        if (typeof body.detail.code === 'string') code = body.detail.code
+      }
     } catch {
       // Keep the HTTP status when the response is not JSON.
     }
-    throw new Error(detail)
+    const error = new Error(detail) as Error & { code?: string }
+    error.code = code
+    throw error
   }
   return response.json() as Promise<T>
 }
@@ -48,13 +56,27 @@ export const api = {
     request<{ available: boolean; devices: AudioDevice[]; error: string | null }>(
       '/api/v1/speaker-outputs',
     ),
+  bluetoothAudio: () => request<BluetoothAudioState>('/api/v1/bluetooth-audio'),
+  scanBluetoothAudio: (durationSeconds = 8) =>
+    request<BluetoothAudioState>('/api/v1/bluetooth-audio/scan', {
+      method: 'POST',
+      body: JSON.stringify({ duration_seconds: durationSeconds }),
+    }),
+  connectBluetoothAudio: (payload: { address: string; pair?: boolean; trust?: boolean }) =>
+    request<BluetoothAudioActionResponse>('/api/v1/bluetooth-audio/connect', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  disconnectBluetoothAudio: (address: string) =>
+    request<BluetoothAudioActionResponse>('/api/v1/bluetooth-audio/disconnect', {
+      method: 'POST',
+      body: JSON.stringify({ address }),
+    }),
   midiPorts: () =>
     request<{ available: boolean; ports: MidiPort[]; error: string | null }>(
       '/api/v1/midi-ports',
     ),
   jobs: () => request<{ jobs: Job[] }>('/api/v1/jobs'),
-  benchmark: () =>
-    request<{ summary: BenchmarkSummary | null }>('/api/v1/benchmark-summary'),
   startDdspVst: (payload: Record<string, unknown>) =>
     request<DdspVstStatus>('/api/v1/ddsp-vst/start', {
       method: 'POST',
@@ -75,16 +97,22 @@ export const api = {
       body: file,
       headers: { 'Content-Type': 'audio/midi' },
     }),
+  midiVoices: (midiId: string) =>
+    request<MidiVoiceAnalysis>(
+      `/api/v1/midi-files/${encodeURIComponent(midiId)}/voices`,
+    ),
   startMidiDdsp: (payload: Record<string, unknown>) =>
     request<Job>('/api/v1/midi-ddsp/jobs', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  playMidiDdspRecording: (jobId: string, payload: Record<string, unknown>) =>
+    request<Job>(`/api/v1/midi-ddsp/recordings/${jobId}/play`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   controlJob: (jobId: string, action: 'pause' | 'resume' | 'stop') =>
     request<Job>(`/api/v1/jobs/${jobId}/${action}`, { method: 'POST' }),
-  runRuntime: () => request<Job>('/api/v1/tests/runtime', { method: 'POST' }),
-  runBenchmark: () =>
-    request<Job>('/api/v1/tests/benchmark-smoke', { method: 'POST' }),
 }
 
 export function websocketUrl(path: string): string {

@@ -13,16 +13,22 @@ from realtime_ddsp import (
     Adsr,
     DEFAULT_ENVELOPE,
     DdspVstSettings,
+    HarmonicSynthesizer,
     JuceFreeverb,
     MODEL_HOP_SIZE,
     LivePlayer,
     PolyphonicGainSmoother,
     PolyphonicMidiState,
+    RawMidiInput,
     RealtimeSynthEngine,
     VoiceRenderer,
     MidiVoiceSnapshot,
     ModelControls,
+    NoiseSynthesizer,
+    WindowedSincResampler,
+    _midi_device_profile,
     query_midi_devices,
+    shape_midi_velocity,
 )
 
 
@@ -76,11 +82,32 @@ def wait_until(predicate, timeout: float = 0.2) -> bool:
 
 
 class MidiDeviceQueryTest(unittest.TestCase):
-    def test_missing_linux_alsa_sequencer_is_reported_cleanly(self) -> None:
+    def test_midiplus_tiny_profile_reports_32_keys(self) -> None:
+        self.assertEqual(
+            _midi_device_profile("MIDIPLUS TINY"),
+            {"manufacturer": "MIDIPLUS", "model": "TINY", "key_count": 32},
+        )
+
+    def test_linux_uses_raw_midi_when_alsa_sequencer_is_missing(self) -> None:
+        raw_device = {
+            "id": "raw:/dev/snd/midiC1D0",
+            "index": 0,
+            "name": "MIDIPLUS TINY",
+            "port": "raw:/dev/snd/midiC1D0",
+            "backend": "raw",
+        }
         with patch("realtime_ddsp.sys.platform", "linux"), patch(
             "realtime_ddsp.Path.exists", return_value=False
+        ), patch(
+            "realtime_ddsp._query_raw_midi_devices", return_value=[raw_device]
         ):
-            with self.assertRaisesRegex(RuntimeError, "/dev/snd/seq is missing"):
+            self.assertEqual(query_midi_devices(), [raw_device])
+
+    def test_missing_linux_midi_backends_is_reported_cleanly(self) -> None:
+        with patch("realtime_ddsp.sys.platform", "linux"), patch(
+            "realtime_ddsp.Path.exists", return_value=False
+        ), patch("realtime_ddsp._query_raw_midi_devices", return_value=[]):
+            with self.assertRaisesRegex(RuntimeError, "no raw MIDI device was found"):
                 query_midi_devices()
 
     def test_rtmidi_initialization_error_is_normalized(self) -> None:
@@ -90,8 +117,77 @@ class MidiDeviceQueryTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Unable to enumerate MIDI"):
                 query_midi_devices()
 
+    def test_raw_midi_reader_parses_note_on_bytes(self) -> None:
+        import mido
+
+        messages = []
+        reader = RawMidiInput.__new__(RawMidiInput)
+        reader.fd = 7
+        reader._fd_lock = threading.Lock()
+        reader.parser = mido.Parser()
+        reader._parser_factory = mido.Parser
+        reader.callback = messages.append
+        reader.stop_event = SimpleNamespace(
+            is_set=lambda calls=iter((False, True)): next(calls)
+        )
+
+        with patch.object(reader, "_fd_matches_path", return_value=True), patch(
+            "realtime_ddsp.select.select", return_value=([7], [], [])
+        ), patch(
+            "realtime_ddsp.os.read", return_value=bytes((0x90, 60, 100))
+        ):
+            reader._read_loop()
+
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].type, "note_on")
+        self.assertEqual(messages[0].note, 60)
+        self.assertEqual(messages[0].velocity, 100)
+
+    def test_raw_midi_reader_reopens_after_device_replacement(self) -> None:
+        import mido
+
+        messages = []
+        reader = RawMidiInput.__new__(RawMidiInput)
+        reader.fd = 7
+        reader._fd_lock = threading.Lock()
+        reader.parser = mido.Parser()
+        reader._parser_factory = mido.Parser
+        reader.callback = messages.append
+        reader.reconnect_count = 0
+        reader.last_error = None
+        reader.stop_event = SimpleNamespace(
+            is_set=lambda calls=iter((False, False, False, True)): next(calls),
+            wait=lambda _timeout: False,
+        )
+
+        def reopen() -> bool:
+            reader.fd = 8
+            reader.reconnect_count += 1
+            return True
+
+        with patch.object(reader, "_fd_matches_path", return_value=True), patch.object(
+            reader, "_open_available", side_effect=reopen
+        ), patch("realtime_ddsp.os.close"), patch(
+            "realtime_ddsp.select.select",
+            side_effect=[([7], [], []), ([8], [], [])],
+        ), patch(
+            "realtime_ddsp.os.read",
+            side_effect=[b"", bytes((0x90, 64, 96))],
+        ):
+            reader._read_loop()
+
+        self.assertEqual(reader.reconnect_count, 1)
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].note, 64)
+
 
 class LivePlayerTest(unittest.TestCase):
+    def test_velocity_curve_boosts_light_touch_without_changing_full_scale(self) -> None:
+        self.assertAlmostEqual(shape_midi_velocity(0.25, 0.5), 0.5)
+        self.assertAlmostEqual(shape_midi_velocity(0.25, 1.0), 0.25)
+        self.assertEqual(shape_midi_velocity(0.0, 0.5), 0.0)
+        self.assertEqual(shape_midi_velocity(1.0, 0.5), 1.0)
+
     def test_default_envelope_matches_ddsp_vst_and_ramps_over_frames(self) -> None:
         self.assertEqual(DEFAULT_ENVELOPE.attack, 0.10)
         self.assertEqual(DEFAULT_ENVELOPE.decay, 0.0)
@@ -131,6 +227,9 @@ class PolyphonicSynthesisTest(unittest.TestCase):
     def test_output_gain_is_applied_before_stereo_reverb(self) -> None:
         engine = RealtimeSynthEngine.__new__(RealtimeSynthEngine)
         engine._settings_lock = threading.Lock()
+        engine._output_stats_lock = threading.Lock()
+        engine.output_peak = 0.0
+        engine.clipped_samples = 0
         engine.settings = DdspVstSettings(output_gain_db=-6.0)
         engine.resampler = SimpleNamespace(process=lambda samples: samples)
         engine.reverb = SimpleNamespace(
@@ -147,6 +246,26 @@ class PolyphonicSynthesisTest(unittest.TestCase):
         )
         np.testing.assert_allclose(output[:, 0], expected, atol=1e-7)
         np.testing.assert_allclose(output[:, 1], expected, atol=1e-7)
+
+    def test_engine_reports_over_range_samples_without_hard_clipping(self) -> None:
+        engine = RealtimeSynthEngine.__new__(RealtimeSynthEngine)
+        engine._settings_lock = threading.Lock()
+        engine._output_stats_lock = threading.Lock()
+        engine.settings = DdspVstSettings()
+        engine.output_peak = 0.0
+        engine.clipped_samples = 0
+        engine.resampler = SimpleNamespace(process=lambda samples: samples)
+        engine.reverb = SimpleNamespace(
+            process=lambda samples: np.repeat(samples[:, None], 2, axis=1)
+        )
+        engine.render_model_frame = lambda: np.array([-1.2, 0.0, 1.3], dtype=np.float32)
+
+        output = engine.render_output_block()
+
+        self.assertAlmostEqual(float(output.min()), -1.2, places=6)
+        self.assertAlmostEqual(float(output.max()), 1.3, places=6)
+        self.assertAlmostEqual(engine.output_peak, 1.3, places=6)
+        self.assertEqual(engine.clipped_samples, 4)
 
     def test_ddsp_vst_engine_defaults_to_google_monophonic_mode(self) -> None:
         default = inspect.signature(RealtimeSynthEngine).parameters["max_voices"].default
@@ -183,7 +302,7 @@ class PolyphonicSynthesisTest(unittest.TestCase):
         snapshot = MidiVoiceSnapshot(
             slot=0,
             note=69,
-            velocity=1.0,
+            velocity=0.25,
             pitch_bend=8192,
             volume=1.0,
             expression=1.0,
@@ -193,6 +312,7 @@ class PolyphonicSynthesisTest(unittest.TestCase):
             pitch_shift=12,
             harmonic_gain=0.5,
             noise_gain=0.25,
+            velocity_curve=0.5,
             input_pitch=0.1,
             input_gain=0.2,
         )
@@ -200,7 +320,7 @@ class PolyphonicSynthesisTest(unittest.TestCase):
         output = voice.render(snapshot, settings)
 
         self.assertAlmostEqual(controls.inputs[0], 81 / 127 - 0.1)
-        self.assertAlmostEqual(controls.inputs[1], 0.8)
+        self.assertAlmostEqual(controls.inputs[1], 0.3)
         expected_f0 = 880.0
         np.testing.assert_allclose(output, 0.4 + expected_f0 / 1000.0 + 0.25)
 
@@ -318,6 +438,77 @@ class LivePlayerDeviceTest(unittest.TestCase):
                 player.raise_worker_error()
         finally:
             player._stop_worker()
+
+
+class GoogleDspParityTest(unittest.TestCase):
+    def test_harmonic_synth_matches_halfway_interpolation_reference(self) -> None:
+        synth = HarmonicSynthesizer()
+        distribution = np.zeros(60, dtype=np.float32)
+        distribution[0] = 1.0
+
+        output = synth.render(0.4, distribution, 440.0)
+
+        midpoint = MODEL_HOP_SIZE // 2
+        amplitude = np.empty(MODEL_HOP_SIZE, dtype=np.float32)
+        amplitude[:midpoint] = np.linspace(
+            0.0, 0.4, midpoint, endpoint=False, dtype=np.float32
+        )
+        amplitude[midpoint:] = 0.4
+        phases = np.cumsum(
+            np.full(MODEL_HOP_SIZE, 2.0 * np.pi * 440.0 / 16_000, dtype=np.float32),
+            dtype=np.float32,
+        )
+        expected = np.sin(phases) * amplitude
+        np.testing.assert_allclose(output, expected, atol=2e-6)
+
+    def test_noise_synth_reset_replays_the_reference_sequence(self) -> None:
+        synth = NoiseSynthesizer(seed=42)
+        magnitudes = np.linspace(0.01, 0.3, 65, dtype=np.float32)
+
+        first = synth.render(magnitudes)
+        synth.reset()
+        replay = synth.render(magnitudes)
+
+        np.testing.assert_array_equal(first, replay)
+        self.assertTrue(np.all(np.isfinite(first)))
+
+    def test_windowed_sinc_is_continuous_across_control_frames(self) -> None:
+        rng = np.random.default_rng(20260725)
+        source = rng.normal(0.0, 0.2, MODEL_HOP_SIZE * 4).astype(np.float32)
+        streaming = WindowedSincResampler(16_000, 48_000)
+        whole = WindowedSincResampler(16_000, 48_000)
+
+        streamed = np.concatenate(
+            [streaming.process(block) for block in source.reshape(-1, MODEL_HOP_SIZE)]
+        )
+        reference = whole.process(source)
+
+        np.testing.assert_allclose(streamed, reference, atol=1e-6)
+        self.assertAlmostEqual(streaming.algorithmic_latency_seconds, 0.00625)
+
+    def test_windowed_sinc_preserves_passband_and_rejects_images(self) -> None:
+        frequency = 7_000.0
+        source = np.sin(
+            2.0 * np.pi * frequency * np.arange(16_000) / 16_000
+        ).astype(np.float32)
+        resampler = WindowedSincResampler(16_000, 48_000)
+        output = np.concatenate(
+            [resampler.process(block) for block in source.reshape(-1, MODEL_HOP_SIZE)]
+        )
+        steady = output[6_000:]
+
+        passband_db = 20.0 * np.log10(
+            np.sqrt(np.mean(steady * steady)) / np.sqrt(0.5)
+        )
+        windowed = steady * np.hanning(steady.size)
+        spectrum = np.abs(np.fft.rfft(windowed))
+        frequencies = np.fft.rfftfreq(windowed.size, 1.0 / 48_000)
+        tone = spectrum[np.argmin(np.abs(frequencies - frequency))]
+        image = spectrum[np.argmin(np.abs(frequencies - (16_000 - frequency)))]
+        image_db = 20.0 * np.log10(max(float(image / tone), 1e-12))
+
+        self.assertLess(abs(float(passband_db)), 0.2)
+        self.assertLess(image_db, -60.0)
 
 
 if __name__ == "__main__":

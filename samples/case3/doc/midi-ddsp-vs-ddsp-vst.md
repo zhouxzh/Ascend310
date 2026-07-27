@@ -227,7 +227,7 @@ voice 1: state_1, harmonic_phase_1, noise_state_1, ADSR_1
 
 MIDI-DDSP 仍需要提前知道完整 MIDI，因为 Expression 和 Synthesis 都包含双向上下文。
 stateful v2 先按正序和逆序分块运行上下文 GRU，再连续运行自回归 decoder；F0 decoder
-显式传递上一帧 one-hot 和两层 GRU state，Timbre 网络按实际 124 帧感受野携带 halo。
+显式传递上一帧 one-hot 和两层 GRU state。Timbre 网络不能仅靠卷积 halo 分块，因为官方 LayerNorm 同时统计整段时间轴；stateful v2 使用最多 65,536 帧的掩码整段模型保持全曲统计一致。
 因此块之间不再使用下面这种旧版经验重叠：
 
 ```text
@@ -315,7 +315,7 @@ models/midi_ddsp/weights/midi_ddsp_model_weights_urmp_9_10/
 | 谐波振荡器 | CPU | CPU |
 | 滤波噪声 | CPU | CPU |
 | 混响 | JUCE/FreeVerb 风格，Size/Damping/Wet 可调 | Google 逐乐器 IR，分区 FFT 干湿叠加 |
-| 16 kHz -> 声卡采样率 | CPU 线性重采样 | CPU 线性重采样 |
+| 16 kHz -> 声卡采样率 | CPU 100-crossing Hann 窗化 sinc 重采样 | CPU 线性重采样 |
 | 声卡输出 | PortAudio 或指定 PulseAudio sink | PortAudio 或指定 PulseAudio sink |
 
 因此，OM 延迟只代表神经网络控制参数生成成本，不代表完整音频链路成本。完整听感还
@@ -343,7 +343,7 @@ models/midi_ddsp/weights/midi_ddsp_model_weights_urmp_9_10/
 
 - 不能把 `midi_ddsp_synthesis_params_frames64.om` 当成 `realtime_ddsp.py` 的
   `--model` 传入；它的输入输出完全不同。
-- 不能把 `Violin_mixed_float16.om` 当成 MIDI-DDSP 的 Synthesis OM；它没有
+- 不能把 DDSP-VST 的音色 OM 当成 MIDI-DDSP 的 Synthesis OM；它没有
   Expression 控制、onset/offset 或 250 Hz 序列窗口。
 - 不能把 DDSP-VST 的多声部堆叠理解成原生钢琴模型；它只是多个独立单声部音色的
   混音。
@@ -352,7 +352,7 @@ models/midi_ddsp/weights/midi_ddsp_model_weights_urmp_9_10/
 ## 后续迁移建议
 
 1. 保持两套运行入口分离。DDSP-VST 的 `realtime_ddsp.py` 继续承担低延迟实时演奏；
-   MIDI-DDSP 的 `midi_ddsp_realtime.py` 继续承担已知 MIDI 文件合成和 OM 实验。
+   MIDI-DDSP 的 `midi_ddsp_realtime.py` 继续承担已知 MIDI 文件合成和验证。
 2. 如果要让 MIDI-DDSP 支持真正实时键盘，需要重新设计模型接口，把 Expression 的
    双向上下文改成因果/流式状态，或者在程序里接受更高延迟的 lookahead。
 3. 如果要做钢琴实时合成，不应只扩展 DDSP-VST 小提琴声部数；应优先迁移支持
@@ -366,7 +366,6 @@ models/midi_ddsp/weights/midi_ddsp_model_weights_urmp_9_10/
 
 - [DDSP 模型导出](model-export.md)
 - [实时 DDSP](realtime-ddsp.md)
-- [MIDI-DDSP OM 精度与速度实测](midi-ddsp-benchmark.md)
 - [MIDI-DDSP OM 实时 MIDI 合成测试](midi-ddsp-realtime.md)
 - [OM 转换与验证](om-deployment.md)
 - [Upstream 参考仓库清单](upstream-repositories.md)

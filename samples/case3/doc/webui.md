@@ -1,8 +1,8 @@
 # MIDI-DDSP Studio Web 界面
 
 MIDI-DDSP Studio 是运行在 Ascend 310B 开发板上的音乐工作台。界面可以在板载
-触摸屏或同一局域网内的电脑浏览器中打开，提供实时演奏、MIDI-DDSP 播放与渲染、
-OM 实验和设备检查四个工作区；扬声器测试合并在设备工作区中。
+触摸屏或同一局域网内的电脑浏览器中打开，提供实时演奏、MIDI-DDSP 播放与渲染和
+设备检查三个工作区；扬声器测试合并在设备工作区中。
 
 ## 技术方案
 
@@ -43,13 +43,15 @@ sudo apt install libportaudio2
 安装 Web 服务、MIDI 和音频 Python 依赖：
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install --user -r requirements.txt
 ```
 
 `requirements.txt` 是板端唯一的 Python 依赖入口，包含 Web 服务、NumPy、Pygame、
 Mido、RtMidi 和 SoundDevice。Web UI 只使用 OM 模型，不安装或扫描 ONNX 模型。ONNX/TFLite
 导出工具属于本地开发流程，其依赖不纳入板端 `requirements.txt`。PyACL 必须由开发板现有
-CANN 环境提供，`ais_bench` 由已有 Ascend 基准测试环境提供。
+CANN 环境提供，`ais_bench` 由已有 Ascend 基准测试环境提供。板端 Anaconda 位于管理员
+所有的 `/usr/local/miniconda3`，普通用户必须使用 `--user` 将 Python 包安装到
+`~/.local/`；不要使用 `sudo pip` 修改管理员安装的 Anaconda。
 
 ## 本地构建与同步
 
@@ -60,7 +62,7 @@ powershell -ExecutionPolicy Bypass -File tools/deploy_midi_ddsp_webui.ps1
 ```
 
 脚本在本地执行 `npm ci` 和生产构建，然后通过 SSH 别名 `ascend8t` 将前端产物、
-FastAPI 服务、运行模块、受控实验工具、文档和 MIDI 输入同步到
+FastAPI 服务、运行模块、文档和 MIDI 输入同步到
 `/home/HwHiAiUser/Documents/case3`。远端 MIDI 文件会按本地目录镜像，因此本地删除的
 `.mid`/`.midi` 也会从板端移除。脚本不会远程安装
 依赖，也不会修改 shell 启动文件或系统服务。可通过参数修改目标：
@@ -97,6 +99,9 @@ python scripts/run_webui.py
 - 板载浏览器：`http://127.0.0.1:8765`
 - 局域网电脑：`http://<开发板 IP>:8765`
 
+启动脚本会在终端打印检测到的局域网地址；Web 界面顶部状态条、左侧底部状态和
+“设备 / 系统与设备”摘要卡也会显示当前开发板 IP，便于从另一台电脑远程登录或打开页面。
+
 服务没有登录功能，只应运行在可信局域网中。API 只接受目录扫描生成的模型 ID、MIDI
 ID 和设备 ID，不接受浏览器提交的任意文件路径或 shell 命令。
 
@@ -109,6 +114,11 @@ ID 和设备 ID，不接受浏览器提交的任意文件路径或 shell 命令�
 实体 MIDI 会进入同一实时引擎。窗口失焦、触摸取消、WebSocket 断开或停止会触发
 all-notes-off，避免持续音符。默认优先选择 Violin Mixed OM 和单音模式；FP16 与
 2-8 声部只在高级设置显示。
+
+USB/有线输出默认使用 `balanced` 延时档（2 个 20ms 控制帧、20ms 设备缓冲），
+也可以选择 `low` 或 `safe`。蓝牙输出禁用 `low` 并使用至少 220ms 的 A2DP 缓冲。
+运行状态分别显示渲染、队列、设备、Pulse Sink 和估算总延时。模型下方的音域来自
+Google TFLite `metadata.json`；超出训练音域的按键会降低饱和度，但不会自动移调。
 
 页面提供 Pitch Shift、Harmonics、Noise、Output Gain、ADSR、Input Pitch、Input Gain、
 Reverb Size、Damping 和 Wet。除模型与输出设备外，这些参数可在会话运行时通过
@@ -125,15 +135,30 @@ dataset、buffer 和 context，但不反复执行 `reset_device`/`acl.finalize`�
 的 `.mid`/`.midi` 文件，随后完整渲染并缓存 WAV，再播放或下载。模型包固定源码提交、
 checkpoint、全部 ONNX/OM 组件和随机种子，前端不再分别组合 Expression 与 Synthesis。
 
-MIDI-DDSP 模型本身是单声部模型。单轨和弦或其他复音文件返回
-`422 polyphonic_track`，渲染按钮会禁用；程序不再静默提取最高声部。多轨文件只有在
-每个轨道均为单声部、且 General MIDI program 能映射到 13 种 URMP 乐器时，才由
-stateful v2 逐轨渲染、保存 stem 并混音。旧 legacy 模型包不能渲染多轨文件。
+页面将“音频库”和“新建渲染”分开。任务目录中已经存在 `output.wav` 的历史 MIDI-DDSP
+任务会持续出现在音频库中，不要求当前曲目、音色或模型参数与生成时一致。浏览器播放器
+直接读取该 WAV；“开发板播放”则通过 `paplay` 将同一个文件发送到选定的 PulseAudio
+输出，不重新加载模型或执行 NPU 推理。开发板直放提供 `-60` 到 `0 dB` 的独立增益，
+默认按 WAV 原始电平使用 `0 dB`，且支持暂停、继续和停止。
+“播放位置”使用“当前浏览器 / 开发板喇叭”二选一；页面只显示所选路径对应的控制器，
+避免把浏览器原生播放键误认为开发板音频输出。
+
+MIDI-DDSP 模型本身是单声部模型。stateful v2 会把复音轨自动拆成最少数量的单音
+voice，按静态 batch `1/2/4/8` 推理，再按 Google MIDI-DDSP 的方式对齐并混音；程序不会
+静默丢弃和弦或只保留最高声部。页面选择的渲染音色统一应用到全部 voice，MIDI 文件
+中的 General MIDI program 只保留为分析信息。旧 legacy 模型包不能渲染多声部文件。
+
+渲染期间页面持续显示固定阶段列表、总进度、阶段进度、当前声部批次、工作量、已用
+时间、ETA 和最近心跳。10 秒没有心跳会显示连接警告，恢复事件后自动消失。渲染期只
+提供停止；完整 WAV 写入缓存并进入播放后才启用暂停/继续。波形、下载和播放器始终
+选择最终 `output.wav`，不会误选 stem。
 
 运行时使用 Google MIDI-DDSP 的谐波、FilteredNoise 和逐乐器混响语义。混响资产为
 20 组 16 kHz、48,000 点 IR，产品使用 ID 0-12，采用 2,048 点分区 FFT 卷积并叠加
-干声；默认在上游 1 秒结束静音之外保留 2 秒混响尾音。Mixed OM、种子 `20260724`
-与 `0 dB` 为默认值。缺少或损坏混响资产时任务不会启动。
+干声；默认在上游 1 秒结束静音之外保留 2 秒混响尾音。已验证 origin OM、种子 `20260724`
+与 `0 dB` 为默认值。缺少或损坏混响资产时任务不会启动。多 voice 求和超过
+`-0.45 dBFS` 时会统一降低最终混音增益，避免写入 WAV 或设备时发生硬削波；报告记录
+原始峰值、保护增益和超范围样本数。
 
 ### 设备：扬声器测试
 
@@ -143,19 +168,21 @@ stateful v2 逐轨渲染、保存 stem 并混音。旧 legacy 模型包不能渲
 默认测试音为 440 Hz、-18 dBFS、3 秒；后端将单次测试限制在 10 秒以内，最大音量限制
 为 -3 dBFS，并在测试音首尾加入淡入淡出以减少爆音。
 
+设备页还提供“蓝牙音频”面板。该面板使用开发板系统中已经存在的 `bluetoothctl`
+扫描、配对、信任、连接和断开设备，不安装软件，也不修改系统启动配置。连接成功后，
+后端会尽量将对应 `bluez_card` 切换到 A2DP 播放 profile；随后刷新音频输出列表，
+蓝牙音箱会以“蓝牙”标记出现在 DDSP-VST、MIDI-DDSP 和扬声器测试的音频输出下拉框中。
+若设备需要 PIN、确认码或特殊 HFP/A2DP 流程，界面会保留错误信息，需要在开发板系统界面
+或终端中完成该设备特有的交互。
+
 测试音使用 `paplay --device=<sink>` 直接发送到下拉菜单选中的 PulseAudio 输出，不依赖
 系统默认输出。蓝牙设备只有在 `bluetoothctl info <MAC>` 显示 `Connected: yes`，并且
 `pactl list short sinks` 中出现对应 `bluez_sink` 后才会进入下拉菜单。仅完成配对但当前
 断开的设备不会作为可播放输出显示。
 
-扬声器测试与实时演奏、MIDI-DDSP 播放和实验任务共用资源锁。声卡被其他任务占用时，
+扬声器测试与实时演奏、MIDI-DDSP 播放共用资源锁。声卡被其他任务占用时，
 设备页会禁用启动按钮，API 返回 `409 busy`。该测试能够确认所选输出路径是否实际发声及
 左右声道是否正确，但不能替代麦克风、声压计或硬件回环进行的音质与电气测量。
-
-### 实验
-
-只提供白名单内的一次 OM 运行验证和短基准测试。任务日志、状态和报告保存在
-`reports/webui/jobs/<job-id>/`，界面可下载受控的 WAV、JSON 和文本产物。
 
 ### 设备
 
@@ -168,9 +195,9 @@ A2DP monitor，页面会显示“无真实音频输入”，并且不提供 Effe
 后续启用条件为：USB/HFP capture 可见、特征模型完成 ONNX/OM 对齐、20 ms 连续推理和
 双工声卡测试全部通过。
 
-蓝牙配对仍建议使用显示器和触摸屏上的系统图形界面。不同耳机或喇叭的命令行配对及
-A2DP/HFP 配置可能不同，纯命令行流程对初学者较复杂。Web 界面只选择系统已经连接
-并暴露出来的音频设备，不负责蓝牙配对。
+蓝牙面板可以处理常见无 PIN 音箱的扫描、配对和连接。不同耳机或喇叭的命令行配对及
+A2DP/HFP 配置可能不同；若 Web 界面返回认证、profile 或控制器错误，优先保留错误输出，
+再用系统图形界面或 `bluetoothctl` 终端交互完成设备特有步骤。
 
 如果开发板内核没有 `/dev/snd/seq` 或 `snd_seq` 模块，RtMidi 无法创建 ALSA
 Sequencer 客户端。此时 MIDI 端口接口会返回 `available: false`，界面仍可使用
@@ -181,8 +208,12 @@ Sequencer 客户端。此时 MIDI 端口接口会返回 `available: false`，界
 - `GET /api/v1/status` 使用 `ddsp_vst` 返回 Synth 状态。
 - `GET /api/v1/catalog` 返回 `ddsp_vst_models`、`midi_ddsp_bundles`、带单/复音分析的 MIDI 和混响资产。
 - `GET /api/v1/audio-devices` 与 `GET /api/v1/audio-inputs` 返回输出和分类后的输入。
+- `GET /api/v1/bluetooth-audio`、`POST /api/v1/bluetooth-audio/scan|connect|disconnect`
+  管理蓝牙音频设备发现与连接。
 - `POST /api/v1/ddsp-vst/start|stop` 与 `WS /api/v1/ddsp-vst/events` 管理实时 Synth。
 - `POST /api/v1/midi-ddsp/jobs` 使用 `model_bundle_id`、乐器、种子和尾音参数管理播放/渲染。
+- `POST /api/v1/midi-ddsp/recordings/{job_id}/play` 将历史任务的 `output.wav` 直接发送到
+  指定开发板音频输出，不触发 MIDI-DDSP 渲染。
 
 旧 `/api/v1/live/*` 路由已删除，不再同时维护两套含义不同的命名。
 

@@ -79,6 +79,103 @@ def _canonical_name(raw_name: str, expected: set[str]) -> str:
     return matches[0]
 
 
+def _acquire_runtime(acl_module: Any, device_id: int) -> tuple[int, int]:
+    key = (id(acl_module), int(device_id))
+    with _RUNTIME_LOCK:
+        state = _RUNTIME_STATE.get(key)
+        if state is None:
+            ret = acl_module.init()
+            if ret not in (0, 100002):
+                _check_ret(ret, "acl.init")
+            try:
+                _check_ret(
+                    acl_module.rt.set_device(device_id),
+                    "acl.rt.set_device",
+                )
+            except BaseException:
+                acl_module.finalize()
+                raise
+            state = {"count": 0, "acl": acl_module}
+            _RUNTIME_STATE[key] = state
+        state["count"] += 1
+    return key
+
+
+def _release_runtime(
+    acl_module: Any,
+    device_id: int,
+    key: tuple[int, int],
+    errors: list[BaseException],
+) -> None:
+    with _RUNTIME_LOCK:
+        state = _RUNTIME_STATE.get(key)
+        if state is None:
+            return
+        state["count"] -= 1
+        if state["count"] > 0:
+            return
+        _RUNTIME_STATE.pop(key, None)
+        for operation, value in (
+            (acl_module.rt.reset_device, device_id),
+            (acl_module.finalize, None),
+        ):
+            try:
+                result = operation() if value is None else operation(value)
+                _check_ret(result, operation.__name__)
+            except BaseException as exc:
+                errors.append(exc)
+
+
+class MidiDdspAclRuntime:
+    """Keep one ACL/GE runtime alive across a sequence of component models."""
+
+    def __init__(
+        self,
+        device_id: int = 0,
+        *,
+        acl_module: Any | None = None,
+    ) -> None:
+        if device_id < 0:
+            raise ValueError("device_id must be non-negative")
+        if acl_module is None:
+            try:
+                import acl as acl_module  # type: ignore[import-not-found,no-redef]
+            except ImportError as exc:
+                raise RuntimeError(
+                    "PyACL is required. Activate the existing CANN environment first."
+                ) from exc
+        self.acl = acl_module
+        self.device_id = int(device_id)
+        self._runtime_key = _acquire_runtime(self.acl, self.device_id)
+        self._closed = False
+
+    def close(self, *, suppress_errors: bool = False) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        errors: list[BaseException] = []
+        _release_runtime(
+            self.acl,
+            self.device_id,
+            self._runtime_key,
+            errors,
+        )
+        if errors and not suppress_errors:
+            raise errors[0]
+
+    def __enter__(self) -> "MidiDdspAclRuntime":
+        return self
+
+    def __exit__(self, exc_type, exc, traceback) -> None:
+        self.close(suppress_errors=exc is not None)
+
+    def __del__(self) -> None:
+        try:
+            self.close(suppress_errors=True)
+        except BaseException:
+            pass
+
+
 class MidiDdspAclRunner:
     """Own one ACL context and execute one fixed MIDI-DDSP OM."""
 
@@ -149,60 +246,39 @@ class MidiDdspAclRunner:
         self._prepare_outputs()
 
     def _acquire_runtime(self) -> None:
-        with _RUNTIME_LOCK:
-            state = _RUNTIME_STATE.get(self._runtime_key)
-            if state is None:
-                ret = self.acl.init()
-                if ret not in (0, 100002):
-                    _check_ret(ret, "acl.init")
-                try:
-                    _check_ret(
-                        self.acl.rt.set_device(self.device_id),
-                        "acl.rt.set_device",
-                    )
-                except BaseException:
-                    self.acl.finalize()
-                    raise
-                state = {"count": 0, "acl": self.acl}
-                _RUNTIME_STATE[self._runtime_key] = state
-            state["count"] += 1
-            self._runtime_acquired = True
+        self._runtime_key = _acquire_runtime(self.acl, self.device_id)
+        self._runtime_acquired = True
 
     def _release_runtime(self, errors: list[BaseException]) -> None:
         if not self._runtime_acquired:
             return
-        with _RUNTIME_LOCK:
-            state = _RUNTIME_STATE.get(self._runtime_key)
-            self._runtime_acquired = False
-            if state is None:
-                return
-            state["count"] -= 1
-            if state["count"] > 0:
-                return
-            _RUNTIME_STATE.pop(self._runtime_key, None)
-            for operation, value in (
-                (self.acl.rt.reset_device, self.device_id),
-                (self.acl.finalize, None),
-            ):
-                try:
-                    result = operation() if value is None else operation(value)
-                    _check_ret(result, operation.__name__)
-                except BaseException as exc:
-                    errors.append(exc)
+        self._runtime_acquired = False
+        _release_runtime(
+            self.acl,
+            self.device_id,
+            self._runtime_key,
+            errors,
+        )
 
-    def _check_dtype(self, index: int, expected: np.dtype, is_input: bool) -> None:
+    def _check_dtype(
+        self, index: int, expected: np.dtype, is_input: bool
+    ) -> int | None:
         kind = "input" if is_input else "output"
         getter = getattr(self.acl.mdl, f"get_{kind}_data_type", None)
         if getter is None:
-            return
-        actual = getter(self.model_desc, index)
+            return None
+        actual = int(getter(self.model_desc, index))
         constant_name = "ACL_FLOAT" if expected == np.dtype(np.float32) else "ACL_INT64"
-        expected_code = getattr(self.acl, constant_name, None)
-        if expected_code is not None and actual != expected_code:
+        fallback_codes = {"ACL_FLOAT": 0, "ACL_INT64": 9}
+        expected_code = int(
+            getattr(self.acl, constant_name, fallback_codes[constant_name])
+        )
+        if actual != expected_code:
             raise ValueError(
                 f"Unexpected OM {kind} dtype at index {index}: {actual}; "
                 f"expected {constant_name} ({expected_code})"
             )
+        return actual
 
     def _prepare_inputs(self) -> None:
         self.input_dataset = self.acl.mdl.create_dataset()
@@ -222,10 +298,15 @@ class MidiDdspAclRunner:
                 raise ValueError(
                     f"Unexpected OM input {name} shape: {shape}, expected {spec.shape}"
                 )
-            self._check_dtype(index, spec.dtype, True)
+            dtype_code = self._check_dtype(index, spec.dtype, True)
             self.input_names.append(name)
             self.input_descriptors.append(
-                {"name": raw_name, "logical_name": name, "shape": list(shape)}
+                {
+                    "name": raw_name,
+                    "logical_name": name,
+                    "shape": list(shape),
+                    "dtype_code": dtype_code,
+                }
             )
             self.input_buffers.append(self._allocate_buffer(index, spec, True))
         if self.input_names != [spec.name for spec in self.input_specs]:
@@ -248,10 +329,15 @@ class MidiDdspAclRunner:
                 raise ValueError(
                     f"Unexpected OM output {spec.name} shape: {shape}, expected {spec.shape}"
                 )
-            self._check_dtype(index, spec.dtype, False)
+            dtype_code = self._check_dtype(index, spec.dtype, False)
             self.output_names.append(spec.name)
             self.output_descriptors.append(
-                {"name": raw_name, "logical_name": spec.name, "shape": list(shape)}
+                {
+                    "name": raw_name,
+                    "logical_name": spec.name,
+                    "shape": list(shape),
+                    "dtype_code": dtype_code,
+                }
             )
             self.output_buffers.append(self._allocate_buffer(index, spec, False))
 

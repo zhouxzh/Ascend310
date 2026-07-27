@@ -3,6 +3,15 @@ import { vi } from 'vitest'
 import Piano from './Piano'
 
 describe('Piano', () => {
+  it('renders the 32-key MIDIPLUS layout from F3 through C6', () => {
+    render(<Piano octave={4} keyCount={32} velocity={100} activeNotes={[]} onNoteOn={() => undefined} onNoteOff={() => undefined} />)
+    const piano = screen.getByLabelText('触控钢琴')
+    expect(piano).toHaveAttribute('data-key-count', '32')
+    expect(screen.getAllByRole('button')).toHaveLength(32)
+    expect(screen.getByRole('button', { name: 'F3' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'C6' })).toBeVisible()
+  })
+
   it('sends paired note events for pointer input', () => {
     const noteOn = vi.fn()
     const noteOff = vi.fn()

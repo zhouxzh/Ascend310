@@ -18,7 +18,6 @@
 | [Ascend 音频输出](audio-output.md) | 板载 3.5mm、官方样例、USB 声卡、蓝牙 A2DP/HFP 和漫步者喇叭 |
 | [OM 转换与验证](om-deployment.md) | ATC 转换、日志检查和 FP16 精度验证 |
 | [板端实测结果](benchmark-results.md) | 8T/8T2/20T 的精度、速度和兼容性结果 |
-| [MIDI-DDSP OM 实测](midi-ddsp-benchmark.md) | MIDI-DDSP FP16/Mixed OM 的精度、随机性和速度对比 |
 | [MIDI-DDSP 实时合成](midi-ddsp-realtime.md) | 使用 MIDI-DDSP OM、PyACL、CPU DSP 和 M25 实时播放 MIDI |
 | [MIDI-DDSP Studio Web 界面](webui.md) | React/FastAPI 工作台、板端手动安装、同步、启动和测试 |
 | [测试故障排查](troubleshooting.md) | SSH/systemd、音频、ATC、OOM、兼容性和性能问题记录 |

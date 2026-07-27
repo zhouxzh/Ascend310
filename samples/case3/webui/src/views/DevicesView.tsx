@@ -1,7 +1,9 @@
-import { Box, Cable, CheckCircle2, Cpu, Headphones, Mic2, RefreshCw, Server, TriangleAlert, XCircle } from 'lucide-react'
+import { Box, Cable, CheckCircle2, Cpu, Headphones, Mic2, RefreshCw, Server, TriangleAlert, Wifi, XCircle } from 'lucide-react'
 import { formatBytes } from '../api'
+import { audioDeviceLabel } from '../audio'
 import { PanelHeader, StatusPill } from '../components/ui'
 import type { AudioDevice, AudioInput, Catalog, MidiPort, SystemStatus } from '../types'
+import BluetoothAudioPanel from './BluetoothAudioPanel'
 import SpeakerView from './SpeakerView'
 
 interface Props {
@@ -19,18 +21,25 @@ interface Props {
 
 export default function DevicesView({ status, catalog, audioDevices, speakerOutputs, audioInputs, midiPorts, audioError, audioInputError, midiError, onRefresh }: Props) {
   const captureInputs = audioInputs.filter((input) => input.type === 'capture' && input.available)
+  const midiDdspComponentCount = catalog.midi_ddsp_bundles.reduce(
+    (total, bundle) => total + Object.keys(bundle.components).length,
+    0,
+  )
   return (
     <div className="devices-workspace">
       <section className="panel device-overview">
-        <PanelHeader title="系统与设备" subtitle={`${status.hostname} · ${status.machine}`} action={<button className="icon-button" title="刷新设备" type="button" onClick={onRefresh}><RefreshCw size={18} /></button>} />
+        <PanelHeader title="系统与设备" subtitle={`${status.hostname} · ${status.primary_ip} · ${status.machine}`} action={<button className="icon-button" title="刷新设备" type="button" onClick={onRefresh}><RefreshCw size={18} /></button>} />
         <div className="device-summary-grid">
           <div className="device-summary"><span className="summary-icon"><Cpu size={22} /></span><div><small>ASCEND NPU</small><strong>{status.npu.available ? '310B4' : '不可用'}</strong></div><StatusPill tone={status.npu.health_alarm ? 'warn' : status.npu.available ? 'ok' : 'error'}>{status.npu.health_alarm ? 'Alarm' : status.npu.available ? 'Ready' : 'Offline'}</StatusPill></div>
+          <div className="device-summary"><span className="summary-icon teal"><Wifi size={22} /></span><div><small>BOARD IP</small><strong>{status.primary_ip}</strong></div><StatusPill tone={status.primary_ip.startsWith('127.') ? 'warn' : 'ok'}>{status.primary_ip.startsWith('127.') ? 'Local' : 'LAN'}</StatusPill></div>
           <div className="device-summary"><span className="summary-icon teal"><Headphones size={22} /></span><div><small>AUDIO OUTPUT</small><strong>{audioDevices.length}</strong></div><StatusPill tone={audioDevices.length ? 'ok' : 'error'}>{audioDevices.length ? 'Ready' : 'Missing'}</StatusPill></div>
           <div className="device-summary"><span className="summary-icon teal"><Mic2 size={22} /></span><div><small>AUDIO INPUT</small><strong>{captureInputs.length}</strong></div><StatusPill tone={captureInputs.length ? 'ok' : 'warn'}>{captureInputs.length ? 'Capture' : 'No capture'}</StatusPill></div>
           <div className="device-summary"><span className="summary-icon amber"><Cable size={22} /></span><div><small>MIDI INPUT</small><strong>{midiPorts.length}</strong></div><StatusPill tone={midiPorts.length ? 'ok' : 'neutral'}>{midiPorts.length ? 'Connected' : 'None'}</StatusPill></div>
-          <div className="device-summary"><span className="summary-icon graphite"><Box size={22} /></span><div><small>MODEL FILES</small><strong>{catalog.ddsp_vst_models.length + catalog.midi_ddsp_models.length}</strong></div><StatusPill tone="ok">Indexed</StatusPill></div>
+          <div className="device-summary"><span className="summary-icon graphite"><Box size={22} /></span><div><small>MODEL FILES</small><strong>{catalog.ddsp_vst_models.length + midiDdspComponentCount}</strong></div><StatusPill tone="ok">Indexed</StatusPill></div>
         </div>
       </section>
+
+      <BluetoothAudioPanel onRefresh={onRefresh} />
 
       <SpeakerView status={status} audioDevices={speakerOutputs} onRefresh={onRefresh} />
 
@@ -61,7 +70,7 @@ export default function DevicesView({ status, catalog, audioDevices, speakerOutp
         <PanelHeader title="音频输出" action={<Headphones size={18} />} />
         {audioError && <div className="inline-error"><TriangleAlert size={17} />{audioError}</div>}
         <div className="device-list">
-          {audioDevices.map((device) => <div className="device-list-row" key={device.id}><div><strong>{device.name}</strong><small>{device.host_api}</small></div><span>{device.max_output_channels} ch</span><span>{device.default_sample_rate / 1000} kHz</span></div>)}
+          {audioDevices.map((device) => <div className="device-list-row" key={device.id}><div><strong>{audioDeviceLabel(device)}</strong><small>{device.host_api}</small></div><span>{device.max_output_channels} ch</span><span>{device.default_sample_rate / 1000} kHz</span></div>)}
           {!audioDevices.length && !audioError && <div className="empty-list">未发现音频输出</div>}
         </div>
       </section>
@@ -78,8 +87,11 @@ export default function DevicesView({ status, catalog, audioDevices, speakerOutp
       <section className="panel model-inventory">
         <PanelHeader title="模型目录" action={<Box size={18} />} />
         <div className="inventory-table">
-          {[...catalog.ddsp_vst_models, ...catalog.midi_ddsp_models].map((model) => (
-            <div className="inventory-row" key={model.id}><strong>{model.name}</strong><span>{'backend' in model ? model.backend.toUpperCase() : model.component}</span><span>{model.precision}</span><span>{formatBytes(model.size_bytes)}</span></div>
+          {catalog.ddsp_vst_models.map((model) => (
+            <div className="inventory-row" key={model.id}><strong>{model.name}</strong><span>{model.backend.toUpperCase()}</span><span>{model.precision}</span><span>{formatBytes(model.size_bytes)}</span></div>
+          ))}
+          {catalog.midi_ddsp_bundles.map((bundle) => (
+            <div className="inventory-row" key={bundle.id}><strong>{bundle.name}</strong><span>BUNDLE</span><span>{bundle.precision}</span><span>{Object.keys(bundle.components).length} components</span></div>
           ))}
         </div>
       </section>
