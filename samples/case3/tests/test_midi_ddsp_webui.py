@@ -214,7 +214,7 @@ class ApiValidationTest(unittest.TestCase):
             )
 
     def test_speaker_test_rejects_unknown_audio_device(self) -> None:
-        with patch.object(web_app, "query_speaker_outputs", return_value=[]):
+        with patch.object(web_app, "query_piano_audio_outputs", return_value=[]):
             with self.assertRaises(HTTPException) as raised:
                 asyncio.run(
                     web_app.start_speaker_test(

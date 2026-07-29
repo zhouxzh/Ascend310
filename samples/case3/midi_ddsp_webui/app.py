@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import queue
 import sys
+import time
 from typing import Literal, Optional
 from uuid import uuid4
 
@@ -43,7 +44,21 @@ from .core import (
 )
 from .live import DdspVstSessionController
 from .midi_analysis import MidiValidationError, analyze_midi, analyze_midi_voices
-from .speaker import SpeakerTestController, query_audio_inputs, query_speaker_outputs
+from .piano import (
+    PianoDdspController,
+    piano_catalog,
+    resolve_piano_bundle,
+    resolve_recording,
+)
+from .speaker import (
+    NO_AUDIO_OUTPUT,
+    NO_REALTIME_AUDIO_OUTPUT,
+    SpeakerTestController,
+    query_audio_inputs,
+    query_ddsp_vst_audio_outputs,
+    query_midi_ddsp_audio_outputs,
+    query_piano_audio_outputs,
+)
 
 
 MAX_MIDI_BYTES = 10 * 1024 * 1024
@@ -53,6 +68,8 @@ WEB_DIST = ROOT / "webui" / "dist"
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     yield
+    if piano.running:
+        piano.stop()
     if ddsp_vst.running:
         ddsp_vst.stop()
     if speaker.running:
@@ -65,6 +82,7 @@ coordinator = ResourceCoordinator()
 jobs = JobManager(coordinator)
 ddsp_vst = DdspVstSessionController(coordinator)
 speaker = SpeakerTestController(coordinator)
+piano = PianoDdspController(coordinator)
 
 
 class ApiModel(BaseModel):
@@ -139,6 +157,31 @@ class BluetoothDeviceRequest(ApiModel):
     trust: bool = True
 
 
+class PianoDdspStartRequest(ApiModel):
+    bundle_id: Optional[str] = None
+    model_id: str = "paper_ir"
+    piano_year: int = Field(2018, ge=2000, le=2100)
+    midi_port: Optional[str] = None
+    audio_device_id: Optional[str] = None
+    latency_profile: Literal["low", "balanced", "safe"] = "balanced"
+    seed: int = Field(0, ge=0, le=2_147_483_647)
+    velocity_curve: float = Field(1.0, ge=0.25, le=2.0)
+    transpose: int = Field(0, ge=-24, le=24)
+    output_gain_db: float = Field(-12.0, ge=-60.0, le=0.0)
+    reverb_mix: float = Field(1.0, ge=0.0, le=1.0)
+    device_id: int = Field(0, ge=0, le=63)
+
+
+class PianoDdspParametersRequest(ApiModel):
+    model_id: Optional[str] = None
+    piano_year: Optional[int] = Field(None, ge=2000, le=2100)
+    velocity_curve: Optional[float] = Field(None, ge=0.25, le=2.0)
+    transpose: Optional[int] = Field(None, ge=-24, le=24)
+    output_gain_db: Optional[float] = Field(None, ge=-60.0, le=0.0)
+    reverb_mix: Optional[float] = Field(None, ge=0.0, le=1.0)
+    pedal: Optional[bool] = None
+
+
 def _http_error(exc: BaseException) -> HTTPException:
     if isinstance(exc, ResourceBusyError):
         return HTTPException(status_code=409, detail=str(exc))
@@ -164,6 +207,7 @@ def _require_board() -> None:
 def get_status() -> dict[str, object]:
     return {
         **system_status(coordinator.owner),
+        "piano_ddsp": piano.status(),
         "ddsp_vst": ddsp_vst.status(),
         "speaker_test": speaker.status(),
         "job_count": len(jobs.list()),
@@ -178,10 +222,11 @@ def get_catalog() -> dict[str, object]:
 @app.get("/api/v1/audio-devices")
 def get_audio_devices() -> dict[str, object]:
     try:
+        devices = query_ddsp_vst_audio_outputs(query_audio_devices)
         return {
-            "available": True,
-            "devices": query_speaker_outputs(query_audio_devices),
-            "error": None,
+            "available": bool(devices),
+            "devices": devices,
+            "error": None if devices else NO_REALTIME_AUDIO_OUTPUT,
         }
     except Exception as exc:
         return {"available": False, "devices": [], "error": str(exc)}
@@ -200,12 +245,292 @@ def get_audio_inputs() -> dict[str, object]:
         return {"available": False, "devices": [], "error": str(exc)}
 
 
+@app.get("/api/v1/midi-ddsp/audio-devices")
+def get_midi_ddsp_audio_devices() -> dict[str, object]:
+    try:
+        devices = query_midi_ddsp_audio_outputs(query_audio_devices)
+        return {
+            "available": bool(devices),
+            "devices": devices,
+            "error": None if devices else NO_AUDIO_OUTPUT,
+        }
+    except Exception as exc:
+        return {"available": False, "devices": [], "error": str(exc)}
+
+
 @app.get("/api/v1/midi-ports")
 def get_midi_ports() -> dict[str, object]:
     try:
         return {"available": True, "ports": query_midi_devices(), "error": None}
     except Exception as exc:
         return {"available": False, "ports": [], "error": str(exc)}
+
+
+@app.get("/api/v1/piano-ddsp/catalog")
+def get_piano_ddsp_catalog() -> dict[str, object]:
+    try:
+        return piano_catalog()
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.get("/api/v1/piano-ddsp/audio-devices")
+def get_piano_ddsp_audio_devices() -> dict[str, object]:
+    try:
+        devices = query_piano_audio_outputs(query_audio_devices)
+        return {
+            "available": bool(devices),
+            "devices": devices,
+            "error": None if devices else NO_AUDIO_OUTPUT,
+        }
+    except Exception as exc:
+        return {"available": False, "devices": [], "error": str(exc)}
+
+
+@app.get("/api/v1/piano-ddsp/status")
+def get_piano_ddsp_status() -> dict[str, object]:
+    return piano.status()
+
+
+@app.post("/api/v1/piano-ddsp/start")
+async def start_piano_ddsp(payload: PianoDdspStartRequest) -> dict[str, object]:
+    _require_board()
+    try:
+        catalog_data = piano_catalog()
+        bundles = list(catalog_data.get("bundles", []))
+        bundle_id = payload.bundle_id
+        if bundle_id is None:
+            active_bundle_id = catalog_data.get("active_bundle_id")
+            active = next(
+                (
+                    item
+                    for item in bundles
+                    if item.get("id") == active_bundle_id
+                    and payload.model_id in item.get("models", [])
+                ),
+                None,
+            )
+            bundle_id = str(active["id"]) if active else next(
+                str(item["id"])
+                for item in bundles
+                if payload.model_id in item.get("models", [])
+            )
+        bundle_manifest = resolve_piano_bundle(bundle_id)
+        outputs = query_piano_audio_outputs(query_audio_devices)
+        if payload.audio_device_id not in (None, ""):
+            audio_output = next(
+                item for item in outputs if item["id"] == payload.audio_device_id
+            )
+        else:
+            audio_output = next(
+                (item for item in outputs if item.get("is_default")),
+                outputs[0] if outputs else None,
+            )
+        if audio_output is None:
+            raise RuntimeError(NO_AUDIO_OUTPUT)
+        midi_port = payload.midi_port
+        if midi_port:
+            ports = query_midi_devices()
+            selected_port = next(
+                (
+                    item
+                    for item in ports
+                    if midi_port in {str(item.get("id")), str(item.get("port"))}
+                ),
+                None,
+            )
+            if selected_port is None:
+                raise KeyError(f"MIDI input {midi_port!r} was not found")
+            midi_port = str(selected_port.get("port") or selected_port.get("name"))
+        audio_device: str | int | None = (
+            audio_output.get("index")
+            if audio_output.get("backend") == "portaudio"
+            else audio_output.get("id")
+        )
+        config = {
+            "bundle_manifest": str(bundle_manifest),
+            "model_id": payload.model_id,
+            "piano_year": payload.piano_year,
+            "output_sample_rate": int(audio_output.get("default_sample_rate", 48_000)),
+            "latency_profile": payload.latency_profile,
+            "seed": payload.seed,
+            "velocity_curve": payload.velocity_curve,
+            "transpose": payload.transpose,
+            "output_gain_db": payload.output_gain_db,
+            "reverb_mix": payload.reverb_mix,
+            "midi_port": midi_port,
+            "audio_backend": str(audio_output.get("backend", "portaudio")),
+            "pulse_sink": audio_output.get("sink_name"),
+            "audio_device": audio_device,
+            "is_bluetooth": bool(audio_output.get("is_bluetooth", False)),
+            "alsa_card": audio_output.get("alsa_card"),
+            "alsa_device": audio_output.get("alsa_device"),
+            "alsa_route_device_id": audio_output.get("alsa_route_device_id"),
+            "alsa_playback_level": audio_output.get("alsa_playback_level"),
+            "device_id": payload.device_id,
+            "recorder_root": str(REPORT_ROOT / "piano-ddsp"),
+        }
+        return await asyncio.to_thread(piano.start, config)
+    except StopIteration as exc:
+        raise HTTPException(status_code=404, detail="Piano-DDSP bundle or audio output not found") from exc
+    except HTTPException:
+        raise
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/v1/piano-ddsp/stop")
+async def stop_piano_ddsp() -> dict[str, object]:
+    return await asyncio.to_thread(piano.stop)
+
+
+@app.post("/api/v1/piano-ddsp/panic")
+async def panic_piano_ddsp() -> dict[str, object]:
+    try:
+        await asyncio.to_thread(piano.command, "panic")
+        return piano.status()
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.patch("/api/v1/piano-ddsp/parameters")
+async def patch_piano_ddsp_parameters(
+    payload: PianoDdspParametersRequest,
+) -> dict[str, object]:
+    values = payload.model_dump(exclude_none=True)
+    try:
+        await asyncio.to_thread(piano.command, "parameters", values=values)
+        return piano.status()
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.get("/api/v1/piano-ddsp/recordings/{recording_id}")
+def get_piano_ddsp_recording(recording_id: str) -> FileResponse:
+    try:
+        path = resolve_recording(recording_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Piano-DDSP recording not found") from exc
+    return FileResponse(path, filename=path.name, media_type="audio/wav")
+
+
+@app.websocket("/api/v1/piano-ddsp/events")
+async def piano_ddsp_events(websocket: WebSocket) -> None:
+    await websocket.accept()
+    source = f"browser-{uuid4().hex[:10]}"
+    subscriber = piano.subscribe()
+    monitor_enabled = False
+    last_status = 0.0
+    try:
+        await websocket.send_json({"event": "status", "data": piano.status()})
+        while True:
+            while True:
+                try:
+                    outgoing = subscriber.get_nowait()
+                except queue.Empty:
+                    break
+                if outgoing.get("event") != "monitor" or monitor_enabled:
+                    await websocket.send_json(outgoing)
+            now = time.monotonic()
+            if now - last_status >= 1.0:
+                last_status = now
+                await websocket.send_json({"event": "status", "data": piano.status()})
+            try:
+                message = await asyncio.wait_for(websocket.receive_json(), timeout=0.1)
+            except asyncio.TimeoutError:
+                continue
+            event = str(message.get("event", ""))
+            try:
+                result: object = None
+                if event in {"note_on", "note_off"}:
+                    result = await asyncio.to_thread(
+                        piano.command,
+                        "note",
+                        source=source,
+                        note=int(message["note"]),
+                        velocity=int(message.get("velocity", 100 if event == "note_on" else 0)),
+                        on=event == "note_on",
+                    )
+                elif event in {"cc", "control_change"}:
+                    result = await asyncio.to_thread(
+                        piano.command,
+                        "cc",
+                        source=source,
+                        controller=int(message["controller"]),
+                        value=int(message["value"]),
+                    )
+                elif event == "sustain":
+                    result = await asyncio.to_thread(
+                        piano.command,
+                        "cc",
+                        source=source,
+                        controller=64,
+                        value=127 if bool(message.get("enabled")) else 0,
+                    )
+                elif event == "player":
+                    action = str(message["action"])
+                    values = dict(message.get("values") or {})
+                    if action == "load" and "midi_id" in values:
+                        midi = resolve_catalog_item("midi_files", str(values.pop("midi_id")))
+                        values["path"] = str(midi["path"])
+                    result = await asyncio.to_thread(
+                        piano.command, "player", action=action, values=values
+                    )
+                elif event == "record_start":
+                    recording_id = f"piano-{uuid4().hex}"
+                    result = await asyncio.to_thread(
+                        piano.command, "record_start", recording_id=recording_id
+                    )
+                    result = {
+                        "id": recording_id,
+                        "download_url": f"/api/v1/piano-ddsp/recordings/{recording_id}",
+                    }
+                elif event == "record_stop":
+                    raw = await asyncio.to_thread(piano.command, "record_stop")
+                    path = Path(str(dict(raw or {}).get("path", "")))
+                    result = (
+                        {
+                            "id": path.stem,
+                            "download_url": f"/api/v1/piano-ddsp/recordings/{path.stem}",
+                        }
+                        if path.name
+                        else None
+                    )
+                elif event == "monitor":
+                    monitor_enabled = bool(message.get("enabled", False))
+                    await asyncio.to_thread(piano.set_monitor, source, monitor_enabled)
+                    result = {"enabled": monitor_enabled}
+                elif event == "panic":
+                    result = await asyncio.to_thread(piano.command, "panic")
+                elif event == "parameters":
+                    values = message.get("values")
+                    if not isinstance(values, dict):
+                        raise ValueError("parameters event requires a values object")
+                    result = await asyncio.to_thread(
+                        piano.command, "parameters", values=values
+                    )
+                elif event == "ping":
+                    await websocket.send_json({"event": "pong"})
+                    continue
+                else:
+                    raise ValueError(f"Unknown Piano-DDSP event: {event}")
+                await websocket.send_json({"event": "ack", "request": event, "data": result})
+            except BaseException as exc:
+                await websocket.send_json({"event": "error", "message": str(exc)})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if monitor_enabled:
+            try:
+                await asyncio.to_thread(piano.set_monitor, source, False)
+            except BaseException:
+                pass
+        if piano.running:
+            try:
+                await asyncio.to_thread(piano.command, "release_source", source=source)
+            except BaseException:
+                pass
+        piano.unsubscribe(subscriber)
 
 
 @app.get("/api/v1/speaker-test/status")
@@ -218,7 +543,7 @@ def get_speaker_outputs() -> dict[str, object]:
     try:
         return {
             "available": True,
-            "devices": query_speaker_outputs(query_audio_devices),
+            "devices": query_piano_audio_outputs(query_audio_devices),
             "error": None,
         }
     except Exception as exc:
@@ -284,7 +609,7 @@ async def disconnect_bluetooth_audio(payload: BluetoothDeviceRequest) -> dict[st
 @app.post("/api/v1/speaker-test/start")
 async def start_speaker_test(payload: SpeakerTestRequest) -> dict[str, object]:
     try:
-        devices = query_speaker_outputs(query_audio_devices)
+        devices = query_piano_audio_outputs(query_audio_devices)
         device = next(
             item for item in devices if item["id"] == payload.audio_device_id
         )
@@ -292,10 +617,15 @@ async def start_speaker_test(payload: SpeakerTestRequest) -> dict[str, object]:
         config.update(
             {
                 "device_name": device["name"],
+                "audio_device_id": device.get("index", payload.audio_device_id),
                 "audio_backend": device.get("backend", "portaudio"),
                 "pulse_sink": device.get("sink_name"),
                 "max_output_channels": device["max_output_channels"],
                 "default_sample_rate": device["default_sample_rate"],
+                "alsa_card": device.get("alsa_card"),
+                "alsa_device": device.get("alsa_device"),
+                "alsa_route_device_id": device.get("alsa_route_device_id"),
+                "alsa_playback_level": device.get("alsa_playback_level"),
             }
         )
         return await asyncio.to_thread(speaker.start, config)
@@ -327,7 +657,7 @@ async def start_ddsp_vst(payload: DdspVstStartRequest) -> dict[str, object]:
         if payload.audio_device_id:
             device = next(
                 output
-                for output in query_speaker_outputs(query_audio_devices)
+                for output in query_ddsp_vst_audio_outputs(query_audio_devices)
                 if output["id"] == payload.audio_device_id
             )
             config.update(
@@ -507,7 +837,7 @@ def start_midi_ddsp_job(payload: MidiDdspJobRequest) -> dict[str, object]:
         if payload.mode == "play" and payload.audio_device_id not in (None, ""):
             audio_output = next(
                 output
-                for output in query_speaker_outputs(query_audio_devices)
+                for output in query_ddsp_vst_audio_outputs(query_audio_devices)
                 if output["id"] == payload.audio_device_id
             )
         command = [
@@ -622,7 +952,7 @@ def play_midi_ddsp_recording(
             raise ValueError("Selected job is not a MIDI-DDSP recording")
         artifact_id = f"{source_job_id}--output.wav"
         wav_path = resolve_artifact(artifact_id)
-        outputs = query_speaker_outputs(query_audio_devices)
+        outputs = query_midi_ddsp_audio_outputs(query_audio_devices)
         if payload.audio_device_id not in (None, ""):
             audio_output = next(
                 output for output in outputs if output["id"] == payload.audio_device_id
@@ -634,22 +964,35 @@ def play_midi_ddsp_recording(
             )
         if audio_output is None:
             raise RuntimeError("No audio output device is available")
-        if audio_output.get("backend") != "pulse":
-            raise RuntimeError("Existing WAV playback requires a PulseAudio output")
         command = [
             sys.executable,
             "-m",
             "midi_ddsp_webui.wav_playback",
             "--input",
             str(wav_path),
-            "--pulse-sink",
-            str(audio_output["sink_name"]),
             "--latency-ms",
             str(payload.latency_ms),
             "--output-gain-db",
             str(payload.output_gain_db),
             "--json-events",
         ]
+        if audio_output.get("backend") == "pulse":
+            command.extend(["--pulse-sink", str(audio_output["sink_name"])])
+        elif audio_output.get("backend") == "alsa_mono":
+            command.extend(
+                [
+                    "--alsa-device",
+                    str(audio_output["alsa_device"]),
+                    "--alsa-card",
+                    str(audio_output.get("alsa_card", 0)),
+                    "--alsa-route-device-id",
+                    str(audio_output.get("alsa_route_device_id", 2)),
+                    "--alsa-playback-level",
+                    str(audio_output.get("alsa_playback_level", 10)),
+                ]
+            )
+        else:
+            raise RuntimeError("Selected audio output is unsupported for WAV playback")
         copied_metadata = {
             key: source_job.metadata[key]
             for key in (

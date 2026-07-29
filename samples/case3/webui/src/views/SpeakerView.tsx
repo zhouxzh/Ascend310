@@ -36,6 +36,9 @@ export default function SpeakerView({ status, audioDevices, onRefresh }: Props) 
   const [error, setError] = useState('')
 
   const selectedDevice = audioDevices.find((device) => device.id === deviceId) ?? preferredDevice
+  const channelOptions = selectedDevice?.is_mono
+    ? [{ value: 'both' as SpeakerChannelMode, label: '单声道' }]
+    : CHANNEL_OPTIONS
   const resourceBusy = status.active_owner !== null && status.active_owner !== 'speaker-test'
   const unavailable = !selectedDevice || resourceBusy
   const activeMode = testStatus.running
@@ -70,7 +73,7 @@ export default function SpeakerView({ status, audioDevices, onRefresh }: Props) 
   }, [onRefresh, testStatus.running])
 
   useEffect(() => {
-    if (selectedDevice && selectedDevice.max_output_channels < 2 && channelMode === 'right') {
+    if (selectedDevice && selectedDevice.max_output_channels < 2 && channelMode !== 'both') {
       setChannelMode('both')
     }
   }, [channelMode, selectedDevice])
@@ -124,6 +127,7 @@ export default function SpeakerView({ status, audioDevices, onRefresh }: Props) 
         />
 
         {(error || testStatus.error) && <Notice tone="error">{error || testStatus.error}</Notice>}
+        {selectedDevice?.warning && <Notice tone="warn">{selectedDevice.warning}</Notice>}
         {resourceBusy && <Notice tone="error">音频资源正在被 {status.active_owner} 占用</Notice>}
         {!selectedDevice && <Notice tone="error">未发现可用的音频输出设备</Notice>}
 
@@ -174,7 +178,7 @@ export default function SpeakerView({ status, audioDevices, onRefresh }: Props) 
             </select>
           </Field>
           <Field label="测试声道">
-            <Segmented value={channelMode} options={CHANNEL_OPTIONS} onChange={setChannelMode} />
+            <Segmented value={channelMode} options={channelOptions} onChange={setChannelMode} />
           </Field>
           <Field label={`频率 ${frequency} Hz`}>
             <input type="range" min="100" max="2000" step="10" value={frequency} disabled={testStatus.running} onChange={(event) => setFrequency(Number(event.target.value))} />

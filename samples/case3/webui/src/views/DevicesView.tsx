@@ -9,7 +9,6 @@ import SpeakerView from './SpeakerView'
 interface Props {
   status: SystemStatus
   catalog: Catalog
-  audioDevices: AudioDevice[]
   speakerOutputs: AudioDevice[]
   audioInputs: AudioInput[]
   midiPorts: MidiPort[]
@@ -19,7 +18,7 @@ interface Props {
   onRefresh: () => Promise<void>
 }
 
-export default function DevicesView({ status, catalog, audioDevices, speakerOutputs, audioInputs, midiPorts, audioError, audioInputError, midiError, onRefresh }: Props) {
+export default function DevicesView({ status, catalog, speakerOutputs, audioInputs, midiPorts, audioError, audioInputError, midiError, onRefresh }: Props) {
   const captureInputs = audioInputs.filter((input) => input.type === 'capture' && input.available)
   const midiDdspComponentCount = catalog.midi_ddsp_bundles.reduce(
     (total, bundle) => total + Object.keys(bundle.components).length,
@@ -32,7 +31,7 @@ export default function DevicesView({ status, catalog, audioDevices, speakerOutp
         <div className="device-summary-grid">
           <div className="device-summary"><span className="summary-icon"><Cpu size={22} /></span><div><small>ASCEND NPU</small><strong>{status.npu.available ? '310B4' : '不可用'}</strong></div><StatusPill tone={status.npu.health_alarm ? 'warn' : status.npu.available ? 'ok' : 'error'}>{status.npu.health_alarm ? 'Alarm' : status.npu.available ? 'Ready' : 'Offline'}</StatusPill></div>
           <div className="device-summary"><span className="summary-icon teal"><Wifi size={22} /></span><div><small>BOARD IP</small><strong>{status.primary_ip}</strong></div><StatusPill tone={status.primary_ip.startsWith('127.') ? 'warn' : 'ok'}>{status.primary_ip.startsWith('127.') ? 'Local' : 'LAN'}</StatusPill></div>
-          <div className="device-summary"><span className="summary-icon teal"><Headphones size={22} /></span><div><small>AUDIO OUTPUT</small><strong>{audioDevices.length}</strong></div><StatusPill tone={audioDevices.length ? 'ok' : 'error'}>{audioDevices.length ? 'Ready' : 'Missing'}</StatusPill></div>
+          <div className="device-summary"><span className="summary-icon teal"><Headphones size={22} /></span><div><small>AUDIO OUTPUT</small><strong>{speakerOutputs.length}</strong></div><StatusPill tone={speakerOutputs.length ? 'ok' : 'error'}>{speakerOutputs.length ? 'Ready' : 'Missing'}</StatusPill></div>
           <div className="device-summary"><span className="summary-icon teal"><Mic2 size={22} /></span><div><small>AUDIO INPUT</small><strong>{captureInputs.length}</strong></div><StatusPill tone={captureInputs.length ? 'ok' : 'warn'}>{captureInputs.length ? 'Capture' : 'No capture'}</StatusPill></div>
           <div className="device-summary"><span className="summary-icon amber"><Cable size={22} /></span><div><small>MIDI INPUT</small><strong>{midiPorts.length}</strong></div><StatusPill tone={midiPorts.length ? 'ok' : 'neutral'}>{midiPorts.length ? 'Connected' : 'None'}</StatusPill></div>
           <div className="device-summary"><span className="summary-icon graphite"><Box size={22} /></span><div><small>MODEL FILES</small><strong>{catalog.ddsp_vst_models.length + midiDdspComponentCount}</strong></div><StatusPill tone="ok">Indexed</StatusPill></div>
@@ -70,8 +69,8 @@ export default function DevicesView({ status, catalog, audioDevices, speakerOutp
         <PanelHeader title="音频输出" action={<Headphones size={18} />} />
         {audioError && <div className="inline-error"><TriangleAlert size={17} />{audioError}</div>}
         <div className="device-list">
-          {audioDevices.map((device) => <div className="device-list-row" key={device.id}><div><strong>{audioDeviceLabel(device)}</strong><small>{device.host_api}</small></div><span>{device.max_output_channels} ch</span><span>{device.default_sample_rate / 1000} kHz</span></div>)}
-          {!audioDevices.length && !audioError && <div className="empty-list">未发现音频输出</div>}
+          {speakerOutputs.map((device) => <div className="device-list-row" key={device.id}><div><strong>{audioDeviceLabel(device)}</strong><small>{device.host_api}</small></div><span>{device.max_output_channels} ch</span><span>{device.default_sample_rate / 1000} kHz</span></div>)}
+          {!speakerOutputs.length && !audioError && <div className="empty-list">未发现音频输出</div>}
         </div>
       </section>
 

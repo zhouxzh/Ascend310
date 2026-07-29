@@ -16,6 +16,76 @@ from .core import ResourceCoordinator
 
 CHANNEL_MODES = {"left", "both", "right"}
 SAMPLE_SPEC_PATTERN = re.compile(r"(?P<channels>\d+)ch\s+(?P<rate>\d+)Hz")
+NO_AUDIO_OUTPUT = "No usable audio output was found"
+NO_REALTIME_AUDIO_OUTPUT = (
+    "当前只有板载 3.5 mm 单声道兼容路径；DDSP-VST 需要 USB、蓝牙或其他可用立体声输出。"
+)
+ONBOARD_OUTPUT_NAME = "板载 3.5 mm"
+ONBOARD_HEADSET_WARNING = (
+    "设备能力提示：板载 3.5 mm 使用厂商 48 kHz 单声道兼容路径。双声道 "
+    "PortAudio 和板载 PulseAudio 已禁用，以避免 DMA 卡死；这不是启动错误。"
+)
+
+
+def _is_ascend_onboard_output(device: dict[str, object]) -> bool:
+    if bool(device.get("is_onboard")):
+        return True
+    identifier = str(device.get("id", "")).lower()
+    sink_name = str(device.get("sink_name", "")).lower()
+    name = str(device.get("name", "")).lower()
+    if "alsa_output.platform-sound" in identifier or "platform-sound" in sink_name:
+        return True
+    return "ascend310b" in name and "(hw:0,0)" in name
+
+
+def canonical_audio_output_name(device: dict[str, object]) -> str:
+    """Return one user-facing name for a physical output across backends."""
+    if _is_ascend_onboard_output(device) or bool(device.get("is_onboard")):
+        return ONBOARD_OUTPUT_NAME
+    raw_name = str(device.get("name", "")).strip()
+    lowered = raw_name.lower()
+    for product in ("EDIFIER M16 Pro", "EDIFIER M25 Plus", "EDIFIER M25"):
+        if product.lower() in lowered:
+            return product
+    normalized = re.sub(r"\s*\(hw:\d+,\d+\)\s*$", "", raw_name).strip()
+    normalized = re.sub(r"\s+(?:Analog|Digital) Stereo\s*$", "", normalized).strip()
+    return normalized or raw_name
+
+
+def _canonicalize_output(device: dict[str, object]) -> dict[str, object]:
+    item = dict(device)
+    if _is_ascend_onboard_output(item) or bool(item.get("is_onboard")):
+        item["is_onboard"] = True
+    raw_name = str(item.get("raw_name") or item.get("name") or "").strip()
+    item["raw_name"] = raw_name
+    item["name"] = canonical_audio_output_name(item)
+    return item
+
+
+def configure_alsa_output_route(
+    card: int,
+    route_device_id: int,
+    playback_level: int = 10,
+) -> None:
+    """Select a board audio route for this session using the vendor controls."""
+    if shutil.which("amixer") is None:
+        raise RuntimeError("amixer is unavailable for the selected onboard output")
+    for control, value in (
+        ("Playback", playback_level),
+        ("Deviceid", route_device_id),
+    ):
+        result = subprocess.run(
+            ["amixer", "-c", str(card), "set", control, str(value)],
+            text=True,
+            capture_output=True,
+            timeout=5.0,
+            check=False,
+        )
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip()
+            raise RuntimeError(
+                detail or f"Unable to set ALSA control {control}={value}"
+            )
 
 
 def query_audio_inputs(
@@ -173,7 +243,7 @@ def query_speaker_outputs(
                         or str(properties.get("device.bus", "")).lower() == "bluetooth"
                     )
                     outputs.append(
-                        {
+                        _canonicalize_output({
                             "id": f"pulse:{sink_name}",
                             "index": int(sink.get("index", len(outputs))),
                             "name": description,
@@ -185,7 +255,7 @@ def query_speaker_outputs(
                             "is_default": sink_name == default_sink,
                             "is_bluetooth": is_bluetooth,
                             "state": str(sink.get("state", "UNKNOWN")).lower(),
-                        }
+                        })
                     )
                 if outputs:
                     return outputs
@@ -206,14 +276,127 @@ def query_speaker_outputs(
     outputs = []
     for device in portaudio_query():
         outputs.append(
-            {
+            _canonicalize_output({
                 **device,
                 "backend": "portaudio",
                 "is_default": str(device.get("name", "")).lower() in {"default", "pulse"},
                 "is_bluetooth": False,
                 "state": "available",
-            }
+            })
         )
+    return outputs
+
+
+def merge_piano_audio_outputs(
+    pulse_outputs: list[dict[str, object]],
+    portaudio_outputs: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Expose direct ALSA devices to Piano-DDSP without changing legacy lists."""
+    outputs = [
+        dict(item)
+        for item in pulse_outputs
+        if item.get("backend") == "pulse" and not _is_ascend_onboard_output(item)
+    ]
+    generic_names = {
+        "pulse",
+        "default",
+        "sysdefault",
+        "samplerate",
+        "speexrate",
+        "upmix",
+        "vdownmix",
+        "dmix",
+    }
+    direct: list[dict[str, object]] = []
+    for device in portaudio_outputs:
+        name = str(device.get("name", "")).strip()
+        if not name:
+            continue
+        if name.lower() in generic_names:
+            continue
+        index = int(device.get("index", device.get("id", len(direct))))
+        item = _canonicalize_output({
+            **device,
+            "id": f"portaudio:{index}",
+            "index": index,
+            "backend": "portaudio",
+            "is_default": False,
+            "is_bluetooth": False,
+            "state": "available",
+        })
+        if _is_ascend_onboard_output(device):
+            item.update(
+                {
+                    "id": "alsa:onboard-headset",
+                    "name": ONBOARD_OUTPUT_NAME,
+                    "host_api": "ALSA aplay",
+                    "backend": "alsa_mono",
+                    "max_output_channels": 1,
+                    "default_sample_rate": 48_000,
+                    "is_onboard": True,
+                    "is_mono": True,
+                    "alsa_device": "hw:ascend310b",
+                    "alsa_card": 0,
+                    "alsa_route_device_id": 2,
+                    "alsa_playback_level": 10,
+                    "warning": ONBOARD_HEADSET_WARNING,
+                }
+            )
+        direct.append(item)
+
+    preferred = next(
+        (
+            item
+            for item in direct
+            if any(token in str(item["name"]).lower() for token in ("edifier", "m16", "m25"))
+        ),
+        None,
+    )
+    if preferred is not None:
+        for item in outputs:
+            item["is_default"] = False
+        preferred["is_default"] = True
+    elif direct and not any(item.get("is_default") for item in outputs + direct):
+        direct[0]["is_default"] = True
+    return outputs + direct
+
+
+def query_ddsp_vst_audio_outputs(
+    portaudio_query: Callable[[], list[dict[str, object]]] | None = None,
+) -> list[dict[str, object]]:
+    """Return only outputs safe for the real-time stereo DDSP-VST engine."""
+    outputs = [
+        _canonicalize_output(item)
+        for item in query_speaker_outputs(portaudio_query)
+        if not _is_ascend_onboard_output(item)
+    ]
+    if outputs and not any(item.get("is_default") for item in outputs):
+        outputs[0]["is_default"] = True
+    return outputs
+
+
+def query_piano_audio_outputs(
+    portaudio_query: Callable[[], list[dict[str, object]]] | None = None,
+) -> list[dict[str, object]]:
+    if portaudio_query is None:
+        from realtime_ddsp import query_audio_devices
+
+        portaudio_query = query_audio_devices
+    pulse_outputs = query_speaker_outputs(portaudio_query)
+    return merge_piano_audio_outputs(pulse_outputs, portaudio_query())
+
+
+def query_midi_ddsp_audio_outputs(
+    portaudio_query: Callable[[], list[dict[str, object]]] | None = None,
+) -> list[dict[str, object]]:
+    """Return only outputs supported by existing MIDI-DDSP WAV playback."""
+    outputs = [
+        dict(item)
+        for item in query_piano_audio_outputs(portaudio_query)
+        if item.get("backend") in {"pulse", "alsa_mono"}
+    ]
+    if outputs and not any(item.get("is_default") for item in outputs):
+        outputs[0]["is_default"] = True
     return outputs
 
 
@@ -375,6 +558,10 @@ class SpeakerTestController:
         self._stop_event.set()
         if process is not None and process.poll() is None:
             process.terminate()
+            try:
+                process.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
         thread.join(timeout=5.0)
         if thread.is_alive():
             raise RuntimeError("Timed out while stopping the speaker test")
@@ -382,8 +569,11 @@ class SpeakerTestController:
 
     def _run(self) -> None:
         try:
-            if self._config.get("audio_backend") == "pulse":
+            backend = self._config.get("audio_backend")
+            if backend == "pulse":
                 self._run_pulse()
+            elif backend == "alsa_mono":
+                self._run_alsa_mono()
             else:
                 self._run_portaudio()
         except Exception as exc:
@@ -404,12 +594,23 @@ class SpeakerTestController:
         sd = self._sounddevice()
         device_id = int(str(self._config["audio_device_id"]))
         channel_mode = str(self._config["channel_mode"])
+        route_device_id = self._config.get("alsa_route_device_id")
+        if route_device_id is not None:
+            configure_alsa_output_route(
+                int(self._config.get("alsa_card", 0)),
+                int(route_device_id),
+                int(self._config.get("alsa_playback_level", 10)),
+            )
         device = sd.query_devices(device_id, "output")
         max_channels = int(device["max_output_channels"])
         if max_channels <= 0:
             raise RuntimeError("Selected device has no output channels")
         output_channels = 2 if max_channels >= 2 else 1
-        sample_rate = round(float(device["default_samplerate"])) or 48_000
+        sample_rate = int(
+            self._config.get("default_sample_rate")
+            or round(float(device["default_samplerate"]))
+            or 48_000
+        )
         signal = build_test_signal(
             sample_rate=sample_rate,
             duration_seconds=float(self._config["duration_seconds"]),
@@ -452,6 +653,79 @@ class SpeakerTestController:
                 self._state = (
                     "stopped" if self._stop_event.is_set() else "succeeded"
                 )
+
+    def _run_alsa_mono(self) -> None:
+        if shutil.which("aplay") is None:
+            raise RuntimeError("aplay is unavailable for the onboard headset output")
+        configure_alsa_output_route(
+            int(self._config.get("alsa_card", 0)),
+            int(self._config.get("alsa_route_device_id", 2)),
+            int(self._config.get("alsa_playback_level", 10)),
+        )
+        sample_rate = int(self._config.get("default_sample_rate", 48_000))
+        signal = build_test_signal(
+            sample_rate=sample_rate,
+            duration_seconds=float(self._config["duration_seconds"]),
+            frequency_hz=float(self._config["frequency_hz"]),
+            level_db=float(self._config["level_db"]),
+            channels=1,
+            channel_mode="both",
+        )
+        process = self._popen_factory(
+            [
+                "aplay",
+                "--quiet",
+                "-D",
+                str(self._config.get("alsa_device", "hw:ascend310b")),
+                "-t",
+                "raw",
+                "-f",
+                "S16_LE",
+                "-r",
+                str(sample_rate),
+                "-c",
+                "1",
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            bufsize=0,
+        )
+        if process.stdin is None:
+            raise RuntimeError("Unable to open aplay input stream")
+        with self._lock:
+            self._process = process
+            self._device_name = str(
+                self._config.get("device_name", "Onboard 3.5 mm Headset (mono)")
+            )
+            self._sample_rate = sample_rate
+            self._output_channels = 1
+            self._total_frames = len(signal)
+            self._state = "running"
+        self._ready_event.set()
+
+        block_frames = 1024
+        for offset in range(0, len(signal), block_frames):
+            if self._stop_event.is_set():
+                break
+            block = signal[offset : offset + block_frames, 0]
+            payload = np.rint(np.clip(block, -1.0, 1.0) * 32767.0).astype(
+                "<i2", copy=False
+            )
+            process.stdin.write(payload.tobytes())
+            with self._lock:
+                self._played_frames += len(block)
+        process.stdin.close()
+        return_code = process.wait(timeout=5.0)
+        if self._stop_event.is_set():
+            with self._lock:
+                self._state = "stopped"
+            return
+        if return_code != 0:
+            error = process.stderr.read().decode("utf-8", errors="replace").strip()
+            raise RuntimeError(error or f"aplay exited with code {return_code}")
+        with self._lock:
+            self._state = "succeeded"
 
     def _run_pulse(self) -> None:
         sink_name = str(self._config["pulse_sink"])

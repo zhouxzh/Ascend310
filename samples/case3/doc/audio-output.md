@@ -3,9 +3,10 @@
 > 本文档中的命令默认从 `case3` 仓库根目录执行。[返回文档索引](README.md)。
 
 以下步骤已在 Orange Pi AI Pro 20T（Ascend 310B）系统镜像上实测。板载 ALSA
-声卡名称为 `ascend310b`，3.5mm 耳机接口使用 `Deviceid 2` 路由。当前板载
-3.5mm 接口只完成了单声道稳定播放验证；需要双声道输出时，建议使用外接 USB
-声卡。
+声卡名称为 `ascend310b`，3.5mm 耳机接口使用 `Deviceid 2` 路由。ALSA 能力表
+宣告一到两个 PCM 声道，但当前板载 3.5mm 接口只完成了单声道稳定播放验证；
+双声道离线播放存在强噪声，实时 PortAudio 双声道还会阻塞写入和停止。项目因此
+不把板载双声道列为可用能力；需要可靠双声道输出时应使用外接 USB 声卡。
 
 ## 板载 3.5mm：检查声卡和当前路由
 
@@ -104,16 +105,90 @@ rate: 48000
 state: RUNNING
 ```
 
-单声道和双声道的静音流测试都返回 0；双声道 WAV 播放也返回 0，DMA 缓冲
-持续推进，并且内核日志中没有发现 underrun、xrun、I2S 或 DMA 错误。因此不能
-简单断言 ALSA 驱动“只支持单声道”。当前证据表明，问题更可能出现在 ALSA
-成功送出数据之后的双声道 codec、I2S 时隙或 `Deviceid 2` 模拟输出路由中。
-系统镜像自带的耳机测试也只使用单声道 WAV，没有覆盖双声道实际听感。
+早期单声道和双声道静音流测试都返回 0；双声道 WAV 播放也返回 0，DMA 缓冲
+持续推进，当次内核日志中没有发现 underrun、xrun、I2S 或 DMA 错误。因此不能
+简单断言 ALSA 驱动“只支持单声道”。但“参数协商成功、命令返回 0”也不能证明
+模拟端的双声道音质和实时流稳定。系统镜像自带的耳机测试只使用单声道 WAV，
+没有覆盖左右声道分离、双声道实际听感或实时流的停止行为。
 
 本地播放正常、上传前后 MD5 一致、双声道文件没有数字削波，因此该现象不是
 采样率错误、文件传输损坏或 WAV 自身削波造成的。若只有双声道出现强噪声，
 优先按板端立体声输出链路问题处理；如果单声道也有噪声，再检查电源、耳机接地、
 插头接触和 CTIA/OMTP 接线兼容性。
+
+### 2026-07-29 实时双声道阻塞
+
+在 Ubuntu 22.04.5、内核 `5.10.0+ #32`（2025-09-25 构建）上，通过 WebUI 对
+`hw:0,0` 执行 48 kHz、双声道 PortAudio 测试。测试设置为 `Playback=10`、
+`Deviceid=2`、3 秒、440 Hz。流成功打开，但只提交 1024/144000 帧后停止推进；
+随后停止接口返回：
+
+```text
+Timed out while stopping the speaker test
+state: stopping
+output_channels: 2
+played_frames: 1024
+total_frames: 144000
+```
+
+卡住时 `/proc/asound/card0/pcm0p/sub0/hw_params` 显示：
+
+```text
+access: MMAP_INTERLEAVED
+format: S16_LE
+channels: 2
+rate: 48000
+period_size: 557
+buffer_size: 1114
+```
+
+`status` 同时显示 `state: RUNNING`、`delay: 1114`、`avail: 0`，即缓冲已经填满，
+硬件指针没有继续释放空间。内核持续输出：
+
+```text
+[hi3xxx_intr_dmac_check_period_irq] dma period irq error interval 23ms
+[ao_drv_isr] IRQ_TIME_ERROR! dma_channel: 2
+```
+
+测试线程因此阻塞在底层音频写入，普通停止只能设置事件，无法让正在阻塞的写调用
+返回；这就是停止超时的直接原因。终止 WebUI 进程后，ALSA 状态立即变为 `closed`，
+内核随后执行 `asp_dmac_stop`、`dai_hw_free` 和 `platform_close`，证明占用者确实是
+该测试流，而不是页面状态机误报。
+
+声道结论必须分三层理解：
+
+- PCM 驱动接受 `channels: 2`，`Playback` 混音器也列出 Front Left/Front Right，
+  因此不能把设备描述成“只支持单声道”。
+- `Deviceid` 控件显示 `Playback channels: Mono` 只表示路由选择值是 joined/mono
+  控件，不表示 PCM 数据只有一个声道。
+- 厂商镜像的 `play_headset.sh` 和 `tianlu.wav` 只验证 48 kHz、16-bit、单声道；
+  官方手册同样使用 mono PCM。昇腾社区示例虽调用 `sample_audio_2ch`，输入文件仍是
+  `qzgy_48k_16_mono_30s.pcm`，不能作为左右声道独立输出已验证的证据。
+
+因此，准确表述是：**板载接口和 ALSA 驱动宣告双声道能力，但当前镜像下双声道
+模拟输出没有通过音质、实时传输和可停止性验证，Piano-DDSP 不得将它作为受支持的
+实时立体声输出。** 单声道只允许沿厂商 `aplay` 路径做短时诊断；在驱动问题关闭前，
+不要用板载 ALSA/PulseAudio 路径运行持续实时合成。
+
+重复触发相同故障后，WebUI 不再把板载设备映射到进程内 PortAudio。设备 ID 改为
+`alsa:onboard-headset`，后端标记为 `alsa_mono`：扬声器测试使用独立、可终止的
+`aplay -D hw:ascend310b -t raw -f S16_LE -r 48000 -c 1` 子进程；Piano-DDSP 在
+输出端将双声道 DSP 结果下混成单声道后写入同一路径。停止时先终止 `aplay`，1 秒
+仍未退出则强制结束子进程，以打断可能阻塞的管道写入。这个兼容路径只用于没有
+USB 音频设备时的单声道播放，不恢复任何板载立体声支持，也不计入低延时验收。
+部署后的板端冒烟测试使用 48 kHz、单声道、0.5 秒、-40 dB 测试音，完整写入
+24000/24000 帧并返回 `succeeded`；测试后 PCM 为 `closed`，未新增
+`IRQ_TIME_ERROR` 或 `dma period irq error`。本地回归还模拟了子进程写入永久阻塞，
+确认停止会终止 `aplay`、解除写入并释放 `ResourceCoordinator`。板端实际停止测试
+随后启动 10 秒流并立即调用停止，在 36864/480000 帧处返回 `state=stopped`；
+`aplay` 已退出、PCM 为 `closed`，内核依次执行 DMA stop、hw_free 和 close，没有
+新增 IRQ 错误。
+
+参考资料：
+
+- [Orange Pi AIpro 产品页](https://www.orangepi.org/html/hardWare/computerAndMicrocontrollers/details/Orange-Pi-AIpro%288-12t%29.html)只承诺 3.5mm 音频输入/输出，没有给出双声道稳定性承诺。
+- [Orange Pi AI Pro v0.3.1 用户手册](https://orangepi.net/wp-content/uploads/2024/05/OrangePi_AI_Pro_v0.3.1.pdf)使用 48 kHz、16-bit mono PCM 验证耳机输出。
+- [昇腾社区 AIpro 外设样例](https://www.hiascend.com/developer/techArticles/20240307-1)使用 `sample_audio_2ch` 播放 mono PCM，未验证左右声道分离。
 
 ## 外接 USB 声卡播放双声道
 
@@ -477,7 +552,7 @@ source 名称或默认源状态的兼容问题。
 
 | 输出路径 | 单声道 | 双声道 |
 | :--- | :--- | :--- |
-| 板载 3.5mm，`Deviceid 2` | 已测试，正常 | 能播放，但伴随很强的噪声，暂不建议使用 |
+| 板载 3.5mm，`Deviceid 2` | 厂商 `aplay` 路径短时验证正常 | 离线播放有强噪声；实时流阻塞并无法正常停止，不支持 |
 | 外接 USB DAC，`CARD=Amplif` | 可通过 `plughw` 转换播放 | 已测试，正常 |
 | 漫步者 M25，`CARD=Device` | 非零信号和 ALSA 路径已验证，待听音确认 | 48 kHz 双声道实时传输已验证，待听音确认 |
 | 漫步者 M16 Pro，`CARD=Pro` | `speaker-test` 已听音确认 | 48 kHz 双声道 `speaker-test` 已听音确认 |
@@ -497,6 +572,13 @@ amixer set Deviceid 2
 aplay -Dhw:ascend310b ode-to-joy-violin-mono-loud.wav
 ```
 
-在后续驱动或系统镜像确认双声道模拟输出正常之前，实时 DDSP 播放和离线 WAV
-导出如果使用板载 3.5mm 接口，应优先使用单声道，避免仅根据 `aplay` 返回 0
-判断耳机端音质正常。需要保留立体声效果时，使用已经验证通过的外接 USB 声卡。
+在后续驱动或系统镜像确认双声道模拟输出正常之前，不要使用板载 3.5mm 运行实时
+立体声 DDSP。WebUI 的 `alsa_mono` 兼容路径只提供可终止的单声道降级输出，不能
+据此外推持续播放稳定性或低延时能力。需要保留立体声效果时，使用已经验证通过的
+外接 USB 声卡。
+
+MIDI-DDSP 音频库的“开发板播放”同样使用这条兼容路径。页面会显示并提交实际设备
+`板载 3.5 mm（单声道，默认）`，不会再把 PulseAudio 的
+`alsa_output.platform-sound.stereo-fallback` 当作未说明的“系统默认”。播放器先把
+48 kHz、16-bit 立体声 WAV 临时下混为单声道，再通过 `aplay -D hw:ascend310b`
+输出；任务结束后删除临时文件，缓存中的原始 WAV 保持不变。

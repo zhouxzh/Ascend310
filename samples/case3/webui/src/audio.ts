@@ -11,7 +11,11 @@ export function isBluetoothOutput(device: AudioDevice): boolean {
 
 export function audioDeviceLabel(device: AudioDevice): string {
   const flags = []
-  if (isBluetoothOutput(device)) flags.push('蓝牙')
+  const bluetooth = isBluetoothOutput(device)
+  if (bluetooth) flags.push('蓝牙')
+  else if (device.backend === 'pulse') flags.push('PulseAudio')
+  else if (device.backend === 'portaudio') flags.push('直连')
+  if (device.is_mono) flags.push('单声道')
   if (device.is_default) flags.push('默认')
   return flags.length ? `${device.name}（${flags.join('，')}）` : device.name
 }

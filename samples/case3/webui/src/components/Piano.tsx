@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 
 interface PianoProps {
   octave: number
+  firstNote?: number
   keyCount?: number
   velocity: number
   activeNotes: number[]
@@ -27,6 +28,7 @@ export function pianoNoteRange(octave: number, keyCount = DEFAULT_PIANO_KEY_COUN
 
 export default function Piano({
   octave,
+  firstNote,
   keyCount = DEFAULT_PIANO_KEY_COUNT,
   velocity,
   activeNotes,
@@ -46,7 +48,7 @@ export default function Piano({
   )
   const layout = useMemo(() => {
     const count = Math.max(1, Math.min(88, Math.round(keyCount)))
-    const { first } = pianoNoteRange(octave, count)
+    const first = firstNote ?? pianoNoteRange(octave, count).first
     const notes = Array.from({ length: count }, (_, index) => first + index)
     const whiteNotes = notes.filter((note) => !BLACK_PITCH_CLASSES.has(note % 12))
     const blackNotes = notes
@@ -56,7 +58,7 @@ export default function Piano({
         left: (whiteNotes.filter((whiteNote) => whiteNote < note).length / whiteNotes.length) * 100,
       }))
     return { count, whiteNotes, blackNotes }
-  }, [keyCount, octave])
+  }, [firstNote, keyCount, octave])
 
   const release = (note: number) => {
     if (held.current.delete(note)) onNoteOff(note)

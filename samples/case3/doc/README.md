@@ -19,6 +19,7 @@
 | [OM 转换与验证](om-deployment.md) | ATC 转换、日志检查和 FP16 精度验证 |
 | [板端实测结果](benchmark-results.md) | 8T/8T2/20T 的精度、速度和兼容性结果 |
 | [MIDI-DDSP 实时合成](midi-ddsp-realtime.md) | 使用 MIDI-DDSP OM、PyACL、CPU DSP 和 M25 实时播放 MIDI |
+| [Piano-DDSP 实时系统](piano-ddsp.md) | 16 声部实时钢琴的模型来源、运行时、API、部署和验收 |
 | [MIDI-DDSP Studio Web 界面](webui.md) | React/FastAPI 工作台、板端手动安装、同步、启动和测试 |
 | [测试故障排查](troubleshooting.md) | SSH/systemd、音频、ATC、OOM、兼容性和性能问题记录 |
 | [Upstream 参考仓库](upstream-repositories.md) | 第三方源码来源、固定提交、本地状态和保留规则 |

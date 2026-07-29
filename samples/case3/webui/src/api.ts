@@ -9,6 +9,8 @@ import type {
   MidiFile,
   MidiVoiceAnalysis,
   MidiPort,
+  PianoDdspCatalog,
+  PianoDdspStatus,
   SpeakerTestStatus,
   SystemStatus,
 } from './types'
@@ -48,6 +50,10 @@ export const api = {
     request<{ available: boolean; devices: AudioDevice[]; error: string | null }>(
       '/api/v1/audio-devices',
     ),
+  midiDdspAudioDevices: () =>
+    request<{ available: boolean; devices: AudioDevice[]; error: string | null }>(
+      '/api/v1/midi-ddsp/audio-devices',
+    ),
   audioInputs: () =>
     request<{ available: boolean; devices: AudioInput[]; error: string | null }>(
       '/api/v1/audio-inputs',
@@ -77,6 +83,26 @@ export const api = {
       '/api/v1/midi-ports',
     ),
   jobs: () => request<{ jobs: Job[] }>('/api/v1/jobs'),
+  pianoDdspCatalog: () => request<PianoDdspCatalog>('/api/v1/piano-ddsp/catalog'),
+  pianoDdspAudioDevices: () =>
+    request<{ available: boolean; devices: AudioDevice[]; error: string | null }>(
+      '/api/v1/piano-ddsp/audio-devices',
+    ),
+  pianoDdspStatus: () => request<PianoDdspStatus>('/api/v1/piano-ddsp/status'),
+  startPianoDdsp: (payload: Record<string, unknown>) =>
+    request<PianoDdspStatus>('/api/v1/piano-ddsp/start', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  stopPianoDdsp: () =>
+    request<PianoDdspStatus>('/api/v1/piano-ddsp/stop', { method: 'POST' }),
+  panicPianoDdsp: () =>
+    request<PianoDdspStatus>('/api/v1/piano-ddsp/panic', { method: 'POST' }),
+  updatePianoDdsp: (payload: Record<string, unknown>) =>
+    request<PianoDdspStatus>('/api/v1/piano-ddsp/parameters', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
   startDdspVst: (payload: Record<string, unknown>) =>
     request<DdspVstStatus>('/api/v1/ddsp-vst/start', {
       method: 'POST',

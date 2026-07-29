@@ -317,12 +317,13 @@ describe('workspace behavior', () => {
         status={{ ...status, active_owner: null, ddsp_vst: { running: false, active_notes: [] } }}
         catalog={catalog}
         audioDevices={[]}
+        audioError="当前只有板载 3.5 mm 单声道兼容路径；DDSP-VST 需要 USB、蓝牙或其他可用立体声输出。"
         midiPorts={[]}
         onRefresh={vi.fn()}
       />,
     )
     expect(screen.getByRole('button', { name: '启动 Synth' })).toBeDisabled()
-    expect(screen.getByText('未发现可用音频输出。')).toBeVisible()
+    expect(screen.getByText(/当前只有板载 3.5 mm 单声道兼容路径/)).toBeVisible()
   })
 
   it('uses bluetooth-safe settings when starting realtime synth on a bluetooth output', async () => {
@@ -573,6 +574,8 @@ describe('workspace behavior', () => {
     )
     expect(screen.queryByRole('button', { name: '开发板播放' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '开发板喇叭' }))
+    expect(screen.getByLabelText('开发板音频输出')).toHaveValue(audioDevice.id)
+    expect(screen.queryByRole('option', { name: '系统默认' })).not.toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('开发板音频输出'), { target: { value: audioDevice.id } })
     fireEvent.click(screen.getByRole('button', { name: '开发板播放' }))
     await waitFor(() => expect(api.playMidiDdspRecording).toHaveBeenCalledWith(
@@ -657,7 +660,6 @@ describe('workspace behavior', () => {
       <DevicesView
         status={{ ...status, active_owner: null }}
         catalog={catalog}
-        audioDevices={[audioDevice]}
         speakerOutputs={[audioDevice]}
         audioInputs={[]}
         midiPorts={[]}
@@ -693,7 +695,6 @@ describe('workspace behavior', () => {
       <DevicesView
         status={{ ...status, active_owner: null }}
         catalog={catalog}
-        audioDevices={[audioDevice]}
         speakerOutputs={[audioDevice]}
         audioInputs={[]}
         midiPorts={[]}

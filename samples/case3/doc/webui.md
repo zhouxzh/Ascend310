@@ -137,11 +137,19 @@ checkpoint、全部 ONNX/OM 组件和随机种子，前端不再分别组合 Exp
 
 页面将“音频库”和“新建渲染”分开。任务目录中已经存在 `output.wav` 的历史 MIDI-DDSP
 任务会持续出现在音频库中，不要求当前曲目、音色或模型参数与生成时一致。浏览器播放器
-直接读取该 WAV；“开发板播放”则通过 `paplay` 将同一个文件发送到选定的 PulseAudio
-输出，不重新加载模型或执行 NPU 推理。开发板直放提供 `-60` 到 `0 dB` 的独立增益，
-默认按 WAV 原始电平使用 `0 dB`，且支持暂停、继续和停止。
+直接读取该 WAV；“开发板播放”会明确提交下拉框中显示的实际设备，不再把空值解释为
+含义不确定的“系统默认”。USB/蓝牙 PulseAudio 输出使用 `paplay`；没有外接输出时，板载
+3.5 mm 使用 `Deviceid 2`、`hw:ascend310b`、48 kHz 单声道 `aplay` 兼容路径，立体声
+WAV 在临时文件中确定性下混，原始 WAV 不改写。播放不会重新加载模型或执行 NPU 推理。
+开发板直放提供 `-60` 到 `0 dB` 的独立增益，默认按 WAV 原始电平使用 `0 dB`，且支持
+暂停、继续和停止。
 “播放位置”使用“当前浏览器 / 开发板喇叭”二选一；页面只显示所选路径对应的控制器，
 避免把浏览器原生播放键误认为开发板音频输出。
+
+所有页面按物理设备使用统一名称；后端差异只作为括号标记显示，例如
+`EDIFIER M16 Pro（PulseAudio）`、`EDIFIER M16 Pro（直连，默认）` 和
+`板载 3.5 mm（单声道，默认）`。DDSP-VST 不显示曾导致 DMA 卡死的板载 PulseAudio
+双声道路径；设备总览仍显示板载单声道兼容输出，因此不会出现设备可播放但总数为零的矛盾状态。
 
 MIDI-DDSP 模型本身是单声部模型。stateful v2 会把复音轨自动拆成最少数量的单音
 voice，按静态 batch `1/2/4/8` 推理，再按 Google MIDI-DDSP 的方式对齐并混音；程序不会
@@ -211,6 +219,8 @@ Sequencer 客户端。此时 MIDI 端口接口会返回 `available: false`，界
 - `GET /api/v1/bluetooth-audio`、`POST /api/v1/bluetooth-audio/scan|connect|disconnect`
   管理蓝牙音频设备发现与连接。
 - `POST /api/v1/ddsp-vst/start|stop` 与 `WS /api/v1/ddsp-vst/events` 管理实时 Synth。
+- `GET /api/v1/midi-ddsp/audio-devices` 只返回 MIDI-DDSP WAV 播放实际支持的输出，并标明
+  当前默认设备。
 - `POST /api/v1/midi-ddsp/jobs` 使用 `model_bundle_id`、乐器、种子和尾音参数管理播放/渲染。
 - `POST /api/v1/midi-ddsp/recordings/{job_id}/play` 将历史任务的 `output.wav` 直接发送到
   指定开发板音频输出，不触发 MIDI-DDSP 渲染。

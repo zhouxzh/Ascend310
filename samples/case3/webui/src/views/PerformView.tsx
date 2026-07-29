@@ -10,6 +10,7 @@ interface Props {
   status: SystemStatus
   catalog: Catalog
   audioDevices: AudioDevice[]
+  audioError?: string | null
   midiPorts: MidiPort[]
   onRefresh: () => Promise<void>
 }
@@ -50,7 +51,7 @@ const VELOCITY_CURVES = [
   { value: 1.4, label: '宽动态' },
 ] as const
 
-export default function PerformView({ status, catalog, audioDevices, midiPorts, onRefresh }: Props) {
+export default function PerformView({ status, catalog, audioDevices, audioError, midiPorts, onRefresh }: Props) {
   const preferredModel = useMemo(
     () => catalog.ddsp_vst_models.find((model) => model.instrument.toLowerCase() === 'violin' && model.precision === 'mixed_float16')
       ?? catalog.ddsp_vst_models.find((model) => model.precision === 'mixed_float16')
@@ -58,7 +59,10 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
     [catalog.ddsp_vst_models],
   )
   const [modelId, setModelId] = useState(preferredModel?.id ?? '')
-  const [audioDeviceId, setAudioDeviceId] = useState('')
+  const defaultAudioDeviceId = audioDevices.find((device) => device.is_default)?.id
+    ?? audioDevices[0]?.id
+    ?? ''
+  const [audioDeviceId, setAudioDeviceId] = useState(defaultAudioDeviceId)
   const [midiPort, setMidiPort] = useState('')
   const [octave, setOctave] = useState(4)
   const [velocity, setVelocity] = useState(100)
@@ -74,6 +78,12 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
   const [socketState, setSocketState] = useState<'offline' | 'connecting' | 'online'>('offline')
   const socketRef = useRef<WebSocket | null>(null)
   const pressedKeys = useRef(new Map<string, number>())
+
+  useEffect(() => {
+    if (!audioDevices.some((device) => device.id === audioDeviceId)) {
+      setAudioDeviceId(defaultAudioDeviceId)
+    }
+  }, [audioDeviceId, audioDevices, defaultAudioDeviceId])
 
   const modelOptions = useMemo(
     () => advanced ? catalog.ddsp_vst_models : catalog.ddsp_vst_models.filter((model) => model.precision === 'mixed_float16'),
@@ -232,12 +242,13 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
   }, [send])
 
   async function start() {
+    if (!audioDeviceId) return
     setBusy(true)
     setError('')
     try {
       const next = await api.startDdspVst({
         model_id: modelId,
-        audio_device_id: audioDeviceId || null,
+        audio_device_id: audioDeviceId,
         midi_port: midiPort || null,
         sample_rate: outputSampleRate,
         latency_profile: latencyProfile,
@@ -302,7 +313,7 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
         />
 
         {error && <Notice tone="error">{error}</Notice>}
-        {unavailable && !error && <Notice tone="error">{catalog.ddsp_vst_models.length === 0 ? '未发现 DDSP-VST OM。' : '未发现可用音频输出。'}</Notice>}
+        {unavailable && !error && <Notice tone="error">{catalog.ddsp_vst_models.length === 0 ? '未发现 DDSP-VST OM。' : audioError || '未发现可用音频输出。'}</Notice>}
         {bluetoothOutputSelected && !error && <Notice tone="warn">蓝牙输出已切换为更高缓冲；实时演奏想要更低延迟，建议使用 USB 或有线声卡。</Notice>}
         {outOfRangeNotes.length > 0 && <Notice tone="warn">当前音符 {outOfRangeNotes.join('、')} 超出 {selectedModel?.instrument} 的训练音域。</Notice>}
 
@@ -352,7 +363,7 @@ export default function PerformView({ status, catalog, audioDevices, midiPorts, 
           </div>}
           <Field label="音频输出">
             <select value={audioDeviceId} onChange={(event) => setAudioDeviceId(event.target.value)} disabled={synthStatus.running}>
-              <option value="">系统默认</option>
+              {!audioDevices.length && <option value="">无可用输出</option>}
               {audioDevices.map((device) => <option value={device.id} key={device.id}>{audioDeviceLabel(device)}</option>)}
             </select>
           </Field>

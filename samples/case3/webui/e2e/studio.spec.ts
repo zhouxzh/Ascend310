@@ -41,6 +41,7 @@ test('all workspaces can be opened', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'MIDI-DDSP' }).first().click()
   await expect(page.getByRole('heading', { name: /MIDI-DDSP (音频库|新建渲染)/ })).toBeVisible()
+  await page.getByRole('button', { name: '新建渲染' }).click()
   await expect(page.getByLabel('MIDI 声部音色分配')).toBeVisible()
   await expect(page.getByLabel('声部 1 音色')).toBeVisible()
   await page.screenshot({ path: '../reports/webui/screenshots/studio-midi-ddsp.png', fullPage: true })
@@ -151,6 +152,26 @@ for (const viewport of [
 
 test('generated WAV files can be selected and sent to the board output', async ({ page }) => {
   const now = new Date().toISOString()
+  await page.route('**/api/v1/midi-ddsp/audio-devices', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        available: true,
+        devices: [{
+          id: 'alsa:onboard-headset',
+          index: 0,
+          name: '板载 3.5 mm',
+          host_api: 'ALSA aplay',
+          backend: 'alsa_mono',
+          max_output_channels: 1,
+          default_sample_rate: 48000,
+          is_default: true,
+          is_mono: true,
+        }],
+        error: null,
+      }),
+    })
+  })
   await page.route('**/api/v1/jobs', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -213,7 +234,11 @@ test('generated WAV files can be selected and sent to the board output', async (
   await page.getByRole('button', { name: '开发板喇叭' }).click()
   await page.getByRole('button', { name: '开发板播放' }).click()
   await expect.poll(() => replayRequest?.jobId).toBe('old-recording')
-  expect(replayRequest?.body).toMatchObject({ latency_ms: 40, output_gain_db: 0 })
+  expect(replayRequest?.body).toMatchObject({
+    audio_device_id: 'alsa:onboard-headset',
+    latency_ms: 40,
+    output_gain_db: 0,
+  })
   await page.screenshot({
     path: '../reports/webui/screenshots/midi-audio-library-desktop.png',
     fullPage: true,

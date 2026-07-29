@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
 import time
 import unittest
 from unittest.mock import patch
@@ -12,7 +13,11 @@ from midi_ddsp_webui.core import ResourceBusyError, ResourceCoordinator
 from midi_ddsp_webui.speaker import (
     SpeakerTestController,
     build_test_signal,
+    canonical_audio_output_name,
+    configure_alsa_output_route,
     query_audio_inputs,
+    query_ddsp_vst_audio_outputs,
+    query_midi_ddsp_audio_outputs,
     query_speaker_outputs,
 )
 
@@ -90,6 +95,40 @@ class FakePulseProcess:
     def terminate(self) -> None:
         self.return_code = -15
 
+    def kill(self) -> None:
+        self.return_code = -9
+
+
+class BlockingInput(FakePulseInput):
+    def __init__(self, released: threading.Event) -> None:
+        super().__init__()
+        self.released = released
+
+    def write(self, block: bytes) -> int:
+        self.blocks.append(block)
+        self.released.wait(timeout=2.0)
+        return len(block)
+
+
+class BlockingProcess(FakePulseProcess):
+    def __init__(self, command: list[str]) -> None:
+        super().__init__(command)
+        self.released = threading.Event()
+        self.stdin = BlockingInput(self.released)
+
+    def wait(self, timeout: float) -> int:
+        if self.return_code is None and not self.released.wait(timeout=timeout):
+            raise subprocess.TimeoutExpired(self.command, timeout)
+        return int(self.return_code or 0)
+
+    def terminate(self) -> None:
+        self.return_code = -15
+        self.released.set()
+
+    def kill(self) -> None:
+        self.return_code = -9
+        self.released.set()
+
 
 def speaker_config(channel_mode: str = "both") -> dict[str, object]:
     return {
@@ -116,6 +155,70 @@ class SpeakerSignalTest(unittest.TestCase):
 
 
 class SpeakerOutputCatalogTest(unittest.TestCase):
+    def test_canonical_names_match_across_audio_backends(self) -> None:
+        self.assertEqual(
+            canonical_audio_output_name(
+                {"id": "pulse:edifier", "name": "EDIFIER M16 Pro Analog Stereo"}
+            ),
+            "EDIFIER M16 Pro",
+        )
+        self.assertEqual(
+            canonical_audio_output_name(
+                {"id": "4", "name": "EDIFIER M16 Pro (hw:2,0)"}
+            ),
+            "EDIFIER M16 Pro",
+        )
+        self.assertEqual(
+            canonical_audio_output_name(
+                {
+                    "id": "pulse:alsa_output.platform-sound.stereo-fallback",
+                    "name": "Built-in Audio Stereo",
+                }
+            ),
+            "板载 3.5 mm",
+        )
+
+    def test_ddsp_vst_outputs_hide_unsafe_onboard_route(self) -> None:
+        outputs = [
+            {
+                "id": "pulse:alsa_output.platform-sound.stereo-fallback",
+                "name": "Built-in Audio Stereo",
+                "backend": "pulse",
+                "is_default": True,
+            },
+            {
+                "id": "pulse:usb-edifier",
+                "name": "EDIFIER M16 Pro Analog Stereo",
+                "backend": "pulse",
+                "is_default": False,
+            },
+        ]
+        with patch(
+            "midi_ddsp_webui.speaker.query_speaker_outputs",
+            return_value=outputs,
+        ):
+            compatible = query_ddsp_vst_audio_outputs(lambda: [])
+        self.assertEqual([item["id"] for item in compatible], ["pulse:usb-edifier"])
+        self.assertEqual(compatible[0]["name"], "EDIFIER M16 Pro")
+        self.assertTrue(compatible[0]["is_default"])
+
+    def test_midi_ddsp_outputs_exclude_unsupported_portaudio_and_keep_default(self) -> None:
+        outputs = [
+            {"id": "portaudio:2", "backend": "portaudio", "is_default": True},
+            {"id": "pulse:usb", "backend": "pulse", "is_default": False},
+            {"id": "alsa:onboard-headset", "backend": "alsa_mono", "is_default": False},
+        ]
+        with patch(
+            "midi_ddsp_webui.speaker.query_piano_audio_outputs",
+            return_value=outputs,
+        ):
+            compatible = query_midi_ddsp_audio_outputs(lambda: [])
+        self.assertEqual(
+            [item["id"] for item in compatible],
+            ["pulse:usb", "alsa:onboard-headset"],
+        )
+        self.assertTrue(compatible[0]["is_default"])
+
     def test_pulse_catalog_exposes_friendly_bluetooth_sink(self) -> None:
         sinks = [
             {
@@ -168,6 +271,25 @@ class SpeakerOutputCatalogTest(unittest.TestCase):
 
 
 class SpeakerControllerTest(unittest.TestCase):
+    def test_onboard_route_uses_vendor_mixer_controls_without_a_shell(self) -> None:
+        completed = subprocess.CompletedProcess([], 0, "ok", "")
+        with (
+            patch("midi_ddsp_webui.speaker.shutil.which", return_value="/usr/bin/amixer"),
+            patch(
+                "midi_ddsp_webui.speaker.subprocess.run",
+                return_value=completed,
+            ) as run,
+        ):
+            configure_alsa_output_route(0, 2, 10)
+
+        self.assertEqual(
+            [call.args[0] for call in run.call_args_list],
+            [
+                ["amixer", "-c", "0", "set", "Playback", "10"],
+                ["amixer", "-c", "0", "set", "Deviceid", "2"],
+            ],
+        )
+
     def test_successful_test_releases_the_audio_resource(self) -> None:
         coordinator = ResourceCoordinator()
         sounddevice = FakeSoundDevice()
@@ -182,6 +304,80 @@ class SpeakerControllerTest(unittest.TestCase):
         self.assertEqual(status["underruns"], 0)
         self.assertIsNone(coordinator.owner)
         self.assertGreater(len(sounddevice.blocks), 0)
+
+    def test_onboard_test_uses_killable_mono_aplay_process(self) -> None:
+        processes: list[FakePulseProcess] = []
+
+        def create_process(command, **_options):
+            process = FakePulseProcess(command)
+            processes.append(process)
+            return process
+
+        coordinator = ResourceCoordinator()
+        controller = SpeakerTestController(
+            coordinator,
+            sounddevice_module=FakeSoundDevice(),
+            popen_factory=create_process,
+        )
+        config = {
+            **speaker_config(),
+            "audio_backend": "alsa_mono",
+            "alsa_device": "hw:ascend310b",
+            "alsa_card": 0,
+            "alsa_route_device_id": 2,
+            "alsa_playback_level": 10,
+            "default_sample_rate": 8_000,
+        }
+        with (
+            patch("midi_ddsp_webui.speaker.shutil.which", return_value="/usr/bin/aplay"),
+            patch("midi_ddsp_webui.speaker.configure_alsa_output_route") as route,
+        ):
+            controller.start(config)
+            deadline = time.monotonic() + 1.0
+            while controller.running and time.monotonic() < deadline:
+                time.sleep(0.001)
+
+        status = controller.status()
+        self.assertEqual(status["state"], "succeeded")
+        self.assertEqual(status["output_channels"], 1)
+        self.assertEqual(processes[0].command[0], "aplay")
+        self.assertIn("hw:ascend310b", processes[0].command)
+        self.assertEqual(processes[0].command[-2:], ["-c", "1"])
+        self.assertTrue(processes[0].stdin.closed)
+        self.assertGreater(len(processes[0].stdin.blocks), 0)
+        route.assert_called_once_with(0, 2, 10)
+        self.assertIsNone(coordinator.owner)
+
+    def test_onboard_stop_interrupts_a_blocked_aplay_write(self) -> None:
+        processes: list[BlockingProcess] = []
+
+        def create_process(command, **_options):
+            process = BlockingProcess(command)
+            processes.append(process)
+            return process
+
+        coordinator = ResourceCoordinator()
+        controller = SpeakerTestController(coordinator, popen_factory=create_process)
+        config = {
+            **speaker_config(),
+            "audio_backend": "alsa_mono",
+            "alsa_device": "hw:ascend310b",
+            "default_sample_rate": 8_000,
+        }
+        with (
+            patch("midi_ddsp_webui.speaker.shutil.which", return_value="/usr/bin/aplay"),
+            patch("midi_ddsp_webui.speaker.configure_alsa_output_route"),
+        ):
+            controller.start(config)
+            deadline = time.monotonic() + 1.0
+            while not processes[0].stdin.blocks and time.monotonic() < deadline:
+                time.sleep(0.001)
+            status = controller.stop()
+
+        self.assertEqual(status["state"], "stopped")
+        self.assertFalse(status["running"])
+        self.assertEqual(processes[0].return_code, -15)
+        self.assertIsNone(coordinator.owner)
 
     def test_failure_releases_the_audio_resource(self) -> None:
         coordinator = ResourceCoordinator()

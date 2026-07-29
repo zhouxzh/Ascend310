@@ -113,9 +113,107 @@ export interface SystemStatus {
     health_alarm: boolean
   }
   active_owner: string | null
+  piano_ddsp?: PianoDdspStatus
   ddsp_vst: DdspVstStatus
   speaker_test: SpeakerTestStatus
   job_count: number
+}
+
+export interface PianoDdspBundle {
+  id: string
+  release: string
+  precision: string
+  soc_version: string
+  complete: boolean
+  models: string[]
+}
+
+export interface PianoDdspModel {
+  id: string
+  name: string
+  architecture: string
+  quality_status: string
+  available: boolean
+  bundle_ids: string[]
+  n_harmonics: number
+  n_noise_bands: number
+  reverb_type: string
+}
+
+export interface PianoDdspCatalog {
+  release: string
+  source_commit: string
+  hf_commit: string
+  active_bundle_id: string | null
+  bundles: PianoDdspBundle[]
+  models: PianoDdspModel[]
+  piano_years: number[]
+  io_contract: Record<string, unknown>
+  latency_profiles: Record<LatencyProfile, { frames: number; prebuffer_blocks: number; audio_latency_ms: number }>
+  errors: string[]
+}
+
+export interface PianoDdspMetrics {
+  rendered_blocks: number
+  played_blocks: number
+  underruns: number
+  overruns: number
+  clipped_samples: number
+  npu_samples: number
+  npu_p50_ms: number
+  npu_p95_ms: number
+  npu_p99_ms: number
+  dsp_p95_ms: number
+  block_p95_ms: number
+  queue_latency_ms: number
+  device_latency_ms: number
+  sink_latency_ms: number
+  estimated_total_latency_ms: number
+  monitor_drops: number
+}
+
+export interface PianoDdspStatus {
+  state: 'stopped' | 'starting' | 'running' | 'switching' | 'stopping' | 'failed'
+  running: boolean
+  error?: string | null
+  heartbeat_age_seconds?: number | null
+  config?: {
+    bundle_id?: string
+    model_id?: string
+    piano_year?: number
+    latency_profile?: LatencyProfile
+    velocity_curve?: number
+    transpose?: number
+    output_gain_db?: number
+    reverb_mix?: number
+  }
+  midi?: {
+    port?: string | null
+    connected: boolean
+    reconnects: number
+    error?: string | null
+    active_notes: number[]
+    slot_notes: number[]
+    pedal: number[]
+    voice_steals: number
+    last_velocity: number
+  }
+  audio?: {
+    backend?: string
+    sink?: string | null
+    device_lost: boolean
+    error?: string | null
+  }
+  player?: {
+    state: string
+    path?: string | null
+    position_seconds: number
+    duration_seconds: number
+    tempo: number
+    loop: boolean
+  }
+  recording?: { active: boolean; id?: string | null }
+  metrics?: PianoDdspMetrics
 }
 
 export interface MidiFile {
@@ -141,6 +239,7 @@ export interface MidiFile {
 export interface MidiTrackAnalysis {
   index: number
   name: string
+  raw_name?: string
   note_count: number
   max_polyphony: number
   monophonic: boolean
@@ -268,12 +367,18 @@ export interface AudioDevice {
   index: number
   name: string
   host_api: string
-  backend?: 'pulse' | 'portaudio'
+  backend?: 'pulse' | 'portaudio' | 'alsa_mono'
   sink_name?: string
   max_output_channels: number
   default_sample_rate: number
   is_default?: boolean
   is_bluetooth?: boolean
+  is_onboard?: boolean
+  is_mono?: boolean
+  warning?: string
+  alsa_device?: string
+  alsa_card?: number
+  alsa_route_device_id?: number
   state?: string
 }
 

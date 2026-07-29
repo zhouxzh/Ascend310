@@ -204,7 +204,10 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
   const [voiceAnalysisLoading, setVoiceAnalysisLoading] = useState(false)
   const [voiceAnalysisError, setVoiceAnalysisError] = useState('')
   const [voiceAnalysisRevision, setVoiceAnalysisRevision] = useState(0)
-  const [audioDeviceId, setAudioDeviceId] = useState('')
+  const defaultAudioDeviceId = audioDevices.find((device) => device.is_default)?.id
+    ?? audioDevices[0]?.id
+    ?? ''
+  const [audioDeviceId, setAudioDeviceId] = useState(defaultAudioDeviceId)
   const [selectedRecordingId, setSelectedRecordingId] = useState(recordings[0]?.job.id ?? '')
   const [playbackTarget, setPlaybackTarget] = useState<'browser' | 'board'>('board')
   const [playbackGain, setPlaybackGain] = useState(0)
@@ -227,6 +230,12 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
       setBundleId(defaultBundle.id)
     }
   }, [bundleId, catalog.midi_files, defaultBundle, midiId, modelBundles, preferredMidi])
+
+  useEffect(() => {
+    if (!audioDevices.some((device) => device.id === audioDeviceId)) {
+      setAudioDeviceId(defaultAudioDeviceId)
+    }
+  }, [audioDeviceId, audioDevices, defaultAudioDeviceId])
 
   useEffect(() => {
     let cancelled = false
@@ -418,12 +427,12 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
   }
 
   async function playRecording() {
-    if (!selectedRecording) return
+    if (!selectedRecording || !audioDeviceId) return
     setBusy(true)
     setError('')
     try {
       await api.playMidiDdspRecording(selectedRecording.job.id, {
-        audio_device_id: audioDeviceId || null,
+        audio_device_id: audioDeviceId,
         latency_ms: 40,
         output_gain_db: playbackGain,
       })
@@ -525,7 +534,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
                     <div className="recording-output-bar">
                       <Field label="开发板音频输出">
                         <select value={audioDeviceId} onChange={(event) => setAudioDeviceId(event.target.value)} disabled={Boolean(activeJob)}>
-                          <option value="">系统默认</option>
+                          {!audioDevices.length && <option value="">无可用输出</option>}
                           {audioDevices.map((device) => <option value={device.id} key={device.id}>{audioDeviceLabel(device)}</option>)}
                         </select>
                       </Field>
@@ -542,7 +551,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
                         />
                       </Field>
                       {!activePlaybackJob ? (
-                        <button type="button" className="primary-button" onClick={playRecording} disabled={busy || Boolean(activeRenderJob)}>
+                        <button type="button" className="primary-button" onClick={playRecording} disabled={busy || Boolean(activeRenderJob) || !audioDeviceId}>
                           <Volume2 size={17} />开发板播放
                         </button>
                       ) : (

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import signal
+import struct
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -10,7 +11,9 @@ import wave
 from midi_ddsp_webui import app as web_app
 from midi_ddsp_webui import core
 from midi_ddsp_webui.wav_playback import (
+    aplay_command,
     paplay_command,
+    prepare_alsa_mono_wav,
     pulse_volume,
     wav_duration_seconds,
 )
@@ -37,6 +40,26 @@ class WavPlaybackCommandTest(unittest.TestCase):
         self.assertEqual(pulse_volume(3.0), 65_536)
         self.assertEqual(pulse_volume(-60.0), 66)
         self.assertEqual(pulse_volume(-90.0), 66)
+
+    def test_prepares_stereo_wav_for_vendor_mono_route(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            source_path = Path(folder) / "stereo.wav"
+            mono_path = Path(folder) / "mono.wav"
+            with wave.open(str(source_path), "wb") as target:
+                target.setnchannels(2)
+                target.setsampwidth(2)
+                target.setframerate(48_000)
+                target.writeframes(struct.pack("<hhhh", 1000, 3000, -2000, 2000))
+            prepare_alsa_mono_wav(source_path, mono_path, 0.0)
+            with wave.open(str(mono_path), "rb") as result:
+                self.assertEqual(result.getnchannels(), 1)
+                self.assertEqual(result.getframerate(), 48_000)
+                samples = struct.unpack("<hh", result.readframes(2))
+        self.assertEqual(samples, (2000, 0))
+        self.assertEqual(
+            aplay_command(mono_path, "hw:ascend310b")[:4],
+            ["aplay", "-q", "-D", "hw:ascend310b"],
+        )
 
     def test_api_uses_the_wav_original_level_by_default(self) -> None:
         self.assertEqual(web_app.MidiDdspPlaybackRequest().output_gain_db, 0.0)
@@ -71,7 +94,7 @@ class ExistingRecordingApiTest(unittest.TestCase):
                 patch.object(web_app, "_require_board"),
                 patch.object(web_app.jobs, "get", return_value=source),
                 patch.object(web_app, "resolve_artifact", return_value=wav_path),
-                patch.object(web_app, "query_speaker_outputs", return_value=[output]),
+                patch.object(web_app, "query_midi_ddsp_audio_outputs", return_value=[output]),
                 patch.object(web_app.jobs, "start", return_value=playback) as start,
             ):
                 result = web_app.play_midi_ddsp_recording(
@@ -92,6 +115,49 @@ class ExistingRecordingApiTest(unittest.TestCase):
         self.assertEqual(metadata["source_job_id"], source.id)
         self.assertEqual(metadata["midi_name"], "canon.mid")
         self.assertEqual(metadata["output_gain_db"], -24)
+
+    def test_starts_existing_wav_on_default_onboard_mono_output(self) -> None:
+        source = core.Job(
+            id="source123",
+            kind="midi-ddsp-render",
+            state="succeeded",
+            metadata={"midi_name": "canon.mid"},
+        )
+        playback = core.Job(id="playback123", kind="midi-ddsp-wav-playback")
+        output = {
+            "id": "alsa:onboard-headset",
+            "name": "板载 3.5 mm",
+            "backend": "alsa_mono",
+            "alsa_device": "hw:ascend310b",
+            "alsa_card": 0,
+            "alsa_route_device_id": 2,
+            "alsa_playback_level": 10,
+            "is_default": True,
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            wav_path = Path(folder) / "output.wav"
+            wav_path.write_bytes(b"RIFF")
+            with (
+                patch.object(web_app, "_require_board"),
+                patch.object(web_app.jobs, "get", return_value=source),
+                patch.object(web_app, "resolve_artifact", return_value=wav_path),
+                patch.object(web_app, "query_midi_ddsp_audio_outputs", return_value=[output]),
+                patch.object(web_app.jobs, "start", return_value=playback) as start,
+            ):
+                result = web_app.play_midi_ddsp_recording(
+                    source.id,
+                    web_app.MidiDdspPlaybackRequest(),
+                )
+        self.assertEqual(result["id"], playback.id)
+        command = start.call_args.args[1]
+        self.assertIn("--alsa-device", command)
+        self.assertIn("hw:ascend310b", command)
+        self.assertIn("--alsa-route-device-id", command)
+        self.assertIn("2", command)
+        self.assertEqual(
+            start.call_args.kwargs["metadata"]["audio_output"],
+            output["name"],
+        )
 
     def test_existing_wav_playback_can_be_paused_and_resumed(self) -> None:
         manager = core.JobManager(core.ResourceCoordinator())

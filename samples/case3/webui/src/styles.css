@@ -2248,3 +2248,277 @@ input[type="range"] {
   .inventory-row span:nth-of-type(2),
   .inventory-row span:nth-of-type(3) { display: none; }
 }
+
+.piano-ddsp-workspace {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.piano-session-bar {
+  position: sticky;
+  z-index: 8;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  padding: 6px 10px;
+  background: #f7f8f7;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--teal);
+  border-radius: 5px;
+}
+
+.piano-session-state,
+.piano-session-actions,
+.piano-health-row,
+.piano-record-row,
+.piano-transport,
+.mobile-octave {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.piano-session-state {
+  min-width: 0;
+  color: #66716e;
+  font-size: 10px;
+}
+
+.piano-session-state > span:not(.status-pill) {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.piano-session-actions .danger-button {
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 11px;
+  color: white;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.piano-config-strip {
+  display: grid;
+  grid-template-columns: 1.05fr .8fr 1.1fr 1.4fr .9fr;
+  gap: 8px;
+  padding: 9px 11px;
+  background: #e0e5e2;
+  border: 1px solid #cbd2cf;
+  border-radius: 5px;
+}
+
+.piano-config-strip .field {
+  gap: 4px;
+}
+
+.piano-config-strip .field select {
+  min-height: 32px;
+  font-size: 10px;
+}
+
+.piano-surface .panel-header,
+.piano-parameters .panel-header,
+.piano-player .panel-header,
+.piano-metrics .panel-header {
+  min-height: 44px;
+  padding: 9px 12px;
+}
+
+.piano-overview {
+  display: grid;
+  grid-template-columns: repeat(88, minmax(1px, 1fr));
+  gap: 1px;
+  height: 10px;
+  margin: 8px 12px 6px;
+  overflow: hidden;
+  background: #cad0ce;
+  border-radius: 2px;
+}
+
+.piano-overview span {
+  background: #f8faf9;
+}
+
+.piano-overview span.is-window {
+  background: #aebbb8;
+}
+
+.piano-overview span.is-active {
+  background: var(--teal);
+}
+
+.piano-surface .piano {
+  --black-key-width: clamp(5px, .86vw, 12px);
+  height: 118px;
+  margin: 0 12px 12px;
+}
+
+.piano-surface .white-key span {
+  bottom: 6px;
+  overflow: hidden;
+  font-size: 5px;
+}
+
+.piano-surface .piano-key.is-out-of-range {
+  opacity: .72;
+}
+
+.mobile-piano {
+  display: none;
+}
+
+.piano-lower-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, .9fr) minmax(270px, 1fr) minmax(390px, 1.35fr);
+  gap: 9px;
+  min-width: 0;
+}
+
+.piano-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  padding: 10px 12px 12px;
+}
+
+.piano-control-grid .sustain-button {
+  min-height: 38px;
+  gap: 6px;
+}
+
+.piano-player-body {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px 12px;
+}
+
+.piano-file-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  gap: 7px;
+}
+
+.piano-file-row select,
+.piano-transport select {
+  min-width: 0;
+  height: 36px;
+  padding: 0 8px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.piano-file-row .icon-button,
+.piano-transport .icon-button,
+.piano-record-row .icon-button,
+.piano-metrics .icon-button {
+  flex-basis: 36px;
+  width: 36px;
+  height: 36px;
+}
+
+.player-seek {
+  margin: 3px 0 0 !important;
+}
+
+.piano-player-time {
+  display: flex;
+  justify-content: space-between;
+  color: #687370;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 9px;
+}
+
+.piano-transport {
+  justify-content: flex-start;
+}
+
+.piano-transport select {
+  margin-left: auto;
+}
+
+.compact-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #56615e;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.compact-check input {
+  accent-color: var(--teal);
+}
+
+.piano-record-row {
+  justify-content: space-between;
+  min-width: 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.piano-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 9px 10px 7px;
+}
+
+.piano-metric-grid .metric {
+  min-height: 48px;
+  padding: 7px 8px;
+}
+
+.piano-metric-grid .metric strong {
+  font-size: 13px;
+}
+
+.piano-health-row {
+  flex-wrap: wrap;
+  padding: 0 10px 10px;
+}
+
+@media (max-width: 1180px) {
+  .piano-config-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .piano-lower-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .piano-metrics { grid-column: 1 / -1; }
+  .piano-surface .piano { height: 112px; }
+}
+
+@media (max-width: 900px) {
+  .bottom-nav { grid-template-columns: repeat(4, 1fr); }
+  .piano-session-bar { top: 58px; }
+  .piano-config-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .piano-lower-grid { grid-template-columns: minmax(0, 1fr); }
+  .piano-metrics { grid-column: auto; }
+  .desktop-piano { display: none; }
+  .mobile-piano { display: block; }
+  .mobile-octave { justify-content: space-between; padding: 0 12px 8px; color: #5f6967; font-size: 10px; font-weight: 700; }
+  .mobile-octave .stepper { width: 118px; }
+  .piano-surface .piano { --black-key-width: clamp(12px, 4.6vw, 20px); height: 180px; }
+  .piano-surface .white-key span { bottom: 8px; font-size: 7px; }
+}
+
+@media (max-width: 600px) {
+  .piano-ddsp-workspace { gap: 8px; }
+  .piano-session-bar { align-items: stretch; flex-direction: column; padding: 8px; }
+  .piano-session-state { justify-content: space-between; }
+  .piano-session-state > span:not(.status-pill):last-child { display: none; }
+  .piano-session-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .piano-session-actions button { width: 100%; }
+  .piano-config-strip { grid-template-columns: minmax(0, 1fr); }
+  .piano-control-grid { grid-template-columns: minmax(0, 1fr); }
+  .piano-control-grid .sustain-button { grid-column: auto; }
+  .piano-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .piano-record-row { align-items: stretch; flex-wrap: wrap; }
+}
