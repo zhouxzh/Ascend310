@@ -74,18 +74,24 @@ RIFF/WAVE、PCM、16-bit、48000 Hz、单声道、无压缩
 
 ```bash
 file /opt/opi_test/audio/tianlu.wav
-file ~/Documents/case3/midi_wav/*.wav
+file ~/Documents/case3/reports/audio-fixtures/*.wav
+```
+
+仓库中的 WAV 夹具由脚本生成，不提交二进制文件：
+
+```bash
+python tools/create_audio_test_fixtures.py
 ```
 
 ## 双声道播放实测问题
 
-本次测试对同一首曲子制作了音量接近的单声道和双声道版本：
+本次测试对同一组确定性测试音生成了单声道和双声道版本：
 
 | 文件 | 格式 | 3.5mm 接口实测结果 |
 | :--- | :--- | :--- |
 | `/opt/opi_test/audio/tianlu.wav` | 48 kHz、16-bit、单声道 | 正常 |
-| `midi_wav/ode-to-joy-violin-mono-loud.wav` | 48 kHz、16-bit、单声道 | 正常 |
-| `midi_wav/ode-to-joy-violin-stereo-loud.wav` | 48 kHz、16-bit、双声道 | 能听到音乐，但伴随很强的静电/数字噪声 |
+| `reports/audio-fixtures/speaker-test-mono.wav` | 48 kHz、16-bit、单声道 | 正常 |
+| `reports/audio-fixtures/speaker-test-stereo.wav` | 48 kHz、16-bit、双声道 | 能听到音乐，但伴随很强的静电/数字噪声 |
 
 ALSA 查询结果显示硬件接口声明支持 1 到 2 个声道：
 
@@ -224,15 +230,15 @@ card 1: Amplif [Meizu HiFi DAC Headphone Amplif], device 0: USB Audio
 重启或重新插拔后变化，因此优先使用 ALSA card ID，而不是固定数字编号：
 
 ```bash
-cd ~/Documents/case3/midi_wav
-aplay -Dplughw:CARD=Amplif,DEV=0 ode-to-joy-violin-stereo-loud.wav
+cd ~/Documents/case3/reports/audio-fixtures
+aplay -Dplughw:CARD=Amplif,DEV=0 speaker-test-stereo.wav
 ```
 
 `plughw` 会在 USB DAC 不直接接受源文件格式时通过 ALSA plug 层转换。确认文件
 格式与设备原生参数一致后，也可以直接访问当前硬件编号：
 
 ```bash
-aplay -Dhw:1,0 ode-to-joy-violin-stereo-loud.wav
+aplay -Dhw:1,0 speaker-test-stereo.wav
 ```
 
 `amixer set Deviceid 2` 和板载 `Playback` 控件只用于 `ascend310b` 的 3.5mm
@@ -276,13 +282,13 @@ amixer -c Device get PCM
 使用稳定的 ALSA card ID 设置音量并播放：
 
 ```bash
-cd ~/Documents/case3/midi_wav
+cd ~/Documents/case3/reports/audio-fixtures
 
 # 建议先从 30% 开始，确认声音正常后再提高
 amixer -c Device set PCM 30% unmute
 
 aplay -Dplughw:CARD=Device,DEV=0 \
-  ode-to-joy-violin-stereo-loud.wav
+  speaker-test-stereo.wav
 ```
 
 播放期间可以在另一个终端直接调整硬件音量：
@@ -305,7 +311,7 @@ amixer -c Device set PCM unmute
 pactl list short sinks
 pactl set-sink-volume @DEFAULT_SINK@ 50%
 aplay -D pulse \
-  ~/Documents/case3/midi_wav/ode-to-joy-violin-stereo-loud.wav
+  ~/Documents/case3/reports/audio-fixtures/speaker-test-stereo.wav
 ```
 
 如果默认输出后来发生变化，可以显式设置 M25 对应的 sink：
@@ -324,8 +330,9 @@ pactl set-default-sink \
 PortAudio 双声道实时传输。首次实时 DDSP 无声还包含软件输出过低的问题：原始波形
 峰值只有 `-32.5 dBFS`，程序又错误地优先选择了单声道。修复后使用双声道和
 旧版本的 `--output-gain-db 24` 测试把峰值提高到 `-8.5 dBFS` 且没有削波；当前
-DDSP-VST 插件语义改为 `-60..0 dB`，该正增益只作为历史诊断记录。短 MIDI 测试中
-`underruns=0`、`overruns=0`。实际听音反馈仍待现场确认。
+DDSP-VST 实时输出将范围限制为 `-60..+6 dB`，默认 `0 dB`，避免继续依赖过大的
+软件提升。短 MIDI 测试中 `underruns=0`、`overruns=0`。正增益应结合诊断页的
+削波样本数使用，实际听音反馈仍待现场确认。
 
 ### 漫步者 M16 Pro USB 喇叭
 
@@ -424,8 +431,8 @@ Stream parameters are 48000Hz, S16_LE, 2 channels
 出声。后续需要播放 case3 的 WAV 素材时，可以使用同一个 ALSA 设备名：
 
 ```bash
-cd ~/Documents/case3/midi_wav
-aplay -Dplughw:CARD=Pro,DEV=0 ode-to-joy-violin-stereo-loud.wav
+cd ~/Documents/case3/reports/audio-fixtures
+aplay -Dplughw:CARD=Pro,DEV=0 speaker-test-stereo.wav
 ```
 
 `card 1` 在重启或重新插拔后可能变化，因此脚本中优先使用
@@ -546,7 +553,7 @@ pactl set-card-profile bluez_card.84_26_7A_6C_EB_FC a2dp_sink
 经过 PulseAudio，只是使用 ALSA 的 `pulse` 插件入口，通常能绕过 `parecord` 对
 source 名称或默认源状态的兼容问题。
 
-双声道增强版 `ode-to-joy-violin-stereo-loud.wav` 已通过该 USB DAC 实测，可以
+生成的双声道测试音 `speaker-test-stereo.wav` 已通过该 USB DAC 实测，可以
 正常播放音乐，没有板载 3.5mm 接口上出现的强静电/数字噪声。当前
 音频输出路径的验收结果如下：
 
@@ -566,10 +573,10 @@ RIFF/WAVE、PCM、16-bit、48000 Hz、单声道
 推荐测试命令：
 
 ```bash
-cd ~/Documents/case3/midi_wav
+cd ~/Documents/case3/reports/audio-fixtures
 amixer set Playback 10
 amixer set Deviceid 2
-aplay -Dhw:ascend310b ode-to-joy-violin-mono-loud.wav
+aplay -Dhw:ascend310b speaker-test-mono.wav
 ```
 
 在后续驱动或系统镜像确认双声道模拟输出正常之前，不要使用板载 3.5mm 运行实时

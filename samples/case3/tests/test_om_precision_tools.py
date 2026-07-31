@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 
@@ -19,6 +22,7 @@ from tools.summarize_all_om_results import (
     precision_report_complete,
     render_markdown,
 )
+from tools.midi_ddsp_conversion_provenance import main as provenance_main
 
 
 class TimingSummaryTest(unittest.TestCase):
@@ -48,6 +52,55 @@ class TimingSummaryTest(unittest.TestCase):
     def test_rejects_missing_samples(self) -> None:
         with self.assertRaises(ValueError):
             summarize_timing([], steps=1024)
+
+
+class ConversionProvenanceTest(unittest.TestCase):
+    def test_recorded_conversion_rejects_a_changed_om(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            onnx = root / "expression.onnx"
+            om = root / "expression_origin.om"
+            log = root / "expression_origin.atc.log"
+            summary = root / "expression_origin.atc.summary.txt"
+            provenance = root / "expression_origin.provenance.json"
+            onnx.write_bytes(b"onnx")
+            om.write_bytes(b"om-v1")
+            log.write_text("raw atc output\n", encoding="utf-8")
+            summary.write_text(
+                "ATC_EXIT_CODE=0\nOM_UPDATED=yes\nERROR_LINES=none\n",
+                encoding="utf-8",
+            )
+            import hashlib
+
+            arguments = [
+                "provenance",
+                "record",
+                "--onnx",
+                str(onnx),
+                "--expected-onnx-sha256",
+                hashlib.sha256(onnx.read_bytes()).hexdigest(),
+                "--om",
+                str(om),
+                "--log",
+                str(log),
+                "--summary",
+                str(summary),
+                "--provenance",
+                str(provenance),
+                "--soc-version",
+                "Ascend310B4",
+                "--input-shape",
+                "state:1,1",
+                "--precision-mode-v2",
+                "origin",
+            ]
+            with mock.patch("sys.argv", arguments):
+                self.assertEqual(provenance_main(), 0)
+            om.write_bytes(b"om-v2")
+            arguments[1] = "validate"
+            with mock.patch("sys.argv", arguments):
+                with self.assertRaisesRegex(ValueError, "provenance mismatch"):
+                    provenance_main()
 
 
 class AisBenchParserTest(unittest.TestCase):

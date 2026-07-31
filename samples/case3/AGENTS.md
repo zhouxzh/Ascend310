@@ -29,3 +29,16 @@ These instructions apply to the entire `case3` directory.
 - Do not modify any files in the sibling `case2` directory.
 - Do not revert unrelated user changes.
 - Keep model checksums and raw conversion logs with each conversion result.
+
+## Test Assets
+
+- Files under `midi/` and `midi_wav/` are local test assets for MIDI parsing,
+  DDSP rendering, WebUI catalog checks, and audio playback validation. Do not
+  delete them during cleanup or code reduction.
+- These MIDI, MuseScore, and WAV files are intentionally excluded from the
+  GitHub package by the repository `.gitignore`. Keep them in the local
+  workspace and board staging area, but do not add them with `git add -f` or
+  upload them to GitHub.
+- Regenerate only the deterministic fixture when needed with
+  `python tools/create_test_midi.py --output midi/ddsp-test.mid`; preserve the
+  rest of the local test library.

@@ -3,7 +3,6 @@ from types import SimpleNamespace
 import json
 import tempfile
 import unittest
-from unittest.mock import patch
 
 import mido
 import numpy as np
@@ -97,8 +96,8 @@ class VendoredVoiceSeparationTest(unittest.TestCase):
         )
         self.assertNotIn(9, {voice.channel for voice in voices})
 
-    def test_canon_partition_is_complete_monophonic_and_deterministic(self) -> None:
-        path = Path(__file__).resolve().parents[1] / "midi" / "canon-in-d-johann-pachelbel.mid"
+    def test_generated_fixture_partition_is_complete_monophonic_and_deterministic(self) -> None:
+        path = Path(__file__).resolve().parents[1] / "midi" / "ddsp-test.mid"
         analysis = analyze_midi(path)
         first = split_midi_voices(analysis)
         second = split_midi_voices(analysis)

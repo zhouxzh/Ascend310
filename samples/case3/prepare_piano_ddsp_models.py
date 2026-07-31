@@ -192,12 +192,26 @@ def convert_one(
         "--enable_graph_parallel=0",
         "--log=info",
     ]
-    command_record = {
-        "command": command,
-        "environment": ATC_COMPILE_ENVIRONMENT,
-    }
-    command_path.write_text(json.dumps(command_record, indent=2) + "\n", encoding="utf-8")
-    if not om_path.is_file():
+    source_onnx_sha256 = sha256_file(onnx_path)
+    if om_path.is_file():
+        if not command_path.is_file() or not log_path.is_file():
+            raise RuntimeError(
+                f"Refusing to reuse {om_path}: conversion record or raw ATC log is missing"
+            )
+        command_record = json.loads(command_path.read_text(encoding="utf-8"))
+        expected_record = {
+            "schema": "piano-ddsp-atc-conversion/v1",
+            "command": command,
+            "environment": ATC_COMPILE_ENVIRONMENT,
+            "source_onnx_sha256": source_onnx_sha256,
+            "om_sha256": sha256_file(om_path),
+            "atc_log_sha256": sha256_file(log_path),
+        }
+        if any(command_record.get(key) != value for key, value in expected_record.items()):
+            raise RuntimeError(
+                f"Refusing to reuse {om_path}: ONNX, ATC command, OM, or log provenance changed"
+            )
+    else:
         with log_path.open("w", encoding="utf-8") as output:
             output.write("COMMAND " + json.dumps(command) + "\n")
             output.write("ENVIRONMENT " + json.dumps(ATC_COMPILE_ENVIRONMENT) + "\n")
@@ -214,6 +228,19 @@ def convert_one(
             raise RuntimeError(
                 f"ATC failed for {model_id} with exit code {result.returncode}; see {log_path}"
             )
+        command_record = {
+            "schema": "piano-ddsp-atc-conversion/v1",
+            "command": command,
+            "environment": ATC_COMPILE_ENVIRONMENT,
+            "source_onnx_sha256": source_onnx_sha256,
+            "om_sha256": sha256_file(om_path),
+            "atc_log_sha256": sha256_file(log_path),
+        }
+        command_tmp = command_path.with_suffix(".json.part")
+        command_tmp.write_text(
+            json.dumps(command_record, indent=2) + "\n", encoding="utf-8"
+        )
+        os.replace(command_tmp, command_path)
     copied_metadata = models_root / metadata_path.name
     if copied_metadata.is_file() and sha256_file(copied_metadata) != sha256_file(metadata_path):
         raise RuntimeError(f"Refusing to replace immutable metadata {copied_metadata}")
@@ -230,7 +257,7 @@ def convert_one(
         "precision_mode_v2": PRECISION_MODE_V2,
         "export_variant": variant,
         "source_onnx": onnx_path.name,
-        "source_onnx_sha256": sha256_file(onnx_path),
+        "source_onnx_sha256": source_onnx_sha256,
         "metadata": str(copied_metadata.relative_to(bundle_root).as_posix()),
         "metadata_sha256": sha256_file(copied_metadata),
         "om": str(om_path.relative_to(bundle_root).as_posix()),
@@ -241,9 +268,69 @@ def convert_one(
         "outputs": metadata.get("outputs"),
         "io_contract_validation": io_validation,
         "atc_log": str(log_path.relative_to(bundle_root).as_posix()),
+        "atc_log_sha256": sha256_file(log_path),
+        "atc_command_record": str(command_path.relative_to(bundle_root).as_posix()),
+        "atc_command_record_sha256": sha256_file(command_path),
         "atc_command": command,
         "atc_compile_environment": ATC_COMPILE_ENVIRONMENT,
     }
+
+
+def validate_existing_model_result(
+    model_id: str,
+    result: dict[str, object],
+    onnx_path: Path,
+    metadata_path: Path,
+    bundle_root: Path,
+    soc_version: str,
+) -> None:
+    source_hash = sha256_file(onnx_path)
+    if result.get("source_onnx_sha256") != source_hash:
+        raise RuntimeError(f"Existing {model_id} result was built from a different ONNX file")
+    expected_command = [
+        "atc",
+        f"--model={onnx_path}",
+        "--framework=5",
+        f"--output={bundle_root / 'models' / onnx_path.stem}",
+        "--input_format=ND",
+        f"--input_shape={INPUT_SHAPE}",
+        f"--soc_version={soc_version}",
+        f"--precision_mode_v2={PRECISION_MODE_V2}",
+        "--enable_graph_parallel=0",
+        "--log=info",
+    ]
+    if result.get("atc_command") != expected_command:
+        raise RuntimeError(f"Existing {model_id} result used a different ATC command")
+    paths_and_hashes = (
+        ("om", "om_sha256"),
+        ("metadata", "metadata_sha256"),
+        ("atc_log", "atc_log_sha256"),
+        ("atc_command_record", "atc_command_record_sha256"),
+    )
+    resolved: dict[str, Path] = {}
+    for path_key, hash_key in paths_and_hashes:
+        raw_path = result.get(path_key)
+        if not isinstance(raw_path, str) or not raw_path:
+            raise RuntimeError(f"Existing {model_id} result is missing {path_key}")
+        path = (bundle_root / raw_path).resolve()
+        if bundle_root.resolve() not in path.parents or not path.is_file():
+            raise RuntimeError(f"Existing {model_id} result has invalid {path_key}: {raw_path}")
+        if result.get(hash_key) != sha256_file(path):
+            raise RuntimeError(f"Existing {model_id} result has a changed {path_key}")
+        resolved[path_key] = path
+    if sha256_file(metadata_path) != result.get("metadata_sha256"):
+        raise RuntimeError(f"Existing {model_id} metadata no longer matches the source release")
+    record = json.loads(resolved["atc_command_record"].read_text(encoding="utf-8"))
+    expected_record = {
+        "schema": "piano-ddsp-atc-conversion/v1",
+        "command": expected_command,
+        "environment": ATC_COMPILE_ENVIRONMENT,
+        "source_onnx_sha256": source_hash,
+        "om_sha256": result["om_sha256"],
+        "atc_log_sha256": result["atc_log_sha256"],
+    }
+    if any(record.get(key) != value for key, value in expected_record.items()):
+        raise RuntimeError(f"Existing {model_id} conversion record does not match its artifacts")
 
 
 def parse_models(values: Iterable[str]) -> list[str]:
@@ -335,7 +422,22 @@ def main() -> None:
         missing = [model_id for model_id in selected if model_id not in existing]
         if missing:
             raise RuntimeError(f"Immutable completed bundle is missing models: {missing}")
-        print(f"Completed bundle is immutable; leaving files unchanged: {manifest_path}")
+        for model_id in selected:
+            onnx_path, metadata_path, _ = model_assets(
+                release, model_root, model_id, args.variant, variant_root
+            )
+            raw_result = existing[model_id]
+            if not isinstance(raw_result, dict):
+                raise RuntimeError(f"Invalid existing model result: {model_id}")
+            validate_existing_model_result(
+                model_id,
+                raw_result,
+                onnx_path,
+                metadata_path,
+                bundle_root,
+                args.soc_version,
+            )
+        print(f"Completed bundle provenance verified; leaving files unchanged: {manifest_path}")
         if args.activate:
             write_active_pointer(bundle_root, loaded)
         return
@@ -348,12 +450,23 @@ def main() -> None:
 
     converted = dict(existing)
     for model_id in selected:
-        if model_id in converted:
-            print(f"Keeping existing immutable model result: {model_id}")
-            continue
         onnx_path, metadata_path, metadata = model_assets(
             release, model_root, model_id, args.variant, variant_root
         )
+        if model_id in converted:
+            raw_result = converted[model_id]
+            if not isinstance(raw_result, dict):
+                raise RuntimeError(f"Invalid existing model result: {model_id}")
+            validate_existing_model_result(
+                model_id,
+                raw_result,
+                onnx_path,
+                metadata_path,
+                bundle_root,
+                args.soc_version,
+            )
+            print(f"Keeping verified immutable model result: {model_id}")
+            continue
         converted[model_id] = convert_one(
             model_id,
             onnx_path,

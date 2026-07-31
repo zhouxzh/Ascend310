@@ -43,7 +43,7 @@ python tools/export_midi_ddsp_tf_reference.py \
   --instrument-id 0
 
 python tools/export_midi_ddsp_tf_reference.py \
-  --midi midi/ode-to-joy-violin.mid \
+  --midi midi/ddsp-test.mid \
   --instrument-id 0
 ```
 
@@ -85,7 +85,7 @@ F0 采样严格保留官方 `top-p=0.95` 和 `midi_zero_silence=True` 语义。�
 ```bash
 python tools/compare_midi_ddsp_stateful_onnx.py \
   --export-manifest models/midi_ddsp/stateful_v2_batched/onnx/export_manifest.json \
-  --reference reports/midi_ddsp/tf_reference/ode-to-joy-violin/reference.npz \
+  --reference reports/midi_ddsp/tf_reference/ddsp-test/reference.npz \
   --voice-batch-size 8
 ```
 
@@ -97,7 +97,7 @@ batch 比较会用独立种子复制参考声部，要求所有成员的 `sample
 
 ```bash
 python tools/compare_midi_ddsp_tf_dsp.py \
-  reports/midi_ddsp/tf_reference/ode-to-joy-violin/reference.npz
+  reports/midi_ddsp/tf_reference/ddsp-test/reference.npz
 ```
 
 比较工具把相同白噪声注入 NumPy FilteredNoise，分别比较干声和湿声，默认要求 NRMSE
@@ -145,9 +145,9 @@ ID 0-12。前 16,000 点保持原值，后 32,000 点应用 `exp(-4t)`，首样�
   harmonics <= 0.8%，noise <= 1.5%，F0 采样索引完全一致；
 - NumPy 干声和湿声相对官方 TensorFlow DSP：NRMSE <= `1e-4`；
 - OM 通过同一固定夹具和阈值后，才将 stateful v2 标记为推荐模型；
-- 板端 `ode-to-joy-violin.mid` 无周期接缝、活动音符静音、默认削波、underrun 或 overrun；
+- 板端 `ddsp-test.mid` 无周期接缝、活动音符静音、默认削波、underrun 或 overrun；
 
-2026-07-25 本地 batch `1/2/4/8` 均通过 `ode-to-joy-violin.mid` 固定基准：每档
+2026-07-25 本地 batch `1/2/4/8` 均通过 `ddsp-test.mid` 固定基准：每档
 `sampled_bins` 完全一致，batch 内成员张量一致。Expression NRMSE
 `5.11e-7`、F0 `2.62e-8`、amplitude `5.49e-4`、harmonics `8.23e-4`、noise
 `2.23e-3`，采样索引完全一致；NumPy 干声 NRMSE `9.35e-5`、湿声 `1.74e-5`。

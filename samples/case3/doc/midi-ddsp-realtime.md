@@ -1,7 +1,7 @@
 # MIDI-DDSP 文件渲染与播放
 
 MIDI-DDSP 用于已知 MIDI 文件，不承担触控键盘或实体 MIDI 的低延迟即时合成。实时
-演奏由 DDSP-VST 页面负责。
+演奏由统一工作区中的 Piano-DDSP 钢琴或 DDSP-VST 神经音色模式负责。
 
 ## 当前架构
 
@@ -69,14 +69,14 @@ stateful v2 离线渲染：
 
 ```bash
 python midi_ddsp_realtime.py \
-  --midi midi/ode-to-joy-violin.mid \
+  --midi midi/ddsp-test.mid \
   --model-bundle models/midi_ddsp/bundles/google-urmp-stateful-v2-batched-origin/manifest.json \
   --instrument-id 0 \
   --seed 20260724 \
   --render-only \
   --tail-seconds 2 \
-  --output reports/midi_ddsp/ode-to-joy-violin.wav \
-  --report reports/midi_ddsp/ode-to-joy-violin.json
+  --output reports/midi_ddsp/ddsp-test.wav \
+  --report reports/midi_ddsp/ddsp-test.json
 ```
 
 去掉 `--render-only` 即可在完整渲染后播放。可用 `--audio-device` 选择 PortAudio 输出，
@@ -103,7 +103,7 @@ python midi_ddsp_realtime.py \
 ## 验收
 
 本地先完成 [stateful v2 导出与对齐](midi-ddsp-export.md)。板端再使用
-`midi/ode-to-joy-violin.mid` 验证：
+`midi/ddsp-test.mid` 验证：
 
 - 已验证 origin OM 完成整首渲染，速度低于音频时长；
 - 无周期性块接缝、活动音符静音和默认削波；

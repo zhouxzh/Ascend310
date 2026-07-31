@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a short monophonic violin MIDI file for DDSP testing."""
+"""Create a deterministic monophonic MIDI fixture for DDSP testing."""
 
 from __future__ import annotations
 
@@ -16,44 +16,22 @@ def create_test_midi(output: Path) -> None:
     midi = mido.MidiFile(type=0, ticks_per_beat=480)
     track = mido.MidiTrack()
     midi.tracks.append(track)
-    track.append(mido.MetaMessage("track_name", name="DDSP Violin Test", time=0))
+    track.append(mido.MetaMessage("track_name", name="DDSP MIDI Test", time=0))
     track.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(96), time=0))
     track.append(mido.Message("program_change", program=40, channel=0, time=0))
     track.append(mido.Message("control_change", control=7, value=110, channel=0, time=0))
     track.append(mido.Message("control_change", control=11, value=112, channel=0, time=0))
 
-    # First two phrases of "Ode to Joy". Durations are in beats.
+    # A self-authored scale-and-interval pattern. Durations are in beats.
     melody = [
-        (64, 1.0, 92),
-        (64, 1.0, 84),
-        (65, 1.0, 94),
-        (67, 1.0, 104),
-        (67, 1.0, 96),
-        (65, 1.0, 88),
-        (64, 1.0, 92),
-        (62, 1.0, 82),
-        (60, 1.0, 88),
-        (60, 1.0, 80),
-        (62, 1.0, 90),
-        (64, 1.0, 100),
-        (64, 1.5, 94),
-        (62, 0.5, 82),
-        (62, 2.0, 88),
-        (64, 1.0, 94),
-        (64, 1.0, 86),
-        (65, 1.0, 96),
-        (67, 1.0, 106),
-        (67, 1.0, 98),
-        (65, 1.0, 90),
-        (64, 1.0, 94),
-        (62, 1.0, 84),
-        (60, 1.0, 90),
-        (60, 1.0, 82),
-        (62, 1.0, 92),
-        (64, 1.0, 102),
-        (62, 1.5, 88),
-        (60, 0.5, 80),
-        (60, 2.0, 92),
+        (60, 0.5, 78), (62, 0.5, 84), (64, 0.5, 90), (65, 0.5, 96),
+        (67, 0.5, 102), (69, 0.5, 96), (71, 0.5, 90), (72, 0.5, 84),
+        (71, 0.75, 96), (69, 0.25, 86), (67, 0.5, 92), (65, 0.5, 88),
+        (64, 0.5, 84), (62, 0.5, 80), (60, 1.0, 76),
+        (55, 0.5, 80), (57, 0.5, 86), (59, 0.5, 92), (60, 0.5, 98),
+        (62, 0.5, 104), (64, 0.5, 98), (65, 0.5, 92), (67, 0.5, 86),
+        (65, 0.75, 96), (64, 0.25, 86), (62, 0.5, 90), (60, 0.5, 86),
+        (59, 0.5, 82), (57, 0.5, 78), (55, 1.0, 74),
     ]
 
     pending_gap = 0

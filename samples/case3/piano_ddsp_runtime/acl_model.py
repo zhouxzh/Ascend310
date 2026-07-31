@@ -173,63 +173,91 @@ class PianoAclModel:
         count = int(getattr(self.acl.mdl, f"get_num_{kind}s")(self.model_desc))
         prepared: list[dict[str, Any]] = []
         names: list[str] = []
-        for index in range(count):
-            raw_name = str(
-                getattr(self.acl.mdl, f"get_{kind}_name_by_index")(self.model_desc, index)
-            )
-            name = _canonical_name(raw_name, set(shapes), kind)
-            names.append(name)
-            actual_shape = _shape(
-                getattr(self.acl.mdl, f"get_{kind}_dims")(self.model_desc, index),
-                f"acl.mdl.get_{kind}_dims[{index}]",
-            )
-            if actual_shape != shapes[name]:
-                raise ValueError(
-                    f"Unexpected OM {kind} {name} shape {actual_shape}; expected {shapes[name]}"
+        try:
+            for index in range(count):
+                raw_name = str(
+                    getattr(self.acl.mdl, f"get_{kind}_name_by_index")(
+                        self.model_desc, index
+                    )
                 )
-            dtype = np.dtype(dtypes[name])
-            expected_size = int(np.prod(shapes[name])) * dtype.itemsize
-            actual_size = int(
-                getattr(self.acl.mdl, f"get_{kind}_size_by_index")(self.model_desc, index)
-            )
-            if actual_size != expected_size:
-                raise ValueError(
-                    f"Unexpected OM {kind} {name} size {actual_size}; expected {expected_size}"
+                name = _canonical_name(raw_name, set(shapes), kind)
+                names.append(name)
+                actual_shape = _shape(
+                    getattr(self.acl.mdl, f"get_{kind}_dims")(
+                        self.model_desc, index
+                    ),
+                    f"acl.mdl.get_{kind}_dims[{index}]",
                 )
-            dtype_getter = getattr(self.acl.mdl, f"get_{kind}_data_type", None)
-            if dtype_getter is not None:
-                actual_dtype = dtype_getter(self.model_desc, index)
-                expected_acl = (
-                    getattr(self.acl, "ACL_INT32", 3)
-                    if dtype == np.dtype(np.int32)
-                    else getattr(self.acl, "ACL_FLOAT", 0)
+                if actual_shape != shapes[name]:
+                    raise ValueError(
+                        f"Unexpected OM {kind} {name} shape {actual_shape}; expected {shapes[name]}"
+                    )
+                dtype = np.dtype(dtypes[name])
+                expected_size = int(np.prod(shapes[name])) * dtype.itemsize
+                actual_size = int(
+                    getattr(self.acl.mdl, f"get_{kind}_size_by_index")(
+                        self.model_desc, index
+                    )
                 )
-                if actual_dtype != expected_acl:
-                    raise ValueError(f"Unexpected OM {kind} {name} dtype {actual_dtype}")
-            pointer, status = self.acl.rt.malloc(actual_size, ACL_MEM_MALLOC_HUGE_FIRST)
-            _check((pointer, status), f"acl.rt.malloc {kind}[{index}]")
-            data_buffer = self.acl.create_data_buffer(pointer, actual_size)
-            if data_buffer is None:
-                self.acl.rt.free(pointer)
-                raise RuntimeError(f"acl.create_data_buffer {kind}[{index}] failed")
-            _check(
-                self.acl.mdl.add_dataset_buffer(dataset, data_buffer),
-                f"acl.mdl.add_dataset_buffer {kind}[{index}]",
-            )
-            item = {
-                "name": name,
-                "raw_name": raw_name,
-                "shape": list(actual_shape),
-                "dtype": "int32" if dtype == np.dtype(np.int32) else "float32",
-                "ptr": pointer,
-                "size": actual_size,
-                "buffer": data_buffer,
-                "host": np.empty(shapes[name], dtype=dtype) if not is_input else None,
-            }
-            prepared.append(item)
-        if len(names) != len(set(names)) or set(names) != set(shapes):
-            raise ValueError(f"Unexpected OM {kind}s: {names}")
-        return prepared
+                if actual_size != expected_size:
+                    raise ValueError(
+                        f"Unexpected OM {kind} {name} size {actual_size}; expected {expected_size}"
+                    )
+                dtype_getter = getattr(self.acl.mdl, f"get_{kind}_data_type", None)
+                if dtype_getter is not None:
+                    actual_dtype = dtype_getter(self.model_desc, index)
+                    expected_acl = (
+                        getattr(self.acl, "ACL_INT32", 3)
+                        if dtype == np.dtype(np.int32)
+                        else getattr(self.acl, "ACL_FLOAT", 0)
+                    )
+                    if actual_dtype != expected_acl:
+                        raise ValueError(f"Unexpected OM {kind} {name} dtype {actual_dtype}")
+                pointer, status = self.acl.rt.malloc(
+                    actual_size, ACL_MEM_MALLOC_HUGE_FIRST
+                )
+                _check((pointer, status), f"acl.rt.malloc {kind}[{index}]")
+                data_buffer = self.acl.create_data_buffer(pointer, actual_size)
+                if data_buffer is None:
+                    self.acl.rt.free(pointer)
+                    raise RuntimeError(
+                        f"acl.create_data_buffer {kind}[{index}] failed"
+                    )
+                try:
+                    _check(
+                        self.acl.mdl.add_dataset_buffer(dataset, data_buffer),
+                        f"acl.mdl.add_dataset_buffer {kind}[{index}]",
+                    )
+                except BaseException:
+                    self.acl.destroy_data_buffer(data_buffer)
+                    self.acl.rt.free(pointer)
+                    raise
+                prepared.append(
+                    {
+                        "name": name,
+                        "raw_name": raw_name,
+                        "shape": list(actual_shape),
+                        "dtype": "int32" if dtype == np.dtype(np.int32) else "float32",
+                        "ptr": pointer,
+                        "size": actual_size,
+                        "buffer": data_buffer,
+                        "host": np.empty(shapes[name], dtype=dtype) if not is_input else None,
+                    }
+                )
+            if len(names) != len(set(names)) or set(names) != set(shapes):
+                raise ValueError(f"Unexpected OM {kind}s: {names}")
+            return prepared
+        except BaseException:
+            for item in reversed(prepared):
+                try:
+                    self.acl.destroy_data_buffer(item["buffer"])
+                except BaseException:
+                    pass
+                try:
+                    self.acl.rt.free(item["ptr"])
+                except BaseException:
+                    pass
+            raise
 
     def contract_report(self) -> dict[str, object]:
         """Return the OM contract that was validated while allocating buffers."""

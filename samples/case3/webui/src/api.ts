@@ -5,12 +5,11 @@ import type {
   AudioInput,
   Catalog,
   Job,
-  DdspVstStatus,
   MidiFile,
   MidiVoiceAnalysis,
   MidiPort,
-  PianoDdspCatalog,
-  PianoDdspStatus,
+  RealtimeCatalog,
+  RealtimeStatus,
   SpeakerTestStatus,
   SystemStatus,
 } from './types'
@@ -46,10 +45,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   status: () => request<SystemStatus>('/api/v1/status'),
   catalog: () => request<Catalog>('/api/v1/catalog'),
-  audioDevices: () =>
-    request<{ available: boolean; devices: AudioDevice[]; error: string | null }>(
-      '/api/v1/audio-devices',
-    ),
   midiDdspAudioDevices: () =>
     request<{ available: boolean; devices: AudioDevice[]; error: string | null }>(
       '/api/v1/midi-ddsp/audio-devices',
@@ -83,32 +78,27 @@ export const api = {
       '/api/v1/midi-ports',
     ),
   jobs: () => request<{ jobs: Job[] }>('/api/v1/jobs'),
-  pianoDdspCatalog: () => request<PianoDdspCatalog>('/api/v1/piano-ddsp/catalog'),
-  pianoDdspAudioDevices: () =>
-    request<{ available: boolean; devices: AudioDevice[]; error: string | null }>(
-      '/api/v1/piano-ddsp/audio-devices',
-    ),
-  pianoDdspStatus: () => request<PianoDdspStatus>('/api/v1/piano-ddsp/status'),
-  startPianoDdsp: (payload: Record<string, unknown>) =>
-    request<PianoDdspStatus>('/api/v1/piano-ddsp/start', {
+  realtimeCatalog: () => request<RealtimeCatalog>('/api/v1/realtime/catalog'),
+  realtimeStatus: () => request<RealtimeStatus>('/api/v1/realtime/status'),
+  startRealtime: (payload: Record<string, unknown>) =>
+    request<RealtimeStatus>('/api/v1/realtime/start', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  stopPianoDdsp: () =>
-    request<PianoDdspStatus>('/api/v1/piano-ddsp/stop', { method: 'POST' }),
-  panicPianoDdsp: () =>
-    request<PianoDdspStatus>('/api/v1/piano-ddsp/panic', { method: 'POST' }),
-  updatePianoDdsp: (payload: Record<string, unknown>) =>
-    request<PianoDdspStatus>('/api/v1/piano-ddsp/parameters', {
+  switchRealtime: (payload: Record<string, unknown>) =>
+    request<RealtimeStatus>('/api/v1/realtime/switch', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateRealtime: (values: Record<string, number>) =>
+    request<RealtimeStatus>('/api/v1/realtime/parameters', {
       method: 'PATCH',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ values }),
     }),
-  startDdspVst: (payload: Record<string, unknown>) =>
-    request<DdspVstStatus>('/api/v1/ddsp-vst/start', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  stopDdspVst: () => request<DdspVstStatus>('/api/v1/ddsp-vst/stop', { method: 'POST' }),
+  stopRealtime: () =>
+    request<RealtimeStatus>('/api/v1/realtime/stop', { method: 'POST' }),
+  panicRealtime: () =>
+    request<RealtimeStatus>('/api/v1/realtime/panic', { method: 'POST' }),
   speakerTestStatus: () => request<SpeakerTestStatus>('/api/v1/speaker-test/status'),
   startSpeakerTest: (payload: Record<string, unknown>) =>
     request<SpeakerTestStatus>('/api/v1/speaker-test/start', {

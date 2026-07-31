@@ -12,61 +12,7 @@ export interface DependencyMap {
   [name: string]: boolean
 }
 
-export interface DdspVstMetrics {
-  rendered_blocks: number
-  played_blocks: number
-  underruns: number
-  overruns: number
-  max_render_ms: number
-  p95_render_ms: number
-  buffered_blocks: number
-  queue_latency_ms?: number
-  device_latency_ms?: number
-  pulse_buffer_latency_ms?: number
-  sink_latency_ms?: number
-  resampler_latency_ms?: number
-  audio_path_latency_ms?: number
-  estimated_total_latency_ms?: number
-  midi_to_render_p95_ms?: number
-  write_block_p95_ms?: number
-  output_peak?: number
-  clipped_samples?: number
-  midi_connected?: boolean
-  midi_reconnects?: number
-  midi_velocity_last?: number
-  midi_velocity_min?: number
-  midi_velocity_max?: number
-  midi_velocity_p50?: number
-  midi_velocity_mapped_last?: number
-}
-
 export type LatencyProfile = 'low' | 'balanced' | 'safe'
-
-export interface DdspVstParameters {
-  pitch_shift: number
-  harmonic_gain: number
-  noise_gain: number
-  output_gain_db: number
-  velocity_curve: number
-  attack: number
-  decay: number
-  sustain: number
-  release: number
-  input_pitch: number
-  input_gain: number
-  reverb_size: number
-  reverb_damping: number
-  reverb_wet: number
-}
-
-export interface DdspVstStatus {
-  running: boolean
-  active_notes: number[]
-  backend?: string
-  metrics?: DdspVstMetrics
-  parameters?: DdspVstParameters
-  config?: Record<string, unknown>
-}
 
 export type SpeakerChannelMode = 'left' | 'both' | 'right'
 
@@ -113,107 +59,83 @@ export interface SystemStatus {
     health_alarm: boolean
   }
   active_owner: string | null
-  piano_ddsp?: PianoDdspStatus
-  ddsp_vst: DdspVstStatus
+  realtime?: RealtimeStatus
   speaker_test: SpeakerTestStatus
   job_count: number
 }
 
-export interface PianoDdspBundle {
-  id: string
-  release: string
-  precision: string
-  soc_version: string
-  complete: boolean
-  models: string[]
+export type RealtimePatchCategory = 'piano' | 'woodwind' | 'brass' | 'strings' | 'other'
+
+export interface RealtimeParameterMetadata {
+  min?: number
+  max?: number
+  default?: number
+  options?: number[]
 }
 
-export interface PianoDdspModel {
-  id: string
+export interface RealtimePatch {
+  patch_id: string
   name: string
-  architecture: string
-  quality_status: string
+  category: RealtimePatchCategory
   available: boolean
-  bundle_ids: string[]
-  n_harmonics: number
-  n_noise_bands: number
-  reverb_type: string
+  pitch_min: number
+  pitch_max: number
+  polyphony: number
+  compatible_audio_device_ids: string[]
+  parameters: Record<string, RealtimeParameterMetadata>
+  details: {
+    engine?: string
+    architecture?: string
+    quality_status?: string
+    model?: string
+    precision?: string
+    backend?: string
+    n_harmonics?: number
+    n_noise_bands?: number
+  }
 }
 
-export interface PianoDdspCatalog {
-  release: string
-  source_commit: string
-  hf_commit: string
-  active_bundle_id: string | null
-  bundles: PianoDdspBundle[]
-  models: PianoDdspModel[]
-  piano_years: number[]
-  io_contract: Record<string, unknown>
-  latency_profiles: Record<LatencyProfile, { frames: number; prebuffer_blocks: number; audio_latency_ms: number }>
-  errors: string[]
+export interface RealtimeCatalog {
+  schema_version: number
+  patches: RealtimePatch[]
+  audio_devices: AudioDevice[]
+  midi_ports: MidiPort[]
+  midi_error: string | null
+  midi_files: MidiFile[]
+  latency_profiles: LatencyProfile[]
 }
 
-export interface PianoDdspMetrics {
-  rendered_blocks: number
-  played_blocks: number
-  underruns: number
-  overruns: number
-  clipped_samples: number
-  npu_samples: number
-  npu_p50_ms: number
-  npu_p95_ms: number
-  npu_p99_ms: number
-  dsp_p95_ms: number
-  block_p95_ms: number
-  queue_latency_ms: number
-  device_latency_ms: number
-  sink_latency_ms: number
-  estimated_total_latency_ms: number
-  monitor_drops: number
+export interface RealtimePlayerStatus {
+  state: 'empty' | 'loaded' | 'paused' | 'playing'
+  path?: string | null
+  position_seconds: number
+  duration_seconds: number
+  tempo: number
+  loop: boolean
 }
 
-export interface PianoDdspStatus {
+export interface RealtimeStatus {
   state: 'stopped' | 'starting' | 'running' | 'switching' | 'stopping' | 'failed'
   running: boolean
-  error?: string | null
-  heartbeat_age_seconds?: number | null
-  config?: {
-    bundle_id?: string
-    model_id?: string
-    piano_year?: number
-    latency_profile?: LatencyProfile
-    velocity_curve?: number
-    transpose?: number
-    output_gain_db?: number
-    reverb_mix?: number
-  }
-  midi?: {
-    port?: string | null
-    connected: boolean
-    reconnects: number
-    error?: string | null
-    active_notes: number[]
-    slot_notes: number[]
-    pedal: number[]
-    voice_steals: number
-    last_velocity: number
-  }
-  audio?: {
-    backend?: string
-    sink?: string | null
-    device_lost: boolean
-    error?: string | null
-  }
-  player?: {
-    state: string
-    path?: string | null
-    position_seconds: number
-    duration_seconds: number
-    tempo: number
-    loop: boolean
-  }
-  recording?: { active: boolean; id?: string | null }
-  metrics?: PianoDdspMetrics
+  session_id?: string | null
+  patch_id?: string | null
+  patch?: RealtimePatch | null
+  active_notes: number[]
+  audio_device_id?: string | null
+  latency_profile?: LatencyProfile | null
+  player?: RealtimePlayerStatus | null
+  recording: { active: boolean; id?: string | null }
+  metrics: Record<string, number | boolean | string | null>
+  audio?: { device_lost?: boolean; error?: string | null }
+  midi?: { connected?: boolean; reconnects?: number; error?: string | null }
+  diagnostics: { engine?: string | null; runtime?: Record<string, unknown> }
+  last_switch?: {
+    ok: boolean
+    rolled_back: boolean
+    error?: string
+    rollback_error?: string
+    duration_ms?: number
+  } | null
 }
 
 export interface MidiFile {

@@ -8,8 +8,7 @@
 | 文档 | 内容 |
 | :--- | :--- |
 | [项目概览](overview.md) | 项目边界、硬件要求、目录结构和完整系统链路 |
-| [MIDI 键盘应用](midi-app.md) | `midi.py` 功能、键盘映射、设备枚举和依赖 |
-| [MIDI 测试曲目与来源](midi-test-tracks.md) | 当前测试曲目、MuseScore 下载来源和 ONNX 试听输出约定 |
+| [MIDI 测试素材](midi-test-tracks.md) | 脚本生成的确定性 MIDI 夹具和使用边界 |
 | [3D 打印硬件](hardware.md) | CAD/STL 文件、打印参数和装配关系 |
 | [DDSP-VST 模型导出](model-export.md) | 状态化音色模型的 TFLite 到 ONNX 流程 |
 | [MIDI-DDSP 模型导出](midi-ddsp-export.md) | checkpoint 到 Expression/Synthesis ONNX 的流程与产物 |
@@ -21,6 +20,7 @@
 | [MIDI-DDSP 实时合成](midi-ddsp-realtime.md) | 使用 MIDI-DDSP OM、PyACL、CPU DSP 和 M25 实时播放 MIDI |
 | [Piano-DDSP 实时系统](piano-ddsp.md) | 16 声部实时钢琴的模型来源、运行时、API、部署和验收 |
 | [MIDI-DDSP Studio Web 界面](webui.md) | React/FastAPI 工作台、板端手动安装、同步、启动和测试 |
+| [触摸屏输入法配置](touchscreen-input.md) | 英文 XFCE 桌面的 Onboard、IBus 拼音、自动弹出和登录自启配置 |
 | [测试故障排查](troubleshooting.md) | SSH/systemd、音频、ATC、OOM、兼容性和性能问题记录 |
 | [Upstream 参考仓库](upstream-repositories.md) | 第三方源码来源、固定提交、本地状态和保留规则 |
 

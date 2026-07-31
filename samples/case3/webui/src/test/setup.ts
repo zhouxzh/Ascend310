@@ -14,3 +14,22 @@ class ResizeObserverStub implements ResizeObserver {
 }
 
 globalThis.ResizeObserver = ResizeObserverStub
+
+const canvasContextStub = {
+  beginPath() {},
+  clearRect() {},
+  fill() {},
+  fillRect() {},
+  fillText() {},
+  lineTo() {},
+  moveTo() {},
+  rect() {},
+  roundRect() {},
+  setTransform() {},
+  stroke() {},
+}
+
+Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+  configurable: true,
+  value: () => canvasContextStub,
+})

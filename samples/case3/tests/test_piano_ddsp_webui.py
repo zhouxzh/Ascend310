@@ -8,7 +8,12 @@ import unittest
 from unittest import mock
 
 from midi_ddsp_webui.core import ResourceCoordinator
-from midi_ddsp_webui.piano import PianoDdspController, piano_catalog
+from midi_ddsp_webui.piano import (
+    PianoDdspController,
+    piano_catalog,
+    resolve_piano_bundle,
+)
+from piano_ddsp_runtime.bundle import load_bundle
 from midi_ddsp_webui.speaker import merge_piano_audio_outputs
 
 
@@ -29,6 +34,7 @@ def make_bundle(
     om = models / "paper.om"
     metadata_path = models / "paper.json"
     om.write_bytes(b"fixture-om")
+    om_sha256 = hashlib.sha256(om.read_bytes()).hexdigest()
     metadata_path.write_bytes((RELEASE_ROOT / "ddsp_piano_paper_ir.json").read_bytes())
     validation_dir = bundle / "validation"
     validation_dir.mkdir()
@@ -39,6 +45,7 @@ def make_bundle(
                 "schema": "piano-ddsp-om-validation/v1",
                 "bundle_id": bundle_id,
                 "model_id": "paper_ir",
+                "om_sha256": om_sha256,
                 "frames": validation_frames,
                 "passed": validation_passed,
             }
@@ -57,7 +64,7 @@ def make_bundle(
             "paper_ir": {
                 "display_name": "Paper IR",
                 "om": "models/paper.om",
-                "om_sha256": hashlib.sha256(om.read_bytes()).hexdigest(),
+                "om_sha256": om_sha256,
                 "metadata": "models/paper.json",
                 "metadata_sha256": hashlib.sha256(metadata_path.read_bytes()).hexdigest(),
                 "validation": {
@@ -65,6 +72,7 @@ def make_bundle(
                     "sha256": hashlib.sha256(validation_path.read_bytes()).hexdigest(),
                     "frames": validation_frames,
                     "passed": validation_passed,
+                    "om_sha256": om_sha256,
                 },
             }
         },
@@ -73,6 +81,43 @@ def make_bundle(
 
 
 class PianoWebUiTest(unittest.TestCase):
+    def test_spawn_failure_releases_resource_owner(self) -> None:
+        coordinator = ResourceCoordinator()
+        controller = PianoDdspController(coordinator)
+        with mock.patch.object(controller, "_spawn", side_effect=OSError("spawn failed")):
+            with self.assertRaisesRegex(OSError, "spawn failed"):
+                controller.start({})
+        self.assertIsNone(coordinator.owner)
+
+    def test_bundle_resolution_requires_requested_model(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            make_bundle(root)
+            with mock.patch("midi_ddsp_webui.piano.BUNDLE_ROOT", root / "bundles"):
+                self.assertTrue(resolve_piano_bundle("fixture", "paper_ir").is_file())
+                with self.assertRaisesRegex(KeyError, "film_fdn"):
+                    resolve_piano_bundle("fixture", "film_fdn")
+
+    def test_validation_report_must_match_the_current_om_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            make_bundle(root)
+            bundle = root / "bundles" / "fixture"
+            report_path = bundle / "validation" / "paper_ir.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            report["om_sha256"] = "0" * 64
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            manifest_path = bundle / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["models"]["paper_ir"]["validation"]["sha256"] = hashlib.sha256(
+                report_path.read_bytes()
+            ).hexdigest()
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "Validation report mismatch"):
+                load_bundle(manifest_path)
+            relaxed = load_bundle(manifest_path, validate_qualification=False)
+            self.assertFalse(relaxed.models["paper_ir"].validation_passed)
+
     def test_piano_audio_outputs_add_direct_edifier_without_changing_pulse_id(self) -> None:
         outputs = merge_piano_audio_outputs(
             [

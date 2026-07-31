@@ -8,7 +8,6 @@ import math
 from pathlib import Path
 import threading
 import time
-from typing import Iterable
 
 import numpy as np
 

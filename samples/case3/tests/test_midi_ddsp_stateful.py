@@ -15,7 +15,6 @@ import midi_ddsp_webui.stateful_midi_ddsp as stateful_module
 from midi_ddsp_realtime import (
     MidiToken,
     _boundary_continuity,
-    _stem_seed,
     build_frame_features,
 )
 from midi_ddsp_webui.midi_analysis import analyze_midi, split_midi_voices
@@ -35,7 +34,6 @@ class _ContextRunner:
         state = feeds["state_in"].copy()
         self.observed_states.append(state)
         block = next(value for name, value in feeds.items() if name != "state_in")
-        width = state.shape[1]
         context = np.repeat(state[:, None, :], block.shape[1], axis=1)
         return {"context": context.astype(np.float32), "state_out": state + 1.0}
 
@@ -82,10 +80,6 @@ class StatefulInferenceTest(unittest.TestCase):
         pitch = np.asarray([[60], [60], [0], [0], [62], [62]], dtype=np.float32)
         position = StatefulMidiDdspInference.relative_position(onsets, pitch)
         np.testing.assert_allclose(position[:, 0], [0.5, 1.0, 0.0, 0.0, 0.5, 1.0])
-
-    def test_track_seed_is_stable_and_track_specific(self) -> None:
-        self.assertEqual(_stem_seed(20260724, 3), _stem_seed(20260724, 3))
-        self.assertNotEqual(_stem_seed(20260724, 3), _stem_seed(20260724, 4))
 
     def test_boundary_metric_reports_known_jump(self) -> None:
         result = _boundary_continuity(
@@ -296,17 +290,14 @@ class AclRuntimeSessionTest(unittest.TestCase):
 
 
 class MidiAnalysisTest(unittest.TestCase):
-    def test_canon_is_partitioned_into_seven_monophonic_voices(self) -> None:
-        path = (
-            Path(__file__).resolve().parents[1]
-            / "midi/canon-in-d-johann-pachelbel.mid"
-        )
+    def test_generated_fixture_is_monophonic_and_complete(self) -> None:
+        path = Path(__file__).resolve().parents[1] / "midi/ddsp-test.mid"
         analysis = analyze_midi(path)
         voices = split_midi_voices(analysis)
-        self.assertEqual(analysis.mode, "polyphonic")
+        self.assertEqual(analysis.mode, "monophonic")
         self.assertTrue(analysis.supported)
-        self.assertEqual(analysis.max_polyphony, 7)
-        self.assertEqual(analysis.voice_count, 7)
+        self.assertEqual(analysis.max_polyphony, 1)
+        self.assertEqual(analysis.voice_count, 1)
         self.assertEqual(sum(len(voice.notes) for voice in voices), analysis.note_count)
         self.assertTrue(
             all(
@@ -374,11 +365,6 @@ class MidiAnalysisTest(unittest.TestCase):
             [[note.pitch for note in voice.notes] for voice in voices],
             [[72, 71], [60, 61]],
         )
-
-    def test_stem_seed_is_stable_and_unique_per_voice(self) -> None:
-        self.assertEqual(_stem_seed(7, 2), _stem_seed(7, 2, 0))
-        self.assertNotEqual(_stem_seed(7, 2, 0), _stem_seed(7, 2, 1))
-
 
 class RuntimeBundleTest(unittest.TestCase):
     def _manifest(self, root: Path) -> Path:

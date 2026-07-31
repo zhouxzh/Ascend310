@@ -1,20 +1,19 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, Cpu, KeyboardMusic, Music2, RefreshCw, Waves } from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { Activity, Cable, Cpu, KeyboardMusic, RefreshCw, Waves } from 'lucide-react'
 import { api, websocketUrl } from './api'
 import { Notice, StatusPill } from './components/ui'
 import type { AudioDevice, AudioInput, Catalog, Job, MidiPort, SystemStatus } from './types'
 
-type Tab = 'midi-ddsp' | 'piano-ddsp' | 'ddsp-vst' | 'devices'
+type Tab = 'midi-ddsp' | 'touch-performance' | 'midi-performance' | 'devices'
 
 const MidiDdspView = lazy(() => import('./views/MidiDdspView'))
-const PianoDdspView = lazy(() => import('./views/PianoDdspView'))
-const PerformView = lazy(() => import('./views/PerformView'))
+const RealtimePerformanceView = lazy(() => import('./views/RealtimePerformanceView'))
 const DevicesView = lazy(() => import('./views/DevicesView'))
 
 const NAVIGATION: { id: Tab; label: string; icon: typeof Waves }[] = [
+  { id: 'touch-performance', label: '触控演奏', icon: KeyboardMusic },
+  { id: 'midi-performance', label: 'MIDI 键盘', icon: Cable },
   { id: 'midi-ddsp', label: 'MIDI-DDSP', icon: Waves },
-  { id: 'piano-ddsp', label: 'Piano-DDSP', icon: Music2 },
-  { id: 'ddsp-vst', label: 'DDSP-VST', icon: KeyboardMusic },
   { id: 'devices', label: '设备', icon: Cpu },
 ]
 
@@ -23,16 +22,17 @@ function errorMessage(cause: unknown): string {
 }
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('midi-ddsp')
+  const coarsePointer = window.matchMedia?.('(any-pointer: coarse)').matches ?? false
+  const boardSizedDisplay = window.innerWidth >= 1500 && window.innerHeight <= 1100
+  const isTouchDisplay = coarsePointer || navigator.maxTouchPoints > 0 || boardSizedDisplay
+  const [tab, setTab] = useState<Tab>(() => (
+    isTouchDisplay ? 'touch-performance' : 'midi-performance'
+  ))
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [catalog, setCatalog] = useState<Catalog | null>(null)
-  const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([])
-  const [ddspVstAudioError, setDdspVstAudioError] = useState<string | null>(null)
   const [midiDdspAudioDevices, setMidiDdspAudioDevices] = useState<AudioDevice[]>([])
   const [speakerOutputs, setSpeakerOutputs] = useState<AudioDevice[]>([])
   const [speakerAudioError, setSpeakerAudioError] = useState<string | null>(null)
-  const [pianoAudioDevices, setPianoAudioDevices] = useState<AudioDevice[]>([])
-  const [pianoAudioError, setPianoAudioError] = useState<string | null>(null)
   const [audioInputs, setAudioInputs] = useState<AudioInput[]>([])
   const [midiPorts, setMidiPorts] = useState<MidiPort[]>([])
   const [audioInputError, setAudioInputError] = useState<string | null>(null)
@@ -44,26 +44,20 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextStatus, nextCatalog, audio, midiDdspAudio, inputs, speakerAudio, pianoAudio, midi, jobResponse] = await Promise.all([
+      const [nextStatus, nextCatalog, midiDdspAudio, inputs, speakerAudio, midi, jobResponse] = await Promise.all([
         api.status(),
         api.catalog(),
-        api.audioDevices().catch((cause) => ({ available: false, devices: [], error: errorMessage(cause) })),
         api.midiDdspAudioDevices().catch((cause) => ({ available: false, devices: [], error: errorMessage(cause) })),
         api.audioInputs().catch((cause) => ({ available: false, devices: [], error: errorMessage(cause) })),
         api.speakerOutputs().catch((cause) => ({ available: false, devices: [], error: errorMessage(cause) })),
-        api.pianoDdspAudioDevices().catch((cause) => ({ available: false, devices: [], error: errorMessage(cause) })),
         api.midiPorts().catch((cause) => ({ available: false, ports: [], error: errorMessage(cause) })),
         api.jobs(),
       ])
       setStatus(nextStatus)
       setCatalog(nextCatalog)
-      setAudioDevices(audio.devices)
-      setDdspVstAudioError(audio.error)
       setMidiDdspAudioDevices(midiDdspAudio.devices)
       setSpeakerOutputs(speakerAudio.devices)
       setSpeakerAudioError(speakerAudio.error)
-      setPianoAudioDevices(pianoAudio.devices)
-      setPianoAudioError(pianoAudio.error)
       setAudioInputs(inputs.devices)
       setMidiPorts(midi.ports)
       setAudioInputError(inputs.error)
@@ -113,8 +107,6 @@ export default function App() {
     return () => socket.close()
   }, [])
 
-  const activeTab = useMemo(() => NAVIGATION.find((item) => item.id === tab)!, [tab])
-  const ActiveIcon = activeTab.icon
   const activeJob = jobs.find((job) => ['queued', 'preparing', 'running', 'paused', 'stopping'].includes(job.state))
 
   if (loading && (!status || !catalog)) {
@@ -139,43 +131,35 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
-      <aside className="side-rail">
+    <div className={`app-shell${isTouchDisplay ? ' app-shell--touch-display' : ''}`}>
+      <header className="app-header">
         <div className="brand">
           <div className="brand-mark"><Waves size={23} /></div>
           <div><strong>MIDI-DDSP</strong><span>STUDIO</span></div>
         </div>
-        <nav>
+        <nav className="primary-nav" aria-label="主工作区">
           {NAVIGATION.map((item) => {
             const Icon = item.icon
             return <button type="button" aria-label={item.label} className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)} key={item.id}><Icon size={20} /><span>{item.label}</span></button>
           })}
         </nav>
-        <div className="rail-footer">
-          <span className={`connection-dot ${status.is_ascend_board ? 'online' : ''}`} />
-          <div><strong>{status.primary_ip}</strong><small>{status.hostname}</small></div>
+        <div className="system-strip">
+          {activeJob && <StatusPill tone="warn"><Activity size={13} />{activeJob.kind}</StatusPill>}
+          <StatusPill tone={status.primary_ip.startsWith('127.') ? 'warn' : 'ok'}>IP {status.primary_ip}</StatusPill>
+          <StatusPill tone={status.npu.available ? status.npu.health_alarm ? 'warn' : 'ok' : 'neutral'}>NPU {status.npu.available ? status.npu.health_alarm ? 'ALARM' : 'READY' : 'OFFLINE'}</StatusPill>
+          <StatusPill tone={speakerOutputs.length ? 'ok' : 'error'}>AUDIO {speakerOutputs.length || '—'}</StatusPill>
+          <button className="icon-button" type="button" title="刷新" onClick={refresh}><RefreshCw size={17} /></button>
         </div>
-      </aside>
+      </header>
 
       <div className="app-main">
-        <header className="top-bar">
-          <div className="page-title"><ActiveIcon size={20} /><h1>{activeTab.label}</h1></div>
-          <div className="system-strip">
-            {activeJob && <StatusPill tone="warn"><Activity size={13} />{activeJob.kind}</StatusPill>}
-            <StatusPill tone={status.primary_ip.startsWith('127.') ? 'warn' : 'ok'}>IP {status.primary_ip}</StatusPill>
-            <StatusPill tone={status.npu.available ? status.npu.health_alarm ? 'warn' : 'ok' : 'neutral'}>NPU {status.npu.available ? status.npu.health_alarm ? 'ALARM' : 'READY' : 'OFFLINE'}</StatusPill>
-            <StatusPill tone={speakerOutputs.length ? 'ok' : 'error'}>AUDIO {speakerOutputs.length || '—'}</StatusPill>
-            <button className="icon-button" type="button" title="刷新" onClick={refresh}><RefreshCw size={17} /></button>
-          </div>
-        </header>
-
         {error && <div className="global-error"><Notice tone="error">{error}</Notice></div>}
 
         <main className="content-area">
           <Suspense fallback={<Notice tone="loading">正在载入工作区</Notice>}>
             {tab === 'midi-ddsp' && <MidiDdspView catalog={catalog} audioDevices={midiDdspAudioDevices} jobs={jobs} onRefresh={refresh} />}
-            {tab === 'piano-ddsp' && <PianoDdspView status={status.piano_ddsp ?? { state: 'stopped', running: false }} midiFiles={catalog.midi_files} audioDevices={pianoAudioDevices} audioError={pianoAudioError} midiPorts={midiPorts} onRefresh={refresh} />}
-            {tab === 'ddsp-vst' && <PerformView status={status} catalog={catalog} audioDevices={audioDevices} audioError={ddspVstAudioError} midiPorts={midiPorts} onRefresh={refresh} />}
+            {tab === 'touch-performance' && <RealtimePerformanceView key="touch" inputMode="touch" onRefresh={refresh} />}
+            {tab === 'midi-performance' && <RealtimePerformanceView key="midi" inputMode="midi" onRefresh={refresh} />}
             {tab === 'devices' && <DevicesView status={status} catalog={catalog} speakerOutputs={speakerOutputs} audioInputs={audioInputs} midiPorts={midiPorts} audioError={speakerAudioError} audioInputError={audioInputError} midiError={midiError} onRefresh={refresh} />}
           </Suspense>
         </main>

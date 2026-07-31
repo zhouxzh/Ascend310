@@ -12,6 +12,7 @@ import numpy as np
 from realtime_ddsp import (
     Adsr,
     DEFAULT_ENVELOPE,
+    DDSP_VST_PARAMETER_RANGES,
     DdspVstSettings,
     HarmonicSynthesizer,
     JuceFreeverb,
@@ -224,6 +225,10 @@ class LivePlayerTest(unittest.TestCase):
 
 
 class PolyphonicSynthesisTest(unittest.TestCase):
+    def test_output_gain_uses_zero_db_default_and_supports_six_db_boost(self) -> None:
+        self.assertEqual(DdspVstSettings().output_gain_db, 0.0)
+        self.assertEqual(DDSP_VST_PARAMETER_RANGES["output_gain_db"], (-60.0, 6.0))
+
     def test_output_gain_is_applied_before_stereo_reverb(self) -> None:
         engine = RealtimeSynthEngine.__new__(RealtimeSynthEngine)
         engine._settings_lock = threading.Lock()

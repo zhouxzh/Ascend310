@@ -16,7 +16,6 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Callable, Iterable
 from uuid import uuid4
 import zipfile
 
@@ -92,7 +91,7 @@ def dependency_status() -> dict[str, bool]:
 
 
 def _file_id(prefix: str, path: Path) -> str:
-    relative = path.resolve().relative_to(ROOT.resolve()).as_posix()
+    relative = path.absolute().relative_to(ROOT.absolute()).as_posix()
     digest = hashlib.sha1(relative.encode("utf-8")).hexdigest()[:12]
     return f"{prefix}-{digest}"
 
@@ -683,19 +682,54 @@ class JobManager:
         job = Job(id=job_id, kind=kind, command=resolved_command)
         if metadata:
             job.metadata.update(metadata)
-        self.coordinator.acquire(job.id)
-        with self._lock:
-            self._jobs[job.id] = job
-        self._persist(job)
-        self._publish(job)
-        thread = threading.Thread(
-            target=self._run,
-            args=(job, resolved_env),
-            daemon=True,
-            name=f"webui-job-{job.id}",
-        )
-        thread.start()
+        acquired = False
+        try:
+            self.coordinator.acquire(job.id)
+            acquired = True
+            with self._lock:
+                self._jobs[job.id] = job
+            self._persist(job)
+            self._publish(job)
+            thread = threading.Thread(
+                target=self._run,
+                args=(job, resolved_env),
+                daemon=True,
+                name=f"webui-job-{job.id}",
+            )
+            thread.start()
+        except BaseException as exc:
+            job.state = "failed"
+            job.message = str(exc)
+            job.updated_at = utc_timestamp()
+            if acquired:
+                self.coordinator.release(job.id)
+            try:
+                self._persist(job)
+                self._publish(job)
+            except BaseException:
+                pass
+            raise
         return job
+
+    @staticmethod
+    def _terminate_process(process: subprocess.Popen[str]) -> None:
+        if process.poll() is not None:
+            return
+        try:
+            if os.name == "nt":
+                process.terminate()
+            else:
+                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+            process.wait(timeout=3.0)
+        except (OSError, ProcessLookupError):
+            if process.poll() is None:
+                raise
+        except subprocess.TimeoutExpired:
+            if os.name == "nt":
+                process.kill()
+            else:
+                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            process.wait(timeout=2.0)
 
     def _run(self, job: Job, extra_env: dict[str, str] | None) -> None:
         folder = JOB_ROOT / job.id
@@ -753,14 +787,29 @@ class JobManager:
             final_state = "failed"
             job.message = str(exc)
         finally:
+            termination_error: BaseException | None = None
+            if process is not None and process.poll() is None:
+                try:
+                    self._terminate_process(process)
+                except BaseException as exc:
+                    termination_error = exc
+                    job.message = f"{job.message}; failed to terminate child: {exc}".strip("; ")
             if process is not None and process.stdout is not None:
                 process.stdout.close()
-            job.process = None
+            child_exited = process is None or process.poll() is not None
+            if child_exited:
+                if process is not None and job.exit_code is None:
+                    job.exit_code = process.returncode
+                job.process = None
+                self.coordinator.release(job.id)
+            else:
+                job.process = process
             job.updated_at = utc_timestamp()
-            self.coordinator.release(job.id)
             job.state = final_state
             self._persist(job)
             self._publish(job)
+            if termination_error is not None:
+                raise termination_error
 
     @staticmethod
     def _apply_web_event(job: Job, raw: str) -> None:

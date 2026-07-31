@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import base64
 from dataclasses import asdict
 from pathlib import Path
 from collections import deque
 import os
+import queue
 import re
 import shutil
 import subprocess
@@ -21,8 +23,10 @@ from realtime_ddsp import (
     parse_audio_device,
     shape_midi_velocity,
 )
+from piano_ddsp_runtime.audio_output import WavRecorder
+from piano_ddsp_runtime.scheduler import MidiTimeline, load_midi_timeline
 
-from .core import ResourceCoordinator
+from .core import REPORT_ROOT, ResourceCoordinator
 
 
 LATENCY_PROFILES: dict[str, dict[str, float | int]] = {
@@ -30,6 +34,7 @@ LATENCY_PROFILES: dict[str, dict[str, float | int]] = {
     "balanced": {"prebuffer": 2, "audio_latency_ms": 20.0},
     "safe": {"prebuffer": 3, "audio_latency_ms": 60.0},
 }
+RECORDING_ROOT = REPORT_ROOT / "realtime"
 
 
 def resolve_latency_profile(config: dict[str, object]) -> dict[str, object]:
@@ -93,6 +98,7 @@ class PulseLivePlayer:
         device_name: str,
         output_latency_seconds: float,
         before_render: Callable[[int], None] | None = None,
+        on_block: Callable[[np.ndarray], None] | None = None,
     ) -> None:
         self.engine = engine
         self.sink_name = sink_name
@@ -103,6 +109,7 @@ class PulseLivePlayer:
         self.pulse_buffer_latency_seconds = 0.0
         self.frame_period = 320 / 16_000
         self.before_render = before_render
+        self.on_block = on_block
         self.stop_event = threading.Event()
         self._stats_lock = threading.Lock()
         self._worker_error: BaseException | None = None
@@ -215,6 +222,8 @@ class PulseLivePlayer:
                 block = np.asarray(block, dtype=np.float32)
                 if block.ndim == 1:
                     block = np.repeat(block[:, None], 2, axis=1)
+                if self.on_block is not None:
+                    self.on_block(block)
                 payload = memoryview(
                     block[:, :2].astype("<f4", copy=False).tobytes()
                 )
@@ -266,8 +275,13 @@ class PulseLivePlayer:
 class InputRouter:
     """Merge browser and hardware MIDI without leaving stuck notes."""
 
-    def __init__(self, midi_state: Any) -> None:
+    def __init__(
+        self,
+        midi_state: Any,
+        note_listener: Callable[[int, bool], None] | None = None,
+    ) -> None:
         self.midi_state = midi_state
+        self._note_listener = note_listener
         self._lock = threading.Lock()
         self._notes: dict[str, set[int]] = {}
         self._sustain_sources: set[str] = set()
@@ -282,12 +296,14 @@ class InputRouter:
             if not was_active:
                 self.midi_state.note_on(note, velocity)
                 self._pending_note_on.append(time.monotonic())
+                self._notify_note(note, True)
 
     def note_off(self, source: str, note: int) -> None:
         with self._lock:
             self._notes.setdefault(source, set()).discard(note)
             if not any(note in notes for notes in self._notes.values()):
                 self.midi_state.note_off(note)
+                self._notify_note(note, False)
 
     def sustain(self, source: str, enabled: bool) -> None:
         with self._lock:
@@ -307,13 +323,27 @@ class InputRouter:
             for note in notes:
                 if not any(note in values for values in self._notes.values()):
                     self.midi_state.note_off(note)
+                    self._notify_note(note, False)
             self.midi_state.set_sustain(bool(self._sustain_sources))
 
     def all_notes_off(self) -> None:
         with self._lock:
+            active_notes = sorted({note for notes in self._notes.values() for note in notes})
             self._notes.clear()
             self._sustain_sources.clear()
             self.midi_state.all_notes_off()
+            for note in active_notes:
+                self._notify_note(note, False)
+
+    def _notify_note(self, note: int, on: bool) -> None:
+        listener = self._note_listener
+        if listener is None:
+            return
+        try:
+            listener(int(note), bool(on))
+        except Exception:
+            # Visual telemetry must never interrupt the audio input path.
+            return
 
     def mark_render_started(self, _frame_index: int) -> None:
         now = time.monotonic()
@@ -346,25 +376,276 @@ class InputRouter:
             self.midi_state.handle_message(message)
 
 
+class RealtimeMidiPlayer:
+    """Monotonic MIDI transport shared by DDSP-VST and unified switching."""
+
+    SOURCE = "midi-file"
+
+    def __init__(self, router: InputRouter) -> None:
+        self.router = router
+        self._lock = threading.RLock()
+        self.timeline: MidiTimeline | None = None
+        self.path: str | None = None
+        self.state = "empty"
+        self.position_seconds = 0.0
+        self.tempo = 1.0
+        self.loop = False
+        self._started_ns = 0
+        self._event_index = 0
+
+    def _sync_position_locked(self, now_ns: int) -> None:
+        if self.state == "playing":
+            elapsed = (now_ns - self._started_ns) / 1e9 * self.tempo
+            self.position_seconds += max(0.0, elapsed)
+            self._started_ns = now_ns
+
+    def _restore_locked(self) -> None:
+        timeline = self.timeline
+        self.router.release_source(self.SOURCE)
+        self._event_index = 0
+        if timeline is None:
+            return
+        for index, (event_time, kind, data1, data2) in enumerate(timeline.events):
+            if event_time > self.position_seconds:
+                self._event_index = index
+                return
+            self._apply(kind, data1, data2)
+            self._event_index = index + 1
+
+    def _apply(self, kind: str, data1: int, data2: int) -> None:
+        if kind == "note_on":
+            self.router.note_on(self.SOURCE, data1, data2)
+        elif kind == "note_off":
+            self.router.note_off(self.SOURCE, data1)
+        elif kind in {"control_change", "cc"} and data1 == 64:
+            self.router.sustain(self.SOURCE, data2 >= 64)
+
+    def command(self, action: str, **values: object) -> dict[str, object]:
+        now_ns = time.monotonic_ns()
+        with self._lock:
+            if action == "load":
+                path = Path(str(values["path"])).resolve()
+                self.timeline = load_midi_timeline(path)
+                self.path = str(path)
+                self.state = "loaded"
+                self.position_seconds = 0.0
+                self._event_index = 0
+                self.router.release_source(self.SOURCE)
+            elif self.timeline is None:
+                raise RuntimeError("Load a MIDI file before using the player")
+            elif action == "play":
+                if self.position_seconds >= self.timeline.duration_seconds:
+                    self.position_seconds = 0.0
+                self._restore_locked()
+                self._started_ns = now_ns
+                self.state = "playing"
+            elif action == "pause":
+                self._sync_position_locked(now_ns)
+                self.state = "paused"
+                self.router.release_source(self.SOURCE)
+            elif action == "stop":
+                self.state = "loaded"
+                self.position_seconds = 0.0
+                self._event_index = 0
+                self.router.release_source(self.SOURCE)
+            elif action == "seek":
+                self._sync_position_locked(now_ns)
+                position = float(values.get("position_seconds", values.get("position", 0.0)))
+                self.position_seconds = min(self.timeline.duration_seconds, max(0.0, position))
+                self._restore_locked()
+                self._started_ns = now_ns
+            elif action == "tempo":
+                self._sync_position_locked(now_ns)
+                tempo = float(values.get("value", 1.0))
+                if not 0.5 <= tempo <= 2.0:
+                    raise ValueError("MIDI tempo must be between 0.5 and 2.0")
+                self.tempo = tempo
+                self._started_ns = now_ns
+            elif action == "loop":
+                self.loop = bool(values.get("enabled", False))
+            else:
+                raise ValueError(f"Unknown player action: {action}")
+        return self.status()
+
+    def before_render(self, _frame_index: int) -> None:
+        now_ns = time.monotonic_ns()
+        with self._lock:
+            timeline = self.timeline
+            if timeline is None or self.state != "playing":
+                return
+            self._sync_position_locked(now_ns)
+            while self._event_index < len(timeline.events):
+                event_time, kind, data1, data2 = timeline.events[self._event_index]
+                if event_time > self.position_seconds:
+                    break
+                self._event_index += 1
+                self._apply(kind, data1, data2)
+            if self.position_seconds >= timeline.duration_seconds:
+                if self.loop:
+                    self.position_seconds = 0.0
+                    self._started_ns = now_ns
+                    self._restore_locked()
+                else:
+                    self.position_seconds = timeline.duration_seconds
+                    self.state = "loaded"
+                    self.router.release_source(self.SOURCE)
+
+    def release(self) -> None:
+        with self._lock:
+            if self.state == "playing":
+                self._sync_position_locked(time.monotonic_ns())
+                self.state = "paused"
+            self.router.release_source(self.SOURCE)
+
+    def status(self) -> dict[str, object]:
+        with self._lock:
+            position = self.position_seconds
+            if self.state == "playing":
+                position += (time.monotonic_ns() - self._started_ns) / 1e9 * self.tempo
+            duration = self.timeline.duration_seconds if self.timeline else 0.0
+            return {
+                "state": self.state,
+                "path": self.path,
+                "position_seconds": min(duration, max(0.0, position)),
+                "duration_seconds": duration,
+                "tempo": self.tempo,
+                "loop": self.loop,
+            }
+
+
 class DdspVstSessionController:
     OWNER = "ddsp-vst"
 
     def __init__(self, coordinator: ResourceCoordinator) -> None:
         self.coordinator = coordinator
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self.engine: RealtimeSynthEngine | None = None
         self.player: LivePlayer | PulseLivePlayer | None = None
         self.router: InputRouter | None = None
+        self.transport: RealtimeMidiPlayer | None = None
         self.port: Any | None = None
         self.config: dict[str, object] = {}
+        self._owns_resource = False
+        self._recorder = WavRecorder()
+        self._tap_queue: queue.Queue[object] = queue.Queue(maxsize=8)
+        self._audio_tap_drops = 0
+        self._recording_accepts_blocks = False
+        self._monitor_sources: set[str] = set()
+        self._monitor_queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=2)
+        self._monitor_drops = 0
+        self._subscribers: list[queue.Queue[dict[str, object]]] = []
+        threading.Thread(
+            target=self._tap_loop,
+            name="ddsp-vst-audio-tap",
+            daemon=True,
+        ).start()
+        threading.Thread(
+            target=self._monitor_loop,
+            name="ddsp-vst-monitor",
+            daemon=True,
+        ).start()
 
     @property
     def running(self) -> bool:
         with self._lock:
             return self.player is not None
 
-    def start(self, config: dict[str, object]) -> dict[str, object]:
-        self.coordinator.acquire(self.OWNER)
+    def subscribe(self) -> queue.Queue[dict[str, object]]:
+        target: queue.Queue[dict[str, object]] = queue.Queue(maxsize=64)
+        with self._lock:
+            self._subscribers.append(target)
+        return target
+
+    def unsubscribe(self, target: queue.Queue[dict[str, object]]) -> None:
+        with self._lock:
+            if target in self._subscribers:
+                self._subscribers.remove(target)
+
+    def _publish(self, payload: dict[str, object]) -> None:
+        with self._lock:
+            subscribers = list(self._subscribers)
+        for target in subscribers:
+            try:
+                target.put_nowait(payload)
+            except queue.Full:
+                try:
+                    target.get_nowait()
+                    target.put_nowait(payload)
+                except queue.Empty:
+                    pass
+
+    def _audio_tap(self, block: np.ndarray) -> None:
+        stereo = np.asarray(block, dtype=np.float32)
+        if stereo.ndim == 1:
+            stereo = np.repeat(stereo[:, None], 2, axis=1)
+        elif stereo.shape[1] == 1:
+            stereo = np.repeat(stereo, 2, axis=1)
+        else:
+            stereo = stereo[:, :2]
+        with self._lock:
+            record_block = self._recording_accepts_blocks
+        try:
+            self._tap_queue.put_nowait((stereo.copy(), record_block))
+        except queue.Full:
+            with self._lock:
+                self._audio_tap_drops += 1
+
+    def _tap_loop(self) -> None:
+        while True:
+            item = self._tap_queue.get()
+            if isinstance(item, threading.Event):
+                item.set()
+                self._tap_queue.task_done()
+                continue
+            block, record_block = item
+            try:
+                if record_block:
+                    self._recorder.write(block)
+            except (OSError, ValueError):
+                with self._lock:
+                    self._audio_tap_drops += 1
+            with self._lock:
+                monitoring = bool(self._monitor_sources)
+            if not monitoring:
+                self._tap_queue.task_done()
+                continue
+            try:
+                self._monitor_queue.put_nowait(block)
+            except queue.Full:
+                with self._lock:
+                    self._monitor_drops += 1
+            finally:
+                self._tap_queue.task_done()
+
+    def _flush_tap(self) -> None:
+        barrier = threading.Event()
+        self._tap_queue.put(barrier, timeout=1.0)
+        if not barrier.wait(timeout=1.0):
+            raise TimeoutError("Realtime audio tap did not drain")
+
+    def _monitor_loop(self) -> None:
+        while True:
+            block = self._monitor_queue.get()
+            payload = base64.b64encode(
+                np.asarray(block, dtype="<f4").tobytes()
+            ).decode("ascii")
+            with self._lock:
+                sample_rate = int(
+                    self.engine.output_sample_rate if self.engine is not None else 48_000
+                )
+            self._publish(
+                {"event": "monitor", "sample_rate": sample_rate, "audio": payload}
+            )
+
+    def start(
+        self, config: dict[str, object], *, manage_resource: bool = True
+    ) -> dict[str, object]:
+        if self.running:
+            return self.status()
+        if manage_resource:
+            self.coordinator.acquire(self.OWNER)
+            with self._lock:
+                self._owns_resource = True
         engine: RealtimeSynthEngine | None = None
         player: LivePlayer | PulseLivePlayer | None = None
         port = None
@@ -409,7 +690,13 @@ class DdspVstSessionController:
                     if name in config
                 }
             )
-            router = InputRouter(engine.midi)
+            router = InputRouter(engine.midi, self._publish_note_event)
+            transport = RealtimeMidiPlayer(router)
+
+            def before_render(frame_index: int) -> None:
+                transport.before_render(frame_index)
+                router.mark_render_started(frame_index)
+
             latency_seconds = float(config.get("audio_latency_ms", 80.0)) / 1000.0
             if config.get("audio_backend") == "pulse":
                 player = PulseLivePlayer(
@@ -417,7 +704,8 @@ class DdspVstSessionController:
                     sink_name=str(config["pulse_sink"]),
                     device_name=str(config.get("audio_device_name", "PulseAudio")),
                     output_latency_seconds=latency_seconds,
-                    before_render=router.mark_render_started,
+                    before_render=before_render,
+                    on_block=self._audio_tap,
                 )
             else:
                 player = LivePlayer(
@@ -429,7 +717,8 @@ class DdspVstSessionController:
                         else str(config["audio_device_id"])
                     ),
                     output_latency_seconds=latency_seconds,
-                    before_render=router.mark_render_started,
+                    before_render=before_render,
+                    on_block=self._audio_tap,
                 )
             midi_port = config.get("midi_port")
             if midi_port:
@@ -439,6 +728,7 @@ class DdspVstSessionController:
                 self.engine = engine
                 self.player = player
                 self.router = router
+                self.transport = transport
                 self.port = port
                 self.config = {key: value for key, value in config.items() if key != "model_path"}
             return self.status()
@@ -449,7 +739,11 @@ class DdspVstSessionController:
                 player.stop()
             if engine is not None:
                 engine.close()
-            self.coordinator.release(self.OWNER)
+            with self._lock:
+                owns_resource = self._owns_resource
+                self._owns_resource = False
+            if owns_resource:
+                self.coordinator.release(self.OWNER)
             raise
 
     def stop(self) -> dict[str, object]:
@@ -457,27 +751,56 @@ class DdspVstSessionController:
             engine = self.engine
             player = self.player
             router = self.router
+            transport = self.transport
             port = self.port
             self.engine = None
             self.player = None
             self.router = None
+            self.transport = None
             self.port = None
+            owns_resource = self._owns_resource
+            self._owns_resource = False
+            self._monitor_sources.clear()
+        stop_error: BaseException | None = None
+
+        def attempt(action: Callable[[], object]) -> None:
+            nonlocal stop_error
+            try:
+                action()
+            except BaseException as exc:
+                stop_error = stop_error or exc
+
         try:
+            with self._lock:
+                self._recording_accepts_blocks = False
+            try:
+                self._flush_tap()
+            except (queue.Full, TimeoutError):
+                pass
+            attempt(self._recorder.stop)
+            if transport is not None:
+                attempt(transport.release)
             if router is not None:
-                router.all_notes_off()
+                attempt(router.all_notes_off)
             if port is not None:
-                port.close()
+                attempt(port.close)
             if player is not None:
-                player.stop()
+                attempt(player.stop)
             if engine is not None:
-                engine.close()
+                attempt(engine.close)
         finally:
-            self.coordinator.release(self.OWNER)
+            if owns_resource:
+                self.coordinator.release(self.OWNER)
+        if stop_error is not None:
+            raise stop_error
         return self.status()
 
     def note_on(self, source: str, note: int, velocity: int) -> None:
         router = self._require_router()
         router.note_on(source, note, velocity)
+
+    def _publish_note_event(self, note: int, on: bool) -> None:
+        self._publish({"event": "note", "note": int(note), "on": bool(on)})
 
     def note_off(self, source: str, note: int) -> None:
         router = self._require_router()
@@ -500,6 +823,46 @@ class DdspVstSessionController:
             self.config.update(values)
         return asdict(settings)
 
+    def player_command(self, action: str, **values: object) -> dict[str, object]:
+        with self._lock:
+            transport = self.transport
+        if transport is None:
+            raise RuntimeError("DDSP-VST session is not running")
+        return transport.command(action, **values)
+
+    def record_start(self, recording_id: str) -> dict[str, object]:
+        safe = "".join(
+            char for char in recording_id if char.isalnum() or char in "-_"
+        )
+        if not safe or safe != recording_id:
+            raise ValueError("Invalid realtime recording id")
+        with self._lock:
+            engine = self.engine
+        if engine is None:
+            raise RuntimeError("DDSP-VST session is not running")
+        with self._lock:
+            self._recording_accepts_blocks = False
+        self._flush_tap()
+        path = self._recorder.start(RECORDING_ROOT / f"{safe}.wav", engine.output_sample_rate)
+        with self._lock:
+            self._recording_accepts_blocks = True
+        return {"id": path.stem, "path": str(path)}
+
+    def record_stop(self) -> dict[str, object] | None:
+        with self._lock:
+            self._recording_accepts_blocks = False
+        if self._recorder.active:
+            self._flush_tap()
+        path = self._recorder.stop()
+        return {"id": path.stem, "path": str(path)} if path is not None else None
+
+    def set_monitor(self, source: str, enabled: bool) -> None:
+        with self._lock:
+            if enabled:
+                self._monitor_sources.add(source)
+            else:
+                self._monitor_sources.discard(source)
+
     def release_source(self, source: str) -> None:
         with self._lock:
             router = self.router
@@ -518,10 +881,31 @@ class DdspVstSessionController:
             engine = self.engine
             player = self.player
             router = self.router
+            transport = self.transport
             port = self.port
             config = dict(self.config)
         if engine is None or player is None:
-            return {"running": False, "active_notes": [], "config": config}
+            return {
+                "running": False,
+                "active_notes": [],
+                "config": config,
+                "player": transport.status() if transport is not None else {
+                    "state": "empty",
+                    "path": None,
+                    "position_seconds": 0.0,
+                    "duration_seconds": 0.0,
+                    "tempo": 1.0,
+                    "loop": False,
+                },
+                "recording": {"active": self._recorder.active, "id": None},
+            }
+        audio_status: dict[str, object] = {"device_lost": False, "error": None}
+        try:
+            player.raise_worker_error()
+        except RuntimeError as exc:
+            if router is not None:
+                router.all_notes_off()
+            audio_status = {"device_lost": True, "error": str(exc)}
         refresh_latencies = getattr(player, "refresh_audio_latencies", None)
         if refresh_latencies is not None:
             refresh_latencies()
@@ -568,6 +952,8 @@ class DdspVstSessionController:
                 "write_block_p95_ms": (
                     float(np.quantile(write_times, 0.95)) if write_times else 0.0
                 ),
+                "monitor_drops": self._monitor_drops,
+                "audio_tap_drops": self._audio_tap_drops,
             }
         midi_times = router.latency_snapshot() if router is not None else []
         metrics["midi_to_render_p95_ms"] = (
@@ -590,8 +976,13 @@ class DdspVstSessionController:
             metrics["output_peak"] = engine.output_peak
             metrics["clipped_samples"] = engine.clipped_samples
         if port is not None:
-            metrics["midi_connected"] = bool(getattr(port, "connected", True))
+            midi_connected = bool(getattr(port, "connected", True))
+            metrics["midi_connected"] = midi_connected
             metrics["midi_reconnects"] = int(getattr(port, "reconnect_count", 0))
+            if not midi_connected and router is not None:
+                router.release_source("hardware-midi")
+        else:
+            midi_connected = False
         return {
             "running": True,
             "active_notes": engine.midi.active_notes,
@@ -599,4 +990,25 @@ class DdspVstSessionController:
             "parameters": asdict(engine.settings),
             "metrics": metrics,
             "config": config,
+            "player": transport.status() if transport is not None else None,
+            "recording": {
+                "active": self._recorder.active,
+                "id": self._recorder.path.stem if self._recorder.path else None,
+            },
+            "audio": audio_status,
+            "midi": {
+                "connected": midi_connected,
+                "reconnects": int(getattr(port, "reconnect_count", 0)) if port is not None else 0,
+                "error": getattr(port, "last_error", None) if port is not None else None,
+            },
         }
+
+
+def resolve_realtime_recording(recording_id: str) -> Path:
+    safe = "".join(char for char in recording_id if char.isalnum() or char in "-_")
+    if not safe or safe != recording_id:
+        raise KeyError(recording_id)
+    path = (RECORDING_ROOT / f"{safe}.wav").resolve()
+    if RECORDING_ROOT.resolve() not in path.parents or not path.is_file():
+        raise KeyError(recording_id)
+    return path

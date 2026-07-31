@@ -271,6 +271,18 @@ class SpeakerOutputCatalogTest(unittest.TestCase):
 
 
 class SpeakerControllerTest(unittest.TestCase):
+    def test_thread_start_failure_releases_the_audio_resource(self) -> None:
+        coordinator = ResourceCoordinator()
+        controller = SpeakerTestController(coordinator, FakeSoundDevice())
+        with patch(
+            "midi_ddsp_webui.speaker.threading.Thread.start",
+            side_effect=RuntimeError("thread unavailable"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "thread unavailable"):
+                controller.start(speaker_config())
+        self.assertIsNone(coordinator.owner)
+        self.assertEqual(controller.status()["state"], "failed")
+
     def test_onboard_route_uses_vendor_mixer_controls_without_a_shell(self) -> None:
         completed = subprocess.CompletedProcess([], 0, "ok", "")
         with (

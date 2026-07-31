@@ -327,15 +327,6 @@ def split_voice_group(group: MidiVoiceGroup) -> tuple[MidiVoice, ...]:
     return tuple(voices)
 
 
-def split_track_voices(track: MidiTrack) -> tuple[MidiVoice, ...]:
-    """Separate all channel/program groups belonging to one MIDI track."""
-    return tuple(
-        voice
-        for group in group_midi_notes((track,))
-        for voice in split_voice_group(group)
-    )
-
-
 def split_midi_voices(analysis: MidiAnalysis) -> tuple[MidiVoice, ...]:
     return tuple(
         voice for group in analysis.groups for voice in split_voice_group(group)
@@ -626,13 +617,3 @@ def analyze_midi_voices(path: Path) -> dict[str, object]:
             _VOICE_CACHE.pop(next(iter(_VOICE_CACHE)))
         _VOICE_CACHE[cache_key] = result
     return copy.deepcopy(result)
-
-
-def require_supported_midi(path: Path) -> MidiAnalysis:
-    analysis = analyze_midi(path)
-    if not analysis.supported:
-        raise MidiValidationError(
-            analysis.unsupported_code or "unsupported_midi",
-            analysis.unsupported_reason or "MIDI file is not supported",
-        )
-    return analysis

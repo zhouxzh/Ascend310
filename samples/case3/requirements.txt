@@ -11,9 +11,8 @@ mido>=1.3,<2
 # named python-rtmidi, while the Python import name is rtmidi.
 python-rtmidi>=1.5,<2
 
-# Audio output and the legacy local MIDI utility.
+# Audio output.
 sounddevice>=0.4,<1
-pygame>=2.5,<3
 
 # Web service runtime.
 fastapi>=0.115,<1

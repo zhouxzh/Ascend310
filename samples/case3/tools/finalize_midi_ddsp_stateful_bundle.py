@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import shutil
 
 
 def sha256(path: Path) -> str:
@@ -21,6 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--export-manifest", type=Path, required=True)
     parser.add_argument("--bundle-dir", type=Path, required=True)
+    parser.add_argument("--conversion-log-dir", type=Path)
     parser.add_argument("--recommended", action="store_true")
     parser.add_argument(
         "--voice-batch-sizes",
@@ -69,6 +71,9 @@ def main() -> int:
 
     bundle_dir = args.bundle_dir.resolve()
     bundle_dir.mkdir(parents=True, exist_ok=True)
+    conversion_log_dir = (args.conversion_log_dir or bundle_dir / "logs").resolve()
+    published_log_dir = bundle_dir / "logs"
+    published_log_dir.mkdir(parents=True, exist_ok=True)
     components: dict[str, dict[str, object]] = {}
     for name, component in source["components"].items():
         batch_size = int(component.get("voice_batch_size", 1))
@@ -84,6 +89,55 @@ def main() -> int:
             raise ValueError(f"Logical input count mismatch for {name}")
         if len(logical_outputs) != len(component["outputs"]):
             raise ValueError(f"Logical output count mismatch for {name}")
+        provenance_source = conversion_log_dir / f"{name}_origin.provenance.json"
+        if not provenance_source.is_file():
+            raise FileNotFoundError(provenance_source)
+        provenance = json.loads(provenance_source.read_text(encoding="utf-8"))
+        expected_onnx_hash = str(component["sha256"])
+        expected_input_shape = ";".join(
+            f"{item['name']}:{','.join(str(value) for value in item['shape'])}"
+            for item in component["inputs"]
+        )
+        if (
+            provenance.get("schema") != "midi-ddsp-atc-conversion/v1"
+            or provenance.get("source_onnx") != component["file"]
+            or provenance.get("source_onnx_sha256") != expected_onnx_hash
+            or provenance.get("om") != filename
+            or provenance.get("om_sha256") != sha256(model)
+            or provenance.get("soc_version") != "Ascend310B4"
+            or provenance.get("input_shape") != expected_input_shape
+            or provenance.get("precision_mode_v2") != "origin"
+        ):
+            raise ValueError(f"Conversion provenance mismatch for {name}")
+        artifact_names = (
+            ("atc_log", "atc_log_sha256"),
+            ("atc_summary", "atc_summary_sha256"),
+        )
+        published_artifacts: dict[str, dict[str, str]] = {}
+        for path_key, hash_key in artifact_names:
+            artifact_name = provenance.get(path_key)
+            if not isinstance(artifact_name, str) or Path(artifact_name).name != artifact_name:
+                raise ValueError(f"Invalid {path_key} in conversion provenance for {name}")
+            source_path = conversion_log_dir / artifact_name
+            if not source_path.is_file() or sha256(source_path) != provenance.get(hash_key):
+                raise ValueError(f"Changed {path_key} for {name}")
+            if path_key == "atc_summary":
+                summary_lines = source_path.read_text(
+                    encoding="utf-8", errors="replace"
+                ).splitlines()
+                required = {"ATC_EXIT_CODE=0", "OM_UPDATED=yes", "ERROR_LINES=none"}
+                if not required.issubset(summary_lines):
+                    raise ValueError(f"Unsuccessful ATC summary for {name}")
+            target_path = published_log_dir / artifact_name
+            if source_path.resolve() != target_path.resolve():
+                shutil.copy2(source_path, target_path)
+            published_artifacts[path_key] = {
+                "path": target_path.relative_to(bundle_dir).as_posix(),
+                "sha256": sha256(target_path),
+            }
+        provenance_target = published_log_dir / provenance_source.name
+        if provenance_source.resolve() != provenance_target.resolve():
+            shutil.copy2(provenance_source, provenance_target)
         components[name] = {
             "file": filename,
             "sha256": sha256(model),
@@ -93,6 +147,16 @@ def main() -> int:
             "outputs": runtime_specs(component["outputs"], logical_outputs),
             "onnx_sha256": component["sha256"],
             "onnx_metrics": component["metrics"],
+            "conversion": {
+                "path": provenance_target.relative_to(bundle_dir).as_posix(),
+                "sha256": sha256(provenance_target),
+                "source_onnx_sha256": expected_onnx_hash,
+                "om_sha256": sha256(model),
+                "soc_version": provenance["soc_version"],
+                "input_shape": expected_input_shape,
+                "precision_mode_v2": "origin",
+                **published_artifacts,
+            },
         }
 
     manifest = {

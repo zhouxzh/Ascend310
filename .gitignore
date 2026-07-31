@@ -230,6 +230,11 @@ samples/case3/_upstream/
 # Local datasets used by case 3.
 samples/case3/datasets/
 
+# Case 3 local test assets. Keep the MIDI library and rendered audition WAVs
+# available for local/board validation, but do not publish them to GitHub.
+samples/case3/midi/
+samples/case3/midi_wav/
+
 # model files
 *.om
 *.onnx

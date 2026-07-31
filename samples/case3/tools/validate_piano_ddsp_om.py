@@ -84,6 +84,7 @@ def record_bundle_validation(
         "sha256": sha256_file(validation_path),
         "frames": report["frames"],
         "passed": report["passed"],
+        "om_sha256": report["om_sha256"],
     }
     expected_models = {"paper_ir", "film_fdn", "calibrated_ir", "calibrated_film_ir"}
     manifest["complete"] = expected_models.issubset(models) and all(
@@ -113,7 +114,9 @@ def main() -> None:
     args = parse_args()
     if platform.machine().lower() not in {"aarch64", "arm64"}:
         raise RuntimeError("OM validation must run on the Ascend 310B board")
-    bundle = load_bundle(args.bundle)
+    # A legacy or stale qualification record must not prevent re-validating the
+    # immutable OM and metadata assets. Runtime discovery keeps strict loading.
+    bundle = load_bundle(args.bundle, validate_qualification=False)
     if args.model_id not in bundle.models:
         raise KeyError(args.model_id)
     reference_hash = validate_reference_provenance(args.reference, args.model_id)
@@ -210,6 +213,7 @@ def main() -> None:
         "qualification_frames": 10_000,
         "reference": args.reference.name,
         "reference_sha256": reference_hash,
+        "om_sha256": asset.om_sha256,
         "comparisons": comparisons,
         "timing_ms": {
             "p50": float(percentiles[0]),

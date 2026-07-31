@@ -123,12 +123,19 @@ def piano_catalog() -> dict[str, object]:
     }
 
 
-def resolve_piano_bundle(bundle_id: str) -> Path:
+def resolve_piano_bundle(bundle_id: str, model_id: str | None = None) -> Path:
     bundles, errors = scan_bundles(BUNDLE_ROOT)
     for bundle in bundles:
-        if bundle.id == bundle_id and any(
-            asset.validation_passed for asset in bundle.models.values()
-        ):
+        if bundle.id != bundle_id:
+            continue
+        if model_id is not None:
+            asset = bundle.models.get(model_id)
+            if asset is not None and asset.validation_passed:
+                return bundle.manifest_path
+            raise KeyError(
+                f"Piano-DDSP model {model_id!r} is unavailable in bundle {bundle_id!r}"
+            )
+        if any(asset.validation_passed for asset in bundle.models.values()):
             return bundle.manifest_path
     detail = f"; invalid bundles: {errors}" if errors else ""
     raise KeyError(f"Piano-DDSP bundle {bundle_id!r} is unavailable{detail}")
@@ -152,6 +159,7 @@ class PianoDdspController:
         self._intentional_stop = False
         self._stderr_path: Path | None = None
         self._failure_cleanup_started = False
+        self._owns_resource = False
 
     @property
     def running(self) -> bool:
@@ -182,6 +190,13 @@ class PianoDdspController:
                 except queue.Empty:
                     pass
 
+    def _release_owned_resource(self) -> None:
+        with self._lock:
+            owns_resource = self._owns_resource
+            self._owns_resource = False
+        if owns_resource:
+            self.coordinator.release(self.OWNER)
+
     def _stdout_loop(self, process: subprocess.Popen[str]) -> None:
         assert process.stdout is not None
         try:
@@ -209,7 +224,7 @@ class PianoDdspController:
                 elif event == "ready":
                     with self._lock:
                         self._last_heartbeat = time.monotonic()
-                if event in {"ready", "status", "monitor", "error"}:
+                if event in {"ready", "status", "monitor", "note", "error"}:
                     self._publish(payload)
         finally:
             return_code = process.wait()
@@ -223,7 +238,7 @@ class PianoDdspController:
                             "running": False,
                             "error": f"Piano-DDSP worker exited with code {return_code}",
                         }
-            self.coordinator.release(self.OWNER)
+            self._release_owned_resource()
             self._publish({"event": "status", "data": self.status()})
 
     def _stderr_loop(self, process: subprocess.Popen[str], path: Path) -> None:
@@ -299,7 +314,7 @@ class PianoDdspController:
         with self._lock:
             if self._process is process:
                 self._process = None
-        self.coordinator.release(self.OWNER)
+        self._release_owned_resource()
         self._publish({"event": "status", "data": self.status()})
 
     def send(self, command: str, *, timeout: float = 15.0, **values: object) -> object:
@@ -327,17 +342,27 @@ class PianoDdspController:
             with self._lock:
                 self._responses.pop(request_id, None)
 
-    def start(self, config: dict[str, object]) -> dict[str, object]:
-        with self._lock:
-            if self.running:
-                return self.status()
-            self.coordinator.acquire(self.OWNER)
-            self._intentional_stop = False
-            self._failure_cleanup_started = False
-            self._last_heartbeat = 0.0
-            self._status = {"state": "starting", "running": False, "config": dict(config)}
-            self._spawn()
+    def start(
+        self, config: dict[str, object], *, manage_resource: bool = True
+    ) -> dict[str, object]:
+        acquired = False
         try:
+            with self._lock:
+                if self.running:
+                    return self.status()
+                if manage_resource:
+                    self.coordinator.acquire(self.OWNER)
+                    self._owns_resource = True
+                    acquired = True
+                self._intentional_stop = False
+                self._failure_cleanup_started = False
+                self._last_heartbeat = 0.0
+                self._status = {
+                    "state": "starting",
+                    "running": False,
+                    "config": dict(config),
+                }
+                self._spawn()
             deadline = time.monotonic() + 5.0
             while self._last_heartbeat == 0.0 and time.monotonic() < deadline:
                 time.sleep(0.02)
@@ -350,7 +375,8 @@ class PianoDdspController:
                     self._last_heartbeat = time.monotonic()
             return self.status()
         except BaseException:
-            self.stop(force=True)
+            if acquired or self._process is not None:
+                self.stop(force=True)
             raise
 
     def stop(self, *, force: bool = False) -> dict[str, object]:
@@ -359,7 +385,7 @@ class PianoDdspController:
             self._intentional_stop = True
             if process is None:
                 self._status = {"state": "stopped", "running": False}
-                self.coordinator.release(self.OWNER)
+                self._release_owned_resource()
                 return self.status()
             self._status = {**self._status, "state": "stopping"}
         if not force and process.poll() is None:
@@ -379,7 +405,7 @@ class PianoDdspController:
                 self._process = None
             self._status = {"state": "stopped", "running": False}
             self._monitor_sources.clear()
-        self.coordinator.release(self.OWNER)
+        self._release_owned_resource()
         return self.status()
 
     def command(self, command: str, **values: object) -> object:

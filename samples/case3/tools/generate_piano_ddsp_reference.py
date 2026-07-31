@@ -200,7 +200,6 @@ def main() -> None:
 
     import onnxruntime as ort
     import torch
-    from torch.nn import functional as functional
     from ddsp_piano.deployment import extend_pitch_for_release
     from ddsp_piano.ddsp_pytorch.core import frequency_impulse_response, get_fft_size, scale_function
     from ddsp_piano.realtime import LiveMidiState, StreamingReverb as ReferenceReverb

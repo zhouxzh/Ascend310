@@ -516,29 +516,43 @@ class SpeakerTestController:
         return payload
 
     def start(self, config: dict[str, object]) -> dict[str, object]:
-        self.coordinator.acquire(self.OWNER)
-        self._stop_event = threading.Event()
-        self._ready_event = threading.Event()
-        with self._lock:
-            self._state = "starting"
-            self._error = None
-            self._config = dict(config)
-            self._device_name = str(config.get("device_name", ""))
-            self._sample_rate = 0
-            self._output_channels = 0
-            self._played_frames = 0
-            self._total_frames = 0
-            self._underruns = 0
-            self._started_at = time.monotonic()
-        thread = threading.Thread(
-            target=self._run,
-            daemon=True,
-            name="speaker-test",
-        )
-        self._thread = thread
-        thread.start()
+        acquired = False
+        try:
+            self.coordinator.acquire(self.OWNER)
+            acquired = True
+            self._stop_event = threading.Event()
+            self._ready_event = threading.Event()
+            with self._lock:
+                self._state = "starting"
+                self._error = None
+                self._config = dict(config)
+                self._device_name = str(config.get("device_name", ""))
+                self._sample_rate = 0
+                self._output_channels = 0
+                self._played_frames = 0
+                self._total_frames = 0
+                self._underruns = 0
+                self._started_at = time.monotonic()
+            thread = threading.Thread(
+                target=self._run,
+                daemon=True,
+                name="speaker-test",
+            )
+            self._thread = thread
+            thread.start()
+        except BaseException as exc:
+            with self._lock:
+                self._state = "failed"
+                self._error = str(exc)
+                self._thread = None
+            if acquired:
+                self.coordinator.release(self.OWNER)
+            raise
         if not self._ready_event.wait(timeout=10.0):
             self._stop_event.set()
+            with self._lock:
+                self._state = "failed"
+                self._error = "Timed out while opening the audio output device"
             raise RuntimeError("Timed out while opening the audio output device")
         with self._lock:
             error = self._error

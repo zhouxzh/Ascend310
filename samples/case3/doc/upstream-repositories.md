@@ -56,8 +56,20 @@ cplusplus/level1_single_api/6_media/1_audio/audio_gitee/sample_audio.c
 误计入 Git 仓库数量。
 
 `_upstream/` 根目录还可能有 WAV、MIDI、临时 ONNX/JSON 等导出或检查产物。这些
-是测试生成物，不是独立仓库。新增文件时应尽量放到正式的 `midi_wav/`、`models/`
+是测试生成物，不是独立仓库。新增文件时应尽量放到正式的 `midi/`、`models/`
 或 `reports/`，避免和上游源码混在一起。
+
+## 前端设计参考
+
+实时演奏界面的钢琴卷帘参考了
+[`ptnghia-j/ChordMiniApp`](https://github.com/ptnghia-j/ChordMiniApp) 的 Piano
+Visualizer 信息层次，固定参考提交为
+`33623b8885259f59c4005dad79b489aca8ae4ef9`，许可证为 MIT。本项目只参考紧凑上下文
+栏、深色卷帘、命中线、琴键对齐、图例和相邻 transport 的组织方式，没有复制其
+Next.js 组件、Canvas 实现、图片或其他资源。case3 的实时历史卷帘使用现有 React/Vite
+音符流独立实现，因此不需要把 ChordMiniApp 克隆到 `_upstream/`，也不会增加板端运行依赖。
+
+完整设计参考声明见 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)。
 
 ## 独立训练仓库
 

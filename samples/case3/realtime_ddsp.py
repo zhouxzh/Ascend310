@@ -95,7 +95,7 @@ DDSP_VST_PARAMETER_RANGES = {
     "pitch_shift": (-24.0, 24.0),
     "harmonic_gain": (0.0, 1.0),
     "noise_gain": (0.0, 1.0),
-    "output_gain_db": (-60.0, 0.0),
+    "output_gain_db": (-60.0, 6.0),
     "velocity_curve": (0.25, 2.0),
     "attack": (0.01, 3.0),
     "decay": (0.0, 3.0),
@@ -109,22 +109,10 @@ DDSP_VST_PARAMETER_RANGES = {
 }
 
 
-def midi_to_frequency(note: float, pitch_bend: int = 8192) -> float:
-    """Convert a MIDI note and the standard +/-2 semitone bend to Hertz."""
-    bend_semitones = (pitch_bend - 8192.0) / 4096.0
-    return 440.0 * 2.0 ** ((note - 69.0 + bend_semitones) / 12.0)
-
-
 def shape_midi_velocity(velocity: float, curve: float) -> float:
     """Apply a gamma curve while preserving silence and full-scale velocity."""
     normalized = float(np.clip(velocity, 0.0, 1.0))
     return normalized ** float(curve)
-
-
-def midi_to_scaled(note: float, pitch_bend: int) -> float:
-    """Return the DDSP-VST input scale, where MIDI 0..127 maps to 0..1."""
-    bend_semitones = (pitch_bend - 8192.0) / 4096.0
-    return float(np.clip((note + bend_semitones) / 127.0, 0.0, 1.0))
 
 
 class Adsr:
@@ -1361,6 +1349,7 @@ class LivePlayer:
         before_render: Callable[[int], None] | None = None,
         output_device: str | int | None = None,
         output_latency_seconds: float = 0.08,
+        on_block: Callable[[np.ndarray], None] | None = None,
     ):
         self.engine = engine
         self.prebuffer_blocks = max(1, prebuffer_blocks)
@@ -1369,6 +1358,7 @@ class LivePlayer:
         self.space_available = threading.Event()
         self.space_available.set()
         self.before_render = before_render
+        self.on_block = on_block
         self.output_device = output_device
         self.output_latency_seconds = max(float(output_latency_seconds), 0.001)
         self.device_latency_seconds = self.output_latency_seconds
@@ -1411,6 +1401,8 @@ class LivePlayer:
                 started = time.monotonic()
                 block = self.engine.render_output_block()
                 elapsed_ms = (time.monotonic() - started) * 1000.0
+                if self.on_block is not None:
+                    self.on_block(block)
                 try:
                     self.blocks.put_nowait(block)
                 except queue.Full:
@@ -2132,8 +2124,8 @@ def main() -> int:
         raise ValueError("--tail cannot be negative")
     if args.audio_latency_ms <= 0:
         raise ValueError("--audio-latency-ms must be positive")
-    if not math.isfinite(args.output_gain_db) or not -60.0 <= args.output_gain_db <= 0.0:
-        raise ValueError("--output-gain-db must be finite and between -60 and 0")
+    if not math.isfinite(args.output_gain_db) or not -60.0 <= args.output_gain_db <= 6.0:
+        raise ValueError("--output-gain-db must be finite and between -60 and 6")
     audio_device = parse_audio_device(args.audio_device)
     audio_latency_seconds = args.audio_latency_ms / 1000.0
     envelope = EnvelopeSettings(

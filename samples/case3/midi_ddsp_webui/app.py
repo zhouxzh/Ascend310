@@ -4,12 +4,14 @@ import asyncio
 from contextlib import asynccontextmanager
 import hashlib
 import json
+import os
 from pathlib import Path
 import queue
 import sys
 import time
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 from uuid import uuid4
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
@@ -26,7 +28,6 @@ from .bluetooth import (
     scan_bluetooth_audio_devices,
 )
 from .core import (
-    JOB_ROOT,
     REPORT_ROOT,
     ROOT,
     UPLOAD_ROOT,
@@ -46,18 +47,19 @@ from .live import DdspVstSessionController
 from .midi_analysis import MidiValidationError, analyze_midi, analyze_midi_voices
 from .piano import (
     PianoDdspController,
-    piano_catalog,
-    resolve_piano_bundle,
-    resolve_recording,
 )
 from .speaker import (
     NO_AUDIO_OUTPUT,
-    NO_REALTIME_AUDIO_OUTPUT,
     SpeakerTestController,
     query_audio_inputs,
     query_ddsp_vst_audio_outputs,
     query_midi_ddsp_audio_outputs,
     query_piano_audio_outputs,
+)
+from .realtime_session import (
+    RealtimeSessionController,
+    public_realtime_catalog,
+    resolve_unified_recording,
 )
 
 
@@ -68,6 +70,8 @@ WEB_DIST = ROOT / "webui" / "dist"
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     yield
+    if realtime.running:
+        realtime.stop()
     if piano.running:
         piano.stop()
     if ddsp_vst.running:
@@ -83,36 +87,42 @@ jobs = JobManager(coordinator)
 ddsp_vst = DdspVstSessionController(coordinator)
 speaker = SpeakerTestController(coordinator)
 piano = PianoDdspController(coordinator)
+realtime = RealtimeSessionController(coordinator, piano, ddsp_vst)
+
+
+def _origin_allowed(headers: object) -> bool:
+    get = getattr(headers, "get", None)
+    if get is None:
+        return False
+    origin = str(get("origin", "") or "").rstrip("/")
+    if not origin:
+        return True
+    explicit = {
+        item.strip().rstrip("/")
+        for item in os.environ.get("MIDI_DDSP_ALLOWED_ORIGINS", "").split(",")
+        if item.strip()
+    }
+    if origin in explicit:
+        return True
+    try:
+        origin_host = urlsplit(origin).netloc.casefold()
+    except ValueError:
+        return False
+    request_host = str(get("host", "") or "").casefold()
+    return bool(origin_host) and origin_host == request_host
+
+
+@app.middleware("http")
+async def enforce_same_origin(request: Request, call_next):
+    if request.method not in {"GET", "HEAD", "OPTIONS"} and not _origin_allowed(
+        request.headers
+    ):
+        return JSONResponse(status_code=403, content={"detail": "Cross-origin request denied"})
+    return await call_next(request)
 
 
 class ApiModel(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
-
-
-class DdspVstStartRequest(ApiModel):
-    model_id: str
-    audio_device_id: Optional[str] = None
-    midi_port: Optional[str] = None
-    latency_profile: Optional[Literal["low", "balanced", "safe"]] = None
-    sample_rate: int = Field(48_000, ge=8_000, le=192_000)
-    prebuffer: int = Field(6, ge=1, le=64)
-    max_voices: int = Field(1, ge=1, le=8)
-    audio_latency_ms: float = Field(80.0, gt=0, le=1000)
-    pitch_shift: float = Field(0.0, ge=-24, le=24)
-    harmonic_gain: float = Field(1.0, ge=0, le=1)
-    noise_gain: float = Field(1.0, ge=0, le=1)
-    output_gain_db: float = Field(-18.0, ge=-60, le=0)
-    velocity_curve: float = Field(0.55, ge=0.25, le=2)
-    attack: float = Field(0.02, ge=0.01, le=3)
-    decay: float = Field(0.0, ge=0, le=3)
-    sustain: float = Field(1.0, ge=0, le=1)
-    release: float = Field(1.20, ge=0.01, le=5)
-    input_pitch: float = Field(0.0, ge=-0.5, le=0.5)
-    input_gain: float = Field(0.0, ge=-0.5, le=0.5)
-    reverb_size: float = Field(0.4, ge=0, le=1)
-    reverb_damping: float = Field(0.1, ge=0, le=1)
-    reverb_wet: float = Field(0.0, ge=0, le=1)
-    device_id: int = Field(0, ge=0, le=63)
 
 
 class MidiDdspJobRequest(ApiModel):
@@ -157,29 +167,25 @@ class BluetoothDeviceRequest(ApiModel):
     trust: bool = True
 
 
-class PianoDdspStartRequest(ApiModel):
-    bundle_id: Optional[str] = None
-    model_id: str = "paper_ir"
-    piano_year: int = Field(2018, ge=2000, le=2100)
-    midi_port: Optional[str] = None
-    audio_device_id: Optional[str] = None
+class RealtimeStartRequest(ApiModel):
+    patch_id: str = Field(min_length=1, max_length=128)
+    audio_device_id: Optional[str] = Field(default=None, max_length=256)
+    midi_port: Optional[str] = Field(default=None, max_length=256)
     latency_profile: Literal["low", "balanced", "safe"] = "balanced"
-    seed: int = Field(0, ge=0, le=2_147_483_647)
-    velocity_curve: float = Field(1.0, ge=0.25, le=2.0)
-    transpose: int = Field(0, ge=-24, le=24)
-    output_gain_db: float = Field(-12.0, ge=-60.0, le=0.0)
-    reverb_mix: float = Field(1.0, ge=0.0, le=1.0)
+    parameters: dict[str, Union[float, int]] = Field(default_factory=dict)
     device_id: int = Field(0, ge=0, le=63)
+    seed: int = Field(0, ge=0, le=2_147_483_647)
+    max_voices: int = Field(4, ge=1, le=8)
 
 
-class PianoDdspParametersRequest(ApiModel):
-    model_id: Optional[str] = None
-    piano_year: Optional[int] = Field(None, ge=2000, le=2100)
-    velocity_curve: Optional[float] = Field(None, ge=0.25, le=2.0)
-    transpose: Optional[int] = Field(None, ge=-24, le=24)
-    output_gain_db: Optional[float] = Field(None, ge=-60.0, le=0.0)
-    reverb_mix: Optional[float] = Field(None, ge=0.0, le=1.0)
-    pedal: Optional[bool] = None
+class RealtimeSwitchRequest(ApiModel):
+    patch_id: str = Field(min_length=1, max_length=128)
+    audio_device_id: Optional[str] = Field(default=None, max_length=256)
+    parameters: dict[str, Union[float, int]] = Field(default_factory=dict)
+
+
+class RealtimeParametersRequest(ApiModel):
+    values: dict[str, Union[float, int]] = Field(default_factory=dict)
 
 
 def _http_error(exc: BaseException) -> HTTPException:
@@ -207,8 +213,7 @@ def _require_board() -> None:
 def get_status() -> dict[str, object]:
     return {
         **system_status(coordinator.owner),
-        "piano_ddsp": piano.status(),
-        "ddsp_vst": ddsp_vst.status(),
+        "realtime": realtime.status(),
         "speaker_test": speaker.status(),
         "job_count": len(jobs.list()),
     }
@@ -217,19 +222,6 @@ def get_status() -> dict[str, object]:
 @app.get("/api/v1/catalog")
 def get_catalog() -> dict[str, object]:
     return public_catalog()
-
-
-@app.get("/api/v1/audio-devices")
-def get_audio_devices() -> dict[str, object]:
-    try:
-        devices = query_ddsp_vst_audio_outputs(query_audio_devices)
-        return {
-            "available": bool(devices),
-            "devices": devices,
-            "error": None if devices else NO_REALTIME_AUDIO_OUTPUT,
-        }
-    except Exception as exc:
-        return {"available": False, "devices": [], "error": str(exc)}
 
 
 @app.get("/api/v1/audio-inputs")
@@ -266,163 +258,90 @@ def get_midi_ports() -> dict[str, object]:
         return {"available": False, "ports": [], "error": str(exc)}
 
 
-@app.get("/api/v1/piano-ddsp/catalog")
-def get_piano_ddsp_catalog() -> dict[str, object]:
+@app.get("/api/v1/realtime/catalog")
+def get_realtime_catalog() -> dict[str, object]:
     try:
-        return piano_catalog()
+        return public_realtime_catalog()
     except BaseException as exc:
         raise _http_error(exc) from exc
 
 
-@app.get("/api/v1/piano-ddsp/audio-devices")
-def get_piano_ddsp_audio_devices() -> dict[str, object]:
-    try:
-        devices = query_piano_audio_outputs(query_audio_devices)
-        return {
-            "available": bool(devices),
-            "devices": devices,
-            "error": None if devices else NO_AUDIO_OUTPUT,
-        }
-    except Exception as exc:
-        return {"available": False, "devices": [], "error": str(exc)}
+@app.get("/api/v1/realtime/status")
+def get_realtime_status() -> dict[str, object]:
+    return realtime.status()
 
 
-@app.get("/api/v1/piano-ddsp/status")
-def get_piano_ddsp_status() -> dict[str, object]:
-    return piano.status()
-
-
-@app.post("/api/v1/piano-ddsp/start")
-async def start_piano_ddsp(payload: PianoDdspStartRequest) -> dict[str, object]:
+@app.post("/api/v1/realtime/start")
+async def start_realtime(payload: RealtimeStartRequest) -> dict[str, object]:
     _require_board()
     try:
-        catalog_data = piano_catalog()
-        bundles = list(catalog_data.get("bundles", []))
-        bundle_id = payload.bundle_id
-        if bundle_id is None:
-            active_bundle_id = catalog_data.get("active_bundle_id")
-            active = next(
-                (
-                    item
-                    for item in bundles
-                    if item.get("id") == active_bundle_id
-                    and payload.model_id in item.get("models", [])
-                ),
-                None,
-            )
-            bundle_id = str(active["id"]) if active else next(
-                str(item["id"])
-                for item in bundles
-                if payload.model_id in item.get("models", [])
-            )
-        bundle_manifest = resolve_piano_bundle(bundle_id)
-        outputs = query_piano_audio_outputs(query_audio_devices)
-        if payload.audio_device_id not in (None, ""):
-            audio_output = next(
-                item for item in outputs if item["id"] == payload.audio_device_id
-            )
-        else:
-            audio_output = next(
-                (item for item in outputs if item.get("is_default")),
-                outputs[0] if outputs else None,
-            )
-        if audio_output is None:
-            raise RuntimeError(NO_AUDIO_OUTPUT)
-        midi_port = payload.midi_port
-        if midi_port:
-            ports = query_midi_devices()
-            selected_port = next(
-                (
-                    item
-                    for item in ports
-                    if midi_port in {str(item.get("id")), str(item.get("port"))}
-                ),
-                None,
-            )
-            if selected_port is None:
-                raise KeyError(f"MIDI input {midi_port!r} was not found")
-            midi_port = str(selected_port.get("port") or selected_port.get("name"))
-        audio_device: str | int | None = (
-            audio_output.get("index")
-            if audio_output.get("backend") == "portaudio"
-            else audio_output.get("id")
-        )
-        config = {
-            "bundle_manifest": str(bundle_manifest),
-            "model_id": payload.model_id,
-            "piano_year": payload.piano_year,
-            "output_sample_rate": int(audio_output.get("default_sample_rate", 48_000)),
-            "latency_profile": payload.latency_profile,
-            "seed": payload.seed,
-            "velocity_curve": payload.velocity_curve,
-            "transpose": payload.transpose,
-            "output_gain_db": payload.output_gain_db,
-            "reverb_mix": payload.reverb_mix,
-            "midi_port": midi_port,
-            "audio_backend": str(audio_output.get("backend", "portaudio")),
-            "pulse_sink": audio_output.get("sink_name"),
-            "audio_device": audio_device,
-            "is_bluetooth": bool(audio_output.get("is_bluetooth", False)),
-            "alsa_card": audio_output.get("alsa_card"),
-            "alsa_device": audio_output.get("alsa_device"),
-            "alsa_route_device_id": audio_output.get("alsa_route_device_id"),
-            "alsa_playback_level": audio_output.get("alsa_playback_level"),
-            "device_id": payload.device_id,
-            "recorder_root": str(REPORT_ROOT / "piano-ddsp"),
-        }
-        return await asyncio.to_thread(piano.start, config)
-    except StopIteration as exc:
-        raise HTTPException(status_code=404, detail="Piano-DDSP bundle or audio output not found") from exc
+        return await asyncio.to_thread(realtime.start, payload.model_dump())
     except HTTPException:
         raise
     except BaseException as exc:
         raise _http_error(exc) from exc
 
 
-@app.post("/api/v1/piano-ddsp/stop")
-async def stop_piano_ddsp() -> dict[str, object]:
-    return await asyncio.to_thread(piano.stop)
-
-
-@app.post("/api/v1/piano-ddsp/panic")
-async def panic_piano_ddsp() -> dict[str, object]:
+@app.post("/api/v1/realtime/switch")
+async def switch_realtime(payload: RealtimeSwitchRequest) -> dict[str, object]:
+    _require_board()
     try:
-        await asyncio.to_thread(piano.command, "panic")
-        return piano.status()
+        return await asyncio.to_thread(
+            realtime.switch, payload.model_dump(exclude_none=True)
+        )
+    except HTTPException:
+        raise
     except BaseException as exc:
         raise _http_error(exc) from exc
 
 
-@app.patch("/api/v1/piano-ddsp/parameters")
-async def patch_piano_ddsp_parameters(
-    payload: PianoDdspParametersRequest,
+@app.patch("/api/v1/realtime/parameters")
+async def patch_realtime_parameters(
+    payload: RealtimeParametersRequest,
 ) -> dict[str, object]:
-    values = payload.model_dump(exclude_none=True)
     try:
-        await asyncio.to_thread(piano.command, "parameters", values=values)
-        return piano.status()
+        return await asyncio.to_thread(realtime.update_parameters, payload.values)
     except BaseException as exc:
         raise _http_error(exc) from exc
 
 
-@app.get("/api/v1/piano-ddsp/recordings/{recording_id}")
-def get_piano_ddsp_recording(recording_id: str) -> FileResponse:
+@app.post("/api/v1/realtime/stop")
+async def stop_realtime() -> dict[str, object]:
     try:
-        path = resolve_recording(recording_id)
+        return await asyncio.to_thread(realtime.stop)
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/v1/realtime/panic")
+async def panic_realtime() -> dict[str, object]:
+    try:
+        return await asyncio.to_thread(realtime.panic)
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.get("/api/v1/realtime/recordings/{recording_id}")
+def get_realtime_recording(recording_id: str) -> FileResponse:
+    try:
+        path = resolve_unified_recording(recording_id)
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Piano-DDSP recording not found") from exc
+        raise HTTPException(status_code=404, detail="Realtime recording not found") from exc
     return FileResponse(path, filename=path.name, media_type="audio/wav")
 
 
-@app.websocket("/api/v1/piano-ddsp/events")
-async def piano_ddsp_events(websocket: WebSocket) -> None:
+@app.websocket("/api/v1/realtime/events")
+async def realtime_events(websocket: WebSocket) -> None:
+    if not _origin_allowed(websocket.headers):
+        await websocket.close(code=1008, reason="Cross-origin WebSocket denied")
+        return
     await websocket.accept()
     source = f"browser-{uuid4().hex[:10]}"
-    subscriber = piano.subscribe()
+    subscriber = realtime.subscribe()
     monitor_enabled = False
     last_status = 0.0
     try:
-        await websocket.send_json({"event": "status", "data": piano.status()})
+        await websocket.send_json({"event": "status", "data": realtime.status()})
         while True:
             while True:
                 try:
@@ -432,9 +351,9 @@ async def piano_ddsp_events(websocket: WebSocket) -> None:
                 if outgoing.get("event") != "monitor" or monitor_enabled:
                     await websocket.send_json(outgoing)
             now = time.monotonic()
-            if now - last_status >= 1.0:
+            if now - last_status >= 2.0:
                 last_status = now
-                await websocket.send_json({"event": "status", "data": piano.status()})
+                await websocket.send_json({"event": "heartbeat", "data": realtime.status()})
             try:
                 message = await asyncio.wait_for(websocket.receive_json(), timeout=0.1)
             except asyncio.TimeoutError:
@@ -442,95 +361,84 @@ async def piano_ddsp_events(websocket: WebSocket) -> None:
             event = str(message.get("event", ""))
             try:
                 result: object = None
-                if event in {"note_on", "note_off"}:
+                if event == "note_on":
                     result = await asyncio.to_thread(
-                        piano.command,
-                        "note",
-                        source=source,
-                        note=int(message["note"]),
-                        velocity=int(message.get("velocity", 100 if event == "note_on" else 0)),
-                        on=event == "note_on",
+                        realtime.note_on,
+                        source,
+                        int(message["note"]),
+                        int(message.get("velocity", 100)),
+                    )
+                elif event == "note_off":
+                    result = await asyncio.to_thread(
+                        realtime.note_off, source, int(message["note"])
                     )
                 elif event in {"cc", "control_change"}:
+                    controller = int(message["controller"])
+                    if controller != 64:
+                        raise ValueError(f"Unsupported realtime controller: {controller}")
                     result = await asyncio.to_thread(
-                        piano.command,
-                        "cc",
-                        source=source,
-                        controller=int(message["controller"]),
-                        value=int(message["value"]),
+                        realtime.sustain, source, int(message["value"]) >= 64
                     )
                 elif event == "sustain":
                     result = await asyncio.to_thread(
-                        piano.command,
-                        "cc",
-                        source=source,
-                        controller=64,
-                        value=127 if bool(message.get("enabled")) else 0,
+                        realtime.sustain, source, bool(message.get("enabled"))
                     )
+                elif event == "pitch_bend":
+                    result = await asyncio.to_thread(
+                        realtime.pitch_bend, int(message.get("value", 0))
+                    )
+                elif event == "parameters":
+                    values = message.get("values")
+                    if not isinstance(values, dict):
+                        raise ValueError("parameters event requires a values object")
+                    result = await asyncio.to_thread(realtime.update_parameters, values)
                 elif event == "player":
                     action = str(message["action"])
                     values = dict(message.get("values") or {})
                     if action == "load" and "midi_id" in values:
                         midi = resolve_catalog_item("midi_files", str(values.pop("midi_id")))
                         values["path"] = str(midi["path"])
-                    result = await asyncio.to_thread(
-                        piano.command, "player", action=action, values=values
-                    )
+                    result = await asyncio.to_thread(realtime.player, action, **values)
                 elif event == "record_start":
-                    recording_id = f"piano-{uuid4().hex}"
-                    result = await asyncio.to_thread(
-                        piano.command, "record_start", recording_id=recording_id
-                    )
-                    result = {
-                        "id": recording_id,
-                        "download_url": f"/api/v1/piano-ddsp/recordings/{recording_id}",
-                    }
+                    result = await asyncio.to_thread(realtime.record_start)
                 elif event == "record_stop":
-                    raw = await asyncio.to_thread(piano.command, "record_stop")
-                    path = Path(str(dict(raw or {}).get("path", "")))
-                    result = (
-                        {
-                            "id": path.stem,
-                            "download_url": f"/api/v1/piano-ddsp/recordings/{path.stem}",
-                        }
-                        if path.name
-                        else None
-                    )
+                    result = await asyncio.to_thread(realtime.record_stop)
                 elif event == "monitor":
                     monitor_enabled = bool(message.get("enabled", False))
-                    await asyncio.to_thread(piano.set_monitor, source, monitor_enabled)
-                    result = {"enabled": monitor_enabled}
-                elif event == "panic":
-                    result = await asyncio.to_thread(piano.command, "panic")
-                elif event == "parameters":
-                    values = message.get("values")
-                    if not isinstance(values, dict):
-                        raise ValueError("parameters event requires a values object")
                     result = await asyncio.to_thread(
-                        piano.command, "parameters", values=values
+                        realtime.monitor, source, monitor_enabled
                     )
+                elif event in {"panic", "all_notes_off"}:
+                    result = await asyncio.to_thread(realtime.panic)
                 elif event == "ping":
                     await websocket.send_json({"event": "pong"})
                     continue
                 else:
-                    raise ValueError(f"Unknown Piano-DDSP event: {event}")
-                await websocket.send_json({"event": "ack", "request": event, "data": result})
-            except BaseException as exc:
-                await websocket.send_json({"event": "error", "message": str(exc)})
+                    raise ValueError(f"Unknown realtime event: {event}")
+                await websocket.send_json(
+                    {"event": "ack", "request": event, "data": result}
+                )
+            except WebSocketDisconnect:
+                raise
+            except Exception as exc:
+                try:
+                    await websocket.send_json({"event": "error", "message": str(exc)})
+                except (WebSocketDisconnect, RuntimeError) as disconnect:
+                    raise WebSocketDisconnect(code=1006) from disconnect
     except WebSocketDisconnect:
         pass
     finally:
-        if monitor_enabled:
+        if monitor_enabled and realtime.running:
             try:
-                await asyncio.to_thread(piano.set_monitor, source, False)
+                await asyncio.to_thread(realtime.monitor, source, False)
             except BaseException:
                 pass
-        if piano.running:
+        if realtime.running:
             try:
-                await asyncio.to_thread(piano.command, "release_source", source=source)
+                await asyncio.to_thread(realtime.release_source, source)
             except BaseException:
                 pass
-        piano.unsubscribe(subscriber)
+        realtime.unsubscribe(subscriber)
 
 
 @app.get("/api/v1/speaker-test/status")
@@ -641,91 +549,6 @@ async def stop_speaker_test() -> dict[str, object]:
         return await asyncio.to_thread(speaker.stop)
     except BaseException as exc:
         raise _http_error(exc) from exc
-
-
-@app.post("/api/v1/ddsp-vst/start")
-async def start_ddsp_vst(payload: DdspVstStartRequest) -> dict[str, object]:
-    try:
-        item = resolve_catalog_item("ddsp_vst_models", payload.model_id)
-        config = payload.model_dump()
-        config.update(
-            {
-                "model_path": item["path"],
-                "backend": "om",
-            }
-        )
-        if payload.audio_device_id:
-            device = next(
-                output
-                for output in query_ddsp_vst_audio_outputs(query_audio_devices)
-                if output["id"] == payload.audio_device_id
-            )
-            config.update(
-                {
-                    "audio_backend": device.get("backend", "portaudio"),
-                    "pulse_sink": device.get("sink_name"),
-                    "audio_device_name": device["name"],
-                    "audio_device_sample_rate": device.get("default_sample_rate"),
-                    "is_bluetooth": bool(device.get("is_bluetooth", False)),
-                }
-            )
-        _require_board()
-        return await asyncio.to_thread(ddsp_vst.start, config)
-    except StopIteration as exc:
-        raise HTTPException(status_code=404, detail="Audio device not found") from exc
-    except HTTPException:
-        raise
-    except BaseException as exc:
-        raise _http_error(exc) from exc
-
-
-@app.post("/api/v1/ddsp-vst/stop")
-async def stop_ddsp_vst() -> dict[str, object]:
-    return await asyncio.to_thread(ddsp_vst.stop)
-
-
-@app.websocket("/api/v1/ddsp-vst/events")
-async def ddsp_vst_events(websocket: WebSocket) -> None:
-    await websocket.accept()
-    source = f"browser-{uuid4().hex[:10]}"
-    try:
-        while True:
-            try:
-                message = await asyncio.wait_for(websocket.receive_json(), timeout=0.5)
-            except asyncio.TimeoutError:
-                await websocket.send_json({"event": "status", "data": ddsp_vst.status()})
-                continue
-            event = message.get("event")
-            try:
-                if event == "note_on":
-                    ddsp_vst.note_on(source, int(message["note"]), int(message.get("velocity", 100)))
-                elif event == "note_off":
-                    ddsp_vst.note_off(source, int(message["note"]))
-                elif event == "sustain":
-                    ddsp_vst.sustain(source, bool(message.get("enabled")))
-                elif event == "pitch_bend":
-                    ddsp_vst.pitch_bend(int(message.get("value", 0)))
-                elif event == "parameters":
-                    values = message.get("values")
-                    if not isinstance(values, dict):
-                        raise ValueError("parameters event requires an object")
-                    ddsp_vst.update_parameters(values)
-                elif event == "all_notes_off":
-                    ddsp_vst.release_source(source)
-                elif event != "ping":
-                    raise ValueError(f"Unknown DDSP-VST event: {event}")
-                await websocket.send_json({"event": "status", "data": ddsp_vst.status()})
-            except WebSocketDisconnect:
-                break
-            except BaseException as exc:
-                try:
-                    await websocket.send_json({"event": "error", "message": str(exc)})
-                except (WebSocketDisconnect, RuntimeError):
-                    break
-    except WebSocketDisconnect:
-        pass
-    finally:
-        ddsp_vst.release_source(source)
 
 
 @app.post("/api/v1/midi-files")
@@ -1048,6 +871,9 @@ def control_job(job_id: str, action: Literal["pause", "resume", "stop"]) -> dict
 
 @app.websocket("/api/v1/events")
 async def job_events(websocket: WebSocket) -> None:
+    if not _origin_allowed(websocket.headers):
+        await websocket.close(code=1008, reason="Cross-origin WebSocket denied")
+        return
     await websocket.accept()
     subscriber = jobs.subscribe()
     try:

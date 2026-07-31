@@ -12,7 +12,7 @@
 
 | 链路 | 入口 | OM 模型 | 用途 |
 | :--- | :--- | :--- | :--- |
-| DDSP-VST | `realtime_ddsp.py` | 每种音色一个状态化 OM | Web“DDSP-VST”、触控键盘、电脑键盘和实体 MIDI 实时演奏 |
+| DDSP-VST | `realtime_ddsp.py` | 每种音色一个状态化 OM | Web“实时演奏”的神经音色模式、电脑键盘和实体 MIDI 实时演奏 |
 | MIDI-DDSP | `midi_ddsp_realtime.py` | stateful v2 版本化模型包 | Web“MIDI-DDSP”页面的 MIDI 文件播放和 WAV 渲染 |
 | Piano-DDSP | `piano_ddsp_runtime.worker` | `model-suite-v1.0.0` FP32 bundle | 16 声部钢琴、硬件/网页 MIDI 与 MIDI 文件的统一实时播放 |
 
@@ -24,11 +24,10 @@ Piano-DDSP 是独立常驻子进程，不经过 MIDI-DDSP 的整曲预渲染和 
 
 ## Web 工作台
 
-MIDI-DDSP Studio 使用 React + TypeScript + Vite 前端和 FastAPI 后端，包含四个工作区：
+MIDI-DDSP Studio 使用 React + TypeScript + Vite 前端和 FastAPI 后端，包含三个工作区：
 
-- **DDSP-VST**：状态化 OM 实时 Synth，默认单音，支持插件音色、包络和混响参数。
+- **实时演奏**：只选择钢琴、提琴、长笛等音色；统一会话自动选择 Piano-DDSP 或 DDSP-VST 运行时，并共用网页琴盘、电脑键盘、实体 MIDI、MIDI 播放、录音和监听。
 - **MIDI-DDSP**：使用版本锁定的模型包完整渲染并缓存 WAV，再播放或下载。
-- **Piano-DDSP**：16 声部实时钢琴，支持硬件/网页 MIDI、踏板、MIDI 文件和录音。
 - **设备**：查看 NPU、模型、音频与 MIDI 状态，并测试 PulseAudio 输出和左右声道。
 
 DDSP-VST Effect 本轮不提供启动入口。设备页只区分真实 `capture` 与 PulseAudio
@@ -59,25 +58,28 @@ Piano-DDSP 只使用开发板已有的 CANN 8.0.0、Conda `base` 和已安装依
 
 ## 常用命令
 
-### MIDI 设备与键盘窗口
-
-```bash
-python midi.py --list
-python midi.py --output
-```
-
 ### DDSP-VST 实时链路
 
 ```bash
 python realtime_ddsp.py --demo --duration 2 --output violin_demo.wav
 
-python realtime_ddsp.py --play-midi midi/ode-to-joy-violin.mid \
+python realtime_ddsp.py --play-midi midi/ddsp-test.mid \
   --model models/om/Violin_mixed_float16.om \
   --device-id 0 --audio-device 1 --sample-rate 48000 \
   --prebuffer 6 --max-voices 1 --output-gain-db 0
 ```
 
 ### 本地 ONNX 导出
+
+导出环境固定使用 **CPython 3.11**；TensorFlow 2.15.1 不支持 Python 3.12。Windows
+可先创建独立环境，避免与板端依赖混用：
+
+```powershell
+py -3.11 -m venv .venv-export
+.\.venv-export\Scripts\python -m pip install -r requirements-export.txt
+```
+
+Linux/macOS 使用等价的 Python 3.11 虚拟环境。激活后再执行：
 
 ```bash
 python -m pip install -r requirements-export.txt
@@ -89,7 +91,7 @@ python tools/export_ddsp_vst_onnx.py \
 python tools/export_midi_ddsp_onnx.py --component all
 
 python tools/export_midi_ddsp_tf_reference.py \
-  --midi midi/ode-to-joy-violin.mid --instrument-id 0
+  --midi midi/ddsp-test.mid --instrument-id 0
 python tools/export_midi_ddsp_stateful_onnx.py
 ```
 
@@ -136,7 +138,6 @@ PulseAudio `platform-sound` 路径曾触发 ALSA 内核 hard lock，因此 Piano
 
 ```text
 case3/
-├── midi.py                     # Pygame MIDI 键盘应用
 ├── realtime_ddsp.py            # DDSP-VST 实时/文件播放引擎
 ├── pyacl_ddsp.py               # DDSP-VST PyACL OM 后端
 ├── midi_ddsp_realtime.py       # MIDI-DDSP 文件播放和渲染会话
@@ -150,12 +151,19 @@ case3/
 ├── tests/                      # 不调用 Ascend 硬件的本地测试
 ├── models/                     # 模型、日志和校验清单（仅 README 提交）
 ├── reports/                    # 精度、性能和 Web 任务报告（不提交）
-├── midi/                       # MIDI 和 MuseScore 测试曲目
-├── midi_wav/                   # 单/双声道硬件试听夹具
+├── midi/                       # MIDI 曲库、MuseScore 工程和确定性测试夹具
+├── midi_wav/                   # MIDI 曲库对应的单/双声道试听音频
 ├── model3/                     # FreeCAD、STEP 和 STL 结构件
 ├── _upstream/                  # 固定版本的第三方参考源码
 └── doc/                        # 设计和实测文档
 ```
+
+统一实时会话由 `midi_ddsp_webui/realtime_session.py` 管理。会话从开始到停止始终持有
+`realtime-session` 资源锁；切换音色时暂停并保存 MIDI 播放位置，停掉旧运行时后启动
+目标运行时。目标启动失败会自动恢复旧音色，录音期间禁止切换。两个模型图和推理进程
+仍然独立，不做并行叠加。
+
+前端琴键比例和快捷键标签的第三方来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 根目录中的四个 Python 模块是可直接运行的 CLI 和 Web 后端公共模块，因此不移动到
 `scripts/`；`scripts/` 只保存很薄的板端启动入口和环境检查器。
@@ -181,14 +189,20 @@ npm run build
 ```
 
 本地测试使用模拟设备，不替代板端 OM 加载、NPU 推理、真实 MIDI 输入或声卡试听。
+在已激活 CANN 和 Conda `base` 的 Ascend 310B 板端可运行：
+
+```bash
+python tools/validate_webui_runtime.py
+python tools/smoke_test_ddsp_om.py \
+  --model models/om/mixed_precision/Violin_mixed_float16.om --steps 16
+```
 
 ## 文档
 
 | 文档 | 内容 |
 | :--- | :--- |
 | [项目概览](doc/overview.md) | 项目边界、硬件和系统链路 |
-| [MIDI 键盘应用](doc/midi-app.md) | MIDI 设备、键盘交互和用法 |
-| [MIDI 测试曲目](doc/midi-test-tracks.md) | MuseScore 来源、曲目和试听约定 |
+| [MIDI 测试素材](doc/midi-test-tracks.md) | 确定性生成夹具、复现命令和使用边界 |
 | [DDSP-VST 导出](doc/model-export.md) | TFLite 到 ONNX 的状态化模型导出 |
 | [MIDI-DDSP 导出](doc/midi-ddsp-export.md) | TensorFlow 基准、stateful v2 ONNX/OM 和逐张量对齐 |
 | [两套模型对比](doc/midi-ddsp-vs-ddsp-vst.md) | 接口、实时性和适用场景差异 |

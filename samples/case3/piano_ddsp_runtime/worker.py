@@ -8,7 +8,6 @@ from pathlib import Path
 import queue
 import sys
 import threading
-import time
 import traceback
 from typing import Any
 
@@ -25,8 +24,10 @@ class Worker:
         self.stop_event = threading.Event()
         self.monitor_enabled = False
         self.monitor_queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=2)
+        self.note_queue: queue.Queue[tuple[int, bool]] = queue.Queue(maxsize=512)
         self.status_thread = threading.Thread(target=self._status_loop, daemon=True)
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        self.note_thread = threading.Thread(target=self._note_loop, daemon=True)
 
     def emit(self, event: str, **data: object) -> None:
         payload = {"event": event, **data}
@@ -64,11 +65,31 @@ class Worker:
             if engine is not None:
                 self.emit("status", data=engine.status())
 
+    def note_event(self, note: int, on: bool) -> None:
+        try:
+            self.note_queue.put_nowait((int(note), bool(on)))
+        except queue.Full:
+            # The renderer remains real-time safe if an unavailable client stops reading.
+            return
+
+    def _note_loop(self) -> None:
+        while not self.stop_event.is_set():
+            try:
+                note, on = self.note_queue.get(timeout=0.2)
+            except queue.Empty:
+                continue
+            self.emit("note", note=note, on=on)
+
     def start(self, config: dict[str, Any]) -> dict[str, object]:
         if self.engine is not None:
             return self.engine.status()
         bundle = load_bundle(Path(str(config.pop("bundle_manifest"))))
-        engine = PianoDdspEngine(bundle, monitor_callback=self.monitor, **config)
+        engine = PianoDdspEngine(
+            bundle,
+            monitor_callback=self.monitor,
+            note_listener=self.note_event,
+            **config,
+        )
         self.engine = engine
         try:
             engine.start()
@@ -141,6 +162,7 @@ class Worker:
     def run(self) -> int:
         self.status_thread.start()
         self.monitor_thread.start()
+        self.note_thread.start()
         self.emit("ready", pid=str(__import__("os").getpid()))
         try:
             for raw in sys.stdin:
@@ -177,4 +199,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

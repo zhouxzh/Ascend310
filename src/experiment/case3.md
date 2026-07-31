@@ -108,13 +108,12 @@ MIDI-DDSP Studio 采用 React、TypeScript 和 Vite 构建浏览器端，采用 
 Uvicorn 和 WebSocket 提供板端服务。开发电脑生成 `webui/dist/`，开发板只运行 Python
 服务和静态资源。
 
-界面包含四个工作区：
+界面包含三个工作区：
 
 | 工作区 | 功能 |
 | :--- | :--- |
-| DDSP-VST | 使用状态化 OM 接收触控、电脑键盘和实体 MIDI 事件 |
+| 实时演奏 | 统一选择 Piano-DDSP 或 DDSP-VST patch，接收触控、电脑键盘和实体 MIDI 事件 |
 | MIDI-DDSP | 使用 stateful v2 模型包完整渲染、缓存并播放 MIDI 文件 |
-| Piano-DDSP | 16 声部实时钢琴、硬件/网页 MIDI、文件播放器、录音和实时指标 |
 | 设备 | 查看 NPU、模型、音频与 MIDI 状态，并测试 PulseAudio 输出和左右声道 |
 
 所有会占用 NPU 或声卡的操作共享同一个资源协调器。同一时间只允许一个 DDSP-VST Synth、
@@ -136,7 +135,7 @@ powershell -ExecutionPolicy Bypass -File tools/deploy_midi_ddsp_webui.ps1
 ```
 
 脚本执行前端生产构建，然后同步静态资源、Python 运行模块、Piano-DDSP 固定 ONNX 与
-参考向量、受控测试工具、文档和 MIDI 输入文件。它不会在开发板上安装、升级或删除软件，
+参考向量、受控测试工具和确定性 MIDI 输入夹具。它不会在开发板上安装、升级或删除软件，
 也不会修改 shell 启动文件或系统服务。
 
 ### 5.2 板端环境检查 {#src-experiment-case3-h12}
@@ -165,10 +164,10 @@ python scripts/run_webui.py
 USB 喇叭通常会直接出现在 PulseAudio 输出列表中。蓝牙音箱必须先在系统图形界面中
 连接，并在 `pactl list short sinks` 中出现对应 `bluez_sink`，才能进入 Web 下拉菜单。
 
-“设备”页的音频输出测试使用选中的 sink 播放短正弦测试音，可以检查输出路径和左右声道。仓库
-`midi_wav/` 只保留两份 48 kHz、16-bit 硬件试听夹具：单声道
-`ode-to-joy-violin-mono-loud.wav` 和立体声
-`ode-to-joy-violin-stereo-loud.wav`。
+“设备”页的音频输出测试使用选中的 sink 播放短正弦测试音，可以检查输出路径和左右声道。
+仓库不提交音频二进制；需要命令行夹具时运行
+`python tools/create_audio_test_fixtures.py`，输出写入被忽略的
+`reports/audio-fixtures/`。
 
 设备页的扬声器测试只能确认是否发声和声道路由，不能替代麦克风、声压计或硬件回环进行音质与
 电气测量。
@@ -219,7 +218,6 @@ samples/case3/
 ├── models/
 ├── reports/
 ├── midi/
-├── midi_wav/
 ├── model3/
 └── doc/
 ```

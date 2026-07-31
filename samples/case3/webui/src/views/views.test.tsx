@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import { api } from '../api'
 import type {
@@ -10,7 +10,6 @@ import type {
 } from '../types'
 import DevicesView from './DevicesView'
 import MidiDdspView, { buildVoiceAssignments, selectableMidiDdspBundles } from './MidiDdspView'
-import PerformView from './PerformView'
 import SpeakerView from './SpeakerView'
 
 vi.mock('../api', async () => {
@@ -24,8 +23,6 @@ vi.mock('../api', async () => {
       scanBluetoothAudio: vi.fn(),
       connectBluetoothAudio: vi.fn(),
       disconnectBluetoothAudio: vi.fn(),
-      startDdspVst: vi.fn(),
-      stopDdspVst: vi.fn(),
       midiVoices: vi.fn(),
       startMidiDdsp: vi.fn(),
       playMidiDdspRecording: vi.fn(),
@@ -86,8 +83,7 @@ const status: SystemStatus = {
   is_ascend_board: true,
   dependencies: {},
   npu: { available: true, exit_code: 0, output: '', health_alarm: false },
-  active_owner: 'ddsp-vst',
-  ddsp_vst: { running: true, active_notes: [] },
+  active_owner: 'realtime',
   speaker_test: {
     running: false,
     state: 'idle',
@@ -107,27 +103,6 @@ const status: SystemStatus = {
 }
 
 const audioDevice = { id: '1', index: 1, name: 'USB Audio', host_api: 'ALSA', max_output_channels: 2, default_sample_rate: 48000 }
-const tinyMidiPort = {
-  id: 'raw:/dev/snd/midiC1D0',
-  index: 0,
-  name: 'MIDIPLUS TINY',
-  port: 'raw:/dev/snd/midiC1D0',
-  backend: 'raw' as const,
-  manufacturer: 'MIDIPLUS',
-  model: 'TINY',
-  key_count: 32,
-}
-const bluetoothAudioDevice = {
-  id: 'pulse:bluez_sink.C8_24_78_D5_B2_9E.a2dp_sink',
-  index: 2,
-  name: 'EDIFIER M16 Pro',
-  host_api: 'PulseAudio',
-  backend: 'pulse' as const,
-  sink_name: 'bluez_sink.C8_24_78_D5_B2_9E.a2dp_sink',
-  max_output_channels: 2,
-  default_sample_rate: 44100,
-  is_bluetooth: true,
-}
 const bluetoothSpeaker = {
   address: 'C8:24:78:D5:B2:9E',
   name: 'EDIFIER M16 Pro',
@@ -203,34 +178,9 @@ function voiceAnalysis(voiceCount = 1, midiName = 'demo.mid'): MidiVoiceAnalysis
   }
 }
 
-class FakeWebSocket {
-  static OPEN = 1
-  readyState = FakeWebSocket.OPEN
-  sent: string[] = []
-  onopen: (() => void) | null = null
-  onmessage: ((event: MessageEvent) => void) | null = null
-  onclose: (() => void) | null = null
-
-  constructor() {
-    sockets.push(this)
-  }
-
-  send(message: string) {
-    this.sent.push(message)
-  }
-
-  close() {
-    this.onclose?.()
-  }
-}
-
-const sockets: FakeWebSocket[] = []
-
 describe('workspace behavior', () => {
   beforeEach(() => {
-    sockets.length = 0
     vi.clearAllMocks()
-    vi.stubGlobal('WebSocket', FakeWebSocket)
     vi.mocked(api.bluetoothAudio).mockResolvedValue({
       available: true,
       controller: {
@@ -258,8 +208,6 @@ describe('workspace behavior', () => {
       device: bluetoothSpeaker,
       profile: { selected: null, error: null },
     })
-    vi.mocked(api.startDdspVst).mockResolvedValue({ running: true, active_notes: [] })
-    vi.mocked(api.stopDdspVst).mockResolvedValue({ running: false, active_notes: [] })
     vi.mocked(api.midiVoices).mockImplementation(async (midiId) => (
       voiceAnalysis(midiId === 'polyphonic' ? 4 : 1, midiId === 'polyphonic' ? 'piano.mid' : 'demo.mid')
     ))
@@ -271,85 +219,6 @@ describe('workspace behavior', () => {
   })
 
   afterEach(() => vi.unstubAllGlobals())
-
-  it('sends computer keyboard notes and releases them when focus is lost', async () => {
-    render(
-      <PerformView
-        status={status}
-        catalog={catalog}
-        audioDevices={[{ id: 'audio-1', index: 1, name: 'USB Audio', host_api: 'ALSA', max_output_channels: 2, default_sample_rate: 48000 }]}
-        midiPorts={[]}
-        onRefresh={vi.fn()}
-      />,
-    )
-    await waitFor(() => expect(sockets).toHaveLength(1))
-    fireEvent.keyDown(window, { key: 'a' })
-    fireEvent.keyUp(window, { key: 'a' })
-    fireEvent.blur(window)
-    expect(sockets[0].sent.map((message) => JSON.parse(message))).toEqual([
-      { event: 'note_on', note: 60, velocity: 100 },
-      { event: 'note_off', note: 60 },
-      { event: 'all_notes_off' },
-      { event: 'pitch_bend', value: 0 },
-    ])
-  })
-
-  it('shows the active MIDIPLUS TINY 32-key controller profile', async () => {
-    render(
-      <PerformView
-        status={{ ...status, ddsp_vst: { ...status.ddsp_vst, config: { midi_port: tinyMidiPort.port } } }}
-        catalog={catalog}
-        audioDevices={[audioDevice]}
-        midiPorts={[tinyMidiPort]}
-        onRefresh={vi.fn()}
-      />,
-    )
-
-    await waitFor(() => expect(screen.getByLabelText('MIDI 输入')).toHaveValue(tinyMidiPort.port))
-    expect(screen.getByText('MIDIPLUS TINY', { selector: '.keyboard-profile strong' })).toBeVisible()
-    expect(screen.getByText('32键 · F3-C6')).toBeVisible()
-    expect(screen.getByLabelText('触控钢琴')).toHaveAttribute('data-key-count', '32')
-  })
-
-  it('disables realtime start when no audio output exists', () => {
-    render(
-      <PerformView
-        status={{ ...status, active_owner: null, ddsp_vst: { running: false, active_notes: [] } }}
-        catalog={catalog}
-        audioDevices={[]}
-        audioError="当前只有板载 3.5 mm 单声道兼容路径；DDSP-VST 需要 USB、蓝牙或其他可用立体声输出。"
-        midiPorts={[]}
-        onRefresh={vi.fn()}
-      />,
-    )
-    expect(screen.getByRole('button', { name: '启动 Synth' })).toBeDisabled()
-    expect(screen.getByText(/当前只有板载 3.5 mm 单声道兼容路径/)).toBeVisible()
-  })
-
-  it('uses bluetooth-safe settings when starting realtime synth on a bluetooth output', async () => {
-    const onRefresh = vi.fn().mockResolvedValue(undefined)
-    render(
-      <PerformView
-        status={{ ...status, active_owner: null, ddsp_vst: { running: false, active_notes: [] } }}
-        catalog={catalog}
-        audioDevices={[audioDevice, bluetoothAudioDevice]}
-        midiPorts={[]}
-        onRefresh={onRefresh}
-      />,
-    )
-    fireEvent.change(screen.getByLabelText('音频输出'), { target: { value: bluetoothAudioDevice.id } })
-    expect(screen.getByText(/蓝牙输出已切换为更高缓冲/)).toBeVisible()
-    fireEvent.click(screen.getByRole('button', { name: '启动 Synth' }))
-    await waitFor(() => expect(api.startDdspVst).toHaveBeenCalledWith(expect.objectContaining({
-      audio_device_id: bluetoothAudioDevice.id,
-      sample_rate: 44100,
-      latency_profile: 'balanced',
-      output_gain_db: -18,
-      velocity_curve: 0.55,
-      attack: 0.02,
-    })))
-    expect(screen.getByRole('button', { name: '低延时' })).toBeDisabled()
-  })
 
   it('shows playback control failures', async () => {
     vi.mocked(api.controlJob).mockRejectedValueOnce(new Error('设备忙'))
@@ -471,7 +340,7 @@ describe('workspace behavior', () => {
     ])
   })
 
-  it('hides a legacy bundle covered by the recommended batched bundle', () => {
+  it('hides a legacy bundle covered by the recommended batched bundle', async () => {
     const recommended = {
       ...catalog.midi_ddsp_bundles[0],
       voice_batch_sizes: [1, 2, 4],
@@ -495,9 +364,10 @@ describe('workspace behavior', () => {
     )
     expect(screen.queryByRole('combobox', { name: '模型包' })).not.toBeInTheDocument()
     expect(screen.getByText(recommended.name, { selector: 'output' })).toBeVisible()
+    expect(await screen.findByText('1 个声部')).toBeVisible()
   })
 
-  it('keeps generated WAV files available when render inputs change', () => {
+  it('keeps generated WAV files available when render inputs change', async () => {
     const alternate = {
       ...catalog.midi_files[0],
       id: 'midi-2',
@@ -535,6 +405,11 @@ describe('workspace behavior', () => {
     )
     expect(screen.getByRole('heading', { name: 'MIDI-DDSP 音频库' })).toBeVisible()
     expect(screen.getByText('已生成音频')).toBeVisible()
+    await waitFor(() => expect(api.midiVoices).toHaveBeenCalledWith('midi-1'))
+    const initialAnalysis = vi.mocked(api.midiVoices).mock.results.at(-1)?.value
+    await act(async () => {
+      await initialAnalysis
+    })
     fireEvent.click(screen.getByRole('button', { name: '当前浏览器' }))
     expect(document.querySelector('audio')).toHaveAttribute(
       'src',
@@ -543,6 +418,8 @@ describe('workspace behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: '新建渲染' }))
     expect(document.querySelector('audio')).not.toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('曲目'), { target: { value: 'midi-2' } })
+    await waitFor(() => expect(api.midiVoices).toHaveBeenLastCalledWith('midi-2'))
+    expect(await screen.findByText('1 个声部')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: '音频库' }))
     expect(document.querySelector('audio')).toHaveAttribute(
       'src',

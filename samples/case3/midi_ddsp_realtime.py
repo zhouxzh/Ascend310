@@ -1295,16 +1295,6 @@ def _render_stateful_audio(
     return output.astype(np.float32), metrics
 
 
-def _stateful_stage(component: str) -> str:
-    if "expression" in component:
-        return "expression"
-    if "f0" in component or "context" in component or "precondition" in component:
-        return "f0"
-    if "timbre" in component:
-        return "timbre"
-    return component
-
-
 def _stateful_timing_report(inference: StatefulMidiDdspInference) -> dict[str, object]:
     expression = [
         value
@@ -1350,17 +1340,6 @@ def _boundary_continuity(samples: np.ndarray, block_size: int) -> dict[str, floa
         "mean_abs_jump": float(jumps.mean()),
         "max_abs_jump": float(jumps.max()),
     }
-
-
-def _stem_seed(seed: int, track_index: int, voice_index: int = 0) -> int:
-    entropy = [int(seed), int(track_index)]
-    if voice_index:
-        entropy.append(int(voice_index))
-    return int(
-        np.random.SeedSequence(entropy).generate_state(
-            1, dtype=np.uint32
-        )[0]
-    )
 
 
 def _voice_seed(seed: int, voice: MidiVoice) -> int:

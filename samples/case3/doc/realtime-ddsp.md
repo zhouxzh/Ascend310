@@ -6,7 +6,7 @@
 ONNX Runtime CPU，`.om` 使用 Ascend PyACL。MIDI 状态和音频输出在独立线程中
 运行，模型每 20 ms 更新一次；谐波振荡器、噪声滤波和重采样仍在 CPU 完成。
 
-Web“DDSP-VST”工作区以 Google Synth 的单音模式为默认值，Mixed OM 默认显示；FP16
+Web“实时演奏”的神经音色模式以 Google Synth 的单音模式为默认值，Mixed OM 默认显示；FP16
 和 2-8 声部扩展位于高级设置。运行时可更新 Pitch Shift、Harmonics、Noise、Output
 Gain、ADSR、Input Pitch、Input Gain、Reverb Size、Damping 和 Wet。模型与音频输出
 只能在停止会话后切换。模型控制、谐波/噪声增益、合成、输出增益和 JUCE/FreeVerb
@@ -86,8 +86,8 @@ PortAudio 列出的设备名称或编号。先执行 `--list-audio`，再选择�
 python realtime_ddsp.py --demo --duration 1 --output violin_demo.wav
 
 # 生成一段单声部小提琴测试 MIDI，并渲染成 WAV
-python tools/create_test_midi.py --output test_violin.mid
-python realtime_ddsp.py --midi-file test_violin.mid --output test_violin.wav
+python tools/create_test_midi.py --output midi/ddsp-test.mid
+python realtime_ddsp.py --midi-file midi/ddsp-test.mid --output reports/ddsp-test.wav
 
 # 查看 MIDI 输入设备
 python realtime_ddsp.py --list-midi
@@ -96,7 +96,7 @@ python realtime_ddsp.py --list-midi
 python realtime_ddsp.py --live --midi-port "你的 MIDI 设备名称" --max-voices 1
 
 # 直接从声卡实时播放 MIDI 文件，不生成 WAV
-python realtime_ddsp.py --play-midi test_violin.mid --prebuffer 6 --max-voices 1
+python realtime_ddsp.py --play-midi midi/ddsp-test.mid --prebuffer 6 --max-voices 1
 
 # 换成长笛音色实时播放；其他音色只需替换 --model 路径
 python realtime_ddsp.py --play-midi test_violin.mid \
@@ -119,7 +119,7 @@ amixer -c Device set PCM 70% unmute
 
 # 先从上一条 --list-audio 输出中确认 M25 的 PortAudio 编号 N
 python realtime_ddsp.py \
-  --play-midi midi/ode-to-joy-violin.mid \
+  --play-midi midi/ddsp-test.mid \
   --model models/om/Violin_mixed_float16.om \
   --device-id 0 \
   --audio-device N \
@@ -134,9 +134,10 @@ python realtime_ddsp.py \
 访问 ALSA 硬件，PulseAudio sink 音量不参与；应使用 `amixer -c Device set PCM`
 调整 M25 硬件音量。设备编号会在重启或插拔后变化，不能永久固定为 `1`。
 
-`--output-gain-db` 在重采样后施加软件增益，并在写入声卡前限幅到 `[-1, 1]`，当前
-插件语义范围为 `-60..0 dB`。历史测试曾在旧版本额外使用 `+24 dB` 软件增益；该值
-不再是当前默认或允许范围，音量应优先在模型参数、系统 mixer 和功放侧正确设置。
+`--output-gain-db` 在重采样后施加软件增益，并在写入声卡前限幅到 `[-1, 1]`。当前
+范围为 `-60..+6 dB`，默认值为 `0 dB`：负值表示衰减，正值表示提升。WebUI 可在
+会话运行期间实时更新该参数，不会修改 PulseAudio、ALSA mixer 或功放的系统音量。
+若正增益导致超出满幅，诊断面板会显示削波样本数；应降低增益以避免失真。
 
 2026-07-21 的短 MIDI 板端实测结果为：
 
@@ -173,7 +174,7 @@ PyACL 后端按模型描述中的名称映射 3 个输入和 4 个输出，I/O �
 ### OM 实时实测和连贯性判定
 
 2026-07-21 在 `ascend8t2` 上使用 `Violin_mixed_float16.om` 和漫步者 M25 播放
-`midi/ode-to-joy-violin.mid`：默认包络、`max-voices=8` 时最大渲染帧为
+`midi/ddsp-test.mid`：默认包络、`max-voices=8` 时最大渲染帧为
 9.53 ms；`attack=0.03`、`release=0.35`、`max-voices=4` 时为 7.08 ms。两次均为
 `underruns=0`、`overruns=0`，低于 20 ms 控制周期。
 
@@ -187,7 +188,7 @@ PyACL 后端按模型描述中的名称映射 3 个输入和 4 个输出，I/O �
 
 ```bash
 python realtime_ddsp.py \
-  --play-midi midi/ode-to-joy-violin.mid \
+  --play-midi midi/ddsp-test.mid \
   --model models/om/Violin_mixed_float16.om \
   --device-id 0 --audio-device 1 --sample-rate 48000 \
   --prebuffer 6 --max-voices 4 --audio-latency-ms 80 \

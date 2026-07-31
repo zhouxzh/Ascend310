@@ -51,6 +51,18 @@ def midi_bytes() -> bytes:
 
 
 class CatalogTest(unittest.TestCase):
+    def test_file_id_uses_logical_project_path(self) -> None:
+        original_root = core.ROOT
+        with tempfile.TemporaryDirectory() as folder:
+            core.ROOT = Path(folder)
+            try:
+                first = core._file_id("model", core.ROOT / "models" / "a.om")
+                second = core._file_id("model", core.ROOT / "models" / "a.om")
+            finally:
+                core.ROOT = original_root
+        self.assertEqual(first, second)
+        self.assertTrue(first.startswith("model-"))
+
     def setUp(self) -> None:
         self.original_root = core.ROOT
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -199,10 +211,20 @@ class ApiValidationTest(unittest.TestCase):
             ],
         }
 
-    def test_public_routes_use_ddsp_vst_name_only(self) -> None:
+    def test_public_routes_use_unified_realtime_name(self) -> None:
         paths = {route.path for route in web_app.app.routes}
-        self.assertIn("/api/v1/ddsp-vst/start", paths)
-        self.assertIn("/api/v1/ddsp-vst/events", paths)
+        for path in (
+            "/api/v1/realtime/catalog",
+            "/api/v1/realtime/status",
+            "/api/v1/realtime/start",
+            "/api/v1/realtime/switch",
+            "/api/v1/realtime/parameters",
+            "/api/v1/realtime/stop",
+            "/api/v1/realtime/panic",
+            "/api/v1/realtime/recordings/{recording_id}",
+            "/api/v1/realtime/events",
+        ):
+            self.assertIn(path, paths)
         self.assertNotIn("/api/v1/live/start", paths)
         self.assertNotIn("/api/v1/live/events", paths)
 
@@ -234,15 +256,13 @@ class ApiValidationTest(unittest.TestCase):
         self.assertEqual(result["ports"], [])
         self.assertIn("ALSA sequencer unavailable", str(result["error"]))
 
-    def test_ddsp_vst_parameters_are_bounded(self) -> None:
+    def test_realtime_parameters_are_bounded(self) -> None:
         with self.assertRaises(ValidationError):
-            web_app.DdspVstStartRequest(model_id="known-model", max_voices=0)
+            web_app.RealtimeStartRequest(patch_id="known-patch", max_voices=0)
         with self.assertRaises(ValidationError):
-            web_app.DdspVstStartRequest(model_id="known-model", reverb_wet=1.1)
+            web_app.RealtimeStartRequest(patch_id="known-patch", latency_profile="fast")
         with self.assertRaises(ValidationError):
-            web_app.DdspVstStartRequest(model_id="known-model", latency_profile="fast")
-        with self.assertRaises(ValidationError):
-            web_app.DdspVstStartRequest(model_id="known-model", velocity_curve=0.2)
+            web_app.RealtimeStartRequest(patch_id="known-patch", seed=-1)
 
     def test_latency_profiles_are_device_aware_and_keep_legacy_values(self) -> None:
         balanced = resolve_latency_profile({"latency_profile": "balanced"})
@@ -385,12 +405,6 @@ class ApiValidationTest(unittest.TestCase):
         self.assertEqual(metadata["voice_instruments"], mapping)
         self.assertEqual(metadata["instrument_mode"], "per_voice")
 
-    def test_ddsp_vst_uses_safe_default_output_gain(self) -> None:
-        request = web_app.DdspVstStartRequest(model_id="known-model")
-        self.assertEqual(request.output_gain_db, -18.0)
-        self.assertEqual(request.attack, 0.02)
-        self.assertEqual(request.velocity_curve, 0.55)
-
     def test_corrupt_reverb_asset_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "midi_ddsp_reverb_ir.npz"
@@ -530,6 +544,81 @@ class JobManagerTest(unittest.TestCase):
             finally:
                 core.JOB_ROOT = original_job_root
 
+    def test_thread_start_failure_rolls_back_resource_owner(self) -> None:
+        original_job_root = core.JOB_ROOT
+        with tempfile.TemporaryDirectory() as folder:
+            core.JOB_ROOT = Path(folder)
+            try:
+                coordinator = ResourceCoordinator()
+                manager = JobManager(coordinator)
+                with patch(
+                    "midi_ddsp_webui.core.threading.Thread.start",
+                    side_effect=RuntimeError("thread unavailable"),
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "thread unavailable"):
+                        manager.start("test", [sys.executable, "-c", "pass"])
+                self.assertIsNone(coordinator.owner)
+                self.assertEqual(manager.list()[0]["state"], "failed")
+            finally:
+                core.JOB_ROOT = original_job_root
+
+    def test_post_spawn_failure_terminates_child_before_releasing_owner(self) -> None:
+        original_job_root = core.JOB_ROOT
+        with tempfile.TemporaryDirectory() as folder:
+            core.JOB_ROOT = Path(folder)
+            try:
+                coordinator = ResourceCoordinator()
+                manager = JobManager(coordinator)
+                job = core.Job(
+                    id="post-spawn",
+                    kind="test",
+                    command=[sys.executable, "-c", "import time; time.sleep(30)"],
+                )
+                coordinator.acquire(job.id)
+                real_persist = manager._persist
+                persist_calls = 0
+
+                def fail_after_spawn(item):
+                    nonlocal persist_calls
+                    persist_calls += 1
+                    if persist_calls == 2:
+                        raise OSError("metadata write failed")
+                    real_persist(item)
+
+                with patch.object(manager, "_persist", side_effect=fail_after_spawn):
+                    manager._run(job, None)
+                self.assertEqual(job.state, "failed")
+                self.assertIsNone(job.process)
+                self.assertIsNotNone(job.exit_code)
+                self.assertIsNone(coordinator.owner)
+            finally:
+                core.JOB_ROOT = original_job_root
+
+
+class SameOriginTest(unittest.TestCase):
+    def test_cross_origin_browser_requests_are_rejected(self) -> None:
+        self.assertTrue(web_app._origin_allowed({"host": "board:8765"}))
+        self.assertTrue(
+            web_app._origin_allowed(
+                {"host": "board:8765", "origin": "http://board:8765"}
+            )
+        )
+        self.assertFalse(
+            web_app._origin_allowed(
+                {"host": "board:8765", "origin": "https://attacker.example"}
+            )
+        )
+
+    def test_explicit_proxy_origin_can_be_allowed(self) -> None:
+        with patch.dict(
+            "os.environ", {"MIDI_DDSP_ALLOWED_ORIGINS": "https://studio.example"}
+        ):
+            self.assertTrue(
+                web_app._origin_allowed(
+                    {"host": "board:8765", "origin": "https://studio.example"}
+                )
+            )
+
 
 class FakeMidiState:
     def __init__(self) -> None:
@@ -549,6 +638,18 @@ class FakeMidiState:
 
 
 class InputRouterTest(unittest.TestCase):
+    def test_note_listener_emits_first_press_and_last_release(self) -> None:
+        midi = FakeMidiState()
+        events: list[tuple[int, bool]] = []
+        router = InputRouter(midi, note_listener=lambda note, on: events.append((note, on)))
+
+        router.note_on("touch", 60, 100)
+        router.note_on("hardware", 60, 80)
+        router.note_off("touch", 60)
+        router.note_off("hardware", 60)
+
+        self.assertEqual(events, [(60, True), (60, False)])
+
     def test_duplicate_sources_do_not_cut_each_other_off(self) -> None:
         midi = FakeMidiState()
         router = InputRouter(midi)

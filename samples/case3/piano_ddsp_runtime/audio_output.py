@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 import queue
 import re
@@ -75,7 +74,7 @@ class WavRecorder:
         path.parent.mkdir(parents=True, exist_ok=True)
         with self._lock:
             if self._wave is not None:
-                raise RuntimeError("A Piano-DDSP recording is already active")
+                raise RuntimeError("A realtime recording is already active")
             handle = wave.open(str(path), "wb")
             handle.setnchannels(2)
             handle.setsampwidth(2)

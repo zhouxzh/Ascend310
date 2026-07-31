@@ -26,8 +26,13 @@ $ToolFiles = @(
     "compare_midi_ddsp_stateful_onnx.py",
     "convert_onnx_to_om.sh",
     "convert_midi_ddsp_stateful_bundle.sh",
+    "midi_ddsp_conversion_provenance.py",
     "finalize_midi_ddsp_stateful_bundle.py",
-    "validate_piano_ddsp_om.py"
+    "validate_piano_ddsp_om.py",
+    "create_test_midi.py",
+    "create_audio_test_fixtures.py",
+    "validate_webui_runtime.py",
+    "smoke_test_ddsp_om.py"
 )
 
 Push-Location (Join-Path $ProjectRoot "webui")
@@ -51,6 +56,11 @@ if ($ResolvedRemoteRoot -ne $RemoteRoot -or $ResolvedRemoteRoot -eq "/") {
 ssh $SshTarget "rm -rf '$ResolvedRemoteRoot/webui/dist'"
 ssh $SshTarget "mkdir -p '$RemoteRoot/webui' '$RemoteRoot/midi_ddsp_webui' '$RemoteRoot/piano_ddsp_runtime' '$RemoteRoot/scripts' '$RemoteRoot/tools' '$RemoteRoot/doc' '$RemoteRoot/midi' '$RemoteRoot/models/om' '$RemoteRoot/models/ddsp_vst' '$RemoteRoot/models/midi_ddsp/stateful_v2' '$RemoteRoot/models/midi_ddsp/bundles' '$RemoteRoot/models/piano_ddsp' '$RemoteRoot/models/piano_ddsp/bundles'"
 scp -r (Join-Path $ProjectRoot "webui/dist") "${SshTarget}:$RemoteRoot/webui/"
+$MidiFixture = Join-Path $ProjectRoot "midi/ddsp-test.mid"
+if (-not (Test-Path $MidiFixture)) {
+    throw "Generated MIDI fixture is missing: $MidiFixture"
+}
+scp $MidiFixture "${SshTarget}:$RemoteRoot/midi/"
 Get-ChildItem (Join-Path $ProjectRoot "midi_ddsp_webui") -Filter "*.py" | ForEach-Object {
     scp $_.FullName "${SshTarget}:$RemoteRoot/midi_ddsp_webui/"
 }
@@ -152,7 +162,9 @@ Get-ChildItem (Join-Path $ProjectRoot "midi") -File | Where-Object {
     scp $_.FullName "${SshTarget}:$RemoteRoot/midi/"
 }
 
-scp (Join-Path $ProjectRoot "README.md") "${SshTarget}:$RemoteRoot/"
+@("README.md", "THIRD_PARTY_NOTICES.md") | ForEach-Object {
+    scp (Join-Path $ProjectRoot $_) "${SshTarget}:$RemoteRoot/"
+}
 Get-ChildItem (Join-Path $ProjectRoot "doc") -Filter "*.md" | ForEach-Object {
     scp $_.FullName "${SshTarget}:$RemoteRoot/doc/"
 }

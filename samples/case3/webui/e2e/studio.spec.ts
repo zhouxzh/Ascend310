@@ -12,8 +12,12 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport)
     await page.goto('/')
     await expect(page.getByRole('button', { name: 'MIDI-DDSP' }).first()).toBeVisible({ timeout: 15_000 })
-    await page.getByRole('button', { name: 'DDSP-VST' }).first().click()
-    await expect(page.locator('.piano')).toBeVisible()
+    await page.getByRole('button', { name: 'MIDI 键盘' }).first().click()
+    await expect(page.getByRole('region', { name: 'MIDI 键盘实时演奏' })).toBeVisible()
+    await expect(page.getByRole('img', { name: '动态钢琴卷帘' })).toBeVisible()
+    await page.getByRole('button', { name: '触控演奏' }).first().click()
+    await expect(page.getByRole('region', { name: '触控实时演奏' })).toBeVisible()
+    await expect(page.locator('.realtime-stage .piano')).toBeVisible()
 
     const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(horizontalOverflow).toBeLessThanOrEqual(1)
@@ -43,11 +47,15 @@ test('all workspaces can be opened', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /MIDI-DDSP (音频库|新建渲染)/ })).toBeVisible()
   await page.getByRole('button', { name: '新建渲染' }).click()
   await expect(page.getByLabel('MIDI 声部音色分配')).toBeVisible()
-  await expect(page.getByLabel('声部 1 音色')).toBeVisible()
+  await expect(page.getByLabel('声部 1 音色')).toBeVisible({ timeout: 15_000 })
   await page.screenshot({ path: '../reports/webui/screenshots/studio-midi-ddsp.png', fullPage: true })
-  await page.getByRole('button', { name: 'DDSP-VST' }).first().click()
-  await expect(page.getByRole('heading', { name: 'DDSP-VST Synth' })).toBeVisible()
-  await page.screenshot({ path: '../reports/webui/screenshots/studio-ddsp-vst.png', fullPage: true })
+  await page.getByRole('button', { name: 'MIDI 键盘' }).first().click()
+  await expect(page.getByRole('region', { name: 'MIDI 键盘实时演奏' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: /神经音色/ })).toHaveCount(0)
+  await page.screenshot({ path: '../reports/webui/screenshots/studio-midi-keyboard.png', fullPage: true })
+  await page.getByRole('button', { name: '触控演奏' }).first().click()
+  await expect(page.getByRole('region', { name: '触控实时演奏' })).toBeVisible()
+  await page.screenshot({ path: '../reports/webui/screenshots/studio-touch-performance.png', fullPage: true })
   await page.getByRole('button', { name: '设备' }).first().click()
   await expect(page.getByRole('heading', { name: '系统与设备' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '扬声器输出测试' })).toBeVisible()
@@ -198,7 +206,7 @@ test('generated WAV files can be selected and sent to the board output', async (
             progress: 1,
             message: '',
             exit_code: 0,
-            metadata: { midi_name: 'ode-to-joy.mid', instrument_id: 4, report: { duration_seconds: 35 } },
+            metadata: { midi_name: 'ddsp-test.mid', instrument_id: 4, report: { duration_seconds: 35 } },
             artifacts: [{ id: 'old-recording--output.wav', name: 'output.wav', size_bytes: 1024 }],
           },
         ],
@@ -228,7 +236,7 @@ test('generated WAV files can be selected and sent to the board output', async (
   await expect(page.locator('audio')).toHaveCount(0)
   await page.getByRole('button', { name: '当前浏览器' }).click()
   await expect(page.locator('audio')).toHaveAttribute('src', /new-recording--output\.wav/)
-  await page.getByRole('button', { name: /ode-to-joy\.mid/ }).click()
+  await page.getByRole('button', { name: /ddsp-test\.mid/ }).click()
   await expect(page.locator('audio')).toHaveAttribute('src', /old-recording--output\.wav/)
   await expect(page.getByRole('button', { name: '开发板播放' })).toHaveCount(0)
   await page.getByRole('button', { name: '开发板喇叭' }).click()

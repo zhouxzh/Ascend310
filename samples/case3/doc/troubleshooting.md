@@ -195,7 +195,7 @@ aplay -Dhw:ascend310b -f S16_LE -r 48000 -t wav \
 ## WAV 格式相同但播放结果不同
 
 已知正常的官方文件 `tianlu.wav` 是 PCM、S16_LE、48 kHz、单声道。当前保留的
-`ode-to-joy-violin-stereo-loud.wav` 是 PCM、S16_LE、48 kHz、双声道。两者采样率和位深相同，
+`speaker-test-stereo.wav` 是 PCM、S16_LE、48 kHz、双声道。两者采样率和位深相同，
 但声道数不同，因此不能说格式完全相同。
 
 检查命令：
@@ -225,8 +225,8 @@ sha256sum output-mono-loud.wav
 ### 实测事实
 
 - 官方 `tianlu.wav`：48 kHz、16-bit、单声道，正常。
-- `ode-to-joy-violin-mono-loud.wav`：48 kHz、16-bit、单声道，正常。
-- `ode-to-joy-violin-stereo-loud.wav`：48 kHz、16-bit、双声道，能听到音乐，
+- `speaker-test-mono.wav`：48 kHz、16-bit、单声道，正常。
+- `speaker-test-stereo.wav`：48 kHz、16-bit、双声道，能听到音乐，
   但伴随很强的静电或数字噪声。
 - ALSA 声明硬件支持 1 到 2 声道，双声道流进入 `RUNNING`。
 - 单声道和双声道静音流都返回 0；内核日志未发现 xrun、DMA 或 I2S 错误。
@@ -256,7 +256,7 @@ card 1, device 0: USB Audio
 
 ```bash
 aplay -Dplughw:CARD=Amplif,DEV=0 \
-  ~/Documents/case3/midi_wav/ode-to-joy-violin-stereo-loud.wav
+  ~/Documents/case3/reports/audio-fixtures/speaker-test-stereo.wav
 ```
 
 同一个双声道文件通过 USB DAC 可以正常播放，没有板载 3.5mm 的强噪声。这一对照
@@ -286,7 +286,7 @@ cd ~/Documents/case3
 amixer -c Device set PCM 70% unmute
 
 python realtime_ddsp.py \
-  --play-midi midi/ode-to-joy-violin.mid \
+  --play-midi midi/ddsp-test.mid \
   --model models/ddsp_vst/Violin.onnx \
   --audio-device 1 \
   --sample-rate 48000 \
@@ -297,22 +297,22 @@ python realtime_ddsp.py \
 ```
 
 设备编号 `1` 只是本轮枚举结果，重启或插拔后要通过 `--list-audio` 重新确认。
-旧版本使用 `+24 dB` 后曾测得平均 `-24.6 dBFS`、峰值 `-8.5 dBFS`；当前插件语义
-限制为 `-60..0 dB`，不再用正软件增益补偿音量。应调节系统 mixer、音箱物理音量和
-模型参数，并检查削波指标。
+旧版本使用 `+24 dB` 后曾测得平均 `-24.6 dBFS`、峰值 `-8.5 dBFS`；当前实时输出
+限制为 `-60..+6 dB`，默认 `0 dB`。WebUI 可以在运行中衰减或提升，但不修改系统
+mixer 或音箱物理音量；使用正增益时应检查诊断页的削波样本数。
 
 已知 WAV 的直接 ALSA 验证命令为：
 
 ```bash
 python realtime_ddsp.py \
-  --midi-file midi/ode-to-joy-violin.mid \
+  --midi-file midi/ddsp-test.mid \
   --model models/ddsp_vst/Violin.onnx \
-  --output /tmp/ode-to-joy-ddsp.wav \
+  --output /tmp/ddsp-test-ddsp.wav \
   --sample-rate 48000 \
   --max-voices 1 \
   --output-gain-db 0
 
-aplay -Dplughw:CARD=Device,DEV=0 /tmp/ode-to-joy-ddsp.wav
+aplay -Dplughw:CARD=Device,DEV=0 /tmp/ddsp-test-ddsp.wav
 ```
 
 如果直接 ALSA 播放时报 `Device or resource busy`，先确认是否有 PulseAudio 或其他
@@ -482,7 +482,7 @@ noise_amps 和下一帧状态；谐波振荡器和噪声 FFT 合成在 CPU/Pytho
 - 统一模型根目录：`models/`；旧的 `model/` 已合并，不再创建第二套模型目录。
 - DDSP-VST 源模型：`models/ddsp_vst/`。
 - 板端 OM：`models/om/<target>/`。
-- 音频测试文件：`midi_wav/`。
+- 音频测试文件：`reports/audio-fixtures/`。
 - 原始测试报告：`reports/<target>/`。
 
 ### 同步后必须校验

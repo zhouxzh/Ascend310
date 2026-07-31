@@ -93,16 +93,16 @@ CANN `set_env.sh` 和 Conda `base` 重新执行自身；FastAPI 启动的 Piano 
 
 | 接口 | 用途 |
 | :--- | :--- |
-| `GET /api/v1/piano-ddsp/catalog` | bundle、模型、年份、I/O 合同和可用性 |
-| `GET /api/v1/piano-ddsp/status` | 状态、设备、播放器、录音、心跳和指标 |
-| `POST /api/v1/piano-ddsp/start` | 获取共享资源并启动常驻 worker |
-| `POST /api/v1/piano-ddsp/stop` | 120 ms 淡出并有序释放资源，幂等 |
-| `POST /api/v1/piano-ddsp/panic` | 清空全部状态但保持会话 |
-| `PATCH /api/v1/piano-ddsp/parameters` | 块边界热更新；模型/年份执行完整切换 |
-| `WS /api/v1/piano-ddsp/events` | MIDI、播放器、录音、监听、状态和指标 |
+| `GET /api/v1/realtime/catalog` | 统一实时音色目录，包含 Piano-DDSP 与 DDSP-VST patch |
+| `GET /api/v1/realtime/status` | 当前统一会话状态、设备、播放器、录音和指标 |
+| `POST /api/v1/realtime/start` | 获取共享资源并启动所选 patch |
+| `POST /api/v1/realtime/stop` | 120 ms 淡出并有序释放资源，幂等 |
+| `POST /api/v1/realtime/panic` | 清空全部状态但保持会话 |
+| `PATCH /api/v1/realtime/parameters` | 块边界热更新；模型/年份执行完整切换 |
+| `WS /api/v1/realtime/events` | MIDI、播放器、录音、监听、状态和指标 |
 
-Piano-DDSP 与 DDSP-VST、MIDI-DDSP 作业和扬声器测试共用 `ResourceCoordinator`，旧 API
-保持不变。浏览器监听默认关闭，使用容量为两块的独立丢弃队列，不能反压音频线程。
+Piano-DDSP 与 DDSP-VST、MIDI-DDSP 作业和扬声器测试共用 `ResourceCoordinator`，统一实时
+接口负责会话生命周期。浏览器监听默认关闭，使用容量为两块的独立丢弃队列，不能反压音频线程。
 
 ## 延时与输出
 

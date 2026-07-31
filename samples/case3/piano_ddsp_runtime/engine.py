@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import math
 from pathlib import Path
 import threading
 import time
@@ -69,7 +68,7 @@ class PianoDdspEngine:
         seed: int = 0,
         velocity_curve: float = 1.0,
         transpose: int = 0,
-        output_gain_db: float = -12.0,
+        output_gain_db: float = 0.0,
         reverb_mix: float = 1.0,
         midi_port: str | None = None,
         audio_backend: str = "pulse",
@@ -83,6 +82,7 @@ class PianoDdspEngine:
         device_id: int = 0,
         recorder_root: Path | None = None,
         monitor_callback: Callable[[np.ndarray], None] | None = None,
+        note_listener: Callable[[int, bool], None] | None = None,
         model_factory: Callable[[Path, dict[str, Any], int], Any] = PianoAclModel,
     ) -> None:
         if latency_profile not in LATENCY_PROFILES:
@@ -121,7 +121,7 @@ class PianoDdspEngine:
         self.monitor_callback = monitor_callback
         self.model_factory = model_factory
         self.metrics = RuntimeMetrics(10_000)
-        self.midi = LiveMidiState()
+        self.midi = LiveMidiState(note_listener=note_listener)
         self.scheduler = MidiScheduler(self.midi)
         self.player = PlayerState()
         self.recorder = WavRecorder()
@@ -447,8 +447,8 @@ class PianoDdspEngine:
                 self.transpose = value
             if "output_gain_db" in values:
                 value = float(values["output_gain_db"])
-                if not -60.0 <= value <= 0.0:
-                    raise ValueError("output_gain_db must be between -60 and 0")
+                if not -60.0 <= value <= 6.0:
+                    raise ValueError("output_gain_db must be between -60 and 6")
                 self.output_gain_db = value
             if "reverb_mix" in values:
                 value = float(values["reverb_mix"])
@@ -582,10 +582,11 @@ class PianoDdspEngine:
         elif action == "loop":
             player.loop = bool(values.get("enabled", False))
         elif action == "tempo":
-            self._sync_player_position(time.monotonic_ns())
-            player.tempo = float(values.get("value", 1.0))
-            if not 0.5 <= player.tempo <= 2.0:
+            tempo = float(values.get("value", 1.0))
+            if not 0.5 <= tempo <= 2.0:
                 raise ValueError("tempo must be between 0.5 and 2")
+            self._sync_player_position(time.monotonic_ns())
+            player.tempo = tempo
             if player.state == "playing":
                 player.started_ns = time.monotonic_ns()
                 self.scheduler.schedule_timeline(

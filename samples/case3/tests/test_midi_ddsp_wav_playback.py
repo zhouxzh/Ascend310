@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import signal
 import struct
 import tempfile
 import unittest

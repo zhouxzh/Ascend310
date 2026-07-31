@@ -1,8 +1,8 @@
 # MIDI-DDSP Studio Web 界面
 
 MIDI-DDSP Studio 是运行在 Ascend 310B 开发板上的音乐工作台。界面可以在板载
-触摸屏或同一局域网内的电脑浏览器中打开，提供实时演奏、MIDI-DDSP 播放与渲染和
-设备检查三个工作区；扬声器测试合并在设备工作区中。
+触摸屏或同一局域网内的电脑浏览器中打开，提供触控演奏、MIDI 键盘、MIDI-DDSP
+播放与渲染和设备检查四个工作区；扬声器测试合并在设备工作区中。
 
 ## 技术方案
 
@@ -46,7 +46,7 @@ sudo apt install libportaudio2
 python -m pip install --user -r requirements.txt
 ```
 
-`requirements.txt` 是板端唯一的 Python 依赖入口，包含 Web 服务、NumPy、Pygame、
+`requirements.txt` 是板端唯一的 Python 依赖入口，包含 Web 服务、NumPy、
 Mido、RtMidi 和 SoundDevice。Web UI 只使用 OM 模型，不安装或扫描 ONNX 模型。ONNX/TFLite
 导出工具属于本地开发流程，其依赖不纳入板端 `requirements.txt`。PyACL 必须由开发板现有
 CANN 环境提供，`ais_bench` 由已有 Ascend 基准测试环境提供。板端 Anaconda 位于管理员
@@ -99,19 +99,103 @@ python scripts/run_webui.py
 - 板载浏览器：`http://127.0.0.1:8765`
 - 局域网电脑：`http://<开发板 IP>:8765`
 
+板载触摸屏需要平板式软键盘和中文输入时，按
+[触摸屏输入法配置](touchscreen-input.md)安装并设置 Onboard + IBus Pinyin。该配置使用
+英文 XFCE 菜单名称，并包含自动弹出、底部停靠、登录自启和 Firefox 故障排查步骤。
+
 启动脚本会在终端打印检测到的局域网地址；Web 界面顶部状态条、左侧底部状态和
 “设备 / 系统与设备”摘要卡也会显示当前开发板 IP，便于从另一台电脑远程登录或打开页面。
 
-服务没有登录功能，只应运行在可信局域网中。API 只接受目录扫描生成的模型 ID、MIDI
+服务没有登录功能，只应运行在可信局域网中。浏览器发起的有副作用 HTTP 请求和
+WebSocket 连接必须与页面同源；反向代理使用不同公开域名时，可通过逗号分隔的
+`MIDI_DDSP_ALLOWED_ORIGINS` 显式加入允许来源。API 只接受目录扫描生成的模型 ID、MIDI
 ID 和设备 ID，不接受浏览器提交的任意文件路径或 shell 命令。
 
 ## 工作区
 
-### DDSP-VST
+### 实时演奏工作区
 
-“DDSP-VST”使用的是 **DDSP-VST 状态化音色 OM**，不是 MIDI-DDSP 双模型。选择动态扫描到
-的 DDSP-VST OM、音频输出和实体 MIDI 输入。触控钢琴、电脑键盘和
-实体 MIDI 会进入同一实时引擎。窗口失焦、触摸取消、WebSocket 断开或停止会触发
+“触控演奏”和“MIDI 键盘”是同一个实时乐器会话的两个独立工作区。用户只选择钢琴、
+提琴、长笛等音色，不选择 Piano-DDSP 或 DDSP-VST 引擎。两页共用实时服务、音色、
+音频输出、录音、监听和模型参数；底层仍保留两个独立的 OM 契约与运行时，不合并模型图，
+也不同时叠加发声。
+
+页面加载音色库时不占用 NPU 或声卡；用户选择音色、输出和延时档位后显式点击
+“开始演奏”。运行中选择其他音色会先检查当前输出兼容性，再释放手动音符和踏板、
+暂停并保存 MIDI 位置，在同一个 `realtime-session` 资源锁内停止旧运行时并启动目标
+运行时。成功后恢复 MIDI 位置、速度、循环和监听；失败时自动回滚旧音色。录音期间
+音色锁定，停止会话会先完成 WAV 再释放资源。
+
+#### 触控演奏
+
+触控演奏不提供 32、49、61 或 88 键，避免在 10 英寸屏幕上把可点击琴键压得过小。它默认
+显示 25 键的 `C3-C5` 两个八度，也可切换为 13 键的 `C4-C5`；两个范围都可用左右按钮按
+12 个半音移动，到达标准钢琴边界后自动禁用。触控页只保留大尺寸、可点击的琴键和力度、
+移调、混响、弯音、延音控制。动态卷帘位于可点击琴键上方，显示实际触控音符；触控页
+不显示 MIDI 页的紧凑状态琴键。切换音域前先发送 all-notes-off，避免触摸音符悬挂。
+
+触控布局参考 [iPad 版库乐队的键盘布局和大小](https://support.apple.com/zh-cn/guide/garageband-ipad/chs39282dbe/ipados)：
+库乐队将键盘尺寸作为“小、中、大”界面选项，而不是把屏幕中的键长绑定到实体钢琴毫米
+比例。本项目同样默认“中”档，并在触控页提供小、中、大切换；三档使用固定的触控高度，
+键盘始终铺满舞台宽度。这样 10 英寸屏幕可同时看到卷帘和完整的 25 键键盘，不对屏幕像素
+密度或实体钢琴尺寸做任何推断。
+
+#### 动态钢琴卷帘
+
+实时演奏区的卷帘是与当前键盘音域对齐的 Canvas 可视化，而不是 MIDI 文件的预览。白键使用等宽列，黑键按相邻白键的位置叠放；音符块从上方移动至命中线，因此触控页和 MIDI 键盘页都能把正在演奏的音高直接对应到下方琴键。卷帘保留 2、4 或 8 秒历史，默认 4 秒；结束音符至少绘制为 8 px，避免极短的有效音符因时长换算而不可见。为保持 10 英寸触摸屏的操作流畅，有轨迹时的重绘上限为 30 FPS，画布像素比上限为 1.25，且最多保留最近 192 条轨迹；这些限制只影响动画开销，不会改变声音或 MIDI 事件。
+
+卷帘不依赖轮询得到的 `active_notes` 快照来记录音符。浏览器在触控键按下和松开时立即创建 `note_on`/`note_off` 轨迹；Piano-DDSP 运行进程和 DDSP-VST 输入路由也会把实际生效的状态变化经实时 WebSocket 发布为下列离散事件：
+
+```json
+{"event":"note","note":60,"on":true}
+{"event":"note","note":60,"on":false}
+```
+
+前端以事件到达时的单调时间戳记录轨迹，后续的 `status`/`heartbeat` 快照只用于当前琴键高亮、初始同步和断线恢复。因此，即使按下和松开都发生在同一个浏览器动画帧内，或其持续时间短于一次画布重绘，也会留下一个最小可见的卷帘块。实体 MIDI 输入和 MIDI 文件播放使用同一条后端事件通路；同一个音高被多个输入源同时按住时，只有首次按下和最后一次松开会改变卷帘状态。
+
+当前可见音域之外的音符不会绘制到卷帘，这是有意的范围裁剪；在 2、4 或 8 秒历史窗口之外的结束音符也会自然移出画面。前端单元测试覆盖同一动画帧内的按下/松开边沿，Playwright 回归测试会向 WebSocket 注入短音事件并检查画布确实出现有效像素。
+
+#### MIDI 键盘
+
+MIDI 键盘页用于连接实体 MIDI 控制器，顶端直接提供端口选择和动态钢琴卷帘。它从 32 键
+`F2-C5` 起步，可切换为常见控制器的 49/61 键 `C2` 范围或完整 88 键 `A0-C8`；少于 88 键时
+同样可左右移动一个八度。卷帘可选择 2、4 或 8 秒时间窗，只显示 WebSocket 实际收到的
+离散音符事件及其历史轨迹，不把实时输入伪装成可预知的未来 MIDI 音符；命中线与当前琴键
+高亮会根据实时状态同步。MIDI 文件播放器位于该页下方抽屉，触控页不会显示它。
+
+触控页与 MIDI 页分别将键数和起始音写入版本化浏览器配置，因此在两个工作区间切换不会
+相互覆盖音域。触摸指针设备默认进入触控演奏，普通桌面浏览器默认进入 MIDI 键盘页。
+
+在 10 英寸等触摸设备上，界面通过 `any-pointer: coarse` 将导航、音色卡、音域与八度控制、
+演奏参数和抽屉文字提升到约 15-20 px；主要点击目标为 50-82 px。布局采用库乐队的
+“顶部控制区 + 弹奏区”层级：音色、卷帘和演奏控制保持在大琴键上方。针对 10 英寸常见
+宽度还会应用同一字号尺度，即使扩展坞或浏览器把触摸屏报告为 fine pointer。触控琴键铺满
+舞台宽度，但使用固定的触屏高度而非真实键长宽比；普通桌面浏览器不受此宽度规则影响。
+
+布局参考 ChordMiniApp 固定提交 `33623b8885259f59c4005dad79b489aca8ae4ef9` 中
+`PianoRollPanel`、`FallingNotesCanvas`、`PianoKeyboard` 和 `PianoVisualizerHeader`
+的公开实现：卷帘与紧凑钢琴约为 280:60，命中线位于卷帘高度的 88%。本项目没有复制
+其 Canvas 或播放逻辑；实时历史渲染器最高 30 FPS，设备像素比限制为 1.25，页面隐藏
+时停止绘制，音符记录上限为 192 条。音符更新通过独立 external store 订阅，不驱动
+整个实时页面按帧重渲染。输出增益固定显示在两页工具栏，使用 `-60..+6 dB` 的实际
+物理量，默认 `0 dB`；负值衰减、正值提升，并在会话运行期间实时生效。该控件只调整
+合成器输出，不修改浏览器、PulseAudio 或 ALSA mixer 的系统音量。力度、移调、混响、
+弯音和延音位于触控演奏页；MIDI 文件、录音监听、模型参数、连接设置和性能诊断位于
+相应页面的底部抽屉。主界面不显示引擎名，诊断页才显示实际运行时；正增益造成满幅削波时，
+诊断页显示累计削波样本数。
+
+#### Piano-DDSP 钢琴
+
+“钢琴”默认进入 Piano-DDSP，提供 16 声部、延音踏板、钢琴年份、实时模型切换、
+MIDI 文件播放器、浏览器监听和录音。它使用版本化 FP32 bundle 和独立常驻 worker，
+不经过 DDSP-VST 的单音控制模型。完整模型、部署和验收约定见
+[Piano-DDSP 实时系统](piano-ddsp.md)。
+
+#### DDSP-VST 神经音色
+
+“神经音色”使用的是 **DDSP-VST 状态化音色 OM**，不是 MIDI-DDSP 双模型。选择动态扫描到
+的 DDSP-VST OM、音频输出和实体 MIDI 输入。触控钢琴和实体 MIDI 会进入同一实时引擎。
+窗口失焦、触摸取消、WebSocket 断开或停止会触发
 all-notes-off，避免持续音符。默认优先选择 Violin Mixed OM 和单音模式；FP16 与
 2-8 声部只在高级设置显示。
 
@@ -179,7 +263,7 @@ voice，按静态 batch `1/2/4/8` 推理，再按 Google MIDI-DDSP 的方式对�
 设备页还提供“蓝牙音频”面板。该面板使用开发板系统中已经存在的 `bluetoothctl`
 扫描、配对、信任、连接和断开设备，不安装软件，也不修改系统启动配置。连接成功后，
 后端会尽量将对应 `bluez_card` 切换到 A2DP 播放 profile；随后刷新音频输出列表，
-蓝牙音箱会以“蓝牙”标记出现在 DDSP-VST、MIDI-DDSP 和扬声器测试的音频输出下拉框中。
+蓝牙音箱会以“蓝牙”标记出现在实时演奏、MIDI-DDSP 和扬声器测试的音频输出下拉框中。
 若设备需要 PIN、确认码或特殊 HFP/A2DP 流程，界面会保留错误信息，需要在开发板系统界面
 或终端中完成该设备特有的交互。
 
@@ -213,19 +297,25 @@ Sequencer 客户端。此时 MIDI 端口接口会返回 `available: false`，界
 
 ## API 命名
 
-- `GET /api/v1/status` 使用 `ddsp_vst` 返回 Synth 状态。
+- `GET /api/v1/status` 使用 `realtime` 返回统一会话状态。
+- `GET /api/v1/realtime/catalog|status` 返回统一音色、兼容设备和当前会话。
+- `POST /api/v1/realtime/start|switch|stop|panic` 与
+  `PATCH /api/v1/realtime/parameters` 管理统一实时会话。
+- `WS /api/v1/realtime/events` 统一处理音符、踏板、弯音、播放器、录音、监听和状态事件；
+  `GET /api/v1/realtime/recordings/{id}` 下载完成的 WAV。
 - `GET /api/v1/catalog` 返回 `ddsp_vst_models`、`midi_ddsp_bundles`、带单/复音分析的 MIDI 和混响资产。
-- `GET /api/v1/audio-devices` 与 `GET /api/v1/audio-inputs` 返回输出和分类后的输入。
+- `GET /api/v1/audio-inputs` 返回分类后的音频输入；实时输出从
+  `GET /api/v1/realtime/catalog` 获取。
 - `GET /api/v1/bluetooth-audio`、`POST /api/v1/bluetooth-audio/scan|connect|disconnect`
   管理蓝牙音频设备发现与连接。
-- `POST /api/v1/ddsp-vst/start|stop` 与 `WS /api/v1/ddsp-vst/events` 管理实时 Synth。
 - `GET /api/v1/midi-ddsp/audio-devices` 只返回 MIDI-DDSP WAV 播放实际支持的输出，并标明
   当前默认设备。
 - `POST /api/v1/midi-ddsp/jobs` 使用 `model_bundle_id`、乐器、种子和尾音参数管理播放/渲染。
 - `POST /api/v1/midi-ddsp/recordings/{job_id}/play` 将历史任务的 `output.wav` 直接发送到
   指定开发板音频输出，不触发 MIDI-DDSP 渲染。
 
-旧 `/api/v1/live/*` 路由已删除，不再同时维护两套含义不同的命名。
+旧 `/api/v1/live/*`、`/api/v1/ddsp-vst/*` 和 `/api/v1/piano-ddsp/*` 路由已删除，
+实时功能统一使用 `/api/v1/realtime/*`，避免维护多套行为不同的接口。
 
 ## 开发与测试
 
@@ -255,6 +345,10 @@ npm run test:e2e
 
 本地测试不会执行 PyACL、ATC、OM 推理或 `npu-smi`。触控发声、USB/蓝牙输出、实体
 MIDI、OM 验证和基准测试必须在真实 Ascend 310B 开发板上完成。
+
+实时界面的 Playwright 验收覆盖 1366x768、1024x600 和 390x844，检查琴键数量、布局
+稳定性、横向溢出、抽屉与底部导航关系，并向实时 WebSocket 注入三和弦后读取 Canvas
+像素，避免只检查到一个空白画布。
 
 ## 常见问题
 

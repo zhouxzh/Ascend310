@@ -13,7 +13,6 @@
 
 ## 核心模块
 
-- [midi.py](../midi.py)：Pygame MIDI 设备和键盘窗口。
 - [realtime_ddsp.py](../realtime_ddsp.py)：DDSP-VST OM 实时演奏与文件播放引擎。
 - [midi_ddsp_realtime.py](../midi_ddsp_realtime.py)：MIDI-DDSP 版本化模型包、完整渲染缓存和播放会话。
 - `pyacl_ddsp.py` / `pyacl_midi_ddsp.py`：两套模型的 PyACL 后端。
@@ -30,7 +29,7 @@
 - USB 喇叭、系统已连接的蓝牙音箱或板载音频输出；
 - 可选的 3D 打印设备，用于制作 `model3/` 中的结构件。
 
-仅运行 `midi.py` 的窗口和本地模拟测试不需要 NPU。ATC、OM、PyACL、`ais_bench`
+本地模拟测试不需要 NPU。ATC、OM、PyACL、`ais_bench`
 和 `npu-smi` 必须在真实 Ascend 310B 开发板上执行。
 
 ## 系统链路
@@ -39,21 +38,24 @@
 触控钢琴 / 电脑键盘 / 实体 MIDI
                 |
                 v
-       DDSP-VST 实时引擎 ------> PyACL / 单音色 OM
-                |                         |
-                +-----------+-------------+
-                            v
-MIDI 文件 -> MIDI-DDSP 会话 -> stateful v2 模型包
-                            |
-                            v
-                    CPU DDSP 音频合成
-                            |
-                            v
-              板载 / USB / 蓝牙音频输出
+          统一实时演奏入口
+                |
+        +-------+--------+
+        |                |
+  Piano-DDSP       DDSP-VST 神经音色
+  16声部 bundle      单音色状态化 OM
+        |                |
+        +-------+--------+
+                |
+                v
+        板载 / USB / 蓝牙音频输出
+
+MIDI 文件 -> MIDI-DDSP 会话 -> stateful v2 模型包 -> WAV / 音频输出
 ```
 
-Web 工作台将这两条模型链路分别放在“DDSP-VST”和“MIDI-DDSP”页面，另外提供“实验”
-和“设备”页面；扬声器测试已合并到设备页。所有 NPU/声卡任务共享资源锁。
+Web 工作台包含“实时演奏”“MIDI-DDSP”和“设备”三个工作区。“实时演奏”将
+Piano-DDSP 钢琴与 DDSP-VST 神经音色放在同一个入口中，但后端模型和运行时保持独立；
+扬声器测试位于设备页。所有 NPU/声卡任务共享资源锁。
 
 ## 模型和报告
 
@@ -70,9 +72,9 @@ Ascend 20T 已验证可以运行 8T 生成的同一批 OM，因此仓库不再�
 1. 运行 `python scripts/check_webui_env.py` 检查现有板端环境。
 2. 运行 `python scripts/run_webui.py`，使用程序打印的局域网地址打开界面。
 3. 在“设备”页的扬声器测试中确认目标输出可以发声。
-4. 在“DDSP-VST”页面测试状态化 Synth 实时输入。
+4. 在“实时演奏”中分别测试 Piano-DDSP 钢琴和 DDSP-VST 神经音色实时输入。
 5. 在“MIDI-DDSP”页面测试 MIDI 文件播放和 WAV 渲染。
-6. 在“实验”和“设备”页面检查 OM、性能、NPU 和依赖状态。
+6. 在“设备”页面检查 OM、性能、NPU 和依赖状态。
 
 书稿中的案例说明见
 [`src/experiment/case3.md`](../../../src/experiment/case3.md)。

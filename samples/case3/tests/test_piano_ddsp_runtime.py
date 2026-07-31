@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 from pathlib import Path
 import tempfile
@@ -16,13 +17,17 @@ from piano_ddsp_runtime.audio_output import _stereo_to_mono_s16
 from piano_ddsp_runtime.bundle import PianoBundle, PianoModelAsset, load_bundle
 from piano_ddsp_runtime.engine import PianoDdspEngine
 from piano_ddsp_runtime.harmonic import HarmonicSynthesizer
-from piano_ddsp_runtime.midi_state import LiveMidiState
+from piano_ddsp_runtime.midi_state import LiveMidiState, MIN_AUDIBLE_GATE_FRAMES
 from piano_ddsp_runtime.metrics import RuntimeMetrics
 from piano_ddsp_runtime.noise import NoiseSynthesizer
 from piano_ddsp_runtime.reverb import PartitionedConvolver, fdn_impulse_response
 from piano_ddsp_runtime.resampler import PianoSincResampler
 from piano_ddsp_runtime.scheduler import MidiScheduler
-from prepare_piano_ddsp_models import ATC_COMPILE_ENVIRONMENT, atc_subprocess_environment
+from prepare_piano_ddsp_models import (
+    ATC_COMPILE_ENVIRONMENT,
+    atc_subprocess_environment,
+    convert_one,
+)
 from tools.download_piano_ddsp_onnx import REQUIRED_FILES, parse_sha256s, validate_release
 from tools.validate_piano_ddsp_om import validate_reference_provenance
 
@@ -45,6 +50,27 @@ class PianoAtcPolicyTest(unittest.TestCase):
         )
         self.assertEqual(environment["MULTI_THREAD_COMPILE"], "0")
         self.assertEqual(environment["TE_PARALLEL_COMPILER"], "1")
+
+    def test_existing_om_without_conversion_evidence_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            onnx = root / "paper.onnx"
+            metadata = root / "paper.json"
+            bundle = root / "bundle"
+            (bundle / "models").mkdir(parents=True)
+            onnx.write_bytes(b"onnx")
+            metadata.write_text("{}", encoding="utf-8")
+            (bundle / "models" / "paper.om").write_bytes(b"stale-om")
+            with self.assertRaisesRegex(RuntimeError, "conversion record or raw ATC log"):
+                convert_one(
+                    "paper_ir",
+                    onnx,
+                    metadata,
+                    {},
+                    bundle,
+                    "Ascend310B4",
+                    "origin",
+                )
 
 
 class PianoAclInputTest(unittest.TestCase):
@@ -86,8 +112,55 @@ class PianoAclInputTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "C-contiguous"):
             _host_pointer(np.arange(8, dtype=np.float32)[::2])
 
+    def test_prepare_failure_releases_every_allocated_device_buffer(self) -> None:
+        acl = SimpleNamespace(
+            ACL_FLOAT=0,
+            rt=SimpleNamespace(
+                malloc=mock.Mock(side_effect=[(101, 0), (102, 0)]),
+                free=mock.Mock(return_value=0),
+            ),
+            mdl=SimpleNamespace(
+                get_num_inputs=mock.Mock(return_value=2),
+                get_input_name_by_index=mock.Mock(return_value="conditioning"),
+                get_input_dims=mock.Mock(return_value=({"dimCount": 1, "dims": [1]}, 0)),
+                get_input_size_by_index=mock.Mock(return_value=4),
+                get_input_data_type=mock.Mock(return_value=0),
+                add_dataset_buffer=mock.Mock(return_value=0),
+            ),
+            create_data_buffer=mock.Mock(side_effect=["buffer-1", "buffer-2"]),
+            destroy_data_buffer=mock.Mock(return_value=0),
+        )
+        model = object.__new__(PianoAclModel)
+        model.acl = acl
+        model.model_desc = object()
+        model.input_dataset = object()
+        model.output_dataset = object()
+        model.input_shapes = {"conditioning": (1,)}
+        model.output_shapes = {}
+        model.input_dtypes = {"conditioning": np.float32}
+        model.output_dtypes = {}
+
+        with self.assertRaisesRegex(ValueError, "Unexpected OM inputs"):
+            model._prepare(True)
+        self.assertEqual(
+            acl.destroy_data_buffer.call_args_list,
+            [mock.call("buffer-2"), mock.call("buffer-1")],
+        )
+        self.assertEqual(acl.rt.free.call_args_list, [mock.call(102), mock.call(101)])
+
 
 class PianoMidiStateTest(unittest.TestCase):
+    def test_note_listener_reports_a_short_note_as_two_edges(self) -> None:
+        events: list[tuple[int, bool]] = []
+        state = LiveMidiState(note_listener=lambda note, on: events.append((note, on)))
+
+        state.note_on("browser", 60, 96)
+        state.note_off("browser", 60)
+        for _ in range(MIN_AUDIBLE_GATE_FRAMES):
+            state.render_frame()
+
+        self.assertEqual(events, [(60, True), (60, False)])
+
     def test_repeated_note_reuses_slot_and_release_pitch_is_extended(self) -> None:
         state = LiveMidiState()
         self.assertTrue(state.note_on("browser", 60, 96))
@@ -97,9 +170,10 @@ class PianoMidiStateTest(unittest.TestCase):
         self.assertTrue(gate[0])
 
         state.note_off("browser", 60)
-        conditioning, _, gate = state.render_frame()
-        self.assertEqual(float(conditioning[0, 0, 0]), 0.0)
+        gates = [state.render_frame()[2] for _ in range(MIN_AUDIBLE_GATE_FRAMES - 1)]
         self.assertEqual(state.snapshot().slot_notes[0], 60)
+        self.assertTrue(all(bool(gate[0]) for gate in gates))
+        conditioning, _, gate = state.render_frame()
         self.assertFalse(gate[0])
 
         state.note_on("browser", 60, 64)
@@ -122,6 +196,8 @@ class PianoMidiStateTest(unittest.TestCase):
         state.release_source("browser")
         self.assertTrue(state.snapshot().sustain)
         state.control_change("hardware", 64, 0)
+        for _ in range(MIN_AUDIBLE_GATE_FRAMES):
+            conditioning, _, gate = state.render_frame()
         conditioning, _, gate = state.render_frame()
         self.assertEqual(float(conditioning[0, 0, 0]), 0.0)
         self.assertFalse(gate[0])
@@ -150,6 +226,7 @@ class PianoSchedulerTest(unittest.TestCase):
         scheduler.push("file", "note_on", 60, 90, 100)
         scheduler.push("file", "note_off", 60, 0, 100)
         self.assertEqual(scheduler.drain(100), 2)
+        scheduler.render_conditions(MIN_AUDIBLE_GATE_FRAMES, 100)
         self.assertEqual(state.snapshot().active_notes, ())
         scheduler.push("file", "note_on", 61, 90, 200)
         scheduler.cancel_source("file")
@@ -157,6 +234,18 @@ class PianoSchedulerTest(unittest.TestCase):
         self.assertEqual(scheduler.drain(250), 0)
         self.assertEqual(scheduler.drain(300), 1)
         self.assertEqual(state.snapshot().active_notes, (62,))
+
+    def test_same_frame_tap_keeps_four_audio_frames(self) -> None:
+        state = LiveMidiState()
+        scheduler = MidiScheduler(state)
+        scheduler.push("browser", "note_on", 60, 100, 100)
+        scheduler.push("browser", "note_off", 60, 0, 100)
+
+        _, _, gates = scheduler.render_conditions(MIN_AUDIBLE_GATE_FRAMES, 100)
+
+        self.assertTrue(all(bool(frame[0]) for frame in gates))
+        _, _, next_gate = scheduler.render_conditions(1, 100 + MIN_AUDIBLE_GATE_FRAMES * scheduler.FRAME_NS)
+        self.assertFalse(next_gate[0, 0])
 
 
 class PianoDspTest(unittest.TestCase):
@@ -326,6 +415,10 @@ def fixture_bundle(folder: Path) -> PianoBundle:
 
 
 class PianoEngineTest(unittest.TestCase):
+    def test_output_gain_defaults_to_zero_db(self) -> None:
+        default = inspect.signature(PianoDdspEngine).parameters["output_gain_db"].default
+        self.assertEqual(default, 0.0)
+
     def test_fake_model_render_is_deterministic_and_panic_clears_all_state(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             bundle = fixture_bundle(Path(folder))

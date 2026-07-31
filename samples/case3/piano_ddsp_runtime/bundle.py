@@ -93,7 +93,11 @@ def _validate_metadata(metadata: dict[str, Any], model_id: str) -> None:
         raise ValueError(f"Unexpected input contract for {model_id}: {inputs!r}")
 
 
-def load_bundle(path: Path) -> PianoBundle:
+def load_bundle(
+    path: Path,
+    *,
+    validate_qualification: bool = True,
+) -> PianoBundle:
     manifest_path = Path(path).resolve()
     if manifest_path.is_dir():
         manifest_path = manifest_path / "manifest.json"
@@ -131,7 +135,7 @@ def load_bundle(path: Path) -> PianoBundle:
         _validate_metadata(metadata, str(model_id))
         validation_passed = False
         validation = raw.get("validation")
-        if validation is not None:
+        if validation is not None and validate_qualification:
             if not isinstance(validation, dict):
                 raise ValueError(f"Invalid validation record for {model_id}")
             validation_path = _resolved_child(
@@ -147,6 +151,8 @@ def load_bundle(path: Path) -> PianoBundle:
                 or report.get("model_id") != model_id
                 or int(validation.get("frames", 0)) != report_frames
                 or bool(validation.get("passed", False)) != bool(report.get("passed", False))
+                or validation.get("om_sha256") != actual_om_hash
+                or report.get("om_sha256") != actual_om_hash
             ):
                 raise ValueError(f"Validation report mismatch for {model_id}")
             validation_passed = bool(report.get("passed", False)) and (
