@@ -1,0 +1,32 @@
+.realtime-stage .roll-toolbar,
+.realtime-stage .keyboard-range-bar,
+.realtime-stage .performance-control-bar {
+  min-width: 0;
+}
+
+.realtime-stage--touch .performance-control-bar label,
+.realtime-stage--touch .sustain-control,
+.realtime-stage--touch .roll-window-control,
+.realtime-stage--touch .key-count-control button,
+.realtime-stage--touch .touch-keyboard-size-control button {
+  min-height: var(--studio-touch-control);
+}
+
+.realtime-stage--touch .key-count-control button,
+.realtime-stage--touch .touch-keyboard-size-control button {
+  min-height: var(--studio-primary-control);
+}
+
+.realtime-stage--touch .stage-session-actions .primary-button {
+  min-height: var(--studio-primary-control);
+}
+
+.realtime-stage--midi .drawer-tabs button,
+.realtime-stage--midi .key-count-control button,
+.realtime-stage--midi .roll-window-control button {
+  min-height: var(--studio-touch-control);
+}
+
+.realtime-stage--midi .key-count-control button {
+  min-height: var(--studio-primary-control);
+}

@@ -1,0 +1,86 @@
+.device-section-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  padding: 4px;
+  border: 1px solid var(--studio-line);
+  border-radius: var(--studio-radius);
+  background: #d8dee0;
+}
+
+.device-section-tabs button {
+  min-height: 50px;
+  border: 0;
+  border-radius: 4px;
+  background: #f6f8f8;
+  color: #53636a;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.device-section-tabs button.is-active {
+  background: var(--studio-graphite);
+  color: #ffffff;
+}
+
+.device-section-panel {
+  min-width: 0;
+}
+
+.devices-workspace > .device-section-tabs,
+.devices-workspace > .device-section-panel {
+  grid-column: 1 / -1;
+}
+
+.device-section-stack {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.device-section-stack > .bluetooth-panel,
+.device-section-stack > .speaker-workspace {
+  grid-column: 1 / -1;
+}
+
+.device-overview-help {
+  display: grid;
+  gap: 8px;
+  padding: 24px;
+  border: 1px solid var(--studio-line);
+  background: var(--studio-surface);
+}
+
+.device-overview-help strong {
+  font-size: 20px;
+}
+
+.device-overview-help span {
+  color: var(--studio-muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.devices-workspace .panel-header h2,
+.devices-workspace .device-list-row strong,
+.devices-workspace .inventory-row strong {
+  font-size: max(16px, 1em);
+}
+
+.devices-workspace .panel-header p,
+.devices-workspace small,
+.devices-workspace .device-list-row > span,
+.devices-workspace .inventory-row > span {
+  font-size: max(14px, 1em);
+}
+
+@media (max-width: 900px) {
+  .device-section-stack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .device-section-stack > .bluetooth-panel,
+  .device-section-stack > .speaker-workspace {
+    grid-column: auto;
+  }
+}

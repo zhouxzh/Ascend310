@@ -1,0 +1,152 @@
+@media (min-width: 1500px) and (max-height: 1100px) {
+  .app-shell--touch-display {
+    font-size: 16px;
+  }
+
+  .app-shell--touch-display .primary-nav button {
+    min-height: 56px;
+    font-size: 22px;
+  }
+
+  .app-shell--touch-display .panel-header h2 {
+    font-size: 22px;
+  }
+
+  .app-shell--touch-display .field > span,
+  .app-shell--touch-display .field-hint,
+  .app-shell--touch-display .metric > span,
+  .app-shell--touch-display .status-pill,
+  .app-shell--touch-display .notice,
+  .app-shell--touch-display .recording-row small,
+  .app-shell--touch-display .voice-assignment-row,
+  .app-shell--touch-display .device-list-row,
+  .app-shell--touch-display .inventory-row,
+  .app-shell--touch-display .dependency-row {
+    font-size: 16px;
+  }
+
+  .app-shell--touch-display .field select,
+  .app-shell--touch-display .field input:not([type='range']),
+  .app-shell--touch-display .primary-button,
+  .app-shell--touch-display .secondary-button,
+  .app-shell--touch-display .segmented button,
+  .app-shell--touch-display .device-section-tabs button {
+    min-height: var(--studio-primary-control);
+    font-size: 18px;
+  }
+
+  .app-shell--touch-display .icon-button {
+    min-width: var(--studio-touch-control);
+    min-height: var(--studio-touch-control);
+  }
+
+  .app-shell--touch-display .realtime-stage .drawer-content {
+    padding: 12px 14px;
+  }
+
+  .app-shell--touch-display .realtime-stage .transport-layout {
+    grid-template-columns: minmax(240px, 1.2fr) repeat(3, 52px) minmax(220px, 2fr) auto 96px auto;
+    gap: 10px;
+  }
+
+  .app-shell--touch-display .realtime-stage .transport-layout select {
+    height: 52px;
+    font-size: 16px;
+  }
+
+  .app-shell--touch-display .realtime-stage .transport-layout .icon-command {
+    flex-basis: 52px;
+    width: 52px;
+    height: 52px;
+  }
+
+  .app-shell--touch-display .realtime-stage .transport-time,
+  .app-shell--touch-display .realtime-stage .compact-check {
+    font-size: 16px;
+  }
+
+  .app-shell--touch-display .realtime-stage .compact-check input {
+    width: 22px;
+    height: 22px;
+  }
+
+  .app-shell--touch-display .midi-file-roll-canvas {
+    height: 220px;
+  }
+
+  .app-shell--touch-display .midi-file-roll.is-compact .midi-file-roll-canvas {
+    height: 180px;
+  }
+}
+
+@media (max-width: 900px), (any-pointer: coarse) and (max-width: 1499px) {
+  .primary-button,
+  .secondary-button,
+  .segmented button,
+  .device-section-tabs button,
+  .field select,
+  .field input:not([type='range']) {
+    min-height: 48px;
+  }
+
+  .icon-button {
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  .midi-file-roll-toolbar {
+    min-height: 56px;
+  }
+}
+
+@media (max-width: 600px) {
+  .content-area {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+
+  .status-footer {
+    display: none;
+  }
+
+  .bottom-nav {
+    min-height: calc(64px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .bottom-nav button {
+    min-height: 64px;
+    font-size: 12px;
+  }
+
+  .recording-version-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .recording-version-bar .secondary-button {
+    width: 100%;
+  }
+
+  .midi-file-roll-toolbar > div:first-child span {
+    display: none;
+  }
+
+  .midi-file-roll-actions .icon-button:not(.roll-collapse),
+  .midi-file-roll-actions output {
+    display: none;
+  }
+
+  .midi-file-roll.is-collapsed .midi-file-roll-toolbar {
+    border-bottom: 0;
+  }
+
+  .device-section-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+
+  .device-section-tabs button {
+    padding: 6px;
+    font-size: 14px;
+  }
+}

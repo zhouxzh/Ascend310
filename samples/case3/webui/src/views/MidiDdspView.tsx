@@ -11,12 +11,14 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Star,
   Square,
   Volume2,
 } from 'lucide-react'
 import { api, artifactUrl, formatBytes } from '../api'
 import { audioDeviceLabel } from '../audio'
-import AudioWaveform from '../components/AudioWaveform'
+import MidiAudioTransport from '../components/MidiAudioTransport'
+import MidiFilePianoRoll from '../components/MidiFilePianoRoll'
 import { Field, Metric, Notice, PanelHeader, Segmented, StatusPill } from '../components/ui'
 import type {
   Artifact,
@@ -24,6 +26,9 @@ import type {
   Catalog,
   Job,
   MidiDdspBundle,
+  MidiDdspLibraryTrack,
+  MidiDdspLibraryVersion,
+  MidiPianoRoll,
   MidiVoiceAnalysis,
   MidiVoiceAnalysisVoice,
 } from '../types'
@@ -38,6 +43,37 @@ interface Props {
 interface Recording {
   job: Job
   artifact: Artifact
+}
+
+function fallbackVersion(recording: Recording): MidiDdspLibraryVersion {
+  const metadata = recording.job.metadata
+  return {
+    render_id: recording.job.id,
+    source_id: `legacy-${String(metadata.midi_id ?? metadata.midi_name ?? recording.job.id)}`,
+    configuration_hash: String(metadata.voice_config_id ?? recording.job.id),
+    version_label: `${String(metadata.model_bundle ?? 'MIDI-DDSP')} · ${formatTimestamp(recording.job.created_at)}`,
+    state: recording.job.state,
+    model_bundle_id: typeof metadata.model_bundle_id === 'string' ? metadata.model_bundle_id : null,
+    model_bundle: typeof metadata.model_bundle === 'string' ? metadata.model_bundle : null,
+    voice_instruments: metadata.voice_instruments && typeof metadata.voice_instruments === 'object'
+      ? metadata.voice_instruments as Record<string, number>
+      : null,
+    instrument_ids: Array.isArray(metadata.instrument_ids)
+      ? metadata.instrument_ids.filter((value): value is number => typeof value === 'number')
+      : [typeof metadata.instrument_id === 'number' ? metadata.instrument_id : 0],
+    seed: typeof metadata.seed === 'number' ? metadata.seed : 0,
+    output_gain_db: typeof metadata.output_gain_db === 'number' ? metadata.output_gain_db : 0,
+    tail_seconds: typeof metadata.tail_seconds === 'number' ? metadata.tail_seconds : 0,
+    sample_rate: typeof metadata.sample_rate === 'number' ? metadata.sample_rate : 0,
+    reverb: typeof metadata.reverb === 'string' ? metadata.reverb : null,
+    available: true,
+    artifact: recording.artifact,
+    report_available: Boolean(metadata.report),
+    metadata,
+    report: metadata.report ?? null,
+    created_at: recording.job.created_at,
+    updated_at: recording.job.updated_at,
+  }
 }
 
 type VoiceScheme = 'auto' | 'strings' | 'woodwinds' | 'brass' | 'custom'
@@ -182,6 +218,36 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
     const artifact = job.artifacts.find((item) => item.name === 'output.wav')
     return artifact ? [{ job, artifact }] : []
   }), [jobs])
+  const fallbackLibrary = useMemo(() => {
+    const versions = recordings.map(fallbackVersion)
+    const grouped = new Map<string, MidiDdspLibraryVersion[]>()
+    for (const version of versions) {
+      const current = grouped.get(version.source_id) ?? []
+      current.push(version)
+      grouped.set(version.source_id, current)
+    }
+    const tracks = [...grouped.entries()].map(([sourceId, sourceVersions]) => {
+      sourceVersions.sort((left, right) => right.created_at.localeCompare(left.created_at))
+      const latest = sourceVersions[0]
+      return {
+        source_id: sourceId,
+        midi_sha256: sourceId,
+        midi_id: typeof latest.metadata.midi_id === 'string' ? latest.metadata.midi_id : null,
+        display_name: String(latest.metadata.midi_name ?? 'output.wav'),
+        duration_seconds: latest.report?.duration_seconds ?? 0,
+        note_count: typeof latest.metadata.notes === 'number' ? latest.metadata.notes : 0,
+        track_count: typeof latest.metadata.source_track_count === 'number' ? latest.metadata.source_track_count : 0,
+        legacy: true,
+        version_count: sourceVersions.length,
+        available_version_count: sourceVersions.length,
+        preferred_render_id: null,
+        default_render_id: latest.render_id,
+        default_version: latest,
+        updated_at: latest.updated_at,
+      } satisfies MidiDdspLibraryTrack
+    })
+    return { tracks, grouped }
+  }, [recordings])
   const activeRenderJob = jobs.find((job) => (
     job.kind !== 'midi-ddsp-wav-playback'
     && job.kind.startsWith('midi-ddsp')
@@ -208,8 +274,17 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
     ?? audioDevices[0]?.id
     ?? ''
   const [audioDeviceId, setAudioDeviceId] = useState(defaultAudioDeviceId)
-  const [selectedRecordingId, setSelectedRecordingId] = useState(recordings[0]?.job.id ?? '')
+  const [libraryTracks, setLibraryTracks] = useState<MidiDdspLibraryTrack[]>([])
+  const [libraryVersions, setLibraryVersions] = useState<MidiDdspLibraryVersion[]>([])
+  const [selectedSourceId, setSelectedSourceId] = useState('')
+  const [selectedVersionId, setSelectedVersionId] = useState(recordings[0]?.job.id ?? '')
+  const [libraryError, setLibraryError] = useState('')
+  const [pianoRoll, setPianoRoll] = useState<MidiPianoRoll | null>(null)
+  const [pianoRollError, setPianoRollError] = useState('')
+  const [activeRollVoiceId, setActiveRollVoiceId] = useState<string | null>(null)
   const [playbackTarget, setPlaybackTarget] = useState<'browser' | 'board'>('board')
+  const [browserPlaybackProgress, setBrowserPlaybackProgress] = useState<number | null>(null)
+  const [browserPlaying, setBrowserPlaying] = useState(false)
   const [playbackGain, setPlaybackGain] = useState(0)
   const [gain, setGain] = useState(0)
   const [tail, setTail] = useState(2)
@@ -218,8 +293,71 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
   const [error, setError] = useState('')
   const [clock, setClock] = useState(() => Date.now() / 1000)
   const uploadRef = useRef<HTMLInputElement>(null)
+  const playerPanelRef = useRef<HTMLElement>(null)
   const libraryAutoSelected = useRef(recordings.length > 0)
   const playbackAutoSelectedJobId = useRef('')
+
+  useEffect(() => {
+    playerPanelRef.current?.scrollTo?.({ top: 0 })
+  }, [selectedSourceId, view])
+
+  useEffect(() => {
+    let cancelled = false
+    api.midiDdspLibrary()
+      .then(({ tracks }) => {
+        if (cancelled) return
+        setLibraryTracks(tracks)
+        setLibraryError('')
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) setLibraryError(cause instanceof Error ? cause.message : String(cause))
+      })
+    return () => { cancelled = true }
+  }, [jobs])
+
+  const availableTracks = libraryTracks.length ? libraryTracks : fallbackLibrary.tracks
+  const selectedTrack = availableTracks.find((track) => track.source_id === selectedSourceId)
+    ?? availableTracks[0]
+
+  useEffect(() => {
+    if (!availableTracks.length) {
+      setSelectedSourceId('')
+      setSelectedVersionId('')
+      setLibraryVersions([])
+      return
+    }
+    if (!availableTracks.some((track) => track.source_id === selectedSourceId)) {
+      const first = availableTracks[0]
+      setSelectedSourceId(first.source_id)
+      setSelectedVersionId(first.default_render_id ?? '')
+    }
+  }, [availableTracks, selectedSourceId])
+
+  useEffect(() => {
+    if (!selectedTrack) return
+    if (!libraryTracks.length) {
+      const fallback = fallbackLibrary.grouped.get(selectedTrack.source_id) ?? []
+      setLibraryVersions(fallback)
+      if (!fallback.some((version) => version.render_id === selectedVersionId)) {
+        setSelectedVersionId(selectedTrack.default_render_id ?? fallback[0]?.render_id ?? '')
+      }
+      return
+    }
+    let cancelled = false
+    setLibraryVersions([])
+    api.midiDdspLibraryVersions(selectedTrack.source_id)
+      .then(({ versions }) => {
+        if (cancelled) return
+        setLibraryVersions(versions)
+        if (!versions.some((version) => version.render_id === selectedVersionId)) {
+          setSelectedVersionId(selectedTrack.default_render_id ?? versions[0]?.render_id ?? '')
+        }
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) setLibraryError(cause instanceof Error ? cause.message : String(cause))
+      })
+    return () => { cancelled = true }
+  }, [fallbackLibrary.grouped, libraryTracks.length, selectedTrack, selectedVersionId])
 
   useEffect(() => {
     if (!midiId && preferredMidi) setMidiId(preferredMidi.id)
@@ -265,21 +403,11 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
   }, [midiId, voiceAnalysisRevision])
 
   useEffect(() => {
-    if (!recordings.length) {
-      setSelectedRecordingId('')
-      return
-    }
-    if (!recordings.some((recording) => recording.job.id === selectedRecordingId)) {
-      setSelectedRecordingId(recordings[0].job.id)
-    }
-  }, [recordings, selectedRecordingId])
-
-  useEffect(() => {
-    if (recordings.length && !libraryAutoSelected.current && !activeRenderJob) {
+    if (availableTracks.length && !libraryAutoSelected.current && !activeRenderJob) {
       libraryAutoSelected.current = true
       setView('library')
     }
-  }, [activeRenderJob, recordings.length])
+  }, [activeRenderJob, availableTracks.length])
 
   useEffect(() => {
     if (activeRenderJob) setView('render')
@@ -288,7 +416,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
       && playbackAutoSelectedJobId.current !== activePlaybackJob.id
     ) {
       playbackAutoSelectedJobId.current = activePlaybackJob.id
-      if (activePlaybackSourceId) setSelectedRecordingId(activePlaybackSourceId)
+      if (activePlaybackSourceId) setSelectedVersionId(activePlaybackSourceId)
       setPlaybackTarget('board')
       setView('library')
     }
@@ -333,9 +461,28 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
   const currentStageLabel = progressDetail?.activity === 'reading_cache'
     ? '读取缓存'
     : RENDER_STAGES.find(([stage]) => stage === currentStage)?.[1]
-  const selectedRecording = recordings.find((recording) => recording.job.id === selectedRecordingId)
-    ?? recordings[0]
-  const recordingReport = selectedRecording?.job.metadata.report
+  const selectedVersion = libraryVersions.find((version) => version.render_id === selectedVersionId)
+    ?? libraryVersions.find((version) => version.render_id === selectedTrack?.default_render_id)
+    ?? libraryVersions[0]
+    ?? selectedTrack?.default_version
+  const selectedRecording = selectedVersion
+    ? recordings.find((recording) => recording.job.id === selectedVersion.render_id) ?? {
+        artifact: selectedVersion.artifact,
+        job: {
+          id: selectedVersion.render_id,
+          kind: 'midi-ddsp-render',
+          state: selectedVersion.state,
+          created_at: selectedVersion.created_at,
+          updated_at: selectedVersion.updated_at,
+          progress: 1,
+          message: '',
+          exit_code: selectedVersion.state === 'succeeded' ? 0 : null,
+          metadata: { ...selectedVersion.metadata, report: selectedVersion.report ?? undefined },
+          artifacts: [selectedVersion.artifact],
+        },
+      }
+    : undefined
+  const recordingReport = selectedVersion?.report ?? selectedRecording?.job.metadata.report
   const recordingInstrumentId = selectedRecording
     ? metadataNumber(selectedRecording.job, 'instrument_id')
     : 0
@@ -345,6 +492,10 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
   const playbackProgress = activePlaybackJob?.progress_detail?.overall_progress
     ?? activePlaybackJob?.progress
     ?? 0
+  const rollMidiId = view === 'render'
+    ? midiId
+    : selectedTrack?.midi_id
+      ?? (typeof selectedVersion?.metadata.midi_id === 'string' ? selectedVersion.metadata.midi_id : '')
   const reverbAsset = catalog.midi_ddsp_reverb_assets[0]
   const supported = Boolean(selectedMidi?.midi_ddsp_supported)
   const configuredInstrumentIds = [...new Set(Object.values(voiceAssignments))]
@@ -374,6 +525,22 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
     }),
     [catalog.midi_files],
   )
+
+  useEffect(() => {
+    let cancelled = false
+    setPianoRoll(null)
+    setPianoRollError('')
+    setActiveRollVoiceId(null)
+    if (!rollMidiId) return () => { cancelled = true }
+    api.midiPianoRoll(rollMidiId)
+      .then((data) => {
+        if (!cancelled) setPianoRoll(data)
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) setPianoRollError(cause instanceof Error ? cause.message : String(cause))
+      })
+    return () => { cancelled = true }
+  }, [rollMidiId])
 
   function applyVoiceScheme(scheme: Exclude<VoiceScheme, 'custom'>) {
     if (!voiceAnalysis) return
@@ -427,21 +594,55 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
   }
 
   async function playRecording() {
-    if (!selectedRecording || !audioDeviceId) return
+    if (!selectedRecording || !selectedVersion?.available || !audioDeviceId) return
     setBusy(true)
     setError('')
     try {
-      await api.playMidiDdspRecording(selectedRecording.job.id, {
+      const payload = {
         audio_device_id: audioDeviceId,
         latency_ms: 40,
         output_gain_db: playbackGain,
-      })
+      }
+      if (libraryTracks.length) {
+        await api.playMidiDdspLibraryVersion(selectedVersion.render_id, payload)
+      } else {
+        await api.playMidiDdspRecording(selectedRecording.job.id, payload)
+      }
       await onRefresh()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       setBusy(false)
     }
+  }
+
+  async function setPreferredVersion() {
+    if (!selectedTrack || !selectedVersion || !libraryTracks.length) return
+    setBusy(true)
+    setError('')
+    try {
+      const next = await api.setMidiDdspLibraryPreference(
+        selectedTrack.source_id,
+        selectedTrack.preferred_render_id === selectedVersion.render_id
+          ? null
+          : selectedVersion.render_id,
+      )
+      setLibraryTracks((current) => current.map((track) => (
+        track.source_id === next.source_id ? next : track
+      )))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function selectRollVoice(voiceId: string) {
+    setActiveRollVoiceId(voiceId)
+    document.getElementById(`voice-assignment-${voiceId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    })
   }
 
   async function control(job: Job | undefined, action: 'pause' | 'resume' | 'stop') {
@@ -476,7 +677,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
 
   return (
     <div className="workspace midi-workspace">
-      <section className={`panel midi-player-panel ${activeRenderJob ? 'has-active-render' : ''}`}>
+      <section ref={playerPanelRef} className={`panel midi-player-panel ${activeRenderJob ? 'has-active-render' : ''}`}>
         <PanelHeader
           title={view === 'library' ? 'MIDI-DDSP 音频库' : 'MIDI-DDSP 新建渲染'}
           subtitle={view === 'library' ? '选择已有 WAV 立即播放' : '完整质量渲染与进度'}
@@ -492,6 +693,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
           )}
         />
         {error && <Notice tone="error">{error}</Notice>}
+        {view === 'library' && libraryError && !fallbackLibrary.tracks.length && <Notice tone="error">{libraryError}</Notice>}
 
         {view === 'library' ? (
           <>
@@ -509,13 +711,80 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
                   <div className="track-icon"><FileAudio size={27} /></div>
                   <div>
                     <span>正在查看</span>
-                    <strong>{metadataString(selectedRecording.job, 'midi_name', 'MIDI-DDSP output.wav')}</strong>
-                    <small>{recordingInstrumentLabel} · {formatTimestamp(selectedRecording.job.created_at)}</small>
+                    <strong>{selectedTrack?.display_name ?? metadataString(selectedRecording.job, 'midi_name', 'MIDI-DDSP output.wav')}</strong>
+                    <small>{selectedTrack?.version_count ?? 1} 个版本 · {recordingInstrumentLabel}</small>
                   </div>
                   <a className="icon-button" title="下载 WAV" href={artifactUrl(selectedRecording.artifact.id)} download>
                     <Download size={18} />
                   </a>
                 </div>
+                <div className="recording-version-bar">
+                  <Field label="渲染版本">
+                    <select
+                      aria-label="渲染版本"
+                      value={selectedVersion?.render_id ?? ''}
+                      onChange={(event) => setSelectedVersionId(event.target.value)}
+                    >
+                      {libraryVersions.map((version) => (
+                        <option value={version.render_id} key={version.render_id}>
+                          {version.render_id === selectedTrack?.preferred_render_id ? '★ ' : ''}
+                          {version.version_label}{version.available ? '' : ' · 文件不可用'}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <button
+                    type="button"
+                    className={`secondary-button ${selectedVersion?.render_id === selectedTrack?.preferred_render_id ? 'is-active' : ''}`}
+                    onClick={setPreferredVersion}
+                    disabled={busy || !libraryTracks.length || !selectedVersion?.available}
+                    title="设置默认播放版本"
+                  >
+                    <Star size={18} fill={selectedVersion?.render_id === selectedTrack?.preferred_render_id ? 'currentColor' : 'none'} />
+                    {selectedVersion?.render_id === selectedTrack?.preferred_render_id ? '默认版本' : '设为默认'}
+                  </button>
+                </div>
+                {pianoRollError && <Notice tone="warn">该曲目的 MIDI 卷帘不可用：{pianoRollError}</Notice>}
+                <MidiFilePianoRoll
+                    data={pianoRoll}
+                    assignments={selectedVersion?.voice_instruments}
+                    progress={playbackTarget === 'browser'
+                      ? browserPlaybackProgress
+                      : activePlaybackSourceId === selectedVersion?.render_id ? playbackProgress : null}
+                    playing={playbackTarget === 'browser'
+                      ? browserPlaying
+                      : activePlaybackSourceId === selectedVersion?.render_id && activePlaybackJob?.state === 'running'}
+                    errorMessage={pianoRollError || undefined}
+                    compact
+                    activeVoiceId={activeRollVoiceId}
+                    onVoiceSelect={selectRollVoice}
+                    transport={playbackTarget === 'browser' ? (
+                      <MidiAudioTransport
+                        artifact={selectedVersion?.available ? selectedRecording.artifact : undefined}
+                        onProgress={setBrowserPlaybackProgress}
+                        onPlayingChange={setBrowserPlaying}
+                      />
+                    ) : (
+                      <div className="midi-roll-transport" aria-label="开发板音频播放">
+                        {!activePlaybackJob ? (
+                          <button type="button" className="primary-button" onClick={playRecording} disabled={busy || Boolean(activeRenderJob) || !audioDeviceId || !selectedVersion?.available}>
+                            <Volume2 size={17} />开发板播放
+                          </button>
+                        ) : (
+                          <>
+                            {activePlaybackJob.state === 'paused' ? (
+                              <button className="icon-button" type="button" title="继续" onClick={() => control(activePlaybackJob, 'resume')} disabled={busy}><Play size={18} fill="currentColor" /></button>
+                            ) : (
+                              <button className="icon-button" type="button" title="暂停" onClick={() => control(activePlaybackJob, 'pause')} disabled={busy}><Pause size={18} fill="currentColor" /></button>
+                            )}
+                            <button className="icon-button" type="button" title="停止" onClick={() => control(activePlaybackJob, 'stop')} disabled={busy}><Square size={17} fill="currentColor" /></button>
+                            <output className="midi-roll-transport-time">{Math.round(playbackProgress * 100)}%</output>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  />
+                {!selectedVersion?.available && <Notice tone="error">所选版本的 WAV 文件不可用，请选择其他版本。</Notice>}
                 <div className="recording-playback-route">
                   <span>播放位置</span>
                   <Segmented
@@ -528,7 +797,6 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
                     disabled={Boolean(activePlaybackJob)}
                   />
                 </div>
-                <AudioWaveform artifact={selectedRecording.artifact} showControls={playbackTarget === 'browser'} />
                 {playbackTarget === 'board' && (
                   <>
                     <div className="recording-output-bar">
@@ -550,30 +818,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
                           disabled={Boolean(activeJob)}
                         />
                       </Field>
-                      {!activePlaybackJob ? (
-                        <button type="button" className="primary-button" onClick={playRecording} disabled={busy || Boolean(activeRenderJob) || !audioDeviceId}>
-                          <Volume2 size={17} />开发板播放
-                        </button>
-                      ) : (
-                        <div className="recording-playback-controls">
-                          {activePlaybackJob.state === 'paused' ? (
-                            <button className="icon-button" type="button" title="继续" onClick={() => control(activePlaybackJob, 'resume')} disabled={busy}><Play size={18} fill="currentColor" /></button>
-                          ) : (
-                            <button className="icon-button" type="button" title="暂停" onClick={() => control(activePlaybackJob, 'pause')} disabled={busy}><Pause size={18} fill="currentColor" /></button>
-                          )}
-                          <button className="icon-button" type="button" title="停止" onClick={() => control(activePlaybackJob, 'stop')} disabled={busy}><Square size={17} fill="currentColor" /></button>
-                        </div>
-                      )}
                     </div>
-                    {activePlaybackJob && (
-                      <div className="recording-playback-progress" aria-label="已有 WAV 播放进度">
-                        <div className="timeline-meta">
-                          <StatusPill tone={activePlaybackJob.state === 'paused' ? 'warn' : 'ok'}>{activePlaybackJob.state}</StatusPill>
-                          <span>{Math.round(playbackProgress * 100)}%</span>
-                        </div>
-                        <div className="progress-track"><span style={{ width: `${playbackProgress * 100}%` }} /></div>
-                      </div>
-                    )}
                   </>
                 )}
                 <div className="metrics-row report-metrics recording-metrics">
@@ -621,6 +866,16 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
               </div>
             )}
 
+            {pianoRollError && <Notice tone="warn">MIDI 卷帘载入失败：{pianoRollError}</Notice>}
+            <MidiFilePianoRoll
+                data={pianoRoll}
+                assignments={voiceAssignments}
+                progress={renderJob ? renderJob.progress : null}
+                errorMessage={pianoRollError || undefined}
+                activeVoiceId={activeRollVoiceId}
+                onVoiceSelect={selectRollVoice}
+              />
+
             <section className="voice-assignment-section" aria-label="MIDI 声部音色分配">
               <div className="voice-assignment-heading">
                 <div>
@@ -660,7 +915,12 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
                         ? null
                         : catalog.instruments.find((item) => item.id === voice.detected_instrument_id)
                       return (
-                        <div className="voice-assignment-row" role="row" key={voice.id}>
+                        <div
+                          id={`voice-assignment-${voice.id}`}
+                          className={`voice-assignment-row ${activeRollVoiceId === voice.id ? 'is-highlighted' : ''}`}
+                          role="row"
+                          key={voice.id}
+                        >
                           <span className="voice-number" role="cell" title={voice.id}>V{index + 1}</span>
                           <span className="voice-source" role="cell">
                             <strong>Track {voice.track_index} · Ch {voice.channel}</strong>
@@ -692,8 +952,6 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
                 </>
               )}
             </section>
-
-            {renderAudioArtifact && <AudioWaveform artifact={renderAudioArtifact} compact={Boolean(activeRenderJob)} showControls={false} />}
 
             {renderJob && (
               <div className="midi-render-progress" aria-label="MIDI-DDSP 渲染进度">
@@ -744,25 +1002,28 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
 
       {view === 'library' ? (
         <aside className="panel recording-library-panel">
-          <PanelHeader title="已生成音频" subtitle={`${recordings.length} 个 WAV`} action={<Library size={18} />} />
+          <PanelHeader title="已生成音频" subtitle={`${availableTracks.length} 首曲目 · ${availableTracks.reduce((total, track) => total + track.version_count, 0)} 个版本`} action={<Library size={18} />} />
           <div className="recording-list">
-            {recordings.map((recording) => {
-              const itemInstrumentLabel = recordingInstrumentLabelForJob(recording.job, catalog)
-              const isPlaying = recording.job.id === activePlaybackSourceId
+            {availableTracks.map((track) => {
+              const isPlaying = track.source_id === selectedTrack?.source_id
+                && track.default_render_id === activePlaybackSourceId
               return (
                 <button
                   type="button"
-                  className={`recording-row ${recording.job.id === selectedRecording?.job.id ? 'is-selected' : ''}`}
-                  key={recording.job.id}
-                  onClick={() => setSelectedRecordingId(recording.job.id)}
-                  aria-pressed={recording.job.id === selectedRecording?.job.id}
+                  className={`recording-row ${track.source_id === selectedTrack?.source_id ? 'is-selected' : ''}`}
+                  key={track.source_id}
+                  onClick={() => {
+                    setSelectedSourceId(track.source_id)
+                    setSelectedVersionId(track.default_render_id ?? '')
+                  }}
+                  aria-pressed={track.source_id === selectedTrack?.source_id}
                 >
                   <FileAudio size={18} />
                   <span>
-                    <strong>{metadataString(recording.job, 'midi_name', 'output.wav')}</strong>
-                    <small>{itemInstrumentLabel} · {formatTimestamp(recording.job.created_at)} · {formatBytes(recording.artifact.size_bytes)}</small>
+                    <strong>{track.display_name}</strong>
+                    <small>{track.version_count} 个版本 · {formatDuration(track.duration_seconds)} · {formatTimestamp(track.updated_at)}</small>
                   </span>
-                  <StatusPill tone={isPlaying ? 'warn' : recording.job.state === 'succeeded' ? 'ok' : 'neutral'}>{isPlaying ? 'PLAY' : 'WAV'}</StatusPill>
+                  <StatusPill tone={isPlaying ? 'warn' : track.available_version_count ? 'ok' : 'error'}>{isPlaying ? 'PLAY' : track.available_version_count ? 'WAV' : 'MISSING'}</StatusPill>
                 </button>
               )
             })}

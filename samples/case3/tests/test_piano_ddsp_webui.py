@@ -18,7 +18,17 @@ from midi_ddsp_webui.speaker import merge_piano_audio_outputs
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RELEASE_ROOT = ROOT / "models" / "piano_ddsp" / "model-suite-v1.0.0"
+MODEL_ID = "gru_ir_96_64"
+MODEL_RELEASE = "model-suite-v1.0.1"
+MODEL_METADATA_PATH = (
+    ROOT
+    / "models"
+    / "piano_ddsp"
+    / "bundles"
+    / "model-suite-v1.0.1-gru-unrolled-fp32-origin"
+    / "models"
+    / "ddsp_piano_gru_ir_96_64-gru-unrolled.json"
+)
 
 
 def make_bundle(
@@ -31,20 +41,20 @@ def make_bundle(
     bundle = root / "bundles" / bundle_id
     models = bundle / "models"
     models.mkdir(parents=True)
-    om = models / "paper.om"
-    metadata_path = models / "paper.json"
+    om = models / "model.om"
+    metadata_path = models / "model.json"
     om.write_bytes(b"fixture-om")
     om_sha256 = hashlib.sha256(om.read_bytes()).hexdigest()
-    metadata_path.write_bytes((RELEASE_ROOT / "ddsp_piano_paper_ir.json").read_bytes())
+    metadata_path.write_bytes(MODEL_METADATA_PATH.read_bytes())
     validation_dir = bundle / "validation"
     validation_dir.mkdir()
-    validation_path = validation_dir / "paper_ir.json"
+    validation_path = validation_dir / "model.json"
     validation_path.write_text(
         json.dumps(
             {
                 "schema": "piano-ddsp-om-validation/v1",
                 "bundle_id": bundle_id,
-                "model_id": "paper_ir",
+                "model_id": MODEL_ID,
                 "om_sha256": om_sha256,
                 "frames": validation_frames,
                 "passed": validation_passed,
@@ -55,20 +65,20 @@ def make_bundle(
     manifest = {
         "schema": "piano-ddsp-om-bundle/v1",
         "id": bundle_id,
-        "release": "model-suite-v1.0.0",
+        "release": MODEL_RELEASE,
         "precision": "FP32",
         "precision_mode_v2": "origin",
         "soc_version": "Ascend310B4",
         "complete": False,
         "models": {
-            "paper_ir": {
-                "display_name": "Paper IR",
-                "om": "models/paper.om",
+            MODEL_ID: {
+                "display_name": "GRU IR 96/64",
+                "om": "models/model.om",
                 "om_sha256": om_sha256,
-                "metadata": "models/paper.json",
+                "metadata": "models/model.json",
                 "metadata_sha256": hashlib.sha256(metadata_path.read_bytes()).hexdigest(),
                 "validation": {
-                    "path": "validation/paper_ir.json",
+                    "path": "validation/model.json",
                     "sha256": hashlib.sha256(validation_path.read_bytes()).hexdigest(),
                     "frames": validation_frames,
                     "passed": validation_passed,
@@ -94,7 +104,7 @@ class PianoWebUiTest(unittest.TestCase):
             root = Path(folder)
             make_bundle(root)
             with mock.patch("midi_ddsp_webui.piano.BUNDLE_ROOT", root / "bundles"):
-                self.assertTrue(resolve_piano_bundle("fixture", "paper_ir").is_file())
+                self.assertTrue(resolve_piano_bundle("fixture", MODEL_ID).is_file())
                 with self.assertRaisesRegex(KeyError, "film_fdn"):
                     resolve_piano_bundle("fixture", "film_fdn")
 
@@ -103,20 +113,20 @@ class PianoWebUiTest(unittest.TestCase):
             root = Path(folder)
             make_bundle(root)
             bundle = root / "bundles" / "fixture"
-            report_path = bundle / "validation" / "paper_ir.json"
+            report_path = bundle / "validation" / "model.json"
             report = json.loads(report_path.read_text(encoding="utf-8"))
             report["om_sha256"] = "0" * 64
             report_path.write_text(json.dumps(report), encoding="utf-8")
             manifest_path = bundle / "manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest["models"]["paper_ir"]["validation"]["sha256"] = hashlib.sha256(
+            manifest["models"][MODEL_ID]["validation"]["sha256"] = hashlib.sha256(
                 report_path.read_bytes()
             ).hexdigest()
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "Validation report mismatch"):
                 load_bundle(manifest_path)
             relaxed = load_bundle(manifest_path, validate_qualification=False)
-            self.assertFalse(relaxed.models["paper_ir"].validation_passed)
+            self.assertFalse(relaxed.models[MODEL_ID].validation_passed)
 
     def test_piano_audio_outputs_add_direct_edifier_without_changing_pulse_id(self) -> None:
         outputs = merge_piano_audio_outputs(
@@ -209,7 +219,6 @@ class PianoWebUiTest(unittest.TestCase):
             )
             with (
                 mock.patch("midi_ddsp_webui.piano.BUNDLE_ROOT", root / "bundles"),
-                mock.patch("midi_ddsp_webui.piano.RELEASE_ROOT", RELEASE_ROOT),
                 mock.patch("midi_ddsp_webui.piano.ACTIVE_BUNDLE_PATH", active),
             ):
                 catalog = piano_catalog()
@@ -229,12 +238,46 @@ class PianoWebUiTest(unittest.TestCase):
             make_bundle(root, validation_frames=100, validation_passed=False)
             with (
                 mock.patch("midi_ddsp_webui.piano.BUNDLE_ROOT", root / "bundles"),
-                mock.patch("midi_ddsp_webui.piano.RELEASE_ROOT", RELEASE_ROOT),
                 mock.patch("midi_ddsp_webui.piano.ACTIVE_BUNDLE_PATH", root / "missing.json"),
             ):
                 catalog = piano_catalog()
-            self.assertFalse(catalog["models"][0]["available"])
+            self.assertEqual(catalog["models"], [])
             self.assertEqual(catalog["bundles"][0]["models"], [])
+
+    def test_v2_validation_report_qualifies_a_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            make_bundle(root)
+            bundle = root / "bundles" / "fixture"
+            manifest_path = bundle / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            metadata_path = bundle / "models" / "model.json"
+            om_path = bundle / "models" / "model.om"
+            report_path = bundle / "validation" / "model.json"
+            report = {
+                "schema": "piano-ddsp-om-validation/v2",
+                "release": MODEL_RELEASE,
+                "model_id": MODEL_ID,
+                "frames": 10_000,
+                "passed": True,
+                "om_sha256": hashlib.sha256(om_path.read_bytes()).hexdigest(),
+                "metadata_sha256": hashlib.sha256(metadata_path.read_bytes()).hexdigest(),
+                "contract": {"validated": True},
+                "qualification": {
+                    "numerical": True,
+                    "reverb": True,
+                    "determinism": True,
+                    "realtime": True,
+                },
+            }
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            manifest["models"][MODEL_ID]["validation"]["sha256"] = hashlib.sha256(
+                report_path.read_bytes()
+            ).hexdigest()
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            loaded = load_bundle(manifest_path)
+            self.assertTrue(loaded.models[MODEL_ID].validation_passed)
 
     def test_failed_worker_gets_shutdown_before_forced_termination(self) -> None:
         class Process:

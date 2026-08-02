@@ -141,6 +141,7 @@ export interface RealtimeStatus {
 export interface MidiFile {
   id: string
   name: string
+  sha256?: string
   size_bytes: number
   uploaded: boolean
   original_name?: string
@@ -222,6 +223,44 @@ export interface MidiVoiceAnalysis {
   group_count: number
   voice_count: number
   groups: MidiVoiceAnalysisGroup[]
+}
+
+export interface MidiPianoRollNote {
+  start_seconds: number
+  duration_seconds: number
+  pitch: number
+  velocity: number
+}
+
+export interface MidiPianoRollVoice {
+  id: string
+  track_index: number
+  track_name: string
+  channel: number
+  program: number
+  suggested_instrument_id: number
+  notes: MidiPianoRollNote[]
+}
+
+export interface MidiPianoRoll {
+  midi_id: string
+  midi_sha256: string
+  midi_name: string
+  duration_seconds: number
+  note_count: number
+  pitch_min: number
+  pitch_max: number
+  timing: {
+    ticks_per_beat: number
+    tempo_changes: { tick: number; time_seconds: number; bpm: number }[]
+    time_signatures: {
+      tick: number
+      time_seconds: number
+      numerator: number
+      denominator: number
+    }[]
+  }
+  voices: MidiPianoRollVoice[]
 }
 
 export interface DdspVstModel {
@@ -458,4 +497,45 @@ export interface Job {
   exit_code: number | null
   metadata: Record<string, unknown> & { report?: MidiDdspReport }
   artifacts: Artifact[]
+}
+
+export interface MidiDdspLibraryVersion {
+  render_id: string
+  source_id: string
+  configuration_hash: string
+  version_label: string
+  state: JobState
+  model_bundle_id: string | null
+  model_bundle: string | null
+  voice_instruments: Record<string, number> | null
+  instrument_ids: number[]
+  seed: number
+  output_gain_db: number
+  tail_seconds: number
+  sample_rate: number
+  reverb: string | null
+  available: boolean
+  artifact: Artifact
+  report_available: boolean
+  metadata: Record<string, unknown>
+  report: MidiDdspReport | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MidiDdspLibraryTrack {
+  source_id: string
+  midi_sha256: string
+  midi_id: string | null
+  display_name: string
+  duration_seconds: number
+  note_count: number
+  track_count: number
+  legacy: boolean
+  version_count: number
+  available_version_count: number
+  preferred_render_id: string | null
+  default_render_id: string | null
+  default_version: MidiDdspLibraryVersion | null
+  updated_at: string
 }

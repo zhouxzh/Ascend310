@@ -18,7 +18,6 @@ from .core import REPORT_ROOT, ROOT, ResourceCoordinator
 
 
 BUNDLE_ROOT = ROOT / "models" / "piano_ddsp" / "bundles"
-RELEASE_ROOT = ROOT / "models" / "piano_ddsp" / "model-suite-v1.0.0"
 RECORDING_ROOT = REPORT_ROOT / "piano-ddsp"
 ACTIVE_BUNDLE_PATH = ROOT / "models" / "piano_ddsp" / "active-bundle.json"
 
@@ -48,10 +47,11 @@ def piano_catalog() -> dict[str, object]:
     active_bundle_id, active_error = active_piano_bundle_id(qualified_bundle_ids)
     if active_error:
         bundle_errors.append(active_error)
+    ranked_bundles = sorted(
+        bundles,
+        key=lambda bundle: (bundle.id != active_bundle_id, bundle.id),
+    )
     release: dict[str, Any] = {}
-    release_path = RELEASE_ROOT / "model-suite.json"
-    if release_path.is_file():
-        release = json.loads(release_path.read_text(encoding="utf-8"))
     public_bundles = [
         {
             "id": bundle.id,
@@ -65,50 +65,52 @@ def piano_catalog() -> dict[str, object]:
                 if asset.validation_passed
             ),
         }
-        for bundle in bundles
+        for bundle in ranked_bundles
     ]
+    assets_by_id: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+    for bundle in ranked_bundles:
+        for model_id, asset in bundle.models.items():
+            if asset.validation_passed:
+                assets_by_id.setdefault(model_id, []).append((bundle.id, asset.metadata))
+
     models: list[dict[str, object]] = []
-    for model_id, raw in dict(release.get("models", {})).items():
-        if not isinstance(raw, dict):
-            continue
-        metadata_path = RELEASE_ROOT / f"ddsp_piano_{model_id}.json"
-        metadata = (
-            json.loads(metadata_path.read_text(encoding="utf-8"))
-            if metadata_path.is_file()
-            else {}
-        )
-        available_bundles = [
-            bundle.id
-            for bundle in bundles
-            if model_id in bundle.models and bundle.models[model_id].validation_passed
-        ]
+    years: list[int] = []
+    contract: dict[str, object] = {}
+    for model_id, assets in assets_by_id.items():
+        bundle_ids = [bundle_id for bundle_id, _metadata in assets]
+        metadata = assets[0][1]
+        model_config = metadata.get("model_config")
         models.append(
             {
                 "id": model_id,
-                "name": raw.get("display_name", model_id),
-                "architecture": raw.get("architecture"),
-                "quality_status": raw.get("quality_status", "quality_selection_pending"),
-                "available": bool(available_bundles),
-                "bundle_ids": available_bundles,
+                "name": metadata.get("display_name", model_id),
+                "architecture": metadata.get("architecture"),
+                "quality_status": metadata.get("quality_status", "quality_selection_pending"),
+                "available": True,
+                "bundle_ids": bundle_ids,
                 "n_harmonics": metadata.get("n_harmonics"),
                 "n_noise_bands": metadata.get("n_noise_bands"),
-                "reverb_type": dict(metadata.get("model_config", {})).get("reverb_type"),
+                "reverb_type": dict(model_config or {}).get("reverb_type"),
             }
         )
-    contract = dict(release.get("deployment_contract", {}))
-    years: list[int] = []
-    first_metadata = next(RELEASE_ROOT.glob("ddsp_piano_*.json"), None) if RELEASE_ROOT.is_dir() else None
-    if first_metadata is not None:
-        years = [
-            int(value)
-            for value in json.loads(first_metadata.read_text(encoding="utf-8")).get(
-                "piano_model_index_to_maestro_year", []
-            )
-        ]
+        if not years:
+            years = [
+                int(value)
+                for value in metadata.get("piano_model_index_to_maestro_year", [])
+            ]
+            contract = {
+                "dtype": metadata.get("dtype"),
+                "opset": metadata.get("opset"),
+                "frames_per_call": metadata.get("frames_per_call"),
+                "frame_rate": metadata.get("frame_rate"),
+                "sample_rate": metadata.get("sample_rate"),
+                "audio_samples_per_call": metadata.get("audio_samples_per_call"),
+                "release_frames": metadata.get("release_frames"),
+            }
+    if ranked_bundles:
+        release = {"release": ranked_bundles[0].release}
     return {
-        "release": release.get("release", "model-suite-v1.0.0"),
-        "source_commit": "1f7cf65ff9c58968bc3b605ee571db928d1ac37a",
-        "hf_commit": "2199df0a55953a0d2469d59ab2f23a8bef8eb314",
+        "release": release.get("release"),
         "bundles": public_bundles,
         "active_bundle_id": active_bundle_id,
         "models": models,

@@ -1,0 +1,16 @@
+:root {
+  --studio-bg: #eef1f2;
+  --studio-surface: #ffffff;
+  --studio-graphite: #182126;
+  --studio-muted: #607078;
+  --studio-line: #cbd3d6;
+  --studio-teal: #128d88;
+  --studio-teal-dark: #0d716d;
+  --studio-amber: #d38a20;
+  --studio-red: #c44e59;
+  --studio-focus: #167dbe;
+  --studio-radius: 6px;
+  --studio-control: 44px;
+  --studio-touch-control: 52px;
+  --studio-primary-control: 56px;
+}

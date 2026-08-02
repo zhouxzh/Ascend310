@@ -63,8 +63,8 @@ powershell -ExecutionPolicy Bypass -File tools/deploy_midi_ddsp_webui.ps1
 
 脚本在本地执行 `npm ci` 和生产构建，然后通过 SSH 别名 `ascend8t` 将前端产物、
 FastAPI 服务、运行模块、文档和 MIDI 输入同步到
-`/home/HwHiAiUser/Documents/case3`。远端 MIDI 文件会按本地目录镜像，因此本地删除的
-`.mid`/`.midi` 也会从板端移除。脚本不会远程安装
+`/home/HwHiAiUser/Documents/case3`。MIDI 输入采用增量同步；部署不会删除板端已有的
+`midi/`、`midi_wav/`、历史任务、转换日志或校验和。脚本不会远程安装
 依赖，也不会修改 shell 启动文件或系统服务。可通过参数修改目标：
 
 ```powershell
@@ -230,6 +230,37 @@ WAV 在临时文件中确定性下混，原始 WAV 不改写。播放不会重�
 “播放位置”使用“当前浏览器 / 开发板喇叭”二选一；页面只显示所选路径对应的控制器，
 避免把浏览器原生播放键误认为开发板音频输出。
 
+新建渲染区使用独立的只读文件卷帘显示完整 MIDI 时间轴。卷帘按声部和乐器着色，显示
+左侧音高键盘、小节线、拍线、缩放、横向拖动和渲染进度游标；点击声部会定位到相应的
+乐器分配行。音频库中的卷帘随所选版本同步更新，并且是页面唯一的动态可视化：旧波形区
+已经移除，浏览器或开发板播放按钮合并到卷帘工具栏，10 寸屏不再同时堆叠两块动态画布。
+
+浏览器播放时间直接绑定到卷帘。播放开始后自动放大时间轴并跟随当前区段，当前音符和
+左侧琴键同步高亮；卷帘工具栏提供播放、暂停、停止、循环、可拖动播放位置以及当前/总
+时长，音频元数据载入完成前会冻结控制，播放失败会显示明确状态。暂停、停止或渲染空闲
+时会停止动画循环。交互参考
+[html-midi-player](https://github.com/cifkao/html-midi-player)、官方
+[advanced demo](https://codepen.io/cifkao/pen/GRZxqZN) 与其使用的
+[Magenta.js PianoRollCanvasVisualizer](https://magenta.github.io/magenta-js/music/classes/_core_visualizer_.pianorollcanvasvisualizer.html)
+的播放器绑定、活动音符和自动跟随方案；声部配色与页面视觉继续参考
+[ChordMiniApp](https://github.com/ptnghia-j/ChordMiniApp)。项目没有直接引入 Tone.js、
+Magenta.js 或新的播放器依赖，而是沿用后端已经解析好的音符数据和现有 WAV。高级示例
+支持多播放器/多可视化器互相绑定；本项目按 10 寸屏的单卷帘要求只保留一个可视化器。
+
+文件卷帘与实时演奏的事件卷帘互不共享状态，第一版只提供查看、缩放、平移、声部联动和
+游标，不编辑 MIDI 音符。实现使用静态网格、音符和游标三个 Canvas 层；播放或渲染停止后
+不保留动画循环，大型 MIDI 也不会为每个音符生成 React 节点。
+
+音频库使用 Python 标准库 `sqlite3` 建立可重建目录索引，数据库位于
+`reports/webui/library.sqlite3`。`midi_sources` 按 MIDI 内容 SHA256 归并曲目，
+`render_versions` 保存每次显式渲染的模型、声部映射、种子、增益、尾音、采样率、配置
+哈希和产物引用，`library_preferences` 保存每首曲目的首选版本。WAV、MIDI、完整报告和
+任务元数据仍由文件系统负责；数据库删除或损坏后可从成功任务的 `metadata.json` 幂等
+重建。产物缺失时版本会标记为不可用而不删除记录。
+
+同一配置再次渲染也会保留为新版本。默认播放首先选择可用的首选版本；没有首选版本时
+选择最新成功版本。用户明确选择的版本不可用时直接报错，不静默切换到其他 WAV。
+
 所有页面按物理设备使用统一名称；后端差异只作为括号标记显示，例如
 `EDIFIER M16 Pro（PulseAudio）`、`EDIFIER M16 Pro（直连，默认）` 和
 `板载 3.5 mm（单声道，默认）`。DDSP-VST 不显示曾导致 DMA 卡死的板载 PulseAudio
@@ -242,8 +273,8 @@ voice，按静态 batch `1/2/4/8` 推理，再按 Google MIDI-DDSP 的方式对�
 
 渲染期间页面持续显示固定阶段列表、总进度、阶段进度、当前声部批次、工作量、已用
 时间、ETA 和最近心跳。10 秒没有心跳会显示连接警告，恢复事件后自动消失。渲染期只
-提供停止；完整 WAV 写入缓存并进入播放后才启用暂停/继续。波形、下载和播放器始终
-选择最终 `output.wav`，不会误选 stem。
+提供停止；完整 WAV 写入缓存并进入播放后才启用暂停/继续。下载和播放器始终选择最终
+`output.wav`，不会误选 stem。
 
 运行时使用 Google MIDI-DDSP 的谐波、FilteredNoise 和逐乐器混响语义。混响资产为
 20 组 16 kHz、48,000 点 IR，产品使用 ID 0-12，采用 2,048 点分区 FFT 卷积并叠加
@@ -313,6 +344,12 @@ Sequencer 客户端。此时 MIDI 端口接口会返回 `available: false`，界
 - `POST /api/v1/midi-ddsp/jobs` 使用 `model_bundle_id`、乐器、种子和尾音参数管理播放/渲染。
 - `POST /api/v1/midi-ddsp/recordings/{job_id}/play` 将历史任务的 `output.wav` 直接发送到
   指定开发板音频输出，不触发 MIDI-DDSP 渲染。
+- `GET /api/v1/midi-ddsp/library` 按 MIDI 曲目返回音频库、默认版本和版本数量；
+  `GET /api/v1/midi-ddsp/library/{source_id}/versions` 返回该曲目的全部版本配置。
+- `PATCH /api/v1/midi-ddsp/library/{source_id}/preference` 设置或清除首选版本；
+  `POST /api/v1/midi-ddsp/library/versions/{render_id}/play` 播放明确指定的版本。
+- `GET /api/v1/midi-files/{midi_id}/piano-roll` 返回文件卷帘所需的时长、音域、节拍、
+  声部和音符数据。
 
 旧 `/api/v1/live/*`、`/api/v1/ddsp-vst/*` 和 `/api/v1/piano-ddsp/*` 路由已删除，
 实时功能统一使用 `/api/v1/realtime/*`，避免维护多套行为不同的接口。

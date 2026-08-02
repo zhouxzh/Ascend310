@@ -16,12 +16,13 @@ import subprocess
 import sys
 import threading
 import time
+from typing import Callable
 from uuid import uuid4
 import zipfile
 
 import numpy as np
 
-from .midi_analysis import analyze_midi
+from .midi_analysis import analyze_midi, midi_file_sha256
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -117,6 +118,7 @@ def scan_midi_files() -> list[dict[str, object]]:
             "id": _file_id("midi", path),
             "name": path.name,
             "size_bytes": path.stat().st_size,
+            "sha256": midi_file_sha256(path),
             "uploaded": UPLOAD_ROOT in path.parents,
             "path": str(path.resolve()),
         }
@@ -585,8 +587,13 @@ class Job:
 
 
 class JobManager:
-    def __init__(self, coordinator: ResourceCoordinator) -> None:
+    def __init__(
+        self,
+        coordinator: ResourceCoordinator,
+        terminal_callback: Callable[[Job], None] | None = None,
+    ) -> None:
         self.coordinator = coordinator
+        self.terminal_callback = terminal_callback
         self._lock = threading.Lock()
         self._jobs: dict[str, Job] = {}
         self._subscribers: list[queue.Queue[dict[str, object]]] = []
@@ -807,6 +814,12 @@ class JobManager:
             job.updated_at = utc_timestamp()
             job.state = final_state
             self._persist(job)
+            if self.terminal_callback is not None:
+                try:
+                    self.terminal_callback(job)
+                except BaseException as exc:
+                    job.message = f"{job.message}; library index failed: {exc}".strip("; ")
+                    self._persist(job)
             self._publish(job)
             if termination_error is not None:
                 raise termination_error

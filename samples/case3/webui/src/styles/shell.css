@@ -1,0 +1,38 @@
+.app-shell {
+  color: var(--studio-graphite);
+  background: var(--studio-bg);
+}
+
+.app-header,
+.status-footer {
+  border-color: var(--studio-line);
+}
+
+.primary-nav button,
+.bottom-nav button {
+  letter-spacing: 0;
+}
+
+.primary-nav button[aria-current='page'],
+.bottom-nav button[aria-current='page'] {
+  color: var(--studio-teal-dark);
+}
+
+.content-area[role='tabpanel']:focus-visible {
+  outline: none;
+}
+
+.app-shell--touch-display .primary-nav button {
+  min-height: var(--studio-touch-control);
+  padding-inline: 18px;
+  font-size: 18px;
+}
+
+.app-shell--touch-display .primary-nav button span {
+  font-size: inherit;
+}
+
+.app-shell--touch-display .status-footer {
+  min-height: 48px;
+  font-size: 16px;
+}

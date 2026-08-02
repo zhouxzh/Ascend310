@@ -1,0 +1,56 @@
+.panel,
+.device-section-panel {
+  border-radius: var(--studio-radius);
+}
+
+.panel-header h2 {
+  letter-spacing: 0;
+}
+
+.field > span,
+.field-hint,
+.metric > span,
+.status-pill,
+.notice,
+.device-list-row,
+.inventory-row,
+.dependency-row {
+  letter-spacing: 0;
+}
+
+.field select,
+.field input:not([type='range']),
+.field-readonly,
+.primary-button,
+.secondary-button,
+.segmented button {
+  min-height: var(--studio-control);
+}
+
+.icon-button {
+  min-width: var(--studio-control);
+  min-height: var(--studio-control);
+}
+
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--studio-focus);
+  outline-offset: 2px;
+}
+
+.primary-button {
+  background: var(--studio-teal-dark);
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--studio-teal);
+}
+
+.secondary-button.is-active {
+  color: var(--studio-teal-dark);
+  border-color: var(--studio-teal);
+  background: #e8f5f4;
+}

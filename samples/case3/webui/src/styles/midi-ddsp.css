@@ -1,0 +1,284 @@
+.recording-version-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.recording-version-bar .field {
+  min-width: 0;
+}
+
+.recording-version-bar select {
+  width: 100%;
+  text-overflow: ellipsis;
+}
+
+.midi-file-roll {
+  overflow: hidden;
+  margin: 14px 0;
+  border: 1px solid #35464d;
+  border-radius: var(--studio-radius);
+  background: #10181c;
+  color: #f5f7f8;
+}
+
+.midi-file-roll-toolbar {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto auto;
+  align-items: center;
+  min-height: 52px;
+  gap: 12px;
+  padding: 6px 10px 6px 14px;
+  background: #1b272c;
+  border-bottom: 1px solid #35464d;
+}
+
+.midi-file-roll-title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.midi-file-roll-toolbar strong {
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.midi-file-roll-toolbar span {
+  overflow: hidden;
+  color: #b7c4c9;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.midi-file-roll-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.midi-file-roll-actions .icon-button {
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  color: #e8edef;
+  border-color: #4e6068;
+  background: #243238;
+}
+
+.midi-file-roll-actions .icon-button.is-active {
+  color: #10181c;
+  border-color: #57c7ba;
+  background: #57c7ba;
+}
+
+.midi-roll-transport {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.midi-roll-transport .icon-button {
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  color: #f1f5f6;
+  border-color: #53656d;
+  background: #26373d;
+}
+
+.midi-roll-transport .icon-button.is-active {
+  color: #10181c;
+  border-color: #f3b94d;
+  background: #f3b94d;
+}
+
+.midi-roll-transport .primary-button {
+  min-height: 42px;
+  padding-inline: 14px;
+}
+
+.midi-roll-audio {
+  display: none;
+}
+
+.midi-roll-seek {
+  width: clamp(140px, 18vw, 280px);
+  min-width: 100px;
+  min-height: 30px;
+  margin: 0 4px;
+  accent-color: #57c7ba;
+  cursor: pointer;
+}
+
+.midi-roll-seek:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.midi-roll-transport-time {
+  min-width: 82px;
+  color: #eef2f3;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 14px;
+  text-align: center;
+}
+
+.midi-roll-transport-error,
+.midi-roll-transport-status {
+  flex: 0 0 auto;
+  font-size: 14px;
+}
+
+.midi-roll-transport-status {
+  color: #b7c4c9;
+}
+
+.midi-roll-transport-error {
+  color: #ff9aa2;
+}
+
+.midi-file-roll-actions output {
+  min-width: 34px;
+  color: #d6dfe2;
+  font-size: 14px;
+  text-align: center;
+}
+
+.midi-file-roll-canvas {
+  position: relative;
+  width: 100%;
+  height: 230px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+
+.midi-file-roll.is-compact .midi-file-roll-canvas {
+  height: 196px;
+}
+
+.midi-file-roll-canvas:active {
+  cursor: grabbing;
+}
+
+.midi-file-roll-canvas canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.midi-file-roll-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #c4cfd3;
+  font-size: 16px;
+}
+
+.midi-file-roll-loading.is-error {
+  padding: 20px;
+  color: #ffb4ba;
+  text-align: center;
+}
+
+.voice-assignment-row.is-highlighted {
+  box-shadow: inset 4px 0 var(--studio-amber);
+  background: #fff8e9;
+}
+
+.recording-row small,
+.recording-heading small,
+.recording-heading span,
+.recording-playback-route > span,
+.midi-render-progress,
+.voice-analysis-source,
+.voice-assignment-row {
+  font-size: max(14px, 1em);
+}
+
+.midi-workspace .panel-header h2,
+.midi-settings .panel-header h2 {
+  font-size: 20px;
+}
+
+.midi-settings .field > span,
+.midi-settings .field-hint,
+.midi-settings select,
+.midi-settings input,
+.recording-version-bar .field > span,
+.recording-version-bar select {
+  font-size: 16px;
+}
+
+@media (max-width: 1100px) {
+  .midi-file-roll-toolbar {
+    grid-template-columns: minmax(130px, 1fr) auto;
+  }
+
+  .midi-roll-transport {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+  }
+
+  .midi-file-roll-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 700px) {
+  .midi-file-roll-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .midi-file-roll-actions .icon-button {
+    width: 40px;
+    min-width: 40px;
+  }
+
+  .midi-file-roll-actions output,
+  .midi-file-roll-actions .icon-button:nth-of-type(4) {
+    display: none;
+  }
+
+  .midi-roll-transport-time {
+    min-width: 76px;
+    font-size: 14px;
+  }
+
+  .midi-roll-transport {
+    width: 100%;
+  }
+
+  .midi-roll-transport .icon-button {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .midi-roll-seek {
+    flex: 1 1 90px;
+    width: auto;
+    min-width: 64px;
+    margin-inline: 0;
+  }
+
+  .midi-roll-transport-status,
+  .midi-roll-transport-error {
+    display: none;
+  }
+}

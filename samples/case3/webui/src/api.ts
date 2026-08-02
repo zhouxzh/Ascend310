@@ -5,7 +5,10 @@ import type {
   AudioInput,
   Catalog,
   Job,
+  MidiDdspLibraryTrack,
+  MidiDdspLibraryVersion,
   MidiFile,
+  MidiPianoRoll,
   MidiVoiceAnalysis,
   MidiPort,
   RealtimeCatalog,
@@ -117,6 +120,21 @@ export const api = {
     request<MidiVoiceAnalysis>(
       `/api/v1/midi-files/${encodeURIComponent(midiId)}/voices`,
     ),
+  midiPianoRoll: (midiId: string) =>
+    request<MidiPianoRoll>(
+      `/api/v1/midi-files/${encodeURIComponent(midiId)}/piano-roll`,
+    ),
+  midiDdspLibrary: () =>
+    request<{ tracks: MidiDdspLibraryTrack[] }>('/api/v1/midi-ddsp/library'),
+  midiDdspLibraryVersions: (sourceId: string) =>
+    request<{ source_id: string; versions: MidiDdspLibraryVersion[] }>(
+      `/api/v1/midi-ddsp/library/${encodeURIComponent(sourceId)}/versions`,
+    ),
+  setMidiDdspLibraryPreference: (sourceId: string, preferredRenderId: string | null) =>
+    request<MidiDdspLibraryTrack>(
+      `/api/v1/midi-ddsp/library/${encodeURIComponent(sourceId)}/preference`,
+      { method: 'PATCH', body: JSON.stringify({ preferred_render_id: preferredRenderId }) },
+    ),
   startMidiDdsp: (payload: Record<string, unknown>) =>
     request<Job>('/api/v1/midi-ddsp/jobs', {
       method: 'POST',
@@ -124,6 +142,11 @@ export const api = {
     }),
   playMidiDdspRecording: (jobId: string, payload: Record<string, unknown>) =>
     request<Job>(`/api/v1/midi-ddsp/recordings/${jobId}/play`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  playMidiDdspLibraryVersion: (renderId: string, payload: Record<string, unknown>) =>
+    request<Job>(`/api/v1/midi-ddsp/library/versions/${encodeURIComponent(renderId)}/play`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

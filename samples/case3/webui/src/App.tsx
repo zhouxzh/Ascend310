@@ -140,7 +140,7 @@ export default function App() {
         <nav className="primary-nav" aria-label="主工作区">
           {NAVIGATION.map((item) => {
             const Icon = item.icon
-            return <button type="button" aria-label={item.label} className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)} key={item.id}><Icon size={20} /><span>{item.label}</span></button>
+            return <button type="button" aria-current={tab === item.id ? 'page' : undefined} aria-label={item.label} className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)} key={item.id}><Icon size={20} /><span>{item.label}</span></button>
           })}
         </nav>
         <div className="system-strip">
@@ -175,7 +175,7 @@ export default function App() {
       <nav className="bottom-nav">
         {NAVIGATION.map((item) => {
           const Icon = item.icon
-          return <button type="button" aria-label={item.label} className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)} key={item.id}><Icon size={20} /><span>{item.label}</span></button>
+          return <button type="button" aria-label={item.label} aria-current={tab === item.id ? 'page' : undefined} className={tab === item.id ? 'is-active' : ''} onClick={() => setTab(item.id)} key={item.id}><Icon size={20} /><span>{item.label}</span></button>
         })}
       </nav>
     </div>

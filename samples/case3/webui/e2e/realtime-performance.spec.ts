@@ -257,9 +257,12 @@ test('physical 10-inch touch stage keeps performance controls in the first viewp
 
     const controls = page.locator('.realtime-stage--touch .performance-control-bar > *')
     await expect(controls).toHaveCount(5)
-    const [viewport, footerBox, pianoBox, controlsBox, labelSize, valueSize, controlBoxes] = await Promise.all([
+    const [viewport, footerBox, footerFontSizes, pianoBox, controlsBox, labelSize, valueSize, controlBoxes] = await Promise.all([
       page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight })),
       page.locator('.status-footer').boundingBox(),
+      page.locator('.status-footer span').evaluateAll((elements) => (
+        elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize))
+      )),
       page.locator('.realtime-stage--touch .piano').boundingBox(),
       page.locator('.realtime-stage--touch .performance-control-bar').boundingBox(),
       page.locator('.realtime-stage--touch .performance-control-bar label > span').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
@@ -271,6 +274,8 @@ test('physical 10-inch touch stage keeps performance controls in the first viewp
     ])
     expect(viewport).toEqual({ width: 1920, height: 969 })
     expect(footerBox).not.toBeNull()
+    expect(footerBox!.height).toBeGreaterThanOrEqual(48)
+    expect(footerFontSizes.every((size) => size >= 16)).toBe(true)
     expect(pianoBox).not.toBeNull()
     expect(controlsBox).not.toBeNull()
     expect(labelSize).toBeGreaterThanOrEqual(24)
@@ -302,7 +307,7 @@ test('physical 10-inch MIDI stage keeps controller controls and visualizer reada
     await picker.locator('summary').click()
     await expect(pickerContent).not.toBeVisible()
 
-    const [inputLabelSize, inputSelectBox, keyButtons, rollBox, visualizerBox, drawerBox, navigationFontSize, navigationBox] = await Promise.all([
+    const [inputLabelSize, inputSelectBox, keyButtons, rollBox, visualizerBox, drawerBox, navigationFontSize, navigationBox, transportSelectStyle, transportButtonBox, transportTimeSize] = await Promise.all([
       page.locator('.realtime-stage--midi .midi-input-control span').evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
       page.getByLabel('实体 MIDI 输入').boundingBox(),
       page.locator('.realtime-stage--midi .key-count-control button').evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().toJSON())),
@@ -311,6 +316,12 @@ test('physical 10-inch MIDI stage keeps controller controls and visualizer reada
       page.locator('.realtime-stage--midi .drawer-tabs').boundingBox(),
       page.locator('.primary-nav button').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
       page.locator('.primary-nav button').first().boundingBox(),
+      page.locator('.transport-layout select').first().evaluate((element) => ({
+        fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+        height: element.getBoundingClientRect().height,
+      })),
+      page.locator('.transport-layout .icon-command').first().boundingBox(),
+      page.locator('.transport-time').evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
     ])
     expect(inputLabelSize).toBeGreaterThanOrEqual(18)
     expect(inputSelectBox).not.toBeNull()
@@ -325,6 +336,11 @@ test('physical 10-inch MIDI stage keeps controller controls and visualizer reada
     expect(navigationFontSize).toBeGreaterThanOrEqual(22)
     expect(navigationBox).not.toBeNull()
     expect(navigationBox!.height).toBeGreaterThanOrEqual(80)
+    expect(transportSelectStyle.fontSize).toBeGreaterThanOrEqual(16)
+    expect(transportSelectStyle.height).toBeGreaterThanOrEqual(52)
+    expect(transportButtonBox).not.toBeNull()
+    expect(transportButtonBox!.height).toBeGreaterThanOrEqual(52)
+    expect(transportTimeSize).toBeGreaterThanOrEqual(16)
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
     await mkdir('../reports/webui/screenshots', { recursive: true })
     await page.screenshot({ path: '../reports/webui/screenshots/realtime-midi-stage-1920x969.png', fullPage: false })
@@ -354,13 +370,14 @@ test('unified session starts, switches patch, and releases notes on blur', async
   await expect.poll(() => switchBody).toMatchObject({ patch_id: 'neural.violin', audio_device_id: 'usb-audio' })
 
   await page.evaluate(() => window.dispatchEvent(new Event('blur')))
-  const allNotesOff = await page.evaluate(() => {
+  await expect.poll(() => page.evaluate(() => {
     const sockets = (globalThis as unknown as { __testSockets: Array<{ url: string; sent: string[] }> }).__testSockets
-    return sockets.find((socket) => socket.url.includes('/realtime/events'))?.sent
-      .map((item) => JSON.parse(item))
-      .some((item) => item.event === 'all_notes_off')
-  })
-  expect(allNotesOff).toBe(true)
+    return sockets
+      .filter((socket) => socket.url.includes('/realtime/events'))
+      .some((socket) => socket.sent
+        .map((item) => JSON.parse(item))
+        .some((item) => item.event === 'all_notes_off'))
+  })).toBe(true)
 })
 
 test('live piano roll paints websocket note activity', async ({ page }) => {

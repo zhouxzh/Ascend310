@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-EXPECTED_RELEASE = "model-suite-v1.0.0"
+SUPPORTED_RELEASES = frozenset({"model-suite-v1.0.0", "model-suite-v1.0.1"})
 EXPECTED_PRECISION = "FP32"
 EXPECTED_PRECISION_MODE_V2 = "origin"
 EXPECTED_SOC = "Ascend310B4"
@@ -104,7 +104,7 @@ def load_bundle(
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
     if data.get("schema") != "piano-ddsp-om-bundle/v1":
         raise ValueError(f"Unsupported Piano-DDSP bundle schema: {manifest_path}")
-    if data.get("release") != EXPECTED_RELEASE:
+    if data.get("release") not in SUPPORTED_RELEASES:
         raise ValueError(f"Unexpected Piano-DDSP release: {data.get('release')!r}")
     if data.get("precision") != EXPECTED_PRECISION:
         raise ValueError("Only the FP32 Piano-DDSP baseline is accepted")
@@ -145,15 +145,38 @@ def load_bundle(
                 raise ValueError(f"SHA256 mismatch for {validation_path}")
             report = json.loads(validation_path.read_text(encoding="utf-8"))
             report_frames = int(report.get("frames", 0))
-            if (
-                report.get("schema") != "piano-ddsp-om-validation/v1"
-                or report.get("bundle_id") != data.get("id", manifest_path.parent.name)
-                or report.get("model_id") != model_id
-                or int(validation.get("frames", 0)) != report_frames
-                or bool(validation.get("passed", False)) != bool(report.get("passed", False))
-                or validation.get("om_sha256") != actual_om_hash
-                or report.get("om_sha256") != actual_om_hash
-            ):
+            report_schema = report.get("schema")
+            if report_schema == "piano-ddsp-om-validation/v1":
+                report_matches = (
+                    report.get("bundle_id") == data.get("id", manifest_path.parent.name)
+                    and report.get("model_id") == model_id
+                    and int(validation.get("frames", 0)) == report_frames
+                    and bool(validation.get("passed", False)) == bool(report.get("passed", False))
+                    and validation.get("om_sha256") == actual_om_hash
+                    and report.get("om_sha256") == actual_om_hash
+                )
+            elif report_schema == "piano-ddsp-om-validation/v2":
+                qualification = report.get("qualification")
+                contract = report.get("contract")
+                report_matches = (
+                    report.get("release") == data.get("release")
+                    and report.get("model_id") == model_id
+                    and int(validation.get("frames", 0)) == report_frames
+                    and bool(validation.get("passed", False)) == bool(report.get("passed", False))
+                    and validation.get("om_sha256") == actual_om_hash
+                    and report.get("om_sha256") == actual_om_hash
+                    and report.get("metadata_sha256") == expected_metadata_hash
+                    and isinstance(contract, dict)
+                    and contract.get("validated") is True
+                    and isinstance(qualification, dict)
+                    and all(
+                        qualification.get(name) is True
+                        for name in ("numerical", "reverb", "determinism", "realtime")
+                    )
+                )
+            else:
+                report_matches = False
+            if not report_matches:
                 raise ValueError(f"Validation report mismatch for {model_id}")
             validation_passed = bool(report.get("passed", False)) and (
                 report_frames >= MINIMUM_VALIDATION_FRAMES

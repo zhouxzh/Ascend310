@@ -73,6 +73,11 @@ MIDI_DDSP_INSTRUMENT_NAMES = (
 _VOICE_CACHE_LOCK = threading.Lock()
 _VOICE_CACHE: dict[tuple[str, str], dict[str, object]] = {}
 _VOICE_CACHE_MAX_ITEMS = 32
+_PIANO_ROLL_CACHE_LOCK = threading.Lock()
+_PIANO_ROLL_CACHE: dict[tuple[str, str], dict[str, object]] = {}
+_VOICE_SPLIT_CACHE_LOCK = threading.Lock()
+_VOICE_SPLIT_CACHE: dict[tuple[str, str], tuple["MidiVoice", ...]] = {}
+_VOICE_SPLIT_INFLIGHT: dict[tuple[str, str], threading.Event] = {}
 
 
 class MidiValidationError(ValueError):
@@ -333,6 +338,37 @@ def split_midi_voices(analysis: MidiAnalysis) -> tuple[MidiVoice, ...]:
     )
 
 
+def _cached_split_midi_voices(
+    analysis: MidiAnalysis, midi_sha256: str
+) -> tuple[MidiVoice, ...]:
+    cache_key = (midi_sha256, VOICE_SEPARATION_COMMIT)
+    while True:
+        with _VOICE_SPLIT_CACHE_LOCK:
+            cached = _VOICE_SPLIT_CACHE.get(cache_key)
+            if cached is not None:
+                return cached
+            pending = _VOICE_SPLIT_INFLIGHT.get(cache_key)
+            if pending is None:
+                pending = threading.Event()
+                _VOICE_SPLIT_INFLIGHT[cache_key] = pending
+                break
+        pending.wait()
+
+    try:
+        voices = split_midi_voices(analysis)
+    except BaseException:
+        with _VOICE_SPLIT_CACHE_LOCK:
+            _VOICE_SPLIT_INFLIGHT.pop(cache_key, pending).set()
+        raise
+
+    with _VOICE_SPLIT_CACHE_LOCK:
+        if len(_VOICE_SPLIT_CACHE) >= _VOICE_CACHE_MAX_ITEMS:
+            _VOICE_SPLIT_CACHE.pop(next(iter(_VOICE_SPLIT_CACHE)))
+        _VOICE_SPLIT_CACHE[cache_key] = voices
+        _VOICE_SPLIT_INFLIGHT.pop(cache_key, pending).set()
+    return voices
+
+
 def _tempo_map(midi: Any) -> list[tuple[int, int]]:
     events: list[tuple[int, int]] = [(0, 500_000)]
     for track in midi.tracks:
@@ -521,6 +557,10 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def midi_file_sha256(path: Path) -> str:
+    return _sha256_file(path)
+
+
 def _voice_public(voice: MidiVoice) -> dict[str, object]:
     pitches = np.asarray([note.pitch for note in voice.notes], dtype=np.float64)
     detected_name = (
@@ -554,7 +594,7 @@ def _voice_public(voice: MidiVoice) -> dict[str, object]:
 
 
 def _build_voice_analysis(path: Path, analysis: MidiAnalysis, midi_sha256: str) -> dict[str, object]:
-    voices = split_midi_voices(analysis)
+    voices = _cached_split_midi_voices(analysis, midi_sha256)
     signature = {
         "midi_sha256": midi_sha256,
         "algorithm_commit": VOICE_SEPARATION_COMMIT,
@@ -616,4 +656,99 @@ def analyze_midi_voices(path: Path) -> dict[str, object]:
         if len(_VOICE_CACHE) >= _VOICE_CACHE_MAX_ITEMS:
             _VOICE_CACHE.pop(next(iter(_VOICE_CACHE)))
         _VOICE_CACHE[cache_key] = result
+    return copy.deepcopy(result)
+
+
+def _midi_timing(path: Path) -> dict[str, object]:
+    try:
+        import mido
+    except ImportError as exc:
+        raise RuntimeError("mido is required for MIDI-DDSP") from exc
+
+    midi = mido.MidiFile(str(path))
+    tempos = _tempo_map(midi)
+    tempo_changes = [
+        {
+            "tick": tick,
+            "time_seconds": _tick_to_seconds(tick, midi.ticks_per_beat, tempos, mido),
+            "bpm": 60_000_000.0 / tempo,
+        }
+        for tick, tempo in tempos
+    ]
+    signature_events: list[tuple[int, int, int]] = [(0, 4, 4)]
+    for track in midi.tracks:
+        tick = 0
+        for message in track:
+            tick += int(message.time)
+            if message.type == "time_signature":
+                signature_events.append(
+                    (tick, int(message.numerator), int(message.denominator))
+                )
+    normalized: list[tuple[int, int, int]] = []
+    for event in sorted(signature_events, key=lambda item: item[0]):
+        if normalized and normalized[-1][0] == event[0]:
+            normalized[-1] = event
+        else:
+            normalized.append(event)
+    return {
+        "ticks_per_beat": int(midi.ticks_per_beat),
+        "tempo_changes": tempo_changes,
+        "time_signatures": [
+            {
+                "tick": tick,
+                "time_seconds": _tick_to_seconds(
+                    tick, midi.ticks_per_beat, tempos, mido
+                ),
+                "numerator": numerator,
+                "denominator": denominator,
+            }
+            for tick, numerator, denominator in normalized
+        ],
+    }
+
+
+def analyze_midi_piano_roll(path: Path) -> dict[str, object]:
+    midi_sha256 = _sha256_file(path)
+    cache_key = (midi_sha256, VOICE_SEPARATION_COMMIT)
+    with _PIANO_ROLL_CACHE_LOCK:
+        cached = _PIANO_ROLL_CACHE.get(cache_key)
+        if cached is not None:
+            return copy.deepcopy(cached)
+
+    analysis = analyze_midi(path)
+    voices = _cached_split_midi_voices(analysis, midi_sha256)
+    notes = [note for voice in voices for note in voice.notes]
+    result = {
+        "midi_sha256": midi_sha256,
+        "midi_name": path.name,
+        "duration_seconds": analysis.duration_seconds,
+        "note_count": analysis.note_count,
+        "pitch_min": min(note.pitch for note in notes),
+        "pitch_max": max(note.pitch for note in notes),
+        "timing": _midi_timing(path),
+        "voices": [
+            {
+                "id": voice.id,
+                "track_index": voice.source_track_index,
+                "track_name": voice.source_track_name,
+                "channel": voice.channel + 1,
+                "program": voice.program,
+                "suggested_instrument_id": voice.suggested_instrument_id,
+                "notes": [
+                    {
+                        "start_seconds": note.start,
+                        "duration_seconds": max(0.001, note.end - note.start),
+                        "pitch": note.pitch,
+                        "velocity": note.velocity,
+                    }
+                    for note in voice.notes
+                ],
+            }
+            for voice in voices
+        ],
+    }
+    with _PIANO_ROLL_CACHE_LOCK:
+        if len(_PIANO_ROLL_CACHE) >= _VOICE_CACHE_MAX_ITEMS:
+            _PIANO_ROLL_CACHE.pop(next(iter(_PIANO_ROLL_CACHE)))
+        _PIANO_ROLL_CACHE[cache_key] = result
     return copy.deepcopy(result)

@@ -1,0 +1,1671 @@
+/* Unified realtime stage */
+.realtime-stage {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 2px;
+}
+
+.stage-session-bar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 6px 9px 6px 12px;
+  color: #e9efed;
+  background: #202728;
+  border-left: 3px solid #21a898;
+  border-radius: 5px;
+}
+
+.stage-current-patch,
+.stage-session-meta,
+.stage-session-actions,
+.drawer-tabs,
+.recording-layout {
+  display: flex;
+  align-items: center;
+}
+
+.stage-current-patch {
+  gap: 10px;
+  min-width: 0;
+}
+
+.stage-current-patch svg { color: #6ed4c7; }
+.stage-current-patch div { min-width: 0; }
+.stage-current-patch span,
+.stage-current-patch strong { display: block; }
+.stage-current-patch span { color: #8f9b98; font-size: 9px; font-weight: 700; }
+.stage-current-patch strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.stage-session-meta,
+.stage-session-actions { gap: 7px; }
+
+.icon-command {
+  display: inline-grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  color: #47514f;
+  background: #e5e9e7;
+  border: 1px solid #cbd2cf;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.icon-command:hover { color: var(--teal-dark); background: #f4f7f5; }
+.icon-command.danger { color: #f7ddda; background: #76302e; border-color: #8c3c39; }
+.icon-command input { display: none; }
+
+.patch-library {
+  min-width: 0;
+  padding: 7px 8px 8px;
+  background: #e5e8e9;
+  border: 1px solid #c7cdcf;
+  border-radius: 5px;
+}
+
+.patch-category-tabs {
+  display: inline-flex;
+  gap: 2px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 3px;
+  overflow-x: auto;
+  background: #cfd4d6;
+  border-radius: 5px;
+  scrollbar-width: none;
+}
+
+.patch-category-tabs::-webkit-scrollbar { display: none; }
+.patch-category-tabs button {
+  flex: 0 0 auto;
+  min-height: 27px;
+  padding: 0 11px;
+  color: #555f63;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+.patch-category-tabs button.is-active { color: #f5f7f8; background: #293238; }
+
+.patch-strip {
+  display: flex;
+  gap: 3px;
+  min-height: 56px;
+  margin-top: 6px;
+  padding: 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  background: #11161b;
+  border: 1px solid #343c43;
+  border-radius: 3px;
+  scrollbar-width: thin;
+}
+
+.patch-tile {
+  display: grid;
+  flex: 0 0 148px;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 6px 9px;
+  color: #e4e9eb;
+  text-align: left;
+  background: #1b2228;
+  border: 1px solid #4b555d;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.patch-tile:hover { background: #252e35; border-color: #78858e; }
+.patch-tile.is-active { color: #f4f8ff; background: #234772; border-color: #68a9f5; box-shadow: inset 3px 0 #66aaf7; }
+.patch-tile strong,
+.patch-tile span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.patch-tile strong { font-size: 11px; }
+.patch-tile span { color: #8f9aa1; font-size: 8px; }
+.patch-tile.is-active span { color: #b9d8fa; }
+.patch-empty { align-self: center; color: #879197; font-size: 10px; }
+
+.keyboard-stage {
+  min-width: 0;
+  overflow: hidden;
+  background: #0f1317;
+  border: 1px solid #2d353b;
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(16, 23, 26, 0.14);
+}
+
+.roll-toolbar {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(190px, 260px) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 40px;
+  padding: 5px 10px;
+  color: #4f5a5f;
+  background: #eef0f0;
+  border-bottom: 1px solid #cbd0d2;
+}
+
+.keyboard-stage.is-touch .roll-toolbar {
+  grid-template-columns: minmax(150px, 1fr) minmax(190px, 260px) auto;
+}
+
+.roll-heading,
+.roll-legend,
+.roll-window-control {
+  display: flex;
+  align-items: center;
+}
+
+.roll-heading {
+  gap: 8px;
+  min-width: 0;
+}
+
+.roll-heading > svg {
+  flex: 0 0 auto;
+  color: #3779bb;
+}
+
+.roll-heading div {
+  min-width: 0;
+}
+
+.roll-heading strong,
+.roll-heading span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roll-heading strong {
+  color: #273137;
+  font-size: 11px;
+}
+
+.roll-heading span {
+  margin-top: 2px;
+  color: #6c777c;
+  font-size: 8px;
+}
+
+.midi-input-control,
+.stage-gain-control {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+  min-height: 31px;
+  padding: 3px 7px;
+  color: #59646a;
+  background: #d9dddf;
+  border: 1px solid #c6cccf;
+  border-radius: 4px;
+}
+
+.midi-input-control {
+  grid-template-columns: auto auto minmax(100px, 1fr);
+  min-width: 190px;
+}
+
+.midi-input-control svg { color: #55717e; }
+.midi-input-control span { font-size: 8px; font-weight: 700; white-space: nowrap; }
+.midi-input-control select {
+  min-width: 0;
+  height: 25px;
+  padding: 0 4px;
+  color: #35403d;
+  background: white;
+  border: 1px solid #c6cccf;
+  border-radius: 3px;
+  font-size: 8px;
+}
+
+.stage-gain-control {
+  grid-template-columns: auto auto minmax(70px, 1fr) 58px;
+  min-width: 190px;
+}
+
+.stage-gain-control svg {
+  color: #55717e;
+}
+
+.stage-gain-control span {
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stage-gain-control input {
+  width: 100%;
+  min-width: 70px;
+  margin: 0;
+  accent-color: #347fca;
+}
+
+.stage-gain-control strong {
+  color: #273137;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.keyboard-range-bar {
+  display: grid;
+  grid-template-columns: auto auto minmax(190px, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 43px;
+  padding: 5px 10px;
+  color: #c4cdca;
+  background: #242b30;
+  border-bottom: 1px solid #343b41;
+}
+
+.keyboard-stage.is-touch .keyboard-range-bar {
+  grid-template-columns: auto auto auto minmax(190px, 1fr);
+}
+
+.keyboard-range-label {
+  color: #aeb7bc;
+  font-size: 9px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.key-count-control {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: #12171b;
+  border: 1px solid #41494f;
+  border-radius: 4px;
+}
+
+.key-count-control button {
+  min-width: 43px;
+  min-height: 29px;
+  padding: 0 9px;
+  color: #b7c0c4;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.key-count-control button.is-active {
+  color: white;
+  background: #347fca;
+}
+
+.touch-keyboard-size-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: #12171b;
+  border: 1px solid #41494f;
+  border-radius: 4px;
+}
+
+.touch-keyboard-size-control > span {
+  padding: 0 5px;
+  color: #aeb7bc;
+  font-size: 9px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.touch-keyboard-size-control button {
+  min-width: 29px;
+  min-height: 29px;
+  padding: 0 7px;
+  color: #b7c0c4;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.touch-keyboard-size-control button.is-active {
+  color: white;
+  background: #347fca;
+}
+
+.keyboard-range-summary {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.keyboard-range-summary .icon-command {
+  flex-basis: 30px;
+  width: 30px;
+  height: 30px;
+  color: #e1e8e6;
+  background: #3b4548;
+  border-color: #566164;
+}
+
+.keyboard-range-summary strong {
+  min-width: 74px;
+  color: white;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.keyboard-range-summary span {
+  color: #8f9b9e;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.roll-legend {
+  gap: 12px;
+}
+
+.roll-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #8e9a9d;
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.roll-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.roll-legend i.is-hit-line {
+  width: 13px;
+  height: 2px;
+  background: #62aef7;
+  border-radius: 0;
+}
+
+.roll-window-control {
+  gap: 3px;
+  padding: 3px;
+  background: #d9dddf;
+  border: 1px solid #c6cccf;
+  border-radius: 4px;
+}
+
+.roll-window-control > svg {
+  margin: 0 3px;
+  color: #68747a;
+}
+
+.roll-window-control button {
+  min-width: 31px;
+  min-height: 25px;
+  padding: 0 7px;
+  color: #59646a;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.roll-window-control button.is-active {
+  color: #f5f8fa;
+  background: #347fca;
+}
+
+.instrument-legend {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 31px;
+  padding: 5px 10px;
+  overflow-x: auto;
+  color: #778188;
+  background: #191e23;
+  border-bottom: 1px solid #343b41;
+  scrollbar-width: none;
+}
+
+.instrument-legend::-webkit-scrollbar { display: none; }
+.instrument-legend > span {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.instrument-legend .instrument-legend-label {
+  color: #aeb7bc;
+  text-transform: uppercase;
+}
+.instrument-legend i { width: 9px; height: 9px; border-radius: 2px; }
+.instrument-legend > span.is-active { color: #edf2f4; }
+.instrument-legend > span.is-active i { box-shadow: 0 0 0 2px rgba(255, 255, 255, .16); }
+.instrument-legend .instrument-hit-line { margin-left: auto; }
+.instrument-legend .instrument-hit-line i { width: 14px; height: 2px; background: #62aef7; border-radius: 0; }
+
+.live-piano-roll {
+  position: relative;
+  height: clamp(190px, 32vh, 280px);
+  margin: 0;
+  overflow: hidden;
+  background: #0e1317;
+}
+
+.live-piano-roll canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.live-piano-roll .roll-background { z-index: 0; }
+.live-piano-roll .roll-trails { z-index: 1; }
+
+.roll-readout {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  display: flex;
+  gap: 9px;
+  color: #637075;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 7px;
+  pointer-events: none;
+}
+
+.roll-live-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.roll-live-state i {
+  width: 5px;
+  height: 5px;
+  background: #687579;
+  border-radius: 50%;
+}
+
+.live-piano-roll.is-running .roll-live-state {
+  color: #76d7ca;
+}
+
+.live-piano-roll.is-running .roll-live-state i {
+  background: #49c4b4;
+}
+
+.visualizer-keyboard {
+  position: relative;
+  height: 64px;
+  overflow: hidden;
+  background: #11161a;
+  border-top: 1px solid #2d353b;
+  user-select: none;
+}
+
+.visualizer-white-keys {
+  display: grid;
+  height: 100%;
+}
+
+.visualizer-white-key {
+  position: relative;
+  min-width: 0;
+  background: #f5f5f3;
+  border-right: 1px solid #7d8385;
+  border-bottom: 2px solid #aeb2b3;
+}
+
+.visualizer-white-key:first-child { border-left: 1px solid #7d8385; }
+.visualizer-white-key.is-out-of-range { background: #d8dad9; }
+.visualizer-white-key.is-active { border-color: transparent; box-shadow: inset 0 -4px rgba(255, 255, 255, .22); }
+.visualizer-white-key small {
+  position: absolute;
+  right: 0;
+  bottom: 3px;
+  left: 0;
+  overflow: hidden;
+  color: #7f8587;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 6px;
+  text-align: center;
+}
+
+.visualizer-black-key {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  height: 62.5%;
+  background: #22282c;
+  border: 1px solid #0d1114;
+  border-radius: 0 0 2px 2px;
+  box-shadow: 0 2px 2px rgba(0, 0, 0, .4);
+}
+
+.visualizer-black-key.is-out-of-range { background: #363c3f; }
+.visualizer-black-key.is-active { border-color: rgba(255, 255, 255, .22); box-shadow: 0 0 8px var(--visualizer-accent); }
+
+.realtime-stage .piano {
+  --piano-inline-gutter: 18px;
+  --black-key-width: clamp(7px, .9vw, 14px);
+  width: min(calc(100% - var(--piano-inline-gutter)), var(--piano-reference-width));
+  height: auto;
+  aspect-ratio: var(--piano-keyboard-aspect-ratio);
+  margin: 0 auto;
+  border-color: #121718;
+  border-radius: 3px;
+}
+
+.realtime-stage--touch .piano {
+  width: calc(100% - var(--piano-inline-gutter));
+  height: clamp(220px, 31vh, 260px);
+  max-width: none;
+  aspect-ratio: auto;
+}
+
+.realtime-stage--touch.touch-keyboard-size--small .piano { height: clamp(180px, 27vh, 230px); }
+.realtime-stage--touch.touch-keyboard-size--medium .piano { height: 220px; }
+.realtime-stage--touch.touch-keyboard-size--large .piano { height: clamp(285px, 42vh, 360px); }
+
+.keyboard-stage.is-touch .live-piano-roll {
+  height: clamp(140px, 20vh, 180px);
+}
+
+.realtime-stage .black-key { height: 63.333%; }
+
+.realtime-stage .white-key .note-label {
+  right: 0;
+  bottom: 7px;
+  left: 0;
+  font-size: 6px;
+}
+
+.realtime-stage .piano-key .shortcut-label {
+  position: absolute;
+  right: 50%;
+  bottom: 23px;
+  left: auto;
+  display: grid;
+  width: 15px;
+  height: 15px;
+  transform: translateX(50%);
+  place-items: center;
+  color: #4e5b58;
+  background: #e6ebe8;
+  border: 1px solid #c7cfcc;
+  border-radius: 50%;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 7px;
+  line-height: 1;
+}
+
+.realtime-stage .black-key .shortcut-label {
+  bottom: 8px;
+  color: #d6dfdc;
+  background: #394241;
+  border-color: #515b59;
+}
+
+.performance-control-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(82px, 1fr)) 104px;
+  gap: 7px;
+  padding: 7px 9px 8px;
+}
+
+.performance-control-bar label,
+.tone-parameter-grid label,
+.connection-layout label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 8px;
+  min-width: 0;
+}
+
+.performance-control-bar label {
+  min-height: 43px;
+  padding: 5px 7px;
+  color: #dce4e1;
+  background: #333b3c;
+  border: 1px solid #454f4e;
+  border-radius: 4px;
+}
+
+.performance-control-bar label > span,
+.tone-parameter-grid label > span,
+.connection-layout label > span { overflow: hidden; font-size: 9px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.performance-control-bar label > strong { color: #7fd6cb; font-family: "Cascadia Mono", Consolas, monospace; font-size: 8px; }
+.performance-control-bar input[type="range"],
+.tone-parameter-grid input[type="range"] { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: #20a494; }
+
+.sustain-control {
+  min-height: 43px;
+  color: #c8d1ce;
+  background: #3a4243;
+  border: 1px solid #505a58;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 750;
+}
+.sustain-control.is-active { color: #073d38; background: #71d1c5; border-color: #8de0d6; }
+
+.stage-drawer {
+  min-width: 0;
+  background: #f2f4f3;
+  border: 1px solid #cbd2cf;
+  border-radius: 5px;
+}
+
+.drawer-tabs {
+  min-width: 0;
+  height: 38px;
+  overflow-x: auto;
+  background: #dfe4e1;
+  scrollbar-width: none;
+}
+.drawer-tabs::-webkit-scrollbar { display: none; }
+.drawer-tabs button {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  height: 38px;
+  padding: 0 13px;
+  color: #596461;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 700;
+}
+.drawer-tabs button.is-active { color: #086c63; background: #f2f4f3; border-bottom-color: var(--teal); }
+.drawer-tabs button.has-alert { color: #a13c38; }
+.drawer-content { display: none; min-width: 0; padding: 8px 10px; border-top: 1px solid #cbd2cf; }
+.stage-drawer.is-open .drawer-content { display: block; }
+
+.transport-layout {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.2fr) 34px 34px 34px minmax(160px, 2fr) auto 76px auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.transport-layout select,
+.tone-parameter-grid select,
+.connection-layout select {
+  min-width: 0;
+  height: 34px;
+  padding: 0 7px;
+  color: #35403d;
+  background: white;
+  border: 1px solid #cbd2cf;
+  border-radius: 4px;
+  font-size: 9px;
+}
+.transport-seek { min-width: 80px; width: 100%; accent-color: var(--teal); }
+.transport-time { color: #596461; font-family: "Cascadia Mono", Consolas, monospace; font-size: 8px; white-space: nowrap; }
+
+.recording-layout { gap: 8px; min-height: 36px; }
+.recording-layout > span { color: #65706d; font-size: 9px; }
+.download-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 11px;
+  color: #075e56;
+  background: #d8ece7;
+  border: 1px solid #8fc8c0;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.tone-parameter-grid,
+.connection-layout,
+.diagnostics-layout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.tone-parameter-grid label,
+.connection-layout label { min-height: 44px; padding: 6px 8px; background: #e5e9e7; border-radius: 4px; }
+.patch-detail { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 3px 8px; padding: 6px 8px; color: #66716e; font-size: 9px; }
+.patch-detail strong { color: #283331; }
+.connection-layout > span { align-self: center; color: #65706d; font-size: 9px; }
+
+.diagnostics-layout > div {
+  display: grid;
+  gap: 3px;
+  min-height: 42px;
+  padding: 6px 8px;
+  background: #e5e9e7;
+  border-left: 3px solid #919c99;
+  border-radius: 4px;
+}
+.diagnostics-layout > div.is-alert { color: #8d2e2a; background: #f2dedd; border-left-color: var(--red); }
+.diagnostics-layout span { color: #66716e; font-size: 8px; }
+.diagnostics-layout strong { font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; }
+.diagnostics-layout details { grid-column: 1 / -1; min-width: 0; font-size: 9px; }
+.diagnostics-layout summary { cursor: pointer; font-weight: 700; }
+.diagnostics-layout pre { max-height: 180px; overflow: auto; padding: 8px; color: #c7e5e1; background: #202728; border-radius: 4px; font-size: 8px; white-space: pre-wrap; }
+
+@media (max-height: 650px) and (min-width: 901px) {
+  .realtime-stage { gap: 6px; }
+  .stage-session-bar { min-height: 42px; }
+  .patch-library { padding-top: 4px; padding-bottom: 5px; }
+  .patch-strip { min-height: 39px; }
+  .patch-tile { min-height: 37px; }
+  .live-piano-roll { height: 150px; }
+  .visualizer-keyboard { height: 50px; }
+  .performance-control-bar { padding-top: 5px; padding-bottom: 5px; }
+  .performance-control-bar label,
+  .sustain-control { min-height: 37px; }
+  .drawer-content { padding-top: 5px; padding-bottom: 5px; }
+}
+
+@media (max-width: 900px) {
+  .realtime-stage { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .stage-session-bar { position: sticky; z-index: 9; top: 56px; }
+  .roll-toolbar { grid-template-columns: minmax(140px, 1fr) auto auto; }
+  .keyboard-stage.is-touch .roll-toolbar { grid-template-columns: minmax(140px, 1fr) minmax(190px, 260px) auto; }
+  .stage-gain-control { grid-column: 1 / -1; min-width: 0; }
+  .keyboard-range-bar { grid-template-columns: auto auto minmax(150px, 1fr); }
+  .keyboard-stage.is-touch .keyboard-range-bar { grid-template-columns: auto auto auto minmax(150px, 1fr); }
+  .performance-control-bar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .transport-layout { grid-template-columns: minmax(130px, 1fr) 34px 34px 34px; }
+  .transport-seek { grid-column: 1 / -1; }
+  .transport-time { grid-column: 1 / span 2; }
+  .tone-parameter-grid,
+  .connection-layout,
+  .diagnostics-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .realtime-stage { gap: 7px; }
+  .stage-session-bar { grid-template-columns: minmax(0, 1fr) auto; gap: 7px; padding-left: 9px; }
+  .stage-session-meta { display: none; }
+  .stage-session-actions .secondary-button,
+  .stage-session-actions .primary-button { min-height: 34px; padding: 0 9px; font-size: 9px; }
+  .stage-current-patch strong { font-size: 12px; }
+  .patch-library { padding-right: 6px; padding-left: 6px; }
+  .patch-category-tabs button { padding: 0 9px; }
+  .patch-tile { flex-basis: 124px; min-height: 46px; }
+  .roll-toolbar { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 6px; }
+  .roll-heading { grid-column: 1 / -1; }
+  .stage-gain-control { grid-column: 1 / -1; }
+  .keyboard-range-bar { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 7px; }
+  .keyboard-stage.is-touch .keyboard-range-bar { grid-template-columns: minmax(0, 1fr); }
+  .keyboard-range-label { display: none; }
+  .key-count-control { width: 100%; }
+  .key-count-control button { flex: 1 1 25%; min-width: 0; }
+  .touch-keyboard-size-control { justify-content: center; }
+  .keyboard-range-summary { justify-content: space-between; justify-self: stretch; }
+  .roll-window-control > svg { display: none; }
+  .roll-window-control button { min-width: 28px; padding: 0 5px; }
+  .instrument-legend { gap: 10px; padding-right: 7px; padding-left: 7px; }
+  .instrument-legend .instrument-hit-line { margin-left: 0; }
+  .live-piano-roll { height: 190px; margin: 0; }
+  .visualizer-keyboard { height: 52px; }
+  .visualizer-white-key small { display: none; }
+  .realtime-stage .piano { --piano-inline-gutter: 12px; --black-key-width: clamp(12px, 4.5vw, 19px); }
+  .realtime-stage--touch .piano { height: 220px; }
+  .realtime-stage--touch.touch-keyboard-size--small .piano { height: 180px; }
+  .realtime-stage--touch.touch-keyboard-size--large .piano { height: 280px; }
+  .performance-control-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 7px 6px; }
+  .performance-control-bar label { min-height: 47px; }
+  .sustain-control { min-height: 47px; }
+  .drawer-tabs {
+    position: sticky;
+    z-index: 8;
+    bottom: calc(62px + env(safe-area-inset-bottom));
+    height: 42px;
+  }
+  .drawer-tabs button { height: 42px; padding: 0 11px; }
+  .drawer-tabs button span { display: none; }
+  .drawer-content { padding: 8px; }
+  .transport-layout { grid-template-columns: minmax(0, 1fr) repeat(3, 34px); }
+  .transport-layout > select:first-child { grid-column: 1 / -1; }
+  .transport-time { grid-column: 1 / span 2; }
+  .recording-layout { align-items: stretch; flex-direction: column; }
+  .recording-layout > button,
+  .recording-layout > a { justify-content: center; width: 100%; }
+  .tone-parameter-grid,
+  .connection-layout,
+  .diagnostics-layout { grid-template-columns: minmax(0, 1fr); }
+  .diagnostics-layout details { grid-column: auto; }
+}
+
+@media (any-pointer: coarse) and (min-width: 601px) {
+  .app-shell { grid-template-rows: 68px minmax(0, 1fr); }
+  .app-header { min-height: 68px; }
+  .app-main { height: calc(100vh - 68px); }
+  .brand strong { font-size: 15px; }
+  .brand span { font-size: 12px; }
+  .primary-nav button { min-height: 54px; font-size: 15px; }
+  .status-pill { min-height: 34px; font-size: 12px; }
+  .status-footer { height: 32px; font-size: 12px; }
+  .content-area { padding: 14px; }
+
+  .stage-session-bar { min-height: 66px; padding: 9px 14px; }
+  .stage-current-patch span { font-size: 14px; }
+  .stage-current-patch strong { font-size: 20px; }
+  .stage-session-actions .primary-button,
+  .stage-session-actions .secondary-button { min-height: 50px; padding: 0 16px; font-size: 15px; }
+  .icon-command { flex-basis: 50px; width: 50px; height: 50px; }
+
+  .patch-category-tabs button { min-height: 48px; padding: 0 18px; font-size: 15px; }
+  .patch-strip { min-height: 82px; }
+  .patch-tile { flex-basis: 194px; min-height: 72px; padding: 9px 13px; }
+  .patch-tile strong { font-size: 17px; }
+  .patch-tile span { font-size: 13px; }
+
+  .roll-toolbar { min-height: 64px; padding: 8px 14px; }
+  .keyboard-stage.is-touch .roll-toolbar { grid-template-columns: minmax(170px, 1fr) minmax(280px, 360px) auto; }
+  .roll-heading strong { font-size: 17px; }
+  .roll-heading span { font-size: 14px; }
+  .midi-input-control { min-height: 50px; }
+  .midi-input-control span,
+  .midi-input-control select { font-size: 13px; }
+  .midi-input-control select { height: 42px; }
+  .stage-gain-control { min-height: 50px; }
+  .stage-gain-control span,
+  .stage-gain-control strong { font-size: 13px; }
+  .roll-window-control button { min-width: 44px; min-height: 46px; font-size: 13px; }
+
+  .keyboard-range-bar { min-height: 68px; padding: 8px 14px; }
+  .keyboard-range-label { font-size: 14px; }
+  .key-count-control button { min-width: 58px; min-height: 48px; font-size: 15px; }
+  .keyboard-range-summary .icon-command { flex-basis: 50px; width: 50px; height: 50px; }
+  .keyboard-range-summary strong { min-width: 108px; font-size: 17px; }
+  .keyboard-range-summary span { font-size: 13px; }
+
+  .instrument-legend { min-height: 48px; padding: 8px 14px; }
+  .instrument-legend > span { font-size: 13px; }
+  .roll-readout { font-size: 12px; }
+  .visualizer-keyboard { height: 86px; }
+  .visualizer-white-key small { font-size: 11px; }
+  .realtime-stage .piano-key .note-label { font-size: 13px; }
+  .realtime-stage .piano-key .shortcut-label { font-size: 12px; }
+
+  .performance-control-bar { gap: 10px; padding: 10px 14px 12px; }
+  .performance-control-bar label { min-height: 76px; padding: 8px 10px; }
+  .performance-control-bar label > span,
+  .tone-parameter-grid label > span,
+  .connection-layout label > span { font-size: 14px; }
+  .performance-control-bar label > strong { font-size: 13px; }
+  .sustain-control { min-height: 76px; font-size: 15px; }
+
+  .drawer-tabs { height: 56px; }
+  .drawer-tabs button { height: 56px; padding: 0 19px; font-size: 14px; }
+  .transport-layout select,
+  .tone-parameter-grid select,
+  .connection-layout select { height: 50px; font-size: 14px; }
+  .transport-time,
+  .recording-layout > span,
+  .patch-detail,
+  .connection-layout > span,
+  .diagnostics-layout span,
+  .diagnostics-layout details { font-size: 13px; }
+  .diagnostics-layout strong { font-size: 16px; }
+  .download-button { min-height: 50px; font-size: 14px; }
+}
+
+/* A 10-inch panel can report a fine pointer when a USB hub is attached.
+   Scale the operating surface from the actual panel width as well. */
+@media (min-width: 601px) and (max-width: 1400px) {
+  .app-shell { grid-template-rows: 72px minmax(0, 1fr); }
+  .app-header { min-height: 72px; padding: 0 18px; }
+  .app-main { height: calc(100vh - 72px); }
+  .brand strong { font-size: 16px; }
+  .brand span { font-size: 13px; }
+  .primary-nav { gap: 6px; }
+  .primary-nav button { min-height: 58px; padding: 0 16px; font-size: 17px; }
+  .status-pill { min-height: 36px; font-size: 13px; }
+  .status-footer { height: 34px; font-size: 12px; }
+  .content-area { padding: 16px; }
+
+  .stage-session-bar { min-height: 72px; padding: 10px 16px; }
+  .stage-current-patch span { font-size: 16px; }
+  .stage-current-patch strong { font-size: 23px; }
+  .stage-session-actions .primary-button,
+  .stage-session-actions .secondary-button { min-height: 54px; padding: 0 18px; font-size: 17px; }
+  .icon-command { flex-basis: 54px; width: 54px; height: 54px; }
+
+  .patch-category-tabs button { min-height: 54px; padding: 0 20px; font-size: 17px; }
+  .patch-strip { min-height: 90px; }
+  .patch-tile { flex-basis: 218px; min-height: 78px; padding: 10px 15px; }
+  .patch-tile strong { font-size: 20px; }
+  .patch-tile span { font-size: 15px; }
+
+  .roll-toolbar { min-height: 70px; padding: 9px 16px; }
+  .roll-heading strong { font-size: 20px; }
+  .roll-heading span { font-size: 16px; }
+  .midi-input-control,
+  .stage-gain-control { min-height: 54px; }
+  .midi-input-control span,
+  .midi-input-control select,
+  .stage-gain-control span,
+  .stage-gain-control strong { font-size: 15px; }
+  .midi-input-control select { height: 44px; }
+  .roll-window-control button { min-width: 48px; min-height: 50px; font-size: 15px; }
+
+  .keyboard-range-bar { min-height: 74px; padding: 9px 16px; }
+  .keyboard-range-label { font-size: 16px; }
+  .key-count-control button { min-width: 66px; min-height: 54px; font-size: 18px; }
+  .touch-keyboard-size-control > span { font-size: 15px; }
+  .touch-keyboard-size-control button { min-width: 42px; min-height: 54px; font-size: 17px; }
+  .keyboard-range-summary .icon-command { flex-basis: 54px; width: 54px; height: 54px; }
+  .keyboard-range-summary strong { min-width: 120px; font-size: 20px; }
+  .keyboard-range-summary span { font-size: 15px; }
+
+  .instrument-legend { min-height: 52px; padding: 9px 16px; }
+  .instrument-legend > span { font-size: 15px; }
+  .roll-readout { font-size: 13px; }
+  .realtime-stage .piano-key .note-label { bottom: 10px; font-size: 16px; }
+  .realtime-stage--touch .live-piano-roll { height: 160px; }
+
+  .performance-control-bar { gap: 12px; padding: 12px 16px 14px; }
+  .performance-control-bar label { min-height: 82px; padding: 10px 12px; }
+  .performance-control-bar label > span,
+  .tone-parameter-grid label > span,
+  .connection-layout label > span { font-size: 16px; }
+  .performance-control-bar label > strong { font-size: 15px; }
+  .sustain-control { min-height: 82px; font-size: 17px; }
+
+  .drawer-tabs { height: 60px; }
+  .drawer-tabs button { height: 60px; padding: 0 20px; font-size: 16px; }
+  .transport-layout select,
+  .tone-parameter-grid select,
+  .connection-layout select { height: 54px; font-size: 16px; }
+  .transport-time,
+  .recording-layout > span,
+  .patch-detail,
+  .connection-layout > span,
+  .diagnostics-layout span,
+  .diagnostics-layout details { font-size: 15px; }
+  .diagnostics-layout strong { font-size: 18px; }
+  .download-button { min-height: 54px; font-size: 16px; }
+
+  .realtime-stage--touch .stage-session-bar { min-height: 60px; padding: 7px 12px; }
+  .realtime-stage--touch .stage-current-patch span { font-size: 14px; }
+  .realtime-stage--touch .stage-current-patch strong { font-size: 20px; }
+  .realtime-stage--touch .stage-session-actions .primary-button,
+  .realtime-stage--touch .stage-session-actions .secondary-button { min-height: 48px; padding: 0 14px; font-size: 16px; }
+  .realtime-stage--touch .patch-library { padding: 4px; }
+  .realtime-stage--touch .patch-category-tabs { padding: 2px; }
+  .realtime-stage--touch .patch-category-tabs button { min-height: 36px; padding: 0 13px; font-size: 15px; }
+  .realtime-stage--touch .patch-strip { min-height: 48px; margin-top: 4px; padding: 2px; }
+  .realtime-stage--touch .patch-tile { flex-basis: 176px; min-height: 42px; padding: 4px 8px; }
+  .realtime-stage--touch .patch-tile strong { font-size: 16px; }
+  .realtime-stage--touch .patch-tile span { font-size: 11px; }
+  .realtime-stage--touch .roll-toolbar { min-height: 60px; padding: 6px 12px; }
+  .realtime-stage--touch .roll-heading strong { font-size: 18px; }
+  .realtime-stage--touch .roll-heading span { font-size: 14px; }
+  .realtime-stage--touch .stage-gain-control { min-height: 46px; }
+  .realtime-stage--touch .stage-gain-control span,
+  .realtime-stage--touch .stage-gain-control strong { font-size: 14px; }
+  .realtime-stage--touch .roll-window-control button { min-width: 42px; min-height: 44px; font-size: 14px; }
+  .realtime-stage--touch .keyboard-range-bar { min-height: 64px; padding: 6px 12px; }
+  .realtime-stage--touch .key-count-control button { min-width: 54px; min-height: 48px; font-size: 17px; }
+  .realtime-stage--touch .touch-keyboard-size-control > span { font-size: 14px; }
+  .realtime-stage--touch .touch-keyboard-size-control button { min-width: 38px; min-height: 48px; font-size: 16px; }
+  .realtime-stage--touch .keyboard-range-summary .icon-command { flex-basis: 48px; width: 48px; height: 48px; }
+  .realtime-stage--touch .keyboard-range-summary strong { min-width: 108px; font-size: 18px; }
+  .realtime-stage--touch .keyboard-range-summary span { font-size: 14px; }
+.realtime-stage--touch .keyboard-stage.is-touch .live-piano-roll { height: 94px; }
+  .realtime-stage--touch .piano-key .note-label { bottom: 8px; font-size: 15px; }
+}
+
+/* Touch performance has an explicit layout contract. It must not depend on
+   whether the browser reports the panel as a coarse pointer. */
+.realtime-stage--touch .stage-session-bar {
+  min-height: 56px;
+}
+
+.realtime-stage--touch .stage-session-actions .primary-button,
+.realtime-stage--touch .stage-session-actions .secondary-button,
+.realtime-stage--touch .icon-command {
+  min-height: 56px;
+}
+
+.realtime-stage--touch .patch-category-tabs button {
+  min-height: 44px;
+  font-size: 16px;
+}
+
+.realtime-stage--touch .patch-tile strong { font-size: 18px; }
+.realtime-stage--touch .patch-tile span { font-size: 14px; }
+
+.realtime-stage--touch .roll-toolbar {
+  min-height: 56px;
+  padding: 4px 12px;
+}
+
+.realtime-stage--touch .roll-heading strong,
+.realtime-stage--touch .roll-heading span,
+.realtime-stage--touch .stage-gain-control span,
+.realtime-stage--touch .stage-gain-control strong,
+.realtime-stage--touch .keyboard-range-label,
+.realtime-stage--touch .keyboard-range-summary span,
+.realtime-stage--touch .touch-keyboard-size-control > span {
+  font-size: 18px;
+}
+
+.realtime-stage--touch .stage-gain-control,
+.realtime-stage--touch .roll-window-control {
+  min-height: 56px;
+}
+
+.realtime-stage--touch .stage-gain-control input,
+.realtime-stage--touch .performance-control-bar input[type="range"] {
+  min-height: 28px;
+}
+
+.realtime-stage--touch .roll-window-control button,
+.realtime-stage--touch .key-count-control button,
+.realtime-stage--touch .touch-keyboard-size-control button,
+.realtime-stage--touch .keyboard-range-summary .icon-command {
+  min-height: 56px;
+  font-size: 18px;
+}
+
+.realtime-stage--touch .keyboard-range-bar {
+  min-height: 56px;
+  padding: 0 12px;
+}
+
+.realtime-stage--touch .keyboard-range-summary strong {
+  font-size: 20px;
+}
+
+.realtime-stage--touch .piano-key .note-label {
+  bottom: 10px;
+  font-size: 16px;
+}
+
+.realtime-stage--touch .performance-control-bar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px 14px 14px;
+}
+
+.realtime-stage--touch .performance-control-bar label {
+  min-height: 64px;
+  padding: 9px 11px;
+}
+
+.realtime-stage--touch .performance-control-bar label > span {
+  font-size: 18px;
+}
+
+.realtime-stage--touch .performance-control-bar label > strong {
+  font-size: 20px;
+}
+
+.realtime-stage--touch .sustain-control {
+  min-height: 64px;
+  font-size: 18px;
+}
+
+/* The physical 10-inch panel is 1920px wide. Keep its performance controls
+   on the stage and move infrequent setup choices into an overlay. */
+.realtime-stage--touch {
+  gap: 6px;
+}
+
+.realtime-stage--touch .stage-session-bar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 56px;
+  padding: 5px 10px;
+}
+
+.realtime-stage--touch .stage-current-patch {
+  display: none;
+}
+
+.realtime-stage--touch .stage-session-meta {
+  justify-self: end;
+}
+
+.touch-patch-picker,
+.midi-patch-picker {
+  position: relative;
+  z-index: 12;
+  min-width: 0;
+  color: #dce5e5;
+  background: #1a2226;
+  border: 1px solid #3d494d;
+  border-left: 3px solid var(--teal);
+  border-radius: 5px;
+}
+
+.touch-patch-picker summary,
+.midi-patch-picker summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 54px;
+  padding: 0 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.touch-patch-picker summary::-webkit-details-marker,
+.midi-patch-picker summary::-webkit-details-marker { display: none; }
+.touch-patch-picker summary > span:first-child,
+.midi-patch-picker summary > span:first-child {
+  color: #aebdbc;
+  font-size: 20px;
+  font-weight: 700;
+}
+.touch-patch-picker summary strong,
+.midi-patch-picker summary strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.patch-picker-action {
+  padding: 8px 12px;
+  color: #7fd6cb;
+  background: #253d3d;
+  border: 1px solid #406665;
+  border-radius: 4px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.touch-patch-picker-content,
+.midi-patch-picker-content {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  display: grid;
+  gap: 8px;
+  max-height: min(360px, 50vh);
+  padding: 10px;
+  overflow: auto;
+  background: #171e22;
+  border: 1px solid #475359;
+  border-radius: 5px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .42);
+}
+
+.touch-patch-picker-content .patch-category-tabs,
+.midi-patch-picker-content .patch-category-tabs {
+  padding: 3px;
+  overflow-x: auto;
+  background: #273136;
+}
+
+.touch-patch-picker-content .patch-category-tabs button,
+.midi-patch-picker-content .patch-category-tabs button {
+  min-height: 48px;
+  padding: 0 18px;
+  font-size: 18px;
+}
+
+.touch-patch-picker-content .patch-strip,
+.midi-patch-picker-content .patch-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+}
+
+.touch-patch-picker-content .patch-tile,
+.midi-patch-picker-content .patch-tile {
+  min-height: 76px;
+  padding: 10px 14px;
+}
+
+.touch-patch-picker-content .patch-tile strong,
+.midi-patch-picker-content .patch-tile strong { font-size: 21px; }
+.touch-patch-picker-content .patch-tile span,
+.midi-patch-picker-content .patch-tile span { font-size: 16px; }
+
+.realtime-stage--touch .roll-toolbar {
+  grid-template-columns: minmax(150px, 1fr) minmax(380px, 530px) auto;
+  gap: 10px;
+  min-height: 60px;
+  padding: 5px 12px;
+}
+
+.realtime-stage--touch .roll-heading { gap: 10px; }
+.realtime-stage--touch .roll-heading > svg { width: 22px; height: 22px; }
+.realtime-stage--touch .roll-heading strong { font-size: 22px; }
+.realtime-stage--touch .roll-heading span { display: none; }
+
+.realtime-stage--touch .stage-gain-control {
+  grid-template-columns: auto auto minmax(120px, 1fr) 94px;
+  min-width: 0;
+  min-height: 54px;
+  padding: 5px 10px;
+}
+
+.realtime-stage--touch .stage-gain-control > svg { width: 20px; height: 20px; }
+.realtime-stage--touch .stage-gain-control span { font-size: 20px; }
+.realtime-stage--touch .stage-gain-control strong { font-size: 24px; }
+.realtime-stage--touch .stage-gain-control input { min-height: 32px; }
+
+.realtime-stage--touch .roll-window-control {
+  gap: 3px;
+  min-height: 54px;
+  padding: 2px;
+}
+
+.realtime-stage--touch .roll-window-control > svg { width: 20px; height: 20px; }
+.realtime-stage--touch .roll-window-control button {
+  min-width: 52px;
+  min-height: 50px;
+  font-size: 18px;
+}
+
+.realtime-stage--touch .keyboard-range-bar {
+  grid-template-columns: auto auto auto minmax(0, 1fr);
+  gap: 9px;
+  min-height: 68px;
+  padding: 5px 12px;
+}
+
+.realtime-stage--touch .keyboard-range-label,
+.realtime-stage--touch .touch-keyboard-size-control > span,
+.realtime-stage--touch .keyboard-range-summary span {
+  font-size: 20px;
+}
+
+.realtime-stage--touch .key-count-control button,
+.realtime-stage--touch .touch-keyboard-size-control button {
+  min-height: 56px;
+  font-size: 22px;
+}
+
+.realtime-stage--touch .keyboard-range-summary { gap: 10px; }
+.realtime-stage--touch .keyboard-range-summary .icon-command {
+  flex-basis: 54px;
+  width: 54px;
+  height: 54px;
+}
+.realtime-stage--touch .keyboard-range-summary strong { font-size: 23px; }
+
+.realtime-stage--touch .keyboard-stage.is-touch .live-piano-roll {
+  height: 120px;
+}
+
+.realtime-stage--touch.touch-keyboard-size--small .piano { height: 220px; }
+.realtime-stage--touch.touch-keyboard-size--medium .piano { height: 260px; }
+.realtime-stage--touch.touch-keyboard-size--large .piano { height: 320px; }
+.realtime-stage--touch .piano-key .note-label { font-size: 20px; }
+
+.realtime-stage--touch .performance-control-bar {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 8px 12px 10px;
+}
+
+.realtime-stage--touch .performance-control-bar label,
+.realtime-stage--touch .sustain-control {
+  min-height: 82px;
+}
+
+.realtime-stage--touch .performance-control-bar label > span { font-size: 24px; }
+.realtime-stage--touch .performance-control-bar label > strong { font-size: 28px; }
+.realtime-stage--touch .performance-control-bar input[type="range"] { min-height: 32px; }
+.realtime-stage--touch .sustain-control { font-size: 23px; }
+
+@media (min-width: 1500px) {
+  .realtime-stage--touch .performance-control-bar {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .touch-patch-picker summary,
+  .midi-patch-picker summary {
+    gap: 8px;
+    min-height: 56px;
+    padding: 0 10px;
+  }
+
+  .touch-patch-picker summary > span:first-child,
+  .midi-patch-picker summary > span:first-child { font-size: 18px; }
+  .touch-patch-picker summary strong,
+  .midi-patch-picker summary strong { font-size: 21px; }
+  .patch-picker-action { padding: 7px 9px; font-size: 16px; }
+  .touch-patch-picker-content .patch-strip,
+  .midi-patch-picker-content .patch-strip { grid-template-columns: minmax(0, 1fr); }
+
+  .realtime-stage--touch .roll-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 0;
+  }
+
+  .realtime-stage--touch .stage-gain-control { grid-column: 1 / -1; }
+  .realtime-stage--touch .keyboard-range-bar { grid-template-columns: minmax(0, 1fr); }
+  .realtime-stage--touch .key-count-control,
+  .realtime-stage--touch .touch-keyboard-size-control,
+  .realtime-stage--touch .keyboard-range-summary { justify-self: stretch; }
+  .realtime-stage--touch .keyboard-range-summary { justify-content: center; }
+  .realtime-stage--touch .keyboard-stage.is-touch .live-piano-roll { height: 110px; }
+  .realtime-stage--touch.touch-keyboard-size--small .piano { height: 200px; }
+  .realtime-stage--touch.touch-keyboard-size--medium .piano { height: 240px; }
+  .realtime-stage--touch.touch-keyboard-size--large .piano { height: 300px; }
+  .realtime-stage--touch .performance-control-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.piano-ddsp-workspace {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.piano-session-bar {
+  position: sticky;
+  z-index: 8;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  padding: 6px 10px;
+  background: #f7f8f7;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--teal);
+  border-radius: 5px;
+}
+
+.piano-session-state,
+.piano-session-actions,
+.piano-health-row,
+.piano-record-row,
+.piano-transport,
+.mobile-octave {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.piano-session-state {
+  min-width: 0;
+  color: #66716e;
+  font-size: 10px;
+}
+
+.piano-session-state > span:not(.status-pill) {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.piano-session-actions .danger-button {
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 11px;
+  color: white;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.piano-config-strip {
+  display: grid;
+  grid-template-columns: 1.05fr .8fr 1.1fr 1.4fr .9fr;
+  gap: 8px;
+  padding: 9px 11px;
+  background: #e0e5e2;
+  border: 1px solid #cbd2cf;
+  border-radius: 5px;
+}
+
+.piano-config-strip .field {
+  gap: 4px;
+}
+
+.piano-config-strip .field select {
+  min-height: 32px;
+  font-size: 10px;
+}
+
+.piano-surface .panel-header,
+.piano-parameters .panel-header,
+.piano-player .panel-header,
+.piano-metrics .panel-header {
+  min-height: 44px;
+  padding: 9px 12px;
+}
+
+.piano-overview {
+  display: grid;
+  grid-template-columns: repeat(88, minmax(1px, 1fr));
+  gap: 1px;
+  height: 10px;
+  margin: 8px 12px 6px;
+  overflow: hidden;
+  background: #cad0ce;
+  border-radius: 2px;
+}
+
+.piano-overview span {
+  background: #f8faf9;
+}
+
+.piano-overview span.is-window {
+  background: #aebbb8;
+}
+
+.piano-overview span.is-active {
+  background: var(--teal);
+}
+
+.piano-surface .piano {
+  --black-key-width: clamp(5px, .86vw, 12px);
+  height: 118px;
+  margin: 0 12px 12px;
+}
+
+.piano-surface .white-key span {
+  bottom: 6px;
+  overflow: hidden;
+  font-size: 5px;
+}
+
+.piano-surface .piano-key.is-out-of-range {
+  opacity: .72;
+}
+
+.mobile-piano {
+  display: none;
+}
+
+.piano-lower-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, .9fr) minmax(270px, 1fr) minmax(390px, 1.35fr);
+  gap: 9px;
+  min-width: 0;
+}
+
+.piano-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  padding: 10px 12px 12px;
+}
+
+.piano-control-grid .sustain-button {
+  min-height: 38px;
+  gap: 6px;
+}
+
+.piano-player-body {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px 12px;
+}
+
+.piano-file-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  gap: 7px;
+}
+
+.piano-file-row select,
+.piano-transport select {
+  min-width: 0;
+  height: 36px;
+  padding: 0 8px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.piano-file-row .icon-button,
+.piano-transport .icon-button,
+.piano-record-row .icon-button,
+.piano-metrics .icon-button {
+  flex-basis: 36px;
+  width: 36px;
+  height: 36px;
+}
+
+.player-seek {
+  margin: 3px 0 0 !important;
+}
+
+.piano-player-time {
+  display: flex;
+  justify-content: space-between;
+  color: #687370;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 9px;
+}
+
+.piano-transport {
+  justify-content: flex-start;
+}
+
+.piano-transport select {
+  margin-left: auto;
+}
+
+.compact-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #56615e;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.compact-check input {
+  accent-color: var(--teal);
+}
+
+.piano-record-row {
+  justify-content: space-between;
+  min-width: 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.piano-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 9px 10px 7px;
+}
+
+.piano-metric-grid .metric {
+  min-height: 48px;
+  padding: 7px 8px;
+}
+
+.piano-metric-grid .metric strong {
+  font-size: 13px;
+}
+
+.piano-health-row {
+  flex-wrap: wrap;
+  padding: 0 10px 10px;
+}
+
+@media (max-width: 1180px) {
+  .piano-config-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .piano-lower-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .piano-metrics { grid-column: 1 / -1; }
+  .piano-surface .piano { height: 112px; }
+}
+
+@media (max-width: 900px) {
+  .bottom-nav { grid-template-columns: repeat(4, 1fr); }
+  .piano-session-bar { top: 58px; }
+  .piano-config-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .piano-lower-grid { grid-template-columns: minmax(0, 1fr); }
+  .piano-metrics { grid-column: auto; }
+  .desktop-piano { display: none; }
+  .mobile-piano { display: block; }
+  .mobile-octave { justify-content: space-between; padding: 0 12px 8px; color: #5f6967; font-size: 10px; font-weight: 700; }
+  .mobile-octave .stepper { width: 118px; }
+  .piano-surface .piano { --black-key-width: clamp(12px, 4.6vw, 20px); height: 180px; }
+  .piano-surface .white-key span { bottom: 8px; font-size: 7px; }
+}
+
+@media (max-width: 600px) {
+  .instrument-engine-bar { align-items: stretch; flex-wrap: wrap; gap: 7px; }
+  .instrument-engine-title { min-width: 0; margin-right: auto; }
+  .instrument-engine-switch { order: 2; width: 100%; }
+  .instrument-engine-bar > .status-pill { align-self: center; }
+  .piano-ddsp-workspace { gap: 8px; }
+  .piano-session-bar { align-items: stretch; flex-direction: column; padding: 8px; }
+  .piano-session-state { justify-content: space-between; }
+  .piano-session-state > span:not(.status-pill):last-child { display: none; }
+  .piano-session-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .piano-session-actions button { width: 100%; }
+  .piano-config-strip { grid-template-columns: minmax(0, 1fr); }
+  .piano-control-grid { grid-template-columns: minmax(0, 1fr); }
+  .piano-control-grid .sustain-button { grid-column: auto; }
+  .piano-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .piano-record-row { align-items: stretch; flex-wrap: wrap; }
+}
+

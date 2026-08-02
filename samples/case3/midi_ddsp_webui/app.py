@@ -28,6 +28,7 @@ from .bluetooth import (
     scan_bluetooth_audio_devices,
 )
 from .core import (
+    JOB_ROOT,
     REPORT_ROOT,
     ROOT,
     UPLOAD_ROOT,
@@ -41,10 +42,18 @@ from .core import (
     resolve_artifact,
     resolve_catalog_item,
     system_status,
+    utc_timestamp,
     validate_midi_ddsp_reverb_asset,
 )
+from .library import MidiDdspLibrary
 from .live import DdspVstSessionController
-from .midi_analysis import MidiValidationError, analyze_midi, analyze_midi_voices
+from .midi_analysis import (
+    MidiValidationError,
+    analyze_midi,
+    analyze_midi_piano_roll,
+    analyze_midi_voices,
+    midi_file_sha256,
+)
 from .piano import (
     PianoDdspController,
 )
@@ -69,6 +78,7 @@ WEB_DIST = ROOT / "webui" / "dist"
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    _sync_library()
     yield
     if realtime.running:
         realtime.stop()
@@ -83,7 +93,8 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="MIDI-DDSP Studio API", version="0.1.0", lifespan=lifespan)
 coordinator = ResourceCoordinator()
-jobs = JobManager(coordinator)
+library = MidiDdspLibrary(REPORT_ROOT, JOB_ROOT)
+jobs = JobManager(coordinator, terminal_callback=library.index_job)
 ddsp_vst = DdspVstSessionController(coordinator)
 speaker = SpeakerTestController(coordinator)
 piano = PianoDdspController(coordinator)
@@ -147,6 +158,10 @@ class MidiDdspPlaybackRequest(ApiModel):
     audio_device_id: Optional[str] = None
     latency_ms: float = Field(40.0, ge=5.0, le=500.0)
     output_gain_db: float = Field(0.0, ge=-60.0, le=0.0)
+
+
+class MidiDdspLibraryPreferenceRequest(ApiModel):
+    preferred_render_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
 
 
 class SpeakerTestRequest(ApiModel):
@@ -598,6 +613,54 @@ def get_midi_voices(midi_id: str) -> dict[str, object]:
         raise _http_error(exc) from exc
 
 
+@app.get("/api/v1/midi-files/{midi_id}/piano-roll")
+def get_midi_piano_roll(midi_id: str) -> dict[str, object]:
+    try:
+        midi = resolve_catalog_item("midi_files", midi_id)
+        result = analyze_midi_piano_roll(Path(str(midi["path"])))
+        result["midi_id"] = midi_id
+        return result
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+def _sync_library() -> None:
+    midi_files = list(catalog().get("midi_files", []))
+    library.synchronize(jobs.list(), midi_files, sha256_file=midi_file_sha256)
+
+
+@app.get("/api/v1/midi-ddsp/library")
+def get_midi_ddsp_library() -> dict[str, object]:
+    try:
+        _sync_library()
+        return {"tracks": library.list_tracks()}
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.get("/api/v1/midi-ddsp/library/{source_id}/versions")
+def get_midi_ddsp_library_versions(source_id: str) -> dict[str, object]:
+    try:
+        _sync_library()
+        return {"source_id": source_id, "versions": library.versions(source_id)}
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.patch("/api/v1/midi-ddsp/library/{source_id}/preference")
+def set_midi_ddsp_library_preference(
+    source_id: str,
+    payload: MidiDdspLibraryPreferenceRequest,
+) -> dict[str, object]:
+    try:
+        _sync_library()
+        return library.set_preference(
+            source_id, payload.preferred_render_id, utc_timestamp()
+        )
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
 @app.post("/api/v1/midi-ddsp/jobs")
 def start_midi_ddsp_job(payload: MidiDdspJobRequest) -> dict[str, object]:
     _require_board()
@@ -728,6 +791,15 @@ def start_midi_ddsp_job(payload: MidiDdspJobRequest) -> dict[str, object]:
             metadata={
                 "midi_name": midi["name"],
                 "midi_id": payload.midi_id,
+                **(
+                    {"midi_sha256": str(midi["sha256"])}
+                    if midi.get("sha256")
+                    else (
+                        {"midi_sha256": midi_file_sha256(Path(str(midi["path"])))}
+                        if Path(str(midi["path"])).is_file()
+                        else {}
+                    )
+                ),
                 "model_bundle_id": bundle["id"],
                 "model_bundle": bundle["name"],
                 "model_architecture": bundle["architecture"],
@@ -763,8 +835,7 @@ def start_midi_ddsp_job(payload: MidiDdspJobRequest) -> dict[str, object]:
         raise _http_error(exc) from exc
 
 
-@app.post("/api/v1/midi-ddsp/recordings/{source_job_id}/play")
-def play_midi_ddsp_recording(
+def _play_midi_ddsp_recording(
     source_job_id: str,
     payload: MidiDdspPlaybackRequest,
 ) -> dict[str, object]:
@@ -845,6 +916,29 @@ def play_midi_ddsp_recording(
         raise HTTPException(status_code=404, detail="Audio output device not found") from exc
     except BaseException as exc:
         raise _http_error(exc) from exc
+
+
+@app.post("/api/v1/midi-ddsp/recordings/{source_job_id}/play")
+def play_midi_ddsp_recording(
+    source_job_id: str,
+    payload: MidiDdspPlaybackRequest,
+) -> dict[str, object]:
+    return _play_midi_ddsp_recording(source_job_id, payload)
+
+
+@app.post("/api/v1/midi-ddsp/library/versions/{render_id}/play")
+def play_midi_ddsp_library_version(
+    render_id: str,
+    payload: MidiDdspPlaybackRequest,
+) -> dict[str, object]:
+    try:
+        _sync_library()
+        version = library.version(render_id)
+        if not version["available"]:
+            raise FileNotFoundError("Selected audio version is unavailable")
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+    return _play_midi_ddsp_recording(render_id, payload)
 
 
 @app.get("/api/v1/jobs")

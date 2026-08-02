@@ -153,9 +153,8 @@ function Sync-StatefulOnnxExport([string]$ExportName) {
 Sync-StatefulOnnxExport "stateful_v2"
 Sync-StatefulOnnxExport "stateful_v2_batched"
 
-# The board only needs MIDI inputs. Mirror these files so local deletions also
-# disappear remotely, while MuseScore project files remain local source assets.
-ssh $SshTarget "find '$RemoteRoot/midi' -maxdepth 1 -type f \( -name '*.mid' -o -name '*.midi' \) -delete"
+# MIDI files are local test assets as well as WebUI inputs. Copy known inputs
+# additively so deployment never removes board-only fixtures or user files.
 Get-ChildItem (Join-Path $ProjectRoot "midi") -File | Where-Object {
     $_.Extension -in ".mid", ".midi"
 } | ForEach-Object {
