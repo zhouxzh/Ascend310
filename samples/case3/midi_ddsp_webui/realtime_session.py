@@ -125,11 +125,17 @@ def build_realtime_catalog() -> dict[str, object]:
                     "velocity_curve": {"min": 0.25, "max": 2.0, "default": 0.55},
                     "transpose": {"min": -24, "max": 24, "default": 0},
                     "output_gain_db": {"min": -60, "max": 6, "default": 0},
-                    "reverb": {"min": 0, "max": 1, "default": 0.15},
+                    "reverb": {"min": 0, "max": 1, "default": 0.0},
                     "harmonic_gain": {"min": 0, "max": 1, "default": 1.0},
                     "noise_gain": {"min": 0, "max": 1, "default": 1.0},
-                    "attack": {"min": 0.01, "max": 3, "default": 0.02},
-                    "release": {"min": 0.01, "max": 5, "default": 1.2},
+                    "attack": {"min": 0.1, "max": 3, "default": 0.1},
+                    "decay": {"min": 0, "max": 3, "default": 0.0},
+                    "sustain": {"min": 0, "max": 1, "default": 1.0},
+                    "release": {"min": 0.1, "max": 5, "default": 1.2},
+                    "input_pitch": {"min": -0.5, "max": 0.5, "default": 0.0},
+                    "input_gain": {"min": -0.5, "max": 0.5, "default": 0.0},
+                    "reverb_size": {"min": 0, "max": 1, "default": 0.4},
+                    "reverb_damping": {"min": 0, "max": 1, "default": 0.1},
                 },
                 "details": {
                     "engine": "ddsp-vst",
@@ -313,11 +319,17 @@ def resolve_runtime_config(
         "velocity_curve": float(parameters.get("velocity_curve", 0.55)),
         "pitch_shift": float(parameters.get("transpose", 0)),
         "output_gain_db": float(parameters.get("output_gain_db", 0.0)),
-        "reverb_wet": float(parameters.get("reverb", 0.15)),
+        "reverb_wet": float(parameters.get("reverb", 0.0)),
         "harmonic_gain": float(parameters.get("harmonic_gain", 1.0)),
         "noise_gain": float(parameters.get("noise_gain", 1.0)),
-        "attack": float(parameters.get("attack", 0.02)),
+        "attack": float(parameters.get("attack", 0.1)),
+        "decay": float(parameters.get("decay", 0.0)),
+        "sustain": float(parameters.get("sustain", 1.0)),
         "release": float(parameters.get("release", 1.2)),
+        "input_pitch": float(parameters.get("input_pitch", 0.0)),
+        "input_gain": float(parameters.get("input_gain", 0.0)),
+        "reverb_size": float(parameters.get("reverb_size", 0.4)),
+        "reverb_damping": float(parameters.get("reverb_damping", 0.1)),
     }
 
 
@@ -387,19 +399,19 @@ class PianoRuntimeAdapter:
         return self.controller.status()
 
     def note_on(self, source: str, note: int, velocity: int) -> None:
-        self.controller.command("note", source=source, note=note, velocity=velocity, on=True)
+        self.controller.notify("note", source=source, note=note, velocity=velocity, on=True)
 
     def note_off(self, source: str, note: int) -> None:
-        self.controller.command("note", source=source, note=note, velocity=0, on=False)
+        self.controller.notify("note", source=source, note=note, velocity=0, on=False)
 
     def sustain(self, source: str, enabled: bool) -> None:
-        self.controller.command("cc", source=source, controller=64, value=127 if enabled else 0)
+        self.controller.notify("cc", source=source, controller=64, value=127 if enabled else 0)
 
     def pitch_bend(self, value: int) -> None:
         del value  # Piano-DDSP checkpoint has no continuous pitch-bend input.
 
     def release_source(self, source: str) -> None:
-        self.controller.command("release_source", source=source)
+        self.controller.notify("release_source", source=source)
 
     def panic(self) -> None:
         self.controller.command("panic")

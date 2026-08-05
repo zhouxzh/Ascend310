@@ -156,7 +156,7 @@ ROI 坐标系基准。
 CLAHE（对比度受限的自适应直方图均衡化），然后转换回 BGR。这样做在不引入
 色彩伪影的前提下显著增强了掌纹纹理的对比度。
 
-全部代码实现在 [palm_preprocessor.py](samples/case4/palm_preprocessor.py) 的
+全部代码实现在 [palm_preprocessor.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/palm_preprocessor.py) 的
 `PalmPreprocessor` 类中，纯 OpenCV 实现，无需任何模型文件。
 
 #### 预处理失败的处理 {#src-experiment-case4-h12}
@@ -271,7 +271,7 @@ if norm > 0:
 L2 归一化确保了 FAISS `IndexFlatIP` 的内积等价于余弦相似度，这是案例7
 已验证的模式。
 
-完整 GhostNet 实现在 [ghostnet.py](samples/case4/ghostnet.py)，包含
+完整 GhostNet 实现在 [ghostnet.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/ghostnet.py)，包含
 `GhostModule`、`SELayer`、`GhostBottleneck`、`GhostNet` 四个类以及工厂函数
 `ghostnet_1x()`。
 
@@ -349,7 +349,7 @@ python3 train.py --data-dir /path/to/PolyU_Palmprint
 
 训练使用 AdamW 优化器 + CosineAnnealingLR 学习率调度，训练/验证集按用户
 （而非图像）85/15 分割以确保无数据泄漏。完整训练脚本在
-[train.py](samples/case4/train.py)。
+[train.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/train.py)。
 
 #### 评估指标 {#src-experiment-case4-h24}
 
@@ -498,7 +498,7 @@ FAISS `IndexFlatIP` 不支持直接删除单条记录。删除用户时，系统
 `reconstruct()` 方法从索引中取出保留的向量，重建一个新的 FAISS 索引。
 对于边缘场景（<1000 个用户），这一 O(N) 操作耗时 <100ms，完全可以接受。
 
-完整索引管理实现在 [palm_index.py](samples/case4/palm_index.py) 的
+完整索引管理实现在 [palm_index.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/palm_index.py) 的
 `PalmIndex` 类中。
 
 ### 2.8. Web 仪表盘 {#src-experiment-case4-h35}

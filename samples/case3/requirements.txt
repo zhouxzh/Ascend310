@@ -20,5 +20,15 @@ pydantic>=2.5,<3
 uvicorn>=0.32,<1
 websockets>=12,<16
 
+# The local and board verification entry point. Existing unittest-style test
+# cases run under pytest; no separate unittest command is maintained.
+pytest>=8,<9
+
+# ONNX files are downloaded as published release assets and may be validated
+# locally before ATC conversion. The aarch64 board runs OM through CANN/PyACL
+# and must not install or use ONNX Runtime as an inference fallback.
+onnx>=1.14,<2; platform_machine != "aarch64"
+onnxruntime>=1.16,<2; platform_machine != "aarch64"
+
 # `acl` is supplied by CANN/PyACL and `ais_bench` by the existing Ascend
 # benchmark environment; neither is installed from public PyPI here.

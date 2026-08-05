@@ -197,7 +197,7 @@ flowchart TD
     NORM --> TRANSPOSE["维度重排\nHWC -> CHW -> NCHW\n(1, 3, 224, 224)"]
 ```
 
-预处理代码在 [feature_extractor.py](samples/case7/feature_extractor.py) 的
+预处理代码在 [feature_extractor.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/feature_extractor.py) 的
 `FeatureExtractor.preprocess()` 方法中，与案例8的手势识别预处理完全一致。
 
 ### 2.4. 模型转换与昇腾部署 {#src-experiment-case7-h16}
@@ -238,7 +238,7 @@ python3 prepare_models.py --onnx-only
 3. 用 `torch.onnx.export()` 导出为 ONNX 格式
 4. 输入形状固定为 `(1, 3, 224, 224)`，输出形状固定为 `(1, 2048)`
 
-关键代码见 [prepare_models.py](samples/case7/prepare_models.py) 中的
+关键代码见 [prepare_models.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/prepare_models.py) 中的
 `export_onnx()` 函数。注意 `dynamic_axes={}` 参数——我们刻意禁用了动态
 形状，确保与 ATC 转换兼容。
 
@@ -309,7 +309,7 @@ flowchart TD
 
 #### PhotoIndex 类设计 {#src-experiment-case7-h22}
 
-[photo_index.py](samples/case7/photo_index.py) 中的 `PhotoIndex` 类管理
+[photo_index.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/photo_index.py) 中的 `PhotoIndex` 类管理
 整个照片索引的生命周期：
 
 - `index_photos(photo_dir)` — 扫描目录，逐张提取特征，构建 FAISS 索引

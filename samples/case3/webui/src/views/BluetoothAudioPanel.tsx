@@ -20,10 +20,10 @@ function deviceLabel(device: BluetoothAudioDevice): string {
 }
 
 function deviceStatusLabel(device: BluetoothAudioDevice): string {
-  if (device.blocked) return 'Blocked'
-  if (device.connected) return 'Connected'
-  if (device.paired || device.trusted || device.bonded) return 'Paired'
-  return device.is_audio ? 'Audio' : 'Found'
+  if (device.blocked) return '已屏蔽'
+  if (device.connected) return '已连接'
+  if (device.paired || device.trusted || device.bonded) return '已配对'
+  return device.is_audio ? '音频设备' : '已发现'
 }
 
 function deviceStatusTone(device: BluetoothAudioDevice): 'ok' | 'warn' | 'error' | 'neutral' {
@@ -33,8 +33,23 @@ function deviceStatusTone(device: BluetoothAudioDevice): 'ok' | 'warn' | 'error'
   return 'neutral'
 }
 
+function bluetoothErrorSummary(error: string): string {
+  const normalized = error.toLowerCase()
+  if (normalized.includes('bluetoothctl') && (
+    normalized.includes('not available')
+    || normalized.includes('not found')
+    || normalized.includes('no such file')
+  )) {
+    return '蓝牙服务不可用'
+  }
+  if (normalized.includes('timed out') || normalized.includes('timeout')) {
+    return '蓝牙操作超时'
+  }
+  return '蓝牙操作失败'
+}
+
 function controllerSubtitle(state: BluetoothAudioState): string {
-  if (state.error) return state.error
+  if (state.error) return bluetoothErrorSummary(state.error)
   if (!state.controller) return '未发现蓝牙控制器'
   const powered = state.controller.powered ? '已开启' : '未开启'
   return `${state.controller.name || state.controller.address} · ${powered}`
@@ -150,14 +165,19 @@ export default function BluetoothAudioPanel({ onRefresh }: Props) {
         )}
       />
 
-      {error && <Notice tone="error">{error}</Notice>}
+      {error && (
+        <Notice tone="error">
+          <strong>{bluetoothErrorSummary(error)}</strong>
+          <span className="diagnostic-detail">{error}</span>
+        </Notice>
+      )}
       {message && !error && <Notice tone="success">{message}</Notice>}
 
       <div className="bluetooth-summary">
         <div>
           <Bluetooth size={20} />
           <span>控制器</span>
-          <strong>{controllerPowered ? 'Power On' : 'Power Off'}</strong>
+          <strong>{controllerPowered ? '已开启' : '已关闭'}</strong>
         </div>
         <div>
           <BluetoothConnected size={20} />
@@ -165,7 +185,7 @@ export default function BluetoothAudioPanel({ onRefresh }: Props) {
           <strong>{audioCount}</strong>
         </div>
         <StatusPill tone={state.available && controllerPowered ? 'ok' : state.available ? 'warn' : 'neutral'}>
-          {state.available ? 'Bluetooth' : 'Unavailable'}
+          {state.available ? '蓝牙可用' : '不可用'}
         </StatusPill>
       </div>
 

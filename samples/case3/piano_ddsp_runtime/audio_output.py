@@ -126,6 +126,7 @@ class BoundedAudioOutput:
         self.sample_rate = int(sample_rate)
         self.block_samples = int(block_samples)
         self.latency_ms = float(latency_ms)
+        self.capacity = int(capacity)
         self.prebuffer = int(prebuffer)
         self.metrics = metrics
         self.backend = backend
@@ -136,7 +137,7 @@ class BoundedAudioOutput:
         self.alsa_route_device_id = alsa_route_device_id
         self.alsa_playback_level = int(alsa_playback_level)
         self.on_played = on_played
-        self.queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=capacity)
+        self.queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=self.capacity)
         self.stop_event = threading.Event()
         self.ready = threading.Event()
         self.error: BaseException | None = None
@@ -146,6 +147,11 @@ class BoundedAudioOutput:
         self.process: subprocess.Popen[bytes] | None = None
         self.stream = None
         self.worker = threading.Thread(target=self._write_loop, name="piano-audio", daemon=True)
+        self.latency_worker = threading.Thread(
+            target=self._latency_loop,
+            name="piano-audio-telemetry",
+            daemon=True,
+        )
 
     @property
     def buffered_blocks(self) -> int:
@@ -230,6 +236,7 @@ class BoundedAudioOutput:
         else:
             raise ValueError(f"Unsupported audio backend: {self.backend}")
         self.worker.start()
+        self.latency_worker.start()
 
     def submit(self, stereo: np.ndarray) -> bool:
         block = np.ascontiguousarray(stereo, dtype=np.float32)
@@ -306,6 +313,10 @@ class BoundedAudioOutput:
             self.sink_latency_ms = values.get("Sink", self.sink_latency_ms)
             return
 
+    def _latency_loop(self) -> None:
+        while not self.stop_event.wait(1.0):
+            self.refresh_latencies()
+
     def close(self) -> None:
         self.stop_event.set()
         self.ready.set()
@@ -318,6 +329,8 @@ class BoundedAudioOutput:
                 process.kill()
         if self.worker.ident is not None:
             self.worker.join(timeout=2.0)
+        if self.latency_worker.ident is not None:
+            self.latency_worker.join(timeout=2.0)
         if self.stream is not None:
             try:
                 self.stream.stop()

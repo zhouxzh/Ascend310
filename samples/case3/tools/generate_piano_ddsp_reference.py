@@ -168,13 +168,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument(
-        "--model", type=Path, default=Path("models/piano_ddsp/model-suite-v1.0.0/ddsp_piano_paper_ir.onnx")
+        "--model", type=Path, default=Path("models/piano_ddsp/model-suite-v1.0.1/ddsp_piano_gru_ir_96_64.onnx")
     )
     parser.add_argument(
-        "--metadata", type=Path, default=Path("models/piano_ddsp/model-suite-v1.0.0/ddsp_piano_paper_ir.json")
+        "--metadata", type=Path, default=Path("models/piano_ddsp/model-suite-v1.0.1/ddsp_piano_gru_ir_96_64.json")
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=Path("models/piano_ddsp/references/model-suite-v1.0.0/paper_ir")
+        "--output-dir", type=Path, default=Path("models/piano_ddsp/references/model-suite-v1.0.1/gru_ir_96_64")
     )
     parser.add_argument("--frames", type=int, default=10_000)
     parser.add_argument("--audio-frames", type=int, default=2_048)

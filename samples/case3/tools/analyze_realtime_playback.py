@@ -9,7 +9,6 @@ import math
 from pathlib import Path
 import sys
 import time
-import zipfile
 
 import mido
 import numpy as np
@@ -104,14 +103,16 @@ def load_midi_events(midi_path: Path) -> tuple[list[tuple[float, object]], float
 
 
 def load_model_metadata(model_path: Path) -> dict[str, object]:
-    tflite_path = model_path.with_suffix(".tflite")
-    if not tflite_path.exists():
+    metadata_path = model_path.parent / "metadata.json"
+    if not metadata_path.is_file():
         return {}
     try:
-        with zipfile.ZipFile(tflite_path) as archive:
-            return json.loads(archive.read("metadata.json"))
-    except (KeyError, OSError, ValueError, zipfile.BadZipFile):
+        all_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
         return {}
+    instrument = model_path.stem.split("_force_fp16")[0].split("_mixed_float16")[0]
+    candidate = all_metadata.get(instrument, {})
+    return candidate if isinstance(candidate, dict) else {}
 
 
 def _summary(values: np.ndarray) -> dict[str, float]:

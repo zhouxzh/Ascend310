@@ -20,6 +20,7 @@ ResNet18，但内存生命周期、数据搬运、预处理下沉和流水线分
 
 本章统一记录以下指标：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 指标 & 含义 & 适合回答的问题 \\
@@ -33,6 +34,7 @@ p95 & 95 分位耗时 & 是否存在长尾卡顿 \\
 FPS & 单位时间处理帧数 & 吞吐量是否达标 \\
 加速比 & 优化前耗时 / 优化后耗时 & 单项优化是否值得保留 \\
 \end{longtable}
+}
 
 测试时需要遵守三个规则：
 
@@ -53,6 +55,7 @@ FPS & 单位时间处理帧数 & 吞吐量是否达标 \\
 
 本章代码位于 \passthrough{\lstinline!samples/chapter7/!}：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -90,6 +93,7 @@ Queue Pipeline \\
 AIPP 配置示例 \\
 \passthrough{\lstinline!model/!} & 第 7 章模型和 AIPP 配置目录 \\
 \end{longtable}
+}
 
 阅读本章时，建议先进入第 7 章样例目录，后续命令都默认在这个目录下执行：
 
@@ -154,6 +158,7 @@ bash tools/profile_with_msprof.sh --name baseline -- \
 
 采集后重点观察：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -178,6 +183,7 @@ Stream Timeline & NPU 计算任务之间是否有大片空白 & NPU 在等待 Ho
 AI Core Metrics & Pipe 利用率是否低 & 模型算子、Batch
 或输入尺寸需要继续分析 \\
 \end{longtable}
+}
 
 \subsection{npu-smi：确认设备状态}\label{src-book-chapter7-h6}
 
@@ -265,6 +271,7 @@ acl.rt.memcpy(host_out, output_size, output_ptr, output_size, ACL_MEMCPY_DEVICE_
 
 基线需要记录以下阶段：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 阶段 & 含义 \\
@@ -283,6 +290,7 @@ Dataset \\
 等轻量后处理 \\
 \passthrough{\lstinline!end\_to\_end!} & 单帧端到端耗时 \\
 \end{longtable}
+}
 
 如果 \passthrough{\lstinline!alloc\_dataset!} 和
 \passthrough{\lstinline!free\_dataset!}
@@ -340,6 +348,7 @@ python3 03_cpu_preprocess_benchmark.py --runs 100 --resolution 1920x1080
 
 脚本比较两种方式：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 方式 & 特点 \\
@@ -352,6 +361,7 @@ python3 03_cpu_preprocess_benchmark.py --runs 100 --resolution 1920x1080
 \passthrough{\lstinline!workspace\_reuse!} &
 预先创建工作区，循环中复用数组 \\
 \end{longtable}
+}
 
 这个案例的学习重点不是把 CPU 预处理调到极致，而是理解何时应该停止优化
 CPU。若预处理耗时已经接近或超过模型执行耗时，应优先考虑：
@@ -513,6 +523,7 @@ p95 latency 可能上升；如果业务目标是交互式低延迟，需要谨�
 设备上得到的实测数据。读者自己的板端温度、CANN
 版本、设备健康状态和后台进程不同，绝对数值会有差异；更重要的是复现实验方法和观察相对趋势。
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -539,12 +550,14 @@ Python &
 \passthrough{\lstinline!Alarm!}，温度约 61 C，测试前后内存约 2939-3003 /
 7545 MB \\
 \end{longtable}
+}
 
 以下表格由
 \passthrough{\lstinline!samples/chapter7/tools/summarize\_metrics.py!}
 汇总远端 JSON 指标生成。由于测试时设备状态为
 \passthrough{\lstinline!Alarm!}，数据更适合作为章节教学样例和相对趋势参考；正式项目验收应在设备健康状态正常、无其他进程干扰时重新跑完整评测。
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1034}}
   >{\raggedright\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1034}}
@@ -610,6 +623,7 @@ Post 串行 \\
 Queue Pipeline & \passthrough{\lstinline!simulate\_queue\_pipeline!} &
 8.1233 & 157.4201 & 123.1021 & 200 & 1.868 & 三段线程通过 Queue 解耦 \\
 \end{longtable}
+}
 
 从这组数据可以得到五个结论：
 
@@ -688,6 +702,7 @@ bash tools/profile_with_msprof.sh --name baseline-remote-latest -- \
 
 \section{调优 Checklist}\label{src-book-chapter7-h16}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -716,6 +731,7 @@ DVPP、AIPP、C++/NumPy 工作区复用 \\
 Pipeline FPS 不升反降 & 队列太深或阶段不均衡 &
 缩小队列、调整线程数、重新划分阶段 \\
 \end{longtable}
+}
 
 \section{练习任务}\label{src-book-chapter7-h17}
 

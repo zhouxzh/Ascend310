@@ -27,6 +27,42 @@ ONBOARD_HEADSET_WARNING = (
 )
 
 
+def _pulse_system_volume(sink: dict[str, object]) -> dict[str, object]:
+    """Return an averaged, read-only system volume for a PulseAudio sink."""
+    volume = sink.get("volume")
+    percentages: list[float] = []
+    decibels: list[float] = []
+    if isinstance(volume, dict):
+        for channel in volume.values():
+            if not isinstance(channel, dict):
+                continue
+            percent_text = str(channel.get("value_percent", "")).strip()
+            percent_match = re.search(r"-?\d+(?:\.\d+)?", percent_text)
+            if percent_match:
+                percentages.append(float(percent_match.group(0)))
+            elif isinstance(channel.get("value"), (int, float)):
+                percentages.append(float(channel["value"]) * 100.0 / 65_536.0)
+            db_text = str(channel.get("db", "")).strip()
+            db_match = re.search(r"-?\d+(?:\.\d+)?", db_text)
+            if db_match:
+                decibels.append(float(db_match.group(0)))
+    return {
+        "system_volume_percent": (
+            round(sum(percentages) / len(percentages), 1) if percentages else None
+        ),
+        "system_volume_db": (
+            round(sum(decibels) / len(decibels), 2) if decibels else None
+        ),
+        "system_muted": bool(sink.get("mute", False)),
+    }
+
+
+def is_pulse_output_event(message: str) -> bool:
+    """Identify pactl subscription events that can change output state."""
+    normalized = message.casefold()
+    return " on sink " in normalized or " on server " in normalized
+
+
 def _is_ascend_onboard_output(device: dict[str, object]) -> bool:
     if bool(device.get("is_onboard")):
         return True
@@ -255,6 +291,7 @@ def query_speaker_outputs(
                             "is_default": sink_name == default_sink,
                             "is_bluetooth": is_bluetooth,
                             "state": str(sink.get("state", "UNKNOWN")).lower(),
+                            **_pulse_system_volume(sink),
                         })
                     )
                 if outputs:
@@ -439,6 +476,309 @@ def build_test_signal(
         output[:, 0] = tone
         output[:, 1] = tone
     return output
+
+
+def amplitude_to_dbfs(value: float, floor_dbfs: float = -96.0) -> float:
+    floor_amplitude = 10.0 ** (floor_dbfs / 20.0)
+    return max(20.0 * math.log10(max(float(value), floor_amplitude)), floor_dbfs)
+
+
+class AudioInputTestController:
+    OWNER = "audio-input-test"
+
+    def __init__(
+        self,
+        coordinator: ResourceCoordinator,
+        sounddevice_module: Any | None = None,
+        popen_factory: Callable[..., Any] | None = None,
+    ) -> None:
+        self.coordinator = coordinator
+        self._sounddevice_module = sounddevice_module
+        self._popen_factory = popen_factory or subprocess.Popen
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._ready_event = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._process: Any | None = None
+        self._state = "idle"
+        self._error: str | None = None
+        self._config: dict[str, object] = {}
+        self._device_name = ""
+        self._sample_rate = 0
+        self._input_channels = 0
+        self._captured_frames = 0
+        self._total_frames = 0
+        self._overflows = 0
+        self._rms_dbfs = -96.0
+        self._peak_dbfs = -96.0
+        self._signal_detected = False
+        self._started_at = 0.0
+
+    @property
+    def running(self) -> bool:
+        with self._lock:
+            return self._state in {"starting", "running", "stopping"}
+
+    def _sounddevice(self) -> Any:
+        if self._sounddevice_module is not None:
+            return self._sounddevice_module
+        try:
+            import sounddevice as sd
+        except ImportError as exc:
+            raise RuntimeError("Install requirements.txt first.") from exc
+        return sd
+
+    def status(self) -> dict[str, object]:
+        with self._lock:
+            state = self._state
+            config = dict(self._config)
+            captured_frames = self._captured_frames
+            total_frames = self._total_frames
+            sample_rate = self._sample_rate
+            started_at = self._started_at
+            payload = {
+                "running": state in {"starting", "running", "stopping"},
+                "state": state,
+                "error": self._error,
+                "device_name": self._device_name,
+                "sample_rate": sample_rate,
+                "input_channels": self._input_channels,
+                "captured_frames": captured_frames,
+                "total_frames": total_frames,
+                "overflows": self._overflows,
+                "rms_dbfs": self._rms_dbfs,
+                "peak_dbfs": self._peak_dbfs,
+                "signal_detected": self._signal_detected,
+                "config": config,
+            }
+        progress = captured_frames / total_frames if total_frames else 0.0
+        elapsed = time.monotonic() - started_at if started_at else 0.0
+        duration = total_frames / sample_rate if sample_rate else 0.0
+        payload.update(
+            {
+                "progress": min(max(progress, 0.0), 1.0),
+                "elapsed_seconds": min(elapsed, duration) if duration else 0.0,
+                "remaining_seconds": max(duration - elapsed, 0.0),
+            }
+        )
+        return payload
+
+    def start(self, config: dict[str, object]) -> dict[str, object]:
+        acquired = False
+        try:
+            self.coordinator.acquire(self.OWNER)
+            acquired = True
+            self._stop_event = threading.Event()
+            self._ready_event = threading.Event()
+            with self._lock:
+                self._state = "starting"
+                self._error = None
+                self._config = dict(config)
+                self._device_name = str(config.get("device_name", ""))
+                self._sample_rate = 0
+                self._input_channels = 0
+                self._captured_frames = 0
+                self._total_frames = 0
+                self._overflows = 0
+                self._rms_dbfs = -96.0
+                self._peak_dbfs = -96.0
+                self._signal_detected = False
+                self._started_at = time.monotonic()
+            thread = threading.Thread(
+                target=self._run,
+                daemon=True,
+                name="audio-input-test",
+            )
+            self._thread = thread
+            thread.start()
+        except BaseException as exc:
+            with self._lock:
+                self._state = "failed"
+                self._error = str(exc)
+                self._thread = None
+            if acquired:
+                self.coordinator.release(self.OWNER)
+            raise
+        if not self._ready_event.wait(timeout=10.0):
+            self._stop_event.set()
+            with self._lock:
+                self._state = "failed"
+                self._error = "Timed out while opening the audio input device"
+            raise RuntimeError("Timed out while opening the audio input device")
+        with self._lock:
+            error = self._error
+        if error is not None:
+            thread.join(timeout=1.0)
+            raise RuntimeError(error)
+        return self.status()
+
+    def stop(self) -> dict[str, object]:
+        with self._lock:
+            thread = self._thread
+            process = self._process
+            if self._state in {"starting", "running"}:
+                self._state = "stopping"
+        if thread is None or not thread.is_alive():
+            return self.status()
+        self._stop_event.set()
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        thread.join(timeout=5.0)
+        if thread.is_alive():
+            raise RuntimeError("Timed out while stopping the audio input test")
+        return self.status()
+
+    def _run(self) -> None:
+        try:
+            if self._config.get("audio_backend") == "pulse":
+                self._run_pulse()
+            else:
+                self._run_portaudio()
+        except Exception as exc:
+            with self._lock:
+                if self._stop_event.is_set():
+                    self._state = "stopped"
+                    self._error = None
+                else:
+                    self._state = "failed"
+                    self._error = str(exc)
+            self._ready_event.set()
+        finally:
+            with self._lock:
+                self._process = None
+            self.coordinator.release(self.OWNER)
+
+    def _update_metrics(self, block: np.ndarray, overflowed: bool = False) -> None:
+        samples = np.asarray(block, dtype=np.float32)
+        if samples.ndim == 1:
+            samples = samples[:, np.newaxis]
+        if samples.size == 0:
+            return
+        samples = np.nan_to_num(samples, copy=True)
+        flat = samples.reshape(-1).astype(np.float64, copy=False)
+        rms = float(np.sqrt(np.mean(np.square(flat))))
+        peak = float(np.max(np.abs(flat)))
+        rms_dbfs = amplitude_to_dbfs(rms)
+        peak_dbfs = amplitude_to_dbfs(peak)
+        threshold_dbfs = float(self._config.get("threshold_dbfs", -45.0))
+        with self._lock:
+            self._captured_frames += int(samples.shape[0])
+            self._rms_dbfs = rms_dbfs
+            self._peak_dbfs = max(self._peak_dbfs, peak_dbfs)
+            self._signal_detected = self._signal_detected or peak_dbfs >= threshold_dbfs
+            if overflowed:
+                self._overflows += 1
+
+    def _mark_running(self, sample_rate: int, channels: int) -> None:
+        with self._lock:
+            self._sample_rate = sample_rate
+            self._input_channels = channels
+            self._total_frames = round(
+                sample_rate * float(self._config["duration_seconds"])
+            )
+            self._state = "running"
+        self._ready_event.set()
+
+    def _mark_finished(self) -> None:
+        with self._lock:
+            self._state = "stopped" if self._stop_event.is_set() else "succeeded"
+
+    def _run_portaudio(self) -> None:
+        sd = self._sounddevice()
+        device_id = int(str(self._config["audio_device_id"]))
+        device = sd.query_devices(device_id, "input")
+        max_channels = int(device["max_input_channels"])
+        if max_channels <= 0:
+            raise RuntimeError("Selected device has no input channels")
+        channels = min(max_channels, 2)
+        sample_rate = int(
+            self._config.get("default_sample_rate")
+            or round(float(device["default_samplerate"]))
+            or 48_000
+        )
+        sd.check_input_settings(
+            device=device_id,
+            samplerate=sample_rate,
+            channels=channels,
+            dtype="float32",
+        )
+        with sd.InputStream(
+            device=device_id,
+            samplerate=sample_rate,
+            channels=channels,
+            dtype="float32",
+            latency="high",
+        ) as stream:
+            with self._lock:
+                self._device_name = str(device["name"])
+            self._mark_running(sample_rate, channels)
+            while not self._stop_event.is_set():
+                with self._lock:
+                    remaining = self._total_frames - self._captured_frames
+                if remaining <= 0:
+                    break
+                block, overflowed = stream.read(min(1024, remaining))
+                self._update_metrics(block, bool(overflowed))
+        self._mark_finished()
+
+    def _run_pulse(self) -> None:
+        parec = shutil.which("parec")
+        if parec is None:
+            raise RuntimeError("parec is unavailable for the selected PulseAudio input")
+        sample_rate = int(self._config.get("default_sample_rate") or 48_000)
+        max_channels = int(self._config.get("max_input_channels") or 1)
+        channels = min(max(max_channels, 1), 2)
+        process = self._popen_factory(
+            [
+                parec,
+                f"--device={self._config['pulse_source']}",
+                "--format=float32le",
+                f"--rate={sample_rate}",
+                f"--channels={channels}",
+                "--latency-msec=100",
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=0,
+        )
+        if process.stdout is None:
+            raise RuntimeError("Unable to open parec output stream")
+        with self._lock:
+            self._process = process
+        self._mark_running(sample_rate, channels)
+        block_frames = 1024
+        while not self._stop_event.is_set():
+            with self._lock:
+                remaining = self._total_frames - self._captured_frames
+            if remaining <= 0:
+                break
+            requested_frames = min(block_frames, remaining)
+            payload = process.stdout.read(requested_frames * channels * 4)
+            if not payload:
+                if process.poll() is not None:
+                    error = process.stderr.read().decode("utf-8", errors="replace").strip()
+                    raise RuntimeError(error or "parec stopped before input testing completed")
+                continue
+            sample_count = len(payload) // 4
+            frame_count = sample_count // channels
+            if frame_count <= 0:
+                continue
+            samples = np.frombuffer(
+                payload[: frame_count * channels * 4], dtype="<f4"
+            ).reshape(frame_count, channels)
+            self._update_metrics(samples)
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        self._mark_finished()
 
 
 class SpeakerTestController:

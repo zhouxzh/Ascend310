@@ -56,6 +56,7 @@ AI 模型精度，并且可同时运行多个模型。 -
 
 \subsection{边缘计算 vs 云计算？}\label{src-book-chapter1-h4}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1081}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2162}}
@@ -93,6 +94,7 @@ AI 模型精度，并且可同时运行多个模型。 -
 非实时批处理、模型训练、集中化数据湖 &
 云：非时间敏感数据、可靠互联网、已在云存储的数据；边缘：实时数据处理、受限或无联网地点、传输成本过高的大规模本地数据、受严格法规约束的数据。 \\
 \end{longtable}
+}
 
 一个边缘计算优于云计算的示例是医疗机器人，外科医生需要实时数据访问。这些系统包含大量可在云中执行的软件，但手术室中日益出现的智能分析与机器人控制无法容忍时延、网络可靠性问题或带宽限制。在此示例中，边缘计算为患者提供了生死攸关的益处。
 
@@ -228,6 +230,7 @@ Core计算单元、存储层次等深度解析请参见第6章），在一张芯
 
 华为昇腾310B系列提供了两个不同算力等级的AI加速模块，分别是20T算力版本跟8T算力版本。它们在核心架构、接口和外形上高度统一，主要差异在于性能配置。详细的技术规格如下表所示：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.1356}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4407}}
@@ -266,6 +269,7 @@ Gen3（8Gbps） 向下兼容各接口旧版本 & 同左 \\
 同左 \\
 \textbf{结构尺寸} & MXM连接器 82mm × 60mm × 7mm & 同左 \\
 \end{longtable}
+}
 
 \textbf{20 TOPS版本}在整体性能上全面领先，其AI算力（20 TOPS
 INT8）和CPU频率（1.6GHz）均高于\textbf{8 TOPS版本}（8 TOPS INT8,
@@ -286,6 +290,7 @@ Orin
 Nano是英伟达面向入门级边缘AI市场推出的嵌入式系统模块。它继承了英伟达在GPU计算领域的绝对优势，在小型封装内提供了惊人的AI算力，其核心价值在于强大的性能和无与伦比的成熟软件生态，是AI开发者的首选平台之一。
 它们之间的详细性能参数对比如下表所示：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1385}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2462}}
@@ -335,6 +340,7 @@ SPI×2 I2S×2, I2C×4 CAN×1, PWM, GPIO \\
 SO-DIMM连接器 \\
 \textbf{工艺制程} & 12nm & 8nm & - \\
 \end{longtable}
+}
 
 在AI性能方面，Jetson Orin
 Nano凭借其基于Ampere架构的GPU，提供了三者中最强的AI算力；昇腾310B则凭借其专用AI加速器，提供了坚实的中等算力；而RK3588集成的NPU则提供了相对基础的AI加速能力。

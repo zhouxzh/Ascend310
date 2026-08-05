@@ -1,0 +1,15 @@
+Use case: scientific-educational
+Asset type: technical report figure
+Primary request:
+Create a publication-ready DDSP signal-flow schematic for a Chinese technical book. White background, flat vector style, high contrast, generous margins, no gradients, no shadows, no title or figure number. Use Okabe-Ito colors, black arrowheads, and shapes that remain distinct in grayscale. All text must be exact, large, crisp, and horizontal.
+
+Left-to-right signal flow. Input block “MIDI / 音频特征” feeds “神经控制网络”. The network fans out to exactly three control blocks at the bottom edge of the blue control region: “基频 f0 + 总幅度”, “谐波分布”, and “噪声频带”. EACH OF THESE THREE LABELS MUST APPEAR EXACTLY ONCE IN THE ENTIRE IMAGE; do not duplicate them in the green region. Align “基频 f0 + 总幅度” and “谐波分布” directly ABOVE “谐波振荡器”, with two vertical arrows crossing the blue-green boundary and terminating only at “谐波振荡器”. Align “噪声频带” directly ABOVE “滤波噪声”, with one vertical arrow crossing the boundary and terminating only at “滤波噪声”. No control block may connect directly to “干声混合”, and “噪声频带” must never connect to “谐波振荡器”. The two audio outputs “谐波振荡器” and “滤波噪声” then merge at “干声混合”. Continue through “包络插值 + 重采样”, “增益 + 混响”, and output “PCM / WAV”.
+
+Visually separate neural inference from deterministic DSP: put “神经控制网络” and its outputs in a pale blue band labeled “低速控制域 50 / 250 Hz”; put oscillators, noise, mixing, resampling, gain, and reverb in a pale green band labeled “音频 DSP 域 16 / 48 kHz”. Use a purple dotted arrow labeled “IR / FDN 参数” entering “增益 + 混响”. Make every arrow direction explicit and avoid crossing connectors.
+Scene/backdrop: clean white or very light neutral background
+Style/medium: precise flat scientific infographic with vector-like geometry and professional sans-serif typography
+Composition/framing: scan-friendly hierarchy, generous whitespace, consistent alignment, and clearly terminated arrows
+Color palette: colorblind-safe Okabe-Ito colors with dark charcoal text and sufficient grayscale contrast
+Text handling: render requested labels verbatim; use consistent capitalization; do not add pseudo-text or unnecessary labels
+Scientific constraints: preserve the requested causal, spatial, and mathematical relationships; do not invent values, equations, units, components, or scientific claims
+Output constraints: no overlapping or clipped text; no ambiguous connections; no gradients, shadows, 3D effects, logos, watermarks, decorative borders, or photorealism

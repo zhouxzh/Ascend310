@@ -46,7 +46,7 @@ const realtimeCatalog = {
 }
 const stopped = {
   state: 'stopped', running: false, patch_id: null, patch: null, active_notes: [],
-  recording: { active: false }, metrics: {}, diagnostics: {},
+  recording: { active: false }, metrics: { midi_to_pcm_p95_ms: 18.4, npu_p95_ms: 11.3 }, diagnostics: {},
 }
 
 async function installRealtimeWebSocket(page: Page) {
@@ -89,10 +89,11 @@ async function openRealtimeStage(page: Page, workspace: '触控演奏' | 'MIDI �
     body: JSON.stringify({ ...stopped, state: 'running', running: true, patch_id: violinPatch.patch_id, patch: violinPatch, audio_device_id: 'usb-audio', last_switch: { ok: true, rolled_back: false, duration_ms: 238 } }),
   }))
   await page.goto('/')
-  await page.getByRole('button', { name: workspace }).first().click()
+  await page.getByRole('button', { name: '实时演奏' }).first().click()
+  const mode = page.getByRole('tab', { name: workspace === '触控演奏' ? '触摸屏' : 'MIDI 键盘', exact: true })
+  if (await mode.getAttribute('aria-selected') !== 'true') await mode.click()
   await expect(page.getByRole('region', { name: workspace === '触控演奏' ? '触控实时演奏' : 'MIDI 键盘实时演奏' })).toBeVisible()
-  const picker = workspace === '触控演奏' ? '.touch-patch-picker' : '.midi-patch-picker'
-  await expect(page.locator(`${picker} summary`)).toBeVisible()
+  await expect(page.getByRole('combobox', { name: '当前音色' })).toBeVisible()
 }
 
 for (const viewport of [
@@ -105,24 +106,17 @@ for (const viewport of [
     await openRealtimeStage(page)
 
     const visualizerKeyboard = page.getByRole('img', { name: '32 键钢琴可视化' })
-    const roll = page.getByRole('img', { name: '动态钢琴卷帘' })
+    const roll = page.locator('.realtime-stage--midi .live-piano-roll')
     await expect(visualizerKeyboard).toHaveAttribute('data-key-count', '32')
     await expect(page.getByRole('button', { name: '使用 32 键' })).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByLabel('实体 MIDI 输入')).toBeVisible()
     await expect(roll).toBeVisible()
     await expect(page.getByRole('slider', { name: '输出增益' })).toHaveValue('0')
     await expect(page.getByText('0.0 dB')).toBeVisible()
-    const before = await visualizerKeyboard.boundingBox()
-    expect(before).not.toBeNull()
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
 
-    await page.locator('.midi-patch-picker summary').click()
-    await page.getByRole('tab', { name: '弦乐' }).click()
-    await page.getByRole('button', { name: /Violin/ }).click()
-    const after = await visualizerKeyboard.boundingBox()
-    expect(after).not.toBeNull()
-    expect(Math.abs(after!.height - before!.height)).toBeLessThanOrEqual(1)
-    expect(Math.abs(after!.width - before!.width)).toBeLessThanOrEqual(1)
+    await expect(page.getByRole('combobox', { name: '当前音色' }).locator('option')).toHaveCount(1)
+    await expect(page.getByRole('option', { name: 'Violin' })).toHaveCount(0)
 
     await mkdir('../reports/webui/screenshots', { recursive: true })
     await page.screenshot({
@@ -131,21 +125,46 @@ for (const viewport of [
     })
 
     if (viewport.width <= 600) {
-      const drawerTab = page.getByRole('tab', { name: '录音监听' })
-      await drawerTab.scrollIntoViewIfNeeded()
-      await drawerTab.click()
-      await expect(page.getByRole('button', { name: /开始录音/ })).toBeVisible()
-      const [drawerBox, navBox] = await Promise.all([
-        page.locator('.drawer-tabs').boundingBox(),
+      const recordButton = page.getByRole('button', { name: '录音' })
+      await recordButton.scrollIntoViewIfNeeded()
+      await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }))
+      await expect(recordButton).toBeVisible()
+      const [recordBox, navBox] = await Promise.all([
+        recordButton.boundingBox(),
         page.locator('.bottom-nav').boundingBox(),
       ])
-      expect(drawerBox).not.toBeNull()
+      expect(recordBox).not.toBeNull()
       expect(navBox).not.toBeNull()
-      expect(drawerBox!.y + drawerBox!.height).toBeLessThanOrEqual(navBox!.y + 1)
+      expect(recordBox!.y + recordBox!.height).toBeLessThanOrEqual(navBox!.y + 1)
     }
 
   })
 }
+
+test('switching realtime input modes reuses the loaded Piano-DDSP catalog', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 969 })
+  await installRealtimeWebSocket(page)
+  let catalogRequests = 0
+  await page.route('**/api/v1/realtime/catalog', async (route) => {
+    catalogRequests += 1
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(realtimeCatalog) })
+  })
+  await page.route('**/api/v1/realtime/status', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(stopped),
+  }))
+
+  await page.goto('/')
+  await expect(page.getByRole('region', { name: '触控实时演奏' })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: '当前音色' })).toHaveValue('piano.paper-ir')
+  expect(catalogRequests).toBe(1)
+
+  await page.getByRole('tab', { name: 'MIDI 键盘', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'MIDI 键盘实时演奏' })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: '当前音色' })).toHaveValue('piano.paper-ir', { timeout: 500 })
+  expect(catalogRequests).toBe(1)
+  await expect(page.getByText('正在加载统一音色库')).toHaveCount(0)
+})
 
 test('10-inch touch layout opens a readable two-octave performance keyboard by default', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, hasTouch: true })
@@ -160,45 +179,53 @@ test('10-inch touch layout opens a readable two-octave performance keyboard by d
     await expect(page.getByRole('button', { name: '使用 32 键' })).toHaveCount(0)
     await expect(page.getByText('C3–C5')).toBeVisible()
     const [patchFontSize, keyButtonBox, controlLabelSize, controlValueSize, controlBox] = await Promise.all([
-      page.locator('.patch-tile strong').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+      page.getByRole('combobox', { name: '当前音色' }).evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
       page.getByRole('button', { name: '使用 25 键' }).boundingBox(),
-      page.locator('.realtime-stage--touch .performance-control-bar label > span').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
-      page.locator('.realtime-stage--touch .performance-control-bar label > strong').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
-      page.locator('.realtime-stage--touch .performance-control-bar label').first().boundingBox(),
+      page.locator('.touch-shaping-controls label > span:first-child').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+      page.locator('.touch-shaping-controls label > strong').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+      page.locator('.touch-shaping-controls label').first().boundingBox(),
     ])
     expect(patchFontSize).toBeGreaterThanOrEqual(15)
     expect(keyButtonBox).not.toBeNull()
     expect(keyButtonBox!.height).toBeGreaterThanOrEqual(56)
-    expect(controlLabelSize).toBeGreaterThanOrEqual(18)
-    expect(controlValueSize).toBeGreaterThanOrEqual(20)
+    expect(controlLabelSize).toBeGreaterThanOrEqual(16)
+    expect(controlValueSize).toBeGreaterThanOrEqual(17)
     expect(controlBox).not.toBeNull()
-    expect(controlBox!.height).toBeGreaterThanOrEqual(64)
+    expect(controlBox!.height).toBeGreaterThanOrEqual(88)
 
     await page.getByRole('button', { name: '向高音区移动一个八度' }).click()
     await expect(page.getByText('C4–C6')).toBeVisible()
     const piano = page.locator('.realtime-stage .piano')
     await expect(piano).toHaveAttribute('data-key-count', '25')
     await expect(piano).toHaveAttribute('data-white-key-count', '15')
-    const [pianoBox, whiteKeyBox, blackKeyBox, footerBox, pianoStyleHeight, stageClass] = await Promise.all([
+    const [pianoBox, frameBox, whiteKeyBox, blackKeyBox, pianoStyleHeight, stageClass, frameBorder] = await Promise.all([
       piano.boundingBox(),
+      page.locator('.keyboard-frame--touch').boundingBox(),
       piano.locator('.white-key').first().boundingBox(),
       piano.locator('.black-key').first().boundingBox(),
-      page.locator('.status-footer').boundingBox(),
       piano.evaluate((element) => Number.parseFloat(getComputedStyle(element).height)),
       page.locator('.realtime-stage').getAttribute('class'),
+      page.locator('.keyboard-frame--touch').evaluate((element) => getComputedStyle(element).borderBottomWidth),
     ])
     expect(pianoBox).not.toBeNull()
+    expect(frameBox).not.toBeNull()
     expect(whiteKeyBox).not.toBeNull()
     expect(blackKeyBox).not.toBeNull()
-    expect(footerBox).not.toBeNull()
+    await expect(page.locator('.realtime-stage--touch .stage-drawer')).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: '触摸屏' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'MIDI 键盘', exact: true })).toHaveAttribute('aria-selected', 'false')
+    await expect(page.locator('.status-footer')).toHaveCount(0)
     expect(stageClass).toContain('touch-keyboard-size--medium')
-    expect(pianoStyleHeight).toBe(260)
+    expect(pianoStyleHeight).toBe(190)
     const stageBox = await page.locator('.keyboard-stage').boundingBox()
     expect(stageBox).not.toBeNull()
-    expect(pianoBox!.width).toBeGreaterThanOrEqual(stageBox!.width - 24)
-    expect(pianoBox!.height).toBeGreaterThanOrEqual(220)
+    expect(pianoBox!.width).toBeGreaterThanOrEqual(stageBox!.width - 48)
+    expect(pianoBox!.height).toBeGreaterThanOrEqual(180)
     expect(pianoBox!.height).toBeLessThanOrEqual(310)
-    expect(pianoBox!.y + pianoBox!.height).toBeLessThanOrEqual(footerBox!.y)
+    expect(frameBorder).toBe('1px')
+    expect(frameBox!.y + frameBox!.height).toBeGreaterThanOrEqual(788)
+    expect(frameBox!.y + frameBox!.height).toBeLessThanOrEqual(796)
+    expect(frameBox!.y + frameBox!.height - (pianoBox!.y + pianoBox!.height)).toBeGreaterThanOrEqual(9)
     expect(pianoBox!.height / whiteKeyBox!.width).toBeLessThan(4)
     expect(blackKeyBox!.width).toBeLessThan(whiteKeyBox!.width)
     expect(blackKeyBox!.height).toBeLessThan(pianoBox!.height)
@@ -225,14 +252,14 @@ test('10-inch touch layout opens a readable two-octave performance keyboard by d
 
     await page.setViewportSize({ width: 600, height: 400 })
     const [narrowLabelSize, narrowValueSize, narrowControlBox] = await Promise.all([
-      page.locator('.realtime-stage--touch .performance-control-bar label > span').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
-      page.locator('.realtime-stage--touch .performance-control-bar label > strong').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
-      page.locator('.realtime-stage--touch .performance-control-bar label').first().boundingBox(),
+      page.locator('.touch-shaping-controls label > span:first-child').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+      page.locator('.touch-shaping-controls label > strong').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+      page.locator('.touch-shaping-controls label').first().boundingBox(),
     ])
-    expect(narrowLabelSize).toBeGreaterThanOrEqual(18)
-    expect(narrowValueSize).toBeGreaterThanOrEqual(20)
+    expect(narrowLabelSize).toBeGreaterThanOrEqual(16)
+    expect(narrowValueSize).toBeGreaterThanOrEqual(17)
     expect(narrowControlBox).not.toBeNull()
-    expect(narrowControlBox!.height).toBeGreaterThanOrEqual(64)
+    expect(narrowControlBox!.height).toBeGreaterThanOrEqual(88)
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
   } finally {
     await context.close()
@@ -246,46 +273,114 @@ test('physical 10-inch touch stage keeps performance controls in the first viewp
   try {
     await openRealtimeStage(page, '触控演奏')
 
-    const picker = page.locator('.touch-patch-picker')
-    const pickerContent = page.locator('.touch-patch-picker-content')
-    await expect(picker).toBeVisible()
-    await expect(pickerContent).not.toBeVisible()
-    await picker.locator('summary').click()
-    await expect(pickerContent).toBeVisible()
-    await picker.locator('summary').click()
-    await expect(pickerContent).not.toBeVisible()
+    const pianoSelector = page.getByRole('combobox', { name: '当前音色' })
+    await expect(pianoSelector).toBeVisible()
+    await expect(pianoSelector.locator('option')).toHaveCount(1)
+    await expect(page.getByRole('option', { name: /小提琴/ })).toHaveCount(0)
+    await expect(page.locator('.touch-patch-picker')).toHaveCount(0)
 
-    const controls = page.locator('.realtime-stage--touch .performance-control-bar > *')
-    await expect(controls).toHaveCount(5)
-    const [viewport, footerBox, footerFontSizes, pianoBox, controlsBox, labelSize, valueSize, controlBoxes] = await Promise.all([
+    const controls = page.locator('.touch-shaping-controls > *')
+    await expect(controls).toHaveCount(6)
+    const [viewport, sessionBox, pianoBox, frameBox, deckBox, keyboardBox, rollBox, labelSize, valueSize, controlBoxes] = await Promise.all([
       page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight })),
-      page.locator('.status-footer').boundingBox(),
-      page.locator('.status-footer span').evaluateAll((elements) => (
-        elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize))
-      )),
+      page.locator('.realtime-stage--touch .stage-session-bar').boundingBox(),
       page.locator('.realtime-stage--touch .piano').boundingBox(),
-      page.locator('.realtime-stage--touch .performance-control-bar').boundingBox(),
-      page.locator('.realtime-stage--touch .performance-control-bar label > span').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
-      page.locator('.realtime-stage--touch .performance-control-bar label > strong').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+      page.locator('.keyboard-frame--touch').boundingBox(),
+      page.locator('.touch-control-deck').boundingBox(),
+      page.locator('.realtime-stage--touch .keyboard-stage').boundingBox(),
+      page.locator('.realtime-stage--touch .live-piano-roll').boundingBox(),
+      page.locator('.touch-shaping-controls label > span:first-child').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+      page.locator('.touch-shaping-controls label > strong').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
       controls.evaluateAll((elements) => elements.map((element) => {
         const box = element.getBoundingClientRect()
         return { top: box.top, bottom: box.bottom, height: box.height }
       })),
     ])
     expect(viewport).toEqual({ width: 1920, height: 969 })
-    expect(footerBox).not.toBeNull()
-    expect(footerBox!.height).toBeGreaterThanOrEqual(48)
-    expect(footerFontSizes.every((size) => size >= 16)).toBe(true)
+    await expect(page.locator('.status-footer')).toHaveCount(0)
+    expect(sessionBox).not.toBeNull()
+    expect(sessionBox!.height).toBeLessThanOrEqual(68)
     expect(pianoBox).not.toBeNull()
-    expect(controlsBox).not.toBeNull()
-    expect(labelSize).toBeGreaterThanOrEqual(24)
-    expect(valueSize).toBeGreaterThanOrEqual(28)
-    expect(controlBoxes.every((box) => box.height >= 82)).toBe(true)
-    expect(controlBoxes.every((box) => box.bottom <= footerBox!.y)).toBe(true)
-    expect(pianoBox!.y + pianoBox!.height).toBeLessThanOrEqual(controlsBox!.y)
+    expect(frameBox).not.toBeNull()
+    expect(deckBox).not.toBeNull()
+    await expect(page.locator('.realtime-stage--touch .stage-drawer')).toHaveCount(0)
+    expect(keyboardBox).not.toBeNull()
+    expect(rollBox).not.toBeNull()
+    expect(labelSize).toBeGreaterThanOrEqual(16)
+    expect(valueSize).toBeGreaterThanOrEqual(17)
+    expect(controlBoxes.every((box) => box.height >= 88)).toBe(true)
+    expect(controlBoxes.every((box) => box.bottom <= viewport.height)).toBe(true)
+    expect(deckBox!.y + deckBox!.height).toBeLessThanOrEqual(keyboardBox!.y)
+    expect(rollBox!.height).toBeGreaterThanOrEqual(220)
+    expect(frameBox!.y + frameBox!.height).toBeGreaterThanOrEqual(viewport.height - 12)
+    expect(frameBox!.y + frameBox!.height).toBeLessThanOrEqual(viewport.height - 6)
+    expect(frameBox!.y + frameBox!.height - (pianoBox!.y + pianoBox!.height)).toBeGreaterThanOrEqual(9)
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
     await mkdir('../reports/webui/screenshots', { recursive: true })
     await page.screenshot({ path: '../reports/webui/screenshots/realtime-touch-stage-1920x969.png', fullPage: false })
+  } finally {
+    await context.close()
+  }
+})
+
+test('touch workbench keeps sound, routing, performance, and recording controls out of the piano roll', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1920, height: 969 }, hasTouch: true })
+  const page = await context.newPage()
+  try {
+    await openRealtimeStage(page, '触控演奏')
+
+    await expect(page.locator('.realtime-stage--touch .stage-drawer')).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: '录音监听' })).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: '音色参数' })).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: '连接设置' })).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: '性能' })).toHaveCount(0)
+    await expect(page.getByRole('combobox', { name: '当前音色' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: '音频输出' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: '延时档位' })).toBeVisible()
+    await expect(page.getByLabel('会话状态')).toBeVisible()
+    const runtimeMetrics = page.getByLabel('实时性能')
+    await expect(runtimeMetrics).toBeVisible()
+    await expect(runtimeMetrics.locator(':scope > span')).toHaveCount(5)
+    await expect(runtimeMetrics.getByText('按键 P95')).toBeVisible()
+    await expect(runtimeMetrics.getByText('18.4 ms')).toBeVisible()
+    await expect(runtimeMetrics.getByText('NPU P95')).toBeVisible()
+    await expect(runtimeMetrics.getByText('监听丢弃')).toBeVisible()
+    const [sessionLabelSizes, sessionValueSizes, metricLabelSizes, metricValueSizes] = await Promise.all([
+      page.locator('.touch-session-field > span, .touch-session-routing label > span').evaluateAll((elements) => (
+        elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize))
+      )),
+      page.locator('.touch-session-field select, .touch-session-routing select').evaluateAll((elements) => (
+        elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize))
+      )),
+      runtimeMetrics.locator(':scope > span > span').evaluateAll((elements) => (
+        elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize))
+      )),
+      runtimeMetrics.locator(':scope > span > strong').evaluateAll((elements) => (
+        elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize))
+      )),
+    ])
+    expect(sessionLabelSizes.every((size) => size >= 16)).toBe(true)
+    expect(sessionValueSizes.every((size) => size >= 18)).toBe(true)
+    expect(metricLabelSizes.every((size) => size >= 16)).toBe(true)
+    expect(metricValueSizes.every((size) => size >= 18)).toBe(true)
+    await expect(page.getByRole('button', { name: '录音' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '监听' })).toBeVisible()
+    await expect(page.getByRole('slider', { name: '力度曲线' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: '钢琴年份' })).toBeVisible()
+
+    const [toolbarBox, rollBox, pianoBox] = await Promise.all([
+      page.locator('.realtime-stage--touch .roll-toolbar').boundingBox(),
+      page.locator('.realtime-stage--touch .live-piano-roll').boundingBox(),
+      page.locator('.keyboard-frame--touch').boundingBox(),
+    ])
+    expect(toolbarBox).not.toBeNull()
+    expect(rollBox).not.toBeNull()
+    expect(pianoBox).not.toBeNull()
+    expect(toolbarBox!.y + toolbarBox!.height).toBeLessThanOrEqual(rollBox!.y)
+    expect(rollBox!.y + rollBox!.height).toBeLessThanOrEqual(pianoBox!.y)
+
+    await mkdir('../reports/webui/screenshots', { recursive: true })
+    await page.screenshot({ path: '../reports/webui/screenshots/realtime-touch-compact-workbench-1920x969.png', fullPage: false })
   } finally {
     await context.close()
   }
@@ -297,50 +392,45 @@ test('physical 10-inch MIDI stage keeps controller controls and visualizer reada
   try {
     await openRealtimeStage(page, 'MIDI 键盘')
 
-    const picker = page.locator('.midi-patch-picker')
-    const pickerContent = page.locator('.midi-patch-picker-content')
-    await expect(picker).toBeVisible()
-    await expect(pickerContent).not.toBeVisible()
-    await expect(page.locator('.patch-library')).toHaveCount(0)
-    await picker.locator('summary').click()
-    await expect(pickerContent).toBeVisible()
-    await picker.locator('summary').click()
-    await expect(pickerContent).not.toBeVisible()
+    const soundSelector = page.getByRole('combobox', { name: '当前音色' })
+    await expect(soundSelector).toBeVisible()
+    await expect(soundSelector.locator('option')).toHaveCount(1)
+    await expect(page.getByRole('option', { name: 'Violin' })).toHaveCount(0)
+    await expect(page.locator('.touch-control-deck')).toBeVisible()
+    await expect(page.getByLabel('实时性能')).toBeVisible()
+    await expect(page.getByRole('button', { name: '录音' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '监听' })).toBeVisible()
+    await expect(page.locator('.realtime-stage--midi .stage-drawer')).toHaveCount(0)
 
-    const [inputLabelSize, inputSelectBox, keyButtons, rollBox, visualizerBox, drawerBox, navigationFontSize, navigationBox, transportSelectStyle, transportButtonBox, transportTimeSize] = await Promise.all([
-      page.locator('.realtime-stage--midi .midi-input-control span').evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+    const [inputLabelSize, inputSelectBox, rangeBox, keyButtons, rollBox, visualizerBox, frameBox, navigationFontSize, navigationBox] = await Promise.all([
+      page.locator('.midi-keyboard-port-control > span').evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
       page.getByLabel('实体 MIDI 输入').boundingBox(),
+      page.locator('.realtime-stage--midi .keyboard-range-bar').boundingBox(),
       page.locator('.realtime-stage--midi .key-count-control button').evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().toJSON())),
       page.locator('.realtime-stage--midi .live-piano-roll').boundingBox(),
       page.getByRole('img', { name: '32 键钢琴可视化' }).boundingBox(),
-      page.locator('.realtime-stage--midi .drawer-tabs').boundingBox(),
+      page.locator('.keyboard-frame--midi').boundingBox(),
       page.locator('.primary-nav button').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
       page.locator('.primary-nav button').first().boundingBox(),
-      page.locator('.transport-layout select').first().evaluate((element) => ({
-        fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
-        height: element.getBoundingClientRect().height,
-      })),
-      page.locator('.transport-layout .icon-command').first().boundingBox(),
-      page.locator('.transport-time').evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
     ])
-    expect(inputLabelSize).toBeGreaterThanOrEqual(18)
+    expect(inputLabelSize).toBeGreaterThanOrEqual(16)
     expect(inputSelectBox).not.toBeNull()
-    expect(inputSelectBox!.height).toBeGreaterThanOrEqual(42)
+    expect(inputSelectBox!.height).toBeGreaterThanOrEqual(48)
+    expect(rangeBox).not.toBeNull()
+    expect(inputSelectBox!.y).toBeGreaterThanOrEqual(rangeBox!.y)
+    expect(inputSelectBox!.y + inputSelectBox!.height).toBeLessThanOrEqual(rangeBox!.y + rangeBox!.height)
     expect(keyButtons.every((box) => box.height >= 56)).toBe(true)
     expect(rollBox).not.toBeNull()
     expect(rollBox!.height).toBeGreaterThanOrEqual(220)
     expect(visualizerBox).not.toBeNull()
+    expect(frameBox).not.toBeNull()
     expect(visualizerBox!.height).toBeGreaterThanOrEqual(96)
-    expect(drawerBox).not.toBeNull()
-    expect(visualizerBox!.y + visualizerBox!.height).toBeLessThanOrEqual(drawerBox!.y)
+    expect(frameBox!.y + frameBox!.height).toBeGreaterThanOrEqual(957)
+    expect(frameBox!.y + frameBox!.height).toBeLessThanOrEqual(963)
+    expect(frameBox!.y + frameBox!.height - (visualizerBox!.y + visualizerBox!.height)).toBeGreaterThanOrEqual(9)
     expect(navigationFontSize).toBeGreaterThanOrEqual(22)
     expect(navigationBox).not.toBeNull()
     expect(navigationBox!.height).toBeGreaterThanOrEqual(80)
-    expect(transportSelectStyle.fontSize).toBeGreaterThanOrEqual(16)
-    expect(transportSelectStyle.height).toBeGreaterThanOrEqual(52)
-    expect(transportButtonBox).not.toBeNull()
-    expect(transportButtonBox!.height).toBeGreaterThanOrEqual(52)
-    expect(transportTimeSize).toBeGreaterThanOrEqual(16)
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
     await mkdir('../reports/webui/screenshots', { recursive: true })
     await page.screenshot({ path: '../reports/webui/screenshots/realtime-midi-stage-1920x969.png', fullPage: false })
@@ -349,25 +439,12 @@ test('physical 10-inch MIDI stage keeps controller controls and visualizer reada
   }
 })
 
-test('unified session starts, switches patch, and releases notes on blur', async ({ page }) => {
+test('unified session starts and releases notes on blur', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 768 })
-  let switchBody: Record<string, unknown> | null = null
   await openRealtimeStage(page)
-  await page.unroute('**/api/v1/realtime/switch')
-  await page.route('**/api/v1/realtime/switch', async (route) => {
-    switchBody = route.request().postDataJSON()
-    await route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ ...stopped, state: 'running', running: true, patch_id: violinPatch.patch_id, patch: violinPatch, audio_device_id: 'usb-audio', last_switch: { ok: true, rolled_back: false, duration_ms: 220 } }),
-    })
-  })
 
   await page.getByRole('button', { name: /开始演奏/ }).click()
   await expect(page.getByText('演奏中')).toBeVisible()
-  await page.locator('.midi-patch-picker summary').click()
-  await page.getByRole('tab', { name: '弦乐' }).click()
-  await page.getByRole('button', { name: /Violin/ }).click()
-  await expect.poll(() => switchBody).toMatchObject({ patch_id: 'neural.violin', audio_device_id: 'usb-audio' })
 
   await page.evaluate(() => window.dispatchEvent(new Event('blur')))
   await expect.poll(() => page.evaluate(() => {
@@ -378,6 +455,78 @@ test('unified session starts, switches patch, and releases notes on blur', async
         .map((item) => JSON.parse(item))
         .some((item) => item.event === 'all_notes_off'))
   })).toBe(true)
+})
+
+test('touch keyboard sends independent note edges for two simultaneous contacts', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 969 })
+  await openRealtimeStage(page, '触控演奏')
+  await page.getByRole('button', { name: /开始演奏/ }).click()
+  await expect(page.getByText('演奏中')).toBeVisible()
+  await expect(page.getByText('已连接', { exact: true })).toBeVisible()
+
+  const c4 = page.locator('.piano-key[data-note="60"]')
+  const d4 = page.locator('.piano-key[data-note="62"]')
+  const e4 = page.locator('.piano-key[data-note="64"]')
+  await expect(c4).toBeEnabled()
+  await expect(d4).toBeEnabled()
+  await expect(e4).toBeEnabled()
+  const touchStartResult = await page.locator('.piano').evaluate((piano, keys) => {
+    const changedTouches = keys.map(({ selector, identifier }) => {
+      const key = piano.querySelector<HTMLElement>(selector)
+      if (!key) throw new Error(`Missing piano key ${selector}`)
+      const bounds = key.getBoundingClientRect()
+      return {
+        identifier,
+        clientX: bounds.x + bounds.width / 2,
+        clientY: bounds.y + bounds.height * 0.8,
+      }
+    })
+    const event = new Event('touchstart', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'changedTouches', { value: changedTouches })
+    const dispatched = piano.dispatchEvent(event)
+    return { dispatched, defaultPrevented: event.defaultPrevented }
+  }, [
+    { selector: '.piano-key[data-note="60"]', identifier: 31 },
+    { selector: '.piano-key[data-note="64"]', identifier: 32 },
+  ])
+  expect(touchStartResult).toEqual({ dispatched: false, defaultPrevented: true })
+
+  const sentNotes = () => page.evaluate(() => {
+    const sockets = (globalThis as unknown as { __testSockets: Array<{ url: string; sent: string[] }> }).__testSockets
+    return sockets
+      .filter((socket) => socket.url.includes('/realtime/events'))
+      .flatMap((socket) => socket.sent.map((payload) => JSON.parse(payload)))
+      .filter((message) => message.event === 'note_on' || message.event === 'note_off')
+      .map((message) => `${message.event}:${message.note}`)
+  })
+  await expect.poll(sentNotes).toEqual(['note_on:60', 'note_on:64'])
+
+  const touchMoveResult = await page.locator('.piano').evaluate((piano) => {
+    const key = piano.querySelector<HTMLElement>('.piano-key[data-note="62"]')
+    if (!key) throw new Error('Missing piano key 62')
+    const bounds = key.getBoundingClientRect()
+    const event = new Event('touchmove', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'changedTouches', {
+      value: [{ identifier: 31, clientX: bounds.x + bounds.width / 2, clientY: bounds.y + bounds.height * 0.8 }],
+    })
+    const dispatched = piano.dispatchEvent(event)
+    return { dispatched, defaultPrevented: event.defaultPrevented }
+  })
+  expect(touchMoveResult).toEqual({ dispatched: false, defaultPrevented: true })
+  await expect.poll(sentNotes).toEqual(['note_on:60', 'note_on:64', 'note_off:60', 'note_on:62'])
+  await expect(c4).not.toHaveClass(/is-(pressed|active)/)
+  await expect(d4).toHaveClass(/is-(pressed|active)/)
+  await expect(e4).toHaveClass(/is-(pressed|active)/)
+
+  const releaseTouch = (identifier: number) => page.locator('.piano').evaluate((piano, touchIdentifier) => {
+    const event = new Event('touchend', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'changedTouches', { value: [{ identifier: touchIdentifier }] })
+    piano.dispatchEvent(event)
+  }, identifier)
+  await releaseTouch(31)
+  await expect.poll(sentNotes).toEqual(['note_on:60', 'note_on:64', 'note_off:60', 'note_on:62', 'note_off:62'])
+  await releaseTouch(32)
+  await expect.poll(sentNotes).toEqual(['note_on:60', 'note_on:64', 'note_off:60', 'note_on:62', 'note_off:62', 'note_off:64'])
 })
 
 test('live piano roll paints websocket note activity', async ({ page }) => {
@@ -398,9 +547,7 @@ test('live piano roll paints websocket note activity', async ({ page }) => {
     audio_device_id: 'usb-audio',
     active_notes: [60, 64, 67],
   })
-  await page.waitForTimeout(120)
-
-  const paintedPixels = await page.getByRole('img', { name: '动态钢琴卷帘' }).evaluate((element) => {
+  await expect.poll(async () => page.getByRole('img', { name: '动态钢琴卷帘' }).evaluate((element) => {
     const canvas = element as HTMLCanvasElement
     const context = canvas.getContext('2d')
     if (!context || canvas.width === 0 || canvas.height === 0) return 0
@@ -410,8 +557,7 @@ test('live piano roll paints websocket note activity', async ({ page }) => {
       if (pixels[index + 2] > 120 && pixels[index + 2] > pixels[index] * 1.25) count += 1
     }
     return count
-  })
-  expect(paintedPixels).toBeGreaterThan(10)
+  }), { timeout: 1_000 }).toBeGreaterThan(10)
   await mkdir('../reports/webui/screenshots', { recursive: true })
   await page.screenshot({ path: '../reports/webui/screenshots/realtime-roll-active-1366x768.png', fullPage: true })
 })

@@ -1,19 +1,20 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { Activity, Cable, Cpu, KeyboardMusic, RefreshCw, Waves } from 'lucide-react'
+import { Activity, AudioLines, Cpu, KeyboardMusic, RefreshCw, Waves } from 'lucide-react'
 import { api, websocketUrl } from './api'
 import { Notice, StatusPill } from './components/ui'
 import type { AudioDevice, AudioInput, Catalog, Job, MidiPort, SystemStatus } from './types'
 
-type Tab = 'midi-ddsp' | 'touch-performance' | 'midi-performance' | 'devices'
+type Tab = 'realtime-performance' | 'midi-ddsp' | 'ddsp-vst-effect' | 'devices'
 
 const MidiDdspView = lazy(() => import('./views/MidiDdspView'))
+const DdspVstEffectView = lazy(() => import('./views/DdspVstEffectView'))
 const RealtimePerformanceView = lazy(() => import('./views/RealtimePerformanceView'))
 const DevicesView = lazy(() => import('./views/DevicesView'))
 
 const NAVIGATION: { id: Tab; label: string; icon: typeof Waves }[] = [
-  { id: 'touch-performance', label: '触控演奏', icon: KeyboardMusic },
-  { id: 'midi-performance', label: 'MIDI 键盘', icon: Cable },
+  { id: 'realtime-performance', label: '实时演奏', icon: KeyboardMusic },
   { id: 'midi-ddsp', label: 'MIDI-DDSP', icon: Waves },
+  { id: 'ddsp-vst-effect', label: 'DDSP-VST', icon: AudioLines },
   { id: 'devices', label: '设备', icon: Cpu },
 ]
 
@@ -25,9 +26,7 @@ export default function App() {
   const coarsePointer = window.matchMedia?.('(any-pointer: coarse)').matches ?? false
   const boardSizedDisplay = window.innerWidth >= 1500 && window.innerHeight <= 1100
   const isTouchDisplay = coarsePointer || navigator.maxTouchPoints > 0 || boardSizedDisplay
-  const [tab, setTab] = useState<Tab>(() => (
-    isTouchDisplay ? 'touch-performance' : 'midi-performance'
-  ))
+  const [tab, setTab] = useState<Tab>('realtime-performance')
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [catalog, setCatalog] = useState<Catalog | null>(null)
   const [midiDdspAudioDevices, setMidiDdspAudioDevices] = useState<AudioDevice[]>([])
@@ -38,6 +37,7 @@ export default function App() {
   const [audioInputError, setAudioInputError] = useState<string | null>(null)
   const [midiError, setMidiError] = useState<string | null>(null)
   const [jobs, setJobs] = useState<Job[]>([])
+  const [keepDdspVstMounted, setKeepDdspVstMounted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null)
@@ -107,7 +107,30 @@ export default function App() {
     return () => socket.close()
   }, [])
 
+  useEffect(() => {
+    const socket = new WebSocket(websocketUrl('/api/v1/audio-output-events'))
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data) as {
+        event?: string
+        devices?: AudioDevice[]
+        error?: string | null
+      }
+      if ((message.event === 'snapshot' || message.event === 'audio_outputs') && message.devices) {
+        setSpeakerOutputs(message.devices)
+        setSpeakerAudioError(message.error ?? null)
+        setRefreshedAt(new Date())
+      }
+      if (message.event === 'error' && message.error) setSpeakerAudioError(message.error)
+    }
+    return () => socket.close()
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'ddsp-vst-effect') setKeepDdspVstMounted(true)
+  }, [tab])
+
   const activeJob = jobs.find((job) => ['queued', 'preparing', 'running', 'paused', 'stopping'].includes(job.state))
+  const isRealtimeWorkspace = tab === 'realtime-performance'
 
   if (loading && (!status || !catalog)) {
     return (
@@ -131,7 +154,7 @@ export default function App() {
   }
 
   return (
-    <div className={`app-shell${isTouchDisplay ? ' app-shell--touch-display' : ''}`}>
+    <div className={`app-shell${isTouchDisplay ? ' app-shell--touch-display' : ''}${isRealtimeWorkspace ? ' app-shell--realtime' : ''}`}>
       <header className="app-header">
         <div className="brand">
           <div className="brand-mark"><Waves size={23} /></div>
@@ -158,18 +181,24 @@ export default function App() {
         <main className="content-area">
           <Suspense fallback={<Notice tone="loading">正在载入工作区</Notice>}>
             {tab === 'midi-ddsp' && <MidiDdspView catalog={catalog} audioDevices={midiDdspAudioDevices} jobs={jobs} onRefresh={refresh} />}
-            {tab === 'touch-performance' && <RealtimePerformanceView key="touch" inputMode="touch" onRefresh={refresh} />}
-            {tab === 'midi-performance' && <RealtimePerformanceView key="midi" inputMode="midi" onRefresh={refresh} />}
+            {(tab === 'ddsp-vst-effect' || keepDdspVstMounted) && (
+              <div className="workspace-cache" hidden={tab !== 'ddsp-vst-effect'}>
+                <DdspVstEffectView />
+              </div>
+            )}
+            {tab === 'realtime-performance' && <RealtimePerformanceView inputMode={isTouchDisplay ? 'touch' : 'midi'} onRefresh={refresh} />}
             {tab === 'devices' && <DevicesView status={status} catalog={catalog} speakerOutputs={speakerOutputs} audioInputs={audioInputs} midiPorts={midiPorts} audioError={speakerAudioError} audioInputError={audioInputError} midiError={midiError} onRefresh={refresh} />}
           </Suspense>
         </main>
 
-        <footer className="status-footer">
-          <span>{status.platform}</span>
-          <span>{status.ip_addresses.join(' / ')}</span>
-          <span>Python {status.python}</span>
-          <span>{refreshedAt ? `SYNC ${refreshedAt.toLocaleTimeString()}` : 'SYNC —'}</span>
-        </footer>
+        {!isRealtimeWorkspace && (
+          <footer className="status-footer">
+            <span>{status.platform}</span>
+            <span>{status.ip_addresses.join(' / ')}</span>
+            <span>Python {status.python}</span>
+            <span>{refreshedAt ? `SYNC ${refreshedAt.toLocaleTimeString()}` : 'SYNC —'}</span>
+          </footer>
+        )}
       </div>
 
       <nav className="bottom-nav">

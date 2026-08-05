@@ -41,6 +41,32 @@ export interface SpeakerTestStatus {
   config: SpeakerTestConfig
 }
 
+export interface AudioInputTestConfig {
+  audio_input_id?: string
+  device_name?: string
+  duration_seconds?: number
+  threshold_dbfs?: number
+}
+
+export interface AudioInputTestStatus {
+  running: boolean
+  state: 'idle' | 'starting' | 'running' | 'stopping' | 'stopped' | 'succeeded' | 'failed'
+  error: string | null
+  device_name: string
+  sample_rate: number
+  input_channels: number
+  captured_frames: number
+  total_frames: number
+  overflows: number
+  rms_dbfs: number
+  peak_dbfs: number
+  signal_detected: boolean
+  progress: number
+  elapsed_seconds: number
+  remaining_seconds: number
+  config: AudioInputTestConfig
+}
+
 export interface SystemStatus {
   time: string
   hostname: string
@@ -61,6 +87,7 @@ export interface SystemStatus {
   active_owner: string | null
   realtime?: RealtimeStatus
   speaker_test: SpeakerTestStatus
+  audio_input_test: AudioInputTestStatus
   job_count: number
 }
 
@@ -278,6 +305,83 @@ export interface DdspVstModel {
   power_max_db?: number
 }
 
+export interface DdspVstEffectParameterMetadata {
+  min: number
+  max: number
+  default: number
+}
+
+export interface DdspVstEffectCatalog {
+  available: boolean
+  error: string | null
+  backend: 'acl/om'
+  feature_model: {
+    name: string
+    sha256: string
+    available: boolean
+    contract?: Record<string, number[]>
+  }
+  models: DdspVstModel[]
+  audio_inputs: AudioInput[]
+  audio_outputs: AudioDevice[]
+  default_model_id: string | null
+  default_audio_input_id: string | null
+  default_audio_output_id: string | null
+  parameters: Record<string, DdspVstEffectParameterMetadata>
+}
+
+export interface DdspVstEffectMetrics {
+  frames: number
+  f0_hz: number
+  pw_db: number
+  input_rms_dbfs: number
+  input_peak_dbfs: number
+  output_rms_dbfs: number
+  output_peak_dbfs: number
+  feature_ms: number
+  feature_p95_ms: number
+  control_ms: number
+  control_p95_ms: number
+  queue_latency_ms: number
+  total_latency_ms: number
+  capture_overflows: number
+  playback_underruns: number
+  clipped_samples: number
+  safety_muted: boolean
+  gate_open: boolean
+  gate_gain: number
+  gate_threshold_dbfs: number
+  gate_close_threshold_dbfs: number
+  gate_hold_frames: number
+  gated_frames: number
+  noise_floor_dbfs: number
+  calibrating: boolean
+  calibration_progress: number
+  captured_frames?: number
+  played_frames?: number
+  elapsed_seconds?: number
+}
+
+export interface DdspVstEffectStatus {
+  state: 'stopped' | 'starting' | 'running' | 'stopping' | 'failed'
+  running: boolean
+  error: string | null
+  backend: 'acl/om'
+  feature_backend: 'acl/om'
+  control_backend: 'acl/om'
+  feature_model: string
+  config: {
+    model_id?: string
+    audio_input_id?: string
+    audio_output_id?: string
+    input_device_name?: string
+    output_device_name?: string
+  }
+  parameters: Record<string, number>
+  hashes: Record<string, string>
+  metrics: DdspVstEffectMetrics
+}
+
 export interface MidiDdspBundleComponent {
   file?: string
   name?: string
@@ -336,6 +440,9 @@ export interface AudioDevice {
   is_bluetooth?: boolean
   is_onboard?: boolean
   is_mono?: boolean
+  system_volume_percent?: number | null
+  system_volume_db?: number | null
+  system_muted?: boolean
   warning?: string
   alsa_device?: string
   alsa_card?: number

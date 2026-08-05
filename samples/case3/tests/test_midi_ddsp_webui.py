@@ -223,6 +223,7 @@ class ApiValidationTest(unittest.TestCase):
             "/api/v1/realtime/panic",
             "/api/v1/realtime/recordings/{recording_id}",
             "/api/v1/realtime/events",
+            "/api/v1/audio-output-events",
         ):
             self.assertIn(path, paths)
         self.assertNotIn("/api/v1/live/start", paths)
@@ -244,6 +245,39 @@ class ApiValidationTest(unittest.TestCase):
                     )
                 )
         self.assertEqual(raised.exception.status_code, 404)
+
+    def test_audio_input_test_threshold_is_bounded(self) -> None:
+        with self.assertRaises(ValidationError):
+            web_app.AudioInputTestRequest(
+                audio_input_id="capture-1",
+                threshold_dbfs=-10,
+            )
+
+    def test_audio_input_test_rejects_monitor_sources(self) -> None:
+        monitor = {
+            "id": "pulse:monitor",
+            "index": 2,
+            "name": "Output Monitor",
+            "backend": "pulse",
+            "type": "monitor",
+            "available": False,
+            "max_input_channels": 2,
+            "default_sample_rate": 48_000,
+        }
+        with patch.object(web_app, "query_audio_inputs", return_value=[monitor]):
+            with self.assertRaises(HTTPException) as raised:
+                asyncio.run(
+                    web_app.start_audio_input_test(
+                        web_app.AudioInputTestRequest(audio_input_id="pulse:monitor")
+                    )
+                )
+        self.assertEqual(raised.exception.status_code, 409)
+
+    def test_audio_input_test_routes_are_public(self) -> None:
+        paths = {route.path for route in web_app.app.routes}
+        self.assertIn("/api/v1/audio-input-test/status", paths)
+        self.assertIn("/api/v1/audio-input-test/start", paths)
+        self.assertIn("/api/v1/audio-input-test/stop", paths)
 
     def test_midi_backend_failure_returns_unavailable_response(self) -> None:
         with patch.object(

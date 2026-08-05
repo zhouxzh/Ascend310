@@ -18,7 +18,6 @@ import threading
 import time
 from typing import Callable
 from uuid import uuid4
-import zipfile
 
 import numpy as np
 
@@ -162,7 +161,7 @@ def scan_ddsp_vst_models() -> list[dict[str, object]]:
 
     selected: dict[tuple[str, str], Path] = {}
     for path in sorted(om_root.rglob("*.om"), key=model_priority):
-        if "midi_ddsp" in path.name.lower():
+        if "midi_ddsp" in path.name.lower() or path.name.lower().startswith("ddsp_vst_feature"):
             continue
         stem = path.stem
         instrument = stem.split("_force_fp16")[0].split("_mixed_float16")[0]
@@ -192,22 +191,14 @@ def scan_ddsp_vst_models() -> list[dict[str, object]]:
 def _load_ddsp_vst_metadata(instrument: str) -> dict[str, float]:
     metadata_root = ROOT / "models" / "ddsp_vst"
     raw: dict[str, object] = {}
-    tflite_path = metadata_root / f"{instrument}.tflite"
-    if tflite_path.is_file():
-        try:
-            with zipfile.ZipFile(tflite_path) as archive:
-                raw = json.loads(archive.read("metadata.json").decode("utf-8"))
-        except (KeyError, OSError, ValueError, zipfile.BadZipFile):
-            raw = {}
-    if not raw:
-        metadata_path = metadata_root / "metadata.json"
-        try:
-            all_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            candidate = all_metadata.get(instrument, {})
-            if isinstance(candidate, dict):
-                raw = candidate
-        except (OSError, ValueError):
-            raw = {}
+    metadata_path = metadata_root / "metadata.json"
+    try:
+        all_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        candidate = all_metadata.get(instrument, {})
+        if isinstance(candidate, dict):
+            raw = candidate
+    except (OSError, ValueError):
+        raw = {}
 
     fields = {
         "pitch_min_note": "mean_min_pitch_note",

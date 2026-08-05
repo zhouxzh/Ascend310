@@ -34,13 +34,29 @@ check_book_heading_levels() {
     fi
 }
 
+pandoc_to_file() {
+    local output=$1
+    local temp_output
+    shift
+
+    temp_output="$(mktemp "${TMPDIR:-/tmp}/ascend310-pandoc.XXXXXX.tex")"
+    if ! pandoc "$@" -o "$temp_output"; then
+        rm -f "$temp_output"
+        return 1
+    fi
+
+    rm -f "$output"
+    cp "$temp_output" "$output"
+    rm -f "$temp_output"
+}
+
 convert_markdown() {
     local input=$1
     local output=$2
     local media_dir=$3
     local resource_path=$4
 
-    pandoc \
+    pandoc_to_file "$output" \
         -f "$PANDOC_FROM" \
         "$input" \
         --top-level-division=chapter \
@@ -48,8 +64,7 @@ convert_markdown() {
         --syntax-highlighting=idiomatic \
         -t latex \
         --extract-media="$media_dir" \
-        --resource-path="$resource_path" \
-        -o "$output"
+        --resource-path="$resource_path"
 }
 
 check_book_heading_levels
@@ -59,7 +74,7 @@ cd "$LATEX_DIR"
 mkdir -p chapters cases
 
 # 使用 --syntax-highlighting=idiomatic 替代已废弃的 --idiomatic
-pandoc \
+pandoc_to_file "chapters/preface.tex" \
     -f "$PANDOC_FROM" \
     ../src/book/README.md \
     --top-level-division=chapter \
@@ -68,8 +83,7 @@ pandoc \
     --syntax-highlighting=idiomatic \
     -t latex \
     --extract-media=chapters/ \
-    --resource-path=../src/book \
-    -o chapters/preface.tex
+    --resource-path=../src/book
 
 for chapter in {1..9}; do
     convert_markdown \
@@ -93,7 +107,11 @@ for case_number in {0..9}; do
         "../src/experiment"
 done
 
-python3 replace_block.py chapters/chapter3.tex
+replace_temp="$(mktemp "${TMPDIR:-/tmp}/ascend310-replace-block.XXXXXX.tex")"
+python3 replace_block.py chapters/chapter3.tex "$replace_temp"
+rm -f chapters/chapter3.tex
+cp "$replace_temp" chapters/chapter3.tex
+rm -f "$replace_temp"
 
 # 修复 Pandoc 生成无标题 longtable 时引入的错误代码
 find chapters cases -name '*.tex' -type f -exec sed -i 's/\\def\\LTcaptype{none}//g' {} +

@@ -1,6 +1,10 @@
-# MIDI-DDSP 与 DDSP-VST 的程序和模型差异
+# 历史参考：MIDI-DDSP 与 DDSP-VST 的程序和模型差异
 
 > 本文档中的路径默认从 `samples/case3` 目录理解。[返回文档索引](README.md)。
+
+> **历史对比资料。** 本文保留上游 DDSP-VST Synth、ONNX 对照与 MIDI-DDSP 迁移背景，
+> 不描述当前用户入口。现在实时演奏只加载 Piano-DDSP 钢琴；DDSP-VST 是 OM-only 的
+> 麦克风 Effect。当前操作请以[WebUI 操作、部署与 API](webui.md)为准。
 
 本项目现在同时保留了两条 DDSP 移植路线：
 
@@ -34,12 +38,20 @@
 
 ## 上游项目定位不同
 
-DDSP-VST 上游是 `magenta/ddsp-vst`。它的主产品是基于 JUCE 的 DDSP Effect 和
-DDSP Synth 插件，内置一组 TFLite `predict_controls` 模型。插件侧实时获取音高和
-响度，调用控制模型，再由插件内合成器生成音频。本项目没有移植 JUCE 插件 UI、
-音频宿主或 Effect 链路，只复用了其中 11 个实时音色 TFLite 模型，并把单步控制
-网络重建成 ONNX/OM。Synth 侧已实现插件参数顺序和 JUCE/FreeVerb 风格混响；Effect
-仍等待真实 capture source 和特征 OM 验证。
+DDSP-VST 上游是 `magenta/ddsp-vst`，本项目以固定提交
+[`f2996e9`](https://github.com/magenta/ddsp-vst/tree/f2996e97f9469f3956a6b8e9d2d9b50b6555e1e9)
+为行为基准。它的主产品是基于 JUCE 的 DDSP Effect 和 DDSP Synth 插件，内置一组
+TFLite `predict_controls` 模型。插件侧实时获取音高和响度，调用控制模型，再由插件内
+合成器生成音频。本项目不移植 JUCE/VST3/AU 宿主外壳，而是把完整音频行为映射到 WebUI：
+Synth 对应“触控演奏”和“MIDI 键盘”，Effect 对应独立的“DDSP-VST”麦克风页；神经网络
+在开发板仅加载 OM，谐波、噪声、重采样和 FreeVerb 保持在 CPU DSP 层。
+
+官方 Effect 不包含噪声门。case3 针对 UGREEN 摄像头麦克风的实际底噪增加启动校准、
+滞回、保持及平滑开关，避免安静环境中的底噪直接产生音色；它是输入安全层，不改变官方
+Feature/Control、合成与混响顺序。官方的自定义 TFLite 文件夹加载没有直接暴露给浏览器，
+等价工作流是本地转换和验证、开发板 ATC、发布固定哈希 OM，再由服务端模型目录发现。
+WebUI 保留官方训练音高/响度范围、输入轨迹、拖动 Input Pitch/Input Gain 校准和模型目录
+刷新；刷新操作只发现服务端资产，不改变 OM-only 与服务端路径边界。
 
 MIDI-DDSP 上游是 `magenta/midi-ddsp`。它的目标是从 MIDI 生成更像真实演奏的
 音频，不只是把 note-on/note-off 变成固定包络。上游把任务拆成两层：Expression
@@ -66,7 +78,7 @@ Harmonic、FilteredNoise 和逐乐器 Reverb 语义。
 演奏状态，渲染线程读取快照并补充音频 FIFO，声卡回调只取已经渲染好的块。模型
 推理不在声卡回调里执行。
 
-DDSP-VST 后端有两种：
+独立开发命令 `realtime_ddsp.py` 可用两种后端做本地/板端对照：
 
 ```text
 .onnx -> ONNX Runtime CPU
@@ -74,7 +86,8 @@ DDSP-VST 后端有两种：
 ```
 
 程序通过文件扩展名和 `--backend auto` 选择后端。ONNX 和 OM 后端使用同一套
-输入输出契约，所以同一个 MIDI 可以做 CPU/NPU A/B 对照。
+输入输出契约，所以同一个 MIDI 可以做 CPU/NPU A/B 对照。WebUI 生产会话不使用该回退：
+它只接受模型目录中的 `acl/om` 资产，模型或 NPU 不可用时直接拒绝启动。
 
 ### `midi_ddsp_realtime.py`
 
@@ -92,8 +105,8 @@ DDSP-VST 后端有两种：
 需要一段已知的音符上下文；Synthesis 模型也是固定 64 帧静态窗口。当前程序虽然
 可以实时把块送进声卡，但它的实时性不是实体键盘那种未知未来输入的低延迟实时。
 
-MIDI-DDSP 当前运行程序只走 PyACL/OM。`tools/export_midi_ddsp_stateful_onnx.py` 生成
-版本化 ONNX 组件和参考 NPZ，是为了本地导出验证、ATC 转换输入和 OM 精度对比；不是
+MIDI-DDSP 当前运行程序只走 PyACL/OM。版本化 ONNX 组件、参考 NPZ 和 OM bundle 从
+已发布模型 release 获取，用于 ATC 输入和 OM 精度对比；不是
 `midi_ddsp_realtime.py` 的 CPU 运行后端。
 
 ## 模型契约差异
@@ -124,9 +137,8 @@ outputs:
 - 噪声频带：65；
 - 每个音色一个模型文件。
 
-导出工具 [`tools/export_ddsp_vst_onnx.py`](../tools/export_ddsp_vst_onnx.py)
-不直接把 TFLite 的 `WHILE/TensorList` 图交给 ONNX 转换器，而是从 TFLite
-flatbuffer 中读取权重，手工重建一个显式单步 ONNX 图。导出的图把 GRU 展开成
+已发布的 DDSP-VST ONNX 不直接把 TFLite 的 `WHILE/TensorList` 图交给 ONNX 转换器，
+而是采用显式单步 ONNX 图。图把 GRU 展开成
 普通矩阵运算和门控算子，并把 `exp_sigmoid`、谐波 Nyquist mask 和谐波归一化也
 放入图内。因此运行时收到的 `amplitude`、`harmonics`、`noise_amps` 已经是可直接
 送入 CPU 合成器的控制量。
@@ -261,8 +273,7 @@ MIDI-DDSP 程序不再从复音文件静默提取最高声部。单轨和弦返�
 DDSP-VST：
 
 ```text
-models/ddsp_vst/<Instrument>.tflite
-  -> tools/export_ddsp_vst_onnx.py
+Hugging Face published DDSP-VST ONNX release
   -> models/ddsp_vst/<Instrument>.onnx
   -> ATC on Ascend board
   -> models/om/<Instrument>_force_fp16.om
@@ -274,15 +285,14 @@ models/ddsp_vst/<Instrument>.tflite
 - ONNX checker；
 - 输入输出形状和名称；
 - 连续 8 帧 ONNX Runtime 推理；
-- TFLite/ONNX 数值对齐；
+- 已发布 ONNX/OM 的哈希、输入输出契约和波形 A/B；
 - OM/ONNX 输出波形 A/B；
 - 实时声卡播放的 underrun/overrun。
 
 MIDI-DDSP：
 
 ```text
-models/midi_ddsp/weights/midi_ddsp_model_weights_urmp_9_10/
-  -> tools/export_midi_ddsp_onnx.py
+Hugging Face published MIDI-DDSP ONNX release
   -> models/midi_ddsp/onnx/midi_ddsp_expression_notes32.onnx
   -> models/midi_ddsp/onnx/midi_ddsp_synthesis_params_frames64.onnx
   -> ATC on Ascend board
@@ -292,7 +302,7 @@ models/midi_ddsp/weights/midi_ddsp_model_weights_urmp_9_10/
 
 关键验证点：
 
-- TensorFlow 和 ONNX 的参考输出；
+- 已发布参考 NPZ 与 ONNX/OM 的输出；
 - ONNX 输入输出形状；
 - ATC 兼容性修正，包括 BatchNormalization 分解和 OneHot 类型对齐；
 - 每个 OM 的固定输入 NPZ 精度；
@@ -300,7 +310,7 @@ models/midi_ddsp/weights/midi_ddsp_model_weights_urmp_9_10/
 - Expression 与 Synthesis 在同一 Python 进程中共享 PyACL 生命周期；
 - 实时块播放的 underrun/overrun。
 
-本地开发电脑只负责编辑和 ONNX/参考文件生成；ATC、OM 加载、PyACL 推理、
+本地开发电脑负责编辑、下载已发布 ONNX/OM 和前端构建；ATC、OM 加载、PyACL 推理、
 `npu-smi` 和声卡实测必须在真实 Ascend 310B 板端执行。
 
 ## 音频合成边界
@@ -364,7 +374,8 @@ models/midi_ddsp/weights/midi_ddsp_model_weights_urmp_9_10/
 
 ## 相关文档
 
-- [DDSP 模型导出](model-export.md)
+- [模型与 OM 部署](om-deployment.md)
+- [MIDI-DDSP 历史导出](midi-ddsp-export.md)
 - [实时 DDSP](realtime-ddsp.md)
 - [MIDI-DDSP OM 实时 MIDI 合成测试](midi-ddsp-realtime.md)
 - [OM 转换与验证](om-deployment.md)

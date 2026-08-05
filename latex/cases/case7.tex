@@ -26,6 +26,7 @@
 
 \subsection{与已有案例的关系}\label{src-experiment-case7-h3}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2143}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2143}}
@@ -53,6 +54,7 @@ NPU 任务
 Gradio \\
 案例9 & 聊天机器人 & MiniLM 文本嵌入 & 文本 RAG + 云端 LLM \\
 \end{longtable}
+}
 
 \section{2. 内容大纲}\label{src-experiment-case7-h4}
 
@@ -104,6 +106,7 @@ flowchart LR
 
 \subsubsection{操作系统与框架}\label{src-experiment-case7-h7}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -132,6 +135,7 @@ Python & CPython & 3.8 \textasciitilde{} 3.10 & 应用开发语言 \\
 向量搜索 & FAISS & 1.7+ & 向量相似度检索 \\
 Web & Gradio & 4.0+ & 照片画廊 + 搜索界面 \\
 \end{longtable}
+}
 
 \subsubsection{环境准备}\label{src-experiment-case7-h8}
 
@@ -157,6 +161,7 @@ python3 prepare_models.py --onnx-only
 
 \subsubsection{Python 依赖说明}\label{src-experiment-case7-h9}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 包 & 用途 & 必需？ \\
@@ -179,6 +184,7 @@ python3 prepare_models.py --onnx-only
 \passthrough{\lstinline!acl!} (CANN 自带) & NPU 推理，随 CANN 安装 &
 仅推理 \\
 \end{longtable}
+}
 
 \passthrough{\lstinline!requirements.txt!} 文件中已包含所有 pip 可安装的
 Python 依赖。\passthrough{\lstinline!acl!} 包 无需手动安装，它随 CANN
@@ -209,6 +215,7 @@ Python 依赖。\passthrough{\lstinline!acl!} 包 无需手动安装，它随 CA
 昇腾 310B NPU 最适合运行固定输入输出形状的卷积神经网络。ResNet50 是计
 算机视觉领域最经典的特征提取骨干网络之一：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lllll@{}}
 \toprule\noalign{}
 模型 & 特征维度 & 模型大小 (OM) & NPU 推理 & 备注 \\
@@ -225,6 +232,7 @@ EfficientNet-B0 & 1280-dim & \textasciitilde20 MB & \textasciitilde10ms
 CLIP ViT-B/32 & 512-dim & \textasciitilde350 MB & 一般 & Transformer，OM
 转换复杂 \\
 \end{longtable}
+}
 
 选择 ResNet50 的理由：
 
@@ -293,8 +301,8 @@ flowchart TD
 \end{lstlisting}
 
 预处理代码在
-\href{samples/case7/feature_extractor.py}{feature\_extractor.py} 的
-\passthrough{\lstinline!FeatureExtractor.preprocess()!}
+\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/feature_extractor.py}{feature\_extractor.py}
+的 \passthrough{\lstinline!FeatureExtractor.preprocess()!}
 方法中，与案例8的手势识别预处理完全一致。
 
 \subsection{模型转换与昇腾部署}\label{src-experiment-case7-h16}
@@ -337,7 +345,8 @@ python3 prepare_models.py --onnx-only
 \passthrough{\lstinline!(1, 3, 224, 224)!}，输出形状固定为
 \passthrough{\lstinline!(1, 2048)!}
 
-关键代码见 \href{samples/case7/prepare_models.py}{prepare\_models.py}
+关键代码见
+\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/prepare_models.py}{prepare\_models.py}
 中的 \passthrough{\lstinline!export\_onnx()!} 函数。注意
 \passthrough{\lstinline!dynamic\_axes=\{\}!}
 参数------我们刻意禁用了动态 形状，确保与 ATC 转换兼容。
@@ -363,6 +372,7 @@ atc --model=models/resnet50_feature.onnx \
 
 参数说明：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 参数 & 值 & 说明 \\
@@ -379,6 +389,7 @@ atc --model=models/resnet50_feature.onnx \
 \passthrough{\lstinline!--input\_shape!} & input:1,3,224,224 &
 固定输入形状 \\
 \end{longtable}
+}
 
 \passthrough{\lstinline!soc\_version!} 通过
 \passthrough{\lstinline!npu-smi info!} 自动检测，默认值为
@@ -386,6 +397,7 @@ atc --model=models/resnet50_feature.onnx \
 
 \subsubsection{与案例8的模型转换对比}\label{src-experiment-case7-h19}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 对比项 & 案例8 (手势识别) & 案例7 (智能相册) \\
@@ -399,6 +411,7 @@ atc --model=models/resnet50_feature.onnx \
 需要训练？ & 是（或下载 .pth） & 否（torchvision 直接提供） \\
 外部下载 & 预训练 .pth + HaGRID 数据集 & 无（PyTorch CDN 自动拉取） \\
 \end{longtable}
+}
 
 本案不需要训练脚本------这是案例8已经覆盖的内容。本案展示的是另一种常见的
 边缘 AI 模式：直接使用预训练模型做特征提取，无需微调。
@@ -426,8 +439,9 @@ flowchart TD
 
 \subsubsection{PhotoIndex 类设计}\label{src-experiment-case7-h22}
 
-\href{samples/case7/photo_index.py}{photo\_index.py} 中的
-\passthrough{\lstinline!PhotoIndex!} 类管理 整个照片索引的生命周期：
+\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/photo_index.py}{photo\_index.py}
+中的 \passthrough{\lstinline!PhotoIndex!} 类管理
+整个照片索引的生命周期：
 
 \begin{itemize}
 \tightlist
@@ -488,6 +502,7 @@ Cascade}\label{src-experiment-case7-h25}
 分类器做人脸\textbf{计数}，而不是使用 案例1中的 SCRFD NPU
 模型做人脸\textbf{识别}：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 方面 & Haar Cascade (本案) & SCRFD (案例1) \\
@@ -501,6 +516,7 @@ Cascade}\label{src-experiment-case7-h25}
 设置成本 & 零（OpenCV 自带） & 需下载模型 + ATC 转换 \\
 单张耗时 & \textless10ms (CPU) & \textasciitilde5ms (NPU) + 前后处理 \\
 \end{longtable}
+}
 
 对于智能相册的''按人数筛选''需求，知道一张照片里有几个人就足够了。如果需
 要完整的人脸识别（标记每个人是谁），读者可以将案例1的
@@ -645,6 +661,7 @@ def get_extractor():
 
 索引速度参考（100 张照片）：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 后端 & 耗时 \\
@@ -655,6 +672,7 @@ def get_extractor():
 NPU (Ascend 310B) & \textasciitilde1-2 秒 \\
 CPU (PyTorch) & \textasciitilde3-5 秒 \\
 \end{longtable}
+}
 
 \subsubsection{浏览和搜索}\label{src-experiment-case7-h34}
 
@@ -684,6 +702,7 @@ CPU (PyTorch) & \textasciitilde3-5 秒 \\
 
 \subsubsection{故障排除}\label{src-experiment-case7-h35}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3750}}
@@ -714,6 +733,7 @@ ATC 转换失败 & soc\_version 不匹配 &
 ONNX 导出失败 & onnx 包未安装 &
 \passthrough{\lstinline!pip install onnx!} \\
 \end{longtable}
+}
 
 \subsubsection{扩展建议}\label{src-experiment-case7-h36}
 
@@ -813,6 +833,7 @@ flowchart TB
 
 在正常使用条件下，系统的各功能预期表现：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2857}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4286}}
@@ -837,9 +858,11 @@ flowchart TB
 相似结果相关性 & 同类场景/物体的照片排前面 & 受 ResNet50 ImageNet
 训练域影响 \\
 \end{longtable}
+}
 
 \subsection{性能指标}\label{src-experiment-case7-h40}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 指标 & NPU (Ascend 310B) & CPU (PyTorch) \\
@@ -853,6 +876,7 @@ FAISS 搜索 (1000 张) & \textasciitilde0.5 ms & \textasciitilde0.5 ms \\
 模型大小 (.om) & \textasciitilde95 MB & N/A \\
 FAISS 索引 (10000 张) & \textasciitilde80 MB & \textasciitilde80 MB \\
 \end{longtable}
+}
 
 \subsection{浏览器中的效果}\label{src-experiment-case7-h41}
 

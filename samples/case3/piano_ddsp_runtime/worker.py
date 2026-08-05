@@ -123,12 +123,15 @@ class Worker:
                 int(message.get("velocity", 0)),
                 bool(message.get("on", False)),
             )
+            return {"accepted": True}
         elif command == "cc":
             self.engine.control_change(
                 str(message["source"]), int(message["controller"]), int(message["value"])
             )
+            return {"accepted": True}
         elif command == "release_source":
             self.engine.release_source(str(message["source"]))
+            return {"accepted": True}
         elif command == "panic":
             self.engine.panic()
         elif command == "parameters":
@@ -173,17 +176,21 @@ class Worker:
                         raise ValueError("Worker command must be a JSON object")
                     request_id = message.get("request_id")
                     result = self.dispatch(message)
-                    self.emit("response", request_id=request_id, ok=True, data=result)
+                    if request_id is not None:
+                        self.emit("response", request_id=request_id, ok=True, data=result)
                     if message.get("command") == "shutdown":
                         break
                 except BaseException as exc:
-                    self.emit(
-                        "response",
-                        request_id=request_id,
-                        ok=False,
-                        error=str(exc),
-                        error_type=type(exc).__name__,
-                    )
+                    if request_id is None:
+                        self.emit("error", message=str(exc), error_type=type(exc).__name__)
+                    else:
+                        self.emit(
+                            "response",
+                            request_id=request_id,
+                            ok=False,
+                            error=str(exc),
+                            error_type=type(exc).__name__,
+                        )
                     traceback.print_exc(file=sys.stderr)
         finally:
             self.stop_event.set()

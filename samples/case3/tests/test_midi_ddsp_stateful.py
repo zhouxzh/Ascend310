@@ -24,6 +24,7 @@ from midi_ddsp_webui.stateful_midi_ddsp import (
     StatefulMidiDdspInference,
 )
 from pyacl_midi_ddsp import MidiDdspAclRuntime
+from tests.midi_fixture import create_ddsp_fixture
 
 
 class _ContextRunner:
@@ -291,8 +292,8 @@ class AclRuntimeSessionTest(unittest.TestCase):
 
 class MidiAnalysisTest(unittest.TestCase):
     def test_generated_fixture_is_monophonic_and_complete(self) -> None:
-        path = Path(__file__).resolve().parents[1] / "midi/ddsp-test.mid"
-        analysis = analyze_midi(path)
+        with tempfile.TemporaryDirectory() as folder:
+            analysis = analyze_midi(create_ddsp_fixture(folder))
         voices = split_midi_voices(analysis)
         self.assertEqual(analysis.mode, "monophonic")
         self.assertTrue(analysis.supported)

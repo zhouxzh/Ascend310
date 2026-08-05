@@ -18,6 +18,7 @@ from midi_ddsp_webui.midi_analysis import (
     split_midi_voices,
 )
 from midi_ddsp_webui.vendor.partitura import estimate_voices
+from tests.midi_fixture import create_ddsp_fixture
 
 
 def _write_grouping_fixture(path: Path) -> None:
@@ -97,8 +98,8 @@ class VendoredVoiceSeparationTest(unittest.TestCase):
         self.assertNotIn(9, {voice.channel for voice in voices})
 
     def test_generated_fixture_partition_is_complete_monophonic_and_deterministic(self) -> None:
-        path = Path(__file__).resolve().parents[1] / "midi" / "ddsp-test.mid"
-        analysis = analyze_midi(path)
+        with tempfile.TemporaryDirectory() as folder:
+            analysis = analyze_midi(create_ddsp_fixture(folder))
         first = split_midi_voices(analysis)
         second = split_midi_voices(analysis)
         self.assertEqual([voice.id for voice in first], [voice.id for voice in second])

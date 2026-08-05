@@ -7,9 +7,10 @@ import json
 import os
 from pathlib import Path
 import queue
+import shutil
 import sys
 import time
-from typing import Literal, Optional, Union
+from typing import Literal, Mapping, Optional, Union
 from uuid import uuid4
 from urllib.parse import urlsplit
 
@@ -45,6 +46,14 @@ from .core import (
     utc_timestamp,
     validate_midi_ddsp_reverb_asset,
 )
+from .ddsp_vst_effect import (
+    DEFAULT_PARAMETERS as DDSP_VST_EFFECT_DEFAULTS,
+    FEATURE_OM_PATH,
+    FEATURE_OM_SHA256,
+    PARAMETER_RANGES as DDSP_VST_EFFECT_PARAMETER_RANGES,
+    DdspVstEffectController,
+    sha256_file,
+)
 from .library import MidiDdspLibrary
 from .live import DdspVstSessionController
 from .midi_analysis import (
@@ -58,8 +67,10 @@ from .piano import (
     PianoDdspController,
 )
 from .speaker import (
+    AudioInputTestController,
     NO_AUDIO_OUTPUT,
     SpeakerTestController,
+    is_pulse_output_event,
     query_audio_inputs,
     query_ddsp_vst_audio_outputs,
     query_midi_ddsp_audio_outputs,
@@ -88,6 +99,10 @@ async def lifespan(_: FastAPI):
         ddsp_vst.stop()
     if speaker.running:
         speaker.stop()
+    if audio_input_test.running:
+        audio_input_test.stop()
+    if ddsp_vst_effect.running:
+        ddsp_vst_effect.stop()
     shutdown_persistent_runtimes(suppress_errors=True)
 
 
@@ -97,8 +112,10 @@ library = MidiDdspLibrary(REPORT_ROOT, JOB_ROOT)
 jobs = JobManager(coordinator, terminal_callback=library.index_job)
 ddsp_vst = DdspVstSessionController(coordinator)
 speaker = SpeakerTestController(coordinator)
+audio_input_test = AudioInputTestController(coordinator)
 piano = PianoDdspController(coordinator)
 realtime = RealtimeSessionController(coordinator, piano, ddsp_vst)
+ddsp_vst_effect = DdspVstEffectController(coordinator)
 
 
 def _origin_allowed(headers: object) -> bool:
@@ -172,6 +189,12 @@ class SpeakerTestRequest(ApiModel):
     duration_seconds: float = Field(3.0, ge=0.5, le=10.0)
 
 
+class AudioInputTestRequest(ApiModel):
+    audio_input_id: str = Field(min_length=1, max_length=256)
+    duration_seconds: float = Field(3.0, ge=0.5, le=10.0)
+    threshold_dbfs: float = Field(-45.0, ge=-80.0, le=-20.0)
+
+
 class BluetoothScanRequest(ApiModel):
     duration_seconds: float = Field(8.0, ge=2.0, le=30.0)
 
@@ -203,6 +226,20 @@ class RealtimeParametersRequest(ApiModel):
     values: dict[str, Union[float, int]] = Field(default_factory=dict)
 
 
+class DdspVstEffectStartRequest(ApiModel):
+    model_config = ConfigDict(protected_namespaces=(), extra="forbid")
+    model_id: str = Field(min_length=1, max_length=128)
+    audio_input_id: str = Field(min_length=1, max_length=256)
+    audio_output_id: str = Field(min_length=1, max_length=256)
+    parameters: dict[str, Union[float, int]] = Field(default_factory=dict)
+    device_id: int = Field(0, ge=0, le=63)
+
+
+class DdspVstEffectParametersRequest(ApiModel):
+    model_config = ConfigDict(protected_namespaces=(), extra="forbid")
+    values: dict[str, Union[float, int]] = Field(default_factory=dict)
+
+
 def _http_error(exc: BaseException) -> HTTPException:
     if isinstance(exc, ResourceBusyError):
         return HTTPException(status_code=409, detail=str(exc))
@@ -230,6 +267,8 @@ def get_status() -> dict[str, object]:
         **system_status(coordinator.owner),
         "realtime": realtime.status(),
         "speaker_test": speaker.status(),
+        "audio_input_test": audio_input_test.status(),
+        "ddsp_vst_effect": ddsp_vst_effect.status(),
         "job_count": len(jobs.list()),
     }
 
@@ -271,6 +310,226 @@ def get_midi_ports() -> dict[str, object]:
         return {"available": True, "ports": query_midi_devices(), "error": None}
     except Exception as exc:
         return {"available": False, "ports": [], "error": str(exc)}
+
+
+def _effect_control_models() -> list[dict[str, object]]:
+    by_instrument: dict[str, dict[str, object]] = {}
+    for model in catalog().get("ddsp_vst_models", []):
+        if model.get("backend") != "om":
+            continue
+        instrument = str(model.get("instrument", ""))
+        current = by_instrument.get(instrument)
+        if current is None or (
+            model.get("precision") == "mixed_float16"
+            and current.get("precision") != "mixed_float16"
+        ):
+            by_instrument[instrument] = model
+    return [by_instrument[name] for name in sorted(by_instrument)]
+
+
+def _public_effect_model(model: Mapping[str, object]) -> dict[str, object]:
+    return {key: value for key, value in model.items() if key != "path"}
+
+
+def _default_device_id(devices: list[dict[str, object]], marker: str) -> str | None:
+    marker = marker.casefold()
+    return next(
+        (str(item["id"]) for item in devices if marker in str(item.get("name", "")).casefold()),
+        None,
+    )
+
+
+@app.get("/api/v1/ddsp-vst-effect/catalog")
+def get_ddsp_vst_effect_catalog() -> dict[str, object]:
+    try:
+        models = _effect_control_models()
+        inputs = [
+            item
+            for item in query_audio_inputs()
+            if item.get("backend") == "pulse"
+            and item.get("type") == "capture"
+            and item.get("available")
+            and item.get("source_name")
+        ]
+        outputs = [
+            item
+            for item in query_ddsp_vst_audio_outputs(query_audio_devices)
+            if item.get("backend") == "pulse" and item.get("sink_name")
+        ]
+        feature_hash_ok = FEATURE_OM_PATH.is_file() and sha256_file(FEATURE_OM_PATH) == FEATURE_OM_SHA256
+        board = is_ascend_board()
+        reasons = []
+        if not board:
+            reasons.append("DDSP-VST Effect 仅能在 Ascend 开发板上运行")
+        if not feature_hash_ok:
+            reasons.append("已发布的 Feature OM 缺失或 SHA256 不匹配")
+        if len(models) < 11:
+            reasons.append("11 个已发布 Control OM 未全部就绪")
+        if _default_device_id(inputs, "UGREEN") is None:
+            reasons.append("UGREEN 摄像头麦克风输入不可用")
+        if _default_device_id(outputs, "EDIFIER") is None:
+            reasons.append("EDIFIER 漫步者音频输出不可用")
+        return {
+            "available": not reasons,
+            "error": "; ".join(reasons) if reasons else None,
+            "backend": "acl/om",
+            "feature_model": {
+                "name": FEATURE_OM_PATH.name,
+                "sha256": FEATURE_OM_SHA256,
+                "available": feature_hash_ok,
+                "contract": {
+                    "audio": [1024],
+                    "f0_scaled": [1],
+                    "pw_scaled": [1],
+                    "f0_hz": [1],
+                    "pw_db": [1],
+                },
+            },
+            "models": [_public_effect_model(item) for item in models],
+            "audio_inputs": inputs,
+            "audio_outputs": outputs,
+            "default_model_id": next(
+                (str(item["id"]) for item in models if item.get("instrument") == "Violin"),
+                None,
+            ),
+            "default_audio_input_id": _default_device_id(inputs, "UGREEN"),
+            "default_audio_output_id": _default_device_id(outputs, "EDIFIER"),
+            "parameters": {
+                name: {"min": bounds[0], "max": bounds[1], "default": DDSP_VST_EFFECT_DEFAULTS[name]}
+                for name, bounds in DDSP_VST_EFFECT_PARAMETER_RANGES.items()
+            },
+        }
+    except BaseException as exc:
+        return {
+            "available": False,
+            "error": str(exc),
+            "backend": "acl/om",
+            "feature_model": {"name": FEATURE_OM_PATH.name, "sha256": FEATURE_OM_SHA256, "available": False},
+            "models": [],
+            "audio_inputs": [],
+            "audio_outputs": [],
+            "default_model_id": None,
+            "default_audio_input_id": None,
+            "default_audio_output_id": None,
+            "parameters": {},
+        }
+
+
+@app.get("/api/v1/ddsp-vst-effect/status")
+def get_ddsp_vst_effect_status() -> dict[str, object]:
+    return ddsp_vst_effect.status()
+
+
+@app.post("/api/v1/ddsp-vst-effect/start")
+async def start_ddsp_vst_effect(
+    payload: DdspVstEffectStartRequest,
+) -> dict[str, object]:
+    _require_board()
+    try:
+        model = next(item for item in _effect_control_models() if item["id"] == payload.model_id)
+        input_device = next(
+            item for item in query_audio_inputs() if item["id"] == payload.audio_input_id
+        )
+        output_device = next(
+            item
+            for item in query_ddsp_vst_audio_outputs(query_audio_devices)
+            if item["id"] == payload.audio_output_id
+        )
+        if (
+            input_device.get("backend") != "pulse"
+            or input_device.get("type") != "capture"
+            or not input_device.get("available")
+            or not input_device.get("source_name")
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="DDSP-VST Effect requires an available physical PulseAudio capture input",
+            )
+        if output_device.get("backend") != "pulse" or not output_device.get("sink_name"):
+            raise HTTPException(
+                status_code=409,
+                detail="DDSP-VST Effect requires a PulseAudio output sink",
+            )
+        config = {
+            **payload.model_dump(),
+            "feature_model_path": str(FEATURE_OM_PATH),
+            "control_model_path": str(model["path"]),
+            "pulse_source": str(input_device["source_name"]),
+            "pulse_sink": str(output_device["sink_name"]),
+            "input_device_name": str(input_device["name"]),
+            "output_device_name": str(output_device["name"]),
+        }
+        return await asyncio.to_thread(ddsp_vst_effect.start, config)
+    except StopIteration as exc:
+        raise HTTPException(status_code=404, detail="Effect model or audio device not found") from exc
+    except HTTPException:
+        raise
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/v1/ddsp-vst-effect/catalog/refresh")
+def refresh_ddsp_vst_effect_catalog() -> dict[str, object]:
+    try:
+        catalog(refresh=True)
+        return get_ddsp_vst_effect_catalog()
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.patch("/api/v1/ddsp-vst-effect/parameters")
+async def patch_ddsp_vst_effect_parameters(
+    payload: DdspVstEffectParametersRequest,
+) -> dict[str, object]:
+    try:
+        return await asyncio.to_thread(ddsp_vst_effect.update_parameters, payload.values)
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/v1/ddsp-vst-effect/stop")
+async def stop_ddsp_vst_effect() -> dict[str, object]:
+    try:
+        return await asyncio.to_thread(ddsp_vst_effect.stop)
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/v1/ddsp-vst-effect/calibrate")
+async def calibrate_ddsp_vst_effect() -> dict[str, object]:
+    try:
+        return await asyncio.to_thread(ddsp_vst_effect.calibrate)
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.websocket("/api/v1/ddsp-vst-effect/events")
+async def ddsp_vst_effect_events(websocket: WebSocket) -> None:
+    if not _origin_allowed(websocket.headers):
+        await websocket.close(code=1008, reason="Cross-origin WebSocket denied")
+        return
+    await websocket.accept()
+    try:
+        while True:
+            status = ddsp_vst_effect.status()
+            await websocket.send_json(
+                {"event": "status", "data": status}
+            )
+            try:
+                interval = 0.1 if status.get("running") else 0.5
+                message = await asyncio.wait_for(
+                    websocket.receive_json(), timeout=interval
+                )
+            except asyncio.TimeoutError:
+                continue
+            if message.get("event") == "ping":
+                await websocket.send_json({"event": "pong"})
+            else:
+                await websocket.send_json(
+                    {"event": "error", "message": "Only ping is accepted on this socket"}
+                )
+    except WebSocketDisconnect:
+        pass
 
 
 @app.get("/api/v1/realtime/catalog")
@@ -461,6 +720,11 @@ def get_speaker_test_status() -> dict[str, object]:
     return speaker.status()
 
 
+@app.get("/api/v1/audio-input-test/status")
+def get_audio_input_test_status() -> dict[str, object]:
+    return audio_input_test.status()
+
+
 @app.get("/api/v1/speaker-outputs")
 def get_speaker_outputs() -> dict[str, object]:
     try:
@@ -471,6 +735,82 @@ def get_speaker_outputs() -> dict[str, object]:
         }
     except Exception as exc:
         return {"available": False, "devices": [], "error": str(exc)}
+
+
+async def _send_audio_output_snapshot(
+    websocket: WebSocket,
+    event: str,
+) -> None:
+    try:
+        devices = await asyncio.to_thread(
+            query_piano_audio_outputs,
+            query_audio_devices,
+        )
+        error = None
+    except Exception as exc:
+        devices = []
+        error = str(exc)
+    await websocket.send_json(
+        {"event": event, "devices": devices, "error": error}
+    )
+
+
+@app.websocket("/api/v1/audio-output-events")
+async def audio_output_events(websocket: WebSocket) -> None:
+    if not _origin_allowed(websocket.headers):
+        await websocket.close(code=1008, reason="Cross-origin WebSocket denied")
+        return
+    await websocket.accept()
+    process: asyncio.subprocess.Process | None = None
+    try:
+        await _send_audio_output_snapshot(websocket, "snapshot")
+        if shutil.which("pactl") is None:
+            while True:
+                await asyncio.sleep(5.0)
+                await websocket.send_json({"event": "ping"})
+
+        environment = dict(os.environ)
+        environment["LC_ALL"] = "C"
+        process = await asyncio.create_subprocess_exec(
+            "pactl",
+            "subscribe",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=environment,
+        )
+        if process.stdout is None:
+            raise RuntimeError("Unable to read PulseAudio output events")
+        while True:
+            try:
+                raw_event = await asyncio.wait_for(
+                    process.stdout.readline(),
+                    timeout=5.0,
+                )
+            except asyncio.TimeoutError:
+                await websocket.send_json({"event": "ping"})
+                continue
+            if not raw_event:
+                detail = "PulseAudio event monitor stopped"
+                if process.stderr is not None:
+                    stderr = (await process.stderr.read()).decode(
+                        "utf-8", errors="replace"
+                    ).strip()
+                    detail = stderr or detail
+                await websocket.send_json({"event": "error", "error": detail})
+                break
+            message = raw_event.decode("utf-8", errors="replace").strip()
+            if is_pulse_output_event(message):
+                await _send_audio_output_snapshot(websocket, "audio_outputs")
+    except (WebSocketDisconnect, ConnectionResetError):
+        pass
+    finally:
+        if process is not None and process.returncode is None:
+            process.terminate()
+            try:
+                await asyncio.wait_for(process.wait(), timeout=1.0)
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
 
 
 @app.get("/api/v1/bluetooth-audio")
@@ -562,6 +902,44 @@ async def start_speaker_test(payload: SpeakerTestRequest) -> dict[str, object]:
 async def stop_speaker_test() -> dict[str, object]:
     try:
         return await asyncio.to_thread(speaker.stop)
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/v1/audio-input-test/start")
+async def start_audio_input_test(payload: AudioInputTestRequest) -> dict[str, object]:
+    try:
+        inputs = query_audio_inputs()
+        device = next(item for item in inputs if item["id"] == payload.audio_input_id)
+        if device.get("type") != "capture" or not device.get("available"):
+            raise HTTPException(
+                status_code=409,
+                detail="Only an available physical capture input can be tested",
+            )
+        config = payload.model_dump()
+        config.update(
+            {
+                "device_name": device["name"],
+                "audio_device_id": device.get("index", payload.audio_input_id),
+                "audio_backend": device.get("backend", "portaudio"),
+                "pulse_source": device.get("source_name"),
+                "max_input_channels": device["max_input_channels"],
+                "default_sample_rate": device["default_sample_rate"],
+            }
+        )
+        return await asyncio.to_thread(audio_input_test.start, config)
+    except StopIteration as exc:
+        raise HTTPException(status_code=404, detail="Audio input not found") from exc
+    except HTTPException:
+        raise
+    except BaseException as exc:
+        raise _http_error(exc) from exc
+
+
+@app.post("/api/v1/audio-input-test/stop")
+async def stop_audio_input_test() -> dict[str, object]:
+    try:
+        return await asyncio.to_thread(audio_input_test.stop)
     except BaseException as exc:
         raise _http_error(exc) from exc
 

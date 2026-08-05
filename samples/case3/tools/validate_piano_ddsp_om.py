@@ -27,6 +27,14 @@ CONTROL_NAMES = (
     "f0_hz",
     "noise_magnitudes",
 )
+EXPECTED_MODEL_IDS = {
+    "gru_ir_96_64",
+    "film_fdn_128_96",
+    "gru_ir_fullwet_96_64",
+    "film_ir_fullwet_96_64",
+}
+EXPECTED_RELEASE = "model-suite-v1.0.1"
+EXPECTED_SOURCE_COMMIT = "c41911aa7de454aeacf0b3edbb2d06a0801fb3ff"
 
 
 def nrmse(reference: np.ndarray, actual: np.ndarray) -> float:
@@ -38,7 +46,7 @@ def nrmse(reference: np.ndarray, actual: np.ndarray) -> float:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", type=Path, required=True)
-    parser.add_argument("--model-id", default="paper_ir")
+    parser.add_argument("--model-id", default="gru_ir_96_64")
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--device-id", type=int, default=0)
@@ -53,15 +61,82 @@ def validate_reference_provenance(reference_path: Path, model_id: str) -> str:
         raise FileNotFoundError(f"Reference provenance report is missing: {report_path}")
     report = json.loads(report_path.read_text(encoding="utf-8"))
     reference_hash = sha256_file(reference_path)
-    if (
-        report.get("schema") != "piano-ddsp-reference/v1"
-        or report.get("model_id") != model_id
-        or report.get("npz") != reference_path.name
-        or report.get("npz_sha256") != reference_hash
-        or int(report.get("frames", 0)) < 10_000
-    ):
+    schema = report.get("schema")
+    common_matches = (
+        report.get("model_id") == model_id
+        and report.get("npz") == reference_path.name
+        and report.get("npz_sha256") == reference_hash
+        and int(report.get("frames", 0)) >= 10_000
+    )
+    if schema == "piano-ddsp-reference/v1":
+        valid = common_matches
+    elif schema == "piano-ddsp-onnx-reference/v2":
+        inputs_name = report.get("inputs")
+        reference_root = reference_path.parent.parent.resolve()
+        inputs_path = (reference_root / str(inputs_name)).resolve()
+        valid = (
+            common_matches
+            and report.get("release") == EXPECTED_RELEASE
+            and report.get("source_hf_commit") == EXPECTED_SOURCE_COMMIT
+            and isinstance(inputs_name, str)
+            and reference_root in inputs_path.parents
+            and inputs_path.is_file()
+            and report.get("inputs_sha256") == sha256_file(inputs_path)
+        )
+    else:
+        valid = False
+    if not valid:
         raise ValueError(f"Reference provenance does not match model {model_id!r}")
     return reference_hash
+
+
+def load_reference_arrays(reference_path: Path, frames_requested: int) -> tuple[int, dict[str, np.ndarray]]:
+    report = json.loads((reference_path.parent / "report.json").read_text(encoding="utf-8"))
+    schema = report.get("schema")
+    output_names = CONTROL_NAMES + ("next_context_state", "next_monophonic_state")
+    if schema == "piano-ddsp-onnx-reference/v2":
+        inputs_path = reference_path.parent.parent / str(report["inputs"])
+        with np.load(inputs_path, allow_pickle=False) as input_archive:
+            inputs = {name: input_archive[name] for name in input_archive.files}
+        with np.load(reference_path, allow_pickle=False) as output_archive:
+            outputs = {name: output_archive[name] for name in output_names}
+        reference = {**inputs, **outputs}
+    else:
+        legacy_names = (
+            "conditioning",
+            "pedal",
+            "piano_model",
+            "extended_pitch",
+            "context_state_out",
+            "monophonic_state_out",
+        ) + CONTROL_NAMES
+        with np.load(reference_path, allow_pickle=False) as archive:
+            missing = set(legacy_names) - set(archive.files)
+            if missing:
+                raise ValueError(f"Reference is missing arrays: {sorted(missing)}")
+            reference = {name: archive[name] for name in legacy_names}
+        reference["next_context_state"] = reference.pop("context_state_out")
+        reference["next_monophonic_state"] = reference.pop("monophonic_state_out")
+    required = {
+        "conditioning",
+        "pedal",
+        "piano_model",
+        "extended_pitch",
+        *output_names,
+    }
+    missing = required - set(reference)
+    if missing:
+        raise ValueError(f"Reference is missing arrays: {sorted(missing)}")
+    available_frames = int(reference["conditioning"].shape[0])
+    if frames_requested <= 0 or frames_requested > available_frames:
+        raise ValueError(
+            f"--frames must be between 1 and {available_frames}, received {frames_requested}"
+        )
+    frames = int(frames_requested)
+    return frames, {
+        name: value if name == "piano_model" else value[:frames]
+        for name, value in reference.items()
+    }
 
 
 def record_bundle_validation(
@@ -86,12 +161,11 @@ def record_bundle_validation(
         "passed": report["passed"],
         "om_sha256": report["om_sha256"],
     }
-    expected_models = {"paper_ir", "film_fdn", "calibrated_ir", "calibrated_film_ir"}
-    manifest["complete"] = expected_models.issubset(models) and all(
+    manifest["complete"] = EXPECTED_MODEL_IDS.issubset(models) and all(
         isinstance(models[name], dict)
         and isinstance(models[name].get("validation"), dict)
         and models[name]["validation"].get("passed") is True
-        for name in expected_models
+        for name in EXPECTED_MODEL_IDS
     )
     manifest_tmp = manifest_path.with_suffix(".json.part")
     manifest_tmp.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -120,30 +194,7 @@ def main() -> None:
     if args.model_id not in bundle.models:
         raise KeyError(args.model_id)
     reference_hash = validate_reference_provenance(args.reference, args.model_id)
-    required_arrays = (
-        "conditioning",
-        "pedal",
-        "piano_model",
-        "extended_pitch",
-        "context_state_out",
-        "monophonic_state_out",
-    ) + CONTROL_NAMES
-    with np.load(args.reference, allow_pickle=False) as archive:
-        missing = set(required_arrays) - set(archive.files)
-        if missing:
-            raise ValueError(f"Reference is missing arrays: {sorted(missing)}")
-        # NpzFile indexing decompresses a member on every access. Materialize each
-        # required array once before the 10,000-frame loop.
-        available_frames = int(archive["conditioning"].shape[0])
-        if args.frames <= 0 or args.frames > available_frames:
-            raise ValueError(
-                f"--frames must be between 1 and {available_frames}, received {args.frames}"
-            )
-        frames = int(args.frames)
-        reference = {
-            name: archive[name] if name == "piano_model" else archive[name][:frames]
-            for name in required_arrays
-        }
+    frames, reference = load_reference_arrays(args.reference, args.frames)
     asset = bundle.models[args.model_id]
     context = np.zeros((1, 1, 64), dtype=np.float32)
     monophonic = np.zeros((1, 16, 192), dtype=np.float32)
@@ -170,9 +221,9 @@ def main() -> None:
             monophonic = outputs["next_monophonic_state"]
             pairs = {
                 **{name: (reference[name][frame], outputs[name][0, 0]) for name in CONTROL_NAMES},
-                "next_context_state": (reference["context_state_out"][frame], context[0, 0]),
+                "next_context_state": (reference["next_context_state"][frame], context[0, 0]),
                 "next_monophonic_state": (
-                    reference["monophonic_state_out"][frame],
+                    reference["next_monophonic_state"][frame],
                     monophonic[0],
                 ),
             }

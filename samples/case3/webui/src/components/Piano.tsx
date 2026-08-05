@@ -23,6 +23,8 @@ export const REFERENCE_WHITE_KEY_WIDTH_PX = 66
 
 // Key geometry and shortcut-label behavior adapted from react-piano at
 // a8fac9f1ab0aab8fd21658714f1ad9f14568feee (MIT); pointer safety is local.
+// Per-contact ownership and slide-to-play follow Magenta AI Jam's KeyboardElement
+// at 1146656d0ac54951ddf89486c264582c037f11e4 (Apache-2.0).
 
 export function noteLabel(note: number): string {
   return `${NOTE_NAMES[note % 12]}${Math.floor(note / 12) - 1}`
@@ -46,7 +48,8 @@ export default function Piano({
   onNoteOn,
   onNoteOff,
 }: PianoProps) {
-  const held = useRef(new Set<number>())
+  const pianoRef = useRef<HTMLDivElement>(null)
+  const heldInputs = useRef(new Map<string, number>())
   const noteOffRef = useRef(onNoteOff)
   const noteOnRef = useRef(onNoteOn)
   const velocityRef = useRef(velocity)
@@ -83,33 +86,135 @@ export default function Piano({
     return { count, whiteNotes, blackNotes }
   }, [firstNote, keyCount, octave])
 
-  const release = (note: number) => {
-    if (held.current.delete(note)) onNoteOff(note)
+  const setPressed = (note: number, pressed: boolean) => {
+    pianoRef.current
+      ?.querySelector<HTMLElement>(`.piano-key[data-note="${note}"]`)
+      ?.classList.toggle('is-pressed', pressed)
   }
 
-  const press = (note: number, target: HTMLElement, pointerId: number) => {
-    if (disabled || held.current.has(note)) return
-    held.current.add(note)
-    target.setPointerCapture?.(pointerId)
-    onNoteOn(note, velocity)
+  const noteAtPoint = (clientX: number, clientY: number) => {
+    const root = pianoRef.current
+    const element = document.elementFromPoint(clientX, clientY)
+    const key = element instanceof Element ? element.closest<HTMLElement>('.piano-key') : null
+    if (!root || !key || !root.contains(key)) return null
+    const note = Number(key.dataset.note)
+    return Number.isInteger(note) ? note : null
+  }
+
+  const releaseInput = (token: string) => {
+    const note = heldInputs.current.get(token)
+    if (note === undefined) return
+    heldInputs.current.delete(token)
+    if (![...heldInputs.current.values()].includes(note)) {
+      setPressed(note, false)
+      noteOffRef.current(note)
+    }
+  }
+
+  const holdInput = (token: string, note: number) => {
+    if (disabledRef.current || heldInputs.current.get(token) === note) return
+    releaseInput(token)
+    const noteAlreadyHeld = [...heldInputs.current.values()].includes(note)
+    heldInputs.current.set(token, note)
+    if (!noteAlreadyHeld) {
+      setPressed(note, true)
+      noteOnRef.current(note, velocityRef.current)
+    }
+  }
+
+  const moveInput = (token: string, clientX: number, clientY: number) => {
+    if (!heldInputs.current.has(token)) return
+    const note = noteAtPoint(clientX, clientY)
+    if (note === null) releaseInput(token)
+    else holdInput(token, note)
+  }
+
+  const pressPointer = (note: number, target: HTMLElement, pointerId: number) => {
+    holdInput(`pointer:${pointerId}`, note)
+    try {
+      target.setPointerCapture?.(pointerId)
+    } catch {
+      // Firefox can reject capture while a touch contact is changing targets.
+    }
   }
 
   useEffect(() => {
     const releaseAll = () => {
-      for (const note of held.current) noteOffRef.current(note)
-      held.current.clear()
+      for (const note of new Set(heldInputs.current.values())) {
+        setPressed(note, false)
+        noteOffRef.current(note)
+      }
+      heldInputs.current.clear()
+    }
+    const releaseWhenHidden = () => {
+      if (document.hidden) releaseAll()
     }
     window.addEventListener('blur', releaseAll)
+    document.addEventListener('visibilitychange', releaseWhenHidden)
     return () => {
       window.removeEventListener('blur', releaseAll)
+      document.removeEventListener('visibilitychange', releaseWhenHidden)
       releaseAll()
     }
   }, [])
 
   useEffect(() => {
-    for (const note of held.current) noteOffRef.current(note)
-    held.current.clear()
+    for (const note of new Set(heldInputs.current.values())) {
+      setPressed(note, false)
+      noteOffRef.current(note)
+    }
+    heldInputs.current.clear()
   }, [firstNote, keyCount])
+
+  useEffect(() => {
+    if (!disabled) return
+    for (const token of [...heldInputs.current.keys()]) releaseInput(token)
+  }, [disabled])
+
+  useEffect(() => {
+    const root = pianoRef.current
+    if (!root) return
+    const touchStart = (event: TouchEvent) => {
+      let handled = false
+      for (const touch of Array.from(event.changedTouches)) {
+        const note = noteAtPoint(touch.clientX, touch.clientY)
+        if (note === null) continue
+        holdInput(`touch:${touch.identifier}`, note)
+        handled = true
+      }
+      if (handled) event.preventDefault()
+    }
+    const touchMove = (event: TouchEvent) => {
+      let handled = false
+      for (const touch of Array.from(event.changedTouches)) {
+        const token = `touch:${touch.identifier}`
+        if (!heldInputs.current.has(token)) continue
+        moveInput(token, touch.clientX, touch.clientY)
+        handled = true
+      }
+      if (handled) event.preventDefault()
+    }
+    const touchEnd = (event: TouchEvent) => {
+      let handled = false
+      for (const touch of Array.from(event.changedTouches)) {
+        const token = `touch:${touch.identifier}`
+        if (!heldInputs.current.has(token)) continue
+        releaseInput(token)
+        handled = true
+      }
+      if (handled) event.preventDefault()
+    }
+    root.addEventListener('touchstart', touchStart, { passive: false })
+    root.addEventListener('touchmove', touchMove, { passive: false })
+    root.addEventListener('touchend', touchEnd, { passive: false })
+    root.addEventListener('touchcancel', touchEnd, { passive: false })
+    return () => {
+      root.removeEventListener('touchstart', touchStart)
+      root.removeEventListener('touchmove', touchMove)
+      root.removeEventListener('touchend', touchEnd)
+      root.removeEventListener('touchcancel', touchEnd)
+    }
+  }, [])
 
   useEffect(() => {
     const keyboardHeld = new Map<string, number>()
@@ -123,11 +228,10 @@ export default function Piano({
       if (event.repeat || isTypingTarget(event.target) || disabledRef.current) return
       const key = event.key.toLowerCase()
       const note = shortcutsRef.current[key]
-      if (note === undefined || held.current.has(note)) return
+      if (note === undefined) return
       event.preventDefault()
       keyboardHeld.set(key, note)
-      held.current.add(note)
-      noteOnRef.current(note, velocityRef.current)
+      holdInput(`keyboard:${key}`, note)
     }
     const keyUp = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
@@ -135,25 +239,25 @@ export default function Piano({
       if (note === undefined) return
       event.preventDefault()
       keyboardHeld.delete(key)
-      if (held.current.delete(note)) noteOffRef.current(note)
+      releaseInput(`keyboard:${key}`)
     }
     window.addEventListener('keydown', keyDown)
     window.addEventListener('keyup', keyUp)
     return () => {
       window.removeEventListener('keydown', keyDown)
       window.removeEventListener('keyup', keyUp)
-      for (const note of keyboardHeld.values()) {
-        if (held.current.delete(note)) noteOffRef.current(note)
-      }
+      for (const key of keyboardHeld.keys()) releaseInput(`keyboard:${key}`)
     }
   }, [])
 
   return (
     <div
+      ref={pianoRef}
       className={`piano ${disabled ? 'is-disabled' : ''}`}
       aria-label="触控钢琴"
       data-key-count={layout.count}
       data-white-key-count={layout.whiteNotes.length}
+      onContextMenu={(event) => event.preventDefault()}
       style={{
         '--piano-keyboard-aspect-ratio': `${layout.whiteNotes.length} / ${WHITE_KEY_LENGTH_TO_WIDTH_RATIO}`,
         '--piano-reference-width': `${layout.whiteNotes.length * REFERENCE_WHITE_KEY_WIDTH_PX}px`,
@@ -164,12 +268,15 @@ export default function Piano({
           <button
             className={`piano-key white-key ${active.has(note) ? 'is-active' : ''} ${rangeClass(note)}`}
             key={note}
+            data-note={note}
             type="button"
+            disabled={disabled}
             aria-label={noteLabel(note)}
-            onPointerDown={(event) => press(note, event.currentTarget, event.pointerId)}
-            onPointerUp={() => release(note)}
-            onPointerCancel={() => release(note)}
-            onLostPointerCapture={() => release(note)}
+            onPointerDown={(event) => pressPointer(note, event.currentTarget, event.pointerId)}
+            onPointerMove={(event) => moveInput(`pointer:${event.pointerId}`, event.clientX, event.clientY)}
+            onPointerUp={(event) => releaseInput(`pointer:${event.pointerId}`)}
+            onPointerCancel={(event) => releaseInput(`pointer:${event.pointerId}`)}
+            onLostPointerCapture={(event) => releaseInput(`pointer:${event.pointerId}`)}
           >
             <span className="note-label">{noteLabel(note)}</span>
             {shortcutLabels.has(note) && <span className="shortcut-label">{shortcutLabels.get(note)}</span>}
@@ -184,12 +291,15 @@ export default function Piano({
             width: `${(BLACK_KEY_WIDTH_TO_WHITE_KEY_WIDTH_RATIO / layout.whiteNotes.length) * 100}%`,
           }}
           key={note}
+          data-note={note}
           type="button"
+          disabled={disabled}
           aria-label={noteLabel(note)}
-          onPointerDown={(event) => press(note, event.currentTarget, event.pointerId)}
-          onPointerUp={() => release(note)}
-          onPointerCancel={() => release(note)}
-          onLostPointerCapture={() => release(note)}
+          onPointerDown={(event) => pressPointer(note, event.currentTarget, event.pointerId)}
+          onPointerMove={(event) => moveInput(`pointer:${event.pointerId}`, event.clientX, event.clientY)}
+          onPointerUp={(event) => releaseInput(`pointer:${event.pointerId}`)}
+          onPointerCancel={(event) => releaseInput(`pointer:${event.pointerId}`)}
+          onLostPointerCapture={(event) => releaseInput(`pointer:${event.pointerId}`)}
         >
           {shortcutLabels.has(note) && <span className="shortcut-label">{shortcutLabels.get(note)}</span>}
         </button>

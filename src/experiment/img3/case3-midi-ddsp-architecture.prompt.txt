@@ -1,0 +1,25 @@
+Use case: scientific-educational
+Asset type: technical report figure
+Primary request:
+Create a tall publication-ready hierarchical architecture diagram for MIDI-DDSP in a Chinese technical book. White background, flat vector style, high contrast, generous margins, no gradients, no shadows, no title or figure number. Use the Okabe-Ito palette, black arrows, and exact large horizontal labels. The output will be portrait; use the full vertical space and avoid tiny text.
+
+Build a top-to-bottom pipeline with four clearly separated bands:
+
+Band 1 “符号输入”: “完整 MIDI 文件” -> “Partitura 声部分离” -> “单音声部”.
+
+Band 2 “Expression Generator”: “32 个 note / rest token” -> “双向上下文” -> “自回归解码” -> “6 维表情控制”. Under the last block, show the exact compact list: “volume · vol_fluc · vibrato · brightness · attack · vol_peak_pos”.
+
+Band 3 “Synthesis Generator · 250 Hz”: “帧级预处理” -> “64 帧双向上下文” -> “F0 解码” -> “Timbre 网络” -> “幅度 [1] · 谐波 [60] · 噪声 [65]”.
+
+Band 4 “CPU 音频域”: “逐声部 DDSP” -> “stem 对齐与混音” -> “WAV + 版本化音频库”.
+
+Add a right-side bracket spanning the Expression and Synthesis bands labeled “八组件 stateful v2 OM”. Add a small note badge near the bottom: “完整前后文；离线渲染”. Make hierarchy and arrow direction unmistakable.
+
+The four bands are one continuous pipeline, not disconnected rows. Draw three prominent inter-band elbow arrows: from “单音声部” down to “32 个 note / rest token”; from “6 维表情控制” down to “帧级预处理”; and from “幅度 [1] · 谐波 [60] · 噪声 [65]” down to “逐声部 DDSP”. Route each arrow through the whitespace between bands without crossing any label. Every block must be reachable from “完整 MIDI 文件” by following arrows and must lead to “WAV + 版本化音频库”.
+Scene/backdrop: clean white or very light neutral background
+Style/medium: precise flat scientific infographic with vector-like geometry and professional sans-serif typography
+Composition/framing: scan-friendly hierarchy, generous whitespace, consistent alignment, and clearly terminated arrows
+Color palette: colorblind-safe Okabe-Ito colors with dark charcoal text and sufficient grayscale contrast
+Text handling: render requested labels verbatim; use consistent capitalization; do not add pseudo-text or unnecessary labels
+Scientific constraints: preserve the requested causal, spatial, and mathematical relationships; do not invent values, equations, units, components, or scientific claims
+Output constraints: no overlapping or clipped text; no ambiguous connections; no gradients, shadows, 3D effects, logos, watermarks, decorative borders, or photorealism

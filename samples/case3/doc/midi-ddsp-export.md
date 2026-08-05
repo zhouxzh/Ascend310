@@ -1,6 +1,9 @@
-# MIDI-DDSP stateful v2 导出与对齐
+# 历史参考：MIDI-DDSP stateful v2 导出与对齐
 
-> 命令默认从 `case3` 根目录执行。[返回文档索引](README.md)。
+> 这是历史导出流程的技术记录，不再随 case3 源码提供 TensorFlow 导出器或对应测试。
+> 当前部署从 Hugging Face 已发布的 ONNX/OM release 下载资产，固定 revision，并先校验
+> `SHA256SUMS`。下载入口为 `tools/download_model_release.py`；当前部署步骤见
+> [模型与 OM 部署](om-deployment.md)。[返回文档索引](README.md)。
 
 ## 目标与版本锁定
 
@@ -20,32 +23,14 @@ stateful v2 固定以下资产：
 
 本轮不训练或微调模型。目标是复现官方整段推理语义，再把有状态组件转换为静态 ONNX/OM。
 
-## 本地导出环境
+## 历史本地导出环境
 
-TensorFlow checkpoint、TensorFlow 基准和 ONNX 导出只在开发电脑执行。板端不要安装
-该依赖文件：
-
-```bash
-python -m pip install -r requirements-export.txt
-```
-
-当前开发电脑使用 Conda `mediapipe_legacy` 环境。该环境包含 TensorFlow 2.15.1、
-DDSP 3.2.0、tf2onnx 1.16.1 和 ONNX Runtime 1.16.0；`setuptools` 必须保持 `<81`，
-以便旧版 `pretty_midi` 继续使用 `pkg_resources`。导出程序缺少依赖时会立即报错。
+历史开发电脑使用独立 TensorFlow/DDSP/tf2onnx 环境生成基准和 ONNX。该环境及其
+`requirements-export.txt` 已移除，开发板也不再安装导出依赖。
 
 ## 1. 生成完整 TensorFlow 基准
 
-先使用官方 `pretty_midi` 和完整序列模型生成固定基准：
-
-```bash
-python tools/export_midi_ddsp_tf_reference.py \
-  --midi _upstream/midi-ddsp/midi_example/ode_to_joy.mid \
-  --instrument-id 0
-
-python tools/export_midi_ddsp_tf_reference.py \
-  --midi midi/ddsp-test.mid \
-  --instrument-id 0
-```
+历史实现使用官方 `pretty_midi` 和完整序列模型生成固定基准；相关脚本已不在 case3 中。
 
 每个输出目录包含 `reference.npz`、`dry.wav`、`wet.wav` 和 `manifest.json`。NPZ 保存：
 
@@ -58,10 +43,6 @@ python tools/export_midi_ddsp_tf_reference.py \
 manifest 保存源码、MIDI、checkpoint、参考文件及每个张量的 SHA256。
 
 ## 2. 导出 stateful v2 ONNX
-
-```bash
-python tools/export_midi_ddsp_stateful_onnx.py
-```
 
 输出目录默认为 `models/midi_ddsp/stateful_v2_batched/onnx/`。导出器为静态
 batch `1/2/4/8` 分别生成以下 8 个组件，共 32 个 ONNX：
@@ -80,14 +61,8 @@ Timbre 不能使用有限 halo 分块。DDSP 3.2.0 的 `Normalize('layer')` 会�
 F0 采样严格保留官方 `top-p=0.95` 和 `midi_zero_silence=True` 语义。导出清单同时记录 ONNX
 张量名和稳定逻辑名，避免 tf2onnx 重命名影响 PyACL 运行时。
 
-每个组件导出时都会使用 ONNX Runtime 与对应 TensorFlow 子图比较。整链比较命令为：
-
-```bash
-python tools/compare_midi_ddsp_stateful_onnx.py \
-  --export-manifest models/midi_ddsp/stateful_v2_batched/onnx/export_manifest.json \
-  --reference reports/midi_ddsp/tf_reference/ddsp-test/reference.npz \
-  --voice-batch-size 8
-```
+每个组件导出时曾使用 ONNX Runtime 与对应 TensorFlow 子图比较。整链比较使用已保存的
+发布清单和参考 NPZ；当前 case3 只保留 ONNX/OM 验证工具，不再重建这些 TensorFlow 基准。
 
 batch 比较会用独立种子复制参考声部，要求所有成员的 `sampled_bins` 完全一致，并按
 既有阈值比较其余输出。运行时按声部数选择最小可容纳 batch；超过 8 个声部时按原
@@ -95,12 +70,7 @@ batch 比较会用独立种子复制参考声部，要求所有成员的 `sample
 
 ## 3. 对齐 CPU DSP 与混响
 
-```bash
-python tools/compare_midi_ddsp_tf_dsp.py \
-  reports/midi_ddsp/tf_reference/ddsp-test/reference.npz
-```
-
-比较工具把相同白噪声注入 NumPy FilteredNoise，分别比较干声和湿声，默认要求 NRMSE
+历史比较工具把相同白噪声注入 NumPy FilteredNoise，分别比较干声和湿声，默认要求 NRMSE
 不超过 `1e-4`。运行时复现 `exp_sigmoid`、控制曲线上采样、角度累积、Nyquist 谐波
 屏蔽、谐波归一化、Hann IR、延迟补偿和干湿叠加。
 
@@ -130,14 +100,13 @@ manifest 记录源码、checkpoint、ONNX、OM、输入输出、状态尺寸和�
 
 ## 5. 混响资产
 
-```bash
-python tools/export_midi_ddsp_reverb.py
-```
-
 `models/om/midi_ddsp_reverb_ir.npz` 保存 checkpoint 中的 20 组原始 IR，产品只使用
 ID 0-12。前 16,000 点保持原值，后 32,000 点应用 `exp(-4t)`，首样本清零，卷积后
 叠加干声。当前锁定 SHA256 为
 `ecbc733bc9a17516dc00897e64eaae70114aa79ed97e2bbc59dedb334f356058`。
+
+当前从已发布模型 release 下载该资产并校验上述哈希；不会从 TensorFlow checkpoint
+重新生成它。
 
 ## 验收门槛
 

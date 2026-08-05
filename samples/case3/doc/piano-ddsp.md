@@ -9,48 +9,46 @@ Piano-DDSP 是 `case3` 中独立于 MIDI-DDSP 和 DDSP-VST 的实时系统。它
 
 - 训练源码提交：`1f7cf65ff9c58968bc3b605ee571db928d1ac37a`
 - Hugging Face：`zhouxzh/piano-ddsp-ascend310`
-- 发布标签：`model-suite-v1.0.0`
-- 固定 HF 提交：`2199df0a55953a0d2469d59ab2f23a8bef8eb314`
+- 发布标签：`model-suite-v1.0.1`
+- 固定 HF 提交：`c41911aa7de454aeacf0b3edbb2d06a0801fb3ff`
 - 合同：FP32、opset 13、batch 1、16 声部、250 Hz、16 kHz
 
 开发电脑使用纯标准库下载器：
 
 ```bash
-python tools/download_piano_ddsp_onnx.py
+python tools/download_model_release.py
 ```
 
-它校验标签提交、文件大小和 SHA256，使用 `.part`、HTTP Range 和原子重命名，并默认
-排除 checkpoint、优化器和 `.pt`。HF 不可用时只能显式执行：
-
-```bash
-python tools/download_piano_ddsp_onnx.py --source ace2
-```
-
-报告会记录每个文件的真实来源；ace2 文件仍必须匹配同一发布哈希。
+它先将固定 revision 解析为提交 SHA，再校验 `SHA256SUMS`，使用 `.part`、HTTP Range
+和原子重命名下载 manifest 中的部署资产。下载报告记录实际提交和每个已校验资产；不支持从本地
+checkpoint、TensorFlow 或 TFLite 重新导出。其他 Piano-DDSP、DDSP-VST、MIDI-DDSP 的
+发布目录必须显式提供各自固定 `--revision`、`--release-dir` 和 `--manifest-sha256`。
 
 ## 模型和 bundle
 
-第一版包含 `paper_ir`、`film_fdn`、`calibrated_ir` 和
-`calibrated_film_ir`。完成板端音质、性能和稳定性比较前，catalog 和 UI 不提供推荐标记。
+v1.0.1 包含 `gru_ir_96_64`、`film_fdn_128_96`、`gru_ir_fullwet_96_64`
+和 `film_ir_fullwet_96_64`。完成板端音质、性能和稳定性比较前，catalog 和 UI 不提供推荐标记。
 
 ```text
 models/piano_ddsp/
-|-- model-suite-v1.0.0/
-|-- references/model-suite-v1.0.0/paper_ir/
+|-- model-suite-v1.0.1/
+|-- references/model-suite-v1.0.1/
+|   |-- inputs-10000.npz
+|   |-- gru_ir_96_64/
 |   |-- reference-10000.npz
-|   |-- reference.wav
 |   `-- report.json
-|-- model-suite-v1.0.0-gru-unrolled/
-|-- bundles/model-suite-v1.0.0-gru-unrolled-fp32-origin/
+|-- model-suite-v1.0.1-gru-unrolled/
+|-- bundles/model-suite-v1.0.1-gru-unrolled-fp32-origin/
 |   |-- manifest.json
 |   |-- environment.json
 |   |-- models/
+|   |-- validation/full-10000/
 |   `-- logs/
 `-- active-bundle.json
 ```
 
 `prepare_piano_ddsp_models.py` 只能在 aarch64 且已有 ATC 的板端运行。转换固定为
-`Ascend310B4` FP32，并显式设置 `precision_mode_v2=origin`，先处理 `paper_ir`。
+`Ascend310B4` FP32，并显式设置 `precision_mode_v2=origin`，默认先处理 `gru_ir_96_64`。
 ATC 子进程固定使用 `MULTI_THREAD_COMPILE=0`、`TE_PARALLEL_COMPILER=1` 和
 `enable_graph_parallel=0`，避免在开发板上并行编译算子。
 CANN 8.0.0 的原生 `DynamicGRUV2` 只提供 FP16 kernel，因此真实 FP32 基线使用在固定
@@ -64,7 +62,7 @@ source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate base
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd /home/HwHiAiUser/Documents/case3
-python prepare_piano_ddsp_models.py --variant gru-unrolled --models paper_ir
+python prepare_piano_ddsp_models.py --variant gru-unrolled --models gru_ir_96_64
 ```
 
 这些命令只激活已有环境。不得在板端安装、升级或删除包，也不得修改 CANN、Conda、
@@ -72,9 +70,9 @@ PulseAudio、系统配置或 shell 启动文件。缺少依赖时停止并保留
 
 日常启动使用 `python scripts/run_webui.py`。入口在板端检测不到 `acl` 时，会通过现有
 CANN `set_env.sh` 和 Conda `base` 重新执行自身；FastAPI 启动的 Piano worker 会继承
-同一组 `PYTHONPATH`、`LD_LIBRARY_PATH` 和 `ASCEND_*` 变量。2026-07-29 实测主进程
-报告 `acl:true`，`paper_ir` worker 成功加载 OM 并运行 3944 次推理，NPU P99 为
-1.46 ms，停止后 worker、`aplay` 和 PCM 均已释放。
+同一组 `PYTHONPATH`、`LD_LIBRARY_PATH` 和 `ASCEND_*` 变量。运行时只从
+`active-bundle.json` 指向的完整、已验证 bundle 读取 OM，当前指针对应
+`model-suite-v1.0.1-gru-unrolled-fp32-origin`。
 
 ## 实时语义
 
@@ -93,9 +91,9 @@ CANN `set_env.sh` 和 Conda `base` 重新执行自身；FastAPI 启动的 Piano 
 
 | 接口 | 用途 |
 | :--- | :--- |
-| `GET /api/v1/realtime/catalog` | 统一实时音色目录，包含 Piano-DDSP 与 DDSP-VST patch |
+| `GET /api/v1/realtime/catalog` | Piano-DDSP 钢琴音色、输出设备和实体 MIDI 端口目录 |
 | `GET /api/v1/realtime/status` | 当前统一会话状态、设备、播放器、录音和指标 |
-| `POST /api/v1/realtime/start` | 获取共享资源并启动所选 patch |
+| `POST /api/v1/realtime/start` | 获取共享资源并启动 Piano-DDSP 会话 |
 | `POST /api/v1/realtime/stop` | 120 ms 淡出并有序释放资源，幂等 |
 | `POST /api/v1/realtime/panic` | 清空全部状态但保持会话 |
 | `PATCH /api/v1/realtime/parameters` | 块边界热更新；模型/年份执行完整切换 |
@@ -140,14 +138,14 @@ DMA IRQ 错误；10 秒流在 36864 帧处主动停止也返回 `stopped` 并释
 
 ```bash
 python tools/validate_piano_ddsp_om.py \
-  --bundle models/piano_ddsp/bundles/model-suite-v1.0.0-gru-unrolled-fp32-origin/manifest.json \
-  --reference models/piano_ddsp/references/model-suite-v1.0.0/paper_ir/reference-10000.npz \
-  --report reports/piano-ddsp/paper-ir-smoke.json --frames 100
+  --bundle models/piano_ddsp/bundles/model-suite-v1.0.1-gru-unrolled-fp32-origin/manifest.json \
+  --reference models/piano_ddsp/references/model-suite-v1.0.1/gru_ir_96_64/reference-10000.npz \
+  --report reports/piano-ddsp/gru-ir-96-64-smoke.json --frames 100
 
 python tools/validate_piano_ddsp_om.py \
-  --bundle models/piano_ddsp/bundles/model-suite-v1.0.0-gru-unrolled-fp32-origin/manifest.json \
-  --reference models/piano_ddsp/references/model-suite-v1.0.0/paper_ir/reference-10000.npz \
-  --report reports/piano-ddsp/paper-ir-10000.json --frames 10000 --activate
+  --bundle models/piano_ddsp/bundles/model-suite-v1.0.1-gru-unrolled-fp32-origin/manifest.json \
+  --reference models/piano_ddsp/references/model-suite-v1.0.1/gru_ir_96_64/reference-10000.npz \
+  --report reports/piano-ddsp/gru-ir-96-64-10000.json --frames 10000 --activate
 ```
 
 要求无 NaN/Inf，F0 NRMSE 不超过 `1e-5`，其他控制量和状态 NRMSE 不超过 `0.003`，
@@ -156,26 +154,20 @@ python tools/validate_piano_ddsp_om.py \
 和 worker 也只接受该合格模型。完整验收还包括八帧块 P99、EDIFIER USB 软件总延时、16 音
 和弦、快速/重复音、CC64-67、设备拔插、模型切换、录音和 10 分钟稳定性。
 
-### 2026-07-29 板端结果
+### 2026-07-31 板端结果
 
 不可变 active bundle 为
-`model-suite-v1.0.0-gru-unrolled-fp32-origin`。四个模型均完成 10,000 帧 OM 连续对照，
+`model-suite-v1.0.1-gru-unrolled-fp32-origin`。四个模型均完成 10,000 帧 OM 连续对照，
 无 NaN/Inf，F0、连续控制量和逐帧状态均通过上述阈值：
 
 | 模型 | 单帧 NPU P99 | 10,000 帧数值对照 |
 | :--- | ---: | :--- |
-| `paper_ir` | 1.25 ms | 通过 |
-| `film_fdn` | 1.19 ms | 通过 |
-| `calibrated_ir` | 1.23 ms | 通过 |
-| `calibrated_film_ir` | 1.34 ms | 通过 |
+| `gru_ir_96_64` | 1.193 ms | 通过 |
+| `film_fdn_128_96` | 1.269 ms | 通过 |
+| `gru_ir_fullwet_96_64` | 1.177 ms | 通过 |
+| `film_ir_fullwet_96_64` | 1.312 ms | 通过 |
 
-固定白噪声 DSP 对照中最低谐波 SNR 为 65.10 dB，最低 wet 输出 SNR 为 68.84 dB。
-`paper_ir` 的 `balanced` 八帧完整块 P99 为 23.219344 ms，50 秒窗口无 underrun，满足
-24 ms 计算预算；由于该测量使用后来证实不安全的板载音频，只记录计算结果，不计入 USB
-总延时验收。真实进程内 `paper_ir -> film_fdn -> paper_ir` 的 ACL 加载、预热、Panic、
-停止和释放已单独通过，停止后 ACL 生命周期探针全部成功。
-
-同日 Playwright 在实际板端 WebUI 上完成 11 项测试，覆盖 1366x768 和 390x844，无页面
-横向溢出或关键控件重叠。当前开发板未连接 EDIFIER M16 Pro 和 MIDIPLUS TINY，因此
-USB balanced 不超过 100 ms、原始 MIDI、物理拔插、现场演奏和带外设的 10 分钟稳定性
-仍是明确的未验收项；完成这些项目及四模型听感比较前不设置推荐模型。
+四模型累计验证 40,000 个有状态帧；确定性重放、混响输出和数值对照均通过。最高单帧
+P99 为 1.312 ms，`film_ir_fullwet_96_64` 出现 3 次孤立的 4 ms 截止时间超限，比例为
+0.0003，未影响其 P99 合格判定。这组结果只用于确认神经控制 OM 的数值、确定性和板端
+推理预算，不代表主机侧谐波/噪声/混响合成、物理音频设备延时或主观音质已验收。

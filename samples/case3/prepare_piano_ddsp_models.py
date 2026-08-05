@@ -15,18 +15,20 @@ import time
 from typing import Iterable
 
 
-RELEASE = "model-suite-v1.0.0"
+RELEASE = "model-suite-v1.0.1"
+SOURCE_COMMIT = "c41911aa7de454aeacf0b3edbb2d06a0801fb3ff"
 PRECISION_MODE_V2 = "origin"
 ATC_COMPILE_ENVIRONMENT = {
     "MULTI_THREAD_COMPILE": "0",
     "TE_PARALLEL_COMPILER": "1",
 }
 MODEL_ORDER = (
-    "paper_ir",
-    "film_fdn",
-    "calibrated_ir",
-    "calibrated_film_ir",
+    "gru_ir_96_64",
+    "film_fdn_128_96",
+    "gru_ir_fullwet_96_64",
+    "film_ir_fullwet_96_64",
 )
+PRIMARY_MODEL_ID = MODEL_ORDER[0]
 INPUT_SHAPE = (
     "conditioning:1,1,16,2;pedal:1,1,4;piano_model:1;"
     "extended_pitch:1,1,16,1;context_state:1,1,64;"
@@ -345,14 +347,14 @@ def parse_models(values: Iterable[str]) -> list[str]:
             if model_id not in result:
                 result.append(model_id)
     if not result:
-        return ["paper_ir"]
+        return [PRIMARY_MODEL_ID]
     return sorted(result, key=MODEL_ORDER.index)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--model-root", type=Path, default=Path("models/piano_ddsp/model-suite-v1.0.0")
+        "--model-root", type=Path, default=Path("models/piano_ddsp/model-suite-v1.0.1")
     )
     parser.add_argument(
         "--bundle-root",
@@ -363,9 +365,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--variant-root",
         type=Path,
-        default=Path("models/piano_ddsp/model-suite-v1.0.0-gru-unrolled"),
+        default=Path("models/piano_ddsp/model-suite-v1.0.1-gru-unrolled"),
     )
-    parser.add_argument("--models", nargs="+", default=["paper_ir"])
+    parser.add_argument("--models", nargs="+", default=[PRIMARY_MODEL_ID])
     parser.add_argument("--soc-version", default="Ascend310B4")
     parser.add_argument("--activate", action="store_true")
     return parser.parse_args()
@@ -383,17 +385,19 @@ def main() -> None:
         or Path(
             "models/piano_ddsp/bundles/"
             + (
-                "model-suite-v1.0.0-fp32-origin"
+                "model-suite-v1.0.1-fp32-origin"
                 if args.variant == "origin"
-                else "model-suite-v1.0.0-gru-unrolled-fp32-origin"
+                else "model-suite-v1.0.1-gru-unrolled-fp32-origin"
             )
         )
     ).resolve()
     variant_root = args.variant_root.resolve()
     release = load_release(model_root)
     selected = parse_models(args.models)
-    if selected != ["paper_ir"] and "paper_ir" not in selected:
-        raise ValueError("paper_ir must be converted and validated before other models")
+    if selected != [PRIMARY_MODEL_ID] and PRIMARY_MODEL_ID not in selected:
+        raise ValueError(
+            f"{PRIMARY_MODEL_ID} must be converted and validated before other models"
+        )
     manifest_path = bundle_root / "manifest.json"
     existing: dict[str, object] = {}
     loaded: dict[str, object] | None = None
@@ -410,12 +414,13 @@ def main() -> None:
         if isinstance(raw_models, dict):
             existing = raw_models
 
-    if any(model_id != "paper_ir" for model_id in selected):
-        paper = existing.get("paper_ir")
-        validation = paper.get("validation") if isinstance(paper, dict) else None
+    if any(model_id != PRIMARY_MODEL_ID for model_id in selected):
+        primary = existing.get(PRIMARY_MODEL_ID)
+        validation = primary.get("validation") if isinstance(primary, dict) else None
         if not isinstance(validation, dict) or validation.get("passed") is not True:
             raise RuntimeError(
-                "paper_ir must pass the 10,000-frame OM validation before converting other models"
+                f"{PRIMARY_MODEL_ID} must pass the 10,000-frame OM validation "
+                "before converting other models"
             )
 
     if loaded is not None and loaded.get("complete") is True:
@@ -487,7 +492,7 @@ def main() -> None:
         "export_variant": args.variant,
         "soc_version": args.soc_version,
         "source_manifest_sha256": sha256_file(model_root / "model-suite.json"),
-        "source_commit": "1f7cf65ff9c58968bc3b605ee571db928d1ac37a",
+        "source_commit": SOURCE_COMMIT,
         "models": converted,
         "complete": all(
             model_id in converted

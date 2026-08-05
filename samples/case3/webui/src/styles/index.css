@@ -8,5 +8,6 @@
 @import './common.css';
 @import './realtime.css';
 @import './midi-ddsp.css';
+@import './ddsp-vst-effect.css';
 @import './devices.css';
 @import './responsive.css';

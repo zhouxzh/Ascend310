@@ -2,7 +2,7 @@ import os
 import sys
 import argparse
 
-def replace_block_symbol(file_path):
+def replace_block_symbol(file_path, output_path=None):
     target_char = "█"
     # LaTeX 命令：灰色实心方块，使用 (*@ ... @*) 在 listing 中逃逸
     replacement = r"(*@\textcolor{gray}{\rule{1em}{1em}}@*)"
@@ -25,11 +25,15 @@ def replace_block_symbol(file_path):
             if lst_config not in new_content:
                 new_content = lst_config + "\n" + new_content
 
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(new_content)
-            print(f"Successfully replaced symbols and added lstset in {file_path}")
+            message = f"Successfully replaced symbols and added lstset in {file_path}"
         else:
-            print(f"No target symbols found in {file_path}")
+            new_content = content
+            message = f"No target symbols found in {file_path}"
+
+        destination = output_path or file_path
+        with open(destination, 'w', encoding='utf-8', newline='') as f:
+            f.write(new_content)
+        print(message)
             
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -37,6 +41,7 @@ def replace_block_symbol(file_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Replace block symbol in LaTeX file.")
     parser.add_argument("file", help="Path to the target file")
+    parser.add_argument("output", nargs="?", help="Optional output path")
     args = parser.parse_args()
-    
-    replace_block_symbol(args.file)
+
+    replace_block_symbol(args.file, args.output)

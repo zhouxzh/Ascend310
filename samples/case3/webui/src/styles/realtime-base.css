@@ -19,6 +19,55 @@
   border-radius: 5px;
 }
 
+.realtime-input-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 260px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 3px;
+  background: #111819;
+  border: 1px solid #465250;
+  border-radius: 4px;
+}
+
+.realtime-input-mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0 10px;
+  color: #aebbb8;
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.realtime-input-mode button.is-active {
+  color: #fff;
+  background: #087f76;
+}
+
+.realtime-input-mode button svg {
+  flex: 0 0 auto;
+}
+
+.realtime-input-mode button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.realtime-input-mode button:focus-visible {
+  outline: 3px solid #86ddd2;
+  outline-offset: -3px;
+}
+
 .stage-current-patch,
 .stage-session-meta,
 .stage-session-actions,
@@ -275,6 +324,10 @@
   grid-template-columns: auto auto auto minmax(190px, 1fr);
 }
 
+.keyboard-stage.is-midi .keyboard-range-bar {
+  grid-template-columns: auto auto minmax(320px, .8fr) minmax(190px, 1fr);
+}
+
 .keyboard-range-label {
   color: #aeb7bc;
   font-size: 9px;
@@ -349,6 +402,42 @@
   justify-self: end;
   gap: 8px;
   min-width: 0;
+}
+
+.midi-keyboard-port-control {
+  display: grid;
+  grid-template-columns: auto auto minmax(160px, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 320px;
+  min-height: 48px;
+  padding: 5px 9px;
+  color: #d8e1de;
+  background: #30383b;
+  border: 1px solid #4a5657;
+  border-radius: 3px;
+}
+
+.midi-keyboard-port-control > svg { color: #78c5bb; }
+
+.midi-keyboard-port-control > span {
+  color: #d8e1de;
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.midi-keyboard-port-control select {
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  padding: 0 30px 0 10px;
+  color: #f0f5f3;
+  font-size: 16px;
+  font-weight: 650;
+  background: #1c2427;
+  border: 1px solid #5b6868;
+  border-radius: 3px;
 }
 
 .keyboard-range-summary .icon-command {
@@ -528,6 +617,22 @@
   user-select: none;
 }
 
+.keyboard-frame {
+  min-width: 0;
+  margin: 0 10px 8px;
+  padding: 8px 8px 10px;
+  overflow: hidden;
+  background: #232a2d;
+  border: 1px solid #566166;
+  border-radius: 5px;
+  box-shadow: inset 0 1px rgb(255 255 255 / 7%), 0 2px 5px rgb(0 0 0 / 24%);
+}
+
+.keyboard-frame--midi .visualizer-keyboard {
+  border: 1px solid #0b0f11;
+  border-radius: 3px;
+}
+
 .visualizer-white-keys {
   display: grid;
   height: 100%;
@@ -586,6 +691,10 @@
   height: clamp(220px, 31vh, 260px);
   max-width: none;
   aspect-ratio: auto;
+}
+
+.keyboard-frame--touch .piano {
+  width: 100%;
 }
 
 .realtime-stage--touch.touch-keyboard-size--small .piano { height: clamp(180px, 27vh, 230px); }
@@ -1045,115 +1154,136 @@
   .realtime-stage--touch .piano-key .note-label { bottom: 8px; font-size: 15px; }
 }
 
-/* Touch performance has an explicit layout contract. It must not depend on
-   whether the browser reports the panel as a coarse pointer. */
-.realtime-stage--touch .stage-session-bar {
-  min-height: 56px;
-}
+/* Touch performance borrows the compact instrument hierarchy of a mobile
+   music workstation while preserving case3's live roll and OM session model. */
 
-.realtime-stage--touch .stage-session-actions .primary-button,
-.realtime-stage--touch .stage-session-actions .secondary-button,
-.realtime-stage--touch .icon-command {
-  min-height: 56px;
-}
-
-.realtime-stage--touch .patch-category-tabs button {
-  min-height: 44px;
-  font-size: 16px;
-}
-
-.realtime-stage--touch .patch-tile strong { font-size: 18px; }
-.realtime-stage--touch .patch-tile span { font-size: 14px; }
-
-.realtime-stage--touch .roll-toolbar {
-  min-height: 56px;
-  padding: 4px 12px;
-}
-
-.realtime-stage--touch .roll-heading strong,
-.realtime-stage--touch .roll-heading span,
-.realtime-stage--touch .stage-gain-control span,
-.realtime-stage--touch .stage-gain-control strong,
-.realtime-stage--touch .keyboard-range-label,
-.realtime-stage--touch .keyboard-range-summary span,
-.realtime-stage--touch .touch-keyboard-size-control > span {
-  font-size: 18px;
-}
-
-.realtime-stage--touch .stage-gain-control,
-.realtime-stage--touch .roll-window-control {
-  min-height: 56px;
-}
-
-.realtime-stage--touch .stage-gain-control input,
-.realtime-stage--touch .performance-control-bar input[type="range"] {
-  min-height: 28px;
-}
-
-.realtime-stage--touch .roll-window-control button,
-.realtime-stage--touch .key-count-control button,
-.realtime-stage--touch .touch-keyboard-size-control button,
-.realtime-stage--touch .keyboard-range-summary .icon-command {
-  min-height: 56px;
-  font-size: 18px;
-}
-
-.realtime-stage--touch .keyboard-range-bar {
-  min-height: 56px;
-  padding: 0 12px;
-}
-
-.realtime-stage--touch .keyboard-range-summary strong {
-  font-size: 20px;
-}
-
-.realtime-stage--touch .piano-key .note-label {
-  bottom: 10px;
-  font-size: 16px;
-}
-
-.realtime-stage--touch .performance-control-bar {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  padding: 12px 14px 14px;
-}
-
-.realtime-stage--touch .performance-control-bar label {
-  min-height: 64px;
-  padding: 9px 11px;
-}
-
-.realtime-stage--touch .performance-control-bar label > span {
-  font-size: 18px;
-}
-
-.realtime-stage--touch .performance-control-bar label > strong {
-  font-size: 20px;
-}
-
-.realtime-stage--touch .sustain-control {
-  min-height: 64px;
-  font-size: 18px;
-}
-
-/* The physical 10-inch panel is 1920px wide. Keep its performance controls
-   on the stage and move infrequent setup choices into an overlay. */
 .realtime-stage--touch {
   gap: 6px;
 }
 
-.realtime-stage--touch .stage-session-bar {
-  grid-template-columns: minmax(0, 1fr) auto;
+.realtime-stage--touch .stage-session-bar:not(.realtime-session-bar) {
+  grid-template-columns: minmax(0, 1fr) auto auto;
   min-height: 56px;
-  padding: 5px 10px;
+  padding: 5px 10px 5px 14px;
 }
 
 .realtime-stage--touch .stage-current-patch {
-  display: none;
+  display: flex;
 }
 
-.realtime-stage--touch .stage-session-meta {
-  justify-self: end;
+.realtime-stage--touch .stage-current-patch span {
+  color: #91a09d;
+  font-size: 14px;
+}
+
+.realtime-stage--touch .stage-current-patch strong {
+  font-size: 20px;
+}
+
+.realtime-session-bar .stage-session-actions .primary-button,
+.realtime-session-bar .stage-session-actions .secondary-button,
+.realtime-session-bar .stage-session-actions .icon-command {
+  min-height: 52px;
+}
+
+.realtime-session-bar {
+  grid-template-columns: 260px minmax(250px, 0.9fr) minmax(440px, 1.25fr) auto auto;
+  min-height: 66px;
+  gap: 10px;
+  padding: 6px 10px;
+}
+
+.touch-session-field,
+.touch-session-routing,
+.touch-session-health {
+  min-width: 0;
+  min-height: 52px;
+}
+
+.touch-session-field {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+}
+
+.touch-session-field > span,
+.touch-session-routing label > span {
+  color: #c3cecc;
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.touch-session-field select,
+.touch-session-routing select {
+  width: 100%;
+  min-width: 0;
+  height: 52px;
+  padding: 0 34px 0 12px;
+  color: #f4f7f6;
+  font-size: 18px;
+  font-weight: 700;
+  background: #293235;
+  border: 1px solid #53605f;
+  border-radius: 3px;
+}
+
+.touch-session-routing {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) minmax(150px, 0.55fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.touch-session-routing label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.touch-session-health {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.touch-session-health > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 0 9px;
+  color: #cbd5d3;
+  font-size: 13px;
+  background: #293235;
+  border: 1px solid #465250;
+  border-radius: 3px;
+}
+
+.touch-session-health > span strong {
+  color: #fff;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.touch-session-health > span.is-alert {
+  color: #ffd4cf;
+  background: #5b2d2a;
+  border-color: #94504b;
+}
+
+.touch-control-deck {
+  position: relative;
+  z-index: 11;
+  min-height: 92px;
+  overflow: hidden;
+  color: #263033;
+  background: #e2e5e4;
+  border: 1px solid #b7c0bd;
+  border-radius: 5px;
 }
 
 .touch-patch-picker,
@@ -1162,10 +1292,9 @@
   z-index: 12;
   min-width: 0;
   color: #dce5e5;
-  background: #1a2226;
-  border: 1px solid #3d494d;
-  border-left: 3px solid var(--teal);
-  border-radius: 5px;
+  background: #171d20;
+  border: 1px solid #485257;
+  border-radius: 4px;
 }
 
 .touch-patch-picker summary,
@@ -1173,222 +1302,594 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 14px;
-  min-height: 54px;
-  padding: 0 16px;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 14px;
   cursor: pointer;
   list-style: none;
 }
 
 .touch-patch-picker summary::-webkit-details-marker,
-.midi-patch-picker summary::-webkit-details-marker { display: none; }
+.midi-patch-picker summary::-webkit-details-marker {
+  display: none;
+}
+
 .touch-patch-picker summary > span:first-child,
 .midi-patch-picker summary > span:first-child {
-  color: #aebdbc;
-  font-size: 20px;
-  font-weight: 700;
+  color: #92a19e;
+  font-size: 17px;
 }
+
 .touch-patch-picker summary strong,
 .midi-patch-picker summary strong {
   overflow: hidden;
-  color: #ffffff;
-  font-size: 24px;
-  font-weight: 720;
+  color: #fff;
+  font-size: 22px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .patch-picker-action {
+  color: #75d5ca;
+  font-size: 16px;
+}
+
+.touch-shaping-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  min-width: 0;
+  min-height: 90px;
+  padding: 0 8px;
+  background: #e2e5e4;
+}
+
+.touch-slider-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 34px;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  min-height: 88px;
   padding: 8px 12px;
-  color: #7fd6cb;
-  background: #253d3d;
-  border: 1px solid #406665;
-  border-radius: 4px;
-  font-size: 18px;
+  color: #263033;
+  border-left: 1px solid #c2c8c6;
+}
+
+.touch-slider-control:first-child {
+  border-left: 0;
+}
+
+.touch-slider-control > span:first-child {
+  font-size: 16px;
   font-weight: 700;
+}
+
+.touch-slider-control > strong {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 19px;
+  text-align: right;
+}
+
+.touch-slider-control input {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 32px;
+  accent-color: #258f84;
+}
+
+.touch-option-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 88px;
+  padding: 8px 12px;
+  color: #263033;
+  border-left: 1px solid #c2c8c6;
+}
+
+.touch-option-control > span {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.touch-option-control select {
+  min-width: 104px;
+  height: 52px;
+  padding: 0 32px 0 10px;
+  color: #263033;
+  font-size: 16px;
+  font-weight: 700;
+  background: #f7f9f8;
+  border: 1px solid #aeb9b6;
+  border-radius: 3px;
 }
 
 .touch-patch-picker-content,
 .midi-patch-picker-content {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
   left: 0;
-  display: grid;
-  gap: 8px;
-  max-height: min(360px, 50vh);
-  padding: 10px;
+  z-index: 30;
+  width: min(900px, calc(100vw - 56px));
+  max-height: min(390px, 52vh);
   overflow: auto;
+  padding: 8px;
   background: #171e22;
-  border: 1px solid #475359;
-  border-radius: 5px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, .42);
+  border: 1px solid #4c5a5e;
+  border-radius: 4px;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 36%);
 }
 
-.touch-patch-picker-content .patch-category-tabs,
-.midi-patch-picker-content .patch-category-tabs {
-  padding: 3px;
+.patch-category-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
   overflow-x: auto;
-  background: #273136;
 }
 
-.touch-patch-picker-content .patch-category-tabs button,
-.midi-patch-picker-content .patch-category-tabs button {
-  min-height: 48px;
-  padding: 0 18px;
-  font-size: 18px;
+.patch-category-tabs button {
+  flex: 0 0 auto;
+  min-height: var(--studio-touch-control);
+  padding: 0 16px;
+  color: #bac7c5;
+  font-size: 17px;
+  background: #283135;
+  border: 1px solid #414d51;
+  border-radius: 3px;
 }
 
-.touch-patch-picker-content .patch-strip,
-.midi-patch-picker-content .patch-strip {
+.patch-category-tabs button.is-active {
+  color: #fff;
+  background: #24534e;
+  border-color: #49b7aa;
+}
+
+.patch-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px;
-  min-height: 0;
-  margin: 0;
-  padding: 0;
-  overflow: visible;
-  background: transparent;
-  border: 0;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 5px;
 }
 
-.touch-patch-picker-content .patch-tile,
-.midi-patch-picker-content .patch-tile {
-  min-height: 76px;
-  padding: 10px 14px;
+.patch-tile {
+  display: grid;
+  align-content: center;
+  min-height: 72px;
+  padding: 8px 12px;
+  color: #dbe4e2;
+  text-align: left;
+  background: #252d30;
+  border: 1px solid #3f494c;
+  border-radius: 3px;
 }
 
-.touch-patch-picker-content .patch-tile strong,
-.midi-patch-picker-content .patch-tile strong { font-size: 21px; }
-.touch-patch-picker-content .patch-tile span,
-.midi-patch-picker-content .patch-tile span { font-size: 16px; }
-
-.realtime-stage--touch .roll-toolbar {
-  grid-template-columns: minmax(150px, 1fr) minmax(380px, 530px) auto;
-  gap: 10px;
-  min-height: 60px;
-  padding: 5px 12px;
+.patch-tile strong {
+  font-size: 19px;
 }
 
-.realtime-stage--touch .roll-heading { gap: 10px; }
-.realtime-stage--touch .roll-heading > svg { width: 22px; height: 22px; }
-.realtime-stage--touch .roll-heading strong { font-size: 22px; }
-.realtime-stage--touch .roll-heading span { display: none; }
+.patch-tile span,
+.patch-empty {
+  color: #93a3a0;
+  font-size: 14px;
+}
 
-.realtime-stage--touch .stage-gain-control {
-  grid-template-columns: auto auto minmax(120px, 1fr) 94px;
+.patch-tile.is-active {
+  background: #314441;
+  border-color: #5cc5b8;
+  box-shadow: inset 4px 0 #5cc5b8;
+}
+
+.realtime-stage--touch .keyboard-stage.is-touch .roll-toolbar {
+  grid-template-columns: minmax(130px, 0.65fr) minmax(560px, 1.9fr) auto auto;
+  min-height: 58px;
+  padding: 3px 10px;
+}
+
+.touch-runtime-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(92px, 1fr));
+  align-items: stretch;
+  gap: 5px;
   min-width: 0;
-  min-height: 54px;
+}
+
+.touch-runtime-metrics > span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0 9px;
+  color: #53605e;
+  font-size: 16px;
+  font-weight: 700;
+  background: #e4e8e6;
+  border-left: 3px solid #9aa7a4;
+}
+
+.touch-runtime-metrics > span > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.touch-runtime-metrics strong {
+  color: #202a2c;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.touch-runtime-metrics > span.is-alert {
+  color: #9a302c;
+  background: #fff0ee;
+  border-left-color: #cf4c46;
+}
+
+.touch-capture-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.touch-capture-controls button,
+.touch-capture-controls .download-button {
+  min-height: 52px;
+  padding: 0 13px;
+  font-size: 15px;
+}
+
+.realtime-stage--touch .roll-heading strong {
+  font-size: 19px;
+}
+
+.realtime-stage--touch .roll-heading span {
+  display: none;
+}
+
+.realtime-stage--touch .roll-window-control {
+  min-height: 44px;
+}
+
+.realtime-stage--touch .roll-window-control button {
+  min-width: 48px;
+  min-height: 52px;
+  font-size: 16px;
+}
+
+.realtime-stage--touch .keyboard-stage.is-touch .live-piano-roll {
+  height: 70px;
+}
+
+.touch-keyboard-command-bar {
+  grid-template-columns: auto auto minmax(230px, 0.7fr) minmax(260px, 1fr) minmax(132px, auto);
+  gap: 8px;
+  min-height: 64px;
   padding: 5px 10px;
 }
 
-.realtime-stage--touch .stage-gain-control > svg { width: 20px; height: 20px; }
-.realtime-stage--touch .stage-gain-control span { font-size: 20px; }
-.realtime-stage--touch .stage-gain-control strong { font-size: 24px; }
-.realtime-stage--touch .stage-gain-control input { min-height: 32px; }
-
-.realtime-stage--touch .roll-window-control {
-  gap: 3px;
-  min-height: 54px;
-  padding: 2px;
+.touch-keyboard-command-bar .keyboard-range-label {
+  display: none;
 }
 
-.realtime-stage--touch .roll-window-control > svg { width: 20px; height: 20px; }
-.realtime-stage--touch .roll-window-control button {
+.touch-keyboard-command-bar .keyboard-range-summary {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.touch-keyboard-command-bar .key-count-control {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.touch-keyboard-command-bar .touch-keyboard-size-control {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.touch-keyboard-command-bar .touch-bend-control {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+.touch-keyboard-command-bar .touch-sustain-control {
+  grid-column: 5;
+  grid-row: 1;
+}
+
+.touch-keyboard-command-bar button,
+.touch-keyboard-command-bar .icon-command {
+  min-height: 52px;
+}
+
+.touch-keyboard-command-bar .key-count-control button {
   min-width: 52px;
-  min-height: 50px;
+  font-size: 17px;
+}
+
+.touch-keyboard-command-bar .touch-keyboard-size-control {
+  min-height: 52px;
+}
+
+.touch-keyboard-command-bar .touch-keyboard-size-control > span {
+  font-size: 14px;
+}
+
+.touch-keyboard-command-bar .touch-keyboard-size-control button {
+  min-width: 52px;
+  min-height: 44px;
+  font-size: 16px;
+}
+
+.touch-keyboard-command-bar .keyboard-range-summary span {
+  font-size: 14px;
+}
+
+.touch-keyboard-command-bar .keyboard-range-summary strong {
+  min-width: 92px;
+  font-size: 19px;
+}
+
+.touch-bend-control {
+  display: grid;
+  grid-template-columns: auto auto minmax(120px, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 5px 12px;
+  color: #dce5e3;
+  background: #343c3e;
+  border: 1px solid #4d5759;
+  border-radius: 4px;
+}
+
+.touch-bend-control span {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.touch-bend-control strong {
+  min-width: 44px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 15px;
+  text-align: right;
+}
+
+.touch-bend-control input {
+  width: 100%;
+  min-height: 28px;
+  accent-color: #50bfb2;
+}
+
+.touch-sustain-control {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 132px;
+  min-height: 52px;
+  color: #dbe4e2;
+  background: #343c3e;
+  border: 1px solid #4d5759;
+  border-radius: 4px;
+}
+
+.touch-sustain-control svg {
+  grid-row: 1 / 3;
+}
+
+.touch-sustain-control span {
+  font-size: 15px;
+}
+
+.touch-sustain-control strong {
+  color: #92a09e;
+  font-size: 13px;
+}
+
+.touch-sustain-control.is-active {
+  color: #fff;
+  background: #2d5b56;
+  border-color: #5ac6b8;
+}
+
+.touch-sustain-control.is-active strong {
+  color: #b8fff6;
+}
+
+.realtime-stage--touch.touch-keyboard-size--small .piano {
+  height: 205px;
+}
+
+.realtime-stage--touch.touch-keyboard-size--medium .piano {
+  height: 230px;
+}
+
+.realtime-stage--touch.touch-keyboard-size--large .piano {
+  height: 290px;
+}
+
+.realtime-stage--touch .piano-key .note-label {
   font-size: 18px;
 }
 
-.realtime-stage--touch .keyboard-range-bar {
-  grid-template-columns: auto auto auto minmax(0, 1fr);
-  gap: 9px;
-  min-height: 68px;
-  padding: 5px 12px;
+.realtime-stage--touch .bottom-drawer-tabs button {
+  min-height: 52px;
+  font-size: 14px;
 }
 
-.realtime-stage--touch .keyboard-range-label,
-.realtime-stage--touch .touch-keyboard-size-control > span,
-.realtime-stage--touch .keyboard-range-summary span {
-  font-size: 20px;
-}
+@media (max-width: 1180px) {
+  .realtime-session-bar {
+    grid-template-columns: minmax(200px, 0.8fr) minmax(220px, 1fr) auto auto;
+  }
 
-.realtime-stage--touch .key-count-control button,
-.realtime-stage--touch .touch-keyboard-size-control button {
-  min-height: 56px;
-  font-size: 22px;
-}
+  .realtime-session-bar .realtime-input-mode {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+  }
 
-.realtime-stage--touch .keyboard-range-summary { gap: 10px; }
-.realtime-stage--touch .keyboard-range-summary .icon-command {
-  flex-basis: 54px;
-  width: 54px;
-  height: 54px;
-}
-.realtime-stage--touch .keyboard-range-summary strong { font-size: 23px; }
+  .realtime-session-bar .touch-session-patch {
+    grid-column: 2;
+    grid-row: 1;
+  }
 
-.realtime-stage--touch .keyboard-stage.is-touch .live-piano-roll {
-  height: 120px;
-}
+  .realtime-session-bar .touch-session-routing {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 
-.realtime-stage--touch.touch-keyboard-size--small .piano { height: 220px; }
-.realtime-stage--touch.touch-keyboard-size--medium .piano { height: 260px; }
-.realtime-stage--touch.touch-keyboard-size--large .piano { height: 320px; }
-.realtime-stage--touch .piano-key .note-label { font-size: 20px; }
+  .touch-session-health > span {
+    display: none;
+  }
 
-.realtime-stage--touch .performance-control-bar {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 8px 12px 10px;
-}
+  .touch-shaping-controls {
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+  }
 
-.realtime-stage--touch .performance-control-bar label,
-.realtime-stage--touch .sustain-control {
-  min-height: 82px;
-}
+  .realtime-stage--touch .keyboard-stage.is-touch .roll-toolbar {
+    grid-template-columns: minmax(140px, 1fr) auto auto;
+  }
 
-.realtime-stage--touch .performance-control-bar label > span { font-size: 24px; }
-.realtime-stage--touch .performance-control-bar label > strong { font-size: 28px; }
-.realtime-stage--touch .performance-control-bar input[type="range"] { min-height: 32px; }
-.realtime-stage--touch .sustain-control { font-size: 23px; }
+  .touch-runtime-metrics {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 
-@media (min-width: 1500px) {
-  .realtime-stage--touch .performance-control-bar {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+  .touch-keyboard-command-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .touch-keyboard-command-bar .keyboard-range-summary,
+  .touch-keyboard-command-bar .key-count-control,
+  .touch-keyboard-command-bar .touch-keyboard-size-control,
+  .touch-keyboard-command-bar .touch-bend-control,
+  .touch-keyboard-command-bar .touch-sustain-control {
+    grid-column: auto;
+    grid-row: auto;
+    width: 100%;
   }
 }
 
-@media (max-width: 900px) {
+@media (min-width: 1500px) {
+  .realtime-stage--touch .keyboard-stage.is-touch .live-piano-roll {
+    height: 84px;
+  }
+
+  .realtime-stage--touch.touch-keyboard-size--small .piano {
+    height: 210px;
+  }
+
+  .realtime-stage--touch.touch-keyboard-size--medium .piano {
+    height: 250px;
+  }
+
+  .realtime-stage--touch.touch-keyboard-size--large .piano {
+    height: 300px;
+  }
+}
+
+@media (max-width: 700px) {
+  .realtime-session-bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .realtime-session-bar .realtime-input-mode {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .realtime-session-bar .touch-session-patch {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .realtime-session-bar .touch-session-routing {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr);
+  }
+
+  .touch-session-routing > svg {
+    display: none;
+  }
+
+  .touch-session-routing label {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .realtime-session-bar .touch-session-health {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .realtime-session-bar .stage-session-actions {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .touch-shaping-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .touch-runtime-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .touch-patch-picker summary,
   .midi-patch-picker summary {
     gap: 8px;
-    min-height: 56px;
     padding: 0 10px;
   }
 
-  .touch-patch-picker summary > span:first-child,
-  .midi-patch-picker summary > span:first-child { font-size: 18px; }
   .touch-patch-picker summary strong,
-  .midi-patch-picker summary strong { font-size: 21px; }
-  .patch-picker-action { padding: 7px 9px; font-size: 16px; }
-  .touch-patch-picker-content .patch-strip,
-  .midi-patch-picker-content .patch-strip { grid-template-columns: minmax(0, 1fr); }
-
-  .realtime-stage--touch .roll-toolbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    min-height: 0;
+  .midi-patch-picker summary strong {
+    font-size: 18px;
   }
 
-  .realtime-stage--touch .stage-gain-control { grid-column: 1 / -1; }
-  .realtime-stage--touch .keyboard-range-bar { grid-template-columns: minmax(0, 1fr); }
-  .realtime-stage--touch .key-count-control,
-  .realtime-stage--touch .touch-keyboard-size-control,
-  .realtime-stage--touch .keyboard-range-summary { justify-self: stretch; }
-  .realtime-stage--touch .keyboard-range-summary { justify-content: center; }
-  .realtime-stage--touch .keyboard-stage.is-touch .live-piano-roll { height: 110px; }
-  .realtime-stage--touch.touch-keyboard-size--small .piano { height: 200px; }
-  .realtime-stage--touch.touch-keyboard-size--medium .piano { height: 240px; }
-  .realtime-stage--touch.touch-keyboard-size--large .piano { height: 300px; }
-  .realtime-stage--touch .performance-control-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .touch-patch-picker-content,
+  .midi-patch-picker-content {
+    width: calc(100vw - 28px);
+  }
+
+  .patch-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .realtime-stage--touch .roll-heading strong {
+    font-size: 17px;
+  }
+
+  .realtime-stage--touch .roll-window-control svg {
+    display: none;
+  }
+
+  .realtime-stage--touch .roll-window-control button {
+    min-width: 38px;
+  }
+
+  .touch-keyboard-command-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .realtime-stage--touch.touch-keyboard-size--small .piano {
+    height: 185px;
+  }
+
+  .realtime-stage--touch.touch-keyboard-size--medium .piano {
+    height: 220px;
+  }
+
+  .realtime-stage--touch.touch-keyboard-size--large .piano {
+    height: 270px;
+  }
 }
 
 .piano-ddsp-workspace {
@@ -1668,4 +2169,3 @@
   .piano-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .piano-record-row { align-items: stretch; flex-wrap: wrap; }
 }
-

@@ -344,6 +344,17 @@ class PianoDdspController:
             with self._lock:
                 self._responses.pop(request_id, None)
 
+    def notify(self, command: str, **values: object) -> None:
+        """Write a realtime edge without waiting for an unused status response."""
+        with self._lock:
+            process = self._process
+        if process is None or process.poll() is not None or process.stdin is None:
+            raise RuntimeError("Piano-DDSP worker is not running")
+        message = {"command": command, **values}
+        with self._write_lock:
+            process.stdin.write(json.dumps(message, separators=(",", ":")) + "\n")
+            process.stdin.flush()
+
     def start(
         self, config: dict[str, object], *, manage_resource: bool = True
     ) -> dict[str, object]:

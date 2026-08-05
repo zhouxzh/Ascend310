@@ -8,16 +8,11 @@ import {
   Clock3,
   Disc3,
   Download,
-  Gauge,
   Headphones,
+  KeyboardMusic,
   Music2,
   Octagon,
-  Pause,
   Play,
-  RotateCcw,
-  SlidersHorizontal,
-  Upload,
-  Volume2,
 } from 'lucide-react'
 import { api, websocketUrl } from '../api'
 import LivePianoRoll from '../components/LivePianoRoll'
@@ -30,6 +25,7 @@ import {
   useLiveNotes,
 } from '../components/realtimeLiveNotes'
 import { Notice, StatusPill } from '../components/ui'
+import { realtimePatchNameZh } from '../timbres'
 import type {
   LatencyProfile,
   RealtimeCatalog,
@@ -43,7 +39,6 @@ interface Props {
   inputMode?: RealtimeInputMode
 }
 
-type DrawerTab = 'player' | 'recording' | 'tone' | 'connection' | 'diagnostics'
 type RealtimeInputMode = 'touch' | 'midi'
 type TouchKeyboardKeyCount = 13 | 25
 type TouchKeyboardSize = 'small' | 'medium' | 'large'
@@ -78,14 +73,7 @@ const EMPTY_STATUS: RealtimeStatus = {
   metrics: {},
   diagnostics: {},
 }
-const CATEGORIES: { id: RealtimePatchCategory | 'recent'; label: string }[] = [
-  { id: 'recent', label: '最近使用' },
-  { id: 'piano', label: '钢琴' },
-  { id: 'strings', label: '弦乐' },
-  { id: 'woodwind', label: '木管' },
-  { id: 'brass', label: '铜管' },
-  { id: 'other', label: '其他' },
-]
+let realtimeCatalogSnapshot: RealtimeCatalog | null = null
 const PATCH_ACCENTS: Record<RealtimePatchCategory, string> = {
   piano: '#5ba4f4',
   strings: '#43c89a',
@@ -110,6 +98,19 @@ const TOUCH_KEYBOARD_SIZES: { id: TouchKeyboardSize; label: string }[] = [
   { id: 'medium', label: '中' },
   { id: 'large', label: '大' },
 ]
+const TONE_PARAMETER_LABELS: Record<string, string> = {
+  velocity_curve: '力度曲线',
+  harmonic_gain: '谐波',
+  noise_gain: '噪声',
+  attack: '起音',
+  decay: '衰减',
+  sustain: '延音电平',
+  release: '释音',
+  input_pitch: '输入音高校准',
+  input_gain: '输入响度校准',
+  reverb_size: '混响空间',
+  reverb_damping: '混响阻尼',
+}
 
 export function loadWorkbenchConfig(storage: Pick<Storage, 'getItem'>): StoredWorkbenchConfig | null {
   try {
@@ -170,11 +171,6 @@ function clampKeyboardFirstNote(keyCount: KeyboardKeyCount, value: number | unde
   return Math.min(maximum, Math.max(21, Math.round(value ?? fallback)))
 }
 
-function formatTime(seconds = 0) {
-  const safe = Math.max(0, Number.isFinite(seconds) ? seconds : 0)
-  return `${Math.floor(safe / 60)}:${Math.floor(safe % 60).toString().padStart(2, '0')}`
-}
-
 function formatGainDb(value: number) {
   const normalized = Math.abs(value) < 0.05 ? 0 : value
   return `${normalized > 0 ? '+' : ''}${normalized.toFixed(1)} dB`
@@ -191,7 +187,9 @@ const LivePiano = memo(function LivePiano(props: LivePianoProps) {
   return <Piano {...props} activeNotes={activeNotes} />
 })
 
-export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' }: Props) {
+export default function RealtimePerformanceView({ onRefresh, inputMode: initialInputMode = 'midi' }: Props) {
+  const [inputMode, setInputMode] = useState<RealtimeInputMode>(initialInputMode)
+  const isTouchPerformance = inputMode === 'touch'
   const savedRef = useRef<StoredWorkbenchConfig | null>(loadWorkbenchConfig(window.localStorage))
   const initialKeyCount = normalizeKeyboardKeyCount(inputMode, getStoredKeyboardKeyCount(savedRef.current, inputMode))
   const socketRef = useRef<WebSocket | null>(null)
@@ -203,10 +201,9 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
   const monitorTimeRef = useRef(0)
   const mountedRef = useRef(true)
 
-  const [catalog, setCatalog] = useState<RealtimeCatalog | null>(null)
+  const [catalog, setCatalog] = useState<RealtimeCatalog | null>(() => realtimeCatalogSnapshot)
   const [runtime, setRuntime] = useState<RealtimeStatus>(EMPTY_STATUS)
   const [selectedPatchId, setSelectedPatchId] = useState(savedRef.current?.lastPatchId ?? '')
-  const [category, setCategory] = useState<RealtimePatchCategory | 'recent'>('piano')
   const [audioDeviceId, setAudioDeviceId] = useState(savedRef.current?.audioDeviceId ?? '')
   const [midiPort, setMidiPort] = useState(savedRef.current?.midiPort ?? '')
   const [latencyProfile, setLatencyProfile] = useState<LatencyProfile>(savedRef.current?.latencyProfile ?? 'balanced')
@@ -220,14 +217,10 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
   const [touchKeyboardSize, setTouchKeyboardSize] = useState<TouchKeyboardSize>(() => (
     normalizeTouchKeyboardSize(savedRef.current?.touchKeyboardSize)
   ))
-  const [patchPickerOpen, setPatchPickerOpen] = useState(false)
-  const [drawerTab, setDrawerTab] = useState<DrawerTab>(inputMode === 'midi' ? 'player' : 'recording')
-  const [drawerOpen, setDrawerOpen] = useState(inputMode !== 'touch')
   const [rollWindow, setRollWindow] = useState<2 | 4 | 8>(4)
   const [velocity, setVelocity] = useState(96)
   const [sustain, setSustain] = useState(false)
   const [pitchBend, setPitchBend] = useState(0)
-  const [midiId, setMidiId] = useState('')
   const [monitor, setMonitor] = useState(false)
   const [recordingUrl, setRecordingUrl] = useState('')
   const [connection, setConnection] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
@@ -239,17 +232,20 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
     setRuntime(nextStatus)
   }, [])
 
+  const selectablePatches = useMemo(() => (
+    catalog?.patches.filter((patch) => patch.category === 'piano') ?? []
+  ), [catalog])
   const selectedPatch = useMemo(
-    () => catalog?.patches.find((patch) => patch.patch_id === selectedPatchId) ?? null,
-    [catalog, selectedPatchId],
+    () => selectablePatches.find((patch) => patch.patch_id === selectedPatchId) ?? null,
+    [selectablePatches, selectedPatchId],
   )
   const currentPatch = runtime.running && runtime.patch ? runtime.patch : selectedPatch
+  const sessionUsesUnsupportedPatch = runtime.running
+    && currentPatch?.category !== 'piano'
   const patchAccent = PATCH_ACCENTS[currentPatch?.category ?? selectedPatch?.category ?? 'piano']
   const parameters = selectedPatch ? clampPatchParameters(selectedPatch, patchParameters[selectedPatch.patch_id]) : {}
-  const player = runtime.player ?? { state: 'empty', position_seconds: 0, duration_seconds: 0, tempo: 1, loop: false }
   const selectedAudio = catalog?.audio_devices.find((device) => device.id === audioDeviceId)
   const recording = Boolean(runtime.recording?.active)
-  const hasAnomaly = Number(runtime.metrics?.underruns ?? 0) > 0
     || Number(runtime.metrics?.overruns ?? 0) > 0
     || Number(runtime.metrics?.audio_tap_drops ?? 0) > 0
     || Number(runtime.metrics?.clipped_samples ?? 0) > 0
@@ -258,17 +254,21 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
   const refreshCatalog = useCallback(async () => {
     const [nextCatalog, nextStatus] = await Promise.all([api.realtimeCatalog(), api.realtimeStatus()])
     if (!mountedRef.current) return
+    realtimeCatalogSnapshot = nextCatalog
     setCatalog(nextCatalog)
     applyRuntime(nextStatus)
     const saved = savedRef.current
-    const currentId = nextStatus.patch_id ?? saved?.lastPatchId
-    const patch = nextCatalog.patches.find((item) => item.patch_id === currentId)
-      ?? nextCatalog.patches.find((item) => item.patch_id === saved?.lastPatchId)
-      ?? nextCatalog.patches.find((item) => item.category === 'piano')
-      ?? nextCatalog.patches[0]
+    const availablePatches = nextCatalog.patches.filter((item) => item.category === 'piano')
+    const runningPatchId = nextStatus.patch?.category !== 'piano'
+      ? null
+      : nextStatus.patch_id
+    const currentId = runningPatchId ?? saved?.lastPatchId
+    const patch = availablePatches.find((item) => item.patch_id === currentId)
+      ?? availablePatches.find((item) => item.patch_id === saved?.lastPatchId)
+      ?? availablePatches.find((item) => item.category === 'piano')
+      ?? availablePatches[0]
     if (!patch) return
     setSelectedPatchId(patch.patch_id)
-    setCategory(patch.category)
     setPatchParameters((current) => ({
       ...current,
       [patch.patch_id]: clampPatchParameters(patch, current[patch.patch_id]),
@@ -390,7 +390,7 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
   useEffect(() => {
     const release = () => {
       setSustain(false)
-      send({ event: 'all_notes_off' })
+      if (runtime.running) send({ event: 'all_notes_off' })
     }
     const visibility = () => {
       if (document.visibilityState === 'hidden') release()
@@ -401,7 +401,7 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
       window.removeEventListener('blur', release)
       document.removeEventListener('visibilitychange', visibility)
     }
-  }, [send])
+  }, [runtime.running, send])
 
   useEffect(() => {
     setWindowStart((value) => clampKeyboardFirstNote(keyCount, value))
@@ -439,24 +439,24 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
   }, [audioDeviceId, inputMode, keyCount, latencyProfile, midiPort, patchParameters, recentPatchIds, selectedPatchId, touchKeyboardSize, windowStart])
 
   useEffect(() => {
-    if (runtime.last_switch?.rolled_back && runtime.patch_id) setSelectedPatchId(runtime.patch_id)
-  }, [runtime.last_switch, runtime.patch_id])
+    if (
+      runtime.last_switch?.rolled_back
+      && runtime.patch_id
+      && runtime.patch?.category === 'piano'
+    ) setSelectedPatchId(runtime.patch_id)
+  }, [runtime.last_switch, runtime.patch, runtime.patch_id])
 
   const choosePatch = async (patch: RealtimePatch) => {
+    if (patch.category !== 'piano') return
     if (recording) {
       setError('录音期间音色已锁定，请先停止录音')
-      setDrawerTab('recording')
-      setDrawerOpen(true)
       return
     }
     if (runtime.running && !patch.compatible_audio_device_ids.includes(audioDeviceId)) {
       setError('当前输出设备不兼容该音色；当前音色会继续运行，请停止会话后更换输出设备')
-      setDrawerTab('connection')
-      setDrawerOpen(true)
       return
     }
     setSelectedPatchId(patch.patch_id)
-    setCategory(patch.category)
     setPatchParameters((current) => ({
       ...current,
       [patch.patch_id]: clampPatchParameters(patch, current[patch.patch_id]),
@@ -547,15 +547,6 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
     if (send({ event: 'monitor', enabled })) setMonitor(enabled)
   }
 
-  const filteredPatches = useMemo(() => {
-    if (!catalog) return []
-    if (category === 'recent') {
-      const byId = new Map(catalog.patches.map((patch) => [patch.patch_id, patch]))
-      return recentPatchIds.map((id) => byId.get(id)).filter((patch): patch is RealtimePatch => Boolean(patch))
-    }
-    return catalog.patches.filter((patch) => patch.category === category)
-  }, [catalog, category, recentPatchIds])
-
   const canShiftOctaveLeft = keyCount < 88 && windowStart - 12 >= 21
   const canShiftOctaveRight = keyCount < 88 && windowStart + 12 <= 109 - keyCount
 
@@ -565,6 +556,24 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
     setSustain(false)
     setKeyCount(nextKeyCount)
     setWindowStart(KEYBOARD_DEFAULT_FIRST_NOTE[nextKeyCount])
+  }
+
+  const selectInputMode = (nextInputMode: RealtimeInputMode) => {
+    if (nextInputMode === inputMode || runtime.running || busy || recording) return
+    const stored = savedRef.current
+    const nextKeyCount = normalizeKeyboardKeyCount(
+      nextInputMode,
+      getStoredKeyboardKeyCount(stored, nextInputMode),
+    )
+    setSustain(false)
+    setPitchBend(0)
+    clearLiveNotes()
+    setKeyCount(nextKeyCount)
+    setWindowStart(clampKeyboardFirstNote(
+      nextKeyCount,
+      getStoredKeyboardFirstNote(stored, nextInputMode),
+    ))
+    setInputMode(nextInputMode)
   }
 
   const shiftKeyboardOctave = (direction: -1 | 1) => {
@@ -582,28 +591,75 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
     if (send({ event: 'note_off', note })) publishLiveNoteEvent(note, false)
   }, [send])
 
-  const playerLoaded = Boolean(player.path) && Boolean(midiId)
-  const bottomTabs: { id: DrawerTab; label: string; icon: typeof Play }[] = [
-    ...(inputMode === 'midi' ? [{ id: 'player' as const, label: 'MIDI 文件', icon: Play }] : []),
-    { id: 'recording', label: '录音监听', icon: Disc3 },
-    { id: 'tone', label: '音色参数', icon: SlidersHorizontal },
-    { id: 'connection', label: '连接设置', icon: Cable },
-    { id: 'diagnostics', label: '性能', icon: Gauge },
-  ]
-
-  const isTouchPerformance = inputMode === 'touch'
   const keyCounts = KEYBOARD_KEY_COUNTS[inputMode]
-  const patchPickerClass = isTouchPerformance ? 'touch-patch-picker' : 'midi-patch-picker'
-  const patchPickerContentClass = isTouchPerformance ? 'touch-patch-picker-content' : 'midi-patch-picker-content'
-
+  const outputGain = parameters.output_gain_db ?? 0
+  const reverb = parameters.reverb ?? 0
+  const transpose = parameters.transpose ?? 0
+  const compatibleAudioDevices = (catalog?.audio_devices ?? []).filter((device) => selectedPatch?.compatible_audio_device_ids.includes(device.id))
+  const npuP95 = runtime.metrics?.npu_p95_ms ?? runtime.metrics?.p95_render_ms
+  const midiToPcmP95 = runtime.metrics?.midi_to_pcm_p95_ms
   return (
     <section className={`realtime-stage realtime-stage--${inputMode} ${isTouchPerformance ? `touch-keyboard-size--${touchKeyboardSize}` : ''}`}>
-      <header className="stage-session-bar">
-        <div className="stage-current-patch">
-          <Music2 size={20} />
-          <div><span>当前音色</span><strong>{currentPatch?.name ?? '未选择音色'}</strong></div>
+      <header className="stage-session-bar has-input-mode realtime-session-bar">
+        <div className="realtime-input-mode" role="tablist" aria-label="演奏输入方式">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={isTouchPerformance}
+            className={isTouchPerformance ? 'is-active' : ''}
+            disabled={runtime.running || busy || recording}
+            title={runtime.running ? '停止演奏后切换输入方式' : '使用屏幕琴键演奏'}
+            onClick={() => selectInputMode('touch')}
+          >
+            <KeyboardMusic size={18} />
+            <span>触摸屏</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!isTouchPerformance}
+            className={!isTouchPerformance ? 'is-active' : ''}
+            disabled={runtime.running || busy || recording}
+            title={runtime.running ? '停止演奏后切换输入方式' : '使用实体 MIDI 键盘'}
+            onClick={() => selectInputMode('midi')}
+          >
+            <Cable size={18} />
+            <span>MIDI 键盘</span>
+          </button>
         </div>
-        <div className="stage-session-meta">
+        <label className="touch-session-field touch-session-patch">
+          <Music2 size={20} />
+          <span>当前音色</span>
+          <select
+            aria-label="当前音色"
+            value={selectedPatchId}
+            disabled={busy || recording}
+            onChange={(event) => {
+              const patch = selectablePatches.find((item) => item.patch_id === event.target.value)
+              if (patch) choosePatch(patch)
+            }}
+          >
+            {selectablePatches.map((patch) => <option value={patch.patch_id} key={patch.patch_id}>{realtimePatchNameZh(patch)}</option>)}
+          </select>
+        </label>
+        <div className="touch-session-routing" aria-label="连接设置">
+          <Cable size={18} />
+          <label>
+            <span>音频输出</span>
+            <select aria-label="音频输出" value={audioDeviceId} disabled={runtime.running} onChange={(event) => setAudioDeviceId(event.target.value)}>
+              {compatibleAudioDevices.map((device) => <option value={device.id} key={device.id}>{device.name}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>延时</span>
+            <select aria-label="延时档位" value={latencyProfile} disabled={runtime.running} onChange={(event) => setLatencyProfile(event.target.value as LatencyProfile)}>
+              <option value="low" disabled={Boolean(selectedAudio?.is_bluetooth)}>低延时</option>
+              <option value="balanced">均衡</option>
+              <option value="safe">稳定</option>
+            </select>
+          </label>
+        </div>
+        <div className="touch-session-health" aria-label="会话状态">
           <StatusPill tone={connection === 'connected' ? 'ok' : connection === 'connecting' ? 'warn' : 'error'}>
             {connection === 'connected' ? '已连接' : connection === 'connecting' ? '连接中' : '连接断开'}
           </StatusPill>
@@ -621,45 +677,60 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
 
       {error && <Notice tone="error">{error}</Notice>}
       {runtime.audio?.device_lost && <Notice tone="error">音频设备已断开，会话已执行全部停音</Notice>}
+      {sessionUsesUnsupportedPatch && <Notice tone="warn">当前会话不是 Piano-DDSP 钢琴模型。请停止演奏后，从上方统一音色菜单重新选择钢琴模型。</Notice>}
       {!catalog && <Notice tone="loading">正在加载统一音色库</Notice>}
 
-      <details
-        className={patchPickerClass}
-        open={patchPickerOpen}
-        onToggle={(event) => setPatchPickerOpen(event.currentTarget.open)}
-      >
-        <summary aria-label="切换音色">
-          <span>音色</span>
-          <strong>{currentPatch?.name ?? '未选择音色'}</strong>
-          <span className="patch-picker-action">更换</span>
-        </summary>
-        <div className={patchPickerContentClass} aria-label="音色库">
-          <div className="patch-category-tabs" role="tablist">
-            {CATEGORIES.map((item) => (
-              <button type="button" role="tab" aria-selected={category === item.id} className={category === item.id ? 'is-active' : ''} key={item.id} onClick={() => setCategory(item.id)}>{item.label}</button>
-            ))}
-          </div>
-          <div className="patch-strip">
-            {filteredPatches.length === 0 && <span className="patch-empty">该分类暂无可用音色</span>}
-            {filteredPatches.map((patch) => (
-              <button
-                type="button"
-                className={`patch-tile ${selectedPatchId === patch.patch_id ? 'is-active' : ''}`}
-                aria-pressed={selectedPatchId === patch.patch_id}
-                disabled={busy || (recording && runtime.patch_id !== patch.patch_id)}
-                onClick={() => {
-                  choosePatch(patch)
-                  setPatchPickerOpen(false)
-                }}
-                key={patch.patch_id}
-              >
-                <strong>{patch.name}</strong>
-                <span>{patch.pitch_min}–{patch.pitch_max} · {patch.polyphony} 音</span>
-              </button>
-            ))}
-          </div>
+      <section className="touch-control-deck" aria-label="实时演奏控制台">
+        <div className="touch-shaping-controls">
+          <label className="touch-slider-control">
+            <span>输出增益</span>
+            <strong>{formatGainDb(outputGain)}</strong>
+            <input aria-label="输出增益" type="range" min="-60" max="6" step="0.5" value={outputGain} onChange={(event) => updateParameter('output_gain_db', Number(event.target.value))} />
+          </label>
+          <label className="touch-slider-control">
+            <span>混响</span>
+            <strong>{Math.round(reverb * 100)}%</strong>
+            <input aria-label="混响" type="range" min="0" max="1" step="0.01" value={reverb} onChange={(event) => updateParameter('reverb', Number(event.target.value))} />
+          </label>
+          {isTouchPerformance && (
+            <label className="touch-slider-control">
+              <span>力度</span>
+              <strong>{velocity}</strong>
+              <input aria-label="触控力度" type="range" min="1" max="127" value={velocity} onChange={(event) => setVelocity(Number(event.target.value))} />
+            </label>
+          )}
+          <label className="touch-slider-control">
+            <span>移调</span>
+            <strong>{transpose > 0 ? `+${transpose}` : transpose}</strong>
+            <input aria-label="移调" type="range" min="-24" max="24" value={transpose} onChange={(event) => updateParameter('transpose', Number(event.target.value))} />
+          </label>
+          {selectedPatch && Object.entries(selectedPatch.parameters)
+            .filter(([name, metadata]) => (
+              !['transpose', 'output_gain_db', 'reverb', 'piano_year'].includes(name)
+              && metadata.min !== undefined
+              && metadata.max !== undefined
+            ))
+            .map(([name, metadata]) => {
+              const label = TONE_PARAMETER_LABELS[name] ?? name.replaceAll('_', ' ')
+              const value = parameters[name] ?? metadata.default ?? 0
+              return (
+                <label className="touch-slider-control" key={name}>
+                  <span>{label}</span>
+                  <strong>{value.toFixed(2)}</strong>
+                  <input aria-label={label} type="range" min={metadata.min} max={metadata.max} step={(metadata.max! - metadata.min!) / 100} value={value} onChange={(event) => updateParameter(name, Number(event.target.value))} />
+                </label>
+              )
+            })}
+          {selectedPatch?.parameters.piano_year?.options && (
+            <label className="touch-option-control">
+              <span>钢琴年份</span>
+              <select aria-label="钢琴年份" value={parameters.piano_year ?? 2018} onChange={(event) => updateParameter('piano_year', Number(event.target.value))}>
+                {selectedPatch.parameters.piano_year.options.map((year) => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </label>
+          )}
         </div>
-      </details>
+      </section>
 
       <section
         className={`keyboard-stage is-${inputMode}`}
@@ -670,26 +741,22 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
           <div className="roll-heading">
             <Activity size={17} />
             <div>
-              <strong>{isTouchPerformance ? '实时卷帘' : 'MIDI 键盘演奏'}</strong>
-              <span>{isTouchPerformance ? '触控演奏' : currentPatch?.name ?? '等待音色'}</span>
+              <strong>实时卷帘</strong>
+              <span>{isTouchPerformance ? '触控演奏' : '实体 MIDI 键盘'}</span>
             </div>
           </div>
-          {!isTouchPerformance && (
-            <label className="midi-input-control">
-              <Cable size={15} />
-              <span>实体 MIDI 输入</span>
-              <select aria-label="实体 MIDI 输入" value={midiPort} disabled={runtime.running} onChange={(event) => setMidiPort(event.target.value)}>
-                <option value="">选择 MIDI 输入</option>
-                {(catalog?.midi_ports ?? []).map((port) => <option value={port.port ?? port.id} key={port.id}>{port.name}</option>)}
-              </select>
-            </label>
-          )}
-          <label className="stage-gain-control">
-            <Volume2 size={14} />
-            <span>输出增益</span>
-            <input aria-label="输出增益" type="range" min="-60" max="6" step="0.5" value={parameters.output_gain_db ?? 0} onChange={(event) => updateParameter('output_gain_db', Number(event.target.value))} />
-            <strong>{formatGainDb(parameters.output_gain_db ?? 0)}</strong>
-          </label>
+          <div className="touch-runtime-metrics" aria-label="实时性能">
+            <span title="按键事件到首个 PCM 音频块的延迟 P95"><span>按键 P95</span><strong>{midiToPcmP95 === undefined ? '–' : Number(midiToPcmP95).toFixed(1)} ms</strong></span>
+            <span title="NPU 推理耗时 P95"><span>NPU P95</span><strong>{npuP95 === undefined ? '–' : Number(npuP95).toFixed(1)} ms</strong></span>
+            <span className={Number(runtime.metrics?.underruns ?? 0) > 0 ? 'is-alert' : ''}><span>欠载</span><strong>{String(runtime.metrics?.underruns ?? 0)}</strong></span>
+            <span className={Number(runtime.metrics?.audio_tap_drops ?? 0) > 0 ? 'is-alert' : ''}><span>监听丢弃</span><strong>{String(runtime.metrics?.audio_tap_drops ?? 0)}</strong></span>
+            <span className={Number(runtime.metrics?.clipped_samples ?? 0) > 0 ? 'is-alert' : ''}><span>削波</span><strong>{String(runtime.metrics?.clipped_samples ?? 0)}</strong></span>
+          </div>
+          <div className="touch-capture-controls" aria-label="录音与监听">
+            <button className={recording ? 'danger-button' : 'secondary-button'} type="button" disabled={!runtime.running} onClick={() => send({ event: recording ? 'record_stop' : 'record_start' })}><Disc3 size={17} />{recording ? '停止录音' : '录音'}</button>
+            <button className={`secondary-button ${monitor ? 'is-active' : ''}`} type="button" disabled={!runtime.running} onClick={() => toggleMonitor().catch((cause) => setError(errorMessage(cause)))}><Headphones size={17} />{monitor ? '关闭监听' : '监听'}</button>
+            {recordingUrl && <a className="download-button" href={recordingUrl} download title="下载录音"><Download size={17} />WAV</a>}
+          </div>
           <div className="roll-window-control" aria-label="卷帘时间范围">
             <Clock3 size={14} />
             {[2, 4, 8].map((seconds) => (
@@ -706,7 +773,7 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
             ))}
           </div>
         </div>
-        <div className="keyboard-range-bar">
+        <div className={`keyboard-range-bar ${isTouchPerformance ? 'touch-keyboard-command-bar' : ''}`}>
           <span className="keyboard-range-label">琴键数量</span>
           <div className="key-count-control" role="group" aria-label="琴键数量">
             {keyCounts.map((count) => (
@@ -722,6 +789,16 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
               </button>
             ))}
           </div>
+          {!isTouchPerformance && (
+            <label className="midi-keyboard-port-control">
+              <Cable size={18} />
+              <span>实体 MIDI 输入</span>
+              <select aria-label="实体 MIDI 输入" value={midiPort} disabled={runtime.running} onChange={(event) => setMidiPort(event.target.value)}>
+                <option value="">选择 MIDI 输入</option>
+                {(catalog?.midi_ports ?? []).map((port) => <option value={port.port ?? port.id} key={port.id}>{port.name}</option>)}
+              </select>
+            </label>
+          )}
           {isTouchPerformance && (
             <div className="touch-keyboard-size-control" role="group" aria-label="触控键盘大小">
               <span>键盘大小</span>
@@ -749,6 +826,45 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
               <button type="button" className="icon-command" aria-label="向高音区移动一个八度" title="向高音区移动一个八度" disabled={!canShiftOctaveRight} onClick={() => shiftKeyboardOctave(1)}><ChevronRight size={19} /></button>
             )}
           </div>
+          {isTouchPerformance && (
+            <label className="touch-bend-control">
+              <span>弯音</span>
+              <strong>{pitchBend}</strong>
+              <input
+                aria-label="弯音"
+                type="range"
+                min="-8192"
+                max="8191"
+                value={pitchBend}
+                onChange={(event) => {
+                  const value = Number(event.target.value)
+                  setPitchBend(value)
+                  send({ event: 'pitch_bend', value })
+                }}
+                onPointerUp={() => {
+                  setPitchBend(0)
+                  send({ event: 'pitch_bend', value: 0 })
+                }}
+              />
+            </label>
+          )}
+          {isTouchPerformance && (
+            <button
+              type="button"
+              className={`sustain-control touch-sustain-control ${sustain ? 'is-active' : ''}`}
+              disabled={!runtime.running}
+              aria-pressed={sustain}
+              onClick={() => {
+                const enabled = !sustain
+                setSustain(enabled)
+                send({ event: 'sustain', enabled })
+              }}
+            >
+              <Music2 size={20} />
+              <span>延音</span>
+              <strong>{sustain ? '开启' : '关闭'}</strong>
+            </button>
+          )}
         </div>
         {isTouchPerformance ? (
           <>
@@ -759,37 +875,23 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
               running={runtime.running}
               accentColor={patchAccent}
             />
-            <LivePiano
-              octave={3}
-              firstNote={windowStart}
-              keyCount={keyCount}
-              velocity={velocity}
-              recommendedMin={currentPatch?.pitch_min}
-              recommendedMax={currentPatch?.pitch_max}
-              disabled={!runtime.running || busy}
-              keyboardShortcuts={{}}
-              onNoteOn={handleNoteOn}
-              onNoteOff={handleNoteOff}
-            />
-            <div className="performance-control-bar">
-              <label><span>力度</span><input type="range" min="1" max="127" value={velocity} onChange={(event) => setVelocity(Number(event.target.value))} /><strong>{velocity}</strong></label>
-              <label><span>移调</span><input type="range" min="-24" max="24" value={parameters.transpose ?? 0} onChange={(event) => updateParameter('transpose', Number(event.target.value))} /><strong>{parameters.transpose ?? 0}</strong></label>
-              <label><span>混响</span><input type="range" min="0" max="1" step="0.01" value={parameters.reverb ?? 0} onChange={(event) => updateParameter('reverb', Number(event.target.value))} /><strong>{Math.round((parameters.reverb ?? 0) * 100)}%</strong></label>
-              <label className="bend-control"><span>弯音</span><input type="range" min="-8192" max="8191" value={pitchBend} onChange={(event) => { const value = Number(event.target.value); setPitchBend(value); send({ event: 'pitch_bend', value }) }} onPointerUp={() => { setPitchBend(0); send({ event: 'pitch_bend', value: 0 }) }} /><strong>{pitchBend}</strong></label>
-              <button type="button" className={`sustain-control ${sustain ? 'is-active' : ''}`} disabled={!runtime.running} aria-pressed={sustain} onClick={() => { const enabled = !sustain; setSustain(enabled); send({ event: 'sustain', enabled }) }}>延音踏板</button>
+            <div className="keyboard-frame keyboard-frame--touch">
+              <LivePiano
+                octave={3}
+                firstNote={windowStart}
+                keyCount={keyCount}
+                velocity={velocity}
+                recommendedMin={currentPatch?.pitch_min}
+                recommendedMax={currentPatch?.pitch_max}
+                disabled={!runtime.running || busy || sessionUsesUnsupportedPatch}
+                keyboardShortcuts={{}}
+                onNoteOn={handleNoteOn}
+                onNoteOff={handleNoteOff}
+              />
             </div>
           </>
         ) : (
           <>
-            <div className="instrument-legend" aria-label="音色声部图例">
-              <span className="instrument-legend-label">音色声部</span>
-              {CATEGORIES.filter((item) => item.id !== 'recent').map((item) => (
-                <span className={currentPatch?.category === item.id ? 'is-active' : ''} key={item.id}>
-                  <i style={{ backgroundColor: PATCH_ACCENTS[item.id as RealtimePatchCategory] }} />{item.label}
-                </span>
-              ))}
-              <span className="instrument-hit-line"><i />命中线</span>
-            </div>
             <LivePianoRoll
               firstNote={windowStart}
               keyCount={keyCount}
@@ -797,83 +899,19 @@ export default function RealtimePerformanceView({ onRefresh, inputMode = 'midi' 
               running={runtime.running}
               accentColor={patchAccent}
             />
-            <VisualizerKeyboard
-              firstNote={windowStart}
-              keyCount={keyCount}
-              accentColor={patchAccent}
-              recommendedMin={currentPatch?.pitch_min}
-              recommendedMax={currentPatch?.pitch_max}
-            />
+            <div className="keyboard-frame keyboard-frame--midi">
+              <VisualizerKeyboard
+                firstNote={windowStart}
+                keyCount={keyCount}
+                accentColor={patchAccent}
+                recommendedMin={currentPatch?.pitch_min}
+                recommendedMax={currentPatch?.pitch_max}
+              />
+            </div>
           </>
         )}
       </section>
 
-      <section className={`stage-drawer ${drawerOpen ? 'is-open' : ''}`}>
-        <div className="drawer-tabs" role="tablist">
-          {bottomTabs.map((tab) => {
-            const Icon = tab.icon
-            return <button type="button" role="tab" aria-label={tab.label} aria-selected={drawerTab === tab.id} className={`${drawerTab === tab.id ? 'is-active' : ''} ${tab.id === 'diagnostics' && hasAnomaly ? 'has-alert' : ''}`} key={tab.id} onClick={() => { setDrawerTab(tab.id); setDrawerOpen(drawerTab !== tab.id || !drawerOpen) }}><Icon size={16} /><span>{tab.label}</span></button>
-          })}
-        </div>
-        <div className="drawer-content">
-          {drawerTab === 'player' && (
-            <div className="transport-layout">
-              <select aria-label="MIDI 文件" value={midiId} onChange={(event) => { const id = event.target.value; setMidiId(id); if (runtime.running && id) send({ event: 'player', action: 'load', values: { midi_id: id } }) }}>
-                <option value="">选择 MIDI 文件</option>
-                {(catalog?.midi_files ?? []).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
-              </select>
-              <label className="icon-command" title="上传 MIDI"><Upload size={17} /><input type="file" accept=".mid,.midi,audio/midi" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const item = await api.uploadMidi(file); await refreshCatalog(); setMidiId(item.id) } catch (cause) { setError(errorMessage(cause)) } }} /></label>
-              <button className="icon-command" type="button" title={player.state === 'playing' ? '暂停' : '播放'} disabled={!runtime.running || !midiId} onClick={() => { if (!playerLoaded) send({ event: 'player', action: 'load', values: { midi_id: midiId } }); send({ event: 'player', action: player.state === 'playing' ? 'pause' : 'play', values: {} }) }}>{player.state === 'playing' ? <Pause size={18} /> : <Play size={18} />}</button>
-              <button className="icon-command" type="button" title="停止并回到开头" disabled={!runtime.running || !playerLoaded} onClick={() => send({ event: 'player', action: 'stop', values: {} })}><RotateCcw size={18} /></button>
-              <input className="transport-seek" aria-label="播放位置" type="range" min="0" max={Math.max(0.01, player.duration_seconds)} step="0.01" value={Math.min(player.position_seconds, Math.max(0.01, player.duration_seconds))} disabled={!playerLoaded} onChange={(event) => send({ event: 'player', action: 'seek', values: { position_seconds: Number(event.target.value) } })} />
-              <span className="transport-time">{formatTime(player.position_seconds)} / {formatTime(player.duration_seconds)}</span>
-              <select aria-label="播放速度" value={player.tempo} disabled={!runtime.running} onChange={(event) => send({ event: 'player', action: 'tempo', values: { value: Number(event.target.value) } })}><option value="0.75">0.75×</option><option value="1">1.00×</option><option value="1.25">1.25×</option><option value="1.5">1.50×</option></select>
-              <label className="compact-check"><input type="checkbox" checked={player.loop} disabled={!runtime.running} onChange={(event) => send({ event: 'player', action: 'loop', values: { enabled: event.target.checked } })} />循环</label>
-            </div>
-          )}
-
-          {drawerTab === 'recording' && (
-            <div className="recording-layout">
-              <button className={recording ? 'danger-button' : 'primary-button'} type="button" disabled={!runtime.running} onClick={() => send({ event: recording ? 'record_stop' : 'record_start' })}><Disc3 size={17} />{recording ? '停止录音' : '开始录音'}</button>
-              <button className={`secondary-button ${monitor ? 'is-active' : ''}`} type="button" disabled={!runtime.running} onClick={() => toggleMonitor().catch((cause) => setError(errorMessage(cause)))}><Headphones size={17} />{monitor ? '关闭监听' : '浏览器监听'}</button>
-              {recordingUrl && <a className="download-button" href={recordingUrl} download><Download size={17} />下载 WAV</a>}
-              <span>{recording ? '录音中，音色切换已锁定' : '录音覆盖当前输出设备听到的实时合成结果'}</span>
-            </div>
-          )}
-
-          {drawerTab === 'tone' && (
-            <div className="tone-parameter-grid">
-              {selectedPatch && Object.entries(selectedPatch.parameters)
-                .filter(([name, metadata]) => !['velocity_curve', 'transpose', 'output_gain_db', 'reverb', 'piano_year'].includes(name) && metadata.min !== undefined && metadata.max !== undefined)
-                .map(([name, metadata]) => (
-                  <label key={name}><span>{name.replaceAll('_', ' ')}</span><input type="range" min={metadata.min} max={metadata.max} step={(metadata.max! - metadata.min!) / 100} value={parameters[name] ?? metadata.default ?? 0} onChange={(event) => updateParameter(name, Number(event.target.value))} /><strong>{(parameters[name] ?? metadata.default ?? 0).toFixed(2)}</strong></label>
-                ))}
-              {selectedPatch?.parameters.piano_year?.options && <label><span>钢琴年份</span><select value={parameters.piano_year ?? 2018} onChange={(event) => updateParameter('piano_year', Number(event.target.value))}>{selectedPatch.parameters.piano_year.options.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>}
-              <div className="patch-detail"><span>可用音域</span><strong>{selectedPatch?.pitch_min}–{selectedPatch?.pitch_max}</strong><span>最大复音</span><strong>{selectedPatch?.polyphony}</strong></div>
-            </div>
-          )}
-
-          {drawerTab === 'connection' && (
-            <div className="connection-layout">
-              <label><span>音频输出</span><select value={audioDeviceId} disabled={runtime.running} onChange={(event) => setAudioDeviceId(event.target.value)}>{(catalog?.audio_devices ?? []).filter((device) => selectedPatch?.compatible_audio_device_ids.includes(device.id)).map((device) => <option value={device.id} key={device.id}>{device.name}</option>)}</select></label>
-              {!isTouchPerformance && <label><span>实体 MIDI 输入</span><select value={midiPort} disabled={runtime.running} onChange={(event) => setMidiPort(event.target.value)}><option value="">选择 MIDI 输入</option>{(catalog?.midi_ports ?? []).map((port) => <option value={port.port ?? port.id} key={port.id}>{port.name}</option>)}</select></label>}
-              <label><span>延时档位</span><select value={latencyProfile} disabled={runtime.running} onChange={(event) => setLatencyProfile(event.target.value as LatencyProfile)}><option value="low" disabled={Boolean(selectedAudio?.is_bluetooth)}>低延时</option><option value="balanced">均衡</option><option value="safe">稳定</option></select></label>
-              <span>{runtime.running ? isTouchPerformance ? '停止会话后可更改输出设备' : '停止会话后可更改输出设备和 MIDI 端口' : selectedAudio?.warning ?? '配置会在浏览器中自动保存'}</span>
-            </div>
-          )}
-
-          {drawerTab === 'diagnostics' && (
-            <div className="diagnostics-layout">
-              <div><span>切换耗时</span><strong>{runtime.last_switch?.duration_ms?.toFixed(0) ?? '–'} ms</strong></div>
-              <div><span>NPU P95</span><strong>{String(runtime.metrics?.npu_p95_ms ?? runtime.metrics?.p95_render_ms ?? '–')} ms</strong></div>
-              <div className={Number(runtime.metrics?.underruns ?? 0) > 0 ? 'is-alert' : ''}><span>Underrun</span><strong>{String(runtime.metrics?.underruns ?? 0)}</strong></div>
-              <div className={Number(runtime.metrics?.audio_tap_drops ?? 0) > 0 ? 'is-alert' : ''}><span>Tap 丢弃</span><strong>{String(runtime.metrics?.audio_tap_drops ?? 0)}</strong></div>
-              <div className={Number(runtime.metrics?.clipped_samples ?? 0) > 0 ? 'is-alert' : ''}><span>削波样本</span><strong>{String(runtime.metrics?.clipped_samples ?? 0)}</strong></div>
-              <details open={hasAnomaly}><summary>运行时详情</summary><pre>{JSON.stringify({ engine: runtime.diagnostics?.engine, metrics: runtime.metrics, audio: runtime.audio, midi: runtime.midi }, null, 2)}</pre></details>
-            </div>
-          )}
-        </div>
-      </section>
     </section>
   )
 }

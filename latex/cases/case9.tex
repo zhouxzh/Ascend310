@@ -266,6 +266,7 @@ flowchart TD
 
 \textbf{每一层的职责和设计考量}：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -289,9 +290,11 @@ FAISS检索 & CPU &
 向量搜索是索引结构的遍历，非矩阵运算，CPU+C++优化就足够快（\textless1ms） \\
 回复生成 & CPU & 模板匹配在CPU上是O(1)；云端API走网络，与NPU无关 \\
 \end{longtable}
+}
 
 \subsubsection{与纯云端/纯边缘方案的对比}\label{src-experiment-case9-h8}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -319,6 +322,7 @@ FAISS检索 & CPU &
 硬件要求 & 无需NPU & 需大内存+GPU & 升腾310B或普通CPU \\
 维护成本 & API费用 & 模型更新复杂 & 只更新知识库文本 \\
 \end{longtable}
+}
 
 \subsection{文本嵌入模型与昇腾部署}\label{src-experiment-case9-h9}
 
@@ -340,6 +344,7 @@ Embedding）将一段自然语言文本转换为固定长度的浮点数向量�
 \subsubsection{为什么选择
 all-MiniLM-L6-v2}\label{src-experiment-case9-h11}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lllll@{}}
 \toprule\noalign{}
 候选模型 & 参数量 & 向量维度 & 模型大小 & 推理速度 (CPU) \\
@@ -356,6 +361,7 @@ bge-large-zh-v1.5 & 326M & 1024 & \textasciitilde1.3 GB &
 text2vec-large-chinese & 326M & 1024 & \textasciitilde1.3 GB &
 \textasciitilde150ms \\
 \end{longtable}
+}
 
 all-MiniLM-L6-v2 是由 Microsoft 的 Sentence-Transformers
 团队发布的轻量级嵌入模型。它用知识蒸馏技术将 BERT 的 12 层压缩到 6
@@ -921,6 +927,7 @@ flowchart TD
 
 \subsubsection{配置说明}\label{src-experiment-case9-h32}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -947,6 +954,7 @@ all-MiniLM-L6-v2，可换其他 sentence-transformers 模型 \\
 兼容接口（Ollama/vLLM/通义千问等） \\
 语音开关 & 设置面板 & 关闭后仅文本交互 \\
 \end{longtable}
+}
 
 \subsubsection{使用指南}\label{src-experiment-case9-h33}
 
@@ -1074,6 +1082,7 @@ flowchart TB
 
 \subsection{性能指标}\label{src-experiment-case9-h40}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 指标 & CPU 模式 & NPU 模式 & 说明 \\
@@ -1089,6 +1098,7 @@ FAISS 检索 (1000条) & \textless{} 1ms & \textless{} 1ms & IndexFlatIP \\
 端到端响应 (云端LLM) & 1-3s & 1-3s & 取决于网络和API \\
 语音识别延迟 & 1-2s & 1-2s & Google Web Speech API \\
 \end{longtable}
+}
 
 关键观察：NPU 对嵌入计算有约 4-5x
 的加速，这对批量入库知识库时效果明显。端到端延迟的主要瓶颈在云端 API

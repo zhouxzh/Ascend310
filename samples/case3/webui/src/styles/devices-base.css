@@ -1,14 +1,7 @@
 .devices-workspace {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.device-overview,
-.bluetooth-panel,
-.model-inventory,
-.npu-console {
-  grid-column: 1 / -1;
+  gap: 14px;
 }
 
 .devices-workspace > .speaker-workspace {
@@ -16,59 +9,10 @@
   min-height: 0;
 }
 
-.device-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 12px;
-  padding: 18px;
-}
-
-.device-summary {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 70px;
-  padding: 11px;
-  background: #edf0ef;
-  border-left: 3px solid var(--teal);
-  border-radius: 5px;
-}
-
-.device-summary .status-pill {
-  grid-column: 1 / -1;
-  justify-self: start;
-  min-height: 20px;
-}
-
 .summary-icon {
   grid-row: 1;
   width: 42px;
   height: 42px;
-}
-
-.summary-icon.graphite {
-  color: white;
-  background: var(--graphite-700);
-}
-
-.device-summary small,
-.device-summary strong {
-  display: block;
-}
-
-.device-summary small {
-  color: #77827f;
-  font-size: 8px;
-  font-weight: 800;
-}
-
-.device-summary strong {
-  margin-top: 4px;
-  overflow: hidden;
-  font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .dependency-grid,
@@ -87,6 +31,7 @@
 .bluetooth-summary > div {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-rows: auto auto;
   align-items: center;
   gap: 8px;
   min-height: 46px;
@@ -94,6 +39,15 @@
   background: #edf0ef;
   border-left: 3px solid var(--teal);
   border-radius: 5px;
+}
+
+.bluetooth-summary > div > svg {
+  grid-row: 1 / span 2;
+}
+
+.bluetooth-summary > div > span,
+.bluetooth-summary > div > strong {
+  grid-column: 2;
 }
 
 .bluetooth-summary svg,
@@ -200,9 +154,9 @@
 
 .device-list-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-height: 50px;
   padding: 7px 0;
   border-bottom: 1px solid #e1e5e3;
@@ -255,6 +209,771 @@
   font-size: 10px;
 }
 
+.device-section-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.device-section-tabs button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.device-section-tabs button > span:first-child {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-section-tabs button .status-pill {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+.device-overview-dashboard {
+  display: grid;
+  gap: 14px;
+}
+
+.device-board-status {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 2.2fr);
+  align-items: stretch;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--teal);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+.device-board-status-heading {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-right: 1px solid var(--line);
+}
+
+.device-board-status-heading h2,
+.device-board-status-heading p {
+  margin: 0;
+}
+
+.device-board-status-heading h2 {
+  font-size: 22px;
+}
+
+.device-board-status-heading p {
+  margin-top: 5px;
+  color: var(--graphite-500);
+  font-size: 16px;
+}
+
+.device-board-facts {
+  display: grid;
+  grid-template-columns: 0.8fr 1fr 1.8fr 1.2fr;
+  align-items: stretch;
+  min-width: 0;
+  margin: 0;
+}
+
+.device-board-facts > div {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 94px;
+  padding: 14px 18px;
+  border-left: 1px solid #e1e6e4;
+}
+
+.device-board-facts > div:first-child {
+  border-left: 0;
+}
+
+.device-board-facts dt {
+  color: #77827f;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.device-board-facts dd {
+  margin: 0;
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-audio-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 12px;
+}
+
+.device-audio-sidebar {
+  display: contents;
+}
+
+.device-audio-layout .bluetooth-panel,
+.device-audio-layout .device-io-panel {
+  align-self: stretch;
+}
+
+.device-audio-layout > .speaker-workspace {
+  grid-column: 1 / -1;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.device-audio-layout .audio-test-panel {
+  min-width: 0;
+}
+
+.device-audio-layout .audio-test-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(620px, 1fr);
+  min-width: 0;
+}
+
+.device-audio-layout .audio-test-feedback,
+.device-audio-layout .audio-test-controls {
+  min-width: 0;
+}
+
+.device-audio-layout .audio-test-controls {
+  display: flex;
+  flex-direction: column;
+  background: #fafbfa;
+  border-left: 1px solid var(--line);
+}
+
+.device-audio-layout .speaker-monitor {
+  min-height: 104px;
+  height: 104px;
+  margin: 12px;
+  gap: 10px;
+}
+
+.device-audio-layout .speaker-channel {
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  place-content: center stretch;
+  justify-items: start;
+  column-gap: 12px;
+  padding: 14px 16px;
+}
+
+.device-audio-layout .speaker-channel::before {
+  inset: 8px;
+}
+
+.device-audio-layout .speaker-channel > svg {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 36px;
+  height: 36px;
+}
+
+.device-audio-layout .speaker-channel strong {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  font-size: 16px;
+}
+
+.device-audio-layout .speaker-channel span {
+  grid-column: 2;
+  grid-row: 2;
+  margin: 2px 0 0;
+  font-size: 14px;
+}
+
+.device-audio-layout .speaker-level {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+  height: 24px;
+  margin: 0;
+}
+
+.device-audio-layout .speaker-metrics {
+  margin: 10px 12px;
+}
+
+.device-audio-layout .speaker-progress {
+  margin: 0 12px;
+}
+
+.device-audio-layout .speaker-actions {
+  margin: 0 12px 12px;
+}
+
+.device-audio-layout .audio-test-form {
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.device-audio-layout .audio-output-test-form {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.device-audio-layout .audio-output-test-form .field:nth-child(1) {
+  grid-column: 1 / span 2;
+  grid-row: 1;
+}
+
+.device-audio-layout .audio-output-test-form .field:nth-child(2) {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.device-audio-layout .audio-output-test-form .field:nth-child(3) {
+  grid-column: 4 / span 2;
+  grid-row: 1;
+}
+
+.device-audio-layout .audio-output-test-form .field:nth-child(4) {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.device-audio-layout .audio-output-test-form .field:nth-child(5) {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.device-audio-layout .audio-output-test-form .field:nth-child(6) {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.device-audio-layout .audio-output-test-controls .segmented button {
+  min-width: 0;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.device-audio-layout .audio-input-test-form {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.device-audio-layout .audio-input-test-form .field:first-child {
+  grid-column: 1 / span 2;
+}
+
+.device-audio-layout .audio-test-action-row {
+  grid-column: 4 / span 2;
+  grid-row: 2;
+  align-items: center;
+  align-self: end;
+  gap: 12px;
+  margin: 0;
+}
+
+.device-audio-layout .audio-input-test-form .audio-test-action-row {
+  grid-column: 2 / span 2;
+}
+
+.device-audio-layout .audio-test-action-row .status-pill {
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.audio-test-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.audio-test-mode-control .segmented button {
+  min-width: 96px;
+}
+
+.system-volume-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 10px;
+  color: var(--teal-dark);
+  background: var(--teal-soft);
+  border: 1px solid #b8ded8;
+  border-radius: 5px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.system-volume-readout span {
+  color: var(--graphite-600);
+  font-weight: 700;
+}
+
+.system-volume-readout strong {
+  min-width: 38px;
+  text-align: right;
+}
+
+.audio-output-system-volume {
+  justify-content: center;
+  width: 100%;
+  min-height: var(--studio-control);
+}
+
+.system-volume-readout.is-muted {
+  color: #8a5709;
+  background: var(--amber-soft);
+  border-color: #e5cd9d;
+}
+
+.input-level-monitor {
+  height: 104px;
+  margin: 12px;
+  padding: 13px 16px 11px;
+  background: #f6f8f7;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
+.input-level-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.input-level-heading span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--graphite-600);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.input-level-heading strong {
+  min-width: 104px;
+  color: var(--graphite-900);
+  font-size: 18px;
+  text-align: right;
+}
+
+.input-level-meter {
+  position: relative;
+  height: 18px;
+  overflow: hidden;
+  background: #dfe5e2;
+  border: 1px solid #c9d1ce;
+  border-radius: 3px;
+}
+
+.input-level-fill {
+  height: 100%;
+  background: #778784;
+  transition: width 80ms linear;
+}
+
+.input-level-meter.has-signal .input-level-fill {
+  background: var(--teal);
+}
+
+.input-level-threshold,
+.input-level-peak {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-1px);
+}
+
+.input-level-threshold {
+  background: var(--amber);
+}
+
+.input-level-peak {
+  width: 3px;
+  background: var(--graphite-900);
+}
+
+.input-level-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: #6f7a77;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.device-io-panel {
+  min-width: 0;
+}
+
+.device-io-panel .panel-header {
+  align-items: center;
+}
+
+.device-io-panel .panel-action .segmented button {
+  min-width: 72px;
+}
+
+.device-io-panel .device-list {
+  max-height: 280px;
+  overflow: auto;
+}
+
+.device-runtime-layout {
+  display: grid;
+  gap: 14px;
+}
+
+.runtime-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.runtime-summary-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 92px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+.runtime-summary-card.tone-ok { border-left-color: var(--teal); }
+.runtime-summary-card.tone-warn { border-left-color: var(--amber); }
+.runtime-summary-card.tone-error { border-left-color: var(--red); }
+
+.runtime-summary-card small,
+.runtime-summary-card strong,
+.runtime-summary-card div > span {
+  display: block;
+}
+
+.runtime-summary-card small {
+  color: #77827f;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.runtime-summary-card strong {
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-summary-card div > span {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--graphite-500);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-health-note {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border-left: 3px solid var(--line);
+  border-radius: 5px;
+}
+
+.runtime-health-note.tone-warn {
+  color: #6e4a08;
+  background: var(--amber-soft);
+  border-left-color: var(--amber);
+}
+
+.runtime-health-note.tone-error {
+  color: #842b34;
+  background: #fae9eb;
+  border-left-color: var(--red);
+}
+
+.runtime-health-note strong,
+.runtime-health-note span {
+  display: block;
+}
+
+.runtime-health-note strong { font-size: 15px; }
+.runtime-health-note span { margin-top: 3px; font-size: 14px; }
+
+.runtime-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(500px, 0.85fr) minmax(0, 1.65fr);
+  gap: 14px;
+}
+
+.runtime-detail-grid > .panel {
+  display: grid;
+  height: clamp(400px, calc(100vh - 420px), 530px);
+  min-height: 0;
+}
+
+.runtime-detail-grid > .dependency-panel {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.runtime-detail-grid > .model-inventory {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.runtime-detail-grid .dependency-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 0 16px;
+  overflow: auto;
+}
+
+.runtime-detail-grid .inventory-table {
+  overflow: auto;
+}
+
+.runtime-python-path {
+  display: grid;
+  gap: 5px;
+  margin: 0 16px 15px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--teal);
+  border-radius: 4px;
+}
+
+.runtime-python-path span {
+  color: #77827f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.runtime-python-path code {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-kind-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 16px 6px;
+}
+
+.model-kind-summary > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 10px;
+  min-height: 58px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--teal);
+  border-radius: 4px;
+}
+
+.model-kind-summary span,
+.model-kind-summary small {
+  color: var(--graphite-500);
+  font-size: 13px;
+}
+
+.model-kind-summary strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 20px;
+}
+
+.device-readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.device-readiness-card {
+  display: grid;
+  grid-template-rows: auto auto minmax(38px, auto);
+  gap: 12px;
+  min-height: 100%;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--teal);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+.device-readiness-card.tone-ok {
+  border-left-color: var(--teal);
+}
+
+.device-readiness-card.tone-warn {
+  border-left-color: var(--amber);
+}
+
+.device-readiness-card.tone-error {
+  border-left-color: var(--red);
+}
+
+.device-readiness-card.tone-neutral {
+  border-left-color: var(--line);
+}
+
+.device-readiness-heading {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.device-readiness-card h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.device-readiness-card dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid #e2e7e5;
+  border-bottom: 1px solid #e2e7e5;
+}
+
+.device-readiness-card dl div {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 68px;
+  padding: 10px 14px;
+  border-left: 1px solid #e2e7e5;
+}
+
+.device-readiness-card dl div:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.device-readiness-card dt {
+  color: #77827f;
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.device-readiness-card dd {
+  margin: 0;
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-readiness-hint {
+  align-self: end;
+  min-height: 38px;
+  margin: 0;
+  padding-top: 4px;
+  color: var(--graphite-500);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.device-state-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--amber-soft);
+  border-left: 3px solid var(--amber);
+  border-radius: 5px;
+  color: #6e4a08;
+}
+
+.device-state-note span {
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.device-audio-layout .panel-header p,
+.device-runtime-layout .panel-header p {
+  max-width: none;
+}
+
+.device-list-row .status-pill {
+  justify-self: end;
+  min-height: 22px;
+  padding: 0 8px;
+}
+
+.device-list-row.is-muted {
+  opacity: 0.82;
+}
+
+.device-list-row.has-warning {
+  color: #6e4a08;
+}
+
+.dependency-row {
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.dependency-row.is-missing svg {
+  color: var(--red);
+}
+
+.dependency-row.is-found svg {
+  color: var(--teal);
+}
+
+.inventory-row {
+  grid-template-columns: minmax(240px, 2fr) 96px 128px 96px;
+  gap: 12px;
+  padding: 8px 0;
+}
+
 .inventory-table {
   padding: 8px 16px 15px;
 }
@@ -280,18 +999,17 @@
   font-family: "Cascadia Mono", Consolas, monospace;
 }
 
-.npu-console pre {
-  max-height: 280px;
-  margin: 0;
-  overflow: auto;
-  padding: 16px;
-  color: #a8e7de;
-  background: #1d2425;
-  border-radius: 0 0 6px 6px;
-  font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 9px;
-  line-height: 1.55;
-  white-space: pre-wrap;
+.empty-list {
+  min-height: 72px;
+  border: 1px dashed #d0d7d4;
+  background: #fafbfa;
+}
+
+@media (max-width: 1500px) {
+  .device-readiness-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .device-board-status { grid-template-columns: minmax(0, 1fr); }
+  .device-board-status-heading { border-right: 0; border-bottom: 1px solid var(--line); }
+  .runtime-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 1180px) {
@@ -305,6 +1023,17 @@
   .compact-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .piano { height: 230px; }
   .piano { --black-key-width: 28px; }
+  .device-audio-layout { grid-template-columns: minmax(0, 1fr); }
+  .device-audio-layout > .speaker-workspace { grid-template-columns: minmax(0, 1fr); }
+  .device-audio-layout .audio-test-body { grid-template-columns: minmax(0, 1fr) minmax(440px, 0.9fr); }
+  .device-audio-layout .audio-output-test-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .device-audio-layout .audio-output-test-form .field { grid-column: auto; grid-row: auto; }
+  .device-audio-layout .audio-output-test-form .field:nth-child(1) { grid-column: 1 / -1; }
+  .device-audio-layout .audio-test-action-row,
+  .device-audio-layout .audio-input-test-form .audio-test-action-row { grid-column: 1 / -1; grid-row: auto; }
+  .runtime-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .runtime-detail-grid > .panel { height: auto; }
+  .runtime-detail-grid .inventory-table { max-height: 420px; }
 }
 
 @media (max-width: 900px) {
@@ -348,14 +1077,15 @@
   .synth-settings { max-height: none; overflow: visible; }
   .form-grid.single-column { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-footer { grid-column: 1 / -1; }
-  .speaker-settings { order: 2; }
   .job-list { max-height: none; }
   .recording-list { max-height: none; }
   .devices-workspace { grid-template-columns: minmax(0, 1fr); }
-  .device-overview,
-  .model-inventory,
-  .npu-console { grid-column: auto; }
-  .device-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .device-section-tabs button { min-height: 58px; }
+  .device-list-row { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+  .device-readiness-grid { grid-template-columns: minmax(0, 1fr); }
+  .device-audio-layout > .speaker-workspace { grid-template-columns: minmax(0, 1fr); }
+  .device-audio-layout .audio-test-body { grid-template-columns: minmax(0, 1fr); }
+  .device-audio-layout .audio-test-controls { border-top: 1px solid var(--line); border-left: 0; }
 }
 
 @media (max-width: 600px) {
@@ -419,7 +1149,50 @@
   .speaker-progress { margin: 0 13px; }
   .speaker-actions { margin: 0 13px 13px; }
   .speaker-actions .primary-button { width: 100%; }
-  .device-summary-grid { grid-template-columns: minmax(0, 1fr); padding: 13px; }
+  .device-audio-layout .speaker-monitor {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 190px;
+    height: 190px;
+  }
+  .device-audio-layout .audio-test-form { grid-template-columns: minmax(0, 1fr); }
+  .device-audio-layout .audio-test-form .field { grid-column: 1; }
+  .audio-test-header-actions { align-items: stretch; flex-direction: column-reverse; }
+  .audio-test-header-actions .status-pill { align-self: flex-end; }
+  .audio-test-mode-control .segmented { width: 100%; }
+  .audio-test-mode-control .segmented button { flex: 1; min-width: 0; }
+  .input-level-monitor { height: 116px; margin: 13px; }
+  .device-section-tabs button { min-height: 54px; padding: 10px 11px; }
+  .device-section-tabs button { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
+  .device-section-tabs button > span:first-child { font-size: 14px; }
+  .device-section-tabs button .status-pill { display: none; }
+  .device-readiness-grid { grid-template-columns: minmax(0, 1fr); }
+  .device-readiness-card { padding: 14px; }
+  .device-readiness-heading { grid-template-columns: 42px minmax(0, 1fr); }
+  .device-readiness-heading .status-pill { grid-column: 2; justify-self: start; }
+  .device-readiness-card dl { grid-template-columns: minmax(0, 1fr); border-bottom: 0; }
+  .device-readiness-card dl div {
+    grid-template-columns: 76px minmax(0, 1fr);
+    align-items: center;
+    min-height: 52px;
+    padding: 8px 0;
+    border-top: 1px solid #e2e7e5;
+    border-left: 0;
+  }
+  .device-readiness-card dl div:first-child { border-top: 0; }
+  .device-readiness-card h3 { font-size: 18px; }
+  .device-board-status-heading { grid-template-columns: 42px minmax(0, 1fr); }
+  .device-board-status-heading .status-pill { grid-column: 2; justify-self: start; }
+  .device-board-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .device-board-facts > div { min-height: 72px; border-top: 1px solid #e1e6e4; }
+  .device-board-facts > div:nth-child(odd) { border-left: 0; }
+  .device-state-note { padding: 12px 13px; }
+  .runtime-summary-grid { grid-template-columns: minmax(0, 1fr); }
+  .runtime-summary-card { grid-template-columns: 42px minmax(0, 1fr); }
+  .runtime-summary-card .status-pill { grid-column: 2; justify-self: start; }
+  .runtime-detail-grid .dependency-grid { grid-template-columns: minmax(0, 1fr); }
+  .model-kind-summary { gap: 6px; padding: 10px 12px 5px; }
+  .model-kind-summary > div { grid-template-columns: minmax(0, 1fr); }
+  .model-kind-summary strong { grid-column: 1; grid-row: auto; font-size: 18px; }
   .bluetooth-summary { grid-template-columns: minmax(0, 1fr); padding: 13px 13px 4px; }
   .bluetooth-summary .status-pill { justify-self: start; }
   .bluetooth-device-list { padding: 8px 13px 13px; }
@@ -429,4 +1202,6 @@
   .inventory-row { grid-template-columns: minmax(0, 1fr) 74px; padding: 7px 0; }
   .inventory-row span:nth-of-type(2),
   .inventory-row span:nth-of-type(3) { display: none; }
+  .device-list-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .device-list-row .status-pill { grid-column: 1 / -1; justify-self: start; }
 }

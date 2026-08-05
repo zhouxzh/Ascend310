@@ -5,6 +5,7 @@ Checklist、术语字典、推荐资源与社区贡献规范。可作为日常�
 
 \section{A.2 常见报错速查}\label{src-book-appendix-h2}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1111}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2222}}
@@ -52,6 +53,7 @@ Normalize \& Layout \\
 部署 & 模型加载慢 & 冷启动/IO 慢 & 预热/缓存 & 预加载 + 固态存储 \\
 安全 & 日志泄露敏感路径 & 直接 print & grep 审计 & 结构化日志脱敏 \\
 \end{longtable}
+}
 
 \section{A.3 模型转换参数模板合集}\label{src-book-appendix-h3}
 
@@ -152,6 +154,7 @@ Checklist（执行勾项）}\label{src-book-appendix-h7}
 
 \section{A.5 术语表（扩展）}\label{src-book-appendix-h8}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 术语 & 说明 \\
@@ -170,6 +173,7 @@ Quant Calibration & 量化尺度统计过程 \\
 Baseline & 初始标准对照性能/精度集 \\
 Drift & 指标随时间未经预期的漂移 \\
 \end{longtable}
+}
 
 \section{A.6 推荐资源与外部引用}\label{src-book-appendix-h9}
 
@@ -201,6 +205,7 @@ PR（描述动机/影响面/验证方式）。 PR 要求： \textbar{} 要素 \t
 
 \section{A.8 FAQ}\label{src-book-appendix-h11}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -221,6 +226,7 @@ PR（描述动机/影响面/验证方式）。 PR 要求： \textbar{} 要素 \t
 Compute-bound，或激活分布集中导致尺度相近。 \\
 NMS 很慢？ & 合并小框批量处理/降低候选阈值/考虑 Device 版 NMS。 \\
 \end{longtable}
+}
 
 \section{A.9 License 与引用}\label{src-book-appendix-h12}
 
@@ -230,6 +236,7 @@ zhouxzh/Ascend310）
 
 \section{A.10 版本路线回顾}\label{src-book-appendix-h13}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 版本 & 内容 & 目标 \\
@@ -242,6 +249,7 @@ v0.3 & 核心部署链路 & 形成可用主线 \\
 v0.6 & 案例与工程化 & 贴近实战 \\
 v1.0 & 全面审校发行 & 正式发布 \\
 \end{longtable}
+}
 
 \section{A.11 实践任务}\label{src-book-appendix-h14}
 

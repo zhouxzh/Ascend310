@@ -1,7 +1,8 @@
 # MIDI-DDSP 文件渲染与播放
 
-MIDI-DDSP 用于已知 MIDI 文件，不承担触控键盘或实体 MIDI 的低延迟即时合成。实时
-演奏由统一工作区中的 Piano-DDSP 钢琴或 DDSP-VST 神经音色模式负责。
+MIDI-DDSP 用于已知 MIDI 文件，不承担触控键盘或实体 MIDI 的低延迟即时合成。当前实时
+演奏统一由 Piano-DDSP 钢琴会话负责；DDSP-VST 只保留为摄像头/麦克风的 Effect，不是
+MIDI Synth。
 
 ## 当前架构
 

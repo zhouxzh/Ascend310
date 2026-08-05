@@ -1,0 +1,21 @@
+Use case: scientific-educational
+Asset type: technical report figure
+Primary request:
+Create a publication-ready scientific workflow schematic for a Chinese technical book. White background, flat vector style, high contrast, generous margins, no gradients, no shadows, no decorative imagery, no title or figure number inside the image. Use the Okabe-Ito palette: blue #0072B2, sky blue #56B4E9, green #009E73, orange #E69F00, vermillion #D55E00, purple #CC79A7, yellow #F0E442, black #000000. Use color plus distinct border styles so the diagram remains understandable in grayscale. All text must be large, crisp, horizontal, and exactly as specified; do not invent labels.
+
+Show three parallel left-to-right lanes with aligned stages and clear arrowheads:
+
+Lane 1 header: “实时钢琴 250 Hz”. Stages: “触摸屏 / 实体 MIDI” -> “MIDI 状态\n16 声部调度” -> “Piano-DDSP OM” -> “CPU 谐波 + 噪声 + 混响” -> “EDIFIER 音箱”.
+
+Lane 2 header: “MIDI 文件渲染 离线”. Stages: “MIDI 文件” -> “声部分离\n乐器分配” -> “Expression OM” -> “Synthesis OM” -> “CPU DDSP + 混响” -> “WAV / 音频库”.
+
+Lane 3 header: “麦克风音色转换 50 Hz”. Stages: “UGREEN 麦克风\n48 kHz” -> “单声道\n重采样 16 kHz” -> “Feature OM” -> “Control OM” -> “CPU DDSP\n重采样 48 kHz” -> “EDIFIER 音箱”.
+
+Place a narrow shared-resource band below all lanes labeled “共享：Ascend NPU 与实体音频设备”. Keep the three lanes visually distinct: blue, orange, and green accents. Use simple rounded rectangles with radius no more than 8 px and strong black or dark-gray connectors. Avoid icons if they reduce label reliability.
+Scene/backdrop: clean white or very light neutral background
+Style/medium: precise flat scientific infographic with vector-like geometry and professional sans-serif typography
+Composition/framing: scan-friendly hierarchy, generous whitespace, consistent alignment, and clearly terminated arrows
+Color palette: colorblind-safe Okabe-Ito colors with dark charcoal text and sufficient grayscale contrast
+Text handling: render requested labels verbatim; use consistent capitalization; do not add pseudo-text or unnecessary labels
+Scientific constraints: preserve the requested causal, spatial, and mathematical relationships; do not invent values, equations, units, components, or scientific claims
+Output constraints: no overlapping or clipped text; no ambiguous connections; no gradients, shadows, 3D effects, logos, watermarks, decorative borders, or photorealism

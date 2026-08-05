@@ -4,6 +4,103 @@
   min-width: 0;
 }
 
+.app-shell--realtime .app-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.app-shell--realtime .content-area {
+  padding-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .app-shell--realtime .content-area {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+}
+
+.app-shell--realtime .realtime-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding-bottom: 0;
+}
+
+.app-shell--realtime .keyboard-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 0;
+}
+
+@media (min-width: 901px) {
+  .app-shell--realtime .keyboard-stage {
+    display: grid;
+  }
+
+  .app-shell--realtime .keyboard-stage.is-touch {
+    grid-template-rows: auto auto minmax(70px, 1fr) auto;
+  }
+
+  .app-shell--realtime .keyboard-stage.is-midi {
+    grid-template-rows: auto auto minmax(150px, 1fr) auto;
+  }
+
+  .app-shell--realtime .keyboard-stage .live-piano-roll {
+    height: auto !important;
+    min-height: 0;
+  }
+
+  .app-shell--realtime .stage-drawer {
+    position: relative;
+    z-index: 24;
+  }
+
+  .app-shell--realtime .midi-patch-picker[open] {
+    z-index: 36;
+  }
+
+  .app-shell--realtime .stage-drawer .drawer-content {
+    position: absolute;
+    right: -1px;
+    bottom: calc(100% - 1px);
+    left: -1px;
+    max-height: min(360px, 45vh);
+    overflow: auto;
+    background: #f2f4f3;
+    border: 1px solid #b9c3c0;
+    border-radius: 5px 5px 0 0;
+    box-shadow: 0 -10px 24px rgb(20 28 27 / 24%);
+  }
+
+}
+
+@media (min-width: 901px) and (max-width: 1499px) {
+  .app-shell--realtime .realtime-stage {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .app-shell--realtime .realtime-stage--touch .keyboard-stage.is-touch .live-piano-roll {
+    height: 32px;
+  }
+
+  .app-shell--realtime .realtime-stage--touch.touch-keyboard-size--small .piano {
+    height: 170px;
+  }
+
+  .app-shell--realtime .realtime-stage--touch.touch-keyboard-size--medium .piano {
+    height: 190px;
+  }
+
+  .app-shell--realtime .realtime-stage--touch.touch-keyboard-size--large .piano {
+    height: 240px;
+  }
+}
+
+.realtime-stage--touch .stage-session-bar::before {
+  display: none;
+  content: none;
+}
+
 .realtime-stage--touch .performance-control-bar label,
 .realtime-stage--touch .sustain-control,
 .realtime-stage--touch .roll-window-control,
@@ -29,4 +126,12 @@
 
 .realtime-stage--midi .key-count-control button {
   min-height: var(--studio-primary-control);
+}
+
+.realtime-stage--midi .stage-session-actions .primary-button {
+  min-height: var(--studio-primary-control);
+}
+
+.realtime-stage--midi .midi-input-control select {
+  height: var(--studio-touch-control);
 }

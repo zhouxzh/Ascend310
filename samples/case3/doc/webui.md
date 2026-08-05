@@ -1,397 +1,360 @@
-# MIDI-DDSP Studio Web 界面
+# WebUI 操作、部署与 API
 
-MIDI-DDSP Studio 是运行在 Ascend 310B 开发板上的音乐工作台。界面可以在板载
-触摸屏或同一局域网内的电脑浏览器中打开，提供触控演奏、MIDI 键盘、MIDI-DDSP
-播放与渲染和设备检查四个工作区；扬声器测试合并在设备工作区中。
+本文是 Case3 WebUI 的统一参考，面向触摸屏使用者、开发者和板端维护者。内容以当前四个
+工作区和唯一的 `8765` 生产服务为准，覆盖逐页操作、12 张实机截图、前后端边界、部署、
+API 与验收。模型准备另见[模型与 OM 部署](om-deployment.md)，实测命令和结果另见
+[WebUI 触摸屏终审与实机压测](webui-acceptance.md)。
 
-## 技术方案
+本页截图于 2026-08-04 从 `ascend8t` 上的 `http://127.0.0.1:8765` Firefox kiosk 采集，
+物理屏幕分辨率为 `1920 x 1080`。截图中的设备、IP、系统音量、模型数和 NPU 警告是当时
+状态，仅用于解释布局；操作时应以页面实时状态为准。
 
-- 浏览器端：React、TypeScript、Vite、Lucide 和 Recharts。
-- 板端服务：FastAPI、Uvicorn 和 WebSocket。
-- 推理与音频：现有 PyACL/OM、PortAudio、Mido 和 RtMidi 代码。
-- 生产部署：开发电脑编译 `webui/dist/`，开发板只运行 Python 服务和静态文件。
+## 1. 产品边界与安全顺序
 
-Flask 与 FastAPI 都适合提供 HTTP 服务，但它们不是完整的前端框架。Gradio 适合快速
-搭建模型演示，难以精确控制低延迟钢琴事件、复杂工作区、任务状态和触摸屏布局。
-因此本项目使用 React + FastAPI；不需要额外安装 Flask 或 Gradio。
+顶层导航只有四个工作区。“触摸屏”和“MIDI 键盘”是“实时演奏”内部的两种输入方式，
+共享同一套 Piano-DDSP 会话和设置。
 
-## 板端手动安装
+| 工作区 | 输入 | 结果 | 开始前确认 |
+| :--- | :--- | :--- | :--- |
+| 实时演奏 | 触摸琴键或实体 MIDI | Piano-DDSP 实时钢琴声音 | 已选择输出，其他音频任务已停止 |
+| MIDI-DDSP | `.mid` 或 `.midi` 文件 | 版本化 WAV、报告和播放任务 | 模型 bundle、混响资产和资源可用 |
+| DDSP-VST | 实体麦克风 Capture | Feature OM、Control OM 与 CPU DDSP 合成后的音频 | Capture、输出和两个 OM 后端可用 |
+| 设备 | 音频、MIDI、蓝牙和运行环境 | 状态检查或短时测试 | 实时会话、播放和 Effect 已停止 |
 
-以下命令仅供用户在 Ascend 开发板上手动执行。同步和启动脚本不会安装、升级或删除
-任何板端软件。
+实时演奏、MIDI-DDSP 板端播放、DDSP-VST、扬声器测试和输入测试共用排他资源锁，不能
+并发运行。遇到“资源被占用”时，先停止当前拥有者，再启动新任务；刷新页面不会释放声卡
+或 NPU。
 
-先进入项目使用的 Anaconda `base` 环境：
+```mermaid
+flowchart LR
+    accTitle: Case3 的安全操作顺序
+    accDescr: 从设备检查进入一种音频工作流，结束时停止任务并回到设备页确认资源已释放。
+    check["设备页确认输出与输入"] --> choose{"选择工作流"}
+    choose --> live["实时演奏\n触摸屏或实体 MIDI"]
+    choose --> render["MIDI-DDSP\n浏览或新建渲染"]
+    choose --> effect["DDSP-VST\n校准输入门后启动"]
+    live --> stop["停止 / 全部停音"]
+    render --> stop
+    effect --> stop
+    stop --> check
+```
+
+页面上的应用增益互不影响：实时演奏输出增益、MIDI-DDSP 板端播放音量和 DDSP-VST 输出
+增益只处理各自的音频流。“系统音量”只读显示所选 PulseAudio 输出的 mixer 状态，音箱硬件
+按键或桌面 mixer 改变音量后页面会同步显示。
+
+## 2. 启动、访问与全屏
+
+开发板使用既有 Conda `base` 和 CANN 环境，不回退到系统 Python，不安装 Node/npm，也不
+运行 Vite 或第二个 Web 服务。首次部署或 `requirements.txt` 变更后执行：
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate base
 cd /home/HwHiAiUser/Documents/case3
-```
-
-检查 PortAudio 动态库：
-
-```bash
-ldconfig -p | grep libportaudio.so.2
-```
-
-如果没有输出，需要手动安装系统运行库：
-
-```bash
-sudo apt install libportaudio2
-```
-
-安装 Web 服务、MIDI 和音频 Python 依赖：
-
-```bash
-python -m pip install --user -r requirements.txt
-```
-
-`requirements.txt` 是板端唯一的 Python 依赖入口，包含 Web 服务、NumPy、
-Mido、RtMidi 和 SoundDevice。Web UI 只使用 OM 模型，不安装或扫描 ONNX 模型。ONNX/TFLite
-导出工具属于本地开发流程，其依赖不纳入板端 `requirements.txt`。PyACL 必须由开发板现有
-CANN 环境提供，`ais_bench` 由已有 Ascend 基准测试环境提供。板端 Anaconda 位于管理员
-所有的 `/usr/local/miniconda3`，普通用户必须使用 `--user` 将 Python 包安装到
-`~/.local/`；不要使用 `sudo pip` 修改管理员安装的 Anaconda。
-
-## 本地构建与同步
-
-在 Windows 开发电脑的 `case3` 根目录执行：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools/deploy_midi_ddsp_webui.ps1
-```
-
-脚本在本地执行 `npm ci` 和生产构建，然后通过 SSH 别名 `ascend8t` 将前端产物、
-FastAPI 服务、运行模块、文档和 MIDI 输入同步到
-`/home/HwHiAiUser/Documents/case3`。MIDI 输入采用增量同步；部署不会删除板端已有的
-`midi/`、`midi_wav/`、历史任务、转换日志或校验和。脚本不会远程安装
-依赖，也不会修改 shell 启动文件或系统服务。可通过参数修改目标：
-
-```powershell
-tools/deploy_midi_ddsp_webui.ps1 `
-  -SshTarget ascend8t `
-  -RemoteRoot /home/HwHiAiUser/Documents/case3
-```
-
-## 启动
-
-首次安装或修改环境后执行一次只读检查：
-
-```bash
-cd /home/HwHiAiUser/Documents/case3
+python -m pip install -r requirements.txt
+python -c "import pytest; print(pytest.__version__)"
 python scripts/check_webui_env.py
 ```
 
-检查器只验证当前 `base`、CANN 环境变量、Python 包和前端产物，不设置环境变量，也不
-安装或修改软件。检查通过后，日常在开发板终端直接启动：
+日常启动只使用仓库脚本：
 
 ```bash
 cd /home/HwHiAiUser/Documents/case3
 python scripts/run_webui.py
 ```
 
-`scripts/run_webui.py` 只启动 Uvicorn 并监听 `0.0.0.0:8765`。它不设置或检查环境；程序和
-模型运行错误会直接显示在当前终端。启动时会打印板载地址和自动检测到的局域网 IPv4
-地址，终端可直接识别完整的 `http://` 链接。
+板载触摸屏打开 Firefox kiosk：
 
-打开地址：
-
-- 板载浏览器：`http://127.0.0.1:8765`
-- 局域网电脑：`http://<开发板 IP>:8765`
-
-板载触摸屏需要平板式软键盘和中文输入时，按
-[触摸屏输入法配置](touchscreen-input.md)安装并设置 Onboard + IBus Pinyin。该配置使用
-英文 XFCE 菜单名称，并包含自动弹出、底部停靠、登录自启和 Firefox 故障排查步骤。
-
-启动脚本会在终端打印检测到的局域网地址；Web 界面顶部状态条、左侧底部状态和
-“设备 / 系统与设备”摘要卡也会显示当前开发板 IP，便于从另一台电脑远程登录或打开页面。
-
-服务没有登录功能，只应运行在可信局域网中。浏览器发起的有副作用 HTTP 请求和
-WebSocket 连接必须与页面同源；反向代理使用不同公开域名时，可通过逗号分隔的
-`MIDI_DDSP_ALLOWED_ORIGINS` 显式加入允许来源。API 只接受目录扫描生成的模型 ID、MIDI
-ID 和设备 ID，不接受浏览器提交的任意文件路径或 shell 命令。
-
-## 工作区
-
-### 实时演奏工作区
-
-“触控演奏”和“MIDI 键盘”是同一个实时乐器会话的两个独立工作区。用户只选择钢琴、
-提琴、长笛等音色，不选择 Piano-DDSP 或 DDSP-VST 引擎。两页共用实时服务、音色、
-音频输出、录音、监听和模型参数；底层仍保留两个独立的 OM 契约与运行时，不合并模型图，
-也不同时叠加发声。
-
-页面加载音色库时不占用 NPU 或声卡；用户选择音色、输出和延时档位后显式点击
-“开始演奏”。运行中选择其他音色会先检查当前输出兼容性，再释放手动音符和踏板、
-暂停并保存 MIDI 位置，在同一个 `realtime-session` 资源锁内停止旧运行时并启动目标
-运行时。成功后恢复 MIDI 位置、速度、循环和监听；失败时自动回滚旧音色。录音期间
-音色锁定，停止会话会先完成 WAV 再释放资源。
-
-#### 触控演奏
-
-触控演奏不提供 32、49、61 或 88 键，避免在 10 英寸屏幕上把可点击琴键压得过小。它默认
-显示 25 键的 `C3-C5` 两个八度，也可切换为 13 键的 `C4-C5`；两个范围都可用左右按钮按
-12 个半音移动，到达标准钢琴边界后自动禁用。触控页只保留大尺寸、可点击的琴键和力度、
-移调、混响、弯音、延音控制。动态卷帘位于可点击琴键上方，显示实际触控音符；触控页
-不显示 MIDI 页的紧凑状态琴键。切换音域前先发送 all-notes-off，避免触摸音符悬挂。
-
-触控布局参考 [iPad 版库乐队的键盘布局和大小](https://support.apple.com/zh-cn/guide/garageband-ipad/chs39282dbe/ipados)：
-库乐队将键盘尺寸作为“小、中、大”界面选项，而不是把屏幕中的键长绑定到实体钢琴毫米
-比例。本项目同样默认“中”档，并在触控页提供小、中、大切换；三档使用固定的触控高度，
-键盘始终铺满舞台宽度。这样 10 英寸屏幕可同时看到卷帘和完整的 25 键键盘，不对屏幕像素
-密度或实体钢琴尺寸做任何推断。
-
-#### 动态钢琴卷帘
-
-实时演奏区的卷帘是与当前键盘音域对齐的 Canvas 可视化，而不是 MIDI 文件的预览。白键使用等宽列，黑键按相邻白键的位置叠放；音符块从上方移动至命中线，因此触控页和 MIDI 键盘页都能把正在演奏的音高直接对应到下方琴键。卷帘保留 2、4 或 8 秒历史，默认 4 秒；结束音符至少绘制为 8 px，避免极短的有效音符因时长换算而不可见。为保持 10 英寸触摸屏的操作流畅，有轨迹时的重绘上限为 30 FPS，画布像素比上限为 1.25，且最多保留最近 192 条轨迹；这些限制只影响动画开销，不会改变声音或 MIDI 事件。
-
-卷帘不依赖轮询得到的 `active_notes` 快照来记录音符。浏览器在触控键按下和松开时立即创建 `note_on`/`note_off` 轨迹；Piano-DDSP 运行进程和 DDSP-VST 输入路由也会把实际生效的状态变化经实时 WebSocket 发布为下列离散事件：
-
-```json
-{"event":"note","note":60,"on":true}
-{"event":"note","note":60,"on":false}
+```bash
+DISPLAY=:0 XAUTHORITY=/home/HwHiAiUser/.Xauthority \
+firefox --kiosk http://127.0.0.1:8765
 ```
 
-前端以事件到达时的单调时间戳记录轨迹，后续的 `status`/`heartbeat` 快照只用于当前琴键高亮、初始同步和断线恢复。因此，即使按下和松开都发生在同一个浏览器动画帧内，或其持续时间短于一次画布重绘，也会留下一个最小可见的卷帘块。实体 MIDI 输入和 MIDI 文件播放使用同一条后端事件通路；同一个音高被多个输入源同时按住时，只有首次按下和最后一次松开会改变卷帘状态。
+已有 Firefox 时先关闭原窗口，再执行同一条 kiosk 命令，避免多个窗口覆盖触摸事件。远程
+电脑通过 `http://<开发板 IPv4>:8765` 访问。服务没有登录和公网访问控制，只应运行在可信
+局域网。输入法和 kiosk 配置见[触摸屏输入法配置](touchscreen-input.md)。
 
-当前可见音域之外的音符不会绘制到卷帘，这是有意的范围裁剪；在 2、4 或 8 秒历史窗口之外的结束音符也会自然移出画面。前端单元测试覆盖同一动画帧内的按下/松开边沿，Playwright 回归测试会向 WebSocket 注入短音事件并检查画布确实出现有效像素。
+## 3. 实时演奏
 
-#### MIDI 键盘
+两个输入模式共用钢琴音色、音频输出、延时档、输出增益、混响、移调、力度、力度曲线、
+钢琴年份、录音、监听、实时性能和 Panic。会话运行或录音时不能切换输入模式；先按“停止”，
+再更换模式、输出或 MIDI 端口。
 
-MIDI 键盘页用于连接实体 MIDI 控制器，顶端直接提供端口选择和动态钢琴卷帘。它从 32 键
-`F2-C5` 起步，可切换为常见控制器的 49/61 键 `C2` 范围或完整 88 键 `A0-C8`；少于 88 键时
-同样可左右移动一个八度。卷帘可选择 2、4 或 8 秒时间窗，只显示 WebSocket 实际收到的
-离散音符事件及其历史轨迹，不把实时输入伪装成可预知的未来 MIDI 音符；命中线与当前琴键
-高亮会根据实时状态同步。MIDI 文件播放器位于该页下方抽屉，触控页不会显示它。
+### 3.1 触摸屏
 
-触控页与 MIDI 页分别将键数和起始音写入版本化浏览器配置，因此在两个工作区间切换不会
-相互覆盖音域。触摸指针设备默认进入触控演奏，普通桌面浏览器默认进入 MIDI 键盘页。
+![实时演奏触摸模式，顶部是共享会话栏，中部是参数与实时卷帘，底部是带边框的大尺寸钢琴键盘。](images/webui/realtime-touch.png)
 
-在 10 英寸等触摸设备上，界面通过 `any-pointer: coarse` 将导航、音色卡、音域与八度控制、
-演奏参数和抽屉文字提升到约 15-20 px；主要点击目标为 50-82 px。布局采用库乐队的
-“顶部控制区 + 弹奏区”层级：音色、卷帘和演奏控制保持在大琴键上方。针对 10 英寸常见
-宽度还会应用同一字号尺度，即使扩展坞或浏览器把触摸屏报告为 fine pointer。触控琴键铺满
-舞台宽度，但使用固定的触屏高度而非真实键长宽比；普通桌面浏览器不受此宽度规则影响。
+*图 1：实时演奏 / 触摸屏。截图处于待机，开始会话后琴键才输出声音。*
 
-布局参考 ChordMiniApp 固定提交 `33623b8885259f59c4005dad79b489aca8ae4ef9` 中
-`PianoRollPanel`、`FallingNotesCanvas`、`PianoKeyboard` 和 `PianoVisualizerHeader`
-的公开实现：卷帘与紧凑钢琴约为 280:60，命中线位于卷帘高度的 88%。本项目没有复制
-其 Canvas 或播放逻辑；实时历史渲染器最高 30 FPS，设备像素比限制为 1.25，页面隐藏
-时停止绘制，音符记录上限为 192 条。音符更新通过独立 external store 订阅，不驱动
-整个实时页面按帧重渲染。输出增益固定显示在两页工具栏，使用 `-60..+6 dB` 的实际
-物理量，默认 `0 dB`；负值衰减、正值提升，并在会话运行期间实时生效。该控件只调整
-合成器输出，不修改浏览器、PulseAudio 或 ALSA mixer 的系统音量。力度、移调、混响、
-弯音和延音位于触控演奏页；MIDI 文件、录音监听、模型参数、连接设置和性能诊断位于
-相应页面的底部抽屉。主界面不显示引擎名，诊断页才显示实际运行时；正增益造成满幅削波时，
-诊断页显示累计削波样本数。
+| 区域 | 操作 | 正常状态与注意事项 |
+| :--- | :--- | :--- |
+| 会话栏 | 选择触摸屏、钢琴音色、输出和延时档，然后按“开始演奏” | 状态显示“待机”或“演奏中”；蓝牙输出不允许低延时档 |
+| 参数栏 | 拖动输出增益、混响、力度和移调，选择力度曲线与钢琴年份 | 参数实时作用于合成 PCM，不改变系统音量 |
+| 实时卷帘 | 选择 2、4 或 8 秒历史，查看按键和 NPU P95、欠载、监听丢弃及削波 | 指标在会话产生事件后更新；短音符仍保留可见轨迹 |
+| 触控控制 | 选择 13 或 25 键、键盘大小和八度；使用弯音与延音 | 触摸模式不提供 88 键；弯音松开后回中 |
+| 底部琴键 | 按下立即发送 `note_on`，抬起发送 `note_off` | 后端保证最短 16 ms 发声门；取消触摸和失焦会释放音符 |
 
-#### Piano-DDSP 钢琴
+推荐先选择 EDIFIER 等明确输出和“均衡”延时档，确认“演奏中”后再触键。发生悬挂音符时，
+使用顶部 Panic 图标全部停音，随后停止会话并检查输出设备。
 
-“钢琴”默认进入 Piano-DDSP，提供 16 声部、延音踏板、钢琴年份、实时模型切换、
-MIDI 文件播放器、浏览器监听和录音。它使用版本化 FP32 bundle 和独立常驻 worker，
-不经过 DDSP-VST 的单音控制模型。完整模型、部署和验收约定见
-[Piano-DDSP 实时系统](piano-ddsp.md)。
+### 3.2 MIDI 键盘
 
-#### DDSP-VST 神经音色
+![实时演奏 MIDI 模式，顶部复用共享钢琴设置，中部是实体 MIDI 输入和实时卷帘，底部是可视键盘。](images/webui/realtime-midi.png)
 
-“神经音色”使用的是 **DDSP-VST 状态化音色 OM**，不是 MIDI-DDSP 双模型。选择动态扫描到
-的 DDSP-VST OM、音频输出和实体 MIDI 输入。触控钢琴和实体 MIDI 会进入同一实时引擎。
-窗口失焦、触摸取消、WebSocket 断开或停止会触发
-all-notes-off，避免持续音符。默认优先选择 Violin Mixed OM 和单音模式；FP16 与
-2-8 声部只在高级设置显示。
+*图 2：实时演奏 / MIDI 键盘。MIDIPLUS TINY 是实体输入，钢琴模型和参数与触摸模式一致。*
 
-USB/有线输出默认使用 `balanced` 延时档（2 个 20ms 控制帧、20ms 设备缓冲），
-也可以选择 `low` 或 `safe`。蓝牙输出禁用 `low` 并使用至少 220ms 的 A2DP 缓冲。
-运行状态分别显示渲染、队列、设备、Pulse Sink 和估算总延时。模型下方的音域来自
-Google TFLite `metadata.json`；超出训练音域的按键会降低饱和度，但不会自动移调。
+| 区域 | 操作 | 正常状态与注意事项 |
+| :--- | :--- | :--- |
+| 会话栏与参数栏 | 与触摸模式相同，先选择输出和钢琴音色再开始 | 不存在第二套音色参数，也不加载 DDSP-VST Synth |
+| 琴键数量 | 选择 32、49、61 或 88，使可视范围匹配控制器 | 低于 88 键可按箭头移动八度；88 键固定为 A0-C8 |
+| MIDI 输入 | 选择服务端枚举的实体端口 | 输入来自板端 ALSA/RtMidi，不来自浏览器 Web MIDI |
+| 卷帘与键盘 | 观察后端 WebSocket 发送的真实音符边沿 | 底部键盘用于可视反馈，不是 MIDI 文件编辑器 |
+| 录音、监听和性能 | 使用与触摸模式相同的卷帘工具栏 | 这些状态属于共享会话，切换停止模式不会重置设置 |
 
-页面提供 Pitch Shift、Harmonics、Noise、Output Gain、ADSR、Input Pitch、Input Gain、
-Reverb Size、Damping 和 Wet。除模型与输出设备外，这些参数可在会话运行时通过
-WebSocket 更新。处理顺序为状态化 OM、谐波/噪声增益、CPU 合成、输出增益和
-JUCE/FreeVerb 风格混响。
+列表没有端口时，到“设备 / 音频设备 / MIDI”确认 USB 与 `/dev/snd/seq`。运行中不要拔插
+控制器；设备断开时后端会释放该来源的音符和踏板。
 
-Web 服务在进程内保留一次 PyACL runtime 初始化，停止会话时释放音符、声卡、OM、
-dataset、buffer 和 context，但不反复执行 `reset_device`/`acl.finalize`。这样模型或输出
-设备切换后可以立即重新启动；服务进程退出时才统一释放 device 和 ACL runtime。
+## 4. MIDI-DDSP 文件渲染
 
-### MIDI-DDSP
+MIDI-DDSP 先把已有 MIDI 渲染为完整 WAV，再播放或下载，不承担低延时按键合成。“音频库”
+和“新建渲染”是分段视图，一次只显示一个文件钢琴卷帘。
 
-该页面使用真正的 **MIDI-DDSP 版本化模型包**。可选择仓库 MIDI 或上传不超过 10 MiB
-的 `.mid`/`.midi` 文件，随后完整渲染并缓存 WAV，再播放或下载。模型包固定源码提交、
-checkpoint、全部 ONNX/OM 组件和随机种子，前端不再分别组合 Expression 与 Synthesis。
+### 4.1 音频库
 
-页面将“音频库”和“新建渲染”分开。任务目录中已经存在 `output.wav` 的历史 MIDI-DDSP
-任务会持续出现在音频库中，不要求当前曲目、音色或模型参数与生成时一致。浏览器播放器
-直接读取该 WAV；“开发板播放”会明确提交下拉框中显示的实际设备，不再把空值解释为
-含义不确定的“系统默认”。USB/蓝牙 PulseAudio 输出使用 `paplay`；没有外接输出时，板载
-3.5 mm 使用 `Deviceid 2`、`hw:ascend310b`、48 kHz 单声道 `aplay` 兼容路径，立体声
-WAV 在临时文件中确定性下混，原始 WAV 不改写。播放不会重新加载模型或执行 NPU 推理。
-开发板直放提供 `-60` 到 `0 dB` 的独立增益，默认按 WAV 原始电平使用 `0 dB`，且支持
-暂停、继续和停止。
-“播放位置”使用“当前浏览器 / 开发板喇叭”二选一；页面只显示所选路径对应的控制器，
-避免把浏览器原生播放键误认为开发板音频输出。
+![MIDI-DDSP 音频库，左侧是当前 MIDI 与版本，中间是唯一的文件钢琴卷帘和播放控制，右侧是曲目列表。](images/webui/midi-ddsp-library.png)
 
-新建渲染区使用独立的只读文件卷帘显示完整 MIDI 时间轴。卷帘按声部和乐器着色，显示
-左侧音高键盘、小节线、拍线、缩放、横向拖动和渲染进度游标；点击声部会定位到相应的
-乐器分配行。音频库中的卷帘随所选版本同步更新，并且是页面唯一的动态可视化：旧波形区
-已经移除，浏览器或开发板播放按钮合并到卷帘工具栏，10 寸屏不再同时堆叠两块动态画布。
+*图 3：MIDI-DDSP / 音频库。选择版本会同步更新配置摘要、卷帘和 WAV。*
 
-浏览器播放时间直接绑定到卷帘。播放开始后自动放大时间轴并跟随当前区段，当前音符和
-左侧琴键同步高亮；卷帘工具栏提供播放、暂停、停止、循环、可拖动播放位置以及当前/总
-时长，音频元数据载入完成前会冻结控制，播放失败会显示明确状态。暂停、停止或渲染空闲
-时会停止动画循环。交互参考
-[html-midi-player](https://github.com/cifkao/html-midi-player)、官方
-[advanced demo](https://codepen.io/cifkao/pen/GRZxqZN) 与其使用的
-[Magenta.js PianoRollCanvasVisualizer](https://magenta.github.io/magenta-js/music/classes/_core_visualizer_.pianorollcanvasvisualizer.html)
-的播放器绑定、活动音符和自动跟随方案；声部配色与页面视觉继续参考
-[ChordMiniApp](https://github.com/ptnghia-j/ChordMiniApp)。项目没有直接引入 Tone.js、
-Magenta.js 或新的播放器依赖，而是沿用后端已经解析好的音符数据和现有 WAV。高级示例
-支持多播放器/多可视化器互相绑定；本项目按 10 寸屏的单卷帘要求只保留一个可视化器。
+| 区域 | 操作 | 正常状态与注意事项 |
+| :--- | :--- | :--- |
+| 曲目与版本 | 选择曲目和历史渲染版本，必要时设为默认 | 文件缺失的版本标记不可用，不会被静默替换或删除 |
+| 文件卷帘 | 使用缩放、复位、全屏和折叠检查完整 MIDI | Canvas 是只读时间轴，显示声部颜色、光标和活动音符 |
+| 播放位置 | 选择“开发板喇叭”或“当前浏览器” | 默认是开发板输出；浏览器播放不修改板端 mixer |
+| 板端播放 | 选择明确输出和播放音量后开始 | 播放占用资源锁，先停止实时演奏、Effect 和设备测试 |
 
-文件卷帘与实时演奏的事件卷帘互不共享状态，第一版只提供查看、缩放、平移、声部联动和
-游标，不编辑 MIDI 音符。实现使用静态网格、音符和游标三个 Canvas 层；播放或渲染停止后
-不保留动画循环，大型 MIDI 也不会为每个音符生成 React 节点。
+### 4.2 新建渲染
 
-音频库使用 Python 标准库 `sqlite3` 建立可重建目录索引，数据库位于
-`reports/webui/library.sqlite3`。`midi_sources` 按 MIDI 内容 SHA256 归并曲目，
-`render_versions` 保存每次显式渲染的模型、声部映射、种子、增益、尾音、采样率、配置
-哈希和产物引用，`library_preferences` 保存每首曲目的首选版本。WAV、MIDI、完整报告和
-任务元数据仍由文件系统负责；数据库删除或损坏后可从成功任务的 `metadata.json` 幂等
-重建。产物缺失时版本会标记为不可用而不删除记录。
+![MIDI-DDSP 新建渲染，中部是 MIDI 概况和钢琴卷帘，下方是声部音色分配，右侧是模型、种子、增益和尾音设置。](images/webui/midi-ddsp-render.png)
 
-同一配置再次渲染也会保留为新版本。默认播放首先选择可用的首选版本；没有首选版本时
-选择最新成功版本。用户明确选择的版本不可用时直接报错，不静默切换到其他 WAV。
+*图 4：MIDI-DDSP / 新建渲染。配置和随机种子会写入新版本，供后续追溯。*
 
-所有页面按物理设备使用统一名称；后端差异只作为括号标记显示，例如
-`EDIFIER M16 Pro（PulseAudio）`、`EDIFIER M16 Pro（直连，默认）` 和
-`板载 3.5 mm（单声道，默认）`。DDSP-VST 不显示曾导致 DMA 卡死的板载 PulseAudio
-双声道路径；设备总览仍显示板载单声道兼容输出，因此不会出现设备可播放但总数为零的矛盾状态。
+| 区域 | 操作 | 正常状态与注意事项 |
+| :--- | :--- | :--- |
+| 曲目栏 | 从目录选择 MIDI，或上传 `.mid`/`.midi` | 上传受格式和大小限制，不接收任意文件路径 |
+| 概况与卷帘 | 核对时长、音符、轨道、声部和最大复音 | 复音轨会拆为严格单音声部，并显示明确提示 |
+| 声部音色 | 为每个声部选择服务端目录中的 MIDI-DDSP 音色 | GM Program 只是建议，不是最终合成器 |
+| 渲染设置 | 选择固定 bundle、方案、种子、输出增益和尾音 | 相同配置再次提交仍生成新历史版本 |
+| 任务进度 | 开始后观察阶段、心跳、ETA 和报告 | 完成后到音频库选择该版本播放或下载 |
 
-MIDI-DDSP 模型本身是单声部模型。stateful v2 会把复音轨自动拆成最少数量的单音
-voice，按静态 batch `1/2/4/8` 推理，再按 Google MIDI-DDSP 的方式对齐并混音；程序不会
-静默丢弃和弦或只保留最高声部。页面选择的渲染音色统一应用到全部 voice，MIDI 文件
-中的 General MIDI program 只保留为分析信息。旧 legacy 模型包不能渲染多声部文件。
+## 5. DDSP-VST 麦克风 Effect
 
-渲染期间页面持续显示固定阶段列表、总进度、阶段进度、当前声部批次、工作量、已用
-时间、ETA 和最近心跳。10 秒没有心跳会显示连接警告，恢复事件后自动消失。渲染期只
-提供停止；完整 WAV 写入缓存并进入播放后才启用暂停/继续。下载和播放器始终选择最终
-`output.wav`，不会误选 stem。
+固定链路为“实体 Capture -> Feature OM -> Control OM -> CPU DDSP 合成 -> 明确输出”。
+生产后端必须同时报告 `acl/om`，不提供 ONNX、TFLite、浏览器推理或 CPU 模型回退，也不
+提供录音、浏览器监听或原声 Dry/Wet 直通。测试时使用独立单音声源，禁止让音箱直接反馈到
+摄像头麦克风。
 
-运行时使用 Google MIDI-DDSP 的谐波、FilteredNoise 和逐乐器混响语义。混响资产为
-20 组 16 kHz、48,000 点 IR，产品使用 ID 0-12，采用 2,048 点分区 FFT 卷积并叠加
-干声；默认在上游 1 秒结束静音之外保留 2 秒混响尾音。已验证 origin OM、种子 `20260724`
-与 `0 dB` 为默认值。缺少或损坏混响资产时任务不会启动。多 voice 求和超过
-`-0.45 dBFS` 时会统一降低最终混音增益，避免写入 WAV 或设备时发生硬削波；报告记录
-原始峰值、保护增益和超范围样本数。
+### 5.1 音色与实时监测
 
-### 设备：扬声器测试
+![DDSP-VST 音色页，左侧是音高响度轨迹和推理指标，右侧是输入、输出、音色、移调、校准、谐波和噪声参数。](images/webui/ddsp-vst-tone.png)
 
-设备页通过 PulseAudio 的结构化 sink 列表显示当前音频输出，包括已经连接并加载为
-`bluez_sink` 的蓝牙音箱。选择输出后，可播放短正弦测试音，分别检查左声道、双声道或右声道。
-页面可调测试频率、音量和持续时间，并显示进度、采样率、声道数和音频下溢次数。
-默认测试音为 440 Hz、-18 dBFS、3 秒；后端将单次测试限制在 10 秒以内，最大音量限制
-为 -3 dBFS，并在测试音首尾加入淡入淡出以减少爆音。
+*图 5：DDSP-VST / 音色。待机时轨迹为零，后端标识仍应显示 Feature 和 Control 均为 ACL/OM。*
 
-设备页还提供“蓝牙音频”面板。该面板使用开发板系统中已经存在的 `bluetoothctl`
-扫描、配对、信任、连接和断开设备，不安装软件，也不修改系统启动配置。连接成功后，
-后端会尽量将对应 `bluez_card` 切换到 A2DP 播放 profile；随后刷新音频输出列表，
-蓝牙音箱会以“蓝牙”标记出现在实时演奏、MIDI-DDSP 和扬声器测试的音频输出下拉框中。
-若设备需要 PIN、确认码或特殊 HFP/A2DP 流程，界面会保留错误信息，需要在开发板系统界面
-或终端中完成该设备特有的交互。
+| 区域 | 操作 | 正常状态与注意事项 |
+| :--- | :--- | :--- |
+| 音频链路 | 确认 UGREEN 等实体 Capture 和 EDIFIER 等输出后启动 | 运行中设备与音色锁定；设备丢失会停止并释放资源 |
+| 实时监测 | 查看音高、电平、Feature/Control 耗时、总延迟和异常计数 | 两个后端都必须是 `ACL/OM`，溢出、欠载和削波应为 0 |
+| 音色 | 从中文下拉框选择已发布 Control OM；刷新仅重扫目录 | 中文显示名不改变服务端 ID 或 SHA256 |
+| 音色参数 | 调整移调、音高校准、力度校准、谐波和噪声 | 同时关闭谐波与噪声会失去主要合成声源 |
 
-测试音使用 `paplay --device=<sink>` 直接发送到下拉菜单选中的 PulseAudio 输出，不依赖
-系统默认输出。蓝牙设备只有在 `bluetoothctl info <MAC>` 显示 `Connected: yes`，并且
-`pactl list short sinks` 中出现对应 `bluez_sink` 后才会进入下拉菜单。仅完成配对但当前
-断开的设备不会作为可播放输出显示。
+### 5.2 输入门
 
-扬声器测试与实时演奏、MIDI-DDSP 播放共用资源锁。声卡被其他任务占用时，
-设备页会禁用启动按钮，API 返回 `409 busy`。该测试能够确认所选输出路径是否实际发声及
-左右声道是否正确，但不能替代麦克风、声压计或硬件回环进行的音质与电气测量。
+![DDSP-VST 输入门页，左侧保留轨迹和指标，右侧是校准、门限、迟滞、保持、开启与关闭时间。](images/webui/ddsp-vst-gate.png)
 
-### 设备
+*图 6：DDSP-VST / 输入门。门关闭时，底噪不会送入合成输出。*
 
-显示 NPU、CANN、PyACL、Python 依赖、模型、音频输入输出和 MIDI 端口状态。已知的
-`npu-smi` `Health: Alarm` 只显示警告；实际 OM 推理成功时不会阻断操作。
+| 控件 | 操作 | 注意事项 |
+| :--- | :--- | :--- |
+| 重新校准 | 在安静环境采集底噪并生成建议阈值 | 校准期间不要讲话、拍手或播放扬声器 |
+| 开启门限 | 设置为高于底噪、低于目标声源峰值 | 太低会被噪声触发，太高会吞掉弱音和起音 |
+| 迟滞 | 让关闭阈值低于开启阈值 | 用于减少临界电平附近的反复开关，不是额外增益 |
+| 保持、开启、关闭 | 调整门的保持与包络时间 | 关闭过快会截断尾音，过慢会保留环境声 |
 
-设备页通过 `/api/v1/audio-inputs` 区分真实 `capture` 和 PulseAudio `monitor`。monitor
-只是输出回采，不算 DDSP-VST Effect 的真实麦克风输入。当前板端若只有板载与蓝牙
-A2DP monitor，页面会显示“无真实音频输入”，并且不提供 Effect 启动按钮。Effect 的
-后续启用条件为：USB/HFP capture 可见、特征模型完成 ONNX/OM 对齐、20 ms 连续推理和
-双工声卡测试全部通过。
+### 5.3 效果
 
-蓝牙面板可以处理常见无 PIN 音箱的扫描、配对和连接。不同耳机或喇叭的命令行配对及
-A2DP/HFP 配置可能不同；若 Web 界面返回认证、profile 或控制器错误，优先保留错误输出，
-再用系统图形界面或 `bluetoothctl` 终端交互完成设备特有步骤。
+![DDSP-VST 效果页，右侧集中显示输出增益、混响空间、阻尼和混响量，左侧保留实时链路指标。](images/webui/ddsp-vst-effects.png)
 
-如果开发板内核没有 `/dev/snd/seq` 或 `snd_seq` 模块，RtMidi 无法创建 ALSA
-Sequencer 客户端。此时 MIDI 端口接口会返回 `available: false`，界面仍可使用
-触控钢琴和电脑键盘；这不是重新安装 `mido` 或 `python-rtmidi` 能够解决的问题。
+*图 7：DDSP-VST / 效果。默认输出增益为 -18 dB，持续过载会触发安全静音。*
 
-## API 命名
+| 控件 | 操作 | 注意事项 |
+| :--- | :--- | :--- |
+| 输出增益 | 从较低值开始逐步调高 | 这是转换后 PCM 增益，不是系统音量 |
+| 混响空间与阻尼 | 调整反馈长度和高频衰减 | 参数描述听感，不代表精确房间尺寸或截止频率 |
+| 混响 | 调整合成信号的混响比例 | 没有原声直通，因此不是 Dry/Wet 混音器 |
+| 安全状态 | 看到“安全静音”或异常时立即停止 | 排查峰值、增益和反馈后再重新启动 |
 
-- `GET /api/v1/status` 使用 `realtime` 返回统一会话状态。
-- `GET /api/v1/realtime/catalog|status` 返回统一音色、兼容设备和当前会话。
-- `POST /api/v1/realtime/start|switch|stop|panic` 与
-  `PATCH /api/v1/realtime/parameters` 管理统一实时会话。
-- `WS /api/v1/realtime/events` 统一处理音符、踏板、弯音、播放器、录音、监听和状态事件；
-  `GET /api/v1/realtime/recordings/{id}` 下载完成的 WAV。
-- `GET /api/v1/catalog` 返回 `ddsp_vst_models`、`midi_ddsp_bundles`、带单/复音分析的 MIDI 和混响资产。
-- `GET /api/v1/audio-inputs` 返回分类后的音频输入；实时输出从
-  `GET /api/v1/realtime/catalog` 获取。
-- `GET /api/v1/bluetooth-audio`、`POST /api/v1/bluetooth-audio/scan|connect|disconnect`
-  管理蓝牙音频设备发现与连接。
-- `GET /api/v1/midi-ddsp/audio-devices` 只返回 MIDI-DDSP WAV 播放实际支持的输出，并标明
-  当前默认设备。
-- `POST /api/v1/midi-ddsp/jobs` 使用 `model_bundle_id`、乐器、种子和尾音参数管理播放/渲染。
-- `POST /api/v1/midi-ddsp/recordings/{job_id}/play` 将历史任务的 `output.wav` 直接发送到
-  指定开发板音频输出，不触发 MIDI-DDSP 渲染。
-- `GET /api/v1/midi-ddsp/library` 按 MIDI 曲目返回音频库、默认版本和版本数量；
-  `GET /api/v1/midi-ddsp/library/{source_id}/versions` 返回该曲目的全部版本配置。
-- `PATCH /api/v1/midi-ddsp/library/{source_id}/preference` 设置或清除首选版本；
-  `POST /api/v1/midi-ddsp/library/versions/{render_id}/play` 播放明确指定的版本。
-- `GET /api/v1/midi-files/{midi_id}/piano-roll` 返回文件卷帘所需的时长、音域、节拍、
-  声部和音符数据。
+## 6. 设备
 
-旧 `/api/v1/live/*`、`/api/v1/ddsp-vst/*` 和 `/api/v1/piano-ddsp/*` 路由已删除，
-实时功能统一使用 `/api/v1/realtime/*`，避免维护多套行为不同的接口。
+设备工作区分为“设备概览”“音频设备”和“运行环境”。它用于核验和短测试；检测到设备并不
+等于已经听音或完成真实 OM 推理。
 
-## 开发与测试
+### 6.1 设备概览
 
-本地启动 FastAPI 服务：
+![设备概览，展示开发板状态、实时演奏准备度、DDSP-VST Capture 条件、MIDI-DDSP 资产和运行依赖。](images/webui/devices-overview.png)
 
-```powershell
-python -m uvicorn midi_ddsp_webui.app:app --host 127.0.0.1 --port 8765
+*图 8：设备概览只总结状态，不重复放置页面跳转按钮或终端全文。*
+
+| 区域 | 阅读方法 | 注意事项 |
+| :--- | :--- | :--- |
+| 开发板状态 | 确认主机、IPv4、平台和 NPU | `Health Alarm` 是警告，真实 OM 任务结果才决定可用性 |
+| 实时演奏 | 确认 NPU、输出和会话是否空闲 | “空闲”不表示已经听到声音 |
+| DDSP-VST | 确认实体 Capture、Monitor 数量和错误 | Monitor 不能替代麦克风 Capture |
+| MIDI-DDSP 与环境 | 确认模型、组件和 Python 依赖已索引 | 目录数量不替代 SHA256 与真实推理验收 |
+
+### 6.2 音频输出与扬声器测试
+
+![音频输出页，上方是蓝牙和输出接口，下方是声道可视化、系统音量、测试声道、频率、音量和时长。](images/webui/devices-audio-output.png)
+
+*图 9：设备 / 音频设备 / 输出。系统音量属于输出状态，与测试 dBFS 和应用增益独立。*
+
+| 区域 | 操作 | 注意事项 |
+| :--- | :--- | :--- |
+| 蓝牙音频 | 刷新、扫描或连接板端已有设施支持的设备 | 不安装缺失软件；配对成功不等于 A2DP sink 可播放 |
+| 输出接口 | 选择 EDIFIER 等明确的 PulseAudio 或 ALSA 输出 | 后端标识用于区分路由，不静默切换设备 |
+| 系统音量 | 查看当前 sink 的只读音量和静音状态 | 音箱硬件按键可以改变该读数 |
+| 扬声器测试 | 从低 dBFS 开始，选择声道、频率和 1-10 秒时长 | 测试独占资源；逐项听辨左、右声道 |
+
+### 6.3 音频输入与麦克风测试
+
+![音频输入页，上方区分实体 Capture 和 Monitor，下方显示 dBFS、电平、阈值、时长和测试按钮。](images/webui/devices-audio-input.png)
+
+*图 10：设备 / 音频设备 / 输入。UGREEN 是实体输入，Monitor 明确标为输出回采。*
+
+| 区域 | 操作 | 注意事项 |
+| :--- | :--- | :--- |
+| 输入列表 | 选择标有“实体输入/CAPTURE”的设备 | 输入测试和 DDSP-VST 都拒绝 Monitor |
+| 实时电平 | 对麦克风发声并观察 RMS、峰值和电平条 | `-96 dBFS` 常表示待机或静音 |
+| 阈值与时长 | 阈值设在底噪之上、目标声源之下，选择 1-10 秒 | 该阈值不等于 DDSP-VST 输入门参数 |
+| 输入测试 | 启动后等待“测试中”和最终结果 | 测试占用 Capture，Effect 运行时不能开始 |
+
+### 6.4 MIDI 设备
+
+![MIDI 设备页，上方显示输入数量，下方全宽展示 MIDIPLUS TINY 的键数、型号、端口和可用状态。](images/webui/devices-midi.png)
+
+*图 11：设备 / 音频设备 / MIDI。零或单端口占满可用宽度，多端口才分栏。*
+
+| 区域 | 操作 | 注意事项 |
+| :--- | :--- | :--- |
+| MIDI 列表 | 核对制造商、型号、键数和输入端口 | 数据来自服务端 ALSA/RtMidi，不是浏览器 Web MIDI |
+| 状态 | 显示可用后，在实时演奏选择同一端口 | 重新插拔可能改变 ID，应刷新并重新选择 |
+| 空状态 | 零设备时显示明确提示 | 检查 USB 和 `/dev/snd/seq`；触摸模式仍可使用 |
+
+### 6.5 运行环境
+
+![运行环境页，顶部是 Python、依赖、模型和 NPU 摘要，下方是依赖清单、解释器路径和已索引模型。](images/webui/devices-runtime.png)
+
+*图 12：设备 / 运行环境。NPU 警告以结构化摘要显示，不直接输出终端全文。*
+
+| 区域 | 阅读方法 | 注意事项 |
+| :--- | :--- | :--- |
+| 摘要 | Python、依赖、模型和 NPU 应有明确文字状态 | 依赖通过不替代声卡、OM 和听音验收 |
+| NPU | 保留 `Health Alarm`，结合真实 OM 任务判断 | 已知 Alarm 不是自动推理失败 |
+| 运行依赖 | 检查 FastAPI、音频、MIDI 和 ACL | 板端只允许部署脚本规定的 requirements pip 安装 |
+| 模型与解释器 | 检查 OM 类型、精度、大小和 Python 路径 | 不使用系统 Python，也不在板端运行 Node/npm |
+
+## 7. 前后端结构
+
+```mermaid
+flowchart LR
+    accTitle: WebUI 前后端边界
+    accDescr: 浏览器只提交目录 ID 与受限参数，FastAPI 管理资源、模型和板端设备，NPU 推理留在 Ascend 设备侧。
+    browser["React / TypeScript\nCanvas + WebSocket"] --> api["FastAPI / Uvicorn\n端口 8765"]
+    api --> resources["ResourceCoordinator\n任务与设备边界"]
+    resources --> piano["Piano-DDSP runtime\nOM + CPU DSP"]
+    resources --> midi["MIDI-DDSP renderer\nOM bundle + WAV library"]
+    resources --> effect["DDSP-VST Effect\nFeature OM + Control OM + CPU DSP"]
+    resources --> devices["PulseAudio / ALSA / MIDI\n蓝牙和测试"]
 ```
 
-前端开发服务器：
+- `webui/src/`：React、TypeScript、Vite、Lucide、Canvas、Vitest 和 Playwright。
+- `midi_ddsp_webui/`：FastAPI 路由、状态、资源协调、MIDI-DDSP 音频库、设备测试和 Effect。
+- `piano_ddsp_runtime/`：Piano-DDSP 实时 MIDI 状态、16 ms 最短门长、worker、FIFO 和 CPU DSP。
+- `reports/webui/library.sqlite3`：可重建目录；MIDI、WAV、任务元数据、manifest、哈希和报告仍是事实来源。
+
+浏览器只提交服务端枚举的模型、MIDI、渲染和设备 ID，以及有边界的数值参数。它不提交任意
+路径、shell 命令或推理后端。所有有副作用的 HTTP 请求和 WebSocket 均为同源连接。
+
+## 8. 本地构建与安全部署
+
+在开发电脑执行标准验证和生产构建。`npm ci` 只在首次准备或锁文件变化时执行；开发板不
+安装 Node/npm。
 
 ```powershell
+python -m pytest -q
 cd webui
 npm ci
-npm run dev
-```
-
-测试与构建：
-
-```powershell
-python -m unittest discover -s tests -v
-cd webui
 npm run test
 npm run build
 npm run test:e2e
 ```
 
-本地测试不会执行 PyACL、ATC、OM 推理或 `npu-smi`。触控发声、USB/蓝牙输出、实体
-MIDI、OM 验证和基准测试必须在真实 Ascend 310B 开发板上完成。
+回到 `case3` 根目录后运行部署脚本：
 
-实时界面的 Playwright 验收覆盖 1366x768、1024x600 和 390x844，检查琴键数量、布局
-稳定性、横向溢出、抽屉与底部导航关系，并向实时 WebSocket 注入三和弦后读取 Canvas
-像素，避免只检查到一个空白画布。
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/deploy_midi_ddsp_webui.ps1 `
+  -SshTarget ascend8t `
+  -RemoteRoot /home/HwHiAiUser/Documents/case3
+```
 
-## 常见问题
+脚本在本地生成 `webui/dist`，同步完整后端、vendored `partitura` 和静态资源到 staging，
+校验 SHA256 后原子切换 `dist`，并只重启原 `scripts/run_webui.py` 对应的 `8765` 服务。同步
+不得删除板端 `midi/`、`midi_wav/`、任务、转换日志、模型、校验清单或报告。
 
-- 页面显示“板端功能不可用”：本地开发环境会主动禁用 OM 播放和板端测试，这是预期行为。
-- 启动时报 `missing existing dependencies`：按错误清单手动安装依赖后重新启动。
-- 找不到蓝牙声卡：先在系统图形界面完成配对和音频模式选择，再刷新设备页。
-- 实体 MIDI 显示不可用：检查 `ls -l /dev/snd/seq`；设备不存在时继续使用触控或电脑键盘。
-- 返回 `409 busy`：NPU 或声卡正被另一个实时、播放或测试任务占用，停止该任务后重试。
-- 更换或新增模型后列表不更新：点击界面刷新按钮，目录扫描不使用浏览器传入的路径。
+部署后至少验证首页和状态接口，再核对 WebSocket、进程 PID、静态资源哈希与真实设备流程：
+
+```powershell
+Invoke-WebRequest http://192.168.1.90:8765/ -UseBasicParsing
+Invoke-RestMethod http://192.168.1.90:8765/api/v1/status
+```
+
+## 9. API 索引
+
+下表是稳定分组，具体请求体和响应以路由代码与测试为准。浏览器请求只接受目录 ID、设备 ID
+和受限参数，不接受任意文件路径或后端选择。
+
+| 分组 | 主要端点 | 用途 |
+| :--- | :--- | :--- |
+| 全局 | `GET /api/v1/status` | 汇总资源拥有者、实时会话、Effect、设备和依赖 |
+| 实时会话 | `GET /api/v1/realtime/catalog`, `GET /api/v1/realtime/status`, `POST /api/v1/realtime/start|stop|panic`, `PATCH /api/v1/realtime/parameters` | 管理共享 Piano-DDSP 会话 |
+| 实时事件 | `WS /api/v1/realtime/events`, `GET /api/v1/realtime/recordings/{id}` | 音符边沿、踏板、弯音、录音、监听和状态同步 |
+| MIDI-DDSP | `GET /api/v1/catalog`, `/midi-ddsp/library`, `/midi-files/{id}/piano-roll`, `POST /api/v1/midi-ddsp/jobs` | 目录、文件卷帘、版本、渲染和播放 |
+| DDSP-VST | `GET /api/v1/ddsp-vst-effect/catalog|status`, `POST /api/v1/ddsp-vst-effect/start|stop|calibrate`, `PATCH /api/v1/ddsp-vst-effect/parameters`, `WS /api/v1/ddsp-vst-effect/events` | OM-only Effect 目录、启停、校准和指标 |
+| 音频输入 | `GET /api/v1/audio-inputs`, `GET /api/v1/audio-input-test/status`, `POST /api/v1/audio-input-test/start|stop` | 区分 Capture/Monitor 并运行输入测试 |
+| 设备与蓝牙 | `GET /api/v1/bluetooth-audio`, `POST /api/v1/bluetooth-audio/scan|connect|disconnect` | 使用板端已有蓝牙能力 |
+
+`/api/v1/realtime/*` 是实时钢琴唯一入口；不要恢复历史的 `/api/v1/live/*`、
+`/api/v1/ddsp-vst/*` 或 `/api/v1/piano-ddsp/*`。麦克风 Effect 使用独立的
+`/api/v1/ddsp-vst-effect/*`。设备消失、哈希或张量不符、NPU 不可用、真实 Capture 丢失时，
+Effect 必须拒绝或停止并释放锁，不能静默改用其他设备。
+
+## 10. 测试、验收与故障处理
+
+本地只能运行语法、单元、前端和浏览器测试，不得执行 PyACL、ATC、OM 推理、`npu-smi` 或
+物理音频。板端验收覆盖 `1920x969` 触摸、`1366x768` 桌面、`1024x768` 平板和
+`390x844` 手机，检查无横向溢出、重叠、文字截断、触控目标过小、Canvas 空白和不可达控件。
+
+界面改动还应验证四项导航、语义页签、加载/错误/运行状态、触摸快速按放、底部琴键位置、
+MIDI 复音和模式切换。音频或推理改动必须记录 `midi_to_pcm_ms`、队列延迟、非零 PCM、
+削波、欠载和真实后端，HTTP 200 不能单独证明声音正确。完整阈值、UI soak、API 负载和
+600 秒 DDSP-VST 双工结果见[WebUI 触摸屏终审与实机压测](webui-acceptance.md)。
+
+常见处理原则：
+
+- 资源占用：停止当前实时、播放、Effect 或测试任务，不通过刷新抢占。
+- 实体 MIDI 不可用：检查 USB 和 `/dev/snd/seq`，再刷新服务端端口。
+- 蓝牙已配对但无输出：确认 A2DP sink 已出现；不在部署中安装缺失工具。
+- DDSP-VST 无法启动：检查模型哈希、张量、`acl/om`、实体 Capture 和指定输出，不使用回退。
+- NPU 显示 `Health Alarm`：保留为警告，结合真实 OM 推理和指标判断。
+- 任务结束：使用页面停止按钮；实时会话可额外 Panic，然后回到设备概览确认资源空闲。
+
+更完整的诊断步骤见[测试故障排查](troubleshooting.md)。

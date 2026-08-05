@@ -132,7 +132,7 @@ flowchart TD
     FIT --> DRAW["cv2.addWeighted\n叠加到原图"]
 ```
 
-每一步的实现都在 [lane_detector.py](samples/case6/lane_detector.py) 的
+每一步的实现都在 [lane_detector.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case6/lane_detector.py) 的
 `LaneDetector` 类中。关键步骤说明：
 
 1. **Canny 边缘检测**：检测图像中亮度剧烈变化的位置（车道线通常是白色或
@@ -335,7 +335,7 @@ def get_classifier():
 1. 在「道路感知」页签上传一张包含道路的图像
 2. 观察车道线检测结果——绿色线条应覆盖路面上的车道标线
 3. 查看右侧的场景分类结果和驾驶建议
-4. 如果车道线检测不理想，可以在 [config.py](samples/case6/config.py) 中
+4. 如果车道线检测不理想，可以在 [config.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case6/config.py) 中
    调整参数
 
 #### 2.7.3 调整车道线参数 {#src-experiment-case6-h25}

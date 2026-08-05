@@ -1,7 +1,7 @@
 # Case 3：Ascend 310B DDSP 音乐工作台
 
-本目录包含 Ascend 310B 智能电子琴案例的可运行程序、Web 工作台、模型转换工具、
-板端验证脚本和 3D 结构件。系统接收触控钢琴、电脑键盘、实体 MIDI 或 MIDI 文件，
+本目录包含 Ascend 310B 智能电子琴案例的可运行程序、Web 工作台、已发布模型下载工具和
+板端验证脚本。系统接收触控钢琴、实体 MIDI、MIDI 文件或实体麦克风输入，
 使用 PyACL 调用 OM 模型，并通过已连接的 USB、蓝牙或板载音频设备播放。
 
 详细设计、板端记录和操作步骤见 [doc/](doc/README.md)。
@@ -12,26 +12,28 @@
 
 | 链路 | 入口 | OM 模型 | 用途 |
 | :--- | :--- | :--- | :--- |
-| DDSP-VST | `realtime_ddsp.py` | 每种音色一个状态化 OM | Web“实时演奏”的神经音色模式、电脑键盘和实体 MIDI 实时演奏 |
-| MIDI-DDSP | `midi_ddsp_realtime.py` | stateful v2 版本化模型包 | Web“MIDI-DDSP”页面的 MIDI 文件播放和 WAV 渲染 |
-| Piano-DDSP | `piano_ddsp_runtime.worker` | `model-suite-v1.0.0` FP32 bundle | 16 声部钢琴、硬件/网页 MIDI 与 MIDI 文件的统一实时播放 |
+| Piano-DDSP | `piano_ddsp_runtime.worker` | `model-suite-v1.0.1` FP32 bundle | 16 声部钢琴、硬件/网页 MIDI 与 MIDI 文件的统一实时播放 |
+| MIDI-DDSP | `midi_ddsp_realtime.py` | stateful v2 版本化模型包 | Web“MIDI-DDSP”页面的 MIDI 文件分析、WAV 渲染和播放 |
+| DDSP-VST Effect | `midi_ddsp_webui.ddsp_vst_effect` | Feature OM 与 11 个 Control OM | 摄像头麦克风的实时单音音色转换 |
 
-DDSP-VST 每 20 ms 根据音高、力度和 GRU 状态预测谐波/噪声控制量。MIDI-DDSP
-先从音符序列生成 expression controls，再由 synthesis 网络生成 DDSP 参数。stateful v2
-把双向上下文和自回归状态显式跨块传递。
-三条链路都在模型外执行音频合成，因此 ONNX/OM 只包含神经网络参数预测部分。
 Piano-DDSP 是独立常驻子进程，不经过 MIDI-DDSP 的整曲预渲染和 WAV 缓存流程。
+MIDI-DDSP 先从音符序列生成 expression controls，再由 synthesis 网络生成 DDSP 参数；
+stateful v2 把上下文和自回归状态显式跨块传递。DDSP-VST Effect 每 20 ms 从实体 Capture
+提取音高与响度，再由 Control OM 预测谐波和噪声控制量。三条链路都在模型外执行音频合成，
+生产运行时只加载已验证的 OM，不提供 ONNX、TFLite 或 CPU 模型回退。
 
 ## Web 工作台
 
-MIDI-DDSP Studio 使用 React + TypeScript + Vite 前端和 FastAPI 后端，包含三个工作区：
+MIDI-DDSP Studio 使用 React + TypeScript + Vite 前端和 FastAPI 后端，包含四个工作区：
 
-- **实时演奏**：只选择钢琴、提琴、长笛等音色；统一会话自动选择 Piano-DDSP 或 DDSP-VST 运行时，并共用网页琴盘、电脑键盘、实体 MIDI、MIDI 播放、录音和监听。
+- **实时演奏**：在同一工作区内切换触摸屏 13/25 键和实体 MIDI 键盘 32/49/61/88 键模式。
 - **MIDI-DDSP**：使用版本锁定的模型包完整渲染并缓存 WAV，再播放或下载。
-- **设备**：查看 NPU、模型、音频与 MIDI 状态，并测试 PulseAudio 输出和左右声道。
+- **DDSP-VST**：UGREEN 摄像头麦克风经 Feature OM 和 Control OM 实时转换音色，再输出到漫步者音箱。
+- **设备**：查看 NPU、模型、音频与 MIDI 状态，并测试音频输入电平、PulseAudio 输出和左右声道。
 
-DDSP-VST Effect 本轮不提供启动入口。设备页只区分真实 `capture` 与 PulseAudio
-`monitor`；只有真实输入、特征模型 ONNX/OM 对齐和双工音频测试均通过后才启用 Effect。
+DDSP-VST Effect 只接受真实 PulseAudio `capture`，不会把输出 `monitor` 当作麦克风。
+开发板运行时强制使用 Feature OM 和 Control OM；模型缺失、SHA256 不符、NPU 不可用或
+所选设备消失时拒绝启动或立即停止，不提供 ONNX、TFLite 或 CPU 模型回退。
 
 前端在开发电脑构建，开发板只运行 Python 服务和 `webui/dist/`。板端日常启动：
 
@@ -43,74 +45,85 @@ python scripts/run_webui.py
 在 Ascend 板上检测不到 `acl` 时，启动程序会使用现有
 `/usr/local/Ascend/ascend-toolkit/set_env.sh` 和 Conda `base` 重新执行自身；该过程
 只设置当前服务进程的环境，不修改 shell 启动文件。随后程序打印本机和局域网访问
-地址，默认监听 `0.0.0.0:8765`。安装依赖、构建、同步和故障排查见
-[Web 界面文档](doc/webui.md)。
+地址，默认监听 `0.0.0.0:8765`。安装依赖、全屏启动、逐页操作、12 张实机截图、构建、
+同步和接口索引统一见 [WebUI 操作、部署与 API](doc/webui.md)。
+
+### 板载触摸屏全屏打开
+
+服务启动后，直接在开发板的 Firefox 中打开：
+
+```text
+http://127.0.0.1:8765
+```
+
+推荐使用 Firefox kiosk 模式隐藏地址栏和标签栏，使界面铺满 10 英寸触摸屏：
+
+```bash
+DISPLAY=:0 XAUTHORITY=/home/HwHiAiUser/.Xauthority \
+firefox --kiosk http://127.0.0.1:8765
+```
+
+这条命令可以从 SSH 会话控制开发板已有的图形桌面；若在板端本地图形终端执行，通常只需：
+
+```bash
+firefox --kiosk http://127.0.0.1:8765
+```
+
+已在普通 Firefox 窗口中打开页面时，按 `F11` 可切换全屏。日常只保留
+`python scripts/run_webui.py` 启动的一个 `8765` 服务；开发板不运行 `npm run dev`、Vite
+或其他前端端口。
 
 ## Python 依赖
 
-- `requirements.txt`：记录 Ascend 板端运行依赖；Piano-DDSP 部署不会执行安装。
-- `requirements-export.txt`：开发电脑上的 ONNX 导出和本地测试依赖；不要安装到开发板。
+- `requirements.txt`：唯一的本地/板端 Python 依赖入口，包含运行时、ONNX/OM 校验和 pytest。
 - PyACL 由 CANN 提供，`ais_bench` 由开发板现有基准环境提供，不从 PyPI 安装。
 
-Piano-DDSP 只使用开发板已有的 CANN 8.0.0、Conda `base` 和已安装依赖。部署和验证
-期间禁止执行 `pip`、`conda`、`apt` 等安装、升级或卸载命令，也不修改音频服务、系统
-配置或 shell 启动文件。依赖缺失时保留诊断并停止，不在板端补装。
+Piano-DDSP 使用开发板已有的 CANN 8.0.0 和 Conda `base`。部署脚本只在该已有环境中
+执行 `python -m pip install -r requirements.txt` 与 pytest 验证；不安装 Node/npm，不修改
+音频服务、系统配置或 shell 启动文件。
 
-## 常用命令
+## 模型与板端命令
 
-### DDSP-VST 实时链路
+早期 `realtime_ddsp.py` 的 DDSP-VST MIDI Synth/ONNX 命令已退出当前使用流程，只保留为
+[历史实时 DDSP 路径](doc/realtime-ddsp.md)。当前 DDSP-VST 是 WebUI 中的麦克风 Effect，
+运行时必须使用 Feature OM 和 Control OM；实时触控与实体 MIDI 演奏统一使用 Piano-DDSP。
 
-```bash
-python realtime_ddsp.py --demo --duration 2 --output violin_demo.wav
+### 已发布模型下载
 
-python realtime_ddsp.py --play-midi midi/ddsp-test.mid \
-  --model models/om/Violin_mixed_float16.om \
-  --device-id 0 --audio-device 1 --sample-rate 48000 \
-  --prebuffer 6 --max-voices 1 --output-gain-db 0
-```
-
-### 本地 ONNX 导出
-
-导出环境固定使用 **CPython 3.11**；TensorFlow 2.15.1 不支持 Python 3.12。Windows
-可先创建独立环境，避免与板端依赖混用：
-
-```powershell
-py -3.11 -m venv .venv-export
-.\.venv-export\Scripts\python -m pip install -r requirements-export.txt
-```
-
-Linux/macOS 使用等价的 Python 3.11 虚拟环境。激活后再执行：
+Piano-DDSP、DDSP-VST 和 MIDI-DDSP 的 ONNX/OM 都从
+`zhouxzh/piano-ddsp-ascend310` 已发布 release 获取，不在 case3 重新导出。下载器先读取
+固定 revision 的 `SHA256SUMS`，再断点下载并逐项校验：
 
 ```bash
-python -m pip install -r requirements-export.txt
+# 默认是锁定的 Piano-DDSP release。
+python tools/download_model_release.py
 
-python tools/export_ddsp_vst_onnx.py \
-  --tflite models/ddsp_vst/Violin.tflite \
-  --output models/ddsp_vst/Violin.onnx
-
-python tools/export_midi_ddsp_onnx.py --component all
-
-python tools/export_midi_ddsp_tf_reference.py \
-  --midi midi/ddsp-test.mid --instrument-id 0
-python tools/export_midi_ddsp_stateful_onnx.py
+# DDSP-VST 或 MIDI-DDSP 使用发布清单中固定的 revision、目录和 manifest SHA256。
+python tools/download_model_release.py \
+  --revision <immutable-release> --release-dir <published-directory> \
+  --target-dir models/<family> --manifest-sha256 <sha256-of-SHA256SUMS>
 ```
+
+下载报告会保存解析后的提交 SHA。不要用移动的分支名替代发布 revision，也不要让部署脚本
+依赖本地 `.tflite`、checkpoint 或旧 ONNX 文件。
 
 ### Piano-DDSP 模型与板端转换
 
 开发电脑下载固定发布版本：
 
 ```bash
-python tools/download_piano_ddsp_onnx.py
+python tools/download_model_release.py
 ```
 
 仅在 Ascend 310B 板端激活已有环境后转换；脚本在非 ARM/无 ATC 环境会直接拒绝：
 
 ```bash
-python prepare_piano_ddsp_models.py --variant gru-unrolled --models paper_ir
+python prepare_piano_ddsp_models.py --variant gru-unrolled --models gru_ir_96_64
 python tools/validate_piano_ddsp_om.py \
-  --bundle models/piano_ddsp/bundles/model-suite-v1.0.0-gru-unrolled-fp32-origin/manifest.json \
-  --reference models/piano_ddsp/references/model-suite-v1.0.0/paper_ir/reference-10000.npz \
-  --report reports/piano-ddsp/paper-ir-10000.json --frames 10000 --activate
+  --bundle models/piano_ddsp/bundles/model-suite-v1.0.1-gru-unrolled-fp32-origin/manifest.json \
+  --model-id gru_ir_96_64 \
+  --reference models/piano_ddsp/references/model-suite-v1.0.1/gru_ir_96_64/reference-10000.npz \
+  --report reports/piano-ddsp/gru-ir-96-64-10000.json --frames 10000 --activate
 ```
 
 ATC 命令固定显式使用 `precision_mode_v2=origin`。为控制板端编译温度和内存，准备脚本
@@ -120,8 +133,8 @@ ATC 命令固定显式使用 `precision_mode_v2=origin`。为控制板端编译�
 10,000 帧的 `gru-unrolled` 变体。短于 10,000 帧的冒烟报告不能激活模型；catalog 和
 worker 也会拒绝没有合格报告的 OM。
 
-2026-07-29 板端验证已完成四个 `gru-unrolled` FP32 OM 的 10,000 帧连续对照，单帧
-NPU P99 为 1.19-1.34 ms；`balanced` 八帧完整块已测 P99 为 23.22 ms。该次完整块
+2026-07-31 板端验证已完成 v1.0.1 四个 `gru-unrolled` FP32 OM 的 10,000 帧连续对照，单帧
+NPU P99 为 1.18-1.31 ms；历史 `balanced` 八帧完整块已测 P99 为 23.22 ms。该次完整块
 测量使用板载音频路径，只证明计算预算，不作为 EDIFIER USB 延时验收。板载
 PulseAudio `platform-sound` 路径曾触发 ALSA 内核 hard lock，因此 Piano-DDSP
 不会使用该 Pulse sink。后续 `hw:0,0`、48 kHz 双声道直连测试也在 1024 帧后阻塞，
@@ -138,35 +151,34 @@ PulseAudio `platform-sound` 路径曾触发 ALSA 内核 hard lock，因此 Piano
 
 ```text
 case3/
-├── realtime_ddsp.py            # DDSP-VST 实时/文件播放引擎
-├── pyacl_ddsp.py               # DDSP-VST PyACL OM 后端
+├── realtime_ddsp.py            # 已退役 DDSP-VST MIDI Synth 的历史 CLI
+├── pyacl_ddsp.py               # 历史 CLI 使用的 PyACL 控制模型后端
 ├── midi_ddsp_realtime.py       # MIDI-DDSP 文件播放和渲染会话
 ├── pyacl_midi_ddsp.py          # MIDI-DDSP 固定张量 PyACL 后端
 ├── prepare_piano_ddsp_models.py # 板端 Piano-DDSP ATC 与 bundle 生成器
 ├── piano_ddsp_runtime/          # 独立 Piano-DDSP 实时运行时和 NDJSON worker
-├── midi_ddsp_webui/            # FastAPI API、任务、设备和扬声器服务
+├── midi_ddsp_webui/            # FastAPI API、任务、设备、Effect 和扬声器服务
 ├── webui/                      # React/TypeScript 前端源代码
 ├── scripts/                    # 板端启动和只读环境检查入口
-├── tools/                      # 导出、转换、部署、验证和报告工具
+├── tools/                      # 发布模型下载、ATC、部署、验证和报告工具
 ├── tests/                      # 不调用 Ascend 硬件的本地测试
 ├── models/                     # 模型、日志和校验清单（仅 README 提交）
 ├── reports/                    # 精度、性能和 Web 任务报告（不提交）
 ├── midi/                       # MIDI 曲库、MuseScore 工程和确定性测试夹具
 ├── midi_wav/                   # MIDI 曲库对应的单/双声道试听音频
-├── model3/                     # FreeCAD、STEP 和 STL 结构件
 ├── _upstream/                  # 固定版本的第三方参考源码
 └── doc/                        # 设计和实测文档
 ```
 
 统一实时会话由 `midi_ddsp_webui/realtime_session.py` 管理。会话从开始到停止始终持有
-`realtime-session` 资源锁；切换音色时暂停并保存 MIDI 播放位置，停掉旧运行时后启动
-目标运行时。目标启动失败会自动恢复旧音色，录音期间禁止切换。两个模型图和推理进程
-仍然独立，不做并行叠加。
+`realtime-session` 资源锁；触摸屏和实体 MIDI 只是同一 Piano-DDSP 会话的两个输入模式，
+共享音色、输出、增益、混响、移调、录音、监听和性能状态。运行或录音时锁定输入模式，
+停止后切换模式不会创建第二套模型参数。
 
 前端琴键比例和快捷键标签的第三方来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-根目录中的四个 Python 模块是可直接运行的 CLI 和 Web 后端公共模块，因此不移动到
-`scripts/`；`scripts/` 只保存很薄的板端启动入口和环境检查器。
+根目录模块包含当前 Web 后端公共代码及历史验证 CLI；用户入口统一为
+`scripts/run_webui.py`。`scripts/` 只保存板端启动和只读环境检查入口。
 
 `models/om/` 保存 DDSP-VST OM 和原版混响 IR。stateful v2 的
 batch `1/2/4/8` 共 32 个相互匹配组件统一放入
@@ -175,17 +187,51 @@ batch `1/2/4/8` 共 32 个相互匹配组件统一放入
 产品只展示论文支持的乐器 ID 0-12。
 MIDI-DDSP bundle 固定使用 `precision_mode_v2=origin`；GRU 已展开为基础算子。
 Ascend 20T 已验证可以运行 8T 生成的同一批 OM，因此不保留按开发板重复的模型副本。
-Piano-DDSP 的 ONNX 发布位于 `models/piano_ddsp/model-suite-v1.0.0/`，板端 OM 位于
+Piano-DDSP 的 ONNX 发布位于 `models/piano_ddsp/model-suite-v1.0.1/`，板端 OM 位于
 `models/piano_ddsp/bundles/<bundle-id>/`；`active-bundle.json` 只切换指针，不覆盖旧 bundle。
 
 ## 测试
+
+### Codex 物理触摸屏自动化依赖
+
+使用 Codex 自动审核开发板上的 Firefox kiosk、实际点击按钮和采集物理触摸屏截图时，
+开发板必须安装 `xdotool`。它用于向 XFCE 图形会话发送鼠标、键盘、窗口激活和刷新事件；
+仅运行 Playwright 不能替代这一层物理 kiosk 验收。
+
+在基于 Debian/Ubuntu 的 Ascend 310B 开发板上，由设备管理员执行一次：
+
+```bash
+sudo apt install -y xdotool
+```
+
+安装后验证：
+
+```bash
+command -v xdotool
+xdotool --version
+```
+
+Codex 通过 SSH 操作当前 `HwHiAiUser` 图形会话时需要显式指定显示器和授权文件：
+
+```bash
+DISPLAY=:0 XAUTHORITY=/home/HwHiAiUser/.Xauthority \
+  xdotool search --onlyvisible --class firefox
+```
+
+该命令应只返回一个可见 Firefox kiosk 窗口。Codex 随后使用同样的
+`DISPLAY`/`XAUTHORITY` 环境激活窗口、刷新页面并执行物理坐标点击。`xdotool` 是
+Codex 自动化测试的必需辅助工具，但不是 WebUI 生产运行依赖；正常启动
+`python scripts/run_webui.py`、执行 OM 推理或从其他电脑访问 8765 端口都不依赖它。
+详细实机方法和截图命名见
+[WebUI 触摸屏终审与实机压测](doc/webui-acceptance.md#74-xdotool-物理-kiosk-复核)。
 
 ```bash
 python -m pytest -q
 
 cd webui
-npm test
+npm run test
 npm run build
+npm run test:e2e
 ```
 
 本地测试使用模拟设备，不替代板端 OM 加载、NPU 推理、真实 MIDI 输入或声卡试听。
@@ -193,9 +239,10 @@ npm run build
 
 ```bash
 python tools/validate_webui_runtime.py
-python tools/smoke_test_ddsp_om.py \
-  --model models/om/mixed_precision/Violin_mixed_float16.om --steps 16
 ```
+
+真实 OM、音频和 600 秒 DDSP-VST 双工命令见
+[WebUI 实机验收](doc/webui-acceptance.md)，不得以旧 MIDI Synth 冒烟命令替代 Effect 验收。
 
 ## 文档
 
@@ -203,16 +250,16 @@ python tools/smoke_test_ddsp_om.py \
 | :--- | :--- |
 | [项目概览](doc/overview.md) | 项目边界、硬件和系统链路 |
 | [MIDI 测试素材](doc/midi-test-tracks.md) | 确定性生成夹具、复现命令和使用边界 |
-| [DDSP-VST 导出](doc/model-export.md) | TFLite 到 ONNX 的状态化模型导出 |
-| [MIDI-DDSP 导出](doc/midi-ddsp-export.md) | TensorFlow 基准、stateful v2 ONNX/OM 和逐张量对齐 |
-| [两套模型对比](doc/midi-ddsp-vs-ddsp-vst.md) | 接口、实时性和适用场景差异 |
-| [DDSP-VST 实时播放](doc/realtime-ddsp.md) | 实时合成、缓冲和音频输出 |
+| [模型与 OM 部署](doc/om-deployment.md) | 已发布模型下载、ATC、校验值和日志判定 |
+| [MIDI-DDSP 历史导出](doc/midi-ddsp-export.md) | 历史 TensorFlow 基准、模型结构、张量契约和验证记录 |
+| [两套模型对比](doc/midi-ddsp-vs-ddsp-vst.md) | 历史迁移背景和模型差异，不是当前用户入口 |
+| [历史实时 DDSP 路径](doc/realtime-ddsp.md) | 已退役的 DDSP-VST MIDI Synth/ONNX 对照资料 |
 | [MIDI-DDSP 播放](doc/midi-ddsp-realtime.md) | 完整渲染缓存、复音声部化、多 voice stem 和原版混响 |
 | [Piano-DDSP 实时系统](doc/piano-ddsp.md) | 固定模型来源、实时运行时、API、部署和验收 |
 | [Ascend 音频输出](doc/audio-output.md) | 板载、USB、蓝牙和扬声器测试 |
-| [OM 转换与验证](doc/om-deployment.md) | ATC、校验值和日志判定 |
 | [板端实测结果](doc/benchmark-results.md) | DDSP-VST 板端结果 |
-| [Web 工作台](doc/webui.md) | 三个工作区、构建、同步和启动 |
+| [WebUI 操作、部署与 API](doc/webui.md) | 四个工作区、12 张实机截图、全屏启动、构建部署和接口索引 |
+| [WebUI 实机验收](doc/webui-acceptance.md) | 12 页面视觉审核、四视口回归、UI/API 压测和 600 秒 Effect 结果 |
 | [故障排查](doc/troubleshooting.md) | SSH、音频、ATC、OM 和兼容问题 |
 | [第三方参考仓库](doc/upstream-repositories.md) | 固定提交和保留规则 |
 

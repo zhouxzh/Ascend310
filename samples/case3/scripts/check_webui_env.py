@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import os
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -32,6 +33,7 @@ REQUIRED_MODULES = (
     "mido",
     "rtmidi",
     "sounddevice",
+    "pytest",
     "acl",
 )
 
@@ -45,6 +47,17 @@ def main() -> int:
         print(f"[OK] conda environment: {os.environ['CONDA_DEFAULT_ENV']}")
 
     print(f"[OK] Python: {sys.version.split()[0]} ({sys.executable})")
+
+    pip = subprocess.run(
+        [sys.executable, "-m", "pip", "--version"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if pip.returncode:
+        failures.append(f"pip is unavailable: {pip.stderr.strip() or pip.stdout.strip()}")
+    else:
+        print(f"[OK] pip: {pip.stdout.strip()}")
 
     for name, expected in EXPECTED_PATHS.items():
         value = os.environ.get(name)

@@ -1,0 +1,16 @@
+Use case: scientific-educational
+Asset type: peer-reviewed journal figure
+Primary request:
+Create a publication-ready DDSP-VST Effect architecture schematic for a Chinese technical book. White background, flat vector style, high contrast, generous margins, no gradients, no shadows, no title or figure number. Use Okabe-Ito colors, black arrows, and exact large horizontal labels. Distinguish physical audio, preprocessing, NPU inference, recurrent state, and CPU DSP by both shape and color.
+
+Main left-to-right audio path:
+“UGREEN capture\n48 kHz 双声道” -> “单声道” -> “重采样 16 kHz” -> “1024 窗口\n320 步长” -> “Feature OM” -> runtime feature processing -> “Control GRU OM” -> “CPU DDSP + FreeVerb” -> “重采样 48 kHz 双声道” -> “EDIFIER sink”.
+
+The runtime feature processing between the models has two exact Control-input branches. First, Feature OM output “f0_hz” flows through “移调 + 归一化” and becomes “f0_scaled”; this value enters Control GRU OM and the shifted frequency also branches to CPU harmonic synthesis. Second, Feature OM output “pw_scaled” flows through “力度校准” and enters Control GRU OM. Feature OM output “pw_db” branches only to “状态指标” and must not enter Control GRU OM. Do not draw “f0_hz” or “pw_db” as direct Control inputs. Control GRU OM receives exactly “state [512]”, “f0_scaled”, and “pw_scaled”. It produces “幅度 [1]”, “60 谐波”, and “65 噪声” into CPU DDSP. Draw a prominent recurrent loop: “state [512]” -> Control GRU OM -> “state_out [512]” -> back to “state [512]”. Add a band label over Feature and Control: “Ascend NPU · OM-only · 50 Hz”. Add a small safety badge near physical input: “实体 capture；禁止 monitor”. Ensure the 512-state loop cannot be mistaken for the main audio path.
+Scene/backdrop: clean white or very light neutral background
+Style/medium: precise flat scientific infographic with vector-like geometry and professional sans-serif typography
+Composition/framing: scan-friendly hierarchy, generous whitespace, consistent alignment, and clearly terminated arrows
+Color palette: colorblind-safe Okabe-Ito colors with dark charcoal text and sufficient grayscale contrast
+Text handling: render requested labels verbatim; use consistent capitalization; do not add pseudo-text or unnecessary labels
+Scientific constraints: preserve the requested causal, spatial, and mathematical relationships; do not invent values, equations, units, components, or scientific claims
+Output constraints: no overlapping or clipped text; no ambiguous connections; no gradients, shadows, 3D effects, logos, watermarks, decorative borders, or photorealism

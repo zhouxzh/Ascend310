@@ -222,7 +222,191 @@
   font-size: 16px;
 }
 
+.midi-workspace--render {
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 19vw, 360px);
+}
+
+.midi-player-panel.is-render-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.midi-render-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.midi-render-source {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.2fr) minmax(540px, 2fr);
+  align-items: stretch;
+  min-height: 68px;
+  margin: 10px 15px;
+  background: #f2f5f3;
+  border-top: 1px solid #dce2df;
+  border-bottom: 1px solid #dce2df;
+}
+
+.midi-render-source .track-browser {
+  grid-template-columns: 46px minmax(0, 1fr) 50px;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 12px 8px 0;
+  border-right: 1px solid #d7ddda;
+}
+
+.midi-render-source .track-icon {
+  width: 46px;
+  height: 46px;
+}
+
+.midi-render-source .track-select > span {
+  font-size: 13px;
+}
+
+.midi-render-source .track-select select {
+  min-height: 52px;
+  font-size: 16px;
+}
+
+.midi-render-facts {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  min-width: 0;
+  margin: 0;
+}
+
+.midi-render-facts > div {
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  padding: 8px 10px;
+  border-left: 3px solid transparent;
+}
+
+.midi-render-facts > div + div {
+  border-left-color: #dce2df;
+}
+
+.midi-render-facts > div.is-emphasis {
+  border-left-color: var(--teal);
+}
+
+.midi-render-facts > div.is-warning {
+  border-left-color: var(--amber);
+}
+
+.midi-render-facts dt,
+.midi-render-facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.midi-render-facts dt {
+  color: #697572;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.midi-render-facts dd {
+  margin-top: 5px;
+  color: #24302d;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 16px;
+  font-weight: 720;
+}
+
+.midi-player-panel.is-render-view .midi-file-roll {
+  margin: 8px 15px;
+}
+
+.midi-player-panel.is-render-view .midi-file-roll-canvas {
+  height: clamp(150px, 20vh, 190px);
+}
+
+.midi-player-panel.is-render-view .voice-assignment-section {
+  margin-bottom: 10px;
+}
+
+.midi-player-panel.is-render-view .voice-assignment-table {
+  max-height: min(250px, calc(100vh - 600px));
+}
+
+.voice-assignment-heading-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.voice-assignment-heading-meta .voice-analysis-source {
+  max-width: 190px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.midi-settings-body {
+  min-height: 0;
+  padding: 0 16px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.midi-settings-group {
+  padding: 10px 0;
+}
+
+.midi-settings-group + .midi-settings-group {
+  border-top: 1px solid var(--line);
+}
+
+.midi-settings-group h3 {
+  margin: 0 0 8px;
+  color: #35413e;
+  font-size: 16px;
+  font-weight: 730;
+}
+
+.midi-settings .midi-settings-body .form-grid {
+  gap: 10px;
+  min-height: auto;
+  padding: 0;
+  overflow: visible;
+}
+
+.midi-output-settings input[type='range'] {
+  width: 100%;
+  accent-color: var(--teal);
+}
+
+.midi-settings .midi-settings-body .midi-output-settings {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 14px;
+}
+
+.midi-output-settings > .field:first-child {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 1100px) {
+  .midi-render-source {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .midi-render-source .track-browser {
+    border-right: 0;
+    border-bottom: 1px solid #d7ddda;
+  }
+
   .midi-file-roll-toolbar {
     grid-template-columns: minmax(130px, 1fr) auto;
   }
@@ -240,6 +424,30 @@
 }
 
 @media (max-width: 700px) {
+  .midi-render-source {
+    margin: 8px 13px;
+  }
+
+  .midi-render-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .midi-render-facts > div {
+    min-height: 58px;
+  }
+
+  .midi-settings-body {
+    padding-inline: 13px;
+  }
+
+  .midi-settings .midi-settings-body .midi-output-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .midi-output-settings > .field:first-child {
+    grid-column: auto;
+  }
+
   .midi-file-roll-toolbar {
     grid-template-columns: minmax(0, 1fr) auto;
   }

@@ -7,13 +7,14 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:live-controls": "playwright test e2e/live-controls-audit.spec.ts",
+    "test:e2e:soak": "playwright test e2e/webui-soak.spec.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "recharts": "^2.15.1"
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.0",

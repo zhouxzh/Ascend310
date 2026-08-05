@@ -1,4 +1,4 @@
-"""Small synchronous PyACL runner for the stateful DDSP control model."""
+"""Small synchronous PyACL runner for static float32 OM models."""
 
 from __future__ import annotations
 
@@ -65,6 +65,8 @@ class PyAclModelRunner:
         *,
         acl_module: Any | None = None,
         keep_runtime: bool = False,
+        input_shapes: Mapping[str, tuple[int, ...]] | None = None,
+        output_shapes: Mapping[str, tuple[int, ...]] | None = None,
     ) -> None:
         if device_id < 0:
             raise ValueError("device_id must be non-negative")
@@ -85,6 +87,8 @@ class PyAclModelRunner:
         self.model_path = model_path
         self.device_id = int(device_id)
         self.keep_runtime = bool(keep_runtime)
+        self.input_shapes = self._validated_shapes(input_shapes or INPUT_SHAPES, "input")
+        self.output_shapes = self._validated_shapes(output_shapes or OUTPUT_SHAPES, "output")
         self._persistent_runtime_key = (id(self.acl), self.device_id)
         self.context = None
         self.model_id = None
@@ -105,6 +109,18 @@ class PyAclModelRunner:
         except BaseException:
             self.close(suppress_errors=True)
             raise
+
+    @staticmethod
+    def _validated_shapes(
+        values: Mapping[str, tuple[int, ...]], kind: str
+    ) -> dict[str, tuple[int, ...]]:
+        shapes = {str(name): tuple(int(value) for value in shape) for name, shape in values.items()}
+        if not shapes or any(
+            not name or not shape or any(value <= 0 for value in shape)
+            for name, shape in shapes.items()
+        ):
+            raise ValueError(f"OM {kind} shapes must be named positive static dimensions")
+        return shapes
 
     def _initialize(self) -> None:
         if self.keep_runtime:
@@ -162,7 +178,7 @@ class PyAclModelRunner:
         if self.input_dataset is None:
             raise RuntimeError("acl.mdl.create_dataset for inputs failed")
 
-        expected = set(INPUT_SHAPES)
+        expected = set(self.input_shapes)
         count = int(self.acl.mdl.get_num_inputs(self.model_desc))
         for index in range(count):
             raw_name = str(
@@ -173,7 +189,7 @@ class PyAclModelRunner:
                 self.acl.mdl.get_input_dims(self.model_desc, index),
                 f"acl.mdl.get_input_dims[{index}]",
             )
-            self._validate_tensor(index, name, shape, INPUT_SHAPES[name], True)
+            self._validate_tensor(index, name, shape, self.input_shapes[name], True)
             self.input_names.append(name)
             self.input_buffers.append(self._allocate_buffer(index, True))
         if set(self.input_names) != expected or len(self.input_names) != len(expected):
@@ -184,7 +200,7 @@ class PyAclModelRunner:
         if self.output_dataset is None:
             raise RuntimeError("acl.mdl.create_dataset for outputs failed")
 
-        expected = set(OUTPUT_SHAPES)
+        expected = set(self.output_shapes)
         count = int(self.acl.mdl.get_num_outputs(self.model_desc))
         for index in range(count):
             raw_name = str(
@@ -195,10 +211,10 @@ class PyAclModelRunner:
                 self.acl.mdl.get_output_dims(self.model_desc, index),
                 f"acl.mdl.get_output_dims[{index}]",
             )
-            self._validate_tensor(index, name, shape, OUTPUT_SHAPES[name], False)
+            self._validate_tensor(index, name, shape, self.output_shapes[name], False)
             self.output_names.append(name)
             buffer = self._allocate_buffer(index, False)
-            buffer["host"] = np.empty(OUTPUT_SHAPES[name], dtype=np.float32)
+            buffer["host"] = np.empty(self.output_shapes[name], dtype=np.float32)
             self.output_buffers.append(buffer)
         if set(self.output_names) != expected or len(self.output_names) != len(expected):
             raise ValueError(f"Unexpected OM outputs: {self.output_names}")
@@ -236,7 +252,7 @@ class PyAclModelRunner:
         size_getter = getattr(self.acl.mdl, f"get_{kind}_size_by_index")
         size = int(size_getter(self.model_desc, index))
         names = self.input_names if is_input else self.output_names
-        shapes = INPUT_SHAPES if is_input else OUTPUT_SHAPES
+        shapes = self.input_shapes if is_input else self.output_shapes
         expected_size = int(np.prod(shapes[names[index]])) * np.dtype(np.float32).itemsize
         if size != expected_size:
             raise ValueError(
@@ -265,11 +281,11 @@ class PyAclModelRunner:
     def infer(self, inputs: Mapping[str, np.ndarray]) -> dict[str, np.ndarray]:
         if self._closed:
             raise RuntimeError("PyACL model runner is closed")
-        if set(inputs) != set(INPUT_SHAPES):
-            raise ValueError(f"OM inputs must be exactly {sorted(INPUT_SHAPES)}")
+        if set(inputs) != set(self.input_shapes):
+            raise ValueError(f"OM inputs must be exactly {sorted(self.input_shapes)}")
 
         prepared: dict[str, np.ndarray] = {}
-        for name, shape in INPUT_SHAPES.items():
+        for name, shape in self.input_shapes.items():
             array = np.ascontiguousarray(inputs[name], dtype=np.float32)
             if array.shape != shape:
                 raise ValueError(

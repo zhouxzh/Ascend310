@@ -462,6 +462,7 @@ SSD启动。当连接了多种存储设备时，需通过背面的拨码开关�
 
 拨码开关状态说明（ON方向为1/右，相反为0/左，具体请参考板上丝印或下表）：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ccc@{}}
 \toprule\noalign{}
 Boot1 & Boot2 & 启动设备 \\
@@ -474,6 +475,7 @@ Boot1 & Boot2 & 启动设备 \\
 左 & 右 & eMMC \\
 右 & 左 & M.2 SSD \\
 \end{longtable}
+}
 
 \textbf{注意}：切换拨码开关后，必须\textbf{完全断电}（拔掉电源线）再重新上电，新的启动配置才会生效。仅按RESET键重启无效。
 
@@ -553,45 +555,30 @@ Boot1 & Boot2 & 启动设备 \\
   \textbar{} \textbar{} HwHiAiUser \textbar{} Mind@123 \textbar{}
 \end{enumerate}
 
-\subsection{串口界面}\label{src-experiment-case0-h17}
+\subsection{方式二：串口登录}\label{src-experiment-case0-h17}
 
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\item
-  \textbf{使用USB2TTL模块，与开发板的GPIO口进行连线}
-
-  \begin{figure}
-  \centering
-  \includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={开发板串口}]{cases/img0/gpio_ttl.png}
-  \caption{开发板串口}\label{fig:gpio_ttl}
-  \end{figure}
-
-  开发板的TX（GPIO8）接入USB2TTL模块的RX接口，开发板的RX（GPIO10）则接入模块的TX接口，并连接好GND接地，在Windows电脑下可以使用PUTTY连接串口。
-\item
-  \textbf{使用开发板自带的Micro
-  USB接口进行串口调试，该方法更为方便，只需要一根Micro
-  USB数据线，接入电脑后打开设备管理器查询对应的串口，然后使用PUTTY进行链接即可。}
-
-  \begin{figure}
-  \centering
-  \includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={MicroUSB串口}]{cases/img0/microusbser.png}
-  \caption{MicroUSB串口}\label{fig:microusbser}
-  \end{figure}
-\end{enumerate}
-
-以Micro USB接口为例： 1. \textbf{使用Micro
-USB数据线连接开发板和电脑，此时请不要给开发板上电。} 2.
-\textbf{打开电脑的设备管理器，选择端口，寻找开发板对应的串口端口号}
+如果暂时没有显示器、键盘和鼠标，也可以通过串口登录开发板。建议初学者使用开发板自带的Micro
+USB接口，该方法不需要额外接线，只需要一根Micro
+USB数据线，接入电脑后打开设备管理器查询对应的串口，然后使用PUTTY进行连接即可。
 
 \begin{figure}
 \centering
-\includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={端口号}]{cases/img0/ttl.png}
-\caption{端口号}\label{fig:ttl}
+\includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={MicroUSB串口}]{cases/img0/microusbser.png}
+\caption{MicroUSB串口}\label{fig:microusbser}
 \end{figure}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
-\setcounter{enumi}{2}
+\item
+  \textbf{使用Micro USB数据线连接开发板和电脑，此时请不要给开发板上电。}
+\item
+  \textbf{打开电脑的设备管理器，选择端口，寻找开发板对应的串口端口号}
+
+  \begin{figure}
+  \centering
+  \includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio,alt={端口号}]{cases/img0/ttl.png}
+  \caption{端口号}\label{fig:ttl}
+  \end{figure}
 \item
   \textbf{打开串口调试软件（PUTTY）}
 
@@ -645,6 +632,36 @@ nmcli dev wifi connect <SSID> password <PASSWORD>
 
 \begin{lstlisting}[language=bash]
 nmcli connection show
+\end{lstlisting}
+\end{enumerate}
+
+如果不熟悉命令参数，也可以使用\passthrough{\lstinline!nmtui!}提供的终端图形界面连接WiFi：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{打开NetworkManager终端界面}
+
+\begin{lstlisting}[language=bash]
+sudo nmtui
+\end{lstlisting}
+
+  接着就会出现如下的界面：
+  \pandocbounded{\includegraphics[keepaspectratio,alt={nmtui}]{cases/img0/nmtui.png}}
+\item
+  \textbf{选择无线网络}
+  在界面中选择\passthrough{\lstinline!Activate a connection!}，进入连接列表后选择需要连接的WiFi名称。
+  \pandocbounded{\includegraphics[keepaspectratio,alt={nmtui2}]{cases/img0/nmtui2.png}}
+\item
+  \textbf{输入密码并连接}
+  按提示输入WiFi密码，确认后等待连接状态变为已连接。完成后选择\passthrough{\lstinline!Back!}返回，再选择\passthrough{\lstinline!Quit!}退出。
+  \pandocbounded{\includegraphics[keepaspectratio,alt={nmtui3}]{cases/img0/nmtui3.png}}
+\item
+  \textbf{确认网络状态}
+
+\begin{lstlisting}[language=bash]
+nmcli connection show
+ip addr
 \end{lstlisting}
 \end{enumerate}
 
@@ -729,68 +746,6 @@ echo $ASCEND_HOME_PATH
 \begin{lstlisting}[language=bash]
 c++ --version
 \end{lstlisting}
-\end{enumerate}
-
-\subsection{设置SWAP交换分区}\label{src-experiment-case0-h23}
-
-开发板虽然有8G/16G的运存，但是有些应用（例如ATC模型转换工具）需要较大的内存，在这种情况下我们可以通过设置SWAP交换分区来扩展系统能使用的最大内存容量。
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\item
-  \textbf{创建交换文件}
-
-  首先，使用\passthrough{\lstinline!fallocate!}命令创建一个指定大小的文件（例如12GB）。如果你的存储空间允许，建议设置得大一些，以防模型转换时内存不足。
-
-\begin{lstlisting}[language=bash]
-sudo fallocate -l 8G /swapfile
-\end{lstlisting}
-
-  如果提示\passthrough{\lstinline!fallocate!}失败，可以使用\passthrough{\lstinline!dd!}命令：
-
-\begin{lstlisting}[language=bash]
-sudo dd if=/dev/zero of=/swapfile bs=1G count=8
-\end{lstlisting}
-\item
-  \textbf{设置权限}
-
-  出于安全考虑，需要修改文件的权限，仅允许root用户读写。
-
-\begin{lstlisting}[language=bash]
-sudo chmod 600 /swapfile
-\end{lstlisting}
-\item
-  \textbf{设置交换区}
-
-  将文件格式化为交换分区格式。
-
-\begin{lstlisting}[language=bash]
-sudo mkswap /swapfile
-\end{lstlisting}
-\item
-  \textbf{启用交换区}
-
-  启用该交换文件。
-
-\begin{lstlisting}[language=bash]
-sudo swapon /swapfile
-\end{lstlisting}
-\item
-  \textbf{持久化设置}
-
-  为了防止重启后失效，需要将其写入\passthrough{\lstinline!/etc/fstab!}文件中。
-
-\begin{lstlisting}[language=bash]
-sudo nano /etc/fstab
-\end{lstlisting}
-
-  在文件末尾添加以下内容：
-
-\begin{lstlisting}
-/swapfile none swap sw 0 0
-\end{lstlisting}
-
-  保存并退出（Ctrl+O, Enter, Ctrl+X）。
 \end{enumerate}
 
 \section{结语}\label{src-experiment-case0-h24}

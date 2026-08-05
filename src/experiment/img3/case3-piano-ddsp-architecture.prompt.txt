@@ -1,0 +1,20 @@
+Use case: scientific-educational
+Asset type: technical report figure
+Primary request:
+Create a publication-grade Piano-DDSP neural architecture schematic for a Chinese technical book. White background, flat vector style, high contrast, no gradients, no shadows, no title or figure number. Use the Okabe-Ito palette with black connectors; use color and shape to distinguish input, NPU network, recurrent state, neural controls, and CPU DSP. All text must be exact, large, crisp, and horizontal.
+
+Arrange left to right.
+
+Inputs at left: “16 声部\n音高 + 力度”, “4 维踏板”, “钢琴年份索引”, “extended_pitch”.
+Two NPU modules in the center: upper “全局上下文网络” and lower “逐声部网络”. Inputs connect logically: pedal and year to global context; 16 voices and extended_pitch to voice network; global context also feeds voice network.
+
+Two recurrent state loops are visually prominent with curved return arrows: “context_state [1,1,64]” -> global context -> “next_context_state”; and “monophonic_state [1,16,192]” -> voice network -> “next_monophonic_state”. Label the NPU region “Piano-DDSP OM · 250 Hz”.
+
+The voice network fans out to four exact control groups: “幅度 [16,1]”, “96 谐波”, “f0 + 非谐性”, and “64 噪声频带”. These merge into “CPU DDSP”. A separate input “IR / FDN 混响参数” also feeds CPU DDSP. Final output: “16 kHz 音频 -> 48 kHz 输出”. Include a small badge “默认：gru_ir_96_64”. Do not draw a generic black-box neural network; show the recurrent topology clearly.
+Scene/backdrop: clean white or very light neutral background
+Style/medium: precise flat scientific infographic with vector-like geometry and professional sans-serif typography
+Composition/framing: scan-friendly hierarchy, generous whitespace, consistent alignment, and clearly terminated arrows
+Color palette: colorblind-safe Okabe-Ito colors with dark charcoal text and sufficient grayscale contrast
+Text handling: render requested labels verbatim; use consistent capitalization; do not add pseudo-text or unnecessary labels
+Scientific constraints: preserve the requested causal, spatial, and mathematical relationships; do not invent values, equations, units, components, or scientific claims
+Output constraints: no overlapping or clipped text; no ambiguous connections; no gradients, shadows, 3D effects, logos, watermarks, decorative borders, or photorealism

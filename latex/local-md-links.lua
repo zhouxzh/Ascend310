@@ -12,6 +12,31 @@ function Link(el)
   end
 end
 
+local force_next_figure_here = false
+
+function RawBlock(el)
+  if el.format == 'html' and el.text:match('^%s*<!%-%-%s*pdf%-page%-break%s*%-%->%s*$') then
+    return pandoc.RawBlock('latex', '\\clearpage')
+  end
+
+  if el.format == 'html' and el.text:match('^%s*<!%-%-%s*pdf%-figure%-here%s*%-%->%s*$') then
+    force_next_figure_here = true
+    return {}
+  end
+end
+
+function Figure(el)
+  if not force_next_figure_here then
+    return nil
+  end
+
+  force_next_figure_here = false
+  local latex = pandoc.write(pandoc.Pandoc({ el }), 'latex')
+  latex = latex:gsub('\\begin{figure}', '\\begin{figure}[H]', 1)
+  latex = latex:gsub('%./img3/', 'cases/img3/')
+  return pandoc.RawBlock('latex', latex)
+end
+
 local function is_manual_heading_number(text)
   local part_count = 0
 

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import { api } from '../api'
 import type {
+  AudioInputTestStatus,
   Catalog,
   Job,
   MidiVoiceAnalysis,
@@ -9,6 +10,7 @@ import type {
   SystemStatus,
 } from '../types'
 import DevicesView from './DevicesView'
+import AudioInputTestView from './AudioInputTestView'
 import MidiDdspView, { buildVoiceAssignments, selectableMidiDdspBundles } from './MidiDdspView'
 import SpeakerView from './SpeakerView'
 
@@ -29,6 +31,9 @@ vi.mock('../api', async () => {
       speakerTestStatus: vi.fn(),
       startSpeakerTest: vi.fn(),
       stopSpeakerTest: vi.fn(),
+      audioInputTestStatus: vi.fn(),
+      startAudioInputTest: vi.fn(),
+      stopAudioInputTest: vi.fn(),
     },
   }
 })
@@ -99,10 +104,51 @@ const status: SystemStatus = {
     remaining_seconds: 0,
     config: {},
   },
+  audio_input_test: {
+    running: false,
+    state: 'idle',
+    error: null,
+    device_name: '',
+    sample_rate: 0,
+    input_channels: 0,
+    captured_frames: 0,
+    total_frames: 0,
+    overflows: 0,
+    rms_dbfs: -96,
+    peak_dbfs: -96,
+    signal_detected: false,
+    progress: 0,
+    elapsed_seconds: 0,
+    remaining_seconds: 0,
+    config: {},
+  },
   job_count: 0,
 }
 
-const audioDevice = { id: '1', index: 1, name: 'USB Audio', host_api: 'ALSA', max_output_channels: 2, default_sample_rate: 48000 }
+const audioDevice = {
+  id: '1',
+  index: 1,
+  name: 'USB Audio',
+  host_api: 'PulseAudio',
+  backend: 'pulse' as const,
+  max_output_channels: 2,
+  default_sample_rate: 48000,
+  system_volume_percent: 64,
+  system_volume_db: -3.88,
+  system_muted: false,
+}
+const audioInput = {
+  id: 'pulse:alsa_input.usb-microphone.mono-fallback',
+  index: 2,
+  name: 'USB Microphone',
+  host_api: 'PulseAudio',
+  backend: 'pulse' as const,
+  type: 'capture' as const,
+  max_input_channels: 1,
+  default_sample_rate: 48000,
+  state: 'RUNNING',
+  available: true,
+}
 const bluetoothSpeaker = {
   address: 'C8:24:78:D5:B2:9E',
   name: 'EDIFIER M16 Pro',
@@ -287,7 +333,8 @@ describe('workspace behavior', () => {
     expect(screen.queryByText('完成后由开发板播放')).not.toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('全部设置为'), { target: { value: '4' } })
-    expect(screen.getAllByText('Flute').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('长笛').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Flute')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '开始渲染' }))
     await waitFor(() => expect(api.startMidiDdsp).toHaveBeenCalledWith(expect.objectContaining({
       mode: 'render',
@@ -532,13 +579,78 @@ describe('workspace behavior', () => {
     })))
   })
 
+  it('prefers the PulseAudio route that exposes system volume', () => {
+    const directDevice = {
+      ...audioDevice,
+      id: 'direct',
+      backend: 'portaudio' as const,
+      is_default: true,
+      system_volume_percent: undefined,
+      system_volume_db: undefined,
+      system_muted: undefined,
+    }
+    render(
+      <SpeakerView
+        status={{ ...status, active_owner: null }}
+        audioDevices={[directDevice, audioDevice]}
+        onRefresh={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+    expect(screen.getByRole('combobox', { name: '音频输出' })).toHaveValue(audioDevice.id)
+    expect(screen.getByLabelText('系统音量 64%')).toBeVisible()
+  })
+
+  it('starts an input level test with the selected capture source', async () => {
+    const runningStatus: AudioInputTestStatus = {
+      ...status.audio_input_test,
+      running: true,
+      state: 'running',
+      device_name: audioInput.name,
+      sample_rate: 48000,
+      input_channels: 1,
+      total_frames: 144000,
+      remaining_seconds: 3,
+      config: {
+        audio_input_id: audioInput.id,
+        duration_seconds: 3,
+        threshold_dbfs: -45,
+      },
+    }
+    vi.mocked(api.startAudioInputTest).mockResolvedValue(runningStatus)
+    render(
+      <AudioInputTestView
+        status={{ ...status, active_owner: null }}
+        audioInputs={[audioInput]}
+        onRefresh={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '开始输入测试' }))
+    await waitFor(() => expect(api.startAudioInputTest).toHaveBeenCalledWith({
+      audio_input_id: audioInput.id,
+      duration_seconds: 3,
+      threshold_dbfs: -45,
+    }))
+  })
+
+  it('shows localized audio input test states', () => {
+    render(
+      <AudioInputTestView
+        status={{ ...status, active_owner: null }}
+        audioInputs={[audioInput]}
+        onRefresh={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+    expect(screen.getByText('待机')).toBeVisible()
+    expect(screen.queryByText('idle')).not.toBeInTheDocument()
+  })
+
   it('includes speaker testing in the devices workspace', async () => {
     render(
       <DevicesView
         status={{ ...status, active_owner: null }}
         catalog={catalog}
         speakerOutputs={[audioDevice]}
-        audioInputs={[]}
+        audioInputs={[audioInput]}
         midiPorts={[]}
         audioError={null}
         audioInputError={null}
@@ -546,11 +658,41 @@ describe('workspace behavior', () => {
         onRefresh={vi.fn().mockResolvedValue(undefined)}
       />,
     )
-    expect(screen.getByRole('heading', { name: '系统与设备' })).toBeVisible()
-    expect(screen.getByText('192.168.1.42')).toBeVisible()
+    expect(screen.getByRole('tab', { name: /设备概览/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('heading', { name: '系统与设备' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '开发板基本状态' })).toBeVisible()
+    expect(screen.getByText('触控与 MIDI 演奏')).toBeVisible()
+    expect(screen.getByText('演奏前确认 NPU、音频输出和 MIDI 控制器状态。')).toBeVisible()
+    expect(screen.queryByRole('button', { name: /检查音频|查看输入|查看模型|查看环境/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: /音频设备/ }))
+    expect(screen.queryByRole('heading', { name: '系统与设备' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '蓝牙音频' })).toBeVisible()
-    expect(screen.getByRole('heading', { name: '扬声器输出测试' })).toBeVisible()
-    expect(await screen.findByText('Power On')).toBeVisible()
+    expect(screen.getByRole('heading', { name: '接口状态' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: '音频设备测试' })).toBeVisible()
+    expect(screen.getByLabelText('输出测试参数')).toBeVisible()
+    expect(screen.queryByRole('heading', { name: '输出设置' })).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.speaker-workspace > .panel')).toHaveLength(1)
+    expect(screen.getByLabelText('系统音量 64%')).toBeVisible()
+    expect(screen.getByText(/系统音量 64%/)).toBeVisible()
+    expect(screen.getByRole('button', { name: '输出 1' })).toHaveClass('is-active')
+    fireEvent.click(screen.getByRole('button', { name: '输入 1' }))
+    expect(screen.getAllByText('USB Microphone')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: '输入测试' }))
+    expect(screen.getByRole('heading', { name: '音频设备测试' })).toBeVisible()
+    expect(screen.getByLabelText('输入测试参数')).toBeVisible()
+    expect(screen.queryByLabelText('系统音量 64%')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '输入设置' })).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.speaker-workspace > .panel')).toHaveLength(1)
+    expect(await screen.findByText('已开启')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'MIDI 0' }))
+    expect(screen.getByRole('heading', { name: 'MIDI 输入状态' })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: '音频设备测试' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: /运行环境/ }))
+    expect(screen.getByLabelText('运行环境状态摘要')).toHaveTextContent('NPU')
+    expect(screen.getByRole('heading', { name: '运行依赖' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: '模型资产' })).toBeVisible()
+    expect(screen.queryByText('No NPU output.')).not.toBeInTheDocument()
+    expect(document.querySelector('.device-runtime-layout pre')).toBeNull()
   })
 
   it('connects a bluetooth speaker from the devices workspace', async () => {
@@ -581,6 +723,7 @@ describe('workspace behavior', () => {
         onRefresh={onRefresh}
       />,
     )
+    fireEvent.click(screen.getByRole('tab', { name: /音频设备/ }))
     fireEvent.click(await screen.findByTitle('连接蓝牙音频'))
     await waitFor(() => expect(api.connectBluetoothAudio).toHaveBeenCalledWith({
       address: 'C8:24:78:D5:B2:9E',
@@ -588,6 +731,31 @@ describe('workspace behavior', () => {
       trust: true,
     }))
     expect(onRefresh).toHaveBeenCalled()
+  })
+
+  it('summarizes known bluetooth failures in Chinese and keeps diagnostics', async () => {
+    vi.mocked(api.bluetoothAudio).mockResolvedValue({
+      available: false,
+      controller: null,
+      devices: [],
+      error: 'bluetoothctl is not available on this system',
+    })
+    render(
+      <DevicesView
+        status={{ ...status, active_owner: null }}
+        catalog={catalog}
+        speakerOutputs={[audioDevice]}
+        audioInputs={[]}
+        midiPorts={[]}
+        audioError={null}
+        audioInputError={null}
+        midiError={null}
+        onRefresh={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+    fireEvent.click(screen.getByRole('tab', { name: /音频设备/ }))
+    expect(await screen.findAllByText('蓝牙服务不可用')).not.toHaveLength(0)
+    expect(screen.getByText('bluetoothctl is not available on this system')).toBeVisible()
   })
 
   it('disables speaker testing when no output device exists', () => {

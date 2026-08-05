@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_RELEASES = frozenset({"model-suite-v1.0.0", "model-suite-v1.0.1"})
+SUPPORTED_RELEASES = frozenset({"model-suite-v1.0.1"})
 EXPECTED_PRECISION = "FP32"
 EXPECTED_PRECISION_MODE_V2 = "origin"
 EXPECTED_SOC = "Ascend310B4"

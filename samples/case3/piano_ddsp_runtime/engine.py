@@ -38,10 +38,11 @@ RUNTIME_OUTPUT_NAMES = set(CONTROL_OUTPUT_NAMES) | {
     "next_context_state",
     "next_monophonic_state",
 }
+RUNTIME_METRIC_CAPACITY = 2_048
 LATENCY_PROFILES = {
-    "low": {"frames": 4, "prebuffer": 1, "latency_ms": 15.0, "capacity": 3},
-    "balanced": {"frames": 8, "prebuffer": 1, "latency_ms": 20.0, "capacity": 4},
-    "safe": {"frames": 16, "prebuffer": 2, "latency_ms": 40.0, "capacity": 5},
+    "low": {"frames": 4, "prebuffer": 1, "latency_ms": 15.0, "capacity": 2},
+    "balanced": {"frames": 8, "prebuffer": 2, "latency_ms": 20.0, "capacity": 4},
+    "safe": {"frames": 16, "prebuffer": 2, "latency_ms": 40.0, "capacity": 3},
 }
 
 
@@ -60,7 +61,7 @@ class PianoDdspEngine:
     def __init__(
         self,
         bundle: PianoBundle,
-        model_id: str = "paper_ir",
+        model_id: str = "gru_ir_96_64",
         *,
         piano_year: int = 2018,
         output_sample_rate: int = 48_000,
@@ -120,7 +121,7 @@ class PianoDdspEngine:
         self.recorder_root = Path(recorder_root or "reports/webui/piano-ddsp").resolve()
         self.monitor_callback = monitor_callback
         self.model_factory = model_factory
-        self.metrics = RuntimeMetrics(10_000)
+        self.metrics = RuntimeMetrics(RUNTIME_METRIC_CAPACITY)
         self.midi = LiveMidiState(note_listener=note_listener)
         self.scheduler = MidiScheduler(self.midi)
         self.player = PlayerState()
@@ -151,7 +152,6 @@ class PianoDdspEngine:
         self._reset_after_fade = False
         self._input_frozen = False
         self._pending_note_times: list[int] = []
-        self._last_latency_refresh = 0.0
 
     @property
     def block_frames(self) -> int:
@@ -177,7 +177,7 @@ class PianoDdspEngine:
             self.audio = BoundedAudioOutput(
                 self.output_sample_rate,
                 output_block,
-                max(int(profile["capacity"]), prebuffer + 2),
+                max(int(profile["capacity"]), prebuffer + 1),
                 prebuffer,
                 latency_ms,
                 self.metrics,
@@ -190,9 +190,11 @@ class PianoDdspEngine:
                 alsa_playback_level=self.alsa_playback_level,
                 on_played=self._on_played,
             )
-            self.audio.start()
             if self.midi_port:
                 self.midi_input = open_midi_input(self.midi_port, self._hardware_message)
+            self._prime_audio(self.audio)
+            self.audio.ready.clear()
+            self.audio.start()
             self._stop.clear()
             self._running = True
             self._state = "running"
@@ -200,6 +202,17 @@ class PianoDdspEngine:
                 target=self._render_loop, name="piano-render", daemon=True
             )
             self._render_thread.start()
+            self.audio.ready.set()
+
+    def _prime_audio(self, audio: BoundedAudioOutput) -> None:
+        """Warm inference/DSP, then queue a clean initial timeline before playback."""
+        for _ in range(2):
+            self.render_block()
+        self._reset_states(reset_midi=False)
+        for _ in range(audio.capacity):
+            if not audio.submit(self.render_block()):
+                raise RuntimeError("Unable to prefill the realtime audio queue")
+        self.metrics.reset()
 
     def _load_model(self, asset: PianoModelAsset) -> None:
         if self.piano_year not in asset.piano_years:
@@ -379,14 +392,9 @@ class PianoDdspEngine:
                 if audio.error is not None:
                     raise RuntimeError("Audio output failed") from audio.error
                 block = self.render_block()
-                if not audio.submit(block):
-                    time.sleep(self.block_frames / FRAME_RATE)
+                audio.submit(block)
                 if self._state == "stopping" and self._fade_samples <= 0:
                     self._stop.set()
-                now = time.monotonic()
-                if now - self._last_latency_refresh >= 1.0:
-                    self._last_latency_refresh = now
-                    audio.refresh_latencies()
         except BaseException as exc:
             self._error = str(exc)
             self._state = "failed"

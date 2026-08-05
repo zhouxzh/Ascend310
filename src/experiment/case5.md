@@ -147,7 +147,7 @@ M0:T=42.5,C=1.25,R=3200|M1:T=38.2,C=0.85,R=2950|M2:T=45.1,C=1.52,R=3100|M3:T=40.
 STM32 固件的完整开发指南（接线图、Arduino 示例、STM32CubeIDE 框架）
 见 [stm32_protocol.md](https://github.com/zhouxzh/Ascend310/blob/master/samples/case5/stm32_protocol.md)。
 
-Ascend 310B 端通过 [sensor_reader.py](samples/case5/sensor_reader.py) 的
+Ascend 310B 端通过 [sensor_reader.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/sensor_reader.py) 的
 `SensorReader` 类读取 UART 数据。当未检测到 STM32 时（`/dev/ttyUSB0`
 不存在），自动切换为仿真模式，生成带随机游走和偶发故障注入的模拟数据，
 方便在没有硬件的情况下开发和测试。
@@ -173,7 +173,7 @@ FPGA 的核心工作：
 3. 可选地在 FPGA 内完成 FFT 预处理，减轻 CPU 负担
 4. 通过 SPI 接口将数据发送给 Ascend 310B
 
-Ascend 310B 端通过 [vibration_processor.py](samples/case5/vibration_processor.py)
+Ascend 310B 端通过 [vibration_processor.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/vibration_processor.py)
 的 `VibrationProcessor` 类管理振动数据。当 FPGA 未连接时，自动生成含
 故障特征的仿真振动波形，包括：
 
@@ -217,7 +217,7 @@ flowchart TD
 ```
 
 全部实现仅依赖 NumPy（无需 librosa/scipy），在
-[vibration_processor.py](samples/case5/vibration_processor.py) 的
+[vibration_processor.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/vibration_processor.py) 的
 `waveform_to_spectrogram()` 方法中完成。梅尔滤波器组的三角滤波器矩阵在
 `VibrationProcessor` 初始化时预计算一次，后续每次转换仅需矩阵乘法。
 
@@ -304,7 +304,7 @@ if predicted > TEMP_WARN_THRESHOLD:
     alert("温度趋势告警: 预计将超阈值")
 ```
 
-实现在 [anomaly_detector.py](samples/case5/anomaly_detector.py) 的
+实现在 [anomaly_detector.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/anomaly_detector.py) 的
 `AnomalyDetector` 类中，纯 NumPy 实现，无需任何模型文件。
 
 ### 2.8. 模型转换与昇腾部署 {#src-experiment-case5-h22}

@@ -20,6 +20,7 @@ import { audioDeviceLabel } from '../audio'
 import MidiAudioTransport from '../components/MidiAudioTransport'
 import MidiFilePianoRoll from '../components/MidiFilePianoRoll'
 import { Field, Metric, Notice, PanelHeader, Segmented, StatusPill } from '../components/ui'
+import { timbreNameZh } from '../timbres'
 import type {
   Artifact,
   AudioDevice,
@@ -85,6 +86,16 @@ const SCHEME_ROLES: Record<Exclude<VoiceScheme, 'auto' | 'custom'>, number[]> = 
 }
 
 const ACTIVE = new Set(['queued', 'preparing', 'running', 'paused', 'stopping'])
+const JOB_STATE_LABELS: Record<string, string> = {
+  queued: '排队中',
+  preparing: '准备中',
+  running: '渲染中',
+  paused: '已暂停',
+  stopping: '停止中',
+  succeeded: '已完成',
+  failed: '失败',
+  cancelled: '已取消',
+}
 const RENDER_STAGES = [
   ['preparing', '准备'],
   ['loading_models', '加载模型'],
@@ -156,8 +167,8 @@ function recordingInstrumentLabelForJob(job: Job, catalog: Catalog): string {
   ).length)
   if (instrumentIds.length > 1) return `多音色 · ${voiceCount} 个声部`
   const instrumentId = instrumentIds[0] ?? metadataNumber(job, 'instrument_id')
-  return catalog.instruments.find((item) => item.id === instrumentId)?.name
-    ?? `Instrument ${instrumentId}`
+  const instrument = catalog.instruments.find((item) => item.id === instrumentId)
+  return instrument ? timbreNameZh(instrument.name) : `乐器 ${instrumentId}`
 }
 
 function formatDuration(value?: number | null): string {
@@ -488,7 +499,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
     : 0
   const recordingInstrumentLabel = selectedRecording
     ? recordingInstrumentLabelForJob(selectedRecording.job, catalog)
-    : `Instrument ${recordingInstrumentId}`
+    : `乐器 ${recordingInstrumentId}`
   const playbackProgress = activePlaybackJob?.progress_detail?.overall_progress
     ?? activePlaybackJob?.progress
     ?? 0
@@ -501,7 +512,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
   const configuredInstrumentIds = [...new Set(Object.values(voiceAssignments))]
   const configuredInstrumentLabel = configuredInstrumentIds.length > 1
     ? `多音色 · ${voices.length} 个声部`
-    : catalog.instruments.find((item) => item.id === configuredInstrumentIds[0])?.name ?? '-'
+    : timbreNameZh(catalog.instruments.find((item) => item.id === configuredInstrumentIds[0])?.name ?? '-')
   const ready = Boolean(
     midiId
     && bundleId
@@ -676,8 +687,8 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
   }
 
   return (
-    <div className="workspace midi-workspace">
-      <section ref={playerPanelRef} className={`panel midi-player-panel ${activeRenderJob ? 'has-active-render' : ''}`}>
+    <div className={`workspace midi-workspace midi-workspace--${view}`}>
+      <section ref={playerPanelRef} className={`panel midi-player-panel is-${view}-view ${activeRenderJob ? 'has-active-render' : ''}`}>
         <PanelHeader
           title={view === 'library' ? 'MIDI-DDSP 音频库' : 'MIDI-DDSP 新建渲染'}
           subtitle={view === 'library' ? '选择已有 WAV 立即播放' : '完整质量渲染与进度'}
@@ -832,7 +843,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
             )}
           </>
         ) : (
-          <>
+          <div className="midi-render-body">
             {!reverbAsset && <Notice tone="error">缺少 MIDI-DDSP 原版混响资产</Notice>}
             {renderJob?.state === 'failed' && renderJob.message && <Notice tone="error">{renderJob.message}</Notice>}
             {heartbeatStale && <Notice tone="warn">渲染进程超过 10 秒没有心跳，正在等待连接恢复。</Notice>}
@@ -843,28 +854,29 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
               </Notice>
             )}
 
-            <div className="track-browser">
-              <div className="track-icon"><FileAudio size={27} /></div>
-              <div className="track-select">
-                <span>TRACK</span>
-                <select aria-label="曲目" value={midiId} onChange={(event) => setMidiId(event.target.value)} disabled={Boolean(activeJob)}>
-                  {midiOptions.map((file) => <option value={file.id} key={file.id}>{midiOptionTag(file)} {file.name}</option>)}
-                </select>
+            <section className="midi-render-source" aria-label="待渲染 MIDI 概况">
+              <div className="track-browser">
+                <div className="track-icon"><FileAudio size={27} /></div>
+                <div className="track-select">
+                  <span>曲目</span>
+                  <select aria-label="曲目" value={midiId} onChange={(event) => setMidiId(event.target.value)} disabled={Boolean(activeJob)}>
+                    {midiOptions.map((file) => <option value={file.id} key={file.id}>{midiOptionTag(file)} {file.name}</option>)}
+                  </select>
+                </div>
+                <input ref={uploadRef} type="file" accept=".mid,.midi,audio/midi" hidden onChange={(event) => upload(event.target.files?.[0])} />
+                <button type="button" className="icon-button" title="上传 MIDI" onClick={() => uploadRef.current?.click()} disabled={busy || Boolean(activeJob)}><FolderUp size={19} /></button>
               </div>
-              <input ref={uploadRef} type="file" accept=".mid,.midi,audio/midi" hidden onChange={(event) => upload(event.target.files?.[0])} />
-              <button type="button" className="icon-button" title="上传 MIDI" onClick={() => uploadRef.current?.click()} disabled={busy || Boolean(activeJob)}><FolderUp size={19} /></button>
-            </div>
-
-            {selectedMidi && (
-              <div className="metrics-row report-metrics midi-track-metrics">
-                <Metric label="时长" value={selectedMidi.duration_seconds.toFixed(2)} unit="s" />
-                <Metric label="音符" value={selectedMidi.note_count} />
-                <Metric label="有效轨道" value={selectedMidi.track_count} />
-                <Metric label="声部" value={selectedMidi.voice_count} tone={selectedMidi.voice_count > 1 ? 'amber' : 'teal'} />
-                <Metric label="最大复音" value={selectedMidi.max_polyphony} tone={selectedMidi.max_polyphony > 1 ? 'amber' : 'teal'} />
-                <Metric label="音色配置" value={configuredInstrumentLabel} tone="teal" />
-              </div>
-            )}
+              {selectedMidi && (
+                <dl className="midi-render-facts">
+                  <div><dt>时长</dt><dd>{selectedMidi.duration_seconds.toFixed(2)} s</dd></div>
+                  <div><dt>音符</dt><dd>{selectedMidi.note_count}</dd></div>
+                  <div><dt>轨道</dt><dd>{selectedMidi.track_count}</dd></div>
+                  <div className={selectedMidi.voice_count > 1 ? 'is-emphasis' : ''}><dt>声部</dt><dd>{selectedMidi.voice_count}</dd></div>
+                  <div className={selectedMidi.max_polyphony > 1 ? 'is-warning' : ''}><dt>最大复音</dt><dd>{selectedMidi.max_polyphony}</dd></div>
+                  <div className="is-emphasis"><dt>音色配置</dt><dd>{configuredInstrumentLabel}</dd></div>
+                </dl>
+              )}
+            </section>
 
             {pianoRollError && <Notice tone="warn">MIDI 卷帘载入失败：{pianoRollError}</Notice>}
             <MidiFilePianoRoll
@@ -879,14 +891,21 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
             <section className="voice-assignment-section" aria-label="MIDI 声部音色分配">
               <div className="voice-assignment-heading">
                 <div>
-                  <span>VOICE ASSIGNMENT</span>
-                  <strong>检测到的声部</strong>
+                  <span>声部音色</span>
+                  <strong>检测与分配</strong>
                 </div>
-                {voiceAnalysisLoading ? (
-                  <span className="voice-analysis-status"><LoaderCircle className="spin" size={14} />分析中</span>
-                ) : voiceAnalysis ? (
-                  <StatusPill tone="ok">{voiceAnalysis.voice_count} 个声部</StatusPill>
-                ) : null}
+                <div className="voice-assignment-heading-meta">
+                  {voiceAnalysis && (
+                    <span className="voice-analysis-source" title={`${voiceAnalysis.algorithm.name} · ${voiceAnalysis.algorithm.commit}`}>
+                      Partitura {voiceAnalysis.algorithm.version}
+                    </span>
+                  )}
+                  {voiceAnalysisLoading ? (
+                    <span className="voice-analysis-status"><LoaderCircle className="spin" size={14} />分析中</span>
+                  ) : voiceAnalysis ? (
+                    <StatusPill tone="ok">{voiceAnalysis.voice_count} 个声部</StatusPill>
+                  ) : null}
+                </div>
               </div>
               {voiceAnalysisError && (
                 <div className="voice-analysis-error">
@@ -896,11 +915,6 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
               )}
               {!voiceAnalysisLoading && voiceAnalysis && (
                 <>
-                  <div className="voice-analysis-source">
-                    <span>{voiceAnalysis.algorithm.name}</span>
-                    <span>Partitura {voiceAnalysis.algorithm.version}</span>
-                    <span>{voiceAnalysis.algorithm.commit.slice(0, 8)}</span>
-                  </div>
                   <div className="voice-assignment-table" role="table">
                     <div className="voice-assignment-row voice-assignment-header" role="row">
                       <span role="columnheader">声部</span>
@@ -928,7 +942,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
                           </span>
                           <span className="voice-program" role="cell">
                             <strong>{voice.program}</strong>
-                            <small>{detectedInstrument?.name ?? '按音域建议'}</small>
+                            <small>{detectedInstrument ? timbreNameZh(detectedInstrument.name) : '按音域建议'}</small>
                           </span>
                           <span className="voice-notes" role="cell">{voice.note_count}</span>
                           <span className="voice-range" role="cell">
@@ -942,7 +956,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
                               onChange={(event) => setVoiceInstrument(voice.id, Number(event.target.value))}
                               disabled={Boolean(activeJob)}
                             >
-                              {catalog.instruments.map((instrument) => <option value={instrument.id} key={instrument.id}>{instrument.id.toString().padStart(2, '0')} · {instrument.name}</option>)}
+                              {catalog.instruments.map((instrument) => <option value={instrument.id} key={instrument.id}>{instrument.id.toString().padStart(2, '0')} · {timbreNameZh(instrument.name)}</option>)}
                             </select>
                           </span>
                         </div>
@@ -996,7 +1010,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
                 <Metric label="削波" value={renderReport?.clipped_samples ?? 0} tone={(renderReport?.clipped_samples ?? 0) > 0 ? 'red' : undefined} />
               </div>
             )}
-          </>
+          </div>
         )}
       </section>
 
@@ -1032,45 +1046,55 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
       ) : (
         <aside className="panel settings-panel midi-settings">
           <PanelHeader
-            title="渲染参数"
+            title="渲染设置"
             action={(
               <button type="button" className="icon-button" title="恢复自动建议" onClick={() => applyVoiceScheme('auto')} disabled={Boolean(activeJob) || !voiceAnalysis}>
                 <RotateCcw size={18} />
               </button>
             )}
           />
-          <div className="form-grid single-column">
-            <Field label="模型包">
-              {modelBundles.length > 1 ? (
-                <select value={bundleId} onChange={(event) => setBundleId(event.target.value)} disabled={Boolean(activeJob)}>
-                  {modelBundles.map((bundle) => <option value={bundle.id} key={bundle.id}>{bundle.name}{bundle.recommended ? ' · 推荐' : ''}</option>)}
-                </select>
-              ) : (
-                <output className="field-readonly">{selectedBundle?.name ?? 'Stateful v2'}</output>
-              )}
-            </Field>
-            {selectedBundle && <small className="field-hint">{selectedBundle.quality_status === 'om_validated' ? 'OM 已验证' : selectedBundle.quality_status} · {formatBytes(bundleSize)} · batch {(selectedBundle.voice_batch_sizes ?? [1]).join('/')}</small>}
-            <Field label="音色方案">
-              <select
-                value={voiceScheme}
-                onChange={(event) => applyVoiceScheme(event.target.value as Exclude<VoiceScheme, 'custom'>)}
-                disabled={Boolean(activeJob) || !voiceAnalysis}
-              >
-                <option value="auto">自动建议</option>
-                <option value="strings">Google 弦乐</option>
-                <option value="woodwinds">Google 木管</option>
-                <option value="brass">Google 铜管</option>
-                <option value="custom" disabled>自定义</option>
-              </select>
-            </Field>
-            <Field label="全部设置为">
-              <select value={instrumentId} onChange={(event) => setAllVoiceInstruments(Number(event.target.value))} disabled={Boolean(activeJob) || !voiceAnalysis}>
-                {catalog.instruments.map((instrument) => <option value={instrument.id} key={instrument.id}>{instrument.id.toString().padStart(2, '0')} · {instrument.name}</option>)}
-              </select>
-            </Field>
-            <Field label="随机种子"><input type="number" min="0" max="2147483647" value={seed} onChange={(event) => setSeed(Number(event.target.value))} disabled={Boolean(activeJob)} /></Field>
-            <Field label={`输出增益 ${gain} dB`}><input type="range" min="-60" max="0" value={gain} onChange={(event) => setGain(Number(event.target.value))} disabled={Boolean(activeJob)} /></Field>
-            <Field label={`额外尾音 ${tail.toFixed(1)} s`}><input type="range" min="0" max="4" step="0.1" value={tail} onChange={(event) => setTail(Number(event.target.value))} disabled={Boolean(activeJob)} /></Field>
+          <div className="midi-settings-body">
+            <section className="midi-settings-group" aria-labelledby="midi-model-settings-title">
+              <h3 id="midi-model-settings-title">模型与音色</h3>
+              <div className="form-grid single-column">
+                <Field label="模型包">
+                  {modelBundles.length > 1 ? (
+                    <select value={bundleId} onChange={(event) => setBundleId(event.target.value)} disabled={Boolean(activeJob)}>
+                      {modelBundles.map((bundle) => <option value={bundle.id} key={bundle.id}>{bundle.name}{bundle.recommended ? ' · 推荐' : ''}</option>)}
+                    </select>
+                  ) : (
+                    <output className="field-readonly">{selectedBundle?.name ?? 'Stateful v2'}</output>
+                  )}
+                </Field>
+                {selectedBundle && <small className="field-hint">{selectedBundle.quality_status === 'om_validated' ? 'OM 已验证' : selectedBundle.quality_status} · {formatBytes(bundleSize)} · batch {(selectedBundle.voice_batch_sizes ?? [1]).join('/')}</small>}
+                <Field label="音色方案">
+                  <select
+                    value={voiceScheme}
+                    onChange={(event) => applyVoiceScheme(event.target.value as Exclude<VoiceScheme, 'custom'>)}
+                    disabled={Boolean(activeJob) || !voiceAnalysis}
+                  >
+                    <option value="auto">自动建议</option>
+                    <option value="strings">Google 弦乐</option>
+                    <option value="woodwinds">Google 木管</option>
+                    <option value="brass">Google 铜管</option>
+                    <option value="custom" disabled>自定义</option>
+                  </select>
+                </Field>
+                <Field label="全部设置为">
+                  <select value={instrumentId} onChange={(event) => setAllVoiceInstruments(Number(event.target.value))} disabled={Boolean(activeJob) || !voiceAnalysis}>
+                    {catalog.instruments.map((instrument) => <option value={instrument.id} key={instrument.id}>{instrument.id.toString().padStart(2, '0')} · {timbreNameZh(instrument.name)}</option>)}
+                  </select>
+                </Field>
+              </div>
+            </section>
+            <section className="midi-settings-group" aria-labelledby="midi-output-settings-title">
+              <h3 id="midi-output-settings-title">输出设置</h3>
+              <div className="form-grid single-column midi-output-settings">
+                <Field label="随机种子"><input type="number" min="0" max="2147483647" value={seed} onChange={(event) => setSeed(Number(event.target.value))} disabled={Boolean(activeJob)} /></Field>
+                <Field label={`输出增益 ${gain} dB`}><input type="range" min="-60" max="0" value={gain} onChange={(event) => setGain(Number(event.target.value))} disabled={Boolean(activeJob)} /></Field>
+                <Field label={`额外尾音 ${tail.toFixed(1)} s`}><input type="range" min="0" max="4" step="0.1" value={tail} onChange={(event) => setTail(Number(event.target.value))} disabled={Boolean(activeJob)} /></Field>
+              </div>
+            </section>
           </div>
           <div className="midi-settings-footer">
             <div className="midi-render-readiness">
@@ -1088,7 +1112,7 @@ export default function MidiDdspView({ catalog, audioDevices, jobs, onRefresh }:
               {renderJob && (
                 <div className="timeline">
                   <div className="timeline-meta">
-                    <StatusPill tone={renderJob.state === 'succeeded' ? 'ok' : renderJob.state === 'failed' ? 'error' : activeRenderJob ? 'warn' : 'neutral'}>{renderJob.state}</StatusPill>
+                    <StatusPill tone={renderJob.state === 'succeeded' ? 'ok' : renderJob.state === 'failed' ? 'error' : activeRenderJob ? 'warn' : 'neutral'}>{JOB_STATE_LABELS[renderJob.state] ?? renderJob.state}</StatusPill>
                     <span>{Math.round(renderJob.progress * 100)}%</span>
                   </div>
                   <div className="progress-track"><span style={{ width: `${renderJob.progress * 100}%` }} /></div>

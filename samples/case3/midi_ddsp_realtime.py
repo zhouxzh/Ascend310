@@ -451,7 +451,7 @@ class StreamingFftReverb:
         if not path.is_file():
             raise FileNotFoundError(
                 f"MIDI-DDSP reverb asset not found: {path}. "
-                "Run tools/export_midi_ddsp_reverb.py locally and sync the output."
+                "Download or synchronize the verified published model release."
             )
         with np.load(path, allow_pickle=False) as data:
             impulse_responses = np.asarray(data["impulse_responses"], dtype=np.float32)

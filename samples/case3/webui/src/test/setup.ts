@@ -16,6 +16,7 @@ class ResizeObserverStub implements ResizeObserver {
 globalThis.ResizeObserver = ResizeObserverStub
 
 const canvasContextStub = {
+  arc() {},
   beginPath() {},
   clearRect() {},
   fill() {},
@@ -25,8 +26,10 @@ const canvasContextStub = {
   moveTo() {},
   rect() {},
   roundRect() {},
+  setLineDash() {},
   setTransform() {},
   stroke() {},
+  strokeRect() {},
 }
 
 Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {

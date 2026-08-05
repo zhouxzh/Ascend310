@@ -35,6 +35,35 @@
     font-size: 18px;
   }
 
+  .app-shell--touch-display .audio-output-system-volume {
+    min-height: var(--studio-primary-control);
+  }
+
+  .app-shell--touch-display .device-section-tabs button > span:first-child,
+  .app-shell--touch-display .device-readiness-card h3 {
+    font-size: 20px;
+  }
+
+  .app-shell--touch-display .device-section-tabs button .status-pill {
+    font-size: 14px;
+  }
+
+  .app-shell--touch-display .device-board-status-heading h2 {
+    font-size: 22px;
+  }
+
+  .app-shell--touch-display .device-board-status-heading p,
+  .app-shell--touch-display .device-board-facts dt,
+  .app-shell--touch-display .device-readiness-card dt,
+  .app-shell--touch-display .device-readiness-hint {
+    font-size: 16px;
+  }
+
+  .app-shell--touch-display .device-board-facts dd,
+  .app-shell--touch-display .device-readiness-card dd {
+    font-size: 18px;
+  }
+
   .app-shell--touch-display .icon-button {
     min-width: var(--studio-touch-control);
     min-height: var(--studio-touch-control);
@@ -74,12 +103,20 @@
     height: 220px;
   }
 
+  .app-shell--touch-display .midi-player-panel.is-render-view .midi-file-roll-canvas {
+    height: 180px;
+  }
+
   .app-shell--touch-display .midi-file-roll.is-compact .midi-file-roll-canvas {
     height: 180px;
   }
 }
 
 @media (max-width: 900px), (any-pointer: coarse) and (max-width: 1499px) {
+  .bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
   .primary-button,
   .secondary-button,
   .segmented button,
@@ -146,6 +183,7 @@
   }
 
   .device-section-tabs button {
+    min-height: 52px;
     padding: 6px;
     font-size: 14px;
   }

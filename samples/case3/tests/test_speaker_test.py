@@ -11,10 +11,13 @@ import numpy as np
 
 from midi_ddsp_webui.core import ResourceBusyError, ResourceCoordinator
 from midi_ddsp_webui.speaker import (
+    AudioInputTestController,
     SpeakerTestController,
+    amplitude_to_dbfs,
     build_test_signal,
     canonical_audio_output_name,
     configure_alsa_output_route,
+    is_pulse_output_event,
     query_audio_inputs,
     query_ddsp_vst_audio_outputs,
     query_midi_ddsp_audio_outputs,
@@ -58,6 +61,74 @@ class FakeSoundDevice:
 
     def OutputStream(self, **config):
         return FakeOutputStream(self, **config)
+
+
+class FakeInputStream:
+    def __init__(self, owner, **config) -> None:
+        self.owner = owner
+        self.config = config
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _exc_type, _exc, _traceback) -> None:
+        return None
+
+    def read(self, frames: int):
+        self.owner.read_sizes.append(frames)
+        return np.full((frames, self.owner.channels), self.owner.level, dtype=np.float32), False
+
+
+class FakeInputSoundDevice:
+    def __init__(self, channels: int = 1, level: float = 0.1) -> None:
+        self.channels = channels
+        self.level = level
+        self.read_sizes: list[int] = []
+        self.checked: dict[str, object] = {}
+
+    def query_devices(self, device, kind):
+        if kind != "input":
+            raise AssertionError(kind)
+        return {
+            "name": f"Fake input {device}",
+            "max_input_channels": self.channels,
+            "default_samplerate": 8_000,
+        }
+
+    def check_input_settings(self, **config) -> None:
+        self.checked = config
+
+    def InputStream(self, **config):
+        return FakeInputStream(self, **config)
+
+
+class FakeCaptureOutput:
+    def __init__(self, level: float = 0.1) -> None:
+        self.level = level
+
+    def read(self, size: int) -> bytes:
+        return np.full(size // 4, self.level, dtype="<f4").tobytes()
+
+
+class FakePulseCaptureProcess:
+    def __init__(self, command: list[str]) -> None:
+        self.command = command
+        self.stdout = FakeCaptureOutput()
+        self.stderr = FakePulseError()
+        self.return_code: int | None = None
+
+    def poll(self) -> int | None:
+        return self.return_code
+
+    def wait(self, timeout: float) -> int:
+        self.return_code = -15
+        return self.return_code
+
+    def terminate(self) -> None:
+        self.return_code = -15
+
+    def kill(self) -> None:
+        self.return_code = -9
 
 
 class FakePulseInput:
@@ -141,6 +212,19 @@ def speaker_config(channel_mode: str = "both") -> dict[str, object]:
     }
 
 
+def input_test_config() -> dict[str, object]:
+    return {
+        "audio_input_id": "1",
+        "audio_device_id": "1",
+        "device_name": "Fake input",
+        "audio_backend": "portaudio",
+        "default_sample_rate": 8_000,
+        "max_input_channels": 1,
+        "duration_seconds": 0.05,
+        "threshold_dbfs": -45.0,
+    }
+
+
 class SpeakerSignalTest(unittest.TestCase):
     def test_left_channel_does_not_leak_into_right_channel(self) -> None:
         signal = build_test_signal(8_000, 0.1, 440.0, -12.0, 2, "left")
@@ -152,6 +236,83 @@ class SpeakerSignalTest(unittest.TestCase):
     def test_both_channels_receive_the_same_test_tone(self) -> None:
         signal = build_test_signal(8_000, 0.1, 440.0, -12.0, 2, "both")
         np.testing.assert_array_equal(signal[:, 0], signal[:, 1])
+
+    def test_audio_level_dbfs_has_a_stable_silence_floor(self) -> None:
+        self.assertEqual(amplitude_to_dbfs(0.0), -96.0)
+        self.assertAlmostEqual(amplitude_to_dbfs(0.1), -20.0)
+
+
+class AudioInputControllerTest(unittest.TestCase):
+    def test_capture_reports_levels_and_releases_the_audio_resource(self) -> None:
+        coordinator = ResourceCoordinator()
+        sounddevice = FakeInputSoundDevice(level=0.1)
+        controller = AudioInputTestController(coordinator, sounddevice)
+        controller.start(input_test_config())
+        deadline = time.monotonic() + 1.0
+        while controller.running and time.monotonic() < deadline:
+            time.sleep(0.001)
+        status = controller.status()
+        self.assertEqual(status["state"], "succeeded")
+        self.assertEqual(status["progress"], 1.0)
+        self.assertAlmostEqual(float(status["rms_dbfs"]), -20.0, places=3)
+        self.assertAlmostEqual(float(status["peak_dbfs"]), -20.0, places=3)
+        self.assertTrue(status["signal_detected"])
+        self.assertEqual(status["overflows"], 0)
+        self.assertIsNone(coordinator.owner)
+        self.assertTrue(sounddevice.read_sizes)
+
+    def test_silence_does_not_report_a_detected_signal(self) -> None:
+        coordinator = ResourceCoordinator()
+        controller = AudioInputTestController(
+            coordinator,
+            FakeInputSoundDevice(level=0.0),
+        )
+        controller.start(input_test_config())
+        deadline = time.monotonic() + 1.0
+        while controller.running and time.monotonic() < deadline:
+            time.sleep(0.001)
+        status = controller.status()
+        self.assertEqual(status["rms_dbfs"], -96.0)
+        self.assertFalse(status["signal_detected"])
+        self.assertIsNone(coordinator.owner)
+
+    def test_pulse_capture_targets_the_selected_source(self) -> None:
+        processes: list[FakePulseCaptureProcess] = []
+
+        def create_process(command, **_options):
+            process = FakePulseCaptureProcess(command)
+            processes.append(process)
+            return process
+
+        coordinator = ResourceCoordinator()
+        controller = AudioInputTestController(
+            coordinator,
+            popen_factory=create_process,
+        )
+        config = {
+            **input_test_config(),
+            "audio_backend": "pulse",
+            "pulse_source": "alsa_input.usb-microphone.mono-fallback",
+        }
+        with patch("midi_ddsp_webui.speaker.shutil.which", return_value="/usr/bin/parec"):
+            controller.start(config)
+            deadline = time.monotonic() + 1.0
+            while controller.running and time.monotonic() < deadline:
+                time.sleep(0.001)
+        self.assertEqual(controller.status()["state"], "succeeded")
+        self.assertIn(
+            "--device=alsa_input.usb-microphone.mono-fallback",
+            processes[0].command,
+        )
+        self.assertIsNone(coordinator.owner)
+
+    def test_other_audio_owner_blocks_input_testing(self) -> None:
+        coordinator = ResourceCoordinator()
+        coordinator.acquire("live-session")
+        controller = AudioInputTestController(coordinator, FakeInputSoundDevice())
+        with self.assertRaises(ResourceBusyError):
+            controller.start(input_test_config())
+        coordinator.release("live-session")
 
 
 class SpeakerOutputCatalogTest(unittest.TestCase):
@@ -228,6 +389,19 @@ class SpeakerOutputCatalogTest(unittest.TestCase):
                 "description": "EDIFIER M16 Pro",
                 "sample_specification": "s16le 2ch 44100Hz",
                 "properties": {"device.description": "EDIFIER M16 Pro"},
+                "volume": {
+                    "front-left": {
+                        "value": 32_768,
+                        "value_percent": "50%",
+                        "db": "-6.02 dB",
+                    },
+                    "front-right": {
+                        "value": 39_322,
+                        "value_percent": "60%",
+                        "db": "-4.44 dB",
+                    },
+                },
+                "mute": False,
             }
         ]
         results = [
@@ -242,6 +416,15 @@ class SpeakerOutputCatalogTest(unittest.TestCase):
         self.assertTrue(outputs[0]["is_default"])
         self.assertTrue(outputs[0]["is_bluetooth"])
         self.assertEqual(outputs[0]["default_sample_rate"], 44_100)
+        self.assertEqual(outputs[0]["system_volume_percent"], 55.0)
+        self.assertEqual(outputs[0]["system_volume_db"], -5.23)
+        self.assertFalse(outputs[0]["system_muted"])
+
+    def test_pulse_output_event_filter_ignores_unrelated_stream_events(self) -> None:
+        self.assertTrue(is_pulse_output_event("Event 'change' on sink #3"))
+        self.assertTrue(is_pulse_output_event("Event 'change' on server #0"))
+        self.assertFalse(is_pulse_output_event("Event 'new' on sink-input #42"))
+        self.assertFalse(is_pulse_output_event("Event 'change' on source #1"))
 
     def test_audio_inputs_distinguish_capture_from_monitor(self) -> None:
         sources = [

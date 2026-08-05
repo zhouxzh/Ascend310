@@ -8,9 +8,13 @@ import theme from "./theme.js";
 export default defineUserConfig({
   base: "/Ascend310/",
 
+  head: [
+    ["link", { rel: "icon", href: "/Ascend310/favicon.ico" }],
+  ],
+
   lang: "zh-CN",
-  title: "主页",
-  description: "vuepress-theme-hope 的文档演示",
+  title: "昇腾310B实战",
+  description: "基于昇腾310B的边缘计算与人工智能推理部署开源教材",
 
   bundler: viteBundler({
     viteOptions: {},

@@ -1,6 +1,11 @@
-# ONNX 与 PyACL/OM 实时播放
+# 历史参考：ONNX 与 PyACL/OM 实时播放
 
 > 本文档中的命令默认从 `case3` 仓库根目录执行。[返回文档索引](README.md)。
+
+> **历史参考，不是当前部署步骤。** 本文记录早期 DDSP-VST MIDI Synth 与 ONNX/OM 对照
+> 路径。当前 Case3 的“实时演奏”只使用 Piano-DDSP OM；DDSP-VST 只用于麦克风 Effect，
+> 生产运行时严格 OM-only。请使用[WebUI 操作、部署与 API](webui.md)、
+> [Piano-DDSP 实时系统](piano-ddsp.md)和[模型与 OM 部署](om-deployment.md)完成当前部署。
 
 `realtime_ddsp.py` 已将验证通过的控制模型接入同一套实时流水线：`.onnx` 使用
 ONNX Runtime CPU，`.om` 使用 Ascend PyACL。MIDI 状态和音频输出在独立线程中
@@ -23,22 +28,19 @@ python-rtmidi
 sounddevice
 ```
 
-其中 `sounddevice` 只是 Python 封装，Linux 上实时声卡输出还需要系统动态库
+其中 `sounddevice` 只是 Python 封装，Linux 上实时声卡输出还需要既有系统动态库
 `libportaudio2`。在 Ascend 开发板上统一激活 Anaconda `base`，不要回退到系统
-Python：
+Python；缺少系统库时保留诊断，不在部署流程安装系统软件：
 
 ```bash
-sudo apt install -y libportaudio2
-
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate base
 cd ~/Documents/case3
-python -m pip install --user -r requirements.txt
+python -m pip install -r requirements.txt
+python -c "import pytest; print(pytest.__version__)"
 ```
 
-板端 Anaconda 安装在管理员所有的 `/usr/local/miniconda3`。普通 `HwHiAiUser` 用户
-没有该目录的写权限，因此必须使用 `--user` 安装到 `~/.local/`。不要使用 `sudo pip`；
-`python -m pip` 用于确保依赖安装给当前激活的 `base` Python。
+不要使用 `sudo pip`；`python -m pip` 用于确保依赖安装给当前激活的 `base` Python。
 
 依赖用途：
 
@@ -48,8 +50,11 @@ python -m pip install --user -r requirements.txt
 | `sounddevice` | Python 到 PortAudio 的接口 | `Install requirements.txt first` |
 | `mido` | 解析 MIDI 文件和 MIDI 消息 | `MIDI playback requires mido` |
 | `python-rtmidi` | 连接实体 MIDI 键盘 | `--live` 无法打开 MIDI port |
-| `onnxruntime` | 在 CPU 上运行 DDSP-VST ONNX 控制模型 | 模型会话创建失败或模块不存在 |
+| `onnxruntime`（仅非 aarch64 开发环境） | 本地对照旧 ONNX 控制模型 | 模型会话创建失败或模块不存在 |
 | `acl`（PyACL） | 在 Ascend NPU 上加载和执行 OM | `PyACL is required for OM inference` |
+
+Ascend 310B 部署只允许 PyACL/OM 后端。`requirements.txt` 使用环境标记跳过板端
+ONNX 与 ONNX Runtime 安装，WebUI 的 DDSP-VST Effect 也不提供 ONNX/CPU 回退。
 
 只使用 `--play-midi` 播放 MIDI 文件时不需要实体 MIDI 键盘，但仍需要 `mido`、
 `sounddevice` 和 `libportaudio2`。使用 `--live` 连接实体键盘时还需要

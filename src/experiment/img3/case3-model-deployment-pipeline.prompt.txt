@@ -1,0 +1,30 @@
+Use case: scientific-educational
+Asset type: technical report figure
+Primary request:
+Create a tall publication-ready verified model-deployment pipeline for a Chinese technical book. White background, flat vector style, high contrast, generous margins, no gradients, no shadows, no title or figure number. Use the Okabe-Ito palette and black arrowheads. All labels must be exact, large, crisp, and horizontal. Use checkmark-like geometric status markers only if they do not replace text.
+
+Make a top-to-bottom pipeline split into two responsibility zones.
+
+Zone “开发电脑” contains:
+1. “固定 HF revision”
+2. “SHA256SUMS 校验”
+3. “断点下载 + 原子落盘”
+4. “ONNX checker + 张量合同”
+5. “上传到 staging”
+
+Zone “Ascend 310B 开发板” contains:
+6. “ATC -> Ascend310B4 OM”
+7. “保存 ATC 原始日志”
+8. “PyACL 精度 + 性能验证”
+9. “manifest + 资产 SHA256”
+10. “不可变 OM bundle”
+11. “active-bundle.json 原子切换”
+
+Use green validation gates between steps 2/3, 4/5, and 8/9. Put a red side exit from each gate labeled “失败：停止，不激活”. Add a rollback arrow from the last step to a compact box “历史 bundle 保留”. Include a small provenance badge beside the first zone: “model-suite-v1.0.1 · c41911aa”. Make the immutable-bundle and atomic-pointer concepts visually obvious.
+Scene/backdrop: clean white or very light neutral background
+Style/medium: precise flat scientific infographic with vector-like geometry and professional sans-serif typography
+Composition/framing: scan-friendly hierarchy, generous whitespace, consistent alignment, and clearly terminated arrows
+Color palette: colorblind-safe Okabe-Ito colors with dark charcoal text and sufficient grayscale contrast
+Text handling: render requested labels verbatim; use consistent capitalization; do not add pseudo-text or unnecessary labels
+Scientific constraints: preserve the requested causal, spatial, and mathematical relationships; do not invent values, equations, units, components, or scientific claims
+Output constraints: no overlapping or clipped text; no ambiguous connections; no gradients, shadows, 3D effects, logos, watermarks, decorative borders, or photorealism

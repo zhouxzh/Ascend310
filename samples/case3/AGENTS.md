@@ -42,22 +42,20 @@ decisions. Detailed operator instructions and API descriptions remain in
 
 ## Runtime Boundary
 
-- The local computer is the development and model-export environment.
-- TensorFlow checkpoint to ONNX export must be completed on the local computer.
+- The local computer is the development, frontend-build, and published-model download environment.
+- TensorFlow checkpoint to ONNX export is historical only; case3 consumes verified published ONNX/OM releases.
 - Ascend-only operations such as ATC conversion, OM inference, PyACL runtime
   checks, and `npu-smi` inspection must run on the target Ascend 310B board.
 
 ## Remote Board Safety
 
-- Never install, upgrade, downgrade, remove, or initialize software on any
-  remote Ascend 310B board.
-- Do not run package-management commands on a remote board, including
-  `pip install`, `conda install`, `apt install`, or their uninstall/upgrade
-  equivalents.
-- Use only software and conda environments that already exist on the board.
-- If a required board-side dependency is missing, stop that step, preserve the
-  diagnostic output, and report the dependency as a blocker. Do not work around
-  it by modifying system or environment packages.
+- Use the board's existing CANN and Conda `base` environment. The authorized
+  deployment exception is `python -m pip install -r requirements.txt` and a
+  subsequent pytest check in that environment.
+- Do not install Node/npm, use `conda install`, run `apt install`, remove or
+  upgrade unrelated packages, or initialize software on the remote board.
+- If a system or CANN dependency is missing, stop that step, preserve the
+  diagnostic output, and report the dependency as a blocker.
 - Do not edit remote shell startup files or system configuration.
 
 ## Change Discipline
@@ -104,10 +102,19 @@ browser responsible for model inference or board device selection.
 
 ## Product Workspaces
 
-The top-level application has exactly four user workspaces. Keep their jobs
-separate even though some share services.
+The top-level application has exactly four user workspaces. Real-time touch and
+physical MIDI performance share one workspace with explicit input modes; keep
+the other workspace jobs separate even though some share services.
 
-### Touch Performance (`触控演奏`)
+### Real-Time Performance (`实时演奏`)
+
+- Provide `触摸屏` and `MIDI 键盘` as a segmented input-mode control inside one
+  mounted real-time workspace. Preserve the running session, shared settings,
+  and catalog while navigating between the two stopped modes.
+- Lock input-mode switching while the session is running or recording so the
+  selected physical MIDI port and capture sources cannot disagree with the UI.
+
+#### Touch Input (`触摸屏`)
 
 - Intended for direct finger performance on the 10-inch display.
 - Default to 25 keys and allow 13 or 25 keys only. These are screen instruments,
@@ -119,16 +126,16 @@ separate even though some share services.
 - A touch `pointerdown` sends `note_on` immediately. Never add a front-end hold
   delay to make a note audible.
 
-### MIDI Keyboard (`MIDI 键盘`)
+#### MIDI Keyboard Input (`MIDI 键盘`)
 
-- Intended for a physical MIDI controller and must remain a separate page from
-  touch performance.
+- Intended for a physical MIDI controller and must remain a distinct mode from
+  touch input inside the shared workspace.
 - Support 32, 49, 61, and 88-key views. Allow octave movement for every range
   below 88 keys.
 - Make the dynamic roll the visual focus. Keep MIDI port, modulation, pitch
   bend, output gain, and range controls compact; place infrequent settings in a
   lower details area.
-- Do not put an 88-key touch keyboard on the touch-performance page.
+- Do not put an 88-key touch keyboard in touch input mode.
 
 ### MIDI-DDSP
 
@@ -147,9 +154,30 @@ separate even though some share services.
   draggable seek, current/total time, active-note highlighting, and follow mode.
   Do not copy its multi-player/multi-visualizer advanced-demo layout.
 
+### DDSP-VST Effect (`DDSP-VST`)
+
+- This page is a microphone effect, not another MIDI synthesizer. Its fixed
+  route is physical PulseAudio capture, Feature OM, Control OM, CPU DDSP
+  synthesis, and an explicitly selected PulseAudio output.
+- Production inference is OM-only. Both Feature and Control backends must
+  report `acl/om`; do not add ONNX Runtime, TFLite, browser inference, or CPU
+  model fallbacks.
+- Accept catalog model/device IDs and bounded parameters only. The server owns
+  model paths and PulseAudio source/sink resolution, and a monitor source must
+  never be accepted as a microphone.
+- Share the exclusive audio/NPU resource lock with real-time performance,
+  MIDI-DDSP playback, audio input tests, and speaker tests. Device loss or an
+  invalid model/hash/tensor contract must stop the effect and release resources.
+- Keep one lightweight pitch/loudness Canvas and the controls in the physical
+  `1920x969` viewport without page-level vertical scrolling. Do not add browser
+  monitoring, recording, Dry/Wet passthrough, or a duplicate MIDI synth.
+- Default to UGREEN camera capture, EDIFIER M16 Pro output, `-18 dB` output
+  gain, and transformed audio only. Sustained overload must cause explicit
+  safety mute rather than silent device rerouting.
+
 ### Devices (`设备`)
 
-- Organize the page into `设备概览`, `音频与 MIDI`, and `运行环境` tabs.
+- Organize the page into `设备概览`, `音频设备`, and `运行环境` tabs.
 - Show NPU/CANN/PyACL, audio inputs/outputs, MIDI ports, Bluetooth status,
   diagnostics, and speaker test without implying that a detected device has
   been audibly verified.
@@ -162,9 +190,10 @@ separate even though some share services.
 
 ## Shared Real-Time Contract
 
-- Touch and physical MIDI pages are two views over one exclusive real-time
+- Touch and physical MIDI are two input modes over one exclusive real-time
   session. They share the selected patch, output device, recording, monitoring,
-  parameters, resource lock, and diagnostics.
+  parameters, resource lock, and diagnostics while retaining independent key
+  ranges and mode-specific controls.
 - Starting, switching, stopping, panic, disconnection, pointer cancellation,
   and source release must not leave hanging notes or a held pedal.
 - New Piano-DDSP notes have a minimum audible gate of four 4 ms synthesis
@@ -324,7 +353,7 @@ their time models.
 Run local checks proportional to the change. The standard suite is:
 
 ```powershell
-python -m unittest discover -s tests -v
+python -m pytest -q
 cd webui
 npm run test
 npm run build
@@ -357,7 +386,8 @@ npm run test:e2e
   atomically switch the directory. Keep a rollback copy until HTTP and
   Playwright checks pass; remove only that verified temporary backup afterward.
 - Activate the board's existing CANN and conda `base` environment. Do not fall
-  back to system Python and do not install packages.
+  back to system Python; install only this repository's `requirements.txt` via
+  pip, then verify pytest.
 - Start with the existing `scripts/run_webui.py`; do not edit shell startup or
   create a new system service as part of routine deployment.
 - Verify `/`, `/api/v1/status`, WebSocket connection, process PID, served asset

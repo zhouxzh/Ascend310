@@ -1,9 +1,12 @@
 import type {
   AudioDevice,
+  AudioInputTestStatus,
   BluetoothAudioActionResponse,
   BluetoothAudioState,
   AudioInput,
   Catalog,
+  DdspVstEffectCatalog,
+  DdspVstEffectStatus,
   Job,
   MidiDdspLibraryTrack,
   MidiDdspLibraryVersion,
@@ -81,6 +84,30 @@ export const api = {
       '/api/v1/midi-ports',
     ),
   jobs: () => request<{ jobs: Job[] }>('/api/v1/jobs'),
+  ddspVstEffectCatalog: () =>
+    request<DdspVstEffectCatalog>('/api/v1/ddsp-vst-effect/catalog'),
+  refreshDdspVstEffectCatalog: () =>
+    request<DdspVstEffectCatalog>('/api/v1/ddsp-vst-effect/catalog/refresh', { method: 'POST' }),
+  ddspVstEffectStatus: () =>
+    request<DdspVstEffectStatus>('/api/v1/ddsp-vst-effect/status'),
+  startDdspVstEffect: (payload: {
+    model_id: string
+    audio_input_id: string
+    audio_output_id: string
+    parameters: Record<string, number>
+  }) => request<DdspVstEffectStatus>('/api/v1/ddsp-vst-effect/start', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+  updateDdspVstEffect: (values: Record<string, number>) =>
+    request<DdspVstEffectStatus>('/api/v1/ddsp-vst-effect/parameters', {
+      method: 'PATCH',
+      body: JSON.stringify({ values }),
+    }),
+  stopDdspVstEffect: () =>
+    request<DdspVstEffectStatus>('/api/v1/ddsp-vst-effect/stop', { method: 'POST' }),
+  calibrateDdspVstEffect: () =>
+    request<DdspVstEffectStatus>('/api/v1/ddsp-vst-effect/calibrate', { method: 'POST' }),
   realtimeCatalog: () => request<RealtimeCatalog>('/api/v1/realtime/catalog'),
   realtimeStatus: () => request<RealtimeStatus>('/api/v1/realtime/status'),
   startRealtime: (payload: Record<string, unknown>) =>
@@ -110,6 +137,15 @@ export const api = {
     }),
   stopSpeakerTest: () =>
     request<SpeakerTestStatus>('/api/v1/speaker-test/stop', { method: 'POST' }),
+  audioInputTestStatus: () =>
+    request<AudioInputTestStatus>('/api/v1/audio-input-test/status'),
+  startAudioInputTest: (payload: Record<string, unknown>) =>
+    request<AudioInputTestStatus>('/api/v1/audio-input-test/start', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  stopAudioInputTest: () =>
+    request<AudioInputTestStatus>('/api/v1/audio-input-test/stop', { method: 'POST' }),
   uploadMidi: async (file: File) =>
     request<MidiFile>(`/api/v1/midi-files?filename=${encodeURIComponent(file.name)}`, {
       method: 'POST',

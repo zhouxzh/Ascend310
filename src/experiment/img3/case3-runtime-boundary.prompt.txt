@@ -1,0 +1,29 @@
+Use case: scientific-educational
+Asset type: technical report figure
+Primary request:
+Create a clean publication-grade responsibility-boundary diagram for a Chinese technical book. White background, flat vector style, high contrast, generous margins, no gradients, no shadows, no title or figure number. Use the Okabe-Ito palette, dark outlines, large crisp sans-serif text, and exact labels only.
+
+Split the canvas into two large side-by-side zones separated by a strong vertical boundary.
+
+Left zone header: “开发电脑”. Stack five blocks:
+1. “编辑 Python / TypeScript”
+2. “固定 revision 下载”
+3. “ONNX checker + SHA256”
+4. “pytest / Vitest / Playwright”
+5. “npm build -> webui/dist”
+
+Right zone header: “Ascend 310B 开发板”. Stack five blocks:
+1. “既有 CANN + ATC”
+2. “OM 精度 / 性能验证”
+3. “PyACL 推理 + CPU DSP”
+4. “PulseAudio + MIDI + FastAPI”
+5. “8765 唯一生产服务”
+
+Draw only two arrows crossing the boundary. First, draw a clearly visible diagonal or elbow arrow that starts at the RIGHT EDGE OF THE THIRD LEFT BLOCK “ONNX checker + SHA256” and ends at the LEFT EDGE OF THE FIRST RIGHT BLOCK “既有 CANN + ATC”; label it “已校验 ONNX”. It must not touch “固定 revision 下载” or “OM 精度 / 性能验证”. Second, draw an arrow from “npm build -> webui/dist” to “8765 唯一生产服务”, labeled “原子发布”. Within the board zone, connect its five blocks top to bottom. Include two compact boundary badges: left “不运行 CANN / PyACL”, right “ATC / OM / 实体音频仅在板端”. Use blue accents for development, orange accents for board execution, and a black dashed boundary.
+Scene/backdrop: clean white or very light neutral background
+Style/medium: precise flat scientific infographic with vector-like geometry and professional sans-serif typography
+Composition/framing: scan-friendly hierarchy, generous whitespace, consistent alignment, and clearly terminated arrows
+Color palette: colorblind-safe Okabe-Ito colors with dark charcoal text and sufficient grayscale contrast
+Text handling: render requested labels verbatim; use consistent capitalization; do not add pseudo-text or unnecessary labels
+Scientific constraints: preserve the requested causal, spatial, and mathematical relationships; do not invent values, equations, units, components, or scientific claims
+Output constraints: no overlapping or clipped text; no ambiguous connections; no gradients, shadows, 3D effects, logos, watermarks, decorative borders, or photorealism

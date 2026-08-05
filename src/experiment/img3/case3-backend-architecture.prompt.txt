@@ -1,0 +1,30 @@
+Use case: scientific-educational
+Asset type: technical report figure
+Primary request:
+Create a tall publication-ready backend module architecture for a Chinese technical book. White background, flat vector style, high contrast, generous margins, no gradients, no shadows, no title or figure number. Use the Okabe-Ito palette with black connectors. All labels must be exact, large, crisp, and horizontal. Prefer a strict layered layout with no crossing lines.
+
+Top layer: one wide block “FastAPI app · :8765”.
+
+Second layer has three separated columns, each reached by one downward arrow from FastAPI:
+- left block “模型 / 设备 catalog”
+- center large container labeled “控制器” containing a clean 2 x 2 grid of four blocks: “MIDI-DDSP 作业系统”, “Piano 实时会话”, “DDSP-VST EffectController”, and “音频 / MIDI / 蓝牙 / 测试”
+- right block “WebSocket 事件”
+
+Third layer contains two independent dependency blocks aligned left to right under the controller container. Draw exactly one grouped arrow from the bottom of the controller container to each dependency, and print the caller list beside that arrow:
+- left: “ResourceCoordinator”, arrow label “作业 + Piano + Effect + 设备测试”, sublabel under the block “NPU 与实体音频互斥”
+- center: “PyACL OM”, arrow label “作业 + Piano + Effect”
+
+Also draw one dashed arrow from the right edge of the controller container to the existing right-side “WebSocket 事件” block, labeled “作业 + Piano + Effect 事件”. WebSocket has no outgoing arrow.
+
+The ResourceCoordinator and PyACL blocks are peers. Never draw an arrow from ResourceCoordinator to PyACL. The catalog never connects to ResourceCoordinator or PyACL. WebSocket never connects to ResourceCoordinator, PyACL, or storage.
+
+Add one separate storage branch starting from the “MIDI-DDSP 作业系统” box only: solid arrow to “MIDI / WAV / JSON / 报告”, then solid arrow to “SQLite 可重建索引”. Keep this branch at the far left so it does not cross the three dependency connectors.
+
+At the bottom add two trust-boundary notes: “权威资产：文件 + manifest + SHA256” and “SQLite 仅为可重建目录”. Use blue for the API, orange/purple for controllers, green for coordination, sky blue for PyACL, pink for WebSocket, and teal/yellow for storage. Do not add a legend.
+Scene/backdrop: clean white or very light neutral background
+Style/medium: precise flat scientific infographic with vector-like geometry and professional sans-serif typography
+Composition/framing: scan-friendly hierarchy, generous whitespace, consistent alignment, and clearly terminated arrows
+Color palette: colorblind-safe Okabe-Ito colors with dark charcoal text and sufficient grayscale contrast
+Text handling: render requested labels verbatim; use consistent capitalization; do not add pseudo-text or unnecessary labels
+Scientific constraints: preserve the requested causal, spatial, and mathematical relationships; do not invent values, equations, units, components, or scientific claims
+Output constraints: no overlapping or clipped text; no ambiguous connections; no gradients, shadows, 3D effects, logos, watermarks, decorative borders, or photorealism

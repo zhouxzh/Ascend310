@@ -4,7 +4,7 @@ import navbar from "./navbar.js";
 import sidebar from "./sidebar.js";
 
 export default hopeTheme({
-  hostname: "https://vuepress-theme-hope-docs-demo.netlify.app",
+  hostname: "https://zhouxzh.github.io",
 
   author: {
     name: "Xianzhong Zhou",
@@ -13,7 +13,7 @@ export default hopeTheme({
 
   logo: "logo.png",
 
-  repo: "vuepress-theme-hope/vuepress-theme-hope",
+  repo: "zhouxzh/Ascend310",
 
   docsDir: "src",
 
@@ -24,7 +24,7 @@ export default hopeTheme({
   sidebar,
 
   // 页脚
-  footer: "默认页脚",
+  footer: "周贤中 版权所有 © 2025 | 电子邮箱：zhouxzh@gdut.edu.cn",
   displayFooter: true,
 
   // // 加密配置

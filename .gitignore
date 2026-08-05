@@ -297,6 +297,14 @@ logs/
 samples/case3/models/*
 !samples/case3/models/README.md
 
+# Case3 keeps the reports directory ignored except for its retention contract.
+!samples/case3/reports/
+samples/case3/reports/*
+!samples/case3/reports/README.md
+!samples/case3/reports/publication/
+samples/case3/reports/publication/*
+!samples/case3/reports/publication/ddsp-vst-effect-long-run.json
+
 # case8 keeps source helpers and README files inside artifact directories.
 !samples/case8/models/
 !samples/case8/models/README.md

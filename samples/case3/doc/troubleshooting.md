@@ -7,6 +7,11 @@
 当前证据支持什么结论，以及还有哪些边界没有验证。原始环境、ATC、精度和速度报告
 保存在本地 `reports/` 与 `models/om/`；这两个目录默认不提交到主仓库。
 
+> **历史命令边界。** 文中 `realtime_ddsp.py`、DDSP-VST MIDI Synth 和 ONNX 播放命令是
+> 早期排障证据，不是当前用户流程。现在实时触控与实体 MIDI 使用 Piano-DDSP，麦克风
+> DDSP-VST Effect 严格使用 Feature OM 和 Control OM；当前操作以
+> [WebUI 操作、部署与 API](webui.md)为准。
+
 ## 快速索引
 
 | 现象 | 优先检查 | 当前结论 |
@@ -472,7 +477,7 @@ Nyquist 比较边界出现很大的单点绝对误差，但乘上总幅度后的
 这与 DDSP-VST 的实现边界一致：ONNX/OM 只预测 amplitude、harmonics、
 noise_amps 和下一帧状态；谐波振荡器和噪声 FFT 合成在 CPU/Python 侧执行。因此
 当前 OM 的速度数据不包含最终波形合成，也不能用来回答完整 DDSP 音频链路的延迟。
-算子清单见 [DDSP 模型导出](model-export.md)。
+模型获取、ATC 与算子验证见 [模型与 OM 部署](om-deployment.md)。
 
 ## 文件位置、同步和哈希
 

@@ -1,28 +1,50 @@
-# 文档索引
+# Case3 文档索引
 
-[返回仓库 README](../README.md)。
+本目录记录 Case3 音乐工作台的操作、部署、模型与实测资料。命令默认从
+`samples/case3` 根目录执行；书稿中的完整实验教程见
+[Case3 智能电子琴](../../../src/experiment/case3.md)。
 
-详细设计、操作步骤和硬件实测记录按主题存放在本目录。文档中的命令默认从
-`samples/case3` 仓库根目录执行。
+## 从这里开始
+
+| 目标 | 阅读文档 | 内容 |
+| :--- | :--- | :--- |
+| 第一次使用或部署触摸屏工作台 | [WebUI 操作、部署与 API](webui.md) | 四个工作区、12 张真实截图、安全边界、全屏启动、部署和接口 |
+| 了解系统范围与硬件职责 | [项目概览](overview.md) | 三条音频链、核心模块、硬件要求和推荐验收顺序 |
+| 复测已发布版本 | [WebUI 触摸屏终审与实机压测](webui-acceptance.md) | 2026-08-04 的测试方法、阈值、原始结果与复测规则 |
+| 排查运行问题 | [测试故障排查](troubleshooting.md) | 网络、音频、模型、NPU 和服务诊断 |
+
+## 模型与运行时
 
 | 文档 | 内容 |
 | :--- | :--- |
-| [项目概览](overview.md) | 项目边界、硬件要求、目录结构和完整系统链路 |
-| [MIDI 测试素材](midi-test-tracks.md) | 脚本生成的确定性 MIDI 夹具和使用边界 |
-| [3D 打印硬件](hardware.md) | CAD/STL 文件、打印参数和装配关系 |
-| [DDSP-VST 模型导出](model-export.md) | 状态化音色模型的 TFLite 到 ONNX 流程 |
-| [MIDI-DDSP 模型导出](midi-ddsp-export.md) | checkpoint 到 Expression/Synthesis ONNX 的流程与产物 |
-| [MIDI-DDSP 与 DDSP-VST 对比](midi-ddsp-vs-ddsp-vst.md) | 两条移植路线的程序入口、模型契约、实时性和适用场景差异 |
-| [实时 DDSP](realtime-ddsp.md) | ONNX/PyACL 后端、MIDI 实时播放和缓冲架构 |
-| [Ascend 音频输出](audio-output.md) | 板载 3.5mm、官方样例、USB 声卡、蓝牙 A2DP/HFP 和漫步者喇叭 |
-| [OM 转换与验证](om-deployment.md) | ATC 转换、日志检查和 FP16 精度验证 |
-| [板端实测结果](benchmark-results.md) | 8T/8T2/20T 的精度、速度和兼容性结果 |
-| [MIDI-DDSP 实时合成](midi-ddsp-realtime.md) | 使用 MIDI-DDSP OM、PyACL、CPU DSP 和 M25 实时播放 MIDI |
-| [Piano-DDSP 实时系统](piano-ddsp.md) | 16 声部实时钢琴的模型来源、运行时、API、部署和验收 |
-| [MIDI-DDSP Studio Web 界面](webui.md) | React/FastAPI 工作台、板端手动安装、同步、启动和测试 |
-| [触摸屏输入法配置](touchscreen-input.md) | 英文 XFCE 桌面的 Onboard、IBus 拼音、自动弹出和登录自启配置 |
-| [测试故障排查](troubleshooting.md) | SSH/systemd、音频、ATC、OOM、兼容性和性能问题记录 |
-| [Upstream 参考仓库](upstream-repositories.md) | 第三方源码来源、固定提交、本地状态和保留规则 |
+| [模型与 OM 部署](om-deployment.md) | 固定 revision 下载、SHA256、ATC、OM bundle 和板端验证 |
+| [Piano-DDSP 实时系统](piano-ddsp.md) | 共享实时钢琴会话、16 声部、模型目录、运行时与验收 |
+| [MIDI-DDSP 文件渲染与播放](midi-ddsp-realtime.md) | MIDI 文件的声部分析、离线渲染、WAV 版本和播放 |
+| [MIDI 测试素材](midi-test-tracks.md) | 确定性 MIDI 夹具和使用边界 |
+| [Ascend 音频输出](audio-output.md) | PulseAudio、ALSA、USB、蓝牙与扬声器测试约定 |
+| [板端实测结果](benchmark-results.md) | 8T/8T2/20T 的精度、性能和兼容性记录 |
 
-原始机器报告保存在本地 `reports/`，模型产物保存在 `models/`。这两个目录默认被
-仓库级 `.gitignore` 忽略，文档中的结论以对应的日志、JSON 和 SHA256 清单为依据。
+## 硬件、界面与运维
+
+| 文档 | 内容 |
+| :--- | :--- |
+| [触摸屏输入法配置](touchscreen-input.md) | Onboard、IBus 拼音和 Firefox kiosk 配置 |
+| [WebUI 操作、部署与 API](webui.md) | 触摸演奏、MIDI、渲染、Effect、设备、前后端职责、部署和端点 |
+| [WebUI 触摸屏终审与实机压测](webui-acceptance.md) | 四视口、控件审计、UI soak、API 负载与双工测试 |
+
+## 历史与上游参考
+
+下列文档保留研究背景、迁移记录或上游行为对照，不是当前 Case3 的部署步骤。
+
+| 文档 | 内容 |
+| :--- | :--- |
+| [MIDI-DDSP 历史导出](midi-ddsp-export.md) | TensorFlow 导出原理、张量契约和历史验证记录 |
+| [MIDI-DDSP 与 DDSP-VST 对比](midi-ddsp-vs-ddsp-vst.md) | 两条上游路线的历史差异与迁移背景 |
+| [历史实时 DDSP 路径](realtime-ddsp.md) | 已退役的 DDSP-VST MIDI Synth/ONNX 对照说明 |
+| [Upstream 参考仓库](upstream-repositories.md) | 第三方仓库、固定提交与保留规则 |
+
+## 证据与产物
+
+`reports/`、`midi/`、`midi_wav/` 和模型二进制是本地或板端运行证据，默认不提交。当前
+WebUI 文档使用的 12 张截图已复制到受版本控制的 `doc/images/webui/`，因此阅读文档不依赖
+会变化的报告目录。模型清单、校验和与发布说明见 `models/`。

@@ -13,9 +13,9 @@ from unittest import mock
 import numpy as np
 
 from piano_ddsp_runtime.acl_model import PianoAclModel, _host_pointer
-from piano_ddsp_runtime.audio_output import _stereo_to_mono_s16
+from piano_ddsp_runtime.audio_output import BoundedAudioOutput, _stereo_to_mono_s16
 from piano_ddsp_runtime.bundle import PianoBundle, PianoModelAsset, load_bundle
-from piano_ddsp_runtime.engine import PianoDdspEngine
+from piano_ddsp_runtime.engine import LATENCY_PROFILES, RUNTIME_METRIC_CAPACITY, PianoDdspEngine
 from piano_ddsp_runtime.harmonic import HarmonicSynthesizer
 from piano_ddsp_runtime.midi_state import LiveMidiState, MIN_AUDIBLE_GATE_FRAMES
 from piano_ddsp_runtime.metrics import RuntimeMetrics
@@ -23,17 +23,18 @@ from piano_ddsp_runtime.noise import NoiseSynthesizer
 from piano_ddsp_runtime.reverb import PartitionedConvolver, fdn_impulse_response
 from piano_ddsp_runtime.resampler import PianoSincResampler
 from piano_ddsp_runtime.scheduler import MidiScheduler
+from piano_ddsp_runtime.worker import Worker
 from prepare_piano_ddsp_models import (
     ATC_COMPILE_ENVIRONMENT,
     atc_subprocess_environment,
     convert_one,
 )
-from tools.download_piano_ddsp_onnx import REQUIRED_FILES, parse_sha256s, validate_release
-from tools.validate_piano_ddsp_om import validate_reference_provenance
+from tools.download_model_release import DEFAULT_PIANO_FILES, parse_sha256s, validate_release
+from tools.validate_piano_ddsp_om import load_reference_arrays, validate_reference_provenance
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RELEASE_ROOT = ROOT / "models" / "piano_ddsp" / "model-suite-v1.0.0"
+RELEASE_ROOT = ROOT / "models" / "piano_ddsp" / "model-suite-v1.0.1"
 
 
 class PianoAtcPolicyTest(unittest.TestCase):
@@ -63,7 +64,7 @@ class PianoAtcPolicyTest(unittest.TestCase):
             (bundle / "models" / "paper.om").write_bytes(b"stale-om")
             with self.assertRaisesRegex(RuntimeError, "conversion record or raw ATC log"):
                 convert_one(
-                    "paper_ir",
+                    "gru_ir_96_64",
                     onnx,
                     metadata,
                     {},
@@ -219,6 +220,32 @@ class PianoMidiStateTest(unittest.TestCase):
         self.assertEqual(active.snapshot().slot_notes[0], 80)
 
 
+class PianoWorkerTest(unittest.TestCase):
+    def test_realtime_edges_skip_full_status_calculation(self) -> None:
+        worker = Worker()
+        engine = SimpleNamespace(
+            note=mock.Mock(),
+            control_change=mock.Mock(),
+            release_source=mock.Mock(),
+            status=mock.Mock(side_effect=AssertionError("status should not be calculated")),
+        )
+        worker.engine = engine
+
+        self.assertEqual(
+            worker.dispatch({"command": "note", "source": "browser", "note": 60, "velocity": 96, "on": True}),
+            {"accepted": True},
+        )
+        self.assertEqual(
+            worker.dispatch({"command": "cc", "source": "browser", "controller": 64, "value": 127}),
+            {"accepted": True},
+        )
+        self.assertEqual(
+            worker.dispatch({"command": "release_source", "source": "browser"}),
+            {"accepted": True},
+        )
+        engine.status.assert_not_called()
+
+
 class PianoSchedulerTest(unittest.TestCase):
     def test_same_timestamp_is_stable_and_cancel_removes_old_events(self) -> None:
         state = LiveMidiState()
@@ -258,6 +285,42 @@ class PianoDspTest(unittest.TestCase):
         metrics = RuntimeMetrics(capacity=3)
         metrics.add_many("npu_ms", [1.0, 2.0, 3.0, 4.0])
         self.assertEqual(tuple(metrics.npu_ms), (2.0, 3.0, 4.0))
+
+    def test_metrics_reset_discards_warmup_samples_and_counters(self) -> None:
+        metrics = RuntimeMetrics(capacity=3)
+        metrics.add("block_ms", 42.0)
+        metrics.increment("underruns", 2)
+        metrics.reset()
+        self.assertEqual(tuple(metrics.block_ms), ())
+        self.assertEqual(metrics.underruns, 0)
+
+    def test_metrics_calculates_each_series_percentiles_once(self) -> None:
+        metrics = RuntimeMetrics(capacity=8)
+        for name in ("npu_ms", "dsp_ms", "block_ms", "write_ms", "midi_to_pcm_ms"):
+            metrics.add_many(name, (1.0, 2.0, 3.0, 4.0))
+
+        with mock.patch("piano_ddsp_runtime.metrics.np.quantile", wraps=np.quantile) as quantile:
+            snapshot = metrics.snapshot()
+
+        self.assertEqual(quantile.call_count, 5)
+        self.assertAlmostEqual(float(snapshot["npu_p95_ms"]), 3.85)
+        self.assertAlmostEqual(float(snapshot["estimated_total_latency_ms"]), 3.85)
+
+    def test_balanced_profile_prefills_without_a_deep_queue(self) -> None:
+        profile = LATENCY_PROFILES["balanced"]
+        self.assertEqual(profile["prebuffer"], 2)
+        self.assertEqual(profile["capacity"], 4)
+
+    def test_audio_latency_probe_runs_on_telemetry_worker(self) -> None:
+        output = BoundedAudioOutput(48_000, 1_536, 3, 2, 20.0, RuntimeMetrics())
+        output.stop_event = mock.Mock()
+        output.stop_event.wait.side_effect = [False, True]
+        output.refresh_latencies = mock.Mock()
+
+        output._latency_loop()
+
+        output.refresh_latencies.assert_called_once_with()
+        self.assertEqual(output.latency_worker.name, "piano-audio-telemetry")
 
     def test_voice_release_envelope_matches_scalar_sample_updates(self) -> None:
         engine = object.__new__(PianoDdspEngine)
@@ -396,22 +459,61 @@ class FakePianoModel:
 
 
 def fixture_bundle(folder: Path) -> PianoBundle:
-    metadata = json.loads((RELEASE_ROOT / "ddsp_piano_paper_ir.json").read_text(encoding="utf-8"))
+    metadata = {
+        "model_id": "gru_ir_96_64",
+        "display_name": "GRU IR 96/64",
+        "n_harmonics": 96,
+        "n_noise_bands": 64,
+        "n_substrings": 1,
+        "reverb_output": "reverb_ir",
+        "reverb_wet_gain": 0.25,
+        "reverb_ir_postprocess": {"type": "exponential_decay"},
+        "outputs": {
+            "amplitudes": [1, 1, 16, 1],
+            "harmonic_distribution": [1, 1, 16, 96],
+            "inharmonicity": [1, 1, 16, 1],
+            "f0_hz": [1, 1, 16, 1],
+            "noise_magnitudes": [1, 1, 16, 64],
+            "reverb_ir": [1, 24_000],
+            "next_context_state": [1, 1, 64],
+            "next_monophonic_state": [1, 16, 192],
+        },
+        "piano_model_index_to_maestro_year": [
+            2004,
+            2006,
+            2008,
+            2009,
+            2011,
+            2013,
+            2014,
+            2015,
+            2017,
+            2018,
+        ],
+    }
     om = folder / "paper.om"
     meta = folder / "paper.json"
     manifest = folder / "manifest.json"
     om.write_bytes(b"om")
     meta.write_text(json.dumps(metadata), encoding="utf-8")
     asset = PianoModelAsset(
-        "paper_ir",
-        "Paper IR",
+        "gru_ir_96_64",
+        "GRU IR 96/64",
         om,
         meta,
         metadata,
         hashlib.sha256(b"om").hexdigest(),
         validation_passed=True,
     )
-    return PianoBundle("fixture", "model-suite-v1.0.0", "FP32", "Ascend310B4", manifest, {"paper_ir": asset}, False)
+    return PianoBundle(
+        "fixture",
+        "model-suite-v1.0.1",
+        "FP32",
+        "Ascend310B4",
+        manifest,
+        {"gru_ir_96_64": asset},
+        False,
+    )
 
 
 class PianoEngineTest(unittest.TestCase):
@@ -428,7 +530,7 @@ class PianoEngineTest(unittest.TestCase):
             ]
             blocks = []
             for engine in engines:
-                engine._load_model(bundle.models["paper_ir"])
+                engine._load_model(bundle.models["gru_ir_96_64"])
                 engine.note("browser", 60, 100, True)
                 blocks.append(engine.render_block(10**20))
                 self.assertEqual(engine.context_state[0, 0, 0], engine.block_frames)
@@ -440,11 +542,57 @@ class PianoEngineTest(unittest.TestCase):
                 engine.model.close()
             np.testing.assert_allclose(blocks[0], blocks[1], rtol=1e-6, atol=1e-6)
 
+    def test_audio_priming_warms_then_prefills_from_reset_state(self) -> None:
+        class AudioQueue:
+            prebuffer = 2
+            capacity = 4
+
+            def __init__(self) -> None:
+                self.blocks: list[np.ndarray] = []
+
+            def submit(self, block: np.ndarray) -> bool:
+                self.blocks.append(block)
+                return True
+
+        with tempfile.TemporaryDirectory() as folder:
+            bundle = fixture_bundle(Path(folder))
+            engine = PianoDdspEngine(bundle, model_factory=FakePianoModel)
+            engine._load_model(bundle.models["gru_ir_96_64"])
+            audio = AudioQueue()
+
+            engine._prime_audio(audio)  # type: ignore[arg-type]
+
+            self.assertEqual(len(audio.blocks), 4)
+            self.assertTrue(all(block.shape == (1_536, 2) for block in audio.blocks))
+            self.assertEqual(engine.context_state[0, 0, 0], 4 * engine.block_frames)
+            self.assertEqual(engine.metrics.rendered_blocks, 0)
+            self.assertEqual(tuple(engine.metrics.block_ms), ())
+            engine.model.close()
+
+    def test_rejected_audio_block_does_not_add_a_second_block_delay(self) -> None:
+        engine = object.__new__(PianoDdspEngine)
+        engine._stop = SimpleNamespace(is_set=mock.Mock(side_effect=[False, True]))
+        engine._state = "running"
+        engine._error = None
+        engine.audio = SimpleNamespace(error=None, submit=mock.Mock(return_value=False))
+        engine.render_block = mock.Mock(return_value=np.zeros((1_536, 2), dtype=np.float32))
+
+        with mock.patch("piano_ddsp_runtime.engine.time.sleep") as sleep:
+            engine._render_loop()
+
+        sleep.assert_not_called()
+        engine.audio.submit.assert_called_once()
+
+    def test_runtime_metrics_keep_a_short_realtime_window(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            engine = PianoDdspEngine(fixture_bundle(Path(folder)), model_factory=FakePianoModel)
+        self.assertEqual(engine.metrics.block_ms.maxlen, RUNTIME_METRIC_CAPACITY)
+
     def test_all_notes_off_uses_global_fade(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             bundle = fixture_bundle(Path(folder))
             engine = PianoDdspEngine(bundle, model_factory=FakePianoModel)
-            engine._load_model(bundle.models["paper_ir"])
+            engine._load_model(bundle.models["gru_ir_96_64"])
             engine.note("hardware", 60, 100, True)
             engine.render_block(10**20)
             engine.control_change("hardware", 123, 0)
@@ -459,7 +607,7 @@ class PianoEngineTest(unittest.TestCase):
             engine = PianoDdspEngine(
                 bundle, model_factory=FakePianoModel, recorder_root=root / "recordings"
             )
-            engine._load_model(bundle.models["paper_ir"])
+            engine._load_model(bundle.models["gru_ir_96_64"])
             path = Path(engine.start_recording("played"))
             block = np.full((96, 2), 0.25, dtype=np.float32)
             engine._on_played(block)
@@ -482,7 +630,7 @@ class PianoBundleAndDownloadTest(unittest.TestCase):
                 json.dumps(
                     {
                         "schema": "piano-ddsp-reference/v1",
-                        "model_id": "paper_ir",
+                        "model_id": "gru_ir_96_64",
                         "frames": 10_000,
                         "npz": reference.name,
                         "npz_sha256": digest,
@@ -490,21 +638,69 @@ class PianoBundleAndDownloadTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            self.assertEqual(validate_reference_provenance(reference, "paper_ir"), digest)
+            self.assertEqual(validate_reference_provenance(reference, "gru_ir_96_64"), digest)
             with self.assertRaisesRegex(ValueError, "does not match"):
-                validate_reference_provenance(reference, "film_fdn")
+                validate_reference_provenance(reference, "film_fdn_128_96")
 
-    def test_downloaded_release_is_complete_and_pt_files_are_excluded(self) -> None:
+    def test_v2_reference_uses_shared_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            model_root = root / "gru_ir_96_64"
+            model_root.mkdir()
+            inputs = root / "inputs-10000.npz"
+            reference = model_root / "reference-10000.npz"
+            np.savez(
+                inputs,
+                conditioning=np.zeros((2, 16, 2), dtype=np.float32),
+                pedal=np.zeros((2, 4), dtype=np.float32),
+                piano_model=np.zeros((1,), dtype=np.int32),
+                extended_pitch=np.zeros((2, 16, 1), dtype=np.float32),
+            )
+            np.savez(
+                reference,
+                amplitudes=np.zeros((2, 16, 1), dtype=np.float32),
+                harmonic_distribution=np.zeros((2, 16, 96), dtype=np.float32),
+                inharmonicity=np.zeros((2, 16, 1), dtype=np.float32),
+                f0_hz=np.zeros((2, 16, 1), dtype=np.float32),
+                noise_magnitudes=np.zeros((2, 16, 64), dtype=np.float32),
+                next_context_state=np.zeros((2, 64), dtype=np.float32),
+                next_monophonic_state=np.zeros((2, 16, 192), dtype=np.float32),
+            )
+            (model_root / "report.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "piano-ddsp-onnx-reference/v2",
+                        "release": "model-suite-v1.0.1",
+                        "source_hf_commit": "c41911aa7de454aeacf0b3edbb2d06a0801fb3ff",
+                        "model_id": "gru_ir_96_64",
+                        "frames": 10_000,
+                        "inputs": inputs.name,
+                        "inputs_sha256": hashlib.sha256(inputs.read_bytes()).hexdigest(),
+                        "npz": reference.name,
+                        "npz_sha256": hashlib.sha256(reference.read_bytes()).hexdigest(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                validate_reference_provenance(reference, "gru_ir_96_64"),
+                hashlib.sha256(reference.read_bytes()).hexdigest(),
+            )
+            frames, arrays = load_reference_arrays(reference, 2)
+            self.assertEqual(frames, 2)
+            self.assertEqual(arrays["next_context_state"].shape, (2, 64))
+
+    def test_downloaded_release_is_complete_and_source_pt_files_are_not_required(self) -> None:
+        if not (RELEASE_ROOT / "SHA256SUMS").is_file():
+            self.skipTest("ignored Piano-DDSP release assets are not installed")
         hashes = parse_sha256s((RELEASE_ROOT / "SHA256SUMS").read_text(encoding="utf-8"))
-        validate_release(RELEASE_ROOT, hashes, REQUIRED_FILES)
-        self.assertFalse(any(path.suffix == ".pt" for path in RELEASE_ROOT.rglob("*")))
+        validate_release(RELEASE_ROOT, hashes, DEFAULT_PIANO_FILES)
+        self.assertFalse(any(path.suffix == ".pt" for path in map(Path, DEFAULT_PIANO_FILES)))
 
     def test_bundle_rejects_hash_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            metadata = json.loads(
-                (RELEASE_ROOT / "ddsp_piano_paper_ir.json").read_text(encoding="utf-8")
-            )
+            metadata = fixture_bundle(root).models["gru_ir_96_64"].metadata
             om = root / "model.om"
             meta = root / "model.json"
             om.write_bytes(b"fixture")
@@ -514,12 +710,12 @@ class PianoBundleAndDownloadTest(unittest.TestCase):
                     {
                         "schema": "piano-ddsp-om-bundle/v1",
                         "id": "fixture",
-                        "release": "model-suite-v1.0.0",
+                        "release": "model-suite-v1.0.1",
                         "precision": "FP32",
                         "precision_mode_v2": "origin",
                         "soc_version": "Ascend310B4",
                         "models": {
-                            "paper_ir": {
+                            "gru_ir_96_64": {
                                 "om": om.name,
                                 "om_sha256": "0" * 64,
                                 "metadata": meta.name,

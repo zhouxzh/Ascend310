@@ -125,4 +125,5 @@ git check-ignore -v _upstream
 6. 不覆盖 `D:\Github\piano-ddsp-pytorch` 等用户独立工作仓库。
 7. 板端同步脚本继续排除 `_upstream`，但本地清理脚本不得把它作为缓存自动删除。
 
-模型接口、训练路线和各参考仓库的技术比较见 [DDSP 模型导出](model-export.md)。
+模型接口、训练路线和各参考仓库的技术比较见
+[MIDI-DDSP 历史导出](midi-ddsp-export.md) 与 [模型与 OM 部署](om-deployment.md)。

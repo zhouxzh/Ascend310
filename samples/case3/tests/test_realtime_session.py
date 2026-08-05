@@ -5,17 +5,20 @@ import queue
 import tempfile
 import threading
 import unittest
+from unittest.mock import Mock, call, patch
 
 import numpy as np
 
 from midi_ddsp_webui.core import ResourceBusyError, ResourceCoordinator
 from midi_ddsp_webui.live import DdspVstSessionController
 from midi_ddsp_webui.realtime_session import (
+    PianoRuntimeAdapter,
     RealtimeSessionController,
     _public_patch,
     _runtime_payload,
     _select_output,
     map_parameters,
+    resolve_runtime_config,
 )
 
 
@@ -105,6 +108,28 @@ class FakeAdapter:
         self.calls.append(("monitor", source, enabled))
 
 
+class PianoRuntimeAdapterTest(unittest.TestCase):
+    def test_realtime_edges_use_one_way_worker_notifications(self) -> None:
+        controller = Mock()
+        adapter = PianoRuntimeAdapter(controller)
+
+        adapter.note_on("browser", 60, 96)
+        adapter.note_off("browser", 60)
+        adapter.sustain("browser", True)
+        adapter.release_source("browser")
+
+        self.assertEqual(
+            controller.notify.call_args_list,
+            [
+                call("note", source="browser", note=60, velocity=96, on=True),
+                call("note", source="browser", note=60, velocity=0, on=False),
+                call("cc", source="browser", controller=64, value=127),
+                call("release_source", source="browser"),
+            ],
+        )
+        controller.command.assert_not_called()
+
+
 def fixture_catalog() -> dict[str, object]:
     return {
         "_patches": [
@@ -186,6 +211,48 @@ class RealtimeSessionTest(unittest.TestCase):
             ),
             {"model_id": "paper", "latency_profile": "balanced"},
         )
+
+    @patch("midi_ddsp_webui.realtime_session._resolve_midi_port", return_value=None)
+    @patch(
+        "midi_ddsp_webui.realtime_session.resolve_catalog_item",
+        return_value={"path": Path("models/om/Violin.om")},
+    )
+    def test_ddsp_vst_runtime_exposes_complete_adsr(
+        self, _resolve_model: object, _resolve_port: object
+    ) -> None:
+        patch_data = {
+            "patch_id": "neural.violin",
+            "name": "Violin",
+            "_engine": "ddsp-vst",
+            "_model_id": "violin",
+            "polyphony": 4,
+            "compatible_audio_device_ids": ["shared"],
+            "parameters": {
+                "attack": {"default": 0.1},
+                "decay": {"default": 0.4},
+                "sustain": {"default": 0.75},
+                "release": {"default": 1.2},
+            },
+        }
+        data = {
+            "audio_devices": [
+                {
+                    "id": "shared",
+                    "name": "USB",
+                    "backend": "portaudio",
+                    "index": 3,
+                    "default_sample_rate": 48_000,
+                    "is_default": True,
+                }
+            ]
+        }
+
+        config = resolve_runtime_config(patch_data, {}, data)
+
+        self.assertEqual(config["attack"], 0.1)
+        self.assertEqual(config["decay"], 0.4)
+        self.assertEqual(config["sustain"], 0.75)
+        self.assertEqual(config["release"], 1.2)
 
     def test_output_compatibility_is_checked_before_switch(self) -> None:
         patch = fixture_catalog()["_patches"][0]

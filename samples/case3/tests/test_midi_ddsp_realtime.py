@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import math
 import pickle
 from types import SimpleNamespace
 import tempfile
@@ -33,10 +32,6 @@ from midi_ddsp_realtime import (
     plan_voice_batches,
 )
 from midi_ddsp_webui.midi_analysis import MidiValidationError
-from tools.export_midi_ddsp_reverb import (
-    original_inference_decay,
-    prepare_impulse_responses,
-)
 
 
 class MidiDdspRealtimeHelpersTest(unittest.TestCase):
@@ -385,16 +380,6 @@ class MidiDdspRealtimeHelpersTest(unittest.TestCase):
         self.assertEqual(reverb.ir_length, 8)
         output = reverb.process(np.ones(4, dtype=np.float32))
         np.testing.assert_allclose(output, [1.0, 1.0, 1.25, 1.25], atol=1e-6)
-
-    def test_reverb_export_applies_original_decay_and_dry_mask(self) -> None:
-        decay = original_inference_decay(total_length=8, start_length=4, decay_exponent=4)
-        np.testing.assert_array_equal(decay[:4], np.ones(4, dtype=np.float32))
-        self.assertAlmostEqual(float(decay[-1]), math.exp(-4.0), places=6)
-        raw = np.ones((2, 48_000), dtype=np.float32)
-        prepared = prepare_impulse_responses(raw)
-        np.testing.assert_array_equal(prepared[:, 0], np.zeros(2, dtype=np.float32))
-        np.testing.assert_array_equal(prepared[:, 1:16_000], raw[:, 1:16_000])
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,25 +1,16 @@
 .device-section-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  padding: 4px;
-  border: 1px solid var(--studio-line);
-  border-radius: var(--studio-radius);
-  background: #d8dee0;
+  border-color: var(--line);
+  background: var(--surface-2);
 }
 
 .device-section-tabs button {
-  min-height: 50px;
-  border: 0;
-  border-radius: 4px;
-  background: #f6f8f8;
+  border-radius: 5px;
+  background: var(--surface);
   color: #53636a;
-  font-size: 16px;
-  font-weight: 700;
 }
 
 .device-section-tabs button.is-active {
-  background: var(--studio-graphite);
+  background: var(--graphite-900);
   color: #ffffff;
 }
 
@@ -32,55 +23,144 @@
   grid-column: 1 / -1;
 }
 
-.device-section-stack {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.device-section-stack > .bluetooth-panel,
-.device-section-stack > .speaker-workspace {
-  grid-column: 1 / -1;
-}
-
-.device-overview-help {
-  display: grid;
-  gap: 8px;
-  padding: 24px;
-  border: 1px solid var(--studio-line);
-  background: var(--studio-surface);
-}
-
-.device-overview-help strong {
-  font-size: 20px;
-}
-
-.device-overview-help span {
-  color: var(--studio-muted);
-  font-size: 16px;
-  line-height: 1.6;
-}
-
 .devices-workspace .panel-header h2,
 .devices-workspace .device-list-row strong,
 .devices-workspace .inventory-row strong {
   font-size: max(16px, 1em);
 }
 
+.devices-workspace .device-readiness-card h3 {
+  font-size: 20px;
+}
+
 .devices-workspace .panel-header p,
 .devices-workspace small,
 .devices-workspace .device-list-row > span,
-.devices-workspace .inventory-row > span {
+.devices-workspace .inventory-row > span,
+.devices-workspace .device-state-note span {
   font-size: max(14px, 1em);
 }
 
-@media (max-width: 900px) {
-  .device-section-stack {
+.devices-workspace .device-readiness-card dt {
+  font-size: 16px;
+}
+
+.devices-workspace .device-readiness-card dd {
+  font-size: 18px;
+}
+
+.bluetooth-panel .diagnostic-detail {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: currentColor;
+  font-weight: 500;
+  opacity: .82;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell--touch-display .device-audio-layout .speaker-metrics .metric {
+  min-height: 58px;
+  padding: 8px 10px;
+}
+
+.app-shell--touch-display .device-audio-layout .audio-test-panel > .panel-header {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.midi-device-status-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.midi-device-status-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr));
+  gap: 12px;
+  min-height: 210px;
+  padding: 14px 16px;
+}
+
+.midi-device-status-list > .empty-list {
+  width: 100%;
+}
+
+.midi-device-status-card {
+  display: grid;
+  grid-template-columns: 48px minmax(170px, .7fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  min-height: 116px;
+  padding: 14px 16px;
+  background: var(--studio-surface);
+  border: 1px solid var(--studio-line);
+  border-left: 3px solid var(--studio-teal);
+  border-radius: var(--studio-radius);
+}
+
+.midi-device-status-heading strong,
+.midi-device-status-heading span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.midi-device-status-heading strong {
+  font-size: 19px;
+}
+
+.midi-device-status-heading span {
+  margin-top: 5px;
+  color: var(--studio-muted);
+  font-size: 15px;
+}
+
+.midi-device-status-card dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+
+.midi-device-status-card dl > div {
+  min-width: 0;
+  padding: 7px 12px;
+  border-left: 1px solid var(--studio-line);
+}
+
+.midi-device-status-card dt {
+  color: var(--studio-muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.midi-device-status-card dd {
+  margin: 5px 0 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .midi-device-status-list {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .device-section-stack > .bluetooth-panel,
-  .device-section-stack > .speaker-workspace {
-    grid-column: auto;
+  .midi-device-status-card {
+    grid-template-columns: 48px minmax(150px, .8fr) minmax(0, 1.2fr);
+  }
+}
+
+@media (min-width: 1500px) and (max-height: 1100px) {
+  .app-shell--touch-display .device-audio-layout .speaker-monitor,
+  .app-shell--touch-display .device-audio-layout .input-level-monitor {
+    min-height: 88px;
+    height: 88px;
+    margin: 8px 12px;
   }
 }

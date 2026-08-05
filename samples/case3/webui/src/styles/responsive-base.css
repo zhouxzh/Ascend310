@@ -81,95 +81,37 @@
 
   .app-shell--touch-display .field input[type="range"] { min-height: 30px; }
   .app-shell--touch-display .piano-config-strip .field select { min-height: 48px; font-size: 16px; }
-  .app-shell--touch-display .device-summary small,
   .app-shell--touch-display .device-list-row small,
   .app-shell--touch-display .dependency-row,
   .app-shell--touch-display .inventory-row { font-size: 15px; }
-  .app-shell--touch-display .device-summary strong,
   .app-shell--touch-display .device-list-row strong { font-size: 19px; }
 }
 
-/* MIDI controller performance uses the same compact sound chooser as touch
-   performance, while retaining its dedicated controller and file controls. */
-.realtime-stage--touch .stage-session-bar::before,
-.realtime-stage--midi .stage-session-bar::before {
-  align-self: center;
-  color: #dce8e6;
-  font-size: 20px;
-  font-weight: 720;
-}
-
-.realtime-stage--touch .stage-session-bar::before { content: '触控演奏'; }
-.realtime-stage--midi .stage-session-bar::before { content: 'MIDI 键盘'; }
-
-.realtime-stage--touch .stage-session-bar {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-}
+/* MIDI mode shares the same Piano-DDSP session and monitoring surface as touch.
+   Only the physical input and visual keyboard presentation remain distinct. */
 
 .realtime-stage--midi {
   gap: 6px;
 }
 
-.realtime-stage--midi .stage-session-bar {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  min-height: 62px;
-  padding: 5px 11px;
-}
-
-.realtime-stage--midi .stage-current-patch { display: none; }
-.realtime-stage--midi .stage-session-actions .primary-button,
-.realtime-stage--midi .stage-session-actions .secondary-button,
-.realtime-stage--midi .stage-session-actions .icon-command {
-  min-height: 52px;
-  font-size: 17px;
-}
-
-.realtime-stage--midi .stage-session-actions .icon-command {
-  flex-basis: 52px;
-  width: 52px;
-  height: 52px;
-}
-
 .realtime-stage--midi .roll-toolbar {
-  grid-template-columns: minmax(190px, 1fr) minmax(340px, 500px) minmax(380px, 530px) auto;
+  grid-template-columns: minmax(130px, 0.65fr) minmax(560px, 1.9fr) auto auto;
   gap: 10px;
-  min-height: 66px;
-  padding: 6px 13px;
+  min-height: 58px;
+  padding: 3px 10px;
 }
 
 .realtime-stage--midi .roll-heading { gap: 10px; }
 .realtime-stage--midi .roll-heading > svg { width: 22px; height: 22px; }
-.realtime-stage--midi .roll-heading strong { font-size: 22px; }
-.realtime-stage--midi .roll-heading span { font-size: 16px; }
-
-.realtime-stage--midi .midi-input-control {
-  grid-template-columns: auto auto minmax(170px, 1fr);
-  min-width: 0;
-  min-height: 54px;
-  padding: 5px 10px;
-}
-
-.realtime-stage--midi .midi-input-control > svg { width: 20px; height: 20px; }
-.realtime-stage--midi .midi-input-control span { font-size: 18px; }
-.realtime-stage--midi .midi-input-control select { height: 42px; font-size: 17px; }
-
-.realtime-stage--midi .stage-gain-control {
-  grid-template-columns: auto auto minmax(120px, 1fr) 96px;
-  min-height: 54px;
-  padding: 5px 10px;
-}
-
-.realtime-stage--midi .stage-gain-control > svg { width: 20px; height: 20px; }
-.realtime-stage--midi .stage-gain-control span { font-size: 18px; }
-.realtime-stage--midi .stage-gain-control strong { font-size: 22px; }
-.realtime-stage--midi .stage-gain-control input { min-height: 30px; }
+.realtime-stage--midi .roll-heading strong { font-size: 19px; }
+.realtime-stage--midi .roll-heading span { display: none; }
 
 .realtime-stage--midi .roll-window-control { min-height: 54px; padding: 2px; }
 .realtime-stage--midi .roll-window-control > svg { width: 20px; height: 20px; }
 .realtime-stage--midi .roll-window-control button { min-width: 52px; min-height: 50px; font-size: 17px; }
 
 .realtime-stage--midi .keyboard-range-bar {
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(320px, .8fr) minmax(0, 1fr);
   min-height: 68px;
   padding: 5px 13px;
 }
@@ -180,34 +122,25 @@
 .realtime-stage--midi .keyboard-range-summary { gap: 10px; }
 .realtime-stage--midi .keyboard-range-summary .icon-command { flex-basis: 54px; width: 54px; height: 54px; }
 .realtime-stage--midi .keyboard-range-summary strong { min-width: 142px; font-size: 22px; }
-
-.realtime-stage--midi .instrument-legend { min-height: 42px; padding: 7px 13px; }
-.realtime-stage--midi .instrument-legend > span { font-size: 15px; }
+.realtime-stage--midi .midi-keyboard-port-control { min-height: 56px; }
+.realtime-stage--midi .midi-keyboard-port-control > span,
+.realtime-stage--midi .midi-keyboard-port-control select { font-size: 16px; }
 .realtime-stage--midi .roll-readout { font-size: 13px; }
 .realtime-stage--midi .live-piano-roll { height: 220px; }
 .realtime-stage--midi .visualizer-keyboard { height: 96px; }
 .realtime-stage--midi .visualizer-white-key small { font-size: 12px; }
 
-.realtime-stage--midi .drawer-tabs { height: 56px; }
-.realtime-stage--midi .drawer-tabs button { height: 56px; padding: 0 18px; font-size: 16px; }
-.realtime-stage--midi .drawer-content { padding: 12px 14px; }
-
 @media (max-width: 900px) {
   .realtime-stage--midi .roll-toolbar {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(140px, 1fr) minmax(190px, 260px) auto;
   }
 
-  .realtime-stage--midi .midi-input-control,
-  .realtime-stage--midi .stage-gain-control { grid-column: 1 / -1; }
   .realtime-stage--midi .keyboard-range-bar { grid-template-columns: minmax(0, 1fr); }
   .realtime-stage--midi .key-count-control,
+  .realtime-stage--midi .midi-keyboard-port-control,
   .realtime-stage--midi .keyboard-range-summary { justify-self: stretch; }
+  .realtime-stage--midi .midi-keyboard-port-control { min-width: 0; width: 100%; }
   .realtime-stage--midi .keyboard-range-summary { justify-content: center; }
-}
-
-@media (max-width: 1499px) {
-  .realtime-stage--touch .stage-session-bar::before,
-  .realtime-stage--midi .stage-session-bar::before { display: none; }
 }
 
 /* The 10-inch board panel is physically dense even at 1920px wide. Keep
@@ -256,6 +189,11 @@
     margin: 14px 17px;
   }
 
+  .app-shell--touch-display .midi-render-source .track-browser {
+    min-height: 68px;
+    margin: 0;
+  }
+
   .app-shell--touch-display .track-select > span,
   .app-shell--touch-display .recording-heading span,
   .app-shell--touch-display .recording-heading small,
@@ -267,8 +205,16 @@
   }
 
   .app-shell--touch-display .track-select select {
-    min-height: 42px;
+    min-height: var(--studio-touch-control);
     font-size: 18px;
+  }
+
+  .app-shell--touch-display .midi-render-facts dt {
+    font-size: 14px;
+  }
+
+  .app-shell--touch-display .midi-render-facts dd {
+    font-size: 17px;
   }
 
   .app-shell--touch-display .recording-heading {
@@ -310,6 +256,10 @@
     max-height: min(420px, calc(100vh - 380px));
   }
 
+  .app-shell--touch-display .midi-player-panel.is-render-view .voice-assignment-table {
+    max-height: min(250px, calc(100vh - 600px));
+  }
+
   .app-shell--touch-display .voice-assignment-row {
     min-height: 54px;
   }
@@ -325,7 +275,7 @@
   }
 
   .app-shell--touch-display .voice-instrument select {
-    min-height: 42px;
+    min-height: var(--studio-touch-control);
     font-size: 16px;
   }
 
@@ -378,8 +328,7 @@
   }
 
   .app-shell--touch-display .inline-error,
-  .app-shell--touch-display .inline-warning,
-  .app-shell--touch-display .npu-console pre {
+  .app-shell--touch-display .inline-warning {
     font-size: 14px;
   }
 
@@ -433,4 +382,3 @@
     font-size: 18px;
   }
 }
-
