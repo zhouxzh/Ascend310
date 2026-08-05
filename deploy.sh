@@ -23,13 +23,13 @@ run_pnpm() {
 }
 
 run_deploy_git() {
-    local deploy_dir=$1
+    local worktree_dir=$1
     shift
 
     if command -v git.exe >/dev/null 2>&1 && command -v wslpath >/dev/null 2>&1; then
-        git.exe -C "$(wslpath -w "$deploy_dir")" "$@"
+        git.exe -C "$(wslpath -w "$worktree_dir")" "$@"
     else
-        git -C "$deploy_dir" "$@"
+        git -C "$worktree_dir" "$@"
     fi
 }
 
@@ -37,17 +37,17 @@ cd "$REPO_ROOT"
 run_pnpm run docs:build
 
 mkdir -p "$REPO_ROOT/tmp"
-deploy_dir="$(mktemp -d "$REPO_ROOT/tmp/pages-deploy.XXXXXX")"
-readonly deploy_dir
-trap 'rm -rf -- "$deploy_dir"' EXIT
+PAGES_WORKTREE="$(mktemp -d "$REPO_ROOT/tmp/pages-deploy.XXXXXX")"
+readonly PAGES_WORKTREE
+trap 'rm -rf -- "$PAGES_WORKTREE"' EXIT
 
-cp -a "$DIST_DIR/." "$deploy_dir/"
-rm -rf -- "$deploy_dir/.git"
-touch "$deploy_dir/.nojekyll"
+cp -a "$DIST_DIR/." "$PAGES_WORKTREE/"
+rm -rf -- "$PAGES_WORKTREE/.git"
+touch "$PAGES_WORKTREE/.nojekyll"
 
-run_deploy_git "$deploy_dir" init -b main
-run_deploy_git "$deploy_dir" add -A
-run_deploy_git "$deploy_dir" commit -m 'deploy'
-run_deploy_git "$deploy_dir" push --force "$PAGES_REMOTE_URL" "main:$PAGES_DEPLOY_BRANCH"
+run_deploy_git "$PAGES_WORKTREE" init -b main
+run_deploy_git "$PAGES_WORKTREE" add -A
+run_deploy_git "$PAGES_WORKTREE" commit -m 'deploy'
+run_deploy_git "$PAGES_WORKTREE" push --force "$PAGES_REMOTE_URL" "main:$PAGES_DEPLOY_BRANCH"
 
 printf 'Deploy complete: https://zhouxzh.github.io/Ascend310/\n'
