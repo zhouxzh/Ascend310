@@ -2,7 +2,6 @@
 home: true
 portfolio: true
 title: 作者简介
-icon: house
 welcome: 👋 你好，我是
 name: 周贤中
 # avatar: https://theme-hope-assets.vuejs.press/hero/conan.png
