@@ -995,6 +995,8 @@ ONNX 和 OM 中。
 
 量化失败时不要先调参数。建议按图中的顺序回退检查：
 
+<!-- pdf-page-break -->
+
 ![量化失败时的回退检查顺序](img8/quantization_debug_order.png){#fig:chapter8_quantization_debug_order width=30% .center}
 
 ## 8.14 小结 {#src-book-chapter8-h14}

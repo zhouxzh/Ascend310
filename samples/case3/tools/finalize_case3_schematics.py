@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -53,6 +53,41 @@ def connect_harmonic_distribution(image: Image.Image) -> None:
     width = 5
     points = [(823, 373), (823, 421), (464, 421)]
     draw.line(points, fill=(0, 0, 0), width=width, joint="curve")
+
+
+def relabel_hardware_connections(image: Image.Image) -> None:
+    """Replace brand-specific labels in the accepted hardware schematic."""
+    if image.size != (2048, 1280):
+        raise ValueError(f"Unexpected hardware schematic size: {image.size}")
+
+    draw = ImageDraw.Draw(image)
+    font_path = Path(r"C:\Windows\Fonts\msyhbd.ttc")
+
+    def replace(box: tuple[int, int, int, int], text: str, size: int) -> None:
+        draw.rectangle(box, fill="white")
+        font = ImageFont.truetype(str(font_path), size=size)
+        bounds = draw.textbbox((0, 0), text, font=font)
+        width = bounds[2] - bounds[0]
+        height = bounds[3] - bounds[1]
+        x = box[0] + (box[2] - box[0] - width) // 2
+        y = box[1] + (box[3] - box[1] - height) // 2 - bounds[1]
+        draw.text((x, y), text, font=font, fill="black")
+
+    replace((245, 285, 525, 340), "触摸屏", 34)
+    replace((720, 175, 1260, 235), "摄像头", 36)
+    replace((1440, 295, 1815, 350), "音箱", 34)
+    replace((210, 645, 525, 705), "MIDI 键盘", 34)
+    replace((920, 385, 1240, 440), "USB 音频输入", 30)
+    replace((1240, 435, 1470, 485), "USB 音频输出", 28)
+    replace((535, 695, 730, 775), "USB MIDI 输入", 27)
+    replace((765, 950, 1325, 1020), "按设备标识显式路由；禁止使用输出监听源", 28)
+
+
+def relabel_hardware_file(path: Path) -> None:
+    with Image.open(path) as source:
+        image = source.convert("RGB")
+    relabel_hardware_connections(image)
+    image.save(path, format="PNG", optimize=True, dpi=(300, 300))
 
 
 def normalize(path: Path, target: tuple[int, int]) -> None:

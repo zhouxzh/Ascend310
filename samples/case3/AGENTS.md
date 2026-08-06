@@ -7,7 +7,7 @@ These instructions apply to the entire `case3` directory.
 This file is the implementation contract for future agents working on case3.
 It records the product intent, architectural boundaries, and accepted UX
 decisions. Detailed operator instructions and API descriptions remain in
-`doc/webui.md`; do not duplicate that document here.
+`doc/02-webui.md`; do not duplicate that document here.
 
 ## Project Intent
 
@@ -28,8 +28,8 @@ decisions. Detailed operator instructions and API descriptions remain in
 ## Sources of Truth
 
 - `AGENTS.md`: engineering constraints and design contract.
-- `doc/webui.md`: detailed WebUI behavior, deployment, controls, and API guide.
-- `doc/piano-ddsp.md`: Piano-DDSP model and runtime contract.
+- `doc/02-webui.md`: detailed WebUI behavior, deployment, controls, and API guide.
+- `doc/04-piano-ddsp.md`: Piano-DDSP model and runtime contract.
 - `webui/src/`: browser implementation.
 - `midi_ddsp_webui/`: FastAPI service, jobs, MIDI analysis, playback, and audio
   library index.
@@ -326,7 +326,7 @@ their time models.
   commands.
 - Preserve the current `/api/v1/realtime/*`, MIDI-DDSP library, piano-roll,
   artifact, job, device, Bluetooth, and speaker-test contracts described in
-  `doc/webui.md`.
+  `doc/02-webui.md`.
 - The legacy `POST /api/v1/midi-ddsp/recordings/{job_id}/play` endpoint delegates
   to the same playback implementation as version playback; keep it compatible.
 - The service is LAN-only and has no authentication. Keep mutating HTTP and

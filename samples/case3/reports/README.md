@@ -18,5 +18,5 @@ from filesystem task metadata and artifacts; it is not the only source of data.
 
 The detailed WebUI test procedure, acceptance thresholds, and the 2026-08-04
 Ascend 310B results are documented in
-[`doc/webui-acceptance.md`](../doc/webui-acceptance.md). The JSON files and
+[`doc/09-webui-acceptance.md`](../doc/09-webui-acceptance.md). The JSON files and
 screenshots under `reports/webui/` are the raw evidence for that narrative.

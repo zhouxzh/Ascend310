@@ -1,20 +1,20 @@
 Create a publication-ready hardware connection schematic for a Chinese technical book. White background, flat vector style, high contrast, generous margins, no gradients, no shadows, no title or figure number. Use the Okabe-Ito palette and black connectors; distinguish connection types by both color and line style for grayscale readability. All labels must be exactly spelled, large, crisp, and horizontal.
 
 Place “Ascend 310B 开发板” as the central device. Arrange these external devices around it:
-- left upper: “10 英寸触摸屏”
-- left lower: “MIDIPLUS TINY”
-- top: “UGREEN Camera 1080P”
-- right upper: “EDIFIER M16 Pro”
+- left upper: “触摸屏”
+- left lower: “MIDI 键盘”
+- top: “摄像头”
+- right upper: “音箱”
 - right lower: “局域网路由器”
 - far right lower: “开发电脑”
 
 Draw directional connections with exact labels:
 - touch display -> board: “USB 触控”
 - board -> touch display: “HDMI 视频”
-- MIDIPLUS TINY -> board: “USB MIDI”
-- UGREEN Camera 1080P -> board: “USB Audio Capture”
-- board -> EDIFIER M16 Pro: “USB Audio”
+- MIDI keyboard -> board: “USB MIDI 输入”
+- camera -> board: “USB 音频输入”
+- board -> speaker: “USB 音频输出”
 - board <-> router: “以太网 / Wi-Fi”
 - router <-> development computer: “部署 / 浏览器访问”
 
-Use restrained device silhouettes or technical pictograms only as secondary cues. Make arrow directions unambiguous and do not cross lines. Add a small boxed safety note at the bottom: “按设备 ID 显式路由；禁止 monitor 输入”.
+Use restrained device silhouettes or technical pictograms only as secondary cues. Make arrow directions unambiguous and do not cross lines. Add a small boxed safety note at the bottom: “按设备标识显式路由；禁止使用输出监听源”.

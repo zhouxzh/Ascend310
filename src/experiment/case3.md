@@ -1,21 +1,24 @@
 # 案例3：Ascend 310B DDSP 智能电子琴
 
-本案例在 Ascend 310B 开发板上实现一个可实际演奏、渲染和测试的音乐工作站。它不是只展示模型推理结果的演示页面，而是把触摸屏、实体 MIDI 键盘、MIDI 文件、摄像头麦克风、OM 模型、CPU 端可微分数字信号处理和音频设备组织成四个顶层工作区；触摸屏与实体 MIDI 键盘是“实时演奏”工作区内共享同一 Piano-DDSP 会话的两种输入方式。
+数字乐器的音色生成既要描述音高、力度、起音和衰减等音乐控制信息，也要在有限计算资源下连续产生具有稳定听感的音频波形。传统采样合成依赖预先录制的声音素材，而直接生成波形的神经网络通常需要在音频采样率上执行高密度计算。可微分数字信号处理（Differentiable Digital Signal Processing，DDSP）将谐波振荡器、滤波噪声和混响等声学结构引入神经网络训练，使模型能够预测具有物理含义的控制量，再由数字信号处理模块完成波形合成。[DDSP 论文][ref-ddsp-paper]给出了这一方法的系统论述。
 
-案例代码位于 [`samples/case3`](https://github.com/zhouxzh/Ascend310/tree/main/samples/case3)。本文以 2026-08-04 的代码、`model-suite-v1.0.1`、真实 `ascend8t` 板端页面和可追溯资产为准；性能数字只允许从合格的 publication 报告回填。TensorFlow/TFLite 到 ONNX 的导出脚本已经从 case3 删除，生产运行时严格使用 OM，不提供 ONNX、TFLite 或 CPU 神经网络回退。
+将 DDSP 从研究模型迁移到边缘计算设备，并不只是完成模型格式转换。实时演奏需要维持毫秒级控制周期和连续循环状态，MIDI 文件渲染需要处理完整乐曲的时序上下文，麦克风音色转换还涉及音高估计、噪声门、采样率转换和双工音频路由。这些任务具有不同的时间尺度和资源需求，能够集中体现神经网络推理、数字信号处理、实时调度与人机交互之间的协同关系。
+
+基于上述背景，本案例以 Ascend 310B 为计算平台，选取复音钢琴演奏、MIDI 文件音色渲染和单音音色转换三类任务，构建一套完整的 DDSP 实验系统。该案例既可用于理解 Piano-DDSP、MIDI-DDSP 与 DDSP-VST 的网络结构和控制机制，也可用于研究 NPU 推理与 CPU 音频合成的任务划分，以及模型在交互式数字乐器、自动音乐制作和边缘音频处理中的应用方式。
+
+配套代码位于 [`samples/case3`](https://github.com/zhouxzh/Ascend310/tree/main/samples/case3)。
 
 ## 1. 案例目标与学习成果 {#src-experiment-case3-overview}
 
-### 1.1 系统能做什么 {#src-experiment-case3-capabilities}
+### 1.1 系统功能 {#src-experiment-case3-capabilities}
 
-完成本案例后，可以在同一套 Web 工作站中使用四种不同输入方式：
+该 Web 工作站支持以下三类处理流程：
 
 | 工作流 | 输入 | 神经网络 | 输出 | 适用场景 |
 | :--- | :--- | :--- | :--- | :--- |
-| 触控演奏 | 10 英寸触摸屏上的 13 或 25 键钢琴 | Piano-DDSP OM | 实时扬声器声音 | 无外接键盘时直接演奏 |
-| MIDI 键盘 | MIDIPLUS TINY 或其他标准 MIDI 输入 | Piano-DDSP OM | 实时扬声器声音 | 有力度、踏板和弯音的实体演奏 |
+| 实时演奏 | 触摸屏钢琴或标准 MIDI 键盘 | Piano-DDSP OM | 实时扬声器声音 | 触控输入与具有力度、踏板和弯音控制的实体演奏 |
 | MIDI-DDSP | `.mid` 或 `.midi` 文件 | Expression 与 Synthesis OM 组件 | WAV、开发板播放或浏览器播放 | 离线多声部音色渲染 |
-| DDSP-VST | UGREEN 摄像头的实体麦克风输入 | Feature OM 与 Control OM | 实时音色转换 | 把单音哼唱或乐器声转换为 11 种音色 |
+| DDSP-VST | 摄像头或独立麦克风的实体音频输入 | Feature OM 与 Control OM | 实时音色转换 | 把单音哼唱或乐器声转换为 11 种音色 |
 
 设备页不参与音乐生成，它负责展示开发板、NPU、模型、音频、MIDI、蓝牙和 Python 环境状态，并提供独占的扬声器与麦克风测试。
 
@@ -23,13 +26,13 @@
 
 读者将理解并复现以下内容：
 
-1. DDSP 为什么让神经网络预测可解释的控制量，而不是直接生成每个音频采样点。
+1. DDSP 以可解释控制量连接神经网络与音频合成模块的基本原理。
 2. Piano-DDSP、MIDI-DDSP 和 DDSP-VST 三套网络在输入、状态、时序和用途上的区别。
-3. ONNX 下载与校验、开发板 ATC 转换、OM 打包和 PyACL 调用之间的边界。
+3. 自训练模型导出与上游 TFLite 模型迁移两类来源，以及 ONNX、OM 和板端推理之间的关系。
 4. FastAPI、WebSocket、音频线程、MIDI 状态机、资源互斥和文件产物如何协作。
-5. React 触摸界面如何在 `1920 x 1080` 的 10 英寸物理屏幕及约 `1920 x 969` 的浏览器内容视口中保持可读、可按和低开销。
+5. React 界面如何在触摸屏、桌面和移动视口中保持良好的可读性、可操作性与渲染效率。
 
-本案例不做摄像头图像识别。摄像头只提供 USB 麦克风。DDSP-VST Effect 第一版也不提供录音、浏览器监听、原声 Dry/Wet 混合或复音音频转音色；它面向稳定基频的单音输入。程序指标可以证明链路在运行，但不能替代现场听感、声压或声学测量。
+本案例关注声音生成与实时音频处理，摄像头仅作为麦克风载体，不涉及图像分析。DDSP-VST Effect 的研究对象限定为基频相对稳定的单音输入，复音分离与复杂声场建模不在讨论范围内。运行指标用于描述计算链路和资源状态；音色质量、声压与声学特性仍需通过独立的听音和测量实验评价。
 
 ## 2. 器件与材料清单 {#src-experiment-case3-bom}
 
@@ -41,19 +44,21 @@
 | :--- | :---: | :--- | :--- | :--- |
 | Ascend 310B 开发板 | 1 | 以太网、HDMI、USB、音频 | 运行 FastAPI、PyACL、OM 推理和 CPU DSP | 必须具备可用 CANN/PyACL 和对应 SoC 的 OM 支持 |
 | 原配电源与启动存储 | 1 套 | 开发板专用 | 启动和稳定供电 | 电压、电流和启动介质必须符合板卡说明 |
-| 10 英寸 HDMI 触摸屏 | 1 | HDMI、USB 触控 | 本地显示与触摸演奏 | 至少能稳定显示 `1920 x 1080`，浏览器内容区约 `1920 x 969` |
+| HDMI 触摸显示器 | 1 | HDMI、USB 触控 | 本地显示与触摸演奏 | 应支持浏览器全屏显示和稳定的多点触控 |
 | HDMI 线与 USB 触控线 | 各 1 | HDMI、USB | 视频与触控回传 | 线材需支持屏幕分辨率和持续供电 |
-| 有线音频输出 | 1 | USB 或板载接口 | 播放合成音频 | 推荐独立 USB 音箱或 USB DAC，避免未经验证的板载双声道路由 |
+| 音频输出 | 1 | USB、板载接口或 Bluetooth A2DP | 播放合成音频 | 支持有线音箱、蓝牙音箱和蓝牙耳机；实时演奏验收推荐使用有线输出 |
 | 局域网与开发电脑 | 1 套 | 以太网或 Wi-Fi | 构建、部署和浏览器访问 | 开发电脑与开发板需位于可信局域网 |
+
+本案例支持通过 Bluetooth A2DP 连接蓝牙音箱和蓝牙耳机。蓝牙链路中的音频编码、无线传输和播放缓冲通常会增加端到端延迟，因此实时演奏时可能出现较明显的声音滞后，影响演奏反馈。该部分延迟来自蓝牙音频链路，不应归因于 NPU 推理性能；评价模型推理和实时合成能力时，应优先采用有线输出，或将蓝牙链路延迟作为独立分量测量。
 
 ### 2.2 完整功能配置 {#src-experiment-case3-full-bom}
 
-以下型号是本案例当前实测组合，不代表唯一可用品牌。
+以下型号构成本案例的验证配置，但不代表唯一可用品牌。
 
-| 器件 | 数量 | 当前实测型号 | 接口 | 在实验中的作用 |
+| 器件 | 数量 | 验证型号 | 接口 | 在实验中的作用 |
 | :--- | :---: | :--- | :--- | :--- |
 | Ascend 310B 开发板 | 1 | [Orange Pi AIpro][ref-orange-pi] | USB、HDMI、网络 | OM 推理、音频、后端和触摸屏主机 |
-| 触摸显示器 | 1 | 10 英寸 HDMI 触摸屏 | HDMI + USB | 四工作区本地操作 |
+| 触摸显示器 | 1 | HDMI 触摸显示器 | HDMI + USB | 四工作区本地操作 |
 | USB 音箱 | 1 | EDIFIER M16 Pro | USB Audio | Piano-DDSP、MIDI-DDSP 和 DDSP-VST 的默认输出 |
 | 摄像头麦克风 | 1 | UGREEN Camera 1080P | USB Audio Capture | DDSP-VST 输入与麦克风测试；图像数据不参与本案例 |
 | MIDI 键盘 | 1 | MIDIPLUS TINY，32 键 | USB MIDI | 物理按键、力度和控制器输入 |
@@ -77,13 +82,13 @@
 
 ![Case 3 的实时钢琴、MIDI 文件渲染和麦克风音色转换三条业务链](./img3/case3-three-workflows.png)
 
-三条链路共享 NPU 和音频设备，但时间模型不同。Piano-DDSP 每 `4 ms` 更新一次控制量；MIDI-DDSP 先知道完整乐曲并离线生成 WAV；DDSP-VST 每 `20 ms` 处理一帧音高和响度控制。它们不能被简单合并为一个“通用模型”。
+三条链路共享 NPU 和音频设备，但采用不同的时间模型。Piano-DDSP 每 `4 ms` 更新一次控制量；MIDI-DDSP 利用完整乐曲上下文离线生成 WAV；DDSP-VST 每 `20 ms` 处理一帧音高和响度控制。因此，三条链路需要分别设计状态管理、调度和缓冲策略。
 
 ### 3.2 硬件连接 {#src-experiment-case3-hardware-connection}
 
 ![Ascend 310B 开发板与触摸屏、MIDI 键盘、USB 麦克风、音箱和开发电脑的硬件连接](./img3/case3-hardware-connections.png)
 
-应按设备 ID 选择输入输出。程序不会在摄像头或音箱断开后静默切换到其他设备，也不会把 `Monitor of ...` 当作麦克风。这样的显式路由可以避免突然回放系统声音、产生反馈或把测试发到错误音箱。
+应按设备标识选择输入输出。程序不会在摄像头或音箱断开后静默切换到其他设备，也不会把 PulseAudio 输出监听源用作麦克风输入。显式路由可以避免意外回放系统声音、产生反馈或将测试信号发送到错误的音频设备。
 
 ### 3.3 开发电脑与开发板的职责边界 {#src-experiment-case3-runtime-boundary}
 
@@ -94,7 +99,6 @@
 | 编辑源码、运行普通 Python 单元测试 | 是 | 否 |
 | `npm ci`、`npm run test`、`npm run build` | 是 | 否 |
 | 下载并校验发布模型 | 是 | 可接收已校验资产 |
-| TensorFlow/TFLite 历史导出 | 不属于 case3 当前流程 | 否 |
 | ATC、PyACL、OM 推理、`npu-smi` | 否 | 是 |
 | PulseAudio 实体路由和真实听音 | 否 | 是 |
 
@@ -104,7 +108,7 @@
 
 传统采样合成器把大量录音映射到音高和力度区域，音色逼真但资产大，跨音高和连续控制依赖插值。端到端波形神经网络可以直接预测音频，却需要在音频采样率上输出大量数据，实时部署的计算量、状态和可解释性都更困难。
 
-DDSP 将已知的振荡器、滤波器、包络和混响写成可微模块，训练时仍可通过梯度优化，部署时只让神经网络预测少量控制量。Google 的 DDSP 工作证明了这种“神经网络负责控制，DSP 负责生成”的音频建模方式。[DDSP 论文][ref-ddsp-paper]和[官方代码][ref-ddsp-repo]给出了完整背景。
+DDSP 将振荡器、滤波器、包络和混响等数字信号处理模块写成可微形式，使这些模块能够参与梯度优化；部署阶段则由神经网络预测低维控制量，再由信号处理模块合成波形。[DDSP 论文][ref-ddsp-paper]提出了这一建模框架，[官方代码][ref-ddsp-repo]给出了相应实现。
 
 ### 4.2 基频、谐波和相位 {#src-experiment-case3-harmonic-synthesis}
 
@@ -167,11 +171,44 @@ $$
 
 ### 5.1 Piano-DDSP {#src-experiment-case3-piano-ddsp}
 
-当前发布为 `model-suite-v1.0.1`，模型结构源自 [DDSP-Piano][ref-piano-ddsp]：`16 kHz` 音频、`250 Hz` 控制率、每次一帧、每帧 `64` 个采样、最多 `16` 个声部。部署图显式输入和输出循环状态，开发板激活的 bundle 为 `model-suite-v1.0.1-gru-unrolled-fp32-origin`，默认模型为 `gru_ir_96_64`。GRU 被展开为基础算子，以适配当前 `Ascend310B4` 的 FP32 编译和连续状态验证。
+#### 5.1.1 模型来源 {#src-experiment-case3-piano-ddsp-origin}
+
+本案例所用的 Piano-DDSP 不是对上游 TensorFlow 权重的格式转换，而是作者在独立的 [piano-ddsp-pytorch 训练项目][ref-piano-pytorch]中完成的 PyTorch 实现与训练。网络设计以 [DDSP-Piano][ref-piano-ddsp] 的复音钢琴建模方法为基础，发布权重均由该项目在 [MAESTRO 数据集][ref-maestro]上的训练过程产生，并由训练所得 checkpoint 导出为 ONNX。因而，Piano-DDSP 的研究链路是“结构复现与修改、PyTorch 训练、ONNX 导出、OM 转换”，与本章另外两类模型的迁移来源有本质区别。
+
+#### 5.1.2 网络实现 {#src-experiment-case3-piano-ddsp-implementation}
+
+模型以 MIDI 音高、力度、踏板状态和钢琴录音域索引为条件，在 `16 kHz` 采样率下以 `250 Hz` 控制率工作，每个控制帧对应 `64` 个音频采样，并行描述最多 `16` 个声部。网络由全局上下文分支和共享权重的单声部分支构成。全局分支综合所有活动音符、踏板和钢琴嵌入，通过循环网络形成跨声部的上下文表示；单声部分支则为每个声部分别结合当前音符、延音阶段与全局上下文，预测幅度、谐波分布和噪声频带。音高支路进一步估计基频、弦间微小失谐与非谐性，从而表达钢琴弦的刚度及同音弦拍频。
+
+这一分层结构兼顾了复音耦合与逐声部独立性：全局上下文反映踏板和同时发声音符对整体音色的影响，单声部循环状态保持各音符起音、持续和释放阶段的连续性。神经网络只预测声学控制量，谐波振荡、滤波噪声、相位累积与混响卷积由宿主端 DSP 完成，避免在高采样率上直接生成整段波形。
 
 ![Piano-DDSP 的上下文网络、逐声部网络、循环状态和 CPU 合成边界](./img3/case3-piano-ddsp-architecture.png)
 
-主要张量合同如下，所有张量均为 FP32：
+#### 5.1.3 训练策略 {#src-experiment-case3-piano-ddsp-training}
+
+MAESTRO 提供时间对齐的钢琴音频与高精度 MIDI。训练时，MIDI 音符、击键力度和踏板控制构成条件序列，配对音频构成声学监督；录音年份映射为钢琴录音域索引，使模型能够学习不同乐器与录音环境之间的系统差异。训练、验证和测试按照数据集给定的乐曲划分组织，避免同一作品的不同演奏跨越数据子集而造成信息泄漏。
+
+训练过程将音色控制与音高细节分阶段优化。首先关闭失谐支路，学习上下文网络、单声部控制网络、钢琴嵌入和混响，使模型建立稳定的幅度、谐波与噪声表征；随后固定主要音色通路，训练失谐、非谐性及其录音域嵌入；最后在音高支路生效的条件下微调控制网络，使频率结构与音色包络共同收敛。分阶段训练减少了幅度谱重建与细微音高偏差之间的相互干扰，也使不同结构方案能够在一致的数据和控制合同下比较。
+
+训练系统保留干声与混响声两条评价路径。干声约束主要考察振荡器控制和瞬态是否合理，混响声约束则用于评价最终听感及空间响应。对全湿声候选结构，还加入能量、起音和力度相关的感知约束，以抑制仅凭频谱损失获得低数值误差、却削弱击弦瞬态的情况。模型选择因此不能只依据单一损失值，还需要结合未见曲目的渲染结果和听音比较。
+
+#### 5.1.4 面向实时部署的结构修改 {#src-experiment-case3-piano-ddsp-modifications}
+
+为适应流式推理，训练实现将原本隐含在序列计算中的上下文状态和逐声部状态改为显式输入输出，使每次推理只处理一个控制帧，同时保持帧间递归关系。音符释放状态由宿主端维护，谐波相位、噪声重叠缓存和混响历史也位于模型之外；这种边界既缩小了 ONNX 计算图，也使状态复位、声部回收和确定性重放具有明确语义。面向 Ascend 转换时，GRU 进一步等价展开为矩阵乘、门控激活和逐元素运算，以规避循环算子的精度与算子支持限制。展开只改变计算图的表示方式，不改变训练权重和递推方程。
+
+在共同的输入、状态和输出合同下，本案例训练并比较了四类结构：
+
+| 结构方案 | 主要修改 | 研究目的 |
+| :--- | :--- | :--- |
+| GRU 与学习型冲激响应 | 复现基准上下文网络和单声部 GRU，预测 96 个谐波与 64 个噪声频带 | 建立与 DDSP-Piano 结构相近的因果基线 |
+| FiLM 与反馈延迟网络 | 用钢琴嵌入调制全局特征，引入更深的单声部网络、联合非谐性模型和 128/96 维控制 | 考察条件调制、模型容量和参数化混响的作用 |
+| GRU 全湿声校准 | 保留基准控制网络，强化混响声、能量、起音和力度约束 | 研究感知目标对击弦瞬态和空间感的影响 |
+| FiLM 全湿声校准 | 结合 FiLM、深层单声部网络、联合非谐性和学习型冲激响应 | 比较结构扩展与感知校准的联合效果 |
+
+这些结构名称表示建模假设，而不是预设的音质排序。不同方案在网络容量、谐波分辨率和混响表示上各有侧重，最终选择需要同时考虑闭环数值误差、实时预算和主观听音结果。
+
+#### 5.1.5 ONNX 导出合同 {#src-experiment-case3-piano-ddsp-onnx}
+
+训练后的 PyTorch 控制网络以 FP32、固定批量和单控制帧形式导出为 ONNX。下表以 GRU 与学习型冲激响应结构为例；FiLM 与反馈延迟网络结构保持相同的输入和循环状态语义，但将谐波、噪声及混响输出分别扩展为相应的控制维度。
 
 | 方向 | 张量 | 形状 | 含义 |
 | :--- | :--- | :--- | :--- |
@@ -189,23 +226,7 @@ $$
 | 输出 | `next_context_state` | `[1,1,64]` | 下一帧全局状态 |
 | 输出 | `next_monophonic_state` | `[1,16,192]` | 下一帧声部状态 |
 
-四个已发布候选模型都通过 `10,000` 帧 OM 连续对照，但结构和混响边界不同：
-
-| 变体 | 时序调制 | 混响 | 谐波/噪声 | 当前作用 |
-| :--- | :--- | :--- | :--- | :--- |
-| GRU IR | GRU | 学习 IR | 96/64 | 当前默认激活模型 |
-| FiLM FDN | FiLM | FDN | 128/96 | 可配置候选 |
-| GRU 全湿声 | GRU | 全湿声 IR | 96/64 | 感知校准候选 |
-| FiLM 全湿声 | FiLM | 全湿声 IR | 96/64 | FiLM 与学习 IR 候选 |
-
-清单中的完整模型 ID 为：
-
-```text
-gru_ir_96_64
-film_fdn_128_96
-gru_ir_fullwet_96_64
-film_ir_fullwet_96_64
-```
+导出验证不仅比较单帧输出，还将上一帧状态连续反馈给下一帧，逐项对照 PyTorch 与 ONNX Runtime 的控制量和循环状态。这样可以发现单帧误差较小、但在长序列中逐步累积的偏差。通过该检验的 ONNX 才进入后续 OM 转换；此处的数值一致性仍不等价于音质评价或端到端音频延迟。
 
 ### 5.2 MIDI-DDSP {#src-experiment-case3-midi-ddsp}
 
@@ -232,19 +253,7 @@ stateful v2 把原始图拆成八个可独立转换和批处理的组件：
 
 ### 5.3 DDSP-VST Feature 与 Control {#src-experiment-case3-ddsp-vst}
 
-DDSP-VST Effect 参考[固定上游提交 `f2996e97`][ref-ddsp-vst]。Feature 模型来自 `extract_features_micro.tflite`。固定上游提交的完整值为：
-
-```text
-f2996e97f9469f3956a6b8e9d2d9b50b6555e1e9
-```
-
-Feature 源码 SHA256 为：
-
-```text
-98ade06772f9ca6ac64789fd843f14aeddf709084bbc76f060761b141837d0a2
-```
-
-case3 只保留验证后的 ONNX、OM 和转换证据，不保留 TFLite 导出工具。当前 Feature OM 使用 `mixed_float16`，Control OM 对应选择的乐器音色。
+DDSP-VST Effect 参考[上游 DDSP-VST 实现][ref-ddsp-vst]。其计算过程分为 Feature 与 Control 两级：Feature 模型从滑动音频窗口估计基频和响度表征，Control 模型结合循环状态生成谐波、噪声与幅度控制量。两级模型的分离使音频特征提取与乐器音色建模能够采用不同的状态更新方式。
 
 ![DDSP-VST Effect 的实体音频输入、Feature OM、Control GRU 状态回路和 CPU 音频输出](./img3/case3-ddsp-vst-architecture.png)
 
@@ -253,7 +262,7 @@ case3 只保留验证后的 ONNX、OM 和转换证据，不保留 TFLite 导出�
 | Feature OM | `float32[1024]` 音频 | `f0_scaled[1]`、`pw_scaled[1]`、`f0_hz[1]`、`pw_db[1]` | `16 kHz`，步长 `320`，即 `50 Hz` |
 | Control OM | `state[512]`、`f0_scaled[1]`、`pw_scaled[1]` | `amplitude[1]`、`harmonics[60]`、`noise_amps[65]`、`state_out[512]` | 每 `20 ms` 更新音色控制与 GRU 状态 |
 
-控制目录包含 Bassoon、Clarinet、Flute、Melodica、Saxophone、Sitar、Trombone、Trumpet、Tuba、Violin 和 Vowels 共 11 种音色。界面显示中文乐器名，但模型 ID、清单和哈希仍保留稳定英文标识。
+Control 模型覆盖巴松、单簧管、长笛、口风琴、萨克斯、西塔琴、长号、小号、大号、小提琴和人声音色，共 11 类。不同音色共享相同的输入与状态合同，但通过各自的模型参数形成不同的谐波和噪声分布。
 
 ### 5.4 三套网络对比 {#src-experiment-case3-model-comparison}
 
@@ -268,67 +277,70 @@ case3 只保留验证后的 ONNX、OM 和转换证据，不保留 TFLite 导出�
 | NPU 输出 | 96 谐波、64 噪声等控制 | 60 谐波、65 噪声等控制 | Feature 特征和 60/65 控制 |
 | DSP 边界 | CPU 合成、重采样和 IR/FDN | CPU 合成、混响、stem 混音和 WAV | CPU 合成、重采样、增益和 FreeVerb |
 
-## 6. 模型获取与 Ascend 部署 {#src-experiment-case3-model-deployment}
+## 6. 模型转换与 Ascend 部署 {#src-experiment-case3-model-deployment}
 
-### 6.1 只消费已发布模型 {#src-experiment-case3-model-download}
+### 6.1 两类模型来源 {#src-experiment-case3-model-download}
 
-case3 不再提供 TensorFlow、Keras、SavedModel 或 TFLite 到 ONNX 的导出代码。历史 TensorFlow/MIDI-DDSP 的模型结构、张量合同和验证过程仍保留在[历史导出文档](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/midi-ddsp-export.md)，但不再作为当前复现步骤。
+三套网络进入 Ascend 部署链之前具有两种不同来源，不能将其笼统表述为同一种“模型下载”过程。
 
-当前下载入口为 [`tools/download_model_release.py`](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/tools/download_model_release.py)。下载器拒绝 `main`、`master` 和 `HEAD` 等移动分支，先解析固定 revision，再下载 `SHA256SUMS`，支持 `.part` 断点续传，并在原子替换前逐文件验证。Piano-DDSP `model-suite-v1.0.1` 的示例为：
+| 模型族 | 原始来源 | ONNX 的形成方式 | 本案例中的作用 |
+| :--- | :--- | :--- | :--- |
+| Piano-DDSP | 作者基于 DDSP-Piano 结构完成的 PyTorch 训练模型 | 从本地训练 checkpoint 导出因果、显式状态的 ONNX | 实时复音钢琴控制 |
+| MIDI-DDSP | Google MIDI-DDSP 项目的 TFLite 模型 | 按层级生成过程重构静态 ONNX 组件，并显式化双向与自回归状态 | 完整 MIDI 的表情与音色渲染 |
+| DDSP-VST | Google DDSP-VST 项目的 TFLite 模型 | 将 Feature 与 Control 分别转换为流式 ONNX，并显式化 Control 的循环状态 | 实时单音特征提取与音色转换 |
 
-```powershell
-cd D:\Github\Ascend310\samples\case3
-python tools/download_model_release.py `
-  --revision model-suite-v1.0.1 `
-  --manifest-sha256 1a4a2500ae357577a4a6f7378c28d54235f543663b9b69cc3cf5938929c458d7 `
-  --target-dir models/piano_ddsp/model-suite-v1.0.1
-```
+Piano-DDSP 的训练代码与模型修改见 [piano-ddsp-pytorch][ref-piano-pytorch]，导出的 ONNX 模型发布在 [Piano-DDSP 模型仓库][ref-hf-models]。MIDI-DDSP 与 DDSP-VST 的网络语义分别以 [Google MIDI-DDSP][ref-midi-ddsp-repo] 和 [Google DDSP-VST][ref-ddsp-vst] 为依据。固定模型来源的意义在于使后续差异可以归因于图变换、精度配置或硬件执行，而不是上游权重的变化。
 
-发布仓库为 [`zhouxzh/piano-ddsp-ascend310`][ref-hf-models]。下载完成后还要核对解析出的固定提交（完整 SHA）：
+### 6.2 从 TFLite 到 ONNX 的图语义重构 {#src-experiment-case3-tflite-onnx}
 
-```text
-c41911aa7de454aeacf0b3edbb2d06a0801fb3ff
-```
+TFLite 到 ONNX 的迁移不能只追求算子逐项替换，还必须保持原模型的时序语义。DDSP-VST 的 Control 模型原本包含循环控制流；转换时将其改写为单步计算图，把上一帧 GRU 状态作为输入、下一帧状态作为输出，并将幅度非线性、谐波归一化和奈奎斯特频率屏蔽纳入同一图中。Feature 模型则保持滑动音频窗口与固定步长，使基频和响度估计与上游实时处理的时间尺度一致。验证时需要连续输入多帧信号，因为循环状态的误差不会在孤立单帧测试中充分显现。
 
-如果 revision、清单摘要或任一资产哈希不一致，应停止，不得继续 ATC。
+MIDI-DDSP 的转换更为复杂。Expression Generator 与 Synthesis Generator 同时包含双向上下文和自回归解码，若简单按窗口截断，会破坏完整乐曲的前后文。本案例将其分解为上下文编码、条件预处理、自回归解码、基频解码和音色控制等八类组件，显式传递各级状态，并通过有效帧掩码保持填充区域不参与统计。该设计既满足 ONNX 静态形状约束，又保留完整 MIDI 序列上的双向语义和逐帧递推关系。
 
-DDSP-VST Feature 当前本地 release 已保存 ONNX、参考 NPZ、许可证、ATC 原始日志、两种精度验证和 SHA256；在新的不可变 HF revision 完成发布之前，不应把本地目录描述成已公开下载的 release。模型发布状态和操作以[模型与 OM 部署文档](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/om-deployment.md)为准。
+具体转换遵循以下方法：
 
-### 6.2 ONNX、ATC、OM 与 PyACL 验证链 {#src-experiment-case3-atc-pipeline}
+1. 以 TFLite 模型和一组连续参考输入为起点，记录初始状态、逐帧输出及状态演化，而非只保存孤立样本。
+2. 识别 TFLite 子图中的常量权重、张量布局、门控顺序和后处理操作，建立与上游模型一致的逻辑张量合同。
+3. 将动态循环和张量列表改写为固定形状的单步或分段 ONNX 图，把所有跨调用信息显式表示为状态输入输出。
+4. 对广播、归一化、填充掩码和非线性后处理逐项对齐，避免框架默认语义差异改变声学控制量。
+5. 使用相同输入连续运行 TFLite 与 ONNX，比较控制量、离散采样结果和循环状态；通过闭环对照后再执行 ONNX 结构检查。
 
-![固定模型发布从下载校验、板端 ATC、PyACL 验证到不可变 bundle 原子激活的流程](./img3/case3-model-deployment-pipeline.png)
+两类转换均以 TFLite 输出为参考，比较连续控制量、离散采样结果和状态演化；只有当 ONNX 在相同输入下保持规定误差范围内的一致性，才能进入硬件编译阶段。这种做法把“模型可以被转换”与“转换后仍实现同一算法”区分开来。
 
-开发板使用现有 CANN 环境执行 ATC，目标 SoC 为 `Ascend310B4`；参数含义和版本要求应以 [Ascend CANN 官方文档][ref-ascend]为准。ONNX 文件先按 [ONNX 官方规范和 checker][ref-onnx]检查。Piano-DDSP 当前使用 `precision_mode_v2=origin` 的 FP32 GRU 展开图；DDSP-VST Feature 选择 `mixed_float16`，因为它通过了 `1,000` 帧精度和 Feature+Control `p95 < 20 ms` 验证，而 `force_fp16` 候选被精度门槛拒绝。
+### 6.3 ONNX 到 OM 的转换与验证 {#src-experiment-case3-atc-pipeline}
 
-一个可进入运行目录的 bundle 至少应包含：
+![模型从来源确认、ONNX 语义验证、板端 ATC 转换到 PyACL 闭环检验的流程](./img3/case3-model-deployment-pipeline.png)
 
-| 证据 | 目的 |
-| :--- | :--- |
-| 源 ONNX SHA256 与固定 revision | 证明转换输入没有漂移 |
-| OM SHA256 与目标 SoC | 证明运行文件和硬件目标一致 |
-| 原始 ATC 日志与摘要 | 保留编译参数、退出码和算子诊断 |
-| 输入输出张量合同 | 阻止名称、形状和类型错配 |
-| 参考 NPZ 与误差报告 | 比较 ONNX/TFLite 参考和 OM 输出 |
-| 性能报告 | 记录 warmup、循环次数、p50、p95、p99 |
-| manifest 与许可证 | 让服务端只发现完整、可追溯资产 |
+ONNX 首先按照 [ONNX 官方规范][ref-onnx]检查计算图、张量名称、形状和数据类型，再由与开发板匹配的 CANN 工具链转换为 OM；ATC 参数及目标芯片配置应以 [Ascend CANN 官方文档][ref-ascend]为准。精度模式不是孤立的编译选项，而会改变循环状态和声学控制量的数值行为，因此不同网络应依据参考误差与实时预算分别确定，不能仅以转换成功或模型文件大小作为选择标准。
 
-### 6.3 生产运行时严格 OM-only {#src-experiment-case3-om-only}
+验证分为四个相互衔接的层次：
 
-生产服务只接受目录中的模型 ID，不接受浏览器提交任意文件路径或后端名称。Piano、MIDI-DDSP、DDSP-VST Feature 和 Control 的实际后端都必须报告为 `acl/om`。模型缺失、哈希不符、张量不符、NPU 不可用或实体 capture 消失时，服务拒绝启动并释放资源；不会切换到 ONNX Runtime、TFLite、浏览器推理或 CPU 神经网络。
+| 验证层次 | 核心问题 | 主要判据 |
+| :--- | :--- | :--- |
+| 结构一致性 | OM 是否实现预期的输入输出接口 | 张量名称、形状、类型和状态维度完全对应 |
+| 数值一致性 | 图变换和精度选择是否改变模型行为 | ONNX 与 OM 在固定输入及连续状态回路上的误差受控，无 NaN 或 Inf |
+| 时间可行性 | 推理是否能在控制周期内稳定完成 | 预热后统计延迟分布，并以高百分位而非单次最小值判断 |
+| 系统一致性 | 神经控制量能否形成连续可听的音频 | 检查非静音输入输出、音频缓冲、削波、设备路由与长时间状态增长 |
+
+其中，Piano-DDSP 尤其需要考察全局状态与逐声部状态的长期累积误差；MIDI-DDSP 需要保持双向上下文、自回归采样和整曲统计；DDSP-VST 则需要联合验证 Feature 与 Control 的控制周期。详细转换命令、张量夹具和报告格式见[模型与 OM 部署文档](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/03-om-deployment.md)。
+
+### 6.4 运行时模型边界 {#src-experiment-case3-runtime-model-boundary}
+
+实验系统在板端以 OM 作为统一的神经网络执行形式，使三套模型共享相同的 NPU 调用和资源管理边界。若模型合同、循环状态或音频设备条件不满足，运行会话应显式终止并释放资源，避免不同推理后端或隐式设备切换混入同一次实验。ONNX 与 TFLite 在这里承担来源对照和数值参考的角色，性能评价则以真实 OM 推理和完整音频链路为对象。
 
 ## 7. 后端设计 {#src-experiment-case3-backend}
 
-### 7.1 FastAPI、作业和文件资产 {#src-experiment-case3-fastapi}
+### 7.1 服务分层与作业模型 {#src-experiment-case3-fastapi}
 
-后端入口是 [`midi_ddsp_webui/app.py`](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/midi_ddsp_webui/app.py)，由 [`scripts/run_webui.py`](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/scripts/run_webui.py) 在 `0.0.0.0:8765` 启动。FastAPI 同时提供生产静态资源、REST API、WebSocket、MIDI 上传、WAV 产物和状态页面。
+后端以 FastAPI 为服务框架，将静态界面、请求响应、事件推送、文件产物和硬件控制组织在同一应用边界内。查询类请求用于获得模型、设备和会话快照，命令类请求负责启动或停止具有副作用的操作，WebSocket 则传递音符边沿、作业进度和实时指标。三类通信承担不同的时间语义，可避免用高频轮询近似短暂事件，也能防止将耗时渲染阻塞在一次 HTTP 请求中。
 
 ![Case 3 FastAPI 后端的控制器、资源互斥、PyACL、事件和存储模块边界](./img3/case3-backend-architecture.png)
 
-MIDI-DDSP 音频库使用 Python 标准库 `sqlite3`，数据库路径为 `reports/webui/library.sqlite3`。`midi_sources` 以 MIDI 内容 SHA256 标识曲目，`render_versions` 保存每次渲染的模型、声部分配、seed、增益、尾音、WAV 和报告引用；即使配置相同，显式渲染也会产生新历史。SQLite 只是可重建目录，真正权威的数据仍是 MIDI、WAV、任务元数据、manifest、报告和哈希文件。
+MIDI-DDSP 渲染采用异步作业模型。输入 MIDI、声部分配、模型选择与合成参数共同确定一次渲染上下文，输出 WAV 与任务元数据构成可追溯的结果版本。关系数据库只承担索引和检索功能，原始 MIDI、音频产物及其元数据仍是实验记录的主体；这种安排既支持同一乐曲的多方案比较，也避免界面状态成为唯一的数据来源。
 
 ### 7.2 资源互斥与实时钢琴 {#src-experiment-case3-resource-coordinator}
 
-`ResourceCoordinator` 互斥以下会占用 NPU 或真实音频设备的流程：
+资源协调层对以下会占用 NPU 或物理音频设备的流程实行互斥：
 
 - Piano-DDSP 触控与实体 MIDI 共享实时会话；
 - DDSP-VST Effect 双工链路；
@@ -336,11 +348,11 @@ MIDI-DDSP 音频库使用 Python 标准库 `sqlite3`，数据库路径为 `repor
 - 麦克风输入测试；
 - 扬声器左右声道测试。
 
-发生冲突时 API 返回 `409`，而不是同时打开设备。停止、异常、设备断开和线程退出都必须释放锁。浏览器不能绕过协调器直接选择板端文件路径。
+冲突请求会被显式拒绝，而不是让多个任务同时打开同一硬件。会话在正常停止、异常退出或设备断开时均需释放资源；设备和模型的实际路径由后端管理，浏览器只表达选择意图。由此可以把一次实验的输入、模型与输出路由固定在明确的资源组合上。
 
-Piano worker 是独立常驻子进程。MIDI 的 `note_on` 立即进入状态机，早到的 `note_off` 只在合成状态内部延迟，保证至少四个 `4 ms` 帧，即 `16 ms` 的可听门长。这样既保留触摸响应，也避免一次浏览器帧内的快速按下和释放被合成为零长度声音。重复音符、CC64 延音、voice stealing、`panic` 和 `release_source` 必须共同维护 16 个声部槽位，不能留下悬挂音符或踏板。
+实时钢琴在独立常驻进程中维持神经状态和音频状态。MIDI 按下事件立即进入状态机，过早到达的释放事件只延长合成内部的最小发声门限，从而避免一次浏览器刷新周期内的快速点按退化为零长度声音。重复音符、延音踏板、声部替换和异常断开都在同一状态机中处理，以保证有限声部槽位能够被确定地占用和回收。
 
-合成结果先进入有界 FIFO，再按 low、balanced 或 safe 延迟档合并音频块，通过所选的 PulseAudio、PortAudio 或板载 `alsa_mono` 后端写入明确设备。输出增益是合成内部的 `-60..+6 dB`，默认 `0 dB`；它不会修改 PulseAudio、ALSA、浏览器或音箱硬件音量。
+合成结果先写入有界队列，再依据交互延迟与抗抖动需求组合为不同长度的音频块。较短的缓冲提高按键响应，但对推理抖动和设备调度更敏感；较长的缓冲能够提高连续性，却增加演奏反馈延迟。合成增益、系统混音器音量和音箱硬件音量属于三个独立控制层，评价时应分别记录，避免把音量变化误判为模型幅度变化。
 
 ### 7.3 DDSP-VST 音频线程与安全控制 {#src-experiment-case3-effect-runtime}
 
@@ -350,57 +362,47 @@ Effect 的固定链路为：`48 kHz 双声道摄像头输入 -> 单声道 -> 16 
 
 ![DDSP-VST Effect 从目录查询、资源加锁和模型启动到有序停止释放的时序](./img3/case3-ddsp-vst-sequence.png)
 
-### 7.4 主要 API {#src-experiment-case3-api}
+### 7.4 通信语义 {#src-experiment-case3-api}
 
-| 类别 | 代表接口 | 作用 |
+| 通信形式 | 适用信息 | 设计依据 |
 | :--- | :--- | :--- |
-| 系统 | `GET /api/v1/status`、`GET /api/v1/catalog` | 主机、依赖、NPU、模型和作业摘要 |
-| 实时钢琴 | `GET /api/v1/realtime/catalog|status` | 查询 patch、输出、MIDI 和会话状态 |
-| 实时钢琴 | `POST /api/v1/realtime/start|switch|stop|panic` | 启动、切换、停止和紧急释放共享会话 |
-| 实时钢琴 | `PATCH /api/v1/realtime/parameters` | 实时更新增益、移调、混响等有界参数 |
-| MIDI-DDSP | `POST /api/v1/midi-files`、`POST /api/v1/midi-ddsp/jobs` | 上传 MIDI，创建渲染任务 |
-| 音频库 | `GET /api/v1/midi-ddsp/library` | 曲目、版本、首选版本和可用性 |
-| MIDI 解析 | `GET /api/v1/midi-files/{midi_id}/voices|piano-roll` | 声部分离结果与浏览器钢琴卷帘数据 |
-| DDSP-VST | `GET /api/v1/ddsp-vst-effect/catalog|status` | OM-only 模型与实体设备目录 |
-| DDSP-VST | `POST /api/v1/ddsp-vst-effect/start|stop|calibrate` | Effect 生命周期和底噪校准 |
-| DDSP-VST | `PATCH /api/v1/ddsp-vst-effect/parameters` | 更新音色、门限、谐波、噪声、增益和混响 |
-| 设备 | `GET /api/v1/speaker-outputs`、`GET /api/v1/audio-inputs`、`GET /api/v1/midi-ddsp/audio-devices`、`GET /api/v1/midi-ports` | 显式枚举各工作流的输入输出和 MIDI |
-| 测试 | 扬声器、输入测试和蓝牙接口 | 独占测试与设备管理 |
-| WebSocket | `/api/v1/events`、`/api/v1/realtime/events` | 作业状态，以及音符、踏板、弯音、录音、监听和运行指标 |
-| WebSocket | `/api/v1/ddsp-vst-effect/events` | 音高、响度、延迟、门与安全静音 |
+| REST 查询 | 模型目录、设备目录、系统状态和历史作业 | 信息具有快照语义，可重复读取且不改变运行状态 |
+| REST 命令 | 会话启停、参数修改、渲染创建和设备测试 | 操作具有明确副作用，需要校验资源条件并返回执行结果 |
+| WebSocket 事件 | 音符边沿、踏板变化、作业进度、设备变化和实时指标 | 信息短暂且连续，轮询可能遗漏事件或引入额外延迟 |
+| 文件访问 | MIDI、WAV、录音与评价报告 | 大型产物采用独立传输，避免混入控制消息 |
 
-详细字段、状态和同源限制见[WebUI 与 API 指南](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/webui.md)。服务没有身份认证，只适合可信局域网。
+通信接口的核心约束是：客户端提交目录标识和有界参数，服务端解析实际模型与设备；实时事件负责同步变化，状态快照负责断线后的重新对齐。具体端点和字段属于实现合同，见[WebUI 与 API 指南](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/02-webui.md)。由于服务直接控制音频与模型资源，部署范围应限定在可信网络中。
 
 ## 8. 前端设计 {#src-experiment-case3-frontend}
 
-### 8.1 技术栈与应用壳 {#src-experiment-case3-frontend-stack}
+### 8.1 信息架构与状态同步 {#src-experiment-case3-frontend-stack}
 
-前端使用 React 19、TypeScript、Vite、Lucide 图标、Canvas、Vitest 和 Playwright。[`webui/src/App.tsx`](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/webui/src/App.tsx) 提供固定四项顶层导航：实时演奏、MIDI-DDSP、DDSP-VST 和设备；实时演奏内部使用分段控件切换触摸屏与 MIDI 键盘输入模式。四个工作区使用懒加载，首次进入时显示稳定加载状态；DDSP-VST 首次打开后保留挂载，隐藏时停止 Canvas 绘制，避免重复初始化实时资源。应用每 `5 s` 刷新低频系统状态，同时由 WebSocket 推送作业、音频设备、实时演奏事件和 Effect 指标。
+前端以 React、TypeScript 和 Canvas 构成交互层，按照实时演奏、MIDI 文件渲染、麦克风音色转换和设备管理四类任务组织顶层信息。触摸琴键与实体 MIDI 键盘共享同一实时演奏工作区和后端会话，只在输入方式上切换，避免把同一模型和参数拆成两套彼此漂移的界面。
 
-前端只提交服务端目录提供的模型 ID、设备 ID 和有边界参数。错误、不可用、运行、暂停、门关闭、安全静音和 Health Alarm 都同时使用文字与颜色表达，不能只靠颜色区分。
+界面状态分为三类：用户偏好、服务端快照和实时事件。音色显示方式、键盘范围等偏好可以保存在浏览器中；模型可用性、设备选择和会话生命周期以服务端为准；音符、作业进度和音频指标则由事件流更新。恢复页面时先读取快照，再接续事件，能够在刷新或短暂断线后重新建立一致状态。会话运行期间锁定会改变模型或设备归属的选项，以免界面选择与实际音频链路脱节。
 
-`RealtimePerformanceView` 把当前钢琴音色、音频输出、MIDI 端口、延时档、各音色参数，以及触摸屏和 MIDI 键盘各自的键数、起始音和触控键盘大小保存在版本化浏览器配置中。恢复配置时仍以服务端目录和参数边界为准；会话运行、录音或切换期间锁定输入方式和设备选择，浏览器本地状态不能替代后端会话状态。
+低频状态采用周期性查询，短暂变化采用 WebSocket 推送。工作区按需加载，包含连续动画的视图在不可见时暂停绘制，使界面更新不会与音频线程争夺不必要的 CPU 时间。运行、不可用、故障、输入门和安全静音等状态同时使用文字、图标和颜色表达，保证信息不依赖单一视觉通道。
 
 ### 8.2 两个钢琴卷帘的时间模型 {#src-experiment-case3-canvas}
 
-`LivePianoRoll` 与 `MidiFilePianoRoll` 都使用 Canvas，但不能合并：
+实时演奏和 MIDI 文件浏览都使用钢琴卷帘，但二者具有不同的时间模型：
 
-| 组件 | 时间来源 | 绘制策略 | 性能边界 |
+| 卷帘类型 | 时间来源 | 绘制策略 | 性能边界 |
 | :--- | :--- | :--- | :--- |
-| `LivePianoRoll` | WebSocket 的实时 note edge | 静态键位/网格缓存，动态轨迹单层更新 | 最多 30 FPS，像素比上限 1.25，历史最多 192 条，空闲时停止 |
-| `MidiFilePianoRoll` | 完整 MIDI 时间轴与播放位置 | 静态网格、音符层、动态光标三层 Canvas | 可显示 10,000 音符，不创建逐音符 React/SVG 节点，空闲时停止动画 |
+| 实时卷帘 | WebSocket 的音符边沿 | 缓存键位与网格，仅更新新增轨迹和当前按键 | 限制刷新率、像素密度与历史长度，空闲时停止绘制 |
+| 文件卷帘 | 完整 MIDI 时间轴与播放位置 | 分离静态网格、音符层和动态光标 | 以分层 Canvas 承载长序列，避免为每个音符创建界面节点 |
 
 实时卷帘保留短音符的最小可见高度；状态快照只用于重新同步当前按键，不能反推已错过的短音符。文件卷帘支持声部颜色、拍号网格、缩放、拖动、进度光标和活动音符，但不是 MIDI 编辑器。
 
 ### 8.3 触摸屏、桌面和手机布局 {#src-experiment-case3-responsive}
 
-10 英寸板端物理屏幕为 `1920 x 1080`，Firefox kiosk 的浏览器内容视口约为 `1920 x 969`。主要导航使用 `20-22 px` 字体，正文和控件以 `16 px` 为目标，次要文字不小于 `14 px`；主要操作高度至少 `56 px`，普通触控目标至少 `52 px`。页面不能依赖浏览器只报告 coarse pointer，因此还使用板端尺寸和页面类触发触摸布局。
+响应式设计不以某一种屏幕尺寸作为成立条件，而以内容优先级、可用空间和输入方式决定布局。宽视口并排显示控制面板与主要可视化区域，空间收窄时依次换行或折叠次要信息；钢琴键盘和卷帘保持自身比例并在容器内缩放。触控目标应留有足够间距，连续滑块与离散命令采用不同控件，文本标签不得因缩放而被截断。
 
-窄手机隐藏完整顶部导航并使用带安全区的底部导航。所有支持视口都要求无文档级横向滚动、无控件重叠、文本不被截断，并保留 `tablist`、`tab`、`tabpanel`、键盘焦点和可访问名称。
+移动布局将高频工作流保留在可达位置，并处理浏览器安全区；桌面布局则强调横向比较和键盘焦点。所有布局都应避免文档级横向滚动、控件重叠和状态跳动，同时保留页签语义、可访问名称与清晰的焦点顺序。由此，界面可以适应不同显示设备，而不把案例能力绑定到某一分辨率或物理尺寸。
 
 ## 9. 逐页界面与操作说明 {#src-experiment-case3-ui-guide}
 
-本节 12 张截图均在 2026-08-04 从真实 `ascend8t:8765` 生产服务的 Firefox kiosk 重新采集，物理屏幕分辨率为 `1920 x 1080`，没有使用模拟 API。界面上的 `NPU ALARM` 是该板 `npu-smi` 的真实警告；只要 NPU 可见且真实 OM 推理通过，它不自动等同于推理失败。
+本节截图采集自 Ascend 310B 开发板实际运行的服务，用于说明界面结构、交互关系和典型状态，不作为性能测量证据。界面中的 NPU 诊断警告应与设备可见性、模型加载状态和 OM 推理结果联合解释，不能由单一提示直接推断推理失败。
 
 ### 9.1 实时演奏 / 触摸屏 {#src-experiment-case3-ui-touch}
 
@@ -421,8 +423,8 @@ Effect 的固定链路为：`48 kHz 双声道摄像头输入 -> 单声道 -> 16 
 | 区域 | 控件 | 作用 | 正常状态 | 注意事项 |
 | :--- | :--- | :--- | :--- | :--- |
 | 统一会话栏与参数带 | 当前钢琴音色、音频输出、延时档、输出增益、混响、移调和力度曲线 | 与触摸屏模式共享 Piano-DDSP 会话 | 截图为已连接、待机 | 本页没有第二套音色参数，也不加载 DDSP-VST Synth 或 MIDI 文件抽屉 |
-| 键盘范围 | 32/49/61/88 键、八度 | 匹配实体控制器与可视范围 | MIDIPLUS TINY 显示 32 键 | 小于 88 键可逐八度移动；88 键固定为 A0-C8 |
-| 实体 MIDI 输入 | 服务端端口下拉框 | 绑定板端枚举的输入端口 | MIDIPLUS TINY 被选中 | 浏览器 Web MIDI 不是输入来源；运行中不能换端口，断开时释放该来源音符 |
+| 键盘范围 | 常见键数与八度 | 匹配实体控制器与可视范围 | 键数与已连接键盘一致 | 非全音域键盘可逐八度移动；全音域范围固定为 A0-C8 |
+| 实体 MIDI 输入 | 服务端端口下拉框 | 绑定板端枚举的输入端口 | 已连接键盘被选中 | 浏览器 Web MIDI 不是输入来源；运行中不能换端口，断开时释放该来源音符 |
 | 卷帘工具栏 | 会话指标、录音、监听、2/4/8 秒 | 观察真实 WebSocket 音符边沿和运行状态 | 短音符仍有可见标记 | 不用轮询替代边沿事件；录音、监听和指标与触摸屏模式共享 |
 | 可视键盘 | 只读键位高亮 | 对照实体 MIDI 的当前音符和音域 | 32 键范围为 F2-C5 | 只用于反馈，不在此处提供鼠标或触控演奏 |
 
@@ -447,8 +449,8 @@ Effect 的固定链路为：`48 kHz 双声道摄像头输入 -> 单声道 -> 16 
 | 曲目栏 | MIDI 选择和上传 | 选择现有文件或上传受限格式 | 显示时长、音符、轨道和声部 | 只接受 `.mid/.midi` 和大小限制 |
 | 文件卷帘 | 声部颜色与视图控制 | 检查声部分离结果 | 声部数与表格一致 | 和弦轨需先拆成单音声部 |
 | 分配表 | 每声部合成音色 | 修改自动建议 | 每个声部都有有效目录 ID | 浏览器不提交模型文件路径 |
-| 右侧设置 | bundle、方案、seed、增益、尾音 | 固定可复现的渲染配置 | OM 已验证、声部已就绪 | 相同配置再次渲染仍创建新版本 |
-| 底部操作 | 开始渲染、状态、产物 | 创建异步任务并显示进度 | succeeded 后可下载 | 运行时保留取消、心跳、ETA 和报告 |
+| 右侧设置 | 模型包、方案、随机种子、增益、尾音 | 固定可复现的渲染配置 | OM 已验证、声部已就绪 | 相同配置再次渲染仍创建新版本 |
+| 底部操作 | 开始渲染、状态、产物 | 创建异步任务并显示进度 | 成功后可下载 | 运行时保留取消、心跳、预计完成时间和报告 |
 
 <!-- pdf-page-break -->
 
@@ -458,11 +460,11 @@ Effect 的固定链路为：`48 kHz 双声道摄像头输入 -> 单声道 -> 16 
 
 | 区域 | 控件 | 作用 | 正常状态 | 注意事项 |
 | :--- | :--- | :--- | :--- | :--- |
-| 顶部链路 | 输入、输出、运行/停止 | 明确真实设备路径 | UGREEN 到 EDIFIER，运行中 | 运行时不允许静默换设备 |
+| 顶部链路 | 输入、输出、运行/停止 | 明确真实设备路径 | 实体输入到所选音频输出，运行中 | 运行时不允许静默换设备 |
 | 轨迹 Canvas | 音高和响度点 | 观察单音输入与门限 | Canvas 非空，异常为 0 | 环境噪声也可能有音高估计，不等于已输出 |
-| 模型区 | 11 种中文音色 | 选择 Control OM | 小提琴混合半精度 | 后端仍用稳定模型 ID 和 SHA256 |
+| 模型区 | 11 种中文音色 | 选择 Control OM | 已选择小提琴音色 | 后端使用稳定的模型 ID |
 | 音色参数 | 移调、音高校准、力度、谐波、噪声 | 调整转换控制 | 有边界值即时更新 | 谐波和噪声全关会失去主要声源 |
-| 指标 | Feature、Control、总延迟、后端 | 证明 OM 链路和线程状态 | `ACL/OM` 且异常 0 | 指标不能代替听感评价 |
+| 指标 | Feature、Control、总延迟、后端 | 检查 OM 链路和线程状态 | `ACL/OM` 且异常 0 | 指标不能代替听感评价 |
 
 ### 9.6 DDSP-VST 输入门 {#src-experiment-case3-ui-vst-gate}
 
@@ -485,10 +487,14 @@ Effect 的固定链路为：`48 kHz 双声道摄像头输入 -> 单声道 -> 16 
 | 输出增益 | dB 滑块 | 控制转换后 PCM | 默认 `-18 dB` | 与系统音量分离，避免同时放大两处 |
 | 混响空间 | 0 到 1 | 调整房间反馈感 | 默认 0.40 | 更大空间会增加主观尾音 |
 | 混响阻尼 | 0 到 1 | 衰减高频反馈 | 默认 0.10 | 不是低通滤波器的精确截止频率 |
-| 混响 | 0 到 1 | 控制湿声比例 | 默认 0 | 第一版没有原声 Dry/Wet 直通 |
+| 混响 | 0 到 1 | 控制湿声比例 | 默认 0 | 本实现没有原声 Dry/Wet 直通 |
 | 安全状态 | 异常和安全静音 | 防止持续过载 | 异常 0、安全静音关闭 | 触发后应停止并排查输入和增益 |
 
+<!-- pdf-page-break -->
+
 ### 9.8 设备概览 {#src-experiment-case3-ui-device-overview}
+
+<!-- pdf-figure-here -->
 
 ![设备概览页面](./img3/case3-ui-devices-overview.png)
 
@@ -509,9 +515,9 @@ Effect 的固定链路为：`48 kHz 双声道摄像头输入 -> 单声道 -> 16 
 | 区域 | 控件 | 作用 | 正常状态 | 注意事项 |
 | :--- | :--- | :--- | :--- | :--- |
 | 蓝牙音频 | 刷新、扫描、连接 | 管理板端已有蓝牙能力 | 控制器开启、设备可见 | 不在板端安装缺失的 `bluetoothctl` |
-| 接口状态 | 输出/输入/MIDI | 切换设备清单 | EDIFIER PulseAudio 和直接 ALSA 可见 | “检测到”不等于已听见 |
+| 接口状态 | 输出/输入/MIDI | 切换设备清单 | 系统音频输出和直接 ALSA 设备可见 | “检测到”不等于已听见 |
 | 声道表 | Left、Right 和电平 | 展示测试声道和状态 | 空闲时电平归零 | 测试会独占输出资源 |
-| 输出设置 | 音频输出、系统音量 | 选择 sink 并显示真实系统音量 | EDIFIER、100%、未静音 | 音箱硬件按键应通过设备事件更新显示 |
+| 输出设置 | 音频输出、系统音量 | 选择输出并显示系统音量 | 已选择有线输出且未静音 | 音箱硬件按键应通过设备事件更新显示 |
 | 测试设置 | 左/双/右声道、频率、增益、时长 | 播放受控正弦测试 | 状态从 IDLE 进入运行 | 从低增益开始，避免突然高声压 |
 
 ### 9.10 音频输入与麦克风测试 {#src-experiment-case3-ui-audio-input}
@@ -520,9 +526,9 @@ Effect 的固定链路为：`48 kHz 双声道摄像头输入 -> 单声道 -> 16 
 
 | 区域 | 控件 | 作用 | 正常状态 | 注意事项 |
 | :--- | :--- | :--- | :--- | :--- |
-| 输入清单 | capture 与 monitor | 区分实体采集和回放监视 | UGREEN 标为 CAPTURE | Effect 和输入测试都拒绝 monitor |
+| 输入清单 | capture 与 monitor | 区分实体采集和回放监视 | 实体输入标为 CAPTURE | Effect 和输入测试都拒绝 monitor |
 | 实时电平 | dBFS 表和峰值 | 观察麦克风输入 | 讲话时电平变化、无溢出 | `-96 dBFS` 表示空闲或未开始测试 |
-| 输入选择 | capture 下拉 | 固定真实麦克风 ID | UGREEN 被选中 | 设备断开后不会自动替换 |
+| 输入选择 | capture 下拉 | 固定真实麦克风 ID | 实体输入被选中 | 设备断开后不会自动替换 |
 | 检测阈值 | dBFS 滑块 | 控制输入测试是否判为有效 | 高于底噪、低于说话峰值 | 与 DDSP-VST 噪声门是两个不同设置 |
 | 时长与开始 | 步进器、开始输入测试 | 运行独占采集检查 | IDLE 或完成结果 | 测试期间不能启动 Effect |
 
@@ -532,9 +538,9 @@ Effect 的固定链路为：`48 kHz 双声道摄像头输入 -> 单声道 -> 16 
 
 | 区域 | 控件 | 作用 | 正常状态 | 注意事项 |
 | :--- | :--- | :--- | :--- | :--- |
-| MIDI 清单 | MIDI 页签 | 枚举服务端输入端口 | MIDIPLUS TINY、32 keys、AVAILABLE | 浏览器 Web MIDI 不是板端输入来源 |
-| 制造商与端口 | 型号、Input port | 识别正确设备 | MIDIPLUS、端口 0 | 重新插拔后设备 ID 可能变化，应刷新 |
-| MIDI 输入状态 | 全宽设备状态卡 | 显示键数、型号、输入端口和可用状态 | MIDIPLUS TINY 已连接 | 切换到 MIDI 后不显示输入或输出音频测试；MIDI 枚举本身不会产生声音 |
+| MIDI 清单 | MIDI 页签 | 枚举服务端输入端口 | 键数与可用状态可见 | 浏览器 Web MIDI 不是板端输入来源 |
+| 设备与端口 | 型号、输入端口 | 识别正确设备 | 端口状态正常 | 重新插拔后设备 ID 可能变化，应刷新 |
+| MIDI 输入状态 | 全宽设备状态卡 | 显示键数、型号、输入端口和可用状态 | 实体键盘已连接 | 切换到 MIDI 后不显示音频输入输出测试；MIDI 枚举本身不会产生声音 |
 | 蓝牙区 | 已配对音频设备 | 展示另一类外设状态 | 与 MIDI 清单分开 | 蓝牙音频不能替代 USB MIDI |
 
 ### 9.12 运行环境 {#src-experiment-case3-ui-runtime}
@@ -545,28 +551,27 @@ Effect 的固定链路为：`48 kHz 双声道摄像头输入 -> 单声道 -> 16 
 
 | 区域 | 控件 | 作用 | 正常状态 | 注意事项 |
 | :--- | :--- | :--- | :--- | :--- |
-| 摘要 | Python、依赖、模型、NPU | 一屏判断服务准备度 | Python 3.9.2、10/10 依赖 | 版本以当前板端环境为准 |
+| 摘要 | Python、依赖、模型、NPU | 一屏判断服务准备度 | 版本号与依赖状态均可见 | 版本应与部署清单和板端环境一致 |
 | NPU 警告 | Health Alarm 文本 | 如实展示硬件诊断 | 警告可见 | 不直接粘贴整个终端输出 |
 | 运行依赖 | 包名与找到状态 | 定位 Python 启动缺包 | 全部找到 | 板端只允许唯一 requirements 的 pip 安装例外 |
-| 模型资产 | 类型、精度、大小 | 检查目录索引结果 | OM 数量和精度可见 | 资产存在仍需哈希和真实推理验证 |
-| Python 路径 | 可执行文件 | 证明使用现有 conda base | `/usr/local/miniconda3/bin/python` | 不回退到系统 Python |
+| 模型资产 | 类型、精度、大小 | 检查目录索引结果 | OM 数量和精度可见 | 资产存在仍需清单和真实推理验证 |
+| Python 环境 | 解释器与环境名称 | 核对服务使用的板端运行环境 | 环境与依赖合同一致 | 不在运行中隐式切换解释器 |
 
-### 9.13 已验证视口 {#src-experiment-case3-viewport-matrix}
+### 9.13 布局验收场景 {#src-experiment-case3-viewport-matrix}
 
-| 视口 | 输入方式 | 导航 | 重点验收 |
-| :--- | :--- | :--- | :--- |
-| `1920 x 1080` | 10 英寸物理 kiosk | 完整顶部导航 | 12 张真实页面截图、实际点按、底部琴键贴边和无裁切 |
-| `1920 x 969` | 10 英寸触摸内容视口 | 完整顶部导航 | 一屏主工作流、触控目标、Canvas 非空、无滚动冲突 |
-| `1366 x 768` | 桌面 | 完整顶部导航 | 紧凑布局、无重叠和横向溢出 |
-| `1024 x 768` | 平板 | 响应式顶部/底部策略 | 参数换行、可访问页签和触控尺寸 |
-| `390 x 844` | 手机 | 底部导航 | 安全区、折叠内容、无文档级横向滚动 |
+| 使用场景 | 导航与布局策略 | 重点验收 |
+| :--- | :--- | :--- |
+| 横向触摸显示器 | 完整导航，主控制与可视化并排 | 实际点按、琴键可达、无裁切和滚动冲突 |
+| 桌面浏览器 | 完整导航，强调信息对照 | 参数区紧凑但不重叠，Canvas 与表格无横向溢出 |
+| 平板或窄窗口 | 控制组换行，次要信息折叠 | 页签语义、触控间距和文本完整性 |
+| 移动浏览器 | 采用易触达导航并处理安全区 | 核心命令可达，无文档级横向滚动 |
 
 ## 10. 从零复现实验 {#src-experiment-case3-reproduction}
 
 ### 10.1 接线与启动检查 {#src-experiment-case3-bringup}
 
 1. 断电状态连接开发板电源、启动存储、HDMI 屏幕和 USB 触控线。
-2. 连接 EDIFIER M16 Pro、UGREEN 摄像头和 MIDIPLUS TINY；高功耗 USB 设备较多时使用合规的独立供电 Hub。
+2. 连接音频输出、摄像头或独立麦克风以及 MIDI 键盘；高功耗 USB 设备较多时使用合规的独立供电 Hub。
 3. 连接网线或 Wi-Fi，启动开发板，确认触摸和桌面正常。
 4. 在开发板查看 IPv4、USB、ALSA/PulseAudio 和 MIDI；这些是板端只读诊断，不在开发电脑执行。
 
@@ -579,12 +584,13 @@ cat /proc/asound/cards
 cat /proc/asound/seq/clients
 ```
 
-在 `pactl list short sources` 中，UGREEN 应出现为 `alsa_input...` 实体 capture。`*.monitor` 是输出回放监视源，不能用于 DDSP-VST 或麦克风输入测试。
+在 `pactl list short sources` 中，麦克风应显示为实体 capture source。名称以 `.monitor` 结尾的条目是输出回放监视源，不能用于 DDSP-VST 或麦克风输入测试。
 
 ### 10.2 开发电脑准备与本地测试 {#src-experiment-case3-local-setup}
 
 ```powershell
-cd D:\Github\Ascend310\samples\case3
+# 从 Ascend310 仓库根目录执行
+cd samples\case3
 python -m pip install -r requirements.txt
 python -m pytest -q
 
@@ -602,26 +608,27 @@ npm run test:e2e
 | `npm ci` | 严格按 `package-lock.json` 安装前端依赖 | 第一次准备环境、删除过 `node_modules` 或锁文件变化后 |
 | `npm run test` | 用 Vitest 检查组件、状态和交互回归 | 前端逻辑、组件或相关样式改变后；纯低风险文字修改可酌情跳过 |
 | `npm run build` | TypeScript 检查并生成部署所需 `webui/dist` | 任何前端源码变化后必须执行 |
-| `npm run test:e2e` | 用 Playwright 检查真实页面布局和交互 | 发布前或影响工作流、响应式、Canvas 时 |
+| `npm run test:e2e` | 用 Playwright 检查生产页面布局和交互 | 发布前或影响工作流、响应式、Canvas 时 |
 
 开发板不安装 Node 或 npm，也不运行 Vite 生产服务器。它只接收开发电脑生成的 `webui/dist/`。
 
-### 10.3 下载、校验和准备模型 {#src-experiment-case3-prepare-models}
+### 10.3 模型准备与转换边界 {#src-experiment-case3-prepare-models}
 
-先执行第 6.1 节的固定 revision 下载。对每个发布目录执行清单校验，并检查 manifest 中的模型 ID、输入输出、精度、目标 SoC 和验证状态。ONNX 到 OM 的 ATC 操作必须在真实 Ascend 开发板上完成；开发电脑不安装或模拟 CANN。
+模型准备应遵循第 6 节给出的两类来源：Piano-DDSP 使用作者训练并验证的 ONNX，MIDI-DDSP 与 DDSP-VST 使用由上游 TFLite 语义重构并完成对照的 ONNX。进入 ATC 之前，应确认来源、输入输出合同和参考结果彼此对应，避免把不同结构或音色的模型混入同一次转换。
 
-板端 ATC 和 bundle 细节随模型族不同，不应手工猜测输入形状。使用仓库现有的模型准备、转换和验证工具，并遵循[模型与 OM 部署文档](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/om-deployment.md)与[Piano-DDSP 合同](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/piano-ddsp.md)。所有新结果保留源/目标 SHA256、ATC 日志、参考输入和 PyACL 报告。
+ONNX 到 OM 的转换和 PyACL 验证必须在真实 Ascend 开发板上完成，开发电脑不安装或模拟 CANN。各模型族的输入形状、循环状态和精度判据不同，应依据[模型与 OM 部署文档](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/03-om-deployment.md)与[Piano-DDSP 合同](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/04-piano-ddsp.md)执行，并保留足以复核图变换和数值对照的实验记录。
 
 ### 10.4 部署、原子切换和启动 {#src-experiment-case3-deploy}
 
-开发电脑执行现有部署脚本：
+在开发电脑上执行仓库提供的部署脚本：
 
 ```powershell
-cd D:\Github\Ascend310\samples\case3
+# 从 Ascend310 仓库根目录执行
+cd samples\case3
 powershell -ExecutionPolicy Bypass -File tools/deploy_midi_ddsp_webui.ps1
 ```
 
-脚本递归同步完整 Python 包、vendored `partitura` 和模型运行元数据，并把前端 `dist` 放到 staging，校验哈希后才原子切换。不要使用会删除远端文件的镜像参数；板端的 MIDI、WAV、报告、任务历史、转换日志和校验文件必须保留。
+部署过程先在暂存位置完成程序、前端资源和模型元数据的一致性检查，再原子切换运行版本。该策略使正在运行的服务不会读取到半同步状态，并将程序升级与实验产生的 MIDI、WAV 和评价记录分离。
 
 在板端已有 conda `base` 中，仅允许安装本仓库唯一 requirements 并确认 pytest：
 
@@ -633,135 +640,109 @@ cd /home/HwHiAiUser/Documents/case3
 /usr/local/miniconda3/bin/python scripts/run_webui.py
 ```
 
-只启动原 `8765` 服务，不额外开启 Vite、Node 或其他端口。服务启动后检查：
+服务启动后检查本机页面和状态接口：
 
 ```bash
 curl -fsS http://127.0.0.1:8765/
 curl -fsS http://127.0.0.1:8765/api/v1/status
 ```
 
-还应核对进程 PID、WebSocket、生产静态资源哈希和触摸屏页面。Web 服务是 LAN-only 且无认证，不要直接暴露到公网。
+还应核对进程状态、事件连接、生产静态资源和触摸操作。由于服务能够直接控制模型和音频设备，不应将其暴露到不可信网络。
 
 ### 10.5 功能验收顺序 {#src-experiment-case3-acceptance-order}
 
-1. **设备**：确认 IP、NPU、Python、依赖、EDIFIER 输出、UGREEN capture 和 MIDIPLUS MIDI。
+1. **设备**：确认网络、NPU、Python 环境、实体音频输入输出和 MIDI 键盘均可用。
 2. **触控演奏**：先以低音量测试单音，再测试快速点按、多指、延音、移调和 panic。
 3. **MIDI 键盘**：测试力度、重复音、快速音阶、CC64、断开重连和无悬挂音符。
 4. **MIDI-DDSP**：选择 MIDI，检查声部分离和分配，渲染 WAV，切换版本并测试开发板/浏览器播放。
-5. **DDSP-VST**：停止钢琴会话，选择 UGREEN 与 EDIFIER，安静校准噪声门，再以单音测试 11 个音色。
+5. **DDSP-VST**：停止钢琴会话，选择实体输入与输出，安静校准噪声门，再以独立单音声源测试各类音色。
 
 真实音频验收至少记录推理耗时、队列延迟、总延迟、PCM 非零、削波、capture overflow 和 playback underrun。仅有 HTTP 200 不能证明发声正确。
 
-## 11. 实测结果与故障排查 {#src-experiment-case3-results}
+## 11. 性能评价与故障排查 {#src-experiment-case3-results}
 
-### 11.1 DDSP-VST 板端长稳验收 {#src-experiment-case3-measured-results}
+### 11.1 DDSP-VST 板端长稳评价方法 {#src-experiment-case3-measured-results}
 
-本节只从 `samples/case3/reports/publication/ddsp-vst-effect-long-run.json` 回填日期和数值。
-报告必须由 `tools/benchmark_ddsp_vst_effect.py` 在板端本机 API 上生成，并同时满足以下条件：
+为避免把接口连通性、单模型推理或短时运行误写成实时音频性能，本案例采用长时间双工测试评价 DDSP-VST Effect。评价协议包括：
 
-- 使用 UGREEN 实体 capture、Violin Control OM 和 EDIFIER 实体 sink；
-- 由操作人员显式确认独立单音声源，禁止把 EDIFIER 到 UGREEN 的声学反馈当作输入；
+- 固定实体音频输入、待测 Control OM 和实体音频输出；
+- 使用独立单音声源，禁止把扬声器到麦克风的声学反馈当作输入；
 - 持续至少 `600 s`，状态每 `10 s` 采样一次，处理帧数持续增长；
 - 存在非静音输入、非静音输出和有效 F0；
 - Feature 与 Control 的合计 p95 小于 `20 ms`，软件总延迟小于 `150 ms`；
 - capture overflow、playback underrun、clipped samples 均为 `0`，且 safety mute 未触发。
 
-当前未保留合格的 publication 报告，因此不发布旧日期或旧性能数字。真实设备、独立声源和上述
-全部门槛通过后，才可将该 JSON 中的结果回填到本节；失败报告必须保留失败状态，不能沿用上一次
-成功表格。HTTP 200、单独 OM smoke test 或页面截图都不能替代这项双工长稳验收。
+其中，p95 表示采样期间耗时分布的第 95 百分位数，时间单位均为毫秒。`20 ms` 和 `150 ms` 是本案例的验收阈值，不是未执行测试时的性能结论。
+
+只有同时满足上述条件的报告，才能作为板端性能结论的证据。接口响应、单独的 OM 冒烟测试或页面截图均不能替代双工长稳评价；未通过的实验也应保留原始指标，以免在事后选择性呈现结果。
 
 ### 11.2 常见问题 {#src-experiment-case3-troubleshooting}
 
 | 现象 | 优先检查 | 处理原则 |
 | :--- | :--- | :--- |
 | 页面正常但没有声音 | 会话状态、输出 ID、系统静音、合成增益、PCM 非零、underrun | 先用扬声器测试确认路由，再检查模型和 MIDI；不要同时提高系统音量和合成增益 |
-| 一点噪声就触发 DDSP-VST | capture 是否正确、底噪、开启门限、迟滞和校准环境 | 安静时重新校准；提高开启门限，保留合理迟滞和保持时间 |
+| 环境噪声触发 DDSP-VST | capture 是否正确、底噪、开启门限、迟滞和校准环境 | 安静时重新校准；提高开启门限，保留合理迟滞和保持时间 |
 | DDSP-VST 始终没有输出 | 输入门、`pw_db`、安全静音、Feature/Control 后端 | 确认讲话峰值高于门限且两个后端都是 `acl/om` |
 | 快速 MIDI 声音抖动 | 重复 note edge、声部复用、FIFO、设备 underrun | 不增加前端 hold delay；检查后端 16 ms 最小门、WebSocket 边沿和 MIDI 来源释放 |
 | 触摸键抖动或多指缺失 | 浏览器 pointer 事件、触控硬件、多指取消 | 确保 `pointerdown/up/cancel` 成对，禁用浏览器手势冲突，保留 `panic` 回收 |
 | 悬挂音符或踏板 | `note_off`、CC64、`release_source`、断线清理 | 执行 panic；修复事件边界，不能靠高频轮询重建短音符 |
 | 开发板没有 IPv4 | 路由器 DHCP、网线、接口状态、地址冲突 | 先恢复网络基础设施；不要修改应用代码来掩盖路由器故障 |
 | NPU 显示 Health Alarm | NPU 是否可见、真实 OM 是否能加载和推理、CANN 日志 | 保留警告；真实推理成功时不自动阻断，失败时保存诊断 |
-| 模型哈希错误 | revision、`SHA256SUMS`、`.part` 文件、同步完整性 | 删除或重新下载损坏的单个暂存文件；不能跳过校验或修改 manifest 迎合错误文件 |
+| 模型资产验证失败 | 发布版本、模型清单、暂存文件和同步完整性 | 重新下载损坏的暂存文件；不能跳过校验或修改清单以迎合错误文件 |
 | 摄像头或音箱中途断开 | 固定设备 ID、PulseAudio source/sink、线程退出和资源锁 | 立即停止并释放资源；重新枚举后由用户显式选择，禁止静默改路 |
 | 蓝牙设备可见但不可播放 | `bluetoothctl`、PulseAudio A2DP sink、连接 profile | 使用板端已有设施；缺少系统组件时报告，不在部署中安装 |
 
-更多板端日志、ATC/OOM、音频和兼容性案例见[测试故障排查记录](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/troubleshooting.md)与[音频输出说明](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/audio-output.md)。
+更多板端日志、ATC/OOM、音频和兼容性案例见[测试故障排查记录](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/11-troubleshooting.md)与[音频输出说明](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/06-audio-output.md)。
 
 ### 11.3 测试矩阵 {#src-experiment-case3-test-matrix}
 
 | 层级 | 工具 | 主要覆盖 |
 | :--- | :--- | :--- |
-| Python 单元与 API | pytest | MIDI 状态边沿、16 ms 门、资源冲突、SQLite 重建、OM-only、monitor 拒绝、参数边界和线程清理 |
+| Python 单元与 API | pytest | MIDI 状态边沿、最小门长、资源冲突、索引重建、模型后端边界、监视源拒绝、参数边界和线程清理 |
 | React 组件 | Vitest | 加载、不可用、运行、故障、安全静音、触摸事件和音色中文显示 |
-| 页面回归 | Playwright | 四视口、四项导航、实时演奏双输入模式、Canvas 非空、无溢出、快速触摸和 MIDI-DDSP 单卷帘 |
+| 页面回归 | Playwright | 多类视口、顶层导航、实时演奏双输入模式、Canvas 非空、无溢出、快速触摸和 MIDI-DDSP 单卷帘 |
 | 板端模型 | PyACL 与参考 NPZ | 张量合同、1,000/10,000 帧精度、p95/p99 和 NaN/Inf |
 | 板端音频 | 真实双工与听音 | PCM 非零、路由、总延迟、overflow、underrun、clipping 和设备断开 |
 
 本地测试不得运行 PyACL、ATC、OM 推理或 `npu-smi`；这些结果必须来自真实 Ascend 310B。
 
-## 12. 代码结构、总结与参考资料 {#src-experiment-case3-code-and-references}
+## 12. 系统分层、总结与参考资料 {#src-experiment-case3-code-and-references}
 
-### 12.1 目录结构 {#src-experiment-case3-directory-tree}
+### 12.1 软件分层 {#src-experiment-case3-directory-tree}
 
-```text
-samples/case3/
-|-- midi_ddsp_webui/          # FastAPI、作业、设备、音频库和 DDSP-VST Effect
-|   `-- vendor/partitura/     # vendored MIDI 解析依赖
-|-- piano_ddsp_runtime/       # Piano worker、MIDI 状态、DSP、FIFO 和指标
-|-- webui/
-|   |-- src/                  # React、TypeScript、Canvas 和分模块 CSS
-|   |-- e2e/                  # Playwright 真实页面测试
-|   `-- dist/                 # 本地构建、板端部署的生产静态资源
-|-- tests/                    # Python 单元、API 和部署布局测试
-|-- tools/                    # 下载、部署、OM 对照、哈希和报告工具
-|-- scripts/                  # 服务启动与板端环境检查入口
-|-- models/                   # 发布 ONNX、OM bundle、manifest 和转换证据
-|-- reports/                  # 本地或板端生成的测试证据和音频库索引
-|-- midi/                     # 本地测试 MIDI，不上传 GitHub
-|-- midi_wav/                 # 本地渲染 WAV，不上传 GitHub
-|-- doc/                      # 深入设计、部署和故障文档
-|-- pyacl_ddsp.py             # DDSP-VST Control OM 封装
-|-- pyacl_midi_ddsp.py        # MIDI-DDSP 多组件 OM 封装
-|-- midi_ddsp_realtime.py     # MIDI-DDSP 渲染与 CPU DSP
-|-- realtime_ddsp.py          # 命令行实时入口
-|-- requirements.txt          # 唯一 Python 依赖清单，包含 pytest
-`-- README.md                 # 案例代码入口
-```
-
-目录数量不能只按视觉上的“少”来优化。浏览器 UI、板端音频路由、MIDI 状态、模型推理、测试和生成证据有不同生命周期，保留清晰边界比把它们塞进少数大文件更容易维护。可以删除的是已证明无运行、测试、教程或部署作用的代码，不能删除本地 MIDI/WAV、模型清单、哈希、转换日志和历史报告。
-
-### 12.2 关键模块与数据流 {#src-experiment-case3-module-map}
-
-| 模块 | 责任 | 不负责的内容 |
+| 层次 | 核心职责 | 与相邻层的边界 |
 | :--- | :--- | :--- |
-| `midi_ddsp_webui/app.py` | API、同源检查、请求校验和静态资源 | 不直接实现 DSP 算法 |
-| `midi_ddsp_webui/core.py` | 目录、作业、资源协调和通用状态 | 不允许浏览器路径穿透 |
-| `midi_ddsp_webui/realtime_session.py` | Piano 会话生命周期和 worker 通信 | 不解析完整 MIDI-DDSP 乐曲 |
-| `midi_ddsp_webui/ddsp_vst_effect.py` | capture、Feature/Control OM、噪声门和双工线程 | 不提供 ONNX/TFLite 回退 |
-| `piano_ddsp_runtime/midi_state.py` | 16 声部、重复音、踏板、panic 和最小门长 | 不增加前端网络延迟 |
-| `piano_ddsp_runtime/engine.py` | Piano OM 控制与 CPU DSP | 不改变系统 mixer |
-| `midi_ddsp_realtime.py` | 八组件调度、声部 stem、合成和混音 | 不作为实体 MIDI 的低延迟引擎 |
-| `webui/src/App.tsx` | 应用壳、四项顶层导航、状态刷新和懒加载 | 不执行模型推理 |
-| Canvas 组件 | 卷帘几何、缓存和动画 | 不每帧触发整页 React 更新 |
+| 交互层 | 呈现演奏、渲染、音色转换和设备状态 | 只提交用户意图，不持有模型文件或物理设备路径 |
+| 服务与协调层 | 校验请求、管理作业、同步事件并仲裁共享资源 | 不直接实现神经网络或音频合成算法 |
+| 神经推理层 | 维护模型输入输出和循环状态，调用 OM 产生控制量 | 不承担高采样率波形生成 |
+| 信号处理层 | 完成谐波、噪声、混响、重采样、缓冲与设备输出 | 不决定模型或界面状态 |
+| 实验记录层 | 关联输入、配置、音频产物和评价结果 | 不参与实时控制路径 |
 
-最关键的数据原则是：浏览器只表达用户意图，后端拥有模型和设备路径，OM 只预测控制量，CPU DSP 生成波形，文件系统保存可恢复证据。
+这种分层对应不同的时间尺度：交互事件要求及时响应，神经控制按固定帧率递推，音频设备持续消费采样块，离线作业则以完整乐曲为单位。将这些时间尺度分离，是在同一设备上维持实时性与可复现性的基础。
+
+### 12.2 数据与控制边界 {#src-experiment-case3-module-map}
+
+系统的数据流遵循单向责任关系：浏览器表达操作意图，后端确定模型与设备资源，OM 预测低维声学控制量，CPU DSP 将控制量转换为波形，实验记录层保存可复核的输入与结果。状态流则沿相反方向返回：音频线程和模型运行时产生指标，服务端汇总为快照与事件，界面据此更新显示。
+
+这一边界有两个方法论意义。其一，模型推理耗时与端到端音频延迟可以分别测量，避免把缓冲或无线传输延迟归因于 NPU；其二，界面刷新、设备切换和文件索引不会直接改变正在执行的神经状态，从而降低交互层扰动实时链路的风险。
 
 ### 12.3 继续阅读 {#src-experiment-case3-further-reading}
 
 - [Case3 代码总览](https://github.com/zhouxzh/Ascend310/tree/main/samples/case3)
-- [系统分层设计](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/overview.md)
-- [WebUI、操作与 API](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/webui.md)
-- [Piano-DDSP 模型与实时合同](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/piano-ddsp.md)
-- [MIDI-DDSP 与 DDSP-VST 对比](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/midi-ddsp-vs-ddsp-vst.md)
-- [MIDI-DDSP 实时与离线边界](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/midi-ddsp-realtime.md)
-- [模型与 OM 部署](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/om-deployment.md)
-- [音频输出与设备边界](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/audio-output.md)
-- [测试故障排查](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/troubleshooting.md)
+- [系统分层设计](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/01-overview.md)
+- [WebUI、操作与 API](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/02-webui.md)
+- [Piano-DDSP 模型与实时合同](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/04-piano-ddsp.md)
+- [MIDI-DDSP 与 DDSP-VST 对比](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/13-midi-ddsp-vs-ddsp-vst.md)
+- [MIDI-DDSP 实时与离线边界](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/05-midi-ddsp-realtime.md)
+- [模型与 OM 部署](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/03-om-deployment.md)
+- [音频输出与设备边界](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/06-audio-output.md)
+- [测试故障排查](https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/11-troubleshooting.md)
 
 ### 12.4 总结 {#src-experiment-case3-summary}
 
-本案例的核心不是把三个模型放进同一个网页，而是为三种不同的时间问题建立正确边界：Piano-DDSP 处理低延迟复音 MIDI，MIDI-DDSP 利用完整乐曲上下文生成版本化 WAV，DDSP-VST 用真实麦克风和噪声门完成单音音色转换。统一的 OM-only 模型目录、资源协调器、显式设备 ID、CPU DDSP、文件证据和四工作区界面，使这些能力能够在同一块 Ascend 310B 上安全切换和复现。
+本案例展示了三类 DDSP 模型在边缘设备上的不同研究路径。Piano-DDSP 由作者基于 PyTorch 实现并在 MAESTRO 数据上训练，通过显式循环状态支持低延迟复音演奏；MIDI-DDSP 与 DDSP-VST 则从 Google 项目的 TFLite 模型出发，在保持层级上下文和流式状态语义的前提下迁移到 ONNX 与 OM。三者共享“神经网络预测控制量、宿主 DSP 生成波形”的基本范式，却分别对应因果复音控制、完整乐曲建模和实时单音转换三种时间问题。
+
+案例的普遍意义不在于把若干模型集中到同一界面，而在于建立清晰的模型来源、状态边界和评价层次。只有将图语义一致性、NPU 推理预算、CPU 音频处理、设备路由与人机交互分别建模并联合验证，才能对实时数字乐器的性能与局限作出可靠判断。
 
 ### 12.5 参考资料 {#src-experiment-case3-references}
 
@@ -769,9 +750,11 @@ samples/case3/
 [ref-ddsp-repo]: https://github.com/magenta/ddsp "Magenta DDSP official repository"
 [ref-midi-ddsp-paper]: https://openreview.net/forum?id=UseMOjWENv "MIDI-DDSP: Detailed Control of Musical Performance via Hierarchical Modeling"
 [ref-midi-ddsp-repo]: https://github.com/magenta/midi-ddsp "Magenta MIDI-DDSP official repository"
-[ref-ddsp-vst]: https://github.com/magenta/ddsp-vst/tree/f2996e97f9469f3956a6b8e9d2d9b50b6555e1e9 "Pinned DDSP-VST upstream revision"
+[ref-ddsp-vst]: https://github.com/magenta/ddsp-vst "DDSP-VST upstream repository"
 [ref-piano-ddsp]: https://github.com/lrenault/ddsp-piano "DDSP-Piano upstream repository"
-[ref-hf-models]: https://huggingface.co/zhouxzh/piano-ddsp-ascend310 "Case3 published model repository"
+[ref-piano-pytorch]: https://github.com/zhouxzh/piano-ddsp-pytorch/tree/main "Piano-DDSP PyTorch training and ONNX export"
+[ref-maestro]: https://magenta.withgoogle.com/datasets/maestro "MAESTRO paired piano audio and MIDI dataset"
+[ref-hf-models]: https://huggingface.co/zhouxzh/piano-ddsp-ascend310 "Piano-DDSP model repository"
 [ref-onnx]: https://onnx.ai/onnx/ "ONNX official documentation"
 [ref-ascend]: https://www.hiascend.com/document "Ascend CANN official documentation"
 [ref-orange-pi]: https://www.orangepi.org/html/hardWare/computerAndMicrocontrollers/details/Orange-Pi-AIpro%288-12t%29.html "Orange Pi AIpro product page"

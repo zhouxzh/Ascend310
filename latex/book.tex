@@ -1,12 +1,26 @@
 % !TEX program = xelatex
 % 使用 XeLaTeX 编译
-\documentclass[fontsize=12pt, paper=a4, twoside=false, DIV=11]{scrbook}
+\documentclass[fontsize=10.5pt, paper=185mm:260mm, twoside=false, open=any]{scrbook}
 
 % 基本设置
 \usepackage[UTF8]{ctex} % 中文支持
 \usepackage{fontspec} % 字体设置
+\usepackage[
+    paperwidth=185mm,
+    paperheight=260mm,
+    left=21mm,
+    right=21mm,
+    top=20mm,
+    bottom=24mm,
+    headheight=14pt,
+    headsep=5mm,
+    footskip=10mm
+]{geometry}
+\usepackage{setspace}
+\usepackage{indentfirst}
+\usepackage[protrusion=true,expansion=false]{microtype}
 % \usepackage{xeCJK} % 中日韩文字支持
-\usepackage[font=small,labelfont=bf]{caption}
+\usepackage[font=small,labelfont=bf,labelsep=quad]{caption}
 
 % 设置默认字体为无衬线体（思源黑体）
 % 中文/英文字体配对：正文用思源宋体（Noto Serif CJK SC）+ Noto Serif，标题用思源黑体（Noto Sans CJK SC）+ Noto Sans，等宽用 Noto Sans Mono CJK SC
@@ -31,11 +45,37 @@
 \setmonofont{Noto Sans Mono}[
     BoldFont = Noto Sans Mono Bold,
 ]
+
+% 正式技术著作的正文节奏：适中的行长、稳定的行距和统一的段首缩进。
+\setstretch{1.28}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0pt}
+\setlength{\emergencystretch}{1.5em}
+\clubpenalty=10000
+\widowpenalty=10000
+\displaywidowpenalty=10000
+\interfootnotelinepenalty=10000
+
+% 章节标题保持清晰层级，同时避免教程正文出现过大的展示型标题。
+\setkomafont{disposition}{\sffamily\bfseries}
+\setkomafont{part}{\sffamily\bfseries\Huge}
+\setkomafont{chapter}{\sffamily\bfseries\LARGE}
+\setkomafont{section}{\sffamily\bfseries\Large}
+\setkomafont{subsection}{\sffamily\bfseries\large}
+\setkomafont{subsubsection}{\sffamily\bfseries\normalsize}
+\RedeclareSectionCommand[beforeskip=3.2\baselineskip,afterskip=1.8\baselineskip]{chapter}
+\RedeclareSectionCommand[beforeskip=1.7\baselineskip,afterskip=0.7\baselineskip]{section}
+\RedeclareSectionCommand[beforeskip=1.25\baselineskip,afterskip=0.5\baselineskip]{subsection}
+\RedeclareSectionCommand[beforeskip=1.0\baselineskip,afterskip=0.4\baselineskip]{subsubsection}
+
 % 页面布局和外观设置
-\usepackage[automark,headsepline]{scrlayer-scrpage} % 页眉页脚
+\usepackage[automark,headsepline=0.4pt,plainheadsepline=false,singlespacing=true]{scrlayer-scrpage} % 页眉页脚
 \clearpairofpagestyles
-\ohead{\headmark} % 页眉显示章节名
-\ofoot[\pagemark]{\pagemark} % 页脚显示页码
+\automark{chapter}
+\ohead{\headmark}
+\cfoot[\pagemark]{\pagemark}
+\setkomafont{pageheadfoot}{\normalfont\small}
+\setkomafont{pagenumber}{\normalfont\small}
 
 % 数学相关包
 \usepackage{amsmath, amssymb, amsthm}
@@ -52,6 +92,14 @@
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{calc} % 提供增强的计算功能
+\renewcommand{\arraystretch}{1.15}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\AtBeginEnvironment{longtable}{%
+    \small
+    \setstretch{1.12}%
+    \setlength{\tabcolsep}{4pt}%
+}
 % 为 Pandoc 片段提供安全的宏定义，避免 Undefined control sequence
 \usepackage{graphicx}
 \usepackage{textcomp}
@@ -67,8 +115,8 @@
 \lstset{
     language=Python,
     backgroundcolor=\color{lightgray},
-    basicstyle=\ttfamily\small,
-    lineskip=-0.3pt,
+    basicstyle=\ttfamily\footnotesize,
+    lineskip=0pt,
     keywordstyle=\color{darkblue}\bfseries,
     commentstyle=\color{cyan},
     stringstyle=\color{purple},
@@ -82,6 +130,10 @@
     showstringspaces=false,
     showtabs=false,
     tabsize=4,
+    columns=fullflexible,
+    keepspaces=true,
+    aboveskip=0.75\baselineskip,
+    belowskip=0.75\baselineskip,
     frame=lines,
     captionpos=b
 }
@@ -109,14 +161,17 @@
     partopsep=0pt
 }
 % 超链接设置
+\usepackage{xurl}
 \usepackage{hyperref}
 \hypersetup{
-    colorlinks=true,
-    linkcolor=mainblue,
-    citecolor=mainblue,
-    urlcolor=mainblue,
+    hidelinks,
     pdftitle={昇腾310B实战——从入门到精通边缘计算与人工智能},
     pdfauthor={周贤中}
+}
+\urlstyle{same}
+\AtBeginDocument{%
+    \renewcommand{\figurename}{图}%
+    \renewcommand{\tablename}{表}%
 }
 % 目录显示到 subsection 后，编号如 2.10.16 需要更宽的编号栏。
 \DeclareTOCStyleEntry[numwidth=4.2em]{tocline}{subsection}
@@ -139,7 +194,7 @@
 % 文档信息
 \title{昇腾310B实战\\从入门到精通边缘计算与人工智能}
 \author{周贤中}
-\date{\today}
+\date{}
 
 % 文档内容开始
 \begin{document}
