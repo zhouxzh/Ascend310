@@ -24,8 +24,9 @@
 
 | 部分 | 内容 | 说明 |
 | :-- | :-- | :-- |
-| **Part I：理论教程** | Chapter 1~9 + Appendix A | 从边缘计算基础到项目交付方法论，并提供工具速查 |
-| **Part II：实验教程** | Case 0~9 | 十个动手实验，从开发板点亮到聊天机器人 |
+| **理论教程** | Chapter 1~9 | 从边缘计算基础到项目交付方法论 |
+| **实践案例** | Case 1~9 | 九个端侧 AI 项目案例，从人脸识别到聊天机器人 |
+| **附录** | 附录 1~2（持续扩展） | 开发板与基础环境，以及工具、FAQ 和参数模板 |
 
 ---
 
@@ -49,16 +50,19 @@ Ascend310/
 │   ├── book/                    # 理论教程 Markdown
 │   │   ├── README.md            # 前言 / 理论教程首页
 │   │   ├── chapter1.md ... chapter9.md
-│   │   ├── appendix.md
 │   │   ├── ssd_optimize.md
 │   │   └── img2/ img3/ img4/ img5/
 │   ├── experiment/              # 实践案例 Markdown
 │   │   ├── README.md
-│   │   ├── case0.md ... case9.md
-│   │   └── img0/ img1/ img2/ img3/
+│   │   ├── case1.md ... case9.md
+│   │   └── img1/ img2/ img3/
+│   ├── appendix/                # 附录 Markdown
+│   │   ├── README.md
+│   │   ├── appendix1.md appendix2.md
+│   │   └── img1/
 │   └── .vuepress/               # VuePress 配置、主题、样式与 public 资源
 ├── samples/                     # 教程与实践案例配套源码
-│   ├── case1/ ... case9/        # 实践案例源码；Case 0 以文档和图片为主
+│   ├── case1/ ... case9/        # 实践案例源码
 │   ├── chapter2/                # ResNet 快速入门示例
 │   ├── chapter3/                # PyTorch / torch_npu 迁移与训练示例
 │   ├── chapter4/                # PyACL 模型推理示例
@@ -71,6 +75,7 @@ Ascend310/
 │   ├── book.pdf                 # 生成的教材 PDF
 │   ├── chapters/                # Pandoc 生成的理论章节 tex 与图片
 │   ├── cases/                   # Pandoc 生成的实验章节 tex 与图片
+│   ├── appendices/              # Pandoc 生成的附录 tex、包含清单与图片
 │   ├── remove-numbering.lua
 │   └── replace_block.py
 └── notebook/                    # Jupyter Notebook 与导出辅助脚本
@@ -118,7 +123,7 @@ pnpm export-pdf
 ./convert-vuepress.sh
 ```
 
-脚本会读取 `src/book` 与 `src/experiment` 下的 Markdown，生成 `latex/chapters/*.tex`、`latex/cases/*.tex`，并通过 `latex/book.tex` 编译出 `latex/book.pdf`。这是正式教材 PDF 的生成入口，详细说明见 [latex/README.md](latex/README.md)。
+脚本会读取 `src/book`、`src/experiment` 与 `src/appendix` 下的 Markdown，生成 `latex/chapters/*.tex`、`latex/cases/*.tex` 和 `latex/appendices/*.tex`，并通过 `latex/book.tex` 编译出 `latex/book.pdf`。这是正式教材 PDF 的生成入口，详细说明见 [latex/README.md](latex/README.md)。
 
 ---
 
@@ -129,11 +134,12 @@ pnpm export-pdf
 - VuePress：`src` 目录转换为 GitHub Pages 网页。
 - Pandoc + XeLaTeX：Markdown 转换为 LaTeX，再生成正式 PDF。
 
-因此，`src/book` 中的正文 Markdown 必须使用两边都稳定支持的语法。不要依赖只在浏览器中生效的 Vue 组件、HTML 片段或 Mermaid 渲染结果作为正式书稿内容。
+因此，`src/book`、`src/experiment` 和 `src/appendix` 中的正文 Markdown 必须使用两边都稳定支持的语法。不要依赖只在浏览器中生效的 Vue 组件、HTML 片段或 Mermaid 渲染结果作为正式书稿内容。
 
 ### 标题层级
 
 - `src/book/chapter*.md` 不使用一级标题 `#`。这些章节已经在 `latex/book.tex` 中通过 `\chapter{}` 统一组织，正文最高层级从 `##` 开始。
+- `src/experiment/case*.md` 与 `src/appendix/appendix*.md` 使用一级标题作为案例或附录标题；附录文件按 `appendix1.md`、`appendix2.md` 的形式连续编号。
 - 正文标题只使用 `##`、`###`、`####`。不要使用 `#####` 或更深层级。
 - 五级标题在 LaTeX 中容易转换为 run-in 形式的 `\paragraph`，如果后面紧跟代码块、图片或表格，会出现标题贴着代码框上边线、断句异常等问题。
 - 更细的小节标注使用加粗文字，例如 `**(1) 测试参数**`，不要继续增加 Markdown 标题层级。
@@ -185,7 +191,7 @@ markdown+yaml_metadata_block+tex_math_dollars+pipe_tables+header_attributes+link
 
 - 项目专用 PDF 版式集中维护在 `latex/book.tex`，不要修改外部 KOMA-Script 模板。
 - 当前 PDF 使用 A4、双面排版、`BCOR=6mm` 装订修正、`DIV=11` 版心设置，适合作为正式教材初稿。
-- `latex/chapters/*.tex` 和 `latex/cases/*.tex` 是转换生成文件。正文修改应优先改 `src/book/*.md` 与 `src/experiment/*.md`，再运行转换脚本重新生成。
+- `latex/chapters/*.tex`、`latex/cases/*.tex` 和 `latex/appendices/*.tex` 是转换生成文件。正文修改应优先改 `src/book/*.md`、`src/experiment/*.md` 与 `src/appendix/*.md`，再运行转换脚本重新生成。
 
 ### 提交前检查
 
@@ -208,7 +214,7 @@ pnpm docs:build
 
 | 读者类型 | 推荐路径 | 目标 |
 | :-- | :-- | :-- |
-| 零基础学生 | Ch1 → Ch2 → Case 0 → Case 1 | 跑通首个模型 |
+| 零基础学生 | 附录 1 → Ch1 → Ch2 → Case 1 | 跑通首个模型 |
 | 嵌入式工程师 | Ch4 → Ch5 → Ch6 | 掌握底层开发与优化 |
 | AI应用开发者 | Ch2 → Ch3 → 选读案例 | 快速场景落地 |
 | 技术负责人 | Ch1 → Ch7 → Ch8 → Ch9 | 构建量化评估、性能验收与交付方法论 |
@@ -219,8 +225,9 @@ pnpm docs:build
 
 **v0.1** — 初稿与转换流程持续审校中。
 
-- [x] 理论教程 Chapter 1~9 与附录 Markdown 初稿
-- [x] 实践案例 Case 0~9 Markdown 初稿
+- [x] 理论教程 Chapter 1~9 Markdown 初稿
+- [x] 实践案例 Case 1~9 Markdown 初稿
+- [x] 附录 1~2 Markdown 初稿
 - [x] VuePress 站点构建与 GitHub Pages 部署脚本
 - [x] Pandoc + XeLaTeX 正式 PDF 生成流程
 - [x] Chapter 5 图示改为 DOT 源文件 + PNG 静态图片

@@ -949,7 +949,7 @@ python samples/chapter5/venc/bench_venc.py
 
 ---
 
-### 附录 {#src-book-chapter5-h47}
+### VENC 调试与参数速查 {#src-book-chapter5-h47}
 
 #### 常用调试命令 {#src-book-chapter5-h48}
 
@@ -1655,7 +1655,7 @@ H.265 路径不同：VDEC 在 480p 已经领先单线程 CPU，在 720p 以上�
 
 ---
 
-### 附录 {#src-book-chapter5-h81}
+### VDEC 调试与参数速查 {#src-book-chapter5-h81}
 
 #### 常用调试命令 {#src-book-chapter5-h82}
 
@@ -2060,7 +2060,7 @@ acl.media.dvpp_set_roi_config(crop_area, left, right, top, bottom)
 
 ---
 
-### 附录 {#src-book-chapter5-h112}
+### VPC 调试与参数速查 {#src-book-chapter5-h112}
 
 #### 常用调试命令 {#src-book-chapter5-h113}
 
@@ -2414,7 +2414,7 @@ WebRTC NV12 帧 -> VPC resize(320×240) -> JPEGE(quality=80) -> JPEG 文件
 
 ---
 
-### 附录 {#src-book-chapter5-h143}
+### JPEG 编解码参数速查 {#src-book-chapter5-h143}
 
 #### 参数速查表 {#src-book-chapter5-h144}
 

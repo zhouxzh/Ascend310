@@ -9,10 +9,16 @@ export default navbar([
     activeMatch: "^/book/"
   },
   {
-  text: "实践案例",
-  link: "/experiment/",
-  icon: "experiment",
-  activeMatch: "^/experiment/"
+    text: "实践案例",
+    link: "/experiment/",
+    icon: "experiment",
+    activeMatch: "^/experiment/"
+  },
+  {
+    text: "附录",
+    link: "/appendix/",
+    icon: "book",
+    activeMatch: "^/appendix/"
   },
   "portfolio.md",
 ]);

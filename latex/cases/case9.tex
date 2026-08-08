@@ -1,6 +1,6 @@
 \chapter{案例9：边缘智能聊天机器人}\label{ux6848ux4f8b9ux8fb9ux7f18ux667aux80fdux804aux5929ux673aux5668ux4eba}
 
-\section{1. 项目简介}\label{src-experiment-case9-h1}
+\section{项目简介}\label{src-experiment-case9-h1}
 
 本项目基于昇腾310B平台，构建一个可以在边缘设备上运行的智能聊天机器人。系统集成了文本嵌入、RAG（检索增强生成）、语音交互等AI技术，能够在离线环境下回答专业问题，也可接入云端大语言模型提升回复质量。
 
@@ -8,7 +8,7 @@
 
 项目的源代码可以从\href{https://github.com/zhouxzh/Ascend310/tree/main/samples/case9}{这里}下载。
 
-\section{2. 内容大纲}\label{src-experiment-case9-h2}
+\section{内容大纲}\label{src-experiment-case9-h2}
 
 \subsection{硬件准备}\label{src-experiment-case9-h3}
 
@@ -998,7 +998,7 @@ all-MiniLM-L6-v2，可换其他 sentence-transformers 模型 \\
   \textbf{日志监控}：终端输出包含请求日志和检索上下文，方便调试
 \end{itemize}
 
-\section{3. 源代码结构}\label{src-experiment-case9-h35}
+\section{源代码结构}\label{src-experiment-case9-h35}
 
 \begin{lstlisting}
 samples/case9/
@@ -1050,7 +1050,7 @@ flowchart TB
     DIALOG --> KB
 \end{lstlisting}
 
-\section{4. 效果演示}\label{src-experiment-case9-h36}
+\section{效果演示}\label{src-experiment-case9-h36}
 
 \subsection{基础对话 --- 离线模板模式}\label{src-experiment-case9-h37}
 

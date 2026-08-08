@@ -147,25 +147,36 @@ function Convert-Markdown {
         [string]$MediaDir,
 
         [Parameter(Mandatory = $true)]
-        [string]$ResourcePath
+        [string]$ResourcePath,
+
+        [string[]]$AdditionalLuaFilters = @()
     )
 
-    Invoke-CheckedNativeCommand 'pandoc' @(
+    $arguments = @(
         '-f', $PandocFrom,
         $InputPath,
         '--top-level-division=chapter',
-        '--lua-filter=local-md-links.lua',
+        '--lua-filter=local-md-links.lua'
+    )
+
+    foreach ($filter in $AdditionalLuaFilters) {
+        $arguments += "--lua-filter=$filter"
+    }
+
+    $arguments += @(
         '--syntax-highlighting=idiomatic',
         '-t', 'latex',
         "--extract-media=$MediaDir",
         "--resource-path=$ResourcePath",
         '-o', $OutputPath
     )
+
+    Invoke-CheckedNativeCommand 'pandoc' $arguments
 }
 
 function Remove-LongTableCapType {
     $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-    $texFiles = Get-ChildItem -Path 'chapters', 'cases' -Filter '*.tex' -File -Recurse
+    $texFiles = Get-ChildItem -Path 'chapters', 'cases', 'appendices' -Filter '*.tex' -File -Recurse
 
     foreach ($texFile in $texFiles) {
         $content = [System.IO.File]::ReadAllText($texFile.FullName)
@@ -182,6 +193,9 @@ Check-BookHeadingLevels
 Push-Location -LiteralPath $LatexDir
 try {
     New-Item -ItemType Directory -Force -Path 'chapters', 'cases' | Out-Null
+    Remove-Item -LiteralPath 'appendices', 'cases/img0' -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force -Path 'appendices' | Out-Null
+    Remove-Item -LiteralPath 'chapters/appendix.tex', 'cases/case0.tex' -Force -ErrorAction SilentlyContinue
 
     Invoke-CheckedNativeCommand 'pandoc' @(
         '-f', $PandocFrom,
@@ -204,19 +218,41 @@ try {
             -ResourcePath '../src/book'
     }
 
-    Convert-Markdown `
-        -InputPath '../src/book/appendix.md' `
-        -OutputPath 'chapters/appendix.tex' `
-        -MediaDir 'chapters/' `
-        -ResourcePath '../src/book'
-
-    foreach ($caseNumber in 0..9) {
+    foreach ($caseNumber in 1..9) {
         Convert-Markdown `
             -InputPath "../src/experiment/case$caseNumber.md" `
             -OutputPath "cases/case$caseNumber.tex" `
             -MediaDir 'cases/' `
-            -ResourcePath '../src/experiment'
+            -ResourcePath '../src/experiment' `
+            -AdditionalLuaFilters @('case-heading.lua')
     }
+
+    $appendixFiles = @(
+        Get-ChildItem -LiteralPath '../src/appendix' -Filter 'appendix*.md' -File |
+            Where-Object { $_.BaseName -match '^appendix\d+$' } |
+            Sort-Object { [int]($_.BaseName -replace '^appendix', '') }
+    )
+
+    if ($appendixFiles.Count -eq 0) {
+        throw 'No numbered appendices found in src/appendix.'
+    }
+
+    $appendixIncludes = foreach ($appendixFile in $appendixFiles) {
+        Convert-Markdown `
+            -InputPath $appendixFile.FullName `
+            -OutputPath "appendices/$($appendixFile.BaseName).tex" `
+            -MediaDir 'appendices/' `
+            -ResourcePath '../src/appendix' `
+            -AdditionalLuaFilters @('appendix-heading.lua')
+
+        "\input{appendices/$($appendixFile.BaseName).tex}"
+    }
+
+    [System.IO.File]::WriteAllLines(
+        (Join-Path (Get-Location) 'appendices/includes.tex'),
+        $appendixIncludes,
+        [System.Text.UTF8Encoding]::new($false)
+    )
 
     $python = Get-PythonCommand
     Invoke-CheckedNativeCommand `

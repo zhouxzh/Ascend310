@@ -173,8 +173,12 @@
     \renewcommand{\figurename}{图}%
     \renewcommand{\tablename}{表}%
 }
-% 目录显示到 subsection 后，编号如 2.10.16 需要更宽的编号栏。
+% 为两位数节号和三位数页码预留稳定宽度，避免目录编号与标题粘连。
+\DeclareTOCStyleEntry[numwidth=2.8em]{tocline}{section}
 \DeclareTOCStyleEntry[numwidth=4.2em]{tocline}{subsection}
+\makeatletter
+\renewcommand*\@pnumwidth{1.9em}
+\makeatother
 
 % 定理环境设置
 \newtheoremstyle{break}
@@ -219,7 +223,7 @@
 % 主内容开始
 \mainmatter
 
-\part{Part I：理论教程}
+\part{理论教程}
 
 % 第一章
 \chapter{昇腾310B边缘计算基础}
@@ -257,20 +261,17 @@
 \chapter{AI项目交付闭环}
 \input{chapters/chapter9.tex}
 
-\part{Part II：实验教程}
+\part{实践案例}
 
-\setcounter{chapter}{-1}
-% Part II reuses chapter numbers for cases. Give hyperref destinations a
-% separate prefix so PDF TOC links do not jump to Part I chapters.
+\setcounter{chapter}{0}
+% The case section reuses chapter numbers. Give hyperref destinations a
+% separate prefix so PDF TOC links do not jump to theory chapters.
 \renewcommand{\theHchapter}{case.\arabic{chapter}}
 \renewcommand{\theHsection}{case.\arabic{chapter}.\arabic{section}}
 \renewcommand{\theHsubsection}{case.\arabic{chapter}.\arabic{section}.\arabic{subsection}}
 \renewcommand{\theHsubsubsection}{case.\arabic{chapter}.\arabic{section}.\arabic{subsection}.\arabic{subsubsection}}
 \renewcommand{\theHfigure}{case.\arabic{chapter}.\arabic{figure}}
 \renewcommand{\theHtable}{case.\arabic{chapter}.\arabic{table}}
-
-% 案例0
-\input{cases/case0.tex}
 
 % 案例1
 \input{cases/case1.tex}
@@ -299,15 +300,18 @@
 % 案例9
 \input{cases/case9.tex}
 
-\appendix
-\renewcommand{\theHchapter}{appendix.\Alph{chapter}}
-\renewcommand{\theHsection}{appendix.\Alph{chapter}.\arabic{section}}
-\renewcommand{\theHsubsection}{appendix.\Alph{chapter}.\arabic{section}.\arabic{subsection}}
-\renewcommand{\theHsubsubsection}{appendix.\Alph{chapter}.\arabic{section}.\arabic{subsection}.\arabic{subsubsection}}
-\renewcommand{\theHfigure}{appendix.\Alph{chapter}.\arabic{figure}}
-\renewcommand{\theHtable}{appendix.\Alph{chapter}.\arabic{table}}
-\chapter{工具箱、FAQ 与参数模板}
-\input{chapters/appendix.tex}
+\addpart{附录}
+
+\setcounter{chapter}{0}
+\renewcommand*{\chapterformat}{附录~\thechapter\autodot\enskip}
+\renewcommand*{\chaptermarkformat}{附录~\thechapter\autodot\enskip}
+\renewcommand{\theHchapter}{appendix.\arabic{chapter}}
+\renewcommand{\theHsection}{appendix.\arabic{chapter}.\arabic{section}}
+\renewcommand{\theHsubsection}{appendix.\arabic{chapter}.\arabic{section}.\arabic{subsection}}
+\renewcommand{\theHsubsubsection}{appendix.\arabic{chapter}.\arabic{section}.\arabic{subsection}.\arabic{subsubsection}}
+\renewcommand{\theHfigure}{appendix.\arabic{chapter}.\arabic{figure}}
+\renewcommand{\theHtable}{appendix.\arabic{chapter}.\arabic{table}}
+\input{appendices/includes.tex}
 
 % 参考文献
 % \backmatter

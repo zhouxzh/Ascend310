@@ -1339,9 +1339,7 @@ cameras = {
 手机拍照 -> Base64 编码 -> POST /api/clockin -> 返回结果
 ```
 
-##  Web 界面详细介绍 {#src-experiment-case1-h84}
-
-##  Web 界面详细介绍 {#src-experiment-case1-h85}
+## Web 界面详细介绍 {#src-experiment-case1-h85}
 
 ### 1. 主页 (/) {#src-experiment-case1-h86}
 

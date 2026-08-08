@@ -1,4 +1,4 @@
--- Pandoc Lua filter：把 level 1/2 的 Header 转为无编号的 \section* / \subsection*
+-- Pandoc Lua filter：把前言中的 level 1/2/3 标题转换为无编号标题。
 local stringify = require('pandoc.utils').stringify
 
 local function latex_escape(s)
@@ -19,16 +19,21 @@ local function latex_escape(s)
 end
 
 function Header(el)
-  if el.level == 1 or el.level == 2 then
+  if el.level >= 1 and el.level <= 3 then
     local title = stringify(el.content)
     title = latex_escape(title)
-    local cmd = (el.level == 1) and "\\section*{" or "\\subsection*{"
+    local commands = {
+      [1] = "\\section*{",
+      [2] = "\\subsection*{",
+      [3] = "\\subsubsection*{",
+    }
+    local cmd = commands[el.level]
     cmd = cmd .. title .. "}"
     if el.identifier and el.identifier ~= "" then
       cmd = cmd .. "\\label{" .. el.identifier .. "}"
     end
     -- 如需在目录中显示（无编号但出现在 TOC），可取消下面一行注释：
-    -- cmd = cmd .. "\\addcontentsline{toc}{" .. ((el.level==1) and "section" or "subsection") .. "}{" .. title .. "}"
+    -- cmd = cmd .. "\\addcontentsline{toc}{section}{" .. title .. "}"
     return pandoc.RawBlock('latex', cmd)
   end
   -- 其他 Header 保持不变（返回 nil 表示不修改）

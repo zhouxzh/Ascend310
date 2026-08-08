@@ -51,10 +51,10 @@
 
 \subsection*{全书结构（初版规划）}\label{src-book-README-h3}
 
-本书分为 \textbf{Part I：理论教程} 与 \textbf{Part II：实验教程}
-两大部分。
+本书主体分为 \textbf{理论教程} 与
+\textbf{实践案例}，并在正文之后设置独立的附录部分。
 
-\subsection{Part I：理论教程}\label{src-book-README-h4}
+\subsubsection*{理论教程}\label{src-book-README-h4}
 
 { % do not increment counter
 \begin{longtable}[]{@{}
@@ -97,15 +97,18 @@ FP16、INT8、校准数据、精度对齐与性能对比 &
 Chapter 9 & AI项目交付闭环 &
 SSD300实验室实时检测、评测体系、标准化交付流程 &
 建立规范的AI项目交付方法论 \\
-Appendix A & 工具箱、FAQ 与参数模板 & 错误速查、参数模板、Checklist、FAQ
-& 提供高效查阅的工具与参考资料 \\
 \end{longtable}
 }
 
-\subsection{Part II：实验教程}\label{src-book-README-h5}
+\subsubsection*{实践案例}\label{src-book-README-h5}
 
-包含从 \textbf{Case 0} 到 \textbf{Case 9}
-的十个动手实验，涵盖环境搭建与九大端侧AI实战案例（人脸打卡机、实时跟踪、智能电子琴、掌纹识别、数据采集仪、智能小车、智能相册、手势识别、聊天机器人）。
+包含从 \textbf{Case 1} 到 \textbf{Case 9} 的九个端侧 AI
+实战案例，涵盖人脸打卡机、实时跟踪、智能电子琴、掌纹识别、数据采集仪、智能小车、智能相册、手势识别与聊天机器人。
+
+\subsubsection*{附录}\label{附录}
+
+附录用于集中收录实验基础和查阅型资料。附录 1 介绍开发板与基础环境，附录
+2 汇集工具箱、FAQ 与参数模板；后续附录按阿拉伯数字顺序扩展。
 
 \subsection*{各模块核心要点概述}\label{src-book-README-h6}
 
@@ -223,26 +226,10 @@ Appendix A & 工具箱、FAQ 与参数模板 & 错误速查、参数模板、Che
   验收、回归与风险管理
 \end{itemize}
 
-\textbf{附录A. 工具箱、FAQ 与参数模板}
+\textbf{实践案例 (Case 1 - 9)}
 
 \begin{itemize}
 \tightlist
-\item
-  常见报错速查表
-\item
-  模型转换参数模板合集 (ResNet, YOLO, INT8)
-\item
-  性能与质量 Checklist
-\item
-  术语表、FAQ 与推荐资源
-\end{itemize}
-
-\textbf{10. 实验教程 (Case 0 - 9)}
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{Case 0}：开发板硬件介绍、系统安装 (刷写/启动/网络)、环境验证
 \item
   \textbf{Case 1}：智能打卡机 (Web应用, 人脸识别)
 \item
@@ -261,6 +248,17 @@ Appendix A & 工具箱、FAQ 与参数模板 & 错误速查、参数模板、Che
   \textbf{Case 8}：手势识别 (数据采集, 实时系统)
 \item
   \textbf{Case 9}：智能聊天机器人 (LLM, 语音交互, RAG)
+\end{itemize}
+
+\textbf{附录}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{附录 1}：开发板硬件、系统安装、启动与网络连接、基础环境验证
+\item
+  \textbf{附录 2}：常见报错速查、模型转换参数模板、性能与质量
+  Checklist、术语表与 FAQ
 \end{itemize}
 
 \subsection*{实践驱动与开源协作}\label{src-book-README-h7}
@@ -302,7 +300,7 @@ Appendix A & 工具箱、FAQ 与参数模板 & 错误速查、参数模板、Che
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-零基础学生 & Chapter 1、Chapter 2、Case 0、Case 1 & 能跑通首个模型 &
+零基础学生 & 附录 1、Chapter 1、Chapter 2、Case 1 & 能跑通首个模型 &
 结合案例做改动实验 \\
 嵌入式工程师 & Chapter 4、Chapter 5、Chapter 6、Chapter 7 &
 掌握底层开发与优化 & 关注资源管理、媒体处理、算子开发与性能调优 \\

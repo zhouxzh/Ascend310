@@ -165,8 +165,7 @@ SSD、YOLO）性能大幅提升，但通用检测器在人脸这种特定任务�
 
 RetinaFace 的强大性能源于其对多个关键技术的巧妙融合。
 
-\subsubsection{1.
-单阶段检测器与多任务学习}\label{src-experiment-case1-h9}
+\subsubsection{单阶段检测器与多任务学习}\label{src-experiment-case1-h9}
 
 与需要先生成候选区域再进行分类的两阶段检测器（如 Faster
 R-CNN）不同，RetinaFace
@@ -185,19 +184,19 @@ Learning）}框架，让一个网络同时完成多项任务：
 
 这种设计不仅提升了效率，而且关键点定位任务的加入，反过来为模型提供了更丰富的监督信息，有助于更准确地识别人脸区域，尤其是对于部分遮挡的人脸。
 
-\subsubsection{2. 特征金字塔网络 (FPN)}\label{src-experiment-case1-h10}
+\subsubsection{特征金字塔网络 (FPN)}\label{src-experiment-case1-h10}
 
 为了解决尺度变化问题，RetinaFace 采用了\textbf{特征金字塔网络（Feature
 Pyramid Network, FPN）}。FPN
 的思想是``高层特征看语义，底层特征看细节''。它通过自顶向下的路径和横向连接，将高层特征图中丰富的语义信息与底层特征图中高分辨率的细节信息相融合，从而在多个不同尺度的特征图上进行预测。这意味着，大的特征图负责检测小人脸，小的特征图负责检测大人脸，实现了对各种尺寸人脸的``全覆盖''。
 
-\subsubsection{3. 上下文感知模块 (SSH)}\label{src-experiment-case1-h11}
+\subsubsection{上下文感知模块 (SSH)}\label{src-experiment-case1-h11}
 
 为了进一步增强特征的表达能力，RetinaFace 在 FPN 的每个预测层后都引入了
 \textbf{SSH（Single Stage Headless）模块}。SSH
 模块通过并行的、具有不同大小卷积核的通路来提取特征，并将它们拼接在一起。这就像给模型装上了``广角镜''和``长焦镜''，使其能够同时关注一个区域的局部细节和它周围的上下文信息，从而在复杂背景或人脸密集的情况下做出更鲁棒的判断。
 
-\subsubsection{4. 焦点损失 (Focal Loss)
+\subsubsection{焦点损失 (Focal Loss)
 的启示}\label{src-experiment-case1-h12}
 
 虽然 RetinaFace 的论文没有将焦点损失（Focal
@@ -249,8 +248,7 @@ ArcFace
 为了解决这个问题，研究者们开始探索\textbf{度量学习（Metric
 Learning）}的思想，其核心目标是直接在特征空间中优化距离：最大化类间距离，最小化类内距离。
 
-\subsubsection{1. SphereFace
-(A-Softmax)}\label{src-experiment-case1-h16}
+\subsubsection{SphereFace (A-Softmax)}\label{src-experiment-case1-h16}
 
 SphereFace 首次提出，在计算角度时应该引入一个\textbf{角度间隔（Angular
 Margin）}。它将传统的 Softmax 中的权重与特征的点积 \(W^T x\) 修改为
@@ -259,7 +257,7 @@ Margin）}。它将传统的 Softmax 中的权重与特征的点积 \(W^T x\) �
 \(\theta_y\) 上乘以一个整数 \(m\)，变成了
 \(\cos(m\theta_y)\)。这样一来，分类的决策边界从简单的线性边界变成了角度边界，强制模型学习到角度区分度更强的特征。
 
-\subsubsection{2. CosFace (LMCL)}\label{src-experiment-case1-h17}
+\subsubsection{CosFace (LMCL)}\label{src-experiment-case1-h17}
 
 CosFace 认为 SphereFace 的乘性间隔 \(m\theta_y\)
 会导致训练不稳定。因此，它提出了一种更简单、更稳定的\textbf{加性余弦间隔（Additive
@@ -1205,7 +1203,7 @@ JSON、HTML） - 静态文件服务（CSS、JS、图片）
 
 \subsection{Flask 的核心概念}\label{src-experiment-case1-h54}
 
-\subsubsection{1. 路由 (Route)}\label{src-experiment-case1-h55}
+\subsubsection{路由 (Route)}\label{src-experiment-case1-h55}
 
 \begin{lstlisting}[language=Python]
 @app.route('/api/users', methods=['GET'])
@@ -1228,7 +1226,7 @@ def list_users():
 
 \emph{比喻}：路由就像餐厅的菜单。客人点''宫保鸡丁''（URL），服务员就知道要让厨师做哪道菜（调用哪个函数）。
 
-\subsubsection{2. HTTP 方法}\label{src-experiment-case1-h56}
+\subsubsection{HTTP 方法}\label{src-experiment-case1-h56}
 
 \begin{lstlisting}[language=Python]
 @app.route('/api/users', methods=['GET'])   # 查询用户
@@ -1245,7 +1243,7 @@ def list_users():
 POST = 捐赠新书（增加藏书） - PUT = 更换书籍（用新版替换旧版） - DELETE
 = 销毁书籍（减少藏书）
 
-\subsubsection{3. 请求数据的获取}\label{src-experiment-case1-h57}
+\subsubsection{请求数据的获取}\label{src-experiment-case1-h57}
 
 \begin{lstlisting}[language=Python]
 @app.route('/api/users', methods=['POST'])
@@ -1263,7 +1261,7 @@ Flask 的 \passthrough{\lstinline!request!}
 \passthrough{\lstinline!request.args!}：URL 查询参数（如
 \passthrough{\lstinline!?page=1\&size=10!}）
 
-\subsubsection{4. 响应的生成}\label{src-experiment-case1-h58}
+\subsubsection{响应的生成}\label{src-experiment-case1-h58}
 
 \begin{lstlisting}[language=Python]
 # 返回 JSON
@@ -1431,7 +1429,7 @@ img = np.expand_dims(img, axis=0)  # (3, 640, 640) -> (1, 3, 640, 640)
 
 \section{性能优化策略：让系统跑得更快}\label{src-experiment-case1-h65}
 
-\subsection{1. 内存复用：避免重复分配}\label{src-experiment-case1-h66}
+\subsection{内存复用：避免重复分配}\label{src-experiment-case1-h66}
 
 在 \passthrough{\lstinline!AscendModel!} 的设计中，输入输出 buffer
 在初始化时就分配好了，之后每次推理都复用这些 buffer。
@@ -1464,7 +1462,7 @@ def execute_bad(self, input_data):
 
 \emph{比喻}：这就像餐厅的盘子。好的做法是准备一套盘子，用完洗干净继续用。坏的做法是每次都买新盘子，用完就扔，既浪费又慢。
 
-\subsection{2. 批处理：一次处理多张图片}\label{src-experiment-case1-h67}
+\subsection{批处理：一次处理多张图片}\label{src-experiment-case1-h67}
 
 虽然本案例是单张处理，但如果需要处理大量图片（如批量注册用户），可以使用批处理：
 
@@ -1485,7 +1483,7 @@ results = model.execute([batch])  # 一次性处理 100 张
 
 \emph{比喻}：这就像坐电梯。等人齐了再走（批处理）比每来一个人就开一次（单张处理）效率高得多。
 
-\subsection{3. 异步推理：让 CPU 和 NPU
+\subsection{异步推理：让 CPU 和 NPU
 并行工作}\label{src-experiment-case1-h68}
 
 当前实现是同步的：
@@ -1515,8 +1513,7 @@ prepare_next_data()
 acl.rt.synchronize_stream(stream)
 \end{lstlisting}
 
-\subsection{4.
-模型量化：用更少的位数表示权重}\label{src-experiment-case1-h69}
+\subsection{模型量化：用更少的位数表示权重}\label{src-experiment-case1-h69}
 
 当前模型使用 FP32（32 位浮点数）。通过量化，可以转换为 FP16 或 INT8：
 
@@ -1544,7 +1541,7 @@ atc --model=det.onnx \
 
 \section{实际部署建议}\label{src-experiment-case1-h70}
 
-\subsection{1. 用户规模与检索策略}\label{src-experiment-case1-h71}
+\subsection{用户规模与检索策略}\label{src-experiment-case1-h71}
 
 { % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
@@ -1561,7 +1558,7 @@ atc --model=det.onnx \
 \end{longtable}
 }
 
-\subsection{2. 防止重复打卡}\label{src-experiment-case1-h72}
+\subsection{防止重复打卡}\label{src-experiment-case1-h72}
 
 当前实现每 2 秒就会记录一次考勤。实际应用中应该添加去重逻辑：
 
@@ -1592,7 +1589,7 @@ def add_attendance_if_not_recent(user_id, type, image_path, cooldown=60):
     conn.close()
 \end{lstlisting}
 
-\subsection{3. 安全性考虑}\label{src-experiment-case1-h73}
+\subsection{安全性考虑}\label{src-experiment-case1-h73}
 
 \textbf{照片攻击防御}：
 
@@ -1613,7 +1610,7 @@ def encrypt_embedding(embedding, key):
     return encrypted
 \end{lstlisting}
 
-\subsection{4. 日志与监控}\label{src-experiment-case1-h74}
+\subsection{日志与监控}\label{src-experiment-case1-h74}
 
 添加详细的日志记录：
 
@@ -1637,7 +1634,7 @@ logger.warning(f"Failed to detect face in frame")
 logger.error(f"NPU inference failed: {error}")
 \end{lstlisting}
 
-\subsection{5. 错误处理与降级策略}\label{src-experiment-case1-h75}
+\subsection{错误处理与降级策略}\label{src-experiment-case1-h75}
 
 \begin{lstlisting}[language=Python]
 def get_face_system():
@@ -1817,17 +1814,15 @@ cameras = {
 手机拍照 -> Base64 编码 -> POST /api/clockin -> 返回结果
 \end{lstlisting}
 
-\section{Web 界面详细介绍}\label{src-experiment-case1-h84}
-
 \section{Web 界面详细介绍}\label{src-experiment-case1-h85}
 
-\subsection{1. 主页 (/)}\label{src-experiment-case1-h86}
+\subsection{主页 (/)}\label{src-experiment-case1-h86}
 
 系统概览与功能导航入口。提供三个主要功能模块的快速访问： -
 用户管理：注册新用户、查看用户列表 - 考勤记录：查看打卡历史、手动打卡 -
 实时监控：查看摄像头实时画面
 
-\subsection{2. 用户管理 (/users\_page)}\label{src-experiment-case1-h87}
+\subsection{用户管理 (/users\_page)}\label{src-experiment-case1-h87}
 
 \textbf{用户注册功能}：
 
@@ -1883,7 +1878,7 @@ fetch('/api/users', {method: 'POST', body: formData});
 \textbf{用户列表}： - 显示所有已注册用户 -
 支持删除操作（同时删除考勤记录） - 实时更新
 
-\subsection{3. 考勤记录
+\subsection{考勤记录
 (/attendance\_page)}\label{src-experiment-case1-h88}
 
 \textbf{自动打卡显示}： - 实时展示本地摄像头自动识别的打卡记录 -
@@ -1913,8 +1908,7 @@ fetch('/api/clockin', {
 });
 \end{lstlisting}
 
-\subsection{4. 实时视频流
-(/video\_feed)}\label{src-experiment-case1-h89}
+\subsection{实时视频流 (/video\_feed)}\label{src-experiment-case1-h89}
 
 通过 MJPEG 协议提供实时视频流：
 

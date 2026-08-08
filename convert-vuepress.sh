@@ -55,12 +55,19 @@ convert_markdown() {
     local output=$2
     local media_dir=$3
     local resource_path=$4
+    local lua_filter=${5:-}
+    local -a filter_args=()
+
+    if [[ -n "$lua_filter" ]]; then
+        filter_args=(--lua-filter="$lua_filter")
+    fi
 
     pandoc_to_file "$output" \
         -f "$PANDOC_FROM" \
         "$input" \
         --top-level-division=chapter \
         --lua-filter=local-md-links.lua \
+        "${filter_args[@]}" \
         --syntax-highlighting=idiomatic \
         -t latex \
         --extract-media="$media_dir" \
@@ -72,6 +79,9 @@ check_book_heading_levels
 cd "$LATEX_DIR"
 
 mkdir -p chapters cases
+rm -rf appendices cases/img0
+mkdir -p appendices
+rm -f chapters/appendix.tex cases/case0.tex
 
 # 使用 --syntax-highlighting=idiomatic 替代已废弃的 --idiomatic
 pandoc_to_file "chapters/preface.tex" \
@@ -93,19 +103,38 @@ for chapter in {1..9}; do
         "../src/book"
 done
 
-convert_markdown \
-    "../src/book/appendix.md" \
-    "chapters/appendix.tex" \
-    "chapters/" \
-    "../src/book"
-
-for case_number in {0..9}; do
+for case_number in {1..9}; do
     convert_markdown \
         "../src/experiment/case${case_number}.md" \
         "cases/case${case_number}.tex" \
         "cases/" \
-        "../src/experiment"
+        "../src/experiment" \
+        "case-heading.lua"
 done
+
+appendix_count=0
+: > appendices/includes.tex
+while IFS= read -r -d '' appendix_path; do
+    appendix_name="$(basename "$appendix_path" .md)"
+    [[ "$appendix_name" =~ ^appendix[0-9]+$ ]] || continue
+    pandoc_to_file "appendices/${appendix_name}.tex" \
+        -f "$PANDOC_FROM" \
+        "$appendix_path" \
+        --top-level-division=chapter \
+        --lua-filter=appendix-heading.lua \
+        --lua-filter=local-md-links.lua \
+        --syntax-highlighting=idiomatic \
+        -t latex \
+        --extract-media=appendices/ \
+        --resource-path=../src/appendix
+    printf '\\input{appendices/%s.tex}\n' "$appendix_name" >> appendices/includes.tex
+    appendix_count=$((appendix_count + 1))
+done < <(find ../src/appendix -maxdepth 1 -type f -name 'appendix[0-9]*.md' -print0 | sort -z -V)
+
+if [[ "$appendix_count" -eq 0 ]]; then
+    printf 'error: no numbered appendices found in src/appendix.\n' >&2
+    exit 1
+fi
 
 replace_temp="$(mktemp "${TMPDIR:-/tmp}/ascend310-replace-block.XXXXXX.tex")"
 python3 replace_block.py chapters/chapter3.tex "$replace_temp"
@@ -114,6 +143,6 @@ cp "$replace_temp" chapters/chapter3.tex
 rm -f "$replace_temp"
 
 # 修复 Pandoc 生成无标题 longtable 时引入的错误代码
-find chapters cases -name '*.tex' -type f -exec sed -i 's/\\def\\LTcaptype{none}//g' {} +
+find chapters cases appendices -name '*.tex' -type f -exec sed -i 's/\\def\\LTcaptype{none}//g' {} +
 
 latexmk -xelatex -interaction=nonstopmode -file-line-error -synctex=1 -halt-on-error book.tex

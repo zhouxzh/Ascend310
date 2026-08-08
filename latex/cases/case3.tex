@@ -19,7 +19,7 @@ Processing，DDSP）将谐波振荡器、滤波噪声和混响等声学结构引
 配套代码位于
 \href{https://github.com/zhouxzh/Ascend310/tree/main/samples/case3}{\passthrough{\lstinline!samples/case3!}}。
 
-\section{1. 案例目标与学习成果}\label{src-experiment-case3-overview}
+\section{案例目标与学习成果}\label{src-experiment-case3-overview}
 
 \subsection{系统功能}\label{src-experiment-case3-capabilities}
 
@@ -88,7 +88,7 @@ Python 环境状态，并提供独占的扬声器与麦克风测试。
 Effect
 的研究对象限定为基频相对稳定的单音输入，复音分离与复杂声场建模不在讨论范围内。运行指标用于描述计算链路和资源状态；音色质量、声压与声学特性仍需通过独立的听音和测量实验评价。
 
-\section{2. 器件与材料清单}\label{src-experiment-case3-bom}
+\section{器件与材料清单}\label{src-experiment-case3-bom}
 
 \subsection{最小配置}\label{src-experiment-case3-minimum-bom}
 
@@ -215,8 +215,7 @@ source，不能使用 PulseAudio monitor \\
 \end{longtable}
 }
 
-\section{3.
-系统总体架构与完整流程}\label{src-experiment-case3-system-architecture}
+\section{系统总体架构与完整流程}\label{src-experiment-case3-system-architecture}
 
 \subsection{三条业务链}\label{src-experiment-case3-three-flows}
 
@@ -270,7 +269,7 @@ PulseAudio 实体路由和真实听音 & 否 & 是 \\
 \end{longtable}
 }
 
-\section{4. DDSP 原理}\label{src-experiment-case3-ddsp-theory}
+\section{DDSP 原理}\label{src-experiment-case3-ddsp-theory}
 
 \subsection{从采样合成到可微分
 DSP}\label{src-experiment-case3-ddsp-motivation}
@@ -373,8 +372,7 @@ y[n] = (1-m)x_{dry}[n] + m x_{wet}[n].
 \end{longtable}
 }
 
-\section{5.
-三套神经网络架构}\label{src-experiment-case3-model-architectures}
+\section{三套神经网络架构}\label{src-experiment-case3-model-architectures}
 
 \subsection{Piano-DDSP}\label{src-experiment-case3-piano-ddsp}
 
@@ -657,7 +655,7 @@ CPU 合成、重采样、增益和 FreeVerb \\
 \end{longtable}
 }
 
-\section{6. 模型转换与 Ascend
+\section{模型转换与 Ascend
 部署}\label{src-experiment-case3-model-deployment}
 
 \subsection{两类模型来源}\label{src-experiment-case3-model-download}
@@ -803,7 +801,7 @@ OM 部署文档}。
 与 TFLite 在这里承担来源对照和数值参考的角色，性能评价则以真实 OM
 推理和完整音频链路为对象。
 
-\section{7. 后端设计}\label{src-experiment-case3-backend}
+\section{后端设计}\label{src-experiment-case3-backend}
 
 \subsection{服务分层与作业模型}\label{src-experiment-case3-fastapi}
 
@@ -902,7 +900,7 @@ WebSocket 事件 & 音符边沿、踏板变化、作业进度、设备变化和�
 与 API
 指南}。由于服务直接控制音频与模型资源，部署范围应限定在可信网络中。
 
-\section{8. 前端设计}\label{src-experiment-case3-frontend}
+\section{前端设计}\label{src-experiment-case3-frontend}
 
 \subsection{信息架构与状态同步}\label{src-experiment-case3-frontend-stack}
 
@@ -959,7 +957,7 @@ MIDI 编辑器。
 
 移动布局将高频工作流保留在可达位置，并处理浏览器安全区；桌面布局则强调横向比较和键盘焦点。所有布局都应避免文档级横向滚动、控件重叠和状态跳动，同时保留页签语义、可访问名称与清晰的焦点顺序。由此，界面可以适应不同显示设备，而不把案例能力绑定到某一分辨率或物理尺寸。
 
-\section{9. 逐页界面与操作说明}\label{src-experiment-case3-ui-guide}
+\section{逐页界面与操作说明}\label{src-experiment-case3-ui-guide}
 
 本节截图采集自 Ascend 310B
 开发板实际运行的服务，用于说明界面结构、交互关系和典型状态，不作为性能测量证据。界面中的
@@ -1536,7 +1534,7 @@ Python 环境 & 解释器与环境名称 & 核对服务使用的板端运行环�
 \end{longtable}
 }
 
-\section{10. 从零复现实验}\label{src-experiment-case3-reproduction}
+\section{从零复现实验}\label{src-experiment-case3-reproduction}
 
 \subsection{接线与启动检查}\label{src-experiment-case3-bringup}
 
@@ -1692,7 +1690,7 @@ curl -fsS http://127.0.0.1:8765/api/v1/status
 真实音频验收至少记录推理耗时、队列延迟、总延迟、PCM 非零、削波、capture
 overflow 和 playback underrun。仅有 HTTP 200 不能证明发声正确。
 
-\section{11. 性能评价与故障排查}\label{src-experiment-case3-results}
+\section{性能评价与故障排查}\label{src-experiment-case3-results}
 
 \subsection{DDSP-VST
 板端长稳评价方法}\label{src-experiment-case3-measured-results}
@@ -1817,8 +1815,7 @@ NaN/Inf \\
 本地测试不得运行 PyACL、ATC、OM 推理或
 \passthrough{\lstinline!npu-smi!}；这些结果必须来自真实 Ascend 310B。
 
-\section{12.
-系统分层、总结与参考资料}\label{src-experiment-case3-code-and-references}
+\section{系统分层、总结与参考资料}\label{src-experiment-case3-code-and-references}
 
 \subsection{软件分层}\label{src-experiment-case3-directory-tree}
 

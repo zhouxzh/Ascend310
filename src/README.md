@@ -17,6 +17,9 @@ actions:
   - text: 实践案例
     link: ./experiment/README.md
 
+  - text: 附录
+    link: ./appendix/README.md
+
 highlights:
   - header: 课程特色
     # image: /assets/image/fpga-feature.svg

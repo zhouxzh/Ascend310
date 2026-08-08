@@ -18,8 +18,7 @@ export default sidebar({
         "chapter6.md",
         "chapter7.md",
         "chapter8.md",
-        "chapter9.md",
-        "appendix.md"
+        "chapter9.md"
       ]
     },
     {
@@ -29,7 +28,6 @@ export default sidebar({
       collapsible: true,
       children: [
         "README.md",
-        "case0.md",
         "case1.md",
         "case2.md",
         "case3.md",
@@ -39,6 +37,17 @@ export default sidebar({
         "case7.md",
         "case8.md",
         "case9.md"
+      ]
+    },
+    {
+      text: "附录",
+      icon: "book",
+      prefix: "/appendix/",
+      collapsible: true,
+      children: [
+        "README.md",
+        "appendix1.md",
+        "appendix2.md"
       ]
     },
   ],
