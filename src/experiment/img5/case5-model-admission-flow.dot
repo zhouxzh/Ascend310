@@ -1,0 +1,37 @@
+digraph Case5ModelAdmissionFlow {
+  graph [
+    rankdir=TB,
+    bgcolor="white",
+    pad="0.22",
+    nodesep="0.30",
+    ranksep="0.48",
+    splines=polyline,
+    fontname="Microsoft YaHei",
+    dpi=150
+  ];
+  node [shape=box, style="rounded,filled", fontname="Microsoft YaHei", fontsize=11,
+        color="#374151", fontcolor="#111827", fillcolor="#f8fafc", margin="0.14,0.09"];
+  edge [fontname="Microsoft YaHei", fontsize=9, color="#475569", arrowsize=0.75];
+
+  candidate [shape=oval, label="固定来源的权重、ONNX 与 OM\n写入 candidate manifest", fillcolor="#dbeafe", color="#0072B2"];
+  npu_check [label="板端 NPU 准入验证\n来源/哈希/输入合同 + 数值比较 + NPU P95", fillcolor="#dcfce7", color="#009E73"];
+  gate [shape=diamond, label="数值通过且 P95\n满足固定窗口预算？", fillcolor="#fff7ed", color="#E69F00"];
+  accepted [shape=note, label="accepted manifest\n只证明模型数值一致与 NPU 窗口预算\n不等于主机全流水线通过", fillcolor="#f3e8ff", color="#CC79A7"];
+  rejected [label="rejected / candidate\n不进入实时入口", fillcolor="#fee2e2", color="#D55E00"];
+  run [label="独立真实 RTL-SDR 运行\n产生 inference.jsonl 与原始 CU8", fillcolor="#dbeafe", color="#0072B2"];
+  qc [label="只读复核并绑定模型合同\n重算哈希、批次、丢批与流水线时延", fillcolor="#fef3c7", color="#E69F00"];
+  evidence_gate [shape=diamond, label="短时窗口检查通过？\n完整交付、零丢批、时延不超窗口", fillcolor="#fff7ed", color="#E69F00"];
+  sibling [shape=note, label="新的 pipeline-verified sibling manifest\n附短时证据；不覆盖 accepted", fillcolor="#dcfce7", color="#009E73"];
+  limited [label="保留 accepted 原件\n不得声称流水线实时已验证", fillcolor="#fef3c7", color="#E69F00"];
+
+  { rank=same; rejected; accepted; }
+  { rank=same; sibling; limited; }
+
+  candidate -> npu_check -> gate;
+  gate -> accepted [label="是"];
+  gate -> rejected [label="否", style=dashed, color="#D55E00", fontcolor="#D55E00"];
+  accepted -> run [label="独立证据步骤"];
+  run -> qc -> evidence_gate;
+  evidence_gate -> sibling [label="是"];
+  evidence_gate -> limited [label="否", style=dashed, color="#E69F00", fontcolor="#E69F00"];
+}

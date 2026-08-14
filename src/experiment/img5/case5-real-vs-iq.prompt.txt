@@ -1,0 +1,10 @@
+Use case: scientific-educational
+Asset type: Chinese technical textbook comparison figure
+Primary request:
+Create a publication-ready two-panel comparison of a real-valued oscilloscope signal and complex IQ data. The left panel shows a real waveform x[n], a conjugate-symmetric conceptual spectrum, and the retained nonnegative one-sided spectrum. The right panel shows orthogonal I and Q axes with a rotating complex phasor and a full spectrum centered at zero frequency offset, preserving negative and positive frequency offsets around center frequency fc. Use simple scientifically correct plots rather than software boxes.
+Scene/backdrop: clean white background with a thin central divider and generous margins
+Style/medium: flat scientific diagram with precise axes, curves, phasor arrow, and sparse labels
+Composition/framing: 16:10 landscape, two equal panels, matching visual scale
+Color palette: Okabe-Ito blue #0072B2 for real signal, orange #E69F00 and green #009E73 for I/Q, charcoal axes
+Text (verbatim): "实值波形", "x[n]", "单边频谱", "复数 IQ", "I", "Q", "双边频谱", "-Δf", "0", "+Δf", "中心频率 fc"
+Constraints: render every requested label exactly once; the real spectrum must be symmetric before retaining the nonnegative half; the IQ spectrum must visibly include negative and positive offsets; no title or figure number inside the image; no extra labels, pseudo-text, gradients, shadows, decorative imagery, or watermark

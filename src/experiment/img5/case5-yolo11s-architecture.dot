@@ -1,0 +1,40 @@
+digraph Case5Yolo11sArchitecture {
+  graph [
+    rankdir=TB,
+    bgcolor="white",
+    pad="0.16",
+    nodesep="0.46",
+    ranksep="0.52",
+    splines=ortho,
+    fontname="Microsoft YaHei",
+    dpi=170
+  ];
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Microsoft YaHei",
+    fontsize=11,
+    color="#374151",
+    fontcolor="#111827",
+    fillcolor="#f8fafc",
+    margin="0.16,0.11"
+  ];
+  edge [color="#475569", arrowsize=0.72, penwidth=1.20];
+
+  input [label="CPU 时频图\n[1,3,1024,1024]\nBlackman-FFTW，RGB 复制", fillcolor="#e0f2fe", color="#0072B2"];
+  backbone [label="NPU：YOLO11s Backbone\nStem：两次 Conv s=2\nP3 / P4 / P5：128 / 64 / 32\nC3k2，SPPF，C2PSA", fillcolor="#dcfce7", color="#009E73"];
+  neck [label="NPU：FPN + PAN Neck\nP5 -> P4 -> P3：上采样、拼接\nP3 -> P4 -> P5：下采样、拼接\n融合语义与定位信息", fillcolor="#fef3c7", color="#E69F00"];
+  detect [label="NPU：Anchor-free Detect\n在 P3 / P4 / P5 输出\n16,384 + 4,096 + 1,024\n= 21,504 个候选", fillcolor="#f3e8ff", color="#CC79A7"];
+  head [label="NPU：检测头\n框回归：4 坐标 x 16 DFL bins\n评分：51 个输出评分通道\n受 single_cls 训练限制", fillcolor="#f3e8ff", color="#CC79A7"];
+  output [label="NPU 输出 output0\n[1,55,21504]\n4 个已解码框参数 + 51 个评分通道", fillcolor="#ffedd5", color="#D55E00"];
+
+  { rank=same; input; backbone; }
+  { rank=same; neck; detect; }
+  { rank=same; head; output; }
+
+  input -> backbone;
+  backbone -> neck;
+  neck -> detect;
+  detect -> head;
+  head -> output;
+}

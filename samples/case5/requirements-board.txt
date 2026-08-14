@@ -1,0 +1,7 @@
+# User-space dependency for USB diagnostics. Capture itself uses the compiled
+# libsigrok bridge and the board's system libusb/libsigrok libraries.
+# Install in the existing Ascend 310B base Conda environment.
+pyusb==1.2.1
+# User-space scientific plotting for the Qt touch dashboard.
+PySide6>=6.5,<7
+pyqtgraph==0.13.7

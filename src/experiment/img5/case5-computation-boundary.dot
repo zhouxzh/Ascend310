@@ -1,0 +1,41 @@
+digraph Case5ComputationBoundary {
+  graph [rankdir=TB, bgcolor="white", pad="0.16", nodesep="0.24", ranksep="0.38", splines=ortho, fontname="Microsoft YaHei", dpi=160];
+  node [shape=box, style="rounded,filled", fontname="Microsoft YaHei", fontsize=12, color="#374151", fontcolor="#111827", fillcolor="#f8fafc", margin="0.15,0.10"];
+  edge [color="#475569", arrowsize=0.75, penwidth=1.15];
+
+  question [shape=oval, label="同一块 Ascend NPU 上运行的模型\n是否都是神经网络？", fillcolor="#f3e8ff", color="#CC79A7"];
+  distinction [label="不是。先区分确定性数值图\n和训练后固定的学习模型。", fillcolor="#fefce8", color="#E69F00"];
+
+  subgraph cluster_dft {
+    label="确定性数值分析：不是学习模型";
+    color="#0072B2";
+    fontcolor="#0072B2";
+    style="rounded";
+    hinput [label="Hantek 窗口 [1,2,10000]", fillcolor="#e0f2fe", color="#56B4E9"];
+    hcpu [label="CPU：换算 / 拼窗 / 去直流", fillcolor="#e0f2fe", color="#56B4E9"];
+    hom [label="NPU OM：固定 Hann DFT\nMatMul + 平方 + 求和", fillcolor="#dbeafe", color="#0072B2"];
+    hout [label="线性功率 [1,2,201,1]", fillcolor="#dbeafe", color="#0072B2"];
+  }
+
+  subgraph cluster_yolo {
+    label="学习模型：训练后固定的 YOLO11s 参数";
+    color="#009E73";
+    fontcolor="#007A5E";
+    style="rounded";
+    rinput [label="RTL-SDR CU8 IQ\n1,048,576 个复样本", fillcolor="#e0f2fe", color="#56B4E9"];
+    rcpu [label="CPU FFTW：Blackman 时频图\n[1,3,1024,1024]", fillcolor="#e0f2fe", color="#56B4E9"];
+    rom [label="NPU OM：YOLO11s\nBackbone / Neck / Head", fillcolor="#dcfce7", color="#009E73"];
+    rout [label="框参数与评分\noutput0 [1,55,21504]", fillcolor="#dcfce7", color="#009E73"];
+  }
+
+  display [label="CPU 显示与存储\n后端、延迟、原始窗口、结果", fillcolor="#fef3c7", color="#E69F00"];
+  boundary [shape=note, label="共同原则：NPU 结果必须来自真实 OM；\n失败时显示 NPU unavailable，不回退伪造结果。", fillcolor="#fefce8", color="#E69F00"];
+
+  question -> distinction;
+  distinction -> hinput;
+  hinput -> hcpu -> hom -> hout -> display;
+  hout -> rinput [style=invis, weight=20];
+  distinction -> rinput [style=invis, weight=10];
+  rinput -> rcpu -> rom -> rout -> display;
+  display -> boundary;
+}

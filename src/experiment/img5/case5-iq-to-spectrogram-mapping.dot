@@ -1,0 +1,22 @@
+digraph Case5IqToSpectrogramMapping {
+  graph [rankdir=TB, bgcolor="white", pad="0.22", nodesep="0.34", ranksep="0.52", splines=ortho, fontname="Microsoft YaHei", dpi=160];
+  node [shape=box, style="rounded,filled", fontname="Microsoft YaHei", fontsize=12, color="#374151", fontcolor="#111827", fillcolor="#f8fafc", margin="0.15,0.10"];
+  edge [color="#475569", arrowsize=0.75, penwidth=1.15];
+
+  iq [label="CU8 交错 I/Q\n1,048,576 个复样本\n2.048 MS/s", fillcolor="#e0f2fe", color="#0072B2"];
+  frames [label="重排为 1024 行 x 1024 点\n每行 0.5 ms；频率间隔 2 kHz", fillcolor="#e0f2fe", color="#0072B2"];
+  fftw [label="CPU FFTW\n周期 Blackman + 1024 点 FFT + 功率", fillcolor="#e0f2fe", color="#0072B2"];
+  image [label="峰值归一化 + fftshift + 垂直翻转\ndB 黑热图 + RGB 复制\n时频张量 [1,3,1024,1024]", fillcolor="#dcfce7", color="#009E73"];
+  box [label="YOLO 图像框\n(x0, y0, x1, y1)", fillcolor="#f3e8ff", color="#CC79A7"];
+  time [label="时间映射\nt0 = x0 / 1024 x 0.512 s\nt1 = x1 / 1024 x 0.512 s", fillcolor="#fef3c7", color="#E69F00"];
+  freq [label="名义频率映射\nfhigh = fc + (0.5 - y0 / 1024) Fs\nflow = fc + (0.5 - y1 / 1024) Fs", fillcolor="#fef3c7", color="#E69F00"];
+  physical [shape=note, label="时频事件\n持续时间 / 名义频带 / 置信度\n不等于射频幅度或频率校准", fillcolor="#f3e8ff", color="#CC79A7"];
+  note [shape=note, label="图像顶部对应 fc + Fs/2，底部对应 fc - Fs/2。\n该方向来自 fftshift 后的垂直翻转。", fillcolor="#fefce8", color="#E69F00"];
+
+  iq -> frames -> fftw -> image -> box;
+  box -> time;
+  box -> freq;
+  time -> physical;
+  freq -> physical;
+  image -> note [style=dashed, color="#E69F00"];
+}

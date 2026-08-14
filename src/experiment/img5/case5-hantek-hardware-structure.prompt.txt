@@ -1,0 +1,10 @@
+Use case: scientific-educational
+Asset type: Chinese technical textbook figure
+Primary request:
+Create a publication-ready hardware structure diagram for a low-voltage two-channel signal acquisition experiment. Show an isolated low-voltage circuit on the left. A voltage probe measures the circuit and enters CH1 of a Hantek 6022BE. A Little Bee B1 current probe surrounds exactly one intact insulated conductor; its analog output enters CH2 of the same Hantek 6022BE. The oscilloscope connects by USB to an Ascend 310B development board. Make the two acquisition paths visually distinct and make the shared-ground limitation visible. Add a compact safety boundary at the bottom; do not depict exposed mains wiring.
+Scene/backdrop: clean white background with generous margins
+Style/medium: flat scientific diagram, restrained technical device silhouettes, crisp black connectors, no photorealism
+Composition/framing: 16:10 landscape, left-to-right physical connection structure, no crossed lines
+Color palette: Okabe-Ito blue #0072B2, sky blue #56B4E9, green #009E73, orange #E69F00, vermillion #D55E00, charcoal text
+Text (verbatim): "隔离低压回路", "CH1 电压", "Little Bee B1", "单根绝缘导线", "CH2 探头输出", "Hantek 6022BE", "USB", "Ascend 310B", "共地", "禁止接入市电"
+Constraints: render every requested label exactly once; large horizontal Chinese text; arrows and cables must be unambiguous; Little Bee must surround one conductor only; CH1 and CH2 must terminate at the oscilloscope; USB must terminate at Ascend 310B; no title or figure number inside the image; no extra labels, pseudo-text, logos, gradients, shadows, decorative imagery, watermark, exposed conductor, wall outlet, or mains appliance

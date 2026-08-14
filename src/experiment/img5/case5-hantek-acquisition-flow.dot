@@ -1,0 +1,56 @@
+digraph Case5HantekAcquisitionFlow {
+  graph [
+    rankdir=TB,
+    bgcolor="white",
+    size="7.4,9.0!",
+    pad="0.14",
+    nodesep="0.30",
+    ranksep="0.42",
+    splines=polyline,
+    fontname="Microsoft YaHei",
+    dpi=180
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Microsoft YaHei",
+    fontsize=14,
+    color="#475569",
+    fontcolor="#0F172A",
+    fillcolor="#F8FAFC",
+    margin="0.16,0.10"
+  ];
+  edge [
+    fontname="Microsoft YaHei",
+    fontsize=10,
+    color="#475569",
+    fontcolor="#334155",
+    arrowsize=0.75
+  ];
+
+  capture [label="libsigrok hantek-6xxx\n读取双通道采样", fillcolor="#E8F2FB", color="#0072B2"];
+  frame [label="BridgeFrameV1\n序号、时间、实际采样率、CH1/CH2", fillcolor="#E8F2FB", color="#0072B2"];
+  contract [shape=diamond, label="帧合同有效？", fillcolor="#FFF7ED", color="#E69F00"];
+  sequence [shape=diamond, label="序号、主机时间和\n采样率连续？", fillcolor="#FFF7ED", color="#E69F00"];
+  process [label="CaptureProcessor\nCH2 单位换算与统计量", fillcolor="#E0F2FE", color="#56B4E9"];
+  assemble [label="WindowAssembler\n追加已处理样本", fillcolor="#E0F2FE", color="#56B4E9"];
+  complete [shape=diamond, label="达到 10 000 点？", fillcolor="#FFF7ED", color="#E69F00"];
+  tensor [label="逐通道去直流\n形成 [1,2,10000]", fillcolor="#E0F2FE", color="#56B4E9"];
+  queue [label="有界 latest 队列\n满时丢弃最旧分析任务", fillcolor="#FEF3C7", color="#E69F00"];
+  submit [label="提交最新完整窗口\n等待 OM 推理", fillcolor="#DCFCE7", color="#009E73"];
+
+  reject [label="报告帧错误并停止\n不拼接无效样本", fillcolor="#FEE2E2", color="#D55E00"];
+  reset [label="帧缺口：重置拼窗\n丢弃跨缺口残留样本", fillcolor="#FEE2E2", color="#D55E00"];
+  wait [label="窗口未满\n继续接收下一帧", fillcolor="#F8FAFC", color="#64748B"];
+
+  { rank=same; contract; reject; }
+  { rank=same; sequence; reset; }
+  { rank=same; complete; wait; }
+
+  capture -> frame -> contract -> sequence -> process -> assemble -> complete -> tensor -> queue -> submit;
+  contract -> reject [label="否", color="#D55E00", fontcolor="#D55E00", style=dashed, constraint=false];
+  sequence -> reset [label="否", color="#D55E00", fontcolor="#D55E00", style=dashed, constraint=false];
+  reset -> process [label="从当前帧重新开始", color="#D55E00", fontcolor="#D55E00", constraint=false];
+  complete -> wait [label="否", constraint=false];
+}

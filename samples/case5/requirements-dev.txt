@@ -1,0 +1,5 @@
+# Local model/test dependencies. Board-side CANN packages are intentionally excluded.
+numpy>=1.24,<3
+onnx>=1.14,<2
+onnxruntime>=1.16,<2
+pytest>=7,<9

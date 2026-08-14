@@ -1,0 +1,78 @@
+digraph Case5HardwareConnections {
+  graph [
+    rankdir=TB,
+    newrank=true,
+    bgcolor="white",
+    pad="0.16",
+    nodesep="0.28",
+    ranksep="0.42",
+    splines=polyline,
+    size="12.8,8!",
+    ratio="fill",
+    fontname="Microsoft YaHei",
+    dpi=150
+  ];
+  node [shape=box, style="rounded,filled", fontname="Microsoft YaHei", fontsize=10.5,
+        color="#374151", fontcolor="#111827", fillcolor="#f8fafc", margin="0.13,0.08"];
+  edge [fontname="Microsoft YaHei", fontsize=9, color="#475569", arrowsize=0.72];
+
+  subgraph cluster_hantek {
+    label="A. Hantek 6022BE 采集与扩展测量";
+    labelloc="t";
+    labeljust="l";
+    fontname="Microsoft YaHei";
+    fontsize=13;
+    fontcolor="#1f2937";
+    color="#94a3b8";
+    penwidth=1.2;
+    style="rounded";
+    margin=18;
+
+    cal [label="6022BE CAL 标准方波输出\n仅用于 CH1 最小连通检查", fillcolor="#dbeafe", color="#0072B2"];
+    low_voltage [label="经确认隔离的教学回路\n单根绝缘载流导线", fillcolor="#dbeafe", color="#0072B2"];
+    ch1_probe [label="CH1 探头\n尖端与地夹", fillcolor="#e0f2fe", color="#56B4E9"];
+    bee [label="Little Bee B1\n磁环感应电流", fillcolor="#e0f2fe", color="#56B4E9"];
+    ch1 [label="CH1 BNC 输入", fillcolor="#f8fafc", color="#374151"];
+    ch2 [label="CH2 BNC 输入", fillcolor="#f8fafc", color="#374151"];
+    hantek [label="Hantek 6022BE\nCH1/CH2 BNC 外壳共地\n非隔离输入", fillcolor="#dbeafe", color="#0072B2"];
+    board_a [shape=component, label="Ascend 310B\nUSB + sigrok 采集", fillcolor="#dcfce7", color="#009E73"];
+    boundary [shape=note, label="安全与验证边界\nCH1/CH2 共地且不隔离：核心实验仅以 CAL 检查 CH1 连通\nLittle Bee 扩展任务须先确认回路隔离和允许测量范围\n未确认量程、接地与隔离前禁止测市电；CAL 不证明幅值/带宽、B1 标定或 NPU", fillcolor="#fee2e2", color="#D55E00"];
+
+    { rank=same; cal; low_voltage; }
+    { rank=same; ch1_probe; bee; }
+    { rank=same; ch1; ch2; }
+
+    cal -> ch1_probe -> ch1 -> hantek;
+    low_voltage -> bee [label="载流导线穿过磁环"];
+    bee -> ch2 [label="SMA-BNC 线"];
+    ch2 -> hantek;
+    hantek -> board_a [dir=both, label="USB"];
+    board_a -> boundary [style=dashed, arrowhead=none, color="#D55E00"];
+  }
+
+  subgraph cluster_rtl {
+    label="B. RTL-SDR 复数 IQ 接收";
+    labelloc="t";
+    labeljust="l";
+    fontname="Microsoft YaHei";
+    fontsize=13;
+    fontcolor="#1f2937";
+    color="#94a3b8";
+    penwidth=1.2;
+    style="rounded";
+    margin=18;
+
+    rf_input [label="天线 或 实验室受控线缆\n二选一的 RF 输入", fillcolor="#dbeafe", color="#0072B2"];
+    rtl [label="RTL-SDR\n接收并输出 CU8 复数 IQ", fillcolor="#dbeafe", color="#0072B2"];
+    board_b [shape=component, label="Ascend 310B\nUSB + RTL-SDR 服务", fillcolor="#dcfce7", color="#009E73"];
+    config [shape=note, label="运行配置记录\n中心频率、增益、PPM 写入运行元数据\n不是频率/幅度标定，也不证明接收或检测准确率", fillcolor="#fef3c7", color="#E69F00"];
+
+    rf_input -> rtl [label="RF"];
+    rtl -> board_b [dir=both, label="USB"];
+    board_b -> config [style=dashed, label="写入 JSONL", color="#E69F00", fontcolor="#E69F00"];
+  }
+
+  { rank=same; cal; low_voltage; rf_input; }
+  { rank=same; ch1_probe; bee; rtl; }
+  { rank=same; ch1; ch2; board_b; }
+}

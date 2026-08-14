@@ -1,0 +1,10 @@
+Use case: scientific-educational
+Asset type: Chinese technical textbook concept figure
+Primary request:
+Create a publication-ready educational diagram explaining how sampling rate and window length determine time span and DFT frequency spacing. On the left show a continuous sampled waveform with one highlighted analysis window containing N=10000 samples at fs=1 MS/s. In the middle show the two relationships T=N/fs and delta-f=fs/N. On the right show a discrete frequency axis from 0 to 20 kHz with evenly spaced bins, emphasizing 100 Hz spacing and 201 retained frequency points. Make the causal relationship obvious without turning it into a software flowchart.
+Scene/backdrop: clean white background with generous margins
+Style/medium: flat scientific infographic with precise waveform, sample marks, braces, axes, and vector-like geometry
+Composition/framing: 16:10 landscape, three aligned conceptual regions, large readable formulas
+Color palette: Okabe-Ito blue #0072B2, sky blue #56B4E9, green #009E73, orange #E69F00, charcoal text
+Text (verbatim): "采样波形", "N = 10000", "fs = 1 MS/s", "T = N / fs", "T = 10 ms", "Δf = fs / N", "Δf = 100 Hz", "0", "20 kHz", "201 个频点"
+Constraints: render every requested label exactly once; mathematical relationships and values must be exact; keep axis labels large; no title or figure number inside the image; no extra formulas, pseudo-text, gradients, shadows, 3D effects, decorative imagery, or watermark

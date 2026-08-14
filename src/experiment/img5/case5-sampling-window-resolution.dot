@@ -1,0 +1,29 @@
+digraph Case5SamplingWindowResolution {
+  graph [rankdir=TB, bgcolor="white", pad="0.20", nodesep="0.32", ranksep="0.46", splines=ortho, fontname="Microsoft YaHei", dpi=160];
+  node [shape=box, style="rounded,filled", fontname="Microsoft YaHei", fontsize=12, color="#374151", fontcolor="#111827", fillcolor="#f8fafc", margin="0.15,0.10"];
+  edge [color="#475569", arrowsize=0.72, penwidth=1.15];
+
+  sampleRate [label="实际采样率 f_s\n由采集合同记录", fillcolor="#e0f2fe", color="#0072B2"];
+  samples [label="窗口样本数 N\n由模型输入形状固定", fillcolor="#e0f2fe", color="#0072B2"];
+  duration [label="时间跨度\nT = N / f_s", fillcolor="#dcfce7", color="#009E73"];
+  resolution [label="频率间隔\nDelta f = f_s / N", fillcolor="#dcfce7", color="#009E73"];
+  {rank=same; sampleRate; samples;}
+  {rank=same; duration; resolution;}
+
+  fixed [label="Case 5 Hantek 固定合同\nf_s = 1 MS/s, N = 10,000\nT = 10 ms, Delta f = 100 Hz", fillcolor="#fef3c7", color="#E69F00"];
+  longer [label="若 N 增大一倍\nT 增大一倍，Delta f 减半\n频率更细，但等待与模型规模增加", fillcolor="#f3e8ff", color="#7E57C2"];
+  shorter [label="若 N 减小一半\nT 减半，Delta f 增大一倍\n更新更快，但相邻频率更难区分", fillcolor="#ffedd5", color="#D55E00"];
+  note [shape=note, label="窗口不是界面刷新参数。\n它同时约束观察尺度、固定张量形状和实时预算。", fillcolor="#fefce8", color="#E69F00"];
+  {rank=same; longer; shorter;}
+
+  sampleRate -> duration;
+  samples -> duration;
+  sampleRate -> resolution;
+  samples -> resolution;
+  duration -> fixed;
+  resolution -> fixed;
+  fixed -> longer;
+  fixed -> shorter;
+  longer -> note;
+  shorter -> note;
+}

@@ -1,0 +1,10 @@
+Use case: scientific-educational
+Asset type: Chinese technical textbook figure
+Primary request:
+Create a publication-ready hardware structure diagram for an RTL-SDR IQ acquisition experiment. Show a suitable antenna or controlled RF cable feeding an RTL-SDR receiver, the receiver connected by USB to an Ascend 310B development board, and CU8 interleaved I/Q data crossing the USB link. Above the receiver, show three compact configuration controls for center frequency, gain, and PPM correction. Distinguish physical RF input, USB data, and configuration using both color and line style.
+Scene/backdrop: clean white background with generous margins
+Style/medium: flat scientific diagram, precise technical silhouettes, crisp connectors, no photorealism
+Composition/framing: 16:10 landscape, left-to-right structure with the three controls aligned above the receiver
+Color palette: Okabe-Ito blue #0072B2, green #009E73, orange #E69F00, purple #CC79A7, charcoal text
+Text (verbatim): "天线或受控线缆", "射频输入", "RTL-SDR", "中心频率", "增益", "PPM", "USB", "CU8 I/Q", "Ascend 310B"
+Constraints: render every requested label exactly once; large horizontal Chinese text; no spectrum peaks or detection boxes; no implication that gain or PPM is calibrated; no title or figure number inside the image; no extra labels, pseudo-text, brand logos, gradients, shadows, decorative imagery, or watermark

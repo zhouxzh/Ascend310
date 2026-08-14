@@ -4,3 +4,16 @@
   margin-left: auto;
   margin-right: auto;
 }
+
+@media (max-width: 719px) {
+  .vp-page table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .vp-page th,
+  .vp-page td {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}

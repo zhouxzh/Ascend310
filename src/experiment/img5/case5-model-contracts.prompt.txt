@@ -1,0 +1,10 @@
+Use case: scientific-educational
+Asset type: Chinese technical textbook tensor-contract comparison
+Primary request:
+Create a publication-ready three-column comparison of three fixed NPU model contracts. Column one is Hantek fixed real DFT: a two-channel waveform tensor [1,2,10000] enters a fixed real DFT and produces power tensor [1,2,201,1]. Column two is the RTL fixed complex DFT teaching model: an I/Q batch tensor [16,2,1024] enters a fixed complex DFT and produces full-spectrum power [16,1024]. Column three is formal RTL detection: an RGB time-frequency tensor [1,3,1024,1024] enters YOLO detection and produces boxes, classes, and confidence. Use tensor slabs and simple output pictograms; do not imply that the contracts are interchangeable.
+Scene/backdrop: clean white background with generous margins
+Style/medium: flat scientific comparison diagram with three equal framed columns and crisp tensor geometry
+Composition/framing: 16:10 landscape, three columns aligned at input, task, and output levels
+Color palette: Okabe-Ito blue #0072B2, orange #E69F00, green #009E73, purple #CC79A7, charcoal text
+Text (verbatim): "Hantek 固定 DFT", "[1,2,10000]", "固定实值 DFT", "[1,2,201,1]", "RTL DFT 教学", "[16,2,1024]", "固定复数 DFT", "[16,1024]", "RTL 正式检测", "[1,3,1024,1024]", "YOLO 检测", "检测框 / 类别 / 置信度", "合同不可混用"
+Constraints: render every requested label exactly once; preserve every bracket, comma, and digit exactly; keep text large; no title or figure number inside the image; no extra dimensions, labels, pseudo-text, gradients, shadows, decorative imagery, or watermark

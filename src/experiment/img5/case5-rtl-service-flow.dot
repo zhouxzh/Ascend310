@@ -1,0 +1,38 @@
+digraph Case5RtlServiceFlow {
+  graph [
+    rankdir=TB,
+    bgcolor="white",
+    pad="0.22",
+    nodesep="0.28",
+    ranksep="0.46",
+    splines=polyline,
+    fontname="Microsoft YaHei",
+    dpi=150
+  ];
+  node [shape=box, style="rounded,filled", fontname="Microsoft YaHei", fontsize=11,
+        color="#374151", fontcolor="#111827", fillcolor="#f8fafc", margin="0.14,0.09"];
+  edge [fontname="Microsoft YaHei", fontsize=9, color="#475569", arrowsize=0.75];
+
+  manifest [shape=note, label="accepted manifest 与启动预检\n哈希、输入合同、FFTW 与真实 NPU", fillcolor="#f3e8ff", color="#CC79A7"];
+  capture [label="rtl_sdr 读取完整固定窗口\nCU8 I/Q + 序号、样本偏移、主机时间", fillcolor="#dbeafe", color="#0072B2"];
+  archive [shape=folder, label="先归档原始 CU8\n持续计算 SHA256", fillcolor="#fef3c7", color="#E69F00"];
+  queue [shape=diamond, label="推理队列有空位？", fillcolor="#fff7ed", color="#E69F00"];
+  drop [label="丢弃最旧未推理批次\nqueue_dropped_batches + 1", fillcolor="#fef3c7", color="#E69F00"];
+  fftw [label="CPU FFTW 构造模型输入\n解码、Blackman、功率、fftshift、dB、RGB\n[1,3,1024,1024]", fillcolor="#e0f2fe", color="#56B4E9"];
+  om [label="NPU: AscendOmRunner\naccepted YOLO OM 推理", fillcolor="#dcfce7", color="#009E73"];
+  post [label="CPU 解码与按预测通道 NMS\n候选框、软件标签、置信度", fillcolor="#e0f2fe", color="#56B4E9"];
+  publish [shape=note, label="写入 inference.jsonl\n发布最新 Qt 快照与时延", fillcolor="#f3e8ff", color="#CC79A7"];
+  unavailable [label="启动时 NPU unavailable\n入口拒绝；不以 CPU 检测替代", fillcolor="#fee2e2", color="#D55E00"];
+  failed [label="执行期错误\n记录 failed/error 并终止本次 run\n不以 CPU 检测替代", fillcolor="#fee2e2", color="#D55E00"];
+
+  { rank=same; drop; fftw; }
+  { rank=same; om; failed; }
+
+  manifest -> capture -> archive -> queue;
+  queue -> fftw [label="是"];
+  queue -> drop [label="否", color="#E69F00", fontcolor="#E69F00"];
+  drop -> fftw;
+  fftw -> om -> post -> publish;
+  manifest -> unavailable [label="启动预检失败", style=dashed, color="#D55E00", fontcolor="#D55E00", constraint=false];
+  om -> failed [label="执行或输出合同失败", style=dashed, color="#D55E00", fontcolor="#D55E00"];
+}

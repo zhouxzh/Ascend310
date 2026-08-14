@@ -1,0 +1,31 @@
+digraph Case5SessionTraceFlow {
+  graph [
+    rankdir=TB,
+    bgcolor="white",
+    pad="0.22",
+    nodesep="0.30",
+    ranksep="0.48",
+    splines=polyline,
+    fontname="Microsoft YaHei",
+    dpi=150
+  ];
+  node [shape=box, style="rounded,filled", fontname="Microsoft YaHei", fontsize=11,
+        color="#374151", fontcolor="#111827", fillcolor="#f8fafc", margin="0.14,0.09"];
+  edge [fontname="Microsoft YaHei", fontsize=9, color="#475569", arrowsize=0.75];
+
+  analysis [shape=note, label="analysis.jsonl 的一条结果\n序号范围、OM 后端、线性功率、时延", fillcolor="#f3e8ff", color="#CC79A7"];
+  range [label="取出 first_sequence 至 last_sequence\n确定本分析窗口对应的帧", fillcolor="#e0f2fe", color="#56B4E9"];
+  index [shape=note, label="raw_index.jsonl\nsequence -> chunk、offset、bytes", fillcolor="#fef3c7", color="#E69F00"];
+  raw [shape=folder, label="raw_XXXX.c5raw\n原始 BridgeFrameV1 分块", fillcolor="#fef3c7", color="#E69F00"];
+  replay [label="按索引重读并解码\n复原同一窗口的 CH1 / CH2 样本", fillcolor="#e0f2fe", color="#56B4E9"];
+  session_meta [shape=note, label="会话配置与完整性证据\nmanifest.json：采样率、通道换算、模型元数据\nsummary.json：帧数、原始字节、存储丢帧、写入错误", fillcolor="#dcfce7", color="#009E73"];
+  check [shape=diamond, label="序号、配置与存储状态\n都能相互印证？", fillcolor="#fff7ed", color="#E69F00"];
+  verified [label="可复核的分析窗口\n结果与原始证据绑定", fillcolor="#dcfce7", color="#009E73"];
+  limited [label="标记证据限制\n不得宣称完整窗口", fillcolor="#fee2e2", color="#D55E00"];
+
+  { rank=same; verified; limited; }
+
+  analysis -> range -> index -> raw -> replay -> session_meta -> check;
+  check -> verified [label="是"];
+  check -> limited [label="否", style=dashed, color="#D55E00", fontcolor="#D55E00"];
+}

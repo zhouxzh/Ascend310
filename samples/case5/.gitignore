@@ -1,0 +1,17 @@
+# Generated Case 5 model artifacts and session captures remain board-local.
+models/*
+!models/README.md
+data/*
+!data/README.md
+third_party/
+__pycache__/
+.pytest_cache/
+.pytest-tmp/
+.pytest-tmp-*/
+.pytest_tmp/
+*.py[cod]
+*.log
+capture.cu8
+tmp/
+.tmp_*/
+.pytest-legacy-rtl-audit/

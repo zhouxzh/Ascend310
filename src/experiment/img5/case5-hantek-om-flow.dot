@@ -1,0 +1,54 @@
+digraph Case5HantekOmFlow {
+  graph [
+    rankdir=TB,
+    bgcolor="white",
+    size="7.4,9.3!",
+    pad="0.14",
+    nodesep="0.32",
+    ranksep="0.44",
+    splines=polyline,
+    fontname="Microsoft YaHei",
+    dpi=180
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Microsoft YaHei",
+    fontsize=14,
+    color="#475569",
+    fontcolor="#0F172A",
+    fillcolor="#F8FAFC",
+    margin="0.16,0.10"
+  ];
+  edge [
+    fontname="Microsoft YaHei",
+    fontsize=10,
+    color="#475569",
+    fontcolor="#334155",
+    arrowsize=0.75
+  ];
+
+  model [label="固定 DFT 模型\nHann 权重与原生 ONNX", fillcolor="#E8F2FB", color="#0072B2"];
+  atc [label="ATC 转换\nAscend310B4 OM", fillcolor="#DCFCE7", color="#009E73"];
+  verify [label="真实 OM 数值验证\n与 NumPy 参考比较", fillcolor="#DCFCE7", color="#009E73"];
+  verified [shape=diamond, label="形状、有限值和\n误差门限通过？", fillcolor="#FFF7ED", color="#E69F00"];
+  load [label="AscendOmRunner\n加载 OM session", fillcolor="#DCFCE7", color="#009E73"];
+  ready [shape=diamond, label="NPU ready？", fillcolor="#FFF7ED", color="#E69F00"];
+  infer [label="固定 DFT 推理\n输入 [1,2,10000]", fillcolor="#DCFCE7", color="#009E73"];
+  output [shape=diamond, label="输出 [1,2,201,1]\n且全部有限？", fillcolor="#FFF7ED", color="#E69F00"];
+  publish [label="发布 OM 线性功率\n频谱、瀑布与 analysis.jsonl", fillcolor="#F3E8FF", color="#CC79A7"];
+
+  rejected [label="数值验证失败\n模型不进入运行入口", fillcolor="#FEE2E2", color="#D55E00"];
+  unavailable [label="NPU unavailable\n停止更新频谱和瀑布", fillcolor="#FEE2E2", color="#D55E00"];
+  nofallback [label="NPU unavailable\n禁止 CPU FFT 回退", fillcolor="#FEE2E2", color="#D55E00"];
+
+  { rank=same; verified; rejected; }
+  { rank=same; ready; unavailable; }
+  { rank=same; output; nofallback; }
+
+  model -> atc -> verify -> verified -> load -> ready -> infer -> output -> publish;
+  verified -> rejected [label="否", color="#D55E00", fontcolor="#D55E00", style=dashed, constraint=false];
+  ready -> unavailable [label="否", color="#D55E00", fontcolor="#D55E00", style=dashed, constraint=false];
+  output -> nofallback [label="否", color="#D55E00", fontcolor="#D55E00", style=dashed, constraint=false];
+}

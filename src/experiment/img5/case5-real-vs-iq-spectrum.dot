@@ -1,0 +1,31 @@
+digraph Case5RealVsIqSpectrum {
+  graph [rankdir=TB, bgcolor="white", pad="0.20", nodesep="0.30", ranksep="0.44", splines=ortho, fontname="Microsoft YaHei", dpi=160];
+  node [shape=box, style="rounded,filled", fontname="Microsoft YaHei", fontsize=12, color="#374151", fontcolor="#111827", fillcolor="#f8fafc", margin="0.15,0.10"];
+  edge [color="#475569", arrowsize=0.72, penwidth=1.15];
+
+  subgraph cluster_real {
+    label="Hantek：实值时间序列";
+    color="#0072B2";
+    fontcolor="#0072B2";
+    style="rounded";
+    realSamples [label="CH1 或 CH2\nx[n] 为实值", fillcolor="#e0f2fe", color="#0072B2"];
+    realDft [label="Hann 窗 DFT\nX[-k] = conjugate(X[k])", fillcolor="#dbeafe", color="#0072B2"];
+    oneSided [label="显示单边频谱\n0 至 f_s / 2", fillcolor="#dbeafe", color="#0072B2"];
+    realSamples -> realDft -> oneSided;
+  }
+
+  subgraph cluster_iq {
+    label="RTL-SDR：复数 IQ";
+    color="#009E73";
+    fontcolor="#007A5E";
+    style="rounded";
+    cu8 [label="交错 CU8\nI_u8, Q_u8", fillcolor="#e0f2fe", color="#56B4E9"];
+    complex [label="z[n] = I[n] + jQ[n]\n保留相对中心频率的正、负频移", fillcolor="#dcfce7", color="#009E73"];
+    twoSided [label="完整双边频率轴\n-f_s / 2 至 +f_s / 2\n时频图再 fftshift 并上下翻转", fillcolor="#dcfce7", color="#009E73"];
+    cu8 -> complex -> twoSided;
+  }
+
+  conclusion [shape=note, label="单边与双边频谱的区别来自信号表示，\n不是 CPU 或 NPU 后端的区别。", fillcolor="#fefce8", color="#E69F00"];
+  oneSided -> conclusion;
+  twoSided -> conclusion;
+}

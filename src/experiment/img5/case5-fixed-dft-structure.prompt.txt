@@ -1,0 +1,10 @@
+Use case: scientific-educational
+Asset type: Chinese technical textbook computation structure
+Primary request:
+Create a publication-ready fixed-DFT computation structure corresponding to a static ONNX graph. A waveform tensor [1,2,10000] and precomputed Hann DFT projection weights feed MatMul. The projected real/imaginary pairs are squared, reshaped into real/imaginary pairs, summed pairwise, and emitted as linear power [1,2,201,1], representing 201 frequency points. Use a small inset to show cosine and sine basis rows multiplied by a Hann envelope. This is dense matrix projection, not an FFT butterfly.
+Scene/backdrop: clean white background with generous margins
+Style/medium: flat scientific computation diagram with matrices, tensor slabs, operator blocks, and precise arrows
+Composition/framing: 16:10 landscape, left-to-right computation with the Hann-weight inset above the projection block
+Color palette: Okabe-Ito blue #0072B2, sky blue #56B4E9, green #009E73, orange #E69F00, purple #CC79A7, charcoal text
+Text (verbatim): "波形 [1,2,10000]", "Hann DFT 权重", "MatMul", "平方", "实部 / 虚部配对", "成对求和", "线性功率 [1,2,201,1]", "201 个频点", "固定矩阵 DFT"
+Constraints: render every requested label exactly once; operation order and tensor shapes must be exact; do not draw an FFT butterfly; no logarithm or dB conversion inside the model; no title or figure number inside the image; no extra labels, pseudo-text, gradients, shadows, 3D effects, decorative imagery, or watermark
