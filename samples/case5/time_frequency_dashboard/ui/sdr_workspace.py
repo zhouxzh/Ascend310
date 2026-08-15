@@ -14,6 +14,9 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QGridLayout,
+    QScrollArea,
+    QSizePolicy,
     QSplitter,
     QTabWidget,
     QVBoxLayout,
@@ -28,7 +31,7 @@ from .sdr_views import (
     SpectrogramDetectionPlot,
     constellation_samples_from_model_input,
 )
-from .theme import ERROR, GOOD
+from .theme import CONTROL_RAIL_WIDTH, ERROR, GOOD, RESULTS_RAIL_WIDTH
 
 
 def _field(value: Any, name: str, default: Any = None) -> Any:
@@ -75,6 +78,7 @@ class SdrWorkspace(QWidget):
         self._rendered_frame_key: tuple[Any, Any] | None = None
         self._rendered_generation: Any = None
         self._last_snapshot: Any = None
+        self._compact = False
         self._build_ui()
         self.controls.start_requested.connect(self.start_requested.emit)
         self.controls.stop_requested.connect(self.stop_requested.emit)
@@ -92,8 +96,15 @@ class SdrWorkspace(QWidget):
         layout.setSpacing(8)
         self.controls = SdrControls()
         self.controls.setObjectName("sdrControlRail")
-        self.controls.setFixedWidth(310)
-        layout.addWidget(self.controls)
+        self.controls.setMinimumWidth(0)
+        self.controls.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.control_scroll = QScrollArea()
+        self.control_scroll.setObjectName("sdrControlRailViewport")
+        self.control_scroll.setWidgetResizable(True)
+        self.control_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.control_scroll.setWidget(self.controls)
+        self.control_scroll.setFixedWidth(CONTROL_RAIL_WIDTH)
+        layout.addWidget(self.control_scroll)
 
         content = QWidget()
         content_layout = QVBoxLayout(content)
@@ -114,14 +125,14 @@ class SdrWorkspace(QWidget):
         content_layout.addWidget(self.tabs, 1)
         layout.addWidget(content, 1)
 
-        results_frame = QFrame()
-        results_frame.setObjectName("sdrResultsRail")
-        results_layout = QVBoxLayout(results_frame)
+        self.results_frame = QFrame()
+        self.results_frame.setObjectName("sdrResultsRail")
+        results_layout = QVBoxLayout(self.results_frame)
         results_layout.setContentsMargins(8, 8, 8, 8)
         self.results = SdrInferenceResults()
         results_layout.addWidget(self.results, 1)
-        results_frame.setFixedWidth(350)
-        layout.addWidget(results_frame)
+        self.results_frame.setFixedWidth(RESULTS_RAIL_WIDTH)
+        layout.addWidget(self.results_frame)
 
     def _build_iq_page(self) -> None:
         page = QWidget()
@@ -134,7 +145,6 @@ class SdrWorkspace(QWidget):
         splitter.addWidget(self.constellation_plot)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([400, 400])
         page_layout.addWidget(splitter, 1)
         self.iq_context_label = QLabel("星座：等待模型输入")
         self.iq_context_label.setObjectName("sdrIqContext")
@@ -163,6 +173,12 @@ class SdrWorkspace(QWidget):
 
     def set_available(self, available: bool, reason: str = "") -> None:
         self.controls.set_available(available, reason)
+
+    def set_compact(self, compact: bool) -> None:
+        """Keep both side rails usable when a smaller output is selected."""
+        self._compact = bool(compact)
+        self.control_scroll.setFixedWidth(292 if self._compact else CONTROL_RAIL_WIDTH)
+        self.results_frame.setFixedWidth(320 if self._compact else RESULTS_RAIL_WIDTH)
 
     def set_display_paused(self, paused: bool) -> None:
         self._display_paused = bool(paused)
@@ -240,7 +256,7 @@ class SdrWorkspace(QWidget):
         message = str(error or _field(snapshot, "message", "准备就绪"))
         if coordinator_active and state.lower() in {"idle", "stopped"}:
             state = str(coordinator_state)
-            message = str(coordinator_message or "Starting RTL-SDR")
+            message = str(coordinator_message or "正在启动 RTL-SDR")
         self.status_label.setText(f"{state} · {message}")
         self.model_label.setText(f"模型：{model_id} {task_label}".strip())
         self.npu_label.setText(str(backend))
@@ -265,7 +281,13 @@ class SdrWorkspace(QWidget):
         run_dir = _field(snapshot, "run_dir")
         result_path = _field(snapshot, "result_path")
         location = result_path or run_dir
-        self.run_label.setText("记录：-" if location is None else f"记录：{location}")
+        run_text = "记录：-" if location is None else f"记录：{location}"
+        self.run_label.setToolTip(run_text)
+        self.run_label.setText(
+            self.run_label.fontMetrics().elidedText(
+                run_text, Qt.ElideMiddle, max(self.run_label.width(), 180)
+            )
+        )
         self.controls.set_qc_available(
             state.lower() == "idle"
             and _field(snapshot, "source") == "rtl"
@@ -344,8 +366,10 @@ class SdrWorkspace(QWidget):
     def _build_status_strip(self) -> QWidget:
         status_bar = QFrame()
         status_bar.setObjectName("sdrStatusBar")
-        status_layout = QHBoxLayout(status_bar)
-        status_layout.setContentsMargins(10, 5, 10, 5)
+        status_layout = QGridLayout(status_bar)
+        status_layout.setContentsMargins(10, 6, 10, 6)
+        status_layout.setHorizontalSpacing(12)
+        status_layout.setVerticalSpacing(3)
         self.status_label = QLabel("IDLE · 准备就绪")
         self.model_label = QLabel("模型：-")
         self.npu_label = QLabel("NPU 未初始化")
@@ -354,13 +378,18 @@ class SdrWorkspace(QWidget):
         self.latency_label = QLabel("NPU：-- · 采集后：-- · 端到端：--")
         self.run_label = QLabel("记录：-")
         self.run_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        for widget in (
-            self.status_label,
-            self.model_label,
-            self.npu_label,
-            self.pipeline_label,
-            self.latency_label,
-        ):
-            status_layout.addWidget(widget)
-        status_layout.addWidget(self.run_label, 1)
+        self.status_label.setWordWrap(True)
+        self.model_label.setWordWrap(True)
+        self.run_label.setMinimumWidth(180)
+        self.run_label.setToolTip("完整 JSONL 或运行目录路径将在这里显示")
+        status_layout.addWidget(self.status_label, 0, 0, 1, 2)
+        status_layout.addWidget(self.model_label, 0, 2)
+        status_layout.addWidget(self.npu_label, 0, 3)
+        status_layout.addWidget(self.pipeline_label, 1, 0)
+        status_layout.addWidget(self.latency_label, 1, 1, 1, 2)
+        status_layout.addWidget(self.run_label, 1, 3)
+        status_layout.setColumnStretch(0, 1)
+        status_layout.setColumnStretch(1, 1)
+        status_layout.setColumnStretch(2, 1)
+        status_layout.setColumnStretch(3, 2)
         return status_bar

@@ -172,7 +172,7 @@ $$
 
 这张图解决“像素与物理量怎样对应”的问题。它把一个模型图像还原为连续 IQ、时间行和频率 bin；图中的箭头是数据变换，不是神经网络层。
 
-![RTL-SDR IQ 到 1024 乘 1024 时频图和物理坐标的映射](./img5/case5-iq-to-spectrogram-mapping.png){width=680px}
+![RTL-SDR IQ 到 1024 乘 1024 时频图和物理坐标的映射](./img5/case5-iq-to-spectrogram-mapping.png){width=520px}
 
 *图 5-5 IQ 到时频图的映射。2.048 MS/s 下，1024 点的一行覆盖 0.5 ms，频率 bin 间隔为 2 kHz；纵轴经过 `fftshift` 和上下翻转，图像顶端对应中心频率上方约 $f_s/2$。这是当前实现的名义频率坐标，尚不构成射频频率标定。图源见 `img5/case5-iq-to-spectrogram-mapping.dot`。*
 
@@ -182,7 +182,7 @@ $$
 
 这张图解决“同样部署为 OM 是否就同样属于人工智能”的问题。两条主线都把固定形状张量交给 Ascend 310B，但 Hantek 的图只实现预先写死的 DFT 投影；RTL-SDR 的图才包含由训练确定的卷积、特征融合和检测参数。
 
-![Case 5 固定 DFT 与 YOLO11s 的计算边界](./img5/case5-computation-boundary.png){width=620px}
+![Case 5 固定 DFT 与 YOLO11s 的计算边界](./img5/case5-computation-boundary.png){width=380px}
 
 *图 5-6 两种 NPU 任务的计算边界。固定 DFT 是确定性数值分析，不含训练得到的可学习参数；YOLO11s 是学习模型。两条路径都要求 OM 真正运行：初始化不可用时显式报告 `NPU unavailable`，运行期错误显式失败且不以 CPU 结果替代。图源见 `img5/case5-computation-boundary.dot`。*
 
@@ -308,7 +308,7 @@ $$
 
 这张图解决“神经网络输出后还发生了什么”的问题。ONNX 没有嵌入 NMS；OM 输出先在 CPU 上完成确定性的解码和抑制，才成为界面叠加框和 JSONL 记录。
 
-![YOLO11 输出张量到时频检测事件的解码流程](./img5/case5-yolo-detection-decode-flow.png){width=620px}
+![YOLO11 输出张量到时频检测事件的解码流程](./img5/case5-yolo-detection-decode-flow.png){width=520px}
 
 *图 5-8 当前 OM 兼容解码流程。`output0 [1,55,21504]` 转置为候选行后，前四列按 `xywh` 解释；现有实现从后 51 列取最大评分和通道索引，并按该索引分组做 IoU 0.70 的 NMS，最多保留 300 个框。该索引只是张量布局的兼容信息，不是调制类别标签；因此本图只说明输出解码和流水线连通，不能说明候选区域的类别、数量、召回率或误报率。图源见 `img5/case5-yolo-detection-decode-flow.dot`。*
 
@@ -396,7 +396,7 @@ self.latest_statistics = (
 
 这张图把“帧缺口为什么必须丢掉半个窗口”和“队列为什么丢弃旧分析任务”放在同一条流程上。它对应的是运行时数据完整性规则，而不是一次性的 USB 连接检查。
 
-![Hantek 桥接帧到固定分析窗口的流程](./img5/case5-hantek-acquisition-flow.png){width=580px}
+![Hantek 桥接帧到固定分析窗口的流程](./img5/case5-hantek-acquisition-flow.png){width=380px}
 
 *图 5-9 Hantek 实时窗口形成流程。任何帧序号、主机时间或采样率连续性错误都会重置未完成窗口；形成 `[1,2,10000]` 后才进入容量为 2 的最新任务队列。队列满时丢弃旧分析任务并计数，不能把跨越缺口的样本拼成正常频谱。图源见 `img5/case5-hantek-acquisition-flow.dot`。*
 
@@ -435,7 +435,7 @@ nodes = [
 
 这张图解决“生成 ONNX 后为什么还不能直接宣布 NPU 可用”的问题。ATC 只完成格式转换；真实 OM 的加载、数值与有限值检查才决定仪表盘能否发布频谱。
 
-![Hantek 固定 DFT 从 ONNX 到 OM 发布的流程](./img5/case5-hantek-om-flow.png){width=580px}
+![Hantek 固定 DFT 从 ONNX 到 OM 发布的流程](./img5/case5-hantek-om-flow.png){width=380px}
 
 *图 5-10 固定 DFT 的板端验证与发布流程。只有真实 OM 输出形状正确、全为有限值并满足数值门限时，频谱和瀑布才接收线性功率；失败路径明确显示 `NPU unavailable`，没有 CPU FFT 回退。图源见 `img5/case5-hantek-om-flow.dot`。*
 
@@ -466,11 +466,15 @@ cd ~/Documents/case5
 bash scripts/run_dashboard.sh --sigrok-bridge build/sigrok_capture_bridge
 ```
 
-连接 Hantek 后，顶部后端区域应显示 `NPU (Ascend 310B)`，而不是 `NPU unavailable`。下图是以 6022BE `CAL` 方波取得的实机界面记录。
+连接 Hantek 后，顶部后端区域应显示 `NPU (Ascend 310B)`，而不是 `NPU unavailable`。图 5-11 是 2026-08-15 在 `ascend8t` 的 HDMI `1920x1080` 输出上取得的实机记录：CH1 探头接 6022BE 的低压 `CAL`，采样合同为 1 MS/s、10,000 点窗口。它解决的是“真实采集、OM 和触摸界面是否同时工作”的问题，不是电流标定或射频性能验收。
 
-![Hantek CAL 方波在 Case 5 仪表盘中的实时显示](./img5/case5-hantek-dashboard.png)
+![Hantek CAL 方波在 Case 5 仪表盘中的实时显示](./img5/case5-hantek-dashboard-1920x1080.png)
 
-*图 5-11 Hantek 工作区的界面示例。它展示 CH1 采集、OM 后端状态和会话写入的位置，不代表 Little Bee 双通道幅相已经标定；一次运行是否可追溯仍以第 8 节所述的会话记录为准。*
+*图 5-11a Hantek 波形工作区，完整显示区为 1920x1080。绿色状态块证明本次频谱后端为真实 `NPU (Ascend 310B)`；底部给出帧、USB 块、丢弃计数、延迟和会话目录。波形来自 CH1 的 `CAL`，不代表 Little Bee 的 CH2 幅相已标定。*
+
+![Hantek CAL 方波的 NPU DFT 频谱与瀑布](./img5/case5-hantek-spectrum-1920x1080.png)
+
+*图 5-11b 同一会话的频谱与瀑布页。上图和瀑布均由固定 DFT OM 的功率输出绘制，右侧色标显示的是相对 1 V² 的未校准 dB，不是 dBV、dBFS 或 dBm。图中的离散谱线说明方波谐波结构，不能单独用于估计探头带宽或精确幅值。*
 
 界面可以按从上到下、从左到右的顺序阅读：
 
@@ -484,7 +488,9 @@ CAL 方波的基频约为 1 kHz，理想方波还会出现奇次谐波。在频�
 
 ### 7.4 NPU 不可用时系统怎样表现 {#src-experiment-case5-no-fallback}
 
-`AscendOmRunner` 只有在 OM 文件存在、`aclruntime` 可导入、session 建立成功且输出名称可读取后才进入 ready 状态。任意一轮返回 NaN、Inf、错误形状或运行异常，后端都会转为 `NPU unavailable`，频谱和瀑布停止接收新行。
+Hantek 的 `AscendOmRunner` 只有在 OM 文件存在、`aclruntime` 可导入、session 建立成功且输出名称可读取后才进入 ready 状态。初始化失败时，Hantek 顶部明确显示 `NPU unavailable`；已经开始的 Hantek 分析若返回 NaN、Inf、错误形状或运行异常，分析 worker 停止发布新频谱行并转入同一不可用状态。
+
+RTL-SDR 的状态语义应单独阅读：初始化或 OM 合同预检失败时入口显示或记录 `NPU unavailable`；服务已经启动后若遇到 NaN、Inf、错误形状或运行异常，则本次 run 进入 `failed`，并在 JSONL footer 中写入 `error` 和 `completion_status=failed`。后者不能笼统写成一个成功后又“降级”的状态。
 
 系统没有 Hantek CPU FFT fallback。模拟源可以帮助调试采集、队列和界面，但没有 OM 时不会生成一条 CPU 频谱冒充 NPU 结果。这个失败状态是可验证设计的一部分，而不是缺少功能。
 
@@ -518,7 +524,7 @@ CAL 方波的基频约为 1 kHz，理想方波还会出现奇次谐波。在频�
 
 这张图解决“一个漂亮的频谱图怎样被独立复核”的问题。它从结果记录反向回到原始帧，再让配置与会话完整性证据参与判断。
 
-![Hantek 分析结果到原始证据的追溯流程](./img5/case5-session-trace-flow.png){width=540px}
+![Hantek 分析结果到原始证据的追溯流程](./img5/case5-session-trace-flow.png){width=340px}
 
 *图 5-12 单条 Hantek 分析结果的追溯路径。`analysis.jsonl` 给出窗口范围和 OM 结果，`raw_index.jsonl` 定位原始块；`manifest.json` 约束采样率、探头和模型，`summary.json` 报告会话完整性。缺少任一环节时，不能声称该窗口完全可复核。图源见 `img5/case5-session-trace-flow.dot`。*
 
@@ -587,7 +593,7 @@ bash scripts/run_rtl_sdr_npu_demo.sh \
 
 ![RTL-SDR 实时服务从 CU8 到 OM 检测与 JSONL 的流程](./img5/case5-rtl-service-flow.png)
 
-*图 5-13 RTL-SDR 实时服务流程。原始 CU8 先归档并绑定 SHA256；输入队列积压时丢弃最旧待推理批次；FFTW 生成时频图后由 OM 执行检测。初始化失败时入口拒绝 NPU 运行；执行期输出异常则以失败记录终止本次 run，二者都不会改用 CPU 检测器。图源见 `img5/case5-rtl-service-flow.dot`。*
+*图 5-13a RTL-SDR 实时服务流程。原始 CU8 先归档并绑定 SHA256；输入队列积压时丢弃最旧待推理批次；FFTW 生成时频图后由 OM 执行检测。初始化失败时入口拒绝 NPU 运行；执行期输出异常则以失败记录终止本次 run，二者都不会改用 CPU 检测器。图源见 `img5/case5-rtl-service-flow.dot`。*
 
 ### 9.3 谁计算时频图，谁完成检测 {#src-experiment-case5-rtl-cpu-npu-boundary}
 
@@ -596,6 +602,16 @@ bash scripts/run_rtl_sdr_npu_demo.sh \
 这个时频图可以在界面中预览，但必须标注为“CPU FFTW 模型输入”。NPU 执行 YOLO 并返回框参数与评分，CPU 再按第 5.4 节进行确定性解码和显示。当前 checkpoint 的输出只可作为候选区域链路的技术性证据；现有兼容解码中的通道索引和框数均不是类别或真实事件数量。把 CPU 模型输入称为“NPU FFT”，或者用 CPU 检测结果代替 OM，都会破坏后端可解释性。
 
 对于 raw-IQ 分类模型，CPU 只按 manifest 进行去直流和归一化，NPU 返回类别 logits，界面再显示 Top-K。两类模型共用服务，但输入形状和后处理不能混用。
+
+图 5-13b 和图 5-13c 是 2026-08-15 在 `ascend8t` 的 HDMI `1920x1080` 输出上获得的一次真实短运行。运行选择已准入的 `torchsig-yolo11s-v1.1.0-b1` OM，记录中心频率 100 MHz、采样率 2.048 MS/s、手动增益 40.2 dB、`antenna_connected` 和 10 s 请求。服务将请求扩展为 20 个完整窗口；本次完成 20/20 批、推理队列丢批为 0，并对同一 CU8/JSONL 的只读 QC 报告端到端 P95 为 902.59 ms。该记录证明数据流与后端，不构成天线、频率轴、信号类别或检测准确率的计量结论。
+
+![RTL-SDR 真实 I/Q 与星座工作区](./img5/case5-sdr-iq-1920x1080.png)
+
+*图 5-13b RTL-SDR I/Q 与星座页，完整显示区为 1920x1080。中间两图是已归档 CU8 解码后的未校准 I/Q 和显示用星座，右侧表是 OM 输出经确定性解码后的最近候选。顶部绿色块明确给出 `NPU (Ascend 310B)`；表中省略的长时间和频率值可由悬浮提示读取。*
+
+![RTL-SDR 真实时频检测工作区](./img5/case5-sdr-detection-1920x1080.png)
+
+*图 5-13c RTL-SDR 时频检测页。灰度图是 CPU FFTW/Blackman 预处理后实际送入 OM 的 `[1,3,1024,1024]` 图像；绿色框来自 OM 神经网络输出的 CPU 确定性解码。为保证触摸屏可读性，界面保留全部框和结果表，但只标注一组不重叠的高置信度框。`bpsk` 是当前单类 checkpoint 的部署映射文字，不能解释为已验证的 BPSK 识别或 51 类调制识别。名义 RF 轴尚未校准。*
 
 ## 10. 模型准入与真实板端运行 {#src-experiment-case5-rtl-admission}
 
@@ -616,7 +632,7 @@ Case 5 用版本化 manifest 保存这些答案。正式入口只展示同时满
 
 这张图区分“离线准入”与“在线连续运行证据”。前者证明一个固定模型合同可部署，后者才说明在明确输入状态下的完整流水线没有超过窗口预算。
 
-![模型准入与连续流水线证据的流程](./img5/case5-model-admission-flow.png){width=600px}
+![模型准入与连续流水线证据的流程](./img5/case5-model-admission-flow.png){width=480px}
 
 *图 5-14 模型准入与证据附着流程。来源、哈希、数值比较和窗口预算共同决定 `accepted`；真实运行的 CU8、JSONL 和只读 QC 形成新的 sibling manifest 证据，而不是改写原始 manifest。图源见 `img5/case5-model-admission-flow.dot`。*
 
@@ -794,7 +810,7 @@ python -m pytest -q tests/test_hardware_capture_and_inference.py
 6. 对同一 JSONL/CU8 生成只读 QC；
 7. 需要连续验收时，再执行至少 600 秒、已接天线或受控线缆的运行。
 
-Hantek 与 RTL-SDR 在仪表盘中互斥。切换前必须先停止当前来源，等待采集进程、队列和 NPU runner 完全退出。
+Hantek 与 RTL-SDR 在仪表盘中互斥。切换前必须先停止当前来源，等待采集进程、队列和 NPU runner 完全退出。互斥只证明应用层不会并行分配设备，不自动证明某一 CANN 版本可以在同一 Python 进程中完成任意 OM 的反复重初始化；这项行为仍需按板端环境单独验收。
 
 ### 12.5 常见故障 {#src-experiment-case5-troubleshooting}
 
@@ -802,10 +818,11 @@ Hantek 与 RTL-SDR 在仪表盘中互斥。切换前必须先停止当前来源�
 | --- | --- | --- |
 | `Resource busy` / `LIBUSB_ERROR_BUSY` | PulseView、`sigrok-cli` 或旧仪表盘仍占用 6022BE | 关闭占用程序；必要时物理拔插 |
 | `writable=False` | 当前用户没有 USB 写权限 | 安装项目 udev 规则，不要 sudo 启动 UI |
-| `sigrok capture bridge not found` | 尚未编译桥或路径错误 | 运行 `scripts/build_sigrok_capture_bridge.sh` |
+| `sigrok capture bridge not found` | 尚未编译桥或路径错误 | 运行 `scripts/` 下的 `build_sigrok_capture_bridge.sh` |
 | 实际采样率不是 1 MS/s | 采集合同与固定 OM 不匹配 | 检查驱动、量程和启动参数 |
 | `NPU unavailable` | Hantek runner 在初始化或输出合同检查中失败，或 RTL 服务在启动预检时无法建立 OM | 先区分 Hantek 与 RTL 路径，再运行对应 `verify_*_model` 并查看具体消息 |
 | RTL run `failed` / `error` | runner 已启动后输出出现 NaN/Inf 或违反形状合同 | 保留 JSONL，检查失败记录；不要把运行期错误写成 CPU 或 NPU 成功 |
+| `GeExecutor has not been initialized` 或 `[ACL: invalid parameter]` | 本次板端审查中，Hantek 停止后同一 Python 进程重新启动 RTL-SDR OM 时出现的 CANN 生命周期错误 | 保留日志和失败 JSONL，确认 USB 已释放后关闭并重新启动仪表盘；不得改用 CPU 检测器。该跨来源重初始化问题不应被写成已通过的无缝切换验收 |
 | Hantek 频谱不更新 | NPU 没有 ready 或未形成完整窗口 | 检查后端、采样率、帧缺口和队列计数 |
 | CH2 数值异常 | Little Bee 模式、匝数、去零或削顶不正确 | 回到探头说明和经确认隔离的教学回路重新检查；标定前不把 CH2 数值当作计量结果 |
 | SDR 页面没有模型 | 没有通过准入和哈希复核的 manifest | 按 `docs/07` 完成模型准入 |
@@ -844,16 +861,16 @@ Case 5 的两条实验链面对不同物理信号，却使用了相同的工程�
 
 ### 13.4 外部资料 {#src-experiment-case5-external-references}
 
-[^1]: Weston Braun. "Little Bee B1 Operating Instructions." 固定审查版本：9157c50a5d6e56ba746725cb0de5875efac7d5e7. https://github.com/westonb/little-bee-B1/blob/9157c50a5d6e56ba746725cb0de5875efac7d5e7/getting-started/README.md
+[^1]: Weston Braun. "Little Bee B1 Operating Instructions." 固定审查提交：[9157c50a5d6e](https://github.com/westonb/little-bee-B1/blob/9157c50a5d6e56ba746725cb0de5875efac7d5e7/getting-started/README.md)。
 
-[^2]: Luke Boegner et al. "Large Scale Radio Frequency Wideband Signal Detection & Recognition." arXiv:2211.10335, 2022. https://doi.org/10.48550/arXiv.2211.10335
+[^2]: Luke Boegner et al. "Large Scale Radio Frequency Wideband Signal Detection & Recognition." arXiv:2211.10335, 2022. <https://doi.org/10.48550/arXiv.2211.10335>
 
-[^3]: TorchDSP. "gr-spectrumdetect." 固定审查版本：868cb381e1fdd7d13ad70ecaf271e5060c43308d. https://github.com/TorchDSP/gr-spectrumdetect/blob/868cb381e1fdd7d13ad70ecaf271e5060c43308d/README.md#training
+[^3]: TorchDSP. "gr-spectrumdetect." 固定审查版本：868cb381e1fdd7d13ad70ecaf271e5060c43308d. <https://github.com/TorchDSP/gr-spectrumdetect/blob/868cb381e1fdd7d13ad70ecaf271e5060c43308d/README.md#training>
 
-[^4]: Ultralytics. "YOLO11: Architecture and model documentation." https://docs.ultralytics.com/models/yolo11/
+[^4]: Ultralytics. "YOLO11: Architecture and model documentation." <https://docs.ultralytics.com/models/yolo11/>
 
-[^5]: Xiang Li et al. "Generalized Focal Loss: Learning Qualified and Distributed Bounding Boxes for Dense Object Detection." NeurIPS 2020. https://doi.org/10.48550/arXiv.2006.04388
+[^5]: Xiang Li et al. "Generalized Focal Loss: Learning Qualified and Distributed Bounding Boxes for Dense Object Detection." NeurIPS 2020. <https://doi.org/10.48550/arXiv.2006.04388>
 
-[^6]: Huawei. "CANN 8.0 ATC precision_mode." https://www.hiascend.com/document/detail/en/canncommercial/800/devaids/atc/atlasatcparam_16_0068.html
+[^6]: Huawei. "CANN 8.0 ATC precision_mode." <https://www.hiascend.com/document/detail/en/canncommercial/800/devaids/atc/atlasatcparam_16_0068.html>
 
-[^7]: Huawei. "CANN 8.0 ATC keep_dtype." https://www.hiascend.com/document/detail/en/canncommercial/800/devaids/atc/atlasatcparam_16_0074.html
+[^7]: Huawei. "CANN 8.0 ATC keep_dtype." <https://www.hiascend.com/document/detail/en/canncommercial/800/devaids/atc/atlasatcparam_16_0074.html>

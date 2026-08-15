@@ -50,6 +50,44 @@ def test_spectrogram_detection_mapping_clips_image_coordinates():
     assert mapped.frequency_high_hz == pytest.approx(100_824_000.0)
 
 
+def test_detection_overlay_captions_are_bounded_and_spaced(monkeypatch):
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("pyqtgraph")
+    from PySide6.QtWidgets import QApplication
+
+    from time_frequency_dashboard.ui.sdr_views import (
+        MAX_DETECTION_CAPTIONS,
+        PhysicalDetectionBox,
+        SpectrogramDetectionPlot,
+    )
+
+    app = QApplication.instance() or QApplication([])
+    view = SpectrogramDetectionPlot()
+    view._boxes = [
+        PhysicalDetectionBox(
+            label="candidate",
+            confidence=1.0 - index / 20.0,
+            image_box_xyxy=(0.0, 0.0, 1.0, 1.0),
+            time_start_s=index * 0.01,
+            time_end_s=index * 0.01 + 0.02,
+            frequency_low_hz=99_900_000.0,
+            frequency_high_hz=100_000_000.0,
+        )
+        for index in range(16)
+    ]
+
+    captions = view._caption_boxes()
+
+    assert len(captions) <= MAX_DETECTION_CAPTIONS
+    assert captions[0].confidence == pytest.approx(1.0)
+    assert all(
+        later.time_start_s - earlier.time_start_s >= 0.025
+        for earlier, later in zip(captions, captions[1:])
+    )
+    view.close()
+    app.processEvents()
+
+
 @pytest.mark.parametrize("center_frequency_hz", (float("nan"), 0.0, -1.0))
 def test_spectrogram_mapping_rejects_invalid_rf_axis_values(center_frequency_hz):
     from time_frequency_dashboard.ui.sdr_views import map_detection_box

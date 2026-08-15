@@ -1,97 +1,44 @@
 # 01 Hantek 6022BE：sigrok 驱动和实机采集
 
-本案例只使用 sigrok 作为 Hantek 6022BE 的程序采集后端。PulseView 是人工观察和
-排查工具；`time_frequency_dashboard` 通过项目内的 C 桥直接调用同一个 libsigrok
-`hantek-6xxx` 驱动，不解析 PulseView 截图或 `sigrok-cli` 文本。
+本文件解释 Hantek 6022BE 的硬件边界与 libsigrok 采集实现。安装、桥编译和 `CAL` 实验的操作顺序统一见 [README](../README.md)。
 
-## 硬件与接线
+## 当前可证明的范围
 
-6022BE 是 USB 2.0 双通道示波器。首轮验证把 CH1 探头接到机身 `CAL` 标准测试输出，
-这只证明 USB、固件和波形链路连通；截图和波形不能作为带宽、幅值精度或 NPU 验收。
-CH2 预留给 Little Bee B1 的安全低压电流输出，电流探头说明见
-[`02_little_bee_b1.md`](02_little_bee_b1.md)。两个通道共地，禁止在未确认隔离和量程时
-测量市电。
+Case 5 的 Hantek 主路径只使用系统 libsigrok 的 `hantek-6xxx` 驱动。PulseView 与 `sigrok-cli` 只用于人工观察或排查；仪表盘不解析它们的文本输出，也不使用示波器专用 Python 库。
 
-## 手动安装的系统包
+已记录的实机证据是 CH1 探头接 6022BE `CAL` 标准测试输出后，桥接、连续窗口、固定 DFT OM 和仪表盘连通。它不证明幅值精度、模拟带宽、CH2 电流标定、设备 FIFO 连续性或 NPU 以外的能力。
 
-在板端 `base` 环境运行程序前，用户需要手动安装：
+## 接线与安全
 
-```bash
-sudo apt-get update
-sudo apt-get install -y libsigrok-dev sigrok-cli gcc pkg-config libfftw3-single3
-```
+6022BE 是 USB 双通道示波器，两个输入共地而非隔离输入。首轮验证应把 CH1 探头接在机身低压 `CAL` 输出；CH2 保持未接，或只连接已确认隔离的低压 Little Bee 输出。
 
-前四个包的用途分别是 libsigrok API/驱动、人工命令行排查、编译桥接程序和读取编译参数；
-`libfftw3-single3` 为已准入的 RTL-SDR 时频检测模型提供 CPU 端 FFTW 预处理运行库。
-触摸屏若缺 Qt X11 光标库，再安装：
+- 未确认被测回路的隔离、接地、量程和探头倍率前，禁止测量市电。
+- CH2 要接 Little Bee B1 时，先阅读 [02 Little Bee B1](02_little_bee_b1.md)，完成探头去零并如实记录模式、灵敏度和匝数。
+- PulseView、`sigrok-cli` 与仪表盘不能同时占用同一台 6022BE；切换程序前必须停止前一个 session。
+- PulseView 退出后若设备仍显示 `1d50:608e`，物理拔插一次，使下一次 sigrok 扫描重新加载 `fx2lafw` 易失固件。
 
-```bash
-sudo apt-get install -y libxcb-cursor0
-```
+## 采集桥的职责
 
-Python 依赖不需要 sudo：
+`time_frequency_dashboard/acquisition/native/sigrok_capture_bridge.c` 以一个长期运行的 libsigrok session 完成：
 
-```bash
-conda activate base
-python -m pip install -r requirements-board.txt
-```
+1. 扫描 Hantek，在驱动需要时上传易失固件；
+2. 开启 CH1/CH2，设置驱动支持的 V/div 和目标采样率；
+3. 接收两个 `SR_DF_ANALOG` 回调，并只在两个通道都获得新样本后配对；
+4. 输出 `BridgeFrameV1` 二进制帧到 stdout，诊断写入 stderr。
 
-## 编译和启动
+桥输出的 payload 是 `[N, CH1, CH2]` 小端 float32；头部包括魔数、版本、序号、主机单调时间、实际采样率、样本数、通道数、削顶标志和 payload 长度。Python 端从任意 stdout 分片重建帧，拒绝错误版本、跳号或非 1 MS/s 的输入，再拼成固定 `[1,2,10000]` 的 OM 窗口。
 
-```bash
-cd ~/Documents/case5
-bash scripts/build_sigrok_capture_bridge.sh
-python -m time_frequency_dashboard.acquisition.usb_diagnostics
-```
+UI 只提供 `1`、`0.5`、`0.25`、`0.1 V/div` 这四个 sigrok 驱动真实支持的量程。探头倍率和量程只能在连接前修改；采集期间不伪造硬件触发功能。
 
-诊断程序只枚举设备，不打开接口、不上传固件。关闭 PulseView 后，如果 `lsusb` 仍显示
-`1d50:608e`，物理拔插一次，让下一次 sigrok 扫描重新加载 `fx2lafw` 易失固件。
+## 连续性与吞吐边界
 
-加载 CANN、激活 `base` 后启动：
+libsigrok 0.5.2 的 Hantek 驱动按较大 USB transfer 交付模拟回调。桥通过滑动 `SR_CONF_LIMIT_MSEC` 目标约 40 ms 改善主机交付节奏，但不会针对每个窗口重新打开设备。任一通道长期无法配对时，桥会报错停止，而不是无限制缓存或静默拼接不同步数据。
 
-```bash
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
-source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
-python -m time_frequency_dashboard.model.prepare_models
-python -m time_frequency_dashboard.model.verify_npu_model
-bash scripts/run_dashboard.sh --sigrok-bridge build/sigrok_capture_bridge
-```
+驱动没有设备端 FIFO 溢出、硬件采样序号或跨 USB 回调缺口元数据。因此桥的连续序号只说明 stdout 用户态输出没有跳帧，不能作为无间隙 ADC 采样证明。
 
-UI 的 Hantek 量程只能选择 sigrok 驱动真实支持的 `1、0.5、0.25、0.1 V/div`。采样率固定
-为 1 MS/s，桥接会读回设备实际值；如果不是 1 MS/s，帧会被拒绝，不会送进固定 OM。
+2026-08-09 在 `ascend8t`、libsigrok 0.5.2、USB 2.0 高速环境中，`scripts/measure_sigrok_streaming.sh` 记录的主机有效回调速率如下：
 
-## sigrok 桥协议
-
-`time_frequency_dashboard/acquisition/native/sigrok_capture_bridge.c` 调用 libsigrok：
-
-1. 扫描 Hantek 6022BE，并在需要时上传 `fx2lafw` 固件；
-2. 开启 CH1、CH2，设置采样率和两路 V/div；
-3. 用一个长期运行的 session 接收两个 `SR_DF_ANALOG` 回调；
-4. 配对通道、转换为 float32，并输出 `BridgeFrameV1` 到 stdout，诊断写 stderr。
-
-BridgeFrameV1 的头部包括魔数、版本、序号、主机单调时间、实际采样率、样本数、通道数、
-削顶标志和 payload 长度；payload 是交错的 `[N, CH1, CH2]` 小端 float32。Python 端以
-任意 stdout 分片解码，检查序号连续和采样率，再应用探头倍率。
-
-libsigrok 0.5.2 的 Hantek 驱动默认按大 USB transfer 回调。桥接只有在 CH1/CH2 都收到新的
-模拟样本并完成配对后，才更新滑动 `SR_CONF_LIMIT_MSEC`，默认目标约 40 ms；这减少 UI 的
-突发延迟而不重复启动设备。每个通道最多保留一个 Linux 最大 USB 传输对应的未配对样本（约
-6,291,456 点）；任一通道长期落后时，
-桥接会报错停止，而不会无限制占用内存或把不同步的样本静默拼接。设备
-仍不提供 FIFO 溢出或跨回调采样缺口信息，因此序号连续不等于物理 ADC 无间隙。
-
-## 实测记录
-
-板端吞吐脚本：
-
-```bash
-CASE5_SIGROK_DURATION_MS=10000 bash scripts/measure_sigrok_streaming.sh
-```
-
-2026-08-09 实测（libsigrok 0.5.2、sigrok-cli 0.7.2、USB 2.0 高速）：
-
-| 请求 | 单通道有效速率 | 双通道每通道有效速率 |
+| 请求速率 | 单通道有效速率 | 双通道每通道有效速率 |
 | ---: | ---: | ---: |
 | 1 MS/s | 0.993 MS/s | 0.991 MS/s |
 | 8 MS/s | 7.769 MS/s | 7.635 MS/s |
@@ -100,13 +47,14 @@ CASE5_SIGROK_DURATION_MS=10000 bash scripts/measure_sigrok_streaming.sh
 | 30 MS/s | 20.450 MS/s | 19.688 MS/s |
 | 48 MS/s | 20.393 MS/s | 19.615 MS/s |
 
-这是主机收到的 libsigrok 模拟样本回调速率，不是 USB 总线字节率，也不是无间隙 ADC
-时钟证明。原始 JSONL 保存在板端 `~/Documents/case5/data/sigrok_throughput/`。
+这是一项主机回调吞吐记录，不是 USB 总线带宽、ADC 时钟或无缺口采样证明。原始 JSONL 位于板端 `data/sigrok_throughput/`。
 
-## 常见问题
+## 常见停止点
 
-- `Resource busy`：关闭仪表盘、PulseView 和 `sigrok-cli`，一次只允许一个程序占用设备。
-- `cannot set ... V/div`：使用 UI 提供的四个 sigrok 量程，不要传驱动未公开的其他档位。
-- `sigrok capture bridge not found`：重新运行 `bash scripts/build_sigrok_capture_bridge.sh`。
-- `writable=False`：按 udev 规则处理当前用户权限，不要 sudo 启动仪表盘。
-- `NPU unavailable`：先按 README 生成并验证 OM；CPU 不会被伪装成 NPU 结果。
+| 现象 | 含义与处理 |
+| --- | --- |
+| `Resource busy` | 有其他 Hantek 使用者。关闭仪表盘、PulseView 或 `sigrok-cli`，不强杀未知进程。 |
+| `writable=False` | 当前用户缺 USB 权限。由管理员安装 `scripts/udev/60-case5-hantek6022.rules` 后拔插设备；不要 sudo 启动 Qt。 |
+| `sigrok capture bridge not found` | 未编译或路径错误。回到 README 的桥编译步骤。 |
+| 量程设置失败 | 只使用界面暴露的四个驱动支持档位。 |
+| `NPU unavailable` | 初始化阶段没有可用 Hantek OM/CANN。验证 OM；CPU FFT 不会顶替频谱。 |

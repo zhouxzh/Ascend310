@@ -1,106 +1,69 @@
-# 04 实时信号分析仪表盘前端
+# 04 触摸仪表盘界面说明
 
-## SDR workspace
+本文件说明 PySide6/PyQtGraph 仪表盘如何呈现已发生的采集和推理。完整实验顺序、依赖安装和启动命令见 [README](../README.md)；界面不是第二套采集脚本，也不会因切换页签自动打开任何设备。
 
-The PySide6 main window provides Hantek and RTL-SDR top-level workspaces.
-Restoring the last selected tab only restores presentation state: it does not
-connect a device, start capture, or create an NPU runner. Airspy is not exposed
-by this UI.
+## 页面与职责
 
-The SDR page is backed by the same `RtlSdrService` used by
-`python -m time_frequency_dashboard.rtl_sdr_npu_inference` and
-`bash scripts/run_rtl_sdr_npu_inference.sh`. It lists only raw-IQ OM models that
-are `accepted` and have passed manifest/ONNX/OM hash validation plus
-live-deployment checks. Validation is repeated before opening `rtl_sdr`; missing
-OM, a shape mismatch, an unavailable NPU, or a failed FFTW/NPU preflight is an
-explicit start failure, never a CPU fallback. The historical
-`rtl_sdr_npu_demo` fixed-DFT module is not used by this workspace or by the
-shared service.
+| 工作区 | 页面 | 展示的真实数据 | 明确不代表什么 |
+| --- | --- | --- | --- |
+| Hantek | 波形 | CH1 电压和可选 CH2 声明换算趋势 | CH2 计量标定、功率因数或市电安全 |
+| Hantek | 频谱与瀑布 | Hantek 固定 DFT OM 的功率 | CPU FFT、dBV、dBm 或设备无间隙采样 |
+| RTL-SDR | I/Q 与星座 | 解码后的未校准 CU8，或分类模型的预处理 I/Q | RF 幅度/频率校准 |
+| RTL-SDR | 时频检测 | CPU FFTW Blackman 模型输入与 OM 检测框 | “NPU FFT”或无标签数据的检测准确率 |
 
-Hantek and RTL-SDR are globally exclusive. `InstrumentCoordinator` owns the
-shared acquisition/NPU lifecycle and assigns a generation to each run. A second
-start request is rejected until the first source has stopped, its queues are
-drained, and its runner is released. Results from an old generation must not be
-rendered into a new session.
+Hantek 与 RTL-SDR 由 `InstrumentCoordinator` 互斥。选择另一页签只改变显示状态；只有用户点击连接/开始才会尝试启动设备。停止或退出前，当前路径仍拥有设备和 NPU runner，不能并行开启另一条路径。
 
-The SDR controls record device index, nominal centre frequency, sample rate,
-gain mode/value, PPM, RF-input context, duration, and estimated CU8 size. A
-manifest-fixed sample rate is displayed as fixed. The estimate is raw CU8 size;
-the service separately requires the estimate plus its disk safety margin before
-opening a live receiver. Development CU8 replay and synthetic sources are
-hidden unless `--sdr-developer-sources` is supplied, and the page then keeps a
-visible development-input warning.
+## 可操作状态
 
-Display definitions are intentionally narrow: the I/Q time plot is decoded,
-uncalibrated CU8 data in `[-1, 1]`; the constellation uses the exact model
-preprocessing for raw-IQ classification and otherwise the capture IQ; a
-detection model preview is the actual CPU FFTW/Blackman input sent to the OM.
-The NPU performs model inference/detection, not the FFT. Detection frequency
-labels are nominal centre-frequency offsets with configured PPM, not calibrated
-RF measurements. The displayed frequency range is derived from nominal centre
-frequency plus that offset. Top-K or detection boxes are shown according to
-model task; detector rows retain at most 64 newest-first mappings for the
-current generation (the table renders its newest 20 rows).
+顶部状态与底部运行区始终区分设备、模型、后端、延迟、丢帧/丢批和会话路径。完整路径在显示区中间省略，悬停可见完整值；这避免长目录压坏状态栏。
 
-Each run writes CU8 and JSONL. The UI may show a read-only strict QC summary
-only after a completed run; partial, cancelled, damaged, or CPU-backed records
-cannot become acceptance evidence. Real RTL-SDR and Ascend validation remains
-a board operation, outside local Windows UI tests.
+| 状态 | 含义 | 操作员应做什么 |
+| --- | --- | --- |
+| `NPU (Ascend 310B)` | OM 已加载并实际完成推理 | 可记录此轮为 NPU 结果，仍需看丢帧和会话产物 |
+| `NPU unavailable` | 启动阶段无 OM、CANN 或可用 NPU | 停在启动阶段，检查 OM、CANN 环境和模型合同；不会回退 CPU |
+| `failed` | 已启动 run 发生 NaN、Inf、形状或运行时错误 | 保留 JSONL/错误信息，检查原因后重新开始；不能概括成初始化不可用 |
+| 暂停显示 | 仅冻结图形刷新 | 设备仍被占用；要切换设备必须停止 |
+| 停止/已释放 | 采集、队列和 NPU runner 已关闭 | 才可启动另一条路径或外部工具 |
 
-When a run generation changes, the workspace clears its plots, overlays, and
-result history before accepting a new frame. A malformed display-only frame is
-shown as an explicit preview error instead of being allowed to terminate Qt's
-periodic refresh loop.
+RTL-SDR 页面只列出通过来源、哈希、数值和实时预算检查的 `accepted` manifest。开发用 CU8 回放和合成输入默认隐藏；只有以 `--sdr-developer-sources` 启动时才显示，而且持续标记为开发输入。
 
-The dashboard startup defaults Hantek sessions to `data/hantek_sessions/`,
-SDR run artifacts to `data/rtl_sdr_npu_inference/`, and accepted manifests to
-`models/generated/inference/`. `--sessions`, `--sdr-output-root`, and
-`--sdr-models-dir` override those roots without changing an admitted model's
-fixed input contract.
+## 1920x1080 触摸显示档位
 
-The Hantek workspace continues to use the Hantek 6022BE sigrok backend. The SDR
-workspace currently exposes only the validated RTL-SDR path; other receiver
-types remain intentionally absent until they have equivalent acquisition and
-NPU validation.
+本项目把活动 HDMI `1920x1080` 作为 10 寸触摸显示的目标像素档位。EDID/DPI 不能可靠推断面板物理英寸，因此以下设置保证的是像素布局和可点击面积，不声明物理尺寸标定。
 
-## 版面
+| 项目 | 当前设置 | 目的 |
+| --- | ---: | --- |
+| 正文 | 18 px | 正常阅读状态、控制和结果 |
+| 辅助文字 | 15 px | 合同提示和次要状态 |
+| 分区标题 | 18 px | 控制区和结果区的视觉锚点 |
+| 按钮、下拉框、步进框 | 最小 48 px | 触摸目标和稳定行高 |
+| 复选框 | 最小 44 px | 可点击区域不只依赖小方框 |
+| 标签页 | 最小 52 px | 波形、频谱、I/Q、检测页面容易点选 |
+| 结果表行 | 38 px | 表格密度与可读性平衡 |
 
-```text
-顶部：Hantek/sigrok 状态 | NPU 状态 | 连接 | 暂停显示 | 停止
-左侧：量程、探头倍率、CH2 显示、频带与色标参数
-中间：波形 / 频谱与瀑布 两个页面
-底部：分析帧、USB 回调块、丢帧、NPU 耗时、会话路径
-```
+Hantek 和 RTL-SDR 控制栏都放入纵向滚动区。宽屏档使用约 320 px 控制栏和 360 px RTL 结果栏；窗口宽度小于 1500 px 或高度小于 850 px 时自动切换到约 292 px/320 px 的紧凑档。主绘图区使用 stretch factor，而不是固定 splitter 像素高度，因此内容不会在较小窗口中垂直裁切。
 
-波形页始终显示 CH1 电压；勾选后才显示按 Little Bee 声明灵敏度换算的 CH2 电流。此开关不会改变底层双通道
-sigrok 采集、CH2 单位换算或 OM 输入。Little Bee 的去零由探头自身完成，界面不提供软件校零。
+PyQtGraph 的坐标轴刻度显式设为 13 px，检测框文字显式设为 14 px。密集目标保留全部框和结果表项，但图上只显示最多 6 个彼此错开的标签，避免标签遮住时频底图。
 
-频谱与瀑布页参考 QSpectrumAnalyzer 的上下结构：上方是当前 NPU DFT dB 曲线、光标和
-峰值保持，下方是同一频率轴的瀑布，右侧是可拖动 `HistogramLUTItem` 色标。模型输出
-0--20 kHz 的 201 个频点，间隔 100 Hz；`CAL` 的 1 kHz 方波及奇次谐波可在这里观察。
-界面没有 CPU FFT 曲线或后备频谱。
+## 界面中的数据边界
 
-## 数据和线程边界
+- Hantek 频谱和瀑布只接收 OM 输出。若 NPU 未初始化，没有新的频谱行，而不是显示 CPU 伪替代品。
+- Hantek 的 dB 显示为相对 `1 V^2` 的未校准能量；CH2 显示是否打开不会改变底层双通道采集或 OM 输入。
+- Little Bee 去零由探头硬件完成，界面不提供软件校零；当前青色档参数只是声明换算。
+- RTL-SDR 检测时的时频图是 CPU FFTW 预处理合同的一部分，NPU 只运行神经网络 OM。频率框的标签来自名义中心频率和 PPM，不能作为频率校准。
+- 完成的 SDR run 可显示只读 QC 摘要；取消、损坏、CPU 后端或不完整 run 不能作为准入或连续实时证据。
 
-sigrok 桥进程输出 BridgeFrameV1，Python 采集线程读 stdout 并向控制器提交帧。处理器、
-NPU worker 和会话写入各自运行在非 Qt 线程；Qt 定时器只读取快照并绘图。因此绘图变慢时，
-有界分析队列会丢弃旧窗口而不是无限增长内存。
+## 实机截图与范围
 
-NPU 不可用时，顶部明确显示 `NPU unavailable`，频谱和瀑布没有新 NPU 行。暂停显示只冻结
-界面，停止才释放 USB 设备。
+2026-08-15 在 `ascend8t` 的 `1920x1080` 输出上获得以下界面证据：
 
-## 色彩与参数
+- [Hantek 波形页](../../../src/experiment/img5/case5-hantek-dashboard-1920x1080.png)：CH1 接 6022BE `CAL`，显示真实采集与 NPU DFT 状态。
+- [Hantek 频谱与瀑布页](../../../src/experiment/img5/case5-hantek-spectrum-1920x1080.png)：同一 `CAL` 采集的 OM 频谱显示。
+- [RTL-SDR I/Q 页](../../../src/experiment/img5/case5-sdr-iq-1920x1080.png)：真实 RTL-SDR 会话的 I/Q/星座状态。
+- [RTL-SDR 时频检测页](../../../src/experiment/img5/case5-sdr-detection-1920x1080.png)：CPU FFTW 模型输入与 NPU 检测状态。
 
-- CH1 为青色，CH2 为琥珀色；绿、黄、红分别表示正常、待校准/限制和错误。
-- dB 显示为 `10*log10(max(E, 1e-12) / 1 V²)`，标注“相对 1 V²，未校准”，不宣称 dBV、dBFS 或 dBm。
-- 两通道各自维持色标。Auto 在前 20 行用 2%/98% 分位数估计，至少 40 dB 跨度、最低 -120 dB，随后锁定。
-- sigrok 的 Hantek 驱动只接受 `1、0.5、0.25、0.1 V/div`；量程和探头倍率仅能在连接前修改。
-- 瀑布历史可在 20--500 行之间调整；峰值保持、色标和 CH2 可见性可以在采集期间改动。
+这些截图证明的是对应分辨率下的布局、实际后端和采集链路。`CAL` 图不证明 CH2 标定，真实无标签 IQ 图不证明调制类别、检测率或识别准确率。
 
-## 参考项目
+## 维护约束
 
-- [QSpectrumAnalyzer](https://github.com/xmikos/qspectrumanalyzer)：频谱/瀑布上下布局、色标和缩放交互。
-- [inspectrum](https://github.com/miek/inspectrum)：大面积时频观察和光标交互。
-
-本项目使用 PyQtGraph API 实现自己的控件，没有复制完整上游应用或图片资源；若未来复用
-GPL 代码，必须保留原始版权和许可证声明。
+前端只消费控制器或 `RtlSdrService` 的快照；Qt 主线程不访问 USB、不构造 OM 输入，也不直接执行 NPU。任何新增控件必须保持这一边界，并在 `1920x1080` 和紧凑档下验证文字省略、滚动、触摸高度与状态栏不重叠。

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -22,14 +23,17 @@ class ControlSection(QWidget):
 
     def __init__(self, title: str, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("section")
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(8)
         title_label = QLabel(title)
         title_label.setObjectName("sectionTitle")
+        title_label.setWordWrap(True)
         layout.addWidget(title_label)
         self.body = QVBoxLayout()
-        self.body.setSpacing(5)
+        self.body.setSpacing(7)
         layout.addLayout(self.body)
 
     def add(self, widget: QWidget) -> QWidget:
@@ -56,20 +60,24 @@ class HantekControls(QWidget):
         self.scope_info = scope_section.add(
             QLabel("连续 sigrok：1 MS/s · NPU 窗口 10,000 点 · DFT 0--20 kHz · 201 点")
         )
+        self.scope_info.setObjectName("secondary")
         self.scope_info.setWordWrap(True)
         self.ch1_info = scope_section.add(QLabel("CH1 电压始终采集并显示"))
+        self.ch1_info.setObjectName("secondary")
         self.ch2_visible = scope_section.add(QCheckBox("显示 CH2 电流"))
         self.ch2_visible.setChecked(False)
         self.ch2_visible.toggled.connect(self._on_ch2_visibility_changed)
         self.analysis_channel = scope_section.add(QComboBox())
         self.analysis_channel.addItem("分析通道：CH1 电压", 0)
+        self.analysis_channel.setToolTip("选择用于 DFT 频谱和瀑布显示的通道")
         self.analysis_channel.currentIndexChanged.connect(
             lambda _index: self.analysis_channel_changed.emit(self.selected_analysis_channel())
         )
-        self.scope_info = scope_section.add(
+        self.session_info = scope_section.add(
             QLabel("单次连续 session，无硬件触发；CH2 未显示时仍完成单位换算和 NPU 分析")
         )
-        self.scope_info.setWordWrap(True)
+        self.session_info.setObjectName("secondary")
+        self.session_info.setWordWrap(True)
         layout.addWidget(scope_section)
 
         capture_section = ControlSection("开始前采集参数")
@@ -82,6 +90,7 @@ class HantekControls(QWidget):
         capture_note = capture_section.add(
             QLabel("采样率和 10 ms 分析窗口由 OM 固定；sigrok 实际返回值不匹配时拒绝分析。")
         )
+        capture_note.setObjectName("secondary")
         capture_note.setWordWrap(True)
         layout.addWidget(capture_section)
 
@@ -90,13 +99,17 @@ class HantekControls(QWidget):
         self.waterfall_history.setRange(20, 500)
         self.waterfall_history.setValue(180)
         self.waterfall_history.setSuffix(" 行瀑布历史")
+        self.waterfall_history.setToolTip("限制界面保留的频谱历史行数；不改变原始会话")
         self.waterfall_history.valueChanged.connect(self.history_rows_changed)
         display_section.add(self.waterfall_history)
         self.peak_hold = display_section.add(QCheckBox("峰值保持"))
+        self.peak_hold.setToolTip("保留显示窗口内的历史最高频谱功率")
         self.peak_hold.toggled.connect(self.peak_hold_changed)
         self.full_spectrum_button = display_section.add(QPushButton("恢复全频段"))
+        self.full_spectrum_button.setToolTip("恢复 0--20 kHz 的完整频率视图")
         self.full_spectrum_button.clicked.connect(self.spectrum_reset_requested)
         self.auto_scale_button = display_section.add(QPushButton("自动 dB 色标"))
+        self.auto_scale_button.setToolTip("用最近 20 行 NPU 输出估计瀑布色标")
         self.auto_scale_button.clicked.connect(self.auto_scale_requested)
         self.color_status = display_section.add(QLabel("自动：等待 0/20 行"))
         self.color_low = display_section.add(QDoubleSpinBox())
@@ -112,6 +125,7 @@ class HantekControls(QWidget):
         self.color_low.valueChanged.connect(self._emit_color_levels)
         self.color_high.valueChanged.connect(self._emit_color_levels)
         display_note = display_section.add(QLabel("dB 相对 1 V²，未校准；不是 dBV、dBFS 或 dBm。"))
+        display_note.setObjectName("secondary")
         display_note.setWordWrap(True)
         layout.addWidget(display_section)
 

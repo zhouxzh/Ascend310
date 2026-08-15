@@ -31,13 +31,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .plot_views import MissingPlotWidget
-from .theme import CURRENT, GOOD, MUTED, SURFACE, VOLTAGE
+from .plot_views import MissingPlotWidget, configure_plot_fonts
+from .theme import CURRENT, GOOD, MUTED, SURFACE, VOLTAGE, plot_font, TABLE_ROW_HEIGHT
 
 
 MAX_DISPLAY_SAMPLES = 4096
 MAX_DETECTION_OVERLAYS = 64
 MAX_RECENT_DETECTIONS = 64
+MAX_DETECTION_CAPTIONS = 6
 
 
 @dataclass(frozen=True)
@@ -212,6 +213,7 @@ class IqTimePlot(QWidget):
         self.plot.showGrid(x=True, y=True, alpha=0.25)
         self.plot.setLabel("left", "未校准 I/Q", units="[-1, 1]")
         self.plot.setLabel("bottom", "时间", units="s")
+        configure_plot_fonts(self.plot)
         self.plot.getPlotItem().hideButtons()
         self.plot.addLegend(offset=(10, 10))
         self.i_curve = self.plot.plot(pen=pg.mkPen(VOLTAGE, width=1.5), name="I")
@@ -269,6 +271,7 @@ class ConstellationPlot(QWidget):
         self.plot.showGrid(x=True, y=True, alpha=0.25)
         self.plot.setLabel("left", "Q")
         self.plot.setLabel("bottom", "I")
+        configure_plot_fonts(self.plot)
         self.plot.getPlotItem().hideButtons()
         self.plot.getViewBox().setAspectLocked(True, ratio=1.0)
         self.scatter = pg.ScatterPlotItem(size=4, pen=None, brush=pg.mkBrush(VOLTAGE + "88"))
@@ -314,6 +317,7 @@ class SpectrogramDetectionPlot(QWidget):
             self.image_item = None
             return
         self.note_label = QLabel("CPU FFTW 模型输入；NPU 负责检测。未校准 RF 轴。")
+        self.note_label.setObjectName("secondary")
         self.note_label.setStyleSheet(f"color: {MUTED}; padding: 2px 6px;")
         layout.addWidget(self.note_label)
         self.plot = PlotWidget()
@@ -321,6 +325,7 @@ class SpectrogramDetectionPlot(QWidget):
         self.plot.showGrid(x=True, y=True, alpha=0.15)
         self.plot.setLabel("bottom", "批内时间", units="s")
         self.plot.setLabel("left", "Nominal frequency", units="Hz")
+        configure_plot_fonts(self.plot)
         self.plot.getPlotItem().hideButtons()
         self.image_item = pg.ImageItem(axisOrder="row-major")
         self.plot.addItem(self.image_item)
@@ -441,10 +446,42 @@ class SpectrogramDetectionPlot(QWidget):
                 ],
                 pen=pen,
             )
+            self._overlay_items.append(curve)
+        # Wideband frames can contain many valid candidate boxes.  Keep every
+        # outline and table row, but limit captions so the plot remains
+        # readable on the target touch display.
+        for box in self._caption_boxes():
             caption = pg.TextItem(f"{box.label} {box.confidence:.2f}", color=GOOD, anchor=(0, 1))
+            caption.setFont(plot_font(14, bold=True))
             caption.setPos(box.time_start_s, box.frequency_high_hz)
             self.plot.addItem(caption)
-            self._overlay_items.extend((curve, caption))
+            self._overlay_items.append(caption)
+
+    def _caption_boxes(self) -> tuple[PhysicalDetectionBox, ...]:
+        """Choose non-overlapping annotations without changing detections."""
+        if not self._boxes:
+            return ()
+        time_span = max(box.time_end_s for box in self._boxes) - min(
+            box.time_start_s for box in self._boxes
+        )
+        frequency_span = max(box.frequency_high_hz for box in self._boxes) - min(
+            box.frequency_low_hz for box in self._boxes
+        )
+        time_clearance = max(time_span * 0.08, 0.025)
+        frequency_clearance = max(frequency_span * 0.04, 50_000.0)
+        selected: list[PhysicalDetectionBox] = []
+        for box in sorted(self._boxes, key=lambda item: item.confidence, reverse=True):
+            overlaps_caption = any(
+                abs(box.time_start_s - previous.time_start_s) < time_clearance
+                and abs(box.frequency_high_hz - previous.frequency_high_hz)
+                < frequency_clearance
+                for previous in selected
+            )
+            if not overlaps_caption:
+                selected.append(box)
+            if len(selected) == MAX_DETECTION_CAPTIONS:
+                break
+        return tuple(selected)
 
 
 class SdrInferenceResults(QWidget):
@@ -461,8 +498,12 @@ class SdrInferenceResults(QWidget):
         self.table.setObjectName("sdrInferenceResults")
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.table.setTextElideMode(Qt.ElideMiddle)
+        self.table.setWordWrap(False)
         self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setDefaultSectionSize(TABLE_ROW_HEIGHT)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.horizontalHeader().setMinimumSectionSize(54)
         layout.addWidget(self.table, 1)
         self._recent_detections: list[PhysicalDetectionBox] = []
         self.show_empty("等待 NPU 结果")
@@ -528,4 +569,5 @@ class SdrInferenceResults(QWidget):
         for column, value in enumerate(values):
             item = QTableWidgetItem(value)
             item.setTextAlignment(Qt.AlignCenter)
+            item.setToolTip(value)
             self.table.setItem(row, column, item)

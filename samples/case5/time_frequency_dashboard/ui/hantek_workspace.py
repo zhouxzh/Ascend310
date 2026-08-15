@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QSplitter,
     QTabWidget,
     QVBoxLayout,
@@ -22,7 +24,14 @@ from PySide6.QtWidgets import (
 from ..controller import Case5Controller, DashboardSnapshot
 from .controls import HantekControls
 from .plot_views import SpectrumPlot, WaterfallPlot, WaveformPlot
-from .theme import CURRENT, ERROR, GOOD, MUTED, VOLTAGE
+from .theme import (
+    CONTROL_RAIL_WIDTH,
+    CURRENT,
+    ERROR,
+    GOOD,
+    MUTED,
+    VOLTAGE,
+)
 
 
 class HantekWorkspace(QWidget):
@@ -54,6 +63,7 @@ class HantekWorkspace(QWidget):
         self._rendered_analysis_count = -1
         self._available = True
         self._availability_reason = ""
+        self._compact = False
         self._build_ui()
         if on_start is not None:
             self.start_requested.connect(on_start)
@@ -71,17 +81,22 @@ class HantekWorkspace(QWidget):
         top_bar.setObjectName("topBar")
         top = QHBoxLayout(top_bar)
         top.setContentsMargins(10, 6, 10, 6)
-        self.device_label = QLabel("Device: Hantek 6022BE (sigrok)")
+        self.device_label = QLabel("设备：Hantek 6022BE")
         self.device_label.setObjectName("badge")
-        self.npu_label = QLabel("NPU unavailable")
+        self.device_label.setToolTip("系统 libsigrok hantek-6xxx 采集适配器")
+        self.npu_label = QLabel("NPU 不可用")
         self.npu_label.setObjectName("badge")
-        self.status_label = QLabel("Ready")
+        self.npu_label.setToolTip("只有真实 OM 初始化并通过输出合同检查后才会显示可用")
+        self.status_label = QLabel("准备就绪")
         self.status_label.setWordWrap(True)
-        self.connect_button = QPushButton("Connect")
+        self.connect_button = QPushButton("连接")
+        self.connect_button.setToolTip("打开 6022BE 的独占 sigrok session")
         self.connect_button.clicked.connect(self._emit_hardware_start)
-        self.pause_button = QPushButton("Pause display")
+        self.pause_button = QPushButton("暂停显示")
+        self.pause_button.setToolTip("冻结绘图，不释放 USB 或停止采集")
         self.pause_button.clicked.connect(self.toggle_display_pause)
-        self.stop_button = QPushButton("Stop")
+        self.stop_button = QPushButton("停止")
+        self.stop_button.setToolTip("停止采集、分析队列和会话写入")
         self.stop_button.clicked.connect(self.stop_requested)
         top.addWidget(self.device_label)
         top.addWidget(self.npu_label)
@@ -90,7 +105,7 @@ class HantekWorkspace(QWidget):
         top.addWidget(self.pause_button)
         top.addWidget(self.stop_button)
         if self.allow_simulation:
-            self.simulation_button = QPushButton("Simulation")
+            self.simulation_button = QPushButton("模拟")
             self.simulation_button.clicked.connect(self.simulation_requested)
             top.addWidget(self.simulation_button)
         else:
@@ -101,13 +116,20 @@ class HantekWorkspace(QWidget):
         body.setSpacing(8)
         self.controls = HantekControls()
         self.controls.setObjectName("controlRail")
-        self.controls.setFixedWidth(308)
+        self.controls.setMinimumWidth(0)
+        self.controls.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.control_scroll = QScrollArea()
+        self.control_scroll.setObjectName("controlRailViewport")
+        self.control_scroll.setWidgetResizable(True)
+        self.control_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.control_scroll.setWidget(self.controls)
+        self.control_scroll.setFixedWidth(CONTROL_RAIL_WIDTH)
         self.controls.ch2_display_changed.connect(self.set_ch2_visible)
         self.controls.analysis_channel_changed.connect(self.set_analysis_channel)
         self.controls.auto_scale_requested.connect(self.reset_auto_scale)
         self.controls.color_levels_changed.connect(self.set_manual_color_levels)
         self.controls.history_rows_changed.connect(self.set_waterfall_history_rows)
-        body.addWidget(self.controls)
+        body.addWidget(self.control_scroll)
 
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
@@ -121,10 +143,12 @@ class HantekWorkspace(QWidget):
         status_bar.setObjectName("statusBar")
         status_layout = QHBoxLayout(status_bar)
         status_layout.setContentsMargins(10, 5, 10, 5)
-        self.pipeline_label = QLabel("Frames: 0 | dropped: 0")
-        self.latency_label = QLabel("NPU: -- | end-to-end: --")
-        self.session_label = QLabel("Session: --")
+        self.pipeline_label = QLabel("帧：0 · 丢弃：0")
+        self.latency_label = QLabel("NPU：-- · 端到端：--")
+        self.session_label = QLabel("会话：--")
         self.session_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.session_label.setMinimumWidth(220)
+        self.session_label.setToolTip("完整会话路径将在这里显示")
         status_layout.addWidget(self.pipeline_label)
         status_layout.addWidget(self.latency_label)
         status_layout.addWidget(self.session_label, 1)
@@ -139,15 +163,17 @@ class HantekWorkspace(QWidget):
         waveform_layout.addWidget(self.voltage_wave, 1)
         waveform_layout.addWidget(self.current_wave, 1)
         self.current_wave.setVisible(False)
-        self.tabs.addTab(waveform_page, "Waveforms")
+        self.tabs.addTab(waveform_page, "波形")
 
         analysis_page = QWidget()
         analysis_layout = QVBoxLayout(analysis_page)
         analysis_layout.setContentsMargins(4, 4, 4, 4)
         header = QHBoxLayout()
-        self.analysis_title = QLabel("CH1 voltage | NPU DFT spectrum power")
+        self.analysis_title = QLabel("CH1 电压｜NPU DFT 频谱功率")
         self.analysis_title.setObjectName("sectionTitle")
-        self.analysis_hint = QLabel("NPU DFT spectrum and waterfall; dB re 1 V^2 (uncalibrated)")
+        self.analysis_hint = QLabel("相对 1 V²，未校准")
+        self.analysis_hint.setObjectName("secondary")
+        self.analysis_hint.setWordWrap(True)
         self.analysis_hint.setStyleSheet(f"color: {MUTED}; padding: 2px 6px;")
         header.addWidget(self.analysis_title)
         header.addWidget(self.analysis_hint, 1)
@@ -160,9 +186,8 @@ class HantekWorkspace(QWidget):
         splitter.addWidget(self.analysis_waterfall)
         splitter.setStretchFactor(0, 35)
         splitter.setStretchFactor(1, 65)
-        splitter.setSizes([330, 610])
         analysis_layout.addWidget(splitter, 1)
-        self.tabs.addTab(analysis_page, "Spectrum and waterfall")
+        self.tabs.addTab(analysis_page, "频谱与瀑布")
 
     def set_available(self, available: bool, reason: str = "") -> None:
         self._available = bool(available)
@@ -170,6 +195,11 @@ class HantekWorkspace(QWidget):
         self._apply_running_state(self.controls is not None and self.stop_button.isEnabled())
         if not self._available and reason:
             self.status_label.setText(reason)
+
+    def set_compact(self, compact: bool) -> None:
+        """Adapt the rail width when the available screen is smaller than the target."""
+        self._compact = bool(compact)
+        self.control_scroll.setFixedWidth(292 if self._compact else CONTROL_RAIL_WIDTH)
 
     def render(
         self,
@@ -184,10 +214,10 @@ class HantekWorkspace(QWidget):
         running = snapshot.acquisition_state == "RUNNING" or coordinator_active
         self._apply_running_state(running)
         source_title = {
-            "SIGROK": "Device: Hantek 6022BE (sigrok)",
-            "SIMULATED": "Device: simulated data",
-            "DISCONNECTED": "Device: Hantek 6022BE (sigrok)",
-        }.get(snapshot.source, f"Device: {snapshot.source}")
+            "SIGROK": "设备：Hantek 6022BE",
+            "SIMULATED": "设备：模拟数据",
+            "DISCONNECTED": "设备：Hantek 6022BE",
+        }.get(snapshot.source, f"设备：{snapshot.source}")
         self.device_label.setText(source_title)
         self.npu_label.setText(snapshot.npu_status.backend)
         self.npu_label.setStyleSheet(
@@ -199,15 +229,16 @@ class HantekWorkspace(QWidget):
         self.status_label.setText(message)
         drops = snapshot.analysis_dropped + snapshot.storage_dropped
         self.pipeline_label.setText(
-            f"Frames: {snapshot.frames_received} | USB blocks: {snapshot.usb_blocks_received} | dropped: {drops}"
+            f"帧：{snapshot.frames_received} · USB 块：{snapshot.usb_blocks_received} · 丢弃：{drops}"
         )
         latency = snapshot.npu_status.last_latency_ms
         end_to_end = snapshot.analysis_latency_ms
         if latency is None or end_to_end is None:
-            self.latency_label.setText("NPU: -- | end-to-end: --")
+            self.latency_label.setText("NPU：-- · 端到端：--")
         else:
-            self.latency_label.setText(f"NPU: {latency:.2f} ms | end-to-end: {end_to_end:.2f} ms")
-        self.session_label.setText("Session: --" if snapshot.session_path is None else f"Session: {snapshot.session_path}")
+            self.latency_label.setText(f"NPU：{latency:.2f} ms · 端到端：{end_to_end:.2f} ms")
+        session_text = "会话：--" if snapshot.session_path is None else f"会话：{snapshot.session_path}"
+        self._set_elided_session(session_text)
         if self._display_paused:
             return
         if snapshot.frames_received != self._rendered_frame_count and snapshot.waveforms is not None:
@@ -221,7 +252,15 @@ class HantekWorkspace(QWidget):
 
     def toggle_display_pause(self) -> None:
         self._display_paused = not self._display_paused
-        self.pause_button.setText("Resume display" if self._display_paused else "Pause display")
+        self.pause_button.setText("继续显示" if self._display_paused else "暂停显示")
+
+    def _set_elided_session(self, text: str) -> None:
+        """Keep the status bar readable while retaining the full path in a tooltip."""
+        self.session_label.setToolTip(text)
+        width = max(self.session_label.width(), 220)
+        self.session_label.setText(
+            self.session_label.fontMetrics().elidedText(text, Qt.ElideMiddle, width)
+        )
 
     def reset_views(self) -> None:
         self.voltage_wave.reset_view()
@@ -239,9 +278,9 @@ class HantekWorkspace(QWidget):
     def set_analysis_channel(self, channel: int) -> None:
         self._analysis_channel = 1 if int(channel) == 1 and self._ch2_visible else 0
         self.analysis_title.setText(
-            "CH2 current | NPU DFT spectrum power"
+            "CH2 电流｜NPU DFT 频谱功率"
             if self._analysis_channel
-            else "CH1 voltage | NPU DFT spectrum power"
+            else "CH1 电压｜NPU DFT 频谱功率"
         )
         self.spectrum_plot.clear_peak_hold()
         self._rendered_analysis_count = -1

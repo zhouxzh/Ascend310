@@ -16,11 +16,22 @@ except ImportError:  # pragma: no cover - exercised by dependency-skip tests
 from PySide6.QtCore import QRectF, Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from .theme import ERROR, MUTED, SURFACE, VOLTAGE
+from .theme import ERROR, MUTED, SURFACE, VOLTAGE, plot_font
 
 
 def pyqtgraph_available() -> bool:
     return pg is not None
+
+
+def configure_plot_fonts(plot) -> None:
+    """Make axis and tick text readable on the board touch display."""
+    if plot is None:
+        return
+    item = plot.getPlotItem()
+    for name in ("left", "bottom", "right", "top"):
+        axis = item.getAxis(name)
+        axis.setTickFont(plot_font(13))
+        axis.setTextPen(MUTED)
 
 
 class MissingPlotWidget(QWidget):
@@ -52,6 +63,7 @@ class WaveformPlot(QWidget):
         self.plot.showGrid(x=True, y=True, alpha=0.25)
         self.plot.setLabel("left", title, units=unit)
         self.plot.setLabel("bottom", "时间", units="s")
+        configure_plot_fonts(self.plot)
         self.plot.getPlotItem().hideButtons()
         self.curve = self.plot.plot(pen=pg.mkPen(color, width=2))
         layout.addWidget(self.plot)
@@ -93,6 +105,7 @@ class SpectrumPlot(QWidget):
             return
         self.position_label = QLabel("频率：-- · 频带能量：--")
         self.position_label.setAlignment(Qt.AlignRight)
+        self.position_label.setObjectName("secondary")
         self.position_label.setStyleSheet(f"color: {MUTED}; padding: 2px 6px;")
         layout.addWidget(self.position_label)
         self.plot = PlotWidget()
@@ -100,6 +113,7 @@ class SpectrumPlot(QWidget):
         self.plot.showGrid(x=True, y=True, alpha=0.25)
         self.plot.setLabel("left", "频带能量", units="dB re 1 V²（未校准）")
         self.plot.setLabel("bottom", "频率", units="Hz")
+        configure_plot_fonts(self.plot)
         self.plot.getPlotItem().hideButtons()
         self.plot.addLegend(offset=(10, 10))
         self.curve = self.plot.plot(pen=pg.mkPen(VOLTAGE, width=2), name="NPU DFT 频谱")
@@ -193,11 +207,12 @@ class WaterfallPlot(QWidget):
         self.plot.showGrid(x=False, y=False)
         self.plot.setLabel("left", "时间（新→旧）")
         self.plot.setLabel("bottom", "频率", units="Hz")
+        configure_plot_fonts(self.plot)
         self.plot.getPlotItem().hideButtons()
         self.image = pg.ImageItem(axisOrder="row-major")
         self.plot.addItem(self.image)
         self.histogram = pg.HistogramLUTWidget()
-        self.histogram.setMinimumWidth(92)
+        self.histogram.setMinimumWidth(112)
         self.histogram.item.gradient.loadPreset("flame")
         self.histogram.item.setImageItem(self.image)
         self.histogram.item.sigLevelsChanged.connect(self._on_histogram_levels_changed)

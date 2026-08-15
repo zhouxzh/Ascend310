@@ -63,8 +63,10 @@ class DashboardWindow(QMainWindow):
         self.qc_finished.connect(self._show_qc_result)
         self.start_finished.connect(self._show_start_result)
 
-        self.setWindowTitle("Case 5 - Signal Analysis Dashboard")
-        self.setMinimumSize(1280, 760)
+        self.setWindowTitle("Case 5 · 实时信号分析仪表盘")
+        # Keep a useful compact minimum for remote/VNC sessions; the board
+        # target is maximized at 1920x1080 and does not rely on this minimum.
+        self.setMinimumSize(960, 600)
         self.setStyleSheet(stylesheet())
         self._build_ui()
         self._restore_workspace()
@@ -72,6 +74,7 @@ class DashboardWindow(QMainWindow):
         # workspace before observing changes so construction cannot overwrite
         # a previously selected SDR tab with the Hantek default.
         self.workspace_tabs.currentChanged.connect(self._remember_workspace)
+        self._apply_display_profile()
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
@@ -80,6 +83,17 @@ class DashboardWindow(QMainWindow):
         # start sigrok.  Validation happens only inside the respective Start
         # handler, after the coordinator granted ownership.
         self.refresh()
+
+    def _apply_display_profile(self) -> None:
+        """Select rail widths from the available window geometry."""
+        compact = self.width() < 1500 or self.height() < 850
+        self.hantek_workspace.set_compact(compact)
+        self.sdr_workspace.set_compact(compact)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        if hasattr(self, "hantek_workspace"):
+            self._apply_display_profile()
 
     def _build_ui(self) -> None:
         self.workspace_tabs = QTabWidget(self)
@@ -385,6 +399,12 @@ class DashboardWindow(QMainWindow):
             self.timer.stop()
             self.coordinator.close()
         event.accept()
+        application = QApplication.instance()
+        if application is not None:
+            # Explicitly leave the event loop after this close event.  On the
+            # board's X11 session, hiding the final QMainWindow alone can
+            # leave a headless Python dashboard process behind.
+            QTimer.singleShot(0, application.quit)
 
 
 def run_dashboard(
@@ -399,6 +419,10 @@ def run_dashboard(
     sdr_developer_sources: bool = False,
 ) -> int:
     application = QApplication.instance() or QApplication([])
+    # Keep the normal Qt policy as a secondary safeguard.  closeEvent also
+    # queues quit explicitly for X11 sessions that merely hide the window.
+    application.setQuitOnLastWindowClosed(True)
+    application.lastWindowClosed.connect(application.quit)
     window = DashboardWindow(
         controller,
         sigrok_bridge,

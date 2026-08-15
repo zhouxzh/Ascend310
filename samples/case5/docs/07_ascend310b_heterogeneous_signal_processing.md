@@ -1,9 +1,10 @@
 # 07 昇腾 310B 异构信号处理评估与 SDR-NPU 指引
 
-本章给出 Case 5 在一块昇腾 310B 开发板上的可复现实测结果。结论只适用于本次记录的
-板卡、软件版本、输入形状和测量方法，不外推到其他昇腾型号。
+本文是 Case 5 的模型准入与板端实测说明，不是首次运行教程；安装、Hantek `CAL`、RTL-SDR 启动和 QC 的操作顺序见 [README](../README.md)，服务的数据语义见 [06 RTL-SDR](06_rtl_sdr_npu_demo.md)。
 
-## 1. 测量边界
+文中的数字、哈希和日志属于带日期的证据记录。结论只适用于当次板卡、软件版本、输入形状和测量方法，不外推到其他昇腾型号，也不能代替本工作树当前版本的测试结果。
+
+## 测量方法和边界
 
 VOLK、FFTW、ONNX Runtime CPU 和 OM 的计时都从主机输入开始，到主机输出结束。NPU
 计时包括输入 Tensor 创建、H2D、OM 执行、D2H 和输出复制，不包括模型初始化。每个样本
@@ -22,7 +23,7 @@ python -m time_frequency_dashboard.benchmark_volk_npu \
 内核的可用实现、ONNX/OM/ATC/CANN provenance、NPU 状态和温度前后值。本轮 NPU 温度
 为 83 C 到 81 C；这不是功耗或散热能力结论。
 
-## 2. VOLK 与 NPU 对照
+## CPU SIMD 与 NPU 对照
 
 四个内核的 ONNX 对照图只使用标准逐点算子和 `ReduceSum`，分别对应 `Mul+Add`、复数展开
 的 `Mul/Add/Sub` 和实数/复数归约。下表引用板端
@@ -51,7 +52,7 @@ python -m time_frequency_dashboard.benchmark_volk_npu \
 内核的 batch 16/64 还未通过默认数值门限。NPU 没有在四类内核上达到 1.2 倍收益门槛，因此
 全部标记为 CPU/SIMD；小批量逐点运算和归约由主机 Tensor 与搬运开销主导。
 
-## 3. FFTW 的位置
+## FFTW 的位置
 
 同一块板、同一 1024 点窗口的已有 RTL-SDR 基准为：FFTW3 `0.136/0.141 ms`（P50/P95），
 NumPy FFT `1.208/1.270 ms`，固定稠密 DFT `6.168/6.421 ms`，OM 固定 DFT
@@ -59,7 +60,7 @@ NumPy FFT `1.208/1.270 ms`，固定稠密 DFT `6.168/6.421 ms`，OM 固定 DFT
 快约 3.81 倍。不能把 NPU DFT 结果表述为 FFTW 的替代品。FFT、去直流、窗口和轻量滤波
 默认留在 ARM + FFTW/VOLK。
 
-## 4. 模型准入结果
+## 模型准入结果
 
 模型导出和 ATC 在独立临时环境/板端完成，权重不提交仓库；每个版本化 manifest 记录 URL、
 revision、许可证、上游权重 SHA256、采样/预处理约定、ONNX/OM SHA256、ATC 命令和 CANN
@@ -104,6 +105,12 @@ python -m time_frequency_dashboard.model.materialize_inference_manifest \
 | TorchSig YOLO11，混合精度 + 解码保精度 | `[1,3,1024,1024]` | 141.422/141.705 | 2560.730 | 18.11x | 数值通过，预算 512 ms 满足 | 推荐 |
 | TorchSig YOLO11 | `[16,3,1024,1024]` | 2986.525/2990.200 | 30803.558 | 10.31x | 数值未通过，预算 8192 ms 满足 | 拒绝 |
 
+### 当前 YOLO 权重的语义限制
+
+当前接受的 YOLO11 权重在上游训练中使用 `single_cls=True`。这意味着它只能支持“是否存在候选信号区域”的单类检测；部署目录中保留的 51 项名称映射不会把该权重变成 51 类调制识别器。无标签真实 IQ 上即使界面显示了诸如 `bpsk` 的候选文字，也只能说明模型、预处理和后处理链路产生了一个区域结果，不能作为调制类别、检测率或准确率证据。
+
+后处理先从评分通道选择单一预测类别（`argmax`），再按该预测类别分组执行 NMS；它不对全部评分通道分别 NMS。若要得到 51 类调制识别结论，必须使用有明确多类监督的训练数据重新训练或取得相应权重，并对独立带标签数据完成类别级评测。
+
 YOLO 第一次 ATC 使用错误的输入名 `input_tensor`，板端日志为 `E10016 Opname[input_tensor]
 not found`；改用导出图真实输入名 `images` 后 ATC 成功。这类修正只允许修正图/输入合同，
 不能用它绕过数值准入。YOLO 导出图含 88 个 `Conv`，以及 `Mul`、`Sigmoid`、`Concat`、
@@ -140,7 +147,7 @@ python -m time_frequency_dashboard.model.compile_inference_candidate \
 给出了参数的适用范围与配置格式。YOLO 导出元数据报告 Ultralytics AGPL-3.0，重新分发前
 仍需单独完成许可证审查。
 
-## 5. CVNET-rf 与 SignalIQ 的结论
+## 被拒绝候选的原因
 
 CVNET-rf 使用固定 revision `df32f6cd9bb033835465928307610bba1c376708`。RealCNN 和
 ComplexCNN 都安全读取了官方 checkpoint（SHA256 分别为
@@ -154,30 +161,21 @@ ComplexCNN 都安全读取了官方 checkpoint（SHA256 分别为
 forward/pooling 源码。临时重建 CLDNN 仅用于 ONNX/ATC 算子可行性检查，不能证明原模型
 准确率；它因此保持 rejected。二者都没有进入 `rtl_sdr_npu_inference` 默认选择。
 
-## 6. RTL-SDR 实时 NPU 链路
+## RTL-SDR 实时 NPU 链路与证据
 
-### Dashboard integration scope
+### 服务范围
 
-The PySide6 dashboard uses this same RTL-SDR service as a separate SDR
-workspace. It intentionally keeps CPU and NPU roles visible: CU8 decoding,
-DC removal, queueing, and FFTW Blackman time-frequency construction remain on
-the ARM CPU; an accepted fixed-shape OM runs the raw-IQ classifier or spectrum
-detector on the NPU. A time-frequency preview must therefore be labelled as
-CPU FFTW model input, not NPU FFT.
+PySide6 SDR 工作区与 CLI 共享同一个服务。ARM CPU 保留 CU8 解码、去直流、队列和 FFTW Blackman 时频图构造；accepted 的固定形状 OM 负责神经网络推理。时频预览因此必须标注为 CPU FFTW 模型输入，而不是 NPU FFT。
 
-Only `accepted` raw-IQ manifests whose hashes and live checks pass are offered
-by the UI. Hantek and RTL-SDR are mutually exclusive and a page change does not
-open hardware. These are application safety contracts. The local development
-machine can unit-test them, but it cannot validate ACL, OM, CANN, or real
-RTL-SDR behaviour; those claims require an Ascend 310B board run.
+界面只提供哈希和现场部署检查均通过的 `accepted` manifest。Hantek 与 RTL-SDR 互斥，切换页签不会自动打开设备。本地开发机只能单测这些应用契约，不能验证 ACL、OM、CANN 或真实 RTL-SDR 行为。
 
 共享入口为 `python -m time_frequency_dashboard.rtl_sdr_npu_inference`，其板端封装为
 `bash scripts/run_rtl_sdr_npu_inference.sh`，支持 `rtl`、`cu8` 和 `synthetic`。PySide6 SDR
-工作区通过同一个 `RtlSdrService` 运行这条路径。CPU 负责 CU8 解码、raw-IQ 分类模型的逐窗口去直流/归一化、与
-`gr-spectrumdetect` 一致的 FFTW Blackman 频谱图、Top-K 和 NMS；
+工作区通过同一个 `RtlSdrService` 运行这条路径。CPU 负责 CU8 解码；raw-IQ 分类模型使用逐窗口去直流/归一化，频谱检测模型使用与
+`gr-spectrumdetect` 一致的 FFTW Blackman 频谱图；输出后处理按任务产生 Top-K 或经预测类别分组 NMS 的检测框。
 NPU 只负责已准入 OM。队列有界，满载时丢弃最旧批次，并在 JSONL 中记录采集序号、IQ 偏移、
 模型版本、后端、置信度、推理/端到端延迟和丢批数。`end_to_end_ms` 从当前批次的主机读取/生成
-开始，到输出校验和 Top-K/NMS 完成；`post_capture_pipeline_ms` 从主机收齐该批 IQ 到同一终点。
+开始，到输出校验和相应后处理完成；`post_capture_pipeline_ms` 从主机收齐该批 IQ 到同一终点。
 它们分列记录采集、RTL 原始 CU8 归档写入、解码、队列等待、预处理、主机到主机的 OM 推理边界
 （Tensor/H2D/OM/D2H/输出复制）和后处理（输出校验 + Top-K/NMS）；不包含模型初始化或 JSONL
 行的序列化/落盘。它不是 RF/ADC 首样本到结果的时延，因为 RTL-SDR 的 FIFO、USB、驱动缓冲和
@@ -252,8 +250,8 @@ SHA256 是 `f4a719c5588c88ecd0f3ec81d3ae4f353c6b00eec5482ce45964d26277b50d9e`；
 `torchsig_yolo11_b1_mix_headkeep.accepted_v4.antenna-10m-gain40.manifest.json`（SHA256
 `fed877099f550bf165595ccac63e607b5a555d67ef187b9f54a0103af6b58427`）。`--verify-attached` 重新读取
 源 v3、ONNX/OM、JSONL 和 CU8 后通过；严格汇总也确认 1,170 条核心 NPU/后采集时延字段均未缺失；
-在代码加严后，板端再次执行全量 pytest 为 **113 passed、1 skipped**，并通过
-`python -m compileall -q time_frequency_dashboard`。新的严格 QC 从同一份 10 分钟 CU8 流式重算后，
+在 2026-08-12 对应的历史工作树中，板端全量 pytest 为 **113 passed、1 skipped**，并通过
+`python -m compileall -q time_frequency_dashboard`。这不是当前工作树的测试结果。新的严格 QC 从同一份 10 分钟 CU8 流式重算后，
 再次确认 1,170 条批记录的 metadata/每批/footer 后端都是 `NPU (Ascend 310B)`、核心 NPU 与后采集
 时延字段均完整，且字节数和 SHA256 不变。运行期间
 `npu-smi` 温度观测为 82--83 C，前后均显示 `Health=Alarm`；ACL/OM 未报错，但本实验不诊断或清除
@@ -284,7 +282,7 @@ XCiT 与 CLDNN 仍然 rejected；已有的固定 DFT
 没有返回错误。这只能证明本轮持续推理未中断，不构成对该硬件健康告警的诊断或清除。历史的
 XCiT 600.379 s 记录保留为被拒绝候选的稳定性参考，不能替代默认 YOLO11 的验收。
 
-## 7. 选择规则
+## 工程选择规则
 
 按以下顺序决定实现位置：
 

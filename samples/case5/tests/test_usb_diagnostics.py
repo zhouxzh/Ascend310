@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from time_frequency_dashboard.acquisition import usb_diagnostics
 from time_frequency_dashboard.acquisition.usb_diagnostics import (
     UsbDiagnosticReport,
     UsbDeviceRecord,
@@ -13,7 +14,10 @@ class FakeUsbUtil:
         return {1: "Cypress", 2: "Hantek 6022BE"}[index]
 
 
-def test_summarize_only_includes_expected_hantek_ids():
+def test_summarize_only_includes_expected_hantek_ids(monkeypatch):
+    # Keep this unit test independent from a real Hantek that happens to use
+    # the synthetic bus/address pair on a development board.
+    monkeypatch.setattr(usb_diagnostics.os, "access", lambda *_args: False)
     devices = [
         SimpleNamespace(
             idVendor=0x04B4,
