@@ -1,0 +1,1046 @@
+{
+  "schema_version": 1,
+  "purpose": "Board-only local Chinese chat artifacts. Files are never committed to this repository.",
+  "chat_model_profiles": {
+    "registry": "configs/chat_model_profiles.json",
+    "profiles": [
+      {
+        "id": "qwen1.5-0.5b-mindspore",
+        "model": "Qwen/Qwen1.5-0.5B-Chat",
+        "board": "Ascend310B4/8T at 192.168.1.90",
+        "revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+        "tokenizer_revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+        "cache_dir": "artifacts/models/qwen1.5-0.5b-chat",
+        "artifact_verification": "repro/mindspore-chat-20260829/reports/board8t/qwen-artifact-verification.json",
+        "validation_report": "repro/mindspore-chat-20260829/reports/board8t/qwen-full-20260829b/acceptance.json",
+        "gap_board20_validation_report": "repro/case9-dual-board-gap-20260830/reports/board20t/qwen1.5-0.5b-mindspore/qwen20-gap-20260830/acceptance.json",
+        "gap_board20_validation_report_bytes": 68315,
+        "gap_board20_validation_report_sha256": "978864c6ddab8d7944d318748abaa1a00145c2ce6d5dcb6b6b1b40014b62e1c4",
+        "gap_board20_status": "passed; 9/9 machine gates; 10-round stability and 2+30 performance recorded; human quality review pending; experimental_dirty_base",
+        "gap_board20_performance": {
+          "total_p50_ms": 1329.830,
+          "total_p95_ms": 1440.076,
+          "first_event_p50_ms": 661.419,
+          "first_event_p95_ms": 754.165,
+          "tokens_per_second_p50": 1.505,
+          "tokens_per_second_p95": 1.619,
+          "protocol": "2 warmup + 30 SSE measurements; max_tokens=2; prompt_tokens=20"
+        },
+        "post_restart_validation_report": "repro/mindspore-chat-20260829/board8t/reports/mindspore-chat/qwen1.5-0.5b-mindspore/qwen-post-restart-20260829d/acceptance.json",
+        "current_restart_validation_report": "repro/mindspore-chat-20260829/board8t/reports/mindspore-chat/qwen1.5-0.5b-mindspore/qwen-post-restart-20260829e/acceptance.json",
+        "post_code_validation_report": "repro/mindspore-chat-20260829/board8t/reports/mindspore-chat/qwen1.5-0.5b-mindspore/qwen-post-mask-20260829n/acceptance.json",
+        "post_code_worker_pid": 90531,
+        "lpm_recovery_validation_report": "repro/mindspore-chat-20260829/board8t/reports/mindspore-chat/qwen1.5-0.5b-mindspore/qwen-lpm-recovery-20260829r/acceptance.json",
+        "lpm_recovery_worker_pid": 15897,
+        "lpm_recovery_diagnostic_report": "repro/mindspore-chat-20260829/board8t/reports/mindspore-chat/qwen1.5-0.5b-mindspore/qwen-lpm-recovery-20260829r/lpm-dmesg-and-processes.txt",
+        "candidate_chain_recovery_report": "repro/mindspore-chat-20260829/board8t/run/mindspore-chat/candidate-recovery-20260829r/chain-summary-final.json",
+        "lifecycle_evidence": "repro/mindspore-chat-20260829/board8t/run/mindspore-chat/process-migration-20260829T105131Z.log",
+        "status": "experimental_dirty_base",
+        "admission": "not-run; machine gates and restart/switch smoke are recorded, but human quality review and clean-environment approval remain pending",
+        "adapter": "mindspore_chat_providers.py"
+      },
+      {
+        "id": "tinyllama-1.1b-mindspore",
+        "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+        "board": "Ascend310B4/8T at 192.168.1.90",
+        "revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+        "tokenizer_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+        "cache_dir": "artifacts/models/tinyllama-1.1b-chat",
+        "artifact_verification": "repro/mindspore-chat-20260829/reports/board8t/tiny-artifact-verification.json",
+        "validation_report": "repro/mindspore-chat-20260829/reports/board8t/tiny-full-20260829b/acceptance.json",
+        "gap_board20_validation_report": "repro/case9-dual-board-gap-20260830/reports/board20t/tinyllama-1.1b-mindspore/tiny20-gap-20260830/acceptance.json",
+        "gap_board20_validation_report_bytes": 66436,
+        "gap_board20_validation_report_sha256": "b160e2d36d734a7f94c6e92722e97eb02c26f5de468480ac625808b54f0d97db",
+        "gap_board20_status": "failed; 8/9 machine gates; long-output UTF-8 failures at max_tokens=32/48 and Chinese machine quality 7/10; 10-round stability and 2+30 performance recorded; keep blocked",
+        "gap_board20_performance": {
+          "total_p50_ms": 1939.938,
+          "total_p95_ms": 2003.937,
+          "first_event_p50_ms": 1938.973,
+          "first_event_p95_ms": 2003.336,
+          "tokens_per_second_p50": 1.031,
+          "tokens_per_second_p95": 1.044,
+          "protocol": "2 warmup + 30 SSE measurements; max_tokens=2; prompt_tokens=18"
+        },
+        "status": "blocked",
+        "admission": "blocked; long-output and machine-quality gates failed (U+FFFD observed); do not activate",
+        "adapter": "mindspore_chat_providers.py"
+      },
+      {
+        "id": "deepseek-r1-qwen-1.5b-mindspore",
+        "model": "MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B-FP16",
+        "source_model": "MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B",
+        "board": "Ascend310B1/20T at 192.168.1.95 (legacy request address 192.168.8.210)",
+        "revision": "0a28897fe71fdd30de350b667ae588601a85990f",
+        "tokenizer_revision": "0a28897fe71fdd30de350b667ae588601a85990f",
+        "revision_pinned": true,
+        "cache_dir": "artifacts/model",
+        "bundle_root": "repro/deepseek-r1-20t-20260830",
+        "weight_bytes": 3554214416,
+        "weight_sha256": "706e1bfd7cb0680fbf73df6a2506766e447246e4291d7054c8b395dc3583419c",
+        "artifact_verification": "repro/deepseek-r1-20t-20260830/reports/board20t/api/artifact-verification.json",
+        "validation_report": "repro/deepseek-r1-20t-20260830/reports/board20t/api/deepseek-api-full-20t-20260830T051523Z/acceptance.json",
+        "reopen_validation_report": "repro/deepseek-r1-20t-20260830/reports/board20t/api/reopen-20260830T0536Z/acceptance.json",
+        "gap_board8_validation_report": "repro/case9-dual-board-gap-20260830/reports/board8t/deepseek-r1-qwen-1.5b-mindspore/deepseek-8t-gap-20260830/acceptance.json",
+        "gap_board8_validation_report_bytes": 68211,
+        "gap_board8_validation_report_sha256": "6f04a998980dbf2c872f0c470178af6e028d48da3c8af36d21fab08b30f43ab1",
+        "gap_board8_status": "passed; 9/9 machine gates; 10-round stability and 2+30 performance recorded; human quality review pending; experimental_dirty_base",
+        "gap_board8_performance": {
+          "total_p50_ms": 3938.489,
+          "total_p95_ms": 4008.768,
+          "first_event_p50_ms": 3932.103,
+          "first_event_p95_ms": 4002.231,
+          "tokens_per_second_p50": 0.510,
+          "tokens_per_second_p95": 0.517,
+          "protocol": "2 warmup + 30 SSE measurements; max_tokens=2; prompt_tokens=6"
+        },
+        "reproducibility_bundle": "repro/deepseek-r1-20t-20260830/bundle-manifest.json",
+        "status": "blocked",
+        "admission": "blocked; fixed FP16 artifact and temporary API machine gates verified on 20T, but Chinese quality, formal gateway/UI and dirty-base approval remain incomplete",
+        "adapter": "mindspore_chat_providers.py"
+      }
+    ],
+    "candidate_topology": "browser:7868 -> gateway:7867 -> mindspore:8090 -> Ascend NPU",
+    "formal_topology_unchanged": "acl:8080 -> gateway:7861 -> text-ui:7865",
+    "runtime_boundary": "Adapter imports MindSpore/MindNLP only on the board; no Torch, torch_npu, torchaudio, vLLM, MindIE, or CPU fallback.",
+    "validation_docs": [
+      "docs/23-mindspore-chat-porting-plan.md",
+      "docs/24-mindspore-chat-validation-record.md",
+      "docs/25-chat-model-profile-runbook.md"
+    ]
+  },
+  "mindspore_chat_reproducibility_bundle": {
+    "path": "repro/mindspore-chat-20260829",
+    "sync_run_id": "mindspore-chat-final-20260830e",
+    "manifest": "repro/mindspore-chat-20260829/bundle-manifest.json",
+    "sha256_inventory": "repro/mindspore-chat-20260829/SHA256SUMS.txt",
+    "verified_entries": 392,
+    "source_entries": 124,
+    "board8_entries": 170,
+    "board20_entries": 0,
+    "board8_host": "192.168.1.90",
+    "board8_soc": "Ascend310B4",
+    "board8_status": "synced_and_sha256_verified",
+    "board20_host": "192.168.1.95",
+    "board20_legacy_host": "192.168.8.210",
+    "board20_status": "partial at 192.168.1.95: Qwen1.5 (9/9) and TinyLlama (8/9) gap reports recorded; DeepSeek and Qwen2.5 identity evidence are tracked in the dual-board gap bundle; this historical bundle has 0 board20 entries",
+    "gap_bundle": "repro/case9-dual-board-gap-20260830",
+    "gap_bundle_status": "local_hash_verified; 197/197 required files verified; matrix preserves passed, failed, blocked and not-run states",
+    "secrets_included": false,
+    "model_weights_committed": false,
+    "latest_qwen_report": "repro/mindspore-chat-20260829/board8t/reports/mindspore-chat/qwen1.5-0.5b-mindspore/qwen-lpm-recovery-20260829r/acceptance.json",
+    "latest_qwen_worker_pid_at_sync": 4378,
+    "hardware_diagnostic_status": "recovered_service_but_recurrent_lpm_fault_requires_follow-up"
+  },
+  "dual_board_gap_bundle": {
+    "path": "repro/case9-dual-board-gap-20260830",
+    "sync_run_id": "case9-gap-sync-20260830",
+    "manifest": "repro/case9-dual-board-gap-20260830/bundle-manifest.json",
+    "sha256_inventory": "repro/case9-dual-board-gap-20260830/SHA256SUMS.txt",
+    "verified_entries": 197,
+    "boards": {
+      "board8t": {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
+      "board20t": {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"}
+    },
+    "matrix_status": {
+      "board8t/qwen25-onnx-om": "passed (identity-only)",
+      "board8t/qwen1.5-0.5b-mindspore": "not-run in this gap bundle (historical .178/.90 machine report is external; no rerun after IP-only change; experimental_dirty_base; human quality/admission pending)",
+      "board8t/tinyllama-1.1b-mindspore": "not-run in this gap bundle (historical .178/.90 batch is external and overall blocked after 8/9 long-output/quality failure; no rerun after IP-only change)",
+      "board8t/deepseek-r1-qwen-1.5b-mindspore": "passed",
+      "board20t/qwen25-onnx-om": "blocked (current artifacts missing)",
+      "board20t/qwen1.5-0.5b-mindspore": "passed",
+      "board20t/tinyllama-1.1b-mindspore": "failed",
+      "board20t/deepseek-r1-qwen-1.5b-mindspore": "not-run in this gap bundle (current .95 API evidence is in the separate DeepSeek bundle; Chinese quality and dirty-base admission incomplete)"
+    },
+    "formal_entry": "unchanged; no candidate promoted"
+  },
+  "artifacts": {
+    "asr": {
+      "id": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23",
+      "kind": "archive",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23.tar.bz2",
+      "expected_bytes": 74004050,
+      "sha256": null,
+      "license": "Apache-2.0 runtime; inspect the model archive before redistribution",
+      "verification": "The upstream release does not publish a checksum alongside this asset. The provisioning script records the first verified TLS download in the board-local lock file, then verifies every later use against that lock."
+    },
+    "tts": {
+      "id": "vits-piper-zh_CN-huayan-medium",
+      "kind": "archive",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-zh_CN-huayan-medium.tar.bz2",
+      "expected_bytes": 67255926,
+      "sha256": null,
+      "license": "Private experiment only. The Huayan model card lists its dataset license as Unknown; do not make a commercial-use claim.",
+      "verification": "The upstream release does not publish a checksum alongside this asset. The provisioning script records the first verified TLS download in the board-local lock file, then verifies every later use against that lock."
+    },
+    "llm": {
+      "id": "Qwen2.5-0.5B-Instruct-GGUF:q4_0",
+      "kind": "gguf",
+      "repository": "Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+      "revision": "12145bd1d629190a4d44254073650877954d02c9",
+      "filename": "qwen2.5-0.5b-instruct-q4_0.gguf",
+      "url": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/12145bd1d629190a4d44254073650877954d02c9/qwen2.5-0.5b-instruct-q4_0.gguf?download=true",
+      "expected_bytes": null,
+      "sha256": "7671c0c304e6ce5a7fc577bcb12aba01e2c155cc2efd29b2213c95b18edaf6ed",
+      "license": "Apache-2.0",
+      "verification": "The Hugging Face file page reports approximately 429 MB and publishes the SHA-256 above. The provisioning script records the exact downloaded byte count in the board-local lock file."
+    },
+    "acl_om_llm": {
+      "id": "Qwen1.5-0.5B-Chat-ONNX:model_fp16",
+      "kind": "onnx",
+      "repository": "onnx-community/Qwen1.5-0.5B-Chat-ONNX",
+      "revision": "6d413dd9a252749e0760902c93331e3e4e65b73c",
+      "filename": "qwen1.5-0.5b-chat-model_fp16.onnx",
+      "source_filename": "onnx/model_fp16.onnx",
+      "url": "https://huggingface.co/onnx-community/Qwen1.5-0.5B-Chat-ONNX/resolve/6d413dd9a252749e0760902c93331e3e4e65b73c/onnx/model_fp16.onnx?download=true",
+      "expected_bytes": 928499243,
+      "sha256": "1397b07c02c5821316ca20cb64f45af87b87932eddd13c743d988d5a7c826262",
+      "license": "tongyi-qianwen-research (as published by the Qwen1.5 source/model card; review the license before redistribution)",
+      "target": "Ascend310B4",
+      "precision": "fp16",
+      "status": "candidate; generic ONNX export, not an Ascend OM",
+      "verification": "Verify bytes and SHA-256 before ONNX contract inspection. ATC, OM loading, ACL smoke, NPU observation, and OpenAI API checks are separate gates."
+    },
+    "acl_om_tokenizer": {
+      "id": "Qwen1.5-0.5B-Chat-ONNX-tokenizer",
+      "kind": "tokenizer",
+      "repository": "onnx-community/Qwen1.5-0.5B-Chat-ONNX",
+      "revision": "6d413dd9a252749e0760902c93331e3e4e65b73c",
+      "filename": "tokenizer.json",
+      "source_filename": "tokenizer.json",
+      "url": "https://huggingface.co/onnx-community/Qwen1.5-0.5B-Chat-ONNX/resolve/6d413dd9a252749e0760902c93331e3e4e65b73c/tokenizer.json?download=true",
+      "expected_bytes": 11418266,
+      "sha256": "bcfe42da0a4497e8b2b172c1f9f4ec423a46dc12907f4349c55025f670422ba9",
+      "license": "tongyi-qianwen-research (as published by the Qwen1.5 source/model card)",
+      "verification": "The tokenizer is required by the no-Transformers ACL service. Keep the tokenizer revision identical to the ONNX revision."
+    },
+    "tinyllama_acl_om": {
+      "id": "TinyLlama-1.1B-Chat-v1.0-Ascend310B4-prebuilt-om",
+      "kind": "om",
+      "repository": "wan-zutao/tiny-llama-manual-reset",
+      "repository_url": "https://gitee.com/wan-zutao/tiny-llama-manual-reset",
+      "revision": "114a158718411d8b0a252806ca14144c01a7e3db",
+      "filename": "tiny-llama.om",
+      "source_filename": "tiny-llama.om",
+      "url": "https://obs-9be7.obs.cn-east-2.myhuaweicloud.com/models/tiny_llama/tiny-llama.om",
+      "expected_bytes": 1493077371,
+      "sha256": "604e47c5b6e1239abcc012d7e8d4be8398465657a142ad59280d2c1917eda967",
+      "license": "Apache-2.0 repository; verify the model and tokenizer provenance before redistribution",
+      "target": "Ascend310B4",
+      "precision": "smoothquant-int8",
+      "status": "api_verified_experimental; Chinese quality failed/not-admitted",
+      "verification": "The board recorded SHA-256 604e47c5b6e1239abcc012d7e8d4be8398465657a142ad59280d2c1917eda967 for the exact OBS object. ACL descriptor, real NPU greedy generation, JSON/SSE API and case9 gateway forwarding passed on Ascend310B4/CANN8.0. Chinese probing showed English fallback and replacement characters, and stability observations showed residual NPU memory/HugePages growth; do not admit as a Chinese chat model. The OBS object has a multipart ETag rather than a SHA-256."
+    },
+    "tinyllama_tokenizer_zip": {
+      "id": "TinyLlama-1.1B-Chat-v1.0-tokenizer",
+      "kind": "tokenizer_archive",
+      "repository": "wan-zutao/tiny-llama-manual-reset",
+      "repository_url": "https://gitee.com/wan-zutao/tiny-llama-manual-reset",
+      "revision": "114a158718411d8b0a252806ca14144c01a7e3db",
+      "filename": "tokenizer.zip",
+      "source_filename": "tokenizer.zip",
+      "url": "https://obs-9be7.obs.cn-east-2.myhuaweicloud.com/wanzutao/tiny-llama/tokenizer.zip",
+      "expected_bytes": 709459,
+      "sha256": "d785e2532e65d83fd34870e762cc3c65326991ddcc97179796860ab9893f6917",
+      "license": "Apache-2.0 repository; verify the model and tokenizer provenance before redistribution",
+      "target": "Ascend310B4",
+      "status": "candidate; tokenizer archive is content-verified but model compatibility remains a separate gate",
+      "extracted_files": {
+        "tokenizer.json": {
+          "expected_bytes": 1842767,
+          "sha256": "bcd04f0eadf90287bd26e1a183ac487d8a141b09b06aecb7725bbdd343640f2e"
+        },
+        "tokenizer.model": {
+          "expected_bytes": 499723,
+          "sha256": "9e556afd44213b6bd1be2b850ebbbd98f5481437a8021afaf58ee7fb1818d347"
+        },
+        "special_tokens_map.json": {
+          "expected_bytes": 414,
+          "sha256": "6fa06efa2785e450051989a6f8fb4416b10149ded485ddd3f127a40734f5cfd0"
+        },
+        "tokenizer_config.json": {
+          "expected_bytes": 932,
+          "sha256": "bcdc6f267b05e1afd27fa622a62fea649bcb941e6dc705d2835883a0746192da"
+        }
+      },
+      "verification": "The archive contains tokenizer.json, tokenizer.model, tokenizer_config.json, special_tokens_map.json and auxiliary metadata. Runtime must bind every extracted tokenizer file to these hashes, require the tokenizer revision to equal the OM revision, and must not use the bundled model index as an architecture source."
+    },
+    "tinyllama_onnx": {
+      "id": "TinyLlama-1.1B-Chat-v1.0-smoothquant-onnx",
+      "kind": "onnx",
+      "repository": "wan-zutao/tiny-llama-manual-reset",
+      "repository_url": "https://gitee.com/wan-zutao/tiny-llama-manual-reset",
+      "revision": "114a158718411d8b0a252806ca14144c01a7e3db",
+      "filename": "tiny-llama.onnx",
+      "source_filename": "tiny-llama.onnx",
+      "url": "https://obs-9be7.obs.cn-east-2.myhuaweicloud.com/wanzutao/tiny-llama/tiny-llama.onnx",
+      "expected_bytes": 1487421772,
+      "sha256": null,
+      "license": "Apache-2.0 repository; verify the model provenance before redistribution",
+      "target": "Ascend310B4",
+      "precision": "smoothquant-int8",
+      "status": "optional; source graph requires custom MatMulInteger OPP and CANN/ATC compatibility review",
+      "verification": "Do not download or convert this graph in the default prebuilt-OM path. If the prebuilt OM is blocked and a custom OPP rebuild is explicitly authorized, hash this ONNX file before inspection and retain the full ATC log."
+    },
+    "qwen25_static_fp16_onnx": {
+      "id": "Qwen2.5-0.5B-Instruct-static-fp16-2048",
+      "kind": "onnx",
+      "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "repository_url": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct",
+      "transport": "ModelScope object storage (Hugging Face direct download timed out during this run)",
+      "revision": "modelscope:13448952dbdab7a1627d0680ecd207535d889a23",
+      "filename": "qwen25-static-2048.onnx",
+      "source_filename": "model.safetensors",
+      "url": null,
+      "expected_bytes": 1269330329,
+      "sha256": "9887d67ad36179ef8d451a1226adc35011ad7093e65b1b49cf2ab1888163c43f",
+      "source_artifact": {
+        "filename": "model.safetensors",
+        "bytes": 988097824,
+        "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+      },
+      "license": "Apache-2.0 (Qwen2.5 model card; verify terms before redistribution)",
+      "target": "Ascend310B4",
+      "precision": "fp16",
+      "export": {
+        "device": "external CPU build in sci-agent; no CUDA",
+        "opset": 17,
+        "batch": 1,
+        "sequence_length": 2048,
+        "dynamic_axes": null,
+        "use_cache": false,
+        "inputs": "input_ids, attention_mask, position_ids: int64 [1,2048]",
+        "output": "logits: float16 [1,2048,151936]"
+      },
+      "status": "candidate; static graph and ATC/descriptor/ACL/API passed in isolated batch; Chinese quality and stability pending",
+      "verification": "The ONNX graph is a locally exported artifact, not an upstream Ascend OM. Static inspection found no dynamic dimensions, external initializers, or unsupported operators. Board JSON/SSE and an isolated gateway on 7864 passed; formal gateway 7861, Chinese quality, and stability remain separate gates. Keep the CPU reference and board reports separate from NPU quality claims."
+    },
+    "qwen25_last_logits_static_fp16_onnx": {
+      "id": "Qwen2.5-0.5B-Instruct-static-last-logits-fp16-2048",
+      "kind": "onnx",
+      "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "repository_url": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct",
+      "transport": "controller graph rewrite from the audited Qwen2.5 full-context ONNX",
+      "revision": "modelscope:13448952dbdab7a1627d0680ecd207535d889a23",
+      "filename": "qwen25-static-2048-last.onnx",
+      "source_filename": "qwen25-static-2048.onnx",
+      "url": null,
+      "expected_bytes": 1269331200,
+      "sha256": "7d443d424127305368e78bc6755df41875bd0a029582ccaa432f26e3428dc5c4",
+      "source_artifact": {
+        "filename": "qwen25-static-2048.onnx",
+        "bytes": 1269330329,
+        "sha256": "9887d67ad36179ef8d451a1226adc35011ad7093e65b1b49cf2ab1888163c43f"
+      },
+      "license": "Apache-2.0 (inherits the audited Qwen2.5 model; verify terms before redistribution)",
+      "target": "Ascend310B4",
+      "precision": "fp16",
+      "export": {
+        "device": "external CPU graph rewrite in sci-agent; no CUDA",
+        "opset": 17,
+        "batch": 1,
+        "sequence_length": 2048,
+        "dynamic_axes": null,
+        "use_cache": false,
+        "inputs": "input_ids, attention_mask, position_ids: int64 [1,2048]",
+        "output": "last_logits: float16 [1,1,151936]",
+        "optimization": "ReduceSum(attention_mask)-1 -> Gather(axis=1)"
+      },
+      "status": "candidate; last-logits ACL/NPU/API verified on isolated 8083; full-context compute remains; speedup and Chinese quality pending",
+      "verification": "The graph rewrite changes only the public output and preserves the original last row in CPU/ONNX comparison. Board ATC, descriptor, ACL greedy generation, JSON and SSE passed on 192.168.1.90. It is not an official Ascend OM and must not replace the full-context entry until short-context or static-KV performance gates pass."
+    },
+    "qwen25_short_context_last_logits_fp16_onnx": {
+      "id": "Qwen2.5-0.5B-Instruct-static-last-logits-fp16-short-context",
+      "kind": "onnx_candidates",
+      "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "repository_url": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct",
+      "transport": "controller CPU export and last-logits graph rewrite",
+      "revision": "modelscope:13448952dbdab7a1627d0680ecd207535d889a23",
+      "target": "Ascend310B4",
+      "precision": "fp16",
+      "files": {
+        "qwen25-static-1024-last.onnx": {
+          "expected_bytes": 1263023352,
+          "sha256": "bbd85ce8af9ef332e4135678de3b72a9e134b4c4655f5281e9b95f0cee7ce70b",
+          "sequence_length": 1024
+        },
+        "qwen25-static-512-last.onnx": {
+          "expected_bytes": 1261442290,
+          "sha256": "8966c00e87c20ddb549fc7ca99e32d006b85f3f45b23d1f288e7fe26e829e586",
+          "sequence_length": 512
+        }
+      },
+      "status": "controller_verified_only; board ATC/OM/ACL/NPU not run",
+      "verification": "Both fixed-shape graphs pass ONNX checker and last-logits contract inspection. CPU/ORT comparison against the 2048 graph used the same 36-token input and matched logits/top-5. Shorter context may reduce NPU work but imposes a hard prompt-plus-generation limit; do not promote either file without a new board evidence set."
+    },
+    "qwen25_static_kv_1024_fp32_onnx": {
+      "id": "qwen2.5-0.5b-instruct-static-kv-1024-fp32",
+      "kind": "onnx_candidate",
+      "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "repository_url": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct",
+      "transport": "controller CPU export in sci-agent; board transfer verified with WSL rsync and atomic rename",
+      "revision": "modelscope:13448952dbdab7a1627d0680ecd207535d889a23",
+      "filename": "qwen25-static-kv-1024-v2.onnx",
+      "source_filename": "model.safetensors",
+      "url": null,
+      "expected_bytes": 1261082122,
+      "sha256": "b4870df5da9c8cbef4163ceb65d4dc13433f2fd8ed5d2083ef3223d07d1a3c0e",
+      "source_artifact": {
+        "filename": "model.safetensors",
+        "bytes": 988097824,
+        "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+      },
+      "license": "Apache-2.0 (Qwen2.5 model card; verify terms before redistribution)",
+      "target": "Ascend310B4",
+      "precision": "fp32",
+      "export": {
+        "device": "external CPU build in sci-agent; no CUDA",
+        "opset": 17,
+        "batch": 1,
+        "execution_mode": "static_kv_token_fp32",
+        "static_sequence_length": 1024,
+        "mask_length": 1024,
+        "cache_layout": "split",
+        "cache_dtype": "float32",
+        "cache_shape": [1, 2, 1024, 64],
+        "token_cache_shape": [1, 1, 2, 64],
+        "cache_tensor_count": 48,
+        "inputs": "input_ids [1,1] int64; attention_mask [1,1024] int64; position_ids [1,1] int64; past_key_values.{layer}.{key|value} x48 [1,2,1024,64] float32",
+        "outputs": "logits [1,1,151936] float32; present.{layer}.{key|value} x48 [1,1,2,64] float32"
+      },
+      "tokenizer_ref": "qwen25_static_tokenizer",
+      "status": "artifact_verified; descriptor_verified; acl_smoke_passed; npu_generation_passed; dual_board_api_passed; formal_entry_unchanged",
+      "verification": "The controller generated and inspected a single-file static-KV graph with the recorded bytes/SHA-256, no external initializers, no dynamic dimensions, and no unsupported operators. The graph uses FP16 weight tensors to remain below the protobuf 2 GiB limit while exposing FP32 cache/logit interfaces. Target-SoC B4 and B1 OM loads, full acceptance, candidate gateway/UI, and usage-perf reports are recorded separately. The 8T report was collected at 192.168.8.178 and remains valid after that same board moved to 192.168.1.90; this is an address alias, not a new hardware validation. The formal 8080/7861/7865 entry was not changed. Chinese probes were machine-valid; an engineering qualitative review estimated approximately 9/10 understandable, but the hardware fact probe was incorrect and formal human quality sign-off remains incomplete. Do not treat this as unconditional factual-quality approval."
+    },
+    "qwen25_static_tokenizer": {
+      "id": "Qwen2.5-0.5B-Instruct-tokenizer",
+      "kind": "tokenizer",
+      "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "repository_url": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct",
+      "transport": "ModelScope object storage",
+      "revision": "modelscope:13448952dbdab7a1627d0680ecd207535d889a23",
+      "license": "Apache-2.0 (Qwen2.5 model card; verify terms before redistribution)",
+      "target": "Ascend310B4",
+      "status": "content-verified; tokenizer/runtime contract tested locally",
+      "files": {
+        "tokenizer.json": {
+          "expected_bytes": 7031645,
+          "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"
+        },
+        "tokenizer_config.json": {
+          "expected_bytes": 7305,
+          "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583"
+        },
+        "config.json": {
+          "expected_bytes": 659,
+          "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45"
+        }
+      },
+      "verification": "Runtime uses tokenizer.json and tokenizer_config.json only; architecture values come from the audited ONNX contract. The tokenizer vocabulary is smaller than the model embedding vocabulary, so generated IDs are checked against the ONNX vocabulary size."
+    },
+    "qwen25_static_fp16_om": {
+      "id": "Qwen2.5-0.5B-Instruct-static-fp16-Ascend310B4-OM",
+      "kind": "om",
+      "source": "board-generated by ATC from qwen25-static-2048.onnx",
+      "filename": "qwen25-static-2048.om",
+      "board_path": "/home/HwHiAiUser/case9-qwen25/artifacts/qwen25-static-2048.om",
+      "expected_bytes": 1407111161,
+      "sha256": "dc17b153ee1e76b3d31e971617d1cfdc7c56f366226212a61377a2c85e1d92b8",
+      "target": "Ascend310B4",
+      "precision": "fp16",
+      "cann": "8.0.0",
+      "atc_soc_version": "Ascend310B4",
+      "status": "artifact_verified; descriptor_verified; ACL smoke and isolated JSON/SSE API passed; gateway 7864 passed; Chinese quality/stability pending",
+      "verification": "This OM is board-local and is not committed. The generated hash is valid only for the recorded ONNX, ATC command, CANN version, and board. JSON/SSE ran on loopback 8082 and an isolated gateway on 7864; formal 7861 and user-facing admission still require separate approval. Preserve the ATC log, descriptor report, and API reports before promoting this candidate."
+    },
+    "qwen25_last_logits_static_fp16_om": {
+      "id": "Qwen2.5-0.5B-Instruct-static-last-logits-fp16-Ascend310B4-OM",
+      "kind": "om",
+      "source": "board-generated by ATC from qwen25-static-2048-last.onnx",
+      "filename": "qwen25-static-2048-last-retry2.om",
+      "board_path": "/home/HwHiAiUser/case9-qwen25/artifacts/optimized-last-logits/qwen25-static-2048-last-retry2.om",
+      "expected_bytes": 1407130895,
+      "sha256": "ae196fd8ba4ccb7c721f8fcb9d0ff4d9b5b72bfcdf9a77309c6fe51d5103c460",
+      "target": "Ascend310B4",
+      "precision": "fp16",
+      "cann": "8.0.0",
+      "atc_soc_version": "Ascend310B4",
+      "execution_mode": "last_logits_static",
+      "status": "artifact_verified; descriptor_verified; ACL/NPU and isolated JSON/SSE passed; speedup and Chinese quality pending",
+      "verification": "This OM is board-local and is not committed. Its public output is float16 [1,1,151936], while the transformer still uses the fixed 2048 context. Keep it as an experimental optimization candidate and preserve the ATC log, contract, NPU sample and API reports."
+    },
+    "qwen25_static_kv_1024_fp32_om": {
+      "id": "qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om",
+      "kind": "om",
+      "source": "board-generated by ATC from qwen25-static-kv-1024-v2.onnx",
+      "filename": "qwen25-static-kv-1024-v2.om",
+      "board_path": "/home/HwHiAiUser/case9-qwen25-kv1024/artifacts/qwen25-static-kv-1024-v2.om",
+      "expected_bytes": 1266010586,
+      "sha256": "f6650e52ff3908288763ef7957832ade606b0e554fa8fde986932f1ca1140eb8",
+      "local_copy": {
+        "status": "content_verified",
+        "synced_at": "2026-08-25",
+        "transport": "WSL rsync --partial --append-verify over SSH; resumed after network interruption",
+        "path": "artifacts/qwen25-kv-1024/board/qwen25-static-kv-1024-v2.om",
+        "bytes": 1266010586,
+        "sha256": "f6650e52ff3908288763ef7957832ade606b0e554fa8fde986932f1ca1140eb8",
+        "lock_path": "artifacts/qwen25-kv-1024/board/qwen25-static-kv-1024-v2.om.lock.json",
+        "contract_path": "contracts/qwen25-kv-1024/board/qwen25-static-kv-1024-v2-om-contract.json",
+        "evidence_doc": "docs/19-qwen25-om-local-copy-record.md",
+        "runtime_note": "Local copy is archived and hash-verified; Windows does not execute Ascend ACL/NPU inference."
+      },
+      "target": "Ascend310B4",
+      "precision": "fp32",
+      "cann": "8.0.0",
+      "atc_soc_version": "Ascend310B4",
+      "execution_mode": "static_kv_token_fp32",
+      "static_sequence_length": 1024,
+      "mask_length": 1024,
+      "cache_layout": "split",
+      "cache_dtype": "float32",
+      "cache_shape": [1, 2, 1024, 64],
+      "token_cache_shape": [1, 1, 2, 64],
+      "cache_tensor_count": 48,
+      "max_tokens": 80,
+      "sentence_stop": true,
+      "runtime_execution_timeout_seconds": 240,
+      "gateway_timeout_seconds": 270,
+      "text_ui_llm_timeout_seconds": 300,
+      "device_cache_update": true,
+      "device_cache_update_note": "CANN 8.0 Python ACL binding on 192.168.1.90 does not export ACL_MEMCPY_DEVICE_TO_DEVICE, but the CANN header confirms ABI value 3. The runtime checks compatible H2D/D2H enum values before using that fallback; the repaired formal service executed it successfully and reports device_cache_update=true.",
+      "tokenizer_ref": "qwen25_static_tokenizer",
+      "atc_log": "/home/HwHiAiUser/case9-qwen25-kv1024/logs/atc-retry1-20260823T110028Z.log",
+      "om_contract": "/home/HwHiAiUser/case9-qwen25-kv1024/contracts/qwen25-static-kv-1024-v2-om-contract.json",
+      "formal_promotion_report": "/home/HwHiAiUser/case9-qwen25-kv1024/logs/formal-promotion-20260823.json",
+      "formal_promotion_report_sha256": "78bd9e0de61fb992bcc0e5e87b22f16ff95d0f3cff2d73e2c629be59fa90224f",
+      "formal_npu_report": "/home/HwHiAiUser/case9-qwen25-kv1024/logs/formal-npu-during-20260823T121716Z.txt",
+      "formal_npu_report_sha256": "6a5d96230a60c725f52a89cbe19d071f494ffbb7b597c724578bef37cc6aa22c",
+      "formal_runtime_sha256": "7371271f23bf3b830a4713b6a4aa85e3c10631055b02b927ba1b0a52f65f480c",
+      "formal_service_sha256": "7146b566d1583da6341ce8422029af6e30dde28173b693bf6025f3e5d6092e02",
+      "formal_gateway_sha256": "f4cb662b2dc61828fdcf2de43ea293ac4cf8933b1329c204ba58d972e7670bd3",
+      "formal_config_sha256": "f1ec4729e8c43e43bc3cbad7948c93b97455bd392561fd27fb41574c32ca9dd1",
+      "formal_text_ui_sha256": "705d510ce41f12e4a50514fb1ebde44e331c440ca1683a9b677d6ff67eb5eab8",
+      "formal_local_session_sha256": "6dcfe0c8c03bd8f89ec8f9dc082a87f1b39df3fbed90d6841f6b92c273e79b25",
+      "previous_formal_text_ui_sha256": "3943cec9b01320ff8782fd8abd3b4ca0ba124bbdc7953b832feffc369f9dfa91",
+      "candidate_sentence_stop": {
+        "pid": 61313,
+        "port": 8084,
+        "prompt": "你是谁？",
+        "request_max_tokens": 80,
+        "prompt_tokens": 32,
+        "completion_tokens": 76,
+        "finish_reason": "stop",
+        "text_suffix": "回答。"
+      },
+      "candidate_gateway_default_max": {
+        "pid": 61990,
+        "port": 7867,
+        "max_tokens_omitted": true,
+        "completion_tokens": 76,
+        "finish_reason": "stop"
+      },
+      "candidate_sse_max32": {
+        "port": 8084,
+        "request_max_tokens": 32,
+        "sentence_stop": true,
+        "finish_reason": "stop",
+        "done_event": true
+      },
+      "formal_processes": {
+        "acl": {"pid": 4255, "port": 8080},
+        "gateway": {"pid": 4726, "port": 7861},
+        "ui": {"pid": 4833, "port": 7865}
+      },
+      "previous_formal_processes": {
+        "acl": {"pid": 62188, "port": 8080},
+        "gateway": {"pid": 62247, "port": 7861},
+        "ui": {"pid": 62277, "port": 7865}
+      },
+      "formal_default_max_evidence": {
+        "historical": true,
+        "max_tokens_omitted": true,
+        "completion_tokens": 76,
+        "finish_reason": "stop"
+      },
+      "formal_max32_evidence": {
+        "pid": 62188,
+        "port": 8080,
+        "prompt": "你是谁？",
+        "request_max_tokens": 32,
+        "prompt_tokens": 32,
+        "completion_tokens": 22,
+        "finish_reason": "stop",
+        "text_suffix": "千问。"
+      },
+      "formal_max32_after_restart": {
+        "historical": true,
+        "pid": 65088,
+        "port": 8080,
+        "request_max_tokens": 32,
+        "completion_tokens": 22,
+        "finish_reason": "stop",
+        "text_suffix": "千问。"
+      },
+      "formal_gateway_max32_sse": {
+        "pid": 62247,
+        "port": 7861,
+        "request_max_tokens": 32,
+        "text_suffix": "千问。",
+        "terminal_finish_reason": "stop",
+        "done_event": true
+      },
+      "formal_ui_evidence": {
+        "historical": true,
+        "pid": 62277,
+        "http_status": 200,
+        "max_tokens_omitted": true,
+        "sentences": 3,
+        "text_suffix": "回答。"
+      },
+      "finish_reason_fix": {
+        "ui_pid": 64080,
+        "ui_log": "/home/HwHiAiUser/case9-review-20260822/logs/text-chat-qwen25-finish-reason-formal-7865.log",
+        "ui_log_sha256": "c233a5a93f1215b1b0f86d7d288a2bb4dbd1c38c40c98fdf9e9292984a22fb8b",
+        "stream_finish_reason": "stop",
+        "done_event_contains_full_text": true,
+        "length_is_rejected": true
+      },
+      "formal_health_after_request": {
+        "ready": true,
+        "device_cache_update": true,
+        "restart_required": false
+      },
+      "current_sentence_stop": {
+        "minimum_generated_tokens": 16,
+        "default_max_tokens": 80,
+        "policy": "stop_at_first_sentence_boundary_after_minimum",
+        "explicit_limit_semantics": "finish_reason=length_is_error_at_ui"
+      },
+      "current_formal_verification": {
+        "acl_pid": 4255,
+        "gateway_pid": 4726,
+        "text_ui_pid": 4833,
+        "port_chain": "7865->7861->8080",
+        "prompt": "你是谁？",
+        "max_tokens_omitted": true,
+        "completion_tokens": 22,
+        "finish_reason": "stop",
+        "text_suffix": "千问。",
+        "acl_health": "ready=true;device_cache_update=true;restart_required=false"
+      },
+      "current_recovery_20260824": {
+        "source_runtime_sha256": "7371271f23bf3b830a4713b6a4aa85e3c10631055b02b927ba1b0a52f65f480c",
+        "acl": {
+          "pid": 4255,
+          "port": 8080,
+          "max_tokens": 80,
+          "sentence_stop_min_tokens": 16,
+          "log": "/home/HwHiAiUser/case9-qwen25-kv1024/logs/qwen25-static-kv-1024-health-policy-8080.log",
+          "log_sha256": "412170c8a4b9714f52c8d26f556a9092596ca84182e2c34e8360a6eb2f1b0d3b",
+          "health": "ready=true;device_cache_update=true;restart_required=false"
+        },
+        "gateway": {
+          "pid": 4726,
+          "port": 7861,
+          "log": "/home/HwHiAiUser/case9-review-20260822/logs/gateway-qwen25-health-policy-formal-7861.log",
+          "log_sha256": "fef8503e512302d8ebf72bddaafd10a3aac2f35613e47be0f075b79b869995d0"
+        },
+        "text_ui": {
+          "pid": 4833,
+          "port": 7865,
+          "log": "/home/HwHiAiUser/case9-review-20260822/logs/text-chat-qwen25-health-policy-formal-7865.log",
+          "log_sha256": "943a450e833668ad63ec09a0c421022558de278987cc1cb1a8e168c4fdd17326"
+        },
+        "prompt": "你是谁？",
+        "completion_tokens": 22,
+        "finish_reason": "stop",
+        "text_suffix": "千问。",
+        "gateway_sse_done": true,
+        "text_ui_done_contains_full_text": true,
+        "npu": {
+          "chip": "Ascend310B4",
+          "health": "Alarm",
+          "memory_used_mb": 5712,
+          "memory_total_mb": 15610,
+          "hugepages_used": 647,
+          "hugepages_total": 647
+        }
+      },
+      "current_recovery_20260825": {
+        "board_time": "2026-08-25T21:35:30+08:00",
+        "reboot": {
+          "approximate_time": "2026-08-25T21:24:20+08:00",
+          "kernel_cmdline_reason": "OS_PANIC",
+          "drv_lpm_fault": "0x80E3A203",
+          "bbox_exception": "0xa6193215",
+          "bbox_from_module": "lpm",
+          "mata_ras_error_code": "0x50e",
+          "safety_event_status": "0xfc30050e",
+          "classification": "board OS/Ascend driver or hardware LPM/RAS fault; app-normal-exit not supported",
+          "automatic_restart_configured": false
+        },
+        "source_runtime_sha256": "7371271f23bf3b830a4713b6a4aa85e3c10631055b02b927ba1b0a52f65f480c",
+        "processes": {
+          "acl": {"pid": 3974, "port": 8080},
+          "gateway": {"pid": 4266, "port": 7861},
+          "text_ui": {"pid": 4443, "port": 7865}
+        },
+        "ports": "7865->7861->8080",
+        "acl_health": {
+          "ready": true,
+          "descriptor_validated": true,
+          "device_cache_update": true,
+          "restart_required": false,
+          "max_tokens": 80,
+          "sentence_stop_min_tokens": 16
+        },
+        "prompt": "你是谁？",
+        "completion_tokens": 22,
+        "finish_reason": "stop",
+        "text_suffix": "千问。",
+        "gateway_sse_done": true,
+        "text_ui_http_status": 200,
+        "text_ui_done_contains_full_text": true,
+        "single_request_elapsed_seconds_approx": 30.0,
+        "reports": {
+          "gateway_sse": "/home/HwHiAiUser/case9-qwen25-kv1024/reports/20260825-gateway-sse-max32.txt",
+          "gateway_sse_sha256": "f362756bce9a51ef2f8e87d6178714dccea5f0cc99815ea6a685fbefb6e099ad",
+          "text_ui_json": "/home/HwHiAiUser/case9-qwen25-kv1024/reports/20260825-text-ui-json.txt",
+          "text_ui_json_sha256": "e2b38758631a52406131b2b282a30c68ff18d3a0462efd5ffb752efa7a1df5ad",
+          "text_ui_sse": "/home/HwHiAiUser/case9-qwen25-kv1024/reports/20260825-text-ui-sse.txt",
+          "text_ui_sse_sha256": "a64215e1943106a7e005215a302dbb75c1590c88cd60cff21794c3aef6f2e1b8"
+        },
+        "logs": {
+          "acl": "/home/HwHiAiUser/case9-qwen25-kv1024/logs/qwen25-static-kv-1024-boot-20260824.log",
+          "acl_sha256": "dd98694f0d79647aa2729094622b658e1496e27195eaf1200917f92adf6bfbf2",
+          "gateway": "/home/HwHiAiUser/case9-review-20260822/logs/gateway-qwen25-boot-20260825.log",
+          "gateway_sha256": "1cea4c7077d57409a69e55a832ad4c53c20928ca5f6d035707eecc21707827d2",
+          "text_ui": "/home/HwHiAiUser/case9-review-20260822/logs/text-chat-qwen25-boot-20260825.log",
+          "text_ui_sha256": "0ef7138b0a894f00b975afaf09b799dc7c08b531823edfa6b49e7b6dadcf0c22"
+        },
+        "npu": {
+          "chip": "Ascend310B4",
+          "health": "Alarm",
+          "memory_used_mb": 8196,
+          "memory_total_mb": 15610,
+          "hugepages_used": 647,
+          "hugepages_total": 647,
+          "memory_snapshot_note": "post-request npu-smi was recorded; Alarm is diagnostic only"
+        }
+      },
+      "post_npu": {
+        "chip": "Ascend310B4",
+        "health": "Alarm",
+        "memory_used_mb": 8284,
+        "memory_total_mb": 15610,
+        "hugepages_used": 647,
+        "hugepages_total": 647
+      },
+      "post_restart_npu": {
+        "chip": "Ascend310B4",
+        "health": "Alarm",
+        "memory_used_mb": 13844,
+        "memory_total_mb": 15610,
+        "hugepages_used": 647,
+        "hugepages_total": 647
+      },
+      "historical_limits": {
+        "max_tokens": 32,
+        "runtime_execution_timeout_seconds": 96,
+        "note": "Historical repair batch only. Older 64/80 runs without complete finish evidence are not classified as sentence-stop results."
+      },
+      "formal_runtime_refresh_report": "/home/HwHiAiUser/case9-qwen25-kv1024/logs/formal-npu-during-runtime-refresh-20260823T122323Z.txt",
+      "formal_runtime_refresh_report_sha256": "e7ce0c80995d18f29f8cee51f5eeaebd2699e8e356009e38db889719af614552",
+      "formal_fix_validation_report": "/home/HwHiAiUser/case9-qwen25-kv1024/logs/qwen25-static-kv-1024-formal-fix-validation.json",
+      "formal_fix_validation_report_sha256": "69f8bb58187265b541914fe4de4d5f92c3844369bab2121c1ffe48d4c36c60fd",
+      "formal_fix_ui_validation_report": "/home/HwHiAiUser/case9-qwen25-kv1024/logs/qwen25-static-kv-1024-formal-fix-ui-validation.json",
+      "formal_fix_ui_validation_report_sha256": "3801d9060ed48457490de91175b8fc9dd565b739493db6d981af5558a6b5efd1",
+      "formal_finish_reason_acl_log": "/home/HwHiAiUser/case9-qwen25-kv1024/logs/qwen25-static-kv-1024-formal-finish-reason-restart-8080.log",
+      "formal_finish_reason_acl_log_sha256": "2a5611f98408177154f16fa8e03fb275461d71049b95a1e09675666e4fb9b033",
+      "formal_sentence_stop_acl_log": "/home/HwHiAiUser/case9-qwen25-kv1024/logs/qwen25-static-kv-1024-health-policy-8080.log",
+      "formal_sentence_stop_acl_log_sha256": "412170c8a4b9714f52c8d26f556a9092596ca84182e2c34e8360a6eb2f1b0d3b",
+      "previous_formal_sentence_stop_acl_log": "/home/HwHiAiUser/case9-qwen25-kv1024/logs/qwen25-static-kv-1024-sentence-stop-8080.log",
+      "previous_formal_sentence_stop_acl_log_sha256": "14af20f6757405121f26948ce93e3b68586fd7163af88d9f1a6be001bbb259f1",
+      "status": "artifact_verified; descriptor_verified; acl_smoke_passed; npu_generation_passed; dual_board_api_passed; candidate_gateway_ui_local_hash_verified; historical_formal_promotion_only; formal_entry_unchanged",
+      "current_runtime_state": "not_running_after_2026-08-25T22:26:43+08:00_board_reboot; no_autostart_claim",
+      "current_board_snapshot": "repro/qwen25-kv1024-20260825/environment/board-snapshot-20260825.txt",
+      "current_board": {
+        "ip": "192.168.1.90",
+        "report_collection_ip": "192.168.8.178",
+        "same_physical_board": true,
+        "status": "IP-only change; reuse locally verified 20260827T113500Z and 20260827T124500Z-usageperf without rerun; seven explicitly allowlisted candidate gateway/UI files are locally SHA-256 verified under reports/board8t/candidate; the planned 20260827T130500Z-chain directory is not claimed to exist"
+      },
+      "verification": "The exact ONNX was transferred and verified before atomic rename. ATC with --soc_version=Ascend310B4/CANN8.0 generated this B4 OM; descriptor exposes 51 inputs and 49 outputs in the split StaticCache layout. Historical formal 8080/7861/7865 evidence belongs to the earlier .90 deployment and is retained as history. The current dual-board campaign used candidate ports only: full campaign 20260827T113500Z and usage-perf 20260827T124500Z are locally hash-verified. The original 20260827T130500Z-chain directory is not claimed to exist; seven explicitly allowlisted historical gateway/UI log and response files from the board were copied to reports/board8t/candidate and individually SHA-256 verified. The 8T board current configured address is 192.168.1.90; it was not rerun after the address change because it is the same hardware previously measured at 192.168.8.178. Its measured p50 was 8693.731 ms (0.230 token/s), about 21.96% below the recorded 8082 baseline. The 20T B1 result is dirty-base and its p50 improvement is about 16.32%, so the formal entry remains unchanged."
+    },
+    "qwen25_static_kv_1024_fp32_b1_om": {
+      "id": "qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om-Ascend310B1",
+      "kind": "om",
+      "source": "board-generated by ATC from qwen25-static-kv-1024-v2.onnx",
+      "filename": "qwen25-static-kv-1024-b1.om",
+      "expected_bytes": 1266009438,
+      "sha256": "6bca884fbce746efdb02f8c9294cad5b2faa6c8b96cac9ec8c83730126298609",
+      "target": "Ascend310B1",
+      "precision": "fp32",
+      "cann": "8.0.0",
+      "atc_soc_version": "Ascend310B1",
+      "runtime_contract_sha256": "a1d64b1aa379c0f675947a10b9971190fc94ece0040bc45ca3e13f45beb46c6d",
+      "status": "artifact_verified; descriptor_verified; acl_smoke_passed; npu_generation_passed; candidate_gateway_ui_board_observed_sync_pending; dirty_base_not_production_admitted",
+      "verification": "The B1 OM is a separate ATC artifact, with its own lock and descriptor contract. Full campaign 20260827T113500Z and usage-perf 20260827T124500Z-usageperf are locally hash-verified. Candidate chain 20260827T130500Z-chain-retry passed during the board-side observation, but its raw 401/JSON/SSE/UI files remain board-side pending synchronization. The board used an existing base environment plus a user-owned overlay in which torch, torch_npu, torchaudio and MindSpore were already present; no such package was installed or imported by the ACL service. The p50 latency was 6486.422 ms and token/s p50 was 0.308, but the measured p50 gain against its old baseline was about 16.32%, below the 20 percent promotion criterion."
+    },
+    "llama_cpp": {
+      "repository": "https://github.com/ggml-org/llama.cpp.git",
+      "revision": "d9b6be07d0864ab09417b17ba36f9788087dd22c",
+      "backend": "CANN",
+      "hardware_status": "Experimental on Ascend 310B4 / 8T; a successful build is not NPU-inference evidence."
+    },
+    "xiaozhi_server": {
+      "repository": "https://github.com/xinnan-tech/xiaozhi-esp32-server.git",
+      "revision": "e1876f1ce19cad6e7bfd7c80e41dc56b2e858dd5"
+    }
+  },
+  "reproducibility_bundle": {
+    "path": "repro/qwen25-kv1024-dual-board-20260827",
+    "status": "local_hash_verified; full_and_usage_reports_local_verified; board8_candidate_evidence_local_hash_verified; source_and_frontend_snapshot_local_verified; environment_provenance_local_verified; board20_candidate_chain_pending; formal_entry_unchanged",
+    "purpose": "Complete Qwen2.5 static-KV 1024 reproduction bundle for the current 8T address alias and separate 20T experiment",
+    "bytes_approx": 4797166079,
+    "sha256_inventory": "repro/qwen25-kv1024-dual-board-20260827/SHA256SUMS.txt",
+    "manifest": "repro/qwen25-kv1024-dual-board-20260827/bundle-manifest.json",
+    "model_onnx_sha256": "b4870df5da9c8cbef4163ceb65d4dc13433f2fd8ed5d2083ef3223d07d1a3c0e",
+    "model_om_sha256": "f6650e52ff3908288763ef7957832ade606b0e554fa8fde986932f1ca1140eb8",
+    "source_checkpoint_sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+    "target": "Ascend310B4/8T + Ascend310B1/20T/aarch64/CANN8.0",
+    "secrets_included": false,
+    "system_cann_included": false,
+    "sync_state": {
+      "schema_version": 3,
+      "sync_run_id": "20260829T012933Z",
+      "managed_entries": 129,
+      "board8_sync_status": "remote_verified at 192.168.1.90; full-campaign and usage-perf reports local-verified; seven candidate files local SHA-256 verified",
+      "board20_sync_status": "historical batch was unreachable at 192.168.8.210; current 192.168.1.95 evidence is tracked in the separate gap bundle",
+      "candidate_chain_sync_status": "board8 seven explicit historical files copied and verified; board20 raw files from the old .210 batch remain pending; this is historical provenance, not current .95 reachability; 20260827T130500Z-chain directory not claimed"
+    },
+    "replacement_board_revalidation_required": false,
+    "replacement_board_status": "artifact_verified; descriptor_verified; acl_smoke_passed; full_campaign_passed; candidate_gateway_ui_local_hash_verified; formal_entry_unchanged",
+    "replacement_board": {
+      "ip": "192.168.1.90",
+      "report_collection_ip": "192.168.8.178",
+      "address_change_note": "Same physical Ascend310B4/8T board; IP changed after the recorded campaign, so the campaign was not rerun.",
+      "hostname": "orangepiaipro",
+      "synced_at_utc": "2026-08-27",
+      "current_candidate_root": "/home/HwHiAiUser/case9-qwen25-kv1024",
+      "historical_campaign_root": "/home/HwHiAiUser/case9-qwen25-dual-acceptance-20260827",
+      "remote_path": "/home/HwHiAiUser/case9-qwen25-dual-acceptance-20260827",
+      "evidence_root": "/home/HwHiAiUser/case9-qwen25-dual-acceptance-20260827/reports/dual-board-acceptance/20260827T113500Z/board8t",
+      "archive_sha256_check": "passed; dual-board bundle manifest and SHA256SUMS",
+      "environment_check": "passed; Ascend310B4/8T; CANN 8.0.0; Python 3.9.25; acl importable; forbidden imports blocked",
+      "onnx_contract_check": "passed; 51 inputs; 49 outputs; 48 split KV pairs; static sequence 1024",
+      "acl_smoke": {
+        "status": "passed",
+        "prompt": "你好",
+        "text": "你好！",
+        "prompt_tokens": 30,
+        "completion_tokens": 2,
+        "report": "run/replacement/192.168.8.178/20260827T030758Z/reports/20260827T031013Z-acl-smoke.txt"
+      },
+      "candidate_api": {
+        "status": "passed",
+        "host": "127.0.0.1",
+        "port": 8084,
+        "json": "passed",
+        "sse": "passed",
+        "service_after_test": "stopped",
+        "health_report": {"path": "run/replacement/192.168.8.178/20260827T030758Z/reports/20260827T034015Z-health.json", "bytes": 451, "sha256": "2536f585ceab04ae3d6fc8c5df85f212db6535e26ed8c94ca45272b986b1a75e"},
+        "models_report": {"path": "run/replacement/192.168.8.178/20260827T030758Z/reports/20260827T034015Z-models.json", "bytes": 120, "sha256": "b750b7695315450b802a360fd6dbe42bf241ae4e0c5444e33d0f9aaf8ee5ae7f"},
+        "json_report": {"path": "run/replacement/192.168.8.178/20260827T030758Z/reports/20260827T034015Z-json-completion.json", "bytes": 328, "sha256": "ea8de0d2051d2fdf33a851edf99e6274a0bd90506851f8b303ece329cc6949ad"},
+        "sse_report": {"path": "run/replacement/192.168.8.178/20260827T030758Z/reports/20260827T034015Z-sse-completion.txt", "bytes": 751, "sha256": "bee035546a466f27345db769bd609de66129a76133ba63be86eb1ac29e47463e"},
+        "service_log": "run/replacement/192.168.8.178/20260827T030758Z/logs/api-candidate-20260827T034015Z.log"
+      },
+      "full_campaign": {
+        "run_id": "20260827T113500Z",
+        "report": "reports/full-campaign/board8t/20260827T113500Z/acceptance.json",
+        "status": "passed"
+      },
+      "usage_performance": {
+        "run_id": "20260827T124500Z-usageperf",
+        "report": "reports/usage-perf/board8t/20260827T124500Z-usageperf/acceptance.json",
+        "p50_ms": 8693.731,
+        "p95_ms": 8707.133,
+        "first_event_p50_ms": 8563.591,
+        "first_event_p95_ms": 8576.954,
+        "token_s_p50": 0.230
+      },
+      "candidate_gateway_ui": {
+        "board_side_report": "historical board logs under /home/HwHiAiUser/case9-qwen25-kv1024 (planned 20260827T130500Z-chain directory not present)",
+        "local_paths": "reports/board8t/candidate/ (seven explicitly allowlisted files)",
+        "local_sync_status": "passed; each of seven files size and SHA-256 verified in bundle-manifest.json",
+        "status": "board-side observed passed; unauthorized=401; JSON/SSE/UI passed; duplicate_delta=false; historical candidate evidence only"
+      },
+      "formal_gateway_ui": "not_admitted; keep 8080/7861/7865 unchanged",
+      "health_alarm": "recorded as diagnostic only"
+    },
+    "performance_comparison_20t": {
+      "ip": "192.168.1.95",
+      "legacy_ip": "192.168.8.210",
+      "address_note": "The 20T board moved from the historical request address to 192.168.1.95; report paths below retain their original provenance.",
+      "hostname": "orangepiaipro-20t",
+      "board_tier": "20T",
+      "chip_name": "Ascend310B1",
+      "current_candidate_root": "/home/HwHiAiUser/case9-qwen25-kv1024-20t",
+      "historical_campaign_root": "/home/HwHiAiUser/case9-qwen25-kv1024-20260827-20t",
+      "cann": "8.0.0",
+      "python_observed": "3.9.2 (base)",
+      "ssh": "passed",
+      "hardware_probe": "passed; aarch64; npu-smi 25.2.0; 1914/23673 MB NPU memory; Health Alarm diagnostic",
+      "environment_gate": "passed_with_explicit_dirty_base_override; base contains pre-existing torch, torch_npu, torchaudio and mindspore; no forbidden package was installed; system site-packages remained unchanged",
+      "package_overlay": {
+        "path": "/home/HwHiAiUser/case9-qwen25-kv1024-20260827-20t/base-overlay",
+        "python": "base /usr/local/miniconda3/bin/python 3.9.2",
+        "packages": {
+          "numpy": {"version": "1.26.4", "wheel_bytes": 14226281, "wheel_sha256": "d5241e0a80d808d70546c697135da2c613f30e28251ff8307eb72ba696945764"},
+          "tokenizers": {"version": "0.19.1", "wheel_bytes": 3570575, "wheel_sha256": "c85cf76561fbd01e0d9ea2d1cbe711a65400092bc52b5242b16cfd22e51f0c58"}
+        },
+        "install_mode": "pip --no-index --no-deps --target user-owned overlay; PYTHONPATH prepended",
+        "root_site_install": "permission_denied; not modified",
+        "wheel_manifest": {
+          "local_archive_path": "reports/board20t/20260827T045500Z/artifacts/wheels/wheel-manifest.json",
+          "sha256": "ad2a3dd2f0e80512652fb631249d33b1a126c5bdce86da831409b826f918b0b3"
+        },
+        "preflight_report": {
+          "board_relative_path": "run/replacement/192.168.8.210/20260827T045500Z/reports/base-overlay-check.txt",
+          "sha256": "18a85b7a66318f799c4a4f97117f016dfdcc0c95117fbcd3b880bf5f65598553"
+        }
+      },
+      "artifact_sync": {
+        "status": "passed",
+        "root": "/home/HwHiAiUser/case9-qwen25-kv1024-20260827-20t",
+        "onnx_bytes": 1261082122,
+        "onnx_sha256": "b4870df5da9c8cbef4163ceb65d4dc13433f2fd8ed5d2083ef3223d07d1a3c0e",
+        "onnx_path": "artifacts/qwen25-static-kv-1024-v2.onnx",
+        "tokenizer_bytes": 7031645,
+        "tokenizer_sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+        "tokenizer_path": "artifacts/tokenizer.json",
+        "controller_contract_sha256": "fcc423f24fdf36c5d364ad7bd535943fb0c8545ab546a5724ab0261330639498"
+      },
+      "b1_onnx_atc": {
+        "status": "passed",
+        "soc_version": "Ascend310B1",
+        "om_bytes": 1266009438,
+        "om_sha256": "6bca884fbce746efdb02f8c9294cad5b2faa6c8b96cac9ec8c83730126298609",
+        "atc_log": "run/replacement/192.168.8.210/20260827T045500Z/logs/atc-20260827T053058Z.log",
+        "atc_log_sha256": "d1945c78aad1f1290d0539f801b4b959ddecdaefe6c17a5420c54cf4e984ae87",
+        "lock": "run/replacement/192.168.8.210/20260827T045500Z/artifacts/qwen25-static-kv-1024-b1.om.lock.json",
+        "lock_sha256": "47a4030202342132d5794bea1e1e5ae19316f6c132b2fa00895df87b4b9d3272",
+        "warnings": "Expand/ScatterElements operators did not hit high-priority operator library; performance risk"
+      },
+      "descriptor": {
+        "status": "passed",
+        "inputs": 51,
+        "outputs": 49,
+        "cache_pairs": 48,
+        "cache_shape": [1, 2, 1024, 64],
+        "cache_dtype": "float32",
+        "logits_shape": [1, 1, 151936],
+        "contract": "run/replacement/192.168.8.210/20260827T045500Z/contracts/qwen25-static-kv-1024-v2-om-contract.json"
+      },
+      "acl_smoke": {
+        "status": "passed",
+        "text": "你好！",
+        "prompt_tokens": 30,
+        "completion_tokens": 2,
+        "report": "run/replacement/192.168.8.210/20260827T045500Z/reports/20260827T054614Z-acl-smoke.txt",
+        "report_sha256": "7b527e39f42597855ed09dd0411103db8165bdc617f348f31d30b2a2f0e0b763"
+      },
+      "api_benchmark": {
+        "status": "passed",
+        "host": "127.0.0.1",
+        "port": 8084,
+        "json": {
+          "report": "run/replacement/192.168.8.210/20260827T045500Z/reports/benchmark-json-1warmup-5.json",
+          "report_sha256": "2e5ef763e9956bb343614c7a5d019a5a56c4636411858f743bdaf44803cb13db",
+          "success": "5/5",
+          "elapsed_ms": {"mean": 7749.626, "p50": 7751.579, "p95": 7751.770, "min": 7725.153, "max": 7778.458},
+          "text": "我是Q"
+        },
+        "sse": {
+          "report": "run/replacement/192.168.8.210/20260827T045500Z/reports/benchmark-sse-1warmup-5.json",
+          "report_sha256": "01ccf59362888d877b5c1700c337519bedb3bb154d3239fc7235cdcb1026c907",
+          "success": "5/5",
+          "elapsed_ms": {"mean": 7781.765, "p50": 7789.273, "p95": 7792.435},
+          "first_event_ms": {"mean": 7654.959, "p50": 7661.332, "p95": 7668.468},
+          "usage_fields": "not_present; token rate intentionally omitted"
+        },
+        "service_after_test": "stopped; 8084 listener absent; PID was not persisted in report",
+        "postcheck": {
+          "board_relative_path": "run/replacement/192.168.8.210/20260827T045500Z/reports/service-postcheck.txt",
+          "sha256": "cc778ff4f20b20b367fb806354daf7bffdad4024c0bfc9a3c8a1a25e0b3d8ce7"
+        }
+      },
+      "npu_snapshots": {
+        "json": "run/replacement/192.168.8.210/20260827T045500Z/reports/benchmark-json-{before,during,after}.txt",
+        "sse": "run/replacement/192.168.8.210/20260827T045500Z/reports/benchmark-sse-{before,during,after}.txt",
+        "observed": "310B1, Health Alarm, HugePages 647/647, approximately 7383 -> 7421 MB; during AICore samples were 0%",
+        "stability_gate": "not_run; no 10-round RSS/FD/NPU-leak claim"
+      },
+      "runtime_sha256": {
+        "qwen25_kv_acl_runtime.py": "7371271f23bf3b830a4713b6a4aa85e3c10631055b02b927ba1b0a52f65f480c",
+        "qwen25_kv_acl_service.py": "7146b566d1583da6341ce8422029af6e30dde28173b693bf6025f3e5d6092e02",
+        "serve_qwen25_kv_acl.py": "5a0398129066e23be8feb9dbd786d570e697c70f5e7b9f27fc85533286c71346",
+        "qwen25_kv_acl_contract.py": "9f9fbb62d6e74c595fab4ae13ce3b08f6c6748f74944e56f8b24abc60a018f1a",
+        "qwen25_kv_tokenizer.py": "262a42aec55f23b0ec5b19ee49505595a15dc2e76e2fd11ef7b3ac4b2838c5e8"
+      },
+      "comparison": {
+        "baseline_8t": {"chip": "Ascend310B4", "p50_ms": 11139.7, "p95_ms": 11164.9},
+        "20t": {"chip": "Ascend310B1", "p50_ms": 7751.579, "p95_ms": 7751.770},
+        "p50_speedup": 1.43708785,
+        "p50_improvement_percent": 30.414832,
+        "p95_speedup": 1.44030331,
+        "p95_improvement_percent": 30.570180,
+        "protocol": "same prompt, max_tokens=2, temperature=0, top_p=1, one warmup plus five measured JSON requests"
+      },
+      "comparison_report": "docs/21-qwen25-20t-performance-comparison.md",
+      "result": "experimental_npu_api_performance_passed; dirty_base_not_production_admitted; formal_8080_7861_7865_unchanged",
+      "current_dual_board_campaign": {
+        "full_campaign_run_id": "20260827T113500Z",
+        "full_campaign_report": "reports/full-campaign/board20t/20260827T113500Z/acceptance.json",
+        "usageperf_run_id": "20260827T124500Z-usageperf",
+        "usageperf_report": "reports/usage-perf/board20t/20260827T124500Z-usageperf/acceptance.json",
+        "p50_ms": 6486.422,
+        "p95_ms": 6506.085,
+        "first_event_p50_ms": 6364.634,
+        "first_event_p95_ms": 6383.111,
+        "token_s_p50": 0.308,
+        "relative_p50_improvement_percent": 16.321,
+        "candidate_gateway_ui": "board-side reports/board20t/20260827T130500Z-chain-retry/; raw files from the historical .210 batch remain pending local synchronization; this does not describe current .95 reachability; unauthorized=401; JSON/SSE/UI observed passed; duplicate_delta=false",
+        "admission": "not_admitted; dirty-base and performance improvement below the 20 percent promotion threshold"
+      },
+      "health_alarm": "recorded as diagnostic only"
+    },
+    "cross_board_om_validation": {
+      "status": "passed_experimentally",
+      "report": "docs/22-qwen25-cross-board-om-validation.md",
+      "archive_root": "repro/qwen25-kv1024-20260825/reports/cross-om/20260827T080000Z",
+      "onnx_sha256": "b4870df5da9c8cbef4163ceb65d4dc13433f2fd8ed5d2083ef3223d07d1a3c0e",
+      "b4_om": {
+        "sha256": "f6650e52ff3908288763ef7957832ade606b0e554fa8fde986932f1ca1140eb8",
+        "bytes": 1266010586,
+        "smoke_on_b4": "passed",
+        "smoke_on_b1": "passed",
+        "json_p50_ms": {"b4": 10375.744, "b1": 7678.424},
+        "json_p95_ms": {"b4": 10377.64, "b1": 7737.832},
+        "sse_p50_ms": {"b4": 10344.559, "b1": 7709.688}
+      },
+      "b1_om": {
+        "sha256": "6bca884fbce746efdb02f8c9294cad5b2faa6c8b96cac9ec8c83730126298609",
+        "bytes": 1266009438,
+        "smoke_on_b4": "passed",
+        "smoke_on_b1": "passed",
+        "json_p50_ms": {"b4": 10285.786, "b1": 7679.848},
+        "json_p95_ms": {"b4": 10303.1, "b1": 7696.983},
+        "sse_p50_ms": {"b4": 10302.362, "b1": 7697.568}
+      },
+      "protocol": "same tokenizer/contract/runtime, prompt 你好，请用一句话介绍你自己。, max_tokens=2, one warmup plus five measured requests",
+      "formal_status": "not_admitted; target-SoC-specific OM remains the default; cross-SoC reuse requires explicit exception",
+      "services_after_test": "stopped; no 8084/8080/7861/7865 listeners"
+    },
+    "evidence_doc": "docs/20-qwen25-kv1024-reproducibility-bundle.md"
+  }
+}

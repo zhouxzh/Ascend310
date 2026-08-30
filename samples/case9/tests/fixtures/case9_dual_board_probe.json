@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "probes": [
+    {
+      "id": "zh_identity",
+      "language": "zh",
+      "prompt": "你是谁？请用一句话回答。"
+    },
+    {
+      "id": "zh_addition",
+      "language": "zh",
+      "prompt": "请计算 12 加 30 等于多少，只给出结果。"
+    },
+    {
+      "id": "zh_definition",
+      "language": "zh",
+      "prompt": "请用一句话解释什么是人工智能。"
+    },
+    {
+      "id": "zh_steps",
+      "language": "zh",
+      "prompt": "请列出泡一杯茶的三个步骤。"
+    },
+    {
+      "id": "zh_safety",
+      "language": "zh",
+      "prompt": "写一句提醒用户保护密码安全的话。"
+    },
+    {
+      "id": "zh_summary",
+      "language": "zh",
+      "prompt": "用一句话概括春天的特点。"
+    },
+    {
+      "id": "zh_translation",
+      "language": "zh",
+      "prompt": "把 hello 翻译成中文，只返回译文。"
+    },
+    {
+      "id": "zh_instruction",
+      "language": "zh",
+      "prompt": "请用中文回答：水在标准大气压下何时沸腾？"
+    },
+    {
+      "id": "zh_compare",
+      "language": "zh",
+      "prompt": "用一句话说明 CPU 和 NPU 的主要区别。"
+    },
+    {
+      "id": "zh_unknown",
+      "language": "zh",
+      "prompt": "如果不知道实时天气，应该怎样诚实地回答？"
+    },
+    {
+      "id": "en_identity",
+      "language": "en",
+      "prompt": "Who are you? Answer in one short sentence."
+    },
+    {
+      "id": "en_addition",
+      "language": "en",
+      "prompt": "What is 12 plus 30? Return only the number."
+    },
+    {
+      "id": "en_cpu_npu",
+      "language": "en",
+      "prompt": "Explain the main difference between a CPU and an NPU in one sentence."
+    },
+    {
+      "id": "en_spring",
+      "language": "en",
+      "prompt": "Describe spring in no more than ten words."
+    },
+    {
+      "id": "en_unknown",
+      "language": "en",
+      "prompt": "How should you answer honestly when you do not know the real-time weather?"
+    }
+  ]
+}

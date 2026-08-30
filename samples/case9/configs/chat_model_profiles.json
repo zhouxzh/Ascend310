@@ -1,0 +1,256 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "id": "qwen1.5-0.5b-mindspore",
+      "display_name": "Qwen1.5 0.5B Chat",
+      "model_id": "Qwen/Qwen1.5-0.5B-Chat",
+      "repository": "Qwen/Qwen1.5-0.5B-Chat",
+      "source": "huggingface",
+      "revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+      "tokenizer_revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+      "revision_pinned": true,
+      "mirror": null,
+      "board": {
+        "host": "192.168.1.90",
+        "soc": "Ascend310B4",
+        "tier": "8T"
+      },
+      "runtime": {
+        "provider": "mindspore",
+        "context_length": 1024,
+        "default_max_tokens": 32,
+        "max_tokens": 80,
+        "temperature": 0.0,
+        "top_p": 1.0
+      },
+      "cache_dir": "artifacts/models/qwen1.5-0.5b-chat",
+      "artifacts": [
+        {
+          "name": "model",
+          "kind": "weights",
+          "filename": "model.safetensors",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/model.safetensors?download=true",
+          "expected_bytes": 1239173352,
+          "sha256": "72453a8ccb338811935ab95a3a6ffa86b586807bf5b3dc327f28b5389b5636e6"
+        },
+        {
+          "name": "tokenizer",
+          "kind": "tokenizer",
+          "filename": "tokenizer.json",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/tokenizer.json?download=true",
+          "expected_bytes": 7028015,
+          "sha256": "f7c9b2dba4a296b1aa76c16a34b8225c0c118978400d4bb66bff0902d702f5b8"
+        },
+        {
+          "name": "config",
+          "kind": "config",
+          "filename": "config.json",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/config.json?download=true",
+          "expected_bytes": 661,
+          "sha256": "adac3bb8bf1b15c74312a2835e3796f6b352d817ff726960e1d5c2cd171da951"
+        },
+        {
+          "name": "tokenizer-config",
+          "kind": "tokenizer_metadata",
+          "filename": "tokenizer_config.json",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/tokenizer_config.json?download=true",
+          "expected_bytes": 1287,
+          "sha256": "482bd979881423375ca5414e4e0d94cd7c5349dbb17fffd46b4d36d71e62a1bc"
+        },
+        {
+          "name": "vocab",
+          "kind": "tokenizer_metadata",
+          "filename": "vocab.json",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/vocab.json?download=true",
+          "expected_bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        },
+        {
+          "name": "merges",
+          "kind": "tokenizer_metadata",
+          "filename": "merges.txt",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/merges.txt?download=true",
+          "expected_bytes": 1671839,
+          "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+        },
+        {
+          "name": "generation-config",
+          "kind": "generation_metadata",
+          "filename": "generation_config.json",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/generation_config.json?download=true",
+          "expected_bytes": 206,
+          "sha256": "5cf6fb81bd473eeb55678afbaee79e8d5f8b6e9bc2f942c30ee94721a0a91945"
+        }
+      ],
+      "status": "experimental_dirty_base",
+      "admission": {
+        "eligible": false,
+        "reason": "The shared board base environment is dirty; independent API, stability, performance, and quality gates are pending."
+      },
+      "notes": "Use the official MindNLP Qwen1.5 example as the model-loading reference. The case9 adapter must not import Torch."
+    },
+    {
+      "id": "tinyllama-1.1b-mindspore",
+      "display_name": "TinyLlama 1.1B Chat",
+      "model_id": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "repository": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "source": "huggingface",
+      "revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+      "tokenizer_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+      "revision_pinned": true,
+      "mirror": "hf-mirror.com",
+      "board": {
+        "host": "192.168.1.90",
+        "soc": "Ascend310B4",
+        "tier": "8T"
+      },
+      "runtime": {
+        "provider": "mindspore",
+        "context_length": 1024,
+        "default_max_tokens": 32,
+        "max_tokens": 80,
+        "temperature": 0.0,
+        "top_p": 1.0
+      },
+      "cache_dir": "artifacts/models/tinyllama-1.1b-chat",
+      "artifacts": [
+        {
+          "name": "model",
+          "kind": "weights",
+          "filename": "model.safetensors",
+          "url": "https://hf-mirror.com/TinyLlama/TinyLlama-1.1B-Chat-v1.0/resolve/fe8a4ea1ffedaf415f4da2f062534de366a451e6/model.safetensors?download=true",
+          "expected_bytes": 2200119864,
+          "sha256": "6e6001da2106d4757498752a021df6c2bdc332c650aae4bae6b0c004dcf14933"
+        },
+        {
+          "name": "tokenizer",
+          "kind": "tokenizer",
+          "filename": "tokenizer.json",
+          "url": "https://hf-mirror.com/TinyLlama/TinyLlama-1.1B-Chat-v1.0/resolve/fe8a4ea1ffedaf415f4da2f062534de366a451e6/tokenizer.json?download=true",
+          "expected_bytes": 1842767,
+          "sha256": "bcd04f0eadf90287bd26e1a183ac487d8a141b09b06aecb7725bbdd343640f2e"
+        },
+        {
+          "name": "config",
+          "kind": "config",
+          "filename": "config.json",
+          "url": "https://hf-mirror.com/TinyLlama/TinyLlama-1.1B-Chat-v1.0/resolve/fe8a4ea1ffedaf415f4da2f062534de366a451e6/config.json?download=true",
+          "expected_bytes": 608,
+          "sha256": "486bedda3a6988332e60d9638a09ca4b260d34ebcf1b19e22cf3b140b63d8fe9"
+        },
+        {
+          "name": "generation-config",
+          "kind": "config",
+          "filename": "generation_config.json",
+          "url": "https://hf-mirror.com/TinyLlama/TinyLlama-1.1B-Chat-v1.0/resolve/fe8a4ea1ffedaf415f4da2f062534de366a451e6/generation_config.json?download=true",
+          "expected_bytes": 124,
+          "sha256": "18046d04f5bd8b4998095ecabdd17a1bf0053d9acdccead4a05be4a3575f3c5c"
+        },
+        {
+          "name": "special-tokens-map",
+          "kind": "config",
+          "filename": "special_tokens_map.json",
+          "url": "https://hf-mirror.com/TinyLlama/TinyLlama-1.1B-Chat-v1.0/resolve/fe8a4ea1ffedaf415f4da2f062534de366a451e6/special_tokens_map.json?download=true",
+          "expected_bytes": 551,
+          "sha256": "82d96d7a9e6ced037f12394b7ea6a5b02e6ca87e0d11edaa8d60d9be857ce7db"
+        },
+        {
+          "name": "tokenizer-config",
+          "kind": "config",
+          "filename": "tokenizer_config.json",
+          "url": "https://hf-mirror.com/TinyLlama/TinyLlama-1.1B-Chat-v1.0/resolve/fe8a4ea1ffedaf415f4da2f062534de366a451e6/tokenizer_config.json?download=true",
+          "expected_bytes": 1289,
+          "sha256": "7b41ba7d0eb91e77914ca3dafde559ea3e19878769b7e68409e89bed5222e77a"
+        },
+        {
+          "name": "tokenizer-model",
+          "kind": "tokenizer",
+          "filename": "tokenizer.model",
+          "url": "https://hf-mirror.com/TinyLlama/TinyLlama-1.1B-Chat-v1.0/resolve/fe8a4ea1ffedaf415f4da2f062534de366a451e6/tokenizer.model?download=true",
+          "expected_bytes": 499723,
+          "sha256": "9e556afd44213b6bd1be2b850ebbbd98f5481437a8021afaf58ee7fb1818d347"
+        }
+      ],
+      "status": "blocked",
+      "admission": {
+        "eligible": false,
+        "reason": "TinyLlama long-output and machine-quality gates failed (U+FFFD observed); profile is disabled until a new verified artifact and acceptance run pass."
+      },
+      "notes": "The prior TinyLlama ACL experiment is historical evidence only. This Profile is a separate MindSpore experiment."
+    },
+    {
+      "id": "deepseek-r1-qwen-1.5b-mindspore",
+      "display_name": "DeepSeek-R1 Distill Qwen 1.5B",
+      "model_id": "MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B",
+      "repository": "MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B",
+      "source": "huggingface",
+      "revision": "0a28897fe71fdd30de350b667ae588601a85990f",
+      "tokenizer_revision": "0a28897fe71fdd30de350b667ae588601a85990f",
+      "revision_pinned": true,
+      "mirror": "modelers",
+      "board": {
+        "host": "192.168.1.95",
+        "soc": "Ascend310B1",
+        "tier": "20T"
+      },
+      "runtime": {
+        "provider": "mindspore",
+        "context_length": 1024,
+        "default_max_tokens": 32,
+        "max_tokens": 80,
+        "temperature": 0.0,
+        "top_p": 1.0
+      },
+      "cache_dir": "artifacts/models/deepseek-r1-distill-qwen-1.5b",
+      "artifacts": [
+        {
+          "name": "model",
+          "kind": "weights",
+          "filename": "model.safetensors",
+          "url": "https://huggingface.co/MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B/resolve/0a28897fe71fdd30de350b667ae588601a85990f/model.safetensors?download=true",
+          "expected_bytes": 3554214416,
+          "sha256": "706e1bfd7cb0680fbf73df6a2506766e447246e4291d7054c8b395dc3583419c"
+        },
+        {
+          "name": "tokenizer",
+          "kind": "tokenizer",
+          "filename": "tokenizer.json",
+          "url": "https://huggingface.co/MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B/resolve/0a28897fe71fdd30de350b667ae588601a85990f/tokenizer.json?download=true",
+          "expected_bytes": 7031660,
+          "sha256": "88145e3c3249adc2546ede277e9819d6e405e19072456e4b521cbc724bd60773"
+        },
+        {
+          "name": "config",
+          "kind": "config",
+          "filename": "config.json",
+          "url": "https://huggingface.co/MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B/resolve/0a28897fe71fdd30de350b667ae588601a85990f/config.json?download=true",
+          "expected_bytes": 751,
+          "sha256": "5144478ee3982b0698022588e965afd9f437ab6e418895ed156bc16972b8a86c"
+        },
+        {
+          "name": "generation-config",
+          "kind": "config",
+          "filename": "generation_config.json",
+          "url": "https://huggingface.co/MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B/resolve/0a28897fe71fdd30de350b667ae588601a85990f/generation_config.json?download=true",
+          "expected_bytes": 145,
+          "sha256": "71b075a544000dc786ccc30106a03fe7eab40fc510842ee7b3475ccdfcd3d794"
+        },
+        {
+          "name": "tokenizer-config",
+          "kind": "tokenizer_metadata",
+          "filename": "tokenizer_config.json",
+          "url": "https://huggingface.co/MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B/resolve/0a28897fe71fdd30de350b667ae588601a85990f/tokenizer_config.json?download=true",
+          "expected_bytes": 3071,
+          "sha256": "8ac8c85fb242563c2260baec0909debd69d718af6a0b3d90e6cab62b4d341cd5"
+        }
+      ],
+      "status": "blocked",
+      "admission": {
+        "eligible": false,
+        "reason": "Machine gates are recorded on both board tiers, but Chinese quality, dirty-base approval and formal gateway/UI admission remain incomplete."
+      },
+      "notes": "The official example uses the modelers mirror. This profile is pinned to the measured revision and artifacts; it remains blocked until quality and environment approval are completed."
+    }
+  ]
+}

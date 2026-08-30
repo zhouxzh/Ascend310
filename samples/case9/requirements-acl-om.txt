@@ -1,0 +1,11 @@
+# Python 3.9 / Linux aarch64 only.  These are direct PyPI wheel URLs rather
+# than version ranges.  Install only into the separately reviewed
+# `case9-acl-om` environment with `pip --no-deps --require-hashes`; the
+# command-line flags are supplied by the provisioning script; this file
+# does not authorize changes to the board environment and never includes
+# torch, torch_npu, torchaudio, mindtorch, or a runtime framework.
+numpy @ https://files.pythonhosted.org/packages/6d/64/c3bcdf822269421d85fe0d64ba972003f9bb4aa9a419da64b86856c9961f/numpy-1.26.4-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl --hash=sha256:d5241e0a80d808d70546c697135da2c613f30e28251ff8307eb72ba696945764
+tokenizers @ https://files.pythonhosted.org/packages/ba/26/139bd2371228a0e203da7b3e3eddcb02f45b2b7edd91df00e342e4b55e13/tokenizers-0.19.1-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl --hash=sha256:c85cf76561fbd01e0d9ea2d1cbe711a65400092bc52b5242b16cfd22e51f0c58
+onnx @ https://files.pythonhosted.org/packages/64/fd/f38042d1e807cc0c6fbd8663b8aef6f2a08d87ee71669ff6130e4e550b39/onnx-1.16.2-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl --hash=sha256:2d192db8501103fede9c1725861e65ed41efb65da1ce915ba969aae40073eb94
+protobuf @ https://files.pythonhosted.org/packages/d8/82/aefe901174b5a618daee511ddd00342193c1b545e3cd6a2cd6df9ba452b5/protobuf-4.25.3-cp37-abi3-manylinux2014_aarch64.whl --hash=sha256:e7cb0ae90dd83727f0c0718634ed56837bfeeee29a5f82a7514c03ee1364c019
+typing-extensions @ https://files.pythonhosted.org/packages/26/9f/ad63fc0248c5379346306f8668cda6e2e2e9c95e01216d2b8ffd9ff037d0/typing_extensions-4.12.2-py3-none-any.whl --hash=sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d

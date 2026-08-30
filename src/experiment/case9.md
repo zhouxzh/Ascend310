@@ -1,848 +1,281 @@
-# 案例9：边缘智能聊天机器人
+# 案例 9：在昇腾 310B 上复现中文文本聊天
 
-## 1. 项目简介 {#src-experiment-case9-h1}
+_本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验。当前同时维护两条彼此独立的路线：Qwen2.5 静态 KV 的 ONNX -> OM -> 原生 ACL 路线，以及 Qwen1.5、TinyLlama、DeepSeek 的 MindSpore/MindNLP 路线。8T 当前地址为 `192.168.1.90`（`192.168.8.178` 仅为同一块板的历史采集地址）；20T 当前地址为 `192.168.1.95`（`192.168.8.210` 仅为历史地址）。本教程只写入有原始证据的结果，双板缺口批次未完成的门标为 `not-run` 或 `blocked`。_
 
-本项目基于昇腾310B平台，构建一个可以在边缘设备上运行的智能聊天机器人。系统集成了文本嵌入、RAG（检索增强生成）、语音交互等AI技术，能够在离线环境下回答专业问题，也可接入云端大语言模型提升回复质量。
+## 1. 当前目标和已暂停范围
 
-与云端聊天机器人相比，边缘端部署具有**低延迟、隐私保护、离线可用**三大优势。本项目的核心设计思想是：不强行在昇腾310B上运行大语言模型（这在实际硬件条件下既困难又低效），而是将NPU用于它最擅长的事情——文本嵌入的快速推理，再通过向量检索和模板/云端LLM两级策略生成回复。
+本案例的当前目标是把聊天模型以 OpenAI-compatible JSON/SSE 服务运行在昇腾 NPU 上，
+再通过 Case9 网关和文字页面访问。当前只验收文字 LLM，不把文字服务当作 XiaoZhi
+设备后端的完整证明。
 
-项目的源代码可以从[这里](https://github.com/zhouxzh/Ascend310/tree/main/samples/case9)下载。
+| Profile 或链路 | 当前状态 |
+| --- | --- |
+| Qwen2.5 静态 KV ACL：`8080 -> 7861 -> 7865` | 现有正式基线；`.90` 当前身份只读复核 `passed`（identity-only），B4/B1 的历史 OM、ACL 和性能证据保留；`.95` 当前身份因工件缺失 `blocked`，不替换正式入口 |
+| `qwen1.5-0.5b-mindspore`：`.90` B4/8T 与 `.95` B1/20T | `.90` 已有机器门；`.95` 缺口批次 9/9 机器门和性能通过；共享 `base`，两板均保持 `experimental_dirty_base`，人工质量/准入待签字 |
+| `tinyllama-1.1b-mindspore`：`.90` B4/8T 与 `.95` B1/20T | 两板均保留 `blocked`；`.95` 缺口批次 8/9，32/48-token 输出出现 `U+FFFD`，中文机器质量 7/10 |
+| `deepseek-r1-qwen-1.5b-mindspore`：`.90` B4/8T 与 `.95` B1/20T | `.90` 缺口批次 9/9 机器门和性能通过；`.95` 隔离 API 机器门通过但中文质量/dirty-base 准入未完成，保持 `blocked` |
+| 音频、麦克风、ASR/TTS、PTT、XiaoZhi、OTA、设备 WebSocket | 暂停，不安装、不启动、不验收 |
 
-## 2. 内容大纲 {#src-experiment-case9-h2}
+机器门只表示协议、资源和运行检查通过，不表示回答正确或适合生产。正式入口、音频
+链路和 XiaoZhi 均须另行批准。
 
-### 2.1. 硬件准备 {#src-experiment-case9-h3}
+## 2. 浏览器、网关、ACL 和 NPU 架构
 
-- **核心计算单元**: 昇腾310B开发者套件
-- **音频设备**:
-  - USB麦克风或USB耳机（语音输入）
-  - USB音响或3.5mm耳机（语音输出）
-  - 也可直接使用电脑自带麦克风和扬声器
-- **网络连接**:
-  - 以太网或WiFi（仅云端LLM模式需要）
-- **可选外设**:
-  - 触摸屏显示器（用于独立运行时的交互）
-  - 键盘鼠标（开发调试用）
-
-*系统硬件架构*
+候选链一次只运行一个 MindSpore worker。浏览器没有管理接口，Profile 切换只能在板端
+执行 `case9-modelctl`；网关密钥只存在板端环境。ONNX -> OM 路线和 MindSpore 路线
+共享 NPU，但不共享进程、模型实例或验收结论；同一时刻只启动明确记录的那一条路线。
 
 ```mermaid
 flowchart LR
-    MIC[/"语音 USB 麦克风"/]
-    SPK[/" USB 音响"/]
-    BROWSER[/" 浏览器<br/>Gradio UI"/]
-    CLOUD[/" 云端 LLM API<br/>(可选)"/]
-
-    subgraph DEVICE["昇腾310B 开发板"]
-        NPU["NPU<br/>文本嵌入推理"]
-        CPU["CPU<br/>FAISS检索 + 对话管理"]
-        NPU --- CPU
-    end
-
-    MIC -->|"音频流"| DEVICE
-    DEVICE -->|"音频输出"| SPK
-    BROWSER -->|"HTTP/WebSocket<br/>文本/语音数据"| DEVICE
-    DEVICE -->|"HTTP<br/>(可选)"| CLOUD
-    CLOUD -.->|"LLM 回复"| DEVICE
+    accTitle: Case9 candidate text architecture
+    accDescr: A trusted browser reaches the read-only candidate text UI and authenticated gateway; the gateway reaches one active MindSpore profile worker, while the formal Qwen2.5 ONNX-to-OM ACL route remains a separate NPU path.
+    browser[浏览器文字 UI :7868] --> gateway[候选网关 :7867]
+    gateway --> worker[活动 Profile 服务 :8090]
+    worker --> ms[MindSpore]
+    ms --> npu[Ascend NPU]
+    ctl[板端 modelctl] --> worker
+    formal[正式网关 :7861] --> acl[Qwen2.5 ACL :8080]
+    acl --> npu
 ```
 
-相比原方案中动辄列出"4麦克风阵列、NVMe SSD、触摸屏、锂电池组"等大量外围硬件，本项目的硬件需求非常简洁：一块昇腾310B开发板、一个USB麦克风和音响（或一个USB耳机），足以运行完整的聊天机器人系统。没有昇腾设备也可以——嵌入模型会自动回退到CPU推理。
+| 用途 | 服务 | 网关 | 页面 |
+| --- | --- | --- | --- |
+| MindSpore 候选 | `127.0.0.1:8090` | `127.0.0.1:7867` | `0.0.0.0:7868` |
+| 正式 Qwen2.5 基线 | `127.0.0.1:8080` | `127.0.0.1:7861` | `0.0.0.0:7865` |
 
-### 2.2. 软件环境 {#src-experiment-case9-h4}
+候选 UI 是实验页面，任何同网段主机都可能提交文字；只允许在可信实验网络使用。
 
-- **操作系统**: Ubuntu 20.04 / 22.04 LTS
-- **CANN版本**: 7.0.RC1 或以上（仅NPU推理需要）
-- **Python版本**: 3.9 或以上
-- **核心依赖**:
-  - `gradio` — Web聊天界面
-  - `sentence-transformers` — 嵌入模型（CPU推理 & 模型参考）
-  - `faiss-cpu` — 向量相似度搜索
-  - `jieba` — 中文分词（文本分块）
-  - `numpy` — 数值计算
-- **语音交互（可选）**:
-  - `SpeechRecognition` — 语音识别（调用Google Web Speech API）
-  - `pyaudio` — 麦克风音频采集
-  - `pyttsx3` — 语音合成（espeak后端）
-- **模型准备（仅开发/转换阶段）**:
-  - `torch` + `transformers` — ONNX模型导出
-  - `optimum` — HuggingFace模型导出工具（推荐）
-- **云端LLM（可选）**:
-  - `requests` — HTTP调用OpenAI兼容API
+## 3. 两种板卡和无 Torch 边界
 
-*环境配置脚本 (`setup.sh`)*
+`.90` 是 Ascend310B4/8T；`.95` 是 Ascend310B1/20T。`.178` 和 `.210` 都是历史
+采集地址，不应再用于新批次。两块板的 CANN、Python、MindSpore、MindNLP、驱动和
+`npu-smi` 版本必须在每个批次重新快照，不能把一块板的环境结论复制给另一块板。
+Qwen1.5、TinyLlama 和 DeepSeek 使用板端已有 `base`，因此即使机器门通过也只能标记
+`experimental_dirty_base`；TinyLlama 的既有失败证据仍保持 `blocked`，DeepSeek 的
+质量和准入在双板数据补齐前保持未决。
+
+每次在板端同一个 shell 中准备环境：
 
 ```bash
-#!/bin/bash
-set -e
-
-echo "=== Ascend 310B 智能聊天机器人 - 环境安装 ==="
-
-# 1. 系统依赖
-sudo apt update
-sudo apt install -y python3-dev python3-pip portaudio19-dev espeak
-
-# 2. Python包
-pip3 install gradio sentence-transformers faiss-cpu jieba numpy<2.0
-pip3 install SpeechRecognition pyaudio pyttsx3
-
-# 3. 模型准备（下载 + ONNX导出 + ATC转换）
-python3 prepare_models.py
-
-echo "安装完成！启动: python3 app.py"
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate base
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+# 版本以本批次 environment snapshot 为准；不要从另一块板复制版本结论。
+# PYTHONNOUSERSITE=1 只用于负向诊断，不能作为服务启动环境。
+unset PYTHONNOUSERSITE
+cd ~/case9-mindspore-chat
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 ```
 
-与旧方案的关键区别：
-- **不再安装 PyTorch / transformers / accelerate / peft** 作为运行时依赖——这些加起来超过 5GB，对于嵌入模型来说完全不需要
-- **不再安装 Redis / FastAPI / uvicorn / websockets**——Gradio 一个库覆盖了 Web 界面和 API
-- 语音库标注为可选，没有麦克风也不影响核心功能
+MindSpore 路线直接调用 MindSpore/MindNLP；现有 `torch`、`torch_npu`、`torchaudio`
+和其他污染包只记录，不删除、不升级，适配代码不得导入它们。ONNX -> OM 路线使用
+独立的 `case9-acl-om` 环境和原生 ACL，板端不安装 Torch、Transformers、ONNX Runtime、
+vLLM 或 MindIE。两条路线都不修改系统 CANN、驱动、kernel 或 OPP。控制机 `sci-agent`
+只用于静态检查、前端构建和外部参考，不把其运行时复制到板端。
 
-### 2.3. 系统架构设计 {#src-experiment-case9-h5}
+## 4. 模型工件与哈希校验
 
-本节是理解整个项目设计思路的核心。在动手写代码之前，需要先回答一个关键问题：**昇腾310B到底能不能跑大语言模型？**
+注册表是 `configs/chat_model_profiles.json`。两条路线的工件必须分开登记：ONNX -> OM
+路线记录 ONNX、每块 SoC 对应的 OM、ATC 日志和 ACL descriptor；MindSpore 路线记录
+checkpoint、tokenizer、配置、源码 revision 及环境锁。已有历史工件位于本地忽略目录：
 
-#### 2.3.1 为什么不在NPU上直接跑LLM {#src-experiment-case9-h6}
-
-昇腾310B的NPU通过OM（Offline Model）格式执行推理。OM是一个**静态计算图**——输入张量的形状和数据类型在模型转换时就固定了，运行时不可改变。
-
-而大语言模型的生成过程是**自回归**的：每生成一个token，要把它拼回输入序列，再跑一次模型。序列长度在逐token增长，输入形状在不断变化。这与OM的静态图假设根本矛盾。
-
-加上KV-cache管理的复杂性、7B模型至少14GB的FP16内存需求（而昇腾310B通常只有4-8GB），直接部署LLM不切实际。
-
-但这不意味着NPU在NLP任务中没用。恰恰相反——**文本嵌入**（Text Embedding）是NPU的"甜点区"：
-
-- 固定输入形状（256 tokens in，384维向量 out）
-- 纯前向推理，一次执行完成
-- 模型小（all-MiniLM-L6-v2 约90MB），轻松装入NPU内存
-- 推理速度快（NPU上约10ms/条 vs CPU 50-80ms/条）
-
-#### 2.3.2 三层架构设计 {#src-experiment-case9-h7}
-
-基于上述分析，本项目采用**三层混合架构**，完整程序流程如下：
-
-```mermaid
-flowchart TD
-    %% ========== 入口 ==========
-    U[/" 用户"/]
-    UI{{"输入方式?"}}
-
-    U --> UI
-    UI -->|" 文本"| TXT["输入消息"]
-    UI -->|"语音 语音"| MIC["浏览器录音<br/>gr.Audio"]
-    MIC --> WAV["WAV 音频数据<br/>float32->int16"]
-    WAV --> ASR["SpeechRecognizer<br/>Google Web Speech API"]
-    ASR --> ASR_CHECK{{"识别成功?"}}
-    ASR_CHECK -->|"是"| TXT
-    ASR_CHECK -->|"否"| ERR(["[失败] 识别错误"])
-    ERR --> U
-
-    %% ========== 对话管理 ==========
-    TXT --> DM["DialogueManager<br/>.process_message()"]
-    DM --> INTENT{{"意图检测<br/>关键词匹配?"}}
-
-    INTENT -->|"问候词"| GREET["GREETING 状态<br/>返回时段问候语"]
-    INTENT -->|"告别词"| BYE["FAREWELL 状态<br/>返回告别语"]
-    INTENT -->|"正常问答"| RAG["进入 RAG 管道"]
-    INTENT -->|"模糊不清"| CLARIFY["CLARIFYING 状态<br/>请用户重述"]
-
-    %% ========== RAG 管道 ==========
-    RAG --> ENC["EmbeddingModel.encode()<br/>用户查询 -> 384维向量"]
-    ENC --> NPU_CHECK{{"NPU 可用?"}}
-    NPU_CHECK -->|"[OK] 是"| TOK["Tokenizer<br/>文本->input_ids/attn_mask"]
-    TOK --> H2D["acl.rt.memcpy H2D<br/>numpy->NPU 内存"]
-    H2D --> ACL_EXEC["acl.mdl.execute<br/>OM 模型推理"]
-    ACL_EXEC --> D2H["acl.rt.memcpy D2H<br/>NPU 内存->numpy"]
-    D2H --> POOL["Mean Pooling<br/>attention_mask 加权均值"]
-    NPU_CHECK -->|"[失败] 否 (回退)"| CPU_ENC["SentenceTransformer<br/>.encode(normalize=True)"]
-    POOL --> NORM["L2 归一化<br/>向量/|向量|"]
-    CPU_ENC --> NORM
-
-    NORM --> FAISS["FAISS IndexFlatIP<br/>.search(query_vec, k=3)"]
-    FAISS --> FILTER{{"相似度 >= 阈值<br/>(SIMILARITY_THRESHOLD=0.3)?"}}
-    FILTER -->|"是"| CTX["检索上下文<br/>[{text, score, metadata}]"]
-    FILTER -->|"否"| NO_CTX["无匹配知识<br/>context=[]"]
-
-    %% ========== 回复生成 ==========
-    CTX --> GEN{{"回复模式?"}}
-    NO_CTX --> GEN
-    GEN -->|" 离线模式"| TPL["模板生成<br/>_generate_template()"]
-    GEN -->|" 云端模式"| CLOUD_CHECK{{"API Key 已配置?"}}
-    CLOUD_CHECK -->|"是"| LLM["_generate_cloud()<br/>构造 System Prompt<br/>+ RAG上下文 + 历史"]
-    LLM --> API["POST OpenAI-compatible API<br/>requests.post(endpoint)"]
-    API --> API_CHECK{{"API 响应 OK?"}}
-    API_CHECK -->|"是"| LLM_RESP["LLM 回复文本"]
-    API_CHECK -->|"否"| TPL
-    CLOUD_CHECK -->|"否"| TPL
-
-    TPL --> RESP["回复文本"]
-    LLM_RESP --> RESP
-    GREET --> RESP
-    BYE --> RESP
-    CLARIFY --> RESP
-
-    %% ========== 输出 ==========
-    RESP --> TTS_CHECK{{"语音输出开启?"}}
-    TTS_CHECK -->|"是"| TTS["TextToSpeech.speak()<br/>pyttsx3 / espeak<br/>异步线程播放"]
-    TTS_CHECK -->|"否"| CHAT[Gradio Chatbot 展示]
-    TTS --> CHAT
-    CHAT --> HISTORY["存入 ConversationHistory<br/>环形缓冲 (最近10轮)"]
-    HISTORY --> U
+```text
+samples/case9/repro/qwen25-kv1024-dual-board-20260827/
+samples/case9/repro/mindspore-chat-20260829/
 ```
 
-**每一层的职责和设计考量**：
+补齐批次由 `scripts/sync_case9_gap_bundle.sh` 写入新的时间戳目录，不覆盖上述历史
+证据。每个目录应含板端环境快照、原始验收报告、源码快照、`bundle-manifest.json`
+和 `SHA256SUMS.txt`；清单记录来源 IP、SoC、字节数和 SHA-256，模型文件不提交 Git。
+DeepSeek 的当前目标板是 `.95`；`.210` 上的旧路径或旧缓存不能作为当前工件证明。
 
-| 层 | 运行位置 | 为什么放在这里 |
-|:---|:---|:---|
-| 语音I/O | CPU | 音频采集/播放是操作系统层面的事，与NPU无关 |
-| 文本嵌入 | NPU（主）/ CPU（回退） | NPU擅长矩阵运算，嵌入模型正好是纯矩阵计算；CPU作为无NPU时的保障 |
-| FAISS检索 | CPU | 向量搜索是索引结构的遍历，非矩阵运算，CPU+C++优化就足够快（<1ms） |
-| 回复生成 | CPU | 模板匹配在CPU上是O(1)；云端API走网络，与NPU无关 |
+Qwen2.5 静态 KV 的已登记哈希（用于启动前核验）为：ONNX
+`b4870df5da9c8cbef4163ceb65d4dc13433f2fd8ed5d2083ef3223d07d1a3c0e`，B4 OM
+`f6650e52ff3908288763ef7957832ade606b0e554fa8fde986932f1ca1140eb8`，B1 OM
+`6bca884fbce746efdb02f8c9294cad5b2faa6c8b96cac9ec8c83730126298609`，tokenizer
+`c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539`。哈希只证明
+工件完整性，不证明目标板上的 ATC、ACL 或中文质量门通过。
 
-#### 2.3.3 与纯云端/纯边缘方案的对比 {#src-experiment-case9-h8}
-
-| 维度 | 纯云端 | 纯边缘LLM | 本项目（混合） |
-|:---|:---|:---|:---|
-| 延迟 | 网络延迟 0.5-3s | NPU不可行，CPU上极慢 | 嵌入<50ms + 检索<1ms + 回复<10ms（模板） |
-| 隐私 | 数据上传云端 | 完全本地 | 完全本地（离线模式） |
-| 可用性 | 依赖网络 | 始终可用 | 始终可用（离线模式） |
-| 回复质量 | 高（大模型） | 取决于模型大小 | 模板精准/云端高质量 |
-| 硬件要求 | 无需NPU | 需大内存+GPU | 升腾310B或普通CPU |
-| 维护成本 | API费用 | 模型更新复杂 | 只更新知识库文本 |
-
-### 2.4. 文本嵌入模型与昇腾部署 {#src-experiment-case9-h9}
-
-本节详细介绍如何在昇腾310B上部署文本嵌入模型，这是整个RAG管道的基石。
-
-#### 2.4.1 什么是文本嵌入 {#src-experiment-case9-h10}
-
-文本嵌入（Text Embedding）将一段自然语言文本转换为固定长度的浮点数向量。其核心性质是：**语义相近的文本，在向量空间中距离更近**。
-
-```
-"昇腾310B是一款边缘AI芯片"  ->  [0.12, -0.34, 0.08, ..., 0.21]  (384维)
-"华为Ascend 310B是边缘推理处理器" -> [0.13, -0.31, 0.06, ..., 0.19]  ← 余弦相似度 约等于 0.92
-"今天天气很好适合出去玩"  -> [-0.45, 0.28, 0.73, ..., -0.55]  ← 余弦相似度 约等于 0.03
-```
-
-有了这个性质，"找到知识库里和用户问题最相关的内容"就变成了数学上的向量内积运算。
-
-#### 2.4.2 为什么选择 all-MiniLM-L6-v2 {#src-experiment-case9-h11}
-
-| 候选模型 | 参数量 | 向量维度 | 模型大小 | 推理速度 (CPU) |
-|:---|:---|:---|:---|:---|
-| all-MiniLM-L6-v2 | 22M | 384 | ~90 MB | ~10ms |
-| all-mpnet-base-v2 | 110M | 768 | ~420 MB | ~50ms |
-| bge-large-zh-v1.5 | 326M | 1024 | ~1.3 GB | ~150ms |
-| text2vec-large-chinese | 326M | 1024 | ~1.3 GB | ~150ms |
-
-all-MiniLM-L6-v2 是由 Microsoft 的 Sentence-Transformers 团队发布的轻量级嵌入模型。它用知识蒸馏技术将 BERT 的 12 层压缩到 6 层，保留了原始模型约 95% 的嵌入质量，但体积缩小为原来的 1/3。
-
-选择它的原因：
-- **规格适中**：90MB 的 ONNX 模型对昇腾310B的内存没有任何压力
-- **固定输入输出**：最大 256 tokens 输入，384 维向量输出，完美匹配 OM 静态图
-- **多语言支持**：虽然以英文为主训练，但对中文的嵌入质量在轻量模型中排名靠前
-- **生态成熟**：HuggingFace 直接支持，optimum 库可一行代码导出 ONNX
-
-#### 2.4.3 模型转换管线 {#src-experiment-case9-h12}
-
-```mermaid
-flowchart TD
-    HF["HuggingFace<br/>all-MiniLM-L6-v2<br/>PyTorch (~90MB)"]
-    HF -->|"optimum / torch.onnx.export"| ONNX["ONNX 模型 (~90MB)<br/><br/>inputs:<br/>  input_ids [batch,256] int64<br/>  attention_mask [batch,256] int64<br/>  token_type_ids [batch,256] int64<br/><br/>output:<br/>  sentence_embedding [batch,384] float32"]
-    ONNX -->|"atc --framework=5<br/>--soc_version=Ascend310B4"| OM["OM 模型 (~45MB, FP16)<br/>静态计算图"]
-    OM -->|"PyACL 加载 & 执行"| INFER["实时推理<br/><br/>文本 -> Tokenizer -> numpy<br/>-> NPU H2D -> acl.mdl.execute -> D2H<br/>-> Mean Pooling -> L2 归一化<br/>-> 384维向量"]
-```
-
-ONNX 导出代码（`prepare_models.py` 核心逻辑）：
-
-```python
-from transformers import AutoTokenizer, AutoModel
-import torch
-
-tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
-model = AutoModel.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
-model.eval()
-
-# 准备一个dummy输入来确定动态轴
-dummy = tokenizer("Hello world", padding="max_length",
-                   truncation=True, max_length=256, return_tensors="pt")
-
-torch.onnx.export(
-    model,
-    (dummy["input_ids"], dummy["attention_mask"],
-     dummy.get("token_type_ids", torch.zeros_like(dummy["input_ids"]))),
-    "models/embedding_model.onnx",
-    input_names=["input_ids", "attention_mask", "token_type_ids"],
-    output_names=["sentence_embedding"],
-    dynamic_axes={
-        "input_ids": {0: "batch_size"},
-        "attention_mask": {0: "batch_size"},
-        "token_type_ids": {0: "batch_size"},
-        "sentence_embedding": {0: "batch_size"},
-    },
-    opset_version=14,
-)
-```
-
-ATC 转换命令：
+启动前只读核验 Profile 声明的每个文件：
 
 ```bash
-atc --model=models/embedding_model.onnx \
-    --framework=5 \
-    --output=models/embedding_model \
-    --input_shape="input_ids:1,256;attention_mask:1,256;token_type_ids:1,256" \
-    --soc_version=Ascend310B4
+python scripts/verify_mindspore_profile_artifacts.py \
+  --profile qwen1.5-0.5b-mindspore \
+  --root "$PWD" \
+  --output reports/mindspore-chat/qwen1.5-0.5b-mindspore/artifact-verify.json
 ```
 
-参数说明：
-- `--framework=5`：5 代表 ONNX 格式
-- `--input_shape`：明确指定每个输入的维度，避免 ATC 推导失败
-- `--soc_version`：根据实际芯片选择，`npu-smi info` 可查看
+返回 `passed` 才能记录 `artifact_verified`。下载或同步必须使用临时文件、远端字节数、
+本地 SHA-256 和原子改名；不使用未验证的 LFS 指针、缓存目录或可变 `main` 作为模型证明。
 
-转换完成后，`models/` 目录下会生成 `embedding_model.om`（约 45MB，FP16），这就是昇腾 NPU 可以直接执行的格式。
+## 5. 新板环境检查和模型门禁
 
-#### 2.4.4 NPU 推理封装 {#src-experiment-case9-h13}
+在 `.90` 和 `.95` 分别记录 SoC、CANN、Python、磁盘、内存、HugePages、`npu-smi`
+和污染包；`.178`/`.210` 只用于查阅历史报告：
 
-昇腾的 Python API（PyACL）提供了底层的设备管理、内存拷贝和模型执行接口。`ascend_inference.py` 沿用了案例1中成熟的 `AscendSystem` / `AscendModel` 模式。
-
-**AscendSystem** — 管理 NPU 设备生命周期：
-
-```python
-class AscendSystem:
-    def __init__(self, device_id=0):
-        ret = acl.init()                          # 初始化 ACL 运行时
-        ret = acl.rt.set_device(device_id)         # 选择 NPU 设备
-        self.context, ret = acl.rt.create_context(device_id)  # 创建执行上下文
-        self.stream, ret = acl.rt.create_stream()  # 创建任务流
+```bash
+python - <<'PY'
+import importlib.metadata, sys
+print("python", sys.version)
+for name in ("mindspore", "mindnlp", "numpy", "pytest"):
+    try:
+        print(name, importlib.metadata.version(name))
+    except importlib.metadata.PackageNotFoundError:
+        print(name, "missing")
+PY
+npu-smi info
+bash scripts/case9-modelctl.sh list
+bash scripts/case9-modelctl.sh status
 ```
 
-初始化顺序是固定的：`acl.init -> set_device -> create_context -> create_stream`。释放时严格反向：`destroy_stream -> destroy_context -> reset_device -> finalize`。
+MindSpore Profile 没有 OM 转换步骤；其门禁是工件核验、MindSpore Ascend context、
+tokenizer 导入、单 token 生成、JSON/SSE 契约、长输出、稳定性、质量和性能。Qwen2.5
+的 ONNX -> ATC -> OM -> ACL 门禁属于独立正式基线，必须逐板确认 `Ascend310B4`
+或 `Ascend310B1` 的 descriptor、输入输出 byte size、ACL smoke 和 NPU 采样，不能用
+MindSpore 结果替代。任何门失败都记录为 `failed`、`blocked` 或 `not-run`，不自动切换
+CPU、云端或其他推理框架；没有当前 `.95` 的完整环境和工件快照前，不得把 `.210` 的
+历史报告当作 20T 通过证据。
 
-**AscendModel** — 加载和执行 OM 模型：
+ONNX -> OM 路线的候选端口先使用 `127.0.0.1:8084`；通过完整门禁后才有资格替换正式
+`127.0.0.1:8080`。MindSpore 路线使用 `127.0.0.1:8090`，两者不能同时占用同一 NPU
+模型实例。
 
-```python
-class AscendModel:
-    def _load_model(self):
-        self.model_id, ret = acl.mdl.load_from_file(self.model_path)  # 加载 OM
-        self.desc = acl.mdl.create_desc()         # 获取模型描述
-        acl.mdl.get_desc(self.desc, self.model_id)
-        self._init_buffers()                       # 预分配输入/输出内存
+## 6. 候选 Profile 服务和 OpenAI API
 
-    def execute(self, input_data_list):
-        # 1. Host -> Device: 将 numpy 数组拷贝到 NPU 内存
-        for i, data in enumerate(input_data_list):
-            acl.rt.memcpy(dev_ptr, size, host_ptr, size, 1)  # 1 = H2D
+`case9-modelctl` 负责停止旧 worker、启动新 worker、轮询健康状态和记录活动状态；失败
+时尝试回滚，回滚也失败则 fail-closed：
 
-        # 2. 执行推理
-        acl.mdl.execute(self.model_id, self.input_dataset, self.output_dataset)
-
-        # 3. Device -> Host: 将结果拷回主机
-        for i in range(len(self.output_buffers)):
-            acl.rt.memcpy(host_ptr, size, dev_ptr, size, 2)  # 2 = D2H
+```bash
+CASE9_ALLOW_EXPERIMENTAL=1 bash scripts/case9-modelctl.sh switch qwen1.5-0.5b-mindspore
+# 正式注册表中的 blocked/not-run Profile 会被 CLI 拒绝；测试批次只能使用明确标记
+# 的临时注册表，不能用参数绕过工件、环境或质量门禁。
 ```
 
-**EmbeddingModel** — 业务层封装，整合 tokenizer 和 NPU 推理：
+DeepSeek 的当前目标板是 `.95`；`.210` 只保留为历史地址。服务固定监听
+`127.0.0.1:8090`，内部模型名为 `case9-active`，请求限制如下：
 
-```python
-class EmbeddingModel:
-    def encode(self, texts):
-        """输入文本列表，返回归一化的嵌入向量 (N, 384)"""
-        if self._use_npu:
-            return self._encode_npu(texts)
-        else:
-            return self._encode_cpu(texts)  # 自动回退
+- `messages` 只接受 `system`、`user`、`assistant`，使用 Profile tokenizer/chat template；
+- batch 为 1，单进程单请求串行，实际 token 化后检查 context `1024`；
+- `max_tokens` 默认 `32`、上限 `64`，只接受 `temperature=0`、`top_p=1`；
+- 请求体上限 `256 KiB`，支持普通 JSON 和 OpenAI SSE；
+- SSE 只发送前缀差量；实现包含超时 watchdog 和客户端中断清理，但 watchdog 实际触发、
+  自动回滚及浏览器会话清空仍未获得本轮正向验收；
+- 客户端不能指定 Profile、权重路径、后端或任意 Python 表达式。
 
-    def _encode_npu(self, texts):
-        for text in texts:
-            encoded = tokenizer(text, padding="max_length",
-                                truncation=True, max_length=256,
-                                return_tensors="np")
-            outputs = self._ascend_model.execute([
-                encoded["input_ids"].astype(np.int64),
-                encoded["attention_mask"].astype(np.int64),
-                encoded["token_type_ids"].astype(np.int64),
-            ])
-            embedding = mean_pool(outputs[0], attention_mask)
-            embeddings = L2_normalize(embeddings)
-        return embeddings
+接口为 `GET /health`、`GET /v1/models` 和 `POST /v1/chat/completions`。`/health` 返回
+Profile、revision、环境指纹、NPU 型号、worker PID、busy、缓存清理和 admission 状态。
+
+## 7. 网关和文字 UI 验证
+
+Profile 服务健康后，在另一个板端 shell 启动候选链：
+
+```bash
+export GATEWAY_API_KEY="<板端内部 token>"
+bash scripts/run_mindspore_chat_gateway.sh
+bash scripts/run_mindspore_chat_text.sh
 ```
 
-需要特别注意的细节：
+候选网关固定转发到 `http://127.0.0.1:8090/v1`，对外模型名是 `case9-rag`，并关闭 RAG
+注入：
 
-1. **数据类型**：PyACL 要求 int64 输入。numpy 默认的 int32 会导致数据错位。
-2. **内存对齐**：`np.ascontiguousarray()` 确保 C-contiguous 内存布局，否则 `acl.rt.memcpy` 会失败。
-3. **Mean Pooling**：Transformer 输出是每个 token 的隐藏状态，需要对其求均值得到句子级向量。注意要用 attention_mask 屏蔽 padding token。
-
-```python
-def _pool_output(self, outputs, attention_mask):
-    # outputs: [batch, seq_len, hidden_size]
-    # mask:    [batch, seq_len]
-    mask = np.expand_dims(attention_mask.astype(np.float32), axis=-1)
-    summed = (token_embeddings * mask).sum(axis=1)   # 有效token求和
-    counts = mask.sum(axis=1).clip(min=1)             # 有效token数量
-    return summed / counts                             # 均值
+```dotenv
+UPSTREAM_BASE_URL=http://127.0.0.1:8090/v1
+UPSTREAM_MODEL=case9-active
+RAG_ENABLED=false
+MAX_CONCURRENT_REQUESTS=1
+PUBLIC_MODEL_ID=case9-rag
 ```
 
-4. **L2 归一化**：将向量归一化到单位球面上。归一化后，内积即等价于余弦相似度，这是 FAISS IndexFlatIP 的工作前提。
+浏览器按实际运行板卡访问 `http://192.168.1.90:7868/`（8T）或
+`http://192.168.1.95:7868/`（20T）。已归档的候选链 smoke 报告包含未授权 `401`、授权
+`/v1/models`、JSON/SSE 和 UI health 的历史响应；这些是协议/UI 证据，不是双板缺口批次
+的自动通过。每次新批次都必须保存请求、响应、服务 PID 和板卡 IP，不能把 `.90` 的 UI
+结果复制给 `.95`。
 
-```python
-@staticmethod
-def _normalize(embeddings):
-    norms = np.linalg.norm(embeddings, axis=-1, keepdims=True)
-    norms = np.clip(norms, 1e-12, None)   # 防止除零
-    return embeddings / norms
+正式 `8080 -> 7861 -> 7865` 由本教程和候选脚本保持不变。
+
+## 8. 长输出、稳定性、中文质量和性能测试
+
+验收脚本只访问已启动的 loopback 服务，不管理 PID：
+
+```bash
+python scripts/mindspore_chat_acceptance.py \
+  --profile qwen1.5-0.5b-mindspore --execute \
+  --run-id qwen-full-20260829b --timeout 600 \
+  --probe-file tests/fixtures/qwen25_chinese_probe.json \
+  --output reports/mindspore-chat/qwen1.5-0.5b-mindspore/qwen-full-20260829b
 ```
 
-### 2.5. 知识库与向量检索 {#src-experiment-case9-h14}
-
-有了嵌入模型，下一步是构建知识库并实现高效的向量检索。
-
-#### 2.5.1 RAG 的核心思想 {#src-experiment-case9-h15}
-
-RAG（Retrieval-Augmented Generation，检索增强生成）的工作流程：
-
-```mermaid
-flowchart LR
-    subgraph OFFLINE["1 离线阶段"]
-        direction LR
-        A["知识库文档"] --> B["中文分块<br/>段落/句子切分"]
-        B --> C["嵌入编码<br/>EmbeddingModel.encode()"]
-        C --> D["存入 FAISS 索引<br/>IndexFlatIP.add()"]
-    end
-
-    subgraph ONLINE["2 在线阶段"]
-        direction LR
-        E["用户提问"] --> F["嵌入编码<br/>-> 384维向量"]
-        F --> G["向量检索<br/>FAISS.search(k=3)"]
-        G --> H["Top-K 文档块<br/>含相似度分数"]
-    end
-
-    subgraph GENERATE["3 生成阶段"]
-        direction LR
-        H --> I["构造 Prompt<br/>上下文 + 提问"]
-        I --> J["回复生成模块<br/>模板 / 云端LLM"]
-    end
-
-    D -.-> G
-```
-
-RAG 解决的核心问题：**让 AI 的回答有据可查**。没有 RAG 时，模型要么凭空编造（大模型的"幻觉"），要么只能靠训练数据中记住的知识。有了 RAG 后，回答可以被溯源到知识库中的具体文档片段。
-
-#### 2.5.2 中文文本分块策略 {#src-experiment-case9-h16}
-
-知识库文档需要被切成合适大小的"块"（chunk）。块太大，检索精度下降（一个块里混入太多不相关内容）；块太小，语义不完整。
-
-`knowledge_base.py` 中的分块策略考虑了中文的特点：
-
-```python
-def _split_text(self, text):
-    paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
-    chunks = []
-    for para in paragraphs:
-        if len(para) <= self._chunk_size:      # 短段落直接作为一块
-            chunks.append(para)
-            continue
-        sentences = self._split_sentences(para)  # 按句号/问号/感叹号切分
-        current = ""
-        for sent in sentences:
-            if len(current) + len(sent) <= self._chunk_size:
-                current += sent
-            else:
-                chunks.append(current)
-                # 重叠：保留上一块的末尾，避免语义断裂
-                current = current[-self._chunk_overlap:] + sent
-        if current:
-            chunks.append(current)
-    return chunks
-```
-
-中文分句不使用 jieba 分词，而是通过正则表达式匹配句末标点（`。！？；`）。这比用分词器更轻量，且对中文段落的分句准确度足够。
-
-#### 2.5.3 FAISS 向量索引 {#src-experiment-case9-h17}
-
-FAISS（Facebook AI Similarity Search）是 Meta 开源的向量相似度搜索库。核心操作极其简单：
-
-```python
-import faiss
-import numpy as np
-
-# 创建索引
-dim = 384
-index = faiss.IndexFlatIP(dim)         # 内积索引
-
-# 添加向量
-embeddings = model.encode(documents)   # shape: (N, 384)
-index.add(embeddings)                  # 加入索引
-
-# 搜索
-query_vec = model.encode(["昇腾310B的算力是多少？"])
-scores, indices = index.search(query_vec, k=3)  # 返回最相似的3个
-```
-
-`IndexFlatIP` 的含义：
-- **Flat**：暴力搜索，不做任何近似。对 N 个文档、384 维向量，复杂度 O(N×384)。
-- **IP**：Inner Product（内积）。配合 L2 归一化的向量，内积等价于余弦相似度。
-
-对于几千到几万条文档的规模，暴力搜索完全够用（<1ms）。当知识库扩大到百万级别时，FAISS 提供了 IVF（倒排索引）、HNSW（图索引）等近似搜索方案，只需改一行代码即可切换。
-
-#### 2.5.4 知识库管理 {#src-experiment-case9-h18}
-
-`KnowledgeBase` 类提供了完整的增删查改和持久化：
-
-```python
-kb = KnowledgeBase(embedding_model)
-
-# 添加知识
-kb.add_texts(["昇腾310B支持FP16和INT8推理..."], [{"source": "manual"}])
-kb.add_document("path/to/knowledge.txt")  # 自动分块 + 编码 + 入库
-
-# 检索
-results = kb.search("什么是CANN？", k=3)
-# [{"text": "...", "score": 0.87, "metadata": {...}}, ...]
-
-# 持久化
-kb.save("data/index.faiss", "data/documents.json")
-kb.load("data/index.faiss", "data/documents.json")
-```
-
-### 2.6. 对话管理与响应生成 {#src-experiment-case9-h19}
-
-#### 2.6.1 对话状态机 {#src-experiment-case9-h20}
-
-`DialogueManager` 维护一个简单的四状态机：
-
-```mermaid
-stateDiagram-v2
-    [*] --> GREETING: 启动 / 首次交互
-    GREETING --> ACTIVE: 用户发言
-    ACTIVE --> ACTIVE: 正常问答<br/>走 RAG 管道
-    ACTIVE --> CLARIFYING: 意图模糊不清
-    CLARIFYING --> ACTIVE: 用户重述/补充
-    ACTIVE --> FAREWELL: 检测到告别词
-    FAREWELL --> [*]: 对话结束
-
-    note right of GREETING: 根据时段返回<br/>不同问候语
-    note right of ACTIVE: 嵌入->检索->回复
-    note left of FAREWELL: 再见/拜拜/bye
-```
-
-状态转换规则：
-- 首次交互自动进入 GREETING（根据时间段返回不同问候语）
-- 检测到"再见/拜拜/bye"等关键词进入 FAREWELL
-- 其他情况保持在 ACTIVE 状态，走完整的 RAG 处理流程
-
-#### 2.6.2 两级回复生成 {#src-experiment-case9-h21}
-
-**默认模式：模板 + RAG 检索上下文**
-
-查询经过 RAG 检索后，将匹配到的知识片段直接组织成回复：
-
-```python
-def _generate_template(self, query, context):
-    if context:
-        pieces = ["根据我的知识库，以下是相关内容：\n"]
-        for i, item in enumerate(context, 1):
-            pieces.append(f"{i}. {item['text']}\n")
-        pieces.append("\n请问还有什么想了解的吗？")
-        return "".join(pieces)
-    return "抱歉，我在知识库中没有找到相关的信息..."
-```
-
-这种方式虽然简单，但结合了 RAG 的检索能力——回复中的每一条信息都直接来自知识库，**零幻觉**。对于昇腾310B、CANN、边缘计算等专业问题，FAQ + 知识库的模板回复比大模型凭空生成更可靠。
-
-**云端增强模式：LLM + RAG**
-
-当用户配置了云端 API Key，同样的检索结果会作为 system prompt 注入 LLM：
-
-```python
-def _generate_cloud(self, query, context, history):
-    system_prompt = (
-        "你是一个运行在昇腾310B边缘设备上的AI助手。"
-        "请基于提供的知识库内容回答用户问题。"
-        "如果知识库中没有相关信息，请诚实告知，不要编造。"
-    )
-    # 将检索到的文档拼接为上下文
-    context_block = "\n".join(f"[{i}] {item['text']}"
-                              for i, item in enumerate(context, 1))
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "system", "content": f"相关知识库内容：{context_block}"},
-        {"role": "user", "content": query},
-    ]
-    # 调用 OpenAI 兼容 API
-    resp = requests.post(endpoint, headers={...}, json={
-        "model": "gpt-3.5-turbo",
-        "messages": messages,
-        "max_tokens": 512,
-        "temperature": 0.7,
-    })
-```
-
-兼容所有使用 OpenAI API 格式的服务：
-- 云端：OpenAI、Azure OpenAI、通义千问、DeepSeek
-- 本地：Ollama、vLLM、llama.cpp server、LocalAI
-
-#### 2.6.3 对话历史管理 {#src-experiment-case9-h22}
-
-`ConversationHistory` 是一个固定容量的环形缓冲区：
-
-```python
-class ConversationHistory:
-    def __init__(self, max_turns=10):
-        self._turns = []
-        self._max = max_turns
-
-    def add(self, role, text):
-        self._turns.append(Turn(role=role, text=text, timestamp=time.time()))
-        if len(self._turns) > self._max:
-            self._turns.pop(0)  # 超出容量时丢弃最早的
-
-    def get_recent(self, n=4):
-        return self._turns[-n:]   # 获取最近n轮
-```
-
-保留最近 10 轮对话，云端模式下将最近 4 轮作为上下文发送给 LLM。这样做既维持了多轮对话的连贯性，又控制了 API 调用的 token 消耗。
-
-### 2.7. 语音交互系统 {#src-experiment-case9-h23}
-
-语音交互采用**浏览器端录音 + 服务端识别**的架构。Gradio 的 `Audio` 组件负责在浏览器中通过 `MediaRecorder API` 录制音频，然后将 WAV 数据发送到服务端。服务端的 `SpeechRecognizer` 接收音频文件，调用 Google Web Speech API 完成语音识别。
-
-#### 2.7.1 语音识别 {#src-experiment-case9-h24}
-
-```python
-class SpeechRecognizer:
-    def recognize_from_file(self, audio_path):
-        recognizer = sr.Recognizer()
-        with sr.AudioFile(audio_path) as source:
-            audio = recognizer.record(source)
-        return recognizer.recognize_google(audio, language="zh-CN")
-```
-
-Google Web Speech API 的优势是免费、无需注册、中英文识别准确率不错。局限是需要网络连接，且可能有频率限制。在生产环境中可以替换为：
-- **Vosk** — 离线、支持中文的小型识别模型
-- **Whisper.cpp** — OpenAI Whisper 的 C++ 移植，在 CPU 上可运行
-- **FunASR** — 阿里达摩院出品，中文识别效果优秀
-
-#### 2.7.2 语音合成 {#src-experiment-case9-h25}
-
-```python
-class TextToSpeech:
-    def speak(self, text):
-        def _run():
-            engine = pyttsx3.init()
-            engine.setProperty("rate", 160)    # 语速
-            engine.setProperty("volume", 0.8)  # 音量
-            engine.say(text)
-            engine.runAndWait()
-        threading.Thread(target=_run, daemon=True).start()
-```
-
-pyttsx3 在 Linux 上使用 espeak 作为后端，离线可用、零成本。缺点是中文发音偏机械，自然度不及商业 TTS 服务。如需更好的中文语音效果，可替换为 Piper TTS（开源、离线、中文音色更自然）。
-
-#### 2.7.3 浏览器端录音 {#src-experiment-case9-h26}
-
-Gradio 的 `gr.Audio(sources=["microphone"], type="numpy")` 返回 `(sample_rate, audio_array)`，其中 `audio_array` 是 float32 numpy 数组。需要在服务端将其转换为 WAV 格式，因为 `speech_recognition` 只接受文件路径：
-
-```python
-def voice_input_fn(audio):
-    sr_val, audio_data = audio
-    audio_int16 = (audio_data * 32767).astype(np.int16)
-
-    # 写入临时 WAV 文件
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        with wave.open(tmp, "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(sr_val)
-            wf.writeframes(audio_int16.tobytes())
-        tmp_path = tmp.name
-
-    text = asr.recognize_from_file(tmp_path)
-    os.unlink(tmp_path)
-    return text, text  # 返回识别结果，自动填入聊天输入框
-```
-
-### 2.8. Web界面与API服务 {#src-experiment-case9-h27}
-
-本项目使用 **Gradio** 构建 Web 界面。Gradio 是 HuggingFace 出品的 Python 库，专为机器学习模型演示而设计。与 Flask/FastAPI 相比，Gradio 的优势在于：不需要写 HTML/CSS/JS 代码，Python 类定义直接映射为 Web 组件，内置 WebSocket 连接管理、队列系统和错误处理。
-
-#### 2.8.1 界面设计 {#src-experiment-case9-h28}
-
-```python
-with gr.Blocks(theme=gr.themes.Soft(), title="Ascend 310B 智能聊天机器人") as demo:
-    with gr.Tabs():
-        with gr.TabItem(" 对话"):
-            chatbot = gr.Chatbot(height=500)
-            msg_box = gr.Textbox(label="输入消息")
-            send_btn = gr.Button("发送", variant="primary")
-            audio_in = gr.Audio(sources=["microphone"], type="numpy")
-
-            # 文本对话
-            msg_box.submit(chat_fn, [msg_box, chatbot], [msg_box, chatbot])
-            send_btn.click(chat_fn, [msg_box, chatbot], [msg_box, chatbot])
-
-            # 语音输入
-            audio_in.stop_recording(voice_input_fn, audio_in, [status, msg_box])
-
-        with gr.TabItem(" 设置"):
-            cloud_toggle = gr.Checkbox(label="启用云端 LLM")
-            ...
-```
-
-`gr.Chatbot` 组件内置了聊天气泡样式和自动滚动，交互逻辑只需关注 handler 函数的输入输出映射。
-
-#### 2.8.2 事件流 {#src-experiment-case9-h29}
-
-Gradio 的事件驱动模型：
-
-```mermaid
-flowchart TD
-    subgraph TEXT[" 文本输入路径"]
-        direction LR
-        T1["用户输入文本"] --> T2["msg_box.submit()"]
-        T2 --> T3["chat_fn(message, history)"]
-        T3 --> T4["dialogue_manager<br/>.process_message()"]
-        T4 --> T5["返回<br/>(reply, updated_history)"]
-        T5 --> T6["chatbot 自动刷新"]
-    end
-
-    subgraph VOICE["语音 语音输入路径"]
-        direction LR
-        V1["用户点击录音按钮"] --> V2["audio_in 开始录音"]
-        V2 --> V3["松开触发<br/>stop_recording 事件"]
-        V3 --> V4["voice_input_fn(audio)<br/>WAV 转换 + ASR 识别"]
-        V4 --> V5["识别文本填入<br/>msg_box"]
-    end
-
-    V5 -->|"触发 submit 链"| T2
-```
-
-### 2.9. 用户手册 {#src-experiment-case9-h30}
-
-#### 2.9.1 系统部署 {#src-experiment-case9-h31}
-
-1. **克隆代码**：进入 `samples/case9/` 目录
-2. **安装环境**：`bash setup.sh`
-3. **准备模型**：`python3 prepare_models.py`（自动下载、导出ONNX、转换为OM）
-4. **启动服务**：`python3 app.py`
-5. **访问界面**：打开浏览器访问 `http://127.0.0.1:7860`
-
-如果没有昇腾设备，跳过第3步的 ATC 转换即可。系统会自动使用 CPU 模式运行，所有功能不受影响。
-
-#### 2.9.2 配置说明 {#src-experiment-case9-h32}
-
-| 配置项 | 位置 | 说明 |
-|:---|:---|:---|
-| 嵌入模型 | `config.py` | 默认 all-MiniLM-L6-v2，可换其他 sentence-transformers 模型 |
-| 检索数量 | `config.py: TOP_K_RETRIEVAL` | 默认 3，增大可提供更多上下文 |
-| 相似度阈值 | `config.py: SIMILARITY_THRESHOLD` | 默认 0.3，提高可过滤不相关结果 |
-| 云端 API | 设置面板 | 支持任何 OpenAI 兼容接口（Ollama/vLLM/通义千问等） |
-| 语音开关 | 设置面板 | 关闭后仅文本交互 |
-
-#### 2.9.3 使用指南 {#src-experiment-case9-h33}
-
-- **文本对话**：直接在输入框打字，回车发送
-- **语音输入**：点击 语音 按钮开始录音，再次点击停止，自动识别并发送
-- **知识问答**：询问昇腾310B、CANN、边缘计算、RAG 等相关问题，系统会从知识库检索后回答
-- **云端增强**：在设置面板填入 API Key 并启用，回复质量大幅提升
-- **扩展知识库**：编辑 `data/sample_knowledge.txt` 添加自己的知识条目，重启服务即可生效
-
-#### 2.9.4 维护与扩展 {#src-experiment-case9-h34}
-
-- **添加自定义知识**：在 `data/` 目录下创建文本文件，修改 `app.py` 中 `get_knowledge_base()` 的加载逻辑
-- **切换嵌入模型**：修改 `config.py` 中的 `MODEL_NAME`，重新运行 `prepare_models.py`
-- **自定义回复模板**：编辑 `data/sample_faq.json` 增加 FAQ 问答对
-- **接入离线 ASR**：将 `voice_io.py` 中的 `recognize_google` 替换为 Vosk 或 Whisper
-- **日志监控**：终端输出包含请求日志和检索上下文，方便调试
-
-## 3. 源代码结构 {#src-experiment-case9-h35}
-
-```
-samples/case9/
-├── app.py                   # Gradio Web 界面入口，事件绑定
-├── ascend_inference.py      # Ascend NPU 推理封装
-│   ├── AscendSystem         #   NPU 设备初始化 / 释放
-│   ├── AscendModel          #   OM 模型加载 / H2D / execute / D2H
-│   ├── EmbeddingModel       #   文本嵌入业务层（tokenize -> NPU/CPU -> 归一化）
-│   └── create_embedding_model()  # 工厂函数，自动尝试 NPU -> 回退 CPU
-├── knowledge_base.py        # RAG 检索引擎
-│   ├── Document             #   文档数据类
-│   └── KnowledgeBase        #   FAISS 索引管理 / 分块 / 检索 / 持久化
-├── dialogue.py              # 对话管理器
-│   ├── State                #   对话状态枚举
-│   ├── ConversationHistory  #   环形缓冲对话历史
-│   └── DialogueManager      #   意图检测 -> RAG -> 模板/API 回复
-├── voice_io.py              # 语音交互
-│   ├── SpeechRecognizer     #   语音识别（Google API / 文件）
-│   └── TextToSpeech         #   语音合成（pyttsx3 / espeak）
-├── config.py                # 全局配置常量
-├── prepare_models.py        # 模型准备（ONNX 导出 + ATC 转换）
-├── setup.sh                 # 一键环境安装
-├── requirements.txt         # Python 依赖清单
-├── data/
-│   ├── sample_knowledge.txt # 示例知识库（约 20 条昇腾/边缘计算知识）
-│   └── sample_faq.json      # 示例 FAQ 问答对（15 组模式匹配）
-├── models/                  # 模型文件目录
-└── README.md                # 快速开始指南
-```
-
-各模块的调用关系：
-
-```mermaid
-flowchart TB
-    APP["app.py<br/>Gradio Web 入口"]
-
-    subgraph MODULES["核心模块"]
-        EMBED["ascend_inference<br/>EmbeddingModel<br/>文本 -> 384维向量"]
-        KB["knowledge_base<br/>KnowledgeBase<br/>FAISS 索引管理 & 检索"]
-        DIALOG["dialogue<br/>DialogueManager<br/>对话状态机 & 回复生成"]
-        VOICE["voice_io<br/>SpeechRecognizer<br/>TextToSpeech<br/>语音识别 & 合成"]
-    end
-
-    APP --> EMBED
-    APP --> KB
-    APP --> DIALOG
-    APP --> VOICE
-    DIALOG --> EMBED
-    DIALOG --> KB
-```
-
-## 4. 效果演示 {#src-experiment-case9-h36}
-
-### 基础对话 — 离线模板模式 {#src-experiment-case9-h37}
-
-```
-用户: 什么是昇腾310B？
-机器人: 根据我的知识库，以下是相关内容：
-  1. 昇腾310B是华为推出的面向边缘计算场景的AI推理处理器...
-  2. 昇腾310B支持FP16和INT8两种计算精度...
-  请问还有什么想了解的吗？
-```
-
-### RAG 检索 — 专业问题 {#src-experiment-case9-h38}
-
-```
-用户: CANN的ATC工具怎么用？
-机器人: 根据我的知识库，以下是相关内容：
-  1. ATC（Ascend Tensor Compiler）是昇腾的模型转换工具...
-  2. 使用ATC进行模型转换的基本流程是：首先将训练好的模型导出为ONNX格式...
-  请问还有什么想了解的吗？
-```
-
-### 语音交互 {#src-experiment-case9-h39}
-
-```
-用户: （点击录音按钮）"什么是边缘计算？"
-机器人: （识别文字 -> RAG检索 -> 返回回复 -> TTS朗读）
-       "根据我的知识库，边缘计算是一种将计算和数据存储从云端推到..."
-```
-
-### 性能指标 {#src-experiment-case9-h40}
-
-| 指标 | CPU 模式 | NPU 模式 | 说明 |
-|:---|:---|:---|:---|
-| 嵌入延迟 (单条) | 50-80ms | 10-15ms | all-MiniLM-L6-v2, 256 tokens |
-| 嵌入延迟 (批量32条) | 200ms | 80ms | 知识库批量入库 |
-| FAISS 检索 (1000条) | < 1ms | < 1ms | IndexFlatIP |
-| 端到端响应 (模板) | ~100ms | ~30ms | 不含语音 |
-| 端到端响应 (云端LLM) | 1-3s | 1-3s | 取决于网络和API |
-| 语音识别延迟 | 1-2s | 1-2s | Google Web Speech API |
-
-关键观察：NPU 对嵌入计算有约 4-5x 的加速，这对批量入库知识库时效果明显。端到端延迟的主要瓶颈在云端 API 和语音识别服务，而非本地推理。这也印证了架构设计的合理性——NPU 被用在它最擅长的密集矩阵计算上，而系统的其他部分不受 NPU 限制。
+已有可复核的历史数据如下；它们用于说明基线，不等于当前双板缺口批次已经通过：
+
+| 路线/Profile | 板卡和采集地址 | 协议/批次 | 已测指标或门结果 | 当前解释 |
+| --- | --- | --- | --- | --- |
+| Qwen2.5 静态 KV ACL | B4/8T（`.90`；旧采集 `.178`） | 2 warmup + 30 SSE，`max_tokens=2` | 总耗时 p50/p95 `8,693.731/8,707.133 ms`；首事件 p50/p95 `8,563.591/8,576.954 ms`；约 `0.230/0.231 token/s` | 正式基线历史证据；本轮只补身份、工件和 descriptor 索引 |
+| Qwen2.5 静态 KV ACL | B1/20T（旧采集 `.210`；当前 `.95`） | 同协议 | 总耗时 p50/p95 `6,486.422/6,506.085 ms`；首事件 p50/p95 `6,364.634/6,383.111 ms`；约 `0.308/0.310 token/s` | 只作为 B1 历史对照，不能与 B4 合并排名 |
+| `qwen1.5-0.5b-mindspore` | B4/8T（`.90`） | 2 warmup + 30 SSE，`max_tokens=2` | 总耗时 p50/p95 `1,412.236/1,603.883 ms`；首事件 p50/p95 `761.847/810.331 ms`；约 `1.420/1.479 token/s`；机器门 `9/9` | 共享 `base` 的实验性证据；人工质量、重复故障定位和准入未完成 |
+| `tinyllama-1.1b-mindspore` | B4/8T（`.90`） | 同协议 | 总耗时 p50/p95 `3,114.857/3,185.731 ms`；首事件 p50/p95 `3,110.338/3,181.192 ms`；约 `0.642/0.651 token/s`；机器门 `8/9` | 32-token 输出含 `U+FFFD`，保持 `blocked` |
+| `deepseek-r1-qwen-1.5b-mindspore` | B1/20T（`.95`） | 隔离 API 2 warmup + 30 SSE，`max_tokens=2` | 总耗时 p50/p95 `2,484.751/2,557.242 ms`；首事件 p50/p95 `2,478.495/2,551.004 ms`；约 `0.805/0.815 token/s` | 仅隔离实验；双板统一门、中文质量和准入仍未完成 |
+
+缺口批次必须在两块板分别执行，状态只能引用相应原始报告：
+
+| 缺口门 | `.90` B4/8T | `.95` B1/20T |
+| --- | --- | --- |
+| Qwen2.5 ONNX/OM 当前身份、descriptor、ACL smoke | `passed`（identity-only；历史性能不重跑） | `blocked`（当前 ONNX/OM/contract/lock 缺失，未执行 ACL load） |
+| Qwen1.5 MindSpore 长输出、稳定性、质量、性能 | 已有完整机器批次；共享 `base`，人工质量待审 | `passed`，9/9 机器门，人工质量待审，`experimental_dirty_base` |
+| TinyLlama MindSpore 长输出、稳定性、质量、性能 | `blocked`（历史长输出/中文质量失败） | `failed`，8/9；32/48 token UTF-8 失败，保持 `blocked` |
+| DeepSeek MindSpore API、稳定性、质量、性能 | `passed`，9/9 机器门，人工质量待审，`experimental_dirty_base` | 已有隔离 API 机器门；中文质量和正式准入 `blocked` |
+
+上述状态直接对应本地复现包中的原始报告；`not-run` 只保留有意未执行的跨 SoC 兼容性组合，
+不是对板端能力的推断。历史两批错误边界为 `6/6`，
+协议边界包含超上下文、超大正文和客户端中断后的 health 检查；这些结果仍需在双板批次
+中分别复核。早期 Qwen 日志曾有 TBE 进程、leaked semaphore、dtype、`top_p` 和 attention
+mask 告警；post-mask n 批次已固定 `top_p=1.0` 并显式传入 mask。`Health: Alarm` 只作为
+诊断记录，不单独阻断结果。
+
+在 post-mask n 批次后，8T 内核记录了重复 `DRV_LPM_FAULT 0x80E3A203`，blackbox 描述为
+`lpm get current error`。原 worker 退出后，受控启动的新 worker `15897` 完成了缩小恢复
+批次（2/4 token 长输出、1 次稳定性、1 次性能、错误与协议边界）和候选链复核；这只证明
+服务恢复，不证明硬件稳定。恢复时 NPU 内存约 `14.9/15.6 GB`、HugePages `547/547`，应先
+解决或定位该诊断事件，再重新执行完整稳定性和性能批次。
+
+机器有效不等于中文正确。Qwen 的历史硬件探测存在事实错误，TinyLlama 主要面向英文；
+正式中文/英文人工评分、`quality_reviewed` 和 `admitted` 仍未完成。任何一块板的性能
+数字都必须带 SoC、环境、warmup、循环数、百分位方法和报告路径，不能只抄到教程表格。
+
+## 9. 失败处理、回滚和证据保存
+
+每次批次使用唯一 UTC 目录，保存命令、PID、服务日志、环境指纹、模型哈希、原始响应和
+`npu-smi` before/during/after 快照。失败时：
+
+1. 只停止本批次明确记录且命令行匹配的 worker PID；
+2. 保留失败日志、哈希和报告，不删除系统 CANN、conda 缓存、其他模型或正式服务；
+3. 维持 `blocked`、`not-run` 或具体失败状态，不自动切换 CPU、云端、Torch、vLLM、MindIE
+   或其他模型；
+4. 切换失败先回滚上一个已验证 Profile，回滚失败则保持候选链不可用；
+5. 新板复现时重新做环境、工件、加载、API、稳定性、质量和性能门，不能因相同模型名
+   或 IP 别名自动继承正式状态。
+
+若出现 `DRV_LPM_FAULT`、设备重置、worker 非正常退出或 NPU 内存持续增长，先保存
+`dmesg -T`、`npu-smi info`、`modelctl status`、监听端口和本批次 PID，再停止扩大测试；
+不得把一次受控恢复写成模型稳定性通过。
+
+详细原始文件位于 `repro/mindspore-chat-20260829/`、
+`repro/qwen25-kv1024-dual-board-20260827/` 以及每次生成的
+`repro/case9-dual-board-gap-<timestamp>/`（本地忽略）；板端对应
+`~/case9-mindspore-chat/run/`、`reports/`。TinyLlama 的 `U+FFFD`、`.210` 历史地址的
+连接失败记录和任何新的 `.95` 门禁失败都必须保留，不能改写成当前地址的成功结果。
+
+## 10. XiaoZhi 后续边界
+
+本轮不安装或启动 `xiaozhi-esp32-server`，不提供 OTA、设备 WebSocket、Opus、ASR/TTS
+或真实设备命令。文字 LLM 的 JSON/SSE 成功不能证明 XiaoZhi 语音闭环可用。恢复该阶段
+前，需单独审核无 Torch 的语音组件、设备协议、鉴权、音频资源和真实设备端到端验收。
+
+参考：[MindSpore Orange Pi 在线推理目录][mindspore-orange-pi]、[Qwen1.5 模型卡][qwen15]、
+[TinyLlama 模型卡][tinyllama]、[DeepSeek 模型卡][deepseek]、[昇腾 ATC 文档][atc]。
+
+[mindspore-orange-pi]: https://www.mindspore.cn/tutorials/zh-CN/master/orange_pi/model_infer.html "MindSpore Orange Pi"
+[qwen15]: https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat "Qwen1.5-0.5B-Chat"
+[tinyllama]: https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0 "TinyLlama"
+[deepseek]: https://huggingface.co/MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B-FP16 "DeepSeek-R1-Distill-Qwen-1.5B-FP16"
+[atc]: https://www.hiascend.com/document/detail/en/canncommercial/800/devaids/atc/atlasatcparam_16_0036.html "ATC soc_version"

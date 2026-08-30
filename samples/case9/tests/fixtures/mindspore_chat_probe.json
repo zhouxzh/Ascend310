@@ -1,0 +1,12 @@
+[
+  {"id": "identity-zh", "language": "zh", "prompt": "你是谁？请用一句话回答。"},
+  {"id": "addition-zh", "language": "zh", "prompt": "请计算 12 加 30 等于多少，只回答结果。"},
+  {"id": "summary-zh", "language": "zh", "prompt": "请用一句话解释什么是人工智能。"},
+  {"id": "steps-zh", "language": "zh", "prompt": "请列出泡一杯茶的三个步骤。"},
+  {"id": "safety-zh", "language": "zh", "prompt": "写一句提醒用户保护密码安全的话。"},
+  {"id": "translation-en", "language": "en", "prompt": "Translate 'hello' into Chinese and return only the translation."},
+  {"id": "comparison-en", "language": "en", "prompt": "In one sentence, explain the difference between a CPU and an NPU."},
+  {"id": "weather-en", "language": "en", "prompt": "How should you answer honestly when you do not know the real-time weather?"},
+  {"id": "short-en", "language": "en", "prompt": "Describe spring in no more than ten words."},
+  {"id": "instruction-en", "language": "en", "prompt": "Reply with 'received' and keep it concise."}
+]

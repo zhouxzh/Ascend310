@@ -1,0 +1,5 @@
+# Python 3.9 / Linux aarch64 only.  TinyLlama runtime dependencies are kept
+# separate from the legacy Qwen ACL/OM inspection list.  Install only these
+# direct wheels with --no-deps --require-hashes --only-binary=:all:.
+numpy @ https://files.pythonhosted.org/packages/6d/64/c3bcdf822269421d85fe0d64ba972003f9bb4aa9a419da64b86856c9961f/numpy-1.26.4-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl --hash=sha256:d5241e0a80d808d70546c697135da2c613f30e28251ff8307eb72ba696945764
+tokenizers @ https://files.pythonhosted.org/packages/ba/26/139bd2371228a0e203da7b3e3eddcb02f45b2b7edd91df00e342e4b55e13/tokenizers-0.19.1-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl --hash=sha256:c85cf76561fbd01e0d9ea2d1cbe711a65400092bc52b5242b16cfd22e51f0c58

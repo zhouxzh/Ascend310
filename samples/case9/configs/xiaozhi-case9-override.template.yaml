@@ -1,0 +1,20 @@
+# This is a partial override for xinnan-tech/xiaozhi-esp32-server.
+# The provisioning script renders it to data/.config.yaml on the board only.
+# Do not put an actual gateway key in this checked-in template.
+
+server:
+  ip: 0.0.0.0
+  port: 8000
+  http_port: 8003
+
+selected_module:
+  LLM: Case9RagLLM
+  Intent: nointent
+  Memory: nomem
+
+LLM:
+  Case9RagLLM:
+    type: openai
+    base_url: http://127.0.0.1:7861/v1
+    model_name: case9-rag
+    api_key: "__CASE9_GATEWAY_API_KEY__"

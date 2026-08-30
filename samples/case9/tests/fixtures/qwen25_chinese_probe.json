@@ -1,0 +1,12 @@
+[
+  {"id": "identity", "prompt": "你是谁？请用一句话回答。"},
+  {"id": "capability", "prompt": "请用中文说明你能做什么。"},
+  {"id": "summarize", "prompt": "请把“昇腾开发板运行本地模型”概括成一句话。"},
+  {"id": "math", "prompt": "请计算 12 加 30 等于多少，只回答结果。"},
+  {"id": "list", "prompt": "请列出两个保持软件可复现的要点。"},
+  {"id": "translation", "prompt": "把 hello 翻译成中文，只回答译文。"},
+  {"id": "safety", "prompt": "如果不知道答案，你应该怎么做？请简短回答。"},
+  {"id": "hardware", "prompt": "Ascend 310B 是 CPU 还是 NPU？请简短回答。"},
+  {"id": "format", "prompt": "请用中文回答：静态 KV cache 的主要作用是什么？"},
+  {"id": "closing", "prompt": "请写一句不超过二十字的中文问候。"}
+]

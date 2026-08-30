@@ -1,0 +1,18 @@
+# External builder only: install this file in a dedicated CPU environment,
+# never in the Ascend board environment.  The export script forces
+# torch.device("cpu"), model.float(), local_files_only=True, and no dynamic
+# axes.  Do not add torch_npu, acl, CANN, ATC, MindSpore, vLLM, or MindIE.
+#
+# For a strictly CPU PyTorch wheel, use the CPU wheel index appropriate for the
+# host before installing this file (the exact wheel/hash must be recorded in
+# the external build report).  This requirements file intentionally contains
+# no board runtime or GPU inference package.
+numpy==1.26.4
+torch==2.4.1
+transformers==4.46.3
+tokenizers==0.20.3
+safetensors==0.4.5
+huggingface-hub==0.26.2
+onnx==1.17.0
+onnxruntime==1.20.1
+protobuf==4.25.5
