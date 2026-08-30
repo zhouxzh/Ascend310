@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "purpose": "Board-only local Chinese chat artifacts. Files are never committed to this repository.",
+  "purpose": "Case9 model metadata and local evidence index. Model binaries, logs, and board-generated reports are never committed to this repository.",
   "chat_model_profiles": {
     "registry": "configs/chat_model_profiles.json",
     "profiles": [
