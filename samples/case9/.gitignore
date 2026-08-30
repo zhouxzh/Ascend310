@@ -32,6 +32,11 @@ qwen25-kv-1024-artifacts.lock.json
 qwen25-static-kv-1024*.onnx
 qwen25-static-kv-1024*.om
 
+# Controller-generated ONNX audit reports remain local and reproducible.
+contract-v2.json
+export-report-v2.json
+inspect-report-v2.json
+
 # Board-exported OM provenance and validation evidence copied back for audit.
 artifacts/qwen25-kv-1024/board/
 contracts/qwen25-kv-1024/board/
