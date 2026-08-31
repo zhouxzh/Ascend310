@@ -1,2126 +1,526 @@
-\chapter{案例1：智能人脸识别考勤系统}\label{ux6848ux4f8b1ux667aux80fdux4ebaux8138ux8bc6ux522bux8003ux52e4ux7cfbux7edf}
+\chapter{案例1：边缘人脸考勤------FastAPI 与昇腾 NPU
+协同}\label{src-experiment-case1-h1}
 
-\section{教程定位}\label{src-experiment-case1-h1}
+\section{教程定位}\label{ux6559ux7a0bux5b9aux4f4d}
 
-本案例旨在利用昇腾 310B 的强大 AI
-算力，构建一个功能完整、响应迅速的智能人脸识别打卡系统。系统通过 USB
-摄像头实时捕捉视频流，检测画面中的人脸，并与预先注册的员工人脸数据库进行比对，完成身份验证和自动记录考勤。
+考勤系统是边缘人工智能中一个典型的端到端问题：摄像头产生连续图像，模型
+在设备侧完成检测和特征提取，主机程序负责比对与记录，浏览器则提供管理和
+观察入口。它同时涉及模型合同、主机---设备数据传输、线程生命周期、网络接口
+和个人数据边界，因而适合作为本书的第一个综合案例。
 
-本案例的设计初衷是为开发者提供一个端到端的边缘 AI
-应用范例，涵盖了以下核心知识点：
+本案例的目标不是构造可直接用于真实身份认证的产品，而是建立一条可以观察、
+拆解和复现实验的技术链路。系统在昇腾 310B 开发板上运行两个离线模型，将
+人脸图像转换为可比较的特征向量，再由 SQLite
+保存用户记录和考勤事件。FastAPI 提供类型明确的 HTTP 接口，React
+界面负责用户注册、浏览器抓拍、手动打卡和
+记录查看。板端摄像头产生的预览帧通过 MJPEG 接口送往浏览器。
 
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  \textbf{高性能推理加速}：利用昇腾 PyACL 接口直接驱动 NPU，实现
-  RetinaFace 检测与 ArcFace 识别的硬件加速。
-\item
-  \textbf{端到端流水线}：建立从``视频流采集 -\textgreater{} 人脸检测
-  -\textgreater{} 人脸对齐 -\textgreater{} 特征提取 -\textgreater{}
-  特征比对 -\textgreater{} 数据库存取''的完整业务链路。
-\item
-  \textbf{嵌入式 Web 交互}：通过 Flask
-  框架构建轻量级管理后端，支持远程监控、用户注册与考勤导出。
-\item
-  \textbf{边缘存储实践}：使用 SQLite
-  数据库在本地高效存储用户特征向量（Embedding）与考勤记录。
-\end{enumerate}
-
-从整体结构看，本案例对应一条标准的生物特征识别流水线：
+自动登记陌生人是本案例保留的教学演示策略：它用于展示``检测到人脸---提取
+特征---写入数据库''的完整分支，不代表经过同意的身份注册，也不构成生产级
+认证方案。真实部署必须增加身份确认、访问控制、活体检测、审计和数据删除
+机制；本章不把演示结果表述为识别准确率或考勤有效性结论。
 
 \begin{figure}
 \centering
-\includegraphics[width=0.6\linewidth,height=\textheight,keepaspectratio,alt={程序流程图}]{cases/img1/case1_flow_simple.png}
-\caption{程序流程图}\label{fig:face_flow}
+\includegraphics[width=0.72\linewidth,height=\textheight,keepaspectratio,alt={案例1系统流程}]{cases/img1/case1_flow_simple.png}
+\caption{案例1系统流程}\label{fig:case1-flow-simple}
 \end{figure}
 
-本案例选择的实现路线是： * 使用 \textbf{RetinaFace} 完成鲁棒的人脸检测。
-* 使用 \textbf{ArcFace} 完成高精度的特征提取。 * 使用 \textbf{SQLite}
-进行本地数据持久化。 * 使用 \textbf{Python Flask} 提供现代化的 Web
-交互界面。
-
-\section{实验硬件与运行条件}\label{src-experiment-case1-h2}
-
-为了完成实时人脸识别与考勤实验，建议准备如下硬件条件：
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{昇腾 310B 开发者套件} (如 OrangePi AIpro)
-\item
-  \textbf{USB 摄像头} (支持 640x480 及以上分辨率)
-\item
-  \textbf{显示设备 (可选)}: HDMI 显示器或通过 Web 远程访问
-\item
-  \textbf{CANN 软件栈}: 7.0 或更高版本
-\item
-  \textbf{Python 环境}: 3.9 或更高版本，需安装
-  \passthrough{\lstinline!flask!},
-  \passthrough{\lstinline!opencv-python!},
-  \passthrough{\lstinline!numpy<2.0!}, \passthrough{\lstinline!sqlite3!}
-  等
-\end{itemize}
-
-运行方式： * \textbf{本地模式}：直接运行
-\passthrough{\lstinline!python3 app.py!}，后台线程会自动处理本地 USB
-摄像头。 * \textbf{Web 模式}：通过浏览器访问
-\passthrough{\lstinline!http://<开发板IP>:5000!} 进行管理和手动打卡。
-
-\section{本案例支持的模型结构}\label{src-experiment-case1-h3}
-
-当前仓库里的模型基于 InsightFace 提供的轻量化版本，经过
-\passthrough{\lstinline!atc!} 工具转换为 \passthrough{\lstinline!.om!}
-格式：
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{检测模型 (RetinaFace)}:
-  \passthrough{\lstinline!face\_detection.om!}
-
-  \begin{itemize}
-  \tightlist
-  \item
-    输入尺寸: \passthrough{\lstinline!640 x 640!}
-  \item
-    输出: 多尺度分数 (Scores) 与边界框偏移量 (BBoxes)
-  \end{itemize}
-\item
-  \textbf{识别模型 (ArcFace)}:
-  \passthrough{\lstinline!face\_recognition.om!}
-
-  \begin{itemize}
-  \tightlist
-  \item
-    输入尺寸: \passthrough{\lstinline!112 x 112!} (对齐后的人脸切片)
-  \item
-    输出: \passthrough{\lstinline!512!} 维特征向量 (Embedding)
-  \end{itemize}
-\end{itemize}
-
-这两类模型共同构成了``检测-对齐-识别''的经典人脸分析链路。
-
-\section{人脸识别系统的核心流水线}\label{src-experiment-case1-h4}
-
-人脸识别不仅仅是``看一眼''，它包含了一系列精细的图像处理步骤：
+完成本案例后，读者应能够：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  \textbf{检测 (Detection)}：在复杂的背景中定位人脸的具体位置。
+  根据输入、输出和前处理合同检查一个 ONNX/OM 模型，而不是只依据文件名
+  判断模型是否可用；
 \item
-  \textbf{对齐与裁剪 (Alignment \&
-  Cropping)}：根据检测到的关键点，将人脸旋转至正位并裁剪为固定尺寸（如
-  112x112），以消除姿态影响。
+  解释 PyACL 初始化、Host/Device 拷贝、模型执行和资源释放的顺序；
 \item
-  \textbf{特征提取 (Feature
-  Extraction)}：将图像编码为一个具有高度代表性的固定长度向量（512 维）。
+  设计一个由 FastAPI API、React
+  浏览器界面和单一硬件工作线程组成的边缘服务；
 \item
-  \textbf{比对
-  (Matching)}：计算当前向量与数据库中已知向量的相似度（如余弦相似度）。
+  区分模型转换检查、数值烟测、接口烟测、用户体验检查和性能测量等不同证据；
+\item
+  讨论生物特征数据的保存范围、访问边界和教学示例与生产系统之间的差异。
 \end{enumerate}
 
-\section{RetinaFace
-深度剖析：从``看见''到``看懂''人脸}\label{src-experiment-case1-h5}
-
-RetinaFace
-不仅仅是一个检测人脸框的工具，它是一个精密的、为解决现实世界中各种复杂人脸检测问题而设计的深度学习模型。要理解它的价值，我们需要先了解它的历史背景和设计哲学。
-
-\subsection{RetinaFace
-的发展历史与作者信息}\label{src-experiment-case1-h6}
-
-RetinaFace 模型由 \textbf{InsightFace}
-团队发布，该团队在人脸识别领域享有盛誉，其开源的
-\passthrough{\lstinline!insightface!}
-代码库已成为学术界和工业界广泛使用的基准。RetinaFace
-的提出，正是在单阶段目标检测器（如
-SSD、YOLO）性能大幅提升，但通用检测器在人脸这种特定任务上仍有优化空间的背景下诞生的。
-
-它的设计目标非常明确：创建一个在速度和精度上都达到顶尖水平，并且能同时处理人脸框、关键点乃至
-3D 姿态的\textbf{一体化解决方案}。它借鉴了通用目标检测器
-\textbf{RetinaNet} 的核心思想，并针对人脸任务的特性进行了深度定制。
-
-\subsection{RetinaFace
-到底在解决什么问题？}\label{src-experiment-case1-h7}
-
-在真实场景中，``找到一张脸''远比想象的复杂。RetinaFace
-主要致力于解决以下几个核心挑战：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  \textbf{尺度变化巨大}：从合影中的微小人脸到监控下的特写人脸，尺寸差异可能达到上百倍。
-\item
-  \textbf{姿态与遮挡}：侧脸、低头、被口罩或手部分遮挡的人脸，都需要被准确识别。
-\item
-  \textbf{密集场景}：在人群中，大量人脸紧密排列，容易产生漏检或错误的合并检测。
-\item
-  \textbf{实时性要求}：在边缘设备上，检测速度必须足够快，才能支撑实时应用。
-\end{enumerate}
-
-\subsection{核心技术解析}\label{src-experiment-case1-h8}
-
-RetinaFace 的强大性能源于其对多个关键技术的巧妙融合。
-
-\subsubsection{单阶段检测器与多任务学习}\label{src-experiment-case1-h9}
-
-与需要先生成候选区域再进行分类的两阶段检测器（如 Faster
-R-CNN）不同，RetinaFace
-是一个\textbf{单阶段（One-Stage）检测器}。它直接在特征图上预测目标的位置和类别，速度更快。更重要的是，它采用\textbf{多任务学习（Multi-task
-Learning）}框架，让一个网络同时完成多项任务：
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{人脸分类}：判断某个区域是人脸还是背景。
-\item
-  \textbf{边界框回归}：精调人脸框的位置。
-\item
-  \textbf{关键点定位}：预测眼睛、鼻子、嘴角等 5 个关键点的位置。
-\end{itemize}
-
-这种设计不仅提升了效率，而且关键点定位任务的加入，反过来为模型提供了更丰富的监督信息，有助于更准确地识别人脸区域，尤其是对于部分遮挡的人脸。
-
-\subsubsection{特征金字塔网络 (FPN)}\label{src-experiment-case1-h10}
-
-为了解决尺度变化问题，RetinaFace 采用了\textbf{特征金字塔网络（Feature
-Pyramid Network, FPN）}。FPN
-的思想是``高层特征看语义，底层特征看细节''。它通过自顶向下的路径和横向连接，将高层特征图中丰富的语义信息与底层特征图中高分辨率的细节信息相融合，从而在多个不同尺度的特征图上进行预测。这意味着，大的特征图负责检测小人脸，小的特征图负责检测大人脸，实现了对各种尺寸人脸的``全覆盖''。
-
-\subsubsection{上下文感知模块 (SSH)}\label{src-experiment-case1-h11}
-
-为了进一步增强特征的表达能力，RetinaFace 在 FPN 的每个预测层后都引入了
-\textbf{SSH（Single Stage Headless）模块}。SSH
-模块通过并行的、具有不同大小卷积核的通路来提取特征，并将它们拼接在一起。这就像给模型装上了``广角镜''和``长焦镜''，使其能够同时关注一个区域的局部细节和它周围的上下文信息，从而在复杂背景或人脸密集的情况下做出更鲁棒的判断。
-
-\subsubsection{焦点损失 (Focal Loss)
-的启示}\label{src-experiment-case1-h12}
-
-虽然 RetinaFace 的论文没有将焦点损失（Focal
-Loss）作为其核心创新点，但这个概念对于理解所有现代单阶段检测器至关重要。在人脸检测中，一张图像里绝大部分区域都是背景（负样本），只有极少数区域是人脸（正样本）。这种\textbf{正负样本的极端不平衡}会导致模型训练时被大量简单的背景样本主导，而忽略了对困难人脸样本的学习。
-
-Focal Loss
-通过一个动态缩放因子，降低了大量简单负样本在损失计算中的权重，使得模型能够更专注于学习那些难以区分的正样本和困难负样本。RetinaFace
-正是受益于这种思想，才能在复杂的背景中精准地``聚焦''于人脸。
-
-\subsection{在本案例中的应用}\label{src-experiment-case1-h13}
-
-在我们的智能考勤系统中，RetinaFace
-作为整个识别流程的``眼睛''，其作用至关重要：
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{提供高质量输入}：它为后续的 ArcFace
-  识别模块提供了准确的人脸边界框和关键点。只有检测得准，后续的对齐和识别才有可能成功。
-\item
-  \textbf{保证实时性能}：通过在昇腾 310B NPU
-  上的高效推理，它确保了系统能够对视频流进行逐帧处理而不会出现明显卡顿，这是实现``自动打卡''功能的基础。
-\item
-  \textbf{鲁棒性保障}：得益于其先进的设计，即使在光线不佳、人员走动或部分遮挡的情况下，系统依然能维持较高的检测成功率。
-\end{itemize}
-
-\section{ArcFace
-深度剖析：让特征在角度空间中更具区分度}\label{src-experiment-case1-h14}
-
-ArcFace
-是人脸识别流程的``大脑''，负责将检测到的人脸图像转化为一个高度浓缩且易于比较的
-512
-维特征向量（Embedding）。它的成功并非偶然，而是建立在人脸识别损失函数长期演进的基础之上。
-
-\subsection{从 Softmax
-到度量学习：损失函数的演进之路}\label{src-experiment-case1-h15}
-
-在深度学习的早期，人脸识别通常被当作一个多分类问题来处理。例如，在一个包含
-1000 个人的数据集中，模型会尝试将输入的人脸图像正确分类到这 1000
-个类别中的某一个。这个过程通常使用 \textbf{Softmax Loss}。
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{Softmax Loss 的局限}：Softmax
-  的目标是让不同类别能够被分开，但它并不强制要求``同一类''的样本在特征空间中靠得足够近，也未要求``不同类''的样本离得足够远。这导致在面对从未见过的新人脸（开集识别）时，模型泛化能力不足。
-\end{itemize}
-
-为了解决这个问题，研究者们开始探索\textbf{度量学习（Metric
-Learning）}的思想，其核心目标是直接在特征空间中优化距离：最大化类间距离，最小化类内距离。
-
-\subsubsection{SphereFace (A-Softmax)}\label{src-experiment-case1-h16}
-
-SphereFace 首次提出，在计算角度时应该引入一个\textbf{角度间隔（Angular
-Margin）}。它将传统的 Softmax 中的权重与特征的点积 \(W^T x\) 修改为
-\(\|W\|\|x\|\cos(\theta)\)，并通过对权重 \(W\)
-的归一化，将特征学习过程约束在一个单位超球面上。然后，它在目标类别的角度
-\(\theta_y\) 上乘以一个整数 \(m\)，变成了
-\(\cos(m\theta_y)\)。这样一来，分类的决策边界从简单的线性边界变成了角度边界，强制模型学习到角度区分度更强的特征。
-
-\subsubsection{CosFace (LMCL)}\label{src-experiment-case1-h17}
-
-CosFace 认为 SphereFace 的乘性间隔 \(m\theta_y\)
-会导致训练不稳定。因此，它提出了一种更简单、更稳定的\textbf{加性余弦间隔（Additive
-Cosine Margin）}。它直接在余弦空间中减去一个常数 \(m\)，将决策边界从
-\(\cos(\theta_y)\) 变为
-\(\cos(\theta_y) - m\)。这种方式在实现上更简单，训练过程也更平滑。
-
-\subsection{ArcFace
-的核心创新：加性角度间隔}\label{src-experiment-case1-h18}
-
-ArcFace (Additive Angular Margin Loss)
-结合了前两者的优点，并做出了关键性的改进。它的作者同样来自
-\textbf{InsightFace} 团队，这保证了从检测到识别的算法思想一脉相承。
-
-ArcFace
-认为，无论是在余弦空间还是角度空间进行乘性操作，都有些间接。最直接、最有效的方式，应该是在\textbf{角度空间}中直接增加一个\textbf{加性间隔（Additive
-Angular Margin）}。
-
-它的数学形式是将决策边界从 \(\cos(\theta_y)\) 修改为
-\(\cos(\theta_y + m)\)。
-
-这个看似微小的改动，却带来了巨大的优势：
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{几何意义明确}：直接在超球面上的测地距离（Geodesic
-  Distance）上增加了一个恒定的角度惩罚项
-  \(m\)。这意味着，模型不仅要正确识别人脸，还必须保证该人脸的特征向量与对应类中心的夹角，要比与其他所有类中心的夹角\textbf{至少小
-  \(m\) 度}。这个要求非常严格，极大地提升了特征的区分度。
-\item
-  \textbf{训练更稳定}：相比 SphereFace
-  的乘性间隔，加性间隔的设计更加稳定，更容易收敛。
-\item
-  \textbf{性能卓越}：ArcFace
-  在几乎所有主流人脸识别评测基准上都取得了当时的最佳性能，证明了其设计的有效性。
-\end{itemize}
-
-上图直观地展示了不同损失函数下的决策边界。可以看到，ArcFace
-的决策边界（绿色虚线）相比其他损失函数，对类内样本的约束更强，类间间隔也更大。
-
-\subsection{在本案例中的应用}\label{src-experiment-case1-h19}
-
-在本考勤系统中，ArcFace 的作用是赋予系统``认识''人的能力：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  \textbf{生成高质量 Embedding}：对于每一张注册的人脸，ArcFace
-  都会生成一个 512
-  维的特征向量。这个向量就是这张脸在数学空间中的``身份证''。
-\item
-  \textbf{实现精准比对}：当一个新的人脸被检测到后，系统同样会提取其特征向量。通过计算这个新向量与数据库中所有已注册向量的\textbf{余弦相似度}，我们可以快速找到最相似的用户。
-\item
-  \textbf{高可靠性}：由于 ArcFace
-  学习到的特征具有极强的类内紧凑性和类间分离性，因此即使在光照变化、表情变化甚至轻微遮挡的情况下，识别的准确率和召回率依然非常高，误识率极低。这对于一个严肃的考勤应用至关重要。
-\end{enumerate}
-
-\section{数据存储与检索深度剖析：边缘场景下的智慧与权衡}\label{src-experiment-case1-h20}
-
-如果说模型是系统的大脑，那么数据存储就是系统的记忆。本案例采用 SQLite
-存储用户特征和考勤记录，这个选择背后体现了边缘计算场景下的典型工程权衡。
-
-\subsection{为什么选择 SQLite？}\label{src-experiment-case1-h21}
-
-在动辄使用 MySQL、PostgreSQL 或云数据库的时代，选择 SQLite
-似乎有些``复古''。但在昇腾 310B
-这样的边缘设备上，它却是最合适的选择之一：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  \textbf{轻量级与零配置}：SQLite
-  是一个库，而不是一个独立的服务器进程。它直接将整个数据库存储为一个单一的文件（\passthrough{\lstinline!attendance.db!}），无需安装、无需配置、无需管理用户权限，极大地降低了部署和维护的复杂度。
-\item
-  \textbf{资源占用极低}：它对内存和 CPU
-  的占用非常小，这对于资源本就紧张的边缘设备至关重要，可以确保更多的计算资源留给核心的
-  AI 推理任务。
-\item
-  \textbf{事务支持}：尽管轻量，SQLite 依然提供了完整的 ACID
-  事务支持，保证了数据操作的原子性、一致性、隔离性和持久性，确保了考勤数据不会因为意外中断而损坏。
-\item
-  \textbf{Python 内置支持}：Python 的标准库
-  \passthrough{\lstinline!sqlite3!} 直接提供了对 SQLite
-  的支持，无需安装任何额外的驱动包，进一步简化了开发。
-\end{enumerate}
-
-\subsection{特征向量的存储：BLOB
-格式的优与劣}\label{src-experiment-case1-h22}
-
-本案例将 512 维的人脸特征向量（一个包含 512 个浮点数的
-\passthrough{\lstinline!numpy!}
-数组）直接转换为二进制数据，并存储在数据库的 \textbf{BLOB (Binary Large
-Object)} 类型字段中。
-
-\begin{lstlisting}[language=Python]
-# In database.py
-def add_user(name, embedding):
-    # embedding 是一个 numpy 数组
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    # 将 numpy 数组转换为二进制格式存入 BLOB 字段
-    c.execute('INSERT INTO users (name, embedding) VALUES (?, ?)', (name, embedding))
-    # ...
-\end{lstlisting}
-
-这种做法的\textbf{优点}非常明显：
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{简单高效}：直接存储原始二进制数据，无需进行任何格式转换，读写速度快。
-\item
-  \textbf{精度无损}：避免了将浮点数转为字符串等可能引入精度损失的操作。
-\end{itemize}
-
-但它的\textbf{缺点}也同样突出：
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{数据库``不理解''数据}：对于 SQLite 来说，BLOB
-  字段里存的只是一堆无意义的二进制数据。它无法理解这是一个 512
-  维的向量，因此也无法在数据库层面进行任何向量相关的运算，比如计算距离或相似度。
-\end{itemize}
-
-\subsection{当前的检索方案：简单遍历}\label{src-experiment-case1-h23}
-
-正是由于数据库无法直接操作向量，本案例的识别流程采用了最简单直接的\textbf{暴力检索（Brute-force
-Search）}方案：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  当一个新的人脸出现时，计算其特征向量 \(V_{curr}\)。
-\item
-  从数据库中\textbf{取出所有}已注册用户的特征向量，加载到内存中形成一个列表
-  \([V_1, V_2, ..., V_n]\)。
-\item
-  在内存中，使用 \passthrough{\lstinline!numpy!} 逐一计算 \(V_{curr}\)
-  与列表中每个向量的余弦相似度。
-\item
-  找到相似度最高且超过阈值的用户作为识别结果。
-\end{enumerate}
-
-这个方案在用户规模较小（如几十人或几百人）时是完全可行的，因为现代 CPU
-进行几百次 512 维向量的点积运算耗时极短，远低于视频帧率的间隔。
-
-\subsection{性能瓶颈与未来展望}\label{src-experiment-case1-h24}
-
-然而，当用户规模从几百人扩大到几千人、几万人甚至更多时，上述暴力检索方案的性能瓶颈会立刻显现。每次识别都需要遍历整个数据库，计算量会随着用户数量线性增长，最终导致识别延迟变得无法接受。
-
-为了解决大规模向量检索的问题，工业界发展出了一系列\textbf{近似最近邻（Approximate
-Nearest Neighbor,
-ANN）}搜索技术和专门的\textbf{向量数据库}。其核心思想是：不再保证 100\%
-找到最相似的向量，而是通过构建特殊的索引结构（如树、图、哈希等），在牺牲极少量精度的前提下，将检索速度提升几个数量级。
-
-如果本系统需要向上扩展，可以考虑以下演进路径：
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{集成 ANN 库}：在应用层面集成如 \textbf{Faiss}（由 Facebook AI
-  开发）或 \textbf{ScaNN}（由 Google
-  开发）这样的高性能向量检索库。数据仍然可以存储在 SQLite
-  中，但在系统启动时，将所有向量加载到内存中构建 Faiss
-  索引，后续检索直接通过该索引进行。
-\item
-  \textbf{迁移到向量数据库}：当数据规模和并发请求进一步增大时，可以考虑使用专门的向量数据库，如
-  \textbf{Milvus} 或 \textbf{Weaviate}。这些系统不仅内置了高效的 ANN
-  索引算法，还提供了完整的分布式、高可用的数据管理方案，是处理海量向量数据的终极解决方案。
-\end{itemize}
-
-因此，本案例采用的 SQLite + BLOB +
-暴力检索的方案，是在边缘计算资源受限、用户规模可控的特定场景下的最佳实践。它体现了``\textbf{简单、有效、满足当前需求}''的工程设计原则，同时也为未来的系统扩展留下了清晰的演进路径。
-
-\section{PyACL 深度剖析：与昇腾 NPU
-对话的艺术}\label{src-experiment-case1-h25}
-
-\passthrough{\lstinline!ascend\_inference.py!} 是本案例与昇腾 NPU
-硬件沟通的桥梁。它通过 \passthrough{\lstinline!pyacl!} 库，将上层的
-Python
-指令转化为底层硬件可以理解的指令。理解其工作流程，是掌握昇腾平台开发的关键。
-
-\subsection{什么是 ACL？为什么需要它？}\label{src-experiment-case1-h26}
-
-在深入代码之前，我们先理解一个基本问题：为什么不能直接用 Python 调用
-NPU？
-
-想象一下，NPU 就像一个只会说''机器语言''的超级计算专家，而我们的 Python
-程序说的是''人类语言''。它们之间需要一个翻译官，这个翻译官就是
-\textbf{ACL (Ascend Computing Language，昇腾计算语言)}。
-
-ACL 提供了一套标准化的 API 接口，让我们可以用相对高级的语言（如
-Python、C++）来： - 管理 NPU 硬件资源（设备、内存、计算队列） -
-加载和运行 AI 模型 - 在 CPU 和 NPU 之间传输数据 - 监控和调试推理过程
-
-可以把 ACL 理解为 NPU 的''操作系统接口''，就像我们通过操作系统 API
-来使用 CPU 和内存一样。
-
-\subsection{昇腾计算语言 (ACL)
-的标准工作流}\label{src-experiment-case1-h27}
-
-在昇腾平台上进行一次完整的模型推理，通常遵循一个非常标准且结构化的流程。这个流程可以被概括为''初始化-执行-释放''三大阶段。
-
-让我们用一个生活化的比喻来理解整个流程：把 NPU 推理想象成去餐厅吃饭。
-
-\subsubsection{阶段一：资源初始化（进入餐厅，找座位）}\label{src-experiment-case1-h28}
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\item
-  \textbf{ACL 初始化 (\passthrough{\lstinline!acl.init!})}:
-  这是与硬件沟通的第一步。它负责加载底层驱动，建立与硬件的连接。一个进程中只需调用一次。
-
-  \emph{比喻}：这就像推开餐厅的大门，告诉服务员''我来了''。只需要在进门时做一次。
-\item
-  \textbf{设备与上下文管理
-  (\passthrough{\lstinline!acl.rt.set\_device!},
-  \passthrough{\lstinline!acl.rt.create\_context!})}:
-
-  \begin{itemize}
-  \tightlist
-  \item
-    \passthrough{\lstinline!set\_device!}：指定我们要使用哪一块 NPU
-    设备（对于只有一个 NPU 的开发板，通常是设备 0）。
-  \item
-    \passthrough{\lstinline!create\_context!}：为当前线程创建一个独立的执行上下文。这个上下文管理着队列、事件和内存等所有与该线程相关的资源，确保多线程环境下的资源隔离。
-  \end{itemize}
-
-  \emph{比喻}：\passthrough{\lstinline!set\_device!}
-  就像选择在哪个餐厅用餐（如果你有多家连锁店可选）。\passthrough{\lstinline!create\_context!}
-  就像服务员给你安排了一个专属的座位和餐具，这些资源只属于你这一桌，不会和其他客人混淆。
-\end{enumerate}
-
-在 \passthrough{\lstinline!ascend\_inference.py!} 的
-\passthrough{\lstinline!AscendSystem!} 类中，这个过程被封装在
-\passthrough{\lstinline!\_init\_resource!}
-方法里，确保了系统启动时资源的正确准备。
-
-\begin{lstlisting}[language=Python]
-# In ascend_inference.py -> AscendSystem
-class AscendSystem:
-    def __init__(self, device_id=0):
-        # ...
-        self._init_resource()
-
-    def _init_resource(self):
-        ret = acl.init() # 1. ACL 初始化 - 推开餐厅大门
-        ret = acl.rt.set_device(self.device_id) # 2. 设置设备 - 选择餐厅
-        self.context, ret = acl.rt.create_context(self.device_id) # 2. 创建上下文 - 分配座位
-        self.stream, ret = acl.rt.create_stream() # 创建计算流 - 叫来服务员
-        # ...
-\end{lstlisting}
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\setcounter{enumi}{2}
-\item
-  \textbf{创建 Stream (计算流)}: Stream 是一个任务队列，所有提交给 NPU
-  的计算任务都会按顺序在这个队列中执行。
-
-  \emph{比喻}：这就像餐厅的服务员，你点的菜会按顺序送到厨房，厨房按顺序做菜。
-\end{enumerate}
-
-\subsubsection{阶段二：模型执行（点菜、上菜、吃饭）}\label{src-experiment-case1-h29}
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\setcounter{enumi}{2}
-\item
-  \textbf{模型加载
-  (\passthrough{\lstinline!acl.mdl.load\_from\_file!})}: 将编译好的
-  \passthrough{\lstinline!.om!} 离线模型从硬盘加载到 NPU
-  的内存中。加载后，我们会得到一个模型 ID，后续所有操作都通过这个 ID
-  来引用该模型。
-
-  \emph{比喻}：这就像把菜单（模型文件）交给厨房，厨房记住了你要的菜（模型
-  ID），之后你只需要说''上第 3 号菜''就行了。
-
-\begin{lstlisting}[language=Python]
-# In ascend_inference.py -> AscendModel
-def _load_model(self):
-    self.model_id, ret = acl.mdl.load_from_file(self.model_path)
-    # 获取模型描述信息（输入输出的形状、大小等）
-    self.desc = acl.mdl.create_desc()
-    ret = acl.mdl.get_desc(self.desc, self.model_id)
-\end{lstlisting}
-\item
-  \textbf{内存分配与数据准备}: 这是最核心也最容易出错的环节。
-
-  \emph{比喻}：在点菜之前，餐厅需要准备好盘子（内存空间）。厨房有自己的盘子（Device
-  内存），你手里也有食材（Host
-  内存的数据），需要把食材放到厨房的盘子里才能开始做菜。
-
-  \begin{itemize}
-  \item
-    \textbf{Device 内存}: 模型推理是在 NPU (Device)
-    上完成的，因此输入数据和输出结果都需要存放在 Device 内存中。我们使用
-    \passthrough{\lstinline!acl.rt.malloc!} 来分配 Device 内存。
-  \item
-    \textbf{Host 内存}: 我们的原始图像数据（如用 OpenCV 读取的
-    \passthrough{\lstinline!numpy!} 数组）存放在 CPU
-    管理的内存（Host）中。
-  \item
-    \textbf{数据传输}: 在推理前，必须使用
-    \passthrough{\lstinline!acl.rt.memcpy!} 将 Host 上的输入数据拷贝到
-    Device 上的指定内存区域。这个过程被称为 \textbf{H2D (Host to
-    Device)} 拷贝。
-  \end{itemize}
-
-\begin{lstlisting}[language=Python]
-# In ascend_inference.py -> AscendModel._init_buffers
-def _init_buffers(self):
-    # 为每个输入分配 Device 内存
-    num_inputs = acl.mdl.get_num_inputs(self.desc)
-    for i in range(num_inputs):
-        size = acl.mdl.get_input_size_by_index(self.desc, i)
-        dev_ptr, ret = acl.rt.malloc(size, 2)  # 在 Device 上分配内存
-        self.input_buffers.append({"ptr": dev_ptr, "size": size})
-
-    # 为每个输出分配 Device 内存
-    num_outputs = acl.mdl.get_num_outputs(self.desc)
-    for i in range(num_outputs):
-        size = acl.mdl.get_output_size_by_index(self.desc, i)
-        dev_ptr, ret = acl.rt.malloc(size, 2)
-        self.output_buffers.append({"ptr": dev_ptr, "size": size})
-\end{lstlisting}
-\item
-  \textbf{模型执行 (\passthrough{\lstinline!acl.mdl.execute!})}:
-  将准备好的输入数据（存放于 Device 内存）送入已加载的模型中进行推理。
-
-  \emph{比喻}：食材已经放到厨房的盘子里了，现在厨师开始做菜（NPU
-  开始计算）。
-
-\begin{lstlisting}[language=Python]
-# In ascend_inference.py -> AscendModel.execute
-def execute(self, input_data_list):
-    # 步骤 1: H2D - 把数据从 CPU 内存拷贝到 NPU 内存
-    for i, data in enumerate(input_data_list):
-        data = np.ascontiguousarray(data)  # 确保数据在内存中连续
-        ptr = acl.util.numpy_to_ptr(data)  # 获取 numpy 数组的内存指针
-        ret = acl.rt.memcpy(
-            self.input_buffers[i]["ptr"],  # 目标：Device 内存
-            self.input_buffers[i]["size"],
-            ptr,  # 源：Host 内存
-            data.nbytes,
-            1  # 模式 1 = Host to Device
-        )
-
-    # 步骤 2: 执行模型推理
-    ret = acl.mdl.execute(self.model_id, self.input_dataset, self.output_dataset)
-\end{lstlisting}
-\item
-  \textbf{结果获取}: 推理完成后，结果仍然存放在 Device
-  内存中。我们需要再次使用 \passthrough{\lstinline!acl.rt.memcpy!}
-  将其从 Device 拷贝回 Host 内存，这个过程被称为 \textbf{D2H (Device to
-  Host)} 拷贝。
-
-  \emph{比喻}：菜做好了，但还在厨房的盘子里，服务员需要把菜端到你的桌子上（从
-  Device 拷贝回 Host）。
-
-\begin{lstlisting}[language=Python]
-    # 步骤 3: D2H - 把结果从 NPU 内存拷贝回 CPU 内存
-    outputs = []
-    for i in range(len(self.output_buffers)):
-        size = self.output_buffers[i]["size"]
-        host_data = np.zeros(size, dtype=np.byte)  # 在 Host 上分配接收空间
-        host_ptr = acl.util.numpy_to_ptr(host_data)
-        ret = acl.rt.memcpy(
-            host_ptr,  # 目标：Host 内存
-            size,
-            self.output_buffers[i]["ptr"],  # 源：Device 内存
-            size,
-            2  # 模式 2 = Device to Host
-        )
-        outputs.append(host_data)
-    return outputs
-\end{lstlisting}
-\end{enumerate}
-
-\subsubsection{阶段三：资源释放（吃完饭，结账离开）}\label{src-experiment-case1-h30}
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\setcounter{enumi}{6}
-\item
-  \textbf{资源清理}:
-  为了避免内存泄漏，所有申请的资源在使用完毕后都必须被显式释放。这包括模型、Device
-  内存、上下文、流等。最后调用 \passthrough{\lstinline!acl.finalize!}
-  来断开与硬件的连接。
-
-  \emph{比喻}：吃完饭要结账、归还餐具、离开餐厅。如果不做清理，内存就会像没还的餐具一样越积越多，最终耗尽系统资源。
-
-\begin{lstlisting}[language=Python]
-# In ascend_inference.py -> AscendModel.release
-def release(self):
-    # 释放输入输出的 Device 内存
-    for buf in self.input_buffers:
-        acl.rt.free(buf[“ptr”])
-    for buf in self.output_buffers:
-        acl.rt.free(buf[“ptr”])
-
-    # 卸载模型
-    if self.model_id:
-        acl.mdl.unload(self.model_id)
-
-    # 销毁数据集和描述符
-    if self.input_dataset:
-        acl.mdl.destroy_dataset(self.input_dataset)
-    if self.output_dataset:
-        acl.mdl.destroy_dataset(self.output_dataset)
-
-# In ascend_inference.py -> AscendSystem.release
-def release(self):
-    if self.stream:
-        acl.rt.destroy_stream(self.stream)
-    if self.context:
-        acl.rt.destroy_context(self.context)
-    acl.rt.reset_device(self.device_id)
-    acl.finalize()  # 最后关闭 ACL
-\end{lstlisting}
-\end{enumerate}
-
-\subsection{为什么需要区分 Host 和
-Device？}\label{src-experiment-case1-h31}
-
-对于初学者来说，最困惑的莫过于 Host 和 Device
-的概念。让我们用一个更生活化的比喻来理解：
-
-想象你家里有两个厨房：
-
-\begin{itemize}
-\item
-  \textbf{Host (主厨房 -
-  CPU)}：这是你日常使用的厨房，有冰箱（内存）、微波炉（通用计算）。你可以在这里做各种事情：切菜、洗碗、煮咖啡。但如果要做一道需要专业设备的菜（比如需要专业烤箱的甜点），效率就不高。
-\item
-  \textbf{Device (专业厨房 -
-  NPU)}：这是一个配备了专业设备的厨房，有工业级烤箱（AI
-  加速器）、专业搅拌机（矩阵运算单元）。它做某些特定的事情（AI
-  推理）速度极快，但不能做通用的事情（比如不能用来煮咖啡）。
-\end{itemize}
-
-\textbf{关键问题}：这两个厨房的冰箱（内存）是分开的！
-
-\begin{itemize}
-\tightlist
-\item
-  你在主厨房冰箱里的食材（Host 内存的数据），专业厨房看不到
-\item
-  你必须手动把食材从主厨房搬到专业厨房（H2D 拷贝）
-\item
-  做好的菜在专业厨房，你要吃的话得搬回主厨房（D2H 拷贝）
-\end{itemize}
-
-\textbf{技术层面的解释}：
-
-\begin{itemize}
-\item
-  \textbf{Host (主机)}：指 CPU
-  及其管理的内存（我们常用的内存条，DDR4/DDR5）。它是系统的''总管''，负责运行操作系统、Python
-  解释器和大部分通用逻辑。
-\item
-  \textbf{Device (设备)}：指 NPU 及其专用的板载内存（如 HBM - High
-  Bandwidth Memory）。它是专门用于并行计算的''专家''，执行 AI
-  推理速度极快，但不能直接运行通用程序。
-\end{itemize}
-
-CPU 和 NPU
-是两个独立的计算单元，它们之间的内存地址空间\textbf{不共享}。因此，数据必须通过
-\passthrough{\lstinline!memcpy!}
-在两者之间显式地来回传递。这个过程是昇腾乃至所有异构计算（如 NVIDIA
-CUDA、AMD ROCm）平台的基本操作。
-
-\textbf{为什么不能共享内存？}
-
-这是硬件架构决定的。NPU
-为了达到极高的计算性能，使用了专门优化的内存系统（高带宽、低延迟），这套内存系统与
-CPU
-的内存系统是物理隔离的。虽然这增加了编程的复杂度（需要手动拷贝数据），但换来了数十倍甚至上百倍的计算性能提升。
-
-\subsection{从 ONNX 到
-OM：模型转换的必要性}\label{src-experiment-case1-h32}
-
-你可能会好奇：为什么不能直接用原始的 ONNX 模型，而要转换成
-\passthrough{\lstinline!.om!} 格式？
-
-\textbf{ONNX (Open Neural Network Exchange)}
-是一个开放的模型格式标准，就像 PDF
-是文档的通用格式一样。它的优点是通用性强，PyTorch、TensorFlow
-等框架训练的模型都可以导出为 ONNX。
-
-但是，ONNX 模型是''通用语言''，NPU
-硬件需要的是''方言''。每种硬件（NVIDIA GPU、昇腾 NPU、Intel
-CPU）都有自己的优化方式和指令集。
-
-\textbf{OM (Offline Model)} 是昇腾平台的专用模型格式。通过
-\passthrough{\lstinline!atc!} (Ascend Tensor Compiler) 工具，我们可以：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  \textbf{算子融合}：把多个小操作合并成一个大操作，减少内存读写
-\item
-  \textbf{内存优化}：预先规划好内存分配，避免运行时的动态分配开销
-\item
-  \textbf{指令优化}：把通用的神经网络操作翻译成 NPU 的专用指令
-\item
-  \textbf{量化加速}：可选地将 FP32 转为 FP16 或 INT8，进一步提升速度
-\end{enumerate}
-
-\emph{比喻}：ONNX
-就像一份通用的菜谱，任何厨房都能看懂。但如果你有一个专业的意大利餐厅（昇腾
-NPU），你会把菜谱翻译成意大利语，并标注上''用我们的专业烤箱，温度设置
-220 度，时间 15 分钟''。这样厨师（NPU）执行起来会快得多。
-
-\textbf{转换命令示例}（在 \passthrough{\lstinline!prepare\_models.py!}
-中）：
-
-\begin{lstlisting}[language=bash]
-atc --model=det_500m.onnx \
-    --framework=5 \
-    --output=face_detection \
-    --input_shape="input.1:1,3,640,640" \
-    --soc_version=Ascend310B1
-\end{lstlisting}
-
-参数解释： - \passthrough{\lstinline!--model!}: 输入的 ONNX 模型 -
-\passthrough{\lstinline!--framework=5!}: 表示 ONNX 格式 -
-\passthrough{\lstinline!--output!}: 输出的 OM 模型名称 -
-\passthrough{\lstinline!--input\_shape!}: 指定输入张量的形状 -
-\passthrough{\lstinline!--soc\_version!}: 目标硬件型号
-
-\section{Anchor-based 检测深度解析：RetinaFace
-如何''看见''人脸}\label{src-experiment-case1-h33}
-
-在 \passthrough{\lstinline!ascend\_inference.py!}
-中，有一段看起来很神秘的代码：
-
-\begin{lstlisting}[language=Python]
-def generate_anchors(self, height, width):
-    strides = [8, 16, 32]
-    anchors = []
-    for stride in strides:
-        num_grid_y = height // stride
-        num_grid_x = width // stride
-        for y in range(num_grid_y):
-            for x in range(num_grid_x):
-                for _ in range(2):  # 2 anchors per grid
-                    anchors.append([x * stride, y * stride, stride])
-    return np.array(anchors, dtype=np.float32)
-\end{lstlisting}
-
-这段代码在生成
-\textbf{Anchors（锚点）}。要理解它，我们需要先理解目标检测的核心挑战。
-
-\subsection{目标检测的根本问题}\label{src-experiment-case1-h34}
-
-假设你要在一张 640×640 的图片中找到所有人脸。最直接的想法是什么？
-
-\textbf{暴力方法}：用一个固定大小的窗口（比如
-100×100）在图片上滑动，每个位置都判断''这里有没有人脸''。
-
-问题来了： 1. 人脸大小不一样，有的 50×50，有的 200×200，一个窗口怎么够？
-2. 即使用多个不同大小的窗口，也需要滑动成千上万次，太慢了！
-
-\subsection{Anchor-based 方法的智慧}\label{src-experiment-case1-h35}
-
-Anchor-based 检测器（如 RetinaFace、YOLO、Faster R-CNN）的核心思想是：
-
-\textbf{不要在原图上滑动窗口，而是在特征图上预测！}
-
-让我们一步步理解：
-
-\subsubsection{第 1 步：特征图的概念}\label{src-experiment-case1-h36}
-
-当图像经过卷积神经网络后，会得到多个不同尺度的\textbf{特征图 (Feature
-Map)}。
-
-\begin{itemize}
-\tightlist
-\item
-  输入图像：640×640×3
-\item
-  经过网络后：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    浅层特征图：80×80×256 (stride=8，每 8 个像素压缩成 1 个)
-  \item
-    中层特征图：40×40×512 (stride=16)
-  \item
-    深层特征图：20×20×1024 (stride=32)
-  \end{itemize}
-\end{itemize}
-
-\emph{比喻}：原图是一张高清照片，特征图是这张照片的''缩略图''。浅层特征图是''中等缩略图''，深层特征图是''超小缩略图''。
-
-\subsubsection{第 2 步：Anchor 的作用}\label{src-experiment-case1-h37}
-
-在每个特征图的每个位置（网格点），我们预先定义几个\textbf{候选框（Anchor）}。
-
-\begin{itemize}
-\tightlist
-\item
-  在 80×80 的特征图上，有 80×80 = 6400 个网格点
-\item
-  每个网格点放置 2 个 anchor
-\item
-  总共 6400×2 = 12800 个 anchor
-\end{itemize}
-
-\emph{比喻}：Anchor
-就像是''预设的相框''。我们在墙上（特征图）的每个位置都挂了几个不同大小的相框，然后让模型判断：
-1. 这个相框里有没有人脸？（分类） 2.
-如果有，人脸的实际位置相对于相框偏移了多少？（回归）
-
-\subsubsection{第 3 步：多尺度检测}\label{src-experiment-case1-h38}
-
-为什么要用 stride=8/16/32 三个尺度？
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{stride=8 (80×80 特征图)}：负责检测\textbf{小人脸}
-
-  \begin{itemize}
-  \tightlist
-  \item
-    每个网格对应原图 8×8 像素
-  \item
-    适合检测 16-64 像素的人脸
-  \end{itemize}
-\item
-  \textbf{stride=16 (40×40 特征图)}：负责检测\textbf{中等人脸}
-
-  \begin{itemize}
-  \tightlist
-  \item
-    每个网格对应原图 16×16 像素
-  \item
-    适合检测 32-128 像素的人脸
-  \end{itemize}
-\item
-  \textbf{stride=32 (20×20 特征图)}：负责检测\textbf{大人脸}
-
-  \begin{itemize}
-  \tightlist
-  \item
-    每个网格对应原图 32×32 像素
-  \item
-    适合检测 64-256 像素的人脸
-  \end{itemize}
-\end{itemize}
-
-\emph{比喻}：这就像用三种不同倍率的望远镜同时观察：低倍镜看远处的大物体，高倍镜看近处的小物体。
-
-\subsection{边界框解码：从偏移量到坐标}\label{src-experiment-case1-h39}
-
-模型输出的不是直接的坐标，而是相对于 anchor 的\textbf{偏移量}。
-
-\begin{lstlisting}[language=Python]
-def decode_bbox(self, anchors, raw_outputs):
-    # 模型输出：相对于 anchor 的偏移 [left, top, right, bottom]
-    # 需要转换为：绝对坐标 [x1, y1, x2, y2]
-
-    x1 = anchors[:, 0] - bbox_all[:, 0] * anchors[:, 2]  # anchor_x - left*stride
-    y1 = anchors[:, 1] - bbox_all[:, 1] * anchors[:, 2]  # anchor_y - top*stride
-    x2 = anchors[:, 0] + bbox_all[:, 2] * anchors[:, 2]  # anchor_x + right*stride
-    y2 = anchors[:, 1] + bbox_all[:, 3] * anchors[:, 2]  # anchor_y + bottom*stride
-\end{lstlisting}
-
-\textbf{为什么要这样设计？}
-
-如果直接预测绝对坐标，模型需要学习''在 640×640
-的图像中，人脸可能在任何位置''，这个学习空间太大了。
-
-但如果预测相对偏移，模型只需要学习''相对于这个
-anchor，人脸往左偏了一点，往上偏了一点''，学习难度大大降低。
-
-\emph{比喻}：这就像导航。直接说''目的地在北纬 39.9°，东经
-116.4°``（绝对坐标）不如说''从你当前位置往北走 500 米，再往东走 200
-米''（相对偏移）更容易理解和执行。
-
-\subsection{NMS
-(非极大值抑制)：去除重复检测}\label{src-experiment-case1-h40}
-
-由于有 16800 个 anchor，同一张人脸可能被多个 anchor 同时检测到。NMS
-的作用是保留最好的那个，去掉重复的。
-
-\begin{lstlisting}[language=Python]
-indices = cv2.dnn.NMSBoxes(rects, scores.tolist(), threshold, 0.4)
-\end{lstlisting}
-
-\textbf{工作原理}： 1. 按置信度分数排序 2. 选择分数最高的框 A 3.
-计算其他框与 A 的重叠度（IoU） 4. 删除所有与 A 重叠度 \textgreater{} 0.4
-的框 5. 重复 2-4，直到处理完所有框
-
-\emph{比喻}：就像选班长，先选出票数最高的，然后把所有和他''太像''的候选人（重复检测）都去掉，再选下一个。
-
-\section{余弦相似度：如何判断''两张脸是同一个人''}\label{src-experiment-case1-h41}
-
-在 \passthrough{\lstinline!app.py!} 和
-\passthrough{\lstinline!camera.py!} 中，有这样一段关键代码：
-
-\begin{lstlisting}[language=Python]
-# 计算余弦相似度
-sim = np.dot(target_embedding, db_emb) / (np.linalg.norm(target_embedding) * np.linalg.norm(db_emb) + 1e-6)
-
-# 判断是否匹配
-if sim > 0.5:  # 阈值
-    print(f"匹配成功！相似度：{sim}")
-\end{lstlisting}
-
-这段代码在做什么？为什么用余弦相似度而不是欧氏距离？
-
-\subsection{特征向量的几何意义}\label{src-experiment-case1-h42}
-
-ArcFace 模型输出的 512 维特征向量，可以理解为 512
-维空间中的一个点（或者说从原点出发的一个箭头）。
-
-\emph{比喻}：想象你在描述一个人的特征：身高、体重、肤色、发型\ldots{}
-如果用 512 个维度来描述，每个人就是 512 维空间中的一个点。
-
-\textbf{关键问题}：如何衡量两个点（两张脸）的相似度？
-
-\subsection{方法 1：欧氏距离（不推荐）}\label{src-experiment-case1-h43}
-
-欧氏距离就是两点之间的直线距离：
-
-\[d = \sqrt{\sum_{i=1}^{512} (a_i - b_i)^2}\]
-
-\textbf{问题}：欧氏距离受向量长度（模）的影响很大。
-
-假设有两个向量： - 向量 A：{[}1, 1, 1, \ldots, 1{]} (512 个 1) - 向量
-B：{[}2, 2, 2, \ldots, 2{]} (512 个 2) - 向量 C：{[}1, 0, 0, \ldots,
-0{]} (第一个是 1，其余是 0)
-
-从方向上看，A 和 B 完全一致（都指向同一个方向），只是 B 的长度是 A 的 2
-倍。但欧氏距离会认为 A 和 B 差别很大。
-
-而 A 和 C 的方向差异巨大，但如果 C 的长度恰好合适，欧氏距离可能反而比
-A-B 更小。
-
-\subsection{方法 2：余弦相似度（推荐）}\label{src-experiment-case1-h44}
-
-余弦相似度只关心方向，不关心长度：
-
-\[\text{cosine similarity} = \frac{A \cdot B}{||A|| \times ||B||} = \cos(\theta)\]
-
-其中 \(\theta\) 是两个向量的夹角。
-
-\textbf{几何意义}： - 如果两个向量方向完全相同，夹角 = 0°，cos(0°) = 1 -
-如果两个向量垂直，夹角 = 90°，cos(90°) = 0 - 如果两个向量方向相反，夹角
-= 180°，cos(180°) = -1
-
-\emph{比喻}：想象两个人站在原点，分别指向不同的方向。余弦相似度衡量的是''他们指的方向有多接近''，而不管''他们的手臂伸得有多长''。
-
-\subsection{为什么 ArcFace
-适合用余弦相似度？}\label{src-experiment-case1-h45}
-
-还记得 ArcFace
-的训练目标吗？它在\textbf{超球面}上进行优化，强制所有特征向量的长度（模）都归一化到
-1。
-
-这意味着： 1. 所有特征向量都在一个单位球面上 2.
-向量之间的差异只体现在方向上 3. 余弦相似度完美地捕捉了这种''方向差异''
-
-\textbf{代码实现细节}：
-
-\begin{lstlisting}[language=Python]
-# 分子：向量点积
-dot_product = np.dot(emb1, emb2)
-
-# 分母：两个向量的模的乘积
-norm_product = np.linalg.norm(emb1) * np.linalg.norm(emb2)
-
-# 余弦相似度
-similarity = dot_product / (norm_product + 1e-6)  # 加 1e-6 防止除零
-\end{lstlisting}
-
-\textbf{为什么加 1e-6？}
-
-这是一个防御性编程技巧。虽然理论上向量的模不会是
-0，但由于浮点数精度问题，可能出现极小的值。加上一个极小的数（1e-6 =
-0.000001）可以避免除零错误，同时不影响正常计算结果。
-
-\subsection{阈值的选择：0.5 的含义}\label{src-experiment-case1-h46}
-
-\begin{lstlisting}[language=Python]
-threshold = 0.5
-if similarity > threshold:
-    # 认为是同一个人
-\end{lstlisting}
-
-\textbf{0.5 对应的夹角}：
-
-\[\theta = \arccos(0.5) = 60°\]
-
-这意味着，如果两个特征向量的夹角小于 60°，我们就认为它们是同一个人。
-
-\textbf{如何调整阈值？}
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{提高阈值（如 0.6-0.7）}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    更严格，减少误识别（把陌生人认成员工）
-  \item
-    但可能增加漏识别（把员工认不出来）
-  \item
-    适合安全性要求高的场景
-  \end{itemize}
-\item
-  \textbf{降低阈值（如 0.4-0.5）}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    更宽松，减少漏识别
-  \item
-    但可能增加误识别
-  \item
-    适合便利性优先的场景
-  \end{itemize}
-\end{itemize}
-
-\emph{比喻}：阈值就像门禁的严格程度。设得高，只有拿着正确钥匙的人才能进（安全但不便）；设得低，钥匙差不多的也能进（方便但不安全）。
-
-\section{多线程与实时性：摄像头后台线程的设计}\label{src-experiment-case1-h47}
-
-在 \passthrough{\lstinline!camera.py!} 中，有一个精妙的多线程设计：
-
-\begin{lstlisting}[language=Python]
-class VideoCamera:
-    def __init__(self, face_system):
-        self.video = cv2.VideoCapture(0)
-        self.lock = threading.Lock()
-        self.last_frame = None
-
-        # 启动后台线程
-        self.thread = threading.Thread(target=self.update, args=())
-        self.thread.daemon = True
-        self.thread.start()
-
-    def update(self):
-        while self.running:
-            success, frame = self.video.read()
-            with self.lock:
-                self.last_frame = frame.copy()
-
-            # 每 2 秒自动打卡
-            if time.time() - self.last_check_time > 2.0:
-                self.process_attendance(frame)
-\end{lstlisting}
-
-\subsection{为什么需要多线程？}\label{src-experiment-case1-h48}
-
-\textbf{问题场景}：如果在主线程中同步处理摄像头，会发生什么？
-
-\begin{lstlisting}[language=Python]
-# 错误的做法（伪代码）
-while True:
-    frame = camera.read()  # 读取帧，耗时 30ms
-    detect_face(frame)     # 检测人脸，耗时 20ms
-    recognize_face(frame)  # 识别人脸，耗时 15ms
-    # 总耗时：65ms，帧率只有 15 FPS
-\end{lstlisting}
-
-在这种设计下： 1. 读取帧要等待 2. 处理帧要等待 3. 如果有 Web
-请求进来，整个系统都会卡住
-
-\subsection{多线程的优势}\label{src-experiment-case1-h49}
-
-\textbf{后台线程}持续做两件事： 1. 以 30 FPS 的速度读取摄像头帧，保存到
-\passthrough{\lstinline!last\_frame!} 2. 每 2 秒触发一次人脸识别
-
-\textbf{主线程}可以： 1. 随时读取 \passthrough{\lstinline!last\_frame!}
-用于 Web 视频流 2. 处理用户的 HTTP 请求 3. 不会被摄像头读取阻塞
-
-\emph{比喻}：这就像餐厅的分工。后厨（后台线程）持续准备食材、做菜，前台（主线程）负责接待客人、上菜。两者并行工作，互不干扰。
-
-\subsection{线程安全：Lock 的作用}\label{src-experiment-case1-h50}
-
-\begin{lstlisting}[language=Python]
-with self.lock:
-    self.last_frame = frame.copy()
-\end{lstlisting}
-
-\textbf{为什么需要锁？}
-
-想象两个线程同时访问 \passthrough{\lstinline!last\_frame!}： - 线程
-A（后台）：正在写入新的帧 - 线程 B（主线程）：正在读取帧用于 Web 传输
-
-如果没有锁，可能发生： - 线程 B 读到一半，线程 A 开始写入 -
-结果：读到的是''半新半旧''的数据，导致图像错乱
-
-\textbf{Lock（互斥锁）} 确保： - 同一时刻只有一个线程能访问
-\passthrough{\lstinline!last\_frame!} - 其他线程必须等待，直到锁被释放
-
-\emph{比喻}：Lock 就像卫生间的门锁。有人在用的时候，其他人必须在外面等。
-
-\subsection{daemon 线程的含义}\label{src-experiment-case1-h51}
-
-\begin{lstlisting}[language=Python]
-self.thread.daemon = True
-\end{lstlisting}
-
-\textbf{daemon（守护线程）} 的特点： -
-当主程序退出时，守护线程会自动终止 - 不会阻止程序退出
-
-如果不设置为 daemon： - 主程序想退出时，会等待所有非 daemon 线程结束 -
-摄像头线程在 \passthrough{\lstinline!while self.running!}
-中循环，可能导致程序无法正常退出
-
-\emph{比喻}：daemon
-线程就像保安。老板（主程序）下班了，保安也就下班了，不会一个人留在公司。
-
-\section{Flask Web 框架：构建轻量级 API
-服务}\label{src-experiment-case1-h52}
-
-\passthrough{\lstinline!app.py!} 使用 Flask 框架构建了整个 Web
-服务。Flask 是 Python 中最流行的轻量级 Web 框架之一。
-
-\subsection{什么是 Web 框架？}\label{src-experiment-case1-h53}
-
-想象你要开一家餐厅。你可以： 1.
-\textbf{从零开始}：自己建房子、装修、设计菜单、培训服务员\ldots{} 2.
-\textbf{加盟连锁}：使用现成的装修方案、标准化流程、培训体系\ldots{}
-
-Web 框架就是''连锁餐厅的标准化方案''。它提供了： - 路由系统（URL
-到函数的映射） - 请求处理（解析 HTTP 请求） - 响应生成（返回
-JSON、HTML） - 静态文件服务（CSS、JS、图片）
-
-\subsection{Flask 的核心概念}\label{src-experiment-case1-h54}
-
-\subsubsection{路由 (Route)}\label{src-experiment-case1-h55}
-
-\begin{lstlisting}[language=Python]
-@app.route('/api/users', methods=['GET'])
-def list_users():
-    users = database.get_users()
-    return jsonify(users)
-\end{lstlisting}
-
-\textbf{路由的作用}：把 URL 映射到 Python 函数。
-
-\begin{itemize}
-\tightlist
-\item
-  当用户访问 \passthrough{\lstinline!http://localhost:5000/api/users!}
-\item
-  Flask 自动调用 \passthrough{\lstinline!list\_users()!} 函数
-\item
-  函数返回的数据被转换成 JSON 响应
-\end{itemize}
-
-\emph{比喻}：路由就像餐厅的菜单。客人点''宫保鸡丁''（URL），服务员就知道要让厨师做哪道菜（调用哪个函数）。
-
-\subsubsection{HTTP 方法}\label{src-experiment-case1-h56}
-
-\begin{lstlisting}[language=Python]
-@app.route('/api/users', methods=['GET'])   # 查询用户
-@app.route('/api/users', methods=['POST'])  # 添加用户
-@app.route('/api/users/<id>', methods=['DELETE'])  # 删除用户
-\end{lstlisting}
-
-\textbf{HTTP 方法的语义}： -
-\textbf{GET}：获取数据（只读，不修改服务器状态） -
-\textbf{POST}：提交数据（创建新资源） -
-\textbf{PUT}：更新数据（完整替换） - \textbf{DELETE}：删除数据
-
-\emph{比喻}：这就像对图书馆的操作： - GET = 查阅书籍（不改变图书馆） -
-POST = 捐赠新书（增加藏书） - PUT = 更换书籍（用新版替换旧版） - DELETE
-= 销毁书籍（减少藏书）
-
-\subsubsection{请求数据的获取}\label{src-experiment-case1-h57}
-
-\begin{lstlisting}[language=Python]
-@app.route('/api/users', methods=['POST'])
-def add_user():
-    name = request.form.get('name')        # 表单数据
-    file = request.files['image']          # 上传的文件
-    data = request.json                    # JSON 数据
-\end{lstlisting}
-
-Flask 的 \passthrough{\lstinline!request!}
-对象提供了访问各种请求数据的接口： -
-\passthrough{\lstinline!request.form!}：HTML 表单数据 -
-\passthrough{\lstinline!request.files!}：上传的文件 -
-\passthrough{\lstinline!request.json!}：JSON 格式的请求体 -
-\passthrough{\lstinline!request.args!}：URL 查询参数（如
-\passthrough{\lstinline!?page=1\&size=10!}）
-
-\subsubsection{响应的生成}\label{src-experiment-case1-h58}
-
-\begin{lstlisting}[language=Python]
-# 返回 JSON
-return jsonify({"success": True, "user_id": 123})
-
-# 返回 HTML 页面
-return render_template('index.html')
-
-# 返回文件
-return send_from_directory('uploads', filename)
-
-# 返回流式数据（视频流）
-return Response(gen(camera), mimetype='multipart/x-mixed-replace; boundary=frame')
-\end{lstlisting}
-
-\subsection{MJPEG
-视频流：实时传输的技巧}\label{src-experiment-case1-h59}
-
-\begin{lstlisting}[language=Python]
-def gen(camera):
-    while True:
-        frame = camera.get_frame()  # 获取 JPEG 编码的帧
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-@app.route('/video_feed')
-def video_feed():
-    return Response(gen(camera), mimetype='multipart/x-mixed-replace; boundary=frame')
-\end{lstlisting}
-
-\textbf{MJPEG (Motion JPEG)} 的原理： - 把视频流当作一系列 JPEG 图片 -
-通过 HTTP 持续发送，用特殊的分隔符 \passthrough{\lstinline!--frame!}
-分隔每一帧 - 浏览器接收到后，自动连续显示，形成视频效果
-
-\emph{比喻}：这就像翻页动画。每一页是一张静态图片（JPEG），快速翻页就形成了动画效果。
-
-\textbf{为什么用 yield？}
-
-\passthrough{\lstinline!yield!} 是 Python 的生成器语法，它可以： 1.
-逐帧生成数据，而不是一次性生成所有帧（节省内存） 2.
-实现''无限流''，持续发送数据直到连接断开
-
-\section{图像预处理：为什么需要归一化？}\label{src-experiment-case1-h60}
-
-在 \passthrough{\lstinline!ascend\_inference.py!}
-中，有这样的预处理代码：
-
-\begin{lstlisting}[language=Python]
-def preprocess_det(self, image):
-    img = cv2.resize(image, (640, 640))
-    img = img.astype(np.float32)
-    img -= np.array([127.5, 127.5, 127.5])  # 减去均值
-    img /= 128.0                             # 除以标准差
-    img = img.transpose(2, 0, 1)             # HWC -> CHW
-    img = np.expand_dims(img, axis=0)        # 添加 batch 维度
-    return img
-\end{lstlisting}
-
-每一步都有其深刻的原因。
-
-\subsection{第 1 步：缩放到固定尺寸}\label{src-experiment-case1-h61}
-
-\begin{lstlisting}[language=Python]
-img = cv2.resize(image, (640, 640))
-\end{lstlisting}
-
-\textbf{为什么？}
-
-神经网络的输入必须是固定尺寸。模型在训练时使用 640×640
-的图像，推理时也必须用相同尺寸。
-
-\textbf{会不会变形？}
-
-会的。如果原图是 1920×1080，缩放到 640×640 会拉伸。但这不是问题，因为：
-1. 模型在训练时也见过各种拉伸的图像 2. 检测到的坐标会按比例缩放回原图
-
-\emph{比喻}：这就像证件照必须是 2
-寸（35×45mm）。不管你的脸是圆是方，都要缩放到这个尺寸。
-
-\subsection{第 2 步：归一化
-(Normalization)}\label{src-experiment-case1-h62}
-
-\begin{lstlisting}[language=Python]
-img -= 127.5  # 减去均值
-img /= 128.0  # 除以标准差
-\end{lstlisting}
-
-\textbf{原始像素值的范围}：0-255（8 位整数）
-
-\textbf{归一化后的范围}：约 -1 到 +1
-
-\textbf{为什么要归一化？}
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\item
-  \textbf{数值稳定性}：神经网络的权重通常在 -1 到 +1 之间。如果输入是
-  0-255，会导致梯度爆炸或消失。
-\item
-  \textbf{加速收敛}：归一化后，不同特征的数值范围一致，优化器更容易找到最优解。
-\item
-  \textbf{匹配训练时的分布}：模型训练时用的是归一化数据，推理时也必须用相同的预处理。
-\end{enumerate}
-
-\emph{比喻}：想象你在称重。如果有人用公斤，有人用磅，有人用吨，就很难比较。归一化就是把所有单位统一成''标准单位''。
-
-\textbf{为什么是 127.5 和 128？}
-
-\begin{itemize}
-\tightlist
-\item
-  像素值范围：0-255
-\item
-  中间值：127.5
-\item
-  减去中间值后：-127.5 到 +127.5
-\item
-  除以 128：约 -1 到 +1
-\end{itemize}
-
-这是一种常见的归一化方法，称为 \textbf{零均值归一化}。
-
-\subsection{第 3 步：通道顺序转换}\label{src-experiment-case1-h63}
-
-\begin{lstlisting}[language=Python]
-img = img.transpose(2, 0, 1)  # HWC -> CHW
-\end{lstlisting}
-
-\textbf{OpenCV 的格式}：(Height, Width, Channels) = (640, 640, 3) - 第 0
-维：高度 - 第 1 维：宽度 - 第 2 维：通道（BGR）
-
-\textbf{PyTorch/ONNX 的格式}：(Channels, Height, Width) = (3, 640, 640)
-- 第 0 维：通道 - 第 1 维：高度 - 第 2 维：宽度
-
-\textbf{为什么要转换？}
-
-这是深度学习框架的约定。PyTorch、TensorFlow
-等框架在处理卷积时，期望通道维度在前。
-
-\emph{比喻}：这就像不同国家的日期格式。中国用''年-月-日''，美国用''月-日-年''。虽然信息相同，但格式必须匹配。
-
-\subsection{第 4 步：添加 Batch 维度}\label{src-experiment-case1-h64}
-
-\begin{lstlisting}[language=Python]
-img = np.expand_dims(img, axis=0)  # (3, 640, 640) -> (1, 3, 640, 640)
-\end{lstlisting}
-
-\textbf{为什么需要 Batch？}
-
-神经网络通常设计为处理''一批''数据，而不是单个样本。即使我们只有一张图片，也要把它包装成''一批，包含
-1 张图片''。
-
-\begin{itemize}
-\tightlist
-\item
-  输入形状：(Batch, Channels, Height, Width)
-\item
-  单张图片：(1, 3, 640, 640)
-\item
-  多张图片：(4, 3, 640, 640) 表示一批 4 张图片
-\end{itemize}
-
-\emph{比喻}：这就像快递。即使你只寄一件商品，也要装在一个箱子里（batch）。箱子上写着''内含
-1 件商品''。
-
-\section{性能优化策略：让系统跑得更快}\label{src-experiment-case1-h65}
-
-\subsection{内存复用：避免重复分配}\label{src-experiment-case1-h66}
-
-在 \passthrough{\lstinline!AscendModel!} 的设计中，输入输出 buffer
-在初始化时就分配好了，之后每次推理都复用这些 buffer。
-
-\begin{lstlisting}[language=Python]
-def _init_buffers(self):
-    # 只在初始化时分配一次
-    dev_ptr, ret = acl.rt.malloc(size, 2)
-    self.input_buffers.append({"ptr": dev_ptr, "size": size})
-
-def execute(self, input_data_list):
-    # 每次推理都复用同一块内存
-    ret = acl.rt.memcpy(self.input_buffers[i]["ptr"], ...)
-\end{lstlisting}
-
-\textbf{如果每次都重新分配会怎样？}
-
-\begin{lstlisting}[language=Python]
-# 错误的做法
-def execute_bad(self, input_data):
-    dev_ptr, ret = acl.rt.malloc(size, 2)  # 每次都分配
-    acl.rt.memcpy(dev_ptr, ...)
-    acl.mdl.execute(...)
-    acl.rt.free(dev_ptr)  # 每次都释放
-\end{lstlisting}
-
-这样做的问题： - 内存分配/释放是昂贵的操作（可能耗时几毫秒） -
-频繁分配会导致内存碎片 -
-在实时应用中，这些毫秒级的延迟会累积成明显的卡顿
-
-\emph{比喻}：这就像餐厅的盘子。好的做法是准备一套盘子，用完洗干净继续用。坏的做法是每次都买新盘子，用完就扔，既浪费又慢。
-
-\subsection{批处理：一次处理多张图片}\label{src-experiment-case1-h67}
-
-虽然本案例是单张处理，但如果需要处理大量图片（如批量注册用户），可以使用批处理：
-
-\begin{lstlisting}[language=Python]
-# 单张处理：推理 100 次
-for img in images:
-    result = model.execute([img])  # 每次 H2D + 推理 + D2H
-
-# 批处理：推理 1 次
-batch = np.stack(images[:100])  # (100, 3, 640, 640)
-results = model.execute([batch])  # 一次性处理 100 张
-\end{lstlisting}
-
-\textbf{批处理的优势}： - 减少 H2D/D2H 的次数（数据传输开销） - NPU
-的并行计算能力得到充分利用 - 吞吐量可提升 5-10 倍
-
-\textbf{权衡}： - 延迟增加（需要等待凑够一批） - 内存占用增加
-
-\emph{比喻}：这就像坐电梯。等人齐了再走（批处理）比每来一个人就开一次（单张处理）效率高得多。
-
-\subsection{异步推理：让 CPU 和 NPU
-并行工作}\label{src-experiment-case1-h68}
-
-当前实现是同步的：
-
-\begin{lstlisting}
-CPU: 准备数据 -> 等待 -> 等待 -> 处理结果
-NPU:            空闲 -> 推理 -> 空闲
-\end{lstlisting}
-
-异步推理可以让 CPU 和 NPU 同时工作：
-
-\begin{lstlisting}
-CPU: 准备数据1 -> 准备数据2 -> 准备数据3 -> 处理结果1
-NPU:            推理1 -> 推理2 -> 推理3
-\end{lstlisting}
-
-\textbf{实现方式}（伪代码）：
-
-\begin{lstlisting}[language=Python]
-# 提交任务到 stream，不等待完成
-acl.mdl.execute_async(model_id, input, output, stream)
-
-# CPU 继续做其他事情
-prepare_next_data()
-
-# 需要结果时再同步
-acl.rt.synchronize_stream(stream)
-\end{lstlisting}
-
-\subsection{模型量化：用更少的位数表示权重}\label{src-experiment-case1-h69}
-
-当前模型使用 FP32（32 位浮点数）。通过量化，可以转换为 FP16 或 INT8：
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{FP32}：精度最高，速度最慢，内存占用最大
-\item
-  \textbf{FP16}：精度略降，速度提升 2 倍，内存减半
-\item
-  \textbf{INT8}：精度再降，速度提升 4 倍，内存减少 75\%
-\end{itemize}
-
-\textbf{量化的代价}： - 精度损失（通常在 1-3\% 以内） - 需要校准数据集
-
-\textbf{在 atc 转换时启用量化}：
-
-\begin{lstlisting}[language=bash]
-atc --model=det.onnx \
-    --framework=5 \
-    --output=det_int8 \
-    --precision_mode=allow_mix_precision \
-    --insert_op_conf=quant_config.json
-\end{lstlisting}
-
-\section{实际部署建议}\label{src-experiment-case1-h70}
-
-\subsection{用户规模与检索策略}\label{src-experiment-case1-h71}
-
-{ % do not increment counter
-\begin{longtable}[]{@{}lll@{}}
+\section{问题背景与系统边界}\label{ux95eeux9898ux80ccux666fux4e0eux7cfbux7edfux8fb9ux754c}
+
+在云端系统中，摄像头数据通常上传到远程服务进行处理；在边缘设备上，图像、
+特征和考勤记录可以留在设备本地，从而减少网络依赖并缩短数据离开现场的路径。
+代价是设备同时承担推理、采集、存储和服务任务，资源释放、并发控制和故障
+可见性必须由应用显式管理。
+
+本案例的边界如下：
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
 \toprule\noalign{}
-用户数量 & 检索方法 & 预期延迟 \\
+\begin{minipage}[b]{\linewidth}\raggedright
+边界
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+本案例承担的工作
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+不在本案例结论范围内
+\end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-\textless{} 100 & 暴力检索（当前方案） & \textless{} 10ms \\
-100-1000 & 暴力检索 + 缓存 & \textless{} 50ms \\
-1000-10000 & Faiss (IVF) & \textless{} 20ms \\
-\textgreater{} 10000 & Faiss (HNSW) 或向量数据库 & \textless{} 50ms \\
+图像采集 & 板端 USB 摄像头采集；浏览器也可提交单张图像 &
+摄像头质量、光照和姿态的全面评测 \\
+模型推理 & 在昇腾 NPU 上执行已转换的检测和特征模型 &
+重新训练模型或证明某一公开基准上的精度 \\
+身份比对 & 在主机内存中计算余弦相似度并选取最高候选 &
+法律意义上的身份认证或活体认证 \\
+数据保存 & SQLite 保存用户、特征和事件元数据 &
+云端同步、多人权限和长期档案管理 \\
+Web 交互 & FastAPI API 与 React 界面 &
+互联网暴露、生产级认证和高可用集群 \\
 \end{longtable}
-}
 
-\subsection{防止重复打卡}\label{src-experiment-case1-h72}
+系统默认只监听本机地址。若在可信的实验局域网内访问开发板，操作者必须显式
+指定监听地址，并意识到照片、特征和考勤接口仍属于敏感资源。
 
-当前实现每 2 秒就会记录一次考勤。实际应用中应该添加去重逻辑：
+\section{系统架构}\label{ux7cfbux7edfux67b6ux6784}
 
-\begin{lstlisting}[language=Python]
-def add_attendance_if_not_recent(user_id, type, image_path, cooldown=60):
-    """只有距离上次打卡超过 cooldown 秒才记录"""
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-
-    # 查询最近一次打卡时间
-    c.execute('''
-        SELECT timestamp FROM attendance
-        WHERE user_id = ?
-        ORDER BY timestamp DESC LIMIT 1
-    ''', (user_id,))
-
-    last_record = c.fetchone()
-    if last_record:
-        last_time = datetime.fromisoformat(last_record[0])
-        if (datetime.now() - last_time).total_seconds() < cooldown:
-            conn.close()
-            return None  # 太频繁，不记录
-
-    # 记录新的考勤
-    c.execute('INSERT INTO attendance (user_id, type, image_path) VALUES (?, ?, ?)',
-              (user_id, type, image_path))
-    conn.commit()
-    conn.close()
-\end{lstlisting}
-
-\subsection{安全性考虑}\label{src-experiment-case1-h73}
-
-\textbf{照片攻击防御}：
-
-当前系统无法防御''拿着照片打卡''的攻击。如需防御，可以： 1.
-添加活体检测模型（检测眨眼、张嘴等动作） 2. 使用 3D
-人脸识别（需要深度摄像头） 3. 结合其他生物特征（指纹、虹膜）
-
-\textbf{数据安全}：
-
-\begin{lstlisting}[language=Python]
-# 特征向量加密存储
-import hashlib
-
-def encrypt_embedding(embedding, key):
-    # 简单的 XOR 加密（实际应用应使用 AES）
-    key_hash = hashlib.sha256(key.encode()).digest()
-    encrypted = bytes([a ^ b for a, b in zip(embedding.tobytes(), key_hash * 100)])
-    return encrypted
-\end{lstlisting}
-
-\subsection{日志与监控}\label{src-experiment-case1-h74}
-
-添加详细的日志记录：
-
-\begin{lstlisting}[language=Python]
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('attendance.log'),
-        logging.StreamHandler()
-    ]
-)
-
-logger = logging.getLogger(__name__)
-
-# 在关键位置记录日志
-logger.info(f"User {user_id} checked in, similarity: {similarity:.3f}")
-logger.warning(f"Failed to detect face in frame")
-logger.error(f"NPU inference failed: {error}")
-\end{lstlisting}
-
-\subsection{错误处理与降级策略}\label{src-experiment-case1-h75}
-
-\begin{lstlisting}[language=Python]
-def get_face_system():
-    global face_system
-    if face_system is None:
-        try:
-            face_system = FaceSystem()
-        except Exception as e:
-            logger.error(f"Failed to initialize NPU: {e}")
-            # 降级到 CPU 模式（使用 ONNX Runtime）
-            face_system = FaceSystemCPU()
-    return face_system
-\end{lstlisting}
-
-\section{常见问题深度解答}\label{src-experiment-case1-h76}
-
-\subsection{Q1: 为什么摄像头打开失败？}\label{src-experiment-case1-h77}
-
-\textbf{可能原因}：
+系统由四个相互约束的层次构成：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  \textbf{权限问题}：
-\end{enumerate}
-
-\begin{lstlisting}[language=bash]
-ls -l /dev/video0
-# 如果显示 crw-rw---- root video，说明只有 root 和 video 组能访问
-
-# 解决方案 1：临时修改权限
-sudo chmod 666 /dev/video0
-
-# 解决方案 2：将用户加入 video 组（永久）
-sudo usermod -aG video $USER
-# 需要重新登录生效
-\end{lstlisting}
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\setcounter{enumi}{1}
-\tightlist
+  \textbf{采集层}：板端 \passthrough{\lstinline!VideoCamera!}
+  读取摄像头帧并维护最近一帧；React 可以
+  使用浏览器摄像头生成上传图像。两种来源都进入同一图像处理接口。
 \item
-  \textbf{设备被占用}：
-\end{enumerate}
-
-\begin{lstlisting}[language=bash]
-# 查看哪个进程在使用摄像头
-lsof /dev/video0
-
-# 如果是其他程序，先关闭它
-\end{lstlisting}
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\setcounter{enumi}{2}
-\tightlist
+  \textbf{硬件工作层}：一个受控的运行线程顺序调用检测、裁剪和特征提取；注册、
+  打卡等推理任务经同一队列执行，避免多个 HTTP 请求同时使用同一 ACL
+  context、 Device buffer 或摄像头句柄。SQLite 另以进程内锁保护读写。
 \item
-  \textbf{驱动问题}：
+  \textbf{服务层}：FastAPI 将注册、抓拍、手动打卡、记录查询和 MJPEG
+  预览暴露为 HTTP 资源。API
+  只负责校验请求、提交硬件任务和组织响应，不在请求函数中
+  复制一套推理流程。
+\item
+  \textbf{界面层}：React 调用 API
+  并呈现状态。界面中的``自动登记''标签必须说明
+  其教学属性，不能暗示这是经过人工授权的生产注册。
 \end{enumerate}
 
-\begin{lstlisting}[language=bash]
-# 检查摄像头是否被识别
-v4l2-ctl --list-devices
+\begin{figure}
+\centering
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio,alt={案例1详细流程}]{cases/img1/case1_flow.png}
+\caption{案例1详细流程}\label{fig:case1-flow}
+\end{figure}
 
-# 测试摄像头
-ffplay /dev/video0
-\end{lstlisting}
+\subsection{一次图像请求的逻辑顺序}\label{ux4e00ux6b21ux56feux50cfux8bf7ux6c42ux7684ux903bux8f91ux987aux5e8f}
 
-\subsection{Q2: 识别率低怎么办？}\label{src-experiment-case1-h78}
-
-\textbf{诊断步骤}：
+对于注册或手动打卡，一次请求通常经历以下阶段：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  \textbf{检查注册照片质量}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    光照是否均匀？
-  \item
-    人脸是否清晰？
-  \item
-    是否有遮挡？
-  \end{itemize}
+  FastAPI 读取 multipart 文件或 base64 图像，并限制请求大小；
 \item
-  \textbf{调整阈值}：
+  OpenCV 解码图像，检查图像非空且位于允许的处理范围；
+\item
+  检测模型定位候选人脸，选择面积最大的候选作为本案例的简化策略；
+\item
+  根据边界框裁剪人脸并送入特征模型；
+\item
+  将输出向量与数据库中的向量逐一计算余弦相似度；
+\item
+  注册请求写入用户和头像，打卡请求在通过阈值时写入事件；
+\item
+  API 返回结构化结果，界面根据
+  \passthrough{\lstinline!success!}、\passthrough{\lstinline!match!}
+  或错误状态更新视图。
 \end{enumerate}
 
-\begin{lstlisting}[language=Python]
-# 在 app.py 和 camera.py 中
-threshold = 0.5  # 降低到 0.4 试试
+这是一种便于教学的串行流程。它没有声称对多人脸、遮挡、姿态或大规模用户
+库具有最佳性能；这些问题应在后续实验中单独设计协议。
 
-# 同时记录相似度分布
-logger.info(f"Similarity scores: {[f'{s:.3f}' for s in all_similarities]}")
-\end{lstlisting}
+\section{模型与张量合同}\label{ux6a21ux578bux4e0eux5f20ux91cfux5408ux540c}
 
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\setcounter{enumi}{2}
-\tightlist
-\item
-  \textbf{检查预处理是否正确}：
-\end{enumerate}
+\subsection{文件角色}\label{ux6587ux4ef6ux89d2ux8272}
 
-\begin{lstlisting}[language=Python]
-# 保存预处理后的图像，检查是否正常
-cv2.imwrite('debug_preprocessed.jpg', img * 128 + 127.5)
-\end{lstlisting}
+样例脚本使用以下逻辑文件名：
 
-\subsection{Q3: 推理速度慢怎么办？}\label{src-experiment-case1-h79}
-
-\textbf{性能分析}：
-
-\begin{lstlisting}[language=Python]
-import time
-
-def profile_inference():
-    # 测试检测速度
-    start = time.time()
-    faces = face_system.detect(image)
-    det_time = time.time() - start
-
-    # 测试识别速度
-    start = time.time()
-    embedding = face_system.get_embedding(face_img)
-    rec_time = time.time() - start
-
-    print(f"Detection: {det_time*1000:.1f}ms")
-    print(f"Recognition: {rec_time*1000:.1f}ms")
-\end{lstlisting}
-
-\textbf{优化方向}： - 如果检测慢：降低输入分辨率（640-\textgreater480）
-- 如果识别慢：检查是否正确使用了 NPU -
-如果数据传输慢：检查是否有不必要的内存拷贝
-
-\section{扩展实验建议}\label{src-experiment-case1-h80}
-
-\subsection{实验 1：添加情绪识别}\label{src-experiment-case1-h81}
-
-在人脸识别的基础上，添加情绪分类（开心、悲伤、愤怒等）：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  下载情绪识别模型（如 FER2013）
-\item
-  转换为 OM 格式
-\item
-  在检测到人脸后，额外进行情绪推理
-\item
-  在考勤记录中保存情绪信息
-\end{enumerate}
-
-\subsection{实验 2：多摄像头支持}\label{src-experiment-case1-h82}
-
-扩展系统支持多个摄像头（如大门、前台、会议室）：
-
-\begin{lstlisting}[language=Python]
-cameras = {
-    'entrance': VideoCamera(face_system, device_id=0),
-    'lobby': VideoCamera(face_system, device_id=1),
-    'meeting_room': VideoCamera(face_system, device_id=2),
-}
-\end{lstlisting}
-
-\subsection{实验 3：移动端集成}\label{src-experiment-case1-h83}
-
-开发移动 App，通过 HTTP API 与服务器通信：
-
-\begin{lstlisting}
-手机拍照 -> Base64 编码 -> POST /api/clockin -> 返回结果
-\end{lstlisting}
-
-\section{Web 界面详细介绍}\label{src-experiment-case1-h85}
-
-\subsection{主页 (/)}\label{src-experiment-case1-h86}
-
-系统概览与功能导航入口。提供三个主要功能模块的快速访问： -
-用户管理：注册新用户、查看用户列表 - 考勤记录：查看打卡历史、手动打卡 -
-实时监控：查看摄像头实时画面
-
-\subsection{用户管理 (/users\_page)}\label{src-experiment-case1-h87}
-
-\textbf{用户注册功能}：
-
-支持两种注册方式：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  \textbf{上传照片}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    用户选择本地照片文件
-  \item
-    系统自动检测人脸并裁剪
-  \item
-    提取 512 维特征向量存入数据库
-  \end{itemize}
-\item
-  \textbf{设备摄像头抓拍}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    点击''Capture from Device Camera''
-  \item
-    系统从本地 USB 摄像头抓取当前帧
-  \item
-    自动完成人脸检测和特征提取
-  \end{itemize}
-\end{enumerate}
-
-\textbf{技术实现}：
-
-\begin{lstlisting}
-// 前端调用摄像头抓拍
-fetch('/api/camera/capture', {method: 'POST'})
-    .then(res => res.json())
-    .then(data => {
-        // 获得临时图片路径
-        document.getElementById('preview').src = '/uploads/' + data.temp_path;
-    });
-
-// 提交注册
-const formData = new FormData();
-formData.append('name', userName);
-formData.append('temp_path', tempPath);  // 使用抓拍的图片
-fetch('/api/users', {method: 'POST', body: formData});
-\end{lstlisting}
-
-\textbf{用户列表}： - 显示所有已注册用户 -
-支持删除操作（同时删除考勤记录） - 实时更新
-
-\subsection{考勤记录
-(/attendance\_page)}\label{src-experiment-case1-h88}
-
-\textbf{自动打卡显示}： - 实时展示本地摄像头自动识别的打卡记录 -
-显示用户姓名、打卡时间、相似度分数 - 页面自动刷新（每 5 秒）
-
-\textbf{手动打卡功能}： - 支持浏览器摄像头拍照打卡 - 支持上传照片打卡 -
-实时反馈识别结果（匹配成功/失败）
-
-\textbf{技术实现}：
-
-\begin{lstlisting}
-// 使用浏览器摄像头
-navigator.mediaDevices.getUserMedia({video: true})
-    .then(stream => {
-        video.srcObject = stream;
-    });
-
-// 拍照并打卡
-const canvas = document.createElement('canvas');
-canvas.getContext('2d').drawImage(video, 0, 0);
-const imageData = canvas.toDataURL('image/jpeg');
-
-fetch('/api/clockin', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-    body: 'image_base64=' + encodeURIComponent(imageData)
-});
-\end{lstlisting}
-
-\subsection{实时视频流 (/video\_feed)}\label{src-experiment-case1-h89}
-
-通过 MJPEG 协议提供实时视频流：
-
-\begin{lstlisting}[language=HTML]
-<img src=”/video_feed” alt=”Live Camera Feed”>
-\end{lstlisting}
-
-浏览器会持续接收视频帧，形成实时监控效果。
-
-\section{系统架构总结}\label{src-experiment-case1-h90}
-
-\subsection{数据流向}\label{src-experiment-case1-h91}
-
-\begin{lstlisting}
-摄像头 -> OpenCV -> 人脸检测(NPU) -> 人脸裁剪 -> 特征提取(NPU) -> 相似度计算(CPU) -> 数据库
-   ↓                                                                              ↓
-后台线程(30 FPS)                                                            考勤记录
-   ↓
-MJPEG 流 -> Web 浏览器
-\end{lstlisting}
-
-\subsection{关键技术栈}\label{src-experiment-case1-h92}
-
-{ % do not increment counter
-\begin{longtable}[]{@{}lll@{}}
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
 \toprule\noalign{}
-层次 & 技术 & 作用 \\
+\begin{minipage}[b]{\linewidth}\raggedright
+逻辑角色
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+ONNX 文件（准备阶段）
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+OM 文件（运行阶段）
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+处理结果
+\end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-硬件加速 & 昇腾 310B NPU & AI 推理加速 \\
-推理接口 & PyACL & NPU 编程接口 \\
-模型格式 & OM (离线模型) & 昇腾专用格式 \\
-检测算法 & RetinaFace (SCRFD) & 人脸检测 \\
-识别算法 & ArcFace & 特征提取 \\
-Web 框架 & Flask & HTTP 服务 \\
-数据库 & SQLite & 本地存储 \\
-图像处理 & OpenCV & 摄像头、图像操作 \\
-前端 & HTML5 + Bootstrap & 用户界面 \\
+人脸检测 & \passthrough{\lstinline!models/det\_500m.onnx!} &
+\passthrough{\lstinline!models/face\_detection.om!} &
+候选框与分数，供主机后处理 \\
+特征提取 & \passthrough{\lstinline!models/w600k\_mbf.onnx!} &
+\passthrough{\lstinline!models/face\_recognition.om!} & 人脸特征向量 \\
 \end{longtable}
-}
 
-\subsection{性能指标}\label{src-experiment-case1-h93}
+文件名是工程约定，不足以证明网络的论文名称或训练来源。检测网络的输出解析
+必须以实际 ONNX
+图、\passthrough{\lstinline!check\_onnx.py!}/\passthrough{\lstinline!check\_onnx\_out.py!}
+的结果以及板端
+数值烟测共同确认。本实现采用三尺度分数、边界框距离和关键点输出的解析路径；
+若转换得到的图结构不同，应先修正后处理合同，不能以``模型能加载''替代验证。
 
-在昇腾 310B 上的典型性能：
+\subsection{输入和前处理}\label{ux8f93ux5165ux548cux524dux5904ux7406}
 
-{ % do not increment counter
-\begin{longtable}[]{@{}ll@{}}
+当前实现编码了两组固定输入形状：检测输入为
+\passthrough{\lstinline!1×3×640×640!}，特征输入为
+\passthrough{\lstinline!1×3×112×112!}，数据类型为浮点数组。摄像头帧通常以
+BGR 排列进入 OpenCV， 再缩放、归一化并转换为
+\passthrough{\lstinline!NCHW!}。这些尺寸和归一化常数属于运行时合同，必须
+与板端 OM 的描述和模型准备记录一致；改变其中任一项都应重新执行输入输出
+检查和数值烟测。
+
+特征模型的输出在当前实现中被解释为 \passthrough{\lstinline!float32!}
+向量并写入 SQLite BLOB。向量
+维度、字节序和归一化方式是数据库数据的隐含类型信息，迁移或更换模型时不能
+只保留文件名而忽略这些字段。
+
+\subsection{从 ONNX 到 OM}\label{ux4ece-onnx-ux5230-om}
+
+ONNX 是准备和检查阶段的交换格式，OM 是昇腾运行时加载的离线模型。模型准备
+脚本负责下载或定位源资产、检查 ONNX 输入输出，并在板端调用 ATC 生成 OM。
+ATC、PyACL 和 OM 执行依赖 CANN 环境，开发机上的纯 Python
+测试不能替代这些
+步骤。模型、照片、数据库和板端报告属于运行资产，均不复制到本书源码。
+
+推荐把证据分成四个独立门槛：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{文件检查}：路径存在、文件可读、ONNX 能被解析；
+\item
+  \textbf{合同检查}：输入形状、输出数量、数据类型与后处理实现一致；
+\item
+  \textbf{转换检查}：ATC 成功生成目标 OM，并保留命令和日志；
+\item
+  \textbf{运行检查}：在目标开发板上完成 ACL 加载、一次推理和资源释放。
+\end{enumerate}
+
+只有完成相应门槛，文档才可以使用``已验证''这一表述。没有报告支撑的 FPS、
+延迟、准确率和召回率不应写入案例结论。
+
+\section{PyACL
+运行时与资源生命周期}\label{pyacl-ux8fd0ux884cux65f6ux4e0eux8d44ux6e90ux751fux547dux5468ux671f}
+
+\subsection{初始化}\label{ux521dux59cbux5316}
+
+应用启动时由运行时管理器完成以下工作：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  调用 \passthrough{\lstinline!acl.init!}，设置目标设备并创建 context 与
+  stream；
+\item
+  加载检测和特征 OM，读取模型描述中的输入输出信息；
+\item
+  为输入、输出数据集和 Device buffer 分配资源；
+\item
+  初始化 SQLite，并启动摄像头采集线程或延迟到首次使用。
+\end{enumerate}
+
+FastAPI 的 lifespan
+是组织这些步骤的合适位置。它使服务启动失败能够显式呈现 为
+\passthrough{\lstinline!degraded!}
+健康状态，而不是让请求在模型不存在时悄悄生成没有语义的向量。
+
+\subsection{一次执行}\label{ux4e00ux6b21ux6267ux884c}
+
+对每个模型，主机把连续的 NumPy 数组拷贝到 Device buffer，调用
+\passthrough{\lstinline!acl.mdl.execute!}，再将输出拷回主机并按模型合同解释。检测和特征提取应由
+同一个硬件工作队列串行调度；数据库查询和余弦相似度计算在主机侧完成，SQLite
+读写由进程内锁与事务边界保护。
+
+\subsection{释放}\label{ux91caux653e}
+
+服务停止时应先停止接收新任务，再停止 MJPEG 生成器和摄像头线程，随后释放
+模型数据集、data buffer、Device buffer、模型句柄、stream、context
+和设备，最后 调用 \passthrough{\lstinline!acl.finalize!}。显式的
+\passthrough{\lstinline!stop()!} 与线程 \passthrough{\lstinline!join()!}
+比依赖 Python 析构函数更
+容易测试；若线程未在期限内退出，运行时必须报告失败并禁止再次创建硬件
+owner。
+
+\section{FastAPI 与 React
+的协作边界}\label{fastapi-ux4e0e-react-ux7684ux534fux4f5cux8fb9ux754c}
+
+\subsection{API 资源}\label{api-ux8d44ux6e90}
+
+下表描述稳定的教学接口。字段由请求校验和运行时合同共同约束；错误响应使用
+可读的 \passthrough{\lstinline!error!} 字段，而不是把 Python
+异常堆栈返回给浏览器。
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
 \toprule\noalign{}
-指标 & 数值 \\
+\begin{minipage}[b]{\linewidth}\raggedright
+方法
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+路径
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+语义
+\end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-人脸检测延迟 & 10-20ms \\
-特征提取延迟 & 5-10ms \\
-特征比对延迟 (100 人) & \textless{} 5ms \\
-端到端延迟 & \textless{} 50ms \\
-视频流帧率 & 30 FPS \\
-自动打卡间隔 & 2 秒 \\
+\passthrough{\lstinline!GET!} & \passthrough{\lstinline!/api/health!} &
+返回服务、模型和摄像头的就绪状态 \\
+\passthrough{\lstinline!GET!} & \passthrough{\lstinline!/api/users!} &
+返回用户列表，不包含特征向量 \\
+\passthrough{\lstinline!POST!} & \passthrough{\lstinline!/api/users!} &
+接收姓名与图像，提取特征并注册用户 \\
+\passthrough{\lstinline!PUT!} &
+\passthrough{\lstinline!/api/users/\{id\}!} & 修改用户显示名称 \\
+\passthrough{\lstinline!DELETE!} &
+\passthrough{\lstinline!/api/users/\{id\}!} & 删除用户及其关联事件 \\
+\passthrough{\lstinline!POST!} &
+\passthrough{\lstinline!/api/camera/capture!} &
+从板端摄像头抓取一张图像 \\
+\passthrough{\lstinline!POST!} & \passthrough{\lstinline!/api/clockin!}
+& 接收上传或浏览器图像并尝试手动打卡 \\
+\passthrough{\lstinline!GET!} &
+\passthrough{\lstinline!/api/attendance!} &
+返回当天每位用户的最近一条记录 \\
+\passthrough{\lstinline!GET!} & \passthrough{\lstinline!/video\_feed!} &
+返回缓存帧组成的 \passthrough{\lstinline!multipart/x-mixed-replace!}
+流 \\
+\passthrough{\lstinline!GET!} &
+\passthrough{\lstinline!/uploads/\{resource\}!} &
+返回已授权的头像或抓拍资源 \\
 \end{longtable}
-}
 
-\section{学习路径建议}\label{src-experiment-case1-h94}
+模型缺失、加载失败或输出合同不满足时，健康接口应报告
+\passthrough{\lstinline!degraded!}，注册和 推理接口返回 HTTP
+\passthrough{\lstinline!503!}。这比返回随机特征或空的成功响应更容易定位部署
+错误，也不会把无效结果写入考勤数据。
 
-\subsection{初学者（第 1-2 周）}\label{src-experiment-case1-h95}
+\subsection{浏览器界面}\label{ux6d4fux89c8ux5668ux754cux9762}
+
+React 页面通过 \passthrough{\lstinline!fetch!}
+调用上述资源，使用文件上传或浏览器
+\passthrough{\lstinline!getUserMedia!}
+产生图像。离开页面、重新抓拍或请求失败时，前端应释放媒体 轨道并清理对象
+URL。FastAPI
+托管构建后的静态资源；\passthrough{\lstinline!/!}、\passthrough{\lstinline!/users\_page!}
+和 \passthrough{\lstinline!/attendance\_page!} 作为兼容入口回退到同一个
+SPA，使旧书签仍然可用。
+
+MJPEG 预览只读取硬件线程维护的最近 JPEG，不在每个 HTTP 客户端中重新执行
+检测。这样可以把``采集与推理''和``网络传输''分开，避免浏览器数量改变硬件
+工作顺序。它仍然是教学级流式方案，不提供 WebRTC、鉴权和带宽自适应。
+
+\subsection{同步与异步的选择}\label{ux540cux6b65ux4e0eux5f02ux6b65ux7684ux9009ux62e9}
+
+FastAPI 采用 ASGI，但 PyACL、OpenCV 和标准库
+\passthrough{\lstinline!sqlite3!} 都是阻塞调用。请求
+处理函数不能因为使用 FastAPI 就全部改写为
+\passthrough{\lstinline!async def!}；硬件操作应进入单一
+工作队列或受控线程池，异步层只负责等待结果和发送响应。多 worker
+启动会复制 模型和摄像头句柄，本案例固定单 worker。
+
+\section{检测、特征与比对}\label{ux68c0ux6d4bux7279ux5f81ux4e0eux6bd4ux5bf9}
+
+\subsection{检测与裁剪}\label{ux68c0ux6d4bux4e0eux88c1ux526a}
+
+检测输出先经过分数阈值筛选、坐标缩放和 NMS，再得到候选框。当前示例在存在
+多张人脸时选择面积最大的框，作为单人考勤演示的确定性策略。空框、越界框或
+裁剪后尺寸为零时，应返回可解释的业务错误，不应把整张无脸图像当作有效身份
+输入。
+
+\subsection{特征比对}\label{ux7279ux5f81ux6bd4ux5bf9}
+
+设查询向量为 \(q\)，数据库向量为 \(v_i\)，余弦相似度为
+
+\[
+s(q,v_i)=\frac{q\cdot v_i}{\lVert q\rVert_2\lVert v_i\rVert_2+\epsilon}.
+\]
+
+系统在候选用户中取最大相似度，并与配置阈值比较。示例阈值是工程参数，不是
+经过特定数据集校准的生物识别决策边界；改变模型、摄像头、光照或用户群体后，
+应以独立的正负样本协议重新估计阈值，并报告误接受与误拒绝情况。
+
+\subsection{两种考勤分支}\label{ux4e24ux79cdux8003ux52e4ux5206ux652f}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{板端自动分支}：摄像头线程定期取当前帧，检测最大人脸，完成特征比对；
+  已匹配用户可以写入 \passthrough{\lstinline!camera\_auto!}
+  事件，陌生人按教学策略自动登记并标注为 演示事件。
+\item
+  \textbf{浏览器手动分支}：React 上传文件或浏览器抓拍，API
+  完成同样的检测、 特征和比对过程；只有匹配通过时才写入
+  \passthrough{\lstinline!manual!} 事件，未匹配结果返回
+  \passthrough{\lstinline!match=false!}。
+\end{itemize}
+
+\passthrough{\lstinline!GET /api/attendance!}
+的当前语义是``当天每位用户最近一次记录''，不是完整历史
+审计。若研究需要多次事件、跨日期查询或导出，应另行设计带日期、用户、分页和
+时区参数的接口，不应仅修改页面标题。
+
+\section{数据存储与隐私边界}\label{ux6570ux636eux5b58ux50a8ux4e0eux9690ux79c1ux8fb9ux754c}
+
+SQLite 表保存用户名称、特征
+BLOB、头像资源标识和考勤事件。特征是敏感的生物 特征数据，即使转换为 BLOB
+也没有自动获得加密或匿名性。教学部署应至少做到：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  \textbf{理解整体流程}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    运行系统，体验各项功能
-  \item
-    阅读 README.md，理解系统架构
-  \item
-    观察日志输出，了解执行过程
-  \end{itemize}
+  上传文件由服务端生成不透明资源名，限制大小和图像类型，校验规范化路径
+  位于 \passthrough{\lstinline!data/uploads!} 内；
 \item
-  \textbf{修改简单参数}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    调整识别阈值（0.5 -\textgreater{} 0.6）
-  \item
-    修改自动打卡间隔（2 秒 -\textgreater{} 5 秒）
-  \item
-    更改摄像头分辨率
-  \end{itemize}
+  API 列表不返回 embedding，资源下载经过明确的访问边界，不把上传目录
+  直接作为公开静态目录；
 \item
-  \textbf{理解核心概念}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    什么是特征向量？
-  \item
-    什么是余弦相似度？
-  \item
-    Host 和 Device 的区别
-  \end{itemize}
+  数据库、照片、模型和报告保留在设备本地，测试结束按实验协议删除；
+\item
+  日志只记录必要的事件标识，不输出完整特征、原始图像或调试堆栈；
+\item
+  自动登记仅用于教学观察，正式系统必须有知情同意、人工审核、撤销和删除
+  流程。
 \end{enumerate}
 
-\subsection{进阶学习（第 3-4 周）}\label{src-experiment-case1-h96}
+这些措施是最低限度的工程边界，不等同于完整的隐私影响评估或合规认证。
+
+\section{实验步骤与证据记录}\label{ux5b9eux9a8cux6b65ux9aa4ux4e0eux8bc1ux636eux8bb0ux5f55}
+
+\subsection{开发机上的纯 Python
+检查}\label{ux5f00ux53d1ux673aux4e0aux7684ux7eaf-python-ux68c0ux67e5}
+
+开发机不具备 CANN、PyACL、OM
+和摄像头运行条件。可执行的检查包括目录合同、 Python 语法、FastAPI
+请求合同和使用 fake runtime 的生命周期测试：
+
+\begin{lstlisting}[language=bash]
+cd samples/case1
+python -m unittest discover -s tests -p 'test_layout.py'
+python -m py_compile app.py face_attendance/*.py
+\end{lstlisting}
+
+模型检查脚本可以解析已提供的 ONNX 文件，但解析成功不等于转换成功或推理
+正确。测试输出应标明``静态检查''，不能写成板端性能结论。
+
+\subsection{开发板上的硬件检查}\label{ux5f00ux53d1ux677fux4e0aux7684ux786cux4ef6ux68c0ux67e5}
+
+在已加载 CANN 环境的 Ascend 310B 上依次完成：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  \textbf{深入代码细节}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    阅读 \passthrough{\lstinline!ascend\_inference.py!}，理解 ACL 工作流
-  \item
-    阅读 \passthrough{\lstinline!camera.py!}，理解多线程设计
-  \item
-    阅读 \passthrough{\lstinline!app.py!}，理解 Flask 路由
-  \end{itemize}
+  检查设备状态、摄像头节点和 Python \passthrough{\lstinline!acl!} 导入；
 \item
-  \textbf{实验与调试}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    添加性能分析代码
-  \item
-    尝试不同的预处理方法
-  \item
-    测试不同光照条件下的识别率
-  \end{itemize}
+  检查 ONNX 输入输出合同，按目标 SoC 运行 ATC（若 OM 尚未存在）；
 \item
-  \textbf{扩展功能}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    添加考勤统计功能
-  \item
-    实现考勤数据导出（CSV/Excel）
-  \item
-    添加用户权限管理
-  \end{itemize}
+  加载两个 OM，执行一次检测和一次特征提取，确认输出形状；
+\item
+  启动 FastAPI，检查
+  \passthrough{\lstinline!/api/health!}、静态首页、用户 API 和 MJPEG
+  首帧；
+\item
+  用合成或经同意的测试图像完成注册、手动打卡和自动分支；
+\item
+  发送停止信号，检查摄像头、模型、ACL context 和服务进程均已释放。
 \end{enumerate}
 
-\subsection{高级应用（第 5-8 周）}\label{src-experiment-case1-h97}
+每项结果都应保留命令、环境、模型文件名、输入协议和原始日志路径。只有在
+具有明确测量脚本和报告时，才可增加延迟、帧率、识别率或资源占用数字。
+
+\subsection{API 合同示例}\label{api-ux5408ux540cux793aux4f8b}
+
+以下示例只说明接口形状，不包含真实图像或生产凭据：
+
+\begin{lstlisting}[language=bash]
+curl http://127.0.0.1:5000/api/health
+curl http://127.0.0.1:5000/api/users
+curl -F 'name=example' -F 'image=@synthetic-face.jpg' \
+  http://127.0.0.1:5000/api/users
+curl -F 'image=@synthetic-face.jpg' \
+  http://127.0.0.1:5000/api/clockin
+\end{lstlisting}
+
+板端服务若需要局域网访问，应显式传入受控的
+\passthrough{\lstinline!--host!}，并在实验结束后恢复本机
+监听。默认命令不启用调试模式、自动重载或多 worker。
+
+\section{局限与可扩展方向}\label{ux5c40ux9650ux4e0eux53efux6269ux5c55ux65b9ux5411}
+
+本案例的简化点包括：最大人脸策略、全库线性检索、固定阈值、SQLite
+单机写入、 MJPEG
+预览和教学性的陌生人自动登记。它们有助于暴露基本数据流，但不能直接
+推导出大规模、多摄像头、跨网络或高安全场景的结论。
+
+合理的后续实验包括：
+
+\begin{itemize}
+\tightlist
+\item
+  用独立的同人/异人样本校准阈值，并报告 ROC、误接受率和误拒绝率；
+\item
+  增加活体检测和人工审核，将``未知人脸''与``新用户注册''分离；
+\item
+  将向量检索从全库遍历扩展为带版本和重建策略的 ANN 索引；
+\item
+  以任务队列和限流机制研究多摄像头、多个浏览器客户端的资源竞争；
+\item
+  比较 MJPEG 与其他传输协议的带宽和延迟，但不得把协议比较结果归因于 NPU
+  推理速度。
+\end{itemize}
+
+\section{小结}\label{ux5c0fux7ed3}
+
+案例1把一个看似简单的``摄像头打卡''问题拆解为模型合同、硬件运行时、数据
+比对、服务接口和隐私边界五个可以单独验证的对象。FastAPI 与 React
+负责清晰 地表达服务和交互，单一硬件工作线程负责稳定地使用摄像头与
+NPU，SQLite 则
+提供可观察的本地事件存储。学习重点不是记住某个未经测量的延迟数字，而是
+建立从资产检查到板端证据的完整推理链，并能说明每个结论的适用范围。
+
+\section{参考文献}\label{ux53c2ux8003ux6587ux732e}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  \textbf{性能优化}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    实现批处理推理
-  \item
-    集成 Faiss 加速检索
-  \item
-    尝试模型量化（FP16/INT8）
-  \end{itemize}
+  Deng, J., Guo, J., Xue, N., and Zafeiriou, S. \emph{ArcFace: Additive
+  Angular Margin Loss for Deep Face Recognition}. CVPR, 2019. DOI:
+  \href{https://doi.org/10.1109/CVPR.2019.00482}{10.1109/CVPR.2019.00482}.
 \item
-  \textbf{功能增强}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    添加活体检测
-  \item
-    支持多摄像头
-  \item
-    实现移动端 App
-  \end{itemize}
-\item
-  \textbf{生产部署}：
-
-  \begin{itemize}
-  \tightlist
-  \item
-    添加完善的错误处理
-  \item
-    实现日志系统
-  \item
-    配置 Nginx 反向代理
-  \item
-    使用 Gunicorn 部署
-  \end{itemize}
+  FastAPI documentation,
+  \href{https://fastapi.tiangolo.com/tutorial/request-files/}{Request
+  files and uploads} and
+  \href{https://fastapi.tiangolo.com/advanced/events/}{Lifespan events}.
 \end{enumerate}
-
-\section{总结}\label{src-experiment-case1-h98}
-
-本案例展示了如何利用昇腾 310B NPU
-构建一个完整的人脸识别考勤系统。通过学习本案例，你应该掌握：
-
-\textbf{理论知识}： - Anchor-based 目标检测原理 - 度量学习与 ArcFace
-损失函数 - 余弦相似度与特征匹配 - 图像预处理与归一化
-
-\textbf{工程技能}： - PyACL 编程与 NPU 资源管理 - Host-Device 内存管理 -
-多线程编程与线程安全 - Flask Web 开发 - SQLite 数据库操作
-
-\textbf{实践经验}： - 模型转换（ONNX -\textgreater{} OM） - 边缘设备部署
-- 实时视频流处理 - 性能优化策略
-
-这些知识和技能不仅适用于人脸识别，也可以迁移到其他 AI
-应用场景，如物体检测、图像分类、语义分割等。
-
-祝你学习愉快！

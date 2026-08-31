@@ -56,7 +56,6 @@
 
 \subsubsection*{理论教程}\label{src-book-README-h4}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -98,7 +97,6 @@ Chapter 9 & AI项目交付闭环 &
 SSD300实验室实时检测、评测体系、标准化交付流程 &
 建立规范的AI项目交付方法论 \\
 \end{longtable}
-}
 
 \subsubsection*{实践案例}\label{src-book-README-h5}
 
@@ -108,7 +106,8 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
 \subsubsection*{附录}\label{附录}
 
 附录用于集中收录实验基础和查阅型资料。附录 1 介绍开发板与基础环境，附录
-2 汇集工具箱、FAQ 与参数模板；后续附录按阿拉伯数字顺序扩展。
+2 系统整理昇腾 310B Linux 操作与命令，附录 3 汇集工具箱、FAQ
+与参数模板；后续附录按阿拉伯数字顺序扩展。
 
 \subsection*{各模块核心要点概述}\label{src-book-README-h6}
 
@@ -231,13 +230,13 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
 \begin{itemize}
 \tightlist
 \item
-  \textbf{Case 1}：智能打卡机 (Web应用, 人脸识别)
+  \textbf{Case 1 · Face Attendance}：人脸考勤（Web 应用）
 \item
   \textbf{Case 2}：边缘端实时目标跟踪 (检测+关联)
 \item
   \textbf{Case 3}：智能电子琴 (手势识别+音频合成)
 \item
-  \textbf{Case 4}：智能掌纹识别机 (预处理, 特征提取)
+  \textbf{Case 4 · 掌纹识别 NPU 工作台}：预处理、特征提取与触控部署
 \item
   \textbf{Case 5}：智能数据采集仪 (传感器, 数据分析)
 \item
@@ -247,7 +246,7 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
 \item
   \textbf{Case 8}：手势识别 (数据采集, 实时系统)
 \item
-  \textbf{Case 9}：智能聊天机器人 (LLM, 语音交互, RAG)
+  \textbf{Case 9}：小智 OpenAI 兼容 RAG 网关 (LLM, 流式接口, 检索增强)
 \end{itemize}
 
 \textbf{附录}
@@ -257,7 +256,10 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
 \item
   \textbf{附录 1}：开发板硬件、系统安装、启动与网络连接、基础环境验证
 \item
-  \textbf{附录 2}：常见报错速查、模型转换参数模板、性能与质量
+  \textbf{附录 2}：昇腾 310B Linux
+  shell、CANN、设备、服务、测试与证据边界
+\item
+  \textbf{附录 3}：常见报错速查、模型转换参数模板、性能与质量
   Checklist、术语表与 FAQ
 \end{itemize}
 
@@ -280,7 +282,6 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
 
 \subsection*{如何使用本书}\label{src-book-README-h8}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -309,7 +310,6 @@ AI应用开发者 & Chapter 2、Chapter 3、Chapter 8、选读 Case 案例 &
 技术负责人 & Chapter 1、Chapter 7、Chapter 8、Chapter 9 & 构建团队方法论
 & 制定内部量化评估、性能验收和交付标准 \\
 \end{longtable}
-}
 
 \subsection*{许可证与引用}\label{src-book-README-h9}
 

@@ -25,7 +25,6 @@ Processing，DDSP）将谐波振荡器、滤波噪声和混响等声学结构引
 
 该 Web 工作站支持以下三类处理流程：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -56,7 +55,6 @@ WAV、开发板播放或浏览器播放 & 离线多声部音色渲染 \\
 DDSP-VST & 摄像头或独立麦克风的实体音频输入 & Feature OM 与 Control OM &
 实时音色转换 & 把单音哼唱或乐器声转换为 11 种音色 \\
 \end{longtable}
-}
 
 设备页不参与音乐生成，它负责展示开发板、NPU、模型、音频、MIDI、蓝牙和
 Python 环境状态，并提供独占的扬声器与麦克风测试。
@@ -94,7 +92,6 @@ Effect
 
 最小配置用于完成触控演奏、浏览器操作和基本声音输出。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1905}}
   >{\centering\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2381}}
@@ -131,7 +128,6 @@ HDMI 线与 USB 触控线 & 各 1 & HDMI、USB & 视频与触控回传 &
 局域网与开发电脑 & 1 套 & 以太网或 Wi-Fi & 构建、部署和浏览器访问 &
 开发电脑与开发板需位于可信局域网 \\
 \end{longtable}
-}
 
 本案例支持通过 Bluetooth A2DP
 连接蓝牙音箱和蓝牙耳机。蓝牙链路中的音频编码、无线传输和播放缓冲通常会增加端到端延迟，因此实时演奏时可能出现较明显的声音滞后，影响演奏反馈。该部分延迟来自蓝牙音频链路，不应归因于
@@ -142,7 +138,6 @@ NPU
 
 以下型号构成本案例的验证配置，但不代表唯一可用品牌。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1905}}
   >{\centering\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2381}}
@@ -183,11 +178,9 @@ MIDI 键盘 & 1 & MIDIPLUS TINY，32 键 & USB MIDI &
 USB 线材与供电线 & 若干 & 与设备匹配 & USB-A、USB-C 等 &
 音箱、摄像头、MIDI、触控和供电连接 \\
 \end{longtable}
-}
 
 \subsection{可选扩展}\label{src-experiment-case3-optional-bom}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -213,7 +206,6 @@ source，不能使用 PulseAudio monitor \\
 延音踏板 & 控制实体 MIDI 的 CC64 & MIDI
 控制器需要上报标准控制变化消息 \\
 \end{longtable}
-}
 
 \section{系统总体架构与完整流程}\label{src-experiment-case3-system-architecture}
 
@@ -252,7 +244,6 @@ PulseAudio
 \caption{开发电脑与 Ascend 310B 开发板的职责边界}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lcc@{}}
 \toprule\noalign{}
 操作 & 开发电脑 & Ascend 310B \\
@@ -267,7 +258,6 @@ PulseAudio
 ATC、PyACL、OM 推理、\passthrough{\lstinline!npu-smi!} & 否 & 是 \\
 PulseAudio 实体路由和真实听音 & 否 & 是 \\
 \end{longtable}
-}
 
 \section{DDSP 原理}\label{src-experiment-case3-ddsp-theory}
 
@@ -341,7 +331,6 @@ y[n] = (1-m)x_{dry}[n] + m x_{wet}[n].
 
 \subsection{参数如何改变听感}\label{src-experiment-case3-perception}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -370,7 +359,6 @@ y[n] = (1-m)x_{dry}[n] + m x_{wet}[n].
 噪声门 & 阻止环境底噪触发模型 &
 阈值过低会持续触发，过高会吞掉轻声起音 \\
 \end{longtable}
-}
 
 \section{三套神经网络架构}\label{src-experiment-case3-model-architectures}
 
@@ -425,7 +413,6 @@ ONNX 计算图，也使状态复位、声部回收和确定性重放具有明确
 
 在共同的输入、状态和输出合同下，本案例训练并比较了四类结构：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -452,7 +439,6 @@ GRU 全湿声校准 & 保留基准控制网络，强化混响声、能量、起�
 FiLM 全湿声校准 & 结合 FiLM、深层单声部网络、联合非谐性和学习型冲激响应
 & 比较结构扩展与感知校准的联合效果 \\
 \end{longtable}
-}
 
 这些结构名称表示建模假设，而不是预设的音质排序。不同方案在网络容量、谐波分辨率和混响表示上各有侧重，最终选择需要同时考虑闭环数值误差、实时预算和主观听音结果。
 
@@ -463,7 +449,6 @@ FiLM 全湿声校准 & 结合 FiLM、深层单声部网络、联合非谐性和�
 ONNX。下表以 GRU 与学习型冲激响应结构为例；FiLM
 与反馈延迟网络结构保持相同的输入和循环状态语义，但将谐波、噪声及混响输出分别扩展为相应的控制维度。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 方向 & 张量 & 形状 & 含义 \\
@@ -499,7 +484,6 @@ ONNX。下表以 GRU 与学习型冲激响应结构为例；FiLM
 输出 & \passthrough{\lstinline!next\_monophonic\_state!} &
 \passthrough{\lstinline![1,16,192]!} & 下一帧声部状态 \\
 \end{longtable}
-}
 
 导出验证不仅比较单帧输出，还将上一帧状态连续反馈给下一帧，逐项对照
 PyTorch 与 ONNX Runtime
@@ -528,7 +512,6 @@ MIDI-DDSP 为已知完整乐曲的离线层级模型，不是物理 MIDI
 
 stateful v2 把原始图拆成八个可独立转换和批处理的组件：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -558,7 +541,6 @@ stateful v2 把原始图拆成八个可独立转换和批处理的组件：
 \passthrough{\lstinline!synthesis\_timbre!} &
 \passthrough{\lstinline!amplitude[1]!}、\passthrough{\lstinline!harmonics[60]!}、\passthrough{\lstinline!noise\_amps[65]!} \\
 \end{longtable}
-}
 
 模型为单声部建模。程序先把 MIDI 分成单音声部，再按静态 batch
 \passthrough{\lstinline!1/2/4/8!} 选择最小可容纳 OM，生成每个
@@ -580,7 +562,6 @@ DDSP-VST 实现}。其计算过程分为 Feature 与 Control 两级：Feature
 状态回路和 CPU 音频输出}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -610,7 +591,6 @@ Control OM &
 \passthrough{\lstinline!amplitude[1]!}、\passthrough{\lstinline!harmonics[60]!}、\passthrough{\lstinline!noise\_amps[65]!}、\passthrough{\lstinline!state\_out[512]!}
 & 每 \passthrough{\lstinline!20 ms!} 更新音色控制与 GRU 状态 \\
 \end{longtable}
-}
 
 Control
 模型覆盖巴松、单簧管、长笛、口风琴、萨克斯、西塔琴、长号、小号、大号、小提琴和人声音色，共
@@ -619,7 +599,6 @@ Control
 
 \subsection{三套网络对比}\label{src-experiment-case3-model-comparison}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -653,7 +632,6 @@ NPU 输出 & 96 谐波、64 噪声等控制 & 60 谐波、65 噪声等控制 & F
 DSP 边界 & CPU 合成、重采样和 IR/FDN & CPU 合成、混响、stem 混音和 WAV &
 CPU 合成、重采样、增益和 FreeVerb \\
 \end{longtable}
-}
 
 \section{模型转换与 Ascend
 部署}\label{src-experiment-case3-model-deployment}
@@ -663,7 +641,6 @@ CPU 合成、重采样、增益和 FreeVerb \\
 三套网络进入 Ascend
 部署链之前具有两种不同来源，不能将其笼统表述为同一种``模型下载''过程。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -691,7 +668,6 @@ DDSP-VST & Google DDSP-VST 项目的 TFLite 模型 & 将 Feature 与 Control
 分别转换为流式 ONNX，并显式化 Control 的循环状态 &
 实时单音特征提取与音色转换 \\
 \end{longtable}
-}
 
 Piano-DDSP 的训练代码与模型修改见
 \href{https://github.com/zhouxzh/piano-ddsp-pytorch/tree/main}{piano-ddsp-pytorch}，导出的
@@ -759,7 +735,6 @@ ONNX 首先按照 \href{https://onnx.ai/onnx/}{ONNX
 
 验证分为四个相互衔接的层次：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -785,7 +760,6 @@ ONNX 首先按照 \href{https://onnx.ai/onnx/}{ONNX
 系统一致性 & 神经控制量能否形成连续可听的音频 &
 检查非静音输入输出、音频缓冲、削波、设备路由与长时间状态增长 \\
 \end{longtable}
-}
 
 其中，Piano-DDSP
 尤其需要考察全局状态与逐声部状态的长期累积误差；MIDI-DDSP
@@ -868,7 +842,6 @@ WebSocket 中报告；不会继续输出可能削波的声音。
 
 \subsection{通信语义}\label{src-experiment-case3-api}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -894,7 +867,6 @@ WebSocket 事件 & 音符边沿、踏板变化、作业进度、设备变化和�
 文件访问 & MIDI、WAV、录音与评价报告 &
 大型产物采用独立传输，避免混入控制消息 \\
 \end{longtable}
-}
 
 通信接口的核心约束是：客户端提交目录标识和有界参数，服务端解析实际模型与设备；实时事件负责同步变化，状态快照负责断线后的重新对齐。具体端点和字段属于实现合同，见\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/02-webui.md}{WebUI
 与 API
@@ -920,7 +892,6 @@ CPU
 
 实时演奏和 MIDI 文件浏览都使用钢琴卷帘，但二者具有不同的时间模型：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -946,7 +917,6 @@ CPU
 文件卷帘 & 完整 MIDI 时间轴与播放位置 & 分离静态网格、音符层和动态光标 &
 以分层 Canvas 承载长序列，避免为每个音符创建界面节点 \\
 \end{longtable}
-}
 
 实时卷帘保留短音符的最小可见高度；状态快照只用于重新同步当前按键，不能反推已错过的短音符。文件卷帘支持声部颜色、拍号网格、缩放、拖动、进度光标和活动音符，但不是
 MIDI 编辑器。
@@ -972,7 +942,6 @@ NPU 诊断警告应与设备可见性、模型加载状态和 OM
 \caption{实时演奏工作区的触摸屏模式}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1013,7 +982,6 @@ NPU 诊断警告应与设备可见性、模型加载状态和 OM
 待机可查看音域，开始后发声 & 快速松开仍由后端保证 16 ms
 门长；失焦、取消触摸或停止会全部停音 \\
 \end{longtable}
-}
 
 \subsection{实时演奏 / MIDI
 键盘}\label{src-experiment-case3-ui-midi-keyboard}
@@ -1024,7 +992,6 @@ NPU 诊断警告应与设备可见性、模型加载状态和 OM
 \caption{实时演奏工作区的 MIDI 键盘模式}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1063,7 +1030,6 @@ A0-C8 \\
 可视键盘 & 只读键位高亮 & 对照实体 MIDI 的当前音符和音域 & 32 键范围为
 F2-C5 & 只用于反馈，不在此处提供鼠标或触控演奏 \\
 \end{longtable}
-}
 
 \subsection{MIDI-DDSP 音频库}\label{src-experiment-case3-ui-library}
 
@@ -1073,7 +1039,6 @@ F2-C5 & 只用于反馈，不在此处提供鼠标或触控演奏 \\
 \caption{MIDI-DDSP 音频库页面}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1107,7 +1072,6 @@ WAV 同步变化 & 缺失文件会标记不可用，不删除历史 \\
 右侧曲目列表 & 曲目、版本数、时长 & 快速切换音频库来源 &
 选中项有文字和底色 & 选择不可用版本时返回错误 \\
 \end{longtable}
-}
 
 \subsection{MIDI-DDSP 新建渲染}\label{src-experiment-case3-ui-render}
 
@@ -1117,7 +1081,6 @@ WAV 同步变化 & 缺失文件会标记不可用，不删除历史 \\
 \caption{MIDI-DDSP 新建渲染页面}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1152,7 +1115,6 @@ OM 已验证、声部已就绪 & 相同配置再次渲染仍创建新版本 \\
 底部操作 & 开始渲染、状态、产物 & 创建异步任务并显示进度 & 成功后可下载
 & 运行时保留取消、心跳、预计完成时间和报告 \\
 \end{longtable}
-}
 
 \clearpage
 
@@ -1164,7 +1126,6 @@ OM 已验证、声部已就绪 & 相同配置再次渲染仍创建新版本 \\
 \caption{DDSP-VST 音色页面}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1198,7 +1159,6 @@ OM 已验证、声部已就绪 & 相同配置再次渲染仍创建新版本 \\
 指标 & Feature、Control、总延迟、后端 & 检查 OM 链路和线程状态 &
 \passthrough{\lstinline!ACL/OM!} 且异常 0 & 指标不能代替听感评价 \\
 \end{longtable}
-}
 
 \subsection{DDSP-VST 输入门}\label{src-experiment-case3-ui-vst-gate}
 
@@ -1208,7 +1168,6 @@ OM 已验证、声部已就绪 & 相同配置再次渲染仍创建新版本 \\
 \caption{DDSP-VST 输入门页面}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1242,7 +1201,6 @@ OM 已验证、声部已就绪 & 相同配置再次渲染仍创建新版本 \\
 状态条 & 输入门已关闭/打开 & 明确当前是否输出 & 静音环境显示关闭 &
 有音高点但门关闭时不会送入合成输出 \\
 \end{longtable}
-}
 
 \subsection{DDSP-VST 效果}\label{src-experiment-case3-ui-vst-effects}
 
@@ -1252,7 +1210,6 @@ OM 已验证、声部已就绪 & 相同配置再次渲染仍创建新版本 \\
 \caption{DDSP-VST 效果页面}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1285,7 +1242,6 @@ OM 已验证、声部已就绪 & 相同配置再次渲染仍创建新版本 \\
 安全状态 & 异常和安全静音 & 防止持续过载 & 异常 0、安全静音关闭 &
 触发后应停止并排查输入和增益 \\
 \end{longtable}
-}
 
 \clearpage
 
@@ -1299,7 +1255,6 @@ OM 已验证、声部已就绪 & 相同配置再次渲染仍创建新版本 \\
 
 \clearpage
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -1324,7 +1279,6 @@ DDSP-VST & 至少一个 capture、错误为 0 & monitor 数量不代表麦克风
 MIDI-DDSP & bundle 和组件已索引 & 发现资产不等同于已听音验收 \\
 运行环境 & Python、依赖、任务状态可见 & 详细内容放在运行环境页 \\
 \end{longtable}
-}
 
 \subsection{音频输出与扬声器测试}\label{src-experiment-case3-ui-audio-output}
 
@@ -1334,7 +1288,6 @@ MIDI-DDSP & bundle 和组件已索引 & 发现资产不等同于已听音验收 
 \caption{音频输出与扬声器测试页面}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1369,7 +1322,6 @@ MIDI-DDSP & bundle 和组件已索引 & 发现资产不等同于已听音验收 
 测试设置 & 左/双/右声道、频率、增益、时长 & 播放受控正弦测试 & 状态从
 IDLE 进入运行 & 从低增益开始，避免突然高声压 \\
 \end{longtable}
-}
 
 \subsection{音频输入与麦克风测试}\label{src-experiment-case3-ui-audio-input}
 
@@ -1379,7 +1331,6 @@ IDLE 进入运行 & 从低增益开始，避免突然高声压 \\
 \caption{音频输入与麦克风测试页面}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1413,7 +1364,6 @@ CAPTURE & Effect 和输入测试都拒绝 monitor \\
 时长与开始 & 步进器、开始输入测试 & 运行独占采集检查 & IDLE 或完成结果 &
 测试期间不能启动 Effect \\
 \end{longtable}
-}
 
 \subsection{MIDI 设备}\label{src-experiment-case3-ui-midi-device}
 
@@ -1423,7 +1373,6 @@ CAPTURE & Effect 和输入测试都拒绝 monitor \\
 \caption{MIDI 设备页面}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1456,7 +1405,6 @@ MIDI 输入状态 & 全宽设备状态卡 & 显示键数、型号、输入端口
 蓝牙区 & 已配对音频设备 & 展示另一类外设状态 & 与 MIDI 清单分开 &
 蓝牙音频不能替代 USB MIDI \\
 \end{longtable}
-}
 
 \subsection{运行环境}\label{src-experiment-case3-ui-runtime}
 
@@ -1468,7 +1416,6 @@ MIDI 输入状态 & 全宽设备状态卡 & 显示键数、型号、输入端口
 
 \clearpage
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -1502,11 +1449,9 @@ NPU 警告 & Health Alarm 文本 & 如实展示硬件诊断 & 警告可见 &
 Python 环境 & 解释器与环境名称 & 核对服务使用的板端运行环境 &
 环境与依赖合同一致 & 不在运行中隐式切换解释器 \\
 \end{longtable}
-}
 
 \subsection{布局验收场景}\label{src-experiment-case3-viewport-matrix}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -1532,7 +1477,6 @@ Python 环境 & 解释器与环境名称 & 核对服务使用的板端运行环�
 移动浏览器 & 采用易触达导航并处理安全区 &
 核心命令可达，无文档级横向滚动 \\
 \end{longtable}
-}
 
 \section{从零复现实验}\label{src-experiment-case3-reproduction}
 
@@ -1584,7 +1528,6 @@ npm run test:e2e
 
 各 npm 命令的职责不同：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -1613,7 +1556,6 @@ npm run test:e2e
 \passthrough{\lstinline!npm run test:e2e!} & 用 Playwright
 检查生产页面布局和交互 & 发布前或影响工作流、响应式、Canvas 时 \\
 \end{longtable}
-}
 
 开发板不安装 Node 或 npm，也不运行 Vite
 生产服务器。它只接收开发电脑生成的
@@ -1729,7 +1671,6 @@ OM
 
 \subsection{常见问题}\label{src-experiment-case3-troubleshooting}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -1776,13 +1717,11 @@ source/sink、线程退出和资源锁 &
 \passthrough{\lstinline!bluetoothctl!}、PulseAudio A2DP sink、连接
 profile & 使用板端已有设施；缺少系统组件时报告，不在部署中安装 \\
 \end{longtable}
-}
 
 更多板端日志、ATC/OOM、音频和兼容性案例见\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/11-troubleshooting.md}{测试故障排查记录}与\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/06-audio-output.md}{音频输出说明}。
 
 \subsection{测试矩阵}\label{src-experiment-case3-test-matrix}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -1810,7 +1749,6 @@ NaN/Inf \\
 板端音频 & 真实双工与听音 & PCM
 非零、路由、总延迟、overflow、underrun、clipping 和设备断开 \\
 \end{longtable}
-}
 
 本地测试不得运行 PyACL、ATC、OM 推理或
 \passthrough{\lstinline!npu-smi!}；这些结果必须来自真实 Ascend 310B。
@@ -1819,7 +1757,6 @@ NaN/Inf \\
 
 \subsection{软件分层}\label{src-experiment-case3-directory-tree}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -1846,7 +1783,6 @@ NaN/Inf \\
 不决定模型或界面状态 \\
 实验记录层 & 关联输入、配置、音频产物和评价结果 & 不参与实时控制路径 \\
 \end{longtable}
-}
 
 这种分层对应不同的时间尺度：交互事件要求及时响应，神经控制按固定帧率递推，音频设备持续消费采样块，离线作业则以完整乐曲为单位。将这些时间尺度分离，是在同一设备上维持实时性与可复现性的基础。
 

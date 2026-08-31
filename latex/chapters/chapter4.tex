@@ -761,7 +761,6 @@ CPU，因此\textbf{减少 Host 侧（CPU）的阻塞}、把调度压力卸载�
 下表详细对比了昇腾 310B 与树莓派 5、RK3588 以及 NVIDIA Jetson Orin Nano
 在 CPU 规格上的差异：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1667}}
   >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1667}}
@@ -800,7 +799,6 @@ GHz (大) / 1.8 GHz (小) & \textasciitilde{} 5000+ 分 \\
 小核 & 3.6 GHz \textasciitilde{} 5.0 GHz & \textasciitilde{} 45000+
 分 \\
 \end{longtable}
-}
 
 \textbf{数据解读与性能差距分析：}
 
@@ -1979,7 +1977,6 @@ BCM2712, 4 核 Cortex-A76 @ 2.4GHz)}
 
 \textbf{多平台 ResNet-18（Tiny-ImageNet）推理性能对比数据：}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -2012,7 +2009,6 @@ Raspberry Pi 5B & OnnxRuntime & CPU & 22.38 & \textasciitilde8.4\% \\
 Ascend 310B CPU & OnnxRuntime & CPU (Arm Cortex-A55) & 5.02 &
 \textasciitilde1.9\% \\
 \end{longtable}
-}
 
 通过数据对比，我们可以清晰地看到昇腾 310B NPU 的强大优势：
 
@@ -2067,7 +2063,6 @@ SSD（Single Shot MultiBox Detector）是一种单阶段目标检测器，以 Re
 \passthrough{\lstinline!HF\_ENDPOINT!} 或
 \passthrough{\lstinline!--endpoint!} 指定其他镜像。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -2090,7 +2085,6 @@ NPU 推理 \\
 \passthrough{\lstinline!zhouxzh/SSD300!} 下载
 \passthrough{\lstinline!ssd300\_*!} ONNX/OM 模型 \\
 \end{longtable}
-}
 
 代码位于
 \href{https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter4/SSD/}{\passthrough{\lstinline!samples/chapter4/SSD/!}}。
@@ -2135,7 +2129,6 @@ MobileNetV1、MobileNetV2、MobileNetV3 和 MobileNetV4 的 15 个 SSDLite320
 ONNX 导出细节，应到该 GitHub 仓库查找。Ascend 310B 侧的样例代码位于
 \href{https://github.com/zhouxzh/Ascend310/tree/master/samples/chapter4/SSDLite/}{\passthrough{\lstinline!samples/chapter4/SSDLite/!}}。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -2159,7 +2152,6 @@ OM（需在 Ascend 设备上运行） \\
 \passthrough{\lstinline!ssdlite320/!} & Default
 Boxes、Decode、NMS、可视化与评估工具 \\
 \end{longtable}
-}
 
 \subsubsection{昇腾 310B
 评估口径}\label{ux6607ux817e-310b-ux8bc4ux4f30ux53e3ux5f84}
@@ -2264,7 +2256,6 @@ AP50
 \passthrough{\lstinline!mobilenetv3\_small\_050!} 或
 \passthrough{\lstinline!mobilenetv3\_small\_100!}；但从通用目标检测效果看，它们更适合作为速度上限参考，而不是推荐默认模型。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -2308,7 +2299,6 @@ SSDLite320+Python/PyACL+NMS 结果无法支撑 120 FPS
 逐帧检测，需要降低输入尺寸、使用更小检测器、迁移后处理到
 C++/设备侧、引入 DVPP 和多 Stream 异步流水线 \\
 \end{longtable}
-}
 
 因此，在昇腾 310B 上做 SSDLite320
 部署时，可以按业务目标分成两类：追求检测质量时选择

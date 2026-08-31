@@ -14,7 +14,6 @@
 
 \subsection{与已有案例的关系}\label{src-experiment-case6-h2}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1875}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1875}}
@@ -41,7 +40,6 @@ NPU 任务
 案例8 & 手势识别 & MobileNetV3 分类 & 训练 -\textgreater{} 转换
 -\textgreater{} 部署 \\
 \end{longtable}
-}
 
 案例6是全书第一个\textbf{显式结合经典 CV 与深度学习}的案例，展示了在实际
 工程中如何选择合适的技术方案------不是所有问题都需要神经网络。
@@ -92,7 +90,6 @@ flowchart LR
 
 \subsubsection{操作系统与框架}\label{src-experiment-case6-h6}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -120,7 +117,6 @@ Python & CPython & 3.8 \textasciitilde{} 3.10 & 应用开发语言 \\
 图像处理 & OpenCV & 4.8+ & 车道线检测 + 图像预处理 \\
 Web & Gradio & 4.0+ & 感知结果展示界面 \\
 \end{longtable}
-}
 
 \subsubsection{环境准备}\label{src-experiment-case6-h7}
 
@@ -141,7 +137,6 @@ python3 prepare_models.py --onnx-only
 
 \subsubsection{Python 依赖说明}\label{src-experiment-case6-h8}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 包 & 用途 & 必需？ \\
@@ -161,7 +156,6 @@ python3 prepare_models.py --onnx-only
 \passthrough{\lstinline!acl!} (CANN 自带) & NPU 推理，随 CANN 安装 &
 仅推理 \\
 \end{longtable}
-}
 
 \subsection{车道线检测原理}\label{src-experiment-case6-h9}
 
@@ -172,7 +166,6 @@ python3 prepare_models.py --onnx-only
 
 \subsubsection{为什么不用深度学习做车道线检测}\label{src-experiment-case6-h10}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -194,7 +187,6 @@ python3 prepare_models.py --onnx-only
 深度学习 (UNet / LaneNet) & 对复杂场景鲁棒 & 需要标注数据、模型大、OM
 转换复杂 \\
 \end{longtable}
-}
 
 对于昇腾 310B 上的智能小车应用，经典 CV 是更合理的选择：不需要额外
 的标注数据，不占用 NPU 资源（NPU 留给场景分类），处理速度极快。
@@ -250,7 +242,6 @@ flowchart TD
 
 本项目使用 ResNet18 对 5 种典型驾驶场景进行分类：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 \# & 场景 & 特征 & 驾驶建议 \\
@@ -264,11 +255,9 @@ flowchart TD
 3 & 停车场 & 车位线、密集车辆 & 低速行驶 \\
 4 & 隧道 & 昏暗、墙壁、灯光 & 开启车灯 \\
 \end{longtable}
-}
 
 \subsubsection{为什么选择 ResNet18}\label{src-experiment-case6-h13}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 模型 & 参数量 & 310B 推理 & 适用性 \\
@@ -282,7 +271,6 @@ ResNet50 & 25.6M & \textasciitilde25ms & 更准但更慢，案例7已使用 \\
 MobileNetV3-Small & 2.5M & \textasciitilde5ms & 案例8已使用，精度略低 \\
 EfficientNet-B0 & 5.3M & \textasciitilde10ms & 也可用 \\
 \end{longtable}
-}
 
 选择 ResNet18 的理由： - \textbf{与已有案例差异化}：案例7用 ResNet50
 做特征提取，案例8用 MobileNetV3-Small 做手势分类，这里用 ResNet18
@@ -469,7 +457,6 @@ def get_classifier():
 
 \subsubsection{调整车道线参数}\label{src-experiment-case6-h25}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 参数 & 默认值 & 调高效果 & 调低效果 \\
@@ -488,11 +475,9 @@ def get_classifier():
 \passthrough{\lstinline!ROI\_TOP!} & 0.6 & ROI 更小（忽略远处） & ROI
 更大（包含远处） \\
 \end{longtable}
-}
 
 \subsubsection{故障排除}\label{src-experiment-case6-h26}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3750}}
@@ -520,7 +505,6 @@ NPU 初始化失败 & CANN 环境未配置 &
 ATC 转换失败 & soc\_version 不匹配 &
 \passthrough{\lstinline!npu-smi info!} 查看版本 \\
 \end{longtable}
-}
 
 \subsubsection{如何训练场景分类模型}\label{src-experiment-case6-h27}
 
@@ -619,7 +603,6 @@ flowchart TB
 
 \subsection{预期效果}\label{src-experiment-case6-h31}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 功能 & 预期表现 & 备注 \\
@@ -635,11 +618,9 @@ flowchart TB
 总计 \textasciitilde20ms \\
 车道线检测范围 & 画面下部 40\% 区域 & ROI 参数可调 \\
 \end{longtable}
-}
 
 \subsection{性能指标}\label{src-experiment-case6-h32}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 指标 & NPU (Ascend 310B) & CPU (PyTorch) \\
@@ -651,7 +632,6 @@ flowchart TB
 场景分类 & 10-15 ms & 25-40 ms \\
 模型大小 (.om) & \textasciitilde45 MB & N/A \\
 \end{longtable}
-}
 
 \subsection{浏览器中的效果}\label{src-experiment-case6-h33}
 

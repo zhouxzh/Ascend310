@@ -126,7 +126,6 @@ HaGRIDv2 对边缘部署很有价值。它不是只在干净背景下拍摄单�
 34，完整类别列表如下（推 理时 \passthrough{\lstinline!class\_id!}
 即对应此表编号）：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}rlll@{}}
 \toprule\noalign{}
 ID & 标签 & 中文名称 & 手势说明 \\
@@ -184,7 +183,6 @@ ID & 标签 & 中文名称 & 手势说明 \\
 33 & \passthrough{\lstinline!no\_gesture!} & 无手势 &
 无特定手势或背景 \\
 \end{longtable}
-}
 
 标签文件存储在 \passthrough{\lstinline!models/<模型名>\_labels.txt!}
 中，由 \passthrough{\lstinline!hagrid\_yolo/metadata.py!} 中的
@@ -213,7 +211,6 @@ python scripts/infer_om_camera.py \
 输入为脚本生成的全零张量，因此结果只代表 OM 后端推理耗时，不包含摄像
 头采集、预处理、后处理、画框、颜色转换和 WebRTC 编码。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lrrr@{}}
 \toprule\noalign{}
 模型简称 & 类别数 & 模型大小 & 推理平均延迟 \\
@@ -226,7 +223,6 @@ python scripts/infer_om_camera.py \
 \passthrough{\lstinline!x\_gestures!} & 34 & 64 MB & 122.61 ms \\
 \passthrough{\lstinline!x\_hands!} & 48 & 65 MB & 124.64 ms \\
 \end{longtable}
-}
 
 表中模型简称均省略 \passthrough{\lstinline!YOLOv10!} 前缀，例如
 \passthrough{\lstinline!n\_gestures!} 对应
@@ -277,7 +273,6 @@ NMS（非极大值抑制）后处理，同时从模型结构上减少冗余计�
 图 3：YOLOv10 骨干网络------Stem + 4 个 Stage 逐级下采样，Stage 4 包含
 SPPF、大核卷积和 PSA 三个关键创新。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -304,7 +299,6 @@ Stage 3 & 40×40 & C2f + Conv & 语义信息，如手部整体轮廓（输出 P5
 Stage 4 & 20×20 & C2f + SPPF + 大核卷积 + PSA & 全局抽象特征（输出
 P6） \\
 \end{longtable}
-}
 
 Stage 4 包含了骨干网络的主要改进：
 
@@ -335,7 +329,6 @@ Stage 4 包含了骨干网络的主要改进：
 图 4：YOLOv10 颈部网络------FPN 自上而下传递语义信息，PAN
 自下而上传递定位 信息，\(\star\) 标记的模块为空间-通道解耦下采样。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -360,7 +353,6 @@ FPN（自上而下） & P5 \(\to\) P4 \(\to\) P3 & 上采样 + 拼接 + C2f &
 PAN（自下而上） & N3 \(\to\) N4 \(\to\) N5 & 解耦下采样 + 拼接 + C2f &
 把浅层的''这在哪里''传给深层，利于精确定位 \\
 \end{longtable}
-}
 
 两条通路中的关键设计：
 
