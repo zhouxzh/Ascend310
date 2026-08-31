@@ -440,4 +440,4 @@ ifconfig
 
 ## 结语 {#src-experiment-case0-h24}
 
-至此，你的昇腾310B开发板（OrangePi AIpro）已经完成了基本的环境搭建。接下来，你可以进入[案例1：智能打卡机](../experiment/case1.md)的学习，开始你的第一个AI应用开发之旅。
+至此，你的昇腾310B开发板（OrangePi AIpro）已经完成了基本的环境搭建。接下来，你可以进入[案例1：人脸考勤（face-attendance）](../experiment/case1.md)的学习，开始你的第一个AI应用开发之旅。

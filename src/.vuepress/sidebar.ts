@@ -28,7 +28,7 @@ export default sidebar({
       collapsible: true,
       children: [
         "README.md",
-        "case1.md",
+        { text: "案例 1 · 人脸考勤（face-attendance）", link: "case1.md" },
         "case2.md",
         "case3.md",
         "case4.md",
@@ -47,7 +47,8 @@ export default sidebar({
       children: [
         "README.md",
         "appendix1.md",
-        "appendix2.md"
+        "appendix2.md",
+        "appendix3.md"
       ]
     },
   ],
