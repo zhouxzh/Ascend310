@@ -1,6 +1,12 @@
 # Temporary workspace and local experiment outputs
 tmp/
 
+# Local-only teaching workspace; never publish this directory to GitHub
+linux/
+
+# Generated Marp slide HTML under the VuePress public folder
+src/.vuepress/public/presentation/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

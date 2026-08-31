@@ -53,5 +53,22 @@ export default sidebar({
         "appendix5.md"
       ]
     },
+    {
+      text: "教学演示",
+      icon: "presentation",
+      prefix: "/presentation/",
+      collapsible: true,
+      children: [
+        "README.md",
+        "week01.md",
+        "week02.md",
+        "week03.md",
+        "week04.md",
+        "week05.md",
+        "week06.md",
+        "week07.md",
+        "week08.md"
+      ]
+    },
   ],
 });

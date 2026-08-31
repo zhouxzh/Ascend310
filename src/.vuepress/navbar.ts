@@ -20,5 +20,11 @@ export default navbar([
     icon: "book",
     activeMatch: "^/appendix/"
   },
+  {
+    text: "教学演示",
+    link: "/presentation/",
+    icon: "presentation",
+    activeMatch: "^/presentation/"
+  },
   "portfolio.md",
 ]);
