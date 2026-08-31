@@ -60,14 +60,14 @@ export default sidebar({
       collapsible: true,
       children: [
         "README.md",
-        "week01.md",
-        "week02.md",
-        "week03.md",
-        "week04.md",
-        "week05.md",
-        "week06.md",
-        "week07.md",
-        "week08.md"
+        "01-hardware-basics.md",
+        "02-linux-commands.md",
+        "03-python-basics.md",
+        "04-vibe-coding.md",
+        "05-face-recognition.md",
+        "06-object-tracking.md",
+        "07-smart-piano.md",
+        "08-chatbot.md"
       ]
     },
   ],
