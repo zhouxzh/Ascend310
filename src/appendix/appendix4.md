@@ -218,7 +218,7 @@ TUNA 的 Anaconda 镜像帮助页：
 
 <https://mirrors.tuna.tsinghua.edu.cn/help/anaconda/>
 
-![TUNA Anaconda 镜像帮助页](./images/week01/tuna-anaconda-help.png)
+![TUNA Anaconda 镜像帮助页](./img4/tuna-anaconda-help.png)
 
 下载目录：
 
@@ -366,7 +366,7 @@ pip config set global.index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/si
 
    <https://code.visualstudio.com/download>
 
-   ![VS Code 官方下载页](./images/week01/vscode-download.png)
+   ![VS Code 官方下载页](./img4/vscode-download.png)
 
 2. 按自己的系统下载并安装：
 
@@ -610,7 +610,7 @@ DSH 的官方仓库在：
 
 <https://github.com/deepseek-ai/deepseek-harness>
 
-![DSH 官方仓库](./images/week01/dsh-github.png)
+![DSH 官方仓库](./img4/dsh-github.png)
 
 > 截图来自官方 GitHub 仓库；安装命令以官方 README 为准。
 
@@ -629,7 +629,7 @@ dsh web
 
 看到下面这些信息，说明 DSH 已经启动：
 
-![DSH 启动与验证示例](./images/week01/terminal-verify.png)
+![DSH 启动与验证示例](./img4/terminal-verify.png)
 
 ```text
 URL: http://127.0.0.1:3080
@@ -659,7 +659,7 @@ Windows 上类似：
 D:\python-data-analysis
 ```
 
-![DSH 模型与工作区配置示意图](./images/week01/webui-config.png)
+![DSH 模型与工作区配置示意图](./img4/webui-config.png)
 
 保存 API Key、选中工作区后，会话输入框才可以使用。注意：**API Key 只保存在本地设置里，不要写进教程、代码、聊天内容或 GitHub。**
 
@@ -667,7 +667,7 @@ D:\python-data-analysis
 
 启动 DSH 后，浏览器打开 <http://127.0.0.1:3080>，界面主要分成几块：
 
-![DSH Web 界面](./images/week01/dsh-webui-main.png)
+![DSH Web 界面](./img4/dsh-webui-main.png)
 
 | 区域 | 作用 | 常见操作 |
 |---|---|---|
