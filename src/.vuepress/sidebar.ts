@@ -48,7 +48,9 @@ export default sidebar({
         "README.md",
         "appendix1.md",
         "appendix2.md",
-        "appendix3.md"
+        "appendix3.md",
+        "appendix4.md",
+        "appendix5.md"
       ]
     },
   ],
