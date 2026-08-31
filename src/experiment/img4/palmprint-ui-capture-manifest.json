@@ -1,0 +1,78 @@
+{
+  "schema_version": 3,
+  "capture_set": "react_fastapi_touch_workbench",
+  "captured_at": "2026-08-16T18:35:00+08:00",
+  "board": {
+    "login": "HwHiAiUser@ascend8t",
+    "hostname": "orangepiaipro",
+    "address": "192.168.1.90"
+  },
+  "capture_environment": {
+    "browser": "Codex In-app Browser",
+    "display": "browser viewport (board URL)",
+    "viewport": {
+      "width": 1920,
+      "height": 1080,
+      "orientation": "landscape"
+    }
+  },
+  "application": {
+    "entrypoint": "python -m palmprint_workbench.api --host 0.0.0.0 --port 7860",
+    "app_sha256": "be5e26115978970e4dc9f94baf886ba12691b6ed6afdd86b19624cb9762e2578",
+    "api_server_sha256": "994c53e0c24d8ed04bddd5e2a003a0481fbfd43f21cca96dcd1d169a0fa28742",
+    "palmprint_service_sha256": "0daefeb9097141ee56e24b22b5e77a3600e048e85111b9fa7ebbc8462c07a016",
+    "frontend_js_sha256": "f7cd911ffb751c58adc39474c1c958a863e8b37e0c2b82d6267143f9f96e4151",
+    "frontend_css_sha256": "f30b9c73580c33a16d07da158aec8d2b6a12dfc9e8f035c600656eb2f675def7"
+  },
+  "privacy": {
+    "contains_real_palm_images": false,
+    "roi_source": "deterministic geometric synthetic ROI",
+    "template_label": "SYNTHETIC-UI-TEST",
+    "template_database_cleaned_after_capture": true,
+    "note": "All screenshots use synthetic ROI data and an anonymous temporary template. The template database was empty after capture."
+  },
+  "captures": [
+    {
+      "file": "palmprint-ui-react-live-idle-1920x1080.png",
+      "page": "realtime recognition",
+      "state": "idle",
+      "bytes": 107225,
+      "sha256": "d6a5551fa89b963384bd3d2f04288bd7ed4be01b2898e5927d8c59c0de395d1b"
+    },
+    {
+      "file": "palmprint-ui-react-live-result-1920x1080.png",
+      "page": "realtime recognition",
+      "state": "empty-template refusal",
+      "bytes": 132981,
+      "sha256": "7938fe4a5b333abda443524c44a93ce3a254946b7fd755504aa7fbf0ff0f3bd8"
+    },
+    {
+      "file": "palmprint-ui-react-enrollment-samples-1920x1080.png",
+      "page": "palmprint enrollment",
+      "state": "three synthetic samples",
+      "bytes": 137760,
+      "sha256": "58fe9110c69166b9c2a51d86817d82b46281d1d090f7ed2cfa4d20fcc2725a91"
+    },
+    {
+      "file": "palmprint-ui-react-template-management-1920x1080.png",
+      "page": "palmprint enrollment",
+      "state": "template drawer before cleanup",
+      "bytes": 90322,
+      "sha256": "a2b7892732f2d51317ebf878cdeb53fb159c7a47fe6ce29a3753cb4a10833bf3"
+    },
+    {
+      "file": "palmprint-ui-react-evaluation-1920x1080.png",
+      "page": "dataset evaluation",
+      "state": "Tongji bounded UI smoke completed",
+      "bytes": 135627,
+      "sha256": "d727e9fec1a6dcda482303052aea6dba406ee7edd4f8919931202f4d0f8c2501"
+    },
+    {
+      "file": "palmprint-ui-react-system-status-1920x1080.png",
+      "page": "system status",
+      "state": "NPU Health Alarm warning visible",
+      "bytes": 170503,
+      "sha256": "0305e38a8a93b2e86787af4ff5985781146266e6c2cd8e5851a03b96ade6fa46"
+    }
+  ]
+}

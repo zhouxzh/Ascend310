@@ -1,623 +1,520 @@
-# 案例7：智能相册
+# 案例 7：昇腾 310B 智能相册
 
-## 1. 项目简介 {#src-experiment-case7-h1}
+*本教程从问题建模、模型迁移、NPU 运行时、相册服务器到触摸屏和电子纸输出，完整解释 Case7 的设计与实现。*
 
-本项目基于昇腾 310B 平台，构建一个智能照片管理和检索系统。系统使用
-**ResNet50** 卷积神经网络提取每张照片的 2048 维视觉特征向量，通过
-**FAISS** 向量检索引擎实现毫秒级的相似图片搜索，利用 **OpenCV** 进行人
-脸计数实现按人物筛选。
+---
 
-与案例1（人脸识别）的实时摄像头推理不同，本项目是书中第一个演示**批量
-离线索引 + 在线检索**模式的案例，帮助读者理解 NPU 如何在"先算后查"的
-场景中发挥作用。
+## 🎯 案例目标与问题定义
 
-### 三个核心功能 {#src-experiment-case7-h2}
+传统电子相册只会按文件名或固定顺序轮播。Case7 要解决的是一个更完整的问题：照片由手机上传到局域网服务器，服务器在 Ascend 310B 上建立语义索引，再根据中文/英文查询、日期、天气和最近显示历史选择合适照片；同一份选择结果既服务开发板上的 10 寸触摸屏，也服务已登记的 ESP32 电子纸终端。本轮实测目标是新的 Waveshare ESP32-S3-PhotoPainter，Seeed Studio reTerminal E1002 只作为历史对照 profile。Orange Pi 的 SPI/GPIO 直连微雪 E6 是独立的本机输出路径，不是第三种可注册 ESP32 相册。
 
-1. **照片浏览**：按"全部 / 有人脸 / 无人脸"筛选照片库
-2. **相似搜索**：上传一张照片，找出视觉上最相似的 12 张
-3. **批量索引**：一键扫描照片文件夹，提取特征向量，构建 FAISS 索引
+因此，Case7 不是单独的“图片分类脚本”，而是一条端到端链路：
 
-### 与已有案例的关系 {#src-experiment-case7-h3}
+1. **照片进入**：手机上传或扫描目录，经过内容 hash、解码、尺寸和路径安全检查；
+2. **照片理解**：NPU 图像编码器生成归一化 embedding，SQLite 保存元数据，FAISS 保存逐模型检索结构；
+3. **照片选择**：中文/英文文本查询、相似图查询和日期/天气智能选图使用相应模型空间；
+4. **照片显示**：FastAPI 静态页面、JPEG 设备接口和 E6 dry-run 使用同一个选择状态；
+5. **设备协同**：ESP32 通过能力握手、manifest、ETag 和按需 content 获取照片。
 
-| 案例 | 领域 | NPU 任务 | 模式 |
-|------|------|----------|------|
-| 案例1 | 人脸识别 | SCRFD 检测 + MobileFaceNet 识别 | 实时摄像头 -> Flask API |
-| **案例7** | **智能相册** | **ResNet50 特征提取** | **批量索引 + FAISS 检索** |
-| 案例8 | 手势识别 | MobileNetV3 分类 | 实时摄像头 -> Gradio |
-| 案例9 | 聊天机器人 | MiniLM 文本嵌入 | 文本 RAG + 云端 LLM |
+生产服务只接受已准入的 Ascend OM，不回退 CPU/PyTorch 推理。CPU 负责图像解码、OpenCV Haar 人数计数、FAISS、JPEG/E6 准备和离线 ONNX 数值参考。
 
-## 2. 内容大纲 {#src-experiment-case7-h4}
+## 🏗️ 系统总体架构
 
-### 2.1. 硬件准备 {#src-experiment-case7-h5}
-
-相比旧版案例7中列出的扫描仪、4K 显示器、触摸屏、NAS 网络存储等复杂设
-备，本项目只需要：
-
-- **昇腾 310B 开发者套件**：核心计算单元
-- **存储设备**：存放照片的 USB 硬盘 / SD 卡 / SSD（照片库需要一定容量）
-- **显示屏**（可选）：用于浏览器访问 Gradio 界面
-
-硬件架构如图所示：
+下面的架构图展示手机、触摸屏和远程终端如何共享 310B 上的 FastAPI、索引和 NPU 资源。
 
 ```mermaid
 flowchart LR
-    subgraph STORAGE["存储"]
-        DISK["USB 硬盘 / SD 卡\n照片库"]
+    accTitle: 智能相册系统架构
+    accDescr: 手机、触摸屏和远程显示设备通过 FastAPI 访问 SQLite/FAISS 索引、Ascend 310B NPU 和天气服务
+
+    phone[👤 手机浏览器]
+    touch[🖥️ 10 寸触摸屏]
+    esp32[🔌 Waveshare PhotoPainter（当前）/ E1002（历史）]
+    e6[🔌 Orange Pi SPI/GPIO 直连微雪 E6]
+
+    subgraph server[🖥️ Orange Pi AIpro / Ascend 310B]
+        api[🌐 FastAPI 服务]
+        selector[🧠 智能选图器]
+        runtime[⚙️ PyACL NPU 运行时]
+        storage[(💾 SQLite 元数据)]
+        faiss[(💾 逐模型 FAISS 索引)]
+        renderer[🎨 按需渲染器]
     end
 
-    subgraph COMPUTE["计算平台"]
-        NPU["昇腾 310B NPU\nResNet50 特征提取 -> OM"]
-        CPU["CPU\nOpenCV 人脸计数 + FAISS 检索"]
-    end
+    weather[☁️ Open-Meteo]
+    models[📦 MobileCLIP / Chinese-CLIP / ResNet50 OM]
 
-    subgraph OUTPUT["输出"]
-        UI["Gradio Web 界面\n浏览 / 搜索 / 管理"]
-    end
-
-    DISK -->|"读取照片"| CPU
-    CPU -->|"预处理张量"| NPU
-    NPU -->|"2048-dim 特征向量"| CPU
-    CPU -->|"FAISS 索引"| UI
+    phone -->|上传、搜索、配置| api
+    touch -->|图库、控制、设置| api
+    esp32 -->|握手、manifest、ETag| api
+    api -->|未来 SPI/GPIO| e6
+    api --> storage
+    api --> selector
+    selector --> runtime
+    runtime --> models
+    runtime --> faiss
+    selector --> storage
+    api --> renderer
+    renderer -->|JPEG 或 E6 帧| esp32
+    renderer -->|浏览器 JPEG| touch
+    selector -->|定时刷新| weather
+    api --> faiss
 ```
 
-为什么不需要 GPU 工作站？ResNet50 的特征提取在 310B NPU 上即可高效完成，
-单张照片推理仅需 5-10ms。对于个人照片库（几百到数千张），310B 完全能
-在几十秒内完成全库索引。而且模型权重直接由 PyTorch 官方 CDN 提供，无需
-额外下载第三方模型文件。
+### PDF 版结构图
 
-### 2.2. 软件环境 {#src-experiment-case7-h6}
+下面两张图由 Graphviz DOT 源文件生成。Markdown 中保留 Mermaid 版本便于在线阅读，PNG 版本用于 VuePress/Pandoc 电子书排版；修改结构时先改 DOT，再重新生成 PNG。
 
-#### 操作系统与框架 {#src-experiment-case7-h7}
+![局域网相册服务器网络结构图](./img7/network-architecture.png){#fig:network_architecture width=92% .center}
 
-| 层级 | 软件 | 版本 | 用途 |
-|------|------|------|------|
-| 操作系统 | Ubuntu | 20.04 / 22.04 LTS | 运行环境 |
-| CANN | Ascend Toolkit | 7.0+ | NPU 驱动与 ATC 转换工具 |
-| Python | CPython | 3.8 ~ 3.10 | 应用开发语言 |
-| 深度学习 | PyTorch + torchvision | 2.0+ | ResNet50 模型 / CPU 推理回退 |
-| 图像处理 | OpenCV | 4.8+ | 图像预处理 + 人脸检测 |
-| 向量搜索 | FAISS | 1.7+ | 向量相似度检索 |
-| Web | Gradio | 4.0+ | 照片画廊 + 搜索界面 |
+*图 7-1 网络结构：手机、触摸屏和 PhotoPainter 通过 FastAPI 访问 SQLite/FAISS、Ascend 310B NPU、按需渲染器和天气服务。图源：`img7/network-architecture.dot`。*
 
-#### 环境准备 {#src-experiment-case7-h8}
+![程序完整流程图](./img7/program-flow.png){#fig:program_flow width=78% .center}
 
-在昇腾 310B 设备上，运行一键安装脚本：
+*图 7-2 程序流程：服务启动完成 CANN、模型 hash 和索引恢复后，分别处理上传、语义搜索、显示控制以及 ESP32/PhotoPainter 的 ETag 拉图请求。图源：`img7/program-flow.dot`。*
 
-```bash
-# 安装 Python 依赖并导出 ONNX 模型
-bash setup.sh
-```
-
-`setup.sh` 会依次完成：
-1. 安装系统包（`python3-dev`, `python3-pip`）
-2. 安装 Python 依赖（`pip3 install -r requirements.txt`）
-3. 运行 `prepare_models.py` 导出 ResNet50 的 ONNX 模型（如有 CANN 则继续
-   转换为 OM）
-
-如果你希望在开发机上只做 ONNX 导出：
-
-```bash
-python3 prepare_models.py --onnx-only
-```
-
-#### Python 依赖说明 {#src-experiment-case7-h9}
-
-| 包 | 用途 | 必需？ |
-|:---|:---|:---|
-| `gradio` | Web 界面框架，内置 `gr.Gallery` 照片墙组件 | 是 |
-| `torch` + `torchvision` | ResNet50 模型定义、CPU 特征提取回退 | 是 |
-| `opencv-python` | 图像缩放、色彩转换、归一化、人脸检测 | 是 |
-| `numpy` | 特征向量操作、L2 归一化 | 是 |
-| `faiss-cpu` | 向量相似度搜索（IndexFlatIP） | 是 |
-| `Pillow` | Gradio 图像格式转换 | 是 |
-| `onnx` | ONNX 模型校验（仅 prepare_models.py） | 仅转换 |
-| `acl` (CANN 自带) | NPU 推理，随 CANN 安装 | 仅推理 |
-
-`requirements.txt` 文件中已包含所有 pip 可安装的 Python 依赖。`acl` 包
-无需手动安装，它随 CANN 一起部署，Python 通过 `import acl` 调用。
-
-### 2.3. 图像特征提取原理 {#src-experiment-case7-h10}
-
-#### 什么是图像特征向量 {#src-experiment-case7-h11}
-
-要让计算机判断两张照片是否"相似"，不能直接比较像素——同一物体在不同光
-照、角度、背景下，像素值完全不同。正确的做法是：用一个训练好的深度神经
-网络将每张图像映射为一个固定长度的**特征向量（Embedding）**，使得语义
-相似的图像在向量空间中距离很近。
-
-```
-照片 A (海滩日落)  ->  ResNet50  ->  [0.12, -0.34, 0.78, ..., 0.05]  (2048-dim)
-照片 B (海边黄昏)  ->  ResNet50  ->  [0.11, -0.32, 0.80, ..., 0.04]  (2048-dim)
-                                               ↓
-                                    余弦相似度 约等于 0.95  (高度相似!)
-
-照片 C (会议室)    ->  ResNet50  ->  [-0.45, 0.67, -0.12, ..., 0.33]  (2048-dim)
-                                               ↓
-                              与 A 的余弦相似度 约等于 0.12  (不相似)
-```
-
-#### 为什么选择 ResNet50 {#src-experiment-case7-h12}
-
-昇腾 310B NPU 最适合运行固定输入输出形状的卷积神经网络。ResNet50 是计
-算机视觉领域最经典的特征提取骨干网络之一：
-
-| 模型 | 特征维度 | 模型大小 (OM) | NPU 推理 | 备注 |
-|------|---------|--------------|----------|------|
-| **ResNet50** | 2048-dim | ~95 MB | ~8ms | 推荐，torchvision 内置 |
-| MobileNetV3-Small | 576-dim | ~10 MB | ~5ms | 案例8已使用，维度较低 |
-| EfficientNet-B0 | 1280-dim | ~20 MB | ~10ms | 也可用 |
-| CLIP ViT-B/32 | 512-dim | ~350 MB | 一般 | Transformer，OM 转换复杂 |
-
-选择 ResNet50 的理由：
-
-1. **零外部下载**：`torchvision.models.resnet50(weights=...)` 自动从
-   PyTorch CDN 获取权重，无需维护第三方模型下载链接
-2. **经典可迁移**：ResNet 是计算机视觉的"标准答案"，"去掉分类头得到特
-   征向量"的模式适用于几乎所有 CNN 骨干网络
-3. **维度适中**：2048 维特征向量在表达能力（越高越好）和存储开销（越低
-   越好）之间取得平衡——10,000 张照片的索引仅占 ~80 MB
-4. **与案例8差异化**：案例8使用 MobileNetV3-Small 做手势分类，本案使用
-   ResNet50 做特征提取——不同的模型、不同的任务类型
-
-#### 去掉分类头：分类模型 -> 特征提取器 {#src-experiment-case7-h13}
-
-torchvision 的 `resnet50` 默认输出 1000 类的分类概率。我们只需要图像的
-"语义表示"，不需要分类结果。做法是将最后一层 `fc`（全连接层）替换为
-`nn.Identity()`（恒等映射）：
-
-```python
-import torchvision.models as models
-
-model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
-model.fc = torch.nn.Identity()  # 去掉分类头 -> 输出 2048-dim 特征向量
-model.eval()
-```
-
-这样模型输入 `(1, 3, 224, 224)` 的图像张量，输出 `(1, 2048)` 的特征
-向量，而不是 `(1, 1000)` 的类别概率。
-
-#### L2 归一化：让内积等于余弦相似度 {#src-experiment-case7-h14}
-
-FAISS 的 `IndexFlatIP`（内积索引）计算的是向量点积。为了让点积等价于余
-弦相似度，需要先将所有特征向量做 L2 归一化（模长为 1）：
-
-```python
-norm = np.linalg.norm(vec)
-if norm > 0:
-    vec = vec / norm  # 归一化后 |vec| = 1，点积 = 余弦相似度
-```
-
-#### 图像预处理流程 {#src-experiment-case7-h15}
-
-```mermaid
-flowchart TD
-    INPUT["输入图像\nBGR (H, W, 3)"] --> RESIZE["cv2.resize\n-> 224×224"]
-    RESIZE --> RGB["cv2.cvtColor\nBGR -> RGB"]
-    RGB --> NORM["归一化\npixel/255 -> (pixel-mean)/std\nImageNet 统计值"]
-    NORM --> TRANSPOSE["维度重排\nHWC -> CHW -> NCHW\n(1, 3, 224, 224)"]
-```
-
-预处理代码在 [feature_extractor.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/feature_extractor.py) 的
-`FeatureExtractor.preprocess()` 方法中，与案例8的手势识别预处理完全一致。
-
-### 2.4. 模型转换与昇腾部署 {#src-experiment-case7-h16}
-
-torchvision 提供的 ResNet50 权重是 PyTorch 格式，需要通过两次转换才能
-在 310B NPU 上运行。
-
-```mermaid
-flowchart TD
-    subgraph EXPORT["1. ONNX 导出（开发机 / 昇腾设备）"]
-        TORCH["torchvision\nresnet50(IMAGENET1K_V1)\nmodel.fc = nn.Identity()"]
-        ONNX["resnet50_feature.onnx\n输入 (1,3,224,224)\n输出 (1,2048)"]
-    end
-
-    subgraph CONVERT["2. ATC 转换（昇腾设备）"]
-        OM["resnet50_feature.om\nAscend 离线模型 ~95MB"]
-    end
-
-    subgraph DEPLOY["3. 推理部署"]
-        APP["app.py -> FeatureExtractor\n-> AscendModel.execute()"]
-    end
-
-    TORCH -->|"torch.onnx.export()\nopset=11"| ONNX
-    ONNX -->|"atc --framework=5\n--soc_version=Ascend310B4"| OM
-    OM -->|"acl.mdl.execute()"| APP
-```
-
-#### 步骤 1：导出 ONNX {#src-experiment-case7-h17}
-
-```bash
-# 仅导出 ONNX（可在开发机上运行，不需要昇腾硬件）
-python3 prepare_models.py --onnx-only
-```
-
-这一步会：
-1. 从 torchvision 加载预训练的 ResNet50（ImageNet 权重）
-2. 将 `fc` 层替换为 `nn.Identity()`
-3. 用 `torch.onnx.export()` 导出为 ONNX 格式
-4. 输入形状固定为 `(1, 3, 224, 224)`，输出形状固定为 `(1, 2048)`
-
-关键代码见 [prepare_models.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/prepare_models.py) 中的
-`export_onnx()` 函数。注意 `dynamic_axes={}` 参数——我们刻意禁用了动态
-形状，确保与 ATC 转换兼容。
-
-#### 步骤 2：ATC 转换 ONNX -> OM {#src-experiment-case7-h18}
-
-```bash
-# 在昇腾设备上运行
-python3 prepare_models.py
-```
-
-这一步调用 CANN 的 `atc` 工具：
-
-```bash
-atc --model=models/resnet50_feature.onnx \
-    --framework=5 \
-    --output=models/resnet50_feature \
-    --soc_version=Ascend310B4 \
-    --input_format=NCHW \
-    --input_shape=input:1,3,224,224
-```
-
-参数说明：
-
-| 参数 | 值 | 说明 |
-|------|-----|------|
-| `--model` | ONNX 文件路径 | 输入的 ONNX 模型 |
-| `--framework` | 5 | 5 = ONNX 格式 |
-| `--output` | 输出路径 | 生成的 `.om` 文件路径 |
-| `--soc_version` | Ascend310B4 | 芯片型号 |
-| `--input_format` | NCHW | 输入数据排布格式 |
-| `--input_shape` | input:1,3,224,224 | 固定输入形状 |
-
-`soc_version` 通过 `npu-smi info` 自动检测，默认值为 `Ascend310B4`。
-
-#### 与案例8的模型转换对比 {#src-experiment-case7-h19}
-
-| 对比项 | 案例8 (手势识别) | 案例7 (智能相册) |
-|--------|-----------------|-----------------|
-| 模型来源 | 自己训练 (.pth) | torchvision 预训练 |
-| 模型架构 | MobileNetV3-Small | ResNet50 |
-| 输出 | 10 类 logits | 2048-dim 特征向量 |
-| 需要训练？ | 是（或下载 .pth） | 否（torchvision 直接提供） |
-| 外部下载 | 预训练 .pth + HaGRID 数据集 | 无（PyTorch CDN 自动拉取） |
-
-本案不需要训练脚本——这是案例8已经覆盖的内容。本案展示的是另一种常见的
-边缘 AI 模式：直接使用预训练模型做特征提取，无需微调。
-
-### 2.5. 照片索引与向量检索 {#src-experiment-case7-h20}
-
-#### 整体流程 {#src-experiment-case7-h21}
-
-```mermaid
-flowchart TD
-    PHOTOS["照片文件夹\n(几十 ~ 几千张)"] --> SCAN["扫描图像文件\n.jpg .jpeg .png .bmp"]
-    SCAN --> LOOP["逐张处理"]
-
-    subgraph PER_PHOTO["每张照片"]
-        READ["cv2.imread()\n读取"] --> FACE["OpenCV Haar Cascade\n人脸计数"]
-        READ --> FEATURE["ResNet50 (NPU)\n提取 2048-dim 特征"]
-        FACE --> META["记录元数据\n{文件名, 人脸数, 路径}"]
-        FEATURE --> ADD["faiss.add()\n加入向量索引"]
-    end
-
-    LOOP --> PER_PHOTO
-    META --> SAVE["持久化\nphoto_index.faiss\nphoto_metadata.json"]
-    ADD --> SAVE
-```
-
-#### PhotoIndex 类设计 {#src-experiment-case7-h22}
-
-[photo_index.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/photo_index.py) 中的 `PhotoIndex` 类管理
-整个照片索引的生命周期：
-
-- `index_photos(photo_dir)` — 扫描目录，逐张提取特征，构建 FAISS 索引
-- `search(query_image, k)` — 提取查询图像特征，返回 Top-K 相似照片
-- `get_all_photos()` / `get_photos_by_face_count()` — 按条件筛选照片
-- `save()` / `load()` — 将 FAISS 索引和元数据持久化到磁盘
-
-#### 为什么用 IndexFlatIP（暴搜） {#src-experiment-case7-h23}
-
-`faiss.IndexFlatIP` 是 FAISS 提供的最简单的索引——不做任何近似或压缩，
-直接计算查询向量与库中所有向量的内积。对于个人照片库（通常几百到几千张），
-暴搜完全够用：
-
-- 在 10,000 张照片的库中搜索一次约需 1-2ms（2048 维 × 10,000 次点积）
-- 不需要训练（IVF 需要）、不损失精度（PQ 会降低召回率）
-- 索引文件大小 = 照片数 × 2048 × 4 字节，10,000 张约 80 MB
-
-当照片库增长到数万张以上时，可以将 `IndexFlatIP` 替换为 `IndexIVFFlat`
-或 `IndexHNSWFlat`，在精度和速度之间做权衡。
-
-#### NPU 批量推理的实际情况 {#src-experiment-case7-h24}
-
-OM 模型的输入形状固定为 `(1, 3, 224, 224)`（batch size = 1），所以 NPU
-模式下的"批量索引"实际上是逐张调用 `execute()`。对于几百张照片的索引，
-总耗时完全可以接受（每张 ~8ms，100 张不到 1 秒）。
-
-CPU 回退模式反而可以利用 PyTorch 的动态批处理能力——将多张照片堆叠为
-`(N, 3, 224, 224)` 的张量，一次前向传播处理整个批次。这是 OM 模型的一
-个已知限制，书中已在多处提及（参见案例8、案例9中的相关讨论）。
-
-#### 人脸检测：为什么只用 Haar Cascade {#src-experiment-case7-h25}
-
-本案例使用 OpenCV 内置的 Haar Cascade 分类器做人脸**计数**，而不是使用
-案例1中的 SCRFD NPU 模型做人脸**识别**：
-
-| 方面 | Haar Cascade (本案) | SCRFD (案例1) |
-|------|---------------------|--------------|
-| 任务 | 数人脸 -> 几人 | 检测 + 提取人脸特征 -> 是谁 |
-| 运行位置 | CPU | NPU (OM) |
-| 设置成本 | 零（OpenCV 自带） | 需下载模型 + ATC 转换 |
-| 单张耗时 | <10ms (CPU) | ~5ms (NPU) + 前后处理 |
-
-对于智能相册的"按人数筛选"需求，知道一张照片里有几个人就足够了。如果需
-要完整的人脸识别（标记每个人是谁），读者可以将案例1的 `FaceSystem` 集成
-到本案中——两个案例的 `AscendResource` / `AscendModel` 基础设施是相同的。
-
-#### 持久化 {#src-experiment-case7-h26}
-
-FAISS 索引通过 `faiss.write_index()` 保存为二进制文件，照片元数据保存
-为 JSON。这与案例9的知识库持久化模式完全一致。下次启动时，如果检测到已
-有索引文件，会自动加载，无需重新索引。
-
-### 2.6. Web 界面 {#src-experiment-case7-h27}
-
-本项目使用 Gradio 构建 Web 界面，通过 `gr.Gallery` 实现照片墙展示，
-无需任何前端代码。
-
-```mermaid
-flowchart TD
-    subgraph UI["Gradio Blocks 界面"]
-        TAB1[" 照片浏览 (Tab 1)"]
-        TAB2[" 相似搜索 (Tab 2)"]
-        TAB3[" 管理 (Tab 3)"]
-    end
-
-    subgraph TAB1_DETAIL["浏览 Tab"]
-        FILTER["Radio\n全部 / 有人脸 / 无人脸"] --> GALLERY1["gr.Gallery\n照片缩略图 + 人脸数"]
-    end
-
-    subgraph TAB2_DETAIL["搜索 Tab"]
-        UPLOAD["gr.Image\n上传查询照片"] --> SEARCH["search_similar()"]
-        SEARCH --> GALLERY2["gr.Gallery\nTop-12 相似照片"]
-        SEARCH --> REPORT["Markdown\n相似度分数 + 进度条"]
-    end
-
-    subgraph TAB3_DETAIL["管理 Tab"]
-        FOLDER["Textbox\n照片目录路径"] --> INDEX["index_folder()"]
-        INDEX --> PROGRESS["Progress\n索引进度条"]
-        INDEX --> PREVIEW["Gallery\n索引预览 (前20张)"]
-        INDEX --> STATS["Markdown\n系统信息 / 索引统计"]
-    end
-
-    TAB1 --> TAB1_DETAIL
-    TAB2 --> TAB2_DETAIL
-    TAB3 --> TAB3_DETAIL
-```
-
-#### 三个页签 {#src-experiment-case7-h28}
-
-1. **照片浏览**：`gr.Gallery` 以网格形式展示所有已索引的照片，每张照片下
-   方标注文件名和人脸数。通过单选按钮筛选"全部 / 有人脸 / 无人脸"。
-
-2. **相似搜索**：上传一张查询照片，系统提取其特征向量后在 FAISS 索引中
-   搜索最相似的 12 张照片。结果以画廊形式展示，同时以 Markdown 表格列出
-   每张照片的相似度分数和进度条。
-
-3. **管理**：输入照片文件夹路径，点击"开始索引"即可批量处理整个文件夹。
-   `gr.Progress` 组件实时显示索引进度。索引完成后展示前 20 张照片预览
-   和系统统计信息。
-
-#### 双后端切换 {#src-experiment-case7-h29}
-
-`FeatureExtractor` 在初始化时自动检测 NPU 可用性：
-
-```python
-class FeatureExtractor:
-    def _init_backend(self):
-        if os.path.exists(OM_MODEL_PATH):
-            try:
-                self._acl_resource = AscendResource(NPU_DEVICE_ID)
-                self._om_model = AscendModel(...)
-                self.use_npu = True     # NPU 模式
-                return
-            except Exception:
-                pass
-        self._init_cpu_backend()        # CPU 回退
-```
-
-这意味着：
-- 在昇腾 310B 上 -> 自动使用 OM 模型，NPU 特征提取
-- 在没有昇腾硬件的机器上 -> 自动使用 PyTorch ResNet50，CPU 推理
-- 同一份代码，无需修改任何配置
-
-#### 懒加载 {#src-experiment-case7-h30}
-
-与案例8、案例9相同，`FeatureExtractor` 和 `PhotoIndex` 使用模块级懒加载：
-
-```python
-_extractor = None
-_photo_index = None
-
-def get_extractor():
-    global _extractor
-    if _extractor is None:
-        _extractor = FeatureExtractor()
-    return _extractor
-```
-
-这避免了 import 时的重操作，只在首次使用时初始化模型。
-
-### 2.7. 用户手册 {#src-experiment-case7-h31}
-
-#### 2.7.1 部署 {#src-experiment-case7-h32}
-
-1. 将项目代码拷贝到昇腾 310B 设备
-2. 运行 `bash setup.sh` 安装依赖并导出模型
-3. （可选）在「管理」页签中准备测试照片文件夹
-4. 启动服务：`python3 app.py`
-5. 浏览器打开 `http://<设备IP>:7860`
-
-#### 2.7.2 索引照片 {#src-experiment-case7-h33}
-
-1. 在「管理」页签的"照片目录路径"中输入照片文件夹路径
-2. 点击"开始索引"
-3. 观察进度条，等待索引完成
-4. 索引会自动保存，下次启动无需重新索引
-
-索引速度参考（100 张照片）：
-
-| 后端 | 耗时 |
-|------|------|
-| NPU (Ascend 310B) | ~1-2 秒 |
-| CPU (PyTorch) | ~3-5 秒 |
-
-#### 2.7.3 浏览和搜索 {#src-experiment-case7-h34}
-
-1. 在「照片浏览」页签查看已索引的照片
-2. 使用筛选按钮按人脸数过滤
-3. 在「相似搜索」页签上传任意照片，查看相似结果
-4. 相似度分数反映两张照片在 ResNet50 特征空间中的余弦距离
-   - > 90%：高度相似（同类场景 / 同一物体）
-   - 70-90%：有一定相似性（色彩 / 构图接近）
-   - < 70%：视觉差异较大
-
-#### 2.7.4 故障排除 {#src-experiment-case7-h35}
-
-| 问题 | 可能原因 | 解决方法 |
-|------|---------|---------|
-| 索引时找不到照片 | 目录路径错误 | 检查路径是否正确，支持绝对路径 |
-| 照片不显示在画廊中 | 文件格式不支持 | 支持 .jpg / .jpeg / .png / .bmp / .webp |
-| 人脸数始终为 0 | Haar Cascade 漏检 | 正常现象——正面清晰人脸检测率更高 |
-| 搜索结果不相关 | ResNet50 特征侧重场景 | 它对场景/物体/色彩敏感，对人脸身份不敏感 |
-| NPU 初始化失败 | CANN 环境未配置 | `source /usr/local/Ascend/ascend-toolkit/set_env.sh` |
-| ATC 转换失败 | soc_version 不匹配 | `npu-smi info` 查看版本，脚本会自动检测 |
-| ONNX 导出失败 | onnx 包未安装 | `pip install onnx` |
-
-#### 2.7.5 扩展建议 {#src-experiment-case7-h36}
-
-1. **集成人脸识别**：将案例1的 `FaceSystem`（SCRFD + MobileFaceNet）加
-   入本案，实现"按人物搜索"和"面孔聚类"
-2. **文本搜索**：接入案例9的文本嵌入模型，支持用自然语言描述搜索照片
-   （如"海边的日落"）
-3. **大规模索引**：照片超过 10,000 张时，将 `IndexFlatIP` 替换为
-   `IndexIVFPQ` 以压缩索引体积和加速检索
-4. **增量索引**：监控照片文件夹变化，自动索引新增照片
-5. **更大模型**：将 ResNet50 替换为 ResNet101 或 ConvNeXt，获得更强的
-   特征表达能力（模型更大，转换方式相同）
-
-## 3. 源代码结构 {#src-experiment-case7-h37}
-
-```text
-case7/
-├── app.py                 # Gradio Web 界面入口
-├── feature_extractor.py   # NPU/CPU 双后端特征提取 (ResNet50)
-├── photo_index.py         # FAISS 索引管理 + 人脸检测
-├── config.py              # 配置常量（模型路径、文件路径、阈值）
-├── prepare_models.py      # ONNX 导出 & ATC OM 转换
-├── setup.sh               # 一键环境安装
-├── requirements.txt       # Python 依赖列表
-├── data/
-│   ├── .gitkeep
-│   ├── photo_index.faiss     # FAISS 索引（运行时生成）
-│   └── photo_metadata.json   # 照片元数据（运行时生成）
-├── models/                   # 模型文件目录 (.onnx / .om)
-├── photos/                   # 默认照片目录
-└── README.md                 # 快速开始指南
-```
-
-模块间的调用关系：
+### 数据流
 
 ```mermaid
 flowchart TB
-    APP["app.py\nGradio 界面入口"] --> FE["feature_extractor.py\nFeatureExtractor\n· extract()\n· preprocess()"]
-    APP --> PI["photo_index.py\nPhotoIndex\n· index_photos()\n· search()\n· get_all_photos()"]
-    APP --> CFG["config.py\n· FEATURE_DIM\n· IMAGE_SIZE\n· TOP_K_RESULTS"]
+    accTitle: 相册数据处理流程
+    accDescr: 照片从上传和校验开始，经过三模型索引，最终被文本检索或智能选择并按设备能力渲染
 
-    FE --> AR["AscendResource\nacl.init / device / context"]
-    FE --> AM["AscendModel\nacl.mdl.execute()"]
-    FE --> TORCH["torchvision\nresnet50(IMAGENET1K_V1)"]
-
-    PI --> FE
-    PI --> FAISS["faiss\nIndexFlatIP"]
-    PI --> CV["cv2\nHaar Cascade"]
-
-    PREP["prepare_models.py\n模型转换"] --> TORCH
-    PREP --> CFG
-
-    AR --> ACL["acl (CANN)"]
-    AM --> ACL
+    input([📥 上传或扫描照片]) --> validate[🔍 校验路径、解码、大小和 SHA-256]
+    validate --> metadata[🏷️ 写入 EXIF、时间、尺寸；保留兼容元数据]
+    metadata --> encode[🧠 三模型 NPU 图像编码]
+    encode --> vector[(💾 SQLite embedding + FAISS)]
+    query[👤 文本、图片或轮播时隙] --> route{🔍 选择模型或策略}
+    route --> search[🔍 归一化向量内积检索]
+    route --> select[🧠 日期、天气、兼容元数据和历史评分]
+    search --> result[📝 当前照片 revision]
+    select --> result
+    result --> render[🎨 尺寸、EXIF、叠加和 JPEG/E6 渲染]
+    render --> output[📤 触摸屏、手机、ESP32 或 E6]
 ```
 
-与之前案例的继承关系：
+### 服务启动与请求时序
 
-- `AscendResource` / `AscendModel` 沿用案例8的同一套模式（案例8又继承自
-  案例1）
-- `config.py` 的路径管理方式与案例9一致（`BASE_DIR` + `os.path.join`）
-- `app.py` 的 Gradio 模式与案例8/案例9一致（`gr.Blocks` + 懒加载）
-- `prepare_models.py` 的 ONNX -> ATC 流程与案例8一致
-- `PhotoIndex` 的 FAISS 持久化模式与案例9的 `KnowledgeBase` 一致
-- 本项目**不需要**训练脚本——直接使用 torchvision 预训练权重，这是与案例8
-  最大的区别
+```mermaid
+sequenceDiagram
+    accTitle: NPU 服务启动时序
+    accDescr: 服务启动先加载 CANN 和注册表，再恢复 SQLite/FAISS 状态，最后接受手机或设备请求
 
-## 4. 效果演示 {#src-experiment-case7-h38}
+    participant launcher as 🚀 启动脚本
+    participant cann as ⚙️ CANN/PyACL
+    participant registry as 📦 模型注册表
+    participant index as 💾 SQLite/FAISS
+    participant api as 🌐 FastAPI
+    participant client as 👤 客户端
 
-### 预期效果 {#src-experiment-case7-h39}
-
-在正常使用条件下，系统的各功能预期表现：
-
-| 功能 | 预期表现 | 备注 |
-|------|---------|------|
-| 照片索引 | 100 张照片 < 2 秒 (NPU) | 含特征提取 + 人脸检测 |
-| 相似搜索 | < 20ms / 次 | 特征提取 ~8ms + FAISS 搜索 ~2ms |
-| 人脸计数 | 正面清晰人脸检测率 > 85% | Haar Cascade 对侧脸/遮挡敏感 |
-| 相似结果相关性 | 同类场景/物体的照片排前面 | 受 ResNet50 ImageNet 训练域影响 |
-
-### 性能指标 {#src-experiment-case7-h40}
-
-| 指标 | NPU (Ascend 310B) | CPU (PyTorch) |
-|------|-------------------|---------------|
-| 单张特征提取 | 5-10 ms | 20-40 ms |
-| 100 张批量索引 | 1-2 秒 | 3-5 秒 |
-| FAISS 搜索 (1000 张) | ~0.5 ms | ~0.5 ms |
-| 模型大小 (.om) | ~95 MB | N/A |
-| FAISS 索引 (10000 张) | ~80 MB | ~80 MB |
-
-### 浏览器中的效果 {#src-experiment-case7-h41}
-
-Gradio 界面在浏览器中的预期布局：
-
-```
-┌──────────────────────────────────────────────────────┐
-│   智能相册                                         │
-│  ResNet50 特征提取 + FAISS 向量检索                   │
-├──────────────────────────────────────────────────────┤
-│  [ 照片浏览]  [ 相似搜索]  [ 管理]              │
-│                                                      │
-│  ┌─────────────────────────────────────────────┐     │
-│  │  筛选: ○ 全部  ◉ 有人脸  ○ 无人脸  [刷新]    │     │
-│  ├─────────────────────────────────────────────┤     │
-│  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐       │     │
-│  │  │      │ │      │ │      │ │      │       │     │
-│  │  │ 2人  │ │ 1人  │ │ 0人  │ │ 3人  │       │     │
-│  │  └──────┘ └──────┘ └──────┘ └──────┘       │     │
-│  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐       │     │
-│  │  │      │ │      │ │      │ │      │       │     │
-│  │  │ 5人  │ │ 0人  │ │ 1人  │ │ 2人  │       │     │
-│  │  └──────┘ └──────┘ └──────┘ └──────┘       │     │
-│  └─────────────────────────────────────────────┘     │
-│                                                      │
-└──────────────────────────────────────────────────────┘
+    launcher->>cann: import acl 与设备初始化
+    cann-->>launcher: ✅ Ascend 310B 可用
+    launcher->>registry: 校验 admitted OM 与 SHA-256
+    registry-->>launcher: ✅ 三个模型准入
+    launcher->>index: 恢复照片、embedding 和显示状态
+    index-->>launcher: ✅ 500 张 COCO-CN 图库
+    launcher->>api: 启动 7860
+    client->>api: GET /api/health 或 POST /api/search/text
+    api->>cann: 单锁执行图像/文本 OM
+    cann-->>api: 归一化 embedding
+    api->>index: FAISS 检索或读取选择状态
+    index-->>api: 结果与 revision
+    api-->>client: JSON、JPEG 或 304
 ```
 
-### 如何验证系统正常工作 {#src-experiment-case7-h42}
+## 🧱 硬件与软件基础
 
-1. 打开浏览器访问 `http://127.0.0.1:7860`
-2. 切换到「管理」页签，输入包含一些照片的文件夹路径
-3. 点击"开始索引"，等待进度条完成
-4. 切换到「照片浏览」页签，确认照片显示在画廊中
-5. 切换到「相似搜索」页签，上传一张照片，确认返回 12 张相似结果
-6. 在「管理」页签中确认系统信息显示正确的后端（NPU 或 CPU）
-7. 关闭并重启 `app.py`，确认索引被正确保存和自动加载
+| 层 | 组件 | 在本案例中的职责 |
+| --- | --- | --- |
+| 计算 | Orange Pi AIpro / Ascend 310B4 / 8T | 执行图像和文本 OM |
+| 工具链 | CANN 8.x、ATC、PyACL | 转换、加载和执行模型；准入报告记录板端 `version.cfg` 的实际版本 |
+| 服务 | FastAPI、Uvicorn、原生 HTML/CSS/JavaScript | 手机、触摸屏和设备 HTTP 接口 |
+| 存储 | SQLite、faiss-cpu 1.7.4 | 元数据真源和逐模型向量检索 |
+| 图像 | Pillow、OpenCV | 解码、EXIF、尺寸检查和 Haar 人数计数 |
+| 显示 | QDtech MPI1001、PhotoPainter、微雪 E6 | 本机管理、六色终端和 E6 协议输出 |
+
+310B 的 NPU 只负责已准入 OM 的推理。相册数据、FAISS 文件、设备状态和配置都留在板端；手机和 ESP32 只通过 HTTP 获取受控结果。
+
+## 💾 核心数据模型
+
+`photos` 保存原图生命周期，关键字段包括 `id`、`filepath`、`filename`、`sha256`、`size_bytes`、`mtime`、`available`、`width`、`height`、`mime_type`、`capture_time`、`capture_time_source`、`upload_time`、`tags`、`face_count` 和 `deleted_at`。普通上传原图位于系统用户的 `~/Pictures/ai-album/imports/`，临时 multipart 文件位于 `~/Pictures/ai-album/.upload-tmp/`；仓库 `shared/photos/` 仅承载 COCO-CN 和旧数据兼容读取，避免个人照片进入发布目录。其中 `tags` 只保留为旧数据库迁移兼容元数据；常规上传不要求或写入手工标签，当前工程也没有部署自动图像标注模型。
+
+`embeddings` 使用 `(photo_id, model_id)` 作为主键，保存维度和归一化向量。每个模型有独立的 `IndexIDMap2(IndexFlatIP)`，FAISS 的 ID 就是 SQLite 的 `photo_id`，因此不会把不同模型空间混合。
+
+`display_state` 和 `display_history` 保存本机触摸屏、两个 PhotoFrame profile 与本机 E6 输出的当前照片、暂停状态、时隙、策略 revision、selection revision 和最近 12 张历史。`jobs` 保存手机上传后的串行索引进度。
+
+## 🧠 多模型语义检索方法
+
+### CLIP 的共同向量空间
+
+CLIP 使用图像编码器和文本编码器把两个模态投影到同一个向量空间。图像查询先编码成向量，文本查询也编码成向量，二者做 L2 归一化后使用内积近似余弦相似度。相似度高表示模型训练中认为图像和文本语义更接近。
+
+Case7 不把三个模型的数值直接相加：不同训练数据、投影层和维度形成不同坐标空间。模型 ID 是索引隔离和 API 路由的边界。
+
+### MobileCLIP-S0
+
+MobileCLIP-S0 面向英文和通用语义，图像输入固定为 `1x3x256x256`，文本输入固定为 `1x77`，输出 embedding 为 512 维。图像和文本组件分别导出 ONNX，再分别转换成 OM。
+
+```mermaid
+flowchart LR
+    accTitle: MobileCLIP 编码结构
+    accDescr: MobileCLIP-S0 分别编码图像和英文文本，再投影到 512 维归一化空间进行检索
+
+    image[📥 RGB 图像 256x256] --> image_encoder[🧠 MobileCLIP 图像编码器]
+    text[📥 英文文本 77 tokens] --> text_encoder[🧠 MobileCLIP 文本编码器]
+    image_encoder --> image_projection[⚙️ 图像投影层]
+    text_encoder --> text_projection[⚙️ 文本投影层]
+    image_projection --> image_vector[🏷️ 512 维 L2 归一化]
+    text_projection --> text_vector[🏷️ 512 维 L2 归一化]
+    image_vector --> similarity[🔍 FAISS 内积或余弦相似度]
+    text_vector --> similarity
+```
+
+### Chinese-CLIP RN50
+
+Chinese-CLIP RN50 面向中文语义，图像输入固定为 `1x3x224x224`，文本输入固定为 `1x52`，输出 embedding 为 1024 维。文本 tokenizer 使用 BERT 风格的 `vocab.txt`、`[CLS]`、`[SEP]`、`[PAD]` 和 `[UNK]` 合同；tokenizer 的物理行读取规则必须和固定上游实现一致。
+
+```mermaid
+flowchart LR
+    accTitle: Chinese-CLIP 编码结构
+    accDescr: Chinese-CLIP RN50 使用 ResNet 图像分支和 BERT 风格中文文本分支，输出 1024 维归一化向量
+
+    image[📥 RGB 图像 224x224] --> rn50[🧠 ResNet50 图像编码器]
+    text[📥 中文文本 52 tokens] --> bert[🧠 BERT 风格文本编码器]
+    rn50 --> image_projection[⚙️ 图像投影层]
+    bert --> text_projection[⚙️ 文本投影层]
+    image_projection --> image_vector[🏷️ 1024 维 L2 归一化]
+    text_projection --> text_vector[🏷️ 1024 维 L2 归一化]
+    image_vector --> similarity[🔍 Chinese-CLIP FAISS 内积]
+    text_vector --> similarity
+```
+
+### ResNet50 经典相似图
+
+ResNet50 输出 2048 维视觉特征，用于兼容传统“以图搜相似图”模式。它没有文本编码器，也不提供中文/英文语义能力。它必须使用独立 FAISS 文件，不能和任意 CLIP embedding 混合。
+
+```mermaid
+flowchart LR
+    accTitle: ResNet50 相似图结构
+    accDescr: ResNet50 只把图像映射到 2048 维视觉特征空间，用于图像到图像检索
+
+    image[📥 RGB 图像 224x224] --> backbone[🧠 ResNet50 卷积骨干]
+    backbone --> feature[⚙️ 去除分类头]
+    feature --> vector[🏷️ 2048 维 L2 归一化]
+    vector --> search[🔍 ResNet50 独立 FAISS 检索]
+```
+
+### 自动路由
+
+文本自动模式检测中日韩字符时选择 Chinese-CLIP，否则选择 MobileCLIP；图片自动模式默认选择 MobileCLIP。用户手动指定模型时，服务检查模型已准入且查询输入合同正确。
+
+## 🔧 昇腾 310B 模型迁移方法
+
+模型迁移分为四个可审计阶段：
+
+```text
+checkpoint / tokenizer
+        ↓ 离线导出
+FP32 ONNX（固定 batch=1）
+        ↓ 板端 ATC
+Ascend310B4 mixed-FP16 OM
+        ↓ PyACL / ACL
+NPU embedding + FAISS 检索
+```
+
+导出阶段记录输入名称、shape、dtype、输出维度和 ONNX SHA-256。转换阶段使用 `--soc_version Ascend310B4` 和 `--precision_mode allow_fp32_to_fp16`。MobileCLIP 图像组件的当前生产 OM 已通过选择性精度扫描，使用 C0 的零节点 FP32 白名单；任何未来的例外仍必须写入 ATC 证据，而不能更换模型。
+
+310B 板端内存有限，ATC 强制单线程：`MAX_COMPILE_CORE_NUMBER=1`、`TBE_PARALLEL_COMPILER=0`、`ASCENDC_PAR_COMPILE_JOB=0`、`TILINGKEY_PAR_COMPILE=0`、`OMP_NUM_THREADS=1` 和 `OPENBLAS_NUM_THREADS=1`。不添加 swap 或编译缓存，不开启并行图编译；转换器只在旧版确实提供该参数时选择 `--enable_graph_parallel=0`。CANN 8.x 的 `--ac_parallel_enable` 是动态 shape 执行阶段的 AI CPU/Core 并行选项，不等价于图编译开关，不能把它写成 ATC 并行门禁。
+
+MobileCLIP 和 Chinese-CLIP 文本图目前登记为 `int64` 输入。这个类型是否能被目标 CANN 版本的 ONNX 到 ATC 链路接受，必须用板端最小文本图预检；若失败，应重新导出并验证 `int32` 合同，同时更新 tokenizer、ACL 输入检查、hash 和准入报告，而不是只改模型清单。
+
+准入脚本先验证 ACL 初始化，再验证输入字节数、dtype、输出字节数、维度和有限值，最后比较 ONNX 与 OM 的归一化向量，余弦相似度门槛为 `0.995`。只有 `models/registry.json` 中 hash 一致且 `status=admitted` 的 OM 才会被服务加载。
+
+### 310B4/8T 与 310B1/20T 的跨板 OM 兼容性实验
+
+MobileCLIP 的 OM 不是脱离目标芯片的通用二进制。为了区分“ATC 转换成功”“本机 ACL 可执行”和“跨 SoC 可移植”，Case7 对图像、文本两个组件分别建立 8T/20T 对照矩阵：8T 使用 `--soc_version=Ascend310B4` 重新转换，20T 使用已经生成的 `--soc_version=Ascend310B1` OM 做原生复验，然后把两套 OM 在两块板上各运行一次。完整命令、版本原文、哈希和错误日志保存在 `samples/case7/docs/12-mobileclip-cross-board-compatibility.md`。
+
+```mermaid
+flowchart LR
+    onnx[锁定 MobileCLIP ONNX] --> atc8[8T ATC\nAscend310B4]
+    onnx --> atc20[20T ATC/复用\nAscend310B1]
+    atc8 --> om8[8T image/text OM]
+    atc20 --> om20[20T image/text OM]
+    om8 --> run8[8T ACL 原生]
+    om8 --> run20[20T ACL 跨板]
+    om20 --> run20n[20T ACL 原生]
+    om20 --> run8x[8T ACL 跨板]
+```
+
+每个矩阵单元都重新检查 ACL 初始化、输入字节数和 dtype、512 维有限输出，以及与同一 ONNX 参考向量的归一化余弦 `>= 0.995`。`load_rejected`、`execute_failed`、`output_contract_mismatch`、`numerical_mismatch` 和 `non_finite` 必须保留原始错误，不能通过 CPU fallback 或再次编译隐藏。原生通过而跨板失败，说明该 OM 在观测到的 SoC/运行栈组合下有兼容性边界；原生和跨板都通过，也只代表本次版本组合和 fixture，不代表所有 310B 型号通用。
+
+本次实测使用 CANN `7.6.0.1.220:8.0.0`、driver/npu-smi `25.2.0`。`npu-smi info` 是版本和 SoC 的直接入口；`npu-smi info -t board -i 0` 提供固件字段，但两板原文均返回 `Firmware Version=NA`，因此实际固件版本未取得，不能从驱动版本或安装包 hash 推断固件状态。图像 36 个 fixture 和文本 20 个 fixture 在八个组件-矩阵单元全部通过：图像最小/最大余弦为 `0.9999415278434753`/`0.9999895095825195`，文本为 `0.999996542930603`/`0.9999986886978149`。8T 新 OM 的 image/text 大小和 SHA-256 分别为 `34179432/6d294c0d8ac069c12728eb3b2f29c8c06c9cff4003e1e81121181b89e6cf4eb6` 与 `137089078/eaee8ed5b0695542da24cede466d34556ffbcf3048001c41e47bd0d9a4184382`；20T OM 分别为 `34179368/096b5ced17bf5386be3478a2bb38b32365b6d2c23d3ec1355122669d2ddcd95d` 与 `137089021/d9cbee64b10f7c3fcf0a77c1706d8ea9af3da3d4b922ac27249136ede95c8f77`。这些数字属于固定 campaign 和隔离 fixture，不是对其他 CANN、固件或 SoC 的通用承诺。
+
+#### CANN、驱动、固件和目标 SoC 的关系
+
+`--soc_version` 决定 ATC 为哪一类 NPU 生成算子和执行计划；CANN Toolkit/ATC、板端 CANN Runtime/PyACL、驱动和 NPU 固件是相互配套的层次。运行时 CANN 不应低于生成 OM 的版本，驱动/固件也必须满足官方兼容矩阵；不匹配可能表现为算子不支持、OM 加载拒绝、ACL 执行失败、数值异常或设备重置。CANN 版本号不能推断固件版本，`npu-smi` 的固件字段返回 `Firmware Version=NA` 时必须原样记录并把固件状态标为“未取得”。本案例中同一 8T 板的 `npu-smi info` 软件版本均为 `25.2.0`，历史 CANN `8.3.0.1.200:8.3.RC1` 批次出现 MobileCLIP 图像 ATC/ACL 异常，换为 CANN `7.6.0.1.220:8.0.0` 后 36/36 数值门通过；这把问题优先缩小到 CANN 8.3 用户空间转换栈，但仍是版本对照相关性，不能冒充唯一因果证明。同时升级时遵循 firmware → driver → CANN 的顺序，具体以 [ATC `--soc_version` 文档](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/910/devaids/atctool/atlasatcparam_16_0036.html)、[CANN 升级说明](https://www.hiascend.com/document/detail/en/canncommercial/800/softwareinst/instg/instg_0028.html) 和 [`npu-smi` 版本查询说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/910/softwareinst/instg/instg_0064.html) 为准。
+
+完整的实测矩阵、原始环境路径和本地哈希清单见 `samples/case7/docs/12-mobileclip-cross-board-compatibility.md`。聚合报告为 `samples/case7/reports/model_pipeline/mobileclip-cross-board-20260829-aggregate/compatibility_matrix.json`；该报告的 `production_mutation=false`，仅作为兼容性证据，不会自动更新生产注册表或部署模型。
+
+### 选择性 FP32/FP16 与误差定位
+
+`allow_fp32_to_fp16` 是一种转换许可，不是“整张图强制 FP16”。图像浮点输入和 embedding 输出仍按
+FP32 ONNX 合同处理；文本 token 输入是 `int64`。ATC 会在允许的节点上选择 FP16 实现，未被转换或被
+`keep_dtype` 白名单保护的节点仍可沿用 FP32。这个区别很重要：MobileCLIP
+图像分支当前生产 OM 的组件级策略是 `allow_fp32_to_fp16`，并已推广 C0 的零节点 FP32
+白名单。推广前的 `must_keep_origin_dtype` OM 及其 `mobileclip_s0_image_keep_dtype.cfg` 仅保留为
+诊断和候选节点清单。MobileCLIP 文本、Chinese-CLIP 两个分支和 ResNet50 图像分支使用模型级
+`allow_fp32_to_fp16`。详细的命令、清单和证据字段见
+[`docs/08-model-pipeline-and-npu-admission.md`](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/08-model-pipeline-and-npu-admission.md)。
+
+诊断的基本方法是比较同一输入在 ONNX 参考执行器和候选 OM 各中间输出的方向，而不是只看最终
+embedding。现有诊断报告在 `network.4` 的加法节点记录余弦 `0.9994069`，在
+`network.5/proj/proj.0/lkb_reparam/Conv` 记录 `0.7932538`；同一分组还出现 SE `Sigmoid`
+`0.7223154`、主乘法 `0.2903332` 和 `proj.1` 卷积 `0.5836687`。另一次诊断的
+`network.5/proj/proj.1/activation/Mul_1` 为 `0.2216825`，最终 embedding 为 `0.2551974`。
+这些数字来自诊断图的单个输入，是误差传播线索而不是因果证明。一次整组件 `force_fp32` 候选也
+记录了 `0.4368718` 的失败，因此“全部 FP32”并不能被当作自动修复。
+
+选择性精度扫描按从小到大的白名单逐级验证：
+
+| 候选 | FP32 保留范围 | 本次结果 |
+| --- | --- | --- |
+| `C0` | 空白名单 | 通过并推广为生产 OM |
+| `C1` | `network.5/.../lkb_reparam/Conv` | 通过，因 C0 更快而未推广 |
+| `C2` | `C1` 加 SE 的池化、两层卷积、激活、门控和乘法 | C0 已满足门槛，未执行 |
+| `C3` | `C1` 加 GELU/`Erf`、主乘法链和 `proj.1` 卷积 | C0 已满足门槛，未执行 |
+| `C4` | `C2 + C3`，再保护两组注意力 `MatMul`/`Softmax` 和 head `MatMul` | C0 已满足门槛，未执行 |
+
+候选模型的流程如下。候选 OM、keep-dtype 文件和报告必须位于独立的
+`reports/precision_sweep/mobileclip_s0_image_precision/<candidate>/` 目录，不能覆盖生产 OM、注册表、SQLite、FAISS 或既有
+准入报告。
+
+```mermaid
+flowchart TB
+    accTitle: 选择性精度准入流程
+    accDescr: MobileCLIP 图像候选从单线程 ATC 转换开始，经过数值、检索和性能门禁后才可能替换生产模型
+
+    source([生产 ONNX]) --> candidate[生成 C0 到 C4 白名单]
+    candidate --> convert[单线程 ATC 隔离转换]
+    convert --> numeric{36 个输入余弦 >= 0.995?}
+    numeric -->|否| reject[保留日志并拒绝候选]
+    numeric -->|是| recall{500 张图库 Recall 不下降?}
+    recall -->|否| reject
+    recall -->|是| latency{P50 <= 生产基线 90%?}
+    latency -->|否| reject
+    latency -->|是| admit[候选可推广]
+
+    classDef source_style fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#3b0764
+    classDef process_style fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
+    classDef decision_style fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#713f12
+    classDef reject_style fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    classDef admit_style fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
+
+    class source source_style
+    class candidate,convert process_style
+    class numeric,recall,latency decision_style
+    class reject reject_style
+    class admit admit_style
+```
+
+每个候选需要 32 张按 `image_id` 固定的 COCO-CN 图片和种子 `310` 至 `313` 生成的 4 张确定性
+uint8 BGR 合成图；合成图也必须经过生产的 `NpuEmbeddingBackend.preprocess_image`，而不是直接把
+标准正态张量送入模型。输出必须是 512 维有限向量，36 次归一化余弦全部达到 `0.995`。随后在临时
+索引中重建 500 张图库，以同轮生产 OM 比较既有 20 条英文查询的 Recall@1/3/5；临时向量和索引在
+报告完成后删除。最后在 `Ascend310B4` 板端以单线程、20 次预热、100 次计时、3 轮重复测量 P50/P95。
+
+最终批次 `full-serial-20260827-prod-domain-cann` 在 `192.168.8.180`、CANN
+`7.6.0.1.220:8.0.0` 上完成，状态为 `passed`。生产 ONNX SHA-256 为
+`baaffc19bb5af33aa3ec05180e9e9c43c4a1f01a3ea1b64737aaaf325dca1b79`；C0 OM SHA-256 为
+`4ba82838bcb13c1542b2e0b5cebb30ef754abdc2745663f92f9becc5ce943517`，大小 `34179446` bytes。
+C0 和 C1 的 36/36 数值输入均达到门槛，英文 Recall@1/3/5 均为 `0.90/1.00/1.00`，与基线相同。
+性能结果为：基线 P50/P95 `64.541943/64.780770 ms`，C0 `38.913310/39.271904 ms`，C1
+`39.124595/39.437814 ms`。因此 C0 以零 FP32 白名单和更低 P50 被选中，C2–C4 不再执行。
+
+推广后，canonical MobileCLIP OM 和注册表均已更新为 C0 的 `allow_fp32_to_fp16` 策略，并串行重建
+500 个 MobileCLIP 图像向量；服务健康状态为 `ready`。`npu-smi` 的 `Health: Alarm` 是已记录的
+板卡诊断状态，不单独改变本次模型准入结论。早期标准正态压力输入报告若存在，只能作为域外稳定性
+诊断，不能替代上述生产域 fixture。
+
+## ⚙️ NPU 运行时与串行资源管理
+
+`embedding_backend.py` 用一个 ACL 资源管理器拥有 device、context、stream 和 model。`ModelManager` 按需加载图像/文本 OM；切换模型前释放旧 model，避免多个大模型同时占用内存。获取模型、构造输入、执行和释放由同一把锁保护。
+
+服务的索引任务、ATC 转换和单次 embedding 都是串行的。这样牺牲并发换取可预测的 NPU 内存峰值和板端稳定性。CPU/PyTorch 不作为生产 fallback，因为 fallback 会掩盖 OM 缺失、ACL 初始化失败或模型合同错误；这些错误必须直接返回并写入健康状态。
+
+## 🌦️ 智能选图与天气方法
+
+候选照片必须可用且未删除。默认总分为：
+
+```text
+总分 = 0.60 * Chinese-CLIP 语义相似度
+     + 0.25 * 日期、月份、星期和时段匹配
+     + 0.15 * 天气与兼容元数据匹配
+```
+
+照片时间优先 EXIF `DateTimeOriginal`，缺失时使用上传时间。天气默认来自 Open-Meteo；请求失败时保留最后有效状态。历史迁移照片若包含兼容 `tags`，可参与天气匹配；新上传照片不接受手工标签，缺少该元数据时该项得分为零。最近显示的 12 张照片进入重复抑制窗口，无匹配时回退到最新照片。
+
+天气在后台按 `weather.refresh_seconds` 更新；`next`、`previous`、图库点选和相似图查询复用已有天气状态，不主动访问天气服务。服务器在空闲调度周期中用已准入 Chinese-CLIP 文本编码器查询语义空间，并把 FAISS 排序后的照片 ID 放入易失的内存候选队列；手动 `next` 消费这份 NPU 语义计划，因此不是按文件名绕过模型。队列因天气、配置、图库变化而失效或耗尽时，下一次操作会在缓存天气下补做一次串行 NPU 排序。这样连续点击不会重复请求天气或反复加载模型，同时每个候选顺序仍由 NPU 语义分数参与决定。触摸屏自动选图默认每 60 秒执行，普通电脑网页每 30 秒轮询显示元数据；网页比较 ETag，未变化时不重新下载 JPEG。电子纸物理刷新使用独立的 30 分钟周期，也可明确设置为 10 分钟，暂停相册会暂停这些自动动作。
+
+手动切图的控制请求和图像显示是两个阶段：前者提交 NPU 预选队列中的照片 ID（冷队列时先完成一次 NPU 文本推理和 FAISS 排序），浏览器随后按实际视口请求一次性 JPEG。高分辨率原图的 EXIF 旋转、缩放和 JPEG 编码通常比温热队列的选择状态更新更耗时；服务器使用 `Image.draft` 作为当前 JPEG 解码的尺寸提示，但不写入缩略图或其他派生缓存。首页不预加载整个图库，图库面板打开后才创建网格，网格图片使用浏览器懒加载和异步解码，避免原图请求与主屏渲染争用板端资源。
+
+`selection_revision` 在上传、天气变化、配置变化和轮播时隙到达时递增。每个 profile 的 current photo、pause 状态和 history 写入 SQLite，重启后恢复而不是重新随机选择。
+
+## 🌐 服务器化设计
+
+### 上传任务状态机
+
+手机的 `POST /api/photos/upload` 只负责接收和保存受管原图，然后返回 `job_id`。单线程任务依次完成解码、元数据写入、三模型 embedding 和 FAISS 更新；手机轮询 `/api/jobs/{job_id}` 获取 `queued`、`running`、`completed` 或 `failed`。
+
+### 配置与显示状态
+
+`GET/PATCH /api/config` 使用 revision 乐观锁和原子 JSON 写入。手机可以修改时区、轮播、天气坐标、重复抑制、JPEG 参数、E6 参数和文件名水印开关，但不能执行 shell、修改任意系统路径或改变 CANN 环境。显示控制 API 持久化 `select`、`next`、`previous`、`pause` 和 `resume`。
+
+### ESP32 与 PhotoPainter
+
+设备先发送显示能力，服务器返回 device ID、轮询周期和 manifest。后续以 ETag 条件请求 manifest/content；JPEG profile 按设备尺寸、方向和字节上限按需编码，E6 profile 输出固定 800x480、六色、192000-byte 帧。PhotoPainter profile 返回 bounded JPEG，由上游固件继续完成六色校准、抖动和电子纸刷新。
+
+Case7 固定记录两种 7.3 英寸设备 profile：[Waveshare ESP32-S3-PhotoPainter 官方产品页](https://www.waveshare.com/product/displays/e-paper/epaper-1/esp32-s3-photopainter.htm) / [Wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter) 为 E6 六色（黑、白、绿、蓝、红、黄）800x480；Wiki Mode 1 接受 800x480 或 480x800 图像，因此内容可标记为 `landscape` 或 `portrait`；[Seeed Studio reTerminal E1002 官方 Wiki](https://wiki.seeedstudio.com/getting_started_with_reterminal_e1002/) 为 ACeP / Spectra 6 全彩 800x480，Case7 将它固定为 `landscape`。方向字段只允许 `landscape`、`portrait`，不支持 360°、180°或 90°/270°安装旋转；E1002 的 `portrait` 请求必须拒绝。Seeed 的资料只确认面板规格，横屏限制是本项目的设备策略；厂商资料不替代固件识别和真实面板刷新证据。
+
+新设备在管理 API 和低层握手 API 中都必须显式携带这两个 `profile_id` 之一，JPEG 能力固定为 `["jpeg"]`；服务不会因为 800x480、设备名称或 IP 地址相同而猜测型号。历史 `devices.json` 缺少 profile 的记录会被标记为待确认，仍可在管理页查看，但不能取图、推进轮播或主动推送，直到操作者按实物型号完成确认。
+
+当前 LAN 部署的设备注册和取图都是 URL-only：不生成、不显示、也不要求设备令牌。服务设置私有、重新验证缓存语义和 `Vary`，不把真实文件路径暴露给设备。禁用设备返回 `404`；访问边界依赖可信局域网和服务器端设备启停状态，而不是旧固件令牌。
+
+### 从串口启动日志取得 PhotoPainter 的 IPv4 地址
+
+设备网页地址由路由器 DHCP 分配，不能从设备名称、MAC 或旧的租约记录推断。实际操作时只连接当前
+PhotoPainter，打开串口监视器并按一次 `BOOT/KEY` 唤醒，再按复位键观察完整启动过程：
+
+```powershell
+$idfPython = 'C:\Espressif\tools\python\v6.0.2\venv\Scripts\python.exe'
+& $idfPython -m serial.tools.miniterm COM17 115200
+```
+
+日志中出现 `No WiFi credentials found - Starting AP mode` 表示设备还在临时配网 AP；连接形如
+`PhotoFrame - XXXXX` 的 2.4 GHz AP 后配置家庭网络。配网成功必须同时看到 `sta ip: ...`、
+`HTTP server started` 和 `Web interface available at: http://...`。本次新微雪设备的证据是：
+
+```text
+profile: waveshare_photopainter_73
+serial: COM17
+firmware: esp32-photoframe v2.18.0
+sta ip: 192.168.1.137
+web: http://192.168.1.137/
+```
+
+在同一局域网电脑上用这个 IPv4 地址验证，而不是登录 `photoframe.local`：
+
+```powershell
+$photoIp = '192.168.1.137'
+curl.exe --noproxy "*" "http://$photoIp/api/system-info"
+curl.exe --noproxy "*" -I "http://$photoIp/"
+```
+
+`photoframe.local` 只是可选 mDNS 别名，Windows、VPN 或路由器不支持解析时仍属正常；它不是账号、
+密码或必须的登录入口。`192.168.1.135:7860` 是 310B 相册服务器，`192.168.1.117` 是旧 E1002
+记录，均不能代替当前串口日志中的地址。每次重启、换路由器或重新配网后都要重新读取 `sta ip`。
+完整的端口枚举、日志保存、DHCP 变化和故障排查步骤见仓库中的
+[PhotoPainter 串口读取 IP 与 Wi-Fi 配网手册](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/13-photopainter-serial-ip-and-wifi.md)。
+
+### 横竖屏图像方向
+
+照片显示先执行 EXIF Orientation 校正，再应用设备 profile 的 `orientation`（`landscape` 或 `portrait`）。默认
+`orientation_mode=auto` 保持照片本身的横竖构图，只将其按 `cover` 或 `fit` 放进目标画布；这是人像
+照片的安全默认值。需要让最终编码帧严格匹配显示器横竖方向时，可启用
+`orientation_mode=match_display`，服务会按 profile 选择 `landscape` 或 `portrait` 目标；E1002 的
+`portrait` 请求直接拒绝，不通过隐式交换宽高放行。
+
+设备可用 `X-Display-Width` 和 `X-Display-Height` 在**其已登记 profile 允许范围内**协商当前能力：
+只有 PhotoPainter 可以使用 `480x800` 竖屏，E1002 的这类请求会拒绝；不可沿用旧的方向标签。JPEG 响应中的 `X-Album-Orientation` 是实际像素方向，
+`X-Album-Target-Orientation` 是目标显示方向，因此 `auto` 模式下两者可以不同。尺寸、方向模式和安装
+方向都会进入 JPEG 的 ETag。触摸屏 `display.*` 与 E6 `epaper.*` 的方向设置相互独立；E6 仍是固定
+`800x480`、192000-byte 线协议，天气刷新或触摸屏方向变化不会让同一 E6 图帧失效并触发额外刷新。
+
+## 🎨 触摸屏交互设计
+
+触摸屏首页把照片作为第一视觉层，天气卡片和状态信息使用高对比度实体背景。五个首页动作收拢为一个紧凑工具栏；文件名作为同一工具栏内的非交互文本，设置页有“显示文件名水印”开关。8 秒无操作时工具栏和文件名一起淡出，触摸照片唤醒。
+
+底部导航打开图库、智能搜索、上传、设备和设置五个全屏面板。按钮最小高度为 56px，图片网格固定宽高比；1920x1080、1280x800、1024x600 和 400x900 视口均禁止页面横向滚动。
+
+## 🖨️ E6 图像处理方法
+
+`epaper_display.py` 在 CPU 上执行：
+
+1. 读取 EXIF 方向并旋转；
+2. 将图像居中裁剪到 800x480；
+3. 量化到 E6 六色调色板；
+4. 使用官方稀疏颜色编号：黑 0、白 1、黄 2、红 3、保留黑 4、蓝 5、绿 6；
+5. 两个像素按高半字节优先打包，输出 `800*480/2 = 192000` bytes；
+6. dry-run 验证初始化、刷新、BUSY 和休眠命令序列。
+
+真实硬件模式必须显式提供 SPI 设备、gpiochip 和 DC/RST/BUSY line offset。当前驱动板型号和接线尚未确认，PNG/帧 dry-run 只能证明协议编码，不能宣称微雪实屏刷新通过。PhotoPainter 六色路径同样不能由 E6 六色帧结果替代。
+
+## 🗂️ 工程代码导读
+
+| 模块 | 职责 |
+| --- | --- |
+| `app.py` | FastAPI 入口、上传、搜索、配置、显示和设备 API |
+| `server_config.py` | 配置默认值、类型校验、revision 和原子写入 |
+| `model_registry.py` | 候选清单、生产注册表、文件 hash 和准入状态 |
+| `embedding_backend.py` | ACL 资源、固定输入输出合同、tokenizer 和模型切换锁 |
+| `photo_index.py` | SQLite 元数据、旧索引迁移、逐模型 FAISS 和增量更新 |
+| `smart_selector.py` | 日期、天气、兼容元数据、语义排序、时隙和显示历史 |
+| `display_policy.py` | PhotoPainter 策略、cron、渲染、ETag 组成和 JPEG 限制 |
+| `epaper_display.py` | E6 旋转、裁剪、量化、打包和 periphery 协议 |
+| `web/` | 原生静态触摸屏/手机 UI，不需要额外前端构建运行时 |
+| `scripts/` | 模型、COCO-CN、部署、服务、kiosk 和性能脚本 |
+
+## 🧪 测试、性能与验收方法
+
+测试把不同证据分开：
+
+- 单元测试覆盖模型合同、ACL 模拟、索引隔离、上传安全、配置 revision、显示历史、设备握手/ETag 和 E6 帧；
+- 模型准入覆盖 ONNX 合同、ATC 日志、OM hash、ACL 数值和有限值；
+- COCO-CN 检索覆盖 20 条中文和 20 条英文查询，Recall@3 门槛均为 80%；
+- 性能使用单线程、20 次预热、100 次计时、3 轮重复，报告图像/文本编码、FAISS 和 API P50/P95；
+- UI 验收覆盖 1920x1080、1280x800、1024x600 和 400x900，无横向滚动、控件重叠或文字溢出；
+- E6 dry-run 覆盖 EXIF、裁剪、六色、颜色编号、192000 bytes、BUSY 超时和无 GPIO 拒绝。
+
+历史 310B4/8T 报告曾记录 COCO-CN 英文 MobileCLIP Recall@1/3/5 = `0.90/1.00/1.00`、中文
+Chinese-CLIP = `0.80/0.95/1.00`，以及 MobileCLIP 图像编码 P50/P95 `55.898/56.106 ms`、
+Chinese-CLIP 文本编码 `11.988/12.048 ms`、FAISS 搜索 `0.413/0.449 ms`。这些数字属于历史
+证据，不能移植到其他板卡。当前验收目标是 `192.168.8.180`；其 2026-08-27 复核报告显示 500 张
+COCO-CN 图片已建立三个模型的各 500 个 embedding，英文 Recall@1/3/5 为 `0.90/1.00/1.00`，
+中文为 `0.80/0.95/1.00`，三个模型均为 `admitted`。当前板端性能和模型 hash 以
+`reports/benchmarks/coco_cn_case7_performance_20260827_newboard.json`、
+`reports/datasets/coco_cn_case7_retrieval_20260827_newboard.json` 和
+`reports/model_pipeline/board-20260827/acl_numerical_validation.json` 为准；新板报告仍需与候选
+精度扫描分开记录。
+
+本机显示恢复也在同一目标板上单独验收：报告
+`reports/display-restart-recovery-20260827.json`（SHA-256
+`69c9fd4f8e89b9a09980edbf9b8919bc35a9f08f51e14420258643e114ade36b`）记录了只重启 Case7 服务
+后的结果。重启前后 `photo_id=194`、`selection_revision=3` 和 `ready` 状态保持不变；等待一次
+天气 tick 后仍为同一张照片，revision 递增到 4 并更新 ETag。这是本机状态恢复与天气解耦的
+接口/服务证据，不等同于真实电子纸刷新证据。
+
+## ⚠️ 限制、许可证与后续工作
+
+- MobileCLIP 使用 Apple Machine Learning Research Model License，按清单中的非商业研究/教育边界使用；Chinese-CLIP 代码和权重许可应以固定上游仓库为准；ResNet50 使用 torchvision/ImageNet 研究教育资产。
+- COCO-CN 是唯一公开测试集；图像来源于 COCO-CN/MS-COCO，使用时必须保留 manifest 的来源和许可证字段。
+- Open-Meteo 是默认天气服务，网络失败时只能使用最后有效状态。
+- PhotoPainter 使用上游 `v2.18.0` 固件；Case7 不维护自定义 ESP32 固件分支。
+- 服务无管理员登录，只适合可信局域网，禁止公网暴露。
+- 微雪 E6 驱动板型号和 GPIO/SPI 接线尚未确认，真实实屏刷新是独立后续验收。
+- 通用 ESP-IDF 客户端需要具体 ESP32 变体、显示控制器、总线、GPIO、电源、Flash/PSRAM 和 IDF 版本后才能安全实现；当前先使用 HTTP 协议和上游 PhotoFrame。
+
+## 📚 参考资料
+
+- [Apple MobileCLIP](https://github.com/apple/ml-mobileclip)
+- [OFA-Sys Chinese-CLIP](https://github.com/OFA-Sys/Chinese-CLIP)
+- [COCO-CN 论文](https://arxiv.org/abs/1805.08661)
+- [Waveshare E6 Python 驱动](https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd/epd7in3e.py)
+- [Ascend samples](https://github.com/Ascend/samples)
+- [ESP32 PhotoFrame](https://github.com/aitjcize/esp32-photoframe)
+
+[^1]: Apple. *ml-mobileclip*. https://github.com/apple/ml-mobileclip
+[^2]: OFA-Sys. *Chinese-CLIP*. https://github.com/OFA-Sys/Chinese-CLIP
+[^3]: Yuan, Y. et al. *Building a Large Scale Multimedia Dataset with Chinese Captions*. https://arxiv.org/abs/1805.08661
+[^4]: Waveshare Team. *e-Paper*. https://github.com/waveshareteam/e-Paper
+[^5]: Ascend. *samples*. https://github.com/Ascend/samples
+[^6]: aitjcize. *esp32-photoframe*. https://github.com/aitjcize/esp32-photoframe

@@ -20,9 +20,9 @@ Ascend310/
 ├── src/book/          # 教程 markdown 源文件
 ├── src/experiment/    # 各案例详细教程 (case1.md ~ case9.md)
 ├── samples/           # 各案例配套代码
-│   ├── case1/         # 图像分类 (ResNet)
+│   ├── case1/         # 人脸考勤（face-attendance）
 │   ├── case2/         # 目标检测 (YOLO)
-│   ├── case3/         # 智能电子琴 (MIDI + 3D打印)
+│   ├── case3/         # DDSP 音乐工作站（ddsp-music-workstation）
 │   └── case9/         # 边缘智能聊天机器人
 └── CLAUDE.md
 ```

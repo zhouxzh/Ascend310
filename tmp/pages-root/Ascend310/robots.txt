@@ -1,4 +1,0 @@
-User-agent:*
-Disallow:
-
-Sitemap: https://zhouxzh.github.io/Ascend310/sitemap.xml

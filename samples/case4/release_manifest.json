@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "release_id": "1.0.0",
+  "status": "manual_test_frozen",
+  "created_at": null,
+  "git_revision": null,
+  "source_archive": {
+    "filename": null,
+    "bytes": null,
+    "sha256": null
+  },
+  "runtime": {
+    "python": "3.9.x",
+    "cann": "8.0.0",
+    "soc_version": "Ascend310B4",
+    "compute_tier": "8T",
+    "npu_device_id": 0
+  },
+  "template_policy": {
+    "included_in_release": false,
+    "runtime_generated": true,
+    "storage": "ROOT/data/templates",
+    "format": "PWST1",
+    "encryption_required": false,
+    "key_env": null,
+    "encryption_env": null,
+    "internal_test_only": true
+  },
+  "capture_policy": {
+    "storage": "ROOT/data/captures",
+    "index": "data/captures/index.json",
+    "original_format": "jpeg",
+    "roi_format": "png",
+    "continuous_preview_archived": false,
+    "template_delete_keeps_captures": true,
+    "excluded_from_source_and_asset_sync": true
+  },
+  "frontend": {
+    "version": "1.0.0",
+    "dist_index_sha256": "300e3f21fbe43abd91abc3e109de69dc773076d73d0c087f5c9890db8d7e6d13",
+    "bundle_sha256": "86ea4915b5be77f251922937a3d9af2fa526e0c16e393a8ab8b97ece6072b7f0",
+    "bundle_definition": "sha256 over sorted frontend/dist records: relative POSIX path, NUL, per-file SHA-256, LF; use tools.board.verify_frontend_assets"
+  },
+  "asset_package": {
+    "kind": "external-board-assets",
+    "models_directory": "models/om",
+    "source_package_contains_binaries": false,
+    "local_sync_status": "six_om_files_locally_staged_and_sha256_verified",
+    "manifest_path": "om_manifest.json",
+    "manifest_sha256": "999d8298891ed36329cd25ec8f88e654d83c92733c359da43997ac0f0fdcf540",
+    "assets": [
+      {"model_id": "ccnet", "filename": "palm_ccnet_mixed_fp16.om", "bytes": 131904474, "sha256": "8465fbf483524a1b373618e5e67b2903c522a32f0fc3b3ee6a4b40881295b7f1", "redistribution_status": "review_required"},
+      {"model_id": "compnet_tongji_600", "filename": "compnet_tongji_600_mixed_fp16.om", "bytes": 11130543, "sha256": "b412804c403d4dc30e251a7382e1d27efe666a7595954187c762c8c3b9400d8d", "redistribution_status": "review_required"},
+      {"model_id": "compnet_iitd_460", "filename": "compnet_iitd_460_mixed_fp16.om", "bytes": 11130535, "sha256": "64737e66b226c4b77a561d82c7af840c09488a63cff289c6af0ccf7d92d4e2da", "redistribution_status": "review_required"},
+      {"model_id": "compnet_rest_358", "filename": "compnet_rest_358_mixed_fp16.om", "bytes": 11130535, "sha256": "e197b884cd0c22942ace51727743d287d544fb98b82b895a81edcef146c41844", "redistribution_status": "review_required"},
+      {"model_id": "compnet_xjtu_flash_200", "filename": "compnet_xjtu_flash_200_mixed_fp16.om", "bytes": 11130559, "sha256": "764d9d81c7844bf41ba2054f577a1e465d6b9139134fee4ded352ff64959052c", "redistribution_status": "review_required"},
+      {"model_id": "compnet_xjtu_natural_200", "filename": "compnet_xjtu_natural_200_mixed_fp16.om", "bytes": 11130567, "sha256": "54b4a5f102b6914591d8901ee2c2b6deed44b05e33145b8e5052fd5c41ab797a", "redistribution_status": "review_required"}
+    ],
+    "huggingface": {
+      "repo_id": "zhouxzh/ascend310-palmprint",
+      "revision": null,
+      "visibility": "public",
+      "download_policy": "pin_commit_and_verify_sha256",
+      "license_review": "pending",
+      "upload_status": "blocked_pending_explicit_user_upload_and_redistribution_review"
+    }
+  },
+  "registry": {
+    "path": "models/registry.json",
+    "sha256": "26c5aaf2e8eb08047956e2c66dc460008fd0767dc3265f314dbb35e126adc9d4",
+    "admitted_model_ids": ["ccnet"],
+    "manual_test_model_ids": ["ccnet", "compnet_tongji_600", "compnet_iitd_460", "compnet_rest_358", "compnet_xjtu_flash_200", "compnet_xjtu_natural_200"],
+    "profile": "production defaults to ccnet; manual_test enables six models",
+    "manual_test_pending": ["compnet_tongji_600", "compnet_iitd_460", "compnet_rest_358", "compnet_xjtu_flash_200", "compnet_xjtu_natural_200"]
+  },
+  "candidate_manifest": {
+    "path": "candidate_manifest.json",
+    "sha256": "ae855c102cfc398b4d93b4ec2ff3d42a9438ef2a6a1ed0cc10524387d95abbff"
+  },
+  "external_assets": {
+    "models": [],
+    "datasets": [],
+    "templates": [],
+    "reports": [],
+    "policy": "references only; datasets are downloaded from dataset_manifest.json, templates and reports remain device-local"
+  },
+  "verification": {
+    "python_tests": "72 passed / 47 skipped (control machine; skipped hardware dependencies; POSIX file-lock test requires board)",
+    "frontend_tests": "7 passed",
+    "frontend_build": "passed",
+    "health_url": "board-local:http://127.0.0.1:7860/api/health (smoke evidence)",
+    "bootstrap_url": "board-local:http://127.0.0.1:7860/api/bootstrap (smoke evidence)",
+    "board_acceptance_report": "docs/evidence/package-board-smoke-20260817.md (smoke only; full acceptance pending)",
+    "manual_test_smoke": "docs/evidence/manual-test-smoke-20260818.md (synthetic ROI API/template/restart smoke; touch screen and camera remain operator checks)"
+  },
+  "manual_test": {
+    "profile": "manual_test",
+    "version_frozen": true,
+    "upgrade_policy": "Do not upgrade dependencies, CANN, driver, firmware, or APP_VERSION during manual testing.",
+    "failure_policy": "Stop the affected model, record a redacted summary, and fall back to CCNet; plan fixes in a later release."
+  },
+  "notes": "Frozen manual-test source release. OM binaries are external board assets and must be verified against om_manifest.json before use. No automatic remote upload/download is performed. Do not commit private paths, credentials, templates, datasets, captures, or raw reports."
+}

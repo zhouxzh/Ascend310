@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "release_id": "1.0.0",
+  "repository": "zhouxzh/ascend310-palmprint",
+  "upload_status": "uploaded_verified",
+  "remote_revision": "e9fdcb5fee43ee64c1533647b06183f0d62e60bc",
+  "hardware": {
+    "soc": "Ascend310B4",
+    "compute_tier": "8T",
+    "cann": "8.0.0",
+    "precision": "mixed_fp16",
+    "input": "float32[1,1,128,128]"
+  },
+  "assets": [
+    {
+      "model_id": "ccnet",
+      "filename": "palm_ccnet_mixed_fp16.om",
+      "hub_path": "models/om/palm_ccnet_mixed_fp16.om",
+      "bytes": 131904474,
+      "sha256": "8465fbf483524a1b373618e5e67b2903c522a32f0fc3b3ee6a4b40881295b7f1",
+      "feature_dim": 2048,
+      "source": "https://huggingface.co/kyereboatengcaleb/palm-ccnet-onnx",
+      "source_revision": "a20685bdc844e153227a0d7bf7b6bdb3d2da4ff6",
+      "license": "other",
+      "redistribution_status": "review_required",
+      "production_enabled": true
+    },
+    {
+      "model_id": "compnet_tongji_600",
+      "filename": "compnet_tongji_600_mixed_fp16.om",
+      "hub_path": "models/om/compnet_tongji_600_mixed_fp16.om",
+      "bytes": 11130543,
+      "sha256": "b412804c403d4dc30e251a7382e1d27efe666a7595954187c762c8c3b9400d8d",
+      "feature_dim": 512,
+      "source": "https://github.com/JonnyLewis/compnet",
+      "source_revision": "21f8b56bcbcb620eafa85eaff5ea1f5a9675f194",
+      "license": "BSD-3-Clause",
+      "redistribution_status": "review_required",
+      "production_enabled": false,
+      "manual_test_enabled": true,
+      "manual_test_pending": true
+    },
+    {
+      "model_id": "compnet_iitd_460",
+      "filename": "compnet_iitd_460_mixed_fp16.om",
+      "hub_path": "models/om/compnet_iitd_460_mixed_fp16.om",
+      "bytes": 11130535,
+      "sha256": "64737e66b226c4b77a561d82c7af840c09488a63cff289c6af0ccf7d92d4e2da",
+      "feature_dim": 512,
+      "source": "https://github.com/JonnyLewis/compnet",
+      "source_revision": "21f8b56bcbcb620eafa85eaff5ea1f5a9675f194",
+      "license": "BSD-3-Clause",
+      "redistribution_status": "review_required",
+      "production_enabled": false,
+      "manual_test_enabled": true,
+      "manual_test_pending": true
+    },
+    {
+      "model_id": "compnet_rest_358",
+      "filename": "compnet_rest_358_mixed_fp16.om",
+      "hub_path": "models/om/compnet_rest_358_mixed_fp16.om",
+      "bytes": 11130535,
+      "sha256": "e197b884cd0c22942ace51727743d287d544fb98b82b895a81edcef146c41844",
+      "feature_dim": 512,
+      "source": "https://github.com/JonnyLewis/compnet",
+      "source_revision": "21f8b56bcbcb620eafa85eaff5ea1f5a9675f194",
+      "license": "BSD-3-Clause",
+      "redistribution_status": "review_required",
+      "production_enabled": false,
+      "manual_test_enabled": true,
+      "manual_test_pending": true
+    },
+    {
+      "model_id": "compnet_xjtu_flash_200",
+      "filename": "compnet_xjtu_flash_200_mixed_fp16.om",
+      "hub_path": "models/om/compnet_xjtu_flash_200_mixed_fp16.om",
+      "bytes": 11130559,
+      "sha256": "764d9d81c7844bf41ba2054f577a1e465d6b9139134fee4ded352ff64959052c",
+      "feature_dim": 512,
+      "source": "https://github.com/JonnyLewis/compnet",
+      "source_revision": "21f8b56bcbcb620eafa85eaff5ea1f5a9675f194",
+      "license": "BSD-3-Clause",
+      "redistribution_status": "review_required",
+      "production_enabled": false,
+      "manual_test_enabled": true,
+      "manual_test_pending": true
+    },
+    {
+      "model_id": "compnet_xjtu_natural_200",
+      "filename": "compnet_xjtu_natural_200_mixed_fp16.om",
+      "hub_path": "models/om/compnet_xjtu_natural_200_mixed_fp16.om",
+      "bytes": 11130567,
+      "sha256": "54b4a5f102b6914591d8901ee2c2b6deed44b05e33145b8e5052fd5c41ab797a",
+      "feature_dim": 512,
+      "source": "https://github.com/JonnyLewis/compnet",
+      "source_revision": "21f8b56bcbcb620eafa85eaff5ea1f5a9675f194",
+      "license": "BSD-3-Clause",
+      "redistribution_status": "review_required",
+      "production_enabled": false,
+      "manual_test_enabled": true,
+      "manual_test_pending": true
+    }
+  ],
+  "policy": [
+    "OM files are board-generated assets for Ascend310B4 / 8T and are not source-package contents.",
+    "The upload was explicitly requested by the repository owner and verified at the remote commit above; upstream redistribution/license review remains pending for each binary.",
+    "Downloading an OM never changes production_enabled or models/registry.json admission."
+  ]
+}

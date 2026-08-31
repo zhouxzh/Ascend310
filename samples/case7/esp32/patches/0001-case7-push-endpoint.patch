@@ -1,0 +1,89 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Case7 maintainers <case7@localhost>
+Date: Sun, 23 Aug 2026 00:00:00 +0800
+Subject: [PATCH] Add explicit Case7 raw JPEG push endpoint
+
+Add a deliberately separate endpoint for the Ascend 310B server.  The
+endpoint accepts only raw JPEG requests carrying X-Case7-Push: 1 and delegates
+the actual decode/display work to the upstream direct-display handler.  The
+first valid request persistently disables deep sleep through the existing
+configuration manager so a server-initiated push can reach the device after
+reboot.
+
+The endpoint does not discover peers, change Wi-Fi settings, or alter URL
+Rotation.  It is intentionally opt-in and should only be exposed on a trusted
+LAN.
+---
+ main/http_server.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
+
+diff --git a/main/http_server.c b/main/http_server.c
+--- a/main/http_server.c
++++ b/main/http_server.c
+@@ -648,6 +648,52 @@ static esp_err_t display_image_direct_handler(httpd_req_t *req)
+     return display_received_image(req, CURRENT_UPLOAD_PATH, format, NULL);
+ }
+
++/*
++ * Case7's server-initiated transport is intentionally distinct from the
++ * upstream public endpoint.  Requiring an explicit marker prevents an
++ * accidental browser/form upload from being treated as a server push.
++ */
++static esp_err_t case7_push_handler(httpd_req_t *req)
++{
++    if (!system_ready) {
++        httpd_resp_set_status(req, HTTPD_503);
++        httpd_resp_sendstr(req, "System is still initializing");
++        return ESP_FAIL;
++    }
++
++    char marker[2] = {0};
++    size_t marker_len = httpd_req_get_hdr_value_len(req, "X-Case7-Push");
++    if (marker_len != 1 ||
++        httpd_req_get_hdr_value_str(req, "X-Case7-Push", marker, sizeof(marker)) != ESP_OK ||
++        strcmp(marker, "1") != 0) {
++        httpd_resp_set_status(req, "403 Forbidden");
++        httpd_resp_sendstr(req, "Case7 push requires X-Case7-Push: 1");
++        return ESP_FAIL;
++    }
++
++    char content_type[128] = {0};
++    const size_t jpeg_type_len = strlen("image/jpeg");
++    if (httpd_req_get_hdr_value_str(req, "Content-Type", content_type,
++                                    sizeof(content_type)) != ESP_OK ||
++        strncasecmp(content_type, "image/jpeg", jpeg_type_len) != 0 ||
++        (content_type[jpeg_type_len] != '\0' && content_type[jpeg_type_len] != ';' &&
++         content_type[jpeg_type_len] != ' ' && content_type[jpeg_type_len] != '\t')) {
++        httpd_resp_set_status(req, "415 Unsupported Media Type");
++        httpd_resp_sendstr(req, "Case7 push accepts raw image/jpeg only");
++        return ESP_FAIL;
++    }
++
++    /* This setter writes NVS.  The getter keeps later requests from causing
++     * another flash write; a reboot observes the persisted disabled value. */
++    if (config_manager_get_deep_sleep_enabled()) {
++        ESP_LOGI(TAG, "Case7 push received; disabling deep sleep persistently");
++        config_manager_set_deep_sleep_enabled(false);
++    }
++
++    httpd_resp_set_hdr(req, "X-Case7-Push", "1");
++    return display_image_direct_handler(req);
++}
++
+ // URL decode helper function to handle encoded characters like %20 for space
+ static void url_decode(char *dst, const char *src, size_t dst_size)
+ {
+@@ -2492,5 +2492,11 @@ esp_err_t http_server_init(void)
+         httpd_register_uri_handler(server, &display_image_direct_uri);
+
++        httpd_uri_t case7_push_uri = {.uri = "/api/case7/push",
++                                      .method = HTTP_POST,
++                                      .handler = case7_push_handler,
++                                      .user_ctx = NULL};
++        httpd_register_uri_handler(server, &case7_push_uri);
++
+         httpd_uri_t albums_get_uri = {
+             .uri = "/api/albums", .method = HTTP_GET, .handler = albums_handler, .user_ctx = NULL};
+         httpd_register_uri_handler(server, &albums_get_uri);
+--
+2.46.0

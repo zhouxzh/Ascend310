@@ -1,370 +1,172 @@
-# Ascend 人脸打卡系统
+# Case 1 · 人脸考勤（face-attendance）
 
-基于华为 Ascend 310B NPU 的高性能人脸识别考勤系统。
+本样例在昇腾 310B 开发板上演示人脸检测、特征提取、相似度比对和本地考勤
+记录。服务端采用 FastAPI，界面采用 React；稳定目录标识仍为 `case1`，便于
+书稿、站点和已有部署脚本引用。
 
-## 系统架构
+**功能关键词：** 人脸检测、特征比对、PyACL、边缘服务、考勤记录
 
-### 核心模块
+## 运行边界
 
-1. **[app.py](app.py)** - Flask Web 服务器，提供 REST API 和页面路由
-2. **[ascend_inference.py](ascend_inference.py)** - Ascend NPU 推理引擎，封装人脸检测和识别
-3. **[camera.py](camera.py)** - 摄像头管理，实现自动打卡逻辑
-4. **[database.py](database.py)** - SQLite 数据库操作
+样例用于教学和受控实验，不是生产级身份认证系统。陌生人自动登记分支被保留
+用于展示完整数据流，但不代表经过同意的注册。不要在未授权的摄像头、照片或
+人员数据上运行；模型、照片、数据库和板端报告均属于本地运行资产，不提交到
+版本库。
 
-## 详细代码分析
+## 目录结构
 
-### 1. 数据库层 (database.py)
-
-#### 数据表结构
-
-**users 表** - 存储用户信息
-- `id`: 主键，自增
-- `name`: 用户姓名
-- `embedding`: 人脸特征向量 (BLOB，512维 float32)
-- `created_at`: 创建时间
-
-**attendance 表** - 存储考勤记录
-- `id`: 主键
-- `user_id`: 外键，关联 users.id
-- `timestamp`: 打卡时间
-- `type`: 打卡类型 ('manual' 手动 / 'camera_auto' 自动)
-- `image_path`: 图片路径
-
-#### 核心函数
-
-```python
-init_db()              # 初始化数据库表
-add_user(name, embedding)  # 添加用户，返回 user_id
-get_users()            # 获取所有用户（含 embedding）
-delete_user(user_id)   # 删除用户及其考勤记录
-add_attendance(user_id, type, image_path)  # 记录考勤
-get_attendance()       # 获取考勤记录（JOIN users 表）
+```text
+case1/
+├── app.py                         # FastAPI/Uvicorn 启动入口
+├── face_attendance/               # 推理、摄像头、数据库和服务组件
+├── frontend/                      # React + Vite 源码；dist 为构建产物
+├── scripts/                       # 模型准备、合同检查和运行数据迁移
+├── tests/                         # 纯 Python 与板端测试
+├── models/                        # ONNX/OM 本地资产（不提交二进制）
+├── data/                          # 数据库、头像和抓拍文件
+├── reports/                       # 本地验证报告（不提交真实数据）
+└── docs/                          # 目录、模型、架构和板端验收说明
 ```
 
-### 2. Ascend 推理引擎 (ascend_inference.py)
+`frontend/dist` 由前端构建生成，开发板只需要静态产物，不需要 Node.js。旧的
+页面书签 `/users_page` 与 `/attendance_page` 由 FastAPI 回退到 React 应用。
 
-#### 类结构
+## 系统结构
 
-**AscendSystem** - NPU 设备管理
-- 初始化 ACL 运行时环境
-- 创建 context 和 stream
-- 管理设备资源生命周期
+### 运行组件
 
-**AscendModel** - 模型加载与推理
-- 加载 `.om` 模型文件
-- 管理输入/输出 buffer（设备内存）
-- 执行推理：Host → Device → Execute → Device → Host
+1. **FastAPI 应用**：负责请求校验、资源路径边界、API 响应和静态资源托管；
+2. **硬件工作线程**：串行使用摄像头、PyACL context 和两个 OM，避免请求之间
+   竞争 NPU 或视频设备；SQLite 由进程内锁和事务边界保护；
+3. **React 界面**：提供用户管理、设备抓拍、手动打卡、MJPEG 预览和今日记录；
+4. **SQLite**：保存用户名称、特征 BLOB、头像资源标识和考勤事件。
 
-**FaceSystem** - 人脸系统封装
-- 加载人脸检测模型 (`face_detection.om`)
-- 加载人脸识别模型 (`face_recognition.om`)
-- 提供高层接口：`detect()` 和 `get_embedding()`
+PyACL、OpenCV 和 SQLite 是阻塞调用。FastAPI 路由不能因为使用 ASGI 就无条件
+改成并发的 `async` 硬件操作；应用使用单 worker 和受控队列，服务关闭时显式
+停止线程、摄像头、模型和 ACL 资源。
 
-#### 人脸检测流程
+### 模型角色
 
-```
-输入图像 (H×W×3 BGR)
-    ↓
-preprocess_det()  # 缩放到 640×640，归一化 (x-127.5)/128
-    ↓
-det_model.execute()  # NPU 推理，输出 9 个 tensor
-    ↓
-decode_bbox()  # 解码 anchor-based 检测结果
-    ↓
-NMS 过滤  # 非极大值抑制，阈值 0.4
-    ↓
-返回人脸框列表 [[x1,y1,x2,y2], ...]
-```
+| 角色 | 准备阶段 | 运行阶段 | 当前实现合同 |
+| --- | --- | --- | --- |
+| 人脸检测 | `models/det_500m.onnx` | `models/face_detection.om` | `1×3×640×640` 浮点输入 |
+| 特征提取 | `models/w600k_mbf.onnx` | `models/face_recognition.om` | `1×3×112×112` 浮点输入，输出特征向量 |
 
-**检测模型输出解析**：
-- 输出 0-2: 三个尺度的分类分数 (stride 8/16/32)
-- 输出 3-5: 三个尺度的边界框偏移 (l, t, r, b)
-- 输出 6-8: 关键点（本项目未使用）
+文件名不等于论文名称。输出数量、形状、数据类型和后处理假设必须用
+`scripts/check_onnx.py`、`scripts/check_onnx_out.py` 及板端运行检查确认。
 
-**Anchor 生成**：
-- 在 640×640 图像上，stride=8/16/32 生成网格
-- 每个网格点 2 个 anchor
-- 总计 (80×80 + 40×40 + 20×20) × 2 = 16800 个 anchor
+## API 合同
 
-**边界框解码** (SCRFD 格式)：
-```python
-x1 = anchor_x - left * stride
-y1 = anchor_y - top * stride
-x2 = anchor_x + right * stride
-y2 = anchor_y + bottom * stride
-```
+| 方法 | 路径 | 作用 |
+| --- | --- | --- |
+| `GET` | `/api/health` | 服务、模型和摄像头状态；不可推理时为 `degraded` |
+| `GET` | `/api/users` | 用户列表，不返回 embedding |
+| `POST` | `/api/users` | multipart 图像和姓名注册用户 |
+| `PUT` | `/api/users/{id}` | 修改用户名称 |
+| `DELETE` | `/api/users/{id}` | 删除用户及关联考勤事件 |
+| `POST` | `/api/camera/capture` | 板端摄像头抓拍 |
+| `POST` | `/api/clockin` | 上传或浏览器图像手动打卡 |
+| `GET` | `/api/attendance` | 当天每位用户最近一条记录 |
+| `GET` | `/video_feed` | 缓存 JPEG 的 MJPEG 流 |
+| `GET` | `/uploads/{resource}` | 受控头像或抓拍资源 |
 
-#### 人脸识别流程
-
-```
-人脸图像 (裁剪后)
-    ↓
-preprocess_rec()  # 缩放到 112×112，归一化
-    ↓
-rec_model.execute()  # NPU 推理
-    ↓
-返回 512 维特征向量 (float32)
-```
-
-**相似度计算**：
-```python
-similarity = cosine_similarity(emb1, emb2)
-           = dot(emb1, emb2) / (norm(emb1) * norm(emb2))
-```
-阈值设为 0.5，超过则认为是同一人。
-
-### 3. 摄像头管理 (camera.py)
-
-#### VideoCamera 类
-
-**初始化**：
-- 打开 `/dev/video0` 摄像头
-- 设置分辨率 640×480
-- 启动后台线程持续读取帧
-
-**后台线程 (update 方法)**：
-```
-循环 (30 FPS):
-    读取摄像头帧 → 保存到 last_frame
-    ↓
-    每 2 秒触发一次:
-        process_attendance(frame)  # 自动打卡逻辑
-```
-
-**自动打卡逻辑 (process_attendance)**：
-```
-1. 人脸检测 → 选择最大人脸
-2. 裁剪人脸区域
-3. 提取特征向量
-4. 遍历数据库所有用户，计算相似度
-5. 如果最高相似度 > 0.5:
-   - 打印识别结果
-   - 写入考勤记录 (type='camera_auto')
-```
-
-**Web 流式传输**：
-- `get_frame()`: 返回 JPEG 编码的帧（用于 `/video_feed` 路由）
-- `get_snapshot()`: 返回原始帧（用于用户注册拍照）
-
-### 4. Web 服务器 (app.py)
-
-#### 路由结构
-
-**页面路由**：
-- `/` → index.html (主页)
-- `/users_page` → users.html (用户管理)
-- `/attendance_page` → attendance.html (考勤记录)
-
-**API 路由**：
-
-| 路由 | 方法 | 功能 |
-|------|------|------|
-| `/api/users` | GET | 获取用户列表 |
-| `/api/users` | POST | 添加用户 |
-| `/api/users/<id>` | DELETE | 删除用户 |
-| `/api/camera/capture` | POST | 从设备摄像头抓拍 |
-| `/api/clockin` | POST | 手动打卡 |
-| `/api/attendance` | GET | 获取考勤记录 |
-| `/video_feed` | GET | 视频流 (MJPEG) |
-
-#### 关键流程
-
-**用户注册流程**：
-```
-1. 接收图片 (上传文件 或 摄像头抓拍)
-2. 人脸检测 → 选择最大人脸
-3. 裁剪人脸 → 提取 512 维特征
-4. 特征向量转 bytes 存入数据库
-5. 返回 user_id
-```
-
-**手动打卡流程**：
-```
-1. 接收图片 (文件上传 或 base64)
-2. 人脸检测 → 裁剪
-3. 提取特征向量
-4. 遍历数据库用户，计算余弦相似度
-5. 找到最高相似度 > 0.5:
-   - 记录考勤 (type='manual')
-   - 返回匹配结果
-6. 否则返回 match=False
-```
-
-## 完整工作流程
-
-### 启动流程
-
-```
-python3 app.py
-    ↓
-database.init_db()  # 初始化数据库
-    ↓
-get_face_system()  # 初始化 Ascend NPU
-    ├─ AscendSystem() → 初始化 ACL
-    ├─ 加载 face_detection.om
-    └─ 加载 face_recognition.om
-    ↓
-get_video_camera()  # 初始化摄像头
-    └─ 启动后台线程 (自动打卡)
-    ↓
-Flask 启动 (0.0.0.0:5000)
-```
-
-### 用户注册流程
-
-```
-用户上传照片 / 摄像头抓拍
-    ↓
-POST /api/users
-    ↓
-FaceSystem.detect(image)  # NPU 检测人脸
-    ↓
-选择最大人脸框 → 裁剪
-    ↓
-FaceSystem.get_embedding(face)  # NPU 提取特征
-    ↓
-database.add_user(name, embedding_bytes)
-    ↓
-返回 user_id
-```
-
-### 自动打卡流程
-
-```
-摄像头后台线程 (每 2 秒)
-    ↓
-读取当前帧
-    ↓
-FaceSystem.detect(frame)
-    ↓
-有人脸? → 裁剪最大人脸
-    ↓
-FaceSystem.get_embedding(face)
-    ↓
-遍历数据库用户:
-    计算 cosine_similarity(current_emb, db_emb)
-    ↓
-    找到最高相似度 > 0.5?
-        ↓
-        database.add_attendance(user_id, 'camera_auto', 'local_camera')
-        ↓
-        打印识别结果
-```
-
-### 手动打卡流程
-
-```
-用户在网页点击打卡 (浏览器摄像头 / 上传)
-    ↓
-POST /api/clockin (image_base64 或 file)
-    ↓
-FaceSystem.detect(image) → 裁剪人脸
-    ↓
-FaceSystem.get_embedding(face)
-    ↓
-遍历数据库用户，计算相似度
-    ↓
-最高相似度 > 0.5?
-    ├─ 是: database.add_attendance() → 返回 match=True
-    └─ 否: 返回 match=False
-```
-
-## 技术细节
-
-### NPU 推理优化
-
-1. **内存管理**：使用 `acl.rt.malloc` 在设备上预分配 buffer，避免重复分配
-2. **数据传输**：Host → Device 使用 `acl.rt.memcpy`，模式 1 (H2D)
-3. **异步执行**：通过 stream 管理推理任务（本项目为同步模式）
-
-### 性能特点
-
-- **检测速度**：640×640 图像，Ascend 310B 约 10-20ms
-- **识别速度**：112×112 人脸，约 5-10ms
-- **自动打卡间隔**：2 秒（可调整 `check_interval`）
-- **视频流帧率**：30 FPS
-
-### 相似度阈值
-
-- **当前阈值**：0.5 (余弦相似度)
-- **调整建议**：
-  - 提高阈值 (0.6-0.7) → 更严格，减少误识别
-  - 降低阈值 (0.4-0.5) → 更宽松，提高召回率
+模型缺失、加载失败或输出不符合合同时，注册和推理接口返回 HTTP `503`；不
+生成随机 embedding，也不把失败请求写成成功考勤。
 
 ## 快速开始
 
-### 1. 环境准备
+### 纯 Python 检查
+
+开发机不运行 CANN、PyACL、ATC、OM 或摄像头测试。可先执行：
 
 ```bash
-# 检查 NPU
-npu-smi info
-
-# 安装依赖
-pip install flask
+cd samples/case1
+python -m unittest discover -s tests -p 'test_layout.py'
+python -m py_compile app.py face_attendance/*.py
 ```
 
-### 2. 模型准备
+### 开发板环境
 
-**基本用法**（自动判断，只做必要的步骤）：
-```bash
-export TE_PARALLEL_COMPILER=1      # 限制算子最大并行编译进程数
-export MAX_COMPILE_CORE_NUMBER=1   # 限制图编译占用的 CPU 核数
-python3 prepare_models.py
-```
-
-**高级选项**：
-```bash
-# 只下载模型，不转换
-python3 prepare_models.py --download-only
-
-# 只转换模型（假设 ONNX 已存在）
-python3 prepare_models.py --convert-only
-
-# 强制重新下载和转换
-python3 prepare_models.py --force
-```
-
-脚本会自动：
-- 检测已有文件（ZIP/ONNX/OM）
-- 下载 buffalo_s.zip（约 86MB）
-- 解压 ONNX 模型
-- 转换为 OM 格式
-
-生成文件：
-- `models/face_detection.om` (SCRFD 检测模型)
-- `models/face_recognition.om` (ArcFace 识别模型)
-
-### 3. 摄像头权限
+在 Ascend 310B 上加载与设备匹配的 CANN 环境，然后准备模型。若已有经验证的
+OM，可跳过 ATC，但仍要完成文件、合同和 ACL 烟测：
 
 ```bash
-sudo chmod 666 /dev/video0
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate base
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+cd samples/case1
+python -m pip install -r requirements.txt
+python scripts/prepare_models.py
+python scripts/check_onnx.py
+python scripts/check_onnx_out.py
 ```
 
-### 4. 启动系统
+模型准备和 ATC 只在开发板执行。模型文件位于 `models/`，不会由 Git 跟踪。
+
+### 构建和启动界面
+
+在开发机完成前端构建后，将 `frontend/dist` 与样例源码同步到板端：
 
 ```bash
-python3 app.py
+cd frontend
+npm ci
+npm test
+npm run build
+cd ..
+python app.py --host 127.0.0.1 --port 5000
 ```
 
-访问：http://127.0.0.1:5000
+默认只监听本机。可信实验网络中如需从其他设备访问，可显式使用受控的
+`--host`，并在实验结束后停止服务；不要开启调试模式、自动重载或多个 worker。
 
-## 使用说明
+健康检查和界面地址：
 
-1. **注册用户**：进入 User Management，上传照片或使用摄像头抓拍
-2. **自动打卡**：站在摄像头前，系统每 2 秒自动识别
-3. **手动打卡**：进入 Attendance Log，点击 Manual Check-in
-4. **查看记录**：Attendance Log 页面显示所有打卡记录
+```bash
+curl http://127.0.0.1:5000/api/health
+```
 
-## 常见问题
+浏览器打开 `http://127.0.0.1:5000/`。在开发板上通过局域网访问时，将地址替换
+为板端实际监听地址。
 
-**Q: 摄像头无法打开？**
-A: 检查 `/dev/video0` 权限，或确认设备未被占用
+## 用户流程
 
-**Q: 识别率低？**
-A: 调整阈值 (app.py:185, camera.py:110)，或重新注册清晰照片
+1. **注册**：在 React 用户管理页输入显示名称，上传合成测试图像或使用设备
+   抓拍；服务检测最大人脸并写入特征与头像资源。
+2. **自动考勤**：板端摄像头线程定期处理当前帧；已匹配用户可产生
+   `camera_auto` 事件，陌生人自动登记分支仅用于教学观察。
+3. **手动打卡**：在考勤页上传图像或使用浏览器摄像头；匹配成功时产生
+   `manual` 事件，失败时显示 `match=false`。
+4. **查看记录**：考勤页显示当天每位用户的最近一条记录。它不是跨日期的完整
+   审计历史；需要完整历史时应另行设计分页和日期查询接口。
 
-**Q: 模型转换失败？**
-A: 确保 `atc` 命令可用，内存充足（建议 4GB+）
+## 数据和安全注意事项
 
-**Q: 重复打卡？**
-A: 自动打卡每 2 秒触发一次，可在数据库层添加去重逻辑（检查最近 1 分钟是否已打卡）
+- 上传文件名由服务端生成，服务端必须限制大小、校验图像解码并约束真实路径；
+- API 列表不返回 embedding，头像和抓拍资源不能通过任意路径公开；
+- 测试使用合成或经同意的图像，结束后删除数据库、照片和临时目录；
+- 日志不写入完整特征、原始图像或调试堆栈；
+- 自动登记不是授权流程，不得将其用于真实考勤或身份认证；
+- FastAPI 的 OpenAPI 文档和调试端点按部署边界决定是否开放，不应暴露到不可信网络。
+
+## 验证证据
+
+请将结果区分为以下类型，并在报告中记录环境、模型文件、输入协议和原始日志：
+
+| 证据类型 | 可回答的问题 |
+| --- | --- |
+| 静态检查 | 文件和 ONNX 图是否可解析 |
+| 转换检查 | ATC 是否生成目标 OM |
+| ACL 烟测 | 板端能否加载并执行一次推理 |
+| API 烟测 | FastAPI 路由、错误状态和静态页面是否可用 |
+| UI 检查 | React 导航、抓拍、上传和状态展示是否可用 |
+| 性能实验 | 在明确协议下的延迟、帧率和资源占用 |
+
+没有固定测试脚本和报告时，不在 README 或教材中填写性能数字。开发机结果
+不能替代开发板上的 CANN、摄像头和 NPU 证据。
+
+更多合同与边界说明见：
+
+- [`docs/00-directory-layout.md`](docs/00-directory-layout.md)
+- [`docs/01-model-contract.md`](docs/01-model-contract.md)
+- [`docs/02-fastapi-react-architecture.md`](docs/02-fastapi-react-architecture.md)
+- [`docs/03-board-acceptance.md`](docs/03-board-acceptance.md)

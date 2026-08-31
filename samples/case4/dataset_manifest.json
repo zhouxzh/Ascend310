@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "datasets": [
+    {
+      "id": "tongji",
+      "display_name": "Tongji Contactless Palmprint",
+      "source": "https://blog-images-1257621236.cos.ap-shanghai.myqcloud.com/edcc_data/all/Tongji.tar.gz",
+      "archive": "data/downloads/Tongji.tar.gz",
+      "extract_dir": "data/datasets/Tongji",
+      "size": 119490938,
+      "sha256": "0440959b4b2e50d00c78c686e9f0840b45005c952c032e8b53e9e34831222f84",
+      "license": "NOASSERTION",
+      "terms_status": "upstream terms not recorded",
+      "redistribution": "external download only; excluded from release archives",
+      "images": 12000,
+      "palm_identities": 600,
+      "sessions": 2,
+      "samples_per_identity_per_session": 10,
+      "parser": "tongji"
+    },
+    {
+      "id": "polyu",
+      "display_name": "PolyU Multispectral Palmprint",
+      "source": "https://blog-images-1257621236.cos.ap-shanghai.myqcloud.com/edcc_data/all/PolyU.tar.gz",
+      "archive": "data/downloads/PolyU.tar.gz",
+      "extract_dir": "data/datasets/PolyU",
+      "size": 247486526,
+      "sha256": "f5f8709db93299826bb7fedde42aaf5478633ced7a813730618b7b5fd872fcff",
+      "license": "NOASSERTION",
+      "terms_status": "upstream terms not recorded",
+      "redistribution": "external download only; excluded from release archives",
+      "images": 24000,
+      "palm_identities": 500,
+      "sessions": 2,
+      "samples_per_identity_per_session": 6,
+      "spectra": ["B", "G", "I", "R"],
+      "parser": "polyu"
+    },
+    {
+      "id": "palmmatchdb",
+      "display_name": "PalmMatchDB",
+      "source": "https://huggingface.co/datasets/aspmirlab/PalmMatchDB",
+      "revision": "adc051fa4fe169c807f18864fe5ef01480acc84b",
+      "archive": "data/downloads/PalmMatchDB.zip",
+      "extract_dir": "data/datasets/PalmMatchDB",
+      "size": 1265221178,
+      "sha256": "b19786aadc31c7b08e8294e9e56be5118d299b9f4780389fe2935a2a2149c2f6",
+      "license": "Apache-2.0",
+      "terms_status": "dataset card license recorded; downstream terms still require review",
+      "redistribution": "external download only; excluded from release archives",
+      "expected_images": 10528,
+      "parser": "palmmatchdb_audit_only"
+    }
+  ]
+}

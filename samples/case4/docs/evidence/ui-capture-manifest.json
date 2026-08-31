@@ -1,0 +1,27 @@
+{
+  "schema_version": 3,
+  "capture_set": "react_fastapi_touch_workbench",
+  "captured_at": "2026-08-16T18:35:00+08:00",
+  "capture_environment": {
+    "browser": "Codex In-app Browser",
+    "viewport": { "width": 1920, "height": 1080, "orientation": "landscape" }
+  },
+  "privacy": {
+    "contains_real_palm_images": false,
+    "roi_source": "deterministic geometric synthetic ROI",
+    "template_label": "SYNTHETIC-UI-TEST",
+    "template_database_cleaned_after_capture": true
+  },
+  "application_hashes": {
+    "app_sha256": "8eecb5a6693d647e43065283ab3459d5ff7ab0bc9658daeb10cd53c9aaea1edf",
+    "frontend_assets_are_external": true
+  },
+  "captures": [
+    { "file": "palmprint-ui-react-live-idle-1920x1080.png", "sha256": "d6a5551fa89b963384bd3d2f04288bd7ed4be01b2898e5927d8c59c0de395d1b" },
+    { "file": "palmprint-ui-react-live-result-1920x1080.png", "sha256": "7938fe4a5b333abda443524c44a93ce3a254946b7fd755504aa7fbf0ff0f3bd8" },
+    { "file": "palmprint-ui-react-enrollment-samples-1920x1080.png", "sha256": "58fe9110c69166b9c2a51d86817d82b46281d1d090f7ed2cfa4d20fcc2725a91" },
+    { "file": "palmprint-ui-react-template-management-1920x1080.png", "sha256": "a2b7892732f2d51317ebf878cdeb53fb159c7a47fe6ce29a3753cb4a10833bf3" },
+    { "file": "palmprint-ui-react-evaluation-1920x1080.png", "sha256": "d727e9fec1a6dcda482303052aea6dba406ee7edd4f8919931202f4d0f8c2501" },
+    { "file": "palmprint-ui-react-system-status-1920x1080.png", "sha256": "0305e38a8a93b2e86787af4ff5985781146266e6c2cd8e5851a03b96ade6fa46" }
+  ]
+}

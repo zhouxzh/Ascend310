@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#10161b">
+  <title>昇腾智能相册</title>
+  <link rel="stylesheet" href="/style.css?v=20260830-provision-pull-v11">
+</head>
+<body class="touchscreen-shell">
+  <main class="album-app">
+    <section id="hero" class="hero" aria-label="当前推荐照片">
+      <img id="current-image" class="hero-image" alt="当前推荐照片">
+      <div id="hero-empty" class="hero-empty" hidden><strong>相册还没有可显示的照片</strong><span>打开上传面板添加第一张照片</span></div>
+      <header class="hero-topbar">
+        <div class="brand-lockup"><span class="brand-mark">相</span><span><strong>智能相册</strong><small>Ascend 310B</small></span></div>
+        <div class="hero-status"><span id="health-dot" class="status-dot"></span><span id="health-label">连接中</span><span id="selection-label" class="selection-label">NPU 排序准备中</span><span id="clock-label">--:--</span></div>
+      </header>
+      <aside id="weather-widget" class="weather-widget" aria-label="天气状态" title="天气状态来自 Open-Meteo">
+        <span id="weather-icon" class="weather-icon" aria-hidden="true">☁</span>
+        <span class="weather-copy"><strong id="weather-label">天气加载中</strong><small id="weather-detail">--°C · 风速 --</small></span>
+        <small id="weather-source" class="weather-source">Open-Meteo</small>
+      </aside>
+      <div id="hero-controls" class="hero-controls" aria-label="照片控制">
+        <button type="button" class="control-button" data-display-action="previous"><span class="control-icon">‹</span><span>上一张</span></button>
+        <button type="button" class="control-button control-primary" data-display-action="next"><span class="control-icon">›</span><span>下一张</span></button>
+        <button type="button" id="pause-button" class="control-button" data-display-action="pause"><span class="control-icon">Ⅱ</span><span>暂停轮播</span></button>
+        <button type="button" class="control-button" data-panel="gallery"><span class="control-icon">▣</span><span>浏览图库</span></button>
+        <button type="button" class="control-button" data-panel="search"><span class="control-icon">⌕</span><span>智能搜索</span></button>
+        <div id="filename-watermark" class="filename-watermark" hidden><span id="filename-watermark-text"></span></div>
+      </div>
+      <div id="hero-error" class="hero-error" role="status" hidden></div>
+    </section>
+    <nav class="bottom-nav" aria-label="相册功能">
+      <button type="button" class="nav-button active" data-panel="gallery"><span class="nav-icon">▦</span><span>图库</span></button>
+      <button type="button" class="nav-button" data-panel="search"><span class="nav-icon">⌕</span><span>搜索</span></button>
+      <button type="button" class="nav-button" data-panel="upload"><span class="nav-icon">＋</span><span>上传</span></button>
+      <button type="button" class="nav-button" data-panel="devices"><span class="nav-icon">▣</span><span>设备</span></button>
+      <button type="button" class="nav-button" data-panel="settings"><span class="nav-icon">⚙</span><span>设置</span></button>
+    </nav>
+  </main>
+  <div id="panel-layer" class="panel-layer" hidden>
+    <div id="panel-scrim" class="panel-scrim"></div>
+    <section id="panel" class="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title">
+      <header class="panel-header"><div><span class="eyebrow">相册控制台</span><h1 id="panel-title">图库</h1></div><button id="close-panel" class="close-button" aria-label="关闭面板">×</button></header>
+      <div class="panel-content">
+        <section id="gallery-panel" class="panel-view active"><div class="panel-toolbar"><p id="gallery-status" class="panel-status">正在读取图库</p><button id="reload-gallery" class="secondary-button">刷新图库</button></div><div id="gallery-grid" class="photo-grid"></div></section>
+        <section id="search-panel" class="panel-view"><form id="search-form" class="large-form search-form" autocomplete="off"><label>搜索照片<input id="search-query" name="query" required placeholder="例如：海边的日落 / a red car" autocomplete="off"></label><label>语义模型<select id="search-model" name="model" autocomplete="off"><option value="auto">自动选择</option><option value="mobileclip_s0__npu__mixed_fp16">MobileCLIP-S0</option><option value="chinese_clip_rn50__npu__mixed_fp16">Chinese-CLIP RN50</option></select></label><button class="primary-button" type="submit">开始搜索</button></form><p id="search-status" class="panel-status"></p><div id="search-grid" class="photo-grid"></div></section>
+        <section id="upload-panel" class="panel-view">
+          <form id="upload-form" class="large-form">
+            <div class="upload-source-grid">
+              <label class="file-drop"><span>选择照片</span><input id="upload-files" type="file" accept="image/jpeg,image/png,image/bmp,image/webp" multiple><strong>点击选择照片（支持多选）</strong><small>文件大小和选择数量不设硬上限</small></label>
+              <label class="file-drop"><span>选择文件夹</span><input id="upload-folder" type="file" accept="image/jpeg,image/png,image/bmp,image/webp" webkitdirectory directory multiple><strong>选择文件夹中的全部照片</strong><small>自动递归提交；单张解码像素保护为 50 MP</small></label>
+            </div>
+            <p id="upload-selection-status" class="panel-status">可以选择照片，也可以选择整个文件夹。</p>
+            <div id="upload-progress" class="upload-progress" hidden aria-live="polite">
+              <div class="upload-progress-row"><span>文件传输</span><output id="upload-transfer-label">等待开始</output></div>
+              <progress id="upload-transfer-progress" max="100" value="0" aria-label="文件传输进度">0%</progress>
+              <div class="upload-progress-row"><span>NPU 索引</span><output id="upload-index-label">等待开始</output></div>
+              <progress id="upload-index-progress" max="100" value="0" aria-label="NPU 索引进度">0%</progress>
+              <p id="upload-progress-detail" class="upload-progress-detail"></p>
+            </div>
+            <p class="upload-metadata-note">照片会自动读取 EXIF 拍摄时间；没有 EXIF 时使用上传时间。语义搜索不需要人工标签。</p>
+            <label>拍摄时间（可选，覆盖 EXIF）<input id="upload-time" type="datetime-local"></label>
+            <button id="upload-submit" class="primary-button" type="submit">上传并建立 NPU 索引</button>
+          </form>
+          <p id="upload-status" class="panel-status">上传后会进入单线程索引队列。</p>
+        </section>
+        <section id="devices-panel" class="panel-view"><div id="device-console" class="device-console" aria-live="polite" aria-busy="false"></div></section>
+        <section id="settings-panel" class="panel-view"><form id="config-form" class="large-form settings-form"><div class="settings-grid"><label>时区<input name="timezone" required></label><label>触摸屏自动换图（秒）<input name="display.touchscreen_interval_seconds" type="number" min="5" required></label><label>远程网页刷新（秒）<input name="display.remote_refresh_seconds" type="number" min="5" required></label><label>重复抑制图片数<input name="display.repeat_window" type="number" min="0" required></label><label class="toggle-label"><input name="display.show_filename" type="checkbox">显示文件名水印</label><label>触摸屏照片方向<select name="display.orientation_mode"><option value="auto">自动校正 EXIF，保持构图</option><option value="match_display">自动匹配屏幕方向</option></select></label><label>触摸屏安装角度<select name="display.rotation"><option value="0">0 度</option><option value="90">90 度</option><option value="180">180 度</option><option value="270">270 度</option></select></label><label>电子纸轮播间隔<select name="epaper.rotation_interval_seconds"><option value="600">10 分钟</option><option value="1800">30 分钟</option></select></label><label>E6 照片方向<select name="epaper.orientation_mode"><option value="auto">自动校正 EXIF，保持构图</option><option value="match_display">自动匹配屏幕方向</option></select></label><label>E6 安装角度<select name="epaper.rotation"><option value="0">0 度</option><option value="90">90 度</option><option value="180">180 度</option><option value="270">270 度</option></select></label><label class="toggle-label"><input name="epaper.e6_dither" type="checkbox">E6 抖动</label><label>纬度<input name="weather.latitude" type="number" step="0.0001" required></label><label>经度<input name="weather.longitude" type="number" step="0.0001" required></label><label>天气刷新（秒）<input name="weather.refresh_seconds" type="number" min="60" required></label><label>JPEG 质量<input name="device.jpeg_quality" type="number" min="1" max="100" required></label><label>ESP32 轮询（秒）<input name="device.poll_seconds" type="number" min="60" required></label></div><details><summary>高级配置</summary><textarea id="config-json" spellcheck="false" aria-label="受控配置 JSON"></textarea></details><button class="primary-button" type="submit">保存配置</button></form><p id="config-status" class="panel-status"></p><div class="system-strip"><strong>系统状态</strong><pre id="system-status">读取中</pre></div></section>
+      </div>
+    </section>
+  </div>
+  <template id="photo-template"><button class="photo-tile" type="button"><img alt=""><span class="photo-tile-name"></span><small class="photo-tile-score"></small></button></template>
+  <script src="/app.js?v=20260831-registration-state-v11"></script>
+</body>
+</html>

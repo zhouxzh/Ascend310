@@ -26,7 +26,9 @@
 | :-- | :-- | :-- |
 | **理论教程** | Chapter 1~9 | 从边缘计算基础到项目交付方法论 |
 | **实践案例** | Case 1~9 | 九个端侧 AI 项目案例，从人脸识别到聊天机器人 |
-| **附录** | 附录 1~2（持续扩展） | 开发板与基础环境，以及工具、FAQ 和参数模板 |
+| **附录** | 附录 1~3（持续扩展） | 开发板与基础环境、昇腾 310B Linux 命令教程，以及工具、FAQ 和参数模板 |
+
+实践案例保留 `case1` 至 `case9` 的稳定路径，并在 [案例索引](samples/case-index.json) 中提供面向读者的功能关键词。
 
 ---
 
@@ -58,11 +60,11 @@ Ascend310/
 │   │   └── img1/ img2/ img3/
 │   ├── appendix/                # 附录 Markdown
 │   │   ├── README.md
-│   │   ├── appendix1.md appendix2.md
+│   │   ├── appendix1.md appendix2.md appendix3.md
 │   │   └── img1/
 │   └── .vuepress/               # VuePress 配置、主题、样式与 public 资源
 ├── samples/                     # 教程与实践案例配套源码
-│   ├── case1/ ... case9/        # 实践案例源码
+│   ├── case1/ ... case9/        # 实践案例源码（Case 1 为 face-attendance）
 │   ├── chapter2/                # ResNet 快速入门示例
 │   ├── chapter3/                # PyTorch / torch_npu 迁移与训练示例
 │   ├── chapter4/                # PyACL 模型推理示例
@@ -139,7 +141,7 @@ pnpm export-pdf
 ### 标题层级
 
 - `src/book/chapter*.md` 不使用一级标题 `#`。这些章节已经在 `latex/book.tex` 中通过 `\chapter{}` 统一组织，正文最高层级从 `##` 开始。
-- `src/experiment/case*.md` 与 `src/appendix/appendix*.md` 使用一级标题作为案例或附录标题；附录文件按 `appendix1.md`、`appendix2.md` 的形式连续编号。
+- `src/experiment/case*.md` 与 `src/appendix/appendix*.md` 使用一级标题作为案例或附录标题；附录文件按 `appendix1.md`、`appendix2.md`、`appendix3.md` 的形式连续编号。
 - 正文标题只使用 `##`、`###`、`####`。不要使用 `#####` 或更深层级。
 - 五级标题在 LaTeX 中容易转换为 run-in 形式的 `\paragraph`，如果后面紧跟代码块、图片或表格，会出现标题贴着代码框上边线、断句异常等问题。
 - 更细的小节标注使用加粗文字，例如 `**(1) 测试参数**`，不要继续增加 Markdown 标题层级。
@@ -214,7 +216,7 @@ pnpm docs:build
 
 | 读者类型 | 推荐路径 | 目标 |
 | :-- | :-- | :-- |
-| 零基础学生 | 附录 1 → Ch1 → Ch2 → Case 1 | 跑通首个模型 |
+| 零基础学生 | 附录 1 → 附录 2 → Ch1 → Ch2 → Case 1 | 跑通首个模型 |
 | 嵌入式工程师 | Ch4 → Ch5 → Ch6 | 掌握底层开发与优化 |
 | AI应用开发者 | Ch2 → Ch3 → 选读案例 | 快速场景落地 |
 | 技术负责人 | Ch1 → Ch7 → Ch8 → Ch9 | 构建量化评估、性能验收与交付方法论 |
@@ -227,7 +229,7 @@ pnpm docs:build
 
 - [x] 理论教程 Chapter 1~9 Markdown 初稿
 - [x] 实践案例 Case 1~9 Markdown 初稿
-- [x] 附录 1~2 Markdown 初稿
+- [x] 附录 1~3 Markdown 初稿
 - [x] VuePress 站点构建与 GitHub Pages 部署脚本
 - [x] Pandoc + XeLaTeX 正式 PDF 生成流程
 - [x] Chapter 5 图示改为 DOT 源文件 + PNG 静态图片

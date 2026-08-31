@@ -1,0 +1,102 @@
+digraph program_flow {
+  graph [
+    rankdir=TB,
+    splines=ortho,
+    nodesep=0.34,
+    ranksep=0.56,
+    pad=0.24,
+    bgcolor="white",
+    fontname="Microsoft YaHei",
+    fontsize=22,
+    label="程序完整流程",
+    labelloc=t,
+    labeljust=c
+  ]
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Microsoft YaHei",
+    fontsize=14,
+    margin="0.15,0.09",
+    color="#334155",
+    penwidth=1.3
+  ]
+  edge [
+    fontname="Microsoft YaHei",
+    fontsize=10,
+    color="#64748B",
+    penwidth=1.1,
+    arrowsize=0.68
+  ]
+
+  start [label="服务启动", shape=oval, fillcolor="#EDE9FE", color="#7C3AED"]
+  env [label="激活 conda + CANN\n导入 acl / FAISS / OpenCV", fillcolor="#DBEAFE", color="#2563EB"]
+  admission [label="模型注册表与 OM hash 预检\n只允许 admitted 模型", fillcolor="#DCFCE7", color="#16A34A"]
+  restore [label="恢复 SQLite / FAISS / display_state\n读取照片可用状态与历史", fillcolor="#F1F5F9", color="#475569"]
+  listen [label="启动 FastAPI :7860", fillcolor="#DBEAFE", color="#2563EB"]
+  event [label="收到请求类型？", shape=diamond, fillcolor="#FEF3C7", color="#B45309"]
+
+  subgraph cluster_upload {
+    label="手机上传"
+    color="#CBD5E1"
+    style="rounded"
+    fontname="Microsoft YaHei"
+    upload_check [label="校验大小、解码、路径和 SHA-256", fillcolor="#DBEAFE", color="#2563EB"]
+    dedupe [label="内容 hash 去重\n写入照片元数据", fillcolor="#F1F5F9", color="#475569"]
+    encode [label="单锁串行执行三个图像 OM", fillcolor="#DCFCE7", color="#16A34A"]
+    index [label="写 embedding + 更新 FAISS\n完成 job 状态", fillcolor="#F1F5F9", color="#475569"]
+    upload_check -> dedupe -> encode -> index
+  }
+
+  subgraph cluster_search {
+    label="文本或图片搜索"
+    color="#CBD5E1"
+    style="rounded"
+    fontname="Microsoft YaHei"
+    route [label="自动语言路由\n中文 → Chinese-CLIP\n英文 → MobileCLIP", fillcolor="#DBEAFE", color="#2563EB"]
+    query_encode [label="执行文本/图片编码 OM\nL2 归一化", fillcolor="#DCFCE7", color="#16A34A"]
+    retrieve [label="对应模型 FAISS 内积检索", fillcolor="#F1F5F9", color="#475569"]
+    search_result [label="返回照片与相似度", fillcolor="#E0F2FE", color="#0284C7"]
+    route -> query_encode -> retrieve -> search_result
+  }
+
+  subgraph cluster_display {
+    label="下一张 / 上一张 / 轮播"
+    color="#CBD5E1"
+    style="rounded"
+    fontname="Microsoft YaHei"
+    state [label="读取当前显示状态与最近 12 张", fillcolor="#F1F5F9", color="#475569"]
+    select [label="智能选图\n不重复请求天气", fillcolor="#EDE9FE", color="#7C3AED"]
+    revision [label="写入 display_history\n递增 selection revision", fillcolor="#F1F5F9", color="#475569"]
+    render [label="按设备能力按需渲染\nJPEG 或 E6 dry-run 帧", fillcolor="#EDE9FE", color="#7C3AED"]
+    state -> select -> revision -> render
+  }
+
+  subgraph cluster_device {
+    label="ESP32 / PhotoPainter 拉图"
+    color="#CBD5E1"
+    style="rounded"
+    fontname="Microsoft YaHei"
+    manifest [label="读取 manifest 与 ETag", fillcolor="#DBEAFE", color="#2563EB"]
+    unchanged [label="ETag 未变化？", shape=diamond, fillcolor="#FEF3C7", color="#B45309"]
+    not_modified [label="返回 304\n不重新编码", fillcolor="#DCFCE7", color="#16A34A"]
+    content [label="ETag 变化：渲染并返回 content\n更新设备请求状态", fillcolor="#EDE9FE", color="#7C3AED"]
+    manifest -> unchanged
+    unchanged -> not_modified [label="是"]
+    unchanged -> content [label="否"]
+  }
+
+  done [label="客户端显示或收到 JSON", shape=oval, fillcolor="#DCFCE7", color="#16A34A"]
+
+  start -> env -> admission -> restore -> listen -> event
+  event -> upload_check [label="上传"]
+  event -> route [label="搜索"]
+  event -> state [label="显示控制"]
+  event -> manifest [label="设备拉图"]
+  index -> done
+  search_result -> done
+  render -> done
+  not_modified -> done
+  content -> done
+}

@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "candidate_registry": "candidate_manifest.json",
+  "admitted_candidates": [],
+  "models": [
+    {
+      "id": "ccnet",
+      "display_name": "CCNet Palm Encoder",
+      "kind": "embedding",
+      "license": "other",
+      "research_only": false,
+      "source": "https://huggingface.co/kyereboatengcaleb/palm-ccnet-onnx",
+      "revision": "a20685bdc844e153227a0d7bf7b6bdb3d2da4ff6",
+      "input_shape": [1, 1, 128, 128],
+      "input_range": "zero_one",
+      "feature_dim": 2048,
+      "metric": "cosine",
+      "production_enabled": true,
+      "backend": "npu",
+      "precision": "mixed_fp16",
+      "reference_onnx": "models/onnx/palm_ccnet.onnx",
+      "om_models": {
+        "mixed_fp16": "models/om/palm_ccnet_mixed_fp16.om"
+      },
+      "assets": {
+        "reference_onnx": {
+          "path": "models/onnx/palm_ccnet.onnx",
+          "bytes": 257311904,
+          "sha256": "bfc5c6349239083a376a7f03d9f068ab2fddd3c6a09dad1fe5140779a1127012"
+        },
+        "mixed_fp16_om": {
+          "path": "models/om/palm_ccnet_mixed_fp16.om",
+          "bytes": 131904474,
+          "sha256": "8465fbf483524a1b373618e5e67b2903c522a32f0fc3b3ee6a4b40881295b7f1"
+        }
+      },
+      "calibration": {
+        "dataset": "not_recorded",
+        "protocol": "legacy_operational_default",
+        "threshold": 0.75,
+        "metric": "cosine",
+        "qualification": "Operational default retained for compatibility; not a benchmark-derived threshold."
+      },
+      "admission": {
+        "status": "admitted",
+        "npu_model": "Ascend 310B4",
+        "compute_tier": "8T",
+        "precision": "mixed_fp16",
+        "evidence_status": "runtime_asset_hashes_verified; board acceptance records external"
+      }
+    }
+  ],
+  "offline_models": [
+    {
+      "id": "compnet",
+      "display_name": "CompNet Static Gabor",
+      "kind": "embedding",
+      "license": "BSD-3-Clause",
+      "research_only": true,
+      "offline_only": true,
+      "source": "https://github.com/JonnyLewis/compnet",
+      "revision": "21f8b56bcbcb620eafa85eaff5ea1f5a9675f194",
+      "input_shape": [1, 1, 128, 128],
+      "input_range": "nonzero_standardize",
+      "feature_dim": 512,
+      "metric": "cosine",
+      "reference_onnx": "models/onnx/compnet_static_gabor.onnx",
+      "checkpoint": "models/checkpoints/compnet_official.pth",
+      "conversion_only_marker": "models/checkpoints/compnet_conversion_only.json",
+      "om_models": {
+        "origin": "models/om/compnet_static_gabor_origin.om",
+        "mixed_fp16": "models/om/compnet_static_gabor_mixed_fp16.om"
+      }
+    },
+    {
+      "id": "edcc",
+      "display_name": "EDCC Competitive Code",
+      "kind": "code",
+      "license": "MIT",
+      "research_only": true,
+      "offline_only": true,
+      "source": "https://github.com/leosocy/EDCC-Palmprint-Recognition",
+      "revision": "c90875837c8bbd9be889dbd42ee51f78c9354683",
+      "input_shape": [128, 128],
+      "input_range": "uint8",
+      "feature_dim": null,
+      "metric": "edcc",
+      "library": "third_party/edcc/install/lib/libedcc.so"
+    }
+  ]
+}

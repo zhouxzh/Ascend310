@@ -1,0 +1,6 @@
+# Local development and API-test lock. Install after board.lock when the same
+# environment is used for board smoke tests.
+-r board.lock
+pytest==8.3.4
+httpx==0.28.1
+tomli==2.2.1; python_version < "3.11"

@@ -1,0 +1,10 @@
+# Ascend 310B4 / 8T runtime lock, Python 3.9 aarch64.
+# CANN, PyACL (acl) and the Ascend driver are installed by the board image;
+# they must not be installed from PyPI or bundled in the source archive.
+fastapi==0.115.12
+uvicorn==0.34.3
+python-multipart==0.0.20
+numpy==1.22.4
+pandas==2.0.3
+opencv-python-headless==4.10.0.84
+cryptography==42.0.8

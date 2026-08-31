@@ -1,0 +1,79 @@
+digraph network_architecture {
+  graph [
+    rankdir=LR,
+    splines=ortho,
+    nodesep=0.42,
+    ranksep=0.82,
+    pad=0.24,
+    bgcolor="white",
+    fontname="Microsoft YaHei",
+    fontsize=22,
+    label="智能相册服务器网络结构",
+    labelloc=t,
+    labeljust=c
+  ]
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Microsoft YaHei",
+    fontsize=15,
+    margin="0.16,0.10",
+    color="#334155",
+    penwidth=1.4
+  ]
+  edge [
+    fontname="Microsoft YaHei",
+    fontsize=11,
+    color="#64748B",
+    penwidth=1.2,
+    arrowsize=0.72
+  ]
+
+  subgraph cluster_clients {
+    label="局域网客户端"
+    color="#CBD5E1"
+    style="rounded"
+    fontname="Microsoft YaHei"
+    fontsize=16
+    phone [label="手机浏览器\n上传 · 搜索 · 配置", fillcolor="#FEF3C7", color="#B45309"]
+    touch [label="10 寸触摸屏\n图库 · 控制 · 设置", fillcolor="#FEF3C7", color="#B45309"]
+    photopainter [label="PhotoPainter\nESP32-S3 七色终端", fillcolor="#FDE68A", color="#B45309"]
+    epaper [label="微雪 E6\n未来 SPI/GPIO 终端", fillcolor="#FDE68A", color="#B45309"]
+  }
+
+  subgraph cluster_server {
+    label="Orange Pi AIpro / Ascend 310B4 · 8T"
+    color="#93C5FD"
+    style="rounded"
+    fontname="Microsoft YaHei"
+    fontsize=17
+
+    api [label="FastAPI 服务\n静态页面 · REST API", fillcolor="#DBEAFE", color="#2563EB"]
+    selector [label="智能选图器\n日期 · 天气 · 标签 · 历史", fillcolor="#EDE9FE", color="#7C3AED"]
+    renderer [label="按需渲染器\nEXIF · cover · JPEG/E6", fillcolor="#EDE9FE", color="#7C3AED"]
+    runtime [label="PyACL 串行运行时\n单锁 · 模型生命周期", fillcolor="#DCFCE7", color="#16A34A"]
+    storage [label="SQLite + FAISS\n元数据 · 多模型索引", shape=cylinder, fillcolor="#F1F5F9", color="#475569"]
+    models [label="已准入 OM 模型\nMobileCLIP · Chinese-CLIP · ResNet50", fillcolor="#DCFCE7", color="#16A34A"]
+  }
+
+  weather [label="Open-Meteo\n天气服务", shape=box, style="rounded,filled", fillcolor="#E0F2FE", color="#0284C7"]
+
+  phone -> api [label="HTTP"]
+  touch -> api [label="HTTP"]
+  photopainter -> api [label="握手 · ETag · content"]
+  epaper -> renderer [label="硬件模式时"]
+
+  api -> selector [label="查询 / 显示控制"]
+  api -> storage [label="照片 · 配置 · 任务"]
+  selector -> runtime [label="语义排序"]
+  selector -> storage [label="选择 revision"]
+  runtime -> models [label="ACL 执行"]
+  runtime -> storage [label="embedding / 检索"]
+  api -> renderer [label="当前照片"]
+  renderer -> touch [label="浏览器 JPEG"]
+  renderer -> photopainter [label="bounded JPEG"]
+  renderer -> epaper [label="192000-byte E6 帧"]
+  selector -> weather [label="定时刷新天气"]
+  weather -> selector [label="最后有效状态"]
+}

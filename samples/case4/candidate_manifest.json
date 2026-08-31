@@ -1,0 +1,1566 @@
+{
+  "schema_version": 1,
+  "purpose": "Audited public palmprint and palm-vein candidates. This is metadata only: it does not download, redistribute, or activate model assets.",
+  "comparison_policy": "Only active or conversion_candidate palmprint encoders with a reproducible inference contract, permitted local evaluation, and successful ONNX/OM validation may enter the formal palmprint ranking.",
+  "candidates": [
+  {
+    "id": "ccnet",
+      "display_name": "CCNet Palm Encoder",
+      "family": "CCNet",
+      "modality": "palmprint",
+      "task": "single-input embedding",
+    "task_type": "embedding",
+      "comparison_scope": "active",
+      "source": {
+        "url": "https://huggingface.co/kyereboatengcaleb/palm-ccnet-onnx",
+        "revision": "a20685bdc844e153227a0d7bf7b6bdb3d2da4ff6"
+      },
+      "license": {
+        "spdx": "other",
+        "usage": "research_only; do not redistribute the upstream ONNX without confirming upstream permission"
+      },
+      "weights": {
+        "availability": "active_project_asset",
+        "format": "onnx",
+        "artifacts": [
+          {
+            "local_path": "models/onnx/palm_ccnet.onnx",
+            "filename": "palm_ccnet.onnx",
+            "sha256": "bfc5c6349239083a376a7f03d9f068ab2fddd3c6a09dad1fe5140779a1127012"
+          }
+        ]
+      },
+      "input_contract": "float32[1,1,128,128], grayscale [0,1]",
+      "output_contract": "2048-D L2-normalized embedding",
+      "npu_status": "om_ready",
+      "notes": "Tongji-pretrained, so Tongji accuracy is in-domain evidence only."
+    },
+    {
+    "id": "compnet_tongji_600",
+      "display_name": "CompNet Tongji 600",
+      "family": "CompNet Static Gabor",
+      "modality": "palmprint",
+      "task": "single-input embedding",
+      "task_type": "embedding",
+      "comparison_scope": "conversion_candidate",
+      "source": {
+        "url": "https://github.com/JonnyLewis/compnet",
+        "revision": "21f8b56bcbcb620eafa85eaff5ea1f5a9675f194"
+      },
+      "license": {
+        "spdx": "BSD-3-Clause",
+        "usage": "checkpoint provenance and any upstream data terms remain to be recorded with results"
+      },
+      "weights": {
+        "availability": "local_verified",
+        "format": "pytorch_checkpoint",
+        "artifacts": [
+          {
+            "local_path": "models/checkpoints/pretrained compnet models/net_params_tongji_600.pth",
+            "filename": "net_params_tongji_600.pth",
+            "bytes": 21210404,
+            "sha256": "e27c86179dad2a69e9d9c7d4365eae5a31c3ccb4770a891a4ea3c1844d9f8a9a"
+          }
+        ]
+      },
+      "input_contract": "float32[1,1,128,128], project nonzero standardization",
+      "output_contract": "512-D L2-normalized embedding after static Gabor export",
+      "npu_status": "om_ready_admission_blocked",
+      "available_backends": ["npu"],
+      "production_enabled": false,
+      "manual_test_enabled": true,
+      "manual_test_pending": true,
+      "conversion": {
+        "onnx_path": "models/onnx/compnet_tongji_600.onnx",
+        "marker_path": "models/checkpoints/compnet_tongji_600_export.json",
+        "om_paths": {
+          "origin": "models/om/compnet_tongji_600_origin.om",
+          "mixed_fp16": "models/om/compnet_tongji_600_mixed_fp16.om"
+        },
+        "onnx_status": "local_verified",
+        "onnx_bytes": 20036416,
+        "onnx_sha256": "3792739e85fef4ebe889612442eb9a1a85c3a2c13dd2022e3b7ccb3289a9e181",
+        "om_status": "mixed_fp16_ready_smoke_only",
+        "board_npu_status": "om_ready_smoke_only",
+        "origin_status": "failed",
+        "origin_failure": "ATC EZ3002: MaxPoolV3 FP32 DT_FLOAT is unsupported on Ascend 310B4 CANN 8.0.0",
+        "mixed_fp16_bytes": 11130543,
+        "mixed_fp16_sha256": "b412804c403d4dc30e251a7382e1d27efe666a7595954187c762c8c3b9400d8d",
+        "acl_smoke": "passed",
+        "numeric_smoke": {
+          "dataset": "tongji",
+          "spectrum": "B",
+          "samples": 5,
+          "mean_cosine": 0.9999998212,
+          "min_cosine": 0.999999702,
+          "max_abs_error": 0.000131816,
+          "mean_abs_error": 0.00002611995,
+          "status": "passed",
+          "qualification": "smoke_only; no formal ranking"
+        }
+      },
+      "formal_validation": {
+        "hardware": "Ascend 310B4 / 8T",
+        "status": "tongji_complete_polyu_blocked",
+        "campaign_log": {
+          "filename": "reports/runs/compnet_full_eval_20260817.log",
+          "sha256": "d86b93a15d5637cc69bbfde8b33d83d9c8c018fcd9af2e592b4527ae28858ec9"
+        },
+        "numeric_compare_100": {
+          "status": "passed",
+          "dataset": "tongji",
+          "samples": 100,
+          "mean_cosine": 0.9999998211860657,
+          "min_cosine": 0.9999992847442627,
+          "max_abs_error": 0.00017384439706802368,
+          "mean_abs_error": 0.000027003197828889824,
+          "qualification": "ONNX/OM numerical consistency only; not an identity-recognition metric",
+          "report": {
+            "board_filename": "reports/runs/compare_compnet_tongji_600_mixed_fp16_tongji.json",
+            "sha256": "75460e8b0f122aeb4174967b9757c2715fbfe56876601a51b262efe07f519b64"
+          }
+        },
+        "tongji_evaluation": {
+          "status": "passed",
+          "return_code": 0,
+          "protocol": {
+            "version": "palmprint-verification-v2",
+            "backend": "npu",
+            "precision": "mixed_fp16",
+            "seed": 20260814,
+            "identities": 600,
+            "calibration_identities": 120,
+            "test_identities": 480,
+            "query_samples": 4800,
+            "registration_samples_per_identity": 2,
+            "verification": "1:1 all-pair session-2 queries against two session-1 templates per identity",
+            "identification": "closed-set 1:N Rank-1 over test identities only",
+            "open_set_rejection": "not_evaluated"
+          },
+          "metrics": {
+            "eer": 0.020625,
+            "auc": 0.9981112310463965,
+            "tar_at_far_0.01": 0.9694791666666667,
+            "tar_at_far_0.001": 0.9214583333333334,
+            "rank1": 0.9664583333333333,
+            "threshold": 0.42857635021209717
+          },
+          "elapsed_seconds": 173.61357245399995,
+          "report": {
+            "board_filename": "reports/runs/eval_compnet_tongji_600_npu_tongji.json",
+            "sha256": "b2b2374c357cf51f99a976eca681a273088fcfca7d90c3b1e4e8af065009abc6"
+          }
+        },
+        "performance": {
+          "status": "passed",
+          "protocol": {
+            "backend": "npu",
+            "precision": "mixed_fp16",
+            "warmup": 50,
+            "loops": 500,
+            "repeats": 5,
+            "threads": 1,
+            "batch_size": 1
+          },
+          "pure_model": {
+            "p50_ms": 6.206884,
+            "p95_ms": 6.2632256,
+            "fps": 160.99560734561854,
+            "cpu_percent": 5.167166079103543
+          },
+          "pipeline": {
+            "p50_ms": 7.2364975000000005,
+            "p95_ms": 7.32116715,
+            "fps": 138.02743291806166,
+            "cpu_percent": 18.459999089464862
+          },
+          "peak_rss_mb": 577.265625,
+          "report": {
+            "board_filename": "reports/runs/perf_compnet_tongji_600_npu_mixed_fp16_t1.json",
+            "sha256": "6567f36b6a7098ead4fabc0d8dd42b838b5500754de360fafd670ed63b0f2193"
+          }
+        },
+        "lifecycle_probe_20260818": {
+          "status": "blocked_driver_fault",
+          "cycles": 10,
+          "threads": 1,
+          "command_return_code": 0,
+          "inference": "passed; all 10 outputs finite and 512-D",
+          "acl_cleanup": "passed; runner resources, reset_device and finalize all returned 0",
+          "temperature_c": {
+            "samples": 8,
+            "min": 79.0,
+            "max": 80.0
+          },
+          "blocking_faults": [
+            "new LPM exception 0xA6193215 / DRV_LPM_FAULT 0x80E3A203 during the task window",
+            "reset_core_mk=0x800 recorded by the driver",
+            "process release recorded err_ret=-512 and Kthread_create not up to expectations"
+          ],
+          "reports": [
+            {
+              "board_filename": "reports/system/acl_lifecycle_compnet_tongji_600_20260818_120058.json",
+              "sha256": "18f9394261d2fd743929f6814fd05c3ae6e3c2f3938a85e2834a3b2740e23b35"
+            },
+            {
+              "board_filename": "reports/system/compnet_tongji_600_lifecycle_10_20260818_120057.json",
+              "sha256": "e03583b0cdd0f98a9185f304aba102c0de364b84543f8cb281f4a03b9aad8c33"
+            },
+            {
+              "board_filename": "reports/system/compnet_tongji_600_lifecycle_10_20260818_120057.jsonl",
+              "sha256": "48d91ee63847cf11ba1cdfea39d499b053efb4584572ce4568424532f4b26ac3"
+            }
+          ],
+          "qualification": "software lifecycle cleanup passed, but the concrete board/driver fault blocks production admission and stopped the remaining variants"
+        },
+        "post_reboot_lifecycle_probe_20260818": {
+          "status": "blocked_driver_fault",
+          "board_reboot_observed": true,
+          "cycles": 10,
+          "threads": 1,
+          "command_return_code": 0,
+          "inference": "passed; all 10 outputs finite and 512-D",
+          "acl_cleanup": "passed; runner resources, reset_device and finalize all returned 0",
+          "temperature_c": {
+            "samples": 8,
+            "min": 79.0,
+            "max": 80.0
+          },
+          "blocking_faults": [
+            "LPM exception 0xA6193215 was already observed during the idle post-reboot baseline",
+            "post-process release still recorded err_ret=-512 and driver release failure"
+          ],
+          "reports": [
+            {
+              "board_filename": "reports/system/acl_lifecycle_compnet_tongji_600_20260818_135305.json",
+              "sha256": "1a19358d192e7ec4124b9bd83d65ed0c5d916373887929325d0e65f48315ff40"
+            },
+            {
+              "board_filename": "reports/system/post_reboot_compnet_tongji_600_lifecycle_10_20260818_135304.json",
+              "sha256": "3353041b65e9c1f5d9112888f9e9ec5872695424c1633078c62ca14a84862e71"
+            },
+            {
+              "board_filename": "reports/system/post_reboot_compnet_tongji_600_lifecycle_10_20260818_135304.jsonl",
+              "sha256": "d4c6ca616b20ee5956371edff9512cbf0551da83e2067428f38482f1a0a9bc44"
+            }
+          ],
+          "qualification": "reboot did not clear the board fault; do not continue remaining variants until the power path is changed or the board is replaced"
+        },
+        "polyu_b": {
+          "status": "not_run_blocked",
+          "reason": "The PolyU B campaign was blocked by concrete ACL runtime exit 139 evidence before this variant ran; N/A, not a passed cross-domain result."
+        },
+        "admission_blockers": [
+          "origin FP32 ATC failed: MaxPoolV3 DT_FLOAT unsupported",
+          "PolyU B validation is blocked by ACL exit 139 / err_ret=-512 AICore LPM evidence",
+          "production_enabled remains false until the concrete runtime failure is resolved and the required stability gates are rerun"
+        ]
+      },
+      "training_domain": "Tongji, 600 classes",
+      "notes": "The mixed-FP16 OM has independent five-sample smoke and 100-sample numerical-consistency evidence, plus a clean Tongji full evaluation and repeated performance report. It remains outside the production registry: FP32 origin ATC failed and PolyU B validation is blocked by concrete ACL exit 139 evidence."
+    },
+    {
+    "id": "compnet_iitd_460",
+      "display_name": "CompNet IITD 460",
+      "family": "CompNet Static Gabor",
+      "modality": "palmprint",
+      "task": "single-input embedding",
+      "task_type": "embedding",
+      "comparison_scope": "conversion_candidate",
+      "source": {
+        "url": "https://github.com/JonnyLewis/compnet",
+        "revision": "21f8b56bcbcb620eafa85eaff5ea1f5a9675f194"
+      },
+      "license": {
+        "spdx": "BSD-3-Clause",
+        "usage": "checkpoint provenance and any upstream data terms remain to be recorded with results"
+      },
+      "weights": {
+        "availability": "local_verified",
+        "format": "pytorch_checkpoint",
+        "artifacts": [
+          {
+            "local_path": "models/checkpoints/pretrained compnet models/net_params_iitd_460.pth",
+            "filename": "net_params_iitd_460.pth",
+            "bytes": 20923684,
+            "sha256": "2e0744f4d73070d274822aa7c566a020daedd428761e90d78d1aecee6acccd77"
+          }
+        ]
+      },
+      "input_contract": "float32[1,1,128,128], project nonzero standardization",
+      "output_contract": "512-D L2-normalized embedding after static Gabor export",
+      "npu_status": "om_ready_admission_blocked",
+      "available_backends": ["npu"],
+      "production_enabled": false,
+      "manual_test_enabled": true,
+      "manual_test_pending": true,
+      "conversion": {
+        "onnx_path": "models/onnx/compnet_iitd_460.onnx",
+        "marker_path": "models/checkpoints/compnet_iitd_460_export.json",
+        "om_paths": {
+          "origin": "models/om/compnet_iitd_460_origin.om",
+          "mixed_fp16": "models/om/compnet_iitd_460_mixed_fp16.om"
+        },
+        "onnx_status": "local_verified",
+        "onnx_bytes": 20036416,
+        "onnx_sha256": "63ff86527840b916b5b3939227b29a0dc1d0cbf7be7604ac4dc8fcf1f3d497b4",
+        "om_status": "mixed_fp16_ready_smoke_only",
+        "board_npu_status": "om_ready_smoke_only",
+        "origin_status": "failed",
+        "origin_failure": "ATC EZ3002: MaxPoolV3 FP32 DT_FLOAT is unsupported on Ascend 310B4 CANN 8.0.0",
+        "mixed_fp16_bytes": 11130535,
+        "mixed_fp16_sha256": "64737e66b226c4b77a561d82c7af840c09488a63cff289c6af0ccf7d92d4e2da",
+        "acl_smoke": "passed",
+        "numeric_smoke": {
+          "dataset": "tongji",
+          "spectrum": "B",
+          "samples": 5,
+          "mean_cosine": 0.9999998808,
+          "min_cosine": 0.9999997616,
+          "max_abs_error": 0.0001068674,
+          "mean_abs_error": 0.00002127066,
+          "status": "passed",
+          "qualification": "smoke_only; no formal ranking"
+        }
+      },
+      "formal_validation": {
+        "hardware": "Ascend 310B4 / 8T",
+        "status": "tongji_complete_polyu_failed",
+        "campaign_log": {
+          "filename": "reports/runs/compnet_full_eval_20260817.log",
+          "sha256": "d86b93a15d5637cc69bbfde8b33d83d9c8c018fcd9af2e592b4527ae28858ec9"
+        },
+        "numeric_compare_100": {
+          "status": "passed",
+          "dataset": "tongji",
+          "samples": 100,
+          "mean_cosine": 0.9999998211860657,
+          "min_cosine": 0.9999994039535522,
+          "max_abs_error": 0.00017342902719974518,
+          "mean_abs_error": 0.000027122405299451202,
+          "qualification": "ONNX/OM numerical consistency only; not an identity-recognition metric",
+          "report": {
+            "board_filename": "reports/runs/compare_compnet_iitd_460_mixed_fp16_tongji.json",
+            "sha256": "2485f01f3895c7491648026af92b0918cf65b94093d461adf96d3014bd322073"
+          }
+        },
+        "tongji_evaluation": {
+          "status": "passed",
+          "return_code": 0,
+          "protocol": {
+            "version": "palmprint-verification-v2",
+            "backend": "npu",
+            "precision": "mixed_fp16",
+            "seed": 20260814,
+            "identities": 600,
+            "calibration_identities": 120,
+            "test_identities": 480,
+            "query_samples": 4800,
+            "registration_samples_per_identity": 2,
+            "verification": "1:1 all-pair session-2 queries against two session-1 templates per identity",
+            "identification": "closed-set 1:N Rank-1 over test identities only",
+            "open_set_rejection": "not_evaluated"
+          },
+          "metrics": {
+            "eer": 0.031145833333333334,
+            "auc": 0.9963505669317951,
+            "tar_at_far_0.01": 0.9383333333333334,
+            "tar_at_far_0.001": 0.8534375,
+            "rank1": 0.9425,
+            "threshold": 0.5041888356208801
+          },
+          "elapsed_seconds": 167.2132786909997,
+          "report": {
+            "board_filename": "reports/runs/eval_compnet_iitd_460_npu_tongji.json",
+            "sha256": "a15995130cebfdf75a733ef9b96ae9cb2f3d6d739a0678198e9ff575b377e805"
+          }
+        },
+        "performance": {
+          "status": "passed",
+          "protocol": {
+            "backend": "npu",
+            "precision": "mixed_fp16",
+            "warmup": 50,
+            "loops": 500,
+            "repeats": 5,
+            "threads": 1,
+            "batch_size": 1
+          },
+          "pure_model": {
+            "p50_ms": 6.2138525,
+            "p95_ms": 6.25830515,
+            "fps": 160.71261903833022,
+            "cpu_percent": 5.146092733735545
+          },
+          "pipeline": {
+            "p50_ms": 7.241601,
+            "p95_ms": 7.333360750000001,
+            "fps": 137.81799460481471,
+            "cpu_percent": 18.821618562518154
+          },
+          "peak_rss_mb": 577.48046875,
+          "report": {
+            "board_filename": "reports/runs/perf_compnet_iitd_460_npu_mixed_fp16_t1.json",
+            "sha256": "c20f1a1cbd19322143d919f6273117cb69934da1b64fdf0be1d91e3aab04839e"
+          }
+        },
+        "polyu_b": {
+          "status": "invalid_rc139",
+          "qualification": "A JSON report was written before ACL process cleanup crashed; these values are invalid and must not be ranked or used for admission.",
+          "evaluation_return_codes": [139, 139],
+          "related_tongji_compare": {
+            "model_id": "compnet_tongji_600",
+            "dataset": "polyu",
+            "return_code": 139,
+            "qualification": "preflight compare failure; distinct from the five passing 100-sample Tongji numerical-consistency reports"
+          },
+          "runtime_diagnostic": "ACL runtime err_ret=-512 with AICore/LPM diagnostics; this is a concrete runtime failure, not the known Health: Alarm diagnostic.",
+          "partial_report": {
+            "metrics": {
+              "eer": 0.011041666666666667,
+              "auc": 0.9994607470825502,
+              "tar_at_far_0.01": 0.988125,
+              "tar_at_far_0.001": 0.9566666666666667,
+              "rank1": 0.9916666666666667,
+              "threshold": 0.48804545402526855
+            },
+            "elapsed_seconds": 76.81640500499998,
+            "report": {
+              "board_filename": "reports/runs/eval_compnet_iitd_460_npu_polyu.json",
+              "sha256": "aa2f430284acb94004b00a058b06e9fe0c487157220cf8d2d67bf7ef496c867e"
+            }
+          }
+        },
+        "admission_blockers": [
+          "origin FP32 ATC failed: MaxPoolV3 DT_FLOAT unsupported",
+          "PolyU B ACL evaluation and a later Tongji compare retry terminated with exit 139 / err_ret=-512 AICore LPM",
+          "production_enabled remains false until the concrete runtime failure is resolved and the required stability gates are rerun"
+        ]
+      },
+      "training_domain": "IITD, 460 classes",
+      "notes": "Tongji is a cross-domain full evaluation with clean rc=0; the 100-sample numerical comparison and repeated performance report also passed. The PolyU B report was written before ACL exited 139 twice, and the separate compnet_tongji_600 PolyU preflight compare also exited 139; PolyU numbers are invalid, unranked, and block production admission."
+    },
+    {
+    "id": "compnet_rest_358",
+      "display_name": "CompNet REST 358",
+      "family": "CompNet Static Gabor",
+      "modality": "palmprint",
+      "task": "single-input embedding",
+      "task_type": "embedding",
+      "comparison_scope": "conversion_candidate",
+      "source": {
+        "url": "https://github.com/JonnyLewis/compnet",
+        "revision": "21f8b56bcbcb620eafa85eaff5ea1f5a9675f194"
+      },
+      "license": {
+        "spdx": "BSD-3-Clause",
+        "usage": "checkpoint provenance and any upstream data terms remain to be recorded with results"
+      },
+      "weights": {
+        "availability": "local_verified",
+        "format": "pytorch_checkpoint",
+        "artifacts": [
+          {
+            "local_path": "models/checkpoints/pretrained compnet models/net_params_rest_358.pth",
+            "filename": "net_params_rest_358.pth",
+            "bytes": 20714788,
+            "sha256": "9d188319ffb3adbcde6543baac5e2487df2b025e49cffe174ef6279990a60e58"
+          }
+        ]
+      },
+      "input_contract": "float32[1,1,128,128], project nonzero standardization",
+      "output_contract": "512-D L2-normalized embedding after static Gabor export",
+      "npu_status": "om_ready_admission_blocked",
+      "available_backends": ["npu"],
+      "production_enabled": false,
+      "manual_test_enabled": true,
+      "manual_test_pending": true,
+      "conversion": {
+        "onnx_path": "models/onnx/compnet_rest_358.onnx",
+        "marker_path": "models/checkpoints/compnet_rest_358_export.json",
+        "om_paths": {
+          "origin": "models/om/compnet_rest_358_origin.om",
+          "mixed_fp16": "models/om/compnet_rest_358_mixed_fp16.om"
+        },
+        "onnx_status": "local_verified",
+        "onnx_bytes": 20036416,
+        "onnx_sha256": "4d3921226fa5caa3cba659da63da9eeed83cd387d2385e96d2967ecaefe492d7",
+        "om_status": "mixed_fp16_ready_smoke_only",
+        "board_npu_status": "om_ready_smoke_only",
+        "origin_status": "failed",
+        "origin_failure": "ATC EZ3002: MaxPoolV3 FP32 DT_FLOAT is unsupported on Ascend 310B4 CANN 8.0.0",
+        "mixed_fp16_bytes": 11130535,
+        "mixed_fp16_sha256": "e197b884cd0c22942ace51727743d287d544fb98b82b895a81edcef146c41844",
+        "acl_smoke": "passed",
+        "numeric_smoke": {
+          "dataset": "tongji",
+          "spectrum": "B",
+          "samples": 5,
+          "mean_cosine": 0.9999990463,
+          "min_cosine": 0.9999988079,
+          "max_abs_error": 0.0002057403,
+          "mean_abs_error": 0.00004840925,
+          "status": "passed",
+          "qualification": "smoke_only; no formal ranking"
+        }
+      },
+      "formal_validation": {
+        "hardware": "Ascend 310B4 / 8T",
+        "status": "tongji_complete_polyu_blocked",
+        "campaign_log": {
+          "filename": "reports/runs/compnet_full_eval_20260817.log",
+          "sha256": "d86b93a15d5637cc69bbfde8b33d83d9c8c018fcd9af2e592b4527ae28858ec9"
+        },
+        "numeric_compare_100": {
+          "status": "passed",
+          "dataset": "tongji",
+          "samples": 100,
+          "mean_cosine": 0.9999986290931702,
+          "min_cosine": 0.9999970197677612,
+          "max_abs_error": 0.00037625059485435486,
+          "mean_abs_error": 0.00006124395440565422,
+          "qualification": "ONNX/OM numerical consistency only; not an identity-recognition metric",
+          "report": {
+            "board_filename": "reports/runs/compare_compnet_rest_358_mixed_fp16_tongji.json",
+            "sha256": "708e0dfac7e3564164c33f70012e911d9cf8e1388889481552eed32dcd843e65"
+          }
+        },
+        "tongji_evaluation": {
+          "status": "passed",
+          "return_code": 0,
+          "protocol": {
+            "version": "palmprint-verification-v2",
+            "backend": "npu",
+            "precision": "mixed_fp16",
+            "seed": 20260814,
+            "identities": 600,
+            "calibration_identities": 120,
+            "test_identities": 480,
+            "query_samples": 4800,
+            "registration_samples_per_identity": 2,
+            "verification": "1:1 all-pair session-2 queries against two session-1 templates per identity",
+            "identification": "closed-set 1:N Rank-1 over test identities only",
+            "open_set_rejection": "not_evaluated"
+          },
+          "metrics": {
+            "eer": 0.02343858733472512,
+            "auc": 0.9975693918559535,
+            "tar_at_far_0.01": 0.9595833333333333,
+            "tar_at_far_0.001": 0.8932291666666666,
+            "rank1": 0.96125,
+            "threshold": 0.41717028617858887
+          },
+          "elapsed_seconds": 167.516797192,
+          "report": {
+            "board_filename": "reports/runs/eval_compnet_rest_358_npu_tongji.json",
+            "sha256": "5dc883463dc49bd9a4a03fed199a689d58bea54e41193eca0b2248bddbc35667"
+          }
+        },
+        "performance": {
+          "status": "passed",
+          "protocol": {
+            "backend": "npu",
+            "precision": "mixed_fp16",
+            "warmup": 50,
+            "loops": 500,
+            "repeats": 5,
+            "threads": 1,
+            "batch_size": 1
+          },
+          "pure_model": {
+            "p50_ms": 6.1996655,
+            "p95_ms": 6.2427754,
+            "fps": 161.20332868430995,
+            "cpu_percent": 4.905872808538129
+          },
+          "pipeline": {
+            "p50_ms": 7.230549,
+            "p95_ms": 7.3293351499999995,
+            "fps": 137.99650143155378,
+            "cpu_percent": 18.460979208952033
+          },
+          "peak_rss_mb": 577.4296875,
+          "report": {
+            "board_filename": "reports/runs/perf_compnet_rest_358_npu_mixed_fp16_t1.json",
+            "sha256": "5d28d7f1b046893430970b0833cc07c55e9d586262709ad185f664fd903231eb"
+          }
+        },
+        "polyu_b": {
+          "status": "not_run_blocked",
+          "reason": "The PolyU B campaign was blocked by concrete ACL runtime exit 139 evidence before this variant ran; N/A, not a passed cross-domain result."
+        },
+        "admission_blockers": [
+          "origin FP32 ATC failed: MaxPoolV3 DT_FLOAT unsupported",
+          "PolyU B validation is blocked by ACL exit 139 / err_ret=-512 AICore LPM evidence",
+          "production_enabled remains false until the concrete runtime failure is resolved and the required stability gates are rerun"
+        ]
+      },
+      "training_domain": "REST 2016, 358 classes",
+      "notes": "Tongji is a cross-domain full evaluation with clean rc=0; the 100-sample numerical comparison and repeated performance report also passed. PolyU B was not run after the concrete ACL exit 139 block, so no cross-domain PolyU result is claimed and production remains disabled."
+    },
+    {
+    "id": "compnet_xjtu_flash_200",
+      "display_name": "CompNet XJTU-UP Flash 200",
+      "family": "CompNet Static Gabor",
+      "modality": "palmprint",
+      "task": "single-input embedding",
+      "task_type": "embedding",
+      "comparison_scope": "conversion_candidate",
+      "source": {
+        "url": "https://github.com/JonnyLewis/compnet",
+        "revision": "21f8b56bcbcb620eafa85eaff5ea1f5a9675f194"
+      },
+      "license": {
+        "spdx": "BSD-3-Clause",
+        "usage": "checkpoint provenance and any upstream data terms remain to be recorded with results"
+      },
+      "weights": {
+        "availability": "local_verified",
+        "format": "pytorch_checkpoint",
+        "artifacts": [
+          {
+            "local_path": "models/checkpoints/pretrained compnet models/net_params_if_200.pth",
+            "filename": "net_params_if_200.pth",
+            "bytes": 20391203,
+            "sha256": "af4f50d21843e57bf4039f9508d2c5bc2aa3d7352947d6a3e447292588b4e924"
+          }
+        ]
+      },
+      "input_contract": "float32[1,1,128,128], project nonzero standardization",
+      "output_contract": "512-D L2-normalized embedding after static Gabor export",
+      "npu_status": "om_ready_admission_blocked",
+      "available_backends": ["npu"],
+      "production_enabled": false,
+      "manual_test_enabled": true,
+      "manual_test_pending": true,
+      "conversion": {
+        "onnx_path": "models/onnx/compnet_xjtu_flash_200.onnx",
+        "marker_path": "models/checkpoints/compnet_xjtu_flash_200_export.json",
+        "om_paths": {
+          "origin": "models/om/compnet_xjtu_flash_200_origin.om",
+          "mixed_fp16": "models/om/compnet_xjtu_flash_200_mixed_fp16.om"
+        },
+        "onnx_status": "local_verified",
+        "onnx_bytes": 20036416,
+        "onnx_sha256": "d7368e16417c16b6dfd5ea70491047b4d7b7f346b5f3c25863c8ebe5010c30f8",
+        "om_status": "mixed_fp16_ready_smoke_only",
+        "board_npu_status": "om_ready_smoke_only",
+        "origin_status": "failed",
+        "origin_failure": "ATC EZ3002: MaxPoolV3 FP32 DT_FLOAT is unsupported on Ascend 310B4 CANN 8.0.0",
+        "mixed_fp16_bytes": 11130559,
+        "mixed_fp16_sha256": "764d9d81c7844bf41ba2054f577a1e465d6b9139134fee4ded352ff64959052c",
+        "acl_smoke": "passed",
+        "numeric_smoke": {
+          "dataset": "tongji",
+          "spectrum": "B",
+          "samples": 5,
+          "mean_cosine": 0.9999996424,
+          "min_cosine": 0.9999995232,
+          "max_abs_error": 0.0001572892,
+          "mean_abs_error": 0.00003334124,
+          "status": "passed",
+          "qualification": "smoke_only; no formal ranking"
+        }
+      },
+      "formal_validation": {
+        "hardware": "Ascend 310B4 / 8T",
+        "status": "tongji_complete_polyu_blocked",
+        "campaign_log": {
+          "filename": "reports/runs/compnet_full_eval_20260817.log",
+          "sha256": "d86b93a15d5637cc69bbfde8b33d83d9c8c018fcd9af2e592b4527ae28858ec9"
+        },
+        "numeric_compare_100": {
+          "status": "passed",
+          "dataset": "tongji",
+          "samples": 100,
+          "mean_cosine": 0.9999994039535522,
+          "min_cosine": 0.9999982118606567,
+          "max_abs_error": 0.0002597477287054062,
+          "mean_abs_error": 0.00004102142702322453,
+          "qualification": "ONNX/OM numerical consistency only; not an identity-recognition metric",
+          "report": {
+            "board_filename": "reports/runs/compare_compnet_xjtu_flash_200_mixed_fp16_tongji.json",
+            "sha256": "6848a3271ee8b4b0070a1eb6baea72b947b79b01a0e41a547d0b14c09d1ac6cf"
+          }
+        },
+        "tongji_evaluation": {
+          "status": "passed",
+          "return_code": 0,
+          "protocol": {
+            "version": "palmprint-verification-v2",
+            "backend": "npu",
+            "precision": "mixed_fp16",
+            "seed": 20260814,
+            "identities": 600,
+            "calibration_identities": 120,
+            "test_identities": 480,
+            "query_samples": 4800,
+            "registration_samples_per_identity": 2,
+            "verification": "1:1 all-pair session-2 queries against two session-1 templates per identity",
+            "identification": "closed-set 1:N Rank-1 over test identities only",
+            "open_set_rejection": "not_evaluated"
+          },
+          "metrics": {
+            "eer": 0.03135416666666667,
+            "auc": 0.9962217438968808,
+            "tar_at_far_0.01": 0.9378125,
+            "tar_at_far_0.001": 0.8685416666666667,
+            "rank1": 0.9329166666666666,
+            "threshold": 0.4774385094642639
+          },
+          "elapsed_seconds": 170.52163708100124,
+          "report": {
+            "board_filename": "reports/runs/eval_compnet_xjtu_flash_200_npu_tongji.json",
+            "sha256": "e871082760cd88bb8c107d23fb04471283c5759901f125c776b8eb39aed7e6fe"
+          }
+        },
+        "performance": {
+          "status": "passed",
+          "protocol": {
+            "backend": "npu",
+            "precision": "mixed_fp16",
+            "warmup": 50,
+            "loops": 500,
+            "repeats": 5,
+            "threads": 1,
+            "batch_size": 1
+          },
+          "pure_model": {
+            "p50_ms": 6.2076965,
+            "p95_ms": 6.2560157499999995,
+            "fps": 161.0015117327105,
+            "cpu_percent": 4.996905848370983
+          },
+          "pipeline": {
+            "p50_ms": 7.233414,
+            "p95_ms": 7.33164245,
+            "fps": 138.03795982882514,
+            "cpu_percent": 18.62445251115856
+          },
+          "peak_rss_mb": 577.4765625,
+          "report": {
+            "board_filename": "reports/runs/perf_compnet_xjtu_flash_200_npu_mixed_fp16_t1.json",
+            "sha256": "e732482a022681d397b461aadece6ca90d0fa9cfea22a342e6e01fca0fa1dd22"
+          }
+        },
+        "polyu_b": {
+          "status": "not_run_blocked",
+          "reason": "The PolyU B campaign was blocked by concrete ACL runtime exit 139 evidence before this variant ran; N/A, not a passed cross-domain result."
+        },
+        "admission_blockers": [
+          "origin FP32 ATC failed: MaxPoolV3 DT_FLOAT unsupported",
+          "PolyU B validation is blocked by ACL exit 139 / err_ret=-512 AICore LPM evidence",
+          "production_enabled remains false until the concrete runtime failure is resolved and the required stability gates are rerun"
+        ]
+      },
+      "training_domain": "XJTU-UP iPhone 6s Flash, 200 classes",
+      "notes": "Tongji is a cross-domain full evaluation with clean rc=0; the 100-sample numerical comparison and repeated performance report also passed. PolyU B was not run after the concrete ACL exit 139 block, so no cross-domain PolyU result is claimed and production remains disabled."
+    },
+    {
+    "id": "compnet_xjtu_natural_200",
+      "display_name": "CompNet XJTU-UP Natural 200",
+      "family": "CompNet Static Gabor",
+      "modality": "palmprint",
+      "task": "single-input embedding",
+      "task_type": "embedding",
+      "comparison_scope": "conversion_candidate",
+      "source": {
+        "url": "https://github.com/JonnyLewis/compnet",
+        "revision": "21f8b56bcbcb620eafa85eaff5ea1f5a9675f194"
+      },
+      "license": {
+        "spdx": "BSD-3-Clause",
+        "usage": "checkpoint provenance and any upstream data terms remain to be recorded with results"
+      },
+      "weights": {
+        "availability": "local_verified",
+        "format": "pytorch_checkpoint",
+        "artifacts": [
+          {
+            "local_path": "models/checkpoints/pretrained compnet models/net_params_in_200.pth",
+            "filename": "net_params_in_200.pth",
+            "bytes": 20391203,
+            "sha256": "65d99dd95237c645f1ce2a9e6f06e307beb5a5035c264ff10d8e8342e6a267bb"
+          }
+        ]
+      },
+      "input_contract": "float32[1,1,128,128], project nonzero standardization",
+      "output_contract": "512-D L2-normalized embedding after static Gabor export",
+      "npu_status": "om_ready_admission_blocked",
+      "available_backends": ["npu"],
+      "production_enabled": false,
+      "manual_test_enabled": true,
+      "manual_test_pending": true,
+      "conversion": {
+        "onnx_path": "models/onnx/compnet_xjtu_natural_200.onnx",
+        "marker_path": "models/checkpoints/compnet_xjtu_natural_200_export.json",
+        "om_paths": {
+          "origin": "models/om/compnet_xjtu_natural_200_origin.om",
+          "mixed_fp16": "models/om/compnet_xjtu_natural_200_mixed_fp16.om"
+        },
+        "onnx_status": "local_verified",
+        "onnx_bytes": 20036416,
+        "onnx_sha256": "72f0226f167d89f64d0b68919a8161d5bbb34ccbf8687e9481af279cbfc06d36",
+        "om_status": "mixed_fp16_ready_smoke_only",
+        "board_npu_status": "om_ready_smoke_only",
+        "origin_status": "failed",
+        "origin_failure": "ATC EZ3002: MaxPoolV3 FP32 DT_FLOAT is unsupported on Ascend 310B4 CANN 8.0.0",
+        "mixed_fp16_bytes": 11130567,
+        "mixed_fp16_sha256": "54b4a5f102b6914591d8901ee2c2b6deed44b05e33145b8e5052fd5c41ab797a",
+        "acl_smoke": "passed",
+        "numeric_smoke": {
+          "dataset": "tongji",
+          "spectrum": "B",
+          "samples": 5,
+          "mean_cosine": 0.9999991655,
+          "min_cosine": 0.9999989867,
+          "max_abs_error": 0.0002227845,
+          "mean_abs_error": 0.00004730945,
+          "status": "passed",
+          "qualification": "smoke_only; no formal ranking"
+        }
+      },
+      "formal_validation": {
+        "hardware": "Ascend 310B4 / 8T",
+        "status": "tongji_complete_polyu_blocked",
+        "campaign_log": {
+          "filename": "reports/runs/compnet_full_eval_20260817.log",
+          "sha256": "d86b93a15d5637cc69bbfde8b33d83d9c8c018fcd9af2e592b4527ae28858ec9"
+        },
+        "numeric_compare_100": {
+          "status": "passed",
+          "dataset": "tongji",
+          "samples": 100,
+          "mean_cosine": 0.9999984502792358,
+          "min_cosine": 0.9999955892562866,
+          "max_abs_error": 0.0004282630980014801,
+          "mean_abs_error": 0.00006418976408895105,
+          "qualification": "ONNX/OM numerical consistency only; not an identity-recognition metric",
+          "report": {
+            "board_filename": "reports/runs/compare_compnet_xjtu_natural_200_mixed_fp16_tongji.json",
+            "sha256": "ba36e45a290c80d33292e983c825cc0a0e7777ce09cce03037e35db9a165a95a"
+          }
+        },
+        "tongji_evaluation": {
+          "status": "passed",
+          "return_code": 0,
+          "protocol": {
+            "version": "palmprint-verification-v2",
+            "backend": "npu",
+            "precision": "mixed_fp16",
+            "seed": 20260814,
+            "identities": 600,
+            "calibration_identities": 120,
+            "test_identities": 480,
+            "query_samples": 4800,
+            "registration_samples_per_identity": 2,
+            "verification": "1:1 all-pair session-2 queries against two session-1 templates per identity",
+            "identification": "closed-set 1:N Rank-1 over test identities only",
+            "open_set_rejection": "not_evaluated"
+          },
+          "metrics": {
+            "eer": 0.025833333333333333,
+            "auc": 0.9971585800223991,
+            "tar_at_far_0.01": 0.9534375,
+            "tar_at_far_0.001": 0.8883333333333333,
+            "rank1": 0.951875,
+            "threshold": 0.45045793056488037
+          },
+          "elapsed_seconds": 169.04509080199932,
+          "report": {
+            "board_filename": "reports/runs/eval_compnet_xjtu_natural_200_npu_tongji.json",
+            "sha256": "5c451846038369b7c28b8742a6fb751b77ab36d76e3c9f2f947945b0c2a38084"
+          }
+        },
+        "performance": {
+          "status": "passed",
+          "protocol": {
+            "backend": "npu",
+            "precision": "mixed_fp16",
+            "warmup": 50,
+            "loops": 500,
+            "repeats": 5,
+            "threads": 1,
+            "batch_size": 1
+          },
+          "pure_model": {
+            "p50_ms": 6.2095305,
+            "p95_ms": 6.2531263,
+            "fps": 160.85033801419775,
+            "cpu_percent": 5.075179723202438
+          },
+          "pipeline": {
+            "p50_ms": 7.2453615,
+            "p95_ms": 7.3118815999999995,
+            "fps": 137.88885734338086,
+            "cpu_percent": 18.66048065405177
+          },
+          "peak_rss_mb": 577.47265625,
+          "report": {
+            "board_filename": "reports/runs/perf_compnet_xjtu_natural_200_npu_mixed_fp16_t1.json",
+            "sha256": "67160a9c5d497b21d276c4fdc526c3bc9bdd24d8bc408394cf1ff07be2143a68"
+          }
+        },
+        "polyu_b": {
+          "status": "not_run_blocked",
+          "reason": "The PolyU B campaign was blocked by concrete ACL runtime exit 139 evidence before this variant ran; N/A, not a passed cross-domain result."
+        },
+        "admission_blockers": [
+          "origin FP32 ATC failed: MaxPoolV3 DT_FLOAT unsupported",
+          "PolyU B validation is blocked by ACL exit 139 / err_ret=-512 AICore LPM evidence",
+          "production_enabled remains false until the concrete runtime failure is resolved and the required stability gates are rerun"
+        ]
+      },
+      "training_domain": "XJTU-UP iPhone 6s Natural, 200 classes",
+      "notes": "Tongji is a cross-domain full evaluation with clean rc=0; the 100-sample numerical comparison and repeated performance report also passed. PolyU B was not run after the concrete ACL exit 139 block, so no cross-domain PolyU result is claimed and production remains disabled."
+    },
+    {
+      "id": "ppnet",
+      "display_name": "PPNet Palmprint CNN",
+      "family": "PPNet",
+      "modality": "palmprint",
+      "task": "classifier with penultimate feature candidate",
+      "task_type": "classifier",
+      "comparison_scope": "conversion_candidate",
+      "source": {
+        "url": "https://github.com/xuliangcs/ppnet",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "CC-BY-NC-4.0",
+        "usage": "noncommercial local evaluation with attribution; confirm separate checkpoint and dataset terms before use"
+      },
+      "weights": {
+        "availability": "official_link_unverified",
+        "format": "pytorch_checkpoint",
+      "artifacts": [
+        {
+          "url": "https://drive.google.com/drive/folders/1xcBzSxIDDWeIKK4mb6XHIdgwGsvQURHc?usp=drive_link",
+          "role": "official pretrained model folder"
+        },
+        {
+          "url": "https://pan.baidu.com/s/1Y990hI1diS0bwmCetHTfPA?pwd=iavt",
+          "role": "official pretrained model folder (Baidu fallback)",
+          "access_code": "iavt"
+        }
+      ]
+    },
+    "input_contract": "float32[1,1,128,128]; grayscale PIL ToTensor [0,1], then NormSingleROI normalizes nonzero pixels to mean 0 and std 1",
+    "output_contract": "getFeatureCode() emits 512-D fc2/bn2/relu2 features; forward() emits dataset-sized logits plus a paired distance",
+    "npu_status": "conversion_pending",
+    "download_audit": {
+      "attempted_at": "2026-08-16",
+      "result": "not_downloaded",
+      "google_drive": {
+        "transport": "curl.exe",
+        "result": "connection_timeout",
+        "error": "curl: (28) Failed to connect to drive.google.com:443 after 21271 ms: Could not connect to server"
+      },
+      "baidu": {
+        "landing_page": "HTTP 302 followed by HTTP 200",
+        "share_verify": "errno=2",
+        "file_list": "errno=-9",
+        "message": "提取码验证失败，请重试"
+      }
+    },
+    "notes": "The upstream source contract is audited, but no checkpoint was downloaded. Do not register or rank until a selected file, hash, and checkpoint structure are verified."
+    },
+    {
+      "id": "holzweber_resnet18_tongji",
+      "display_name": "Holzweber ResNet18 Tongji",
+      "family": "Holzweber Palmprint Recognition",
+      "modality": "palmprint",
+      "task": "closed-set classifier with penultimate feature candidate",
+      "task_type": "classifier",
+      "comparison_scope": "conversion_candidate",
+      "source": {
+        "url": "https://github.com/holzweber/palmprint-recognition",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "MIT",
+        "usage": "code is MIT; verify dataset and checkpoint provenance before redistribution"
+      },
+      "weights": {
+        "availability": "repository_asset_unverified",
+        "format": "pytorch_checkpoint",
+        "artifacts": [
+          {
+            "url": "https://github.com/holzweber/palmprint-recognition/raw/refs/heads/main/Model-Training/CNN-for-Tongji-ROI-Classification/tongji-resnet18-unfreeze/resnet18_tongji_unfreezed.pt",
+            "filename": "resnet18_tongji_unfreezed.pt",
+            "bytes": 46015245
+          },
+          {
+            "url": "https://github.com/holzweber/palmprint-recognition/raw/refs/heads/main/Model-Training/CNN-for-Tongji-ROI-Classification/tongji-mobilenetv2-unfreeze/MobileNetV2_tongji_unfreezed_04042022.pt",
+            "filename": "MobileNetV2_tongji_unfreezed_04042022.pt",
+            "bytes": 12220857
+          }
+        ]
+      },
+      "input_contract": "RGB 224x224 with ImageNet normalization according to upstream code",
+      "output_contract": "600-class Tongji logits; 512-D penultimate feature must be exported as an explicitly different evaluation mode",
+      "npu_status": "conversion_pending",
+      "notes": "Keep classifier accuracy and embedding-matching experiments separate."
+    },
+    {
+      "id": "holzweber_roi_lanet",
+      "display_name": "Holzweber ROI-LANet",
+      "family": "Holzweber Palmprint Recognition",
+      "modality": "palmprint",
+      "task": "ROI localization",
+      "task_type": "roi",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/holzweber/palmprint-recognition",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "MIT",
+        "usage": "code is MIT; verify dataset and checkpoint provenance before redistribution"
+      },
+      "weights": {
+        "availability": "repository_asset_unverified",
+        "format": "pytorch_checkpoint",
+        "artifacts": [
+          {
+            "url": "https://github.com/holzweber/palmprint-recognition/raw/refs/heads/main/Model-Training/Feature-Extractor-Training/ROI_extractor_augmented_TJ-NTU.pt",
+            "filename": "ROI_extractor_augmented_TJ-NTU.pt",
+            "bytes": 65818921
+          }
+        ]
+      },
+      "input_contract": "full hand image; exact transform must be audited",
+      "output_contract": "ROI localization transform, not an identity embedding",
+      "npu_status": "needs_reimplementation",
+      "notes": "Contains thin-plate-spline/grid sampling behavior and is not part of identity accuracy ranking."
+    },
+    {
+      "id": "lin_dxin_resnet18_pair",
+      "display_name": "Lin-Dxin Paired ResNet18",
+      "family": "Lin-Dxin PalmprintRecognition",
+      "modality": "palmprint",
+      "task": "two-input feature comparison",
+      "task_type": "classifier",
+      "comparison_scope": "conversion_candidate",
+      "source": {
+        "url": "https://github.com/Lin-Dxin/PalmprintRecognition",
+        "revision": "master"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "usage": "license not published; local evaluation only until the author supplies permission"
+      },
+      "weights": {
+        "availability": "repository_asset_unverified",
+        "format": "pytorch_checkpoint",
+        "artifacts": [
+          {
+            "url": "https://github.com/Lin-Dxin/PalmprintRecognition/raw/refs/heads/master/model1.pt",
+            "filename": "model1.pt",
+            "bytes": 44784977
+          }
+        ]
+      },
+      "input_contract": "two RGB 224x224 inputs with ImageNet normalization according to upstream test code",
+      "output_contract": "paired feature tensors; a one-input shared encoder export must be designed and verified",
+      "npu_status": "needs_reimplementation",
+      "notes": "No public license means that a noncommercial intent does not create redistribution permission."
+    },
+    {
+      "id": "ee_prnet",
+      "display_name": "EE-PRNet",
+      "family": "Palmprint Recognition in the Wild",
+      "modality": "palmprint",
+      "task": "end-to-end touchless palmprint recognition",
+      "task_type": "embedding",
+      "comparison_scope": "conversion_candidate",
+      "source": {
+        "url": "https://github.com/matkowski-voy/Palmprint-Recognition-in-the-Wild",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "usage": "license not published; local evaluation only until the author supplies permission"
+      },
+      "weights": {
+        "availability": "official_link_unverified",
+        "format": "matconvnet_mat",
+        "artifacts": [
+          {
+            "url": "https://www.dropbox.com/scl/fi/k2rg5brxh0ahxxjwk2wqg/EE_PRnet-epoch-60.mat?rlkey=dk2jaiqynbbb0shf6v8k1w9z4&dl=0",
+            "filename": "EE_PRnet-epoch-60.mat"
+          }
+        ]
+      },
+      "input_contract": "must be recovered from the MATLAB/MatConvNet model",
+      "output_contract": "must be recovered from the MATLAB/MatConvNet model",
+      "npu_status": "needs_reimplementation",
+      "notes": "Official model link exists, but it is not directly importable by ONNX/ATC."
+    },
+    {
+      "id": "alignnet_roi_lanet",
+      "display_name": "AlignNet ROI-LANet",
+      "family": "Palmprint Recognition in the Wild",
+      "modality": "palmprint",
+      "task": "ROI alignment",
+      "task_type": "roi",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/matkowski-voy/Palmprint-Recognition-in-the-Wild",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "usage": "license not published; local evaluation only until the author supplies permission"
+      },
+      "weights": {
+        "availability": "official_link_unverified",
+        "format": "matconvnet_mat",
+        "artifacts": [
+          {
+            "url": "https://www.dropbox.com/scl/fi/lk3kgko3ulbv5hv99fo5s/AlignNet-epoch-25.mat?rlkey=jssrvfl83e5ugn9vuynzfckci&dl=0",
+            "filename": "AlignNet-epoch-25.mat"
+          }
+        ]
+      },
+      "input_contract": "full hand image; recover from the MATLAB/MatConvNet model",
+      "output_contract": "ROI alignment transform, not an identity embedding",
+      "npu_status": "needs_reimplementation",
+      "notes": "This candidate must not be ranked as a standalone recognizer."
+    },
+    {
+      "id": "kenan_cnn_palmar_veins",
+      "display_name": "CNN Palmar Veins",
+      "family": "cnn_palmar_veins",
+      "modality": "palm_vein",
+      "task": "closed-set NIR classification",
+      "task_type": "vein_embedding",
+      "comparison_scope": "separate_modality",
+      "source": {
+        "url": "https://github.com/kenanGonnot/cnn_palmar_veins",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "usage": "license not published; local evaluation only until the author supplies permission"
+      },
+      "weights": {
+        "availability": "official_link_unverified",
+        "format": "keras_h5_git_lfs",
+        "artifacts": [
+          {
+            "url": "https://github.com/kenanGonnot/cnn_palmar_veins/blob/main/saved_model/model_identification_500users_60train40test.h5",
+            "filename": "model_identification_500users_60train40test.h5",
+            "bytes": 722000000,
+            "role": "Git LFS asset; verify that an actual LFS blob rather than pointer was downloaded"
+          },
+          {
+            "url": "https://github.com/kenanGonnot/cnn_palmar_veins/blob/main/app/deployed_model/model_identification_500users_1Layer.h5",
+            "filename": "model_identification_500users_1Layer.h5",
+            "bytes": 722000000,
+            "role": "Git LFS asset; verify that an actual LFS blob rather than pointer was downloaded"
+          }
+        ]
+      },
+      "input_contract": "NIR palm-vein image contract must be recovered from upstream Keras code",
+      "output_contract": "500-user classifier logits",
+      "npu_status": "needs_reimplementation",
+      "notes": "Different capture modality and task; never aggregate its accuracy with visible-light palmprint results."
+    },
+  {
+    "id": "edcc",
+      "display_name": "EDCC Competitive Code",
+      "family": "EDCC",
+      "modality": "palmprint",
+      "task": "hand-crafted competitive-code comparison",
+    "task_type": "code",
+      "comparison_scope": "active",
+      "source": {
+        "url": "https://github.com/leosocy/EDCC-Palmprint-Recognition",
+        "revision": "c90875837c8bbd9be889dbd42ee51f78c9354683"
+      },
+      "license": {
+        "spdx": "MIT",
+        "usage": "source build used as the CPU-only reference implementation"
+      },
+      "weights": {
+        "availability": "not_applicable",
+        "format": "none",
+        "artifacts": []
+      },
+      "input_contract": "uint8 grayscale 128x128 ROI",
+      "output_contract": "EDCC code and native comparison score",
+      "npu_status": "not_applicable",
+      "notes": "Traditional CPU baseline; it is intentionally not wrapped as an OM model."
+    },
+    {
+      "id": "mpsnet",
+      "display_name": "MPSNet",
+      "family": "Mobile Palm Vein Recognition",
+      "modality": "palm_vein",
+      "task": "feature extraction",
+      "task_type": "vein_embedding",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/trungvdhp/mpsnet",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "MIT",
+        "usage": "code is MIT; the full NTUST dataset requires its release agreement"
+      },
+      "weights": {
+        "availability": "not_available",
+        "format": "keras",
+        "artifacts": []
+      },
+      "input_contract": "RGB smartphone palm-vein preprocessing, saturation channel",
+      "output_contract": "model-defined vein features",
+      "npu_status": "unknown",
+      "notes": "Repository has source and sample images but no published pretrained checkpoint."
+    },
+    {
+      "id": "pklnet",
+      "display_name": "PKLNet",
+      "family": "PKLNet",
+      "modality": "palmprint",
+      "task": "palm keypoint localization and ROI extraction",
+      "task_type": "roi",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/xuliangcs/pklnet",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "MIT",
+        "usage": "code is MIT; source does not presently expose a usable checkpoint link"
+      },
+      "weights": {
+        "availability": "not_available",
+        "format": "pytorch_checkpoint",
+        "artifacts": []
+      },
+      "input_contract": "full hand image; upstream keypoint contract",
+      "output_contract": "palm keypoints and ROI geometry",
+      "npu_status": "unknown",
+      "notes": "README mentions net_params_500.pth but no verifiable artifact URL is present."
+    },
+    {
+      "id": "co3net",
+      "display_name": "CO3Net",
+      "family": "CO3Net",
+      "modality": "palmprint",
+      "task": "recognition network",
+      "task_type": "embedding",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/Zi-YuanYang/CO3Net",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "usage": "no explicit repository license or pretrained checkpoint was verified"
+      },
+      "weights": {
+        "availability": "not_available",
+        "format": "pytorch_checkpoint",
+        "artifacts": []
+      },
+      "input_contract": "recover from source if an authorized checkpoint becomes available",
+      "output_contract": "recover from source if an authorized checkpoint becomes available",
+      "npu_status": "unknown",
+      "notes": "Repository publishes code and dataset splits, not a verifiable pretrained model."
+    },
+    {
+      "id": "tpa_cnn",
+      "display_name": "TPA-CNN",
+      "family": "TPA-CNN",
+      "modality": "palmprint",
+      "task": "two-branch feature/classification network",
+      "task_type": "classifier",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/marjanstoimchev/tpa-cnn",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "MIT",
+        "usage": "code is MIT; the current repository exposes training code but no palmprint checkpoint"
+      },
+      "weights": {
+        "availability": "not_available",
+        "format": "pytorch_checkpoint",
+        "artifacts": []
+      },
+      "input_contract": "two RGB branches (full image and patch); recover from source",
+      "output_contract": "1024-D feature/classification output; no verified checkpoint",
+      "npu_status": "unknown",
+      "notes": "README describes training outputs under a local saved_models directory, not a downloadable release asset."
+    },
+    {
+      "id": "robust_palm_roi",
+      "display_name": "RobustPalmRoi",
+      "family": "RobustPalmRoi",
+      "modality": "palmprint",
+      "task": "ROI extraction",
+      "task_type": "roi",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/leosocy/RobustPalmRoi",
+        "revision": "master"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "usage": "ROI source is recorded for audit; no verifiable model checkpoint or license metadata was found"
+      },
+      "weights": {
+        "availability": "not_available",
+        "format": "c++/model-dependent",
+        "artifacts": []
+      },
+      "input_contract": "uncontrolled full-hand mobile image",
+      "output_contract": "palm ROI geometry, not an identity embedding",
+      "npu_status": "unknown",
+      "notes": "ROI-only candidate; identity metrics are N/A and no downloadable weight was verified."
+    },
+    {
+      "id": "glnet",
+      "display_name": "GLNet / GLGANet",
+      "family": "GLNet",
+      "modality": "palmprint",
+      "task": "recognition network",
+      "task_type": "embedding",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/Ywatery/GLnet",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "usage": "paper-linked repository currently unavailable; no source, checkpoint, or license can be verified"
+      },
+      "weights": {
+        "availability": "not_available",
+        "format": "unknown",
+        "artifacts": []
+      },
+      "input_contract": "unknown because the paper-linked repository is unavailable",
+      "output_contract": "unknown",
+      "npu_status": "unknown",
+      "notes": "A paper result is not a downloadable model artifact; keep identity metrics N/A."
+    },
+    {
+      "id": "palmwildnet",
+      "display_name": "PalmWildNet",
+      "family": "PalmWildNet",
+      "modality": "palmprint",
+      "task": "video/mobile palmprint recognition",
+      "task_type": "embedding",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/bingolo/PalmWildNet",
+        "revision": "v0.5.0-alpha"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "usage": "source is listed for audit; checkpoint and dataset access terms require independent verification"
+      },
+      "weights": {
+        "availability": "not_available",
+        "format": "unknown",
+        "artifacts": []
+      },
+      "input_contract": "video/mobile capture contract must be recovered from source",
+      "output_contract": "recognition feature contract must be recovered from source",
+      "npu_status": "unknown",
+      "notes": "No verified downloadable weight was recorded in this run; do not compare against fixed ROI embeddings."
+    },
+    {
+      "id": "palmnet",
+      "display_name": "PalmNet",
+      "family": "PalmNet",
+      "modality": "palmprint",
+      "task": "Gabor-PCA convolutional representation",
+      "task_type": "embedding",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/AngeloUNIMI/PalmNet",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "GPL-3.0-only",
+        "usage": "source is GPL-3.0; no verifiable pretrained model was found"
+      },
+      "weights": {
+        "availability": "not_available",
+        "format": "matlab",
+        "artifacts": []
+      },
+      "input_contract": "MATLAB ROI pipeline",
+      "output_contract": "hand-crafted/learned descriptor",
+      "npu_status": "needs_reimplementation",
+      "notes": "Do not incorporate GPL code into the project without an explicit licensing decision."
+    },
+    {
+      "id": "fusionnet",
+      "display_name": "FusionNet",
+      "family": "FusionNet",
+      "modality": "palmprint_plus_finger_texture",
+      "task": "multimodal fusion",
+      "task_type": "embedding",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/AngeloUNIMI/FusionNet",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "GPL-3.0-only",
+        "usage": "source is GPL-3.0; model task is outside the single-palmprint scope"
+      },
+      "weights": {
+        "availability": "repository_asset_unverified",
+        "format": "matlab_mat",
+        "artifacts": [
+          {
+            "url": "https://github.com/AngeloUNIMI/FusionNet/tree/master/Demo/Demo_FusionNet/models",
+            "role": "PCANet fusion artifacts"
+          }
+        ]
+      },
+      "input_contract": "touchless palm and inner-finger texture inputs",
+      "output_contract": "multimodal fusion score",
+      "npu_status": "needs_reimplementation",
+      "notes": "It has MATLAB artifacts but is not comparable to a palmprint-only embedding model."
+    },
+    {
+      "id": "jpfa",
+      "display_name": "JPFA",
+      "family": "JPFA",
+      "modality": "palmprint",
+      "task": "cross-dataset recognition",
+      "task_type": "embedding",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/HuikaiShao/JPFA",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "usage": "no explicit repository license or task-specific checkpoint was verified"
+      },
+      "weights": {
+        "availability": "not_available",
+        "format": "tensorflow_checkpoint",
+        "artifacts": []
+      },
+      "input_contract": "TensorFlow 1.x source contract",
+      "output_contract": "source-defined feature/classification output",
+      "npu_status": "unknown",
+      "notes": "The linked vgg16.npy is a generic initialization, not a trained JPFA recognition checkpoint."
+    },
+    {
+      "id": "ddh",
+      "display_name": "DDH",
+      "family": "Distilled Hashing Coding",
+      "modality": "palmprint",
+      "task": "hash-based recognition",
+      "task_type": "embedding",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/HuikaiShao/DDH",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "usage": "no explicit repository license or task-specific checkpoint was verified"
+      },
+      "weights": {
+        "availability": "not_available",
+        "format": "tensorflow_checkpoint",
+        "artifacts": []
+      },
+      "input_contract": "TensorFlow 1.x source contract",
+      "output_contract": "hash code/recognition output",
+      "npu_status": "unknown",
+      "notes": "The linked vgg16.npy is generic initialization rather than a trained DDH checkpoint."
+    },
+    {
+      "id": "kby_palmprint_sdk",
+      "display_name": "KBY-AI Palmprint SDK",
+      "family": "KBY-AI Palmprint Recognition",
+      "modality": "palmprint",
+      "task": "opaque SDK feature matching",
+      "task_type": "sdk",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/kby-ai/Palmprint-Recognition-Docker",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "LicenseRef-Proprietary",
+        "usage": "per-machine activation license is required from KBY-AI"
+      },
+      "weights": {
+        "availability": "opaque_sdk",
+        "format": "binary_sdk",
+        "artifacts": []
+      },
+      "input_contract": "SDK-defined bytes/image API",
+      "output_contract": "SDK feature and comparison API",
+      "npu_status": "not_supported",
+      "notes": "Bundled binary artifacts are not transparent model checkpoints and cannot be reproducibly exported to OM."
+    },
+    {
+      "id": "kby_palmvein_sdk",
+      "display_name": "KBY-AI Palmvein SDK",
+      "family": "KBY-AI Palmvein Recognition",
+      "modality": "palm_vein",
+      "task": "opaque SDK feature matching",
+      "task_type": "sdk",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://github.com/kby-ai/Palmvein-Recognition-Docker",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "LicenseRef-Proprietary",
+        "usage": "per-machine activation license is required from KBY-AI"
+      },
+      "weights": {
+        "availability": "opaque_sdk",
+        "format": "binary_sdk",
+        "artifacts": []
+      },
+      "input_contract": "SDK-defined vein image API",
+      "output_contract": "SDK feature and comparison API",
+      "npu_status": "not_supported",
+      "notes": "Bundled binary artifacts are not transparent model checkpoints and cannot be reproducibly exported to OM."
+    },
+    {
+      "id": "tencent_palm_ai",
+      "display_name": "Tencent Cloud PalmAI",
+      "family": "Tencent PalmAI",
+      "modality": "palmprint_plus_palm_vein",
+      "task": "cloud dual-modal service",
+      "task_type": "sdk",
+      "comparison_scope": "audit_only",
+      "source": {
+        "url": "https://huggingface.co/Tencent-PalmAI/PalmAI",
+        "revision": "main"
+      },
+      "license": {
+        "spdx": "LicenseRef-Cloud-Service",
+        "usage": "service/API offering; no downloadable model asset was verified"
+      },
+      "weights": {
+        "availability": "not_available",
+        "format": "cloud_service",
+        "artifacts": []
+      },
+      "input_contract": "infrared camera cloud-service input",
+      "output_contract": "cloud-service result",
+      "npu_status": "not_supported",
+      "notes": "A Hugging Face model card exists, but it links to a service and exposes no model files."
+    }
+  ]
+}

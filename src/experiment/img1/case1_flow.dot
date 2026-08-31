@@ -1,238 +1,93 @@
-digraph FaceAttendanceSystem {
-    // 全局图属性
+digraph Case1Flow {
     graph [
-        rankdir = TB,
-        fontname = "Microsoft YaHei",
-        fontsize = 14,
-        label = "基于 RetinaFace 与 ArcFace 的智能人脸识别考勤系统流程图",
-        labelloc = t,
-        splines = spline,
-        nodesep = 0.6,
-        ranksep = 0.7,
-        bgcolor = "#F8F9FA"
+        rankdir=LR,
+        newrank=true,
+        fontname="Microsoft YaHei",
+        fontsize=15,
+        label="案例1：FastAPI、React 与昇腾 NPU 的数据流",
+        labelloc=t,
+        nodesep=0.28,
+        ranksep=0.60,
+        splines=polyline,
+        bgcolor="#FFFFFF"
     ]
-
-    // 全局节点属性
     node [
-        fontname = "Microsoft YaHei",
-        fontsize = 12,
-        style = "filled,rounded",
-        shape = box
+        shape=box,
+        style="filled,rounded",
+        fontname="Microsoft YaHei",
+        fontsize=11,
+        color="#333333",
+        margin="0.12,0.08"
     ]
+    edge [fontname="Microsoft YaHei", fontsize=9, color="#4D4D4D"]
 
-    // 全局边属性
-    edge [
-        fontname = "Microsoft YaHei",
-        fontsize = 10
-    ]
+    H1 [shape=plaintext, fontname="Microsoft YaHei", fontsize=13, fontcolor="#0072B2", label="① 生命周期"]
+    H2 [shape=plaintext, fontname="Microsoft YaHei", fontsize=13, fontcolor="#E69F00", label="② 服务与界面"]
+    H3 [shape=plaintext, fontname="Microsoft YaHei", fontsize=13, fontcolor="#009E73", label="③ 采集与队列"]
+    H4 [shape=plaintext, fontname="Microsoft YaHei", fontsize=13, fontcolor="#CC79A7", label="④ 模型执行"]
+    H5 [shape=plaintext, fontname="Microsoft YaHei", fontsize=13, fontcolor="#56B4E9", label="⑤ 比对与事件"]
 
-    // ─── 起止节点 ───
-    node [shape = oval, fillcolor = "#2C3E50", fontcolor = white, style = filled]
-    Start [label = "系统启动"]
-    End   [label = "系统结束"]
+    Start [shape=oval, fillcolor="#0072B2", fontcolor=white, label="启动"]
+    Init [fillcolor="#56B4E9", label="FastAPI lifespan\n数据库与运行时"]
+    Ready [shape=diamond, fillcolor="#F0E442", label="模型与摄像头\n是否就绪？"]
+    Degraded [fillcolor="#E69F00", label="降级状态\n推理接口 503"]
+    Stop [shape=diamond, fillcolor="#F0E442", label="收到退出信号？"]
+    Release [fillcolor="#999999", fontcolor=white, label="停止摄像头与流\n释放 OM、buffer、ACL"]
+    End [shape=oval, fillcolor="#0072B2", fontcolor=white, label="结束"]
 
-    // ─── 初始化阶段 ───
-    node [shape = box, fillcolor = "#3498DB", fontcolor = white, style = "filled,rounded"]
-    InitACL      [label = "ACL 初始化\nacl.init()"]
-    SetDevice    [label = "绑定 NPU 设备\nacl.rt.set_device()"]
-    CreateCtx    [label = "创建执行上下文\nacl.rt.create_context()"]
-    LoadDetModel [label = "加载检测模型\nface_detection.om\n(640×640 输入)"]
-    LoadRecModel [label = "加载识别模型\nface_recognition.om\n(112×112 输入)"]
-    AllocBuf     [label = "分配 Host/Device 内存缓冲区"]
-    InitDB       [label = "初始化 SQLite 数据库\nattendance.db"]
-    StartFlask   [label = "启动 Flask Web 服务\n(端口 5000)"]
+    React [fillcolor="#E69F00", label="React 界面\n注册、抓拍、打卡"]
+    Validate [fillcolor="#E69F00", label="FastAPI 校验\n类型、大小、路径"]
+    Response [fillcolor="#56B4E9", label="JSON 响应\n结果或错误"]
 
-    // ─── 主循环 ───
-    node [shape = box, fillcolor = "#27AE60", fontcolor = white, style = "filled,rounded"]
-    OpenCamera   [label = "打开 USB 摄像头\n(640×480 分辨率)"]
-    CaptureFrame [label = "读取视频帧\ncap.read()"]
+    Camera [fillcolor="#009E73", fontcolor=white, label="摄像头帧"]
+    Cache [fillcolor="#009E73", fontcolor=white, label="JPEG 缓存"]
+    Queue [fillcolor="#F0E442", label="单一硬件队列\n串行提交任务"]
 
-    // ─── 判断节点 ───
-    node [shape = diamond, fillcolor = "#E67E22", fontcolor = white, style = filled]
-    FrameOK      [label = "帧读取\n成功？"]
-    FaceFound    [label = "检测到\n人脸？"]
-    SimilarOK    [label = "相似度 ≥\n阈值？"]
-    Dup          [label = "重复打卡\n(间隔内)？"]
-    SysRunning   [label = "系统\n运行中？"]
-    WebRequest   [label = "收到 Web\n请求？"]
+    Detect [fillcolor="#CC79A7", fontcolor=white, label="检测 OM\n640×640"]
+    Crop [fillcolor="#56B4E9", label="最大框裁剪\n边界约束"]
+    Feature [fillcolor="#D55E00", fontcolor=white, label="特征 OM\n112×112"]
 
-    // ─── RetinaFace 检测阶段 ───
-    node [shape = box, fillcolor = "#8E44AD", fontcolor = white, style = "filled,rounded"]
-    PreProcess   [label = "图像预处理\nResize → 640×640\nNormalize"]
-    H2D_Det      [label = "H2D 内存拷贝\n(输入数据 → Device)"]
-    RunDet       [label = "NPU 推理：RetinaFace\nacl.mdl.execute()"]
-    SyncDet      [label = "等待推理完成\nacl.rt.synchronize_stream()"]
-    D2H_Det      [label = "D2H 内存拷贝\n(结果 → Host)"]
-    PostDet      [label = "后处理\nNMS + 解码 BBox\n提取 5 关键点"]
+    Vectors [fillcolor="#56B4E9", label="SQLite\n用户向量"]
+    Similarity [fillcolor="#56B4E9", label="余弦相似度\n最高候选"]
+    Decision [shape=diamond, fillcolor="#F0E442", label="超过阈值？"]
+    Event [fillcolor="#009E73", fontcolor=white, label="考勤事件\n已知用户或教学登记"]
 
-    // ─── 对齐裁剪阶段 ───
-    node [shape = box, fillcolor = "#16A085", fontcolor = white, style = "filled,rounded"]
-    Align        [label = "人脸对齐与裁剪\n(基于 5 关键点仿射变换)\n输出: 112×112 人脸切片"]
+    {rank=same; H1; Start; Init; Ready; Stop; Release; End}
+    {rank=same; H2; React; Validate; Response; Degraded}
+    {rank=same; H3; Camera; Cache; Queue}
+    {rank=same; H4; Detect; Crop; Feature}
+    {rank=same; H5; Vectors; Similarity; Decision; Event}
 
-    // ─── ArcFace 识别阶段 ───
-    node [shape = box, fillcolor = "#C0392B", fontcolor = white, style = "filled,rounded"]
-    H2D_Rec      [label = "H2D 内存拷贝\n(112×112 → Device)"]
-    RunRec       [label = "NPU 推理：ArcFace\nacl.mdl.execute()"]
-    SyncRec      [label = "等待推理完成\nacl.rt.synchronize_stream()"]
-    D2H_Rec      [label = "D2H 内存拷贝\n(Embedding → Host)"]
-    GetEmbed     [label = "获取 512 维特征向量\n(Embedding)"]
+    H1 -> H2 [style=invis, weight=100]
+    H2 -> H3 [style=invis, weight=100]
+    H3 -> H4 [style=invis, weight=100]
+    H4 -> H5 [style=invis, weight=100]
 
-    // ─── 特征比对阶段 ───
-    node [shape = box, fillcolor = "#2980B9", fontcolor = white, style = "filled,rounded"]
-    LoadDB       [label = "从 SQLite 读取\n所有已注册用户 Embedding"]
-    CosSim       [label = "计算余弦相似度\n(当前向量 vs 全库向量)"]
-    FindBest     [label = "找出最高相似度\n及对应用户"]
+    Start -> Init [constraint=false]
+    Init -> Ready [constraint=false]
+    Ready -> React [label="是", constraint=false]
+    Ready -> Degraded [label="否", constraint=false]
+    Degraded -> React [style=dashed, label="页面可用", constraint=false]
+    React -> Validate [label="HTTP", constraint=false]
+    Validate -> Queue [label="注册/打卡", constraint=false]
+    Queue -> Detect [constraint=false]
+    Detect -> Crop [constraint=false]
+    Crop -> Feature [constraint=false]
+    Feature -> Vectors [constraint=false]
+    Vectors -> Similarity [constraint=false]
+    Similarity -> Decision [constraint=false]
+    Decision -> Event [label="是；或自动登记", constraint=false]
+    Decision -> Response [label="否：手动请求", constraint=false]
+    Event -> Response [constraint=false]
+    Response -> React [style=dashed, label="JSON", constraint=false]
 
-    // ─── 考勤记录阶段 ───
-    node [shape = box, fillcolor = "#27AE60", fontcolor = white, style = "filled,rounded"]
-    WriteRecord  [label = "写入考勤记录\n(姓名 + 时间戳 + 截图)\n存入 SQLite"]
-    DrawResult   [label = "在帧上绘制识别结果\n(人脸框 + 姓名 + 相似度)"]
+    Init -> Camera [style=dashed, label="启动采集", constraint=false]
+    Camera -> Cache [constraint=false]
+    Cache -> Queue [style=dashed, label="自动考勤", constraint=false]
+    Cache -> React [style=dashed, label="MJPEG", constraint=false]
 
-    // ─── Web 路由处理 ───
-    node [shape = box, fillcolor = "#7F8C8D", fontcolor = white, style = "filled,rounded"]
-    WebRegister  [label = "用户注册\n上传照片 / 摄像头抓拍\n提取并存储 Embedding"]
-    WebAttend    [label = "查询考勤记录\n返回 JSON"]
-    WebConfig    [label = "调整配置\n(阈值 / 打卡间隔)"]
-    WebStream    [label = "视频流推送\nMJPEG 流"]
-
-    // ─── 资源释放 ───
-    node [shape = box, fillcolor = "#95A5A6", fontcolor = white, style = "filled,rounded"]
-    RelModel     [label = "卸载模型\nacl.mdl.unload()"]
-    RelMem       [label = "释放 Device 内存\nacl.rt.free()"]
-    RelCtx       [label = "销毁上下文与设备\nacl.rt.destroy_context()\nacl.finalize()"]
-
-    // ═══════════════════════════════════
-    //            主流程连线
-    // ═══════════════════════════════════
-
-    Start        -> InitACL
-    InitACL      -> SetDevice
-    SetDevice    -> CreateCtx
-    CreateCtx    -> LoadDetModel
-    LoadDetModel -> LoadRecModel
-    LoadRecModel -> AllocBuf
-    AllocBuf     -> InitDB
-    InitDB       -> StartFlask
-    StartFlask   -> OpenCamera
-    OpenCamera   -> CaptureFrame
-
-    CaptureFrame -> FrameOK
-    FrameOK      -> PreProcess   [xlabel = "是"]
-    FrameOK      -> CaptureFrame [xlabel = "否（重试）", style = dashed]
-
-    // RetinaFace 检测流水线
-    PreProcess -> H2D_Det -> RunDet -> SyncDet -> D2H_Det -> PostDet
-    PostDet    -> FaceFound
-    FaceFound  -> Align      [xlabel = "是"]
-    FaceFound  -> DrawResult [xlabel = "否（无人脸）", style = dashed]
-
-    // ArcFace 识别流水线
-    Align -> H2D_Rec -> RunRec -> SyncRec -> D2H_Rec -> GetEmbed
-
-    // 特征比对流水线
-    GetEmbed -> LoadDB -> CosSim -> FindBest
-    FindBest  -> SimilarOK
-    SimilarOK -> Dup        [xlabel = "是（身份确认）"]
-    SimilarOK -> DrawResult [xlabel = "否（陌生人）", style = dashed]
-
-    Dup -> WriteRecord [xlabel = "否（首次/超间隔）"]
-    Dup -> DrawResult  [xlabel = "是（跳过）", style = dashed]
-
-    WriteRecord -> DrawResult
-
-    // 帧展示与循环
-    DrawResult -> SysRunning
-    SysRunning -> CaptureFrame [xlabel = "是（继续）"]
-    SysRunning -> RelModel     [xlabel = "否（退出）"]
-
-    // ─── Web 并发处理（与主循环并行）───
-    StartFlask  -> WebRequest  [style = dashed, color = "#7F8C8D", xlabel = "并行线程"]
-    WebRequest  -> WebRegister [xlabel = "/user_management"]
-    WebRequest  -> WebAttend   [xlabel = "/attendance"]
-    WebRequest  -> WebConfig   [xlabel = "/config"]
-    WebRequest  -> WebStream   [xlabel = "/video_feed"]
-
-    // 用户注册写回数据库
-    WebRegister -> InitDB [style = dashed, color = "#7F8C8D", xlabel = "写入 Embedding"]
-
-    // ─── 资源释放 ───
-    RelModel -> RelMem -> RelCtx -> End
-
-    // ═══════════════════════════════════
-    //            分组（子图）
-    // ═══════════════════════════════════
-
-    subgraph cluster_init {
-        label = "① 系统初始化"
-        fontcolor = "#2C3E50"
-        style = "dashed"
-        color = "#3498DB"
-        InitACL; SetDevice; CreateCtx;
-        LoadDetModel; LoadRecModel; AllocBuf;
-        InitDB; StartFlask
-    }
-
-    subgraph cluster_capture {
-        label = "② 视频采集"
-        fontcolor = "#2C3E50"
-        style = "dashed"
-        color = "#27AE60"
-        OpenCamera; CaptureFrame; FrameOK
-    }
-
-    subgraph cluster_detection {
-        label = "③ RetinaFace 人脸检测（NPU）"
-        fontcolor = "#2C3E50"
-        style = "dashed"
-        color = "#8E44AD"
-        PreProcess; H2D_Det; RunDet; SyncDet; D2H_Det; PostDet; FaceFound
-    }
-
-    subgraph cluster_align {
-        label = "④ 对齐与裁剪"
-        fontcolor = "#2C3E50"
-        style = "dashed"
-        color = "#16A085"
-        Align
-    }
-
-    subgraph cluster_recognition {
-        label = "⑤ ArcFace 特征提取（NPU）"
-        fontcolor = "#2C3E50"
-        style = "dashed"
-        color = "#C0392B"
-        H2D_Rec; RunRec; SyncRec; D2H_Rec; GetEmbed
-    }
-
-    subgraph cluster_matching {
-        label = "⑥ 特征比对（CPU）"
-        fontcolor = "#2C3E50"
-        style = "dashed"
-        color = "#2980B9"
-        LoadDB; CosSim; FindBest; SimilarOK; Dup
-    }
-
-    subgraph cluster_record {
-        label = "⑦ 考勤记录"
-        fontcolor = "#2C3E50"
-        style = "dashed"
-        color = "#27AE60"
-        WriteRecord; DrawResult
-    }
-
-    subgraph cluster_web {
-        label = "⑧ Flask Web 服务（并行线程）"
-        fontcolor = "#2C3E50"
-        style = "dashed"
-        color = "#7F8C8D"
-        WebRequest; WebRegister; WebAttend; WebConfig; WebStream
-    }
-
-    subgraph cluster_release {
-        label = "⑨ 资源释放"
-        fontcolor = "#2C3E50"
-        style = "dashed"
-        color = "#95A5A6"
-        RelModel; RelMem; RelCtx
-    }
+    Init -> Stop [style=dashed, constraint=false]
+    Stop -> Camera [label="否", style=dashed, constraint=false]
+    Stop -> Release [label="是", constraint=false]
+    Release -> End [constraint=false]
 }

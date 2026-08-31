@@ -1,3 +1,6 @@
+# Temporary workspace and local experiment outputs
+tmp/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -311,3 +314,19 @@ samples/case3/reports/publication/*
 !samples/case8/weights/
 !samples/case8/weights/README.md
 !samples/case8/weights/export_yolo_to_onnx.py
+
+# case7 tracks only the smart-album model registry contract. Checkpoints,
+# ONNX/OM files, tokenizers, cloned sources and generated reports stay local.
+!samples/case7/models/
+samples/case7/models/*
+!samples/case7/models/README.md
+!samples/case7/models/registry.json
+
+# Case 1 keeps only the model contract in Git; runtime data and reports stay local.
+!samples/case1/models/
+samples/case1/models/*
+!samples/case1/models/README.md
+!samples/case1/data/
+samples/case1/data/*
+!samples/case1/reports/
+samples/case1/reports/*

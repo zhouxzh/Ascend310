@@ -1,0 +1,66 @@
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.tmp-wheel/
+
+# Local React/Vite tooling and generated browser bundle. The bundle is built
+# on the development machine and synchronized manually as documented in README.
+frontend/node_modules/
+frontend/.vite/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
+
+# Downloaded and generated artifacts
+# The parent repository ignores models/ and data/ globally. Re-include only
+# lightweight metadata, then exclude every model/data asset in this project.
+!models/
+models/*
+!models/registry.json
+!models/README.md
+!models/om/
+models/om/*
+!models/om/README.md
+!data/
+data/*
+!data/.gitkeep
+!data/README.md
+!data/dataset_manifest.json
+reports/runs/
+reports/system/
+third_party/
+artifacts/
+data/templates/
+data/templates/*
+data/captures/
+data/captures/*
+data/**/*.jpg
+data/**/*.jpeg
+data/**/*.png
+data/**/*.json
+!data/dataset_manifest.json
+data/**/*.part
+data/**/*.tmp
+
+# Mutable local enrollment/state files and ad-hoc smoke-test output.
+*.sqlite3
+*.sqlite3-*
+*.state
+*.lock
+!requirements/
+!requirements/*.lock
+
+# Shell launch/install/deployment helpers are retained locally for historical
+# board investigations, but are intentionally outside the source release.
+# Production operation uses the Python entry points and manual README steps.
+tools/offline/legacy_shell/
+
+# Ascend compiler/runtime artifacts
+*.om
+*.log
+kernel_meta/
+atc_data/
+palmprint-deploy.tar.gz

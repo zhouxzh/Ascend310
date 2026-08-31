@@ -1,62 +1,54 @@
-digraph FaceAttendanceSystemSimple {
-    // 全局图属性
+digraph Case1FlowSimple {
     graph [
-        rankdir = TB,
-        fontname = "Microsoft YaHei",
-        fontsize = 14,
-        label = "基于 RetinaFace 与 ArcFace 的智能人脸识别考勤系统流程图（简版）",
-        labelloc = t,
-        splines = spline,
-        nodesep = 0.5,
-        ranksep = 0.5,
-        bgcolor = "#F8F9FA"
+        rankdir=TB,
+        fontname="Microsoft YaHei",
+        fontsize=14,
+        label="案例1：边缘人脸考勤的 FastAPI—NPU 流程",
+        labelloc=t,
+        nodesep=0.55,
+        ranksep=0.65,
+        bgcolor="#FFFFFF"
     ]
 
-    // 全局节点属性
     node [
-        fontname = "Microsoft YaHei",
-        fontsize = 12,
-        style = "filled,rounded",
-        shape = box
+        shape=box,
+        style="filled,rounded",
+        fontname="Microsoft YaHei",
+        fontsize=12,
+        color="#333333"
     ]
+    edge [fontname="Microsoft YaHei", fontsize=10, color="#4D4D4D"]
 
-    // 全局边属性
-    edge [
-        fontname = "Microsoft YaHei",
-        fontsize = 10
-    ]
+    Start [shape=oval, fillcolor="#0072B2", fontcolor=white, label="服务启动"]
+    Init [fillcolor="#56B4E9", label="FastAPI lifespan\n数据库、模型与运行时检查"]
+    UI [fillcolor="#E69F00", label="React 界面\n注册、抓拍、手动打卡、记录"]
+    Camera [fillcolor="#009E73", fontcolor=white, label="摄像头采集\n维护最近帧"]
+    Queue [fillcolor="#F0E442", label="单一硬件工作队列\n串行访问摄像头与 NPU"]
+    Detect [fillcolor="#CC79A7", fontcolor=white, label="检测模型\n缩放、推理、后处理"]
+    Embed [fillcolor="#D55E00", fontcolor=white, label="特征模型\n对齐、推理、输出向量"]
+    Match [fillcolor="#56B4E9", label="余弦相似度\n与 SQLite 用户向量比对"]
+    Record [fillcolor="#009E73", fontcolor=white, label="考勤事件\nSQLite 本地保存"]
+    Stream [fillcolor="#E69F00", label="JPEG 缓存\nMJPEG 预览"]
+    Health [fillcolor="#F0E442", label="API 响应\nready / degraded / 业务结果"]
+    Stop [fillcolor="#999999", fontcolor=white, label="停止任务、摄像头、模型与 ACL"]
+    End [shape=oval, fillcolor="#0072B2", fontcolor=white, label="服务结束"]
 
-    // ─── 节点定义 ───
-    Start [shape = oval, fillcolor = "#2C3E50", fontcolor = white, style = filled, label = "系统启动"]
-    End   [shape = oval, fillcolor = "#2C3E50", fontcolor = white, style = filled, label = "系统结束"]
-
-    Init     [fillcolor = "#3498DB", fontcolor = white, label = "系统初始化\n(NPU, 模型加载, 数据库)"]
-    Web      [fillcolor = "#7F8C8D", fontcolor = white, label = "Flask Web 并行服务\n(注册查询/配置管理/视频流)"]
-    
-    Capture  [fillcolor = "#27AE60", fontcolor = white, label = "读取摄像头视频帧"]
-    Detect   [fillcolor = "#8E44AD", fontcolor = white, label = "人脸检测 (RetinaFace)"]
-    Align    [fillcolor = "#16A085", fontcolor = white, label = "人脸对齐与裁剪"]
-    Extract  [fillcolor = "#C0392B", fontcolor = white, label = "特征提取 (ArcFace)"]
-    Match    [fillcolor = "#2980B9", fontcolor = white, label = "特征比对 (数据库查询)"]
-    Record   [fillcolor = "#27AE60", fontcolor = white, label = "记录考勤并绘制结果"]
-    Release  [fillcolor = "#95A5A6", fontcolor = white, label = "系统资源释放"]
-
-    // ─── 流程连接 ───
     Start -> Init
-    Init -> Web [style = dashed, label = "启动后台服务"]
-    Init -> Capture
-    
-    Capture -> Detect
-    Detect -> Align [label = "检测到人脸"]
-    Detect -> Capture [style = dashed, label = "无人脸"]
-    
-    Align -> Extract
-    Extract -> Match
-    Match -> Record [label = "比对成功且非重复"]
-    Match -> Capture [style = dashed, label = "陌生人/重复打卡"]
-    
-    Record -> Capture [label = "继续运行"]
-    Record -> Release [label = "收到退出信号"]
-    
-    Release -> End
+    Init -> Queue
+    Init -> UI [style=dashed, label="静态资源"]
+    Queue -> Camera
+    Camera -> Queue [label="当前帧"]
+    Queue -> Detect
+    Detect -> Embed [label="检测到人脸"]
+    Detect -> Camera [style=dashed, label="无人脸或无效框"]
+    Embed -> Match
+    Match -> Record [label="注册或匹配通过"]
+    Match -> Health [label="未匹配 / 错误"]
+    Record -> Health
+    Camera -> Stream [style=dashed, label="JPEG 缓存"]
+    Stream -> UI [style=dashed, label="/video_feed"]
+    UI -> Queue [style=dashed, label="HTTP 任务"]
+    Health -> UI [style=dashed, constraint=false]
+    Init -> Stop [style=dashed, label="退出信号"]
+    Stop -> End
 }

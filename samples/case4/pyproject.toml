@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68,<76", "wheel>=0.42,<1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "palmprint-workbench"
+version = "1.0.0"
+description = "NPU-only palmprint recognition workbench for Ascend 310B4 / 8T"
+readme = "README.md"
+requires-python = ">=3.9,<3.14"
+authors = [{ name = "Ascend310 samples maintainers" }]
+dependencies = []
+
+[project.optional-dependencies]
+board = [
+  "fastapi==0.115.12",
+  "uvicorn==0.34.3",
+  "python-multipart==0.0.20",
+  "numpy==1.22.4",
+  "pandas==2.0.3",
+  "opencv-python-headless==4.10.0.84",
+  "cryptography==42.0.8",
+]
+dev = [
+  "pytest==8.3.4",
+  "httpx==0.28.1",
+  "tomli==2.2.1; python_version < '3.11'",
+]
+export = [
+  "numpy==2.3.5",
+  "onnx==1.20.1",
+  "onnxruntime==1.24.2",
+  "torch==2.13.0",
+]
+
+[project.scripts]
+palmprint-workbench = "palmprint_workbench.api:main"
+palmprint-verify-assets = "palmprint_workbench.tools.verify_assets:main"
+palmprint-offline-benchmark = "tools.offline.benchmark:main"
+palmprint-prepare-models = "tools.export.prepare_models:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["palmprint_workbench*", "tools*"]
+exclude = ["tools.offline.legacy*", "tools.offline.legacy_shell*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+  "unit: pure-Python tests that do not require an Ascend board",
+  "api: HTTP/API contract tests",
+  "offline: export and reference-model tests",
+  "board: tests that require CANN, PyACL, an OM, or a camera",
+]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100

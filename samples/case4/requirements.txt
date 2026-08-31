@@ -1,8 +1,0 @@
-faiss-cpu>=1.7.0,<2.0
-gradio>=4.0,<6.0
-numpy>=1.21,<2.0
-onnx>=1.14
-opencv-python>=4.8
-Pillow>=9.0
-torch>=2.0
-torchvision>=0.15

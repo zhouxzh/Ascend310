@@ -1,0 +1,18 @@
+# Runtime and private assets
+data/*
+!data/.gitkeep
+reports/*
+models/*
+!models/README.md
+
+# Local Python/tool state
+__pycache__/
+.pytest_cache/
+
+# React/Vite frontend output
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+frontend/*.tsbuildinfo

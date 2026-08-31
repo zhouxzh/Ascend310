@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "path_policy": "Keep caseN paths stable; use slug for display and search.",
+  "cases": [
+    {
+      "id": "case1",
+      "slug": "face-attendance",
+      "title_zh": "人脸考勤",
+      "keywords": ["人脸识别", "考勤", "PyACL"],
+      "source": "src/experiment/case1.md",
+      "sample": "samples/case1",
+      "layout_status": "migrated"
+    },
+    {
+      "id": "case2",
+      "slug": "object-tracking",
+      "title_zh": "目标跟踪",
+      "keywords": ["目标检测", "多目标跟踪", "DeepSORT"],
+      "source": "src/experiment/case2.md",
+      "sample": "samples/case2",
+      "layout_status": "planned"
+    },
+    {
+      "id": "case3",
+      "slug": "ddsp-music-workstation",
+      "title_zh": "DDSP 音乐工作站",
+      "keywords": ["Piano-DDSP", "MIDI", "音频合成"],
+      "source": "src/experiment/case3.md",
+      "sample": "samples/case3",
+      "layout_status": "planned"
+    },
+    {
+      "id": "case4",
+      "slug": "palmprint-workbench",
+      "title_zh": "掌纹识别工作台",
+      "keywords": ["掌纹识别", "ROI", "FAISS"],
+      "source": "src/experiment/case4.md",
+      "sample": "samples/case4",
+      "layout_status": "planned"
+    },
+    {
+      "id": "case5",
+      "slug": "signal-analysis",
+      "title_zh": "信号采集与时频分析",
+      "keywords": ["数据采集", "DFT", "时频分析"],
+      "source": "src/experiment/case5.md",
+      "sample": "samples/case5",
+      "layout_status": "planned"
+    },
+    {
+      "id": "case6",
+      "slug": "smart-car-vision",
+      "title_zh": "智能小车视觉",
+      "keywords": ["车道线", "场景分类", "视觉感知"],
+      "source": "src/experiment/case6.md",
+      "sample": "samples/case6",
+      "layout_status": "planned"
+    },
+    {
+      "id": "case7",
+      "slug": "smart-album",
+      "title_zh": "智能相册",
+      "keywords": ["语义检索", "图像索引", "FAISS"],
+      "source": "src/experiment/case7.md",
+      "sample": "samples/case7",
+      "layout_status": "planned"
+    },
+    {
+      "id": "case8",
+      "slug": "gesture-detection",
+      "title_zh": "手势检测",
+      "keywords": ["HaGRID", "YOLO", "WebRTC"],
+      "source": "src/experiment/case8.md",
+      "sample": "samples/case8",
+      "layout_status": "planned"
+    },
+    {
+      "id": "case9",
+      "slug": "rag-gateway",
+      "title_zh": "RAG 网关",
+      "keywords": ["小智", "OpenAI 兼容", "检索增强"],
+      "source": "src/experiment/case9.md",
+      "sample": "samples/case9",
+      "layout_status": "planned"
+    }
+  ]
+}

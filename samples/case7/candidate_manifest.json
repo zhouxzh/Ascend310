@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "upstream_revisions": {
+    "mobileclip": "aecfb5453d022e9deff12f81a150ea8f35194baa",
+    "chinese_clip": "31863c707501bf1605d36842f43deb78793dbc5d"
+  },
+  "models": [
+    {
+      "model_id": "mobileclip_s0__npu__mixed_fp16",
+      "display_name": "MobileCLIP-S0",
+      "source": "https://github.com/apple/ml-mobileclip",
+      "revision": "aecfb5453d022e9deff12f81a150ea8f35194baa",
+      "checkpoint_repository": "apple/MobileCLIP-S0",
+      "license": "Apple Machine Learning Research Model License",
+      "usage": "non-commercial research and education only",
+      "languages": [
+        "en",
+        "general"
+      ],
+      "embedding_dim": 512,
+      "tokenizer": {
+        "path": "models/tokenizers/mobileclip_s0/tokenizer.json",
+        "context_length": 77,
+        "pad_token_id": 0,
+        "sha256": "b556ac8c99757ffb677208af34bc8c6721572114111a6e0aaf5fa69ff0b8d842"
+      },
+      "image_preprocess": {
+        "size": 256,
+        "mean": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "std": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "input_color": "RGB"
+      },
+      "components": {
+        "image": {
+          "onnx": "models/onnx/mobileclip_s0_image.onnx",
+          "om": "models/om/mobileclip_s0_image.om",
+          "input_name": "image",
+          "input_shape": [
+            1,
+            3,
+            256,
+            256
+          ],
+          "input_dtype": "float32",
+          "output_dtype": "float32",
+          "onnx_sha256": "baaffc19bb5af33aa3ec05180e9e9c43c4a1f01a3ea1b64737aaaf325dca1b79",
+          "precision_mode": "allow_fp32_to_fp16",
+          "om_sha256": "4ba82838bcb13c1542b2e0b5cebb30ef754abdc2745663f92f9becc5ce943517"
+        },
+        "text": {
+          "onnx": "models/onnx/mobileclip_s0_text.onnx",
+          "om": "models/om/mobileclip_s0_text.om",
+          "input_name": "text",
+          "input_shape": [
+            1,
+            77
+          ],
+          "input_dtype": "int64",
+          "output_dtype": "float32"
+        }
+      },
+      "precision_mode": "allow_fp32_to_fp16",
+      "status": "candidate",
+      "precision_strategy": {
+        "kind": "selective_mixed_precision",
+        "candidate_id": "C0",
+        "om_sha256": "4ba82838bcb13c1542b2e0b5cebb30ef754abdc2745663f92f9becc5ce943517"
+      }
+    },
+    {
+      "model_id": "chinese_clip_rn50__npu__mixed_fp16",
+      "display_name": "Chinese-CLIP RN50",
+      "source": "https://github.com/OFA-Sys/Chinese-CLIP",
+      "revision": "31863c707501bf1605d36842f43deb78793dbc5d",
+      "checkpoint_repository": "OFA-Sys/chinese-clip-rn50",
+      "license": "MIT",
+      "usage": "research and education",
+      "languages": [
+        "zh"
+      ],
+      "embedding_dim": 1024,
+      "tokenizer": {
+        "path": "models/tokenizers/chinese_clip_rn50/vocab.txt",
+        "kind": "bert",
+        "context_length": 52,
+        "pad_token": "[PAD]",
+        "cls_token": "[CLS]",
+        "sep_token": "[SEP]",
+        "unk_token": "[UNK]",
+        "sha256": "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c"
+      },
+      "image_preprocess": {
+        "size": 224,
+        "mean": [
+          0.48145466,
+          0.4578275,
+          0.40821073
+        ],
+        "std": [
+          0.26862954,
+          0.26130258,
+          0.27577711
+        ],
+        "input_color": "RGB"
+      },
+      "components": {
+        "image": {
+          "onnx": "models/onnx/chinese_clip_rn50.img.fp32.onnx",
+          "om": "models/om/chinese_clip_rn50_image.om",
+          "input_name": "image",
+          "input_shape": [
+            1,
+            3,
+            224,
+            224
+          ],
+          "input_dtype": "float32",
+          "output_dtype": "float32"
+        },
+        "text": {
+          "onnx": "models/onnx/chinese_clip_rn50.txt.fp32.onnx",
+          "om": "models/om/chinese_clip_rn50_text.om",
+          "input_name": "text",
+          "input_shape": [
+            1,
+            52
+          ],
+          "input_dtype": "int64",
+          "output_dtype": "float32"
+        }
+      },
+      "precision_mode": "allow_fp32_to_fp16",
+      "status": "candidate"
+    },
+    {
+      "model_id": "resnet50_feature__npu__mixed_fp16",
+      "display_name": "ResNet50 visual similarity",
+      "source": "torchvision.models.ResNet50_Weights.IMAGENET1K_V1",
+      "revision": "torchvision-0.16.0",
+      "license": "BSD-3-Clause code; ImageNet weights for research/education",
+      "usage": "legacy visual-similarity compatibility",
+      "languages": [],
+      "embedding_dim": 2048,
+      "image_preprocess": {
+        "size": 224,
+        "mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "input_color": "RGB"
+      },
+      "components": {
+        "image": {
+          "onnx": "models/onnx/resnet50_feature.onnx",
+          "om": "models/om/resnet50_feature.om",
+          "input_name": "input",
+          "input_shape": [
+            1,
+            3,
+            224,
+            224
+          ],
+          "input_dtype": "float32",
+          "output_dtype": "float32"
+        }
+      },
+      "precision_mode": "allow_fp32_to_fp16",
+      "status": "candidate"
+    }
+  ]
+}
