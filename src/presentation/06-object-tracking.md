@@ -1,11 +1,13 @@
 ---
 marp: true
 size: 16:9
-theme: default
+theme: ascend310
 paginate: true
 header: "昇腾310B 8周教学"
 footer: "第6周：目标跟踪"
 ---
+
+<!-- _class: cover -->
 
 # 第6周：目标跟踪
 
@@ -64,6 +66,16 @@ footer: "第6周：目标跟踪"
 
 ---
 
+<!-- _class: visual -->
+
+## 案例2仓库图：跟踪质量主线
+
+![目标跟踪质量主线](../experiment/img2/主线图.png)
+
+<div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img2/%E4%B8%BB%E7%BA%BF%E5%9B%BE.png">src/experiment/img2/主线图.png</a>；正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case2.md">src/experiment/case2.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case2">samples/case2/</a></div>
+
+---
+
 ## 硬件与运行条件
 
 | 条件 | 说明 |
@@ -107,6 +119,22 @@ case2/
 ```
 
 `scripts/` 是运行入口，`ssdlite/`、`tracking/`、`utils/` 是支撑模块。
+
+---
+
+<!-- _class: compact -->
+
+## 案例2源码地图：入口、检测与跟踪
+
+```text
+samples/case2/
+├── scripts/detection_app.py       采集 -> 检测 -> 可视化
+├── scripts/tracking_app.py        检测结果 -> tracker.update
+├── ssdlite/{decoder,npu_backend}.py  后端与 SSD 解码
+└── tracking/{deepsort,kalman_filter}.py  轨迹状态
+```
+
+<div class="source">源码：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case2">samples/case2/</a>；入口合同：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case2/README.md">samples/case2/README.md</a></div>
 
 ---
 
@@ -244,6 +272,8 @@ SSD 是 Single Shot MultiBox Detector，典型一阶段检测器：
 SSD 推理速度快、结构直接，但对小目标、密集目标和复杂遮挡的稳定性不如更新的检测器。
 
 ---
+
+<!-- _class: compact -->
 
 ## NMS 为什么重要
 
@@ -781,6 +811,8 @@ annotated = draw_tracks(...)
 
 ---
 
+<!-- _class: tight -->
+
 ## Tracking 常用命令
 
 NPU 摄像头跟踪：
@@ -838,6 +870,8 @@ NPU 和实时摄像头操作属于板端操作。
 默认值来自 `tracking_app.py` 的真实 argparse 定义。
 
 ---
+
+<!-- _class: compact -->
 
 ## DeepSORT.update 的主线
 

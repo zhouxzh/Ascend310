@@ -60,6 +60,7 @@ export default sidebar({
       collapsible: true,
       children: [
         "README.md",
+        { text: "00 · 仓库内容地图", link: "00-repository-map.md" },
         "01-hardware-basics.md",
         "02-linux-commands.md",
         "03-python-basics.md",

@@ -1,11 +1,12 @@
 ---
 marp: true
 size: 16:9
-theme: default
+theme: ascend310
 paginate: true
 header: "昇腾310B 8周教学"
 footer: "第2周：Linux命令基础"
 ---
+<!-- _class: cover -->
 
 # 第2周：Linux命令基础
 
@@ -22,6 +23,27 @@ footer: "第2周：Linux命令基础"
 | 第1课时 | 45分钟 | Shell 与命令安全 | 命令四问、路径、权限、删除边界 |
 | 第2课时 | 45分钟 | 文件、权限与软件 | 权限、APT、Conda、Python 路径 |
 | 第3课时 | 45分钟 | CANN、服务与日志 | CANN 环境、npu-smi、ATC、进程、日志、有序停止 |
+
+---
+
+## 串口登录：板端的第一条可复现路径
+
+<figure>
+<img src="../appendix/img1/serial.png" alt="Orange Pi AIpro 串口登录终端">
+<figcaption>Micro USB 串口登录示例，速率 115200；来源：<a href="../appendix/appendix1.md">src/appendix/appendix1.md</a>；图片：<code>src/appendix/img1/serial.png</code></figcaption>
+</figure>
+
+---
+
+## Linux 练习对应的仓库入口
+
+| 练习 | 源文件/目录 | 证据边界 |
+| --- | --- | --- |
+| 命令四问与路径安全 | <a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a> | 本地命令与路径检查 |
+| CANN/NPU 快速诊断 | <a href="../../samples/chapter5/check_cann.py"><code>samples/chapter5/check_cann.py</code></a> | 必须在板端运行 |
+| WebRTC 设备与日志 | <a href="../../samples/chapter5/WebRTC/"><code>samples/chapter5/WebRTC/</code></a> | 摄像头/编码器板端证据 |
+
+来源索引：<a href="../appendix/appendix2.md">附录2</a> · <a href="../appendix/appendix5.md">附录5</a> · <a href="../../samples/README.md">samples/README.md</a>
 
 ---
 

@@ -1,11 +1,13 @@
 ---
 marp: true
 size: 16:9
-theme: default
+theme: ascend310
 paginate: true
 header: "昇腾310B 8周教学"
 footer: "第5周：人脸识别"
 ---
+
+<!-- _class: cover -->
 
 # 第5周：人脸识别
 
@@ -55,6 +57,16 @@ footer: "第5周：人脸识别"
 
 ---
 
+<!-- _class: visual -->
+
+## 案例1仓库流程图：采集到打卡
+
+![案例1详细流程](../experiment/img1/case1_flow.png)
+
+<div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img1/case1_flow.png">src/experiment/img1/case1_flow.png</a>；正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case1.md">src/experiment/case1.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case1">samples/case1/</a></div>
+
+---
+
 ## 系统四层架构
 
 1. 采集层：板端 `VideoCamera` 读取摄像头帧并维护最近一帧；React 可用浏览器摄像头或上传图像生成输入。
@@ -96,6 +108,23 @@ FastAPI 应用工厂
 ```
 
 解释：FastAPI 层不重复实现推理算法；摄像头和 NPU 都归单一硬件工作队列管理，MJPEG 客户端只读取缓存 JPEG，连接数增加不会自动增加 NPU 推理次数。
+
+---
+
+<!-- _class: compact -->
+
+## 案例1源码地图：入口到 NPU
+
+```text
+samples/case1/
+├── app.py                         FastAPI launcher
+├── face_attendance/api.py         routes + lifecycle
+├── face_attendance/inference.py   preprocess + detect/embed
+├── face_attendance/runtime.py     PyACL model execution
+└── frontend/src/App.tsx           React workflow UI
+```
+
+<div class="source">源码：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case1">samples/case1/</a>；合同：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case1/docs/01-model-contract.md">docs/01-model-contract.md</a></div>
 
 ---
 
@@ -143,6 +172,8 @@ FastAPI 应用工厂
 解释：摄像头帧通常以 BGR 排列进入 OpenCV，代码先缩放、归一化，再转成 `NCHW`。检测和特征模型各有一组固定输入形状；这些尺寸和归一化常数属于运行时合同，改变任何一项都要重新做输入输出检查和数值烟测。
 
 ---
+
+<!-- _class: tight -->
 
 ## 检测输出合同
 

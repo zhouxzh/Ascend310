@@ -1,11 +1,12 @@
 ---
 marp: true
 size: 16:9
-theme: default
+theme: ascend310
 paginate: true
 header: "昇腾310B 8周教学"
 footer: "第4周：Vibe Coding基础"
 ---
+<!-- _class: cover -->
 
 # 第4周：Vibe Coding基础
 
@@ -24,6 +25,27 @@ footer: "第4周：Vibe Coding基础"
 | 第1课时 | 45分钟 | Vibe Coding 与 Agent 概念 | 人机分工、Agent 四部分、DSH 工作循环 |
 | 第2课时 | 45分钟 | DSH 配置与安全 | 环境确认、模型与工作区、安全规则 |
 | 第3课时 | 45分钟 | 提示词设计与代码审查 | 提示词五要素、生成脚本、验收与审查 |
+
+---
+
+## DSH 工作区：先看真实工具状态
+
+<figure>
+<img src="../appendix/img4/dsh-webui-main.png" alt="DeepSeek Harness DSH Web UI 工作区">
+<figcaption>DSH 工作区与模型配置界面；来源：<a href="../appendix/appendix4.md">src/appendix/appendix4.md</a>；图片：<code>src/appendix/img4/dsh-webui-main.png</code></figcaption>
+</figure>
+
+---
+
+## 本周实战的输入、输出与边界
+
+| 环节 | 仓库对象 | 约束 |
+| --- | --- | --- |
+| 输入 | <a href="../../samples/case7/models/registry.json"><code>samples/case7/models/registry.json</code></a> | 只读真实注册表 |
+| 生成脚本 | `tmp/week04/<姓名>/vibe_read_fusion.py` | 只用 `json` 与 `pathlib` |
+| 验证 | <a href="../../samples/case1/fusion_result.json"><code>samples/case1/fusion_result.json</code></a> | 自己运行并核对字段 |
+
+来源索引：<a href="../appendix/appendix4.md">附录4</a> · <a href="../../samples/case7/models/registry.json">samples/case7/models/registry.json</a> · <a href="../../samples/case1/fusion_result.json">samples/case1/fusion_result.json</a>
 
 ---
 

@@ -1,11 +1,13 @@
 ---
 marp: true
 size: 16:9
-theme: default
+theme: ascend310
 paginate: true
 header: "昇腾310B 8周教学"
 footer: "第8周：聊天机器人"
 ---
+
+<!-- _class: cover -->
 
 # 第8周：聊天机器人
 
@@ -71,20 +73,42 @@ footer: "第8周：聊天机器人"
 
 ---
 
-## 候选架构
+## 候选架构：服务链与 NPU 边界
 
-```mermaid
-flowchart LR
-    browser[浏览器文字 UI :7868] --> gateway[候选网关 :7867]
-    gateway --> worker[活动 Profile 服务 :8090]
-    worker --> ms[MindSpore]
-    ms --> npu[Ascend NPU]
-    ctl[板端 case9-modelctl] --> worker
-    formal[正式网关 :7861] --> acl[Qwen2.5 ACL :8080]
-    acl --> npu
-```
+本页的端口和互斥关系来自 Case9；下面的仓库图示用于对照同一仓库中已经落地的 ONNX → OM → NPU 部署边界。Marp 不把 Mermaid 代码自动绘制成图，因此不把代码块冒充流程图。
+
+![仓库中的 NPU 部署架构图](../experiment/img8/case8_system_arch.png)
+
+<div class="source">图示参考：`src/experiment/img8/case8_system_arch.png`；Case9 架构正文：`src/experiment/case9.md`；实现：`samples/case9/`</div>
 
 浏览器没有模型管理接口；Profile 切换只能在板端执行 `case9-modelctl`。网关密钥只存在板端环境，不会发送给浏览器。
+
+---
+
+<!-- _class: visual -->
+
+## 仓库部署图例：ONNX → OM → NPU
+
+![ONNX 到 OM 的转换与 NPU 推理边界](../experiment/img8/case8_model_conversion.png)
+
+<div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img8/case8_model_conversion.png">src/experiment/img8/case8_model_conversion.png</a>（案例8）；本周 Case9 架构正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case9.md">src/experiment/case9.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case9">samples/case9/</a></div>
+
+---
+
+<!-- _class: compact -->
+
+## 案例9源码地图：网关、服务与 runtime
+
+```text
+samples/case9/
+├── app.py                         Bearer/OpenAI gateway
+├── mindspore_chat_service.py     candidate worker service
+├── acl_om_service.py             loopback ACL/OM service
+├── tinyllama_acl_runtime.py      ACL runtime + contract checks
+└── text_chat_app.py               browser text UI
+```
+
+<div class="source">源码：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case9">samples/case9/</a>；架构与门禁：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case9.md">src/experiment/case9.md</a></div>
 
 ---
 

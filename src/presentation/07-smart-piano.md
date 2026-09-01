@@ -1,11 +1,13 @@
 ---
 marp: true
 size: 16:9
-theme: default
+theme: ascend310
 paginate: true
 header: "昇腾310B 8周教学"
 footer: "第7周：智能电子琴"
 ---
+
+<!-- _class: cover -->
 
 # 第7周：智能电子琴
 
@@ -81,6 +83,33 @@ $$
 - 网络分为全局上下文分支和共享权重的单声部分支，并行描述最多 16 个声部
 - 为流式部署，循环状态被显式化为输入输出；面向 Ascend 时 GRU 等价展开为矩阵乘、门控激活和逐元素运算
 - 发布模型版本为 `model-suite-v1.0.1`，部署合同为 FP32、opset 13、batch 1、每调用 1 帧、`250 Hz`、`16 kHz`、最多 16 声部
+
+---
+
+<!-- _class: visual -->
+
+## 仓库网络图：Piano-DDSP 的状态边界
+
+![Piano-DDSP 网络与 CPU 合成边界](../experiment/img3/case3-piano-ddsp-architecture.png)
+
+<div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img3/case3-piano-ddsp-architecture.png">src/experiment/img3/case3-piano-ddsp-architecture.png</a>；正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case3.md">src/experiment/case3.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case3/piano_ddsp_runtime">samples/case3/piano_ddsp_runtime/</a></div>
+
+---
+
+<!-- _class: compact -->
+
+## 案例3源码地图：模型、状态与 WebUI
+
+```text
+samples/case3/
+├── prepare_piano_ddsp_models.py   model release + ATC args
+├── pyacl_ddsp.py                  Feature/Control ACL contract
+├── piano_ddsp_runtime/worker.py   realtime state + scheduling
+├── midi_ddsp_realtime.py          MIDI-DDSP offline renderer
+└── webui/src/App.tsx              browser workbench
+```
+
+<div class="source">源码：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case3">samples/case3/</a>；模型合同：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/04-piano-ddsp.md">doc/04-piano-ddsp.md</a></div>
 
 ---
 

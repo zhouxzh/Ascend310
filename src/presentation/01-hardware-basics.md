@@ -1,11 +1,12 @@
 ---
 marp: true
 size: 16:9
-theme: default
+theme: ascend310
 paginate: true
 header: "昇腾310B 8周教学"
 footer: "第1周：昇腾310B硬件基础"
 ---
+<!-- _class: cover -->
 
 # 第1周：昇腾310B硬件基础
 
@@ -24,6 +25,27 @@ footer: "第1周：昇腾310B硬件基础"
 ## 课程目标：建立一条可复现的验证路线
 
 本课程的重点是建立从硬件、系统、网络到NPU环境的可复现路径。学完本周内容后，学生应能回答附录2给出的四个审查问题：命令运行在哪台机器和哪个环境中、输入输出路径是什么、这一步验证的是语法、路由、转换、数值、性能还是硬件现象、命令是否会安装软件或修改系统状态。这四个问题会贯穿后续章节和案例。
+
+---
+
+## 实验板实物：Orange Pi AIpro（8T）
+
+<figure>
+<img src="../appendix/img1/aipro.png" alt="Orange Pi AIpro（8T）开发板">
+<figcaption>板级实物图：后续接口、启动介质和 CANN/NPU 检查都以这块实验板为对象。来源：<a href="../appendix/appendix1.md">src/appendix/appendix1.md</a>；图片：<code>src/appendix/img1/aipro.png</code></figcaption>
+</figure>
+
+---
+
+## 本周仓库入口
+
+| 学习对象 | 可直接打开的仓库文件 |
+| --- | --- |
+| 板卡、配件、拨码与串口 | <a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> |
+| ACL 设备枚举样例 | <a href="../../samples/chapter4/check_ascend_device/check_ascend_device.py"><code>samples/chapter4/check_ascend_device/check_ascend_device.py</code></a> |
+| ONNX → OM 转换示例 | <a href="../../samples/chapter4/resnet18/"><code>samples/chapter4/resnet18/</code></a> |
+
+来源索引：<a href="../appendix/README.md">src/appendix/README.md</a> · <a href="../../samples/README.md">samples/README.md</a>
 
 ---
 

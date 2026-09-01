@@ -1,11 +1,12 @@
 ---
 marp: true
 size: 16:9
-theme: default
+theme: ascend310
 paginate: true
 header: "昇腾310B 8周教学"
 footer: "第3周：Python编程基础"
 ---
+<!-- _class: cover -->
 
 # 第3周：Python编程基础
 
@@ -13,6 +14,27 @@ footer: "第3周：Python编程基础"
 - 目标：掌握模型部署与样例代码中最常用的 Python 语法和标准库
 - 练习数据：`samples/case1/fusion_result.json`
 - 依赖：仅使用 Python 标准库，不使用 pandas
+
+---
+
+## 真实训练产物：把曲线当作数据来读
+
+<figure>
+<img src="../../samples/chapter3/ResNet/training_metrics_resnet_npu.png" alt="ResNet NPU 训练准确率与损失曲线">
+<figcaption>ResNet NPU 训练记录（accuracy/loss）；这是训练曲线，不是板端推理性能。来源：<a href="../../samples/chapter3/README.md">samples/chapter3/README.md</a>；图片：<code>samples/chapter3/ResNet/training_metrics_resnet_npu.png</code></figcaption>
+</figure>
+
+---
+
+## 从仓库样例读 Python
+
+| Python 对象 | 实际文件 | 课堂动作 |
+| --- | --- | --- |
+| 嵌套字典与 JSON | <a href="../../samples/case1/fusion_result.json"><code>samples/case1/fusion_result.json</code></a> | 用 `json.loads` 读取并统计 pass |
+| 模型训练脚本 | <a href="../../samples/chapter3/ResNet/resnet_npu.py"><code>samples/chapter3/ResNet/resnet_npu.py</code></a> | 找入口、参数与日志 |
+| 运行时检查 | <a href="../../samples/chapter4/check_ascend_device/check_ascend_device.py"><code>samples/chapter4/check_ascend_device/check_ascend_device.py</code></a> | 区分语法检查和板端 ACL |
+
+来源索引：<a href="../appendix/appendix3.md">src/appendix/appendix3.md</a> · <a href="../../samples/README.md">samples/README.md</a>
 
 ---
 
@@ -235,6 +257,8 @@ resnet50_feature 2048
 ```
 
 ---
+
+<!-- _class: tight -->
 
 # 2.4 while、break 与 continue
 
@@ -474,6 +498,8 @@ True
 
 ---
 
+<!-- _class: tight -->
+
 # 4.1 缺失键与类型转换
 
 模型清单可能来自不同版本的脚本，字段并不总是一致。直接读取缺失字段会触发 `KeyError`，用 `dict.get()` 可以提供默认值。
@@ -570,6 +596,8 @@ mixed_fp16
 读取真实数据时，先确认路径存在，再使用 `Path.open()` 或 `read_text()`，不要用字符串拼接路径去猜层级。
 
 ---
+
+<!-- _class: tight -->
 
 # 4.4 json.loads 与 json.dumps
 

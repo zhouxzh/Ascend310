@@ -1,0 +1,281 @@
+/* @theme ascend310 */
+/* A restrained, source-first Marp theme for the repository's teaching decks. */
+@import 'default';
+
+:root {
+  --ink: #17232b;
+  --muted: #5d6b72;
+  --paper: #f5f8f7;
+  --panel: #ffffff;
+  --teal: #087f73;
+  --teal-dark: #07544f;
+  --amber: #c76b12;
+  --red: #a43b3b;
+  --line: #d4dfdd;
+  --code: #13232a;
+}
+
+section {
+  box-sizing: border-box;
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  padding: 62px 72px 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: "Aptos", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+section::after {
+  color: var(--muted);
+  right: 72px;
+  bottom: 22px;
+  font-size: 14px;
+}
+
+header,
+footer {
+  position: absolute;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+header {
+  top: 24px;
+  left: 72px;
+  font-weight: 600;
+}
+
+footer {
+  right: 72px;
+  bottom: 22px;
+  left: 72px;
+  text-align: left;
+  padding-right: 72px;
+}
+
+h1,
+h2,
+h3 {
+  flex: 0 0 auto;
+  margin: 0 0 0.42em;
+  color: var(--teal-dark);
+  font-weight: 750;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+h1 { font-size: 42px; }
+h2 { font-size: 32px; }
+h3 { font-size: 25px; }
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre {
+  flex: 0 0 auto;
+  margin: 0.35em 0;
+}
+
+ul,
+ol {
+  padding-left: 1.25em;
+}
+
+li { margin: 0.18em 0; }
+
+strong { color: var(--teal-dark); }
+
+blockquote {
+  padding: 0.45em 0.8em;
+  border-left: 5px solid var(--amber);
+  background: #fff8ef;
+  color: #34434a;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  font-size: 17px;
+  line-height: 1.15;
+}
+
+th,
+td {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  vertical-align: top;
+}
+
+th {
+  color: #fff;
+  background: var(--teal);
+  font-weight: 700;
+}
+
+tr:nth-child(even) td { background: #f0f6f4; }
+
+code {
+  color: #075e58;
+  background: #e5f1ef;
+  border-radius: 3px;
+  padding: 0.06em 0.25em;
+}
+
+pre {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 430px;
+  overflow: hidden;
+  padding: 13px 16px;
+  border: 0;
+  border-left: 5px solid var(--teal);
+  border-radius: 5px;
+  background: var(--code);
+  color: #e7f1ef;
+  font-family: "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+  font-size: 15px;
+  line-height: 1.18;
+  white-space: pre-wrap;
+}
+
+pre code {
+  color: inherit;
+  background: transparent;
+  padding: 0;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  max-height: 438px;
+  margin: 0.15em auto;
+  object-fit: contain;
+}
+
+figure {
+  margin: 0;
+  text-align: center;
+}
+
+figcaption {
+  margin-top: 0.2em;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.15;
+}
+
+section.cover,
+section.title {
+  justify-content: center;
+  background: var(--teal-dark);
+  color: #f4fbf9;
+}
+
+section.cover h1,
+section.title h1,
+section.cover h2,
+section.title h2 {
+  color: #fff;
+}
+
+section.cover p,
+section.title p { color: #d9efeb; }
+
+section.section {
+  justify-content: center;
+  background: var(--teal);
+  color: #fff;
+}
+
+section.section h1,
+section.section h2 { color: #fff; }
+
+section.visual {
+  justify-content: center;
+}
+
+section.visual h2,
+section.visual h3 { margin-bottom: 0.22em; }
+
+section.visual img { max-height: 500px; }
+
+.source {
+  position: absolute;
+  right: 72px;
+  bottom: 45px;
+  left: 72px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.source a {
+  color: var(--teal);
+  text-decoration: none;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+  min-height: 0;
+}
+
+.split > * { min-width: 0; }
+
+.split img { max-height: 430px; }
+
+.callout {
+  padding: 14px 18px;
+  border-left: 6px solid var(--amber);
+  background: #fff8ef;
+}
+
+.compact {
+  font-size: 18px;
+  line-height: 1.14;
+  padding-top: 58px;
+  padding-bottom: 88px;
+}
+
+section.compact h1 { font-size: 36px; }
+section.compact h2 { font-size: 28px; }
+section.compact h3 { font-size: 22px; }
+section.compact table { font-size: 14px; }
+section.compact th,
+section.compact td { padding: 5px 7px; }
+section.compact pre { max-height: 460px; font-size: 13px; line-height: 1.12; }
+section.compact img { max-height: 420px; }
+
+section.tight {
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+section.tight h1 { font-size: 34px; }
+section.tight h2 { font-size: 26px; }
+section.tight table { font-size: 13px; }
+section.tight pre { font-size: 12px; }
+
+/* Keep content clear of the fixed source/footer strip. */
+section > :not(header):not(footer):not(.source) { max-width: 100%; }
+section > :last-child { margin-bottom: 0; }
