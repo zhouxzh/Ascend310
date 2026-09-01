@@ -8,6 +8,16 @@ import theme from "./theme.js";
 export default defineUserConfig({
   base: "/Ascend310/",
 
+  // Numbered presentation Markdown files are Marp sources. Their generated
+  // HTML is copied into the public directory and must not be rebuilt as
+  // ordinary VuePress pages at the same output path.
+  pagePatterns: [
+    "**/*.md",
+    "!presentation/[0-9][0-9]-*.md",
+    "!.vuepress",
+    "!node_modules",
+  ],
+
   head: [
     ["link", { rel: "icon", href: "/Ascend310/favicon.ico" }],
   ],

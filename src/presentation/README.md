@@ -6,15 +6,15 @@
 
 | 周次 | 文件 | 主题 | 主要来源 |
 |---|---|---|---|
-| 导览 | [00-repository-map.md](./00-repository-map.md) | 仓库内容地图 | `src/book`、`src/appendix`、`src/experiment`、`samples` |
-| 第1周 | [01-hardware-basics.md](./01-hardware-basics.md) | 昇腾310B硬件基础 | 附录1、理论第1章、第2章，samples/chapter3-4 |
-| 第2周 | [02-linux-commands.md](./02-linux-commands.md) | Linux命令基础 | 附录2、理论第2章、附录5，samples/chapter5 |
-| 第3周 | [03-python-basics.md](./03-python-basics.md) | Python编程基础 | 附录3，samples/case1/fusion_result.json |
-| 第4周 | [04-vibe-coding.md](./04-vibe-coding.md) | Vibe Coding基础 | 附录4，samples/case1/fusion_result.json |
-| 第5周 | [05-face-recognition.md](./05-face-recognition.md) | 人脸识别 | 案例1，samples/case1 |
-| 第6周 | [06-object-tracking.md](./06-object-tracking.md) | 目标跟踪 | 案例2，samples/case2 |
-| 第7周 | [07-smart-piano.md](./07-smart-piano.md) | 智能电子琴 | 案例3，samples/case3 |
-| 第8周 | [08-chatbot.md](./08-chatbot.md) | 聊天机器人 | 案例9，samples/case9 |
+| 导览 | [00-repository-map.md](./00-repository-map.html) | 仓库内容地图 | `src/book`、`src/appendix`、`src/experiment`、`samples` |
+| 第1周 | [01-hardware-basics.md](./01-hardware-basics.html) | 昇腾310B硬件基础 | 附录1、理论第1章、第2章，samples/chapter3-4 |
+| 第2周 | [02-linux-commands.md](./02-linux-commands.html) | Linux命令基础 | 附录2、理论第2章、附录5，samples/chapter5 |
+| 第3周 | [03-python-basics.md](./03-python-basics.html) | Python编程基础 | 附录3，samples/case1/fusion_result.json |
+| 第4周 | [04-vibe-coding.md](./04-vibe-coding.html) | Vibe Coding基础 | 附录4，samples/case1/fusion_result.json |
+| 第5周 | [05-face-recognition.md](./05-face-recognition.html) | 人脸识别 | 案例1，samples/case1 |
+| 第6周 | [06-object-tracking.md](./06-object-tracking.html) | 目标跟踪 | 案例2，samples/case2 |
+| 第7周 | [07-smart-piano.md](./07-smart-piano.html) | 智能电子琴 | 案例3，samples/case3 |
+| 第8周 | [08-chatbot.md](./08-chatbot.html) | 聊天机器人 | 案例9，samples/case9 |
 
 ## 图示与代码来源
 
@@ -44,18 +44,18 @@ pnpm run docs:slides
 
 生成的 HTML 位于：
 
-[打开 00 · 仓库内容地图](./00-repository-map.md)（生成页：[`00-repository-map.html`](./00-repository-map.html)）。
+[打开 00 · 仓库内容地图](./00-repository-map.html)（源文件：`00-repository-map.md`）。
 
 专题课件：
 
-`01` [硬件基础](./01-hardware-basics.md) ·
-`02` [Linux 命令](./02-linux-commands.md) ·
-`03` [Python 基础](./03-python-basics.md) ·
-`04` [Vibe Coding](./04-vibe-coding.md) ·
-`05` [人脸识别](./05-face-recognition.md) ·
-`06` [目标跟踪](./06-object-tracking.md) ·
-`07` [智能电子琴](./07-smart-piano.md) ·
-`08` [聊天机器人](./08-chatbot.md)
+`01` [硬件基础](./01-hardware-basics.html) ·
+`02` [Linux 命令](./02-linux-commands.html) ·
+`03` [Python 基础](./03-python-basics.html) ·
+`04` [Vibe Coding](./04-vibe-coding.html) ·
+`05` [人脸识别](./05-face-recognition.html) ·
+`06` [目标跟踪](./06-object-tracking.html) ·
+`07` [智能电子琴](./07-smart-piano.html) ·
+`08` [聊天机器人](./08-chatbot.html)
 
 也可以使用 VS Code 的 Marp 扩展直接打开 `00-repository-map.md` 或任一周课件预览。
 

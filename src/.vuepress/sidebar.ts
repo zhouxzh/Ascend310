@@ -60,15 +60,15 @@ export default sidebar({
       collapsible: true,
       children: [
         "README.md",
-        { text: "00 · 仓库内容地图", link: "00-repository-map.md" },
-        "01-hardware-basics.md",
-        "02-linux-commands.md",
-        "03-python-basics.md",
-        "04-vibe-coding.md",
-        "05-face-recognition.md",
-        "06-object-tracking.md",
-        "07-smart-piano.md",
-        "08-chatbot.md"
+        { text: "00 · 仓库内容地图", link: "00-repository-map.html" },
+        { text: "第1周：昇腾310B硬件基础", link: "01-hardware-basics.html" },
+        { text: "第2周：Linux命令基础", link: "02-linux-commands.html" },
+        { text: "第3周：Python编程基础", link: "03-python-basics.html" },
+        { text: "第4周：Vibe Coding基础", link: "04-vibe-coding.html" },
+        { text: "第5周：人脸识别", link: "05-face-recognition.html" },
+        { text: "第6周：目标跟踪", link: "06-object-tracking.html" },
+        { text: "第7周：智能电子琴", link: "07-smart-piano.html" },
+        { text: "第8周：聊天机器人", link: "08-chatbot.html" }
       ]
     },
   ],
