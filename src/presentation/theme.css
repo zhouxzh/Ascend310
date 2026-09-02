@@ -265,6 +265,7 @@ section.compact th,
 section.compact td { padding: 5px 7px; }
 section.compact pre { max-height: 460px; font-size: 13px; line-height: 1.12; }
 section.compact img { max-height: 420px; }
+section.compact .compact-note { font-size: 16px; line-height: 1.1; }
 
 section.tight {
   font-size: 16px;

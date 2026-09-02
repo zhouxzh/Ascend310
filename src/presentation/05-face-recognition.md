@@ -237,6 +237,8 @@ samples/case1/
 
 ---
 
+<!-- _class: compact -->
+
 ## PyACL 初始化和释放（板端步骤）
 
 以下代码只应在已加载匹配 CANN 环境的昇腾板端执行，开发机不运行 `acl`、NPU、ATC 或 OM 推理。
@@ -279,7 +281,7 @@ class AscendSystem:
         print("[AscendSystem] Resources released.")
 ```
 
-解释：生命周期顺序是 `acl.init` → 设置设备 → 创建 context/stream → 释放时按逆序销毁。不能依赖 Python 析构函数的执行顺序。
+<p class="compact-note">解释：生命周期顺序是 <code>acl.init</code> → 设置设备 → 创建 context/stream → 释放时按逆序销毁。不能依赖 Python 析构函数的执行顺序。</p>
 
 ---
 
