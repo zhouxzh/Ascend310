@@ -96,10 +96,6 @@ export default sidebar({
           text: "第8周：聊天机器人",
           link: "/presentation/08-chatbot.html",
         },
-        {
-          text: "源码目录（GitHub）",
-          link: "https://github.com/zhouxzh/Ascend310/tree/main/src/presentation",
-        },
       ]
     },
   ],
