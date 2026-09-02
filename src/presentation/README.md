@@ -4,13 +4,13 @@ editLink: false
 
 # 教学演示
 
-本目录提供仓库导览和 8 周教学放映课件。`00` 是总览页，随后按周进入专题课件。主页只展示放映入口；图片、流程图、网络结构图和代码引用说明均放在对应的课件页内。
+本目录提供教材总览和 8 周教学放映课件。`00` 是教材总览页，随后按周进入专题课件。主页只展示放映入口；图片、流程图、网络结构图和代码引用说明均放在对应的课件页内。
 
 ## 课件目录
 
 | 周次 | 放映版（GitHub Pages） | 主题 | 内容来源 |
 |---|---|---|---|
-| 导览 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/00-repository-map.html) | 仓库内容地图 | `src/book`、`src/appendix`、`src/experiment`、`samples` |
+| 00 教材总览 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/00-repository-map.html) | 昇腾310B实战教材总览 | `src/book`、`src/appendix`、`src/experiment`、`samples` |
 | 第1周 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/01-hardware-basics.html) | 昇腾310B硬件基础 | 附录1、理论第1章、第2章、`samples/chapter3-4` |
 | 第2周 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/02-linux-commands.html) | Linux命令基础 | 附录2、理论第2章、附录5、`samples/chapter5` |
 | 第3周 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/03-python-basics.html) | Python编程基础 | 附录3、`samples/case1/fusion_result.json` |
