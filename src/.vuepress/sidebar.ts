@@ -61,7 +61,7 @@ export default sidebar({
       children: [
         "README.md",
         {
-          text: "00 · 教材总览（Marp 放映）",
+          text: "00 · 全书导览（Marp 放映）",
           link: "/presentation/00-repository-map.html",
         },
         {
