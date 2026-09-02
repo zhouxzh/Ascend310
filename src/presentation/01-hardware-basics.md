@@ -3,16 +3,16 @@ marp: true
 size: 16:9
 theme: ascend310
 paginate: true
-header: "昇腾310B 8周教学"
-footer: "第1周：昇腾310B硬件基础"
+header: "《昇腾310B实战》教材配套演示"
+footer: "附录 1：开发板与基础环境"
 ---
 <!-- _class: cover -->
 
-# 第1周：昇腾310B硬件基础
+# 附录 1：开发板与基础环境
 
-昇腾310B 8周教学
+昇腾310B 教材配套演示
 
-每周 3 课时，每课时 45 分钟
+专题安排：3 课时，每课时 45 分钟
 
 | 课时 | 主题 | 完成后的能力 |
 | --- | --- | --- |
@@ -24,7 +24,7 @@ footer: "第1周：昇腾310B硬件基础"
 
 ## 课程目标：建立一条可复现的验证路线
 
-本课程的重点是建立从硬件、系统、网络到NPU环境的可复现路径。学完本周内容后，学生应能回答附录2给出的四个审查问题：命令运行在哪台机器和哪个环境中、输入输出路径是什么、这一步验证的是语法、路由、转换、数值、性能还是硬件现象、命令是否会安装软件或修改系统状态。这四个问题会贯穿后续章节和案例。
+本课程的重点是建立从硬件、系统、网络到NPU环境的可复现路径。学完本专题后，学生应能回答附录2给出的四个审查问题：命令运行在哪台机器和哪个环境中、输入输出路径是什么、这一步验证的是语法、路由、转换、数值、性能还是硬件现象、命令是否会安装软件或修改系统状态。这四个问题会贯穿后续章节和案例。
 
 ---
 
@@ -37,7 +37,7 @@ footer: "第1周：昇腾310B硬件基础"
 
 ---
 
-## 本周仓库入口
+## 本专题仓库入口
 
 | 学习对象 | 可直接打开的仓库文件 |
 | --- | --- |
@@ -436,7 +436,7 @@ python samples/chapter4/check_ascend_device/check_ascend_device.py
 
 ## 后续章节样例的运行前提
 
-第3章和第4章样例的运行前提也应在本周验证。第3章README要求先加载CANN并确认`torch_npu`可用：
+第3章和第4章样例的运行前提也应在本专题验证。第3章README要求先加载CANN并确认`torch_npu`可用：
 
 ```bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -487,7 +487,7 @@ chmod +x Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
 
 ## 验证结果的证据边界
 
-本周收集的证据必须区分层级：`npu-smi info`是设备摘要，`import acl`成功是运行库可用，模型加载成功不代表任务精度，HTTP状态码不代表NPU推理成功。记录时应保存原始输出、执行机器、shell、环境、路径和时间戳。
+本专题收集的证据必须区分层级：`npu-smi info`是设备摘要，`import acl`成功是运行库可用，模型加载成功不代表任务精度，HTTP状态码不代表NPU推理成功。记录时应保存原始输出、执行机器、shell、环境、路径和时间戳。
 
 若出现`import acl`失败，先检查`command -v python`和是否在同一shell中执行了`source set_env.sh`；若ATC找不到算子，保存失败命令、模型合同和日志，不生成伪OM；若出现`Health: Alarm`，记录为诊断背景，不自动判定失败。
 
@@ -508,10 +508,10 @@ chmod +x Ascend-cann-kernels-310b_8.3.RC1_linux-aarch64.run
 
 | 交付物 | 内容 |
 | --- | --- |
-| `linux/week01/board-snapshot.txt` | `uname -a`、`/etc/os-release`、`free -h`、`df -h`、`npu-smi info`等原始输出 |
-| `linux/week01/network-ssh.txt` | WiFi或有线连接方式、IP地址、SSH登录使用的用户名和结果摘要 |
-| `linux/week01/env-validation.txt` | conda、Python、CANN、PyACL、torch_npu和ACL设备检查的原始输出 |
-| `linux/week01/safety-notes.md` | 硬件安全边界、命令审查清单和不执行命令模式 |
+| `linux/appendix1/board-snapshot.txt` | `uname -a`、`/etc/os-release`、`free -h`、`df -h`、`npu-smi info`等原始输出 |
+| `linux/appendix1/network-ssh.txt` | WiFi或有线连接方式、IP地址、SSH登录使用的用户名和结果摘要 |
+| `linux/appendix1/env-validation.txt` | conda、Python、CANN、PyACL、torch_npu和ACL设备检查的原始输出 |
+| `linux/appendix1/safety-notes.md` | 硬件安全边界、命令审查清单和不执行命令模式 |
 
 报告中应删除用户名、IP、token、真实图像路径等隐私信息；IP地址可保留课堂实验网络中的必要记录。
 

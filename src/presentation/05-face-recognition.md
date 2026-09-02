@@ -3,16 +3,16 @@ marp: true
 size: 16:9
 theme: ascend310
 paginate: true
-header: "昇腾310B 8周教学"
-footer: "第5周：人脸识别"
+header: "《昇腾310B实战》教材配套演示"
+footer: "案例 1：边缘人脸考勤"
 ---
 
 <!-- _class: cover -->
 
-# 第5周：人脸识别
+# 案例 1：边缘人脸考勤
 
 - 案例：边缘人脸考勤——FastAPI 与昇腾 NPU 协同，对应 `samples/case1`
-- 课时：每周 3 课时，每课时 45 分钟
+- 专题安排：3 课时，每课时 45 分钟
 - 主线：系统架构与模型合同 → FastAPI/NPU 与本地检查 → 板端运行与 API 验收
 - 隐私要求：本讲只使用合成或经同意的匿名测试图像，不展示真实人脸图片
 

@@ -54,46 +54,46 @@ export default sidebar({
       ]
     },
     {
-      text: "教学演示",
+      text: "教材配套演示",
       icon: "presentation",
       prefix: "/presentation/",
       collapsible: true,
       children: [
         "README.md",
         {
-          text: "00 · 全书导览（Marp 放映）",
+          text: "全书导览（Marp 放映）",
           link: "/presentation/00-repository-map.html",
         },
         {
-          text: "第1周：昇腾310B硬件基础",
+          text: "附录 1 · 开发板与基础环境",
           link: "/presentation/01-hardware-basics.html",
         },
         {
-          text: "第2周：Linux命令基础",
+          text: "附录 2 · 昇腾 310B Linux 操作与命令教程",
           link: "/presentation/02-linux-commands.html",
         },
         {
-          text: "第3周：Python编程基础",
+          text: "附录 3 · Python 编程基础",
           link: "/presentation/03-python-basics.html",
         },
         {
-          text: "第4周：Vibe Coding基础",
+          text: "附录 4 · Vibe Coding 基础",
           link: "/presentation/04-vibe-coding.html",
         },
         {
-          text: "第5周：人脸识别",
+          text: "案例 1 · 边缘人脸考勤",
           link: "/presentation/05-face-recognition.html",
         },
         {
-          text: "第6周：目标跟踪",
+          text: "案例 2 · 目标跟踪检测",
           link: "/presentation/06-object-tracking.html",
         },
         {
-          text: "第7周：智能电子琴",
+          text: "案例 3 · Ascend 310B DDSP 智能电子琴",
           link: "/presentation/07-smart-piano.html",
         },
         {
-          text: "第8周：聊天机器人",
+          text: "案例 9 · 在昇腾 310B 上复现中文文本聊天",
           link: "/presentation/08-chatbot.html",
         },
       ]

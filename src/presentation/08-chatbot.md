@@ -3,17 +3,17 @@ marp: true
 size: 16:9
 theme: ascend310
 paginate: true
-header: "昇腾310B 8周教学"
-footer: "第8周：聊天机器人"
+header: "《昇腾310B实战》教材配套演示"
+footer: "案例 9：在昇腾 310B 上复现中文文本聊天"
 ---
 
 <!-- _class: cover -->
 
-# 第8周：聊天机器人
+# 案例 9：在昇腾 310B 上复现中文文本聊天
 
-昇腾 310B 8周教学计划
+昇腾 310B 教材配套演示计划
 
-每周 3 课时，每课时 45 分钟
+专题安排：3 课时，每课时 45 分钟
 
 对应案例：`samples/case9`
 
@@ -91,7 +91,7 @@ footer: "第8周：聊天机器人"
 
 ![ONNX 到 OM 的转换与 NPU 推理边界](../experiment/img8/case8_model_conversion.png)
 
-<div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img8/case8_model_conversion.png">src/experiment/img8/case8_model_conversion.png</a>（案例8）；本周 Case9 架构正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case9.md">src/experiment/case9.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case9">samples/case9/</a></div>
+<div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img8/case8_model_conversion.png">src/experiment/img8/case8_model_conversion.png</a>（案例8）；本专题 Case9 架构正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case9.md">src/experiment/case9.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case9">samples/case9/</a></div>
 
 ---
 
@@ -287,7 +287,7 @@ ACL、OM、PyACL 和 NPU 检查只能在板端执行，不能在控制机模拟�
 - `/api/clear`：清空会话
 - SSE 事件：`start`、`delta`、`done`、`error`
 
-页面本身未启用浏览器鉴权，只在可信实验网络使用。`local_app.py` 是独立的板端本地服务（默认 `0.0.0.0:7862`），音频/PTT 路径当前暂停，本周不启动、不验收。
+页面本身未启用浏览器鉴权，只在可信实验网络使用。`local_app.py` 是独立的板端本地服务（默认 `0.0.0.0:7862`），音频/PTT 路径当前暂停，本专题不启动、不验收。
 
 ---
 
@@ -318,7 +318,7 @@ Set-Location ..
 git diff --check
 ```
 
-前端构建只在控制机执行。当前 MindSpore 候选文字 UI 由 `text_chat_app.py` 返回内嵌 HTML；板端不需要 Node.js。React 构建产物 `frontend/dist` 服务于 `local_app.py` 的本地 UI，本周文字验收不强制依赖它。
+前端构建只在控制机执行。当前 MindSpore 候选文字 UI 由 `text_chat_app.py` 返回内嵌 HTML；板端不需要 Node.js。React 构建产物 `frontend/dist` 服务于 `local_app.py` 的本地 UI，本专题文字验收不强制依赖它。
 
 ---
 
@@ -556,8 +556,8 @@ curl -fsS \
 
 ## 交付物
 
-- `linux/week08/chat-demo.md`
-- `linux/week08/final-report.md`
+- `linux/case9/chat-demo.md`
+- `linux/case9/final-report.md`
 
 报告必须包含：使用的板卡地址与 SoC、环境激活命令、候选 Profile、端口关系、API 契约、一次完整请求/响应、服务 PID、日志路径、失败或未完成门禁，以及是否使用了 `CASE9_ALLOW_EXPERIMENTAL=1`。
 

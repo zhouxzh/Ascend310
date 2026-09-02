@@ -3,22 +3,22 @@ marp: true
 size: 16:9
 theme: ascend310
 paginate: true
-header: "昇腾310B 8周教学"
-footer: "第4周：Vibe Coding基础"
+header: "《昇腾310B实战》教材配套演示"
+footer: "附录 4：Vibe Coding 基础"
 ---
 <!-- _class: cover -->
 
-# 第4周：Vibe Coding基础
+# 附录 4：Vibe Coding 基础
 
-昇腾 310B 8周教学计划
+昇腾 310B 教材配套演示计划
 
-每周 3 课时，每课时 45 分钟
+专题安排：3 课时，每课时 45 分钟
 
-本周目标：用 DSH 生成、运行并审查 Python 代码
+本专题目标：用 DSH 生成、运行并审查 Python 代码
 
 ---
 
-## 本周课程安排
+## 专题安排
 
 | 课时 | 时长 | 主题 | 重点 |
 |---|---|---|---|
@@ -37,12 +37,12 @@ footer: "第4周：Vibe Coding基础"
 
 ---
 
-## 本周实战的输入、输出与边界
+## 本专题实战的输入、输出与边界
 
 | 环节 | 仓库对象 | 约束 |
 | --- | --- | --- |
 | 输入 | <a href="../../samples/case7/models/registry.json"><code>samples/case7/models/registry.json</code></a> | 只读真实注册表 |
-| 生成脚本 | `tmp/week04/<姓名>/vibe_read_fusion.py` | 只用 `json` 与 `pathlib` |
+| 生成脚本 | `tmp/vibe-coding/<姓名>/vibe_read_fusion.py` | 只用 `json` 与 `pathlib` |
 | 验证 | <a href="../../samples/case1/fusion_result.json"><code>samples/case1/fusion_result.json</code></a> | 自己运行并核对字段 |
 
 来源索引：<a href="../appendix/appendix4.md">附录4</a> · <a href="../../samples/case7/models/registry.json">samples/case7/models/registry.json</a> · <a href="../../samples/case1/fusion_result.json">samples/case1/fusion_result.json</a>
@@ -270,7 +270,7 @@ Agent 能做的事情和真人操作电脑一样有后果。
 |---|---|---|
 | 目标 | 说明要做什么 | 读取融合结果并输出摘要 |
 | 数据路径 | 给出明确路径 | `samples/case1/fusion_result.json` |
-| 输出位置 | 说明代码保存到哪里 | `tmp/week04/<姓名>/vibe_read_fusion.py` |
+| 输出位置 | 说明代码保存到哪里 | `tmp/vibe-coding/<姓名>/vibe_read_fusion.py` |
 | 约束 | 说明允许和禁止的操作 | 只读、只用标准库、不装依赖 |
 | 验收标准 | 说明怎样算完成 | 输出 fusion pass 名称与 match_times |
 
@@ -295,7 +295,7 @@ Agent 能做的事情和真人操作电脑一样有后果。
 用标准库 json 输出：
 1. graph_fusion 和 ub_fusion 中每个 fusion pass 的名称；
 2. 每个 pass 的 effect_times 和 match_times。
-代码保存到 tmp/week04/<姓名>/vibe_read_fusion.py。
+代码保存到 `tmp/vibe-coding/<姓名>/vibe_read_fusion.py`。
 只允许读取，不安装任何依赖。
 ```
 
@@ -419,10 +419,10 @@ DSH 完成任务后，按以下顺序验收：
 
 ## 交付物
 
-- `tmp/week04/<姓名>/vibe_read_fusion.py`
-- `tmp/week04/<姓名>/safety.md`
-- `tmp/week04/<姓名>/prompt-notes.md`
-- `tmp/week04/<姓名>/review.md`
+- `tmp/vibe-coding/<姓名>/vibe_read_fusion.py`
+- `tmp/vibe-coding/<姓名>/safety.md`
+- `tmp/vibe-coding/<姓名>/prompt-notes.md`
+- `tmp/vibe-coding/<姓名>/review.md`
 
 ---
 

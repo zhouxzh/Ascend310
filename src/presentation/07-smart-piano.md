@@ -3,21 +3,21 @@ marp: true
 size: 16:9
 theme: ascend310
 paginate: true
-header: "昇腾310B 8周教学"
-footer: "第7周：智能电子琴"
+header: "《昇腾310B实战》教材配套演示"
+footer: "案例 3：Ascend 310B DDSP 智能电子琴"
 ---
 
 <!-- _class: cover -->
 
-# 第7周：智能电子琴
+# 案例 3：Ascend 310B DDSP 智能电子琴
 
 - 案例：`samples/case3` DDSP 音乐工作台
-- 每周 3 课时，每课时 45 分钟
+- 专题安排：3 课时，每课时 45 分钟
 - 目标：理解 DDSP 系统与三条模型链，完成模型和音频设备准备，运行 Web UI 并完成冒烟测试
 
 ---
 
-## 本周课程安排
+## 专题安排
 
 | 课时 | 时长 | 主题 | 重点 |
 |---|---|---|---|
@@ -613,9 +613,9 @@ else:
 
 ## 交付物
 
-- `linux/week07/model-chain.md`：三条模型链、模型来源、输入输出合同与命令记录
-- `linux/week07/piano-output.md`：触控/MIDI 演奏、实时会话和音频冒烟记录
-- `linux/week07/audio-smoke.md`：ALSA/PulseAudio/设备检查、扬声器测试和音量记录
+- `linux/case3/model-chain.md`：三条模型链、模型来源、输入输出合同与命令记录
+- `linux/case3/piano-output.md`：触控/MIDI 演奏、实时会话和音频冒烟记录
+- `linux/case3/audio-smoke.md`：ALSA/PulseAudio/设备检查、扬声器测试和音量记录
 - 板端报告与产物路径：ATC 日志、OM bundle manifest、渲染 WAV 与 JSON 报告
 - 记录实际执行的板端环境、设备 ID、模型 ID、端口、进程 PID 和停止后的资源状态
 

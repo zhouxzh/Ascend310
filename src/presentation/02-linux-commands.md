@@ -3,20 +3,20 @@ marp: true
 size: 16:9
 theme: ascend310
 paginate: true
-header: "昇腾310B 8周教学"
-footer: "第2周：Linux命令基础"
+header: "《昇腾310B实战》教材配套演示"
+footer: "附录 2：昇腾 310B Linux 操作与命令教程"
 ---
 <!-- _class: cover -->
 
-# 第2周：Linux命令基础
+# 附录 2：昇腾 310B Linux 操作与命令教程
 
-昇腾310B 8周教学
+昇腾310B 教材配套演示
 
-每周 3 课时，每课时 45 分钟
+专题安排：3 课时，每课时 45 分钟
 
 ---
 
-## 本周课程安排
+## 专题安排
 
 | 课时 | 时长 | 主题 | 本讲重点 |
 | --- | --- | --- | --- |
@@ -746,10 +746,10 @@ curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5000/video_feed
 
 ## 交付物
 
-- `linux/week02/linux-commands.md`
-- `linux/week02/safety-rules.md`
-- `linux/week02/cann-npu-check.md`
-- `linux/week02/service-log-check.md`
+- `linux/appendix2/linux-commands.md`
+- `linux/appendix2/safety-rules.md`
+- `linux/appendix2/cann-npu-check.md`
+- `linux/appendix2/service-log-check.md`
 
 交付物中应包含原始命令、执行位置、日期、关键输出和结论；不得包含真实 token、密码、个人图像或未经审查的敏感路径。
 

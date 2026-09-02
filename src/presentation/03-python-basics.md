@@ -3,14 +3,14 @@ marp: true
 size: 16:9
 theme: ascend310
 paginate: true
-header: "昇腾310B 8周教学"
-footer: "第3周：Python编程基础"
+header: "《昇腾310B实战》教材配套演示"
+footer: "附录 3：Python 编程基础"
 ---
 <!-- _class: cover -->
 
-# 第3周：Python编程基础
+# 附录 3：Python 编程基础
 
-- 每周 3 课时，每课时 45 分钟
+- 专题安排：3 课时，每课时 45 分钟
 - 目标：掌握模型部署与样例代码中最常用的 Python 语法和标准库
 - 练习数据：`samples/case1/fusion_result.json`
 - 依赖：仅使用 Python 标准库，不使用 pandas
@@ -38,7 +38,7 @@ footer: "第3周：Python编程基础"
 
 ---
 
-# 本周结构
+# 专题结构
 
 | 课时 | 时长 | 内容 | 重点 |
 | --- | --- | --- | --- |
@@ -52,7 +52,7 @@ footer: "第3周：Python编程基础"
 
 # 学习目标
 
-学完本周后，你应该能够：
+学完本专题后，你应该能够：
 
 - 用 Python 描述模型 ID、输入形状、精度模式和状态
 - 用函数、类、dataclass 组织可复用代码
@@ -784,7 +784,7 @@ python -m py_compile 脚本路径.py
 
 # 交付物
 
-- 一个 Python 脚本文件：`week03_practice.py`
+- 一个 Python 脚本文件：`python_basics_practice.py`
 - 脚本包含变量、容器、控制流、函数或类、异常处理
 - 脚本通过 `argparse` 接收文件路径参数
 - 脚本读取 `samples/case1/fusion_result.json` 并输出结构化摘要

@@ -3,21 +3,21 @@ marp: true
 size: 16:9
 theme: ascend310
 paginate: true
-header: "昇腾310B 8周教学"
-footer: "第6周：目标跟踪"
+header: "《昇腾310B实战》教材配套演示"
+footer: "案例 2：目标跟踪检测"
 ---
 
 <!-- _class: cover -->
 
-# 第6周：目标跟踪
+# 案例 2：目标跟踪检测
 
-昇腾 310B 8周教学
-每周 3 课时，每课时 45 分钟
+昇腾 310B 教材配套演示
+专题安排：3 课时，每课时 45 分钟
 对应案例：`samples/case2`
 
 ---
 
-## 本周课程安排
+## 专题安排
 
 | 课时 | 时长 | 主题 | 核心产出 |
 |---|---|---|---|
@@ -974,11 +974,11 @@ caption = f"ID {track.track_id} | {label} | {track.score:.2f}"
 
 ## 交付物
 
-- `linux/week06/model-evidence.md`
+- `linux/case2/model-evidence.md`
   - 模型来源、下载文件名、依赖版本
   - CANN 环境、精确 ATC 命令、`--soc-version`
   - 输入输出合同、生成 OM 路径、ATC 日志
-- `linux/week06/tracking-output.md`
+- `linux/case2/tracking-output.md`
   - detection 与 tracking 的启动日志
   - 使用的命令、模型、参数
   - 保存的输出视频路径
