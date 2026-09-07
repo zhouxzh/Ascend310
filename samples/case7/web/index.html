@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#10161b">
   <title>昇腾智能相册</title>
-  <link rel="stylesheet" href="/style.css?v=20260830-provision-pull-v11">
+  <link rel="stylesheet" href="/style.css?v=20260907-device-summary-v1">
 </head>
 <body class="touchscreen-shell">
   <main class="album-app">
@@ -45,7 +45,7 @@
       <header class="panel-header"><div><span class="eyebrow">相册控制台</span><h1 id="panel-title">图库</h1></div><button id="close-panel" class="close-button" aria-label="关闭面板">×</button></header>
       <div class="panel-content">
         <section id="gallery-panel" class="panel-view active"><div class="panel-toolbar"><p id="gallery-status" class="panel-status">正在读取图库</p><button id="reload-gallery" class="secondary-button">刷新图库</button></div><div id="gallery-grid" class="photo-grid"></div></section>
-        <section id="search-panel" class="panel-view"><form id="search-form" class="large-form search-form" autocomplete="off"><label>搜索照片<input id="search-query" name="query" required placeholder="例如：海边的日落 / a red car" autocomplete="off"></label><label>语义模型<select id="search-model" name="model" autocomplete="off"><option value="auto">自动选择</option><option value="mobileclip_s0__npu__mixed_fp16">MobileCLIP-S0</option><option value="chinese_clip_rn50__npu__mixed_fp16">Chinese-CLIP RN50</option></select></label><button class="primary-button" type="submit">开始搜索</button></form><p id="search-status" class="panel-status"></p><div id="search-grid" class="photo-grid"></div></section>
+        <section id="search-panel" class="panel-view"><form id="search-form" class="large-form search-form" autocomplete="off"><label>搜索照片<input id="search-query" name="query" required placeholder="例如：海边的日落 / a red car" autocomplete="off"></label><label>语义模型<select id="search-model" name="model" autocomplete="off"><option value="auto">自动选择</option><option value="mobileclip_s0__npu__mixed_fp16">MobileCLIP-S0</option><option value="chinese_clip_rn50__npu__mixed_fp16">Chinese-CLIP RN50</option></select></label><div class="search-filter-grid"><label>最小宽度<input name="min_width" type="number" min="0" step="1" placeholder="不限"></label><label>最小高度<input name="min_height" type="number" min="0" step="1" placeholder="不限"></label><label>照片格式<select name="extensions"><option value="">全部格式</option><option value="jpg">JPG/JPEG</option><option value="png">PNG</option><option value="webp">WebP</option><option value="bmp">BMP</option></select></label><label>人物筛选<select name="face_filter"><option value="all">全部照片</option><option value="has_people">有人物</option><option value="no_people">无人脸</option></select></label></div><button class="primary-button" type="submit">开始 NPU 搜索</button></form><p id="search-status" class="panel-status"></p><div id="search-grid" class="photo-grid"></div></section>
         <section id="upload-panel" class="panel-view">
           <form id="upload-form" class="large-form">
             <div class="upload-source-grid">
@@ -72,6 +72,6 @@
     </section>
   </div>
   <template id="photo-template"><button class="photo-tile" type="button"><img alt=""><span class="photo-tile-name"></span><small class="photo-tile-score"></small></button></template>
-  <script src="/app.js?v=20260831-registration-state-v11"></script>
+  <script src="/app.js?v=20260907-device-summary-v1"></script>
 </body>
 </html>

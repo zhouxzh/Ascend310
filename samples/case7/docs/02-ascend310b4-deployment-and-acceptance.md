@@ -128,7 +128,11 @@ bash scripts/deploy_ascend8t.sh --ssh-target HwHiAiUser@192.168.1.135
 bash scripts/deploy_ascend8t.sh --ssh-target HwHiAiUser@192.168.1.135 --apply
 ```
 
-脚本使用 `releases/<release-id>`、`current` 和 `shared` 结构。先在 7861 启动备用版本并检查健康接口，再切换 `current`；不使用 `--delete`，不覆盖 `shared/models`、`shared/data`、`shared/photos` 或 `shared/reports`，只停止本项目 PID。
+Case7 的固定对外端口是 `7860`：手机、触摸屏、ESP32 URL Rotation 和所有可执行教程 URL
+都使用 `http://192.168.1.135:7860/`。脚本使用 `releases/<release-id>`、`current` 和 `shared`
+结构；它会短暂在内部 smoke 端口启动备用版本并检查健康接口，再切换 `current` 到 7860。
+该临时端口不面向用户、不写入 ESP32 配置，也不属于教程操作。发布不使用 `--delete`，不覆盖
+`shared/models`、`shared/data`、`shared/photos` 或 `shared/reports`，只停止本项目 PID。
 
 板端启动：
 
@@ -277,7 +281,7 @@ curl http://127.0.0.1:7860/api/index/stats
 bash scripts/launch_touchscreen_kiosk.sh
 ```
 
-PhotoFrame 五分钟测试支持两条互斥链路。当前实测目标是 Waveshare PhotoPainter；E1002 仅是历史对照。上游 API 资料中的服务器主动推送使用 `POST /api/display-image`，但这不代表当前设备已运行该端点；只有操作者确认固件、IP 和实机响应后，310B 才能向该根 URL 建立连接。URL Rotation 兼容模式则由终端主动请求 310B。两者都不允许根据错误响应猜测固件。把固定的 20 张测试图片放入 `shared/incoming/photoframe-test/` 后执行：
+PhotoFrame 五分钟测试支持 Waveshare PhotoPainter 和 Seeed E1002 两类 profile，以及两条互斥链路。当前已有的实机记录主要来自 Waveshare；E1002 的历史段落只表示证据批次，不表示该 profile 被移出支持范围。上游 API 资料中的服务器主动推送使用 `POST /api/display-image`，但这不代表当前设备已运行该端点；只有操作者确认固件、IP 和实机响应后，310B 才能向该根 URL 建立连接。URL Rotation 兼容模式则由终端主动请求 310B。两者都不允许根据错误响应猜测固件。把固定的 20 张测试图片放入 `shared/incoming/photoframe-test/` 后执行：
 
 ```bash
 # 在电脑端（Git Bash/WSL 的 OpenSSH）进入测试目录，只传输这一个固定批次；不要同步整个 Pictures 目录。

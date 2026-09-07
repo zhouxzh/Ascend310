@@ -2,6 +2,8 @@
 
 本项目包含一系列基于昇腾310B的简单、有趣且可复现的实战项目。各案例按实际需要提供源代码、数据集预处理脚本以及模型训练与部署指南，旨在强化您的动手实践能力。
 
+仓库文档按三层组织：理论正文在本目录，案例运行入口在 [samples/README.md](https://github.com/zhouxzh/Ascend310/blob/main/samples/README.md)，全仓库按任务索引在 [docs/README.md](https://github.com/zhouxzh/Ascend310/blob/main/docs/README.md)。案例的 `samples/caseN/README.md` 是可执行入口；编号 `docs/` 是工程专题和验收证据，不需要按编号顺序通读。
+
 ## 案例列表
 
 ### 1. 人脸考勤（face-attendance）
@@ -30,7 +32,7 @@
 
 ### 7. 智能相册
 [查看案例](./case7.md)
-在 Orange Pi AIpro 的 Ascend 310B4 上运行 NPU-only 智能相册：MobileCLIP 和 Chinese-CLIP 提供中英文语义搜索，ResNet50 保留经典相似图兼容模式，SQLite/FAISS 管理多模型向量，并先在 10 寸触摸屏验收，再输出微雪 E6 六色电子墨水 dry-run 帧。
+在 Orange Pi AIpro 的 Ascend 310B4 上运行 NPU-only 智能相册：MobileCLIP 和 Chinese-CLIP 提供中英文语义搜索，ResNet50 保留经典相似图兼容模式，SQLite/FAISS 管理多模型向量，并先在 10 寸触摸屏验收，再输出微雪 E6 六色电子墨水 dry-run 帧。配套运行手册是 [samples/case7/README.md](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/README.md)，工程文档从 [samples/case7/docs/README.md](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/README.md) 开始。
 
 ### 8. 手势识别
 [查看案例](./case8.md)

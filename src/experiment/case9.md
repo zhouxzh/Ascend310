@@ -1,6 +1,6 @@
 # 案例 9：在昇腾 310B 上复现中文文本聊天
 
-_本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验。当前同时维护两条彼此独立的路线：Qwen2.5 静态 KV 的 ONNX -> OM -> 原生 ACL 路线，以及 Qwen1.5、TinyLlama、DeepSeek 的 MindSpore/MindNLP 路线。8T 当前地址为 `192.168.1.90`（`192.168.8.178` 仅为同一块板的历史采集地址）；20T 当前地址为 `192.168.1.95`（`192.168.8.210` 仅为历史地址）。本教程只写入有原始证据的结果，双板缺口批次未完成的门标为 `not-run` 或 `blocked`。_
+_本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验。当前同时维护两条彼此独立的路线：Qwen2.5 静态 KV 的 ONNX -> OM -> 原生 ACL 路线，以及逐步扩展的 MindSpore/MindNLP 候选路线。已有正式候选实测的 MindSpore 模型为 Qwen1.5、TinyLlama、DeepSeek；Qwen2.5-0.5B 在 8T 新地址完成了 context-only loader/NPU 活动诊断，但严格 placement gate 仍为 `blocked`；Qwen3 因当前 MindNLP 0.4.1 缺少 loader 而阻断。Qwen2.5-1.5B 的初次 `SIGSEGV`（exit 139）来自污染的 CANN/PYTHONPATH 诊断，随后在正确 CANN v4 环境完成七个文件校验、模型加载和两 token 的 context-only 生成；由于 placement、API、质量和性能门仍未完成，仍为 `blocked`。仅面向 20T 的 MiniCPM3 尚未运行。8T 当前地址为 `192.168.1.90`；`192.168.11.14` 与报告采集地址 `192.168.8.178` 是同一块板的历史别名。20T 当前地址为 `192.168.1.95`（`192.168.8.210` 仅为历史地址）。本教程只写入有原始证据的结果，双板缺口批次未完成的门标为 `not-run` 或 `blocked`。_
 
 ## 1. 当前目标和已暂停范围
 
@@ -10,14 +10,39 @@ _本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验。当�
 
 | Profile 或链路 | 当前状态 |
 | --- | --- |
-| Qwen2.5 静态 KV ACL：`8080 -> 7861 -> 7865` | 现有正式基线；`.90` 当前身份只读复核 `passed`（identity-only），B4/B1 的历史 OM、ACL 和性能证据保留；`.95` 当前身份因工件缺失 `blocked`，不替换正式入口 |
-| `qwen1.5-0.5b-mindspore`：`.90` B4/8T 与 `.95` B1/20T | `.90` 已有机器门；`.95` 缺口批次 9/9 机器门和性能通过；共享 `base`，两板均保持 `experimental_dirty_base`，人工质量/准入待签字 |
+| Qwen2.5 静态 KV ACL：`8080 -> 7861 -> 7865` | 现有正式基线；8T 当前 `.90`（`.11.14`/`.178` 为同一板的历史报告地址）只读复核 `passed`（identity-only），B4/B1 的历史 OM、ACL 和性能证据保留；`.95` 当前身份因工件缺失 `blocked`，不替换正式入口 |
+| `qwen1.5-0.5b-mindspore`：`.90` B4/8T 与 `.95` B1/20T | 8T 历史 `.11.14` 身份字段缺失按 8/9，当前 G0 已补齐但严格 placement 失败，保持 `blocked`；`.95` 缺口批次 9/9 机器门和性能通过，保持 `experimental_dirty_base`；人工质量/准入待签字 |
 | `tinyllama-1.1b-mindspore`：`.90` B4/8T 与 `.95` B1/20T | 两板均保留 `blocked`；`.95` 缺口批次 8/9，32/48-token 输出出现 `U+FFFD`，中文机器质量 7/10 |
-| `deepseek-r1-qwen-1.5b-mindspore`：`.90` B4/8T 与 `.95` B1/20T | `.90` 缺口批次 9/9 机器门和性能通过；`.95` 隔离 API 机器门通过但中文质量/dirty-base 准入未完成，保持 `blocked` |
+| `deepseek-r1-qwen-1.5b-mindspore`：`.90` B4/8T 与 `.95` B1/20T | 8T 历史 `.11.14` 缺口批次 9/9 机器门和性能通过；`.95` 隔离 API 机器门通过但中文质量/dirty-base 准入未完成，保持 `blocked` |
 | 音频、麦克风、ASR/TTS、PTT、XiaoZhi、OTA、设备 WebSocket | 暂停，不安装、不启动、不验收 |
 
 机器门只表示协议、资源和运行检查通过，不表示回答正确或适合生产。正式入口、音频
 链路和 XiaoZhi 均须另行批准。
+
+当前 `.90` 的只读设备快照还显示周期性 `DRV_LPM_FAULT 0x80E3A203`，NPU 内存约
+`13598/15610 MB`；在用户确认设备恢复前，暂停新的重模型加载和长压测。`Health: Alarm`
+仅作为诊断记录，不单独替代模型门禁；快照、哈希和处理边界见仓库验收记录。
+
+## 1.1 MindSpore 候选模型范围
+
+候选注册表同时保存已测试、失败和未执行的 Profile。下表是本教程当前固定的首批范围；
+条件候选只用于记录研究状态，不下载、不安装，也不能由 `case9-modelctl` 启动。
+
+| Profile | 8T B4 | 20T B1 | 首轮结论 |
+| --- | --- | --- | --- |
+| `qwen1.5-0.5b-mindspore` | 已测但 B4 `blocked` | 已测 | B4 身份门待补；B1 共享 `base`，技术通过后为 `experimental_dirty_base` |
+| `tinyllama-1.1b-mindspore` | 已测 | 已测 | 长输出/中文质量失败，保持 `blocked`；英文单独报告 |
+| `deepseek-r1-qwen-1.5b-mindspore` | 兼容性已测 | 优先已测 | 中文质量与正式准入独立审核 |
+| `qwen2.5-0.5b-mindspore` | `blocked`：context-only 诊断有输出，但严格 placement 证据缺失 | `not-run` | 不能用诊断输出启动服务 |
+| `qwen2.5-1.5b-mindspore` | `blocked`：七个文件已同步并校验；污染 CANN/PYTHONPATH 的初次 SIGSEGV 仅作历史证据，正确 CANN v4 已完成加载和两 token context-only 诊断 | `not-run` | placement、生成/API/质量/性能均未完成；内存门原始记录为 `docs/37-qwen25-1.5b-8t-memory-gate-20260904.md` |
+| `qwen3-0.6b-mindspore` | `blocked`：MindNLP 0.4.1 无 Qwen3 loader | `not-run` | 不升级环境 |
+| `qwen3-1.7b-mindspore` | `blocked`：MindNLP 0.4.1 无 Qwen3 loader | `not-run` | 不升级环境 |
+| `minicpm3-4b-mindspore` | 不执行 | `not-run` | 仅使用官方 20T/24G Modelers FP16 示例 |
+
+OpenPangu、EE-Model、TeleChat、BitCPM、MiniCPM5、MiniMind 和 Haidass 等条件候选
+若依赖 Torch/Torch-NPU、vLLM、MindIE、新版 CANN 或缺少 310B 证据，则登记为
+`blocked`/`not-run`，不得作为失败回退。模型来源、证据等级和具体阻断原因见仓库中的
+候选清单与验收记录；框架支持不能替代当前板端 NPU 证据。
 
 ## 2. 浏览器、网关、ACL 和 NPU 架构
 
@@ -47,11 +72,11 @@ flowchart LR
 
 ## 3. 两种板卡和无 Torch 边界
 
-`.90` 是 Ascend310B4/8T；`.95` 是 Ascend310B1/20T。`.178` 和 `.210` 都是历史
-采集地址，不应再用于新批次。两块板的 CANN、Python、MindSpore、MindNLP、驱动和
+`.90` 是 Ascend310B4/8T（`.11.14` 是此前活动地址，报告采集地址为 `.178`）；`.95` 是 Ascend310B1/20T。
+`.11.14`、`.178` 和 `.210` 都是历史地址，不应再用于新批次。两块板的 CANN、Python、MindSpore、MindNLP、驱动和
 `npu-smi` 版本必须在每个批次重新快照，不能把一块板的环境结论复制给另一块板。
-Qwen1.5、TinyLlama 和 DeepSeek 使用板端已有 `base`，因此即使机器门通过也只能标记
-`experimental_dirty_base`；TinyLlama 的既有失败证据仍保持 `blocked`，DeepSeek 的
+Qwen1.5、TinyLlama 和 DeepSeek 使用板端已有 `base`，因此逐板机器门全部通过后也只能标记
+`experimental_dirty_base`；Qwen1.5 B4 当前身份门不完整而保持 `blocked`，TinyLlama 的既有失败证据仍保持 `blocked`，DeepSeek 的
 质量和准入在双板数据补齐前保持未决。
 
 每次在板端同一个 shell 中准备环境：
@@ -210,20 +235,24 @@ python scripts/mindspore_chat_acceptance.py \
 
 | 路线/Profile | 板卡和采集地址 | 协议/批次 | 已测指标或门结果 | 当前解释 |
 | --- | --- | --- | --- | --- |
-| Qwen2.5 静态 KV ACL | B4/8T（`.90`；旧采集 `.178`） | 2 warmup + 30 SSE，`max_tokens=2` | 总耗时 p50/p95 `8,693.731/8,707.133 ms`；首事件 p50/p95 `8,563.591/8,576.954 ms`；约 `0.230/0.231 token/s` | 正式基线历史证据；本轮只补身份、工件和 descriptor 索引 |
+| Qwen2.5 静态 KV ACL | B4/8T（当前 `.90`；历史采集 `.11.14`/`.178`） | 2 warmup + 30 SSE，`max_tokens=2` | 总耗时 p50/p95 `8,693.731/8,707.133 ms`；首事件 p50/p95 `8,563.591/8,576.954 ms`；约 `0.230/0.231 token/s` | 正式基线历史证据；本轮只补身份、工件和 descriptor 索引 |
 | Qwen2.5 静态 KV ACL | B1/20T（旧采集 `.210`；当前 `.95`） | 同协议 | 总耗时 p50/p95 `6,486.422/6,506.085 ms`；首事件 p50/p95 `6,364.634/6,383.111 ms`；约 `0.308/0.310 token/s` | 只作为 B1 历史对照，不能与 B4 合并排名 |
-| `qwen1.5-0.5b-mindspore` | B4/8T（`.90`） | 2 warmup + 30 SSE，`max_tokens=2` | 总耗时 p50/p95 `1,412.236/1,603.883 ms`；首事件 p50/p95 `761.847/810.331 ms`；约 `1.420/1.479 token/s`；机器门 `9/9` | 共享 `base` 的实验性证据；人工质量、重复故障定位和准入未完成 |
-| `tinyllama-1.1b-mindspore` | B4/8T（`.90`） | 同协议 | 总耗时 p50/p95 `3,114.857/3,185.731 ms`；首事件 p50/p95 `3,110.338/3,181.192 ms`；约 `0.642/0.651 token/s`；机器门 `8/9` | 32-token 输出含 `U+FFFD`，保持 `blocked` |
+| `qwen1.5-0.5b-mindspore` | B4/8T（当前 `.90`；历史报告 `.11.14`） | 2 warmup + 30 SSE，`max_tokens=2` | 历史报表机器门 `9/9`；历史身份字段缺失按 `8/9`，当前 G0 已补齐但严格 placement 仍失败 | 历史输出和性能保留，但 B4 当前 `blocked`；人工质量、重复故障定位和准入未完成 |
+| `tinyllama-1.1b-mindspore` | B4/8T（当前 `.90`；历史报告 `.11.14`） | 同协议 | 总耗时 p50/p95 `3,114.857/3,185.731 ms`；首事件 p50/p95 `3,110.338/3,181.192 ms`；约 `0.642/0.651 token/s`；机器门 `8/9` | 32-token 输出含 `U+FFFD`，保持 `blocked` |
 | `deepseek-r1-qwen-1.5b-mindspore` | B1/20T（`.95`） | 隔离 API 2 warmup + 30 SSE，`max_tokens=2` | 总耗时 p50/p95 `2,484.751/2,557.242 ms`；首事件 p50/p95 `2,478.495/2,551.004 ms`；约 `0.805/0.815 token/s` | 仅隔离实验；双板统一门、中文质量和准入仍未完成 |
+| `qwen2.5-0.5b-mindspore` | B4/8T（当前 `.90`；旧 `.11.14`/`.178`） | loader 诊断 + 并发 `npu-smi` 采样 | 固定权重 `988,097,824` bytes；加载 `48.223862 s`；16 token 中文生成 `27.194196 s`；AICore 非零峰值约 `37%`、设备内存约 `38% -> 91% -> 46%` | context-only 活动旁证；无显式 placement metadata，严格 worker `blocked`；未启动 API/网关，不是正式候选通过 |
 
 缺口批次必须在两块板分别执行，状态只能引用相应原始报告：
 
-| 缺口门 | `.90` B4/8T | `.95` B1/20T |
+| 缺口门 | 当前 `.90` B4/8T（历史报告 `.11.14`/`.178`） | `.95` B1/20T |
 | --- | --- | --- |
 | Qwen2.5 ONNX/OM 当前身份、descriptor、ACL smoke | `passed`（identity-only；历史性能不重跑） | `blocked`（当前 ONNX/OM/contract/lock 缺失，未执行 ACL load） |
-| Qwen1.5 MindSpore 长输出、稳定性、质量、性能 | 已有完整机器批次；共享 `base`，人工质量待审 | `passed`，9/9 机器门，人工质量待审，`experimental_dirty_base` |
+| Qwen1.5 MindSpore 长输出、稳定性、质量、性能 | 历史报表 9/9，但严格身份门 8/9，当前 `blocked`；共享 `base`，人工质量待审 | `passed`，9/9 机器门，人工质量待审，`experimental_dirty_base` |
 | TinyLlama MindSpore 长输出、稳定性、质量、性能 | `blocked`（历史长输出/中文质量失败） | `failed`，8/9；32/48 token UTF-8 失败，保持 `blocked` |
 | DeepSeek MindSpore API、稳定性、质量、性能 | `passed`，9/9 机器门，人工质量待审，`experimental_dirty_base` | 已有隔离 API 机器门；中文质量和正式准入 `blocked` |
+| Qwen2.5-0.5B MindSpore loader/placement | `blocked`；固定工件和 NPU 活动诊断已记录，严格 placement 缺失 | `not-run`；当前 20T 不可达 |
+| Qwen2.5-1.5B MindSpore 配置/权重加载 | `blocked`；初次污染环境 SIGSEGV（exit 139）保留为历史证据，正确 CANN v4 已加载并生成 2 token，但 placement/API/质量/性能未运行 | `not-run`；未执行 |
+| Qwen3-0.6B/1.7B MindSpore loader | `blocked`；MindNLP 0.4.1 无 Qwen3 loader，未下载权重 | `not-run`；未执行 |
 
 上述状态直接对应本地复现包中的原始报告；`not-run` 只保留有意未执行的跨 SoC 兼容性组合，
 不是对板端能力的推断。历史两批错误边界为 `6/6`，
@@ -270,6 +299,9 @@ mask 告警；post-mask n 批次已固定 `top_p=1.0` 并显式传入 mask。`He
 本轮不安装或启动 `xiaozhi-esp32-server`，不提供 OTA、设备 WebSocket、Opus、ASR/TTS
 或真实设备命令。文字 LLM 的 JSON/SSE 成功不能证明 XiaoZhi 语音闭环可用。恢复该阶段
 前，需单独审核无 Torch 的语音组件、设备协议、鉴权、音频资源和真实设备端到端验收。
+
+模型候选的来源、证据分级、逐板执行顺序和验收记录由仓库工程文档维护；本教程只保留
+可独立复现的命令、边界和已测结果，不依赖其他仓库 Markdown 文件。
 
 参考：[MindSpore Orange Pi 在线推理目录][mindspore-orange-pi]、[Qwen1.5 模型卡][qwen15]、
 [TinyLlama 模型卡][tinyllama]、[DeepSeek 模型卡][deepseek]、[昇腾 ATC 文档][atc]。

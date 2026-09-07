@@ -1,8 +1,8 @@
 # samples 配套代码说明
 
-本目录存放书稿章节和实践案例的可运行代码。CANN、PyACL、ATC、OM、DVPP 和 `npu-smi` 相关命令必须在真实 Ascend 310B 设备执行；普通开发机只适合文档、语法、前端和不依赖硬件的单元测试。
+本目录只负责“代码在哪里、如何进入和运行”。它不是全仓库文档索引；工程文档请从 [`../docs/README.md`](../docs/README.md) 开始，目录职责请看 [`CASE_LAYOUT.md`](CASE_LAYOUT.md)。CANN、PyACL、ATC、OM、DVPP 和 `npu-smi` 相关命令必须在真实 Ascend 310B 设备执行；普通开发机只适合文档、语法、前端和不依赖硬件的单元测试。
 
-案例的稳定 ID、语义关键词和迁移状态见 [实践案例目录规范](CASE_LAYOUT.md) 与 [案例索引](case-index.json)。
+案例的稳定 ID、语义关键词和迁移状态见 [实践案例目录规范](CASE_LAYOUT.md) 与 [案例索引](case-index.json)。仓库级工程文档入口见 [`../docs/README.md`](../docs/README.md)；根 README 只负责项目首页和本地书稿起步。
 
 ## 📚 章节代码
 
@@ -24,7 +24,7 @@
 
 ## 🖼️ Case7 入口
 
-Case7 将 Orange Pi AIpro / Ascend 310B4 作为 NPU 相册服务器，同时服务手机、10 寸 QDtech MPI1001 触摸屏、ESP32/PhotoPainter 和 E6 dry-run。运行入口是 [`case7/README.md`](case7/README.md)，完整理论教程是 [`../src/experiment/case7.md`](../src/experiment/case7.md)，工程文档在 [`case7/docs/`](case7/docs/)。
+Case7 将 Orange Pi AIpro / Ascend 310B4 作为 NPU 相册服务器，同时服务手机、10 寸 QDtech MPI1001 触摸屏、ESP32/PhotoPainter 和 E6 dry-run。运行入口是 [`case7/README.md`](case7/README.md)，完整理论教程是 [`../src/experiment/case7.md`](../src/experiment/case7.md)，按任务查找工程文档从 [`case7/docs/README.md`](case7/docs/README.md) 开始。
 
 ## 🧾 统一目录角色
 

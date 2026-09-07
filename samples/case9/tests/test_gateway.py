@@ -235,6 +235,30 @@ class GatewayTests(unittest.TestCase):
         self.assertTrue(data_lines)
         self.assertTrue(all(item["model"] == "case9-rag" for item in data_lines))
 
+    def test_mindspore_candidate_rejects_generation_over_64_tokens(self) -> None:
+        settings = replace(
+            make_settings(self.knowledge_dir),
+            upstream_model=_MINDSPORE_ACTIVE_UPSTREAM_MODEL,
+            rag_enabled=False,
+        )
+        upstream = FakeUpstream()
+        app = create_app(settings, upstream, None)
+        with TestClient(app) as client:
+            response = client.post(
+                "/v1/chat/completions",
+                headers={"Authorization": "Bearer gateway-token-0123456789abcdef"},
+                json={
+                    "model": "case9-rag",
+                    "messages": [{"role": "user", "content": "你好"}],
+                    "max_tokens": 65,
+                    "temperature": 0,
+                    "top_p": 1,
+                },
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "invalid_request_error")
+        self.assertEqual(upstream.complete_payloads, [])
+
     def test_tinyllama_adapter_rejects_non_greedy_limits(self) -> None:
         settings = replace(make_settings(self.knowledge_dir), upstream_model=_TINYLLAMA_UPSTREAM_MODEL)
         app = create_app(settings, self.upstream, LocalRetriever(self.knowledge_dir))

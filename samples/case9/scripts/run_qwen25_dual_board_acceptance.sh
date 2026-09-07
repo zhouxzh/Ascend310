@@ -8,7 +8,9 @@ SCRIPT_DIR="$(cd "$(dirname "$BASH_SOURCE")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 HELPER="$SCRIPT_DIR/qwen25_acceptance.py"
 BOARD8_HOST="192.168.1.90"
-BOARD20_HOST="192.168.8.210"
+# Current 20T address.  The former .210 address is retained only in archived
+# provenance and must never be selected by a default replay command.
+BOARD20_HOST="192.168.1.95"
 SSH_USER="HwHiAiUser"
 # Candidate service roots used by the current runbook.  Historical campaign
 # roots must be supplied explicitly when replaying an archived report.
@@ -53,7 +55,7 @@ This command never starts/stops a service and installs no packages.
 
   --board 8t|20t|both       target board(s), default both
   --board8-host IP          default 192.168.1.90
-  --board20-host IP         default 192.168.8.210
+  --board20-host IP         default 192.168.1.95
   --user NAME               default HwHiAiUser
   --board8-root PATH        8T deployment root below /home/NAME
   --board20-root PATH       20T deployment root below /home/NAME

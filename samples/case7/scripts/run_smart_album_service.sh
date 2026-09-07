@@ -25,6 +25,7 @@ case "$ROOT_DIR" in
   *) echo "refusing project root outside /home/HwHiAiUser/Documents/ai-album: $ROOT_DIR" >&2; exit 1 ;;
 esac
 
+
 mkdir -p "$(dirname "$PID_FILE")" "$(dirname "$LOG_FILE")"
 
 # A touchscreen kiosk may be opened through 127.0.0.1, but remote PhotoFrame

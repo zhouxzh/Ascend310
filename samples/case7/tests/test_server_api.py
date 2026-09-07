@@ -264,9 +264,10 @@ class ServerApiTests(unittest.TestCase):
         self.assertEqual(photo["file_url"], "/api/photos/1/file")
 
         class SearchIndex(FakeIndex):
-            def search_text(self, query, model_id, k):
+            def search_text(self, query, model_id, k, filters=None):
                 from photo_index import SearchResult
 
+                self.received_filters = filters
                 return [SearchResult(1, self.row["filepath"], self.row["filename"], 0, 0.5, model_id)]
 
         self.state.index = SearchIndex(self.row)
@@ -280,6 +281,27 @@ class ServerApiTests(unittest.TestCase):
         self.assertIn("/preview?width=480&height=360", item["url"])
         self.assertEqual(item["preview_url"], item["url"])
         self.assertEqual(item["file_url"], "/api/photos/1/file")
+
+        filtered = self.client.post(
+            "/api/search/text",
+            json={
+                "query": "雪景",
+                "model": "auto",
+                "top_k": 3,
+                "min_width": 1920,
+                "min_height": 1080,
+                "extensions": ["jpg"],
+                "face_filter": "no_people",
+            },
+        )
+        self.assertEqual(filtered.status_code, 200)
+        self.assertEqual(filtered.json()["filters"], {
+            "min_width": 1920,
+            "min_height": 1080,
+            "extensions": ["jpg"],
+            "face_filter": "no_people",
+        })
+        self.assertEqual(self.state.index.received_filters["min_width"], 1920)
 
     def test_upload_job_exposes_real_indexing_progress_fields(self):
         class UploadRegistry:
@@ -511,6 +533,96 @@ class ServerApiTests(unittest.TestCase):
         self.assertEqual(detail["next"], "/api/admin/devices/register")
         self.assertEqual(self.state.devices.list(), [])
 
+    def test_photoframe_discovery_returns_all_verified_candidates_without_registration(self):
+        """Same-name mDNS records must never cause an implicit first choice."""
+
+        candidates = [
+            {
+                "device_url": "http://192.168.1.137",
+                "hostname": "photoframe.local",
+                "device_hardware_id": "a4cb8fdaa1dc",
+                "board_name": "Waveshare ESP32-S3-PhotoPainter 7.3",
+                "firmware_version": "v2.18.0",
+                "width": 800,
+                "height": 480,
+                "profile_candidates": ["waveshare_photopainter_73"],
+                "status": "ready",
+            },
+            {
+                "device_url": "http://192.168.1.138",
+                "hostname": "photoframe.local",
+                "device_hardware_id": "a4cb8fdaa1dd",
+                "board_name": "Waveshare ESP32-S3-PhotoPainter 7.3",
+                "firmware_version": "v2.18.0",
+                "width": 800,
+                "height": 480,
+                "profile_candidates": ["waveshare_photopainter_73"],
+                "status": "ready",
+            },
+        ]
+
+        with mock.patch.object(app, "discover_photoframe_candidates", return_value=candidates) as discoverer:
+            response = self.client.get("/api/admin/devices/discover")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["service_type"], "_esp32-pframe._tcp.local.")
+        self.assertEqual(body["status"], "ready")
+        self.assertEqual([item["device_url"] for item in body["candidates"]], [
+            "http://192.168.1.137",
+            "http://192.168.1.138",
+        ])
+        self.assertEqual([item["device_hardware_id"] for item in body["candidates"]], [
+            "a4cb8fdaa1dc",
+            "a4cb8fdaa1dd",
+        ])
+        self.assertTrue(all(item["status"] == "ready" for item in body["candidates"]))
+        self.assertTrue(all(item["profile_candidates"] == ["waveshare_photopainter_73"] for item in body["candidates"]))
+        self.assertEqual(self.state.devices.list(), [])
+        discoverer.assert_called_once_with()
+
+    def test_photoframe_discovery_rejects_network_input_and_reports_unavailable(self):
+        with mock.patch.object(app, "discover_local_photoframe_services") as discoverer:
+            rejected = self.client.get("/api/admin/devices/discover?cidr=192.168.1.0/24")
+            self.assertEqual(rejected.status_code, 400)
+            discoverer.assert_not_called()
+
+        with mock.patch.object(app, "discover_photoframe_candidates", side_effect=app.DiscoveryError("mDNS discovery is unavailable")):
+            unavailable = self.client.get("/api/admin/devices/discover")
+        self.assertEqual(unavailable.status_code, 200)
+        body = unavailable.json()
+        self.assertEqual(body["status"], "none_found")
+        self.assertIn("mDNS", body["message"])
+        self.assertEqual(body["diagnostics"]["mdns_error"], "mDNS discovery is unavailable")
+
+    def test_photoframe_manual_probe_is_read_only_and_returns_candidate(self):
+        candidate = {
+            "device_url": "http://192.168.1.137",
+            "hostname": None,
+            "device_hardware_id": "a4cb8fdaa1dc",
+            "board_name": "Waveshare ESP32-S3-PhotoPainter 7.3",
+            "firmware_version": "v2.18.0",
+            "width": 800,
+            "height": 480,
+            "profile_candidates": ["waveshare_photopainter_73"],
+            "status": "ready",
+        }
+        with mock.patch.object(app, "probe_photoframe_candidate", return_value=candidate) as probe:
+            response = self.client.post("/api/admin/devices/probe", json={"device_url": "http://192.168.1.137"})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["read_only"])
+        self.assertEqual(body["status"], "ready")
+        self.assertEqual(body["candidate"]["device_hardware_id"], "a4cb8fdaa1dc")
+        probe.assert_called_once_with("http://192.168.1.137")
+        self.assertEqual(self.state.devices.list(), [])
+
+    def test_photoframe_manual_probe_rejects_non_private_address(self):
+        with mock.patch.object(app, "probe_photoframe_candidate") as probe:
+            response = self.client.post("/api/admin/devices/probe", json={"device_url": "http://8.8.8.8"})
+        self.assertEqual(response.status_code, 400)
+        probe.assert_not_called()
+
     @mock.patch.object(app, "PhotoFrameProvisioner")
     def test_atomic_registration_does_not_leave_unreachable_device(self, provisioner_class):
         """A failed connection must not be presented as a registered device."""
@@ -532,6 +644,35 @@ class ServerApiTests(unittest.TestCase):
         self.assertEqual(body["detail"]["registration_status"], "not_registered")
         self.assertEqual(self.state.devices.list(), [])
         provisioner_class.return_value.provision.assert_called_once()
+
+    @mock.patch.object(app, "PhotoFrameProvisioner")
+    def test_atomic_registration_forwards_discovered_hardware_id(self, provisioner_class):
+        provisioner_class.return_value.provision.return_value = app.ProvisionResult(
+            device_url="http://192.168.1.137",
+            device_hardware_id="a4cb8fdaa1dc",
+            firmware_version="v2.18.0",
+            board_name="Waveshare 7.3 7-Color",
+            configured_image_url="http://192.168.1.135:7860/api/devices/pending/photoframe",
+            rotation_cron=("*/30 * *",),
+            display_orientation="landscape",
+            rotate_requested=False,
+            rotate_status="not_requested",
+        )
+        response = self.client.post(
+            "/api/admin/devices/register",
+            json={
+                "name": "discovered-frame",
+                "profile_id": "waveshare_photopainter_73",
+                "device_url": "http://192.168.1.137",
+                "expected_device_id": "a4cb8fdaa1dc",
+                "trigger_now": False,
+            },
+        )
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(
+            provisioner_class.return_value.provision.call_args.kwargs["expected_device_id"],
+            "a4cb8fdaa1dc",
+        )
 
     @mock.patch.object(app, "PhotoFrameProvisioner")
     def test_atomic_registration_requires_device_url_and_reports_rotate_failure(self, provisioner_class):
@@ -576,6 +717,20 @@ class ServerApiTests(unittest.TestCase):
         self.assertIn("等待设备", body["message"])
         self.assertEqual(body["pull_provision"]["status"], "awaiting_pull")
         self.assertEqual(len(self.state.devices.list()), 1)
+
+    def test_registration_rejects_disabling_fixed_deep_sleep(self):
+        response = self.client.post(
+            "/api/admin/devices/register",
+            json={
+                "name": "always-sleep",
+                "profile_id": "seeedstudio_reterminal_e1002",
+                "device_url": "http://192.168.1.91",
+                "deep_sleep_enabled": False,
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("fixed enabled", response.json()["detail"])
+        self.assertEqual(self.state.devices.list(), [])
 
     @mock.patch.object(app, "PhotoFrameProvisioner")
     def test_atomic_registration_rejects_a_duplicate_normalized_device_url(self, provisioner_class):
@@ -798,6 +953,13 @@ class ServerApiTests(unittest.TestCase):
             headers={"X-Display-Width": "480", "X-Display-Height": "800", "X-Display-Orientation": "portrait"},
         )
         self.assertIn(wave_content.status_code, {200, 404})
+        if wave_content.status_code == 200:
+            self.assertEqual(wave_content.headers["x-album-width"], "480")
+            self.assertEqual(wave_content.headers["x-album-height"], "800")
+            self.assertEqual(wave_content.headers["x-album-hardware-rotation"], "180")
+            payload = json.loads(wave_content.headers["x-config-payload"])
+            self.assertEqual(payload["config"]["display_orientation"], "portrait")
+            self.assertEqual(payload["config"]["display_rotation_deg"], 180)
 
         seeed_value = self._create_test_photoframe(
             profile_id="seeedstudio_reterminal_e1002",
@@ -916,7 +1078,11 @@ class ServerApiTests(unittest.TestCase):
 
         response = self.client.post(
             f"/api/admin/devices/{device_id}/provision-pull",
-            json={"device_url": "http://192.168.1.137", "trigger_now": True},
+            json={
+                "device_url": "http://192.168.1.137",
+                "expected_device_id": "a4cb8fdaa1dc",
+                "trigger_now": True,
+            },
         )
         self.assertEqual(response.status_code, 200)
         body = response.json()
@@ -927,6 +1093,7 @@ class ServerApiTests(unittest.TestCase):
         kwargs = provisioner.provision.call_args.kwargs
         self.assertTrue(kwargs["image_url"].endswith(f"/api/devices/{device_id}/photoframe"))
         self.assertEqual(kwargs["rotation_cron"], ["*/30 * *"])
+        self.assertEqual(kwargs["expected_device_id"], "a4cb8fdaa1dc")
 
         # Configuration success only proves that the ESP32 accepted settings.
         # It must not be displayed as an image fetch before the device itself
@@ -1048,7 +1215,9 @@ class ServerApiTests(unittest.TestCase):
         self.assertEqual(device_response.status_code, 200)
         payload = json.loads(device_response.headers["x-config-payload"])
         self.assertEqual(payload["config"]["display_orientation"], "landscape")
-        self.assertEqual(payload["config"]["display_rotation_deg"], 0)
+        self.assertEqual(payload["config"]["display_rotation_deg"], 180)
+        self.assertTrue(payload["config"]["deep_sleep_enabled"])
+        self.assertEqual(device_response.headers["x-album-hardware-rotation"], "180")
         self.assertNotIn("orientation_mode", payload["config"])
         after = self.client.get(f"/api/admin/devices/{device_id}/state").json()
         self.assertEqual(after["last_request_firmware"], "v2.18.0")
@@ -1069,6 +1238,35 @@ class ServerApiTests(unittest.TestCase):
         self.assertEqual(unchanged.status_code, 304)
         final_state = self.client.get(f"/api/admin/devices/{device_id}/state").json()
         self.assertEqual(final_state["last_status"], "not_modified")
+
+    def test_photoframe_config_payload_uses_seeed_native_rotation(self):
+        """The fixed board compensation is isolated per product profile."""
+
+        value = self._create_test_photoframe(
+            name="e1002-rotation",
+            profile_id="seeedstudio_reterminal_e1002",
+        )
+        device_id = value["device_id"]
+        self.state.devices.mark_pull_provision(
+            device_id,
+            "awaiting_pull",
+            device_url="http://192.168.1.138",
+            configured_image_url=f"http://192.168.1.135:7860/api/devices/{device_id}/photoframe",
+            successful=True,
+        )
+        response = self.photoframe_client.get(
+            f"/api/devices/{device_id}/photoframe",
+            headers={
+                "X-Display-Width": "800",
+                "X-Display-Height": "480",
+                "X-Display-Orientation": "landscape",
+                "X-Firmware-Version": "v2.18.0",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.headers["x-config-payload"])
+        self.assertEqual(payload["config"]["display_rotation_deg"], 0)
+        self.assertEqual(response.headers["x-album-hardware-rotation"], "0")
 
     def test_admin_device_delete_requires_confirmation_and_removes_record(self):
         value = self._create_test_photoframe(name="remove-me")

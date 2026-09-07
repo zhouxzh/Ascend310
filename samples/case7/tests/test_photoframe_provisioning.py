@@ -1,12 +1,16 @@
 import io
 import json
 import unittest
+from types import SimpleNamespace
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
 from photoframe_provisioning import (
+    AVAHI_BROWSE_PATH,
+    DiscoveryError,
     PhotoFrameProvisioner,
     ProvisionError,
+    discover_local_photoframe_services,
     normalize_device_url,
 )
 
@@ -107,12 +111,14 @@ class PhotoFrameProvisioningTests(unittest.TestCase):
         self.assertEqual(patch_body["image_url"], desired_image)
         self.assertTrue(patch_body["auto_rotate"])
         self.assertEqual(patch_body["rotation_mode"], "url")
-        self.assertEqual(patch_body["display_rotation_deg"], 0)
-        self.assertFalse(patch_body["deep_sleep_enabled"])
+        self.assertEqual(patch_body["display_rotation_deg"], 180)
+        # Registration always keeps the battery-saving sleep invariant.
+        self.assertTrue(patch_body["deep_sleep_enabled"])
         self.assertFalse(patch_body["save_downloaded_images"])
         self.assertIsNone(calls[4][3])
         self.assertEqual(result.rotate_status, "requested")
         self.assertEqual(result.device_hardware_id, "aabbccddeeff")
+        self.assertEqual(result.display_rotation_deg, 180)
 
     def test_config_readback_requires_rotation_sleep_and_download_storage_settings(self):
         expected = {
@@ -121,13 +127,13 @@ class PhotoFrameProvisioningTests(unittest.TestCase):
             "rotation_mode": "url",
             "image_url": "http://192.168.1.135:7860/api/devices/demo/photoframe",
             "display_orientation": "landscape",
-            "display_rotation_deg": 0,
-            "deep_sleep_enabled": False,
+            "display_rotation_deg": 180,
+            "deep_sleep_enabled": True,
             "save_downloaded_images": False,
         }
         cases = (
-            ("display_rotation_deg", 180, "display_rotation_deg=0"),
-            ("deep_sleep_enabled", True, "deep_sleep_enabled=false"),
+            ("display_rotation_deg", 0, "display_rotation_deg=180"),
+            ("deep_sleep_enabled", False, "deep_sleep_enabled=true"),
             ("save_downloaded_images", True, "save_downloaded_images=false"),
         )
         for key, actual, message in cases:
@@ -179,6 +185,45 @@ class PhotoFrameProvisioningTests(unittest.TestCase):
         self.assertTrue(patch_payloads[0]["auto_rotate"])
         self.assertEqual(patch_payloads[1], saved)
 
+    def test_provision_rejects_explicit_disable_of_deep_sleep(self):
+        saved = {
+            "auto_rotate": True,
+            "rotate_cron": ["*/30 * *"],
+            "rotation_mode": "url",
+            "image_url": "http://example.invalid/old.jpg",
+            "display_orientation": "landscape",
+            "display_rotation_deg": 180,
+            "deep_sleep_enabled": True,
+            "save_downloaded_images": False,
+        }
+
+        def opener(request: Request, timeout: float):
+            path = request.full_url.split("192.168.1.137", 1)[-1]
+            if request.get_method() == "GET" and path == "/api/system-info":
+                return _Response(_json({
+                    "project_name": "esp32-photoframe",
+                    "width": 800,
+                    "height": 480,
+                }))
+            if request.get_method() == "GET" and path == "/api/config":
+                return _Response(_json(saved))
+            if request.get_method() == "PATCH" and path == "/api/config":
+                saved.update(json.loads(request.data.decode("utf-8")))
+                return _Response(_json({"status": "success"}))
+            if request.get_method() == "POST" and path == "/api/rotate":
+                return _Response(b"")
+            raise AssertionError((request.get_method(), request.full_url))
+
+        with self.assertRaisesRegex(ProvisionError, "deep sleep is fixed enabled"):
+            PhotoFrameProvisioner(opener=opener).provision(
+                "http://192.168.1.137",
+                image_url="http://192.168.1.135:7860/api/devices/demo/photoframe",
+                rotation_cron=["*/30 * *"],
+                display_orientation="landscape",
+                native_size=(800, 480),
+                deep_sleep_enabled=False,
+            )
+
     def test_identity_mismatch_stops_before_config_write(self):
         calls = []
 
@@ -228,7 +273,7 @@ class PhotoFrameProvisioningTests(unittest.TestCase):
             "image_url": "http://192.168.1.135:7860/api/devices/demo/photoframe",
             "display_orientation": "landscape",
             "display_rotation_deg": 0,
-            "deep_sleep_enabled": False,
+            "deep_sleep_enabled": True,
             "save_downloaded_images": False,
         }
 
@@ -260,7 +305,7 @@ class PhotoFrameProvisioningTests(unittest.TestCase):
             "image_url": "http://192.168.1.135:7860/api/devices/demo/photoframe",
             "display_orientation": "landscape",
             "display_rotation_deg": 0,
-            "deep_sleep_enabled": False,
+            "deep_sleep_enabled": True,
             "save_downloaded_images": False,
         }
 
@@ -298,6 +343,62 @@ class PhotoFrameProvisioningTests(unittest.TestCase):
                 display_orientation="landscape",
                 native_size=(800, 480),
             )
+
+    def test_expected_device_id_mismatch_stops_after_system_info(self):
+        """A discovered identity pin must be checked before any config I/O."""
+
+        calls = []
+
+        def opener(request, timeout):
+            calls.append((request.get_method(), request.full_url))
+            if request.full_url.endswith("/api/system-info"):
+                return _Response(_json({
+                    "project_name": "esp32-photoframe",
+                    "device_id": "a4cb8fdaa1dc",
+                    "width": 800,
+                    "height": 480,
+                }))
+            raise AssertionError("identity mismatch must stop before /api/config or PATCH")
+
+        with self.assertRaisesRegex(ProvisionError, "device_id does not match"):
+            PhotoFrameProvisioner(opener=opener).provision(
+                "http://192.168.1.137",
+                image_url="http://192.168.1.135:7860/api/devices/demo/photoframe",
+                rotation_cron=["*/30 * *"],
+                display_orientation="landscape",
+                native_size=(800, 480),
+                expected_device_id="different-device",
+            )
+        self.assertEqual(calls, [("GET", "http://192.168.1.137/api/system-info")])
+
+    def test_local_avahi_discovery_keeps_only_private_port_80_records(self):
+        calls = []
+        output = "\n".join((
+            "=;eth0;IPv4;PhotoFrame\\; One;_esp32-pframe._tcp;local;photoframe.local;192.168.1.137;80;",
+            "=;eth0;IPv4;PhotoFrame Two;_esp32-pframe._tcp;local;photoframe.local;192.168.1.138;80;",
+            "=;eth0;IPv4;Public;_esp32-pframe._tcp;local;public.local;8.8.8.8;80;",
+            "=;eth0;IPv4;WrongPort;_esp32-pframe._tcp;local;wrong.local;192.168.1.139;8080;",
+            "=;eth0;IPv4;WrongType;_http._tcp;local;wrong.local;192.168.1.140;80;",
+            "+;eth0;IPv4;Unresolved;_esp32-pframe._tcp;local",
+        ))
+
+        def runner(command, timeout):
+            calls.append((command, timeout))
+            return SimpleNamespace(returncode=0, stdout=output, stderr="")
+
+        services = discover_local_photoframe_services(timeout_seconds=2, runner=runner)
+        self.assertEqual(calls, [((AVAHI_BROWSE_PATH, "-rpt", "_esp32-pframe._tcp"), 2.0)])
+        self.assertEqual(len(services), 1)
+        self.assertEqual(services[0].hostname, "photoframe.local")
+        self.assertEqual(services[0].addresses, ("192.168.1.137", "192.168.1.138"))
+        self.assertEqual(services[0].port, 80)
+
+    def test_local_avahi_discovery_reports_unavailable_runner(self):
+        def runner(command, timeout):
+            return SimpleNamespace(returncode=127, stdout="", stderr="not found")
+
+        with self.assertRaisesRegex(DiscoveryError, "exit code 127"):
+            discover_local_photoframe_services(runner=runner)
 
 
 if __name__ == "__main__":

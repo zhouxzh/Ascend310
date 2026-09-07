@@ -63,6 +63,11 @@ PHOTOFRAME_PROFILES = {
         "partial_refresh": False,
         "orientations": ["landscape", "portrait"],
         "orientation_policy": "landscape_or_portrait",
+        # The stock Waveshare board profile mounts the Spectra panel with a
+        # fixed half-turn.  This is hardware compensation, not a user-facing
+        # third orientation and must be sent to the ESP32 independently of the
+        # logical landscape/portrait choice.
+        "hardware_rotation_deg": 180,
         "rotation_degrees": [],
         "codecs": ["jpeg"],
     },
@@ -83,6 +88,8 @@ PHOTOFRAME_PROFILES = {
         "partial_refresh": False,
         "orientations": ["landscape"],
         "orientation_policy": "landscape_only",
+        # The Seeed board is installed in its native direction.
+        "hardware_rotation_deg": 0,
         "rotation_degrees": [],
         "codecs": ["jpeg"],
     },
@@ -117,6 +124,25 @@ def photo_frame_profile(profile_id: Optional[str]) -> dict:
         "codecs": list(profile["codecs"]),
         "colors": list(profile["colors"]),
     }
+
+
+def photo_frame_hardware_rotation_deg(profile_id: Optional[str]) -> int:
+    """Return the fixed panel-installation compensation for a product.
+
+    The value is deliberately separate from ``display.rotation``.  The latter
+    is the server-side pixel transform and remains zero for the two-value
+    PhotoFrame orientation contract; this value is the board's physical
+    coordinate compensation consumed by the upstream firmware.
+    """
+
+    profile = photo_frame_profile(profile_id)
+    try:
+        value = int(profile.get("hardware_rotation_deg", 0))
+    except (TypeError, ValueError) as exc:
+        raise DeviceError("photoframe hardware rotation metadata is invalid") from exc
+    if value not in {0, 180}:
+        raise DeviceError("photoframe hardware rotation metadata must be 0 or 180")
+    return value
 
 
 def validate_photo_frame_capability(profile_id: Optional[str], display: dict) -> dict:
@@ -180,6 +206,7 @@ def validate_photo_frame_capability(profile_id: Optional[str], display: dict) ->
         height=height,
         orientation=orientation,
         rotation=0,
+        hardware_rotation_deg=photo_frame_hardware_rotation_deg(profile["profile_id"]),
         codecs=["jpeg"],
     )
     return result
@@ -258,6 +285,9 @@ DEFAULT_PULL_PROVISION = {
     "firmware_version": None,
     "board_name": None,
     "configured_image_url": None,
+    # Read back from the ESP32 during provisioning. A null value means an old
+    # registry entry predating this field, not that deep sleep is disabled.
+    "deep_sleep_enabled": None,
     "rotate_requested_at": None,
     "rotate_status": "not_requested",
     # Set only after a complete PhotoFrame URL Rotation request reaches the
@@ -293,6 +323,8 @@ def _validate_pull_provision(value: Optional[dict], base: Optional[dict] = None)
     for key in ("device_url", "last_error", "device_hardware_id", "firmware_version", "board_name", "configured_image_url"):
         if result.get(key) is not None:
             result[key] = str(result[key])[:500 if key == "last_error" else 256]
+    if result.get("deep_sleep_enabled") is not None and not isinstance(result["deep_sleep_enabled"], bool):
+        raise DeviceError("pull_provision.deep_sleep_enabled must be boolean or null")
     for key in ("last_attempt", "last_success", "rotate_requested_at", "first_pull_at", "last_pull_at"):
         raw = result.get(key)
         if raw is not None:
@@ -430,6 +462,13 @@ class DeviceRegistry:
             if isinstance(raw_policy, dict) and raw_policy.get("rotation_cron") == ["0 8-22 *"]:
                 raw_policy = dict(raw_policy)
                 raw_policy["rotation_cron"] = list(DEFAULT_EINK_ROTATION_CRON)
+            # Deep sleep is now a fixed PhotoFrame invariant.  Normalize old
+            # registries that explicitly stored false so a service restart
+            # does not fail validation and the next device pull repairs the
+            # firmware setting.
+            if isinstance(raw_policy, dict):
+                raw_policy = dict(raw_policy)
+                raw_policy["deep_sleep_enabled"] = True
             item["policy"] = validate_policy(raw_policy, raw_policy)
             raw_push = item.get("push")
             # Older experimental registries could mark push enabled before a
@@ -1002,6 +1041,7 @@ class DeviceRegistry:
         firmware_version=_UNSET,
         board_name=_UNSET,
         configured_image_url=_UNSET,
+        deep_sleep_enabled=_UNSET,
         rotate_requested_at=_UNSET,
         rotate_status=_UNSET,
         successful: bool = False,
@@ -1039,6 +1079,7 @@ class DeviceRegistry:
                 "firmware_version": firmware_version,
                 "board_name": board_name,
                 "configured_image_url": configured_image_url,
+                "deep_sleep_enabled": deep_sleep_enabled,
                 "rotate_requested_at": rotate_requested_at,
                 "rotate_status": rotate_status,
             }

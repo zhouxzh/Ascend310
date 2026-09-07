@@ -9,7 +9,7 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUNDLE="$REPO_DIR/repro/qwen25-kv1024-dual-board-20260827"
 USER_NAME="HwHiAiUser"
 BOARD8_HOST="192.168.1.90"
-BOARD20_HOST="192.168.8.210"
+BOARD20_HOST="192.168.1.95"
 # These defaults are for the archived historical layout.  The current
 # candidate roots are intentionally passed explicitly by the canonical
 # runbook, because a historical campaign stores 20T files below run/replacement.
@@ -42,7 +42,7 @@ No recursive copy or --delete is used.
   --bundle DIR              destination bundle (default: repro/...)
   --user NAME               default HwHiAiUser
   --board8-host IP          default 192.168.1.90
-  --board20-host IP         default 192.168.8.210
+  --board20-host IP         default 192.168.1.95 (historical alias: 192.168.8.210)
   --board8-root PATH        source root below /home/NAME (pass current candidate root explicitly)
   --board20-root PATH       source root below /home/NAME (pass current candidate root explicitly)
   --layout NAME             historical or candidate (default: historical)
@@ -501,10 +501,12 @@ scope=controller-side provenance only; CANN/ACL/ATC are board-only
     "environment/board8t-provenance.txt": f"""board_id=board8t
 soc=Ascend310B4
 current_ip={board8}
+previous_active_ip=192.168.11.14
+historical_aliases=192.168.11.14,192.168.8.178
 report_collection_ip=192.168.8.178
 sync_run_id={sync_id}
 sync_status={'unreachable' if offline8 == '1' else 'remote_verified'}
-note=The current .90 address is an alias for the same physical board previously measured at .178; an IP-only change does not imply a new inference run.
+note=The active 8T address for this sync is {board8}; .11.14 and .178 are historical aliases for the same physical board. An IP-only change does not imply a new inference run.
 candidate_evidence=Explicit historical 7867/7868 files are tracked separately when present; the original 130500Z chain directory is not asserted by this snapshot.
 """,
     "environment/board20t-provenance.txt": f"""board_id=board20t

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -15,6 +16,22 @@ from case9_model_profiles import load_profiles, write_active_state
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "case9-modelctl.sh"
+
+
+class ModelCtlSourceTests(unittest.TestCase):
+    def test_embedded_python_heredocs_compile(self) -> None:
+        """Catch indentation drift in shell-embedded admission checks."""
+
+        source = SCRIPT.read_text(encoding="utf-8")
+        blocks = re.findall(r"<<'PY'\n(.*?)\nPY", source, flags=re.DOTALL)
+        self.assertGreaterEqual(len(blocks), 1)
+        for index, block in enumerate(blocks, 1):
+            try:
+                compile(block, "case9-modelctl-heredoc-%d" % index, "exec")
+            except SyntaxError as exc:
+                self.fail(
+                    "embedded Python heredoc %d does not compile: %s" % (index, exc)
+                )
 
 
 def _bash_path(path: Path) -> str:
@@ -38,6 +55,22 @@ def _bash_available() -> bool:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     ) == 0
+
+
+def _enable_qwen15_b4_fixture(registry_path: Path) -> None:
+    """Make a private activation fixture without weakening the checked-in registry.
+
+    These lifecycle tests exercise PID/journal handling, not the real board
+    admission result.  The production registry intentionally keeps B4 blocked
+    until its missing identity evidence is refreshed, so the fixture promotes
+    only its copied B4 record.
+    """
+
+    document = json.loads(registry_path.read_text(encoding="utf-8"))
+    profile = next(item for item in document["profiles"] if item["id"] == "qwen1.5-0.5b-mindspore")
+    profile["status"] = "experimental_dirty_base"
+    profile["validation"]["Ascend310B4"]["status"] = "experimental_dirty_base"
+    registry_path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
 
 
 @unittest.skipUnless(_bash_available(), "bash unavailable")
@@ -363,6 +396,7 @@ class ModelCtlShellTests(unittest.TestCase):
                 ROOT / "configs" / "chat_model_profiles.json",
                 root / "configs" / "chat_model_profiles.json",
             )
+            _enable_qwen15_b4_fixture(root / "configs" / "chat_model_profiles.json")
             fake_launcher = root / "scripts" / "run_mindspore_chat_service.sh"
             fake_launcher.write_text(
                 "#!/usr/bin/env bash\n"
@@ -474,6 +508,20 @@ class ModelCtlShellTests(unittest.TestCase):
         self.assertIn('worker_group_isolated "${expected_pid}" "${expected_pgid}" || return 1', health_source)
         self.assertIn('worker_group_alive "${expected_pgid}" || return 1', health_source)
         self.assertIn('re.fullmatch(r"[0-9a-fA-F]{64}", fingerprint)', health_source)
+        # A ready HTTP response is only admissible when it proves the same
+        # native profile/SoC and a clean, idle worker state.  These checks keep
+        # a stale or malformed candidate from being treated as active.
+        for required in (
+            'body.get("model_id") != expected_model_id',
+            'body.get("busy") is not False',
+            'body.get("cache_cleanup") != "idle"',
+            'body.get("admission_allowed") is not True',
+            'candidate_kind != "native_mindspore"',
+            'body.get("conditional") is not False',
+            'admission_status != observed_soc_status',
+            'admission_soc != observed_soc',
+        ):
+            self.assertIn(required, health_source)
 
     def test_missing_conda_refuses_system_python_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -798,6 +846,7 @@ class ModelCtlShellTests(unittest.TestCase):
                 ROOT / "configs" / "chat_model_profiles.json",
                 root / "configs" / "chat_model_profiles.json",
             )
+            _enable_qwen15_b4_fixture(root / "configs" / "chat_model_profiles.json")
             fake_launcher = root / "scripts" / "run_mindspore_chat_service.sh"
             fake_launcher.write_text(
                 # Keep the intentionally mismatched process alive long enough

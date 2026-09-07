@@ -582,8 +582,13 @@ TEXT_CHAT_HTML = r"""<!doctype html>
     .subtle { color: #64717d; font-size: .86rem; margin: 5px 0 0; }
     .profiles { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 5px 8px; align-items: center; color: #52616d; font-size: .78rem; }
     .profiles strong { color: #31414d; font-weight: 600; }
-    .profile-pill { border: 1px solid #d1dbe2; border-radius: 999px; padding: 3px 8px; background: #fff; }
+    .profile-pill { border: 1px solid #d1dbe2; border-radius: 999px; padding: 3px 8px; background: #fff; max-width: 100%; overflow-wrap: anywhere; }
     .profile-pill.active { border-color: #75a9ca; background: #eef7fc; color: #174b70; }
+    .profile-pill[data-status="blocked"], .profile-pill[data-status="not-run"] { border-color: #e1aaaa; background: #fff7f7; color: #7b3a3a; }
+    .profile-pill[data-status="experimental_dirty_base"] { border-color: #e7c77e; background: #fff9e9; color: #7a5311; }
+    .profile-pill .profile-main { font-weight: 600; }
+    .profile-pill .profile-detail { color: #687783; font-weight: 400; }
+    .profile-pill[data-status="blocked"] .profile-detail, .profile-pill[data-status="not-run"] .profile-detail { color: #8d5555; }
     .status { border: 1px solid #c9d2da; border-radius: 999px; padding: 6px 11px; font-size: .82rem; white-space: nowrap; background: #fff; }
     .status[data-kind="ok"] { color: #176b45; border-color: #9bd3b5; background: #effaf3; }
     .status[data-kind="busy"] { color: #7a5311; border-color: #e7c77e; background: #fff9e9; }
@@ -684,10 +689,56 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         items.forEach((item) => {
           if (!item || typeof item.id !== 'string') return;
           const pill = document.createElement('span');
-          pill.className = 'profile-pill' + (item.id === activeId ? ' active' : '');
-          const name = typeof item.display_name === 'string' ? item.display_name : item.id;
           const status = typeof item.status === 'string' ? item.status : 'unknown';
-          pill.textContent = name + ' · ' + status;
+          pill.className = 'profile-pill' + (item.id === activeId ? ' active' : '');
+          pill.dataset.status = status;
+          const name = typeof item.display_name === 'string' ? item.display_name : item.id;
+          const main = document.createElement('span');
+          main.className = 'profile-main';
+          main.textContent = name + ' · ' + status;
+          pill.appendChild(main);
+          const details = [];
+          if (Array.isArray(item.languages) && item.languages.length) {
+            details.push(item.languages.join('/'));
+          } else if (typeof item.language === 'string' && item.language) {
+            details.push(item.language);
+          }
+          if (Array.isArray(item.board_targets) && item.board_targets.length) {
+            details.push(item.board_targets.map((target) => {
+              if (!target || typeof target !== 'object') return '';
+              return target.tier || target.soc || '';
+            }).filter(Boolean).join('/'));
+          } else if (typeof item.board_tier === 'string' && item.board_tier) {
+            details.push(item.board_tier);
+          }
+          // The registry keeps validation independent for each SoC.  Render
+          // those states beside the target tiers so a B4 result can never be
+          // mistaken for a B1 result (or vice versa).
+          if (Array.isArray(item.board_targets) && item.board_targets.length && item.validation && typeof item.validation === 'object') {
+            const boardStates = item.board_targets.map((target) => {
+              if (!target || typeof target !== 'object') return '';
+              const soc = typeof target.soc === 'string' ? target.soc : '';
+              const record = soc && item.validation[soc] && typeof item.validation[soc] === 'object' ? item.validation[soc] : null;
+              const state = record && typeof record.status === 'string' ? record.status : 'not-run';
+              const label = target.tier || soc;
+              return label ? label + ':' + state : '';
+            }).filter(Boolean);
+            if (boardStates.length) details.push(boardStates.join(' / '));
+          }
+          if (typeof item.quality_status === 'string' && item.quality_status) {
+            details.push(item.quality_status);
+          }
+          const reason = typeof item.blocked_reason === 'string' ? item.blocked_reason :
+            (typeof item.admission_reason === 'string' ? item.admission_reason : '');
+          if (reason && (status === 'blocked' || status === 'not-run')) {
+            pill.title = reason;
+          }
+          if (details.length) {
+            const detail = document.createElement('span');
+            detail.className = 'profile-detail';
+            detail.textContent = ' · ' + details.join(' · ');
+            pill.appendChild(detail);
+          }
           profiles.appendChild(pill);
         });
       }

@@ -33,7 +33,7 @@ allowlist 同步并校验大小与 SHA-256。源码、`package-lock.json` 和测
 
 ## 2. 板端准备
 
-在 `.90`（B4/8T）或 `.95`（B1/20T；`.210` 仅为旧地址）上，用同一个 shell 执行：
+在 `192.168.1.90`（B4/8T；`.11.14`/`.178` 为历史地址）或 `.95`（B1/20T；`.210` 仅为旧地址）上，用同一个 shell 执行：
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
@@ -66,7 +66,7 @@ export CASE9_MODEL_ROOT="$PWD"
 admission gate。
 
 启动器的导入预检会打印 `mindspore`/`mindnlp` 的实际模块路径、Python user-site
-开关和版本。2026-08-30 在当前 8T `.90` 与 20T `.95` 板上，默认 unset
+开关和版本。2026-08-30 在 8T 历史地址 `.90` 与 20T `.95` 板上，默认 unset
 `PYTHONNOUSERSITE` 均成功导入 MindNLP 0.4.1；显式设为 `1` 均按预期找不到
 `mindnlp`。因此不要在 MindSpore worker 的启动命令中全局设置 `PYTHONNOUSERSITE=1`。
 
@@ -154,14 +154,16 @@ Tiny 使用相同命令替换 Profile ID。返回 `passed` 才能把该次文件
 `scripts/mindspore_chat_acceptance.py` 也只对已经启动的 loopback 服务发请求。它的
 `process_management` 固定为 `none`，不会替 operator 管理 PID；报告中的质量门只检查
 HTTP/JSON、UTF-8、预算和结构，`human_review` 必须人工填写，脚本不会设置
-`admitted`。推荐在独立 UTC 目录保存完整批次：
+`admitted`。只有人工质量证据同时满足 `reviewed=true`、明确 `approved`、至少 8/10
+通过且中文语言标签为 `passed`，注册表/服务才会接受 `admitted`；机器有效计数不能
+替代人工批准。推荐在独立 UTC 目录保存完整批次：
 
 ```bash
 python scripts/mindspore_chat_acceptance.py \
   --profile qwen1.5-0.5b-mindspore \
   --execute \
   --run-id <utc-run-id> \
-  --long-budgets 8,16,32,64,80 \
+  --long-budgets 8,16,32,64 \
   --stability-loops 10 \
   --perf-warmup 2 --perf-loops 30 \
   --probe-file tests/fixtures/mindspore_chat_probe.json \
@@ -227,7 +229,7 @@ CLI 必须只停止自己状态文件中记录、且命令行匹配的旧 PID；
 通过，相关门仍须以原始报告为准。
 
 DeepSeek 命令仅适用于 `.95`（Ascend310B1/20T）。`.210` 是旧请求地址；若 `.95` 不可达、
-SoC/CANN 不匹配或工件未锁定，应保持 `blocked`，不要在 `.90` 代跑。
+SoC/CANN 不匹配或工件未锁定，应保持 `blocked`，不要在当前 8T `.90` 代跑。
 
 ## 5. 直接检查服务 API
 
@@ -255,7 +257,7 @@ curl -N http://127.0.0.1:8090/v1/chat/completions \
 ```
 
 服务应返回 OpenAI 兼容结构。SSE 的每个 `delta.content` 必须是新增前缀差量，不能把
-累计全文重复发送。`max_tokens > 80`、非法角色、非零 temperature、错误模型名、
+累计全文重复发送。`max_tokens > 64`、非法角色、非零 temperature、错误模型名、
 超出 context 或超过 256 KB 请求体都应返回明确的 4xx；错误后健康状态和资源清理要
 通过 `/health` 复核。
 
@@ -288,7 +290,7 @@ bash scripts/run_mindspore_chat_text.sh
 每次切换后按以下顺序记录同一 UTC run-id：
 
 ```text
-health/models -> JSON -> SSE -> 8/16/32/64/80 tokens
+health/models -> JSON -> SSE -> 8/16/32/64 tokens
 -> 10 轮稳定性 -> 2 warmup + 30 performance -> 10 条质量探测
 -> 网关鉴权/UI -> 成功切换/失败回滚
 ```

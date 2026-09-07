@@ -25,6 +25,10 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 
 SCHEMA_VERSION = 1
+DEFAULT_BUNDLE_NAMES: Tuple[str, ...] = (
+    "case9-dual-board-gap-20260830",
+    "case9-dual-board-gap",
+)
 ALLOWED_COMBINATION_STATUSES = frozenset(
     {
         "passed",
@@ -44,8 +48,15 @@ ALLOWED_COMBINATION_STATUSES = frozenset(
     }
 )
 EXPECTED_BOARDS: Dict[str, Dict[str, str]] = {
+    # Canonical active address.  Older manifests may still carry .90 or
+    # .178 because they were collected from this same physical B4 board;
+    # `_check_boards` accepts those aliases without rewriting provenance.
     "board8t": {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
     "board20t": {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"},
+}
+BOARD_HOST_ALIASES: Dict[str, frozenset[str]] = {
+    "board8t": frozenset(("192.168.11.14", "192.168.1.90", "192.168.8.178")),
+    "board20t": frozenset(("192.168.1.95",)),
 }
 EXPECTED_MATRIX: Tuple[Tuple[str, str], ...] = (
     ("board8t", "qwen25-onnx-om"),
@@ -256,6 +267,10 @@ def _check_boards(document: Mapping[str, Any], failures: List[str]) -> None:
             failures.append("missing board record: %s" % board_id)
             continue
         for key, value in expected.items():
+            if key == "host":
+                accepted = BOARD_HOST_ALIASES.get(board_id, frozenset((value,)))
+                if observed.get(key) in accepted:
+                    continue
             if observed.get(key) != value:
                 failures.append("%s.%s expected %s, got %s" % (board_id, key, value, observed.get(key)))
 
@@ -391,11 +406,16 @@ def _write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    repro_root = Path(__file__).resolve().parents[1] / "repro"
+    default_bundle = next(
+        (repro_root / name for name in DEFAULT_BUNDLE_NAMES if (repro_root / name).is_dir()),
+        repro_root / DEFAULT_BUNDLE_NAMES[0],
+    )
     parser.add_argument(
         "root",
         nargs="?",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "repro" / "case9-dual-board-gap",
+        default=default_bundle,
         help="gap bundle directory",
     )
     parser.add_argument("--bundle", dest="bundle_option", type=Path, help="bundle directory (alternative to root)")

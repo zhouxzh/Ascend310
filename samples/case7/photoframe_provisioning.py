@@ -11,15 +11,26 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import os
 import socket
+import subprocess
 from dataclasses import dataclass
 from typing import Callable, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
+from device_registry import DeviceError, photo_frame_hardware_rotation_deg
+
 
 MAX_RESPONSE_BYTES = 64 * 1024
+PHOTOFRAME_MDNS_SERVICE_TYPE = "_esp32-pframe._tcp.local."
+AVAHI_BROWSE_PATH = "/usr/bin/avahi-browse"
+# ESP32 Wi-Fi association and HTTP startup can take several seconds after the
+# physical wake key.  A three-second browse window regularly expired while
+# Avahi was still resolving the service, so discovery now waits the full
+# bounded ten seconds.
+DEFAULT_MDNS_DISCOVERY_SECONDS = 10.0
 PRIVATE_V4_NETWORKS = (
     ipaddress.ip_network("10.0.0.0/8"),
     ipaddress.ip_network("172.16.0.0/12"),
@@ -34,6 +45,24 @@ class ProvisionError(ValueError):
         super().__init__(message)
         self.status_code = status_code
         self.kind = kind
+
+
+class DiscoveryError(RuntimeError):
+    """A local mDNS discovery failure that did not contact a chosen device."""
+
+
+@dataclass(frozen=True)
+class MdnsPhotoFrameService:
+    """One PhotoFrame service advertisement observed on the local LAN.
+
+    ``hostname`` is display-only evidence from mDNS.  It is never resolved or
+    used as an HTTP destination: subsequent inspection always uses one of the
+    literal IPv4 addresses from the same service record.
+    """
+
+    hostname: str
+    addresses: tuple[str, ...]
+    port: int
 
 
 @dataclass(frozen=True)
@@ -51,6 +80,13 @@ class ProvisionResult:
     rotate_status: str
     rotate_error: Optional[str] = None
     rotate_http_status: Optional[int] = None
+    # Fixed physical compensation from the selected board profile.  This is
+    # separate from the user-facing landscape/portrait mode.
+    display_rotation_deg: int = 0
+    # The persisted firmware setting. ``None`` is reserved for older test
+    # doubles; real provisioning always resolves it from the device config or
+    # an explicit request.
+    deep_sleep_enabled: Optional[bool] = None
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -96,6 +132,155 @@ def normalize_device_url(value: str) -> str:
     if port not in {None, 80}:
         raise ProvisionError("device_url must use the PhotoFrame HTTP port 80", kind="invalid_url")
     return urlunsplit(("http", str(address), "", "", ""))
+
+
+def normalize_expected_device_id(value: object) -> Optional[str]:
+    """Normalize an optional immutable PhotoFrame hardware identifier.
+
+    Device IDs are returned by the firmware, not derived from a mutable mDNS
+    host name.  Keep the accepted form intentionally small and printable so
+    it can be safely persisted and compared before any configuration write.
+    ``None`` means that a legacy/manual registration has no identity pin.
+    """
+
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or len(text) > 128 or any(not (char.isalnum() or char in "._:-") for char in text):
+        raise ProvisionError(
+            "expected_device_id must be a non-empty hardware identifier",
+            kind="invalid_input",
+        )
+    return text
+
+
+def _private_ipv4_addresses(values: object) -> tuple[str, ...]:
+    """Return unique RFC1918 IPv4 literals without resolving host names."""
+
+    result: list[str] = []
+    for raw in values or ():
+        try:
+            address = ipaddress.IPv4Address(str(raw))
+        except ipaddress.AddressValueError:
+            continue
+        if any(address in network for network in PRIVATE_V4_NETWORKS):
+            value = str(address)
+            if value not in result:
+                result.append(value)
+    return tuple(result)
+
+
+def _safe_mdns_hostname(value: object) -> str:
+    """Keep mDNS service metadata display-only and bounded."""
+
+    text = str(value or "").strip().rstrip(".")
+    if not text:
+        return ""
+    return "".join(char for char in text if char.isprintable())[:255]
+
+
+def _split_avahi_fields(line: str) -> list[str]:
+    """Split Avahi's semicolon format while preserving escaped text fields."""
+
+    fields: list[str] = []
+    current: list[str] = []
+    escaped = False
+    for char in line.rstrip("\r\n"):
+        if escaped:
+            current.append(char)
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == ";":
+            fields.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    if escaped:
+        current.append("\\")
+    fields.append("".join(current))
+    return fields
+
+
+def _default_avahi_browse_runner(command: tuple[str, ...], timeout_seconds: float):
+    return subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout_seconds,
+    )
+
+
+def discover_local_photoframe_services(
+    *,
+    timeout_seconds: float = DEFAULT_MDNS_DISCOVERY_SECONDS,
+    runner: Optional[Callable[[tuple[str, ...], float], object]] = None,
+) -> list[MdnsPhotoFrameService]:
+    """Browse the fixed PhotoFrame mDNS type through local Avahi only.
+
+    The command is deliberately fixed to ``/usr/bin/avahi-browse -rpt
+    _esp32-pframe._tcp``.  There is no user-controlled host, CIDR, command,
+    DNS lookup, or HTTP request here.  The caller can inspect the returned
+    literal RFC1918 IPv4 addresses separately with a read-only request.
+    """
+
+    try:
+        bounded_timeout = float(timeout_seconds)
+    except (TypeError, ValueError) as exc:
+        raise DiscoveryError("mDNS discovery timeout is invalid") from exc
+    if not 0.1 <= bounded_timeout <= 10.0:
+        raise DiscoveryError("mDNS discovery timeout must be between 0.1 and 10 seconds")
+    if runner is None:
+        if not os.path.isfile(AVAHI_BROWSE_PATH) or not os.access(AVAHI_BROWSE_PATH, os.X_OK):
+            raise DiscoveryError(f"mDNS discovery is unavailable: {AVAHI_BROWSE_PATH} is not executable")
+        runner = _default_avahi_browse_runner
+    command = (AVAHI_BROWSE_PATH, "-rpt", "_esp32-pframe._tcp")
+    try:
+        completed = runner(command, bounded_timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise DiscoveryError("local mDNS discovery timed out") from exc
+    except (OSError, RuntimeError) as exc:
+        raise DiscoveryError(f"local mDNS discovery failed: {exc}") from exc
+
+    return_code = int(getattr(completed, "returncode", 0) or 0)
+    stdout = str(getattr(completed, "stdout", "") or "")
+    stderr = str(getattr(completed, "stderr", "") or "").strip()
+    if return_code != 0:
+        detail = f": {stderr[:300]}" if stderr else ""
+        raise DiscoveryError(f"local mDNS discovery failed with exit code {return_code}{detail}")
+
+    grouped: dict[tuple[str, int], list[str]] = {}
+    for line in stdout.splitlines():
+        fields = _split_avahi_fields(line)
+        # ``-p`` format: marker;interface;protocol;name;type;domain;host;ip;port;txt
+        if len(fields) < 9 or fields[0] != "=":
+            continue
+        service_type = fields[4].strip().lower().rstrip(".")
+        domain = fields[5].strip().lower().rstrip(".")
+        if service_type != "_esp32-pframe._tcp" or domain != "local":
+            continue
+        try:
+            port = int(fields[8])
+        except (TypeError, ValueError):
+            continue
+        if port != 80:
+            continue
+        addresses = _private_ipv4_addresses((fields[7],))
+        if not addresses:
+            continue
+        hostname = _safe_mdns_hostname(fields[6]) or _safe_mdns_hostname(fields[3])
+        key = (hostname, port)
+        bucket = grouped.setdefault(key, [])
+        for address in addresses:
+            if address not in bucket:
+                bucket.append(address)
+    return [
+        MdnsPhotoFrameService(hostname=hostname, addresses=tuple(addresses), port=port)
+        for (hostname, port), addresses in sorted(grouped.items())
+    ]
 
 
 def _safe_text(value: object, limit: int = 200) -> Optional[str]:
@@ -204,12 +389,25 @@ class PhotoFrameProvisioner:
             )
         return value, status
 
+    def read_system_info(self, device_url: str) -> tuple[str, dict]:
+        """Read one PhotoFrame identity document without modifying the device.
+
+        Discovery and pairing previews use this narrow method.  Keeping it
+        separate from :meth:`provision` makes it mechanically impossible for
+        an mDNS browse call to PATCH URL Rotation or trigger a refresh.
+        """
+
+        root = normalize_device_url(device_url)
+        system_info, _ = self._request_json(root, "/api/system-info")
+        return root, system_info
+
     @staticmethod
     def _validate_system_info(
         system_info: dict,
         *,
         native_size: tuple[int, int],
         expected_profile_id: Optional[str] = None,
+        expected_device_id: Optional[str] = None,
     ) -> None:
         if str(system_info.get("project_name") or "").strip().lower() != "esp32-photoframe":
             raise ProvisionError("target is not official esp32-photoframe firmware", kind="identity")
@@ -222,6 +420,14 @@ class PhotoFrameProvisioner:
                 f"PhotoFrame display is {size[0]}x{size[1]}, expected {native_size[0]}x{native_size[1]}",
                 kind="identity",
             )
+        expected_id = normalize_expected_device_id(expected_device_id)
+        if expected_id is not None:
+            actual_id = _safe_text(system_info.get("device_id"), limit=128)
+            if actual_id != expected_id:
+                raise ProvisionError(
+                    "PhotoFrame device_id does not match the discovered device",
+                    kind="identity",
+                )
         # A shared 800x480 contract is not enough to identify the product.
         # When the firmware exposes a board/product name, require it to agree
         # with the profile selected by the operator.  Older builds may omit
@@ -270,10 +476,18 @@ class PhotoFrameProvisioner:
             raise ProvisionError("PhotoFrame did not persist the requested rotation schedule", kind="verification")
         if config.get("display_orientation") != expected["display_orientation"]:
             raise ProvisionError("PhotoFrame did not persist the requested display orientation", kind="verification")
-        if config.get("display_rotation_deg") != expected["display_rotation_deg"]:
-            raise ProvisionError("PhotoFrame did not persist display_rotation_deg=0", kind="verification")
-        if config.get("deep_sleep_enabled") is not False:
-            raise ProvisionError("PhotoFrame did not persist deep_sleep_enabled=false", kind="verification")
+        expected_rotation = int(expected.get("display_rotation_deg", 0))
+        if config.get("display_rotation_deg") != expected_rotation:
+            raise ProvisionError(
+                f"PhotoFrame did not persist display_rotation_deg={expected_rotation}",
+                kind="verification",
+            )
+        expected_sleep = expected.get("deep_sleep_enabled", True)
+        if config.get("deep_sleep_enabled") is not True or expected_sleep is not True:
+            raise ProvisionError(
+                "PhotoFrame did not persist deep_sleep_enabled=true",
+                kind="verification",
+            )
         if config.get("save_downloaded_images") is not False:
             raise ProvisionError("PhotoFrame did not persist save_downloaded_images=false", kind="verification")
 
@@ -286,7 +500,9 @@ class PhotoFrameProvisioner:
         display_orientation: str,
         native_size: tuple[int, int],
         expected_profile_id: Optional[str] = None,
+        expected_device_id: Optional[str] = None,
         trigger_now: bool = True,
+        deep_sleep_enabled: Optional[bool] = None,
     ) -> ProvisionResult:
         """Configure URL Rotation and optionally ask the ESP32 to rotate now.
 
@@ -304,29 +520,50 @@ class PhotoFrameProvisioner:
             raise ProvisionError("rotation_cron must contain at least one cron rule", kind="invalid_input")
         if not isinstance(image_url, str) or not image_url.startswith(("http://", "https://")) or len(image_url) > 256:
             raise ProvisionError("Case7 image URL is invalid for PhotoFrame", kind="invalid_input")
+        if deep_sleep_enabled is False:
+            raise ProvisionError(
+                "PhotoFrame deep sleep is fixed enabled; deep_sleep_enabled=false is not supported",
+                kind="invalid_input",
+            )
 
+        expected_device_id = normalize_expected_device_id(expected_device_id)
+        try:
+            # The board profile owns this fixed half-turn/native-direction
+            # compensation.  It must not be inferred from the requested
+            # landscape/portrait orientation or exposed as a 360-degree knob.
+            hardware_rotation = photo_frame_hardware_rotation_deg(expected_profile_id) if expected_profile_id else 0
+        except DeviceError as exc:
+            raise ProvisionError(str(exc), kind="invalid_input") from exc
         system_info, _ = self._request_json(root, "/api/system-info")
         self._validate_system_info(
             system_info,
             native_size=native_size,
             expected_profile_id=expected_profile_id,
+            expected_device_id=expected_device_id,
         )
         # A read before PATCH ensures we fail early against an incomplete or
         # incompatible web API instead of leaving a half-described audit entry.
         # Keep only the fields this transaction changes so a failed read-back
         # can best-effort restore the device's previous URL Rotation state.
         previous_config, _ = self._request_json(root, "/api/config")
+        # This is intentionally not inherited from the device.  Re-registering
+        # a frame must repair an old always-on setting instead of preserving it.
+        # The value is fixed for both supported ESP32 products.
+        resolved_deep_sleep = True
         desired = {
             "auto_rotate": True,
             "rotate_cron": list(normalized_cron),
             "rotation_mode": "url",
             "image_url": image_url,
             "display_orientation": str(display_orientation),
-            # Case7 has only landscape/portrait modes, so reset arbitrary
-            # angle state rather than presenting a 360-degree control.
-            "display_rotation_deg": 0,
-            # Keep Wi-Fi online while proving the first retrieval path.
-            "deep_sleep_enabled": False,
+            # This is a fixed board-installation correction, not a user-facing
+            # orientation choice.  Waveshare PhotoPainter uses 180 degrees;
+            # Seeed E1002 uses 0 degrees.
+            "display_rotation_deg": hardware_rotation,
+            # Battery operation is a product invariant.  Registration always
+            # repairs the device to deep sleep, so the physical wake key and
+            # firmware timer remain available after a fresh flash.
+            "deep_sleep_enabled": resolved_deep_sleep,
             # URL Rotation is a stream from Case7. Do not fill device storage
             # with a separate copy of every server-rendered image.
             "save_downloaded_images": False,
@@ -416,4 +653,6 @@ class PhotoFrameProvisioner:
             rotate_status=rotate_status,
             rotate_error=rotate_error,
             rotate_http_status=rotate_http_status,
+            display_rotation_deg=hardware_rotation,
+            deep_sleep_enabled=resolved_deep_sleep,
         )

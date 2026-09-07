@@ -22,9 +22,17 @@ Case7 当前只记录以下两种 7.3 英寸终端：
 | [Waveshare ESP32-S3-PhotoPainter](https://www.waveshare.com/product/displays/e-paper/epaper-1/esp32-s3-photopainter.htm) / [Wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter) | E6 六色（黑、白、绿、蓝、红、黄），800x480；官方 Wiki Mode 1 接受 800x480 或 480x800 图像 | `landscape`、`portrait` 内容 |
 | [Seeed Studio reTerminal E1002 Wiki](https://wiki.seeedstudio.com/getting_started_with_reterminal_e1002/) | ACeP / E Ink Spectra 6 全彩，800x480 | Case7 策略仅 `landscape` |
 
-设备 profile 只使用 `landscape` 或 `portrait`。不提供、不记录 360°、180°、90°/270°安装旋转选项；E1002 请求 `portrait` 必须拒绝。Seeed 的厂商资料确认的是固定 `800x480` 面板，E1002 的横屏限制是 Case7 当前设备策略，不是对其固件能力的推断。上述规格也不代表当前固件协议或真实面板刷新已经验收。管理 API 注册时必须明确提交 `profile_id`，不会把缺少型号的历史记录自动标成 Waveshare。
+设备 profile 对用户只开放 `landscape` 或 `portrait` 两种内容方向，不提供可调的 360°、90°/270°或安装角度选项。profile 内部记录固定的物理安装补偿：Waveshare PhotoPainter 为 `hardware_rotation_deg=180`，Seeed E1002 为 `hardware_rotation_deg=0`；服务器 JPEG 的 `rotation` 仍为 `0`，避免把同一个半转重复应用。注册和每次 URL Rotation 成功拉图时，Case7 会将对应的 `display_rotation_deg` 写入/同步给固件。E1002 请求 `portrait` 必须拒绝。Seeed 的厂商资料确认的是固定 `800x480` 面板，E1002 的横屏限制是 Case7 当前设备策略，不是对其固件能力的推断。上述规格也不代表当前固件协议或真实面板刷新已经验收。管理 API 注册时必须明确提交 `profile_id`，不会把缺少型号的历史记录自动标成 Waveshare。
 
 服务不回退 CPU/PyTorch 推理；CPU 仅用于解码、OpenCV Haar 人数计数、FAISS、JPEG/E6 准备和离线 ONNX 参考。服务只建议在可信局域网运行，禁止公网暴露。
+
+### 端口约定
+
+Case7 对手机、触摸屏、ESP32 和所有教程命令统一使用 `7860`：
+`http://192.168.1.135:7860/`。不要把 310B 改成 80、8080 或其他端口。`80` 只属于
+ESP32 PhotoFrame 自己的控制网页，例如 `http://<ESP32-IP>/`；这是另一台设备，和 310B
+服务端口无关。发布脚本会短暂使用内部 smoke 端口验证新版本，但它不会暴露给用户、不会写入
+PhotoFrame URL，也不需要在教程操作中记住。
 
 ## 🧪 本机检查
 
@@ -73,7 +81,7 @@ bash scripts/launch_touchscreen_kiosk.sh
 
 触摸屏首页显示当前照片、天气和紧凑工具栏。默认本机选图间隔为 60 秒，电脑浏览器每 30 秒轮询一次元数据；ETag 未变化时不会重新下载或编码 JPEG。文件名位于工具栏内，可在设置页关闭水印；8 秒无操作时工具栏和文件名一起隐藏。电子纸物理刷新单独默认为 30 分钟，可在设置中改为 10 分钟。详细操作见 [07-touchscreen-ui-and-operations.md](docs/07-touchscreen-ui-and-operations.md)。
 
-设备页将两类显示终端分开管理：**本机触摸屏相册**是固定身份为 `local-touchscreen` 的 HDMI 虚拟设备，可单独设置名称、启停、换图间隔、显示方向、重复抑制和文件名水印；它不需要 IP、设备令牌或网络轮询。**ESP32 电子相册**使用“验证并注册 ESP32 设备”创建远端 PhotoFrame/电子纸设备，传输方式固定为“设备主动拉取”。注册时必须填写串口日志得到的 ESP32 地址；310B 会先访问设备网页、核验 PhotoFrame 身份和型号、写入并读回 URL Rotation 配置，然后返回 HTTP `202`（`registration_status=awaiting_pull`）。任一步失败都返回“未注册”，不会留下孤立的设备记录。`202` 只表示“310B 已验证设备地址并完成控制面配置”，不等于电子纸已经完成物理刷新；只有设备随后带官方固件/显示能力请求访问取图 URL，卡片才显示“设备已拉图”。若设备网页不支持该 API，必须先刷入或修改明确支持 URL Rotation 的固件。两类设备不会相互覆盖设置。远端卡片中的“禁用设备”是可恢复停用；“删除注册”需两次确认并移除设备记录及轮播状态，但不会删除任何照片。
+设备页将两类显示终端分开管理：**本机触摸屏相册**是固定身份为 `local-touchscreen` 的 HDMI 虚拟设备，可单独设置名称、启停、换图间隔、显示方向、重复抑制和文件名水印；它不需要 IP、设备令牌或网络轮询。**ESP32 电子相册**使用“验证并注册 ESP32 设备”创建远端 PhotoFrame/电子纸设备，传输方式固定为“设备主动拉取”。二维码中的 `photoframe.local` 只是 mDNS 主机名，不能区分多台同名设备；在设备页先点击“发现局域网 PhotoFrame”，从候选中按字面 IPv4、硬件 ID/MAC、板型和固件版本明确选择一台。发现接口只读查询 `_esp32-pframe._tcp`，不扫描网段、不自动选第一条，也不写设备配置。注册请求携带选中的 `device_url` 和 `expected_device_id`；310B 会先访问设备网页并再次核验硬件 ID，确认后才写入并读回 URL Rotation 配置，然后返回 HTTP `202`（`registration_status=awaiting_pull`）。任一步失败都返回“未注册”，不会留下孤立的设备记录。`202` 只表示“310B 已验证设备地址并完成控制面配置”，不等于电子纸已经完成物理刷新；只有设备随后带官方固件/显示能力请求访问取图 URL，卡片才显示“设备已拉图”。发现为空时唤醒设备并按 [串口/IP 手册](docs/13-photopainter-serial-ip-and-wifi.md) 读取 `sta ip:` 或查看 DHCP 租约后手动选择；不能把 `photoframe.local` 的解析结果当成唯一地址。若设备网页不支持该 API，必须先刷入或修改明确支持 URL Rotation 的固件。两类设备不会相互覆盖设置。远端卡片中的“禁用设备”是可恢复停用；“删除注册”需两次确认并移除设备记录及轮播状态，但不会删除任何照片。
 
 ## 📤 首次上传照片
 
@@ -96,26 +104,30 @@ curl http://192.168.1.135:7860/api/jobs/<job_id>
 
 若页面仍为空，先检查 `GET /api/index/stats` 返回的 `available_photos`，再检查 `GET /api/display/current`；若任务为 `failed`，查看响应中的 `error` 字段。`400` 通常表示格式、空请求或不支持的扩展名；若前置代理返回 `413`，则是代理自身的请求体策略，不是 Case7 上传接口的限制。历史数据库中的 `tags` 字段仅为迁移兼容元数据，常规上传不写入它。API 字段和完整示例见 [03-album-server-api-and-esp32-protocol.md](docs/03-album-server-api-and-esp32-protocol.md)，照片生命周期限制见 [09-index-storage-and-photo-lifecycle.md](docs/09-index-storage-and-photo-lifecycle.md)。
 
-## 🖼️ PhotoPainter 五分钟 URL 拉取测试
+## 🖼️ 两类 ESP32 电子相册接入
 
-当前实测目标是新的 Waveshare ESP32-S3-PhotoPainter。设备地址必须先从串口启动日志读取；
-`photoframe.local` 只是可选 mDNS 别名，打不开时直接使用串口日志中的 IPv4 地址。完整步骤见
-[PhotoPainter 串口读取 IP 与 Wi-Fi 配网](docs/13-photopainter-serial-ip-and-wifi.md)。
+当前支持两种设备 profile：Waveshare ESP32-S3-PhotoPainter 7.3 英寸和 Seeed Studio
+reTerminal E1002。设备地址必须先从串口启动日志或路由器 DHCP 租约读取；
+`photoframe.local` 只是可选 mDNS 别名，打不开时直接使用字面 IPv4。完整的唤醒、发现、
+双设备配对步骤见 [唤醒与发现两类 ESP32 电子相册](docs/14-wake-and-discover-esp32-photoframes.md)，
+Waveshare 串口细节见 [PhotoPainter 串口读取 IP 与 Wi-Fi 配网](docs/13-photopainter-serial-ip-and-wifi.md)。
 
 Case7 的设备注册和设备页只提供一种远端传输方式：**设备主动 URL 拉取**。310B 为已注册设备
 生成 `/api/devices/<id>/photoframe`，PhotoFrame 在自己的 URL Rotation 时隙发起 `GET`，服务器
-返回 JPEG、ETag 和 `304 Not Modified`。310B 不扫描局域网或猜测设备地址。
+返回 JPEG、ETag 和 `304 Not Modified`。310B 不进行 CIDR 网段扫描或猜测设备地址；配对前的
+只读 mDNS 发现只返回候选，必须由用户明确选择并核对硬件 ID。
 
-在设备页的 **验证并登记** 区域填写串口日志得到的 ESP32 IPv4，例如
-`http://192.168.1.137`，再点击 **验证并登记**。310B 只会对 RFC1918 私网 IPv4 的
-80 端口执行一次受限操作：读取 `/api/system-info` 验证官方 PhotoFrame、读取并写入
+在触摸屏/手机的 **设备管理 → ESP32 唤醒与发现** 中先点击 **发现局域网电子相册**，从候选卡片
+选择目标；mDNS 受限时可在同一区域输入地址并点击 **读取并验证 IP**。若需手工填写，请使用串口日志或 DHCP 租约
+确认的 ESP32 IPv4，例如 `http://192.168.1.137`，并核对硬件 ID，再点击 **验证并登记**。310B
+只会对 RFC1918 私网 IPv4 的 80 端口执行一次受限操作：读取 `/api/system-info` 验证官方 PhotoFrame、读取并写入
 `/api/config`、读取回配置核验，然后请求 `/api/rotate`。它会写入 `auto_rotate=true`、
-`rotation_mode=url`、本设备的图片 URL，并在首次联调时关闭深度睡眠。成功配置不等于屏幕已刷新；
-只有设备随后携带固件版本和显示能力头访问取图 URL，页面才显示 **设备已拉图**。KEY 只能唤醒
-设备或重置睡眠计时，不能替代这一配置步骤。
-
-Seeed Studio reTerminal E1002 只保留为历史对照，使用时必须显式填写
-`--profile-id seeedstudio_reterminal_e1002`，不能套用当前 PhotoPainter 的地址或固件结论。
+`rotation_mode=url`、本设备的图片 URL，并固定写入 `deep_sleep_enabled=true`。页面不提供关闭深度睡眠
+的选项；成功配置不等于屏幕已刷新；
+只有设备随后携带固件版本和显示能力头访问取图 URL，页面才显示 **设备已拉图**。深度休眠时
+310B 不能网络唤醒：Waveshare 先按 **BOOT**，Seeed E1002 先按顶部绿色 **Wake/Refresh**，
+等待设备网页服务恢复后再点发现。两者的 profile、方向和固件端点必须分别核对，不能把一个
+设备的 IP 或按键结论套到另一台。
 
 测试批次固定为电脑目录中按文件名排序的 `CIMG2780.JPG` 至 `CIMG2799.JPG`；先将这 20 张图片复制到板端受管的 `shared/incoming/photoframe-test/`，再在板端执行：
 
@@ -137,7 +149,7 @@ bash scripts/setup_photoframe_test.sh \
   "rotate_cron": ["*/5 * *"],
   "rotation_mode": "url",
   "image_url": "http://192.168.1.135:7860/api/devices/<device_id>/photoframe",
-  "deep_sleep_enabled": false
+  "deep_sleep_enabled": true
 }
 ```
 
@@ -167,19 +179,14 @@ python prepare_models.py check --model all
 
 ## 📚 工程文档
 
-- [00 GitHub 参考与文档地图](docs/00-github-research-and-porting-plan.md)
-- [01 COCO-CN 固定测试协议](docs/01-coco-cn-test-protocol.md)
-- [02 板端部署与验收](docs/02-ascend310b4-deployment-and-acceptance.md)
-- [03 API 与 ESP32 协议](docs/03-album-server-api-and-esp32-protocol.md)
-- [04 PhotoPainter 接入](docs/04-photopainter-7in3-integration.md)
-- [05 设备策略、渲染与安全](docs/05-device-policy-rendering-and-security.md)
-- [06 PhotoPainter 部署与验收](docs/06-photopainter-deployment-and-acceptance.md)
-- [07 触摸屏 UI 与操作](docs/07-touchscreen-ui-and-operations.md)
-- [08 模型流水线与 NPU 准入](docs/08-model-pipeline-and-npu-admission.md)
-- [09 索引与照片生命周期](docs/09-index-storage-and-photo-lifecycle.md)
-- [10 智能选图与天气](docs/10-smart-selection-and-weather.md)
-- [11 PhotoFrame 主动推送与固件协议](docs/11-photoframe-active-push.md)
-- [12 MobileCLIP 8T/20T 跨板兼容性验证](docs/12-mobileclip-cross-board-compatibility.md)
-- [13 PhotoPainter 串口读取 IP 与 Wi-Fi 配网](docs/13-photopainter-serial-ip-and-wifi.md)
+完整工程文档请从 [Case7 工程文档总索引](docs/README.md) 开始。索引按“当前操作”“历史证据与兼容实验”“理论教程”分组，并按上传、触摸屏、设备配对、模型转换和 E6 排障给出直接入口；不需要按 `00` 到 `15` 顺序阅读。
 
-完整理论教程包含架构图、模型结构图、NPU 迁移方法、数据流、代码导读、测试方法和限制说明： [src/experiment/case7.md](../../src/experiment/case7.md)。
+最常用的入口：
+
+- [部署 310B 服务](docs/02-ascend310b4-deployment-and-acceptance.md)
+- [上传照片与触摸屏操作](docs/07-touchscreen-ui-and-operations.md)
+- [读取设备 IP、唤醒和配对](docs/14-wake-and-discover-esp32-photoframes.md)
+- [模型转换与 NPU 准入](docs/08-model-pipeline-and-npu-admission.md)
+- [完整理论教程](../../src/experiment/case7.md)
+
+历史主动推送、跨板兼容性和外部检索参考不要当作当前启动步骤；它们的边界和用途见 [工程文档总索引](docs/README.md)。

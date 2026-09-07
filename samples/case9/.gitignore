@@ -51,5 +51,17 @@ run/mindspore-chat/
 reports/mindspore-chat/
 artifacts/models/
 
+# Strict 8T candidate campaign outputs (metadata stays in the registry/docs).
+run/mindspore-8t-strict/
+reports/mindspore-8t-strict/
+artifacts/models/qwen2*/
+artifacts/models/llama3.2*/
+
 # Acceptance scratch files stay in the local evidence bundle, not Git.
 run/gap-working/
+
+# Root-level diagnostic outputs and ad-hoc board probes are reproducibility
+# evidence, not checked-in source. Canonical scripts live under scripts/.
+run/*.json
+run/*.py
+run/__pycache__/

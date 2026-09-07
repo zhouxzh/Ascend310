@@ -19,11 +19,18 @@ curl http://127.0.0.1:7860/api/index/stats
 
 1. 记录官方固件版本、Release SHA-256 和刷写日志。
 2. 断开电池，仅 USB 供电刷写并完成 2.4 GHz Wi-Fi 配网。
-3. 记录设备 ID、屏幕尺寸、RSSI、服务器 URL 和轮播策略。
-4. 验证首次 `200`、相同 ETag 的 `304` 和策略变化后的新 `200`。
-5. 验证日期/天气叠加、cover/fit、断网重试和服务重启恢复。
-6. 禁用设备，确认拉图返回 `404`；重新启用后确认恢复。
-7. 按上游硬件说明分别测试 USB 和电池供电，未确认前不同时接入。
+3. 保持设备唤醒并确认与 310B 在同一局域网。二维码中的 `photoframe.local` 只是 mDNS
+   主机名；若局域网有多个同名设备，不可据此区分目标。
+4. 在 Case7 设备页执行只读 **发现局域网 PhotoFrame**，保存完整候选清单（字面 IPv4、
+   硬件 ID/MAC、板型、固件和分辨率）。发现只查询 `_esp32-pframe._tcp`，不扫描 CIDR、
+   不注册、不写入设备配置；必须由验收人员明确点击一条候选。
+5. 记录选中的设备 ID、屏幕尺寸、RSSI、服务器 URL 和轮播策略；注册请求应携带
+   `expected_device_id`。服务器重新读取 `/api/system-info`，在写 URL Rotation 前核对硬件
+   ID；故意使用另一候选或错误 ID 时，应失败且不产生配置写入/有效注册。
+6. 验证首次 `200`、相同 ETag 的 `304` 和策略变化后的新 `200`。
+7. 验证日期/天气叠加、cover/fit、断网重试和服务重启恢复。
+8. 禁用设备，确认拉图返回 `404`；重新启用后确认恢复。
+9. 按上游硬件说明分别测试 USB 和电池供电，未确认前不同时接入。
 
 ## 当前目标：Waveshare PhotoPainter（2026-08-30）
 
@@ -50,9 +57,45 @@ curl -I --connect-timeout 5 --max-time 10 http://<WAVESHARE-IP>/
 ```
 
 只有当响应中的 `board_name`、`version` 和尺寸与实物一致时，才继续进行 JPEG 推送或
-URL Rotation。`photoframe.local` 是可选 mDNS 名称，解析失败不影响验收；不能把它当成
-登录账号或固定地址。服务器端的 PhotoFrame 注册、设备状态和 ETag 证据应与屏幕肉眼刷新
+URL Rotation。`photoframe.local` 是可选 mDNS 名称，且可能对应多台同名设备；解析失败或
+解析到未选择的设备都不能作为注册证据。不能把它当成登录账号或固定地址。服务器端的
+PhotoFrame 注册、设备状态和 ETag 证据应与屏幕肉眼刷新
 结果分开记录。当前地址为 DHCP 租约，不能写死到长期配置中。
+
+### 2026-09-05 竖屏补偿修复部署证据
+
+本次 Case7 发布为 `20260905-rotation-fix`，目标板为 `192.168.1.135` 的
+Ascend 310B4/8T。服务端只改用 profile 的固定板级补偿：Waveshare 为
+`hardware_rotation_deg=180`，服务器 JPEG 像素 `rotation=0`；旧记录中保存的
+`display_rotation_deg=0` 会在服务器迁移时校正为 `180`，ESP32 的 NVS 则要等下一次
+URL Rotation 返回 `200` 并携带配置同步头后才会写入 `180`。
+Seeed E1002 的固定值仍为 `0`。
+
+部署后的只读检查结果：
+
+| 检查项 | 实测结果 |
+| --- | --- |
+| `/api/health` | `status=ready`、`backend=npu`、PyACL 可用，设备 `Ascend 310B4` |
+| 生产模型 | MobileCLIP、Chinese-CLIP、ResNet50 均 `admitted` |
+| 受管图库 | 90 张可用照片；三个模型各 90 条 embedding |
+| PhotoFrame profile | `waveshare_photopainter_73`，内容 `portrait` 为 `480x800`，固定补偿 `180` |
+| JPEG 响应头 | `X-Album-Hardware-Rotation: 180`、`X-Album-Width: 480`、`X-Album-Height: 800` |
+| 配置同步头 | `display_rotation_deg:180`，`display_orientation:portrait` |
+| 相同 ETag 重试 | `304 Not Modified` |
+| `npu-smi info` | `25.2.0`，`310B4`，`Health: Alarm`（仅诊断记录） |
+
+上述 HTTP 检查来自服务器端的真实请求，证明配置合同和按需 JPEG 尺寸正确；它不等于
+电子纸已经完成物理刷新。检查时 `192.168.1.137` 处于休眠/未响应 TCP 80，因此尚未
+重新读取设备 `/api/config` 或完成本轮屏幕目视确认。设备唤醒后应先执行：
+
+```bash
+curl -i --connect-timeout 5 --max-time 10 http://<WAVESHARE-IP>/api/config
+curl -i --connect-timeout 5 --max-time 10 http://<WAVESHARE-IP>/api/system-info
+```
+
+必须看到 `display_orientation=portrait` 和 `display_rotation_deg=180`，再观察一张新图。
+若字段正确仍上下倒置，应检查 ESP32 固件的 Waveshare board target 与面板安装方向，不能
+继续修改照片 EXIF 或给服务器 JPEG 追加 180 度。
 
 ### 历史对照：E1002 五分钟主动推送验收
 
@@ -108,7 +151,7 @@ bash scripts/setup_photoframe_test.sh \
 | 首次 URL 拉图 | `200 image/jpeg`，800x480，ETag 有效 |
 | 同 ETag 重试 | `304 Not Modified`，设备状态记录 `not_modified` |
 | 19:10 新时隙 | photo ID `3`，selection revision `5`，返回新的 `200` 和 ETag |
-| 配置同步 | `X-Config-Payload` 下发 `auto_rotate=true` 与 `rotate_cron=["*/5 * *"]` |
+| 配置同步 | `X-Config-Payload` 下发 `auto_rotate=true`、`rotate_cron=["*/5 * *"]` 与 Waveshare 固定 `display_rotation_deg=180` |
 
 PhotoFrame 功能代码在 `case7-photoframe-20260823m` 之后又加入了严格整数 ID 校验和发布回滚加固；
 后续发布不覆盖共享模型、数据、照片或报告资产。当前服务 PID 可由

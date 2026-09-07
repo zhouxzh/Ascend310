@@ -217,6 +217,10 @@ DEFAULT_EINK_ROTATION_CRON = ["*/30 * *"]
 DEFAULT_PHOTOFRAME_POLICY = {
     "auto_rotate": True,
     "rotation_cron": list(DEFAULT_EINK_ROTATION_CRON),
+    # PhotoFrame devices are battery-powered endpoints.  Deep sleep is a
+    # product invariant: the physical wake key or the firmware timer wakes
+    # the device, while the server never turns this mode off remotely.
+    "deep_sleep_enabled": True,
     # Smart selection remains the backwards-compatible default.  A playlist
     # is deliberately represented by photo IDs rather than file paths so a
     # device policy cannot escape the managed photo store.
@@ -273,6 +277,11 @@ def validate_policy(patch: Optional[dict] = None, base: Optional[dict] = None) -
     for key in ("overlay_date", "overlay_weather", "auto_rotate"):
         if not isinstance(value[key], bool):
             raise DisplayPolicyError(f"{key} must be boolean")
+    if not isinstance(value["deep_sleep_enabled"], bool):
+        raise DisplayPolicyError("deep_sleep_enabled must be boolean")
+    if value["deep_sleep_enabled"] is not True:
+        raise DisplayPolicyError("PhotoFrame deep sleep is fixed enabled; deep_sleep_enabled must be true")
+    value["deep_sleep_enabled"] = True
     for key, low, high in (("jpeg_quality", 1, 100), ("max_bytes", 4096, 25 * 1024 * 1024), ("width", 1, 4096), ("height", 1, 4096)):
         try:
             value[key] = int(value[key])

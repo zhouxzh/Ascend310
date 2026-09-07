@@ -1,5 +1,13 @@
-const state = { config: null, current: null, displayEnabled: true, panel: null, idleTimer: null, weatherTimer: null, displayTimer: null, feedbackTimer: null, weather: null, viewportKey: null, viewportTimer: null, imageUrl: null, uploadFiles: [], uploadIgnored: 0, uploading: false, currentLoading: false, galleryLoading: false, galleryRefreshQueued: false, lastPairing: null, devicePullWatch: null };
+const state = { config: null, current: null, displayEnabled: true, panel: null, deviceTab: 'overview', idleTimer: null, weatherTimer: null, displayTimer: null, feedbackTimer: null, weather: null, viewportKey: null, viewportTimer: null, imageUrl: null, uploadFiles: [], uploadIgnored: 0, uploading: false, currentLoading: false, galleryLoading: false, galleryRefreshQueued: false, lastPairing: null, devicePullWatch: null };
 const supportedPhotoFrameProfiles = new Set(['waveshare_photopainter_73', 'seeedstudio_reterminal_e1002']);
+const rotationScheduleChoices = [
+  ['*/5 * *', '每 5 分钟（测试）'],
+  ['*/10 * *', '每 10 分钟'],
+  ['*/15 * *', '每 15 分钟'],
+  ['*/30 * *', '每 30 分钟'],
+  ['0 * *', '每小时整点'],
+  ['0 8-22 *', '每天 08:00–22:00，每小时'],
+];
 const json = async (url, options = {}) => { const response = await fetch(url, {...options, cache: 'no-store'}); if (!response.ok) { const payload = await response.json().catch(() => ({})); const detail = payload.detail; const message = typeof detail === 'string' ? detail : (detail && typeof detail === 'object' ? (detail.message || JSON.stringify(detail)) : `${response.status}`); const error = new Error(message); error.status = response.status; error.payload = payload; throw error; } const type = response.headers.get('content-type') || ''; return type.includes('application/json') ? response.json() : response; };
 const formPatch = form => { const value = {}; for (const [key, field] of new FormData(form)) { const parts = key.split('.'); let target = value; while (parts.length > 1) target = target[parts.shift()] ||= {}; target[parts[0]] = field === '' ? '' : (field.match(/^-?\d+(\.\d+)?$/) ? Number(field) : field); } return value; };
 const merge = (target, patch) => { Object.entries(patch).forEach(([key, value]) => { target[key] = value && typeof value === 'object' && !Array.isArray(value) ? merge(target[key] || {}, value) : value; }); return target; };
@@ -33,6 +41,7 @@ function setPanel(name) {
   armIdle();
 }
 function closePanel() { state.panel = null; document.querySelector('#panel-layer').hidden = true; document.querySelectorAll('.nav-button').forEach(node => node.classList.toggle('active', node.dataset.panel === 'gallery')); armIdle(); }
+
 function renderFilenameWatermark() {
   const watermark = document.querySelector('#filename-watermark');
   const filename = state.current?.filename;
@@ -351,6 +360,17 @@ function addToggle(parent, label, name, checked) {
   return node.querySelector('input');
 }
 
+function rotationScheduleOptions(current) {
+  const value = String(current || '*/30 * *').trim();
+  if (rotationScheduleChoices.some(([cron]) => cron === value)) return rotationScheduleChoices;
+  return [[value, `自定义（${value}）`], ...rotationScheduleChoices];
+}
+
+function rotationScheduleLabel(current) {
+  const value = String(current || '*/30 * *').trim();
+  return rotationScheduleChoices.find(([cron]) => cron === value)?.[1] || `自定义（${value}）`;
+}
+
 function setDeviceStatus(node, text, error = false) {
   node.textContent = text;
   node.classList.toggle('is-error', error);
@@ -370,6 +390,14 @@ function deviceProfileLabel(device) {
   if (device.profile_id === 'seeedstudio_reterminal_e1002') return 'Seeed Studio reTerminal E1002';
   if (device.profile_id === 'waveshare_photopainter_73') return 'Waveshare ESP32-S3-PhotoPainter 7.3"';
   return '型号待确认';
+}
+
+function deviceUserName(device, fallback = '未命名设备') {
+  const name = String(device?.name || '').trim();
+  // Older registrations used this English placeholder. Keep the migration
+  // visible in Chinese even before the operator saves the new name.
+  if (name.toLowerCase() === 'living-room') return '客厅';
+  return name || fallback;
 }
 
 function deviceGroupKey(device) {
@@ -798,33 +826,242 @@ function renderTouchscreenCard(host, value) {
 function renderEspPairingCard(host) {
   const card = document.createElement('article');
   card.className = 'device-console-card esp-pair-card';
-  card.innerHTML = '<header class="device-console-header"><div class="device-type-mark esp-mark">E</div><div><h3>验证并登记 ESP32 电子相册</h3><p class="device-subtitle">Waveshare PhotoPainter 或 Seeed reTerminal E1002</p></div><span class="device-badge">先验证，再登记</span></header><p class="device-help">登记不是离线填表：必须填写 ESP32 当前网页地址。服务器会先访问设备、确认 PhotoFrame 身份并写入 URL Rotation；任何一步失败都不会显示配置成功，也不会留下误导性的在线记录。</p><p class="device-steps"><b>操作顺序：</b>按 KEY 唤醒 → 从串口日志取得 ESP32 IPv4 → 填写下方地址并点击“验证并登记” → 看到“已验证配置”后设备才会按计划主动取图。KEY 只负责唤醒或重置睡眠计时，不能代替 URL Rotation。</p>';
+  card.innerHTML = '<header class="device-console-header"><div class="device-type-mark esp-mark">E</div><div><h3>验证并登记 ESP32 电子相册</h3><p class="device-subtitle">Waveshare PhotoPainter 或 Seeed reTerminal E1002</p></div><span class="device-badge">先唤醒，再发现</span></header><p class="device-help">登记不是离线填表：设备必须先从休眠中醒来并出现在同一局域网，再由你明确选择一台候选。服务器只验证设备身份并写入 URL Rotation；它不会通过网络唤醒深度休眠的 ESP32，也不会把同名 photoframe.local 自动配给某台设备。</p><p class="device-steps"><b>推荐顺序：</b>微雪按一次 BOOT；E1002 按顶部绿色 Wake/Refresh → 等待网页服务启动 → 点击“发现局域网电子相册” → 按字面 IP 与硬件 ID 选择目标 → 点击“验证并注册设备”。</p>';
   const form = document.createElement('form'); form.className = 'device-settings-form esp-pairing-form';
   const grid = document.createElement('div'); grid.className = 'device-settings-grid';
-  addField(grid, '设备名称', 'name', 'living-room');
+  addField(grid, '设备名称', 'name', '客厅');
   addSelect(grid, '设备型号', 'profile_id', [['', '请选择已确认的设备型号'], ['waveshare_photopainter_73', 'Waveshare ESP32-S3-PhotoPainter 7.3\"'], ['seeedstudio_reterminal_e1002', 'Seeed Studio reTerminal E1002']], '');
   addSelect(grid, '屏幕摆放', 'orientation', [['landscape', '横屏 800×480'], ['portrait', '竖屏 480×800']], 'landscape');
+  const sleepNote = document.createElement('p');
+  sleepNote.className = 'device-fixed-setting';
+  sleepNote.textContent = '深度睡眠：固定启用（省电）；按设备实体唤醒键恢复网络。';
+  grid.append(sleepNote);
   const deviceUrlInput = addField(grid, 'ESP32 网页地址（必填）', 'device_url', '', 'url');
   deviceUrlInput.placeholder = 'http://192.168.1.137';
   deviceUrlInput.required = true;
   deviceUrlInput.autocomplete = 'off';
   deviceUrlInput.inputMode = 'url';
+  const expectedDeviceIdInput = document.createElement('input');
+  expectedDeviceIdInput.type = 'hidden';
+  expectedDeviceIdInput.name = 'expected_device_id';
   const modeLabel = document.createElement('p');
   modeLabel.className = 'pair-fixed-mode';
   modeLabel.textContent = '传输方式：设备主动拉取（服务器先验证设备连通性）';
-  card.append(modeLabel);
-  form.append(grid);
+  const wakeHelp = document.createElement('p');
+  wakeHelp.className = 'pair-wake-help';
+  card.append(modeLabel, wakeHelp);
+  const discovery = document.createElement('section');
+  discovery.className = 'device-discovery';
+  discovery.setAttribute('aria-label', '发现局域网 ESP32 电子相册');
+  const discoveryHeading = document.createElement('div');
+  discoveryHeading.className = 'device-discovery-heading';
+  discoveryHeading.innerHTML = '<div><strong>ESP32 唤醒与发现</strong><small>设备管理第 1 步：只读发现，不会登记、修改或唤醒任何设备</small></div>';
+  const discover = document.createElement('button');
+  discover.type = 'button';
+  discover.className = 'secondary-button discovery-button';
+  discover.textContent = '发现局域网电子相册';
+  discoveryHeading.append(discover);
+  const discoveryStatus = document.createElement('p');
+  discoveryStatus.className = 'device-discovery-status';
+  discoveryStatus.setAttribute('role', 'status');
+  discoveryStatus.setAttribute('aria-live', 'polite');
+  discoveryStatus.textContent = '尚未扫描。先按 Waveshare 的 BOOT 或 E1002 的绿色 Wake/Refresh，等待设备网页服务启动，再确认同一局域网。';
+  const candidates = document.createElement('div');
+  candidates.className = 'device-discovery-candidates';
+  candidates.hidden = true;
+  const candidateSelection = document.createElement('p');
+  candidateSelection.className = 'device-discovery-selection';
+  candidateSelection.textContent = '2. 尚未选择候选设备。发现后必须点选其中一台，服务器才会携带其硬件 ID 进行登记校验。';
+  const probeGroup = document.createElement('div');
+  probeGroup.className = 'device-discovery-probe';
+  const probeLabel = document.createElement('label');
+  probeLabel.htmlFor = 'device-probe-url';
+  probeLabel.textContent = '发现为空时，按 IP 验证单台设备';
+  const probeRow = document.createElement('span');
+  probeRow.className = 'device-discovery-probe-row';
+  const probeInput = document.createElement('input');
+  probeInput.id = 'device-probe-url';
+  probeInput.type = 'url';
+  probeInput.placeholder = 'http://192.168.1.137';
+  probeInput.autocomplete = 'off';
+  probeInput.inputMode = 'url';
+  const probeButton = document.createElement('button');
+  probeButton.id = 'device-probe-device';
+  probeButton.type = 'button';
+  probeButton.className = 'secondary-button';
+  probeButton.textContent = '读取并验证 IP';
+  probeRow.append(probeInput, probeButton);
+  probeGroup.append(probeLabel, probeRow);
+  discovery.append(discoveryHeading, discoveryStatus, candidates, candidateSelection, probeGroup);
+  form.append(discovery, grid, expectedDeviceIdInput);
   const profileSelect = form.elements.profile_id;
   const orientationSelect = form.elements.orientation;
   profileSelect.required = true;
+  let selectedCandidate = null;
+  const normalizeCandidateUrl = value => String(value || '').trim().replace(/\/$/, '');
+  const candidateHardwareId = candidate => String(
+    candidate?.device_hardware_id || candidate?.hardware_id || candidate?.device_id || ''
+  ).trim();
+  const candidateProfile = candidate => {
+    const board = String(candidate?.board_name || candidate?.profile_id || '').trim().toLowerCase();
+    if (board === 'waveshare_photopainter_73' || board.includes('photopainter')
+      || (board.includes('waveshare') && /7(?:\.3|in3|inch)/.test(board))) return 'waveshare_photopainter_73';
+    if (board === 'seeedstudio_reterminal_e1002' || board.includes('reterminal_e1002')
+      || (board.includes('seeed') && (board.includes('e1002') || board.includes('reterminal')))) return 'seeedstudio_reterminal_e1002';
+    return '';
+  };
+  const candidateStatus = candidate => String(candidate?.status || '').trim().toLowerCase();
+  const candidateSelectable = candidate => {
+    const status = candidateStatus(candidate);
+    return Boolean(normalizeCandidateUrl(candidate?.device_url) && candidateHardwareId(candidate))
+      && ['ready', 'choose_profile'].includes(status);
+  };
+  const clearCandidateSelection = (message = '已改为手工填写地址；请先读取 /api/system-info 并核对硬件 ID，不会自动绑定同型号设备。') => {
+    selectedCandidate = null;
+    expectedDeviceIdInput.value = '';
+    candidates.querySelectorAll('.device-discovery-candidate').forEach(node => node.setAttribute('aria-pressed', 'false'));
+    candidateSelection.textContent = message;
+  };
+  const selectCandidate = candidate => {
+    selectedCandidate = candidate;
+    const deviceUrl = normalizeCandidateUrl(candidate.device_url);
+    const hardwareId = candidateHardwareId(candidate);
+    deviceUrlInput.value = deviceUrl;
+    expectedDeviceIdInput.value = hardwareId;
+    candidates.querySelectorAll('.device-discovery-candidate').forEach(node => {
+      node.setAttribute('aria-pressed', String(node.dataset.hardwareId === hardwareId && node.dataset.deviceUrl === deviceUrl));
+    });
+    const profile = candidateProfile(candidate);
+    if (profile) {
+      profileSelect.value = profile;
+      syncProfileDimensions();
+    }
+    const dimensions = Number(candidate.width) && Number(candidate.height) ? ` · ${candidate.width}×${candidate.height}` : '';
+    candidateSelection.textContent = `已选择 ${deviceUrl}，硬件 ID：${hardwareId}${dimensions}。登记时服务器会再次校验此硬件 ID。`;
+  };
+  deviceUrlInput.addEventListener('input', () => {
+    if (!selectedCandidate) return;
+    if (normalizeCandidateUrl(deviceUrlInput.value) !== normalizeCandidateUrl(selectedCandidate.device_url)) {
+      clearCandidateSelection();
+    }
+  });
   const syncProfileDimensions = () => {
     orientationSelect.querySelector('option[value="portrait"]').disabled = profileSelect.value === 'seeedstudio_reterminal_e1002';
     if (orientationSelect.value === 'portrait' && orientationSelect.querySelector('option[value="portrait"]').disabled) orientationSelect.value = 'landscape';
   };
-  profileSelect.onchange = syncProfileDimensions; orientationSelect.onchange = syncProfileDimensions; syncProfileDimensions();
+  const updateWakeHelp = () => {
+    if (profileSelect.value === 'waveshare_photopainter_73') {
+      wakeHelp.textContent = '微雪 PhotoPainter：深度休眠时按一次 BOOT 唤醒；KEY 主要用于切换或唤醒后的操作。看到网页服务启动后再发现。';
+    } else if (profileSelect.value === 'seeedstudio_reterminal_e1002') {
+      wakeHelp.textContent = 'Seeed reTerminal E1002：深度休眠时按顶部绿色 Wake/Refresh 键；原厂固件的按键和网页协议可能不同，先用 IP 验证实际固件。';
+    } else {
+      wakeHelp.textContent = '先按对应设备的实体唤醒键。深度休眠期间 Wi-Fi、mDNS 和 HTTP 都不可用，310B 的发现按钮不能代替按键。';
+    }
+  };
+  profileSelect.onchange = () => { syncProfileDimensions(); updateWakeHelp(); };
+  orientationSelect.onchange = syncProfileDimensions;
+  syncProfileDimensions();
+  updateWakeHelp();
+  const renderCandidates = response => {
+    const discovered = Array.isArray(response)
+      ? response
+      : (Array.isArray(response?.candidates)
+        ? response.candidates
+        : (response?.candidate && typeof response.candidate === 'object' ? [response.candidate] : []));
+    candidates.replaceChildren();
+    candidates.hidden = false;
+    // Never preserve a selection across scans: an IP lease can change and the
+    // operator must explicitly confirm a candidate from this scan.
+    clearCandidateSelection('2. 请点击一台候选设备以确认目标；即使只发现一台，也不会自动选择。');
+    if (!discovered.length) {
+      discoveryStatus.textContent = response?.message || '未发现可登记的电子相册。深度休眠时设备没有 Wi-Fi、mDNS 或 HTTP，必须先按对应实体唤醒键；然后确认同一 Wi-Fi，再重试。也可以手工填写明确的 IPv4 地址。';
+      candidates.hidden = true;
+      return;
+    }
+    discoveryStatus.textContent = response?.message || (discovered.length === 1
+      ? '发现 1 台候选设备。请点击该候选设备确认，不会自动选择。'
+      : `发现 ${discovered.length} 台候选设备。请按 IP 和硬件 ID 选择目标，不能根据相同的主机名自动配对。`);
+    discovered.forEach((rawCandidate, index) => {
+      const candidate = rawCandidate && typeof rawCandidate === 'object' ? rawCandidate : {};
+      const deviceUrl = normalizeCandidateUrl(candidate.device_url);
+      const hardwareId = candidateHardwareId(candidate);
+      const canSelect = candidateSelectable(candidate);
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'device-discovery-candidate';
+      item.dataset.hardwareId = hardwareId;
+      item.dataset.deviceUrl = deviceUrl;
+      item.setAttribute('aria-pressed', 'false');
+      item.disabled = !canSelect;
+      const title = document.createElement('strong');
+      title.textContent = deviceUrl || `候选 ${index + 1}（缺少地址）`;
+      const identity = document.createElement('span');
+      identity.className = 'device-discovery-identity';
+      identity.textContent = hardwareId ? `硬件 ID：${hardwareId}` : '缺少设备硬件 ID，不能安全登记';
+      const facts = document.createElement('span');
+      facts.className = 'device-discovery-facts';
+      const detailParts = [
+        candidate.board_name && `型号：${candidate.board_name}`,
+        candidate.firmware_version && `固件：${candidate.firmware_version}`,
+        Number(candidate.width) && Number(candidate.height) && `屏幕：${candidate.width}×${candidate.height}`,
+        candidate.hostname && `主机名：${candidate.hostname}（不作为唯一身份）`,
+      ].filter(Boolean);
+      facts.textContent = detailParts.join(' · ') || '未提供型号或显示能力';
+      const note = document.createElement('span');
+      note.className = 'device-discovery-note';
+      note.textContent = canSelect
+        ? (candidate.message || '点击选择此设备，并将其地址与硬件 ID 写入登记请求。')
+        : (candidate.message || '该候选不可用于登记：请等待设备上线或检查发现结果。');
+      item.append(title, identity, facts, note);
+      item.onclick = () => selectCandidate(candidate);
+      candidates.append(item);
+    });
+  };
+  discover.onclick = async () => {
+    discover.disabled = true;
+    candidates.hidden = true;
+    discoveryStatus.textContent = '正在发现局域网电子相册；此操作不会写入注册表或修改设备…';
+    try {
+      renderCandidates(await json('/api/admin/devices/discover'));
+    } catch (error) {
+      candidates.replaceChildren();
+      candidates.hidden = true;
+      clearCandidateSelection('2. 发现失败，仍可手工填写明确的 IPv4 地址；此失败不会创建任何记录。');
+      discoveryStatus.textContent = `发现失败：${error.message}。请检查服务器与 ESP32 是否在同一局域网，或改用手工 IPv4 地址。`;
+      discoveryStatus.classList.add('is-error');
+      return;
+    } finally {
+      discover.disabled = false;
+    }
+    discoveryStatus.classList.remove('is-error');
+  };
+  probeButton.onclick = async () => {
+    const deviceUrl = normalizeCandidateUrl(probeInput.value);
+    if (!deviceUrl) {
+      discoveryStatus.classList.add('is-error');
+      discoveryStatus.textContent = '请输入设备当前的局域网 IPv4 地址，例如 http://192.168.1.137。';
+      probeInput.focus();
+      return;
+    }
+    probeButton.disabled = true;
+    discoveryStatus.classList.remove('is-error');
+    discoveryStatus.textContent = '正在读取设备 /api/system-info；这是只读身份验证，不会注册或修改设备…';
+    try {
+      renderCandidates(await json('/api/admin/devices/probe', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({device_url: deviceUrl}),
+      }));
+    } catch (error) {
+      discoveryStatus.classList.add('is-error');
+      discoveryStatus.textContent = `地址验证失败：${error.message}。请确认设备已按键唤醒、IP 正确且网页服务可达。`;
+    } finally {
+      probeButton.disabled = false;
+    }
+  };
   const actions = document.createElement('div'); actions.className = 'device-form-actions';
   const submit = document.createElement('button'); submit.className = 'primary-button'; submit.type = 'submit'; submit.textContent = '验证并注册设备'; actions.append(submit); form.append(actions);
-  const status = document.createElement('p'); status.className = 'device-console-status'; status.textContent = '填写局域网 ESP32 地址后，服务器会先验证连通性；验证失败不会创建注册记录。';
+  const status = document.createElement('p'); status.className = 'device-console-status'; status.textContent = '可先发现并选择候选设备；手工填写 IPv4 时请先读取 /api/system-info 并核对硬件 ID，验证失败不会创建注册记录。';
   const result = document.createElement('div'); result.className = 'pair-result device-pair-result'; result.hidden = true;
   result.innerHTML = '<label>服务器取图 URL<input name="url" readonly></label><p class="pair-result-help">服务器已完成设备验证和 URL Rotation 配置。此状态只表示配置成功；看到“设备已拉图”还需要 ESP32 实际访问服务器取图地址。</p>';
   if (state.lastPairing) {
@@ -868,9 +1105,11 @@ function renderEspPairingCard(host) {
         kind: 'photoframe',
         delivery_mode: 'device_pull',
         device_url: deviceUrl,
+        ...(expectedDeviceIdInput.value ? {expected_device_id: expectedDeviceIdInput.value} : {}),
         trigger_now: true,
         profile_id: form.elements.profile_id.value,
         name: form.elements.name.value.trim(),
+        deep_sleep_enabled: true,
         display: {kind: 'photoframe', width: form.elements.orientation.value === 'portrait' ? 480 : 800, height: form.elements.orientation.value === 'portrait' ? 800 : 480, orientation: form.elements.orientation.value, codecs: ['jpeg'], max_bytes: 2097152, rotation: 0, orientation_mode: 'auto'},
         policy: {rotation_cron: ['*/30 * *'], crop_mode: 'cover', orientation_mode: 'auto', rotation: 0, overlay_date: true, overlay_weather: true},
       })});
@@ -910,8 +1149,9 @@ function renderEspPairingCard(host) {
   };
   const details = document.createElement('details');
   details.className = 'device-advanced pairing-settings';
+  details.open = true;
   const summary = document.createElement('summary');
-  summary.textContent = '验证并注册新 ESP32 电子相册（点击展开）';
+  summary.textContent = '验证并注册新 ESP32 电子相册';
   details.append(summary, form, result, status);
   card.append(details);
   host.append(card);
@@ -938,35 +1178,49 @@ function renderExternalDevice(target, device, snapshot = null, stateError = null
   const cron = (policy.rotation_cron || ['*/30 * *'])[0];
   const connection = '设备主动拉取';
   const address = 'ESP32 定期访问服务器取图';
+  const wakeAction = device.profile_id === 'waveshare_photopainter_73'
+    ? 'BOOT（深睡时）'
+    : device.profile_id === 'seeedstudio_reterminal_e1002'
+      ? '绿色 Wake/Refresh（深睡时）'
+      : '先确认设备型号';
   const lastStatus = String(effectiveState.last_status ?? device.last_status ?? '').toLowerCase();
   const lastDeviceRequest = lastStatus === 'advanced' ? null : (effectiveState.last_request ?? device.last_request);
-  item.innerHTML = `<header class="device-console-header"><div class="device-type-mark esp-mark">${kind === 'photoframe' ? 'E' : '屏'}</div><div><h3>${esc(device.name || label)}</h3><p class="device-subtitle">${esc(deviceProfileLabel(device))} · ${width}×${height} · ${orientation}</p><code class="device-id">设备 ID：${esc(deviceId || '未分配')}</code></div><span class="device-state ${statusInfo.className}">${statusInfo.label}</span></header>`;
-  const facts = [
-    ['设备型号', deviceProfileLabel(device)],
-    ['连接方式', connection],
-    ['设备地址', address],
-    ['最近设备请求', formatDeviceTime(lastDeviceRequest)],
+  const displayName = deviceUserName(device, label);
+  item.innerHTML = `<header class="device-console-header"><div class="device-type-mark esp-mark">${kind === 'photoframe' ? 'E' : '屏'}</div><div><h3>${esc(displayName)}</h3><p class="device-subtitle">${esc(deviceProfileLabel(device))} · ${width}×${height} · ${orientation}</p></div><span class="device-state ${statusInfo.className}">${statusInfo.label}</span></header>`;
+  // Keep the first view scannable. Identity, endpoint and policy details stay
+  // available but collapsed so a card does not become a full-page form.
+  const currentSummary = kind === 'photoframe'
+    ? (verifiedDevicePull ? (current?.filename || '已拉取，文件名未知') : (current?.filename ? `候选：${current.filename}` : '尚未选择'))
+    : (current?.filename || '尚未拉取或选择');
+  appendDeviceFacts(item, [
+    ['当前照片', currentSummary],
+    ['最近请求', formatDeviceTime(lastDeviceRequest)],
     ['请求结果', deviceRequestLabel(effectiveState.last_status ?? device.last_status)],
-    ['轮播策略', `${selectionMode === 'playlist' ? '播放列表' : '智能选图'} · ${cron}`],
+    ['轮播策略', `${selectionMode === 'playlist' ? '播放列表' : '智能选图'} · ${rotationScheduleLabel(cron)}`],
+  ]);
+  const details = document.createElement('details');
+  details.className = 'device-details';
+  const detailsSummary = document.createElement('summary');
+  detailsSummary.textContent = '查看设备详情、取图地址与策略';
+  details.append(detailsSummary);
+  const detailFacts = [
+    ['设备型号', deviceProfileLabel(device)],
+    ['设备 ID', deviceId || '未分配'],
+    ['连接方式', connection],
+    ...(kind === 'photoframe' ? [['深睡唤醒', wakeAction]] : []),
+    ['设备地址', address],
+    ['深度睡眠', '固定启用（实体按键唤醒）'],
+    ['服务器候选照片', current?.filename || '尚未选择'],
+    ...(kind === 'photoframe' ? [['设备已显示照片', verifiedDevicePull ? (current?.filename || '已拉取，文件名未知') : '尚未确认设备显示']] : []),
     ['策略版本', `revision ${Number(device.policy_revision || policy.policy_revision || 1)}`],
   ];
-  if (kind === 'photoframe') {
-    // ``current`` is the server's candidate selected by the selector.  It is
-    // not evidence that the ESP32 rendered the image; only a complete
-    // PhotoFrame request makes that claim safe to show in the UI.
-    facts.splice(3, 0,
-      ['服务器候选照片', current?.filename || '尚未选择'],
-      ['设备已显示照片', verifiedDevicePull ? (current?.filename || '已拉取，文件名未知') : '尚未确认设备显示'],
-    );
-  } else {
-    facts.splice(3, 0, ['当前照片', current?.filename || '尚未拉取或选择']);
-  }
-  appendDeviceFacts(item, facts);
+  appendDeviceFacts(details, detailFacts);
+  item.append(details);
   // A legacy record without a confirmed hardware profile is not usable yet;
   // do not present its URL as if the endpoint were ready for the device.
   if (kind === 'photoframe' && !profileRequired) {
-    appendDeviceEndpoint(item, deviceId, device.pull_url);
-    appendPullProvision(item, device, effectiveState);
+    appendDeviceEndpoint(details, deviceId, device.pull_url);
+    appendPullProvision(details, device, effectiveState);
   }
   if (stateError) {
     const note = document.createElement('p');
@@ -1018,8 +1272,12 @@ function renderExternalDevice(target, device, snapshot = null, stateError = null
     form.className = 'device-settings-form device-policy-form';
     const grid = document.createElement('div');
     grid.className = 'device-settings-grid';
-    addField(grid, '设备名称', 'name', device.name || label);
-    addField(grid, '轮播 cron', 'rotation_cron', cron);
+    addField(grid, '设备名称', 'name', displayName);
+    addSelect(grid, '换图频率', 'rotation_cron', rotationScheduleOptions(cron), cron);
+    const sleepNote = document.createElement('p');
+    sleepNote.className = 'device-fixed-setting';
+    sleepNote.textContent = '深度睡眠：固定启用（省电）；按设备实体唤醒键恢复网络。';
+    grid.append(sleepNote);
     addSelect(grid, '裁剪', 'crop_mode', [['cover', '填满'], ['fit', '留白']], policy.crop_mode || 'cover');
     addSelect(grid, '方向', 'orientation_mode', [['auto', '保持照片方向'], ['match_display', '匹配屏幕']], policy.orientation_mode || 'auto');
     addSelect(grid, '屏幕摆放', 'orientation', device.profile_id === 'waveshare_photopainter_73' ? [['landscape', '横屏 800×480'], ['portrait', '竖屏 480×800']] : [['landscape', '横屏 800×480']], device.display?.orientation || 'landscape');
@@ -1034,6 +1292,15 @@ function renderExternalDevice(target, device, snapshot = null, stateError = null
     form.onsubmit = async event => {
       event.preventDefault(); save.disabled = true;
       try {
+        const policyPatch = {
+          rotation_cron: [form.elements.rotation_cron.value.trim()],
+          crop_mode: form.elements.crop_mode.value,
+          orientation_mode: form.elements.orientation_mode.value,
+          rotation: 0,
+          overlay_date: form.elements.overlay_date.checked,
+          overlay_weather: form.elements.overlay_weather.checked,
+        };
+        policyPatch.deep_sleep_enabled = true;
         await json(`/api/admin/devices/${encodeURIComponent(deviceId)}`, {
           method: 'PATCH', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
@@ -1043,14 +1310,7 @@ function renderExternalDevice(target, device, snapshot = null, stateError = null
               width: form.elements.orientation.value === 'portrait' ? 480 : 800,
               height: form.elements.orientation.value === 'portrait' ? 800 : 480,
             },
-            policy: {
-              rotation_cron: [form.elements.rotation_cron.value.trim()],
-              crop_mode: form.elements.crop_mode.value,
-              orientation_mode: form.elements.orientation_mode.value,
-              rotation: 0,
-              overlay_date: form.elements.overlay_date.checked,
-              overlay_weather: form.elements.overlay_weather.checked,
-            },
+            policy: policyPatch,
           }),
         });
         await loadDevices();
@@ -1061,7 +1321,7 @@ function renderExternalDevice(target, device, snapshot = null, stateError = null
     advanced.append(form);
     const pullStatus = document.createElement('p');
     pullStatus.className = 'device-console-status device-pull-mode';
-    pullStatus.textContent = '传输方式：设备主动拉取。首次使用时在上方“验证并登记”表单填写 ESP32 网页地址；成功后由 ESP32 自己定时获取照片。';
+    pullStatus.textContent = '传输方式：设备主动拉取。深度睡眠固定启用，并在 ESP32 下一次主动取图时同步；设备已经休眠时，必须先按实体唤醒键，服务器不能隔空修改或唤醒它。';
     advanced.append(pullStatus);
     item.append(advanced);
   }
@@ -1137,9 +1397,9 @@ function renderExternalDevice(target, device, snapshot = null, stateError = null
     remove.disabled = true;
     try {
       await json(`/api/admin/devices/${encodeURIComponent(deviceId)}?confirm=true`, {method: 'DELETE'});
-      actionNote.textContent = `设备“${device.name || deviceId}”已删除注册记录，照片未受影响。`;
+      actionNote.textContent = `设备“${displayName || deviceId}”已删除注册记录，照片未受影响。`;
       actionNote.classList.remove('is-warning', 'is-error');
-      showNotice(`设备“${device.name || deviceId}”已删除注册记录，照片未受影响。`);
+      showNotice(`设备“${displayName || deviceId}”已删除注册记录，照片未受影响。`);
       await loadDevices();
     } catch (error) {
       actionNote.textContent = `删除失败：${error.message}`;
@@ -1170,12 +1430,78 @@ async function loadDevices() {
     return device.display?.kind !== 'photoframe' || ['awaiting_pull', 'pulled'].includes(status);
   }).length;
   const pulledCount = external.filter(device => String(device.pull_provision?.status || '').toLowerCase() === 'pulled').length;
+  const workspace = document.createElement('div');
+  workspace.className = 'device-workspace';
+  const tabBar = document.createElement('nav');
+  tabBar.className = 'device-tabs';
+  tabBar.setAttribute('aria-label', '设备管理视图');
+  tabBar.setAttribute('role', 'tablist');
+  const viewHost = document.createElement('div');
+  viewHost.className = 'device-tab-views';
+  const views = new Map();
+  const tabLabels = {
+    overview: ['总览', '全部设备状态'],
+    touchscreen: ['本机触摸屏', 'HDMI 显示与控制'],
+    registered: ['已注册设备', `${external.length} 台 ESP32`],
+    pairing: ['发现与配对', '唤醒、验证、登记'],
+  };
+  const activateDeviceTab = name => {
+    const selected = views.has(name) ? name : 'overview';
+    state.deviceTab = selected;
+    tabBar.querySelectorAll('.device-tab-button').forEach(button => {
+      const active = button.dataset.deviceTab === selected;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', String(active));
+    });
+    views.forEach((view, key) => {
+      const active = key === selected;
+      view.hidden = !active;
+      view.classList.toggle('active', active);
+    });
+  };
+  Object.entries(tabLabels).forEach(([key, [label, hint]]) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'device-tab-button';
+    button.dataset.deviceTab = key;
+    button.setAttribute('role', 'tab');
+    button.id = `device-tab-${key}`;
+    button.setAttribute('aria-controls', `device-view-${key}`);
+    button.innerHTML = `<strong>${esc(label)}</strong><small>${esc(hint)}</small>`;
+    button.onclick = () => activateDeviceTab(key);
+    tabBar.append(button);
+    const view = document.createElement('section');
+    view.className = 'device-tab-view';
+    view.dataset.deviceView = key;
+    view.id = `device-view-${key}`;
+    view.setAttribute('role', 'tabpanel');
+    view.setAttribute('aria-labelledby', `device-tab-${key}`);
+    view.hidden = true;
+    viewHost.append(view);
+    views.set(key, view);
+  });
+  workspace.append(tabBar, viewHost);
+  consoleHost.append(workspace);
   const overview = document.createElement('section');
   overview.className = 'device-overview';
   overview.innerHTML = `<div class="device-overview-heading"><div><span class="eyebrow">设备注册表</span><h2>设备总览</h2><p>这里显示服务器登记的设备。只有完成地址和配置验证才算有效登记；真实 ESP32 拉图后才算已连通。</p></div><span class="device-overview-refresh">数据来自 /api/admin/devices</span></div><div class="device-overview-metrics"><div><strong>${external.length}</strong><span>登记记录</span></div><div><strong>${verifiedConfigCount}</strong><span>配置已验证</span></div><div><strong>${pulledCount}</strong><span>已验证拉图</span></div><div><strong>${enabledCount}</strong><span>已启用</span></div><div><strong>${identifiedCount}</strong><span>型号已确认</span></div><div><strong>${pendingCount}</strong><span>待确认型号</span></div></div><p class="device-overview-note"><b>状态含义：</b>“配置已验证”表示服务器实际访问 ESP32 并读回 URL Rotation，但不表示设备已取图；“已验证拉图”需要设备真实请求并匹配登记地址。失败的原子注册不会留下记录；旧兼容记录会明确显示为待验证。已禁用记录仍保留但不能访问照片。</p>`;
-  consoleHost.append(overview);
-  renderTouchscreenCard(consoleHost, touchscreen);
-  renderEspPairingCard(consoleHost);
+  const overviewActions = document.createElement('div');
+  overviewActions.className = 'device-overview-actions';
+  [
+    ['touchscreen', '本机触摸屏', '管理 HDMI 屏幕、轮播和水印'],
+    ['registered', '已注册设备', '查看状态、策略和删除操作'],
+    ['pairing', '发现与配对', '唤醒设备后进行网络发现'],
+  ].forEach(([key, label, hint]) => {
+    const action = document.createElement('button');
+    action.type = 'button';
+    action.className = 'device-overview-action';
+    action.innerHTML = `<strong>${esc(label)}</strong><span>${esc(hint)}</span><b aria-hidden="true">›</b>`;
+    action.onclick = () => activateDeviceTab(key);
+    overviewActions.append(action);
+  });
+  views.get('overview').append(overview, overviewActions);
+  renderTouchscreenCard(views.get('touchscreen'), touchscreen);
+  renderEspPairingCard(views.get('pairing'));
   const stateById = new Map();
   const stateErrors = new Map();
   await Promise.all(external.map(async device => {
@@ -1190,16 +1516,16 @@ async function loadDevices() {
   const heading = document.createElement('div');
   heading.className = 'device-section-heading device-section-toolbar';
   const headingCopy = document.createElement('div');
-  headingCopy.innerHTML = `<h3>已注册的 ESP32 设备 <span class="device-count">${external.length}</span></h3><p>按实际型号分组；状态、地址和当前照片显示在卡片顶部。</p>`;
+  headingCopy.innerHTML = `<h3>已注册的 ESP32 设备 <span class="device-count">${external.length}</span></h3><p>按实际型号分组；卡片顶部显示运行摘要，低频连接信息可展开查看。</p>`;
   heading.append(headingCopy);
   const refresh = document.createElement('button');
   refresh.className = 'secondary-button'; refresh.type = 'button'; refresh.textContent = '刷新设备状态';
   refresh.onclick = () => loadDevices();
   heading.append(refresh);
-  consoleHost.append(heading);
+  views.get('registered').append(heading);
   const list = document.createElement('div');
   list.className = 'device-list';
-  consoleHost.append(list);
+  views.get('registered').append(list);
   if (!external.length) {
     list.innerHTML = '<p class="panel-status">还没有 ESP32 电子相册。使用上方配对表单注册第一台设备。</p>';
   } else {
@@ -1232,7 +1558,8 @@ async function loadDevices() {
       list.append(section);
     });
   }
-  if (devicesResult.status === 'rejected') { const note = document.createElement('p'); note.className = 'device-console-status is-error'; note.textContent = `ESP32 设备列表读取失败：${devicesResult.reason.message}`; consoleHost.append(note); }
+  if (devicesResult.status === 'rejected') { const note = document.createElement('p'); note.className = 'device-console-status is-error'; note.textContent = `ESP32 设备列表读取失败：${devicesResult.reason.message}`; views.get('registered').append(note); }
+  activateDeviceTab(state.deviceTab);
 }
 
 function watchDevicePull(deviceId, tries = 15) {
@@ -1276,7 +1603,7 @@ document.querySelector('#close-panel').onclick = closePanel;
 document.querySelector('#panel-scrim').onclick = closePanel;
 document.querySelector('#reload-gallery').onclick = () => loadGallery(true);
 window.addEventListener('resize', () => { clearTimeout(state.viewportTimer); state.viewportTimer = setTimeout(() => { const viewport = displayViewport(); if (state.current && viewport.key !== state.viewportKey) loadCurrent(false).catch(error => showError(error.message)); }, 250); });
-document.querySelector('#search-form').onsubmit = async event => { event.preventDefault(); const status = document.querySelector('#search-status'); const grid = document.querySelector('#search-grid'); status.textContent = 'NPU 搜索中…'; grid.replaceChildren(); try { const form = event.currentTarget; const query = form.query.value.trim(); if (!query) { status.textContent = '请输入搜索内容'; return; } const value = await json('/api/search/text', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query, model:form.model.value, top_k:24})}); const results = Array.isArray(value.results) ? value.results : []; const topScore = results.reduce((best, item) => Math.max(best, Number(item.score) || 0), 0); status.textContent = results.length ? `${value.model_id} 返回 ${results.length} 项，最高相关度 ${(topScore * 100).toFixed(1)}%` : `${value.model_id} 暂无匹配照片`; renderPhotos(grid, results.map(item => ({...item, id:item.photo_id}))); } catch (error) { status.textContent = `搜索失败：${error.message}`; } };
+document.querySelector('#search-form').onsubmit = async event => { event.preventDefault(); const status = document.querySelector('#search-status'); const grid = document.querySelector('#search-grid'); status.textContent = 'NPU 搜索中…'; grid.replaceChildren(); try { const form = event.currentTarget; const query = form.query.value.trim(); if (!query) { status.textContent = '请输入搜索内容'; return; } const filters = {min_width: Math.max(0, Number(form.min_width.value) || 0), min_height: Math.max(0, Number(form.min_height.value) || 0), extensions: form.extensions.value ? [form.extensions.value] : [], face_filter: form.face_filter.value || 'all'}; const value = await json('/api/search/text', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query, model:form.model.value, top_k:24, ...filters})}); const results = Array.isArray(value.results) ? value.results : []; const topScore = results.reduce((best, item) => Math.max(best, Number(item.score) || 0), 0); const filterText = filters.min_width || filters.min_height || filters.extensions.length || filters.face_filter !== 'all' ? ' · 已应用元数据预筛选' : ''; status.textContent = results.length ? `${value.model_id} 返回 ${results.length} 项，最高相关度 ${(topScore * 100).toFixed(1)}%${filterText}` : `${value.model_id} 暂无匹配照片${filterText}`; renderPhotos(grid, results.map(item => ({...item, id:item.photo_id}))); } catch (error) { status.textContent = `搜索失败：${error.message}`; } };
 function uploadSelection() {
   const allFiles = [
     ...document.querySelector('#upload-files').files,

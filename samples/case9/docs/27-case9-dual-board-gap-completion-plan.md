@@ -11,7 +11,7 @@ _版本：1.1｜日期：2026-08-30｜状态：已完成（缺口证据已归档
 
 | 板卡 | 当前地址 | SoC/算力 | 运行环境 |
 | --- | --- | --- | --- |
-| 8T | `192.168.1.90` | `Ascend310B4 / 8T` | `case9-acl-om`（ONNX→OM）；`base` + MindSpore/MindNLP（MindNLP 路线） |
+| 8T | `192.168.1.90`（历史 `.11.14`，同一块板） | `Ascend310B4 / 8T` | `case9-acl-om`（ONNX→OM）；`base` + MindSpore/MindNLP（MindNLP 路线） |
 | 20T | `192.168.1.95` | `Ascend310B1 / 20T` | `case9-acl-om` 待建立/核验；现有 `base` + MindSpore/MindNLP（MindNLP 路线） |
 
 `192.168.8.178` 是 8T 的历史采集地址，`192.168.8.210` 是 20T 的历史请求地址。
@@ -30,12 +30,12 @@ Torchaudio、MindSpore、CANN、vLLM、MindIE 或 OPP。已有 `base` 的包污�
 
 ## 2. 需要补齐的组合
 
-| 路线/模型 | 8T `.90` | 20T `.95` | 本批次闭环 |
+| 路线/模型 | 8T `.90`（历史报告 `.11.14`/`.178`） | 20T `.95` | 本批次闭环 |
 | --- | --- | --- | --- |
 | Qwen2.5 Static-KV / native B4/B1 | 当前 B4 身份只读复核 `passed`；历史 ACL/API/性能批次保留 | 当前 B1 身份只读复核 `blocked`（无当前 ONNX、OM、contract、lock） | `.90`/`.95` 身份报告已归档；不重跑历史性能，不把 `.210` 历史工件当作 `.95` 当前证据 |
-| Qwen1.5 MindNLP | 已有完整 8T 批次 | 缺口批次 `passed`，9/9 机器门 | 已归档 JSON/SSE、8/16/24/32/48/64 长输出、10 轮稳定性和 2+30 性能 |
+| Qwen1.5 MindNLP | 历史报表 9/9；严格身份门 8/9 待补证 | 缺口批次 `passed`，9/9 机器门 | 已归档 JSON/SSE、8/16/24/32/48/64 长输出、10 轮稳定性和 2+30 性能 |
 | TinyLlama MindNLP | 已测，长输出/中文质量失败 | 缺口批次 `failed`，8/9 机器门 | 已归档完整失败输出；32/48 token UTF-8 失败，继续 `blocked` |
-| DeepSeek MindNLP | 缺口批次 `passed`，9/9 机器门 | 已有完整隔离 API 批次 | 已归档 `.90` JSON/SSE、8/16/24/32/48/64 长输出、稳定性、质量机器门和性能 |
+| DeepSeek MindNLP | 缺口批次 `passed`，9/9 机器门 | 已有完整隔离 API 批次 | 已归档历史 `.90` JSON/SSE、8/16/24/32/48/64 长输出、稳定性、质量机器门和性能 |
 | Qwen2.5 B4 OM ↔ B1、B1 OM ↔ B4 | `not-run` | `not-run` | 跨 SoC 仅保留历史 compatibility 说明，不作为本批次 native 结论 |
 
 缺口批次的原始 acceptance、性能、长输出和环境快照位于
@@ -108,7 +108,7 @@ MindNLP 测试切换到现有 `base` 后重新记录完整环境指纹。检查 
 
 本批次已完成当前身份核对（不重跑历史性能）：
 
-- `.90`：`repro/case9-dual-board-gap-20260830/identity-input/board8t-qwen25-current-identity.json`，
+- 当前 `.90`（历史报告采集时 `.11.14`/`.178`）：`repro/case9-dual-board-gap-20260830/identity-input/board8t-qwen25-current-identity.json`，
   `status=passed`，只读确认四个工件、B4 descriptor、CANN/ACL 和 `npu-smi`；报告 SHA-256
   为 `738e2788b1ff52f2d623c3462175baef49cce16739c8f40eea5dfc2c4a0d2474`。
 - `.95`：`repro/case9-dual-board-gap-20260830/identity-input/board20t-qwen25-current-identity.json`，
@@ -125,7 +125,7 @@ MindNLP 测试切换到现有 `base` 后重新记录完整环境指纹。检查 
 1. `.95` 的 Qwen1.5 缺口批次 `qwen20-gap-20260830` 已完成，9/9 机器门通过；
 2. `.95` 的 TinyLlama 缺口批次 `tiny20-gap-20260830` 已完成，8/9 机器门，32/48
    token 长输出出现 UTF-8 替换字符，状态保持 `blocked`；
-3. `.90` 的 DeepSeek 缺口批次 `deepseek-8t-gap-20260830b` 已完成，9/9 机器门通过；
+3. 8T（当前地址 `.90`，历史报告地址 `.11.14`/`.178`）的 DeepSeek 缺口批次 `deepseek-8t-gap-20260830` 已完成，9/9 机器门通过；
 4. 每个报告都保留临时 worker、原始响应、资源快照和失败输出；没有因机器门通过而设置
    `admitted`，共享 `base` 仍标为 `experimental_dirty_base`；
 5. 人工中文质量审查仍为待审，不能把机器 `10/10` 或 `7/10` 直接写成正式质量结论。
@@ -157,7 +157,7 @@ MindNLP 测试切换到现有 `base` 后重新记录完整环境指纹。检查 
 
 本计划完成判定（已满足）：
 
-1. Qwen1.5/20T、TinyLlama/20T、DeepSeek/8T 均有真实 acceptance；Qwen2.5 `.90` 有
+1. Qwen1.5/20T、TinyLlama/20T、DeepSeek/8T 均有真实 acceptance；Qwen2.5 当前 8T `.90`（历史 `.11.14`/`.178`）有
    当前身份 `passed`，`.95` 有工件缺失 `blocked`；跨 SoC 组合明确 `not-run`；
 2. 两条路线的模型矩阵、速度、64-token 长输出和状态可由报告路径复核；
 3. B4/B1 native、历史 provenance 与跨 SoC compatibility 已明确分栏；

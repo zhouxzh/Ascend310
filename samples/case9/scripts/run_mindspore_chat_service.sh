@@ -17,7 +17,10 @@ if [[ "${CASE9_PROCESS_GROUP_READY:-0}" != "1" ]]; then
     exit 2
   }
   export CASE9_PROCESS_GROUP_READY="1"
-  exec setsid "${BASH_SOURCE[0]}" "$@"
+  # Invoke through bash rather than relying on the repository file mode. A
+  # checkout copied with a mode-preserving tool may be non-executable, while
+  # the launcher itself is intentionally called as ``bash script.sh``.
+  exec setsid bash "${BASH_SOURCE[0]}" "$@"
 fi
 command -v setsid >/dev/null 2>&1 || {
   echo "setsid is required for worker process-group isolation" >&2
@@ -40,6 +43,14 @@ port="${MINDSPORE_CHAT_PORT:-8090}"
 registry="${CASE9_MODEL_PROFILES:-${script_dir}/configs/chat_model_profiles.json}"
 conda_profile="${CONDA_PROFILE:-/usr/local/miniconda3/etc/profile.d/conda.sh}"
 conda_env="${CASE9_MINDSPORE_CONDA_ENV:-base}"
+
+# The profile is later used only as a report filename component.  Validate it
+# before any path is constructed so a registry/environment typo cannot turn a
+# diagnostic output path into traversal outside the deployment tree.
+if [[ ! "${profile}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
+  echo "Invalid profile identifier for worker launch" >&2
+  exit 2
+fi
 
 if [[ "${host}" != "127.0.0.1" ]]; then
   echo "MindSpore chat service is loopback-only" >&2
@@ -132,6 +143,9 @@ export CASE9_WORKER_MAIN="1"
 # controller.
 if ! "${python_bin}" - "${registry}" "${profile}" <<'PY'
 import os
+import re
+import shutil
+import subprocess
 import sys
 from case9_model_profiles import load_profiles
 
@@ -139,7 +153,21 @@ profiles = load_profiles(sys.argv[1])
 profile = profiles.get(sys.argv[2])
 if profile is None:
     raise SystemExit("unknown profile: %s" % sys.argv[2])
-status = str(profile.status).strip().lower()
+if getattr(profile, "is_conditional", False):
+    raise SystemExit("profile is conditional and cannot be started: %s" % profile.id)
+observed_soc = ""
+tool = shutil.which("npu-smi")
+if tool:
+    try:
+        output = subprocess.check_output([tool, "info"], text=True, stderr=subprocess.STDOUT, timeout=8)
+        matches = sorted(set(item.upper() for item in re.findall(r"(?:Ascend\s*)?(310B[0-9A-Za-z]+)", output, re.IGNORECASE)))
+        if len(matches) == 1:
+            observed_soc = "Ascend" + matches[0]
+    except Exception:
+        observed_soc = ""
+if observed_soc and not profile.supports_soc(observed_soc):
+    raise SystemExit("profile does not target %s: %s" % (observed_soc, profile.id))
+status = profile.activation_status_for_soc(observed_soc) if observed_soc else str(profile.status).strip().lower()
 if status in {"blocked", "not-run"}:
     raise SystemExit("profile is %s: %s" % (status, profile.id))
 if status == "experimental_dirty_base" and os.environ.get("CASE9_ALLOW_EXPERIMENTAL") != "1":
@@ -193,6 +221,7 @@ verification_stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 verification_report="${verification_dir}/${profile}-${verification_stamp}.json"
 if ! "${python_bin}" "${artifact_verifier}" \
     --profile "${profile}" \
+    --registry "${registry}" \
     --root "${CASE9_MODEL_ROOT}" \
     --output "${verification_report}"; then
   echo "Model artifact verification failed; refusing to start profile=${profile}" >&2

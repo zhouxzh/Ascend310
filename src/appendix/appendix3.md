@@ -2,775 +2,727 @@
 title: "附录 3：Python 编程基础"
 author: [周贤中]
 date: 2026-08-31
-subject: "公选课补充材料"
-keywords: [Python, 标准库, CSV, 数据分析, 昇腾310B]
+subject: "昇腾310B教程补充材料"
+keywords: [Python, 标准库, 昇腾310B, 模型部署]
 lang: zh-cn
 ---
 
 # 附录 3：Python 编程基础
 
 > **本章导读**
-> 时长：3 节课，每节 45 分钟
-> 数据：`data/02-python/stock_price.csv`、`data/02-python/supermarket_sales.csv`、`data/02-python/breast_cancer.csv`
-> 你将学到：用 Python 标准库 `csv`、`statistics`、`math` 读取 CSV，掌握变量、容器、条件、循环、函数、异常和调试
-> 本周不引入 pandas
-> 本周产出：`projects/<姓名>/02-stock.py`、`projects/<姓名>/02-supermarket.py`、`projects/<姓名>/02-breast-cancer.py`
+> 目标：用 Python 检查昇腾 310B 模型部署中常见的配置、清单和结果数据。
+> 数据：正文内联示例，不依赖外部数据集。
+> 标准库：`json`、`statistics`、`math`。
+> 输出：可直接在 Python REPL 中运行，也可保存为 `.py` 文件复现。
 
-本周三节课不按“先讲完所有语法，再做题目”的顺序。每一节都从一个具体数据问题开始，先引入刚好够用的概念，再用真实数据练习。
+本附录按实际使用顺序讲解 Python。模型 ID、输入形状、预处理均值、精度模式和准入状态会反复出现在样例代码中，因此本章直接用这些对象编写示例。
 
-```text
-看数据问题 → 引入概念 → 最小代码 → 自己试 → 应用到数据 → DSH 审查 → 验收
-```
+`for`、`if`、`dict`、`set`、异常处理等基础语法会在前几节展开，第 4 节补充 `samples/` 中高频出现的文件、JSON、命令行和异步写法。所有示例都只使用标准库，不引入 `pandas`，也不需要板端运行环境。
 
-1. 第 1 节课：从一个价格列表开始，统计股票价格；
-2. 第 2 节课：从循环到函数和字典，汇总超市分店销售额；
-3. 第 3 节课：把脏数据讲清楚，安全处理乳腺癌数据中的异常值。
+## 1. 数据、类型与容器
 
-**本周使用 DSH 的固定顺序：先理解计划，再检查命令，小步执行，验证结果。** DSH 可以生成代码，但你必须能解释每一行。它说“写好了”不等于“做对了”，要看真实输出；它要执行命令时，先读命令本身。本周代码只允许使用标准库，出现 `pandas` 就是红线；原始 `data/` 目录只读，学生代码只写入 `projects/<姓名>/`。
+### 1.1 变量与基本类型
 
-## 1. 第 1 节课 从一个价格列表开始（45 分钟）
-
-建议流程：先看示例，再自己跑通，最后复盘验收。
-
-### 1.1 今天的数据与问题
-
-数据：`data/02-python/stock_price.csv`，252 行 x 2 列，字段 `Date`、`Price`。
-
-问题：读取 `Price` 列，计算平均价格、最高价格、最低价格和上涨天数。
-
-先看计划：
-
-```mermaid
-flowchart LR
-    A[读取文件] --> B[逐行取出 Price]
-    B --> C[转成 float]
-    C --> D[用 statistics 算平均]
-    D --> E[用 max/min 找极值]
-    E --> F[相邻两日比较，数上涨天数]
-```
-
-计划里没有“修改原文件”和“安装 pandas”。这两件事本周都不做。
-
-### 1.2 变量和基本类型
-
-变量是给一个值起的名字，不是这个值本身。可以把它想成储物格上的标签：`price` 是标签，`23.02` 是格子里放的东西。Python 中每个值都有类型，类型决定它能做什么运算。
-
-写代码前先记三个工具：`print()` 把结果打印到屏幕；`type()` 返回一个值的类型；`#` 后面的文字是注释，只给人看，Python 不执行。
+变量是给值起的名字。Python 中每个值都有类型，类型决定它可以参与哪些运算。检查类型用 `type()`，查看结果用 `print()`。
 
 ```python
-price = 23.02          # float，小数
-days = 252             # int，整数
-stock_name = "PF"      # str，文本
-is_trading_day = True  # bool，布尔
+model_id = "mobileclip_s0"
+feature_dim = 512
+input_scale = 0.00392156862745098
+is_admitted = True
 
-print(type(price))
-print(type(days))
-print(type(stock_name))
-print(type(is_trading_day))
+print(type(model_id))
+print(type(feature_dim))
+print(type(input_scale))
+print(type(is_admitted))
 ```
-
-脚本：[01-variable-types.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/01-variable-types.py)
 
 输出：
 
 ```text
-<class 'float'>
-<class 'int'>
 <class 'str'>
+<class 'int'>
+<class 'float'>
 <class 'bool'>
 ```
 
-本周还会用到另外几种容器类型：
+`str` 是文本，`int` 是整数，`float` 是小数，`bool` 是布尔值。模型 ID 适合存成 `str`，嵌入维度适合存成 `int`。
 
-| 类型 | 中文名 | 示例 | 特点 |
-|---|---|---|---|
-| `None` | 空值 | `None` | 表示“没有值”或“转换失败” |
-| `list` | 列表 | `[23.02, 23.15]` | 有序，可增删 |
-| `tuple` | 元组 | `("2024-01-02", 23.02)` | 有序，创建后不改 |
-| `dict` | 字典 | `{"A": 106200.37}` | 按名字找值 |
-| `set` | 集合 | `{"A", "B", "C"}` | 不重复 |
+### 1.2 数字运算与单位换算
 
-四条规则：
-
-- CSV 读进来的内容默认是 `str`，算数前必须转成数字；
-- 变量名要说明用途，不要叫 `a`、`b`、`c`；
-- 数字和字符串不能直接相加，先看 `type()`，再看报错；
-- 容器类型会在具体用到时再展开，不在这一节一次背完。
-
-**自己试 1：** 新建 `quantity = 5` 和 `unit_price = 12.5`，打印 `quantity * unit_price` 和它的 `type()`。先猜类型，再运行。
-
-### 1.3 数字运算和 `round()`
-
-这一节先认识四个运算：`/` 是普通除法，结果可能是小数；`//` 是向下取整；`%` 是取余数；`round(x, 2)` 保留两位小数，用于显示，不改变原来的数据。
+模型文件大小经常需要在字节和 MiB 之间换算。`/` 是普通除法，`//` 是向下取整，`%` 是取余数，`round()` 控制显示精度。
 
 ```python
-print(10 / 3)
-print(10 // 3)
-print(10 % 3)
-print(round(23.969999, 2))
-```
+bytes_size = 131904474
+mib_size = bytes_size / 1024 / 1024
 
-脚本：[02-number-operations.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/02-number-operations.py)
+print(mib_size)
+print(round(mib_size, 2))
+print(bytes_size // 1024)
+print(bytes_size % 1024)
+```
 
 输出：
 
 ```text
-3.3333333333333335
-3
+125.79369640350342
+125.79
+128812
+986
+```
+
+`round()` 只改变显示结果，不改变原始变量。
+
+### 1.3 列表与元组
+
+模型输入形状、预处理均值和标准差通常是有序数值。`list` 保存可增删的有序数据，`tuple` 保存创建后不修改的固定组合。
+
+```python
+input_shape = [1, 3, 224, 224]
+image_mean = (0.485, 0.456, 0.406)
+
+print(input_shape[0])
+print(input_shape[-1])
+print(len(input_shape))
+print(image_mean[0])
+```
+
+输出：
+
+```text
 1
-23.97
+224
+4
+0.485
 ```
 
-- `/` 是普通除法，结果可能是 `float`
-- `//` 是向下取整
-- `%` 是取余数
-- `round(x, 2)` 保留两位小数，用于显示，不改变原来的数据
+列表索引从 0 开始，`-1` 表示最后一个元素。`len()` 返回元素个数。
 
-### 1.4 列表和 `for` 循环
+### 1.4 字典
 
-价格是一串有序、可以增删的数字，用 `list`。列表编号从 0 开始，所以第一个元素是 `prices[0]`，最后一个是 `prices[-1]`。`len(列表)` 返回元素个数；`列表.append(值)` 在末尾增加一个元素。
+模型清单由多个字段组成，每个字段用一个键和对应的值表示。`dict` 保存键值对，适合描述一个模型条目。
 
 ```python
-prices = [23.02, 23.15, 23.50]
-print(prices[0])
-print(prices[-1])
-prices.append(23.80)
-print(prices)
-print(len(prices))
-```
+model = {
+    "model_id": "mobileclip_s0",
+    "input_shape": [1, 3, 256, 256],
+    "precision_mode": "mixed_fp16",
+    "status": "admitted",
+}
 
-脚本：[03-list-basics.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/03-list-basics.py)
+print(model["model_id"])
+print(model["input_shape"])
+```
 
 输出：
 
 ```text
-23.02
-23.5
-[23.02, 23.15, 23.5, 23.8]
-4
+mobileclip_s0
+[1, 3, 256, 256]
 ```
 
-`for` 循环让程序重复执行同一段代码。`for price in prices:` 的意思是：依次把列表中的每个元素放进变量 `price`，执行缩进块；列表里有几个元素，缩进块就执行几次。`break` 会立即结束整个循环，后面的元素不再处理。
+键通常使用字符串，值可以是字符串、数字、列表或另一个字典。
+
+### 1.5 集合
+
+需要知道模型清单中出现过哪些精度模式时，用 `set` 去重。
 
 ```python
-prices = [23.02, 23.15, 23.50]
+precision_modes = {"mixed_fp16", "allow_fp32_to_fp16", "mixed_fp16"}
+print(precision_modes)
+```
+
+输出：
+
+```text
+{'allow_fp32_to_fp16', 'mixed_fp16'}
+```
+
+集合不保留插入顺序，也不能通过索引取值。顺序不重要的去重任务才适合使用集合。
+
+## 2. 控制流
+
+### 2.1 条件分支
+
+`if` 处理一个条件，`elif` 处理“否则如果”，`else` 是兜底。判断从上往下执行，先命中的分支生效。
+
+```python
+status = "admitted"
+
+if status == "admitted":
+    print("可进入 NPU 服务")
+elif status == "candidate":
+    print("仅用于离线评估")
+else:
+    print("状态未知")
+```
+
+输出：
+
+```text
+可进入 NPU 服务
+```
+
+比较运算符 `==` 判断是否相等，结果是一个布尔值。
+
+### 2.2 for 循环
+
+`for` 循环依次取出列表中的元素，重复执行缩进块。累加前先设置 `total = 0`，这个初始值必须写在循环外。
+
+```python
+feature_dims = [512, 1024, 2048]
 
 total = 0
-for price in prices:
-    total = total + price
+for dim in feature_dims:
+    total = total + dim
 
 print(total)
+print(min(feature_dims))
+print(max(feature_dims))
 ```
-
-脚本：[04-list-for-sum.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/04-list-for-sum.py)
 
 输出：
 
 ```text
-69.67
+3584
+512
+2048
 ```
 
-累加前先准备 `total = 0`，这个初始值必须在循环外设置。
+### 2.3 range、enumerate 与 zip
 
-**自己试 2：** 写一个循环，只打印大于 `23.1` 的价格。先说出你预期会看到哪几个数，再运行。
-
-### 1.5 用 `statistics` 算均值，用 `min` / `max` 找极值
-
-`import statistics` 把标准库模块 statistics 加载进来，之后用 `statistics.mean(...)` 调用它的平均值函数。`min()` 和 `max()` 是 Python 自带函数。
+`range(n)` 生成从 0 到 `n - 1` 的整数序列。`enumerate()` 同时返回序号和元素，`zip()` 把多个序列按位置配对。
 
 ```python
-import statistics
-
-prices = [23.02, 23.15, 23.50]
-print(statistics.mean(prices))
-print(min(prices))
-print(max(prices))
+for index, dim in enumerate([512, 1024, 2048], start=1):
+    print(index, dim)
 ```
-
-脚本：[05-statistics-mean-min-max.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/05-statistics-mean-min-max.py)
 
 输出：
 
 ```text
-23.223333333333333
-23.02
-23.5
+1 512
+2 1024
+3 2048
 ```
-
-`mean` 是平均值，`min` / `max` 是最小值、最大值。这些函数都来自标准库，不需要 pandas。
-
-### 1.6 读取 CSV 的 `Price` 列
-
-现在把前面的概念接到真实文件上。这里会用到几个新语法：`import csv` 加载 CSV 模块；`with open(path, encoding="utf-8-sig", newline="") as f:` 打开文件并在结束时自动关闭；`csv.DictReader(f)` 把每行读成以表头为键的字典；`row["Price"]` 按列名取这一行的值；`float(...)` 把文本转成小数。
 
 ```python
-import csv
-import statistics
+model_ids = ["mobileclip_s0", "resnet50_feature"]
+dims = [512, 2048]
 
-path = "data/02-python/stock_price.csv"
-prices = []
-
-with open(path, encoding="utf-8-sig", newline="") as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        prices.append(float(row["Price"]))
-
-print("样本量:", len(prices))
-print("平均价格:", round(statistics.mean(prices), 2))
-print("最高价格:", round(max(prices), 2))
-print("最低价格:", round(min(prices), 2))
+for model_id, dim in zip(model_ids, dims):
+    print(model_id, dim)
 ```
-
-脚本：[06-stock-csv.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/06-stock-csv.py) ｜ 数据：[stock_price.csv](https://github.com/zhouxzh/python-data-analysis/blob/main/data/02-python/stock_price.csv)
 
 输出：
 
 ```text
-样本量: 252
-平均价格: 19.3
-最高价格: 23.97
-最低价格: 14.5
+mobileclip_s0 512
+resnet50_feature 2048
 ```
 
-关键点：
+### 2.4 while、break 与 continue
 
-- `csv.DictReader` 把每一行读成字典，表头是键，所以用 `row["Price"]`
-- CSV 读出来是字符串，`float(row["Price"])` 把它转成小数
-- `encoding="utf-8-sig"` 自动去掉文件开头的 BOM，避免列名变成 `\ufeffPrice`
-
-**自己试 3：** 把代码改成只打印前 3 个价格。用 `break` 在第三次后停止循环。
-
-### 1.7 数上涨天数
-
-上涨天数表示相邻两天比较后、后一天高于前一天的次数。这里需要两个新工具：`range(1, len(prices))` 生成从 1 到 `len(prices) - 1` 的整数序列；`if prices[i] > prices[i - 1]:` 表示条件成立时才执行缩进块，`>` 是比较大小。`up_days += 1` 是 `up_days = up_days + 1` 的简写。
+`while` 在条件仍为真时重复执行。循环内必须修改条件变量，否则会无限循环。`continue` 跳过本次循环，`break` 立即结束整个循环。
 
 ```python
-import csv
+attempt = 0
 
-path = "data/02-python/stock_price.csv"
-prices = []
-
-with open(path, encoding="utf-8-sig", newline="") as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        prices.append(float(row["Price"]))
-
-up_days = 0
-for i in range(1, len(prices)):
-    if prices[i] > prices[i - 1]:
-        up_days += 1
-
-print("上涨天数:", up_days)
+while attempt < 3:
+    print(f"attempt {attempt + 1}")
+    attempt += 1
 ```
-
-脚本：[07-stock-up-days.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/07-stock-up-days.py) ｜ 数据：[stock_price.csv](https://github.com/zhouxzh/python-data-analysis/blob/main/data/02-python/stock_price.csv)
 
 输出：
 
 ```text
-上涨天数: 122
+attempt 1
+attempt 2
+attempt 3
 ```
-
-重点解释：
-
-- `range(1, len(prices))`：从第 2 个价格开始，和前一天比较
-- `len(prices)` 是 252，所以循环比较 251 次，不是 252 次
-- `prices[i - 1]`：紧邻的前一天价格
-
-### 1.8 DSH vibe loop 与验收
-
-把这节课的脚本交给 DSH 审查，问它三个问题：
-
-1. 为什么 `float(row["Price"])` 不能省略？
-2. 为什么上涨天数不是 252？
-3. 如果 `statistics.mean(prices)` 报错，最可能是什么原因？
-
-DSH 回答后，你必须用自己的话复述一遍，能复述才继续下一步。
-
-- [ ] 能说出 `int`、`float`、`str`、`bool` 的区别
-- [ ] 能解释 `list` 为什么适合存价格序列
-- [ ] 能用 `for` 循环把列表加总
-- [ ] `stock_price.csv` 脚本只用 `csv` 和 `statistics`，没有 pandas
-- [ ] 能输出 252 行、平均 19.3、最高 23.97、最低 14.5、上涨天数 122
-- [ ] 能解释“上涨天数比较 251 次，不是 252 次”
-
-## 2. 第 2 节课 从循环到函数和字典（45 分钟）
-
-建议流程：先看示例，再自己跑通，最后复盘验收。
-
-### 2.1 今天的数据与问题
-
-数据：`data/02-python/supermarket_sales.csv`，1000 行 x 17 列。主要字段：`Branch`、`City`、`Customer type`、`Product line`、`Unit price`、`Quantity`、`Total`、`Rating`。
-
-问题：写一个函数，计算各 `Branch` 的总销售额。
-
-先看计划：
-
-```text
-打开文件 → csv.DictReader 逐行读取 → 取出 Branch 和 Total → Total 转 float → 累加到字典 → 输出 A/B/C 三个分店的总销售额
-```
-
-`Total` 读进来是字符串，例如 `'548.9715'`，必须先转成 `float`，否则字典累加会变成字符串拼接。
-
-### 2.2 条件分支
-
-`if` 处理一个条件；`elif` 表示“否则如果”，可以接多个条件；`else` 是以上都不满足时的兜底。判断从上往下，先命中的分支执行，后面的不再检查。比较运算符 `>`、`>=`、`<`、`==` 的结果是 `True` 或 `False`。
 
 ```python
-rating = 9.1
+dims = [512, 1024, 2048]
 
-if rating >= 8.0:
-    print("高评分")
-elif rating >= 6.0:
-    print("中评分")
-else:
-    print("低评分")
-```
+for dim in dims:
+    if dim == 1024:
+        continue
+    print(dim)
 
-脚本：[08-rating-if-elif-else.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/08-rating-if-elif-else.py)
-
-输出：
-
-```text
-高评分
-```
-
-**自己试 4：** 把 `rating` 改成 `7.5`，预测会输出什么；再把 `elif rating >= 6.0` 改成 `elif rating >= 7.5`，再看结果。
-
-### 2.3 字典
-
-要保存“分店 → 总销售额”，需要一个能把名字和数值配对的容器，这就是 `dict`。它像查字典：键是“分店名”，值是“累计销售额”。`{"A": 0.0}` 创建一个字典；`branch_totals["A"]` 用键 `A` 取出对应值。
-
-```python
-branch_totals = {"A": 0.0, "B": 0.0, "C": 0.0}
-branch_totals["A"] += 10.0
-print(branch_totals)
-print(branch_totals["B"])
-```
-
-脚本：[09-dict-basics.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/09-dict-basics.py)
-
-输出：
-
-```text
-{'A': 10.0, 'B': 0.0, 'C': 0.0}
-0.0
-```
-
-当键第一次出现时，要先用 `get(key, 0.0)` 给默认值，否则直接累加会报 `KeyError`。
-
-### 2.4 `csv.DictReader` 逐行读取
-
-```python
-import csv
-
-path = "data/02-python/supermarket_sales.csv"
-with open(path, encoding="utf-8-sig", newline="") as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        print(row["Branch"], row["Total"])
+for dim in dims:
+    if dim > 1024:
         break
+    print(dim)
 ```
-
-脚本：[10-csv-dictreader-first-row.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/10-csv-dictreader-first-row.py) ｜ 数据：[supermarket_sales.csv](https://github.com/zhouxzh/python-data-analysis/blob/main/data/02-python/supermarket_sales.csv)
-
-输出（只打印第一行，然后停止）：
-
-```text
-A 548.9715
-```
-
-`csv.DictReader` 会用第一行表头作为键，后面的每一行变成字典。用它逐行处理，先想清楚每一行要做什么。
-
-```mermaid
-flowchart LR
-    A[open 文件] --> B[csv.DictReader 逐行读取]
-    B --> C{还有下一行吗}
-    C -- 是 --> D[取出 Branch 和 Total]
-    D --> E[累加到对应分店]
-    E --> C
-    C -- 否 --> F[输出各 Branch 总销售额]
-```
-
-### 2.5 先写循环版汇总
-
-这里用到三个新语法：`dict.get(key, 0.0)` 在键存在时返回值，不存在时返回默认值 `0.0`；`sorted(字典)` 返回按键排序后的列表；`f"..."` 是 f-string，用大括号插入变量，`:.2f` 表示保留两位小数。
-
-```python
-import csv
-
-path = "data/02-python/supermarket_sales.csv"
-branch_totals = {}
-
-with open(path, encoding="utf-8-sig", newline="") as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        branch = row["Branch"]
-        total = float(row["Total"])
-        branch_totals[branch] = branch_totals.get(branch, 0.0) + total
-
-for branch in sorted(branch_totals):
-    print(f"Branch {branch}: {branch_totals[branch]:.2f}")
-```
-
-脚本：[11-supermarket-loop-total.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/11-supermarket-loop-total.py) ｜ 数据：[supermarket_sales.csv](https://github.com/zhouxzh/python-data-analysis/blob/main/data/02-python/supermarket_sales.csv)
 
 输出：
 
 ```text
-Branch A: 106200.37
-Branch B: 106197.67
-Branch C: 110568.71
+512
+2048
+512
+1024
 ```
 
-### 2.6 封装成函数
+### 2.5 列表与字典推导式
 
-函数是把一段可重复使用的逻辑打包，并给它一个明确输入和输出。`def sales_by_branch(path)` 定义了一个函数：输入是文件路径，输出是各分店销售额字典。函数内部只负责计算，`return` 把结果交给调用者；打印应该留在调用处。`result.items()` 返回 `(键, 值)` 组成的序列；`for branch, total in sorted(result.items())` 同时把键和值放进两个变量。
+推导式用一行代码生成新列表或字典，适合结构简单的过滤和转换。
 
 ```python
-import csv
+dims = [512, 1024, 2048]
+large_dims = [dim for dim in dims if dim >= 1024]
 
-def sales_by_branch(path):
-    totals = {}
-    with open(path, encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            branch = row["Branch"]
-            total = float(row["Total"])
-            totals[branch] = totals.get(branch, 0.0) + total
-    return totals
-
-result = sales_by_branch("data/02-python/supermarket_sales.csv")
-for branch, total in sorted(result.items()):
-    print(branch, round(total, 2))
+print(large_dims)
 ```
-
-脚本：[12-supermarket-function.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/12-supermarket-function.py) ｜ 数据：[supermarket_sales.csv](https://github.com/zhouxzh/python-data-analysis/blob/main/data/02-python/supermarket_sales.csv)
 
 输出：
 
 ```text
-A 106200.37
-B 106197.67
-C 110568.71
+[1024, 2048]
 ```
-
-**自己试 5：** 复制 `sales_by_branch()`，改写成 `sales_by_city()`，把 `Branch` 换成 `City`。先写出你预计的输出，再运行。
-
-### 2.7 `tuple` 和 `set` 什么时候用
-
-本节课主线上只需要 `list` 和 `dict`，但要知道另外两个容器什么时候合适：
 
 ```python
-one_day = ("2024-01-02", 23.02)   # tuple：一行固定记录
-branches = {"A", "B", "C"}        # set：不重复的分店名
+sizes = {"mobileclip_s0": 131904474, "resnet50_feature": 102400000}
+sizes_mib = {model: round(size / 1024 / 1024, 2) for model, size in sizes.items()}
+
+print(sizes_mib)
 ```
-
-脚本：[13-tuple-set.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/13-tuple-set.py)
-
-- `tuple` 适合“日期 + 价格”这种固定组合，创建后不修改
-- `set` 适合“有哪些城市”这种去重问题
-
-### 2.8 DSH vibe loop 与验收
-
-先自己写 `sales_by_branch()`，再让 DSH 审查。DSH 给出修改版后，逐行说明它改了什么、为什么改；说不出来，就让它重新解释。
-
-- [ ] 能解释 `if` / `elif` / `else` 的执行顺序
-- [ ] 能说明 `dict` 为什么适合“分店 → 总销售额”
-- [ ] 能用 `csv.DictReader` 逐行读取 `data/02-python/supermarket_sales.csv`
-- [ ] `sales_by_branch()` 返回字典，而不是只在函数里打印
-- [ ] 输出 A、B、C 三个分店总销售额，结果与数据一致
-- [ ] 能解释 `totals.get(branch, 0.0)` 的作用
-- [ ] 全程没有 pandas，DSH 修改过的代码能解释
-
-## 3. 第 3 节课 把脏数据讲清楚（45 分钟）
-
-建议流程：先看示例，再自己跑通，最后复盘验收。
-
-### 3.1 今天的数据与问题
-
-数据：`data/02-python/breast_cancer.csv`，699 行 x 11 列。主要字段：`Id`、`Cl.thickness`、`Cell.size`、`Cell.shape`、`Bare.nuclei`、`Bl.cromatin`、`Normal.nucleoli`、`Mitoses`、`Class`。
-
-问题：`Bare.nuclei` 里有非数字标记，不能直接 `int()`。课程要求识别 `?`；本仓库当前文件把这 16 个缺失写作 `NA`，代码必须两种都处理。
-
-先看计划：
-
-```text
-读取文件 → 审计行数、列数、表头 → 找出 Bare.nuclei 的非数字值 → 用 try/except 保护转换 → 统计时先剔除异常值 → 输出描述统计
-```
-
-### 3.2 先审计
-
-`reader.fieldnames` 是表头列表；`list(reader)` 把所有行一次读进列表，这样能马上知道总行数。
-
-```python
-import csv
-
-path = "data/02-python/breast_cancer.csv"
-with open(path, encoding="utf-8-sig", newline="") as f:
-    reader = csv.DictReader(f)
-    fieldnames = reader.fieldnames
-    rows = list(reader)
-
-print("总记录数:", len(rows))
-print("列数:", len(fieldnames))
-print("列名:", fieldnames)
-```
-
-脚本：[14-breast-cancer-audit.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/14-breast-cancer-audit.py) ｜ 数据：[breast_cancer.csv](https://github.com/zhouxzh/python-data-analysis/blob/main/data/02-python/breast_cancer.csv)
 
 输出：
 
 ```text
-总记录数: 699
-列数: 11
-列名: ['Id', 'Cl.thickness', 'Cell.size', 'Cell.shape', 'Marg.adhesion', 'Epith.c.size', 'Bare.nuclei', 'Bl.cromatin', 'Normal.nucleoli', 'Mitoses', 'Class']
+{'mobileclip_s0': 125.79, 'resnet50_feature': 97.66}
 ```
 
-审计是第一步。没看过表头和行数就做统计，等于没检查材料就开始写结论。
+## 3. 函数与模型清单
 
-### 3.3 找出 `?` 和 `NA`
+### 3.1 函数封装
 
-`row["Bare.nuclei"].strip()` 去掉首尾空格，避免 `NA` 因带空格而漏判。`值 in 集合` 判断该值是否在集合中。
+函数把重复逻辑打包成可复用单元。下面函数接收模型列表，返回按精度模式统计的字典。
 
 ```python
-import csv
+def count_by_precision(models):
+    result = {}
+    for model in models:
+        mode = model["precision_mode"]
+        result[mode] = result.get(mode, 0) + 1
+    return result
 
-path = "data/02-python/breast_cancer.csv"
-missing = 0
-with open(path, encoding="utf-8-sig", newline="") as f:
-    for row in csv.DictReader(f):
-        if row["Bare.nuclei"].strip() in {"?", "NA", ""}:
-            missing += 1
+models = [
+    {"precision_mode": "mixed_fp16"},
+    {"precision_mode": "allow_fp32_to_fp16"},
+    {"precision_mode": "allow_fp32_to_fp16"},
+]
 
-print("Bare.nuclei 缺失/异常标记:", missing)
+summary = count_by_precision(models)
+for mode, count in sorted(summary.items()):
+    print(f"{mode}: {count}")
 ```
-
-脚本：[15-breast-cancer-missing.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/15-breast-cancer-missing.py) ｜ 数据：[breast_cancer.csv](https://github.com/zhouxzh/python-data-analysis/blob/main/data/02-python/breast_cancer.csv)
 
 输出：
 
 ```text
-Bare.nuclei 缺失/异常标记: 16
+allow_fp32_to_fp16: 2
+mixed_fp16: 1
 ```
 
-处理规则：
+`dict.get(key, 0)` 在键不存在时返回默认值 0。`sorted()` 让输出顺序稳定。
 
-- 先统计有多少个 `?` / `NA`，再决定怎么处理
-- 统计数值时剔除这些行，并在结果里报告样本量
-- 不要悄悄把 `?` 当成 0，那是编造数据
+### 3.2 默认参数
 
-### 3.4 用 `try` / `except` 处理转换失败
-
-当 `int("?")` 无法转换时，Python 会抛出 `ValueError`。`try` 先尝试正常执行，`except ValueError` 只捕获这一种预期内的错误。
+默认参数让调用更简洁，同时允许按名字覆盖默认值。
 
 ```python
-def to_int(value):
-    try:
-        return int(value)
-    except ValueError:
-        return None
+def format_model(model_id, precision="mixed_fp16"):
+    return f"{model_id}: {precision}"
 
-print(to_int("5"))
-print(to_int("?"))
-print(to_int("NA"))
+print(format_model("mobileclip_s0"))
+print(format_model("resnet50_feature", precision="allow_fp32_to_fp16"))
 ```
-
-脚本：[16-to-int-try-except.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/16-to-int-try-except.py)
 
 输出：
 
 ```text
-5
+mobileclip_s0: mixed_fp16
+resnet50_feature: allow_fp32_to_fp16
+```
+
+### 3.3 *args 与 **kwargs
+
+`*values` 收集位置参数，`**options` 收集关键字参数。
+
+```python
+def summarize(title, *values, **options):
+    print(title, values, options)
+
+summarize("models", 512, 1024, status="admitted")
+```
+
+输出：
+
+```text
+models (512, 1024) {'status': 'admitted'}
+```
+
+### 3.4 lambda
+
+`lambda` 适合写一个短小的临时函数。
+
+```python
+models = [
+    {"model_id": "mobileclip_s0", "embedding_dim": 512},
+    {"model_id": "resnet50_feature", "embedding_dim": 2048},
+]
+
+models.sort(key=lambda model: model["embedding_dim"], reverse=True)
+print([model["model_id"] for model in models])
+```
+
+输出：
+
+```text
+['resnet50_feature', 'mobileclip_s0']
+```
+
+### 3.5 f-string
+
+f-string 用 `f"..."` 开头，大括号内插入变量。
+
+```python
+model_id = "mobileclip_s0"
+embedding_dim = 512
+
+print(f"{model_id}: {embedding_dim} dim")
+```
+
+输出：
+
+```text
+mobileclip_s0: 512 dim
+```
+
+### 3.6 类型注解
+
+类型注解帮助阅读代码，也方便工具检查错误。它不会改变运行结果。
+
+```python
+def admitted_models(models: list[dict]) -> list[dict]:
+    return [model for model in models if model.get("status") == "admitted"]
+```
+
+### 3.7 dataclass
+
+`dataclass` 自动生成初始化、比较和打印方法，适合保存结构清晰的记录。
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class ModelRecord:
+    model_id: str
+    embedding_dim: int
+    status: str = "admitted"
+
+record = ModelRecord("mobileclip_s0", 512)
+print(record)
+```
+
+输出：
+
+```text
+ModelRecord(model_id='mobileclip_s0', embedding_dim=512, status='admitted')
+```
+
+### 3.8 class 与 self
+
+`__init__` 是实例创建时执行的方法，`self` 指向当前实例。
+
+```python
+class ModelChecker:
+    def __init__(self, status="candidate"):
+        self.status = status
+
+    def is_admitted(self):
+        return self.status == "admitted"
+
+checker = ModelChecker("admitted")
+print(checker.is_admitted())
+```
+
+输出：
+
+```text
+True
+```
+
+## 4. 文件、JSON、命令行与异步
+
+### 4.1 缺失键与类型转换
+
+模型清单可能来自不同版本的脚本，字段并不总是一致。直接读取缺失字段会触发 `KeyError`，用 `dict.get()` 可以提供默认值。
+
+```python
+model = {
+    "model_id": "mobileclip_s0",
+    "precision_mode": "mixed_fp16",
+}
+
+print(model.get("status", "unknown"))
+```
+
+输出：
+
+```text
+unknown
+```
+
+把字符串转成数字时，输入内容决定转换是否成功。`int("fp16")` 会触发 `ValueError`，可以用 `try/except` 捕获。
+
+```python
+value = "fp16"
+
+try:
+    numeric_value = int(value)
+except ValueError:
+    numeric_value = None
+
+print(numeric_value)
+```
+
+输出：
+
+```text
 None
-None
 ```
 
-只捕获 `ValueError`，不写空 `except:`。空捕获会连代码本身的 bug 一起藏起来。
+`None` 表示没有有效数值。统计前应先检查它，不要把 `None` 当成 0。
 
-### 3.5 `print` 和断点调试
+### 4.2 pathlib 与 with open
 
-调试是观察程序运行时的状态，不是把报错藏起来。`print` 适合快速查看一个值，`breakpoint()` 适合在复杂循环里暂停并逐步检查。`repr(value)` 显示值的原始表示，能看出普通 `print` 看不到的空格或引号。
-
-先用 `print` 看转换前的内容：
+`Path` 提供跨平台的路径操作，`with open` 在读取或写入结束后自动关闭文件。
 
 ```python
-def to_int(value):
-    print("转换前:", repr(value))
-    try:
-        return int(value)
-    except ValueError:
-        return None
+from pathlib import Path
+
+path = Path("tmp/appendix3/notes.txt")
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text("mixed_fp16\n", encoding="utf-8")
+
+with path.open(encoding="utf-8") as f:
+    print(f.read().strip())
 ```
-
-脚本：[17-debug-repr.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/17-debug-repr.py)
-
-如果数据多了，再临时加断点：
-
-```python
-def to_int(value):
-    breakpoint()   # 调试完成后必须删除
-    try:
-        return int(value)
-    except ValueError:
-        return None
-```
-
-脚本：[20-debug-breakpoint.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/20-debug-breakpoint.py)
-
-运行后程序会停在 `breakpoint()`，在 `(Pdb)` 提示符后输入 `value` 看当前值，输入 `n` 执行下一行，输入 `q` 退出。VS Code 里也可以点行号左侧加红点断点，用调试按钮运行。
-
-调试只用于找问题，`print` 和 `breakpoint()` 改完代码后要删掉，不能留进提交文件。
-
-### 3.6 `load_column()` 和基础描述统计
-
-`continue` 表示跳过本轮循环，直接处理下一行；在 `load_column()` 里用它跳过异常值。
-
-```python
-import csv
-import statistics
-
-def load_column(path, column):
-    values = []
-    with open(path, encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            raw = row[column].strip()
-            if raw in {"", "?", "NA"}:
-                continue
-            try:
-                values.append(int(raw))
-            except ValueError:
-                print("无法转换:", repr(raw))
-    return values
-
-columns = ["Cl.thickness", "Cell.size", "Cell.shape", "Bare.nuclei"]
-for column in columns:
-    values = load_column("data/02-python/breast_cancer.csv", column)
-    print(
-        column,
-        "n=", len(values),
-        "mean=", round(statistics.mean(values), 2),
-        "min=", min(values),
-        "max=", max(values),
-    )
-```
-
-脚本：[18-load-column-stats.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/18-load-column-stats.py) ｜ 数据：[breast_cancer.csv](https://github.com/zhouxzh/python-data-analysis/blob/main/data/02-python/breast_cancer.csv)
 
 输出：
 
 ```text
-Cl.thickness n= 699 mean= 4.42 min= 1 max= 10
-Cell.size n= 699 mean= 3.13 min= 1 max= 10
-Cell.shape n= 699 mean= 3.21 min= 1 max= 10
-Bare.nuclei n= 683 mean= 3.54 min= 1 max= 10
+mixed_fp16
 ```
 
-注意 `Bare.nuclei` 的 `n=683`，不是 699。16 个 `?` / `NA` 被明确剔除并报告，这才叫处理异常值。
+### 4.3 json.loads 与 json.dumps
 
-**自己试 6：** 把 `load_column()` 里的 `continue` 删掉，预测会发生什么；只改回一行，再运行验证。
-
-### 3.7 统计 `Class` 样本数
+模型配置常以 JSON 保存。`json.loads()` 把 JSON 文本转回 Python 对象，`json.dumps()` 把 Python 对象转成 JSON 文本。
 
 ```python
-import csv
+import json
 
-path = "data/02-python/breast_cancer.csv"
-classes = {}
-with open(path, encoding="utf-8-sig", newline="") as f:
-    for row in csv.DictReader(f):
-        key = row["Class"]
-        classes[key] = classes.get(key, 0) + 1
+text = '{"model_id": "mobileclip_s0", "status": "admitted"}'
+data = json.loads(text)
 
-print("Class 样本数:", classes)
+print(data["model_id"])
+print(data.get("status", "unknown"))
 ```
-
-脚本：[19-class-counts.py](https://github.com/zhouxzh/python-data-analysis/blob/main/scripts/02-python/19-class-counts.py) ｜ 数据：[breast_cancer.csv](https://github.com/zhouxzh/python-data-analysis/blob/main/data/02-python/breast_cancer.csv)
 
 输出：
 
 ```text
-Class 样本数: {'0': 458, '1': 241}
+mobileclip_s0
+admitted
 ```
 
-这里 `Class` 是字符串 `'0'` 和 `'1'`，所以字典键也是字符串。样本量相加等于 699。
+```python
+config = {"model_id": "mobileclip_s0", "precision_mode": "mixed_fp16"}
+print(json.dumps(config, ensure_ascii=False, indent=2))
+```
 
-### 3.8 DSH vibe loop 与验收
+输出：
 
-把脚本交给 DSH 审查，问它：
+```text
+{
+  "model_id": "mobileclip_s0",
+  "precision_mode": "mixed_fp16"
+}
+```
 
-1. 为什么先识别 `?` / `NA`，再 `int()`？
-2. 剔除 16 行数据后，样本量变化对结论有什么影响？
-3. 为什么 `except ValueError` 不能改成空 `except:`？
+解析失败时，`json.loads()` 会抛出 `json.JSONDecodeError`。处理外部配置或日志时，先确认它确实是合法 JSON，再读取字段，不要把解析失败和字段缺失混为一谈。
 
-DSH 解释后，你写一句话说明自己的处理口径。
+### 4.4 try / except / else / finally
 
-- [ ] 能审计出 699 行、11 列和完整表头
-- [ ] 能识别出 `Bare.nuclei` 的 16 个缺失标记（`?` 或 `NA`）
-- [ ] 能用 `try` / `except ValueError` 保护转换，且只捕获 `ValueError`
-- [ ] 能解释 `print` 调试和断点调试的用途，并知道调试代码要删除
-- [ ] 描述统计输出包含样本量 `n`，`Bare.nuclei` 为 683
-- [ ] 能输出 `Class` 为 0 和 1 的样本数
-- [ ] 全程没有 pandas，能复述 DSH 给出的每行代码
+`else` 在没有异常时执行，`finally` 无论是否异常都会执行。
 
-## 4. 本周验证清单
+```python
+try:
+    dim = int("512")
+except ValueError:
+    dim = None
+else:
+    print("converted")
+finally:
+    print("done")
+```
 
-- [ ] 三个脚本保存在 `projects/<姓名>/`：`02-stock.py`、`02-supermarket.py`、`02-breast-cancer.py`
-- [ ] 三个脚本都能从仓库根目录直接运行，路径都是 `data/02-python/...`
-- [ ] 股票脚本输出 252 行、平均 19.3、最高 23.97、最低 14.5、上涨天数 122
-- [ ] 销售脚本输出 A、B、C 三个分店总销售额
-- [ ] 癌症脚本审计 699 行、11 列，识别 16 个 `?` / `NA`
-- [ ] `Bare.nuclei` 统计时明确报告 `n=683`
-- [ ] 三个脚本只使用 `csv`、`statistics`、`math`，没有 pandas
-- [ ] 每个脚本的每一行，学生都能解释
-- [ ] 使用 DSH 时按“先理解计划 → 检查命令 → 小步执行 → 验证结果”完成
-- [ ] `data/` 原始文件没有被修改
+输出：
 
-## 5. 常见错误与坑
+```text
+converted
+done
+```
 
-| 现象 | 原因 | 处理 |
-|---|---|---|
-| `TypeError: can only concatenate str` | 没把 CSV 里的数字转成 float/int | 用 `float(row['Total'])` 后再累加 |
-| `ValueError: invalid literal for int()` | 遇到 `?`、`NA` 或空格 | 先识别异常值，再用 `try/except` 保护转换 |
-| `KeyError: 'Bare.nuclei'` | 表头有 BOM，或列名写错 | 用 `encoding='utf-8-sig'`，先打印 `fieldnames` |
-| 上涨天数写成 252 | 把每个价格都当成上涨起点 | 从 `range(1, len(prices))` 开始，只有 251 次比较 |
-| `while` 一直运行 | 忘记更新循环变量 | 每次循环更新 `i`，或改用 `for` |
-| 函数没有结果 | 只在函数里 `print`，没有 `return` | 函数返回字典，调用处再打印 |
-| 字典报 `KeyError` | 第一次出现键时直接 `totals[branch] += ...` | 用 `totals.get(branch, 0.0)` |
-| 把 `?` 当成 0 | 没审计异常值 | 先统计并剔除，报告 `n`，不编造数据 |
-| 空 `except:` 吞掉错误 | 想“让它别报错” | 只捕获具体异常，如 `ValueError` |
-| 调试代码留在脚本里 | 加了 `print` / `breakpoint()` 后忘记删 | 调试完删除，再运行一次验证 |
-| 脚本里出现 pandas | 提示词没限制，或直接让 DSH 自由发挥 | 明确要求只用 `csv`、`statistics`、`math` |
-| DSH 说完成就相信 | 没有看命令和输出 | 自己运行、看结果、解释代码后再验收 |
-| 结论只有数字没有样本量 | 统计前剔除了数据但没报告 | 每个统计都带 `n`，例如 `Bare.nuclei n=683` |
+### 4.5 argparse
+
+`argparse` 用来解析命令行参数，样例脚本中常用来接收模型 ID、精度和路径。
+
+```python
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model-id", default="mobileclip_s0")
+args = parser.parse_args(["--model-id", "resnet50_feature"])
+
+print(args.model_id)
+```
+
+输出：
+
+```text
+resnet50_feature
+```
+
+### 4.6 if __name__ == "__main__"
+
+被直接运行时会执行 `main()`，被其他模块导入时不会自动执行。
+
+```python
+def main():
+    print("check complete")
+
+if __name__ == "__main__":
+    main()
+```
+
+输出：
+
+```text
+check complete
+```
+
+### 4.7 logging
+
+`logging` 比 `print()` 更适合记录运行过程，样例服务中常用来区分普通日志和错误日志。
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("appendix3")
+logger.info("model check complete")
+```
+
+输出：
+
+```text
+INFO:appendix3:model check complete
+```
+
+### 4.8 subprocess
+
+`subprocess.run()` 启动外部命令，`capture_output=True` 捕获标准输出。
+
+```python
+import subprocess
+
+result = subprocess.run(["python", "--version"], capture_output=True, text=True)
+print(result.stdout.strip())
+```
+
+输出内容取决于本机 Python 版本。
+
+### 4.9 async / await
+
+`async def` 定义异步函数，`await` 等待异步结果。样例中的 WebRTC 和聊天服务大量使用这种写法。
+
+```python
+import asyncio
+
+async def check():
+    return "admitted"
+
+async def main():
+    print(await check())
+
+asyncio.run(main())
+```
+
+输出：
+
+```text
+admitted
+```
+
+## 5. 调试与验证
+
+### 5.1 最小调试手段
+
+出错时先确认对象的真实内容，不要只看报错文字。`repr()` 可以显示字符串中的空格和引号。
+
+```python
+status = " admitted"
+
+print(status)
+print(repr(status))
+```
+
+输出：
+
+```text
+ admitted
+' admitted'
+```
+
+如果逻辑复杂，可以在可疑位置使用 `breakpoint()` 进入调试器，或把中间变量打印出来。脚本保存后，先在仓库根目录执行：
+
+```bash
+python -m py_compile 脚本路径.py
+```
+
+`py_compile` 只检查语法，不运行板端逻辑。昇腾 310B 的 CANN、ATC 和 ACL 检查仍应在真实开发板上完成。
+
+### 5.2 验证清单
+
+- [ ] 能说出 `int`、`float`、`str`、`bool` 的区别。
+- [ ] 能用列表保存输入形状或特征维度，并用循环完成求和。
+- [ ] 能用字典表示一个模型条目，按字段名读取值。
+- [ ] 能写函数统计模型清单中的精度模式。
+- [ ] 能区分 `KeyError`、`ValueError` 和 `json.JSONDecodeError`。
+- [ ] 能阅读 `samples/` 中常见的列表推导、`enumerate`、`argparse` 和 `pathlib` 写法。
+- [ ] 示例只使用标准库，没有 `pandas` 或板端运行时依赖。
+
+### 5.3 常见错误与坑
+
+| 现象 | 可能原因 | 处理方式 |
+| --- | --- | --- |
+| 读取缺失字段报 `KeyError` | 模型清单字段不一致 | 先审计字段，再用 `get()` |
+| `int("fp16")` 报错 | 字符串不是数字 | 用 `try/except` 捕获并记录 |
+| JSON 解析失败 | 文本不是合法 JSON | 检查完整输入，捕获 `JSONDecodeError` |
+| 统计结果比预期少 | 把字符串当成数字 | 先看 `type()`，必要时转换 |
+| 输出顺序每次不同 | 遍历集合或字典 | 需要稳定顺序时用 `sorted()` |
 
 ## 6. 作业
 
-1. 新建 `projects/<姓名>/02-stock.py`：读取 `data/02-python/stock_price.csv`，输出行数、平均价格、最高价格、最低价格、上涨天数；用一句话解释为什么上涨天数比较次数是 251。
-2. 新建 `projects/<姓名>/02-supermarket.py`：实现 `sales_by_branch()`，输出各 `Branch` 总销售额；再写一个 `sales_by_city()`，输出各 `City` 总销售额。
-3. 新建 `projects/<姓名>/02-breast-cancer.py`：审计 699 行、11 列，统计 `Bare.nuclei` 中 `?` / `NA` 的数量，用 `try/except` 保护转换，输出 `Cl.thickness`、`Cell.size`、`Cell.shape`、`Bare.nuclei` 的 `n`、`mean`、`min`、`max`，以及 `Class` 样本数。
-4. 三个脚本都让 DSH 审查一次，但审查后必须逐行解释 DSH 改动的内容；解释不出来，就让 DSH 重新解释，不能直接保存运行。
-5. 在三个脚本开头各写一行注释，说明“这个脚本回答什么问题、处理口径是什么”。
+1. 新建一个脚本，统计 `feature_dims = [512, 1024, 2048, 512]` 的元素个数、最小值、最大值和去重后的维度集合。
+2. 写一个函数 `count_admitted(models)`，接收模型字典列表，返回 `status == "admitted"` 的模型数量。
+3. 写一个 `safe_get(data, key)` 函数：键存在时返回值，不存在或类型错误时返回 `None`。
+4. 用列表推导式筛出 `[512, 1024, 2048, 512]` 中大于等于 1024 的元素。
+5. 用 `argparse` 写一个脚本，接收 `--model-id`，并输出该参数值。
+6. 把上面的脚本都交给 DSH 或人工审查一次，逐行解释每个分支和异常处理。
 
-## 7. 参考写法
-
-本章借鉴了以下 GitHub 开源英文书的“小步示例 + 立即练习 + 数据应用”结构，未直接复制原文：
-
-- [SoftUni/Programming-Basics-Book-Python-EN](https://github.com/SoftUni/Programming-Basics-Book-Python-EN)
-- [AllenDowney/ThinkPython2](https://github.com/AllenDowney/ThinkPython2)
-- [ehmatthes/pcc_3e](https://github.com/ehmatthes/pcc_3e)
-- [csev/py4e](https://github.com/csev/py4e)
-
-## 评分要点
-
-| 项目 | 要求 |
-|---|---|
-| 基础语法 | 能区分 int/float/str/bool，能选择 list/dict/tuple/set |
-| 文件读取 | 只用标准库 `csv`，路径写 `data/02-python/...`，可运行 |
-| 控制流 | 能解释条件分支、for/while，并避免死循环 |
-| 函数 | `sales_by_branch()` 返回字典，调用后输出各分店销售额 |
-| 异常处理 | 能识别 `?` / `NA`，用 `try/except ValueError` 保护转换 |
-| 统计口径 | 描述统计带样本量，明确报告 `Bare.nuclei n=683` |
-| AI 协作 | 先理解计划、检查命令、小步执行、验证结果；DSH 生成的代码能解释 |
-| 数据安全 | `data/` 未修改，代码只写入 `projects/<姓名>/`，全程无 pandas |
+AI 辅助审查时仍遵循先理解计划、检查命令、小步执行、验证结果。DSH 生成代码后，必须自己运行并解释输出，不能只看“已完成”的结论。

@@ -121,6 +121,7 @@ class DeviceRegistryTests(unittest.TestCase):
         self.assertEqual(waveshare["orientations"], ["landscape", "portrait"])
         self.assertEqual(waveshare["panel"], "E6")
         self.assertEqual(waveshare["color_count"], 6)
+        self.assertEqual(waveshare["hardware_rotation_deg"], 180)
         self.assertEqual(waveshare["rotation_degrees"], [])
         with self.assertRaises(DeviceError):
             photo_frame_profile(None)
@@ -137,6 +138,7 @@ class DeviceRegistryTests(unittest.TestCase):
         self.assertEqual(profile_defaults["display"]["width"], 800)
         self.assertEqual(profile_defaults["display"]["height"], 480)
         self.assertEqual(profile_defaults["display"]["codecs"], ["jpeg"])
+        self.assertEqual(profile_defaults["display"]["hardware_rotation_deg"], 0)
         with self.assertRaises(DeviceError):
             self.registry.handshake({
                 "profile_id": "seeedstudio_reterminal_e1002",
@@ -265,6 +267,17 @@ class DeviceRegistryTests(unittest.TestCase):
         self.assertIn("base_url", value["push"]["last_error"])
         self.assertEqual(value["push"]["timeout_seconds"], 60)
         self.assertEqual(value["push"]["attempts"], 1)
+
+    def test_legacy_photoframe_always_normalizes_deep_sleep_enabled(self):
+        path = Path(self.temp.name) / "legacy-always-sleep.json"
+        path.write_text(
+            '{"schema_version":3,"devices":{"frame":{"display":{"kind":"photoframe",'
+            '"profile_id":"seeedstudio_reterminal_e1002","width":800,"height":480,'
+            '"codecs":["jpeg"]},"policy":{"deep_sleep_enabled":false}}}}',
+            encoding="utf-8",
+        )
+        value = DeviceRegistry(path).get("frame")
+        self.assertTrue(value["policy"]["deep_sleep_enabled"])
 
     def test_legacy_photoframe_without_profile_is_not_guessed_as_waveshare(self):
         path = Path(self.temp.name) / "legacy-unidentified.json"

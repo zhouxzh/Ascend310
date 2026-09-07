@@ -445,7 +445,7 @@ echo
 echo "PhotoFrame playlist configured: $DEVICE_ID"
 echo "rotation_cron: */5 * *"
 echo "Optional URL Rotation image_url: $IMAGE_URL"
-echo "Optional URL Rotation configuration for profile $PROFILE_ID (enter in the device local web UI):"
+echo "URL Rotation configuration for profile $PROFILE_ID (deep sleep is fixed enabled):"
 python - "$IMAGE_URL" <<'PY'
 import json, sys
 print(json.dumps({
@@ -453,7 +453,7 @@ print(json.dumps({
     "rotate_cron": ["*/5 * *"],
     "rotation_mode": "url",
     "image_url": sys.argv[1],
-    "deep_sleep_enabled": False,
+    "deep_sleep_enabled": True,
 }, ensure_ascii=False, indent=2))
 PY
 echo "report: $REPORT_PATH"

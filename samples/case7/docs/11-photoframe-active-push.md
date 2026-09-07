@@ -1,10 +1,10 @@
 # PhotoFrame 主动推送与固件协议
 
-*本文件说明 310B 与 PhotoFrame 终端之间的协议选择、固件识别、配置步骤和证据边界。当前实测目标是 Waveshare PhotoPainter；E1002 内容保留为历史对照。它把官方 PhotoFrame 固件与 Waveshare Demo 固件分开描述，避免把一个固件的端点套到另一套固件上。*
+*本文件说明 310B 与两类 PhotoFrame 终端之间的协议选择、固件识别、配置步骤和证据边界。Waveshare PhotoPainter 与 Seeed E1002 都是当前支持的硬件 profile，但下文带“历史”标题的段落只代表当时的实机证据，不代表 E1002 被移出支持范围。它把官方 PhotoFrame 固件与厂商 Demo 固件分开描述，避免把一个固件的端点套到另一套固件上。*
 
 ## 固定设备 profile
 
-Waveshare [ESP32-S3-PhotoPainter 产品页](https://www.waveshare.com/product/displays/e-paper/epaper-1/esp32-s3-photopainter.htm) / [Wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter) 记录为 7.3 英寸 E6 六色（黑、白、绿、蓝、红、黄）800x480；Wiki Mode 1 接受 800x480 或 480x800 图像，因此内容可标记为 `landscape`/`portrait`。Seeed Studio [reTerminal E1002 官方 Wiki](https://wiki.seeedstudio.com/getting_started_with_reterminal_e1002/) 记录为 7.3 英寸 ACeP / Spectra 6 全彩 800x480；Case7 为该设备固定 `landscape`。Case7 方向合同只使用 `landscape`、`portrait`，不支持 360°、180°或 90°/270°安装旋转；E1002 的 `portrait` 必须在请求校验时拒绝。Seeed 横屏限制是本项目策略；以上规格 profile 不等于固件协议或面板刷新通过结论。
+Waveshare [ESP32-S3-PhotoPainter 产品页](https://www.waveshare.com/product/displays/e-paper/epaper-1/esp32-s3-photopainter.htm) / [Wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter) 记录为 7.3 英寸 E6 六色（黑、白、绿、蓝、红、黄）800x480；Wiki Mode 1 接受 800x480 或 480x800 图像，因此内容可标记为 `landscape`/`portrait`。其 profile 的固定板级补偿为 `hardware_rotation_deg=180`，只写入终端配置，不改变服务器 JPEG。Seeed Studio [reTerminal E1002 官方 Wiki](https://wiki.seeedstudio.com/getting_started_with_reterminal_e1002/) 记录为 7.3 英寸 ACeP / Spectra 6 全彩 800x480；Case7 为该设备固定 `landscape`，补偿为 `0`。Case7 方向合同只使用 `landscape`、`portrait`，不提供用户可调安装旋转；E1002 的 `portrait` 必须在请求校验时拒绝。Seeed 横屏限制是本项目策略；以上规格 profile 不等于固件协议或面板刷新通过结论。
 
 当前操作板为 `192.168.1.135`，本文所有可执行 Case7 服务器 URL 均使用该地址。第 7.1 节是
 2026-08-23/2026-08-27 的历史实机记录，保留其中的 `192.168.8.180` 仅作为证据，不是当前配置。
@@ -31,7 +31,7 @@ curl -I --connect-timeout 5 --max-time 10 http://<WAVESHARE-IP>/
 `<WAVESHARE-IP>` 必须替换为串口日志中的当前 IPv4 地址，不能使用旧 E1002 地址
 `192.168.1.117`。
 
-## 1. 先确定传输方向（历史 E1002 与当前 PhotoPainter）
+## 1. 先确定传输方向（两类设备与历史证据）
 
 E1002 可能使用多种完全不同的通信方向和固件协议：
 
@@ -69,7 +69,7 @@ sha256: 9608d69c82decc15d533a695831b9699a1ed1becaeb481675a863eb7a4db74e9
 
 官方 PhotoFrame 镜像的端点字符串包含 `/api/display-image`、`/api/rotate` 和 `/api/system-info`；Demo 镜像包含 `/dataUP`，不包含这些官方端点。Case7 修改固件额外包含 `/api/case7/push`。二进制字符串检查只能辅助审计，不能替代设备实际 HTTP 响应。
 
-## 3. 历史 E1002：官方 PhotoFrame direct push
+## 3. E1002 官方 PhotoFrame direct push（历史实机证据）
 
 ### 3.1 设备要求
 
@@ -144,7 +144,7 @@ bash scripts/setup_photoframe_test.sh \
 
 `--push-url` 缺失时，脚本只建立服务器播放列表，不会假装已经向设备推送。调度器按 `*/5 * *` 每个有效时隙最多发送一次；服务重启后通过 SQLite/设备状态恢复当前选择。
 
-## 4. 历史 E1002：Case7 修改固件主动推送
+## 4. E1002 Case7 修改固件主动推送（历史实验路径）
 
 当 E1002 当前固件没有可用的 direct-push 接口时，使用本仓库 `esp32/patches/` 中针对上游 PhotoFrame `6a4eeac` 的 ESP-IDF 补丁重新构建。补丁新增：
 
@@ -160,7 +160,7 @@ X-Case7-Push: 1
 X-Case7-Push: 1
 ```
 
-服务器客户端会校验这个响应标记；缺失时即使 HTTP 状态是 `200` 也记为失败，不会把未修改固件、代理页或其他 HTTP 服务当成接收端。补丁首次成功处理请求后关闭并持久化 `deep_sleep_enabled`，因为服务器主动连接无法唤醒深度睡眠中的设备。固件补丁不会改变 URL Rotation 的行为。
+服务器客户端会校验这个响应标记；缺失时即使 HTTP 状态是 `200` 也记为失败，不会把未修改固件、代理页或其他 HTTP 服务当成接收端。这里记录的“首次成功后关闭深度睡眠”是旧的主动推送补丁实验，仅用于历史证据；当前 Case7 注册流程不使用该补丁，PhotoFrame 一律固定 `deep_sleep_enabled=true`。
 
 构建和刷写前必须保存原始镜像、设备分区信息和回滚方式。完整步骤见 [esp32/README.md](../esp32/README.md)。本仓库没有在当前 E1002 上自动刷写或宣称实机通过。
 
@@ -184,11 +184,15 @@ URL Rotation 是设备主动拉取，不是主动推送。设备网页中配置�
   "rotate_cron": ["*/5 * *"],
   "rotation_mode": "url",
   "image_url": "http://192.168.1.135:7860/api/devices/<device_id>/photoframe",
-  "deep_sleep_enabled": false
+  "display_orientation": "landscape",
+  "display_rotation_deg": 180,
+  "deep_sleep_enabled": true
 }
 ```
 
-设备向 310B 发出 GET，并携带显示尺寸、方向和 `If-None-Match`；同一选择 revision 返回 `304 Not Modified`。`/api/rotate` 只请求设备立即执行自身轮播，不会让 310B 主动建立到设备的连接。URL Rotation 可以在 direct push 不可用时作为明确选择的兼容方案，但不能在服务器端自动切换。
+上例中的 `display_rotation_deg=180` 只适用于 Waveshare PhotoPainter 的固定板级坐标补偿；Seeed E1002 应填写 `0`，且只能使用横屏。该字段必须先写入设备配置，服务器端不会把 JPEG 再旋转 180 度。设备向 310B 发出 GET，并携带显示尺寸、方向和 `If-None-Match`；同一选择 revision 返回 `304 Not Modified`。`/api/rotate` 只请求设备立即执行自身轮播，不会让 310B 主动建立到设备的连接。URL Rotation 可以在 direct push 不可用时作为明确选择的兼容方案，但不能在服务器端自动切换。
+
+如果使用下面的 direct-push 适配器，服务器只是向设备发起 POST，不会通过响应头替设备修改板级补偿；Waveshare 的 `display_orientation`/`display_rotation_deg=180` 必须已经在固件或设备 NVS 中正确设置。direct push 的 HTTP 成功也不等于电子纸已经完成物理刷新。
 
 ## 6. Waveshare Demo 固件的边界
 
@@ -264,7 +268,7 @@ board_name                  seeedstudio_reterminal_e1002
 firmware_commit             6a4eeac（上游发布版本；未从设备读取二进制 hash）
 firmware_protocol           official_display_image
 display                     800x480 spectra6
-deep_sleep_enabled          false（通过设备 /api/config 写入并 GET 确认）
+deep_sleep_enabled          true（当前注册流程固定；历史主动推送实验曾写入 false）
 server_rotation_cron        */5 * *
 push_timeout_attempts       60 seconds / 1 attempt
 ```

@@ -39,7 +39,7 @@
 4. 设备：创建 PhotoPainter、设置 cron、裁剪和叠加策略；注册方式固定为设备主动拉取。卡片生成唯一的设备取图 URL，设备下次访问该 URL 时取得新选择；点击“推进下一张”只更新 310B 的持久化选择，不会向 ESP32 发起网络连接；
 5. 设置：触摸屏选图间隔（默认 60 秒）、电脑网页刷新间隔（默认 30 秒）、电子纸轮播间隔（10 或 30 分钟）、重复抑制、天气位置、JPEG 参数、文件名水印开关和照片方向模式。
 
-方向设置说明：`auto` 会识别手机照片的 EXIF Orientation 1-8，并保持照片本身的横竖方向；`match_display` 只在源图和屏幕方向相反时选择 `landscape` 或 `portrait` 目标并旋转输出内容。设备 profile 不提供 360°、180°或 90°/270°安装旋转选项。Waveshare PhotoPainter 官方 Wiki 的 Mode 1 输入可为 800x480 或 480x800，因此内容可选两种方向；Case7 把 Seeed reTerminal E1002 固定为 `landscape`，请求 `portrait` 必须拒绝。后者是本项目的设备策略，不能反推上游固件支持范围。
+方向设置说明：`auto` 会识别手机照片的 EXIF Orientation 1-8，并保持照片本身的横竖方向；`match_display` 只在源图和屏幕方向相反时选择 `landscape` 或 `portrait` 目标并旋转输出内容。设备 profile 不提供用户可调的安装角度；Waveshare profile 内部固定 `hardware_rotation_deg=180`，Seeed E1002 固定为 `0`，服务器 JPEG `rotation` 仍为 `0`。Waveshare PhotoPainter 官方 Wiki 的 Mode 1 输入可为 800x480 或 480x800，因此内容可选两种方向；Case7 把 Seeed reTerminal E1002 固定为 `landscape`，请求 `portrait` 必须拒绝。注册和后续拉图会把 profile 补偿同步为 `display_rotation_deg`。后者是本项目的设备策略，不能反推上游固件支持范围。
 
 面板以全屏底部抽屉显示，不在照片下方堆叠后台卡片。关闭面板后恢复照片首页和图库导航状态。
 
@@ -58,6 +58,15 @@ URL Rotation；如果设备固件不提供该 API，注册会失败，需先在 
 | 本机触摸屏相册 | `local-touchscreen`，开发板 HDMI/QDtech MPI1001 输出 | 名称、自动轮播启停、换图间隔、显示方向、重复抑制、文件名水印、立即切换 | IP、HTTP 轮询、ESP32 设备 profile |
 | 注册 ESP32 电子相册 | 新建 Waveshare ESP32-S3-PhotoPainter 或 Seeed Studio reTerminal E1002 远端终端 | 名称、固定 profile、内容方向；注册后设置 cron、裁剪、日期/天气叠加、播放列表和启停 | 不能修改本机 HDMI 的显示策略；不能选择服务器主动发送或注册第三种 ESP32 相册型号 |
 
+设备管理不会把所有卡片同时铺在一个长页面中。打开 **设备** 面板后，先看到四个固定的大标签：
+
+- **总览**：查看登记记录、配置验证、最近拉图和启用数量，并通过快捷按钮进入其他分区；
+- **本机触摸屏**：只管理开发板 HDMI 屏的显示、轮播、方向和文件名水印；
+- **已注册设备**：只显示已经登记的 ESP32，按 Waveshare、Seeed E1002 和待确认型号分组；卡片首屏只显示当前照片、最近请求、请求结果和轮播策略，设备 ID、取图 URL、唤醒方式、详细策略和重新验证收在“查看设备详情、取图地址与策略”中；
+- **发现与配对**：只进行唤醒后的局域网发现、IP 验证和注册，不混入已注册设备的操作卡片。
+
+同一时间只有一个分区可见，切换标签不会改变设备状态；刷新设备后仍会回到当前分区。窄屏会将标签排成两列，标签和操作按钮保持可触摸尺寸，不产生页面级横向滚动。
+
 #### 如何识别已注册设备
 
 打开 **设备** 面板后，先看顶部 **设备总览**。这里的“已注册”数量来自
@@ -67,20 +76,37 @@ URL Rotation；如果设备固件不提供该 API，注册会失败，需先在 
 每张卡片顶部显示名称、设备 ID 和启用状态，事实摘要显示固定的设备主动拉取方式、设备取图 URL、
 当前照片、最近请求、请求结果和策略 revision。
 
-每台已确认设备的 **设备取图 URL** 可以复制到固件配置中。ESP32 注册只有一个传输路径：
+每台已确认设备的 **设备取图 URL** 可以在设备卡片的详情区复制到固件配置中。ESP32 注册只有一个传输路径：
 
-1. 从 ESP32 串口日志或其本机网页获取当前 IPv4；
-2. 在 Case7 注册页面填写该地址并执行“验证并注册”。服务会在设备可达且 API/身份核验
-   成功时写入 URL Rotation，并返回卡片中的取图 URL；
-3. 若固件没有可写入的 URL Rotation API，才在设备自己的网页中粘贴取图 URL、保存并开启
-   自动轮播，然后回到 Case7 重新登记/核验；
-4. 在 Case7 点击 **推进下一张** 时，只更新该设备的持久化选择；ESP32 下一次访问 URL 时才
-   会获取新照片。
+#### 发现、选择和注册
 
-注册不扫描局域网、不猜测 ESP32 IP 或固件端点。它只访问用户明确填写的设备地址，并在
+二维码通常只编码 `http://photoframe.local`。这是 mDNS 主机名；局域网内多个 PhotoFrame
+可能拥有相同名称，所以设备页不会把它解析到某个“默认设备”，也不会按 IP 网段盲扫。
+
+1. 先按实体唤醒键并保持设备醒着：Waveshare PhotoPainter 按 **BOOT**，Seeed
+   reTerminal E1002 按顶部绿色 **Wake/Refresh**。深度休眠时 Wi-Fi、mDNS 和 HTTP
+   都不可用，310B 不能通过网络唤醒。
+2. 点击 **发现局域网 PhotoFrame**。页面调用只读 `GET /api/admin/devices/discover`；
+   服务器仅查询 `_esp32-pframe._tcp` mDNS 服务，并对每个候选读取 `/api/system-info`。
+   候选卡片显示字面 IPv4、hostname、设备硬件 ID/MAC、板型、固件版本和分辨率。发现不会
+   创建设备记录、写入 `/api/config` 或访问公网。
+3. 如果返回多张同名卡片，按屏幕实物和硬件 ID/MAC 点击**唯一的一张**；系统绝不自动选择
+   第一条。选中后页面预填字面 `device_url`，并锁定 `expected_device_id`。
+4. 点击 **验证并注册**。服务器重新读取设备身份，在任何 URL Rotation 配置写入前核对
+   `expected_device_id`；地址指向另一台屏幕、设备离线或身份不符时注册失败，不留下临时设备。
+5. 注册成功后返回 `202/awaiting_pull`，只表示控制面配置完成；设备主动访问取图 URL 后，
+   卡片才变为“设备已拉图”。点击 **推进下一张** 只更新 310B 的持久化选择，ESP32 下一次
+   URL Rotation 请求才会获取新照片。
+
+发现为空不表示注册成功：设备可能正在休眠、尚未广播 mDNS、跨 VLAN，或局域网阻断了组播。
+此时按 [串口/IP 手册](./13-photopainter-serial-ip-and-wifi.md) 读取 `sta ip:`，或查看路由器
+DHCP 租约。在 **设备管理 → ESP32 唤醒与发现** 中输入该地址并点击 **读取并验证 IP**，页面会
+调用只读 `POST /api/admin/devices/probe`；验证通过后可一键带入设备登记表。仍需让服务器
+实际读取 `/api/system-info` 并核对硬件 ID。
+注册不扫描局域网、不猜测 ESP32 IP 或固件端点。它只访问用户明确选择/填写的设备地址，并在
 设备 API 支持时写入 URL Rotation；若固件网页没有 URL Rotation 或图片 URL 配置，必须先
-刷入或修改明确支持该协议的固件，不能通过本页面强行
-开启。设备页面不显示服务器主动发送的协议、根 URL、超时、重试或“立即推送当前照片”控件；
+刷入或修改明确支持该协议的固件，不能通过本页面强行开启。设备页面不显示服务器主动发送的
+协议、根 URL、超时、重试或“立即推送当前照片”控件；
 历史兼容接口仅见 [03 API 与 ESP32 协议](./03-album-server-api-and-esp32-protocol.md) 的维护章节。
 
 设备卡片底部的操作分为两种：**禁用设备**是可恢复的软停用，记录仍留在列表中，
@@ -159,6 +185,18 @@ bash scripts/launch_touchscreen_kiosk.sh
 
 脚本只启动本项目的 Firefox URL，不结束其他浏览器进程。调试时可访问
 `http://192.168.1.135:7860/?mode=touchscreen`，手机浏览器直接访问根 URL 即可。
+
+脚本会在打开 Firefox 前执行 `xinput list --id-only "QDtech MPI1001"`，并将触摸设备映射到 `HDMI-1`。如果开发板同时启用了第二个 HDMI 输出，X11 会把两个输出合并为更宽的虚拟桌面；未映射的触摸坐标会造成明显的横向偏移。不要直接从桌面菜单启动 Firefox；重启或热插拔显示器后重新运行上述脚本即可恢复映射。若输出名称不同，可在启动前设置 `SMART_ALBUM_TOUCH_OUTPUT`，但必须先用 `xrandr --query` 确认实际名称。
+
+可用以下只读命令核对当前会话：
+
+```bash
+xrandr --current | head -5
+xinput list --id-only "QDtech MPI1001"
+xinput list-props "QDtech MPI1001" | grep "Coordinate Transformation Matrix"
+```
+
+主屏为 `1920x1080`、虚拟桌面还包含副屏时，矩阵第一项应接近 `1920 / 虚拟桌面宽度`；这只说明输入映射正确，不是照片布局或 NPU 推理结果。
 
 ## 🛠️ 常见问题
 

@@ -1,6 +1,6 @@
 # PhotoPainter 串口读取 IP 与 Wi-Fi 配网手册
 
-_适用设备：Waveshare ESP32-S3-PhotoPainter 7.3 英寸；本次实测固件 v2.18.0。_
+_适用设备：Waveshare ESP32-S3-PhotoPainter 7.3 英寸；本次实测固件 v2.18.0。Seeed reTerminal E1002 的唤醒、发现和配对见 [14 唤醒与发现两类 ESP32 电子相册](./14-wake-and-discover-esp32-photoframes.md)，不要把本页的串口号、IP 或按键套用到 E1002。_
 
 ## 目标与地址含义
 
@@ -17,6 +17,28 @@ PhotoPainter 的网页地址由路由器通过 DHCP 分配，刷写固件后不�
 注意拼写：固件广播的是 `photoframe.local`（`photo` 后有字母 **o**）；`phtoframe.local`
 不是设备公布的名称。即使拼写正确，mDNS 仍可能因 Windows 网络配置、VPN 或路由器策略而不可用，
 所以教材和排障流程始终以串口输出的 IPv4 地址为准。
+
+### 二维码、mDNS 与多台设备
+
+配网完成后屏幕显示的二维码通常只包含 `http://photoframe.local`。二维码可以用普通手机
+扫码器读取，但它给出的是主机名，不包含当前 DHCP 地址，也不能区分局域网内两台同名的
+PhotoFrame。不要把手机或电脑解析到的第一条 `photoframe.local` 地址直接用于注册。
+
+推荐在 310B 设备页点击 **发现局域网 PhotoFrame**，或在同一局域网请求只读接口：
+
+```bash
+curl http://192.168.1.135:7860/api/admin/devices/discover
+```
+
+服务器仅查询 `_esp32-pframe._tcp` mDNS 广播，并逐个读取候选的 `/api/system-info`。返回的
+候选包含字面 IPv4、hostname、硬件 ID/MAC、板型、固件版本和分辨率；该请求不会注册设备、
+写入 PhotoFrame 配置或扫描任意 CIDR。出现多条候选时，必须依据屏幕实物和硬件 ID 由用户
+点击一条，再让注册请求携带 `expected_device_id` 做第二次身份核验。发现为空只说明设备
+休眠、未广播 mDNS 或组播不可达，不是“没有设备”或“已经注册”。
+
+发现不可用时，回到下面的串口步骤读取 `sta ip:`，或查看路由器 DHCP 租约，手动将明确的
+IPv4 填入 Case7；服务器仍会在写入 URL Rotation 前重新读取并核对设备硬件 ID。这样即使
+局域网有两个 `photoframe.local`，也不会把 URL 写到错误的屏幕。
 
 ## Windows 电脑准备
 
@@ -46,7 +68,7 @@ $idfPython = 'C:\Espressif\tools\python\v6.0.2\venv\Scripts\python.exe'
 
 ### 交互读取
 
-保持设备 USB 供电并按一次 `BOOT/KEY` 唤醒，然后运行：
+保持设备 USB 供电并按一次 **BOOT** 唤醒，然后运行：
 
 ```powershell
 & $idfPython -m serial.tools.miniterm COM17 115200
@@ -175,7 +197,7 @@ curl http://127.0.0.1:7860/api/index/stats
 | 现象 | 检查 | 处理 |
 | --- | --- | --- |
 | `photoframe.local` 打不开 | 先看串口 `sta ip` | 直接访问 `http://<sta_ip>/`；mDNS 不是必需项 |
-| 串口没有新日志 | 设备可能进入休眠 | 按一次 `BOOT/KEY` 唤醒，再复位并重新打开监视器 |
+| 串口没有新日志 | 设备可能进入休眠 | 按一次 **BOOT** 唤醒，再复位并重新打开监视器；E1002 请改看文档 14 的绿色 Wake 步骤 |
 | `COM17` 不存在 | USB 重新枚举 | 重新运行串口枚举命令，使用当前 `VID_303A` 端口 |
 | 只有 `No WiFi credentials...` | 设备仍在 AP 模式 | 连接 `PhotoFrame - XXXXX`，完成 2.4 GHz 配网 |
 | 有 `sta ip` 但网页超时 | 电脑不在同一网段、端口被占用或设备休眠 | 检查电脑 IPv4、按键唤醒，再执行 `curl` |

@@ -1,6 +1,12 @@
 # Case9 MindSpore 聊天模型逐个移植计划
 
-_版本：1.3｜更新日期：2026-08-30｜状态：20T DeepSeek 已在实际可达的 192.168.1.95 完成隔离加载、短稳定性、API 契约和 2+30 SSE 性能证据；中文最终质量、正式候选链和人工准入仍待完成_
+_版本：1.8｜更新日期：2026-09-04｜状态：8T 当前地址 `192.168.1.90`（历史 `.11.14`/`.178`） 已完成 Qwen2.5-0.5B loader/NPU 活动诊断但严格 placement 阻断；Qwen2.5-1.5B 重启后的正确 CANN 诊断在生成阶段因 `Alloc failed:481482240` 阻断，后续服务门禁仍未执行；Qwen3 loader 检查阻断；正式候选链和人工准入仍待完成_
+
+> 本文保留首批三模型的历史移植计划。当前候选范围已扩展到 Qwen2.5、Qwen3 和
+> 20T 专用 MiniCPM3；新的候选清单、双板验收顺序和持续账本分别见
+> [候选模型清单](31-mindspore-llm-candidate-inventory.md)、[验收计划](32-mindspore-llm-candidate-validation-plan.md)
+> 和 [验收记录](33-mindspore-llm-candidate-validation-record.md)。本文中的“MiniCPM3
+> 不在本轮范围”只代表 2026-08-30 旧批次，不代表新计划的最终范围。
 
 ## 1. 目标与范围
 
@@ -11,7 +17,7 @@ OpenAI 兼容候选服务。首轮只处理文本生成模型：
 2. `TinyLlama-1.1B`
 3. `DeepSeek-R1-Distill-Qwen-1.5B`
 
-视觉、扩散、Janus、MiniCPM3 和音频链路不在本轮范围。现有 Qwen2.5 静态 KV
+视觉、扩散、Janus 和音频链路不在本轮范围；MiniCPM3 仅保留 20T 前置条件候选。现有 Qwen2.5 静态 KV
 ACL 服务及正式入口 `8080 -> 7861 -> 7865` 保持不变，直到候选模型独立通过门禁并
 得到人工批准。
 
@@ -38,9 +44,12 @@ Profile，但不能调用切换接口，也不会收到管理密钥。任何时�
 
 | Profile | 上游模型/来源 | 验收板卡 | 初始限制 | 预期状态 |
 | --- | --- | --- | --- | --- |
-| `qwen1.5-0.5b-mindspore` | `Qwen/Qwen1.5-0.5B-Chat` | `192.168.1.90`，Ascend310B4/8T | context 1024；默认 32；上限 80；greedy | `experimental_dirty_base`；完整 b 批次 9/9，post-restart d/e 与 post-mask n 小批次通过，候选链和进程组切换已冒烟；人工质量/准入待定 |
-| `tinyllama-1.1b-mindspore` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | `192.168.1.90`，Ascend310B4/8T | context 1024；默认 32；上限 80；greedy | `blocked`；b 批次 8/9，32-token 长输出含 replacement character；已有切换冒烟仅作历史证据，当前 CLI 禁止激活 |
-| `deepseek-r1-qwen-1.5b-mindspore` | `MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B`（实际 FP16 源：`MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B-FP16`，modelers） | `192.168.1.95`，Ascend310B1/20T（`192.168.8.210` 为旧请求地址） | FP16/context 1024；默认 32、上限 80、greedy；revision `0a28897fe71fdd30de350b667ae588601a85990f`；权重 SHA-256 `706e1bfd7cb0680fbf73df6a2506766e447246e4291d7054c8b395dc3583419c`；shared dirty-base | `blocked`：隔离加载、短稳定性、API 契约和 reduced/full 性能证据已留存；中文推理/事实质量未过，正式网关/UI 未启动 |
+| `qwen1.5-0.5b-mindspore` | `Qwen/Qwen1.5-0.5B-Chat` | `192.168.1.90`，Ascend310B4/8T（历史报告 `.11.14`/`.178`） | context 1024；默认 32；上限 64；greedy | `experimental_dirty_base`；b 批次报表 9/9，但严格身份门按 8/9（health/snapshot 缺少 `npu_model`）待补证；post-restart d/e 与 post-mask n 小批次通过，候选链和进程组切换已冒烟；人工质量/准入待定 |
+| `tinyllama-1.1b-mindspore` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | `192.168.1.90`，Ascend310B4/8T（历史报告 `.11.14`/`.178`） | context 1024；默认 32；上限 64；greedy | `blocked`；b 批次 8/9，32-token 长输出含 replacement character；已有切换冒烟仅作历史证据，当前 CLI 禁止激活 |
+| `deepseek-r1-qwen-1.5b-mindspore` | `MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B`（实际 FP16 源：`MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B-FP16`，modelers） | `192.168.1.95`，Ascend310B1/20T（`192.168.8.210` 为旧请求地址） | FP16/context 1024；默认 32、上限 64、greedy；revision `0a28897fe71fdd30de350b667ae588601a85990f`；权重 SHA-256 `706e1bfd7cb0680fbf73df6a2506766e447246e4291d7054c8b395dc3583419c`；shared dirty-base | `blocked`：隔离加载、短稳定性、API 契约和 reduced/full 性能证据已留存；中文推理/事实质量未过，正式网关/UI 未启动 |
+| `qwen2.5-0.5b-mindspore` | `Qwen/Qwen2.5-0.5B-Instruct`，固定 revision `7ae557604adf67be50417f59c2c2f167def9a775` | `192.168.1.90`，Ascend310B4/8T（旧 `.11.14`/`.178` 为同板别名） | 权重/tokenizer/config 已锁定；context 1024；greedy | `blocked`：context-only loader 和并发 NPU 活动已记录，但没有显式 placement metadata；未启动 API |
+| `qwen2.5-1.5b-mindspore` | `Qwen/Qwen2.5-1.5B-Instruct`，固定 revision `989aa7980e4cf806f80c7fef2b1adb7bc71aa306` | `192.168.1.90`，Ascend310B4/8T（旧 `.11.14`/`.178` 为同板别名） | 七个文件已同步并通过 SHA-256；context 1024；greedy | `blocked`：正确 CANN v2/v3b/v4 曾加载并生成短文本；重启后生成阶段 `Alloc failed:481482240`，placement、API、长输出、稳定性、质量、性能仍 `not-run`；首轮 SIGSEGV 为 PYTHONPATH 污染历史证据，见 [内存门记录](37-qwen25-1.5b-8t-memory-gate-20260904.md) |
+| `qwen3-0.6b-mindspore`、`qwen3-1.7b-mindspore` | `MindSpore-Lab` Modelers 候选 | 8T 当前板先做 loader 检查 | context 1024；首轮关闭 thinking | `blocked`：MindNLP 0.4.1 没有 Qwen3 loader；不下载/不升级 |
 
 每个 Profile 必须单独记录模型 revision、tokenizer、配置、权重路径、环境指纹、
 文件大小和 SHA-256。来源仓库存在但没有锁定哈希时，不能标记
@@ -81,7 +90,7 @@ POST /v1/chat/completions
 - 实际 token 化后检查 `prompt_tokens + max_tokens <= 1024`，超限返回 400；
 - batch 固定为 1，单进程、单请求串行；
 - 首轮只接受 `temperature=0`、`top_p=1`，使用 greedy；
-- 请求体最大 256 KB，`max_tokens` 默认 32、最大 80；
+- 请求体最大 256 KB，`max_tokens` 默认 32、最大 64；
 - 同时支持普通 JSON 和 OpenAI SSE；SSE 只发送前缀差量；
 - 客户端断开、超时或异常后释放 worker/设备资源；阻塞 watchdog 触发时服务
   fail-closed，不继续接收请求；
@@ -100,7 +109,7 @@ POST /v1/chat/completions
 
 ### 6.2 Qwen1.5 首个基线
 
-先在 `.90` 上冻结 `base` 包清单和 CANN/NPU 快照，复用已经下载的官方 Qwen1.5
+先在当前 8T 地址 `192.168.1.90` 上冻结 `base` 包清单和 CANN/NPU 快照，复用已经下载的官方 Qwen1.5
 权重前，补齐不可变 revision、文件哈希和 tokenizer 记录。完成单 token、JSON、SSE、
 长输出、稳定性、性能及中文探测后，才可试运行统一候选链。
 
@@ -135,7 +144,7 @@ Profile，回滚失败则保持 fail-closed。正式端口永不由 CLI 自动�
 | G1 | 权重、tokenizer、配置和 revision | 下载完整并通过 SHA-256 |
 | G2 | MindSpore tokenizer/model 导入 | 单 token 生成成功 |
 | G3 | JSON/SSE | 契约、错误码和前缀 delta 正确 |
-| G4 | 8/16/32/64/80 token | UTF-8 完整、EOS/finish reason 一致 |
+| G4 | 8/16/32/64 token | UTF-8 完整、EOS/finish reason 一致 |
 | G5 | 10 轮稳定性 | 无崩溃、明显 FD/RSS/NPU 泄漏 |
 | G6 | 中文/英文探测 | Qwen/DeepSeek 目标 8/10；TinyLlama 分开报告 |
 | G7 | 性能 | 2 次预热 + 30 次测量，p50/p95、首 token、token/s |
@@ -177,3 +186,4 @@ CPU、云端、Torch、Torch-NPU、vLLM、MindIE 或其他未审核模型。
 - [Qwen1.5-0.5B-Chat](https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat)
 - [TinyLlama-1.1B-Chat-v1.0](https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0)
 - [DeepSeek-R1-Distill-Qwen-1.5B](https://huggingface.co/MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B)
+- [Qwen2.5-1.5B 8T 内存门失败记录](37-qwen25-1.5b-8t-memory-gate-20260904.md)

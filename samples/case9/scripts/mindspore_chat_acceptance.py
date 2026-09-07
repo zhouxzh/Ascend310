@@ -4,6 +4,17 @@
 The candidate service must already be running. This module uses only the
 Python standard library: it does not install packages, launch a worker, or
 manage another process. The shell wrapper defaults to ``--dry-run``.
+
+For a new dual-board campaign, select the board explicitly and associate both
+G0/G1 reports, for example::
+
+    python scripts/mindspore_chat_acceptance.py \
+        --profile qwen1.5-0.5b-mindspore --board 8t --soc Ascend310B4 \
+        --environment-report reports/environment.json \
+        --artifact-report reports/artifact.json --execute
+
+Legacy invocations may omit these options; they retain the primary-board
+health checks but do not claim an evidence gate that was not requested.
 """
 
 from __future__ import annotations
@@ -18,6 +29,7 @@ from pathlib import Path
 import platform
 import re
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -31,7 +43,7 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8090
 DEFAULT_MODEL = "case9-active"
 MAX_CONTEXT_TOKENS = 1024
-MAX_GENERATION_TOKENS = 80
+MAX_GENERATION_TOKENS = 64
 MAX_REQUEST_BYTES = 256 * 1024
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 MAX_TIMEOUT_SECONDS = 600.0
@@ -49,6 +61,26 @@ ABORT_HEADER_BYTES = 32 * 1024
 ABORT_OBSERVATION_BYTES = 64 * 1024
 PROFILE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$")
+SOC_RE = re.compile(r"^(?:ascend)?310b[0-9a-z]+$", re.IGNORECASE)
+ACTIVATABLE_STATUSES = frozenset({"experimental_dirty_base", "admitted"})
+MAX_EVIDENCE_BYTES = 4 * 1024 * 1024
+
+# These aliases mirror the two board records in the checked-in registry.  An
+# alias is only accepted after it is matched against the selected Profile's
+# declared ``board_targets``; it can never redirect a campaign to an
+# undeclared device.
+BOARD_ALIASES: Mapping[str, Mapping[str, str]] = {
+    # 192.168.1.90 is the current address of the existing B4/8T board.
+    # The .11.14 and .178 addresses are retained only as selectors for
+    # archived evidence; all normalized output uses the current host.
+    "8t": {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
+    "board8t": {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
+    "192.168.1.90": {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
+    "192.168.11.14": {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
+    "192.168.8.178": {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
+    "20t": {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"},
+    "board20t": {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"},
+}
 
 REQUIRED_MACHINE_GATES: Tuple[str, ...] = (
     "health",
@@ -93,7 +125,8 @@ class Options:
         "stability_loops", "stability_max_tokens", "perf_warmup", "perf_loops",
         "perf_max_tokens", "probe_max_tokens", "probe_file", "run_id", "execute",
         "quality", "snapshots", "abort_max_tokens", "abort_health_wait_seconds",
-        "registry",
+        "registry", "board", "soc", "tier", "target_explicit",
+        "environment_report", "artifact_report", "require_evidence",
     )
 
     def __init__(
@@ -104,6 +137,13 @@ class Options:
         snapshots: bool, abort_max_tokens: int = 1,
         abort_health_wait_seconds: float = ABORT_HEALTH_WAIT_SECONDS,
         registry: Optional[Path] = None,
+        board: str = "",
+        soc: str = "",
+        tier: str = "",
+        target_explicit: bool = False,
+        environment_report: Optional[Path] = None,
+        artifact_report: Optional[Path] = None,
+        require_evidence: bool = False,
     ) -> None:
         self.profile = profile
         self.host = host
@@ -125,6 +165,13 @@ class Options:
         self.abort_max_tokens = abort_max_tokens
         self.abort_health_wait_seconds = abort_health_wait_seconds
         self.registry = registry
+        self.board = board
+        self.soc = soc
+        self.tier = tier
+        self.target_explicit = bool(target_explicit)
+        self.environment_report = environment_report
+        self.artifact_report = artifact_report
+        self.require_evidence = bool(require_evidence)
 
 
 def utc_now() -> str:
@@ -253,6 +300,413 @@ def load_profile_metadata(profile_id: str, registry_path: Optional[Any] = None) 
         raise AcceptanceError("could not load profile %s: %s" % (profile_id, exc)) from exc
 
 
+def _soc_key(value: Any) -> str:
+    """Return a case-insensitive lookup key for an Ascend 310B SoC."""
+
+    raw = str(value or "").strip().lower()
+    if raw.startswith("ascend"):
+        raw = raw[len("ascend"):]
+    match = re.search(r"310b[0-9a-z]+", raw)
+    return match.group(0) if match else raw
+
+
+def _canonical_soc(value: Any) -> str:
+    """Normalize common ``310B4``/``Ascend310B4`` spellings."""
+
+    raw = str(value or "").strip()
+    if not raw or not SOC_RE.fullmatch(raw):
+        return ""
+    key = _soc_key(raw)
+    return "Ascend" + key.upper()
+
+
+def _canonical_board_host(value: Any) -> str:
+    """Normalize known historical addresses to the board's current host."""
+
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    alias = BOARD_ALIASES.get(raw.lower())
+    if alias is not None:
+        return str(alias["host"])
+    return raw
+
+
+def _profile_targets(metadata: Mapping[str, Any]) -> List[Dict[str, str]]:
+    """Return normalized board targets, retaining the primary-board fallback."""
+
+    raw = metadata.get("board_targets")
+    if isinstance(raw, Mapping):
+        raw = [raw]
+    targets: List[Dict[str, str]] = []
+    if isinstance(raw, (list, tuple)):
+        for item in raw:
+            if not isinstance(item, Mapping):
+                continue
+            host = str(item.get("host", "")).strip()
+            soc = _canonical_soc(item.get("soc"))
+            tier = str(item.get("tier", "")).strip()
+            if host and soc and tier:
+                targets.append({"host": host, "soc": soc, "tier": tier})
+    if targets:
+        return targets
+    host = str(metadata.get("board_host", "")).strip()
+    soc = _canonical_soc(metadata.get("board_soc"))
+    tier = str(metadata.get("board_tier", "")).strip()
+    if host and soc and tier:
+        return [{"host": host, "soc": soc, "tier": tier}]
+    return []
+
+
+def _resolve_target(
+    metadata: Mapping[str, Any],
+    board: Optional[Any] = None,
+    soc: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """Resolve a board/SoC selection against the Profile's declared targets.
+
+    Existing callers may omit both options; in that case the Profile's
+    primary target is selected and ``explicit`` remains false.  Supplying
+    either selector turns on strict per-board validation and rejects a target
+    which is not declared by the selected Profile.
+    """
+
+    targets = _profile_targets(metadata)
+    if not targets:
+        raise AcceptanceError("profile does not declare a usable board target")
+    board_raw = str(board or "").strip()
+    soc_raw = str(soc or "").strip()
+    explicit = bool(board_raw or soc_raw)
+    if soc_raw and not SOC_RE.fullmatch(soc_raw):
+        raise AcceptanceError("--soc must be Ascend310B4/Ascend310B1 (or 310B4/310B1)")
+    requested_soc = _canonical_soc(soc_raw) if soc_raw else ""
+
+    alias: Optional[Mapping[str, str]] = None
+    if board_raw:
+        alias = BOARD_ALIASES.get(board_raw.lower())
+    board_candidates = targets
+    if board_raw and alias is None:
+        # A literal board host, SoC, or tier is accepted only if the matching
+        # target is already declared in the registry.
+        board_candidates = [
+            item for item in targets
+            if item["host"].lower() == board_raw.lower()
+            or _soc_key(item["soc"]) == _soc_key(board_raw)
+            or item["tier"].lower() == board_raw.lower()
+        ]
+        if not board_candidates:
+            raise AcceptanceError("--board %s is not declared by profile" % board_raw)
+    elif alias is not None:
+        board_candidates = [
+            item for item in targets
+            if _soc_key(item["soc"]) == _soc_key(alias["soc"])
+            and item["tier"].lower() == alias["tier"].lower()
+        ]
+        if not board_candidates:
+            raise AcceptanceError("--board %s does not match a profile board target" % board_raw)
+
+    if requested_soc:
+        board_candidates = [
+            item for item in board_candidates
+            if _soc_key(item["soc"]) == _soc_key(requested_soc)
+        ]
+        if not board_candidates:
+            raise AcceptanceError("--soc %s is not a target for profile %s" % (soc_raw, metadata.get("id", "")))
+
+    # A valid registry cannot contain duplicate SoCs, but choose the first
+    # deterministic target if a legacy fixture happens to repeat one.
+    target = dict(board_candidates[0] if board_candidates else targets[0])
+    # The registry may retain an archived address in a historical validation
+    # row.  Normalize only known B4 aliases so a current campaign cannot
+    # accidentally report the old IP as its execution target.
+    target["host"] = _canonical_board_host(target.get("host"))
+    if _soc_key(target.get("soc")) == _soc_key("Ascend310B4"):
+        target["host"] = str(BOARD_ALIASES["board8t"]["host"])
+    if alias is not None and board_raw.lower() in BOARD_ALIASES:
+        # Keep the alias visible for provenance, while the normalized host
+        # above remains the current board address.
+        target["alias"] = board_raw.lower()
+    target["explicit"] = explicit
+    target["selection"] = "explicit" if explicit else "profile_primary"
+    return target
+
+
+def _validation_for_target(metadata: Mapping[str, Any], soc: str) -> Optional[Mapping[str, Any]]:
+    validation = metadata.get("validation")
+    if not isinstance(validation, Mapping):
+        return None
+    expected = _soc_key(soc)
+    for key, item in validation.items():
+        if _soc_key(key) == expected and isinstance(item, Mapping):
+            return item
+    return None
+
+
+def _safe_evidence_path(value: Any, name: str) -> Path:
+    """Validate a report input without following symlink components."""
+
+    if not isinstance(value, (str, Path)) or not str(value).strip():
+        raise AcceptanceError("%s must be a non-empty path" % name)
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = REPO_DIR / path
+    lexical = path.absolute()
+    _reject_symlink_components(lexical)
+    if path.exists() and (path.is_symlink() or not path.is_file()):
+        raise AcceptanceError("%s must be a regular file" % name)
+    return path
+
+
+def _report_soc(document: Mapping[str, Any]) -> str:
+    """Extract a SoC from known environment/artifact report locations."""
+
+    candidates: List[Any] = []
+    for key in ("board_soc", "npu_model", "target_soc", "soc"):
+        candidates.append(document.get(key))
+    board = document.get("board")
+    if isinstance(board, Mapping):
+        candidates.extend(board.get(key) for key in ("soc", "board_soc", "npu_model"))
+    checks = document.get("checks")
+    if isinstance(checks, Mapping):
+        profile_check = checks.get("profile")
+        if isinstance(profile_check, Mapping):
+            candidates.extend(profile_check.get(key) for key in ("board_soc", "soc", "npu_model"))
+        npu_check = checks.get("npu")
+        if isinstance(npu_check, Mapping):
+            candidates.extend(npu_check.get(key) for key in ("chip", "soc", "npu_model"))
+    normalized_values: List[str] = []
+    for value in candidates:
+        normalized = _canonical_soc(value)
+        if normalized:
+            normalized_values.append(normalized)
+            continue
+        # npu-smi commonly reports a compound value such as ``310B4 / 8T``.
+        match = re.search(r"(?:Ascend)?(310B[0-9A-Za-z]+)", str(value or ""), re.IGNORECASE)
+        if match:
+            parsed = _canonical_soc(match.group(1))
+            if parsed:
+                normalized_values.append(parsed)
+    unique = set(normalized_values)
+    # A report containing B4 and B1 claims is ambiguous; do not let field
+    # ordering decide which board receives the evidence.
+    return next(iter(unique)) if len(unique) == 1 else ""
+
+
+def _report_tier(document: Mapping[str, Any]) -> str:
+    """Extract an optional compute-tier label from known report locations."""
+
+    candidates: List[Any] = [document.get("board_tier"), document.get("tier")]
+    board = document.get("board")
+    if isinstance(board, Mapping):
+        candidates.append(board.get("tier"))
+    checks = document.get("checks")
+    if isinstance(checks, Mapping):
+        profile_check = checks.get("profile")
+        if isinstance(profile_check, Mapping):
+            candidates.append(profile_check.get("board_tier"))
+            candidates.append(profile_check.get("tier"))
+    normalized_values: List[str] = []
+    for value in candidates:
+        text = str(value or "").strip()
+        if re.fullmatch(r"[0-9]+T", text, re.IGNORECASE):
+            normalized_values.append(text.upper())
+    unique = set(normalized_values)
+    return next(iter(unique)) if len(unique) == 1 else ""
+
+
+def _report_host(document: Mapping[str, Any]) -> str:
+    """Extract and normalize a board host from an evidence report."""
+
+    candidates: List[Any] = []
+    for key in ("board_host", "target_host", "host"):
+        candidates.append(document.get(key))
+    board = document.get("board")
+    if isinstance(board, Mapping):
+        candidates.extend(board.get(key) for key in ("host", "board_host", "target_host"))
+    checks = document.get("checks")
+    if isinstance(checks, Mapping):
+        profile_check = checks.get("profile")
+        if isinstance(profile_check, Mapping):
+            candidates.extend(profile_check.get(key) for key in ("host", "board_host", "target_host"))
+        for section_name in ("environment", "device", "hardware"):
+            section = checks.get(section_name)
+            if isinstance(section, Mapping):
+                candidates.extend(section.get(key) for key in ("host", "board_host", "target_host"))
+    normalized_values: List[str] = []
+    for value in candidates:
+        raw = str(value or "").strip()
+        if not raw:
+            continue
+        # Accept a URL or a compact diagnostic string, but only normalize
+        # known board aliases.  Unknown hosts remain visible and fail the
+        # strict equality check below.
+        match = re.search(r"(?<![0-9])(?:\d{1,3}\.){3}\d{1,3}(?![0-9])", raw)
+        normalized_values.append(_canonical_board_host(match.group(0) if match else raw))
+    unique = {item for item in normalized_values if item}
+    # Old addresses for the same physical B4 board normalize to .90 and are
+    # therefore compatible; different explicit hosts are not.
+    return next(iter(unique)) if len(unique) == 1 else ""
+
+
+def _report_profile_id(document: Mapping[str, Any]) -> str:
+    for key in ("profile_id", "profile"):
+        value = document.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if isinstance(value, Mapping):
+            nested = value.get("id") or value.get("profile_id")
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip()
+    checks = document.get("checks")
+    if isinstance(checks, Mapping):
+        profile = checks.get("profile")
+        if isinstance(profile, Mapping):
+            value = profile.get("id") or profile.get("profile_id")
+            if isinstance(value, str):
+                return value.strip()
+    return ""
+
+
+def _read_evidence_report(
+    path: Optional[Path],
+    *,
+    kind: str,
+    profile: str,
+    soc: str,
+    required: bool,
+    tier: str = "",
+    host: str = "",
+) -> Dict[str, Any]:
+    """Read and validate one environment/artifact evidence report."""
+
+    if path is not None and not isinstance(path, Path):
+        path = Path(path)
+    result: Dict[str, Any] = {
+        "kind": kind,
+        "path": str(path) if path is not None else None,
+        "required": bool(required),
+        "status": "not_requested" if path is None and not required else "failed",
+        "ok": False if required else True,
+        "checks": {},
+    }
+    if path is None:
+        result["reason"] = "report path was not supplied"
+        return result
+    try:
+        lexical = path.absolute()
+        _reject_symlink_components(lexical)
+        info = path.stat()
+        if not stat.S_ISREG(info.st_mode) or path.is_symlink():
+            raise AcceptanceError("report is not a regular file")
+        if info.st_size > MAX_EVIDENCE_BYTES:
+            raise AcceptanceError("report exceeds 4 MiB")
+        text = path.read_text(encoding="utf-8")
+        document = json.loads(text)
+        if not isinstance(document, Mapping):
+            raise AcceptanceError("report root must be an object")
+    except (OSError, UnicodeError, ValueError, json.JSONDecodeError, AcceptanceError) as exc:
+        result["reason"] = "%s: %s" % (type(exc).__name__, exc)
+        return result
+
+    report_profile = _report_profile_id(document)
+    report_soc = _report_soc(document)
+    report_tier = _report_tier(document)
+    report_host = _report_host(document)
+    if kind == "environment":
+        success = document.get("ok") is True or document.get("status") in {"passed", "verified"}
+        failures = document.get("failures")
+        no_failures = not failures if isinstance(failures, list) else failures in (None, [])
+    else:
+        success = document.get("artifact_verified") is True and document.get("status") in {"passed", "verified"}
+        errors = document.get("errors")
+        no_failures = not errors if isinstance(errors, list) else errors in (None, [])
+    checks = {
+        "report_success": bool(success),
+        "report_has_no_failures": bool(no_failures),
+        "profile_matches": report_profile == profile,
+        "soc_present": bool(report_soc),
+        "soc_matches": bool(report_soc) and _soc_key(report_soc) == _soc_key(soc),
+        # Host identity is mandatory whenever a strict target is selected.
+        # Historical aliases normalize to the current address before compare.
+        "host_present": bool(report_host) if host else True,
+        "host_matches": (
+            not host
+            or (bool(report_host) and _canonical_board_host(report_host) == _canonical_board_host(host))
+        ),
+        "tier_matches_when_present": not report_tier or report_tier == str(tier or "").upper(),
+    }
+    result["checks"] = checks
+    result["report_profile"] = report_profile or None
+    result["report_soc"] = report_soc or None
+    result["report_host"] = report_host or None
+    result["report_tier"] = report_tier or None
+    result["ok"] = all(checks.values())
+    result["status"] = "verified" if result["ok"] else "failed"
+    if not result["ok"]:
+        result["reason"] = "report identity or success checks failed"
+    return result
+
+
+def _evidence_reports(
+    options: "Options", metadata: Mapping[str, Any]
+) -> Tuple[bool, Dict[str, Any]]:
+    # Direct unit callers may construct Options with the legacy positional
+    # signature, leaving board/soc empty.  Resolve the same deterministic
+    # primary target used by validate_options before associating reports.
+    try:
+        target = _resolve_target(
+            metadata,
+            options.board if options.board else None,
+            options.soc if options.soc else None,
+        )
+        target_host = str(target.get("host") or "")
+        target_soc = str(target["soc"])
+        target_tier = str(target.get("tier") or "")
+    except AcceptanceError:
+        target_host = _canonical_board_host(options.board or "")
+        target_soc = str(options.soc or "")
+        target_tier = str(options.tier or "")
+    required = bool(options.require_evidence or options.target_explicit)
+    environment = _read_evidence_report(
+        options.environment_report,
+        kind="environment",
+        profile=options.profile,
+        soc=target_soc,
+        tier=target_tier,
+        host=target_host,
+        required=required,
+    )
+    artifact = _read_evidence_report(
+        options.artifact_report,
+        kind="artifact",
+        profile=options.profile,
+        soc=target_soc,
+        tier=target_tier,
+        host=target_host,
+        required=required,
+    )
+    # If either path was supplied, both reports are required.  This prevents a
+    # single successful artifact hash from disguising a missing environment
+    # preflight (or vice versa).
+    if options.environment_report is not None or options.artifact_report is not None:
+        required = True
+        environment["required"] = True
+        artifact["required"] = True
+        for item in (environment, artifact):
+            if item.get("path") is None:
+                item["status"] = "failed"
+                item["ok"] = False
+                item["reason"] = "required report path was not supplied"
+    passed = (not required) or (environment.get("ok") is True and artifact.get("ok") is True)
+    return passed, {
+        "required": required,
+        "status": ("passed" if passed else "failed") if required else "not_requested",
+        "target": {"profile": options.profile, "host": target_host, "soc": target_soc, "tier": target_tier},
+        "environment": environment,
+        "artifact": artifact,
+    }
+
+
 def _parse_budgets(value: Any) -> Tuple[int, ...]:
     if isinstance(value, (list, tuple)):
         raw_values = list(value)
@@ -280,8 +734,45 @@ def validate_options(args: argparse.Namespace) -> Options:
     profile = str(getattr(args, "profile", ""))
     registry = _registry_path(getattr(args, "registry", None))
     metadata = load_profile_metadata(profile, registry)
-    if metadata.get("status") == "blocked":
-        raise AcceptanceError("profile %s is blocked; acceptance is not run" % profile)
+    board_selector = getattr(args, "board", None)
+    soc_selector = getattr(args, "soc", None)
+    target = _resolve_target(metadata, board_selector, soc_selector)
+    target_soc = str(target["soc"])
+    target_validation = _validation_for_target(metadata, target_soc)
+    candidate_kind = str(metadata.get("candidate_kind", "native_mindspore")).strip().lower()
+    if bool(metadata.get("conditional")) or candidate_kind == "conditional":
+        raise AcceptanceError("profile %s is conditional; acceptance is not run" % profile)
+    # A selector explicitly requests per-board evidence.  A missing validation
+    # entry is therefore a hard stop instead of silently falling back to the
+    # aggregate profile status.  Legacy calls without --board/--soc retain
+    # their historical primary-board fallback.
+    if target["explicit"] and target_validation is None:
+        raise AcceptanceError("profile %s has no validation entry for %s" % (profile, target_soc))
+    target_status = str(
+        target_validation.get("status") if isinstance(target_validation, Mapping) else metadata.get("status", "")
+    ).strip().lower()
+    if target_status in {"blocked", "not-run"}:
+        raise AcceptanceError(
+            "profile %s is %s for %s; acceptance is not run" % (profile, target_status, target_soc)
+        )
+    if target_status not in ACTIVATABLE_STATUSES:
+        raise AcceptanceError(
+            "profile %s is not activatable for %s (status=%s)" % (profile, target_soc, target_status or "missing")
+        )
+    # Preserve the legacy aggregate behavior when no board selector is given:
+    # a globally blocked/not-run Profile remains unavailable.  An explicit
+    # selector may opt into a separately validated SoC entry (for example a
+    # profile blocked on B1 but experimentally usable on B4).  Without this
+    # guard, a schema-v2 profile with aggregate ``not-run`` and a stale or
+    # prematurely populated primary-board validation row could be accepted by
+    # a legacy invocation that omits ``--board``/``--soc``.
+    aggregate_status = str(metadata.get("status", "")).strip().lower()
+    if aggregate_status in {"blocked", "not-run"} and (
+        not target["explicit"] or target_status not in ACTIVATABLE_STATUSES
+    ):
+        raise AcceptanceError(
+            "profile %s is %s; acceptance is not run" % (profile, aggregate_status)
+        )
     host = str(getattr(args, "host", DEFAULT_HOST))
     if not _is_loopback_host(host):
         raise AcceptanceError("acceptance target must be loopback-only")
@@ -308,7 +799,7 @@ def validate_options(args: argparse.Namespace) -> Options:
     )
     if not math.isfinite(abort_health_wait_seconds) or not 0.0 <= abort_health_wait_seconds <= 120.0:
         raise AcceptanceError("abort_health_wait_seconds must be between 0 and 120 seconds")
-    budgets = _parse_budgets(getattr(args, "long_budgets", "8,16,32,64,80"))
+    budgets = _parse_budgets(getattr(args, "long_budgets", "8,16,32,64"))
     run_id = str(getattr(args, "run_id", "") or utc_run_id())
     if not RUN_ID_RE.fullmatch(run_id):
         raise AcceptanceError("run-id contains unsafe characters")
@@ -316,6 +807,21 @@ def validate_options(args: argparse.Namespace) -> Options:
     output_arg = getattr(args, "output", None)
     output = Path(output_arg) if output_arg else REPORT_ROOT / profile / run_id
     output = safe_report_path(output)
+
+    environment_report_raw = getattr(args, "environment_report", None)
+    artifact_report_raw = getattr(args, "artifact_report", None)
+    environment_report = (
+        _safe_evidence_path(environment_report_raw, "--environment-report")
+        if environment_report_raw is not None else None
+    )
+    artifact_report = (
+        _safe_evidence_path(artifact_report_raw, "--artifact-report")
+        if artifact_report_raw is not None else None
+    )
+    require_evidence = bool(getattr(args, "require_evidence", False))
+    if environment_report is not None or artifact_report is not None:
+        require_evidence = True
+
     probe_file = getattr(args, "probe_file", None)
     if probe_file is not None:
         probe_file = Path(probe_file).expanduser()
@@ -348,6 +854,13 @@ def validate_options(args: argparse.Namespace) -> Options:
         abort_max_tokens=abort_max_tokens,
         abort_health_wait_seconds=abort_health_wait_seconds,
         registry=registry,
+        board=str(target["host"]),
+        soc=target_soc,
+        tier=str(target["tier"]),
+        target_explicit=bool(target["explicit"]),
+        environment_report=environment_report,
+        artifact_report=artifact_report,
+        require_evidence=require_evidence,
     )
 
 
@@ -917,6 +1430,10 @@ def _health_after_abort(
     wait_seconds: float,
     profile: Optional[str] = None,
     registry_path: Optional[Any] = None,
+    board: Optional[str] = None,
+    soc: Optional[str] = None,
+    tier: Optional[str] = None,
+    strict_target: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Accept a live ready service or an explicit 503 fail-closed state."""
 
@@ -932,7 +1449,15 @@ def _health_after_abort(
             "healthy": body.get("healthy") if isinstance(body, Mapping) else None,
         }
         if profile is not None:
-            identity_ok, identity_checks = _health_ok(record, profile, registry_path)
+            identity_ok, identity_checks = _health_ok(
+                record,
+                profile,
+                registry_path,
+                board=board,
+                soc=soc,
+                tier=tier,
+                strict_target=strict_target,
+            )
             attempt["identity_checks"] = identity_checks
         else:
             identity_ok = True
@@ -975,6 +1500,25 @@ def _valid_sse(record: Mapping[str, Any], budget: int) -> bool:
         and not isinstance(completion, bool)
         and 1 <= completion <= budget
     )
+
+
+def _required_machine_gates(options: Options, *, evidence_required: Optional[bool] = None) -> Tuple[str, ...]:
+    """Return the gates that determine campaign status.
+
+    Evidence is conditional for backwards compatibility with the original
+    single-board helper.  New per-board/explicit-evidence campaigns include it
+    as a hard gate, so a missing environment or artifact report cannot yield
+    a misleading ``passed`` status.
+    """
+
+    required = bool(
+        options.require_evidence
+        or options.target_explicit
+        or options.environment_report is not None
+        or options.artifact_report is not None
+        or (evidence_required is True)
+    )
+    return REQUIRED_MACHINE_GATES + (("evidence",) if required else ())
 
 
 def _quality_summary(probe_results: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
@@ -1092,16 +1636,74 @@ def _write_text(path: Path, value: str) -> None:
 
 
 def _health_ok(
-    record: Mapping[str, Any], profile: str, registry_path: Optional[Any] = None
+    record: Mapping[str, Any],
+    profile: str,
+    registry_path: Optional[Any] = None,
+    board: Optional[str] = None,
+    soc: Optional[str] = None,
+    tier: Optional[str] = None,
+    strict_target: Optional[bool] = None,
 ) -> Tuple[bool, Dict[str, Any]]:
+    """Validate service health and its board-specific admission identity.
+
+    ``board``/``soc`` are optional for compatibility with historical calls.
+    Once either is supplied, all per-SoC admission and candidate-kind fields
+    become mandatory.  This keeps old reports readable while ensuring a new
+    dual-board campaign cannot pass on a healthy service running the wrong
+    profile or SoC.
+    """
+
     body = record.get("body")
+    metadata: Dict[str, Any] = {}
     try:
-        profile_metadata = load_profile_metadata(profile, registry_path)
-        expected_npu_model = str(profile_metadata.get("board_soc") or "")
+        metadata = load_profile_metadata(profile, registry_path)
+        target = _resolve_target(metadata, board, soc)
+        expected_npu_model = str(target.get("soc") or "")
+        expected_tier = str(target.get("tier") or "")
+        validation = _validation_for_target(metadata, expected_npu_model)
+        expected_admission = str(
+            validation.get("status") if isinstance(validation, Mapping) else metadata.get("status", "")
+        ).strip().lower()
+        expected_kind = str(metadata.get("candidate_kind", "native_mindspore")).strip().lower()
+        target_supported = True
     except AcceptanceError:
         expected_npu_model = ""
-    observed_npu_model = body.get("npu_model") if isinstance(body, Mapping) else None
-    fingerprint = body.get("environment_fingerprint") if isinstance(body, Mapping) else None
+        expected_tier = ""
+        expected_admission = ""
+        expected_kind = ""
+        target_supported = False
+    strict = bool(strict_target) if strict_target is not None else bool(board or soc)
+    observed_npu_model = None
+    fingerprint = None
+    if isinstance(body, Mapping):
+        observed_npu_model = (
+            body.get("npu_model")
+            or body.get("board_soc")
+            or body.get("target_soc")
+            or body.get("soc")
+        )
+        fingerprint = body.get("environment_fingerprint")
+        environment = body.get("environment")
+        if fingerprint is None and isinstance(environment, Mapping):
+            fingerprint = environment.get("fingerprint") or environment.get("environment_fingerprint")
+    observed_admission = body.get("admission_status") if isinstance(body, Mapping) else None
+    if not observed_admission and isinstance(body, Mapping):
+        observed_admission = body.get("admission")
+    observed_admission_soc = body.get("admission_soc") if isinstance(body, Mapping) else None
+    if observed_admission_soc is None and isinstance(body, Mapping):
+        observed_admission_soc = body.get("target_soc") or body.get("board_soc")
+    observed_kind = body.get("candidate_kind") if isinstance(body, Mapping) else None
+    if observed_kind is None and isinstance(body, Mapping):
+        observed_kind = body.get("profile_candidate_kind")
+    observed_conditional = body.get("conditional") if isinstance(body, Mapping) else None
+    observed_tier = body.get("board_tier") if isinstance(body, Mapping) else None
+    observed_host = body.get("board_host") if isinstance(body, Mapping) else None
+
+    def optional_or(check: bool, value: Any) -> bool:
+        """Treat omitted new identity fields as legacy-compatible only."""
+
+        return bool(check) if strict or value is not None else True
+
     checks: Dict[str, bool] = {
         "http_200": record.get("http_status") == 200,
         "ready": isinstance(body, Mapping) and body.get("ready") is True,
@@ -1116,7 +1718,11 @@ def _health_ok(
         and isinstance(observed_npu_model, str)
         and bool(observed_npu_model),
         "npu_model_matches_profile": bool(expected_npu_model)
-        and observed_npu_model == expected_npu_model,
+        and _soc_key(observed_npu_model) == _soc_key(expected_npu_model),
+        "target_supported": target_supported,
+        "requested_tier_matches_target": (
+            not tier or (bool(expected_tier) and str(tier).strip() == expected_tier)
+        ),
         "device_target_ascend": isinstance(body, Mapping)
         and str(body.get("device_target", "")).lower() == "ascend",
         "worker_pid": isinstance(body, Mapping)
@@ -1127,6 +1733,57 @@ def _health_ok(
         and isinstance(fingerprint, str)
         and bool(re.fullmatch(r"[0-9a-fA-F]{64}", fingerprint)),
     }
+    checks["admission_status_present"] = optional_or(
+        isinstance(observed_admission, str) and bool(str(observed_admission).strip()), observed_admission
+    )
+    checks["admission_status_matches_profile"] = optional_or(
+        bool(expected_admission)
+        and isinstance(observed_admission, str)
+        and str(observed_admission).strip().lower() == expected_admission,
+        observed_admission,
+    )
+    checks["admission_status_activatable"] = optional_or(
+        isinstance(observed_admission, str)
+        and str(observed_admission).strip().lower() in ACTIVATABLE_STATUSES,
+        observed_admission,
+    )
+    checks["admission_allowed"] = optional_or(
+        isinstance(body, Mapping) and body.get("admission_allowed") is True,
+        body.get("admission_allowed") if isinstance(body, Mapping) else None,
+    )
+    checks["admission_soc_matches_target"] = optional_or(
+        bool(expected_npu_model)
+        and _soc_key(observed_admission_soc) == _soc_key(expected_npu_model),
+        observed_admission_soc,
+    )
+    checks["candidate_kind_native"] = optional_or(
+        expected_kind == "native_mindspore"
+        and isinstance(observed_kind, str)
+        and observed_kind.strip().lower() == "native_mindspore",
+        observed_kind,
+    )
+    checks["candidate_not_conditional"] = optional_or(
+        observed_conditional is False,
+        observed_conditional,
+    )
+    # Health payloads from older workers do not expose host/tier.  Validate
+    # those fields whenever present, but do not make them a prerequisite for
+    # the SoC/admission identity gate (the NPU model and admission_soc are the
+    # authoritative runtime identity fields).
+    checks["board_tier_matches_target"] = (
+        observed_tier is None
+        or (bool(expected_tier) and str(observed_tier).strip() == expected_tier)
+    )
+    checks["board_host_matches_target"] = (
+        observed_host is None
+        or (bool(board) and isinstance(observed_host, str) and observed_host.strip() == str(board).strip())
+    )
+    # Stable aliases make the machine-readable report easier for external
+    # acceptance tooling to consume without coupling it to one internal key
+    # spelling.
+    checks["soc_matches_target"] = checks["npu_model_matches_profile"]
+    checks["admission_matches_target"] = checks["admission_status_matches_profile"]
+    checks["candidate_kind_matches"] = checks["candidate_kind_native"]
     if isinstance(body, Mapping):
         observed_profile = body.get("profile") or body.get("profile_id")
         checks["profile_matches"] = observed_profile == profile
@@ -1149,6 +1806,13 @@ def run_campaign(options: Options) -> Dict[str, Any]:
     """Run one campaign against an already-running candidate service."""
 
     metadata = load_profile_metadata(options.profile, options.registry)
+    target = _resolve_target(
+        metadata,
+        options.board if options.board else None,
+        options.soc if options.soc else None,
+    )
+    evidence_pass, evidence = _evidence_reports(options, metadata)
+    strict_target = bool(options.target_explicit or options.require_evidence or evidence.get("required"))
     endpoint = "http://%s:%d" % (options.host, options.port)
     report: Dict[str, Any] = {
         "schema_version": 1,
@@ -1162,7 +1826,15 @@ def run_campaign(options: Options) -> Dict[str, Any]:
         },
         "profile": metadata,
         "service": {"base_url": endpoint, "model": DEFAULT_MODEL, "requires_prestarted_service": True},
+        "target": {
+            "board": target.get("host"),
+            "soc": target.get("soc"),
+            "tier": target.get("tier"),
+            "selection": target.get("selection"),
+            "explicit": bool(target.get("explicit")),
+        },
         "registry": str(options.registry) if options.registry is not None else None,
+        "evidence": evidence,
         "policy": {
             "timeout_seconds": options.timeout,
             "long_budgets": list(options.long_budgets),
@@ -1170,6 +1842,7 @@ def run_campaign(options: Options) -> Dict[str, Any]:
             "performance_warmup": options.perf_warmup,
             "performance_loops": options.perf_loops,
             "max_generation_tokens": MAX_GENERATION_TOKENS,
+            "evidence_required": bool(evidence.get("required")),
         },
         "gates": {},
         "notes": [
@@ -1182,24 +1855,37 @@ def run_campaign(options: Options) -> Dict[str, Any]:
     health = _json_request(options.host, options.port, "/health", None, options.timeout)
     models = _json_request(options.host, options.port, "/v1/models", None, options.timeout)
     report["api"] = {"health": health, "models": models}
-    health_pass, health_checks = _health_ok(health, options.profile, options.registry)
+    health_pass, health_checks = _health_ok(
+        health,
+        options.profile,
+        options.registry,
+        board=str(target.get("host") or "") if strict_target else None,
+        soc=str(target.get("soc") or "") if strict_target else None,
+        tier=str(target.get("tier") or "") if strict_target else None,
+        strict_target=strict_target,
+    )
     models_pass, models_details = _models_ok(models)
     report["api"]["health_checks"] = health_checks
     report["api"]["models_checks"] = models_details
     report["gates"]["health"] = health_pass
     report["gates"]["models"] = models_pass
+    report["gates"]["evidence"] = evidence_pass if evidence.get("required") else None
 
     if options.snapshots:
         report.setdefault("snapshots", {})["before"] = system_snapshot("before", health, options.profile)
 
     # Do not spend a full performance campaign against an endpoint that is
     # absent, unhealthy, or serving a different profile.
-    if not (health_pass and models_pass):
+    # Missing or mismatched provenance is a hard campaign failure.  Stop
+    # before expensive model requests rather than producing a large report
+    # whose passing API probes could obscure the absent G0 evidence.
+    if not evidence_pass or not (health_pass and models_pass):
         for gate in ("json", "sse", "long_output", "stability", "quality_machine", "performance", "errors", "protocol"):
             report["gates"][gate] = False if gate != "quality_machine" else None
         report["status"] = "failed"
-        report["machine_gate_count"] = sum(1 for value in report["gates"].values() if value is True)
-        report["machine_gate_total"] = len(REQUIRED_MACHINE_GATES)
+        required = _required_machine_gates(options, evidence_required=bool(evidence.get("required")))
+        report["machine_gate_count"] = sum(1 for name in required if report["gates"].get(name) is True)
+        report["machine_gate_total"] = len(required)
         return report
 
     smoke_prompt = "\u4f60\u597d\uff0c\u8bf7\u7528\u4e00\u53e5\u8bdd\u4ecb\u7ecd\u4f60\u81ea\u5df1\u3002"
@@ -1392,6 +2078,10 @@ def run_campaign(options: Options) -> Dict[str, Any]:
         options.abort_health_wait_seconds,
         options.profile,
         options.registry,
+        board=str(target.get("host") or "") if strict_target else None,
+        soc=str(target.get("soc") or "") if strict_target else None,
+        tier=str(target.get("tier") or "") if strict_target else None,
+        strict_target=strict_target,
     )
     abort_passed = (
         abort_request.get("status") == "sent_and_closed"
@@ -1415,7 +2105,7 @@ def run_campaign(options: Options) -> Dict[str, Any]:
         # the worker's post-cancellation state rather than the initial sample.
         after_health = _json_request(options.host, options.port, "/health", None, options.timeout)
         report.setdefault("snapshots", {})["after"] = system_snapshot("after", after_health, options.profile)
-    required = REQUIRED_MACHINE_GATES
+    required = _required_machine_gates(options, evidence_required=bool(evidence.get("required")))
     report["status"] = "passed" if all(report["gates"].get(name) is True for name in required) else "failed"
     report["machine_gate_count"] = sum(1 for name in required if report["gates"].get(name) is True)
     report["machine_gate_total"] = len(required)
@@ -1425,6 +2115,18 @@ def run_campaign(options: Options) -> Dict[str, Any]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", required=True)
+    parser.add_argument(
+        "--board", "--board-ip",
+        dest="board",
+        default=None,
+        help="target board host or declared alias (8t/20t); optional for legacy primary-board calls",
+    )
+    parser.add_argument(
+        "--soc", "--soc-version",
+        dest="soc",
+        default=None,
+        help="target Ascend SoC (Ascend310B4/Ascend310B1); optional for legacy calls",
+    )
     parser.add_argument(
         "--registry",
         type=Path,
@@ -1436,7 +2138,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--timeout", type=float, default=30.0)
-    parser.add_argument("--long-budgets", default="8,16,32,64,80")
+    parser.add_argument("--long-budgets", default="8,16,32,64")
     parser.add_argument("--stability-loops", type=int, default=10)
     parser.add_argument("--stability-max-tokens", type=int, default=2)
     parser.add_argument("--perf-warmup", type=int, default=2)
@@ -1445,10 +2147,29 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--probe-max-tokens", type=int, default=8)
     parser.add_argument("--probe-file", type=Path, default=None)
     parser.add_argument(
+        "--environment-report", "--environment-evidence",
+        dest="environment_report",
+        type=Path,
+        default=None,
+        help="G0 environment/preflight JSON to associate with this board campaign",
+    )
+    parser.add_argument(
+        "--artifact-report", "--artifact-evidence",
+        dest="artifact_report",
+        type=Path,
+        default=None,
+        help="G1 artifact-verification JSON to associate with this board campaign",
+    )
+    parser.add_argument(
+        "--require-evidence",
+        action="store_true",
+        help="require and validate both environment and artifact reports",
+    )
+    parser.add_argument(
         "--abort-max-tokens",
         type=int,
         default=1,
-        help="token budget for the deliberately aborted SSE request (1-80)",
+        help="token budget for the deliberately aborted SSE request (1-64)",
     )
     parser.add_argument(
         "--abort-health-wait-seconds",
@@ -1469,6 +2190,15 @@ def _dry_run_payload(options: Options) -> Dict[str, Any]:
         "profile": options.profile,
         "registry": str(options.registry) if options.registry is not None else None,
         "target": "http://%s:%d" % (options.host, options.port),
+        "board": options.board or None,
+        "soc": options.soc or None,
+        "tier": options.tier or None,
+        "target_explicit": options.target_explicit,
+        "evidence": {
+            "required": bool(options.require_evidence or options.target_explicit),
+            "environment_report": str(options.environment_report) if options.environment_report else None,
+            "artifact_report": str(options.artifact_report) if options.artifact_report else None,
+        },
         "output": str(options.output),
         "checks": [
             "health", "models", "JSON", "SSE", "long-output", "stability",
@@ -1505,19 +2235,47 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "id": options.profile,
                 "metadata_error": "%s: %s" % (type(metadata_exc).__name__, metadata_exc),
             }
+        try:
+            fallback_target = _resolve_target(
+                profile_metadata,
+                options.board if options.board else None,
+                options.soc if options.soc else None,
+            )
+            fallback_target = {
+                "board": fallback_target.get("host"),
+                "soc": fallback_target.get("soc"),
+                "tier": fallback_target.get("tier"),
+                "selection": fallback_target.get("selection"),
+                "explicit": bool(fallback_target.get("explicit")),
+            }
+        except Exception:
+            fallback_target = {
+                "board": options.board or None,
+                "soc": options.soc or None,
+                "tier": options.tier or None,
+                "selection": "unresolved",
+                "explicit": bool(options.target_explicit),
+            }
+        required = _required_machine_gates(options)
         report = {
             "schema_version": 1,
             "recorded_at_utc": utc_now(),
             "run_id": options.run_id,
             "execution": {"pid": os.getpid(), "argv": list(sys.argv), "service_prestarted": True, "process_management": "none"},
             "profile": profile_metadata,
+            "target": fallback_target,
+            "evidence": {
+                "required": bool(options.require_evidence or options.target_explicit),
+                "status": "failed",
+                "reason": "campaign raised before evidence validation",
+            },
             "status": "error",
             "error": "%s: %s" % (type(exc).__name__, exc),
-            "gates": {name: False for name in REQUIRED_MACHINE_GATES},
+            "gates": {name: False for name in required},
         }
     options.output.mkdir(parents=True, exist_ok=True)
     _write_json(options.output / "acceptance.json", report)
-    _write_json(options.output / "metadata.json", {"profile": report.get("profile"), "service": report.get("service"), "policy": report.get("policy"), "execution": report.get("execution"), "status": report.get("status"), "recorded_at_utc": report.get("recorded_at_utc")})
+    _write_json(options.output / "metadata.json", {"profile": report.get("profile"), "target": report.get("target"), "evidence": report.get("evidence"), "service": report.get("service"), "policy": report.get("policy"), "execution": report.get("execution"), "status": report.get("status"), "recorded_at_utc": report.get("recorded_at_utc")})
     _write_json(options.output / "command.json", report.get("execution", {}))
     _write_json(options.output / "health.json", report.get("api", {}).get("health", {}))
     _write_json(options.output / "models.json", report.get("api", {}).get("models", {}))

@@ -1,6 +1,6 @@
 # Case9 历史结果、候选模型与边界
 
-_保留早期候选、失败原因和暂停范围。8T 当前地址为 `192.168.1.90`；本轮 `.178` 仅是同一块板的报告采集地址。20T 当前地址为 `192.168.1.95`，`.210` 仅是历史请求地址；历史结果不自动提升当前板的状态。_
+_保留早期候选、失败原因和暂停范围。8T 当前地址为 `192.168.1.90`；`.11.14` 与 `.178` 都是同一块板的历史地址。20T 当前地址为 `192.168.1.95`，`.210` 仅是历史请求地址；历史结果不自动提升当前板的状态。_
 
 ---
 
@@ -16,11 +16,12 @@ _保留早期候选、失败原因和暂停范围。8T 当前地址为 `192.168.
 | 网关协议 stub | JSON/SSE 协议检查，不代表真实 LLM 或 NPU | [01-board-gateway-acceptance.md](archive/20260827/01-board-gateway-acceptance.md) |
 | 本地音频 | 仅早期硬件 I/O 检查，未完成 10 条 PTT 闭环 | [03-local-chat-validation.md](archive/20260827/03-local-chat-validation.md) |
 | TinyLlama | 可完成 ACL/API 实验，但中文质量未接纳 | [09-tinyllama-acl-om-validation-record.md](archive/20260827/09-tinyllama-acl-om-validation-record.md) |
+| TinyLlama Hugging Face 发布 | 预编译 OM、tokenizer 和源权重已按历史实验工件发布；长输出/中文质量问题原样标注 | [29-tinyllama-huggingface-publication.md](29-tinyllama-huggingface-publication.md) |
 | Qwen1.5 通用 ONNX | 静态 contract/算子门阻断，未变成当前模型 | [07-acl-om-validation-record.md](archive/20260827/07-acl-om-validation-record.md) |
 | Qwen2.5 2048/full-context | ACL/API 证据属于性能基线，固定 2048 主体计算慢 | [15-qwen25-static-onnx-validation-record.md](archive/20260827/15-qwen25-static-onnx-validation-record.md) |
 | last-logits | 仅减少输出传输，未解决固定上下文主体计算 | [16-qwen25-optimization-research-and-last-logits-validation.md](archive/20260827/16-qwen25-optimization-research-and-last-logits-validation.md) |
-| `.178` -> `.90` 静态 KV | 同一块 B4/8T 板的地址变更；完整双板证据采集于 `.178`，当前入口为 `.90` | [18-qwen25-static-kv-1024-validation-record.md](archive/20260827/18-qwen25-static-kv-1024-validation-record.md) |
-| MindSpore 聊天 Profiles | Qwen1.5 `.90` 原批次和 `.95` 缺口批次均为 9/9 机器门；TinyLlama 两板均 `blocked`（`.95` 缺口 8/9，长输出含 `U+FFFD`）；DeepSeek `.90` 缺口 9/9，`.95` 中文质量/dirty-base 仍 `blocked`；8T 另有重复 LPM fault 诊断，人工质量和准入待签字 | [24-mindspore-chat-validation-record.md](24-mindspore-chat-validation-record.md) |
+| `.178`/`.11.14`/`.90` 静态 KV（历史别名） | 同一块 B4/8T 板的地址变更；完整双板证据采集于 `.178`，历史入口为 `.11.14`，当前入口为 `.90` | [18-qwen25-static-kv-1024-validation-record.md](archive/20260827/18-qwen25-static-kv-1024-validation-record.md) |
+| MindSpore 聊天 Profiles | Qwen1.5 `.90` 历史报表 9/9 但严格身份门 8/9 待补证，`.95` 缺口批次 9/9；TinyLlama 两板均 `blocked`（`.95` 缺口 8/9，长输出含 `U+FFFD`）；DeepSeek `.90` 缺口 9/9，`.95` 中文质量/dirty-base 仍 `blocked`；8T 另有重复 LPM fault 诊断，人工质量和准入待签字 | [24-mindspore-chat-validation-record.md](24-mindspore-chat-validation-record.md) |
 
 ## 🗓️ 决策时间线
 
@@ -45,7 +46,7 @@ timeline
         B4 replacement : Full ACL API stability performance batch recorded; IP later changed to .90
         B1 20T : Full batch and candidate chain recorded as dirty-base
     section 2026-08-29
-        MindSpore profiles : Qwen1.5 9/9 plus restart/switch smoke; TinyLlama 8/9 with long/quality failure; DeepSeek 20T candidate blocked; human review pending
+        MindSpore profiles : Qwen1.5 legacy 9/9 (strict 8/9 identity pending) plus restart/switch smoke; TinyLlama 8/9 with long/quality failure; DeepSeek 20T candidate blocked; human review pending
     section 2026-08-30
         Dual-board gap batch : Qwen1.5 20T 9/9; TinyLlama 20T 8/9 blocked; DeepSeek 8T 9/9; Qwen2.5 .90 identity passed and .95 artifact-missing blocked
 ```
@@ -103,7 +104,7 @@ worker -> NPU`，与 Qwen2.5 的 `8084` ACL 候选后端互斥。Profile 使用�
 
 | Profile | 板卡 | 当前边界 |
 | --- | --- | --- |
-| `qwen1.5-0.5b-mindspore` | `.90` B4/8T；`.95` B1/20T | `.90` b 批次 9/9，重启 d/e 小批次均 10/10，artifact verifier 7/7；`.95` 缺口批次 9/9，性能 p50/p95 `1329.830/1440.076 ms`、吞吐 `1.505/1.619 token/s`；人工质量/准入待签字，均为 dirty-base |
+| `qwen1.5-0.5b-mindspore` | `.90` B4/8T；`.95` B1/20T | `.90` b 批次报表 9/9，但严格身份门 8/9 待补证；重启 d/e 小批次均 10/10，artifact verifier 7/7；`.95` 缺口批次 9/9，性能 p50/p95 `1329.830/1440.076 ms`、吞吐 `1.505/1.619 token/s`；人工质量/准入待签字，均为 dirty-base |
 | `tinyllama-1.1b-mindspore` | `.90` B4/8T；`.95` B1/20T | `blocked`：`.90` b 批次 8/9；`.95` 缺口 8/9，32/48 token 长输出含 `U+FFFD`、中文机器质量 7/10；CLI 禁止激活 |
 | `deepseek-r1-qwen-1.5b-mindspore` | `.90` B4/8T；`.95` B1/20T（`.210` 为旧 alias） | `.90` 缺口 9/9，性能 p50/p95 `3938.489/4008.768 ms`、吞吐 `0.510/0.517 token/s`，人工质量待审；`.95` 固定工件和 API 机器门通过但中文质量/dirty-base 准入未完成，保持 `blocked` |
 
@@ -116,6 +117,35 @@ worker -> NPU`，与 Qwen2.5 的 `8084` ACL 候选后端互斥。Profile 使用�
 [缺口计划](27-case9-dual-board-gap-completion-plan.md)与[缺口账本](28-case9-dual-board-gap-validation-record.md)。
 这些报告不改变正式 `8080 -> 7861 -> 7865` 入口，也不把 dirty-base 机器门提升为准入。
 
+## 新一轮 MindSpore 候选边界
+
+本轮候选范围扩展为 Qwen1.5、TinyLlama、DeepSeek、Qwen2.5-0.5B、Qwen2.5-1.5B、
+Qwen3-0.6B、Qwen3-1.7B，以及仅面向 20T 的 MiniCPM3-4B。Qwen2.5-0.5B 已在
+原 8T 板的历史地址 `192.168.11.14` 完成固定工件和 NPU 活动诊断；当前入口为
+`192.168.1.90`。该诊断因严格 placement
+证据缺失保持 `blocked`；Qwen3 两个 Profile 因当前 MindNLP loader 缺失保持 `blocked`。
+Qwen2.5-1.5B 已在 8T 完成七个文件同步和 SHA-256 核验；修正 CANN `PYTHONPATH`
+后，v2/v3b/v4 诊断已完成模型加载和短生成，但 placement、API、质量和性能仍未执行，
+8T 状态继续为 `blocked`。首轮 SIGSEGV 仅保留为环境污染的历史证据；详见
+[docs/36](36-qwen25-1.5b-8t-preflight-20260904.md) 和
+[docs/37](37-qwen25-1.5b-8t-memory-gate-20260904.md)。其余新增模型在真实板端测试前
+保持 `not-run`，不能把 HF/MindFormers 的框架支持写成 310B 兼容性。
+OpenPangu、EE-Model、TeleChat、BitCPM、MiniCPM5、MiniMind、Haidass 等需要额外
+框架或缺少当前板证据的条目只登记为条件候选，状态为 `blocked` 或 `not-run`，不下载、
+不安装、不启动。
+
+完整来源和证据分级见 [MindSpore LLM 候选模型清单](31-mindspore-llm-candidate-inventory.md)，
+执行顺序和逐板门禁见 [双板验收计划](32-mindspore-llm-candidate-validation-plan.md)，
+实测状态追加到 [验收记录](33-mindspore-llm-candidate-validation-record.md)。候选 UI
+可以显示失败和未执行条目；只有技术门通过的 dirty-base Profile 才能显式实验切换，
+`admitted` 仍需人工批准。新增候选不改变正式 Qwen2.5 ACL 路线，也不恢复音频或 XiaoZhi。
+
+TinyLlama 的 Hugging Face 发布只用于保存可复核工件。发布的预编译 OM、tokenizer 和
+MindSpore 源权重分别记录了来源、字节数和 SHA-256；模型卡明确列出中文质量 `7/10`、
+`max_tokens=32/48` 的 `U+FFFD` 长输出失败、缺少当前 CANN8.0 ATC 证据以及历史资源增长
+风险。因此发布状态是 `experimental_historical_artifact`，不是 `admitted`，也不能作为
+小智或正式中文聊天后端。
+
 ## 🔗 当前入口
 
 - [当前运行手册](00-case9-current-runbook.md)
@@ -124,6 +154,14 @@ worker -> NPU`，与 Qwen2.5 的 `8084` ACL 候选后端互斥。Profile 使用�
 - [完整归档索引](archive/20260827/README.md)
 - [MindSpore 聊天移植计划](23-mindspore-chat-porting-plan.md)
 - [MindSpore 聊天验收记录](24-mindspore-chat-validation-record.md)
+- [MindSpore LLM 候选模型清单](31-mindspore-llm-candidate-inventory.md)
+- [MindSpore LLM 候选双板验收计划](32-mindspore-llm-candidate-validation-plan.md)
+- [MindSpore LLM 候选验收记录](33-mindspore-llm-candidate-validation-record.md)
+- [Qwen2.5-0.5B 8T loader/NPU 活动诊断](34-qwen25-0.5b-mindspore-8t-loader-smoke-20260903.md)
+- [Qwen3 loader 兼容性检查](35-qwen3-loader-compatibility-check-20260903.md)
+- [Qwen2.5-1.5B 8T 配置/loader 预检](36-qwen25-1.5b-8t-preflight-20260904.md)
+- [Qwen2.5-1.5B 8T 内存门失败记录](37-qwen25-1.5b-8t-memory-gate-20260904.md)
+- [TinyLlama Hugging Face 发布记录](29-tinyllama-huggingface-publication.md)
 - [双板缺口计划](27-case9-dual-board-gap-completion-plan.md)
 - [双板缺口账本](28-case9-dual-board-gap-validation-record.md)
 

@@ -180,7 +180,38 @@ def _artifact_result(
     }
 
 
-def verify_profile_artifacts(profile: Any, model_root: Any) -> Dict[str, Any]:
+def _normalise_board_override(board_override: Optional[Mapping[str, Any]]) -> Optional[Dict[str, str]]:
+    """Validate an observed-board override without changing profile metadata.
+
+    A profile's primary ``board`` describes its preferred target and may differ
+    from the board on which a shared artifact is being inspected (for example,
+    the DeepSeek profile is primarily registered for the 20T B1 board while
+    its same files are also exercised on the 8T B4 board).  Callers must pass
+    all three identity fields together so a report cannot silently mix them.
+    """
+
+    if board_override is None:
+        return None
+    if not isinstance(board_override, Mapping):
+        raise VerificationError("observed board must be a mapping")
+    required = ("host", "soc", "tier")
+    values: Dict[str, str] = {}
+    for key in required:
+        value = board_override.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise VerificationError("observed board.%s must be a non-empty string" % key)
+        if "\x00" in value or "\\" in value:
+            raise VerificationError("observed board.%s contains an unsafe character" % key)
+        values[key] = value.strip()
+    return values
+
+
+def verify_profile_artifacts(
+    profile: Any,
+    model_root: Any,
+    *,
+    board_override: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
     """Verify all explicitly declared artifacts for one validated profile.
 
     ``profile`` is normally a :class:`ChatModelProfile` returned by
@@ -196,15 +227,18 @@ def verify_profile_artifacts(profile: Any, model_root: Any) -> Dict[str, Any]:
     cache_dir = str(getattr(profile, "cache_dir", ""))
     raw_artifacts = tuple(getattr(profile, "artifacts", ()) or ())
     profile_status = str(getattr(profile, "status", ""))
+    profile_board = {
+        "host": str(getattr(profile, "board_host", "")),
+        "soc": str(getattr(profile, "board_soc", "")),
+        "tier": str(getattr(profile, "board_tier", "")),
+    }
+    observed_board = _normalise_board_override(board_override)
     result: Dict[str, Any] = {
         "profile": profile_id,
         "model_id": str(getattr(profile, "model_id", "")),
         "revision": str(getattr(profile, "revision", "")),
-        "board": {
-            "host": str(getattr(profile, "board_host", "")),
-            "soc": str(getattr(profile, "board_soc", "")),
-            "tier": str(getattr(profile, "board_tier", "")),
-        },
+        "board": observed_board or profile_board,
+        "profile_board": profile_board,
         "profile_status": profile_status,
         "model_root": str(root),
         "cache_dir": cache_dir,
@@ -213,6 +247,9 @@ def verify_profile_artifacts(profile: Any, model_root: Any) -> Dict[str, Any]:
         "artifacts": [],
         "errors": [],
     }
+    if observed_board is not None:
+        result["board_source"] = "observed_override"
+        result["observed_board"] = dict(observed_board)
 
     if not raw_artifacts:
         result["status"] = "failed"
@@ -293,7 +330,12 @@ def verify_profile_artifacts(profile: Any, model_root: Any) -> Dict[str, Any]:
             result["errors"].append("%s: %s" % (item["name"], error))
     result["verified"] = sum(item["status"] == "verified" for item in result["artifacts"])
     result["checked"] = sum(item["actual_sha256"] is not None for item in result["artifacts"])
-    result["artifact_verified"] = result["status"] == "passed"
+    # Artifact integrity is independent from the profile admission/status
+    # gate. A pinned file set may be fully verified while the profile remains
+    # deliberately ``blocked`` or ``not-run`` for hardware reasons.
+    result["artifact_verified"] = bool(result["artifacts"]) and all(
+        item["status"] == "verified" for item in result["artifacts"]
+    )
     return result
 
 
@@ -308,7 +350,13 @@ def _load_registry(path: Any) -> Any:
         raise VerificationError("could not load profile registry: %s" % exc) from exc
 
 
-def verify_profile_id(profile_id: str, *, registry_path: Any = DEFAULT_REGISTRY, model_root: Any = DEFAULT_MODEL_ROOT) -> Dict[str, Any]:
+def verify_profile_id(
+    profile_id: str,
+    *,
+    registry_path: Any = DEFAULT_REGISTRY,
+    model_root: Any = DEFAULT_MODEL_ROOT,
+    board_override: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
     """Load a profile from the strict registry and verify its local artifacts."""
 
     registry = _load_registry(registry_path)
@@ -316,14 +364,19 @@ def verify_profile_id(profile_id: str, *, registry_path: Any = DEFAULT_REGISTRY,
         profile = registry.get(profile_id)
     except Exception as exc:
         raise VerificationError("unknown profile: %s" % profile_id) from exc
-    return verify_profile_artifacts(profile, model_root)
+    return verify_profile_artifacts(profile, model_root, board_override=board_override)
 
 
-def verify_all(*, registry_path: Any = DEFAULT_REGISTRY, model_root: Any = DEFAULT_MODEL_ROOT) -> Dict[str, Any]:
+def verify_all(
+    *,
+    registry_path: Any = DEFAULT_REGISTRY,
+    model_root: Any = DEFAULT_MODEL_ROOT,
+    board_override: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
     """Verify every registry profile, preserving blocked/not-run evidence."""
 
     registry = _load_registry(registry_path)
-    reports = [verify_profile_artifacts(profile, model_root) for profile in registry]
+    reports = [verify_profile_artifacts(profile, model_root, board_override=board_override) for profile in registry]
     passed = all(item.get("status") == "passed" for item in reports)
     return {
         "status": "passed" if passed else "failed",
@@ -379,10 +432,27 @@ def _timestamp() -> str:
 
 def _build_report(args: argparse.Namespace) -> Dict[str, Any]:
     root = args.root.expanduser() if isinstance(args.root, Path) else Path(args.root).expanduser()
+    board_override = None
+    observed_values = (args.observed_board_host, args.observed_board_soc, args.observed_board_tier)
+    if any(value is not None for value in observed_values):
+        if not all(isinstance(value, str) and value.strip() for value in observed_values):
+            raise VerificationError(
+                "--observed-board-host, --observed-board-soc and --observed-board-tier must be supplied together"
+            )
+        board_override = {
+            "host": args.observed_board_host,
+            "soc": args.observed_board_soc,
+            "tier": args.observed_board_tier,
+        }
     if args.all_profiles:
-        payload = verify_all(registry_path=args.registry, model_root=root)
+        payload = verify_all(registry_path=args.registry, model_root=root, board_override=board_override)
     else:
-        payload = verify_profile_id(args.profile, registry_path=args.registry, model_root=root)
+        payload = verify_profile_id(
+            args.profile,
+            registry_path=args.registry,
+            model_root=root,
+            board_override=board_override,
+        )
     return {
         "schema_version": 1,
         "checked_at": _timestamp(),
@@ -401,6 +471,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--root", "--model-root", dest="root", type=Path,
         default=Path(os.environ.get("CASE9_MODEL_ROOT", str(DEFAULT_MODEL_ROOT))),
         help="deployment/model root containing each profile cache_dir",
+    )
+    parser.add_argument(
+        "--observed-board-host",
+        help="observed board host for provenance when it differs from the profile's primary board",
+    )
+    parser.add_argument(
+        "--observed-board-soc",
+        help="observed board SoC (must be supplied with host and tier)",
+    )
+    parser.add_argument(
+        "--observed-board-tier",
+        help="observed board compute tier (must be supplied with host and SoC)",
     )
     parser.add_argument("--output", type=Path, help="also write the JSON report atomically")
     return parser

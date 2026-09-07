@@ -713,6 +713,81 @@ class AlbumIndex:
             (model_id,),
         ).fetchall()
 
+    def _rows_for_filtered_model(self, model_id: str, filters: dict):
+        """Return eligible vectors before doing similarity ranking.
+
+        Metadata filtering is deliberately performed before vector scoring.  A
+        post-filtered FAISS top-k can return fewer than ``k`` useful results
+        when the best unfiltered neighbors do not satisfy the user's request.
+        This mirrors the reference CLIP search design while keeping SQLite the
+        metadata source of truth and the per-model FAISS index untouched for
+        the unfiltered fast path.
+        """
+        min_width = int(filters.get("min_width") or 0)
+        min_height = int(filters.get("min_height") or 0)
+        if min_width < 0 or min_height < 0:
+            raise AlbumIndexError("minimum dimensions must be non-negative")
+        face_filter = str(filters.get("face_filter") or "all")
+        if face_filter not in {"all", "has_people", "no_people"}:
+            raise AlbumIndexError(f"unsupported face filter: {face_filter}")
+        extensions = filters.get("extensions") or ()
+        normalized_extensions = []
+        for value in extensions:
+            extension = str(value).strip().lower()
+            if extension and not extension.startswith("."):
+                extension = "." + extension
+            if extension and extension not in SUPPORTED_IMAGE_EXTENSIONS:
+                raise AlbumIndexError(f"unsupported search extension: {extension}")
+            if extension and extension not in normalized_extensions:
+                normalized_extensions.append(extension)
+
+        clauses = [
+            "e.model_id=?",
+            "p.available=1",
+            "p.deleted_at IS NULL",
+        ]
+        parameters: list[object] = [model_id]
+        if min_width:
+            clauses.append("p.width>=?")
+            parameters.append(min_width)
+        if min_height:
+            clauses.append("p.height>=?")
+            parameters.append(min_height)
+        if face_filter == "has_people":
+            clauses.append("p.face_count>0")
+        elif face_filter == "no_people":
+            clauses.append("p.face_count=0")
+        if normalized_extensions:
+            mime_by_extension = {
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".png": "image/png",
+                ".webp": "image/webp",
+                ".bmp": "image/bmp",
+            }
+            mime_values = []
+            for extension in normalized_extensions:
+                mime = mime_by_extension.get(extension)
+                if mime and mime not in mime_values:
+                    mime_values.append(mime)
+            mime_placeholders = ",".join("?" for _ in mime_values)
+            suffix_placeholders = ",".join("?" for _ in normalized_extensions)
+            clauses.append(
+                "(lower(COALESCE(p.mime_type, '')) IN ("
+                + mime_placeholders
+                + ") OR lower(substr(p.filename, instr(p.filename, '.'))) IN ("
+                + suffix_placeholders
+                + "))"
+            )
+            parameters.extend(mime_values)
+            parameters.extend(normalized_extensions)
+        return self._connection.execute(
+            "SELECT p.*, e.dimension, e.vector FROM embeddings e "
+            "JOIN photos p ON p.id=e.photo_id WHERE " + " AND ".join(clauses) +
+            " ORDER BY p.id",
+            tuple(parameters),
+        ).fetchall()
+
     def _build_index(self, model_id: str):
         rows = self._rows_for_model(model_id)
         if not rows:
@@ -749,13 +824,49 @@ class AlbumIndex:
         target = self.index_dir / f"{model_id}.faiss"
         faiss.write_index(index, str(target))
 
-    def search_vector(self, vector: np.ndarray, model_id: str, k: int = TOP_K_RESULTS):
+    def search_vector(
+        self,
+        vector: np.ndarray,
+        model_id: str,
+        k: int = TOP_K_RESULTS,
+        filters: Optional[dict] = None,
+    ):
         if k <= 0 or k > 100:
             raise AlbumIndexError("k must be between 1 and 100")
+        filters = dict(filters or {})
+        has_filters = any(
+            filters.get(key)
+            for key in ("min_width", "min_height", "extensions")
+        ) or str(filters.get("face_filter") or "all") != "all"
+        query = np.ascontiguousarray(l2_normalize(vector)[None, :])
+        if has_filters:
+            rows = self._rows_for_filtered_model(model_id, filters)
+            if not rows:
+                return []
+            dimensions = {int(row["dimension"]) for row in rows}
+            if len(dimensions) != 1:
+                raise AlbumIndexError(f"mixed embedding dimensions for {model_id}: {dimensions}")
+            vectors = np.stack([np.frombuffer(row["vector"], np.float32) for row in rows])
+            if vectors.shape[1] != query.shape[1]:
+                raise AlbumIndexError(
+                    f"query dimension {query.shape[1]} does not match {model_id} dimension {vectors.shape[1]}"
+                )
+            scores = (query @ vectors.T)[0]
+            order = np.argsort(-scores)[:k]
+            return [
+                SearchResult(
+                    photo_id=int(rows[index]["id"]),
+                    filepath=rows[index]["filepath"],
+                    filename=rows[index]["filename"],
+                    face_count=int(rows[index]["face_count"]),
+                    score=float(scores[index]),
+                    model_id=model_id,
+                )
+                for index in order
+            ]
         index = self._get_index(model_id)
         if index is None:
             return []
-        query = np.ascontiguousarray(l2_normalize(vector)[None, :])
         scores, ids = index.search(query, k)
         results = []
         for score, photo_id in zip(scores[0], ids[0]):
@@ -777,15 +888,15 @@ class AlbumIndex:
                 )
         return results
 
-    def search_text(self, query: str, model_id: str, k: int = TOP_K_RESULTS):
+    def search_text(self, query: str, model_id: str, k: int = TOP_K_RESULTS, filters: Optional[dict] = None):
         if self.manager is None:
             raise AlbumIndexError("a ModelManager is required for text search")
-        return self.search_vector(self.manager.encode_text(model_id, query), model_id, k)
+        return self.search_vector(self.manager.encode_text(model_id, query), model_id, k, filters=filters)
 
-    def search_image(self, image_bgr, model_id: str, k: int = TOP_K_RESULTS):
+    def search_image(self, image_bgr, model_id: str, k: int = TOP_K_RESULTS, filters: Optional[dict] = None):
         if self.manager is None:
             raise AlbumIndexError("a ModelManager is required for image search")
-        return self.search_vector(self.manager.encode_image(model_id, image_bgr), model_id, k)
+        return self.search_vector(self.manager.encode_image(model_id, image_bgr), model_id, k, filters=filters)
 
     def list_photos(self, face_filter: str = "all", limit: Optional[int] = None):
         clause = "available=1 AND deleted_at IS NULL"

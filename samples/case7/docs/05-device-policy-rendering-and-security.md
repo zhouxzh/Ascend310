@@ -25,7 +25,7 @@ manifest/content/photoframe 接口返回 `404`，设备记录保留用于审计�
 
 ## ⏰ 设备策略
 
-设备 profile 固定为：Waveshare ESP32-S3-PhotoPainter 7.3 英寸 E6 六色（黑、白、绿、蓝、红、黄）800x480（官方[产品页](https://www.waveshare.com/product/displays/e-paper/epaper-1/esp32-s3-photopainter.htm)和[Wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter)；Wiki Mode 1 接受 800x480 或 480x800 图像），内容支持 `landscape`/`portrait`；Seeed Studio reTerminal E1002 7.3 英寸 ACeP / Spectra 6 全彩 800x480（[官方 Wiki](https://wiki.seeedstudio.com/getting_started_with_reterminal_e1002/)），在 Case7 中固定为 `landscape`。方向只使用这两个枚举，不支持 360°、180°或 90°/270°安装旋转；E1002 的 `portrait` 必须拒绝。Seeed 资料确认的是面板规格，横屏限制是 Case7 当前策略。
+设备 profile 固定为：Waveshare ESP32-S3-PhotoPainter 7.3 英寸 E6 六色（黑、白、绿、蓝、红、黄）800x480（官方[产品页](https://www.waveshare.com/product/displays/e-paper/epaper-1/esp32-s3-photopainter.htm)和[Wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter)；Wiki Mode 1 接受 800x480 或 480x800 图像），内容支持 `landscape`/`portrait`，板级固定补偿 `hardware_rotation_deg=180`；Seeed Studio reTerminal E1002 7.3 英寸 ACeP / Spectra 6 全彩 800x480（[官方 Wiki](https://wiki.seeedstudio.com/getting_started_with_reterminal_e1002/)），在 Case7 中固定为 `landscape`，板级补偿为 `0`。方向只向用户暴露这两个枚举，不提供可调安装角度；服务器 JPEG `rotation` 保持 `0`，配对和 URL Rotation 配置同步时才写入对应的 `display_rotation_deg`。E1002 的 `portrait` 必须拒绝。Seeed 资料确认的是面板规格，横屏限制是 Case7 当前策略。
 
 管理注册必须明确选择 `waveshare_photopainter_73` 或
 `seeedstudio_reterminal_e1002`。旧记录若没有 profile 会保留原尺寸并标记
@@ -38,11 +38,13 @@ manifest/content/photoframe 接口返回 `404`，设备记录保留用于审计�
 | --- | --- |
 | `auto_rotate` | 是否按 cron 自动轮播 |
 | `rotation_cron` | 三字段 minute/hour/day-of-week 规则 |
+| `deep_sleep_enabled` | 固定为 `true`；页面和管理 API 不提供关闭选项，取图时会修复旧的常亮配置 |
 | `crop_mode` | `cover` 填满或 `fit` 留白 |
 | `overlay_date` | 是否叠加服务器时区日期 |
 | `overlay_weather` | 是否叠加最后有效天气 |
 | `orientation_mode` | `auto` 先纠正 EXIF 并保持照片横竖方向；`match_display` 只对输出图片内容在照片与目标屏幕方向相反时旋转 90 度，不表示设备支持安装角度旋转 |
 | `orientation` | `landscape` 或 `portrait`；E1002 仅允许 `landscape` |
+| `hardware_rotation_deg` | 只读 profile 元数据：Waveshare `180`、E1002 `0`；不是用户可选方向 |
 | `policy_revision` | 策略修改递增版本 |
 | `selection_mode` | `smart` 或固定顺序的 `playlist` |
 | `playlist_photo_ids` | 播放列表中的整数照片 ID，按配置顺序循环 |
@@ -85,7 +87,7 @@ manifest/content/photoframe 接口返回 `404`，设备记录保留用于审计�
 5. 按策略叠加日期和天气；
 6. 递减 JPEG 质量和尺寸，直到满足 `max_bytes`。
 
-屏幕方向由 profile 的 `orientation` 确定，不能由照片宽高推断，也不通过安装角度字段表达。`match_display` 只校正最终编码帧的横竖比例；它不是 90°/180°/270° 的设备旋转设置。E6 线协议仍固定 800x480，PhotoPainter 的竖屏能力需要对应设备实机确认。
+屏幕方向由 profile 的 `orientation` 确定，不能由照片宽高推断。`match_display` 只校正最终编码帧的横竖比例；它不是用户可调的安装角度设置。Waveshare 的固定 `hardware_rotation_deg=180` 和 E1002 的 `0` 只由 profile 提供，并通过 PhotoFrame 的 `display_rotation_deg` 下发；E6 线协议仍固定 800x480，PhotoPainter 的竖屏能力需要对应设备实机确认。
 
 触摸屏的 `display.orientation_mode`/`display.rotation` 与 E6 的
 `epaper.orientation_mode`/`epaper.rotation` 是两套独立配置。E6 设备的能力只描述
@@ -96,7 +98,7 @@ E6 内容字节和 ETag 不变，仍可返回 `304`。
 
 ## 🏷️ ETag 与响应头
 
-JPEG URL Rotation 的 ETag 包含照片 SHA-256、设备 ID、输出尺寸、旋转、方向模式、目标方向、字节上限、裁剪方式、日期/天气开关、策略 revision、选择 revision 和天气/日期时间输入。完全一致时返回 `304`，避免重复编码；策略、照片、天气、方向模式或尺寸改变时返回新的 `200`。E6 帧没有日期或天气叠加，因此它的 ETag 只由照片 SHA-256 和 E6 渲染选项组成；仅刷新天气或触摸屏逻辑 revision 时，同一帧仍返回 `304`，避免额外电子纸刷新。
+JPEG URL Rotation 的 ETag 包含照片 SHA-256、设备 ID、输出尺寸、服务器像素旋转、profile 固定硬件补偿（variant 中的 `h<deg>`）、方向模式、目标方向、字节上限、裁剪方式、日期/天气开关、策略 revision、选择 revision 和天气/日期时间输入。完全一致时返回 `304`，避免重复编码；策略、照片、天气、方向模式、硬件 profile 或尺寸改变时返回新的 `200`。硬件补偿只影响终端坐标，不改变 JPEG 字节。E6 帧没有日期或天气叠加，因此它的 ETag 只由照片 SHA-256 和 E6 渲染选项组成；仅刷新天气或触摸屏逻辑 revision 时，同一帧仍返回 `304`，避免额外电子纸刷新。
 
 旧式服务器主动 `POST /api/display-image` 不使用条件 GET，因此不会收到 `304`；其 ETag 仅作为
 审计和日志关联字段。该兼容行为不参与当前设备注册或 URL Rotation 流程。
@@ -105,7 +107,7 @@ JPEG URL Rotation 的 ETag 包含照片 SHA-256、设备 ID、输出尺寸、旋
 Cache-Control: private, max-age=0, must-revalidate
 Vary: X-Display-Width, X-Display-Height, X-Display-Orientation, If-None-Match
 ETag: "<opaque-value>"
-X-Config-Payload: {"config":{"auto_rotate":true,"rotate_cron":["*/5 * *"]}}
+X-Config-Payload: {"config":{"auto_rotate":true,"rotate_cron":["*/5 * *"],"display_orientation":"landscape","display_rotation_deg":180}}
 ```
 
 响应不泄露真实路径、内部注册信息或模型资产路径。详细 HTTP 字段见 [03-album-server-api-and-esp32-protocol.md](./03-album-server-api-and-esp32-protocol.md)。

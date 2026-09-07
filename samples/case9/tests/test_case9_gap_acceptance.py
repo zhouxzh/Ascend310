@@ -54,6 +54,13 @@ def bash_available() -> bool:
 
 
 class FixtureTests(unittest.TestCase):
+    def test_default_bundle_prefers_existing_timestamped_bundle(self) -> None:
+        parser = VERIFIER.build_parser()
+        default_value = parser.parse_args([]).root
+        expected = ROOT / "repro" / "case9-dual-board-gap-20260830"
+        if expected.is_dir():
+            self.assertEqual(default_value.resolve(), expected.resolve())
+
     def test_probe_fixture_has_ten_chinese_and_five_english_entries(self) -> None:
         payload = json.loads(
             (ROOT / "tests" / "fixtures" / "case9_dual_board_probe.json").read_text(encoding="utf-8")
@@ -102,6 +109,20 @@ class FixtureTests(unittest.TestCase):
             self.assertEqual(result["status"], "passed")
             self.assertEqual(result["matrix"]["observed"], 8)
             self.assertEqual(result["checked"], 8)
+
+    def test_verifier_accepts_legacy_address_for_same_b4_board(self) -> None:
+        """Historical bundles may retain the former IP without becoming invalid."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_valid_bundle(root)
+            manifest_path = root / "bundle-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["boards"]["board8t"]["host"] = "192.168.1.90"
+            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            result = VERIFIER.verify(root)
+            self.assertEqual(result["status"], "passed")
+            self.assertFalse(any("board8t.host" in item for item in result["failures"]))
 
     def test_verifier_rejects_missing_combination_and_hash_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

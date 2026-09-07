@@ -336,7 +336,7 @@ cd ~/case9-mindspore-chat
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 ```
 
-8T 当前地址是 `192.168.1.90`，20T 当前地址是 `192.168.1.95`。两块板的环境、CANN、Python、MindSpore、MindNLP 和驱动版本必须分别快照，不能把一块板的结论复制给另一块板。
+8T 当前地址是 `192.168.1.90`（`192.168.11.14` 和 `192.168.8.178` 是同一块板的历史地址），20T 当前地址是 `192.168.1.95`。两块板的环境、CANN、Python、MindSpore、MindNLP 和驱动版本必须分别快照，不能把一块板的结论复制给另一块板。
 
 ---
 
@@ -418,7 +418,7 @@ conda activate case9-acl-om
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export PYTHONNOUSERSITE=1
 export CASE9_QWEN25_KV_ROOT="$PWD"
-export CASE9_QWEN25_KV_BOARD_ID="192.168.1.90"  # 报告采集时为同一块板的 192.168.8.178
+export CASE9_QWEN25_KV_BOARD_ID="192.168.1.90"  # 同一块板的历史地址为 192.168.11.14 / 192.168.8.178
 export CASE9_QWEN25_KV_SOC_VERSION="Ascend310B4"
 export CASE9_QWEN25_KV_OUTPUT_ROOT="$PWD/reports/$(date -u +%Y%m%dT%H%M%SZ)"
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"

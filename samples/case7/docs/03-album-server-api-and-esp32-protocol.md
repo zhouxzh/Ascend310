@@ -1,14 +1,16 @@
 # 相册服务器 API 与 ESP32 协议
 
-*手机、触摸屏、Waveshare PhotoPainter 与 Seeed reTerminal E1002 的 HTTP 合同；当前实测终端为 Waveshare，E1002 仅作历史对照。*
+*手机、触摸屏、Waveshare PhotoPainter 与 Seeed reTerminal E1002 的 HTTP 合同。两个 profile 都属于当前支持范围；文中的实机结果按设备分别标注，不能用一台设备的固件证据替代另一台。*
 
 ---
 
 ## 🌐 访问边界
 
-服务监听 `7860`，当前 LAN profile 不要求账号或管理令牌。管理接口和设备取图接口均直接
-在可信局域网内提供；因此不得端口映射、反向代理到公网或把服务放入不可信网络。设备
-enable/disable 状态始终由服务端执行。
+310B 相册服务固定监听 `7860`，所有手机、触摸屏、ESP32 取图和教程示例均使用
+`http://192.168.1.135:7860/`。ESP32 本机控制网页固定使用它自己的 80 端口，这与 310B
+端口无关；不要为了统一地址修改 310B 到 80。当前 LAN profile 不要求账号或管理令牌。管理
+接口和设备取图接口均直接在可信局域网内提供；因此不得端口映射、反向代理到公网或把服务
+放入不可信网络。设备 enable/disable 状态始终由服务端执行。
 
 普通上传原图保存在系统用户目录 `~/Pictures/ai-album/imports/`，临时 multipart 文件保存在
 `~/Pictures/ai-album/.upload-tmp/`，均与仓库发布目录隔离。`shared/photos/` 只承载 COCO-CN
@@ -38,6 +40,8 @@ enable/disable 状态始终由服务端执行。
 | `PATCH` | `/api/admin/touchscreen` | 更新本机触摸屏名称和专属显示设置 |
 | `POST` | `/api/admin/touchscreen/advance` | 本机触摸屏 `next`、`previous`、`pause` 或 `resume` |
 | `GET` | `/api/admin/devices` | 查看设备管理视图 |
+| `GET` | `/api/admin/devices/discover` | 只读发现局域网内已广播的 PhotoFrame 候选，不注册、不写设备配置 |
+| `POST` | `/api/admin/devices/probe` | 按一个明确的私网 IPv4 只读读取 `/api/system-info`，不扫描、不注册 |
 | `POST` | `/api/admin/devices/register` | 验证设备连通性、身份和 URL Rotation 后原子注册（配置完成返回 `202`，等待设备拉图） |
 | `POST` | `/api/admin/devices` | 旧入口；PhotoFrame 请求固定返回 `400/not_registered`，不会创建记录，必须改用 `/register` |
 | `POST` | `/api/admin/devices/{id}/provision-pull` | 一次性验证官方 PhotoFrame 并写入 URL Rotation 配置 |
@@ -61,38 +65,77 @@ URL Rotation”，不等于电子纸已经完成物理刷新；只有设备随�
 历史 `POST /api/admin/devices` 不再创建 `pending_connection` 记录；对 PhotoFrame 请求固定返回
 `400` 和 `registration_status=not_registered`，并指向 `/api/admin/devices/register`。数据库中若仍有
 旧版本留下的 `pending_connection`，只能作为历史状态只读展示，不能当作当前注册成功。远端设备传输方式固定为“设备主动拉取”：
-ESP32 按自己的 URL Rotation 时隙向 310B 的取图 URL 发起 `GET`。注册不会扫描局域网或猜测
-ESP32 地址。
+ESP32 按自己的 URL Rotation 时隙向 310B 的取图 URL 发起 `GET`。注册本身不会扫描网段或猜测
+ESP32 地址；设备页另有受限的只读 mDNS 发现步骤，发现结果仍必须由用户明确选择。
 
 历史记录中的 `push.enabled=false` 只是旧字段的默认值；当前注册页面不把它作为用户选项，
 它不表示设备被禁用或注册失败。设备是否可取图只由 `enabled` 和设备本身是否已经保存 URL
 Rotation 配置决定。
 
+### 发现与唯一配对（URL Rotation 前置步骤）
+
+`photoframe.local` 是固件二维码中的 mDNS 主机名，不是唯一设备地址。局域网内有两台或更多
+默认名称相同的 PhotoFrame 时，按名称或解析到的第一条地址注册会有误配风险。Case7 提供
+`GET /api/admin/devices/discover` 作为**只读**发现入口：310B 只查询本机收到的
+`_esp32-pframe._tcp` mDNS 服务，逐个使用候选的字面 RFC1918 IPv4 读取 `/api/system-info`。
+请求不接受 CIDR、扫描范围或任意 hostname，不创建注册记录，也不写入设备 `/api/config`。如果
+mDNS 被 AP 隔离，设备管理页的 **读取并验证 IP** 会调用 `POST /api/admin/devices/probe`；请求体
+为 `{ "device_url": "http://192.168.1.137" }`，同样只读取 `/api/system-info`，并限制为
+RFC1918 字面 IPv4。
+
+响应中的每个候选至少包含：
+
+```json
+{
+  "device_url": "http://192.168.1.137",
+  "hostname": "photoframe.local",
+  "device_hardware_id": "a4cb8fdaa1dc",
+  "board_name": "waveshare_photopainter_73",
+  "firmware_version": "v2.18.0",
+  "width": 800,
+  "height": 480,
+  "status": "ready"
+}
+```
+
+发现可能返回多个同名候选；服务绝不自动选择第一条。用户应根据设备实物、硬件 ID/MAC、
+板型/固件和字面 IPv4 点击唯一的一张候选卡片，再继续注册。若设备休眠、未广播 mDNS 或不在
+同一二层网络，候选可能为空；这不是注册成功，需按 [串口/IP 手册](./13-photopainter-serial-ip-and-wifi.md)
+读取 `sta ip`，或查看路由器 DHCP 租约后手动输入明确 IPv4。
+
 ### 设置设备主动拉取（URL Rotation）
 
-1. 从 ESP32 串口启动日志或其本机网页取得当前 IPv4；不要把历史 DHCP 地址或
+1. 先按目标设备的实体唤醒键，让它保持唤醒并连接同一局域网：Waveshare PhotoPainter
+   按 **BOOT**；Seeed reTerminal E1002 按顶部绿色 **Wake/Refresh**。深度休眠期间
+   Wi-Fi、mDNS 和 HTTP 都关闭，310B 不能发送网络唤醒包。然后可使用上面的发现列表，或从
+   ESP32 串口启动日志/路由器 DHCP 租约取得当前 IPv4；不要把历史 DHCP 地址或
    `photoframe.local` 解析结果当作当前地址。
-2. 在设备页的 **验证并注册 ESP32 电子相册** 中填写 `http://<ESP32-IP>`，点击
-   **验证并注册设备**。服务只接受 RFC1918 私网 IPv4 的根 URL 和 80 端口，并串行执行：
-   `GET /api/system-info` 身份/尺寸核验、`GET /api/config`、`PATCH /api/config`、配置读回核验，
-   最后可选 `POST /api/rotate`。它不会扫描网段、跟随重定向或访问任意 URL。
-3. 成功后状态为 **已验证配置 · 等待设备拉图**，不是“已显示”。服务器只把 TCP 来源与已登记
+2. 在设备页选择一条候选（或手动填写已确认的 `http://<ESP32-IP>`），同时提交该候选的
+   `expected_device_id`，再点击 **验证并注册设备**。服务只接受 RFC1918 私网 IPv4 的根 URL
+   和 80 端口，并串行执行：`GET /api/system-info` 身份/尺寸核验、`GET /api/config`、
+   `PATCH /api/config`、配置读回核验，最后可选 `POST /api/rotate`。它不会扫描网段、跟随
+   重定向或访问任意 URL。
+3. 服务在任何 `PATCH /api/config` 之前，将实际 `/api/system-info` 返回的硬件 ID 与
+   `expected_device_id` 精确比对；不一致、身份读取失败或设备离线时立即拒绝，响应为未注册，
+   不留下临时设备记录。这一步把用户选中的物理设备与即将写入的 URL Rotation 绑定。
+4. 成功后状态为 **已验证配置 · 等待设备拉图**，不是“已显示”。服务器只把 TCP 来源与已登记
    ESP32 地址一致、且包含完整协商头的请求计为拉图证据。设备必须自己发出包含
    `X-Firmware-Version`、`X-Display-Width`、`X-Display-Height` 和
-   `X-Display-Orientation` 的取图请求后，才会显示 **设备已拉图**。首次联调由服务写入
-   `deep_sleep_enabled=false`；待链路稳定后再单独测试睡眠。
-4. 若无法从 310B 访问 ESP32，可在设备网页或设备端命令手动写入相同配置：
+   `X-Display-Orientation` 的取图请求后，才会显示 **设备已拉图**。注册时默认读取并保留
+   `deep_sleep_enabled=true`。当前服务不提供关闭深度睡眠的选项；重新注册会修复旧的常亮配置，
+   保留实体按键和固件定时器唤醒能力。
+5. 若无法从 310B 访问 ESP32，可在确认硬件 ID 后，在设备网页或设备端命令手动写入相同配置：
 
    ```bash
    curl -X PATCH http://<ESP32-IP>/api/config \
      -H 'Content-Type: application/json' \
-     --data-raw '{"auto_rotate":true,"rotate_cron":["*/10 * *"],"rotation_mode":"url","image_url":"http://192.168.1.135:7860/api/devices/<device_id>/photoframe","deep_sleep_enabled":false}'
+     --data-raw '{"auto_rotate":true,"rotate_cron":["*/10 * *"],"rotation_mode":"url","image_url":"http://192.168.1.135:7860/api/devices/<device_id>/photoframe","deep_sleep_enabled":true}'
    curl http://<ESP32-IP>/api/config
    ```
 
-   首次联调建议关闭深度睡眠；确认每次唤醒能取到图片后再按固件说明恢复睡眠。固件字段
+   首次联调也保持深度睡眠；按实体唤醒键后确认能取到图片。固件字段
    `rotate_cron` 与 Case7 服务策略字段 `rotation_cron` 名称不同，不要混用。
-5. 点击 Case7 卡片的“推进下一张”只更新该设备的持久化选择，ESP32 下一次访问取图 URL
+6. 点击 Case7 卡片的“推进下一张”只更新该设备的持久化选择，ESP32 下一次访问取图 URL
    时会取得新照片。首个请求应为 `200 image/jpeg`，同一 ETag 的再次请求应为 `304`。
 
 如果 ESP32 本机网页没有 URL Rotation、图片 URL 或相应 API 字段，则当前固件不支持设备
@@ -135,7 +178,10 @@ Firefox/嵌入式浏览器都能显示。预览不会写入缩略图、JPEG 或�
 | `waveshare_photopainter_73` | [Waveshare 产品页](https://www.waveshare.com/product/displays/e-paper/epaper-1/esp32-s3-photopainter.htm) / [Wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter) | E6 六色（黑、白、绿、蓝、红、黄），800x480；Wiki Mode 1 接受 800x480 或 480x800 图像 | `landscape` 或 `portrait` 内容 |
 | `seeedstudio_reterminal_e1002` | [Seeed Studio Wiki](https://wiki.seeedstudio.com/getting_started_with_reterminal_e1002/) | ACeP / Spectra 6 全彩，800x480 | Case7 策略仅 `landscape` |
 
-方向字段只允许 `landscape`、`portrait`；不支持 360°、180°或 90°/270°安装旋转字段。
+方向字段只允许 `landscape`、`portrait`；API 不提供用户可调的安装角度。设备 profile 另有固定的
+`hardware_rotation_deg`：Waveshare PhotoPainter 为 `180`，Seeed E1002 为 `0`。这是上游板级坐标
+补偿，不是第三种方向；服务器 JPEG `rotation` 始终为 `0`，避免重复旋转。成功配对和后续 URL
+Rotation 拉图会把该值作为 `display_rotation_deg` 同步到 PhotoFrame 固件。
 `seeedstudio_reterminal_e1002` 请求 `portrait` 时必须返回拒绝，不得通过交换宽高或隐式旋转放行。
 厂商页面只作为规格来源，不作为当前设备固件接口或实机刷新证据。Seeed 的资料确认的是 `800x480` 面板；E1002 的横屏限制是本项目当前设备策略，不能据此推断其上游固件的全部能力。
 
@@ -185,14 +231,15 @@ curl http://192.168.1.135:7860/api/admin/touchscreen
 ### 远端 ESP32 注册
 
 设备页中的“验证并注册 ESP32 设备”调用 `POST /api/admin/devices/register`，当前注册入口只接受
-`kind="photoframe"`，且必须显式提供 `profile_id` 和 `device_url`。服务会先实际访问设备并
+`kind="photoframe"`，且必须显式提供 `profile_id` 和用户选中的字面 `device_url`。可选的
+`expected_device_id` 用于把发现候选与实际响应绑定；服务会先实际访问设备并
 完成身份/配置回读；失败不会创建有效注册。可选 profile 值只有
 `waveshare_photopainter_73` 和 `seeedstudio_reterminal_e1002`；服务不会根据尺寸、名称或
 IP 猜测厂商。低层 `POST /api/devices/handshake` 使用相同限制，不能绕过管理页面创建第三种
 PhotoFrame 合同；`codecs` 只能是精确的 `["jpeg"]`。创建操作返回 `device_id` 和取图 URL；
 当前固件和服务均不使用设备令牌。
 远端设备拥有自己的 `policy`、播放列表和请求状态，和 `local-touchscreen` 的本机配置完全
-分离。注册页面必须收集用户从串口或设备网页确认的 `device_url`；它不让用户选择传输协议、
+分离。注册页面必须收集用户从发现列表、串口或设备网页确认的 `device_url`；它不让用户选择传输协议、
 超时、重试或服务器主动发送参数，远端传输固定为设备主动 URL Rotation：
 
 ```json
@@ -258,7 +305,7 @@ Content-Type: application/json
 
 ```json
 {
-  "name": "living-room",
+  "name": "客厅",
   "protocol_version": 1,
   "display": {
     "kind": "lcd",
@@ -298,10 +345,11 @@ manifest，不能复用旧 ETag。
 是默认安全模式：保持照片本身的横竖方向，使用 `cover` 或 `fit` 适配目标屏幕；
 `orientation_mode=match_display` 才会在源图与目标屏幕方向相反时对**输出图片内容**增加一次
 90 度旋转；这不是设备安装角度，也不会放开 profile 的方向限制。
-设备只登记 `landscape` 或 `portrait`，不要用安装角度或图片宽高猜测设备 profile。
+设备只登记 `landscape` 或 `portrait`；安装补偿只能由已确认的 profile 提供，不要用安装角度或图片宽高猜测设备 profile。
 E1002 的 `portrait` 请求必须拒绝。
 
-响应会返回实际 JPEG 像素方向的 `X-Album-Orientation`、请求显示目标的
+PhotoFrame JPEG 还会返回 `X-Album-Hardware-Rotation`，表示本 profile 的固定板级补偿；它不改变 JPEG
+像素。响应会返回实际 JPEG 像素方向的 `X-Album-Orientation`、请求显示目标的
 `X-Album-Target-Orientation`、`X-Album-Orientation-Mode`、目标尺寸和包含方向
 策略的 ETag。`auto` 模式下两种方向可以不同：例如横拍照片在竖屏视口内仍保持横向。
 相同照片、方向策略和尺寸重复请求返回 `304 Not Modified`；方向模式、

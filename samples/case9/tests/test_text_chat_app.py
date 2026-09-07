@@ -71,6 +71,7 @@ class TextChatAppTests(unittest.TestCase):
         self.assertIn("响应在完成前中断", page.text)
         self.assertIn("authoritative cumulative text", page.text)
         self.assertIn("buffer = buffer.replace(/\\r\\n/g, '\\n')", page.text)
+        self.assertIn("const boardStates = item.board_targets.map", page.text)
         self.assertEqual(health.status_code, 200)
         self.assertEqual(health.json()["mode"], "unauthenticated-lan-experiment")
         self.assertIn(SECURITY_WARNING, health.json()["warning"])

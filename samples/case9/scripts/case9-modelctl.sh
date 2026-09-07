@@ -111,16 +111,42 @@ except ProfileError as exc:
     raise
 if profile is None:
     raise SystemExit("profile is not present in registry: %s" % sys.argv[2])
-if profile.status == "blocked":
-    raise SystemExit("profile is blocked: %s" % profile.id)
-if profile.status == "not-run":
-    raise SystemExit("profile has not passed its load gate: %s" % profile.id)
-if profile.status == "experimental_dirty_base" and os.environ.get("CASE9_ALLOW_EXPERIMENTAL") != "1":
+if getattr(profile, "is_conditional", False):
+    raise SystemExit("profile is conditional and cannot be activated: %s" % profile.id)
+# Select a per-SoC status when the board identity is available.  A missing
+# npu-smi intentionally falls back to the aggregate status, so a blocked
+# profile cannot be activated from a controller or a CPU-only shell.
+import re
+import shutil
+import subprocess
+observed_soc = ""
+tool = shutil.which("npu-smi")
+if tool:
+    try:
+        output = subprocess.check_output([tool, "info"], text=True, stderr=subprocess.STDOUT, timeout=8)
+        matches = sorted(set(match.upper() for match in re.findall(r"(?:Ascend\s*)?(310B[0-9A-Za-z]+)", output, re.IGNORECASE)))
+        if len(matches) == 1:
+            observed_soc = "Ascend" + matches[0]
+    except Exception:
+        observed_soc = ""
+if observed_soc and not profile.supports_soc(observed_soc):
+    raise SystemExit("profile does not target %s: %s" % (observed_soc, profile.id))
+effective_status = profile.activation_status_for_soc(observed_soc) if observed_soc else profile.status
+if effective_status in {"blocked", "not-run"}:
+    raise SystemExit("profile is %s: %s" % (effective_status, profile.id))
+if effective_status == "admitted":
+    try:
+        quality_ok, quality_reason = profile.quality_admission_for_soc(observed_soc or None)
+    except Exception as exc:
+        raise SystemExit("admitted profile quality check failed: %s" % exc)
+    if not quality_ok:
+        raise SystemExit("admitted profile lacks approved human quality evidence: %s" % quality_reason)
+if effective_status == "experimental_dirty_base" and os.environ.get("CASE9_ALLOW_EXPERIMENTAL") != "1":
     raise SystemExit(
         "profile is experimental_dirty_base; set CASE9_ALLOW_EXPERIMENTAL=1 "
         "for an explicit candidate switch"
     )
-if profile.status not in {"admitted", "experimental_dirty_base"}:
+if effective_status not in {"admitted", "experimental_dirty_base"}:
     raise SystemExit("profile status is not activatable: %s" % profile.status)
 PY
 }
@@ -370,7 +396,7 @@ body["runtime"] = {
     "orphan_recovery_required": sys.argv[3] == "true",
     "tracking_error": sys.argv[5] or None,
 }
-print(json.dumps(body, ensure_ascii=False, sort_keys=True))
+print(json.dumps(body, ensure_ascii=True, sort_keys=True))
 PY
     return 0
   fi
@@ -439,7 +465,7 @@ body["runtime"] = {
         and not (pid_alive and identity_match and group_isolated and group_alive and health_ok)
     ),
 }
-print(json.dumps(body, ensure_ascii=False, sort_keys=True))
+print(json.dumps(body, ensure_ascii=True, sort_keys=True))
 PY
 }
 
@@ -1099,13 +1125,26 @@ health_ready() {
 import json
 import re
 import sys
+from collections.abc import Mapping
 from case9_model_profiles import load_profiles
 try:
     body = json.loads(sys.argv[1])
     expected_profile = sys.argv[2]
     expected_pid = int(sys.argv[3])
     registry = load_profiles(sys.argv[4])
-    expected_soc = registry.get(expected_profile).board_soc
+    profile_obj = registry.get(expected_profile)
+    def normalize_soc(value):
+        value = str(value or "").strip().upper()
+        if value.startswith("ASCEND"):
+            value = value[len("ASCEND"):]
+        return value
+    expected_socs = {
+        normalize_soc(item.get("soc"))
+        for item in getattr(profile_obj, "board_targets", ())
+        if isinstance(item, Mapping) and item.get("soc")
+    }
+    if not expected_socs:
+        expected_socs = {normalize_soc(profile_obj.board_soc)}
 except (ValueError, TypeError, json.JSONDecodeError, IndexError):
     raise SystemExit(1)
 if not isinstance(body, dict):
@@ -1113,17 +1152,43 @@ if not isinstance(body, dict):
 observed_profile = body.get("profile") or body.get("profile_id")
 worker_pid = body.get("worker_pid")
 observed_npu = body.get("npu_model")
+observed_soc = normalize_soc(observed_npu)
 fingerprint = body.get("environment_fingerprint")
+try:
+    observed_soc_status = profile_obj.activation_status_for_soc(str(observed_npu or ""))
+except Exception:
+    observed_soc_status = "blocked"
+quality_admission_ok = True
+if observed_soc_status == "admitted":
+    try:
+        quality_admission_ok, _quality_reason = profile_obj.quality_admission_for_soc(observed_npu or None)
+    except Exception:
+        quality_admission_ok = False
+expected_model_id = "case9-active"
+admission_status = str(body.get("admission_status") or "").strip().lower()
+admission_soc = normalize_soc(body.get("admission_soc"))
+candidate_kind = str(body.get("candidate_kind") or "").strip().lower()
 if (
     body.get("ready") is not True
     or body.get("healthy") is not True
+    or body.get("model_id") != expected_model_id
+    or body.get("busy") is not False
+    or body.get("cache_cleanup") != "idle"
     or body.get("cache_cleared") is not True
     or str(body.get("device_target", "")).lower() != "ascend"
     or observed_profile != expected_profile
     or isinstance(worker_pid, bool)
     or not isinstance(worker_pid, int)
     or worker_pid != expected_pid
-    or observed_npu != expected_soc
+    or observed_soc not in expected_socs
+    or observed_soc_status in {"blocked", "not-run"}
+    or observed_soc_status not in {"admitted", "experimental_dirty_base"}
+    or not quality_admission_ok
+    or admission_status != observed_soc_status
+    or admission_soc != observed_soc
+    or body.get("admission_allowed") is not True
+    or candidate_kind != "native_mindspore"
+    or body.get("conditional") is not False
     or not isinstance(fingerprint, str)
     or re.fullmatch(r"[0-9a-fA-F]{64}", fingerprint) is None
 ):

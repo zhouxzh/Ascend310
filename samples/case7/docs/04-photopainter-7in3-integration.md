@@ -4,11 +4,28 @@
 
 ## 固定硬件 profile
 
-本手册的 Waveshare 目标是 [ESP32-S3-PhotoPainter 官方产品页](https://www.waveshare.com/product/displays/e-paper/epaper-1/esp32-s3-photopainter.htm) 及其 [官方 Wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter)：7.3 英寸 E6 六色（黑、白、绿、蓝、红、黄）、800x480；Wiki Mode 1 明确接受 800x480 或 480x800 图像，因此 Case7 将内容方向记为 `landscape` 或 `portrait`。对照设备 [Seeed Studio reTerminal E1002 官方 Wiki](https://wiki.seeedstudio.com/getting_started_with_reterminal_e1002/) 为 7.3 英寸 ACeP / Spectra 6 全彩、800x480；Case7 为它固定横屏 `landscape`。Case7 profile 只接受方向名 `landscape`/`portrait`；不支持 360°、180°或 90°/270°安装旋转选项，E1002 的 `portrait` 请求必须拒绝。Seeed 的厂商资料只确认面板规格，横屏限制是本项目策略；规格资料不等同于固件接口或面板刷新验收。
+本手册的 Waveshare 目标是 [ESP32-S3-PhotoPainter 官方产品页](https://www.waveshare.com/product/displays/e-paper/epaper-1/esp32-s3-photopainter.htm) 及其 [官方 Wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter)：7.3 英寸 E6 六色（黑、白、绿、蓝、红、黄）、800x480；Wiki Mode 1 明确接受 800x480 或 480x800 图像，因此 Case7 将内容方向记为 `landscape` 或 `portrait`。上游 Waveshare 板级 profile 的固定坐标补偿是 `display_rotation_deg=180`，Case7 会自动写入，不作为用户可选安装角度。对照设备 [Seeed Studio reTerminal E1002 官方 Wiki](https://wiki.seeedstudio.com/getting_started_with_reterminal_e1002/) 为 7.3 英寸 ACeP / Spectra 6 全彩、800x480；Case7 为它固定横屏 `landscape`，固定补偿为 `0`。Case7 profile 只接受方向名 `landscape`/`portrait`；E1002 的 `portrait` 请求必须拒绝。Seeed 的厂商资料只确认面板规格，横屏限制是本项目策略；规格资料不等同于固件接口或面板刷新验收。
+
+### 方向配置与倒置排查
+
+`display_orientation` 是逻辑内容方向，`display_rotation_deg` 是板级物理坐标补偿。PhotoPainter
+官方 v2.18.0 的 Waveshare profile 将后者固定为 180 度；若把它误写成 0，竖屏内容会出现整体
+上下倒置。Case7 不在服务器端 JPEG 上再做半转，而是在注册及 `X-Config-Payload` 中发送 profile
+对应的值，并用 `X-Album-Hardware-Rotation` 回显实际补偿。Seeed E1002 使用 0 度。若屏幕仍倒置，
+先读取设备 `/api/config` 核对这两个字段，再检查固件板型和真实安装方向；不要通过修改照片 EXIF
+或随意增加 90/270 度值来掩盖板级配置错误。
 
 ---
 
 ## 🧩 固件与硬件边界
+
+### E1002 存储卡限制
+
+Seeed reTerminal E1002 的官方规格只承诺最大 32 GB、FAT32 的 MicroSD。64 GB 卡即使偶尔能被
+固件报告容量，也不属于该硬件的支持范围；本次实测插入 64 GB 卡时出现 Wi-Fi 拉图异常，拔卡后
+设备恢复正常。因此 Case7 不依赖 E1002 的 SD 卡存储，URL Rotation 使用按需 JPEG；正式联调应
+拔出 64 GB 卡，或使用不超过 32 GB 且确认为 FAT32 的卡。该问题与深度睡眠无关，不能通过服务器
+配置消除。
 
 固定使用上游 PhotoFrame `v2.18.0`，提交 `6a4eeac`，合并镜像：
 
@@ -88,13 +105,32 @@ deep_sleep_enabled: true
 才会把状态变为 `pulled`。该 GET 还必须来自登记时验证过的 ESP32 IPv4 并携带完整协商头；也仍
 不能单独证明电子纸完成物理刷新。
 
+### 多台 PhotoFrame 的安全发现与配对
+
+二维码默认只编码 `http://photoframe.local`。这是 mDNS 主机名，不是设备序列号或唯一 IPv4；
+两台固件默认名称相同的屏幕可能同时显示相同的二维码地址。因此不能把二维码解析到的第一条
+地址、浏览器缓存地址或服务器自行扫描到的地址直接登记。
+
+在设备页点击 **发现局域网 PhotoFrame**，310B 执行只读的
+`GET /api/admin/devices/discover`：仅查询 `_esp32-pframe._tcp` mDNS 广播，并逐候选读取
+`/api/system-info`。返回卡片显示字面 IPv4、hostname、设备硬件 ID/MAC、板型、固件版本和
+`800x480` 能力；不接受 CIDR 或任意 hostname，不访问公网，不创建设备记录，也不写入屏幕的
+`/api/config`。发现结果有多条时，必须按实物和硬件 ID 由用户点击一条，服务不会自动选择。
+
+选中候选后，注册请求同时带上 `device_url` 和 `expected_device_id`。服务在任何 URL Rotation
+写入前重新读取 `/api/system-info`，要求实际硬件 ID 与候选 ID 精确一致；设备地址被复用、返回
+其他屏幕或身份读取失败时，注册立即失败且不保留临时记录。设备休眠、mDNS 未广播或跨 VLAN
+时发现可能为空，应按 [串口/IP 手册](./13-photopainter-serial-ip-and-wifi.md) 从 `sta ip:`
+日志或路由器 DHCP 租约取得明确 IPv4，再手动选择/填写并核对硬件 ID。发现接口只是定位辅助，
+不能替代真实 HTTP 身份和配置回读。
+
 ### 2026-08-30/31 原子注册实测
 
 本次实测验证了“不可达不登记、真实拉图才连通”的边界：
 
 1. PhotoPainter 处于休眠时提交 `POST /api/admin/devices/register`，服务器返回
    `502` 和 `registration_status=not_registered`；临时记录被删除，设备列表没有新增不可达设备。
-2. 按 KEY 唤醒后，同一地址 `http://192.168.1.137` 的 `/api/system-info` 返回 `200`，
+2. 按 **BOOT** 唤醒后，同一地址 `http://192.168.1.137` 的 `/api/system-info` 返回 `200`，
    `board_name=waveshare_photopainter_73`、硬件 ID `a4cb8fdaa1dc`、固件 `v2.18.0`、
    分辨率 `800x480`。服务器写入并回读 URL Rotation 配置，控制面返回 `202`/`awaiting_pull`。
 3. 随后板端日志记录了 `192.168.1.137` 发起的带官方固件/显示能力头的
@@ -106,13 +142,13 @@ deep_sleep_enabled: true
    当次 `/api/rotate` 请求曾超时，服务器将其记录为“立即刷新未确认”，不把超时误判为注册失败；
    后续真实 GET 仍可完成连接确认。彩色电子纸是否完成物理刷新，仍需观察屏幕或串口刷新日志单独验收。
 
-如果设备确实运行提供 `/api/config` 的 PhotoFrame 固件，可在确认 IP 后执行下面的命令；
-初次联调建议关闭深度睡眠：
+如果设备确实运行提供 `/api/config` 的 PhotoFrame 固件，可在确认 IP 后执行下面的命令。深度睡眠
+是 Case7 的固定省电策略，重新刷写或重新注册都必须保持开启：
 
 ```bash
 curl -X PATCH http://192.168.1.137/api/config \
   -H 'Content-Type: application/json' \
-  --data-raw '{"auto_rotate":true,"rotate_cron":["*/30 * *"],"rotation_mode":"url","image_url":"http://192.168.1.135:7860/api/devices/<device_id>/photoframe","deep_sleep_enabled":false}'
+  --data-raw '{"auto_rotate":true,"rotate_cron":["*/30 * *"],"rotation_mode":"url","image_url":"http://192.168.1.135:7860/api/devices/<device_id>/photoframe","display_orientation":"landscape","display_rotation_deg":180,"deep_sleep_enabled":true}'
 curl http://192.168.1.137/api/config
 ```
 
@@ -193,20 +229,27 @@ rotation_cron: */5 * *
   "rotate_cron": ["*/5 * *"],
   "rotation_mode": "url",
   "image_url": "http://192.168.1.135:7860/api/devices/<device_id>/photoframe",
-  "deep_sleep_enabled": false
+  "display_orientation": "landscape",
+  "display_rotation_deg": 180,
+  "deep_sleep_enabled": true
 }
 ```
 
+上面的 `180` 仅适用于 Waveshare PhotoPainter 的固定板级补偿；切换为 `portrait` 只需把
+`display_orientation` 改为 `portrait`，不要再对 JPEG 做 180 度处理。通过 Case7 管理接口配对时
+该字段会自动填入，手工在设备网页 PATCH 时也必须保留它；Seeed E1002 使用 `0` 且不接受竖屏。
+
 当前微雪设备已经完成固件刷写和 `/api/system-info` 识别，但 URL Rotation 和真实面板刷新仍需在
 `192.168.1.137`（或重新读取的当前地址）上单独验收。`--device-url ... --rotate-now` 只用于
-设备端 `/api/rotate`；它不是服务器向 ESP32 发送图片的接口。测试阶段关闭深度睡眠，确认 URL
-拉取稳定后再单独验证睡眠轮播。该流程不保存派生图片缓存。
+设备端 `/api/rotate`；它不是服务器向 ESP32 发送图片的接口。设备策略页可以选择启用或关闭
+深度睡眠；启用后必须由实体按键或固件定时器唤醒，310B 不能通过网络唤醒。该流程不保存派生图片缓存。
 
-成功返回图片的 `200` 响应会携带与固件 URL Rotation 兼容的配置同步头；`304`
+成功返回图片的 `200` 响应会携带与固件 URL Rotation 兼容的配置同步头（Waveshare 的
+`display_rotation_deg` 为 `180`）；`304`
 只表示图片内容未变，只返回 ETag 和缓存控制头：
 
 ```http
-X-Config-Payload: {"config":{"auto_rotate":true,"rotate_cron":["*/5 * *"]}}
+X-Config-Payload: {"config":{"auto_rotate":true,"rotate_cron":["*/5 * *"],"display_orientation":"landscape","display_rotation_deg":180}}
 ```
 
 ## 🧪 验证顺序

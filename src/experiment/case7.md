@@ -6,7 +6,7 @@
 
 ## 🎯 案例目标与问题定义
 
-传统电子相册只会按文件名或固定顺序轮播。Case7 要解决的是一个更完整的问题：照片由手机上传到局域网服务器，服务器在 Ascend 310B 上建立语义索引，再根据中文/英文查询、日期、天气和最近显示历史选择合适照片；同一份选择结果既服务开发板上的 10 寸触摸屏，也服务已登记的 ESP32 电子纸终端。本轮实测目标是新的 Waveshare ESP32-S3-PhotoPainter，Seeed Studio reTerminal E1002 只作为历史对照 profile。Orange Pi 的 SPI/GPIO 直连微雪 E6 是独立的本机输出路径，不是第三种可注册 ESP32 相册。
+传统电子相册只会按文件名或固定顺序轮播。Case7 要解决的是一个更完整的问题：照片由手机上传到局域网服务器，服务器在 Ascend 310B 上建立语义索引，再根据中文/英文查询、日期、天气和最近显示历史选择合适照片；同一份选择结果既服务开发板上的 10 寸触摸屏，也服务已登记的 Waveshare ESP32-S3-PhotoPainter 和 Seeed Studio reTerminal E1002 两类 ESP32 电子纸终端。当前已有的实机记录按设备分别标注，不能把一台设备的历史结果当作另一台已验收。Orange Pi 的 SPI/GPIO 直连微雪 E6 是独立的本机输出路径，不是第三种可注册 ESP32 相册。
 
 因此，Case7 不是单独的“图片分类脚本”，而是一条端到端链路：
 
@@ -29,7 +29,7 @@ flowchart LR
 
     phone[👤 手机浏览器]
     touch[🖥️ 10 寸触摸屏]
-    esp32[🔌 Waveshare PhotoPainter（当前）/ E1002（历史）]
+    esp32[🔌 Waveshare PhotoPainter / Seeed E1002]
     e6[🔌 Orange Pi SPI/GPIO 直连微雪 E6]
 
     subgraph server[🖥️ Orange Pi AIpro / Ascend 310B]
@@ -150,6 +150,25 @@ sequenceDiagram
 CLIP 使用图像编码器和文本编码器把两个模态投影到同一个向量空间。图像查询先编码成向量，文本查询也编码成向量，二者做 L2 归一化后使用内积近似余弦相似度。相似度高表示模型训练中认为图像和文本语义更接近。
 
 Case7 不把三个模型的数值直接相加：不同训练数据、投影层和维度形成不同坐标空间。模型 ID 是索引隔离和 API 路由的边界。
+
+### 参考实现与工程取舍
+
+本案例参考了 Andy 的个人图像搜索实践和 `atarss/clip-image-search`。博客展示了一个很重要的工程事实：图片检索不是“把图片文件名交给搜索框”，而是先递归导入照片、提取图像向量和尺寸等元数据，再用归一化向量做相似度排序；同模态图像查询的分数通常高于跨模态文字查询，分数只能用于同一模型空间内排序，不能跨模型直接比较[^7]。上游仓库的实现把文件导入、CLIP 编码、元数据保存和查询服务拆成两个阶段，并在查询时先按 `width`、`height`、扩展名等字段过滤 MongoDB，再按批次计算余弦相似度[^8]。
+
+Case7 保留这条数据流，但替换了不适合 310B 服务器的组件：
+
+| 参考项目做法 | Case7 实现 | 取舍原因 |
+| --- | --- | --- |
+| OpenAI CLIP 常驻 PyTorch | 已准入 MobileCLIP/Chinese-CLIP OM，经 PyACL 串行执行 | NPU 是生产推理边界，CPU 不作 fallback |
+| MongoDB 保存图片和向量 | SQLite 保存照片元数据与 embedding，FAISS 保存检索缓存 | 减少常驻服务，保留可审计的单文件真源 |
+| 导入时可复制到 hash 目录 | 上传原图放在系统 `Pictures` 受管目录，SHA-256 去重 | 防止个人照片混入发布目录，原图生命周期可控 |
+| 查询时拉取全部向量并分块计算 | 无筛选时使用每模型 `IndexIDMap2(IndexFlatIP)`；有筛选时先 SQLite 预筛选再计算候选内积 | 兼顾常用路径延迟和元数据过滤正确性 |
+| 早期 Gradio Demo（历史参考） | 原生 FastAPI 与触摸屏/手机页面 | 当前服务同时支持本机显示和 ESP32，不再依赖 Gradio |
+| OCR 作为后续实验 | 本版本不自动 OCR、不生成手工标签 | 不把未准入的 CPU 模型混入 NPU 相册主链路 |
+
+因此，本案例借鉴的是可验证的检索分层和元数据预筛选思想，不复制 MongoDB、Gradio 或未经准入的 OCR。`photo_index.py` 的 `search_vector()` 在带有尺寸、格式或人数条件时先构造候选集合，再进行归一化内积；没有条件时仍直接查询 FAISS。两条路径都返回相同的 `SearchResult` 合同，前端只需要消费照片 ID、文件名和分数。
+
+> **边界：** 上游仓库的 README 将 FAISS、EXIF 和多语言列为 TODO；Case7 已经分别用 FAISS、SQLite/EXIF 和双语模型实现，但这不表示上游项目已经提供这些能力，也不表示两个项目的模型权重或分数可以互换。
 
 ### MobileCLIP-S0
 
@@ -362,6 +381,16 @@ C0 和 C1 的 36/36 数值输入均达到门槛，英文 Recall@1/3/5 均为 `0.
 
 ## 🌐 服务器化设计
 
+### 统一端口约定
+
+Case7 的 310B 服务统一使用 `7860`：手机、10 寸触摸屏、ESP32 的 PhotoFrame 图片 URL、
+`curl` 示例和教学部署命令均写作 `http://192.168.1.135:7860/`。这是普通用户进程可直接
+监听的非特权端口，避免为了 80 端口修改 Linux 权限、CANN 环境或额外部署代理。
+
+ESP32 与 310B 是两个不同的 HTTP 服务：ESP32 自身的控制页面为
+`http://<ESP32-IP>/`，其默认端口是 80；310B 相册服务器仍为 7860。发布脚本可能短暂使用
+一个仅回环可见的 smoke 端口验证候选版本，但该端口不写入设备、不出现在用户操作流程中。
+
 ### 上传任务状态机
 
 手机的 `POST /api/photos/upload` 只负责接收和保存受管原图，然后返回 `job_id`。单线程任务依次完成解码、元数据写入、三模型 embedding 和 FAISS 更新；手机轮询 `/api/jobs/{job_id}` 获取 `queued`、`running`、`completed` 或 `failed`。
@@ -374,7 +403,16 @@ C0 和 C1 的 36/36 数值输入均达到门槛，英文 Recall@1/3/5 均为 `0.
 
 设备先发送显示能力，服务器返回 device ID、轮询周期和 manifest。后续以 ETag 条件请求 manifest/content；JPEG profile 按设备尺寸、方向和字节上限按需编码，E6 profile 输出固定 800x480、六色、192000-byte 帧。PhotoPainter profile 返回 bounded JPEG，由上游固件继续完成六色校准、抖动和电子纸刷新。
 
-Case7 固定记录两种 7.3 英寸设备 profile：[Waveshare ESP32-S3-PhotoPainter 官方产品页](https://www.waveshare.com/product/displays/e-paper/epaper-1/esp32-s3-photopainter.htm) / [Wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter) 为 E6 六色（黑、白、绿、蓝、红、黄）800x480；Wiki Mode 1 接受 800x480 或 480x800 图像，因此内容可标记为 `landscape` 或 `portrait`；[Seeed Studio reTerminal E1002 官方 Wiki](https://wiki.seeedstudio.com/getting_started_with_reterminal_e1002/) 为 ACeP / Spectra 6 全彩 800x480，Case7 将它固定为 `landscape`。方向字段只允许 `landscape`、`portrait`，不支持 360°、180°或 90°/270°安装旋转；E1002 的 `portrait` 请求必须拒绝。Seeed 的资料只确认面板规格，横屏限制是本项目的设备策略；厂商资料不替代固件识别和真实面板刷新证据。
+Case7 固定记录两种 7.3 英寸设备 profile：[Waveshare ESP32-S3-PhotoPainter 官方产品页](https://www.waveshare.com/product/displays/e-paper/epaper-1/esp32-s3-photopainter.htm) / [Wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter) 为 E6 六色（黑、白、绿、蓝、红、黄）800x480；Wiki Mode 1 接受 800x480 或 480x800 图像，因此内容可标记为 `landscape` 或 `portrait`；其上游板级 profile 固定 `hardware_rotation_deg=180`。 [Seeed Studio reTerminal E1002 官方 Wiki](https://wiki.seeedstudio.com/getting_started_with_reterminal_e1002/) 为 ACeP / Spectra 6 全彩 800x480，Case7 将它固定为 `landscape`，板级补偿为 `0`。方向字段只允许 `landscape`、`portrait`，不提供用户可调的 360°、90°/270°或安装角度；服务器 JPEG `rotation` 保持 `0`，配对和 URL Rotation 同步时才把 profile 补偿写入固件的 `display_rotation_deg`。E1002 的 `portrait` 请求必须拒绝。Seeed 的资料只确认面板规格，横屏限制是本项目的设备策略；厂商资料不替代固件识别和真实面板刷新证据。
+
+#### PhotoPainter 竖屏倒置的排查
+
+`display_orientation` 表示逻辑内容方向，`display_rotation_deg` 表示板级物理坐标补偿。官方 v2.18.0
+的 Waveshare 板级头文件将补偿定义为 180 度；若服务器把该字段错误地写成 0，竖屏画面会整体
+上下倒置。Case7 不在 JPEG 上再次旋转，而是在注册和 `X-Config-Payload` 中发送固定补偿，并以
+`X-Album-Hardware-Rotation` 回显。读取设备 `/api/config` 时应看到 Waveshare 的 `portrait`/`180` 或
+`landscape`/`180` 组合；E1002 则为 `landscape`/`0`。这不是 NPU、EXIF 或图片内容错误，不能通过
+增加 90/270 度用户选项解决。
 
 新设备在管理 API 和低层握手 API 中都必须显式携带这两个 `profile_id` 之一，JPEG 能力固定为 `["jpeg"]`；服务不会因为 800x480、设备名称或 IP 地址相同而猜测型号。历史 `devices.json` 缺少 profile 的记录会被标记为待确认，仍可在管理页查看，但不能取图、推进轮播或主动推送，直到操作者按实物型号完成确认。
 
@@ -383,7 +421,7 @@ Case7 固定记录两种 7.3 英寸设备 profile：[Waveshare ESP32-S3-PhotoPai
 ### 从串口启动日志取得 PhotoPainter 的 IPv4 地址
 
 设备网页地址由路由器 DHCP 分配，不能从设备名称、MAC 或旧的租约记录推断。实际操作时只连接当前
-PhotoPainter，打开串口监视器并按一次 `BOOT/KEY` 唤醒，再按复位键观察完整启动过程：
+PhotoPainter，打开串口监视器并按一次 **BOOT** 唤醒，再按复位键观察完整启动过程：
 
 ```powershell
 $idfPython = 'C:\Espressif\tools\python\v6.0.2\venv\Scripts\python.exe'
@@ -416,6 +454,36 @@ curl.exe --noproxy "*" -I "http://$photoIp/"
 完整的端口枚举、日志保存、DHCP 变化和故障排查步骤见仓库中的
 [PhotoPainter 串口读取 IP 与 Wi-Fi 配网手册](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/13-photopainter-serial-ip-and-wifi.md)。
 
+### ESP32 深度休眠后的唤醒与 310B 发现
+
+两类终端的“联网”“可发现”和“已配对”是三个独立状态。Waveshare
+PhotoPainter 从深度休眠唤醒使用 **BOOT**，Seeed reTerminal E1002 使用顶部绿色
+**Wake/Refresh**；醒来后先等待 Wi-Fi、HTTP 和 mDNS 服务恢复，再在 310B 上调用
+`GET /api/admin/devices/discover`。该接口只查询 `_esp32-pframe._tcp`、读取每个候选的
+`/api/system-info`，并保留字面 IPv4、硬件 ID、板型和固件版本供操作者选择。它不扫描网段，
+也不能唤醒设备。深度休眠时 Wi-Fi、mDNS 和 HTTP 均关闭，310B 不存在可发送的网络唤醒包。
+
+Case7 对这两类 ESP32 终端固定采用深度休眠：注册、策略更新和设备成功拉图时都写入
+`deep_sleep_enabled=true`，前端不提供关闭或“调试常亮”选项。这样可以保持电池续航和实体
+唤醒键的语义一致；重新刷写固件后重新注册会再次修复该配置。设备必须先由实体按键或固件
+定时器唤醒，310B 才能发现并服务下一次 URL Rotation 请求。
+
+发现为空时，可以在 310B 操作页面的 **设置 → ESP32 唤醒与发现** 中输入该地址并点击
+**读取并验证 IP**；它调用只读 `POST /api/admin/devices/probe`。也可以从串口
+`sta ip:` 或路由器 DHCP 租约取得当前 IPv4，直接读取 `http://<ESP32-IP>/api/system-info`；
+只有 `project_name=esp32-photoframe`、`device_id`
+和正确 profile 均核对后，才提交 `POST /api/admin/devices/register`。注册返回
+`202/awaiting_pull` 只代表控制面配置完成；设备随后主动请求
+`http://192.168.1.135:7860/api/devices/<device_id>/photoframe`，才算观察到真实拉图。
+两台设备可能都显示 `photoframe.local`，因此不能按主机名或列表第一项自动配对。原厂
+SenseCraft/Xiaozhi 固件若没有上述 API 或 mDNS 服务，必须先完成固件适配，不能仅凭外壳和
+二维码判定兼容。可执行的逐步命令、故障表和证据模板见
+[唤醒与发现两类 ESP32 电子相册](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/14-wake-and-discover-esp32-photoframes.md)。
+
+E1002 的 MicroSD 只按官方支持范围使用不超过 32 GB 的 FAT32 卡。64 GB 卡不属于承诺兼容范围；
+本次实测拔出 64 GB 卡后 URL 拉图恢复正常，因此 Case7 的网络相册不把 SD 卡作为照片缓存或
+传输前提。该存储卡兼容性问题与深度休眠策略是两个独立条件。
+
 ### 横竖屏图像方向
 
 照片显示先执行 EXIF Orientation 校正，再应用设备 profile 的 `orientation`（`landscape` 或 `portrait`）。默认
@@ -427,7 +495,9 @@ curl.exe --noproxy "*" -I "http://$photoIp/"
 设备可用 `X-Display-Width` 和 `X-Display-Height` 在**其已登记 profile 允许范围内**协商当前能力：
 只有 PhotoPainter 可以使用 `480x800` 竖屏，E1002 的这类请求会拒绝；不可沿用旧的方向标签。JPEG 响应中的 `X-Album-Orientation` 是实际像素方向，
 `X-Album-Target-Orientation` 是目标显示方向，因此 `auto` 模式下两者可以不同。尺寸、方向模式和安装
-方向都会进入 JPEG 的 ETag。触摸屏 `display.*` 与 E6 `epaper.*` 的方向设置相互独立；E6 仍是固定
+profile 的固定硬件补偿也会进入 JPEG variant/ETag，但不旋转 JPEG 像素：Waveshare PhotoPainter 为
+`hardware_rotation_deg=180`，E1002 为 `0`，并分别写入固件的 `display_rotation_deg`。触摸屏
+`display.*` 与 E6 `epaper.*` 的方向设置相互独立；E6 仍是固定
 `800x480`、192000-byte 线协议，天气刷新或触摸屏方向变化不会让同一 E6 图帧失效并触发额外刷新。
 
 ## 🎨 触摸屏交互设计
@@ -435,6 +505,17 @@ curl.exe --noproxy "*" -I "http://$photoIp/"
 触摸屏首页把照片作为第一视觉层，天气卡片和状态信息使用高对比度实体背景。五个首页动作收拢为一个紧凑工具栏；文件名作为同一工具栏内的非交互文本，设置页有“显示文件名水印”开关。8 秒无操作时工具栏和文件名一起淡出，触摸照片唤醒。
 
 底部导航打开图库、智能搜索、上传、设备和设置五个全屏面板。按钮最小高度为 56px，图片网格固定宽高比；1920x1080、1280x800、1024x600 和 400x900 视口均禁止页面横向滚动。
+
+如果开发板同时连接两个 HDMI 输出，X11 会把它们合成一个更宽的虚拟桌面；触摸设备若仍映射到整个桌面，会表现为照片页面没有偏移但点击位置向一侧偏离。Case7 的 kiosk 启动脚本在打开浏览器前将 `QDtech MPI1001` 映射到主输出 `HDMI-1`，并在重启或热插拔后重新执行。该输入映射属于显示会话配置，与网页 CSS、照片 EXIF 方向和 NPU 推理无关。
+
+设备面板内部再按任务拆成四个互斥视图，而不是把本机屏幕、远端终端和配对表单连续堆叠在同一长页面：
+
+- **总览**显示登记记录、型号确认、最近拉图和启用数量，并提供进入其他视图的快捷入口；
+- **本机触摸屏**只管理开发板 HDMI 显示设备的轮播、方向和文件名水印；
+- **已注册设备**按 Waveshare PhotoPainter、Seeed reTerminal E1002 和待确认型号分组，集中处理远端设备状态、策略、推进、启停和删除；
+- **发现与配对**只负责唤醒后的局域网发现、IP 验证和身份登记。
+
+标签使用 `tablist`/`tabpanel` 语义，同一时间仅激活一个视图；窄屏时标签排成两列，设备数量变化只更新标签副标题，不改变操作位置。这种分区使本机触摸屏成为可单独设置的设备，也避免把“发现候选设备”和“已经注册的设备”混为一谈。
 
 ## 🖨️ E6 图像处理方法
 
@@ -511,6 +592,8 @@ COCO-CN 图片已建立三个模型的各 500 个 embedding，英文 Recall@1/3/
 - [Waveshare E6 Python 驱动](https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd/epd7in3e.py)
 - [Ascend samples](https://github.com/Ascend/samples)
 - [ESP32 PhotoFrame](https://github.com/aitjcize/esp32-photoframe)
+- [Andy：基于 CLIP 模型特征搭建简易的个人图像搜索引擎](https://andy9999678.me/blog/archives/239)
+- [atarss/clip-image-search](https://github.com/atarss/clip-image-search)
 
 [^1]: Apple. *ml-mobileclip*. https://github.com/apple/ml-mobileclip
 [^2]: OFA-Sys. *Chinese-CLIP*. https://github.com/OFA-Sys/Chinese-CLIP
@@ -518,3 +601,5 @@ COCO-CN 图片已建立三个模型的各 500 个 embedding，英文 Recall@1/3/
 [^4]: Waveshare Team. *e-Paper*. https://github.com/waveshareteam/e-Paper
 [^5]: Ascend. *samples*. https://github.com/Ascend/samples
 [^6]: aitjcize. *esp32-photoframe*. https://github.com/aitjcize/esp32-photoframe
+[^7]: Andy. *基于 CLIP 模型特征搭建简易的个人图像搜索引擎*. https://andy9999678.me/blog/archives/239
+[^8]: atarss. *clip-image-search*. https://github.com/atarss/clip-image-search

@@ -66,6 +66,7 @@ class DisplayPolicyTests(unittest.TestCase):
 
     def test_playlist_policy_defaults_and_validation(self):
         value = validate_policy()
+        self.assertTrue(value["deep_sleep_enabled"])
         self.assertEqual(value["selection_mode"], "smart")
         self.assertEqual(value["playlist_photo_ids"], [])
         self.assertEqual(value["repeat_window"], 12)
@@ -78,6 +79,8 @@ class DisplayPolicyTests(unittest.TestCase):
             validate_policy({"playlist_photo_ids": [3, 3]})
         with self.assertRaises(DisplayPolicyError):
             validate_policy({"playlist_photo_ids": [0]})
+        with self.assertRaisesRegex(DisplayPolicyError, "deep sleep is fixed enabled"):
+            validate_policy({"deep_sleep_enabled": False})
 
     def test_five_minute_cron_slot_is_stable(self):
         self.assertEqual(

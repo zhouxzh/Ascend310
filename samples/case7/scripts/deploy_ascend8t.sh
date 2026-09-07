@@ -96,7 +96,7 @@ FILES=(
   docs/07-touchscreen-ui-and-operations.md docs/08-model-pipeline-and-npu-admission.md
   docs/09-index-storage-and-photo-lifecycle.md docs/10-smart-selection-and-weather.md
   docs/11-photoframe-active-push.md docs/12-mobileclip-cross-board-compatibility.md
-  docs/13-photopainter-serial-ip-and-wifi.md
+  docs/13-photopainter-serial-ip-and-wifi.md docs/14-wake-and-discover-esp32-photoframes.md
 )
 
 for file in "${FILES[@]}"; do

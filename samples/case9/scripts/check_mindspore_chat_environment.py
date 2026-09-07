@@ -187,10 +187,12 @@ def run(profile: str, registry_path: Path, root: Path) -> Dict[str, Any]:
             "id": selected.id,
             "board_soc": selected.board_soc,
             "board_tier": selected.board_tier,
+            "board_targets": [dict(item) for item in getattr(selected, "board_targets", ())],
+            "candidate_kind": getattr(selected, "candidate_kind", "native_mindspore"),
             "status": selected.status,
         }
-        if selected.status in {"blocked", "not-run"}:
-            failures.append("selected profile is %s" % selected.status)
+        if getattr(selected, "is_conditional", False):
+            failures.append("selected profile is conditional and cannot run")
     except Exception as exc:
         return {"ok": False, "failures": ["profile registry: %s" % exc], "checks": {}}
 
@@ -224,8 +226,24 @@ def run(profile: str, registry_path: Path, root: Path) -> Dict[str, Any]:
     observed_soc = str(soc.get("chip") or "").upper()
     if not soc.get("ok"):
         failures.append("npu-smi could not prove a visible 310B device")
-    elif observed_soc != expected_soc.replace("ASCEND", ""):
-        failures.append("profile expects %s but npu-smi reported %s" % (expected_soc, observed_soc or "unknown"))
+    else:
+        expected_targets = getattr(selected, "board_targets", ())
+        supported = {
+            str(item.get("soc", "")).upper().replace("ASCEND", "")
+            for item in expected_targets
+            if isinstance(item, Mapping)
+        }
+        if not supported:
+            supported = {expected_soc.replace("ASCEND", "")}
+        if observed_soc not in supported:
+            failures.append(
+                "profile targets %s but npu-smi reported %s"
+                % (", ".join(sorted("Ascend" + item for item in supported)), observed_soc or "unknown")
+            )
+        board_status = selected.activation_status_for_soc("Ascend" + observed_soc)
+        checks["profile"]["observed_soc_status"] = board_status
+        if board_status in {"blocked", "not-run"}:
+            failures.append("selected profile is %s for %s" % (board_status, observed_soc))
 
     forbidden: Dict[str, Optional[str]] = {}
     for package in FORBIDDEN_PACKAGES:

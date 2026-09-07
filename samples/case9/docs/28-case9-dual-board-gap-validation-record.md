@@ -10,7 +10,7 @@ _记录版本：1.1｜日期：2026-08-30｜状态：`completed`（缺口证据�
 
 | 板卡 | 当前 IP | 历史 IP | SoC/算力 | 备注 |
 | --- | --- | --- | --- | --- |
-| 8T | `192.168.1.90` | `192.168.8.178` | `Ascend310B4 / 8T` | 同一块板，IP 变化不自动产生新性能批次 |
+| 8T | `192.168.1.90` | `192.168.11.14`、`192.168.8.178` | `Ascend310B4 / 8T` | 同一块板，IP 变化不自动产生新性能批次；历史报告仍按采集地址引用 |
 | 20T | `192.168.1.95` | `192.168.8.210` | `Ascend310B1 / 20T` | `.210` 不作为当前连接入口；需以 `.95` 的原始快照为准 |
 
 两板均曾记录 `Health: Alarm`；该字段仅为诊断信息，不单独判定成功或失败。
@@ -32,9 +32,9 @@ B1 总耗时 p50/p95 `6486.422/6506.085 ms`、吞吐 `0.308 token/s`。详细报
 
 ### 2.2 MindNLP/MindSpore
 
-| 模型 | 8T `.90` | 20T `.95` |
+| 模型 | 8T（当前 `.90`，历史采集地址 `.11.14`/`.178`） | 20T `.95` |
 | --- | --- | --- |
-| Qwen1.5-0.5B-Chat | 已有完整批次：总耗时 p50/p95 `1412.236/1603.883 ms`，吞吐 `1.420 token/s`；`experimental_dirty_base` | `.95` 缺口 `passed`，9/9 机器门；总耗时 p50/p95 `1329.830/1440.076 ms`，首事件 p50/p95 `661.419/754.165 ms`，吞吐 p50/p95 `1.505/1.619 token/s`；报告见下表，人工质量待审，仍为 `experimental_dirty_base` |
+| Qwen1.5-0.5B-Chat | 历史报表 9/9，但严格身份门 8/9 待补证；总耗时 p50/p95 `1412.236/1603.883 ms`，吞吐 `1.420 token/s`；`experimental_dirty_base` | `.95` 缺口 `passed`，9/9 机器门；总耗时 p50/p95 `1329.830/1440.076 ms`，首事件 p50/p95 `661.419/754.165 ms`，吞吐 p50/p95 `1.505/1.619 token/s`；报告见下表，人工质量待审，仍为 `experimental_dirty_base` |
 | TinyLlama-1.1B-Chat | 已有批次：总耗时 p50/p95 `3114.857/3185.731 ms`，吞吐 `0.642 token/s`；长输出含 `U+FFFD`，`blocked` | `.95` 缺口 `failed`，8/9 机器门；总耗时 p50/p95 `1939.938/2003.937 ms`，首事件 p50/p95 `1938.973/2003.336 ms`，吞吐 p50/p95 `1.031/1.044 token/s`；32/48 token UTF-8 失败、中文机器质量 7/10，保持 `blocked` |
 | DeepSeek-R1-Distill-Qwen-1.5B FP16 | `.90` 缺口 `passed`，9/9 机器门；总耗时 p50/p95 `3938.489/4008.768 ms`，首事件 p50/p95 `3932.103/4002.231 ms`，吞吐 p50/p95 `0.510/0.517 token/s`；报告见下表，人工质量待审，`experimental_dirty_base` | 完整临时 API：总耗时 p50/p95 `2484.751/2557.242 ms`，吞吐 `0.805 token/s`；中文质量未通过，`blocked` |
 
@@ -51,7 +51,7 @@ DeepSeek 8T 与 20T 的 4-token 直接对照使用相同协议，20T p50 延迟�
 | --- | ---: | ---: | --- | --- | --- | --- |
 | `.95` Qwen1.5 | 64 | 55 | `stop` | `true` | `true` | `repro/case9-dual-board-gap-20260830/reports/board20t/qwen1.5-0.5b-mindspore/qwen20-gap-20260830/long-output.json` |
 | `.95` TinyLlama | 64 | 64 | `length` | `true` | `true` | `repro/case9-dual-board-gap-20260830/reports/board20t/tinyllama-1.1b-mindspore/tiny20-gap-20260830/long-output.json` |
-| `.90` DeepSeek | 64 | 64 | `length` | `true` | `true` | `repro/case9-dual-board-gap-20260830/reports/board8t/deepseek-r1-qwen-1.5b-mindspore/deepseek-8t-gap-20260830/long-output.json` |
+| DeepSeek（当前 `.90`；历史 `.11.14`） | 64 | 64 | `length` | `true` | `true` | `repro/case9-dual-board-gap-20260830/reports/board8t/deepseek-r1-qwen-1.5b-mindspore/deepseek-8t-gap-20260830/long-output.json` |
 
 TinyLlama 同一批次的 32 和 48 token 行分别为 `utf8_valid=false`、
 `valid_for_budget=false`；不能因为 64-token 行恢复为有效就清除失败状态。
@@ -80,7 +80,7 @@ TinyLlama 同一批次的 32 和 48 token 行分别为 `utf8_valid=false`、
 
 | run_id | 板卡/IP | 模型/路线 | G0-G8 汇总 | 性能报告 | 原始报告/日志 | 当前状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `deepseek-8t-gap-20260830b` | `.90` / `192.168.1.90` | DeepSeek / MindNLP | 9/9 机器门；JSON/SSE/长输出/稳定性/协议通过；中文机器 10/10，人工待审 | `repro/case9-dual-board-gap-20260830/reports/board8t/deepseek-r1-qwen-1.5b-mindspore/deepseek-8t-gap-20260830/performance.json`；总耗时 p50/p95 `3938.489/4008.768 ms`，吞吐 `0.510/0.517 token/s` | `repro/case9-dual-board-gap-20260830/reports/board8t/deepseek-r1-qwen-1.5b-mindspore/deepseek-8t-gap-20260830/acceptance.json`（68,211 bytes，SHA `6f04a998980dbf2c872f0c470178af6e028d48da3c8af36d21fab08b30f43ab1`）；64 tokens 实际 64，`length`，UTF-8 有效 | `passed` + `experimental_dirty_base` |
+| `deepseek-8t-gap-20260830` | 当前 `192.168.1.90`（历史 `.11.14`/`.178`） | DeepSeek / MindNLP | 9/9 机器门；JSON/SSE/长输出/稳定性/协议通过；中文机器 10/10，人工待审 | `repro/case9-dual-board-gap-20260830/reports/board8t/deepseek-r1-qwen-1.5b-mindspore/deepseek-8t-gap-20260830/performance.json`；总耗时 p50/p95 `3938.489/4008.768 ms`，吞吐 `0.510/0.517 token/s` | `repro/case9-dual-board-gap-20260830/reports/board8t/deepseek-r1-qwen-1.5b-mindspore/deepseek-8t-gap-20260830/acceptance.json`（68,211 bytes，SHA `6f04a998980dbf2c872f0c470178af6e028d48da3c8af36d21fab08b30f43ab1`）；64 tokens 实际 64，`length`，UTF-8 有效 | `passed` + `experimental_dirty_base` |
 | `qwen20-gap-20260830` | `.95` / `192.168.1.95` | Qwen1.5 / MindNLP | 9/9 机器门；JSON/SSE/长输出/稳定性/协议通过；中文机器 10/10，人工待审 | `repro/case9-dual-board-gap-20260830/reports/board20t/qwen1.5-0.5b-mindspore/qwen20-gap-20260830/performance.json`；总耗时 p50/p95 `1329.830/1440.076 ms`，吞吐 `1.505/1.619 token/s` | `repro/case9-dual-board-gap-20260830/reports/board20t/qwen1.5-0.5b-mindspore/qwen20-gap-20260830/acceptance.json`（68,315 bytes，SHA `978864c6ddab8d7944d318748abaa1a00145c2ce6d5dcb6b6b1b40014b62e1c4`）；64 tokens 实际 55，`stop`，UTF-8 有效 | `passed` + `experimental_dirty_base` |
 | `tiny20-gap-20260830` | `.95` / `192.168.1.95` | TinyLlama / MindNLP | 8/9 机器门；JSON/SSE/稳定性/协议通过，长输出失败；中文机器 7/10 | `repro/case9-dual-board-gap-20260830/reports/board20t/tinyllama-1.1b-mindspore/tiny20-gap-20260830/performance.json`；总耗时 p50/p95 `1939.938/2003.937 ms`，吞吐 `1.031/1.044 token/s` | `repro/case9-dual-board-gap-20260830/reports/board20t/tinyllama-1.1b-mindspore/tiny20-gap-20260830/acceptance.json`（66,436 bytes，SHA `b160e2d36d734a7f94c6e92722e97eb02c26f5de468480ac625808b54f0d97db`）；64 tokens 实际 64，`length`，UTF-8 有效；32/48 行无效 | `failed` / `blocked` |
 | `identity-20260830T105928Z` | `.90` / `192.168.1.90` | Qwen2.5 OM 当前身份 | 只读身份、ACL 导入、descriptor 和工件哈希通过；不执行推理 | 不重跑历史性能 | `identity-input/board8t-qwen25-current-identity.json`（2,074 bytes，SHA `738e2788...d2474`） | `passed`（identity-only） |

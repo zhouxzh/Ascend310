@@ -1,6 +1,6 @@
 # Case9 MindSpore 聊天模型实测验收账本
 
-_记录版本：2.0｜更新日期：2026-08-30｜当前结论：Qwen/Tiny 已完成一轮板端机器协议测试，Qwen post-restart d/e、post-mask n 小批次和 Qwen -> Tiny -> Qwen 切换冒烟通过；Tiny 长输出失败，现已标记 blocked 并禁止再次激活；DeepSeek 已在实际可达的 20T（192.168.1.95）完成隔离 NPU 短生成、稳定性、9/9 API 机器门和完整 2+30 SSE 性能对照，但中文质量仍未通过；8T 随后发生可重复的 LPM fault，Qwen 仅完成受控恢复烟测，硬件稳定性仍未通过_
+_记录版本：2.1｜更新日期：2026-09-04｜当前结论：Qwen/Tiny 已完成一轮板端机器协议测试，Qwen post-restart d/e、post-mask n 小批次和 Qwen -> Tiny -> Qwen 切换冒烟通过；Tiny 长输出失败，现已标记 blocked 并禁止再次激活；DeepSeek 已在实际可达的 20T（192.168.1.95）完成隔离 NPU 短生成、稳定性、9/9 API 机器门和完整 2+30 SSE 性能对照，但中文质量仍未通过；8T 随后发生可重复的 LPM fault，Qwen 仅完成受控恢复烟测，硬件稳定性仍未通过；2026-09-04 的当前地址 G0/G1 与 Qwen2.5 context-only 诊断仅补充 provenance，不改变既有准入结论_
 
 本文只记录已经产生的报告和可复核的板端事实。`passed` 仅表示对应机器检查通过，
 不表示中文回答正确、服务适合生产或已经获准进入模型选择器。`human_review` 和
@@ -10,8 +10,8 @@ _记录版本：2.0｜更新日期：2026-08-30｜当前结论：Qwen/Tiny 已�
 
 | Profile | 板卡 | 本批次状态 | 已有证据 | 当前边界 |
 | --- | --- | --- | --- | --- |
-| `qwen1.5-0.5b-mindspore` | `192.168.1.90`，Ascend310B4 / 8T | `passed`（9/9 完整机器门；d/e 与 n 小批次通过） | 板端/本地 artifact verifier 7/7；`/health`、`/v1/models`、JSON、SSE、8/16/32/64 长输出、10 轮稳定性、2+30 性能、错误边界和协议中断检查；`20260829c` 严格 health 身份门；post-restart d/e、post-mask n；候选网关鉴权、候选 UI 和 JSON/SSE 链 HTTP 冒烟 | 共享 `base` 是 `experimental_dirty_base`；人工质量仍 `pending`；成功切换已冒烟，浏览器会话清空、失败回滚和 watchdog 生命周期仍未完成 |
-| `tinyllama-1.1b-mindspore` | `192.168.1.90`，Ascend310B4 / 8T | `failed`（8/9 机器门），Profile `blocked` | 板端/本地 artifact verifier 7/7；基础 API、SSE、错误边界、协议中断、稳定性和性能请求可完成 | `max_tokens=32` 输出含 `U+FFFD`，`quality_machine=7/10`；已有切换仅为历史证据，当前 CLI 禁止激活 |
+| `qwen1.5-0.5b-mindspore` | `192.168.1.90`，Ascend310B4 / 8T（历史报告地址 `.11.14`/.178） | 历史批次 `passed`（9/9 完整机器门；d/e 与 n 小批次通过），当前 Profile `blocked` | 板端/本地 artifact verifier 7/7；历史 `/health`、`/v1/models`、JSON、SSE、8/16/32/64 长输出、10 轮稳定性、2+30 性能、错误边界和协议中断检查；当前地址 G0/工件复核；严格 placement 诊断记录模型未暴露显式 Ascend placement | 历史健康快照缺 `npu_model`，当前严格 placement fail-closed；共享 `base` 是 `experimental_dirty_base`，人工质量仍 `pending`，不得激活 |
+| `tinyllama-1.1b-mindspore` | `192.168.1.90`，Ascend310B4 / 8T（历史报告地址 `.11.14`/`.178`） | `failed`（8/9 机器门），Profile `blocked` | 板端/本地 artifact verifier 7/7；基础 API、SSE、错误边界、协议中断、稳定性和性能请求可完成 | `max_tokens=32` 输出含 `U+FFFD`，`quality_machine=7/10`；已有切换仅为历史证据，当前 CLI 禁止激活 |
 | `deepseek-r1-qwen-1.5b-mindspore` | `192.168.1.95`，Ascend310B1 / 20T（`.210` 为旧地址） | `blocked`（隔离实验已运行） | 固定 Modelers revision、权重哈希、MindSpore/Ascend 加载、短生成、10 轮稳定性、临时 OpenAI API 9/9 机器门、2+30 SSE 性能和中文探测原始报告 | 中文回答仍在推理前缀截断或出现事实错误；正式网关/UI 未运行；共享 `base` 为 dirty-base，不能直接准入 |
 
 Qwen 和 Tiny 的验收脚本是只读 campaign，要求服务已经启动，`process_management` 为
@@ -22,8 +22,9 @@ Qwen 和 Tiny 的验收脚本是只读 campaign，要求服务已经启动，`pr
 
 ## 2. 实测环境指纹
 
-两批报告均采集于同一块 `.90` 板。报告时间为 UTC，当前 IP 已是
-`192.168.1.90`；早期 `.178` 只是同一块板的历史地址，不是第二个测试节点。
+两批报告均采集于同一块 B4/8T 板。报告时间为 UTC；此前活动地址为
+当前入口为 `192.168.1.90`，历史地址为 `.11.14`；早期 `.178` 也是同一块板的历史地址，
+不是第二个测试节点。IP 变化不产生新的性能批次。
 
 | 字段 | Qwen 批次 | Tiny 批次 |
 | --- | --- | --- |
@@ -379,6 +380,29 @@ Qwen 和 Tiny 的 artifact verifier 已分别在控制机和板端缓存根目�
 [`qwen-artifact-verification-board.json`](../repro/mindspore-chat-20260829/reports/board8t/qwen-artifact-verification-board.json)、
 [`tiny-artifact-verification.json`](../repro/mindspore-chat-20260829/reports/board8t/tiny-artifact-verification.json)
 和 [`tiny-artifact-verification-board.json`](../repro/mindspore-chat-20260829/reports/board8t/tiny-artifact-verification-board.json)。
+
+### 7.1 2026-09-03 地址变更后的新增诊断
+
+确认 `192.168.11.14` 与历史 `192.168.1.90`/`192.168.8.178` 是同一块
+Ascend310B4/8T 板，因此没有把 IP 变化伪造为新的性能批次。新增的
+Qwen2.5-0.5B MindSpore 诊断使用固定 revision 和本地工件，模型加载
+`48.223862 s`，16 token 中文生成 `27.194196 s`；并发 `npu-smi` 采样观察到
+AICore 非零峰值约 `37%`、设备内存约 `38% -> 91% -> 46%`。这证明运行期间存在
+NPU 活动旁证，但 provider 没有显式参数 placement metadata，严格模式仍拒绝加载，
+所以没有启动候选 API、网关或 UI。详见 [Qwen2.5 loader 记录](34-qwen25-0.5b-mindspore-8t-loader-smoke-20260903.md)
+及本地忽略复现目录 `repro/mindspore-chat-20260903/`。
+
+同一环境的 Qwen3 loader 检查发现 MindNLP `0.4.1` 没有 `qwen3` 模块或
+`Qwen3ForCausalLM`，8T 两个 Qwen3 Profile 已登记为 `blocked`，未下载权重；见
+[Qwen3 兼容性记录](35-qwen3-loader-compatibility-check-20260903.md)。这些新增结果
+不改变正式 `8080 -> 7861 -> 7865` 入口，也没有安装/升级/删除板端包。
+
+Qwen2.5-1.5B 的 8T 预检已固定 revision 并核验 tokenizer/config；随后七个文件（含
+`3,087,467,144`-byte 完整权重）已同步并通过 SHA-256。首轮初始化 SIGSEGV（exit 139）
+经复核属于覆盖 CANN `PYTHONPATH` 的污染诊断；正确 CANN v2/v3b/v4 已加载模型并完成
+短生成，但 placement、API、质量和性能仍未形成结论，8T 状态保持 `blocked`。详见
+[配置级预检](36-qwen25-1.5b-8t-preflight-20260904.md) 和
+[内存门记录](37-qwen25-1.5b-8t-memory-gate-20260904.md)。
 
 ## 8. 可复现 preflight 和下一步
 

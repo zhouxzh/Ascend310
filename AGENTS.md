@@ -15,6 +15,7 @@ documentation, generated material, or board assets.
 | `src/experiment/` | Practical case manuscript source | Markdown |
 | `src/appendix/` | Appendix manuscript source | Markdown |
 | `samples/` | Runnable code, setup scripts, and model tooling paired with chapters/cases | Source files |
+| `docs/` | Repository-level structure, engineering-document index, and cross-case reviews | Markdown |
 | `docs/` in a sample | Numbered engineering plans, audits, and validation records | Markdown |
 | `src/.vuepress/` | Site navigation and presentation configuration | TypeScript/config |
 | `latex/` | Generated LaTeX/PDF outputs | Generated; do not hand-edit |
@@ -69,6 +70,65 @@ flowchart LR
   limitation explicitly.
 - Use `apply_patch` for manual edits. Do not overwrite or revert unrelated
   user changes, generated output, model assets, or data.
+
+## Evidence-driven hypothesis and empirical validation
+
+- Treat documentation, model cards, product-family names, and vendor examples
+  as prior evidence, not as an exhaustive compatibility whitelist. If a source
+  describes an Atlas family without spelling out every 310B SKU, the missing
+  SKU is **unknown**, not proof of unsupported hardware. Form a falsifiable
+  hypothesis and test it on the target board before making a categorical claim.
+  The Ascend `npu-smi` reference explicitly maps Atlas 310B1 to 20T and 310B4
+  to 8T; use that documented family mapping as valid prior evidence while still
+  testing the selected software/model stack on the actual board:
+  <https://www.hiascend.com/document/detail/zh/Atlas%20200I%20A2/23.0.0/re/npu/npusmi_009.html>.
+- Label evidence explicitly as `documented`, `inferred`, `observed-pass`,
+  `observed-fail`, or `untested`. A documentation omission, a missing loader,
+  or an untried model format must not be recorded as `unsupported` by itself.
+  Conversely, a passing import or example does not prove end-to-end NPU
+  inference; capture the actual backend, device, operator path, and output.
+- Use a progressive experiment loop: state the hypothesis and expected signal,
+  run the smallest non-destructive smoke on the target (runtime import,
+  device/context creation, one representative model operation), inspect logs
+  and device counters, then expand to API, accuracy, and performance tests.
+  Record the exact software/model/hardware tuple and update the hypothesis from
+  the observation. Do not let a failed first loader attempt become a universal
+  claim about the framework or all models.
+- When the documented product family and the target hardware make a route
+  plausible, prefer a bounded smoke test over prolonged semantic debate. Mark
+  the run as exploratory until its evidence gates pass, but do not refuse the
+  experiment solely because a page uses a broader product label or omits a
+  model name.
+- The system-provided examples establish a known-good baseline, not the only
+  models that MindSpore, MindSpore Lite, ACL, or CANN can run. New checkpoints
+  and formats may be evaluated through an explicit adapter or an isolated
+  experiment directory. Keep package and system-change restrictions, hashes,
+  contracts, and rollback requirements unchanged while exploring them.
+- Evaluate model support as separate layers: hardware/runtime initialization,
+  framework version, architecture or loader, weight format and tokenizer,
+  operator graph, memory budget, and end-to-end generation. A model absent from
+  the bundled examples may still pass through a generic loader or a conversion
+  path; a failure at one layer must be reported at that layer rather than
+  treated as proof that the framework only supports its shipped examples.
+- Record Python import origins and user-site policy before judging a runtime.
+  On board images, a validated MindSpore/MindNLP wheel may live in the active
+  user's site while a different conda copy is present. `PYTHONNOUSERSITE=1` can
+  therefore create a false missing-loader result; compare the isolated and
+  actual launch environments explicitly instead of silently treating them as
+  the same installation.
+- Treat full MindSpore and MindSpore Lite as separately versioned runtimes.
+  Check their ABI and import order in fresh processes; an undefined-symbol
+  error from mixing releases is an environment mismatch for that combination,
+  not evidence that the Atlas/310B hardware or external models are unsupported.
+- A negative result is scoped to the tested combination (model revision,
+  loader/runtime version, CANN/driver/firmware, SoC, inputs, and command). Use
+  `blocked` or `unknown` when a prerequisite was not tested, and reserve
+  `unsupported` for a documented incompatibility or a reproducible failure
+  after the relevant supported paths were exercised.
+- Bold hypotheses never justify unsafe changes: do not flash firmware, replace
+  CANN, install prohibited frameworks, or enable CPU/cloud fallback merely to
+  obtain a passing result. Preserve fail-closed behavior and the separation of
+  diagnostic, smoke, numerical, quality, and performance evidence.
 
 ## Palmprint workbench architecture
 

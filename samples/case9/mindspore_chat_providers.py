@@ -24,7 +24,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 import importlib
 import importlib.metadata
+import json
 import logging
+from numbers import Integral
 import os
 from pathlib import Path
 import queue
@@ -42,9 +44,11 @@ LOGGER = logging.getLogger("case9.mindspore_chat.providers")
 
 DEFAULT_CONTEXT_LENGTH = 1024
 DEFAULT_MAX_TOKENS = 32
-# Keep the MindSpore candidate contract aligned with the ACL/Qwen service.
-# The context check below still enforces prompt_tokens + max_tokens <= 1024.
-MAX_MAX_TOKENS = 80
+# MindSpore candidates use a deliberately conservative generation budget.
+# The formal Qwen2.5 ACL service has its own historical limit; this constant
+# applies only to the profile-specific MindSpore endpoint.
+MAX_MAX_TOKENS = 64
+STREAM_READER_POLL_SECONDS = 0.05
 _NPU_SOC_RE = re.compile(r"\b(?:Ascend\s*)?(310B[0-9A-Za-z]+)\b", re.IGNORECASE)
 
 
@@ -86,6 +90,23 @@ def _value(obj: Any, *names: str, default: Any = None) -> Any:
             return obj[name]
         if hasattr(obj, name):
             return getattr(obj, name)
+    # Raw schema-v2 mappings keep runtime limits under ``runtime`` while the
+    # validated dataclass exposes compatibility properties at the top level.
+    # Resolve the same small set of runtime fields here so a recovery/test
+    # caller cannot bypass the provider admission check by passing the raw
+    # JSON shape.
+    runtime = obj.get("runtime") if isinstance(obj, Mapping) else None
+    if isinstance(runtime, Mapping):
+        aliases = {
+            "runtime_provider": "provider",
+            "provider": "provider",
+            "context_window": "context_length",
+            "max_context_tokens": "context_length",
+        }
+        for name in names:
+            runtime_name = aliases.get(name, name)
+            if runtime_name in runtime:
+                return runtime[runtime_name]
     return default
 
 
@@ -273,6 +294,195 @@ def _cann_version() -> Optional[str]:
     return None
 
 
+def _device_label(value: Any) -> Optional[str]:
+    """Normalize an explicitly exposed MindSpore device label.
+
+    MindSpore versions expose placement as ``device``, ``device_type`` or a
+    small Device object.  We intentionally inspect only those explicit
+    attributes; a stringified model/parameter repr is not evidence of where
+    an operator executed.
+    """
+
+    if value is None:
+        return None
+    for attr in ("device_type", "type", "target"):
+        nested = getattr(value, attr, None)
+        if nested is not None and nested is not value:
+            label = _device_label(nested)
+            if label:
+                return label
+    if isinstance(value, (str, bytes)):
+        text = value.decode("utf-8", "replace") if isinstance(value, bytes) else value
+        lowered = text.strip().lower()
+        if any(token in lowered for token in ("ascend", "npu", "davinci")):
+            return "Ascend"
+        if "cpu" in lowered:
+            return "CPU"
+        if "gpu" in lowered:
+            return "GPU"
+        return None
+    return None
+
+
+def _explicit_model_placement(model: Any) -> List[Tuple[str, str]]:
+    """Collect explicit parameter/model placement evidence without mutation."""
+
+    evidence: List[Tuple[str, str]] = []
+
+    def inspect(label: str, value: Any) -> None:
+        target = _device_label(value)
+        if target:
+            evidence.append((label, target))
+
+    for attr in ("device_target", "device_type", "device", "place"):
+        try:
+            inspect("model.%s" % attr, getattr(model, attr, None))
+        except Exception:
+            continue
+
+    def inspect_parameter(label: str, parameter: Any) -> None:
+        """Inspect metadata wrappers without materializing a device tensor.
+
+        MindSpore releases expose placement, when they expose it at all, on
+        either ``Parameter`` or its ``data``/``inited_param`` wrapper.  Do not
+        call ``value()``, ``asnumpy()`` or any other materializing method here:
+        that would copy potentially large weights to host memory and would no
+        longer be a read-only placement check.
+        """
+
+        pending: List[Tuple[str, Any, int]] = [(label, parameter, 0)]
+        seen: set[int] = set()
+        while pending and len(seen) < 16384:
+            current_label, current, depth = pending.pop()
+            if current is None or id(current) in seen:
+                continue
+            seen.add(id(current))
+            for attr in ("device_target", "device_type", "device", "place"):
+                try:
+                    inspect("%s.%s" % (current_label, attr), getattr(current, attr, None))
+                except Exception:
+                    continue
+            if depth >= 2:
+                continue
+            for nested_attr in ("data", "inited_param"):
+                try:
+                    nested = getattr(current, nested_attr, None)
+                except Exception:
+                    continue
+                if nested is not None and nested is not current:
+                    pending.append(("%s.%s" % (current_label, nested_attr), nested, depth + 1))
+
+    # Parameters are the most reliable cross-version placement signal.  Do
+    # not assume a particular MindSpore iterable shape and cap traversal so a
+    # malformed custom model cannot hang the loader.
+    # ``parameters_dict`` is included because a few MindSpore/MindNLP wrappers
+    # hide the regular iterator methods while still exposing Parameter values.
+    for method_name in (
+        "parameters_and_names",
+        "trainable_params",
+        "get_parameters",
+        "parameters_dict",
+    ):
+        method = getattr(model, method_name, None)
+        if not callable(method):
+            continue
+        try:
+            values = method()
+            if isinstance(values, Mapping):
+                values = values.items()
+            iterator = iter(values)
+        except Exception:
+            continue
+        inspected = 0
+        try:
+            for index, item in enumerate(iterator):
+                if index >= 4096:
+                    break
+                inspected += 1
+                parameter = (
+                    item[1]
+                    if isinstance(item, (tuple, list)) and len(item) >= 2
+                    else item
+                )
+                inspect_parameter("%s[%d]" % (method_name, index), parameter)
+        except Exception:
+            # A malformed/lazy iterator must not turn a diagnostic check into
+            # an unbounded or fatal traversal.  Evidence collected so far is
+            # retained; another method is tried only when this one was empty.
+            pass
+        # One non-empty parameter iterator is enough; avoid invoking
+        # potentially expensive model enumeration methods repeatedly.  Empty
+        # ``parameters_and_names`` results are common for lazy wrappers, so
+        # continue and try the next available source in that case.
+        if inspected:
+            break
+    return evidence
+
+
+def _local_weight_files(cache_dir: Path) -> List[Path]:
+    """Return recognized local weight/index files below a profile cache."""
+
+    names = {
+        "model.safetensors",
+        "pytorch_model.bin",
+        "mindspore.ckpt",
+        "model.ckpt",
+        "mindspore_model.ckpt",
+    }
+    files: List[Path] = []
+    for path in cache_dir.iterdir():
+        if path.is_symlink() or not path.is_file():
+            continue
+        lower = path.name.lower()
+        if lower in names or lower.endswith((".safetensors", ".bin", ".ckpt")) or lower.endswith(
+            (".safetensors.index.json", ".bin.index.json")
+        ):
+            files.append(path)
+    return sorted(files, key=lambda item: item.name.lower())
+
+
+def _local_model_artifact_complete(cache_dir: Path) -> Tuple[bool, bool]:
+    """Return ``(complete, looks_partial)`` for a local model cache.
+
+    Sharded Safetensors/PyTorch indexes are accepted only when every shard
+    named by the index exists below the same cache directory.  ``looks_partial``
+    lets the caller fail closed instead of silently redownloading an incomplete
+    synchronized bundle.
+    """
+
+    # A partial transfer must never trigger an implicit remote download.  The
+    # synchronizer deliberately uses ``.part`` so interrupted copies remain
+    # visible and fail closed until an atomic rename completes.
+    try:
+        for path in cache_dir.iterdir():
+            if path.is_file() and (path.name.lower().endswith(".part") or path.name.startswith(".")):
+                return False, True
+    except OSError:
+        return False, True
+    files = _local_weight_files(cache_dir)
+    if not files:
+        return False, False
+    indexes = [item for item in files if item.name.lower().endswith((".safetensors.index.json", ".bin.index.json"))]
+    if indexes:
+        for index_path in indexes:
+            try:
+                document = json.loads(index_path.read_text(encoding="utf-8"))
+                weight_map = document.get("weight_map") if isinstance(document, Mapping) else None
+                if not isinstance(weight_map, Mapping) or not weight_map:
+                    return False, True
+                for relative in set(weight_map.values()):
+                    if not isinstance(relative, str) or not relative or Path(relative).is_absolute():
+                        return False, True
+                    shard = (cache_dir / relative).resolve(strict=False)
+                    if cache_dir.resolve(strict=False) not in shard.parents or not shard.is_file() or shard.is_symlink():
+                        return False, True
+                return True, True
+            except (OSError, UnicodeError, ValueError, TypeError):
+                return False, True
+    # A single-file or native checkpoint is complete when the file is present.
+    return True, False
+
+
 def _as_int(value: Any) -> int:
     """Convert a MindSpore tensor/NumPy scalar/list element to ``int``."""
 
@@ -298,11 +508,15 @@ def _to_list(value: Any) -> List[int]:
         # ``input_ids`` is normally [batch, sequence].
         value = value[0]
     if not isinstance(value, (list, tuple)):
-        try:
-            return [int(value)]
-        except (TypeError, ValueError) as exc:
-            raise ProviderError("model output did not contain token ids") from exc
-    return [int(item) for item in value]
+        if isinstance(value, bool) or not isinstance(value, Integral):
+            raise ProviderError("model output did not contain token ids")
+        return [int(value)]
+    result: List[int] = []
+    for item in value:
+        if isinstance(item, bool) or not isinstance(item, Integral):
+            raise ProviderError("model output did not contain integer token ids")
+        result.append(int(item))
+    return result
 
 
 def _tensor_length(value: Any) -> int:
@@ -326,6 +540,41 @@ def _decode(tokenizer: Any, token_ids: Sequence[int]) -> str:
     return str(result)
 
 
+def _completion_ids(
+    output: Any,
+    input_ids: Any,
+    prompt_tokens: int,
+    max_tokens: int,
+) -> List[int]:
+    """Normalize full-sequence and new-token MindNLP outputs.
+
+    MindNLP versions differ: some ``generate`` implementations return
+    ``prompt + completion`` while others return only newly generated IDs.
+    Treat a matching prompt prefix as the authoritative full-sequence form;
+    otherwise accept a short new-token sequence.  Ambiguous/oversized output
+    is rejected instead of silently slicing a valid response incorrectly.
+    """
+
+    sequence = _extract_sequences(output)
+    all_ids = _to_list(sequence)
+    if not all_ids:
+        return []
+    prompt_ids = _to_list(input_ids)
+    if len(all_ids) >= prompt_tokens and all_ids[:prompt_tokens] == prompt_ids[:prompt_tokens]:
+        generated = all_ids[prompt_tokens:]
+    elif len(all_ids) <= max_tokens:
+        # The backend returned completion-only IDs.  This form is valid only
+        # when it cannot also be a full prompt-prefixed sequence.
+        generated = all_ids
+    else:
+        raise ProviderError(
+            "MindSpore generate output has no verifiable prompt prefix and exceeds max_tokens"
+        )
+    if len(generated) > max_tokens:
+        raise ProviderError("MindSpore generate output exceeds requested max_tokens")
+    return generated
+
+
 class MindSporeChatProvider:
     """Generic MindNLP causal-LM provider shared by the three profiles.
 
@@ -335,6 +584,22 @@ class MindSporeChatProvider:
     """
 
     provider_name = "mindspore"
+    # Most decoder-only profiles are available through MindNLP's automatic
+    # classes.  Specialized profiles override these names without importing
+    # MindSpore or MindNLP at module import time.
+    tokenizer_class_name = "AutoTokenizer"
+    model_class_name = "AutoModelForCausalLM"
+    chat_template_options: Mapping[str, Any] = {}
+    generation_options: Mapping[str, Any] = {}
+    # Optional loader kwargs keyed by ``model``/``tokenizer``.  The base
+    # adapter keeps this empty so it does not guess at version-specific
+    # MindNLP options.
+    pretrained_options: Mapping[str, Mapping[str, Any]] = {}
+    # The generic class remains useful for injected test doubles and legacy
+    # callers.  Concrete registered profiles must opt in explicitly: a
+    # missing/invalid tokenizer template must fail closed instead of silently
+    # changing the prompt format.
+    allow_generic_template_fallback = True
 
     def __init__(
         self,
@@ -364,11 +629,20 @@ class MindSporeChatProvider:
         self._device_id: Optional[int] = None
         self._npu_model: Optional[str] = None
         self._cann_version: Optional[str] = None
+        self._placement_status = "not_checked"
+        self._placement_evidence: List[Dict[str, str]] = []
+        self._config_normalization: Optional[Dict[str, str]] = None
         self._loaded = model is not None and tokenizer is not None
         self._healthy = True
         self._busy = False
         self._cancel_event = threading.Event()
         self._generation_thread: Optional[threading.Thread] = None
+        # ``TextIteratorStreamer.__next__`` is third-party code.  Keep its
+        # reader in a separate, bounded thread so a streamer that accepts a
+        # timeout keyword but still blocks cannot pin the service request
+        # thread forever.  The board-level watchdog can then terminate this
+        # worker when the reader does not unwind.
+        self._stream_reader_thread: Optional[threading.Thread] = None
         # Keep installation, teardown, and health reconciliation of the
         # generation pointer atomic. A thread is not ``alive`` until
         # ``start()`` returns, so unsynchronised polls can otherwise race the
@@ -408,13 +682,38 @@ class MindSporeChatProvider:
 
     @property
     def eos_token_id(self) -> Optional[int]:
-        value = getattr(self.tokenizer, "eos_token_id", None)
-        if value is None:
-            value = getattr(self.tokenizer, "eos_token", None)
-        try:
-            return int(value) if value is not None and not isinstance(value, str) else None
-        except (TypeError, ValueError):
+        tokenizer = self.tokenizer
+        if tokenizer is None:
             return None
+        value = getattr(tokenizer, "eos_token_id", None)
+        if value is not None and not isinstance(value, str):
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                pass
+        token = getattr(tokenizer, "eos_token", None)
+        if not isinstance(token, str) or not token:
+            return None
+        converter = getattr(tokenizer, "convert_tokens_to_ids", None)
+        if callable(converter):
+            try:
+                converted = converter(token)
+                if isinstance(converted, (list, tuple)):
+                    converted = converted[0] if converted else None
+                if converted is not None and not isinstance(converted, str):
+                    return int(converted)
+            except (TypeError, ValueError, KeyError):
+                pass
+        vocab_getter = getattr(tokenizer, "get_vocab", None)
+        if callable(vocab_getter):
+            try:
+                vocab = vocab_getter()
+                converted = vocab.get(token) if isinstance(vocab, Mapping) else None
+                if converted is not None:
+                    return int(converted)
+            except (TypeError, ValueError, KeyError):
+                pass
+        return None
 
     def load(self) -> None:
         """Load MindSpore/MindNLP lazily and fail closed on errors."""
@@ -432,10 +731,18 @@ class MindSporeChatProvider:
                 self._mindspore = importlib.import_module("mindspore")
                 self._configure_ascend_context()
                 transformers = importlib.import_module("mindnlp.transformers")
-                auto_tokenizer = getattr(transformers, "AutoTokenizer")
-                auto_model = getattr(transformers, "AutoModelForCausalLM")
-                self.tokenizer = self._from_pretrained(auto_tokenizer, "tokenizer")
-                self.model = self._from_pretrained(auto_model, "model")
+                tokenizer_loader = getattr(transformers, self.tokenizer_class_name, None)
+                model_loader = getattr(transformers, self.model_class_name, None)
+                if tokenizer_loader is None:
+                    raise ProviderUnavailable(
+                        "MindNLP does not expose tokenizer class %s" % self.tokenizer_class_name
+                    )
+                if model_loader is None:
+                    raise ProviderUnavailable(
+                        "MindNLP does not expose model class %s" % self.model_class_name
+                    )
+                self.tokenizer = self._from_pretrained(tokenizer_loader, "tokenizer")
+                self.model = self._from_pretrained(model_loader, "model")
             if self.model is None or self.tokenizer is None:
                 raise ProviderUnavailable("MindNLP loaders returned no model/tokenizer")
             set_train = getattr(self.model, "set_train", None)
@@ -444,6 +751,8 @@ class MindSporeChatProvider:
             eval_method = getattr(self.model, "eval", None)
             if callable(eval_method):
                 eval_method()
+            self._configure_model_after_load()
+            self._verify_model_placement()
             self._validate_tokenizer()
             self._loaded = True
             self._healthy = True
@@ -455,6 +764,76 @@ class MindSporeChatProvider:
             self._healthy = False
             self._last_error = str(exc)
             raise ProviderUnavailable("failed to load MindSpore chat model: %s" % exc) from exc
+
+    def _configure_model_after_load(self) -> None:
+        """Apply optional profile-specific model hooks after loading."""
+
+        # The official MiniCPM3 example disables its internal multi-thread
+        # helper on the small board.  Keep this hook optional so older
+        # MindNLP releases and the generic Qwen loaders remain compatible.
+        disable_multi_thread = getattr(self.model, "disable_multi_thread", None)
+        if callable(disable_multi_thread):
+            try:
+                disable_multi_thread()
+            except Exception as exc:
+                raise ProviderUnavailable(
+                    "profile %s could not disable model multi-threading: %s"
+                    % (self.profile_id, exc)
+                ) from exc
+
+    def _verify_model_placement(self) -> None:
+        """Reject explicit CPU/GPU placement and require NPU evidence.
+
+        ``set_context(device_target='Ascend')`` alone does not prove that a
+        custom model or an unsupported operator stayed on the NPU.  When the
+        active MindSpore objects expose placement metadata, require it to be
+        Ascend.  Board launchers keep this strict by default; injected test
+        doubles (which never import MindSpore) retain the lightweight path.
+        """
+
+        if self._mindspore is None:
+            self._placement_status = "not_applicable"
+            return
+        evidence = _explicit_model_placement(self.model)
+        self._placement_evidence = [
+            {"source": source, "target": target} for source, target in evidence
+        ]
+        targets = {target for _, target in evidence}
+        if targets.intersection({"CPU", "GPU"}):
+            self._placement_status = "rejected"
+            raise ProviderUnavailable(
+                "model exposes non-Ascend placement (%s); CPU/GPU fallback is disabled"
+                % ", ".join(sorted(targets.intersection({"CPU", "GPU"})))
+            )
+        if targets and targets.issubset({"Ascend"}):
+            self._placement_status = "verified"
+            return
+        # A strict board worker must not advertise a healthy model when no
+        # explicit placement can be inspected.  Operators can opt into a
+        # diagnostic context-only run, but that run is never admission-ready.
+        strict = os.environ.get("CASE9_REQUIRE_PLACEMENT_EVIDENCE", "1").strip().lower()
+        if strict not in {"0", "false", "no", "off"}:
+            self._placement_status = "unknown"
+            raise ProviderUnavailable(
+                "MindSpore model exposes no explicit Ascend placement evidence"
+            )
+        self._placement_status = "context_only"
+
+    def _check_output_placement(self, output: Any) -> None:
+        """Fail closed if a generated tensor explicitly reports CPU/GPU."""
+
+        sequence = _extract_sequences(output)
+        for attr in ("device_target", "device_type", "device", "place"):
+            try:
+                label = _device_label(getattr(sequence, attr, None))
+            except Exception:
+                label = None
+            if label in {"CPU", "GPU"}:
+                self._fail_closed(
+                    "MindSpore generation output is placed on %s; CPU/GPU fallback is disabled"
+                    % label
+                )
+                raise ProviderUnavailable(self._last_error or "non-Ascend generation output")
 
     def _configure_ascend_context(self) -> None:
         """Require an Ascend context; never silently run the model on CPU."""
@@ -484,15 +863,26 @@ class MindSporeChatProvider:
         observed_soc = _probe_npu_model()
         if not observed_soc:
             raise ProviderUnavailable("npu-smi did not report a visible Ascend 310B device")
-        expected_raw = _value(self.profile, "board_soc", default=None)
-        if expected_raw is None and isinstance(self.profile, Mapping):
-            board = self.profile.get("board")
-            if isinstance(board, Mapping):
-                expected_raw = board.get("soc")
-        expected_soc = str(expected_raw or "").upper().replace("ASCEND", "")
-        if expected_soc and observed_soc != expected_soc:
+        expected_socs: List[str] = []
+        targets = _value(self.profile, "board_targets", default=None)
+        if isinstance(targets, (list, tuple)):
+            for target_item in targets:
+                if isinstance(target_item, Mapping):
+                    raw_soc = target_item.get("soc")
+                    if raw_soc:
+                        expected_socs.append(str(raw_soc).upper().replace("ASCEND", ""))
+        if not expected_socs:
+            expected_raw = _value(self.profile, "board_soc", default=None)
+            if expected_raw is None and isinstance(self.profile, Mapping):
+                board = self.profile.get("board")
+                if isinstance(board, Mapping):
+                    expected_raw = board.get("soc")
+            if expected_raw:
+                expected_socs.append(str(expected_raw).upper().replace("ASCEND", ""))
+        if expected_socs and observed_soc not in expected_socs:
             raise ProviderUnavailable(
-                "profile expects Ascend%s but npu-smi reported %s" % (expected_soc, observed_soc)
+                "profile expects one of %s but npu-smi reported %s"
+                % (", ".join("Ascend" + item for item in expected_socs), observed_soc)
             )
         self._device_target = str(actual)
         self._device_id = device_id
@@ -519,18 +909,26 @@ class MindSporeChatProvider:
         # the controlled cache directory.
         if explicit_path is None and cache_dir is not None and cache_dir.is_dir():
             if kind == "model":
-                # Treat a cache as a local model only when both its structure
-                # and at least one supported weight file are present.  A
-                # tokenizer-only directory must not make model loading skip
-                # the remote artifact resolution step.
-                local_complete = (cache_dir / "config.json").is_file() and any(
-                    (cache_dir / name).is_file()
-                    for name in ("model.safetensors", "pytorch_model.bin", "mindspore.ckpt")
-                )
+                # Treat a cache as local only when its complete weight set is
+                # present.  A partially synchronized shard set must fail
+                # closed instead of silently redownloading a different
+                # revision from the network.
+                local_complete, looks_partial = _local_model_artifact_complete(cache_dir)
+                local_complete = (cache_dir / "config.json").is_file() and local_complete
+                if looks_partial and not local_complete:
+                    raise ProviderUnavailable(
+                        "local model cache is incomplete; refusing implicit remote fallback: %s"
+                        % cache_dir
+                    )
             else:
                 local_complete = any(
                     (cache_dir / name).is_file()
-                    for name in ("tokenizer.json", "tokenizer.model")
+                    for name in (
+                        "tokenizer.json",
+                        "tokenizer.model",
+                        "sentencepiece.model",
+                        "spiece.model",
+                    )
                 )
             if local_complete:
                 source = str(cache_dir)
@@ -549,6 +947,24 @@ class MindSporeChatProvider:
             dtype = getattr(self._mindspore, "float16", None)
             if dtype is not None:
                 kwargs["ms_dtype"] = dtype
+            # Some Modelers/MindNLP exports store ``ms_dtype`` as the fully
+            # qualified string ``mindspore.float16``.  MindNLP 0.4.x already
+            # prefixes string values with ``mindspore`` while parsing a
+            # config, so that spelling becomes the invalid lookup
+            # ``mindspore.mindspore.float16``.  Supply an in-memory config
+            # object with the short dtype name; the source JSON and weights
+            # remain untouched and all other loader arguments stay pinned.
+            normalized_config = self._normalised_local_config(source, uses_local_artifact)
+            if normalized_config is not None:
+                kwargs["config"] = normalized_config
+                # The config object carries the validated dtype.  Removing
+                # this duplicate kwarg avoids an older auto-loader re-reading
+                # the malformed string while retaining the same float16
+                # selection.
+                kwargs.pop("ms_dtype", None)
+        optional_profile_options = self.pretrained_options.get(kind, {})
+        if isinstance(optional_profile_options, Mapping):
+            kwargs.update(dict(optional_profile_options))
         # MindNLP releases differ slightly in optional mirror/cache keyword
         # support.  Retry only by dropping those optional transport hints;
         # never drop a pinned revision or dtype and accidentally load a
@@ -556,15 +972,86 @@ class MindSporeChatProvider:
         try:
             return loader.from_pretrained(source, **kwargs)
         except TypeError:
-            for optional in ("mirror", "cache_dir"):
-                if optional in kwargs:
-                    retry = dict(kwargs)
-                    retry.pop(optional)
-                    try:
-                        return loader.from_pretrained(source, **retry)
-                    except TypeError:
-                        kwargs = retry
+            # Older MindNLP releases reject optional transport or memory
+            # hints.  Retry by removing only known optional keys; pinned
+            # revisions and dtype remain mandatory and are never discarded.
+            for optional in (
+                "mirror",
+                "cache_dir",
+                "low_cpu_mem_usage",
+                "disable_multi_thread",
+            ):
+                if optional not in kwargs:
+                    continue
+                retry = dict(kwargs)
+                retry.pop(optional)
+                try:
+                    return loader.from_pretrained(source, **retry)
+                except TypeError:
+                    kwargs = retry
             return loader.from_pretrained(source, **kwargs)
+
+    def _normalised_local_config(self, source: Any, is_local: bool) -> Any:
+        """Build a corrected MindNLP config without mutating model files.
+
+        The workaround is deliberately narrow: it activates only for a local
+        ``config.json`` whose ``ms_dtype`` is written as ``mindspore.X``.  A
+        remote config, an ordinary dtype name, or a loader without the
+        ``AutoConfig.for_model`` API follows the normal path.
+        """
+
+        if not is_local or not isinstance(source, (str, Path)):
+            return None
+        config_path = Path(source) / "config.json"
+        if not config_path.is_file():
+            return None
+        try:
+            with config_path.open("r", encoding="utf-8") as stream:
+                payload = json.load(stream)
+        except (OSError, ValueError) as exc:
+            raise ProviderUnavailable(
+                "could not read local model config %s: %s" % (config_path, exc)
+            ) from exc
+        if not isinstance(payload, Mapping):
+            raise ProviderUnavailable("local model config must be a JSON object: %s" % config_path)
+        raw_dtype = payload.get("ms_dtype")
+        if not isinstance(raw_dtype, str) or not raw_dtype.startswith("mindspore."):
+            return None
+        short_dtype = raw_dtype.split(".", 1)[1].strip()
+        if not short_dtype or "." in short_dtype:
+            raise ProviderUnavailable("invalid qualified ms_dtype in %s" % config_path)
+        model_type = payload.get("model_type")
+        if not isinstance(model_type, str) or not model_type.strip():
+            raise ProviderUnavailable(
+                "qualified ms_dtype requires model_type in %s" % config_path
+            )
+        try:
+            transformers = importlib.import_module("mindnlp.transformers")
+            auto_config = getattr(transformers, "AutoConfig", None)
+            for_model = getattr(auto_config, "for_model", None)
+            if not callable(for_model):
+                raise ProviderUnavailable(
+                    "MindNLP AutoConfig.for_model is unavailable for qualified ms_dtype"
+                )
+            normalized = dict(payload)
+            normalized["ms_dtype"] = short_dtype
+            # ``model_type`` is supplied as the method's positional selector;
+            # leaving it in ``**normalized`` would pass it twice.
+            normalized.pop("model_type", None)
+            config = for_model(model_type, **normalized)
+        except ProviderError:
+            raise
+        except Exception as exc:
+            raise ProviderUnavailable(
+                "could not normalize ms_dtype=%s in %s: %s"
+                % (raw_dtype, config_path, exc)
+            ) from exc
+        self._config_normalization = {
+            "file": str(config_path),
+            "original_ms_dtype": raw_dtype,
+            "normalized_ms_dtype": short_dtype,
+        }
+        return config
 
     def _validate_tokenizer(self) -> None:
         if self.tokenizer is None:
@@ -588,25 +1075,52 @@ class MindSporeChatProvider:
             raise ProviderUnavailable("tokenizer is not loaded")
         template = getattr(tokenizer, "apply_chat_template", None)
         if callable(template):
+            template_options = {
+                "add_generation_prompt": True,
+                "return_tensors": "ms",
+                "tokenize": True,
+            }
+            if self.chat_template_options:
+                template_options.update(dict(self.chat_template_options))
             try:
-                return template(
-                    list(messages),
-                    add_generation_prompt=True,
-                    return_tensors="ms",
-                    tokenize=True,
-                )
-            except (TypeError, ValueError, AttributeError):
+                return template(list(messages), **template_options)
+            except (TypeError, ValueError, AttributeError) as first_error:
                 # Some older MindNLP tokenizers expose the method but do not
-                # support ``return_tensors``.  Fall through to regular call.
+                # support ``return_tensors``.  Retry as text, while retaining
+                # profile-specific options (notably Qwen3's
+                # ``enable_thinking=False``).  Dropping those options would
+                # silently change the prompt semantics on the fallback path.
+                text_options = {
+                    "add_generation_prompt": True,
+                    "tokenize": False,
+                }
+                text_options.update(dict(self.chat_template_options))
                 try:
-                    rendered = template(list(messages), add_generation_prompt=True, tokenize=False)
-                except Exception:
+                    rendered = template(list(messages), **text_options)
+                except (TypeError, ValueError, AttributeError) as second_error:
+                    if self.chat_template_options:
+                        raise ProviderUnavailable(
+                            "tokenizer for profile %s cannot enforce chat template options: %s"
+                            % (self.profile_id, second_error)
+                        ) from second_error
                     rendered = None
                 if rendered is not None:
                     return self._tokenize_text(str(rendered))
+                if self.chat_template_options:
+                    raise ProviderUnavailable(
+                        "tokenizer for profile %s cannot enforce chat template options: %s"
+                        % (self.profile_id, first_error)
+                    ) from first_error
 
-        # TinyLlama's old MindNLP tokenizer has no chat template.  Use its
-        # declared special-token strings instead of hard-coded token ids.
+        if not self.allow_generic_template_fallback:
+            raise ProviderUnavailable(
+                "tokenizer for profile %s has no usable chat template"
+                % self.profile_id
+            )
+
+        # TinyLlama's old MindNLP tokenizer has no chat template.  Its
+        # concrete adapter explicitly opts into this fallback and uses the
+        # tokenizer-declared special-token strings, never hard-coded IDs.
         parts: List[str] = []
         bos = getattr(tokenizer, "bos_token", None) or ""
         eos = getattr(tokenizer, "eos_token", None) or ""
@@ -703,6 +1217,8 @@ class MindSporeChatProvider:
             "num_beams": 1,
             "top_p": 1.0,
         }
+        if self.generation_options:
+            kwargs.update(dict(self.generation_options))
         attention_mask = self._attention_mask(input_ids)
         if attention_mask is not None:
             kwargs["attention_mask"] = attention_mask
@@ -756,15 +1272,23 @@ class MindSporeChatProvider:
                 if isinstance(value, ProviderError):
                     raise value
                 raise ProviderUnavailable("MindSpore generation failed: %s" % value) from value
-            sequences = _extract_sequences(value)
-            all_ids = _to_list(sequences)
-            generated_ids = all_ids[prompt_tokens:] if len(all_ids) >= prompt_tokens else []
+            try:
+                self._check_output_placement(value)
+                generated_ids = _completion_ids(value, input_ids, prompt_tokens, max_tokens)
+            except ProviderError as exc:
+                self._fail_closed(str(exc))
+                raise ProviderUnavailable(str(exc)) from exc
             eos = self.eos_token_id
             if eos is not None and eos in generated_ids:
                 generated_ids = generated_ids[: generated_ids.index(eos) + 1]
             text = _decode(self.tokenizer, generated_ids)
             completion_tokens = len(generated_ids)
-            finish_reason = "stop" if eos is not None and generated_ids and generated_ids[-1] == eos else "length"
+            finish_reason = (
+                "stop"
+                if (eos is not None and generated_ids and generated_ids[-1] == eos)
+                or len(generated_ids) < max_tokens
+                else "length"
+            )
             self._last_prompt_tokens = prompt_tokens
             self._last_completion_tokens = completion_tokens
             self._last_finish_reason = finish_reason
@@ -815,25 +1339,97 @@ class MindSporeChatProvider:
             accumulated = ""
             count = 0
             started = time.monotonic()
+            iterator_queue: "queue.Queue[Tuple[str, Any]]" = queue.Queue(maxsize=1)
+            reader_stop = threading.Event()
+
+            def put_reader_event(event: Tuple[str, Any]) -> bool:
+                """Put one streamer event without blocking teardown forever."""
+
+                while not reader_stop.is_set():
+                    try:
+                        iterator_queue.put(event, timeout=STREAM_READER_POLL_SECONDS)
+                        return True
+                    except queue.Full:
+                        continue
+                return False
+
+            def read_streamer() -> None:
+                """Read the untrusted streamer behind the generation watchdog."""
+
+                try:
+                    iterator = iter(streamer)
+                    while not reader_stop.is_set():
+                        try:
+                            piece = next(iterator)
+                        except StopIteration:
+                            put_reader_event(("done", None))
+                            return
+                        except BaseException as exc:
+                            put_reader_event(("error", exc))
+                            return
+                        if not put_reader_event(("item", piece)):
+                            return
+                except BaseException as exc:
+                    put_reader_event(("error", exc))
+
+            reader_thread = threading.Thread(
+                target=read_streamer,
+                name="case9-ms-stream-reader",
+                daemon=True,
+            )
+            self._start_stream_reader_thread(reader_thread)
             try:
-                iterator = iter(streamer)
                 while True:
                     if self._cancel_event.is_set():
                         raise ProviderUnavailable("generation cancelled")
-                    if time.monotonic() - started > self.generation_timeout:
+                    remaining = self.generation_timeout - (time.monotonic() - started)
+                    if remaining <= 0:
                         self._fail_closed("MindSpore generation watchdog expired")
                         self.cancel()
                         self._terminate_after_watchdog()
                         raise ProviderTimeout("MindSpore generation timed out")
                     try:
-                        piece = next(iterator)
+                        event_kind, event_value = iterator_queue.get(
+                            timeout=min(remaining, STREAM_READER_POLL_SECONDS)
+                        )
                     except StopIteration:
                         break
-                    except (queue.Empty, TimeoutError) as exc:
-                        self._fail_closed("MindSpore streamer watchdog expired")
+                    except queue.Empty:
+                        # The reader may be blocked inside ``next``.  Loop
+                        # back through the deadline/cancellation checks rather
+                        # than waiting on that call in this request thread.
+                        continue
+                    if event_kind == "done":
+                        break
+                    if event_kind == "error":
+                        if isinstance(event_value, (queue.Empty, TimeoutError)):
+                            self._fail_closed("MindSpore streamer watchdog expired")
+                            self.cancel()
+                            self._terminate_after_watchdog()
+                            raise ProviderTimeout(
+                                "MindSpore generation timed out"
+                            ) from event_value
+                        if isinstance(event_value, ProviderError):
+                            # A reader-side provider failure is just as
+                            # terminal as a failure returned by
+                            # ``model.generate``.  Do not leave the worker
+                            # looking healthy after an HTTP stream has
+                            # already observed a broken backend.
+                            self._fail_closed(str(event_value))
+                            self.cancel()
+                            raise event_value
+                        self._fail_closed("MindSpore streamer failed: %s" % event_value)
                         self.cancel()
-                        self._terminate_after_watchdog()
-                        raise ProviderTimeout("MindSpore generation timed out") from exc
+                        raise ProviderUnavailable(
+                            "MindSpore streamer failed: %s" % event_value
+                        ) from event_value
+                    if event_kind != "item":
+                        self._fail_closed("MindSpore streamer emitted an unknown event")
+                        self.cancel()
+                        raise ProviderUnavailable(
+                            "MindSpore streamer emitted an unknown event"
+                        )
+                    piece = event_value
                     if piece is None:
                         continue
                     accumulated += str(piece)
@@ -846,6 +1442,13 @@ class MindSporeChatProvider:
                 thread.join(timeout=0.5)
                 if thread.is_alive():
                     self._fail_closed("MindSpore generation thread did not stop")
+                    # The streamer can terminate before ``generate`` returns
+                    # (for example after a backend exception or a blocked NPU
+                    # call).  Treat this exactly like every other watchdog
+                    # path: request cancellation and terminate the board
+                    # worker when cancellation cannot stop the call.
+                    self.cancel()
+                    self._terminate_after_watchdog()
                     raise ProviderTimeout("MindSpore generation did not stop")
                 # ``TextIteratorStreamer`` can finish after a model exception
                 # on some MindNLP releases.  Inspect the worker result so a
@@ -865,17 +1468,23 @@ class MindSporeChatProvider:
                 # sequence after streaming.
                 if result_kind == "result" and result_value is not None:
                     try:
-                        sequence = _extract_sequences(result_value)
-                        total_tokens = _tensor_length(sequence)
-                        count = max(0, total_tokens - prompt_tokens)
-                        generated = _to_list(sequence)[prompt_tokens:]
+                        self._check_output_placement(result_value)
+                        generated = _completion_ids(
+                            result_value, input_ids, prompt_tokens, max_tokens
+                        )
+                        count = len(generated)
                         eos = self.eos_token_id
                         if eos is not None and eos in generated:
                             self._last_finish_reason = "stop"
                         else:
                             self._last_finish_reason = "length" if count >= max_tokens else "stop"
-                    except Exception:
-                        self._last_finish_reason = "length" if count >= max_tokens else "stop"
+                    except Exception as exc:
+                        self._fail_closed(str(exc))
+                        if isinstance(exc, ProviderUnavailable):
+                            raise
+                        raise ProviderUnavailable(
+                            "MindSpore streaming output could not be normalized: %s" % exc
+                        ) from exc
                 else:
                     self._last_finish_reason = "length" if count >= max_tokens else "stop"
                 self._last_completion_tokens = count
@@ -887,6 +1496,14 @@ class MindSporeChatProvider:
                 self.cancel()
                 raise ProviderUnavailable("MindSpore streaming failed: %s" % exc) from exc
             finally:
+                reader_stop.set()
+                reader_thread.join(timeout=0.2)
+                with self._generation_state_lock:
+                    if (
+                        not reader_thread.is_alive()
+                        and self._stream_reader_thread is reader_thread
+                    ):
+                        self._stream_reader_thread = None
                 # A timeout/cancellation can leave MindNLP's generation call
                 # alive after the iterator has unwound.  Retain its pointer
                 # until the thread has actually exited.
@@ -927,6 +1544,18 @@ class MindSporeChatProvider:
                     self._generation_thread = None
                 raise
 
+    def _start_stream_reader_thread(self, thread: threading.Thread) -> None:
+        """Install and start the bounded streamer-reader thread atomically."""
+
+        with self._generation_state_lock:
+            self._stream_reader_thread = thread
+            try:
+                thread.start()
+            except BaseException:
+                if self._stream_reader_thread is thread:
+                    self._stream_reader_thread = None
+                raise
+
     def cancel(self) -> None:
         self._cancel_event.set()
         # MindNLP does not expose a universal cancellation API.  If a model
@@ -951,22 +1580,50 @@ class MindSporeChatProvider:
 
         self.cancel()
         with self._generation_state_lock:
-            thread = self._generation_thread
-        if thread is None or not thread.is_alive():
-            if thread is not None:
-                with self._generation_state_lock:
-                    if self._generation_thread is thread and not thread.is_alive():
-                        self._generation_thread = None
+            threads = [
+                thread
+                for thread in (self._generation_thread, self._stream_reader_thread)
+                if thread is not None
+            ]
+        if not any(thread.is_alive() for thread in threads):
+            with self._generation_state_lock:
+                if (
+                    self._generation_thread is not None
+                    and not self._generation_thread.is_alive()
+                ):
+                    self._generation_thread = None
+                if (
+                    self._stream_reader_thread is not None
+                    and not self._stream_reader_thread.is_alive()
+                ):
+                    self._stream_reader_thread = None
             return True
         try:
             timeout = max(0.0, min(float(wait_seconds), 5.0))
         except (TypeError, ValueError):
             timeout = 0.5
-        thread.join(timeout=timeout)
+        deadline = time.monotonic() + timeout
+        for thread in threads:
+            left = max(0.0, deadline - time.monotonic())
+            if left <= 0:
+                break
+            thread.join(timeout=left)
         with self._generation_state_lock:
-            if not thread.is_alive() and self._generation_thread is thread:
+            if (
+                self._generation_thread is not None
+                and not self._generation_thread.is_alive()
+            ):
                 self._generation_thread = None
-        if thread.is_alive():
+            if (
+                self._stream_reader_thread is not None
+                and not self._stream_reader_thread.is_alive()
+            ):
+                self._stream_reader_thread = None
+            still_alive = any(
+                thread is not None and thread.is_alive()
+                for thread in (self._generation_thread, self._stream_reader_thread)
+            )
+        if still_alive:
             self._fail_closed("MindSpore generation did not stop after client disconnect")
             self._terminate_after_watchdog()
             return False
@@ -1006,13 +1663,23 @@ class MindSporeChatProvider:
     def close(self) -> None:
         self.cancel()
         with self._generation_state_lock:
-            thread = self._generation_thread
-        if thread is not None and thread.is_alive():
-            thread.join(timeout=0.5)
-        thread_alive = bool(thread is not None and thread.is_alive())
+            threads = [
+                thread
+                for thread in (self._generation_thread, self._stream_reader_thread)
+                if thread is not None
+            ]
+        deadline = time.monotonic() + 0.5
+        for thread in threads:
+            left = max(0.0, deadline - time.monotonic())
+            if left <= 0:
+                break
+            thread.join(timeout=left)
+        thread_alive = any(thread.is_alive() for thread in threads)
         with self._generation_state_lock:
-            if thread is not None and not thread_alive and self._generation_thread is thread:
+            if self._generation_thread is not None and not self._generation_thread.is_alive():
                 self._generation_thread = None
+            if self._stream_reader_thread is not None and not self._stream_reader_thread.is_alive():
+                self._stream_reader_thread = None
         if thread_alive:
             # A Python thread cannot be force-killed safely.  Do not release
             # or invalidate the model object while it may still touch device
@@ -1043,8 +1710,14 @@ class MindSporeChatProvider:
                 if self._generation_thread is generation_thread:
                     self._generation_thread = None
                 generation_thread = self._generation_thread
+            reader_thread = self._stream_reader_thread
+            if reader_thread is not None and not reader_thread.is_alive():
+                if self._stream_reader_thread is reader_thread:
+                    self._stream_reader_thread = None
+                reader_thread = self._stream_reader_thread
         generation_alive = bool(generation_thread is not None and generation_thread.is_alive())
-        busy = bool(self._busy or generation_alive)
+        reader_alive = bool(reader_thread is not None and reader_thread.is_alive())
+        busy = bool(self._busy or generation_alive or reader_alive)
         env = environment_fingerprint()
         profile_status = _value(self.profile, "status", default="experimental_dirty_base")
         admission = _value(self.profile, "admission_eligible", "admitted", default=False)
@@ -1070,6 +1743,9 @@ class MindSporeChatProvider:
             "cann_version": self._cann_version or _cann_version() or "unknown",
             "device_target": self._device_target,
             "device_id": self._device_id,
+            "placement_status": self._placement_status,
+            "placement_evidence": list(self._placement_evidence),
+            "config_normalization": dict(self._config_normalization or {}),
             "admission": "admitted" if admission else str(profile_status),
             "admission_status": str(profile_status),
         }
@@ -1077,18 +1753,58 @@ class MindSporeChatProvider:
 
 class Qwen15MindSporeProvider(MindSporeChatProvider):
     provider_name = "mindspore-qwen1.5"
+    allow_generic_template_fallback = False
 
 
 class TinyLlamaMindSporeProvider(MindSporeChatProvider):
     provider_name = "mindspore-tinyllama"
+    allow_generic_template_fallback = True
 
 
 class DeepSeekMindSporeProvider(MindSporeChatProvider):
     provider_name = "mindspore-deepseek"
+    allow_generic_template_fallback = False
+
+
+class Qwen25MindSporeProvider(MindSporeChatProvider):
+    """Qwen2.5 causal-LM adapter (kept separate for explicit provenance)."""
+
+    provider_name = "mindspore-qwen2.5"
+    allow_generic_template_fallback = False
+
+
+class Qwen3MindSporeProvider(MindSporeChatProvider):
+    """Qwen3 adapter with non-thinking chat-template mode for v1."""
+
+    provider_name = "mindspore-qwen3"
+    chat_template_options = {"enable_thinking": False}
+    allow_generic_template_fallback = False
+
+
+class MiniCPM3MindSporeProvider(MindSporeChatProvider):
+    """MiniCPM3 uses dedicated MindNLP classes in the official example."""
+
+    provider_name = "mindspore-minicpm3"
+    tokenizer_class_name = "MiniCPM3Tokenizer"
+    model_class_name = "MiniCPM3ForCausalLM"
+    # The Orange Pi 20T example loads the FP16 Modelers checkpoint with the
+    # low-memory path.  It is optional across MindNLP releases; the base
+    # loader removes it only when the installed loader explicitly rejects the
+    # keyword, while keeping the required dtype and revision intact.
+    pretrained_options = {"model": {"low_cpu_mem_usage": True}}
+    allow_generic_template_fallback = False
 
 
 def provider_class_for_profile(profile: Any) -> Any:
     profile_id = _profile_id(profile).lower()
+    candidate_kind = str(_value(profile, "candidate_kind", default="native_mindspore")).strip().lower()
+    if candidate_kind not in {"native_mindspore", "conditional"}:
+        raise ProviderUnavailable(
+            "profile %s requests unsupported candidate kind %r"
+            % (profile_id, candidate_kind)
+        )
+    if candidate_kind == "conditional":
+        raise ProviderUnavailable("profile %s is conditional and cannot be loaded" % profile_id)
     runtime_provider = _value(profile, "runtime_provider", "provider", default="mindspore")
     if str(runtime_provider).strip().lower() != "mindspore":
         raise ProviderUnavailable(
@@ -1099,6 +1815,11 @@ def provider_class_for_profile(profile: Any) -> Any:
         "qwen1.5-0.5b-mindspore": Qwen15MindSporeProvider,
         "tinyllama-1.1b-mindspore": TinyLlamaMindSporeProvider,
         "deepseek-r1-qwen-1.5b-mindspore": DeepSeekMindSporeProvider,
+        "qwen2.5-0.5b-mindspore": Qwen25MindSporeProvider,
+        "qwen2.5-1.5b-mindspore": Qwen25MindSporeProvider,
+        "qwen3-0.6b-mindspore": Qwen3MindSporeProvider,
+        "qwen3-1.7b-mindspore": Qwen3MindSporeProvider,
+        "minicpm3-4b-mindspore": MiniCPM3MindSporeProvider,
     }
     try:
         return providers[profile_id]
@@ -1127,13 +1848,49 @@ def _extract_sequences(output: Any) -> Any:
         if candidate is not None:
             return candidate
     if isinstance(output, (tuple, list)):
+        if _looks_like_token_ids(output):
+            return output
         if len(output) == 1:
             return output[0]
-        # A list of IDs is itself a valid sequence; nested output is not.
-        if output and isinstance(output[0], (int, float)):
-            return output
-        return output[0]
+        # GenerateOutput tuples vary by MindNLP release.  Prefer the first
+        # integer tensor/list (rather than blindly taking element zero, which
+        # may be scores/logits in a custom return tuple).
+        for candidate in output:
+            if _looks_like_token_ids(candidate):
+                return candidate
+        return output[0] if output else output
     return output
+
+
+def _looks_like_token_ids(value: Any) -> bool:
+    """Return whether a value is plausibly an integer token sequence."""
+
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, Integral):
+        return True
+    dtype = getattr(value, "dtype", None)
+    if dtype is not None:
+        dtype_name = str(dtype).lower()
+        if not any(name in dtype_name for name in ("int", "uint")):
+            return False
+    try:
+        raw = value.asnumpy() if hasattr(value, "asnumpy") else value
+        raw = raw.tolist() if hasattr(raw, "tolist") else raw
+    except Exception:
+        return False
+    while isinstance(raw, (list, tuple)) and raw:
+        # Token sequences are at most batch x sequence.  Scores/logits have a
+        # third dimension and are not accepted by this shape probe.
+        if isinstance(raw[0], (list, tuple)):
+            if raw and raw[0] and isinstance(raw[0][0], (list, tuple)):
+                return False
+            raw = raw[0]
+        else:
+            break
+    if not isinstance(raw, (list, tuple)) or not raw:
+        return isinstance(raw, Integral) and not isinstance(raw, bool)
+    return all(isinstance(item, Integral) and not isinstance(item, bool) for item in raw)
 
 
 def environment_fingerprint() -> Dict[str, Any]:
@@ -1177,6 +1934,9 @@ __all__ = [
     "Qwen15MindSporeProvider",
     "TinyLlamaMindSporeProvider",
     "DeepSeekMindSporeProvider",
+    "Qwen25MindSporeProvider",
+    "Qwen3MindSporeProvider",
+    "MiniCPM3MindSporeProvider",
     "create_provider",
     "provider_class_for_profile",
     "environment_fingerprint",

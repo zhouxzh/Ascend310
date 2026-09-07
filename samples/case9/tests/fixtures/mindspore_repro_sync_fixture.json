@@ -1,0 +1,104 @@
+{
+  "schema_version": 2,
+  "profiles": [
+    {
+      "id": "fixture-native",
+      "display_name": "Sync fixture",
+      "model_id": "fixture/native",
+      "repository": "fixture/native",
+      "source": "fixture",
+      "license": "Apache-2.0",
+      "revision": "0000000000000000000000000000000000000001",
+      "tokenizer_revision": "0000000000000000000000000000000000000001",
+      "revision_pinned": true,
+      "mirror": null,
+      "board": {"host": "192.0.2.8", "soc": "Ascend310B4", "tier": "8T"},
+      "runtime": {
+        "provider": "mindspore",
+        "context_length": 1024,
+        "default_max_tokens": 32,
+        "max_tokens": 64,
+        "temperature": 0.0,
+        "top_p": 1.0
+      },
+      "status": "not-run",
+      "admission": {"eligible": false, "reason": "Fixture only; never activate."},
+      "notes": "Fixture only; never activate.",
+      "candidate_kind": "native_mindspore",
+      "architecture": "causal_lm",
+      "languages": ["en"],
+      "weight_format": "fixture",
+      "quality": {},
+      "performance": {},
+      "cache_dir": "artifacts/models/fixture",
+      "artifacts": [
+        {
+          "name": "model",
+          "filename": "model.bin",
+          "kind": "weights",
+          "url": "https://example.invalid/fixture/model.bin",
+          "expected_bytes": 22,
+          "sha256": "49ce8ca9b586c1a7c4aac505c46a3c6e8d0937feb3c8bd7996c5c6a8bb1c859c"
+        }
+      ],
+      "board_targets": [
+        {"host": "192.0.2.8", "soc": "Ascend310B4", "tier": "8T"},
+        {"host": "192.0.2.20", "soc": "Ascend310B1", "tier": "20T"}
+      ],
+      "validation": {
+        "Ascend310B4": {
+          "status": "not-run",
+          "reason": "Fixture only; no board execution.",
+          "report_paths": [
+            "repro/fixture-bundle/reports/board8t/run-1/acceptance.json",
+            "repro/fixture-bundle/reports/board8t/run-1/quality.json"
+          ],
+          "updated_at": null,
+          "run_id": null,
+          "soc": "Ascend310B4",
+          "tier": "8T",
+          "environment_fingerprint": null,
+          "artifact_hashes": {},
+          "quality": {},
+          "performance": {},
+          "metrics": {}
+        },
+        "Ascend310B1": {
+          "status": "not-run",
+          "reason": "Fixture only; no board execution.",
+          "report_paths": [],
+          "updated_at": null,
+          "run_id": null,
+          "soc": "Ascend310B1",
+          "tier": "20T",
+          "environment_fingerprint": null,
+          "artifact_hashes": {},
+          "quality": {},
+          "performance": {},
+          "metrics": {}
+        }
+      }
+    }
+  ],
+  "test_expectations": {
+    "payload": "fixture-model-payload\n",
+    "report": {
+      "registry_path": "repro/fixture-bundle/reports/board8t/run-1/acceptance.json",
+      "remote_candidates": [
+        "reports/mindspore-chat/run-1/acceptance.json",
+        "reports/board8t/run-1/acceptance.json",
+        "reports/run-1/acceptance.json"
+      ],
+      "destination": "board8t/profile-reports/fixture-native/Ascend310B4/run-1/acceptance.json"
+    },
+    "missing_report": {
+      "registry_path": "repro/fixture-bundle/reports/board8t/run-1/quality.json",
+      "remote_candidates": [
+        "reports/mindspore-chat/run-1/quality.json",
+        "reports/board8t/run-1/quality.json",
+        "reports/run-1/quality.json"
+      ],
+      "destination": "board8t/profile-reports/fixture-native/Ascend310B4/run-1/quality.json"
+    }
+  }
+}

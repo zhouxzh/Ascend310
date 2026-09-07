@@ -24,7 +24,7 @@ from typing import Optional
 from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 
 from PIL import Image
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from config import DATA_DIR, EPAPER_HEIGHT, EPAPER_WIDTH, PHOTO_DIR, TOP_K_RESULTS, UPLOAD_TMP_DIR
 from device_registry import (
@@ -35,6 +35,7 @@ from device_registry import (
     DeviceError,
     DeviceRegistry,
     photo_frame_profile,
+    photo_frame_hardware_rotation_deg,
     validate_photo_frame_capability,
 )
 from display_policy import (
@@ -53,11 +54,16 @@ from embedding_backend import CHINESE_CLIP_ID, MOBILECLIP_ID, RESNET50_ID, Embed
 from epaper_display import EpaperConfig, EpaperDisplay, prepare_frame
 from model_registry import ModelRegistry, RegistryError, load_candidates
 from photoframe_provisioning import (
+    PHOTOFRAME_MDNS_SERVICE_TYPE,
     PRIVATE_V4_NETWORKS,
+    DiscoveryError,
+    MdnsPhotoFrameService,
     PhotoFrameProvisioner,
     ProvisionError,
     ProvisionResult,
+    discover_local_photoframe_services,
     normalize_device_url,
+    normalize_expected_device_id,
 )
 from photoframe_push import PUSH_PROTOCOLS, PhotoFramePushClient, PushError
 from photo_index import AlbumIndex, AlbumIndexError, _sha256
@@ -67,6 +73,197 @@ from smart_selector import SmartSelector
 REQUIRED_MODEL_IDS = (MOBILECLIP_ID, CHINESE_CLIP_ID, RESNET50_ID)
 MODEL_LABELS = {"auto": "自动", MOBILECLIP_ID: "MobileCLIP-S0", CHINESE_CLIP_ID: "Chinese-CLIP RN50", RESNET50_ID: "ResNet50 经典相似图"}
 _PHOTOFRAME_PROVISION_LOCK = threading.Lock()
+
+
+def _discovery_text(value: object, *, limit: int = 200) -> Optional[str]:
+    """Return bounded printable device metadata for a discovery response."""
+
+    text = str(value or "").strip()
+    if not text:
+        return None
+    filtered = "".join(char for char in text if char.isprintable())[:limit]
+    return filtered or None
+
+
+def _discovery_dimensions(system_info: dict) -> tuple[Optional[int], Optional[int]]:
+    try:
+        width, height = int(system_info.get("width")), int(system_info.get("height"))
+    except (TypeError, ValueError):
+        return None, None
+    if not 1 <= width <= 4096 or not 1 <= height <= 4096:
+        return None, None
+    return width, height
+
+
+def _photoframe_profile_candidates_from_system_info(system_info: dict) -> list[str]:
+    """List possible fixed profiles without silently choosing one.
+
+    Both supported panels share 800x480, so dimensions alone are deliberately
+    not treated as product identity.  A recognizable vendor/product string
+    narrows the result to one profile; otherwise callers receive both choices
+    and must make an explicit operator selection.
+    """
+
+    width, height = _discovery_dimensions(system_info)
+    if width is None or height is None:
+        return []
+    compatible = [
+        profile_id
+        for profile_id, profile in PHOTOFRAME_PROFILES.items()
+        if (width, height) in {
+            (int(profile["width"]), int(profile["height"])),
+            (int(profile["height"]), int(profile["width"])),
+        }
+    ]
+    if not compatible:
+        return []
+    identity = " ".join(
+        str(system_info.get(key) or "").strip().lower()
+        for key in ("board_name", "product_name", "device_name")
+    )
+    known_matches = []
+    if "waveshare" in identity and any(token in identity for token in ("photopainter", "photo painter", "7.3", "7in3", "7inch")):
+        known_matches.append("waveshare_photopainter_73")
+    if "seeed" in identity and any(token in identity for token in ("e1002", "reterminal")):
+        known_matches.append("seeedstudio_reterminal_e1002")
+    narrowed = [profile_id for profile_id in compatible if profile_id in known_matches]
+    return narrowed or compatible
+
+
+def _photoframe_discovery_candidate(
+    service: MdnsPhotoFrameService,
+    address: str,
+    provisioner: PhotoFrameProvisioner,
+) -> dict:
+    """Inspect exactly one mDNS-advertised literal address, read-only."""
+
+    candidate = {
+        "device_url": f"http://{address}",
+        "hostname": _discovery_text(service.hostname, limit=255),
+        "device_hardware_id": None,
+        "board_name": None,
+        "firmware_version": None,
+        "width": None,
+        "height": None,
+        "profile_candidates": [],
+        "status": "unreachable",
+    }
+    try:
+        root, system_info = provisioner.read_system_info(candidate["device_url"])
+    except ProvisionError as exc:
+        candidate["status"] = "unreachable" if exc.kind in {"transport", "http", "response"} else "invalid_system_info"
+        candidate["error"] = str(exc)[:300]
+        return candidate
+    candidate["device_url"] = root
+    candidate["device_hardware_id"] = _discovery_text(system_info.get("device_id"), limit=128)
+    candidate["board_name"] = _discovery_text(system_info.get("board_name"))
+    candidate["firmware_version"] = _discovery_text(system_info.get("version"))
+    candidate["width"], candidate["height"] = _discovery_dimensions(system_info)
+    if str(system_info.get("project_name") or "").strip().lower() != "esp32-photoframe":
+        candidate["status"] = "not_photoframe"
+        return candidate
+    candidate["profile_candidates"] = _photoframe_profile_candidates_from_system_info(system_info)
+    if candidate["width"] is None or candidate["height"] is None:
+        candidate["status"] = "invalid_system_info"
+    elif not candidate["profile_candidates"]:
+        candidate["status"] = "unsupported_display"
+    elif len(candidate["profile_candidates"]) == 1:
+        candidate["status"] = "ready"
+    else:
+        candidate["status"] = "choose_profile"
+    return candidate
+
+
+def discover_photoframe_candidates() -> list[dict]:
+    """Discover and inspect all candidates without registering any device.
+
+    mDNS names are not device identities: the output intentionally preserves
+    every distinct ``(hardware ID, literal IPv4)`` pair.  The caller must
+    choose one response and pass its hardware ID to the atomic register API.
+    """
+
+    services = discover_local_photoframe_services()
+    provisioner = PhotoFrameProvisioner(timeout_seconds=3.0)
+    candidates: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    seen_addresses: set[str] = set()
+    for service in services:
+        if int(service.port) != 80:
+            continue
+        for raw_address in service.addresses:
+            try:
+                device_url = normalize_device_url(f"http://{raw_address}")
+            except ProvisionError:
+                continue
+            if device_url in seen_addresses:
+                continue
+            seen_addresses.add(device_url)
+            address = str(urlsplit(device_url).hostname or "")
+            candidate = _photoframe_discovery_candidate(service, address, provisioner)
+            identity = str(candidate.get("device_hardware_id") or "")
+            key = (identity, str(candidate["device_url"]))
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(candidate)
+    return sorted(candidates, key=lambda item: (str(item["device_url"]), str(item.get("device_hardware_id") or "")))
+
+
+def _registered_photoframe_urls() -> list[str]:
+    """Return only previously operator-approved PhotoFrame addresses.
+
+    This is a bounded fallback for networks where multicast DNS is filtered.
+    It is intentionally not a subnet scan: every address comes from a
+    persisted registration that the operator previously verified.
+    """
+
+    if _state is None:
+        return []
+    urls: list[str] = []
+    try:
+        devices = _state.devices.list()
+    except Exception:
+        return urls
+    for device in devices:
+        if (device.get("display") or {}).get("kind") != "photoframe":
+            continue
+        raw = (device.get("pull_provision") or {}).get("device_url")
+        if not raw:
+            continue
+        try:
+            root = normalize_device_url(raw)
+        except ProvisionError:
+            continue
+        if root not in urls:
+            urls.append(root)
+    return urls
+
+
+def probe_registered_photoframe_candidates(urls: list[str]) -> list[dict]:
+    """Probe explicit registered addresses when mDNS gives no usable result."""
+
+    candidates: list[dict] = []
+    for root in urls:
+        candidate = probe_photoframe_candidate(root)
+        candidate["discovery_source"] = "registered_address"
+        if candidate.get("status") == "unreachable":
+            candidate["message"] = "已登记地址当前不可达；设备可能仍在深度休眠、IP 已变化或网页服务尚未启动。"
+        candidates.append(candidate)
+    return candidates
+
+
+def probe_photoframe_candidate(device_url: str) -> dict:
+    """Read one explicitly supplied LAN PhotoFrame address without registering it.
+
+    This is the deterministic fallback for networks that block mDNS.  The
+    address is normalized before any request, and the same identity checks used
+    by mDNS discovery are applied.  No device or server state is modified.
+    """
+
+    root = normalize_device_url(device_url)
+    address = str(urlsplit(root).hostname or "")
+    service = MdnsPhotoFrameService(hostname="", addresses=(address,), port=80)
+    return _photoframe_discovery_candidate(service, address, PhotoFrameProvisioner(timeout_seconds=3.0))
 
 
 def _normalize_registered_photoframe_capability(device: dict, capability: dict) -> dict:
@@ -115,6 +312,25 @@ def _registered_photoframe_display(device: dict) -> dict:
     if not profile_id:
         raise DeviceError(PROFILE_REQUIRED_MESSAGE)
     return validate_photo_frame_capability(profile_id, display)
+
+
+def _photoframe_hardware_rotation(device_or_profile) -> int:
+    """Return the fixed upstream board compensation for a PhotoFrame.
+
+    This is intentionally not the server-side ``rotation`` field.  The server
+    keeps pixel rotation at zero and lets the ESP32 apply its board-specific
+    coordinate correction while rendering the downloaded image.
+    """
+
+    if isinstance(device_or_profile, dict):
+        display = device_or_profile.get("display") or {}
+        profile_id = device_or_profile.get("profile_id") or display.get("profile_id")
+    else:
+        profile_id = device_or_profile
+    try:
+        return photo_frame_hardware_rotation_deg(profile_id)
+    except DeviceError as exc:
+        raise DisplayPolicyError(str(exc)) from exc
 
 
 def _photoframe_fetch_evidence(
@@ -420,6 +636,10 @@ class TextSearchRequest(BaseModel):
     query: str
     model: str = "auto"
     top_k: int = TOP_K_RESULTS
+    min_width: int = 0
+    min_height: int = 0
+    extensions: list[str] = Field(default_factory=list)
+    face_filter: str = "all"
 
 
 class ApplicationState:
@@ -707,6 +927,7 @@ class ApplicationState:
             # landscape/portrait contract.  Profile validation above already
             # rejected old or corrupted degree-based rotations.
             render_policy["rotation"] = 0
+            hardware_rotation = _photoframe_hardware_rotation(capability.get("profile_id"))
             # The upstream PhotoFrame raw upload handler rejects bodies over
             # 5 MiB. Keep that protocol limit even if a registry entry was
             # created with a larger generic capability.
@@ -733,9 +954,10 @@ class ApplicationState:
                 self.config.get().get("timezone", ""),
                 render_policy["overlay_date"],
             )
-            variant = "{protocol}:{width}x{height}:r{rotation}:o{orientation_mode}:a{target}:m{max_bytes}:p{revision}:c{crop}:d{date}:w{weather}:z{overlay_time}:s{selection}:push".format(
+            variant = "{protocol}:{width}x{height}:r{rotation}:h{hardware_rotation}:o{orientation_mode}:a{target}:m{max_bytes}:p{revision}:c{crop}:d{date}:w{weather}:z{overlay_time}:s{selection}:push".format(
                 protocol=protocol,
                 width=render_policy["width"], height=render_policy["height"], rotation=render_policy["rotation"],
+                hardware_rotation=hardware_rotation,
                 orientation_mode=render_policy["orientation_mode"], target=target_orientation,
                 max_bytes=render_policy["max_bytes"], revision=render_policy["policy_revision"], crop=render_policy["crop_mode"],
                 date=int(render_policy["overlay_date"]), weather=f"{int(render_policy['overlay_weather'])}:{weather_revision}",
@@ -1633,6 +1855,7 @@ def _photoframe_options(config, policy, capability, selector, row):
         capability = validate_photo_frame_capability(profile_id, capability)
     except DeviceError as exc:
         raise DisplayPolicyError(str(exc)) from exc
+    hardware_rotation = _photoframe_hardware_rotation(profile_id)
     # Product profiles do not expose a mounting-angle knob.  Reject a stale
     # policy rather than silently rotating a frame that was registered with
     # the two-value orientation contract.
@@ -1658,10 +1881,11 @@ def _photoframe_options(config, policy, capability, selector, row):
     selection = int(_row_value(row, "selection_revision", _selector_revision(selector)))
     weather_revision = _weather_etag_value(selector)
     overlay_time = _overlay_time_etag_value(selector, config.get("timezone", ""), policy["overlay_date"])
-    variant = "{width}x{height}:r{rotation}:o{orientation_mode}:a{target}:m{max_bytes}:p{revision}:c{crop}:d{date}:w{weather}:z{overlay_time}:s{selection}:t".format(
+    variant = "{width}x{height}:r{rotation}:h{hardware_rotation}:o{orientation_mode}:a{target}:m{max_bytes}:p{revision}:c{crop}:d{date}:w{weather}:z{overlay_time}:s{selection}:t".format(
         width=width,
         height=height,
         rotation=rotation,
+        hardware_rotation=hardware_rotation,
         orientation_mode=policy["orientation_mode"],
         target=target,
         max_bytes=max_bytes,
@@ -1679,6 +1903,7 @@ def _photoframe_options(config, policy, capability, selector, row):
         "height": height,
         "max_bytes": max_bytes,
         "rotation": rotation,
+        "hardware_rotation_deg": hardware_rotation,
         "target_orientation": target,
         "selection_revision": selection,
         "variant": variant,
@@ -1840,6 +2065,86 @@ def create_app(touchscreen=False):
             ]
         }
 
+    @api.get("/api/admin/devices/discover")
+    async def api_admin_device_discover(request: Request):
+        """Return local PhotoFrame candidates without registering any of them.
+
+        Discovery is deliberately an explicit, bounded local mDNS scan.  The
+        response preserves every distinct hardware-ID/IP pair so two devices
+        with the upstream's identical ``photoframe.local`` host name cannot be
+        confused or automatically paired.
+        """
+
+        if request.query_params:
+            raise HTTPException(
+                status_code=400,
+                detail="PhotoFrame discovery accepts no host, IP, CIDR, or other query parameters",
+            )
+        mdns_error = None
+        try:
+            candidates = await run_in_threadpool(discover_photoframe_candidates)
+        except DiscoveryError as exc:
+            mdns_error = str(exc)
+            candidates = []
+        # If mDNS is filtered or its cache contains a stale sleeping record,
+        # probe only addresses already verified by the operator.  This keeps
+        # discovery useful without turning the unauthenticated LAN UI into a
+        # network scanner.
+        usable = {"ready", "choose_profile"}
+        if not any(item.get("status") in usable for item in candidates):
+            known_urls = _registered_photoframe_urls()
+            known_hosts = {str(urlsplit(item.get("device_url", "")).hostname or "") for item in candidates}
+            fallback_urls = [url for url in known_urls if str(urlsplit(url).hostname or "") not in known_hosts]
+            if fallback_urls:
+                candidates.extend(await run_in_threadpool(probe_registered_photoframe_candidates, fallback_urls))
+        usable_count = sum(item.get("status") in usable for item in candidates)
+        if usable_count:
+            message = f"发现 {usable_count} 台可验证的电子相册。请按 IP 和硬件 ID 手动选择，不会自动登记。"
+            status = "ready"
+        elif candidates:
+            message = "发现了已登记或 mDNS 缓存地址，但当前都无法读取 /api/system-info；请按实体唤醒键并等待网页服务启动后重试。"
+            status = "none_found"
+        elif mdns_error:
+            message = "mDNS 在 10 秒内没有返回可验证设备；请按实体唤醒键，等待 Wi-Fi 和网页服务启动后重试，或使用串口读取的 IP 进行验证。"
+            status = "none_found"
+        else:
+            message = "未发现可验证的 PhotoFrame mDNS 设备；请先唤醒设备并等待网页服务启动。"
+            status = "none_found"
+        return {
+            "service_type": PHOTOFRAME_MDNS_SERVICE_TYPE,
+            "status": status,
+            "candidates": candidates,
+            "message": message,
+            "diagnostics": {
+                "mdns_error": mdns_error,
+                "fallback": "registered_address" if any(item.get("discovery_source") == "registered_address" for item in candidates) else None,
+            },
+        }
+
+    @api.post("/api/admin/devices/probe")
+    async def api_admin_device_probe(request: Request):
+        """Probe one operator-supplied private IPv4 PhotoFrame address.
+
+        This endpoint is intentionally read-only and does not scan a subnet.
+        It exists for access points that filter mDNS multicast or firmware that
+        exposes the PhotoFrame HTTP API without advertising the service type.
+        """
+
+        payload = await json_object(request)
+        raw_url = payload.get("device_url")
+        if not isinstance(raw_url, str) or not raw_url.strip():
+            raise HTTPException(status_code=400, detail="device_url is required, for example http://192.168.1.137")
+        try:
+            normalized = normalize_device_url(raw_url)
+        except ProvisionError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        candidate = await run_in_threadpool(probe_photoframe_candidate, normalized)
+        return {
+            "status": candidate.get("status", "unreachable"),
+            "candidate": candidate,
+            "read_only": True,
+        }
+
     @api.get("/api/index/stats")
     def api_index_stats():
         return get_state().index.stats()
@@ -1852,9 +2157,25 @@ def create_app(touchscreen=False):
     def api_search_text(request: TextSearchRequest):
         try:
             model_id = resolve_text_model(request.query, request.model)
-            results = get_state().index.search_text(request.query, model_id, int(request.top_k))
+            filters = {
+                "min_width": int(request.min_width),
+                "min_height": int(request.min_height),
+                "extensions": list(request.extensions or []),
+                "face_filter": request.face_filter,
+            }
+            # Keep the no-filter call compatible with lightweight test doubles
+            # and with old integrations that implement the original three-
+            # argument search contract.
+            has_filters = any(filters[key] for key in ("min_width", "min_height", "extensions")) or filters["face_filter"] != "all"
+            if has_filters:
+                results = get_state().index.search_text(
+                    request.query, model_id, int(request.top_k), filters=filters
+                )
+            else:
+                results = get_state().index.search_text(request.query, model_id, int(request.top_k))
             return {
                 "model_id": model_id,
+                "filters": filters,
                 "results": [
                     {
                         "photo_id": result.photo_id,
@@ -2571,9 +2892,24 @@ def create_app(touchscreen=False):
                 status_code=400,
                 detail="device_url is required; registration verifies the ESP32 before creating a device record",
             )
+        try:
+            expected_device_id = normalize_expected_device_id(
+                payload.get("expected_device_id") if "expected_device_id" in payload else None
+            )
+        except ProvisionError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         trigger_now = payload.get("trigger_now", True)
         if not isinstance(trigger_now, bool):
             raise HTTPException(status_code=400, detail="trigger_now must be boolean")
+        requested_deep_sleep = payload.get("deep_sleep_enabled")
+        if requested_deep_sleep is not None and not isinstance(requested_deep_sleep, bool):
+            raise HTTPException(status_code=400, detail="deep_sleep_enabled must be boolean")
+        if requested_deep_sleep is False:
+            raise HTTPException(
+                status_code=400,
+                detail="PhotoFrame deep sleep is fixed enabled; remove deep_sleep_enabled or set it to true",
+            )
+        requested_deep_sleep = True
 
         # Validate all user-controlled capability and policy fields before
         # creating the temporary record.  This is the first half of the
@@ -2654,7 +2990,9 @@ def create_app(touchscreen=False):
                     display_orientation=str(display.get("orientation") or "landscape"),
                     native_size=(int(profile["width"]), int(profile["height"])),
                     expected_profile_id=profile["profile_id"],
+                    expected_device_id=expected_device_id,
                     trigger_now=trigger_now,
+                    deep_sleep_enabled=True,
                 )
                 # Configuration is a control-plane result only.  Even when
                 # the optional /api/rotate request was skipped or failed, the
@@ -2671,6 +3009,7 @@ def create_app(touchscreen=False):
                     firmware_version=result.firmware_version,
                     board_name=result.board_name,
                     configured_image_url=result.configured_image_url,
+                    deep_sleep_enabled=result.deep_sleep_enabled,
                     rotate_requested_at=time.time() if result.rotate_requested else None,
                     rotate_status=result.rotate_status,
                     successful=True,
@@ -2848,9 +3187,25 @@ def create_app(touchscreen=False):
             raw_device_url = payload.get("device_url")
             if not isinstance(raw_device_url, str) or not raw_device_url.strip():
                 raise DeviceError("device_url is required, for example http://192.168.1.137")
+            # Existing verified records retain their hardware-ID pin unless an
+            # operator explicitly supplies a fresh one from mDNS discovery.
+            # This keeps legacy records working while preventing a DHCP IP
+            # reuse from silently reconfiguring a different PhotoFrame.
+            stored_identity = (device.get("pull_provision") or {}).get("device_hardware_id")
+            expected_device_id = normalize_expected_device_id(
+                payload.get("expected_device_id") if "expected_device_id" in payload else stored_identity
+            )
             trigger_now = payload.get("trigger_now", True)
             if not isinstance(trigger_now, bool):
                 raise DeviceError("trigger_now must be boolean")
+            requested_deep_sleep = payload.get("deep_sleep_enabled")
+            if requested_deep_sleep is not None and not isinstance(requested_deep_sleep, bool):
+                raise DeviceError("deep_sleep_enabled must be boolean")
+            if requested_deep_sleep is False:
+                raise DeviceError(
+                    "PhotoFrame deep sleep is fixed enabled; remove deep_sleep_enabled or set it to true"
+                )
+            requested_deep_sleep = True
             device_url = normalize_device_url(raw_device_url)
             pull_url = managed_photoframe_pull_url(request, device_id, strict=True)
             if urlsplit(device_url).hostname == urlsplit(pull_url).hostname:
@@ -2898,7 +3253,9 @@ def create_app(touchscreen=False):
                     display_orientation=str(display.get("orientation") or "landscape"),
                     native_size=(int(profile["width"]), int(profile["height"])),
                     expected_profile_id=profile["profile_id"],
+                    expected_device_id=expected_device_id,
                     trigger_now=trigger_now,
+                    deep_sleep_enabled=True,
                 )
                 # A successful control-plane write always leaves the device
                 # waiting for its own URL Rotation GET.  A trigger timeout or
@@ -2916,6 +3273,7 @@ def create_app(touchscreen=False):
                     firmware_version=result.firmware_version,
                     board_name=result.board_name,
                     configured_image_url=result.configured_image_url,
+                    deep_sleep_enabled=result.deep_sleep_enabled,
                     rotate_requested_at=time.time() if result.rotate_requested else None,
                     rotate_status=result.rotate_status,
                     successful=True,
@@ -3444,6 +3802,17 @@ def create_app(touchscreen=False):
         config = get_state().config.get()
         render_options = None
         epaper_options = None
+        photoframe_hardware_rotation = 0
+        if render_policy is not None and device_id:
+            # The PhotoFrame profile owns a fixed physical mounting
+            # compensation.  It changes the device configuration payload but
+            # never the JPEG pixels rendered by Case7.
+            try:
+                photoframe_hardware_rotation = _photoframe_hardware_rotation(
+                    get_state().devices.get(device_id)
+                )
+            except (DeviceError, DisplayPolicyError) as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
         if profile == "jpeg" and render_policy is None:
             # Generic LCD and local touchscreen callers negotiate dimensions
             # through query parameters or the stored device capability.
@@ -3556,6 +3925,7 @@ def create_app(touchscreen=False):
             "X-Album-Orientation": actual_orientation,
             "X-Album-Target-Orientation": str(target_orientation or actual_orientation),
             "X-Album-Orientation-Mode": str((render_policy or {}).get("orientation_mode", render_options["orientation_mode"] if render_options else "auto")),
+            "X-Album-Hardware-Rotation": str(photoframe_hardware_rotation) if render_policy is not None else "0",
             "Cache-Control": "private, max-age=0, must-revalidate",
             "Vary": "Authorization, X-Device-Token, X-Display-Width, X-Display-Height, X-Display-Orientation, If-None-Match",
         }
@@ -3566,15 +3936,18 @@ def create_app(touchscreen=False):
                 # Case7's local rendering schema.  It keeps the device's
                 # persisted URL Rotation schedule aligned with its registered
                 # policy on the next successful device-initiated fetch.
+                config_payload = {
+                    "auto_rotate": bool(render_policy.get("auto_rotate", True)),
+                    "rotate_cron": list(render_policy.get("rotation_cron", [])),
+                    "display_orientation": str(target_orientation or "landscape"),
+                    "display_rotation_deg": photoframe_hardware_rotation,
+                }
+                # Deep sleep is a product invariant for both supported ESP32
+                # frames. Every successful pull repairs old always-on device
+                # settings and keeps the physical wake key meaningful.
+                config_payload["deep_sleep_enabled"] = True
                 headers["X-Config-Payload"] = json.dumps(
-                    {
-                        "config": {
-                            "auto_rotate": bool(render_policy.get("auto_rotate", True)),
-                            "rotate_cron": list(render_policy.get("rotation_cron", [])),
-                            "display_orientation": str(target_orientation or "landscape"),
-                            "display_rotation_deg": 0,
-                        }
-                    },
+                    {"config": config_payload},
                     ensure_ascii=False,
                     separators=(",", ":"),
                 )

@@ -85,6 +85,22 @@ class AlbumIndexTests(unittest.TestCase):
         self.assertEqual(result_a[0].model_id, MODEL_A)
         self.assertEqual(result_b[0].model_id, MODEL_B)
 
+    def test_metadata_filters_reduce_candidates_before_similarity_ranking(self):
+        small = self.image("small.jpg", 10)
+        large = self.image("large.png", 240)
+        # The fixture decoder uses a fixed 8x8 array, while SQLite metadata
+        # keeps the original dimensions and extension for pre-filtering.
+        self.index.index_paths([small, large])
+        result = self.index.search_text(
+            "anything",
+            MODEL_A,
+            10,
+            filters={"min_width": 16, "min_height": 16, "extensions": ["png"]},
+        )
+        self.assertEqual([item.filename for item in result], ["large.png"])
+        with self.assertRaises(AlbumIndexError):
+            self.index.search_text("anything", MODEL_A, filters={"extensions": ["gif"]})
+
     def test_incremental_duplicate_and_clear_preserve_photos(self):
         original = self.image("one.jpg", 120)
         first = self.index.index_paths([original])

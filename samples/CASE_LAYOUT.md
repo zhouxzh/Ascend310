@@ -1,6 +1,14 @@
 # 实践案例目录规范
 
-本规范用于统一 `samples/` 下实践案例的代码布局，同时保留现有教材、构建脚本和板端部署所依赖的稳定路径。
+本规范用于统一 `samples/` 下实践案例的代码布局，同时保留现有教材、构建脚本和板端部署所依赖的稳定路径。它是案例目录的契约，不替代根 README、`docs/README.md` 或具体案例 README。
+
+## README 的唯一职责
+
+- 根 `README.md`：项目首页和本地书稿起步。
+- `samples/README.md`：可运行代码总览。
+- `samples/caseN/README.md`：单案例最短运行手册。
+- `samples/caseN/docs/README.md`：单案例工程文档地图。
+- `samples/caseN/models/README.md`、`data/README.md` 等：只说明该资产目录的格式、来源和忽略边界，不承担案例总览。
 
 ## 标识与显示名称
 

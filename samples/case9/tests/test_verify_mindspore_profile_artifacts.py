@@ -66,6 +66,29 @@ class MindSporeArtifactVerifierTests(unittest.TestCase):
             self.assertEqual(report["artifacts"][0]["actual_bytes"], path.stat().st_size)
             self.assertEqual(report["artifacts"][0]["actual_sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
 
+    def test_observed_board_override_preserves_profile_target(self):
+        """A shared profile can be audited on a different, explicitly named board."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile, _ = profile_for(root)
+            report = VERIFY.verify_profile_artifacts(
+                profile,
+                root,
+                board_override={"host": "192.168.11.14", "soc": "Ascend310B4", "tier": "8T"},
+            )
+            self.assertEqual(report["status"], "passed")
+            self.assertEqual(report["board"], {"host": "192.168.11.14", "soc": "Ascend310B4", "tier": "8T"})
+            self.assertEqual(report["profile_board"], {"host": "127.0.0.1", "soc": "Ascend310B4", "tier": "8T"})
+            self.assertEqual(report["board_source"], "observed_override")
+
+    def test_observed_board_override_requires_complete_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile, _ = profile_for(root)
+            with self.assertRaises(VERIFY.VerificationError):
+                VERIFY.verify_profile_artifacts(profile, root, board_override={"host": "192.168.11.14"})
+
     def test_size_and_digest_mismatch_fails_without_mutating_file(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -192,6 +215,48 @@ class MindSporeArtifactVerifierTests(unittest.TestCase):
             self.assertTrue(output.is_file())
             stored = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(stored["profile"], profile.id)
+
+    def test_cli_records_observed_board_override(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile, path = profile_for(root)
+            raw = {
+                "schema_version": 1,
+                "profiles": [{
+                    "id": profile.id,
+                    "display_name": "Fixture",
+                    "model_id": profile.model_id,
+                    "repository": "fixture/model",
+                    "source": "local",
+                    "revision": profile.revision,
+                    "tokenizer_revision": profile.revision,
+                    "revision_pinned": True,
+                    "mirror": None,
+                    "board": {"host": profile.board_host, "soc": "Ascend310B1", "tier": "20T"},
+                    "runtime": {"provider": "mindspore", "context_length": 1024, "default_max_tokens": 32, "max_tokens": 64, "temperature": 0.0, "top_p": 1.0},
+                    "cache_dir": profile.cache_dir,
+                    "artifacts": [{"name": "model", "kind": "weights", "filename": "model.bin", "url": "https://example.invalid/model.bin", "expected_bytes": path.stat().st_size, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}],
+                    "status": "experimental_dirty_base",
+                    "admission": {"eligible": False, "reason": "fixture"},
+                    "notes": "fixture",
+                }],
+            }
+            registry = root / "registry.json"
+            registry.write_text(json.dumps(raw), encoding="utf-8")
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = VERIFY.main([
+                    profile.id,
+                    "--registry", str(registry),
+                    "--root", str(root),
+                    "--observed-board-host", "192.168.11.14",
+                    "--observed-board-soc", "Ascend310B4",
+                    "--observed-board-tier", "8T",
+                ])
+            self.assertEqual(code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["board"]["host"], "192.168.11.14")
+            self.assertEqual(payload["profile_board"]["soc"], "Ascend310B1")
 
 
 if __name__ == "__main__":

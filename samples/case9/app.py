@@ -49,7 +49,9 @@ _QWEN25_STATIC_KV_1024_MAX_TOKENS = 80
 # template, role markers, and generated tokens inside the fixed 1024 window.
 _QWEN25_STATIC_KV_1024_MAX_INPUT_CHARACTERS = 768
 _MINDSPORE_ACTIVE_UPSTREAM_MODEL = "case9-active"
-_MINDSPORE_ACTIVE_MAX_TOKENS = 80
+# MindSpore candidate profiles share the 64-token service contract.  The
+# formal Qwen2.5 ACL route above retains its independent historical limit.
+_MINDSPORE_ACTIVE_MAX_TOKENS = 64
 # The gateway has no tokenizer, so leave a conservative character budget for
 # the profile-specific chat template. The service performs the authoritative
 # token-level context check before loading a generation request.
