@@ -5,21 +5,6 @@
   margin-right: auto;
 }
 
-.vp-sidebar-textbook {
-  border-bottom: 1px solid var(--vp-c-divider);
-  margin-bottom: 0.75rem;
-  padding: 0.75rem 1rem 1rem;
-}
-
-.vp-sidebar-textbook .vp-sidebar-title {
-  font-weight: 600;
-  margin: 0 0 0.5rem;
-}
-
-.vp-sidebar-textbook .vp-sidebar-links {
-  margin: 0;
-}
-
 @media (max-width: 719px) {
   .vp-page table {
     table-layout: fixed;
