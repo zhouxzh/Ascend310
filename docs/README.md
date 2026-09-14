@@ -10,12 +10,12 @@ _这是工程文档入口，不是项目首页，也不是教材正文。项目�
 | --- | --- | --- |
 | 运行一个案例 | 对应 `samples/caseN/README.md` | 依赖、启动命令、板端边界和常见故障 |
 | 学习理论 | [`src/book/README.md`](../src/book/README.md) | 全书章节和推荐学习路线 |
-| 阅读实践教程 | [`src/experiment/README.md`](../src/experiment/README.md) | Case 1 到 Case 9 的理论源稿 |
+| 阅读实践教程 | [`src/experiment/README.md`](../src/experiment/README.md) | 案例 1 到案例 9 的理论源稿 |
 | 查板端命令 | [`src/appendix/appendix2.md`](../src/appendix/appendix2.md) | Linux、CANN、服务和证据边界 |
 | 查验收审查 | [`case-reviews/00-index.md`](case-reviews/00-index.md) | 各案例的风险和未解决问题，不是运行手册 |
 | 查看本次文档整理记录 | [`documentation-audit-20260907.md`](documentation-audit-20260907.md) | 本轮发现、取舍和未解决事项 |
 | 查看仓库目录规范 | [`00-repository-structure.md`](00-repository-structure.md) | README、源码、案例和生成物的职责边界 |
-| 查 Case7 | [`samples/case7/docs/README.md`](../samples/case7/docs/README.md) | 智能相册的按任务文档地图 |
+| 查案例 7 | [`samples/case7/docs/README.md`](../samples/case7/docs/README.md) | 智能相册的 7 份主题工程文档 |
 
 ## 🗂️ 文档分层
 
@@ -23,11 +23,11 @@ _这是工程文档入口，不是项目首页，也不是教材正文。项目�
 | --- | --- | --- |
 | 教材理论 | `src/book/`、`src/experiment/`、`src/appendix/` | 原理、方法、教程正文；是书稿源文件 |
 | 案例运行 | `samples/caseN/README.md` | 可执行的最短路径和当前默认参数 |
-| 案例工程 | `samples/caseN/docs/` 或历史兼容的 `doc/` | API、部署、模型、故障和验收证据 |
+| 案例工程 | `samples/caseN/docs/` 或明确标注的历史 `doc/` | API、部署、模型、故障和验收证据 |
 | 全仓库审查 | `docs/case-reviews/` | 以审查日期为基线的风险清单和修复建议 |
 | 生成输出 | `latex/`、`src/.vuepress/dist/` | 构建结果；禁止手工修改，需回到 `src/` 改源稿 |
 
-`samples/CASE_LAYOUT.md` 规定了案例目录的稳定路径。已有案例中的 `doc/`、多个编号段或历史归档不在本轮强制重命名；导航会明确它们的作用和边界。
+`samples/CASE_LAYOUT.md` 规定了案例目录的稳定路径。案例 7 已将原有 00-15 文档合并为 01-07 主题文档；其他案例的历史 `doc/` 或多段编号仍按各自 README 说明。
 
 ## 🧭 按任务查找
 
@@ -47,19 +47,19 @@ _这是工程文档入口，不是项目首页，也不是教材正文。项目�
 
 | 案例 | 理论源稿 | 可运行入口 | 工程文档位置 |
 | --- | --- | --- | --- |
-| Case 1 人脸考勤 | [`case1.md`](../src/experiment/case1.md) | [`samples/case1/README.md`](../samples/case1/README.md) | `samples/case1/docs/` |
-| Case 2 目标跟踪 | [`case2.md`](../src/experiment/case2.md) | [`samples/case2/README.md`](../samples/case2/README.md) | README 与代码内说明 |
-| Case 3 智能电子琴 | [`case3.md`](../src/experiment/case3.md) | [`samples/case3/README.md`](../samples/case3/README.md) | `samples/case3/doc/`（历史兼容目录） |
-| Case 4 掌纹识别 | [`case4.md`](../src/experiment/case4.md) | [`samples/case4/README.md`](../samples/case4/README.md) | `samples/case4/docs/` |
-| Case 5 数据采集 | [`case5.md`](../src/experiment/case5.md) | [`samples/case5/README.md`](../samples/case5/README.md) | `samples/case5/docs/` |
-| Case 6 智能小车 | [`case6.md`](../src/experiment/case6.md) | [`samples/case6/README.md`](../samples/case6/README.md) | README 与代码内说明 |
-| Case 7 智能相册 | [`case7.md`](../src/experiment/case7.md) | [`samples/case7/README.md`](../samples/case7/README.md) | [`samples/case7/docs/README.md`](../samples/case7/docs/README.md) |
-| Case 8 手势识别 | [`case8.md`](../src/experiment/case8.md) | [`samples/case8/README.md`](../samples/case8/README.md) | README 与代码内说明 |
-| Case 9 RAG 网关 | [`case9.md`](../src/experiment/case9.md) | [`samples/case9/README.md`](../samples/case9/README.md) | `samples/case9/docs/00-case9-current-runbook.md`；其余编号文档按索引和归档说明阅读 |
+| 案例 1：智能考勤机 | [`case1.md`](../src/experiment/case1.md) | [`samples/case1/README.md`](../samples/case1/README.md) | `samples/case1/docs/` |
+| 案例 2：目标跟踪检测 | [`case2.md`](../src/experiment/case2.md) | [`samples/case2/README.md`](../samples/case2/README.md) | README 与代码内说明 |
+| 案例 3：智能电子琴 | [`case3.md`](../src/experiment/case3.md) | [`samples/case3/README.md`](../samples/case3/README.md) | `samples/case3/doc/`（历史兼容目录） |
+| 案例 4：掌纹识别 | [`case4.md`](../src/experiment/case4.md) | [`samples/case4/README.md`](../samples/case4/README.md) | `samples/case4/docs/` |
+| 案例 5：智能数据采集分析仪 | [`case5.md`](../src/experiment/case5.md) | [`samples/case5/README.md`](../samples/case5/README.md) | `samples/case5/docs/` |
+| 案例 6：智能小车 | [`case6.md`](../src/experiment/case6.md) | [`samples/case6/README.md`](../samples/case6/README.md) | README 与代码内说明 |
+| 案例 7：智能相册 | [`case7.md`](../src/experiment/case7.md) | [`samples/case7/README.md`](../samples/case7/README.md) | [`samples/case7/docs/README.md`](../samples/case7/docs/README.md) |
+| 案例 8：实时手势识别 | [`case8.md`](../src/experiment/case8.md) | [`samples/case8/README.md`](../samples/case8/README.md) | README 与代码内说明 |
+| 案例 9：智能聊天机器人 | [`case9.md`](../src/experiment/case9.md) | [`samples/case9/README.md`](../samples/case9/README.md) | `samples/case9/docs/00-case9-current-runbook.md`；其余编号文档按索引和归档说明阅读 |
 
-### Case7 智能相册
+### 案例 7：智能相册
 
-Case7 的入口已经按“运行、接口、设备、模型、证据、理论”分层，具体顺序见 [`samples/case7/docs/README.md`](../samples/case7/docs/README.md)。不要从历史主动推送报告或跨板报告开始；先读 [`samples/case7/README.md`](../samples/case7/README.md) 完成服务启动和照片上传。
+案例 7 的入口已经按“运行、接口、设备、模型、证据、理论”分层，具体顺序见 [`samples/case7/docs/README.md`](../samples/case7/docs/README.md)。先读 [`samples/case7/README.md`](../samples/case7/README.md) 完成服务启动和照片上传，再按任务进入专题文档。
 
 ## 🔍 阅读和搜索规则
 
@@ -89,6 +89,6 @@ Case7 的入口已经按“运行、接口、设备、模型、证据、理论�
 
 - 教材内容只在 `src/` 维护；`latex/` 和 `src/.vuepress/dist/` 是生成物。
 - 案例 README 只保留启动、部署、用户操作和最短排障路径；长篇理论放入对应 `src/experiment/caseN.md`。
-- 工程文档使用两位数字前缀和描述性文件名；历史证据保留原文件，不与当前命令混写。
+- 工程文档使用两位数字前缀和描述性文件名；案例 7 只保留当前主题文档，历史实验不作为当前操作依据。
 - 文档中的板端 IP、端口、模型 ID、版本和 hash 必须与同一份代码或报告相互引用；发生变化时更新索引和当前入口。
 - 不把模型、照片、数据库、FAISS、OM、日志或私人图片复制进教材源文件。

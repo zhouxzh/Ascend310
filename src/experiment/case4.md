@@ -1,4 +1,4 @@
-# 04 - Ascend 310B4 掌纹识别工作台手动测试教程
+# 案例 4：掌纹识别
 
 ## 1. 案例目标
 
@@ -78,3 +78,27 @@ rm -rf "$PALMPRINT_ROOT/data/templates"
 ## 7. 版本冻结
 
 人工测试期间不升级 Python、依赖、驱动、CANN 或应用版本。发现问题时停止当前模型、记录复现步骤、回退 CCNet，并在人工测试结束后单独规划下一版本。人工测试通过后，再更新准入证据、release manifest、版本号和完整验收记录。
+
+## 8. 全候选模型测试
+
+工作台运行通道只保留六个已有 OM 且契约可验证的 NPU embedding。候选清单仍保留完整 28 项审计记录；其余 22 个分类器、ROI、掌静脉、EDCC、SDK 或缺少可复现资产的项目已从 API/UI 候选矩阵归档，不会被服务加载，也不能被强制转换成掌纹 512 维 embedding。
+
+在源码环境中执行静态审计：
+
+```bash
+python -m tools.offline.candidate_campaign inventory --all
+python -m tools.offline.candidate_campaign local --all
+python -m tools.offline.candidate_campaign report --all
+```
+
+当前板端地址是 `192.168.8.178`。在板端激活 conda/CANN 后，对已有 OM 的候选逐一执行：
+
+```bash
+python tools/board/collect_npu_trace.py --label <candidate-id> --interval 1 -- \
+  python -m tools.offline.candidate_campaign board \
+  --candidate <candidate-id> --image <roi-image>
+python tools/board/acl_lifecycle_probe.py --model <candidate-id> \
+  --image <roi-image> --cycles 10
+```
+
+每项记录来源 revision、许可、资产字节数/SHA、输入输出契约、实际 backend、耗时、退出码、温度、功耗、内存、大页、dmesg 和生命周期。`139`、`err_ret=-512`、设备 reset、LPM/AICore/RAS 增量或清理失败会阻断该项；缺权重、不可复现来源或闭源 SDK 则记录为 `blocked_*` 或 `not_applicable`，不是“测试通过”。完整日志留在板端私有目录，源码只提交脱敏状态和哈希。

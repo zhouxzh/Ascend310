@@ -99,3 +99,31 @@ find "$PALMPRINT_ROOT/data/captures" -type f
 ## 8. 当前阶段结论
 
 本文件定义人工测试方法，不宣称五个 CompNet 已通过稳定性或跨域正式验收。当前版本冻结；人工测试出现问题时先记录和回退，下一版本另行规划。
+
+## 9. 全候选板端测试
+
+板端测试目标为 Ascend 310B4 / 8T，当前开发板地址为 `192.168.8.178`。本地控制器不得运行 PyACL、ATC、`npu-smi` 或摄像头测试；必须在已激活 conda/CANN 的板端 shell 中执行。
+
+候选运行前先生成静态审计：
+
+```bash
+python -m tools.offline.candidate_campaign inventory --all
+python -m tools.offline.candidate_campaign local --all
+```
+
+对有 mixed-FP16 OM 的候选单独执行：
+
+```bash
+python tools/board/collect_npu_trace.py \
+  --label <candidate-id> --interval 1 -- \
+  python -m tools.offline.candidate_campaign board \
+  --candidate <candidate-id> --image <roi-image>
+python tools/board/acl_lifecycle_probe.py \
+  --model <candidate-id> --image <roi-image> --cycles 10
+```
+
+每个任务类型使用自己的输入输出契约。分类器、ROI、掌静脉、EDCC 和 SDK 不得通过掌纹 embedding API 伪造测试。板端任何异常退出、设备 reset、LPM/AICore/RAS 增量、清理失败或资源残留都必须保存原始诊断并阻断当前候选；不能把 `Health: Alarm` 单独写成模型结论。
+
+完整证据写入板端私有 `reports/candidates/`，源码只保留脱敏状态索引。2026-09-10 在独立 staging 目录完成 CCNet 及五个 CompNet 的 OM-only ACL smoke；输出分别为 2048-D/512-D 且有限，直接运行的 ACL reset/finalize 返回 0。CCNet 的严格诊断 trace 同时发现新增 `err_ret=-512` 和 driver cleanup 事件，按门禁状态为 `blocked_faults`，因此五个 CompNet 的直接 smoke 不能替代完整诊断验收。该结果不替代数据集质量、数值一致性或正式准入。测试结果不修改生产 registry，也不自动上传模型、数据集、模板或真实图像。
+
+2026-09-11 在正确加载 conda/CANN 的环境下重新执行六个 OM 候选的 10 次独立 ACL load/run/close，六项均完成 10/10，输出有限，`acl_reset_device` 与 `acl_finalize` 返回 0。该重测纠正了早期 `PyACL is unavailable` 环境错误，但仍只属于 ACL smoke；温度诊断、数据集质量、数值一致性、性能和 PolyU 全量证据仍需单独完成，故不改变生产 registry。

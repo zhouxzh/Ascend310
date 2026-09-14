@@ -1,4 +1,4 @@
-# Ascend 310B4 / 8T 掌纹识别工作台
+# 案例 4：掌纹识别
 
 这是一个运行在 Ascend 310B4 / 8T 开发板上的 React + FastAPI 掌纹识别工作台。本文只说明源码构建、手动部署、启动和日常操作；模型评测、转换、故障和验收证据从 [`docs/00-document-index.md`](docs/00-document-index.md) 开始阅读。
 
@@ -226,6 +226,50 @@ python -m tools.offline.benchmark audit --dataset polyu --spectrum B
 ```
 
 真实掌纹图像、数据集、模板和运行报告不得进入 Git 或截图；`ui_smoke_5_20_1` 只能验证界面和报告链路，不能作为正式精度排名。
+
+### 7.1 全候选分任务测试
+
+`candidate_manifest.json` 保留完整 28 项研究审计；生产/模板通道只暴露 6 个 NPU embedding（CCNet 和五个 CompNet）。另有 6 个已核验 OM 通过独立候选运行时实验页调用，包括分类器、ROI、双输入比较器、PPNet 和掌静脉分类器；它们不进入生产模板通道。其余候选因没有可复现 NPU 资产、来源/许可不完整，或属于 SDK/代码任务，继续保留审计记录供后续复核。使用下面的入口生成完整静态审计和脱敏状态索引：
+
+```bash
+python -m tools.offline.candidate_campaign inventory --all
+python -m tools.offline.candidate_campaign local --all
+python -m tools.offline.candidate_campaign report --all
+```
+
+Embedding、classifier、ROI、掌静脉和 SDK/代码使用不同测试契约。`audit_pass` 只表示来源、契约和当前声明资产通过静态检查，不表示板端 ACL、数值、质量或生命周期通过；缺少权重、固定 revision 或许可的候选必须保留 `blocked_*`。EDCC 只作为 CPU 离线基线，SDK/云服务不进入 NPU registry。
+
+当前 staging 版本还提供独立的板端候选运行时实验页。启动工作台后打开
+“模型状态”中的“候选模型实验”，或手动调用：
+
+```bash
+curl --fail http://127.0.0.1:7860/api/candidate-runtimes
+curl --fail -F candidate_id=ppnet -F image=@<anonymous-image> \
+  http://127.0.0.1:7860/api/candidate-runs
+```
+
+该入口支持六个已验证 OM：两个 Tongji 分类器、ROI-LANet、Lin-Dxin 双输入
+比较器、PPNet 和 Kenan 掌静脉分类器。它们按各自输入输出契约运行，不会进入
+`/api/bootstrap`、模板命名空间或生产 registry；一次成功 NPU 推理只表示运行
+时 smoke 通过，不代表识别准确率或正式准入。接口契约和返回字段见
+[`docs/evidence/candidate-runtime-workbench-20260911.md`](docs/evidence/candidate-runtime-workbench-20260911.md)。
+
+当前 Ascend 310B4 开发板地址为 `192.168.8.178`。板端执行实际 NPU smoke 时，先手动激活 conda/CANN，再逐候选运行并保留诊断：
+
+```bash
+ssh HwHiAiUser@192.168.8.178
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate base
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+cd <release-root>
+python tools/board/collect_npu_trace.py --label <candidate-id> --interval 1 -- \
+  python -m tools.offline.candidate_campaign board \
+  --candidate <candidate-id> --image <roi-image>
+python tools/board/acl_lifecycle_probe.py --model <candidate-id> \
+  --image <roi-image> --cycles 10
+```
+
+每次只运行一个候选。报告位于被忽略的 `reports/candidates/`；出现 `139`、`err_ret=-512`、设备 reset、LPM/AICore/RAS 增量、清理失败或资源残留时停止该候选并记录问题，不修改生产 registry。
 
 ## 8. 常见故障
 

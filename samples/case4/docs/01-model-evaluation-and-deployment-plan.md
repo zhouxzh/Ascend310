@@ -61,3 +61,41 @@
 ## 6. 版本冻结
 
 人工测试期间不修改 `APP_VERSION`、release ID、依赖锁、驱动、CANN 或准入策略。发现问题时只建立问题记录并回退到 CCNet；人工测试全部完成后，再单独规划下一版本修复和重新验收。
+
+## 7. 全候选分任务测试
+
+`candidate_manifest.json` 中的 28 项候选必须全部有一条可追溯结论，但不强制使用同一个 embedding 适配器：
+
+- embedding 采用输入契约、ONNX/OM、100 样本数值一致性、适用数据集质量、性能和 10 次 ACL 生命周期门禁；
+- classifier 保留单输入或双输入 logits/类别契约，记录 accuracy、macro-F1 和混淆矩阵；
+- ROI 模型记录框、关键点或分割输出，使用适用标注计算 IoU 或归一化误差；
+- 掌静脉候选只在合法 NIR 数据和独立模态 adapter 可用时测试；
+- EDCC 只作为 CPU 离线基线，闭源/云 SDK 只做授权和 API 适用性记录，均不进入 NPU registry。
+
+静态审计和报告编排命令：
+
+```bash
+python -m tools.offline.candidate_campaign inventory --all
+python -m tools.offline.candidate_campaign local --all
+python -m tools.offline.candidate_campaign report --all
+```
+
+板端已有 OM 的单候选 smoke 必须在 Ascend 310B4 / 8T 上执行。当前板端地址为 `192.168.8.178`，命令中的用户和发行目录仍由操作者确认：
+
+```bash
+ssh HwHiAiUser@192.168.8.178
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate base
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+cd <release-root>
+export PALMPRINT_ROOT="$PWD"
+export PYTHONPATH="$PALMPRINT_ROOT"
+python -m tools.board.verify_runtime_assets --model ccnet --strict
+python tools/board/collect_npu_trace.py --label ccnet --interval 1 -- \
+  python -m tools.offline.candidate_campaign board --candidate ccnet --image <roi-image>
+python tools/board/acl_lifecycle_probe.py --model ccnet --image <roi-image> --cycles 10
+```
+
+五个 CompNet 将 `ccnet` 替换为对应 canonical ID；每次只运行一个候选。需要记录 CANN/SoC、OM SHA、退出码、温度、功耗、NPU 内存、大页、dmesg 和 LPM/AICore/RAS 增量。`139`、`err_ret=-512`、设备 reset、清理失败或资源残留立即阻断该候选，`Health: Alarm` 只作为诊断字段。
+
+候选报告目录使用 `reports/candidates/<candidate-id>/<run-id>/`，完整运行报告留在板端；源码只提交脱敏摘要和哈希索引。只有所有适用门禁通过才能标记 `research_ready`，任何候选都不会因本次测试自动进入生产 registry。

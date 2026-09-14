@@ -934,7 +934,7 @@ type ros2_stop
 type ros2_restart
 ~~~
 
-进入容器后看到的用户提示符可能变化。容器状态异常时先查看 `docker ps -a`、`docker logs <container-name>` 和 `docker inspect`，不要直接删除容器或镜像。ROS2 节点、话题、launch 和工作空间编译属于 ROS2 内容，应放在附录 6 中讲解。
+进入容器后看到的用户提示符可能变化。容器状态异常时先查看 `docker ps -a`、`docker logs <container-name>` 和 `docker inspect`，不要直接删除容器或镜像。ROS2 节点、话题、launch 和工作空间编译属于 ROS2 内容，应放在附录 5 中讲解。
 
 ### 11.4 源码目录、挂载和编译
 

@@ -1,4 +1,4 @@
-# 案例1：边缘人脸考勤——FastAPI 与昇腾 NPU 协同 {#src-experiment-case1-h1}
+# 案例 1：智能考勤机 {#src-experiment-case1-h1}
 
 ## 教程定位
 

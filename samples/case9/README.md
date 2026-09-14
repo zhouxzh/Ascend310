@@ -1,4 +1,4 @@
-# 案例 9：Ascend 310B 中文文本聊天
+# 案例 9：智能聊天机器人
 
 _Qwen2.5 静态 KV ACL 是现有正式基线；Qwen1.5、TinyLlama 和 DeepSeek 是已有的 MindSpore 候选，新一轮还登记 Qwen2.5、Qwen3 和 20T 专用 MiniCPM3 候选。Qwen1.5 的 8T 历史报表为 9/9，因历史 health/snapshot 缺少 `npu_model` 按 8/9 记录；当前地址 G0 已补齐但严格 placement 仍失败，B4 保持 `blocked`；20T `.95` 缺口批次通过 9/9 机器门并保持 `experimental_dirty_base`。8T 随后出现重复 `DRV_LPM_FAULT 0x80E3A203`，恢复 worker 仅完成缩小烟测。TinyLlama 在 8T 的长输出/机器质量门失败，20T 缺口批次执行后为 8/9，32/48 token 长输出出现 UTF-8 错误，继续 `blocked`。DeepSeek 已在 20T `.95` 完成原有 API 机器门，并在 8T 历史 `.90` 地址的缺口批次通过 9/9 机器门；两板中文人工质量和正式准入仍未完成。8T 当前地址为 `192.168.1.90`（`.11.14` 与 `.178` 为同一块板的历史别名）；20T 当前地址为 `192.168.1.95`，`.210` 仅为历史请求地址；音频、ASR/TTS 和 XiaoZhi 暂停。_
 

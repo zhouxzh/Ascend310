@@ -4,12 +4,12 @@ size: 16:9
 theme: ascend310
 paginate: true
 header: "《昇腾310B实战》教材配套演示"
-footer: "案例 1：边缘人脸考勤"
+footer: "案例 1：智能考勤机"
 ---
 
 <!-- _class: cover -->
 
-# 案例 1：边缘人脸考勤
+# 案例 1：智能考勤机
 
 - 案例：边缘人脸考勤——FastAPI 与昇腾 NPU 协同，对应 `samples/case1`
 - 专题安排：3 课时，每课时 45 分钟

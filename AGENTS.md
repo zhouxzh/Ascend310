@@ -29,6 +29,87 @@ document names using an unexplained `case4` label. The canonical book source
 converter and VuePress sidebar; keep its tutorial self-contained rather than
 renaming it or making it depend on other repository Markdown files.
 
+## Frozen textbook naming
+
+Treat the following names as the public, frozen names of the textbook. Do not
+rename a chapter, case, appendix, or paired presentation without an explicit
+user request. Use the exact punctuation shown here: `第N章：`, `案例 N：`, and
+`附录 N：`. Practice-case titles use pure Chinese task names; do not add
+hardware-model prefixes, English subtitles, or acronyms.
+
+When a frozen name changes, update every surface in one scoped change:
+
+- the source frontmatter or H1 in `src/book/`, `src/experiment/`, or
+  `src/appendix/`
+- `src/.vuepress/sidebar.ts`
+- the relevant index in `src/book/README.md`, `src/experiment/README.md`, or
+  `src/appendix/README.md`
+- `src/presentation/README.md` and the relevant Marp deck when a paired
+  presentation exists
+
+Never rename only the sidebar, only the page title, or only one index.
+
+### Theory chapters
+
+| Source | Frozen title |
+| --- | --- |
+| `src/book/chapter1.md` | 第1章：昇腾310B边缘计算基础 |
+| `src/book/chapter2.md` | 第2章：CANN软件栈核心组件解析 |
+| `src/book/chapter3.md` | 第3章：昇腾PyTorch扩展迁移基础 |
+| `src/book/chapter4.md` | 第4章：PyACL应用开发基础 |
+| `src/book/chapter5.md` | 第5章：DVPP视频处理基础 |
+| `src/book/chapter6.md` | 第6章：算子开发实战 |
+| `src/book/chapter7.md` | 第7章：性能分析与优化 |
+| `src/book/chapter8.md` | 第8章：模型量化案例教学 |
+| `src/book/chapter9.md` | 第9章：AI项目交付闭环 |
+
+### Practice cases
+
+| Source | Frozen title |
+| --- | --- |
+| `src/experiment/case1.md` | 案例 1：智能考勤机 |
+| `src/experiment/case2.md` | 案例 2：目标跟踪检测 |
+| `src/experiment/case3.md` | 案例 3：智能电子琴 |
+| `src/experiment/case4.md` | 案例 4：掌纹识别 |
+| `src/experiment/case5.md` | 案例 5：智能数据采集分析仪 |
+| `src/experiment/case6.md` | 案例 6：智能小车 |
+| `src/experiment/case7.md` | 案例 7：智能相册 |
+| `src/experiment/case8.md` | 案例 8：实时手势识别 |
+| `src/experiment/case9.md` | 案例 9：智能聊天机器人 |
+
+### Appendices
+
+The file-to-number mapping is frozen. In particular, `appendix5.md` is ROS2 and
+`appendix6.md` is the toolbox/FAQ appendix; do not swap them back.
+
+| Source | Frozen title |
+| --- | --- |
+| `src/appendix/appendix1.md` | 附录 1：开发板与基础环境 |
+| `src/appendix/appendix2.md` | 附录 2：基于昇腾 310B 的 Ubuntu 教程 |
+| `src/appendix/appendix3.md` | 附录 3：Python 编程基础 |
+| `src/appendix/appendix4.md` | 附录 4：Vibe Coding 基础 |
+| `src/appendix/appendix5.md` | 附录 5：ROS2 基础教程 |
+| `src/appendix/appendix6.md` | 附录 6：工具箱、FAQ 与参数模板 |
+
+## Documentation preview and push policy
+
+- For site or manuscript-name changes, run `pnpm run docs:dev` and give the user
+  the local preview URL. Do not push until the user explicitly confirms that
+  the local pages are correct.
+- When Marp sources change, also run `pnpm run docs:slides` before asking for
+  review so the local static decks match the Markdown sources.
+- `pnpm run docs:build` is a local verification step. A successful build does
+  not replace user review and does not authorize a push.
+
+## Agent instruction files
+
+`AGENTS.md` is the canonical project instruction file. This repository
+intentionally does not keep a separate `CLAUDE.md`; do not recreate it. Put
+shared project rules in `AGENTS.md`. DSH loads `$DSH_HOME/AGENTS.md` and, while
+walking from the project root to the session working directory, the existing
+`AGENTS.md` base files followed by their local overlays. A single `AGENTS.md`
+is sufficient for DSH.
+
 ## Standard development lifecycle
 
 ```mermaid

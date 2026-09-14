@@ -1,4 +1,4 @@
-# 案例 7：昇腾 310B 智能相册
+# 案例 7：智能相册
 
 *本教程从问题建模、模型迁移、NPU 运行时、相册服务器到触摸屏和电子纸输出，完整解释 Case7 的设计与实现。*
 
@@ -163,10 +163,10 @@ Case7 保留这条数据流，但替换了不适合 310B 服务器的组件：
 | MongoDB 保存图片和向量 | SQLite 保存照片元数据与 embedding，FAISS 保存检索缓存 | 减少常驻服务，保留可审计的单文件真源 |
 | 导入时可复制到 hash 目录 | 上传原图放在系统 `Pictures` 受管目录，SHA-256 去重 | 防止个人照片混入发布目录，原图生命周期可控 |
 | 查询时拉取全部向量并分块计算 | 无筛选时使用每模型 `IndexIDMap2(IndexFlatIP)`；有筛选时先 SQLite 预筛选再计算候选内积 | 兼顾常用路径延迟和元数据过滤正确性 |
-| 早期 Gradio Demo（历史参考） | 原生 FastAPI 与触摸屏/手机页面 | 当前服务同时支持本机显示和 ESP32，不再依赖 Gradio |
+| 早期网页 Demo | 原生 FastAPI 与触摸屏/手机页面 | 当前服务同时支持本机显示和 ESP32，不依赖额外 UI 运行时 |
 | OCR 作为后续实验 | 本版本不自动 OCR、不生成手工标签 | 不把未准入的 CPU 模型混入 NPU 相册主链路 |
 
-因此，本案例借鉴的是可验证的检索分层和元数据预筛选思想，不复制 MongoDB、Gradio 或未经准入的 OCR。`photo_index.py` 的 `search_vector()` 在带有尺寸、格式或人数条件时先构造候选集合，再进行归一化内积；没有条件时仍直接查询 FAISS。两条路径都返回相同的 `SearchResult` 合同，前端只需要消费照片 ID、文件名和分数。
+因此，本案例借鉴的是可验证的检索分层和元数据预筛选思想，不复制 MongoDB 或未经准入的 OCR。`photo_index.py` 的 `search_vector()` 在带有尺寸、格式或人数条件时先构造候选集合，再进行归一化内积；没有条件时仍直接查询 FAISS。两条路径都返回相同的 `SearchResult` 合同，前端只需要消费照片 ID、文件名和分数。
 
 > **边界：** 上游仓库的 README 将 FAISS、EXIF 和多语言列为 TODO；Case7 已经分别用 FAISS、SQLite/EXIF 和双语模型实现，但这不表示上游项目已经提供这些能力，也不表示两个项目的模型权重或分数可以互换。
 
@@ -249,31 +249,11 @@ MobileCLIP 和 Chinese-CLIP 文本图目前登记为 `int64` 输入。这个类�
 
 准入脚本先验证 ACL 初始化，再验证输入字节数、dtype、输出字节数、维度和有限值，最后比较 ONNX 与 OM 的归一化向量，余弦相似度门槛为 `0.995`。只有 `models/registry.json` 中 hash 一致且 `status=admitted` 的 OM 才会被服务加载。
 
-### 310B4/8T 与 310B1/20T 的跨板 OM 兼容性实验
+### 目标 SoC 与运行时版本
 
-MobileCLIP 的 OM 不是脱离目标芯片的通用二进制。为了区分“ATC 转换成功”“本机 ACL 可执行”和“跨 SoC 可移植”，Case7 对图像、文本两个组件分别建立 8T/20T 对照矩阵：8T 使用 `--soc_version=Ascend310B4` 重新转换，20T 使用已经生成的 `--soc_version=Ascend310B1` OM 做原生复验，然后把两套 OM 在两块板上各运行一次。完整命令、版本原文、哈希和错误日志保存在 `samples/case7/docs/12-mobileclip-cross-board-compatibility.md`。
+MobileCLIP 的 OM 绑定 ATC 转换时指定的 `--soc_version`，不能默认跨不同 310B SoC 通用。当前服务只使用与目标板卡匹配、已完成准入的 OM。若更换板卡或 CANN 运行时，必须在新环境重新执行 ONNX 合同、ATC、ACL 数值和检索验证；未取得当前报告时，不在教程中写入旧板卡数字。
 
-```mermaid
-flowchart LR
-    onnx[锁定 MobileCLIP ONNX] --> atc8[8T ATC\nAscend310B4]
-    onnx --> atc20[20T ATC/复用\nAscend310B1]
-    atc8 --> om8[8T image/text OM]
-    atc20 --> om20[20T image/text OM]
-    om8 --> run8[8T ACL 原生]
-    om8 --> run20[20T ACL 跨板]
-    om20 --> run20n[20T ACL 原生]
-    om20 --> run8x[8T ACL 跨板]
-```
-
-每个矩阵单元都重新检查 ACL 初始化、输入字节数和 dtype、512 维有限输出，以及与同一 ONNX 参考向量的归一化余弦 `>= 0.995`。`load_rejected`、`execute_failed`、`output_contract_mismatch`、`numerical_mismatch` 和 `non_finite` 必须保留原始错误，不能通过 CPU fallback 或再次编译隐藏。原生通过而跨板失败，说明该 OM 在观测到的 SoC/运行栈组合下有兼容性边界；原生和跨板都通过，也只代表本次版本组合和 fixture，不代表所有 310B 型号通用。
-
-本次实测使用 CANN `7.6.0.1.220:8.0.0`、driver/npu-smi `25.2.0`。`npu-smi info` 是版本和 SoC 的直接入口；`npu-smi info -t board -i 0` 提供固件字段，但两板原文均返回 `Firmware Version=NA`，因此实际固件版本未取得，不能从驱动版本或安装包 hash 推断固件状态。图像 36 个 fixture 和文本 20 个 fixture 在八个组件-矩阵单元全部通过：图像最小/最大余弦为 `0.9999415278434753`/`0.9999895095825195`，文本为 `0.999996542930603`/`0.9999986886978149`。8T 新 OM 的 image/text 大小和 SHA-256 分别为 `34179432/6d294c0d8ac069c12728eb3b2f29c8c06c9cff4003e1e81121181b89e6cf4eb6` 与 `137089078/eaee8ed5b0695542da24cede466d34556ffbcf3048001c41e47bd0d9a4184382`；20T OM 分别为 `34179368/096b5ced17bf5386be3478a2bb38b32365b6d2c23d3ec1355122669d2ddcd95d` 与 `137089021/d9cbee64b10f7c3fcf0a77c1706d8ea9af3da3d4b922ac27249136ede95c8f77`。这些数字属于固定 campaign 和隔离 fixture，不是对其他 CANN、固件或 SoC 的通用承诺。
-
-#### CANN、驱动、固件和目标 SoC 的关系
-
-`--soc_version` 决定 ATC 为哪一类 NPU 生成算子和执行计划；CANN Toolkit/ATC、板端 CANN Runtime/PyACL、驱动和 NPU 固件是相互配套的层次。运行时 CANN 不应低于生成 OM 的版本，驱动/固件也必须满足官方兼容矩阵；不匹配可能表现为算子不支持、OM 加载拒绝、ACL 执行失败、数值异常或设备重置。CANN 版本号不能推断固件版本，`npu-smi` 的固件字段返回 `Firmware Version=NA` 时必须原样记录并把固件状态标为“未取得”。本案例中同一 8T 板的 `npu-smi info` 软件版本均为 `25.2.0`，历史 CANN `8.3.0.1.200:8.3.RC1` 批次出现 MobileCLIP 图像 ATC/ACL 异常，换为 CANN `7.6.0.1.220:8.0.0` 后 36/36 数值门通过；这把问题优先缩小到 CANN 8.3 用户空间转换栈，但仍是版本对照相关性，不能冒充唯一因果证明。同时升级时遵循 firmware → driver → CANN 的顺序，具体以 [ATC `--soc_version` 文档](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/910/devaids/atctool/atlasatcparam_16_0036.html)、[CANN 升级说明](https://www.hiascend.com/document/detail/en/canncommercial/800/softwareinst/instg/instg_0028.html) 和 [`npu-smi` 版本查询说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/910/softwareinst/instg/instg_0064.html) 为准。
-
-完整的实测矩阵、原始环境路径和本地哈希清单见 `samples/case7/docs/12-mobileclip-cross-board-compatibility.md`。聚合报告为 `samples/case7/reports/model_pipeline/mobileclip-cross-board-20260829-aggregate/compatibility_matrix.json`；该报告的 `production_mutation=false`，仅作为兼容性证据，不会自动更新生产注册表或部署模型。
+`npu-smi info` 用于记录板卡、驱动和固件字段；固件字段无法读取时原样记录，不从驱动版本推断。CANN Toolkit/ATC、板端 Runtime/PyACL、驱动和 NPU 固件必须按厂商兼容矩阵配套。版本升级应先查官方说明，再在隔离目录验证，不覆盖生产 OM、注册表或索引。
 
 ### 选择性 FP32/FP16 与误差定位
 
@@ -284,7 +264,7 @@ FP32 ONNX 合同处理；文本 token 输入是 `int64`。ATC 会在允许的节
 白名单。推广前的 `must_keep_origin_dtype` OM 及其 `mobileclip_s0_image_keep_dtype.cfg` 仅保留为
 诊断和候选节点清单。MobileCLIP 文本、Chinese-CLIP 两个分支和 ResNet50 图像分支使用模型级
 `allow_fp32_to_fp16`。详细的命令、清单和证据字段见
-[`docs/08-model-pipeline-and-npu-admission.md`](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/08-model-pipeline-and-npu-admission.md)。
+[模型流水线与 NPU 准入](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/05-models-and-npu.md)。
 
 诊断的基本方法是比较同一输入在 ONNX 参考执行器和候选 OM 各中间输出的方向，而不是只看最终
 embedding。现有诊断报告在 `network.4` 的加法节点记录余弦 `0.9994069`，在
@@ -342,18 +322,10 @@ uint8 BGR 合成图；合成图也必须经过生产的 `NpuEmbeddingBackend.pre
 索引中重建 500 张图库，以同轮生产 OM 比较既有 20 条英文查询的 Recall@1/3/5；临时向量和索引在
 报告完成后删除。最后在 `Ascend310B4` 板端以单线程、20 次预热、100 次计时、3 轮重复测量 P50/P95。
 
-最终批次 `full-serial-20260827-prod-domain-cann` 在 `192.168.8.180`、CANN
-`7.6.0.1.220:8.0.0` 上完成，状态为 `passed`。生产 ONNX SHA-256 为
-`baaffc19bb5af33aa3ec05180e9e9c43c4a1f01a3ea1b64737aaaf325dca1b79`；C0 OM SHA-256 为
-`4ba82838bcb13c1542b2e0b5cebb30ef754abdc2745663f92f9becc5ce943517`，大小 `34179446` bytes。
-C0 和 C1 的 36/36 数值输入均达到门槛，英文 Recall@1/3/5 均为 `0.90/1.00/1.00`，与基线相同。
-性能结果为：基线 P50/P95 `64.541943/64.780770 ms`，C0 `38.913310/39.271904 ms`，C1
-`39.124595/39.437814 ms`。因此 C0 以零 FP32 白名单和更低 P50 被选中，C2–C4 不再执行。
-
-推广后，canonical MobileCLIP OM 和注册表均已更新为 C0 的 `allow_fp32_to_fp16` 策略，并串行重建
-500 个 MobileCLIP 图像向量；服务健康状态为 `ready`。`npu-smi` 的 `Health: Alarm` 是已记录的
-板卡诊断状态，不单独改变本次模型准入结论。早期标准正态压力输入报告若存在，只能作为域外稳定性
-诊断，不能替代上述生产域 fixture。
+每次候选实验都必须把板卡型号、CANN 版本、ONNX/OM SHA-256、ATC 日志、36 个数值样本、
+500 张图库 Recall@1/3/5 和三轮 P50/P95 写入独立报告。只有当前报告同时通过数值、检索和性能门槛，
+候选才可以进入注册表；没有报告支撑的数字在教程中一律不预填。`Health: Alarm` 只作为诊断字段，
+不能单独改变准入结论。候选实验的临时向量和索引在报告完成后删除。
 
 ## ⚙️ NPU 运行时与串行资源管理
 
@@ -384,7 +356,7 @@ C0 和 C1 的 36/36 数值输入均达到门槛，英文 Recall@1/3/5 均为 `0.
 ### 统一端口约定
 
 Case7 的 310B 服务统一使用 `7860`：手机、10 寸触摸屏、ESP32 的 PhotoFrame 图片 URL、
-`curl` 示例和教学部署命令均写作 `http://192.168.1.135:7860/`。这是普通用户进程可直接
+`curl` 示例和教学部署命令均写作 `http://<BOARD_IP>:7860/`。这是普通用户进程可直接
 监听的非特权端口，避免为了 80 端口修改 Linux 权限、CANN 环境或额外部署代理。
 
 ESP32 与 310B 是两个不同的 HTTP 服务：ESP32 自身的控制页面为
@@ -414,7 +386,7 @@ Case7 固定记录两种 7.3 英寸设备 profile：[Waveshare ESP32-S3-PhotoPai
 `landscape`/`180` 组合；E1002 则为 `landscape`/`0`。这不是 NPU、EXIF 或图片内容错误，不能通过
 增加 90/270 度用户选项解决。
 
-新设备在管理 API 和低层握手 API 中都必须显式携带这两个 `profile_id` 之一，JPEG 能力固定为 `["jpeg"]`；服务不会因为 800x480、设备名称或 IP 地址相同而猜测型号。历史 `devices.json` 缺少 profile 的记录会被标记为待确认，仍可在管理页查看，但不能取图、推进轮播或主动推送，直到操作者按实物型号完成确认。
+新设备在管理 API 和低层握手 API 中都必须显式携带这两个 `profile_id` 之一，JPEG 能力固定为 `["jpeg"]`；服务不会因为 800x480、设备名称或 IP 地址相同而猜测型号。缺少 profile 的记录会被标记为待确认，仍可在管理页查看，但不能取图或推进轮播，直到操作者按实物型号完成确认。
 
 当前 LAN 部署的设备注册和取图都是 URL-only：不生成、不显示、也不要求设备令牌。服务设置私有、重新验证缓存语义和 `Vary`，不把真实文件路径暴露给设备。禁用设备返回 `404`；访问边界依赖可信局域网和服务器端设备启停状态，而不是旧固件令牌。
 
@@ -430,29 +402,30 @@ $idfPython = 'C:\Espressif\tools\python\v6.0.2\venv\Scripts\python.exe'
 
 日志中出现 `No WiFi credentials found - Starting AP mode` 表示设备还在临时配网 AP；连接形如
 `PhotoFrame - XXXXX` 的 2.4 GHz AP 后配置家庭网络。配网成功必须同时看到 `sta ip: ...`、
-`HTTP server started` 和 `Web interface available at: http://...`。本次新微雪设备的证据是：
+`HTTP server started` 和 `Web interface available at: http://...`。保存完整串口日志，地址以本次
+启动打印的 IPv4 为准：
 
 ```text
 profile: waveshare_photopainter_73
-serial: COM17
-firmware: esp32-photoframe v2.18.0
-sta ip: 192.168.1.137
-web: http://192.168.1.137/
+serial: <SERIAL_PORT>
+firmware: <FIRMWARE_VERSION>
+sta ip: <ESP32_IP>
+web: http://<ESP32_IP>/
 ```
 
 在同一局域网电脑上用这个 IPv4 地址验证，而不是登录 `photoframe.local`：
 
 ```powershell
-$photoIp = '192.168.1.137'
+$photoIp = '<ESP32_IP>'
 curl.exe --noproxy "*" "http://$photoIp/api/system-info"
 curl.exe --noproxy "*" -I "http://$photoIp/"
 ```
 
 `photoframe.local` 只是可选 mDNS 别名，Windows、VPN 或路由器不支持解析时仍属正常；它不是账号、
-密码或必须的登录入口。`192.168.1.135:7860` 是 310B 相册服务器，`192.168.1.117` 是旧 E1002
-记录，均不能代替当前串口日志中的地址。每次重启、换路由器或重新配网后都要重新读取 `sta ip`。
+密码或必须的登录入口。310B 相册服务器地址使用 `<BOARD_IP>:7860`；旧租约记录不能代替当前串口日志中的
+地址。每次重启、换路由器或重新配网后都要重新读取 `sta ip`。
 完整的端口枚举、日志保存、DHCP 变化和故障排查步骤见仓库中的
-[PhotoPainter 串口读取 IP 与 Wi-Fi 配网手册](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/13-photopainter-serial-ip-and-wifi.md)。
+[ESP32 电子相册设备管理](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/04-esp32-device-management.md)。
 
 ### ESP32 深度休眠后的唤醒与 310B 发现
 
@@ -474,15 +447,14 @@ Case7 对这两类 ESP32 终端固定采用深度休眠：注册、策略更新�
 只有 `project_name=esp32-photoframe`、`device_id`
 和正确 profile 均核对后，才提交 `POST /api/admin/devices/register`。注册返回
 `202/awaiting_pull` 只代表控制面配置完成；设备随后主动请求
-`http://192.168.1.135:7860/api/devices/<device_id>/photoframe`，才算观察到真实拉图。
+`http://<BOARD_IP>:7860/api/devices/<device_id>/photoframe`，才算观察到真实拉图。
 两台设备可能都显示 `photoframe.local`，因此不能按主机名或列表第一项自动配对。原厂
 SenseCraft/Xiaozhi 固件若没有上述 API 或 mDNS 服务，必须先完成固件适配，不能仅凭外壳和
 二维码判定兼容。可执行的逐步命令、故障表和证据模板见
-[唤醒与发现两类 ESP32 电子相册](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/14-wake-and-discover-esp32-photoframes.md)。
+[ESP32 电子相册设备管理](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/04-esp32-device-management.md)。
 
-E1002 的 MicroSD 只按官方支持范围使用不超过 32 GB 的 FAT32 卡。64 GB 卡不属于承诺兼容范围；
-本次实测拔出 64 GB 卡后 URL 拉图恢复正常，因此 Case7 的网络相册不把 SD 卡作为照片缓存或
-传输前提。该存储卡兼容性问题与深度休眠策略是两个独立条件。
+E1002 的 MicroSD 兼容性由设备固件和硬件说明决定，不是 Case7 网络传输的前提。服务器不把 SD
+卡作为照片缓存；存储卡异常与深度休眠策略是两个独立条件。
 
 ### 横竖屏图像方向
 
@@ -556,23 +528,10 @@ profile 的固定硬件补偿也会进入 JPEG variant/ETag，但不旋转 JPEG 
 - UI 验收覆盖 1920x1080、1280x800、1024x600 和 400x900，无横向滚动、控件重叠或文字溢出；
 - E6 dry-run 覆盖 EXIF、裁剪、六色、颜色编号、192000 bytes、BUSY 超时和无 GPIO 拒绝。
 
-历史 310B4/8T 报告曾记录 COCO-CN 英文 MobileCLIP Recall@1/3/5 = `0.90/1.00/1.00`、中文
-Chinese-CLIP = `0.80/0.95/1.00`，以及 MobileCLIP 图像编码 P50/P95 `55.898/56.106 ms`、
-Chinese-CLIP 文本编码 `11.988/12.048 ms`、FAISS 搜索 `0.413/0.449 ms`。这些数字属于历史
-证据，不能移植到其他板卡。当前验收目标是 `192.168.8.180`；其 2026-08-27 复核报告显示 500 张
-COCO-CN 图片已建立三个模型的各 500 个 embedding，英文 Recall@1/3/5 为 `0.90/1.00/1.00`，
-中文为 `0.80/0.95/1.00`，三个模型均为 `admitted`。当前板端性能和模型 hash 以
-`reports/benchmarks/coco_cn_case7_performance_20260827_newboard.json`、
-`reports/datasets/coco_cn_case7_retrieval_20260827_newboard.json` 和
-`reports/model_pipeline/board-20260827/acl_numerical_validation.json` 为准；新板报告仍需与候选
-精度扫描分开记录。
-
-本机显示恢复也在同一目标板上单独验收：报告
-`reports/display-restart-recovery-20260827.json`（SHA-256
-`69c9fd4f8e89b9a09980edbf9b8919bc35a9f08f51e14420258643e114ade36b`）记录了只重启 Case7 服务
-后的结果。重启前后 `photo_id=194`、`selection_revision=3` 和 `ready` 状态保持不变；等待一次
-天气 tick 后仍为同一张照片，revision 递增到 4 并更新 ETag。这是本机状态恢复与天气解耦的
-接口/服务证据，不等同于真实电子纸刷新证据。
+当前教程只定义验收协议，不预填具体 Recall、P50/P95、photo ID 或 hash。执行时把实际 JSON
+报告路径、板卡/运行时版本、输入数量和结果写入 `samples/case7/reports/`，并在工程验证文档中
+注明证据类型。模型准入、接口健康、触摸屏、设备 URL 拉图和 E6 dry-run 必须分别报告；其中
+API 成功或 ACL 数值通过不能替代真实电子纸刷新结论。
 
 ## ⚠️ 限制、许可证与后续工作
 

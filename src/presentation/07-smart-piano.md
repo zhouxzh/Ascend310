@@ -4,12 +4,12 @@ size: 16:9
 theme: ascend310
 paginate: true
 header: "《昇腾310B实战》教材配套演示"
-footer: "案例 3：Ascend 310B DDSP 智能电子琴"
+footer: "案例 3：智能电子琴"
 ---
 
 <!-- _class: cover -->
 
-# 案例 3：Ascend 310B DDSP 智能电子琴
+# 案例 3：智能电子琴
 
 - 案例：`samples/case3` DDSP 音乐工作台
 - 专题安排：3 课时，每课时 45 分钟

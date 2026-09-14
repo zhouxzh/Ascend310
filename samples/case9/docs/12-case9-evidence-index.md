@@ -33,8 +33,11 @@ _本索引以 2026-09-07 的双板证据和 MindSpore 候选复现包为当前�
 | [41-8t-mindspore-llm-strict-validation-record.md](41-8t-mindspore-llm-strict-validation-record.md) | 8T 重启、G0 环境、LPM fault 和门禁账本 | 2026-09-06 G0 `blocked`；MindNLP 缺失、版本不匹配、无 worker |
 | [42-mindspore-candidate-search-record.md](42-mindspore-candidate-search-record.md) | MindSpore 聊天候选搜索与证据分级 | 条件候选不下载、不启动 |
 | [43-mindspore-external-model-empirical-probe-20260906.md](43-mindspore-external-model-empirical-probe-20260906.md) | 用户 site、MindNLP loader 与外部 Qwen1.5 板端 smoke | `observed-pass`（context-only），不替代正式准入 |
+| [47-qwen25-mindspore-vs-acl-benchmark-20260907.md](47-qwen25-mindspore-vs-acl-benchmark-20260907.md) | 同板 Qwen2.5 MindSpore/静态 KV ACL 分阶段性能、PyACL trace 和 tokenizer 优化 | ACL 路径诊断；prefill 优化仍待实施 |
 | [44-mindspore-external-model-followup-20260906.md](44-mindspore-external-model-followup-20260906.md) | 当前地址 Qwen2.5/TinyLlama/DeepSeek 续测、资源故障与启动边界修复 | Qwen2.5 context-only；Tiny 生成内存失败；DeepSeek context1024 diagnostic passed、canonical OOM/blocked；API/长测未运行 |
 | [45-mindspore-lite-2.5-mobilenetv2-ascend-build-smoke-20260907.md](45-mindspore-lite-2.5-mobilenetv2-ascend-build-smoke-20260907.md) | 独立 Lite 2.5.0/2.2.11 aarch64/cp39 环境、Ascend Context、官方 MobileNetV2 与最小 AddNet 烟测 | 2.5.0 导入/Context `observed-pass`；MindIR v2 Ascend `build_from_file` exit 139；2.2.11 明确拒绝 MindIR v2；`.ms` 返回 `Fail to support`；`predict`、placement、LLM 和性能 `not-run` |
+| [46-mindspore-lite-environment-installation-and-cann-matrix-20260907.md](46-mindspore-lite-environment-installation-and-cann-matrix-20260907.md) | Lite 2.4/2.5 安装边界、CANN 8.0 版本矩阵、依赖检查和 CANN 8.5 升级条件 | `check_env/check_python_deps` 通过；Lite Ascend graph-build 仍可复现 `SIGSEGV(139)`；当前不建议盲目升级 CANN 8.5 |
+| [47-qwen25-mindspore-vs-acl-benchmark-20260907.md](47-qwen25-mindspore-vs-acl-benchmark-20260907.md) | 同一 Qwen2.5-0.5B、同一 8T 板、同一 prompt 的 MindSpore 与静态 KV ACL 串行对照 | MindSpore 稳态约 `1.780 token/s`；ACL 约 `0.216 token/s`；两条路径均独立回收，结果为诊断性能实验 |
 | [archive/20260827/README.md](archive/20260827/README.md) | 重构前 27 份报告原文索引 | 只读归档 |
 
 当前 Qwen2.5 和 MindSpore 模型、日志和报告只保存在被 Git 忽略的复现目录；Qwen2.5-0.5B
@@ -97,6 +100,14 @@ DeepSeek 早先带 B1 目标元数据的 G0/G1 文件被标为排除，不作为
 [docs/33-mindspore-llm-candidate-validation-record.md](33-mindspore-llm-candidate-validation-record.md)。
 
 ## 🧪 当前双板证据
+
+2026-09-14 的新 20T ACL 批次已补齐 `.95` 的 B1 原生 Static-KV OM 运行证据：工件
+`6bca884f...6298609` 在 `Ascend310B1 / 20T` 上完成 descriptor、ACL execute、JSON/SSE、
+`8/16/24/32` token 长输出、10 轮稳定性与 `2+30` 性能。2-token SSE 测量的首事件
+p50/p95 为 `4721.046/4736.121 ms`，总耗时 p50/p95 为 `4734.774/4749.877 ms`，吞吐
+p50/p95 为 `0.422/0.423 token/s`。这是 `experimental_dirty_base` 结果，中文探测仅完成
+10/10 机器协议检查，人工质量尚未签字；详情见
+[20T 全量 LLM OM 测试批次](48-case9-20t-all-llm-om-campaign-20260914.md)。
 
 | 板卡 | 工件 | 短批次报告 | 已支持的结论 | 不可推出 |
 | --- | --- | --- | --- | --- |

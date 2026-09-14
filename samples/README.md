@@ -12,19 +12,19 @@
 
 | 目录 | 案例 |
 | --- | --- |
-| [`case1/`](case1/) | Case 1 · 人脸考勤（face-attendance） |
-| [`case2/`](case2/) | 目标检测与多目标跟踪 |
-| [`case3/`](case3/) | 智能电子琴 |
-| [`case4/`](case4/) | 智能掌纹识别机 |
-| [`case5/`](case5/) | 智能数据采集仪 |
-| [`case6/`](case6/) | 小车视觉感知 |
-| [`case7/`](case7/) | 昇腾 310B 智能相册服务器 |
-| [`case8/`](case8/) | 手势识别 |
-| [`case9/`](case9/) | OpenAI 兼容 RAG 网关 |
+| [`case1/`](case1/) | 案例 1：智能考勤机 |
+| [`case2/`](case2/) | 案例 2：目标跟踪检测 |
+| [`case3/`](case3/) | 案例 3：智能电子琴 |
+| [`case4/`](case4/) | 案例 4：掌纹识别 |
+| [`case5/`](case5/) | 案例 5：智能数据采集分析仪 |
+| [`case6/`](case6/) | 案例 6：智能小车 |
+| [`case7/`](case7/) | 案例 7：智能相册 |
+| [`case8/`](case8/) | 案例 8：实时手势识别 |
+| [`case9/`](case9/) | 案例 9：智能聊天机器人 |
 
-## 🖼️ Case7 入口
+## 案例 7 入口
 
-Case7 将 Orange Pi AIpro / Ascend 310B4 作为 NPU 相册服务器，同时服务手机、10 寸 QDtech MPI1001 触摸屏、ESP32/PhotoPainter 和 E6 dry-run。运行入口是 [`case7/README.md`](case7/README.md)，完整理论教程是 [`../src/experiment/case7.md`](../src/experiment/case7.md)，按任务查找工程文档从 [`case7/docs/README.md`](case7/docs/README.md) 开始。
+案例 7 将 Orange Pi AIpro / Ascend 310B4 作为 NPU 相册服务器，同时服务手机、10 寸 QDtech MPI1001 触摸屏、ESP32/PhotoPainter 和 E6 dry-run。运行入口是 [`case7/README.md`](case7/README.md)，完整理论教程是 [`../src/experiment/case7.md`](../src/experiment/case7.md)，按任务查找工程文档从 [`case7/docs/README.md`](case7/docs/README.md) 开始。
 
 ## 🧾 统一目录角色
 

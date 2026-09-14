@@ -6,10 +6,10 @@ export default sidebar({
     {
       text: "理论教程",
       icon: "book",
+      link: "/book/",
       prefix: "/book/",
       collapsible: true,
       children: [
-        "README.md",
         "chapter1.md",
         "chapter2.md",
         "chapter3.md",
@@ -24,11 +24,11 @@ export default sidebar({
     {
       text: "实践案例",
       icon: "experiment",
+      link: "/experiment/",
       prefix: "/experiment/",
       collapsible: true,
       children: [
-        "README.md",
-        { text: "案例 1 · 人脸考勤（face-attendance）", link: "case1.md" },
+        "case1.md",
         "case2.md",
         "case3.md",
         "case4.md",
@@ -42,10 +42,10 @@ export default sidebar({
     {
       text: "附录",
       icon: "book",
+      link: "/appendix/",
       prefix: "/appendix/",
       collapsible: true,
       children: [
-        "README.md",
         "appendix1.md",
         "appendix2.md",
         "appendix3.md",
@@ -57,10 +57,10 @@ export default sidebar({
     {
       text: "教材配套演示",
       icon: "presentation",
+      link: "/presentation/",
       prefix: "/presentation/",
       collapsible: true,
       children: [
-        "README.md",
         {
           text: "全书导览（Marp 放映）",
           link: "/presentation/00-repository-map.html",
@@ -82,24 +82,24 @@ export default sidebar({
           link: "/presentation/04-vibe-coding.html",
         },
         {
-          text: "案例 1 · 边缘人脸考勤",
+          text: "附录 5 · ROS2 基础教程",
+          link: "/presentation/09-ros-basics.html",
+        },
+        {
+          text: "案例 1：智能考勤机",
           link: "/presentation/05-face-recognition.html",
         },
         {
-          text: "案例 2 · 目标跟踪检测",
+          text: "案例 2：目标跟踪检测",
           link: "/presentation/06-object-tracking.html",
         },
         {
-          text: "案例 3 · Ascend 310B DDSP 智能电子琴",
+          text: "案例 3：智能电子琴",
           link: "/presentation/07-smart-piano.html",
         },
         {
-          text: "案例 9 · 在昇腾 310B 上复现中文文本聊天",
+          text: "案例 9：智能聊天机器人",
           link: "/presentation/08-chatbot.html",
-        },
-        {
-          text: "附录 6 · ROS2 基础教程",
-          link: "/presentation/09-ros-basics.html",
         },
       ]
     },

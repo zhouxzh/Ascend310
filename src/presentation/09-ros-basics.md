@@ -4,11 +4,11 @@ size: 16:9
 theme: ascend310
 paginate: true
 header: "《昇腾310B实战》教材配套演示"
-footer: "附录 6：ROS2 基础教程"
+footer: "附录 5：ROS2 基础教程"
 ---
 <!-- _class: cover -->
 
-# 附录 6：ROS2 基础教程
+# 附录 5：ROS2 基础教程
 
 面向昇腾310B 教材的机器人软件栈入门
 

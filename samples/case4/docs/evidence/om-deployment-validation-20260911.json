@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "board": "Ascend 310B4 / 8T",
+  "cann": "8.0.0",
+  "python": "3.9",
+  "backend": "acl",
+  "framework": "numpy_only",
+  "cycles_requested": 10,
+  "models": [
+    {"candidate_id":"ccnet","om_sha256":"8465fbf483524a1b373618e5e67b2903c522a32f0fc3b3ee6a4b40881295b7f1","input_shape":[1,1,128,128],"output_shape":[1,2048],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"current_workbench","api_default_path":"passed","quality_gate":"not_run"},
+    {"candidate_id":"compnet_tongji_600","om_sha256":"b412804c403d4dc30e251a7382e1d27efe666a7595954187c762c8c3b9400d8d","input_shape":[1,1,128,128],"output_shape":[1,512],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"manual_test_pending","api_default_path":"blocked_missing_threshold","quality_gate":"not_run"},
+    {"candidate_id":"compnet_iitd_460","om_sha256":"64737e66b226c4b77a561d82c7af840c09488a63cff289c6af0ccf7d92d4e2da","input_shape":[1,1,128,128],"output_shape":[1,512],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"manual_test_pending","api_default_path":"blocked_missing_threshold","quality_gate":"not_run"},
+    {"candidate_id":"compnet_rest_358","om_sha256":"e197b884cd0c22942ace51727743d287d544fb98b82b895a81edcef146c41844","input_shape":[1,1,128,128],"output_shape":[1,512],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"manual_test_pending","api_default_path":"blocked_missing_threshold","quality_gate":"not_run"},
+    {"candidate_id":"compnet_xjtu_flash_200","om_sha256":"764d9d81c7844bf41ba2054f577a1e465d6b9139134fee4ded352ff64959052c","input_shape":[1,1,128,128],"output_shape":[1,512],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"manual_test_pending","api_default_path":"blocked_missing_threshold","quality_gate":"not_run"},
+    {"candidate_id":"compnet_xjtu_natural_200","om_sha256":"54b4a5f102b6914591d8901ee2c2b6deed44b05e33145b8e5052fd5c41ab797a","input_shape":[1,1,128,128],"output_shape":[1,512],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"manual_test_pending","api_default_path":"blocked_missing_threshold","quality_gate":"not_run"},
+    {"candidate_id":"holzweber_resnet18_tongji","om_sha256":"d16953e44f1bd9c91348d8b9feb1dd0b19b60f372d7322b864e1350f5838587a","input_shape":[1,3,224,224],"output_shape":[1,600],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"research_classifier","quality_gate":"not_run"},
+    {"candidate_id":"holzweber_mobilenet_v2_tongji","om_sha256":"793c89abe5f615d7a163c2effc223e0f24d6b14bf10f406efe9e1027aff196fa","input_shape":[1,3,224,224],"output_shape":[1,600],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"research_classifier","quality_gate":"not_run"},
+    {"candidate_id":"holzweber_roi_lanet","om_sha256":"405ff45fb05eda1cd1f3f797694c9ea3341ddc126ba19dced6dbd2ac0d9c76a9","input_shape":[1,3,56,56],"output_shape":[1,18],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"research_roi","quality_gate":"not_run"},
+    {"candidate_id":"lin_dxin_resnet18_pair","om_sha256":"897853d18d79033540225b030500c062bfdbc81d3093b28557517bb4a68abd99","input_shape":[[1,3,224,224],[1,3,224,224]],"output_shape":[[512],[512]],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"research_pair","quality_gate":"not_run"},
+    {"candidate_id":"ppnet","om_sha256":"355ea31a34df8edacb458bb7fd1fc737742af8aa1650fbb5e6ef49f9d0b45b44","input_shape":[1,1,128,128],"output_shape":[1,512],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"research_embedding_not_admitted","quality_gate":"not_run"},
+    {"candidate_id":"compnet_static_gabor","om_sha256":"603eb9831d3e22da6de86c2addc9a203bd8693d08654e83d3909401df9889f7f","input_shape":[1,1,128,128],"output_shape":[1,512],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"research_legacy_alias_not_admitted","quality_gate":"not_run"},
+    {"candidate_id":"kenan_cnn_palmar_veins","om_sha256":"84b9ec803e3334a2068b80655297b541d8f55f347369f08bfc47fe2f0f74a159","input_shape":[1,1,128,128],"output_shape":[1,500],"cycles_completed":10,"acl_lifecycle":"passed","deployment_gate":"research_vein_classifier","quality_gate":"not_run"}
+  ]
+}

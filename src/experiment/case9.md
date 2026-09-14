@@ -1,4 +1,4 @@
-# 案例 9：在昇腾 310B 上复现中文文本聊天
+# 案例 9：智能聊天机器人
 
 _本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验。当前同时维护两条彼此独立的路线：Qwen2.5 静态 KV 的 ONNX -> OM -> 原生 ACL 路线，以及逐步扩展的 MindSpore/MindNLP 候选路线。已有正式候选实测的 MindSpore 模型为 Qwen1.5、TinyLlama、DeepSeek；Qwen2.5-0.5B 在 8T 新地址完成了 context-only loader/NPU 活动诊断，但严格 placement gate 仍为 `blocked`；Qwen3 因当前 MindNLP 0.4.1 缺少 loader 而阻断。Qwen2.5-1.5B 的初次 `SIGSEGV`（exit 139）来自污染的 CANN/PYTHONPATH 诊断，随后在正确 CANN v4 环境完成七个文件校验、模型加载和两 token 的 context-only 生成；由于 placement、API、质量和性能门仍未完成，仍为 `blocked`。仅面向 20T 的 MiniCPM3 尚未运行。8T 当前地址为 `192.168.1.90`；`192.168.11.14` 与报告采集地址 `192.168.8.178` 是同一块板的历史别名。20T 当前地址为 `192.168.1.95`（`192.168.8.210` 仅为历史地址）。本教程只写入有原始证据的结果，双板缺口批次未完成的门标为 `not-run` 或 `blocked`。_
 

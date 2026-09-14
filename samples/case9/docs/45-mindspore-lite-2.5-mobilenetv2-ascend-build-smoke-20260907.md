@@ -335,6 +335,21 @@ Ascend graph build/plugin 组合，不是 310B、ACL 或 CANN 完全不可用。
 随后开发板重启，重启后用低负载重新完成了 2.4.10 验证；没有执行清理用户进程
 或修改系统 CANN。资源异常本身只记为硬件运行条件，不当作 Lite 兼容性结论。
 
+### 依赖补齐后的最终环境判定
+
+2.4.10 初始环境使用 NumPy 2.0.2 时，Lite 自带 `check_python_deps` 因
+`np.float_` 移除而失败。随后在隔离环境中改用 NumPy 1.x，并补齐 CANN 提供的
+`te`/`hccl` 及其 `sympy`、`decorator` 依赖；检查结果变为
+`check_env=True`、`check_python_deps=True`。这说明安装矩阵已经满足 Lite 的
+版本检查要求，但不是图编译成功的保证。
+
+在该完整依赖环境中，最小 AddNet 仍在
+`GenAclOptions: ge.socVersion=Ascend310B4` 后以 `SIGSEGV(139)` 退出；设置
+`ASCEND_BACK_POLICY=acl` 并不能绕过本次 Python 插件的 GE 初始化路径，同样以
+`139` 结束。因而当前阻断点是 Lite Ascend graph-build/plugin 组合，而非缺少
+NumPy、`te` 或 ACL 初始化。安装矩阵和 CANN 8.5 的升级边界见
+[Lite 环境安装与 CANN 版本矩阵](46-mindspore-lite-environment-installation-and-cann-matrix-20260907.md)。
+
 ## 对 Case9 LLM 的影响
 
 这次实验不改变以下状态：

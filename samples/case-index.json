@@ -5,7 +5,7 @@
     {
       "id": "case1",
       "slug": "face-attendance",
-      "title_zh": "人脸考勤",
+      "title_zh": "智能考勤机",
       "keywords": ["人脸识别", "考勤", "PyACL"],
       "source": "src/experiment/case1.md",
       "sample": "samples/case1",
@@ -14,7 +14,7 @@
     {
       "id": "case2",
       "slug": "object-tracking",
-      "title_zh": "目标跟踪",
+      "title_zh": "目标跟踪检测",
       "keywords": ["目标检测", "多目标跟踪", "DeepSORT"],
       "source": "src/experiment/case2.md",
       "sample": "samples/case2",
@@ -23,7 +23,7 @@
     {
       "id": "case3",
       "slug": "ddsp-music-workstation",
-      "title_zh": "DDSP 音乐工作站",
+      "title_zh": "智能电子琴",
       "keywords": ["Piano-DDSP", "MIDI", "音频合成"],
       "source": "src/experiment/case3.md",
       "sample": "samples/case3",
@@ -32,7 +32,7 @@
     {
       "id": "case4",
       "slug": "palmprint-workbench",
-      "title_zh": "掌纹识别工作台",
+      "title_zh": "掌纹识别",
       "keywords": ["掌纹识别", "ROI", "FAISS"],
       "source": "src/experiment/case4.md",
       "sample": "samples/case4",
@@ -41,7 +41,7 @@
     {
       "id": "case5",
       "slug": "signal-analysis",
-      "title_zh": "信号采集与时频分析",
+      "title_zh": "智能数据采集分析仪",
       "keywords": ["数据采集", "DFT", "时频分析"],
       "source": "src/experiment/case5.md",
       "sample": "samples/case5",
@@ -50,7 +50,7 @@
     {
       "id": "case6",
       "slug": "smart-car-vision",
-      "title_zh": "智能小车视觉",
+      "title_zh": "智能小车",
       "keywords": ["车道线", "场景分类", "视觉感知"],
       "source": "src/experiment/case6.md",
       "sample": "samples/case6",
@@ -68,7 +68,7 @@
     {
       "id": "case8",
       "slug": "gesture-detection",
-      "title_zh": "手势检测",
+      "title_zh": "实时手势识别",
       "keywords": ["HaGRID", "YOLO", "WebRTC"],
       "source": "src/experiment/case8.md",
       "sample": "samples/case8",
@@ -77,7 +77,7 @@
     {
       "id": "case9",
       "slug": "rag-gateway",
-      "title_zh": "RAG 网关",
+      "title_zh": "智能聊天机器人",
       "keywords": ["小智", "OpenAI 兼容", "检索增强"],
       "source": "src/experiment/case9.md",
       "sample": "samples/case9",

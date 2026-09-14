@@ -69,7 +69,7 @@ Ascend310/
 
 <!-- _class: visual -->
 
-## 实验案例 1：人脸考勤的程序主线
+## 实验案例 1：智能考勤机的程序主线
 
 ![案例 1 系统流程](../experiment/img1/case1_flow_simple.png)
 
@@ -97,7 +97,7 @@ Ascend310/
 
 ---
 
-## 附录 6：ROS2 基础与 310B 集成边界
+## 附录 5：ROS2 基础与 310B 集成边界
 
 ```text
 ROS2 节点 ──话题/服务/动作──> 机器人功能包
@@ -111,7 +111,7 @@ ROS2 节点 ──话题/服务/动作──> 机器人功能包
 
 ROS2 附录以 Humble 为主要示例版本，覆盖 DDS、工作空间、功能包、通信、launch、TF2、URDF、SSH/VNC 和自启动。ROS2 + NPU 的端到端链路在当前仓库中尚未验证。
 
-<div class="source">来源：`src/appendix/appendix6.md`；外部参考：`6.ROS2系列教程`；边界：`samples/case1` 至 `samples/case9` 暂无已验证 ROS2 运行链</div>
+<div class="source">来源：`src/appendix/appendix5.md`；外部参考：`6.ROS2系列教程`；边界：`samples/case1` 至 `samples/case9` 暂无已验证 ROS2 运行链</div>
 
 ---
 

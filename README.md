@@ -17,7 +17,7 @@
 | 阅读完整理论教程 | [`src/book/README.md`](src/book/README.md) |
 | 阅读实践案例教程 | [`src/experiment/README.md`](src/experiment/README.md) |
 | 运行某个案例 | [`samples/README.md`](samples/README.md)，然后进入对应 `samples/caseN/README.md` |
-| 运行 Case7 智能相册 | [`samples/case7/README.md`](samples/case7/README.md) |
+| 运行案例 7：智能相册 | [`samples/case7/README.md`](samples/case7/README.md) |
 | 理解本仓库为什么这样分目录 | [`docs/00-repository-structure.md`](docs/00-repository-structure.md) |
 
 根 README 是项目首页和快速起步页；它不替代 `docs/README.md`。根 README 说明“项目是什么、怎样开始”，`docs/README.md` 说明“具体问题应该查哪份工程文档”。完整职责表以 [仓库目录与文档职责](docs/00-repository-structure.md) 为准。

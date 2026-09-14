@@ -109,3 +109,26 @@ rm -rf "$PALMPRINT_ROOT/data/templates"
 ## 9. 发布结论
 
 人工测试完成前，本版本只称为“manual test release”。所有结果写入脱敏人工测试摘要；人工通过后才另行更新准入证据、release manifest 和版本号。
+
+## 10. 全候选测试清单
+
+- [ ] `candidate_manifest.json` 28 项均有静态审计记录。
+- [ ] 每项已记录固定 revision、许可证、输入输出契约和资产 SHA-256，或明确 `blocked_*`/`not_applicable` 原因。
+- [ ] embedding、classifier、ROI、掌静脉和 SDK/代码使用各自 adapter 与质量指标。
+- [ ] 具有 OM 的候选在 Ascend 310B4 / 8T 上完成单候选 ACL smoke；不在本地伪造板端结果。
+- [ ] 可运行 NPU 候选完成 10 次生命周期和资源回落检查。
+- [ ] 记录温度、功耗、NPU 内存、大页、Health、退出码、dmesg 和 LPM/AICore/RAS 增量。
+- [ ] `reports/candidates/<candidate-id>/<run-id>/` 产生完整报告，`reports/candidates/index.json` 覆盖 28 项。
+- [ ] 生产 registry、前端模型列表和模板 namespace 未因候选测试自动改变。
+- [ ] 2026-09-10 staging direct smoke：CCNet 及五个 CompNet 的 OM 校验、有限输出和直接 ACL 生命周期通过；但 CCNet 诊断 trace 发现新增 `err_ret=-512`/driver cleanup，完整诊断门禁阻断，详见 `docs/evidence/candidate-campaign-20260910.md`。
+- [x] 2026-09-11 正确加载 CANN 后重测：六个实际运行候选均完成 10/10 独立 ACL load/run/close，输出有限且 reset/finalize 返回 0；六个诊断 trace 均发现同一 `err_ret=-512`/driver cleanup 事件，因此最终诊断准入阻断，未替代数据集质量和性能门禁。
+
+编排入口：
+
+```bash
+python -m tools.offline.candidate_campaign inventory --all
+python -m tools.offline.candidate_campaign local --all
+python -m tools.offline.candidate_campaign report --all
+```
+
+板端地址为 `192.168.8.178` 时，先手动激活 conda/CANN，再用 `tools/board/collect_npu_trace.py` 包裹单候选命令。报告中出现 `139`、`err_ret=-512`、设备 reset、资源清理失败或无法解释的残留时，停止该候选，回退 CCNet 并保持版本冻结。

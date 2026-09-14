@@ -15,11 +15,11 @@ editLink: false
 | 附录 2 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/02-ubuntu-basics.html) | 基于昇腾 310B 的 Ubuntu 教程 | 附录2、Ubuntu 基础、SSH、VNC、NFS、Docker、CANN/PyACL 板端边界 |
 | 附录 3 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/03-python-basics.html) | Python 编程基础 | 附录3、`samples/case1/fusion_result.json` |
 | 附录 4 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/04-vibe-coding.html) | Vibe Coding 基础 | 附录4、`samples/case1/fusion_result.json` |
-| 案例 1 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/05-face-recognition.html) | 边缘人脸考勤 | 案例1、`samples/case1` |
+| 附录 5 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/09-ros-basics.html) | ROS2 基础教程 | 附录5、ROS2 Humble、ROS2 基础与机器人接口 |
+| 案例 1 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/05-face-recognition.html) | 智能考勤机 | 案例1、`samples/case1` |
 | 案例 2 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/06-object-tracking.html) | 目标跟踪检测 | 案例2、`samples/case2` |
-| 案例 3 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/07-smart-piano.html) | Ascend 310B DDSP 智能电子琴 | 案例3、`samples/case3` |
-| 案例 9 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/08-chatbot.html) | 在昇腾 310B 上复现中文文本聊天 | 案例9、`samples/case9` |
-| 附录 6 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/09-ros-basics.html) | ROS2 基础教程 | 附录6、ROS2 Humble、ROS2 基础与机器人接口 |
+| 案例 3 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/07-smart-piano.html) | 智能电子琴 | 案例3、`samples/case3` |
+| 案例 9 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/08-chatbot.html) | 智能聊天机器人 | 案例9、`samples/case9` |
 
 ## 本地预览
 
