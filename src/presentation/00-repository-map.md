@@ -97,6 +97,24 @@ Ascend310/
 
 ---
 
+## 附录 6：ROS2 基础与 310B 集成边界
+
+```text
+ROS2 节点 ──话题/服务/动作──> 机器人功能包
+      │
+      ├─ 传感器：摄像头、雷达、IMU
+      ├─ 底盘：串口/CAN 控制接口
+      └─ 远程：SSH、VNC、多机通信
+               │
+               └─ 建议集成路径：ROS2 话题 -> 310B 推理服务
+```
+
+ROS2 附录以 Humble 为主要示例版本，覆盖 DDS、工作空间、功能包、通信、launch、TF2、URDF、SSH/VNC 和自启动。ROS2 + NPU 的端到端链路在当前仓库中尚未验证。
+
+<div class="source">来源：`src/appendix/appendix6.md`；外部参考：`6.ROS2系列教程`；边界：`samples/case1` 至 `samples/case9` 暂无已验证 ROS2 运行链</div>
+
+---
+
 <!-- _class: visual -->
 
 ## 实验案例 5：采集、频谱与 NPU 推理
@@ -172,10 +190,11 @@ samples/case3/              samples/case9/
 
 | 专题演示 | 重点 |
 |---|---|
-| 01–02 | 硬件、Linux、CANN 与板端边界 |
+| 01–02 | 硬件、Ubuntu、SSH/VNC、CANN 与板端边界 |
 | 03–04 | Python 数据处理与 DSH/Vibe Coding |
 | 05–06 | 人脸识别、检测与多目标跟踪 |
 | 07–08 | DDSP 智能电子琴与聊天机器人 |
+| 09 | ROS2 基础、远程操作与 310B 集成边界 |
 
 从本页的来源路径出发，可以回到原始 Markdown、真实图片和可运行代码。
 

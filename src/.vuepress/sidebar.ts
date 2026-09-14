@@ -50,7 +50,8 @@ export default sidebar({
         "appendix2.md",
         "appendix3.md",
         "appendix4.md",
-        "appendix5.md"
+        "appendix5.md",
+        "appendix6.md"
       ]
     },
     {
@@ -69,8 +70,8 @@ export default sidebar({
           link: "/presentation/01-hardware-basics.html",
         },
         {
-          text: "附录 2 · 昇腾 310B Linux 操作与命令教程",
-          link: "/presentation/02-linux-commands.html",
+          text: "附录 2 · 基于昇腾 310B 的 Ubuntu 教程",
+          link: "/presentation/02-ubuntu-basics.html",
         },
         {
           text: "附录 3 · Python 编程基础",
@@ -95,6 +96,10 @@ export default sidebar({
         {
           text: "案例 9 · 在昇腾 310B 上复现中文文本聊天",
           link: "/presentation/08-chatbot.html",
+        },
+        {
+          text: "附录 6 · ROS2 基础教程",
+          link: "/presentation/09-ros-basics.html",
         },
       ]
     },

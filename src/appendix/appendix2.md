@@ -1,49 +1,108 @@
 ---
-title: "附录 2：昇腾 310B Linux 操作与命令教程"
+title: "附录 2：基于昇腾 310B 的 Ubuntu 教程"
 author: [周贤中]
 subject: "Markdown"
-keywords: [昇腾310B, Linux, Ubuntu, CANN, PyACL, ATC, 边缘计算]
+keywords: [昇腾310B, Ubuntu, Linux, SSH, VNC, NFS, CANN, PyACL]
 lang: zh-cn
 ---
 
-# 附录 2：昇腾 310B Linux 操作与命令教程
+# 附录 2：基于昇腾 310B 的 Ubuntu 教程
 
-## 教程定位与证据边界
+本附录把 Ubuntu 基础操作、远程访问、网络配置和昇腾 310B 板端命令整理为一条可复用的学习路径。它面向三类位置：负责编辑代码和文档的**开发机**、负责连接网络和发起远程操作的 **Ubuntu 主机**、真正运行 CANN、PyACL、OM 推理和摄像头程序的 **310B 板端**。同一个命令在不同位置执行，得到的结果和证明范围不同，因此每一步都要先确认命令在哪台机器、哪个用户、哪个 shell 和哪个软件环境中运行。
 
-本附录把本书九个实践案例中反复出现的 Linux 命令整理为一条可复用的操作路径。它的对象是运行 Ubuntu 的昇腾 310B 开发板，以及负责准备代码和发起远程操作的开发机。命令不是脱离上下文的速查表：每条命令都应在确认执行位置、当前用户、工作目录和数据范围后使用。
+本附录的命令来自 Ubuntu 基础教程中的文件结构、终端编辑器、SSH、VNC、NFS、Docker、热点与 WiFi、开机自启动、静态 IP 和无屏幕联网资料，并结合现有 310B 材料重新编排。外部资料中的 ROS 小车、树莓派、RDK X5、Orin 等名称只作为操作背景出现于命令示例的原始路径中，不能据此推断 310B 板的实际设备名、IP 地址、接口编号或运行结果。
 
-本附录中的“开发机”表示不具备昇腾运行时的控制机；“板端”表示已经安装 CANN、驱动和目标 Python 环境的 310B 主机；“控制机”表示通过 SSH 或 rsync 操作板端的开发机。开发机可以进行纯 Python、前端和静态模型检查，但不能据此推断板端的 ACL、OM、摄像头或音频结果。ATC、PyACL、OM 推理、NPU 性能、V4L2、ALSA 和真实传感器验证都必须在板端完成。
+## 1. 教程定位与证据边界
 
-命令来自当前工作树中 samples/case1/ 至 samples/case9/ 的 README、脚本、测试和 docs/，并按当前主线流程重新编排。历史归档脚本、Windows PowerShell 片段、停用的模型链和上游项目中的其他平台命令不属于默认部署步骤；需要保留时会明确标注为“历史”或“可选”。示例中的 〈板端IP〉、〈用户名〉、〈模型ID〉和〈路径〉必须替换为本地已确认的值，不应把示例占位符直接粘贴到 shell。
+### 1.1 三类操作位置
 
-| 案例 | 主要 Linux 操作 | 默认执行位置 | 证据边界 |
+| 位置 | 用途 | 能做什么 | 不能据此推断什么 |
 | --- | --- | --- | --- |
-| Case 1 人脸考勤 | Python 环境、FastAPI 服务、上传和健康检查 | 开发机与板端 | HTTP 路由检查不等于真实人脸推理 |
-| Case 2 目标跟踪 | 模型下载、视频传输、检测/跟踪、摄像头 | 控制机与板端 | CPU 仅作离线基线，不能替代 NPU 结果 |
-| Case 3 智能电子琴 | WebUI、ONNX/OM 准备、MIDI、ALSA/PulseAudio | 开发机与板端 | 音频设备和实时延迟必须在板端测量 |
-| Case 4 掌纹工作台 | 资产清单、服务、摄像头、ACL 生命周期 | 开发机与板端 | 模型准入、ACL 烟测和识别指标是不同验证门 |
-| Case 5 数据采集仪 | USB 仪器、sigrok、RTL-SDR、实时仪表盘 | 板端 | 音调演示和 CPU FFT 不能作为实物采集证据 |
-| Case 6 智能小车 | 场景模型、服务、摄像头和运动控制入口 | 板端 | --share 或公网隧道不适合生产部署 |
-| Case 7 智能相册 | 相册服务、索引、触控 kiosk、模型准备 | 控制机与板端 | 合成照片测试不代表真实数据集准确率 |
-| Case 8 手势识别 | YOLO 导出、ATC、OM 摄像头和 WebRTC | 开发机与板端 | ONNX、OM、WebRTC 性能应分别记录 |
-| Case 9 RAG 网关 | ACL/OM 服务、网关、文件同步和 HTTP | 控制机与板端 | B4 与 B1 工件、不同模型链不可混用 |
+| 开发机 | 编辑正文、样例代码和配置文件 | 文本编辑、Python 语法检查、纯 Python 测试、前端构建、静态文件检查 | 不能推断板端 CANN、PyACL、OM、摄像头、音频和 NPU 结果 |
+| Ubuntu 主机 | 作为 SSH、VNC、NFS、SCP 和 rsync 的客户端 | 发起远程连接、挂载共享目录、传输文件、运行普通 Ubuntu 命令 | 不能因为客户端命令成功就认定板端推理或硬件测试成功 |
+| 310B 板端 | 运行目标 Ubuntu 系统与昇腾运行时 | 加载 CANN、执行 ATC、导入 acl、运行 OM、检查设备、服务和日志 | 不能把一次导入成功写成完整模型精度或端到端性能 |
 
-### 命令的四个审查问题
+开发机和 Ubuntu 主机可以共享普通 Linux 操作，例如查看路径、编辑文本、管理网络和传输文件。板端操作则需要额外的证据控制：`source /usr/local/Ascend/ascend-toolkit/set_env.sh`、`npu-smi info`、`atc`、`python -c 'import acl'`、OM 加载、V4L2 摄像头访问和真实 NPU 推理都应在 310B 板上执行。
 
-执行任何命令前，先回答四个问题：
+### 1.2 板端专属操作
 
-1. 命令运行在哪台机器、哪个 shell 和哪个 conda 环境中？
-2. 输入文件、输出目录和日志是否在预期的绝对路径内？
-3. 这一步证明的是语法、路由、转换、数值一致性、性能，还是硬件现象？
-4. 命令是否会安装软件、修改设备状态、覆盖文件或删除数据？
+以下操作默认只能在已经安装好驱动、CANN 和目标 Python 环境的 310B 板端执行：
 
-只有在四个问题都有答案时，命令输出才适合作为教学或实验记录。尤其不能把 npu-smi info 的设备摘要、curl 的 HTTP 状态码或一次模型加载成功误写成任务精度或端到端性能结论。
+~~~bash
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+command -v atc
+python -c 'import acl; print("PyACL import: ok")'
+npu-smi info
+ls -l /dev/video*
+v4l2-ctl --device=/dev/video0 --list-formats-ext
+~~~
 
-## Shell、路径与文件安全
+`command -v atc` 检查实际调用的 ATC 路径，`import acl` 检查当前 Python 是否能够加载 PyACL，`npu-smi info` 读取 NPU 设备摘要。三者属于不同的证据层：ATC 存在不代表转换成功，PyACL 可导入不代表模型能运行，`npu-smi` 能输出也不代表某个 OM 已经通过数值和性能验证。
 
-### 启动一个可审计的 shell
+### 1.3 证据状态
 
-在板端脚本或手工会话中，可先使用严格模式；交互式排查时也可以只执行其中的环境变量和路径检查：
+记录结果时，使用下面五类标签，避免把先验知识写成已经观测到的事实：
+
+| 标签 | 含义 |
+| --- | --- |
+| `documented` | 官方文档、厂商文档或教程中明确写出的能力 |
+| `inferred` | 根据已有资料推断出的可能路径，尚未在目标板上验证 |
+| `observed-pass` | 在当前板端、当前环境和当前命令下实际通过 |
+| `observed-fail` | 在当前组合下实际失败，并保留了完整错误和命令 |
+| `untested` | 尚未执行，不能归入支持或不支持 |
+
+一条命令的通过只能证明它对应的最小验证门。语法检查、HTTP 健康检查、ATC 转换、ACL 数值烟测、任务精度、性能测试和界面烟测必须分别记录。没有执行的板端测试不能写成“已验证”，没有采集到的日志不能补写。
+
+### 1.4 执行命令前的四个问题
+
+执行任何会改变文件、网络、用户、软件包或设备状态的命令前，先回答：
+
+1. 命令在哪台机器、哪个 shell 和哪个 conda 环境中运行？
+2. 输入文件、输出目录、日志和远端路径是否已经解析为明确的绝对路径？
+3. 这一步证明的是语法、路径、网络、转换、数值一致性、性能，还是硬件现象？
+4. 命令是否安装软件、修改权限、覆盖文件、删除数据或暴露网络服务？
+
+四个问题没有答案时，先执行只读检查，不要直接执行写入命令。
+
+## 2. Ubuntu 与 Linux 基础
+
+### 2.1 终端、用户和提示符
+
+Ubuntu 的图形界面之外，终端是与 Linux 交互的主要入口。提示符 `$` 通常表示普通用户，`#` 通常表示 root 用户。进入 root 状态以后，所有命令的权限都会提高，误操作的后果也会放大。
+
+~~~bash
+whoami
+id
+hostname
+pwd
+printf 'shell=%s\n' "$SHELL"
+~~~
+
+`whoami` 显示当前用户名，`id` 同时显示用户、组和补充组，`hostname` 显示主机名，`pwd` 显示当前目录，`$SHELL` 显示当前 shell 路径。远程登录后先确认这些信息，避免把命令发到另一台同名设备。
+
+退出临时 root 状态或当前 shell 可使用：
+
+~~~bash
+exit
+~~~
+
+也可以按 `Ctrl+D` 发送文件结束符。不要为了省事长期保留 root 终端，更不要在 root 终端中编辑项目文件。
+
+### 2.2 第一条环境检查命令
+
+~~~bash
+uname -a
+cat /etc/os-release
+date --iso-8601=seconds
+ip addr
+ip route
+~~~
+
+`uname -a` 查看内核和架构，`/etc/os-release` 查看 Ubuntu 版本，`date` 生成带时区含义的时间戳，`ip addr` 查看接口地址，`ip route` 查看默认路由。把这几条命令的输出和后续测试放在同一份记录中，才能说明测试环境。
+
+### 2.3 可审计 shell
+
+脚本或排障会话可以使用严格模式：
 
 ~~~bash
 set -euo pipefail
@@ -53,68 +112,226 @@ hostname
 printf 'shell=%s\n' "$SHELL"
 ~~~
 
-set -e 会在未处理的失败后停止脚本，-u 会暴露未定义变量，pipefail 会保留管道前段命令的失败状态。需要允许某个命令失败时，应显式写出原因并检查返回值，而不是全局关闭严格模式。
+`set -e` 在未处理的命令失败后停止脚本，`-u` 让未定义变量直接报错，`pipefail` 保留管道前段的失败状态。某个命令允许失败时，应显式处理返回值，不能为了继续执行而全局关闭严格模式。
 
-### 目录与路径
+交互式排查时可以先只运行环境检查命令。脚本中如果必须临时关闭 `-u` 来加载厂商环境脚本，应在加载完成后恢复原状态：
 
 ~~~bash
-cd ~/Documents/Ascend310/samples/case1
-pwd
-realpath .
-readlink -f frontend/dist/index.html
-ls -la
-find . -maxdepth 2 -type f -print | sort
+load_cann() {
+  if [[ $- == *u* ]]; then
+    set +u
+    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+    set -u
+  else
+    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+  fi
+}
 ~~~
 
-pwd 和 realpath 用于确认当前路径；readlink -f 可解析符号链接，适合在删除、同步或启动服务前确认实际目标。find 的 -maxdepth 先限制扫描范围，避免误把整个家目录或挂载盘纳入操作。
+### 2.4 命令权限与执行位置
 
-常用的容量和文件属性检查如下：
+同一句命令在开发机、Ubuntu 客户端和板端的结果可能不同。使用 `command -v` 查看实际可执行文件：
 
 ~~~bash
-stat -c '%A %U:%G %s %n' models/example.om
-file models/example.om
+command -v python
+command -v python3
+command -v atc || true
+command -v npu-smi || true
+~~~
+
+`|| true` 只适合让检查流程继续，不代表后面的命令可以跳过环境问题。若 `atc` 或 `npu-smi` 不存在，应记录当前机器和当前环境，而不是修改代码来掩盖缺失的板端依赖。
+
+## 3. 文件系统、路径与常用命令
+
+### 3.1 Ubuntu 目录结构
+
+| 目录 | 主要用途 |
+| --- | --- |
+| `/bin` | 重要的二进制应用程序 |
+| `/boot` | 启动配置文件和内核相关文件 |
+| `/dev` | 设备文件，以文件形式表示设备和接口 |
+| `/etc` | 系统配置文件、启动脚本和服务配置 |
+| `/home` | 普通用户主目录 |
+| `/lib` | 系统库文件 |
+| `/mnt` | 临时挂载文件系统的位置 |
+| `/opt` | 可选应用程序安装目录 |
+| `/usr/local` | 用户自行安装的软件和运行环境 |
+
+`/dev` 中的文件不是普通文档。`/dev/video0`、`/dev/snd` 和 `/dev/bus/usb` 对应真实设备，访问它们会改变设备状态或与硬件交互。`/etc` 下的文件通常需要 root 权限，修改前应备份并确认目标主机。
+
+### 3.2 绝对路径、相对路径和工作目录
+
+绝对路径从 `/` 开始，例如 `/home/<user>/Documents/ascend310`。相对路径从当前工作目录开始，例如 `models/example.om`。使用 `..` 返回上一层：
+
+~~~bash
+cd ~/Documents
+pwd
+cd ..
+pwd
+cd -
+pwd
+~~~
+
+`cd` 不带参数时返回用户主目录，`cd -` 返回上一个工作目录。进入服务、转换或同步命令之前，先执行 `pwd`，确认没有在错误目录中运行。
+
+解析实际路径：
+
+~~~bash
+realpath .
+realpath models/example.om
+readlink -f frontend/dist/index.html
+~~~
+
+`realpath` 和 `readlink -f` 适合在复制、删除、挂载和部署前确认符号链接真实指向。路径中包含空格时，变量和参数应使用双引号：
+
+~~~bash
+target_dir="$HOME/Documents/board assets"
+mkdir -p "$target_dir"
+cp -a config.example.yaml "$target_dir/"
+~~~
+
+### 3.3 创建、查看和复制
+
+~~~bash
+mkdir -p reports/board/$(date --iso-8601=date)
+touch notes.txt
+ls -la
+ls -lh models
+cp -a config.example.yaml config.yaml
+cp -r templates templates-backup
+mv old-name.txt new-name.txt
+~~~
+
+`mkdir -p` 创建多级目录，`cp -a` 尽量保留文件属性，`cp -r` 复制目录，`mv` 同时用于移动和重命名。覆盖已有文件之前，先用 `ls`、`test -e` 或 `stat` 检查目标：
+
+~~~bash
+test -e config.yaml && echo 'target exists'
+stat -c '%A %U:%G %s %n' config.yaml
+file config.yaml
+~~~
+
+`stat` 显示权限、所有者、字节数和名称，`file` 只根据文件内容给出格式线索，不能证明模型可以由 ACL 加载。
+
+### 3.4 查看文本和日志
+
+~~~bash
+head -n 40 service.log
+tail -n 80 service.log
+tail -f service.log
+wc -l service.log
+sed -n '1,80p' service.log
+awk '{print NR ":" $0}' service.log | tail -n 20
+grep -n 'ERROR\|WARN' service.log
+~~~
+
+`tail -f` 持续跟踪日志，适合前台排障；批量检查应使用 `head`、`tail`、`wc`、`sed` 和 `grep`，并把输出保存到报告。仓库内搜索可使用 `rg`：
+
+~~~bash
+rg -n 'atc|acl|sha256|127\.0\.0\.1|0\.0\.0\.0' README.md docs scripts
+~~~
+
+### 3.5 查找、容量和文件类型
+
+~~~bash
+find . -maxdepth 2 -type f -print | sort
 du -sh models data reports
 df -h .
+lsblk
 ~~~
 
-stat 能同时看到权限、所有者和字节数；file 只能作格式线索，不能证明模型可由 ACL 加载。du 关注目录占用，df 关注文件系统剩余空间，两者含义不同。
+`find` 先用 `-maxdepth` 限制范围，避免扫描整个家目录或挂载盘；`du` 查看目录占用，`df` 查看文件系统剩余空间，两者含义不同。`lsblk` 只用于查看块设备树，不能未经确认就挂载或格式化设备。
 
-### 创建、复制与权限
-
-~~~bash
-run_date="$(date --iso-8601=date)"
-mkdir -p "reports/board/$run_date"
-cp -a config.example.yaml config.yaml
-mv reports/old.json reports/archive/old.json
-chmod u+x scripts/run_service.sh
-test -r models/example.om && echo 'model is readable'
-command -v python
-command -v atc || true
-~~~
-
-cp -a 尽量保留元数据；在覆盖前应先用 test -e 或 ls 检查目标。chmod u+x 只给文件所有者增加执行权限，不要对整棵家目录使用宽泛的 chmod -R 777。command -v 检查实际使用的可执行文件，能够发现 PATH 中混入了错误的 Python、ATC 或脚本版本。
-
-### 文本、日志和归档
+### 3.6 归档和校验
 
 ~~~bash
-printf '%s\n' 'starting board smoke' | tee reports/board/smoke.log
-grep -n 'ERROR\|WARN' reports/board/smoke.log
-rg -n 'atc|acl|sha256|0\.0\.0\.0' samples/case*/README.md samples/case*/docs
-head -n 40 reports/board/smoke.log
-tail -n 80 reports/board/smoke.log
-wc -l reports/board/smoke.log
-awk '{print NR ":" $0}' reports/board/smoke.log | tail -n 20
-sed -n '1,80p' reports/board/smoke.log
 run_date="$(date --iso-8601=date)"
 tar -czf "reports/board/smoke-$run_date.tar.gz" reports/board/smoke.log
+tar -tzf "reports/board/smoke-$run_date.tar.gz" | head
 unzip -l artifact.zip
+sha256sum models/example.om
 ~~~
 
-rg 适合在仓库内检索命令和接口，grep 适合对单份日志做过滤。归档前先确认内容和路径；压缩包不应包含照片、掌纹模板、数据库、模型二进制或密钥。
+压缩前先确认内容。不要把照片、生物特征模板、数据库、模型二进制、密钥和 token 放入公开归档。`sha256sum` 只能证明字节一致，不能证明模型正确、可加载或数值正确。
 
-### 删除操作的边界
+## 4. 用户、组、权限、sudo 与安全删除
 
-rm 不提供回收站。对案例数据只能在已经解析为绝对路径、且明确属于隔离测试目录时使用：
+### 4.1 Linux 用户和组
+
+Ubuntu 安装时会创建一个普通用户，同时保留具有更高权限的 root 用户。普通用户在自己的主目录中通常不需要 `sudo`，访问 `/etc`、安装软件包或修改系统服务时才需要提权。
+
+每个文件都有三组权限：
+
+| 权限组 | 适用范围 |
+| --- | --- |
+| user | 文件所有者 |
+| group | 文件所属组 |
+| other | 其他用户 |
+
+每组权限包含读 `r`、写 `w`、执行 `x`：
+
+~~~bash
+ls -l script.sh
+stat -c '%A %a %U:%G %n' script.sh
+id
+groups
+~~~
+
+`ls -l` 的权限字符串分为三段。`rwxr-xr-x` 表示所有者可读写执行，组和其他用户可读可执行。`stat` 的 `%a` 给出八进制权限，`%U:%G` 给出所有者和组。
+
+### 4.2 修改权限
+
+给脚本增加所有者执行权限：
+
+~~~bash
+chmod u+x scripts/run_service.sh
+bash -n scripts/run_service.sh
+./scripts/run_service.sh --help
+~~~
+
+`chmod u+x` 只给文件所有者增加执行权限。若脚本需要其他用户执行，应先确认运行用户和目录权限，再选择精确的组权限或 ACL。不要对整个家目录、模型目录或系统目录执行 `chmod -R 777`。
+
+修改所有者和组需要管理员权限：
+
+~~~bash
+sudo chown "$USER":"$USER" path/to/file
+sudo chgrp developers path/to/directory
+~~~
+
+`chown -R` 和 `chgrp -R` 会递归改变整棵树，执行前必须用 `find` 预览目标，并确认没有系统文件和共享资产混在其中。
+
+### 4.3 sudo
+
+`sudo` 表示以超级用户权限执行单条命令：
+
+~~~bash
+sudo apt-get update
+sudo systemctl status ssh --no-pager
+sudo -i
+~~~
+
+`sudo -i` 进入 root 环境，`sudo su` 也可能加载 root 环境或保留部分当前环境。两者都不是日常编辑项目文件的默认方式。退出 root 状态使用：
+
+~~~bash
+exit
+~~~
+
+频繁使用系统管理命令时，应通过明确的 sudo 策略和组权限管理，而不是把普通用户长期改成 root。
+
+### 4.4 设备组权限
+
+摄像头和音频设备常通过 `video`、`audio` 等组授权：
+
+~~~bash
+groups
+ls -l /dev/video* /dev/snd
+sudo usermod -aG video "$USER"
+~~~
+
+执行 `usermod` 后需要重新登录，组变更才会进入新会话。不要用 `sudo python` 启动整个服务来绕开设备权限，因为这会改变服务的数据目录所有者、环境变量和日志归属。
+
+### 4.5 安全删除
+
+`rm` 不提供回收站。删除测试数据时，先把目标解析为绝对路径并验证：
 
 ~~~bash
 target_dir="$(realpath -- "$PALMPRINT_ROOT/data/captures")"
@@ -126,138 +343,772 @@ find "$target_dir" -maxdepth 1 -type f -print
 rm -f -- "$target_dir"/*.jpg
 ~~~
 
-上述示例仍需由操作者确认文件列表。仓库中出现的 rm -rf 只用于脚本创建的临时或隔离目录；绝不能把变量为空、路径未解析的命令改成 rm -rf "$HOME"、rm -rf . 或对整个部署目录执行。删除前优先保留报告、移动到明确的归档目录，或让部署脚本在独立临时目录中自动清理。
+先运行 `find` 检查文件列表，再由操作者确认后执行删除。`rm -rf` 只应在脚本创建的隔离临时目录中使用，并且变量必须非空、路径必须已经解析。不要把变量为空、路径未验证的命令变成 `rm -rf "$HOME"`、`rm -rf .` 或对整个部署目录的递归删除。
 
-## Ubuntu 软件包与 Python 环境
+## 5. nano 与 vim 编辑器
 
-### APT 软件包
+### 5.1 nano
 
-Case 5 的 sigrok/RTL-SDR 桥接和 Case 6 的示例安装涉及系统软件包。软件包操作改变系统状态，应在维护窗口中由管理员执行，并记录 Ubuntu 版本和安装结果：
+打开文件：
 
 ~~~bash
+nano config.yaml
+sudo nano /etc/exports
+~~~
+
+nano 进入后可以直接编辑文本。保存时按 `Ctrl+O`，屏幕会显示文件名；不修改文件名就按回车。退出按 `Ctrl+X`。如果文件有未保存修改，nano 会询问是否保存，按屏幕提示选择。
+
+编辑系统文件前先备份：
+
+~~~bash
+sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
+sudo nano /etc/apt/sources.list
+~~~
+
+### 5.2 vim
+
+打开文件：
+
+~~~bash
+vim config.yaml
+sudo vim ~/.config/autostart/myprogram.desktop
+~~~
+
+vim 初始处于普通模式。按 `i` 或 `a` 进入插入模式，按 `Esc` 回到普通模式。常用移动和编辑键：
+
+| 按键 | 作用 |
+| --- | --- |
+| `k` / `j` | 光标上移 / 下移 |
+| `h` / `l` | 光标左移 / 右移 |
+| `i` / `I` | 当前光标处插入 / 行首插入 |
+| `a` / `A` | 光标后插入 / 行末插入 |
+| `o` / `O` | 当前行后新建一行 / 当前行前新建一行 |
+| `x` / `X` | 删除当前字符 / 删除前一个字符 |
+| `dd` | 剪切整行，也可作为删除 |
+| `dw` | 删除一个单词 |
+| `d^` | 删除到行首 |
+| `dG` / `d1G` | 删除到文档末尾 / 删除到文档开头 |
+| `gg` / `Shift+g` | 移到第一行 / 最后一行 |
+| `yy` / `p` / `P` | 复制整行 / 粘贴到光标后 / 粘贴到光标前 |
+
+保存和退出前先按 `Esc` 回到普通模式，再输入冒号命令：
+
+| 命令 | 作用 |
+| --- | --- |
+| `:q` | 退出 |
+| `:q!` | 强制退出，不保存 |
+| `:w` | 保存 |
+| `:wq` | 保存并退出 |
+| `:wq!` | 强制保存并退出 |
+| `:w <文件路径>` | 另存为 |
+
+编辑器中的 `:q!` 会丢失未保存内容，只在确认不需要修改时使用。需要编辑 root 文件时使用 `sudo nano` 或 `sudo vim`，不要把来源不明的 `tee` 保存技巧直接粘贴到终端。保存后使用 `head`、`grep` 或 `git diff` 检查文件内容。
+
+## 6. APT、换源、Conda、pip 与 Python 路径
+
+### 6.1 APT 软件包管理
+
+APT 操作会改变系统状态。执行前记录 Ubuntu 版本和计划安装的包：
+
+~~~bash
+cat /etc/os-release
 sudo apt-get update
-sudo apt-get install -y libsigrok-dev sigrok-cli gcc pkg-config libfftw3-single3 rtl-sdr
+sudo apt-get install -y package-name
+sudo apt-get install -f
 ~~~
 
-Case 6 的旧安装脚本还会尝试安装 python3-dev 和 python3-pip。在已经准备好的板端环境中，优先确认包是否存在；不要为了通过文档示例而重复安装或升级 CANN 相关包：
+`apt-get update` 获取软件包列表，`install` 安装软件包，`install -f` 修复依赖。安装完成后记录命令、版本和输出：
 
 ~~~bash
-dpkg -s python3-dev python3-pip 2>/dev/null | grep -E '^(Package|Status):'
+dpkg -s python3-dev python3-pip 2>/dev/null | grep -E '^(Package|Status|Version):'
+apt-cache policy package-name
 ~~~
 
-触摸屏的 xdotool、onboard 属于可选维护工具，不是案例运行时依赖。只有在隔离的桌面维护窗口中才按需安装；常规板端部署不应执行图形桌面安装。
+不要为了通过文档示例而重复安装或升级 CANN 相关包。板端已经验证过的 CANN、驱动和 Python 环境应保持原样，变更前先建立回滚方案。
 
-### Conda 与解释器
+### 6.2 换源
 
-先加载 Conda shell 函数，再激活目标环境；两步必须在启动 ATC 或服务的同一个 shell 中完成。为兼容前文的严格模式，定义一个可重复使用的加载函数：
+Ubuntu 的软件源配置通常位于 `/etc/apt/sources.list`，部分新版本还会使用 `/etc/apt/sources.list.d/` 下的 `.sources` 文件。先备份，再根据 Ubuntu 版本替换为合适的国内镜像：
 
 ~~~bash
-load_conda() {
-  if [[ $- == *u* ]]; then
-    set +u
-    source /usr/local/miniconda3/etc/profile.d/conda.sh
-    set -u
-  else
-    source /usr/local/miniconda3/etc/profile.d/conda.sh
-  fi
-}
-load_conda
+sudo cp -a /etc/apt/sources.list /etc/apt/sources.list.bak
+sudo nano /etc/apt/sources.list
+sudo apt-get update
+~~~
+
+换源时确认发行版代号与镜像仓库匹配。不要混用不同 Ubuntu 版本的仓库，不要把第三方 PPA 当作系统基础源。更新失败时先恢复备份并检查错误，不要把错误源继续保留。
+
+### 6.3 Conda 环境
+
+先加载 Conda shell 函数，再激活环境：
+
+~~~bash
+source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate base
 python --version
 python -c 'import sys; print(sys.executable)'
 ~~~
 
-若项目明确要求独立环境，可在开发机或板端维护窗口创建。Case 9 当前板端门禁要求 Python 3.9；不要用其他版本的同名环境替代它：
+若脚本开启了 `set -u`，而 Conda 或 CANN 环境脚本读取未定义变量，可以使用第 2 节的 `load_cann` 模式，只在加载厂商脚本时临时关闭 `-u`，加载完成后恢复。
+
+创建独立环境：
 
 ~~~bash
 conda create -n case9-acl-om python=3.9
 conda activate case9-acl-om
+python -c 'import sys; print(sys.executable)'
 ~~~
 
-当前板端主线通常复用已验证的环境，不应无计划地创建新环境。python -m pip 能保证 pip 对应当前解释器；pip、pip3 是历史命令，在教程中保留时必须先用 command -v 核对。
+环境名称和 Python 版本必须来自项目的版本要求。不要用其他版本的同名环境替换已经验证的板端环境。
+
+### 6.4 pip 与 Python 解释器
+
+优先使用 `python -m pip`，让 pip 对应当前解释器：
 
 ~~~bash
+python -m pip --version
 python -m pip install -r requirements.txt
 python -m pip install -r requirements-board.txt
 python -m pip list
 ~~~
 
-Case 2 的旧 README 曾出现 requirementstxt 拼写错误；实际文件名是 requirements.txt，应使用上面的命令。
+不要使用 `sudo pip install` 或 `sudo python`。前者会把包安装到系统目录并绕过 Conda，后者会改变脚本的解释器和文件所有权。安装失败时先记录 `python -m pip --version`、`which python`、`sys.executable` 和完整错误，再决定是否变更环境。
 
-### Python 路径变量
+### 6.5 Python 路径和动态库路径
 
 ~~~bash
 export PYTHONNOUSERSITE=1
 export PYTHONPATH="$PWD:${PYTHONPATH:-}"
 export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/lib64:${LD_LIBRARY_PATH:-}"
 python -c 'import sys; print("\n".join(sys.path))'
+python -c 'import os; print(os.environ.get("LD_LIBRARY_PATH", ""))'
 ~~~
 
-PYTHONNOUSERSITE=1 用于避免用户目录中的包遮蔽板端环境；PYTHONPATH 和 LD_LIBRARY_PATH 应只加入已经确认的项目或 CANN 目录。若变量尚未设置，可先用 export LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/lib64:；持久化修改应经过部署评审。
+`PYTHONNOUSERSITE=1` 用于避免用户目录中的包遮蔽板端环境，但可能让实际启动环境中存在的用户站点包不可见。判断导入问题时，应比较隔离环境和真实启动环境的 `sys.executable` 与 `sys.path`。`PYTHONPATH` 和 `LD_LIBRARY_PATH` 只加入已经确认的项目目录或 CANN 目录。持久化修改应经过部署评审，不能临时写入 `/etc/profile` 后让所有用户和所有服务继承。
 
-## CANN 环境、NPU 诊断与模型工件
+## 7. 网络、静态 IP、WiFi、热点与同网段检查
 
-### 加载 CANN
+### 7.1 网络状态
 
 ~~~bash
-load_cann() {
-  # CANN environment scripts may read variables that an interactive shell has not set.
-  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
-  if [[ $- == *u* ]]; then
-    set +u
-    source /usr/local/Ascend/ascend-toolkit/set_env.sh
-    set -u
-  else
-    source /usr/local/Ascend/ascend-toolkit/set_env.sh
-  fi
-}
-load_cann
+ip addr
+ip route
+nmcli connection show
+nmcli -t -f NAME connection show
+ping -c 4 <target-ip>
+~~~
+
+`ip addr` 查看接口地址，`ip route` 查看默认路由和网段，`nmcli connection show` 查看 NetworkManager 连接配置。`ping` 成功只说明网络层可达，不代表 SSH、VNC、NFS 或 NPU 服务已经可用。
+
+### 7.2 一般静态 IP 概念
+
+Ubuntu 图形桌面可以通过 NetworkManager 配置静态 IP。打开连接编辑器：
+
+~~~bash
+nm-connection-editor
+~~~
+
+在对应连接中进入 `IPv4 Settings`，将方法设为 `Manual`，再填写地址、子网掩码、网关和 DNS。静态地址留在目标设备所在网段内，且不能与其他设备冲突。修改后重新启用该连接，再验证：
+
+~~~bash
+ip -4 addr show
+ip route
+ping -c 4 <同网段设备IP>
+~~~
+
+静态 IP 不等于端口已经开放。SSH 服务、VNC 共享开关、NFS 导出和防火墙都需要单独检查。不要在不确定目标网段和网关的情况下直接覆盖原配置，先在连接编辑器中记录原值，或保存一份配置备份。
+
+### 7.3 同网段判断
+
+IPv4 地址由网络地址和主机地址组成，子网掩码决定两部分的分界。以 `255.255.255.0` 为例，前 24 位是网络地址，后 8 位是主机地址。`192.168.1.10` 和 `192.168.1.20` 与同一子网掩码进行按位与运算后，网络地址都是 `192.168.1.0`，因此属于同一网段。`192.168.0.100` 与 `192.168.1.100` 在同一掩码下不属于同一网段。
+
+排障时检查客户端和板端是否拿到同一网段的地址、是否连接到同一个热点或有线网络、网关是否一致。若客户端和板端存在多个网卡，应使用 `ip route get <目标IP>` 确认实际出口接口，不要只看某一个网卡的地址。
+
+### 7.4 创建 WiFi 热点
+
+图形界面通常从右上角网络图标进入 `Edit Connections`，点击加号，选择 `WiFi`，再点击 `Create`。命令行方式可以打开连接编辑器：
+
+~~~bash
+nm-connection-editor
+~~~
+
+在 `Wi-Fi` 选项卡中设置：
+
+- `SSID`：热点名称，和连接配置名称 `connection name` 不是一回事。
+- `Mode`：选择 `Hotspot`。
+- `Band`：可选自动、2.4 GHz 或 5 GHz。频段拥挤时固定频段可能更稳定。
+- `Device`：多网卡主机需要指定实际使用的无线网卡。
+- `Wi-Fi Security`：选择 `WPA&WPA2 Personal` 并设置密码。
+- `IPv4 Settings`：按需填写静态地址、掩码和网关。
+- `IPv6`：不需要时可选择忽略。
+
+一个无线网卡通常不能同时作为热点又连接外部 WiFi。需要同时提供热点和连接上游网络时，应使用两个独立网卡，并分别确认设备名和驱动状态。
+
+### 7.5 热点与 WiFi 模式切换
+
+图形界面中先断开当前热点或 WiFi，再选择要连接的网络。重新开启热点时，从网络设置菜单选择热点配置并启用。切换后检查：
+
+~~~bash
+ip addr
+iw dev
+nmcli device status
+nmcli connection show --active
+~~~
+
+`iw dev` 是否可用取决于系统是否安装相关工具；即使命令不存在，也应记录 `nmcli device status` 和界面状态，而不是直接推断网卡损坏。切换过程中，已经连接的 SSH 会话可能短暂断开。使用无屏幕板端时，先准备好重新发现的 IP 的方法，再修改网络模式。
+
+### 7.6 自动连接优先级
+
+热点和 WiFi 配置可以在 `General` 选项卡中设置 `Connect automatically with priority`。不同版本的教程对数值方向描述不一致：有的资料写“数值越大优先级越高”，有的资料写“数值越小优先级越高”。不要只照抄数字，应查看当前 NetworkManager 的实际配置并做一次重启验证：
+
+~~~bash
+nmcli -f connection.id,connection.autoconnect,connection.autoconnect-priority connection show
+~~~
+
+记录哪一个连接在重启后实际被选中，再据此调整优先级。修改网络配置后，若板端没有屏幕，先确认仍能通过已有热点或串口获取 IP，防止失去远程入口。
+
+### 7.7 无屏幕联网的基本流程
+
+无屏幕板端的基本顺序是：默认热点可用，客户端连接热点，通过 SSH 登录，扫描可用 WiFi，选择目标 SSID 并输入密码，获取新的 IP，然后让客户端连接到同一 WiFi。切换时可能短暂断开当前热点，需要准备重新连接或通过串口查看 IP。
+
+~~~bash
+ssh -Y <user>@<board-ip>
+nmcli device wifi list
+nmcli connection show
+ip addr
+~~~
+
+具体热点名称、默认 IP 和脚本路径必须来自当前板端的实际配置。不要把其他产品的示例热点名或脚本路径当作 310B 板的默认值。成功连接 WiFi 后，IP 可能改变；应记录 DHCP 分配的地址或为板端设置不冲突的静态地址。
+
+## 8. SSH 远程命令行控制
+
+### 8.1 客户端与服务端
+
+SSH 使用客户端和服务端模型。310B 板端作为服务端运行 `sshd`，Ubuntu 主机作为客户端发起连接。客户端连接后看到的 shell 就是板端 shell，因此文件路径、权限、设备和运行时环境都以板端为准。
+
+### 8.2 安装和启动服务端
+
+在板端确认 SSH 状态：
+
+~~~bash
+sudo service ssh status
+~~~
+
+未安装时执行：
+
+~~~bash
+sudo apt update
+sudo apt install openssh-server
+sudo service ssh start
+sudo systemctl enable ssh
+~~~
+
+再次检查：
+
+~~~bash
+systemctl status ssh --no-pager
+ss -ltnp | grep ':22'
+~~~
+
+Ubuntu 主机通常自带 SSH 客户端。需要单独安装时执行：
+
+~~~bash
+sudo apt-get install openssh-client
+ssh -V
+~~~
+
+### 8.3 网络连通性检查
+
+先连接板端 WiFi 或有线网络，再检查同网段和可达性：
+
+~~~bash
+ip addr
+ip route
+ping -c 4 192.168.0.100
+~~~
+
+若无法 ping 通，依次检查：两台设备是否在同一网段、客户端是否连接了错误的网络、板端 IP 是否已经变化、路由出口是否正确、无线热点是否仍处于开启状态。`ping` 不通时不要直接反复执行 `ssh`，先把网络层问题定位清楚。
+
+### 8.4 登录
+
+源文档中的典型命令是：
+
+~~~bash
+ssh -Y wheeltec@192.168.0.100
+~~~
+
+其中 `-Y` 启用受信任的 X11 转发，`wheeltec` 是服务端用户名，`192.168.0.100` 是服务端地址。实际使用时替换为已经确认的值，不要复制示例密码。仅需要命令行时可以使用普通 SSH：
+
+~~~bash
+ssh <user>@<board-ip>
+ssh <user>@<board-ip> 'hostname; uname -a; npu-smi info'
+~~~
+
+登录后提示符中的用户名和主机名会变化。若用户名仍是本地用户，说明没有进入远端 shell。需要执行单条板端命令时，把命令放在引号中，并确认引号内的变量是在远端还是本地展开。
+
+### 8.5 known_hosts 冲突
+
+第一次连接某台设备或设备身份发生变化时，可能出现主机密钥冲突。源文档给出的处理命令是：
+
+~~~bash
+ssh-keygen -f "/home/wheeltec-client/.ssh/known_hosts" -R "192.168.0.100"
+ssh -Y wheeltec@192.168.0.100
+~~~
+
+第一条命令只删除指定主机在 `known_hosts` 中的记录，第二条重新连接。执行删除前先确认 IP 确实属于目标板端，并核对新的主机密钥指纹。不要为了省事直接删除整个 `known_hosts`，也不要在未确认设备身份时盲目确认新密钥。
+
+### 8.6 同一网段排障
+
+如果 SSH 连接失败，检查客户端和板端的 IPv4 地址与子网掩码：
+
+~~~bash
+ip -4 addr show
+ip route
+ping -c 4 <board-ip>
+~~~
+
+静态 IP 必须位于同一网段，且不能与板端地址或其他设备冲突。若修改的是客户端地址，保留原配置；若修改的是板端地址，先确认自己有第二条访问通道。路由器、热点、交换机和防火墙都可能影响可达性。
+
+### 8.7 SSH 安全注意事项
+
+- 使用强密码或 SSH 密钥，优先使用密钥登录。
+- 只允许可信网络访问 22 端口，不要把 SSH 直接暴露到公网。
+- 需要远程管理时，先确认服务端主机密钥指纹，再建立连接。
+- `ssh -Y` 会转发 X11 连接，信任边界较宽，只在受信网络中使用。
+- 多人共用板端时，为每个用户分配账号，不要共享 root 密码。
+- 修改防火墙或 SSH 配置后，保留一个已登录会话，再从新会话验证，避免把自己锁在系统外。
+
+## 9. VNC 远程桌面控制
+
+### 9.1 客户端与服务端
+
+VNC 也采用客户端和服务端模型。板端提供桌面服务，Ubuntu 主机或 Windows 主机运行 VNC 客户端。远程桌面适合查看图形窗口、图像预览和需要鼠标交互的程序；纯命令行任务优先使用 SSH。
+
+### 9.2 Ubuntu 客户端安装 Remmina
+
+源文档给出的 Remmina 安装命令是：
+
+~~~bash
+sudo apt-add-repository ppa:remmina-ppa-team/remmina-next
+sudo apt update
+sudo apt install remmina remmina-plugin-rdp remmina-plugin-secret
+~~~
+
+PPA 是否适合当前 Ubuntu 版本需要先确认。若系统仓库已经提供合适版本，也可以只安装 `remmina`。安装完成后从应用菜单启动，选择 VNC 协议，填写板端 IP 地址，再输入 VNC 密码。源文档示例 IP 为 `192.168.0.100`，实际使用时必须替换。
+
+### 9.3 Windows 客户端使用 MobaXterm
+
+在 Windows 主机上启动 MobaXterm，点击左上角 `Session`，选择 `VNC`，填写板端 IP 地址，确认客户端已经连接到板端所在网络，然后点击 `OK` 并输入 VNC 密码。不同版本的菜单名称可能略有变化，但客户端、目标 IP、密码和网络可达性这几项不变。
+
+### 9.4 分辨率和画面质量
+
+板端没有连接显示器时，VNC 分辨率可能较低。源文档给出的调整命令是：
+
+~~~bash
+xrandr --fb 1024x768
+~~~
+
+`xrandr --fb` 设置当前 X 显示的帧缓冲尺寸。执行前先运行 `xrandr` 查看可用输出和模式，确认目标分辨率不会超出显示能力。若画面卡顿，可以在 Remmina 中降低画质、颜色深度或更新频率。图像质量和实时性需要权衡，不要把降低画质后的流畅度当作原始编码性能。
+
+### 9.5 共享开关
+
+部分 Ubuntu 桌面镜像使用共享设置提供 VNC。修改网线、IP 或网络模式后，VNC 可能断开，需要检查桌面设置中的 `Sharing` 和 `Screen Sharing` 是否仍为活动状态。带有远程桌面协议的版本可能还需要启用兼容 VNC 协议的选项。共享开关关闭时，SSH 可能仍正常，但 VNC 无法连接。
+
+### 9.6 屏幕和显示要求
+
+部分板端镜像在没有连接显示器时不会生成可用的桌面帧缓冲。VNC 连接前可能需要连接真实屏幕或使用显示欺骗器。无屏幕场景应先确认 VNC 服务、共享开关、显示输出和分辨率，再判断是否为客户端问题。
+
+### 9.7 VNC 中打开终端
+
+大部分 VNC 客户端无法让 `Ctrl+Alt+T` 正确传递到远端桌面。源文档建议使用鼠标右键菜单中的终端入口。打开终端后，先用 `whoami`、`hostname` 和 `pwd` 确认会话确实运行在板端。
+
+### 9.8 SSH 与 VNC 的对比
+
+| 对比项 | SSH | VNC |
+| --- | --- | --- |
+| 传输内容 | 终端文本和可选 X11 转发 | 桌面图像、鼠标和键盘事件 |
+| 带宽占用 | 通常较低 | 通常较高，受分辨率和画质影响 |
+| 适合任务 | 命令、日志、脚本、服务管理 | 图形程序、图像窗口、桌面交互 |
+| 无屏幕要求 | 不要求桌面帧缓冲 | 部分镜像要求显示器或显示欺骗器 |
+| 安全边界 | 可使用密钥和严格访问控制 | 需要保护 VNC 密码和端口 |
+| 断线影响 | 前台命令可能随会话结束 | 前台图形程序可能随会话结束 |
+
+VNC 服务不要直接暴露到不可信网络。需要通过 SSH 隧道访问时，可以把本地端口转发到板端 VNC 端口，但应确认 VNC 监听地址和端口，并使用唯一强密码。
+
+## 10. NFS、SCP 与 rsync
+
+### 10.1 NFS 的角色
+
+NFS 把服务端目录映射到客户端挂载点。典型的板端作为服务端，Ubuntu 主机作为客户端。挂载后，客户端编辑文件就像编辑本地目录，但底层文件仍属于远端文件系统，断网、服务端关机或网络切换会造成挂载失效。
+
+### 10.2 服务端安装和导出
+
+板端安装服务端：
+
+~~~bash
+sudo apt-get install nfs-kernel-server
+~~~
+
+编辑导出配置：
+
+~~~bash
+sudo nano /etc/exports
+~~~
+
+文件内容示例：
+
+~~~text
+/srv/ascend310-share *(rw,sync,no_root_squash)
+~~~
+
+第一列是共享目录，第二列是允许访问的客户端范围。生产或多人环境中应把 `*` 收窄为具体网段或主机地址，并根据需要改为 `ro`。`no_root_squash` 会让客户端 root 保留 root 权限，安全风险较高；只有在隔离实验网络中经过评估后才使用。
+
+源文档还出现过下面的旧示例：
+
+~~~text
+/home/wheeltec/wheeltec_ros2 *(rw,sync,no_root_squash)
+~~~
+
+该路径只是示例，不是 310B 板的默认路径。使用时必须替换为实际共享目录，并确认目录存在、内容范围和客户端权限。
+
+启动服务：
+
+~~~bash
+sudo /etc/init.d/nfs-kernel-server start
+sudo /etc/init.d/nfs-kernel-server restart
+systemctl status nfs-kernel-server --no-pager
+exportfs -v
+~~~
+
+`exportfs -v` 查看当前导出，`systemctl status` 查看服务状态。修改 `/etc/exports` 后通常需要重新加载或重启服务。
+
+### 10.3 客户端安装和挂载
+
+Ubuntu 客户端安装：
+
+~~~bash
+sudo apt-get install nfs-common
+~~~
+
+创建挂载点：
+
+~~~bash
+sudo mkdir -p /mnt/mount_nfs
+~~~
+
+先确认可达，再挂载：
+
+~~~bash
+ping -c 4 <server-ip>
+sudo mount -t nfs <server-ip>:/srv/ascend310-share /mnt/mount_nfs
+mount | grep /mnt/mount_nfs
+~~~
+
+需要指定 NFS 版本或锁选项时，使用明确的参数：
+
+~~~bash
+sudo mount -t nfs -o nolock <server-ip>:/srv/ascend310-share /mnt/mount_nfs
+~~~
+
+卸载：
+
+~~~bash
+sudo umount -t nfs <server-ip>:/srv/ascend310-share /mnt/mount_nfs
+~~~
+
+若服务端曾经关机，挂载可能变成失效状态，重新挂载前先卸载。不要对正在写入的共享目录执行 `umount -f`，除非已经确认没有进程使用并且接受数据风险。
+
+### 10.4 NFS 权限和安全
+
+源文档中的旧配置使用了宽泛权限。下面的命令只作为说明，不建议直接照抄：
+
+~~~text
+sudo chmod -R 777 /path/to/share
+sudo chown -R 777 nobody /path/to/share
+~~~
+
+`chmod -R 777` 会向所有用户开放读写执行；`chown -R 777 nobody` 不是通用安全的用户和组写法。更合理的做法是创建专用组、设置 `u+rwX` 或组权限、把客户端限制在同一网段，并在不需要写入时使用只读导出。模型、数据、模板和报告目录应按实际所有者设置权限，不要用一次宽泛递归命令处理整个家目录。
+
+### 10.5 SCP 定向传输
+
+SCP 使用 SSH 传输文件：
+
+~~~bash
+board_user="replace-with-board-user"
+board_ip="replace-with-board-ip"
+ssh_target="$board_user@$board_ip"
+scp demo/vtest.avi "$ssh_target:Documents/ascend310/demo/"
+scp "$ssh_target:Documents/ascend310/reports/result.json" .
+~~~
+
+下载和上传前都先检查目标目录和磁盘空间：
+
+~~~bash
+ssh "$ssh_target" 'df -h "$HOME"; test -d "$HOME/Documents/ascend310/demo"'
+~~~
+
+### 10.6 rsync 同步
+
+rsync 适合目录同步和断点续传。先预览：
+
+~~~bash
+rsync -av --dry-run samples/case8/ \
+  "$ssh_target:Documents/ascend310/samples/case8/"
+~~~
+
+确认输出后再执行：
+
+~~~bash
+rsync -av --protect-args \
+  samples/case8/ \
+  "$ssh_target:Documents/ascend310/samples/case8/"
+~~~
+
+默认不要使用 `--delete`。它会删除远端已有文件，可能误删模型、数据或报告。需要排除大资产时：
+
+~~~bash
+rsync -av --protect-args \
+  --exclude 'data/' --exclude 'models/' --exclude '*.om' \
+  samples/case8/ \
+  "$ssh_target:Documents/ascend310/samples/case8/"
+~~~
+
+同步后分别在本地和远端执行 `wc -c`、`sha256sum` 或清单检查。模型、OM、数据集和真实运行报告不应因为一次同步就进入 Git。
+
+## 11. Docker 基础与 ROS2 容器命令
+
+### 11.1 Docker 基本概念
+
+Docker 使用镜像和容器组织应用。镜像包含文件系统和运行环境，容器是镜像的一次隔离运行实例。容器与宿主系统共享内核，但可以使用独立的文件系统、网络和进程空间。不要把容器当作可以随意获得所有硬件权限的沙箱。
+
+检查 Docker 是否安装和运行：
+
+~~~bash
+docker --version
+systemctl status docker --no-pager
+sudo systemctl start docker
+sudo systemctl enable docker
+~~~
+
+查看容器和镜像：
+
+~~~bash
+docker ps
+docker ps -a
+docker images
+~~~
+
+`docker ps` 只显示运行中的容器，`docker ps -a` 显示包括已停止的容器，`docker images` 显示本地镜像。
+
+### 11.2 通用容器生命周期命令
+
+~~~bash
+docker start <container-name>
+docker exec -it <container-name> bash
+exit
+docker stop <container-name>
+docker restart <container-name>
+docker update --restart=always <container-name>
+docker inspect <container-name>
+~~~
+
+`docker exec -it` 进入正在运行的容器，`exit` 退出容器 shell 返回宿主。`docker update --restart=always` 会让容器随 Docker 服务自动启动，设置前应确认应用具备断电恢复和安全停机策略。
+
+### 11.3 教程中的 ROS2 容器命令
+
+部分镜像提供了封装脚本，树莓派 5 的 ROS2 示例命令名称为：
+
+~~~bash
+ros2_start
+ros2
+ros2_stop
+ros2_restart
+~~~
+
+这些名称是镜像提供的帮助命令或别名，不是 Docker 自带子命令。执行 `ros2_start` 启动容器，`ros2` 进入容器环境，`ros2_stop` 停止容器，`ros2_restart` 重启容器。使用前先检查它们是脚本、别名还是函数：
+
+~~~bash
+type ros2_start
+type ros2
+type ros2_stop
+type ros2_restart
+~~~
+
+进入容器后看到的用户提示符可能变化。容器状态异常时先查看 `docker ps -a`、`docker logs <container-name>` 和 `docker inspect`，不要直接删除容器或镜像。ROS2 节点、话题、launch 和工作空间编译属于 ROS2 内容，应放在附录 6 中讲解。
+
+### 11.4 源码目录、挂载和编译
+
+容器可以把宿主目录挂载到容器路径。源文档提示容器内的源码可能已经映射到宿主目录，因此可以在宿主或容器中修改文件，但编译必须在安装了对应构建系统的容器中完成。使用前确认挂载关系：
+
+~~~bash
+docker inspect -f '{{json .Mounts}}' <container-name>
+docker exec -it <container-name> pwd
+docker exec -it <container-name> ls -la
+~~~
+
+不要把宿主 `/`、`/etc`、Docker socket 或整个家目录挂载到不可信容器。需要摄像头、串口、USB 或 NPU 设备时，逐项确认设备节点和权限，不要直接使用 `--privileged`。
+
+### 11.5 图形窗口和 DISPLAY
+
+容器中的图形程序需要显示服务器。源文档中的常见传递方式是：
+
+~~~bash
+DISPLAY=${DISPLAY:-unix:0}
+docker exec -it -e DISPLAY=$DISPLAY <container-id> bash
+~~~
+
+`DISPLAY` 是图形显示目标，`-e` 把它传给容器。使用 X11 转发时还要确认宿主端的 `xhost` 和认证设置。源教程使用：
+
+~~~text
+xhost +
+~~~
+
+该命令允许所有客户端连接显示服务器，范围过宽。受信多用户环境中应改为只允许当前本地用户，并在使用后恢复限制。SSH 会话的 `DISPLAY` 可能是 `localhost:10.0` 等转发地址，容器启动后新建的 SSH 会话不一定继承原有显示权限。
+
+## 12. 程序开机自启动：桌面项、启动应用和 systemd
+
+### 12.1 桌面自启动项
+
+桌面环境可以读取 `~/.config/autostart/*.desktop` 自动启动程序：
+
+~~~bash
+mkdir -p ~/.config/autostart
+vim ~/.config/autostart/myprogram.desktop
+~~~
+
+文件内容：
+
+~~~ini
+[Desktop Entry]
+Encoding=UTF-8
+Type=Application
+Name=myprogram
+Exec=/home/wheeltec/script.sh
+Terminal=true
+~~~
+
+`Exec` 必须指向已经确认的脚本或程序，`Terminal=true` 表示需要打开终端。实际使用时把 `/home/wheeltec/script.sh` 替换为当前用户可执行的路径，并设置文件权限：
+
+~~~bash
+chmod a+r ~/.config/autostart/myprogram.desktop
+~~~
+
+用户级桌面项只适用于图形登录用户。服务账号、无桌面会话和系统级程序应使用 systemd，而不是依赖桌面自启动。
+
+### 12.2 启动脚本
+
+一个最小脚本应明确 shebang、工作目录和环境：
+
+~~~bash
+#!/bin/bash
+set -euo pipefail
+cd /home/<user>/Documents/ascend310
+exec /home/<user>/Documents/ascend310/scripts/run_service.sh
+~~~
+
+赋予所有者执行权限即可：
+
+~~~bash
+chmod u+x script.sh
+bash -n script.sh
+./script.sh
+~~~
+
+源教程中的桌面脚本会调用终端模拟器并加载应用程序环境。若脚本只做桌面显示，`Terminal=true` 可以保留终端；若脚本管理后台服务，使用 systemd 并在服务单元中显式设置环境变量。
+
+### 12.3 Startup Applications
+
+部分 Ubuntu 桌面提供 `Startup Applications` 图形工具。搜索 `startup` 打开该工具，点击 `Add`，填写名称和启动命令，保存后重启验证。它本质上仍是用户会话级自启动，不等价于系统服务。
+
+### 12.4 systemd 服务
+
+无桌面或需要自动重启的程序使用 systemd。创建单元文件：
+
+~~~bash
+sudo vim /etc/systemd/system/ascend310-demo.service
+~~~
+
+示例内容：
+
+~~~ini
+[Unit]
+Description=Ascend 310B demo service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<board-user>
+WorkingDirectory=/home/<board-user>/Documents/ascend310
+Environment=PYTHONNOUSERSITE=1
+ExecStart=/home/<board-user>/Documents/ascend310/scripts/run_service.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+~~~
+
+加载并启用：
+
+~~~bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now ascend310-demo.service
+systemctl status ascend310-demo.service --no-pager
+journalctl -u ascend310-demo.service -b --no-pager | tail -n 80
+~~~
+
+systemd 不会自动继承交互式 shell 中临时 `source` 的环境。CANN、Conda、`PYTHONPATH` 和 `LD_LIBRARY_PATH` 应由包装脚本或服务单元显式设置。修改单元后重新执行 `daemon-reload`，停止或重启前先确认服务 PID 和影响范围。
+
+### 12.5 旧式 rc.local
+
+部分旧教程使用 `/etc/rc.local`：
+
+~~~bash
+sudo nano /etc/rc.local
+~~~
+
+在文件末尾添加脚本路径，例如：
+
+~~~text
+/home/wheeltec/nfs.sh
+~~~
+
+然后重启：
+
+~~~bash
+reboot
+~~~
+
+新版本 Ubuntu 默认不一定启用 `rc.local`，而且它不提供服务依赖、重启策略和日志单位。除非目标系统已有明确要求，优先使用 systemd。
+
+## 13. 昇腾 310B 的 CANN、PyACL、NPU、ATC 与 OM
+
+### 13.1 在同一 shell 加载 Conda 和 CANN
+
+~~~bash
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate base
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+python --version
+python -c 'import sys; print(sys.executable)'
 command -v atc
 python -c 'import acl; print("PyACL import: ok")'
 ~~~
 
-set_env.sh 设置 ACL、运行时和工具链的库路径；只在另一个终端执行它，不能保证启动服务的 shell 继承环境。若此前开启了 nounset，示例函数只在加载 CANN 时暂时关闭它，再恢复原状态，以避免环境脚本读取未定义变量而失败。若 import acl 失败，应记录解释器、CANN 路径和完整错误，使用项目的启动脚本修复环境，不添加 CPU 或随机输出回退。
+`set_env.sh` 设置 ACL、运行时和工具链相关路径，`import acl` 验证当前解释器能否加载 PyACL。另一个终端中执行 `source` 不会影响当前服务进程。启动 ATC 或 NPU 服务时，Conda 和 CANN 必须在同一个 shell 或同一个包装脚本中加载。
 
-### 板端基本诊断
+### 13.2 NPU 设备状态
 
 ~~~bash
-uname -a
-cat /etc/os-release
-hostname
-date --iso-8601=seconds
-free -h
-swapon --show
-df -h
-uptime
-ps -p 1 -o pid,comm,args
-ps aux | head -n 20
 npu-smi info
 ~~~
 
-这些命令记录的是操作系统、内存、进程和设备状态。310B4 / 8T 板上出现 Health: Alarm 时，应把它作为诊断背景保存，但不能据此自动判定 ATC、ACL、性能或精度失败；相反，ACL 初始化失败、设备不存在、ATC 非零退出、段错误、资源泄漏和可重复的任务失败都必须单独报告。
+`npu-smi info` 输出设备、芯片和健康状态。310B4 / 8T 与 310B1 / 20T 属于不同算力层级，结果不能混合排名。已知板端出现 `Health: Alarm` 时，应把它作为诊断背景保存，但不能仅凭告警判定 ATC、ACL、精度或性能失败；相反，应继续检查 `acl` 导入失败、设备不存在、ATC 非零退出、OM 缺失、推理不一致、段错误和资源泄漏等具体现象。
 
-可把诊断和被测命令绑定为一份报告：
+### 13.3 ATC 转换
 
-~~~bash
-case4_root="$HOME/Documents/palmprint-recognition"
-test -d "$case4_root"
-cd "$case4_root"
-model_id="admitted-model-id"
-synthetic_roi="path/to/synthetic-roi.png"
-test -r "$synthetic_roi"
-python -m tools.board.collect_npu_trace \
-  --label case4-acl-smoke \
-  --interval 1 \
-  --output-dir reports/system \
-  -- python -m tools.board.acl_lifecycle_probe \
-      --model "$model_id" \
-      --image "$synthetic_roi" \
-      --cycles 10 --threads 1
-~~~
-
-### ATC 与 OM
-
-ATC 只在板端执行 ONNX 到 OM 的转换。下面的示例使用 ONNX（`--framework=5`）；`--soc_version`、输入布局和形状必须来自该模型的合同，不应从另一个模型复制：
+ATC 把 ONNX 等前端模型转换为 OM。下面是最小示例：
 
 ~~~bash
 atc \
@@ -269,251 +1120,150 @@ atc \
   --input_shape=input:1,3,224,224
 ~~~
 
-各案例的实际转换入口如下；脚本可能还会写入日志、manifest 或中间目录，应先阅读 --help：
+`--framework=5` 表示 ONNX，`--soc_version=Ascend310B4` 必须与目标板匹配，输入布局和 `--input_shape` 必须来自该模型的输入合同。不要从另一个模型复制形状、算子参数或 `--soc_version`。转换前先阅读项目脚本的 `--help`：
 
-| 案例 | 入口 |
-| --- | --- |
-| Case 1 | python scripts/prepare_models.py，按 download-only、convert-only 或 force 选择阶段 |
-| Case 2 | python scripts/convert_onnx_to_om.py --soc-version Ascend310B4 |
-| Case 3 | `convert_onnx_to_om.sh`；批量流程由 README 中的编排脚本执行 |
-| Case 4 | python -m tools.export.prepare_models check --model all；候选模型先经过 manifest 准入 |
-| Case 5 | 模型准备与验证模块（完整模块命令见下文）；RTL-IQ 使用对应的准备/验证入口 |
-| Case 6 | python3 prepare_models.py，等价 ATC 参数见上例 |
-| Case 7 | `prepare_models.py` 的 download/export/check 阶段；板端候选转换和准入按准入文档执行 |
-| Case 8 | SOC_VERSION=Ascend310B4 bash scripts/atc_convert.sh |
-| Case 9 | bash scripts/provision_qwen25_kv102_board.sh check，当前主线使用已经核验的 ACL/OM 工件 |
+~~~bash
+python scripts/convert_onnx_to_om.py --help
+SOC_VERSION=Ascend310B4 bash scripts/atc_convert.sh
+~~~
 
-转换完成后至少检查文件存在、字节数和摘要；摘要检查不能替代 OM 加载和数值烟测：
+脚本可能写入日志、manifest 和中间目录。执行前确认输出路径，执行后保存完整 ATC 命令、CANN 版本、模型输入合同、退出码和日志。
+
+### 13.4 OM 工件检查
+
+转换完成后检查文件存在、字节数和摘要：
 
 ~~~bash
 stat -c '%s %n' models/*.om
 sha256sum models/example.om
+~~~
+
+若复现包提供了 `SHA256SUMS.txt`，只能在生成该清单的根目录执行：
+
+~~~bash
 bundle_root=/path/to/repro-bundle
 cd "$bundle_root"
 sha256sum -c SHA256SUMS.txt
 ~~~
 
-SHA256SUMS.txt 只在生成该清单的 bundle 根目录中执行；各案例根目录没有这个文件时，不要凭空创建或照抄该命令。模型、ONNX、OM、数据集、模板和真实运行报告默认不提交到 Git。B4 与 B1 的工件、不同 NPU 算力等级的结果以及不同模型 ID 不得混合比较。
+摘要一致只证明文件没有发生变化。OM 是否能够由 PyACL 加载、输入输出是否与合同一致、数值是否可接受，需要分别执行 ACL 烟测和数值比较。不同 CANN 版本、不同 SoC、不同精度和不同模型 ID 的 OM 不能混用。
 
-## 摄像头、USB 仪器与视频设备
+### 13.5 PyACL 与 OM 推理
 
-### 摄像头枚举与 V4L2
+PyACL 是 ACL 的 Python 接口。服务启动前执行最小导入检查：
+
+~~~bash
+python -c 'import acl; print("PyACL import: ok")'
+~~~
+
+推荐使用项目包装脚本，因为包装脚本可以在启动前检查 `import acl`：
+
+~~~bash
+bash scripts/run_palmprint_service.sh --host 127.0.0.1 --port 7860
+~~~
+
+若 `import acl` 失败，记录 Python 路径、CANN 路径和完整错误，修复环境后重新启动服务。不要添加 CPU 推理回退，也不要用随机输出或模拟结果让健康检查通过。服务健康接口可以证明 HTTP 进程存活，不能证明 NPU 推理链已加载。
+
+### 13.6 环境变量边界
+
+~~~bash
+export PYTHONNOUSERSITE=1
+export PYTHONPATH="$PWD:${PYTHONPATH:-}"
+export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/lib64:${LD_LIBRARY_PATH:-}"
+~~~
+
+这些变量只针对当前 shell 和子进程。需要长期一致的环境应写入项目包装脚本或 systemd 单元，并经过部署评审。不要全局修改 `/etc/profile` 来让所有用户继承未经验证的 CANN 和 Python 路径。
+
+## 14. 板端设备、服务、日志、测试与证据边界
+
+### 14.1 系统状态报告
+
+~~~bash
+uname -a
+cat /etc/os-release
+hostname
+date --iso-8601=seconds
+free -h
+swapon --show
+df -h
+uptime
+ps -p 1 -o pid,comm,args
+npu-smi info
+~~~
+
+这份状态报告用于记录测试环境，不是性能测试。把它和后续 ATC、ACL、精度和性能命令放在同一报告目录中，便于追溯。
+
+### 14.2 摄像头和 V4L2
 
 ~~~bash
 ls -l /dev/video*
-v4l2-ctl --device=/dev/video0 --list-formats-ext
 groups
+v4l2-ctl --device=/dev/video0 --list-formats-ext
+v4l2-ctl --device=/dev/video0 --all
 ~~~
 
-若当前用户没有视频设备权限，可在确认设备归属后由管理员执行：
+`/dev/video0` 不一定是目标摄像头，设备编号可能随枚举顺序变化。先记录实际节点、格式、分辨率和帧率，再运行采集程序。`--source 0` 的含义由 V4L2 枚举顺序决定，不能仅凭一次运行推断为固定硬件。
+
+无权限时检查组：
 
 ~~~bash
+groups
 sudo usermod -aG video "$USER"
 ~~~
 
-重新登录后再验证组成员关系。不要用 sudo 启动整个 Python 服务来绕过权限，否则会改变数据目录所有权和环境解析。
+重新登录后再验证。不要用 root 启动整个图形程序或 Python 服务来绕开设备权限。
 
-Case 2 的检测和跟踪入口可使用摄像头或视频文件：
-
-~~~bash
-python scripts/detection_app.py --device npu --source 0
-python scripts/tracking_app.py --device npu --source demo/vtest.avi \
-  --track-classes person,bus --no-display --save
-~~~
-
---source 0 的含义由 V4L2 枚举顺序决定；在板端记录实际设备节点、分辨率、帧率和是否使用 MJPEG。CPU 模式只能作为离线基线，不能冒充 NPU 结果。
-
-### USB 采集仪器
-
-Case 5 的 sigrok、RTL-SDR 和 USB 桥接程序要求设备独占：启动前关闭 PulseView、sigrok、GQRX、GNU Radio、SDR++ 等可能占用同一接口的程序。
+### 14.3 USB 和音频设备
 
 ~~~bash
 lsusb
-command -v rtl_sdr
-rtl_test -t
-python -m time_frequency_dashboard.acquisition.usb_diagnostics
+lsusb -t
+cat /proc/asound/cards
+aplay -l
+arecord -l
+ls -l /dev/snd
+~~~
+
+音频设备编号和名称必须以当前板端输出为准。`aplay -l` 只列出播放设备，`arecord -l` 列出采集设备。播放测试会改变音量或产生声音，执行前确认扬声器、耳机和实验环境。
+
+USB 采集设备通常需要独占。确认设备节点后查看占用进程：
+
+~~~bash
+lsusb
 usb_node="/dev/bus/usb/001/002"
 test -e "$usb_node"
 fuser -v "$usb_node"
-bash scripts/build_sigrok_capture_bridge.sh
 ~~~
 
-rtl_test -t 只检查设备能否打开；run_rtl_sdr_npu_demo.sh --source tone 是软件演示，不能当作真实天线采集证据。真实运行应保存采集来源、采样率、批次、模型和报告路径。
-完成模型准备和验证后，再按 Case 5 的命令启动仪表盘；采集设备诊断本身不等于 NPU 推理验收。
+`fuser -v` 只用于定位占用者，确认进程属于哪个程序后再处理。不要按模糊名称批量结束进程。
 
-## ALSA、PulseAudio、MIDI 与蓝牙
-
-### ALSA 设备
+### 14.4 服务和端口
 
 ~~~bash
-cat /proc/asound/cards
-cat /proc/asound/seq/clients
-aplay -l
-aplay -L
-arecord -l
-ls -l /dev/snd
-amixer
-speaker-test -t sine -f 440
-~~~
-
-aplay 播放、arecord 录音，amixer 查询或修改 ALSA 混音器；设备编号和名称必须以当前板端输出为准。播放测试会改变音量或产生声音，开始前确认扬声器、耳机和实验环境。
-
-Case 3 的实时链还会调用 PulseAudio 的 paplay 播放 WAV/PCM。它与直接访问 ALSA 的 aplay 不是同一层：
-
-~~~bash
-paplay --list-sinks
-sink_name="replace-with-pulse-sink-name"
-test -n "$sink_name"
-paplay --device="$sink_name" output.wav
-~~~
-
-pactl 管理 PulseAudio 的 sink、source 和 profile：
-
-~~~bash
-pactl list short cards
-pactl list short sinks
-pactl list short sources
-pactl get-default-sink
-pactl get-default-source
-sink_name="replace-with-pulse-sink-name"
-card_name="replace-with-pulse-card-name"
-pactl set-default-sink "$sink_name"
-pactl set-card-profile "$card_name" a2dp_sink
-~~~
-
-不要把 Monitor of ... source 当作独立麦克风输入；它是扬声器回采，可能形成反馈环路。实时演奏应使用独立单音声源，验证输入帧、输出帧、有效 F0、特征/控制延迟和总延迟。蓝牙音箱和蓝牙耳机可以使用，但蓝牙编码与缓冲通常增加音频链路延迟；实时效果变差时，首先检查音频链路和 profile，而不是把它归因于 NPU 推理能力。
-
-录放音示例：
-
-~~~bash
-arecord -D pulse -f S16_LE -r 48000 -c 2 -d 5 capture.wav
-aplay -D pulse capture.wav
-~~~
-
-### MIDI
-
-~~~bash
-python realtime_ddsp.py --list-midi
-python realtime_ddsp.py --list-audio
-python tools/create_test_midi.py --output midi/ddsp-test.mid
-python realtime_ddsp.py --play-midi midi/ddsp-test.mid \
-  --device-id 0 --audio-device 0 --sample-rate 48000 \
-  --prebuffer 6 --max-voices 1
-~~~
-
-MIDI 设备编号和音频设备编号不一定相同；每次测试都应保存枚举结果。--demo 或软件合成声源可用于链路调试，但不能证明外部键盘、摄像头或蓝牙设备已经满足实时验收。
-
-### 桌面与触控辅助
-
-触摸 kiosk 的历史步骤使用 xdotool、firefox --kiosk、onboard 或输入法工具。这些命令只在带桌面的板端维护会话中使用，并不属于无头服务的必需依赖：
-
-~~~bash
-command -v xdotool
-xdotool --version
-board_user="replace-with-board-user"
-window_title="replace-with-window-title"
-kiosk_port=7860
-DISPLAY=:0 XAUTHORITY="/home/$board_user/.Xauthority" xdotool search --name "$window_title"
-firefox --kiosk "http://127.0.0.1:$kiosk_port/"
-~~~
-
-不要在没有确认 DISPLAY、XAUTHORITY 和窗口目标时执行点击脚本；避免把固定 IP 或真实用户照片写入自动化脚本。
-
-## 网络、SSH、文件传输与 HTTP
-
-### 网络状态
-
-~~~bash
-ip addr
-ip route
+systemctl status ssh --no-pager
+systemctl --failed
+systemctl list-units --type=service --state=running
 ss -ltnp
-nmcli connection show
+ss -lunp
 ~~~
 
-ip addr 查看接口地址，ip route 查看路由，ss -ltnp 显示 TCP 监听进程。nmcli connection show 适合检查 NetworkManager 配置；ifconfig 在部分系统仍可用，但不应作为新脚本的唯一依赖。
+`systemctl --failed` 显示失败单元，`ss -ltnp` 显示 TCP 监听及进程，`ss -lunp` 显示 UDP 监听。服务绑定到 `127.0.0.1` 时只接受本机连接，绑定到 `0.0.0.0` 则对所有网卡开放。只有可信实验网络中的明确需求才使用 `0.0.0.0`。
 
-### SSH 与定向同步
-
-控制机连接板端时使用已配置的密钥和明确的用户、地址：
+### 14.5 进程和日志
 
 ~~~bash
-board_user="replace-with-board-user"
-board_ip="replace-with-board-ip"
-ssh_target="$board_user@$board_ip"
-ssh "$ssh_target"
-ssh "$ssh_target" 'hostname; uname -a; npu-smi info'
-scp demo/vtest.avi "$ssh_target:Documents/Ascend310/samples/case2/demo/"
+pgrep -af 'uvicorn|python|docker|npu'
+ps -ef | grep -E 'python|uvicorn|docker' | grep -v grep
+journalctl -b -p err --no-pager | tail -n 100
+journalctl -u ascend310-demo.service -b --no-pager | tail -n 80
+sudo dmesg -T | tail -n 200
 ~~~
 
-部署前先在远端创建带日期的隔离目录，再用定向 rsync：
+`journalctl -b` 查看本次启动，`-u` 查看指定 systemd 单元，`-p err` 过滤错误级别。`dmesg` 查看内核消息，涉及 USB、摄像头、网络和驱动问题时尤其有用。公开报告只保留与故障相关的行，并删除用户名、IP、token、真实图像路径等隐私信息。
 
-~~~bash
-release_id="case9-repro-$(date +%Y%m%d)"
-ssh "$ssh_target" "mkdir -p \"\$HOME/Documents/releases/$release_id\""
-rsync -a --protect-args \
-  --exclude 'data/' --exclude 'models/' --exclude '*.om' \
-  samples/case9/ \
-  "$ssh_target:Documents/releases/$release_id/case9/"
-~~~
+### 14.6 安全停止服务
 
-默认不使用 --delete，这样不会删除远端已有模型、数据或报告。同步完成后在两端分别执行 wc -c、sha256sum 或 manifest 检查。若脚本提供 --remote-dir，只传入已经 realpath 验证过的部署目录；不要把家目录作为目标。
-
-### HTTP 检查
-
-curl 的成功状态只证明 HTTP 路由返回了预期状态，不能证明 NPU 推理成功。常见检查：
-
-~~~bash
-curl --fail --silent --show-error http://127.0.0.1:5000/api/health
-curl --fail --silent http://127.0.0.1:7860/api/bootstrap
-curl --fail --silent http://127.0.0.1:7860/api/candidates
-curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5000/video_feed
-~~~
-
-上传接口应使用项目定义的 multipart 字段，并只使用合成或获授权的测试图像：
-
-~~~bash
-curl --fail -F 'name=example' \
-  -F 'image=@synthetic-face.jpg' \
-  http://127.0.0.1:5000/api/users
-curl --fail -F 'image=@synthetic-face.jpg' \
-  http://127.0.0.1:5000/api/camera/capture
-~~~
-
-Case 9 的网关验收还会查询 /v1/models 和 chat completions；只有在服务启用鉴权后才传递 API token：
-
-~~~bash
-export GATEWAY_API_KEY="$(openssl rand -hex 24)"
-gateway_port=7867
-curl --fail -H "Authorization: Bearer $GATEWAY_API_KEY" \
-  "http://127.0.0.1:$gateway_port/v1/models"
-~~~
-
-不要把 token、Cookie、真实 URL 或完整响应中的个人信息写入 Git、截图或教材。
-
-## 服务进程、日志与有序停止
-
-### 启动服务
-
-示例服务都应绑定到明确的本地地址和端口。默认优先监听回环地址；只有在可信实验网络中才由操作者显式指定 0.0.0.0：
-
-~~~bash
-python app.py --host 127.0.0.1 --port 5000
-python -m palmprint_workbench.api --host 127.0.0.1 --port 7860
-bash scripts/run_smart_album_service.sh --root "$PWD" --host 127.0.0.1
-~~~
-
-0.0.0.0 会把服务暴露到所有网卡；--share 还可能创建公网隧道，只适合短时、无敏感数据的演示，不应作为生产启动参数。Case 6 旧脚本中的 --share 和 Case 9 归档脚本中的固定端口均属于历史示例，使用前必须核对当前脚本。Case 9 的 ACL 服务、网关和文本界面具有不同的环境边界，统一放在本附录的 Case 9 小节说明。
-
-### 进程、端口和日志
-
-~~~bash
-pgrep -af 'uvicorn|fastapi|case9|smart_album'
-ps -ef | grep -E 'python|uvicorn' | grep -v grep
-ss -ltnp | grep -E ':5000|:7860|:8080'
-tail -f logs/service.log
-~~~
-
-停止服务时只终止已经确认的 PID，并等待端口释放：
+只停止已经确认的 PID：
 
 ~~~bash
 service_pid=12345
@@ -523,7 +1273,6 @@ esac
 test "$service_pid" -gt 1
 ps -fp "$service_pid"
 readlink -f "/proc/$service_pid/cwd"
-# 确认上两行均属于目标服务后，才执行下一行。
 kill -TERM "$service_pid"
 for _ in $(seq 1 20); do
   kill -0 "$service_pid" 2>/dev/null || break
@@ -531,548 +1280,11 @@ for _ in $(seq 1 20); do
 done
 ~~~
 
-不要使用 pkill python、killall python 或按模糊名称批量终止进程；板端可能同时运行多个实验。涉及 systemd 的系统诊断可用：
+先确认 PID 对应的命令、工作目录和用户，再发送 `TERM`。不要执行 `pkill python`、`killall python` 或按模糊名称批量结束进程，板端可能同时运行多个实验。
 
-~~~bash
-systemctl status ssh sshd systemd-logind --no-pager
-journalctl -b -u ssh --no-pager | tail -n 80
-dmesg -T | tail -n 200
-~~~
+### 14.7 本地测试
 
-若命令只用于定位故障，应保存输出和时间戳，而不是把系统日志全文复制到公开仓库。音频或 USB 故障可进一步检查：
-
-~~~bash
-lsmod | grep -E 'snd|usb_audio'
-dmesg | grep -iE 'usb|snd|audio|alsa|edifier' | tail -n 80
-~~~
-
-## 各案例的最小 Linux 命令链
-
-下面的链条是从各案例当前主线脚本提取的代表性最小顺序，并非逐字穷举。完整参数以对应 README、测试和脚本的 --help 为准；命令链只说明操作关系，不构成板端成功证据。板端代码块沿用前文已经定义的 load_cann 函数；若新开终端，先在同一终端重新定义该函数。
-
-### Case 1：人脸考勤
-
-开发机先做纯 Python 和前端检查：
-
-~~~bash
-cd samples/case1
-python -m unittest discover -s tests -p 'test_layout.py'
-python -m py_compile app.py face_attendance/*.py
-cd frontend
-npm ci
-npm test
-npm run build
-cd ..
-~~~
-
-板端在同一 shell 加载 CANN 后准备模型和运行时：
-
-~~~bash
-case_root="$HOME/Documents/Ascend310/samples/case1"
-test -d "$case_root"
-cd "$case_root"
-load_conda
-conda activate base
-load_cann
-python -m pip install -r requirements.txt
-python scripts/prepare_models.py
-python scripts/check_onnx.py
-python scripts/check_onnx_out.py
-python -c 'import acl, cv2, fastapi, uvicorn; print("runtime imports: ok")'
-~~~
-
-终端 A 启动 FastAPI 服务：
-
-~~~bash
-case_root="$HOME/Documents/Ascend310/samples/case1"
-test -d "$case_root"
-cd "$case_root"
-python app.py --host 127.0.0.1 --port 5000
-~~~
-
-终端 B 检查 /api/health、/api/users、/api/camera/capture 和 /video_feed。模型不可用时健康状态应为降级，推理接口返回明确的 503，不得生成随机特征。未知人脸自动登记是本案例保留的教学演示策略，不应在教材或部署脚本中表述为生产级身份认证。
-
-~~~bash
-curl --fail http://127.0.0.1:5000/api/health
-curl --fail http://127.0.0.1:5000/api/users
-curl --fail -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5000/video_feed
-~~~
-
-### Case 2：检测与跟踪
-
-控制机下载演示视频并定向传输：
-
-~~~bash
-wget https://raw.githubusercontent.com/opencv/opencv/master/samples/data/vtest.avi \
-  -O demo/vtest.avi
-board_user="replace-with-board-user"
-board_ip="replace-with-board-ip"
-ssh_target="$board_user@$board_ip"
-scp demo/vtest.avi "$ssh_target:Documents/Ascend310/samples/case2/demo/"
-~~~
-
-板端流程：
-
-~~~bash
-case_root="$HOME/Documents/Ascend310/samples/case2"
-test -d "$case_root"
-cd "$case_root"
-load_conda
-conda activate npu
-load_cann
-python scripts/download_models.py
-python scripts/convert_onnx_to_om.py --soc-version Ascend310B4
-~~~
-
-摄像头运行时把 --source 换成已经枚举过的设备编号，并记录实际分辨率和帧率。20--26 FPS 等未经报告支持的数字不能直接写入实验结论。
-
-转换完成后，检测和跟踪分别在前台终端运行：
-
-~~~bash
-case_root="$HOME/Documents/Ascend310/samples/case2"
-test -d "$case_root"
-cd "$case_root"
-python scripts/detection_app.py --device npu --source demo/vtest.avi
-~~~
-
-~~~bash
-case_root="$HOME/Documents/Ascend310/samples/case2"
-test -d "$case_root"
-cd "$case_root"
-python scripts/tracking_app.py --device npu --source demo/vtest.avi \
-  --track-classes person --no-display --save
-~~~
-
-### Case 3：智能电子琴
-
-控制机执行 WebUI 单测、构建和固定版本下载：
-
-~~~bash
-case_root="$PWD/samples/case3"
-cd "$case_root"
-python -m pytest -q
-cd webui
-npm ci
-npm run test
-npm run build
-npm run test:e2e
-cd ..
-python tools/download_model_release.py
-~~~
-
-板端在已有 CANN/base 环境中准备 Piano-DDSP 并检查运行时：
-
-~~~bash
-case_root="$HOME/Documents/case3"
-test -d "$case_root"
-cd "$case_root"
-load_conda
-conda activate base
-load_cann
-python -m pip install -r requirements.txt
-python prepare_piano_ddsp_models.py --variant gru-unrolled --models gru_ir_96_64
-python tools/check_webui_env.py
-~~~
-
-WebUI 是前台服务，应在终端 A 启动：
-
-~~~bash
-case_root="$HOME/Documents/case3"
-test -d "$case_root"
-cd "$case_root"
-python scripts/run_webui.py
-~~~
-
-终端 B 再枚举音频/MIDI，并运行固定 MIDI 片段。以下 realtime_ddsp.py 命令是当前仓库保留的实时链路诊断入口；一次播放成功仍不能替代长稳或延迟报告：
-
-~~~bash
-case_root="$HOME/Documents/case3"
-test -d "$case_root"
-cd "$case_root"
-python tools/create_test_midi.py --output midi/ddsp-test.mid
-python realtime_ddsp.py --list-audio
-python realtime_ddsp.py --list-midi
-python realtime_ddsp.py --play-midi midi/ddsp-test.mid --device-id 0
-~~~
-
-需要板端转换或验证时使用项目脚本和已经核对的输入合同；不得把 npu-smi 或一次播放成功当作实时延迟证明。paplay、pactl 和蓝牙 profile 的检查见本附录前文。
-
-### Case 4：掌纹识别工作台
-
-开发机执行语法、合同、前端和离线基线检查：
-
-~~~bash
-cd samples/case4
-python -m compileall -q app.py palmprint_workbench tools
-python -m pytest -ra tests
-cd frontend
-npm ci
-npm test
-npm run build
-cd ..
-python -m tools.board.verify_frontend_assets --dist frontend/dist --strict
-python -m palmprint_workbench.tools.verify_assets --strict
-~~~
-
-板端启动前验证 CANN、registry 和资源：
-
-~~~bash
-case_root="$HOME/Documents/palmprint-recognition"
-test -d "$case_root"
-cd "$case_root"
-load_conda
-conda activate base
-load_cann
-python -c 'import sys, acl; print(sys.executable)'
-python -m palmprint_workbench.tools.verify_assets --strict
-~~~
-
-服务在终端 A 启动，终端 B 再做 HTTP 检查：
-
-~~~bash
-case_root="$HOME/Documents/palmprint-recognition"
-test -d "$case_root"
-cd "$case_root"
-python -m palmprint_workbench.api --host 127.0.0.1 --port 7860
-~~~
-
-~~~bash
-curl --fail http://127.0.0.1:7860/api/health
-curl --fail http://127.0.0.1:7860/api/bootstrap
-curl --fail http://127.0.0.1:7860/api/candidates
-~~~
-
-同步发布目录时使用显式 rsync 且不带 --delete。掌纹图像和模板只留在隔离板端目录，find 预览后才能清理；不要把 rm -rf 示例当作常规部署步骤。
-
-### Case 5：数据采集仪
-
-在板端安装并检查 USB 采集依赖，然后构建桥接程序：
-
-~~~bash
-case_root="$HOME/Documents/case5"
-test -d "$case_root"
-cd "$case_root"
-sudo apt-get update
-sudo apt-get install -y libsigrok-dev sigrok-cli gcc pkg-config libfftw3-single3 rtl-sdr
-load_conda
-conda activate base
-load_cann
-python -m pip install -r requirements-board.txt
-python -m time_frequency_dashboard.acquisition.usb_diagnostics
-bash scripts/build_sigrok_capture_bridge.sh
-~~~
-
-模型和验证链：
-
-~~~bash
-case_root="$HOME/Documents/case5"
-test -d "$case_root"
-cd "$case_root"
-load_conda
-conda activate base
-load_cann
-python -m time_frequency_dashboard.model.prepare_models
-python -m time_frequency_dashboard.model.verify_npu_model
-python -m time_frequency_dashboard.model.prepare_rtl_iq_model
-python -m time_frequency_dashboard.model.verify_rtl_iq_model
-bash scripts/run_rtl_sdr_npu_demo.sh --source tone --batches 2
-~~~
-
-仪表盘是前台 Qt 程序，应在准备完成后另开终端启动：
-
-~~~bash
-case_root="$HOME/Documents/case5"
-cd "$case_root"
-bash scripts/run_dashboard.sh --sigrok-bridge build/sigrok_capture_bridge
-~~~
-
-真实 RTL-SDR 推理也应单独占用一个终端，并在结束后复核同一次运行报告：
-
-~~~bash
-case_root="$HOME/Documents/case5"
-cd "$case_root"
-manifest="models/generated/inference/candidates/replace-with-accepted-manifest.json"
-test -r "$manifest"
-bash scripts/run_rtl_sdr_npu_inference.sh \
-  --source rtl \
-  --manifest "$manifest" \
-  --duration-seconds 10
-run_dir="data/rtl_sdr_npu_inference/replace-with-run"
-test -r "$run_dir/inference.jsonl"
-python -m time_frequency_dashboard.rtl_sdr_run_report \
-  --inference-jsonl "$run_dir/inference.jsonl" \
-  --output "$run_dir/qc_summary.json"
-~~~
-
-真实硬件测试显式打开后才运行：
-
-~~~bash
-case_root="$HOME/Documents/case5"
-test -d "$case_root"
-cd "$case_root"
-CASE5_RUN_HARDWARE_TESTS=1 python -m pytest -q tests/test_hardware_capture_and_inference.py
-~~~
-
-纯 Python 检查可用以下命令：
-
-~~~bash
-python -m pytest -q
-python -m compileall -q time_frequency_dashboard
-~~~
-
-演示音调、CPU FFT、rtl_test -t 和接口连通性不能替代真实采集、NPU 推理和吞吐报告。上述 replace-with-... 变量必须替换为实际且已核验的 manifest 或运行目录；若文件不存在，test -r 会让流程安全停止。
-
-### Case 6：智能小车
-
-setup.sh 会尝试执行系统包安装、pip 安装和模型准备；使用前审阅脚本，在控制机先导出 ONNX：
-
-~~~bash
-cd samples/case6
-python3 prepare_models.py --onnx-only
-~~~
-
-板端只执行已有 CANN 环境中的转换和服务：
-
-~~~bash
-case_root="$HOME/Documents/Ascend310/samples/case6"
-test -d "$case_root"
-cd "$case_root"
-load_conda
-conda activate base
-load_cann
-python3 prepare_models.py
-~~~
-
-Case 6 的 app.py 是 Gradio 程序，当前实现没有 /health 路由，且内部固定以 0.0.0.0 监听；服务启动后应在另一个终端检查根页面：
-
-~~~bash
-case_root="$HOME/Documents/Ascend310/samples/case6"
-cd "$case_root"
-python3 app.py --port 8080
-~~~
-
-~~~bash
-curl --fail -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/
-~~~
-
---share 会建立外部访问通道，只能在无敏感数据的临时演示中显式使用。当前程序在没有可用 OM 时可能使用 CPU 分类回退；网页可达不等于 NPU 推理、GPIO、串口或急停策略已经验收。运动控制输出必须在确认硬件安全边界后单独测试。
-
-### Case 7：智能相册
-
-开发机先做 Python、JavaScript 和布局检查：
-
-~~~bash
-cd samples/case7
-python -m unittest discover -s tests -v
-python -m py_compile app.py server_config.py photo_index.py smart_selector.py
-node --check web/app.js
-git diff --check
-~~~
-
-控制机先做发布范围预览，再应用发布：
-
-~~~bash
-board_user="replace-with-board-user"
-board_ip="replace-with-board-ip"
-ssh_target="$board_user@$board_ip"
-bash scripts/deploy_ascend8t.sh --ssh-target "$ssh_target"
-# 阅读上一步输出，确认 release、源文件和远端目录后再执行：
-bash scripts/deploy_ascend8t.sh --ssh-target "$ssh_target" --apply
-~~~
-
-模型下载、导出和检查仍在控制机的 Case 7 根目录完成：
-
-~~~bash
-cd samples/case7
-export HF_ENDPOINT=https://hf-mirror.com
-python prepare_models.py download --model all --hf-endpoint "$HF_ENDPOINT"
-python prepare_models.py export --model all
-python prepare_models.py check --model all
-~~~
-
-板端另开 SSH 会话启动当前发布版本：
-
-~~~bash
-case_root="$HOME/Documents/ai-album/current"
-test -d "$case_root"
-cd "$case_root"
-load_conda
-conda activate base
-load_cann
-bash setup.sh board
-bash scripts/run_smart_album_service.sh --root "$case_root" --host 127.0.0.1 --port 7860
-~~~
-
-服务保持运行时，在第二个终端检查接口：
-
-~~~bash
-curl --fail http://127.0.0.1:7860/api/health
-curl --fail http://127.0.0.1:7860/api/models
-curl --fail http://127.0.0.1:7860/api/index/stats
-~~~
-
-触控相框脚本应指定显式照片来源和设备 URL；不得扫描整个局域网。模型下载、导出、COCO 评测和候选转换要分别保存 manifest 与报告；Recall 或延迟只有在对应数据集和板端报告存在时才可引用。
-
-### Case 8：手势识别
-
-控制机导出并检查 ONNX，再定向同步模型伴随文件：
-
-~~~bash
-case_root="$PWD/samples/case8"
-cd "$case_root"
-weights="$case_root/weights/YOLOv10n_gestures.pt"
-onnx_file="$case_root/models/YOLOv10n_gestures.onnx"
-labels_file="$case_root/models/YOLOv10n_gestures_labels.txt"
-metadata_file="$case_root/models/YOLOv10n_gestures_metadata.json"
-test -r "$weights"
-python weights/export_yolo_to_onnx.py \
-  --weights "$weights" --output-dir models \
-  --imgsz 640 --batch 1 --opset 13 --device cpu
-test -r "$onnx_file"
-test -r "$labels_file"
-test -r "$metadata_file"
-board_user="replace-with-board-user"
-board_ip="replace-with-board-ip"
-ssh_target="$board_user@$board_ip"
-rsync -av "$onnx_file" "$labels_file" "$metadata_file" \
-  "$ssh_target:Documents/Ascend310/samples/case8/models/"
-~~~
-
-板端转换只在已准备好的 CANN 和 npu 环境中执行：
-
-~~~bash
-case_root="$HOME/Documents/Ascend310/samples/case8"
-test -d "$case_root"
-cd "$case_root"
-load_conda
-conda activate npu
-load_cann
-python -m pip install -r requirements.txt
-SOC_VERSION=Ascend310B4 bash scripts/atc_convert.sh
-~~~
-
-先用 ls /dev/video* 和 v4l2-ctl --list-formats-ext 确认摄像头，再逐项运行前台推理程序：
-
-~~~bash
-case_root="$HOME/Documents/Ascend310/samples/case8"
-test -d "$case_root"
-cd "$case_root"
-python scripts/infer_om_camera.py \
-  --model models/YOLOv10n_gestures.om \
-  --benchmark-runs 20 --print-model-info
-~~~
-
-~~~bash
-case_root="$HOME/Documents/Ascend310/samples/case8"
-test -d "$case_root"
-cd "$case_root"
-python scripts/infer_om_camera.py \
-  --model models/YOLOv10n_gestures.om \
-  --source /dev/video0 --no-window --max-frames 60
-~~~
-
-WebRTC 服务另开终端启动。使用 `--strict-port` 固定端口，避免端口被占用时脚本自动改用其他端口；保持运行时再从第二个终端访问健康路由：
-
-~~~bash
-case_root="$HOME/Documents/Ascend310/samples/case8"
-test -d "$case_root"
-cd "$case_root"
-python scripts/webrtc_om_app.py \
-  --model models/YOLOv10n_gestures.om \
-  --source /dev/video0 --host 0.0.0.0 --port 8081 --strict-port
-~~~
-
-~~~bash
-curl --fail http://127.0.0.1:8081/health
-~~~
-
-WebRTC 的网络、编码和 OM 推理耗时应分开记录；不能用 CPU 编码结果替代板端端到端证据。0.0.0.0 会向所有网卡开放服务，只有在可信实验网络中才使用；不需要远程浏览器时应改为 127.0.0.1。
-
-### Case 9：小智 RAG 网关
-
-当前候选部署根由 Case 9 的发布包决定。下面的默认值对应板端验收目录；迁移到其他目录时只需设置 `CASE9_ROOT`，并在同一终端保持该变量一致。ACL 服务、网关和文字界面必须分终端启动；其中 ACL 使用 case9-acl-om，网关和文字界面由各自包装器激活 case9-local-chat。
-
-~~~bash
-case9_root="${CASE9_ROOT:-$HOME/case9-qwen25-dual-acceptance-20260827}"
-test -d "$case9_root"
-cd "$case9_root"
-load_conda
-conda activate case9-acl-om
-load_cann
-export PYTHONNOUSERSITE=1
-export CASE9_QWEN25_KV_ROOT="$case9_root"
-export CASE9_QWEN25_KV_BOARD_ID="$(hostname)"
-export CASE9_QWEN25_KV_SOC_VERSION="Ascend310B4"
-export CASE9_QWEN25_KV_OUTPUT_ROOT="$case9_root/reports/$(date -u +%Y%m%dT%H%M%SZ)"
-export PYTHONPATH="$case9_root${PYTHONPATH:+:$PYTHONPATH}"
-bash scripts/provision_qwen25_kv102_board.sh check
-bash scripts/provision_qwen25_kv102_board.sh inspect
-bash scripts/provision_qwen25_kv102_board.sh smoke
-~~~
-
-门禁成功后，在终端 A 启动候选 ACL 服务。服务是前台进程，因此不要把后续启动命令接在同一代码块中：
-
-~~~bash
-case9_root="${CASE9_ROOT:-$HOME/case9-qwen25-dual-acceptance-20260827}"
-cd "$case9_root"
-export QWEN25_ROOT="$case9_root"
-export QWEN25_KV_OM="$case9_root/artifacts/qwen25-static-kv-1024-v2.om"
-export QWEN25_KV_CONTRACT="$case9_root/contracts/qwen25-static-kv-1024-v2-om-contract.json"
-export QWEN25_KV_TOKENIZER="$case9_root/artifacts/tokenizer.json"
-export QWEN25_KV_TOKENIZER_CONFIG="$case9_root/artifacts/tokenizer_config.json"
-export QWEN25_KV_LOCK="$QWEN25_KV_OM.lock.json"
-export QWEN25_KV_TOKENIZER_LOCK="$QWEN25_KV_TOKENIZER.lock.json"
-export QWEN25_KV_MAX_TOKENS=80
-bash scripts/run_qwen25_kv_acl_service.sh
-~~~
-
-终端 B 查询候选 ACL 服务：
-
-~~~bash
-curl --fail http://127.0.0.1:8084/health
-curl --fail http://127.0.0.1:8084/v1/models
-~~~
-
-ACL、JSON/SSE、长输出和资源门通过后，在终端 C 生成临时 token 并启动网关。包装器会使用 case9-local-chat：
-
-~~~bash
-case9_root="${CASE9_ROOT:-$HOME/case9-qwen25-dual-acceptance-20260827}"
-cd "$case9_root"
-export GATEWAY_API_KEY="$(openssl rand -hex 24)"
-export CASE9_GATEWAY_CONDA_ENV=case9-local-chat
-bash scripts/run_qwen25_kv102_gateway.sh
-~~~
-
-终端 D 使用同一 token 启动文字界面；该界面固定暴露 0.0.0.0:7868，只能在可信实验网络中使用：
-
-~~~bash
-case9_root="${CASE9_ROOT:-$HOME/case9-qwen25-dual-acceptance-20260827}"
-cd "$case9_root"
-gateway_token="replace-with-token-from-terminal-C"
-export GATEWAY_API_KEY="$gateway_token"
-export TEXT_CHAT_CONDA_ENV=case9-local-chat
-bash scripts/run_qwen25_kv102_text_chat.sh
-~~~
-
-网关保持运行时，在另一个终端使用 Bearer token 验证模型和一次非流式请求：
-
-~~~bash
-gateway_port=7867
-gateway_token="replace-with-token-from-terminal-C"
-export GATEWAY_API_KEY="$gateway_token"
-curl --fail -H "Authorization: Bearer $GATEWAY_API_KEY" \
-  "http://127.0.0.1:$gateway_port/v1/models"
-curl --fail -H "Authorization: Bearer $GATEWAY_API_KEY" \
-  -H 'Content-Type: application/json' \
-  --data '{"model":"case9-rag","messages":[{"role":"user","content":"请用一句话说明检索网关已启动。"}],"stream":false}' \
-  "http://127.0.0.1:$gateway_port/v1/chat/completions"
-~~~
-
-复现包同步脚本使用 ssh、rsync -aL --partial --append-verify、字节数和 sha256sum 核对；sha256sum -c SHA256SUMS.txt 只在生成该清单的复现包根目录执行。归档中的 TinyLlama、本地聊天和旧端口脚本只作历史参考，不应与当前 Qwen/ACL/OM 链混用。
-
-## 测试、证据与教材构建
-
-### Python 与前端检查
+开发机可以执行语法检查和纯 Python 测试：
 
 ~~~bash
 python -m py_compile app.py
@@ -1082,7 +1294,7 @@ python -m unittest discover -s tests -v
 git diff --check
 ~~~
 
-前端项目按各案例的锁文件执行：
+前端项目按锁文件执行：
 
 ~~~bash
 npm ci
@@ -1091,69 +1303,71 @@ npm run build
 npm run test:e2e
 ~~~
 
-npm run test:e2e 的真实板端用例必须显式设置项目要求的环境变量；普通 E2E 应使用 fake API，不应在开发机隐式访问摄像头、NPU 或真实个人数据。
-
-### 结果记录
-
-每份报告至少应包含：硬件型号和算力层级、CANN 版本、模型 ID/精度、输入合同、预热次数、循环次数、重复次数、百分位计算方式、输入来源、输出路径和原始日志。语法通过、HTTP 200、模型摘要一致、ACL 数值烟测、任务精度、性能和 UI 烟测分别记录，不能互相替代。
-
-### VuePress 与 PDF
-
-在仓库根目录执行站点构建时使用锁文件：
+真实板端硬件测试必须有显式开关，且只在板端执行。例如项目定义了硬件测试变量时：
 
 ~~~bash
-pnpm install --frozen-lockfile
-pnpm docs:build
+BOARD_HARDWARE_TESTS=1 python -m pytest -q tests/test_board_hardware.py
 ~~~
 
-检查构建产物中的内部链接、图片引用、sitemap、robots 和控制台错误。用户明确要求重新生成书稿时，再运行：
+变量名应以项目实际脚本为准。普通单元测试不应隐式访问 NPU、摄像头、串口、音频设备或真实个人数据。
 
-~~~bash
-./convert-vuepress.sh
-pdfinfo latex/book.pdf
-pdftotext latex/book.pdf /tmp/ascend310-book.txt
-rg -n 'LaTeX Error|Undefined control sequence|Fatal error|Missing character|Overfull \hbox' latex/book.log
-~~~
+### 14.8 证据门
 
-转换脚本会从 src/appendix/appendix[0-9]*.md 按数字顺序收集附录；不要手改 latex/appendices/*.tex。PDF 页面还应渲染为 PNG 检查图片清晰度、代码块分页、表格宽度、中文字体和页眉页脚；发现问题时修改 Markdown 或模板后重新生成。
-
-## 常见故障的诊断顺序
-
-| 现象 | 先执行 | 再判断 |
+| 证据门 | 能证明 | 不能证明 |
 | --- | --- | --- |
-| import acl 失败 | command -v python；source set_env.sh；python -c "import acl" | 解释器和 CANN 是否来自同一环境；不要加 CPU 回退 |
-| ATC 找不到算子 | atc --version；检查 --framework、--soc_version、输入形状和日志 | 保存失败命令和模型合同，不生成伪 OM |
-| HTTP 健康正常但推理失败 | curl /api/health；查看服务日志；执行 ACL smoke | HTTP 路由与 NPU 推理是两个验证门 |
-| 摄像头无图像 | ls /dev/video*；v4l2-ctl --list-formats-ext；groups | 设备节点、格式、权限和实际尺寸是否匹配 |
-| USB 仪器被占用 | lsusb；确认设备节点后执行 fuser -v /dev/bus/usb/... | 关闭占用程序，不用宽泛 kill |
-| 无声音或延迟大 | aplay -l；pactl list short sinks；pactl get-default-sink | ALSA/PulseAudio profile、蓝牙缓冲和实际 sink |
-| 端口仍被占用 | ss -ltnp；ps -fp PID | 只停止确认的服务 PID |
-| 磁盘不足 | df -h；du -sh target-dir | 先归档报告，再清理隔离临时目录 |
-| 前端空白 | test -f frontend/dist/index.html；find frontend/dist -maxdepth 2 -type f | 构建产物、静态路径和浏览器缓存 |
-| 摘要不一致 | sha256sum；sha256sum -c；stat | 停止部署，重新取得并核验资产 |
+| Python 语法检查 | 文件可解析 | 运行时依赖、板端设备、模型正确性 |
+| HTTP 200 | 路由和服务进程可达 | NPU 推理成功、精度和性能 |
+| `npu-smi info` | 设备可被管理工具读取 | 某个 OM、模型或应用程序已经验证 |
+| `import acl` | PyACL 可在当前解释器导入 | ACL context、具体模型和算子链通过 |
+| ATC 退出码为 0 | 转换流程返回成功 | OM 数值和任务精度正确 |
+| OM 摘要一致 | 文件字节未变化 | 模型可加载或输入输出合同正确 |
+| ACL 数值烟测 | 指定输入的数值关系在容差内 | 数据集精度、延迟和吞吐 |
+| 任务精度测试 | 指定数据集和协议上的指标 | 其他数据集和硬件层级的结果 |
+| 性能测试 | 指定参数下的延迟或吞吐 | 精度和端到端业务正确性 |
+| UI 烟测 | 页面或控件可以交互 | 后端真实硬件推理已经完成 |
 
-必要时收集更完整的系统信息：
+每份报告至少记录硬件型号和算力层级、CANN 版本、模型 ID 和精度、输入合同、预热次数、循环次数、重复次数、百分位方法、输入来源、输出路径和原始日志。
 
-~~~bash
-uname -a
-date --iso-8601=seconds
-npu-smi info
-dmesg -T | tail -n 200
-~~~
+## 15. 故障排查与禁止命令模式
 
-报告中只保留与故障相关的行，并删除用户名、IP、token、真实图像路径等隐私信息。
+### 15.1 常见故障
 
-## 不应直接执行的命令模式
+| 现象 | 先执行 | 判断重点 |
+| --- | --- | --- |
+| SSH 无法连接 | `ping`、`ip addr`、`ip route`、`systemctl status ssh` | 是否同网段、服务是否启动、22 端口是否监听 |
+| known_hosts 冲突 | `ssh-keygen -R <host>` | 只删除目标主机记录，并核对新指纹 |
+| VNC 无法连接 | 检查共享开关、板端 IP、VNC 服务和显示输出 | VNC 与 SSH 的端口和权限边界不同 |
+| VNC 分辨率低 | `xrandr`、`xrandr --fb 1024x768` | 是否超过显示能力，是否影响画面质量 |
+| WiFi 切换后失联 | 检查热点、网卡、连接优先级和新 IP | 一个网卡通常不能同时做热点和连接上游 WiFi |
+| 无法 ping 通板端 | `ip addr`、`ip route`、`ping` | 同网段、路由、热点和地址冲突 |
+| NFS 挂载失败 | `ping`、`showmount`、`exportfs -v`、检查路径 | 导出范围、目录路径、客户端权限和失效挂载 |
+| NFS 服务端关机 | 先 `umount` 再重新 `mount` | 失效挂载不能直接覆盖 |
+| Docker 容器不在运行 | `docker ps -a`、`docker logs` | 容器状态、退出码和重启策略 |
+| 容器中无图形窗口 | 检查 `DISPLAY`、X11 认证、容器环境变量 | 图形显示与业务推理是两个问题 |
+| `import acl` 失败 | `command -v python`、`source set_env.sh`、重新导入 | 解释器和 CANN 是否来自同一环境 |
+| ATC 找不到算子 | `atc --version`、检查 framework、soc_version、输入形状和日志 | 保存失败命令和模型合同，不生成伪 OM |
+| `npu-smi` 显示 Alarm | 保存状态报告并检查具体错误 | 告警是诊断背景，不能单独作为测试结论 |
+| 摄像头无图像 | `/dev/video*`、`v4l2-ctl`、`groups` | 设备节点、格式、权限和实际尺寸 |
+| USB 仪器被占用 | `lsusb`、`fuser -v <device>` | 确认占用者，不用宽泛 kill |
+| 音频无声音 | `aplay -l`、`pactl list short sinks` | 设备、默认 sink 和配置 profile |
+| 端口被占用 | `ss -ltnp`、`ps -fp <pid>` | 只停止确认属于目标服务的 PID |
+| 磁盘不足 | `df -h`、`du -sh <dir>` | 先归档报告，再清理隔离临时目录 |
 
-以下模式在案例文档或网络帖子中可能出现，但不应未经审查直接执行：
+### 15.2 禁止或必须审查的命令模式
 
-- rm -rf 指向家目录、仓库根目录、变量未验证的路径或正在运行的部署目录。
-- rsync --delete 同步到未确认的远端目录；它可能删除模型、数据和报告。
-- pkill python、killall 或模糊 kill；它们可能终止其他案例和系统服务。
-- sudo pip install、sudo python；它们会绕过 conda 并改变系统包所有权。
+以下命令模式不应未经确认直接执行：
+
+- `rm -rf` 指向家目录、仓库根目录、变量未验证的路径或正在运行的部署目录。
+- `rsync --delete` 同步到未确认的远端目录，它可能删除模型、数据和报告。
+- `pkill python`、`killall` 或模糊 `kill`，它们可能终止其他案例和系统服务。
+- `sudo pip install`、`sudo python`，它们会绕过 Conda 并改变系统包所有权。
+- `chmod -R 777` 和未核实所有者的递归 `chown`，它们会放宽整个目录树的权限。
 - 在开发机运行 CANN、ATC、PyACL、OM、摄像头或 NPU 命令，并把失败归因于代码。
-- 启动 0.0.0.0、--share、未鉴权网关或固定公网地址后再处理个人数据。
-- 把扬声器 monitor、软件 tone、CPU FFT、HTTP 200 或 npu-smi 摘要写成完整硬件验收。
-- 未确认路径就复制真实照片、掌纹模板、数据库、模型或 API token 到 Git、截图或公开报告。
+- 在一个终端加载 CANN 或 Conda，却在另一个未加载环境的终端启动服务。
+- 启动 `0.0.0.0`、公网隧道、未鉴权网关或宽泛 X11 授权后再处理个人数据。
+- 使用 `xhost +` 允许所有客户端访问显示服务器，而不是限制到当前用户。
+- 直接使用 `--privileged` 给容器开放全部宿主能力，而不是逐项授权设备。
+- 把 `npu-smi` 摘要、HTTP 200、软件 tone、CPU 回退或界面可达写成完整硬件验收。
+- 未确认路径就复制真实照片、生物特征模板、数据库、模型、密钥或 token 到 Git、截图和公开报告。
 
-安全的操作顺序是：确认机器和环境，解析绝对路径，预览输入与目标，执行最小范围命令，保存原始输出，最后再把经过审查的结论写入案例报告。这样才能让 Linux 命令成为可复现的实验步骤，而不是无法追溯的部署记账。
+安全的操作顺序是：确认机器和环境，解析绝对路径，预览输入与目标，执行最小范围命令，保存原始输出，再把经过审查的结论写入报告。这样才能让 Ubuntu 命令成为可复现的操作步骤，而不是无法追溯的部署记录。
