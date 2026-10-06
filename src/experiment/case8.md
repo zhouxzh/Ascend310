@@ -2,781 +2,125 @@
 
 ## 项目简介
 
-本案例在昇腾310B上实现一个实时手势检测系统。系统从 USB 摄像头读取图
-像，用 HaGRIDv2 提供的 YOLOv10 手势检测模型完成目标检测，再把检测框画
-回原始画面，通过 WebRTC 推送到远程浏览器。整个流程覆盖了边缘视觉项目
-中最常见的几件事：模型从 PyTorch 导出为 ONNX，使用 ATC 转换为 OM，通
-过 AscendCL/PyACL 在 NPU 上推理，并把推理结果组织成可远程查看的实时视
-频服务。
+本案例在昇腾 310B 上实现实时手势识别。系统从 USB 摄像头读取视频，使用
+HaGRID YOLOv10 模型在 NPU 上完成目标检测，把检测框和标签绘制到原始画面，
+再使用 H.264/WebRTC 将结果发送到浏览器。
 
-本案例采用目标检测路线，而不是只对裁剪后的单张手部图片做分类。YOLOv10
-可以直接处理完整摄像头画面，同时输出手势类别、置信度和目标框坐标。本
-章关注的核心问题是：如何在真实视频流中找到手势、把检测框正确画回原始
-图像，并把结果稳定地推送到远程浏览器。
+案例代码位于 `samples/case8`。其中 `hagrid_yolo` 保存模型预处理、推理后端
+和后处理，`webrtc_app` 保存摄像头、DVPP 和 CANN VENC 适配，`scripts` 保存
+模型转换、OM 推理和 WebRTC 服务入口，`web` 保存浏览器页面。
 
-代码位于 `samples/case8`。其中 `hagrid_yolo` 是可复用 Python 包，保存预
-处理、后处理和推理后端；`scripts` 保存命令行入口，包括 ONNX 验证、ATC
-转换、OM 推理和 WebRTC 服务；`webrtc_app` 保存 CANN VENC、DVPP JPEGD
-和 V4L2 采集相关适配代码；`web` 保存浏览器前端；`weights` 暂时保存
-PyTorch 权重和导出脚本，后续可以单独迁移到模型仓库。
+完整的工程说明位于 `samples/case8/docs/`：
 
-下方架构图说明了本案例的部署关系。PyTorch 到 ONNX 的导出建议在 PC 或
-GPU 工作站完成；310B 侧负责 ATC 转换、OM 推理、摄像头采集和 WebRTC 推
-流。
-
-![](img8/case8_system_arch.png){#fig:case8_system_arch width=85% .center}
-
-图 1：case8 系统架构。
+- `docs/README.md`：工程文档入口；
+- `docs/01-project-design.md`：项目设计；
+- `docs/02-program-analysis.md`：程序解析；
+- `docs/03-model-dataset-and-conversion.md`：模型、数据集与转换；
+- `docs/04-deployment-and-testing.md`：部署与测试；
+- `docs/05-known-issues-and-version-compatibility.md`：问题与版本兼容性。
 
 ## 学习目标
 
-完成本案例后，你将能够：
+完成本案例后，你应能够：
 
-- 在 GPU 工作站上将 YOLO 格式的 `.pt` 权重导出为 ONNX 模型，并生成配套
-  的标签和元数据；
-- 在昇腾 310B 上使用 ATC 将 ONNX 转换为 OM 离线模型；
-- 使用 PyACL 加载 OM 模型，编写 NPU 推理的预处理与后处理代码；
-- 搭建 WebRTC H.264 推流服务，在浏览器中远程查看实时检测结果；
-- 理解 YOLOv10 的无 NMS 推理机制与 HaGRID 数据集的构成。
+- 说明 HaGRID 手势检测任务和 YOLOv10 输出含义；
+- 将 PyTorch 权重导出为 ONNX，并使用 ATC 转换为 Ascend OM；
+- 使用 PyACL 加载 OM，完成摄像头帧的预处理、推理和后处理；
+- 解释 NV12、CANN VENC、CPU `libx264` 和 WebRTC 的关系；
+- 在开发板上完成 OM 冒烟、摄像头测试和远程 WebRTC 验收。
 
-> **预备知识**：需要熟悉 Python 编程和 Linux 命令行基础操作，了解神经网
-> 络的基本概念（卷积、池化、全连接）。本案例使用的 YOLOv10 模型由
-> HaGRIDv2 官方预训练提供，无需自行训练。完整走通全流程约 2~3 小时。
+## 系统流程
 
-## 实验环境
-
-本案例只需要一块昇腾310B开发板和一个普通 USB 摄像头。摄像头最好支持
-MJPG 输出——MJPG 是摄像头的压缩输出格式，相比未压缩的 YUYV 占用的 USB
-带宽更少，更容易在 1280x720 及以上分辨率达到 30fps（详见「OpenCV 与
-DVPP 采集后端」章节）。显示器不是必需的，远程浏览器可以直接查看
-WebRTC 视频流。
-
-310B 运行时需要 CANN、ATC、PyACL、OpenCV、aiortc 和 av 等组件。Python
-运行依赖已经写在 `samples/case8/requirements.txt` 中，可以在 310B 的虚
-拟环境里安装：
-
-```bash
-cd ~/Documents/Ascend310/samples/case8
-pip install -r requirements.txt
+```mermaid
+flowchart LR
+    accTitle: 实时手势识别流程
+    accDescr: 摄像头图像经过预处理和 OM 推理，检测结果绘制回原图后编码为 H.264，通过 WebRTC 发送到浏览器。
+    cam[USB 摄像头] --> pre[预处理]
+    pre --> om[ACL 加载 OM]
+    om --> post[后处理与绘制]
+    post --> enc[CANN VENC 或显式选择的 CPU 编码]
+    enc --> rtc[WebRTC]
+    rtc --> browser[浏览器]
 ```
 
-`acl` 模块由 CANN 提供，不是 pip 安装的普通 Python 包。进入实验目录前通
-常需要先加载 CANN 环境并激活 Python 虚拟环境：
+原始画面可以是 1280x720 等采集尺寸，但模型输入固定为静态
+`1x3x640x640`。程序使用 letterbox 保持宽高比，再转成 RGB、NCHW 和
+归一化张量。推理输出经过置信度过滤、坐标恢复和 NMS 后绘制回原图。
 
-```bash
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
-conda activate npu
-cd ~/Documents/Ascend310/samples/case8
-```
+## 模型与数据集
 
-本教程中的设备示例 hostname 为 `313`，虚拟环境名为 `npu`。如果你的开发
-板名称或环境不同，只需要替换命令中的对应字段。
+本案例使用 HaGRID 提供的 YOLOv10 手势检测权重，不在开发板上训练模型。
+导出脚本同时生成 ONNX、标签文件和元数据；ATC 在目标 Ascend 310B 上生成
+OM。模型输入尺寸、输入名称和类别顺序以元数据及 OM 描述为准，不能在网页
+中动态修改模型输入尺寸。
 
-### 香橙派 8T 系统镜像与 CANN VENC H.264 适用范围 {#case8-board-venc-compatibility}
-
-以下结论针对 Orange Pi Ai Pro 8T / Ascend 310B4 的 **CANN VENC H.264 硬件编码**，
-不代表 OM 手势推理或 CPU `libx264` 编码不可用。根据目前的板端测试和用户复测：
-
-| 系统镜像日期 | CANN 与板端软件 | WebRTC / VENC H.264 结果 | 证据状态 |
-| --- | --- | --- | --- |
-| `20241128` | 系统自带 CANN 7.0 时，独立 VENC H.264 冒烟通过；升级到 CANN 8.0 后，用户报告 case8 WebRTC 推流正常。已采集的基线为驱动 23.0.0、芯片实际 Flash 固件 B309。 | CANN VENC H.264 可用 | 独立冒烟 `observed-pass`；CANN 8.0 WebRTC 为用户报告 |
-| `20250925` | 香橙派提供的新系统；CANN 8.0 和升级后的 CANN 9.0 均测试过，板端驱动 25.2.0、芯片实际 Flash 固件 B309。 | H.264 VENC 创建通道失败，返回 `507018`；日志包含 `iommu_map failed -34` 和 `h264e_create_chn alloc encoder node buffer failed` | `observed-fail` |
-
-这组对照说明，**单纯升级 CANN 不能修复 `20250925` 镜像上的 VENC 故障**；目前应
-优先怀疑该镜像的香橙派固件及板级软件配套（包括驱动、BSP/SMMU 与 DVPP 映射链路），
-而不是把问题归结为 CANN 版本本身。根因尚未隔离到某一个组件：两套系统的驱动版本
-不同，而当前记录中的芯片实际 Flash 固件均为 B309，因此还不能断言是固件单项已被
-证实导致故障。更详细的版本、命令和日志记录在仓库文件
-`samples/case8/docs/README.md` 及其链接的板端故障记录和两份测试报告中。
-
-部署到 `20250925` 系统时，不要把 CPU 编码成功当成 VENC 已修复；CPU `libx264` 只替代
-视频编码，OM 推理仍在 NPU。网页选择 `CANN VENC` 后，CANN/ACL 不可用、VENC 通道
-创建失败或编码失败都不会自动切换到 CPU：程序返回明确错误，或在推流期间上报编码错误
-并关闭连接。只有用户显式选择 `CPU libx264` 时才使用 CPU 编码。供应商提供兼容的
-固件/板级修复并完成复测前，目前用户报告可用的组合是
-`20241128` 系统升级到 CANN 8.0。
-
-## HaGRID 手势检测任务
-
-手势识别可以做成分类任务，也可以做成检测任务。分类任务把已经裁剪好的
-手部图像送入模型，输出一个类别，例如 `ok`、`stop` 或 `like`。这种方式
-实现简单，但对输入画面要求较高：手需要占据主要区域，背景不能太复杂，
-一旦出现多只手或手离摄像头较远，分类模型就很难判断。检测任务则直接接
-收完整图像，输出一个或多个检测框，每个框都带有类别和置信度。对于摄像
-头实时应用，检测任务更贴近实际场景，因为用户不会总是把手放在画面正中，
-画面中也经常会出现身体、背景和多只手。
-
-HaGRID 是 **H**and **G**esture **R**ecognition **I**mage **D**ataset 的缩写，是面向手势识
-别系统的大规模 RGB 图像数据集。初版 HaGRID 于 2022 年首次公开，包含约
-552,992 张 FullHD RGB 图像，覆盖 18 类手势，并提供 `no_gesture` 类来降
-低误检。HaGRIDv2 进一步扩展到约 1,086,158 张 FullHD RGB 图像，包含
-33 类手势和单独的 `no_gesture` 类，并按照 `user_id` 划分训练、验证和测
-试集。这个划分方式很重要，因为它能减少同一个人同时出现在训练集和测试
-集中的情况，更接近真实泛化能力评估。
-
-HaGRIDv2 对边缘部署很有价值。它不是只在干净背景下拍摄单只手，而是包含
-自然室内场景、不同光照、不同距离和不同人群。数据中的手势手和非手势手
-也可能同时出现，这使得模型不仅要识别手势，还要学会避免把普通手部姿态
-误判成命令手势。本案例直接使用 HaGRIDv2 官方提供的 YOLOv10 权重，把重
-点放在部署、推理和实时视频优化，而不是重新训练数据集。
-
-当前 `samples/case8/models` 中包含 `YOLOv10n_gestures`、
-`YOLOv10x_gestures`、`YOLOv10n_hands` 和 `YOLOv10x_hands` 四组模型。
-其中 `YOLOv10n_gestures` 是默认模型，标签数为 34，完整类别列表如下（推
-理时 `class_id` 即对应此表编号）：
-
-| ID | 标签 | 中文名称 | 手势说明 |
-| --: | :--- | :--- | :--- |
-| 0 | `grabbing` | 抓取 | 五指弯曲，做抓握动作 |
-| 1 | `grip` | 握紧 | 五指紧握成拳 |
-| 2 | `holy` | 祈祷 | 双手合十于胸前 |
-| 3 | `point` | 指向 | 食指伸出，其余握拢 |
-| 4 | `call` | 打电话 | 拇指与小指伸出，模拟电话 |
-| 5 | `three3` | 三指展开 | 拇指、食指、中指伸出展开 |
-| 6 | `timeout` | 暂停 | 双手呈 T 形 |
-| 7 | `xsign` | 交叉 | 双手食指交叉成 X 形 |
-| 8 | `hand_heart` | 手指比心 | 单手拇指与食指交叉成心形 |
-| 9 | `hand_heart2` | 双手比心 | 双手合拢围成心形 |
-| 10 | `little_finger` | 小指 | 伸出小拇指 |
-| 11 | `middle_finger` | 中指 | 伸出中指 |
-| 12 | `take_picture` | 拍照 | 模拟按下相机快门 |
-| 13 | `dislike` | 踩 | 拇指向下，表示不喜欢 |
-| 14 | `fist` | 拳头 | 五指紧握成拳，拳面向前 |
-| 15 | `four` | 四指 | 伸出四根手指 |
-| 16 | `like` | 点赞 | 拇指向上，表示喜欢 |
-| 17 | `mute` | 静音 | 食指竖起放在嘴前 |
-| 18 | `ok` | OK | 拇指与食指成圈，其余三指伸直 |
-| 19 | `one` | 一指 | 伸出食指，表示数字 1 |
-| 20 | `palm` | 手掌 | 五指张开，掌心向前 |
-| 21 | `peace` | 剪刀手 | 食指与中指伸出呈 V 形，掌心向外 |
-| 22 | `peace_inverted` | 反手剪刀手 | V 形手势掌心向内 |
-| 23 | `rock` | 摇滚 | 食指与小指伸出，其余握拢 |
-| 24 | `stop` | 停止 | 五指张开，掌心向前 |
-| 25 | `stop_inverted` | 反手停止 | 手背向前，五指张开 |
-| 26 | `three` | 三指 | 拇指、食指、中指伸出 |
-| 27 | `three2` | 三指并拢 | 食指、中指、无名指并拢伸出 |
-| 28 | `two_up` | 两指向上 | 食指与中指并拢向上伸出 |
-| 29 | `two_up_inverted` | 反手两指 | 手背向外，食指中指向上 |
-| 30 | `three_gun` | 手枪 | 拇指与食指伸出成枪形 |
-| 31 | `thumb_index` | 捏合 | 拇指与食指指尖捏合 |
-| 32 | `thumb_index2` | 展开 | 拇指与食指展开成 L 形 |
-| 33 | `no_gesture` | 无手势 | 无特定手势或背景 |
-
-标签文件存储在 `models/<模型名>_labels.txt` 中，由
-`hagrid_yolo/metadata.py` 中的 `load_labels()` 自动加载。48 类模型
-（`YOLOv10x_hands`）在以上 34 类基础上增加了 14 个左右手区分变体。
-
-`YOLOv10n` 和 `YOLOv10x` 的模型输入都是 `1,3,640,640`，差异来自模型规
-模和计算量，而不是输入分辨率。摄像头可以采集 640x480、1280x720 或 1920x1080，但进入模型前都会先等
-比例缩放，再填充到 640×640。
-
-#### 四个 HaGRID YOLOv10 OM 模型的纯推理性能
-
-下表汇总了四个已转换 OM 模型的实测结果。测试在昇腾310B 设备（示例主机
-名 `313`）上执行，命令如下：
-
-```bash
-python scripts/infer_om_camera.py \
-  --benchmark-runs 80 \
-  --warmup-runs 10 \
-  --print-model-info
-```
-
-输入为脚本生成的全零张量，因此结果只代表 OM 后端推理耗时，不包含摄像
-头采集、预处理、后处理、画框、颜色转换和 WebRTC 编码。
-
-| 模型简称 | 类别数 | 模型大小 | 推理平均延迟 |
-| :--- | ---: | ---: | ---: |
-| `n_gestures` | 34 | 6.4 MB | 18.29 ms |
-| `n_hands` | 34 | 6.4 MB | 18.41 ms |
-| `x_gestures` | 34 | 64 MB | 122.61 ms |
-| `x_hands` | 48 | 65 MB | 124.64 ms |
-
-表中模型简称均省略 `YOLOv10` 前缀，例如 `n_gestures` 对应
-`YOLOv10n_gestures.om`。
-
-四个模型的选择建议如下：
-
-- `YOLOv10n_gestures` 是默认模型，速度最快，适合实时手势命令检测。
-- `YOLOv10n_hands` 的标签集合与 `n_gestures` 相同，适合对比误检和召回表现。
-- `YOLOv10x_gestures` 模型规模明显更大，适合离线精度对比，不适合每帧 30fps 推理。
-- `YOLOv10x_hands` 类别更多，包含若干左右手细分类；延迟最高，适合精度优先场景。
-
-## YOLOv10 与本案例模型
-
-YOLOv10 是一种实时目标检测模型，由清华大学 MIG 课题组于 2024 年 5 月发
-布。YOLO 系列的基本思想是单阶段检测——一次前向计算同时预测目标框、置信
-度和类别。YOLOv10 在此基础上重点解决了一个工程问题：推理阶段不再依赖
-NMS（非极大值抑制）后处理，同时从模型结构上减少冗余计算。
-
-下图展示了 YOLOv10 的三段式架构（Backbone $\to$ Neck $\to$ Head）：
-
-![](img8/yolov10_overview.png){#fig:yolov10_overview width=85% .center}
-
-图 2：YOLOv10 总体框架——输入经骨干网络提取特征，颈部网络融合多尺度信息，
-最终由双重检测头输出检测结果。
-
-#### 骨干网络（Backbone）
-
-骨干网络基于增强版 CSPNet，通过 4 个 Stage 逐级下采样，提取从浅层纹理
-到深层语义的多尺度特征：
-
-![](img8/yolov10_backbone.png){#fig:yolov10_backbone width=85% .center}
-
-图 3：YOLOv10 骨干网络——Stem + 4 个 Stage 逐级下采样，Stage 4 包含
-SPPF、大核卷积和 PSA 三个关键创新。
-
-| Stage | 输出尺寸 | 主要模块 | 提取的特征 |
-| :--- | :--- | :--- | :--- |
-| Stem | 320×320 | Conv 3×3, s=2 | 初始降采样，扩充通道数 |
-| Stage 1 | 160×160 | C2f + Conv | 纹理、边缘等浅层细节（输出 P3） |
-| Stage 2 | 80×80 | C2f + Conv | 局部形状、角点等中层结构（输出 P4） |
-| Stage 3 | 40×40 | C2f + Conv | 语义信息，如手部整体轮廓（输出 P5） |
-| Stage 4 | 20×20 | C2f + SPPF + 大核卷积 + PSA | 全局抽象特征（输出 P6） |
-
-Stage 4 包含了骨干网络的主要改进：
-
-- **SPPF（空间金字塔池化）**：用多个不同尺寸的池化核并行处理同一张特征
-  图，再把结果拼接起来，使模型能同时看到局部细节和更大范围的上下文。
-- **大核深度可分离卷积**（7×7 或 9×9）：普通 3×3 卷积每次只能看到相邻
-  像素，要堆很多层才能覆盖大范围。直接把卷积核放大，并用深度可分离的方
-  式（先逐通道做空间卷积，再逐点做通道融合）来控制参数增长。
-- **PSA（部分自注意力）**：卷积的局限在于每个像素只能看到周围一小圈，
-  缺乏"全局视野"。自注意力能让每个像素看到整张图，但计算量太大。PSA 的
-  做法是把特征图按通道一分为二，一半保留卷积结果，另一半只在关键区域内
-  计算自注意力，兼顾全局感知和计算效率。
-
-#### 颈部网络（Neck）
-
-颈部网络采用 PAN（路径聚合网络）结构，通过两条方向相反的路径融合骨干网
-输出的多尺度特征：
-
-![](img8/yolov10_neck.png){#fig:yolov10_neck width=85% .center}
-
-图 4：YOLOv10 颈部网络——FPN 自上而下传递语义信息，PAN 自下而上传递定位
-信息，$\star$ 标记的模块为空间-通道解耦下采样。
-
-| 通路 | 方向 | 操作 | 解决的问题 |
-| :--- | :--- | :--- | :--- |
-| FPN（自上而下） | P5 $\to$ P4 $\to$ P3 | 上采样 + 拼接 + C2f | 把深层的"这是什么"传给浅层，利于小目标检测 |
-| PAN（自下而上） | N3 $\to$ N4 $\to$ N5 | 解耦下采样 + 拼接 + C2f | 把浅层的"这在哪里"传给深层，利于精确定位 |
-
-两条通路中的关键设计：
-
-- **空间-通道解耦下采样**：传统 stride=2 卷积一步完成空间压缩和通道变
-  换，信息损失较大。解耦下采样把这两步分开——先用池化做纯空间降维，再
-  用 1×1 卷积调整通道，信息保留更完整。
-- **秩引导模块设计**：不同 Stage 的特征图信息量不同——浅层特征丰富（矩
-  阵的秩较高），用较大的 C2f 模块；深层特征经过多次压缩后信息密度降低
-  （秩较低），用小型 C2f 即可，避免统一配置带来的参数浪费。
-
-#### 检测头（Head）
-
-检测头是 YOLOv10 与以往 YOLO 版本最大的不同。传统 YOLO 推理后会输出大
-量重叠的预测框，需要 NMS 去重——NMS 本身较慢，且阈值调不好容易误删正确
-结果。YOLOv10 的解决方案是**一致性双重分配（Consistent Dual
-Assignments）**：
-
-- **训练阶段**：同时使用一对多头（一个真实目标匹配多个预测框，提供丰富
-  监督）和一对一头（一个目标只匹配一个最优框，学习直接输出"最佳答案"）。
-  两个头共享统一的匹配评分公式 $m = s^\alpha \times u^\beta$（$s$ 为分类
-  得分，$u$ 为预测框与真实框的 IoU，$\alpha$ 和 $\beta$ 为平衡系数），保
-  证学习方向一致。
-- **推理阶段**：只保留一对一头。因为模型在训练时已学会直接给出最佳预测，
-  推理输出天然没有重叠框，不再需要 NMS。
-- **轻量级分类头**：分类分支用深度可分离卷积代替标准卷积，进一步减少参
-  数量。
-
-对本案例来说，更需要理解的是导出后的部署形式：模型接收固定大小的 NCHW
-图像张量，输出检测结果，后处理再把检测框映射回摄像头原图。
-
-当前导出的模型输出可以理解为若干行检测结果，每一行至少包含
-`[x1, y1, x2, y2, score, class_id]`。虽然 YOLOv10 论文强调 NMS-free，本
-案例的 `postprocess.py` 仍然保留了一次 OpenCV NMS。这不是理论上的必要
-步骤，而是工程兼容措施：不同导出版本可能产生略有差异的输出，保留 NMS
-可以让教程代码在更换模型时更稳健。对当前 HaGRIDv2 YOLOv10 导出模型而
-言，这一步不是主要性能瓶颈。
-
-## 模型导出与 ATC 转换
-
-模型准备流程见下方流程图。
-
-![](img8/case8_model_conversion.png){#fig:case8_model_conversion width=85% .center}
-
-图 5：case8 模型转换流程。
-
-PyTorch 权重到 ONNX 的导出不建议在 310B 上完成。这个步骤依赖 PyTorch、
-Ultralytics 和 ONNX 工具，更适合放在 PC 或 GPU 工作站上。仓库中
-`weights/export_yolo_to_onnx.py` 就是为这一步准备的，它跟随权重文件放在
-`weights` 目录中，后续可以与样例代码仓库分离。
-
-PC 或 GPU 工作站上的导出环境需要额外安装 PyTorch、Ultralytics 和 ONNX
-工具。下面是一组已经验证过的依赖组合：
-
-```bash
-pip install numpy==1.26.4 onnx==1.14.1 onnxruntime==1.15.1 opencv-python==4.8.0.76
-pip install torch==2.10.0 torchvision==0.25.0 --extra-index-url https://download.pytorch.org/whl/cu128
-pip install ultralytics==8.4.60
-```
-
-导出 `YOLOv10n_gestures` 的命令如下：
+模型导出示例：
 
 ```bash
 cd samples/case8
 python weights/export_yolo_to_onnx.py \
   --weights weights/YOLOv10n_gestures.pt \
-  --output-dir models \
-  --imgsz 640 \
-  --batch 1 \
-  --opset 13 \
-  --device cpu
+  --output-dir models --imgsz 640 --batch 1 --opset 13 --device cpu
 ```
 
-脚本会调用 Ultralytics 的 ONNX 导出接口，然后用 `onnx.checker` 检查模型
-合法性，并写出标签文件和元数据文件。元数据文件记录输入名、输入形状、
-输出名、类别名和导出参数。后面的 ATC 脚本会读取这些信息，因此不需要手
-工猜测输入名是不是 `images`，也不容易把输入形状写错。
-
-ONNX 可以先用 CPU 做一次功能验证。`scripts/infer_onnx_camera.py` 默认使
-用 `models/YOLOv10n_gestures.onnx`，直接运行即可：
+开发板转换示例：
 
 ```bash
-python scripts/infer_onnx_camera.py
-```
-
-如果通过 SSH 操作，没有图形界面，可以限制帧数并关闭 OpenCV 窗口：
-
-```bash
-python scripts/infer_onnx_camera.py --no-window --max-frames 30
-```
-
-ONNX 验收时应看到脚本正常打开摄像头，并在退出前打印类似下面的统计信
-息：
-
-```text
-Processed 30 frames, ... inferences, camera FPS ..., inference FPS ..., avg ONNX latency ... ms
-```
-
-这个步骤只用于验证导出模型、标签和后处理流程，不代表最终性能。310B 的
-CPU 跑 YOLOv10 会比较慢，尤其是 `YOLOv10x`。如果 ONNX Runtime 打印
-`pthread_setaffinity_np failed`，通常是线程亲和性设置与当前系统 CPU 拓
-扑不匹配。脚本已经默认设置了较保守的线程数，一般不影响模型功能验证。
-
-在 310B 上转换 OM 时，先加载 CANN 环境，再运行：
-
-```bash
-SOC_VERSION=Ascend310B4 bash scripts/atc_convert.sh
-```
-
-当前 `scripts/atc_convert.sh` 默认会转换 `models` 目录下所有 `.onnx` 文
-件。转换单个模型时，也可以传入 ONNX 路径和输出前缀：
-
-```bash
-SOC_VERSION=Ascend310B4 \
-  bash scripts/atc_convert.sh models/YOLOv10n_gestures.onnx models/YOLOv10n_gestures
-```
-
-脚本最终调用的 ATC 命令核心参数如下：
-
-```bash
-atc \
-  --framework=5 \
-  --model=models/YOLOv10n_gestures.onnx \
-  --output=models/YOLOv10n_gestures \
-  --input_format=NCHW \
-  --input_shape=images:1,3,640,640 \
-  --soc_version=Ascend310B4
-```
-
-其中 `--framework=5` 表示输入模型是 ONNX，`--input_shape` 指定静态输入
-形状。对 310B 这类边缘推理设备来说，静态形状更容易得到稳定性能，也更
-容易定位问题。
-
-ATC 成功时会输出：
-
-```text
-ATC run success, welcome to the next use.
-```
-
-转换完成后，`models` 目录下应出现同名 `.om` 文件，例如
-`models/YOLOv10n_gestures.om`。如果转换脚本一次处理多个 ONNX 文件，每个
-模型都会打印一次 `[ATC] model`、`[ATC] output` 和 `ATC run success`。
-
-有时它还会伴随 W11001 性能警告，例如 `/model.23/Div_1` 和
-`/model.23/Mod` 没有命中高优先级算子信息库。这不是转换失败。对 34 类
-手势模型来说，检测头会把 TopK 得到的展平索引还原为候选框索引和类别
-id。这个关系可以写成：
-
-```text
-flat_index = box_index * 34 + class_id
-box_index  = flat_index // 34
-class_id   = flat_index % 34
-```
-
-因此，`Div` 和 `Mod` 对应的是输出端的索引解码，而不是主干网络中的大卷
-积计算。遇到这种警告时，应该先 benchmark 生成的 OM 模型，再决定是否需
-要重新导出或简化模型图。
-
-## OM 推理与代码解析
-
-OM 摄像头推理入口是 `scripts/infer_om_camera.py`。它的默认模型已经设置
-为 `models/YOLOv10n_gestures.om`，所以在 310B 上可以直接运行：
-
-```bash
-python scripts/infer_om_camera.py
-```
-
-如果要指定摄像头分辨率和阈值，可以写成：
-
-```bash
-python scripts/infer_om_camera.py \
-  --source /dev/video0 \
-  --camera-width 1280 \
-  --camera-height 720 \
-  --camera-fps 30 \
-  --conf 0.25 \
-  --iou 0.45
-```
-
-纯模型 benchmark 不需要打开摄像头：
-
-```bash
-python scripts/infer_om_camera.py \
-  --benchmark-runs 50 \
-  --warmup-runs 5 \
-  --print-model-info
-```
-
-OM benchmark 验收时应看到模型输入、输出和延迟统计。以
-`YOLOv10n_gestures.om` 为例，313 上的实测输出如下：
-
-```text
-[ACL] input[0] size=4915200 shape=(1, 3, 640, 640)
-[ACL] output[0] size=7200 shape=(1, 300, 6)
-[OM] benchmark runs=80, avg=18.29 ms, min=18.20 ms, max=18.47 ms
-[OM] output[0] shape=(1, 300, 6) dtype=float32
-```
-
-理解这段程序，关键是理解 `hagrid_yolo` 包内的三个文件：
-`preprocess.py`、`detector.py` 和 `postprocess.py`。摄像头读到的原图可
-能是 1280x720，而模型需要的是 640x640。直接拉伸会改变手的比例，因此代
-码使用 letterbox：先按比例缩放，再用灰色边填充到正方形。`letterbox()`
-不仅返回填充后的图像，还返回 `scale`、`pad_left` 和 `pad_top`，这些值
-在后处理时会用来恢复坐标。
-
-`preprocess_image()` 的输出是模型需要的 NCHW 张量。它先把 OpenCV 的 BGR
-图像转成 RGB，再把 HWC 排布转为 CHW，最后转成 `float32` 并除以 255：
-
-```python
-padded, info = letterbox(image, imgsz)
-rgb = cv2.cvtColor(padded, cv2.COLOR_BGR2RGB)
-tensor = rgb.transpose(2, 0, 1).astype(np.float32) / 255.0
-tensor = np.expand_dims(tensor, axis=0)
-```
-
-`detector.py` 把预处理、后端推理和后处理连接起来。代码中统计的
-`latency_ms` 只包围 `backend.infer(tensor)`，所以它表示 OM 后端推理时
-间，不包括预处理、后处理和线程调度：
-
-```python
-tensor, preprocess_info = preprocess_image(frame, self.imgsz)
-start_t = time.time()
-outputs = self.backend.infer(tensor)
-latency_ms = (time.time() - start_t) * 1000.0
-detections = decode_detections(outputs[0], frame.shape, preprocess_info, self.conf, self.iou)
-```
-
-后处理最容易出错的是坐标映射。模型输出的框坐标属于 letterbox 后的
-640x640 图像；要画回原图，必须先减去 padding，再除以缩放比例：
-
-```python
-boxes[:, [0, 2]] = (boxes[:, [0, 2]] - preprocess_info.pad_left) / preprocess_info.scale
-boxes[:, [1, 3]] = (boxes[:, [1, 3]] - preprocess_info.pad_top) / preprocess_info.scale
-```
-
-这也是为什么 WebRTC 推流中看到的是原始摄像头分辨率的画面，而不是
-640x640 的模型输入。模型输入尺寸只决定推理张量大小；浏览器中的视频清
-晰度主要由摄像头实际输出、H.264 码率和前端显示尺寸决定。
-
-OM 推理后端在 `hagrid_yolo/backends/acl_backend.py` 中实现。`AclRuntime`
-负责初始化 ACL、设置 device、创建 context 和 stream；`AclModel` 负责加
-载 OM、创建输入输出 dataset、分配 device buffer，并在 `infer()` 中完成
-host 到 device 的输入拷贝、`acl.mdl.execute` 执行和 device 到 host 的输
-出拷贝。WebRTC 程序中 OM 推理、VENC 和 JPEGD 可能位于同一进程，因此代
-码接受 `ACL_ALREADY_INITIALIZED=100002`，并在 WebRTC track 中使用
-`finalize_on_release=False`，避免某个模块释放时全局 `acl.finalize()` 影
-响其他硬件模块。
-
-## WebRTC 远程推流
-
-本地 OpenCV 窗口适合调试，远程查看则需要一个面向实时视频的传输方式。
-WebRTC 是浏览器原生支持的实时音视频协议，可以使用 H.264 编码，并通过
-`RTCPeerConnection.getStats()` 观察接收端码率和帧率。本案例使用 aiortc
-在 Python 服务端建立 PeerConnection，同时把 aiortc 默认的 H.264 编码器
-替换为 Ascend CANN VENC，尽量减少 CPU 编码压力。
-
-板端验收前应先核对系统镜像日期和驱动/固件组合；当前已知的香橙派 8T 适用范围见
-[系统镜像与 CANN VENC H.264 说明](#case8-board-venc-compatibility)。
-
-下方流程图是 WebRTC 程序的简化流程。
-
-![](img8/case8_webrtc_pipeline.png){#fig:case8_webrtc_pipeline width=85% .center}
-
-图 6：case8 WebRTC 流水线。
-
-启动服务只需要：
-
-```bash
-python scripts/webrtc_om_app.py
-```
-
-默认配置使用 `YOLOv10n_gestures.om`、`/dev/video0`、1280x720、30fps、
-MJPG、4000 kbps H.264 码率、OpenCV 采集后端和每帧推理。服务启动后会打
-印可访问地址，也可以直接在浏览器中打开：
-
-```text
-WebRTC H.264 app is starting. Open one of these URLs:
-http://313:8080
-```
-
-前端会从 `/models` 获取 `models` 目录下的 OM 模型列表，并从 `/health` 获取服务状态
-和默认参数，再通过 `/offer` 建立 WebRTC 连接。连接建立后，前端定期读取 `/stats`，
-更新页面顶部状态、视频下方的采集/推理指标和日志。编码器状态不单独占用控制面板；
-`/health` 返回 `status=ok` 只说明 HTTP 服务在线，不证明 VENC 通道已创建或成功出码。
-
-`scripts/webrtc_om_app.py` 中的 `YoloOmVideoTrack` 使用三个后台线程组织
-实时流水线。采集线程不断读取摄像头帧，只保留最新帧；推理线程按
-`infer_every_n` 取帧执行 YOLO 推理；渲染线程把最新检测结果画到最新原始
-帧上，再把 BGR 转成 NV12。WebRTC 的 `recv()` 直接从最新 NV12 图像构造
-PyAV `VideoFrame`：
-
-```python
-video_frame = av.VideoFrame.from_ndarray(frame, format="nv12")
-```
-
-VENC 接收 NV12 图像并输出 H.264 码流。这样可以减少 aiortc 内部的颜色空间转换。
-选择 CANN 后，程序只有在 VENC 通道实际创建成功后才报告硬件编码活动；模块/ACL 不可用
-会使 `/offer` 返回明确错误，通道创建或帧编码失败则通过 `/stats` 上报，前端日志显示
-错误并关闭连接。程序不会因此切换到 CPU。要运行 CPU 编码，必须在控制面板中显式选择
-`CPU libx264`，或通过 `--no-hardware-encode` 启动。
-
-WebRTC 验收时，浏览器应能打开视频页面并列出 `models` 目录下的 OM 模
-型。命令行访问 `/health` 时，应看到类似下面的字段：
-
-```text
-"status": "ok"
-"runtime_target": "ascend-310b"
-"transport": "webrtc"
-"video_codec": "h264"
-"default_model": "YOLOv10n_gestures.om"
-```
-
-这个流水线有一个重要设计：队列长度很短，旧帧会被丢弃。实时视频系统追
-求的是“最新画面”，不是“每一帧都处理完”。如果推理线程一时跟不上采集线
-程，保留旧帧只会让画面延迟越来越大。因此本案例宁愿丢旧帧，也要保持远
-程预览的实时性。
-
-## OpenCV 与 DVPP 采集后端
-
-WebRTC 页面中可以选择 OpenCV 或 DVPP 采集后端。OpenCV 是默认路径，流
-程是 `cv2.VideoCapture -> BGR -> 推理/画框 -> NV12 -> CANN VENC`。它的
-优点是稳定、容易调试、兼容大多数 USB 摄像头。缺点是 MJPEG 解码通常由
-CPU/OpenCV 完成，如果摄像头实际落到 YUYV 高分辨率模式，采集帧率可能明
-显下降。
-
-DVPP 后端的思路是绕过 OpenCV 的部分开销，直接用 V4L2 读取 MJPEG，再通
-过 DVPP JPEGD 解码成 NV12。当前流程仍然需要把 NV12 转为 BGR 做推理和
-画框，然后再转回 NV12 交给 VENC，因此它还不是全链路零拷贝。它的优势是
-可能降低 MJPEG 解码的 CPU 压力，适合高分辨率 MJPG 摄像头；限制是对摄
-像头格式、JPEG bitstream 和 DVPP 初始化更敏感。当前代码选择 `dvpp` 后
-不会静默回退 OpenCV，如果 V4L2 MJPEG 或 JPEGD 失败，`/offer` 会返回明
-确错误，前端日志也会显示对应信息。
-
-调试采集性能时，首先应该确认摄像头真实支持哪些模式：
-
-```bash
-v4l2-ctl --device=/dev/video0 --list-formats-ext
-```
-
-如果同一摄像头显示 YUYV 1280x720 只能到 10fps，而 MJPG 1280x720 可以
-到 30fps，就应该优先请求 MJPG。程序里设置了宽高和帧率，并不代表摄像头
-一定按这个模式工作，最终还要看 `/stats` 里的 `actual_fourcc` 和
-`capture_fps`。
-
-## 完整实验流程
-
-前面各节已经展开了每一步的原理和代码。本节提供一个精简的操作 checklist，
-方便读者快速跑通全流程。各项操作的详细解释请回顾对应章节。
-
-**在 PC / GPU 工作站上**（详见「模型导出与 ATC 转换」）：
-
-```bash
-cd samples/case8
-# 安装导出依赖（一次性）
-pip install numpy==1.26.4 onnx==1.14.1 onnxruntime==1.15.1 opencv-python==4.8.0.76
-pip install torch==2.10.0 torchvision==0.25.0 --extra-index-url https://download.pytorch.org/whl/cu128
-pip install ultralytics==8.4.60
-python weights/export_yolo_to_onnx.py \
-  --weights weights/YOLOv10n_gestures.pt --output-dir models \
-  --imgsz 640 --batch 1 --opset 13 --device cpu
-# 验证：ls models/*.onnx models/*_labels.txt models/*_metadata.json
-```
-
-**将 ONNX 同步到 310B 并转换 OM**（详见「模型导出与 ATC 转换」）：
-
-```bash
-# 在 PC 上
-cd /path/to/Ascend310
-rsync -av samples/case8/ 313:~/Documents/Ascend310/samples/case8/
-
-# SSH 到 310B
-ssh 313
-conda activate npu
+cd /home/HwHiAiUser/Documents/case8
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-cd ~/Documents/Ascend310/samples/case8
-pip install -r requirements.txt
 SOC_VERSION=Ascend310B4 bash scripts/atc_convert.sh
-# 验证：ls models/*.om
 ```
 
-**OM 基准测试与摄像头验证**（详见「OM 推理与代码解析」）：
+## OM 推理
+
+模型转换成功后，先执行不接摄像头的 benchmark：
 
 ```bash
-# 纯模型 benchmark
-python scripts/infer_om_camera.py --benchmark-runs 50 --warmup-runs 5 --print-model-info
-# 基准：avg ≈ 18.29ms（YOLOv10n，具体值因设备而异）
-
-# 摄像头测试（有显示器时可去掉 --no-window）
-python scripts/infer_om_camera.py --no-window --max-frames 60 \
-  --camera-width 1280 --camera-height 720 --camera-fps 30
-# 验证：打印 Processed 60 frames ... avg NPU latency ... ms
+python scripts/infer_om_camera.py \
+  --benchmark-runs 20 --warmup-runs 5 --print-model-info
 ```
 
-**启动 WebRTC 服务**（详见「WebRTC 远程推流」）：
+再执行摄像头推理：
+
+```bash
+python scripts/infer_om_camera.py \
+  --source /dev/video0 --camera-width 1280 --camera-height 720 \
+  --camera-fps 30 --max-frames 60 --no-window
+```
+
+benchmark 只验证 ACL 能够加载和执行 OM；摄像头测试还会验证采集、预处理、
+后处理和资源释放。两者都通过后再进入 WebRTC 测试。
+
+## WebRTC 推流
+
+启动服务：
 
 ```bash
 python scripts/webrtc_om_app.py
-# 浏览器打开终端打印的局域网地址，如 http://192.168.1.100:8080
-# 验证：curl http://127.0.0.1:8080/health  # 返回 "status": "ok"
 ```
 
-验收标准汇总：
+浏览器访问开发板打印的局域网地址，默认是 `http://192.168.1.100:8080`。
+服务通过 `/models` 列出 OM，通过 `/offer` 完成 SDP 协商，通过 `/stats` 提供
+采集、推理和编码状态。
 
-- OM benchmark 能正常加载模型，打印输入形状 `1,3,640,640` 和输出形状
-  `1,300,6`；
-- 摄像头测试脚本正常退出并打印统计信息；
-- WebRTC `/health` 显示 `"runtime_target": "ascend-310b"`；
-- `/models` 路由列出 `models/` 下的全部 `.om` 文件；
-- 选择 `CANN VENC` 后浏览器持续收到带检测框的视频帧；若硬件初始化/编码失败，页面日志
-  应显示 VENC 错误并停止连接，不得自动转为 CPU 编码。
+网页的编码器选项有两个：
 
-## 性能分析与优化
+- `CANN VENC`：推理仍在 NPU，H.264 使用 Ascend VENC；通道创建或编码失败
+  时明确报错并停止，不自动切换 CPU。
+- `CPU libx264`：仅在用户明确选择时使用 CPU 编码，OM 推理仍在 NPU。
 
-实时系统的帧率由最慢环节决定。看到远程 FPS 低时，不应该只看 NPU 推理
-时间。一次完整远程显示至少经过采集、预处理、OM 推理、后处理、画框、颜
-色转换、H.264 编码、网络传输和浏览器解码。NPU 推理时间只有 20ms，并不
-意味着端到端一定能达到 50fps。
+因此 CPU 编码可以作为明确的对照路径，但不能作为 CANN VENC 失败后的隐藏
+回退。
 
-本案例把关键指标拆开放在 `/stats` 中。`capture_fps` 表示摄像头采集速
-度，`infer_fps` 表示推理线程实际运行速度，`track_fps` 表示 WebRTC track
-实际送帧速度，`npu_latency_ms` 表示 OM 后端推理时间，`infer_total_ms`
-表示包含预处理和后处理的完整推理线程耗时，`nv12_ms` 表示 BGR 转 NV12
-耗时。只有把这些指标分开看，才能判断瓶颈在摄像头、模型、颜色转换、编
-码还是网络。
+## 验收顺序
 
-在 313 上的参考测试中，`YOLOv10n_gestures.om`、1280x720、MJPG、CANN
-VENC、OpenCV 后端、`infer_every_n=1` 时，WebRTC 大约可以达到 27fps，
-NPU 推理时间约 24ms，完整推理线程耗时约 30ms。把 `infer_every_n` 改为
-2 后，视频可以接近 30fps，但检测结果每两帧更新一次，推理线程约 15fps。
-这组数字只能作为基线，不同摄像头、CANN 版本和浏览器环境都会改变结果。
+1. 检查 CANN 环境和 `import acl`。
+2. 运行 OM benchmark。
+3. 运行有限帧摄像头推理。
+4. 检查摄像头实际 MJPG/FourCC 和帧率。
+5. 启动 WebRTC，选择 CANN VENC，确认浏览器持续收到 H.264。
+6. 若 VENC 失败，保存错误码和设备日志，不用 CPU 结果替代硬件验收。
 
-四个模型的纯 OM benchmark 显示，`YOLOv10x` 的单次推理约为
-`YOLOv10n` 的 6.7 倍。实时 WebRTC 场景中还要叠加预处理、后处理、画框和
-编码，因此默认使用 `YOLOv10n_gestures` 更稳妥。如果需要比较 `x` 模型的
-识别效果，建议先在本地窗口或低帧率 WebRTC 配置中测试，并把
-`infer_every_n` 调大，避免远程画面堆积延迟。
-
-优化时建议先使用 `YOLOv10n`，不要一开始就用 `YOLOv10x`。两者输入同样
-是 640x640，但 `YOLOv10x` 计算量大得多。然后确认摄像头实际输出是否为
-MJPG，以及 `capture_fps` 是否已经达到目标帧率。如果采集只有 15fps，后
-面的推理和编码再快也无法得到 30fps。采集正常后，再观察
-`infer_total_ms` 和 `nv12_ms`。如果推理接近 33ms，`infer_every_n=1` 就
-很难稳定超过 30fps；如果只是远程画面模糊，可以提高 H.264 码率，当前默
-认值是 4000 kbps。
-
-## 常见问题
-
-如果 ATC 报 `--host_env_os linux is invalid`，说明旧命令中传入了当前
-CANN/OPP 组合不接受的参数。当前 `scripts/atc_convert.sh` 已经不再设置
-`--host_env_os`，只保留 ONNX 转 OM 需要的核心参数。
-
-如果 ATC 成功但出现 W11001，先不要急着改模型。只要已经输出
-`ATC run success`，就先运行 OM benchmark。`/model.23/Div_1` 和
-`/model.23/Mod` 是检测头末尾的索引解码，通常不是主要耗时。
-
-如果 ONNX Runtime 打印 `pthread_setaffinity_np failed`，通常不是模型错
-误，而是线程亲和性设置与系统 CPU 拓扑不匹配。脚本已经提供
-`--intra-op-threads` 和 `--inter-op-threads` 参数，可以显式限制线程数。
-
-如果 WebRTC 端口被占用，可以换端口启动：
-
-```bash
-python scripts/webrtc_om_app.py --port 8081
-```
-
-如果选择 DVPP 后端后没有画面，要看前端日志和服务端日志。当前实现不会
-静默回退 OpenCV。常见关键字包括 `Using direct V4L2 MJPEG capture backend
-for DVPP`、`DVPP JPEGD decode frame`、`jpeg_get_image_info failed` 和
-`jpeg_decode_async failed`。
-
-如果本地显示器能到 30fps，远程浏览器只有个位数 FPS，瓶颈通常不在模型
-推理本身，而在推流链路。需要同时观察 `track_fps`、浏览器 getStats 中的
-码率、服务端 `nv12_ms` 和编码器状态。
-
-## 维护建议
-
-为了让本案例长期适合作为教程使用，代码结构应保持清晰。可复用逻辑放在
-`hagrid_yolo` 包内，脚本只作为入口；`.pt -> ONNX` 导出脚本继续留在
-`weights`，便于后续随权重一起迁移；310B 运行时不要依赖 PyTorch；模型、
-标签和元数据文件保持同名，例如 `YOLOv10n_gestures.om`、
-`YOLOv10n_gestures_labels.txt` 和 `YOLOv10n_gestures_metadata.json`。每
-次新增模型时，都应该先做 ONNX 功能验证，再做 ATC 转换和 OM benchmark。
-涉及 CANN、ATC、OM、DVPP 的行为必须在真实 310B 上验证，本地文档环境只
-能做代码编辑、图生成和 Markdown 检查。
-
-## 参考资料
-
-[1] Kapitanov A, Kvanchiani K, Nagaev A, et al. HaGRID – HAnd gesture
-recognition image dataset[C]// Proceedings of the IEEE/CVF Winter Conference
-on Applications of Computer Vision (WACV). Waikoloa, HI, USA: IEEE, 2024.
-
-[2] Nuzhdin A, Nagaev A, Sautin A, et al. HaGRIDv2: 1M images for static and
-dynamic hand gesture recognition[EB/OL]. (2024-12-02).
-https://arxiv.org/abs/2412.01508.
-
-[3] Kapitanov A. HaGRID: HAnd gesture recognition image dataset[EB/OL].
-https://github.com/hukenovs/hagrid.
-
-[4] Wang A, Chen H, Liu L H, et al. YOLOv10: Real-time end-to-end object
-detection[EB/OL]. (2024-05-23). https://arxiv.org/abs/2405.14458.
-
-[5] Wang A. YOLOv10: Real-time end-to-end object detection[EB/OL].
-https://github.com/THU-MIG/yolov10.
-
-[6] Ultralytics. YOLOv10[EB/OL].
-https://docs.ultralytics.com/models/yolov10/.
-
-[7] ONNX developers. Open Neural Network Exchange[EB/OL].
-https://github.com/onnx/onnx.
-
-[8] Microsoft. ONNX Runtime Python API[EB/OL].
-https://onnxruntime.ai/docs/api/python/api_summary.html.
-
-[9] 华为技术有限公司. 昇腾 CANN 文档[EB/OL].
-https://www.hiascend.com/document.
-
-[10] aiortc contributors. aiortc: WebRTC and ORTC for Python[EB/OL].
-https://github.com/aiortc/aiortc.
-
-[11] W3C. WebRTC: Real-Time Communication Between Browsers[S/OL].
-https://www.w3.org/TR/webrtc/.
+香橙派 8T 的系统版本差异会影响 VENC。当前已验证的旧系统、新系统和
+`iommu_map failed -34` 证据集中记录在
+`samples/case8/docs/05-known-issues-and-version-compatibility.md`。

@@ -1,31 +1,41 @@
-# Case8 工程文档
+# case8 工程文档
 
-这里记录案例 8 的板端环境、CANN VENC/DVPP 故障、部署证据和未解决问题。
-可执行启动步骤仍以 [`../README.md`](../README.md) 为准；本目录不替代案例教程。
+case8 是教材中的一个实践案例：在 Ascend 310B 上使用 YOLOv10 和 HaGRID
+完成实时手势检测，再通过 WebRTC 将带检测框的视频发送到浏览器。
 
-## 文档地图
+## 📚 推荐阅读顺序
 
-| 主题 | 文档 |
+| 文档 | 内容 |
 | --- | --- |
-| Orange Pi 8T 系统基线、CANN 升级历史与 VENC H.264 故障 | [01-venc-h264-board-incident-20261006.md](01-venc-h264-board-incident-20261006.md) |
-| 香橙派 20250925 新系统的 CANN 8.0 干净环境复测 | [02-venc-h264-cann8-clean-system-test-20261006.md](02-venc-h264-cann8-clean-system-test-20261006.md) |
-| 香橙派 20241128 旧系统的 CANN 7.0 VENC H.264 对照测试 | [03-venc-h264-cann7-old-system-test-20261006.md](03-venc-h264-cann7-old-system-test-20261006.md) |
+| [00 文档说明](00-document-guide.md) | 学习目标、阅读顺序和证据约定 |
+| [01 项目设计](01-project-design.md) | 任务理论、系统设计和数据流 |
+| [02 程序解析](02-program-analysis.md) | 源码模块、接口、生命周期和错误处理 |
+| [03 模型、数据集与转换](03-model-dataset-and-conversion.md) | HaGRID、模型契约、ONNX、ATC 和 OM |
+| [04 部署与测试](04-deployment-and-testing.md) | 板端环境、部署命令和验收方法 |
+| [05 问题与版本兼容性](05-known-issues-and-version-compatibility.md) | CANN VENC 实测结果和已知限制 |
 
-## 证据边界
+## 🔗 代码入口
 
-- `observed-pass`：在指定板卡、命令和版本下实测通过。
-- `observed-fail`：在指定条件下实测失败，结论只对该组合负责。
-- `documented`：来自用户提供的 Orange Pi 固件说明或板端安装元数据。
-- `inferred`：依据观测结果推导，尚未由供应商修复包验证。
-- `untested`：尚未执行，不能据此判断支持或不支持。
+- 服务端：[`scripts/webrtc_om_app.py`](../scripts/webrtc_om_app.py)
+- NPU 推理：[`hagrid_yolo/`](../hagrid_yolo/)
+- CANN VENC、DVPP 和 V4L2：[`webrtc_app/`](../webrtc_app/)
+- 浏览器前端：[`web/`](../web/)
+- ONNX 导出：[`weights/export_yolo_to_onnx.py`](../weights/export_yolo_to_onnx.py)
+- ONNX 到 OM：[`scripts/atc_convert.sh`](../scripts/atc_convert.sh)
 
-## WebRTC 编码器失败策略
+## 🧭 文档边界
 
-网页选择 `CANN VENC` 时，CANN/ACL 不可用、VENC 通道创建失败或帧编码失败均按失败处理，
-程序不会自动改用 CPU `libx264`。Offer 阶段的错误由页面启动日志显示；推流中的编码错误
-通过 `/stats` 上报，页面记录错误并关闭连接。CPU `libx264` 仍可由用户在页面中显式选择，
-且只替代视频编码，OM 手势推理仍在 NPU。
+`samples/case8/README.md` 只负责快速部署和启动；`src/experiment/case8.md`
+负责教材叙述；本目录负责工程设计、源码解析、模型转换、板端操作和实测
+证据。模型权重、ONNX、OM、数据集和运行报告不属于 Git 中的文档资产。
 
-`/health` 中 `status=ok` 只表示 HTTP 服务在线；`hardware_encode` 只有在 VENC 通道创建
-成功后才为真。最终验收仍需确认浏览器持续收到视频帧，不能仅凭健康检查或 CPU 模式正常
-判定 VENC 通过。
+文档中的结论使用以下标签：
+
+- `observed-pass`：指定软硬件组合下实际通过。
+- `observed-fail`：指定软硬件组合下实际失败。
+- `documented`：来自供应商资料或项目输入资料。
+- `inferred`：由多个观测推断，尚未独立确认。
+- `untested`：尚未执行，不能写成支持或修复。
+
+后续只需更新对应主题的文档：设计改 `01`，源码改 `02`，模型改 `03`，
+部署和测试改 `04`，新故障或新环境改 `05`。
