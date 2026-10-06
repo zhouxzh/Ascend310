@@ -13,7 +13,7 @@ import time
 import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional
+from typing import NoReturn, Optional
 
 import av
 import cv2
@@ -70,6 +70,7 @@ latest_track_stats: dict[str, object] = {}
 latest_stats_lock = threading.Lock()
 app_logger = logging.getLogger("webrtc_om")
 encoder_patch_lock = threading.Lock()
+encoder_state_lock = threading.Lock()
 original_h264_encoder = None
 original_codecs_h264_encoder = None
 original_codecs_get_encoder = None
@@ -77,7 +78,7 @@ original_rtcrtpsender_get_encoder = None
 encoder_state = {
     "hardware_requested": True,
     "hardware_active": False,
-    "name": "cpu-libx264-fallback",
+    "name": "cann-venc-h264-pending",
     "last_error": "",
 }
 
@@ -88,11 +89,31 @@ def no_store_file_response(path: Path) -> web.FileResponse:
     return response
 
 
+def set_encoder_state(
+    name: str,
+    hardware_active: bool,
+    reason: str = "",
+    hardware_requested: Optional[bool] = None,
+) -> None:
+    with encoder_state_lock:
+        encoder_state["name"] = name
+        encoder_state["hardware_active"] = bool(hardware_active)
+        encoder_state["last_error"] = reason
+        if hardware_requested is not None:
+            encoder_state["hardware_requested"] = bool(hardware_requested)
+
+
+def get_encoder_state() -> dict[str, object]:
+    with encoder_state_lock:
+        return dict(encoder_state)
+
+
 def patch_h264_encoder(use_hardware: bool) -> bool:
-    encoder_state["hardware_requested"] = bool(use_hardware)
-    encoder_state["hardware_active"] = False
-    encoder_state["name"] = "cpu-libx264-fallback" if use_hardware else "cpu-libx264"
-    encoder_state["last_error"] = ""
+    set_encoder_state(
+        "cann-venc-h264-pending" if use_hardware else "cpu-libx264",
+        False,
+        hardware_requested=use_hardware,
+    )
 
     import aiortc.codecs as codecs_module
     import aiortc.codecs.h264 as h264_module
@@ -118,12 +139,19 @@ def patch_h264_encoder(use_hardware: bool) -> bool:
             app_logger.info("H264 encoder switched to CPU libx264")
             return False
 
+        def fail_closed(reason: str) -> NoReturn:
+            set_encoder_state("cann-venc-h264-error", False, reason, True)
+            app_logger.error("CANN VENC selected but unavailable: %s", reason)
+            raise RuntimeError(reason)
+
         if CannH264Encoder is None or _try_import_cann is None:
-            app_logger.warning("CANN VENC modules are unavailable; using CPU libx264")
-            return False
-        if not _try_import_cann():
-            app_logger.warning("CANN ACL not available; using CPU libx264")
-            return False
+            fail_closed("CANN VENC modules are unavailable; CPU fallback is disabled.")
+        try:
+            cann_ready = _try_import_cann()
+        except Exception as exc:
+            fail_closed(f"CANN ACL import failed: {exc}. CPU fallback is disabled.")
+        if not cann_ready:
+            fail_closed("CANN ACL is unavailable; CPU fallback is disabled.")
 
         def get_encoder(codec):
             if codec.mimeType.lower() == "video/h264":
@@ -131,9 +159,7 @@ def patch_h264_encoder(use_hardware: bool) -> bool:
             return original_codecs_get_encoder(codec)
 
         def update_encoder_status(name: str, hardware_active: bool, reason: str = "") -> None:
-            encoder_state["name"] = name
-            encoder_state["hardware_active"] = bool(hardware_active)
-            encoder_state["last_error"] = reason
+            set_encoder_state(name, hardware_active, reason, True)
 
         if set_encoder_status_callback is not None:
             set_encoder_status_callback(update_encoder_status)
@@ -142,9 +168,7 @@ def patch_h264_encoder(use_hardware: bool) -> bool:
         codecs_module.H264Encoder = CannH264Encoder
         codecs_module.get_encoder = get_encoder
         rtcrtpsender_module.get_encoder = get_encoder
-        encoder_state["hardware_active"] = True
-        encoder_state["name"] = "cann-venc-h264"
-        app_logger.info("H264 encoder switched to CANN VENC hardware")
+        app_logger.info("H264 encoder configured for CANN VENC; channel creation is pending")
         return True
 
 
@@ -257,16 +281,17 @@ def default_model_name(configured: str | os.PathLike[str] | None = None) -> str:
 
 
 async def health(request: web.Request) -> web.Response:
+    encoder = get_encoder_state()
     return web.json_response(
         {
             "status": "ok",
             "runtime_target": "ascend-310b",
             "transport": "webrtc",
             "video_codec": "h264",
-            "encoder": encoder_state["name"],
-            "hardware_encode": bool(encoder_state["hardware_active"]),
-            "hardware_encode_requested": bool(encoder_state["hardware_requested"]),
-            "encoder_last_error": encoder_state["last_error"],
+            "encoder": encoder["name"],
+            "hardware_encode": bool(encoder["hardware_active"]),
+            "hardware_encode_requested": bool(encoder["hardware_requested"]),
+            "encoder_last_error": encoder["last_error"],
             "default_model": request.config_dict.get("default_model", DEFAULT_MODEL_NAME),
             "default_source": request.config_dict.get("default_source", "/dev/video0"),
             "default_device_id": request.config_dict.get("device_id", 0),
@@ -298,7 +323,16 @@ async def models(request: web.Request) -> web.Response:
 
 async def stats(_: web.Request) -> web.Response:
     with latest_stats_lock:
-        return web.json_response(dict(latest_track_stats))
+        result = dict(latest_track_stats)
+    encoder = get_encoder_state()
+    result["encoder"] = encoder["name"]
+    result["encoder_active"] = bool(encoder["hardware_active"])
+    result["encoder_error"] = (
+        str(encoder["last_error"])
+        if encoder["name"] == "cann-venc-h264-error"
+        else ""
+    )
+    return web.json_response(result)
 
 
 def parse_positive_int(value: object, name: str, default: int) -> int:
@@ -713,6 +747,7 @@ class YoloOmVideoTrack(MediaStreamTrack):
             return self._snapshot_stats_unlocked()
 
     def _snapshot_stats_unlocked(self) -> dict[str, object]:
+        encoder = get_encoder_state()
         frame_age_ms = 0.0
         if self._latest_frame_time:
             frame_age_ms = max(0.0, (time.time() - self._latest_frame_time) * 1000.0)
@@ -739,7 +774,7 @@ class YoloOmVideoTrack(MediaStreamTrack):
             "camera_backend": self.camera_backend,
             "camera_fourcc": self.camera_fourcc,
             "actual_fourcc": self._actual_fourcc,
-            "encoder": encoder_state["name"],
+            "encoder": encoder["name"],
             "frame_index": self._frame_index,
             "latest_frame_id": self._latest_frame_id,
             "last_sent_frame_id": self._last_sent_frame_id,
@@ -1338,6 +1373,12 @@ async def on_shutdown(_: web.Application) -> None:
 
 
 def build_app(args: argparse.Namespace) -> web.Application:
+    hardware_requested = bool(args.hardware_encode)
+    set_encoder_state(
+        "cann-venc-h264-pending" if hardware_requested else "cpu-libx264",
+        False,
+        hardware_requested=hardware_requested,
+    )
     app = web.Application(middlewares=[error_logging_middleware])
     app["default_model"] = default_model_name(args.model)
     app["default_source"] = args.source
@@ -1482,7 +1523,6 @@ def main() -> None:
     args = parse_args()
     cv2.setNumThreads(max(1, args.opencv_threads))
     setup_logging(args.log_level, args.log_file)
-    patch_h264_encoder(args.hardware_encode)
     args.port = choose_port(args.host, args.port, args.port_range, args.strict_port)
     app_logger.info("Starting WebRTC H.264 OM app on %s:%s", args.host, args.port)
     print_access_urls(args.host, args.port)

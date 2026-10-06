@@ -541,9 +541,19 @@ class CannH264Encoder(H264Encoder):
         self._perf_log_count: int = 0
 
     def close(self) -> None:
-        if self._venc is not None:
-            self._venc.destroy()
-            self._venc = None
+        venc, self._venc = self._venc, None
+        if venc is not None:
+            venc.destroy()
+
+    def _raise_venc_failure(self, stage: str, exc: Exception) -> None:
+        reason = f"CANN VENC {stage} failed: {exc}"
+        try:
+            self.close()
+        except Exception:
+            logger.exception("CANN VENC cleanup failed after encoder error")
+        _notify_encoder_status("cann-venc-h264-error", False, reason)
+        logger.error("%s", reason)
+        raise RuntimeError(reason) from exc
 
     def __del__(self):
         try:
@@ -595,7 +605,8 @@ class CannH264Encoder(H264Encoder):
                 and self._last_bitrate == bitrate):
             return
         if self._venc is not None:
-            self._venc.destroy()
+            venc, self._venc = self._venc, None
+            venc.destroy()
         self._venc = CannVenc(width=width, height=height, fps=fps, bitrate=bitrate)
         _notify_encoder_status("cann-venc-h264", True)
         self._last_width = width
@@ -609,19 +620,16 @@ class CannH264Encoder(H264Encoder):
         self, frame: av.VideoFrame, force_keyframe: bool
     ) -> Iterator[bytes]:
         if not _CANN_READY:
-            # Fallback to CPU libx264
-            yield from super()._encode_frame(frame, force_keyframe)
-            return
+            self._raise_venc_failure(
+                "runtime check",
+                RuntimeError("CANN ACL is not initialized; CPU fallback is disabled."),
+            )
 
         fps = self._estimate_fps(frame)
         try:
             self._ensure_venc(frame.width, frame.height, fps=fps)
-        except RuntimeError as exc:
-            logger.error("CANN VENC initialization failed: %s, falling back to libx264", exc)
-            self.close()
-            _notify_encoder_status("cpu-libx264-fallback", False, str(exc))
-            yield from super()._encode_frame(frame, force_keyframe)
-            return
+        except Exception as exc:
+            self._raise_venc_failure("initialization", exc)
 
         # NV12 passthrough: if the track already prepared NV12, skip PyAV's
         # expensive RGB/BGR -> NV12 reformat step. VENC still pads rows when
@@ -657,12 +665,8 @@ class CannH264Encoder(H264Encoder):
             t0 = time.perf_counter()
             encoded = self._venc.encode(nv12, force_keyframe=force_keyframe, pre_padded=pre_padded)
             encode_ms = (time.perf_counter() - t0) * 1000
-        except RuntimeError as exc:
-            logger.error("CANN VENC encode failed: %s, falling back to libx264", exc)
-            self.close()
-            _notify_encoder_status("cpu-libx264-fallback", False, str(exc))
-            yield from super()._encode_frame(frame, force_keyframe)
-            return
+        except Exception as exc:
+            self._raise_venc_failure("encode", exc)
 
         if self._perf_log_count < 5:
             logger.info(

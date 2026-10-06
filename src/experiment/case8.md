@@ -72,6 +72,30 @@ cd ~/Documents/Ascend310/samples/case8
 本教程中的设备示例 hostname 为 `313`，虚拟环境名为 `npu`。如果你的开发
 板名称或环境不同，只需要替换命令中的对应字段。
 
+### 香橙派 8T 系统镜像与 CANN VENC H.264 适用范围 {#case8-board-venc-compatibility}
+
+以下结论针对 Orange Pi Ai Pro 8T / Ascend 310B4 的 **CANN VENC H.264 硬件编码**，
+不代表 OM 手势推理或 CPU `libx264` 编码不可用。根据目前的板端测试和用户复测：
+
+| 系统镜像日期 | CANN 与板端软件 | WebRTC / VENC H.264 结果 | 证据状态 |
+| --- | --- | --- | --- |
+| `20241128` | 系统自带 CANN 7.0 时，独立 VENC H.264 冒烟通过；升级到 CANN 8.0 后，用户报告 case8 WebRTC 推流正常。已采集的基线为驱动 23.0.0、芯片实际 Flash 固件 B309。 | CANN VENC H.264 可用 | 独立冒烟 `observed-pass`；CANN 8.0 WebRTC 为用户报告 |
+| `20250925` | 香橙派提供的新系统；CANN 8.0 和升级后的 CANN 9.0 均测试过，板端驱动 25.2.0、芯片实际 Flash 固件 B309。 | H.264 VENC 创建通道失败，返回 `507018`；日志包含 `iommu_map failed -34` 和 `h264e_create_chn alloc encoder node buffer failed` | `observed-fail` |
+
+这组对照说明，**单纯升级 CANN 不能修复 `20250925` 镜像上的 VENC 故障**；目前应
+优先怀疑该镜像的香橙派固件及板级软件配套（包括驱动、BSP/SMMU 与 DVPP 映射链路），
+而不是把问题归结为 CANN 版本本身。根因尚未隔离到某一个组件：两套系统的驱动版本
+不同，而当前记录中的芯片实际 Flash 固件均为 B309，因此还不能断言是固件单项已被
+证实导致故障。更详细的版本、命令和日志记录在仓库文件
+`samples/case8/docs/README.md` 及其链接的板端故障记录和两份测试报告中。
+
+部署到 `20250925` 系统时，不要把 CPU 编码成功当成 VENC 已修复；CPU `libx264` 只替代
+视频编码，OM 推理仍在 NPU。网页选择 `CANN VENC` 后，CANN/ACL 不可用、VENC 通道
+创建失败或编码失败都不会自动切换到 CPU：程序返回明确错误，或在推流期间上报编码错误
+并关闭连接。只有用户显式选择 `CPU libx264` 时才使用 CPU 编码。供应商提供兼容的
+固件/板级修复并完成复测前，目前用户报告可用的组合是
+`20241128` 系统升级到 CANN 8.0。
+
 ## HaGRID 手势检测任务
 
 手势识别可以做成分类任务，也可以做成检测任务。分类任务把已经裁剪好的
@@ -491,6 +515,9 @@ WebRTC 是浏览器原生支持的实时音视频协议，可以使用 H.264 编
 在 Python 服务端建立 PeerConnection，同时把 aiortc 默认的 H.264 编码器
 替换为 Ascend CANN VENC，尽量减少 CPU 编码压力。
 
+板端验收前应先核对系统镜像日期和驱动/固件组合；当前已知的香橙派 8T 适用范围见
+[系统镜像与 CANN VENC H.264 说明](#case8-board-venc-compatibility)。
+
 下方流程图是 WebRTC 程序的简化流程。
 
 ![](img8/case8_webrtc_pipeline.png){#fig:case8_webrtc_pipeline width=85% .center}
@@ -512,11 +539,10 @@ WebRTC H.264 app is starting. Open one of these URLs:
 http://313:8080
 ```
 
-前端会从 `/models` 获取 `models` 目录下的 OM 模型列表，从 `/health` 获
-取默认参数和编码器状态，再通过 `/offer` 建立 WebRTC 连接。连接建立后，
-前端定期读取 `/stats`，把 FPS、NPU 推理时间、总推理时间、采集格式、码
-率和错误信息显示在页面右侧，而不是画到视频图像里。这样做的好处是视频
-画面保持干净，性能信息也更容易复制和分析。
+前端会从 `/models` 获取 `models` 目录下的 OM 模型列表，并从 `/health` 获取服务状态
+和默认参数，再通过 `/offer` 建立 WebRTC 连接。连接建立后，前端定期读取 `/stats`，
+更新页面顶部状态、视频下方的采集/推理指标和日志。编码器状态不单独占用控制面板；
+`/health` 返回 `status=ok` 只说明 HTTP 服务在线，不证明 VENC 通道已创建或成功出码。
 
 `scripts/webrtc_om_app.py` 中的 `YoloOmVideoTrack` 使用三个后台线程组织
 实时流水线。采集线程不断读取摄像头帧，只保留最新帧；推理线程按
@@ -528,11 +554,11 @@ PyAV `VideoFrame`：
 video_frame = av.VideoFrame.from_ndarray(frame, format="nv12")
 ```
 
-VENC 接收 NV12 图像并输出 H.264 码流。这样可以减少 aiortc 内部的颜色空
-间转换。如果 CANN VENC 可用，`/health` 中会看到
-`"encoder": "cann-venc-h264"` 和 `"hardware_encode": true`；如果不可用，
-程序会回退到 CPU libx264，也可以用 `--no-hardware-encode` 主动关闭硬件
-编码。
+VENC 接收 NV12 图像并输出 H.264 码流。这样可以减少 aiortc 内部的颜色空间转换。
+选择 CANN 后，程序只有在 VENC 通道实际创建成功后才报告硬件编码活动；模块/ACL 不可用
+会使 `/offer` 返回明确错误，通道创建或帧编码失败则通过 `/stats` 上报，前端日志显示
+错误并关闭连接。程序不会因此切换到 CPU。要运行 CPU 编码，必须在控制面板中显式选择
+`CPU libx264`，或通过 `--no-hardware-encode` 启动。
 
 WebRTC 验收时，浏览器应能打开视频页面并列出 `models` 目录下的 OM 模
 型。命令行访问 `/health` 时，应看到类似下面的字段：
@@ -641,7 +667,8 @@ python scripts/webrtc_om_app.py
 - 摄像头测试脚本正常退出并打印统计信息；
 - WebRTC `/health` 显示 `"runtime_target": "ascend-310b"`；
 - `/models` 路由列出 `models/` 下的全部 `.om` 文件；
-- 浏览器能打开页面并看到带检测框的实时视频。
+- 选择 `CANN VENC` 后浏览器持续收到带检测框的视频帧；若硬件初始化/编码失败，页面日志
+  应显示 VENC 错误并停止连接，不得自动转为 CPU 编码。
 
 ## 性能分析与优化
 

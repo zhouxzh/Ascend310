@@ -35,6 +35,7 @@ let serverStatsTimer = null;
 let lastStats = null;
 let lastFpsStats = null;
 let lastServerErrorText = "";
+let lastEncoderErrorText = "";
 let startInProgress = false;
 let fpsTrackingId = null;
 let fpsTimestamps = [];
@@ -267,6 +268,7 @@ function stopStats() {
   lastStats = null;
   lastFpsStats = null;
   lastServerErrorText = "";
+  lastEncoderErrorText = "";
   setText(elements.bitrateStatus, "-");
   setText(elements.npuStatus, "-");
   setText(elements.inferStatus, "-");
@@ -377,13 +379,30 @@ function startStats(connection) {
 }
 
 async function readServerStats() {
-  if (!activeConnection) {
+  const connection = activeConnection;
+  if (!connection) {
     return;
   }
   const data = await fetchJson("/stats");
+  if (activeConnection !== connection) {
+    return;
+  }
   if (!data || Object.keys(data).length === 0) {
     return;
   }
+  const encoderError = String(data.encoder_error ?? "").trim();
+  if (encoderError) {
+    const message = `CANN VENC 编码失败，未回退到 CPU: ${encoderError}`;
+    if (message !== lastEncoderErrorText) {
+      log(message);
+      lastEncoderErrorText = message;
+    }
+    setText(elements.pipelineStatus, "VENC 失败");
+    elements.pipelineStatus.title = encoderError;
+    stopConnection({ logMessage: false });
+    return;
+  }
+  lastEncoderErrorText = "";
   const serverErrors = [
     data.capture_error ? `capture: ${data.capture_error}` : "",
     data.render_error ? `render: ${data.render_error}` : "",

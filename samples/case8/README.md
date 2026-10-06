@@ -5,7 +5,8 @@
 
 > 完整的教程内容（背景知识、网络架构详解、性能分析等）请阅读
 > [`src/experiment/case8.md`](../../src/experiment/case8.md)。
-> 本 README 仅包含代码使用说明。
+> 本 README 仅包含代码使用说明；板端故障和版本证据见
+> [`docs/README.md`](docs/README.md)。
 
 ## 目录结构
 
@@ -155,7 +156,15 @@ python scripts/webrtc_om_app.py
 
 终端会打印可访问的 URL。在**同一局域网**的浏览器中打开打印的局域网地址
 （如 `http://192.168.1.100:8080`），即可看到带检测框的实时视频。页面支持
-切换模型和调节参数。
+切换模型和调节参数。控制面板的“`H.264 编码器`”可在 `CANN VENC` 与
+`CPU libx264` 间切换；CPU 模式仅替换视频编码，OM 手势推理仍运行在 NPU。
+用户复测报告：`20241128` 系统从 CANN 7.0 升级到 8.0 后，case8 WebRTC 推流正常；
+香橙派 `20250925` 系统的 CANN VENC H.264 在 CANN 8.0 和 9.0 下均失败，主要怀疑
+该系统镜像的固件/板级软件配套，而非单独的 CANN 版本问题。硬件编码失败时应保留
+明确错误，不以 CPU 编码成功代替 VENC 验收。选择 `CANN VENC` 后若 CANN/ACL 不可用、
+VENC 通道创建或编码失败，程序不会自动切换到 CPU：建立连接前的错误会显示在日志中，
+连接建立后的编码错误会显示后关闭视频连接。用户报告的可用组合及板端日志见
+[`docs/README.md`](docs/README.md)。
 
 ```bash
 # 常用启动选项
@@ -167,7 +176,8 @@ python scripts/webrtc_om_app.py \
 ```
 
 > 验证：`curl http://127.0.0.1:8080/health` 应返回 JSON，其中
-> `"status": "ok"`，`"encoder"` 字段指示当前使用的编码器。
+> `"status": "ok"` 表示 HTTP 服务在线，不代表 VENC 通道已创建或已成功输出码流。
+> VENC 是否可用必须在选择 `CANN VENC` 并建立视频连接后验证。
 
 ## 脚本用法速查
 
@@ -196,7 +206,7 @@ python scripts/webrtc_om_app.py \
 | `--bitrate-kbps` | `4000` | H.264 编码码率 |
 | `--camera-backend` | `opencv` | `opencv` 或 `dvpp` |
 | `--infer-every-n` | `1` | 推理间隔 |
-| `--no-hardware-encode` | `False` | 回退 CPU 编码 |
+| `--no-hardware-encode` | `False` | 显式选择 CPU `libx264` 编码 |
 
 ## 常见问题
 
