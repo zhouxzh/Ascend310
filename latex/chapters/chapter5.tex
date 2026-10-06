@@ -72,6 +72,7 @@ DVPP 硬件通过内部总线读取 -\textgreater{} (3) 处理后将结果写入
 
 \subsection{子模块概览}\label{dvpp-modules}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1429}}
   >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1429}}
@@ -108,6 +109,7 @@ NV12 / RGB / BGR & \hyperref[vpc]{VPC} \\
 \textbf{JPEGD} & JPEG Decoder & JPEG 解码 & JPEG 码流 & YUV420SP /
 YUV444 & \hyperref[jpeg]{JPEG} \\
 \end{longtable}
+}
 
 \begin{quote}
 \textbf{PNGD}（PNG 解码器）虽然列在 DVPP 规格中，但在 310B (CANN
@@ -146,6 +148,7 @@ AVC）是目前全球使用最广泛的视频编码标准。核心思想是去�
 
 编码后的每一帧按类型分为：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1875}}
@@ -175,6 +178,7 @@ AVC）是目前全球使用最广泛的视频编码标准。核心思想是去�
 \textbf{B 帧} & Bi-predictive & 最小（\textasciitilde2-5KB@480p） &
 前后帧 & 双向预测，压缩率最高但延迟最大 \\
 \end{longtable}
+}
 
 \begin{quote}
 \textbf{B 帧与实时通信}：B 帧需要参考``未来''帧，引入额外延迟。WebRTC
@@ -196,6 +200,7 @@ AVC）是目前全球使用最广泛的视频编码标准。核心思想是去�
 H.265（也叫 HEVC）是 H.264
 的下一代标准，核心目标：\textbf{相同画质下码率减半}。
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 特性 & H.264 & H.265 \\
@@ -209,6 +214,7 @@ H.265（也叫 HEVC）是 H.264
 编码复杂度 & 基准 & \textbf{约 2-5 倍} \\
 浏览器支持 & 100\% & \textgreater95\%（Firefox 不支持 WebRTC H.265） \\
 \end{longtable}
+}
 
 \textbf{为什么本章仍以 H.264 作为主线}：H.264 在 WebRTC
 和教学演示里最稳定、最容易复现；同时，本章的 VENC/VDEC minimal
@@ -253,6 +259,7 @@ VENC 和 VDEC 都采用\textbf{通道（Channel）}模型。通道是 DVPP
 
 \textbf{DVPP 内部有两种不同的通道模型}：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -279,6 +286,7 @@ VPC / JPEG 通用通道
 stream\_desc-\textgreater pic\_desc & pic\_desc -\textgreater{}
 pic\_desc（同类型） \\
 \end{longtable}
+}
 
 \begin{itemize}
 \tightlist
@@ -314,6 +322,7 @@ DVPP
 
 \textbf{VENC vs VDEC 回调的关键差异}：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -341,6 +350,7 @@ VDEC 回调
 销毁输出 & 不需要（调用方管理） &
 \textbf{\passthrough{\lstinline!销毁图片描述符(输出)!}} \\
 \end{longtable}
+}
 
 \textbf{记忆方法}：第一个参数总是``输入''，第二个总是``输出''。VENC
 输入图片-\textgreater 输出码流；VDEC 输入码流-\textgreater 输出图片。
@@ -358,6 +368,7 @@ VDEC 回调
 
 DVPP 有两套内存系统，必须正确区分：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1429}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2571}}
@@ -387,6 +398,7 @@ DVPP 有两套内存系统，必须正确区分：
 DDR） & CPU 可正常读写 & 回调中临时中转数据 &
 \passthrough{\lstinline!free\_host(ptr)!} \\
 \end{longtable}
+}
 
 数据搬运方向：\passthrough{\lstinline!memcpy(设备内存, 主机数据, 大小)!}
 --- 主机-\textgreater 设备（发送数据给
@@ -395,6 +407,7 @@ DVPP）；\passthrough{\lstinline!memcpy(主机内存, 设备数据, 大小)!} -
 
 \textbf{常见内存错误}：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -420,6 +433,7 @@ DVPP）；\passthrough{\lstinline!memcpy(主机内存, 设备数据, 大小)!} -
 回调中未销毁输入描述符 & 内存泄漏 & VENC pic\_desc / VDEC stream\_desc
 必须由回调销毁 \\
 \end{longtable}
+}
 
 \subsection{描述符模型}\label{src-book-chapter5-h5}
 
@@ -436,6 +450,7 @@ DVPP 使用两种描述符来描述输入/输出数据：
   JPEG），包含数据指针和大小。
 \end{itemize}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -462,6 +477,7 @@ VDEC & stream\_desc & pic\_desc &
 JPEGE & pic\_desc & stream\_desc & 同 VENC \\
 JPEGD & stream\_desc & pic\_desc & 同 VDEC \\
 \end{longtable}
+}
 
 \subsection{NV12------DVPP 的通用货币}\label{nv12-format}
 
@@ -479,6 +495,7 @@ NV12（也叫 YUV420SP）是 DVPP 所有图像相关模块的首选像素格式�
 
 \textbf{与其他 YUV 格式的区别}：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1935}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1935}}
@@ -505,6 +522,7 @@ I420 & YUV420P & Y 平面 + U 平面 + V 平面（3 个独立平面） & VPC
 (部分) \\
 YUYV & YUV422 & YUYV 交错（每 2 像素共享 UV） & --- (需 VPC 转换) \\
 \end{longtable}
+}
 
 \textbf{USB 摄像头输入 -\textgreater{} NV12 的路径}：大多数 USB
 摄像头输出 YUYV 或 MJPG，不是 NV12。转换可选 CPU
@@ -516,6 +534,7 @@ YUYV & YUV422 & YUYV 交错（每 2 像素共享 UV） & --- (需 VPC 转换) \\
 
 CANN 为 Ascend 310B 提供了两套不同的媒体处理 API：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 & DVPP V1 (\passthrough{\lstinline!acl.media!}) & himpi V2
@@ -530,6 +549,7 @@ CANN 为 Ascend 310B 提供了两套不同的媒体处理 API：
 \passthrough{\lstinline!*\_create\_chn!} \\
 310B Python 可用性 & \textbf{大部分可用} & \textbf{通道创建不可用} \\
 \end{longtable}
+}
 
 himpi 的 \passthrough{\lstinline!*\_create\_chn!} 函数需要传入 C
 结构体（如 \passthrough{\lstinline!hi\_vpc\_chn\_attr!}），Python
@@ -708,15 +728,75 @@ VENC 的输入格式必须是 \textbf{NV12}（YUV420SP）。详见
 \begin{itemize}
 \tightlist
 \item
-  \textbf{CANN 版本}：8.3.RC1
+  \textbf{CANN 版本}：8.0.0、8.3.RC1（均由 CANN 7.0 升级，WebRTC
+  性能结果一致）
 \item
-  \textbf{安装路径}：\passthrough{\lstinline!/usr/local/Ascend/ascend-toolkit/8.3.RC1/!}
+  \textbf{安装路径}：当前板端为
+  \passthrough{\lstinline!/usr/local/Ascend/ascend-toolkit/8.0.0/!}；8.3
+  使用对应版本目录
 \item
   \textbf{Python
   API}：\passthrough{\lstinline!/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/acl/!}
 \item
   \textbf{动态库}：\passthrough{\lstinline!/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/!}
 \end{itemize}
+
+\subsubsection{Orange Pi AI Pro
+系统与固件兼容性}\label{venc-system-firmware-compatibility}
+
+\begin{quote}
+\textbf{重要前置条件（板端实测，结论范围有限）}：日期戳为
+\passthrough{\lstinline!20250925!} 的 Orange Pi AI Pro
+最新系统镜像携带的固件，根据板端实测记录会导致 \textbf{VENC H.264
+硬件编码失败}（\passthrough{\lstinline!observed-fail!}）。这是该系统/固件组合的兼容性问题，不能
+仅凭此结果推断 310B VENC 或所有新系统均``不支持''。
+\end{quote}
+
+要复现本章的 VENC H.264 示例和 WebRTC H.264 硬件编码路径，应使用日期戳为
+\passthrough{\lstinline!20241128!}
+的旧版系统镜像，并保留该镜像配套的旧版固件；然后在此基础上将 CANN 7.0
+升级到 \textbf{CANN 8.0 或更高版本}。当前 WebRTC 已验证的两组软件
+组合如下；两组测试使用相同的 \passthrough{\lstinline!20241128!}
+系统和配套旧版固件，性能结果一致：
+
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+系统/固件
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+CANN 升级路径
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+WebRTC H.264 VENC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+性能结论
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!20241128!} 旧系统/旧固件 & CANN 7.0
+-\textgreater{} CANN 8.0 & \passthrough{\lstinline!observed-pass!} & 与
+CANN 8.3 结果一致 \\
+\passthrough{\lstinline!20241128!} 旧系统/旧固件 & CANN 7.0
+-\textgreater{} CANN 8.3 & \passthrough{\lstinline!observed-pass!} & 与
+CANN 8.0 结果一致 \\
+\end{longtable}
+}
+
+因此，本节此前记录的性能结果不因 CANN 8.0 新增验证而改变；CANN 8.0
+验证只是对原有 WebRTC 结论增加了一组软件版本证据。后续还会继续测试更多
+CANN 版本，目前不能把未测试版本写成已验证。
+
+针对日期戳为 \passthrough{\lstinline!20250925!} 的最新系统，现有测试显示
+H.264 VENC 在 CANN 8.0、 CANN 8.5 和 CANN 9.0
+下均无法使用。该失败归因于系统配套固件，而不是 CANN 版本或 API
+参数；在香橙派发布修复固件前，应继续使用
+\passthrough{\lstinline!20241128!} 旧系统 和旧版固件。
 
 \subsubsection{环境变量}\label{src-book-chapter5-h18}
 
@@ -770,6 +850,7 @@ API：
 \caption{VENC 通道输入输出模型}\label{fig:venc_channel_model}
 \end{figure}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 函数 & 用途 \\
@@ -790,6 +871,7 @@ API：
 \passthrough{\lstinline!venc\_destroy\_channel\_desc(desc)!} &
 销毁描述符 \\
 \end{longtable}
+}
 
 \subsubsection{通道参数详解}\label{src-book-chapter5-h22}
 
@@ -1035,6 +1117,7 @@ VENC（参数正确就能创建成功）。\passthrough{\lstinline!Alarm!}
 
 \subsubsection{概览}\label{src-book-chapter5-h34}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2308}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3846}}
@@ -1059,6 +1142,7 @@ VENC（参数正确就能创建成功）。\passthrough{\lstinline!Alarm!}
 \passthrough{\lstinline!CannVenc!} 封装类 + H.264/H.265 分辨率扫描对比 &
 \textasciitilde20s \\
 \end{longtable}
+}
 
 \begin{quote}
 \textbf{实现方式}：本节示例直接使用
@@ -1329,6 +1413,7 @@ for w, h in RESOLUTIONS:
 
 \textbf{(6) 本文件与 \passthrough{\lstinline!venc\_minimal.py!} 的关系}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 & \passthrough{\lstinline!venc\_minimal.py!} &
@@ -1344,6 +1429,7 @@ for w, h in RESOLUTIONS:
 内容 & 确定性 NV12 单帧 & 确定性 YUV420 序列（渐变+条+棋盘） \\
 输出 & H.264/H.265 关键帧大小 & H.264/H.265 双表格 \\
 \end{longtable}
+}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -1385,21 +1471,29 @@ h264_module.H264Encoder = YourCannEncoder
   其他全部继承
 \end{itemize}
 
-\subsubsection{回退机制}\label{src-book-chapter5-h41}
+\subsubsection{失败策略}\label{src-book-chapter5-h41}
 
-CANN 不可用时自动回退到 libx264：
+H.264 硬件路径是严格的 CANN VENC 路径。CANN 不可用、VENC 通道创建失败或
+编码失败时，服务必须报告错误并结束硬件路径；不能改用
+\passthrough{\lstinline!libx264!}，也不能用 合成帧掩盖 DVPP/JPEGD
+初始化失败：
 
 \begin{lstlisting}[language=Python]
 class CannH264Encoder(H264Encoder):
     def _encode_frame(self, frame, force_keyframe):
         if not _CANN_READY:
-            yield from super()._encode_frame(frame, force_keyframe)
-            return
+            raise RuntimeError("CANN ACL is required for H264 VENC encoding")
         try:
             # CANN VENC 编码...
-        except RuntimeError:
-            yield from super()._encode_frame(frame, force_keyframe)
+        except RuntimeError as exc:
+            raise RuntimeError("CANN VENC H264 encoding failed") from exc
 \end{lstlisting}
+
+\passthrough{\lstinline!demo!} 和 \passthrough{\lstinline!usb\_camera!}
+的软件编码是用户显式选择的独立模式，不是硬件路径的
+替代。硬件路径必须使用上一节规定的 \passthrough{\lstinline!20241128!}
+旧系统/旧固件 + CANN 8.0+ 组合；\passthrough{\lstinline!20250925!}
+系统上的 H.264 VENC 失败应直接暴露为失败。
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -1410,9 +1504,17 @@ class CannH264Encoder(H264Encoder):
 
 以下数据在 Orange Pi AI Pro（Ascend 310B4）上实测获得，使用
 \href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/venc/bench_venc.py}{\passthrough{\lstinline!bench\_venc.py!}}
-脚本。该脚本同时覆盖 H.264 与 H.265，并分别测量 CPU
+脚本；复现实验必须满足上一节规定的
+\textbf{\passthrough{\lstinline!20241128!} 旧系统/旧固件 + CANN 8.0+}
+前置条件。WebRTC 已分别验证 CANN 7.0 升级到 8.0 和升级到 8.3
+的组合，系统日期戳保持不变，性能结果一致。该脚本同时覆盖 H.264 与
+H.265，并分别测量 CPU
 自动多线程（\passthrough{\lstinline!thread\_count=0!}）和 CPU
-单线程（\passthrough{\lstinline!thread\_count=1!}）。
+单线程（\passthrough{\lstinline!thread\_count=1!}）。其中 H.264 VENC
+帧率不能外推到 \passthrough{\lstinline!20250925!} 系统，因为该系统在
+CANN 8.0、8.5 和 9.0 下均为
+\passthrough{\lstinline!observed-fail!}；H.265
+仍需在目标系统上单独验证。
 
 \textbf{测试条件}：GOP=30（I/P 混合），90 帧（3 个完整
 GOP），确定性测试帧，固定种子 42。 码率按分辨率自动缩放：H.264 使用
@@ -1448,6 +1550,7 @@ GOP），确定性测试帧，固定种子 42。 码率按分辨率自动缩放�
 
 \textbf{H.264 Baseline}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
 分辨率 & VENC fps & CPU 单线程 & CPU 多线程 & vs 单线程 & vs 多线程 \\
@@ -1461,9 +1564,11 @@ GOP），确定性测试帧，固定种子 42。 码率按分辨率自动缩放�
 2560×1440 & 21 & 7 & 11 & \textbf{3.13x} & \textbf{1.94x} \\
 3840×2160 & 16 & 4 & 7 & \textbf{4.27x} & \textbf{2.23x} \\
 \end{longtable}
+}
 
 \textbf{H.265 Main}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
 分辨率 & VENC fps & CPU 单线程 & CPU 多线程 & vs 单线程 & vs 多线程 \\
@@ -1477,6 +1582,7 @@ GOP），确定性测试帧，固定种子 42。 码率按分辨率自动缩放�
 2560×1440 & 31 & 5 & 6 & \textbf{6.10x} & \textbf{5.02x} \\
 3840×2160 & 15 & 2 & 3 & \textbf{7.00x} & \textbf{5.92x} \\
 \end{longtable}
+}
 
 \textbf{实时性观察}
 
@@ -1497,6 +1603,7 @@ GOP），确定性测试帧，固定种子 42。 码率按分辨率自动缩放�
 
 VENC 和 VDEC 在 Ascend 310B4 上的表现模式不同：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2941}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3529}}
@@ -1524,6 +1631,7 @@ H.265 \textless=1080p & \textbf{大幅领先 CPU 多线程} & 720p 以上领先 
 适合场景 & 实时推流、录制、转码输出 & 高分辨率/HEVC
 解码、多路或零拷贝管道 \\
 \end{longtable}
+}
 
 \textbf{根因}：视频编码计算量大，H.264/H.265 软件编码很快把 ARM CPU
 打满；VENC
@@ -1562,6 +1670,7 @@ CPU。VDEC 的解码计算量小得多，Python
 
 \textbf{典型场景推荐}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2857}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4286}}
@@ -1591,11 +1700,13 @@ CPU。VDEC 的解码计算量小得多，Python
 host 侧资源 \\
 \textbf{低功耗设备} & \textbf{VENC} & 硬件编码功耗远低于 CPU 全速运行 \\
 \end{longtable}
+}
 
 \textbf{多路并发估算}
 
 以 1080p@30fps 为目标帧率：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 编码器 & 单路 fps & 最多支持路数 & CPU 剩余 \\
@@ -1607,6 +1718,7 @@ CPU libx264 多线程 & 13 & \textbf{0 路}（不到 30） & 0\% \\
 \textbf{VENC H.264} & 48 & \textbf{1 路}（48/30） & 较高 \\
 \textbf{VENC H.265} & 51 & \textbf{1 路}（51/30） & 较高 \\
 \end{longtable}
+}
 
 最新单路基准显示，1080p 下 VENC 约 48-51fps，单路 30fps
 有余量，但还不足以稳定支撑 2 路
@@ -1682,6 +1794,7 @@ python samples/chapter5/venc/bench_venc.py
 
 \subsubsection{VENC 通道参数}\label{venc-params}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 参数 & 函数 & 默认 & 推荐值 \\
@@ -1714,6 +1827,7 @@ tid \\
 回调函数 & \passthrough{\lstinline!venc\_set\_channel\_desc\_callback!}
 & --- & cb \\
 \end{longtable}
+}
 
 \textbf{错误码}：0 = ACL\_SUCCESS, 507018 = 参数错误（检查 dmesg）,
 500001 = ACL\_ERROR\_FAILURE, 500004 = ACL\_ERROR\_DRV\_FAILURE
@@ -1760,6 +1874,7 @@ VDEC 对输入码流只有一个硬性要求：必须是 \textbf{Annex-B 格式}
 
 \subsubsection{典型应用场景}\label{src-book-chapter5-h52}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.4286}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5714}}@{}}
@@ -1783,6 +1898,7 @@ H.264/H.265 码流 -\textgreater{} \textbf{VDEC} -\textgreater{} NV12
 NV12 -\textgreater{} \textbf{VENC} -\textgreater{} 不同分辨率/码率的
 H.264/H.265 \\
 \end{longtable}
+}
 
 \subsubsection{与 VENC 的对称关系}\label{src-book-chapter5-h53}
 
@@ -1800,6 +1916,7 @@ VDEC: H.264/H.265 码流 -> [硬件解码] -> NV12
 
 \textbf{支持的编码类型}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 编码格式 & Profile & \passthrough{\lstinline!entype!} 值 & 实测 \\
@@ -1812,6 +1929,7 @@ H.264 / AVC & Baseline & \passthrough{\lstinline!1!} & 支持 \\
 H.264 / AVC & Main & \passthrough{\lstinline!2!} & 支持 \\
 H.264 / AVC & High & \passthrough{\lstinline!3!} & 支持 \\
 \end{longtable}
+}
 
 \begin{quote}
 实验中用 H.264 Baseline 码流测试了全部四种
@@ -1825,6 +1943,7 @@ H.264 / AVC & High & \passthrough{\lstinline!3!} & 支持 \\
 
 \textbf{支持的输出像素格式}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 格式 & \passthrough{\lstinline!out\_pic\_format!} 值 & 位深 & 说明 \\
@@ -1842,6 +1961,7 @@ NV21 4:4:4 & 6 & 8 & \\
 RGB888 & 12 & 8 & \\
 BGR888 & 13 & 8 & \\
 \end{longtable}
+}
 
 \begin{quote}
 位深 10-bit
@@ -1851,6 +1971,7 @@ BGR888 & 13 & 8 & \\
 
 \textbf{分辨率和帧率约束}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 约束项 & 值 & 说明 \\
@@ -1866,6 +1987,7 @@ BGR888 & 13 & 8 & \\
 参考帧数 & 1-5（默认 5） &
 \passthrough{\lstinline!ref\_frame\_num!}，影响解码缓冲大小 \\
 \end{longtable}
+}
 
 \begin{quote}
 实际可解码的最大分辨率受设备内存和码率限制。 310B4 配备 16GB 内存，单路
@@ -1874,6 +1996,7 @@ BGR888 & 13 & 8 & \\
 
 \textbf{输入码流约束}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5714}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.4286}}@{}}
@@ -1896,9 +2019,11 @@ PPS + IDR \\
 帧边界 & 每次 \passthrough{\lstinline!vdec\_send\_frame!}
 应发送完整的一帧（含所有 NAL 单元） \\
 \end{longtable}
+}
 
 \textbf{H.264 Level 与典型应用}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llll@{}}
 \toprule\noalign{}
 Level & 最大宏块数 & 典型分辨率@帧率 & 最大码率 \\
@@ -1914,6 +2039,7 @@ Level & 最大宏块数 & 典型分辨率@帧率 & 最大码率 \\
 5.0 & 22080 & 2560×1920@30 & 135 Mbps \\
 5.1 & 36864 & 4096×2304@30 & 240 Mbps \\
 \end{longtable}
+}
 
 \begin{quote}
 310B4 VDEC 理论上支持到 Level 5.1。 本章基准测试中，480p 使用 Level
@@ -1927,6 +2053,7 @@ Level & 最大宏块数 & 典型分辨率@帧率 & 最大码率 \\
 VDEC 与 VENC 的关键区别如下表所示（同时参考
 \hyperref[dvpp-modules]{子模块概览} 获取完整的子模块间对比）：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -1961,6 +2088,7 @@ H.264/H.265 NAL 单元} \\
 \passthrough{\lstinline!send\_skipped\_frame!} & 无 &
 \textbf{有}，用于丢帧后通知解码器 \\
 \end{longtable}
+}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -2009,6 +2137,7 @@ def vdec_callback(input_stream_desc, output_pic_desc, user_data):
 
 \subsubsection{ret\_code 错误码}\label{src-book-chapter5-h59}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 ret\_code & 含义 \\
@@ -2019,6 +2148,7 @@ ret\_code & 含义 \\
 0 & 解码成功 \\
 非 0 & 解码失败------输入码流损坏、帧边界错误或参考帧不足 \\
 \end{longtable}
+}
 
 \subsection{练习脚本走读}\label{src-book-chapter5-h61}
 
@@ -2300,6 +2430,7 @@ options 设置），所以加了 \passthrough{\lstinline!if!} 判断。
 
 \textbf{I 帧比例对性能的颠覆性影响}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1818}}
   >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1818}}
@@ -2330,6 +2461,7 @@ GOP=1（全 I 帧） & 240 fps & 410 fps & 97 fps & 68 fps &
 \textbf{GOP=30（I/P 混合）} & \textbf{17 fps} & \textbf{1349 fps} &
 \textbf{17 fps} & \textbf{307 fps} & \textbf{2K} \\
 \end{longtable}
+}
 
 \textbf{GOP 的影响是巨大的}：
 
@@ -2348,6 +2480,7 @@ GOP=1（全 I 帧） & 240 fps & 410 fps & 97 fps & 68 fps &
 
 \textbf{帧类型与性能特性}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1569}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2941}}
@@ -2375,6 +2508,7 @@ I 帧 (IDR) & \textasciitilde25 KB (GOP=30) & 帧内解码（完整） &
 P 帧 & \textasciitilde7 KB & 帧间解码（运动矢量 + 残差） &
 \textbf{固定开销主导} & 极快（数据量小） \\
 \end{longtable}
+}
 
 在 GOP=30 混合流中，P 帧占 97\%。P 帧数据量仅为 I 帧的
 \textasciitilde30\%， CPU 解码 P 帧的开销远低于 I 帧（只需解残差），而
@@ -2610,6 +2744,7 @@ CPU HEVC 解码路径把空 packet 当作 EOF。
 只打印帧率，不再打印耗时分解。若按 \passthrough{\lstinline!1000 / fps!}
 反推，H.264 低分辨率路径仍能看到明显的固定开销：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
 编码 & 640×480 & 1280×720 & 1920×1080 & 2560×1440 & 3840×2160 \\
@@ -2620,6 +2755,7 @@ CPU HEVC 解码路径把空 packet 当作 EOF。
 H.264 VDEC & 59.2ms & 59.5ms & 60.6ms & 7.5ms & 14.0ms \\
 H.265 VDEC & 3.6ms & 4.0ms & 5.1ms & 7.4ms & 13.9ms \\
 \end{longtable}
+}
 
 \begin{quote}
 \textbf{关键结论}：H.264 \textless=1080p 时，VDEC 路径稳定在约
@@ -2635,6 +2771,7 @@ DVPP 内存分配、回调线程、Queue
 
 \textbf{H.264 Baseline}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
 分辨率 & VDEC fps & CPU 单线程 & CPU 多线程 & vs 单线程 & vs 多线程 \\
@@ -2648,9 +2785,11 @@ DVPP 内存分配、回调线程、Queue
 2560×1440 & 134 & 76 & 189 & \textbf{1.76x} & 0.71x \\
 3840×2160 & 71 & 35 & 89 & \textbf{2.03x} & 0.80x \\
 \end{longtable}
+}
 
 \textbf{H.265 Main}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
 分辨率 & VDEC fps & CPU 单线程 & CPU 多线程 & vs 单线程 & vs 多线程 \\
@@ -2664,6 +2803,7 @@ DVPP 内存分配、回调线程、Queue
 2560×1440 & 135 & 23 & 47 & \textbf{5.78x} & \textbf{2.90x} \\
 3840×2160 & 72 & 10 & 21 & \textbf{7.24x} & \textbf{3.38x} \\
 \end{longtable}
+}
 
 H.264 路径下，VDEC 在 \textless=1080p 完全不具备竞争力（仅为 CPU
 单线程的 3\%\textasciitilde14\%）。 真正的单线程交叉点在
@@ -2703,6 +2843,7 @@ VDEC 的收益比 H.264 更早出现。
 
 \subsubsection{适用场景速查}\label{src-book-chapter5-h80}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1860}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2093}}
@@ -2729,6 +2870,7 @@ H.265 480p & CPU 多线程优先，VDEC 可选 & CPU 可选 & VDEC 可选 \\
 H.265 \textgreater= 720p & \textbf{VDEC 推荐} & \textbf{VDEC 推荐} &
 \textbf{VDEC 推荐} \\
 \end{longtable}
+}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -2751,6 +2893,7 @@ python samples/chapter5/vdec/vdec_minimal.py
 
 \subsubsection{VDEC 通道参数}\label{vdec-params}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 参数 & 函数 & 示例 \\
@@ -2779,6 +2922,7 @@ python samples/chapter5/vdec/vdec_minimal.py
 位深 & \passthrough{\lstinline!vdec\_set\_channel\_desc\_bit\_depth!} &
 8 \\
 \end{longtable}
+}
 
 \textbf{编码类型}：0 = H.265 Main, 1 = H.264 Baseline, 2 = H.264 Main, 3
 = H.264 High
@@ -2798,6 +2942,7 @@ Core）提供硬件加速的缩放、裁剪、色彩空间转换。前置基础�
 \textbf{VPC}（Video Pre-Processing Core）是 DVPP
 中的硬件图像处理模块。它提供三大功能：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 功能 & 说明 & 典型场景 \\
@@ -2811,6 +2956,7 @@ Core）提供硬件加速的缩放、裁剪、色彩空间转换。前置基础�
 \textbf{CSC} & 色彩空间转换 &
 YUYV-\textgreater NV12、NV12-\textgreater RGB 等 \\
 \end{longtable}
+}
 
 VPC 在 DVPP 管道中的典型位置：
 
@@ -2832,6 +2978,7 @@ USB Camera YUYV -> [VPC CSC] -> NV12 -> [VENC] -> H.264 -> WebRTC
 \subsubsection{硬件能力规格（Ascend
 310B4）}\label{src-book-chapter5-h86}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 约束项 & 值 \\
@@ -2846,6 +2993,7 @@ USB Camera YUYV -> [VPC CSC] -> NV12 -> [VENC] -> H.264 -> WebRTC
 支持的输入格式 & NV12、NV21、YUV400、YUV422、YUV444 \\
 支持的输出格式 & NV12、NV21、YUV400、YUV422、YUV444 \\
 \end{longtable}
+}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -2854,6 +3002,7 @@ USB Camera YUYV -> [VPC CSC] -> NV12 -> [VENC] -> H.264 -> WebRTC
 VPC 使用的是 \textbf{通用 DVPP 通道模型}，与 VENC/VDEC
 的专用通道有本质差异：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2609}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.5217}}
@@ -2884,6 +3033,7 @@ pic\_desc（始终是图像） \\
 回调线程 & 必须启动 & \textbf{不需要} \\
 复杂度 & 高（多线程协调） & 低（同步等待即可） \\
 \end{longtable}
+}
 
 \begin{quote}
 \textbf{310B
@@ -3109,6 +3259,7 @@ acl.rt.destroy_stream(stream)
 
 \subsubsection{与项目的对应关系}\label{src-book-chapter5-h100}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 文件 & 角色 \\
@@ -3121,6 +3272,7 @@ acl.rt.destroy_stream(stream)
 \passthrough{\lstinline!bench\_vpc.py!} & 基准测试------VPC resize vs
 CPU cv2.resize 性能对比 \\
 \end{longtable}
+}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -3141,6 +3293,7 @@ VPC Resize 与 VENC 不同------\textbf{不是所有分辨率都远超 CPU}。VP
 CPU 在低分辨率下互有胜负（720p VPC 赢，1080p CPU 赢），这是 Stream
 同步的固定开销与硬件加速之间的拉锯：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
 分辨率 & 像素数 & VPC fps & CPU fps & 加速比 & 推荐 \\
@@ -3156,6 +3309,7 @@ CPU 在低分辨率下互有胜负（720p VPC 赢，1080p CPU 赢），这是 St
 3840×2160 & 8.3M & \textbf{110} & \textbf{53} & \textbf{2.07x} &
 \textbf{VPC} \\
 \end{longtable}
+}
 
 \textbf{从 2K（2560×1440）开始 VPC
 稳定领先}（1.6×\textasciitilde2.1×）。低分辨率下互有胜负------VPC
@@ -3165,6 +3319,7 @@ CPU 在低分辨率下互有胜负（720p VPC 赢，1080p CPU 赢），这是 St
 
 \textbf{VPC vs VENC vs VDEC 性能模式对比}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1277}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.4043}}
@@ -3193,6 +3348,7 @@ CPU（1.9×\textasciitilde2.2×） & Python 回调调度 \\
 \textbf{VPC} & 与 CPU 互有胜负（0.5×\textasciitilde1.2×） & 领先
 CPU（1.6×\textasciitilde2.1×） & Stream 同步开销 \\
 \end{longtable}
+}
 
 \begin{quote}
 VPC 的固定开销比 VDEC 小得多（Stream 同步比回调线程轻量），因此即使在
@@ -3325,6 +3481,7 @@ acl.media.dvpp_set_roi_config(crop_area, left, right, top, bottom)
 
 \subsubsection{典型场景}\label{src-book-chapter5-h111}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2857}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4286}}
@@ -3350,6 +3507,7 @@ AI 推理前处理 & VPC resize + AIPP CSC & Resize-\textgreater AI Core
 多路视频并发（\textgreater4 路） & \textbf{VPC 必须} & CPU 做多路 resize
 会占满所有核 \\
 \end{longtable}
+}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -3375,6 +3533,7 @@ python samples/chapter5/vpc/bench_vpc.py
 
 \textbf{VPC 通道创建}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 参数 & API & 值 \\
@@ -3389,9 +3548,11 @@ ret=0 \\
 创建 Stream & \passthrough{\lstinline!acl.rt.create\_stream()!} &
 ret=0 \\
 \end{longtable}
+}
 
 \textbf{VPC 操作 API}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 操作 & API & 310B 支持 \\
@@ -3406,6 +3567,7 @@ ret=0 \\
 色域转换 & \passthrough{\lstinline!dvpp\_vpc\_convert\_color\_async!} &
 不支持 \\
 \end{longtable}
+}
 
 \textbf{像素格式}（\passthrough{\lstinline!dvpp\_set\_pic\_desc\_format!}）：1
 = NV12 (YUV420SP), 7 = YUYV (YUV422 interleaved), 12 = RGB888, 13 =
@@ -3436,6 +3598,7 @@ JPEGD (JPEG Decoder):  JPEG 码流 -> [硬件解码] -> NV12
 VENC 输出 H.264 码流，但 JPEGE 输出的是\textbf{独立的 JPEG
 图片}------两者有本质不同：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -3458,10 +3621,12 @@ VENC
 编码参数 & quality（1-100） & GOP、码率、帧率、profile \\
 用途 & 截图、快照、缩略图 & 实时视频传输 \\
 \end{longtable}
+}
 
 \subsubsection{硬件能力规格（Ascend
 310B4）}\label{src-book-chapter5-h117}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 & JPEGE & JPEGD \\
@@ -3476,6 +3641,7 @@ VENC
 质量范围 & 1-100 & --- \\
 编码吞吐 & 1080p@256fps & 1080p@512fps \\
 \end{longtable}
+}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -3483,6 +3649,7 @@ VENC
 
 JPEGE/JPEGD 使用与 VPC 相同的\textbf{通用 dvpp 通道 + Stream 同步}模型：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2069}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3793}}
@@ -3506,6 +3673,7 @@ JPEGE/JPEGD
 输出描述 & 图片或码流描述符 & JPEGE: \textbf{裸内存 + size 指针}；JPEGD:
 pic\_desc \\
 \end{longtable}
+}
 
 \begin{quote}
 JPEGE 的输出不是
@@ -3740,6 +3908,7 @@ quality=85 下通常只有几十 KB。
 
 \subsubsection{与项目的对应关系}\label{src-book-chapter5-h136}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 文件 & 角色 \\
@@ -3750,11 +3919,13 @@ quality=85 下通常只有几十 KB。
 \passthrough{\lstinline!jpeg\_minimal.py!} & 学习用途------裸 API
 编解码闭环 \\
 \end{longtable}
+}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
 \subsection{场景推荐}\label{src-book-chapter5-h137}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 场景 & 推荐方案 \\
@@ -3769,6 +3940,7 @@ VPC resize） \\
 照片缩略图生成 & VPC resize -\textgreater{} JLEGE 编码（全硬件管道） \\
 追求最小 JPEG 文件 & 裸 API + 精细调 quality 参数 \\
 \end{longtable}
+}
 
 \subsubsection{全硬件截图管道}\label{src-book-chapter5-h138}
 
@@ -3831,6 +4003,7 @@ actual\_size。
 
 \textbf{JPEGE 编码流程}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3529}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2941}}
@@ -3861,9 +4034,11 @@ API
 同步等待 & \passthrough{\lstinline!acl.rt.synchronize\_stream(stream)!}
 & --- \\
 \end{longtable}
+}
 
 \textbf{JPEGD 解码流程}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3529}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2941}}
@@ -3892,6 +4067,7 @@ NV12 \\
 同步等待 & \passthrough{\lstinline!acl.rt.synchronize\_stream(stream)!}
 & --- \\
 \end{longtable}
+}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -3913,6 +4089,16 @@ WebRTC 综合案例将本章前面学习的 VENC、JPEGD、NV12 stride 对齐和
 RTP/WebRTC；浏览器只负责接收和显示。当前实现同时支持 H.264 和 H.265/HEVC
 两条编码路径。
 
+\textbf{运行前先确认系统组合}：H.264 硬件编码/WebRTC 路径要求上一节的
+\passthrough{\lstinline!20241128!} 旧系统、旧版固件和 CANN
+8.0+。当前已验证两组组合：同一系统从 CANN 7.0 分别升级到 CANN 8.0 和
+CANN 8.3，WebRTC 性能结果一致；这次增加 CANN 8.0
+验证不会改变此前性能结论。\passthrough{\lstinline!20250925!}
+最新系统的配套固件在 CANN 8.0、8.5、9.0 下均导致 H.264 VENC
+失败，服务应直接报告错误，等待 香橙派发布固件更新。H.265、纯
+\passthrough{\lstinline!demo!}/CPU 路径的结果也必须单独记录，不能 替代
+H.264 VENC 验证。
+
 HTTP \passthrough{\lstinline!POST /offer!}
 只是信令入口，不在媒体路径里。真正的媒体链路是：
 
@@ -3922,6 +4108,7 @@ Ascend 310B frame source -> AscendVideoTrack -> aiortc encoder -> RTP/WebRTC -> 
 
 项目支持三条视频源路径和两种编码格式：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2093}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2791}}
@@ -3953,16 +4140,17 @@ MJPEG 解码
 (PyAV) & PyAV 转 \passthrough{\lstinline!nv12!} & CANN VENC H.264 &
 只替换编码器的对照组 \\
 \passthrough{\lstinline!--source dvpp\_camera --video-codec h264!} &
-DVPP JPEGD & \passthrough{\lstinline!nv12!} & CANN VENC H.264 &
-当前最稳定的 1080p60 路径 \\
+DVPP JPEGD & \passthrough{\lstinline!nv12!} & CANN VENC H.264 & 历史
+1080p60 路径；当前需先通过兼容性验证 \\
 \passthrough{\lstinline!--source dvpp\_camera --video-codec h265!} &
 DVPP JPEGD & \passthrough{\lstinline!nv12!} & CANN VENC H.265 & HEVC
 路径，要求浏览器支持 WebRTC H.265 \\
 \end{longtable}
+}
 
 \passthrough{\lstinline!dvpp\_camera!} 模式下硬件编码自动启用，因为
 JPEGD 产出的 NV12 帧最适合直接交给 VENC。H.264 是默认编码格式；H.265
-只走 CANN VENC，不提供 CPU H.265 fallback。
+只走 CANN VENC，CANN 或 VENC 失败时该模式直接报告错误。
 
 \subsection{目录结构与角色分工}\label{src-book-chapter5-h147}
 
@@ -4041,7 +4229,7 @@ def _prefer_video_codec_for_sender(pc, sender, mime_type):
 \passthrough{\lstinline!H264Encoder!} 替换为
 \passthrough{\lstinline!CannH264Encoder!}。对于
 \passthrough{\lstinline!dvpp\_camera!} 模式下产出的 NV12 帧，VENC
-是必要条件；否则需要额外做格式转换再交给 libx264。
+是必要条件；CANN 或 VENC 失败时直接报告错误。
 
 \textbf{H.265 能力注册}：aiortc 1.14.0 默认没有完整的 H.265
 编码器路径。服务端在 \passthrough{\lstinline!--video-codec h265!}
@@ -4096,8 +4284,7 @@ MJPEG 采集 -\textgreater{} PyAV CPU JPEG 解码 -\textgreater{} RGB
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  V4L2 采集 MJPEG 码流（优先使用
-  \passthrough{\lstinline!V4l2RawCapture!} 直采，失败降级到 PyAV）
+  V4L2 通过 \passthrough{\lstinline!V4l2RawCapture!} 直采 MJPEG 码流
 \item
   \passthrough{\lstinline!DvppJpegDecoder!} 硬件解码为 NV12（含 stride
   对齐）
@@ -4107,14 +4294,10 @@ MJPEG 采集 -\textgreater{} PyAV CPU JPEG 解码 -\textgreater{} RGB
   \passthrough{\lstinline!CannH265Encoder!} 直通编码
 \end{enumerate}
 
-\textbf{V4L2
-双后端策略}：\passthrough{\lstinline!\_init\_dvpp\_camera()!} 优先尝试
+\textbf{V4L2 后端策略}：\passthrough{\lstinline!dvpp\_camera!} 只使用
 \passthrough{\lstinline!v4l2\_raw.py!}（直接 ioctl +
-mmap，帧率更高），失败时降级到
-\passthrough{\lstinline!v4l2\_capture.py!}（基于
-PyAV）。两套后端提供相同的 \passthrough{\lstinline!read(timeout)!}
-接口，上层的 \passthrough{\lstinline!\_camera\_read()!}
-不需要知道用哪个。
+mmap）；该后端或摄像头初始化失败时直接报告错误。需要 PyAV CPU
+解码时，应显式选择 \passthrough{\lstinline!usb\_camera!}。
 
 \textbf{性能日志}：\passthrough{\lstinline!recv()!} 每 150 帧打印一次
 \passthrough{\lstinline!Track FPS!}，方便在设备端直接观察链路帧率；\passthrough{\lstinline!\_camera\_read()!}
@@ -4155,7 +4338,7 @@ BGR-\textgreater NV12 转换。旧版依赖 OpenCV
 \passthrough{\lstinline!cv2.cvtColor!}，现在完全使用 NumPy
 整数运算（ITU-R BT.601 转换公式），消除了 OpenCV 依赖。在
 \passthrough{\lstinline!dvpp\_camera!} 模式下此函数不会被调用（NV12 已由
-JPEGD 产出）；仅在非 NV12 帧走硬件编码时作为回退路径。
+JPEGD 产出）；非 NV12 帧走硬件编码时，它负责输入格式转换。
 
 \textbf{\passthrough{\lstinline!CannH264Encoder!}} --- 继承 aiortc 的
 \passthrough{\lstinline!H264Encoder!}，只覆盖
@@ -4204,19 +4387,17 @@ JPEGD 产出）；仅在非 NV12 帧走硬件编码时作为回退路径。
   \passthrough{\lstinline!src\_rate!}
   参数。当实际帧率因采集链路抖动而变化时，VENC 的码率控制能跟随调整。
 \item
-  \textbf{CANN
-  不可用时自动回退}：\passthrough{\lstinline!\_CANN\_READY!} 为 False
-  时走 \passthrough{\lstinline!super().\_encode\_frame()!}（CPU
-  libx264），无缝降级。
+  \textbf{CANN/VENC 失败即终止}：\passthrough{\lstinline!\_CANN\_READY!}
+  为 False、通道创建失败或编码失败时抛出错误；硬件路径不会切换到
+  \passthrough{\lstinline!super().\_encode\_frame()!}。
 \end{itemize}
 
 \textbf{\passthrough{\lstinline!CannH265Encoder!}} --- aiortc 兼容的
 H.265 编码器。它复用
 \passthrough{\lstinline!CannVenc!}，但创建通道时使用
 \passthrough{\lstinline!ENTYPE\_H265\_MAIN = 0!}，输出 HEVC Annex-B
-码流。与 H.264 路径不同，H.265 路径不继承 aiortc 的 H.264 RTP
-封装，也不提供 CPU fallback；CANN 初始化或 VENC 创建失败应视为 H.265
-模式不可用。
+码流。H.265 路径不继承 aiortc 的 H.264 RTP 封装；CANN 初始化或 VENC
+创建失败应视为 H.265 模式不可用。
 
 \subsubsection{\texorpdfstring{\texttt{hevc.py} --- H.265 RTP
 分包}{hevc.py --- H.265 RTP 分包}}\label{src-book-chapter5-h152}
@@ -4279,8 +4460,10 @@ PyAV 路径（1080p 约 15fps），直接 ioctl 路径可达到摄像头原生�
 \begin{quote}
 \passthrough{\lstinline!v4l2\_raw.py!} 中的
 \passthrough{\lstinline!v4l2\_buffer!} 结构体布局（88 字节）是针对
-aarch64 Linux 的硬编码值。在 x86-64 机器上此模块不可用，自动降级到
-PyAV。
+aarch64 Linux 的硬编码值。在 x86-64
+机器上此模块不可用，\passthrough{\lstinline!dvpp\_camera!}
+硬件路径会直接报告环境错误；需要软件基线时请显式选择
+\passthrough{\lstinline!usb\_camera!}。
 \end{quote}
 
 \subsection{性能实测（1920×1080）}\label{src-book-chapter5-h155}
@@ -4289,8 +4472,21 @@ PyAV。
 \passthrough{\lstinline!311!}（\passthrough{\lstinline!orangepiaipro!}）上
 2026-05-26 的日志。测试请求为
 \passthrough{\lstinline!1920×1080@60!}，浏览器接收端通过 WebRTC
-接收视频流。
+接收视频流；这些性能数据对应同一 \passthrough{\lstinline!20241128!}
+旧系统/旧固件，CANN 7.0 分别升级到 8.0 和 8.3
+的两组验证结果，结论一致，不能外推到 \passthrough{\lstinline!20250925!}
+系统的 H.264 VENC 路径。本次
+\passthrough{\lstinline!20241128 + CANN 8.0!} 复测另外通过了 ACL、最小
+VENC 和 5 秒 WebRTC E2E；后续 CANN 版本仍待继续验证。
 
+本次板端 E2E 的关键日志为
+\passthrough{\lstinline!CANN VENC channel created ... entype=1!}，随后连续输出
+\passthrough{\lstinline!VENC encode frame!}；测试结果为
+\passthrough{\lstinline!E2E\_TEST: PASS!}。这证明本次运行实际使用了
+H.264 VENC，不是 CPU 编码；但测试分辨率为 640×480、持续 5 秒，不能替代
+1080p60 的完整性能测试。
+
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1875}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1875}}
@@ -4314,17 +4510,18 @@ Track FPS
 \passthrough{\lstinline!V4L2 MJPEG -> CPU JPEG decode -> RGB -> libx264!}
 & 约 \passthrough{\lstinline!15 fps!} & CPU JPEG 解码单帧约
 \passthrough{\lstinline!20\~32ms!}，无法支撑 60fps \\
-H.264 硬编 &
+历史 H.264 硬编 &
 \passthrough{\lstinline!V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.264!}
-& 基本稳定 \passthrough{\lstinline!60 fps!} & JPEGD 约
+& 基本稳定 \passthrough{\lstinline!60 fps!} & 历史日志中的 JPEGD 约
 \passthrough{\lstinline!4.9\~9.5ms!}，VENC 约
 \passthrough{\lstinline!6.3\~6.5ms!} \\
-H.265 硬编 &
+历史 H.265 硬编 &
 \passthrough{\lstinline!V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.265!}
 & 通常 \passthrough{\lstinline!57\~59 fps!}，个别样本掉到
-\passthrough{\lstinline!35 fps!} & 码流更小，但本次日志中稳定性弱于
+\passthrough{\lstinline!35 fps!} & 码流更小，但历史日志中稳定性弱于
 H.264 \\
 \end{longtable}
+}
 
 \textbf{关键结论}：
 
@@ -4341,9 +4538,9 @@ H.264 \\
   VENC} 连用：JPEGD 输出 stride 对齐的 NV12，VENC 直接消费，中间不需要
   RGB 转换。
 \item
-  当前这台 \passthrough{\lstinline!311!} 的稳定 1080p60 优先选
-  H.264。H.265 码流更小，但 WebRTC HEVC 接收能力、SDP
-  协商和端到端稳定性更敏感。
+  两组已验证的 CANN 软件组合在这台 \passthrough{\lstinline!311!}
+  上性能结果一致，均优先选 H.264；H.265 码流更小，但 WebRTC HEVC
+  接收能力、SDP 协商和端到端稳定性更敏感。
 \end{itemize}
 
 浏览器有时会显示 \passthrough{\lstinline!1920×1088!}，这是 VENC
@@ -4354,9 +4551,16 @@ H.264 \\
 
 服务端（昇腾 310B）需要的依赖：
 
-\begin{longtable}[]{@{}ll@{}}
+{ % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
 \toprule\noalign{}
-依赖 & 用途 \\
+\begin{minipage}[b]{\linewidth}\raggedright
+依赖
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+用途
+\end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
@@ -4367,9 +4571,12 @@ H.264 \\
 \passthrough{\lstinline!aiortc!} & Python 侧 WebRTC 实现 \\
 \passthrough{\lstinline!av!} (PyAV) & VideoFrame 构造 + V4L2 采集 \\
 \passthrough{\lstinline!numpy!} & 演示帧生成和 NV12 数据操作 \\
-CANN 8.3.RC1 & ACL Python API（硬件编码必需） \\
+CANN 8.0+（已验证 8.0、8.3；8.5/9.0 待后续扩展） & ACL Python
+API（硬件编码必需；须配合 \passthrough{\lstinline!20241128!}
+旧系统/旧固件） \\
 \passthrough{\lstinline!pytest!} & 测试框架（仅开发） \\
 \end{longtable}
+}
 
 \begin{quote}
 旧版依赖的 \passthrough{\lstinline!opencv-python-headless!}
@@ -4384,18 +4591,21 @@ CANN 8.3.RC1 & ACL Python API（硬件编码必需） \\
   \textbf{DVPP 模块不能孤立优化}------只用 VENC 而保留 CPU JPEG
   解码，链路仍会卡在 CPU 解码阶段。DVPP 的收益需要全链路协同才能兑现
 \item
-  \textbf{JPEGD + VENC 是 1080p 实时推流的关键组合}------纯软件路径约
+  \textbf{JPEGD + VENC 是 1080p 实时推流的关键组合}------同一
+  \passthrough{\lstinline!20241128!} 旧系统/旧固件下，CANN 7.0 升级到
+  8.0 与升级到 8.3 的 WebRTC 性能结果一致：纯软件路径约
   \passthrough{\lstinline!15 fps!}，全硬件 H.264 管道可以稳定到
-  \passthrough{\lstinline!60 fps!}
+  \passthrough{\lstinline!60 fps!}；\passthrough{\lstinline!20250925!}
+  系统的 H.264 VENC 失败时不能使用这条结论
 \item
   \textbf{NV12 stride 对齐的零拷贝交付}------JPEGD 输出的 stride 对齐
   NV12 直接匹配 VENC \passthrough{\lstinline!pre\_padded!}
   输入要求，中间不经过任何 CPU 数据重排
 \item
-  \textbf{H.264 与 H.265 的工程取舍不同}------H.264 是当前最稳的 1080p60
-  WebRTC 路径；H.265 只走 CANN VENC，依赖浏览器暴露
-  \passthrough{\lstinline!video/H265!} WebRTC 能力，且本次 311
-  实测中有偶发掉帧
+  \textbf{H.264 与 H.265 的工程取舍不同}------两组已验证 CANN 软件组合中
+  H.264 均是稳定的 1080p60 WebRTC 路径；H.265 只走 CANN
+  VENC，依赖浏览器暴露 \passthrough{\lstinline!video/H265!} WebRTC
+  能力，且历史日志中有偶发掉帧。后续 CANN 版本仍需分别验证
 \item
   \textbf{码率在建连时确定}------页面目标码率会影响本次 VENC
   通道创建，当前不支持在线热调

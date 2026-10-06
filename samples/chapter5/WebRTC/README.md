@@ -34,7 +34,8 @@ HTTP `POST /offer` 只是信令，不在媒体路径里。
 编码格式支持：
 
 - `h264`
-  默认格式。可走纯 CPU，也可走 CANN VENC 硬编
+  默认格式；`demo`/`usb_camera` 是显式软件模式，`--hardware-encode` 和
+  `dvpp_camera` 要求 CANN VENC 硬件编码成功
 - `h265`
   只走 CANN VENC 硬编，要求浏览器具备 WebRTC HEVC 接收能力
 
@@ -87,6 +88,17 @@ export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/li
 export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:$PYTHONPATH"
 ```
 
+硬件路径的板端前置条件是 Orange Pi AI Pro 日期戳 `20241128` 的系统及其配套
+固件，并在此基础上使用 CANN 8.0 或更高版本。本目录已验证 CANN 7.0 分别升级
+到 CANN 8.0 和 CANN 8.3，两组使用相同系统日期戳，WebRTC 性能结果一致。本目录
+的硬件编码路径是严格的：
+CANN 导入、VENC 通道创建或编码失败都会终止该路径，不会改用软件编码或合成
+演示帧。
+
+日期戳为 `20250925` 的最新系统，其配套固件在 CANN 8.0、8.5 和 9.0 下均无法
+使用 H.264 VENC；该问题归因于固件，等待香橙派更新。在修复固件发布前，不要
+通过更换 CANN 版本来规避该问题。
+
 ## 快速开始
 
 ### 1. 启动纯 CPU 演示路径
@@ -118,6 +130,8 @@ python server.py --source dvpp_camera --video-codec h264 --host 0.0.0.0 --port 8
 `dvpp_camera` 会自动走：
 
 `V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.264`
+
+该命令要求上述硬件链路全部初始化成功；任一环节失败都会报告错误并结束连接。
 
 如果你想保留 `usb_camera` 输入，但只把编码切成 H.264 硬编，也可以：
 
@@ -184,7 +198,16 @@ H.265 的失败时机不是“服务端启动失败”，而是“浏览器发�
 
 README 只保留运行和排障说明。
 
-311（`orangepiaipro`）上 2026-05-26 的 1080p60 实测数据、H.264/H.265 对比和链路瓶颈分析已经整理到教程正文：
+历史 311（`orangepiaipro`）上 2026-05-26 的 1080p60 实测数据、H.264/H.265 对比和链路瓶颈分析已经整理到教程正文。
+
+本次 `20241128 + CANN 8.0.0` 板端验证结果（与此前同系统的 CANN 8.3 WebRTC
+性能结论一致）：
+
+- `check_cann.py`：`ACL init OK`，SoC 为 `Ascend310B4`，VENC API 可用
+- `venc_minimal.py`：H.264/H.265 通道创建和关键帧输出均通过
+- `test_dvpp_pipeline.py`：640×480、30fps、5 秒 WebRTC E2E 通过；日志确认 `entype=1` 的 CANN VENC 编码帧
+- 全分辨率性能扫描：当前新增的是 CANN 8.0 软件版本验证；性能结论沿用同系统
+  CANN 8.3 结果，不把系统固件变化与 CANN 版本变化混为一谈
 
 - [src/book/chapter5.md：集成实战 WebRTC 推流性能对比](../../../src/book/chapter5.md#集成实战webrtc-推流性能对比)
 
@@ -307,11 +330,12 @@ v4l2-ctl -d /dev/video0 \
 - `numpy`
 - `v4l-utils`
 - `pytest`
-- `CANN 8.3`
+- `CANN 8.0+`（已验证 8.0、8.3；8.5/9.0 待后续扩展）
 
 ## 一句话建议
 
-如果你现在只是想在 310B 上稳定地把 1080p60 推到浏览器，先用：
+如果你现在只是想在 310B 上稳定地把 1080p60 推到浏览器，请使用
+`20241128` 系统/旧版固件，并选择已验证的 CANN 8.0 或 CANN 8.3：
 
 ```bash
 python server.py --source dvpp_camera --video-codec h264 --host 0.0.0.0 --port 8080

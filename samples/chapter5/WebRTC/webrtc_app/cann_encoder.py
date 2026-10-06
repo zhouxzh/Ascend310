@@ -572,9 +572,9 @@ class CannH264Encoder(H264Encoder):
         self, frame: av.VideoFrame, force_keyframe: bool
     ) -> Iterator[bytes]:
         if not _CANN_READY:
-            # Fallback to CPU libx264
-            yield from super()._encode_frame(frame, force_keyframe)
-            return
+            raise RuntimeError(
+                "CANN ACL is required for H264 VENC encoding"
+            )
 
         fps = self._estimate_fps(frame)
         self._ensure_venc(frame.width, frame.height, fps=fps)
@@ -605,11 +605,11 @@ class CannH264Encoder(H264Encoder):
             encoded = self._venc.encode(nv12, force_keyframe=force_keyframe, pre_padded=pre_padded)
             encode_ms = (time.perf_counter() - t0) * 1000
         except RuntimeError as exc:
-            logger.error("CANN VENC encode failed: %s, falling back to libx264", exc)
-            self._venc.destroy()
+            logger.error("CANN VENC H264 encode failed: %s", exc)
+            if self._venc is not None:
+                self._venc.destroy()
             self._venc = None
-            yield from super()._encode_frame(frame, force_keyframe)
-            return
+            raise RuntimeError("CANN VENC H264 encoding failed") from exc
 
         if self._perf_log_count < 5:
             logger.info(

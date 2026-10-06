@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import fractions
 import io
@@ -92,71 +94,41 @@ class AscendVideoTrack(MediaStreamTrack):
     def _init_dvpp_camera(self, camera_device: str | int) -> None:
         """Initialize V4L2 MJPEG capture + DVPP JPEGD hardware decoder."""
         if not _DVPP_READY or DvppJpegDecoder is None:
-            source_logger.warning(
-                "DVPP/CANN not available, falling back to demo source"
+            raise RuntimeError(
+                "DVPP/CANN is required for dvpp_camera"
             )
-            self.source_type = "demo"
-            self._init_demo()
-            return
 
         device_path = (
             str(camera_device) if not str(camera_device).isdigit()
             else f"/dev/video{int(camera_device)}"
         )
 
-        # Try raw V4L2 first (24fps), fall back to PyAV (~15fps)
-        capture_impl = None
-        if _V4l2RawCapture is not None:
-            try:
-                capture_impl = _V4l2RawCapture(
-                    device=device_path,
-                    width=self.width,
-                    height=self.height,
-                    fps=self.fps,
-                )
-                capture_impl.start()
-                source_logger.info("Using direct V4L2 ioctl capture backend")
-            except Exception as exc:
-                source_logger.info("Raw V4L2 capture unavailable: %s, trying PyAV", exc)
-                capture_impl = None
-
-        if capture_impl is None and V4l2MjpegCapture is not None:
-            try:
-                capture_impl = V4l2MjpegCapture(
-                    device=device_path,
-                    width=self.width,
-                    height=self.height,
-                    fps=self.fps,
-                )
-                capture_impl.start()
-                source_logger.info("Using PyAV V4L2 capture backend")
-            except Exception as exc:
-                source_logger.warning(
-                    "Cannot open USB camera device=%s: %s, "
-                    "falling back to demo source", device_path, exc)
-                self.source_type = "demo"
-                self._init_demo()
-                return
-
-        if capture_impl is None:
-            source_logger.warning(
-                "No V4L2 capture backend available, falling back to demo source")
-            self.source_type = "demo"
-            self._init_demo()
-            return
+        if _V4l2RawCapture is None:
+            raise RuntimeError(
+                "Direct V4L2 capture backend is required for dvpp_camera"
+            )
+        capture_impl = _V4l2RawCapture(
+            device=device_path,
+            width=self.width,
+            height=self.height,
+            fps=self.fps,
+        )
+        try:
+            capture_impl.start()
+        except Exception as exc:
+            raise RuntimeError(
+                f"Direct V4L2 capture failed for {device_path}"
+            ) from exc
+        source_logger.info("Using direct V4L2 ioctl capture backend")
 
         self._capture = capture_impl
 
         try:
             self._jpegd = DvppJpegDecoder()
         except Exception as exc:
-            source_logger.warning(
-                "Cannot create DVPP JPEGD decoder: %s, falling back to demo source", exc)
             self._capture.stop()
             self._capture = None
-            self.source_type = "demo"
-            self._init_demo()
-            return
+            raise RuntimeError("DVPP JPEGD initialization failed") from exc
 
         self.source_name = DVPP_SOURCE_NAME
         actual_w = self._capture.width
@@ -178,12 +150,9 @@ class AscendVideoTrack(MediaStreamTrack):
     def _init_usb_camera(self, camera_device: str | int) -> None:
         """Initialize V4L2 MJPEG capture with CPU decode for software baseline."""
         if V4l2MjpegCapture is None:
-            source_logger.warning(
-                "PyAV V4L2 capture is not available, falling back to demo source"
+            raise RuntimeError(
+                "PyAV V4L2 capture is required for usb_camera"
             )
-            self.source_type = "demo"
-            self._init_demo()
-            return
 
         device_path = (
             str(camera_device) if not str(camera_device).isdigit()
@@ -199,14 +168,7 @@ class AscendVideoTrack(MediaStreamTrack):
             )
             capture_impl.start()
         except Exception as exc:
-            source_logger.warning(
-                "Cannot open USB camera device=%s: %s, falling back to demo source",
-                device_path,
-                exc,
-            )
-            self.source_type = "demo"
-            self._init_demo()
-            return
+            raise RuntimeError(f"Cannot open USB camera device={device_path}") from exc
 
         self._capture = capture_impl
         self.source_name = USB_SOURCE_NAME

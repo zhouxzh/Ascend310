@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import asyncio
 import logging
@@ -381,7 +383,7 @@ def parse_args() -> argparse.Namespace:
         "--hardware-encode",
         action="store_true",
         default=os.environ.get("WEBCAM_HARDWARE_ENCODE", "").lower() in ("1", "true", "yes"),
-        help="Use CANN VENC hardware H264 encoding instead of CPU libx264.",
+        help="Require CANN VENC hardware H264 encoding.",
     )
     parser.add_argument(
         "--video-codec",
@@ -434,10 +436,9 @@ def get_local_ip() -> str:
 def _patch_h264_encoder():
     """Replace aiortc H264Encoder with CANN VENC encoder."""
     if not cann_encoder._try_import_cann():
-        app_logger.warning(
-            "CANN ACL not available, H264 encoding will fall back to CPU libx264"
+        raise RuntimeError(
+            "CANN ACL is required for H264 hardware encoding"
         )
-        return False
     import aiortc.codecs as codecs_module
     import aiortc.codecs.h264 as h264_module
     h264_module.H264Encoder = CannH264Encoder

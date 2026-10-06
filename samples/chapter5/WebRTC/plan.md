@@ -15,7 +15,8 @@ When H.265 is selected:
 - The server negotiates only `video/H265`.
 - Browser offers without `video/H265` are rejected with a clear error.
 - CANN/VENC failures are fatal for the H.265 path.
-- No H.264 fallback and no CPU encoder fallback are used.
+- H.264 and H.265 hardware paths are fail-closed: CANN/VENC failures terminate
+  the selected hardware path.
 
 ## Runtime Assumptions
 
@@ -26,6 +27,11 @@ When H.265 is selected:
   `/home/HwHiAiUser/.conda/envs/npu/bin/python`
 - CANN environment:
   `source /usr/local/Ascend/ascend-toolkit/set_env.sh`
+- WebRTC VENC validation uses the same Orange Pi AI Pro `20241128` system and
+  matching old firmware for both upgrade paths: CANN 7.0 -> 8.0 and CANN 7.0
+  -> 8.3. The observed performance conclusions are the same. The `20250925`
+  system firmware fails H.264 VENC with CANN 8.0, 8.5, and 9.0; this is a
+  firmware issue pending an Orange Pi update, not a CANN-version workaround.
 - Browser must support WebRTC HEVC and expose `video/H265` in
   `RTCRtpReceiver.getCapabilities("video")`.
 
@@ -190,7 +196,7 @@ Browser validation:
   - H.265 codec preference applied,
   - VENC `entype=0`,
   - ICE reaches connected/completed,
-  - no H.264 fallback.
+  - H.264/H.265 hardware encoding remains selected.
 
 ## Phase 8: Failure and Reconnect Tests
 
@@ -198,7 +204,7 @@ Required tests:
 
 - Unsupported browser: page shows H.265 unsupported and does not call `/offer`.
 - Malformed or incompatible offer: server returns HTTP 400.
-- CANN initialization failure: server H.265 mode fails, with no H.264 fallback.
+- CANN initialization failure: the selected hardware mode fails before serving media.
 - Reconnect: old peer connection and VENC channel are released.
 - `dvpp_camera`: NV12 remains direct path; no RGB conversion is introduced.
 

@@ -304,10 +304,36 @@ VENC 的输入格式必须是 **NV12**（YUV420SP）。详见 [NV12 格式](#nv1
 
 #### 软件 {#src-book-chapter5-h17}
 
-- **CANN 版本**：8.3.RC1
-- **安装路径**：`/usr/local/Ascend/ascend-toolkit/8.3.RC1/`
+- **CANN 版本**：8.0.0、8.3.RC1（均由 CANN 7.0 升级，WebRTC 性能结果一致）
+- **安装路径**：当前板端为 `/usr/local/Ascend/ascend-toolkit/8.0.0/`；8.3 使用对应版本目录
 - **Python API**：`/usr/local/Ascend/ascend-toolkit/latest/python/site-packages/acl/`
 - **动态库**：`/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/`
+
+#### Orange Pi AI Pro 系统与固件兼容性 {#venc-system-firmware-compatibility}
+
+> **重要前置条件（板端实测，结论范围有限）**：日期戳为 `20250925` 的
+> Orange Pi AI Pro 最新系统镜像携带的固件，根据板端实测记录会导致 **VENC H.264
+> 硬件编码失败**（`observed-fail`）。这是该系统/固件组合的兼容性问题，不能
+> 仅凭此结果推断 310B VENC 或所有新系统均“不支持”。
+
+要复现本章的 VENC H.264 示例和 WebRTC H.264 硬件编码路径，应使用日期戳为
+`20241128` 的旧版系统镜像，并保留该镜像配套的旧版固件；然后在此基础上将
+CANN 7.0 升级到 **CANN 8.0 或更高版本**。当前 WebRTC 已验证的两组软件
+组合如下；两组测试使用相同的 `20241128` 系统和配套旧版固件，性能结果一致：
+
+| 系统/固件 | CANN 升级路径 | WebRTC H.264 VENC | 性能结论 |
+| --- | --- | --- | --- |
+| `20241128` 旧系统/旧固件 | CANN 7.0 -> CANN 8.0 | `observed-pass` | 与 CANN 8.3 结果一致 |
+| `20241128` 旧系统/旧固件 | CANN 7.0 -> CANN 8.3 | `observed-pass` | 与 CANN 8.0 结果一致 |
+
+因此，本节此前记录的性能结果不因 CANN 8.0 新增验证而改变；CANN 8.0
+验证只是对原有 WebRTC 结论增加了一组软件版本证据。后续还会继续测试更多
+CANN 版本，目前不能把未测试版本写成已验证。
+
+针对日期戳为 `20250925` 的最新系统，现有测试显示 H.264 VENC 在 CANN 8.0、
+CANN 8.5 和 CANN 9.0 下均无法使用。该失败归因于系统配套固件，而不是
+CANN 版本或 API 参数；在香橙派发布修复固件前，应继续使用 `20241128` 旧系统
+和旧版固件。
 
 #### 环境变量 {#src-book-chapter5-h18}
 
@@ -784,21 +810,26 @@ h264_module.H264Encoder = YourCannEncoder
 - `_split_bitstream()` -> Annex-B -> NAL 分割 **[继承]**
 - 其他全部继承
 
-#### 回退机制 {#src-book-chapter5-h41}
+#### 失败策略 {#src-book-chapter5-h41}
 
-CANN 不可用时自动回退到 libx264：
+H.264 硬件路径是严格的 CANN VENC 路径。CANN 不可用、VENC 通道创建失败或
+编码失败时，服务必须报告错误并结束硬件路径；不能改用 `libx264`，也不能用
+合成帧掩盖 DVPP/JPEGD 初始化失败：
 
 ```python
 class CannH264Encoder(H264Encoder):
     def _encode_frame(self, frame, force_keyframe):
         if not _CANN_READY:
-            yield from super()._encode_frame(frame, force_keyframe)
-            return
+            raise RuntimeError("CANN ACL is required for H264 VENC encoding")
         try:
             # CANN VENC 编码...
-        except RuntimeError:
-            yield from super()._encode_frame(frame, force_keyframe)
+        except RuntimeError as exc:
+            raise RuntimeError("CANN VENC H264 encoding failed") from exc
 ```
+
+`demo` 和 `usb_camera` 的软件编码是用户显式选择的独立模式，不是硬件路径的
+替代。硬件路径必须使用上一节规定的 `20241128` 旧系统/旧固件 + CANN 8.0+
+组合；`20250925` 系统上的 H.264 VENC 失败应直接暴露为失败。
 
 ---
 
@@ -806,7 +837,7 @@ class CannH264Encoder(H264Encoder):
 
 #### 实测数据：CANN VENC vs CPU 编码 {#src-book-chapter5-h43}
 
-以下数据在 Orange Pi AI Pro（Ascend 310B4）上实测获得，使用 [`bench_venc.py`](https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/venc/bench_venc.py) 脚本。该脚本同时覆盖 H.264 与 H.265，并分别测量 CPU 自动多线程（`thread_count=0`）和 CPU 单线程（`thread_count=1`）。
+以下数据在 Orange Pi AI Pro（Ascend 310B4）上实测获得，使用 [`bench_venc.py`](https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter5/venc/bench_venc.py) 脚本；复现实验必须满足上一节规定的 **`20241128` 旧系统/旧固件 + CANN 8.0+** 前置条件。WebRTC 已分别验证 CANN 7.0 升级到 8.0 和升级到 8.3 的组合，系统日期戳保持不变，性能结果一致。该脚本同时覆盖 H.264 与 H.265，并分别测量 CPU 自动多线程（`thread_count=0`）和 CPU 单线程（`thread_count=1`）。其中 H.264 VENC 帧率不能外推到 `20250925` 系统，因为该系统在 CANN 8.0、8.5 和 9.0 下均为 `observed-fail`；H.265 仍需在目标系统上单独验证。
 
 **测试条件**：GOP=30（I/P 混合），90 帧（3 个完整 GOP），确定性测试帧，固定种子 42。
 码率按分辨率自动缩放：H.264 使用 `max(2M, w*h*fps*0.1)` bps，H.265 使用 0.7 倍目标码率。
@@ -2447,6 +2478,14 @@ WebRTC NV12 帧 -> VPC resize(320×240) -> JPEGE(quality=80) -> JPEG 文件
 
 WebRTC 综合案例将本章前面学习的 VENC、JPEGD、NV12 stride 对齐和 aiortc 编码器适配串联为完整的视频推流管道。它由一个 Python WebRTC 服务端和一个浏览器接收页面组成：服务端在昇腾 310B 上采集、解码、编码视频，通过 aiortc 发送 RTP/WebRTC；浏览器只负责接收和显示。当前实现同时支持 H.264 和 H.265/HEVC 两条编码路径。
 
+**运行前先确认系统组合**：H.264 硬件编码/WebRTC 路径要求上一节的
+`20241128` 旧系统、旧版固件和 CANN 8.0+。当前已验证两组组合：同一系统从
+CANN 7.0 分别升级到 CANN 8.0 和 CANN 8.3，WebRTC 性能结果一致；这次增加
+CANN 8.0 验证不会改变此前性能结论。`20250925` 最新系统的配套固件在
+CANN 8.0、8.5、9.0 下均导致 H.264 VENC 失败，服务应直接报告错误，等待
+香橙派发布固件更新。H.265、纯 `demo`/CPU 路径的结果也必须单独记录，不能
+替代 H.264 VENC 验证。
+
 HTTP `POST /offer` 只是信令入口，不在媒体路径里。真正的媒体链路是：
 
 ```text
@@ -2460,10 +2499,10 @@ Ascend 310B frame source -> AscendVideoTrack -> aiortc encoder -> RTP/WebRTC -> 
 | `--source demo` | 无 | `rgb24` 合成帧 | libx264 | 验证 WebRTC 信令和浏览器接收链路 |
 | `--source usb_camera` | CPU (PyAV) | `rgb24` | libx264 | 纯 CPU 摄像头基线 |
 | `--source usb_camera --hardware-encode` | CPU (PyAV) | PyAV 转 `nv12` | CANN VENC H.264 | 只替换编码器的对照组 |
-| `--source dvpp_camera --video-codec h264` | DVPP JPEGD | `nv12` | CANN VENC H.264 | 当前最稳定的 1080p60 路径 |
+| `--source dvpp_camera --video-codec h264` | DVPP JPEGD | `nv12` | CANN VENC H.264 | 历史 1080p60 路径；当前需先通过兼容性验证 |
 | `--source dvpp_camera --video-codec h265` | DVPP JPEGD | `nv12` | CANN VENC H.265 | HEVC 路径，要求浏览器支持 WebRTC H.265 |
 
-`dvpp_camera` 模式下硬件编码自动启用，因为 JPEGD 产出的 NV12 帧最适合直接交给 VENC。H.264 是默认编码格式；H.265 只走 CANN VENC，不提供 CPU H.265 fallback。
+`dvpp_camera` 模式下硬件编码自动启用，因为 JPEGD 产出的 NV12 帧最适合直接交给 VENC。H.264 是默认编码格式；H.265 只走 CANN VENC，CANN 或 VENC 失败时该模式直接报告错误。
 
 ### 目录结构与角色分工 {#src-book-chapter5-h147}
 
@@ -2500,7 +2539,7 @@ def _prefer_video_codec_for_sender(pc, sender, mime_type):
             transceiver.setCodecPreferences(codecs)
 ```
 
-**H.264 编码器替换**：`--hardware-encode` 或 `--source dvpp_camera` 会把 aiortc 的 `H264Encoder` 替换为 `CannH264Encoder`。对于 `dvpp_camera` 模式下产出的 NV12 帧，VENC 是必要条件；否则需要额外做格式转换再交给 libx264。
+**H.264 编码器替换**：`--hardware-encode` 或 `--source dvpp_camera` 会把 aiortc 的 `H264Encoder` 替换为 `CannH264Encoder`。对于 `dvpp_camera` 模式下产出的 NV12 帧，VENC 是必要条件；CANN 或 VENC 失败时直接报告错误。
 
 **H.265 能力注册**：aiortc 1.14.0 默认没有完整的 H.265 编码器路径。服务端在 `--video-codec h265` 模式下调用 `_patch_h265_encoder()`：先确认 CANN ACL 可用，再向 aiortc 的 video codec 列表注册 `video/H265`（clock rate 90000），最后把 encoder factory 指向 `CannH265Encoder`。
 
@@ -2524,11 +2563,11 @@ Browser offer does not contain video/H265. Use a WebRTC HEVC-capable browser.
 
 **`dvpp_camera` 模式（全硬件管线）**：
 
-1. V4L2 采集 MJPEG 码流（优先使用 `V4l2RawCapture` 直采，失败降级到 PyAV）
+1. V4L2 通过 `V4l2RawCapture` 直采 MJPEG 码流
 2. `DvppJpegDecoder` 硬件解码为 NV12（含 stride 对齐）
 3. 返回 NV12 `VideoFrame` 给 aiortc -> `CannH264Encoder` 或 `CannH265Encoder` 直通编码
 
-**V4L2 双后端策略**：`_init_dvpp_camera()` 优先尝试 `v4l2_raw.py`（直接 ioctl + mmap，帧率更高），失败时降级到 `v4l2_capture.py`（基于 PyAV）。两套后端提供相同的 `read(timeout)` 接口，上层的 `_camera_read()` 不需要知道用哪个。
+**V4L2 后端策略**：`dvpp_camera` 只使用 `v4l2_raw.py`（直接 ioctl + mmap）；该后端或摄像头初始化失败时直接报告错误。需要 PyAV CPU 解码时，应显式选择 `usb_camera`。
 
 **性能日志**：`recv()` 每 150 帧打印一次 `Track FPS`，方便在设备端直接观察链路帧率；`_camera_read()` 前 5 帧打印单帧解码耗时。
 
@@ -2542,7 +2581,7 @@ Browser offer does not contain video/H265. Use a WebRTC HEVC-capable browser.
 - **回调队列残留检测**：`encode()` 发送前 drain 回调队列，若有残留帧则 warn。这能在日志中暴露"上一帧结果未被消费"的问题，避免静默丢帧。
 - **ACL context 线程安全**：每次 `encode()` 和回调线程入口都显式 `set_context(ctx)`，确保线程池中的 executor 线程也能正常访问 ACL 资源。
 
-**`bgr_to_nv12()`** — 纯 NumPy 实现的 BGR->NV12 转换。旧版依赖 OpenCV `cv2.cvtColor`，现在完全使用 NumPy 整数运算（ITU-R BT.601 转换公式），消除了 OpenCV 依赖。在 `dvpp_camera` 模式下此函数不会被调用（NV12 已由 JPEGD 产出）；仅在非 NV12 帧走硬件编码时作为回退路径。
+**`bgr_to_nv12()`** — 纯 NumPy 实现的 BGR->NV12 转换。旧版依赖 OpenCV `cv2.cvtColor`，现在完全使用 NumPy 整数运算（ITU-R BT.601 转换公式），消除了 OpenCV 依赖。在 `dvpp_camera` 模式下此函数不会被调用（NV12 已由 JPEGD 产出）；非 NV12 帧走硬件编码时，它负责输入格式转换。
 
 **`CannH264Encoder`** — 继承 aiortc 的 `H264Encoder`，只覆盖 `_encode_frame()`：
 
@@ -2559,9 +2598,9 @@ Browser offer does not contain video/H265. Use a WebRTC HEVC-capable browser.
 - **NV12 直通检测**：检查 `frame.format.name == "nv12"`。DVPP 产出的 NV12 帧直接调用 `to_ndarray`（零格式转换），传入 `pre_padded=True` 跳过 CPU stride 重排。
 - **BGR->NV12 走 PyAV reformat**：非 NV12 帧（如 demo 的 RGB 帧）调用 `frame.reformat(format="nv12")`，由 PyAV 的 C 实现完成色彩空间转换（比手动 `bgr_to_nv12()` 快得多），再 `to_ndarray` 取出。
 - **FPS 自适应**：`_estimate_fps()` 从连续帧的 PTS 时间戳差值实时估算实际帧率，据此调整 VENC 的 `src_rate` 参数。当实际帧率因采集链路抖动而变化时，VENC 的码率控制能跟随调整。
-- **CANN 不可用时自动回退**：`_CANN_READY` 为 False 时走 `super()._encode_frame()`（CPU libx264），无缝降级。
+- **CANN/VENC 失败即终止**：`_CANN_READY` 为 False、通道创建失败或编码失败时抛出错误；硬件路径不会切换到 `super()._encode_frame()`。
 
-**`CannH265Encoder`** — aiortc 兼容的 H.265 编码器。它复用 `CannVenc`，但创建通道时使用 `ENTYPE_H265_MAIN = 0`，输出 HEVC Annex-B 码流。与 H.264 路径不同，H.265 路径不继承 aiortc 的 H.264 RTP 封装，也不提供 CPU fallback；CANN 初始化或 VENC 创建失败应视为 H.265 模式不可用。
+**`CannH265Encoder`** — aiortc 兼容的 H.265 编码器。它复用 `CannVenc`，但创建通道时使用 `ENTYPE_H265_MAIN = 0`，输出 HEVC Annex-B 码流。H.265 路径不继承 aiortc 的 H.264 RTP 封装；CANN 初始化或 VENC 创建失败应视为 H.265 模式不可用。
 
 #### `hevc.py` — H.265 RTP 分包 {#src-book-chapter5-h152}
 
@@ -2584,24 +2623,29 @@ H.265 不能复用 H.264 的 RTP 分包格式。`webrtc_app/hevc.py` 单独实�
 
 直接在 Python 中通过 `fcntl.ioctl` + `mmap` 操作 V4L2 设备，绕过 PyAV 的封装层。相比 PyAV 路径（1080p 约 15fps），直接 ioctl 路径可达到摄像头原生帧率（1080p 约 24fps）。两套后端通过相同的 `read(timeout)` 接口互换，上层代码无需感知。
 
-> `v4l2_raw.py` 中的 `v4l2_buffer` 结构体布局（88 字节）是针对 aarch64 Linux 的硬编码值。在 x86-64 机器上此模块不可用，自动降级到 PyAV。
+> `v4l2_raw.py` 中的 `v4l2_buffer` 结构体布局（88 字节）是针对 aarch64 Linux 的硬编码值。在 x86-64 机器上此模块不可用，`dvpp_camera` 硬件路径会直接报告环境错误；需要软件基线时请显式选择 `usb_camera`。
 
 ### 性能实测（1920×1080） {#src-book-chapter5-h155}
 
-下面的数据来自 `311`（`orangepiaipro`）上 2026-05-26 的日志。测试请求为 `1920×1080@60`，浏览器接收端通过 WebRTC 接收视频流。
+下面的数据来自 `311`（`orangepiaipro`）上 2026-05-26 的日志。测试请求为 `1920×1080@60`，浏览器接收端通过 WebRTC 接收视频流；这些性能数据对应同一 `20241128` 旧系统/旧固件，CANN 7.0 分别升级到 8.0 和 8.3 的两组验证结果，结论一致，不能外推到 `20250925` 系统的 H.264 VENC 路径。本次 `20241128 + CANN 8.0` 复测另外通过了 ACL、最小 VENC 和 5 秒 WebRTC E2E；后续 CANN 版本仍待继续验证。
+
+本次板端 E2E 的关键日志为 `CANN VENC channel created ... entype=1`，随后连续输出
+`VENC encode frame`；测试结果为 `E2E_TEST: PASS`。这证明本次运行实际使用了
+H.264 VENC，不是 CPU 编码；但测试分辨率为 640×480、持续 5 秒，不能替代
+1080p60 的完整性能测试。
 
 | 模式 | 路径 | Track FPS | 瓶颈分析 |
 |------|------|-----------|---------|
 | 纯 CPU | `V4L2 MJPEG -> CPU JPEG decode -> RGB -> libx264` | 约 `15 fps` | CPU JPEG 解码单帧约 `20~32ms`，无法支撑 60fps |
-| H.264 硬编 | `V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.264` | 基本稳定 `60 fps` | JPEGD 约 `4.9~9.5ms`，VENC 约 `6.3~6.5ms` |
-| H.265 硬编 | `V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.265` | 通常 `57~59 fps`，个别样本掉到 `35 fps` | 码流更小，但本次日志中稳定性弱于 H.264 |
+| 历史 H.264 硬编 | `V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.264` | 基本稳定 `60 fps` | 历史日志中的 JPEGD 约 `4.9~9.5ms`，VENC 约 `6.3~6.5ms` |
+| 历史 H.265 硬编 | `V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.265` | 通常 `57~59 fps`，个别样本掉到 `35 fps` | 码流更小，但历史日志中稳定性弱于 H.264 |
 
 **关键结论**：
 
 - 纯 CPU 路径在 `1920×1080@60` 请求下只能达到约 `15 fps`，主要瓶颈是 CPU JPEG 解码。
 - 只替换编码器并不能解决全链路瓶颈；如果 MJPEG 解码仍在 CPU 上，VENC 的收益会被前级吞掉。
 - `dvpp_camera` 的核心价值是 **JPEGD + VENC** 连用：JPEGD 输出 stride 对齐的 NV12，VENC 直接消费，中间不需要 RGB 转换。
-- 当前这台 `311` 的稳定 1080p60 优先选 H.264。H.265 码流更小，但 WebRTC HEVC 接收能力、SDP 协商和端到端稳定性更敏感。
+- 两组已验证的 CANN 软件组合在这台 `311` 上性能结果一致，均优先选 H.264；H.265 码流更小，但 WebRTC HEVC 接收能力、SDP 协商和端到端稳定性更敏感。
 
 浏览器有时会显示 `1920×1088`，这是 VENC 编码面高度按 16 对齐后的 coded size，不代表有效画面真的变成了 1088 行。1080 不能被 16 整除，因此硬件会补 8 行 padding。
 
@@ -2616,7 +2660,7 @@ H.265 不能复用 H.264 的 RTP 分包格式。`webrtc_app/hevc.py` 单独实�
 | `aiortc` | Python 侧 WebRTC 实现 |
 | `av` (PyAV) | VideoFrame 构造 + V4L2 采集 |
 | `numpy` | 演示帧生成和 NV12 数据操作 |
-| CANN 8.3.RC1 | ACL Python API（硬件编码必需） |
+| CANN 8.0+（已验证 8.0、8.3；8.5/9.0 待后续扩展） | ACL Python API（硬件编码必需；须配合 `20241128` 旧系统/旧固件） |
 | `pytest` | 测试框架（仅开发） |
 
 > 旧版依赖的 `opencv-python-headless` 已移除。usb_camera 模式和 bgr_to_nv12 均已改用 PyAV + NumPy 纯实现。
@@ -2624,9 +2668,9 @@ H.265 不能复用 H.264 的 RTP 分包格式。`webrtc_app/hevc.py` 单独实�
 ### 关键结论 {#src-book-chapter5-h157}
 
 - **DVPP 模块不能孤立优化**——只用 VENC 而保留 CPU JPEG 解码，链路仍会卡在 CPU 解码阶段。DVPP 的收益需要全链路协同才能兑现
-- **JPEGD + VENC 是 1080p 实时推流的关键组合**——纯软件路径约 `15 fps`，全硬件 H.264 管道可以稳定到 `60 fps`
+- **JPEGD + VENC 是 1080p 实时推流的关键组合**——同一 `20241128` 旧系统/旧固件下，CANN 7.0 升级到 8.0 与升级到 8.3 的 WebRTC 性能结果一致：纯软件路径约 `15 fps`，全硬件 H.264 管道可以稳定到 `60 fps`；`20250925` 系统的 H.264 VENC 失败时不能使用这条结论
 - **NV12 stride 对齐的零拷贝交付**——JPEGD 输出的 stride 对齐 NV12 直接匹配 VENC `pre_padded` 输入要求，中间不经过任何 CPU 数据重排
-- **H.264 与 H.265 的工程取舍不同**——H.264 是当前最稳的 1080p60 WebRTC 路径；H.265 只走 CANN VENC，依赖浏览器暴露 `video/H265` WebRTC 能力，且本次 311 实测中有偶发掉帧
+- **H.264 与 H.265 的工程取舍不同**——两组已验证 CANN 软件组合中 H.264 均是稳定的 1080p60 WebRTC 路径；H.265 只走 CANN VENC，依赖浏览器暴露 `video/H265` WebRTC 能力，且历史日志中有偶发掉帧。后续 CANN 版本仍需分别验证
 - **码率在建连时确定**——页面目标码率会影响本次 VENC 通道创建，当前不支持在线热调
 
 ---

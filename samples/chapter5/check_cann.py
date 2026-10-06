@@ -6,7 +6,7 @@
     python samples/chapter5/check_cann.py
 
 预期输出：
-    ACL init OK  soc=Ascend310B4  cann=8.3.RC1
+    ACL init OK  soc=Ascend310B4  cann=(1, 12, 0, 0)
 """
 
 import acl
