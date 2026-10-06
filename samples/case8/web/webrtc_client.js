@@ -1,13 +1,12 @@
 const elements = {
   model: document.querySelector("#model"),
-  modelInput: document.querySelector("#modelInput"),
   source: document.querySelector("#source"),
   resolution: document.querySelector("#resolution"),
   fps: document.querySelector("#fps"),
   bitrateKbps: document.querySelector("#bitrateKbps"),
   cameraBackend: document.querySelector("#cameraBackend"),
+  encoderMode: document.querySelector("#encoderMode"),
   cameraFourcc: document.querySelector("#cameraFourcc"),
-  encoderStatus: document.querySelector("#encoderStatus"),
   conf: document.querySelector("#conf"),
   iou: document.querySelector("#iou"),
   inferEvery: document.querySelector("#inferEvery"),
@@ -17,21 +16,17 @@ const elements = {
   remoteVideo: document.querySelector("#remoteVideo"),
   videoDimensions: document.querySelector("#videoDimensions"),
   serverStatus: document.querySelector("#serverStatus"),
-  runtimeStatus: document.querySelector("#runtimeStatus"),
   pipelineStatus: document.querySelector("#pipelineStatus"),
   peerStatus: document.querySelector("#peerStatus"),
   bitrateStatus: document.querySelector("#bitrateStatus"),
   npuStatus: document.querySelector("#npuStatus"),
   inferStatus: document.querySelector("#inferStatus"),
   detectionStatus: document.querySelector("#detectionStatus"),
-  trackFpsStatus: document.querySelector("#trackFpsStatus"),
   fpsOverlay: document.querySelector("#fpsOverlay"),
   fpsStatus: document.querySelector("#fpsStatus"),
-  codecStatus: document.querySelector("#codecStatus"),
   logOutput: document.querySelector("#logOutput"),
 };
 
-let modelInfo = new Map();
 let activeConnection = null;
 let activeAttemptId = 0;
 let pendingOfferController = null;
@@ -91,11 +86,6 @@ function parseBitrateKbps(value) {
   return positiveInteger(value, "H.264 码率");
 }
 
-function updateModelInput() {
-  const item = modelInfo.get(elements.model.value);
-  elements.modelInput.value = item?.input ?? "-";
-}
-
 function setSelectValue(select, value, label = null) {
   const stringValue = String(value);
   const exists = Array.from(select.options).some((option) => option.value === stringValue);
@@ -111,7 +101,6 @@ function setSelectValue(select, value, label = null) {
 async function loadModels() {
   const data = await fetchJson("/models");
   const models = data.models ?? [];
-  modelInfo = new Map(models.map((item) => [item.name, item]));
   elements.model.innerHTML = "";
 
   for (const item of models) {
@@ -130,23 +119,22 @@ async function loadModels() {
   } else {
     elements.model.value = data.default_model ?? models[0].name;
   }
-  updateModelInput();
 }
 
 async function checkHealth() {
   const data = await fetchJson("/health");
   setText(elements.serverStatus, data.status === "ok" ? "在线" : "异常");
-  setText(elements.runtimeStatus, `${data.runtime_target ?? "unknown"} / ${data.transport ?? "unknown"}`);
-  setText(elements.codecStatus, (data.video_codec ?? "h264").toUpperCase());
-  elements.encoderStatus.value = data.encoder ?? "-";
+  const defaults = data.defaults ?? {};
   setText(
     elements.pipelineStatus,
-    `${data.defaults?.camera_backend ?? "opencv"} / ${data.encoder ?? "unknown"}`
+    `${defaults.camera_backend ?? "opencv"}/${defaults.camera_fourcc ?? "?"}`
   );
   if (data.default_source) {
     elements.source.value = data.default_source;
   }
-  const defaults = data.defaults ?? {};
+  if (data.default_encoder_mode) {
+    setSelectValue(elements.encoderMode, data.default_encoder_mode);
+  }
   if (defaults.width && defaults.height) {
     const resolution = `${defaults.width}x${defaults.height}`;
     setSelectValue(elements.resolution, resolution, `${defaults.width} x ${defaults.height}`);
@@ -182,6 +170,7 @@ function setControlsBusy(isBusy) {
   elements.fps.disabled = isBusy;
   elements.bitrateKbps.disabled = isBusy;
   elements.cameraBackend.disabled = isBusy;
+  elements.encoderMode.disabled = isBusy;
   elements.cameraFourcc.disabled = isBusy;
   elements.conf.disabled = isBusy;
   elements.iou.disabled = isBusy;
@@ -282,7 +271,6 @@ function stopStats() {
   setText(elements.npuStatus, "-");
   setText(elements.inferStatus, "-");
   setText(elements.detectionStatus, "-");
-  setText(elements.trackFpsStatus, "-");
 }
 
 function cancelPendingOffer() {
@@ -413,15 +401,11 @@ async function readServerStats() {
   if (Number.isFinite(Number(data.npu_latency_ms))) {
     setText(elements.npuStatus, `${Number(data.npu_latency_ms).toFixed(1)} ms`);
   }
-  if (Number.isFinite(Number(data.track_fps))) {
-    setText(elements.trackFpsStatus, `${Number(data.track_fps).toFixed(1)} fps`);
-  }
-  const npuMs = formatNumber(data.npu_latency_ms);
   const totalMs = formatNumber(data.infer_total_ms);
   const inferFps = formatNumber(data.infer_fps);
   setText(
     elements.inferStatus,
-    `1/${data.infer_every_n ?? "?"} · NPU ${npuMs} ms · total ${totalMs} ms · ${inferFps} fps`
+    `1/${data.infer_every_n ?? "?"} · ${totalMs} ms · ${inferFps} fps`
   );
   setText(elements.detectionStatus, `${data.detections ?? 0}`);
   const captureFps = formatNumber(data.capture_fps);
@@ -429,11 +413,14 @@ async function readServerStats() {
   const pipelineMs = formatNumber(data.pipeline_ms);
   const nv12Ms = formatNumber(data.nv12_ms);
   const fourcc = data.actual_fourcc || data.camera_fourcc || "?";
+  elements.pipelineStatus.title = `采集 ${captureMs} ms · NV12 ${nv12Ms} ms · 发送 ${pipelineMs} ms`;
   if (!serverErrors) {
     setText(
       elements.pipelineStatus,
-      `${data.camera_backend ?? "?"}/${fourcc} · cap ${captureFps} fps/${captureMs} ms · nv12 ${nv12Ms} ms · send ${pipelineMs} ms · ${data.encoder ?? elements.encoderStatus.value}`
+      `${data.camera_backend ?? "?"}/${fourcc} · ${captureFps} fps · ${pipelineMs} ms`
     );
+  } else {
+    elements.pipelineStatus.title = serverErrors;
   }
 }
 
@@ -501,7 +488,7 @@ function logAppliedSourceSettings(sourceSettings) {
   );
   setText(
     elements.pipelineStatus,
-    `${applied.camera_backend ?? "?"}/${applied.actual_fourcc || applied.camera_fourcc || "?"} / ${sourceSettings.encoder ?? elements.encoderStatus.value}`
+    `${applied.camera_backend ?? "?"}/${applied.actual_fourcc || applied.camera_fourcc || "?"}`
   );
 }
 
@@ -552,6 +539,7 @@ async function startConnection() {
         fps,
         bitrate_kbps: bitrateKbps,
         camera_backend: elements.cameraBackend.value,
+        encoder_mode: elements.encoderMode.value,
         camera_fourcc: elements.cameraFourcc.value,
         infer_every_n: inferEvery,
         conf,
@@ -565,7 +553,7 @@ async function startConnection() {
     assertActiveAttempt(connection, attemptId);
 
     startStats(connection);
-    log(`WebRTC offer 已发送: ${width}x${height}@${fps} H.264 bitrate=${bitrateKbps ?? "auto"}`);
+    log(`WebRTC offer 已发送: ${width}x${height}@${fps} H.264 ${elements.encoderMode.value} bitrate=${bitrateKbps ?? "auto"}`);
     logAppliedSourceSettings(answer.source_settings);
   } catch (error) {
     if (pendingOfferController && pendingOfferController.signal.aborted) {
@@ -593,7 +581,6 @@ async function startConnection() {
 }
 
 function bindEvents() {
-  elements.model.addEventListener("change", updateModelInput);
   elements.start.addEventListener("click", () => {
     startConnection().catch((error) => log(`启动失败: ${error.message}`));
   });
@@ -616,7 +603,6 @@ async function init() {
   setText(elements.npuStatus, "-");
   setText(elements.inferStatus, "-");
   setText(elements.detectionStatus, "-");
-  setText(elements.trackFpsStatus, "-");
   await Promise.all([loadModels(), checkHealth()]);
   log("页面就绪。");
 }

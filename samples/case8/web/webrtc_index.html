@@ -44,16 +44,10 @@
           <select id="model"></select>
         </label>
 
-        <div class="two-col">
-          <label class="field">
-            <span>模型输入</span>
-            <input id="modelInput" type="text" value="-" readonly>
-          </label>
-          <label class="field">
-            <span>摄像头</span>
-            <input id="source" type="text" value="/dev/video0">
-          </label>
-        </div>
+        <label class="field">
+          <span>摄像头</span>
+          <input id="source" type="text" value="/dev/video0">
+        </label>
 
         <div class="two-col">
           <label class="field">
@@ -89,15 +83,22 @@
             </select>
           </label>
           <label class="field">
+            <span>H.264 编码器</span>
+            <select id="encoderMode">
+              <option value="cann" selected>CANN VENC</option>
+              <option value="cpu">CPU libx264</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="two-col">
+          <label class="field">
             <span>采集后端</span>
             <select id="cameraBackend">
               <option value="opencv" selected>OpenCV</option>
               <option value="dvpp">DVPP JPEGD</option>
             </select>
           </label>
-        </div>
-
-        <div class="two-col">
           <label class="field">
             <span>摄像头 FourCC</span>
             <select id="cameraFourcc">
@@ -105,10 +106,6 @@
               <option value="YUYV">YUYV</option>
               <option value="DEFAULT">默认</option>
             </select>
-          </label>
-          <label class="field">
-            <span>编码器</span>
-            <input id="encoderStatus" type="text" value="-" readonly>
           </label>
         </div>
 
@@ -132,36 +129,6 @@
           <button id="stop" type="button" class="secondary">停止</button>
         </div>
 
-        <dl class="runtime">
-          <div>
-            <dt>Codec</dt>
-            <dd id="codecStatus">H.264</dd>
-          </div>
-          <div>
-            <dt>运行状态</dt>
-            <dd id="runtimeStatus">检查中</dd>
-          </div>
-          <div>
-            <dt>采集/编码</dt>
-            <dd id="pipelineStatus">-</dd>
-          </div>
-          <div>
-            <dt>推理状态</dt>
-            <dd id="inferStatus">-</dd>
-          </div>
-          <div>
-            <dt>检测数量</dt>
-            <dd id="detectionStatus">-</dd>
-          </div>
-          <div>
-            <dt>服务端 FPS</dt>
-            <dd id="trackFpsStatus">-</dd>
-          </div>
-          <div>
-            <dt>画面尺寸</dt>
-            <dd id="videoDimensions">-</dd>
-          </div>
-        </dl>
       </aside>
 
       <section class="viewer">
@@ -169,6 +136,24 @@
           <video id="remoteVideo" autoplay playsinline muted></video>
           <div id="fpsOverlay" class="fps-overlay">- fps</div>
         </div>
+        <dl class="session-metrics" aria-label="实时运行指标">
+          <div>
+            <dt>采集</dt>
+            <dd id="pipelineStatus">-</dd>
+          </div>
+          <div>
+            <dt>推理</dt>
+            <dd id="inferStatus">-</dd>
+          </div>
+          <div>
+            <dt>检测目标</dt>
+            <dd id="detectionStatus">-</dd>
+          </div>
+          <div>
+            <dt>画面尺寸</dt>
+            <dd id="videoDimensions">-</dd>
+          </div>
+        </dl>
         <div class="log-header">
           <h2>日志</h2>
           <button id="clearLog" type="button" class="secondary compact">清空</button>

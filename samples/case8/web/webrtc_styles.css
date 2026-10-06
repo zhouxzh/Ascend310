@@ -24,9 +24,9 @@ body {
 }
 
 .app {
-  width: min(calc(100% - 28px), 1500px);
+  width: min(calc(100% - 32px), 1680px);
   margin: 0 auto;
-  padding: 18px 0 24px;
+  padding: 16px 0 24px;
 }
 
 .topbar {
@@ -50,7 +50,7 @@ body {
 }
 
 .top-status,
-.runtime {
+.session-metrics {
   display: grid;
   gap: 8px;
   margin: 0;
@@ -61,8 +61,7 @@ body {
   min-width: min(760px, 100%);
 }
 
-.top-status div,
-.runtime div {
+.top-status div {
   border: 1px solid var(--edge);
   border-radius: 8px;
   background: var(--panel);
@@ -83,8 +82,8 @@ dd {
 
 .workspace {
   display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 16px;
   align-items: start;
 }
 
@@ -97,13 +96,13 @@ dd {
 
 .controls {
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 12px;
 }
 
 .field {
   display: grid;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -118,7 +117,8 @@ button {
   width: 100%;
   border-radius: 6px;
   border: 1px solid #b9c6cf;
-  padding: 9px 10px;
+  min-height: 40px;
+  padding: 8px 10px;
   font: inherit;
 }
 
@@ -184,18 +184,17 @@ button.compact {
   gap: 10px;
 }
 
-.runtime {
-  grid-template-columns: 1fr;
-}
-
 .viewer {
-  padding: 12px;
+  min-width: 0;
+  padding: 10px;
 }
 
 .video-stage {
   position: relative;
   width: 100%;
-  min-height: 320px;
+  aspect-ratio: 16 / 9;
+  min-height: 260px;
+  max-height: min(68vh, 780px);
   border: 1px solid #243241;
   border-radius: 8px;
   background: var(--video);
@@ -205,10 +204,21 @@ button.compact {
 video {
   display: block;
   width: 100%;
-  min-height: 320px;
-  max-height: calc(100vh - 250px);
+  height: 100%;
   object-fit: contain;
   background: var(--video);
+}
+
+.session-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 10px 2px 0;
+  padding: 10px 0;
+  border-block: 1px solid var(--edge);
+}
+
+.session-metrics dd {
+  font-size: 0.84rem;
 }
 
 .fps-overlay {
@@ -242,8 +252,8 @@ video {
 
 .log-output {
   margin: 0;
-  min-height: 132px;
-  max-height: 220px;
+  min-height: 112px;
+  max-height: 190px;
   overflow: auto;
   border-radius: 8px;
   border: 1px solid #233142;
@@ -264,23 +274,50 @@ video {
   .top-status {
     min-width: 0;
   }
+
+  .video-stage {
+    max-height: none;
+  }
 }
 
 @media (max-width: 620px) {
   .app {
-    width: min(100% - 16px, 1500px);
-    padding-top: 10px;
+    width: min(100% - 16px, 1680px);
+    padding-top: 8px;
   }
 
-  .top-status,
-  .two-col,
-  .three-col,
-  .actions {
-    grid-template-columns: 1fr;
+  .top-status {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  video,
+  .topbar {
+    gap: 12px;
+  }
+
+  .topbar h1 {
+    font-size: 1.2rem;
+  }
+
+  .viewer {
+    padding: 8px;
+  }
+
+  .session-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
   .video-stage {
     min-height: 220px;
+  }
+}
+
+@media (max-width: 420px) {
+  .top-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .three-col {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

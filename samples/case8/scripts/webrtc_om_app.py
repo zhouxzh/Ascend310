@@ -60,6 +60,8 @@ DEFAULT_H264_BITRATE_KBPS = 4000
 DEFAULT_WEBRTC_INFER_EVERY_N = 1
 CAMERA_BACKEND_OPENCV = "opencv"
 CAMERA_BACKEND_DVPP = "dvpp"
+ENCODER_MODE_CANN = "cann"
+ENCODER_MODE_CPU = "cpu"
 VIDEO_CLOCK_RATE = 90000
 VIDEO_TIME_BASE = fractions.Fraction(1, VIDEO_CLOCK_RATE)
 pcs: set[RTCPeerConnection] = set()
@@ -67,6 +69,11 @@ pc_tracks: dict[RTCPeerConnection, "YoloOmVideoTrack"] = {}
 latest_track_stats: dict[str, object] = {}
 latest_stats_lock = threading.Lock()
 app_logger = logging.getLogger("webrtc_om")
+encoder_patch_lock = threading.Lock()
+original_h264_encoder = None
+original_codecs_h264_encoder = None
+original_codecs_get_encoder = None
+original_rtcrtpsender_get_encoder = None
 encoder_state = {
     "hardware_requested": True,
     "hardware_active": False,
@@ -84,46 +91,61 @@ def no_store_file_response(path: Path) -> web.FileResponse:
 def patch_h264_encoder(use_hardware: bool) -> bool:
     encoder_state["hardware_requested"] = bool(use_hardware)
     encoder_state["hardware_active"] = False
-    encoder_state["name"] = "cpu-libx264-fallback"
+    encoder_state["name"] = "cpu-libx264-fallback" if use_hardware else "cpu-libx264"
     encoder_state["last_error"] = ""
-
-    if not use_hardware:
-        app_logger.info("Hardware H264 encoder disabled; using CPU libx264")
-        return False
-    if CannH264Encoder is None or _try_import_cann is None:
-        app_logger.warning("CANN VENC modules are unavailable; using CPU libx264")
-        return False
-    if not _try_import_cann():
-        app_logger.warning("CANN ACL not available; using CPU libx264")
-        return False
 
     import aiortc.codecs as codecs_module
     import aiortc.codecs.h264 as h264_module
     import aiortc.rtcrtpsender as rtcrtpsender_module
 
-    original_get_encoder = codecs_module.get_encoder
+    global original_h264_encoder
+    global original_codecs_h264_encoder
+    global original_codecs_get_encoder
+    global original_rtcrtpsender_get_encoder
 
-    def get_encoder(codec):
-        if codec.mimeType.lower() == "video/h264":
-            return CannH264Encoder()
-        return original_get_encoder(codec)
+    with encoder_patch_lock:
+        if original_codecs_get_encoder is None:
+            original_h264_encoder = h264_module.H264Encoder
+            original_codecs_h264_encoder = codecs_module.H264Encoder
+            original_codecs_get_encoder = codecs_module.get_encoder
+            original_rtcrtpsender_get_encoder = rtcrtpsender_module.get_encoder
 
-    def update_encoder_status(name: str, hardware_active: bool, reason: str = "") -> None:
-        encoder_state["name"] = name
-        encoder_state["hardware_active"] = bool(hardware_active)
-        encoder_state["last_error"] = reason
+        if not use_hardware:
+            h264_module.H264Encoder = original_h264_encoder
+            codecs_module.H264Encoder = original_codecs_h264_encoder
+            codecs_module.get_encoder = original_codecs_get_encoder
+            rtcrtpsender_module.get_encoder = original_rtcrtpsender_get_encoder
+            app_logger.info("H264 encoder switched to CPU libx264")
+            return False
 
-    if set_encoder_status_callback is not None:
-        set_encoder_status_callback(update_encoder_status)
+        if CannH264Encoder is None or _try_import_cann is None:
+            app_logger.warning("CANN VENC modules are unavailable; using CPU libx264")
+            return False
+        if not _try_import_cann():
+            app_logger.warning("CANN ACL not available; using CPU libx264")
+            return False
 
-    h264_module.H264Encoder = CannH264Encoder
-    codecs_module.H264Encoder = CannH264Encoder
-    codecs_module.get_encoder = get_encoder
-    rtcrtpsender_module.get_encoder = get_encoder
-    encoder_state["hardware_active"] = True
-    encoder_state["name"] = "cann-venc-h264"
-    app_logger.info("H264 encoder switched to CANN VENC hardware")
-    return True
+        def get_encoder(codec):
+            if codec.mimeType.lower() == "video/h264":
+                return CannH264Encoder()
+            return original_codecs_get_encoder(codec)
+
+        def update_encoder_status(name: str, hardware_active: bool, reason: str = "") -> None:
+            encoder_state["name"] = name
+            encoder_state["hardware_active"] = bool(hardware_active)
+            encoder_state["last_error"] = reason
+
+        if set_encoder_status_callback is not None:
+            set_encoder_status_callback(update_encoder_status)
+
+        h264_module.H264Encoder = CannH264Encoder
+        codecs_module.H264Encoder = CannH264Encoder
+        codecs_module.get_encoder = get_encoder
+        rtcrtpsender_module.get_encoder = get_encoder
+        encoder_state["hardware_active"] = True
+        encoder_state["name"] = "cann-venc-h264"
+        app_logger.info("H264 encoder switched to CANN VENC hardware")
+        return True
 
 
 def set_offer_bitrate_override(bitrate_kbps: int | None) -> None:
@@ -248,6 +270,7 @@ async def health(request: web.Request) -> web.Response:
             "default_model": request.config_dict.get("default_model", DEFAULT_MODEL_NAME),
             "default_source": request.config_dict.get("default_source", "/dev/video0"),
             "default_device_id": request.config_dict.get("device_id", 0),
+            "default_encoder_mode": request.config_dict.get("encoder_mode", ENCODER_MODE_CANN),
             "defaults": {
                 "width": request.config_dict.get("camera_width", 1280),
                 "height": request.config_dict.get("camera_height", 720),
@@ -314,7 +337,11 @@ def parse_float_range(value: object, name: str, default: float, lower: float, up
     return parsed
 
 
-def parse_offer_payload(params: dict[str, object], default_device_id: int = 0) -> dict[str, object]:
+def parse_offer_payload(
+    params: dict[str, object],
+    default_device_id: int = 0,
+    default_encoder_mode: str = ENCODER_MODE_CANN,
+) -> dict[str, object]:
     try:
         offer = RTCSessionDescription(sdp=str(params["sdp"]), type=str(params["type"]))
     except KeyError as exc:
@@ -346,6 +373,9 @@ def parse_offer_payload(params: dict[str, object], default_device_id: int = 0) -
     camera_fourcc = str(params.get("camera_fourcc") or "MJPG").upper()
     if camera_fourcc not in {"MJPG", "YUYV", "DEFAULT"}:
         raise web.HTTPBadRequest(text="camera_fourcc must be MJPG, YUYV, or DEFAULT.")
+    encoder_mode = str(params.get("encoder_mode") or default_encoder_mode).lower()
+    if encoder_mode not in {ENCODER_MODE_CANN, ENCODER_MODE_CPU}:
+        raise web.HTTPBadRequest(text="encoder_mode must be cann or cpu.")
 
     return {
         "offer": offer,
@@ -361,6 +391,7 @@ def parse_offer_payload(params: dict[str, object], default_device_id: int = 0) -
         "device_id": device_id,
         "camera_backend": camera_backend,
         "camera_fourcc": camera_fourcc,
+        "encoder_mode": encoder_mode,
     }
 
 
@@ -445,6 +476,7 @@ class YoloOmVideoTrack(MediaStreamTrack):
         device_id: int,
         camera_backend: str = CAMERA_BACKEND_OPENCV,
         camera_fourcc: str = "MJPG",
+        encoder_mode: str = ENCODER_MODE_CANN,
     ) -> None:
         super().__init__()
         self.model_path = model_path
@@ -461,6 +493,7 @@ class YoloOmVideoTrack(MediaStreamTrack):
         self.device_id = device_id
         self.camera_backend = camera_backend
         self.camera_fourcc = camera_fourcc
+        self.encoder_mode = encoder_mode
         self.imgsz = resolve_imgsz(model_path, 0)
         self.labels = load_labels(model_path)
         self.backend: Optional[AclModel] = None
@@ -656,6 +689,7 @@ class YoloOmVideoTrack(MediaStreamTrack):
             "model": self.model_path.name,
             "model_input": f"{self.imgsz}x{self.imgsz}",
             "encoder": encoder_state["name"],
+            "encoder_mode": self.encoder_mode,
             "requested": {
                 "width": self.requested_width,
                 "height": self.requested_height,
@@ -1145,6 +1179,7 @@ async def offer(request: web.Request) -> web.Response:
     params = parse_offer_payload(
         await request.json(),
         default_device_id=int(request.config_dict.get("device_id", 0)),
+        default_encoder_mode=str(request.config_dict.get("encoder_mode", ENCODER_MODE_CANN)),
     )
     offer_sdp: RTCSessionDescription = params["offer"]  # type: ignore[assignment]
     if not _offer_has_h264(offer_sdp.sdp):
@@ -1160,6 +1195,7 @@ async def offer(request: web.Request) -> web.Response:
         await asyncio.sleep(0.3)
 
     model_path = resolve_model_path(str(params["model_name"]))
+    encoder_mode = str(params["encoder_mode"])
     bitrate_kbps = params["bitrate_kbps"]
     if bitrate_kbps is None:
         bitrate_kbps = estimate_h264_bitrate_kbps(
@@ -1174,6 +1210,7 @@ async def offer(request: web.Request) -> web.Response:
     connect_timeout_task: Optional[asyncio.Task] = None
 
     try:
+        patch_h264_encoder(encoder_mode == ENCODER_MODE_CANN)
         track = YoloOmVideoTrack(
             model_path=model_path,
             source=str(params["source"]),
@@ -1186,6 +1223,7 @@ async def offer(request: web.Request) -> web.Response:
             device_id=int(params["device_id"]),
             camera_backend=str(params["camera_backend"]),
             camera_fourcc=str(params["camera_fourcc"]),
+            encoder_mode=encoder_mode,
         )
         pc_tracks[pc] = track
         sender = pc.addTrack(track)
@@ -1314,6 +1352,7 @@ def build_app(args: argparse.Namespace) -> web.Application:
     app["camera_backend"] = args.camera_backend
     app["camera_fourcc"] = args.camera_fourcc
     app["hardware_encode"] = args.hardware_encode
+    app["encoder_mode"] = ENCODER_MODE_CANN if args.hardware_encode else ENCODER_MODE_CPU
     app.on_shutdown.append(on_shutdown)
     app.router.add_get("/", index)
     app.router.add_get("/client.js", client_js)
