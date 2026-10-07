@@ -30,6 +30,49 @@ case8/
 当前已验证的运行范围、CANN VENC 限制和系统版本对照见
 [问题与版本兼容性](docs/05-known-issues-and-version-compatibility.md)。
 
+## 摄像头权限
+
+官方昇腾 310B 系统通常把 V4L2 摄像头节点设置为 `root:video`、`0660`。
+因此，使用 `HwHiAiUser` 启动程序前，必须把该用户加入 `video` 组：
+
+```bash
+sudo usermod -aG video HwHiAiUser
+```
+
+执行后退出当前 SSH 会话并重新登录。根据官方 Atlas 开发板的实际验证，随后还要
+拔下并重新插入 USB 摄像头，让 UVC 设备重新初始化；否则用户组已经更新，旧的
+摄像头设备会话仍可能在打开视频流时超时。完成重新插拔后再确认：
+
+```bash
+id HwHiAiUser
+ls -l /dev/video0 /dev/video1
+```
+
+`id` 输出中应包含 `video`。`/dev/video0` 通常是真实的视频采集节点，
+`/dev/video1` 可能是 UVC metadata 节点；case8 默认使用 `/dev/video0`。
+不要使用 `chmod 666` 临时放开设备权限，也不要把 metadata 节点作为视频源。
+
+## 官方 Atlas 开发板验证
+
+当前代码已经在官方 Huawei Atlas 开发板上完成验证。可复核的板端基线如下：
+
+| 项目 | 已验证值 |
+| --- | --- |
+| 板卡/芯片 | Huawei Atlas，Ascend 310B4 |
+| `npu-smi` 产品标识 | `Atlas 200I A2` |
+| 系统 | Ubuntu 22.04.5 LTS |
+| 内核 | `6.6.0-72.0.0.76.h914.eulerosv2r15.ascend.aarch64` |
+| 固件 | `7.8.0.5.216` |
+| 驱动包 | `25.5.0`，内部版本 `V100R001C23SPC005B219` |
+| CANN | `9.2.0-beta.2` |
+| `npu-smi` | `25.5.0`，Ascend 310B4 Health OK |
+
+板端安装目录没有单独名为 `HDK` 的版本字段，因此不把固件、驱动或 CANN
+误称为 HDK 版本；上表是本次验证使用的完整软件栈基线。完成 `video` 组配置、
+重新登录和摄像头重新插拔后，case8 已确认可以使用 CANN VENC 进行 H.264
+硬件编码，并通过 WebRTC 连续推流；OM 推理仍在 NPU 上执行。VENC 失败时不会
+自动回退到 CPU 编码。
+
 ## 快速部署
 
 在 PC 或 GPU 工作站导出 ONNX：

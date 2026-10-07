@@ -8,6 +8,10 @@
   到 CANN 8.0 后，case8 WebRTC 已验证正常。
 - `20250925` 系统上，CANN 8.0 和 CANN 9.0 的独立 H.264 VENC 都在通道创
   建阶段失败。
+- 官方 Huawei Atlas 310B4 上，固件 `7.8.0.5.216`、驱动 `25.5.0`、CANN
+  `9.2.0-beta.2` 的 case8 已完成 WebRTC + CANN VENC H.264 验证；先把
+  `HwHiAiUser` 加入 `video` 组、重新登录，再重新插拔摄像头是该板端实际验证
+  的前置步骤。
 - 新系统失败发生在 DVPP 保护内存的 IOMMU 映射，不依赖 case8 的摄像头、
   WebRTC 或 OM 推理。
 - 当前没有供应商提供的已验证 VENC/SMMU 修复固件，因此不能把问题写成
@@ -21,9 +25,31 @@
 | `20241128` | 8.0 | 未单独记录完整矩阵 | B309 | `observed-pass` | case8 WebRTC 用户复测正常 |
 | `20250925` | 8.0 | 25.2.0 | B309 | `observed-fail` | `507018`、IOMMU 映射失败 |
 | `20250925` | 9.0 | 25.2.0 | B309 | `observed-fail` | 与 CANN 8.0 相同底层错误 |
+| 官方 Atlas 310B4 | 9.2.0-beta.2 | 25.5.0 | 7.8.0.5.216 | `observed-pass` | 用户组配置、重新插拔后，case8 WebRTC + CANN VENC H.264 正常 |
 
 这里的“通过”只针对实际测试过的组合；旧系统的通过不能证明所有驱动、固件
 和 CANN 组合都受支持。
+
+## ✅ 官方 Atlas 310B4 验证结果
+
+本次验证使用官方 Huawei Atlas 开发板，芯片为 Ascend 310B4，系统为 Ubuntu
+22.04.5 LTS，内核为
+`6.6.0-72.0.0.76.h914.eulerosv2r15.ascend.aarch64`。板端可核对的版本为：
+
+| 项目 | 版本或状态 |
+| --- | --- |
+| 固件 | `7.8.0.5.216` |
+| `npu-smi` 产品标识 | `Atlas 200I A2`，芯片 `Ascend 310B4` |
+| 驱动包 | `25.5.0`，内部版本 `V100R001C23SPC005B219` |
+| CANN | `9.2.0-beta.2` |
+| `npu-smi` | `25.5.0`，310B4 Health OK |
+| HDK 独立版本字段 | 当前板端未发现可核对的独立字段 |
+
+完成 `HwHiAiUser` 加入 `video` 组、退出并重新登录 SSH 会话，再拔下并重新插入
+USB 摄像头后，`/dev/video0` 可以正常提供 MJPG 帧。case8 已确认能够在 NPU
+上执行 OM 推理，使用 CANN VENC 生成 H.264，并通过 WebRTC 连续推流到浏览器。
+该结果是官方 Atlas 平台上的 `observed-pass`，不是对 Orange Pi 系统的兼容性
+推断。摄像头重新插拔是本次板端验证观察到的必要初始化步骤。
 
 ## ✅ 旧系统 CANN 7.0 结果
 

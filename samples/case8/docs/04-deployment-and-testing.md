@@ -8,8 +8,8 @@ case8 的硬件相关操作必须在 Ascend 310B 开发板上执行。本地 Win
 
 | 项目 | 推荐/已验证值 |
 | --- | --- |
-| 板卡 | Orange Pi AI Pro，Ascend 310B4 / 8T |
-| 板端 IP | `192.168.1.100` |
+| 板卡 | Orange Pi AI Pro，或官方 Huawei Atlas，Ascend 310B4 / 8T |
+| 板端 IP | Orange Pi：`192.168.1.100`；官方 Atlas：`192.168.1.99` |
 | 部署目录 | `/home/HwHiAiUser/Documents/case8` |
 | 摄像头 | `/dev/video0`，优先 MJPG |
 | 模型输入 | 静态 `1x3x640x640` |
@@ -17,6 +17,25 @@ case8 的硬件相关操作必须在 Ascend 310B 开发板上执行。本地 Win
 | 推荐旧系统 | `20241128`；CANN 8.0 的 case8 运行已验证 |
 
 完整版本对照和 VENC 限制见 [问题与版本兼容性](05-known-issues-and-version-compatibility.md)。
+
+## 📷 摄像头权限与重新初始化
+
+官方 Atlas 系统中的 V4L2 节点通常属于 `root:video`，权限为 `0660`。使用
+`HwHiAiUser` 启动服务前，必须配置用户组，并在当前板端的实际验证流程中重新
+插拔摄像头：
+
+```bash
+sudo usermod -aG video HwHiAiUser
+# 退出当前 SSH 会话后重新登录
+# 重新登录后拔下并插回 USB 摄像头，让 UVC 设备重新初始化
+id HwHiAiUser
+ls -l /dev/video0 /dev/video1
+```
+
+`id` 输出应包含 `video`。重新插拔用于让 UVC 设备重新初始化；在本次官方
+Atlas 验证中，缺少这一步会出现首帧等待超时。`/dev/video0` 是实际视频采集
+节点，`/dev/video1` 可能是 metadata 节点。不要使用 `chmod 666` 替代用户组
+配置，也不要把 metadata 节点作为视频源。
 
 ## 📦 同步项目
 

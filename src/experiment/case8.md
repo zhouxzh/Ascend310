@@ -29,6 +29,48 @@ HaGRID YOLOv10 模型在 NPU 上完成目标检测，把检测框和标签绘制
 - 解释 NV12、CANN VENC、CPU `libx264` 和 WebRTC 的关系；
 - 在开发板上完成 OM 冒烟、摄像头测试和远程 WebRTC 验收。
 
+## 摄像头权限
+
+官方昇腾 310B 系统通常将摄像头设备设置为 `root:video`、`0660`。如果使用
+`HwHiAiUser` 启动 case8，该用户必须属于 `video` 组，否则 WebRTC 会报告
+`Cannot open video source: /dev/video0`，即使设备列表中能看到 `/dev/video0`。
+
+使用 root 或具有用户管理权限的账户执行：
+
+```bash
+sudo usermod -aG video HwHiAiUser
+```
+
+执行后退出当前 SSH 会话并重新登录。官方 Atlas 开发板的实际验证还要求随后
+拔下并重新插入 USB 摄像头，使 UVC 设备重新初始化；否则即使用户组已经更新，
+旧设备会话也可能导致首帧等待超时。重新插拔后再检查：
+
+```bash
+id HwHiAiUser
+ls -l /dev/video0 /dev/video1
+```
+
+`id` 输出中应包含 `video`。`/dev/video0` 通常是真实的视频采集节点，
+`/dev/video1` 可能是 UVC metadata 节点，case8 应使用 `/dev/video0`。不要
+使用 `chmod 666` 代替用户组配置。
+
+## 官方 Atlas 开发板验证
+
+目前的 case8 已在官方 Huawei Atlas 开发板上完成端到端验证。此次验证的板端
+软件栈为：`npu-smi` 产品标识 `Atlas 200I A2`、芯片 Ascend 310B4；Ubuntu
+22.04.5 LTS；内核
+`6.6.0-72.0.0.76.h914.eulerosv2r15.ascend.aarch64`；固件
+`7.8.0.5.216`；驱动包 `25.5.0`（内部版本
+`V100R001C23SPC005B219`）；CANN `9.2.0-beta.2`；`npu-smi` `25.5.0`。
+板端没有单独暴露可核对的 `HDK` 版本字段，因此这里记录实际可查询的固件、
+驱动和 CANN 版本，不把其中任何一个版本冒充 HDK 版本。
+
+完成 `HwHiAiUser` 加入 `video` 组、重新登录并重新插拔摄像头后，程序可以从
+`/dev/video0` 采集 MJPG，使用 NPU 执行 OM 推理，使用 CANN VENC 进行 H.264
+硬件编码，并通过 WebRTC 连续推流到浏览器。这是当前官方 Atlas 平台上的
+`observed-pass` 结果；CANN VENC 失败时仍保持明确报错并停止，不自动回退到
+CPU 编码。
+
 ## 系统流程
 
 ```mermaid
