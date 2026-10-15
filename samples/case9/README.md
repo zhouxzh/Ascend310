@@ -1,6 +1,6 @@
 # 案例 9：智能聊天机器人
 
-_Qwen2.5 静态 KV ACL 是现有正式基线；Qwen1.5、TinyLlama 和 DeepSeek 是已有的 MindSpore 候选，新一轮还登记 Qwen2.5、Qwen3 和 20T 专用 MiniCPM3 候选。Qwen1.5 的 8T 历史报表为 9/9，因历史 health/snapshot 缺少 `npu_model` 按 8/9 记录；当前地址 G0 已补齐但严格 placement 仍失败，B4 保持 `blocked`；20T `.95` 缺口批次通过 9/9 机器门并保持 `experimental_dirty_base`。8T 随后出现重复 `DRV_LPM_FAULT 0x80E3A203`，恢复 worker 仅完成缩小烟测。TinyLlama 在 8T 的长输出/机器质量门失败，20T 缺口批次执行后为 8/9，32/48 token 长输出出现 UTF-8 错误，继续 `blocked`。DeepSeek 已在 20T `.95` 完成原有 API 机器门，并在 8T 历史 `.90` 地址的缺口批次通过 9/9 机器门；两板中文人工质量和正式准入仍未完成。8T 当前地址为 `192.168.1.90`（`.11.14` 与 `.178` 为同一块板的历史别名）；20T 当前地址为 `192.168.1.95`，`.210` 仅为历史请求地址；音频、ASR/TTS 和 XiaoZhi 暂停。_
+_Qwen2.5 静态 KV ACL 是现有正式基线；Qwen1.5、TinyLlama 和 DeepSeek 是已有的 MindSpore 候选，新一轮还登记 Qwen2.5、Qwen3 和 20T 专用 MiniCPM3 候选。Qwen1.5 的 8T 历史报表为 9/9，因历史 health/snapshot 缺少 `npu_model` 按 8/9 记录；当前地址 G0 已补齐但严格 placement 仍失败，B4 保持 `blocked`；20T `.95` 缺口批次通过 9/9 机器门并保持 `experimental_dirty_base`。8T 随后出现重复 `DRV_LPM_FAULT 0x80E3A203`，恢复 worker 仅完成缩小烟测。TinyLlama 在 8T 的长输出/机器质量门失败，20T 缺口批次执行后为 8/9，32/48 token 长输出出现 UTF-8 错误，继续 `blocked`。DeepSeek 已在 20T `.95` 完成原有 API 机器门，并在 8T 历史 `.90` 地址的缺口批次通过 9/9 机器门；两板中文人工质量和正式准入仍未完成。8T 当前地址为 `192.168.1.90`（`.11.14` 与 `.178` 为同一块板的历史别名）；20T 当前地址为 `192.168.1.101`（`.95` 与 `.210` 为同一块板的历史地址）；音频、ASR/TTS 和 XiaoZhi 暂停。_
 
 ---
 
@@ -18,7 +18,8 @@ vLLM 或 MindIE；新增的 MindSpore 候选明确使用开发板现有 `base` �
 | `192.168.11.14` | 同一块 8T 板的历史地址 | 仅用于历史报告 provenance，不作为当前连接入口 |
 | `192.168.8.178` | 同一块 8T 板的旧地址 | 仅 provenance，不再作为连接入口 |
 | `192.168.8.210`（历史请求地址） | Ascend310B1 / 20T | Qwen2.5 历史批次机器门通过；不再作为当前连接入口 |
-| `192.168.1.95`（当前 20T） | Ascend310B1 / 20T | DeepSeek 固定 FP16 工件、MindSpore/Ascend smoke、两次临时 API 9/9 机器门和完整 2+30 SSE 已记录；Qwen1.5 缺口批次 9/9 机器门、10 轮稳定性和 2+30 性能通过（总耗时 p50/p95 `1329.830/1440.076 ms`，吞吐 p50/p95 `1.505/1.619 token/s`）；TinyLlama 缺口批次 8/9，长输出 32/48 token UTF-8 失败，中文机器质量 7/10；共享 `base` 为 dirty-base，候选质量和正式链仍 blocked |
+| `192.168.1.101`（当前 20T） | Ascend310B1 / 20T | 2026-10-15 当前批次：Qwen1.5 MindSpore 完整机器门通过（首 token p50 `655.5 ms`、总耗时 p50 `1295.4 ms`、吞吐 p50 `1.544 token/s`）；Qwen2.5 静态 KV ACL 完整机器门通过（首事件 p50 `4727.8 ms`、总耗时 p50 `4741.3 ms`、约 `0.422 token/s`）；两者人工质量与正式准入待签字，正式 `8080 -> 7861 -> 7865` 本轮未切换。详见 [20T 当前模型验收记录](docs/50-current-model-acceptance-20261015.md) |
+| `192.168.1.95`（历史 20T 地址） | 同一块 Ascend310B1 / 20T 板的历史地址 | DeepSeek 固定 FP16 工件、MindSpore/Ascend smoke、两次临时 API 9/9 机器门和完整 2+30 SSE 已记录；Qwen1.5 缺口批次 9/9 机器门、10 轮稳定性和 2+30 性能通过（总耗时 p50/p95 `1329.830/1440.076 ms`，吞吐 p50/p95 `1.505/1.619 token/s`）；TinyLlama 缺口批次 8/9，长输出 32/48 token UTF-8 失败，中文机器质量 7/10；共享 `base` 为 dirty-base，候选质量和正式链仍 blocked。该地址证据保留为历史 provenance，不自动提升为 `.101` 当前结论 |
 
 ### 模型分层
 
@@ -251,10 +252,12 @@ repro/mindspore-chat-20260829/
 后的缩小复核；`qwen-lpm-recovery-20260829r` 记录 LPM fault 后的受控恢复、候选链和
 NPU 诊断（可执行机器门全部通过，但不代表硬件稳定）。两者都不能替代完整验收批次。
 `bundle-manifest.json` 与 `SHA256SUMS.txt` 记录每个文件的大小和 SHA-256。
-DeepSeek 已在当前可达的 20T 地址 `.95` 完成独立复现包同步；旧 `.210` 仅保留为历史请求地址。
+DeepSeek 已在历史 20T 地址 `.95` 完成独立复现包同步；当前 20T 地址为 `.101`，`.95` 与
+`.210` 均为历史地址。
 Qwen1.5/20T、TinyLlama/20T 与 DeepSeek/8T 的本轮缺口原始报告已同步到
 `repro/case9-dual-board-gap-20260830/`；TinyLlama/20T 报告为 8/9 机器门失败，保持 `blocked`。
-同步使用显式 allowlist，并遵循 `.part -> size -> SHA-256 ->` 原子改名：
+同步使用显式 allowlist，并遵循 `.part -> size -> SHA-256 ->` 原子改名。下例中的 20T
+主机是历史地址 `.95`；在 `.101` 当前板上复现时改为 `192.168.1.101`：
 
 ```bash
 bash scripts/sync_mindspore_chat_repro_bundle.sh \

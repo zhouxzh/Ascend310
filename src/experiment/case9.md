@@ -1,6 +1,6 @@
 # 案例 9：智能聊天机器人
 
-_本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验。当前同时维护两条彼此独立的路线：Qwen2.5 静态 KV 的 ONNX -> OM -> 原生 ACL 路线，以及 MindSpore/MindNLP 候选路线。20T 当前地址为 `192.168.1.101`；`.95` 与 `.210` 是同一块板的历史地址。8T 当前地址为 `192.168.1.90`；`.11.14` 与报告采集地址 `.178` 是同一块板的历史别名。2026-10-15 的 20T 完整机器验收确认：Qwen1.5-0.5B-Chat 的 MindSpore 路线是当前最适合文字聊天的实验性候选；Qwen2.5-0.5B 静态 KV OM 的 ACL 路线功能完整但明显偏慢。TinyLlama 中文质量未通过；DeepSeek、Qwen3、MiniCPM3 等未在本次形成完整当前验收，不列为可用。本教程只写入有原始证据的结果；`not-run` 和 `blocked` 不等同于对硬件或模型的普遍否定。_
+_本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验，同时维护两条彼此独立的路线：Qwen2.5 静态 KV 的 ONNX -> OM -> 原生 ACL 路线，以及 MindSpore/MindNLP 候选路线。当前板卡地址、历史别名和逐板环境边界见第 3 节。2026-10-15 的 20T 完整机器验收确认：Qwen1.5-0.5B-Chat 的 MindSpore 路线是当前最适合文字聊天的实验性候选；Qwen2.5-0.5B 静态 KV OM 的 ACL 路线功能完整但明显偏慢。TinyLlama 中文质量未通过；DeepSeek、Qwen3、MiniCPM3 等未在本次形成完整当前验收，不列为可用。本教程只写入有原始证据的结果；`not-run`（本轮有意未执行）和 `blocked`（前置条件未满足）不等同于对硬件或模型的普遍否定。_
 
 ## 1. 当前目标和已暂停范围
 
@@ -26,10 +26,15 @@ _本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验。当�
 诊断信息。统一验收包含工件哈希、目标 SoC、实际 NPU 生成、JSON/SSE、`8/16/32/64`
 token 长输出、10 轮稳定性、中文机器探测、协议边界和 2 次预热后的 30 次性能测量。
 
+本教程的证据等级按仓库约定标注：`observed-pass` 为板端实测通过，`observed-fail`
+为板端实测失败，`blocked` 为前置条件未满足而未执行，`not-run` 为本轮有意未执行；
+只有框架文档或控制机静态推断支持的结论分别标为 `documented` 或 `inferred`，不写成
+板端通过。
+
 | 模型 | 路线 | 完整机器门 | p50 首 token/首事件 | p50 总耗时 | token/s p50 | 当前选择 |
 | --- | --- | --- | ---: | ---: | ---: | --- |
-| Qwen1.5-0.5B-Chat | MindSpore 2.4.10 + MindNLP 0.4.1 | 通过 | `655.5 ms` | `1295.4 ms` | `1.544` | 当前首选文字聊天候选 |
-| Qwen2.5-0.5B-Instruct 静态 KV 1024 FP32 OM | 原生 ACL/PyACL | 通过 | `4727.8 ms` | `4741.3 ms` | `0.422` | 功能验证候选，不作为当前流畅入口 |
+| Qwen1.5-0.5B-Chat | MindSpore 2.4.10 + MindNLP 0.4.1 | `observed-pass` | `655.5 ms` | `1295.4 ms` | `1.544` | 当前首选文字聊天候选 |
+| Qwen2.5-0.5B-Instruct 静态 KV 1024 FP32 OM | 原生 ACL/PyACL | `observed-pass` | `4727.8 ms` | `4741.3 ms` | `0.422` | 功能验证候选，不作为当前流畅入口 |
 
 Qwen1.5 的 64-token 请求实际生成 55 token 后正常 `stop`，10 轮稳定性为 `10/10`；
 长中文输出连贯且 UTF-8 完整。它的健康接口同时记录 `device_target=Ascend` 与
@@ -47,7 +52,8 @@ AICore 约 `75-80%`，设备内存约 `9.0 GB`，证明该路线确实执行在 
 
 当前 `.90` 的只读设备快照还显示周期性 `DRV_LPM_FAULT 0x80E3A203`，NPU 内存约
 `13598/15610 MB`；在用户确认设备恢复前，暂停新的重模型加载和长压测。`Health: Alarm`
-仅作为诊断记录，不单独替代模型门禁；快照、哈希和处理边界见仓库验收记录。
+仅作为诊断记录，不单独替代模型门禁；快照、哈希和处理边界见
+`samples/case9/docs/12-case9-evidence-index.md` 及其列出的验收记录。
 
 ## 1.2 MindSpore 候选模型范围
 
@@ -60,21 +66,30 @@ AICore 约 `75-80%`，设备内存约 `9.0 GB`，证明该路线确实执行在 
 | `tinyllama-1.1b-mindspore` | 已测 | 已测 | 长输出/中文质量失败，保持 `blocked`；英文单独报告 |
 | `deepseek-r1-qwen-1.5b-mindspore` | 兼容性已测 | 优先已测 | 中文质量与正式准入独立审核 |
 | `qwen2.5-0.5b-mindspore` | `blocked`：context-only 诊断有输出，但严格 placement 证据缺失 | `not-run` | 不能用诊断输出启动服务 |
-| `qwen2.5-1.5b-mindspore` | `blocked`：七个文件已同步并校验；污染 CANN/PYTHONPATH 的初次 SIGSEGV 仅作历史证据，正确 CANN v4 已完成加载和两 token context-only 诊断 | `not-run` | placement、生成/API/质量/性能均未完成；内存门原始记录为 `docs/37-qwen25-1.5b-8t-memory-gate-20260904.md` |
+| `qwen2.5-1.5b-mindspore` | `blocked`：七个文件已同步并校验；污染 CANN/PYTHONPATH 的初次 SIGSEGV 仅作历史证据，正确 CANN v4 已完成加载和两 token context-only 诊断 | `not-run` | placement、生成/API/质量/性能均未完成；内存门原始记录为 `samples/case9/docs/37-qwen25-1.5b-8t-memory-gate-20260904.md` |
 | `qwen3-0.6b-mindspore` | `blocked`：MindNLP 0.4.1 无 Qwen3 loader | `not-run` | 不升级环境 |
 | `qwen3-1.7b-mindspore` | `blocked`：MindNLP 0.4.1 无 Qwen3 loader | `not-run` | 不升级环境 |
 | `minicpm3-4b-mindspore` | 不执行 | `not-run` | 仅使用官方 20T/24G Modelers FP16 示例 |
 
 OpenPangu、EE-Model、TeleChat、BitCPM、MiniCPM5、MiniMind 和 Haidass 等条件候选
 若依赖 Torch/Torch-NPU、vLLM、MindIE、新版 CANN 或缺少 310B 证据，则登记为
-`blocked`/`not-run`，不得作为失败回退。模型来源、证据等级和具体阻断原因见仓库中的
-候选清单与验收记录；框架支持不能替代当前板端 NPU 证据。
+`blocked`/`not-run`，不得作为失败回退。模型来源、证据等级和具体阻断原因见
+`samples/case9/docs/31-mindspore-llm-candidate-inventory.md` 和
+`samples/case9/docs/12-case9-evidence-index.md`；框架支持不能替代当前板端 NPU 证据。
 
 ## 2. 浏览器、网关、ACL 和 NPU 架构
 
 候选链一次只运行一个 MindSpore worker。浏览器没有管理接口，Profile 切换只能在板端
 执行 `case9-modelctl`；网关密钥只存在板端环境。ONNX -> OM 路线和 MindSpore 路线
 共享 NPU，但不共享进程、模型实例或验收结论；同一时刻只启动明确记录的那一条路线。
+
+本案例的运行代码位于 `samples/case9/`：`app.py` 是 Bearer 保护的 OpenAI 兼容网关，
+`mindspore_chat_service.py` 与 `mindspore_chat_providers.py` 是 MindSpore Profile 服务，
+`qwen25_kv_acl_runtime.py` 与 `qwen25_kv_acl_service.py` 是原生 ACL/OM 路线，
+`configs/chat_model_profiles.json` 是 Profile 注册表，`scripts/` 保存环境检查、启动、
+验收和同步命令，`tests/` 保存单元与合同测试。操作者从 `samples/case9/README.md`
+开始执行；编号工程文档和验收证据的索引入口是
+`samples/case9/docs/12-case9-evidence-index.md`。
 
 ```mermaid
 flowchart LR
@@ -183,7 +198,7 @@ MindSpore Profile 没有 OM 转换步骤；其门禁是工件核验、MindSpore 
 tokenizer 导入、单 token 生成、JSON/SSE 契约、长输出、稳定性、质量和性能。Qwen2.5
 的 ONNX -> ATC -> OM -> ACL 门禁属于独立正式基线，必须逐板确认 `Ascend310B4`
 或 `Ascend310B1` 的 descriptor、输入输出 byte size、ACL smoke 和 NPU 采样，不能用
-MindSpore 结果替代。任何门失败都记录为 `failed`、`blocked` 或 `not-run`，不自动切换
+MindSpore 结果替代。任何门失败都记录为 `observed-fail`、`blocked` 或 `not-run`，不自动切换
 CPU、云端或其他推理框架；没有当前 `.101` 的完整环境和工件快照前，不得把 `.210` 的
 历史报告当作 20T 通过证据。
 
@@ -241,7 +256,7 @@ PUBLIC_MODEL_ID=case9-rag
 `http://192.168.1.101:7868/`（20T）。已归档的候选链 smoke 报告包含未授权 `401`、授权
 `/v1/models`、JSON/SSE 和 UI health 的历史响应；这些是协议/UI 证据，不是双板缺口批次
 的自动通过。每次新批次都必须保存请求、响应、服务 PID 和板卡 IP，不能把 `.90` 的 UI
-结果复制给 `.95`。
+结果复制给 `.101`。
 
 正式 `8080 -> 7861 -> 7865` 由本教程和候选脚本保持不变。
 
@@ -272,10 +287,10 @@ python scripts/mindspore_chat_acceptance.py \
 
 | 缺口门 | 当前 `.90` B4/8T（历史报告 `.11.14`/`.178`） | `.101` B1/20T |
 | --- | --- | --- |
-| Qwen2.5 ONNX/OM 当前身份、descriptor、ACL smoke | `passed`（identity-only；历史性能不重跑） | `blocked`（当前 ONNX/OM/contract/lock 缺失，未执行 ACL load） |
-| Qwen1.5 MindSpore 长输出、稳定性、质量、性能 | 历史报表 9/9，但严格身份门 8/9，当前 `blocked`；共享 `base`，人工质量待审 | `passed`，9/9 机器门，人工质量待审，`experimental_dirty_base` |
-| TinyLlama MindSpore 长输出、稳定性、质量、性能 | `blocked`（历史长输出/中文质量失败） | `failed`，8/9；32/48 token UTF-8 失败，保持 `blocked` |
-| DeepSeek MindSpore API、稳定性、质量、性能 | `passed`，9/9 机器门，人工质量待审，`experimental_dirty_base` | 已有隔离 API 机器门；中文质量和正式准入 `blocked` |
+| Qwen2.5 ONNX/OM 当前身份、descriptor、ACL smoke | `observed-pass`（identity-only；历史性能不重跑） | `blocked`（当前 ONNX/OM/contract/lock 缺失，未执行 ACL load） |
+| Qwen1.5 MindSpore 长输出、稳定性、质量、性能 | 历史报表 9/9，但严格身份门 8/9，当前 `blocked`；共享 `base`，人工质量待审 | `observed-pass`，9/9 机器门，人工质量待审，`experimental_dirty_base` |
+| TinyLlama MindSpore 长输出、稳定性、质量、性能 | `blocked`（历史长输出/中文质量失败） | `observed-fail`，8/9；32/48 token UTF-8 失败，保持 `blocked` |
+| DeepSeek MindSpore API、稳定性、质量、性能 | `observed-pass`，9/9 机器门，人工质量待审，`experimental_dirty_base` | 已有隔离 API 机器门；中文质量和正式准入 `blocked` |
 | Qwen2.5-0.5B MindSpore loader/placement | `blocked`；固定工件和 NPU 活动诊断已记录，严格 placement 缺失 | `not-run`；当前 20T 尚未运行该 Profile |
 | Qwen2.5-1.5B MindSpore 配置/权重加载 | `blocked`；初次污染环境 SIGSEGV（exit 139）保留为历史证据，正确 CANN v4 已加载并生成 2 token，但 placement/API/质量/性能未运行 | `not-run`；未执行 |
 | Qwen3-0.6B/1.7B MindSpore loader | `blocked`；MindNLP 0.4.1 无 Qwen3 loader，未下载权重 | `not-run`；未执行 |
@@ -326,8 +341,10 @@ mask 告警；post-mask n 批次已固定 `top_p=1.0` 并显式传入 mask。`He
 或真实设备命令。文字 LLM 的 JSON/SSE 成功不能证明 XiaoZhi 语音闭环可用。恢复该阶段
 前，需单独审核无 Torch 的语音组件、设备协议、鉴权、音频资源和真实设备端到端验收。
 
-模型候选的来源、证据分级、逐板执行顺序和验收记录由仓库工程文档维护；本教程只保留
-可独立复现的命令、边界和已测结果，不依赖其他仓库 Markdown 文件。
+模型候选的来源、证据分级、逐板执行顺序和验收记录由 `samples/case9/docs/` 下的编号
+工程文档维护，索引入口是 `samples/case9/docs/12-case9-evidence-index.md`。本教程正文
+可以独立阅读，只保留可复现的命令、边界和已测结果，不把工程文档当作理解正文的前置
+条件。
 
 参考：[MindSpore Orange Pi 在线推理目录][mindspore-orange-pi]、[Qwen1.5 模型卡][qwen15]、
 [TinyLlama 模型卡][tinyllama]、[DeepSeek 模型卡][deepseek]、[昇腾 ATC 文档][atc]。
