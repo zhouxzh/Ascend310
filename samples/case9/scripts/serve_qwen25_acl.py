@@ -47,13 +47,20 @@ def parse_args() -> argparse.Namespace:
 
 
 def _check_board_environment() -> None:
+    allow_dirty_base = (
+        os.environ.get("CASE9_QWEN25_ALLOW_DIRTY_BASE") == "1"
+        and os.environ.get("CONDA_DEFAULT_ENV") == "base"
+        and Path(sys.prefix).resolve() == Path(os.environ.get("CONDA_PREFIX", sys.prefix)).resolve()
+    )
     for name in _FORBIDDEN_BOARD_PACKAGES:
         try:
             present = importlib.util.find_spec(name) is not None
         except (ImportError, AttributeError, ValueError) as exc:
             raise SystemExit(f"cannot inspect board package {name}: {type(exc).__name__}") from exc
-        if present:
+        if present and not allow_dirty_base:
             raise SystemExit(f"forbidden board package is importable: {name}")
+        if present and allow_dirty_base:
+            LOGGER.warning("dirty-base test override; package remains importable: %s", name)
     try:
         import acl  # type: ignore  # noqa: F401
     except ImportError as exc:

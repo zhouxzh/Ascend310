@@ -19,5 +19,6 @@ export TEXT_CHAT_MAX_CHARACTERS="4000"
 export TEXT_CHAT_MAX_CHARACTERS_CAP="4000"
 export TEXT_CHAT_ENV_ROOT_FILE="/dev/null"
 export TEXT_CHAT_ENV_FILE="/dev/null"
+export TEXT_CHAT_PYTHONNOUSERSITE="${TEXT_CHAT_PYTHONNOUSERSITE:-0}"
 
 exec bash scripts/run_text_chat.sh

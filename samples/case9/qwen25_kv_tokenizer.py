@@ -60,6 +60,9 @@ class Qwen25Tokenizer:
             except Exception as exc:
                 raise TokenizerError(f"cannot load tokenizer: {path}") from exc
         self._tokenizer = implementation
+        # ``get_vocab_size`` is a constant but is relatively expensive on
+        # the board binding. Cache it once; encode/decode validate many IDs.
+        self._vocab_size = self._read_vocab_size()
         self.tokenizer_path = path
         self.config_path = Path(config_path).expanduser() if config_path else None
         self.config = self._read_config(self.config_path)
@@ -154,6 +157,9 @@ class Qwen25Tokenizer:
 
     @property
     def vocab_size(self) -> int:
+        return self._vocab_size
+
+    def _read_vocab_size(self) -> int:
         getter = getattr(self._tokenizer, "get_vocab_size", None)
         if not callable(getter):
             raise TokenizerError("tokenizer implementation lacks get_vocab_size")

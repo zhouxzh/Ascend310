@@ -78,8 +78,11 @@ BOARD_ALIASES: Mapping[str, Mapping[str, str]] = {
     "192.168.1.90": {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
     "192.168.11.14": {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
     "192.168.8.178": {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
-    "20t": {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"},
-    "board20t": {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"},
+    "20t": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
+    "board20t": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
+    # .95 is a historical address for this same B1/20T board.
+    "192.168.1.95": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
+    "192.168.1.101": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
 }
 
 REQUIRED_MACHINE_GATES: Tuple[str, ...] = (
@@ -468,8 +471,14 @@ def _report_soc(document: Mapping[str, Any]) -> str:
         candidates.extend(board.get(key) for key in ("soc", "board_soc", "npu_model"))
     checks = document.get("checks")
     if isinstance(checks, Mapping):
+        observed_board = checks.get("board")
+        if isinstance(observed_board, Mapping):
+            candidates.extend(observed_board.get(key) for key in ("soc", "board_soc", "npu_model"))
         profile_check = checks.get("profile")
-        if isinstance(profile_check, Mapping):
+        # ``checks.profile`` is the registry's primary target. If an observed
+        # board block exists, it is authoritative for this evidence report;
+        # counting both would make a valid secondary-board run ambiguous.
+        if isinstance(profile_check, Mapping) and not isinstance(observed_board, Mapping):
             candidates.extend(profile_check.get(key) for key in ("board_soc", "soc", "npu_model"))
         npu_check = checks.get("npu")
         if isinstance(npu_check, Mapping):
@@ -501,8 +510,11 @@ def _report_tier(document: Mapping[str, Any]) -> str:
         candidates.append(board.get("tier"))
     checks = document.get("checks")
     if isinstance(checks, Mapping):
+        observed_board = checks.get("board")
+        if isinstance(observed_board, Mapping):
+            candidates.append(observed_board.get("tier"))
         profile_check = checks.get("profile")
-        if isinstance(profile_check, Mapping):
+        if isinstance(profile_check, Mapping) and not isinstance(observed_board, Mapping):
             candidates.append(profile_check.get("board_tier"))
             candidates.append(profile_check.get("tier"))
     normalized_values: List[str] = []
@@ -525,6 +537,9 @@ def _report_host(document: Mapping[str, Any]) -> str:
         candidates.extend(board.get(key) for key in ("host", "board_host", "target_host"))
     checks = document.get("checks")
     if isinstance(checks, Mapping):
+        observed_board = checks.get("board")
+        if isinstance(observed_board, Mapping):
+            candidates.extend(observed_board.get(key) for key in ("host", "board_host", "target_host"))
         profile_check = checks.get("profile")
         if isinstance(profile_check, Mapping):
             candidates.extend(profile_check.get(key) for key in ("host", "board_host", "target_host"))

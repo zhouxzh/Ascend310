@@ -14,7 +14,7 @@ test doubles and older ACL bindings.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import importlib
 import json
@@ -203,6 +203,17 @@ def verify_artifact_locks(
         raise RuntimeUnavailable(f"OM lock model_id is not {MODEL_ID}")
     status["model_id"] = str(lock_model) if lock_model is not None else MODEL_ID
     lock_soc = _lock_value(raw, "soc_version", "target_soc", "soc")
+    # The immutable pre-schema B4 lock predates the explicit ``soc_version``
+    # field but records its ATC command.  Admit it only for the separately
+    # marked cross-SoC experiment, and only when that command names a known
+    # Ascend target.  Native admission still requires an explicit field.
+    if lock_soc is None and allow_cross_soc:
+        atc_command = raw.get("atc_command")
+        if isinstance(atc_command, str):
+            match = re.search(r"(?:--soc_version[=\\s]+)(Ascend310B[0-9]+)", atc_command)
+            if match is not None:
+                lock_soc = match.group(1)
+                status["soc_version_inferred_from"] = "atc_command"
     if require_locks and not isinstance(lock_soc, str):
         raise RuntimeUnavailable("OM lock is missing soc_version")
     if expected_soc_version and lock_soc and str(lock_soc) != str(expected_soc_version):
@@ -384,6 +395,9 @@ class _NativeRequest:
     # host mirror is intentionally no longer authoritative.  A later D2D
     # failure must fail closed instead of falling back to a stale cache.
     device_cache_used: bool = False
+    # Opt-in diagnostic counters. The trace is disabled unless
+    # CASE9_ACL_TRACE_FILE is set by an explicit benchmark.
+    trace: Dict[str, Any] = field(default_factory=dict)
 
 
 class _RequestWatchdog:
@@ -680,13 +694,26 @@ class Qwen25AclRuntime:
             raise RuntimeBusy("another Qwen2.5 NPU operation is already running")
         self._cancel.clear()
         request_handle = None
+        stream_started = time.perf_counter()
         try:
+            started = time.perf_counter()
             prompt_ids = self._encode_messages(messages)
+            encode_seconds = time.perf_counter() - started
             sequence_length = int(getattr(self.contract, "static_sequence_length", 1024))
             if len(prompt_ids) + limit > sequence_length:
                 raise RuntimeRequestError(f"prompt plus max_tokens exceeds the fixed {sequence_length}-token context")
+            started = time.perf_counter()
             cache = self._new_cache()
+            cache_create_seconds = time.perf_counter() - started
+            started = time.perf_counter()
             request_handle = self._begin_backend_request(cache)
+            begin_backend_seconds = time.perf_counter() - started
+            if hasattr(request_handle, "trace"):
+                request_handle.trace.update({
+                    "encode_messages_seconds": encode_seconds,
+                    "new_cache_seconds": cache_create_seconds,
+                    "begin_backend_seconds": begin_backend_seconds,
+                })
             self._active_request = request_handle
             deadline = time.monotonic() + self.execution_timeout_seconds
             watchdog = _RequestWatchdog(self, deadline)
@@ -698,7 +725,9 @@ class Qwen25AclRuntime:
                 self._check_cancelled()
                 _, cache, logits = self._run_step(token_id, real_length, cache, deadline, request_handle)
                 real_length += 1
+                started = time.perf_counter()
                 next_id = _greedy_next_id(logits, self._vocabulary_size())
+                self._record_decode_trace(request_handle, started, int(getattr(logits, "nbytes", 0)))
             if next_id is None:
                 raise RuntimeUnavailable("Qwen2.5 produced no logits for the prompt")
 
@@ -728,7 +757,9 @@ class Qwen25AclRuntime:
                     break
                 _, cache, logits = self._run_step(token_id, real_length, cache, deadline, request_handle)
                 real_length += 1
+                started = time.perf_counter()
                 next_id = _greedy_next_id(logits, self._vocabulary_size())
+                self._record_decode_trace(request_handle, started, int(getattr(logits, "nbytes", 0)))
                 yield GenerationResult(text, len(prompt_ids), len(generated), "in_progress", False)
         finally:
             try:
@@ -736,12 +767,26 @@ class Qwen25AclRuntime:
                     self._watchdog.stop()
                     self._watchdog = None
                 if request_handle is not None:
+                    if hasattr(request_handle, "trace"):
+                        request_handle.trace["stream_wall_seconds"] = time.perf_counter() - stream_started
                     self._end_backend_request(request_handle)
             finally:
                 # Never leave the admission lock held when ACL cleanup
                 # reports an error; the backend is already fail-closed.
                 self._active_request = None
                 self._lock.release()
+
+    @staticmethod
+    def _record_decode_trace(handle: Any, started: float, logits_bytes: int) -> None:
+        """Record host-side greedy selection without coupling fake backends."""
+
+        trace = getattr(handle, "trace", None)
+        if not isinstance(trace, dict):
+            return
+        elapsed = time.perf_counter() - started
+        trace["decode_select_seconds"] = trace.get("decode_select_seconds", 0.0) + elapsed
+        trace["decode_select_bytes"] = trace.get("decode_select_bytes", 0) + int(logits_bytes)
+        trace["decode_select_calls"] = trace.get("decode_select_calls", 0) + 1
 
     def _encode_messages(self, messages: Sequence[Mapping[str, Any]]) -> List[int]:
         if self._tokenizer is None or self.contract is None:
@@ -1180,6 +1225,7 @@ class NativeQwen25Backend:
         # before execute() makes worker-thread allocations fail on 310B4.
         if self.context is not None:
             _acl_check(self.acl.rt.set_context(self.context), "acl.rt.set_context")
+        request_begin_started = time.perf_counter()
         input_dataset = self.acl.mdl.create_dataset()
         output_dataset = self.acl.mdl.create_dataset()
         if input_dataset is None or output_dataset is None:
@@ -1194,6 +1240,38 @@ class NativeQwen25Backend:
         cache_input_pointers: Dict[str, int] = {}
         allocations: List[Tuple[int, Any]] = []
         np = _numpy()
+        trace: Dict[str, Any] = {
+            "started_at": time.time(),
+            "begin_request_seconds": 0.0,
+            "initial_cache_h2d_seconds": 0.0,
+            "initial_cache_h2d_bytes": 0,
+            "base_h2d_seconds": 0.0,
+            "base_h2d_bytes": 0,
+            "base_h2d_calls": 0,
+            "cache_h2d_seconds": 0.0,
+            "cache_h2d_bytes": 0,
+            "cache_h2d_calls": 0,
+            "execute_seconds": 0.0,
+            "execute_calls": 0,
+            "logits_d2h_seconds": 0.0,
+            "logits_d2h_bytes": 0,
+            "logits_d2h_calls": 0,
+            "cache_d2h_seconds": 0.0,
+            "cache_d2h_bytes": 0,
+            "cache_d2h_calls": 0,
+            "decode_select_seconds": 0.0,
+            "decode_select_bytes": 0,
+            "decode_select_calls": 0,
+            "set_context_seconds": 0.0,
+            "set_context_calls": 0,
+            "step_wall_seconds": 0.0,
+            "cleanup_seconds": 0.0,
+            "d2d_seconds": 0.0,
+            "d2d_attempts": 0,
+            "d2d_successes": 0,
+            "steps": 0,
+            "step_records": [],
+        }
         try:
             for item in self._inputs:
                 pointer, data = self._add_buffer(input_dataset, _tensor_bytes(item))
@@ -1207,24 +1285,38 @@ class NativeQwen25Backend:
                     value = np.ascontiguousarray(cache_values[item.name], dtype=_numpy_dtype(item.dtype, np))
                     if tuple(value.shape) != item.shape or int(value.nbytes) != _tensor_bytes(item):
                         raise RuntimeUnavailable(f"cache input {item.name} shape/size mismatch")
+                    started = time.perf_counter()
                     self._copy_h2d(pointer, value)
+                    trace["initial_cache_h2d_seconds"] += time.perf_counter() - started
+                    trace["initial_cache_h2d_bytes"] += int(value.nbytes)
                     cache_input_pointers[item.name] = pointer
             for item in self._outputs:
                 pointer, data = self._add_buffer(output_dataset, _tensor_bytes(item))
                 allocations.append((pointer, data))
                 output_records[item.name] = (pointer, data)
                 output_arrays[item.name] = np.empty(item.shape, dtype=_numpy_dtype(item.dtype, np))
-            request = _NativeRequest(input_dataset, output_dataset, input_records, output_records, output_arrays, cache_input_pointers, allocations)
+            request = _NativeRequest(input_dataset, output_dataset, input_records, output_records, output_arrays, cache_input_pointers, allocations, trace=trace)
+            trace["begin_request_seconds"] = time.perf_counter() - request_begin_started
             self._active = request
             return request
         except Exception:
-            self._cleanup_request(_NativeRequest(input_dataset, output_dataset, input_records, output_records, output_arrays, cache_input_pointers, allocations))
+            self._cleanup_request(_NativeRequest(input_dataset, output_dataset, input_records, output_records, output_arrays, cache_input_pointers, allocations, trace=trace))
             raise
 
     def run_request_step(self, request: _NativeRequest, base_inputs: Mapping[str, Any], real_length: int, cache_values: Optional[Mapping[str, Any]] = None) -> BackendStep:
         if request is not self._active or self.acl is None or self.model_id is None:
             raise RuntimeUnavailable("ACL request is not active")
         np = _numpy()
+        trace = request.trace
+        step_started = time.perf_counter()
+        record: Dict[str, Any] = {"real_length": int(real_length)}
+        trace["steps"] += 1
+        trace["step_records"].append(record)
+        if len(trace["step_records"]) > 2048:
+            del trace["step_records"][:-2048]
+        started = time.perf_counter()
+        base_bytes = 0
+        base_calls = 0
         for item in self._inputs[:3]:
             value = base_inputs.get(item.name)
             if value is None:
@@ -1233,32 +1325,76 @@ class NativeQwen25Backend:
             if tuple(array.shape) != item.shape or int(array.nbytes) != _tensor_bytes(item):
                 raise RuntimeUnavailable(f"invalid base input buffer {item.name}")
             self._copy_h2d(request.input_records[item.name][0], array)
+            base_bytes += int(array.nbytes)
+            base_calls += 1
+        base_seconds = time.perf_counter() - started
+        trace["base_h2d_seconds"] += base_seconds
+        trace["base_h2d_bytes"] += base_bytes
+        trace["base_h2d_calls"] += base_calls
+        record.update({"base_h2d_seconds": base_seconds, "base_h2d_bytes": base_bytes})
         # If D2D is unavailable, the runtime's host cache is authoritative and
         # must be copied back before each subsequent execution.  The normal
         # path performs this only after the first D2D attempt fails.
         if not request.device_cache_valid and cache_values is not None:
+            started = time.perf_counter()
+            cache_bytes = 0
+            cache_calls = 0
             for item in self._inputs[3:]:
                 value = cache_values.get(item.name)
                 if value is None:
                     raise RuntimeUnavailable(f"missing host cache input {item.name}")
                 array = np.ascontiguousarray(value, dtype=_numpy_dtype(item.dtype, np))
                 self._copy_h2d(request.input_records[item.name][0], array)
+                cache_bytes += int(array.nbytes)
+                cache_calls += 1
+            cache_seconds = time.perf_counter() - started
+            trace["cache_h2d_seconds"] += cache_seconds
+            trace["cache_h2d_bytes"] += cache_bytes
+            trace["cache_h2d_calls"] += cache_calls
+            record.update({"cache_h2d_seconds": cache_seconds, "cache_h2d_bytes": cache_bytes})
+        else:
+            record.update({"cache_h2d_seconds": 0.0, "cache_h2d_bytes": 0})
         if self.context is not None:
+            started = time.perf_counter()
             _acl_check(self.acl.rt.set_context(self.context), "acl.rt.set_context")
+            trace["set_context_seconds"] += time.perf_counter() - started
+            trace["set_context_calls"] += 1
         execute = getattr(self.acl.mdl, "execute", None)
         if not callable(execute):
             raise RuntimeUnavailable("CANN binding lacks synchronous acl.mdl.execute")
+        started = time.perf_counter()
         _acl_check(execute(self.model_id, request.input_dataset, request.output_dataset), "acl.mdl.execute")
+        execute_seconds = time.perf_counter() - started
+        trace["execute_seconds"] += execute_seconds
+        trace["execute_calls"] += 1
+        record["execute_seconds"] = execute_seconds
         logits_item = self._logits_descriptor()
         if logits_item is None:
             raise RuntimeUnavailable("ACL descriptor does not identify a logits output")
         logits = request.output_arrays[logits_item.name]
+        started = time.perf_counter()
         self._copy_d2h(logits, request.output_records[logits_item.name][0], int(logits.nbytes))
+        logits_seconds = time.perf_counter() - started
+        trace["logits_d2h_seconds"] += logits_seconds
+        trace["logits_d2h_bytes"] += int(logits.nbytes)
+        trace["logits_d2h_calls"] += 1
+        record.update({"logits_d2h_seconds": logits_seconds, "logits_d2h_bytes": int(logits.nbytes)})
         outputs: Dict[str, Any] = {logits_item.name: logits}
+        d2d_attempted = not self._d2d_disabled
+        started = time.perf_counter()
         cache_ok = self._device_cache_d2d(request, real_length)
+        d2d_seconds = time.perf_counter() - started
+        trace["d2d_seconds"] += d2d_seconds
+        if d2d_attempted:
+            trace["d2d_attempts"] += 1
+        if cache_ok:
+            trace["d2d_successes"] += 1
+        record.update({"d2d_attempted": d2d_attempted, "d2d_seconds": d2d_seconds, "d2d_success": bool(cache_ok)})
         if cache_ok:
             request.device_cache_used = True
             request.device_cache_valid = True
+            trace["step_wall_seconds"] += time.perf_counter() - step_started
+            record["step_wall_seconds"] = time.perf_counter() - step_started
             return BackendStep(outputs, True)
         if request.device_cache_used:
             # Host buffers deliberately stop tracking the cache after a
@@ -1267,24 +1403,57 @@ class NativeQwen25Backend:
             # restarted before accepting another request.
             self.poisoned = True
             raise RuntimeUnavailable("device cache update failed after resident-cache execution")
+        started = time.perf_counter()
+        cache_bytes = 0
+        cache_calls = 0
         for item in self._outputs:
             if item.name == logits_item.name:
                 continue
             array = request.output_arrays[item.name]
             self._copy_d2h(array, request.output_records[item.name][0], int(array.nbytes))
             outputs[item.name] = array
+            cache_bytes += int(array.nbytes)
+            cache_calls += 1
+        cache_seconds = time.perf_counter() - started
+        trace["cache_d2h_seconds"] += cache_seconds
+        trace["cache_d2h_bytes"] += cache_bytes
+        trace["cache_d2h_calls"] += cache_calls
+        record.update({"cache_d2h_seconds": cache_seconds, "cache_d2h_bytes": cache_bytes})
         request.device_cache_valid = bool(cache_ok)
+        trace["step_wall_seconds"] += time.perf_counter() - step_started
+        record["step_wall_seconds"] = time.perf_counter() - step_started
         return BackendStep(outputs, False)
 
     def end_request(self, request: _NativeRequest) -> None:
         if request is not self._active:
             return
+        started = time.perf_counter()
         ok = self._cleanup_request(request)
+        request.trace["cleanup_seconds"] = time.perf_counter() - started
         self._active = None
+        self._write_trace(request, cleanup_ok=ok)
         if not ok:
             self.cleanup_failed = True
             self.poisoned = True
             raise RuntimeUnavailable("ACL request buffer cleanup failed; restart required")
+
+    def _write_trace(self, request: _NativeRequest, cleanup_ok: bool) -> None:
+        """Persist opt-in per-request timings as JSONL for board diagnosis."""
+
+        target = os.environ.get("CASE9_ACL_TRACE_FILE", "").strip()
+        if not target:
+            return
+        payload = dict(request.trace)
+        payload["finished_at"] = time.time()
+        payload["cleanup_ok"] = bool(cleanup_ok)
+        payload["device_cache_update"] = bool(self.supports_device_cache_update)
+        try:
+            path = Path(target).expanduser()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        except Exception:
+            LOGGER.warning("could not write ACL trace file", exc_info=True)
 
     def run(self, inputs: Mapping[str, Any]) -> Any:
         cache = {item.name: inputs[item.name] for item in self._inputs[3:] if item.name in inputs}

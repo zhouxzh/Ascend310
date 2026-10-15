@@ -276,7 +276,14 @@ def _profile_status(settings: TextChatSettings) -> dict[str, Any]:
         result["profiles"] = registry.public_profiles()
         state = read_active_state(state_path, registry=registry)
         if state is not None:
-            result["active"] = registry.get(state.profile_id).to_public_dict()
+            active = registry.get(state.profile_id).to_public_dict()
+            # A profile's aggregate registry status belongs to its primary
+            # validation board.  The controller state is authoritative for
+            # the worker actually serving this candidate UI, so expose it on
+            # the active item without rewriting the per-board registry rows.
+            active["status"] = state.status
+            active["runtime_status_source"] = "active_worker"
+            result["active"] = active
             result["state"] = {
                 "profile_id": state.profile_id,
                 "status": state.status,
@@ -630,7 +637,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         <h1>Case9 文字聊天测试</h1>
         <p class="subtle">服务端会话 · <span id="model">读取模型中…</span></p>
         <p class="subtle" id="profile-status" aria-live="polite">活动 Profile：读取中…</p>
-        <div class="profiles" id="profiles" aria-label="可用模型 Profile"><strong>模型列表：</strong><span>读取中…</span></div>
+        <div class="profiles" id="profiles" aria-label="当前运行模型"><strong>当前模型：</strong><span>读取中…</span></div>
       </div>
       <div id="status" class="status" data-kind="busy" role="status">连接中…</div>
     </header>
@@ -675,17 +682,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         input.disabled = value;
       }
 
-      function renderProfiles(items, activeId) {
-        profiles.replaceChildren();
-        const label = document.createElement('strong');
-        label.textContent = '模型列表：';
-        profiles.appendChild(label);
-        if (!Array.isArray(items) || items.length === 0) {
-          const emptyProfiles = document.createElement('span');
-          emptyProfiles.textContent = '暂无可用 Profile';
-          profiles.appendChild(emptyProfiles);
-          return;
-        }
+      function appendProfilePills(container, items, activeId) {
         items.forEach((item) => {
           if (!item || typeof item.id !== 'string') return;
           const pill = document.createElement('span');
@@ -739,8 +736,40 @@ TEXT_CHAT_HTML = r"""<!doctype html>
             detail.textContent = ' · ' + details.join(' · ');
             pill.appendChild(detail);
           }
-          profiles.appendChild(pill);
+          container.appendChild(pill);
         });
+      }
+
+      function renderProfiles(items, active) {
+        profiles.replaceChildren();
+        const label = document.createElement('strong');
+        label.textContent = '当前模型：';
+        profiles.appendChild(label);
+        const all = Array.isArray(items) ? items.filter((item) => item && typeof item.id === 'string') : [];
+        const activeId = active && typeof active.id === 'string' ? active.id : '';
+        const current = all.filter((item) => item.id === activeId).map((item) => (
+          active ? Object.assign({}, item, { status: active.status || item.status }) : item
+        ));
+        if (current.length) {
+          appendProfilePills(profiles, current, activeId);
+        } else {
+          const emptyProfiles = document.createElement('span');
+          emptyProfiles.textContent = '没有正在运行的模型';
+          profiles.appendChild(emptyProfiles);
+        }
+
+        const research = all.filter((item) => item.id !== activeId);
+        if (!research.length) return;
+        const inventory = document.createElement('details');
+        inventory.className = 'profiles';
+        const summary = document.createElement('summary');
+        summary.textContent = '研究候选（' + research.length + '）';
+        inventory.appendChild(summary);
+        const candidateList = document.createElement('div');
+        candidateList.className = 'profiles';
+        appendProfilePills(candidateList, research, activeId);
+        inventory.appendChild(candidateList);
+        profiles.parentNode.insertBefore(inventory, profiles.nextSibling);
       }
 
       function applyProfileConfig(config) {
@@ -767,7 +796,9 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         } else {
           profileStatus.textContent = '活动 Profile：尚未切换';
         }
-        renderProfiles(config && config.profiles, active && active.id);
+        const previousInventory = profiles.parentNode.querySelector('details.profiles');
+        if (previousInventory) previousInventory.remove();
+        renderProfiles(config && config.profiles, active);
       }
 
       function addMessage(role, text) {

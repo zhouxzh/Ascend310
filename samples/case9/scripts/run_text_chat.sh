@@ -40,7 +40,20 @@ conda activate "${conda_env}" || {
   echo "Conda environment not found: ${conda_env}" >&2
   exit 2
 }
-export PYTHONNOUSERSITE=1
+# The default isolated environment must not read user-site packages.  The
+# explicit dirty-base candidate path may need the board image's preinstalled
+# FastAPI stack from user site; it is never a formal deployment path.
+case "${TEXT_CHAT_PYTHONNOUSERSITE:-1}" in
+  1) export PYTHONNOUSERSITE=1 ;;
+  0)
+    if [[ "${TEXT_CHAT_ALLOW_DIRTY_BASE:-0}" != "1" || "${conda_env}" != "base" ]]; then
+      echo "TEXT_CHAT_PYTHONNOUSERSITE=0 is only allowed with TEXT_CHAT_ALLOW_DIRTY_BASE=1 in base" >&2
+      exit 2
+    fi
+    unset PYTHONNOUSERSITE
+    ;;
+  *) echo "TEXT_CHAT_PYTHONNOUSERSITE must be 0 or 1" >&2; exit 2 ;;
+esac
 export TEXT_CHAT_GATEWAY_API_KEY="${TEXT_CHAT_GATEWAY_API_KEY:-${GATEWAY_API_KEY:-}}"
 
 # A dedicated environment remains the default and the only admission path for

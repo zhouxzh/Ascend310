@@ -1,16 +1,19 @@
 # Case9 当前运行手册：Qwen2.5 ACL 基线与 MindSpore 候选链
 
-_更新日期：2026-09-06。当前 8T 开发板地址为 `192.168.1.90`；`192.168.11.14` 与 `192.168.8.178` 是同一块 Ascend310B4/8T 板的历史地址，仅保留为报告 provenance，因此沿用已完成的实测证据。20T DeepSeek 隔离实验使用实际地址 `192.168.1.95`，旧请求地址 `192.168.8.210` 仅保留为历史 provenance。音频、ASR/TTS 与 XiaoZhi 仍暂停。_
+_更新日期：2026-10-15。当前 8T 开发板地址为 `192.168.1.90`；`192.168.11.14` 与 `192.168.8.178` 是同一块 Ascend310B4/8T 板的历史地址。当前 20T 开发板地址为 `192.168.1.101`；`.95` 与 `.210` 仅保留为同一块 Ascend310B1/20T 板的历史 provenance。音频、ASR/TTS 与 XiaoZhi 仍暂停。_
 
 ---
 
 ## 当前状态
 
 Qwen2.5-0.5B-Instruct 静态 KV 图是现有 ACL/NPU 基线，每块板使用自己的 OM，由原生
-ACL 执行。MindSpore 聊天 Profile 是新增的 dirty-base 实验链，使用单一活动 worker，
-不能视为正式模型。旧 Qwen2.5 隔离证据链为 `7868 -> 7867 -> 8084`；MindSpore 候选
-使用 `7868 -> 7867 -> 8090`，两者互斥。正式入口 `8080 -> 7861 -> 7865` 保持原状，
-不因地址变化或候选启动自动切换。
+ACL 执行。MindSpore 聊天 Profile 是 dirty-base 实验链，使用单一活动 worker，不能
+视为正式模型。2026-10-15 的 20T 实测显示 Qwen1.5 MindSpore 完整机器门通过，短中文
+问候首 token p50 为 `655.5 ms`、吞吐约 `1.544 token/s`，是当前候选链的首选；同板
+Qwen2.5 静态 KV ACL 也完成完整机器门，但首事件 p50 为 `4727.8 ms`、吞吐约
+`0.422 token/s`，只保留作功能验证与优化基线。候选 MindSpore 链使用
+`7868 -> 7867 -> 8090`；ACL 候选链使用 `7868 -> 7867 -> 8084`，两者互斥。正式入口
+`8080 -> 7861 -> 7865` 保持原状，不因候选验收自动切换。
 
 > **当前设备暂停：** 2026-09-04 重启后的只读跟进快照显示 `.11.14` 仍周期性报告
 > `DRV_LPM_FAULT 0x80E3A203`；Qwen2.5-1.5B 诊断期间 NPU 峰值约 `14993/15610 MB`，
@@ -35,7 +38,7 @@ ACL 执行。MindSpore 聊天 Profile 是新增的 dirty-base 实验链，使用
 | `192.168.1.90`（历史地址 `.11.14`；原采集地址 `.178`） | Ascend310B4 / 8T；`case9-acl-om`；CANN 8.0.0 | 本地已校验完整批次 `20260827T113500Z`、usageperf `20260827T124500Z`；MindSpore Qwen 历史批次、重启小批次和切换冒烟也已留证；候选日志/响应文件已本地 SHA-256 校验 | 同一板 IP 变更；ACL 工件/API/长输出/稳定性和机器协议门已通过；MindSpore Qwen 历史报表为 9/9，`.90` 地址的 G0 环境/SoC/工件复核已补齐，但严格 placement 诊断仍失败，B4 候选保持 `blocked`；B4 相对旧 8082 p50 基线改善约 21.96%；中文工程定性复核约 9/10 可理解，正式人工签字未完成且含硬件事实错误 |
 | `192.168.8.178` | 同一块 Ascend310B4 / 8T 的历史采集地址 | 上述报告的 provenance 地址 | 不再作为连接入口；报告仍不可改写 |
 | `192.168.8.210`（历史地址） | Ascend310B1 / 20T；CANN 8.0.0；`base + base-overlay` | Qwen2.5 历史完整批次和 usageperf provenance | 历史 Qwen2.5 机器门及 16.32% 结果仍有效；该旧地址不作为当前入口。DeepSeek 新实验见下一行 |
-| `192.168.1.95`（当前 20T） | Ascend310B1 / 20T；CANN 8.0.0；MindSpore 2.4.10/MindNLP 0.4.1；shared dirty-base | `repro/deepseek-r1-20t-20260830/bundle-manifest.json`；DeepSeek revision `0a28897...`、权重 SHA-256 `706e1bfd...3419c`；Qwen1.5/TinyLlama 缺口报告在 `repro/case9-dual-board-gap-20260830/` | DeepSeek 隔离 smoke、10 轮短稳定性、两次 9/9 API 机器门和 2+30 SSE 性能已记录，中文质量/正式准入保持 `blocked`；Qwen1.5 缺口 9/9 机器门（人工质量待审），TinyLlama 缺口 8/9 且长输出失败；Qwen2.5 新 MindSpore 批次尚未在 20T 执行 |
+| `192.168.1.101`（当前 20T；`.95` 为历史地址） | Ascend310B1 / 20T；CANN 8.0.0；MindSpore 2.4.10/MindNLP 0.4.1；shared dirty-base | 本轮 Qwen1.5 和 Qwen2.5 原始报告分别位于板端 `case9-mindspore-chat/.../qwen1.5-20t-current-20261015/` 与 `case9-om-20t-20260914/.../qwen25-b1-current-20261015/` | Qwen1.5 当前完整机器门通过，首 token p50 `655.5 ms`、约 `1.544 token/s`，是实验性候选首选；Qwen2.5 ACL 当前完整机器门通过但约 `0.422 token/s`，保留为功能验证。DeepSeek/TinyLlama 的 `.95` 历史证据不自动提升为当前可用结论 |
 
 IP 变化不会改变 SoC、OM、contract、tokenizer 或已记录的进程证据。若更换硬件、
 系统、CANN、模型或 OM，必须新建 UTC 批次并重新执行门禁；仅换 IP 不需要伪造一轮
@@ -45,7 +48,7 @@ IP 变化不会改变 SoC、OM、contract、tokenizer 或已记录的进程证�
 
 | Profile | 目标板 | 运行方式 | 当前状态 |
 | --- | --- | --- | --- |
-| `qwen1.5-0.5b-mindspore` | `192.168.1.90` B4/8T（历史报告 `.11.14`/`.178`）；`.95` B1/20T | `base` + MindSpore/MindNLP，服务 `8090` | B4 历史机器门按 `8/9`（health/snapshot 缺少 `npu_model`）；当前 G0 已补齐但严格 placement 仍失败，保持 `blocked`；`.95` 缺口批次 `qwen20-gap-20260830` 为 `9/9`、`experimental_dirty_base`（总耗时 p50/p95 `1329.830/1440.076 ms`，吞吐 p50/p95 `1.505/1.619 token/s`）；人工质量/准入待签字 |
+| `qwen1.5-0.5b-mindspore` | `192.168.1.90` B4/8T（历史报告 `.11.14`/`.178`）；`.101` B1/20T | `base` + MindSpore/MindNLP，服务 `8090` | B4 历史机器门按 `8/9`（health/snapshot 缺少 `npu_model`）；当前 G0 已补齐但严格 placement 仍失败，保持 `blocked`；`.101` 当前验收全机器门通过，首 token p50 `655.5 ms`、总耗时 p50 `1295.4 ms`、吞吐 p50 `1.544 token/s`；仍为 `experimental_dirty_base`，人工质量/准入待签字 |
 | `tinyllama-1.1b-mindspore` | `192.168.1.90` B4/8T（历史报告 `.11.14`/`.178`）；`.95` B1/20T | 同上，独立缓存和报告 | B4 原批次 `blocked`（8/9）；`.95` 缺口批次 `tiny20-gap-20260830` 为 8/9，32/48 token 长输出含 `U+FFFD`、中文机器质量 7/10；CLI 禁止激活 |
 | `deepseek-r1-qwen-1.5b-mindspore` | `192.168.1.90` B4/8T（历史报告 `.11.14`/`.178`）；`.95` B1/20T（`.210` 为旧 alias） | 两板均使用临时/隔离 registry 的 `base` + MindSpore/MindNLP，服务 `8090` | B4 缺口批次 `deepseek-8t-gap-20260830` 为 `9/9`（性能 p50/p95 `3938.489/4008.768 ms`，吞吐 `0.510/0.517 token/s`，人工质量待审）；`.95` API 机器门通过但中文质量和 dirty-base 准入未完成，保持 `blocked` |
 

@@ -16,6 +16,7 @@ import importlib.metadata
 import importlib.util
 import json
 import os
+import socket
 from pathlib import Path
 import re
 import site
@@ -175,7 +176,12 @@ def _adapter_import_audit(root: Path) -> Dict[str, Any]:
     return {"ok": not found and not missing, "forbidden_imports": found, "missing_files": missing}
 
 
-def run(profile: str, registry_path: Path, root: Path) -> Dict[str, Any]:
+def run(
+    profile: str,
+    registry_path: Path,
+    root: Path,
+    observed_board_host: Optional[str] = None,
+) -> Dict[str, Any]:
     checks: Dict[str, Any] = {}
     failures: list[str] = []
     try:
@@ -222,6 +228,21 @@ def run(profile: str, registry_path: Path, root: Path) -> Dict[str, Any]:
 
     soc = _detect_soc()
     checks["npu"] = soc
+    observed_host = str(
+        observed_board_host or os.environ.get("CASE9_BOARD_HOST") or socket.gethostname()
+    ).strip()
+    observed_soc_name = "Ascend" + str(soc.get("chip") or "").upper()
+    observed_tier = {
+        "Ascend310B1": "20T",
+        "Ascend310B4": "8T",
+    }.get(observed_soc_name, "")
+    # This reflects the board that produced the report. The profile's primary
+    # target remains under checks.profile and may intentionally differ.
+    checks["board"] = {
+        "host": observed_host,
+        "soc": observed_soc_name or None,
+        "tier": observed_tier or None,
+    }
     expected_soc = str(checks["profile"]["board_soc"]).upper()
     observed_soc = str(soc.get("chip") or "").upper()
     if not soc.get("ok"):
@@ -291,7 +312,13 @@ def run(profile: str, registry_path: Path, root: Path) -> Dict[str, Any]:
         failures.append("MindSpore/MindNLP Ascend import failed: %s" % exc)
 
     checks["disk"] = _command(["df", "-Pk", str(root)])
-    result = {"ok": not failures, "profile_id": profile, "failures": failures, "checks": checks}
+    result = {
+        "ok": not failures,
+        "profile_id": profile,
+        "board": checks["board"],
+        "failures": failures,
+        "checks": checks,
+    }
     return _json_safe(result)
 
 
@@ -300,11 +327,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--profile", required=True)
     parser.add_argument("--registry", type=Path, default=None)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument(
+        "--observed-board-host",
+        help="actual board host/IP for evidence provenance; defaults to CASE9_BOARD_HOST or hostname",
+    )
     parser.add_argument("--json", action="store_true", help="emit JSON only")
     args = parser.parse_args(argv)
     root = args.root.expanduser().resolve()
     registry = args.registry or (root / "configs" / "chat_model_profiles.json")
-    result = run(args.profile, registry.expanduser().resolve(), root)
+    result = run(
+        args.profile,
+        registry.expanduser().resolve(),
+        root,
+        observed_board_host=args.observed_board_host,
+    )
     if args.json:
         print(json.dumps(result, ensure_ascii=True, sort_keys=True))
     else:

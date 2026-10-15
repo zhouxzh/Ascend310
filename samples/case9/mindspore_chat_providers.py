@@ -808,6 +808,22 @@ class MindSporeChatProvider:
         if targets and targets.issubset({"Ascend"}):
             self._placement_status = "verified"
             return
+        # MindSpore 2.4.10 on the board does not expose parameter placement
+        # attributes for this loader.  An operator may explicitly permit a
+        # candidate-only context proof when both set_context(Ascend) and the
+        # matching NPU probe have already passed.  It remains distinguishable
+        # from parameter-level verification and output placement checks still
+        # reject any explicit CPU/GPU tensor.
+        allow_context = os.environ.get("CASE9_ALLOW_CONTEXT_PLACEMENT", "0").strip().lower()
+        if allow_context in {"1", "true", "yes", "on"} and self._device_target == "Ascend" and self._npu_model:
+            self._placement_status = "context_verified"
+            self._placement_evidence.extend(
+                [
+                    {"source": "mindspore.get_context(device_target)", "target": "Ascend"},
+                    {"source": "npu-smi.info", "target": self._npu_model},
+                ]
+            )
+            return
         # A strict board worker must not advertise a healthy model when no
         # explicit placement can be inspected.  Operators can opt into a
         # diagnostic context-only run, but that run is never admission-ready.

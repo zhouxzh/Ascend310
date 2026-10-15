@@ -12,10 +12,17 @@ The two boards were tested separately:
 | Board | Address at test time | SoC / tier | Result scope |
 | --- | --- | --- | --- |
 | 8T | `192.168.1.135` | Ascend 310B4 / 8T | ONNX integrity and ATC memory boundary |
-| 20T | `192.168.1.95` | Ascend 310B1 / 20T | ONNX integrity, ATC, ACL descriptor, JSON/SSE smoke |
+| 20T | `192.168.1.95` (earlier), `192.168.1.101` (latest) | Ascend 310B1 / 20T | ONNX integrity, ATC, ACL descriptor, JSON/SSE smoke |
 
 `Health: Alarm` was present in `npu-smi` snapshots on both boards and was
 recorded as diagnostics only.
+
+The endpoint address must not be used to infer board tier. A fresh, isolated
+SSH check at `192.168.1.101` reported hostname `orangepiaipro-20t`, device
+`Ascend310B1`, and 23,673 MB device memory. It is therefore the 20T board's
+new address, not a replacement address for the unavailable 8T board. The SSH
+host key was checked in a temporary known-hosts file; no global SSH trust
+record was changed.
 
 ## Rebuilt Artifacts
 
@@ -89,6 +96,13 @@ On the 20T board, CANN 8.0 ATC with `--soc_version=Ascend310B1` completed.
 | JSON API, one token | HTTP 200; 8.702 s |
 | SSE API, one token | HTTP 200; 8.585 s; one text delta and `[DONE]` |
 
+An additional strict loopback API run used three serial JSON requests and one
+SSE request, all with `max_tokens=1`, `temperature=0`, and `top_p=1`.
+All four requests passed without UTF-8 replacement characters. The JSON
+latencies were 8.706 s, 8.556 s, and 8.528 s; the SSE latency was 8.555 s.
+The returned text remained `" Moh"`, so this is an API/ACL stability result,
+not a Chinese-quality result.
+
 The candidate service bound only to `127.0.0.1:18084` and was stopped after
 the smoke. It used an explicit dirty-base test override; existing Torch and
 MindSpore packages remained present but were not imported by the ACL service.
@@ -100,10 +114,60 @@ Raw reports remain on the 20T board under
 OpenAI JSON/SSE probe. Models, ONNX files, OM files, transfer logs, and board
 reports remain ignored by Git.
 
+## 20T Eight-Token Follow-up
+
+The 20T board was rechecked at `192.168.1.101` with the same verified B1 OM,
+the same CANN 8.0/base environment, and a loopback-only candidate service on
+`127.0.0.1:18084`. This was a bounded follow-up, not a formal performance
+campaign: one JSON request and one SSE request each used greedy decoding,
+`max_tokens=8`, and the Chinese prompt `你好，请用中文回答一句话。`.
+
+| Gate | Observed result |
+| --- | --- |
+| Service startup and `/health` | passed |
+| JSON transport | HTTP 200; 8 completion tokens; 59.343 s |
+| SSE transport | HTTP 200; 8 completion tokens and `[DONE]`; 59.180 s |
+| UTF-8 acceptance | failed: both responses contain `U+FFFD` |
+| Generated text | ` Holden 纲纲 radiation�azzi Holden` |
+| Approximate end-to-end generation rate | 0.135 token/s from JSON elapsed time |
+| Candidate process cleanup | passed: port `18084` was not listening after the run |
+
+The strict test correctly marks this run `failed`: the HTTP protocol completed,
+but the decoded text contains a replacement character and is not a usable
+Chinese response. The evidence does not establish the root cause; it is scoped
+to this full-context ONNX, B1 OM, ACL runtime, tokenizer, mask/template, and
+generation path. In particular, it must not be reported as a successful
+chat-quality or performance result.
+
+The device-memory snapshots were 3,295 MB before and 3,480 MB after service
+cleanup. That 185 MB difference is a diagnostic observation from one run, not
+a leak conclusion. The exact API report, NPU snapshots, and service log were
+copied to `models/qwen25-full2048/reports/board20t/` and verified with matching
+SHA-256 values between board and controller.
+
+## Local Model Mirror and Cross-SoC Status
+
+The user requested a local mirror. The verified source checkpoint, tokenizer,
+configuration, full and last-logits ONNX artifacts, contracts, and the 20T B1
+OM are now available under `models/qwen25-full2048/`. The B1 OM was copied
+back from the 20T board and rechecked locally at 1,406,879,335 bytes and
+SHA-256 `530906aea22d8a4145489aee8e060593acd294f29def87112022408c61d5fe14`.
+The copied 20T ATC, descriptor, API, service, and NPU reports are stored below
+`models/qwen25-full2048/reports/board20t/`. This local model mirror is ignored
+by Git.
+
+The intended test of this B1 OM on the 8T B4 board has not run. Before the
+verified local OM could be uploaded to 8T, `192.168.1.135` became unreachable:
+ICMP reported `DestinationHostUnreachable` and no ARP entry was present. The
+state is therefore `not-run` due to board network unavailability, not a
+cross-SoC incompatibility result. If it is later tested, it must be labelled a
+compatibility experiment rather than a native B4 result.
+
 ## Status
 
 | Board / artifact | Status | Next gate |
 | --- | --- | --- |
-| 8T B4 full-context 2048 | `blocked` | Reduce graph/ATC peak memory through a separately approved export or conversion strategy; do not claim an OM exists. |
-| 20T B1 full-context 2048 | `api_smoke_passed` | Numerical consistency, multi-token behavior, performance distribution, and quality testing. |
+| 8T B4 full-context 2048 native conversion | `blocked` | Reduce graph/ATC peak memory through a separately approved export or conversion strategy; do not claim a native B4 OM exists. |
+| 8T B4 using 20T B1 OM | `not-run` | Restore board network, copy the locally verified B1 OM, then run descriptor and ACL/API compatibility gates. |
+| 20T B1 full-context 2048 | `single_token_api_passed; multi_token_failed` | Isolate tokenizer/template/cache/logits semantics before any quality or performance campaign. |
 | Last-logits ONNX | `artifact_verified` | Separate B4/B1 ATC campaign; it has not been converted in this run. |

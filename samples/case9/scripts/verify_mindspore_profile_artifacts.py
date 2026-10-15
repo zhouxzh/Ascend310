@@ -226,13 +226,21 @@ def verify_profile_artifacts(
         raise VerificationError("profile has no id")
     cache_dir = str(getattr(profile, "cache_dir", ""))
     raw_artifacts = tuple(getattr(profile, "artifacts", ()) or ())
-    profile_status = str(getattr(profile, "status", ""))
+    # The aggregate profile status describes the primary board only.  When the
+    # caller supplies an observed SoC, use that board's validation row instead
+    # of accidentally blocking a valid secondary-board experiment because the
+    # primary row is blocked or not-run.
+    observed_board = _normalise_board_override(board_override)
+    observed_soc = observed_board.get("soc") if observed_board else None
+    if observed_soc and hasattr(profile, "status_for_soc"):
+        profile_status = str(profile.status_for_soc(observed_soc))
+    else:
+        profile_status = str(getattr(profile, "status", ""))
     profile_board = {
         "host": str(getattr(profile, "board_host", "")),
         "soc": str(getattr(profile, "board_soc", "")),
         "tier": str(getattr(profile, "board_tier", "")),
     }
-    observed_board = _normalise_board_override(board_override)
     result: Dict[str, Any] = {
         "profile": profile_id,
         "model_id": str(getattr(profile, "model_id", "")),

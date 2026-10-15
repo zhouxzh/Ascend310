@@ -45,6 +45,9 @@ reports/qwen25-kv-1024/board/
 # Self-contained reproducibility bundles (models, checkpoints, board snapshots).
 repro/
 
+# User-requested local mirror of large Case9 model artifacts.
+models/
+
 # MindSpore candidate worker state and per-profile evidence. Keep the checked-
 # in registry under configs/; only generated state/logs are ignored.
 run/mindspore-chat/

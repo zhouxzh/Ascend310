@@ -1,6 +1,6 @@
 # Case9 证据索引
 
-_本索引以 2026-09-07 的双板证据和 MindSpore 候选复现包为当前入口。8T 报告采集于历史地址 `.178`/`.11.14`，当前地址为 `192.168.1.90`；这些地址属于同一块板。20T 当前地址为 `.95`，`.210` 仅为旧请求地址。缺口补测已产生 Qwen1.5/20T、TinyLlama/20T 与 DeepSeek/8T 原始报告；Qwen2.5-0.5B 在当前地址完成了六文件校验和严格 placement 复测，但严格门仍阻断；Qwen2.5-1.5B 七个文件已同步并校验，重启后的正确 CANN 诊断在生成阶段发生 `Alloc failed`，placement/API/质量/性能仍未运行，Profile 继续 `blocked`。2026-09-06 重启后的短探针再次观察到 LPM fault，严格 G0 又记录到 MindNLP 缺失和版本不匹配；同日 DeepSeek 的 `context1024` 配置级变体完成了单 token `diagnostic_passed`，但仍为 `context-only`，不改变 canonical Profile 状态；2026-09-07 新增 MindSpore Lite 2.5.0 独立环境和 Ascend 构建烟测，详见 [Lite 构建记录](45-mindspore-lite-2.5-mobilenetv2-ascend-build-smoke-20260907.md)。_
+_本索引以 2026-10-15 的当前 20T 验收和历史双板证据为入口。8T 报告采集于历史地址 `.178`/`.11.14`，当前地址为 `192.168.1.90`；这些地址属于同一块板。20T 当前地址为 `192.168.1.101`，`.95` 与 `.210` 为历史地址。当前 20T 上 Qwen1.5 MindSpore 与 Qwen2.5 静态 KV ACL 已分别完成完整机器门验收；前者是当前文字聊天首选，后者功能可用但明显偏慢。两者仍属于实验性结果，不自动切换正式入口。历史缺口、Lite、Qwen3 和其他候选的结论保留在各自记录中。_
 
 ---
 
@@ -34,6 +34,7 @@ _本索引以 2026-09-07 的双板证据和 MindSpore 候选复现包为当前�
 | [42-mindspore-candidate-search-record.md](42-mindspore-candidate-search-record.md) | MindSpore 聊天候选搜索与证据分级 | 条件候选不下载、不启动 |
 | [43-mindspore-external-model-empirical-probe-20260906.md](43-mindspore-external-model-empirical-probe-20260906.md) | 用户 site、MindNLP loader 与外部 Qwen1.5 板端 smoke | `observed-pass`（context-only），不替代正式准入 |
 | [47-qwen25-mindspore-vs-acl-benchmark-20260907.md](47-qwen25-mindspore-vs-acl-benchmark-20260907.md) | 同板 Qwen2.5 MindSpore/静态 KV ACL 分阶段性能、PyACL trace 和 tokenizer 优化 | ACL 路径诊断；prefill 优化仍待实施 |
+| [50-current-model-acceptance-20261015.md](50-current-model-acceptance-20261015.md) | 当前 20T Qwen1.5 MindSpore 与 Qwen2.5 静态 KV ACL 的完整机器验收和可用性判定 | 当前模型选择入口 |
 | [44-mindspore-external-model-followup-20260906.md](44-mindspore-external-model-followup-20260906.md) | 当前地址 Qwen2.5/TinyLlama/DeepSeek 续测、资源故障与启动边界修复 | Qwen2.5 context-only；Tiny 生成内存失败；DeepSeek context1024 diagnostic passed、canonical OOM/blocked；API/长测未运行 |
 | [45-mindspore-lite-2.5-mobilenetv2-ascend-build-smoke-20260907.md](45-mindspore-lite-2.5-mobilenetv2-ascend-build-smoke-20260907.md) | 独立 Lite 2.5.0/2.2.11 aarch64/cp39 环境、Ascend Context、官方 MobileNetV2 与最小 AddNet 烟测 | 2.5.0 导入/Context `observed-pass`；MindIR v2 Ascend `build_from_file` exit 139；2.2.11 明确拒绝 MindIR v2；`.ms` 返回 `Fail to support`；`predict`、placement、LLM 和性能 `not-run` |
 | [46-mindspore-lite-environment-installation-and-cann-matrix-20260907.md](46-mindspore-lite-environment-installation-and-cann-matrix-20260907.md) | Lite 2.4/2.5 安装边界、CANN 8.0 版本矩阵、依赖检查和 CANN 8.5 升级条件 | `check_env/check_python_deps` 通过；Lite Ascend graph-build 仍可复现 `SIGSEGV(139)`；当前不建议盲目升级 CANN 8.5 |
@@ -115,7 +116,7 @@ p50/p95 为 `0.422/0.423 token/s`。这是 `experimental_dirty_base` 结果，�
 | `192.168.1.90` Qwen2.5 MindSpore 诊断（历史批次 `.11.14`） | Qwen2.5-0.5B Safetensors，SHA `fdf756fa...fb7fe`；严格复测报告 SHA `9f979283...e359c9` | `repro/mindspore-chat-20260904/reports/board8t/qwen2.5-0.5b-strict-placement-20260904-v2/`；[docs/34](34-qwen25-0.5b-mindspore-8t-loader-smoke-20260903.md) | 六文件、CANN `acl/te/hccl`、expected/actual B4 通过；运行中设备内存约 `5705 -> 12520/15610 MB` | `ProviderUnavailable: ... no explicit Ascend placement evidence`，exit 1，generation/API/质量/性能未运行；历史 context-only 旁证不构成准入 |
 | `192.168.8.178` | 同一块 B4/8T 的旧采集地址 | 同上原始报告 provenance | 不作为当前连接入口 | 不应当当成第二块板 |
 | `192.168.8.210` | B1 OM，SHA `6bca884f...6298609` | `reports/full-campaign/board20t/20260827T113500Z/acceptance.json`; `usage-perf/...124500Z...`; `...130500Z-chain-retry/`（历史 provenance） | 同上；dirty-base；这些路径属于旧地址采集批次，不代表当前连接状态 | 干净生产环境、正式提升 |
-| `192.168.1.95`（当前 20T） | DeepSeek FP16 权重，SHA `706e1bfd...3419c`；Ascend310B1 | `repro/deepseek-r1-20t-20260830/reports/board20t/`；DeepSeek API `deepseek-api-full-20t-20260830T051523Z/`、`reopen-20260830T0536Z/`；Qwen1.5 缺口 `repro/case9-dual-board-gap-20260830/reports/board20t/qwen1.5-0.5b-mindspore/qwen20-gap-20260830/acceptance.json`；TinyLlama 缺口 `repro/case9-dual-board-gap-20260830/reports/board20t/tinyllama-1.1b-mindspore/tiny20-gap-20260830/acceptance.json` | DeepSeek 原有 MindSpore/Ascend smoke、10 轮短稳定性、临时 API 9/9 和 2+30 已通过；Qwen1.5/20T 缺口批次 9/9 机器门、10 轮稳定性和 2+30 性能通过（总耗时 p50/p95 `1329.830/1440.076 ms`，吞吐 p50/p95 `1.505/1.619 token/s`）；TinyLlama/20T 缺口批次 8/9，32/48 token 长输出 UTF-8 失败，中文机器质量 7/10；三者共享 `base`，均为实验性 | 中文推理/事实质量与人工质量仍需单独说明；TinyLlama 保持 `blocked`；正式网关/UI 未启动，不能写成正式准入 |
+| `192.168.1.101`（当前 20T；`.95` 为历史地址） | DeepSeek FP16 权重，SHA `706e1bfd...3419c`；Ascend310B1 | 历史 DeepSeek/Qwen1.5/TinyLlama 报告保留在相应复现目录；本轮 Qwen1.5 与 Qwen2.5 的完整报告见 [docs/50](50-current-model-acceptance-20261015.md) | 当前 Qwen1.5 MindSpore 与 Qwen2.5 ACL 均已完成完整机器门；前者为当前文字候选首选，后者仅作功能验证。DeepSeek/TinyLlama 的 `.95` 历史结果不自动提升为当前可用结论 | 中文推理/事实质量与人工质量仍需单独说明；TinyLlama 保持 `blocked`；正式网关/UI 未启动，不能写成正式准入 |
 
 完整批次参数为长输出 `8/16/24/32/48/64/80`、稳定性 10 轮、性能 2+30；
 `usageperf` 报告提供 token/s。工程定性复核估计约 9/10 可理解，但硬件探测存在事实错误，

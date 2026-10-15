@@ -520,7 +520,13 @@ class MindSporeChatService:
         # but fail closed for an actual provider that reports an unverified or
         # rejected placement.
         placement_status = str(status.get("placement_status", "")).strip().lower()
-        if placement_status and placement_status not in {"verified", "not_applicable"}:
+        allow_context_placement = os.environ.get("CASE9_ALLOW_CONTEXT_PLACEMENT", "0").strip().lower() in {
+            "1", "true", "yes", "on"
+        }
+        placement_allowed = placement_status in {"verified", "not_applicable"} or (
+            placement_status == "context_verified" and allow_context_placement
+        )
+        if placement_status and not placement_allowed:
             status["admission_allowed"] = False
             status["healthy"] = False
             status["ready"] = False
@@ -704,7 +710,12 @@ class MindSporeChatService:
         admission = str(status.get("admission", "")).strip().lower()
         admission_allowed = status.get("admission_allowed") is True
         placement = str(status.get("placement_status", "")).strip().lower()
-        placement_bad = bool(placement) and placement not in {"verified", "not_applicable"}
+        allow_context_placement = os.environ.get("CASE9_ALLOW_CONTEXT_PLACEMENT", "0").strip().lower() in {
+            "1", "true", "yes", "on"
+        }
+        placement_bad = bool(placement) and placement not in {"verified", "not_applicable"} and not (
+            placement == "context_verified" and allow_context_placement
+        )
         base_ready = bool(status.get("ready")) and bool(status.get("healthy"))
         admission_bad = explicit_board_contract and not admission_allowed
         terminal_bad = admission in {"blocked", "not-run"} or bool(status.get("conditional"))

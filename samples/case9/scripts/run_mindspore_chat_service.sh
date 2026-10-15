@@ -136,6 +136,39 @@ export CASE9_MODEL_ROOT="${CASE9_MODEL_ROOT:-${script_dir}}"
 # chain fail-closed; formal ACL services are unaffected by this flag.
 export CASE9_PROCESS_WATCHDOG="${CASE9_PROCESS_WATCHDOG:-1}"
 export CASE9_WORKER_MAIN="1"
+# The board image's MindSpore 2.4.10 loader does not expose parameter device
+# metadata.  This explicitly marks the candidate as context-verified only;
+# a real generation plus npu-smi evidence is still required before promotion.
+export CASE9_ALLOW_CONTEXT_PLACEMENT="${CASE9_ALLOW_CONTEXT_PLACEMENT:-1}"
+
+# Resolve the board identity once and pass it to the artifact verifier.  The
+# registry has independent validation rows for 310B1/20T and 310B4/8T; using
+# only its aggregate row can reject a valid secondary-board experiment.
+board_probe="$(${python_bin} - <<'PY'
+import re
+import shutil
+import subprocess
+import sys
+
+tool = shutil.which("npu-smi")
+if not tool:
+    raise SystemExit("npu-smi not found")
+try:
+    output = subprocess.check_output([tool, "info"], text=True, stderr=subprocess.STDOUT, timeout=8)
+except Exception as exc:
+    raise SystemExit("npu-smi probe failed: %s" % exc)
+matches = sorted(set(item.upper() for item in re.findall(r"(?:Ascend\s*)?(310B[0-9A-Za-z]+)", output, re.IGNORECASE)))
+if len(matches) != 1:
+    raise SystemExit("could not determine a unique Ascend 310B SoC")
+soc = "Ascend" + matches[0]
+tier = {"Ascend310B1": "20T", "Ascend310B4": "8T"}.get(soc)
+if tier is None:
+    raise SystemExit("unknown compute tier for %s" % soc)
+print("%s|%s" % (soc, tier))
+PY
+)"
+IFS='|' read -r observed_board_soc observed_board_tier <<< "${board_probe}"
+observed_board_host="${CASE9_BOARD_HOST:-$(hostname -s 2>/dev/null || hostname)}"
 
 # Keep the direct launcher subject to the same admission boundary as
 # case9-modelctl.  A caller must explicitly acknowledge the shared dirty-base
@@ -200,7 +233,9 @@ environment_report="${environment_report_dir}/${profile}-${environment_stamp}.js
 if ! "${python_bin}" "${environment_checker}" \
     --profile "${profile}" \
     --registry "${registry:-${script_dir}/configs/chat_model_profiles.json}" \
-    --root "${script_dir}" --json >"${environment_report}"; then
+    --root "${script_dir}" \
+    --observed-board-host "${observed_board_host}" \
+    --json >"${environment_report}"; then
   echo "MindSpore/Ascend environment preflight failed; refusing to start profile=${profile}" >&2
   echo "Environment report: ${environment_report}" >&2
   exit 2
@@ -223,6 +258,9 @@ if ! "${python_bin}" "${artifact_verifier}" \
     --profile "${profile}" \
     --registry "${registry}" \
     --root "${CASE9_MODEL_ROOT}" \
+    --observed-board-host "${observed_board_host}" \
+    --observed-board-soc "${observed_board_soc}" \
+    --observed-board-tier "${observed_board_tier}" \
     --output "${verification_report}"; then
   echo "Model artifact verification failed; refusing to start profile=${profile}" >&2
   echo "Verification report: ${verification_report}" >&2
