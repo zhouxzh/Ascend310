@@ -269,7 +269,7 @@ DSH 完成任务后，按以下顺序验收：
 | 安全 | 是否没有删除、上传、安装系统级依赖，是否没有泄露 Key |
 | 记录 | 是否保留了 DSH 修改代码的过程 |
 
-## 6. 参考资料 {#src-appendix4-references}
+## 6. 参考资料 {#src-appendix-appendix4-references}
 
 - [datawhalechina/easy-vibe](https://github.com/datawhalechina/easy-vibe)：从零开始学 AI 编程，用“先看示例 + 自己动手做”组织课程。
 - [datawhalechina/vibe-vibe](https://github.com/datawhalechina/vibe-vibe)：系统化的 Vibe Coding 教程，强调从“写代码”转向“对话式创作”。
@@ -282,7 +282,7 @@ DSH 完成任务后，按以下顺序验收：
 - [DSH 官方仓库](https://github.com/deepseek-ai/deepseek-harness)
 - [DeepSeek 开放平台](https://platform.deepseek.com/)
 
-## 7. 验证清单 {#src-appendix4-validation}
+## 7. 验证清单 {#src-appendix-appendix4-validation}
 
 - [ ] 能说出 Vibe Coding 的完整循环。
 - [ ] 能区分 Agent、大模型、工具和工作区。
@@ -294,7 +294,7 @@ DSH 完成任务后，按以下顺序验收：
 - [ ] 能解释生成脚本中的 `json`、`Path` 和 `for` 循环。
 - [ ] 脚本输出与文件内容一致。
 
-## 8. 常见错误与坑 {#src-appendix4-pitfalls}
+## 8. 常见错误与坑 {#src-appendix-appendix4-pitfalls}
 
 | 现象 | 可能原因 | 处理方式 |
 |---|---|---|
@@ -306,7 +306,7 @@ DSH 完成任务后，按以下顺序验收：
 | 输出与文件不一致 | 没有自己运行脚本 | 重新运行，检查路径、字段和输出 |
 | DSH 页面打不开 | 启动命令还在运行，或端口被占用 | 等显示 `URL: http://127.0.0.1:3080` 后再刷新 |
 
-## 9. 作业 {#src-appendix4-assignment}
+## 9. 作业 {#src-appendix-appendix4-assignment}
 
 1. 用自己的话写 300 字以内的“Vibe Coding 安全说明”，至少包含：Vibe Coding 是什么、5 条安全规则、3 个绝对不执行的操作、为什么每条结论都要自己验证。把说明写入 `tmp/appendix4/<姓名>/safety.md`。
 2. 写一份 150 字以内的“提示词设计说明”，解释为什么提示词要包含目标、路径、输出位置和约束。把说明整理成 `tmp/appendix4/<姓名>/prompt-notes.md`。

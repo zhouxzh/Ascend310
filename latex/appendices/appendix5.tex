@@ -13,7 +13,7 @@ STM32 运动底盘通信》《ROS2 环境配置更换 URDF 模型教程》《ROS
 查看小车雷达数据教程》，并按本文档所属教材的语境重新组织。概念性内容可对照教程中列出的
 ROS2 官方文档入口。
 
-\section{教程定位与证据边界}\label{src-appendix5-scope}
+\section{教程定位与证据边界}\label{src-appendix-appendix5-scope}
 
 在开始使用命令之前，先固定本附录的证据边界。以下四条是全文的前提，后续任何章节都不与之冲突。
 
@@ -45,7 +45,6 @@ ROS2 官方文档入口。
 
 \subsection{命令来源与参考资料}\label{ux547dux4ee4ux6765ux6e90ux4e0eux53c2ux8003ux8d44ux6599}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
@@ -80,7 +79,6 @@ documented \\
 ROS2 官方文档 \url{https://docs.ros.org/en/humble/index.html} &
 DDS、发现机制、环境变量与工具行为的背景说明 & documented \\
 \end{longtable}
-}
 
 教程资料中出现的车型、雷达型号、相机型号与设备别名属于 WHEELTEC
 默认配置。更换硬件或修改配置后，话题名、串口别名与坐标系可能变化，必须以实际
@@ -371,7 +369,6 @@ setup(
 
 \subsection{四种通信模型}\label{ux56dbux79cdux901aux4fe1ux6a21ux578b}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1667}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3333}}
@@ -400,7 +397,6 @@ setup(
 参数 & 服务端保存数据，客户端读取与修改 & 共享 &
 节点配置项与运行期可调参数 \\
 \end{longtable}
-}
 
 选择依据可以简化为三个问题：数据是否持续产生，调用是否需要等待结果，过程是否需要中间反馈。持续产生用话题，需要等待单次结果用服务，需要等待长时间任务并观察进度用动作，需要调整节点配置用参数。
 
@@ -624,7 +620,6 @@ ros2 run rqt_gui rqt_gui
 
 教程列出的四个常用插件与用途：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 插件 & 用途 \\
@@ -637,7 +632,6 @@ Topic Monitor & 监视话题的发布状态与数据 \\
 Image View & 查看图像话题的数据流 \\
 TF Tree & 查看坐标变换树的连接与完整性 \\
 \end{longtable}
-}
 
 \subsection{rviz2}\label{rviz2}
 
@@ -1025,7 +1019,6 @@ YAML 参数可以省去重新编译步骤。
 
 \subsection{接口总览}\label{ux63a5ux53e3ux603bux89c8}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1667}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.3333}}
@@ -1065,7 +1058,6 @@ YAML 参数可以省去重新编译步骤。
 \passthrough{\lstinline!/robot\_recharge\_flag!} & 标志消息 &
 上层节点发布 & 回充命令标志 & STM32 通信文档 \\
 \end{longtable}
-}
 
 电池电压、超声波与自动回充的其余话题在文档中以功能描述出现而未给出完整话题名，使用时以
 \passthrough{\lstinline!ros2 topic list!} 的实际输出为准。
@@ -1114,7 +1106,6 @@ ROS 主控通过 USB 与 STM32 控制器通信，设备在系统中会被识别�
 等名称。教程指出这些名称在每次连接时可能变化，且默认可能没有读写权限，因此使用固定的
 udev 别名单一入口。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 传感器 & 设备号 & 别名 \\
@@ -1129,7 +1120,6 @@ STM32 控制器 & 0002 &
 语音传感器 & 0004 & \passthrough{\lstinline!/dev/wheeltec\_mic!} \\
 GNSS 接收机 & 0005 & \passthrough{\lstinline!/dev/wheeltec\_gnss!} \\
 \end{longtable}
-}
 
 别名脚本存放在 \passthrough{\lstinline!turn\_on\_wheeltec\_robot!}
 功能包的 \passthrough{\lstinline!wheeltec\_udev.sh!} 文件中：
@@ -1240,7 +1230,6 @@ SSH 为主，VNC 属于需要时启用的补充手段。
 
 \subsection{选择建议}\label{ux9009ux62e9ux5efaux8bae}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.5000}}
@@ -1267,7 +1256,6 @@ rqt 插件组合调试 & VNC & 多窗口交互在完整桌面下更可靠 \\
 批量文件同步 & SSH 与 \passthrough{\lstinline!scp!} &
 可以配合校验与定向复制 \\
 \end{longtable}
-}
 
 两种方式可以同时使用：用 SSH 启动节点并读取日志，用 VNC
 观察图形结果。混用时注意不要在两侧重复启动同一节点，重复的节点名会让话题出现多个发布方，从而给出难以解释的数据。
@@ -1607,7 +1595,6 @@ def generate_launch_description():
 
 \subsection{风险与失败模式}\label{ux98ceux9669ux4e0eux5931ux8d25ux6a21ux5f0f}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
@@ -1636,7 +1623,6 @@ Python 版本或依赖冲突 & 导入失败、ABI 不匹配 &
 与工作空间环境 \\
 时间戳不一致 & 多传感器数据难以对齐 & 统一时间源并检查消息头的时间戳 \\
 \end{longtable}
-}
 
 任何一项在板端复现失败，都应记录为对应层的失败，而不是直接推导为``ROS2
 不可用''或``NPU 不支持''。分层记录是本书既有证据规则在 ROS2
@@ -1719,7 +1705,6 @@ Python 版本或依赖冲突 & 导入失败、ABI 不匹配 &
 
 \subsection{验收标准}\label{ux9a8cux6536ux6807ux51c6}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1176}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2353}}
@@ -1765,7 +1750,6 @@ launch 文件 & 一条命令启动多个节点，参数按预期生效 & 启动�
 集成设计 & 设计标注为未验证，字段与门槛完整 & 设计文档 &
 补齐接口定义或证据边界 \\
 \end{longtable}
-}
 
 验收时只记录实际观察到的结果。命令没有执行就不要填写为通过，输出没有留存就不要写成结论。ROS2
 相关的板端集成结论必须同时说明运行平台、模型版本、接口类型与日志路径，缺一项都只能作为待验证记录。

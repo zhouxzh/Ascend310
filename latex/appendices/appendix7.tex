@@ -45,7 +45,6 @@ OM 模型在运行时失败。
 
 \section{教程路线与已验证组合}\label{ux6559ux7a0bux8defux7ebfux4e0eux5df2ux9a8cux8bc1ux7ec4ux5408}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -73,7 +72,6 @@ B：华为官方 Atlas 310B & Ubuntu 22.04.5，310B4，CANN 7.0，驱动/HDK 23.
 & 固件 \passthrough{\lstinline!7.8.0.5.216!}、驱动/HDK 25.5.0、CANN
 9.2.0-beta.2 & HDMI/DRM、ACL、OM、摄像头、CANN VENC、WebRTC、回归 \\
 \end{longtable}
-}
 
 先选择路线，再执行后文的共用准备、专项步骤和统一验收。不要把香橙派的
 B309/5.10.0+ 条件与 Atlas 的 7.8.0.5.216/6.6 内核条件拼接。
@@ -83,7 +81,6 @@ B309/5.10.0+ 条件与 Atlas 的 7.8.0.5.216/6.6 内核条件拼接。
 \subsection{驱动、固件、CANN
 和框架适配层}\label{ux9a71ux52a8ux56faux4ef6cann-ux548cux6846ux67b6ux9002ux914dux5c42}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -118,7 +115,6 @@ Toolkit 目录 & 必须满足 CANN 与 Ascend HDK 的配套关系 \\
 插件和第三方库 & Python 导入检查 & 需单独核对框架、Python、CANN
 和驱动的兼容矩阵 \\
 \end{longtable}
-}
 
 这里的``固件版本''和``驱动版本''不是同义词。固件主要在设备侧运行，驱动主要在主机操作系统中运行；二者常由同一套
 Ascend HDK 下载页面提供，但安装包、升级命令和生效方式不同。版本说明中的
@@ -169,7 +165,6 @@ Ascend 950PR、Atlas A2 或 Atlas A3
 的配套边界。它们是版本选择和升级前核对的参考，不替代下载页面针对具体
 310B 产品、操作系统和架构的筛选结果。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -194,7 +189,6 @@ CANN 9.2.X & 本项目 Atlas 路线实测使用 HDK 25.5.0、固件
 \passthrough{\lstinline!25.5.0!}；其他 9.2.X
 发布包仍需按目标产品下载页重新核对 \\
 \end{longtable}
-}
 
 表中的 HDK
 是版本说明使用的配套标识，不是可以替代驱动包或固件包名称的独立版本号。CANN
@@ -209,7 +203,6 @@ CANN 9.0.X 的小版本差异不能被忽略；CANN 9.2.X 在本项目中已经�
 CANN 9.0.X 的组合包可按下表理解；CANN 8.0 和 CANN 9.2 也应遵循相同的
 Toolkit、ops、NNAL 分层原则：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -233,7 +226,6 @@ ops 子包支持独立升级 \\
 NNAL & \passthrough{\lstinline!atb!}、\passthrough{\lstinline!sip!}
 等加速库 & 仅在业务确实使用时纳入变更范围 \\
 \end{longtable}
-}
 
 同一发布线内的 ops 与 Toolkit
 通常具有更明确的配套关系；跨发布线组合必须以对应版本说明和下载页为准。该表不能替代完整兼容性检查：框架插件、模型算子、驱动固件和操作系统仍需单独验证。对于本仓库的案例，优先采用同一发布线的
@@ -269,7 +261,6 @@ CANN 9.0.X 说明包含低比特量化、确定性计算、通信合并、SIMD/S
 
 升级前写下以下信息，并把它们与本次报告绑定：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 项目 & 需要记录的内容 \\
@@ -284,7 +275,6 @@ CANN 9.0.X 说明包含低比特量化、确定性计算、通信合并、SIMD/S
 业务 & 正在运行的服务、端口、模型和数据目录 \\
 证据 & 当前健康检查、代表性 ACL 烟测、性能基线和回滚包位置 \\
 \end{longtable}
-}
 
 升级会造成业务中断。应先停止案例服务和自动启动单元，通知使用者，确保串口或本地控制台可用，并确认设备有稳定供电。安装或升级过程中不要对主机或设备执行断电、复位、热插拔或并行维护操作。
 
@@ -871,7 +861,6 @@ ss -ltnp > "$failure_root/listeners.txt" 2>&1 || true
 
 \section{面向本仓库案例的升级清单}\label{ux9762ux5411ux672cux4ed3ux5e93ux6848ux4f8bux7684ux5347ux7ea7ux6e05ux5355}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -902,7 +891,6 @@ ss -ltnp > "$failure_root/listeners.txt" 2>&1 || true
 文档层 & 更新版本清单和证据路径，不覆盖旧报告 &
 教材、README、工程文档 \\
 \end{longtable}
-}
 
 升级完成前，案例文档中的``已验证''不应自动继承。最小可接受结论是：设备层、运行时层、模型层和任务层分别有可定位的输出；缺少其中任一层时，结论写为
 \passthrough{\lstinline!untested!} 或

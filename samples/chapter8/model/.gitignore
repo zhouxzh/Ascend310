@@ -1,3 +1,4 @@
 *
 !.gitignore
 !README.md
+!resnet18_rgb_static_aipp.cfg

@@ -25,7 +25,7 @@ AscendCL（Ascend Computing Language）是一套用于在昇腾平台上开发�
 PyACL 封装了底层 C语言接口，主要包含以下模块：
 
 - **acl**: 核心模块，提供初始化、Device 管理、内存管理、模型推理等功能。
-- **acl.media**: 媒体数据处理（DVPP），包括 JPEG 编解码、视频编解码、VPC（图像处理）。详见[第 5 章](chapter5.md#dvpp-basics)。
+- **acl.media**: 媒体数据处理（DVPP），包括 JPEG 编解码、视频编解码、VPC（图像处理）。详见[第 6 章](chapter6.md#dvpp-basics)。
 - **acl.op**: 单算子调用接口。
 
 ### PyACL的逻辑架构 {#src-book-chapter4-h2}
@@ -424,7 +424,7 @@ PyACL 提供了四种不同粒度的同步等待机制，以适应从简单的�
 
 基于上述硬件数据，我们在开发中必须遵循以下“生存法则”：
 
-*   **不要信任 CPU 的浮点计算能力**：任何涉及图像 Pixels 遍历的操作（如 Resize, Color Convert, Normalize）若写在 CPU (Python) 端，必将导致帧率骤降。**必须使用 DVPP 硬件加速**（详见[第 5 章](chapter5.md#dvpp-basics)）。
+*   **不要信任 CPU 的浮点计算能力**：任何涉及图像 Pixels 遍历的操作（如 Resize, Color Convert, Normalize）若写在 CPU (Python) 端，必将导致帧率骤降。**必须使用 DVPP 硬件加速**（详见[第 6 章](chapter6.md#dvpp-basics)）。
 *   **Python 代码仅做胶水**：Python 逻辑应仅限于流程控制、参数配置和极少量的后处理。业务主体必须由底层的 C++ 算子或 NPU 模型承担。
 *   **异步是救命稻草**：由于 CPU 处理每一行 Python 代码都比其他平台慢，因此更不能让 CPU 傻傻等待 NPU（同步）。只有利用 `stream_wait_event` 让 CPU 快速把任务分发完并脱身，才能掩盖 A55 核心性能不足的缺陷。
 

@@ -696,7 +696,7 @@ python -m py_compile 脚本路径.py
 
 `py_compile` 只检查语法，不运行板端逻辑。昇腾 310B 的 CANN、ATC 和 ACL 检查仍应在真实开发板上完成。
 
-### 5.2 验证清单 {#src-appendix3-validation}
+### 5.2 验证清单 {#src-appendix-appendix3-validation}
 
 - [ ] 能说出 `int`、`float`、`str`、`bool` 的区别。
 - [ ] 能用列表保存输入形状或特征维度，并用循环完成求和。
@@ -706,7 +706,7 @@ python -m py_compile 脚本路径.py
 - [ ] 能阅读 `samples/` 中常见的列表推导、`enumerate`、`argparse` 和 `pathlib` 写法。
 - [ ] 示例只使用标准库，没有 `pandas` 或板端运行时依赖。
 
-### 5.3 常见错误与坑 {#src-appendix3-pitfalls}
+### 5.3 常见错误与坑 {#src-appendix-appendix3-pitfalls}
 
 | 现象 | 可能原因 | 处理方式 |
 | --- | --- | --- |
@@ -716,7 +716,7 @@ python -m py_compile 脚本路径.py
 | 统计结果比预期少 | 把字符串当成数字 | 先看 `type()`，必要时转换 |
 | 输出顺序每次不同 | 遍历集合或字典 | 需要稳定顺序时用 `sorted()` |
 
-## 6. 作业 {#src-appendix3-assignment}
+## 6. 作业 {#src-appendix-appendix3-assignment}
 
 1. 新建一个脚本，统计 `feature_dims = [512, 1024, 2048, 512]` 的元素个数、最小值、最大值和去重后的维度集合。
 2. 写一个函数 `count_admitted(models)`，接收模型字典列表，返回 `status == "admitted"` 的模型数量。

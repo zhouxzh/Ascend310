@@ -95,7 +95,7 @@ pandoc_to_file "chapters/preface.tex" \
     --extract-media=chapters/ \
     --resource-path=../src/book
 
-for chapter in {1..9}; do
+for chapter in {1..10}; do
     convert_markdown \
         "../src/book/chapter${chapter}.md" \
         "chapters/chapter${chapter}.tex" \

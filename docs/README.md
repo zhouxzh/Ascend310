@@ -35,6 +35,7 @@ _这是工程文档入口，不是项目首页，也不是教材正文。项目�
 | --- | --- |
 | 第一次准备开发板 | [`src/appendix/appendix1.md`](../src/appendix/appendix1.md) |
 | CANN、ATC、PyACL 基础 | [`src/book/chapter2.md`](../src/book/chapter2.md)、[`src/book/chapter4.md`](../src/book/chapter4.md) |
+| MindSpore 框架开发 | [`src/book/chapter5.md`](../src/book/chapter5.md) |
 | 310B Linux 命令 | [`src/appendix/appendix2.md`](../src/appendix/appendix2.md) |
 | CANN、驱动与固件升级 | [`src/appendix/appendix7.md`](../src/appendix/appendix7.md) |
 | 选择一个实践案例 | [`src/experiment/README.md`](../src/experiment/README.md) 和对应 `samples/caseN/README.md` |

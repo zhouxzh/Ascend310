@@ -1,6 +1,6 @@
 # 案例 9：智能聊天机器人
 
-_本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验，同时维护两条彼此独立的路线：Qwen2.5 静态 KV 的 ONNX -> OM -> 原生 ACL 路线，以及 MindSpore/MindNLP 候选路线。2026-10-16 在当前 20T 地址 `192.168.1.101` 完成了八个 Profile 的逐项验收：Qwen1.5 短回归通过并沿用完整性能；TinyLlama、DeepSeek、Qwen2.5 两个版本在生成阶段阻断；Qwen3 因 MindNLP loader 缺失阻断；MiniCPM3 因其 Modelers revision 未锁定而阻断。HF 权重默认通过 `HF_ENDPOINT=https://hf-mirror.com` 下载；这只改变传输入口，不改变哈希和模型来源。只有 Qwen1.5 保留为 `experimental_dirty_base` 候选，其他 Profile 不可切换。本教程只写入有原始证据的结果；`not-run` 和 `blocked` 不等同于对硬件或模型的普遍否定。_
+_本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验，同时维护两条彼此独立的路线：Qwen2.5 静态 KV的 ONNX -> OM -> 原生 ACL 路线，以及 MindSpore/MindNLP 候选路线。2026-10-16 在当前 20T 地址 `192.168.1.101` 的隔离环境完成了超时修正复测：Qwen1.5-0.5B、Qwen1.5-1.8B 与 Qwen2.5-0.5B 通过技术机器门，保持 `experimental_isolated`；Qwen2-0.5B、Qwen2-1.5B 与 Qwen2.5-1.5B 完成生成和稳定性，但中文探测各出现一次 `U+FFFD`，保持 `blocked`。此前 30 秒客户端超时后的 TBE 子进程日志仅标记为 `timeout-confounded`，不是已确认的模型崩溃。Qwen3 仍在 MindNLP loader 门阻断，MiniCPM3 缺少可复现的固定工件。HF 权重默认通过 `HF_ENDPOINT=https://hf-mirror.com` 下载；这只改变传输入口，不改变哈希和模型来源。8T 仍需独立回归，本教程不会用 20T 结果推断 8T。_
 
 ## 1. 当前目标和已暂停范围
 
@@ -11,9 +11,11 @@ _本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验，同�
 | Profile 或链路 | 当前状态 |
 | --- | --- |
 | Qwen2.5 静态 KV ACL：`8080 -> 7861 -> 7865` | 现有正式基线不在本次切换；20T 当前 `.101` 的 B1 OM 完整验收通过，但短问候首事件 p50 约 `4.73 s`、约 `0.422 token/s`，不作为当前流畅文字入口 |
-| `qwen1.5-0.5b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 8T 保持 `blocked`；20T 当前短回归通过，完整性能首 token p50 `655.5 ms`、约 `1.544 token/s`，标记 `experimental_dirty_base`，人工质量/正式准入待签字 |
+| `qwen1.5-0.5b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 8T 保持 `blocked`；20T 隔离复测完整机器门通过，首事件 p50 `671.868 ms`、`1.531 token/s`，标记 `experimental_isolated`，人工质量/正式准入待签字 |
+| `qwen1.5-1.8b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 20T 隔离复测完整机器门通过；中英机器探测各 `5/5`，首事件 p50 `1561.806 ms`、`0.670 token/s`，标记 `experimental_isolated`；8T 未独立回归 |
 | `tinyllama-1.1b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 20T 工件加载通过，但 32-token 出现 `U+FFFD`、随后服务崩溃；两板均 `blocked` |
-| `deepseek-r1-qwen-1.5b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 20T 工件加载通过，首个生成触发 TBE `task_distribute` 崩溃；当前 20T `blocked`，结论仅适用于本次版本组合 |
+| `qwen2.5-0.5b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 20T 隔离复测完成 JSON/SSE、64-token、10 轮稳定性和 30 次性能，标记 `experimental_isolated`；8T 未独立回归 |
+| `qwen2-0.5b-mindspore`、`qwen2-1.5b-mindspore`、`qwen2.5-1.5b-mindspore`：`.101` B1/20T | 长输出与稳定性均已完成，但固定中文加法探测出现 `U+FFFD`，保持 `blocked`，不允许作为聊天后端 |
 | 音频、麦克风、ASR/TTS、PTT、XiaoZhi、OTA、设备 WebSocket | 暂停，不安装、不启动、不验收 |
 
 机器门只表示协议、资源和运行检查通过，不表示回答正确或适合生产。正式入口、音频
@@ -22,7 +24,7 @@ _本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验，同�
 ## 1.1 当前 20T 已验收模型与选择
 
 本节的每一项都来自 `192.168.1.101` 的 Ascend310B1/20T 实测，而不是框架文档或
-控制机推断。测试环境为 CANN `8.0.0`、Python `3.9.2`；`Health: Alarm` 仅保留为
+控制机推断。测试环境为 CANN `8.0.0`、Python `3.9.25`；`Health: Alarm` 仅保留为
 诊断信息。统一验收包含工件哈希、目标 SoC、实际 NPU 生成、JSON/SSE、`8/16/32/64`
 token 长输出、10 轮稳定性、中文机器探测、协议边界和 2 次预热后的 30 次性能测量。
 
@@ -33,9 +35,11 @@ token 长输出、10 轮稳定性、中文机器探测、协议边界和 2 次�
 
 | 模型 | 路线 | 完整机器门 | p50 首 token/首事件 | p50 总耗时 | token/s p50 | 当前选择 |
 | --- | --- | --- | ---: | ---: | ---: | --- |
-| Qwen1.5-0.5B-Chat | MindSpore 2.4.10 + MindNLP 0.4.1 | `observed-pass` | `655.5 ms` | `1295.4 ms` | `1.544` | 当前首选文字聊天候选 |
+| Qwen1.5-0.5B-Chat | MindSpore 2.4.10 + MindNLP 0.4.1 | `observed-pass` | `671.868 ms` | `1310.003 ms` | `1.531` | 当前首选文字聊天候选 |
+| Qwen1.5-1.8B-Chat | MindSpore 2.4.10 + MindNLP 0.4.1 | `observed-pass` | `1561.806 ms` | `2991.879 ms` | `0.670` | `experimental_isolated`，人工质量待审 |
 | Qwen2.5-0.5B-Instruct 静态 KV 1024 FP32 OM | 原生 ACL/PyACL | `observed-pass` | `4727.8 ms` | `4741.3 ms` | `0.422` | 功能验证候选，不作为当前流畅入口 |
-| Qwen2.5-0.5B/1.5B MindSpore | MindSpore 2.4.10 + MindNLP 0.4.1 | `observed-fail` | 仅 1.5B 的 2-token/8/16-token短输出成功 | 32-token 后 TBE 崩溃 | N/A | 20T `blocked`，不可用于聊天服务 |
+| Qwen2.5-0.5B MindSpore | MindSpore 2.4.10 + MindNLP 0.4.1 | `observed-pass` | `696.448 ms` | `1314.523 ms` | `1.531` | `experimental_isolated`，人工质量待审 |
+| Qwen2-0.5B / Qwen2-1.5B / Qwen2.5-1.5B MindSpore | MindSpore 2.4.10 + MindNLP 0.4.1 | 生成与稳定性通过 | `693.995` / `1343.582` / `1428.028 ms` | `1338.346` / `2577.378` / `2698.279 ms` | `1.494` / `0.776` / `0.742` | 中文探测出现 `U+FFFD`，20T `blocked` |
 
 Qwen1.5 的 64-token 请求实际生成 55 token 后正常 `stop`，10 轮稳定性为 `10/10`；
 长中文输出连贯且 UTF-8 完整。它的健康接口同时记录 `device_target=Ascend` 与
@@ -63,11 +67,14 @@ AICore 约 `75-80%`，设备内存约 `9.0 GB`，证明该路线确实执行在 
 
 | Profile | 8T B4 | 20T B1 | 首轮结论 |
 | --- | --- | --- | --- |
-| `qwen1.5-0.5b-mindspore` | 已测但 B4 `blocked` | 已测 | B4 身份门待补；B1 共享 `base`，技术通过后为 `experimental_dirty_base` |
+| `qwen1.5-0.5b-mindspore` | 历史测得但本次 SSH 不可达，不能重测 | 20T 隔离机器门通过 | B1 `experimental_isolated`；8T 不从 B1 推断 |
+| `qwen1.5-1.8b-mindspore` | 本次未运行 | 20T 隔离机器门通过 | B1 `experimental_isolated`；中英文机器探测各 `5/5` |
 | `tinyllama-1.1b-mindspore` | 已测 | 已测 | 长输出/中文质量失败，保持 `blocked`；英文单独报告 |
-| `deepseek-r1-qwen-1.5b-mindspore` | 兼容性已测 | 优先已测 | 中文质量与正式准入独立审核 |
-| `qwen2.5-0.5b-mindspore` | `blocked`：context-only 诊断有输出，但严格 placement 证据缺失 | `blocked`：已加载并通过 health/models，首个生成触发 TBE 崩溃 | 生成、稳定性、质量和性能未通过 |
-| `qwen2.5-1.5b-mindspore` | `blocked`：七个文件已同步并校验；正确 CANN v4 已完成加载和两 token context-only 诊断 | `blocked`：JSON/SSE 的 2-token 及 8/16-token 通过，32-token 超时后 TBE 崩溃 | 当前仅短输出旁证，不能启动候选聊天服务 |
+| `deepseek-r1-qwen-1.5b-mindspore` | 历史兼容性报告保留 | 工件与 Ascend 加载通过，首次生成发生 TBE 子进程失败 | 当前组合 `blocked`；不把旧地址结果替代当前验收 |
+| `qwen2-0.5b-instruct-mindspore` | 本次未运行 | JSON/SSE、64-token、稳定性和性能通过；中文 `U+FFFD` | B1 `blocked` 于文本完整性 |
+| `qwen2-1.5b-instruct-mindspore` | 本次未运行 | JSON/SSE、64-token、稳定性和性能通过；中文 `U+FFFD` | B1 `blocked` 于文本完整性 |
+| `qwen2.5-0.5b-mindspore` | 历史 context-only 诊断，非完整验收 | JSON/SSE、64-token、稳定性和性能通过 | B1 `experimental_isolated`；8T 不从 B1 推断 |
+| `qwen2.5-1.5b-mindspore` | 历史短输出诊断，非完整验收 | 低占用重测完成生成、稳定性和性能；中文 `U+FFFD` | B1 `blocked` 于文本完整性 |
 | `qwen3-0.6b-mindspore` | `blocked`：MindNLP 0.4.1 无 Qwen3 loader | `blocked`：同一 loader 探测确认无 Qwen3 loader，未下载权重 | 不升级环境 |
 | `qwen3-1.7b-mindspore` | `blocked`：MindNLP 0.4.1 无 Qwen3 loader | `blocked`：同一 loader 探测确认无 Qwen3 loader，未下载权重 | 不升级环境 |
 | `minicpm3-4b-mindspore` | 不执行 | `blocked`：专用类可见，但官方权重来自 Modelers；当前 `main` 未形成固定 revision/哈希锁，未下载权重 | 不把工件来源阻断写成模型不兼容 |
@@ -144,6 +151,38 @@ vLLM 或 MindIE。两条路线都不修改系统 CANN、驱动、kernel 或 OPP�
 只用于静态检查、前端构建和外部参考，不把其运行时复制到板端。
 
 ## 4. 模型工件与哈希校验
+
+### 4.1 CANN 8.0 隔离 MindSpore 扩展批次
+
+在不改变正式 ACL 链路的前提下，新增模型必须先使用 `case9-ms240-cann80`
+隔离环境。20T `192.168.1.101` 先做 loader、工件、NPU 单 token、JSON/SSE、
+长输出、稳定性和性能门，再把轻量模型单独回归到 8T `192.168.1.90`；一块板的
+结果不能推断另一块板。启动环境固定为：
+
+```bash
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate case9-ms240-cann80
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+export PYTHONNOUSERSITE=1
+```
+
+当前扩展候选包括 Qwen1.5-1.8B、Qwen2-0.5B、Qwen2-1.5B 和 InternLM2-1.8B；
+InternLM2 只使用 MindNLP 原生 Auto* 映射，禁止 `trust_remote_code`。请求的
+`01-ai/Yi-1.5-1.5B-Chat` 在 HF mirror 不存在，因此注册表只保留一个
+`conditional/blocked` 事实记录，不下载，也不把 Yi-Coder 误当作通用聊天模型。
+Qwen3、MindSpore Lite 和 XiaoZhi 转入后续版本/固件门控。
+
+新批次使用通用 runner：
+
+```bash
+bash scripts/run_mindspore_board_campaign.sh --board 20t \
+  --profile qwen2-0.5b-instruct-mindspore --model-root "$PWD" \
+  --run-id qwen2-05b-20t-<utc>
+```
+
+旧的 `run_mindspore_20t_campaign.sh` 仍兼容，默认目标为 20T；任何 8T 调用必须
+显式 `--board 8t`，以免错误复用 B1 的 SoC 检查。完整实施记录见
+`samples/case9/docs/53-mindspore-isolated-extension-implementation-20261016.md`。
 
 注册表是 `configs/chat_model_profiles.json`。两条路线的工件必须分开登记：ONNX -> OM
 路线记录 ONNX、每块 SoC 对应的 OM、ATC 日志和 ACL descriptor；MindSpore 路线记录
@@ -295,9 +334,9 @@ python scripts/mindspore_chat_acceptance.py \
 | Qwen1.5 MindSpore 长输出、稳定性、质量、性能 | 历史报表 9/9，但严格身份门 8/9，当前 `blocked`；共享 `base`，人工质量待审 | `observed-pass`，9/9 机器门，人工质量待审，`experimental_dirty_base` |
 | TinyLlama MindSpore 长输出、稳定性、质量、性能 | `blocked`（历史长输出/中文质量失败） | `observed-fail`，8/9；32/48 token UTF-8 失败，保持 `blocked` |
 | DeepSeek MindSpore API、稳定性、质量、性能 | `observed-pass`，9/9 机器门，人工质量待审，`experimental_dirty_base` | 已有隔离 API 机器门；中文质量和正式准入 `blocked` |
-| Qwen2.5-0.5B MindSpore loader/placement | `blocked`；固定工件和 NPU 活动诊断已记录，严格 placement 缺失 | `not-run`；当前 20T 尚未运行该 Profile |
-| Qwen2.5-1.5B MindSpore 配置/权重加载 | `blocked`；初次污染环境 SIGSEGV（exit 139）保留为历史证据，正确 CANN v4 已加载并生成 2 token，但 placement/API/质量/性能未运行 | `not-run`；未执行 |
-| Qwen3-0.6B/1.7B MindSpore loader | `blocked`；MindNLP 0.4.1 无 Qwen3 loader，未下载权重 | `not-run`；未执行 |
+| Qwen2.5-0.5B MindSpore loader/placement | `blocked`；固定工件和 NPU 活动诊断已记录，严格 placement 缺失 | `observed-pass`；隔离环境完成 API、64-token、稳定性、机器质量与性能，`experimental_isolated` |
+| Qwen2.5-1.5B MindSpore 配置/权重加载 | `blocked`；初次污染环境 SIGSEGV（exit 139）保留为历史证据，正确 CANN v4 已加载并生成 2 token，但 placement/API/质量/性能未运行 | 非质量机器门 `observed-pass`；中文 `U+FFFD`，故 `blocked` |
+| Qwen3-0.6B/1.7B MindSpore loader | `blocked`；MindNLP 0.4.1 无 Qwen3 loader，未下载权重 | `blocked`；同一 loader 探测，未下载权重 |
 
 上述状态直接对应本地复现包中的原始报告；`not-run` 只保留有意未执行的跨 SoC 兼容性组合，
 不是对板端能力的推断。历史两批错误边界为 `6/6`，

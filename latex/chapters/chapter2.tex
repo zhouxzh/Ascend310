@@ -348,7 +348,6 @@ atc \
 
 \textbf{关键参数说明}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2500}}
@@ -408,7 +407,6 @@ Batch 维变动 \\
 \passthrough{\lstinline!--mode=1!} 使用，\passthrough{\lstinline!1!}
 开启；便于排查 Shape 与算子信息 \\
 \end{longtable}
-}
 
 如果对于参数有任何的疑惑，可以通过命令查询atc的参数作用：
 
@@ -591,7 +589,6 @@ export NPU_HOST_LIB=/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub
 \item
   常用参数速览
 
-  { % do not increment counter
   \begin{longtable}[]{@{}
     >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
     >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -625,7 +622,6 @@ export NPU_HOST_LIB=/usr/local/Ascend/ascend-toolkit/latest/runtime/lib64/stub
   \passthrough{\lstinline!--debug!} & 打印模型描述信息 \\
   \passthrough{\lstinline!--help!} & 查看全部参数 \\
   \end{longtable}
-  }
 \item
   使用注意 运行 msame
   工具时，需确保当前账号拥有目录的执行和写入权限。对于部分动态 Shape
@@ -788,8 +784,7 @@ Inference average time: 6.811000 ms
 \setcounter{enumi}{3}
 \tightlist
 \item
-  后处理\\
-  无论 msame 的 \passthrough{\lstinline!--outfmt!} 选择
+  后处理 无论 msame 的 \passthrough{\lstinline!--outfmt!} 选择
   \passthrough{\lstinline!BIN!} 还是
   \passthrough{\lstinline!TXT!}，得到的都是形如
   \passthrough{\lstinline!1×1000!} 的分类 logits，需要结合 ImageNet
@@ -802,7 +797,7 @@ Inference average time: 6.811000 ms
 \item
   先下载 \passthrough{\lstinline!imagenet\_class\_index.json!}（可来自
   Kaggle 或 GitHub）放到 \passthrough{\lstinline!src!} 目录，然后创建
-  \passthrough{\lstinline!src/postprocess\_resnet50.py!}：\\
+  \passthrough{\lstinline!src/postprocess\_resnet50.py!}：
 \end{itemize}
 
 \begin{lstlisting}[language=Python]
@@ -840,7 +835,7 @@ for rank, idx in enumerate(topk, start=1):
 \begin{itemize}
 \tightlist
 \item
-  执行脚本：\\
+  执行脚本：
 \end{itemize}
 
 \begin{lstlisting}[language=bash]
@@ -850,7 +845,7 @@ python ./src/postprocess_resnet50.py --bin out/20251213_11_6_52_564388/resnet50_
 \begin{itemize}
 \tightlist
 \item
-  示例输出：\\
+  示例输出：
 \end{itemize}
 
 \begin{lstlisting}[language=bash]

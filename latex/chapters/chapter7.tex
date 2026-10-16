@@ -1,587 +1,708 @@
-本章不从概念清单开始，而是从几段可以运行的代码开始。读者先建立一个能测量的
-ResNet18-TinyImageNet 推理基线，再逐步观察内存申请、数据搬运、CPU
-预处理、DVPP 图像处理和流水线并发带来的差异。所有样例代码都放在
-\passthrough{\lstinline!samples/chapter7/!}，模型文件可直接从 Hugging
-Face 仓库 \passthrough{\lstinline!zhouxzh/resnet18\_tiny\_imagenet!}
-下载到本章目录，因此不依赖读者先完成第 4 章。
+昇腾310B作为一款边缘推理芯片，其算子开发是挖掘硬件性能的关键环节。尽管CANN（Compute
+Architecture for Neural
+Networks）已提供丰富的内置算子库，但在面对自定义模型结构、特殊后处理逻辑或对极致性能有着严苛要求时，自定义算子开发（Custom
+Operator
+Development）仍不可或缺。本章将系统性地介绍基于昇腾310B的算子开发流程与核心理论，涵盖
+TBE DSL 快速原型、算子原型定义、Ascend C 深度优化以及 Tiling
+分片计算等关键主题。
 
-本章使用的是 Tiny-ImageNet 版 ResNet18，输入为 64x64 RGB 图像，输出为
-200 类分类结果。它的绝对 FPS 不能等同于标准 ImageNet 224x224
-ResNet18，但内存生命周期、数据搬运、预处理下沉和流水线分析方法是通用的。
+\section{算子开发概述：昇腾310B硬件架构与开发路径}\label{src-book-chapter7-h1}
 
-\section{性能优化先从可测量开始}\label{src-book-chapter7-h1}
+本节作为算子开发实战的开篇，旨在帮助读者构建完整的知识框架。我们将首先解析昇腾310B处理器基于达芬奇（DaVinci）架构的核心特征，深入其AI
+Core的计算单元与存储层次；随后概述CANN异构计算软件栈；最后横向对比TBE与Ascend
+C这两条主流的算子开发路径，并探讨自定义算子开发的必要性。
 
-性能优化的第一步不是改代码，而是把问题拆成可观测的阶段。边缘 AI
-应用通常包含以下链路：
+\subsection{昇腾310B处理器与达芬奇架构}\label{src-book-chapter7-h2}
 
-\begin{lstlisting}
-输入采集 -> CPU/DVPP 预处理 -> Host to Device -> NPU 推理 -> Device to Host -> 后处理 -> 输出
-\end{lstlisting}
+昇腾310B是专门面向边缘计算与推理场景打造的高能效AI处理器。该芯片采用12nm
+FFC工艺制程，在仅5至8W的典型功耗下，提高两个版本------20TOPS@INT8或者8TOPS@INT8的澎湃AI算力，能效比达到惊人的25-40
+TOPS/W。凭借这一优势，它在工业质检、智能电网、智慧交通等对实时性要求极高的场景中展现出了卓越性能。
 
-本章统一记录以下指标：
+达芬奇（DaVinci）架构是昇腾系列AI处理器的技术基石，其最大的亮点在于极强的可扩展性（Scalable）。针对不同应用场景的算力需求，达芬奇架构衍生出了Tiny、Mini、Lite、Standard、Max等多款版本，全面覆盖从低功耗可穿戴设备到高性能云端数据中心的全场景。其中，昇腾310B采用了针对边缘端与移动端专门优化的DaVinci-mini架构。
 
-{ % do not increment counter
-\begin{longtable}[]{@{}lll@{}}
-\toprule\noalign{}
-指标 & 含义 & 适合回答的问题 \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-平均耗时 & 多次运行的平均阶段耗时 & 系统总体是否变快 \\
-p50 & 中位数耗时 & 稳态性能是否符合预期 \\
-p95 & 95 分位耗时 & 是否存在长尾卡顿 \\
-FPS & 单位时间处理帧数 & 吞吐量是否达标 \\
-加速比 & 优化前耗时 / 优化后耗时 & 单项优化是否值得保留 \\
-\end{longtable}
-}
+达芬奇架构的核心设计理念可概括为：\textbf{``将计算任务分层处理，以最契合的计算单元执行最适合的任务''}。该架构将计算任务精细划分为标量（Scalar）、向量（1D）、矩阵（2D）与立方体（3D）四种类型，并在物理硬件层面相应地例化了三大核心计算单元------Cube
+Unit、Vector Unit与Scalar Unit。
 
-测试时需要遵守三个规则：
+\subsubsection{计算单元的精细分工}\label{src-book-chapter7-h3}
 
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
+\textbf{Cube Unit（立方体计算单元）}
+是达芬奇架构的标志性设计，更是提供高密度算力的引擎。它专为深度神经网络量身定制，主要承担矩阵乘法、卷积运算及全连接层等计算密集型（Compute-bound）任务。依靠极高的数据复用率，Cube
+Unit有效突破了内存带宽的限制。在昇腾310B中，其运行频率可达1.224GHz，是释放全周期算力的关键所在。
+
+\textbf{Vector Unit（向量计算单元）}
+专门处理向量级运算，工作机制类似于SIMD（单指令多数据流）。其功能涵盖归一化、激活函数、池化、数据格式转换等，广泛服务于计算机视觉（如RPN网络）中常用的基础算子。Vector
+Unit具备极高的执行灵活性，能够无缝兼容并处理多种数据类型与运算模式。
+
+\textbf{Scalar Unit（标量计算单元）}
+类似于经典的RISC微处理器，主要负责控制流管理与基础标量运算。它承担着循环控制、内存地址计算、分支跳转等逻辑任务，是调度统筹整个AI
+Core的``指挥中枢''。
+
+这三大计算单元紧密协同，构建出高度并行的计算流水线。昇腾技术团队在多项典型任务中的实测数据表明，Cube
+Unit占用的执行周期（Cycles）显著大于Vector Unit，这意味着Cube
+Unit的运算潜能得到了充分释放，未受限于Vector
+Unit的调度阻塞，二者实现了优异的负载均衡。
+
+\subsubsection{存储层次与数据搬运机制}\label{src-book-chapter7-h4}
+
+昇腾310B的存储系统采用了精巧的多级层次结构体系。深入理解这一体系，是突破算子性能瓶颈、实现极致优化的先决条件。
+
+\textbf{全局内存（Global Memory）}
+位于存储架构的最外层，具备最大的容量空间，通常指代片外的板载LPDDR4X内存。昇腾310B普遍配置8-16GB的LPDDR4X，带宽范围在51.2GB/s至408GB/s。尽管容量充裕，但其访存延迟相对较高。因此，在进行算子开发时，应尽可能减少对全局内存的直接读取次数。
+
+\textbf{局部内存（Local Memory）} 集成于AI
+Core内部，属于极低延迟的高速存储区，主要包括L1缓存（L1
+Buffer）与统一缓冲区（Unified
+Buffer，简称UB）。L1缓存专用于暂存高频复用的数据，从而大幅削减跨总线的读写开销。UB则是算子执行时的核心工作台，所有参与计算的数据均需先从全局内存搬移至此，方能被计算单元读取。
+
+\textbf{存储转换引擎（Memory Transfer Engine, MTE）}
+是专为数据搬运与内存重排设计的加速单元。MTE细分为MTE1、MTE2、MTE3等模块，负责高效管理AI
+Core内外不同层级缓冲区之间的数据流动，并能够在搬运过程中硬件加速般地同步完成数据填充（Padding）、转置（Transpose）、Img2Col等格式化操作。
+
+\textbf{总线接口单元（Bus Interface Unit, BIU）} 扮演着AI
+Core与外部存储总线通信的``门户''角色，其主要职责是将AI
+Core发出的各类读写请求精确转化为标准的总线协议交互。
+
+在一个典型的计算流水线中：数据首先通过BIU由全局内存接入，随后经MTE的高效搬运与格式重组，稳妥驻留于L1缓存或UB中。紧接着，Scalar
+Unit发出调度指令，指挥Cube Unit或Vector
+Unit对UB中的数据进行高速运算。处理结束后，输出结果再次交由MTE接管，安全、高效地写回至全局内存，由此形成一个无缝闭环。
+\#\#\#\# 昇腾AI异构计算架构（CANN） \{\#src-book-chapter7-h5\}
+
+正如第 4 章在探讨 PyACL 编程基础时所述，CANN（Compute Architecture for
+Neural
+Networks）是昇腾全面面向AI场景定制的异构计算架构。它在整个计算系统中发挥着承上启下的核心枢纽作用：向上广泛适配MindSpore、PyTorch、TensorFlow等主流AI框架，向下直接调度并深度释放昇腾AI处理器的澎湃算力，是提升硬件计算效率的关键''软件底座''。（CANN的详细架构、与CUDA对比、安装配置等内容请参见第2章。）
+
+为了兼容并蓄不同维度的开发需求，CANN构建了多层次的编程接口与组件体系： -
+\textbf{AscendCL}：统一的应用开发原生接口，旨在屏蔽底层硬件差异，帮助开发者灵活构建从端到云的AI应用。
+- \textbf{Ascend
+C}：基于C++的高性能算子开发语言，允许开发者精细控制底层硬件指令与多级缓存，专为追求极致性能的算子定制而生。
+-
+\textbf{TBE}：基于Python的开发框架，侧重于算子逻辑的快速表达与系统化自动调度优化。
+- \textbf{图引擎（Graph
+Engine）}：核心的计算图编译与执行引擎，负责全局网络图的解析、内存复用规划及算子融合优化。
+
+针对算子开发层面，CANN构建了一站式的全流程工具链支持。涵盖了专属算子编译器、功能验证仿真工具，以及深度的性能调优分析器（Profiler），全面辅助开发者打通从代码原型编写、逻辑调试到逼近硬件理论极限的全闭环开发流程。
+
+\subsection{算子开发的两条主流路径}\label{src-book-chapter7-h6}
+
+针对不同开发需求和性能目标，昇腾CANN提供了两条主要的算子开发路径：\textbf{TBE（快速原型）}
+和 \textbf{Ascend C（深度优化）}。
+
+\subsubsection{TBE：声明式开发，效率优先}\label{src-book-chapter7-h7}
+
+TBE（Tensor Boost
+Engine）是一种基于Python的算子开发框架，其核心特点在于\textbf{让开发者专注于描述计算逻辑，由系统自动完成底层的复杂优化}。在开发方式上，TBE提供了DSL（Domain-Specific
+Language）编程模式。开发者无需深入了解昇腾底层硬件架构，只需通过几行简洁的Python代码即可描述算子的数学表达式。例如，使用\passthrough{\lstinline!dsl.vadd(input\_x, input\_y)!}即可轻松表达向量加法，随后通过调用\passthrough{\lstinline!dsl.auto\_schedule()!}，TBE会自动接管并完成模式识别、子图切分、调度模板选择以及底层指令映射等一系列流程。
+
+这种声明式开发范式赋予了TBE诸多的优势。首先是开发门槛极低且代码异常简洁，一个完整的加法算子核心逻辑往往只需10行左右即可实现。同时，得益于昇腾官方调度模板的自动优化加持，生成的算子性能稳定可靠，这使其非常适合用于算法的原型验证以及非性能瓶颈算子的快速实现。
+
+然而，TBE的自动化机制也带来了一定的局限。当面对具有极端定制化计算需求或特殊数据流模式的算子时，高度封装的自动调度可能难以将其优化至硬件的理论极致性能。此外，在某些特定的高级算子类型上，当前的DSL语法或许尚未提供完全覆盖的底层支持能力。
+
+\begin{quote}
+\textbf{补充：TBE TIK 模式}。TBE 早期还提供了一种名为
+\textbf{TIK（Tensor Iterator Kernel）} 的 Python
+命令式开发模式，允许开发者手动控制数据搬运与计算流水线，在控制粒度上介于
+DSL 与 Ascend C 之间。但随着 Ascend C 的成熟，TIK
+已被逐步取代，不再推荐用于新项目。本书不再展开 TIK
+相关内容，读者若在存量项目中遇到 TIK 算子，可查阅昇腾官方文档。
+\end{quote}
+
+\subsubsection{Ascend
+C：命令式开发，性能优先}\label{src-book-chapter7-h8}
+
+Ascend
+C是一种基于C++的高性能算子开发语言，其核心优势在于赋予了开发者对数据流、指令流以及多核并行执行的精细控制权。在编程模型上，Ascend
+C采用了SPMD（单程序多数据）架构，这意味着所有的AI
+Core将执行同一套代码逻辑，但会根据各自的任务ID去处理被分配的不同数据区间。
+
+在具体的开发过程中，开发者需要显式地设计计算流水线并深度管理多级存储之间的数据搬运。一个典型的Ascend
+C算子实现紧密围绕着三个连续的核心任务展开：首先是``CopyIn''阶段，负责将输入数据从全局内存高效搬运至局部内存；随后进入``Compute''阶段，调用硬件资源执行具体的数学运算；最后是``CopyOut''阶段，将计算所得的结果从局部内存搬运回全局内存，从而完成整个数据流转的闭环。
+
+这种命令式的开发范式实现了灵活性与极致性能的统一。得益于对底层内存读写和流水线编排的精准把控，Ascend
+C能够帮助开发者逼近硬件的理论计算极限，更被广泛应用于搞定大模型场景下如FlashAttention等复杂的性能瓶颈算子。此外，其原生支持CPU模拟调试与中间变量打印，极大地优化了开发体验。然而，获取这种极致性能也意味着较高的开发门槛，开发者必须对昇腾底层硬件架构有透彻的理解。同时，Ascend
+C的代码工程量相对较大，即便是实现一个极简的算子，往往也需要编写数百行代码来完成对底层资源的系统化调度。
+
+\subsubsection{两条路径的协同关系}\label{src-book-chapter7-h9}
+
+两条开发路径并非互斥，而是可以根据需求协同使用：
+
+\begin{itemize}
 \tightlist
 \item
-  先预热，再计时。模型加载、首次内存申请和缓存建立会污染第一批数据。
+  \textbf{首选TBE DSL}，快速实现性能达标的标准算子
 \item
-  一次只改一个变量。比如只改 Buffer 复用，不同时改 Batch 和预处理。
+  \textbf{慎用Ascend
+  C}，在追求极致性能或实现特殊计算模式时，系统化应用优化策略
 \item
-  同时看端到端和分阶段耗时。只看
-  \passthrough{\lstinline!acl.mdl.execute!} 会忽略 H2D、D2H 和 Host
-  阻塞。
-\end{enumerate}
+  \textbf{善用工具链}，坚持数据驱动的性能调优闭环
+\end{itemize}
 
-\section{第 7 章样例目录}\label{src-book-chapter7-h2}
+一个典型的开发流程是：先用TBE快速实现算子原型，验证功能正确性；如果性能不达预期，再用Ascend
+C重写核心计算逻辑，通过精细优化达到极致性能。
 
-本章代码位于 \passthrough{\lstinline!samples/chapter7/!}：
+CANN算子库本身包含了丰富的高性能算子，覆盖了大多数常见场景。但在以下情况下，开发者需要考虑自定义算子：
 
-{ % do not increment counter
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-文件
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-作用
-\end{minipage} \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-\passthrough{\lstinline!01\_baseline\_resnet\_sync.py!} & ResNet18
-同步推理基线，拆分预处理、H2D、Execute、D2H、后处理 \\
-\passthrough{\lstinline!02\_buffer\_reuse\_benchmark.py!} & 对比每帧申请
-ACL 资源与复用 ACL Buffer/Dataset \\
-\passthrough{\lstinline!03\_cpu\_preprocess\_benchmark.py!} & 对比朴素
-CPU 预处理和预分配工作区 \\
-\passthrough{\lstinline!04\_dvpp\_resize\_vs\_cpu.py!} & 对比 DVPP VPC
-resize 与 CPU resize \\
-\passthrough{\lstinline!05\_pipeline\_queue\_demo.py!} & 对比串行流程与
-Queue Pipeline \\
-\passthrough{\lstinline!06\_aipp\_preprocess\_compare.py!} & 对比 CPU
-预处理与已有静态 AIPP OM \\
-\passthrough{\lstinline!tools/download\_model.py!} & 从 Hugging Face
-下载 ResNet18-TinyImageNet 的 OM/ONNX 模型 \\
-\passthrough{\lstinline!tools/convert\_aipp\_resnet18.sh!} & 调用 ATC
-生成静态 AIPP OM \\
-\passthrough{\lstinline!tools/profile\_with\_msprof.sh!} & 使用
-\passthrough{\lstinline!msprof!} 采集应用 Timeline \\
-\passthrough{\lstinline!tools/summarize\_metrics.py!} & 将 JSON
-指标汇总成 Markdown 表格 \\
-\passthrough{\lstinline!model/resnet18\_rgb\_static\_aipp.cfg!} & 静态
-AIPP 配置示例 \\
-\passthrough{\lstinline!model/!} & 第 7 章模型和 AIPP 配置目录 \\
-\end{longtable}
-}
+\textbf{训练场景下的算子缺失}：将第三方框架（如TensorFlow、PyTorch）的训练脚本迁移到昇腾AI处理器时，遇到框架支持但CANN算子库暂不支持的算子。
 
-阅读本章时，建议先进入第 7 章样例目录，后续命令都默认在这个目录下执行：
+\textbf{推理场景下的模型转换}：使用ATC工具将第三方框架模型转换为昇腾离线模型时，遇到不支持的算子。
 
-\begin{lstlisting}[language=bash]
-cd samples/chapter7
-\end{lstlisting}
+\textbf{网络性能调优}：发现某算子性能较低，成为网络性能瓶颈，需要重新开发一个高性能算子替换原有算子。例如，一个2048x2048的矩阵乘法算子，经过系统化优化后，性能可从512ms提升至92ms。
 
-本地开发机可以运行语法检查和 CPU/模拟样例。以下命令中的
-\passthrough{\lstinline!python3!} 指当前已经安装 NumPy 等依赖的 Python
-解释器：
+\textbf{应用后处理加速}：应用程序中的某些逻辑涉及数学运算（如查找最大值、数据类型转换），可以封装为自定义算子在AI处理器上执行，利用NPU提升性能。例如，分类应用中查找概率最大的前5个标识，可以开发ArgMax算子实现后处理加速。
 
-\begin{lstlisting}[language=bash]
-python3 -m py_compile *.py tools/*.py
-python3 03_cpu_preprocess_benchmark.py --runs 10
-python3 05_pipeline_queue_demo.py --simulate --frames 30
-\end{lstlisting}
+\subsection{小结}\label{src-book-chapter7-h10}
 
-真实 PyACL、DVPP、\passthrough{\lstinline!msprof!} 和
-\passthrough{\lstinline!npu-smi!} 验证必须在 Ascend 310B 上运行：
+通过本节的学习，读者应该对昇腾310B的硬件架构、CANN软件栈以及算子开发的两种路径有了整体认识。从下一节开始，我们将从最简单的TBE算子入手，带领读者亲手实现第一个自定义算子，在实践中加深对概念的理解。
 
-\begin{lstlisting}[language=bash]
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
-cd ~/Documents/Ascend310/samples/chapter7
-python3 tools/download_model.py
-python3 01_baseline_resnet_sync.py --runs 100
-\end{lstlisting}
+\section{初体验：使用TBE
+DSL快速实现第一个算子（向量加法）}\label{src-book-chapter7-h11}
 
-\section{工具箱：从轻量计时到系统 Profiling}\label{src-book-chapter7-h3}
+通过一个最简单的向量加法算子，让读者快速体验TBE开发的完整流程。在VSCode中编写Python脚本，使用TBE
+DSL描述算子逻辑，通过命令行工具编译生成算子文件，并编写简单的测试代码在NPU上运行验证。最后总结TBE的优缺点及适用场景，激发读者进一步学习的兴趣。
 
-\subsection{Python 分段计时}\label{src-book-chapter7-h4}
+\subsection{TBE DSL 快速概览}\label{src-book-chapter7-h12}
 
-\passthrough{\lstinline!perf\_counter()!} 适合做应用层粗粒度计时。第 7
-章的样例通过 \passthrough{\lstinline!StageRecorder!}
-记录每一帧的阶段耗时，并输出 JSON：
+在动手编写代码之前，有必要先理解 \textbf{TBE DSL 到底是什么}。
 
-\begin{lstlisting}
-{
-  "metrics": {
-    "h2d": {"mean_ms": 0.12, "p95_ms": 0.18, "fps": 8333.33},
-    "execute": {"mean_ms": 1.85, "p95_ms": 2.10, "fps": 540.54},
-    "end_to_end": {"mean_ms": 3.40, "p95_ms": 4.20, "fps": 294.12}
-  }
-}
-\end{lstlisting}
+\subsubsection{什么是 DSL？}\label{src-book-chapter7-h13}
 
-这种计时不能替代硬件
-Profiling，但它有两个优势：代码改动小，能快速判断优化是否有方向。
+\textbf{DSL（Domain-Specific Language，领域特定语言）}
+是为特定问题域量身定制的编程语言。与通用语言（如 Python、C++）不同，DSL
+只关注一个狭窄的领域，用该领域的术语来表达计算意图，从而大幅降低表达复杂度。
 
-\subsection{msprof：观察 ACL API、Memcpy 和 NPU
-Timeline}\label{src-book-chapter7-h5}
+TBE DSL 就是昇腾为\textbf{算子开发}这一特定领域设计的 Python
+内嵌语言。它运行在 Python
+环境中，但提供了一套专用于描述张量计算、调度策略和编译选项的 API。
 
-\passthrough{\lstinline!msprof!} 是 CANN 提供的性能采集工具。它能记录
-Host 侧 ACL API 调用、Runtime 任务、Stream Timeline、AI Core
-指标和部分系统资源信息。
+\begin{figure}
+\centering
+\includegraphics[width=0.62\linewidth,height=0.75\textheight,alt={TBE DSL 体系结构}]{chapters/img7/dsl_architecture.png}
+\caption{TBE DSL 体系结构}\label{fig:dsl_architecture}
+\end{figure}
 
-本章提供包装脚本：
+上图展示了 TBE DSL
+的完整体系结构。整个架构自顶向下分为三层：最上层是暴露给开发者的
+\textbf{Python DSL 接口}（计算描述 -\textgreater{} 调度 -\textgreater{}
+编译），中间层是 \textbf{TVM 编译框架}
+负责张量表达式的优化与代码生成，底层是 \textbf{CCE 硬件后端}
+将优化后的计算映射到昇腾310B 的 AI Core 指令。
 
-\begin{lstlisting}[language=bash]
-bash tools/profile_with_msprof.sh --name baseline -- \
-  python3 01_baseline_resnet_sync.py --runs 200
-\end{lstlisting}
+\subsubsection{DSL 与 TVM 的关系}\label{src-book-chapter7-h14}
 
-采集后重点观察：
+TBE 基于 \textbf{Apache TVM} 框架深度定制。TVM（Tensor Virtual
+Machine）是一个开源的深度学习编译器框架，它的核心能力是将高层张量计算描述编译为不同硬件后端的可执行代码。TBE
+复用了 TVM 的编译基础设施，并将后端替换为昇腾自家的 CCE。
 
-{ % do not increment counter
+TVM 在算子编译流程中承担三个关键角色：
+
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
-视图
+TVM 组件
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-观察点
+职责
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-常见结论
+在 TBE DSL 中的体现
 \end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-ACL API & \passthrough{\lstinline!acl.mdl.execute!} 调用间隔是否很大 &
-Host 预处理或同步等待过慢 \\
-Memcpy & H2D/D2H 是否占比过高 & 输入输出过大或拷贝次数太多 \\
-Stream Timeline & NPU 计算任务之间是否有大片空白 & NPU 在等待 Host
-下发任务或等待数据 \\
-AI Core Metrics & Pipe 利用率是否低 & 模型算子、Batch
-或输入尺寸需要继续分析 \\
+\textbf{Tensor Expression (TE)} &
+用张量表达式描述算子的数学逻辑（``算什么''） &
+\passthrough{\lstinline!tbe.dsl!} 中的计算 API（如
+\passthrough{\lstinline!dsl.vadd!}） \\
+\textbf{Schedule Primitives} &
+提供低层调度原语（分块、向量化、绑定等），决定计算顺序与并行策略（``怎么算''）
+& \passthrough{\lstinline!dsl.auto\_schedule()!}
+自动选择调度模板；也可手动调用
+\passthrough{\lstinline!tvm.create\_schedule()!} 精细控制 \\
+\textbf{CodeGen} & 将优化后的调度翻译为目标硬件指令 & 对接 \textbf{CCE
+Backend}，生成昇腾 AI Core 可执行的二进制码 \\
 \end{longtable}
-}
 
-\subsection{npu-smi：确认设备状态}\label{src-book-chapter7-h6}
+\subsubsection{什么是 CCE？}\label{src-book-chapter7-h15}
 
-\passthrough{\lstinline!npu-smi info!}
-用于确认设备是否在线、温度是否异常、功耗是否接近限制。性能测试前后都应记录一次，避免把降频、设备异常或其他进程占用误判为代码问题。
+\textbf{CCE（Cube-based Compute Engine）} 是昇腾 CANN
+的编译器后端，专为达芬奇架构设计。它的职责是将 TVM 优化后的计算图翻译为
+AI Core 可直接执行的指令流，包括：
+
+\begin{itemize}
+\tightlist
+\item
+  将计算任务分配到 Cube Unit、Vector Unit、Scalar Unit
+\item
+  生成 MTE 数据搬运指令
+\item
+  管理 L1 Buffer 与 Unified Buffer 的分配与回收
+\end{itemize}
+
+CCE 的输入是 TVM 产生的优化 IR（中间表示），输出是可在昇腾310B
+上加载运行的二进制算子文件（\passthrough{\lstinline!.o!} 和
+\passthrough{\lstinline!.json!}）。在整个 DSL
+开发流程中，开发者无需直接与 CCE
+交互------\passthrough{\lstinline!dsl.build()!} 和
+\passthrough{\lstinline!cce\_build\_code()!} 会自动调用它完成底层编译。
+
+在 TBE 的声明式范式下，开发者\textbf{只需用 TE 描述计算逻辑}，调度部分由
+\passthrough{\lstinline!auto\_schedule()!} 自动完成。这正是 TBE 与
+Ascend C 的根本区别------前者说''算什么''，后者必须亲自说''怎么算''。
+
+\subsubsection{DSL 的核心 API 分层}\label{src-book-chapter7-h16}
+
+TBE DSL 的 API 按职责分为三层：
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+层
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+职责
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+典型 API
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{计算描述层} & 定义张量运算的数学逻辑 &
+\passthrough{\lstinline!dsl.vadd!}, \passthrough{\lstinline!dsl.vmul!},
+\passthrough{\lstinline!dsl.broadcast!},
+\passthrough{\lstinline!dsl.conv!}, \passthrough{\lstinline!dsl.matmul!}
+\ldots{} \\
+\textbf{调度层} & 将计算映射为硬件执行计划 &
+\passthrough{\lstinline!dsl.auto\_schedule!},
+\passthrough{\lstinline!tvm.create\_schedule!} \\
+\textbf{编译层} & 生成昇腾设备可执行文件 &
+\passthrough{\lstinline!dsl.build!} \\
+\end{longtable}
+
+一个典型的 TBE DSL 算子开发流程就是这三层的顺序调用：先用计算描述层的
+API 写出算子的数学表达式，然后交由调度层的
+\passthrough{\lstinline!auto\_schedule()!}
+自动生成硬件执行计划，最后由编译层的
+\passthrough{\lstinline!dsl.build()!}
+生成可在昇腾设备上运行的二进制文件。这个从声明到编译的完整链路，即为前文
+@fig:dsl\_architecture 中蓝色箭头所描绘的纵向路径。
+
+\subsubsection{声明式 vs 命令式}\label{src-book-chapter7-h17}
+
+为了进一步理解 DSL 的定位，这里将其与下一节将要学习的 Ascend C
+做个对比：
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+维度 & TBE DSL（声明式） & Ascend C（命令式） \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{编程语言} & Python & C++ \\
+\textbf{开发思路} & 描述''算什么'' & 控制''怎么算'' \\
+\textbf{调度策略} & \passthrough{\lstinline!auto\_schedule!} 自动生成 &
+开发者手动编排流水线 \\
+\textbf{内存管理} & 框架自动处理 & 开发者显式管理多级缓存 \\
+\textbf{代码量（以加法为例）} & \textasciitilde20 行 &
+\textasciitilde200 行 \\
+\textbf{性能天花板} & 接近硬件极限（官方模板保证） & 可达硬件理论极限 \\
+\textbf{适用场景} & 原型验证、标准算子 & 性能瓶颈算子、特殊计算模式 \\
+\end{longtable}
+
+了解了这些基本概念后，我们就可以正式动手了。
+
+\subsection{算子分析：明确我们要做什么}\label{src-book-chapter7-h18}
+
+在动手编码之前，先明确我们要开发的算子规格。按照昇腾算子开发的规范，我们需要先进行算子分析。
+
+\textbf{算子功能}：实现两个向量的加法，数学表达式为：\passthrough{\lstinline!z = x + y!}
+
+\textbf{输入输出规格}： -
+输入：两个张量（Tensor）x和y，形状相同，数据类型相同 -
+输出：一个张量z，形状和数据类型与输入相同 -
+数据类型支持：float16、float32、int32 -
+Shape支持：所有形状（本例使用简单的1D向量）
+
+\textbf{开发方式选择}：使用TBE DSL方式，主要调用两个接口： -
+\passthrough{\lstinline!tbe.dsl.broadcast!}：处理广播场景（本示例输入shape相同，但保留广播能力）
+- \passthrough{\lstinline!tbe.dsl.vadd!}：执行向量加法
+
+\textbf{算子命名}：算子类型（OpType）采用大驼峰命名''Add''；实现文件名称和函数名称采用小写''add''。
+
+TBE DSL算子的开发流程可以分为四个主要步骤：
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+阶段 & 核心任务 & 关键函数/概念 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+算子定义 & 明确输入输出，设计接口 & te.placeholder \\
+计算实现 & 描述算子的数学逻辑 & te.compute, te.lang.cce.vadd \\
+调度编译 & 将计算逻辑映射到硬件 & auto\_schedule, cce\_build\_code \\
+验证测试 & 在NPU上运行并核验结果 & NumPy对比，AscendCL调用 \\
+\end{longtable}
+
+\subsection{完整代码实现}\label{src-book-chapter7-h19}
+
+\subsubsection{创建工程目录}\label{src-book-chapter7-h20}
+
+首先在VSCode中连接到昇腾310B开发板（或直接在板子上操作），创建以下目录结构：
 
 \begin{lstlisting}[language=bash]
-npu-smi info
+# 创建工程目录并进入
+mkdir -p add_tbe
+cd add_tbe
+
+# 创建必要的源文件
+touch add.py run.py
 \end{lstlisting}
 
-\subsection{msame /
-ais\_bench：独立测模型上限}\label{src-book-chapter7-h7}
-
-当应用端到端 FPS 不理想时，可以用 \passthrough{\lstinline!msame!} 或
-\passthrough{\lstinline!ais\_bench!} 单独测 OM
-模型。它们绕过业务代码，只关注模型输入输出和 Runtime
-执行，适合回答一个问题：模型本身的推理上限是多少？
-
-如果基准工具显示模型很快，而业务程序很慢，瓶颈通常在预处理、拷贝、后处理或调度。如果基准工具也很慢，才继续考虑模型结构、算子、精度模式和
-Batch。
-
-例如，在已经进入 \passthrough{\lstinline!samples/chapter7!}
-并下载模型后，可以用 \passthrough{\lstinline!ais\_bench!} 测普通 OM
-的独立推理耗时：
-
-\begin{lstlisting}[language=bash]
-ais_bench --model model/resnet18_tiny_imagenet.om --batchsize 1
-\end{lstlisting}
-
-不同 CANN 版本和安装方式下，\passthrough{\lstinline!ais\_bench!} 或
-\passthrough{\lstinline!msame!}
-的命令行参数可能略有差异；如果本机未安装该工具，可以跳过本节，继续使用本章
-Python 分段计时脚本观察端到端瓶颈。
-
-\subsection{ATC/AIPP 与
-DVPP：把图像工作下沉到设备侧}\label{src-book-chapter7-h8}
-
-AIPP 能在模型输入侧完成颜色格式处理和归一化，减少 Host CPU
-的像素遍历。示例配置位于：
+预期的目录结构如下：
 
 \begin{lstlisting}
-model/resnet18_rgb_static_aipp.cfg
+add_tbe/
+├── add.py          # TBE算子实现文件
+├── run.py          # 测试验证脚本
+└── kernel_meta/    # 编译输出目录（自动生成）
 \end{lstlisting}
 
-如果只复现实验结果，先下载本章模型资产：
+\subsubsection{编写TBE算子代码（add.py）}\label{src-book-chapter7-h21}
 
-\begin{lstlisting}[language=bash]
-python3 tools/download_model.py --all
-\end{lstlisting}
-
-这个命令会把普通 OM、ONNX、AIPP OM 和 AIPP 配置放到
-\passthrough{\lstinline!model/!}。如果需要自己体验离线转换，应在 Ascend
-310B 上重新生成 AIPP OM：
-
-\begin{lstlisting}[language=bash]
-bash tools/convert_aipp_resnet18.sh
-\end{lstlisting}
-
-DVPP 适合处理视频编解码、JPEG 编解码、VPC resize/crop 等媒体任务。第 5
-章已经介绍 DVPP API，本章只关心它在性能优化中的角色：减少 CPU
-图像处理负担，并让数据尽量早地进入设备侧流水线。
-
-\section{案例一：建立同步推理基线}\label{src-book-chapter7-h9}
-
-先运行基线：
-
-\begin{lstlisting}[language=bash]
-python3 01_baseline_resnet_sync.py --runs 100
-\end{lstlisting}
-
-这个脚本故意采用低效写法：每一帧都申请 Device 输入输出内存、创建
-Dataset、执行推理、复制输出、释放资源。它的价值不是快，而是让问题暴露出来。
-
-核心流程如下：
+下面是完整的向量加法算子实现代码，我们将逐段解释。
 
 \begin{lstlisting}[language=Python]
-input_ptr = acl.rt.malloc(input_size, ACL_MEM_MALLOC_HUGE_FIRST)
-output_ptr = acl.rt.malloc(output_size, ACL_MEM_MALLOC_HUGE_FIRST)
-input_dataset = acl.mdl.create_dataset()
-output_dataset = acl.mdl.create_dataset()
-acl.rt.memcpy(input_ptr, input_size, host_ptr, input_size, ACL_MEMCPY_HOST_TO_DEVICE)
-acl.mdl.execute(model_id, input_dataset, output_dataset)
-acl.rt.memcpy(host_out, output_size, output_ptr, output_size, ACL_MEMCPY_DEVICE_TO_HOST)
+import tbe
+from tbe import tvm
+from tbe import dsl
+from tbe.common.utils import para_check
+from tbe.common.utils import shape_util
+
+from functools import reduce
+
+SHAPE_SIZE_LIMIT = 2147483648
+
+# 实现Add算子的计算逻辑
+
+@tbe.common.register.register_op_compute("add",op_mode="static")
+def add_compute(input_x, input_y, output_z, kernel_name="add"):
+    shape_x = shape_util.shape_to_list(input_x.shape) # 将shape转换为list
+    shape_y = shape_util.shape_to_list(input_y.shape) # 将shape转换为list
+    shape_x, shape_y, shape_max = shape_util.broadcast_shapes(shape_x, shape_y,param_name_input1="input_x",param_name_input2="input_y")   # shape_max取shape_x与shape_y的每个维度的大值
+    shape_size = reduce(lambda x, y: x * y, shape_max[:])      
+    if shape_size > SHAPE_SIZE_LIMIT:
+        raise RuntimeError("the shape is too large to calculate")
+
+    input_x = dsl.broadcast(input_x, shape_max)       # 将input_x的shape广播为shape_max
+    input_y = dsl.broadcast(input_y, shape_max)       # 将input_y的shape广播为shape_max
+    res = dsl.vadd(input_x, input_y)        # 执行input_x + input_y
+
+    return res          # 返回计算结果的tensor
+
+# 算子定义函数
+def add(input_x, input_y, output_z, kernel_name="add"):
+    # 获取算子输入tensor的shape与dtype
+    shape_x = input_x.get("shape")      
+    shape_y = input_y.get("shape")
+    check_tuple = ("float16", "float32", "int32")
+    input_data_type = input_x.get("dtype").lower()
+    if input_data_type not in check_tuple:
+        raise RuntimeError("only support %s while dtype is %s" %
+                           (",".join(check_tuple), input_data_type))
+    # shape_max取shape_x与shape_y的每个维度的最大值
+    shape_x, shape_y, shape_max = shape_util.broadcast_shapes(shape_x, shape_y,param_name_input1="input_x",param_name_input2="input_y")  
+    if shape_x[-1] == 1 and shape_y[-1] == 1 and shape_max[-1] == 1: 
+        # 如果shape的长度等于1，就直接赋值，如果shape的长度不等于1，做切片，将最后一个维度舍弃（按照内存排布，最后一个维度为1与没有最后一个维度的数据排布相同，例如2*3=2*3*1，将最后一个为1的维度舍弃，可提升后续的调度效率）。
+        shape_x = shape_x if len(shape_x) == 1 else shape_x[:-1]   
+        shape_y = shape_y if len(shape_y) == 1 else shape_y[:-1]
+        shape_max = shape_max if len(shape_max) == 1 else shape_max[:-1]
+  
+    # 使用TVM的placeholder接口对第一个输入tensor进行占位，返回一个tensor对象
+    data_x = tvm.placeholder(shape_x, name="data_1", dtype=input_data_type)
+    # 使用TVM的placeholder接口对第二个输入tensor进行占位，返回一个tensor对象
+    data_y = tvm.placeholder(shape_y, name="data_2", dtype=input_data_type)
+
+    # 调用compute实现函数
+    res = add_compute(data_x, data_y, output_z, kernel_name)  
+    # 自动调度
+    with tvm.target.Target("cce", host="cce"):
+        schedule = dsl.auto_schedule(res)
+    # 编译配置
+    config = {"name": kernel_name,
+              "tensor_list": (data_x, data_y, res)}
+    dsl.build(schedule, config)
+    
+# 算子调用
+if __name__ == '__main__':
+    input_output_dict = {"shape": (5, 6, 7),"format": "ND","ori_shape": (5, 6, 7),"ori_format": "ND", "dtype": "float16"}
+    add(input_output_dict, input_output_dict, input_output_dict, kernel_name="add")
 \end{lstlisting}
 
-基线需要记录以下阶段：
-
-{ % do not increment counter
-\begin{longtable}[]{@{}ll@{}}
-\toprule\noalign{}
-阶段 & 含义 \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-\passthrough{\lstinline!preprocess!} & RGB 输入转换为 NCHW float32 \\
-\passthrough{\lstinline!alloc\_dataset!} & 申请输入输出 Buffer 并创建
-Dataset \\
-\passthrough{\lstinline!h2d!} & Host 输入复制到 Device \\
-\passthrough{\lstinline!execute!} & 模型执行 \\
-\passthrough{\lstinline!d2h!} & Device 输出复制回 Host \\
-\passthrough{\lstinline!free\_dataset!} & 销毁 Dataset 并释放 Buffer \\
-\passthrough{\lstinline!postprocess!} & \passthrough{\lstinline!argmax!}
-等轻量后处理 \\
-\passthrough{\lstinline!end\_to\_end!} & 单帧端到端耗时 \\
-\end{longtable}
-}
-
-如果 \passthrough{\lstinline!alloc\_dataset!} 和
-\passthrough{\lstinline!free\_dataset!}
-占比明显，说明优化方向不是模型，而是资源生命周期。
-
-\section{案例二：复用 ACL Buffer 和
-Dataset}\label{src-book-chapter7-h10}
-
-推理服务通常会长时间运行，输入输出张量大小也是固定的。因此更合理的做法是在模型加载后一次性创建输入输出
-Buffer 和 Dataset，在每帧循环里只做数据拷贝和执行：
-
-\begin{lstlisting}[language=bash]
-python3 02_buffer_reuse_benchmark.py --runs 100
-\end{lstlisting}
-
-优化后的流程：
+\begin{quote}
+\textbf{注意事项}：在 CANN 8.3.RC1
+版本中，\passthrough{\lstinline!tvm.target.cce()!}
+已被标记为废弃（deprecated）。如果运行时出现如下警告：
 
 \begin{lstlisting}
-初始化阶段：load model -> create dataset -> malloc input/output buffer
-循环阶段：H2D -> execute -> D2H -> postprocess
-退出阶段：destroy dataset -> free buffer -> unload model
+UserWarning: target_host parameter is going to be deprecated.
+Please pass in tvm.target.Target(target, host=target_host) instead.
 \end{lstlisting}
 
-这项优化的判断标准很直接：
+请将 \passthrough{\lstinline!with tvm.target.cce():!} 替换为
+\passthrough{\lstinline!with tvm.target.Target("cce", host="cce"):!}，这是
+CANN 新版 API 的标准写法。
+\end{quote}
 
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
+\subsection{代码逐段详解}\label{src-book-chapter7-h22}
+
+\subsubsection{导入模块}\label{src-book-chapter7-h23}
+
+\begin{lstlisting}[language=Python]
+import tbe
+from tbe import tvm
+from tbe import dsl
+from tbe.common.utils import para_check
+from tbe.common.utils import shape_util
+from functools import reduce
+\end{lstlisting}
+
+\begin{itemize}
 \tightlist
 \item
-  \passthrough{\lstinline!alloc\_dataset!} 和
-  \passthrough{\lstinline!free\_dataset!} 从每帧计时中消失。
+  \passthrough{\lstinline!tbe!}：TBE框架主模块
 \item
-  \passthrough{\lstinline!end\_to\_end!} 平均耗时下降。
+  \passthrough{\lstinline!tbe.dsl!}：包含DSL计算接口（如vadd）、调度接口和编译接口
 \item
-  \passthrough{\lstinline!msprof!} Timeline 中 Host 侧 ACL Runtime
-  调用密度更高，计算任务之间的空白减少。
-\end{enumerate}
+  \passthrough{\lstinline!tbe.tvm!}：TBE基于TVM框架扩展，可以使用TVM接口
+\item
+  \passthrough{\lstinline!shape\_util!}：提供shape处理工具，如广播shape计算
+\item
+  \passthrough{\lstinline!para\_check!}：参数校验工具
+\end{itemize}
 
-如果模型很小，Buffer
-复用的收益会特别明显；如果模型本身很大，收益占比会下降，但仍然能减少长尾抖动。
+算子计算逻辑（add\_compute）
+这是算子开发的核心，描述''如何计算''。关键点： -
+\passthrough{\lstinline!@register\_op\_compute!}装饰器将函数注册为算子的计算逻辑
+-
+\textbf{Shape大小校验}：计算广播后张量的总元素个数，当超出\passthrough{\lstinline!SHAPE\_SIZE\_LIMIT!}阈值时抛出异常
+-
+\textbf{数据广播与计算}：先通过\passthrough{\lstinline!dsl.broadcast!}将输入形状广播对齐，再调用\passthrough{\lstinline!dsl.vadd!}执行向量加法（自动识别为element-wise模式）
 
-\section{案例三：CPU
-预处理为什么容易成为瓶颈}\label{src-book-chapter7-h11}
+\subsubsection{算子主函数（add）}\label{src-book-chapter7-h24}
 
-很多边缘视觉应用在 NPU 推理前会做 resize、颜色转换、归一化和 HWC 到 CHW
-转换。脚本 \passthrough{\lstinline!03\_cpu\_preprocess\_benchmark.py!}
-用确定性 RGB 图像模拟 1080p 摄像头帧：
+这是算子的入口函数，负责调度和编译：
+
+\textbf{参数校验}：校验数据类型是否在支持范围内（float16/float32/int32）。
+
+\textbf{Shape切片优化}：如果shape的末尾维度长度为1，则将其直接舍弃。由于内存排布上末尾为1并不影响实际排布（例如2\emph{3}1等同于2*3），舍弃后可有效提升后续的调度效率。
+
+\textbf{TVM占位符}：\passthrough{\lstinline!tvm.placeholder!}创建输入张量的占位符，描述张量的形状和数据类型，但不分配实际数据。
+
+\textbf{自动调度}：\passthrough{\lstinline!dsl.auto\_schedule!}自动完成AST标注、模式识别、子图切分、调度模板选择，并将指令映射到昇腾硬件。
+
+\textbf{编译构建}：\passthrough{\lstinline!dsl.build!}将调度后的计算描述编译为昇腾设备可执行的二进制文件。
+
+\subsection{编译算子}\label{src-book-chapter7-h25}
+
+在终端执行以下命令编译算子：
 
 \begin{lstlisting}[language=bash]
-python3 03_cpu_preprocess_benchmark.py --runs 100 --resolution 1920x1080
+python3 add.py
 \end{lstlisting}
 
-如果想观察更稳定的统计结果，可以在确认本机内存充足后把
-\passthrough{\lstinline!--runs!} 增加到 500 或 1000。
+编译成功后，会在当前目录生成\passthrough{\lstinline!kernel\_meta/!}文件夹，包含两个文件：
+- \passthrough{\lstinline!add.o!}：算子的二进制目标文件 -
+\passthrough{\lstinline!add.json!}：算子的元信息描述文件
 
-脚本比较两种方式：
-
-{ % do not increment counter
-\begin{longtable}[]{@{}ll@{}}
-\toprule\noalign{}
-方式 & 特点 \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-\passthrough{\lstinline!naive\_numpy!} & 每帧创建 resize、float32、NCHW
-等中间数组 \\
-\passthrough{\lstinline!workspace\_reuse!} &
-预先创建工作区，循环中复用数组 \\
-\end{longtable}
-}
-
-这个案例的学习重点不是把 CPU 预处理调到极致，而是理解何时应该停止优化
-CPU。若预处理耗时已经接近或超过模型执行耗时，应优先考虑：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  使用 DVPP VPC 做 resize/crop。
-\item
-  使用 AIPP 做归一化和部分颜色格式处理。
-\item
-  使用视频链路时，让 VDEC/JPEGD 的输出直接衔接 VPC 或模型输入。
-\end{enumerate}
-
-\section{案例四：DVPP VPC resize 与 CPU
-resize}\label{src-book-chapter7-h12}
-
-脚本 \passthrough{\lstinline!04\_dvpp\_resize\_vs\_cpu.py!} 生成 NV12
-测试帧，将 1080p 图像缩小到 540p，对比 CPU resize 和 DVPP VPC resize：
+查看生成的文件：
 
 \begin{lstlisting}[language=bash]
-python3 04_dvpp_resize_vs_cpu.py --frames 60 --resolution 1920x1080
+ls kernel_meta/
+# 输出示例：add.o  add.json
 \end{lstlisting}
 
-该脚本包含 H2D、VPC resize、同步和
-D2H，因此测到的是一个完整调用成本，而不是 VPC 内核的裸耗时。如果 DVPP
-仍然明显领先 CPU，说明把 resize 从 Host
-下沉到设备侧很有价值。如果差距不明显，要继续检查：
+\subsection{算子验证：在NPU上运行测试}\label{src-book-chapter7-h26}
 
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  输入尺寸是否太小，导致调用开销大于计算收益。
-\item
-  是否每帧都重复创建 DVPP Channel、Stream 或配置对象。
-\item
-  是否存在多余的 H2D/D2H 拷贝。
-\end{enumerate}
+编译成功后，我们需要验证算子的正确性。昇腾提供了两种验证方式： -
+\textbf{单算子模型执行}：将算子编译成单算子离线模型（.om文件），通过AscendCL加载执行
+- \textbf{单算子API执行}：直接通过AscendCL的API调用算子
 
-\section{案例五：AIPP
-把归一化下沉到模型输入侧}\label{src-book-chapter7-h13}
+本节采用第一种方式，因为它更接近实际部署场景。
 
-前面的基线脚本使用 CPU 完成 resize、归一化和 HWC 到 CHW 转换，然后把
-\passthrough{\lstinline!float32 NCHW!} 输入拷贝到 Device。AIPP
-的思路不同：让模型接收 \passthrough{\lstinline!RGB888\_U8!}
-图像，在模型输入侧完成均值、方差等处理。这样可以减少 Host CPU
-的像素遍历，也能减少输入拷贝字节数。
+\subsubsection{编写验证代码（run.py）}\label{src-book-chapter7-h27}
 
-本章提供静态 AIPP 配置：
+下面是使用AscendCL加载并执行单算子的验证代码：
+
+\begin{lstlisting}[language=Python]
+# run.py
+from tbe import tvm
+from tbe import dsl
+from tbe.common.utils import para_check
+from tbe.common.utils import shape_util
+# 引入testing模块相关接口
+from tbe.common.testing.testing import *
+from tbe.common.testing.testing import _Testing
+import numpy as np
+
+
+def build(inputs, args=None, name="default_function"):
+    """覆盖 testing 模块的 build()，将 target 和 target_host 合并为新版 API。"""
+    _Testing.build(inputs, args=args,
+                   target=tvm.target.Target("c", host="llvm"),
+                   target_host=None, name=name,
+                   tiling_keys=None, binds=None, evaluates=None)
+
+
+@para_check.check_input_type(dict, dict, dict, str)
+def addtest(input_a, input_b, output_d, kernel_name="addtest"):
+    # 进入DSL调试模式，并选择CPU作为运行平台
+    with debug():
+        # 获取算子运行的上下文
+        ctx = get_ctx()
+
+        # 获取输入数据的shape与dtype
+        shape_a = shape_util.scalar2tensor_one(input_a.get("shape"))
+        shape_b = shape_util.scalar2tensor_one(input_b.get("shape"))
+        data_type = input_a.get("dtype").lower()
+
+        # 使用numpy定义输入golden数据大小
+        a = tvm.nd.array(np.random.uniform(size=shape_a).astype(data_type), ctx)
+        b = tvm.nd.array(np.random.uniform(size=shape_b).astype(data_type), ctx)
+        # 使用numpy将输出d初始化为全0
+        d = tvm.nd.array(np.zeros(shape_a, dtype=data_type), ctx)
+
+        # 调用TVM的placeholder接口对输入tensor进行占位，并返回一个tensor对象
+        data_a = tvm.placeholder(shape_a, name="data_1", dtype=data_type)
+        data_b = tvm.placeholder(shape_b, name="data_2", dtype=data_type)
+        # 调用DSL计算接口实现data_a + data_b
+        data_c = dsl.vadd(data_a, data_b)
+
+        # 中间Tensor数据验证
+        sample = open('samplefile.txt', 'w')
+        # 将中间tensor data_c存入文件samplefile.txt
+        print_tensor(data_c, ofile=sample)
+        # 检查中间tensor data_c的值是否正确
+        assert_allclose(data_c, desired=a.asnumpy() + b.asnumpy(), tol=[1e-7, 1e-7])
+        print("The value of data_c is the same as the expected value.")
+
+        # 继续自定义DSL的逻辑撰写,调用DSL接口实现：data_d = data_c + data_b
+        data_d = dsl.vadd(data_c, data_b)
+        # 调用TVM的create_schedule接口，为算子创建调度实例对象，入参为输出tensor的OP列表。
+        s = tvm.create_schedule(data_d.op)
+
+        # 编译生成算子,data_a,data_b,data_d是占位的输入输出列表，AddTest是我们自定义算子的名称
+        build(s, [data_a, data_b, data_d], name="AddTest")
+
+        # 执行算子,将a,b,d按顺序代入编译出来的DSL算子AddTest
+        run(a, b, d)  # AddTest(a, b, d)
+
+        # 将输出数据d的值打印出来,并预期结果进行比较，看是否相符
+        print("d:", d)
+        tvm.testing.assert_allclose(d.asnumpy(), a.asnumpy() + b.asnumpy() + b.asnumpy())
+        print("The actual output is the same as the expected output.")
+
+# 编写入口函数，调用addtest函数
+if __name__ == "__main__":
+    input_output_dict = {"shape": (2, 3, 4),"format": "ND","ori_shape": (2, 3, 4),"ori_format": "ND", "dtype":"float32"}
+    addtest(input_output_dict, input_output_dict, input_output_dict, kernel_name="addtest")
+\end{lstlisting}
+
+\begin{quote}
+\textbf{注意事项}：由于
+\passthrough{\lstinline!tbe.common.testing.testing!} 模块的
+\passthrough{\lstinline!build()!} 函数内部仍使用旧版 API（将
+\passthrough{\lstinline!target!} 和
+\passthrough{\lstinline!target\_host!} 作为独立参数传入
+\passthrough{\lstinline!tvm.build()!}），同样会触发上述废弃警告。解决方案是在
+\passthrough{\lstinline!run.py!} 中自定义一个
+\passthrough{\lstinline!build()!} 函数来覆盖它，将两个参数合并为
+\passthrough{\lstinline!tvm.target.Target("c", host="llvm")!}，从而消除警告。
+\end{quote}
+
+\subsubsection{运行验证}\label{src-book-chapter7-h28}
+
+验证代码：
+
+\begin{lstlisting}[language=bash]
+# 直接运行
+python3 run.py
+\end{lstlisting}
+
+成功输出示例：
 
 \begin{lstlisting}
-model/resnet18_rgb_static_aipp.cfg
+======================== debug enter =======================
+The value of data_c is the same as the expected value.
+Tensor add_0 is saved to file samplefile.txt.
+d: [[[1.0816491  1.9020174  1.2096624  2.5805097 ]
+  [2.401499   1.8532326  1.4911635  2.6252913 ]
+  [1.0037376  2.671739   1.8189309  0.3927391 ]]
+
+ [[1.9595971  2.1914093  1.6825981  0.9398521 ]
+  [1.0270492  2.070397   0.97784364 1.7433951 ]
+  [0.4678194  2.564149   1.746469   1.7772455 ]]]
+The actual output is the same as the expected output.
+======================== debug exit ========================
 \end{lstlisting}
 
-先下载本章模型资产：
+至此，我们完成了第一个TBE
+DSL算子的完整开发流程：从算子分析、代码实现、编译到NPU上验证运行。
 
-\begin{lstlisting}[language=bash]
-python3 tools/download_model.py --all
+\subsubsection{性能验证：NPU 真的比 CPU
+快吗？}\label{src-book-chapter7-h29}
+
+成功运行算子只是第一步，一个自然的问题是：\textbf{算子跑在 NPU 上到底比
+CPU 快多少？}
+
+验证方法并不复杂：用 NumPy 在 CPU 上执行相同规模的加法，与 TBE
+算子对比耗时。以下是一个简单的计时示例：
+
+\begin{lstlisting}[language=Python]
+import time
+import numpy as np
+
+shape = (256, 256, 256)          # 约 1670 万个元素
+dtype = np.float32
+
+a = np.random.uniform(size=shape).astype(dtype)
+b = np.random.uniform(size=shape).astype(dtype)
+
+# CPU 计时
+t0 = time.time()
+c_cpu = a + b
+t_cpu = time.time() - t0
+
+# NPU 计时（在 run.py 的 debug 环境中，用 TVM 的 time_evaluator）
+# 详见 CANN Profiling 工具 msprof 的官方文档
+print(f"CPU time: {t_cpu:.4f}s")
 \end{lstlisting}
 
-\passthrough{\lstinline!--all!} 会把普通 OM、ONNX、AIPP OM 和 AIPP
-配置都下载到 \passthrough{\lstinline!model/!}。如果 Hugging Face
-仓库中已经有
-\passthrough{\lstinline!model/resnet18\_tiny\_imagenet\_aipp.om!}，可以直接运行后面的对比脚本，不必自己转换。
+对于 \passthrough{\lstinline!256x256x256!} 规模的 float32 加法，昇腾310B
+上经 TBE DSL 生成的算子通常可获得数倍乃至十数倍于 CPU 的加速比。这得益于
+NPU 的多核并行执行与 UB 缓冲区的极低访存延迟。
 
-如果需要在板端重新生成 AIPP OM，再运行独立 shell 脚本：
+需要强调的是，上述简单计时只适用于初步感受。系统性的性能分析应使用昇腾官方的
+\textbf{Profiling 工具（msprof）}，它能精确采集 AI Core
+执行周期、内存带宽利用率、算子耗时占比等关键指标。Profiling
+的具体使用方法将在后续的性能优化章节中详细介绍。
 
-\begin{lstlisting}[language=bash]
-bash tools/convert_aipp_resnet18.sh
-\end{lstlisting}
+\subsection{TBE DSL开发的优势与局限}\label{src-book-chapter7-h30}
 
-脚本默认生成
-\passthrough{\lstinline!model/resnet18\_tiny\_imagenet\_aipp.om!}。转换或下载完成后，再运行
-Python 对比脚本：
+通过本次实战体验，我们可以总结TBE DSL开发的特点：
 
-\begin{lstlisting}[language=bash]
-python3 06_aipp_preprocess_compare.py --runs 100
-\end{lstlisting}
+\subsubsection{优势}\label{src-book-chapter7-h31}
 
-这里故意把 ATC 转换和 Python 推理对比分成两步。ATC
-是离线模型转换，可能耗时较长，也可能受板端内存和 CANN 环境影响；Python
-脚本只加载已有 OM 做性能测试，不会在测试过程中调用 ATC。
-
-对比脚本会执行两条路径：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  使用原始 OM 跑
-  \passthrough{\lstinline!CPU preprocess -> H2D -> execute -> D2H -> argmax!}。
-\item
-  使用 AIPP OM 跑
-  \passthrough{\lstinline!RGB888\_U8 prepare -> H2D -> AIPP+execute -> D2H -> argmax!}，并比较输出差异。
-\end{enumerate}
-
-需要注意，AIPP OM 的输入不再是
-\passthrough{\lstinline!float32 NCHW!}，而是
-\passthrough{\lstinline!uint8 HWC RGB!}。因此不能直接拿
-\passthrough{\lstinline!01\_baseline\_resnet\_sync.py!} 去跑 AIPP
-OM，必须使用本节的对比脚本或在自己的程序中按 AIPP 配置准备输入。
-
-对外部读者来说，还有两个容易踩坑的地方：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  运行转换脚本前，需要先完成 CANN 环境配置，并确认当前终端可以直接使用
-  \passthrough{\lstinline!atc!}。
-\item
-  CANN 8.3 对 \passthrough{\lstinline!RGB888\_U8!} 的
-  \passthrough{\lstinline!mean\_chn\_*!} 字段按整数解析，不能直接写
-  \passthrough{\lstinline!123.675!} 这样的浮点均值。本章配置使用
-  \passthrough{\lstinline!mean\_chn\_*: 0!} 加浮点
-  \passthrough{\lstinline!min\_chn\_*!} 表达 ImageNet 均值，并用
-  \passthrough{\lstinline!var\_reci\_chn\_*!} 表达
-  \passthrough{\lstinline!1 / (255 * std)!}。
-\end{enumerate}
-
-ATC
-是离线转换步骤，第一次编译可能明显慢于普通推理脚本。如果转换耗时异常，应先检查板端负载、可用内存、CANN
-日志和 AIPP 配置，再重新运行转换脚本。
-
-\section{案例六：串行流程与 Queue Pipeline}\label{src-book-chapter7-h14}
-
-串行流程的单帧耗时为：
-
-\begin{lstlisting}
-T = T_pre + T_infer + T_post
-\end{lstlisting}
-
-三段流水线稳定后的吞吐上限更接近：
-
-\begin{lstlisting}
-FPS = 1000 / max(T_pre, T_infer, T_post)
-\end{lstlisting}
-
-先在本地使用模拟模式理解这个关系：
-
-\begin{lstlisting}[language=bash]
-python3 05_pipeline_queue_demo.py --simulate --frames 200
-\end{lstlisting}
-
-再在 Ascend 310B 上使用 PyACL 模式：
-
-\begin{lstlisting}[language=bash]
-python3 05_pipeline_queue_demo.py --frames 100
-\end{lstlisting}
-
-流水线优化的目标不是降低单帧端到端延迟，而是提高稳态吞吐。它会引入队列等待，因此
-p95 latency 可能上升；如果业务目标是交互式低延迟，需要谨慎扩大队列深度。
-
-\section{作者实测结果}\label{src-book-chapter7-h15}
-
-本节记录作者在一台 Ascend 310B
-设备上得到的实测数据。读者自己的板端温度、CANN
-版本、设备健康状态和后台进程不同，绝对数值会有差异；更重要的是复现实验方法和观察相对趋势。
-
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
-项目
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-内容
-\end{minipage} \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-测试主机 & \passthrough{\lstinline!313!}，作者内部测试主机编号 \\
-设备名 & \passthrough{\lstinline!orangepiaipro!} \\
-远端仓库 &
-\passthrough{\lstinline!/home/HwHiAiUser/Documents/Ascend310!} \\
-CANN 路径 &
-\passthrough{\lstinline!/usr/local/Ascend/ascend-toolkit/latest!} \\
-Python &
-\passthrough{\lstinline!/home/HwHiAiUser/.conda/envs/npu/bin/python!} \\
-测试日期 & \passthrough{\lstinline!2026-06-08!} \\
-设备状态 & \passthrough{\lstinline!npu-smi!} 显示 310B4，Health 为
-\passthrough{\lstinline!Alarm!}，温度约 61 C，测试前后内存约 2939-3003 /
-7545 MB \\
-\end{longtable}
-}
-
-以下表格由
-\passthrough{\lstinline!samples/chapter7/tools/summarize\_metrics.py!}
-汇总远端 JSON 指标生成。由于测试时设备状态为
-\passthrough{\lstinline!Alarm!}，数据更适合作为章节教学样例和相对趋势参考；正式项目验收应在设备健康状态正常、无其他进程干扰时重新跑完整评测。
-
-{ % do not increment counter
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1034}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1034}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1379}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1379}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1379}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1379}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1379}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1034}}@{}}
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-案例
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-变体
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-平均耗时(ms)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-p95(ms)
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-FPS
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-样本数
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-加速比
+优势
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
 说明
 \end{minipage} \\
@@ -589,182 +710,627 @@ FPS
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-ResNet18 同步推理 & \passthrough{\lstinline!naive\_alloc\_each\_frame!}
-& 4.5088 & 4.712 & 221.791 & 100 & & 每帧申请/释放 ACL 输入输出 Buffer
-和 Dataset \\
-ResNet18 Buffer 复用 &
-\passthrough{\lstinline!naive\_alloc\_each\_frame!} & 4.6047 & 6.8023 &
-217.1708 & 100 & & 对照组 \\
-ResNet18 Buffer 复用 & \passthrough{\lstinline!reuse\_acl\_buffers!} &
-3.2072 & 3.3509 & 311.7963 & 100 & 1.436 & 模型加载后一次性创建输入输出
-Buffer 和 Dataset \\
-CPU 预处理 & \passthrough{\lstinline!naive\_numpy!} & 0.62 & 0.6821 &
-1612.8023 & 200 & & 每帧创建中间数组 \\
-CPU 预处理 & \passthrough{\lstinline!workspace\_reuse!} & 0.3583 &
-0.4154 & 2791.1275 & 200 & 1.731 & 复用 resize/CHW 工作区 \\
-DVPP VPC Resize & \passthrough{\lstinline!cpu\_cv2\_resize!} & 2.6013 &
-2.6659 & 384.4225 & 60 & & CPU resize NV12 Y/UV \\
-DVPP VPC Resize & \passthrough{\lstinline!dvpp\_vpc\_resize!} & 3.5966 &
-3.7102 & 278.0433 & 60 & 0.723 & DVPP VPC resize + H2D/D2H \\
-AIPP 预处理下沉 & \passthrough{\lstinline!cpu\_preprocess!} & 3.2319 &
-3.3155 & 309.4136 & 100 & & CPU 完成
-resize/normalize/HWC-\textgreater CHW 后推理 \\
-AIPP 预处理下沉 & \passthrough{\lstinline!static\_aipp\_rgb!} & 2.6076 &
-2.6283 & 383.5017 & 100 & 1.239 & AIPP 接收 RGB888\_U8
-并在模型输入侧归一化 \\
-Queue Pipeline & \passthrough{\lstinline!pyacl\_serial!} & 3.1943 &
-3.2332 & 313.0536 & 100 & & Pre -\textgreater{} Infer -\textgreater{}
-Post 串行 \\
-Queue Pipeline & \passthrough{\lstinline!pyacl\_queue\_pipeline!} &
-3.993 & 100.0494 & 250.4402 & 100 & 0.8 & 三段线程通过 Queue 解耦 \\
-Queue Pipeline & \passthrough{\lstinline!simulate\_serial!} & 15.1757 &
-15.1942 & 65.8947 & 200 & & Pre -\textgreater{} Infer -\textgreater{}
-Post 串行 \\
-Queue Pipeline & \passthrough{\lstinline!simulate\_queue\_pipeline!} &
-8.1233 & 157.4201 & 123.1021 & 200 & 1.868 & 三段线程通过 Queue 解耦 \\
+\textbf{开发门槛低} &
+使用Python开发，无需深入了解昇腾硬件架构，只需描述数学逻辑 \\
+\textbf{代码简洁} &
+一个完整的加法算子核心代码仅需10行左右，大幅减少开发工作量 \\
+\textbf{自动优化} &
+\passthrough{\lstinline!auto\_schedule!}自动完成指令映射、数据切分、流水线优化，由昇腾官方模板调度，性能稳定可靠 \\
+\textbf{快速验证} & 适合算法原型验证和非性能瓶颈算子的快速实现 \\
 \end{longtable}
-}
 
-从这组数据可以得到五个结论：
+\subsubsection{局限}\label{src-book-chapter7-h32}
 
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  Buffer 复用是确定有效的优化。ResNet18 端到端平均耗时从 4.6047 ms 降到
-  3.2072 ms，提升约 1.436 倍。
-\item
-  CPU 预处理里的中间数组分配值得优化。复用工作区后，预处理平均耗时从
-  0.62 ms 降到 0.3583 ms。
-\item
-  DVPP 不是简单替换 API 就一定更快。本章脚本为了教学完整性包含每帧
-  \passthrough{\lstinline!dvpp\_malloc/free!}、H2D 和 D2H，结果 DVPP VPC
-  resize 平均 3.5966 ms，慢于 CPU resize 的 2.6013
-  ms。真实视频流水线应复用 DVPP 资源，并尽量让 VDEC/JPEGD/VPC
-  输出继续留在设备侧。
-\item
-  AIPP 在本章模型上有明确收益。原始 OM 的 CPU 预处理路径平均耗时为
-  3.2319 ms，AIPP OM 的 \passthrough{\lstinline!RGB888\_U8!}
-  输入路径降到 2.6076 ms，提升约 1.239 倍；100 次测试中 top1 匹配率为
-  1.0，最大单点输出差异为 0.007812。AIPP
-  改变了模型输入格式，正确的比较对象不是``同一个 OM 换输入''，而是原始
-  OM 的 CPU 预处理路径与 AIPP OM 的 \passthrough{\lstinline!RGB888\_U8!}
-  输入路径。
-\item
-  Pipeline 需要足够重的阶段才有收益。模拟场景中队列流水线从 65.8947 FPS
-  提升到 123.1021 FPS；但 ResNet18 小模型的 PyACL
-  场景中，队列和线程上下文开销使 FPS 从 313.0536 降到 250.4402，且 p95
-  latency 明显变差。
-\end{enumerate}
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+局限
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+说明
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{自动调度的''黑盒''特性} & Auto
+Schedule对特殊结构的算子可能不够精细，当算子有强性能诉求时，可能无法达到极致性能 \\
+\textbf{灵活性受限} &
+对于具有极端定制化需求或特殊数据流模式的算子，DSL的自动调度可能无法完全满足 \\
+\textbf{高级算子覆盖} & 某些高级算子类型DSL可能尚未完全覆盖 \\
+\end{longtable}
 
-本次 \passthrough{\lstinline!msprof!} 采集输出目录如下，可用 MindStudio
-或 Ascend Insight 打开：
+\subsection{小结与展望}\label{src-book-chapter7-h33}
 
-\begin{lstlisting}
-outputs/msprof/baseline-remote-latest-20260608-083957/PROF_000001_20260608083959526_RHNMOCNRMNBBHBCC/mindstudio_profiler_output
-\end{lstlisting}
+本节我们通过一个向量加法算子，完整实践了TBE
+DSL开发的四步流程：算子分析、代码实现、编译、验证。你可能会感受到TBE
+DSL带来的便利------用熟悉的Python语言，专注于数学逻辑本身，而将底层复杂的硬件适配交给自动调度完成。
 
-远端验证命令：
+这正体现了TBE的设计哲学：\textbf{将开发者从复杂的硬件指令和内存管理中解放出来，专注于算法本身}。
 
-\begin{lstlisting}[language=bash]
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
-cd /home/HwHiAiUser/Documents/Ascend310/samples/chapter7
-PY=/home/HwHiAiUser/.conda/envs/npu/bin/python
-$PY -m py_compile *.py tools/*.py
-$PY tools/download_model.py
-$PY 01_baseline_resnet_sync.py --runs 100 --output outputs/baseline_resnet_sync_remote_latest.json
-$PY 02_buffer_reuse_benchmark.py --runs 100 --output outputs/buffer_reuse_remote_latest.json
-$PY 03_cpu_preprocess_benchmark.py --runs 200 --output outputs/cpu_preprocess_remote_latest.json
-$PY 04_dvpp_resize_vs_cpu.py --frames 60 --output outputs/dvpp_resize_remote_latest.json
-$PY 05_pipeline_queue_demo.py --simulate --frames 200 --output outputs/pipeline_simulate_remote_latest.json
-$PY 05_pipeline_queue_demo.py --frames 100 --output outputs/pipeline_pyacl_remote_latest.json
-$PY tools/download_model.py --all
-$PY 06_aipp_preprocess_compare.py --runs 100 --output outputs/aipp_preprocess_remote_latest.json
-$PY tools/summarize_metrics.py \
-  outputs/baseline_resnet_sync_remote_latest.json \
-  outputs/buffer_reuse_remote_latest.json \
-  outputs/cpu_preprocess_remote_latest.json \
-  outputs/dvpp_resize_remote_latest.json \
-  outputs/aipp_preprocess_remote_latest.json \
-  outputs/pipeline_pyacl_remote_latest.json \
-  outputs/pipeline_simulate_remote_latest.json \
-  --output outputs/summary_remote_latest.md
-npu-smi info
-\end{lstlisting}
+然而，正如我们在''局限''中提到的，自动调度并非万能。当追求极致性能、或实现特殊计算模式时，我们需要更精细的控制能力。这正是下一节将要学习的\textbf{Ascend
+C开发范式}的用武之地。
 
-Profiling 采集命令：
+在进入下一节之前，建议你亲自动手完成本节示例，并在自己的昇腾310B开发板上跑通验证。这是理解后续更深内容的基础。
 
-\begin{lstlisting}[language=bash]
-bash tools/profile_with_msprof.sh --name baseline-remote-latest -- \
-  /home/HwHiAiUser/.conda/envs/npu/bin/python 01_baseline_resnet_sync.py \
-    --runs 20 --output outputs/baseline_msprof_remote_latest.json
-\end{lstlisting}
+\section{理解算子开发的核心概念}\label{src-book-chapter7-h34}
 
-\section{调优 Checklist}\label{src-book-chapter7-h16}
+在动手实践之后，本节将系统讲解算子开发中必须掌握的三个核心概念：算子原型定义、算子信息库（.ini
+文件）以及 Tiling（分片计算）。无论使用 TBE DSL 还是 Ascend
+C，这些概念都是绕不开的基础知识。
 
-{ % do not increment counter
+\subsection{算子原型定义}\label{src-book-chapter7-h35}
+
+一个算子要在 CANN
+框架中被正确注册和调用，首先需要明确它的\textbf{原型（Prototype）}。算子原型定义了该算子的完整接口契约，包括：
+
+\textbf{输入与输出（Inputs \&
+Outputs）}：每个算子接受若干输入张量，产生若干输出张量。张量的规格包括：
+
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
-现象
+要素
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-优先检查
+说明
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-常见优化
+示例
 \end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-NPU Timeline 有大量空白 & Host 是否慢、是否同步等待 &
-预处理下沉、异步流水线、减少全局同步 \\
-H2D/D2H 占比高 & 输入输出大小和拷贝次数 & 合并
-Buffer、复用内存、减少回传输出 \\
-每帧耗时抖动大 & 是否每帧 malloc/free & 预分配 Buffer、固定 Dataset \\
-CPU 占用高 & resize/cvtColor/normalize 是否在 CPU &
-DVPP、AIPP、C++/NumPy 工作区复用 \\
-模型单独基准也慢 & 算子或模型结构 &
-改输入尺寸、精度模式、Batch、算子优化 \\
-Pipeline FPS 不升反降 & 队列太深或阶段不均衡 &
-缩小队列、调整线程数、重新划分阶段 \\
+\textbf{Shape} & 张量的维度信息 &
+\passthrough{\lstinline!(batch, channel, height, width)!} \\
+\textbf{Format} & 张量的内存排布格式 &
+\passthrough{\lstinline!ND!}（普通排布）、\passthrough{\lstinline!NHWC!}、\passthrough{\lstinline!NCHW!}、\passthrough{\lstinline!FRACTAL\_Z!}（昇腾分形格式） \\
+\textbf{Dtype} & 数据类型 &
+\passthrough{\lstinline!float16!}、\passthrough{\lstinline!float32!}、\passthrough{\lstinline!int32!}、\passthrough{\lstinline!int8!} \\
 \end{longtable}
-}
 
-\section{练习任务}\label{src-book-chapter7-h17}
+昇腾支持多种内存排布格式，其中 \textbf{FRACTAL\_Z} 是昇腾专为 Cube Unit
+卷积/矩阵乘法设计的特殊格式，能最大化数据复用效率。在算子开发中，开发者需要明确算子支持的
+format 列表，必要时在 compute 函数中完成格式转换。
+
+\textbf{属性（Attributes）}：属性是在编译期确定的参数，不同于运行时可变的输入张量。典型的属性包括：
+
+\begin{itemize}
+\tightlist
+\item
+  \passthrough{\lstinline!axis!}：规约操作的轴向（如 Softmax
+  的归一化维度）
+\item
+  \passthrough{\lstinline!kernel\_size!}、\passthrough{\lstinline!stride!}、\passthrough{\lstinline!padding!}：卷积算子的超参数
+\item
+  \passthrough{\lstinline!eps!}：归一化算子的小常数（防止除零）
+\end{itemize}
+
+属性在算子注册时声明类型与默认值，在模型编译时固化到算子的 JSON 描述中。
+
+\textbf{算子类型（OpType）}：每个算子有唯一的类型名称，采用大驼峰命名，如
+\passthrough{\lstinline!Add!}、\passthrough{\lstinline!Conv2D!}、\passthrough{\lstinline!BatchNorm!}。这个名称在算子信息库和
+AscendCL 调用中均需保持一致。
+
+\subsection{算子信息库（.ini 文件）}\label{src-book-chapter7-h36}
+
+\textbf{算子信息库}（Operator Information Library，简称
+\passthrough{\lstinline!.ini!} 文件）是 CANN
+算子管理体系的核心配置文件。每个自定义算子都需要一个对应的
+\passthrough{\lstinline!.ini!} 文件，它的主要作用包括：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  把 \passthrough{\lstinline!01\_baseline\_resnet\_sync.py!} 的
-  \passthrough{\lstinline!--runs!} 从 100 增加到 1000，对比 p95
-  是否稳定。
+  \textbf{声明算子的存在}：告诉 CANN 图引擎''有哪些自定义算子可用''
 \item
-  用 \passthrough{\lstinline!msprof!} 分别采集基线和 Buffer
-  复用脚本，找出 Timeline 中 Host 空白是否减少。
+  \textbf{描述算子规格}：输入输出的数量、支持的数据类型与 format
 \item
-  修改 \passthrough{\lstinline!05\_pipeline\_queue\_demo.py --simulate!}
-  中的
-  \passthrough{\lstinline!--pre-ms!}、\passthrough{\lstinline!--infer-ms!}、\passthrough{\lstinline!--post-ms!}，验证吞吐是否接近最慢阶段。
-\item
-  将自己的模型接入 \passthrough{\lstinline!ReuseResNetRunner!}
-  的思路，记录优化前后的 JSON 指标。
-\item
-  运行 \passthrough{\lstinline!tools/download\_model.py --all!} 获取
-  AIPP OM，或使用
-  \passthrough{\lstinline!tools/convert\_aipp\_resnet18.sh!} 重新生成
-  AIPP OM，再运行
-  \passthrough{\lstinline!06\_aipp\_preprocess\_compare.py!} 比较 CPU
-  归一化下沉前后的端到端耗时和输出差异。
+  \textbf{关联实现文件}：指定算子对应的编译产物（\passthrough{\lstinline!.o!}
+  或 \passthrough{\lstinline!.so!} 文件）路径
 \end{enumerate}
 
-\section{小结}\label{src-book-chapter7-h18}
+一个典型的 \passthrough{\lstinline!.ini!} 文件结构如下：
 
-Ascend 310B
-性能优化的核心是先定位瓶颈，再把瓶颈映射到合适的硬件或软件策略。小模型场景中，内存申请、同步和
-Host 预处理往往比模型执行更值得关注；视频场景中，DVPP、AIPP
-和流水线调度决定了端到端吞吐。调优的最终依据不是经验判断，而是可复现的指标、Timeline
-和对比报告。
+\begin{lstlisting}
+[GENERAL]
+op_type=Add
+op_file=add
+op_compute=add_compute
+
+[INPUT]
+dtype=float16,float32,int32
+format=ND,NHWC,NCHW
+shape=dynamic
+
+[OUTPUT]
+dtype=float16,float32,int32
+format=ND,NHWC,NCHW
+shape=dynamic
+
+[ATTR]
+\end{lstlisting}
+
+各字段含义： -
+\passthrough{\lstinline!op\_type!}：算子类型名称，与代码中注册的名称一致
+- \passthrough{\lstinline!op\_file!}：算子实现文件（不含扩展名），对应
+\passthrough{\lstinline!kernel\_meta/!} 下的编译产物 -
+\passthrough{\lstinline!op\_compute!}：计算函数名 -
+\passthrough{\lstinline![INPUT]!} /
+\passthrough{\lstinline![OUTPUT]!}：声明输入/输出张量支持的数据类型、format
+和 shape（\passthrough{\lstinline!dynamic!} 表示不限制形状） -
+\passthrough{\lstinline![ATTR]!}：声明算子的属性及其默认值
+
+在 TBE DSL 开发流程中，如果使用 \passthrough{\lstinline!dsl.build!}
+编译算子，CANN 会自动生成对应的 \passthrough{\lstinline!.json!}
+描述文件，简化了手动编写 \passthrough{\lstinline!.ini!} 的步骤。但在
+Ascend C 开发中，手动配置 \passthrough{\lstinline!.ini!}
+是必不可少的环节。
+
+\subsection{Tiling（分片计算）的基本思想}\label{src-book-chapter7-h37}
+
+\textbf{Tiling（分片计算）}
+是算子开发中最重要的性能优化概念之一。它的核心思想很简单：\textbf{当数据量超过
+AI Core 的 Local Memory 容量时，将数据切成小块，逐块计算}。
+
+\subsubsection{为什么需要 Tiling？}\label{src-book-chapter7-h38}
+
+回顾第6.1节介绍的存储层次：昇腾310B 的每个 AI Core 内部，用于计算的
+\textbf{Unified Buffer（UB）} 容量有限（通常为 256KB 左右）。而 Global
+Memory 中的输入数据可能有数十 MB。如果一次加载全部数据到
+UB，会直接溢出。
+
+Tiling 的策略是：将输入张量按某个维度切分成多个
+\textbf{Tile（分片）}，每次只搬运一个 Tile 到
+UB，计算完后再搬走结果、加载下一片。这就像用一个小碗吃完一大锅饭------一次一碗，吃完再盛。
+
+\subsubsection{Tiling 的三个关键参数}\label{src-book-chapter7-h39}
+
+设计 Tiling 策略时，需要确定三个数值：
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+参数
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+含义
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+约束
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Tile Size} & 每次搬入 UB 的数据块大小 & 不能超过 UB
+容量；通常需对齐到 32B 或 64B \\
+\textbf{Tile Count} & 总共需要切分的片数 & 由总数据量 / Tile Size
+决定 \\
+\textbf{Core Assignment} & 每个 AI Core 处理哪些 Tile & 多核时按
+core\_id 分配数据区间 \\
+\end{longtable}
+
+\subsubsection{一个简单的 Tiling 示例}\label{src-book-chapter7-h40}
+
+以向量加法为例，假设： - 输入向量长度 = 10,000,000（约 38MB float32） -
+UB 容量 = 256KB - 每块最多处理
+\passthrough{\lstinline!256KB / (3 tensors × 4 bytes) 约等于 21,000!}
+个元素（需要同时放下输入 x、y 和输出 z）
+
+则定一个 Tile 处理 20,000 个元素，总共需要
+\passthrough{\lstinline!10,000,000 / 20,000 = 500!} 个 Tile。每个 AI
+Core 处理其中的一部分 Tile，不同 Core 之间完全并行，互不干扰。
+
+在 TBE DSL 中，\passthrough{\lstinline!auto\_schedule!}
+内部已经集成了自动 Tiling------开发者通常无需手动指定 Tile 大小。这也是
+DSL 便利性的体现之一。但在 Ascend C 中，\textbf{Tiling
+必须由开发者显式设计和编码}------这构成了下一节的核心挑战。
+
+\subsection{小结}\label{src-book-chapter7-h41}
+
+本节梳理了算子开发的三大基础设施：\textbf{原型定义}
+规定了算子的''身份证''信息（输入输出、类型、属性），\textbf{算子信息库}
+将其注册到 CANN 框架中，而 \textbf{Tiling} 则是突破 Local Memory
+容量限制的核心技术。这些概念将直接应用于下一节的 Ascend C 实战。
+
+\section{深入底层：Ascend C算子开发入门}\label{src-book-chapter7-h42}
+
+Ascend C 是 CANN 提供的 C++ 高性能算子开发语言。与 TBE DSL
+的声明式风格不同，Ascend C
+要求开发者\textbf{亲自设计数据流和指令流}，换取的回报是\textbf{逼近硬件理论极限的性能}。本节将以向量加法为起点，带你进入
+Ascend C 的世界。
+
+\subsection{Ascend C 的编程模型}\label{src-book-chapter7-h43}
+
+\subsubsection{Host-Device 协同}\label{src-book-chapter7-h44}
+
+Ascend C 采用经典的 \textbf{Host-Device 协同模型}：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Host 端（CPU）}：负责算子的入口逻辑------准备数据、调用
+  Kernel、回收结果。代码运行在 ARM CPU 上。
+\item
+  \textbf{Device 端（NPU）}：负责算子的实际计算------AI Core 执行 Kernel
+  函数中的计算逻辑。
+\end{itemize}
+
+这种分离意味着开发一个算子需要写两部分代码：一个 Host 侧的主控文件和一个
+Device 侧的 Kernel 文件。
+
+\subsubsection{SPMD 并行模型}\label{src-book-chapter7-h45}
+
+Ascend C 采用 \textbf{SPMD（Single Program Multiple
+Data，单程序多数据）} 架构。所有 AI Core 执行\textbf{同一份 Kernel
+代码}，但通过内置变量 \passthrough{\lstinline!block\_idx!}
+获取各自的序号，从而处理不同的数据区间。
+
+昇腾310B 拥有多个 AI Core（具体数量取决于芯片版本），每个 Core
+独立运行一份 Kernel。开发者需要利用 \passthrough{\lstinline!block\_idx!}
+来分配任务：
+
+\begin{lstlisting}[language={C++}]
+// 伪代码：多核数据分配
+uint32_t total_len = 1000000;
+uint32_t core_num = 8;
+uint32_t len_per_core = total_len / core_num;
+uint32_t offset = block_idx * len_per_core;
+// 当前 Core 处理 [offset, offset + len_per_core) 的数据
+\end{lstlisting}
+
+\subsubsection{三段式流水线}\label{src-book-chapter7-h46}
+
+每个 AI Core 内部的执行流程被抽象为三个连续阶段，这也是 Ascend C Kernel
+代码的标准结构：
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+阶段
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+职责
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+关键操作
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{CopyIn} & 将输入数据从 Global Memory 搬运到 Local Memory（UB） &
+\passthrough{\lstinline!DataCopy!},
+\passthrough{\lstinline!SetAtomicAdd!} \\
+\textbf{Compute} & 在 Local Memory 中执行数学运算 &
+\passthrough{\lstinline!Add!}, \passthrough{\lstinline!Mul!},
+\passthrough{\lstinline!Mads!}, \passthrough{\lstinline!ReduceMax!} \\
+\textbf{CopyOut} & 将计算结果从 UB 搬运回 Global Memory &
+\passthrough{\lstinline!DataCopy!} \\
+\end{longtable}
+
+需要注意的是，这三个阶段的粒度是\textbf{每个 Tile}------在一个 Tiling
+循环中，每个 Tile 都要经历完整的 CopyIn -\textgreater{} Compute
+-\textgreater{} CopyOut 流程。这恰好对应到上一节 Tiling 概念的实际落地。
+
+\subsubsection{Kernel 与 Tiling 的关系}\label{src-book-chapter7-h47}
+
+在 Ascend C 中，Kernel 函数本身只描述''对一块数据的计算逻辑''，而 Tiling
+参数（分几块、每块多大）由 Host 端计算好后传给
+Kernel。这种分工清晰地分离了\textbf{计算逻辑}（Kernel
+负责）和\textbf{数据切分策略}（Host 端的 Tiling 逻辑负责）。
+
+\subsection{工程结构}\label{src-book-chapter7-h48}
+
+一个标准的 Ascend C 算子工程包含以下文件：
+
+\begin{lstlisting}
+add_ascendc/
+├── CMakeLists.txt          # CMake 构建脚本
+├── add_custom.h            # 算子头文件（可选）
+├── add_custom.cpp          # Host 侧实现 + Kernel 函数
+├── run.cpp                 # 测试验证脚本
+├── add_custom.ini          # 算子信息库
+└── build/                  # 构建输出目录
+\end{lstlisting}
+
+关键文件说明： - \textbf{add\_custom.cpp}：包含 Host 侧的入口函数和
+Device 侧的 Kernel 函数。Kernel 函数内部实现 CopyIn -\textgreater{}
+Compute -\textgreater{} CopyOut 流水线。 -
+\textbf{CMakeLists.txt}：配置编译选项，指定依赖的 CANN 库和头文件路径。
+- \textbf{add\_custom.ini}：算子信息库文件，声明算子接口。
+
+\subsection{向量加法的 Ascend C 实现}\label{src-book-chapter7-h49}
+
+下面是一个向量加法的 Ascend C Kernel 实现（完整工程请参见
+\passthrough{\lstinline!samples/chapter7/add\_ascendc/!}）：
+
+\begin{lstlisting}[language={C++}]
+#include "kernel_operator.h"
+using namespace AscendC;
+
+constexpr int32_t BUFFER_NUM = 2;   // 双缓冲
+
+class KernelAdd {
+public:
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR y, GM_ADDR z,
+                                uint32_t totalLength, uint32_t tileNum) {
+        // 多核数据分配
+        this->blockLength = totalLength / GetBlockNum();
+        this->tileLength = this->blockLength / tileNum / BUFFER_NUM;
+
+        xGm.SetGlobalBuffer((__gm__ float *)x + this->blockLength * GetBlockIdx(),
+                            this->blockLength);
+        yGm.SetGlobalBuffer((__gm__ float *)y + this->blockLength * GetBlockIdx(),
+                            this->blockLength);
+        zGm.SetGlobalBuffer((__gm__ float *)z + this->blockLength * GetBlockIdx(),
+                            this->blockLength);
+
+        // 初始化双缓冲队列
+        pipe.InitBuffer(inQueueX, BUFFER_NUM, this->tileLength * sizeof(float));
+        pipe.InitBuffer(inQueueY, BUFFER_NUM, this->tileLength * sizeof(float));
+        pipe.InitBuffer(outQueueZ, BUFFER_NUM, this->tileLength * sizeof(float));
+    }
+
+    __aicore__ inline void Process() {
+        int32_t loopCount = this->tileNum * BUFFER_NUM;
+        for (int32_t i = 0; i < loopCount; i++) {
+            CopyIn(i);    // 从 Global Memory 搬入 UB
+            Compute(i);   // 在 UB 中执行加法
+            CopyOut(i);   // 将结果搬回 Global Memory
+        }
+    }
+
+private:
+    __aicore__ inline void CopyIn(int32_t progress) {
+        LocalTensor<float> xLocal = inQueueX.AllocTensor<float>();
+        LocalTensor<float> yLocal = inQueueY.AllocTensor<float>();
+        DataCopy(xLocal, xGm[progress * this->tileLength], this->tileLength);
+        DataCopy(yLocal, yGm[progress * this->tileLength], this->tileLength);
+        inQueueX.EnQue(xLocal);
+        inQueueY.EnQue(yLocal);
+    }
+    __aicore__ inline void Compute(int32_t progress) {
+        LocalTensor<float> xLocal = inQueueX.DeQue<float>();
+        LocalTensor<float> yLocal = inQueueY.DeQue<float>();
+        LocalTensor<float> zLocal = outQueueZ.AllocTensor<float>();
+        Add(zLocal, xLocal, yLocal, this->tileLength);
+        outQueueZ.EnQue<float>(zLocal);
+        inQueueX.FreeTensor(xLocal);
+        inQueueY.FreeTensor(yLocal);
+    }
+    __aicore__ inline void CopyOut(int32_t progress) {
+        LocalTensor<float> zLocal = outQueueZ.DeQue<float>();
+        DataCopy(zGm[progress * this->tileLength], zLocal, this->tileLength);
+        outQueueZ.FreeTensor(zLocal);
+    }
+
+private:
+    TPipe pipe;
+    TQue<QuePosition::VECIN, BUFFER_NUM> inQueueX, inQueueY;
+    TQue<QuePosition::VECOUT, BUFFER_NUM> outQueueZ;
+    GlobalTensor<float> xGm, yGm, zGm;
+    uint32_t blockLength = 0, tileNum = 0, tileLength = 0;
+};
+
+extern "C" __global__ __aicore__ void add_custom(
+    GM_ADDR x, GM_ADDR y, GM_ADDR z, GM_ADDR workspace, GM_ADDR tiling) {
+    GET_TILING_DATA(tilingData, tiling);
+    KernelAdd op;
+    op.Init(x, y, z, tilingData.totalLength, tilingData.tileNum);
+    if (TILING_KEY_IS(1)) { op.Process(); }
+}
+\end{lstlisting}
+
+（本节中所述的三段式流水线代码与本段样例代码结构相同、逻辑一致。）
+
+这段代码体现了真实 Ascend C 的几个关键特征：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{类封装}：Kernel
+  逻辑封装在类中（\passthrough{\lstinline!KernelAdd!}），通过
+  \passthrough{\lstinline!Init()!}
+  初始化、\passthrough{\lstinline!Process()!} 执行主循环
+\item
+  \textbf{双缓冲队列}：\passthrough{\lstinline!TQue!} 配合
+  \passthrough{\lstinline!EnQue!}/\passthrough{\lstinline!DeQue!} 实现了
+  Double Buffer，CopyIn 和 Compute 可重叠执行
+\item
+  \textbf{多核感知}：\passthrough{\lstinline!GetBlockNum()!}、\passthrough{\lstinline!GetBlockIdx()!}
+  自动获取当前 AI Core 的编号与总数
+\item
+  \textbf{Tiling 数据}：Host 端计算的 Tiling 参数通过
+  \passthrough{\lstinline!GM\_ADDR tiling!}
+  传入，\passthrough{\lstinline!GET\_TILING\_DATA!} 宏将其解包为结构体
+\item
+  \textbf{\textbf{aicore} 属性}：标记所有运行在 AI Core
+  上的函数，编译器据此生成 DaVinci 指令
+\end{itemize}
+
+\subsection{编译与运行}\label{src-book-chapter7-h50}
+
+Ascend C 内核通过 TBE 框架的 \passthrough{\lstinline!compile\_op!}
+接口编译，该接口会自动调用 \passthrough{\lstinline!ccec!}
+并设置正确的编译选项。编译命令封装在 Python 算子注册脚本中（参见
+\passthrough{\lstinline!samples/chapter7/add\_ascendc/add\_custom\_tbe.py!}），最终生成
+\passthrough{\lstinline!kernel\_meta/!} 目录下的
+\passthrough{\lstinline!.o!} 与 \passthrough{\lstinline!.json!}
+文件，随后可通过 AscendCL API 加载并执行。
+
+\subsection{Ascend C 与 TBE DSL 的对比回顾}\label{src-book-chapter7-h51}
+
+经过 Ascend C 的初步体验，我们可以回看第 6.2 节中用 TBE DSL
+实现的向量加法：
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+维度
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+TBE DSL
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Ascend C
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{语言} & Python & C++ \\
+\textbf{代码量} & \textasciitilde20 行 & \textasciitilde200 行 \\
+\textbf{开发者需要关心的} & 数学表达式 &
+数据搬运、Tiling、多核分配、指令映射 \\
+\textbf{编译方式} & \passthrough{\lstinline!python add.py!} 自动编译 &
+ccec + CMake 手动构建 \\
+\textbf{性能} & 良好（官方模板保证） & 极致（可逼近理论值） \\
+\textbf{调试方式} & TVM debug 模式 & CPU 模拟 + printf 打印 \\
+\textbf{适用场景} & 标准算子、快速原型 & 性能瓶颈算子、定制化需求 \\
+\end{longtable}
+
+两种方式并非二选一的关系。在实际项目中，\textbf{先用 TBE DSL
+验证功能正确性，如果性能不达预期，再用 Ascend C
+重写核心逻辑}，是最常见的开发流程。
+
+\section{从简单到复杂：实现一个需要Tiling的算子（如矩阵加法）}\label{src-book-chapter7-h52}
+
+上一节的向量加法示例刻意简化了 Tiling 逻辑（Kernel
+只处理单块数据）。本节将以\textbf{矩阵加法}为例，完整实现一个带 Tiling
+的 Ascend C 算子，让读者真正理解分片计算的工程实现。
+
+\subsection{场景设定}\label{src-book-chapter7-h53}
+
+\begin{itemize}
+\tightlist
+\item
+  两个矩阵 A 和 B，尺寸均为
+  \passthrough{\lstinline!M × N = 1024 × 2048!}，float32 类型
+\item
+  每个矩阵占用 \passthrough{\lstinline!1024 × 2048 × 4 = 8MB!}
+\item
+  昇腾310B 的 UB 容量为 256KB，显然无法一次性容纳
+\item
+  需要设计 Tiling 策略，将矩阵切成小块逐块计算
+\end{itemize}
+
+\subsection{Tiling 策略设计}\label{src-book-chapter7-h54}
+
+\subsubsection{分块大小计算}\label{src-book-chapter7-h55}
+
+UB 中需要同时存放三块数据：输入 A 的 Tile、输入 B 的 Tile、输出 C 的
+Tile。设每个 Tile 大小为 \passthrough{\lstinline!T!} 个 float32（4
+字节），则占用的 UB 空间为 \passthrough{\lstinline!3 × T × 4 = 12T!}
+字节。考虑到 UB 中还需留出空间给中间变量和指令缓存，一般取 UB 总容量的
+60\%--80\% 作为数据区。
+
+\begin{lstlisting}
+UB 数据区上限 约等于 256KB × 70% 约等于 180KB
+T_max 约等于 180KB / (3 × 4B) 约等于 15,000 个 float32
+\end{lstlisting}
+
+在实际工程中，为了提高 Cube Unit 的计算效率，Tile 的尺寸通常还需要对齐到
+16 或 32 的整数倍。取 \passthrough{\lstinline!tile\_num = 12,288!}（即
+\passthrough{\lstinline!16 × 768!}）作为一个合适的 Tile 大小。
+
+\subsubsection{多核任务分配}\label{src-book-chapter7-h56}
+
+假设昇腾310B 有 8 个 AI Core，每个 Core
+独立处理一部分数据。按行切分是最简单的策略：
+
+\begin{lstlisting}
+每 Core 处理行数 = M / core_num = 1024 / 8 = 128 行
+每 Core 需处理的 Tile 数 = (128 × N) / tile_num = (128 × 2048) / 12288 约等于 22 个 Tile
+\end{lstlisting}
+
+Host 端根据 \passthrough{\lstinline!block\_idx!} 计算每个 Core
+的数据起始偏移，Kernel 端在 for 循环中逐 Tile 执行 CopyIn
+-\textgreater{} Compute -\textgreater{} CopyOut。
+
+\subsection{带 Tiling 的 Kernel 伪代码}\label{src-book-chapter7-h57}
+
+\begin{lstlisting}[language={C++}]
+extern "C" __global__ __aicore__ void mat_add_with_tiling(
+    GM_ADDR a, GM_ADDR b, GM_ADDR c, GM_ADDR tiling_info) {
+
+    TPipe pipe;
+    uint32_t block_len = tiling_info.block_len;
+    uint32_t tile_num   = tiling_info.tile_num;
+
+    // 根据 block_idx 计算当前 Core 的数据偏移
+    uint32_t core_offset = block_idx * block_len * tile_num;
+
+    for (uint32_t i = 0; i < tile_num; i++) {
+        uint32_t offset = core_offset + i * block_len;
+
+        // CopyIn
+        LocalTensor<float> tile_a = pipe.AllocTensor<float>(block_len);
+        LocalTensor<float> tile_b = pipe.AllocTensor<float>(block_len);
+        pipe.DataCopy(tile_a, a + offset);
+        pipe.DataCopy(tile_b, b + offset);
+
+        // Compute
+        LocalTensor<float> tile_c = pipe.AllocTensor<float>(block_len);
+        pipe.Add(tile_c, tile_a, tile_b, block_len);
+
+        // CopyOut
+        pipe.DataCopy(c + offset, tile_c);
+
+        pipe.FreeTensor(tile_a);
+        pipe.FreeTensor(tile_b);
+        pipe.FreeTensor(tile_c);
+    }
+}
+\end{lstlisting}
+
+这个骨架代码展示了 Tiling 循环的基本结构。完整工程代码（包含 Host 侧
+Tiling 参数计算、边界处理、CMakeLists.txt 等）请参见
+\passthrough{\lstinline!samples/chapter7/mat\_add\_tiling/!}。
+
+\subsection{调试技巧}\label{src-book-chapter7-h58}
+
+Ascend C 提供了两种调试手段，对于排查 Tiling 相关问题尤其有用：
+
+\subsubsection{CPU 模拟调试}\label{src-book-chapter7-h59}
+
+在开发阶段，可以在 CPU 上模拟运行 Kernel，无需烧录到 NPU：
+
+\begin{lstlisting}[language=bash]
+# 以 CPU 模式编译并运行
+ccec --cpu_mode add_custom.cpp -o add_cpu
+./add_cpu
+\end{lstlisting}
+
+CPU 模拟支持断点调试和变量打印，适合在复杂 Bug 定位时使用。
+
+\subsubsection{printf 打印}\label{src-book-chapter7-h60}
+
+在 Kernel 中可以使用 \passthrough{\lstinline!printf!} 打印中间值（仅 CPU
+模拟和 Debug 模式支持）：
+
+\begin{lstlisting}[language={C++}]
+printf("block_idx=%d, tile=%d, offset=%d\n", block_idx, i, offset);
+\end{lstlisting}
+
+这在大规模数据中追踪特定 Tile 的行为时非常高效。注意在生产部署的 Release
+版本中需要移除或条件编译，避免影响性能。
+
+\subsection{小结与展望}\label{src-book-chapter7-h61}
+
+本节通过矩阵加法的 Tiling 实战，展示了 Ascend C
+开发中最核心的工程挑战：\textbf{如何设计合理的分块策略，使得数据既能塞进有限的
+UB，又能最大化 AI Core 的计算效率}。同时介绍了 CPU 模拟调试和 printf
+打印两种调试手段。
+
+至此，我们已经覆盖了算子开发的核心内容------从 TBE DSL 的快速原型到
+Ascend C 的深度优化，从无 Tiling
+的简单算子到带分片策略的复杂实现。在下一章中，我们将转入算子开发的工程化环节：编译部署、单元测试以及系统性的性能优化，将自定义算子真正推向生产环境。

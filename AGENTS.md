@@ -57,11 +57,12 @@ Never rename only the sidebar, only the page title, or only one index.
 | `src/book/chapter2.md` | 第2章：CANN软件栈核心组件解析 |
 | `src/book/chapter3.md` | 第3章：昇腾PyTorch扩展迁移基础 |
 | `src/book/chapter4.md` | 第4章：PyACL应用开发基础 |
-| `src/book/chapter5.md` | 第5章：DVPP视频处理基础 |
-| `src/book/chapter6.md` | 第6章：算子开发实战 |
-| `src/book/chapter7.md` | 第7章：性能分析与优化 |
-| `src/book/chapter8.md` | 第8章：模型量化案例教学 |
-| `src/book/chapter9.md` | 第9章：AI项目交付闭环 |
+| `src/book/chapter5.md` | 第5章：MindSpore开发基础 |
+| `src/book/chapter6.md` | 第6章：DVPP视频处理基础 |
+| `src/book/chapter7.md` | 第7章：算子开发实战 |
+| `src/book/chapter8.md` | 第8章：性能分析与优化 |
+| `src/book/chapter9.md` | 第9章：模型量化案例教学 |
+| `src/book/chapter10.md` | 第10章：AI项目交付闭环 |
 
 ### Practice cases
 

@@ -1,235 +1,117 @@
-# 第8章 模型量化样例
+# 第8章 代码样例
 
-本目录配套 `src/book/chapter8.md`，使用第 7 章相同的
-ResNet18-TinyImageNet ONNX 模型，演示一条完整但尽量简单的量化实验主线：
+本目录配套 `src/book/chapter8.md`，用小而完整的脚本演示 Ascend 310B 上的性能分析与优化流程。
 
-1. 下载 FP32 ONNX 和 Tiny-ImageNet PNG 数据。
-2. 用 ATC 从 ONNX 转出 FP32 OM 和 FP16 OM。
-3. 用 `01_compare_outputs.py` 和 `02_perf_compare.py` 快速验证 FP16。
-4. 用 AMCT PTQ + ATC 转出 INT8 OM。
-5. 用同样的快速检查验证 INT8。
-6. 用 `05_validate_accuracy.py` 在完整验证集上横向对比 FP32、FP16、INT8。
-7. 用 sweep 脚本观察 INT8 对校准样本数的敏感程度。
-
-涉及 ATC、PyACL 和 OM 推理的命令需要在真实 Ascend 310B 开发板上运行。本地
-开发机适合阅读代码和做语法检查，不运行 CANN/OM 推理。
+所有涉及 PyACL、DVPP、`msprof`、`npu-smi` 的命令都需要在真实 Ascend 310B 设备上运行。本地开发机只适合语法检查和运行不依赖硬件的 CPU/模拟样例。
 
 ## 运行前提
 
+在 Ascend 310B 上先加载 CANN 环境：
+
 ```bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-conda activate npu
 cd ~/Documents/Ascend310/samples/chapter8
+PY=/home/HwHiAiUser/.conda/envs/npu/bin/python
 ```
 
-对于 8GB 及以内内存的 Ascend 310B 开发板，运行 ATC 前建议一定限制并行编译。
-12GB 以上内存的开发板如果遇到 ATC 内存不足或编译进程被杀掉，也加上下面两个变量：
+第 8 章默认使用 Hugging Face 仓库 `zhouxzh/resnet18_tiny_imagenet` 中的 OM 模型。首次运行前先下载到本章目录：
 
 ```bash
-export TE_PARALLEL_COMPILER=1
-export MAX_COMPILE_CORE_NUMBER=1
+$PY tools/download_model.py
 ```
 
-INT8 PTQ 还需要安装与 CANN 版本匹配的 AMCT ONNX。本章验证环境为：
-CANN 8.3.RC1、aarch64、Python 3.11、ONNX 1.14.0、ONNX Runtime 1.16.0、
-AMCT ONNX 0.23.2。
-
-## 1. 下载模型和 PNG 数据
-
-下载 FP32 ONNX：
-
-```bash
-python tools/download_model.py
-```
-
-下载训练集校准图片。脚本默认使用 `https://hf-mirror.com`，并把图片保存为 PNG：
-
-```bash
-python tools/download_tiny_imagenet.py train --force-download --per-class 2
-```
-
-这会生成：
+默认模型路径为：
 
 ```text
-data/tiny_imagenet_train/  # 400 张 PNG
-data/calib_list.txt         # AMCT 校准和快速对齐使用
+model/resnet18_tiny_imagenet.om
 ```
 
-下载验证集图片：
+如果需要做 AIPP 实验，可以下载本章全部模型资产：
 
 ```bash
-python tools/download_tiny_imagenet.py val --force-download
+$PY tools/download_model.py --all
 ```
 
-这会生成：
+`--all` 会把普通 OM、ONNX、AIPP OM 和 AIPP 配置都下载到 `model/`。如果 Hugging Face 仓库中已经有 `resnet18_tiny_imagenet_aipp.om`，读者可以直接运行 AIPP 对比脚本，不必自己转换。
 
-```text
-data/tiny_imagenet_val/  # 10000 张 PNG
-data/val_list.txt         # 05_validate_accuracy.py 使用，格式为：路径 标签
-```
+如果需要在板端重新生成 AIPP OM，再运行 `tools/convert_aipp_resnet18.sh`。AIPP 转换由 ATC 完成，默认生成 `model/resnet18_tiny_imagenet_aipp.om`。运行该脚本前应已经完成 CANN 环境配置。本章的 AIPP 配置使用 `mean_chn_*: 0` 搭配浮点 `min_chn_*` 表达 ImageNet 均值，因为 CANN 8.3 的 `RGB888_U8` AIPP 配置要求 `mean_chn_*` 是 0 到 255 的整数。`06_aipp_preprocess_compare.py` 只加载已有 OM 做性能对比，不会调用 ATC。
 
-如果只想使用本地 Hugging Face cache，可加 `--offline`。
+如果已经完成第 4 章，也可以通过 `--model ../../samples/chapter4/resnet18/model/resnet18_tiny_imagenet.om` 手动复用第 4 章产物。
 
-## 2. ATC 转 FP32 和 FP16 OM
-
-FP32 OM 用作精度参考：
+## 本地检查
 
 ```bash
-atc \
-  --model=model/resnet18_tiny_imagenet.onnx \
-  --framework=5 \
-  --output=model/resnet18_tiny_imagenet_fp32 \
-  --input_format=NCHW \
-  --input_shape="input.1:1,3,64,64" \
-  --soc_version=Ascend310B4 \
-  --precision_mode=force_fp32 \
-  --log=info
+cd samples/chapter8
+python3 -m py_compile *.py tools/*.py
+python3 03_cpu_preprocess_benchmark.py --runs 10
+python3 05_pipeline_queue_demo.py --simulate --frames 30
 ```
 
-FP16 OM 是 310B 上常用的部署精度：
+## Ascend 310B 验证命令
+
+作者实测使用的远端主机编号是 `313`。读者复现时只需要在自己的 Ascend 310B 设备上进入本目录运行下面的命令。
 
 ```bash
-atc \
-  --model=model/resnet18_tiny_imagenet.onnx \
-  --framework=5 \
-  --output=model/resnet18_tiny_imagenet_fp16 \
-  --input_format=NCHW \
-  --input_shape="input.1:1,3,64,64" \
-  --soc_version=Ascend310B4 \
-  --precision_mode=allow_fp32_to_fp16 \
-  --log=info
+$PY -m py_compile *.py tools/*.py
+$PY tools/download_model.py --all
+
+$PY 01_baseline_resnet_sync.py --runs 100
+$PY 02_buffer_reuse_benchmark.py --runs 100
+$PY 03_cpu_preprocess_benchmark.py --runs 200
+$PY 04_dvpp_resize_vs_cpu.py --frames 60
+$PY 05_pipeline_queue_demo.py --simulate --frames 200
+$PY 05_pipeline_queue_demo.py --frames 100
+$PY 06_aipp_preprocess_compare.py --runs 100
 ```
 
-## 3. 快速验证 FP16
-
-`01_compare_outputs.py` 用同一批校准图片比较两个 OM 的输出是否接近。它不看
-真实标签，只回答“新模型是否像基准模型”。
+如果需要在当前板端重新生成 AIPP OM，可在运行 AIPP 对比脚本前执行：
 
 ```bash
-python 01_compare_outputs.py \
-  --base-model model/resnet18_tiny_imagenet_fp32.om \
-  --candidate-model model/resnet18_tiny_imagenet_fp16.om \
-  --output outputs/output_compare.json
+bash tools/convert_aipp_resnet18.sh
 ```
 
-`02_perf_compare.py` 用同一批图片比较端到端性能：
+## Profiling 采集
+
+`msprof` 采集建议至少覆盖基线和 Buffer 复用两个脚本：
 
 ```bash
-python 02_perf_compare.py \
-  --models model/resnet18_tiny_imagenet_fp32.om model/resnet18_tiny_imagenet_fp16.om \
-  --labels fp32 fp16 \
-  --runs 100 \
-  --output outputs/perf_compare.json
+bash tools/profile_with_msprof.sh --name baseline -- \
+  $PY 01_baseline_resnet_sync.py --runs 200
+
+bash tools/profile_with_msprof.sh --name buffer-reuse -- \
+  $PY 02_buffer_reuse_benchmark.py --runs 200
 ```
 
-## 4. AMCT PTQ + ATC 转 INT8 OM
+采集后可将 `outputs/msprof/` 下载到带 MindStudio 或 Ascend Insight 的环境中查看 Timeline。
 
-先生成 AMCT 配置和中间 ONNX：
+## 指标汇总
 
 ```bash
-python 03_prepare_quantization.py
+$PY tools/summarize_metrics.py \
+  outputs/baseline_resnet_sync.json \
+  outputs/buffer_reuse_benchmark.json \
+  outputs/cpu_preprocess_benchmark.json \
+  outputs/dvpp_resize_vs_cpu.json \
+  outputs/aipp_preprocess_compare.json \
+  outputs/pipeline_queue_demo.json \
+  --output outputs/summary.md
 ```
-
-再用 PNG 校准图片统计激活范围并冻结 deploy ONNX：
-
-```bash
-python 04_calibrate_quantization.py
-```
-
-最后用 ATC 转 INT8 OM。这里不要额外设置 `--precision_mode`：
-
-```bash
-atc \
-  --model=model/resnet18_tiny_imagenet_int8_deploy.onnx \
-  --framework=5 \
-  --output=model/resnet18_tiny_imagenet_int8 \
-  --input_format=NCHW \
-  --input_shape="input.1:1,3,64,64" \
-  --soc_version=Ascend310B4 \
-  --log=info
-```
-
-## 5. 快速验证 INT8
-
-先和 FP32 OM 做输出对齐：
-
-```bash
-python 01_compare_outputs.py \
-  --base-model model/resnet18_tiny_imagenet_fp32.om \
-  --candidate-model model/resnet18_tiny_imagenet_int8.om \
-  --output outputs/output_compare_int8.json
-```
-
-再把三种 OM 放在同一个性能口径下比较：
-
-```bash
-python 02_perf_compare.py \
-  --models model/resnet18_tiny_imagenet_fp32.om model/resnet18_tiny_imagenet_fp16.om model/resnet18_tiny_imagenet_int8.om \
-  --labels fp32 fp16 int8 \
-  --runs 100 \
-  --output outputs/perf_compare.json
-```
-
-## 6. 完整验证集 accuracy
-
-最终精度结论必须来自独立验证集，而不是 `01_compare_outputs.py` 的输出相似度：
-
-```bash
-python 05_validate_accuracy.py --output outputs/accuracy_compare.json
-```
-
-脚本会同时运行 FP32、FP16、INT8 三个 OM，输出 Top1、Top5、mean latency 和
-p95 latency。默认评估 `data/val_list.txt` 中全部 10000 张验证图片。
-
-调试时可以先少量运行：
-
-```bash
-python 05_validate_accuracy.py --samples 200
-```
-
-## 7. 校准样本数 sweep
-
-如果要观察 INT8 对校准样本数量的敏感程度，运行：
-
-```bash
-bash tools/sweep_calibration_samples.sh 20 50 100 200 400
-```
-
-脚本会为每个样本数单独生成 deploy ONNX、INT8 OM 和验证集报告，最后写出：
-
-```text
-outputs/calibration_sweep/summary.csv
-outputs/calibration_sweep/samples_*/accuracy_compare.json
-outputs/calibration_sweep/samples_*/resnet18_tiny_imagenet_int8_s*.om
-```
-
-`summary.csv` 中的 `calibration_samples`、`int8_top1_pct`、`int8_top5_pct`
-可以直接用来画“校准样本数 - INT8 精度”曲线。
-
-常用环境变量：
-
-| 变量 | 默认值 | 说明 |
-|---|---|---|
-| `SAMPLE_COUNTS` | `20 50 100 200 400` | 不传命令行参数时使用的样本数列表 |
-| `VAL_SAMPLES` | `0` | 每个点评估多少张验证图，`0` 表示全部验证集 |
-| `OUT_DIR` | `outputs/calibration_sweep` | sweep 输出目录 |
-| `SOC_VERSION` | `Ascend310B4` | ATC 目标芯片 |
-| `SWEEP_SEED` | `2024` | 固定校准子集随机顺序 |
 
 ## 目录说明
 
 | 文件 | 说明 |
 |---|---|
-| `01_compare_outputs.py` | 小样本输出对齐，比较两个 OM 的 Top1/Top5 和 logits 误差 |
-| `02_perf_compare.py` | 端到端性能对比 |
-| `03_prepare_quantization.py` | INT8 量化准备：opset 转换和 AMCT config |
-| `04_calibrate_quantization.py` | INT8 校准并冻结 deploy ONNX |
-| `05_validate_accuracy.py` | 验证集 Top1/Top5 横向对比 |
-| `chapter8_utils.py` | 本章共享工具函数 |
-| `tools/download_model.py` | 下载 FP32 ONNX |
-| `tools/download_tiny_imagenet.py` | 下载 PNG 校准/验证图片 |
-| `tools/calibration_sweep_helper.py` | sweep 的子集生成和 CSV 汇总辅助程序 |
-| `tools/sweep_calibration_samples.sh` | sweep 不同校准样本数 |
-| `model/` | ONNX、OM 和 deploy ONNX |
-| `data/` | PNG 数据和清单 |
-| `outputs/` | 本轮实验报告 |
+| `perf_utils.py` | 计时、百分位统计、确定性输入和 JSON 报告工具 |
+| `acl_resnet_runner.py` | ResNet18 PyACL runner，包含逐帧分配和 Buffer 复用两种实现 |
+| `01_baseline_resnet_sync.py` | 同步推理基线，拆分预处理、H2D、Execute、D2H、后处理 |
+| `02_buffer_reuse_benchmark.py` | 对比每帧申请资源与复用 ACL Buffer/Dataset |
+| `03_cpu_preprocess_benchmark.py` | CPU 预处理对比，可在本地运行 |
+| `04_dvpp_resize_vs_cpu.py` | DVPP VPC resize 与 CPU resize 对比，只在 310B 上运行 |
+| `05_pipeline_queue_demo.py` | 串行与 Queue Pipeline 对比，支持本地模拟和 PyACL 模式 |
+| `06_aipp_preprocess_compare.py` | 对比 CPU 预处理与已有静态 AIPP OM，只在 310B 上运行 |
+| `tools/download_model.py` | 从 Hugging Face 下载 ResNet18-TinyImageNet 的 OM/ONNX 模型 |
+| `tools/convert_aipp_resnet18.sh` | 调用 ATC 生成静态 AIPP OM，只在 310B 上运行 |
+| `tools/profile_with_msprof.sh` | `msprof` 采集包装脚本 |
+| `tools/summarize_metrics.py` | JSON 指标汇总为 Markdown 表格 |
+| `model/resnet18_rgb_static_aipp.cfg` | 静态 AIPP 配置示例 |
+| `model/` | 第 8 章模型和 AIPP 配置目录，模型文件不纳入源码版本管理 |

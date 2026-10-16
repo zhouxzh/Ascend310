@@ -12,7 +12,7 @@ lang: zh-cn
 
 本附录的命令来自 Ubuntu 基础教程中的文件结构、终端编辑器、SSH、VNC、NFS、Docker、热点与 WiFi、开机自启动、静态 IP 和无屏幕联网资料，并结合现有 310B 材料重新编排。外部资料中的 ROS 小车、树莓派、RDK X5、Orin 等名称只作为操作背景出现于命令示例的原始路径中，不能据此推断 310B 板的实际设备名、IP 地址、接口编号或运行结果。
 
-## 1. 教程定位与证据边界 {#src-appendix2-scope}
+## 1. 教程定位与证据边界 {#src-appendix-appendix2-scope}
 
 ### 1.1 三类操作位置
 

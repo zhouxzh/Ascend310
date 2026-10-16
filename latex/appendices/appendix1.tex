@@ -1,6 +1,6 @@
 \chapter{开发板与基础环境}\label{ux9644ux5f55-1ux5f00ux53d1ux677fux4e0eux57faux7840ux73afux5883}
 
-\section{昇腾310B开发板介绍}\label{src-experiment-case0-h1}
+\section{昇腾310B开发板介绍}\label{src-appendix-appendix1-h1}
 
 OrangePi
 AIpro(8T)开发板是由香橙派联合华为精心打造的高性能AI开发板。它采用昇腾AI技术路线，搭载昇腾310B处理器（4核64位处理器
@@ -22,7 +22,7 @@ AIpro(8T)支持Ubuntu和openEuler操作系统，能够满足大多数AI算法原
 \caption{产品图}\label{fig:aipro}
 \end{figure}
 
-\subsection{开发板详细视图}\label{src-experiment-case0-h2}
+\subsection{开发板详细视图}\label{src-appendix-appendix1-h2}
 
 \begin{figure}
 \centering
@@ -44,9 +44,9 @@ AIpro(8T)支持Ubuntu和openEuler操作系统，能够满足大多数AI算法原
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
-\subsection{开发板硬件规格}\label{src-experiment-case0-h3}
+\subsection{开发板硬件规格}\label{src-appendix-appendix1-h3}
 
-\section{配件准备}\label{src-experiment-case0-h4}
+\section{配件准备}\label{src-appendix-appendix1-h4}
 
 为了顺利进行开发，请准备以下配件：
 
@@ -198,7 +198,7 @@ AIpro(8T)支持Ubuntu和openEuler操作系统，能够满足大多数AI算法原
   \end{figure}
 \end{enumerate}
 
-\section{操作系统安装}\label{src-experiment-case0-h5}
+\section{操作系统安装}\label{src-appendix-appendix1-h5}
 
 作为华为昇腾生态的重要成员，OrangePi
 AIpro(8T)支持Ubuntu和openEuler两种操作系统。由于开发板板载无预装系统，我们需要通过电脑将系统镜像刷写到TF卡中。建议使用Windows
@@ -220,9 +220,9 @@ AIpro(8T)支持Ubuntu和openEuler两种操作系统。由于开发板板载无�
 \caption{官方镜像}\label{fig:ux5b98ux65b9ux955cux50cf}
 \end{figure}
 
-\subsection{镜像下载}\label{src-experiment-case0-h6}
+\subsection{镜像下载}\label{src-appendix-appendix1-h6}
 
-\subsubsection{Ubuntu}\label{src-experiment-case0-h7}
+\subsubsection{Ubuntu}\label{src-appendix-appendix1-h7}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -282,7 +282,7 @@ AIpro(8T)支持Ubuntu和openEuler两种操作系统。由于开发板板载无�
   \textbf{下载与解压}：下载完成后，请先校验文件完整性，再解压\passthrough{\lstinline!.xz!}压缩包得到\passthrough{\lstinline!.img!}镜像文件。
 \end{enumerate}
 
-\subsection{校验下载文件 (MD5)}\label{src-experiment-case0-h8}
+\subsection{校验下载文件 (MD5)}\label{src-appendix-appendix1-h8}
 
 为了确保下载的镜像文件未损坏，建议在解压前进行MD5校验。
 
@@ -324,9 +324,9 @@ md5 <filename>
 
 若校验值一致，说明文件完整，可进行解压；若不一致，请重新下载。
 
-\subsection{刷写系统到TF卡}\label{src-experiment-case0-h9}
+\subsection{刷写系统到TF卡}\label{src-appendix-appendix1-h9}
 
-\subsubsection{工具准备}\label{src-experiment-case0-h10}
+\subsubsection{工具准备}\label{src-appendix-appendix1-h10}
 
 \begin{itemize}
 \tightlist
@@ -346,7 +346,7 @@ md5 <filename>
   \textbf{balenaEtcher}：用于将\passthrough{\lstinline!.img!}镜像文件烧录到TF卡。\textbf{注意：建议使用1.19.25及以下版本，以避免兼容性问题。}
 \end{enumerate}
 
-\subsubsection{格式化TF卡}\label{src-experiment-case0-h11}
+\subsubsection{格式化TF卡}\label{src-appendix-appendix1-h11}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -386,7 +386,7 @@ md5 <filename>
   \end{figure}
 \end{enumerate}
 
-\subsubsection{烧录镜像（以Ubuntu为例）}\label{src-experiment-case0-h12}
+\subsubsection{烧录镜像（以Ubuntu为例）}\label{src-appendix-appendix1-h12}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -433,7 +433,7 @@ md5 <filename>
   \end{figure}
 \end{enumerate}
 
-\subsubsection{其他存储介质说明}\label{src-experiment-case0-h13}
+\subsubsection{其他存储介质说明}\label{src-appendix-appendix1-h13}
 
 \begin{itemize}
 \tightlist
@@ -444,7 +444,7 @@ md5 <filename>
   SSD启动，但兼容性有限（仅支持特定品牌型号），且需自行准备。初学者不推荐直接使用SSD作为系统盘。
 \end{itemize}
 
-\subsubsection{设置启动模式}\label{src-experiment-case0-h14}
+\subsubsection{设置启动模式}\label{src-appendix-appendix1-h14}
 
 开发板支持从TF卡、eMMC或M.2
 SSD启动。当连接了多种存储设备时，需通过背面的拨码开关（BOOT开关）指定启动设备。
@@ -457,7 +457,6 @@ SSD启动。当连接了多种存储设备时，需通过背面的拨码开关�
 
 拨码开关状态说明（ON方向为1/右，相反为0/左，具体请参考板上丝印或下表）：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ccc@{}}
 \toprule\noalign{}
 Boot1 & Boot2 & 启动设备 \\
@@ -470,13 +469,12 @@ Boot1 & Boot2 & 启动设备 \\
 左 & 右 & eMMC \\
 右 & 左 & M.2 SSD \\
 \end{longtable}
-}
 
 \textbf{注意}：切换拨码开关后，必须\textbf{完全断电}（拔掉电源线）再重新上电，新的启动配置才会生效。仅按RESET键重启无效。
 
-\section{启动开发板}\label{src-experiment-case0-h15}
+\section{启动开发板}\label{src-appendix-appendix1-h15}
 
-\subsection{方式一：图形化界面启动}\label{src-experiment-case0-h16}
+\subsection{方式一：图形化界面启动}\label{src-appendix-appendix1-h16}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -550,7 +548,7 @@ Boot1 & Boot2 & 启动设备 \\
   \textbar{} \textbar{} HwHiAiUser \textbar{} Mind@123 \textbar{}
 \end{enumerate}
 
-\subsection{方式二：串口登录}\label{src-experiment-case0-h17}
+\subsection{方式二：串口登录}\label{src-appendix-appendix1-h17}
 
 如果暂时没有显示器、键盘和鼠标，也可以通过串口登录开发板。建议初学者使用开发板自带的Micro
 USB接口，该方法不需要额外接线，只需要一根Micro
@@ -601,9 +599,9 @@ USB数据线，接入电脑后打开设备管理器查询对应的串口，然�
   \end{figure}
 \end{enumerate}
 
-\section{网络连接}\label{src-experiment-case0-h18}
+\section{网络连接}\label{src-appendix-appendix1-h18}
 
-\subsection{无线网络连接 (WiFi)}\label{src-experiment-case0-h19}
+\subsection{无线网络连接 (WiFi)}\label{src-appendix-appendix1-h19}
 
 开发板板载了WiFi模块，可以通过命令行工具\passthrough{\lstinline!nmcli!}轻松连接无线网络。
 
@@ -660,7 +658,7 @@ ip addr
 \end{lstlisting}
 \end{enumerate}
 
-\subsection{有线网络连接}\label{src-experiment-case0-h20}
+\subsection{有线网络连接}\label{src-appendix-appendix1-h20}
 
 如果有线网络可用，直接插入网线即可。可以通过以下命令查看IP地址：
 
@@ -674,7 +672,7 @@ ip addr
 ifconfig
 \end{lstlisting}
 
-\section{远程连接 (SSH)}\label{src-experiment-case0-h21}
+\section{远程连接 (SSH)}\label{src-appendix-appendix1-h21}
 
 为了方便开发，通常我们会使用个人电脑通过SSH远程连接到开发板。
 
@@ -701,7 +699,7 @@ ssh HwHiAiUser@192.168.1.100
 \end{enumerate}
 
 \subsection{Windows PowerShell 配置 SSH
-密钥免密码登录}\label{src-experiment-case0-h21-key-login}
+密钥免密码登录}\label{src-appendix-appendix1-h21-key-login}
 
 首次使用密码登录确认开发板身份后，可以把开发机的公钥写入开发板账户。以后使用相同的
 开发机账户连接同一块板时，SSH
@@ -817,7 +815,7 @@ scp .\example.txt ascend310b:~/
 \end{lstlisting}
 \end{enumerate}
 
-\section{验证开发环境}\label{src-experiment-case0-h22}
+\section{验证开发环境}\label{src-appendix-appendix1-h22}
 
 系统启动并连接网络后，我们需要验证昇腾AI处理器的状态以及开发环境是否正常。
 
@@ -860,7 +858,7 @@ c++ --version
 \end{lstlisting}
 \end{enumerate}
 
-\section{结语}\label{src-experiment-case0-h24}
+\section{结语}\label{src-appendix-appendix1-h24}
 
 至此，你的昇腾310B开发板（OrangePi
 AIpro）已经完成了基本的环境搭建。接下来，你可以进入\href{../experiment/case1.md}{案例

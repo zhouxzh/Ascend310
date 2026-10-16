@@ -40,7 +40,7 @@
 \item
   基础模型部署：图像分类、目标检测、语义分割、OCR 与 NLP
 \item
-  媒体处理与底层能力：PyACL、DVPP、算子开发与内存管理
+  框架与底层能力：MindSpore 框架开发、PyACL、DVPP、算子开发与内存管理
 \item
   性能优化：模型结构裁剪、精度与性能权衡、Profiling 与流水线优化
 \item
@@ -56,7 +56,6 @@
 
 \subsubsection*{理论教程}\label{src-book-README-h4}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -84,18 +83,20 @@
 & 学会在昇腾上运行PyTorch模型 \\
 第4章 & PyACL 应用开发基础 & ACL运行时、内存管理、模型推理流程 &
 掌握C/C++底层应用开发能力 \\
-第5章 & DVPP视频处理基础 & VENC、VDEC、VPC、JPEG媒体处理 &
+第5章 & MindSpore开发基础 &
+张量、Cell与网络构建、数据管道、静态图、自动微分、MindIR与Lite &
+掌握昇腾框架级开发与模型交付能力 \\
+第6章 & DVPP视频处理基础 & VENC、VDEC、VPC、JPEG媒体处理 &
 掌握310B媒体硬件调用与调试方法 \\
-第6章 & 算子开发实战 & TBE DSL流程、310B计算架构、自定义算子 &
+第7章 & 算子开发实战 & TBE DSL流程、310B计算架构、自定义算子 &
 理解底层计算原理，具备算子扩展能力 \\
-第7章 & 性能分析与优化 & Profiling分析、瓶颈定位、AIPP/DVPP、流水线优化
+第8章 & 性能分析与优化 & Profiling分析、瓶颈定位、AIPP/DVPP、流水线优化
 & 掌握性能调优与系统工程化技能 \\
-第8章 & 模型量化案例教学 & FP16、INT8、校准数据、精度对齐与性能对比 &
+第9章 & 模型量化案例教学 & FP16、INT8、校准数据、精度对齐与性能对比 &
 学会在精度与性能之间做可验证取舍 \\
-第9章 & AI项目交付闭环 & SSD300实验室实时检测、评测体系、标准化交付流程
+第10章 & AI项目交付闭环 & SSD300实验室实时检测、评测体系、标准化交付流程
 & 建立规范的AI项目交付方法论 \\
 \end{longtable}
-}
 
 \subsubsection*{实践案例}\label{src-book-README-h5}
 
@@ -161,7 +162,22 @@
   Host 与 Device 之间的数据传输、同步与资源释放
 \end{itemize}
 
-\textbf{第5章：DVPP视频处理基础}
+\textbf{第5章：MindSpore开发基础}
+
+\begin{itemize}
+\tightlist
+\item
+  MindSpore 与 CANN、PyACL、MindSpore Lite 的层次边界与版本配套
+\item
+  Tensor、\passthrough{\lstinline!nn.Cell!}、\passthrough{\lstinline!ops!}
+  与数据管道
+\item
+  静态图、自动微分、优化器与训练循环
+\item
+  CKPT/MindIR 交付与 310B 端侧推理边界
+\end{itemize}
+
+\textbf{第6章：DVPP视频处理基础}
 
 \begin{itemize}
 \tightlist
@@ -173,7 +189,7 @@
   视频编解码与图像处理案例、参数调试和性能测试
 \end{itemize}
 
-\textbf{第6章：算子开发实战}
+\textbf{第7章：算子开发实战}
 
 \begin{itemize}
 \tightlist
@@ -185,7 +201,7 @@
   TBE DSL 开发流程与基础算子实例
 \end{itemize}
 
-\textbf{第7章：性能分析与优化}
+\textbf{第8章：性能分析与优化}
 
 \begin{itemize}
 \tightlist
@@ -197,7 +213,7 @@
   核心优化技术：Buffer 复用、AIPP、DVPP 与 Queue Pipeline
 \end{itemize}
 
-\textbf{第8章：模型量化案例教学}
+\textbf{第9章：模型量化案例教学}
 
 \begin{itemize}
 \tightlist
@@ -209,7 +225,7 @@
   ATC 精度模式、量化失败模式与性能对比流程
 \end{itemize}
 
-\textbf{第9章：AI项目交付闭环}
+\textbf{第10章：AI项目交付闭环}
 
 \begin{itemize}
 \tightlist
@@ -292,7 +308,6 @@
 
 \subsection*{如何使用本书}\label{src-book-README-h8}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -314,14 +329,13 @@
 \endlastfoot
 零基础学生 & 附录 1、第1章、第2章、案例 1 & 能跑通首个模型 &
 结合案例做改动实验 \\
-嵌入式工程师 & 第4章、第5章、第6章、第7章 & 掌握底层开发与优化 &
+嵌入式工程师 & 第4章、第6章、第7章、第8章 & 掌握底层开发与优化 &
 关注资源管理、媒体处理、算子开发与性能调优 \\
-AI应用开发者 & 第2章、第3章、第8章、选读案例 & 快速场景落地 & 重点关注
-PyTorch 迁移、模型部署与量化评估 \\
-技术负责人 & 第1章、第7章、第8章、第9章 & 构建团队方法论 &
+AI应用开发者 & 第2章、第3章 或 第5章、第9章、选读案例 & 快速场景落地 &
+重点关注框架迁移、模型部署与量化评估 \\
+技术负责人 & 第1章、第8章、第9章、第10章 & 构建团队方法论 &
 制定内部量化评估、性能验收和交付标准 \\
 \end{longtable}
-}
 
 \subsection*{许可证与引用}\label{src-book-README-h9}
 

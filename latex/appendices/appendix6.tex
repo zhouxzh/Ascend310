@@ -1,14 +1,13 @@
 \chapter{工具箱、FAQ
 与参数模板}\label{ux9644ux5f55-6ux5de5ux5177ux7bb1faq-ux4e0eux53c2ux6570ux6a21ux677f}
 
-\section{内容概览}\label{src-book-appendix-h1}
+\section{内容概览}\label{src-appendix-appendix6-h1}
 
 本附录聚焦``查得快、用得稳''：常见报错速查、转换参数模板、性能/质量
 Checklist、术语字典、推荐资源与社区贡献规范。可作为日常开发随手翻阅的工具章节。
 
-\section{常见报错速查}\label{src-book-appendix-h2}
+\section{常见报错速查}\label{src-appendix-appendix6-h2}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1111}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2222}}
@@ -56,11 +55,10 @@ Normalize \& Layout \\
 部署 & 模型加载慢 & 冷启动/IO 慢 & 预热/缓存 & 预加载 + 固态存储 \\
 安全 & 日志泄露敏感路径 & 直接 print & grep 审计 & 结构化日志脱敏 \\
 \end{longtable}
-}
 
-\section{模型转换参数模板合集}\label{src-book-appendix-h3}
+\section{模型转换参数模板合集}\label{src-appendix-appendix6-h3}
 
-\subsection{分类模型 (ResNet)}\label{src-book-appendix-h4}
+\subsection{分类模型 (ResNet)}\label{src-appendix-appendix6-h4}
 
 \begin{lstlisting}
 atc --model=resnet50.onnx \
@@ -73,7 +71,7 @@ atc --model=resnet50.onnx \
     --log=info
 \end{lstlisting}
 
-\subsection{YOLO 动态分辨率}\label{src-book-appendix-h5}
+\subsection{YOLO 动态分辨率}\label{src-appendix-appendix6-h5}
 
 \begin{lstlisting}
 atc --model=yolov5s.onnx \
@@ -86,7 +84,7 @@ atc --model=yolov5s.onnx \
     --precision_mode=allow_fp32_to_fp16
 \end{lstlisting}
 
-\subsection{INT8 量化（示例）}\label{src-book-appendix-h6}
+\subsection{INT8 量化（示例）}\label{src-appendix-appendix6-h6}
 
 \begin{lstlisting}
 atc --model=resnet50.onnx \
@@ -100,7 +98,8 @@ atc --model=resnet50.onnx \
     --enable_small_channel=true
 \end{lstlisting}
 
-\section{性能与质量 Checklist（执行勾项）}\label{src-book-appendix-h7}
+\section{性能与质量
+Checklist（执行勾项）}\label{src-appendix-appendix6-h7}
 
 性能：
 
@@ -154,9 +153,8 @@ atc --model=resnet50.onnx \
   模型文件 hash 校验通过
 \end{itemize}
 
-\section{术语表（扩展）}\label{src-book-appendix-h8}
+\section{术语表（扩展）}\label{src-appendix-appendix6-h8}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 术语 & 说明 \\
@@ -175,9 +173,8 @@ Quant Calibration & 量化尺度统计过程 \\
 Baseline & 初始标准对照性能/精度集 \\
 Drift & 指标随时间未经预期的漂移 \\
 \end{longtable}
-}
 
-\section{推荐资源与外部引用}\label{src-book-appendix-h9}
+\section{推荐资源与外部引用}\label{src-appendix-appendix6-h9}
 
 \begin{itemize}
 \tightlist
@@ -193,7 +190,7 @@ Drift & 指标随时间未经预期的漂移 \\
   学术资源：算子融合、低比特量化、蒸馏相关论文列表。
 \end{itemize}
 
-\section{贡献指南摘要}\label{src-book-appendix-h10}
+\section{贡献指南摘要}\label{src-appendix-appendix6-h10}
 
 流程：Fork -\textgreater{} 新分支 -\textgreater{} 修改/新增
 -\textgreater{} 本地 lint \& 生成脚本 -\textgreater{}
@@ -205,9 +202,8 @@ PR（描述动机/影响面/验证方式）。 PR 要求： \textbar{} 要素 \t
 若失败如何恢复 \textbar{} \textbar{} 关联 Issue \textbar{} 追踪链接
 \textbar{}
 
-\section{FAQ}\label{src-book-appendix-h11}
+\section{FAQ}\label{src-appendix-appendix6-h11}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -228,17 +224,15 @@ PR（描述动机/影响面/验证方式）。 PR 要求： \textbar{} 要素 \t
 Compute-bound，或激活分布集中导致尺度相近。 \\
 NMS 很慢？ & 合并小框批量处理/降低候选阈值/考虑 Device 版 NMS。 \\
 \end{longtable}
-}
 
-\section{License 与引用}\label{src-book-appendix-h12}
+\section{License 与引用}\label{src-appendix-appendix6-h12}
 
 本书内容遵循 Apache 2.0 许可证。引用： \textgreater{}
 《昇腾310B实战：从入门到精通边缘计算与人工智能》（GitHub:
 zhouxzh/Ascend310）
 
-\section{版本路线回顾}\label{src-book-appendix-h13}
+\section{版本路线回顾}\label{src-appendix-appendix6-h13}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 版本 & 内容 & 目标 \\
@@ -251,9 +245,8 @@ v0.3 & 核心部署链路 & 形成可用主线 \\
 v0.6 & 案例与工程化 & 贴近实战 \\
 v1.0 & 全面审校发行 & 正式发布 \\
 \end{longtable}
-}
 
-\section{实践任务}\label{src-book-appendix-h14}
+\section{实践任务}\label{src-appendix-appendix6-h14}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}

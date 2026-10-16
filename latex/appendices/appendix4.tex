@@ -24,7 +24,6 @@ Vibe Coding 的基本流程是：人负责目标、边界和结果，Agent
 
 每一步都有明确负责人：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 工作 & 谁负责 & 检查重点 \\
@@ -40,7 +39,6 @@ Vibe Coding 的基本流程是：人负责目标、边界和结果，Agent
 审查结果 & 你 & 输出是否来自真实文件，结论能否复现 \\
 验证安全 & 你 & 是否修改了不该改的文件，是否泄露 Key \\
 \end{longtable}
-}
 
 Vibe Coding
 适合探索代码、生成初稿、解释报错和快速迭代。它不适合在完全看不懂代码、不了解文件边界或没有验证方法时直接信任结果。
@@ -65,7 +63,6 @@ Harness）是一个能执行这些操作的 Agent 工作环境。
 
 一个 Agent 通常由四部分组成：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 组成部分 & 作用 & DSH 中的例子 \\
@@ -78,11 +75,9 @@ Harness）是一个能执行这些操作的 Agent 工作环境。
 记忆 & 记录目标和上下文 & 当前会话、长期目标 \\
 工作区 & Agent 的活动范围 & 当前仓库根目录 \\
 \end{longtable}
-}
 
 常见 Agent 可以按权限从低到高分类：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -107,7 +102,6 @@ AI IDE & 代码编辑器 & 会，但通常在打开的项目内 &
 代码补全、修改当前项目 \\
 DSH & 本地 Agent & 会，可以运行命令 & 读取文件、生成脚本、执行验证 \\
 \end{longtable}
-}
 
 DSH
 的工作方式是一个循环：理解目标，制定计划，调用工具，看到结果，再调整计划。下面是一个简化的流程：
@@ -226,7 +220,6 @@ API Key 只保存在本地设置里，不要写进教程、代码、聊天内容
 \caption{DSH Web 界面}
 \end{figure}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 区域 & 作用 & 常见操作 \\
@@ -241,7 +234,6 @@ API Key 只保存在本地设置里，不要写进教程、代码、聊天内容
 右上角状态 & 当前工作区、模型、安全模式 & 确认工作区是否正确 \\
 设置 & API Key、模型、工作区配置 & 只配置一次，之后不要随意修改 \\
 \end{longtable}
-}
 
 每次开始任务前，先问一句：
 
@@ -274,7 +266,6 @@ DSH 时遵守五条规则：
 
 常见风险与应对：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -300,7 +291,6 @@ DSH 时遵守五条规则：
 Key 泄露 & API Key 出现在代码或文档中 & 删除 Key，重新生成，绝不提交 \\
 长任务失控 & Agent 连续修改多个文件 & 拆成小任务，每步检查一次结果 \\
 \end{longtable}
-}
 
 \section{4. 第一次 Vibe Coding
 任务}\label{ux7b2cux4e00ux6b21-vibe-coding-ux4efbux52a1}
@@ -388,7 +378,6 @@ DSH 完成任务后，按以下顺序验收：
 
 \subsection{提示词结构}\label{ux63d0ux793aux8bcdux7ed3ux6784}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -413,7 +402,6 @@ DSH 完成任务后，按以下顺序验收：
 约束 & 说明允许和禁止的操作 & 只读、只用标准库、不装依赖 \\
 验收标准 & 说明怎样算完成 & 输出模型数量、ID、状态、维度 \\
 \end{longtable}
-}
 
 好的提示词让 Agent
 少猜测。坏的提示词只有一句话，例如``帮我分析一下''，这时 Agent
@@ -421,7 +409,6 @@ DSH 完成任务后，按以下顺序验收：
 
 \subsection{审查清单}\label{ux5ba1ux67e5ux6e05ux5355}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 项目 & 检查内容 \\
@@ -436,9 +423,8 @@ DSH 完成任务后，按以下顺序验收：
 安全 & 是否没有删除、上传、安装系统级依赖，是否没有泄露 Key \\
 记录 & 是否保留了 DSH 修改代码的过程 \\
 \end{longtable}
-}
 
-\section{6. 参考资料}\label{src-appendix4-references}
+\section{6. 参考资料}\label{src-appendix-appendix4-references}
 
 \begin{itemize}
 \tightlist
@@ -471,7 +457,7 @@ DSH 完成任务后，按以下顺序验收：
   \href{https://platform.deepseek.com/}{DeepSeek 开放平台}
 \end{itemize}
 
-\section{7. 验证清单}\label{src-appendix4-validation}
+\section{7. 验证清单}\label{src-appendix-appendix4-validation}
 
 \begin{itemize}
 \tightlist
@@ -500,9 +486,8 @@ DSH 完成任务后，按以下顺序验收：
   脚本输出与文件内容一致。
 \end{itemize}
 
-\section{8. 常见错误与坑}\label{src-appendix4-pitfalls}
+\section{8. 常见错误与坑}\label{src-appendix-appendix4-pitfalls}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -531,9 +516,8 @@ API Key 出现在代码中 & 配置时把 Key 当数据传给了 Agent & 删除 
 DSH 页面打不开 & 启动命令还在运行，或端口被占用 & 等显示
 \passthrough{\lstinline!URL: http://127.0.0.1:3080!} 后再刷新 \\
 \end{longtable}
-}
 
-\section{9. 作业}\label{src-appendix4-assignment}
+\section{9. 作业}\label{src-appendix-appendix4-assignment}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -564,7 +548,6 @@ DSH 页面打不开 & 启动命令还在运行，或端口被占用 & 等显示
 
 \section{10. 评分要点}\label{ux8bc4ux5206ux8981ux70b9}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 项目 & 要求 \\
@@ -580,4 +563,3 @@ DSH 页面打不开 & 启动命令还在运行，或端口被占用 & 等显示
 \passthrough{\lstinline!samples/case7/models/registry.json!} 一致 \\
 AI 协作 & 保留 DSH 修改代码的记录，并说明每处修改为什么安全 \\
 \end{longtable}
-}

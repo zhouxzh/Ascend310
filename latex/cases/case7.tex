@@ -163,7 +163,6 @@ sequenceDiagram
 
 \section{硬件与软件基础}\label{ux786cux4ef6ux4e0eux8f6fux4ef6ux57faux7840}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -190,7 +189,6 @@ HTTP 接口 \\
 显示 & QDtech MPI1001、PhotoPainter、微雪 E6 & 本机管理、六色终端和 E6
 协议输出 \\
 \end{longtable}
-}
 
 310B 的 NPU 只负责已准入 OM 的推理。相册数据、FAISS
 文件、设备状态和配置都留在板端；手机和 ESP32 只通过 HTTP 获取受控结果。
@@ -248,7 +246,6 @@ MongoDB，再按批次计算余弦相似度\footnote{atarss.
 
 Case7 保留这条数据流，但替换了不适合 310B 服务器的组件：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -280,7 +277,6 @@ MongoDB 保存图片和向量 & SQLite 保存照片元数据与 embedding，FAIS
 OCR 作为后续实验 & 本版本不自动 OCR、不生成手工标签 & 不把未准入的 CPU
 模型混入 NPU 相册主链路 \\
 \end{longtable}
-}
 
 因此，本案例借鉴的是可验证的检索分层和元数据预筛选思想，不复制 MongoDB
 或未经准入的 OCR。\passthrough{\lstinline!photo\_index.py!} 的
@@ -464,7 +460,6 @@ FP32''并不能被当作自动修复。
 
 选择性精度扫描按从小到大的白名单逐级验证：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -495,7 +490,6 @@ GELU/\passthrough{\lstinline!Erf!}、主乘法链和
 \passthrough{\lstinline!MatMul!}/\passthrough{\lstinline!Softmax!} 和
 head \passthrough{\lstinline!MatMul!} & C0 已满足门槛，未执行 \\
 \end{longtable}
-}
 
 候选模型的流程如下。候选 OM、keep-dtype 文件和报告必须位于独立的
 \passthrough{\lstinline!reports/precision\_sweep/mobileclip\_s0\_image\_precision/<candidate>/!}
@@ -885,7 +879,6 @@ offset。当前驱动板型号和接线尚未确认，PNG/帧 dry-run
 
 \section{工程代码导读}\label{ux5de5ux7a0bux4ee3ux7801ux5bfcux8bfb}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -920,7 +913,6 @@ UI，不需要额外前端构建运行时 \\
 \passthrough{\lstinline!scripts/!} & 模型、COCO-CN、部署、服务、kiosk
 和性能脚本 \\
 \end{longtable}
-}
 
 \section{测试、性能与验收方法}\label{ux6d4bux8bd5ux6027ux80fdux4e0eux9a8cux6536ux65b9ux6cd5}
 

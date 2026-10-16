@@ -1,6 +1,6 @@
 # 附录 1：开发板与基础环境
 
-## 昇腾310B开发板介绍 {#src-experiment-case0-h1}
+## 昇腾310B开发板介绍 {#src-appendix-appendix1-h1}
 
 OrangePi AIpro(8T)开发板是由香橙派联合华为精心打造的高性能AI开发板。它采用昇腾AI技术路线，搭载昇腾310B处理器（4核64位处理器 + AI处理器），集成图形处理器，支持8TOPS INT8的AI算力。板载8GB/16GB LPDDR4X内存，并支持外接32GB至256GB的eMMC模块，同时支持双4K高清输出。
 
@@ -10,7 +10,7 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
 
 ![产品图](img1/aipro.png){#fig:aipro width=70% .center}
 
-### 开发板详细视图 {#src-experiment-case0-h2}
+### 开发板详细视图 {#src-appendix-appendix1-h2}
 
 <!-- ![正面视图](img1/4.png){#fig:4 width=70%}
 
@@ -24,9 +24,9 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
 
 ---
 
-### 开发板硬件规格 {#src-experiment-case0-h3}
+### 开发板硬件规格 {#src-appendix-appendix1-h3}
 
-## 配件准备 {#src-experiment-case0-h4}
+## 配件准备 {#src-appendix-appendix1-h4}
 
 为了顺利进行开发，请准备以下配件：
 
@@ -110,7 +110,7 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
 
     ![Micro USB数据线](img1/microusb.png){#fig:microusb width=30% .center}
 
-## 操作系统安装 {#src-experiment-case0-h5}
+## 操作系统安装 {#src-appendix-appendix1-h5}
 
 作为华为昇腾生态的重要成员，OrangePi AIpro(8T)支持Ubuntu和openEuler两种操作系统。由于开发板板载无预装系统，我们需要通过电脑将系统镜像刷写到TF卡中。建议使用Windows 11或Ubuntu 22.04及以上版本的PC进行操作。
 
@@ -122,9 +122,9 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
 
 ![官方镜像](img1/官方镜像.png){#fig:官方镜像 width=70% .center}
 
-### 镜像下载 {#src-experiment-case0-h6}
+### 镜像下载 {#src-appendix-appendix1-h6}
 
-#### Ubuntu {#src-experiment-case0-h7}
+#### Ubuntu {#src-appendix-appendix1-h7}
 
 1. **点击下载**：点击Ubuntu镜像对应的下载按钮。
 
@@ -172,7 +172,7 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
 
 5. **下载与解压**：同样，下载后请先校验再解压。 -->
 
-### 校验下载文件 (MD5) {#src-experiment-case0-h8}
+### 校验下载文件 (MD5) {#src-appendix-appendix1-h8}
 
 为了确保下载的镜像文件未损坏，建议在解压前进行MD5校验。
 
@@ -203,16 +203,16 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
 
 若校验值一致，说明文件完整，可进行解压；若不一致，请重新下载。
 
-### 刷写系统到TF卡 {#src-experiment-case0-h9}
+### 刷写系统到TF卡 {#src-appendix-appendix1-h9}
 
-#### 工具准备 {#src-experiment-case0-h10}
+#### 工具准备 {#src-appendix-appendix1-h10}
 
 - **下载链接**： [官网](http://www.orangepi.cn/html/hardWare/computerAndMicrocontrollers/service-and-support/Orange-Pi-AIpro.html) ｜ [百度网盘](https://pan.baidu.com/s/1Jho73pw91r5GJD2KijY45Q?pwd=3xuz#list/path=%2F)
 
 1. **SD Card Formatter**：用于格式化TF卡，确保存储卡状态良好。
 2. **balenaEtcher**：用于将`.img`镜像文件烧录到TF卡。**注意：建议使用1.19.25及以下版本，以避免兼容性问题。**
 
-#### 格式化TF卡 {#src-experiment-case0-h11}
+#### 格式化TF卡 {#src-appendix-appendix1-h11}
 
 1. 将TF卡插入读卡器，连接至电脑。
 2. 打开 **SD Card Formatter** 软件。
@@ -231,7 +231,7 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
 
    ![格式化完成](img1/fmtfin.png){#fig:fmtfin width=50% .center}
 
-#### 烧录镜像（以Ubuntu为例） {#src-experiment-case0-h12}
+#### 烧录镜像（以Ubuntu为例） {#src-appendix-appendix1-h12}
 
 1. 打开 **balenaEtcher**，选择“Flash from file”（从文件烧录）。
 
@@ -253,11 +253,11 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
 
    ![完毕](img1/finish.png){#fig:finish width=50% .center}
 
-#### 其他存储介质说明 {#src-experiment-case0-h13}
+#### 其他存储介质说明 {#src-appendix-appendix1-h13}
 - **eMMC**：板载无eMMC，需购买专用模块。刷写方法请参考香橙派用户手册。
 - **SSD**：支持M.2 SSD启动，但兼容性有限（仅支持特定品牌型号），且需自行准备。初学者不推荐直接使用SSD作为系统盘。
 
-#### 设置启动模式 {#src-experiment-case0-h14}
+#### 设置启动模式 {#src-appendix-appendix1-h14}
 
 开发板支持从TF卡、eMMC或M.2 SSD启动。当连接了多种存储设备时，需通过背面的拨码开关（BOOT开关）指定启动设备。
 
@@ -274,9 +274,9 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
 
 **注意**：切换拨码开关后，必须**完全断电**（拔掉电源线）再重新上电，新的启动配置才会生效。仅按RESET键重启无效。
 
-## 启动开发板 {#src-experiment-case0-h15}
+## 启动开发板 {#src-appendix-appendix1-h15}
 
-### 方式一：图形化界面启动 {#src-experiment-case0-h16}
+### 方式一：图形化界面启动 {#src-appendix-appendix1-h16}
 
 1. **硬件连接**：
    - 将刷写好的TF卡插入开发板插槽。
@@ -311,7 +311,7 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
    | root | Mind@123 |
    | HwHiAiUser | Mind@123 |
 
-### 方式二：串口登录 {#src-experiment-case0-h17}
+### 方式二：串口登录 {#src-appendix-appendix1-h17}
 
 如果暂时没有显示器、键盘和鼠标，也可以通过串口登录开发板。建议初学者使用开发板自带的Micro USB接口，该方法不需要额外接线，只需要一根Micro USB数据线，接入电脑后打开设备管理器查询对应的串口，然后使用PUTTY进行连接即可。
 
@@ -333,9 +333,9 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
 
    ![登录成功](img1/login.png){#fig:login width=70% .center}
 
-## 网络连接 {#src-experiment-case0-h18}
+## 网络连接 {#src-appendix-appendix1-h18}
 
-### 无线网络连接 (WiFi) {#src-experiment-case0-h19}
+### 无线网络连接 (WiFi) {#src-appendix-appendix1-h19}
 
 开发板板载了WiFi模块，可以通过命令行工具`nmcli`轻松连接无线网络。
 
@@ -376,7 +376,7 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
    ip addr
    ```
 
-### 有线网络连接 {#src-experiment-case0-h20}
+### 有线网络连接 {#src-appendix-appendix1-h20}
 
 如果有线网络可用，直接插入网线即可。可以通过以下命令查看IP地址：
 ```bash
@@ -387,7 +387,7 @@ ip addr
 ifconfig
 ```
 
-## 远程连接 (SSH) {#src-experiment-case0-h21}
+## 远程连接 (SSH) {#src-appendix-appendix1-h21}
 
 为了方便开发，通常我们会使用个人电脑通过SSH远程连接到开发板。
 
@@ -405,7 +405,7 @@ ifconfig
    ```
    默认密码为：`Mind@123`
 
-### Windows PowerShell 配置 SSH 密钥免密码登录 {#src-experiment-case0-h21-key-login}
+### Windows PowerShell 配置 SSH 密钥免密码登录 {#src-appendix-appendix1-h21-key-login}
 
 首次使用密码登录确认开发板身份后，可以把开发机的公钥写入开发板账户。以后使用相同的
 开发机账户连接同一块板时，SSH 会使用私钥认证，不再要求输入开发板密码。密钥登录只省去
@@ -500,7 +500,7 @@ ifconfig
    scp .\example.txt ascend310b:~/
    ```
 
-## 验证开发环境 {#src-experiment-case0-h22}
+## 验证开发环境 {#src-appendix-appendix1-h22}
 
 系统启动并连接网络后，我们需要验证昇腾AI处理器的状态以及开发环境是否正常。
 
@@ -533,6 +533,6 @@ ifconfig
    c++ --version
    ```
 
-## 结语 {#src-experiment-case0-h24}
+## 结语 {#src-appendix-appendix1-h24}
 
 至此，你的昇腾310B开发板（OrangePi AIpro）已经完成了基本的环境搭建。接下来，你可以进入[案例 1：智能考勤机](../experiment/case1.md)的学习，开始你的第一个AI应用开发之旅。

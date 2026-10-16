@@ -305,14 +305,14 @@ R(Ω) = 118.63302612304688  b(V) = 0.7558640241622925
 提示
 - 数据需统一单位（A、V），使用 float32 更稳妥。
 - 无明显偏置时可将偏置项置为 0；存在测量/接触偏差时保留偏置并做鲁棒处理（如剔除离群点）。
-- 拟合优劣可用 MSE 或 R² 评估，必要时清理异常样本。 
+- 拟合优劣可用 MSE 或 R² 评估，必要时清理异常样本。
 - 在部分环境中，PyTorch 2.1 运行上述代码可能报错，通常与 nn.Linear 的输出维度设为 1 的配置触发兼容性问题有关；建议升级至更高版本或将输出维度调整为大于 1 以规避。
 - 将代码中的 `device = torch.device('npu:0')` 改为 `device = torch.device('cpu')`，即可在纯 CPU 上运行。该示例在 CPU 与 NPU 上耗时接近，主要因为未涉及大规模矩阵/张量计算，计算密度较低，NPU 的并行优势难以发挥。
 
 #### 多元线性回归 {#src-book-chapter3-h12}
 
 为了验证昇腾 310B 上 torch_npu 与 PyTorch 的兼容性，下面以加州房价数据集的多元线性回归示例继续演示 torch_npu 的使用。加州房价数据（California Housing Dataset）可通过 `fetch_california_housing()` 在 `scikit-learn` 获取，或在 [Kaggle](https://www.kaggle.com/datasets/azhadarshad/california-housing-dataset) 等平台下载 CSV。该数据集包含经纬度（longitude/latitude）、房屋中位年龄（housing_median_age）、总房间数与卧室数（total_rooms/total_bedrooms）、人口与家庭数（population/households）、收入中位数（median_income）、房价中位数（median_house_value）以及与海距离类别（ocean_proximity）等字段，可用于房价预测（如线性回归、随机森林、XGBoost 等回归模型）、结合经纬度进行地理可视化绘制房价热力图以分析区域差异，并通过“每户平均房间数”等衍生特征进行特征工程以提升效果。需注意，该数据为历史数据，不能直接反映当前价格；使用时应遵守隐私与数据保护规定，尤其在与其他数据源结合时；该数据集结构清晰、特征丰富，是机器学习回归入门的经典案例。
-对于线性神经网络（多元线性回归），可表示为： 
+对于线性神经网络（多元线性回归），可表示为：
 $$
 \hat{\mathbf{y}} = \mathbf{X} \mathbf{w} + \mathbf{b}, \quad \mathbf{X} \in \mathbb{R}^{m\times d},\; \mathbf{w} \in \mathbb{R}^{d\times k},\; \mathbf{b} \in \mathbb{R}^{k}
 $$
@@ -321,7 +321,7 @@ $$
 
 ![线性神经网络](img3/linear_network.png){#fig:linear_network width=100%}
 
-损失函数通常选用均方误差（MSE）：  
+损失函数通常选用均方误差（MSE）：
 $$
 \mathcal{L}(\mathbf{w},b) = \frac{1}{m}\sum_{i=1}^m \big\|\hat{\mathbf{y}}^{(i)} - \mathbf{y}^{(i)}\big\|_2^2
 $$
@@ -591,19 +591,19 @@ RMSE: $0.77
 
 我们之所以需要多层感知机（Multilayer Perceptron, MPL），是因为线性神经网络的输出仅为输入的加权和，难以刻画现实世界中复杂的非线性关系。以房价预测为例，房屋面积对价格的影响往往存在边际效应，而非简单的线性增长。为了突破这一局限，我们需要构建更深的网络结构。
 
-如果我们仅仅通过堆叠多个线性层来构建网络，其数学表达为 
+如果我们仅仅通过堆叠多个线性层来构建网络，其数学表达为
 $$\hat{\mathbf{y}} = \mathbf{W}_2 (\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1) + \mathbf{b}_2$$
-展开后可见 
+展开后可见
 $$\hat{\mathbf{y}} = (\mathbf{W}_2 \mathbf{W}_1) \mathbf{x} + (\mathbf{W}_2 \mathbf{b}_1 + \mathbf{b}_2) = \mathbf{W}_{new} \mathbf{x} + \mathbf{b}_{new}$$
 这意味着多个线性层的组合在数学上仍然等价于单个线性层。无论网络深度如何增加，若缺乏非线性因素，它都无法拟合复杂的非线性函数。
 
-多层感知机通过在层间引入激活函数打破了这种线性限制。以常用的 ReLU 为例，其定义为 
+多层感知机通过在层间引入激活函数打破了这种线性限制。以常用的 ReLU 为例，其定义为
 $$\text{ReLU}(x) = \max(0, x)$$
-另一个经典的激活函数是 Sigmoid 函数，它将任意实数映射到 $(0, 1)$ 区间，曾广泛应用于早期神经网络。其定义为 
+另一个经典的激活函数是 Sigmoid 函数，它将任意实数映射到 $(0, 1)$ 区间，曾广泛应用于早期神经网络。其定义为
 $$\text{sigmoid}(x) = \frac{1}{1 + e^{-x}}$$
 
-这种非线性变换允许网络通过组合不同的线性分段来逼近任意复杂的连续函数。一个含隐藏层的多层感知机可以表示为 
-$$\mathbf{H} = \sigma(\mathbf{X} \mathbf{W}_1 + \mathbf{b}_1)$$ 
+这种非线性变换允许网络通过组合不同的线性分段来逼近任意复杂的连续函数。一个含隐藏层的多层感知机可以表示为
+$$\mathbf{H} = \sigma(\mathbf{X} \mathbf{W}_1 + \mathbf{b}_1)$$
 与
 $$\mathbf{O} = \mathbf{H} \mathbf{W}_2 + \mathbf{b}_2$$
 其中 $\sigma$ 即为非线性激活函数。

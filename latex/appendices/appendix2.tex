@@ -15,11 +15,10 @@ WiFi、开机自启动、静态 IP 和无屏幕联网资料，并结合现有 31
 等名称只作为操作背景出现于命令示例的原始路径中，不能据此推断 310B
 板的实际设备名、IP 地址、接口编号或运行结果。
 
-\section{1. 教程定位与证据边界}\label{src-appendix2-scope}
+\section{1. 教程定位与证据边界}\label{src-appendix-appendix2-scope}
 
 \subsection{三类操作位置}\label{ux4e09ux7c7bux64cdux4f5cux4f4dux7f6e}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -49,7 +48,6 @@ Ubuntu 主机 & 作为 SSH、VNC、NFS、SCP 和 rsync 的客户端 &
 acl、运行 OM、检查设备、服务和日志 &
 不能把一次导入成功写成完整模型精度或端到端性能 \\
 \end{longtable}
-}
 
 开发机和 Ubuntu 主机可以共享普通 Linux
 操作，例如查看路径、编辑文本、管理网络和传输文件。板端操作则需要额外的证据控制：\passthrough{\lstinline!source /usr/local/Ascend/ascend-toolkit/set\_env.sh!}、\passthrough{\lstinline!npu-smi info!}、\passthrough{\lstinline!atc!}、\passthrough{\lstinline!python -c 'import acl'!}、OM
@@ -80,7 +78,6 @@ PyACL，\passthrough{\lstinline!npu-smi info!} 读取 NPU
 
 记录结果时，使用下面五类标签，避免把先验知识写成已经观测到的事实：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 标签 & 含义 \\
@@ -98,7 +95,6 @@ PyACL，\passthrough{\lstinline!npu-smi info!} 读取 NPU
 在当前组合下实际失败，并保留了完整错误和命令 \\
 \passthrough{\lstinline!untested!} & 尚未执行，不能归入支持或不支持 \\
 \end{longtable}
-}
 
 一条命令的通过只能证明它对应的最小验证门。语法检查、HTTP 健康检查、ATC
 转换、ACL
@@ -230,7 +226,6 @@ command -v npu-smi || true
 
 \subsection{Ubuntu 目录结构}\label{ubuntu-ux76eeux5f55ux7ed3ux6784}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 目录 & 主要用途 \\
@@ -248,7 +243,6 @@ command -v npu-smi || true
 \passthrough{\lstinline!/opt!} & 可选应用程序安装目录 \\
 \passthrough{\lstinline!/usr/local!} & 用户自行安装的软件和运行环境 \\
 \end{longtable}
-}
 
 \passthrough{\lstinline!/dev!}
 中的文件不是普通文档。\passthrough{\lstinline!/dev/video0!}、\passthrough{\lstinline!/dev/snd!}
@@ -388,7 +382,6 @@ Ubuntu 安装时会创建一个普通用户，同时保留具有更高权限的 
 
 每个文件都有三组权限：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 权限组 & 适用范围 \\
@@ -400,7 +393,6 @@ user & 文件所有者 \\
 group & 文件所属组 \\
 other & 其他用户 \\
 \end{longtable}
-}
 
 每组权限包含读 \passthrough{\lstinline!r!}、写
 \passthrough{\lstinline!w!}、执行 \passthrough{\lstinline!x!}：
@@ -541,7 +533,6 @@ vim 初始处于普通模式。按 \passthrough{\lstinline!i!} 或
 \passthrough{\lstinline!a!} 进入插入模式，按
 \passthrough{\lstinline!Esc!} 回到普通模式。常用移动和编辑键：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 按键 & 作用 \\
@@ -571,12 +562,10 @@ vim 初始处于普通模式。按 \passthrough{\lstinline!i!} 或
 \passthrough{\lstinline!yy!} / \passthrough{\lstinline!p!} /
 \passthrough{\lstinline!P!} & 复制整行 / 粘贴到光标后 / 粘贴到光标前 \\
 \end{longtable}
-}
 
 保存和退出前先按 \passthrough{\lstinline!Esc!}
 回到普通模式，再输入冒号命令：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 命令 & 作用 \\
@@ -591,7 +580,6 @@ vim 初始处于普通模式。按 \passthrough{\lstinline!i!} 或
 \passthrough{\lstinline":wq!"} & 强制保存并退出 \\
 \passthrough{\lstinline!:w <文件路径>!} & 另存为 \\
 \end{longtable}
-}
 
 编辑器中的 \passthrough{\lstinline":q!"}
 会丢失未保存内容，只在确认不需要修改时使用。需要编辑 root 文件时使用
@@ -1060,7 +1048,6 @@ Remmina
 
 \subsection{SSH 与 VNC 的对比}\label{ssh-ux4e0e-vnc-ux7684ux5bf9ux6bd4}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 对比项 & SSH & VNC \\
@@ -1075,7 +1062,6 @@ Remmina
 安全边界 & 可使用密钥和严格访问控制 & 需要保护 VNC 密码和端口 \\
 断线影响 & 前台命令可能随会话结束 & 前台图形程序可能随会话结束 \\
 \end{longtable}
-}
 
 VNC 服务不要直接暴露到不可信网络。需要通过 SSH
 隧道访问时，可以把本地端口转发到板端 VNC 端口，但应确认 VNC
@@ -1777,7 +1763,6 @@ NPU、摄像头、串口、音频设备或真实个人数据。
 
 \subsection{证据门}\label{ux8bc1ux636eux95e8}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -1807,7 +1792,6 @@ ACL 数值烟测 & 指定输入的数值关系在容差内 & 数据集精度、�
 性能测试 & 指定参数下的延迟或吞吐 & 精度和端到端业务正确性 \\
 UI 烟测 & 页面或控件可以交互 & 后端真实硬件推理已经完成 \\
 \end{longtable}
-}
 
 每份报告至少记录硬件型号和算力层级、CANN 版本、模型 ID
 和精度、输入合同、预热次数、循环次数、重复次数、百分位方法、输入来源、输出路径和原始日志。
@@ -1817,7 +1801,6 @@ UI 烟测 & 页面或控件可以交互 & 后端真实硬件推理已经完成 \
 
 \subsection{常见故障}\label{ux5e38ux89c1ux6545ux969c}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -1883,7 +1866,6 @@ USB 仪器被占用 &
 \passthrough{\lstinline!df -h!}、\passthrough{\lstinline!du -sh <dir>!}
 & 先归档报告，再清理隔离临时目录 \\
 \end{longtable}
-}
 
 \subsection{禁止或必须审查的命令模式}\label{ux7981ux6b62ux6216ux5fc5ux987bux5ba1ux67e5ux7684ux547dux4ee4ux6a21ux5f0f}
 

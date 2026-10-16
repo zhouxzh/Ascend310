@@ -2,20 +2,23 @@
 9：智能聊天机器人}\label{ux6848ux4f8b-9ux667aux80fdux804aux5929ux673aux5668ux4eba}
 
 \emph{本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM
-实验。当前同时维护两条彼此独立的路线：Qwen2.5 静态 KV 的 ONNX
--\textgreater{} OM -\textgreater{} 原生 ACL 路线，以及 MindSpore/MindNLP
-候选路线。20T 当前地址为
-\passthrough{\lstinline!192.168.1.101!}；\passthrough{\lstinline!.95!}
-与 \passthrough{\lstinline!.210!} 是同一块板的历史地址。8T 当前地址为
-\passthrough{\lstinline!192.168.1.90!}；\passthrough{\lstinline!.11.14!}
-与报告采集地址 \passthrough{\lstinline!.178!}
-是同一块板的历史别名。2026-10-15 的 20T
-完整机器验收确认：Qwen1.5-0.5B-Chat 的 MindSpore
-路线是当前最适合文字聊天的实验性候选；Qwen2.5-0.5B 静态 KV OM 的 ACL
-路线功能完整但明显偏慢。TinyLlama
-中文质量未通过；DeepSeek、Qwen3、MiniCPM3
-等未在本次形成完整当前验收，不列为可用。本教程只写入有原始证据的结果；\passthrough{\lstinline!not-run!}
-和 \passthrough{\lstinline!blocked!} 不等同于对硬件或模型的普遍否定。}
+实验，同时维护两条彼此独立的路线：Qwen2.5 静态 KV的 ONNX -\textgreater{}
+OM -\textgreater{} 原生 ACL 路线，以及 MindSpore/MindNLP
+候选路线。2026-10-16 在当前 20T 地址
+\passthrough{\lstinline!192.168.1.101!}
+的隔离环境完成了超时修正复测：Qwen1.5-0.5B、Qwen1.5-1.8B 与 Qwen2.5-0.5B
+通过技术机器门，保持
+\passthrough{\lstinline!experimental\_isolated!}；Qwen2-0.5B、Qwen2-1.5B
+与 Qwen2.5-1.5B 完成生成和稳定性，但中文探测各出现一次
+\passthrough{\lstinline!U+FFFD!}，保持
+\passthrough{\lstinline!blocked!}。此前 30 秒客户端超时后的 TBE
+子进程日志仅标记为
+\passthrough{\lstinline!timeout-confounded!}，不是已确认的模型崩溃。Qwen3
+仍在 MindNLP loader 门阻断，MiniCPM3 缺少可复现的固定工件。HF
+权重默认通过
+\passthrough{\lstinline!HF\_ENDPOINT=https://hf-mirror.com!}
+下载；这只改变传输入口，不改变哈希和模型来源。8T
+仍需独立回归，本教程不会用 20T 结果推断 8T。}
 
 \section{当前目标和已暂停范围}\label{ux5f53ux524dux76eeux6807ux548cux5df2ux6682ux505cux8303ux56f4}
 
@@ -23,7 +26,6 @@
 NPU 上， 再通过 Case9 网关和文字页面访问。当前只验收文字
 LLM，不把文字服务当作 XiaoZhi 设备后端的完整证明。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -44,24 +46,31 @@ OM 完整验收通过，但短问候首事件 p50 约
 \passthrough{\lstinline!0.422 token/s!}，不作为当前流畅文字入口 \\
 \passthrough{\lstinline!qwen1.5-0.5b-mindspore!}：\passthrough{\lstinline!.90!}
 B4/8T 与 \passthrough{\lstinline!.101!} B1/20T & 8T 保持
-\passthrough{\lstinline!blocked!}；20T 当前批次全机器门通过，首 token
-p50 约 \passthrough{\lstinline!655.5 ms!}、约
-\passthrough{\lstinline!1.544 token/s!}，当前标记为
-\passthrough{\lstinline!experimental\_dirty\_base!}，人工质量/正式准入待签字 \\
+\passthrough{\lstinline!blocked!}；20T 隔离复测完整机器门通过，首事件
+p50
+\passthrough{\lstinline!671.868 ms!}、\passthrough{\lstinline!1.531 token/s!}，标记
+\passthrough{\lstinline!experimental\_isolated!}，人工质量/正式准入待签字 \\
+\passthrough{\lstinline!qwen1.5-1.8b-mindspore!}：\passthrough{\lstinline!.90!}
+B4/8T 与 \passthrough{\lstinline!.101!} B1/20T & 20T
+隔离复测完整机器门通过；中英机器探测各
+\passthrough{\lstinline!5/5!}，首事件 p50
+\passthrough{\lstinline!1561.806 ms!}、\passthrough{\lstinline!0.670 token/s!}，标记
+\passthrough{\lstinline!experimental\_isolated!}；8T 未独立回归 \\
 \passthrough{\lstinline!tinyllama-1.1b-mindspore!}：\passthrough{\lstinline!.90!}
-B4/8T 与 \passthrough{\lstinline!.101!} B1/20T & 两板均保留
-\passthrough{\lstinline!blocked!}；历史 \passthrough{\lstinline!.95!}
-缺口批次 8/9，32/48-token 输出出现
-\passthrough{\lstinline!U+FFFD!}，中文机器质量 7/10 \\
-\passthrough{\lstinline!deepseek-r1-qwen-1.5b-mindspore!}：\passthrough{\lstinline!.90!}
-B4/8T 与 \passthrough{\lstinline!.101!} B1/20T & 8T 历史
-\passthrough{\lstinline!.11.14!} 缺口批次 9/9 机器门和性能通过；历史
-\passthrough{\lstinline!.95!} 隔离 API 机器门通过但中文质量/dirty-base
-准入未完成，保持 \passthrough{\lstinline!blocked!} \\
+B4/8T 与 \passthrough{\lstinline!.101!} B1/20T & 20T 工件加载通过，但
+32-token 出现 \passthrough{\lstinline!U+FFFD!}、随后服务崩溃；两板均
+\passthrough{\lstinline!blocked!} \\
+\passthrough{\lstinline!qwen2.5-0.5b-mindspore!}：\passthrough{\lstinline!.90!}
+B4/8T 与 \passthrough{\lstinline!.101!} B1/20T & 20T 隔离复测完成
+JSON/SSE、64-token、10 轮稳定性和 30 次性能，标记
+\passthrough{\lstinline!experimental\_isolated!}；8T 未独立回归 \\
+\passthrough{\lstinline!qwen2-0.5b-mindspore!}、\passthrough{\lstinline!qwen2-1.5b-mindspore!}、\passthrough{\lstinline!qwen2.5-1.5b-mindspore!}：\passthrough{\lstinline!.101!}
+B1/20T & 长输出与稳定性均已完成，但固定中文加法探测出现
+\passthrough{\lstinline!U+FFFD!}，保持
+\passthrough{\lstinline!blocked!}，不允许作为聊天后端 \\
 音频、麦克风、ASR/TTS、PTT、XiaoZhi、OTA、设备 WebSocket &
 暂停，不安装、不启动、不验收 \\
 \end{longtable}
-}
 
 机器门只表示协议、资源和运行检查通过，不表示回答正确或适合生产。正式入口、音频
 链路和 XiaoZhi 均须另行批准。
@@ -72,12 +81,19 @@ B4/8T 与 \passthrough{\lstinline!.101!} B1/20T & 8T 历史
 本节的每一项都来自 \passthrough{\lstinline!192.168.1.101!} 的
 Ascend310B1/20T 实测，而不是框架文档或 控制机推断。测试环境为 CANN
 \passthrough{\lstinline!8.0.0!}、Python
-\passthrough{\lstinline!3.9.2!}；\passthrough{\lstinline!Health: Alarm!}
+\passthrough{\lstinline!3.9.25!}；\passthrough{\lstinline!Health: Alarm!}
 仅保留为 诊断信息。统一验收包含工件哈希、目标 SoC、实际 NPU
 生成、JSON/SSE、\passthrough{\lstinline!8/16/32/64!} token 长输出、10
 轮稳定性、中文机器探测、协议边界和 2 次预热后的 30 次性能测量。
 
-{ % do not increment counter
+本教程的证据等级按仓库约定标注：\passthrough{\lstinline!observed-pass!}
+为板端实测通过，\passthrough{\lstinline!observed-fail!}
+为板端实测失败，\passthrough{\lstinline!blocked!}
+为前置条件未满足而未执行，\passthrough{\lstinline!not-run!}
+为本轮有意未执行； 只有框架文档或控制机静态推断支持的结论分别标为
+\passthrough{\lstinline!documented!} 或
+\passthrough{\lstinline!inferred!}，不写成 板端通过。
+
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1250}}
   >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1250}}
@@ -106,15 +122,37 @@ token/s p50
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-Qwen1.5-0.5B-Chat & MindSpore 2.4.10 + MindNLP 0.4.1 & 通过 &
-\passthrough{\lstinline!655.5 ms!} & \passthrough{\lstinline!1295.4 ms!}
-& \passthrough{\lstinline!1.544!} & 当前首选文字聊天候选 \\
-Qwen2.5-0.5B-Instruct 静态 KV 1024 FP32 OM & 原生 ACL/PyACL & 通过 &
+Qwen1.5-0.5B-Chat & MindSpore 2.4.10 + MindNLP 0.4.1 &
+\passthrough{\lstinline!observed-pass!} &
+\passthrough{\lstinline!671.868 ms!} &
+\passthrough{\lstinline!1310.003 ms!} & \passthrough{\lstinline!1.531!}
+& 当前首选文字聊天候选 \\
+Qwen1.5-1.8B-Chat & MindSpore 2.4.10 + MindNLP 0.4.1 &
+\passthrough{\lstinline!observed-pass!} &
+\passthrough{\lstinline!1561.806 ms!} &
+\passthrough{\lstinline!2991.879 ms!} & \passthrough{\lstinline!0.670!}
+& \passthrough{\lstinline!experimental\_isolated!}，人工质量待审 \\
+Qwen2.5-0.5B-Instruct 静态 KV 1024 FP32 OM & 原生 ACL/PyACL &
+\passthrough{\lstinline!observed-pass!} &
 \passthrough{\lstinline!4727.8 ms!} &
 \passthrough{\lstinline!4741.3 ms!} & \passthrough{\lstinline!0.422!} &
 功能验证候选，不作为当前流畅入口 \\
+Qwen2.5-0.5B MindSpore & MindSpore 2.4.10 + MindNLP 0.4.1 &
+\passthrough{\lstinline!observed-pass!} &
+\passthrough{\lstinline!696.448 ms!} &
+\passthrough{\lstinline!1314.523 ms!} & \passthrough{\lstinline!1.531!}
+& \passthrough{\lstinline!experimental\_isolated!}，人工质量待审 \\
+Qwen2-0.5B / Qwen2-1.5B / Qwen2.5-1.5B MindSpore & MindSpore 2.4.10 +
+MindNLP 0.4.1 & 生成与稳定性通过 & \passthrough{\lstinline!693.995!} /
+\passthrough{\lstinline!1343.582!} /
+\passthrough{\lstinline!1428.028 ms!} &
+\passthrough{\lstinline!1338.346!} / \passthrough{\lstinline!2577.378!}
+/ \passthrough{\lstinline!2698.279 ms!} &
+\passthrough{\lstinline!1.494!} / \passthrough{\lstinline!0.776!} /
+\passthrough{\lstinline!0.742!} & 中文探测出现
+\passthrough{\lstinline!U+FFFD!}，20T
+\passthrough{\lstinline!blocked!} \\
 \end{longtable}
-}
 
 Qwen1.5 的 64-token 请求实际生成 55 token 后正常
 \passthrough{\lstinline!stop!}，10 轮稳定性为
@@ -142,7 +180,9 @@ Qwen2.5 OM 的字节数为 \passthrough{\lstinline!1,266,009,438!}，SHA-256
 当前 \passthrough{\lstinline!.90!} 的只读设备快照还显示周期性
 \passthrough{\lstinline!DRV\_LPM\_FAULT 0x80E3A203!}，NPU 内存约
 \passthrough{\lstinline!13598/15610 MB!}；在用户确认设备恢复前，暂停新的重模型加载和长压测。\passthrough{\lstinline!Health: Alarm!}
-仅作为诊断记录，不单独替代模型门禁；快照、哈希和处理边界见仓库验收记录。
+仅作为诊断记录，不单独替代模型门禁；快照、哈希和处理边界见
+\passthrough{\lstinline!samples/case9/docs/12-case9-evidence-index.md!}
+及其列出的验收记录。
 
 \section{MindSpore
 候选模型范围}\label{mindspore-ux5019ux9009ux6a21ux578bux8303ux56f4}
@@ -152,7 +192,6 @@ Profile。下表是本教程当前固定的首批范围；
 条件候选只用于记录研究状态，不下载、不安装，也不能由
 \passthrough{\lstinline!case9-modelctl!} 启动。
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -172,42 +211,57 @@ Profile
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-\passthrough{\lstinline!qwen1.5-0.5b-mindspore!} & 已测但 B4
-\passthrough{\lstinline!blocked!} & 已测 & B4 身份门待补；B1 共享
-\passthrough{\lstinline!base!}，技术通过后为
-\passthrough{\lstinline!experimental\_dirty\_base!} \\
+\passthrough{\lstinline!qwen1.5-0.5b-mindspore!} & 历史测得但本次 SSH
+不可达，不能重测 & 20T 隔离机器门通过 & B1
+\passthrough{\lstinline!experimental\_isolated!}；8T 不从 B1 推断 \\
+\passthrough{\lstinline!qwen1.5-1.8b-mindspore!} & 本次未运行 & 20T
+隔离机器门通过 & B1
+\passthrough{\lstinline!experimental\_isolated!}；中英文机器探测各
+\passthrough{\lstinline!5/5!} \\
 \passthrough{\lstinline!tinyllama-1.1b-mindspore!} & 已测 & 已测 &
 长输出/中文质量失败，保持
 \passthrough{\lstinline!blocked!}；英文单独报告 \\
-\passthrough{\lstinline!deepseek-r1-qwen-1.5b-mindspore!} & 兼容性已测 &
-优先已测 & 中文质量与正式准入独立审核 \\
-\passthrough{\lstinline!qwen2.5-0.5b-mindspore!} &
-\passthrough{\lstinline!blocked!}：context-only 诊断有输出，但严格
-placement 证据缺失 & \passthrough{\lstinline!not-run!} &
-不能用诊断输出启动服务 \\
+\passthrough{\lstinline!deepseek-r1-qwen-1.5b-mindspore!} &
+历史兼容性报告保留 & 工件与 Ascend 加载通过，首次生成发生 TBE 子进程失败
+& 当前组合
+\passthrough{\lstinline!blocked!}；不把旧地址结果替代当前验收 \\
+\passthrough{\lstinline!qwen2-0.5b-instruct-mindspore!} & 本次未运行 &
+JSON/SSE、64-token、稳定性和性能通过；中文
+\passthrough{\lstinline!U+FFFD!} & B1 \passthrough{\lstinline!blocked!}
+于文本完整性 \\
+\passthrough{\lstinline!qwen2-1.5b-instruct-mindspore!} & 本次未运行 &
+JSON/SSE、64-token、稳定性和性能通过；中文
+\passthrough{\lstinline!U+FFFD!} & B1 \passthrough{\lstinline!blocked!}
+于文本完整性 \\
+\passthrough{\lstinline!qwen2.5-0.5b-mindspore!} & 历史 context-only
+诊断，非完整验收 & JSON/SSE、64-token、稳定性和性能通过 & B1
+\passthrough{\lstinline!experimental\_isolated!}；8T 不从 B1 推断 \\
 \passthrough{\lstinline!qwen2.5-1.5b-mindspore!} &
-\passthrough{\lstinline!blocked!}：七个文件已同步并校验；污染
-CANN/PYTHONPATH 的初次 SIGSEGV 仅作历史证据，正确 CANN v4 已完成加载和两
-token context-only 诊断 & \passthrough{\lstinline!not-run!} &
-placement、生成/API/质量/性能均未完成；内存门原始记录为
-\passthrough{\lstinline!docs/37-qwen25-1.5b-8t-memory-gate-20260904.md!} \\
+历史短输出诊断，非完整验收 & 低占用重测完成生成、稳定性和性能；中文
+\passthrough{\lstinline!U+FFFD!} & B1 \passthrough{\lstinline!blocked!}
+于文本完整性 \\
 \passthrough{\lstinline!qwen3-0.6b-mindspore!} &
 \passthrough{\lstinline!blocked!}：MindNLP 0.4.1 无 Qwen3 loader &
-\passthrough{\lstinline!not-run!} & 不升级环境 \\
+\passthrough{\lstinline!blocked!}：同一 loader 探测确认无 Qwen3
+loader，未下载权重 & 不升级环境 \\
 \passthrough{\lstinline!qwen3-1.7b-mindspore!} &
 \passthrough{\lstinline!blocked!}：MindNLP 0.4.1 无 Qwen3 loader &
-\passthrough{\lstinline!not-run!} & 不升级环境 \\
+\passthrough{\lstinline!blocked!}：同一 loader 探测确认无 Qwen3
+loader，未下载权重 & 不升级环境 \\
 \passthrough{\lstinline!minicpm3-4b-mindspore!} & 不执行 &
-\passthrough{\lstinline!not-run!} & 仅使用官方 20T/24G Modelers FP16
-示例 \\
+\passthrough{\lstinline!blocked!}：专用类可见，但官方权重来自
+Modelers；当前 \passthrough{\lstinline!main!} 未形成固定
+revision/哈希锁，未下载权重 & 不把工件来源阻断写成模型不兼容 \\
 \end{longtable}
-}
 
 OpenPangu、EE-Model、TeleChat、BitCPM、MiniCPM5、MiniMind 和 Haidass
 等条件候选 若依赖 Torch/Torch-NPU、vLLM、MindIE、新版 CANN 或缺少 310B
 证据，则登记为
-\passthrough{\lstinline!blocked!}/\passthrough{\lstinline!not-run!}，不得作为失败回退。模型来源、证据等级和具体阻断原因见仓库中的
-候选清单与验收记录；框架支持不能替代当前板端 NPU 证据。
+\passthrough{\lstinline!blocked!}/\passthrough{\lstinline!not-run!}，不得作为失败回退。模型来源、证据等级和具体阻断原因见
+\passthrough{\lstinline!samples/case9/docs/31-mindspore-llm-candidate-inventory.md!}
+和
+\passthrough{\lstinline!samples/case9/docs/12-case9-evidence-index.md!}；框架支持不能替代当前板端
+NPU 证据。
 
 \section{浏览器、网关、ACL 和 NPU
 架构}\label{ux6d4fux89c8ux5668ux7f51ux5173acl-ux548c-npu-ux67b6ux6784}
@@ -217,6 +271,21 @@ OpenPangu、EE-Model、TeleChat、BitCPM、MiniCPM5、MiniMind 和 Haidass
 \passthrough{\lstinline!case9-modelctl!}；网关密钥只存在板端环境。ONNX
 -\textgreater{} OM 路线和 MindSpore 路线 共享
 NPU，但不共享进程、模型实例或验收结论；同一时刻只启动明确记录的那一条路线。
+
+本案例的运行代码位于
+\passthrough{\lstinline!samples/case9/!}：\passthrough{\lstinline!app.py!}
+是 Bearer 保护的 OpenAI 兼容网关，
+\passthrough{\lstinline!mindspore\_chat\_service.py!} 与
+\passthrough{\lstinline!mindspore\_chat\_providers.py!} 是 MindSpore
+Profile 服务， \passthrough{\lstinline!qwen25\_kv\_acl\_runtime.py!} 与
+\passthrough{\lstinline!qwen25\_kv\_acl\_service.py!} 是原生 ACL/OM
+路线， \passthrough{\lstinline!configs/chat\_model\_profiles.json!} 是
+Profile 注册表，\passthrough{\lstinline!scripts/!} 保存环境检查、启动、
+验收和同步命令，\passthrough{\lstinline!tests/!}
+保存单元与合同测试。操作者从
+\passthrough{\lstinline!samples/case9/README.md!}
+开始执行；编号工程文档和验收证据的索引入口是
+\passthrough{\lstinline!samples/case9/docs/12-case9-evidence-index.md!}。
 
 \begin{lstlisting}
 flowchart LR
@@ -231,7 +300,6 @@ flowchart LR
     acl --> npu
 \end{lstlisting}
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -258,7 +326,6 @@ MindSpore 候选 & \passthrough{\lstinline!127.0.0.1:8090!} &
 \passthrough{\lstinline!127.0.0.1:7861!} &
 \passthrough{\lstinline!0.0.0.0:7865!} \\
 \end{longtable}
-}
 
 候选 UI
 是实验页面，任何同网段主机都可能提交文字；只允许在可信实验网络使用。
@@ -295,6 +362,9 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 unset PYTHONNOUSERSITE
 cd ~/case9-mindspore-chat
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
+# HF 权重默认经由镜像传输；固定 revision、大小和 SHA-256 校验不能省略。
+export HF_ENDPOINT=https://hf-mirror.com
+# mirror=modelers 的 Profile（例如 MiniCPM3）走 Modelers 独立 URL，不能用 HF_ENDPOINT 替代。
 \end{lstlisting}
 
 MindSpore 路线直接调用 MindSpore/MindNLP；现有
@@ -307,6 +377,46 @@ CANN、驱动、kernel 或 OPP。控制机 \passthrough{\lstinline!sci-agent!}
 只用于静态检查、前端构建和外部参考，不把其运行时复制到板端。
 
 \section{模型工件与哈希校验}\label{ux6a21ux578bux5de5ux4ef6ux4e0eux54c8ux5e0cux6821ux9a8c}
+
+\subsection{CANN 8.0 隔离 MindSpore
+扩展批次}\label{cann-8.0-ux9694ux79bb-mindspore-ux6269ux5c55ux6279ux6b21}
+
+在不改变正式 ACL 链路的前提下，新增模型必须先使用
+\passthrough{\lstinline!case9-ms240-cann80!} 隔离环境。20T
+\passthrough{\lstinline!192.168.1.101!} 先做 loader、工件、NPU 单
+token、JSON/SSE、 长输出、稳定性和性能门，再把轻量模型单独回归到 8T
+\passthrough{\lstinline!192.168.1.90!}；一块板的
+结果不能推断另一块板。启动环境固定为：
+
+\begin{lstlisting}[language=bash]
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate case9-ms240-cann80
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+export PYTHONNOUSERSITE=1
+\end{lstlisting}
+
+当前扩展候选包括 Qwen1.5-1.8B、Qwen2-0.5B、Qwen2-1.5B 和
+InternLM2-1.8B； InternLM2 只使用 MindNLP 原生 Auto* 映射，禁止
+\passthrough{\lstinline!trust\_remote\_code!}。请求的
+\passthrough{\lstinline!01-ai/Yi-1.5-1.5B-Chat!} 在 HF mirror
+不存在，因此注册表只保留一个
+\passthrough{\lstinline!conditional/blocked!} 事实记录，不下载，也不把
+Yi-Coder 误当作通用聊天模型。 Qwen3、MindSpore Lite 和 XiaoZhi
+转入后续版本/固件门控。
+
+新批次使用通用 runner：
+
+\begin{lstlisting}[language=bash]
+bash scripts/run_mindspore_board_campaign.sh --board 20t \
+  --profile qwen2-0.5b-instruct-mindspore --model-root "$PWD" \
+  --run-id qwen2-05b-20t-<utc>
+\end{lstlisting}
+
+旧的 \passthrough{\lstinline!run\_mindspore\_20t\_campaign.sh!}
+仍兼容，默认目标为 20T；任何 8T 调用必须 显式
+\passthrough{\lstinline!--board 8t!}，以免错误复用 B1 的 SoC
+检查。完整实施记录见
+\passthrough{\lstinline!samples/case9/docs/53-mindspore-isolated-extension-implementation-20261016.md!}。
 
 注册表是
 \passthrough{\lstinline!configs/chat\_model\_profiles.json!}。两条路线的工件必须分开登记：ONNX
@@ -381,8 +491,8 @@ context、 tokenizer 导入、单 token 生成、JSON/SSE
 或 \passthrough{\lstinline!Ascend310B1!} 的 descriptor、输入输出 byte
 size、ACL smoke 和 NPU 采样，不能用 MindSpore
 结果替代。任何门失败都记录为
-\passthrough{\lstinline!failed!}、\passthrough{\lstinline!blocked!} 或
-\passthrough{\lstinline!not-run!}，不自动切换
+\passthrough{\lstinline!observed-fail!}、\passthrough{\lstinline!blocked!}
+或 \passthrough{\lstinline!not-run!}，不自动切换
 CPU、云端或其他推理框架；没有当前 \passthrough{\lstinline!.101!}
 的完整环境和工件快照前，不得把 \passthrough{\lstinline!.210!} 的
 历史报告当作 20T 通过证据。
@@ -474,7 +584,7 @@ smoke 报告包含未授权 \passthrough{\lstinline!401!}、授权
 的历史响应；这些是协议/UI 证据，不是双板缺口批次
 的自动通过。每次新批次都必须保存请求、响应、服务 PID 和板卡 IP，不能把
 \passthrough{\lstinline!.90!} 的 UI 结果复制给
-\passthrough{\lstinline!.95!}。
+\passthrough{\lstinline!.101!}。
 
 正式 \passthrough{\lstinline!8080 -> 7861 -> 7865!}
 由本教程和候选脚本保持不变。
@@ -493,7 +603,6 @@ python scripts/mindspore_chat_acceptance.py \
 
 已有可复核的历史数据如下；它们用于说明基线，不等于当前双板缺口批次已经通过：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2000}}
@@ -567,11 +676,9 @@ loader 诊断 + 并发 \passthrough{\lstinline!npu-smi!} 采样 & 固定权重
 活动旁证；无显式 placement metadata，严格 worker
 \passthrough{\lstinline!blocked!}；未启动 API/网关，不是正式候选通过 \\
 \end{longtable}
-}
 
 缺口批次必须在两块板分别执行，状态只能引用相应原始报告：
 
-{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -590,37 +697,39 @@ loader 诊断 + 并发 \passthrough{\lstinline!npu-smi!} 采样 & 固定权重
 \bottomrule\noalign{}
 \endlastfoot
 Qwen2.5 ONNX/OM 当前身份、descriptor、ACL smoke &
-\passthrough{\lstinline!passed!}（identity-only；历史性能不重跑） &
-\passthrough{\lstinline!blocked!}（当前 ONNX/OM/contract/lock
+\passthrough{\lstinline!observed-pass!}（identity-only；历史性能不重跑）
+& \passthrough{\lstinline!blocked!}（当前 ONNX/OM/contract/lock
 缺失，未执行 ACL load） \\
 Qwen1.5 MindSpore 长输出、稳定性、质量、性能 & 历史报表
 9/9，但严格身份门 8/9，当前 \passthrough{\lstinline!blocked!}；共享
 \passthrough{\lstinline!base!}，人工质量待审 &
-\passthrough{\lstinline!passed!}，9/9
+\passthrough{\lstinline!observed-pass!}，9/9
 机器门，人工质量待审，\passthrough{\lstinline!experimental\_dirty\_base!} \\
 TinyLlama MindSpore 长输出、稳定性、质量、性能 &
 \passthrough{\lstinline!blocked!}（历史长输出/中文质量失败） &
-\passthrough{\lstinline!failed!}，8/9；32/48 token UTF-8 失败，保持
-\passthrough{\lstinline!blocked!} \\
+\passthrough{\lstinline!observed-fail!}，8/9；32/48 token UTF-8
+失败，保持 \passthrough{\lstinline!blocked!} \\
 DeepSeek MindSpore API、稳定性、质量、性能 &
-\passthrough{\lstinline!passed!}，9/9
+\passthrough{\lstinline!observed-pass!}，9/9
 机器门，人工质量待审，\passthrough{\lstinline!experimental\_dirty\_base!}
 & 已有隔离 API 机器门；中文质量和正式准入
 \passthrough{\lstinline!blocked!} \\
 Qwen2.5-0.5B MindSpore loader/placement &
 \passthrough{\lstinline!blocked!}；固定工件和 NPU 活动诊断已记录，严格
-placement 缺失 & \passthrough{\lstinline!not-run!}；当前 20T 尚未运行该
-Profile \\
+placement 缺失 & \passthrough{\lstinline!observed-pass!}；隔离环境完成
+API、64-token、稳定性、机器质量与性能，\passthrough{\lstinline!experimental\_isolated!} \\
 Qwen2.5-1.5B MindSpore 配置/权重加载 &
 \passthrough{\lstinline!blocked!}；初次污染环境 SIGSEGV（exit
 139）保留为历史证据，正确 CANN v4 已加载并生成 2 token，但
-placement/API/质量/性能未运行 &
-\passthrough{\lstinline!not-run!}；未执行 \\
+placement/API/质量/性能未运行 & 非质量机器门
+\passthrough{\lstinline!observed-pass!}；中文
+\passthrough{\lstinline!U+FFFD!}，故
+\passthrough{\lstinline!blocked!} \\
 Qwen3-0.6B/1.7B MindSpore loader &
 \passthrough{\lstinline!blocked!}；MindNLP 0.4.1 无 Qwen3
-loader，未下载权重 & \passthrough{\lstinline!not-run!}；未执行 \\
+loader，未下载权重 & \passthrough{\lstinline!blocked!}；同一 loader
+探测，未下载权重 \\
 \end{longtable}
-}
 
 上述状态直接对应本地复现包中的原始报告；\passthrough{\lstinline!not-run!}
 只保留有意未执行的跨 SoC 兼容性组合，
@@ -698,8 +807,12 @@ OTA、设备 WebSocket、Opus、ASR/TTS 或真实设备命令。文字 LLM 的 J
 成功不能证明 XiaoZhi 语音闭环可用。恢复该阶段 前，需单独审核无 Torch
 的语音组件、设备协议、鉴权、音频资源和真实设备端到端验收。
 
-模型候选的来源、证据分级、逐板执行顺序和验收记录由仓库工程文档维护；本教程只保留
-可独立复现的命令、边界和已测结果，不依赖其他仓库 Markdown 文件。
+模型候选的来源、证据分级、逐板执行顺序和验收记录由
+\passthrough{\lstinline!samples/case9/docs/!} 下的编号
+工程文档维护，索引入口是
+\passthrough{\lstinline!samples/case9/docs/12-case9-evidence-index.md!}。本教程正文
+可以独立阅读，只保留可复现的命令、边界和已测结果，不把工程文档当作理解正文的前置
+条件。
 
 参考：\href{https://www.mindspore.cn/tutorials/zh-CN/master/orange_pi/model_infer.html}{MindSpore
 Orange Pi

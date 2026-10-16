@@ -26,10 +26,10 @@ highlights:
     highlights:
       - title: 理论与实践结合
         details: 32课时
-        
+
       - title: 最新开源开发工具
-        details: 
-        
+        details:
+
       - title: 项目驱动教学
         details: 从简单应用到复杂系统设计
 
