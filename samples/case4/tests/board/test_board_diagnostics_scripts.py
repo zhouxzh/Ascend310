@@ -31,6 +31,13 @@ class BoardDiagnosticsScriptTests(unittest.TestCase):
         self.assertIn("npu-smi", source)
         self.assertIn("reports/system", source)
 
+    def test_runtime_asset_verifier_resolves_manual_test_models(self) -> None:
+        source = (ROOT / "tools" / "board" / "verify_runtime_assets.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("include_manual_test=manual_test_enabled()", source)
+        self.assertIn("manual_test_candidate_admission", source)
+
 
 if __name__ == "__main__":
     unittest.main()

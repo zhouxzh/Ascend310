@@ -90,7 +90,7 @@
       "weight_format": "safetensors",
       "board_targets": [
         {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
-        {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"}
+        {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"}
       ],
       "validation": {
         "Ascend310B4": {
@@ -163,9 +163,9 @@
         },
         "Ascend310B1": {
           "status": "experimental_dirty_base",
-          "reason": "20T gap machine gates recorded; shared base and human quality approval remain pending.",
-          "run_id": "qwen20-gap-20260830",
-          "updated_at": "2026-08-30T10:15:20Z",
+          "reason": "The 2026-10-16 current-address short regression reverified the shared dirty-base environment, seven artifact hashes, Ascend310B1 context, health/models, JSON, SSE and protocol boundaries. The complete 30-run acceptance remains the 2026-10-15 evidence; human quality approval remains pending.",
+          "run_id": "qwen15-20t-regression-20261016d",
+          "updated_at": "2026-10-16T03:29:54Z",
           "soc": "Ascend310B1",
           "tier": "20T",
           "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b",
@@ -183,11 +183,12 @@
             "repro/case9-dual-board-gap-20260830/reports/board20t/qwen1.5-0.5b-mindspore/qwen20-gap-20260830/metadata.json",
             "repro/case9-dual-board-gap-20260830/reports/board20t/qwen1.5-0.5b-mindspore/qwen20-gap-20260830/snapshots.json",
             "repro/case9-dual-board-gap-20260830/reports/board20t/qwen1.5-0.5b-mindspore/qwen20-gap-20260830/performance.json",
-            "repro/case9-dual-board-gap-20260830/reports/board20t/qwen1.5-0.5b-mindspore/qwen20-gap-20260830/quality.json"
+            "repro/case9-dual-board-gap-20260830/reports/board20t/qwen1.5-0.5b-mindspore/qwen20-gap-20260830/quality.json",
+            "repro/mindspore-20t-campaign-20261016/reports/qwen15-20t-regression-20261016d/acceptance.json"
           ],
           "quality": {"zh": "pending", "en": "pending", "machine_valid_count": 15, "human_review": "pending"},
           "performance": {"first_token_p50_ms": 661.419, "first_token_p95_ms": 754.165, "total_p50_ms": 1329.83, "total_p95_ms": 1440.076, "tokens_per_second_p50": 1.505, "tokens_per_second_p95": 1.619, "warmup": 2, "loops": 30},
-          "metrics": {"machine_gates_passed": 9, "machine_gates_total": 9}
+          "metrics": {"machine_gates_passed": 10, "machine_gates_total": 10, "current_address": "192.168.1.101", "short_regression_first_event_ms": 678.193, "short_regression_total_ms": 757.529, "short_regression_tokens_per_second": 1.320081, "full_performance_source": "2026-10-15 complete 30-run report"}
         }
       },
       "quality": {"reviewed": false, "languages": {"zh": "pending", "en": "pending"}},
@@ -209,7 +210,7 @@
       "revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
       "tokenizer_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
       "revision_pinned": true,
-      "mirror": "hf-mirror.com",
+      "mirror": "huggingface",
       "board": {
         "host": "192.168.1.90",
         "soc": "Ascend310B4",
@@ -288,7 +289,7 @@
       "weight_format": "safetensors",
       "board_targets": [
         {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
-        {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"}
+        {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"}
       ],
       "validation": {
         "Ascend310B4": {
@@ -340,9 +341,9 @@
         },
         "Ascend310B1": {
           "status": "blocked",
-          "reason": "20T gap run also failed long-output/quality checks.",
-          "run_id": "tiny20-gap-20260830",
-          "updated_at": "2026-08-30T10:26:53Z",
+          "reason": "Current-address full acceptance loaded verified artifacts on Ascend310B1, but 32-token output contained U+FFFD, 64-token output timed out, then the worker entered model_unavailable/connection-refused failure. It remains blocked.",
+          "run_id": "tinyllama-20t-full-20261016",
+          "updated_at": "2026-10-16T03:36:00Z",
           "soc": "Ascend310B1",
           "tier": "20T",
           "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b",
@@ -360,11 +361,12 @@
             "repro/case9-dual-board-gap-20260830/reports/board20t/tinyllama-1.1b-mindspore/tiny20-gap-20260830/metadata.json",
             "repro/case9-dual-board-gap-20260830/reports/board20t/tinyllama-1.1b-mindspore/tiny20-gap-20260830/snapshots.json",
             "repro/case9-dual-board-gap-20260830/reports/board20t/tinyllama-1.1b-mindspore/tiny20-gap-20260830/performance.json",
-            "repro/case9-dual-board-gap-20260830/reports/board20t/tinyllama-1.1b-mindspore/tiny20-gap-20260830/quality.json"
+            "repro/case9-dual-board-gap-20260830/reports/board20t/tinyllama-1.1b-mindspore/tiny20-gap-20260830/quality.json",
+            "repro/mindspore-20t-campaign-20261016/reports/tinyllama-20t-full-20261016/acceptance.json"
           ],
           "quality": {"zh": "failed", "en": "pending", "machine_valid_count": 12, "human_review": "pending"},
           "performance": {"first_token_p50_ms": 1938.973, "first_token_p95_ms": 2003.336, "total_p50_ms": 1939.938, "total_p95_ms": 2003.937, "tokens_per_second_p50": 1.031, "tokens_per_second_p95": 1.044, "warmup": 2, "loops": 30},
-          "metrics": {"machine_gates_passed": 8, "machine_gates_total": 9, "quality_machine_valid_count": 12}
+          "metrics": {"machine_gates_passed": 5, "machine_gates_total": 10, "quality_machine_valid_count": 0, "current_address": "192.168.1.101", "utf8_failure_at_max_tokens": 32, "timeout_at_max_tokens": 64, "worker_failure": "model_unavailable followed by connection refused"}
         }
       },
       "quality": {"reviewed": true, "languages": {"zh": "failed", "en": "pending"}},
@@ -388,7 +390,7 @@
       "revision_pinned": true,
       "mirror": "modelers",
       "board": {
-        "host": "192.168.1.95",
+        "host": "192.168.1.101",
         "soc": "Ascend310B1",
         "tier": "20T"
       },
@@ -449,7 +451,7 @@
       "weight_format": "safetensors",
       "board_targets": [
         {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
-        {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"}
+        {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"}
       ],
       "validation": {
         "Ascend310B4": {
@@ -508,9 +510,9 @@
         },
         "Ascend310B1": {
           "status": "blocked",
-          "reason": "20T isolation run recorded, but Chinese quality and formal admission are incomplete.",
-          "run_id": "deepseek-api-full-20t-20260830T051523Z",
-          "updated_at": "2026-08-30T05:19:37Z",
+          "reason": "Current-address full acceptance verified all five artifacts and loaded the Ascend310B1 worker, but the first generation caused repeated TBE task_distribute subprocess crashes and the worker exited. JSON/SSE/quality/performance gates did not pass; the result is scoped to this artifact and MindSpore 2.4.10/MindNLP 0.4.1/CANN 8.0 combination.",
+          "run_id": "deepseek-20t-full-20261016b",
+          "updated_at": "2026-10-16T04:10:20Z",
           "soc": "Ascend310B1",
           "tier": "20T",
           "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b",
@@ -526,11 +528,12 @@
             "repro/deepseek-r1-20t-20260830/reports/board20t/api/deepseek-api-full-20t-20260830T051523Z/metadata.json",
             "repro/deepseek-r1-20t-20260830/reports/board20t/api/deepseek-api-full-20t-20260830T051523Z/snapshots.json",
             "repro/deepseek-r1-20t-20260830/reports/board20t/api/deepseek-api-full-20t-20260830T051523Z/performance.json",
-            "repro/deepseek-r1-20t-20260830/reports/board20t/api/deepseek-api-full-20t-20260830T051523Z/quality.json"
+            "repro/deepseek-r1-20t-20260830/reports/board20t/api/deepseek-api-full-20t-20260830T051523Z/quality.json",
+            "repro/mindspore-20t-campaign-20261016/reports/deepseek-r1-20t-full-20261016/acceptance.json"
           ],
           "quality": {"zh": "not-run", "en": "not-run", "machine_valid_count": 0, "human_review": "not-run"},
           "performance": {"first_token_p50_ms": 2483.582, "first_token_p95_ms": 2530.96, "total_p50_ms": 2489.698, "total_p95_ms": 2537.096, "tokens_per_second_p50": 0.805, "tokens_per_second_p95": 0.818, "warmup": 2, "loops": 30},
-          "metrics": {"machine_gates_passed": 9, "machine_gates_total": 9}
+          "metrics": {"machine_gates_passed": 4, "machine_gates_total": 10, "current_address": "192.168.1.101", "generation_failure": "MindSpore MallocForInput Allocate memory failed"}
         }
       },
       "quality": {"reviewed": false, "languages": {"zh": "pending", "en": "pending"}},
@@ -570,7 +573,7 @@
       "weight_format": "safetensors",
       "board_targets": [
         {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
-        {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"}
+        {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"}
       ],
       "validation": {
         "Ascend310B4": {
@@ -645,7 +648,7 @@
           },
           "notes": "The v2 strict run is the admission evidence and is intentionally fail-closed. The clean context-only report is supplemental diagnostic evidence only; NPU activity does not prove parameter placement or permit service startup."
         },
-        "Ascend310B1": {"status": "not-run", "reason": "New candidate; artifact lock and NPU loader test pending.", "run_id": null, "updated_at": null, "soc": "Ascend310B1", "tier": "20T", "environment_fingerprint": null, "artifact_hashes": {}, "report_paths": [], "quality": {}, "performance": {}, "metrics": {}}
+        "Ascend310B1": {"status": "blocked", "reason": "Verified Qwen2.5-0.5B artifacts loaded on Ascend310B1 and service health/models passed, but the first JSON generation triggered repeated TBE task_distribute crashes; the worker entered model_unavailable and later API, long-output, stability and performance gates failed.", "run_id": "qwen25-05-20t-full-20261016c", "updated_at": "2026-10-16T04:27:00Z", "soc": "Ascend310B1", "tier": "20T", "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b", "artifact_hashes": {"model":"fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe", "tokenizer":"c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"}, "report_paths": ["/home/HwHiAiUser/case9-mindspore-chat/reports/mindspore-chat/qwen25-05-20t-full-20261016c/acceptance.json", "/home/HwHiAiUser/case9-mindspore-chat/run/mindspore-20t-campaign/qwen25-05-20t-full-20261016c/logs/"], "quality": {"zh":"not-run", "en":"not-run"}, "performance": {}, "metrics": {"current_address":"192.168.1.101", "artifact_acquisition":"passed_from_local_verified_bundle", "weights_downloaded":true, "loader_attempted":true, "npu_generation_attempted":true, "generation_failure":"TBE task_distribute main process disappeared", "json":false, "sse":false, "stability":false}}
       },
       "quality": {"reviewed": false, "languages": {"zh": "pending", "en": "pending"}},
       "performance": {},
@@ -682,11 +685,11 @@
       "weight_format": "safetensors",
       "board_targets": [
         {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
-        {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"}
+        {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"}
       ],
       "validation": {
         "Ascend310B4": {"status":"blocked","reason":"Correct-CANN v4 run on the same 8T board verified all seven artifacts, actual acl/te/hccl imports, and expected/actual Ascend310B4. MindSpore loaded the 1.5B model and generated two tokens, but placement evidence is context_only and all API, long-output, stability, quality, and performance gates remain incomplete; keep this diagnostic profile blocked.","run_id":"qwen25-15-memory-gate-20260904-cann-fixed-v4","updated_at":"2026-09-04T04:07:56Z","soc":"Ascend310B4","tier":"8T","environment_fingerprint":"90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b","artifact_hashes":{"model":"dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee","tokenizer":"c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539","config":"98d2ff8cc47488d08a2b0b3acf4eb99ef210779b42bd48605f6b8e36acdbf670","tokenizer-config":"5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583","generation-config":"e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6","merges":"599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3","vocab":"ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"},"report_paths":["docs/36-qwen25-1.5b-8t-preflight-20260904.md","docs/37-qwen25-1.5b-8t-memory-gate-20260904.md","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-rerun/run.log","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-rerun/dmesg-tail-followup.txt","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v2/report.json","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v2/run.log","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v2/npu-before.txt","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v2/npu-after.txt","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v3b/report.json","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v3b/run.log","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v3b/exit-code.txt","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v4/report.json","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v4/run.log","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v4/exit-code.txt","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v4/npu-before.txt","repro/mindspore-chat-20260904/reports/board8t/qwen2.5-1.5b-mindspore/qwen25-15-memory-gate-20260904-cann-fixed-v4/npu-after.txt"],"quality":{"zh":"not-run","en":"not-run"},"performance":{},"metrics":{"config_loader":true,"weights_downloaded":true,"artifact_verification":"passed","cann_python_modules":"passed","npu_soc_expected":"Ascend310B4","npu_soc_actual":"Ascend310B4","model_load":"passed","model_load_seconds":53.068432,"single_generation":"passed","prompt_tokens":36,"completion_tokens":2,"generated_text":"我是Q","generation_seconds":23.169714,"finish_reason":"length","placement":"context_only","api":"not-run","npu_memory_total_mb":15610,"npu_memory_used_before_mb":5532,"npu_memory_used_after_mb":14984,"python_rss_before_bytes":15036416,"python_rss_peak_bytes":8369860608,"python_rss_after_bytes":7819124736,"mindspore_version":"2.4.10","mindnlp_version":"0.4.1","python":"3.9.2","cann":"8.0.0","prior_contaminated_run":"sigsegv_exit_139_pythonpath_overridden"},"notes":"Correct-CANN v4 diagnostic loaded the pinned artifacts and generated two tokens. Keep blocked until placement/API/long-output/stability/quality/performance gates pass; the earlier PYTHONPATH-contaminated SIGSEGV remains historical evidence."},
-        "Ascend310B1": {"status": "not-run", "reason": "20T-first candidate; artifact and loader gates pending.", "run_id": null, "updated_at": null, "soc": "Ascend310B1", "tier": "20T", "environment_fingerprint": null, "artifact_hashes": {}, "report_paths": [], "quality": {}, "performance": {}, "metrics": {}}
+        "Ascend310B1": {"status": "blocked", "reason": "Verified Qwen2.5-1.5B artifacts loaded on Ascend310B1; JSON/SSE passed for 2-token smoke and 8/16-token output, but the 32-token request timed out and triggered TBE task_distribute crashes. The worker then became unavailable, so long-output, stability, quality and performance gates did not pass.", "run_id": "qwen25-15-20t-full-20261016", "updated_at": "2026-10-16T05:00:00Z", "soc": "Ascend310B1", "tier": "20T", "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b", "artifact_hashes": {"model":"dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee", "tokenizer":"c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"}, "report_paths": ["/home/HwHiAiUser/case9-mindspore-chat/reports/mindspore-chat/qwen25-15-20t-full-20261016/acceptance.json", "/home/HwHiAiUser/case9-mindspore-chat/run/mindspore-20t-campaign/qwen25-15-20t-full-20261016/logs/"], "quality": {"zh":"not-run", "en":"not-run"}, "performance": {}, "metrics": {"current_address":"192.168.1.101", "artifact_acquisition":"passed_from_local_verified_bundle", "weights_downloaded":true, "loader_attempted":true, "npu_generation_attempted":true, "json":true, "sse":true, "short_output_tokens":16, "long_output_32_failure":"timeout_then_TBE_crash", "stability":false}}
       },
       "quality": {"reviewed": false, "languages": {"zh": "pending", "en": "pending"}},
       "performance": {},
@@ -719,11 +722,11 @@
       "weight_format": "safetensors",
       "board_targets": [
         {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
-        {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"}
+        {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"}
       ],
       "validation": {
         "Ascend310B4": {"status": "blocked", "reason": "Current board MindNLP 0.4.1 exposes no qwen3 module or Qwen3ForCausalLM loader; no package upgrade is permitted, so no Qwen3 weights were downloaded or loaded.", "run_id": "qwen3-loader-check-20260903", "updated_at": "2026-09-03T12:02:00Z", "soc": "Ascend310B4", "tier": "8T", "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b", "artifact_hashes": {}, "report_paths": ["docs/35-qwen3-loader-compatibility-check-20260903.md", "docs/38-mindnlp-loader-capability-20260904.md", "repro/mindspore-chat-20260904/reports/board8t/environment/loader-capability-20260904T072000Z/loader-probe.json", "repro/mindspore-chat-20260904/reports/board8t/environment/loader-capability-20260904T072000Z/SHA256SUMS.txt"], "quality": {"zh": "not-run", "en": "not-run"}, "performance": {}, "metrics": {"mindnlp_version": "0.4.1", "qwen3_module": false, "qwen3_loader": false, "weights_downloaded": false, "current_address": "192.168.1.90", "historical_address": "192.168.11.14", "loader_probe_run_id": "loader-capability-20260904T072000Z", "loader_probe_sha256": "8cda8f579ea03381574d755840c310e36989412ab6d9fbb74872b7cc6acbb0e5", "minicpm3_classes_visible": true, "observed_soc": "Ascend310B4"}},
-        "Ascend310B1": {"status": "not-run", "reason": "Check current MindNLP architecture support before loading on 20T.", "run_id": null, "updated_at": null, "soc": "Ascend310B1", "tier": "20T", "environment_fingerprint": null, "artifact_hashes": {}, "report_paths": [], "quality": {}, "performance": {}, "metrics": {}}
+        "Ascend310B1": {"status": "blocked", "reason": "Current MindNLP 0.4.1 loader probe exposes no Qwen3 class; no package upgrade or weight download was performed.", "run_id": "qwen3-06-20t-loader-20261016", "updated_at": "2026-10-16T05:15:00Z", "soc": "Ascend310B1", "tier": "20T", "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b", "artifact_hashes": {}, "report_paths": ["/home/HwHiAiUser/case9-mindspore-chat/run/mindspore-20t-campaign/qwen3-06-20t-loader-20261016/acceptance.json"], "quality": {}, "performance": {}, "metrics": {"current_address":"192.168.1.101", "qwen3_loader":false, "weights_downloaded":false}}
       },
       "quality": {"reviewed": false, "languages": {"zh": "pending", "en": "pending"}},
       "performance": {},
@@ -742,7 +745,7 @@
       "tokenizer_revision": "main",
       "revision_pinned": false,
       "mirror": "modelers",
-      "board": {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"},
+      "board": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
       "runtime": {"provider": "mindspore", "context_length": 1024, "default_max_tokens": 32, "max_tokens": 64, "temperature": 0.0, "top_p": 1.0},
       "cache_dir": "artifacts/models/qwen3-1.7b",
       "artifacts": [
@@ -756,11 +759,11 @@
       "weight_format": "safetensors",
       "board_targets": [
         {"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"},
-        {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"}
+        {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"}
       ],
       "validation": {
         "Ascend310B4": {"status": "blocked", "reason": "Current board MindNLP 0.4.1 exposes no qwen3 module or Qwen3ForCausalLM loader; no package upgrade is permitted, so no Qwen3 weights were downloaded or loaded.", "run_id": "qwen3-loader-check-20260903", "updated_at": "2026-09-03T12:02:00Z", "soc": "Ascend310B4", "tier": "8T", "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b", "artifact_hashes": {}, "report_paths": ["docs/35-qwen3-loader-compatibility-check-20260903.md", "docs/38-mindnlp-loader-capability-20260904.md", "repro/mindspore-chat-20260904/reports/board8t/environment/loader-capability-20260904T072000Z/loader-probe.json", "repro/mindspore-chat-20260904/reports/board8t/environment/loader-capability-20260904T072000Z/SHA256SUMS.txt"], "quality": {"zh": "not-run", "en": "not-run"}, "performance": {}, "metrics": {"mindnlp_version": "0.4.1", "qwen3_module": false, "qwen3_loader": false, "weights_downloaded": false, "current_address": "192.168.1.90", "historical_address": "192.168.11.14", "loader_probe_run_id": "loader-capability-20260904T072000Z", "loader_probe_sha256": "8cda8f579ea03381574d755840c310e36989412ab6d9fbb74872b7cc6acbb0e5", "minicpm3_classes_visible": true, "observed_soc": "Ascend310B4"}},
-        "Ascend310B1": {"status": "not-run", "reason": "20T-first candidate; loader and performance gates pending.", "run_id": null, "updated_at": null, "soc": "Ascend310B1", "tier": "20T", "environment_fingerprint": null, "artifact_hashes": {}, "report_paths": [], "quality": {}, "performance": {}, "metrics": {}}
+        "Ascend310B1": {"status": "blocked", "reason": "Current MindNLP 0.4.1 loader probe exposes no Qwen3 class; no package upgrade or weight download was performed.", "run_id": "qwen3-17-20t-loader-20261016", "updated_at": "2026-10-16T05:15:00Z", "soc": "Ascend310B1", "tier": "20T", "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b", "artifact_hashes": {}, "report_paths": ["/home/HwHiAiUser/case9-mindspore-chat/run/mindspore-20t-campaign/qwen3-17-20t-loader-20261016/acceptance.json"], "quality": {}, "performance": {}, "metrics": {"current_address":"192.168.1.101", "qwen3_loader":false, "weights_downloaded":false}}
       },
       "quality": {"reviewed": false, "languages": {"zh": "pending", "en": "pending"}},
       "performance": {},
@@ -779,7 +782,7 @@
       "tokenizer_revision": "main",
       "revision_pinned": false,
       "mirror": "modelers",
-      "board": {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"},
+      "board": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
       "runtime": {"provider": "mindspore", "context_length": 1024, "default_max_tokens": 32, "max_tokens": 64, "temperature": 0.0, "top_p": 1.0},
       "cache_dir": "artifacts/models/minicpm3-4b-fp16",
       "artifacts": [
@@ -791,13 +794,13 @@
       "architecture": "causal_lm",
       "languages": ["zh", "en"],
       "weight_format": "fp16",
-      "board_targets": [{"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"}, {"host": "192.168.1.95", "soc": "Ascend310B1", "tier": "20T"}],
-      "validation": {"Ascend310B4": {"status": "not-run", "reason": "Official example is 20T-only; 8T is intentionally not tested. A read-only probe confirms the dedicated MiniCPM3 loader classes are exported, but this is not model evidence.", "run_id": "loader-capability-20260904T072000Z", "updated_at": "2026-09-04T07:20:00Z", "soc": "Ascend310B4", "tier": "8T", "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b", "artifact_hashes": {}, "report_paths": ["docs/38-mindnlp-loader-capability-20260904.md", "repro/mindspore-chat-20260904/reports/board8t/environment/loader-capability-20260904T072000Z/loader-probe.json", "repro/mindspore-chat-20260904/reports/board8t/environment/loader-capability-20260904T072000Z/SHA256SUMS.txt"], "quality": {}, "performance": {}, "metrics": {"loader_classes_visible": true, "model_weights_downloaded": false, "model_loaded": false, "api_started": false, "observed_soc": "Ascend310B4", "mindspore_version": "2.4.10", "mindnlp_version": "0.4.1", "loader_probe_sha256": "8cda8f579ea03381574d755840c310e36989412ab6d9fbb74872b7cc6acbb0e5"}}, "Ascend310B1": {"status": "not-run", "reason": "Official 20T example candidate; current environment compatibility and memory gates pending.", "run_id": null, "updated_at": null, "soc": "Ascend310B1", "tier": "20T", "environment_fingerprint": null, "artifact_hashes": {}, "report_paths": [], "quality": {}, "performance": {}, "metrics": {}}},
+      "board_targets": [{"host": "192.168.1.90", "soc": "Ascend310B4", "tier": "8T"}, {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"}],
+      "validation": {"Ascend310B4": {"status": "not-run", "reason": "Official example is 20T-only; 8T is intentionally not tested. A read-only probe confirms the dedicated MiniCPM3 loader classes are exported, but this is not model evidence.", "run_id": "loader-capability-20260904T072000Z", "updated_at": "2026-09-04T07:20:00Z", "soc": "Ascend310B4", "tier": "8T", "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b", "artifact_hashes": {}, "report_paths": ["docs/38-mindnlp-loader-capability-20260904.md", "repro/mindspore-chat-20260904/reports/board8t/environment/loader-capability-20260904T072000Z/loader-probe.json", "repro/mindspore-chat-20260904/reports/board8t/environment/loader-capability-20260904T072000Z/SHA256SUMS.txt"], "quality": {}, "performance": {}, "metrics": {"loader_classes_visible": true, "model_weights_downloaded": false, "model_loaded": false, "api_started": false, "observed_soc": "Ascend310B4", "mindspore_version": "2.4.10", "mindnlp_version": "0.4.1", "loader_probe_sha256": "8cda8f579ea03381574d755840c310e36989412ab6d9fbb74872b7cc6acbb0e5"}}, "Ascend310B1": {"status": "blocked", "reason": "MiniCPM3 loader classes are visible in MindNLP 0.4.1, but the fixed revision could not be resolved: board connection to Hugging Face returned connection refused before any weights were downloaded or loaded. No model compatibility conclusion is made.", "run_id": "minicpm3-20t-full-20261016", "updated_at": "2026-10-16T05:30:00Z", "soc": "Ascend310B1", "tier": "20T", "environment_fingerprint": "90082a2db25c0c1d0f36fdb765be50b9c465c9d43b9b8b9f1039137b8d31778b", "artifact_hashes": {}, "report_paths": ["/home/HwHiAiUser/case9-mindspore-chat/run/mindspore-20t-campaign/minicpm3-20t-full-20261016/fetch.json", "/tmp/minicpm3-20t-full-20261016.log"], "quality": {}, "performance": {}, "metrics": {"current_address":"192.168.1.101", "dedicated_loader_visible":true, "artifact_acquisition":"connection_refused", "weights_downloaded":false, "loader_attempted":false, "npu_generation_attempted":false}}},
       "quality": {"reviewed": false, "languages": {"zh": "pending", "en": "pending"}},
       "performance": {},
       "status": "not-run",
       "admission": {"eligible": false, "reason": "MiniCPM3 4B has no Case9 API or current-board evidence yet."},
-      "notes": "20T-only. Use the dedicated MiniCPM3 MindNLP classes and official FP16 Modelers artifact; never attempt on 8T."
+      "notes": "20T-only. Use the dedicated MiniCPM3 MindNLP classes and official FP16 Modelers artifact; never attempt on 8T. HF profiles use HF_ENDPOINT=https://hf-mirror.com; this profile requires a separately pinned Modelers revision and must not be routed through the HF mirror."
     },
     {
       "id": "openpangu-embedded-1b-conditional",

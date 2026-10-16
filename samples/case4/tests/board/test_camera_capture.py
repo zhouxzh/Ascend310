@@ -47,7 +47,7 @@ class FakeVideoCapture:
 @unittest.skipUnless(cv2 is not None, "camera tests require OpenCV")
 class CameraCaptureTests(unittest.TestCase):
 
-    def test_list_v4l2_devices_uses_filesystem_only(self):
+    def test_list_v4l2_devices_filters_metadata_nodes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             dev = root / "dev"
@@ -55,17 +55,87 @@ class CameraCaptureTests(unittest.TestCase):
             dev.mkdir()
             (dev / "video10").touch()
             (dev / "video2").touch()
+            (dev / "video3").touch()
             (dev / "not-a-camera").touch()
             name_path = sysfs / "video2" / "name"
             name_path.parent.mkdir(parents=True)
             name_path.write_text("USB Palm Camera\n", encoding="utf-8")
 
-            devices = list_v4l2_devices(dev, sysfs)
+            devices = list_v4l2_devices(
+                dev,
+                sysfs,
+                capture_probe=lambda path: path.name in {"video2", "video10"},
+            )
 
         self.assertEqual([(item.index, item.path, item.name) for item in devices], [
             (2, str(dev / "video2"), "USB Palm Camera"),
             (10, str(dev / "video10"), ""),
         ])
+
+    def test_list_v4l2_devices_groups_nodes_of_one_physical_camera(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dev = root / "dev"
+            sysfs = root / "sys"
+            dev.mkdir()
+            (dev / "video0").touch()
+            (dev / "video1").touch()
+            (sysfs / "usb-1-1").mkdir(parents=True)
+            for name in ("video0", "video1"):
+                node = sysfs / name
+                node.mkdir(parents=True)
+                (node / "device").symlink_to(sysfs / "usb-1-1", target_is_directory=True)
+            devices = list_v4l2_devices(
+                dev,
+                sysfs,
+                capture_probe=lambda _path: True,
+            )
+
+        self.assertEqual(len(devices), 1)
+        self.assertEqual(devices[0].path, str(dev / "video0"))
+        self.assertEqual(devices[0].aliases, (str(dev / "video0"), str(dev / "video1")))
+
+    def test_capability_probe_rejects_metadata_capture_node(self):
+        from palmprint_workbench.runtime import camera as camera_module
+
+        def write_capability(_descriptor, _request, payload, _mutate):
+            # A UVC metadata endpoint sets DEVICE_CAPS but does not advertise
+            # either single- or multi-planar Video Capture.
+            import struct
+
+            struct.pack_into(
+                "=II",
+                payload,
+                84,
+                camera_module._V4L2_CAP_DEVICE_CAPS,
+                0x00800000,
+            )
+
+        with patch.object(camera_module.os, "open", return_value=17), patch.object(
+            camera_module.os, "close"
+        ), patch.object(camera_module, "fcntl") as fcntl_mock:
+            fcntl_mock.ioctl.side_effect = write_capability
+            self.assertFalse(camera_module._is_video_capture_node(Path("/dev/video1")))
+
+    def test_capability_probe_accepts_video_capture_node(self):
+        from palmprint_workbench.runtime import camera as camera_module
+
+        def write_capability(_descriptor, _request, payload, _mutate):
+            import struct
+
+            struct.pack_into(
+                "=II",
+                payload,
+                84,
+                camera_module._V4L2_CAP_DEVICE_CAPS,
+                camera_module._V4L2_CAP_VIDEO_CAPTURE,
+            )
+
+        with patch.object(camera_module.os, "open", return_value=17), patch.object(
+            camera_module.os, "close"
+        ), patch.object(camera_module, "fcntl") as fcntl_mock:
+            fcntl_mock.ioctl.side_effect = write_capability
+            self.assertTrue(camera_module._is_video_capture_node(Path("/dev/video0")))
 
     def test_capture_returns_rgb_and_jpeg_and_sets_requested_properties(self):
         created: list[tuple[int | str, int]] = []

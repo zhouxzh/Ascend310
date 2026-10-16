@@ -65,6 +65,52 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(result.roi.shape, (128, 128))
         self.assertEqual(result.roi.dtype, np.uint8)
 
+    def test_fixed_guide_preserves_full_frame_contract_and_returns_128_roi(self):
+        image = np.zeros((720, 1280, 3), dtype=np.uint8)
+        image[120:600, 420:860] = 128
+        result = PalmPreprocessor().extract(image)
+        self.assertEqual(result.pipeline_id, "fixed_guide_v1")
+        self.assertEqual(result.roi.shape, (128, 128))
+        self.assertEqual(result.geometry["roi_mode"], "fixed_guide")
+        self.assertEqual(result.geometry["crop_side"], 648.0)
+        self.assertEqual(result.geometry["center_x"], 0.5)
+        self.assertEqual(result.geometry["center_y"], 0.5)
+
+    def test_fixed_guide_rejects_out_of_bounds_calibration(self):
+        image = np.full((480, 640, 3), 128, dtype=np.uint8)
+        result = PalmPreprocessor().extract(
+            image,
+            roi_config={"center_x": 0.98, "center_y": 0.5, "side_ratio": 0.9},
+        )
+        self.assertFalse(result.ok)
+        self.assertIn("超出", result.reason)
+
+    def test_background_difference_segmentation_isolated_from_static_scene(self):
+        background = np.full((120, 160, 3), 220, dtype=np.uint8)
+        foreground = background.copy()
+        foreground[20:100, 50:110] = np.array([120, 80, 60], dtype=np.uint8)
+
+        mask = PalmPreprocessor._segment_background(foreground, background)
+
+        self.assertGreater(cv2.countNonZero(mask) / mask.size, 0.20)
+        self.assertLess(cv2.countNonZero(mask) / mask.size, 0.35)
+
+    def test_aligned_crop_allows_small_edge_padding_but_rejects_truncation(self):
+        gray = np.full((200, 200), 127, dtype=np.uint8)
+
+        crop, _corners, geometry = PalmPreprocessor._aligned_crop(
+            gray, (50, 100), (130, 120)
+        )
+        self.assertIsNotNone(crop)
+        self.assertGreater(geometry["edge_padding_px"], 0.0)
+        self.assertLessEqual(geometry["edge_padding_px"], 8.0)
+
+        crop, _corners, geometry = PalmPreprocessor._aligned_crop(
+            gray, (50, 150), (130, 170)
+        )
+        self.assertIsNone(crop)
+        self.assertGreater(geometry["edge_padding_px"], 8.0)
+
     def test_embedding_preprocess_and_normalize(self):
         roi = np.arange(128 * 128, dtype=np.uint8).reshape(128, 128)
         value = preprocess_embedding_roi(roi, "zero_one")

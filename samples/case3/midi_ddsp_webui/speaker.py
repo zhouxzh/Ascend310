@@ -420,7 +420,12 @@ def query_piano_audio_outputs(
 
         portaudio_query = query_audio_devices
     pulse_outputs = query_speaker_outputs(portaudio_query)
-    return merge_piano_audio_outputs(pulse_outputs, portaudio_query())
+    try:
+        portaudio_outputs = portaudio_query()
+    except (OSError, RuntimeError):
+        # PulseAudio playback remains usable when libportaudio is absent.
+        portaudio_outputs = []
+    return merge_piano_audio_outputs(pulse_outputs, portaudio_outputs)
 
 
 def query_midi_ddsp_audio_outputs(

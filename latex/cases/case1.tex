@@ -1,5 +1,4 @@
-\chapter{案例1：边缘人脸考勤------FastAPI 与昇腾 NPU
-协同}\label{src-experiment-case1-h1}
+\chapter{案例 1：智能考勤机}\label{src-experiment-case1-h1}
 
 \section{教程定位}\label{ux6559ux7a0bux5b9aux4f4d}
 
@@ -54,6 +53,7 @@
 
 本案例的边界如下：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -81,6 +81,7 @@
 Web 交互 & FastAPI API 与 React 界面 &
 互联网暴露、生产级认证和高可用集群 \\
 \end{longtable}
+}
 
 系统默认只监听本机地址。若在可信的实验局域网内访问开发板，操作者必须显式
 指定监听地址，并意识到照片、特征和考勤接口仍属于敏感资源。
@@ -151,6 +152,7 @@ Web 交互 & FastAPI API 与 React 界面 &
 
 样例脚本使用以下逻辑文件名：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -176,6 +178,7 @@ OM 文件（运行阶段）
 特征提取 & \passthrough{\lstinline!models/w600k\_mbf.onnx!} &
 \passthrough{\lstinline!models/face\_recognition.om!} & 人脸特征向量 \\
 \end{longtable}
+}
 
 文件名是工程约定，不足以证明网络的论文名称或训练来源。检测网络的输出解析
 必须以实际 ONNX
@@ -277,6 +280,7 @@ owner。
 可读的 \passthrough{\lstinline!error!} 字段，而不是把 Python
 异常堆栈返回给浏览器。
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -318,6 +322,7 @@ owner。
 \passthrough{\lstinline!/uploads/\{resource\}!} &
 返回已授权的头像或抓拍资源 \\
 \end{longtable}
+}
 
 模型缺失、加载失败或输出合同不满足时，健康接口应报告
 \passthrough{\lstinline!degraded!}，注册和 推理接口返回 HTTP

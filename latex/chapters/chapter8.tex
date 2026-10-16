@@ -369,6 +369,7 @@ Top1/Top5。把验证集混入校准阶段，会让实验结论不干净，因�
 \passthrough{\lstinline!tools/download\_tiny\_imagenet.py!}
 有两个子命令：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}lll@{}}
 \toprule\noalign{}
 子命令 & 默认行为 & 输出清单 \\
@@ -381,6 +382,7 @@ Top1/Top5。把验证集混入校准阶段，会让实验结论不干净，因�
 \passthrough{\lstinline!val!} & 保存完整验证集，共 10000 张 PNG &
 \passthrough{\lstinline!data/val\_list.txt!} \\
 \end{longtable}
+}
 
 训练集和验证集的清单格式不同：
 
@@ -442,6 +444,7 @@ input_tensor = image_chw[None, ...]
 
 这段预处理也体现了本章的几个设计取舍：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -467,6 +470,7 @@ FP16/INT8，输入预处理仍用同一个 FP32 浮点张量作为比较基准 \
 \passthrough{\lstinline!IMAGENET\_INV\_STD!} &
 复用训练时的归一化方式，否则 accuracy 变化无法归因到量化 \\
 \end{longtable}
+}
 
 \section{ATC 转
 FP32/FP16：先建立可比较的基准}\label{src-book-chapter8-h6}
@@ -504,6 +508,7 @@ atc \
 
 几个参数值得单独解释：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 参数 & 作用 \\
@@ -522,6 +527,7 @@ FP32，作为精度参考 \\
 \passthrough{\lstinline!--precision\_mode=allow\_fp32\_to\_fp16!} & 允许
 ATC 把 FP32 转为 FP16 \\
 \end{longtable}
+}
 
 这一步完成后，\passthrough{\lstinline!model/!} 中至少应有：
 
@@ -601,6 +607,7 @@ max_abs_diff = np.max(np.abs(base_logits - candidate_logits))
 
 本轮 PNG 数据重跑后，FP16 快速验证结果如下：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
@@ -623,6 +630,7 @@ max_abs_diff = np.max(np.abs(base_logits - candidate_logits))
 输出对齐 & FP32 OM vs FP16 OM & 400 张校准图 & Top1 match 100.00\%，Top5
 overlap 4.9975/5，mean abs diff 0.000405 \\
 \end{longtable}
+}
 
 这个结果说明 FP16 的输出排序几乎完全继承了 FP32，可以继续看性能。
 
@@ -645,6 +653,7 @@ python 02_perf_compare.py \
 实现时可以让 \passthrough{\lstinline!measure\_model()!} 围绕同一个
 runner 循环多次，并把一次推理拆成 下面几个容易理解的阶段：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 计时阶段 & 含义 \\
@@ -660,6 +669,7 @@ CPU 预处理 & 图片 resize、归一化、layout 转换 \\
 后处理 & 从输出中取 Top1 等轻量处理 \\
 端到端耗时 & CPU 预处理 + 推理整体耗时 + 后处理 \\
 \end{longtable}
+}
 
 \passthrough{\lstinline!StageRecorder!}
 是样例代码中复用的一个简单阶段计时器。它把每个阶段的多次耗时保存下来，再用
@@ -691,6 +701,7 @@ with recorder.time("postprocess"):
 
 本轮 PNG 数据重跑后，FP16 性能结果如下：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 对比 & 结果 \\
@@ -702,6 +713,7 @@ FP32 end-to-end mean & 4.1116 ms \\
 FP16 end-to-end mean & 3.7774 ms \\
 FP16 相对 FP32 & 约 1.09x \\
 \end{longtable}
+}
 
 FP16
 的输出对齐很好，但端到端收益比较温和。这提示我们：如果希望进一步压缩模型
@@ -734,6 +746,7 @@ Toolkit，即昇腾模型压缩工具包。它不是
 放到代码层面看，\passthrough{\lstinline!amct\_onnx!} 提供的是一组 Python
 API。本章主要用到这些接口：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -760,10 +773,12 @@ SessionOptions & 防止普通图优化破坏 fake-quant/统计节点 \\
 把校准得到的量化比例和零点固化进 deploy ONNX & 生成 ATC 可转换的 INT8
 部署模型 \\
 \end{longtable}
+}
 
 本章选择 \passthrough{\lstinline!amct\_onnx!}，不是因为 PyTorch
 路线不存在，而是因为本案例的工程条件 更适合 ONNX 路线：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -788,6 +803,7 @@ PyTorch 相关图处理 \\
 对 310B 教学适配 & 更贴近``ONNX -\textgreater{} ATC -\textgreater{}
 OM''的离线推理部署链路 & 更适合 PyTorch 训练/量化感知训练等场景 \\
 \end{longtable}
+}
 
 第 3 章已经介绍过，\passthrough{\lstinline!torch\_npu!} 在昇腾 310B
 上仍有算子、精度和图编译方面的
@@ -853,6 +869,7 @@ parser.add_argument("--activation-offset", action=argparse.BooleanOptionalAction
 
 这些参数看似普通，但每一个都对应一个教学目的：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -880,6 +897,7 @@ ONNX，而不是把模型名写死在代码中 \\
 \passthrough{\lstinline!--activation-offset!} & 控制激活量化是否带
 offset，本章默认开启，更适合非对称激活分布 \\
 \end{longtable}
+}
 
 代码中还设置了：
 
@@ -1075,6 +1093,7 @@ python 02_perf_compare.py \
 
 本轮 INT8 快速验证结果如下：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
@@ -1099,6 +1118,7 @@ overlap 4.9075/5，mean abs diff 0.016629 \\
 性能对比 & FP32/FP16/INT8 OM & 100 次 & INT8 end-to-end mean 2.1634
 ms，相对 FP32 约 1.90x \\
 \end{longtable}
+}
 
 INT8 的 logits 误差明显大于
 FP16，这是低比特量化的正常现象。关键不是``误差是否
@@ -1162,6 +1182,7 @@ FP32、FP16、INT8 三个 OM，并用同一份
 
 报告主要看：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -1181,6 +1202,7 @@ Top1 / Top5 & 当前模型相对验证集真实标签的分类精度 \\
 \passthrough{\lstinline!mismatches!} & 部分错误样本及三种模型的 TopK
 预测 \\
 \end{longtable}
+}
 
 报告中，平均推理耗时和 95\% 分位耗时分别保存为
 \passthrough{\lstinline!mean\_ms!} 和 \passthrough{\lstinline!p95\_ms!}
@@ -1188,6 +1210,7 @@ Top1 / Top5 & 当前模型相对验证集真实标签的分类精度 \\
 
 常用参数如下：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -1216,6 +1239,7 @@ OM，减少首次执行开销对推理耗时的影响 \\
 \passthrough{\lstinline!--save-samples!} &
 保存逐图预测，适合深入分析错例，但报告文件会明显变大 \\
 \end{longtable}
+}
 
 调试时可以先少量运行：
 
@@ -1225,6 +1249,7 @@ python 05_validate_accuracy.py --samples 200
 
 但正式结论应使用完整验证集。本轮 PNG 数据重跑后的结果如下：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.0968}}
   >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1290}}
@@ -1263,6 +1288,7 @@ FP16 OM & 62.43\% & 82.68\% & 0.00 pp & 0.00 pp & 3.1410 & 3.1659 &
 INT8 OM & 62.44\% & 82.67\% & +0.01 pp & -0.01 pp & 1.4999 & 1.5196 &
 2.32x \\
 \end{longtable}
+}
 
 这组结果说明：
 
@@ -1331,6 +1357,7 @@ sweep 程序会为每个样本数单独执行图中的流程：
 
 \passthrough{\lstinline!calibration\_sweep\_helper.py!} 里有两个子命令：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -1350,9 +1377,11 @@ sweep 程序会为每个样本数单独执行图中的流程：
 \passthrough{\lstinline!accuracy\_compare.json!} 中提取 Top1/Top5 和
 INT8 推理耗时，写入 CSV \\
 \end{longtable}
+}
 
 常用环境变量如下：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -1381,9 +1410,11 @@ INT8 推理耗时，写入 CSV \\
 \passthrough{\lstinline!SWEEP\_SEED!} & \passthrough{\lstinline!2024!} &
 固定校准子集随机顺序 \\
 \end{longtable}
+}
 
 \passthrough{\lstinline!summary.csv!} 中最关键的列是：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -1408,9 +1439,11 @@ INT8 推理耗时，写入 CSV \\
 \passthrough{\lstinline!int8\_p95\_ms!} & 当前 INT8 模型平均推理耗时和
 95\% 分位耗时 \\
 \end{longtable}
+}
 
 本轮 sweep 结果如下：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedleft\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1429}}
   >{\raggedleft\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1429}}
@@ -1445,6 +1478,7 @@ Top5 相对 FP32
 200 & 62.60\% & 82.78\% & +0.17 pp & +0.10 pp & 1.5055 & 1.5290 \\
 400 & 62.44\% & 82.67\% & +0.01 pp & -0.01 pp & 1.5125 & 1.5351 \\
 \end{longtable}
+}
 
 这轮单次实验的经验拐点大约出现在 50 到 200 张之间：20
 张已经没有明显掉点， 50 张后 Top1/Top5 基本进入平台区，200
@@ -1479,6 +1513,7 @@ OM，因为量化参数已经固化在 deploy ONNX 和 OM 中。
 
 本章参考实现中，报告设计遵循下面的原则：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -1501,9 +1536,11 @@ OM，因为量化参数已经固化在 deploy ONNX 和 OM 中。
 sweep 使用 CSV 汇总 & 方便直接画``校准样本数 - accuracy''曲线 \\
 每个 sweep 点保留独立 JSON & 当某个点异常时，可以回到原始报告排查 \\
 \end{longtable}
+}
 
 常见失败模式如下：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
   >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
@@ -1532,6 +1569,7 @@ INT8 性能收益很小 & 算子回退或模型太小 & 查看 ATC 日志和 Pro
 少数帧耗时明显偏高 & 预热不足、资源复用不稳定 & 增加
 warmup，固定运行环境 \\
 \end{longtable}
+}
 
 量化失败时不要先调参数。建议按图中的顺序回退检查：
 

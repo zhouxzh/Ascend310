@@ -1,6 +1,14 @@
 {
   "schema_version": 1,
   "candidate_registry": "candidate_manifest.json",
+  "runtime_candidate_ids": [
+    "ccnet",
+    "compnet_tongji_600",
+    "compnet_iitd_460",
+    "compnet_rest_358",
+    "compnet_xjtu_flash_200",
+    "compnet_xjtu_natural_200"
+  ],
   "admitted_candidates": [],
   "models": [
     {

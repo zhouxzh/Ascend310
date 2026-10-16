@@ -25,12 +25,34 @@ DATASET_DIR = DATA_DIR / "datasets"
 REGISTRY_PATH = MODEL_DIR / "registry.json"
 
 ROI_SIZE = 128
-MIN_HAND_AREA_RATIO = 0.08
+# Production camera input uses a deterministic guide rectangle.  It deliberately
+# does not attempt semantic hand detection or finger-valley localization.
+# Templates are isolated by this identifier and must be registered again.
+ROI_PIPELINE_ID = "fixed_guide_v1"
+FIXED_ROI_SIDE_RATIO = 0.90
+FIXED_ROI_CENTER_X = 0.50
+FIXED_ROI_CENTER_Y = 0.50
 MIN_SHARPNESS = 40.0
+MIN_ROI_BRIGHTNESS = 12.0
+MAX_ROI_BRIGHTNESS = 245.0
+MAX_CLIPPED_RATIO = 0.35
 MIN_ENROLL_SAMPLES = 3
 MAX_ENROLL_SAMPLES = 5
 TOP_K = 5
 DEFAULT_THRESHOLD = 0.75
+
+# The automatic registration worker owns the V4L2 session.  These are
+# deliberately conservative defaults for a USB visible-light camera and can
+# be tuned through a future calibration release without changing templates.
+AUTO_ENROLL_COUNTDOWN_SECONDS = 3.0
+# Retained as a zero-valued compatibility symbol for older board-side tests;
+# production enrollment no longer has a background-reference phase.
+AUTO_ENROLL_BACKGROUND_SECONDS = 0.0
+AUTO_ENROLL_FRAME_INTERVAL_SECONDS = 0.125
+AUTO_ENROLL_STABLE_SECONDS = 0.4
+AUTO_ENROLL_SAMPLE_INTERVAL_SECONDS = 0.8
+AUTO_ENROLL_WAITING_HAND_TIMEOUT_SECONDS = 20.0
+AUTO_ENROLL_STABILITY_TIMEOUT_SECONDS = 30.0
 
 
 def _environment(name: str, default: str) -> str:

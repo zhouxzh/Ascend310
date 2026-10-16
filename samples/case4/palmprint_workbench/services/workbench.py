@@ -8,6 +8,7 @@ board smoke-test scripts.  It deliberately has no UI framework dependency.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 import re
 import subprocess
@@ -129,6 +130,7 @@ class Workbench:
         # device lets a delayed close/frame request from an old page be
         # rejected after the user swaps cameras or changes resolution.
         self.camera_sessions: dict[str, str] = {}
+        self.camera_details: dict[str, dict[str, Any]] = {}
         self._state_lock = threading.RLock()
         self._closing = False
         self.last_close_diagnostics: dict[str, Any] | None = None
@@ -197,8 +199,21 @@ class Workbench:
                     fps=CAMERA_DEFAULT_FPS,
                 )
                 self.cameras[key] = camera
+            discovered = next((item for item in list_v4l2_devices() if device == item.path or device in item.aliases), None)
+            def captured(current: CameraCapture) -> CameraFrame:
+                frame = current.capture(encode_jpeg=encode_jpeg)
+                if isinstance(frame, CameraFrame):
+                    frame = replace(frame, physical_id=discovered.physical_id if discovered else str(device))
+                    if not hasattr(self, "camera_details"):
+                        self.camera_details = {}
+                    self.camera_details[str(device)] = {
+                        "actual_resolution": f"{frame.rgb.shape[1]}x{frame.rgb.shape[0]}",
+                        "frame_format": frame.frame_format,
+                        "active_node": frame.device,
+                    }
+                return frame
             try:
-                return camera.capture(encode_jpeg=encode_jpeg)
+                return captured(camera)
             except CameraError:
                 # A USB camera can be physically replaced while the process
                 # remains alive.  OpenCV may retain an object whose node is no
@@ -209,14 +224,18 @@ class Workbench:
                     camera.close()
                 finally:
                     self.cameras.pop(key, None)
-                replacement = CameraCapture(
-                    device,
-                    width=width,
-                    height=height,
-                    fps=CAMERA_DEFAULT_FPS,
-                )
-                self.cameras[key] = replacement
-                return replacement.capture(encode_jpeg=encode_jpeg)
+                errors = []
+                aliases = [str(device), *(item for item in (discovered.aliases if discovered else ()) if item != str(device))]
+                for node in aliases:
+                    replacement = CameraCapture(node, width=width, height=height, fps=CAMERA_DEFAULT_FPS)
+                    self.cameras[key] = replacement
+                    try:
+                        return captured(replacement)
+                    except CameraError as exc:
+                        errors.append(f"{node}: {exc}")
+                        replacement.close()
+                        self.cameras.pop(key, None)
+                raise CameraError("; ".join(errors))
 
     def open_camera_session(
         self,
@@ -390,8 +409,19 @@ def _template_namespace(model_id: str, backend: str, precision: str) -> str:
     return f"{model_id}__npu__{precision}"
 
 
-def _extract(image: np.ndarray | None, assume_roi: bool) -> tuple[Any, str | None]:
-    result = WORKBENCH.preprocessor.extract(image, assume_roi=assume_roi)
+def _extract(
+    image: np.ndarray | None,
+    assume_roi: bool,
+    *,
+    background_rgb: np.ndarray | None = None,
+    roi_config: dict[str, float] | None = None,
+) -> tuple[Any, str | None]:
+    result = WORKBENCH.preprocessor.extract(
+        image,
+        assume_roi=assume_roi,
+        background_rgb=background_rgb,
+        roi_config=roi_config,
+    )
     if not result.ok or result.roi is None:
         return result, result.reason
     return result, None

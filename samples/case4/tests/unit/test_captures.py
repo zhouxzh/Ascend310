@@ -73,19 +73,18 @@ class CaptureStoreTests(unittest.TestCase):
             self.assertTrue(store.cleanup(record["capture_id"]))
             self.assertEqual(store.list(limit=10), [])
 
-    def test_template_deletion_only_marks_metadata(self) -> None:
+    def test_template_deletion_removes_metadata_and_images(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = CaptureStore(Path(directory))
             record = store.save(
                 original=self._image(),
                 roi=self._image(),
-                metadata={"model_id": "ccnet", "user_id": "alice"},
+                metadata={"model_id": "ccnet", "palm_id": "P-001:left"},
             )
-            self.assertEqual(store.mark_template_deleted(model_id="ccnet", user_id="alice"), 1)
-            updated = store.get(record["capture_id"])
-            self.assertTrue(updated["template_deleted"])
-            self.assertTrue(store.path_for(record["capture_id"], "original").is_file())
-            self.assertTrue(store.path_for(record["capture_id"], "roi").is_file())
+            self.assertEqual(store.purge_template(model_id="ccnet", palm_id="P-001:left"), 1)
+            with self.assertRaises(KeyError):
+                store.get(record["capture_id"])
+            self.assertFalse((Path(directory) / record["capture_id"]).exists())
 
 
 if __name__ == "__main__":

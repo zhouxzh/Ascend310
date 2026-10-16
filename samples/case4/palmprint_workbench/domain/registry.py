@@ -664,6 +664,26 @@ class ModelRegistry:
                 raise ValueError(f"Duplicate candidate id: {spec.id}")
             self._candidates[spec.id] = spec
 
+        configured_runtime_ids = payload.get("runtime_candidate_ids")
+        if configured_runtime_ids is None:
+            self._runtime_candidate_ids = tuple(self._candidates)
+        else:
+            if not isinstance(configured_runtime_ids, list):
+                raise ValueError("runtime_candidate_ids must be a list")
+            runtime_ids: list[str] = []
+            for index, candidate_id in enumerate(configured_runtime_ids):
+                identifier = _model_id(candidate_id, f"runtime_candidate_ids[{index}]")
+                if identifier in runtime_ids:
+                    raise ValueError(f"Duplicate runtime candidate id: {identifier}")
+                if self._candidates and identifier not in self._candidates:
+                    raise ValueError(
+                        f"runtime_candidate_ids references unknown candidate: {identifier}"
+                    )
+                runtime_ids.append(identifier)
+            self._runtime_candidate_ids = tuple(
+                identifier for identifier in runtime_ids if identifier in self._candidates
+            )
+
         for candidate_id in self._admitted_candidate_ids:
             if candidate_id in self._models:
                 raise ValueError(
@@ -764,6 +784,16 @@ class ModelRegistry:
     def candidates(self) -> list[CandidateSpec]:
         """Return audited candidates, without adding them to ``all()``."""
         return list(self._candidates.values())
+
+    def runtime_candidates(self) -> list[CandidateSpec]:
+        """Return candidates intentionally exposed by the current release."""
+
+        return [self._candidates[item] for item in self._runtime_candidate_ids]
+
+    def runtime_candidate_ids(self) -> list[str]:
+        """Return the release's active candidate IDs."""
+
+        return list(self._runtime_candidate_ids)
 
     def candidates_for(self, family: str) -> list[CandidateSpec]:
         family_name = _non_empty_string(family, "family")
@@ -1239,37 +1269,9 @@ class ModelRegistry:
         }:
             self._append_unique(reasons, "NPU OM 状态尚未完成 smoke 检查")
 
-        weights = self._mapping(candidate.raw.get("weights")) or {}
-        artifacts = weights.get("artifacts")
-        checkpoint = None
-        if isinstance(artifacts, list):
-            checkpoint = next(
-                (
-                    item
-                    for item in artifacts
-                    if isinstance(item, Mapping) and item.get("local_path")
-                ),
-                None,
-            )
-        if checkpoint is None:
-            self._append_unique(reasons, "缺少 checkpoint 资产记录")
-            checkpoint = {}
-        self._check_asset(
-            label="checkpoint",
-            path=candidate.path("checkpoint"),
-            expected_bytes=checkpoint.get("bytes"),
-            expected_sha256=checkpoint.get("sha256"),
-            reasons=reasons,
-            verify_assets=verify_assets,
-        )
-        self._check_asset(
-            label="ONNX",
-            path=candidate.path("onnx_model"),
-            expected_bytes=conversion.get("onnx_bytes"),
-            expected_sha256=conversion.get("onnx_sha256"),
-            reasons=reasons,
-            verify_assets=verify_assets,
-        )
+        # Manual testing consumes the already-converted board asset.  Source
+        # checkpoints and ONNX exports are audit inputs, but are not required
+        # on the board release and must not prevent an OM-only smoke run.
         self._check_asset(
             label="mixed-FP16 OM",
             path=candidate.om_path(_PRODUCTION_PRECISION),

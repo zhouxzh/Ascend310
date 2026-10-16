@@ -141,7 +141,7 @@ unset PALMPRINT_REQUIRE_TEMPLATE_ENCRYPTION
 python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 ```
 
-注册和用户主动触发的识别会自动保存到 `data/captures/`；连续摄像头预览不会保存图片。模板位于 `data/templates/`，报告位于 `reports/`。删除模板只删除 embedding，关联原图和 ROI 会保留。
+自动注册仅保存最终入选的 5 张原图和 ROI；连续摄像头预览及拒绝帧不会保存图片。模板位于 `data/templates/`，报告位于 `reports/`。删除模板会同步删除关联原图、ROI、元数据和索引记录。
 
 查看或清理内测数据必须由操作者手动执行，程序不会自动删除历史图片：
 
@@ -198,7 +198,8 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 ## 6. 工作台操作
 
 - **实时识别**：production profile 选择 CCNet；manual_test profile 可逐一选择五个 CompNet，上传掌纹或选择摄像头，确认 ROI 质量后执行识别。页面中的 `manual_test_pending` 只表示等待人工验收。
-- **掌纹注册**：填写姓名和掌侧，采集 3--5 个合格样本后提交。模板按 `<model_id>__npu__<precision>` 隔离保存。
+- **掌纹注册**：系统在开始采集时自动分配递增的人员编号，如 `P-000001`；显示名可选。左右掌分别是 `人员编号:left`、`人员编号:right`。完成一只掌后可直接登记同一人员的另一只掌，或开始下一位人员；自助模式自动采集并保存 5 张合格样本，管理员辅助模式可审阅、剔除并自动补满 5 张。
+- **实时识别**：未完成本机可见光阈值校准时只显示 Top-K 候选与分数，不显示身份通过/未通过。校准协议、命令和运行时匹配条件见 [`docs/06-visible-light-enrollment-and-calibration.md`](docs/06-visible-light-enrollment-and-calibration.md)。
 - **候选审计**：在线只读查看候选的任务类型、模态、权重、转换和 NPU 状态；候选评测仅在离线研究环境使用 `python -m tools.offline.benchmark` 执行。
 - **系统状态**：查看 API、CANN、PyACL、NPU 和摄像头状态。`Health: Alarm` 是诊断字段；具体的 ACL 崩溃、设备重置和资源释放错误仍需停止相关测试。
 

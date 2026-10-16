@@ -36,6 +36,7 @@ _这是工程文档入口，不是项目首页，也不是教材正文。项目�
 | 第一次准备开发板 | [`src/appendix/appendix1.md`](../src/appendix/appendix1.md) |
 | CANN、ATC、PyACL 基础 | [`src/book/chapter2.md`](../src/book/chapter2.md)、[`src/book/chapter4.md`](../src/book/chapter4.md) |
 | 310B Linux 命令 | [`src/appendix/appendix2.md`](../src/appendix/appendix2.md) |
+| CANN、驱动与固件升级 | [`src/appendix/appendix7.md`](../src/appendix/appendix7.md) |
 | 选择一个实践案例 | [`src/experiment/README.md`](../src/experiment/README.md) 和对应 `samples/caseN/README.md` |
 | 检查某案例是否适合发布 | [`docs/case-reviews/00-index.md`](case-reviews/00-index.md) |
 | 修改教材正文 | 修改 `src/` 下源稿，然后运行 `pnpm docs:build`；不要改 `latex/` 或 `.vuepress/dist/` |

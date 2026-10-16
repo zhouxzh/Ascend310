@@ -13,6 +13,10 @@ frontend/.vite/
 frontend/dist/
 frontend/playwright-report/
 frontend/test-results/
+# The frontend source client/types are part of the release source package.
+!frontend/src/
+!frontend/src/lib/
+!frontend/src/lib/*.ts
 
 # Downloaded and generated artifacts
 # The parent repository ignores models/ and data/ globally. Re-include only
@@ -31,6 +35,7 @@ data/*
 !data/dataset_manifest.json
 reports/runs/
 reports/system/
+reports/candidates/
 third_party/
 artifacts/
 data/templates/

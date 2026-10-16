@@ -204,7 +204,11 @@ class CaptureStore:
             "timing": {},
             "user_id": None,
             "user_name": None,
+            "palm_id": None,
+            "person_id": None,
+            "display_name": None,
             "palm_side": None,
+            "roi_pipeline_id": None,
             "template_deleted": False,
         }
         record.update(self._jsonable(metadata))
@@ -283,32 +287,59 @@ class CaptureStore:
             raise FileNotFoundError(str(path))
         return path
 
-    def mark_template_deleted(self, *, model_id: str, user_id: str) -> int:
-        changed = 0
+    def cleanup_many(self, capture_ids: list[str] | tuple[str, ...] | set[str]) -> int:
+        """Delete a bounded set of capture records and all image bytes."""
+
+        requested = {str(capture_id) for capture_id in capture_ids if capture_id}
+        if not requested:
+            return 0
         with self._lock:
             with self._transaction_lock():
                 records = self._read_index()
-                for record in records:
-                    if record.get("model_id") == model_id and record.get("user_id") == user_id:
-                        record["template_deleted"] = True
-                        record["status"] = "template_deleted"
-                        paths = self._record_paths(str(record["capture_id"]))
-                        self._atomic_write(
-                            paths["metadata"],
-                            json.dumps(record, ensure_ascii=False, indent=2).encode("utf-8"),
-                        )
-                        changed += 1
-                if changed:
-                    self._write_index(records)
-        return changed
+                found = [
+                    str(record["capture_id"])
+                    for record in records
+                    if str(record.get("capture_id")) in requested
+                ]
+                for capture_id in found:
+                    shutil.rmtree(self._record_dir(capture_id))
+                if found:
+                    self._write_index(
+                        [
+                            record
+                            for record in records
+                            if str(record.get("capture_id")) not in requested
+                        ]
+                    )
+        return len(found)
+
+    def purge_template(
+        self,
+        *,
+        model_id: str,
+        palm_id: str,
+        keep_capture_ids: set[str] | None = None,
+        roi_pipeline_id: str | None = None,
+    ) -> int:
+        """Actually remove enrollment images belonging to one stable palm."""
+
+        keep = keep_capture_ids or set()
+        with self._lock:
+            records = self._read_index()
+        matching = [
+            str(record["capture_id"])
+            for record in records
+            if record.get("model_id") == model_id
+            and str(record.get("palm_id") or record.get("user_id")) == palm_id
+            and str(record.get("capture_id")) not in keep
+            and (roi_pipeline_id is None or record.get("roi_pipeline_id") == roi_pipeline_id)
+        ]
+        return self.cleanup_many(matching)
+
+    def mark_template_deleted(self, *, model_id: str, user_id: str) -> int:
+        """Compatibility alias: template deletion now removes biometric files."""
+
+        return self.purge_template(model_id=model_id, palm_id=user_id)
 
     def cleanup(self, capture_id: str) -> bool:
-        with self._lock:
-            with self._transaction_lock():
-                records = self._read_index()
-                remaining = [item for item in records if item.get("capture_id") != capture_id]
-                if len(remaining) == len(records):
-                    return False
-                shutil.rmtree(self._record_dir(capture_id))
-                self._write_index(remaining)
-                return True
+        return bool(self.cleanup_many([capture_id]))

@@ -16,6 +16,93 @@ from palmprint_workbench.domain.templates import TemplateStore
 
 
 class TemplateStoreTests(unittest.TestCase):
+    def test_automatic_person_ids_are_monotonic_and_persisted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = TemplateStore(root)
+            self.assertEqual(store.allocate_person_id(), "P-000001")
+            self.assertEqual(store.allocate_person_id(), "P-000002")
+            self.assertEqual(TemplateStore(root).allocate_person_id(), "P-000003")
+
+    def test_automatic_person_id_skips_existing_template_number(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = TemplateStore(Path(directory))
+            store.replace_palm(
+                "ccnet__npu__mixed_fp16",
+                [np.array([1.0, 0.0], dtype=np.float32)] * 5,
+                person_id="P-000017",
+                display_name=None,
+                palm_side="left",
+            )
+            self.assertEqual(store.allocate_person_id(), "P-000018")
+
+    def test_stable_palm_id_replaces_only_the_same_palm(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = TemplateStore(Path(directory))
+            first = store.replace_palm(
+                "ccnet__npu__mixed_fp16",
+                [np.array([1.0, 0.0], dtype=np.float32)] * 5,
+                person_id="P-001",
+                display_name="Alice",
+                palm_side="left",
+            )
+            right = store.replace_palm(
+                "ccnet__npu__mixed_fp16",
+                [np.array([0.0, 1.0], dtype=np.float32)] * 5,
+                person_id="P-001",
+                display_name="Alice",
+                palm_side="right",
+            )
+            replacement = store.replace_palm(
+                "ccnet__npu__mixed_fp16",
+                [np.array([0.5, 0.5], dtype=np.float32)] * 5,
+                person_id="P-001",
+                display_name="Alice Updated",
+                palm_side="left",
+            )
+
+            self.assertEqual(first["palm_id"], "P-001:left")
+            self.assertEqual(right["palm_id"], "P-001:right")
+            self.assertEqual(replacement["replaced_samples"], 5)
+            users = store.users("ccnet__npu__mixed_fp16")
+            self.assertEqual([item["palm_id"] for item in users], ["P-001:left", "P-001:right"])
+            self.assertEqual([item["samples"] for item in users], [5, 5])
+            self.assertEqual(store.summary("ccnet__npu__mixed_fp16")["person_count"], 1)
+
+    def test_invalid_replacement_keeps_old_generation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = TemplateStore(Path(directory))
+            store.replace_palm(
+                "ccnet__npu__mixed_fp16",
+                [np.array([1.0, 0.0], dtype=np.float32)] * 5,
+                person_id="P-001",
+                display_name="Alice",
+                palm_side="left",
+            )
+            with self.assertRaises(ValueError):
+                store.replace_palm(
+                    "ccnet__npu__mixed_fp16",
+                    [],
+                    person_id="P-001",
+                    display_name="Alice",
+                    palm_side="left",
+                )
+            self.assertEqual(store.users("ccnet__npu__mixed_fp16")[0]["samples"], 5)
+
+    def test_roi_pipeline_isolation_excludes_old_templates(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = TemplateStore(Path(directory))
+            store.replace_palm(
+                "ccnet__npu__mixed_fp16",
+                [np.array([1.0, 0.0], dtype=np.float32)],
+                person_id="P-001",
+                display_name="Alice",
+                palm_side="left",
+                roi_pipeline_id="next_pipeline",
+            )
+            self.assertEqual(store.users("ccnet__npu__mixed_fp16"), [])
+            self.assertEqual(store.summary("ccnet__npu__mixed_fp16")["palm_count"], 0)
+
     def test_combined_store_is_atomic_and_private(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

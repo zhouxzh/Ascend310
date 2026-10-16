@@ -16,10 +16,19 @@ $RuntimeFiles = @(
 )
 $RuntimeAssetFiles = @(
     "models/om/midi_ddsp_reverb_ir.npz",
-    "models/om/ddsp_vst_feature_mixed_float16.om",
     "models/manifests/SHA256SUMS.txt",
     "models/ddsp_vst/metadata.json"
 )
+$DdspVstRuntimeModels = @(
+    Get-ChildItem (Join-Path $ProjectRoot "models/om") -File -Filter "*.om" | Where-Object {
+        $_.Name -notmatch '^midi_ddsp_' -and $_.Name -ne 'ddsp_vst_feature_mixed_float16.om'
+    }
+)
+$DdspVstFeatureModel = Join-Path $ProjectRoot "models/om/ddsp_vst_feature_mixed_float16.om"
+$MidiDdspBundleRoot = Join-Path $ProjectRoot "models/midi_ddsp/bundles"
+$MidiDdspBundleId = "google-urmp-stateful-v2-batched-origin"
+$MidiDdspBundle = Join-Path $MidiDdspBundleRoot $MidiDdspBundleId
+$MidiDdspDeployId = "midi-ddsp-" + [DateTime]::UtcNow.ToString("yyyyMMddHHmmss")
 $ScriptFiles = @("run_webui.py", "check_webui_env.py")
 $ToolFiles = @(
     "assemble_piano_ddsp_om_bundle.py",
@@ -77,6 +86,17 @@ function Invoke-Transfer([string]$Description, [scriptblock]$Action) {
     throw "$Description failed after 4 attempts"
 }
 
+function Get-Sha256([string]$Path) {
+    $HashAlgorithm = [System.Security.Cryptography.SHA256]::Create()
+    $Stream = [System.IO.File]::OpenRead($Path)
+    try {
+        return ([System.BitConverter]::ToString($HashAlgorithm.ComputeHash($Stream))).Replace("-", "").ToLowerInvariant()
+    } finally {
+        $Stream.Dispose()
+        $HashAlgorithm.Dispose()
+    }
+}
+
 function Escape-BashSingleQuoted([string]$Command) {
     return $Command -replace "'", ([char]39 + [char]92 + [char]39 + [char]39)
 }
@@ -89,6 +109,10 @@ function Invoke-Remote([string]$Command) {
 function Invoke-RemoteCapture([string]$Command) {
     $EscapedCommand = Escape-BashSingleQuoted $Command
     return (Invoke-Checked "Remote command" { ssh $SshTarget "bash -lc '$EscapedCommand'" })
+}
+
+function Get-TrimmedValue($Value) {
+    return ([string]$Value).Trim()
 }
 
 function Copy-Tree([string]$RelativePath) {
@@ -116,12 +140,12 @@ try {
     Pop-Location
 }
 
-$ResolvedRemoteRoot = (Invoke-RemoteCapture "readlink -f '$RemoteRoot'").Trim()
+$ResolvedRemoteRoot = Get-TrimmedValue (Invoke-RemoteCapture "readlink -f '$RemoteRoot'")
 if ($ResolvedRemoteRoot -ne $RemoteRoot -or $ResolvedRemoteRoot -eq "/") {
     throw "Refusing to deploy outside the expected remote path: $ResolvedRemoteRoot"
 }
 
-Invoke-Remote "mkdir -p '$RemoteRoot/webui/dist-releases' '$RemoteRoot/midi_ddsp_webui' '$RemoteRoot/piano_ddsp_runtime' '$RemoteRoot/scripts' '$RemoteRoot/tools' '$RemoteRoot/doc' '$RemoteRoot/midi' '$RemoteRoot/models/om' '$RemoteRoot/models/ddsp_vst' '$RemoteRoot/models/piano_ddsp/bundles'"
+Invoke-Remote "mkdir -p '$RemoteRoot/webui/dist-releases' '$RemoteRoot/midi_ddsp_webui' '$RemoteRoot/piano_ddsp_runtime' '$RemoteRoot/scripts' '$RemoteRoot/tools' '$RemoteRoot/doc' '$RemoteRoot/midi' '$RemoteRoot/models/om' '$RemoteRoot/models/ddsp_vst' '$RemoteRoot/models/midi_ddsp/bundles' '$RemoteRoot/models/piano_ddsp/bundles'"
 
 # Sync package directories recursively. This carries midi_ddsp_webui/vendor/partitura,
 # its NOTICE, and any future package data without relying on a top-level *.py glob.
@@ -139,6 +163,13 @@ $RuntimeAssetFiles | ForEach-Object {
     Invoke-Remote "mkdir -p '$RemoteRoot/$RemoteAssetFolder'"
     Invoke-Transfer "Copy $_" { scp $Source "${SshTarget}:$RemoteRoot/$RemoteAssetFolder/" }
 }
+if (-not (Test-Path -LiteralPath $DdspVstFeatureModel)) {
+    throw "Required DDSP-VST Feature OM is missing: $DdspVstFeatureModel"
+}
+Invoke-Transfer "Copy DDSP-VST Feature OM" { scp $DdspVstFeatureModel "${SshTarget}:$RemoteRoot/models/om/" }
+foreach ($Model in $DdspVstRuntimeModels) {
+    Invoke-Transfer "Copy DDSP-VST Control OM $($Model.Name)" { scp $Model.FullName "${SshTarget}:$RemoteRoot/models/om/" }
+}
 $ScriptFiles | ForEach-Object {
     Invoke-Transfer "Copy scripts/$_" { scp (Join-Path $ProjectRoot "scripts/$_") "${SshTarget}:$RemoteRoot/scripts/" }
 }
@@ -152,8 +183,8 @@ $PianoChecksumsPath = Join-Path $PianoRelease "SHA256SUMS"
 if (-not (Test-Path $PianoReleaseManifestPath) -or -not (Test-Path $PianoChecksumsPath)) {
     throw "Piano-DDSP release is missing. Run tools/download_model_release.py first."
 }
-$ReleaseManifestHash = (Get-FileHash -Algorithm SHA256 $PianoReleaseManifestPath).Hash.ToLowerInvariant()
-$ReleaseChecksumsHash = (Get-FileHash -Algorithm SHA256 $PianoChecksumsPath).Hash.ToLowerInvariant()
+$ReleaseManifestHash = Get-Sha256 $PianoReleaseManifestPath
+$ReleaseChecksumsHash = Get-Sha256 $PianoChecksumsPath
 if ($ReleaseManifestHash -ne $PianoReleaseManifestSha256 -or $ReleaseChecksumsHash -ne $PianoChecksumsSha256) {
     throw "Piano-DDSP v1.0.1 release manifest or SHA256SUMS digest is invalid."
 }
@@ -194,7 +225,7 @@ if ($IncludePianoReference) {
         ) {
             throw "Piano-DDSP reference contract is invalid for $ModelId."
         }
-        $ReferenceHash = (Get-FileHash -Algorithm SHA256 $ReferenceNpz).Hash.ToLowerInvariant()
+        $ReferenceHash = Get-Sha256 $ReferenceNpz
         if ($ReferenceHash -ne ([string]$ReferenceReport.npz_sha256).ToLowerInvariant()) {
             throw "Piano-DDSP reference SHA256 mismatch for $ModelId."
         }
@@ -237,7 +268,7 @@ foreach ($ModelId in $PianoModelIds) {
         $ArtifactPath = Join-Path $PianoBundleRoot $Artifact.Path
         if (
             -not (Test-Path -LiteralPath $ArtifactPath) -or
-            (Get-FileHash -Algorithm SHA256 $ArtifactPath).Hash.ToLowerInvariant() -ne $Artifact.Hash.ToLowerInvariant()
+            (Get-Sha256 $ArtifactPath) -ne $Artifact.Hash.ToLowerInvariant()
         ) {
             throw "Piano-DDSP bundle hash mismatch: $ModelId/$($Artifact.Path)"
         }
@@ -253,8 +284,8 @@ if (
 }
 
 $RemotePianoBundle = "$RemoteRoot/models/piano_ddsp/bundles/$PianoBundleId"
-$LocalBundleManifestHash = (Get-FileHash -Algorithm SHA256 $PianoBundleManifestPath).Hash.ToLowerInvariant()
-$RemoteBundleManifestHash = (Invoke-RemoteCapture "if [ -f '$RemotePianoBundle/manifest.json' ]; then sha256sum '$RemotePianoBundle/manifest.json' | cut -d' ' -f1; fi").Trim()
+$LocalBundleManifestHash = Get-Sha256 $PianoBundleManifestPath
+$RemoteBundleManifestHash = Get-TrimmedValue (Invoke-RemoteCapture "if [ -f '$RemotePianoBundle/manifest.json' ]; then sha256sum '$RemotePianoBundle/manifest.json' | cut -d' ' -f1; fi")
 if ($RemoteBundleManifestHash -and $RemoteBundleManifestHash -ne $LocalBundleManifestHash) {
     throw "Refusing to overwrite an existing Piano-DDSP bundle with different content."
 }
@@ -267,6 +298,36 @@ if (-not $RemoteBundleManifestHash) {
 $RemoteActivePointerStage = "$RemoteRoot/models/piano_ddsp/.active-bundle-$([DateTime]::UtcNow.ToString('yyyyMMddHHmmss')).part"
 Invoke-Transfer "Stage Piano-DDSP active pointer" { scp $PianoActivePointerPath "${SshTarget}:$RemoteActivePointerStage" }
 Invoke-Remote "mv '$RemoteActivePointerStage' '$RemoteRoot/models/piano_ddsp/active-bundle.json'"
+
+# MIDI-DDSP is an all-or-nothing stateful v2 runtime bundle.  The WebUI scans
+# only this manifest-rooted directory; legacy models/om/*.om files are not a
+# substitute.  Refuse a deployment that would leave the board with an empty
+# MIDI-DDSP catalog.
+$MidiDdspManifest = Join-Path $MidiDdspBundle "manifest.json"
+$RemoteMidiDdspBundle = "$RemoteRoot/models/midi_ddsp/bundles/$MidiDdspBundleId"
+$RemoteMidiDdspManifestHash = Get-TrimmedValue (Invoke-RemoteCapture "if [ -f '$RemoteMidiDdspBundle/manifest.json' ]; then sha256sum '$RemoteMidiDdspBundle/manifest.json' | cut -d' ' -f1; fi")
+if (Test-Path -LiteralPath $MidiDdspManifest) {
+    $MidiDdspManifestHash = Get-Sha256 $MidiDdspManifest
+    if ($RemoteMidiDdspManifestHash -and $RemoteMidiDdspManifestHash -ne $MidiDdspManifestHash) {
+        throw "Refusing to overwrite an existing MIDI-DDSP bundle with different manifest content."
+    }
+    if (-not $RemoteMidiDdspManifestHash) {
+        $MidiDdspStage = "$RemoteRoot/models/midi_ddsp/bundles/.stage-$MidiDdspBundleId-$MidiDdspDeployId"
+        Invoke-Transfer "Stage MIDI-DDSP runtime bundle" { scp -r $MidiDdspBundle "${SshTarget}:$MidiDdspStage" }
+        Invoke-Remote "cd '$MidiDdspStage' && test -s manifest.json && python -c 'import json; d=json.load(open(\"manifest.json\")); batches=d.get(\"voice_batch_sizes\", []); assert d.get(\"precision\") == \"origin\" and 1 in batches and len(d.get(\"components\", {})) == 8 * len(batches)' && mv '$MidiDdspStage' '$RemoteMidiDdspBundle'"
+    }
+} elseif (-not $RemoteMidiDdspManifestHash) {
+    # OM artifacts are board-specific. Stage only checked ONNX export assets and
+    # make the first origin bundle with the board's installed CANN toolchain.
+    Copy-Tree "models/midi_ddsp/stateful_v2_batched/onnx"
+    Invoke-Remote "source /usr/local/Ascend/ascend-toolkit/set_env.sh; source /usr/local/miniconda3/etc/profile.d/conda.sh; conda activate base; cd '$RemoteRoot'; TE_PARALLEL_COMPILER=1 OMP_NUM_THREADS=1 MULTI_THREAD_COMPILE=0 VOICE_BATCH_SIZES=1 bash tools/convert_midi_ddsp_stateful_bundle.sh"
+    $RemoteMidiDdspManifestHash = Get-TrimmedValue (Invoke-RemoteCapture "sha256sum '$RemoteMidiDdspBundle/manifest.json' | cut -d' ' -f1")
+    if (-not $RemoteMidiDdspManifestHash) {
+        throw "MIDI-DDSP bundle conversion did not produce: $RemoteMidiDdspBundle/manifest.json"
+    }
+} else {
+    Write-Warning "Keeping the MIDI-DDSP bundle already present on the board; local bundle is absent."
+}
 
 # MIDI inputs are copied additively. Absence of the local ignored library is not
 # an error because tests generate their deterministic fixture in a temp directory.
@@ -291,7 +352,7 @@ $ManifestPath = Join-Path ([System.IO.Path]::GetTempPath()) "$DeployId.sha256s"
 try {
     $ManifestLines = Get-ChildItem $DistRoot -File -Recurse | Sort-Object FullName | ForEach-Object {
         $Relative = $_.FullName.Substring($DistRoot.Length).TrimStart('\').Replace('\', '/')
-        "$((Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant())  $Relative"
+        "$(Get-Sha256 $_.FullName)  $Relative"
     }
     [System.IO.File]::WriteAllText(
         $ManifestPath,
@@ -305,7 +366,7 @@ try {
     Invoke-Transfer "Copy frontend hash manifest" { scp $ManifestPath "${SshTarget}:$RemoteStage/.case3-sha256s" }
     Invoke-Remote "cd '$RemoteStage' && sha256sum -c .case3-sha256s && mv '$RemoteStage' '$RemoteRelease'"
 
-    $PreviousDist = (Invoke-RemoteCapture "if [ -L '$RemoteRoot/webui/dist' ]; then readlink '$RemoteRoot/webui/dist'; elif [ -d '$RemoteRoot/webui/dist' ]; then echo directory; fi").Trim()
+    $PreviousDist = Get-TrimmedValue (Invoke-RemoteCapture "if [ -L '$RemoteRoot/webui/dist' ]; then readlink '$RemoteRoot/webui/dist'; elif [ -d '$RemoteRoot/webui/dist' ]; then echo directory; fi")
     Invoke-Remote "if [ -d '$RemoteRoot/webui/dist' ] && [ ! -L '$RemoteRoot/webui/dist' ]; then mv '$RemoteRoot/webui/dist' '$RemoteRoot/webui/dist-releases/legacy-$DeployId'; fi; ln -s 'dist-releases/$DeployId' '$RemoteRoot/webui/.dist-next-$DeployId'; mv -Tf '$RemoteRoot/webui/.dist-next-$DeployId' '$RemoteRoot/webui/dist'"
     $RollbackDist = if ($PreviousDist -eq "directory") { "dist-releases/legacy-$DeployId" } else { $PreviousDist }
 

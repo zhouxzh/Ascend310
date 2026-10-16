@@ -10,6 +10,7 @@
 | [02 - 设备部署与功能验收](02-device-deployment-and-acceptance-report.md) | 手动启动、API、触摸屏、模板和摄像头检查 |
 | [03 - 候选模型审计](03-model-candidate-audit.md) | 来源、许可、哈希和候选状态 |
 | [04 - 发布与人工测试清单](04-release-checklist.md) | 冻结版本、部署、逐模型测试、回滚和问题记录 |
+| [06 - 可见光自动注册与阈值校准](06-visible-light-enrollment-and-calibration.md) | 稳定掌纹 ID、自动采集、ROI 统计与本机阈值校准 |
 | `reports/candidates/`（板端/本地忽略目录） | 28 项候选的分任务测试报告和最新状态索引；运行时只暴露 6 项 active candidate |
 | [evidence/README](evidence/README.md) | 可随源码发布的脱敏证据边界 |
 | [合成 ROI API 冒烟摘要](evidence/manual-test-smoke-20260818.md) | 六模型接口/模板/重启预检；不替代触摸屏和摄像头验收 |

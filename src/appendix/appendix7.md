@@ -10,11 +10,27 @@ lang: zh-cn
 
 ## 本附录解决的问题
 
+本附录按教程顺序组织两条独立升级路线：
+
+* **路线 A：香橙派 AI Pro 8T**：`20241128`、Ascend 310B4 / 8T、驱动 `23.0.0`、B309，CANN 7.0 升级到 CANN 8.0；驱动和固件保持不变。
+* **路线 B：华为官方 Atlas 310B**：原始 CANN 7.0、驱动/HDK 23.0，升级到固件 `7.8.0.5.216`、驱动/HDK 25.5.0 和 CANN `9.2.0-beta.2`；升级后必须恢复 HDMI/DRM。
+
+两条路线共用版本采集、安装包校验、回滚材料和验收原则，但硬件、内核、驱动、固件、CANN 包及测试结果不可混用。Atlas 的 HDMI/DRM 未恢复时，升级不算完成。
+
 昇腾软件环境经常被简单地称为“CANN 版本”。这种说法对于初次安装可以帮助理解，但不足以支撑一次可复现的升级。一个能够运行的 310B 环境至少包含操作系统与内核、NPU 驱动、NPU 固件、CANN 用户态软件、Python 运行时以及可能存在的框架适配层。它们由不同安装包提供，也有不同的生命周期。只替换其中一个组件，可能使 `npu-smi` 仍能显示设备，却让 ATC、PyACL 或已有 OM 模型在运行时失败。
 
-本附录以昇腾官方版本配套查询助手的 310B 系列查询结果为当前版本配套参考，并以 CANN 9.0.0 和用户提供的 CANN 9.0.1 补丁说明补充历史发布线的升级信息，建立一套面向昇腾 310B 的版本审查和升级方法。文中沿用本书的证据状态：`documented` 表示厂商版本说明或安装指南已明确给出；`inferred` 表示由配套关系推得、尚未在目标板验证；`observed-pass` 和 `observed-fail` 分别表示在记录的硬件、版本和输入条件下实测通过或失败；`untested` 表示尚未执行。命令示例属于项目操作建议，不等于厂商对所有设备的兼容性承诺。
+本附录以昇腾官方版本配套查询助手的 310B 系列查询结果为当前版本配套参考，并以 CANN 8.0、CANN 9.0.X 和 CANN 9.2 发布线的配套说明补充升级信息，建立一套面向昇腾 310B 的版本审查和升级方法。文中沿用本书的证据状态：`documented` 表示厂商版本说明或安装指南已明确给出；`inferred` 表示由配套关系推得、尚未在目标板验证；`observed-pass` 和 `observed-fail` 分别表示在记录的硬件、版本和输入条件下实测通过或失败；`untested` 表示尚未执行。命令示例属于项目操作建议，不等于厂商对所有设备的兼容性承诺。
 
 本附录不是“看到新版本就升级”的建议。若现有案例已经通过了模型转换、ACL 烟测和长稳测试，升级应被视为一次新的变更实验；只有在回归证据完整后，才可以把新环境写入案例的默认配置。
+
+## 教程路线与已验证组合
+
+| 路线 | 已验证基线 | 目标组合 | 必须通过的结果 |
+| --- | --- | --- | --- |
+| A：香橙派 AI Pro 8T | Ubuntu 22.04.3，`20241128`，310B4，驱动 23.0，B309，CANN 7.0 | CANN 8.0，驱动和固件不变 | ACL、最小 VENC、OM、CANN VENC、case8 WebRTC、回归 |
+| B：华为官方 Atlas 310B | Ubuntu 22.04.5，310B4，CANN 7.0，驱动/HDK 23.0 | 固件 `7.8.0.5.216`、驱动/HDK 25.5.0、CANN 9.2.0-beta.2 | HDMI/DRM、ACL、OM、摄像头、CANN VENC、WebRTC、回归 |
+
+先选择路线，再执行后文的共用准备、专项步骤和统一验收。不要把香橙派的 B309/5.10.0+ 条件与 Atlas 的 7.8.0.5.216/6.6 内核条件拼接。
 
 ## 软件栈中的版本层次
 
@@ -30,11 +46,11 @@ lang: zh-cn
 
 这里的“固件版本”和“驱动版本”不是同义词。固件主要在设备侧运行，驱动主要在主机操作系统中运行；二者常由同一套 Ascend HDK 下载页面提供，但安装包、升级命令和生效方式不同。版本说明中的 **Ascend HDK** 是厂商用于表达硬件开发套件配套关系的版本标识，不能把它直接当作板上某一个可执行文件的版本号。实际安装时仍应以目标硬件页面列出的驱动包和固件包全名为准。
 
-CANN 也不是一个单一二进制。CANN 9.0.0 的发布说明把组合包分为 Toolkit、算子包（ops）和加速库（NNAL）；Toolkit 中还包含 Runtime、AscendCL 扩展、编译器和 PyACL 等子包。因而“升级 CANN”可能指升级完整 Toolkit，也可能只升级一个允许独立升级的子包。两种操作的风险和验收范围不同。后续命令块给出默认目录的检查方式；表中使用目录类别，是为了避免把默认路径误读为唯一安装路径。
+CANN 也不是一个单一二进制。CANN 9.0.X 的版本说明把组合包分为 Toolkit、算子包（ops）和加速库（NNAL）；Toolkit 中还包含 Runtime、AscendCL 扩展、编译器和 PyACL 等子包。因而“升级 CANN”可能指升级完整 Toolkit，也可能只升级一个允许独立升级的子包。两种操作的风险和验收范围不同。后续命令块给出默认目录的检查方式；表中使用目录类别，是为了避免把默认路径误读为唯一安装路径。
 
 ### 310B 的产品边界
 
-本仓库的主要目标板是 Ascend 310B4 / 8T。CANN 9.0.0 发布说明中出现的 Ascend 950PR、Atlas A2 或 Atlas A3 特性，首先证明这些特性在相应产品族上被发布；它们不自动证明 310B 支持。对 310B 的结论必须同时满足：
+本仓库的主要目标板是 Ascend 310B4 / 8T。CANN 9.0.X 版本说明中出现的 Ascend 950PR、Atlas A2 或 Atlas A3 特性，首先证明这些特性在相应产品族上被发布；它们不自动证明 310B 支持。对 310B 的结论必须同时满足：
 
 1. 目标硬件的配套页面列出该驱动、固件和 CANN 组合；
 2. 当前操作系统、架构和 Python 环境满足安装要求；
@@ -42,39 +58,28 @@ CANN 也不是一个单一二进制。CANN 9.0.0 的发布说明把组合包分�
 
 如果只满足前两项，结论应写成“配套关系已记录，板端功能未验证”，而不是“已支持”。
 
-## 310B 官方版本配套查询快照
+## 官方配套查询的使用方法
 
-证据状态：`documented`。下表来自昇腾[版本配套查询助手](https://www.hiascend.com/developer/download/compatibility)，于 2026-10-03 查询时选择“310B 系列产品”得到的版本配套结果。发布日期由新到旧排列；2026/06/30 一列在官网标记为“推荐”。
+版本配套查询助手用于升级前按目标板卡、操作系统、CPU 架构和产品筛选实际安装包。查询结果是版本选择依据，不是板端验收结果；最终记录仍需保存实际驱动、固件、Toolkit、ops/NNAL 包名、摘要和对应测试结果。PyTorch 等查询项也不能直接等同于本地 `torch` 或 `torch_npu` 已安装。
 
-| 产品 | 2026/06/30（推荐） | 2026/03/30 | 2025/12/30 | 2025/09/30 | 2025/06/30 | 2025/03/30 |
-| --- | --- | --- | --- | --- | --- | --- |
-| PyTorch（第三方） | 26.1.1 | 26.0.0 | 7.3.0 | 7.2.0 | 7.1.0 | 7.0.0 |
-| CANN | 9.1.1 | 9.0.1 | 8.5.0 | 8.3.RC1 | 8.2.RC1 | 8.1.RC1 |
-| Ascend HDK | 26.1.1（A3/A2/910/310P/310B 系列）；25.7.RC1.10（350 加速卡）；25.6.RC1（850E 超节点/650E 服务器）；25.1.RC1（950 超节点） | 26.0.RC1 | 25.5.1 | 25.3.RC1 | 25.2.0 | 25.0.RC1 |
-
-官网将 `N/A` 定义为“该产品不支持或无此系列版本”；本次 310B 查询结果中的上述三行没有 `N/A`。表内“PyTorch（第三方）”沿用官网产品项的名称和版本号，不能直接把它等同于本地某个 `torch` 或 `torch_npu` Python 包已经安装或已经可用。
-
-Ascend HDK 的最新列同时显示多个带产品范围的版本。只有 `26.1.1` 的括号范围明确包含 310B；其余条目分别标注 350 加速卡、850E/650E 或 950。因此，不能仅因它们同处一列就把它们记为 310B 的直接配套证据。实际选包时仍应以目标 310B 型号、操作系统、CPU 架构和下载页面给出的驱动、固件、Toolkit 与 ops 包为准。
-
-这是一份版本选择快照，不是板端验收结果。将 CANN 9.1.1 或任何表中组合用于本仓库前，仍需在目标板完成设备初始化、`import acl`、代表性模型的 ACL 烟测和任务级回归；在这些检查前状态应保持为 `untested` 或 `inferred`。
-
-## 历史版本说明中的 CANN 9.0.0 与 9.0.1 配套信息
+## 历史版本线与 Ascend HDK 配套关系
 
 ### CANN 与 Ascend HDK
 
-下面的关系来自 CANN 9.0.0 官方版本说明以及用户提供的 9.0.1 补丁说明，用于理解历史发布线。当前版本选择优先使用上一节的官方查询结果；本表不替代下载页面针对具体 310B 产品的筛选结果。
+下面的关系用于理解 CANN 8.0、CANN 8.5.X、CANN 9.0.X 和 CANN 9.2.X 发布线与 Ascend HDK 的配套边界。它们是版本选择和升级前核对的参考，不替代下载页面针对具体 310B 产品、操作系统和架构的筛选结果。
 
 | CANN | 版本说明中列出的 Ascend HDK |
 | --- | --- |
-| CANN 9.0.1 | 25.7.RC1、26.0.RC3、26.0.RC1、25.5.X、25.3.X、25.2.X、25.0.X |
-| CANN 9.0.0 | 25.7.RC1、26.0.RC1、25.5.X、25.3.X、25.2.X、25.0.X |
-| CANN 8.5.2 | 26.0.RC1、25.5.X、25.3.X、25.2.X、25.0.X |
+| CANN 8.0 | 以对应 8.0 发布包和目标产品下载页列出的 HDK 为准；本项目香橙派路线固定使用原有驱动/固件组合，不在该路线中升级 HDK |
+| CANN 8.5.X | 26.0.RC1、25.5.X、25.3.X、25.2.X、25.0.X 等版本线，具体以对应小版本说明为准 |
+| CANN 9.0.X | 25.7.RC1、26.0.RC1/RC3、25.5.X、25.3.X、25.2.X、25.0.X 等版本线，具体以对应小版本说明为准 |
+| CANN 9.2.X | 本项目 Atlas 路线实测使用 HDK 25.5.0、固件 `7.8.0.5.216` 和驱动 `25.5.0`；其他 9.2.X 发布包仍需按目标产品下载页重新核对 |
 
-表中的 HDK 是版本说明使用的配套标识，不是一个可以代替驱动包或固件包名称的独立版本号。下载中心会根据产品、操作系统和 CPU 架构列出具体的驱动与固件安装包；正式记录应同时保存包名、实际版本和摘要。“列在表中”只表示版本说明声明了配套关系；仍需确认该关系是否覆盖目标板的具体 SoC、操作系统和架构。特别是 9.0.1 新增的 HDK 26.0.RC3 不能被倒推为当前板端已经具备该驱动或固件。
+表中的 HDK 是版本说明使用的配套标识，不是可以替代驱动包或固件包名称的独立版本号。CANN 8.0 的具体配套必须以实际 8.0 发布包和目标产品下载页为准；CANN 8.5.X 和 CANN 9.0.X 的小版本差异不能被忽略；CANN 9.2.X 在本项目中已经以 HDK 25.5.0/固件 `7.8.0.5.216`/驱动 `25.5.0` 的 Atlas 组合完成实测。正式记录仍需保存包名、实际版本、摘要和板端验收结果。
 
 ### 组合包与独立子包
 
-CANN 9.0.0/9.0.1 的组合包可按下表理解：
+CANN 9.0.X 的组合包可按下表理解；CANN 8.0 和 CANN 9.2 也应遵循相同的 Toolkit、ops、NNAL 分层原则：
 
 | 组合包 | 代表内容 | 独立升级边界 |
 | --- | --- | --- |
@@ -82,11 +87,11 @@ CANN 9.0.0/9.0.1 的组合包可按下表理解：
 | ops | DVPP、通用算子、数学算子、Transformer 算子等 | 版本说明列出的若干 ops 子包支持独立升级 |
 | NNAL | `atb`、`sip` 等加速库 | 仅在业务确实使用时纳入变更范围 |
 
-用户提供的 9.0.1 说明还列出了 ops 与 Toolkit 的交叉配套：9.0.1 ops 可与 9.0.1、9.0.0 和 8.5.2 Toolkit 组合，9.0.0 ops 也列出了与 9.0.1、9.0.0 和 8.5.2 Toolkit 的组合。该表不能替代完整兼容性检查：框架插件、模型算子、驱动固件和操作系统仍需单独验证。对于本仓库的案例，优先采用同一发布线的 Toolkit 与 ops，只有在有明确需求和回归报告时才使用跨版本组合。
+同一发布线内的 ops 与 Toolkit 通常具有更明确的配套关系；跨发布线组合必须以对应版本说明和下载页为准。该表不能替代完整兼容性检查：框架插件、模型算子、驱动固件和操作系统仍需单独验证。对于本仓库的案例，优先采用同一发布线的 Toolkit 与 ops，只有在有明确需求和回归报告时才使用跨版本组合。
 
 ### 版本特性与 310B 结论的关系
 
-CANN 9.0.0 说明包含低比特量化、确定性计算、通信合并、SIMD/SIMT、Runtime 查询接口等大量变化，也列出了若干废弃接口和已知问题。这些条目适合用来制定迁移检查表，但不能直接写成“本项目已获得性能提升”。本仓库不把发布说明中的理论加速倍数、算子覆盖或修复列表当作案例测量结果。
+CANN 9.0.X 说明包含低比特量化、确定性计算、通信合并、SIMD/SIMT、Runtime 查询接口等变化，也列出了若干废弃接口和已知问题。这些条目适合用来制定迁移检查表，但不能直接写成“本项目已获得性能提升”。本仓库不把发布说明中的理论加速倍数、算子覆盖或修复列表当作案例测量结果。
 
 升级前至少搜索代码和配置中是否使用了下列废弃方向：
 
@@ -178,7 +183,7 @@ sha256sum ./selected-*.run > package-sha256.txt || exit 1
 
 将 `selected-*.run` 替换为实际选择的文件名；`.deb` 或 `.rpm` 包应按其包管理器和版本指南核验。若厂商提供的 `SHA256SUMS` 包含这些精确文件，应提取对应条目形成专用校验清单，再执行 `sha256sum -c hashlist`；摘要不匹配或文件缺失即停止。签名校验必须使用该版本发布说明指定的材料和工具，不能把“下载页提供签名”写成“签名已验证”。必要时再用 `file -- *.run` 核对安装包类型。不要使用未核验的镜像链接、旧板卡包或其他 SoC 的包。若下载页没有明确列出目标 310B 的配套关系，状态应记为 `unknown`，先做小范围兼容性核对，不得直接覆盖生产环境。
 
-## 首次安装、覆盖升级和 CANN 升级
+## 共用安装与升级操作
 
 ### 首次安装：驱动后固件
 
@@ -240,7 +245,7 @@ python -c 'import acl; print("PyACL import: ok")'
 
 ### 子包独立升级
 
-CANN 9.0.0/9.0.1 说明允许若干子包独立升级。独立升级不是“随便替换一个 `.so`”：
+CANN 9.0.X 说明允许若干子包独立升级。独立升级不是“随便替换一个 `.so`”：
 
 1. 组合包 `Ascend-cann-toolkit` 和 `Ascend-cann-ops` 必须已经安装；
 2. 子包版本必须在当前 CANN 版本说明的配套表中；
@@ -257,7 +262,172 @@ chmod +x "$hixl_package" || exit 1
 
 上例中的包名和版本号只是命令形状。执行前必须先查看该包的 `--help` 或对应安装指南；如果安装器提供独立的校验选项，应先完成校验，失败时停止，不要用 `--upgrade` 强行覆盖。
 
-## 升级后的验收顺序
+## 板卡专项教程
+
+### 路线 A：香橙派 AI Pro 8T
+
+本路线使用前文固定的 `20241128`、驱动 23.0、B309、CANN 7.0 基线。先完成“升级前的准备与门禁”，然后只升级 CANN 用户态软件：
+
+1. 使用下载中心取得的同一发布号 Toolkit 和 `kernels-310b` 包，完成 SHA-256 与 `--check`。
+2. 对已安装的 CANN 7.0 Toolkit 使用 `--upgrade`。
+3. 加载 `/usr/local/Ascend/ascend-toolkit/set_env.sh` 后安装目标 Kernels；若板端登记方式不同，以该发布包安装指南为准。
+4. 不刷写驱动或固件，不修改内核、IOMMU 和启动参数，不覆盖旧 OM。
+5. 执行统一验收中的门 2 至门 5，并额外完成 case8 的最小 ACL/VENC、OM、摄像头、CANN VENC 和 WebRTC 流程。
+
+本项目已实际验证 `20241128 + CANN 7.0 -> CANN 8.0` 的 ACL、CANN VENC 和 case8 WebRTC 结果。该结论不外推到 `20250925` 系统或 Atlas 板。
+
+### 路线 B：华为官方 Atlas 310B
+
+本路线的升级前基线是 CANN 7.0、驱动/HDK 23.0；目标是固件 `7.8.0.5.216`、驱动/HDK 25.5.0、CANN `9.2.0-beta.2`。执行顺序固定为：
+
+1. 按共用准备保存 CANN 7.0、驱动/HDK 23.0 的版本、配置、模型和日志。
+2. 按“覆盖升级”先升级固件，再升级驱动，重启后执行设备门检查。
+3. 按“升级 CANN Toolkit”配置 CANN 9.2.0-beta.2，执行 PyACL/ATC 检查。
+4. 完成本节后面的 HDMI/DRM 恢复；HDMI 未恢复时不得进入最终业务验收。
+5. HDMI 通过后执行统一验收门 2 至门 5，以及 Atlas 摄像头、OM、CANN VENC 和 WebRTC 回归。
+
+本路线的升级结果必须记录为完整组合，不得只写“CANN 9.2.0 环境”。
+
+#### Atlas HDMI/DRM 必做恢复
+
+本节针对 Atlas 200I A2 / Ascend 310B4、Ubuntu 22.04.5、内核 `6.6.0-72.0.0.76.h914.eulerosv2r15.ascend.aarch64`、驱动 25.5.0。先固定启动介质、DTB 和当前显示状态：
+
+~~~bash
+uname -a
+findmnt -no SOURCE /
+cat /proc/cmdline
+npu-smi info
+ls -l /dev/dri 2>&1 || true
+lsmod | grep -E 'ascend_vdp_drm|drm|drv_osal|ascend_qos' || true
+dmesg -T | grep -Ei 'drm|hdmi|vdp|hifb' | tail -n 200
+~~~
+
+本次板标识为 `M100-B51`，根分区为 `/dev/mmcblk1p2`。将 DTB 显示包含从 `hi1910B-vdp.dtsi` 切换到 `hi1910B-drm.dtsi`，并保留：
+
+~~~text
+console=tty1 cma=256M rootfstype=ext4 root=/dev/mmcblk1p2
+~~~
+
+DTB 写入 SD 卡实际启动位置并重启。使用驱动 25.5 SDK 的精确 `KERNEL_OBJ`、内核配置和 `Module.symvers` 构建 `drm_dma_helper.ko`；构建源文件为 `drm_gem_dma_helper.c`、`drm_fbdev_dma.c`、`drm_fb_dma_helper.c`。通用 Linux 6.6 构建会因厂商 ABI 不匹配失败，不能替代 SDK 构建。目标 ABI 为：
+
+~~~text
+6.6.0-72.0.0.76.h914.eulerosv2r15.ascend.aarch64 SMP mod_unload modversions aarch64
+~~~
+
+`drv_osal.ko` 和 `ascend_qos.ko` 由 `start-davinci.service` 加载，显示模块必须排在该服务之后。建立 `/etc/systemd/system/ascend-hdmi-drm.service`，保留 `drm`、`drm_kms_helper`、`drm_dma_helper`、`ascend_vdp_drm` 和元数据补丁的加载顺序。其关键单元内容为：
+
+~~~ini
+[Unit]
+Description=Load Ascend HDMI DRM stack
+Wants=systemd-modules-load.service
+Requires=start-davinci.service
+After=systemd-modules-load.service local-fs.target start-davinci.service
+Before=display-manager.service
+ConditionPathExists=/var/davinci/driver/ascend_vdp_drm.ko
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/modprobe drm
+ExecStart=/usr/sbin/modprobe drm_kms_helper
+ExecStart=/usr/sbin/modprobe drm_dma_helper
+ExecStart=/bin/sh -ec 'grep -qw ascend_vdp_drm /proc/modules || /usr/sbin/insmod /var/davinci/driver/ascend_vdp_drm.ko'
+ExecStart=/bin/sh -ec 'grep -qw ascend_drm_metadata_fix /proc/modules || /usr/sbin/insmod /lib/modules/6.6.0-72.0.0.76.h914.eulerosv2r15.ascend.aarch64/updates/ascend-hdmi/ascend_drm_metadata_fix.ko target_data=$(cat /sys/module/ascend_vdp_drm/sections/.data)'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+~~~
+
+本次 `DRM_IOCTL_VERSION` 的 name/date/description 为空，导致 `libdrm` 的 `drmGetVersion()` 在 Xorg 初始化期间中止。必须使用同一 SDK 构建 `ascend_drm_metadata_fix.ko`。完整源码如下：
+
+~~~c
+// SPDX-License-Identifier: GPL-2.0-only
+#include <linux/errno.h>
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/types.h>
+#include <drm/drm_drv.h>
+
+#define ASCEND_VDP_DRM_DRIVER_OFFSET 0xd0UL
+
+static unsigned long target_data;
+module_param(target_data, ulong, 0400);
+
+static char driver_name[] = "ascend_vdp_drm";
+static char driver_desc[] = "atlas-200a2 DRM driver";
+static char driver_date[] = "20261007";
+
+static int __init ascend_drm_metadata_fix_init(void)
+{
+    struct drm_driver *driver;
+
+    if (!target_data)
+        return -EINVAL;
+
+    driver = (struct drm_driver *)(target_data + ASCEND_VDP_DRM_DRIVER_OFFSET);
+    if (!driver->fops || driver->name || driver->desc || driver->date)
+        return -EINVAL;
+
+    driver->major = 1;
+    driver->minor = 0;
+    driver->patchlevel = 0;
+    driver->name = driver_name;
+    driver->desc = driver_desc;
+    driver->date = driver_date;
+    pr_info("ascend_drm_metadata_fix: populated ascend_vdp_drm DRM metadata\\n");
+    return 0;
+}
+
+module_init(ascend_drm_metadata_fix_init);
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Populate omitted Ascend VDP DRM driver metadata");
+~~~
+
+`ASCEND_VDP_DRM_DRIVER_OFFSET=0xd0` 是本次 `ascend_vdp_drm.ko` 中本地 `ext_drm_driver` 符号相对于模块 `.data` 段的偏移量。驱动、内核、编译器或结构布局改变后必须重新分析，不能复制到其他版本。模块中的 `driver->fops` 和空字段检查只用于阻止明显错误的重复补丁，不构成跨版本兼容性保证。
+
+本次构建产物及验证输出为：
+
+~~~text
+/lib/modules/6.6.0-72.0.0.76.h914.eulerosv2r15.ascend.aarch64/updates/ascend-hdmi/drm_dma_helper.ko
+SHA-256: e0847ac4c53b471a8d28bee372fef44547217e8a94ce2c89471e7f349359fa0b
+
+/lib/modules/6.6.0-72.0.0.76.h914.eulerosv2r15.ascend.aarch64/updates/ascend-hdmi/ascend_drm_metadata_fix.ko
+SHA-256: ce8f96929d7ad5d198d1019d2c7fc0da4b47ea40e83186f130ca9c3e833106ed
+
+DRM_IOCTL_VERSION: 1.0.0 name=ascend_vdp_drm date=20261007 desc=atlas-200a2 DRM driver
+~~~
+
+恢复原系统的 `SDDM + LXQt + xfwm4` 图形方案。HDMI/DRM 修复不需要额外安装其他桌面环境；显示管理器只需要在 DRM 设备初始化之后启动：
+
+~~~bash
+# 停用当前显示管理器；原系统保留的 SDDM/LXQt 不需要重新安装。
+current_dm="$(basename "$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null || true)")"
+if [ -n "$current_dm" ]; then sudo systemctl disable --now "$current_dm" || true; fi
+sudo systemctl disable --now lightdm.service || true
+sudo systemctl enable sddm.service
+# SDDM 的启动前检查要求这个文件指向 /usr/bin/sddm。
+printf '%s\n' /usr/bin/sddm | sudo tee /etc/X11/default-display-manager
+sudo systemctl set-default graphical.target
+sudo systemctl daemon-reload
+sudo systemctl enable ascend-hdmi-drm.service
+sudo systemctl restart sddm.service
+~~~
+
+如果 `sddm.service` 因 `ExecStartPre` 失败，先检查 `/etc/X11/default-display-manager` 是否仍指向旧的显示管理器路径，修正后执行：
+
+~~~bash
+sudo systemctl reset-failed sddm.service
+sudo systemctl start sddm.service
+~~~
+
+`/var/lib/sddm/state.conf` 应保留 `Session=/usr/share/xsessions/lxqt.desktop`，登录 `HwHiAiUser` 后进入 LXQt。若换系统时使用了不含原桌面包的最小镜像，只恢复原镜像对应的 SDDM/LXQt 包即可，不要为了验证 HDMI 额外引入新的桌面环境。
+
+验收必须同时包括 `/dev/dri/card0`、三个显示模块、`HDMI-A-1` 的 `connected/enabled/DPMS`、EDID、KMS active CRTC、SDDM 登录界面和 `npu-smi`。登录后再确认会话为 LXQt；最后在显示器前确认实际画面。HDMI 通过后才能继续 Atlas 的 PyACL、OM、摄像头、CANN VENC、WebRTC、回归和性能测试。
+
+## 升级后的统一验收顺序
 
 升级验收分成五个门，不应把一个门的通过写成全链路通过。
 
@@ -329,7 +499,7 @@ curl --fail "http://127.0.0.1:${service_port}/health"
 
 ### 废弃接口
 
-CANN 9.0.0 说明把若干 Transformer 相关接口标记为废弃，并给出替代接口；说明中还指出部分特性将在后续版本移除。升级项目应先用静态搜索找出旧接口，再按实际调用路径迁移。不要因为编译仍然通过就认为废弃接口可以长期保留。
+CANN 9.0.X 说明把若干 Transformer 相关接口标记为废弃，并给出替代接口；说明中还指出部分特性将在后续版本移除。升级项目应先用静态搜索找出旧接口，再按实际调用路径迁移。不要因为编译仍然通过就认为废弃接口可以长期保留。
 
 ~~~bash
 rg -n "aclnn(GroupedMat[Mm]ul|PromptFlashAttention|IncreFlashAttention|FusedInferAttentionScore)" \
@@ -340,18 +510,18 @@ rg -n "aclnn(GroupedMat[Mm]ul|PromptFlashAttention|IncreFlashAttention|FusedInfe
 
 ### 版本说明中的已知问题
 
-用户提供的 CANN 9.0.0 说明记录了通信域中 `int64` 集合通信算子可能影响断链后的快速恢复，也记录了跨超场景 `sendrecv` 偶发卡住的问题。它们属于版本说明中的风险提示，不是本仓库 310B 已观察到的故障。若案例使用相关通信路径，应在目标设备和实际拓扑上设计单独的故障恢复测试；不使用该路径时，在报告中写明“不适用”。
+CANN 9.0.X 版本说明记录了通信域中 `int64` 集合通信算子可能影响断链后的快速恢复，也记录了跨超场景 `sendrecv` 偶发卡住的问题。它们属于版本说明中的风险提示，不是本仓库 310B 已观察到的故障。若案例使用相关通信路径，应在目标设备和实际拓扑上设计单独的故障恢复测试；不使用该路径时，在报告中写明“不适用”。
 
-### 9.0.1 补丁的使用方式
+### CANN 9.0.X 小版本补丁的使用方式
 
-用户提供的 9.0.1 文本列出了配套关系更新和若干修复，但没有替代目标产品下载页对 310B 的筛选。采用 9.0.1 时应保留：
+同一 9.0.X 发布线的小版本补丁可能更新配套关系和修复，但不能替代目标产品下载页对 310B 的筛选。采用任一 9.0.X 小版本时应保留：
 
-* 9.0.0 到 9.0.1 的包名、架构和摘要；
+* 目标 9.0.X 小版本的包名、架构和摘要；
 * 驱动、固件、Toolkit、ops/NNAL 的完整组合；
 * 旧版本基线报告和新版本回归报告；
 * 任何因接口废弃、模型算子或框架插件变化产生的适配提交。
 
-不要只升级 Toolkit 而把驱动、固件和 `torch_npu` 的旧版本写成“9.0.1 环境”。准确写法应列出每个组件的实际版本和证据。
+不要只升级 Toolkit 而把驱动、固件和 `torch_npu` 的旧版本写成“9.0.X 环境”。准确写法应列出每个组件的实际版本和证据。
 
 ## 回退与故障处理
 
@@ -391,21 +561,25 @@ ss -ltnp > "$failure_root/listeners.txt" 2>&1 || true
 ## 版本记录模板
 
 ~~~text
+路线：A 香橙派 AI Pro 8T / B 华为官方 Atlas 310B
 设备：
 SoC/算力等级：
 操作系统/内核/架构：
 升级前驱动：
 升级前固件：
 升级前 CANN Toolkit/ops/NNAL：
+升级前 HDK：
 升级前 Python/框架插件：
 目标驱动：
 目标固件：
 目标 CANN Toolkit/ops/NNAL：
+目标 HDK：
 安装包摘要与签名位置：
 升级顺序：首次安装 / 覆盖升级 / 仅 CANN / 子包独立升级
 维护窗口：
 回滚包与配置位置：
 设备门结果：
+Atlas HDMI/DRM 门结果：
 运行时门结果：
 模型门结果：
 服务门结果：
@@ -417,11 +591,11 @@ SoC/算力等级：
 ## 资料来源与使用边界
 
 * [昇腾版本配套查询助手](https://www.hiascend.com/developer/download/compatibility)：310B 系列产品的当前软件版本配套查询。本文表格于 2026-10-03 查询，官网将 2026/06/30 标为推荐。
-* [CANN 9.0.0 版本说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/releasenote/release-notes.md)：版本配套、组合包、特性变化、废弃项和已知问题。
+* [CANN 9.0.X 版本说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/releasenote/release-notes.md)：版本配套、组合包、特性变化、废弃项和已知问题。
 * [昇腾资源下载中心](https://www.hiascend.com/developer/download/ascend-driver)：按产品、操作系统、架构筛选驱动、固件和 CANN 包。
 * [升级前必读](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/softwareinst/instg/instg_0028.html)：升级影响、回退限制和固件—驱动—CANN 的升级顺序。具体版本应以对应版本的安装指南为准。
 * [安装 NPU 驱动和固件](https://www.hiascend.com/document/detail/en/CANNCommunityEdition/900/softwareinst/instg/instg_0005.html?InstallType=local&Mode=PmIns&OS=Debian)：安装包形式、权限、默认路径和用户组注意事项。
 * [CANN 下载中心](https://www.hiascend.com/cann/download)：按具体产品筛选驱动、固件、Toolkit 和配套版本。
 * [Ascend 310B 驱动升级指南](https://www.hiascend.com/document/detail/zh/Atlas%20200I%20A2/24.1.RC1/EP/upgradeguide/upgrad_006.html)：使用 `upgrade-tool` 查询设备侧系统版本的示例。
 
-本附录中的当前版本矩阵来自上述官方查询页；9.0.1 配套表和补丁摘要来自用户提供的版本说明文本。正式升级前，应在昇腾下载中心重新确认页面、包名、签名、适用产品和当前版本的安装指南；本附录不替代厂商发布的安装手册，也不构成对未测试硬件组合的兼容性承诺。
+本附录中的配套关系来自上述官方查询页和各发布线版本说明。正式升级前，应在昇腾下载中心重新确认页面、包名、签名、适用产品和当前版本的安装指南；本附录不替代厂商发布的安装手册，也不构成对未测试硬件组合的兼容性承诺。

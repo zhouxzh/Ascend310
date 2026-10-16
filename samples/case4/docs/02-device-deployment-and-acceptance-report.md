@@ -46,7 +46,7 @@ curl --fail http://127.0.0.1:7860/
 4. 删除模板并确认列表为空。
 5. 重启服务后重新检查模板状态。
 
-模板 namespace 必须为 `<model_id>__npu__mixed_fp16`。当前内测版本固定在发行目录保存明文模板和图片：`data/templates/` 保存 `PWST1` embedding 模板，`data/captures/` 保存用户主动触发的原图、ROI 和 `index.json`。连续预览帧不落盘；删除模板只删除 embedding，关联图片仍保留。当前版本不读取密钥或外部模板目录，不适用于生产部署。
+模板 namespace 必须为 `<model_id>__npu__mixed_fp16`。当前内测版本固定在发行目录保存明文模板和图片：`data/templates/` 保存 `PWST1` embedding 模板，`data/captures/` 保存最终入选注册样本、用户主动识别图像及 `index.json`。连续预览和自动注册拒绝帧不落盘；删除模板会同步删除关联注册原图、ROI 和索引记录。当前版本不读取密钥或外部模板目录，不适用于生产部署。
 
 检查归档：
 

@@ -1,6 +1,6 @@
 # Case9 当前运行手册：Qwen2.5 ACL 基线与 MindSpore 候选链
 
-_更新日期：2026-10-15。当前 8T 开发板地址为 `192.168.1.90`；`192.168.11.14` 与 `192.168.8.178` 是同一块 Ascend310B4/8T 板的历史地址。当前 20T 开发板地址为 `192.168.1.101`；`.95` 与 `.210` 仅保留为同一块 Ascend310B1/20T 板的历史 provenance。音频、ASR/TTS 与 XiaoZhi 仍暂停。_
+_更新日期：2026-10-16。当前 8T 开发板地址为 `192.168.1.90`；`192.168.11.14` 与 `192.168.8.178` 是同一块 Ascend310B4/8T 板的历史地址。当前 20T 开发板地址为 `192.168.1.101`；`.95` 与 `.210` 仅保留为同一块 Ascend310B1/20T 板的历史 provenance。音频、ASR/TTS 与 XiaoZhi 仍暂停。20T MindSpore 批次详见 [2026-10-16 完整验收](51-mindspore-20t-complete-acceptance-20261016.md)。_
 
 ---
 
@@ -38,7 +38,7 @@ Qwen2.5 静态 KV ACL 也完成完整机器门，但首事件 p50 为 `4727.8 ms
 | `192.168.1.90`（历史地址 `.11.14`；原采集地址 `.178`） | Ascend310B4 / 8T；`case9-acl-om`；CANN 8.0.0 | 本地已校验完整批次 `20260827T113500Z`、usageperf `20260827T124500Z`；MindSpore Qwen 历史批次、重启小批次和切换冒烟也已留证；候选日志/响应文件已本地 SHA-256 校验 | 同一板 IP 变更；ACL 工件/API/长输出/稳定性和机器协议门已通过；MindSpore Qwen 历史报表为 9/9，`.90` 地址的 G0 环境/SoC/工件复核已补齐，但严格 placement 诊断仍失败，B4 候选保持 `blocked`；B4 相对旧 8082 p50 基线改善约 21.96%；中文工程定性复核约 9/10 可理解，正式人工签字未完成且含硬件事实错误 |
 | `192.168.8.178` | 同一块 Ascend310B4 / 8T 的历史采集地址 | 上述报告的 provenance 地址 | 不再作为连接入口；报告仍不可改写 |
 | `192.168.8.210`（历史地址） | Ascend310B1 / 20T；CANN 8.0.0；`base + base-overlay` | Qwen2.5 历史完整批次和 usageperf provenance | 历史 Qwen2.5 机器门及 16.32% 结果仍有效；该旧地址不作为当前入口。DeepSeek 新实验见下一行 |
-| `192.168.1.101`（当前 20T；`.95` 为历史地址） | Ascend310B1 / 20T；CANN 8.0.0；MindSpore 2.4.10/MindNLP 0.4.1；shared dirty-base | 本轮 Qwen1.5 和 Qwen2.5 原始报告分别位于板端 `case9-mindspore-chat/.../qwen1.5-20t-current-20261015/` 与 `case9-om-20t-20260914/.../qwen25-b1-current-20261015/` | Qwen1.5 当前完整机器门通过，首 token p50 `655.5 ms`、约 `1.544 token/s`，是实验性候选首选；Qwen2.5 ACL 当前完整机器门通过但约 `0.422 token/s`，保留为功能验证。DeepSeek/TinyLlama 的 `.95` 历史证据不自动提升为当前可用结论 |
+| `192.168.1.101`（当前 20T；`.95` 为历史地址） | Ascend310B1 / 20T；CANN 8.0.0；MindSpore 2.4.10/MindNLP 0.4.1；shared dirty-base | 2026-10-16 批次原始报告位于板端 `~/case9-mindspore-chat/reports/mindspore-chat/` | Qwen1.5 当前短回归通过并沿用完整性能，仍为 `experimental_dirty_base`；TinyLlama、DeepSeek、Qwen2.5 两个版本均在生成阶段阻断；Qwen3 因 loader 缺失阻断；MiniCPM3 因官方 Modelers revision 未锁定阻断。HF 模型默认使用 `HF_ENDPOINT=https://hf-mirror.com`，不改变哈希门。详见 [20T 完整验收](51-mindspore-20t-complete-acceptance-20261016.md) |
 
 IP 变化不会改变 SoC、OM、contract、tokenizer 或已记录的进程证据。若更换硬件、
 系统、CANN、模型或 OM，必须新建 UTC 批次并重新执行门禁；仅换 IP 不需要伪造一轮
@@ -158,6 +158,9 @@ cd ~/case9-mindspore-chat
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate base
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
+# Board-side Hugging Face access uses the mirror; keep fixed revision and
+# SHA-256 checks enabled. Profiles with mirror=modelers use Modelers separately.
+export HF_ENDPOINT=https://hf-mirror.com
 bash scripts/case9-modelctl.sh list
 bash scripts/case9-modelctl.sh status
 CASE9_ALLOW_EXPERIMENTAL=1 bash scripts/case9-modelctl.sh switch qwen1.5-0.5b-mindspore

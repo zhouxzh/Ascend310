@@ -89,14 +89,10 @@ FILES=(
   tests/test_admin_auth.py tests/test_display_policy.py
   tests/test_mobileclip_precision_sweep.py tests/test_precision_pipeline.py
   tests/test_mobileclip_precision_promotion.py tests/test_mobileclip_group_conv_rewrite.py
-  docs/00-github-research-and-porting-plan.md
-  docs/01-coco-cn-test-protocol.md docs/02-ascend310b4-deployment-and-acceptance.md
-  docs/03-album-server-api-and-esp32-protocol.md docs/04-photopainter-7in3-integration.md
-  docs/05-device-policy-rendering-and-security.md docs/06-photopainter-deployment-and-acceptance.md
-  docs/07-touchscreen-ui-and-operations.md docs/08-model-pipeline-and-npu-admission.md
-  docs/09-index-storage-and-photo-lifecycle.md docs/10-smart-selection-and-weather.md
-  docs/11-photoframe-active-push.md docs/12-mobileclip-cross-board-compatibility.md
-  docs/13-photopainter-serial-ip-and-wifi.md docs/14-wake-and-discover-esp32-photoframes.md
+  docs/README.md docs/01-deployment-and-operation.md docs/02-photo-library-and-index.md
+  docs/03-touchscreen-and-display.md docs/04-esp32-device-management.md
+  docs/05-models-and-npu.md docs/06-api-reference.md
+  docs/07-validation-and-troubleshooting.md
 )
 
 for file in "${FILES[@]}"; do

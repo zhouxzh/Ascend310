@@ -22,7 +22,9 @@ websockets>=12,<16
 
 # The local and board verification entry point. Existing unittest-style test
 # cases run under pytest; no separate unittest command is maintained.
-pytest>=8,<9
+# The board image includes MindNLP 0.4.1, which requires pytest 7.2.0.
+# Keep the verification runner compatible with that preinstalled runtime.
+pytest==7.2.0
 
 # ONNX files are downloaded as published release assets and may be validated
 # locally before ATC conversion. The aarch64 board runs OM through CANN/PyACL

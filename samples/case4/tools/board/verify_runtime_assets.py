@@ -10,7 +10,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from palmprint_workbench.config import ROOT
+from palmprint_workbench.config import ROOT, manual_test_enabled
 
 from palmprint_workbench.domain.registry import ModelRegistry, ModelSpec
 
@@ -126,7 +126,11 @@ def validate_embedding(
 ) -> list[dict[str, Any]]:
     candidate_id = spec.raw.get("candidate_id")
     if isinstance(candidate_id, str):
-        decision = registry.candidate_admission(candidate_id, verify_assets=True)
+        decision = (
+            registry.manual_test_candidate_admission(candidate_id, verify_assets=True)
+            if manual_test_enabled()
+            else registry.candidate_admission(candidate_id, verify_assets=True)
+        )
         if not decision.admitted:
             raise ValueError(
                 f"Production admission failed for {candidate_id}: "
@@ -259,7 +263,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     registry = ModelRegistry()
     if args.model == "all":
-        selected = [spec.id for spec in registry.all()]
+        selected = [
+            spec.id for spec in registry.all(include_manual_test=manual_test_enabled())
+        ]
     else:
         selected = [args.model]
     hashes = conversion_hashes()
@@ -268,7 +274,10 @@ def main(argv: list[str] | None = None) -> int:
 
     for model_id in selected:
         try:
-            spec = registry.get_runtime(model_id)
+            spec = registry.get_runtime(
+                model_id,
+                include_manual_test=manual_test_enabled(),
+            )
             if spec.kind != "embedding":
                 raise ValueError(f"unsupported production model kind: {spec.kind}")
             output["models"].extend(

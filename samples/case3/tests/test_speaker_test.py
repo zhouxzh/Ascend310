@@ -380,6 +380,25 @@ class SpeakerOutputCatalogTest(unittest.TestCase):
         )
         self.assertTrue(compatible[0]["is_default"])
 
+    def test_piano_outputs_keep_pulse_sink_when_portaudio_is_unavailable(self) -> None:
+        from midi_ddsp_webui.speaker import query_piano_audio_outputs
+
+        pulse_output = {
+            "id": "pulse:usb-speaker",
+            "name": "USB Speaker",
+            "backend": "pulse",
+            "is_default": True,
+            "max_output_channels": 2,
+        }
+        with patch(
+            "midi_ddsp_webui.speaker.query_speaker_outputs",
+            return_value=[pulse_output],
+        ):
+            outputs = query_piano_audio_outputs(
+                lambda: (_ for _ in ()).throw(RuntimeError("PortAudio library not found"))
+            )
+        self.assertEqual([item["id"] for item in outputs], ["pulse:usb-speaker"])
+
     def test_pulse_catalog_exposes_friendly_bluetooth_sink(self) -> None:
         sinks = [
             {

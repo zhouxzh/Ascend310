@@ -28,7 +28,9 @@ def test_deployment_stages_hashes_and_switches_the_frontend_atomically() -> None
 
 def test_deployment_includes_the_verified_ddsp_vst_feature_runtime() -> None:
     deployment = (ROOT / "tools" / "deploy_midi_ddsp_webui.ps1").read_text(encoding="utf-8")
-    assert '"models/om/ddsp_vst_feature_mixed_float16.om"' in deployment
+    assert '$DdspVstFeatureModel = Join-Path $ProjectRoot "models/om/ddsp_vst_feature_mixed_float16.om"' in deployment
+    assert 'Invoke-Transfer "Copy DDSP-VST Feature OM"' in deployment
+    assert 'Invoke-Transfer "Copy DDSP-VST Control OM $($Model.Name)"' in deployment
     assert '"models/manifests/SHA256SUMS.txt"' in deployment
     assert "a1973830eca98111642dcb331e0a1a163f7a664d871e6d15f40fdc70f9b98db4" in (
         ROOT / "midi_ddsp_webui" / "ddsp_vst_effect.py"
@@ -60,6 +62,14 @@ def test_deployment_uses_the_complete_v101_piano_bundle_atomically() -> None:
     assert "1a4a2500ae357577a4a6f7378c28d54235f543663b9b69cc3cf5938929c458d7" in deployment
     assert "Refusing to overwrite an existing Piano-DDSP bundle" in deployment
     assert ".active-bundle-" in deployment
+
+
+def test_deployment_builds_the_first_midi_ddsp_bundle_on_the_board() -> None:
+    deployment = (ROOT / "tools" / "deploy_midi_ddsp_webui.ps1").read_text(encoding="utf-8")
+    assert 'Copy-Tree "models/midi_ddsp/stateful_v2_batched/onnx"' in deployment
+    assert "VOICE_BATCH_SIZES=1 bash tools/convert_midi_ddsp_stateful_bundle.sh" in deployment
+    assert "TE_PARALLEL_COMPILER=1 OMP_NUM_THREADS=1 MULTI_THREAD_COMPILE=0" in deployment
+    assert "MIDI-DDSP bundle conversion did not produce" in deployment
 
 
 def test_requirements_keep_runtime_validation_without_export_stack() -> None:

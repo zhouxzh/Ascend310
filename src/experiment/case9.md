@@ -1,6 +1,6 @@
 # 案例 9：智能聊天机器人
 
-_本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验，同时维护两条彼此独立的路线：Qwen2.5 静态 KV 的 ONNX -> OM -> 原生 ACL 路线，以及 MindSpore/MindNLP 候选路线。当前板卡地址、历史别名和逐板环境边界见第 3 节。2026-10-15 的 20T 完整机器验收确认：Qwen1.5-0.5B-Chat 的 MindSpore 路线是当前最适合文字聊天的实验性候选；Qwen2.5-0.5B 静态 KV OM 的 ACL 路线功能完整但明显偏慢。TinyLlama 中文质量未通过；DeepSeek、Qwen3、MiniCPM3 等未在本次形成完整当前验收，不列为可用。本教程只写入有原始证据的结果；`not-run`（本轮有意未执行）和 `blocked`（前置条件未满足）不等同于对硬件或模型的普遍否定。_
+_本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验，同时维护两条彼此独立的路线：Qwen2.5 静态 KV 的 ONNX -> OM -> 原生 ACL 路线，以及 MindSpore/MindNLP 候选路线。2026-10-16 在当前 20T 地址 `192.168.1.101` 完成了八个 Profile 的逐项验收：Qwen1.5 短回归通过并沿用完整性能；TinyLlama、DeepSeek、Qwen2.5 两个版本在生成阶段阻断；Qwen3 因 MindNLP loader 缺失阻断；MiniCPM3 因其 Modelers revision 未锁定而阻断。HF 权重默认通过 `HF_ENDPOINT=https://hf-mirror.com` 下载；这只改变传输入口，不改变哈希和模型来源。只有 Qwen1.5 保留为 `experimental_dirty_base` 候选，其他 Profile 不可切换。本教程只写入有原始证据的结果；`not-run` 和 `blocked` 不等同于对硬件或模型的普遍否定。_
 
 ## 1. 当前目标和已暂停范围
 
@@ -11,9 +11,9 @@ _本教程面向 Ascend310B4/8T 与 Ascend310B1/20T 的文本 LLM 实验，同�
 | Profile 或链路 | 当前状态 |
 | --- | --- |
 | Qwen2.5 静态 KV ACL：`8080 -> 7861 -> 7865` | 现有正式基线不在本次切换；20T 当前 `.101` 的 B1 OM 完整验收通过，但短问候首事件 p50 约 `4.73 s`、约 `0.422 token/s`，不作为当前流畅文字入口 |
-| `qwen1.5-0.5b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 8T 保持 `blocked`；20T 当前批次全机器门通过，首 token p50 约 `655.5 ms`、约 `1.544 token/s`，当前标记为 `experimental_dirty_base`，人工质量/正式准入待签字 |
-| `tinyllama-1.1b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 两板均保留 `blocked`；历史 `.95` 缺口批次 8/9，32/48-token 输出出现 `U+FFFD`，中文机器质量 7/10 |
-| `deepseek-r1-qwen-1.5b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 8T 历史 `.11.14` 缺口批次 9/9 机器门和性能通过；历史 `.95` 隔离 API 机器门通过但中文质量/dirty-base 准入未完成，保持 `blocked` |
+| `qwen1.5-0.5b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 8T 保持 `blocked`；20T 当前短回归通过，完整性能首 token p50 `655.5 ms`、约 `1.544 token/s`，标记 `experimental_dirty_base`，人工质量/正式准入待签字 |
+| `tinyllama-1.1b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 20T 工件加载通过，但 32-token 出现 `U+FFFD`、随后服务崩溃；两板均 `blocked` |
+| `deepseek-r1-qwen-1.5b-mindspore`：`.90` B4/8T 与 `.101` B1/20T | 20T 工件加载通过，首个生成触发 TBE `task_distribute` 崩溃；当前 20T `blocked`，结论仅适用于本次版本组合 |
 | 音频、麦克风、ASR/TTS、PTT、XiaoZhi、OTA、设备 WebSocket | 暂停，不安装、不启动、不验收 |
 
 机器门只表示协议、资源和运行检查通过，不表示回答正确或适合生产。正式入口、音频
@@ -35,6 +35,7 @@ token 长输出、10 轮稳定性、中文机器探测、协议边界和 2 次�
 | --- | --- | --- | ---: | ---: | ---: | --- |
 | Qwen1.5-0.5B-Chat | MindSpore 2.4.10 + MindNLP 0.4.1 | `observed-pass` | `655.5 ms` | `1295.4 ms` | `1.544` | 当前首选文字聊天候选 |
 | Qwen2.5-0.5B-Instruct 静态 KV 1024 FP32 OM | 原生 ACL/PyACL | `observed-pass` | `4727.8 ms` | `4741.3 ms` | `0.422` | 功能验证候选，不作为当前流畅入口 |
+| Qwen2.5-0.5B/1.5B MindSpore | MindSpore 2.4.10 + MindNLP 0.4.1 | `observed-fail` | 仅 1.5B 的 2-token/8/16-token短输出成功 | 32-token 后 TBE 崩溃 | N/A | 20T `blocked`，不可用于聊天服务 |
 
 Qwen1.5 的 64-token 请求实际生成 55 token 后正常 `stop`，10 轮稳定性为 `10/10`；
 长中文输出连贯且 UTF-8 完整。它的健康接口同时记录 `device_target=Ascend` 与
@@ -65,11 +66,11 @@ AICore 约 `75-80%`，设备内存约 `9.0 GB`，证明该路线确实执行在 
 | `qwen1.5-0.5b-mindspore` | 已测但 B4 `blocked` | 已测 | B4 身份门待补；B1 共享 `base`，技术通过后为 `experimental_dirty_base` |
 | `tinyllama-1.1b-mindspore` | 已测 | 已测 | 长输出/中文质量失败，保持 `blocked`；英文单独报告 |
 | `deepseek-r1-qwen-1.5b-mindspore` | 兼容性已测 | 优先已测 | 中文质量与正式准入独立审核 |
-| `qwen2.5-0.5b-mindspore` | `blocked`：context-only 诊断有输出，但严格 placement 证据缺失 | `not-run` | 不能用诊断输出启动服务 |
-| `qwen2.5-1.5b-mindspore` | `blocked`：七个文件已同步并校验；污染 CANN/PYTHONPATH 的初次 SIGSEGV 仅作历史证据，正确 CANN v4 已完成加载和两 token context-only 诊断 | `not-run` | placement、生成/API/质量/性能均未完成；内存门原始记录为 `samples/case9/docs/37-qwen25-1.5b-8t-memory-gate-20260904.md` |
-| `qwen3-0.6b-mindspore` | `blocked`：MindNLP 0.4.1 无 Qwen3 loader | `not-run` | 不升级环境 |
-| `qwen3-1.7b-mindspore` | `blocked`：MindNLP 0.4.1 无 Qwen3 loader | `not-run` | 不升级环境 |
-| `minicpm3-4b-mindspore` | 不执行 | `not-run` | 仅使用官方 20T/24G Modelers FP16 示例 |
+| `qwen2.5-0.5b-mindspore` | `blocked`：context-only 诊断有输出，但严格 placement 证据缺失 | `blocked`：已加载并通过 health/models，首个生成触发 TBE 崩溃 | 生成、稳定性、质量和性能未通过 |
+| `qwen2.5-1.5b-mindspore` | `blocked`：七个文件已同步并校验；正确 CANN v4 已完成加载和两 token context-only 诊断 | `blocked`：JSON/SSE 的 2-token 及 8/16-token 通过，32-token 超时后 TBE 崩溃 | 当前仅短输出旁证，不能启动候选聊天服务 |
+| `qwen3-0.6b-mindspore` | `blocked`：MindNLP 0.4.1 无 Qwen3 loader | `blocked`：同一 loader 探测确认无 Qwen3 loader，未下载权重 | 不升级环境 |
+| `qwen3-1.7b-mindspore` | `blocked`：MindNLP 0.4.1 无 Qwen3 loader | `blocked`：同一 loader 探测确认无 Qwen3 loader，未下载权重 | 不升级环境 |
+| `minicpm3-4b-mindspore` | 不执行 | `blocked`：专用类可见，但官方权重来自 Modelers；当前 `main` 未形成固定 revision/哈希锁，未下载权重 | 不把工件来源阻断写成模型不兼容 |
 
 OpenPangu、EE-Model、TeleChat、BitCPM、MiniCPM5、MiniMind 和 Haidass 等条件候选
 若依赖 Torch/Torch-NPU、vLLM、MindIE、新版 CANN 或缺少 310B 证据，则登记为
@@ -131,6 +132,9 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 unset PYTHONNOUSERSITE
 cd ~/case9-mindspore-chat
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
+# HF 权重默认经由镜像传输；固定 revision、大小和 SHA-256 校验不能省略。
+export HF_ENDPOINT=https://hf-mirror.com
+# mirror=modelers 的 Profile（例如 MiniCPM3）走 Modelers 独立 URL，不能用 HF_ENDPOINT 替代。
 ```
 
 MindSpore 路线直接调用 MindSpore/MindNLP；现有 `torch`、`torch_npu`、`torchaudio`

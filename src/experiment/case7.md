@@ -4,7 +4,7 @@
 
 ---
 
-## 🎯 案例目标与问题定义
+## 案例目标与问题定义
 
 传统电子相册只会按文件名或固定顺序轮播。Case7 要解决的是一个更完整的问题：照片由手机上传到局域网服务器，服务器在 Ascend 310B 上建立语义索引，再根据中文/英文查询、日期、天气和最近显示历史选择合适照片；同一份选择结果既服务开发板上的 10 寸触摸屏，也服务已登记的 Waveshare ESP32-S3-PhotoPainter 和 Seeed Studio reTerminal E1002 两类 ESP32 电子纸终端。当前已有的实机记录按设备分别标注，不能把一台设备的历史结果当作另一台已验收。Orange Pi 的 SPI/GPIO 直连微雪 E6 是独立的本机输出路径，不是第三种可注册 ESP32 相册。
 
@@ -18,7 +18,7 @@
 
 生产服务只接受已准入的 Ascend OM，不回退 CPU/PyTorch 推理。CPU 负责图像解码、OpenCV Haar 人数计数、FAISS、JPEG/E6 准备和离线 ONNX 数值参考。
 
-## 🏗️ 系统总体架构
+## 系统总体架构
 
 下面的架构图展示手机、触摸屏和远程终端如何共享 310B 上的 FastAPI、索引和 NPU 资源。
 
@@ -27,22 +27,22 @@ flowchart LR
     accTitle: 智能相册系统架构
     accDescr: 手机、触摸屏和远程显示设备通过 FastAPI 访问 SQLite/FAISS 索引、Ascend 310B NPU 和天气服务
 
-    phone[👤 手机浏览器]
-    touch[🖥️ 10 寸触摸屏]
-    esp32[🔌 Waveshare PhotoPainter / Seeed E1002]
-    e6[🔌 Orange Pi SPI/GPIO 直连微雪 E6]
+    phone[手机浏览器]
+    touch[10 寸触摸屏]
+    esp32[Waveshare PhotoPainter / Seeed E1002]
+    e6[Orange Pi SPI/GPIO 直连微雪 E6]
 
-    subgraph server[🖥️ Orange Pi AIpro / Ascend 310B]
-        api[🌐 FastAPI 服务]
-        selector[🧠 智能选图器]
-        runtime[⚙️ PyACL NPU 运行时]
-        storage[(💾 SQLite 元数据)]
-        faiss[(💾 逐模型 FAISS 索引)]
-        renderer[🎨 按需渲染器]
+    subgraph server[Orange Pi AIpro / Ascend 310B]
+        api[FastAPI 服务]
+        selector[智能选图器]
+        runtime[PyACL NPU 运行时]
+        storage[(SQLite 元数据)]
+        faiss[(逐模型 FAISS 索引)]
+        renderer[按需渲染器]
     end
 
-    weather[☁️ Open-Meteo]
-    models[📦 MobileCLIP / Chinese-CLIP / ResNet50 OM]
+    weather[Open-Meteo]
+    models[MobileCLIP / Chinese-CLIP / ResNet50 OM]
 
     phone -->|上传、搜索、配置| api
     touch -->|图库、控制、设置| api
@@ -80,17 +80,17 @@ flowchart TB
     accTitle: 相册数据处理流程
     accDescr: 照片从上传和校验开始，经过三模型索引，最终被文本检索或智能选择并按设备能力渲染
 
-    input([📥 上传或扫描照片]) --> validate[🔍 校验路径、解码、大小和 SHA-256]
-    validate --> metadata[🏷️ 写入 EXIF、时间、尺寸；保留兼容元数据]
-    metadata --> encode[🧠 三模型 NPU 图像编码]
-    encode --> vector[(💾 SQLite embedding + FAISS)]
-    query[👤 文本、图片或轮播时隙] --> route{🔍 选择模型或策略}
-    route --> search[🔍 归一化向量内积检索]
-    route --> select[🧠 日期、天气、兼容元数据和历史评分]
-    search --> result[📝 当前照片 revision]
+    input([上传或扫描照片]) --> validate[校验路径、解码、大小和 SHA-256]
+    validate --> metadata[写入 EXIF、时间、尺寸；保留兼容元数据]
+    metadata --> encode[三模型 NPU 图像编码]
+    encode --> vector[(SQLite embedding + FAISS)]
+    query[文本、图片或轮播时隙] --> route{选择模型或策略}
+    route --> search[归一化向量内积检索]
+    route --> select[日期、天气、兼容元数据和历史评分]
+    search --> result[当前照片 revision]
     select --> result
-    result --> render[🎨 尺寸、EXIF、叠加和 JPEG/E6 渲染]
-    render --> output[📤 触摸屏、手机、ESP32 或 E6]
+    result --> render[尺寸、EXIF、叠加和 JPEG/E6 渲染]
+    render --> output[触摸屏、手机、ESP32 或 E6]
 ```
 
 ### 服务启动与请求时序
@@ -100,19 +100,19 @@ sequenceDiagram
     accTitle: NPU 服务启动时序
     accDescr: 服务启动先加载 CANN 和注册表，再恢复 SQLite/FAISS 状态，最后接受手机或设备请求
 
-    participant launcher as 🚀 启动脚本
-    participant cann as ⚙️ CANN/PyACL
-    participant registry as 📦 模型注册表
-    participant index as 💾 SQLite/FAISS
-    participant api as 🌐 FastAPI
-    participant client as 👤 客户端
+    participant launcher as 启动脚本
+    participant cann as CANN/PyACL
+    participant registry as 模型注册表
+    participant index as SQLite/FAISS
+    participant api as FastAPI
+    participant client as 客户端
 
     launcher->>cann: import acl 与设备初始化
-    cann-->>launcher: ✅ Ascend 310B 可用
+    cann-->>launcher: Ascend 310B 可用
     launcher->>registry: 校验 admitted OM 与 SHA-256
-    registry-->>launcher: ✅ 三个模型准入
+    registry-->>launcher: 三个模型准入
     launcher->>index: 恢复照片、embedding 和显示状态
-    index-->>launcher: ✅ 500 张 COCO-CN 图库
+    index-->>launcher: 500 张 COCO-CN 图库
     launcher->>api: 启动 7860
     client->>api: GET /api/health 或 POST /api/search/text
     api->>cann: 单锁执行图像/文本 OM
@@ -122,7 +122,7 @@ sequenceDiagram
     api-->>client: JSON、JPEG 或 304
 ```
 
-## 🧱 硬件与软件基础
+## 硬件与软件基础
 
 | 层 | 组件 | 在本案例中的职责 |
 | --- | --- | --- |
@@ -135,7 +135,7 @@ sequenceDiagram
 
 310B 的 NPU 只负责已准入 OM 的推理。相册数据、FAISS 文件、设备状态和配置都留在板端；手机和 ESP32 只通过 HTTP 获取受控结果。
 
-## 💾 核心数据模型
+## 核心数据模型
 
 `photos` 保存原图生命周期，关键字段包括 `id`、`filepath`、`filename`、`sha256`、`size_bytes`、`mtime`、`available`、`width`、`height`、`mime_type`、`capture_time`、`capture_time_source`、`upload_time`、`tags`、`face_count` 和 `deleted_at`。普通上传原图位于系统用户的 `~/Pictures/ai-album/imports/`，临时 multipart 文件位于 `~/Pictures/ai-album/.upload-tmp/`；仓库 `shared/photos/` 仅承载 COCO-CN 和旧数据兼容读取，避免个人照片进入发布目录。其中 `tags` 只保留为旧数据库迁移兼容元数据；常规上传不要求或写入手工标签，当前工程也没有部署自动图像标注模型。
 
@@ -143,7 +143,7 @@ sequenceDiagram
 
 `display_state` 和 `display_history` 保存本机触摸屏、两个 PhotoFrame profile 与本机 E6 输出的当前照片、暂停状态、时隙、策略 revision、selection revision 和最近 12 张历史。`jobs` 保存手机上传后的串行索引进度。
 
-## 🧠 多模型语义检索方法
+## 多模型语义检索方法
 
 ### CLIP 的共同向量空间
 
@@ -179,13 +179,13 @@ flowchart LR
     accTitle: MobileCLIP 编码结构
     accDescr: MobileCLIP-S0 分别编码图像和英文文本，再投影到 512 维归一化空间进行检索
 
-    image[📥 RGB 图像 256x256] --> image_encoder[🧠 MobileCLIP 图像编码器]
-    text[📥 英文文本 77 tokens] --> text_encoder[🧠 MobileCLIP 文本编码器]
-    image_encoder --> image_projection[⚙️ 图像投影层]
-    text_encoder --> text_projection[⚙️ 文本投影层]
-    image_projection --> image_vector[🏷️ 512 维 L2 归一化]
-    text_projection --> text_vector[🏷️ 512 维 L2 归一化]
-    image_vector --> similarity[🔍 FAISS 内积或余弦相似度]
+    image[RGB 图像 256x256] --> image_encoder[MobileCLIP 图像编码器]
+    text[英文文本 77 tokens] --> text_encoder[MobileCLIP 文本编码器]
+    image_encoder --> image_projection[图像投影层]
+    text_encoder --> text_projection[文本投影层]
+    image_projection --> image_vector[512 维 L2 归一化]
+    text_projection --> text_vector[512 维 L2 归一化]
+    image_vector --> similarity[FAISS 内积或余弦相似度]
     text_vector --> similarity
 ```
 
@@ -198,13 +198,13 @@ flowchart LR
     accTitle: Chinese-CLIP 编码结构
     accDescr: Chinese-CLIP RN50 使用 ResNet 图像分支和 BERT 风格中文文本分支，输出 1024 维归一化向量
 
-    image[📥 RGB 图像 224x224] --> rn50[🧠 ResNet50 图像编码器]
-    text[📥 中文文本 52 tokens] --> bert[🧠 BERT 风格文本编码器]
-    rn50 --> image_projection[⚙️ 图像投影层]
-    bert --> text_projection[⚙️ 文本投影层]
-    image_projection --> image_vector[🏷️ 1024 维 L2 归一化]
-    text_projection --> text_vector[🏷️ 1024 维 L2 归一化]
-    image_vector --> similarity[🔍 Chinese-CLIP FAISS 内积]
+    image[RGB 图像 224x224] --> rn50[ResNet50 图像编码器]
+    text[中文文本 52 tokens] --> bert[BERT 风格文本编码器]
+    rn50 --> image_projection[图像投影层]
+    bert --> text_projection[文本投影层]
+    image_projection --> image_vector[1024 维 L2 归一化]
+    text_projection --> text_vector[1024 维 L2 归一化]
+    image_vector --> similarity[Chinese-CLIP FAISS 内积]
     text_vector --> similarity
 ```
 
@@ -217,17 +217,17 @@ flowchart LR
     accTitle: ResNet50 相似图结构
     accDescr: ResNet50 只把图像映射到 2048 维视觉特征空间，用于图像到图像检索
 
-    image[📥 RGB 图像 224x224] --> backbone[🧠 ResNet50 卷积骨干]
-    backbone --> feature[⚙️ 去除分类头]
-    feature --> vector[🏷️ 2048 维 L2 归一化]
-    vector --> search[🔍 ResNet50 独立 FAISS 检索]
+    image[RGB 图像 224x224] --> backbone[ResNet50 卷积骨干]
+    backbone --> feature[去除分类头]
+    feature --> vector[2048 维 L2 归一化]
+    vector --> search[ResNet50 独立 FAISS 检索]
 ```
 
 ### 自动路由
 
 文本自动模式检测中日韩字符时选择 Chinese-CLIP，否则选择 MobileCLIP；图片自动模式默认选择 MobileCLIP。用户手动指定模型时，服务检查模型已准入且查询输入合同正确。
 
-## 🔧 昇腾 310B 模型迁移方法
+## 昇腾 310B 模型迁移方法
 
 模型迁移分为四个可审计阶段：
 
@@ -327,13 +327,13 @@ uint8 BGR 合成图；合成图也必须经过生产的 `NpuEmbeddingBackend.pre
 候选才可以进入注册表；没有报告支撑的数字在教程中一律不预填。`Health: Alarm` 只作为诊断字段，
 不能单独改变准入结论。候选实验的临时向量和索引在报告完成后删除。
 
-## ⚙️ NPU 运行时与串行资源管理
+## NPU 运行时与串行资源管理
 
 `embedding_backend.py` 用一个 ACL 资源管理器拥有 device、context、stream 和 model。`ModelManager` 按需加载图像/文本 OM；切换模型前释放旧 model，避免多个大模型同时占用内存。获取模型、构造输入、执行和释放由同一把锁保护。
 
 服务的索引任务、ATC 转换和单次 embedding 都是串行的。这样牺牲并发换取可预测的 NPU 内存峰值和板端稳定性。CPU/PyTorch 不作为生产 fallback，因为 fallback 会掩盖 OM 缺失、ACL 初始化失败或模型合同错误；这些错误必须直接返回并写入健康状态。
 
-## 🌦️ 智能选图与天气方法
+## 智能选图与天气方法
 
 候选照片必须可用且未删除。默认总分为：
 
@@ -351,7 +351,7 @@ uint8 BGR 合成图；合成图也必须经过生产的 `NpuEmbeddingBackend.pre
 
 `selection_revision` 在上传、天气变化、配置变化和轮播时隙到达时递增。每个 profile 的 current photo、pause 状态和 history 写入 SQLite，重启后恢复而不是重新随机选择。
 
-## 🌐 服务器化设计
+## 服务器化设计
 
 ### 统一端口约定
 
@@ -441,7 +441,7 @@ Case7 对这两类 ESP32 终端固定采用深度休眠：注册、策略更新�
 唤醒键的语义一致；重新刷写固件后重新注册会再次修复该配置。设备必须先由实体按键或固件
 定时器唤醒，310B 才能发现并服务下一次 URL Rotation 请求。
 
-发现为空时，可以在 310B 操作页面的 **设置 → ESP32 唤醒与发现** 中输入该地址并点击
+发现为空时，可以在 310B 操作页面的 **设置 > ESP32 唤醒与发现** 中输入该地址并点击
 **读取并验证 IP**；它调用只读 `POST /api/admin/devices/probe`。也可以从串口
 `sta ip:` 或路由器 DHCP 租约取得当前 IPv4，直接读取 `http://<ESP32-IP>/api/system-info`；
 只有 `project_name=esp32-photoframe`、`device_id`
@@ -472,7 +472,7 @@ profile 的固定硬件补偿也会进入 JPEG variant/ETag，但不旋转 JPEG 
 `display.*` 与 E6 `epaper.*` 的方向设置相互独立；E6 仍是固定
 `800x480`、192000-byte 线协议，天气刷新或触摸屏方向变化不会让同一 E6 图帧失效并触发额外刷新。
 
-## 🎨 触摸屏交互设计
+## 触摸屏交互设计
 
 触摸屏首页把照片作为第一视觉层，天气卡片和状态信息使用高对比度实体背景。五个首页动作收拢为一个紧凑工具栏；文件名作为同一工具栏内的非交互文本，设置页有“显示文件名水印”开关。8 秒无操作时工具栏和文件名一起淡出，触摸照片唤醒。
 
@@ -489,7 +489,7 @@ profile 的固定硬件补偿也会进入 JPEG variant/ETag，但不旋转 JPEG 
 
 标签使用 `tablist`/`tabpanel` 语义，同一时间仅激活一个视图；窄屏时标签排成两列，设备数量变化只更新标签副标题，不改变操作位置。这种分区使本机触摸屏成为可单独设置的设备，也避免把“发现候选设备”和“已经注册的设备”混为一谈。
 
-## 🖨️ E6 图像处理方法
+## E6 图像处理方法
 
 `epaper_display.py` 在 CPU 上执行：
 
@@ -502,7 +502,7 @@ profile 的固定硬件补偿也会进入 JPEG variant/ETag，但不旋转 JPEG 
 
 真实硬件模式必须显式提供 SPI 设备、gpiochip 和 DC/RST/BUSY line offset。当前驱动板型号和接线尚未确认，PNG/帧 dry-run 只能证明协议编码，不能宣称微雪实屏刷新通过。PhotoPainter 六色路径同样不能由 E6 六色帧结果替代。
 
-## 🗂️ 工程代码导读
+## 工程代码导读
 
 | 模块 | 职责 |
 | --- | --- |
@@ -517,7 +517,7 @@ profile 的固定硬件补偿也会进入 JPEG variant/ETag，但不旋转 JPEG 
 | `web/` | 原生静态触摸屏/手机 UI，不需要额外前端构建运行时 |
 | `scripts/` | 模型、COCO-CN、部署、服务、kiosk 和性能脚本 |
 
-## 🧪 测试、性能与验收方法
+## 测试、性能与验收方法
 
 测试把不同证据分开：
 
@@ -533,7 +533,7 @@ profile 的固定硬件补偿也会进入 JPEG variant/ETag，但不旋转 JPEG 
 注明证据类型。模型准入、接口健康、触摸屏、设备 URL 拉图和 E6 dry-run 必须分别报告；其中
 API 成功或 ACL 数值通过不能替代真实电子纸刷新结论。
 
-## ⚠️ 限制、许可证与后续工作
+## 限制、许可证与后续工作
 
 - MobileCLIP 使用 Apple Machine Learning Research Model License，按清单中的非商业研究/教育边界使用；Chinese-CLIP 代码和权重许可应以固定上游仓库为准；ResNet50 使用 torchvision/ImageNet 研究教育资产。
 - COCO-CN 是唯一公开测试集；图像来源于 COCO-CN/MS-COCO，使用时必须保留 manifest 的来源和许可证字段。
@@ -543,7 +543,7 @@ API 成功或 ACL 数值通过不能替代真实电子纸刷新结论。
 - 微雪 E6 驱动板型号和 GPIO/SPI 接线尚未确认，真实实屏刷新是独立后续验收。
 - 通用 ESP-IDF 客户端需要具体 ESP32 变体、显示控制器、总线、GPIO、电源、Flash/PSRAM 和 IDF 版本后才能安全实现；当前先使用 HTTP 协议和上游 PhotoFrame。
 
-## 📚 参考资料
+## 参考资料 {#src-experiment-case7-references}
 
 - [Apple MobileCLIP](https://github.com/apple/ml-mobileclip)
 - [OFA-Sys Chinese-CLIP](https://github.com/OFA-Sys/Chinese-CLIP)

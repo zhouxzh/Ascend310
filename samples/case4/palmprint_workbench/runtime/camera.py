@@ -1,16 +1,19 @@
 """Small, V4L2-oriented camera adapter for board-side API callbacks.
 
 The adapter deliberately only accepts a numeric camera index or a ``/dev/videoN``
-path.  It does not execute shell commands, probe every device by opening it, or
-start a background capture thread.  The API workbench retains one
+path.  It does not execute shell commands or start a background capture thread.
+Device discovery performs a short V4L2 capability query so metadata-only UVC
+nodes cannot be presented as cameras.  The API workbench retains one
 ``CameraCapture`` instance and calls ``capture().rgb`` for a request.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import re
+import struct
 import threading
 import time
 from typing import Any, Callable, Protocol
@@ -18,8 +21,20 @@ from typing import Any, Callable, Protocol
 import cv2
 import numpy as np
 
+try:  # ``fcntl`` is Linux-only; the board is Linux while controller tests are not.
+    import fcntl
+except ImportError:  # pragma: no cover - exercised only on non-POSIX controllers
+    fcntl = None  # type: ignore[assignment]
+
 
 _VIDEO_NAME = re.compile(r"^video(?P<index>[0-9]+)$")
+_V4L2_CAP_VIDEO_CAPTURE = 0x00000001
+_V4L2_CAP_VIDEO_CAPTURE_MPLANE = 0x00001000
+_V4L2_CAP_DEVICE_CAPS = 0x80000000
+_V4L2_CAPABILITY_SIZE = 104
+# Linux's VIDIOC_QUERYCAP = _IOR('V', 0, struct v4l2_capability).  The UAPI
+# structure has a fixed 104-byte layout across the supported 32/64-bit boards.
+_VIDIOC_QUERYCAP = (2 << 30) | (_V4L2_CAPABILITY_SIZE << 16) | (ord("V") << 8)
 
 
 class CameraError(RuntimeError):
@@ -46,6 +61,8 @@ class CameraDevice:
     index: int
     path: str
     name: str = ""
+    physical_id: str = ""
+    aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -61,16 +78,65 @@ class CameraFrame:
     jpeg: bytes
     timestamp_ns: int
     device: str
+    frame_format: str = "unknown"
+    physical_id: str = ""
+
+
+def _is_video_capture_node(path: Path) -> bool:
+    """Return whether a V4L2 node advertises a frame-capture capability."""
+
+    if fcntl is None:
+        return False
+    try:
+        descriptor = os.open(str(path), os.O_RDONLY | os.O_NONBLOCK)
+    except OSError:
+        return False
+    try:
+        capability = bytearray(_V4L2_CAPABILITY_SIZE)
+        fcntl.ioctl(descriptor, _VIDIOC_QUERYCAP, capability, True)
+        capabilities, device_caps = struct.unpack_from("=II", capability, 84)
+        effective_caps = (
+            device_caps if capabilities & _V4L2_CAP_DEVICE_CAPS else capabilities
+        )
+        return bool(
+            effective_caps & (_V4L2_CAP_VIDEO_CAPTURE | _V4L2_CAP_VIDEO_CAPTURE_MPLANE)
+        )
+    except OSError:
+        return False
+    finally:
+        os.close(descriptor)
+
+
+def _physical_identity(sysfs_node: Path) -> str:
+    try:
+        device = (sysfs_node / "device").resolve(strict=True)
+    except OSError:
+        return f"node:{sysfs_node.name}"
+    # UVC interfaces and capture endpoints share their parent USB device.
+    for parent in (device, *device.parents):
+        if (parent / "idVendor").is_file() and (parent / "idProduct").is_file():
+            def read(name: str) -> str:
+                try:
+                    return (parent / name).read_text().strip()
+                except OSError:
+                    return ""
+            return f"usb:{parent}|{read('busnum')}|{read('idVendor')}:{read('idProduct')}|{read('serial')}"
+    return str(device)
 
 
 def list_v4l2_devices(
     dev_root: str | Path = "/dev",
     sys_root: str | Path = "/sys/class/video4linux",
+    *,
+    capture_probe: Callable[[Path], bool] | None = None,
 ) -> list[CameraDevice]:
-    """List V4L2 nodes without opening or querying video devices.
+    """List only V4L2 nodes that can capture image frames.
 
-    ``dev_root`` and ``sys_root`` are parameters so unit tests can use a
-    temporary filesystem instead of depending on the developer machine.
+    V4L2 may expose metadata endpoints beside a webcam's actual capture node.
+    They share the same card name but cannot return an image, so each candidate
+    is queried with ``VIDIOC_QUERYCAP`` and metadata-only nodes are omitted.
+    ``capture_probe`` keeps the filesystem-level behavior testable without a
+    physical V4L2 device.
     """
 
     root = Path(dev_root)
@@ -80,10 +146,16 @@ def list_v4l2_devices(
     except OSError:
         return []
 
-    devices: list[CameraDevice] = []
+    probe = capture_probe or _is_video_capture_node
+    grouped: dict[str, list[CameraDevice]] = {}
     for candidate in candidates:
         match = _VIDEO_NAME.fullmatch(candidate.name)
         if match is None:
+            continue
+        try:
+            if not probe(candidate):
+                continue
+        except OSError:
             continue
         index = int(match.group("index"))
         name_path = sysfs / candidate.name / "name"
@@ -91,7 +163,30 @@ def list_v4l2_devices(
             name = name_path.read_text(encoding="utf-8", errors="replace").strip()
         except OSError:
             name = ""
-        devices.append(CameraDevice(index=index, path=str(candidate), name=name))
+        physical_id = _physical_identity(sysfs / candidate.name)
+        item = CameraDevice(
+            index=index,
+            path=str(candidate),
+            name=name,
+            physical_id=physical_id,
+            aliases=(str(candidate),),
+        )
+        grouped.setdefault(physical_id, []).append(item)
+
+    devices: list[CameraDevice] = []
+    for physical_id, items in grouped.items():
+        ordered = sorted(items, key=lambda item: item.index)
+        primary = ordered[0]
+        aliases = tuple(item.path for item in ordered)
+        devices.append(
+            CameraDevice(
+                index=primary.index,
+                path=primary.path,
+                name=primary.name or next((item.name for item in ordered if item.name), ""),
+                physical_id=physical_id,
+                aliases=aliases,
+            )
+        )
     return sorted(devices, key=lambda item: item.index)
 
 
@@ -237,10 +332,21 @@ class CameraCapture:
                 self.close()
                 raise CameraError(f"Camera {self.device_label} read failed: {exc}") from exc
             if not ok or not isinstance(bgr, np.ndarray) or bgr.size == 0:
+                self.close()
                 raise CameraError(f"Camera {self.device_label} returned no frame")
             if bgr.ndim != 3 or bgr.shape[2] < 3:
                 raise CameraError(f"Camera {self.device_label} returned an invalid frame")
             bgr = np.ascontiguousarray(bgr[:, :, :3], dtype=np.uint8)
+            # Fail visibly instead of silently accepting a different capture
+            # contract and invalidating guide calibration.
+            if self._capture_factory is cv2.VideoCapture and (bgr.shape[1], bgr.shape[0]) != (self.width, self.height):
+                actual = f"{bgr.shape[1]}x{bgr.shape[0]}"
+                self.close()
+                raise CameraError(f"Resolution negotiation failed: requested {self.width}x{self.height}, actual {actual}")
+            frame_format = "unknown"
+            if hasattr(self._capture, "get"):
+                value = int(self._capture.get(cv2.CAP_PROP_FOURCC))
+                frame_format = "".join(chr((value >> (8 * index)) & 255) for index in range(4)).strip("\x00") or "unknown"
             jpeg = b""
             if encode_jpeg:
                 encoded, encoded_jpeg = cv2.imencode(
@@ -254,6 +360,7 @@ class CameraCapture:
                 jpeg=jpeg,
                 timestamp_ns=time.time_ns(),
                 device=self.device_label,
+                frame_format=frame_format,
             )
 
     def capture_rgb(self) -> np.ndarray:

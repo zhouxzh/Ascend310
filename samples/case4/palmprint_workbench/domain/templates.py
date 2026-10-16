@@ -15,11 +15,10 @@ import threading
 import time
 from contextlib import contextmanager
 from typing import Any, TYPE_CHECKING
-from uuid import uuid4
 
 import numpy as np
 
-from ..config import TEMPLATE_DIR, TOP_K
+from ..config import ROI_PIPELINE_ID, TEMPLATE_DIR, TOP_K
 if TYPE_CHECKING:
     from ..runtime.adapters import PalmAdapter
 
@@ -124,6 +123,62 @@ class TemplateStore:
 
     def _version_path(self, model_id: str) -> Path:
         return self.root / f"{model_id}.pstore.version.json"
+
+    def _person_sequence_path(self) -> Path:
+        """Return the monotonic local counter for automatically assigned people."""
+
+        return self.root / "person-sequence.json"
+
+    @staticmethod
+    def _person_number(person_id: Any) -> int:
+        value = str(person_id or "")
+        if not value.startswith("P-"):
+            return 0
+        suffix = value[2:]
+        return int(suffix) if suffix.isdecimal() else 0
+
+    def _assigned_person_high_watermark(self) -> int:
+        """Find the largest historic automatic ID across template namespaces."""
+
+        high_watermark = 0
+        for path in self.root.glob("*.pstore"):
+            model_id = path.name[: -len(".pstore")]
+            _, metadata = self.load(model_id)
+            for item in metadata:
+                high_watermark = max(
+                    high_watermark,
+                    self._person_number(item.get("person_id") or item.get("user_name")),
+                )
+        return high_watermark
+
+    def allocate_person_id(self) -> str:
+        """Reserve and persist the next stable automatic person identifier.
+
+        The reservation happens before capture starts.  Cancelled sessions may
+        leave a gap, but an identifier is never reused after a service restart
+        or a concurrent request.
+        """
+
+        with self.lock:
+            with self._transaction_lock():
+                try:
+                    payload = json.loads(
+                        self._person_sequence_path().read_text(encoding="utf-8")
+                    )
+                    persisted_next = int(payload.get("next_number", 1))
+                except (OSError, ValueError, TypeError, AttributeError):
+                    persisted_next = 1
+                next_number = max(
+                    1, persisted_next, self._assigned_person_high_watermark() + 1
+                )
+                self._atomic_write(
+                    self._person_sequence_path(),
+                    json.dumps(
+                        {"schema_version": 1, "next_number": next_number + 1},
+                        separators=(",", ":"),
+                    ).encode("utf-8"),
+                )
+                return f"P-{next_number:06d}"
 
     def readiness(self) -> dict[str, Any]:
         """Return non-sensitive storage readiness information for health APIs."""
@@ -490,7 +545,10 @@ class TemplateStore:
             raise RuntimeError(
                 "Template persistence is disabled by the current release policy"
             )
-        identity_id = user_id or uuid4().hex
+        # Kept as a compatibility entry point for offline fixtures.  Runtime
+        # enrollment uses replace_palm() below so a palm is never represented
+        # by an opaque, randomly generated identity.
+        identity_id = user_id or f"{user_name.strip()}:{palm_side.strip().lower()}"
         batch = np.stack([np.asarray(code) for code in codes], axis=0)
         with self.lock:
             with self._transaction_lock():
@@ -504,12 +562,103 @@ class TemplateStore:
                         "user_id": identity_id,
                         "user_name": user_name.strip(),
                         "palm_side": palm_side,
+                        "palm_id": identity_id,
+                        "person_id": user_name.strip(),
+                        "display_name": user_name.strip(),
+                        "roi_pipeline_id": ROI_PIPELINE_ID,
                         "enrolled_at": now,
                     }
                     for _ in codes
                 )
                 self._save(model_id, combined, metadata)
         return identity_id
+
+    @staticmethod
+    def palm_id(person_id: str, palm_side: str) -> str:
+        normalized_person_id = person_id.strip()
+        normalized_side = palm_side.strip().lower()
+        if not normalized_person_id:
+            raise ValueError("person_id is required")
+        if ":" in normalized_person_id:
+            raise ValueError("person_id must not contain ':'")
+        if normalized_side not in {"left", "right"}:
+            raise ValueError("palm_side must be 'left' or 'right'")
+        return f"{normalized_person_id}:{normalized_side}"
+
+    def replace_palm(
+        self,
+        model_id: str,
+        codes: list[np.ndarray],
+        *,
+        person_id: str,
+        display_name: str | None,
+        palm_side: str,
+        roi_pipeline_id: str = ROI_PIPELINE_ID,
+        roi_config: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
+        """Atomically replace one palm's samples in a model namespace.
+
+        A failed validation/serialization leaves the previous generation
+        untouched because _save() validates and atomically publishes only the
+        fully constructed replacement generation.
+        """
+
+        if not codes:
+            raise ValueError("At least one code is required")
+        if self._persistence_blocked:
+            raise RuntimeError(
+                "Template persistence is disabled by the current release policy"
+            )
+        stable_id = self.palm_id(person_id, palm_side)
+        batch = np.stack([np.asarray(code) for code in codes], axis=0)
+        normalized_person_id = person_id.strip()
+        normalized_side = palm_side.strip().lower()
+        normalized_display_name = (display_name or "").strip() or normalized_person_id
+        with self.lock:
+            with self._transaction_lock():
+                existing, metadata = self.load(model_id)
+                if existing.size and existing.shape[1:] != batch.shape[1:]:
+                    raise ValueError("Template dimension changed; clear the old model store first")
+                retained = [
+                    index
+                    for index, item in enumerate(metadata)
+                    if str(item.get("palm_id") or item.get("user_id")) != stable_id
+                    or item.get("roi_pipeline_id") != roi_pipeline_id
+                ]
+                prior_samples = len(metadata) - len(retained)
+                kept = existing[retained] if retained else np.empty(
+                    (0, batch.shape[1]), dtype=batch.dtype
+                )
+                combined = np.concatenate([kept, batch], axis=0)
+                now = time.time()
+                next_metadata = [metadata[index] for index in retained]
+                next_metadata.extend(
+                    {
+                        "palm_id": stable_id,
+                        "person_id": normalized_person_id,
+                        "display_name": normalized_display_name,
+                        "palm_side": normalized_side,
+                        # Aliases protect offline readers during this schema
+                        # transition; public API responses use the new names.
+                        "user_id": stable_id,
+                        "user_name": normalized_display_name,
+                        "roi_pipeline_id": roi_pipeline_id,
+                        "roi_config": roi_config,
+                        "enrolled_at": now,
+                    }
+                    for _ in codes
+                )
+                self._save(model_id, combined, next_metadata)
+        return {
+            "palm_id": stable_id,
+            "person_id": normalized_person_id,
+            "display_name": normalized_display_name,
+            "palm_side": normalized_side,
+            "samples": len(codes),
+            "replaced_samples": prior_samples,
+            "roi_pipeline_id": roi_pipeline_id,
+            "updated_at": now,
+        }
 
     def search(
         self,
@@ -519,52 +668,94 @@ class TemplateStore:
         *,
         threshold: float,
         top_k: int = TOP_K,
+        roi_pipeline_id: str = ROI_PIPELINE_ID,
+        roi_config: dict[str, float] | None = None,
     ) -> dict[str, Any]:
         codes, metadata = self.load(model_id)
-        if not metadata:
+        compatible = [
+            index
+            for index, item in enumerate(metadata)
+            if item.get("roi_pipeline_id") == roi_pipeline_id
+            and (roi_config is None or item.get("roi_config") == roi_config)
+        ]
+        if not compatible:
             return {
                 "accepted": False,
                 "score": 0.0,
                 "matches": [],
-                "reason": "template store is empty",
+                "reason": "no compatible templates",
             }
+        codes = codes[compatible]
+        metadata = [metadata[index] for index in compatible]
         sample_scores = adapter.compare(query, codes)
         grouped: dict[str, dict[str, Any]] = {}
         for score, item in zip(sample_scores, metadata):
-            identity = str(item["user_id"])
+            identity = str(item.get("palm_id") or item["user_id"])
             record = grouped.setdefault(identity, {**item, "sample_scores": []})
             record["sample_scores"].append(float(score))
         ranked = []
         for record in grouped.values():
-            values = sorted(record.pop("sample_scores"), reverse=True)[:3]
-            ranked.append({**record, "score": float(np.mean(values)), "samples": len(values)})
+            sample_scores = record.pop("sample_scores")
+            values = sorted(sample_scores, reverse=True)[:3]
+            ranked.append({**record, "score": float(np.mean(values)), "samples": len(sample_scores)})
         ranked.sort(key=lambda item: item["score"], reverse=True)
         best = ranked[0]
         accepted = bool(best["score"] >= threshold)
         return {
             "accepted": accepted,
             "score": best["score"],
-            "user_id": best["user_id"],
-            "user_name": best["user_name"],
+            "palm_id": best.get("palm_id") or best["user_id"],
+            "person_id": best.get("person_id") or best["user_id"],
+            "display_name": best.get("display_name") or best["user_name"],
+            "user_id": best.get("palm_id") or best["user_id"],
+            "user_name": best.get("display_name") or best["user_name"],
             "palm_side": best["palm_side"],
             "matches": ranked[:top_k],
             "reason": "accepted" if accepted else "below threshold",
         }
 
-    def users(self, model_id: str) -> list[dict[str, Any]]:
+    def users(
+        self, model_id: str, *, roi_pipeline_id: str = ROI_PIPELINE_ID
+    ) -> list[dict[str, Any]]:
         _, metadata = self.load(model_id)
         users: dict[str, dict[str, Any]] = {}
         for item in metadata:
-            identity = str(item["user_id"])
+            if item.get("roi_pipeline_id") != roi_pipeline_id:
+                continue
+            identity = str(item.get("palm_id") or item["user_id"])
             record = users.setdefault(identity, {**item, "samples": 0})
             record["samples"] += 1
-        return sorted(users.values(), key=lambda item: (item["user_name"], item["palm_side"]))
+        return sorted(
+            users.values(),
+            key=lambda item: (
+                str(item.get("person_id") or item.get("user_name")),
+                str(item["palm_side"]),
+            ),
+        )
 
-    def remove(self, model_id: str, user_id: str) -> bool:
+    def summary(
+        self, model_id: str, *, roi_pipeline_id: str = ROI_PIPELINE_ID
+    ) -> dict[str, Any]:
+        palms = self.users(model_id, roi_pipeline_id=roi_pipeline_id)
+        return {
+            "palm_count": len(palms),
+            "person_count": len(
+                {str(item.get("person_id") or item.get("user_name")) for item in palms}
+            ),
+            "sample_count": sum(int(item["samples"]) for item in palms),
+            "roi_pipeline_id": roi_pipeline_id,
+        }
+
+    def remove(self, model_id: str, palm_id: str, *, roi_pipeline_id: str | None = None) -> bool:
         with self.lock:
             with self._transaction_lock():
                 codes, metadata = self.load(model_id)
-                keep = [index for index, item in enumerate(metadata) if str(item["user_id"]) != user_id]
+                keep = [
+                    index
+                    for index, item in enumerate(metadata)
+                    if str(item.get("palm_id") or item["user_id"]) != palm_id
+                    or (roi_pipeline_id is not None and item.get("roi_pipeline_id") != roi_pipeline_id)
+                ]
                 if len(keep) == len(metadata):
                     return False
                 width = codes.shape[1] if codes.ndim == 2 else 0

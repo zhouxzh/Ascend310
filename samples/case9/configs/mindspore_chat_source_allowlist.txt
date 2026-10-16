@@ -74,6 +74,8 @@ retrieval.py
 scripts/case9-modelctl.sh
 scripts/check_local_audio_board.sh
 scripts/check_mindspore_chat_environment.py
+scripts/create_mindspore_acceptance_registry.py
+scripts/fetch_mindspore_profile_artifacts.py
 scripts/inspect_qwen_onnx.py
 scripts/mindspore_chat_acceptance.py
 scripts/mindspore_candidate_matrix.py
@@ -89,6 +91,7 @@ scripts/qwen25_15_memory_gate.py
 scripts/run_llama_cann.sh
 scripts/run_local_chat.sh
 scripts/run_mindspore_chat_acceptance.sh
+scripts/run_mindspore_20t_campaign.sh
 scripts/run_mindspore_chat_gateway.sh
 scripts/run_mindspore_chat_service.sh
 scripts/run_mindspore_chat_text.sh

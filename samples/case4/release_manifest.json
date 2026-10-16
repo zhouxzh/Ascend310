@@ -37,8 +37,8 @@
   },
   "frontend": {
     "version": "1.0.0",
-    "dist_index_sha256": "300e3f21fbe43abd91abc3e109de69dc773076d73d0c087f5c9890db8d7e6d13",
-    "bundle_sha256": "86ea4915b5be77f251922937a3d9af2fa526e0c16e393a8ab8b97ece6072b7f0",
+    "dist_index_sha256": "1501be05152135c1d96b1220d36d8f2c73f3e9f72739b6bb527fc07167a87bc8",
+    "bundle_sha256": "772e896984b6e96ba8b2ca116b1b46961d11a27b4caaa86431421330caf9f1aa",
     "bundle_definition": "sha256 over sorted frontend/dist records: relative POSIX path, NUL, per-file SHA-256, LF; use tools.board.verify_frontend_assets"
   },
   "asset_package": {
@@ -67,15 +67,22 @@
   },
   "registry": {
     "path": "models/registry.json",
-    "sha256": "26c5aaf2e8eb08047956e2c66dc460008fd0767dc3265f314dbb35e126adc9d4",
+    "sha256": "d3d836ec71c5abf3728f1aded0d654e8e0e77be87ca96a9b4ef787b06752edd4",
     "admitted_model_ids": ["ccnet"],
     "manual_test_model_ids": ["ccnet", "compnet_tongji_600", "compnet_iitd_460", "compnet_rest_358", "compnet_xjtu_flash_200", "compnet_xjtu_natural_200"],
     "profile": "production defaults to ccnet; manual_test enables six models",
+    "runtime_candidate_ids": ["ccnet", "compnet_tongji_600", "compnet_iitd_460", "compnet_rest_358", "compnet_xjtu_flash_200", "compnet_xjtu_natural_200"],
+    "archived_candidate_count": 22,
     "manual_test_pending": ["compnet_tongji_600", "compnet_iitd_460", "compnet_rest_358", "compnet_xjtu_flash_200", "compnet_xjtu_natural_200"]
   },
   "candidate_manifest": {
     "path": "candidate_manifest.json",
     "sha256": "ae855c102cfc398b4d93b4ec2ff3d42a9438ef2a6a1ed0cc10524387d95abbff"
+  },
+  "candidate_runtime_manifest": {
+    "path": "candidate_runtime_manifest.json",
+    "sha256": "8619ba1f6d35ee8815258ce2ae6ebf5e98c3092e2dd0f3e95937800f095e16d9",
+    "purpose": "manual task-specific NPU experiment adapters; not production registry"
   },
   "external_assets": {
     "models": [],
@@ -91,7 +98,10 @@
     "health_url": "board-local:http://127.0.0.1:7860/api/health (smoke evidence)",
     "bootstrap_url": "board-local:http://127.0.0.1:7860/api/bootstrap (smoke evidence)",
     "board_acceptance_report": "docs/evidence/package-board-smoke-20260817.md (smoke only; full acceptance pending)",
-    "manual_test_smoke": "docs/evidence/manual-test-smoke-20260818.md (synthetic ROI API/template/restart smoke; touch screen and camera remain operator checks)"
+    "manual_test_smoke": "docs/evidence/manual-test-smoke-20260818.md (synthetic ROI API/template/restart smoke; touch screen and camera remain operator checks)",
+    "candidate_campaign": "docs/evidence/candidate-campaign-20260910.md (28 candidate terminal statuses; six OM candidates passed 10-cycle ACL smoke but all six diagnostic traces found the same err_ret=-512/driver cleanup fault; no production promotion)",
+    "candidate_final_status": "docs/evidence/candidate-final-status-20260911.json",
+    "extended_model_campaign": "docs/evidence/extended-model-campaign-20260911.md (generic backbone NPU smoke and task-specific model-family blocking evidence; no registry promotion)"
   },
   "manual_test": {
     "profile": "manual_test",

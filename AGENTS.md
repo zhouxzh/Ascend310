@@ -79,8 +79,9 @@ Never rename only the sidebar, only the page title, or only one index.
 
 ### Appendices
 
-The file-to-number mapping is frozen. In particular, `appendix5.md` is ROS2 and
-`appendix6.md` is the toolbox/FAQ appendix; do not swap them back.
+The file-to-number mapping is frozen. In particular, `appendix5.md` is ROS2,
+`appendix6.md` is the toolbox/FAQ appendix, and `appendix7.md` covers CANN
+upgrade and version pairing; do not swap them.
 
 | Source | Frozen title |
 | --- | --- |
@@ -90,6 +91,7 @@ The file-to-number mapping is frozen. In particular, `appendix5.md` is ROS2 and
 | `src/appendix/appendix4.md` | 附录 4：Vibe Coding 基础 |
 | `src/appendix/appendix5.md` | 附录 5：ROS2 基础教程 |
 | `src/appendix/appendix6.md` | 附录 6：工具箱、FAQ 与参数模板 |
+| `src/appendix/appendix7.md` | 附录 7：CANN 升级与版本配套 |
 
 ## Documentation preview and push policy
 

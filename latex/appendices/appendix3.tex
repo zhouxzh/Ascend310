@@ -1,261 +1,845 @@
-\chapter{工具箱、FAQ
-与参数模板}\label{ux9644ux5f55-3ux5de5ux5177ux7bb1faq-ux4e0eux53c2ux6570ux6a21ux677f}
+\chapter{Python
+编程基础}\label{ux9644ux5f55-3python-ux7f16ux7a0bux57faux7840}
 
-\section{内容概览}\label{src-book-appendix-h1}
+\begin{quote}
+\textbf{本章导读} 目标：用 Python 检查昇腾 310B
+模型部署中常见的配置、清单和结果数据。
+数据：正文内联示例，不依赖外部数据集。
+标准库：\passthrough{\lstinline!json!}、\passthrough{\lstinline!statistics!}、\passthrough{\lstinline!math!}。
+输出：可直接在 Python REPL 中运行，也可保存为
+\passthrough{\lstinline!.py!} 文件复现。
+\end{quote}
 
-本附录聚焦``查得快、用得稳''：常见报错速查、转换参数模板、性能/质量
-Checklist、术语字典、推荐资源与社区贡献规范。可作为日常开发随手翻阅的工具章节。
+本附录按实际使用顺序讲解 Python。模型
+ID、输入形状、预处理均值、精度模式和准入状态会反复出现在样例代码中，因此本章直接用这些对象编写示例。
 
-\section{常见报错速查}\label{src-book-appendix-h2}
+\passthrough{\lstinline!for!}、\passthrough{\lstinline!if!}、\passthrough{\lstinline!dict!}、\passthrough{\lstinline!set!}、异常处理等基础语法会在前几节展开，第
+4 节补充 \passthrough{\lstinline!samples/!}
+中高频出现的文件、JSON、命令行和异步写法。所有示例都只使用标准库，不引入
+\passthrough{\lstinline!pandas!}，也不需要板端运行环境。
 
+\section{1.
+数据、类型与容器}\label{ux6570ux636eux7c7bux578bux4e0eux5bb9ux5668}
+
+\subsection{变量与基本类型}\label{ux53d8ux91cfux4e0eux57faux672cux7c7bux578b}
+
+变量是给值起的名字。Python
+中每个值都有类型，类型决定它可以参与哪些运算。检查类型用
+\passthrough{\lstinline!type()!}，查看结果用
+\passthrough{\lstinline!print()!}。
+
+\begin{lstlisting}[language=Python]
+model_id = "mobileclip_s0"
+feature_dim = 512
+input_scale = 0.00392156862745098
+is_admitted = True
+
+print(type(model_id))
+print(type(feature_dim))
+print(type(input_scale))
+print(type(is_admitted))
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+<class 'str'>
+<class 'int'>
+<class 'float'>
+<class 'bool'>
+\end{lstlisting}
+
+\passthrough{\lstinline!str!} 是文本，\passthrough{\lstinline!int!}
+是整数，\passthrough{\lstinline!float!}
+是小数，\passthrough{\lstinline!bool!} 是布尔值。模型 ID 适合存成
+\passthrough{\lstinline!str!}，嵌入维度适合存成
+\passthrough{\lstinline!int!}。
+
+\subsection{数字运算与单位换算}\label{ux6570ux5b57ux8fd0ux7b97ux4e0eux5355ux4f4dux6362ux7b97}
+
+模型文件大小经常需要在字节和 MiB 之间换算。\passthrough{\lstinline!/!}
+是普通除法，\passthrough{\lstinline!//!}
+是向下取整，\passthrough{\lstinline!\%!}
+是取余数，\passthrough{\lstinline!round()!} 控制显示精度。
+
+\begin{lstlisting}[language=Python]
+bytes_size = 131904474
+mib_size = bytes_size / 1024 / 1024
+
+print(mib_size)
+print(round(mib_size, 2))
+print(bytes_size // 1024)
+print(bytes_size % 1024)
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+125.79369640350342
+125.79
+128812
+986
+\end{lstlisting}
+
+\passthrough{\lstinline!round()!} 只改变显示结果，不改变原始变量。
+
+\subsection{列表与元组}\label{ux5217ux8868ux4e0eux5143ux7ec4}
+
+模型输入形状、预处理均值和标准差通常是有序数值。\passthrough{\lstinline!list!}
+保存可增删的有序数据，\passthrough{\lstinline!tuple!}
+保存创建后不修改的固定组合。
+
+\begin{lstlisting}[language=Python]
+input_shape = [1, 3, 224, 224]
+image_mean = (0.485, 0.456, 0.406)
+
+print(input_shape[0])
+print(input_shape[-1])
+print(len(input_shape))
+print(image_mean[0])
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+1
+224
+4
+0.485
+\end{lstlisting}
+
+列表索引从 0 开始，\passthrough{\lstinline!-1!}
+表示最后一个元素。\passthrough{\lstinline!len()!} 返回元素个数。
+
+\subsection{字典}\label{ux5b57ux5178}
+
+模型清单由多个字段组成，每个字段用一个键和对应的值表示。\passthrough{\lstinline!dict!}
+保存键值对，适合描述一个模型条目。
+
+\begin{lstlisting}[language=Python]
+model = {
+    "model_id": "mobileclip_s0",
+    "input_shape": [1, 3, 256, 256],
+    "precision_mode": "mixed_fp16",
+    "status": "admitted",
+}
+
+print(model["model_id"])
+print(model["input_shape"])
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+mobileclip_s0
+[1, 3, 256, 256]
+\end{lstlisting}
+
+键通常使用字符串，值可以是字符串、数字、列表或另一个字典。
+
+\subsection{集合}\label{ux96c6ux5408}
+
+需要知道模型清单中出现过哪些精度模式时，用 \passthrough{\lstinline!set!}
+去重。
+
+\begin{lstlisting}[language=Python]
+precision_modes = {"mixed_fp16", "allow_fp32_to_fp16", "mixed_fp16"}
+print(precision_modes)
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+{'allow_fp32_to_fp16', 'mixed_fp16'}
+\end{lstlisting}
+
+集合不保留插入顺序，也不能通过索引取值。顺序不重要的去重任务才适合使用集合。
+
+\section{2. 控制流}\label{ux63a7ux5236ux6d41}
+
+\subsection{条件分支}\label{ux6761ux4ef6ux5206ux652f}
+
+\passthrough{\lstinline!if!}
+处理一个条件，\passthrough{\lstinline!elif!}
+处理``否则如果''，\passthrough{\lstinline!else!}
+是兜底。判断从上往下执行，先命中的分支生效。
+
+\begin{lstlisting}[language=Python]
+status = "admitted"
+
+if status == "admitted":
+    print("可进入 NPU 服务")
+elif status == "candidate":
+    print("仅用于离线评估")
+else:
+    print("状态未知")
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+可进入 NPU 服务
+\end{lstlisting}
+
+比较运算符 \passthrough{\lstinline!==!} 判断是否相等，结果是一个布尔值。
+
+\subsection{for 循环}\label{for-ux5faaux73af}
+
+\passthrough{\lstinline!for!}
+循环依次取出列表中的元素，重复执行缩进块。累加前先设置
+\passthrough{\lstinline!total = 0!}，这个初始值必须写在循环外。
+
+\begin{lstlisting}[language=Python]
+feature_dims = [512, 1024, 2048]
+
+total = 0
+for dim in feature_dims:
+    total = total + dim
+
+print(total)
+print(min(feature_dims))
+print(max(feature_dims))
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+3584
+512
+2048
+\end{lstlisting}
+
+\subsection{range、enumerate 与 zip}\label{rangeenumerate-ux4e0e-zip}
+
+\passthrough{\lstinline!range(n)!} 生成从 0 到
+\passthrough{\lstinline!n - 1!}
+的整数序列。\passthrough{\lstinline!enumerate()!}
+同时返回序号和元素，\passthrough{\lstinline!zip()!}
+把多个序列按位置配对。
+
+\begin{lstlisting}[language=Python]
+for index, dim in enumerate([512, 1024, 2048], start=1):
+    print(index, dim)
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+1 512
+2 1024
+3 2048
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+model_ids = ["mobileclip_s0", "resnet50_feature"]
+dims = [512, 2048]
+
+for model_id, dim in zip(model_ids, dims):
+    print(model_id, dim)
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+mobileclip_s0 512
+resnet50_feature 2048
+\end{lstlisting}
+
+\subsection{while、break 与 continue}\label{whilebreak-ux4e0e-continue}
+
+\passthrough{\lstinline!while!}
+在条件仍为真时重复执行。循环内必须修改条件变量，否则会无限循环。\passthrough{\lstinline!continue!}
+跳过本次循环，\passthrough{\lstinline!break!} 立即结束整个循环。
+
+\begin{lstlisting}[language=Python]
+attempt = 0
+
+while attempt < 3:
+    print(f"attempt {attempt + 1}")
+    attempt += 1
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+attempt 1
+attempt 2
+attempt 3
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+dims = [512, 1024, 2048]
+
+for dim in dims:
+    if dim == 1024:
+        continue
+    print(dim)
+
+for dim in dims:
+    if dim > 1024:
+        break
+    print(dim)
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+512
+2048
+512
+1024
+\end{lstlisting}
+
+\subsection{列表与字典推导式}\label{ux5217ux8868ux4e0eux5b57ux5178ux63a8ux5bfcux5f0f}
+
+推导式用一行代码生成新列表或字典，适合结构简单的过滤和转换。
+
+\begin{lstlisting}[language=Python]
+dims = [512, 1024, 2048]
+large_dims = [dim for dim in dims if dim >= 1024]
+
+print(large_dims)
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+[1024, 2048]
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+sizes = {"mobileclip_s0": 131904474, "resnet50_feature": 102400000}
+sizes_mib = {model: round(size / 1024 / 1024, 2) for model, size in sizes.items()}
+
+print(sizes_mib)
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+{'mobileclip_s0': 125.79, 'resnet50_feature': 97.66}
+\end{lstlisting}
+
+\section{3.
+函数与模型清单}\label{ux51fdux6570ux4e0eux6a21ux578bux6e05ux5355}
+
+\subsection{函数封装}\label{ux51fdux6570ux5c01ux88c5}
+
+函数把重复逻辑打包成可复用单元。下面函数接收模型列表，返回按精度模式统计的字典。
+
+\begin{lstlisting}[language=Python]
+def count_by_precision(models):
+    result = {}
+    for model in models:
+        mode = model["precision_mode"]
+        result[mode] = result.get(mode, 0) + 1
+    return result
+
+models = [
+    {"precision_mode": "mixed_fp16"},
+    {"precision_mode": "allow_fp32_to_fp16"},
+    {"precision_mode": "allow_fp32_to_fp16"},
+]
+
+summary = count_by_precision(models)
+for mode, count in sorted(summary.items()):
+    print(f"{mode}: {count}")
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+allow_fp32_to_fp16: 2
+mixed_fp16: 1
+\end{lstlisting}
+
+\passthrough{\lstinline!dict.get(key, 0)!} 在键不存在时返回默认值
+0。\passthrough{\lstinline!sorted()!} 让输出顺序稳定。
+
+\subsection{默认参数}\label{ux9ed8ux8ba4ux53c2ux6570}
+
+默认参数让调用更简洁，同时允许按名字覆盖默认值。
+
+\begin{lstlisting}[language=Python]
+def format_model(model_id, precision="mixed_fp16"):
+    return f"{model_id}: {precision}"
+
+print(format_model("mobileclip_s0"))
+print(format_model("resnet50_feature", precision="allow_fp32_to_fp16"))
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+mobileclip_s0: mixed_fp16
+resnet50_feature: allow_fp32_to_fp16
+\end{lstlisting}
+
+\subsection{*args 与 **kwargs}\label{args-ux4e0e-kwargs}
+
+\passthrough{\lstinline!*values!}
+收集位置参数，\passthrough{\lstinline!**options!} 收集关键字参数。
+
+\begin{lstlisting}[language=Python]
+def summarize(title, *values, **options):
+    print(title, values, options)
+
+summarize("models", 512, 1024, status="admitted")
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+models (512, 1024) {'status': 'admitted'}
+\end{lstlisting}
+
+\subsection{lambda}\label{lambda}
+
+\passthrough{\lstinline!lambda!} 适合写一个短小的临时函数。
+
+\begin{lstlisting}[language=Python]
+models = [
+    {"model_id": "mobileclip_s0", "embedding_dim": 512},
+    {"model_id": "resnet50_feature", "embedding_dim": 2048},
+]
+
+models.sort(key=lambda model: model["embedding_dim"], reverse=True)
+print([model["model_id"] for model in models])
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+['resnet50_feature', 'mobileclip_s0']
+\end{lstlisting}
+
+\subsection{f-string}\label{f-string}
+
+f-string 用 \passthrough{\lstinline!f"..."!} 开头，大括号内插入变量。
+
+\begin{lstlisting}[language=Python]
+model_id = "mobileclip_s0"
+embedding_dim = 512
+
+print(f"{model_id}: {embedding_dim} dim")
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+mobileclip_s0: 512 dim
+\end{lstlisting}
+
+\subsection{类型注解}\label{ux7c7bux578bux6ce8ux89e3}
+
+类型注解帮助阅读代码，也方便工具检查错误。它不会改变运行结果。
+
+\begin{lstlisting}[language=Python]
+def admitted_models(models: list[dict]) -> list[dict]:
+    return [model for model in models if model.get("status") == "admitted"]
+\end{lstlisting}
+
+\subsection{dataclass}\label{dataclass}
+
+\passthrough{\lstinline!dataclass!}
+自动生成初始化、比较和打印方法，适合保存结构清晰的记录。
+
+\begin{lstlisting}[language=Python]
+from dataclasses import dataclass
+
+@dataclass
+class ModelRecord:
+    model_id: str
+    embedding_dim: int
+    status: str = "admitted"
+
+record = ModelRecord("mobileclip_s0", 512)
+print(record)
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+ModelRecord(model_id='mobileclip_s0', embedding_dim=512, status='admitted')
+\end{lstlisting}
+
+\subsection{class 与 self}\label{class-ux4e0e-self}
+
+\passthrough{\lstinline!\_\_init\_\_!}
+是实例创建时执行的方法，\passthrough{\lstinline!self!} 指向当前实例。
+
+\begin{lstlisting}[language=Python]
+class ModelChecker:
+    def __init__(self, status="candidate"):
+        self.status = status
+
+    def is_admitted(self):
+        return self.status == "admitted"
+
+checker = ModelChecker("admitted")
+print(checker.is_admitted())
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+True
+\end{lstlisting}
+
+\section{4.
+文件、JSON、命令行与异步}\label{ux6587ux4ef6jsonux547dux4ee4ux884cux4e0eux5f02ux6b65}
+
+\subsection{缺失键与类型转换}\label{ux7f3aux5931ux952eux4e0eux7c7bux578bux8f6cux6362}
+
+模型清单可能来自不同版本的脚本，字段并不总是一致。直接读取缺失字段会触发
+\passthrough{\lstinline!KeyError!}，用
+\passthrough{\lstinline!dict.get()!} 可以提供默认值。
+
+\begin{lstlisting}[language=Python]
+model = {
+    "model_id": "mobileclip_s0",
+    "precision_mode": "mixed_fp16",
+}
+
+print(model.get("status", "unknown"))
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+unknown
+\end{lstlisting}
+
+把字符串转成数字时，输入内容决定转换是否成功。\passthrough{\lstinline!int("fp16")!}
+会触发 \passthrough{\lstinline!ValueError!}，可以用
+\passthrough{\lstinline!try/except!} 捕获。
+
+\begin{lstlisting}[language=Python]
+value = "fp16"
+
+try:
+    numeric_value = int(value)
+except ValueError:
+    numeric_value = None
+
+print(numeric_value)
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+None
+\end{lstlisting}
+
+\passthrough{\lstinline!None!}
+表示没有有效数值。统计前应先检查它，不要把
+\passthrough{\lstinline!None!} 当成 0。
+
+\subsection{pathlib 与 with open}\label{pathlib-ux4e0e-with-open}
+
+\passthrough{\lstinline!Path!}
+提供跨平台的路径操作，\passthrough{\lstinline!with open!}
+在读取或写入结束后自动关闭文件。
+
+\begin{lstlisting}[language=Python]
+from pathlib import Path
+
+path = Path("tmp/appendix3/notes.txt")
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text("mixed_fp16\n", encoding="utf-8")
+
+with path.open(encoding="utf-8") as f:
+    print(f.read().strip())
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+mixed_fp16
+\end{lstlisting}
+
+\subsection{json.loads 与
+json.dumps}\label{json.loads-ux4e0e-json.dumps}
+
+模型配置常以 JSON 保存。\passthrough{\lstinline!json.loads()!} 把 JSON
+文本转回 Python 对象，\passthrough{\lstinline!json.dumps()!} 把 Python
+对象转成 JSON 文本。
+
+\begin{lstlisting}[language=Python]
+import json
+
+text = '{"model_id": "mobileclip_s0", "status": "admitted"}'
+data = json.loads(text)
+
+print(data["model_id"])
+print(data.get("status", "unknown"))
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+mobileclip_s0
+admitted
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+config = {"model_id": "mobileclip_s0", "precision_mode": "mixed_fp16"}
+print(json.dumps(config, ensure_ascii=False, indent=2))
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+{
+  "model_id": "mobileclip_s0",
+  "precision_mode": "mixed_fp16"
+}
+\end{lstlisting}
+
+解析失败时，\passthrough{\lstinline!json.loads()!} 会抛出
+\passthrough{\lstinline!json.JSONDecodeError!}。处理外部配置或日志时，先确认它确实是合法
+JSON，再读取字段，不要把解析失败和字段缺失混为一谈。
+
+\subsection{try / except / else /
+finally}\label{try-except-else-finally}
+
+\passthrough{\lstinline!else!}
+在没有异常时执行，\passthrough{\lstinline!finally!}
+无论是否异常都会执行。
+
+\begin{lstlisting}[language=Python]
+try:
+    dim = int("512")
+except ValueError:
+    dim = None
+else:
+    print("converted")
+finally:
+    print("done")
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+converted
+done
+\end{lstlisting}
+
+\subsection{argparse}\label{argparse}
+
+\passthrough{\lstinline!argparse!}
+用来解析命令行参数，样例脚本中常用来接收模型 ID、精度和路径。
+
+\begin{lstlisting}[language=Python]
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model-id", default="mobileclip_s0")
+args = parser.parse_args(["--model-id", "resnet50_feature"])
+
+print(args.model_id)
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+resnet50_feature
+\end{lstlisting}
+
+\subsection{\texorpdfstring{if \textbf{name} ==
+``\textbf{main}''}{if name == ``main''}}\label{if-name-main}
+
+被直接运行时会执行
+\passthrough{\lstinline!main()!}，被其他模块导入时不会自动执行。
+
+\begin{lstlisting}[language=Python]
+def main():
+    print("check complete")
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+check complete
+\end{lstlisting}
+
+\subsection{logging}\label{logging}
+
+\passthrough{\lstinline!logging!} 比 \passthrough{\lstinline!print()!}
+更适合记录运行过程，样例服务中常用来区分普通日志和错误日志。
+
+\begin{lstlisting}[language=Python]
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("appendix3")
+logger.info("model check complete")
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+INFO:appendix3:model check complete
+\end{lstlisting}
+
+\subsection{subprocess}\label{subprocess}
+
+\passthrough{\lstinline!subprocess.run()!}
+启动外部命令，\passthrough{\lstinline!capture\_output=True!}
+捕获标准输出。
+
+\begin{lstlisting}[language=Python]
+import subprocess
+
+result = subprocess.run(["python", "--version"], capture_output=True, text=True)
+print(result.stdout.strip())
+\end{lstlisting}
+
+输出内容取决于本机 Python 版本。
+
+\subsection{async / await}\label{async-await}
+
+\passthrough{\lstinline!async def!}
+定义异步函数，\passthrough{\lstinline!await!} 等待异步结果。样例中的
+WebRTC 和聊天服务大量使用这种写法。
+
+\begin{lstlisting}[language=Python]
+import asyncio
+
+async def check():
+    return "admitted"
+
+async def main():
+    print(await check())
+
+asyncio.run(main())
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+admitted
+\end{lstlisting}
+
+\section{5. 调试与验证}\label{ux8c03ux8bd5ux4e0eux9a8cux8bc1}
+
+\subsection{最小调试手段}\label{ux6700ux5c0fux8c03ux8bd5ux624bux6bb5}
+
+出错时先确认对象的真实内容，不要只看报错文字。\passthrough{\lstinline!repr()!}
+可以显示字符串中的空格和引号。
+
+\begin{lstlisting}[language=Python]
+status = " admitted"
+
+print(status)
+print(repr(status))
+\end{lstlisting}
+
+输出：
+
+\begin{lstlisting}
+ admitted
+' admitted'
+\end{lstlisting}
+
+如果逻辑复杂，可以在可疑位置使用 \passthrough{\lstinline!breakpoint()!}
+进入调试器，或把中间变量打印出来。脚本保存后，先在仓库根目录执行：
+
+\begin{lstlisting}[language=bash]
+python -m py_compile 脚本路径.py
+\end{lstlisting}
+
+\passthrough{\lstinline!py\_compile!} 只检查语法，不运行板端逻辑。昇腾
+310B 的 CANN、ATC 和 ACL 检查仍应在真实开发板上完成。
+
+\subsection{验证清单}\label{src-appendix3-validation}
+
+\begin{itemize}
+\tightlist
+\item[$\square$]
+  能说出
+  \passthrough{\lstinline!int!}、\passthrough{\lstinline!float!}、\passthrough{\lstinline!str!}、\passthrough{\lstinline!bool!}
+  的区别。
+\item[$\square$]
+  能用列表保存输入形状或特征维度，并用循环完成求和。
+\item[$\square$]
+  能用字典表示一个模型条目，按字段名读取值。
+\item[$\square$]
+  能写函数统计模型清单中的精度模式。
+\item[$\square$]
+  能区分
+  \passthrough{\lstinline!KeyError!}、\passthrough{\lstinline!ValueError!}
+  和 \passthrough{\lstinline!json.JSONDecodeError!}。
+\item[$\square$]
+  能阅读 \passthrough{\lstinline!samples/!}
+  中常见的列表推导、\passthrough{\lstinline!enumerate!}、\passthrough{\lstinline!argparse!}
+  和 \passthrough{\lstinline!pathlib!} 写法。
+\item[$\square$]
+  示例只使用标准库，没有 \passthrough{\lstinline!pandas!}
+  或板端运行时依赖。
+\end{itemize}
+
+\subsection{常见错误与坑}\label{src-appendix3-pitfalls}
+
+{ % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1111}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2222}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2222}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2222}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2222}}@{}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
-分类
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-报错/现象
+现象
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
 可能原因
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-排查步骤
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-解决建议
+处理方式
 \end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-ATC & \passthrough{\lstinline!E19001: Op Not Supported!} &
-新算子/版本落后 & 确认 CANN 版本 + onnxsim 简化 &
-升级/替换结构/自定义算子 \\
-ATC & Shape 推断失败 & 动态维度不明确 & 检查
-\passthrough{\lstinline!--input\_shape!}/动态参数 &
-固定关键维度或提供范围 \\
-ACL & \passthrough{\lstinline!aclmdlLoadFromFile failed!} &
-权限/路径/模型损坏 & 校验文件 hash/权限 & 修正权限/重新生成 OM \\
-Runtime & OOM / alloc 失败 & Batch 或分辨率过大 & 统计输入分布 & 降
-batch/分桶/复用内存 \\
-运行 & 推理输出 NAN & 数值溢出/量化尺度错误 & Dump 中间 Tensor &
-调整量化/保留 FP32 层 \\
-性能 & Timeline 大量 gap & Host 阻塞/小算子 & Profiling 分析 &
-合并算子/异步预取 \\
-性能 & H2D 高占比 \textgreater25\% & 多次小拷贝 & 合并缓冲 & AIPP
-下沉/批量化 \\
-精度 & Top1 下降 \textgreater1\% & 预处理不匹配 & 对比 ONNX 输出 & 统一
-Normalize \& Layout \\
-精度 & mAP 不稳定 & 阈值或 NMS 误差 & 调整阈值/比对中间框 & 校准 NMS
-公式/尺度 \\
-稳定 & 间歇 Crash & 悬空指针/并发访问 & 启用 ASAN/日志回溯 &
-修订生命周期/加锁 \\
-部署 & 模型加载慢 & 冷启动/IO 慢 & 预热/缓存 & 预加载 + 固态存储 \\
-安全 & 日志泄露敏感路径 & 直接 print & grep 审计 & 结构化日志脱敏 \\
+读取缺失字段报 \passthrough{\lstinline!KeyError!} & 模型清单字段不一致 &
+先审计字段，再用 \passthrough{\lstinline!get()!} \\
+\passthrough{\lstinline!int("fp16")!} 报错 & 字符串不是数字 & 用
+\passthrough{\lstinline!try/except!} 捕获并记录 \\
+JSON 解析失败 & 文本不是合法 JSON & 检查完整输入，捕获
+\passthrough{\lstinline!JSONDecodeError!} \\
+统计结果比预期少 & 把字符串当成数字 & 先看
+\passthrough{\lstinline!type()!}，必要时转换 \\
+输出顺序每次不同 & 遍历集合或字典 & 需要稳定顺序时用
+\passthrough{\lstinline!sorted()!} \\
 \end{longtable}
+}
 
-\section{模型转换参数模板合集}\label{src-book-appendix-h3}
-
-\subsection{分类模型 (ResNet)}\label{src-book-appendix-h4}
-
-\begin{lstlisting}
-atc --model=resnet50.onnx \
-    --framework=5 \
-    --output=resnet50_fp16 \
-    --input_format=NCHW \
-    --input_shape="input:1,3,224,224" \
-    --soc_version=Ascend310B \
-    --precision_mode=allow_fp32_to_fp16 \
-    --log=info
-\end{lstlisting}
-
-\subsection{YOLO 动态分辨率}\label{src-book-appendix-h5}
-
-\begin{lstlisting}
-atc --model=yolov5s.onnx \
-    --framework=5 \
-    --output=yolov5s_640_768 \
-    --dynamic_image_size="640,640;768,768" \
-    --input_format=NCHW \
-    --soc_version=Ascend310B \
-    --op_select_implmode=high_performance \
-    --precision_mode=allow_fp32_to_fp16
-\end{lstlisting}
-
-\subsection{INT8 量化（示例）}\label{src-book-appendix-h6}
-
-\begin{lstlisting}
-atc --model=resnet50.onnx \
-    --framework=5 \
-    --output=resnet50_int8 \
-    --input_format=NCHW \
-    --input_shape="input:1,3,224,224" \
-    --soc_version=Ascend310B \
-    --precision_mode=allow_mix_precision \
-    --insert_op_conf=aipp.cfg \
-    --enable_small_channel=true
-\end{lstlisting}
-
-\section{性能与质量 Checklist（执行勾项）}\label{src-book-appendix-h7}
-
-性能：
-
-\begin{itemize}
-\tightlist
-\item[$\square$]
-  Profiling 无明显 Idle gap \textgreater{} 10\%
-\item[$\square$]
-  H2D + D2H 占比 \textless{} 25\%
-\item[$\square$]
-  Postprocess 占比 \textless{} 20\%
-\item[$\square$]
-  Stream 利用率平衡（无单流饱和）
-\item[$\square$]
-  使用内存池减少频繁 alloc/free
-\end{itemize}
-
-精度：
-
-\begin{itemize}
-\tightlist
-\item[$\square$]
-  ONNX vs OM Top1 差异 \textless{} 0.2\%
-\item[$\square$]
-  L1 平均误差 \textless{} 1e-3（FP16）
-\item[$\square$]
-  NMS 输出框数量与基线差异 \textless{} 1 框/图（平均）
-\item[$\square$]
-  INT8 校准集覆盖多场景
-\end{itemize}
-
-稳定性：
-
-\begin{itemize}
-\tightlist
-\item[$\square$]
-  1h 稳态无 Crash / OOM
-\item[$\square$]
-  温度在安全区间 \textless{} 85°C
-\item[$\square$]
-  看门狗重启次数 = 0
-\end{itemize}
-
-安全：
-
-\begin{itemize}
-\tightlist
-\item[$\square$]
-  日志无明文密钥
-\item[$\square$]
-  模型文件 hash 校验通过
-\end{itemize}
-
-\section{术语表（扩展）}\label{src-book-appendix-h8}
-
-\begin{longtable}[]{@{}ll@{}}
-\toprule\noalign{}
-术语 & 说明 \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-OM & Ascend 离线模型二进制格式 \\
-ACL & Ascend 计算语言 API 层 \\
-ATC & 模型转换/编译工具 \\
-AIPP & 自动图像预处理模块 \\
-Stream & 异步任务调度通道 \\
-Profiling & 性能采样分析工具体系 \\
-Fallback & 算子未匹配优化实现退回通用实现 \\
-Quant Calibration & 量化尺度统计过程 \\
-Baseline & 初始标准对照性能/精度集 \\
-Drift & 指标随时间未经预期的漂移 \\
-\end{longtable}
-
-\section{推荐资源与外部引用}\label{src-book-appendix-h9}
-
-\begin{itemize}
-\tightlist
-\item
-  Ascend 官方文档入口（安装/算子列表/最佳实践）
-\item
-  CANN Release Notes：版本兼容与已知问题。
-\item
-  ONNX Operator 列表与语义说明。
-\item
-  Open Model Zoo / ModelScope：获取预训练模型与许可信息。
-\item
-  学术资源：算子融合、低比特量化、蒸馏相关论文列表。
-\end{itemize}
-
-\section{贡献指南摘要}\label{src-book-appendix-h10}
-
-流程：Fork -\textgreater{} 新分支 -\textgreater{} 修改/新增
--\textgreater{} 本地 lint \& 生成脚本 -\textgreater{}
-PR（描述动机/影响面/验证方式）。 PR 要求： \textbar{} 要素 \textbar{}
-说明 \textbar{} \textbar{} ---- \textbar{} ---- \textbar{} \textbar{}
-标题 \textbar{} 简明说明改动作用 \textbar{} \textbar{} 描述 \textbar{}
-背景 + 修改点 + 风险 \textbar{} \textbar{} 验证 \textbar{}
-性能/精度/功能截图或数据 \textbar{} \textbar{} 回滚 \textbar{}
-若失败如何恢复 \textbar{} \textbar{} 关联 Issue \textbar{} 追踪链接
-\textbar{}
-
-\section{FAQ}\label{src-book-appendix-h11}
-
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
-  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-问题
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-回答
-\end{minipage} \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-模型转换慢怎么办？ & 使用 SSD，关闭调试日志，检查不必要动态 shape。 \\
-精度下降如何定位？ & 离线脚本层级 Dump 比对，逐层二分。 \\
-如何减少内存占用？ & 启用内存池 + 减少中间冗余张量 + 固定 batch。 \\
-量化后收益不明显？ & 检查是否
-Compute-bound，或激活分布集中导致尺度相近。 \\
-NMS 很慢？ & 合并小框批量处理/降低候选阈值/考虑 Device 版 NMS。 \\
-\end{longtable}
-
-\section{License 与引用}\label{src-book-appendix-h12}
-
-本书内容遵循 Apache 2.0 许可证。引用： \textgreater{}
-《昇腾310B实战：从入门到精通边缘计算与人工智能》（GitHub:
-zhouxzh/Ascend310）
-
-\section{版本路线回顾}\label{src-book-appendix-h13}
-
-\begin{longtable}[]{@{}lll@{}}
-\toprule\noalign{}
-版本 & 内容 & 目标 \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-v0.1 & 结构框架 & 验证框架可行 \\
-v0.3 & 核心部署链路 & 形成可用主线 \\
-v0.6 & 案例与工程化 & 贴近实战 \\
-v1.0 & 全面审校发行 & 正式发布 \\
-\end{longtable}
-
-\section{实践任务}\label{src-book-appendix-h14}
+\section{6. 作业}\label{src-appendix3-assignment}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  为你的项目添加 1 条本地常见错误记录（含根因与解决）。
+  新建一个脚本，统计
+  \passthrough{\lstinline!feature\_dims = [512, 1024, 2048, 512]!}
+  的元素个数、最小值、最大值和去重后的维度集合。
 \item
-  复制分类 ATC 模板并改写为检测模型版本（含动态尺寸）。
+  写一个函数
+  \passthrough{\lstinline!count\_admitted(models)!}，接收模型字典列表，返回
+  \passthrough{\lstinline!status == "admitted"!} 的模型数量。
 \item
-  在术语表补充 3 个任务相关术语（并验证唯一性）。
+  写一个 \passthrough{\lstinline!safe\_get(data, key)!}
+  函数：键存在时返回值，不存在或类型错误时返回
+  \passthrough{\lstinline!None!}。
 \item
-  选取 FAQ 一条，写出更深入排查脚本思路。
+  用列表推导式筛出 \passthrough{\lstinline![512, 1024, 2048, 512]!}
+  中大于等于 1024 的元素。
+\item
+  用 \passthrough{\lstinline!argparse!} 写一个脚本，接收
+  \passthrough{\lstinline!--model-id!}，并输出该参数值。
+\item
+  把上面的脚本都交给 DSH 或人工审查一次，逐行解释每个分支和异常处理。
 \end{enumerate}
+
+AI 辅助审查时仍遵循先理解计划、检查命令、小步执行、验证结果。DSH
+生成代码后，必须自己运行并解释输出，不能只看``已完成''的结论。

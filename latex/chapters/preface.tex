@@ -56,6 +56,7 @@
 
 \subsubsection*{理论教程}\label{src-book-README-h4}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -75,43 +76,42 @@
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-Chapter 1 & 昇腾310B边缘计算基础 & 边缘计算概念、竞品对比、310B规格 &
+第1章 & 昇腾310B边缘计算基础 & 边缘计算概念、竞品对比、310B规格 &
 建立边缘计算认知与选型能力 \\
-Chapter 2 & CANN 软件栈核心组件解析 & 异构架构、ATC转换工具、msame推理 &
+第2章 & CANN软件栈核心组件解析 & 异构架构、ATC转换工具、msame推理 &
 掌握CANN基础与模型转换流程 \\
-Chapter 3 & 昇腾 PyTorch 扩展迁移基础 &
-环境搭建、torch\_npu插件、经典网络迁移 & 学会在昇腾上运行PyTorch模型 \\
-Chapter 4 & PyACL 应用开发基础 & ACL运行时、内存管理、模型推理流程 &
+第3章 & 昇腾PyTorch扩展迁移基础 & 环境搭建、torch\_npu插件、经典网络迁移
+& 学会在昇腾上运行PyTorch模型 \\
+第4章 & PyACL 应用开发基础 & ACL运行时、内存管理、模型推理流程 &
 掌握C/C++底层应用开发能力 \\
-Chapter 5 & DVPP视频处理基础 & VENC、VDEC、VPC、JPEG媒体处理 &
+第5章 & DVPP视频处理基础 & VENC、VDEC、VPC、JPEG媒体处理 &
 掌握310B媒体硬件调用与调试方法 \\
-Chapter 6 & 算子开发实战 & TBE DSL流程、310B计算架构、自定义算子 &
+第6章 & 算子开发实战 & TBE DSL流程、310B计算架构、自定义算子 &
 理解底层计算原理，具备算子扩展能力 \\
-Chapter 7 & 性能分析与优化案例教学 &
-Profiling分析、瓶颈定位、AIPP/DVPP、流水线优化 &
-掌握性能调优与系统工程化技能 \\
-Chapter 8 & 模型量化与精度性能权衡 &
-FP16、INT8、校准数据、精度对齐与性能对比 &
+第7章 & 性能分析与优化 & Profiling分析、瓶颈定位、AIPP/DVPP、流水线优化
+& 掌握性能调优与系统工程化技能 \\
+第8章 & 模型量化案例教学 & FP16、INT8、校准数据、精度对齐与性能对比 &
 学会在精度与性能之间做可验证取舍 \\
-Chapter 9 & AI项目交付闭环 &
-SSD300实验室实时检测、评测体系、标准化交付流程 &
-建立规范的AI项目交付方法论 \\
+第9章 & AI项目交付闭环 & SSD300实验室实时检测、评测体系、标准化交付流程
+& 建立规范的AI项目交付方法论 \\
 \end{longtable}
+}
 
 \subsubsection*{实践案例}\label{src-book-README-h5}
 
-包含从 \textbf{Case 1} 到 \textbf{Case 9} 的九个端侧 AI
-实战案例，涵盖人脸打卡机、实时跟踪、智能电子琴、掌纹识别、数据采集仪、智能小车、智能相册、手势识别与聊天机器人。
+包含从 \textbf{案例 1} 到 \textbf{案例 9} 的九个端侧 AI
+实战案例，涵盖智能考勤机、目标跟踪检测、智能电子琴、掌纹识别、智能数据采集分析仪、智能小车、智能相册、实时手势识别与智能聊天机器人。
 
 \subsubsection*{附录}\label{附录}
 
 附录用于集中收录实验基础和查阅型资料。附录 1 介绍开发板与基础环境，附录
-2 系统整理昇腾 310B Linux 操作与命令，附录 3 汇集工具箱、FAQ
-与参数模板；后续附录按阿拉伯数字顺序扩展。
+2 提供基于昇腾 310B 的 Ubuntu 教程，附录 3 介绍 Python 编程基础，附录 4
+介绍 Vibe Coding 基础，附录 5 提供 ROS2 基础教程，附录 6 汇集工具箱、FAQ
+与参数模板，附录 7 说明 CANN、驱动与固件的版本配套、升级和当前版本查询。
 
 \subsection*{各模块核心要点概述}\label{src-book-README-h6}
 
-\textbf{1. 昇腾310B边缘计算基础}
+\textbf{第1章：昇腾310B边缘计算基础}
 
 \begin{itemize}
 \tightlist
@@ -123,7 +123,7 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
   昇腾310B 技术规格详解
 \end{itemize}
 
-\textbf{2. CANN 软件栈核心组件解析}
+\textbf{第2章：CANN软件栈核心组件解析}
 
 \begin{itemize}
 \tightlist
@@ -135,7 +135,7 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
   msame 推理工具使用概览
 \end{itemize}
 
-\textbf{3. 昇腾 PyTorch 扩展迁移基础}
+\textbf{第3章：昇腾PyTorch扩展迁移基础}
 
 \begin{itemize}
 \tightlist
@@ -147,7 +147,7 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
   现代 CNN 移植实战：AlexNet, VGG, ResNet
 \end{itemize}
 
-\textbf{4. PyACL 应用开发基础}
+\textbf{第4章：PyACL 应用开发基础}
 
 \begin{itemize}
 \tightlist
@@ -161,7 +161,7 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
   Host 与 Device 之间的数据传输、同步与资源释放
 \end{itemize}
 
-\textbf{5. DVPP视频处理基础}
+\textbf{第5章：DVPP视频处理基础}
 
 \begin{itemize}
 \tightlist
@@ -173,7 +173,7 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
   视频编解码与图像处理案例、参数调试和性能测试
 \end{itemize}
 
-\textbf{6. 算子开发实战}
+\textbf{第6章：算子开发实战}
 
 \begin{itemize}
 \tightlist
@@ -185,7 +185,7 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
   TBE DSL 开发流程与基础算子实例
 \end{itemize}
 
-\textbf{7. 性能分析与优化案例教学}
+\textbf{第7章：性能分析与优化}
 
 \begin{itemize}
 \tightlist
@@ -197,7 +197,7 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
   核心优化技术：Buffer 复用、AIPP、DVPP 与 Queue Pipeline
 \end{itemize}
 
-\textbf{8. 模型量化与精度性能权衡}
+\textbf{第8章：模型量化案例教学}
 
 \begin{itemize}
 \tightlist
@@ -209,7 +209,7 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
   ATC 精度模式、量化失败模式与性能对比流程
 \end{itemize}
 
-\textbf{9. AI项目交付闭环}
+\textbf{第9章：AI项目交付闭环}
 
 \begin{itemize}
 \tightlist
@@ -225,28 +225,28 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
   验收、回归与风险管理
 \end{itemize}
 
-\textbf{实践案例 (Case 1 - 9)}
+\textbf{实践案例 (案例 1 - 9)}
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{Case 1 · Face Attendance}：人脸考勤（Web 应用）
+  \textbf{案例 1}：智能考勤机
 \item
-  \textbf{Case 2}：边缘端实时目标跟踪 (检测+关联)
+  \textbf{案例 2}：目标跟踪检测
 \item
-  \textbf{Case 3}：智能电子琴 (手势识别+音频合成)
+  \textbf{案例 3}：智能电子琴
 \item
-  \textbf{Case 4 · 掌纹识别 NPU 工作台}：预处理、特征提取与触控部署
+  \textbf{案例 4}：掌纹识别
 \item
-  \textbf{Case 5}：智能数据采集仪 (传感器, 数据分析)
+  \textbf{案例 5}：智能数据采集分析仪
 \item
-  \textbf{Case 6}：智能小车 (视觉, 路径规划, 运动控制)
+  \textbf{案例 6}：智能小车
 \item
-  \textbf{Case 7}：智能相册 (识别, 分类, 检索)
+  \textbf{案例 7}：智能相册
 \item
-  \textbf{Case 8}：手势识别 (数据采集, 实时系统)
+  \textbf{案例 8}：实时手势识别
 \item
-  \textbf{Case 9}：小智 OpenAI 兼容 RAG 网关 (LLM, 流式接口, 检索增强)
+  \textbf{案例 9}：智能聊天机器人
 \end{itemize}
 
 \textbf{附录}
@@ -256,11 +256,21 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
 \item
   \textbf{附录 1}：开发板硬件、系统安装、启动与网络连接、基础环境验证
 \item
-  \textbf{附录 2}：昇腾 310B Linux
-  shell、CANN、设备、服务、测试与证据边界
+  \textbf{附录 2}：基于昇腾 310B 的 Ubuntu
+  教程，涵盖命令、权限、网络、SSH、VNC、NFS、Docker、自启动与板端操作
 \item
-  \textbf{附录 3}：常见报错速查、模型转换参数模板、性能与质量
+  \textbf{附录 3}：Python 编程基础
+\item
+  \textbf{附录 4}：Vibe Coding 基础
+\item
+  \textbf{附录 5}：ROS2 基础教程，涵盖
+  DDS、工作空间、通信、launch、TF2/URDF、多机通信与自启动
+\item
+  \textbf{附录 6}：常见报错速查、模型转换参数模板、性能与质量
   Checklist、术语表与 FAQ
+\item
+  \textbf{附录 7}：CANN、NPU
+  驱动与设备固件的版本配套、升级、验收与回退边界
 \end{itemize}
 
 \subsection*{实践驱动与开源协作}\label{src-book-README-h7}
@@ -282,6 +292,7 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
 
 \subsection*{如何使用本书}\label{src-book-README-h8}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
   >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
@@ -301,15 +312,16 @@ SSD300实验室实时检测、评测体系、标准化交付流程 &
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-零基础学生 & 附录 1、Chapter 1、Chapter 2、Case 1 & 能跑通首个模型 &
+零基础学生 & 附录 1、第1章、第2章、案例 1 & 能跑通首个模型 &
 结合案例做改动实验 \\
-嵌入式工程师 & Chapter 4、Chapter 5、Chapter 6、Chapter 7 &
-掌握底层开发与优化 & 关注资源管理、媒体处理、算子开发与性能调优 \\
-AI应用开发者 & Chapter 2、Chapter 3、Chapter 8、选读 Case 案例 &
-快速场景落地 & 重点关注 PyTorch 迁移、模型部署与量化评估 \\
-技术负责人 & Chapter 1、Chapter 7、Chapter 8、Chapter 9 & 构建团队方法论
-& 制定内部量化评估、性能验收和交付标准 \\
+嵌入式工程师 & 第4章、第5章、第6章、第7章 & 掌握底层开发与优化 &
+关注资源管理、媒体处理、算子开发与性能调优 \\
+AI应用开发者 & 第2章、第3章、第8章、选读案例 & 快速场景落地 & 重点关注
+PyTorch 迁移、模型部署与量化评估 \\
+技术负责人 & 第1章、第7章、第8章、第9章 & 构建团队方法论 &
+制定内部量化评估、性能验收和交付标准 \\
 \end{longtable}
+}
 
 \subsection*{许可证与引用}\label{src-book-README-h9}
 

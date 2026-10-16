@@ -22,6 +22,25 @@ class ModelRegistryCandidateTests(unittest.TestCase):
         self.assertGreaterEqual(len(registry.candidates()), 6)
         self.assertNotIn("compnet_tongji_600", {spec.id for spec in registry.all()})
 
+    def test_runtime_candidate_visibility_excludes_archived_research_entries(self):
+        registry = ModelRegistry()
+        self.assertEqual(
+            registry.runtime_candidate_ids(),
+            [
+                "ccnet",
+                "compnet_tongji_600",
+                "compnet_iitd_460",
+                "compnet_rest_358",
+                "compnet_xjtu_flash_200",
+                "compnet_xjtu_natural_200",
+            ],
+        )
+        self.assertEqual(
+            {candidate.id for candidate in registry.runtime_candidates()},
+            set(registry.runtime_candidate_ids()),
+        )
+        self.assertNotIn("ppnet", registry.runtime_candidate_ids())
+
     def test_manual_test_profile_exposes_only_hash_verified_compnet(self):
         registry = ModelRegistry()
         specs = registry.all(include_manual_test=True)

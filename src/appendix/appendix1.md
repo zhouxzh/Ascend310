@@ -405,6 +405,101 @@ ifconfig
    ```
    默认密码为：`Mind@123`
 
+### Windows PowerShell 配置 SSH 密钥免密码登录 {#src-experiment-case0-h21-key-login}
+
+首次使用密码登录确认开发板身份后，可以把开发机的公钥写入开发板账户。以后使用相同的
+开发机账户连接同一块板时，SSH 会使用私钥认证，不再要求输入开发板密码。密钥登录只省去
+认证步骤；它不替代对开发板 IP、用户名和主机密钥指纹的核对。
+
+1. **先核对主机身份**
+
+   第一次连接会显示开发板的主机密钥指纹。应在开发板本地终端核对后再接受，而不是因为
+   连接方便就直接输入 `yes`：
+
+   ```bash
+   ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+   ```
+
+   若某个 IP 曾属于另一台板，SSH 可能报告主机密钥变化。先确认该 IP 确实是目标板，再只
+   删除该目标的旧记录：
+
+   ```powershell
+   ssh-keygen -R <开发板IP地址>
+   ```
+
+   不要删除整个 `known_hosts` 文件。
+
+2. **在 Windows PowerShell 生成 Ed25519 密钥**
+
+   以下命令只在本机尚未创建该密钥时生成它。私钥文件不得发送给开发板、其他电脑或 Git
+   仓库；只有 `.pub` 公钥可以安装到开发板。
+
+   ```powershell
+   $key = Join-Path $env:USERPROFILE '.ssh\id_ed25519'
+
+   if (-not (Test-Path -LiteralPath $key)) {
+     ssh-keygen -t ed25519 -a 64 -f $key
+   }
+   ```
+
+   根据提示设置私钥口令。口令保护的是开发机上的私钥，不是开发板账户密码。若需要自动化
+   执行部署，可通过受保护的本机 SSH agent 管理私钥；不要为了省事把私钥提交到项目中。
+
+3. **使用一次开发板密码安装公钥**
+
+   将 `<开发板IP地址>` 替换为实际地址。此命令会要求输入一次 `HwHiAiUser` 的开发板密码，
+   并创建权限正确的 `.ssh` 目录和 `authorized_keys` 文件。`${key}.pub` 使用花括号明确
+   指出变量边界，避免 PowerShell 将 `$key.pub` 误解析为名为 `pub` 的属性。
+
+   ```powershell
+   Get-Content -Raw -LiteralPath "${key}.pub" | ssh HwHiAiUser@<开发板IP地址> `
+     'umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys'
+   ```
+
+   对同一把密钥只需执行一次。若误重复执行，只会在 `authorized_keys` 中留下重复的同一公钥，
+   不会生成新的访问权限；可在开发板上人工去重，但不要修改其他用户的条目。
+
+4. **验证免密码登录**
+
+   `BatchMode=yes` 会禁止 SSH 回退到交互式密码输入，因此该命令成功才说明公钥认证已生效：
+
+   ```powershell
+   ssh -o BatchMode=yes -o IdentitiesOnly=yes -i $key `
+     HwHiAiUser@<开发板IP地址> 'hostname; whoami'
+   ```
+
+   正常情况下会输出开发板主机名和 `HwHiAiUser`，且不再要求输入开发板密码。若仍然要求密码，
+   先在开发板本地终端检查目录、文件权限和归属：
+
+   ```bash
+   ls -ld ~/.ssh
+   ls -l ~/.ssh/authorized_keys
+   ```
+
+   `.ssh` 应为 `700`，`authorized_keys` 应为 `600`，两者均应归 `HwHiAiUser` 所有。还应确认
+   当前 PowerShell 会话中的 `$key` 指向实际私钥文件，公钥路径写法为 `"${key}.pub"`，而不是
+   未定义变量时会指向当前目录 `.pub` 的 `"$key.pub"`。
+
+5. **可选：为常用开发板设置别名**
+
+   在 `C:\Users\<Windows用户名>\.ssh\config` 中添加一段配置后，可以用别名连接。不要把真实
+   IP、用户名、私钥或口令写入公开仓库。
+
+   ```text
+   Host ascend310b
+     HostName <开发板IP地址>
+     User HwHiAiUser
+     IdentityFile ~/.ssh/id_ed25519
+     IdentitiesOnly yes
+   ```
+
+   之后可使用：
+
+   ```powershell
+   ssh ascend310b
+   scp .\example.txt ascend310b:~/
+   ```
+
 ## 验证开发环境 {#src-experiment-case0-h22}
 
 系统启动并连接网络后，我们需要验证昇腾AI处理器的状态以及开发环境是否正常。

@@ -14,8 +14,12 @@ def _help() -> int:
     print(
         "Offline benchmark commands require the export/offline dependency set.\n"
         "Use: python -m tools.offline compare --help (or performance/evaluate/audit)\n"
-        "For candidate inventory validation use: "
-        "python -m tools.offline.candidates validate --strict"
+        "For candidate campaign inventory/reporting use: "
+        "python -m tools.offline.candidate_campaign inventory --all\n"
+        "For manifest-only validation use: "
+        "python -m tools.offline.candidates validate --strict\n"
+        "For extended architecture smoke use (on board only): "
+        "python -m tools.offline.extended_model_campaign board-smoke"
     )
     return 0
 

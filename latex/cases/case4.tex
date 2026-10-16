@@ -1,5 +1,4 @@
-\chapter{04 - Ascend 310B4
-掌纹识别工作台手动测试教程}\label{ascend-310b4-ux638cux7eb9ux8bc6ux522bux5de5ux4f5cux53f0ux624bux52a8ux6d4bux8bd5ux6559ux7a0b}
+\chapter{案例 4：掌纹识别}\label{ux6848ux4f8b-4ux638cux7eb9ux8bc6ux522b}
 
 \section{案例目标}\label{ux6848ux4f8bux76eeux6807}
 
@@ -99,6 +98,7 @@ MJPG。连续预览 100
 
 \section{常见问题}\label{ux5e38ux89c1ux95eeux9898}
 
+{ % do not increment counter
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
@@ -134,6 +134,7 @@ CCNet；不要升级版本 \\
 \passthrough{\lstinline!Health: Alarm!} &
 只记录设备状态，不单独判断模型或程序结果 \\
 \end{longtable}
+}
 
 \section{版本冻结}\label{ux7248ux672cux51bbux7ed3}
 
@@ -141,3 +142,37 @@ CCNet；不要升级版本 \\
 或应用版本。发现问题时停止当前模型、记录复现步骤、回退
 CCNet，并在人工测试结束后单独规划下一版本。人工测试通过后，再更新准入证据、release
 manifest、版本号和完整验收记录。
+
+\section{全候选模型测试}\label{ux5168ux5019ux9009ux6a21ux578bux6d4bux8bd5}
+
+工作台运行通道只保留六个已有 OM 且契约可验证的 NPU
+embedding。候选清单仍保留完整 28 项审计记录；其余 22
+个分类器、ROI、掌静脉、EDCC、SDK 或缺少可复现资产的项目已从 API/UI
+候选矩阵归档，不会被服务加载，也不能被强制转换成掌纹 512 维 embedding。
+
+在源码环境中执行静态审计：
+
+\begin{lstlisting}[language=bash]
+python -m tools.offline.candidate_campaign inventory --all
+python -m tools.offline.candidate_campaign local --all
+python -m tools.offline.candidate_campaign report --all
+\end{lstlisting}
+
+当前板端地址是 \passthrough{\lstinline!192.168.8.178!}。在板端激活
+conda/CANN 后，对已有 OM 的候选逐一执行：
+
+\begin{lstlisting}[language=bash]
+python tools/board/collect_npu_trace.py --label <candidate-id> --interval 1 -- \
+  python -m tools.offline.candidate_campaign board \
+  --candidate <candidate-id> --image <roi-image>
+python tools/board/acl_lifecycle_probe.py --model <candidate-id> \
+  --image <roi-image> --cycles 10
+\end{lstlisting}
+
+每项记录来源 revision、许可、资产字节数/SHA、输入输出契约、实际
+backend、耗时、退出码、温度、功耗、内存、大页、dmesg
+和生命周期。\passthrough{\lstinline!139!}、\passthrough{\lstinline!err\_ret=-512!}、设备
+reset、LPM/AICore/RAS
+增量或清理失败会阻断该项；缺权重、不可复现来源或闭源 SDK 则记录为
+\passthrough{\lstinline!blocked\_*!} 或
+\passthrough{\lstinline!not\_applicable!}，不是``测试通过''。完整日志留在板端私有目录，源码只提交脱敏状态和哈希。

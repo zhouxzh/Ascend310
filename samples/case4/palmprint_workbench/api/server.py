@@ -33,9 +33,14 @@ from starlette.concurrency import run_in_threadpool
 
 from .. import __version__
 from ..services import workbench as service_layer
-from ..domain.candidates import CandidateManifest
 from ..runtime.camera import CameraError, list_v4l2_devices
 from ..config import (
+    AUTO_ENROLL_COUNTDOWN_SECONDS,
+    AUTO_ENROLL_FRAME_INTERVAL_SECONDS,
+    AUTO_ENROLL_SAMPLE_INTERVAL_SECONDS,
+    AUTO_ENROLL_STABILITY_TIMEOUT_SECONDS,
+    AUTO_ENROLL_STABLE_SECONDS,
+    AUTO_ENROLL_WAITING_HAND_TIMEOUT_SECONDS,
     CAMERA_DEFAULT_HEIGHT,
     CAMERA_DEFAULT_WIDTH,
     DEFAULT_THRESHOLD,
@@ -49,6 +54,10 @@ from ..config import (
     REPORT_DIR,
     RELEASE_PROFILE,
     ROOT,
+    FIXED_ROI_CENTER_X,
+    FIXED_ROI_CENTER_Y,
+    FIXED_ROI_SIDE_RATIO,
+    ROI_PIPELINE_ID,
     SERVER_HOST,
     SERVER_PORT,
     camera_resolution_options,
@@ -56,6 +65,7 @@ from ..config import (
 from ..domain.datasets import audit_extracted, load_dataset_manifest, records
 from ..domain.admission import resolve_runtime_model
 from ..runtime.acl import acl_runtime_status
+from ..runtime.candidate_runners import candidate_specs, candidate_spec, run_candidate, verify_candidate_asset
 
 
 APP_VERSION = __version__
@@ -65,6 +75,8 @@ MAX_API_IDENTITIES = 100
 MAX_BACKGROUND_JOBS = 2
 MAX_COMPARISON_CANDIDATES = 16
 JOB_TTL_SECONDS = 60 * 60
+CALIBRATION_PATH = ROOT / "data" / "calibration" / "visible_light.json"
+ROI_CALIBRATION_PATH = ROOT / "data" / "calibration" / "fixed_roi.json"
 
 
 def _read_release_id() -> str:
@@ -98,11 +110,32 @@ class EnrollmentOptions(BaseModel):
     backend: str = "npu"
     precision: str = "mixed_fp16"
     assume_roi: bool = False
+    person_id: Optional[str] = Field(default=None, min_length=1, max_length=96)
+    continue_session_id: Optional[str] = None
+    reenroll_palm_id: Optional[str] = None
+    display_name: Optional[str] = Field(default=None, max_length=128)
+    palm_side: str = Field(..., min_length=1, max_length=16)
+    mode: str = "self_service"
+
+
+class EnrollmentAutoCaptureOptions(BaseModel):
+    device: str = Field(..., min_length=1, max_length=256)
+    resolution: str = f"{CAMERA_DEFAULT_WIDTH}x{CAMERA_DEFAULT_HEIGHT}"
+
+
+class FixedRoiCalibration(BaseModel):
+    center_x: float = Field(default=FIXED_ROI_CENTER_X, ge=0.0, le=1.0)
+    center_y: float = Field(default=FIXED_ROI_CENTER_Y, ge=0.0, le=1.0)
+    side_ratio: float = Field(default=FIXED_ROI_SIDE_RATIO, ge=0.4, le=1.0)
 
 
 class EnrollmentCommit(BaseModel):
-    name: str
-    palm_side: str = "right"
+    # Identity is created with the session.  These two optional fields retain
+    # API compatibility for a session created by an older UI.
+    person_id: Optional[str] = Field(default=None, min_length=1, max_length=96)
+    display_name: Optional[str] = Field(default=None, max_length=128)
+    name: Optional[str] = Field(default=None, max_length=128)
+    palm_side: Optional[str] = None
     # Optional[...] keeps the request model importable on the board's
     # Python 3.9 runtime; Pydantic evaluates these annotations at import.
     model_id: Optional[str] = None
@@ -147,13 +180,40 @@ class ComparisonOptions(BaseModel):
 
 
 @dataclass
+class EnrollmentSample:
+    sample_id: str
+    roi: np.ndarray
+    capture_id: str
+    preview_url: str | None
+    roi_url: str | None
+    quality: dict[str, Any]
+    geometry: dict[str, Any]
+
+
+@dataclass
 class EnrollmentState:
     session_id: str
     options: EnrollmentOptions
-    samples: list[Any] = field(default_factory=list)
+    samples: list[EnrollmentSample] = field(default_factory=list)
     capture_ids: list[str] = field(default_factory=list)
-    successful_capture_ids: list[str] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
+    phase: str = "ready"
+    guide: str = "选择掌侧后开始自动采集"
+    rejection_counts: dict[str, int] = field(default_factory=dict)
+    device: str | None = None
+    resolution: str | None = None
+    worker: threading.Thread | None = None
+    stop_event: threading.Event = field(default_factory=threading.Event)
+    started_at: float | None = None
+    completed_at: float | None = None
+    last_preview_url: str | None = None
+    last_roi_url: str | None = None
+    last_quality: dict[str, Any] = field(default_factory=dict)
+    last_geometry: dict[str, Any] = field(default_factory=dict)
+    last_error: str | None = None
+    last_accepted_at: float = 0.0
+    roi_config: dict[str, float] = field(default_factory=dict)
+    actual_resolution: str | None = None
 
 
 @dataclass
@@ -195,6 +255,8 @@ def _runtime_specs() -> list[Any]:
     )
 _SESSION_LOCK = threading.RLock()
 _SESSIONS: dict[str, EnrollmentState] = {}
+_AUTO_ENROLL_LOCK = threading.RLock()
+_AUTO_ENROLL_SESSION_ID: str | None = None
 _EVALUATION_LOCK = threading.RLock()
 _EVALUATIONS: dict[str, EvaluationState] = {}
 _COMPARISONS: dict[str, ComparisonState] = {}
@@ -444,6 +506,54 @@ def _resolved_threshold(options: RecognitionOptions) -> float:
         raise HTTPException(status_code=503, detail="模型缺少校准阈值") from exc
 
 
+def _runtime_calibration(
+    options: RecognitionOptions, *, camera_resolution: str | None,
+    camera_physical_id: str | None = None, roi_config: dict[str, float] | None = None,
+) -> dict[str, Any] | None:
+    """Return a calibration only when it exactly matches runtime provenance."""
+
+    try:
+        payload = json.loads(CALIBRATION_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or not payload.get("approved", False):
+        return None
+    required = {
+        "model_id": options.model_id,
+        "backend": options.backend,
+        "precision": options.precision,
+        "roi_pipeline_id": ROI_PIPELINE_ID,
+    }
+    if any(str(payload.get(key, "")) != value for key, value in required.items()):
+        return None
+    if not camera_resolution or str(payload.get("camera_resolution", "")) != camera_resolution:
+        return None
+    if not camera_physical_id or payload.get("camera_physical_id") != camera_physical_id:
+        return None
+    if payload.get("roi_config") != roi_config:
+        return None
+    try:
+        spec = resolve_runtime_model(
+            options.model_id,
+            registry=WORKBENCH.registry,
+            verify_assets=True,
+            include_manual_test=RELEASE_PROFILE == MANUAL_TEST_PROFILE,
+        )
+        asset = WORKBENCH.registry.runtime_asset_status(spec, verify_hash=True).get(
+            "assets", {}
+        ).get("mixed_fp16_om", {})
+        current_om_hash = asset.get("actual_sha256")
+    except (KeyError, OSError, RuntimeError, ValueError, AttributeError):
+        return None
+    report_om = payload.get("om") if isinstance(payload.get("om"), dict) else {}
+    if not current_om_hash or report_om.get("sha256") != current_om_hash:
+        return None
+    threshold = payload.get("recommended_threshold")
+    if not isinstance(threshold, (int, float)) or not 0.0 <= float(threshold) <= 1.0:
+        return None
+    return payload
+
+
 def _form_int(value: Any, default: int) -> int:
     try:
         return int(default if value in (None, "") else value)
@@ -628,11 +738,22 @@ def _recognition_payload(
     source: str = "upload",
     device: str | None = None,
     requested_resolution: str | None = None,
+    camera_resolution: str | None = None,
+    roi_config: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     _validate_options(options)
     threshold = _resolved_threshold(options)
+    calibration = _runtime_calibration(
+        options, camera_resolution=camera_resolution,
+        camera_physical_id=_camera_physical_id(device) if source == "camera" else None,
+        roi_config=roi_config,
+    )
+    if calibration is not None:
+        threshold = float(calibration["recommended_threshold"])
     started = time.perf_counter_ns()
-    roi_result, error = service_layer._extract(image, options.assume_roi)
+    roi_result, error = service_layer._extract(
+        image, options.assume_roi, roi_config=roi_config
+    )
     roi_finished = time.perf_counter_ns()
     if error:
         timing = {
@@ -641,9 +762,12 @@ def _recognition_payload(
         }
         payload = {
             "accepted": False,
+            "outcome": "roi_rejected",
             "score": 0.0,
             "status": f"未完成：{error}",
             "quality": _jsonable(roi_result.quality),
+            "geometry": _jsonable(roi_result.geometry),
+            "roi_pipeline_id": roi_result.pipeline_id,
             "matches": [],
             "timing": timing,
             "preview_url": _frame_data_url(roi_result.preview),
@@ -659,10 +783,13 @@ def _recognition_payload(
                 "backend": options.backend,
                 "precision": options.precision,
                 "device": device,
+                "camera_physical_id": _camera_physical_id(device) if source == "camera" else None,
                 "requested_resolution": requested_resolution,
                 "actual_resolution": _image_resolution(image),
                 "roi_ok": False,
                 "quality": _jsonable(roi_result.quality),
+                "geometry": _jsonable(roi_result.geometry),
+                "roi_pipeline_id": roi_result.pipeline_id,
                 "status": f"recognition_failed: {error}",
                 "timing": timing,
             },
@@ -686,6 +813,8 @@ def _recognition_payload(
                     encoded.code,
                     threshold=threshold,
                     top_k=int(options.top_k),
+                    roi_pipeline_id=ROI_PIPELINE_ID,
+                    roi_config=roi_config,
                 )
             except RuntimeError as exc:
                 raise HTTPException(status_code=503, detail=f"模板存储不可用：{exc}") from exc
@@ -700,6 +829,7 @@ def _recognition_payload(
                 "backend": options.backend,
                 "precision": options.precision,
                 "device": device,
+                "camera_physical_id": _camera_physical_id(device) if source == "camera" else None,
                 "requested_resolution": requested_resolution,
                 "actual_resolution": _image_resolution(image),
                 "roi_ok": True,
@@ -710,16 +840,29 @@ def _recognition_payload(
         )
         raise
     finished = time.perf_counter_ns()
-    if result.get("accepted"):
-        status = f"通过 | {result.get('user_name', '')} · {result.get('palm_side', '')} | {float(result.get('score', 0.0)):.4f}"
-    elif result.get("matches"):
-        status = f"拒识 | 最高分 {float(result.get('score', 0.0)):.4f}，阈值 {threshold:.4f}"
+    if not result.get("matches"):
+        outcome = "no_templates"
+        status = "当前模型和 ROI 管线没有可用模板"
+        accepted: bool | None = False
+    elif calibration is None:
+        outcome = "candidates_only"
+        status = f"候选检索 | 最高分 {float(result.get('score', 0.0)):.4f}（尚未完成本机阈值校准）"
+        accepted = None
+    elif result.get("accepted"):
+        outcome = "matched"
+        status = f"匹配 | {result.get('display_name', result.get('user_name', ''))} · {result.get('palm_side', '')}"
+        accepted = True
     else:
-        status = "拒识 | 当前模型模板库为空"
+        outcome = "below_threshold"
+        status = f"低于校准阈值 | 最高分 {float(result.get('score', 0.0)):.4f}，阈值 {threshold:.4f}"
+        accepted = False
     matches = [
         {
-            "user_id": item.get("user_id"),
-            "user_name": item.get("user_name"),
+            "palm_id": item.get("palm_id") or item.get("user_id"),
+            "person_id": item.get("person_id") or item.get("user_id"),
+            "display_name": item.get("display_name") or item.get("user_name"),
+            "user_id": item.get("palm_id") or item.get("user_id"),
+            "user_name": item.get("display_name") or item.get("user_name"),
             "palm_side": item.get("palm_side"),
             "score": float(item.get("score", 0.0)),
             "samples": int(item.get("samples", 0)),
@@ -727,13 +870,30 @@ def _recognition_payload(
         for item in result.get("matches", [])
     ]
     payload = {
-        "accepted": bool(result.get("accepted", False)),
+        "accepted": accepted,
+        "outcome": outcome,
         "score": float(result.get("score", 0.0)),
-        "user_id": result.get("user_id"),
-        "user_name": result.get("user_name"),
+        "palm_id": result.get("palm_id") or result.get("user_id"),
+        "person_id": result.get("person_id") or result.get("user_id"),
+        "display_name": result.get("display_name") or result.get("user_name"),
+        "user_id": result.get("palm_id") or result.get("user_id"),
+        "user_name": result.get("display_name") or result.get("user_name"),
         "palm_side": result.get("palm_side"),
         "status": status,
         "quality": _jsonable(roi_result.quality),
+        "geometry": _jsonable(roi_result.geometry),
+        "roi_pipeline_id": roi_result.pipeline_id,
+        "template_summary": WORKBENCH.store.summary(
+            service_layer._template_namespace(
+                options.model_id, options.backend, options.precision
+            ),
+            roi_pipeline_id=ROI_PIPELINE_ID,
+        ),
+        "calibration": (
+            {"ready": True, "recommended_threshold": calibration["recommended_threshold"]}
+            if calibration is not None
+            else {"ready": False}
+        ),
         "matches": matches,
         "timing": {
             "ROI / quality ms": (roi_finished - started) / 1e6,
@@ -755,6 +915,7 @@ def _recognition_payload(
             "backend": options.backend,
             "precision": options.precision,
             "device": device,
+            "camera_physical_id": _camera_physical_id(device) if source == "camera" else None,
             "requested_resolution": requested_resolution,
             "actual_resolution": _image_resolution(image),
             "roi_ok": True,
@@ -763,9 +924,13 @@ def _recognition_payload(
             "score": payload["score"],
             "status": status,
             "timing": payload["timing"],
+            "palm_id": payload.get("palm_id"),
+            "person_id": payload.get("person_id"),
+            "display_name": payload.get("display_name"),
             "user_id": payload.get("user_id"),
             "user_name": payload.get("user_name"),
             "palm_side": payload.get("palm_side"),
+            "roi_pipeline_id": roi_result.pipeline_id,
         },
     )
     if capture_id:
@@ -957,6 +1122,62 @@ def _records(frame: Any) -> list[dict[str, Any]]:
     return [_jsonable(item) for item in values]
 
 
+_ROI_CALIBRATION_LOCK = threading.RLock()
+
+
+def _camera_physical_id(device: str | None) -> str:
+    if not device:
+        return "unknown"
+    for item in list_v4l2_devices():
+        if item.path == str(device) or str(device) in item.aliases:
+            return item.physical_id or item.path
+    return str(device)
+
+
+def _fixed_roi_config(device: str | None, resolution: str | None) -> dict[str, float]:
+    default = {
+        "center_x": FIXED_ROI_CENTER_X,
+        "center_y": FIXED_ROI_CENTER_Y,
+        "side_ratio": FIXED_ROI_SIDE_RATIO,
+    }
+    key = f"{_camera_physical_id(device)}|{resolution or 'default'}"
+    with _ROI_CALIBRATION_LOCK:
+        try:
+            payload = json.loads(ROI_CALIBRATION_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return default
+    entry = payload.get(key) if isinstance(payload, dict) else None
+    if not isinstance(entry, dict):
+        return default
+    try:
+        return FixedRoiCalibration(**entry).model_dump()
+    except AttributeError:
+        return FixedRoiCalibration(**entry).dict()
+    except Exception:
+        return default
+
+
+def _save_fixed_roi_config(device: str, resolution: str, config: FixedRoiCalibration) -> dict[str, Any]:
+    key = f"{_camera_physical_id(device)}|{resolution}"
+    try:
+        payload = json.loads(ROI_CALIBRATION_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    try:
+        value = config.model_dump()
+    except AttributeError:
+        value = config.dict()
+    payload[key] = value
+    ROI_CALIBRATION_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temporary = ROI_CALIBRATION_PATH.with_suffix(".tmp")
+    with _ROI_CALIBRATION_LOCK:
+        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        temporary.replace(ROI_CALIBRATION_PATH)
+    return {"key": key, **value, "roi_pipeline_id": ROI_PIPELINE_ID}
+
+
 def _camera_payload() -> list[dict[str, Any]]:
     states = WORKBENCH.camera_states()
     resolutions = list(camera_resolution_options())
@@ -967,8 +1188,11 @@ def _camera_payload() -> list[dict[str, Any]]:
                 "device": device.path,
                 "path": device.path,
                 "name": device.name or "V4L2 视频节点",
+                "physical_id": device.physical_id or device.path,
+                "aliases": list(device.aliases or (device.path,)),
                 "resolutions": resolutions,
                 "state": states.get(device.path, "已检测，未打开"),
+                **getattr(WORKBENCH, "camera_details", {}).get(device.path, {}),
             }
         )
     return rows
@@ -1015,20 +1239,414 @@ def _status_payload() -> dict[str, Any]:
 
 
 def _session_response(state: EnrollmentState, *, status: str | None = None, **extra: Any) -> dict[str, Any]:
+    """Serialize a registration session without returning biometric originals."""
+
+    review_actions_enabled = (
+        state.options.mode == "assisted"
+        and state.phase == "reviewing"
+        and len(state.samples) == MAX_ENROLL_SAMPLES
+    )
     return {
         "id": state.session_id,
         "session_id": state.session_id,
-        "status": status or f"已采集 {len(state.samples)} / {MAX_ENROLL_SAMPLES}",
+        "phase": state.phase,
+        "status": status or state.guide,
+        "guide": state.guide,
+        "mode": state.options.mode,
+        "review_actions_enabled": review_actions_enabled,
+        "person_id": state.options.person_id,
+        "display_name": state.options.display_name,
+        "palm_side": state.options.palm_side,
         "sample_count": len(state.samples),
         "capture_ids": list(state.capture_ids),
-        "samples": [_frame_data_url(sample, image_format=".jpg") for sample in state.samples],
-        "min_samples": MIN_ENROLL_SAMPLES,
+        "samples": [
+            {
+                "id": sample.sample_id,
+                "capture_id": sample.capture_id,
+                "preview_url": sample.preview_url,
+                "roi_url": sample.roi_url,
+                "original_url": f"/api/captures/{sample.capture_id}/original",
+                "quality": _jsonable(sample.quality),
+                "geometry": _jsonable(sample.geometry),
+            }
+            for sample in state.samples
+        ],
+        "preview_url": state.last_preview_url,
+        "roi_url": state.last_roi_url,
+        "quality": _jsonable(state.last_quality),
+        "geometry": _jsonable(state.last_geometry),
+        "rejections": dict(state.rejection_counts),
+        "last_error": state.last_error,
+        "min_samples": MAX_ENROLL_SAMPLES,
         "max_samples": MAX_ENROLL_SAMPLES,
         "model_id": state.options.model_id,
         "backend": state.options.backend,
         "precision": state.options.precision,
+        "roi_pipeline_id": ROI_PIPELINE_ID,
+        "actual_resolution": state.actual_resolution,
         **extra,
     }
+
+
+def _validate_enrollment_identity(options: EnrollmentOptions) -> tuple[str, str, str]:
+    person_id = (options.person_id or "").strip()
+    display_name = (options.display_name or "").strip() or person_id
+    palm_side = (options.palm_side or "").strip().lower()
+    if not person_id:
+        raise HTTPException(status_code=422, detail="人员编号为必填稳定主键")
+    if ":" in person_id:
+        raise HTTPException(status_code=422, detail="人员编号不能包含 ':'")
+    if palm_side not in {"left", "right"}:
+        raise HTTPException(status_code=422, detail="掌侧必须为 left 或 right")
+    if options.mode not in {"self_service", "assisted"}:
+        raise HTTPException(status_code=422, detail="注册模式必须为 self_service 或 assisted")
+    return person_id, display_name, palm_side
+
+
+def _cleanup_enrollment_captures(state: EnrollmentState) -> None:
+    capture_ids = list(state.capture_ids)
+    if not capture_ids:
+        return
+    try:
+        WORKBENCH.captures.cleanup_many(capture_ids)
+    except Exception:
+        logger.exception("unable to delete enrollment captures for session %s", state.session_id)
+
+
+def _stop_auto_capture(state: EnrollmentState) -> None:
+    state.stop_event.set()
+    if state.device and state.resolution:
+        try:
+            width, height = _parse_resolution(state.resolution)
+            WORKBENCH.close_cameras(
+                device=state.device,
+                width=width,
+                height=height,
+                session=state.session_id,
+            )
+        except Exception:
+            logger.exception("unable to release enrollment camera for %s", state.session_id)
+
+
+def _require_camera_not_reserved(session: str | None = None) -> None:
+    """Keep browser preview/recognition from invalidating auto enrollment."""
+
+    with _AUTO_ENROLL_LOCK:
+        owner = _AUTO_ENROLL_SESSION_ID
+    if owner and owner != session:
+        raise HTTPException(status_code=409, detail="摄像头正在由自动注册会话独占")
+
+
+def _wait_for_auto_capture(state: EnrollmentState, timeout: float = 3.0) -> None:
+    worker = state.worker
+    if worker is not None and worker.is_alive() and worker is not threading.current_thread():
+        worker.join(timeout=timeout)
+
+
+def _set_enrollment_failure(state: EnrollmentState, message: str) -> None:
+    global _AUTO_ENROLL_SESSION_ID
+    with _SESSION_LOCK:
+        if state.phase in {"completed", "cancelled"}:
+            return
+        state.phase = "failed"
+        state.guide = message
+        state.last_error = message
+        state.completed_at = time.time()
+    _cleanup_enrollment_captures(state)
+    with _AUTO_ENROLL_LOCK:
+        if _AUTO_ENROLL_SESSION_ID == state.session_id:
+            _AUTO_ENROLL_SESSION_ID = None
+
+
+def _geometry_is_stable(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    if not previous or not current:
+        return False
+    try:
+        center_delta = max(
+            abs(float(previous["center_x"]) - float(current["center_x"])),
+            abs(float(previous["center_y"]) - float(current["center_y"])),
+        )
+        angle_delta = abs(float(previous["angle_deg"]) - float(current["angle_deg"]))
+        old_side = max(float(previous["crop_side"]), 1.0)
+        scale_delta = abs(float(current["crop_side"]) - old_side) / old_side
+    except (KeyError, TypeError, ValueError):
+        return False
+    return center_delta <= 0.035 and angle_delta <= 8.0 and scale_delta <= 0.12
+
+
+def _complete_enrollment(state: EnrollmentState) -> dict[str, Any]:
+    """Encode five selected ROIs and atomically replace the stable palm."""
+
+    person_id, display_name, palm_side = _validate_enrollment_identity(state.options)
+    if len(state.samples) != MAX_ENROLL_SAMPLES:
+        raise ValueError(f"需要恰好 {MAX_ENROLL_SAMPLES} 个合格样本")
+    namespace = service_layer._template_namespace(
+        state.options.model_id, state.options.backend, state.options.precision
+    )
+    stable_palm_id = WORKBENCH.store.palm_id(person_id, palm_side)
+    new_capture_ids = {sample.capture_id for sample in state.samples}
+    # Bind the new captures before publishing the embedding generation.  If a
+    # capture write fails, the caller removes these files and the old template
+    # generation remains untouched.
+    for capture_id in new_capture_ids:
+        WORKBENCH.captures.update_metadata(
+            capture_id,
+            model_id=state.options.model_id,
+            backend=state.options.backend,
+            precision=state.options.precision,
+            palm_id=stable_palm_id,
+            person_id=person_id,
+            display_name=display_name,
+            user_id=stable_palm_id,
+            user_name=display_name,
+            palm_side=palm_side,
+            roi_pipeline_id=ROI_PIPELINE_ID,
+            accepted=False,
+            status="enrollment_pending_template",
+        )
+    with _workbench_job_lock():
+        adapter = WORKBENCH.adapter(
+            state.options.model_id, state.options.backend, state.options.precision
+        )
+        codes = [adapter.encode(sample.roi).code for sample in state.samples]
+        replacement = WORKBENCH.store.replace_palm(
+            namespace,
+            codes,
+            person_id=person_id,
+            display_name=display_name,
+            palm_side=palm_side,
+            roi_pipeline_id=ROI_PIPELINE_ID,
+            roi_config=state.roi_config or None,
+        )
+    for capture_id in new_capture_ids:
+        try:
+            WORKBENCH.captures.update_metadata(
+                capture_id, accepted=True, status="enrolled"
+            )
+        except Exception:
+            # The template generation is already committed.  Preserve the
+            # sample rather than reporting a false failed registration.
+            logger.exception("unable to finalize enrollment capture %s", capture_id)
+    # The replacement has committed successfully.  Only now is it safe to
+    # remove earlier images for the same stable palm.
+    try:
+        WORKBENCH.captures.purge_template(
+            model_id=state.options.model_id,
+            palm_id=replacement["palm_id"],
+            keep_capture_ids=new_capture_ids,
+            roi_pipeline_id=ROI_PIPELINE_ID,
+        )
+    except Exception:
+        # Do not report a committed template as failed.  The next explicit
+        # template deletion still retries physical image cleanup.
+        logger.exception("unable to remove replaced enrollment captures")
+    return replacement
+
+
+def _auto_capture_worker(state: EnrollmentState) -> None:
+    """Own one camera session and archive only the five selected frames."""
+
+    global _AUTO_ENROLL_SESSION_ID
+    assert state.device is not None and state.resolution is not None
+    width, height = _parse_resolution(state.resolution)
+    started = time.monotonic()
+    stable_since: float | None = None
+    previous_geometry: dict[str, Any] = {}
+    previous_roi: np.ndarray | None = None
+    first_quality_at: float | None = None
+    progress_at = started + AUTO_ENROLL_COUNTDOWN_SECONDS
+    try:
+        with _SESSION_LOCK:
+            state.phase = "camera_opening"
+            state.guide = "正在打开摄像头"
+        WORKBENCH.open_camera_session(state.device, width, height, state.session_id)
+        while not state.stop_event.is_set():
+            now = time.monotonic()
+            elapsed = now - started
+            if elapsed > AUTO_ENROLL_COUNTDOWN_SECONDS and now - progress_at >= AUTO_ENROLL_STABILITY_TIMEOUT_SECONDS:
+                _set_enrollment_failure(state, "30 秒内没有新的合格样本，请调整采集框、距离和光照后重试")
+                return
+            with _SESSION_LOCK:
+                if state.phase in {"cancelled", "completed", "failed", "reviewing"}:
+                    return
+                if elapsed < AUTO_ENROLL_COUNTDOWN_SECONDS:
+                    countdown_elapsed = elapsed
+                    state.phase = "countdown"
+                    state.guide = f"请将掌心放入采集框，{max(1, int(AUTO_ENROLL_COUNTDOWN_SECONDS - countdown_elapsed + 0.99))} 秒后开始"
+                else:
+                    state.phase = "waiting_position"
+                    state.guide = "请将掌心放入采集框并保持稳定"
+            try:
+                frame = WORKBENCH.capture_camera_frame(
+                    state.device,
+                    width,
+                    height,
+                    encode_jpeg=False,
+                    session=state.session_id,
+                )
+            except (CameraError, ValueError) as exc:
+                _set_enrollment_failure(state, f"摄像头异常：{exc}")
+                return
+            if elapsed < AUTO_ENROLL_COUNTDOWN_SECONDS:
+                with _SESSION_LOCK:
+                    state.last_preview_url = _frame_data_url(frame.rgb)
+                    state.last_roi_url = None
+                    state.last_quality = {}
+                    state.last_geometry = {}
+                time.sleep(AUTO_ENROLL_FRAME_INTERVAL_SECONDS)
+                continue
+            result, error = service_layer._extract(
+                frame.rgb,
+                False,
+                roi_config=state.roi_config,
+            )
+            now = time.monotonic()
+            state.actual_resolution = _image_resolution(frame.rgb)
+            with _SESSION_LOCK:
+                preview = result.preview if result.preview is not None else frame.rgb
+                state.last_preview_url = _frame_data_url(preview)
+                state.last_roi_url = _frame_data_url(result.roi, image_format=".png")
+                state.last_quality = _jsonable(result.quality)
+                state.last_geometry = _jsonable(result.geometry)
+            if error or result.roi is None:
+                reason = error or "ROI 提取失败"
+                with _SESSION_LOCK:
+                    state.rejection_counts[reason] = state.rejection_counts.get(reason, 0) + 1
+                    state.last_error = reason
+                    state.phase = "waiting_position"
+                    state.guide = "请将掌心放入采集框，调整距离和光照"
+                if first_quality_at is None and now - started >= AUTO_ENROLL_WAITING_HAND_TIMEOUT_SECONDS:
+                    _set_enrollment_failure(state, "20 秒内未获得合格画面，请将掌心放入采集框后重试")
+                    return
+                stable_since = None
+                previous_geometry = {}
+                time.sleep(AUTO_ENROLL_FRAME_INTERVAL_SECONDS)
+                continue
+
+            if first_quality_at is None:
+                first_quality_at = now
+            current_geometry = result.geometry
+            frame_delta = float(np.mean(np.abs(result.roi.astype(np.float32) - previous_roi.astype(np.float32)))) if previous_roi is not None else float("inf")
+            previous_roi = result.roi.copy()
+            with _SESSION_LOCK:
+                state.last_error = None
+                state.last_quality["frame_delta"] = frame_delta if np.isfinite(frame_delta) else None
+            if not _geometry_is_stable(previous_geometry, current_geometry) or frame_delta > 5.0:
+                stable_since = now
+                previous_geometry = current_geometry
+                with _SESSION_LOCK:
+                    state.phase = "stabilizing"
+                    state.guide = "将掌心放入采集框，保持画面稳定"
+                time.sleep(AUTO_ENROLL_FRAME_INTERVAL_SECONDS)
+                continue
+            previous_geometry = current_geometry
+            assert stable_since is not None
+            if now - stable_since < AUTO_ENROLL_STABLE_SECONDS:
+                with _SESSION_LOCK:
+                    state.phase = "stabilizing"
+                    state.guide = "保持不动，正在稳定定位"
+                time.sleep(AUTO_ENROLL_FRAME_INTERVAL_SECONDS)
+                continue
+            if now - state.last_accepted_at < AUTO_ENROLL_SAMPLE_INTERVAL_SECONDS:
+                with _SESSION_LOCK:
+                    state.phase = "collecting"
+                    state.guide = "轻微调整手掌，准备下一张样本"
+                time.sleep(AUTO_ENROLL_FRAME_INTERVAL_SECONDS)
+                continue
+            if any(float(np.mean(np.abs(result.roi.astype(np.float32) - sample.roi.astype(np.float32)))) < 0.8 for sample in state.samples):
+                with _SESSION_LOCK:
+                    state.rejection_counts["near_duplicate"] = state.rejection_counts.get("near_duplicate", 0) + 1
+                    state.phase = "collecting"
+                    state.guide = "请轻微调整手掌后重采，避免重复样本"
+                time.sleep(AUTO_ENROLL_FRAME_INTERVAL_SECONDS)
+                continue
+            capture_id = _safe_capture_save(
+                original=frame.rgb,
+                roi=result.roi,
+                metadata={
+                    "purpose": "enrollment",
+                    "source": "camera_auto",
+                    "model_id": state.options.model_id,
+                    "backend": state.options.backend,
+                    "precision": state.options.precision,
+                    "device": state.device,
+                    "template_namespace": service_layer._template_namespace(state.options.model_id, state.options.backend, state.options.precision),
+                    "person_id": state.options.person_id,
+                    "palm_side": state.options.palm_side,
+                    "requested_resolution": state.resolution,
+                    "actual_resolution": _image_resolution(frame.rgb),
+                    "roi_mode": "fixed_guide",
+                    "camera_physical_id": _camera_physical_id(state.device),
+                    "roi_ok": True,
+                    "quality": {**_jsonable(result.quality), "frame_delta": frame_delta},
+                    "geometry": _jsonable(result.geometry),
+                    "roi_pipeline_id": ROI_PIPELINE_ID,
+                    "status": "enrollment_selected",
+                    "enrollment_session_id": state.session_id,
+                },
+            )
+            if not capture_id:
+                _set_enrollment_failure(state, "无法保存入选采集样本")
+                return
+            sample = EnrollmentSample(
+                sample_id=uuid4().hex,
+                roi=result.roi.copy(),
+                capture_id=capture_id,
+                preview_url=_frame_data_url(result.preview),
+                roi_url=_frame_data_url(result.roi, image_format=".png"),
+                quality=_jsonable(result.quality),
+                geometry=_jsonable(result.geometry),
+            )
+            discard_capture = False
+            with _SESSION_LOCK:
+                if state.phase in {"cancelled", "completed", "failed"} or state.stop_event.is_set():
+                    discard_capture = True
+                else:
+                    state.samples.append(sample)
+                    state.capture_ids.append(capture_id)
+                    state.last_accepted_at = now
+                    state.phase = "collecting"
+                    state.guide = f"已采集 {len(state.samples)} / {MAX_ENROLL_SAMPLES}，请轻微调整手掌"
+            if discard_capture:
+                try:
+                    WORKBENCH.captures.cleanup(capture_id)
+                except Exception:
+                    logger.exception("unable to remove cancelled enrollment capture %s", capture_id)
+                return
+            progress_at = now
+            if len(state.samples) == MAX_ENROLL_SAMPLES:
+                if state.options.mode == "assisted":
+                    with _SESSION_LOCK:
+                        state.phase = "reviewing"
+                        state.guide = "已采集 5 张，请审阅样本后保存"
+                    return
+                with _SESSION_LOCK:
+                    state.phase = "saving"
+                    state.guide = "正在编码并保存掌纹模板"
+                try:
+                    replacement = _complete_enrollment(state)
+                except Exception as exc:
+                    logger.exception("self-service enrollment failed")
+                    _set_enrollment_failure(state, _npu_error_detail(exc))
+                    return
+                with _SESSION_LOCK:
+                    state.phase = "completed"
+                    state.guide = f"已保存 {replacement['palm_id']} 的 5 个掌纹样本"
+                    state.completed_at = time.time()
+                return
+            time.sleep(AUTO_ENROLL_FRAME_INTERVAL_SECONDS)
+    except Exception as exc:
+        # A worker failure must become observable to the polling UI rather
+        # than leaving the session indefinitely in its previous phase.
+        logger.exception("automatic enrollment worker failed for %s", state.session_id)
+        _set_enrollment_failure(state, f"自动采集异常：{_npu_error_detail(exc)}")
+    finally:
+        _stop_auto_capture(state)
+        with _EVALUATION_LOCK:
+            _BACKGROUND_WORKERS.discard(threading.current_thread())
+        with _AUTO_ENROLL_LOCK:
+            if _AUTO_ENROLL_SESSION_ID == state.session_id:
+                _AUTO_ENROLL_SESSION_ID = None
 
 
 def _evaluation_response(state: EvaluationState) -> dict[str, Any]:
@@ -1057,13 +1675,53 @@ def _evaluation_response(state: EvaluationState) -> dict[str, Any]:
 
 
 def _candidate_inventory() -> list[dict[str, Any]]:
-    """Expose every audited candidate without making it production-runnable."""
+    """Expose only candidates selected for the current release UI.
+
+    The full 28-item research audit remains available to offline tooling and
+    its reports.  The serving UI intentionally hides candidates that have no
+    reproducible NPU runtime path or are not palmprint embedding models.
+    """
 
     try:
-        candidates = CandidateManifest.load().all()
-    except (OSError, ValueError, json.JSONDecodeError):
+        candidates = WORKBENCH.registry.runtime_candidates()
+    except (OSError, ValueError, json.JSONDecodeError, AttributeError):
         candidates = []
     runtime = {spec.id: spec for spec in _runtime_specs()}
+    campaign_status: dict[str, dict[str, Any]] = {}
+    campaign_index = REPORT_DIR / "candidates" / "index.json"
+    try:
+        campaign_payload = json.loads(campaign_index.read_text(encoding="utf-8"))
+        campaign_items = campaign_payload.get("items", []) if isinstance(campaign_payload, dict) else []
+        if isinstance(campaign_items, list):
+            campaign_status = {
+                str(item["candidate_id"]): item
+                for item in campaign_items
+                if isinstance(item, dict) and isinstance(item.get("candidate_id"), str)
+            }
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        # The read-only inventory remains available before the first campaign.
+        campaign_status = {}
+
+    def diagnostic_status(candidate_id: str) -> dict[str, Any]:
+        """Read the latest board trace without conflating it with ACL smoke."""
+
+        system_dir = REPORT_DIR / "system"
+        matches = sorted(system_dir.glob(f"{candidate_id}_*.json"), reverse=True)
+        for path in matches:
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                continue
+            if isinstance(value, dict) and value.get("status"):
+                delta = value.get("fault_delta", {})
+                categories = delta.get("blocking_categories", []) if isinstance(delta, dict) else []
+                return {
+                    "status": value.get("status"),
+                    "blocking_categories": list(categories) if isinstance(categories, list) else [],
+                    "report": str(path),
+                }
+        return {"status": "not_recorded", "blocking_categories": [], "report": None}
+
     rows: list[dict[str, Any]] = []
     for candidate in candidates:
         manual_candidate = bool(candidate.raw.get("manual_test_enabled", False))
@@ -1077,7 +1735,14 @@ def _candidate_inventory() -> list[dict[str, Any]]:
             )
         )
         raw = dict(candidate.raw)
-        weights = dict(candidate.weights)
+        raw_weights = raw.get("weights", {})
+        weights = dict(raw_weights) if isinstance(raw_weights, dict) else {}
+        source_info = raw.get("source", {})
+        if not isinstance(source_info, dict):
+            source_info = {"url": getattr(candidate, "source", ""), "revision": getattr(candidate, "revision", "")}
+        license_info = raw.get("license", {})
+        if not isinstance(license_info, dict):
+            license_info = {"spdx": getattr(candidate, "license", "NOASSERTION")}
         conversion = raw.get("conversion", {})
         if not isinstance(conversion, dict):
             conversion = {}
@@ -1131,6 +1796,8 @@ def _candidate_inventory() -> list[dict[str, Any]]:
             eligibility_reason = admission.reason or eligibility_reason
         elif admission.known:
             eligibility_reason = admission.reason or eligibility_reason
+        campaign = campaign_status.get(candidate.id, {})
+        diagnostic = diagnostic_status(candidate.id)
         rows.append({
             "id": candidate.id,
             "candidate_id": candidate.id,
@@ -1140,9 +1807,9 @@ def _candidate_inventory() -> list[dict[str, Any]]:
             "task": candidate.task,
             "modality": candidate.modality,
             "comparison_scope": candidate.comparison_scope,
-            "source": candidate.source.get("url"),
-            "revision": candidate.source.get("revision"),
-            "license": candidate.license.get("spdx", "NOASSERTION"),
+            "source": source_info.get("url"),
+            "revision": source_info.get("revision"),
+            "license": license_info.get("spdx", "NOASSERTION"),
             "weight_status": weights.get("availability", "unknown"),
             "weight_sha256": artifact_hash,
             "export_status": export_status,
@@ -1169,6 +1836,11 @@ def _candidate_inventory() -> list[dict[str, Any]]:
             "metrics": raw.get("metrics", {}),
             "performance": raw.get("performance", {}),
             "na_reasons": raw.get("na_reasons", {}),
+            "campaign_status": campaign.get("status", "not_started"),
+            "campaign_reasons": campaign.get("reasons", []),
+            "campaign_generated_at": campaign.get("generated_at"),
+            "diagnostic_status": diagnostic["status"],
+            "diagnostic_blocking_categories": diagnostic["blocking_categories"],
         })
     return rows
 
@@ -1354,6 +2026,13 @@ async def _workbench_lifespan(_: FastAPI):
         yield
     finally:
         started = time.time()
+        with _SESSION_LOCK:
+            enrollment_sessions = list(_SESSIONS.values())
+            for session in enrollment_sessions:
+                session.phase = "cancelled"
+                session.guide = "服务关闭，注册会话已取消"
+        for session in enrollment_sessions:
+            _stop_auto_capture(session)
         with _WORKER_GATE:
             with _EVALUATION_LOCK:
                 _SERVICE_STOPPING = True
@@ -1506,11 +2185,142 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
 
     @service.get("/api/candidates")
     async def candidates() -> dict[str, Any]:
-        return {"items": _candidate_inventory()}
+        items = _candidate_inventory()
+        active_ids = set(WORKBENCH.registry.runtime_candidate_ids())
+        archived_ids = sorted(
+            candidate.id
+            for candidate in WORKBENCH.registry.candidates()
+            if candidate.id not in active_ids
+        )
+        return {
+            "items": items,
+            "active_candidate_ids": sorted(active_ids),
+            "archived_candidate_ids": archived_ids,
+            "archived_count": len(archived_ids),
+        }
+
+    @service.get("/api/candidate-runtimes")
+    async def candidate_runtimes() -> dict[str, Any]:
+        """List board-ready heterogeneous candidate experiment adapters.
+
+        This is intentionally separate from ``/api/bootstrap``.  A candidate
+        classifier, ROI graph, vein graph, or pair comparator is callable from
+        the experiment page, but it is not a template/embedding model.
+        """
+
+        rows: list[dict[str, Any]] = []
+        for spec in candidate_specs():
+            row = {
+                "id": spec["id"],
+                "display_name": spec["display_name"],
+                "task_type": spec["task_type"],
+                "modality": spec["modality"],
+                "input_kind": spec["input_kind"],
+                "input_shape": spec["input_shape"],
+                "output_kind": spec["output_kind"],
+                "om_path": spec["om_path"],
+                "bytes": spec["bytes"],
+                "sha256": spec["sha256"],
+                "available": False,
+                "reason": None,
+            }
+            try:
+                verify_candidate_asset(spec)
+            except (FileNotFoundError, OSError, ValueError) as exc:
+                row["reason"] = str(exc)
+            else:
+                row["available"] = True
+            rows.append(row)
+        return {"items": rows, "production_registry_modified": False}
+
+    @service.post("/api/candidate-runs")
+    async def candidate_run(request: Request) -> dict[str, Any]:
+        """Run one board-ready candidate using its task-specific contract."""
+
+        try:
+            form = await request.form()
+        except Exception as exc:
+            raise HTTPException(status_code=415, detail=f"需要 multipart/form-data 图像上传: {exc}") from exc
+        candidate_id = str(form.get("candidate_id", "")).strip()
+        if not candidate_id:
+            raise HTTPException(status_code=422, detail="缺少 candidate_id 字段")
+        upload = form.get("image")
+        if upload is None or not hasattr(upload, "read"):
+            raise HTTPException(status_code=422, detail="缺少 image 文件字段")
+        reference_upload = form.get("reference_image")
+        try:
+            image = _decode_image_bytes(await upload.read())
+            reference = (
+                _decode_image_bytes(await reference_upload.read())
+                if reference_upload is not None and hasattr(reference_upload, "read")
+                else None
+            )
+        except HTTPException:
+            raise
+        try:
+            candidate_spec(candidate_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"未知候选实验模型: {candidate_id}") from exc
+        spec = candidate_spec(candidate_id)
+        if spec.get("input_kind") == "rgb_pair" and reference is None:
+            raise HTTPException(status_code=422, detail="双输入候选需要 reference_image 文件字段")
+        try:
+            with WORKBENCH.execution_lock:
+                result = await run_in_threadpool(run_candidate, candidate_id, image, reference)
+        except (FileNotFoundError, OSError, ValueError, RuntimeError) as exc:
+            raise HTTPException(status_code=503, detail=f"候选模型运行失败：{exc}") from exc
+        capture_id = _safe_capture_save(
+            original=image,
+            roi=None,
+            metadata={
+                "purpose": "candidate_experiment",
+                "source": "upload",
+                "model_id": result["candidate_id"],
+                "backend": result["backend"],
+                "precision": result["precision"],
+                "actual_resolution": _image_resolution(image),
+                "roi_ok": False,
+                "status": "candidate_runtime_ok",
+                "timing": {
+                    "model ms": result["inference_ms"],
+                    "total ms": result["total_ms"],
+                },
+                "candidate_task_type": result["task_type"],
+                "candidate_output_kind": spec.get("output_kind"),
+                "reference_image_supplied": reference is not None,
+            },
+        )
+        response = {"status": "ok", "contains_biometric_data": True, **result}
+        if capture_id:
+            response["capture_id"] = capture_id
+        return response
 
     @service.get("/api/cameras")
     async def cameras() -> dict[str, Any]:
         return {"items": _camera_payload()}
+
+    @service.get("/api/cameras/{device:path}/roi-guide")
+    async def camera_roi_guide(
+        device: str,
+        resolution: str = Query(f"{CAMERA_DEFAULT_WIDTH}x{CAMERA_DEFAULT_HEIGHT}"),
+    ) -> dict[str, Any]:
+        width, height = _parse_resolution(resolution)
+        return {
+            "roi_pipeline_id": ROI_PIPELINE_ID,
+            "resolution": f"{width}x{height}",
+            "physical_id": _camera_physical_id(device),
+            "config": _fixed_roi_config(device, f"{width}x{height}"),
+            "message": "系统不会自动寻找手掌，请将掌心放入固定采集框",
+        }
+
+    @service.put("/api/cameras/{device:path}/roi-guide")
+    async def save_camera_roi_guide(
+        device: str,
+        calibration: FixedRoiCalibration,
+        resolution: str = Query(f"{CAMERA_DEFAULT_WIDTH}x{CAMERA_DEFAULT_HEIGHT}"),
+    ) -> dict[str, Any]:
+        width, height = _parse_resolution(resolution)
+        return _save_fixed_roi_config(device, f"{width}x{height}", calibration)
 
     @service.get("/api/cameras/{device:path}/frame")
     async def camera_frame(
@@ -1521,6 +2331,7 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         max_width: int = Query(960, ge=320, le=1920),
         quality: int = Query(72, ge=40, le=95),
     ) -> Response:
+        _require_camera_not_reserved(session)
         width, height = _parse_resolution(resolution)
         try:
             # CameraCapture.read() is blocking on V4L2.  Keep it off the
@@ -1560,6 +2371,8 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
                 "X-Capture-Resolution": actual_resolution,
                 "X-Requested-Resolution": f"{width}x{height}",
                 "X-Preview-Resolution": f"{preview_width}x{preview_height}",
+                "X-Capture-Format": getattr(frame, "frame_format", "unknown"),
+                "X-Camera-Physical-Id": getattr(frame, "physical_id", ""),
             },
         )
 
@@ -1576,6 +2389,7 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         which matters when a browser abort races with a V4L2 read.
         """
 
+        _require_camera_not_reserved(session)
         width, height = _parse_resolution(resolution)
         try:
             await run_in_threadpool(
@@ -1614,7 +2428,13 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
 
     @service.post("/api/cameras/{device:path}/recognitions")
     async def recognize_camera(device: str, options: CameraRecognitionOptions) -> dict[str, Any]:
+        # A V4L2 frame is always a full camera frame, never a pre-cropped
+        # 128 x 128 palm ROI.  Enforce this at the API boundary so a stale UI
+        # or a direct client request cannot shrink the complete frame into the
+        # embedding input.
+        options.assume_roi = False
         _validate_options(options)
+        _require_camera_not_reserved()
         width, height = _parse_resolution(options.resolution)
         try:
             frame = await run_in_threadpool(
@@ -1637,6 +2457,8 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
                     source="camera",
                     device=device,
                     requested_resolution=options.resolution,
+                    camera_resolution=_image_resolution(frame.rgb),
+                    roi_config=_fixed_roi_config(device, options.resolution),
                 )
             )
         except HTTPException:
@@ -1653,6 +2475,7 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         # Preview cleanup carries the old resolution so an asynchronous close
         # cannot tear down a newly selected resolution.  A call without a
         # resolution still releases every handle for that device.
+        _require_camera_not_reserved(session)
         if resolution:
             width, height = _parse_resolution(resolution)
             WORKBENCH.close_cameras(device=device, width=width, height=height, session=session)
@@ -1670,12 +2493,41 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
 
     @service.post("/api/enrollment-sessions")
     async def create_enrollment(options: EnrollmentOptions) -> dict[str, Any]:
+        # Enrollment sessions capture from a camera.  Uploaded pre-cropped
+        # ROI samples remain supported by the assisted sample endpoint, but
+        # the automatic camera workflow must always run the ROI locator.
+        options.assume_roi = False
         recognition_options = RecognitionOptions(**_model_dict(options))
         _validate_options(recognition_options)
+        if options.person_id:
+            raise HTTPException(status_code=422, detail="新注册不能自定义人员编号")
+        if options.continue_session_id and options.reenroll_palm_id:
+            raise HTTPException(status_code=422, detail="只能选择一种续登记方式")
+        if options.continue_session_id:
+            with _SESSION_LOCK:
+                previous = _SESSIONS.get(options.continue_session_id)
+            if previous is None or previous.phase != "completed":
+                raise HTTPException(status_code=409, detail="只能续登记已完成会话的人员")
+            options.person_id = previous.options.person_id
+        elif options.reenroll_palm_id:
+            namespace = service_layer._template_namespace(options.model_id, options.backend, options.precision)
+            palms = WORKBENCH.store.users(namespace, roi_pipeline_id=ROI_PIPELINE_ID)
+            previous_palm = next((item for item in palms if item.get("palm_id") == options.reenroll_palm_id), None)
+            if previous_palm is None or previous_palm["palm_side"] != options.palm_side:
+                raise HTTPException(status_code=404, detail="待重注册的掌纹模板不存在")
+            options.person_id = previous_palm["person_id"]
+        else:
+            options.person_id = WORKBENCH.store.allocate_person_id()
+        person_id, display_name, palm_side = _validate_enrollment_identity(options)
+        options.person_id = person_id
+        options.display_name = display_name
+        options.palm_side = palm_side
         session = EnrollmentState(uuid4().hex, options)
+        if options.mode == "assisted":
+            session.guide = "管理员审阅模式：采集 5 张合格样本后审阅、剔除或确认保存"
         with _SESSION_LOCK:
             _SESSIONS[session.session_id] = session
-        return _session_response(session, status="采集已开始")
+        return _session_response(session, status="注册会话已创建，请开始自动采集")
 
     def get_session(session_id: str) -> EnrollmentState:
         with _SESSION_LOCK:
@@ -1685,21 +2537,64 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         if time.time() - session.created_at > 30 * 60:
             with _SESSION_LOCK:
                 _SESSIONS.pop(session_id, None)
-            for capture_id in session.capture_ids:
-                try:
-                    WORKBENCH.captures.update_metadata(
-                        capture_id, status="enrollment_expired", accepted=False
-                    )
-                except Exception:
-                    logger.exception("unable to mark expired capture %s", capture_id)
+            _stop_auto_capture(session)
+            _wait_for_auto_capture(session)
+            _cleanup_enrollment_captures(session)
             raise HTTPException(status_code=410, detail="注册会话已过期")
         return session
 
+    @service.get("/api/enrollment-sessions/{session_id}")
+    async def enrollment_status(session_id: str) -> dict[str, Any]:
+        session = get_session(session_id)
+        return _session_response(session)
+
+    @service.post("/api/enrollment-sessions/{session_id}/auto-capture")
+    async def start_auto_capture(
+        session_id: str, request: EnrollmentAutoCaptureOptions
+    ) -> dict[str, Any]:
+        global _AUTO_ENROLL_SESSION_ID
+        session = get_session(session_id)
+        _validate_enrollment_identity(session.options)
+        width, height = _parse_resolution(request.resolution)
+        del width, height  # validation happens before reserving the camera session
+        with _AUTO_ENROLL_LOCK:
+            if _AUTO_ENROLL_SESSION_ID and _AUTO_ENROLL_SESSION_ID != session_id:
+                raise HTTPException(status_code=409, detail="已有注册会话正在独占摄像头")
+            if session.worker is not None and session.worker.is_alive():
+                return _session_response(session, status="自动采集正在运行")
+            if session.phase in {"completed", "cancelled"}:
+                raise HTTPException(status_code=409, detail="当前会话已结束，请创建新的注册会话")
+            if session.phase == "failed":
+                raise HTTPException(status_code=409, detail="当前会话已失败，请创建新的注册会话")
+            session.device = request.device
+            session.resolution = request.resolution
+            session.roi_config = _fixed_roi_config(request.device, request.resolution)
+            session.stop_event.clear()
+            session.started_at = time.time()
+            session.phase = "camera_opening"
+            session.guide = "正在打开摄像头并准备固定采集框"
+            session.last_error = None
+            _AUTO_ENROLL_SESSION_ID = session_id
+            worker = threading.Thread(
+                target=_auto_capture_worker,
+                args=(session,),
+                daemon=True,
+                name=f"palmprint-auto-enroll-{session_id[:8]}",
+            )
+            session.worker = worker
+            with _EVALUATION_LOCK:
+                _BACKGROUND_WORKERS.add(worker)
+            worker.start()
+        return _session_response(session)
+
     @service.post("/api/enrollment-sessions/{session_id}/samples")
     async def enrollment_sample(session_id: str, request: Request) -> dict[str, Any]:
+        """Compatibility path for assisted upload; only a valid sample is saved."""
+
         session = get_session(session_id)
+        if session.options.mode != "assisted":
+            raise HTTPException(status_code=409, detail="自助注册仅支持自动采集")
         form = await request.form()
-        assume_roi = _parse_bool(form.get("assume_roi"), session.options.assume_roi)
         if len(session.samples) >= MAX_ENROLL_SAMPLES:
             raise HTTPException(status_code=409, detail=f"最多 {MAX_ENROLL_SAMPLES} 个样本")
         upload = form.get("image")
@@ -1710,8 +2605,12 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
             if not hasattr(upload, "read"):
                 raise HTTPException(status_code=422, detail="image 字段不是文件")
             image = _decode_image_bytes(await upload.read())
+            # Only an explicitly uploaded, already-cropped sample may bypass
+            # the ROI locator.  A camera frame must never use this shortcut.
+            assume_roi = _parse_bool(form.get("assume_roi"), False)
         else:
             source = "camera"
+            assume_roi = False
             device = str(form.get("camera_device", ""))
             if not device:
                 raise HTTPException(status_code=422, detail="请上传 image 或指定 camera_device")
@@ -1732,7 +2631,13 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
                 image = frame.rgb
             except (CameraError, ValueError) as exc:
                 raise HTTPException(status_code=503, detail=f"摄像头错误: {exc}") from exc
-        result, error = service_layer._extract(image, assume_roi)
+        result, error = service_layer._extract(
+            image,
+            assume_roi,
+            roi_config=_fixed_roi_config(device, requested_resolution) if device else None,
+        )
+        if error or result.roi is None:
+            raise HTTPException(status_code=422, detail=error or "ROI 提取失败")
         capture_id = _safe_capture_save(
             original=image,
             roi=result.roi,
@@ -1745,90 +2650,115 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
                 "device": device,
                 "requested_resolution": requested_resolution,
                 "actual_resolution": _image_resolution(image),
-                "roi_ok": not bool(error) and result.roi is not None,
+                "roi_mode": "pre_cropped" if assume_roi else "fixed_guide",
+                "camera_physical_id": _camera_physical_id(device) if device else None,
+                "roi_ok": True,
                 "quality": _jsonable(result.quality),
-                "status": "enrollment_failed" if error or result.roi is None else "enrollment_sample",
+                "geometry": _jsonable(result.geometry),
+                "roi_pipeline_id": ROI_PIPELINE_ID,
+                "status": "enrollment_selected",
                 "enrollment_session_id": session.session_id,
             },
         )
-        if capture_id:
-            with _SESSION_LOCK:
-                session.capture_ids.append(capture_id)
-        if error or result.roi is None:
-            raise HTTPException(status_code=422, detail=error or "ROI 提取失败")
+        if not capture_id:
+            raise HTTPException(status_code=503, detail="无法保存入选采集样本")
         with _SESSION_LOCK:
-            session.samples.append(result.roi.copy())
-            if capture_id:
-                session.successful_capture_ids.append(capture_id)
-        return _session_response(session, status=f"已采集 {len(session.samples)} / {MAX_ENROLL_SAMPLES}", preview_url=_frame_data_url(result.preview))
+            session.samples.append(
+                EnrollmentSample(
+                    sample_id=uuid4().hex,
+                    roi=result.roi.copy(),
+                    capture_id=capture_id,
+                    preview_url=_frame_data_url(result.preview),
+                    roi_url=_frame_data_url(result.roi, image_format=".png"),
+                    quality=_jsonable(result.quality),
+                    geometry=_jsonable(result.geometry),
+                )
+            )
+            session.capture_ids.append(capture_id)
+            session.phase = "reviewing" if len(session.samples) == MAX_ENROLL_SAMPLES else "collecting"
+            session.guide = (
+                "已采集 5 张，请审阅样本后保存"
+                if session.phase == "reviewing"
+                else f"已采集 {len(session.samples)} / {MAX_ENROLL_SAMPLES}"
+            )
+        return _session_response(session)
+
+    @service.delete("/api/enrollment-sessions/{session_id}/samples/{sample_id}")
+    async def discard_enrollment_sample(session_id: str, sample_id: str) -> dict[str, Any]:
+        session = get_session(session_id)
+        if session.options.mode != "assisted":
+            raise HTTPException(status_code=403, detail="仅管理员辅助注册可以剔除样本")
+        with _SESSION_LOCK:
+            selected = next((item for item in session.samples if item.sample_id == sample_id), None)
+            if selected is None:
+                raise HTTPException(status_code=404, detail="样本不存在")
+            session.samples.remove(selected)
+            session.capture_ids = [item for item in session.capture_ids if item != selected.capture_id]
+            session.phase = "ready"
+            session.guide = "已剔除样本，正在自动补采至 5 张"
+        try:
+            WORKBENCH.captures.cleanup(selected.capture_id)
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"无法删除样本图像：{exc}") from exc
+        if session.device and session.resolution:
+            _wait_for_auto_capture(session)
+            await start_auto_capture(
+                session_id,
+                EnrollmentAutoCaptureOptions(device=session.device, resolution=session.resolution),
+            )
+        return _session_response(session)
 
     @service.post("/api/enrollment-sessions/{session_id}/commit")
     async def commit_enrollment(session_id: str, request: EnrollmentCommit) -> dict[str, Any]:
         session = get_session(session_id)
-        if not request.name.strip():
-            raise HTTPException(status_code=422, detail="姓名不能为空")
-        if not MIN_ENROLL_SAMPLES <= len(session.samples) <= MAX_ENROLL_SAMPLES:
-            raise HTTPException(status_code=422, detail=f"需要 {MIN_ENROLL_SAMPLES} 至 {MAX_ENROLL_SAMPLES} 个合格样本")
-        options = RecognitionOptions(
-            model_id=request.model_id or session.options.model_id,
-            backend=request.backend or session.options.backend,
-            precision=request.precision or session.options.precision,
-        )
-        _validate_options(options)
+        if session.options.mode != "assisted":
+            raise HTTPException(status_code=403, detail="自助注册在第 5 张样本后自动保存")
+        if len(session.samples) != MAX_ENROLL_SAMPLES:
+            raise HTTPException(status_code=422, detail=f"需要恰好 {MAX_ENROLL_SAMPLES} 个合格样本")
+        if session.phase != "reviewing":
+            raise HTTPException(status_code=409, detail="只能保存处于审阅阶段的会话")
+        if request.person_id and request.person_id != session.options.person_id:
+            raise HTTPException(status_code=422, detail="不能修改会话人员编号")
+        if request.name:
+            raise HTTPException(status_code=422, detail="不能修改会话人员编号")
+        if request.display_name is not None:
+            session.options.display_name = request.display_name.strip()
+        if request.palm_side and request.palm_side != session.options.palm_side:
+            raise HTTPException(status_code=422, detail="不能修改会话掌侧")
+        _validate_enrollment_identity(session.options)
+        if request.model_id or request.backend or request.precision:
+            for key in ("model_id", "backend", "precision"):
+                value = getattr(request, key)
+                if value and value != getattr(session.options, key):
+                    raise HTTPException(status_code=422, detail="不能修改已采集会话的模型配置")
+        with _SESSION_LOCK:
+            session.phase = "saving"
+            session.guide = "正在编码并保存掌纹模板"
         try:
-            with WORKBENCH.execution_lock:
-                adapter = WORKBENCH.adapter(options.model_id, options.backend, options.precision)
-                codes = [adapter.encode(sample).code for sample in session.samples]
-                namespace = service_layer._template_namespace(
-                    options.model_id, options.backend, options.precision
-                )
-                user_id = WORKBENCH.store.enroll(namespace, codes, request.name, request.palm_side)
-        except (FileNotFoundError, RuntimeError, ValueError) as exc:
-            for capture_id in session.capture_ids:
-                try:
-                    WORKBENCH.captures.update_metadata(
-                        capture_id, status="enrollment_failed", accepted=False
-                    )
-                except Exception:
-                    logger.exception("unable to mark failed capture %s", capture_id)
+            replacement = await run_in_threadpool(_complete_enrollment, session)
+        except (FileNotFoundError, RuntimeError, ValueError, KeyError) as exc:
+            _set_enrollment_failure(session, _npu_error_detail(exc))
             raise HTTPException(status_code=503, detail=_npu_error_detail(exc)) from exc
         with _SESSION_LOCK:
-            _SESSIONS.pop(session_id, None)
-            capture_ids = list(session.capture_ids)
-        for capture_id in session.successful_capture_ids:
-            try:
-                WORKBENCH.captures.update_metadata(
-                    capture_id,
-                    user_id=user_id,
-                    user_name=request.name.strip(),
-                    palm_side=request.palm_side,
-                    accepted=True,
-                    status="enrolled",
-                )
-            except Exception:
-                logger.exception("unable to bind capture %s to enrolled template", capture_id)
-        return {
-            "id": session_id,
-            "status": "completed",
-            "message": f"注册完成 | ID {user_id[:8]} | {len(codes)} 个样本",
-            "user_id": user_id,
-            "sample_count": len(codes),
-            "capture_ids": capture_ids,
-            "samples": [],
-        }
+            session.phase = "completed"
+            session.completed_at = time.time()
+            session.guide = f"已保存 {replacement['palm_id']} 的 {MAX_ENROLL_SAMPLES} 个样本"
+        return _session_response(session, palm_id=replacement["palm_id"], replaced_samples=replacement["replaced_samples"])
 
     @service.delete("/api/enrollment-sessions/{session_id}")
     async def cancel_enrollment(session_id: str) -> dict[str, Any]:
         with _SESSION_LOCK:
             session = _SESSIONS.pop(session_id, None)
         if session is not None:
-            for capture_id in session.capture_ids:
-                try:
-                    WORKBENCH.captures.update_metadata(
-                        capture_id, status="enrollment_cancelled", accepted=False
-                    )
-                except Exception:
-                    logger.exception("unable to mark cancelled capture %s", capture_id)
+            if session.phase == "completed":
+                with _SESSION_LOCK:
+                    _SESSIONS[session_id] = session
+                raise HTTPException(status_code=409, detail="已完成的注册不能取消；删除模板会同步删除关联图像")
+            session.phase = "cancelled"
+            session.guide = "注册已取消，已删除本次采集图像"
+            _stop_auto_capture(session)
+            _wait_for_auto_capture(session)
+            _cleanup_enrollment_captures(session)
         return {"ok": True, "cancelled": session is not None, "id": session_id}
 
     @service.post("/api/enrollment-sessions/{session_id}/cancel")
@@ -1844,15 +2774,19 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         _validate_options(RecognitionOptions(model_id=model_id, backend=backend, precision=precision))
         namespace = service_layer._template_namespace(model_id, backend, precision)
         try:
-            users = WORKBENCH.store.users(namespace)
+            users = WORKBENCH.store.users(namespace, roi_pipeline_id=ROI_PIPELINE_ID)
+            summary = WORKBENCH.store.summary(namespace, roi_pipeline_id=ROI_PIPELINE_ID)
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=f"模板存储不可用：{exc}") from exc
         return {
             "items": [
                 {
-                    "id": item["user_id"],
-                    "user_id": item["user_id"],
-                    "user_name": item["user_name"],
+                    "id": item.get("palm_id") or item["user_id"],
+                    "palm_id": item.get("palm_id") or item["user_id"],
+                    "person_id": item.get("person_id") or item["user_name"],
+                    "display_name": item.get("display_name") or item["user_name"],
+                    "user_id": item.get("palm_id") or item["user_id"],
+                    "user_name": item.get("display_name") or item["user_name"],
                     "palm_side": item["palm_side"],
                     "samples": item["samples"],
                     "model_id": model_id,
@@ -1863,6 +2797,8 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
             "model_id": model_id,
             "backend": backend,
             "precision": precision,
+            "roi_pipeline_id": ROI_PIPELINE_ID,
+            "summary": summary,
         }
 
     @service.delete("/api/templates/{template_id}")
@@ -1875,15 +2811,15 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         _validate_options(RecognitionOptions(model_id=model_id, backend=backend, precision=precision))
         namespace = service_layer._template_namespace(model_id, backend, precision)
         try:
-            removed = WORKBENCH.store.remove(namespace, template_id)
+            removed = WORKBENCH.store.remove(namespace, template_id, roi_pipeline_id=ROI_PIPELINE_ID)
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=f"模板存储不可用：{exc}") from exc
         if not removed:
             raise HTTPException(status_code=404, detail="模板不存在")
         try:
-            WORKBENCH.captures.mark_template_deleted(model_id=model_id, user_id=template_id)
+            WORKBENCH.captures.purge_template(model_id=model_id, palm_id=template_id, roi_pipeline_id=ROI_PIPELINE_ID)
         except Exception:
-            logger.exception("unable to mark captures after template deletion: %s", template_id)
+            logger.exception("unable to remove captures after template deletion: %s", template_id)
         return {"ok": True, "id": template_id, "deleted": True}
 
     @service.delete("/api/templates")

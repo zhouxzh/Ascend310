@@ -38,6 +38,7 @@ palmprint-workbench = "palmprint_workbench.api:main"
 palmprint-verify-assets = "palmprint_workbench.tools.verify_assets:main"
 palmprint-offline-benchmark = "tools.offline.benchmark:main"
 palmprint-prepare-models = "tools.export.prepare_models:main"
+palmprint-candidate-campaign = "tools.offline.candidate_campaign:main"
 
 [tool.setuptools]
 include-package-data = true
