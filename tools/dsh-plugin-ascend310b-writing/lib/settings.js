@@ -47,6 +47,10 @@ export const DEFAULT_LAYOUT = {
 	generatedDirs: { book: 'latex/chapters', experiment: 'latex/cases', appendix: 'latex/appendices' },
 	/** The build log and PDF the render check reads. */
 	latex: { log: 'latex/book.log', pdf: 'latex/book.pdf' },
+	/** The VuePress site: the built index that tells whether dist is stale. */
+	site: { distIndex: 'src/.vuepress/dist/index.html' },
+	/** Marp decks and the directory their built HTML is written to. */
+	slides: { builtDir: 'src/.vuepress/public/presentation' },
 	parts: [
 		{
 			key: 'book',
@@ -80,6 +84,17 @@ export const DEFAULT_LAYOUT = {
 			titlePattern: '^附录 (\\d+)：\\S',
 			titleHint: '附录 N：标题（附录与数字之间一个半角空格，用全角冒号）',
 			titleInFrontmatter: false
+		},
+		{
+			key: 'presentation',
+			label: '配套演示',
+			dir: 'src/presentation',
+			filePattern: '^\\d{2}-[a-z0-9-]+\\.md$',
+			extras: ['README.md'],
+			// A Marp deck is not a manuscript: it has one H1 per slide run, it is
+			// not in the VuePress sidebar, and it owns no frozen title. Only the
+			// rules that make sense for any Markdown (hygiene, links, images) run.
+			assets: true
 		},
 		{
 			key: 'misc',

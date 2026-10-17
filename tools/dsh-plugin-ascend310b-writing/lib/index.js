@@ -14,6 +14,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools';
 import { PARTS, auditRepo, progressReport, resolveSettings, sortFindings } from './audit-core.js';
 import {
 	collectArtifactFindings,
+	collectAssetFindings,
 	collectCommitFindings,
 	collectFrozenNameFindings,
 	collectRenderFindings,
@@ -125,6 +126,22 @@ function resolveRoot(config, argument) {
  * @param {string} root - the repository root.
  * @returns {object} The compiled settings.
  */
+/**
+ * One line describing the artifacts the manuscript audit does not cover.
+ *
+ * @param {object} assets - the result of the asset collector.
+ * @returns {string} The summary line.
+ */
+function describeAssets(assets) {
+	const slides = `${assets.decks} 个配套演示（放映页过期 ${assets.slidesStale}、未构建 ${assets.slidesMissing}）`;
+	const site = !assets.site.available
+		? '站点尚未构建'
+		: assets.site.stale
+			? `站点 dist 早于 ${assets.site.newestSource?.file ?? '最新源'}`
+			: '站点 dist 是新的';
+	return `交叉产物：${slides}；${site}。`;
+}
+
 function settingsFor(config, root) {
 	return resolveSettings({ root, layout: config?.layout });
 }
@@ -195,6 +212,9 @@ function runAudit({ root, scope, maxFindings, rev }) {
 		extraFindings.push(...commit.findings);
 		notes.push(describeCommit(commit, rev.trim()));
 	}
+	const assets = collectAssetFindings({ root, settings });
+	extraFindings.push(...assets.findings);
+	notes.push(describeAssets(assets));
 	const report = auditRepo({ root, scope, maxFindings, extraFindings, settings });
 	return {
 		text: [report.text, '', ...notes].join('\n'),
@@ -715,11 +735,12 @@ export function apply(ctx, config) {
 			// describes a build, not the manuscript the panel is about.
 			const settings = settingsFor(config, root);
 			const frozen = collectFrozenNameFindings({ root, settings });
+			const assets = collectAssetFindings({ root, settings });
 			const audit = auditRepo({
 				root,
 				scope: 'all',
 				maxFindings: 400,
-				extraFindings: frozen.findings,
+				extraFindings: [...frozen.findings, ...assets.findings],
 				settings
 			});
 			const progress = progressReport({ root, scope: 'all', settings });
@@ -737,7 +758,7 @@ export function apply(ctx, config) {
 					}
 				})(),
 				generatedAt: new Date().toISOString(),
-				parts: PARTS.map((part) => ({ key: part.key, label: part.label })),
+				parts: settings.parts.map((part) => ({ key: part.key, label: part.label })),
 				audit: { summary: audit.summary, findings: audit.findings },
 				progress: {
 					totals: progress.totals,

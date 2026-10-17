@@ -134,8 +134,12 @@ rmSync(root, { recursive: true, force: true });
 // --- the built-in layout is still the default -------------------------------
 const builtin = resolveSettings({ root: tmpdir() });
 check(
-	builtin.parts.map((part) => part.key).join(',') === 'book,experiment,appendix,misc',
+	builtin.parts.map((part) => part.key).join(',') === 'book,experiment,appendix,presentation,misc',
 	`the built-in layout must remain the default, got ${builtin.parts.map((part) => part.key).join(',')}`
+);
+check(
+	builtin.parts.find((part) => part.key === 'presentation')?.assets === true,
+	'the presentation part must be marked as assets, not a manuscript'
 );
 check(builtin.sidebarFile === 'src/.vuepress/sidebar.ts', 'the built-in sidebar path must be unchanged');
 check(builtin.latex.log === 'latex/book.log', 'the built-in build log path must be unchanged');

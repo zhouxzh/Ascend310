@@ -329,6 +329,10 @@ export function documentTitleOf(file, part) {
  */
 function auditFile(context) {
 	const { part, file, numbered, root, findings, maxFindings, sidebarFiles, sidebarFile } = context;
+	// A Marp deck is Markdown but not a manuscript: the title, H1 and sidebar
+	// rules describe book chapters, and applying them to a slide run reports
+	// dozens of findings that are all correct by design.
+	const assetPart = part.assets === true;
 	const rel = relative(root, file).split(sep).join('/');
 	const push = (rule, severity, line, message) => {
 		if (findings.length >= maxFindings) return;
@@ -345,9 +349,9 @@ function auditFile(context) {
 	// Only a numbered manuscript owns a frozen chapter/case/appendix title: a
 	// section README and a site-level page must not be judged against it.
 	const { title: documentTitle, line: titleLine } = pickDocumentTitle(part, { frontmatter, headings });
-	if (numbered && documentTitle === '') {
+	if (!assetPart && numbered && documentTitle === '') {
 		push('title-missing', 'error', titleLine, `缺少标题：${part.titleHint}`);
-	} else if (numbered) {
+	} else if (!assetPart && numbered) {
 		const match = part.titlePattern.exec(documentTitle);
 		if (match === null) {
 			push('title-format', 'error', titleLine, `标题「${documentTitle}」不符合「${part.titleHint}」`);
@@ -363,11 +367,12 @@ function auditFile(context) {
 
 	// --- heading structure --------------------------------------------------
 	const levelOne = headings.filter((heading) => heading.level === 1);
-	if (!part.titleInFrontmatter && levelOne.length !== 1) {
+	if (!assetPart && !part.titleInFrontmatter && levelOne.length !== 1) {
 		push('h1-count', 'error', 1, `正文应恰好有一个一级标题，实际 ${levelOne.length} 个`);
 	}
 	let previous = 0;
-	for (const heading of headings) {
+	// Slides deliberately jump between contexts; only a manuscript has a spine.
+	for (const heading of assetPart ? [] : headings) {
 		if (previous !== 0 && heading.level > previous + 1) {
 			push(
 				'heading-jump',
@@ -479,7 +484,7 @@ function auditFile(context) {
 	// appear as a child entry.
 	if (numbered) {
 		const sidebarKey = `${part.key}/${basename(file)}`;
-		if (sidebarFiles.size > 0 && !sidebarFiles.has(sidebarKey)) {
+		if (!assetPart && sidebarFiles.size > 0 && !sidebarFiles.has(sidebarKey)) {
 			push('sidebar-missing', 'error', 1, `未出现在 ${sidebarFile ?? 'src/.vuepress/sidebar.ts'}：${sidebarKey}`);
 		}
 	}

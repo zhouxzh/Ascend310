@@ -24,7 +24,7 @@ DeepSeek Harness 插件（bundle）。
 | 工具 | 回答的问题 |
 | --- | --- |
 | `ascend310b_writing_toolchain` | 这台机器 + 这个仓库现在能做什么，缺什么、怎么装 |
-| `ascend310b_writing_audit` | 正文本身对不对（含 `AGENTS.md` 冻结名表的双向比对） |
+| `ascend310b_writing_audit` | 正文本身对不对（含 `AGENTS.md` 冻结名表的双向比对），以及演示文稿与站点产物是否过期 |
 | `ascend310b_writing_audit` + `rev` | 这次提交发布出去会不会断链 |
 | `ascend310b_writing_render` | 渲染出来的 PDF 有没有坏字符，生成物是否落后于源 |
 | `ascend310b_writing_push_check` | 现在能不能推，以及哪一项只有人能确认 |
@@ -170,6 +170,20 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 | `tab-indent` / `crlf` / `no-final-newline` | warning | 行尾与换行卫生 |
 | `cjk-halfwidth-punct` / `cjk-halfwidth-bracket` | warning | 中文之间的半角标点与括号（行内代码除外） |
 | `cjk-double-space` | info | 中文之间的连续空格 |
+
+交叉产物规则（同样是 `ascend310b_writing_audit` 的一部分，描述正文之外的两件产物）：
+
+| 规则 | 级别 | 说明 |
+| --- | --- | --- |
+| `deck-frozen-mismatch` | warning | 演示文稿封面标题或 `footer` 里的「第N章／案例 N／附录 N：…」不是冻结名表里的名字——改名时 deck 最容易漏 |
+| `slide-stale` | warning | 放映页（`public/presentation/*.html`）早于源文稿，重新跑 `pnpm run docs:slides` |
+| `slide-missing` | info | 源文稿还没有构建出的放映页 |
+| `site-stale` | warning | 站点 `dist` 早于最新源文件，预览或推送前先 `pnpm run docs:build` |
+| `site-missing` | info | 还没有构建过站点 |
+
+`src/presentation/` 作为**配套演示**分部纳入统计与审计，但标记为 `assets: true`：文稿是 Marp 课件而不是正文，
+一份文稿可能有几十个一级标题、也不进 VuePress sidebar，所以标题形状、单 H1、标题层级、sidebar 覆盖、
+冻结名表这几类规则对它**不适用**；通用 Markdown 卫生与链接/图片检查照常。
 
 提交树规则（`ascend310b_writing_audit` 带 `rev` 时）：
 

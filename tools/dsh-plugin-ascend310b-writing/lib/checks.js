@@ -96,7 +96,7 @@ export function collectFrozenNameFindings({ root, settings }) {
 			});
 			continue;
 		}
-		const part = s.parts.find((entry) => row.source.startsWith(`${partDir(entry)}/`));
+		const part = s.parts.find((entry) => entry.assets !== true && row.source.startsWith(`${partDir(entry)}/`));
 		if (part === undefined) continue;
 		const actual = documentTitleOf(file, part);
 		if (actual.title === row.title) continue;
@@ -112,6 +112,8 @@ export function collectFrozenNameFindings({ root, settings }) {
 	}
 
 	for (const part of s.parts) {
+		// A slide deck owns no frozen chapter title, so it cannot be unregistered.
+		if (part.assets === true) continue;
 		for (const { file, numbered } of listPartFiles(root, part)) {
 			if (!numbered) continue;
 			const source = relative(root, file).split(sep).join('/');
@@ -716,4 +718,126 @@ export function evaluatePushGate({ root, rev = 'HEAD', settings }) {
 	].join('\n');
 
 	return { root, rev, ready: blockingFailed.length === 0, items, blockingFailed, human, text };
+}
+
+/**
+ * A frozen-name shape the presentation decks are expected to use when they name
+ * a unit: `第N章：…`, `案例 N：…`, `附录 N：…`.
+ */
+const FROZEN_SHAPE = /^(?:第\d+章|案例 \d+|附录 \d+)：/u;
+
+/**
+ * Check the two artifacts the manuscript audit does not cover: the built
+ * presentation decks and the built VuePress site.
+ *
+ * Both are *freshness* questions — a deck whose built HTML predates it, or a
+ * site whose `dist` predates its sources, is what makes a preview show the old
+ * thing. The decks also carry the textbook's frozen unit names in their cover
+ * heading and footer, so a renamed unit that was updated in the manuscript but
+ * not in the deck is reported here.
+ *
+ * @param {object} options - check inputs.
+ * @param {string} options.root - absolute repository root.
+ * @param {object} [options.settings] - the resolved layout, for the paths.
+ * @returns {{ findings: Array<object>, decks: number, slidesMissing: number, slidesStale: number, site: object }} The findings and counters.
+ */
+export function collectAssetFindings({ root, settings }) {
+	const s = settings ?? resolveSettings({ root });
+	const findings = [];
+	let decks = 0;
+	let slidesMissing = 0;
+	let slidesStale = 0;
+
+	const presentation = s.parts.find((part) => part.assets === true);
+	const frozenTitleRows = readFrozenNameTable(root, s);
+	const frozenTitles = new Set(frozenTitleRows.rows.map((row) => row.title));
+	const isFrozenShape = (value) => typeof value === 'string' && FROZEN_SHAPE.test(value);
+
+	if (presentation !== undefined) {
+		const builtDir = s.slides?.builtDir;
+		for (const { file, numbered } of listPartFiles(root, presentation)) {
+			// README.md is the deck index, not a deck.
+			if (!numbered) continue;
+			decks += 1;
+			const relSource = relative(root, file).split(sep).join('/');
+			const sourceTime = statSync(file).mtimeMs;
+
+			// A deck names a unit in its cover heading and its footer.
+			const text = readFileSync(file, 'utf8');
+			const cover = /^#\s+(.+)$/mu.exec(text)?.[1]?.trim() ?? '';
+			const footer = /^footer:\s*"?([^"\n]+)"?\s*$/mu.exec(text)?.[1]?.trim() ?? '';
+			for (const value of [cover, footer]) {
+				if (!isFrozenShape(value) || frozenTitles.size === 0 || frozenTitles.has(value)) continue;
+				findings.push({
+					rule: 'deck-frozen-mismatch',
+					severity: 'warning',
+					file: relSource,
+					line: 1,
+					message: `演示文稿里的「${value}」不是冻结名表里的名字：改名时 AGENTS.md、sidebar 与 deck 必须同步`
+				});
+			}
+
+			if (builtDir === undefined) continue;
+			const built = join(root, builtDir, `${basename(file, '.md')}.html`);
+			const relBuilt = relative(root, built).split(sep).join('/');
+			if (!existsSync(built)) {
+				slidesMissing += 1;
+				findings.push({
+					rule: 'slide-missing',
+					severity: 'info',
+					file: relSource,
+					line: 1,
+					message: `还没有构建出的放映页 ${relBuilt}：运行 pnpm run docs:slides`
+				});
+				continue;
+			}
+			if (statSync(built).mtimeMs < sourceTime) {
+				slidesStale += 1;
+				findings.push({
+					rule: 'slide-stale',
+					severity: 'warning',
+					file: relSource,
+					line: 1,
+					message: `放映页 ${relBuilt} 早于源文稿，重新运行 pnpm run docs:slides`
+				});
+			}
+		}
+	}
+
+	// The site build: `dist` older than the newest source page means a preview
+	// would show what the source no longer says.
+	let site = { available: false, stale: false, newestSource: null };
+	const distIndex = s.site?.distIndex;
+	if (distIndex !== undefined) {
+		const distPath = join(root, distIndex);
+		let newest = null;
+		for (const part of s.parts) {
+			for (const { file } of listPartFiles(root, part)) {
+				const mtimeMs = statSync(file).mtimeMs;
+				if (newest === null || mtimeMs > newest.mtimeMs) newest = { file: relative(root, file).split(sep).join('/'), mtimeMs };
+			}
+		}
+		site = { available: existsSync(distPath), stale: false, newestSource: newest };
+		if (!site.available) {
+			findings.push({
+				rule: 'site-missing',
+				severity: 'info',
+				file: distIndex,
+				line: 1,
+				message: '还没有构建站点（src/.vuepress/dist）：本地预览前先运行 pnpm run docs:build'
+			});
+		} else if (newest !== null && statSync(distPath).mtimeMs < newest.mtimeMs) {
+			site.stale = true;
+			findings.push({
+				rule: 'site-stale',
+				severity: 'warning',
+				file: distPath,
+				line: 1,
+				message: `站点产物早于 ${newest.file}：重新运行 pnpm run docs:build 后再预览或推送`
+			});
+		}
+	}
+
+	findings.sort((left, right) => left.file.localeCompare(right.file) || left.rule.localeCompare(right.rule));
+	return { findings, decks, slidesMissing, slidesStale, site };
 }
