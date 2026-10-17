@@ -181,6 +181,22 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 | `site-stale` | warning | 站点 `dist` 早于最新源文件，预览或推送前先 `pnpm run docs:build` |
 | `site-missing` | info | 还没有构建过站点 |
 
+VuePress 配置规则（读 `src/.vuepress/` 的声明式配置，覆盖"Markdown → 站点"这条线上的断链与漂移）：
+
+| 规则 | 级别 | 说明 |
+| --- | --- | --- |
+| `vuepress-page-missing` | error | `navbar.ts` / `sidebar.ts` 里的路由没有对应页面（改名后最容易漏） |
+| `vuepress-nav-missing` | error | 导航栏指向的页面不存在 |
+| `vuepress-deck-link-broken` | error | 侧边栏指向的放映页 `.html` 没有源文稿（文稿被改名/删除） |
+| `deck-unlinked` | warning | 演示文稿存在但 sidebar 里没有入口，站点上访问不到 |
+| `vuepress-deck-unbuilt` | info | 侧边栏的放映页还没构建（`public/presentation/` 是 gitignore 的产物） |
+| `vuepress-asset-missing` | error | `theme.logo` 或 `config.head` 里的 favicon 在 `public/` 下不存在 |
+| `vuepress-frozen-mismatch` | warning | sidebar 的 `text:` 用了冻结名的形状但不在冻结名表里 |
+| `vuepress-base-mismatch` | warning | `config.ts` 的 `base` 与 `client.ts` 里写死的前缀不一致（放映页跳转会失效） |
+| `vuepress-repo-mismatch` | warning | `theme.ts` 的 `repo` 与 git 远端不一致 |
+| `vuepress-hostname-mismatch` | warning | `theme.ts` 的 `hostname` 与 `<user>.github.io` 不一致 |
+
+这几条都在 `ascend310b_writing_audit` 与推送门槛里，和正文规则一起出结论。
 `src/presentation/` 作为**配套演示**分部纳入统计与审计，但标记为 `assets: true`：文稿是 Marp 课件而不是正文，
 一份文稿可能有几十个一级标题、也不进 VuePress sidebar，所以标题形状、单 H1、标题层级、sidebar 覆盖、
 冻结名表这几类规则对它**不适用**；通用 Markdown 卫生与链接/图片检查照常。

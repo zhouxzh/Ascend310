@@ -23,6 +23,7 @@ import {
 	evaluatePushGate
 } from './checks.js';
 import { diagnose } from './doctor.js';
+import { collectVuepressFindings } from './vuepress.js';
 import { planBuild, resolveBuildEnvironment, runBuild } from './build.js';
 
 /** Cordis plugin name used by loader diagnostics. */
@@ -132,6 +133,19 @@ function resolveRoot(config, argument) {
  * @param {object} assets - the result of the asset collector.
  * @returns {string} The summary line.
  */
+/**
+ * One line describing the site wiring the manuscript audit does not cover.
+ *
+ * @param {object} vuepress - the result of the VuePress collector.
+ * @returns {string} The summary line.
+ */
+function describeVuepress(vuepress) {
+	if (!vuepress.available) return '站点配置：没有找到 src/.vuepress 的配置文件，跳过。';
+	const broken = vuepress.findings.filter((finding) => finding.severity === 'error').length;
+	const drift = vuepress.findings.length - broken;
+	return `站点配置：${vuepress.pages} 条路由、${vuepress.decks} 个放映页链接（${broken} 条断链、${drift} 条漂移）。`;
+}
+
 function describeAssets(assets) {
 	const slides = `${assets.decks} 个配套演示（放映页过期 ${assets.slidesStale}、未构建 ${assets.slidesMissing}）`;
 	const site = !assets.site.available
@@ -202,7 +216,7 @@ function formatBuildPlan({ plan, root, target, environment }) {
  * @param {string} [options.rev] - also check this commit's tree for broken references.
  * @returns {object} The tool-shaped audit result.
  */
-function runAudit({ root, scope, maxFindings, rev }) {
+function runAudit({ root, scope, maxFindings, rev, config }) {
 	const settings = settingsFor(config, root);
 	const frozen = collectFrozenNameFindings({ root, settings });
 	const extraFindings = [...frozen.findings];
@@ -215,6 +229,9 @@ function runAudit({ root, scope, maxFindings, rev }) {
 	const assets = collectAssetFindings({ root, settings });
 	extraFindings.push(...assets.findings);
 	notes.push(describeAssets(assets));
+	const vuepress = collectVuepressFindings({ root, settings, frozenRows: frozen.tableRows });
+	extraFindings.push(...vuepress.findings);
+	notes.push(describeVuepress(vuepress));
 	const report = auditRepo({ root, scope, maxFindings, extraFindings, settings });
 	return {
 		text: [report.text, '', ...notes].join('\n'),
@@ -279,7 +296,7 @@ export function apply(ctx, config) {
 				const root = resolveRoot(config, args.root);
 				const scope = SCOPES.includes(args.scope) ? args.scope : 'all';
 				const maxFindings = Number.isInteger(args.maxFindings) && args.maxFindings > 0 ? args.maxFindings : 400;
-				return Promise.resolve(runAudit({ root, scope, maxFindings, rev: args.rev }));
+				return Promise.resolve(runAudit({ root, scope, maxFindings, rev: args.rev, config }));
 			},
 			presentCall: (args) => ({
 				card: 'generic',
@@ -736,11 +753,12 @@ export function apply(ctx, config) {
 			const settings = settingsFor(config, root);
 			const frozen = collectFrozenNameFindings({ root, settings });
 			const assets = collectAssetFindings({ root, settings });
+			const vuepress = collectVuepressFindings({ root, settings, frozenRows: frozen.tableRows });
 			const audit = auditRepo({
 				root,
 				scope: 'all',
 				maxFindings: 400,
-				extraFindings: [...frozen.findings, ...assets.findings],
+				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings],
 				settings
 			});
 			const progress = progressReport({ root, scope: 'all', settings });

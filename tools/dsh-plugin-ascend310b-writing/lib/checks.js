@@ -16,6 +16,7 @@ import { basename, join, relative, sep } from 'node:path';
 
 import { auditRepo, documentTitleOf, listPartFiles } from './audit-core.js';
 import { DEFAULT_SETTINGS, resolveSettings } from './settings.js';
+import { collectVuepressFindings } from './vuepress.js';
 
 /** One row of a two-cell Markdown table whose first cell is a backticked path. */
 const TABLE_ROW = /^\|\s*`([^`]+)`\s*\|\s*([^|]*?)\s*\|\s*$/u;
@@ -81,7 +82,7 @@ export function collectFrozenNameFindings({ root, settings }) {
 	const findings = [];
 	const s = settings ?? resolveSettings({ root });
 	const table = readFrozenNameTable(root, s);
-	if (!table.available) return { findings, available: false, rows: 0 };
+	if (!table.available) return { findings, available: false, rows: 0, tableRows: [] };
 
 	const listed = new Set(table.rows.map((row) => row.source));
 	for (const row of table.rows) {
@@ -127,7 +128,8 @@ export function collectFrozenNameFindings({ root, settings }) {
 			});
 		}
 	}
-	return { findings, available: true, rows: table.rows.length };
+	// `rows` is the count a report prints; `tableRows` is the data a checker needs.
+	return { findings, available: true, rows: table.rows.length, tableRows: table.rows };
 }
 
 /**
@@ -651,7 +653,14 @@ export function dirtyManuscripts(root, settings = DEFAULT_SETTINGS) {
 export function evaluatePushGate({ root, rev = 'HEAD', settings }) {
 	const s = settings ?? resolveSettings({ root });
 	const frozen = collectFrozenNameFindings({ root, settings: s });
-	const audit = auditRepo({ root, maxFindings: 400, extraFindings: frozen.findings, settings: s });
+	const assets = collectAssetFindings({ root, settings: s });
+	const vuepress = collectVuepressFindings({ root, settings: s, frozenRows: frozen.tableRows });
+	const audit = auditRepo({
+		root,
+		maxFindings: 400,
+		extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings],
+		settings: s
+	});
 	const commit = collectCommitFindings({ root, rev });
 	const dirty = dirtyManuscripts(root, s);
 	const render = collectRenderFindings({ root, settings: s });
