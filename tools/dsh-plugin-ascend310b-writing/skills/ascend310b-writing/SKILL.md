@@ -34,12 +34,13 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
    （例如 Markdown 强制换行的行尾空格），在回复里说明。
 4. 需要站点预览时跑 `pnpm run docs:dev`，把本地地址交给用户确认；
    未经用户确认不要 push，也不要因为 `docs:build` 通过就认为可以 push。
-5. 要出 PDF 时跑 `./convert-vuepress.sh`，然后**必须**跑
-   `ascend310b_writing_render`：字体缺字形、未定义引用、硬错误，以及"源里声明的锚点
-   没能进入生成物"只有在这一步才看得见。若报 `artifact-anchor-unparsed`
-   （标题被转义成字面文本、或 `{#id}` 被当成标题文字），**重新构建修不好**，
-   要改源 Markdown；常见原因是标题行前面少了空行，或标题里有未转义的 `_`。
-   发现缺字形同样改源 Markdown（例如把 `→` 写成 `$\to$`），不要改生成的 `latex/*.tex`。
+5. 要出 PDF 时用 `ascend310b_writing_build`（先不带 `confirm` 看预检，确认后带
+   `confirm: true` 起后台任务，用 `job_output` 读）。它会在同一任务里自动跑渲染体检与
+   产物锚点核对，所以**不需要**再单独跑 `ascend310b_writing_render`。
+   若报 `artifact-anchor-unparsed`（标题被转义成字面文本、或 `{#id}` 被当成标题文字），
+   **重新构建修不好**，要改源 Markdown；常见原因是标题行前面少了空行，或标题里有未转义的 `_`。
+   缺字形同样改源 Markdown（例如把 `→` 写成 `$\to$`），不要改生成的 `latex/*.tex`。
+   组成里没有后台任务时，退回 `./convert-vuepress.sh` + `ascend310b_writing_render`。
 6. 准备 push 前跑 `ascend310b_writing_push_check`。它把阻塞项（正文 error、提交树断链）
    和提示项（未提交正文、渲染结论、产物新鲜度）分开列，并在最后点名唯一
    无法机械验证的一项：站点预览是否已由用户确认。

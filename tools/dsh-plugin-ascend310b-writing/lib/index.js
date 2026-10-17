@@ -22,6 +22,7 @@ import {
 	evaluatePushGate
 } from './checks.js';
 import { diagnose } from './doctor.js';
+import { planBuild, resolveBuildEnvironment, runBuild } from './build.js';
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'dsh-plugin-ascend310b-writing';
@@ -37,6 +38,9 @@ const REPORT_TTL_MS = 5000;
 
 /** The scope values both tools accept. */
 const SCOPES = ['all', ...PARTS.map((part) => part.key)];
+
+/** The build targets the build tool accepts. */
+const BUILD_TARGETS = ['latex', 'site', 'all'];
 
 /**
  * Shared parameter spec for the part filter. An optional parameter omits
@@ -123,6 +127,47 @@ function resolveRoot(config, argument) {
  */
 function settingsFor(config, root) {
 	return resolveSettings({ root, layout: config?.layout });
+}
+
+/**
+ * Render the build preflight: what would run, and why it cannot.
+ *
+ * @param {object} input - the plan pieces.
+ * @param {object} input.plan - the plan from the build module.
+ * @param {string} input.root - the repository root.
+ * @param {string} input.target - the requested target.
+ * @param {object} input.environment - the resolved build environment.
+ * @returns {string} The report text.
+ */
+function formatBuildPlan({ plan, root, target, environment }) {
+	const lines = [`构建预检 · ${root} · target=${target}`, '', `环境适配器：${environment.adapter.label}`];
+	for (const component of environment.components) {
+		if (!['bash', 'pandoc', 'latexmk', 'xelatex', 'python3', 'pnpm', 'node'].includes(component.id)) continue;
+		const mark = component.ok ? 'OK  ' : component.required ? '缺失' : '可选';
+		lines.push(`  [${mark}] ${component.id.padEnd(8)} ${component.ok ? component.version ?? '' : component.reason ?? ''}`);
+	}
+	lines.push(`  · ${environment.adapter.pythonPlan().note}`);
+
+	lines.push('');
+	if (plan.ok) lines.push('预检通过，可以构建。');
+	else {
+		lines.push('现在不能构建：');
+		for (const blocker of plan.blockers) lines.push(`  ✗ ${blocker}`);
+	}
+
+	if (plan.steps.length > 0) {
+		lines.push('', '将要执行的步骤：');
+		for (const step of plan.steps) {
+			lines.push(`  · ${step.label}`);
+			lines.push(`    ${step.command} ${step.args.map((arg) => (arg.includes(' ') ? JSON.stringify(arg) : arg)).join(' ')}`);
+			if (step.note !== undefined) lines.push(`    ${step.note}`);
+		}
+	}
+	for (const note of plan.notes) lines.push(`  · ${note}`);
+
+	lines.push('', '这是预检：没有执行任何命令，也没有写入任何文件。');
+	lines.push('确认构建请带 confirm: true —— 它会启动一个后台任务，用 job_output 读输出、job_kill 停止。');
+	return lines.join('\n');
 }
 
 /**
@@ -505,6 +550,133 @@ export function apply(ctx, config) {
 		})
 	);
 
+	// The build driver needs platform background jobs: a full book build runs
+	// for minutes, and the caller should keep its turn. A composition without a
+	// job controller simply does not get this tool.
+	ctx.inject(['jobs'], (jobScope) => {
+		jobScope.tools.register(
+			defineTool({
+				name: 'ascend310b_writing_build',
+				description:
+					'Build the book through the repository\'s own converters, then verify what was produced. ' +
+					'Without confirm: true it only runs a preflight and reports the exact command it would run — nothing ' +
+					'is executed and nothing is written. With confirm: true it starts a background job (read it with ' +
+					'job_output, stop it with job_kill) that runs convert-vuepress.sh for the LaTeX/PDF path and/or ' +
+					'pnpm run docs:build for the site, then immediately reads the fresh log for missing glyphs and checks ' +
+					'the generated anchors against the source. Use it instead of hand-assembling the shell invocation: it ' +
+					'discovers whether the shell is Git Bash or WSL, spells the checkout path for that shell, provides a ' +
+					'temporary python3 when the host has only a conda interpreter, and retries the known PDF file-lock ' +
+					'failure from the already-generated book.xdv.',
+				parameters: {
+					target: {
+						type: 'string',
+						enum: [...BUILD_TARGETS],
+						description: 'What to build. Defaults to "latex".'
+					},
+					confirm: {
+						type: 'boolean',
+						description:
+							'Must be true to actually build. Without it the call is a read-only preflight.'
+					},
+					root: ROOT_PARAMETER
+				},
+				output: {
+					schema: {
+						type: 'object',
+						additionalProperties: false,
+						properties: {
+							text: { type: 'string', required: true },
+							started: { type: 'boolean', required: true },
+							jobId: { type: 'string', required: true },
+							target: { type: 'string', required: true },
+							blockers: { type: 'array', required: true, items: { type: 'string' } }
+						}
+					},
+					render: (_args, value) => [{ type: 'text', text: value.text }]
+				},
+				execute(args) {
+					const root = resolveRoot(config, args.root);
+					const settings = settingsFor(config, root);
+					const environment = resolveBuildEnvironment({ overrides: config?.toolchain ?? {} });
+					const target = BUILD_TARGETS.includes(args.target) ? args.target : 'latex';
+					const plan = planBuild({
+						root,
+						target,
+						adapter: environment.adapter,
+						components: environment.components,
+						settings
+					});
+
+					if (args.confirm !== true) {
+						return Promise.resolve({
+							text: formatBuildPlan({ plan, root, target, environment }),
+							started: false,
+							jobId: '',
+							target,
+							blockers: plan.blockers
+						});
+					}
+					if (!plan.ok) {
+						throw new Error(`无法开始构建（预检未通过）：${plan.blockers.join('；')}`);
+					}
+
+					let running = null;
+					const jobId = jobScope.jobs.start({
+						kind: 'ascend310b-build',
+						label: `${target} 构建`,
+						run(handle) {
+							const done = runBuild({
+								plan,
+								root,
+								adapter: environment.adapter,
+								settings,
+								onChunk: (text, channel) => handle.append(text, { channel }),
+								onSpawn: (child) => {
+									running = child;
+								}
+							})
+								.then((result) => ({
+									status: result.ok ? 'completed' : 'failed',
+									detail: `${result.detail}\n${result.summary.text}`
+								}))
+								.catch((error) => ({ status: 'failed', detail: String(error?.message ?? error) }));
+							return {
+								done,
+								cancel() {
+									try {
+										running?.kill();
+									} catch {
+										// The process may have exited between the read and the kill.
+									}
+								}
+							};
+						}
+					});
+
+					return Promise.resolve({
+						text: [
+							`已启动后台构建任务：${jobId}（target=${target}）`,
+							'',
+							'它会在完成后自行结束；用 job_output 读输出，用 job_kill 停止。',
+							'构建结束后同一个任务里会跑渲染体检与产物锚点核对，结论随任务一起给你。',
+							'',
+							formatBuildPlan({ plan, root, target, environment })
+						].join('\n'),
+						started: true,
+						jobId: String(jobId),
+						target,
+						blockers: []
+					});
+				},
+				presentCall: (args) => ({
+					card: 'generic',
+					title: '构建',
+					kind: 'other',
+					rawInput: args
+				})
+			})
+		);
+	});
 	// The browser panel needs the same data over HTTP. A composition without a
 	// Web server (headless, ACP) simply keeps the tools and skips the route.
 	ctx.inject(['webServer'], (scope) => {

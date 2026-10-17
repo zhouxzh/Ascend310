@@ -28,6 +28,7 @@ DeepSeek Harness 插件（bundle）。
 | `ascend310b_writing_audit` + `rev` | 这次提交发布出去会不会断链 |
 | `ascend310b_writing_render` | 渲染出来的 PDF 有没有坏字符，生成物是否落后于源 |
 | `ascend310b_writing_push_check` | 现在能不能推，以及哪一项只有人能确认 |
+| `ascend310b_writing_build` | 构建（走仓库自己的转换器），并在同一任务里核对产物 |
 | `ascend310b_writing_progress` | 篇幅和剩余工作量 |
 
 ## 安装
@@ -133,6 +134,23 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 都如实降级。规则里刻意**不**禁止 `src/book`、`sidebar.ts`、`AGENTS.md` 这类
 仓库耦合——那是插件的用途。
 
+## 构建
+
+`ascend310b_writing_build` 走仓库自己的 `convert-vuepress.sh` / `pnpm run docs:build`，**不重新实现转换**，
+只负责三件手工容易出错的事：
+
+1. **环境发现**：由适配器决定 shell 是 Git Bash 还是 WSL、检出路径怎么拼给它、以及转换器调用的
+   `python3` 是否需要垫片（Anaconda 用户没有 `python3`，构建期间临时提供一个指向它的 shim）。
+2. **构建后立即核对**：同一任务里读新日志查缺字形/未定义引用，并把生成的 `\label` 与源里的 `{#id}` 比对。
+   这一步最容易忘，现在结论随构建一起到。
+3. **后台任务**：整本书约 10 分钟。返回 `jobId`，用平台自带的 `job_output` 读流式输出、`job_kill` 停止。
+   失败会分类：`book.pdf` 被占用时从已生成的 `book.xdv` 定点重写，不盲重试；未知失败如实上报。
+
+**不带 `confirm: true` 时只做预检**：报告工具链状态、将要执行的完整命令、拦截原因，不执行、不写盘。
+这是刻意对齐 `AGENTS.md` 的"只有用户要求时才生成 LaTeX/PDF"。
+
+该工具只在组成里**有后台任务服务**时注册（需要 `dsh-jobs-local` + `dsh-tool-jobs`）；
+没有后台任务的组成不含这个工具，此时用上面"开发与验证"里的方式手工构建。
 ## 审计规则
 
 正文规则（`ascend310b_writing_audit`，作用于工作区）：
