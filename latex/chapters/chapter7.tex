@@ -1162,7 +1162,7 @@ extern "C" __global__ __aicore__ void add_custom(
 Ascend C 内核通过 TBE 框架的 \passthrough{\lstinline!compile\_op!}
 接口编译，该接口会自动调用 \passthrough{\lstinline!ccec!}
 并设置正确的编译选项。编译命令封装在 Python 算子注册脚本中（参见
-\passthrough{\lstinline!samples/chapter7/add\_ascendc/add\_custom\_tbe.py!}），最终生成
+\passthrough{\lstinline!samples/chapter7/add\_ascendc/run.py!}），最终生成
 \passthrough{\lstinline!kernel\_meta/!} 目录下的
 \passthrough{\lstinline!.o!} 与 \passthrough{\lstinline!.json!}
 文件，随后可通过 AscendCL API 加载并执行。
