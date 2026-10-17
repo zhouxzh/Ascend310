@@ -163,6 +163,18 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 | 空转套话 | 综上所述、众所周知、不难发现、值得注意的是… | 整句删掉 |
 | 元话语 | 本文将、本节将、下面让我们… | 直接进入内容 |
 | 对话残留 | 正如您所指出的、您提到、希望对您有帮助… | 删掉称呼与收尾语（最强的 AI 痕迹） |
+| 名词化空动词 | 对……进行……、加以说明、使……得到提升 | 直接写动词 |
+| 程度虚词 | 非常、极其、相当、十分… | 删掉几乎不丢信息 |
+| 无源权威 | 研究表明、数据显示、专家指出（无出处） | 教材里是硬伤：给出处或删铺垫 |
+| 机器残留 | `oaicite`、`turn0search`、`[cite: 1]` | 从模型输出粘进来的 token，直接删 |
+
+**排版痕迹**单独计数（破折号 `——`、三点省略号、六角括号），并且**只在正文里数**：
+本书实测原始统计有 71 处三点省略号，排除代码块与行内代码后只剩 1 处——不过滤就会造出 70 条假阳性。
+破折号一段内两次以上单列，全书 5 段。
+
+词表与判据合并自公开的中文写作规则集：[textlint-rule-preset-zh-technical-writing](https://github.com/darkyzhou/textlint-rule-preset-zh-technical-writing)、
+[anti-vibe-writing](https://github.com/weijt606/anti-vibe-writing)、[stop-slop-zh](https://github.com/VincentOld/stop-slop-zh)，
+并参考了 DSH 上的另一个写作插件 [dsh-writing-workbench](https://www.npmjs.com/package/dsh-writing-workbench) 的架构（配置化 skill、过期建议保护）。
 
 另外报告段落/句子长度分布与对举句式（不仅…而且、既…又、不是…而是）计数——段落长度过于均匀
 是机械感的一个来源。

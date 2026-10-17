@@ -55,15 +55,69 @@ export const LEXICON = {
 	},
 	对话残留: {
 		note: '这是从对话里带进正文的称呼或收尾语，教材里应删掉或改成直接陈述。',
-		phrases: ['正如您所指出的', '正如您所说', '您提到', '您所问', '您的问题', '希望对您有帮助', '希望这个回答', '如有需要', '以上回答', '如果您还有']
+		phrases: [
+			'正如您所指出的', '正如您所说', '您提到', '您所问', '您的问题', '希望对您有帮助',
+			'希望这个回答', '如有需要', '以上回答', '如果您还有',
+			// Public 中文去 AI 味 checklists list these as chat openers that survive
+			// into finished documents far too often.
+			'问得好', '你说得对', '当然可以', '下面是改写', '下面是修改'
+		]
+	},
+	名词化空动词: {
+		// 把动作名词化，再用一个空动词把它激活——中文 AI 文本的通病。
+		// 来源：anti-vibe-writing 的「名词化动词搭子」。
+		note: '直接写动词："优化算法"而不是"对算法进行优化"；"提升效率"而不是"使效率得到提升"。',
+		phrases: [
+			'对算法进行', '进行分析', '进行优化', '进行测试', '进行验证', '进行配置', '进行部署',
+			'进行训练', '进行推理', '进行说明', '进行对比', '加以说明', '加以解决', '给予支持',
+			'采取措施', '做出贡献', '起到了', '发挥了'
+		]
+	},
+	程度虚词: {
+		note: '删掉几乎不损失信息；每千字超过 5 个就值得通读一遍。',
+		phrases: ['非常', '极其', '相当', '十分', '特别', '格外', '极度']
+	},
+	无源权威: {
+		// 教材里的伪引用：给判断挂一个不存在的靠山。命中率低，一旦出现就是硬伤。
+		note: '说得清是谁说的、哪来的数据就写清楚（附链接或出处）；说不清就删掉这层铺垫，直接给判断。',
+		phrases: ['研究表明', '数据显示', '业内普遍认为', '专家指出', '调查显示', '据统计', '相关研究显示']
+	},
+	机器残留: {
+		// 从模型输出里直接粘进正文的 token 或角标。见到就是硬伤，没有判断余地。
+		note: '从模型输出里带出来的 token / 角标，直接删。',
+		phrases: ['oaicite', 'turn0search', 'turn0view', '[cite:', '<|endoftext|>']
 	}
 };
+
+/**
+ * 排版痕迹：数得清、判得准的机器写法。来源是公开的中文去 AI 味清单
+ * （anti-vibe-writing、stop-slop-zh），它们都把破折号和省略号列在最前。
+ */
+export const TYPOGRAPHY = [
+	{
+		name: '破折号',
+		pattern: /——/gu,
+		note: '一段里出现两次以上基本是机器手笔；按它在干的活换成句号、逗号、括号或冒号。'
+	},
+	{
+		name: '三点省略号',
+		pattern: /(?<![.\w/])\.\.\.(?![.\w])/gu,
+		note: '中文省略号用「……」，不用三个半角点。'
+	},
+	{
+		name: '六角括号',
+		pattern: /【[^】]*】/gu,
+		note: '【】段头是营销/公众号排版；教材里直接说事。'
+	}
+];
 
 /** 对举句式：中文 AI 文本的高频节奏，两处以上连用才提示。 */
 const PAIRED = [
 	{ name: '不仅…而且', pattern: /不仅[^。；\n]{0,40}(?:而且|更|还)/u },
 	{ name: '既…又', pattern: /既[^。；\n]{0,30}又[^。；\n]{0,20}/u },
-	{ name: '不是…而是', pattern: /不是[^。；\n]{0,30}而是/u }
+	{ name: '不是…而是', pattern: /不是[^。；\n]{0,30}而是/u },
+	// 三短句排比是中文 AI 最容易被认出的节奏，公开清单把它排在最前。
+	{ name: '三连排比', pattern: /更[^，。；、\n]{1,8}、更[^，。；、\n]{1,8}/u }
 ];
 
 /**
@@ -74,6 +128,22 @@ const PAIRED = [
  */
 function countCjk(text) {
 	return (text.match(/[\u4e00-\u9fff]/gu) ?? []).length;
+}
+
+/**
+ * Remove fenced blocks and inline code so typography counts prose only.
+ *
+ * Measured on the real book: all 71 three-dot ellipses were inside code
+ * (`venc_send_frame(...)`, `bgr[..., ::-1]`), so counting the raw text would
+ * report 71 false positives for a rule that has zero real hits.
+ *
+ * @param {string} text - the source.
+ * @returns {string} The text with code replaced by spaces.
+ */
+export function stripCode(text) {
+	return text
+		.replace(/^\s*(```|~~~)[\s\S]*?^\s*\1[^\n]*$/gmu, ' ')
+		.replace(/`[^`\n]*`/gu, ' ');
 }
 
 /**
@@ -175,12 +245,25 @@ export function analyzeText({ file, text }) {
 	const cjk = countCjk(text);
 	const density = cjk === 0 ? 0 : Math.round((hits.length * 1000 * 100) / cjk) / 100;
 
+	// Typographic machine traces, counted on prose only: a `...` inside an inline
+	// code sample is the language, not a writing habit.
+	const proseText = stripCode(text);
+	const typography = [];
+	for (const rule of TYPOGRAPHY) {
+		const matches = proseText.match(rule.pattern) ?? [];
+		if (matches.length > 0) typography.push({ name: rule.name, count: matches.length, note: rule.note, samples: matches.slice(0, 3) });
+	}
+	// A single long dash is a legitimate pause; two in one paragraph is a habit.
+	const dashHeavy = proseParagraphs(proseText).filter((paragraph) => (paragraph.match(/——/gu) ?? []).length >= 2).length;
+
 	return {
 		file,
 		cjk,
 		hits,
 		paired,
 		density,
+		typography,
+		dashHeavy,
 		paragraphs: { count: paragraphs.length, ...stats(paragraphLengths) },
 		sentences: { count: sentences.length, ...stats(sentenceLengths) }
 	};
@@ -228,7 +311,18 @@ export function analyzeStyle({ root, settings, scope = 'all', file }) {
 				group,
 				files.reduce((sum, entry) => sum + entry.hits.filter((hit) => hit.group === group).length, 0)
 			])
-		)
+		),
+		// Typography is counted separately: it is a density signal, not a phrase list.
+		byTypography: Object.fromEntries(
+			TYPOGRAPHY.map((rule) => {
+				const total = files.reduce(
+					(sum, entry) => sum + (entry.typography.find((item) => item.name === rule.name)?.count ?? 0),
+					0
+				);
+				return [rule.name, total];
+			})
+		),
+		dashHeavyParagraphs: files.reduce((sum, entry) => sum + entry.dashHeavy, 0)
 	};
 	totals.density = totals.cjk === 0 ? 0 : Math.round((totals.hits * 1000 * 100) / totals.cjk) / 100;
 	return { files, totals };
@@ -250,6 +344,9 @@ export function formatStyle({ analysis, maxHits = 30 }) {
 		`  ${totals.files} 个文件、${totals.cjk} 字；命中 ${totals.hits} 处，` +
 			`密度 ${totals.density} 次/千字`,
 		`  分项：${Object.entries(totals.byGroup).map(([group, count]) => `${group} ${count}`).join(' · ')}`,
+		'',
+		`  排版痕迹：${Object.entries(totals.byTypography).map(([name, count]) => `${name} ${count}`).join(' · ')}；` +
+			`一段内两个以上破折号 ${totals.dashHeavyParagraphs} 段`,
 		''
 	];
 	const ranked = files
@@ -285,6 +382,21 @@ export function formatStyle({ analysis, maxHits = 30 }) {
 			);
 		}
 	}
+	const typographic = files
+		.filter((entry) => entry.typography.length > 0)
+		.sort((left, right) => {
+			const total = (item) => item.typography.reduce((sum, rule) => sum + rule.count, 0);
+			return total(right) - total(left);
+		});
+	if (typographic.length > 0) {
+		lines.push('', '排版痕迹（密度比单次出现更能说明问题）');
+		for (const entry of typographic.slice(0, 6)) {
+			const detail = entry.typography.map((rule) => `${rule.name} ${rule.count}`).join('、');
+			const heavy = entry.dashHeavy > 0 ? `；一段内两个以上破折号 ${entry.dashHeavy} 段` : '';
+			lines.push(`  ${entry.file.padEnd(34)} ${detail}${heavy}`);
+		}
+	}
+
 	const pairedTotal = files.reduce((sum, entry) => sum + entry.paired.reduce((inner, rule) => inner + rule.count, 0), 0);
 	if (pairedTotal > 0) {
 		const detail = files

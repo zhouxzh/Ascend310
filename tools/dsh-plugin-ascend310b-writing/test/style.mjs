@@ -123,6 +123,38 @@ check(report.includes('只提示，不判定对错'), 'the report must say it do
 check(report.includes('不是错误'), 'the report must repeat that a hit is not an error');
 check(report.includes('src/book/chapter1.md'), 'the report must name the file');
 
+// --- merged from public Chinese "de-AI" rule sets -------------------------
+// 名词化空动词 / 无源权威 / 机器残留 / 排版痕迹 are the categories the public
+// checklists (anti-vibe-writing, stop-slop-zh) rank highest.
+const merged = analyzeText({
+	file: 'merged.md',
+	text: [
+		'对算法进行优化之后，效率提升。',
+		'研究表明，边缘推理更省电。',
+		'这段输出里混进了 oaicite 角标。',
+		'',
+		'它很快——真的很快——而且稳定——从不掉线。',
+		'',
+		'看起来更智能、更高效、更人性化。',
+		''
+	].join('\n')
+});
+check(merged.hits.some((hit) => hit.group === '名词化空动词'), '名词化空动词 must be reported');
+check(merged.hits.some((hit) => hit.group === '无源权威'), 'an unsourced authority claim must be reported');
+check(merged.hits.some((hit) => hit.group === '机器残留'), 'a model token must be reported');
+const dash = merged.typography.find((rule) => rule.name === '破折号');
+check(dash?.count === 3, `three long dashes expected, got ${dash?.count}`);
+check(merged.dashHeavy === 1, `the paragraph with three dashes must be flagged, got ${merged.dashHeavy}`);
+check(merged.paired.some((rule) => rule.name === '三连排比'), 'the three-part parallel must be counted');
+
+// Code is not prose: a `...` in a sample is the language, not a habit.
+const coded = analyzeText({
+	file: 'code.md',
+	text: ['```python', 'x = max(...)', '```', '', '调用 `bgr[..., ::-1]` 反转通道。', '', '这是正文里的省略号...', ''].join('\n')
+});
+const dots = coded.typography.find((rule) => rule.name === '三点省略号');
+check(dots?.count === 1, `only the prose ellipsis may be counted, got ${dots?.count}`);
+
 // --- a clean text produces nothing ---------------------------------------
 const clean = analyzeText({ file: 'clean.md', text: ['直接调用 `acl.init` 完成初始化。', '', '再创建 Context 与 Stream。', ''].join('\n') });
 check(clean.hits.length === 0, `a clean text must produce no hits, got ${clean.hits.length}`);
