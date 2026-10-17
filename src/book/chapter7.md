@@ -791,7 +791,7 @@ extern "C" __global__ __aicore__ void add_custom(
 
 ### 编译与运行 {#src-book-chapter7-h50}
 
-Ascend C 内核通过 TBE 框架的 `compile_op` 接口编译，该接口会自动调用 `ccec` 并设置正确的编译选项。编译命令封装在 Python 算子注册脚本中（参见 `samples/chapter7/add_ascendc/add_custom_tbe.py`），最终生成 `kernel_meta/` 目录下的 `.o` 与 `.json` 文件，随后可通过 AscendCL API 加载并执行。
+Ascend C 内核通过 TBE 框架的 `compile_op` 接口编译，该接口会自动调用 `ccec` 并设置正确的编译选项。编译命令封装在 Python 算子注册脚本中（参见 `samples/chapter7/add_ascendc/run.py`），最终生成 `kernel_meta/` 目录下的 `.o` 与 `.json` 文件，随后可通过 AscendCL API 加载并执行。
 
 ### Ascend C 与 TBE DSL 的对比回顾 {#src-book-chapter7-h51}
 

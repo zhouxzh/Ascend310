@@ -171,6 +171,22 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 | `cjk-halfwidth-punct` / `cjk-halfwidth-bracket` | warning | 中文之间的半角标点与括号（行内代码除外） |
 | `cjk-double-space` | info | 中文之间的连续空格 |
 
+代码交叉检查规则（正文与 `samples/` 下真实代码的对齐，回答"文档和代码还一致吗"）：
+
+| 规则 | 级别 | 说明 |
+| --- | --- | --- |
+| `sample-path-missing` | error | 正文引用的 `samples/…`、`scripts/…`、`tools/…` 路径在仓库里找不到 |
+| `sample-path-generated` | info | 引用的是被 gitignore 的运行时产物，确认正文写清了怎么生成 |
+| `doc-code-drift` | warning | 被引用的代码文件在这段正文之后改过（只在推送门槛里跑，走近期 git 历史） |
+
+**路径怎么解析**（这是这类检查最容易误报的地方）：`scripts/xxx.py` 在书里通常是相对于**案例自己的目录**，
+甚至相对于某个子工程。所以一个 token 命中以下任一条就算存在：仓库根目录；该文对应的 `samples/caseN`
+（章节为 `samples/chapterN`）目录；该样例目录下任意深度的**后缀匹配**
+（例如 `samples/chapter4/SSDLite/scripts/inference_npu.py` 可被正文的 `scripts/inference_npu.py` 命中）。
+刻意宽松：误报会让作者忽略规则，而"文件彻底消失"这类真问题依然会被抓到。
+
+另外两类**不检查**，因为它们不是仓库路径：附录 2 那类通用教程命令（没有对应样例目录）、
+以及 `samples/caseN/README.md` 这类模板占位符。
 交叉产物规则（同样是 `ascend310b_writing_audit` 的一部分，描述正文之外的两件产物）：
 
 | 规则 | 级别 | 说明 |

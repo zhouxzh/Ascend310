@@ -24,6 +24,7 @@ import {
 } from './checks.js';
 import { diagnose } from './doctor.js';
 import { collectVuepressFindings } from './vuepress.js';
+import { collectCodeFindings } from './code.js';
 import { planBuild, resolveBuildEnvironment, runBuild } from './build.js';
 
 /** Cordis plugin name used by loader diagnostics. */
@@ -139,6 +140,18 @@ function resolveRoot(config, argument) {
  * @param {object} vuepress - the result of the VuePress collector.
  * @returns {string} The summary line.
  */
+/**
+ * One line describing the manuscript-to-code cross-check.
+ *
+ * @param {object} code - the result of the code collector.
+ * @returns {string} The summary line.
+ */
+function describeCode(code) {
+	const missing = code.findings.filter((finding) => finding.rule === 'sample-path-missing').length;
+	const generated = code.findings.length - missing;
+	return `代码交叉检查：${code.manuscripts} 个文件、${code.tokens} 处路径引用（${missing} 处失效、${generated} 处运行时产物）。`;
+}
+
 function describeVuepress(vuepress) {
 	if (!vuepress.available) return '站点配置：没有找到 src/.vuepress 的配置文件，跳过。';
 	const broken = vuepress.findings.filter((finding) => finding.severity === 'error').length;
@@ -232,6 +245,9 @@ function runAudit({ root, scope, maxFindings, rev, config }) {
 	const vuepress = collectVuepressFindings({ root, settings, frozenRows: frozen.tableRows });
 	extraFindings.push(...vuepress.findings);
 	notes.push(describeVuepress(vuepress));
+	const code = collectCodeFindings({ root, settings });
+	extraFindings.push(...code.findings);
+	notes.push(describeCode(code));
 	const report = auditRepo({ root, scope, maxFindings, extraFindings, settings });
 	return {
 		text: [report.text, '', ...notes].join('\n'),
@@ -754,11 +770,12 @@ export function apply(ctx, config) {
 			const frozen = collectFrozenNameFindings({ root, settings });
 			const assets = collectAssetFindings({ root, settings });
 			const vuepress = collectVuepressFindings({ root, settings, frozenRows: frozen.tableRows });
+			const code = collectCodeFindings({ root, settings });
 			const audit = auditRepo({
 				root,
 				scope: 'all',
 				maxFindings: 400,
-				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings],
+				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings],
 				settings
 			});
 			const progress = progressReport({ root, scope: 'all', settings });
