@@ -15,6 +15,7 @@ _这是工程文档入口，不是项目首页，也不是教材正文。项目�
 | 查验收审查 | [`case-reviews/00-index.md`](case-reviews/00-index.md) | 各案例的风险和未解决问题，不是运行手册 |
 | 查看本次文档整理记录 | [`documentation-audit-20260907.md`](documentation-audit-20260907.md) | 本轮发现、取舍和未解决事项 |
 | 查看仓库目录规范 | [`00-repository-structure.md`](00-repository-structure.md) | README、源码、案例和生成物的职责边界 |
+| 查昇腾 310B 程序开发、工程目录与文档规范 | [`ascend310b-development-standard.md`](../tools/dsh-plugin-ascend310b-debug/docs/ascend310b-development-standard.md) | 代码结构、ACL/ATC 合同、样例目录、证据和 M0-M8 验收门 |
 | 查案例 7 | [`samples/case7/docs/README.md`](../samples/case7/docs/README.md) | 智能相册的 7 份主题工程文档 |
 
 ## 🗂️ 文档分层

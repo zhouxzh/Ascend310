@@ -79,6 +79,11 @@ check(Array.isArray(index.archetypes), '样例索引应返回原型列表');
 if (repoRoot !== null) {
 	check(index.entries.length > 0, '给定仓库根时样例索引不应为空');
 	check(indexQuery(index, { archetype: 'atc-conversion' }).length > 0, '仓库中应至少有一个 ATC 转换样例');
+	check(indexQuery(index, { query: '摄像头' }).length > 0, '中文“摄像头”必须能检索到样例');
+	check(indexQuery(index, { query: 'VENC' }).some((entry) => entry.id === 'chapter6'), 'VENC 必须能检索到 DVPP 样例');
+	check(indexQuery(index, { archetype: 'camera-v4l2' }).some((entry) => entry.id === 'case8'), 'case8 的主类型应为 camera-v4l2');
+	const case4 = index.entries.find((entry) => entry.id === 'case4');
+	check(String(case4?.entry ?? '').includes('palmprint_workbench.api'), 'case4 必须暴露真实服务入口，而不是 compileall');
 }
 
 if (failures.length > 0) {

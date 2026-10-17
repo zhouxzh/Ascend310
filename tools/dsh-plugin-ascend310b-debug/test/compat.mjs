@@ -9,7 +9,7 @@
  * Usage: node test/compat.mjs
  */
 
-import { assessVersionPairing, compareMajorMinor, matchObservedStacks, parseVersion, releaseLineFor } from '../lib/compat.js';
+import { ACCEPTANCE_GATES, assessVersionPairing, compareMajorMinor, matchObservedStacks, parseVersion, releaseLineFor } from '../lib/compat.js';
 import { parseProbeOutput } from '../lib/probe.js';
 import { PROBE_20T_CANN80, PROBE_8T_CANN80, PROBE_ATLAS_CANN92 } from './fixtures.mjs';
 
@@ -103,6 +103,8 @@ equal(incomplete.evidence, 'untested', '缺数据时证据级别为 untested');
 equal(matchObservedStacks({ soc: { value: 'Ascend310B1' }, cannVersion: { value: '8.0.0' }, driverVersion: { value: '25.2.0' } }).length, 1, '20T 只应匹配 20T 记录');
 equal(matchObservedStacks({ soc: { value: 'Ascend310B1' }, cannVersion: { value: '8.0.0' }, driverVersion: { value: '23.0' } }).length, 0, 'SoC 为 20T 时不应命中 8T 的记录');
 equal(matchObservedStacks({ soc: { value: 'Ascend310B4' }, cannVersion: { value: '9.2.0-beta.2' }, driverVersion: { value: '25.5.0' } }).length, 1, 'Atlas 组合应命中一条记录');
+equal(ACCEPTANCE_GATES.length, 5, '五道验收门必须保持为五项');
+check(ACCEPTANCE_GATES.includes('CANN 与 PyACL'), '验收门必须包含 CANN 与 PyACL');
 
 if (failures.length > 0) {
 	console.error('compat tests FAILED:');

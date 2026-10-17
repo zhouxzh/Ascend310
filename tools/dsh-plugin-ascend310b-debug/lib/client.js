@@ -332,7 +332,14 @@ window.__ModuleLoader__.load({
 				.filter((term) => term.length >= 2);
 			const matchedSamples = (payload.samples ?? []).filter((sample) => {
 				if (terms.length === 0) return true;
-				const haystack = [sample.id, sample.title, sample.archetype, (sample.capabilities ?? []).join(" ")]
+				const haystack = [
+					sample.id,
+					sample.title,
+					sample.archetype,
+					(sample.capabilities ?? []).join(" "),
+					(sample.keywords ?? []).join(" "),
+					(sample.searchTerms ?? []).join(" ")
+				]
 					.join(" ")
 					.toLowerCase();
 				return terms.some((term) => haystack.includes(term));

@@ -24,6 +24,8 @@ DSH 插件：面向**昇腾 310B**（Ascend 310B1 / 310B4）程序调试。它�
 
 它的核心约束只有一句：**插件不会断言任何没有从板上读到的板卡事实。**
 
+配套的 [`昇腾310B程序开发、工程目录与文档规范`](docs/ascend310b-development-standard.md) 规定了 310B 程序的设计、ACL/ATC 合同、资源生命周期、仓库目录、样例工程、README、编号文档、证据记录和分层验收门。调试计划负责定位失败层，这份规范负责规定程序从第一行代码到交付证据应如何组织。
+
 ## 安装
 
 源码位于教材仓库的 `tools/dsh-plugin-ascend310b-debug/`。桌面版 DSH 的 profile 由应用托管，插件以**文件拷贝**方式安装（不是软链、不走 pnpm）。安装前先在源码目录跑一次离线测试：
@@ -95,7 +97,7 @@ Copy-Item -Force `
 
 SSH 采用**公钥认证**（`BatchMode=yes`），不会读取或保存密码。首次连接使用 `StrictHostKeyChecking=accept-new`；更严格的环境应先手工核对并写入目标板指纹。板端首次配置见教材附录 1 的 SSH 免密章节。
 
-升级时重复第 1 步和第 5 步即可；源码目录中的 `README.md`、`test/`、`scripts/` 和 `data/` 会一起复制，方便使用者在本地复核。许可证与审核记录见 [`LICENSE`](LICENSE) 和 [`docs/installation-audit.md`](docs/installation-audit.md)。
+升级时重复第 1 步和第 5 步即可；源码目录中的 `README.md`、`docs/`、`test/`、`scripts/` 和 `data/` 会一起复制，方便使用者在本地复核。许可证与审核记录见 [`LICENSE`](LICENSE) 和 [`docs/installation-audit.md`](docs/installation-audit.md)。
 
 Linux/macOS 的 profile 路径是 `$DSH_HOME/profiles/desktop/node_modules/dsh-plugin-ascend310b-debug`，等价复制命令为：
 
@@ -122,7 +124,7 @@ cp -R "$plugin"/. "$dest"/
 
 ### HTTP 路由
 
-面板使用两条只读路由：`GET /ascend310b-debug/report.json`（带 `?fresh=1` 时重新探测默认板）与 `POST /ascend310b-debug/probe`。
+面板使用两条只读路由：`GET /ascend310b-debug/report.json` 返回最近一次探测形成的报告；带 `?fresh=1` 时绕过 120 秒缓存，但仍不执行板端探测。实时探测使用 `POST /ascend310b-debug/probe`，面板右上角的“运行探测”按钮调用这条路由。
 
 ### 面板预览
 
@@ -190,7 +192,7 @@ powershell -File scripts/verify-profile.ps1 -RepoRoot <仓库>    # 用一次性
 powershell -File scripts/check-patch-compose.ps1                # 验证 profile patch 能被解析并生效
 ```
 
-`npm test` 覆盖：解析、版本判定、适用范围（310B 内/外/未确认）、调试计划、只读命令白名单与绕过回归、浏览器半装配、面板渲染（含非 310B 拒绝提示）、可移植性与冒烟路由。
+`npm test` 覆盖：解析、版本判定、适用范围（310B 内/外/未确认）、调试计划、样例检索（含中文症状）、只读命令白名单与绕过回归、浏览器半装配、面板渲染（含非 310B 拒绝提示）、可移植性与冒烟路由。
 
 **主机半改动需要重启 DSH 才会生效。** 桌面 Electron profile 由应用托管，`dsh --profile desktop` 会拒绝执行，所以改动后用 `verify-profile.ps1` 先在一次性 profile 里验证；浏览器半会热更新，主机半（工具与路由）要重启应用。重启前可以用 `live-probe.mjs` 直接确认板端探测结果。
 

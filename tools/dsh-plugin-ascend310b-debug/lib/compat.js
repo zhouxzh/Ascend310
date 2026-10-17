@@ -451,6 +451,15 @@ export function assessVersionPairing(facts) {
 	};
 }
 
+/** The five acceptance gates the repository documents for a full-stack upgrade. */
+export const ACCEPTANCE_GATES = Object.freeze([
+	'设备与驱动',
+	'CANN 与 PyACL',
+	'代表性模型',
+	'服务与前端',
+	'回归与性能'
+]);
+
 /** Upgrade order the repository documents for a full-stack change. */
 export const UPGRADE_ORDER = Object.freeze([
 	'停止案例服务和自动启动单元，保留串口或本地控制台。',
@@ -458,5 +467,5 @@ export const UPGRADE_ORDER = Object.freeze([
 	'覆盖升级顺序固定为：先固件、再驱动、最后 CANN 软件。',
 	'每一步失败即停止；升级过程中不断电、不复位。',
 	'重启后先过设备门（npu-smi、驱动加载、设备节点），再安装或加载 CANN。',
-	'最后按五道门验收：设备与驱动、CANN 与 PyACL、代表性模型、服务与前端、回归与性能。'
+	`最后按五道门验收：${ACCEPTANCE_GATES.join('、')}。`
 ]);

@@ -148,12 +148,59 @@ const ARCHETYPE_RULES = Object.freeze([
 
 /**
  * Canonical samples whose README necessarily covers several neighboring
- * topics. The chapter-4 sample teaches PyACL inference and uses ATC/OM as
- * prerequisites; without this override the keyword vote hides it from the
- * PyACL filter.
+ * topics. Keyword voting is useful for uncurated directories, but a sample
+ * whose primary path is a service, camera pipeline or framework migration must
+ * keep that primary archetype when its README also mentions ATC or OM.
  */
 const SAMPLE_ARCHETYPE_OVERRIDES = Object.freeze({
-	chapter4: Object.freeze({ id: 'pyacl-inference', label: 'PyACL 推理' })
+	case4: Object.freeze({ id: 'npu-service', label: 'NPU 服务与前后端' }),
+	case5: Object.freeze({ id: 'npu-service', label: 'NPU 服务与前后端' }),
+	case6: Object.freeze({ id: 'npu-service', label: 'NPU 服务与前后端' }),
+	case7: Object.freeze({ id: 'npu-service', label: 'NPU 服务与前后端' }),
+	case8: Object.freeze({ id: 'camera-v4l2', label: '摄像头与 V4L2' }),
+	case9: Object.freeze({ id: 'npu-service', label: 'NPU 服务与前后端' }),
+	chapter3: Object.freeze({ id: 'framework-migration', label: '框架迁移与训练' }),
+	chapter4: Object.freeze({ id: 'pyacl-inference', label: 'PyACL 推理' }),
+	chapter5: Object.freeze({ id: 'framework-migration', label: '框架迁移与训练' }),
+	chapter6: Object.freeze({ id: 'dvpp-video', label: 'DVPP 视频处理' }),
+	chapter8: Object.freeze({ id: 'performance', label: '性能与基准' }),
+	chapter9: Object.freeze({ id: 'quantization', label: '量化与精度' })
+});
+
+/**
+ * Explicit primary run commands for samples whose first Python command is a
+ * compile or asset check. The command is still verified against the README, so
+ * a stale override cannot silently point at a command the sample no longer
+ * documents.
+ */
+const SAMPLE_ENTRY_OVERRIDES = Object.freeze({
+	case4: 'python -m palmprint_workbench.api --host 0.0.0.0 --port 7860'
+});
+
+/**
+ * Curated Chinese and English search terms for tutorial samples.
+ *
+ * The README is not copied into the index: it contains board addresses and
+ * credentials that must not leak into a distributable package. These terms are
+ * the searchable vocabulary the book actually uses when a reader describes a
+ * symptom, model or task.
+ */
+const SAMPLE_SEARCH_TERMS = Object.freeze({
+	case1: ['人脸识别', '考勤', '摄像头', 'camera', 'PyACL', '服务', '考勤机', '检测'],
+	case2: ['目标跟踪', '目标检测', '摄像头', 'camera', 'v4l2', 'DeepSORT', 'YOLO', '视频', '检测'],
+	case3: ['电子琴', '音频', 'MIDI', 'Piano', '服务', '前端'],
+	case4: ['掌纹', '掌纹识别', '摄像头', 'camera', 'v4l2', '服务', '推理', '模型'],
+	case5: ['数据采集', '数据采集分析仪', 'DFT', '时频', '服务', '前端'],
+	case6: ['小车', '智能小车', '车道线', '场景分类', '摄像头', 'camera', '服务'],
+	case7: ['相册', '智能相册', '图像', '检索', '语义', '服务', '前端'],
+	case8: ['手势', '手势识别', '摄像头', 'camera', 'v4l2', 'WebRTC', '视频', '推理'],
+	case9: ['聊天', '聊天机器人', '大模型', '推理', '服务', '前端', 'Qwen', 'MindSpore', '超时'],
+	chapter3: ['torch_npu', 'PyTorch', '迁移', '训练', '框架'],
+	chapter4: ['PyACL', 'ACL', '推理', '模型', 'OM', 'ATC'],
+	chapter5: ['MindSpore', '训练', '推理', 'MindIR', '框架'],
+	chapter6: ['DVPP', 'VENC', 'VDEC', 'VPC', '视频', '摄像头', 'camera', '编解码'],
+	chapter8: ['性能', 'benchmark', 'P50', 'P95', '优化', '延迟'],
+	chapter9: ['量化', 'INT8', '精度', '校准']
 });
 
 /** Capability markers, detected from README text. */
@@ -229,9 +276,9 @@ export function detectCapabilities(combined) {
  * Scan `samples/` and build the debug index.
  *
  * The scan is structural (directories and READMEs), so it stays true when the
- * repository moves. Semantic fields (archetype, capabilities) are keyword rules
- * rather than per-sample hand entries, which keeps the index reproducible: run
- * the generator twice and the output is identical.
+ * repository moves. Uncurated semantic fields use keyword rules; the canonical
+ * textbook samples have explicit primary archetypes, entries and search terms
+ * so a README that covers several topics cannot hide its main path.
  *
  * @param {object} options - scan options.
  * @param {string} options.root - repository root, or the `samples` directory.
@@ -267,14 +314,16 @@ export function indexSampleIndex({ root, caseIndex }) {
 		const keywords = known?.keywords ?? [];
 		const title = known?.title_zh ?? readmeTitle(text, name);
 		const combined = [name, title, keywords.join(' '), text].join('\n');
-		const entry = verifyCommand(firstCommand(text), text);
+		const entry = verifyCommand(SAMPLE_ENTRY_OVERRIDES[name] ?? firstCommand(text), text);
 		const test = verifyCommand(firstTestCommand(text), text);
 		const archetype = SAMPLE_ARCHETYPE_OVERRIDES[name] ?? detectArchetype(combined);
+		const searchTerms = [...new Set([...keywords, ...(SAMPLE_SEARCH_TERMS[name] ?? [])])];
 		entries.push({
 			id: name,
 			title,
 			readme: `samples/${name}/README.md`,
 			keywords,
+			searchTerms,
 			archetype: archetype?.id ?? null,
 			archetypeLabel: archetype?.label ?? null,
 			entry,
@@ -330,6 +379,7 @@ export function indexQuery(index, { query, archetype, limit = 12 } = {}) {
 			entry.id,
 			entry.title,
 			(entry.keywords ?? []).join(' '),
+			(entry.searchTerms ?? []).join(' '),
 			entry.archetype ?? '',
 			(entry.capabilities ?? []).join(' '),
 			entry.entry ?? ''

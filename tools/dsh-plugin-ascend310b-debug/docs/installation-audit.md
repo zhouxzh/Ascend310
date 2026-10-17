@@ -33,6 +33,12 @@
 | 包清单未声明 Node 版本，自检未覆盖清单完整性 | 旧 Node 或缺少入口文件时到挂载阶段才报错 | 增加 `engines.node >= 18`，可移植性测试检查入口、导出、许可证与 `files` 目标是否存在 |
 | `ascend_debug_plan` 和 `ascend_sample_index` 的返回对象含 schema 不接受的值 | 真实 DSH 运行时在工具返回后拒绝结果；空 `entry`/`test`、布尔 `applicable` 和额外样例字段都会触发校验失败 | 在输出边界规范化样例对象，把 `applicable` 映射为字符串，并补 smoke 断言防止回归 |
 | 第4章的 PyACL 样例同时提到 ATC/OM，关键词投票把它归到 ATC | `archetype=pyacl-inference` 查询返回 0，调试入口被隐藏 | 对教材第4章固定主类型为 `pyacl-inference`，重新生成索引并加查询回归断言 |
+| 插件只有调试工作流，没有完整的程序开发、工程目录和文档规范 | 使用者只能排查失败，无法按统一规则组织新程序、样例仓库和证据文档 | 新增 `docs/ascend310b-development-standard.md`，覆盖目录、编码、ACL/ATC 合同、文档、证据和 M0-M8 验收门，并在 README、技能和可移植性测试中接入 |
+| 样例检索只匹配 id/title/keywords/archetype/capabilities，中文“摄像头、VENC、服务、推理、性能”返回 0 | 用户无法从常见症状找到教程样例，`ascend_debug_plan` 也缺少可参考程序 | 为 15 个样例增加 `searchTerms` 中文/英文词汇，`indexQuery` 和面板检索都使用该字段；补中文查询回归 |
+| 关键词投票把 case2/5/7/9 等主路径归到 ATC，case4 入口被识别为 compileall | 样例分类和运行入口会误导开发与调试 | 增加主类型覆盖和 case4 服务入口覆盖；入口仍按 README 原文校验 |
+| 已配置仓库根目录时仍优先读取包内快照，生成脚本声称的一致性测试也不存在 | 样例变更后工具可能继续显示旧入口或旧分类 | 有 checkout 时扫描 `samples/`；无 checkout 时回退包内快照；补无仓库根目录和中文查询测试 |
+| `ascend_check` 无仓库根目录时直接抛错，且“五道验收门”只有文字没有结构化输出 | 纯版本检查被无关配置阻断，工具描述与实际返回不一致 | `ascend_check` 回退包内样例并省略未校验文档；新增 `acceptanceGates` 字段和回归断言 |
+| `knowledge.js` 引用不存在的 `samples/chapter4/check_ascend_device.py`；README 对 `fresh=1` 的描述与实现不符 | 样例入口和面板路由说明不可信 | 引用改为 `samples/chapter4/README.md`；README 明确 `fresh=1` 只绕过缓存、不执行探测 |
 
 ## 已验证的门禁
 
@@ -48,11 +54,11 @@ npm pack --dry-run
 
 | 门禁 | 验证内容 | 本次结果 |
 | --- | --- | --- |
-| `npm test` | 解析、版本判定、适用范围、计划、工具输出 schema、只读命令门、浏览器装配、面板渲染、可移植性、HTTP 冒烟 | 通过 |
-| 样例索引 | 用当前 `samples/` 重新生成后与包内快照比较 | 15 个样例，SHA-256 未变化 |
+| `npm test` | 解析、版本判定、适用范围、计划、工具输出 schema、只读命令门、浏览器装配、面板渲染、可移植性、开发规范完整性、HTTP 冒烟 | 通过 |
+| 样例索引 | 当前 `samples/` 扫描、无 checkout 的包内快照、中文症状查询、主类型和 case4 入口 | 通过；`摄像头`、`VENC`、`服务`、`推理`、`性能` 均可命中，`pyacl-inference` 命中第4章 |
 | 一次性 profile | 路由、CANN/驱动解析、8T 夹具、非 310B 拒绝、下发 bundle 含新名称 | 通过 |
 | patch 组合 | 桌面 profile 的插件行能被解析并带到目标列表 | 通过 |
-| 打包清单 | `npm pack --dry-run` 包含 `lib/`、`data/`、`skills/`、`LICENSE`、README | 通过 |
+| 打包清单 | `npm pack --dry-run` 包含 `lib/`、`data/`、`docs/`（含开发规范）、`skills/`、`LICENSE`、README | 通过 |
 | 隐私扫描 | 不包含固定板卡 IP、本机用户名、检出目录或用户主目录 | 通过 |
 
 ## 仍需使用者确认的事项

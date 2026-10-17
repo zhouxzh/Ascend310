@@ -25,6 +25,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools';
 import { assembleReport, indexQuery, indexSampleIndex, loadSampleIndex } from './report.js';
 import {
 	assessVersionPairing,
+	ACCEPTANCE_GATES,
 	CANN_RELEASE_LINES,
 	OBSERVED_STACKS,
 	PLUGIN_DISPLAY_NAME,
@@ -180,6 +181,17 @@ function readText(path) {
 	}
 }
 
+/** Read one JSON file, returning null instead of throwing. */
+function readJson(path) {
+	const text = readText(path);
+	if (text === null) return null;
+	try {
+		return JSON.parse(text);
+	} catch {
+		return null;
+	}
+}
+
 /** Resolve a path against the repository root without escaping it. */
 function resolveInside(root, candidate) {
 	if (typeof candidate !== 'string' || candidate.trim() === '') return null;
@@ -190,23 +202,39 @@ function resolveInside(root, candidate) {
 }
 
 /**
- * Load the generated sample index, falling back to a live scan of the samples
- * tree so a freshly cloned repository works before anyone runs the generator.
+ * Load the sample index.
+ *
+ * A configured checkout is authoritative: scanning its `samples/` tree keeps
+ * `ascend_sample_index` and `ascend_debug_plan` aligned with the code the user
+ * is actually reading. The packaged JSON remains the fallback for a copied
+ * installation without a checkout, so the plugin still works after a file-copy
+ * install.
  */
 function readSampleIndex(repoRoot) {
 	const moduleRoot = dirname(fileURLToPath(import.meta.url));
-	const candidates = [resolveInside(moduleRoot, join('..', 'data', 'sample-index.json'))];
-	for (const candidate of candidates) {
-		if (candidate === null) continue;
-		const text = readText(candidate);
-		if (text === null) continue;
-		try {
-			return loadSampleIndex(JSON.parse(text));
-		} catch {
-			// A malformed index should not take the tool down; fall through to a scan.
+	if (typeof repoRoot === 'string' && repoRoot.trim() !== '') {
+		const samplesRoot = join(resolve(repoRoot), 'samples');
+		if (existsSync(samplesRoot)) {
+			const live = indexSampleIndex({
+				root: samplesRoot,
+				caseIndex: readJson(join(samplesRoot, 'case-index.json'))
+			});
+			if (live.entries.length > 0) return live;
 		}
 	}
-	return indexSampleIndex({ root: join(repoRoot, 'samples') });
+	const candidates = [resolve(join(moduleRoot, '..', 'data', 'sample-index.json'))];
+	for (const candidate of candidates) {
+		if (candidate === null) continue;
+		const parsed = readJson(candidate);
+		if (parsed !== null) {
+			try {
+				return loadSampleIndex(parsed);
+			} catch {
+				// A malformed index should not take the tool down; fall through to a scan.
+			}
+		}
+	}
+	return indexSampleIndex({ root: join(repoRoot ?? process.cwd(), 'samples') });
 }
 
 /**
@@ -309,6 +337,20 @@ function publicSample(sample) {
 		if (Array.isArray(sample[key])) output[key] = sample[key].filter((value) => typeof value === 'string');
 	}
 	return output;
+}
+
+/** Keep the panel payload small while preserving its search vocabulary. */
+function panelSample(sample) {
+	return {
+		id: sample.id,
+		title: sample.title,
+		readme: sample.readme,
+		archetype: sample.archetype,
+		entry: sample.entry,
+		capabilities: sample.capabilities,
+		keywords: sample.keywords,
+		searchTerms: sample.searchTerms
+	};
 }
 
 /** JSON schema for one matched knowledge entry. */
@@ -497,6 +539,7 @@ export function apply(ctx, config) {
 						reasons: { type: 'array', required: true, items: { type: 'string' } },
 						nextActions: { type: 'array', required: true, items: { type: 'string' } },
 						upgradeOrder: { type: 'array', required: true, items: { type: 'string' } },
+						acceptanceGates: { type: 'array', required: true, items: { type: 'string' } },
 						scope: { type: 'object', additionalProperties: true },
 						releaseLine: {
 							type: 'object',
@@ -512,7 +555,13 @@ export function apply(ctx, config) {
 				render: (_args, value) => [{ type: 'text', text: value.text }]
 			},
 			async execute(args) {
-				const repoRoot = resolveRepoRoot(config, args.repoRoot);
+				let repoRoot = null;
+				let repoNote = null;
+				try {
+					repoRoot = resolveRepoRoot(config, args.repoRoot);
+				} catch (error) {
+					repoNote = `未配置教材仓库根目录：样例来自包内快照，版本文档路径未校验。${String(error?.message ?? error)}`;
+				}
 				const result = await collectEnvironment({
 					config,
 					targetSelector: args.target,
@@ -523,11 +572,13 @@ export function apply(ctx, config) {
 				const index = readSampleIndex(repoRoot);
 				const soc = result.environment.facts?.soc?.value ?? null;
 				const relevant = indexQuery(index, { query: [soc, 'atc', 'acl'].filter(Boolean).join(' '), limit: 8 });
-				const docs = [
-					'src/appendix/appendix7.md',
-					'samples/chapter5/docs/01-board-validation-record-20261016.md',
-					'samples/case8/docs/05-known-issues-and-version-compatibility.md'
-				].map((relative) => ({ path: relative, exists: existsSync(join(repoRoot, relative)) }));
+				const docs = repoRoot === null
+					? []
+					: [
+							'src/appendix/appendix7.md',
+							'samples/chapter5/docs/01-board-validation-record-20261016.md',
+							'samples/case8/docs/05-known-issues-and-version-compatibility.md'
+						].map((relative) => ({ path: relative, exists: existsSync(join(repoRoot, relative)) }));
 				const outOfScope = report.scope?.applicable === false;
 				const sampleLines = outOfScope
 					? ['- 设备不在昇腾 310B 范围内，本插件的样例索引不适用于该设备。']
@@ -544,15 +595,23 @@ export function apply(ctx, config) {
 						].join('\n')
 					: [
 							report.text,
+							...(repoNote === null ? [] : ['', `> ${repoNote}`]),
 							'',
 							'### 相关 samples 程序',
 							...sampleLines,
-							'',
-							'### 版本文档',
-							...docs.map((doc) => `- ${doc.exists ? '' : '[仓库中未找到] '}${doc.path}`),
+							...(docs.length === 0
+								? []
+								: [
+										'',
+										'### 版本文档',
+										...docs.map((doc) => `- ${doc.exists ? '' : '[仓库中未找到] '}${doc.path}`)
+									]),
 							'',
 							'### 升级顺序（覆盖升级）',
-							...UPGRADE_ORDER.map((step, position) => `${position + 1}. ${step}`)
+							...UPGRADE_ORDER.map((step, position) => `${position + 1}. ${step}`),
+							'',
+							'### 五道验收门',
+							...ACCEPTANCE_GATES.map((gate, position) => `${position + 1}. ${gate}`)
 						].join('\n');
 				return {
 					text,
@@ -565,6 +624,7 @@ export function apply(ctx, config) {
 						? ['改用检测到的芯片对应的工具链、驱动文档和样例。', '不要在本插件中套用 310B 的 CANN/驱动版本配套。']
 						: report.pairing.nextActions,
 					upgradeOrder: outOfScope ? [] : [...UPGRADE_ORDER],
+					acceptanceGates: outOfScope ? [] : [...ACCEPTANCE_GATES],
 					scope: report.scope ?? null,
 					releaseLine:
 						outOfScope || report.pairing.releaseLine === null || report.pairing.releaseLine === undefined
@@ -655,7 +715,8 @@ export function apply(ctx, config) {
 					const repoRoot = resolveRepoRoot(config, args.repoRoot);
 					index = readSampleIndex(repoRoot);
 				} catch (error) {
-					samplesNote = `未索引教材样例：${error?.message ?? error}`;
+					index = readSampleIndex(null);
+					samplesNote = `未配置教材仓库根目录：样例来自包内快照。${error?.message ?? error}`;
 				}
 				const needsProbe = typeof args.target === 'string' || typeof args.rawText === 'string';
 				let facts = {};
@@ -750,19 +811,15 @@ export function apply(ctx, config) {
 				render: (_args, value) => [{ type: 'text', text: value.text }]
 			},
 			execute(args) {
-				// Without a configured checkout the tool returns a refusal in its
-				// normal shape; throwing here would surface as a harness error rather
-				// than as something the caller can read and act on.
+				// A copied installation ships the generated sample snapshot, so the
+				// tool can still search it without a checkout. When a checkout is
+				// configured, readSampleIndex uses that tree instead of the snapshot.
 				let repoRoot = null;
+				let note = null;
 				try {
 					repoRoot = resolveRepoRoot(config, args.repoRoot);
 				} catch (error) {
-					return Promise.resolve({
-						text: String(error?.message ?? error),
-						matched: [],
-						total: 0,
-						archetypes: []
-					});
+					note = `未配置教材仓库根目录：样例来自包内快照。${String(error?.message ?? error)}`;
 				}
 				const index = readSampleIndex(repoRoot);
 				const matched = indexQuery(index, {
@@ -771,6 +828,7 @@ export function apply(ctx, config) {
 					limit: Number.isInteger(args.limit) && args.limit > 0 ? args.limit : 12
 				});
 				const text = [
+					...(note === null ? [] : [note, '']),
 					`共 ${index.entries.length} 个样例，匹配 ${matched.length} 个。`,
 					...(matched.length === 0
 						? ['没有匹配到样例：换个关键词，或省略 query 查看全部。']
@@ -980,14 +1038,7 @@ export function apply(ctx, config) {
 						symptoms: entry.symptoms
 					})),
 					areas: Object.values(AREAS),
-					samples: index.entries.map((sample) => ({
-						id: sample.id,
-						title: sample.title,
-						readme: sample.readme,
-						archetype: sample.archetype,
-						entry: sample.entry,
-						capabilities: sample.capabilities
-					})),
+					samples: index.entries.map(panelSample),
 					versionLines: CANN_RELEASE_LINES.map((line) => ({ line: line.line, note: line.note ?? '' })),
 					observedStacks: OBSERVED_STACKS.map((stack) => ({
 						id: stack.id,
@@ -1062,14 +1113,7 @@ export function apply(ctx, config) {
 						symptoms: entry.symptoms
 					})),
 					areas: Object.values(AREAS),
-					samples: index.entries.map((sample) => ({
-						id: sample.id,
-						title: sample.title,
-						readme: sample.readme,
-						archetype: sample.archetype,
-						entry: sample.entry,
-						capabilities: sample.capabilities
-					})),
+					samples: index.entries.map(panelSample),
 					versionLines: CANN_RELEASE_LINES.map((line) => ({ line: line.line, note: line.note ?? '' })),
 					observedStacks: OBSERVED_STACKS.map((stack) => ({
 						id: stack.id,

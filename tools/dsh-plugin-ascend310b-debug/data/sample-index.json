@@ -12,6 +12,16 @@
         "考勤",
         "PyACL"
       ],
+      "searchTerms": [
+        "人脸识别",
+        "考勤",
+        "PyACL",
+        "摄像头",
+        "camera",
+        "服务",
+        "考勤机",
+        "检测"
+      ],
       "archetype": "npu-service",
       "archetypeLabel": "NPU 服务与前后端",
       "entry": null,
@@ -35,6 +45,18 @@
         "多目标跟踪",
         "DeepSORT"
       ],
+      "searchTerms": [
+        "目标检测",
+        "多目标跟踪",
+        "DeepSORT",
+        "目标跟踪",
+        "摄像头",
+        "camera",
+        "v4l2",
+        "YOLO",
+        "视频",
+        "检测"
+      ],
       "archetype": "atc-conversion",
       "archetypeLabel": "ATC ONNX→OM 转换",
       "entry": null,
@@ -56,6 +78,16 @@
         "Piano-DDSP",
         "MIDI",
         "音频合成"
+      ],
+      "searchTerms": [
+        "Piano-DDSP",
+        "MIDI",
+        "音频合成",
+        "电子琴",
+        "音频",
+        "Piano",
+        "服务",
+        "前端"
       ],
       "archetype": "npu-service",
       "archetypeLabel": "NPU 服务与前后端",
@@ -80,9 +112,21 @@
         "ROI",
         "FAISS"
       ],
-      "archetype": "camera-v4l2",
-      "archetypeLabel": "摄像头与 V4L2",
-      "entry": "python -m compileall -q app.py palmprint_workbench tools",
+      "searchTerms": [
+        "掌纹识别",
+        "ROI",
+        "FAISS",
+        "掌纹",
+        "摄像头",
+        "camera",
+        "v4l2",
+        "服务",
+        "推理",
+        "模型"
+      ],
+      "archetype": "npu-service",
+      "archetypeLabel": "NPU 服务与前后端",
+      "entry": "python -m palmprint_workbench.api --host 0.0.0.0 --port 7860",
       "test": "python -m pytest -ra tests",
       "capabilities": [
         "ascend",
@@ -103,8 +147,17 @@
         "DFT",
         "时频分析"
       ],
-      "archetype": "atc-conversion",
-      "archetypeLabel": "ATC ONNX→OM 转换",
+      "searchTerms": [
+        "数据采集",
+        "DFT",
+        "时频分析",
+        "数据采集分析仪",
+        "时频",
+        "服务",
+        "前端"
+      ],
+      "archetype": "npu-service",
+      "archetypeLabel": "NPU 服务与前后端",
       "entry": null,
       "test": "python -m pytest -q",
       "capabilities": [
@@ -123,6 +176,16 @@
         "车道线",
         "场景分类",
         "视觉感知"
+      ],
+      "searchTerms": [
+        "车道线",
+        "场景分类",
+        "视觉感知",
+        "小车",
+        "智能小车",
+        "摄像头",
+        "camera",
+        "服务"
       ],
       "archetype": "npu-service",
       "archetypeLabel": "NPU 服务与前后端",
@@ -143,8 +206,20 @@
         "图像索引",
         "FAISS"
       ],
-      "archetype": "atc-conversion",
-      "archetypeLabel": "ATC ONNX→OM 转换",
+      "searchTerms": [
+        "语义检索",
+        "图像索引",
+        "FAISS",
+        "相册",
+        "智能相册",
+        "图像",
+        "检索",
+        "语义",
+        "服务",
+        "前端"
+      ],
+      "archetype": "npu-service",
+      "archetypeLabel": "NPU 服务与前后端",
       "entry": null,
       "test": null,
       "capabilities": [
@@ -163,8 +238,20 @@
         "YOLO",
         "WebRTC"
       ],
-      "archetype": "atc-conversion",
-      "archetypeLabel": "ATC ONNX→OM 转换",
+      "searchTerms": [
+        "HaGRID",
+        "YOLO",
+        "WebRTC",
+        "手势",
+        "手势识别",
+        "摄像头",
+        "camera",
+        "v4l2",
+        "视频",
+        "推理"
+      ],
+      "archetype": "camera-v4l2",
+      "archetypeLabel": "摄像头与 V4L2",
       "entry": null,
       "test": null,
       "capabilities": [
@@ -185,8 +272,22 @@
         "OpenAI 兼容",
         "检索增强"
       ],
-      "archetype": "atc-conversion",
-      "archetypeLabel": "ATC ONNX→OM 转换",
+      "searchTerms": [
+        "小智",
+        "OpenAI 兼容",
+        "检索增强",
+        "聊天",
+        "聊天机器人",
+        "大模型",
+        "推理",
+        "服务",
+        "前端",
+        "Qwen",
+        "MindSpore",
+        "超时"
+      ],
+      "archetype": "npu-service",
+      "archetypeLabel": "NPU 服务与前后端",
       "entry": null,
       "test": "npm test",
       "capabilities": [
@@ -203,6 +304,13 @@
       "title": "第3章 代码样例",
       "readme": "samples/chapter3/README.md",
       "keywords": [],
+      "searchTerms": [
+        "torch_npu",
+        "PyTorch",
+        "迁移",
+        "训练",
+        "框架"
+      ],
       "archetype": "framework-migration",
       "archetypeLabel": "框架迁移与训练",
       "entry": "python -c \"import torch; import torch_npu; print(torch.npu.is_available())\"",
@@ -218,6 +326,14 @@
       "title": "第4章 代码样例",
       "readme": "samples/chapter4/README.md",
       "keywords": [],
+      "searchTerms": [
+        "PyACL",
+        "ACL",
+        "推理",
+        "模型",
+        "OM",
+        "ATC"
+      ],
       "archetype": "pyacl-inference",
       "archetypeLabel": "PyACL 推理",
       "entry": "python -c \"import acl; print('PyACL OK')\"",
@@ -233,8 +349,15 @@
       "title": "第5章 MindSpore 开发样例",
       "readme": "samples/chapter5/README.md",
       "keywords": [],
-      "archetype": "atc-conversion",
-      "archetypeLabel": "ATC ONNX→OM 转换",
+      "searchTerms": [
+        "MindSpore",
+        "训练",
+        "推理",
+        "MindIR",
+        "框架"
+      ],
+      "archetype": "framework-migration",
+      "archetypeLabel": "框架迁移与训练",
       "entry": "python check_mindspore_env.py",
       "test": null,
       "capabilities": [
@@ -249,6 +372,16 @@
       "title": "第6章 代码样例",
       "readme": "samples/chapter6/README.md",
       "keywords": [],
+      "searchTerms": [
+        "DVPP",
+        "VENC",
+        "VDEC",
+        "VPC",
+        "视频",
+        "摄像头",
+        "camera",
+        "编解码"
+      ],
       "archetype": "dvpp-video",
       "archetypeLabel": "DVPP 视频处理",
       "entry": "python samples/chapter6/check_cann.py",
@@ -265,8 +398,16 @@
       "title": "第8章 代码样例",
       "readme": "samples/chapter8/README.md",
       "keywords": [],
-      "archetype": "atc-conversion",
-      "archetypeLabel": "ATC ONNX→OM 转换",
+      "searchTerms": [
+        "性能",
+        "benchmark",
+        "P50",
+        "P95",
+        "优化",
+        "延迟"
+      ],
+      "archetype": "performance",
+      "archetypeLabel": "性能与基准",
       "entry": null,
       "test": null,
       "capabilities": [
@@ -281,6 +422,12 @@
       "title": "第9章 模型量化样例",
       "readme": "samples/chapter9/README.md",
       "keywords": [],
+      "searchTerms": [
+        "量化",
+        "INT8",
+        "精度",
+        "校准"
+      ],
       "archetype": "quantization",
       "archetypeLabel": "量化与精度",
       "entry": "python tools/download_model.py",
@@ -299,6 +446,7 @@
     "dvpp-video",
     "framework-migration",
     "npu-service",
+    "performance",
     "pyacl-inference",
     "quantization"
   ]

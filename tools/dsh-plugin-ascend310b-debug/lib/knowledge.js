@@ -216,7 +216,7 @@ export const ENTRIES = Object.freeze([
 			"python -c 'import acl; print(\"acl: ok\")'",
 			'npu-smi info'
 		],
-		references: ['src/appendix/appendix7.md', 'samples/chapter4/check_ascend_device.py']
+		references: ['src/appendix/appendix7.md', 'samples/chapter4/README.md']
 	},
 	{
 		id: 'atc-failure',

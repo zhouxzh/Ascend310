@@ -62,6 +62,59 @@ const check = (condition, message) => {
 	if (!condition) failures.push(message);
 };
 
+/**
+ * Minimal validator for the subset of the tool output schema this plugin uses.
+ * The real Host validates `defineTool.output.schema` before the model sees a
+ * result; the stub in this test cannot, so this catches shape regressions such
+ * as a null optional field or an undeclared property.
+ */
+function validateOutput(name, value) {
+	const schema = registeredTools.get(name)?.output?.schema;
+	if (schema === undefined) {
+		failures.push(`${name}: missing output schema`);
+		return;
+	}
+	const visit = (node, shape, path) => {
+		if (node === undefined) return;
+		if (shape === null || typeof shape !== 'object') return;
+		const label = (key) => `${path}.${key}`;
+		if (shape.type === 'object') {
+			if (node === null || typeof node !== 'object' || Array.isArray(node)) {
+				failures.push(`${label('')} must be an object for ${name}`);
+				return;
+			}
+			const required = new Set(Array.isArray(shape.required) ? shape.required : []);
+			for (const [key, child] of Object.entries(shape.properties ?? {})) {
+				if (child?.required === true) required.add(key);
+				if (node[key] === undefined) {
+					if (required.has(key)) failures.push(`${label(key)} is required by ${name}`);
+					continue;
+				}
+				visit(node[key], child, label(key));
+			}
+			if (shape.additionalProperties === false) {
+				for (const key of Object.keys(node)) {
+					if (!(key in (shape.properties ?? {}))) failures.push(`${label(key)} is not declared by ${name}`);
+				}
+			}
+			return;
+		}
+		if (shape.type === 'array') {
+			if (!Array.isArray(node)) {
+				failures.push(`${label('')} must be an array for ${name}`);
+				return;
+			}
+			node.forEach((item, index) => visit(item, shape.items, `${path}[${index}]`));
+			return;
+		}
+		if (shape.type === 'integer' && !Number.isInteger(node)) failures.push(`${label('')} must be an integer for ${name}`);
+		else if (shape.type === 'number' && (typeof node !== 'number' || !Number.isFinite(node))) failures.push(`${label('')} must be a number for ${name}`);
+		else if (shape.type === 'boolean' && typeof node !== 'boolean') failures.push(`${label('')} must be a boolean for ${name}`);
+		else if (shape.type === 'string' && typeof node !== 'string') failures.push(`${label('')} must be a string for ${name}`);
+	};
+	visit(value, schema, name);
+}
+
 /** Collected tool definitions, keyed by name. */
 const registeredTools = new Map();
 
@@ -131,12 +184,14 @@ try {
 	// --- probe with a saved transcript ------------------------------------
 	const probeTool = registeredTools.get('ascend_probe');
 	const probeResult = await probeTool.execute({ rawText: PROBE_8T_CANN80, repoRoot }, {});
+	validateOutput('ascend_probe', probeResult);
 	check(probeResult.text.includes('Ascend310B4'), 'the probe tool must print the board from the transcript');
 	check(probeResult.text.includes('8.0.0'), 'the probe tool must print the probed CANN version');
 	check(probeResult.text.includes('observed-match'), 'the probe tool must report the recorded version pairing');
 
 	const planTool = registeredTools.get('ascend_debug_plan');
 	const planResult = await planTool.execute({ symptom: 'import acl 失败', rawText: PROBE_8T_CANN80, repoRoot }, {});
+	validateOutput('ascend_debug_plan', planResult);
 	check(planResult.text.includes('停止条件'), 'the plan tool must render stop conditions');
 	check(typeof planResult.applicable === 'string', 'the plan applicability must be serializable as a schema string');
 	for (const sample of planResult.samples) {
@@ -151,6 +206,7 @@ try {
 	const indexTool = registeredTools.get('ascend_sample_index');
 	if (repoRoot !== null) {
 		const indexResult = await indexTool.execute({ repoRoot, limit: 3 }, {});
+		validateOutput('ascend_sample_index', indexResult);
 		check(indexResult.text.length > 0, 'the sample index tool must render matching samples');
 		for (const sample of indexResult.matched) {
 			for (const key of ['archetype', 'archetypeLabel', 'entry', 'test']) {
@@ -163,30 +219,48 @@ try {
 			pyaclResult.matched.some((sample) => sample.id === 'chapter4'),
 			'the PyACL filter must expose the canonical chapter-4 inference sample'
 		);
+		const cameraResult = await indexTool.execute({ repoRoot, query: '摄像头', limit: 8 }, {});
+		check(
+			cameraResult.matched.some((sample) => ['case2', 'case4', 'case8', 'chapter6'].includes(sample.id)),
+			'a Chinese camera symptom must reach camera/VENC samples'
+		);
+		const vencResult = await indexTool.execute({ repoRoot, query: 'VENC', limit: 8 }, {});
+		check(vencResult.matched.some((sample) => sample.id === 'chapter6'), 'the VENC query must reach the DVPP sample');
+		const case4 = await indexTool.execute({ repoRoot, query: '掌纹', limit: 8 }, {});
+		check(
+			case4.matched.some((sample) => sample.id === 'case4' && String(sample.entry ?? '').includes('palmprint_workbench.api')),
+			'case4 must expose its service entry rather than a compileall check'
+		);
 	} else {
-		// With no configured repository root the tool must refuse clearly instead
-		// of silently indexing whatever directory the process happens to be in.
-		const refusal = await indexTool.execute({ limit: 3 }, {});
-		check(refusal.text.includes('未配置'), 'an unconfigured repoRoot must produce an explicit refusal');
+		// A copied installation has no checkout but still ships the generated
+		// snapshot; search must work instead of refusing.
+		const fallback = await indexTool.execute({ limit: 3 }, {});
+		validateOutput('ascend_sample_index', fallback);
+		check(fallback.matched.length > 0, 'the packaged sample snapshot must be searchable without a checkout');
+		check(fallback.text.includes('包内快照'), 'a snapshot-only search must say where the samples came from');
 	}
 
 	// --- read-only command gate -------------------------------------------
 	const execTool = registeredTools.get('ascend_board_exec');
 	const preview = await execTool.execute({ command: 'npu-smi info', run: false }, {});
+	validateOutput('ascend_board_exec', preview);
 	check(preview.text.includes('npu-smi info'), 'a preview must echo the command');
 	check(preview.text.includes('未执行') || preview.text.includes('read-only'), 'a preview must state that nothing ran');
 
 	let rejected = await execTool.execute({ command: 'rm -rf /home/HwHiAiUser/Documents', run: false }, {});
+	validateOutput('ascend_board_exec', rejected);
 	check(rejected.allowed === false, 'a mutating command must be refused');
 	check(rejected.executed === false, 'a refused command must not execute');
 	check(rejected.text.includes('命令被拒绝'), 'a refusal must say so in its text');
 	check(String(rejected.reason).length > 0, 'a refusal must carry a reason');
 
 	let chained = await execTool.execute({ command: 'npu-smi info && reboot', run: false }, {});
+	validateOutput('ascend_board_exec', chained);
 	check(chained.allowed === false, 'a chained command must be refused');
 	check(chained.executed === false, 'a chained command must not execute');
 
 	let redirected = await execTool.execute({ command: 'npu-smi info > /tmp/x', run: false }, {});
+	validateOutput('ascend_board_exec', redirected);
 	check(redirected.allowed === false, 'a redirecting command must be refused');
 
 	// --- HTTP route with a saved board transcript -------------------------
@@ -257,11 +331,25 @@ try {
 		{}
 	);
 	check(foreignPlan.applicable === 'no', 'the planner must mark an out-of-scope device as not applicable');
+	validateOutput('ascend_debug_plan', foreignPlan);
 	check(foreignPlan.scope?.applicable === false, 'the planner scope must retain the boolean machine-readable decision');
 	check(foreignPlan.matched.length === 0, 'the planner must not return 310B procedures for another chip');
 	check(foreignPlan.text.includes('不适用范围'), 'the planner must explain why it refused');
 
 	const checkTool = registeredTools.get('ascend_check');
+	const inScopeCheck = await checkTool.execute(
+		{ repoRoot: repoRoot ?? process.cwd(), rawText: PROBE_8T_CANN80 },
+		{}
+	);
+	validateOutput('ascend_check', inScopeCheck);
+	check(inScopeCheck.verdict === 'observed-match', 'the check tool must report the recorded 8T stack');
+	check(inScopeCheck.acceptanceGates.length === 5, 'the check tool must return the five acceptance gates');
+	if (repoRoot === null) {
+		const noRepoCheck = await checkTool.execute({ rawText: PROBE_8T_CANN80 }, {});
+		validateOutput('ascend_check', noRepoCheck);
+		check(noRepoCheck.verdict === 'observed-match', 'check must still judge versions without a checkout');
+		check(noRepoCheck.text.includes('包内快照'), 'a checkout-less check must say samples came from the package');
+	}
 	const foreignCheck = await checkTool.execute(
 		{
 			repoRoot: repoRoot ?? process.cwd(),
@@ -270,7 +358,9 @@ try {
 		{}
 	);
 	check(foreignCheck.verdict === 'out-of-scope', 'the check tool must report out-of-scope');
+	validateOutput('ascend_check', foreignCheck);
 	check(foreignCheck.upgradeOrder.length === 0, 'the check tool must withhold the 310B upgrade order');
+	check(foreignCheck.acceptanceGates.length === 0, 'the check tool must withhold acceptance gates out of scope');
 	check(foreignCheck.text.includes('不适用范围'), 'the check tool must explain why it withheld advice');
 	check(!foreignCheck.text.includes('### 升级顺序'), 'an out-of-scope board must not receive an upgrade sequence');
 

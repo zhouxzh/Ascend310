@@ -3,9 +3,10 @@
  *
  * The index is generated, not hand-maintained: it scans samples/<name>/README.md
  * and records each program's title, entry command, test command, debugging
- * archetype and capabilities. Run it after the samples tree changes, then run
- * the plugin tests, which fail when the committed index no longer matches a
- * fresh scan.
+ * archetype, search vocabulary and capabilities. Run it after the samples tree
+ * changes, then run the plugin tests. A configured checkout is scanned live by
+ * the tools, so the committed JSON is the fallback for a copied installation
+ * without a checkout.
  *
  * Usage:
  *   node scripts/generate-sample-index.mjs <repoRoot>

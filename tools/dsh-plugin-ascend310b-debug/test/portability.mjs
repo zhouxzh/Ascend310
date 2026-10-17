@@ -100,6 +100,23 @@ if (skill !== null) {
 	}
 }
 
+// The bundled engineering standard is part of the plugin contract: a copied
+// installation must still explain its code, directory, document and evidence
+// requirements without depending on a local checkout.
+const standardPath = join(root, 'docs', 'ascend310b-development-standard.md');
+let standard = null;
+try {
+	standard = readFileSync(standardPath, 'utf8');
+} catch {
+	failures.push('docs/ascend310b-development-standard.md 不存在');
+}
+if (standard !== null) {
+	for (const heading of ['## 3. 代码仓库工程目录规范', '## 4. 程序开发规范', '## 5. 文档规范', '## 6. 验收门与完成定义']) {
+		if (!standard.includes(heading)) failures.push(`开发规范缺少章节：${heading}`);
+	}
+	if (!standard.includes('`observed-pass`')) failures.push('开发规范缺少 observed-pass 证据词');
+}
+
 // Every bundled file the manifest promises must exist, and the package must
 // carry everything a file-copy installation needs.
 const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
@@ -155,4 +172,5 @@ if (failures.length > 0) {
 console.log('portability test passed');
 console.log(`  scanned files : ${files.length}`);
 console.log(`  skill         : ${skill === null ? '(missing)' : 'ascend310b-debug/SKILL.md'}`);
+console.log(`  standard      : ${standard === null ? '(missing)' : 'docs/ascend310b-development-standard.md'}`);
 console.log(`  manifest files: ${(manifest.files ?? []).join(', ')}`);

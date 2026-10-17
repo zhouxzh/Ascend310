@@ -1,6 +1,6 @@
 # 仓库目录与文档职责
 
-本文是仓库目录结构的唯一规范。它解决“应该从哪个 README 开始”和“某类内容应该放在哪里”两个问题。
+本文是仓库目录结构的唯一规范。它解决“应该从哪个 README 开始”和“某类内容应该放在哪里”两个问题。面向昇腾 310B 程序、样例工程、资源生命周期、验收门和文档证据的完整执行标准见 [`ascend310b-development-standard.md`](../tools/dsh-plugin-ascend310b-debug/docs/ascend310b-development-standard.md)；两者冲突时，本文继续作为目录结构的唯一真源，并与该规范同步修订。
 
 ## 1. 入口职责
 

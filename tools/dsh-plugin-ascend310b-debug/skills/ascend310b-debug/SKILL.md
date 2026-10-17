@@ -9,6 +9,8 @@ description: 昇腾 310B（Ascend 310B1/310B4）程序调试工作流。当用�
 
 它只适用于**昇腾 310B1 / 310B4**。`ascend_probe` 的 `scope.applicable` 为 `false` 时，说明探测到的是其他芯片：不要套用本工作流的调试程序、样例索引或版本配套表，直接改用该芯片自己的工具链与文档。`scope.applicable` 为 `unknown` 时先补探测，不要猜。
 
+开发新程序或整理样例时，同时遵守仓库中的 `tools/dsh-plugin-ascend310b-debug/docs/ascend310b-development-standard.md`。该规范覆盖工程目录、ACL/ATC 合同、资源生命周期、文档结构、证据等级和 M0-M8 验收门；调试工作流负责定位失败，不能替代开发规范中的交付条件。
+
 ## 三条硬规则
 
 1. **版本必须来自板端。** 板卡型号、SoC、CANN、驱动、固件、npu-smi、固件号一律由 `ascend_probe` 或 `ascend_check` 从板端读取。任何"应该是 8.0"的推断都不能写进结论。
