@@ -25,6 +25,7 @@ import {
 import { diagnose } from './doctor.js';
 import { collectVuepressFindings } from './vuepress.js';
 import { collectCodeFindings } from './code.js';
+import { analyzeStyle, formatStyle } from './style.js';
 import { planBuild, resolveBuildEnvironment, runBuild } from './build.js';
 
 /** Cordis plugin name used by loader diagnostics. */
@@ -603,6 +604,58 @@ export function apply(ctx, config) {
 		})
 	);
 
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend310b_writing_style',
+			description:
+				'Report where the prose reads like generated marketing copy instead of a textbook, and why. It groups ' +
+				'candidates into 营销腔 (product-launch adjectives), 空转套话 (filler that can be deleted whole), ' +
+				'元话语 (telling the reader what you are about to say) and 对话残留 (chat phrasing that leaked into the ' +
+				'manuscript), and also reports paragraph/sentence shape and paired constructions. Every hit is a ' +
+				'candidate for a human to read once — none of it is an error, nothing here blocks a push, and a phrase ' +
+				'may be exactly right in its own sentence. Use it when asked to 润色 or 去 AI 味, then rewrite following ' +
+				'the skill and re-run ascend310b_writing_audit to confirm the structure still holds.',
+			parameters: {
+				scope: SCOPE_PARAMETER,
+				root: ROOT_PARAMETER
+			},
+			output: {
+				schema: {
+					type: 'object',
+					additionalProperties: false,
+					properties: {
+						text: { type: 'string', required: true },
+						files: { type: 'integer', required: true },
+						cjk: { type: 'integer', required: true },
+						hits: { type: 'integer', required: true },
+						density: { type: 'number', required: true }
+					}
+				},
+				render: (_args, value) => [{ type: 'text', text: value.text }]
+			},
+			execute(args) {
+				const root = resolveRoot(config, args.root);
+				const analysis = analyzeStyle({
+					root,
+					settings: settingsFor(config, root),
+					scope: SCOPES.includes(args.scope) ? args.scope : 'all'
+				});
+				return Promise.resolve({
+					text: formatStyle({ analysis }),
+					files: analysis.totals.files,
+					cjk: analysis.totals.cjk,
+					hits: analysis.totals.hits,
+					density: analysis.totals.density
+				});
+			},
+			presentCall: (args) => ({
+				card: 'generic',
+				title: '文风体检',
+				kind: 'other',
+				rawInput: args
+			})
+		})
+	);
 	// The build tool runs as a platform background job: a full book build takes
 	// minutes, and the caller should keep its turn.
 	//

@@ -1,0 +1,313 @@
+/**
+ * Prose-style analysis: find the writing that reads like generated marketing
+ * copy rather than a textbook.
+ *
+ * This module is deliberately *not* a rule set like the others. It never
+ * produces an error, it never blocks a push, and it does not claim a phrase is
+ * wrong — a phrase is wrong or right only in its sentence. What it does is
+ * narrow a 250,000-character book down to the few dozen sentences that a human
+ * should read once, which is the part that actually improves writing.
+ *
+ * The lexicon was calibrated against this book rather than assumed:
+ *
+ * - 首先 (44 occurrences) is **excluded**: the sample showed every one is a
+ *   legitimate procedure word ("首先调用 acl.init"). Reporting it would train
+ *   the author to ignore the tool.
+ * - 营销腔 dominates the real signal: 极致 17, 出色 8, 无缝 7, plus 杀手锏 /
+ *   全能型选手 / 护城河 / 脱颖而出. Those are product-launch words in a
+ *   teaching text.
+ * - 空转套话 and 元话语 are rarer but unambiguous when they appear.
+ *
+ * A hit is a candidate for *reading*, not a defect. The skill carries the
+ * rewrite guidance; the judgment stays with the author.
+ *
+ * @module dsh-plugin-ascend310b-writing/style
+ */
+
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+/**
+ * The three groups of phrasing worth reading again.
+ *
+ * `note` is what the rewrite should do instead — it is guidance, not a rule.
+ */
+export const LEXICON = {
+	营销腔: {
+		note: '换成可验证的事实：数字、接口名、行为对比。形容词堆砌删掉不影响信息量。',
+		phrases: [
+			'极致', '出色', '卓越', '非凡', '完美', '无缝', '一站式', '全方位',
+			'赋能', '助力', '打造', '引领', '重塑', '颠覆', '革命性', '里程碑',
+			'杀手锏', '出众', '脱颖而出', '遥遥领先', '如虎添翼', '不二之选', '护城河',
+			'全能型', '极佳', '强大', '卓越性能', '实力显著'
+		]
+	},
+	空转套话: {
+		note: '整句删掉通常不丢信息；若确实要提醒，就把提醒本身写具体（"注意：此处需先 source set_env.sh"）。',
+		phrases: [
+			'综上所述', '总而言之', '简而言之', '众所周知', '不难发现', '由此可见',
+			'值得注意的是', '值得一提的是', '需要指出的是', '毋庸置疑', '显而易见'
+		]
+	},
+	元话语: {
+		note: '直接进入内容；读者不需要被告知"接下来要讲什么"。',
+		phrases: ['本文将', '本节将', '下面让我们', '让我们一起来', '跟随笔者', '读者可以', '接下来我们将']
+	},
+	对话残留: {
+		note: '这是从对话里带进正文的称呼或收尾语，教材里应删掉或改成直接陈述。',
+		phrases: ['正如您所指出的', '正如您所说', '您提到', '您所问', '您的问题', '希望对您有帮助', '希望这个回答', '如有需要', '以上回答', '如果您还有']
+	}
+};
+
+/** 对举句式：中文 AI 文本的高频节奏，两处以上连用才提示。 */
+const PAIRED = [
+	{ name: '不仅…而且', pattern: /不仅[^。；\n]{0,40}(?:而且|更|还)/u },
+	{ name: '既…又', pattern: /既[^。；\n]{0,30}又[^。；\n]{0,20}/u },
+	{ name: '不是…而是', pattern: /不是[^。；\n]{0,30}而是/u }
+];
+
+/**
+ * Count Chinese characters the same way the audit does.
+ *
+ * @param {string} text - the source.
+ * @returns {number} The character count.
+ */
+function countCjk(text) {
+	return (text.match(/[\u4e00-\u9fff]/gu) ?? []).length;
+}
+
+/**
+ * Split prose into paragraphs, ignoring frontmatter, headings and code fences.
+ *
+ * The statistics below describe running text; counting a code block as a
+ * paragraph would make every chapter look uniform.
+ *
+ * @param {string} text - the source.
+ * @returns {string[]} Paragraph texts.
+ */
+export function proseParagraphs(text) {
+	const paragraphs = [];
+	let inFence = false;
+	let buffer = [];
+	const flush = () => {
+		const joined = buffer.join('').trim();
+		if (joined !== '') paragraphs.push(joined);
+		buffer = [];
+	};
+	for (const line of text.split(/\r?\n/u)) {
+		if (/^\s*```/u.test(line)) {
+			inFence = !inFence;
+			flush();
+			continue;
+		}
+		if (inFence) continue;
+		if (/^\s*(?:#{1,6}\s|\||---|>\s*$|<!--)/u.test(line) || line.trim() === '') {
+			flush();
+			continue;
+		}
+		// A list item starts a new paragraph for length purposes.
+		if (/^\s*(?:[-*+]|\d+[.)])\s+/u.test(line)) flush();
+		buffer.push(line.trim());
+	}
+	flush();
+	return paragraphs;
+}
+
+/**
+ * Summarise a list of numbers.
+ *
+ * @param {number[]} values - the samples.
+ * @returns {{ mean: number, stdev: number, min: number, max: number }} The summary.
+ */
+function stats(values) {
+	if (values.length === 0) return { mean: 0, stdev: 0, min: 0, max: 0 };
+	const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+	const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
+	return {
+		mean: Math.round(mean * 10) / 10,
+		stdev: Math.round(Math.sqrt(variance) * 10) / 10,
+		min: Math.min(...values),
+		max: Math.max(...values)
+	};
+}
+
+/**
+ * Analyse one manuscript.
+ *
+ * @param {object} options - inputs.
+ * @param {string} options.file - the repository-relative path.
+ * @param {string} options.text - the source.
+ * @returns {object} Per-file analysis: hits, density and shape statistics.
+ */
+export function analyzeText({ file, text }) {
+	const lines = text.split(/\r?\n/u);
+	const hits = [];
+	for (const [group, entry] of Object.entries(LEXICON)) {
+		for (const phrase of entry.phrases) {
+			lines.forEach((line, index) => {
+				// One report per line per phrase: a paragraph that repeats a word
+				// five times is one thing for the author to look at, not five.
+				const occurrences = line.split(phrase).length - 1;
+				if (occurrences === 0) return;
+				hits.push({
+					file,
+					line: index + 1,
+					phrase,
+					group,
+					note: entry.note,
+					count: occurrences,
+					snippet: line.trim().slice(0, 120)
+				});
+			});
+		}
+	}
+	const paired = [];
+	for (const rule of PAIRED) {
+		let ranges = 0;
+		for (const line of lines) if (rule.pattern.test(line)) ranges += 1;
+		if (ranges > 0) paired.push({ name: rule.name, count: ranges });
+	}
+
+	const paragraphs = proseParagraphs(text);
+	const paragraphLengths = paragraphs.map((paragraph) => paragraph.length);
+	const sentences = paragraphs.flatMap((paragraph) => paragraph.split(/[。！？!?]/u).filter((part) => part.trim() !== ''));
+	const sentenceLengths = sentences.map((sentence) => sentence.length);
+	const cjk = countCjk(text);
+	const density = cjk === 0 ? 0 : Math.round((hits.length * 1000 * 100) / cjk) / 100;
+
+	return {
+		file,
+		cjk,
+		hits,
+		paired,
+		density,
+		paragraphs: { count: paragraphs.length, ...stats(paragraphLengths) },
+		sentences: { count: sentences.length, ...stats(sentenceLengths) }
+	};
+}
+
+/**
+ * Analyse every manuscript in the configured parts.
+ *
+ * Decks are included: they are the most marketing-prone surface of the book
+ * (they are, after all, promotional summaries), and they are short.
+ *
+ * @param {object} options - inputs.
+ * @param {string} options.root - the repository root.
+ * @param {object} options.settings - the resolved layout.
+ * @param {string} [options.scope] - a part key, or `all`.
+ * @param {string} [options.file] - restrict to one repository-relative file.
+ * @returns {{ files: Array<object>, totals: object }} The analysis.
+ */
+export function analyzeStyle({ root, settings, scope = 'all', file }) {
+	const files = [];
+	for (const part of settings.parts) {
+		if (part.files !== undefined) continue;
+		if (scope !== 'all' && scope !== part.key) continue;
+		const directory = join(root, part.dir);
+		if (!existsSync(directory)) continue;
+		for (const entry of readdirDir(directory)) {
+			if (!entry.endsWith('.md')) continue;
+			const rel = `${part.dir}/${entry}`;
+			if (file !== undefined && rel !== file) continue;
+			let text;
+			try {
+				text = readFileSync(join(root, rel), 'utf8');
+			} catch {
+				continue;
+			}
+			files.push(analyzeText({ file: rel, text }));
+		}
+	}
+	const totals = {
+		files: files.length,
+		cjk: files.reduce((sum, entry) => sum + entry.cjk, 0),
+		hits: files.reduce((sum, entry) => sum + entry.hits.length, 0),
+		byGroup: Object.fromEntries(
+			Object.keys(LEXICON).map((group) => [
+				group,
+				files.reduce((sum, entry) => sum + entry.hits.filter((hit) => hit.group === group).length, 0)
+			])
+		)
+	};
+	totals.density = totals.cjk === 0 ? 0 : Math.round((totals.hits * 1000 * 100) / totals.cjk) / 100;
+	return { files, totals };
+}
+
+/**
+ * Render the style report.
+ *
+ * @param {object} options - inputs.
+ * @param {{ files: Array<object>, totals: object }} options.analysis - the analysis.
+ * @param {number} [options.maxHits] - how many individual sentences to show.
+ * @returns {string} The report.
+ */
+export function formatStyle({ analysis, maxHits = 30 }) {
+	const { totals, files } = analysis;
+	const lines = [
+		'文风体检 · 只提示，不判定对错',
+		'',
+		`  ${totals.files} 个文件、${totals.cjk} 字；命中 ${totals.hits} 处，` +
+			`密度 ${totals.density} 次/千字`,
+		`  分项：${Object.entries(totals.byGroup).map(([group, count]) => `${group} ${count}`).join(' · ')}`,
+		''
+	];
+	const ranked = files
+		.filter((entry) => entry.hits.length > 0)
+		.sort((left, right) => right.density - left.density);
+	lines.push('密度最高的文件');
+	for (const entry of ranked.slice(0, 8)) {
+		lines.push(`  ${entry.file.padEnd(34)} ${String(entry.hits.length).padStart(3)} 处  ${entry.density} 次/千字`);
+	}
+	if (ranked.length === 0) lines.push('  （没有命中：这份稿子没有明显的套话腔）');
+
+	const shown = ranked.flatMap((entry) => entry.hits).slice(0, maxHits);
+	if (shown.length > 0) {
+		lines.push('', '建议优先读一遍的句子（按分组给出改写方向）');
+		for (const group of Object.keys(LEXICON)) {
+			const groupHits = shown.filter((hit) => hit.group === group);
+			if (groupHits.length === 0) continue;
+			lines.push('', `【${group}】${LEXICON[group].note}`);
+			for (const hit of groupHits) {
+				lines.push(`  ${hit.file}:${hit.line}  「${hit.phrase}」${hit.count > 1 ? ` ×${hit.count}` : ''}`);
+				lines.push(`    ${hit.snippet}`);
+			}
+		}
+	}
+
+	const shapes = files.filter((entry) => entry.paragraphs.count >= 8);
+	if (shapes.length > 0) {
+		lines.push('', '文字形状（仅供参考：段落长度过于均匀是机械感的一个来源）');
+		for (const entry of shapes.slice(0, 6)) {
+			lines.push(
+				`  ${entry.file.padEnd(34)} 段 ${entry.paragraphs.count} 个，长度 ${entry.paragraphs.mean}±${entry.paragraphs.stdev}` +
+					`（${entry.paragraphs.min}–${entry.paragraphs.max}）；句 ${entry.sentences.count} 个，长度 ${entry.sentences.mean}±${entry.sentences.stdev}`
+			);
+		}
+	}
+	const pairedTotal = files.reduce((sum, entry) => sum + entry.paired.reduce((inner, rule) => inner + rule.count, 0), 0);
+	if (pairedTotal > 0) {
+		const detail = files
+			.filter((entry) => entry.paired.length > 0)
+			.slice(0, 5)
+			.map((entry) => `${entry.file}（${entry.paired.map((rule) => `${rule.name} ${rule.count}`).join('、')}）`)
+			.join('；');
+		lines.push('', `对举句式 ${pairedTotal} 处：${detail}`);
+	}
+
+	lines.push(
+		'',
+		'这些都是"值得读一遍"的候选，不是错误：同一个词在这个句子里可能恰好准确。',
+		'改写方向见技能文档的「去 AI 味」一节；改完请复跑 ascend310b_writing_audit 确认没破坏结构。'
+	);
+	return lines.join('\n');
+}
+
+/** List a directory's entry names, or an empty array. */
+function readdirDir(directory) {
+	try {
+		return readdirSync(directory);
+	} catch {
+		return [];
+	}
+}
