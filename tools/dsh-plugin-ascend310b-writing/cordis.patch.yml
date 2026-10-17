@@ -1,0 +1,7 @@
+# dsh-plugin-ascend310b-writing bundle declaration: insert this plugin's Host
+# row into the composite. The Host half registers the ascend310b_writing_audit and
+# ascend310b_writing_progress tools plus the panel's report route; the browser half
+# registers the 写作 sidebar entry and the panel it opens.
+- insert:
+    - id: dsh-plugin-ascend310b-writing
+      name: dsh-plugin-ascend310b-writing

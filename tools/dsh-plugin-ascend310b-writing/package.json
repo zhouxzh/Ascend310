@@ -1,0 +1,38 @@
+{
+  "name": "dsh-plugin-ascend310b-writing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "教程写作守门员：Ascend310 教材仓库的 Markdown 命名规范、锚点、链接、标点审计与写作进度统计",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./audit": {
+      "default": "./lib/audit-core.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "skills",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "smoke": "node test/smoke.mjs"
+  },
+  "license": "MIT"
+}

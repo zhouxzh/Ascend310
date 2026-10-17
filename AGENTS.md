@@ -20,6 +20,7 @@ documentation, generated material, or board assets.
 | `src/.vuepress/` | Site navigation and presentation configuration | TypeScript/config |
 | `latex/` | Generated LaTeX/PDF outputs | Generated; do not hand-edit |
 | `notebook/` | Auxiliary learning materials | Source notebooks/scripts |
+| `tools/dsh-plugin-ascend310b-writing/` | DSH plugin that audits this manuscript (naming, anchors, links, LaTeX artifacts, push gate) | Node ESM source; machine-local helpers stay outside this repository |
 
 For the palmprint workbench, runtime modules use the `palmprint_` prefix:
 `palmprint_service.py`, `palmprint_benchmark.py`, and

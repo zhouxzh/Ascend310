@@ -1,0 +1,5 @@
+# The repository root ignores any directory named lib/ (Python build artifacts).
+# This package keeps its source in lib/, so re-include that directory here.
+# Only the directory itself is negated: negating the files inside it does not help,
+# because a file cannot be re-included while its parent directory stays excluded.
+!lib/
