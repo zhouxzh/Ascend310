@@ -74,7 +74,6 @@ footer: "案例 2：目标跟踪检测"
 
 <div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img2/%E4%B8%BB%E7%BA%BF%E5%9B%BE.png">src/experiment/img2/主线图.png</a>；正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case2.md">src/experiment/case2.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case2">samples/case2/</a></div>
 
-
 ---
 
 <!-- _class: visual -->
@@ -84,6 +83,7 @@ footer: "案例 2：目标跟踪检测"
 ![目标跟踪流程](../experiment/img2/流程图.png)
 
 <div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img2/流程图.png">src/experiment/img2/流程图.png</a></div>
+
 ---
 
 ## 硬件与运行条件
@@ -448,7 +448,7 @@ matched_indices = self._linear_assignment(assignment_scores)
 
 `requirements.txt` 内容：
 
-```
+```text
 numpy==1.26.4
 opencv-python==4.11.0.86
 onnxruntime==1.15.1

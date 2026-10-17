@@ -19,6 +19,7 @@ import { DEFAULT_SETTINGS, resolveSettings } from './settings.js';
 import { collectVuepressFindings } from './vuepress.js';
 import { collectCodeDrift, collectCodeFindings, collectDriftPairs } from './code.js';
 import { collectDeckFindings } from './deck.js';
+import { collectCoursewareFindings } from './courseware.js';
 
 /** One row of a two-cell Markdown table whose first cell is a backticked path. */
 const TABLE_ROW = /^\|\s*`([^`]+)`\s*\|\s*([^|]*?)\s*\|\s*$/u;
@@ -662,12 +663,13 @@ export function evaluatePushGate({ root, rev = 'HEAD', settings }) {
 	const vuepress = collectVuepressFindings({ root, settings: s, frozenRows: frozen.tableRows });
 	const code = collectCodeFindings({ root, settings: s });
 	const deck = collectDeckFindings({ root, settings: s });
+	const courseware = collectCoursewareFindings({ root, settings: s });
 	// The git-history walk costs seconds, so it belongs here and not in the audit.
 	const drift = collectCodeDrift({ root, pairs: collectDriftPairs({ root, settings: s }) });
 	const audit = auditRepo({
 		root,
 		maxFindings: 400,
-		extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...drift],
+		extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings, ...drift],
 		settings: s
 	});
 	const commit = collectCommitFindings({ root, rev });

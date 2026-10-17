@@ -169,7 +169,7 @@ http://127.0.0.1:3080
 - 等终端显示 `URL: http://127.0.0.1:3080` 后再刷新页面
 - 页面打不开时，先检查 `dsh web` 启动命令是否还在运行
 - 端口被占用是常见原因，先报告现象再排查
-- DSH 官方仓库：https://github.com/deepseek-ai/deepseek-harness
+- DSH 官方仓库：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)
 
 ---
 
@@ -177,7 +177,7 @@ http://127.0.0.1:3080
 
 DSH 需要两样配置才能开始工作：模型 API Key 和工作区。
 
-1. 到 DeepSeek 开放平台申请 API Key：https://platform.deepseek.com/
+1. 到 [DeepSeek 开放平台](https://platform.deepseek.com/) 申请 API Key
 2. 打开 DSH 的 `Settings → Models`，粘贴 API Key 并保存
 3. 在主界面点击 `Choose workspace`，选择本仓库根目录
 

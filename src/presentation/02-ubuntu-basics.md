@@ -11,6 +11,8 @@ footer: "附录 2：基于昇腾 310B 的 Ubuntu 教程"
 
 # 附录 2：基于昇腾 310B 的 Ubuntu 教程
 
+对应教材：`src/appendix/appendix2.md`
+
 昇腾 310B 教材配套演示
 
 3 课时 × 45 分钟

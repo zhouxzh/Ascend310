@@ -65,7 +65,6 @@ footer: "案例 1：智能考勤机"
 
 <div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img1/case1_flow.png">src/experiment/img1/case1_flow.png</a>；正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case1.md">src/experiment/case1.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case1">samples/case1/</a></div>
 
-
 ---
 
 <!-- _class: visual -->
@@ -75,6 +74,7 @@ footer: "案例 1：智能考勤机"
 ![案例1简化流程](../experiment/img1/case1_flow_simple.png)
 
 <div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img1/case1_flow_simple.png">src/experiment/img1/case1_flow_simple.png</a></div>
+
 ---
 
 ## 系统四层架构

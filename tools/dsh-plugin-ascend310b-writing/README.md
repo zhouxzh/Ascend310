@@ -187,6 +187,26 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 
 **永不阻塞**：不进推送门槛、不产生 error。同一个词在某个句子里可能恰好准确，判断权在作者。
 改写方法见技能文档的「去 AI 味」一节。
+## 课件规范检查
+
+`src/presentation/` 的 Marp 课件有一套独立规则，回答"这份课件能不能拿去上课"：
+
+| 规则 | 级别 | 判据 | 来源 |
+| --- | --- | --- | --- |
+| `deck-slide-overflow` | error | 单页估算高度 > 640px（主题 720px + `overflow:hidden` 会裁切） | 本仓库实测 |
+| `deck-code-too-long` | warning | 单页代码 > 22 行 | 同上 |
+| `deck-table-too-wide` | warning | 表格 > 6 列或 > 10 行 | 同上 |
+| `deck-font-too-small` | error | 代码/表格字号 < 18px | 投影可读性 |
+| `deck-source-missing` | error | 课件没有指向 `src/` 或 `samples/` 的来源 | 可追溯 |
+| `deck-metadata-missing` | warning | frontmatter 缺 `marp/theme/paginate/size` | Marp 元数据 |
+| `deck-image-no-alt` | error | 图片无 alt | markdownlint MD045 |
+| `deck-code-no-language` | warning | 代码块无语言标记 | markdownlint MD040 |
+| `deck-bare-url` | warning | 正文裸 URL（行内代码除外） | markdownlint MD034 |
+| `deck-notes-sparse` | info | 讲师备注覆盖 < 20% | Marp 演讲者视图 |
+| `deck-code-untraceable` | info | 少于一半代码块标了来源文件 | 可追溯 |
+
+容量超出时用 `node scripts/split-decks.mjs --write <课件>` 分页，**不要缩小字号**。
+规范全文见技能文档的「课件制作规范（Marp）」一节。
 ## 审计规则
 
 正文规则（`ascend310b_writing_audit`，作用于工作区）：

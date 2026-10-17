@@ -108,7 +108,7 @@ table {
   width: 100%;
   border-collapse: collapse;
   background: var(--panel);
-  font-size: 17px;
+  font-size: 18px;
   line-height: 1.15;
 }
 
@@ -146,7 +146,7 @@ pre {
   background: var(--code);
   color: #e7f1ef;
   font-family: "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
-  font-size: 15px;
+  font-size: 18px;
   line-height: 1.18;
   white-space: pre-wrap;
 }
@@ -260,22 +260,22 @@ section.visual img { max-height: 500px; }
 section.compact h1 { font-size: 36px; }
 section.compact h2 { font-size: 28px; }
 section.compact h3 { font-size: 22px; }
-section.compact table { font-size: 14px; }
+section.compact table { font-size: 18px; }
 section.compact th,
 section.compact td { padding: 5px 7px; }
-section.compact pre { max-height: 460px; font-size: 13px; line-height: 1.12; }
+section.compact pre { max-height: 460px; font-size: 18px; line-height: 1.2; }
 section.compact img { max-height: 420px; }
-section.compact .compact-note { font-size: 16px; line-height: 1.1; }
+section.compact .compact-note { font-size: 18px; line-height: 1.2; }
 
 section.tight {
-  font-size: 16px;
+  font-size: 22px;
   line-height: 1.1;
 }
 
 section.tight h1 { font-size: 34px; }
 section.tight h2 { font-size: 26px; }
-section.tight table { font-size: 13px; }
-section.tight pre { font-size: 12px; }
+section.tight table { font-size: 18px; }
+section.tight pre { font-size: 18px; }
 
 /* Keep content clear of the fixed source/footer strip. */
 section > :not(header):not(footer):not(.source) { max-width: 100%; }

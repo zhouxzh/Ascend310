@@ -1,0 +1,244 @@
+/**
+ * Courseware standards: rules a teaching deck has to meet before it can be
+ * presented, independent of whether it fits on a slide.
+ *
+ * `deck.js` answers "does this page fit". This module answers "is this page
+ * traceable, accessible and self-describing", and its rules are taken from two
+ * open-source projects rather than invented here:
+ *
+ * - **markdownlint** (`MD040`, `MD045`, `MD034`): a fenced block declares its
+ *   language, an image carries alt text, and a URL is a link rather than bare
+ *   text. Its `accessibility` tag groups `MD045` and `MD059`.
+ * - **Marp CLI / Marp Core**: decks support presenter notes (`--notes`,
+ *   `--pdf-notes`, presenter view), deck metadata through global directives,
+ *   and a 16:9 slide is 1280x720. Marp's own docs warn that auto-scaling is
+ *   horizontal only — "the scaled element still may stick out from bottom of
+ *   slide" — which is why vertical fit is measured separately in `deck.js`.
+ *
+ * On top of those, this repository requires traceability: a deck that teaches a
+ * chapter must say which chapter, and a code slide must say which file the code
+ * came from, otherwise the courseware drifts away from the manuscript and the
+ * samples.
+ *
+ * @module dsh-plugin-ascend310b-writing/courseware
+ */
+
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+/** Smallest content font that stays legible from the back of a classroom. */
+export const MIN_CONTENT_FONT_PX = 18;
+
+/** A deck should teach at least this share of its slides with a note. */
+const MIN_NOTE_SHARE = 0.2;
+
+/**
+ * Check one deck's courseware standards.
+ *
+ * @param {object} options - inputs.
+ * @param {string} options.file - repository-relative deck path.
+ * @param {string} options.text - deck source.
+ * @returns {Array<object>} Findings.
+ */
+export function auditCoursewareText({ file, text }) {
+	const findings = [];
+	const lines = text.split(/\r?\n/u);
+	const body = stripFrontmatter(text);
+	const frontmatter = text.slice(0, text.length - body.length);
+
+	// --- Marp metadata ------------------------------------------------------
+	for (const required of ['marp', 'theme', 'paginate', 'size']) {
+		if (!new RegExp(`^${required}:`, 'mu').test(frontmatter)) {
+			findings.push({
+				rule: 'deck-metadata-missing',
+				severity: 'warning',
+				file,
+				line: 1,
+				message: `frontmatter 缺少 ${required}：Marp 靠它确定渲染方式、主题、页码与画布尺寸`
+			});
+		}
+	}
+
+	// --- traceability -------------------------------------------------------
+	const sources = [...body.matchAll(/(?:src\/(?:book|experiment|appendix)\/[\w-]+\.md|samples\/[\w./-]+)/gu)].map((match) => match[0]);
+	if (sources.length === 0) {
+		findings.push({
+			rule: 'deck-source-missing',
+			severity: 'error',
+			file,
+			line: 1,
+			message: '课件没有标明对应的教材正文或样例路径；课件必须可追溯到 src/ 或 samples/ 的源'
+		});
+	}
+
+	// --- per-slide accessibility -------------------------------------------
+	let codeBlocks = 0;
+	let codeWithSource = 0;
+	let inFence = false;
+	let fenceStart = 0;
+	let lastFenceEnd = 0;
+	for (const [index, line] of lines.entries()) {
+		const lineNumber = index + 1;
+		if (/^\s*(?:```|~~~)/u.test(line)) {
+			if (!inFence) {
+				inFence = true;
+				fenceStart = lineNumber;
+				const info = line.trim().replace(/^(?:```|~~~)\s*/u, '');
+				if (info === '') {
+					findings.push({
+						rule: 'deck-code-no-language',
+						severity: 'warning',
+						file,
+						line: lineNumber,
+						message: '代码块没有语言标记（markdownlint MD040）；Marp 靠它选择高亮规则'
+					});
+				}
+				codeBlocks += 1;
+			} else {
+				inFence = false;
+				lastFenceEnd = lineNumber;
+				// The three lines around the block are where a source path belongs.
+				const window = lines.slice(Math.max(0, fenceStart - 4), Math.min(lines.length, lastFenceEnd + 3)).join('\n');
+				if (/samples\/|src\/[\w-]+\/|\.`|\.[a-z]{2,4}`/u.test(window)) codeWithSource += 1;
+			}
+			continue;
+		}
+		if (inFence) continue;
+
+		if (/!\[\]\(/u.test(line)) {
+			findings.push({
+				rule: 'deck-image-no-alt',
+				severity: 'error',
+				file,
+				line: lineNumber,
+				message: '图片缺少替代文字（markdownlint MD045）；放映页和 PDF 都需要 alt 才能被朗读与被搜索'
+			});
+		}
+		// A URL inside inline code is a value to type, not a link to click
+		// (`http://127.0.0.1:3080`), so check the prose with code spans removed.
+		const proseOnly = line.replace(/`[^`]*`/gu, '');
+		if (/(?<![\]("'<])https?:\/\/\S+/u.test(proseOnly) && !/\]\(/u.test(proseOnly)) {
+			findings.push({
+				rule: 'deck-bare-url',
+				severity: 'warning',
+				file,
+				line: lineNumber,
+				message: '裸 URL（markdownlint MD034）；改成有文字说明的链接，投影时才能读'
+			});
+		}
+	}
+
+	// --- presenter notes ----------------------------------------------------
+	// Marp turns HTML comments into presenter notes, which is how a deck stays
+	// teachable without putting the script on the slide.
+	const comments = [...body.matchAll(/<!--([\s\S]*?)-->/gu)]
+		.map((match) => match[1])
+		.filter((comment) => !/^\s*_class:/u.test(comment) && comment.trim() !== '');
+	const slideCount = (body.match(/^---\s*$/gmu) ?? []).length + 1;
+	if (comments.length / slideCount < MIN_NOTE_SHARE) {
+		findings.push({
+			rule: 'deck-notes-sparse',
+			severity: 'info',
+			file,
+			line: 1,
+			message: `讲师备注覆盖 ${comments.length}/${slideCount} 页（Marp 支持演讲者视图）；低于 20% 时讲课时没有提词`
+		});
+	}
+
+	if (codeBlocks > 0 && codeWithSource / codeBlocks < 0.5) {
+		findings.push({
+			rule: 'deck-code-untraceable',
+			severity: 'info',
+			file,
+			line: 1,
+			message: `只有 ${codeWithSource}/${codeBlocks} 个代码块标了来源文件；课件里的代码应能对应回 samples/`
+		});
+	}
+	return findings;
+}
+
+/**
+ * Check the theme's font sizes for classroom legibility.
+ *
+ * Declarations below `MIN_CONTENT_FONT_PX` are only reported for content
+ * selectors: a 14px footer is fine, 13px code is not.
+ *
+ * @param {object} options - inputs.
+ * @param {string} options.root - repository root.
+ * @param {string} options.themePath - repository-relative theme CSS.
+ * @returns {Array<object>} Findings.
+ */
+export function auditTheme({ root, themePath }) {
+	const absolute = join(root, themePath);
+	if (!existsSync(absolute)) return [];
+	let css;
+	try {
+		css = readFileSync(absolute, 'utf8');
+	} catch {
+		return [];
+	}
+	const findings = [];
+	const contentSelector = /(?:^|[}])\s*([^{}]*\b(?:pre|table|section\.tight|section\.compact)\b[^{}]*)[{]([^}]*)[}]/gu;
+	for (const match of css.matchAll(contentSelector)) {
+		const selector = match[1].trim().replace(/\s+/gu, ' ');
+		const size = /font-size:\s*(\d+)px/u.exec(match[2]);
+		if (size === null) continue;
+		const value = Number(size[1]);
+		if (value >= MIN_CONTENT_FONT_PX) continue;
+		findings.push({
+			rule: 'deck-font-too-small',
+			severity: 'error',
+			file: themePath,
+			line: 1,
+			message: `${selector} 使用 ${value}px，低于教室投影可读下限 ${MIN_CONTENT_FONT_PX}px；应改字号并让内容分页，而不是缩小字体`
+		});
+	}
+	return findings;
+}
+
+/**
+ * Run every courseware rule over the presentation part.
+ *
+ * @param {object} options - inputs.
+ * @param {string} options.root - repository root.
+ * @param {object} options.settings - resolved layout.
+ * @returns {{ findings: Array<object>, decks: number }} Findings.
+ */
+export function collectCoursewareFindings({ root, settings }) {
+	const part = settings.parts.find((entry) => entry.key === 'presentation');
+	if (part === undefined) return { findings: [], decks: 0 };
+	const directory = join(root, part.dir);
+	if (!existsSync(directory)) return { findings: [], decks: 0 };
+
+	const findings = auditTheme({ root, themePath: `${part.dir}/theme.css` });
+	let decks = 0;
+	for (const name of readdirSafe(directory)) {
+		if (!/^\d{2}-.*\.md$/iu.test(name)) continue;
+		let text;
+		try {
+			text = readFileSync(join(directory, name), 'utf8');
+		} catch {
+			continue;
+		}
+		decks += 1;
+		findings.push(...auditCoursewareText({ file: `${part.dir}/${name}`, text }));
+	}
+	findings.sort((left, right) => left.file.localeCompare(right.file) || left.line - right.line);
+	return { findings, decks };
+}
+
+/** Strip YAML frontmatter from a deck, returning the slide body. */
+function stripFrontmatter(text) {
+	if (!text.startsWith('---')) return text;
+	const match = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/u.exec(text);
+	return match === null ? text : text.slice(match[0].length);
+}
+
+/** Read a directory's entries, or an empty list. */
+function readdirSafe(directory) {
+	try {
+		return readdirSync(directory);
+	} catch {
+		return [];
+	}
+}

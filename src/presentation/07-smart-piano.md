@@ -94,7 +94,6 @@ $$
 
 <div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img3/case3-piano-ddsp-architecture.png">src/experiment/img3/case3-piano-ddsp-architecture.png</a>；正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case3.md">src/experiment/case3.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case3/piano_ddsp_runtime">samples/case3/piano_ddsp_runtime/</a></div>
 
-
 ---
 
 <!-- _class: visual -->
@@ -104,6 +103,7 @@ $$
 ![DDSP 合成流程](../experiment/img3/case3-ddsp-synthesis-flow.png)
 
 <div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img3/case3-ddsp-synthesis-flow.png">src/experiment/img3/case3-ddsp-synthesis-flow.png</a></div>
+
 ---
 
 <!-- _class: compact -->

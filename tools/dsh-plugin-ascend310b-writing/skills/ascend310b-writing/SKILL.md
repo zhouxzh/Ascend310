@@ -46,6 +46,54 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
    无法机械验证的一项：站点预览是否已由用户确认。
 7. 要汇报篇幅或剩余工作量时跑 `ascend310b_writing_progress`。
 
+## 课件制作规范（Marp）
+
+演示文稿不是教材的摘要，而是**上课直接照着讲的材料**。规范如下，`ascend310b_writing_audit` 会逐条检查。
+
+### 结构与元数据
+
+frontmatter 必填四项，缺一不可：`marp: true`、`theme: ascend310`、`paginate: true`、`size: 16:9`（16:9 = 1280×720）。
+`footer` 写 AGENTS.md 的冻结名（如 `案例 1：智能考勤机`），`header` 统一为教材名。每个课时用二级标题分段。
+
+### 每页容量（超出必须分页，不许缩字号）
+
+| 元素 | 上限 |
+| --- | --- |
+| 正文汉字 | 320 字 |
+| 代码行 | 22 行（纯代码页） |
+| 表格 | 6 列 × 10 行 |
+| 列表 | 8 条 |
+
+主题把每页钉在 720px 且 `overflow: hidden`，**超出的内容会直接消失**，不会滚动。Marp 的自动缩放只解决横向，
+官方文档也明确写了纵向仍可能溢出，所以纵向必须用分页解决。分页脚本：`node scripts/split-decks.mjs --write <文件>`。
+
+### 投影可读性
+
+代码与表格字号**不得低于 18px**，正文 22px。低于这个值在教室后排看不见——宁可多分两页，也不要缩字号。
+
+### 可追溯
+
+- 课件必须写明对应教材：`src/book/…`、`src/experiment/…`、`src/appendix/…` 或 `samples/…`；
+- 代码页要标出代码来自哪个文件，否则课件会和代码脱节；
+- 图片必须有 alt 文字，并给出图源。
+
+### 无障碍与排版（合并自 markdownlint）
+
+| 规则 | 来源 | 要求 |
+| --- | --- | --- |
+| `MD045` | markdownlint | 图片必须有 alt |
+| `MD040` | markdownlint | 代码块必须有语言标记 |
+| `MD034` | markdownlint | 禁止裸 URL（正文里写 `[说明](url)`；行内代码里的地址不算） |
+
+### 讲师备注
+
+Marp 支持演讲者备注（HTML 注释），放映时按 `p` 打开演讲者视图；`marp --notes` 导出文本，`--pdf-notes` 写进 PDF。
+备注放"这页要强调什么、常见误区、提问点"，不要把讲稿搬到幻灯片上。
+
+> 规范来源：[Marp CLI](https://github.com/marp-team/marp-cli)（备注、`--notes`、元数据、自动缩放限制）、
+> [Marp Core](https://github.com/marp-team/marp-core)（16:9 尺寸、`size` 指令、auto-scaling 仅横向）、
+> [markdownlint](https://github.com/DavidAnson/markdownlint)（MD034 / MD040 / MD045，accessibility 标签）。
+
 ## 去 AI 味（用户要求润色时才做）
 
 这是这本书最常被抱怨的问题：**内容是对的，但读起来像产品宣传稿或大模型输出**。先跑

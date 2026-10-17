@@ -26,6 +26,7 @@ import { diagnose } from './doctor.js';
 import { collectVuepressFindings } from './vuepress.js';
 import { collectCodeFindings } from './code.js';
 import { collectDeckFindings } from './deck.js';
+import { collectCoursewareFindings } from './courseware.js';
 import { analyzeStyle, formatStyle } from './style.js';
 import { planBuild, resolveBuildEnvironment, runBuild } from './build.js';
 
@@ -264,6 +265,8 @@ function runAudit({ root, scope, maxFindings, rev, config }) {
 	const deck = collectDeckFindings({ root, settings });
 	extraFindings.push(...deck.findings);
 	notes.push(describeDeck(deck));
+	const courseware = collectCoursewareFindings({ root, settings });
+	extraFindings.push(...courseware.findings);
 	const report = auditRepo({ root, scope, maxFindings, extraFindings, settings });
 	return {
 		text: [report.text, '', ...notes].join('\n'),
@@ -840,11 +843,12 @@ export function apply(ctx, config) {
 			const vuepress = collectVuepressFindings({ root, settings, frozenRows: frozen.tableRows });
 			const code = collectCodeFindings({ root, settings });
 			const deck = collectDeckFindings({ root, settings });
+			const courseware = collectCoursewareFindings({ root, settings });
 			const audit = auditRepo({
 				root,
 				scope: 'all',
 				maxFindings: 400,
-				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings],
+				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings],
 				settings
 			});
 			const progress = progressReport({ root, scope: 'all', settings });
