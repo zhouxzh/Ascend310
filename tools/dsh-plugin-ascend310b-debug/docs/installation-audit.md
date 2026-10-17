@@ -32,6 +32,7 @@
 | 升级时用 `Copy-Item 源目录 目标目录` 会把整个目录再嵌一层 | 第二次安装后 DSH 找不到包入口 | 先创建目标目录，再复制源目录内容（`Join-Path $plugin '*'`） |
 | 包清单未声明 Node 版本，自检未覆盖清单完整性 | 旧 Node 或缺少入口文件时到挂载阶段才报错 | 增加 `engines.node >= 18`，可移植性测试检查入口、导出、许可证与 `files` 目标是否存在 |
 | `ascend_debug_plan` 和 `ascend_sample_index` 的返回对象含 schema 不接受的值 | 真实 DSH 运行时在工具返回后拒绝结果；空 `entry`/`test`、布尔 `applicable` 和额外样例字段都会触发校验失败 | 在输出边界规范化样例对象，把 `applicable` 映射为字符串，并补 smoke 断言防止回归 |
+| 第4章的 PyACL 样例同时提到 ATC/OM，关键词投票把它归到 ATC | `archetype=pyacl-inference` 查询返回 0，调试入口被隐藏 | 对教材第4章固定主类型为 `pyacl-inference`，重新生成索引并加查询回归断言 |
 
 ## 已验证的门禁
 

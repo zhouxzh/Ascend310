@@ -158,6 +158,11 @@ try {
 					`indexed sample field ${key} must be omitted when it is not a string`);
 			}
 		}
+		const pyaclResult = await indexTool.execute({ repoRoot, archetype: 'pyacl-inference', limit: 5 }, {});
+		check(
+			pyaclResult.matched.some((sample) => sample.id === 'chapter4'),
+			'the PyACL filter must expose the canonical chapter-4 inference sample'
+		);
 	} else {
 		// With no configured repository root the tool must refuse clearly instead
 		// of silently indexing whatever directory the process happens to be in.

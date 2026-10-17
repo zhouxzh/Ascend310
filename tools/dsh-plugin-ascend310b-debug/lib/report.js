@@ -146,6 +146,16 @@ const ARCHETYPE_RULES = Object.freeze([
 	{ id: 'pyacl-inference', keywords: ['acl', 'pyacl', 'inference', '推理'], label: 'PyACL 推理' }
 ]);
 
+/**
+ * Canonical samples whose README necessarily covers several neighboring
+ * topics. The chapter-4 sample teaches PyACL inference and uses ATC/OM as
+ * prerequisites; without this override the keyword vote hides it from the
+ * PyACL filter.
+ */
+const SAMPLE_ARCHETYPE_OVERRIDES = Object.freeze({
+	chapter4: Object.freeze({ id: 'pyacl-inference', label: 'PyACL 推理' })
+});
+
 /** Capability markers, detected from README text. */
 const CAPABILITY_RULES = Object.freeze([
 	{ id: 'ascend', pattern: /ascend|npu|cann|acl|atc|om\b|昇腾/i },
@@ -259,7 +269,7 @@ export function indexSampleIndex({ root, caseIndex }) {
 		const combined = [name, title, keywords.join(' '), text].join('\n');
 		const entry = verifyCommand(firstCommand(text), text);
 		const test = verifyCommand(firstTestCommand(text), text);
-		const archetype = detectArchetype(combined);
+		const archetype = SAMPLE_ARCHETYPE_OVERRIDES[name] ?? detectArchetype(combined);
 		entries.push({
 			id: name,
 			title,

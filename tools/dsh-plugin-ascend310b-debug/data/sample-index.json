@@ -218,8 +218,8 @@
       "title": "第4章 代码样例",
       "readme": "samples/chapter4/README.md",
       "keywords": [],
-      "archetype": "atc-conversion",
-      "archetypeLabel": "ATC ONNX→OM 转换",
+      "archetype": "pyacl-inference",
+      "archetypeLabel": "PyACL 推理",
       "entry": "python -c \"import acl; print('PyACL OK')\"",
       "test": null,
       "capabilities": [
@@ -299,6 +299,7 @@
     "dvpp-video",
     "framework-migration",
     "npu-service",
+    "pyacl-inference",
     "quantization"
   ]
 }
