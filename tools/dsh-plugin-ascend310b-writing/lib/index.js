@@ -550,131 +550,156 @@ export function apply(ctx, config) {
 		})
 	);
 
-	// The build driver needs platform background jobs: a full book build runs
-	// for minutes, and the caller should keep its turn. A composition without a
-	// job controller simply does not get this tool.
-	ctx.inject(['jobs'], (jobScope) => {
-		jobScope.tools.register(
-			defineTool({
-				name: 'ascend310b_writing_build',
-				description:
-					'Build the book through the repository\'s own converters, then verify what was produced. ' +
-					'Without confirm: true it only runs a preflight and reports the exact command it would run — nothing ' +
-					'is executed and nothing is written. With confirm: true it starts a background job (read it with ' +
-					'job_output, stop it with job_kill) that runs convert-vuepress.sh for the LaTeX/PDF path and/or ' +
-					'pnpm run docs:build for the site, then immediately reads the fresh log for missing glyphs and checks ' +
-					'the generated anchors against the source. Use it instead of hand-assembling the shell invocation: it ' +
-					'discovers whether the shell is Git Bash or WSL, spells the checkout path for that shell, provides a ' +
-					'temporary python3 when the host has only a conda interpreter, and retries the known PDF file-lock ' +
-					'failure from the already-generated book.xdv.',
-				parameters: {
-					target: {
-						type: 'string',
-						enum: [...BUILD_TARGETS],
-						description: 'What to build. Defaults to "latex".'
-					},
-					confirm: {
-						type: 'boolean',
-						description:
-							'Must be true to actually build. Without it the call is a read-only preflight.'
-					},
-					root: ROOT_PARAMETER
+	// The build tool runs as a platform background job: a full book build takes
+	// minutes, and the caller should keep its turn.
+	//
+	// Registration copies the shipped shell tools exactly, because the obvious
+	// version does not work: `ctx.tools.register` must be called through the
+	// OUTER context. Registering through the injected scope's own `tools` throws
+	// inside the callback, which Cordis swallows — the tool then silently never
+	// appears. The synchronous `ctx.get("jobs")` check registers a variant
+	// without the service first, and the inject callback replaces it.
+	const buildTool = (jobs) =>
+		defineTool({
+			name: 'ascend310b_writing_build',
+			description:
+				'Build the book through the repository\'s own converters, then verify what was produced. ' +
+				'Without confirm: true it only runs a preflight and reports the exact command it would run — nothing ' +
+				'is executed and nothing is written. With confirm: true it starts a background job (read it with ' +
+				'job_output, stop it with job_kill) that runs convert-vuepress.sh for the LaTeX/PDF path and/or ' +
+				'pnpm run docs:build for the site, then immediately reads the fresh log for missing glyphs and checks ' +
+				'the generated anchors against the source. Use it instead of hand-assembling the shell invocation: it ' +
+				'discovers whether the shell is Git Bash or WSL, spells the checkout path for that shell, provides a ' +
+				'temporary python3 when the host has only a conda interpreter, and retries the known PDF file-lock ' +
+				'failure from the already-generated book.xdv.',
+			parameters: {
+				target: {
+					type: 'string',
+					enum: [...BUILD_TARGETS],
+					description: 'What to build. Defaults to "latex".'
 				},
-				output: {
-					schema: {
-						type: 'object',
-						additionalProperties: false,
-						properties: {
-							text: { type: 'string', required: true },
-							started: { type: 'boolean', required: true },
-							jobId: { type: 'string', required: true },
-							target: { type: 'string', required: true },
-							blockers: { type: 'array', required: true, items: { type: 'string' } }
-						}
-					},
-					render: (_args, value) => [{ type: 'text', text: value.text }]
+				confirm: {
+					type: 'boolean',
+					description: 'Must be true to actually build. Without it the call is a read-only preflight.'
 				},
-				execute(args) {
-					const root = resolveRoot(config, args.root);
-					const settings = settingsFor(config, root);
-					const environment = resolveBuildEnvironment({ overrides: config?.toolchain ?? {} });
-					const target = BUILD_TARGETS.includes(args.target) ? args.target : 'latex';
-					const plan = planBuild({
-						root,
-						target,
-						adapter: environment.adapter,
-						components: environment.components,
-						settings
-					});
-
-					if (args.confirm !== true) {
-						return Promise.resolve({
-							text: formatBuildPlan({ plan, root, target, environment }),
-							started: false,
-							jobId: '',
-							target,
-							blockers: plan.blockers
-						});
+				root: ROOT_PARAMETER
+			},
+			output: {
+				schema: {
+					type: 'object',
+					additionalProperties: false,
+					properties: {
+						text: { type: 'string', required: true },
+						started: { type: 'boolean', required: true },
+						jobId: { type: 'string', required: true },
+						target: { type: 'string', required: true },
+						blockers: { type: 'array', required: true, items: { type: 'string' } }
 					}
-					if (!plan.ok) {
-						throw new Error(`无法开始构建（预检未通过）：${plan.blockers.join('；')}`);
-					}
+				},
+				render: (_args, value) => [{ type: 'text', text: value.text }]
+			},
+			execute(args, exec) {
+				const root = resolveRoot(config, args.root);
+				const settings = settingsFor(config, root);
+				const environment = resolveBuildEnvironment({ overrides: config?.toolchain ?? {} });
+				const target = BUILD_TARGETS.includes(args.target) ? args.target : 'latex';
+				const plan = planBuild({
+					root,
+					target,
+					adapter: environment.adapter,
+					components: environment.components,
+					settings
+				});
 
-					let running = null;
-					const jobId = jobScope.jobs.start({
-						kind: 'ascend310b-build',
-						label: `${target} 构建`,
-						run(handle) {
-							const done = runBuild({
-								plan,
-								root,
-								adapter: environment.adapter,
-								settings,
-								onChunk: (text, channel) => handle.append(text, { channel }),
-								onSpawn: (child) => {
-									running = child;
-								}
-							})
-								.then((result) => ({
-									status: result.ok ? 'completed' : 'failed',
-									detail: `${result.detail}\n${result.summary.text}`
-								}))
-								.catch((error) => ({ status: 'failed', detail: String(error?.message ?? error) }));
-							return {
-								done,
-								cancel() {
-									try {
-										running?.kill();
-									} catch {
-										// The process may have exited between the read and the kill.
-									}
-								}
-							};
-						}
-					});
-
+				if (args.confirm !== true) {
 					return Promise.resolve({
-						text: [
-							`已启动后台构建任务：${jobId}（target=${target}）`,
-							'',
-							'它会在完成后自行结束；用 job_output 读输出，用 job_kill 停止。',
-							'构建结束后同一个任务里会跑渲染体检与产物锚点核对，结论随任务一起给你。',
-							'',
-							formatBuildPlan({ plan, root, target, environment })
-						].join('\n'),
-						started: true,
-						jobId: String(jobId),
+						text: formatBuildPlan({ plan, root, target, environment }),
+						started: false,
+						jobId: '',
 						target,
-						blockers: []
+						blockers: plan.blockers
 					});
-				},
-				presentCall: (args) => ({
-					card: 'generic',
-					title: '构建',
-					kind: 'other',
-					rawInput: args
-				})
+				}
+				if (jobs === undefined) {
+					throw new Error(
+						'这个组成没有后台任务服务（jobs），构建任务无法启动。' +
+							'它需要 dsh-jobs-local 与 dsh-tool-jobs；缺少时请改用 ./convert-vuepress.sh ' +
+							'+ ascend310b_writing_render（预检本身仍然可用，不带 confirm 即可）。'
+					);
+				}
+				if (!plan.ok) {
+					throw new Error(`无法开始构建（预检未通过）：${plan.blockers.join('；')}`);
+				}
+
+				let running = null;
+				const jobId = jobs.start({
+					kind: 'ascend310b-build',
+					label: `${target} 构建`,
+					...(exec?.agent === undefined ? {} : { owner: exec.agent.id }),
+					run(handle) {
+						const done = runBuild({
+							plan,
+							root,
+							adapter: environment.adapter,
+							settings,
+							onChunk: (text, channel) => handle.append(text, { channel }),
+							onSpawn: (child) => {
+								running = child;
+							}
+						})
+							.then((result) => ({
+								status: result.ok ? 'completed' : 'failed',
+								detail: `${result.detail}\n${result.summary.text}`
+							}))
+							.catch((error) => ({ status: 'failed', detail: String(error?.message ?? error) }));
+						return {
+							done,
+							cancel() {
+								try {
+									running?.kill();
+								} catch {
+									// The process may have exited between the read and the kill.
+								}
+							}
+						};
+					}
+				});
+
+				return Promise.resolve({
+					text: [
+						`已启动后台构建任务：${jobId}（target=${target}）`,
+						'',
+						'它会在完成后自行结束；用 job_output 读输出，用 job_kill 停止。',
+						'构建结束后同一个任务里会跑渲染体检与产物锚点核对，结论随任务一起给你。',
+						'',
+						formatBuildPlan({ plan, root, target, environment })
+					].join('\n'),
+					started: true,
+					jobId: String(jobId),
+					target,
+					blockers: []
+				});
+			},
+			presentCall: (args) => ({
+				card: 'generic',
+				title: '构建',
+				kind: 'other',
+				rawInput: args
 			})
+		});
+
+	// A composition without the job service still gets the tool, and the call
+	// explains what is missing instead of the tool simply not existing.
+	let foregroundOnly = ctx.get('jobs') === undefined ? ctx.tools.register(buildTool(undefined)) : undefined;
+	ctx.inject(['jobs'], (jobCtx) => {
+		foregroundOnly?.();
+		foregroundOnly = undefined;
+		const unregister = ctx.tools.register(buildTool(jobCtx.jobs));
+		jobCtx.effect(
+			() => () => {
+				unregister();
+			},
+			'tutorial-writing: build tool'
 		);
 	});
 	// The browser panel needs the same data over HTTP. A composition without a
@@ -701,6 +726,16 @@ export function apply(ctx, config) {
 			const value = {
 				ok: true,
 				root,
+				jobsAvailable: ctx.get('jobs') !== undefined,
+				// Registration is otherwise invisible until someone calls the tool;
+				// reporting it here lets the verification script prove it happened.
+				toolRegistered: (() => {
+					try {
+						return ctx.tools.get('ascend310b_writing_build') !== undefined;
+					} catch {
+						return false;
+					}
+				})(),
 				generatedAt: new Date().toISOString(),
 				parts: PARTS.map((part) => ({ key: part.key, label: part.label })),
 				audit: { summary: audit.summary, findings: audit.findings },
