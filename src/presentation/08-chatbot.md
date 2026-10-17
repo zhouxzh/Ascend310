@@ -49,10 +49,10 @@ footer: "案例 9：智能聊天机器人"
 | `src/experiment/case9.md` | 案例教程、验收门禁、失败规则 |
 | `samples/case9/README.md` | 当前状态、候选架构、板端启动命令 |
 | `samples/case9/app.py` | Bearer 保护的 OpenAI 兼容网关 |
-| `samples/case9/local_app.py` | 板端本地中文聊天服务，当前音频路径暂停 |
-| `samples/case9/acl_om_service.py` | loopback ACL/OM OpenAI 服务 |
+| `samples/case9/repro/mindspore-chat-20260829/source/local_app.py` | 板端本地中文聊天服务（历史复现归档，当前音频路径暂停） |
+| `samples/case9/repro/mindspore-chat-20260829/source/acl_om_service.py` | loopback ACL/OM OpenAI 服务（历史复现归档） |
 | `samples/case9/mindspore_chat_service.py` | MindSpore Profile 候选服务 |
-| `samples/case9/contract-v2.json` | Qwen2.5 静态 KV OM 契约 |
+| `samples/case9/contracts/qwen25-kv-1024/board/qwen25-static-kv-1024-v2-om-contract.json` | Qwen2.5 静态 KV OM 契约 |
 | `samples/case9/*tokenizer*.py` | 无 Torch tokenizer 适配 |
 | `samples/case9/configs/chat_model_profiles.json` | 模型 Profile 注册表 |
 
