@@ -15,8 +15,8 @@ import { mkdirSync, rmSync, unlinkSync, utimesSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { auditRepo, resolveSettings } from '../lib/audit-core.js';
-import { collectAssetFindings } from '../lib/checks.js';
+import { auditRepo, progressReport, resolveSettings } from '../lib/audit-core.js';
+import { collectAssetFindings, collectRenderFindings } from '../lib/checks.js';
 
 const failures = [];
 const check = (condition, message) => {
@@ -133,6 +133,27 @@ unlinkSync(builtFile);
 const missing = collectAssetFindings({ root, settings });
 check(missing.slidesMissing === 1, 'a deck without built HTML must be reported missing');
 check(missing.findings.some((finding) => finding.rule === 'slide-missing'), 'the missing deck must be named');
+
+// --- a deck is not a manuscript, part two ----------------------------------
+// The progress report and the LaTeX staleness check both walk the same parts
+// list, and both would be wrong about a deck unless they skip asset parts.
+write('latex/book.log', ['This is XeTeX', 'Output written on book.xdv (632 pages, 12775588 bytes).', ''].join('\n'));
+const nowMs = Date.now();
+utimesSync(join(root, 'src/README.md'), new Date(nowMs - 600_000), new Date(nowMs - 600_000));
+utimesSync(join(root, 'src/presentation/00-intro.md'), new Date(nowMs), new Date(nowMs));
+utimesSync(join(root, 'latex/book.log'), new Date(nowMs - 300_000), new Date(nowMs - 300_000));
+
+const progress = progressReport({ root, settings });
+check(
+	!progress.missingFromSidebar.some((entry) => entry.includes('presentation')),
+	`a deck reaches the site through its .html link, so it must not be reported as missing from the sidebar: ${progress.missingFromSidebar.join(',')}`
+);
+const renderAfterDeckEdit = collectRenderFindings({ root, settings });
+check(renderAfterDeckEdit.available === true, 'the fixture log must be readable');
+check(
+	renderAfterDeckEdit.stats.stale === false,
+	'editing a deck must not make the LaTeX build log look stale — decks are not part of the LaTeX build'
+);
 
 // --- frozen-name drift in a deck -------------------------------------------
 write('src/presentation/00-intro.md', deck.replace('第1章：测试章节', '第9章：不存在的章节'));

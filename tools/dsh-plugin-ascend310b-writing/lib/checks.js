@@ -142,6 +142,9 @@ export function collectFrozenNameFindings({ root, settings }) {
 function newestManuscript(root, settings = DEFAULT_SETTINGS) {
 	let newest = null;
 	for (const part of settings.parts) {
+		// A Marp deck is not part of the LaTeX build, so editing one must not make
+		// the build log look stale.
+		if (part.assets === true) continue;
 		for (const { file } of listPartFiles(root, part)) {
 			const mtimeMs = statSync(file).mtimeMs;
 			if (newest === null || mtimeMs > newest.mtimeMs) {

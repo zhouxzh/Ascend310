@@ -671,7 +671,9 @@ export function progressReport({ root, scope = 'all', settings }) {
 			totals.readingMinutes += readingMinutes;
 			if (numbered) {
 				const sidebarKey = `${part.key}/${basename(file)}`;
-				if (sidebarFiles.size > 0 && !sidebarFiles.has(sidebarKey)) missingFromSidebar.push(rel);
+				// A deck reaches the site through its built .html link in the sidebar, not
+		// as a VuePress page, so the page-coverage rule must not judge it.
+		if (part.assets !== true && sidebarFiles.size > 0 && !sidebarFiles.has(sidebarKey)) missingFromSidebar.push(rel);
 			}
 		}
 		parts.push({
