@@ -417,7 +417,7 @@ resnet18_tiny_imagenet_fp16.om
 logits 误差则不看类别名，而是直接比较两个输出向量的数值差异。本章记录最大绝对
 误差和平均绝对误差：前者观察最剧烈的一项数值漂移，后者观察整体漂移水平。这个
 指标通常比 Top1 更敏感，因为即使 Top1 没变，logits 的数值也可能已经发生变化。
-反过来，如果两个最高分非常接近，极小的 logits 漂移也可能让 Top1 对调。因此
+反过来，如果两个最高分接近，极小的 logits 漂移也可能让 Top1 对调。因此
 输出对齐要同时看排序和数值误差，不能只看一个指标。
 
 [`01_compare_outputs.py`](https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter9/01_compare_outputs.py)

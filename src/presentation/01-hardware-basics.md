@@ -78,7 +78,7 @@ footer: "附录 1：开发板与基础环境"
 
 ## 开发板形态：OrangePi AIpro（8T）
 
-OrangePi AIpro（8T）由香橙派联合华为打造，采用昇腾AI技术路线，搭载昇腾310B处理器（4核64位处理器 + AI处理器），集成图形处理器，支持8TOPS INT8的AI算力。板级规格来自附录1：
+OrangePi AIpro（8T）由香橙派联合华为推出，采用昇腾 AI 技术路线，搭载昇腾310B处理器（4核64位处理器 + AI处理器），集成图形处理器，支持8TOPS INT8的AI算力。板级规格来自附录1：
 
 - 板载LPDDR4X内存：8GB / 16GB
 - 支持外接32GB至256GB的eMMC模块

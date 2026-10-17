@@ -923,7 +923,7 @@ journalctl -u <service>.service -b --no-pager | tail -n 80
 4. 在一台有图形桌面的 Ubuntu 上安装或配置 VNC 客户端，记录 IP、密码来源、分辨率和共享开关状态。
 5. 在临时挂载点完成一次 NFS 挂载、`findmnt` 验证和卸载；不修改生产共享目录。
 6. 用一个测试容器练习 `start`、`logs`、`exec`、`stop`，并说明重启策略。
-7. 写一个只读自启动脚本，先手工运行，再选择桌面 autostart 或 systemd 进行验证。
+7. 写一个只读自启动脚本，先手工运行，再选择桌面 autostart 或 systemd 验证。
 
 ---
 

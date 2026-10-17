@@ -218,7 +218,7 @@ python3 02_buffer_reuse_benchmark.py --runs 100
 2. `end_to_end` 平均耗时下降。
 3. `msprof` Timeline 中 Host 侧 ACL Runtime 调用密度更高，计算任务之间的空白减少。
 
-如果模型很小，Buffer 复用的收益会特别明显；如果模型本身很大，收益占比会下降，但仍然能减少长尾抖动。
+如果模型很小，Buffer 复用的收益会明显；如果模型本身很大，收益占比会下降，但仍然能减少长尾抖动。
 
 ## 8.6 案例三：CPU 预处理为什么容易成为瓶颈 {#src-book-chapter8-h11}
 
@@ -237,7 +237,7 @@ python3 03_cpu_preprocess_benchmark.py --runs 100 --resolution 1920x1080
 | `naive_numpy` | 每帧创建 resize、float32、NCHW 等中间数组 |
 | `workspace_reuse` | 预先创建工作区，循环中复用数组 |
 
-这个案例的学习重点不是把 CPU 预处理调到极致，而是理解何时应该停止优化 CPU。若预处理耗时已经接近或超过模型执行耗时，应优先考虑：
+这个案例的学习重点不是把 CPU 预处理压到最低，而是理解何时应该停止优化 CPU。若预处理耗时已经接近或超过模型执行耗时，应优先考虑：
 
 1. 使用 DVPP VPC 做 resize/crop。
 2. 使用 AIPP 做归一化和部分颜色格式处理。

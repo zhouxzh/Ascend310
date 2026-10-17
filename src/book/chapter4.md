@@ -11,9 +11,9 @@ AscendCL（Ascend Computing Language）是一套用于在昇腾平台上开发�
 
 然而，直接使用 C/C++ 版本的 AscendCL 进行开发存在一定的挑战。首先，C/C++ 语言本身的指针操作和手动内存管理对开发者要求较高，容易产生内存泄漏或访问越界等难以调试的问题；其次，C++ 代码通常较为冗长，构建和编译流程繁琐，不利于算法的快速原型验证与敏捷迭代。回顾上一章，虽然我们可以尝试将 PyTorch 移植到昇腾 310B 开发板上，但受限于硬件架构差异和算子支持度，直接运行原生 PyTorch 代码往往面临诸多兼容性问题和性能瓶颈。**因此，对于初学者而言，直接在 310B 板端运行 PyTorch 并不是最优解，而 PyACL 则是平衡开发效率与运行性能的最佳选择。**
 
-为了解决上述痛点，PyACL（Python Ascend Computing Language）应运而生。作为 AscendCL 的 Python 绑定版本，PyACL 通过 CPython 封装底层 C 接口，在保留硬件高性能特性的同时，大幅降低了开发门槛。它允许开发者通过简洁的 Python 语法调用昇腾处理器的强大能力，无缝衔接主流 AI 框架和数据处理库。
+为了解决上述痛点，PyACL（Python Ascend Computing Language）应运而生。作为 AscendCL 的 Python 绑定版本，PyACL 通过 CPython 封装底层 C 接口，在保留硬件高性能特性的同时，大幅降低了开发门槛。它允许开发者用 Python 直接调用昇腾处理器，并对接主流 AI 框架与数据处理库。
 
-需要特别指出的是，**昇腾 310B 是一款定位为推理（Inference）的 AI 处理器，算力与显存资源受限，并不适合进行大规模的模型训练**。在实际应用中，标准的开发流水线如下：
+**注意：昇腾 310B 是一款定位为推理（Inference）的 AI 处理器，算力与显存资源受限，并不适合进行大规模的模型训练**。在实际应用中，标准的开发流水线如下：
 
 1.  **模型训练**：在拥有高性能显卡（GPU）或昇腾 910 训练卡的服务器上，使用 PyTorch 等框架完成模型训练。
 2.  **模型转换**：使用 ATC 工具将训练好的模型转换为昇腾专用的离线模型（.om）。
@@ -119,7 +119,7 @@ Found 1 Ascend devices.
 
 同样，程序运行结束后必须执行 `acl.finalize()` 以确保资源被正确回收。如果缺少资源释放环节，可能会引发内存泄漏、NPU 算力资源被持续占用或设备状态异常，进而影响后续任务的执行甚至导致系统崩溃。
 
-值得注意的是，对于上述简单的设备查询程序，即使没有显式调用初始化和资源释放接口，程序通常也能够返回正确的结果。例如，我们可以将代码简化为如下一行的命令并在终端执行：
+对于上述简单的设备查询程序，即使没有显式调用初始化和资源释放接口，程序通常也能够返回正确的结果。例如，我们可以将代码简化为如下一行的命令并在终端执行：
 
 ```bash
 python -c "import acl; print(f'Found {acl.rt.get_device_count()[0]} Ascend devices.')"
@@ -168,7 +168,7 @@ PyACL 的资源管理构建在 **Device**、**Context** 与 **Stream** 三个核
 1.  **ACL 初始化 (`acl.init`)**：这是所有 AscendCL 操作的起点。必须在进程启动的最开始调用，用于初始化 ACL 的全局配置。
 2.  **资源申请 (`set_device/create_context/create_stream`)**：开发者通过 `acl.rt.set_device` 锁定物理硬件资源。如果应用没有显式调用 `acl.rt.create_context` 或 `acl.rt.create_stream`，系统在调用 `set_device` 后会自动创建并关联**默认 Context** 与**默认 Stream**。但在生产环境或多线程并发场景下，建议显式创建这些资源，以实现更好的逻辑隔离和任务异步调度。Stream 作为任务执行队列，负责管理指令在硬件上的下发顺序。
 3.  **业务执行 (Execution)**：在此阶段，应用进行模型加载、数据预处理、推理计算等核心逻辑。所有的计算任务（Kernel）都会被下发到之前创建的 Stream 中。
-4.  **资源销毁**：业务完成后，必须按特定顺序释放资源。对于**显式创建**的资源，应首先调用 `acl.rt.destroy_stream` 销毁 Stream，再调用 `acl.rt.destroy_context` 销毁 Context。最后调用 `acl.rt.reset_device` 重置设备以彻底释放 Device 资源。需要特别说明的是，若未显式创建 Context 与 Stream（即使用系统默认资源），开发者**不能**调用相应的销毁接口；在这种情况下，直接调用 `reset_device` 即可隐式地销毁关联的默认 Context 与 Stream 资源。
+4.  **资源销毁**：业务完成后，必须按特定顺序释放资源。对于**显式创建**的资源，应首先调用 `acl.rt.destroy_stream` 销毁 Stream，再调用 `acl.rt.destroy_context` 销毁 Context。最后调用 `acl.rt.reset_device` 重置设备以彻底释放 Device 资源。注意：若未显式创建 Context 与 Stream（即使用系统默认资源），开发者**不能**调用相应的销毁接口；在这种情况下，直接调用 `reset_device` 即可隐式地销毁关联的默认 Context 与 Stream 资源。
 5.  **ACL 去初始化 (`acl.finalize`)**：这是进程退出的最后一步，用于彻底清理全局资源。开发者应严格遵循“先业务、再流、后设备”的逆序原则进行资源释放，最后调用此接口退出环境，以避免内存泄漏或设备状态异常。
 
 **关键点总结：**
@@ -327,7 +327,7 @@ acl.rt.destroy_stream(stream)
 
 #### 同步与异步的概念 {#src-book-chapter4-h12}
 
-**同步操作（Synchronous）** 是最符合直觉的编程方式，它遵循严格的“请求-响应”逻辑。正如我们在 Host 到 Host 拷贝示例中所见，当 Host 线程发起一个同步指令时（如 `acl.rt.memcpy`），CPU 会挂起当前线程，像监工一样死死盯着任务，直到任务彻底完成后才会恢复执行下一行代码。这种模式的优点显而易见：逻辑简单，数据一致性由代码执行顺序天然保证，非常适合初学者进行功能验证或定位 BUG。但其缺点也同样致命：它完全抹杀了硬件并行的可能性。试想，当 CPU 在傻傻等待数据从 Host 搬运到 Device 时，昂贵的 NPU 计算单元可能正处于空闲状态，导致系统整体吞吐量下降。
+**同步操作（Synchronous）** 是最符合直觉的编程方式，它遵循严格的“请求-响应”逻辑。正如我们在 Host 到 Host 拷贝示例中所见，当 Host 线程发起一个同步指令时（如 `acl.rt.memcpy`），CPU 会挂起当前线程，像监工一样死死盯着任务，直到任务彻底完成后才会恢复执行下一行代码。这种模式的优点是：逻辑简单，数据一致性由代码执行顺序天然保证，非常适合初学者进行功能验证或定位 BUG。但其缺点也同样致命：它完全抹杀了硬件并行的可能性。试想，当 CPU 在傻傻等待数据从 Host 搬运到 Device 时，昂贵的 NPU 计算单元可能正处于空闲状态，导致系统整体吞吐量下降。
 
 **异步操作（Asynchronous）** 则打破了这种串行束缚，是高性能 AI 应用的标配。在调用 `acl.rt.memcpy_async` 时，Host 线程仅需将任务“投递”到 Stream 队列中便立即返回，继续处理其他逻辑（如读取下一张图片或预处理数据）。此时，底层的 DMA 搬运引擎会与 NPU 的计算引擎同时工作，实现了真正的**软硬件并行**。这就好比点餐系统，前台服务员（Host）只负责快速接单并把单子（Task）扔给厨房（Stream），而不需要站在厨房门口等菜做好，从而能接待更多的客人。在复杂的 AI 业务流中，这种机制允许我们构建精妙的流水线：**在 NPU 拼命推理当前帧的同时，DMA 正在默默地将下一帧数据搬运进显存，而 CPU 已经在预处理第三帧数据**。这种“想尽办法让显卡即使一毫秒都不闲着”的设计，正是提升 AI 应用帧率的关键。
 
@@ -531,7 +531,7 @@ for image in images:
 
 ### 实例分析（ResNet-18）  {#src-book-chapter4-h24}
 
-在第三章中，我们初步介绍了 ResNet 的网络结构。本章我们将继续以 ResNet 为例，深入探讨 PyACL 的编程技巧与应用。上一章中，由于昇腾 310B 的 PyTorch 插件主要用于推理加速，且端侧设备训练算力有限，我们选用了较小的 CIFAR-10 数据集。而在本章，我们将采用更贴近实际生产的标准开发流程，并引入 **Tiny-ImageNet** 数据集进行实战演练。我们首先利用 Nvidia 显卡配合 CUDA 和 PyTorch 对 ResNet-18 进行训练，获取模型权重；随后将其转换为 ONNX 模型，并最终转换为昇腾特定的 OM 模型。我们将分别在**昇腾 310B (NPU-8T)**、**昇腾 310B (CPU)**、**树莓派 5B (CPU)** 以及RTX 5090D上进行推理测试，重点对比 OnnxRuntime 与 PyACL 的性能差异，深入分析 NPU 带来的帧率提升。
+在第三章中，我们初步介绍了 ResNet 的网络结构。本章我们将继续以 ResNet 为例，深入探讨 PyACL 的编程技巧与应用。上一章中，由于昇腾 310B 的 PyTorch 插件主要用于推理加速，且端侧设备训练算力有限，我们选用了较小的 CIFAR-10 数据集。而在本章，我们将采用更贴近实际生产的标准开发流程，并引入 **Tiny-ImageNet** 数据集进行实战演练。我们首先利用 Nvidia 显卡配合 CUDA 和 PyTorch 对 ResNet-18 训练，获取模型权重；随后将其转换为 ONNX 模型，并最终转换为昇腾特定的 OM 模型。我们将分别在**昇腾 310B (NPU-8T)**、**昇腾 310B (CPU)**、**树莓派 5B (CPU)** 以及RTX 5090D上进行推理测试，重点对比 OnnxRuntime 与 PyACL 的性能差异，深入分析 NPU 带来的帧率提升。
 
 #### Tiny-ImageNet 数据集简介 {#src-book-chapter4-h25}
 
@@ -544,7 +544,7 @@ Tiny-ImageNet 是大规模视觉识别挑战赛 (ILSVRC) 中 ImageNet 数据集�
 > **注意 注意：本节训练代码需在配备 NVIDIA 显卡的 GPU 服务器上运行，不在昇腾 310B 开发板上执行。**
 > 如果只需体验昇腾 310B 上 PyACL 的推理性能，可直接跳转至 [环境配置与模型转换](#src-book-chapter4-h27)。
 
-如果你希望自行训练模型以便进行测试，可以参考本节的模型训练部分。我们需要一台配备 Nvidia 显卡并已正确安装 CUDA 驱动的服务器。本例中，我们使用 GeForce 5090D 显卡。对于图像分类任务，Nvidia GeForce 系列显卡已能很好地满足需求。我们选用 Tiny-ImageNet 数据集进行训练，该数据集相比完整版 ImageNet 体积更小，便于测试和实验。使用 GeForce 5090D 训练一次大约需要 1~2 小时；而若采用完整的 ImageNet 数据集，单卡训练可能需要长达一周的时间。
+如果你希望自行训练模型以便测试，可以参考本节的模型训练部分。我们需要一台配备 Nvidia 显卡并已正确安装 CUDA 驱动的服务器。本例中，我们使用 GeForce 5090D 显卡。对于图像分类任务，Nvidia GeForce 系列显卡已能很好地满足需求。我们选用 Tiny-ImageNet 数据集训练，该数据集相比完整版 ImageNet 体积更小，便于测试和实验。使用 GeForce 5090D 训练一次大约需要 1~2 小时；而若采用完整的 ImageNet 数据集，单卡训练可能需要长达一周的时间。
 
 我们需要从 Hugging Face 下载 Tiny-ImageNet 数据集，为此首先需要使用 pip 安装 Hugging Face 的 CLI 工具。
 如果在下载过程中遇到网络连接问题，建议配置镜像源，例如使用 hf-mirror。
@@ -897,13 +897,13 @@ atc --model=model/resnet18_tiny_imagenet.onnx \
 
 #### 核心实现：模型推理脚本 {#src-book-chapter4-h28}
 
-为了在昇腾 310B 上加载 OM 模型并执行推理，我们需要编写一个完整的 Python 脚本。该脚本不仅负责调用底层 PyACL 接口，还需要处理数据的预处理（Preprocessing）与后处理（Postprocessing）。本节将通过解析 `inference_npu.py` 的关键代码片段，深入讲解 PyACL 应用的构建逻辑。
+为了在昇腾 310B 上加载 OM 模型并执行推理，我们需要编写一个完整的 Python 脚本。该脚本不仅负责调用底层 PyACL 接口，还需要处理数据的预处理（Preprocessing）与后处理（Postprocessing）。下面解析 `inference_npu.py` 的关键代码，说明 PyACL 应用的构建逻辑。
 
 完整的推理代码逻辑被封装在 `AclResource` 类中，它管理着从初始化到资源释放的整个生命周期。
 
 **1. 初始化与模型加载**
 
-在类的 `init` 方法中，我们依次完成系统初始化、Device 指定、Context 创建以及模型加载。值得注意的是，模型加载后，我们需要获取“模型描述”（Model Description），它包含了模型输入输出张量的维度、大小和类型信息，这对于后续申请内存至关重要。
+在类的 `init` 方法中，我们依次完成系统初始化、Device 指定、Context 创建以及模型加载。模型加载后需要获取“模型描述”（Model Description），它包含了模型输入输出张量的维度、大小和类型信息，这对于后续申请内存至关重要。
 
 ```python
 def init(self):
@@ -1351,7 +1351,7 @@ print(f"正确率: {accuracy:.2f}%")
 | Raspberry Pi 5B | OnnxRuntime | CPU | 22.38 | ~8.4% |
 | Ascend 310B CPU | OnnxRuntime | CPU (Arm Cortex-A55) | 5.02 | ~1.9% |
 
-通过数据对比，我们可以清晰地看到昇腾 310B NPU 的强大优势：
+数据对比如下：
 
 *   **对比自身 CPU**：NPU 的推理速度是其 CPU 模式（5.02 FPS）的 **52 倍**，充分证明了专用 AI 加速器的必要性。
 *   **对比树莓派 5B**：虽然同样是 Arm 架构的嵌入式设备，昇腾 310B NPU 的性能是树莓派 5B CPU（22.38 FPS）的 **11 倍**以上。
@@ -1479,7 +1479,7 @@ MobileNetV1 和 MobileNetV2 的中等宽度版本处于中等精度区间。`mob
 
 本章系统讲解了 PyACL 应用开发的基础知识，从运行资源管理到模型推理的全链路流程。PyACL 的核心价值在于：以 Python 的简洁语法驱动昇腾 NPU 的高性能计算，将 C/C++ 的指针操作和手动内存管理封装为 `acl.rt.malloc`、`acl.rt.memcpy`、`acl.mdl.execute` 等简洁接口，极大降低了昇腾 AI 处理器的开发门槛。
 
-在运行时资源方面，Device、Context、Stream 构成的三级资源模型是 PyACL 的骨架。理解它们的层级关系与生命周期——申请按 `Device -> Context -> Stream` 顺序，释放按逆序——是写出健壮 PyACL 程序的前提。在此基础上，异构内存管理（Host 与 Device 间的四种拷贝路径）与同步等待机制（Event、Stream Sync、Stream Wait Event、Device Sync 四种粒度）构成了性能优化的核心手段。特别是在昇腾 310B 这类 CPU 算力较弱（Cortex-A55）的边缘设备上，**全链路异步 + Event 驱动的多 Stream 协作**是榨干 NPU 性能的关键策略。
+在运行时资源方面，Device、Context、Stream 构成的三级资源模型是 PyACL 的骨架。理解它们的层级关系与生命周期——申请按 `Device -> Context -> Stream` 顺序，释放按逆序——是写出健壮 PyACL 程序的前提。在此基础上，异构内存管理（Host 与 Device 间的四种拷贝路径）与同步等待机制（Event、Stream Sync、Stream Wait Event、Device Sync 四种粒度）构成了性能优化的核心手段。在昇腾 310B 这类 CPU 算力较弱（Cortex-A55）的边缘设备上，**全链路异步 + Event 驱动的多 Stream 协作**是榨干 NPU 性能的关键策略。
 
 在应用实践层面，本章通过 ResNet-18（图像分类）和 SSD/SSDLite（目标检测）两个经典场景，完整演示了"GPU 训练 -> ONNX 导出 -> ATC 转换 -> PyACL NPU 推理"的标准开发流水线。跨平台对比数据表明，即便使用相同的 ONNX 模型，昇腾 310B NPU 的 ResNet-18 推理速度（265 FPS）远超其自身 CPU 模式（5 FPS）和树莓派 5B（22 FPS），充分验证了专用 AI 加速器在边缘场景下的不可替代性。对于 SSDLite320 目标检测，`mobilenetv4_hybrid_large` 更适合高精度，`mobilenetv4_conv_medium` 则是在 310B 上兼顾 mAP 与 30 FPS 级检测吞吐的更实用选择。
 

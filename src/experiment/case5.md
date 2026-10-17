@@ -822,7 +822,7 @@ Hantek 与 RTL-SDR 在仪表盘中互斥。切换前必须先停止当前来源�
 | 实际采样率不是 1 MS/s | 采集合同与固定 OM 不匹配 | 检查驱动、量程和启动参数 |
 | `NPU unavailable` | Hantek runner 在初始化或输出合同检查中失败，或 RTL 服务在启动预检时无法建立 OM | 先区分 Hantek 与 RTL 路径，再运行对应 `verify_*_model` 并查看具体消息 |
 | RTL run `failed` / `error` | runner 已启动后输出出现 NaN/Inf 或违反形状合同 | 保留 JSONL，检查失败记录；不要把运行期错误写成 CPU 或 NPU 成功 |
-| `GeExecutor has not been initialized` 或 `[ACL: invalid parameter]` | 本次板端审查中，Hantek 停止后同一 Python 进程重新启动 RTL-SDR OM 时出现的 CANN 生命周期错误 | 保留日志和失败 JSONL，确认 USB 已释放后关闭并重新启动仪表盘；不得改用 CPU 检测器。该跨来源重初始化问题不应被写成已通过的无缝切换验收 |
+| `GeExecutor has not been initialized` 或 `[ACL: invalid parameter]` | 本次板端审查中，Hantek 停止后同一 Python 进程重新启动 RTL-SDR OM 时出现的 CANN 生命周期错误 | 保留日志和失败 JSONL，确认 USB 已释放后关闭并重新启动仪表盘；不得改用 CPU 检测器。该跨来源重初始化问题不应被写成已通过的直接切换验收 |
 | Hantek 频谱不更新 | NPU 没有 ready 或未形成完整窗口 | 检查后端、采样率、帧缺口和队列计数 |
 | CH2 数值异常 | Little Bee 模式、匝数、去零或削顶不正确 | 回到探头说明和经确认隔离的教学回路重新检查；标定前不把 CH2 数值当作计量结果 |
 | SDR 页面没有模型 | 没有通过准入和哈希复核的 manifest | 按 `docs/07` 完成模型准入 |

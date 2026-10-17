@@ -2,7 +2,7 @@
 
 ## 昇腾310B开发板介绍 {#src-appendix-appendix1-h1}
 
-OrangePi AIpro(8T)开发板是由香橙派联合华为精心打造的高性能AI开发板。它采用昇腾AI技术路线，搭载昇腾310B处理器（4核64位处理器 + AI处理器），集成图形处理器，支持8TOPS INT8的AI算力。板载8GB/16GB LPDDR4X内存，并支持外接32GB至256GB的eMMC模块，同时支持双4K高清输出。
+OrangePi AIpro(8T)开发板由香橙派联合华为推出。它采用昇腾AI技术路线，搭载昇腾310B处理器（4核64位处理器 + AI处理器），集成图形处理器，支持8TOPS INT8的AI算力。板载8GB/16GB LPDDR4X内存，并支持外接32GB至256GB的eMMC模块，同时支持双4K高清输出。
 
 OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接口、Type-C电源接口、支持SATA/NVMe SSD 2280的M.2插槽、TF插槽、千兆网口、两个USB3.0、一个USB Type-C 3.0、一个Micro USB（用于串口打印调试）、两个MIPI摄像头接口以及一个MIPI屏幕接口等。此外，还预留了电池接口。
 
