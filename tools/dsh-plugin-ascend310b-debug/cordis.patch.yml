@@ -1,0 +1,7 @@
+# dsh-plugin-ascend310b-debug bundle declaration: insert this plugin's Host row
+# into the composite. The Host half registers the ascend_* debugging tools and
+# the panel's read-only report/probe routes; the browser half registers the
+# "昇腾310B调试" sidebar entry and the panel it opens.
+- insert:
+    - id: dsh-plugin-ascend310b-debug
+      name: dsh-plugin-ascend310b-debug

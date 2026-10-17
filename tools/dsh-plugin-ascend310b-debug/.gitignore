@@ -1,0 +1,9 @@
+# The repository root ignores every lib/ directory (Python build artifacts).
+# This package keeps its DSH host source in lib/, so re-include that directory.
+# Re-including the directory is what matters; a file cannot be re-included while
+# its parent directory is still excluded.
+!lib/
+
+# The root also ignores data/ for model datasets. The plugin's data/ directory
+# holds a small generated sample index and panel previews that must ship with it.
+!data/

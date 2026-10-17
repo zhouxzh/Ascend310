@@ -1,0 +1,304 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": "samples",
+  "generatedAt": null,
+  "entries": [
+    {
+      "id": "case1",
+      "title": "智能考勤机",
+      "readme": "samples/case1/README.md",
+      "keywords": [
+        "人脸识别",
+        "考勤",
+        "PyACL"
+      ],
+      "archetype": "npu-service",
+      "archetypeLabel": "NPU 服务与前后端",
+      "entry": null,
+      "test": "npm test",
+      "capabilities": [
+        "ascend",
+        "camera",
+        "network",
+        "conda",
+        "model-asset",
+        "frontend",
+        "test"
+      ]
+    },
+    {
+      "id": "case2",
+      "title": "目标跟踪检测",
+      "readme": "samples/case2/README.md",
+      "keywords": [
+        "目标检测",
+        "多目标跟踪",
+        "DeepSORT"
+      ],
+      "archetype": "atc-conversion",
+      "archetypeLabel": "ATC ONNX→OM 转换",
+      "entry": null,
+      "test": null,
+      "capabilities": [
+        "ascend",
+        "camera",
+        "network",
+        "conda",
+        "model-asset",
+        "test"
+      ]
+    },
+    {
+      "id": "case3",
+      "title": "智能电子琴",
+      "readme": "samples/case3/README.md",
+      "keywords": [
+        "Piano-DDSP",
+        "MIDI",
+        "音频合成"
+      ],
+      "archetype": "npu-service",
+      "archetypeLabel": "NPU 服务与前后端",
+      "entry": "python scripts/run_webui.py",
+      "test": "python -m pytest -q",
+      "capabilities": [
+        "ascend",
+        "camera",
+        "network",
+        "conda",
+        "model-asset",
+        "frontend",
+        "test"
+      ]
+    },
+    {
+      "id": "case4",
+      "title": "掌纹识别",
+      "readme": "samples/case4/README.md",
+      "keywords": [
+        "掌纹识别",
+        "ROI",
+        "FAISS"
+      ],
+      "archetype": "camera-v4l2",
+      "archetypeLabel": "摄像头与 V4L2",
+      "entry": "python -m compileall -q app.py palmprint_workbench tools",
+      "test": "python -m pytest -ra tests",
+      "capabilities": [
+        "ascend",
+        "camera",
+        "network",
+        "conda",
+        "model-asset",
+        "frontend",
+        "test"
+      ]
+    },
+    {
+      "id": "case5",
+      "title": "智能数据采集分析仪",
+      "readme": "samples/case5/README.md",
+      "keywords": [
+        "数据采集",
+        "DFT",
+        "时频分析"
+      ],
+      "archetype": "atc-conversion",
+      "archetypeLabel": "ATC ONNX→OM 转换",
+      "entry": null,
+      "test": "python -m pytest -q",
+      "capabilities": [
+        "ascend",
+        "network",
+        "conda",
+        "frontend",
+        "test"
+      ]
+    },
+    {
+      "id": "case6",
+      "title": "智能小车",
+      "readme": "samples/case6/README.md",
+      "keywords": [
+        "车道线",
+        "场景分类",
+        "视觉感知"
+      ],
+      "archetype": "npu-service",
+      "archetypeLabel": "NPU 服务与前后端",
+      "entry": null,
+      "test": null,
+      "capabilities": [
+        "ascend",
+        "network",
+        "test"
+      ]
+    },
+    {
+      "id": "case7",
+      "title": "智能相册",
+      "readme": "samples/case7/README.md",
+      "keywords": [
+        "语义检索",
+        "图像索引",
+        "FAISS"
+      ],
+      "archetype": "atc-conversion",
+      "archetypeLabel": "ATC ONNX→OM 转换",
+      "entry": null,
+      "test": null,
+      "capabilities": [
+        "ascend",
+        "network",
+        "conda",
+        "test"
+      ]
+    },
+    {
+      "id": "case8",
+      "title": "实时手势识别",
+      "readme": "samples/case8/README.md",
+      "keywords": [
+        "HaGRID",
+        "YOLO",
+        "WebRTC"
+      ],
+      "archetype": "atc-conversion",
+      "archetypeLabel": "ATC ONNX→OM 转换",
+      "entry": null,
+      "test": null,
+      "capabilities": [
+        "ascend",
+        "camera",
+        "network",
+        "conda",
+        "model-asset",
+        "test"
+      ]
+    },
+    {
+      "id": "case9",
+      "title": "智能聊天机器人",
+      "readme": "samples/case9/README.md",
+      "keywords": [
+        "小智",
+        "OpenAI 兼容",
+        "检索增强"
+      ],
+      "archetype": "atc-conversion",
+      "archetypeLabel": "ATC ONNX→OM 转换",
+      "entry": null,
+      "test": "npm test",
+      "capabilities": [
+        "ascend",
+        "network",
+        "conda",
+        "model-asset",
+        "frontend",
+        "test"
+      ]
+    },
+    {
+      "id": "chapter3",
+      "title": "第3章 代码样例",
+      "readme": "samples/chapter3/README.md",
+      "keywords": [],
+      "archetype": "framework-migration",
+      "archetypeLabel": "框架迁移与训练",
+      "entry": "python -c \"import torch; import torch_npu; print(torch.npu.is_available())\"",
+      "test": null,
+      "capabilities": [
+        "ascend",
+        "network",
+        "test"
+      ]
+    },
+    {
+      "id": "chapter4",
+      "title": "第4章 代码样例",
+      "readme": "samples/chapter4/README.md",
+      "keywords": [],
+      "archetype": "atc-conversion",
+      "archetypeLabel": "ATC ONNX→OM 转换",
+      "entry": "python -c \"import acl; print('PyACL OK')\"",
+      "test": null,
+      "capabilities": [
+        "ascend",
+        "network",
+        "model-asset"
+      ]
+    },
+    {
+      "id": "chapter5",
+      "title": "第5章 MindSpore 开发样例",
+      "readme": "samples/chapter5/README.md",
+      "keywords": [],
+      "archetype": "atc-conversion",
+      "archetypeLabel": "ATC ONNX→OM 转换",
+      "entry": "python check_mindspore_env.py",
+      "test": null,
+      "capabilities": [
+        "ascend",
+        "network",
+        "conda",
+        "model-asset"
+      ]
+    },
+    {
+      "id": "chapter6",
+      "title": "第6章 代码样例",
+      "readme": "samples/chapter6/README.md",
+      "keywords": [],
+      "archetype": "dvpp-video",
+      "archetypeLabel": "DVPP 视频处理",
+      "entry": "python samples/chapter6/check_cann.py",
+      "test": null,
+      "capabilities": [
+        "ascend",
+        "network",
+        "frontend",
+        "test"
+      ]
+    },
+    {
+      "id": "chapter8",
+      "title": "第8章 代码样例",
+      "readme": "samples/chapter8/README.md",
+      "keywords": [],
+      "archetype": "atc-conversion",
+      "archetypeLabel": "ATC ONNX→OM 转换",
+      "entry": null,
+      "test": null,
+      "capabilities": [
+        "ascend",
+        "network",
+        "conda",
+        "model-asset"
+      ]
+    },
+    {
+      "id": "chapter9",
+      "title": "第9章 模型量化样例",
+      "readme": "samples/chapter9/README.md",
+      "keywords": [],
+      "archetype": "quantization",
+      "archetypeLabel": "量化与精度",
+      "entry": "python tools/download_model.py",
+      "test": null,
+      "capabilities": [
+        "ascend",
+        "network",
+        "conda",
+        "model-asset"
+      ]
+    }
+  ],
+  "archetypes": [
+    "atc-conversion",
+    "camera-v4l2",
+    "dvpp-video",
+    "framework-migration",
+    "npu-service",
+    "quantization"
+  ]
+}

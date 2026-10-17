@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>昇腾310B调试面板预览</title>
+<style>
+	:root { color-scheme: light dark; }
+	body { margin: 0; padding: 24px; font: 14px/1.6 "Segoe UI", "Microsoft YaHei", sans-serif; background: #f6f7f9; }
+	.panel { max-width: 900px; margin: 0 auto; border: 1px solid #d5d9e0; border-radius: 8px; background: #fff; overflow: hidden; }
+	.title { padding: 12px 16px; border-bottom: 1px solid #e4e7ec; font-weight: 600; }
+	.section { padding: 14px 16px; border-bottom: 1px solid #eef0f3; }
+	.section:last-child { border-bottom: 0; }
+	.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+	.card { border: 1px solid #e4e7ec; border-radius: 6px; padding: 8px 10px; }
+	.card .label { color: #667085; font-size: 12px; }
+	.card .value { font-weight: 600; margin-top: 2px; word-break: break-word; }
+	.card .missing { color: #b54708; }
+	table { width: 100%; border-collapse: collapse; }
+	th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+	th { color: #667085; font-weight: 500; width: 190px; }
+	.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #ecfdf3; color: #027a48; border: 1px solid #abefc6; }
+	.badge.untested { background: #fffaeb; color: #b54708; border-color: #fedf89; }
+	.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+	.pill { border: 1px solid #e4e7ec; border-radius: 999px; padding: 2px 10px; font-size: 12px; color: #344054; }
+	.note { color: #667085; font-size: 12px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="panel">
+	<div class="title">昇腾310B调试</div>
+	<div class="section">
+		<div><b>适用范围：</b>昇腾 310B（支持）</div>
+		<div class="note">已确认是昇腾 310B（Ascend310B4，8T），插件内的调试程序适用。</div>
+	</div>
+	<div class="section">
+		<div class="cards">
+			<div class="card"><div class="label">芯片</div><div class="value">310B4</div></div>
+			<div class="card"><div class="label">档位</div><div class="value">8T</div></div>
+			<div class="card"><div class="label">健康</div><div class="value">Alarm</div></div>
+			<div class="card"><div class="label">温度</div><div class="value">79 ℃</div></div>
+			<div class="card"><div class="label">内存</div><div class="value">1993 / 15610 MB</div></div>
+			<div class="card"><div class="label">CANN</div><div class="value">8.0.0</div></div>
+			<div class="card"><div class="label">驱动</div><div class="value">25.2.0</div></div>
+			<div class="card"><div class="label">固件</div><div class="value">未采集</div></div>
+		</div>
+	</div>
+	<div class="section">
+		<div>版本配套：<span class="badge">observed-match · observed-pass</span></div>
+		<div class="note">探测到的组合与仓库已记录的组合 orangepi-aipro-live-8t-cann8 一致：Orange Pi AI Pro（香橙派 AI Pro，hostname orangepiaipro） / Ascend310B4 / CANN 8.0.0 / 驱动 25.2.0。</div>
+		<div class="note">本插件对有源板卡的一次只读探测记录：npu-smi 25.2.0，Health Alarm，温度 78C，内存 1896/15610 MB，/dev/davinci0 与 drv_davinci 均在，source CANN 后 import acl 成功、atc 位于 /usr/local/Ascend/ascend-toolkit/latest/bin/atc。设备层与 CANN 层为 observed-pass，模型加载、数值与性能仍是未验证。</div>
+	</div>
+	<div class="section">
+		<table>
+			<tr><th>芯片</th><td>310B4 / Ascend310B4</td></tr>
+			<tr><th>档位</th><td>8T</td></tr>
+			<tr><th>健康</th><td>Alarm</td></tr>
+			<tr><th>操作系统</th><td>Ubuntu 22.04.3 LTS 22.04.3 LTS (Jammy Jellyfish)</td></tr>
+			<tr><th>内核</th><td>5.10.0+</td></tr>
+			<tr><th>架构</th><td>aarch64</td></tr>
+			<tr><th>npu-smi</th><td>25.2.0</td></tr>
+			<tr><th>CANN</th><td>8.0.0</td></tr>
+			<tr><th>驱动</th><td>25.2.0</td></tr>
+			<tr><th>固件</th><td>未采集</td></tr>
+			<tr><th>Python</th><td>/usr/local/miniconda3/bin/python3 3.9.2</td></tr>
+			<tr><th>aclImport（面板取值）</th><td>ok</td></tr>
+			<tr><th>aclImportSourced（source CANN 后）</th><td>ok</td></tr>
+			<tr><th>aclImportBare（裸 SSH）</th><td>ok</td></tr>
+			<tr><th>ATC</th><td>ATC start working now, please wait for a moment.</td></tr>
+			<tr><th>设备节点</th><td>present</td></tr>
+		</table>
+	</div>
+	<div class="section">
+		<div class="label">调试入口（知识库 15 条）</div>
+		<div class="pills">
+			<span class="pill">pyacl · 2</span>
+			<span class="pill">atc · 1</span>
+			<span class="pill">env · 4</span>
+			<span class="pill">framework · 3</span>
+			<span class="pill">camera · 1</span>
+			<span class="pill">service · 1</span>
+			<span class="pill">performance · 2</span>
+			<span class="pill">quant · 1</span>
+		</div>
+	</div>
+	<div class="section">
+		<table>
+			<tr><th>样例索引</th><td>15 条（有入口 7 条，有测试命令 5 条）</td></tr>
+			<tr><th>已识别路径</th><td>atc-conversion、camera-v4l2、dvpp-video、framework-migration、npu-service、quantization</td></tr>
+			<tr><th>探测时间</th><td>2026-10-17T09:53:36+08:00</td></tr>
+		</table>
+	</div>
+</div>
+</body>
+</html>

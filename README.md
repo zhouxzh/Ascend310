@@ -18,6 +18,7 @@
 | 阅读实践案例教程 | [`src/experiment/README.md`](src/experiment/README.md) |
 | 运行某个案例 | [`samples/README.md`](samples/README.md)，然后进入对应 `samples/caseN/README.md` |
 | 运行案例 7：智能相册 | [`samples/case7/README.md`](samples/case7/README.md) |
+| 安装配套 DSH 插件 | [`tools/README.md`](tools/README.md) |
 | 理解本仓库为什么这样分目录 | [`docs/00-repository-structure.md`](docs/00-repository-structure.md) |
 
 根 README 是项目首页和快速起步页；它不替代 `docs/README.md`。根 README 说明“项目是什么、怎样开始”，`docs/README.md` 说明“具体问题应该查哪份工程文档”。完整职责表以 [仓库目录与文档职责](docs/00-repository-structure.md) 为准。
@@ -33,6 +34,7 @@ Ascend310/
 │   ├── experiment/           # 实践案例教程
 │   └── appendix/             # 附录
 ├── samples/                  # 章节示例和 case1-case9 可运行代码
+├── tools/                    # 配套 DSH 插件（昇腾310B调试）
 ├── scripts/                  # 仓库级构建和发布工具
 ├── latex/                    # 生成的 LaTeX/PDF，不手工编辑
 └── .github/                  # CI 和仓库自动化
@@ -59,6 +61,14 @@ git diff --check
 ```
 
 正式电子书的 Markdown 到 LaTeX/PDF 转换入口是 `convert-vuepress.sh`；生成文件位于 `latex/`，不要直接编辑生成的 `.tex` 或 PDF。
+
+## 配套 DSH 插件
+
+[`tools/`](tools/README.md) 存放与本教材配套、可独立安装的 DeepSeek Harness 插件：
+
+- [`昇腾310B调试`](tools/dsh-plugin-ascend310b-debug/README.md)：只面向 Ascend 310B1/310B4，提供板端事实探测、版本配套判定、分层调试计划、样例索引和只读诊断命令。其他芯片会被标记为不适用。
+
+插件采用“复制到 DSH profile”的源码安装方式，不依赖仓库根目录的 Node 依赖。每个插件的 README 都给出安装、配置和自检命令；昇腾310B调试插件的源码审核记录在 [`installation-audit.md`](tools/dsh-plugin-ascend310b-debug/docs/installation-audit.md)。
 
 ## 案例运行原则
 
