@@ -487,7 +487,7 @@ NMS 的处理逻辑可以概括成下面 4 步：
 
 因此，NMS 本质上是在做“去重”。它不是提高分类能力，而是在后处理阶段把重复候选框压缩成更干净的检测结果。
 
-#### ssdlite 中 _nms 的实现解析 {#src-experiment-case2-h33}
+#### ssdlite 中 \_nms 的实现解析 {#src-experiment-case2-h33}
 
 当前工程版本中的 NMS 函数如下：
 

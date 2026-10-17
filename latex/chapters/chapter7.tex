@@ -65,7 +65,8 @@ Core发出的各类读写请求精确转化为标准的总线协议交互。
 在一个典型的计算流水线中：数据首先通过BIU由全局内存接入，随后经MTE的高效搬运与格式重组，稳妥驻留于L1缓存或UB中。紧接着，Scalar
 Unit发出调度指令，指挥Cube Unit或Vector
 Unit对UB中的数据进行高速运算。处理结束后，输出结果再次交由MTE接管，安全、高效地写回至全局内存，由此形成一个无缝闭环。
-\#\#\#\# 昇腾AI异构计算架构（CANN） \{\#src-book-chapter7-h5\}
+
+\subsubsection{昇腾AI异构计算架构（CANN）}\label{src-book-chapter7-h5}
 
 正如第 4 章在探讨 PyACL 编程基础时所述，CANN（Compute Architecture for
 Neural

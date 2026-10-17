@@ -44,6 +44,7 @@ lang: zh-cn
 **总线接口单元（Bus Interface Unit, BIU）** 扮演着AI Core与外部存储总线通信的“门户”角色，其主要职责是将AI Core发出的各类读写请求精确转化为标准的总线协议交互。
 
 在一个典型的计算流水线中：数据首先通过BIU由全局内存接入，随后经MTE的高效搬运与格式重组，稳妥驻留于L1缓存或UB中。紧接着，Scalar Unit发出调度指令，指挥Cube Unit或Vector Unit对UB中的数据进行高速运算。处理结束后，输出结果再次交由MTE接管，安全、高效地写回至全局内存，由此形成一个无缝闭环。
+
 #### 昇腾AI异构计算架构（CANN） {#src-book-chapter7-h5}
 
 正如第 4 章在探讨 PyACL 编程基础时所述，CANN（Compute Architecture for Neural Networks）是昇腾全面面向AI场景定制的异构计算架构。它在整个计算系统中发挥着承上启下的核心枢纽作用：向上广泛适配MindSpore、PyTorch、TensorFlow等主流AI框架，向下直接调度并深度释放昇腾AI处理器的澎湃算力，是提升硬件计算效率的关键”软件底座”。（CANN的详细架构、与CUDA对比、安装配置等内容请参见第2章。）
