@@ -138,11 +138,26 @@ try {
 	const planTool = registeredTools.get('ascend_debug_plan');
 	const planResult = await planTool.execute({ symptom: 'import acl 失败', rawText: PROBE_8T_CANN80, repoRoot }, {});
 	check(planResult.text.includes('停止条件'), 'the plan tool must render stop conditions');
+	check(typeof planResult.applicable === 'string', 'the plan applicability must be serializable as a schema string');
+	for (const sample of planResult.samples) {
+		check(typeof sample.id === 'string' && typeof sample.title === 'string' && typeof sample.readme === 'string',
+			'every planned sample must carry string identity fields');
+		for (const key of ['archetype', 'archetypeLabel', 'entry', 'test']) {
+			check(sample[key] === undefined || typeof sample[key] === 'string',
+				`planned sample field ${key} must be omitted when it is not a string`);
+		}
+	}
 
 	const indexTool = registeredTools.get('ascend_sample_index');
 	if (repoRoot !== null) {
 		const indexResult = await indexTool.execute({ repoRoot, limit: 3 }, {});
 		check(indexResult.text.length > 0, 'the sample index tool must render matching samples');
+		for (const sample of indexResult.matched) {
+			for (const key of ['archetype', 'archetypeLabel', 'entry', 'test']) {
+				check(sample[key] === undefined || typeof sample[key] === 'string',
+					`indexed sample field ${key} must be omitted when it is not a string`);
+			}
+		}
 	} else {
 		// With no configured repository root the tool must refuse clearly instead
 		// of silently indexing whatever directory the process happens to be in.
@@ -236,7 +251,8 @@ try {
 		{ symptom: 'import acl failed', rawText: '===ABS_BEGIN:npu_smi_info===\n| 0       310P3             | OK            | 12.8         45                0    / 0              |\n===ABS_END:npu_smi_info===' },
 		{}
 	);
-	check(foreignPlan.applicable === false, 'the planner must mark an out-of-scope device as not applicable');
+	check(foreignPlan.applicable === 'no', 'the planner must mark an out-of-scope device as not applicable');
+	check(foreignPlan.scope?.applicable === false, 'the planner scope must retain the boolean machine-readable decision');
 	check(foreignPlan.matched.length === 0, 'the planner must not return 310B procedures for another chip');
 	check(foreignPlan.text.includes('不适用范围'), 'the planner must explain why it refused');
 

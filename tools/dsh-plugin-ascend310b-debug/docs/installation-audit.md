@@ -31,6 +31,7 @@
 | README 的安装和测试路径仍指向 `%USERPROFILE%\.dsh\plugins` | 从仓库安装时照做会复制旧目录或失败 | 全部改为 `tools/dsh-plugin-ascend310b-debug`，并把板卡 IP、SSH 用户改为占位符 |
 | 升级时用 `Copy-Item 源目录 目标目录` 会把整个目录再嵌一层 | 第二次安装后 DSH 找不到包入口 | 先创建目标目录，再复制源目录内容（`Join-Path $plugin '*'`） |
 | 包清单未声明 Node 版本，自检未覆盖清单完整性 | 旧 Node 或缺少入口文件时到挂载阶段才报错 | 增加 `engines.node >= 18`，可移植性测试检查入口、导出、许可证与 `files` 目标是否存在 |
+| `ascend_debug_plan` 和 `ascend_sample_index` 的返回对象含 schema 不接受的值 | 真实 DSH 运行时在工具返回后拒绝结果；空 `entry`/`test`、布尔 `applicable` 和额外样例字段都会触发校验失败 | 在输出边界规范化样例对象，把 `applicable` 映射为字符串，并补 smoke 断言防止回归 |
 
 ## 已验证的门禁
 
@@ -46,7 +47,7 @@ npm pack --dry-run
 
 | 门禁 | 验证内容 | 本次结果 |
 | --- | --- | --- |
-| `npm test` | 解析、版本判定、适用范围、计划、只读命令门、浏览器装配、面板渲染、可移植性、HTTP 冒烟 | 通过 |
+| `npm test` | 解析、版本判定、适用范围、计划、工具输出 schema、只读命令门、浏览器装配、面板渲染、可移植性、HTTP 冒烟 | 通过 |
 | 样例索引 | 用当前 `samples/` 重新生成后与包内快照比较 | 15 个样例，SHA-256 未变化 |
 | 一次性 profile | 路由、CANN/驱动解析、8T 夹具、非 310B 拒绝、下发 bundle 含新名称 | 通过 |
 | patch 组合 | 桌面 profile 的插件行能被解析并带到目标列表 | 通过 |

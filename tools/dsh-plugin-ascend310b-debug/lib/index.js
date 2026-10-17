@@ -287,12 +287,29 @@ const SAMPLE_SCHEMA = {
 		title: { type: 'string', required: true },
 		readme: { type: 'string', required: true },
 		archetype: { type: 'string' },
+		archetypeLabel: { type: 'string' },
 		entry: { type: 'string' },
 		test: { type: 'string' },
 		capabilities: { type: 'array', items: { type: 'string' } },
 		keywords: { type: 'array', items: { type: 'string' } }
 	}
 };
+
+/** Remove null/undefined optional sample fields rejected by the tool schema. */
+function publicSample(sample) {
+	const output = {
+		id: sample.id,
+		title: sample.title,
+		readme: sample.readme
+	};
+	for (const key of ['archetype', 'archetypeLabel', 'entry', 'test']) {
+		if (typeof sample[key] === 'string' && sample[key] !== '') output[key] = sample[key];
+	}
+	for (const key of ['capabilities', 'keywords']) {
+		if (Array.isArray(sample[key])) output[key] = sample[key].filter((value) => typeof value === 'string');
+	}
+	return output;
+}
 
 /** JSON schema for one matched knowledge entry. */
 const MATCH_SCHEMA = {
@@ -663,6 +680,8 @@ export function apply(ctx, config) {
 					maxEntries: args.maxEntries
 				});
 				const outOfScope = scope?.applicable === false;
+				const applicable =
+					scope?.applicable === true ? 'yes' : scope?.applicable === false ? 'no' : 'unknown';
 				const scopeNote = outOfScope
 					? `## 不适用范围\n\n${scope.message}\n\n下面的分层计划属于教材的昇腾 310B 调试程序，在 ${scope.soc} 上不应照做；请改用该芯片自己的工具链与文档。\n`
 					: '';
@@ -670,7 +689,7 @@ export function apply(ctx, config) {
 				const text = samplesNote === null ? body : `${body}\n\n${samplesNote}`;
 				return {
 					text,
-					applicable: scope?.applicable ?? 'unknown',
+					applicable,
 					scope,
 					gate: plan.gate,
 					matched: outOfScope ? [] : plan.matched.map((entry) => ({
@@ -686,7 +705,7 @@ export function apply(ctx, config) {
 					steps: outOfScope ? [] : plan.steps,
 					probes: outOfScope ? [] : plan.probes,
 					facts,
-					samples: outOfScope ? [] : samples
+					samples: outOfScope ? [] : samples.map(publicSample)
 				};
 			},
 			presentCall: (args) => ({
@@ -770,7 +789,7 @@ export function apply(ctx, config) {
 				].join('\n');
 				return Promise.resolve({
 					text,
-					matched,
+					matched: matched.map(publicSample),
 					total: index.entries.length,
 					archetypes: index.archetypes ?? []
 				});
