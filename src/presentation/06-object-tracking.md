@@ -74,6 +74,16 @@ footer: "案例 2：目标跟踪检测"
 
 <div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img2/%E4%B8%BB%E7%BA%BF%E5%9B%BE.png">src/experiment/img2/主线图.png</a>；正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case2.md">src/experiment/case2.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case2">samples/case2/</a></div>
 
+
+---
+
+<!-- _class: visual -->
+
+## 目标跟踪流程图：数据从采集到跟踪结果
+
+![目标跟踪流程](../experiment/img2/流程图.png)
+
+<div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img2/流程图.png">src/experiment/img2/流程图.png</a></div>
 ---
 
 ## 硬件与运行条件
@@ -103,6 +113,9 @@ case2/
 │   ├── *.onnx
 │   └── *.om
 ├── ssdlite/
+```
+
+```text
 │   ├── backend_base.py
 │   ├── cpu_backend.py
 │   ├── decoder.py
@@ -113,6 +126,13 @@ case2/
 ├── utils/
 │   ├── opencv_runtime.py
 │   ├── postprocessing.py
+```
+
+---
+
+## `samples/case2` 目录结构（续）
+
+```text
 │   └── preprocessing.py
 ├── README.md
 └── requirements.txt
@@ -149,6 +169,13 @@ samples/case2/
 | `ssdlite/backend_base.py` | CPU/NPU 统一检测后端基类 |
 | `ssdlite/cpu_backend.py` | ONNXRuntime CPU 推理 |
 | `ssdlite/npu_backend.py` | Ascend ACL NPU 推理 |
+
+---
+
+## Python 文件清单与职责（续）
+
+| 路径 | 职责 |
+|---|---|
 | `ssdlite/decoder.py` | default boxes、SSD 解码、NMS |
 | `tracking/deepsort.py` | Track、匹配、轨迹生命周期管理 |
 | `tracking/kalman_filter.py` | 卡尔曼滤波预测与更新 |
@@ -219,6 +246,10 @@ annotated = draw_tracks(...)
 - 遮挡后重新出现的车辆是否还是同一辆
 - 两个目标交叉时 ID 是否保持不交换
 
+---
+
+## 检测与跟踪的分工（续）
+
 因此，跟踪可以理解为“目标检测在时间维度上的延伸”。
 
 ---
@@ -274,7 +305,6 @@ SSD 推理速度快、结构直接，但对小目标、密集目标和复杂遮�
 ---
 
 <!-- _class: compact -->
-
 ## NMS 为什么重要
 
 SSD 会在每个特征位置、每种先验框上产生候选框，同一目标往往有多个高重叠框。NMS 做去重：
@@ -285,6 +315,10 @@ SSD 会在每个特征位置、每种先验框上产生候选框，同一目标�
 4. 删除 IOU 超过阈值的框，继续处理剩余框
 
 真实实现：
+
+---
+
+## NMS 为什么重要（续）
 
 ```python
 def _nms(boxes, scores, iou_threshold, presorted=False):
@@ -297,6 +331,9 @@ def _nms(boxes, scores, iou_threshold, presorted=False):
     keep = []
     while order.size > 0:
         index = order[0]
+```
+
+```python
         keep.append(index)
         if order.size == 1:
             break
@@ -575,8 +612,15 @@ command = [
 ]
 if input_shape:
     command.append(f"--input_shape={input_shape}")
+```
+
+```python
 command.extend(args.extra_arg)
 ```
+
+---
+
+## ATC 命令如何生成（续）
 
 - `framework=5` 表示 ONNX
 - `input_format=NCHW`
@@ -747,6 +791,13 @@ NPU 和实时摄像头操作属于板端操作。
 | `--model-dir` | 模型目录，默认 `models/` |
 | `--source` | 摄像头编号或视频路径 |
 | `--score-threshold` | 检测置信度阈值，默认 `0.35` |
+
+---
+
+## Detection 关键参数（续）
+
+| 参数 | 作用 |
+|---|---|
 | `--nms-threshold` | NMS 阈值，默认 `0.45` |
 | `--max-detections` | 每帧最多保留框数，默认 `100` |
 | `--save` | 输出视频路径 |
@@ -783,6 +834,10 @@ README 记录板端一次实测中，V4L2 + 小缓冲后 tracking 显示 FPS 从
 | `Infer` | 模型推理时间 |
 | `Decode` | SSD 后处理时间 |
 | `Draw` | 绘制与显示时间 |
+
+---
+
+## 阶段耗时怎么看（续）
 
 - `Read` 偏高：优先检查摄像头档位、MJPEG、V4L2 路径
 - `Decode` 偏高：降低 `max-detections` 或使用 `--track-classes`
@@ -980,6 +1035,11 @@ caption = f"ID {track.track_id} | {label} | {track.score:.2f}"
   - 输入输出合同、生成 OM 路径、ATC 日志
 - `linux/case2/tracking-output.md`
   - detection 与 tracking 的启动日志
+
+---
+
+## 交付物（续）
+
   - 使用的命令、模型、参数
   - 保存的输出视频路径
   - ID 稳定性、轨迹连续性和调参观察

@@ -6,6 +6,7 @@ paginate: true
 header: "《昇腾310B实战》教材配套演示"
 footer: "附录 2：基于昇腾 310B 的 Ubuntu 教程"
 ---
+
 <!-- _class: cover -->
 
 # 附录 2：基于昇腾 310B 的 Ubuntu 教程
@@ -108,6 +109,10 @@ readlink -f models/example.om
 
 命令解释：
 
+---
+
+## 路径：命令影响范围的第一证据（续）
+
 - `cd`：切换目录；`~` 展开为当前用户主目录。
 - `pwd`：打印当前工作目录，确认命令将在哪里执行。
 - `realpath .`：把当前相对路径解析为绝对路径。
@@ -129,6 +134,10 @@ sudo apt update
 ```
 
 命令解释：
+
+---
+
+## 用户、root 与 sudo（续）
 
 - `whoami`、`id`：确认当前用户、UID、GID 和附加组。
 - `sudo -i`：进入具有登录环境的 `root` Shell；退出使用 `exit` 或 `Ctrl+D`。
@@ -174,6 +183,10 @@ sudo chown <user>:<group> <path>
 
 命令解释：
 
+---
+
+## 查看和修改权限（续）
+
 - `ls -l`：查看权限位、链接数、所有者、组和大小。
 - `stat`：以稳定格式输出权限、所有者、组、字节数和文件名。
 - `groups`：查看当前用户所在组，如摄像头可能需要 `video` 组。
@@ -201,6 +214,10 @@ rm -r temp-directory
 
 命令解释：
 
+---
+
+## 常用命令：目录与文件操作（续）
+
 - `pwd` 显示当前位置；`cd ..` 返回上一级，`cd` 无参数通常返回主目录。
 - `mkdir -p` 创建多级目录且已存在时不报错。
 - `touch` 创建空文件或更新时间戳。
@@ -226,6 +243,10 @@ command -v python
 
 命令解释：
 
+---
+
+## 常用命令：查看、检索与空间（续）
+
 - `cat` 适合小文件；长日志优先使用 `head`、`tail`。
 - `grep` 过滤文本，`-n` 显示行号。
 - `find -maxdepth` 限定扫描深度，避免误扫整个家目录。
@@ -250,6 +271,10 @@ sudo nano /etc/exports
 4. 按 `Ctrl+X` 退出。
 5. 如果提示保存，确认文件名与内容后再选择 `Y`。
 
+---
+
+## nano：直接编辑、保存与退出（续）
+
 命令解释：
 
 - `nano notes.txt` 编辑用户文件，通常不需要 `sudo`。
@@ -266,12 +291,21 @@ vim notes.txt
 
 基本流程：
 
+---
+
+## vim：模式化编辑与退出（续）
+
 1. 进入 vim 后默认是普通模式，不能直接输入文本。
 2. 按 `i` 进入插入模式，右下角通常显示 `INSERT`。
 3. 按 `Esc` 返回普通模式。
 4. 输入 `:wq` 保存并退出。
 5. 输入 `:q` 未修改时退出。
 6. 输入 `:q!` 放弃修改退出。
+
+---
+
+## vim：模式化编辑与退出（续）
+
 7. 编辑受保护文件时可使用 `:wq!`，但必须先确认权限风险。
 
 命令解释：使用 vim 时先确认当前模式，再执行编辑或退出命令；按键记忆可以在练习中逐步完成。
@@ -315,6 +349,10 @@ nano 适合初学者完成简单配置；vim 适合远程终端和熟练用户�
 - `ubuntu-basics/lesson1-editor-notes.md`
 
 验收标准：
+
+---
+
+## 第 1 课时交付物与验收（续）
 
 - 能说出绝对路径和相对路径的区别。
 - 能解释 `$` 与 `#`、`root` 与普通用户、`sudo` 与 `su` 的基本边界。
@@ -365,6 +403,10 @@ ping -c 4 <board-ip>
 
 命令解释：
 
+---
+
+## 网络状态：先观察，再修改（续）
+
 - `ip a`：查看网卡名称、状态、IPv4/IPv6 地址和掩码。
 - `ip route`：查看默认网关和路由选择。
 - `nmcli connection show`：列出 NetworkManager 连接配置。
@@ -386,6 +428,10 @@ ping -c 4 <board-ip>
 ```
 
 设置前确认：
+
+---
+
+## 静态 IP：规划、设置与验证（续）
 
 - 目标 IP 未被其他设备占用。
 - 目标 IP 与板端或网关位于同一网段。
@@ -414,6 +460,10 @@ ip route
 ip neigh
 ping -c 4 <peer-ip>
 ```
+
+---
+
+## 同一网段：网络位比较（续）
 
 命令解释：
 
@@ -449,6 +499,10 @@ nmcli connection up "<connection-name>"
 - 需要同时连接外网和提供服务时，应明确网卡数量、路由和 IP 规划。
 
 源教程中的热点参数包括：
+
+---
+
+## WiFi 与热点：两种互斥模式（续）
 
 - SSID：对外可见的 WiFi 名称。
 - Mode：`Hotspot`。
@@ -538,6 +592,10 @@ sudo systemctl enable ssh
 
 命令解释：
 
+---
+
+## SSH 服务端：安装、启动与开机自启（续）
+
 - `sudo service ssh status`：查看 SSH 服务是否已安装并运行。
 - `sudo apt update`：更新软件包索引。
 - `sudo apt install openssh-server`：在板端安装 SSH 服务端。
@@ -606,12 +664,20 @@ ss -ltnp | grep ':22'
 
 排查逻辑：
 
+---
+
+## SSH 同一网段故障排查（续）
+
 1. 客户端和板端是否都有正确 IPv4 与掩码。
 2. 两边是否在同一网段，或路由是否能到达对方。
 3. 接口是否启用，WiFi 是否连接到正确 SSID。
 4. 板端 SSH 服务是否运行，是否监听 22 端口。
 5. 是否有防火墙或安全策略阻断。
 6. IP 是否冲突；必要时回到串口或本地终端修正。
+
+---
+
+## SSH 同一网段故障排查（续）
 
 `【板端】` 最后两项检查修改系统状态，必须在确认当前连接不会因操作而永久丢失时执行。
 
@@ -626,6 +692,10 @@ VNC 让客户端看到板端桌面，适合：
 - 不方便使用纯命令行完成的可视化调试。
 
 常见客户端：
+
+---
+
+## VNC：远程桌面适合什么任务（续）
 
 - Ubuntu：Remmina。
 - Windows：MobaXterm 或其他 VNC 客户端。
@@ -651,6 +721,10 @@ sudo apt install remmina remmina-plugin-rdp remmina-plugin-secret
 - `apt update` 刷新软件包索引。
 - `apt install` 安装 Remmina 及插件。
 - 源教程还写了 `sudo killall remmina`；共享环境中不要批量终止进程，先正常退出，必要时按已确认 PID 使用 `kill -TERM`。
+
+---
+
+## VNC 连接：工具、目标 IP 与密码（续）
 
 连接步骤：
 
@@ -686,6 +760,10 @@ VNC 常见限制：
 - 需要重新打开 `Sharing -> Screen sharing`，或启用 `Remote Desktop` 的兼容协议。
 - 共享服务关闭时，即使 IP 可达，VNC 仍可能连接失败。
 
+---
+
+## VNC 共享开关与 SSH/VNC 对比（续）
+
 | 对比项 | SSH | VNC |
 | --- | --- | --- |
 | 主要用途 | 命令行、脚本、文件操作 | 完整桌面与图形窗口 |
@@ -714,6 +792,10 @@ sudo systemctl restart nfs-kernel-server
 ```
 
 命令解释：
+
+---
+
+## NFS：服务端与客户端模型（续）
 
 - `apt-get install nfs-kernel-server`：安装服务端。
 - `mkdir -p`：创建明确的共享目录。
@@ -756,6 +838,10 @@ mount | grep nfs
 
 命令解释：
 
+---
+
+## NFS 客户端：挂载、验证与卸载（续）
+
 - `nfs-common`：客户端基础包；源教程中的 `portmap` 属于旧版方案。
 - `mkdir -p`：创建独立挂载点，避免覆盖已有目录。
 - `umount`：挂载前先卸载旧 NFS，源教程用于避免服务端断电后的残留状态。
@@ -784,6 +870,10 @@ findmnt /mnt/mount_nfs
 - `mount -a` 按 fstab 尝试挂载，但必须在本地终端执行，以免配置错误造成启动受阻。
 - `findmnt` 比 `mount | grep` 更结构化地确认挂载状态。
 
+---
+
+## NFS 开机自动挂载与故障排查（续）
+
 故障顺序：`ping` → `showmount -e <server-ip>` → 导出路径 → 客户端挂载点 → 权限 → 服务端关机后的残留挂载。
 
 ---
@@ -799,6 +889,10 @@ Docker 在同一个 Ubuntu 内核上隔离文件系统和进程环境。
 - Volume/Bind mount：把宿主目录或持久化数据映射给容器。
 - Network：为容器提供端口和网络隔离。
 - 宿主机：运行 Docker Engine 的 Ubuntu 板端或开发机。
+
+---
+
+## Docker：轻量容器与 Ubuntu 的关系（续）
 
 容器适合固定依赖和快速部署，但容器内的设备、网络、图形显示和 NPU 访问仍依赖宿主机配置。`【板端】` 能用 Docker 不等于容器内能自动访问 NPU。
 
@@ -818,6 +912,10 @@ docker logs --tail 100 <container>
 ```
 
 命令解释：
+
+---
+
+## Docker 生命周期命令（续）
 
 - `--version`、`info`：确认客户端、服务端和存储状态。
 - `ps -a`：列出运行和停止的容器。
@@ -839,6 +937,10 @@ docker exec -it -e DISPLAY=$DISPLAY <container> bash
 ```
 
 命令解释：
+
+---
+
+## Docker 挂载、自启动与图形显示（续）
 
 - `docker update --restart=always`：设置容器开机和异常退出后的重启策略。
 - `docker ps -qf "name=<container>"`：按名称过滤并只输出容器 ID。
@@ -883,6 +985,10 @@ Terminal=true
 
 命令解释：
 
+---
+
+## 桌面 autostart：脚本与 .desktop 文件（续）
+
 - `mkdir -p ~/.config/autostart`：创建当前用户的桌面自启动目录。
 - `vim`：编辑 `.desktop` 文件；该文件属于当前用户，通常不需要 `sudo`。源教程使用 `sudo`，会导致属主不一致，本课不采用。
 - `Exec`：必须是脚本的绝对路径。
@@ -909,6 +1015,10 @@ journalctl -u <service>.service -b --no-pager | tail -n 80
 - `start`：立即启动；`status` 查看状态、主 PID 和最近日志。
 - `journalctl -u ... -b`：查看本次启动的服务日志。
 
+---
+
+## systemd：后台服务开机自启（续）
+
 `【板端独占】` CANN、NPU、摄像头和真实设备服务必须验证启动用户、环境变量、设备权限和依赖顺序。状态为 `active` 只说明进程运行，不证明推理成功。
 
 ---
@@ -917,12 +1027,21 @@ journalctl -u <service>.service -b --no-pager | tail -n 80
 
 在隔离实验网络中完成：
 
+---
+
+## 第 2 课时课堂任务（续）
+
 1. 用 `ip a`、`ip route`、`nmcli connection show` 记录客户端和板端网络状态。
 2. 规划一个同网段且不冲突的静态 IP，写出地址、掩码、网关、DNS 和回滚方式。
 3. 从客户端 `ping` 板端，执行 `ssh -Y <user>@<board-ip>`，记录主机名和 `uname -a`。
 4. 在一台有图形桌面的 Ubuntu 上安装或配置 VNC 客户端，记录 IP、密码来源、分辨率和共享开关状态。
 5. 在临时挂载点完成一次 NFS 挂载、`findmnt` 验证和卸载；不修改生产共享目录。
 6. 用一个测试容器练习 `start`、`logs`、`exec`、`stop`，并说明重启策略。
+
+---
+
+## 第 2 课时课堂任务（续）
+
 7. 写一个只读自启动脚本，先手工运行，再选择桌面 autostart 或 systemd 验证。
 
 ---
@@ -938,6 +1057,10 @@ journalctl -u <service>.service -b --no-pager | tail -n 80
 
 验收标准：
 
+---
+
+## 第 2 课时交付物与验收（续）
+
 - 能判断两个 IP 是否在同一网段，并能解释掩码的作用。
 - 能在不丢失恢复通道的前提下规划静态 IP。
 - 能使用 SSH 和 VNC，并能区分两者的用途与证据。
@@ -951,12 +1074,20 @@ journalctl -u <service>.service -b --no-pager | tail -n 80
 
 本课时目标：
 
+---
+
+## 第 3 课时（45 分钟）：310B CANN 与运行证据（续）
+
 - 明确开发机与 310B 板端的职责边界。
 - 能在板端同一 Shell 中加载 CANN，并验证 PyACL 导入。
 - 能读取 `npu-smi`、检查设备节点和记录 `soc_version` 判断过程。
 - 能理解 ATC、OM、PyACL 加载和数值烟测的区别。
 - 能查看服务、端口、日志并有序停止目标 PID。
 - 能按证据门组织测试，不伪造板端结果。
+
+---
+
+## 第 3 课时（45 分钟）：310B CANN 与运行证据（续）
 
 45 分钟建议：10 分钟 CANN/PyACL/NPU，15 分钟 ATC/OM，10 分钟服务与日志，10 分钟测试与证据。
 
@@ -966,12 +1097,21 @@ journalctl -u <service>.service -b --no-pager | tail -n 80
 
 以下操作 `【板端独占】`，不能在开发机上代替：
 
+---
+
+## 板端独占：本课时最重要的边界（续）
+
 - `source /usr/local/Ascend/ascend-toolkit/set_env.sh`
 - `npu-smi info`
 - `python -c "import acl"`
 - `atc` 执行 ONNX 到 OM 转换
 - PyACL 加载 OM 并执行推理
 - `/dev/davinci*`、摄像头、串口、GPIO 等真实设备访问
+
+---
+
+## 板端独占：本课时最重要的边界（续）
+
 - CANN/NPU 服务启动、日志与性能测量
 
 开发机可以做：语法检查、静态文件检查、文档编辑、客户端 SSH/VNC。开发机通过检查不等于板端通过检查。
@@ -1029,6 +1169,10 @@ ls -l /dev/davinci* /dev/davinci_manager /dev/hisi_hdc /dev/devmm_svm 2>/dev/nul
 - `ls -l /dev/...`：确认驱动是否创建设备节点；设备节点名称可能随驱动版本变化，不存在时原样记录。
 - 若 `npu-smi` 的名称类似 `310B4`，ATC 的 `--soc_version` 通常写 `Ascend310B4`，但必须以实际板端和 CANN 文档为准。
 
+---
+
+## NPU 状态与板端设备节点（续）
+
 本页不预设任何 310B 健康、温度、内存或设备数量结果。所有数字都要现场采集并绑定时间、主机和环境。
 
 ---
@@ -1048,6 +1192,10 @@ atc \
 ```
 
 命令解释：
+
+---
+
+## ATC：在板端把 ONNX 转换为 OM（续）
 
 - `TE_PARALLEL_COMPILER=1`、`MAX_COMPILE_CORE_NUMBER=1`：限制编译并行度，降低内存压力。
 - `--framework=5`：输入为 ONNX。
@@ -1091,6 +1239,10 @@ sha256sum -c SHA256SUMS.txt
 - `sha256sum`：计算单个文件摘要，用于比较两份工件是否一致。
 - `sha256sum -c SHA256SUMS.txt`：只在生成该清单的复现包根目录执行，逐项校验。
 - 摘要一致只证明文件字节一致，不证明 OM 能在目标设备加载。
+
+---
+
+## OM 文件：摘要验证只是第一道门（续）
 
 模型、ONNX、OM、数据集和真实报告默认不提交到 Git。`310B4 / 8T` 与 `310B1 / 20T` 的工件和结果不得混用。
 
@@ -1150,6 +1302,10 @@ kill -TERM "$service_pid"
 
 命令解释：
 
+---
+
+## 有序停止服务：确认 PID 再终止（续）
+
 - `case`：确认 PID 只包含数字，防止空值或注入。
 - `ps -fp`：确认该 PID 的命令行。
 - `readlink -f /proc/<pid>/cwd`：确认进程工作目录，避免杀错同名进程。
@@ -1180,12 +1336,20 @@ kill -TERM "$service_pid"
 
 每份板端报告至少记录：
 
+---
+
+## 310B 证据报告与失败记录（续）
+
 - 板卡型号与算力层级、主机名、IP、时间。
 - Ubuntu、内核、CANN、驱动与固件版本。
 - Python 解释器路径、conda 环境、`PYTHONPATH`、`LD_LIBRARY_PATH`。
 - 模型 ID、精度、ONNX/OM 路径、SHA-256 和输入合同。
 - 原始命令、退出码、关键日志、报告路径。
 - 预热次数、循环次数、重复次数和百分位方法。
+
+---
+
+## 310B 证据报告与失败记录（续）
 
 常见失败边界：
 
@@ -1207,6 +1371,11 @@ kill -TERM "$service_pid"
 4. 选择一个已批准的小模型，按输入合同执行一次 ATC；若失败，保存完整失败日志。
 5. 对 OM 计算 `stat` 与 `sha256sum`，再执行一次 ACL 加载烟测。
 6. 启动一个测试服务，检查 PID、监听端口、日志和 HTTP 状态，然后按 PID 有序停止。
+
+---
+
+## 第 3 课时课堂任务（续）
+
 7. 写一张证据表，把语法、转换、加载、数值、性能、UI 六类结果分开。
 
 ---
@@ -1222,6 +1391,10 @@ kill -TERM "$service_pid"
 - `ascend310b/evidence-boundary.md`
 
 验收标准：
+
+---
+
+## 第 3 课时交付物与验收（续）
 
 - 能指出哪些命令是 `【板端独占】`，哪些可以在开发机完成。
 - 能在同一 Shell 中加载 CANN，并区分 `import acl`、设备数量和 OM 加载。

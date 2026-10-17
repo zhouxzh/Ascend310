@@ -65,6 +65,16 @@ footer: "案例 1：智能考勤机"
 
 <div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img1/case1_flow.png">src/experiment/img1/case1_flow.png</a>；正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case1.md">src/experiment/case1.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case1">samples/case1/</a></div>
 
+
+---
+
+<!-- _class: visual -->
+
+## 案例1流程图（简化版）：先看主干
+
+![案例1简化流程](../experiment/img1/case1_flow_simple.png)
+
+<div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img1/case1_flow_simple.png">src/experiment/img1/case1_flow_simple.png</a></div>
 ---
 
 ## 系统四层架构
@@ -84,6 +94,11 @@ footer: "案例 1：智能考勤机"
 4. 根据边界框裁剪人脸并送入特征模型；
 5. 将输出向量与数据库中的向量逐一计算余弦相似度；
 6. 注册请求写入用户和头像，打卡请求在通过阈值时写入事件；
+
+---
+
+## 一次图像请求的逻辑顺序（续）
+
 7. API 返回结构化结果，界面根据 `success`、`match` 或错误状态更新视图。
 
 说明：这是便于教学的串行流程，不声称对多人脸、遮挡、姿态或大规模用户库具有最佳性能。
@@ -146,13 +161,8 @@ samples/case1/
         target_size = (640, 640)
         img = cv2.resize(image, target_size)
         img = img.astype(np.float32)
-        # Assuming model expects BGR, mean subtraction
-        # Buffalo_s det usually: - mean(104, 117, 123)? Or no mean?
-        # InsightFace scrfd usually doesn't need mean subtraction if model is simple, but often it does.
-        # Let's try standard mean subtraction.
-        # However, many ONNX models from InsightFace expect RGB?
-        # Checking input.1 usually implies standard normalization.
-        # I'll stick to simple subtraction for now.
+        # 运行时合同：OpenCV 读入为 BGR，按 (x - 127.5) / 128.0 归一化
+        # 常数以 ONNX 输入描述为准，改动后必须重做数值烟测
         img -= np.array([127.5, 127.5, 127.5], dtype=np.float32)
         img /= 128.0
 
@@ -163,6 +173,9 @@ samples/case1/
     def preprocess_rec(self, face_img):
         img = cv2.resize(face_img, (112, 112))
         img = img.astype(np.float32)
+```
+
+```python
         img = (img - 127.5) / 128.0
         img = img.transpose(2, 0, 1)
         img = np.expand_dims(img, axis=0)
@@ -174,7 +187,6 @@ samples/case1/
 ---
 
 <!-- _class: tight -->
-
 ## 检测输出合同
 
 当前后处理实现按三种 stride（8、16、32）组织分数和边界框距离，并预留关键点输出。代码期望检测模型提供九个可解释的输出张量：三组分数、三组边界框偏移和三组关键点。
@@ -190,6 +202,9 @@ samples/case1/
         if len(raw_outputs) < 6:
             raise ModelNotReadyError("人脸检测模型输出数量不满足后处理合同")
 
+```
+
+```python
         # Flatten and concat
         # Order: 8, 16, 32
 
@@ -200,6 +215,13 @@ samples/case1/
         score_all = np.concatenate([s8, s16, s32], axis=0)
 
         # BBoxes
+```
+
+---
+
+## 检测输出合同（续）
+
+```python
         b8 = np.frombuffer(raw_outputs[3], dtype=np.float32).reshape(-1, 4)
         b16 = np.frombuffer(raw_outputs[4], dtype=np.float32).reshape(-1, 4)
         b32 = np.frombuffer(raw_outputs[5], dtype=np.float32).reshape(-1, 4)
@@ -238,7 +260,6 @@ samples/case1/
 ---
 
 <!-- _class: compact -->
-
 ## PyACL 初始化和释放（板端步骤）
 
 以下代码只应在已加载匹配 CANN 环境的昇腾板端执行，开发机不运行 `acl`、NPU、ATC 或 OM 推理。
@@ -254,6 +275,9 @@ class AscendSystem:
     def __init__(self, device_id=0):
         self.device_id = device_id
         self.context = None
+```
+
+```python
         self.stream = None
         self._init_resource()
 
@@ -264,6 +288,13 @@ class AscendSystem:
         ret = acl.rt.set_device(self.device_id)
         check_ret(ret, "acl.rt.set_device")
 
+```
+
+---
+
+## PyACL 初始化和释放（板端步骤）（续）
+
+```python
         self.context, ret = acl.rt.create_context(self.device_id)
         check_ret(ret, "acl.rt.create_context")
 
@@ -274,6 +305,9 @@ class AscendSystem:
     def release(self):
         if self.stream:
             acl.rt.destroy_stream(self.stream)
+```
+
+```python
         if self.context:
             acl.rt.destroy_context(self.context)
         acl.rt.reset_device(self.device_id)
@@ -304,6 +338,9 @@ class AscendSystem:
                     f"模型输入字节数不匹配: input[{i}] expected={expected_size} actual={data.nbytes}"
                 )
             ptr = acl.util.bytes_to_ptr(data.tobytes())
+```
+
+```python
             size = data.nbytes
             ret = acl.rt.memcpy(self.input_buffers[i]["ptr"], self.input_buffers[i]["size"],
                                 ptr, size, 1)
@@ -351,6 +388,9 @@ class NpuWorker:
         self._ready_event = threading.Event()
         self._stop_event = threading.Event()
         # A readiness failure is reported while holding this lock and the
+```
+
+```python
         # error property takes the same lock; use an RLock to avoid a
         # self-deadlock on the fail-closed path.
         self._state_lock = threading.RLock()
@@ -361,6 +401,13 @@ class NpuWorker:
     @staticmethod
     def _default_backend_factory():
         # Deliberately lazy: importing the web API must not import acl.
+```
+
+---
+
+## 单一硬件所有者：NpuWorker（续）
+
+```python
         from .inference import FaceSystem
 
         return FaceSystem()
@@ -383,8 +430,10 @@ class InferenceProxy:
         return self._worker.call("detect", image, threshold=threshold)
 
     def get_embedding(self, face_image):
-        return self._worker.call("get_embedding", face_image)
+```
 
+```python
+        return self._worker.call("get_embedding", face_image)
 
 def _largest_face(faces, image):
     if not faces:
@@ -393,6 +442,13 @@ def _largest_face(faces, image):
     x1, y1, x2, y2 = map(int, best)
     height, width = image.shape[:2]
     x1, y1 = max(0, x1), max(0, y1)
+```
+
+---
+
+## InferenceProxy 与最大人脸策略（续）
+
+```python
     x2, y2 = min(width, x2), min(height, y2)
     if x2 <= x1 or y2 <= y1:
         return image
@@ -423,10 +479,12 @@ import argparse
 
 from face_attendance.api import create_app
 
-
 # Safe for ASGI tooling: create_app does not open the camera or import ACL.
 app = create_app()
 
+```
+
+```python
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Case 1 face-attendance service")
@@ -437,8 +495,14 @@ def main(argv=None):
     import uvicorn
 
     # Keep one process: the NPU context and camera have a single owner.
-    uvicorn.run(app, host=args.host, port=args.port, workers=1)
+```
 
+---
+
+## FastAPI 启动入口（续）
+
+```python
+    uvicorn.run(app, host=args.host, port=args.port, workers=1)
 
 if __name__ == "__main__":
     main()
@@ -459,6 +523,13 @@ if __name__ == "__main__":
 | `DELETE` | `/api/users/{id}` | 删除用户及其关联事件 |
 | `POST` | `/api/camera/capture` | 从板端摄像头抓取一张图像 |
 | `POST` | `/api/clockin` | 接收上传或浏览器图像并尝试手动打卡 |
+
+---
+
+## API 合同（续）
+
+| 方法 | 路径 | 语义 |
+| --- | --- | --- |
 | `GET` | `/api/attendance` | 返回当天每位用户的最近一条记录 |
 | `GET` | `/video_feed` | 返回缓存帧组成的 `multipart/x-mixed-replace` 流 |
 | `GET` | `/uploads/{resource}` | 返回已授权的头像或抓拍资源 |
@@ -488,6 +559,10 @@ if __name__ == "__main__":
 5. 统一识别服务执行检测、裁剪、特征和比对；
 6. 在数据库锁保护的事务边界内写入 SQLite，并返回最小必要字段。
 
+---
+
+## 请求如何进入硬件队列（续）
+
 解释：摄像头自动考勤与 HTTP 手动打卡使用同一识别服务，不从路由复制一套推理逻辑；摄像头线程只负责采集和维护最近帧，MJPEG 客户端只读取缓存 JPEG。
 
 ---
@@ -505,6 +580,9 @@ def _register_user_job(backend, name, image, upload_dir):
         raise RuntimeNotReadyError("OpenCV 不可用") from exc
 
     faces = list(backend.detect(image))
+```
+
+```python
     face_image = _largest_face(faces, image)
     if getattr(face_image, "size", 0) == 0:
         raise ValueError("无效的人脸区域")
@@ -515,8 +593,15 @@ def _register_user_job(backend, name, image, upload_dir):
     if not cv2.imwrite(str(upload_dir / avatar_filename), face_image):
         raise ValueError("头像保存失败")
     user_id = database.add_user(name or "", embedding.tobytes(), avatar_filename)
+```
+
+```python
     return user_id
 ```
+
+---
+
+## 注册任务代码（续）
 
 解释：注册在 NPU owner 线程内完成检测、裁剪、特征提取和头像保存；头像文件名由服务端生成，不采用客户端文件名。
 
@@ -535,6 +620,9 @@ def _clockin_job(backend, image, image_path):
 
     faces = list(backend.detect(image))
     face_image = _largest_face(faces, image)
+```
+
+```python
     if getattr(face_image, "size", 0) == 0:
         raise ValueError("无效的人脸区域")
     target = np.asarray(backend.get_embedding(face_image), dtype=np.float32)
@@ -545,6 +633,13 @@ def _clockin_job(backend, image, image_path):
         try:
             stored = np.frombuffer(user["embedding"], dtype=np.float32)
             denominator = np.linalg.norm(target) * np.linalg.norm(stored) + 1e-6
+```
+
+---
+
+## 手动打卡任务代码（续）
+
+```python
             similarity = float(np.dot(target, stored) / denominator)
         except (KeyError, TypeError, ValueError):
             continue
@@ -555,6 +650,9 @@ def _clockin_job(backend, image, image_path):
     result = {
         "success": True,
         "match": bool(best_match is not None and max_similarity > 0.5),
+```
+
+```python
         "similarity": float(max_similarity),
     }
     if result["match"]:
@@ -619,6 +717,10 @@ python scripts/check_onnx_out.py models/det_500m.onnx models/w600k_mbf.onnx
 - 日志不输出完整特征、原始图像或调试堆栈；
 - 自动登记仅用于教学观察，正式系统必须有知情同意、人工审核、撤销和删除流程。
 
+---
+
+## 数据存储与隐私边界（续）
+
 解释：这些是最低限度的工程边界，不等同于完整隐私影响评估或合规认证。
 
 ---
@@ -642,6 +744,10 @@ python scripts/check_onnx_out.py models/det_500m.onnx models/w600k_mbf.onnx
 - 摄像头设备节点未被其他进程占用；
 - 两个 OM 已放在样例 `models/`，来源和合同检查结果可追溯；
 - 测试图像为合成图像或经过明确同意的匿名样本。
+
+---
+
+## 板端前置条件（板端步骤）（续）
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
@@ -701,12 +807,21 @@ curl http://127.0.0.1:5000/api/attendance
 
 建议按以下顺序验收：
 
+---
+
+## 功能闭环（板端步骤，使用合成图像）（续）
+
 1. 上传合成图像注册一个带显示名称的用户；
 2. 查询用户列表，确认响应不含 embedding；
 3. 使用同一图像手动打卡，确认 `match`、相似度和事件类型；
 4. 读取 `/api/attendance`，确认当天每位用户最近一条记录语义；
 5. 请求摄像头抓拍和 MJPEG 首帧；
 6. 观察自动分支，明确记录陌生人自动登记仅是教学策略；
+
+---
+
+## 功能闭环（板端步骤，使用合成图像）（续）
+
 7. 修改和删除用户，确认关联事件按合同处理。
 
 ---
@@ -742,6 +857,9 @@ curl http://127.0.0.1:5000/api/attendance
                 self._error = RuntimeError("NPU 工作线程未能在关闭期限内退出")
             raise RuntimeError("NPU 工作线程未能在关闭期限内退出")
         with self._state_lock:
+```
+
+```python
             if self._thread is thread:
                 self._thread = None
 ```
@@ -809,6 +927,11 @@ React/MJPEG 检查：通过 / 失败（报告路径：）
 - 注册、手动打卡、用户列表和今日记录接口使用合成图像完成闭环，用户列表不含 embedding；
 - MJPEG 与摄像头抓拍按实际设备状态返回有效流或明确 `503`，不返回空成功结果；
 - 停止服务后端口和摄像头释放，ACL 资源按逆序释放；
+
+---
+
+## 验收标准（续）
+
 - 所有性能、精度和隐私结论分别绑定各自实验协议，没有报告支撑的数字不写入结论。
 
 ---

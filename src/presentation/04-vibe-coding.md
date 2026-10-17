@@ -6,6 +6,7 @@ paginate: true
 header: "《昇腾310B实战》教材配套演示"
 footer: "附录 4：Vibe Coding 基础"
 ---
+
 <!-- _class: cover -->
 
 # 附录 4：Vibe Coding 基础
@@ -341,6 +342,11 @@ for session_id, session_data in data.items():
 - `json.loads(...)`：把 JSON 文本解析成 Python 字典
 - 外层 `for`：遍历每个 session 的结果
 - 内层 `for`：遍历 `graph_fusion` 和 `ub_fusion` 的 pass
+
+---
+
+## 第3课时：脚本逐行解释（续）
+
 - `len(passes)`：统计每种分类下的 pass 数量
 - 输出名称、`effect_times`、`match_times`，便于和原文件核对
 
@@ -403,6 +409,11 @@ DSH 完成任务后，按以下顺序验收：
 - [luban-agi/Awesome-AIGC-Tutorials](https://github.com/luban-agi/Awesome-AIGC-Tutorials)
 - [e2b-dev/awesome-ai-agents](https://github.com/e2b-dev/awesome-ai-agents)
 - [DSH 官方仓库](https://github.com/deepseek-ai/deepseek-harness)
+
+---
+
+## 参考资料（续）
+
 - [DeepSeek 开放平台](https://platform.deepseek.com/)
 
 ---
@@ -434,5 +445,10 @@ DSH 完成任务后，按以下顺序验收：
 - 提示词包含目标、数据路径、输出位置、约束和验收标准。
 - 生成脚本只使用标准库 `json` 和 `pathlib`，没有 pandas，没有修改原文件。
 - API Key 未出现在代码、文档或聊天记录中。
+
+---
+
+## 验收标准（续）
+
 - 能逐行解释生成代码，并说明哪些行最可能出错。
 - 自己运行脚本后，输出与 `samples/case1/fusion_result.json` 一致。

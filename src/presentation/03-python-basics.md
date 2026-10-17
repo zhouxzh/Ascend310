@@ -6,6 +6,7 @@ paginate: true
 header: "《昇腾310B实战》教材配套演示"
 footer: "附录 3：Python 编程基础"
 ---
+
 <!-- _class: cover -->
 
 # 附录 3：Python 编程基础
@@ -259,7 +260,6 @@ resnet50_feature 2048
 ---
 
 <!-- _class: tight -->
-
 # 2.4 while、break 与 continue
 
 `while` 在条件仍为真时重复执行。循环内必须修改条件变量，否则会无限循环。`continue` 跳过本次循环，`break` 立即结束整个循环。
@@ -289,8 +289,15 @@ for dim in dims:
 for dim in dims:
     if dim > 1024:
         break
+```
+
+```python
     print(dim)
 ```
+
+---
+
+# 2.4 while、break 与 continue（续）
 
 ```text
 512
@@ -801,6 +808,11 @@ python -m py_compile 脚本路径.py
 - [ ] 能写函数统计模型清单中的精度模式
 - [ ] 能区分 `KeyError`、`ValueError` 和 `json.JSONDecodeError`
 - [ ] 能阅读 `samples/` 中常见的列表推导、`enumerate`、`argparse` 和 `pathlib` 写法
+
+---
+
+# 验收标准（续）
+
 - [ ] 能解释 `fusion_result.json` 的三层嵌套结构，并用实际键名读取数据
 - [ ] 脚本通过 `python -m py_compile` 语法检查
 - [ ] 示例只使用标准库，没有 pandas 或板端运行时依赖

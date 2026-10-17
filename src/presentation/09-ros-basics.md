@@ -6,6 +6,7 @@ paginate: true
 header: "《昇腾310B实战》教材配套演示"
 footer: "附录 5：ROS2 基础教程"
 ---
+
 <!-- _class: cover -->
 
 # 附录 5：ROS2 基础教程
@@ -214,6 +215,13 @@ setup(
     ],
     entry_points={
         'console_scripts': [
+```
+
+---
+
+## package.xml 与 setup.py（续）
+
+```python
             'talker = py_pubsub.publisher_member_function:main',
             'listener = py_pubsub.subscriber_member_function:main',
         ],
@@ -616,12 +624,19 @@ URDF 中两类核心标签：`link` 描述刚体部分的外观与物理属性�
 <joint name="left_wheel_joint" type="continuous">
   <origin xyz="0 0.08 0.0325" rpy="1.57 0 0"/>
   <parent link="base_link"/>
+```
+
+```xml
   <child link="left_wheel_link"/>
   <axis xyz="0 1 0"/>
 </joint>
 ```
 
 `origin` 给出子连杆相对父连杆的偏移与旋转；`parent` 与 `child` 定义连接方向；`axis` 是关节运动轴的单位向量；`type="continuous"` 表示可以连续旋转的关节。URDF 中的关节有六种运动类型，选错类型会让运动学结果与实际结构不符。
+
+---
+
+## URDF：描述机器人结构与加载（续）
 
 URDF 通过 `robot_state_publisher` 进入系统：
 
@@ -761,6 +776,10 @@ ros2 launch turn_on_wheeltec_robot \
 
 自启动会让系统在没有人登录时改变机器人的物理状态，因此需要明确边界：
 
+---
+
+## 自启动与开机运行（续）
+
 - 明确哪些节点必须开机启动，哪些只在调试时手动启动；保留手动停止与回滚路径。
 - 保留启动日志，确保失败时能判断失败发生在环境加载、启动还是运行阶段。
 - 对运动相关节点设置安全默认值，避免自启动时立即产生非零速度。
@@ -786,6 +805,10 @@ ros2 launch turn_on_wheeltec_robot \
 该路径把 ROS2 作为数据与启动骨架，把昇腾310B 上运行的模型推理作为一个计算环节，再用标准话题把结果送回机器人系统。
 
 验证按最小风险顺序推进，每一步单独记录证据：
+
+---
+
+## 提出的未验证集成路径：ROS2 + 昇腾310B（续）
 
 1. 只启动 ROS2，确认节点、话题与启动方式正常，不接入任何 NPU 推理。
 2. 只验证昇腾310B 侧的模型推理能力，使用固定输入，不依赖机器人实时数据。
@@ -849,4 +872,9 @@ ros2 launch turn_on_wheeltec_robot \
 - 能使用 `ros2 node`、`ros2 topic`、`ros2 service`、`ros2 action`、`ros2 param`、`ros2 interface`、`ros2 bag`、`rviz2`、`rqt` 中的至少六类命令完成一次观察任务。
 - 能解释 launch、TF2 与 URDF 各自的职责，并说明坐标树断开时会出现什么现象。
 - 能分别说明 SSH 与 VNC 的用途、带宽特征与适用边界，并说明 ROS2 多机通信需要哪些条件。
+
+---
+
+## 验收标准（续）
+
 - 交付物中有完整命令与原始输出，未验证内容明确标注为未验证，不把外部平台结果或文档描述写成昇腾310B 实测结果。

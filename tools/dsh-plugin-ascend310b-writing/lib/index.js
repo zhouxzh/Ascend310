@@ -25,6 +25,7 @@ import {
 import { diagnose } from './doctor.js';
 import { collectVuepressFindings } from './vuepress.js';
 import { collectCodeFindings } from './code.js';
+import { collectDeckFindings } from './deck.js';
 import { analyzeStyle, formatStyle } from './style.js';
 import { planBuild, resolveBuildEnvironment, runBuild } from './build.js';
 
@@ -147,6 +148,17 @@ function resolveRoot(config, argument) {
  * @param {object} code - the result of the code collector.
  * @returns {string} The summary line.
  */
+/**
+ * One line describing the presentation-deck checks.
+ *
+ * @param {object} deck - the result of the deck collector.
+ * @returns {string} The summary line.
+ */
+function describeDeck(deck) {
+	const blocking = deck.findings.filter((finding) => finding.severity === 'error').length;
+	return `课件版式：${deck.decks} 份、${deck.slides} 页（${blocking} 页溢出/口径问题）。`;
+}
+
 function describeCode(code) {
 	const missing = code.findings.filter((finding) => finding.rule === 'sample-path-missing').length;
 	const generated = code.findings.length - missing;
@@ -249,6 +261,9 @@ function runAudit({ root, scope, maxFindings, rev, config }) {
 	const code = collectCodeFindings({ root, settings });
 	extraFindings.push(...code.findings);
 	notes.push(describeCode(code));
+	const deck = collectDeckFindings({ root, settings });
+	extraFindings.push(...deck.findings);
+	notes.push(describeDeck(deck));
 	const report = auditRepo({ root, scope, maxFindings, extraFindings, settings });
 	return {
 		text: [report.text, '', ...notes].join('\n'),
@@ -824,11 +839,12 @@ export function apply(ctx, config) {
 			const assets = collectAssetFindings({ root, settings });
 			const vuepress = collectVuepressFindings({ root, settings, frozenRows: frozen.tableRows });
 			const code = collectCodeFindings({ root, settings });
+			const deck = collectDeckFindings({ root, settings });
 			const audit = auditRepo({
 				root,
 				scope: 'all',
 				maxFindings: 400,
-				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings],
+				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings],
 				settings
 			});
 			const progress = progressReport({ root, scope: 'all', settings });

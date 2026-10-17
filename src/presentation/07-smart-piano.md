@@ -94,6 +94,16 @@ $$
 
 <div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img3/case3-piano-ddsp-architecture.png">src/experiment/img3/case3-piano-ddsp-architecture.png</a>；正文：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/case3.md">src/experiment/case3.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case3/piano_ddsp_runtime">samples/case3/piano_ddsp_runtime/</a></div>
 
+
+---
+
+<!-- _class: visual -->
+
+## DDSP 合成流程：从控制参数到音频
+
+![DDSP 合成流程](../experiment/img3/case3-ddsp-synthesis-flow.png)
+
+<div class="source">图源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img3/case3-ddsp-synthesis-flow.png">src/experiment/img3/case3-ddsp-synthesis-flow.png</a></div>
 ---
 
 <!-- _class: compact -->
@@ -560,6 +570,11 @@ firefox --kiosk http://127.0.0.1:8765
 4. 在“实时演奏/MIDI 键盘”选择实体端口，测试力度、重复音、CC64、断开重连和无悬挂音符
 5. 在“MIDI-DDSP”选择已有版本播放，或建立新的完整渲染任务并检查 WAV 与报告
 6. 停止钢琴会话后，在“DDSP-VST”选择实体输入输出，安静校准噪声门，再用独立单音声源测试
+
+---
+
+## 第3课时：推荐冒烟顺序（续）
+
 7. 完成全部测试后停止任务，确认设备概览中会话恢复为空闲
 
 ---
@@ -607,6 +622,11 @@ else:
 4. 使用已校验 OM 完成 Piano-DDSP 验证，或保留现有 ATC 日志与 bundle 清单；不重新导出模型
 5. 在开发电脑构建前端，在板端启动 `run_webui.py`，确认首页与 `/api/v1/status`
 6. 完成扬声器测试、触摸演奏、MIDI 键盘、MIDI-DDSP 渲染或 DDSP-VST 冒烟
+
+---
+
+## 课堂任务（续）
+
 7. 停止全部音频任务，确认资源锁释放，并保存命令、日志、报告和 WAV 路径
 
 ---
@@ -629,6 +649,11 @@ else:
 - WebUI 在 `0.0.0.0:8765` 启动，`/` 与 `/api/v1/status` 返回正常，kiosk 可打开
 - 至少一条音频输出路径可听到受控测试音；实时演奏验收优先使用 USB 有线输出
 - 触摸或实体 MIDI 的快速点按保留最小门长，`panic`、CC64 和断线释放后无悬挂音符
+
+---
+
+## 验收标准（续）
+
 - MIDI-DDSP 渲染生成可追溯的 WAV 与报告，记录 bundle、instrument、seed、tail 和产物 SHA
 - DDSP-VST 使用实体 capture，Feature/Control 后端为 `acl/om`，PCM 非零，underrun/overflow/clipping 有记录；600 秒长稳协议单独评价
 - 不把未执行的延迟、精度或性能数字写成实测结果，只保留实际命令输出和报告路径
