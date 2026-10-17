@@ -1,0 +1,18 @@
+# Service-only wheels for the validated Python 3.9 / Linux aarch64 runtime.
+# Install from a reviewed local wheelhouse with --no-deps and --require-hashes.
+annotated-types==0.7.0 \
+    --hash=sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53
+click==8.1.8 \
+    --hash=sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2
+fastapi==0.115.2 \
+    --hash=sha256:61704c71286579cc5a598763905928f24ee98bfcc07aabe84cfefb98812bbc86
+pydantic==2.5.3 \
+    --hash=sha256:d0caf5954bee831b6bfe7e338c32b9e30c85dfe080c843680783ac2b631673b4
+pydantic-core==2.14.6 \
+    --hash=sha256:fd9e98b408384989ea4ab60206b8e100d8687da18b5c813c11e92fd8212a98e0
+python-dotenv==1.0.1 \
+    --hash=sha256:f7b63ef50f1b690dddf550d03497b66d609393b40b564ed0d674909a68ebf16a
+starlette==0.40.0 \
+    --hash=sha256:c494a22fae73805376ea6bf88439783ecfba9aac88a43911b48c653437e784c4
+uvicorn==0.32.0 \
+    --hash=sha256:60b8f3a5ac027dcd31448f411ced12b5ef452c646f76f02f8cc3f25d8d26fd82

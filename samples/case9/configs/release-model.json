@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "id": "qwen1.5-0.5b-chat",
+      "display_name": "Qwen1.5 0.5B Chat",
+      "model_id": "Qwen/Qwen1.5-0.5B-Chat",
+      "repository": "Qwen/Qwen1.5-0.5B-Chat",
+      "source": "huggingface",
+      "license": "Tongyi Qianwen Research License Agreement",
+      "revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+      "tokenizer_revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+      "revision_pinned": true,
+      "mirror": "https://hf-mirror.com",
+      "board": {
+        "host": "192.168.1.101",
+        "soc": "Ascend310B1",
+        "tier": "20T"
+      },
+      "runtime": {
+        "provider": "mindspore",
+        "context_length": 1024,
+        "default_max_tokens": 32,
+        "max_tokens": 64,
+        "temperature": 0.0,
+        "top_p": 1.0
+      },
+      "cache_dir": "models/qwen1.5-0.5b-chat",
+      "artifacts": [
+        {
+          "name": "model",
+          "kind": "weights",
+          "filename": "model.safetensors",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/model.safetensors?download=true",
+          "expected_bytes": 1239173352,
+          "sha256": "72453a8ccb338811935ab95a3a6ffa86b586807bf5b3dc327f28b5389b5636e6"
+        },
+        {
+          "name": "tokenizer",
+          "kind": "tokenizer",
+          "filename": "tokenizer.json",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/tokenizer.json?download=true",
+          "expected_bytes": 7028015,
+          "sha256": "f7c9b2dba4a296b1aa76c16a34b8225c0c118978400d4bb66bff0902d702f5b8"
+        },
+        {
+          "name": "config",
+          "kind": "config",
+          "filename": "config.json",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/config.json?download=true",
+          "expected_bytes": 661,
+          "sha256": "adac3bb8bf1b15c74312a2835e3796f6b352d817ff726960e1d5c2cd171da951"
+        },
+        {
+          "name": "tokenizer-config",
+          "kind": "tokenizer_metadata",
+          "filename": "tokenizer_config.json",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/tokenizer_config.json?download=true",
+          "expected_bytes": 1287,
+          "sha256": "482bd979881423375ca5414e4e0d94cd7c5349dbb17fffd46b4d36d71e62a1bc"
+        },
+        {
+          "name": "vocab",
+          "kind": "tokenizer_metadata",
+          "filename": "vocab.json",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/vocab.json?download=true",
+          "expected_bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        },
+        {
+          "name": "merges",
+          "kind": "tokenizer_metadata",
+          "filename": "merges.txt",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/merges.txt?download=true",
+          "expected_bytes": 1671839,
+          "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+        },
+        {
+          "name": "generation-config",
+          "kind": "generation_metadata",
+          "filename": "generation_config.json",
+          "url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/generation_config.json?download=true",
+          "expected_bytes": 206,
+          "sha256": "5cf6fb81bd473eeb55678afbaee79e8d5f8b6e9bc2f942c30ee94721a0a91945"
+        }
+      ],
+      "status": "experimental_isolated",
+      "admission": {
+        "eligible": false,
+        "reason": "The 20T technical gates passed, but formal human Chinese-quality approval remains pending."
+      },
+      "notes": "Release technical-preview profile. The supported target is Ascend310B1 / 20T with the documented isolated runtime."
+    }
+  ]
+}

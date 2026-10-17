@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "project": "Ascend Edge Chat",
+  "profile": "qwen1.5-0.5b-chat",
+  "revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+  "license": "Tongyi Qianwen Research License Agreement",
+  "license_url": "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/blob/4d14e384a4b037942bb3f3016665157c8bcb70ea/LICENSE",
+  "target": {
+    "soc": "Ascend310B1",
+    "tier": "20T",
+    "cann": "8.0.0",
+    "mindspore": "2.4.10",
+    "mindnlp": "0.4.1",
+    "python": "3.9.25"
+  },
+  "model_config": "configs/release-model.json"
+}

@@ -1,70 +1,19 @@
-# Case9 board-local runtime state and generated browser assets.
+# Secrets, board artifacts, and reproducibility outputs never enter Git.
 .env
 .env.local
-artifacts/
-reports/
-frontend/node_modules/
-frontend/dist/
 
-# TinyLlama board-only artifacts, contracts, and runtime reports.
-artifacts/tinyllama/
-reports/tinyllama/
-contracts/tinyllama/
-tinyllama-artifacts.lock.json
-tinyllama-acl-contract.json
-tiny-llama.om
-tiny-llama.onnx
-tokenizer.zip
+# Downloaded or converted models and their board-side contracts/reports.
+/artifacts/
+/contracts/
+/reports/
+/models/
+/repro/
+*.om
+*.onnx
+*.safetensors
+*.part
 
-# Qwen2.5 static ONNX/ACL artifacts and board-local evidence.
-artifacts/qwen25/
-reports/qwen25/
-contracts/qwen25/
-qwen25-artifacts.lock.json
-qwen25-static-*.onnx
-qwen25-static-*.om
-
-# Qwen2.5 static-KV-1024 candidate artifacts and isolated board evidence.
-artifacts/qwen25-kv-1024/
-reports/qwen25-kv-1024/
-contracts/qwen25-kv-1024/
-qwen25-kv-1024-artifacts.lock.json
-qwen25-static-kv-1024*.onnx
-qwen25-static-kv-1024*.om
-
-# Controller-generated ONNX audit reports remain local and reproducible.
-contract-v2.json
-export-report-v2.json
-inspect-report-v2.json
-
-# Board-exported OM provenance and validation evidence copied back for audit.
-artifacts/qwen25-kv-1024/board/
-contracts/qwen25-kv-1024/board/
-reports/qwen25-kv-1024/board/
-
-# Self-contained reproducibility bundles (models, checkpoints, board snapshots).
-repro/
-
-# User-requested local mirror of large Case9 model artifacts.
-models/
-
-# MindSpore candidate worker state and per-profile evidence. Keep the checked-
-# in registry under configs/; only generated state/logs are ignored.
-run/mindspore-chat/
-reports/mindspore-chat/
-artifacts/models/
-
-# Strict 8T candidate campaign outputs (metadata stays in the registry/docs).
-run/mindspore-8t-strict/
-reports/mindspore-8t-strict/
-artifacts/models/qwen2*/
-artifacts/models/llama3.2*/
-
-# Acceptance scratch files stay in the local evidence bundle, not Git.
-run/gap-working/
-
-# Root-level diagnostic outputs and ad-hoc board probes are reproducibility
-# evidence, not checked-in source. Canonical scripts live under scripts/.
-run/*.json
-run/*.py
-run/__pycache__/
+# Runtime state, caches, and generated Python files.
+/run/
+__pycache__/
+*.py[cod]
