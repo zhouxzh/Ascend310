@@ -29,8 +29,24 @@ class ReleaseUiTests(unittest.TestCase):
             chat = client.post("/api/chat", json={"message": "请介绍自己", "stream": False})
         self.assertEqual(page.status_code, 200)
         self.assertNotIn(settings.gateway_api_key, page.text)
-        self.assertNotIn("研究候选", page.text)
+        self.assertIn("测试模型", page.text)
         self.assertIn(SECURITY_WARNING, health.json()["warning"])
-        self.assertNotIn("profiles", config.json())
+        self.assertIn("profiles", config.json())
+        self.assertEqual(config.json()["active_profile"], "qwen1.5-0.5b-chat")
+        self.assertTrue(any(item["id"] == "tinyllama-1.1b-mindspore" for item in config.json()["profiles"]))
         self.assertEqual(chat.status_code, 200)
         self.assertEqual(chat.json()["model"], "ascend-edge-chat")
+
+    def test_ui_explains_that_switching_requires_worker_restart(self) -> None:
+        settings = TextChatSettings(gateway_api_key="server-only-token-0123456789")
+        with TestClient(create_text_chat_app(settings, llm=_FakeLLM())) as client:
+            response = client.post(
+                "/api/chat",
+                json={
+                    "message": "测试另一个模型",
+                    "stream": False,
+                    "profile": "deepseek-r1-qwen-1.5b-mindspore",
+                },
+            )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["error"]["type"], "model_switch_required")

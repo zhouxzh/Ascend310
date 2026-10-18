@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "purpose": "classroom technical experiments; quality is reported separately from runtime availability",
+  "models": [
+    {
+      "id": "qwen1.5-0.5b-chat",
+      "display_name": "Qwen1.5 0.5B Chat",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["zh", "en"],
+      "technical_status": "observed-pass",
+      "quality_status": "pending",
+      "selectable": true,
+      "reason": "默认技术预览；20T 上已完成 worker、JSON、SSE、长输出、稳定性和性能门。",
+      "technical_detail": "20T 20T gap batch 9/9 machine gates; 8T has historical API and performance evidence but strict placement evidence is incomplete.",
+      "quality_detail": "中文和英文人工质量尚未完成正式评分；这不阻止课堂技术测试。",
+      "board_results": {
+        "Ascend310B1/20T": "observed-pass",
+        "Ascend310B4/8T": "observed-degraded"
+      },
+      "worker_registry": "configs/release-model.json",
+      "max_tokens": 64
+    },
+    {
+      "id": "qwen1.5-1.8b-mindspore",
+      "display_name": "Qwen1.5 1.8B Chat",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["zh", "en"],
+      "technical_status": "observed-pass",
+      "quality_status": "pending",
+      "selectable": true,
+      "reason": "20T 已完成完整机器门；需要切换 worker 后单独测量。",
+      "technical_detail": "20T machine probe: JSON/SSE, 64-token, stability and performance completed; 8T not inherited.",
+      "quality_detail": "中文质量未完成独立人工评分。",
+      "board_results": {
+        "Ascend310B1/20T": "observed-pass",
+        "Ascend310B4/8T": "not-run"
+      },
+      "worker_registry": "configs/tutorial-models.json",
+      "max_tokens": 64
+    },
+    {
+      "id": "qwen2-0.5b-instruct-mindspore",
+      "display_name": "Qwen2 0.5B Instruct",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["zh", "en"],
+      "technical_status": "observed-pass",
+      "quality_status": "failed",
+      "selectable": true,
+      "reason": "机器运行门通过；中文加法探测出现 U+FFFD，作为教学实验保留。",
+      "technical_detail": "20T corrected-timeout rerun passed JSON/SSE, 64-token, stability and performance.",
+      "quality_detail": "输出文本完整性失败，原因记录为 tokenizer/解码路径产生替换字符，不等同于 NPU 无法运行。",
+      "board_results": {
+        "Ascend310B1/20T": "observed-pass",
+        "Ascend310B4/8T": "not-run"
+      },
+      "worker_registry": "configs/tutorial-models.json",
+      "max_tokens": 64
+    },
+    {
+      "id": "qwen2-1.5b-instruct-mindspore",
+      "display_name": "Qwen2 1.5B Instruct",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["zh", "en"],
+      "technical_status": "observed-pass",
+      "quality_status": "failed",
+      "selectable": true,
+      "reason": "20T 机器运行门通过；中文探测出现 U+FFFD，不因质量结果隐藏模型。",
+      "technical_detail": "20T completed artifact, Ascend placement, JSON/SSE, 64-token, stability and performance gates.",
+      "quality_detail": "中文加法探测 4/5 含 U+FFFD；这是当前 tokenizer/解码结果，教材中保留原始现象。",
+      "board_results": {
+        "Ascend310B1/20T": "observed-pass",
+        "Ascend310B4/8T": "not-run"
+      },
+      "worker_registry": "configs/tutorial-models.json",
+      "max_tokens": 64
+    },
+    {
+      "id": "qwen2.5-0.5b-mindspore",
+      "display_name": "Qwen2.5 0.5B Instruct",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["zh", "en"],
+      "technical_status": "observed-pass",
+      "quality_status": "pending",
+      "selectable": true,
+      "reason": "20T 复核已完成 JSON/SSE、64-token、稳定性和性能；可作为课堂对照。",
+      "technical_detail": "Earlier context-only evidence was superseded by the corrected-timeout 20T rerun; keep the old timeout report as a failure-analysis example.",
+      "quality_detail": "机器完整性通过；人工质量仍需学生按探测集复核。",
+      "board_results": {
+        "Ascend310B1/20T": "observed-pass",
+        "Ascend310B4/8T": "blocked"
+      },
+      "worker_registry": "configs/tutorial-models.json",
+      "max_tokens": 64
+    },
+    {
+      "id": "qwen2.5-1.5b-mindspore",
+      "display_name": "Qwen2.5 1.5B Instruct",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["zh", "en"],
+      "technical_status": "observed-degraded",
+      "quality_status": "failed",
+      "selectable": true,
+      "reason": "低占用复测可运行并完成机器门；中文探测出现 U+FFFD，另有高占用 Alloc failed 证据。",
+      "technical_detail": "Do not confuse the historical high-occupancy Alloc failed run with the later low-occupancy API/stability pass; both are required teaching evidence.",
+      "quality_detail": "中文文本完整性失败；这解释了为什么质量标签为 failed，但不否定低占用技术路径。",
+      "board_results": {
+        "Ascend310B1/20T": "observed-degraded",
+        "Ascend310B4/8T": "blocked"
+      },
+      "worker_registry": "configs/tutorial-models.json",
+      "max_tokens": 64
+    },
+    {
+      "id": "tinyllama-1.1b-mindspore",
+      "display_name": "TinyLlama 1.1B Chat",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["en", "zh"],
+      "technical_status": "short-smoke",
+      "quality_status": "failed",
+      "selectable": true,
+      "reason": "短请求可以启动和生成；长输出曾触发 U+FFFD/TBE 失败，学生可用它复现边界。",
+      "technical_detail": "8T/20T short API smoke passed; 32/48-token long-output evidence contains U+FFFD and can enter fail-closed watchdog path.",
+      "quality_detail": "中文质量机器探测约 7/10，且长输出文本完整性失败；TinyLlama 主要面向英文。",
+      "board_results": {
+        "Ascend310B1/20T": "short-smoke",
+        "Ascend310B4/8T": "short-smoke"
+      },
+      "worker_registry": "configs/tutorial-models.json",
+      "max_tokens": 8
+    },
+    {
+      "id": "deepseek-r1-qwen-1.5b-mindspore",
+      "display_name": "DeepSeek-R1 Distill Qwen 1.5B",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["zh", "en"],
+      "technical_status": "observed-degraded",
+      "quality_status": "failed",
+      "selectable": true,
+      "reason": "两种板卡都有 NPU/API 运行证据；速度较慢且中文常以推理前缀或事实错误结束。",
+      "technical_detail": "8T and 20T machine gates were recorded; 20T total latency p50/p95 was about 3938/4009 ms at the historical protocol.",
+      "quality_detail": "中文探测出现 <think> 前缀截断或事实错误；这是模型输出行为，不是运行时不可用。",
+      "board_results": {
+        "Ascend310B1/20T": "observed-degraded",
+        "Ascend310B4/8T": "observed-pass"
+      },
+      "worker_registry": "configs/tutorial-models.json",
+      "max_tokens": 32
+    },
+    {
+      "id": "qwen3-0.6b-mindspore",
+      "display_name": "Qwen3 0.6B",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["zh", "en"],
+      "technical_status": "blocked",
+      "quality_status": "not-run",
+      "selectable": false,
+      "reason": "当前 MindNLP 0.4.1 没有对应 loader；这是前置条件阻断，不是中文质量否决。",
+      "technical_detail": "No weight download or NPU generation was performed.",
+      "quality_detail": "未生成输出。",
+      "board_results": {
+        "Ascend310B1/20T": "blocked",
+        "Ascend310B4/8T": "blocked"
+      },
+      "worker_registry": "configs/tutorial-models.json",
+      "max_tokens": 64
+    },
+    {
+      "id": "minicpm3-4b-mindspore",
+      "display_name": "MiniCPM3 4B FP16",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["zh", "en"],
+      "technical_status": "not-run",
+      "quality_status": "not-run",
+      "selectable": false,
+      "reason": "专用 loader、4B 权重和 20T 内存门尚未完成；保留为后续实验。",
+      "technical_detail": "No model start was attempted, so there is no claim of hardware incompatibility.",
+      "quality_detail": "未生成输出。",
+      "board_results": {
+        "Ascend310B1/20T": "not-run",
+        "Ascend310B4/8T": "not-run"
+      },
+      "worker_registry": "configs/tutorial-models.json",
+      "max_tokens": 64
+    }
+  ]
+}

@@ -23,7 +23,27 @@ The tested MindSpore loader did not expose parameter-level device placement. Its
 
 ## Quality State
 
-The fixed model passed automated completion integrity checks for a ten-prompt Chinese probe. Human Chinese-quality review is **pending**. Therefore this release is a technical preview and must not claim that its answers are reliable, complete, safe, or suitable for high-stakes decisions.
+The default Qwen1.5 profile passed automated completion-integrity checks for a
+ten-prompt Chinese probe. Human Chinese-quality review is **pending**. This
+limits the release claim, but it does not make the model unavailable to a
+student testing the NPU path.
+
+The teaching catalog intentionally includes the following technical/quality
+separations:
+
+| Profile | Technical evidence | Quality observation | Interpretation |
+| --- | --- | --- | --- |
+| Qwen1.5 0.5B | 20T machine gates passed | Pending | Baseline is runnable; quality still needs human labels |
+| Qwen2 0.5B / 1.5B | 20T API, long-output and stability evidence | Chinese probes included `U+FFFD` | Runtime works; tokenizer/decode output needs investigation |
+| Qwen2.5 0.5B | Corrected-timeout 20T gates passed | Pending | Earlier 30-second client timeout was a test-harness error, not a model verdict |
+| Qwen2.5 1.5B | Low-occupancy API path passed; separate high-occupancy run had `Alloc failed` | Chinese probes included `U+FFFD` | Selectable as a degraded experiment with a memory warning |
+| TinyLlama 1.1B | Short smoke passed on both tiers | English-oriented; long output had `U+FFFD`/TBE failure | Short test remains useful; long-output limitation is documented |
+| DeepSeek-R1 Distill 1.5B | NPU/API gates recorded on both tiers | `<think>` prefix and factual errors | Slow or poor answers are model behavior, not proof of no NPU execution |
+
+The browser selector follows the technical column. A failed or pending quality
+entry remains selectable; a missing loader or a model that was never run is
+shown as `blocked`/`not-run` and cannot be started until its prerequisite test
+is completed. This is a teaching boundary, not a quality endorsement.
 
 ## Revalidation Gates
 

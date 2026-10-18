@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "id": "qwen1.5-0.5b-chat",
+      "display_name": "Qwen1.5 0.5B Chat",
+      "model_id": "Qwen/Qwen1.5-0.5B-Chat",
+      "repository": "Qwen/Qwen1.5-0.5B-Chat",
+      "source": "huggingface",
+      "license": "Tongyi Qianwen Research License Agreement",
+      "revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+      "tokenizer_revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+      "revision_pinned": true,
+      "mirror": "https://hf-mirror.com",
+      "board": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
+      "runtime": {"provider": "mindspore", "context_length": 1024, "default_max_tokens": 32, "max_tokens": 64, "temperature": 0.0, "top_p": 1.0},
+      "cache_dir": "models/qwen1.5-0.5b-chat",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "url": "https://hf-mirror.com/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/model.safetensors", "expected_bytes": null, "sha256": null},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "url": "https://hf-mirror.com/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/tokenizer.json", "expected_bytes": null, "sha256": null},
+        {"name": "config", "kind": "config", "filename": "config.json", "url": "https://hf-mirror.com/Qwen/Qwen1.5-0.5B-Chat/resolve/4d14e384a4b037942bb3f3016665157c8bcb70ea/config.json", "expected_bytes": null, "sha256": null}
+      ],
+      "status": "experimental_isolated",
+      "admission": {"eligible": false, "reason": "Technical teaching profile; quality is reported separately."},
+      "notes": "Teaching profile. The immutable release lock remains in release-model.json."
+    },
+    {
+      "id": "qwen1.5-1.8b-mindspore",
+      "display_name": "Qwen1.5 1.8B Chat",
+      "model_id": "Qwen/Qwen1.5-1.8B-Chat",
+      "repository": "Qwen/Qwen1.5-1.8B-Chat",
+      "source": "huggingface",
+      "license": "Tongyi Qianwen Research License Agreement",
+      "revision": "e482ee3f73c375a627a16fdf66fd0c8279743ca6",
+      "tokenizer_revision": "e482ee3f73c375a627a16fdf66fd0c8279743ca6",
+      "revision_pinned": true,
+      "mirror": "https://hf-mirror.com",
+      "board": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
+      "runtime": {"provider": "mindspore", "context_length": 1024, "default_max_tokens": 32, "max_tokens": 64, "temperature": 0.0, "top_p": 1.0},
+      "cache_dir": "models/qwen1.5-1.8b-mindspore",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "url": "https://hf-mirror.com/Qwen/Qwen1.5-1.8B-Chat/resolve/e482ee3f73c375a627a16fdf66fd0c8279743ca6/model.safetensors", "expected_bytes": null, "sha256": null},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "url": "https://hf-mirror.com/Qwen/Qwen1.5-1.8B-Chat/resolve/e482ee3f73c375a627a16fdf66fd0c8279743ca6/tokenizer.json", "expected_bytes": null, "sha256": null},
+        {"name": "config", "kind": "config", "filename": "config.json", "url": "https://hf-mirror.com/Qwen/Qwen1.5-1.8B-Chat/resolve/e482ee3f73c375a627a16fdf66fd0c8279743ca6/config.json", "expected_bytes": null, "sha256": null}
+      ],
+      "status": "experimental_isolated",
+      "admission": {"eligible": false, "reason": "Technical teaching profile; quality is reported separately."},
+      "notes": "20T technical gates were recorded; 8T results must be measured independently."
+    },
+    {
+      "id": "qwen2-0.5b-instruct-mindspore",
+      "display_name": "Qwen2 0.5B Instruct",
+      "model_id": "Qwen/Qwen2-0.5B-Instruct",
+      "repository": "Qwen/Qwen2-0.5B-Instruct",
+      "source": "huggingface",
+      "license": "Apache-2.0",
+      "revision": "befdd363d82258f10fa0cbf9f76a4210347dd432",
+      "tokenizer_revision": "befdd363d82258f10fa0cbf9f76a4210347dd432",
+      "revision_pinned": true,
+      "mirror": "https://hf-mirror.com",
+      "board": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
+      "runtime": {"provider": "mindspore", "context_length": 1024, "default_max_tokens": 32, "max_tokens": 64, "temperature": 0.0, "top_p": 1.0},
+      "cache_dir": "models/qwen2-0.5b-instruct-mindspore",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "url": "https://hf-mirror.com/Qwen/Qwen2-0.5B-Instruct/resolve/befdd363d82258f10fa0cbf9f76a4210347dd432/model.safetensors", "expected_bytes": null, "sha256": null},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "url": "https://hf-mirror.com/Qwen/Qwen2-0.5B-Instruct/resolve/befdd363d82258f10fa0cbf9f76a4210347dd432/tokenizer.json", "expected_bytes": null, "sha256": null},
+        {"name": "config", "kind": "config", "filename": "config.json", "url": "https://hf-mirror.com/Qwen/Qwen2-0.5B-Instruct/resolve/befdd363d82258f10fa0cbf9f76a4210347dd432/config.json", "expected_bytes": null, "sha256": null}
+      ],
+      "status": "experimental_isolated",
+      "admission": {"eligible": false, "reason": "Technical teaching profile; U+FFFD quality result is documented separately."},
+      "notes": "Use this profile to reproduce the Qwen2 tokenizer/decoding quality failure on the 20T board."
+    },
+    {
+      "id": "qwen2-1.5b-instruct-mindspore",
+      "display_name": "Qwen2 1.5B Instruct",
+      "model_id": "Qwen/Qwen2-1.5B-Instruct",
+      "repository": "Qwen/Qwen2-1.5B-Instruct",
+      "source": "huggingface",
+      "license": "Apache-2.0",
+      "revision": "b139ca2b8d7ba579ed727ffcd7060075666a808b",
+      "tokenizer_revision": "b139ca2b8d7ba579ed727ffcd7060075666a808b",
+      "revision_pinned": true,
+      "mirror": "https://hf-mirror.com",
+      "board": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
+      "runtime": {"provider": "mindspore", "context_length": 1024, "default_max_tokens": 32, "max_tokens": 64, "temperature": 0.0, "top_p": 1.0},
+      "cache_dir": "models/qwen2-1.5b-instruct-mindspore",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "url": "https://hf-mirror.com/Qwen/Qwen2-1.5B-Instruct/resolve/b139ca2b8d7ba579ed727ffcd7060075666a808b/model.safetensors", "expected_bytes": null, "sha256": null},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "url": "https://hf-mirror.com/Qwen/Qwen2-1.5B-Instruct/resolve/b139ca2b8d7ba579ed727ffcd7060075666a808b/tokenizer.json", "expected_bytes": null, "sha256": null},
+        {"name": "config", "kind": "config", "filename": "config.json", "url": "https://hf-mirror.com/Qwen/Qwen2-1.5B-Instruct/resolve/b139ca2b8d7ba579ed727ffcd7060075666a808b/config.json", "expected_bytes": null, "sha256": null}
+      ],
+      "status": "experimental_isolated",
+      "admission": {"eligible": false, "reason": "Technical teaching profile; U+FFFD quality result is documented separately."},
+      "notes": "The high-occupancy Alloc failed run and the later low-occupancy API pass are both part of the teaching evidence."
+    },
+    {
+      "id": "qwen2.5-0.5b-mindspore",
+      "display_name": "Qwen2.5 0.5B Instruct",
+      "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+      "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "source": "huggingface",
+      "license": "Apache-2.0",
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "tokenizer_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "revision_pinned": true,
+      "mirror": "https://hf-mirror.com",
+      "board": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
+      "runtime": {"provider": "mindspore", "context_length": 1024, "default_max_tokens": 32, "max_tokens": 64, "temperature": 0.0, "top_p": 1.0},
+      "cache_dir": "models/qwen2.5-0.5b-mindspore",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "url": "https://hf-mirror.com/Qwen/Qwen2.5-0.5B-Instruct/resolve/7ae557604adf67be50417f59c2c2f167def9a775/model.safetensors", "expected_bytes": null, "sha256": null},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "url": "https://hf-mirror.com/Qwen/Qwen2.5-0.5B-Instruct/resolve/7ae557604adf67be50417f59c2c2f167def9a775/tokenizer.json", "expected_bytes": null, "sha256": null},
+        {"name": "config", "kind": "config", "filename": "config.json", "url": "https://hf-mirror.com/Qwen/Qwen2.5-0.5B-Instruct/resolve/7ae557604adf67be50417f59c2c2f167def9a775/config.json", "expected_bytes": null, "sha256": null}
+      ],
+      "status": "experimental_isolated",
+      "admission": {"eligible": false, "reason": "Technical teaching profile; quality is reported separately."},
+      "notes": "The original 30-second timeout-confounded run is kept as a debugging example; use the corrected timeout for new tests."
+    },
+    {
+      "id": "qwen2.5-1.5b-mindspore",
+      "display_name": "Qwen2.5 1.5B Instruct",
+      "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+      "source": "huggingface",
+      "license": "Apache-2.0",
+      "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "tokenizer_revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "revision_pinned": true,
+      "mirror": "https://hf-mirror.com",
+      "board": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
+      "runtime": {"provider": "mindspore", "context_length": 1024, "default_max_tokens": 32, "max_tokens": 64, "temperature": 0.0, "top_p": 1.0},
+      "cache_dir": "models/qwen2.5-1.5b-mindspore",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "url": "https://hf-mirror.com/Qwen/Qwen2.5-1.5B-Instruct/resolve/989aa7980e4cf806f80c7fef2b1adb7bc71aa306/model.safetensors", "expected_bytes": null, "sha256": null},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "url": "https://hf-mirror.com/Qwen/Qwen2.5-1.5B-Instruct/resolve/989aa7980e4cf806f80c7fef2b1adb7bc71aa306/tokenizer.json", "expected_bytes": null, "sha256": null},
+        {"name": "config", "kind": "config", "filename": "config.json", "url": "https://hf-mirror.com/Qwen/Qwen2.5-1.5B-Instruct/resolve/989aa7980e4cf806f80c7fef2b1adb7bc71aa306/config.json", "expected_bytes": null, "sha256": null}
+      ],
+      "status": "experimental_isolated",
+      "admission": {"eligible": false, "reason": "Technical teaching profile; low-occupancy and Alloc failed outcomes are both documented."},
+      "notes": "Select only after checking available device memory; this is an intentionally degraded experiment."
+    },
+    {
+      "id": "tinyllama-1.1b-mindspore",
+      "display_name": "TinyLlama 1.1B Chat",
+      "model_id": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "repository": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "source": "huggingface",
+      "license": "Apache-2.0",
+      "revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+      "tokenizer_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+      "revision_pinned": true,
+      "mirror": "https://hf-mirror.com",
+      "board": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
+      "runtime": {"provider": "mindspore", "context_length": 1024, "default_max_tokens": 8, "max_tokens": 8, "temperature": 0.0, "top_p": 1.0},
+      "cache_dir": "models/tinyllama-1.1b-mindspore",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "url": "https://hf-mirror.com/TinyLlama/TinyLlama-1.1B-Chat-v1.0/resolve/fe8a4ea1ffedaf415f4da2f062534de366a451e6/model.safetensors", "expected_bytes": null, "sha256": null},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "url": "https://hf-mirror.com/TinyLlama/TinyLlama-1.1B-Chat-v1.0/resolve/fe8a4ea1ffedaf415f4da2f062534de366a451e6/tokenizer.json", "expected_bytes": null, "sha256": null},
+        {"name": "config", "kind": "config", "filename": "config.json", "url": "https://hf-mirror.com/TinyLlama/TinyLlama-1.1B-Chat-v1.0/resolve/fe8a4ea1ffedaf415f4da2f062534de366a451e6/config.json", "expected_bytes": null, "sha256": null}
+      ],
+      "status": "experimental_isolated",
+      "admission": {"eligible": false, "reason": "Short-smoke teaching profile; long-output failure is expected evidence."},
+      "notes": "The eight-token cap is intentional for a reproducible short-smoke; remove it only after a new long-output run."
+    },
+    {
+      "id": "deepseek-r1-qwen-1.5b-mindspore",
+      "display_name": "DeepSeek-R1 Distill Qwen 1.5B",
+      "model_id": "MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B-FP16",
+      "repository": "MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B-FP16",
+      "source": "modelers",
+      "license": "MIT",
+      "revision": "0a28897fe71fdd30de350b667ae588601a85990f",
+      "tokenizer_revision": "0a28897fe71fdd30de350b667ae588601a85990f",
+      "revision_pinned": true,
+      "mirror": "https://hf-mirror.com",
+      "board": {"host": "192.168.1.101", "soc": "Ascend310B1", "tier": "20T"},
+      "runtime": {"provider": "mindspore", "context_length": 1024, "default_max_tokens": 32, "max_tokens": 32, "temperature": 0.0, "top_p": 1.0},
+      "cache_dir": "models/deepseek-r1-qwen-1.5b-mindspore",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "url": "https://hf-mirror.com/MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B-FP16/resolve/0a28897fe71fdd30de350b667ae588601a85990f/model.safetensors", "expected_bytes": null, "sha256": null},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "url": "https://hf-mirror.com/MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B-FP16/resolve/0a28897fe71fdd30de350b667ae588601a85990f/tokenizer.json", "expected_bytes": null, "sha256": null},
+        {"name": "config", "kind": "config", "filename": "config.json", "url": "https://hf-mirror.com/MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B-FP16/resolve/0a28897fe71fdd30de350b667ae588601a85990f/config.json", "expected_bytes": null, "sha256": null}
+      ],
+      "status": "experimental_isolated",
+      "admission": {"eligible": false, "reason": "Technical teaching profile; speed and Chinese quality are documented separately."},
+      "notes": "The model may emit a thinking prefix; this is a model behavior to measure, not a reason to hide it."
+    }
+  ]
+}

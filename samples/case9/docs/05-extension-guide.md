@@ -2,7 +2,12 @@
 
 ## Extension Boundary
 
-Ascend Edge Chat deliberately ships one immutable release profile. A second model or backend is an engineering change, not a browser option. It must be introduced through source code, a pinned profile, verified artifacts, test coverage, and an independent board validation report.
+Ascend Edge Chat ships one immutable default release profile and a separate
+teaching catalog. A second model is not a hot browser switch: it must be
+introduced through source code, a pinned profile, verified artifacts, test
+coverage, and an independent board validation report. Once its technical path
+has been observed, it may be exposed in the teaching selector even when its
+language-quality result is failed or pending.
 
 ```mermaid
 flowchart LR
@@ -42,7 +47,12 @@ Create a new release profile only in a new release branch. It must include:
 - target SoC and complete runtime fingerprint;
 - explicit status evidence for each target SoC.
 
-Use `release-model.json` as a structural reference, but do not add multiple profiles to a released `v0.1.0` configuration. The artifact acquisition implementation rejects a release configuration containing more than one profile.
+Use `release-model.json` as a structural reference, but do not add multiple
+profiles to the released `v0.1.0` configuration. Classroom profiles belong in
+`configs/tutorial-models.json` and are started explicitly with `--profile`.
+The artifact acquisition implementation rejects a release configuration
+containing more than one profile; the tutorial launcher instead performs a
+minimum local-cache preflight and preserves the separate artifact reports.
 
 ## Tests Required for a New Provider
 
@@ -59,4 +69,9 @@ Then run the board gates listed in [Validation and Limitations](04-validation-an
 
 ## Promotion Rule
 
-Keep experimental profiles outside the release configuration and outside browser-visible model lists. Promote a model only after a reviewer accepts the exact artifact identity, hardware/runtime tuple, API test evidence, stability data, measured performance protocol, and human language-quality review.
+Keep experimental profiles outside the immutable release lock. They may be
+browser-visible in the teaching catalog when technical evidence exists, with
+their quality result and failure cause shown beside them. Promote a model to a
+formal release only after a reviewer accepts the exact artifact identity,
+hardware/runtime tuple, API test evidence, stability data, measured
+performance protocol, and human language-quality review.

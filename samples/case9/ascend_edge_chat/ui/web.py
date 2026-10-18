@@ -13,6 +13,7 @@ import json
 import logging
 import math
 import os
+from pathlib import Path
 import secrets
 import string
 from contextlib import asynccontextmanager
@@ -26,6 +27,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from ..version import __version__
 from ..runtime.config import load_release_environment
+from ..model_catalog import DEFAULT_CATALOG_PATH, CatalogError, catalog_by_id, load_catalog
 
 from .session import (
     Conversation,
@@ -66,6 +68,8 @@ class TextChatSettings:
     gateway_url: str = "http://127.0.0.1:7861/v1"
     gateway_api_key: str = ""
     model: str = "ascend-edge-chat"
+    active_profile: str = "qwen1.5-0.5b-chat"
+    catalog_path: str = str(DEFAULT_CATALOG_PATH)
     # The MindSpore worker is serial and has a board-side watchdog.
     llm_timeout_seconds: float = 300.0
     max_messages: int = 4
@@ -98,6 +102,11 @@ class TextChatSettings:
             )
         if self.model.strip() != "ascend-edge-chat":
             raise TextChatConfigurationError("model must be the fixed public model ascend-edge-chat")
+        if not self.active_profile.strip():
+            raise TextChatConfigurationError("active_profile must not be empty")
+        catalog = Path(self.catalog_path).expanduser()
+        if not catalog.is_absolute():
+            raise TextChatConfigurationError("catalog_path must be an absolute path")
         if self.gateway_api_key:
             allowed_key_characters = string.ascii_letters + string.digits + "-_.~"
             if (
@@ -193,6 +202,12 @@ class TextChatSettings:
             gateway_url=gateway_url,
             gateway_api_key=api_key,
             model="ascend-edge-chat",
+            active_profile=os.environ.get("ASCEND_EDGE_CHAT_PROFILE", "qwen1.5-0.5b-chat").strip()
+            or "qwen1.5-0.5b-chat",
+            catalog_path=os.environ.get(
+                "ASCEND_EDGE_CHAT_MODEL_CATALOG", str(DEFAULT_CATALOG_PATH)
+            ).strip()
+            or str(DEFAULT_CATALOG_PATH),
             llm_timeout_seconds=decimal("ASCEND_EDGE_CHAT_UI_LLM_TIMEOUT_SECONDS", 300.0, 0.1),
             max_messages=integer("ASCEND_EDGE_CHAT_UI_MAX_MESSAGES", 4, 2),
             max_characters=integer("ASCEND_EDGE_CHAT_UI_MAX_CHARACTERS", 4000, 1),
@@ -381,7 +396,7 @@ async def _parse_chat_request(
     max_body_bytes: int,
     max_characters: int,
     body_timeout_seconds: float,
-) -> Tuple[str, bool]:
+) -> Tuple[str, bool, Optional[str]]:
     content_length = request.headers.get("content-length")
     if content_length:
         try:
@@ -413,9 +428,9 @@ async def _parse_chat_request(
         raise TextChatRequestError("请求体必须是 UTF-8 JSON。") from exc
     if not isinstance(payload, dict):
         raise TextChatRequestError("请求体必须是 JSON 对象。")
-    unknown = set(payload) - {"message", "stream"}
+    unknown = set(payload) - {"message", "stream", "profile"}
     if unknown:
-        raise TextChatRequestError("请求只支持 message 和 stream 字段。")
+        raise TextChatRequestError("请求只支持 message、stream 和 profile 字段。")
     message = payload.get("message")
     if not isinstance(message, str) or not message.strip():
         raise TextChatRequestError("message 不能为空。")
@@ -425,7 +440,10 @@ async def _parse_chat_request(
     stream = payload.get("stream", True)
     if not isinstance(stream, bool):
         raise TextChatRequestError("stream 必须是布尔值。")
-    return message, stream
+    profile = payload.get("profile")
+    if profile is not None and (not isinstance(profile, str) or not profile.strip()):
+        raise TextChatRequestError("profile 必须是非空字符串。")
+    return message, stream, profile.strip() if isinstance(profile, str) else None
 
 
 def _pending_prompt(conversation: Conversation, message: str) -> list[dict[str, str]]:
@@ -463,6 +481,9 @@ TEXT_CHAT_HTML = r"""<!doctype html>
     header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 20px 14px; }
     h1 { font-size: 1.25rem; margin: 0; letter-spacing: 0; }
     .subtle { color: #64717d; font-size: .86rem; margin: 5px 0 0; }
+    .model-picker { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: #4d5c67; font-size: .84rem; }
+    .model-picker select { min-width: 250px; border: 1px solid #b9c5ce; border-radius: 6px; padding: 6px 8px; background: #fff; color: #21313d; font: inherit; }
+    .model-note { color: #7a5311; font-size: .8rem; margin: 6px 0 0; max-width: 620px; line-height: 1.45; }
     .status { border: 1px solid #c9d2da; border-radius: 999px; padding: 6px 11px; font-size: .82rem; white-space: nowrap; background: #fff; }
     .status[data-kind="ok"] { color: #176b45; border-color: #9bd3b5; background: #effaf3; }
     .status[data-kind="busy"] { color: #7a5311; border-color: #e7c77e; background: #fff9e9; }
@@ -502,7 +523,12 @@ TEXT_CHAT_HTML = r"""<!doctype html>
     <header>
       <div>
         <h1>Ascend Edge Chat</h1>
-        <p class="subtle">Qwen1.5-0.5B Chat · 20T 技术预览 · <span id="model">读取模型中…</span></p>
+        <p class="subtle">教学实验模式 · 技术可运行性与中文质量分开记录 · <span id="model">读取模型中…</span></p>
+        <div class="model-picker">
+          <label for="profile-select">测试模型</label>
+          <select id="profile-select" aria-label="选择测试模型"></select>
+        </div>
+        <p id="model-note" class="model-note">读取模型目录中…</p>
       </div>
       <div id="status" class="status" data-kind="busy" role="status">连接中…</div>
     </header>
@@ -523,7 +549,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
   </div>
   <script>
     (() => {
-      const state = { busy: false, assistant: null, terminal: false };
+      const state = { busy: false, assistant: null, terminal: false, activeProfile: '', selectedProfile: '', profiles: [] };
       const messages = document.getElementById('messages');
       const empty = document.getElementById('empty');
       const input = document.getElementById('input');
@@ -531,6 +557,8 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       const clear = document.getElementById('clear');
       const status = document.getElementById('status');
       const model = document.getElementById('model');
+      const profileSelect = document.getElementById('profile-select');
+      const modelNote = document.getElementById('model-note');
 
       function setStatus(text, kind) {
         status.textContent = text;
@@ -542,6 +570,37 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         send.disabled = value;
         clear.disabled = value;
         input.disabled = value;
+      }
+
+      function updateModelNote() {
+        const item = state.profiles.find((candidate) => candidate.id === state.selectedProfile);
+        if (!item) return;
+        const status = item.quality_status === 'failed' ? '中文质量未通过，但仍保留技术测试入口。' :
+          item.quality_status === 'pending' ? '中文质量待人工审核；这不是运行门槛。' : '';
+        if (state.selectedProfile !== state.activeProfile) {
+          modelNote.textContent = '已选择“' + item.display_name + '”。' + status + '需要按教程停止并用该 profile 重启 worker，页面不会热切换 NPU 模型。';
+        } else {
+          modelNote.textContent = '当前正在运行“' + item.display_name + '”。' + status + (item.reason || '');
+        }
+      }
+
+      function populateProfiles(items, active) {
+        state.profiles = Array.isArray(items) ? items : [];
+        state.activeProfile = active || '';
+        profileSelect.replaceChildren();
+        state.profiles.forEach((item) => {
+          if (!item || typeof item.id !== 'string') return;
+          const option = document.createElement('option');
+          option.value = item.id;
+          option.textContent = item.display_name + ' · ' + item.technical_status +
+            (item.quality_status === 'failed' ? ' · 中文质量失败' : '');
+          option.disabled = !item.selectable;
+          option.title = item.reason || '';
+          profileSelect.appendChild(option);
+        });
+        profileSelect.value = state.activeProfile;
+        state.selectedProfile = state.activeProfile;
+        updateModelNote();
       }
 
       function addMessage(role, text) {
@@ -622,7 +681,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-            body: JSON.stringify({ message: text, stream: true })
+            body: JSON.stringify({ message: text, stream: true, profile: state.selectedProfile })
           });
           if (!response.ok) {
             let detail = 'HTTP ' + response.status;
@@ -681,6 +740,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           const config = await configResponse.json();
           const history = await historyResponse.json();
           model.textContent = config.model || 'ascend-edge-chat';
+          populateProfiles(config.profiles, config.active_profile);
           if (Number.isInteger(config.max_characters)) input.maxLength = config.max_characters;
           renderHistory(history.messages);
           setStatus('就绪', 'ok');
@@ -691,6 +751,10 @@ TEXT_CHAT_HTML = r"""<!doctype html>
 
       document.getElementById('composer').addEventListener('submit', sendMessage);
       clear.addEventListener('click', clearConversation);
+      profileSelect.addEventListener('change', () => {
+        state.selectedProfile = profileSelect.value;
+        updateModelNote();
+      });
       input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
           event.preventDefault();
@@ -712,6 +776,15 @@ def create_text_chat_app(
     """Build the text-only app with injectable client and session store."""
 
     runtime_settings = settings or TextChatSettings.from_environ()
+    try:
+        catalog = load_catalog(Path(runtime_settings.catalog_path))
+        catalog_index = catalog_by_id(Path(runtime_settings.catalog_path))
+    except (CatalogError, OSError) as exc:
+        raise TextChatConfigurationError("无法加载教学模型目录: %s" % exc) from exc
+    if runtime_settings.active_profile not in catalog_index:
+        raise TextChatConfigurationError(
+            "active_profile 不在教学模型目录中: %s" % runtime_settings.active_profile
+        )
     if llm is None and not runtime_settings.gateway_api_key:
         raise TextChatConfigurationError(
             "gateway_api_key must be set when no test LLM is injected"
@@ -762,6 +835,7 @@ def create_text_chat_app(
     app.state.settings = runtime_settings
     app.state.llm = runtime_llm
     app.state.sessions = runtime_sessions
+    app.state.model_catalog = catalog
 
     @app.middleware("http")
     async def disable_browser_caching(request: Request, call_next: Any) -> Any:
@@ -789,6 +863,8 @@ def create_text_chat_app(
             "warning": SECURITY_WARNING,
             "gateway": runtime_settings.gateway_url,
             "model": runtime_settings.model,
+            "active_profile": runtime_settings.active_profile,
+            "model_selection": "restart-worker",
             "sessions": runtime_sessions.session_count,
         }
 
@@ -796,10 +872,23 @@ def create_text_chat_app(
     async def api_config() -> dict[str, Any]:
         return {
             "model": runtime_settings.model,
+            "active_profile": runtime_settings.active_profile,
+            "model_selection": "restart-worker",
+            "profiles": catalog,
             "streaming": True,
             "max_messages": runtime_settings.max_messages,
             "max_characters": runtime_settings.max_characters,
             "warning": SECURITY_WARNING,
+        }
+
+    @app.get("/api/models")
+    async def api_models() -> dict[str, Any]:
+        """Return all classroom entries, including failed-quality experiments."""
+
+        return {
+            "active_profile": runtime_settings.active_profile,
+            "selection": "restart-worker",
+            "models": catalog,
         }
 
     @app.get("/api/history")
@@ -880,7 +969,7 @@ def create_text_chat_app(
         except asyncio.TimeoutError:
             return _error_response("当前请求读取并发已满，请稍后重试。", 429)
         try:
-            message, stream = await _parse_chat_request(
+            message, stream, requested_profile = await _parse_chat_request(
                 request,
                 runtime_settings.max_body_bytes,
                 runtime_settings.max_characters,
@@ -891,6 +980,13 @@ def create_text_chat_app(
         finally:
             if body_slot_acquired:
                 body_read_slots.release()
+        if requested_profile is not None and requested_profile != runtime_settings.active_profile:
+            return _error_response(
+                "当前 worker 运行的是 %s；切换模型需要按教程停止并用对应 --profile 重启 worker。"
+                % runtime_settings.active_profile,
+                409,
+                "model_switch_required",
+            )
         if request_lock.locked():
             return _error_response("已有一个文字请求正在生成，请稍后重试。", 409)
         await request_lock.acquire()

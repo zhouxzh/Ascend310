@@ -2,7 +2,7 @@
 
 Ascend Edge Chat is a portable, extensible text-chat service for Ascend edge hardware. It exposes a bounded MindSpore worker through an OpenAI-compatible gateway and a browser UI.
 
-`v0.1.0` is a technical preview. The verified release target is **Ascend 310B1 / 20T** and the fixed model is [Qwen1.5-0.5B-Chat](https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat). It supports JSON and OpenAI SSE; it is not a production-model-service claim and does not include speech, device protocols, or automatic model selection.
+`v0.1.0` is a technical preview. The default release target is **Ascend 310B1 / 20T** and the default model is [Qwen1.5-0.5B-Chat](https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat). A separate teaching catalog exposes every model with measured technical-running evidence, including models whose Chinese output is poor. Quality is reported independently and is never silently converted into a runtime claim.
 
 ```mermaid
 flowchart LR
@@ -21,10 +21,11 @@ flowchart LR
 | --- | --- |
 | Verified hardware | Ascend 310B1 / 20T, CANN 8.0.0 |
 | Runtime | Python 3.9.25, MindSpore 2.4.10, MindNLP 0.4.1 |
-| Fixed model | Qwen1.5-0.5B-Chat, revision and SHA-256 locked |
+| Default model | Qwen1.5-0.5B-Chat, revision and SHA-256 locked |
+| Teaching experiments | Qwen1.5 1.8B, Qwen2/Qwen2.5 0.5B/1.5B, TinyLlama and DeepSeek profiles when their artifacts are present |
 | Public model name | `ascend-edge-chat` |
 | API | `GET /v1/models`, `POST /v1/chat/completions`, JSON, SSE |
-| Not included | Speech, ASR/TTS, device protocol, retrieval, model switching |
+| Not included | Speech, ASR/TTS, device protocol, retrieval, hot model switching |
 
 8T hardware does not inherit the 20T result and is not part of this release validation.
 
@@ -84,6 +85,25 @@ ascend-edge-chat ui
 - [Release process](docs/06-release-process.md)
 
 Historical experiments are preserved under [docs/archive/](docs/archive/); they are not supported release features.
+
+## Teaching model tests
+
+The browser lists the teaching catalog from `configs/tutorial-model-catalog.json`. A
+model marked `selectable` has a measured technical path and may be tested even when
+its `quality_status` is `failed` or `pending`. The selector never hot-switches a
+loaded NPU model: choose a profile, stop the worker, and restart it with the
+matching registry entry.
+
+```bash
+ASCEND_EDGE_CHAT_PROFILE=qwen2-1.5b-instruct-mindspore \
+  ascend-edge-chat worker \
+  --profile qwen2-1.5b-instruct-mindspore \
+  --registry configs/tutorial-models.json
+```
+
+The tutorial records the observed reason for each result. For example, Qwen2 and
+Qwen2.5 profiles can pass NPU/API gates while producing `U+FFFD`; that is a
+tokenizer/decoding quality result, not evidence that the NPU cannot run them.
 
 ## Common Faults
 

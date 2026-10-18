@@ -1794,9 +1794,17 @@ def provider_class_for_profile(profile: Any) -> Any:
             "profile %s requests unsupported runtime provider %r"
             % (profile_id, runtime_provider)
         )
-    if profile_id != "qwen1.5-0.5b-chat":
-        raise ProviderUnavailable("unsupported release model profile: %s" % profile_id)
-    return Qwen15MindSporeProvider
+    if profile_id == "qwen1.5-0.5b-chat":
+        return Qwen15MindSporeProvider
+    # The teaching registry deliberately exposes the same generic MindNLP
+    # causal-LM adapter for every profile whose technical gates were actually
+    # exercised.  Quality failures, slow output, or a short-smoke cap are
+    # reported by the catalog; they must not be confused with an unsupported
+    # provider.  Profiles without a loader or a complete cache remain
+    # non-selectable in the catalog and fail closed before this point.
+    if profile_id.endswith("-mindspore"):
+        return MindSporeChatProvider
+    raise ProviderUnavailable("unsupported MindSpore teaching profile: %s" % profile_id)
 
 
 def create_provider(profile: Any, **kwargs: Any) -> MindSporeChatProvider:

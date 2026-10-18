@@ -19,6 +19,7 @@ from .artifacts.model_store import (
     verify_artifacts,
     verify_release_lock,
 )
+from .backends.model_profiles import load_profiles, resolve_safe_path
 from .runtime.config import load_release_environment
 from .version import PROJECT_NAME, __version__
 
@@ -32,6 +33,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     worker = commands.add_parser("worker", help="start the loopback MindSpore worker")
     worker.add_argument("--host", default="127.0.0.1")
     worker.add_argument("--port", default=8090, type=int)
+    worker.add_argument(
+        "--profile",
+        default=os.environ.get("ASCEND_EDGE_CHAT_PROFILE", RELEASE_PROFILE_ID),
+        help="validated profile id; use the tutorial registry for classroom experiments",
+    )
+    worker.add_argument(
+        "--registry",
+        type=Path,
+        default=DEFAULT_MODEL_CONFIG,
+        help="profile registry (default: immutable release registry)",
+    )
 
     gateway = commands.add_parser("gateway", help="start the authenticated loopback gateway")
     gateway.add_argument("--host", default="127.0.0.1")
@@ -57,7 +69,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(list(argv) if argv is not None else None)
     try:
         if args.command == "worker":
-            return _worker(args.host, args.port)
+            return _worker(args.host, args.port, args.profile, args.registry)
         if args.command == "gateway":
             return _gateway(args.host, args.port, args.check_config)
         if args.command == "ui":
@@ -76,13 +88,58 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
-def _worker(host: str, port: int) -> int:
+def _verify_tutorial_cache(root: Path, profile: object) -> None:
+    """Verify the minimum local files before loading a non-release profile.
+
+    Tutorial artifacts intentionally carry metadata-only hashes in the runtime
+    registry.  The acquisition/reproducibility records retain the real hashes;
+    this preflight only prevents a missing or partial cache from becoming an
+    implicit network download.
+    """
+
+    cache_dir = resolve_safe_path(profile.cache_dir, root, allow_missing=True)
+    if not cache_dir.is_dir() or cache_dir.is_symlink():
+        raise ArtifactError("tutorial model cache is missing: %s" % cache_dir)
+    required = ["config.json"]
+    if not any((cache_dir / name).is_file() for name in ("tokenizer.json", "tokenizer.model", "sentencepiece.model")):
+        required.append("tokenizer.json or tokenizer.model")
+    if not any(
+        item.is_file()
+        and not item.name.startswith(".")
+        and item.name.lower().endswith((".safetensors", ".bin", ".ckpt"))
+        for item in cache_dir.iterdir()
+    ):
+        required.append("model.safetensors or checkpoint")
+    missing = [name for name in required if (name == "config.json" and not (cache_dir / name).is_file())]
+    if len(required) > 1 and not any((cache_dir / name).is_file() for name in ("tokenizer.json", "tokenizer.model", "sentencepiece.model")):
+        missing.append("tokenizer")
+    if len(required) > 1 and not any(
+        item.is_file() and item.name.lower().endswith((".safetensors", ".bin", ".ckpt"))
+        for item in cache_dir.iterdir()
+    ):
+        missing.append("weights")
+    if missing:
+        raise ArtifactError("tutorial model cache is incomplete (%s): %s" % (profile.id, ", ".join(dict.fromkeys(missing))))
+
+
+def _worker(host: str, port: int, profile_id: str, registry_path: Path) -> int:
     from .backends import mindspore_worker
 
     root = data_root()
-    verify_artifacts(root)
-    os.environ["ASCEND_EDGE_CHAT_MODEL_PROFILES"] = str(DEFAULT_MODEL_CONFIG)
+    registry_path = registry_path.expanduser().resolve()
+    if registry_path == DEFAULT_MODEL_CONFIG.resolve() and profile_id == RELEASE_PROFILE_ID:
+        verify_artifacts(root)
+    else:
+        try:
+            profile = load_profiles(registry_path).get(profile_id)
+        except Exception as exc:
+            raise ArtifactError("could not load tutorial profile: %s" % exc) from exc
+        if profile.is_conditional:
+            raise ArtifactError("conditional profile cannot be started: %s" % profile_id)
+        _verify_tutorial_cache(root, profile)
+    os.environ["ASCEND_EDGE_CHAT_MODEL_PROFILES"] = str(registry_path)
     os.environ["ASCEND_EDGE_CHAT_MODEL_ROOT"] = str(root)
+    os.environ["ASCEND_EDGE_CHAT_PROFILE"] = profile_id
     os.environ["ASCEND_EDGE_CHAT_LAUNCHER_VERIFIED"] = "1"
     os.environ.setdefault("ASCEND_EDGE_CHAT_PROCESS_WATCHDOG", "1")
     os.environ.setdefault("ASCEND_EDGE_CHAT_WORKER_MAIN", "1")
@@ -91,7 +148,7 @@ def _worker(host: str, port: int) -> int:
     return mindspore_worker._main(
         [
             "--profile",
-            RELEASE_PROFILE_ID,
+            profile_id,
             "--host",
             host,
             "--port",
