@@ -29,6 +29,7 @@ import { collectCodeFindings } from './code.js';
 import { collectDeckFindings } from './deck.js';
 import { collectSiteFindings, describeSite } from './site.js';
 import { collectFigureFindings, describeFigures } from './figures.js';
+import { collectDeckWebFindings, describeDeckWeb } from './deck-web.js';
 import { collectCoursewareFindings } from './courseware.js';
 import { analyzeStyle, formatStyle } from './style.js';
 import { planBuild, resolveBuildEnvironment, runBuild } from './build.js';
@@ -278,6 +279,9 @@ function runAudit({ root, scope, maxFindings, rev, config }) {
 	const figures = collectFigureFindings({ root, settings });
 	extraFindings.push(...figures.findings);
 	notes.push(describeFigures(figures));
+	const deckWeb = collectDeckWebFindings({ root, settings });
+	extraFindings.push(...deckWeb.findings);
+	notes.push(describeDeckWeb(deckWeb));
 	if (latexMap.available) {
 		notes.push(`PDF 章节表：${latexMap.chapters} 章，与源文比对 ${latexMap.findings.length} 处不一致。`);
 	}
@@ -861,11 +865,12 @@ export function apply(ctx, config) {
 			const latexMap = collectLatexChapterFindings({ root, settings });
 			const site = collectSiteFindings({ root, settings });
 			const figures = collectFigureFindings({ root, settings });
+			const deckWeb = collectDeckWebFindings({ root, settings });
 			const audit = auditRepo({
 				root,
 				scope: 'all',
 				maxFindings: 400,
-				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings, ...latexMap.findings, ...site.findings, ...figures.findings],
+				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings, ...latexMap.findings, ...site.findings, ...figures.findings, ...deckWeb.findings],
 				settings
 			});
 			const progress = progressReport({ root, scope: 'all', settings });

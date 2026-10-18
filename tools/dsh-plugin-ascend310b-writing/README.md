@@ -196,7 +196,10 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 | `deck-slide-underfull` | warning | 散文页正文少于 40 字且无代码/表格/图片 |
 | `deck-cover-missing` | warning | 缺少 `_class: cover` 封面 |
 | `deck-summary-missing` | warning | 缺少小结或课堂任务 |
-| `deck-title-too-long` | warning | 页面标题超过 30 字 |`n| `deck-theme-unsupported` | warning | 未使用统一的 `ascend310`（Metropolis 风格）主题 |`n| `deck-cover-meta-label` | warning | 封面出现“教师授课版/理论章节课件”等自我标注 |`n| `deck-cover-byline-missing` | warning | 封面缺作者与邮箱 |
+| `deck-title-too-long` | warning | 页面标题超过 30 字 |`n| `deck-web-density-low` | warning | 生成网页的单页信息量低于学术报告下限 |
+| `deck-web-density-high` | warning | 生成网页的单页信息量超过上限（表格行/列、代码行） |
+| `deck-web-density-uneven` | warning | 同一课件正文/表格页密度跨度 ≥ 2.8 倍 |
+| `deck-web-theme-drift` | warning | 生成页面不是统一的 `ascend310` 主题 || `deck-theme-unsupported` | warning | 未使用统一的 `ascend310`（Metropolis 风格）主题 |`n| `deck-cover-meta-label` | warning | 封面出现“教师授课版/理论章节课件”等自我标注 |`n| `deck-cover-byline-missing` | warning | 封面缺作者与邮箱 |
 | `deck-slide-overflow` | error | 单页估算高度超过安全高度 |
 | `deck-code-too-long` | warning | 单页代码超过 22 行 |
 | `deck-table-too-wide` | warning | 表格超过 6 列 / 10 行 |
