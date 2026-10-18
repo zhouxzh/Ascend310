@@ -30,6 +30,7 @@ import { collectDeckFindings } from './deck.js';
 import { collectSiteFindings, describeSite } from './site.js';
 import { collectFigureFindings, describeFigures } from './figures.js';
 import { collectDeckWebFindings, describeDeckWeb } from './deck-web.js';
+import { collectDeckRenderFindings } from './deck-render.js';
 import { collectCiStatus } from './ci.js';
 import { collectCoursewareFindings } from './courseware.js';
 import { analyzeStyle, formatStyle } from './style.js';
@@ -355,6 +356,55 @@ export function apply(ctx, config) {
 			presentCall: (args) => ({
 				card: 'generic',
 				title: '写作审计',
+				kind: 'other',
+				rawInput: args
+			})
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend310b_writing_deck_render',
+			description:
+				'Measure the built Marp decks in a real 1280x720 browser: every slide is checked for vertical ' +
+				'and horizontal clipping and for images that did not load. Use it after pnpm run docs:slides, ' +
+				'optionally with a deck name such as 10-chapter1 for a one-deck review.',
+			parameters: {
+				root: ROOT_PARAMETER,
+				deck: {
+					type: 'string',
+					description: 'Optional deck basename, e.g. 10-chapter1; omit to check all decks.'
+				}
+			},
+			output: {
+				schema: {
+					type: 'object',
+					additionalProperties: false,
+					properties: {
+						text: { type: 'string', required: true },
+						decks: { type: 'integer', required: true },
+						pages: { type: 'integer', required: true },
+						issues: { type: 'array', required: true, items: { type: 'string' } }
+					}
+				},
+				render: (_args, value) => [{ type: 'text', text: value.text }]
+			},
+			execute(args) {
+				const root = resolveRoot(config, args.root);
+				const render = collectDeckRenderFindings({
+					root,
+					deck: typeof args.deck === 'string' ? args.deck : undefined
+				});
+				return Promise.resolve({
+					text: render.text,
+					decks: render.decks,
+					pages: render.pages,
+					issues: render.findings.map((finding) => finding.message)
+				});
+			},
+			presentCall: (args) => ({
+				card: 'generic',
+				title: '课件真实渲染',
 				kind: 'other',
 				rawInput: args
 			})

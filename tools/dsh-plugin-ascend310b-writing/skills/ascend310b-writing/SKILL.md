@@ -1,6 +1,6 @@
 ---
 name: ascend310b-writing
-description: Ascend310 教材仓库的中文技术写作规范与守门流程。在新增、重命名或改写章节/案例/附录，调整 sidebar 与索引，审查 Markdown 命名、锚点、链接、图片、标点与行尾，出 LaTeX/PDF 后检查缺字形与产物新鲜度，准备 commit/push 前做推送门槛检查，或需要统计写作进度与篇幅、以及用户要求润色/去 AI 味时使用。触发后先跑 ascend310b_writing_audit，再按规则修正文，复跑确认；出 PDF 后跑 ascend310b_writing_render，推送前跑 ascend310b_writing_push_check。
+description: Ascend310 教材仓库的中文技术写作规范与守门流程。在新增、重命名或改写章节/案例/附录，调整 sidebar 与索引，审查 Markdown 命名、锚点、链接、图片、标点与行尾，出 LaTeX/PDF 后检查缺字形与产物新鲜度，检查 Marp 课件的真实浏览器裁切与信息密度，准备 commit/push 前做推送门槛检查，或需要统计写作进度与篇幅、以及用户要求润色/去 AI 味时使用。触发后先跑 ascend310b_writing_audit，课件改动再跑 ascend310b_writing_deck_render，出 PDF 后跑 ascend310b_writing_render，推送前跑 ascend310b_writing_push_check。
 ---
 
 # 教程写作守门
@@ -34,6 +34,9 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
    （例如 Markdown 强制换行的行尾空格），在回复里说明。
 4. 需要站点预览时跑 `pnpm run docs:dev`，把本地地址交给用户确认；
    未经用户确认不要 push，也不要因为 `docs:build` 通过就认为可以 push。
+   演示文稿改动必须先跑 `pnpm run docs:slides`，再用 `ascend310b_writing_deck_render`
+   （可带 `deck` 只查一份）确认真实浏览器中 0 裁切、0 图片未加载，并逐页截图检查封面、
+   目标页、章节页、内容页和小结页。源码估算高度不能代替真实渲染。
 5. 要出 PDF 时用 `ascend310b_writing_build`（先不带 `confirm` 看预检，确认后带
    `confirm: true` 起后台任务，用 `job_output` 读）。它会在同一任务里自动跑渲染体检与
    产物锚点核对，所以**不需要**再单独跑 `ascend310b_writing_render`。
@@ -41,8 +44,8 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
    **重新构建修不好**，要改源 Markdown；常见原因是标题行前面少了空行，或标题里有未转义的 `_`。
    缺字形同样改源 Markdown（例如把 `→` 写成 `$\to$`），不要改生成的 `latex/*.tex`。
    组成里没有后台任务时，退回 `./convert-vuepress.sh` + `ascend310b_writing_render`。
-6. 准备 push 前跑 `ascend310b_writing_push_check`。它把阻塞项（正文 error、提交树断链）
-   和提示项（未提交正文、渲染结论、产物新鲜度）分开列，并在最后点名唯一
+6. 准备 push 前跑 `ascend310b_writing_push_check`。它把阻塞项（正文 error、提交树断链、
+   真实课件裁切/图片失败）和提示项（未提交正文、PDF 渲染结论、产物新鲜度）分开列，并在最后点名唯一
    无法机械验证的一项：站点预览是否已由用户确认。
 7. 要汇报篇幅或剩余工作量时跑 `ascend310b_writing_progress`。
 
@@ -117,7 +120,7 @@ push 之后必须用 `ascend310b_writing_ci` 确认 GitHub Pages 工作流成功
 | 整份课件 | ≥ 6 页且 ≥ 800 字 | `deck-content-thin` |
 | 页面标题 | ≤ 30 字 | `deck-title-too-long` |
 
-实测当前 28 份课件：散文页共 90 页，没有一页低于 40 字；真正稀疏的是 9 份 **4 页脚手架**（约 380 字），它们被单独标为 `deck-scaffold`，不计入完成件。
+实测当前 26 份课件、476 页：全部为 ready，不再有 4 页脚手架。课件必须同时通过源码审计、网页密度审计和真实浏览器渲染检查；任何一份退回占位页都算未完成。
 ### 结构与元数据
 
 frontmatter 必填四项，缺一不可：`marp: true`、`theme: ascend310`、`paginate: true`、`size: 16:9`（16:9 = 1280×720）。
@@ -129,8 +132,10 @@ frontmatter 必填四项，缺一不可：`marp: true`、`theme: ascend310`、`p
 | --- | --- |
 | 正文汉字 | 320 字 |
 | 代码行 | 22 行（纯代码页） |
-| 表格 | 6 列 × 10 行 |
+| 表格 | 7 列 × 10 行 |
 | 列表 | 8 条 |
+
+源码估算只做快速预警，真实裁切由 `ascend310b_writing_deck_render` 在 1280×720 浏览器中判定。
 
 主题把每页钉在 720px 且 `overflow: hidden`，**超出的内容会直接消失**，不会滚动。Marp 的自动缩放只解决横向，
 官方文档也明确写了纵向仍可能溢出，所以纵向必须用分页解决。分页脚本：`node scripts/split-decks.mjs --write <文件>`。

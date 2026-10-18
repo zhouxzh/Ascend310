@@ -29,6 +29,7 @@ import { join } from 'node:path';
 
 /** Smallest content font that stays legible from the back of a classroom. */
 export const MIN_CONTENT_FONT_PX = 20;
+export const MIN_BODY_FONT_PX = 26;
 
 /** A deck should teach at least this share of its slides with a note. */
 const MIN_NOTE_SHARE = 0.2;
@@ -301,6 +302,19 @@ export function auditTheme({ root, themePath }) {
 		return [];
 	}
 	const findings = [];
+	// The base section font is the projector body text; the content selector
+	// below only covers code/table/compact rules.
+	const sectionRule = /(?:^|[}])\s*section\s*[{]([^}]*)[}]/u.exec(css);
+	const bodySize = sectionRule ? /font-size:\s*(\d+)px/u.exec(sectionRule[1]) : null;
+	if (bodySize !== null && Number(bodySize[1]) < MIN_BODY_FONT_PX) {
+		findings.push({
+			rule: 'deck-font-too-small',
+			severity: 'error',
+			file: themePath,
+			line: 1,
+			message: `section 正文使用 ${bodySize[1]}px，低于投影正文下限 ${MIN_BODY_FONT_PX}px；应提高正文并重新分页`
+		});
+	}
 	const contentSelector = /(?:^|[}])\s*([^{}]*\b(?:pre|table|section\.tight|section\.compact)\b[^{}]*)[{]([^}]*)[}]/gu;
 	for (const match of css.matchAll(contentSelector)) {
 		const selector = match[1].trim().replace(/\s+/gu, ' ');

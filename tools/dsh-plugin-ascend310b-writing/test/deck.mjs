@@ -51,12 +51,12 @@ check(slides.length === 2, `frontmatter and fenced --- must not paginate, got ${
 const wideTable = measureSlide([
 	'## 宽表',
 	'',
-	'| a | b | c | d | e | f | g |',
-	'| --- | --- | --- | --- | --- | --- | --- |',
-	'| 1 | 2 | 3 | 4 | 5 | 6 | 7 |',
+	'| a | b | c | d | e | f | g | h |',
+	'| --- | --- | --- | --- | --- | --- | --- | --- |',
+	'| 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |',
 	''
 ]);
-check(wideTable.tableColumns === 7, `seven table columns expected, got ${wideTable.tableColumns}`);
+check(wideTable.tableColumns === 8, `eight table columns expected, got ${wideTable.tableColumns}`);
 
 const longCode = measureSlide(['## 长代码', '', '```python', ...Array.from({ length: 30 }, (_v, i) => `x${i} = ${i}`), '```', '']);
 check(longCode.codeLines === 30, `30 code lines expected, got ${longCode.codeLines}`);
@@ -68,9 +68,9 @@ check(overflowFindings.some((f) => f.rule === 'deck-code-too-long'), 'a 30-line 
 
 const tableFindings = auditDeckText({
 	file: 'x.md',
-	text: ['---', '# 宽表', '', '| a | b | c | d | e | f | g |', '| --- | --- | --- | --- | --- | --- | --- |', '| 1 | 2 | 3 | 4 | 5 | 6 | 7 |', ''].join('\n')
+	text: ['---', '# 宽表', '', '| a | b | c | d | e | f | g | h |', '| --- | --- | --- | --- | --- | --- | --- | --- |', '| 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |', ''].join('\n')
 });
-check(tableFindings.some((f) => f.rule === 'deck-table-too-wide'), 'a seven-column table must be reported');
+check(tableFindings.some((f) => f.rule === 'deck-table-too-wide'), 'an eight-column table must be reported');
 
 const tierFindings = auditDeckText({ file: 'x.md', text: ['---', '# 口径', '', '发布口径是 Ascend 310B1 / 20T。', ''].join('\n') });
 check(tierFindings.some((f) => f.rule === 'deck-tier-claim'), 'a 20T-only claim must be reported');

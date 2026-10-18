@@ -17,7 +17,7 @@
     "docs:slides:render-check": "node scripts/check_presentation_render.mjs",
     "docs:slides:capture": "node scripts/capture_presentation_ui.mjs",
     "docs:slides:screenshot:register": "node scripts/register_presentation_screenshot.mjs",
-    "docs:build": "pnpm run docs:slides:check && pnpm run docs:slides && vuepress-vite build src",
+    "docs:build": "pnpm run docs:slides:check && pnpm run docs:slides && pnpm run docs:slides:render-check && vuepress-vite build src",
     "docs:clean-dev": "vuepress-vite dev src --clean-cache",
     "docs:dev": "vuepress-vite dev src",
     "docs:update-package": "pnpm dlx vp-update",

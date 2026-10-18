@@ -23,6 +23,7 @@ import { collectCoursewareFindings } from './courseware.js';
 import { collectSiteFindings } from './site.js';
 import { collectFigureFindings } from './figures.js';
 import { collectDeckWebFindings } from './deck-web.js';
+import { collectDeckRenderFindings } from './deck-render.js';
 import { collectCiStatus } from './ci.js';
 
 /** One row of a two-cell Markdown table whose first cell is a backticked path. */
@@ -672,12 +673,13 @@ export function evaluatePushGate({ root, rev = 'HEAD', settings }) {
 	const site = collectSiteFindings({ root, settings: s });
 	const figures = collectFigureFindings({ root, settings: s });
 	const deckWeb = collectDeckWebFindings({ root, settings: s });
+	const deckRender = collectDeckRenderFindings({ root });
 	// The git-history walk costs seconds, so it belongs here and not in the audit.
 	const drift = collectCodeDrift({ root, pairs: collectDriftPairs({ root, settings: s }) });
 	const audit = auditRepo({
 		root,
 		maxFindings: 400,
-		extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings, ...latexMap.findings, ...site.findings, ...figures.findings, ...deckWeb.findings, ...drift],
+		extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings, ...latexMap.findings, ...site.findings, ...figures.findings, ...deckWeb.findings, ...deckRender.findings, ...drift],
 		settings: s
 	});
 	const commit = collectCommitFindings({ root, rev });
@@ -728,6 +730,14 @@ export function evaluatePushGate({ root, rev = 'HEAD', settings }) {
 				artifacts.findings.length === 0
 					? `${artifacts.pairs} 对源/产物的锚点一致`
 					: `${artifacts.findings.length} 条产物问题（用 ascend310b_writing_render 看原因）`
+		},
+		{
+			id: 'presentation-render',
+			blocking: true,
+			ok: deckRender.available && deckRender.findings.every((finding) => finding.severity !== 'error'),
+			detail: deckRender.available
+				? `${deckRender.decks} 份、${deckRender.pages} 页真实渲染，${deckRender.findings.filter((finding) => finding.severity === 'error').length} 个裁切/图片问题`
+				: '真实渲染检查不可用；先安装 Chrome/Puppeteer 并运行 docs:slides'
 		},
 		{
 			id: 'pages-ci',

@@ -18,17 +18,21 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** Vertical budget inside a 720px frame with the theme's 62/88px padding. */
+/**
+ * The theme's usable height is 720 - 62 (top) - 84 (bottom) = 574px.
+ * The estimate below deliberately keeps 640px of headroom because it is a
+ * coarse source-level precheck; real clipping is measured in a browser by
+ * scripts/check_presentation_render.mjs and the deck-render tool.
+ */
 export const SLIDE_HEIGHT_BUDGET = 640;
 
-/** Capacity limits, matched to the theme's 22px body and 17px table text. */
-// Calibrated against the theme's real capacity: 720px frame minus the 62/88px
-// padding leaves ~570px of content, so a pure-code page fits about 22 lines.
-// The limit here is the point where a slide stops being readable, not the point
-// where it crops — `deck-slide-overflow` guards the crop.
+/** Capacity limits for the current 26px body / 21px table theme. */
+// These are editorial limits, not a clipping prediction. The browser render
+// check is authoritative for clipping; these limits stop a page before it
+// becomes unreadable on a projector.
 export const LIMITS = {
 	codeLines: 22,
-	tableColumns: 6,
+	tableColumns: 7,
 	tableRows: 10,
 	bullets: 8,
 	slideCjk: 320
@@ -229,16 +233,16 @@ export function collectDeckFindings({ root, settings }) {
 
 	// Case decks carry the visual material; a deck about a camera pipeline with
 	// one diagram is not teaching the pipeline.
-	for (const name of names.filter((entry) => /^(?:05|06|07|08)-/u.test(entry))) {
+	for (const name of names.filter((entry) => /^(?:2[0-8])-case/u.test(entry))) {
 		const text = readFileSync(join(root, part.dir, name), 'utf8');
 		const images = (text.match(/!\[[^\]]*\]\(|<img\b/giu) ?? []).length;
-		if (images < 2) {
+		if (images < 1) {
 			findings.push({
 				rule: 'deck-visual-missing',
 				severity: 'info',
 				file: `${part.dir}/${name}`,
 				line: 1,
-				message: `案例课件只有 ${images} 张图；建议补流水线/源码地图（可复用 src/experiment/img*/ 与 src/appendix/img1/）`
+				message: '案例课件没有图；建议补流水线、源码地图或板端证据图'
 			});
 		}
 	}

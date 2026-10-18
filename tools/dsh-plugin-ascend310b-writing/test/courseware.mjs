@@ -87,6 +87,14 @@ write('src/presentation/theme.css', ['section pre { font-size: 20px; }', 'sectio
 check(auditTheme({ root, themePath: 'src/presentation/theme.css' }).length === 0, 'a 12px footer is peripheral and must not be reported');
 
 write(
+	'src/presentation/theme.css',
+	['section { font-size: 22px; }', 'section pre { font-size: 20px; }', 'section table { font-size: 20px; }'].join('\n')
+);
+const bodySmall = auditTheme({ root, themePath: 'src/presentation/theme.css' });
+check(bodySmall.length === 1, `only the 22px body rule may be reported, got ${bodySmall.length}`);
+check(bodySmall[0]?.message.includes('26px'), 'the body finding must name the 26px floor');
+
+write(
 	'src/presentation/01-alpha.md',
 	deck(['对应教材：`src/book/chapter1.md`', '', '```text', 'tree', '```'].join('\n'))
 );

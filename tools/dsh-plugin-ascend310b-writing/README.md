@@ -4,13 +4,13 @@
 DeepSeek Harness 插件（bundle）。
 
 它把仓库 `AGENTS.md` 里的冻结命名规则、Markdown 卫生要求、LaTeX 渲染与产物
-新鲜度、推送前门槛和写作进度，变成四个模型可直接调用的工具和一个 Web 侧边栏面板。
+新鲜度、演示文稿的真实浏览器布局、推送前门槛和写作进度，变成九个模型可直接调用的工具和一个 Web 侧边栏面板。
 
 ## 组成
 
 | 面 | 文件 | 作用 |
 | --- | --- | --- |
-| 主机端 | `lib/index.js` | 注册 `ascend310b_writing_audit`、`ascend310b_writing_render`、`ascend310b_writing_push_check`、`ascend310b_writing_toolchain`、`ascend310b_writing_progress` 五个工具；组成里有 Web 服务器时额外注册 `/ascend310b-writing/report.json` 只读路由 |
+| 主机端 | `lib/index.js` | 注册 `ascend310b_writing_audit`、`ascend310b_writing_deck_render`、`ascend310b_writing_render`、`ascend310b_writing_push_check`、`ascend310b_writing_ci`、`ascend310b_writing_toolchain`、`ascend310b_writing_progress`、`ascend310b_writing_build`、`ascend310b_writing_style` 九个工具；组成里有 Web 服务器时额外注册 `/ascend310b-writing/report.json` 只读路由 |
 | 审计内核 | `lib/audit-core.js` | 正文审计、行尾分级与进度统计；纯 Node ESM，无 Harness 依赖，可单独运行与测试 |
 | 跨产物检查 | `lib/checks.js` | 读 Markdown 之外的证据：`AGENTS.md` 冻结名表、LaTeX 构建日志、生成物与源的锚点差、Git 提交树 |
 | 工具链体检 | `lib/toolchain.js` + `lib/doctor.js` | 探测 bash/pandoc/latexmk/xelatex/python3/pnpm/node（含 Anaconda/conda），给按平台分类的安装命令，判断哪些能力可用 |
@@ -19,15 +19,17 @@ DeepSeek Harness 插件（bundle）。
 | 技能 | `skills/ascend310b-writing/SKILL.md` | 自然语言触发的中文技术写作流程 |
 | 组合 | `cordis.patch.yml` | 声明本包的 bundle patch，把 Host 行插入组合 |
 
-五个工具各回答一个不同的问题：
+九个工具各回答一个不同的问题：
 
 | 工具 | 回答的问题 |
 | --- | --- |
 | `ascend310b_writing_toolchain` | 这台机器 + 这个仓库现在能做什么，缺什么、怎么装 |
 | `ascend310b_writing_audit` | 正文本身对不对（含 `AGENTS.md` 冻结名表的双向比对），以及演示文稿与站点产物是否过期 |
 | `ascend310b_writing_audit` + `rev` | 这次提交发布出去会不会断链 |
+| `ascend310b_writing_deck_render` | 生成后的 1280×720 课件有没有真实裁切、图片未加载 |
 | `ascend310b_writing_render` | 渲染出来的 PDF 有没有坏字符，生成物是否落后于源 |
-| `ascend310b_writing_ci` | 读取最近一次 GitHub Pages 工作流运行、提交、失败步骤与日志 |`n| `ascend310b_writing_push_check` | 现在能不能推，以及哪一项只有人能确认 |
+| `ascend310b_writing_ci` | 读取最近一次 GitHub Pages 工作流运行、提交、失败步骤与日志 |
+| `ascend310b_writing_push_check` | 现在能不能推，以及哪一项只有人能确认 |
 | `ascend310b_writing_build` | 构建（走仓库自己的转换器），并在同一任务里核对产物 |
 | `ascend310b_writing_style` | 哪些句子读起来像产品宣传稿/AI 输出（只提示，不判定） |
 | `ascend310b_writing_progress` | 篇幅和剩余工作量 |
@@ -187,6 +189,7 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 
 **永不阻塞**：不进推送门槛、不产生 error。同一个词在某个句子里可能恰好准确，判断权在作者。
 改写方法见技能文档的「去 AI 味」一节。
+
 ## 课件规范检查
 
 | 规则 | 级别 | 判据 |
@@ -195,15 +198,23 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 | `deck-content-thin` | warning | 少于 6 页或少于 800 字 |
 | `deck-slide-underfull` | warning | 散文页正文少于 40 字且无代码/表格/图片 |
 | `deck-cover-missing` | warning | 缺少 `_class: cover` 封面 |
+| `deck-cover-meta-label` | warning | 封面出现“教师授课版/理论章节课件”等自我标注 |
+| `deck-cover-byline-missing` | warning | 封面缺作者与邮箱 |
 | `deck-summary-missing` | warning | 缺少小结或课堂任务 |
-| `deck-title-too-long` | warning | 页面标题超过 30 字 |`n| `deck-web-density-low` | warning | 生成网页的单页信息量低于学术报告下限 |
+| `deck-title-too-long` | warning | 页面标题超过 30 字 |
+| `deck-theme-unsupported` | warning | 未使用统一的 `ascend310`（Metropolis 风格）主题 |
+| `deck-web-density-low` | warning | 生成网页的单页信息量低于学术报告下限 |
 | `deck-web-density-high` | warning | 生成网页的单页信息量超过上限（表格行/列、代码行） |
 | `deck-web-density-uneven` | warning | 同一课件正文/表格页密度跨度 ≥ 2.8 倍 |
-| `ci-pages-failed` | error | GitHub Pages 最近一次构建失败（含失败步骤摘要） |`n| `ci-pages-pending` | info | Pages 构建仍在运行 |`n| `ci-run-missing` | warning | 找不到 Pages 工作流运行记录 |`n| `ci-remote-behind` | info | 本地 HEAD 尚未推送，远端构建不代表本地 |`n| `deck-web-theme-drift` | warning | 生成页面不是统一的 `ascend310` 主题 || `deck-theme-unsupported` | warning | 未使用统一的 `ascend310`（Metropolis 风格）主题 |`n| `deck-cover-meta-label` | warning | 封面出现“教师授课版/理论章节课件”等自我标注 |`n| `deck-cover-byline-missing` | warning | 封面缺作者与邮箱 |
-| `deck-slide-overflow` | error | 单页估算高度超过安全高度 |
+| `deck-web-theme-drift` | warning | 生成页面不是统一的 `ascend310` 主题 |
+| `deck-slide-overflow` | error | 源码估算高度超过安全高度 |
+| `deck-render-overflow` | error | 真实浏览器中纵向或横向裁切 |
+| `deck-render-image-missing` | error | 真实浏览器中图片未加载 |
+| `deck-render-no-decks` | warning | 指定的课件尚未构建 |
+| `deck-render-unavailable` | warning | 缺少 Node、Puppeteer 或浏览器 |
 | `deck-code-too-long` | warning | 单页代码超过 22 行 |
-| `deck-table-too-wide` | warning | 表格超过 6 列 / 10 行 |
-| `deck-font-too-small` | error | 代码或表格字号低于 20px |
+| `deck-table-too-wide` | warning | 表格超过 7 列 / 10 行 |
+| `deck-font-too-small` | error | 正文低于 26px，或代码/表格低于 20px |
 | `deck-source-missing` | error | 没有指向教材或样例的来源 |
 | `deck-metadata-missing` | warning | 缺 Marp 全局指令 |
 | `deck-image-no-alt` | error | 图片缺 alt（MD045） |
@@ -211,8 +222,18 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 | `deck-bare-url` | warning | 正文裸 URL（MD034） |
 | `deck-notes-sparse` | info | 讲师备注覆盖低于 20% |
 | `deck-code-untraceable` | info | 代码块未标来源 |
+| `deck-visual-missing` | info | 案例课件少于 2 张图 |
+| `deck-tier-claim` | error | 只写 20T/310B1，缺少 8T/310B4 适用范围 |
+| `deck-frozen-mismatch` | warning | 课件标题与冻结名不一致 |
+| `deck-readme-order` | warning | README 目录顺序与文件编号不一致 |
+| `ci-pages-failed` | error | GitHub Pages 最近一次构建失败（含失败步骤摘要） |
+| `ci-pages-pending` | info | Pages 构建仍在运行 |
+| `ci-run-missing` | warning | 找不到 Pages 工作流运行记录 |
+| `ci-remote-behind` | info | 本地 HEAD 尚未推送，远端构建不代表本地 |
+| `ci-gh-unavailable` | info | gh 不可用，无法读取 Pages 状态 |
+| `ci-query-failed` | warning | gh 查询失败 |
 
-容量超出时用 `node scripts/split-decks.mjs --write <课件>` 分页，不要缩小字号。
+容量超出时用 `node scripts/split-decks.mjs --write <课件>` 分页，不要缩小字号。真实裁切用 `ascend310b_writing_deck_render` 或 `pnpm run docs:slides:render-check` 复核。
 
 ## 新电脑安装插件
 
