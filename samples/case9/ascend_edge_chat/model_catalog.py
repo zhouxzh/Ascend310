@@ -30,6 +30,7 @@ _REQUIRED_ENTRY_KEYS = {
 }
 _ALLOWED_TECHNICAL = {"observed-pass", "observed-degraded", "short-smoke", "not-run", "blocked"}
 _ALLOWED_QUALITY = {"passed", "failed", "pending", "not-run"}
+_ALLOWED_TEXT_INTEGRITY = {"passed", "observed-issue", "pending", "not-run"}
 
 
 class CatalogError(ValueError):
@@ -62,6 +63,9 @@ def _public_entry(raw: Mapping[str, Any]) -> Dict[str, Any]:
         raise CatalogError("unknown technical status for %s" % profile_id)
     if quality not in _ALLOWED_QUALITY:
         raise CatalogError("unknown quality status for %s" % profile_id)
+    text_integrity = raw.get("text_integrity_status", "pending")
+    if text_integrity not in _ALLOWED_TEXT_INTEGRITY:
+        raise CatalogError("unknown text-integrity status for %s" % profile_id)
     if not isinstance(raw.get("selectable"), bool):
         raise CatalogError("selectable must be boolean for %s" % profile_id)
     if raw["selectable"] and technical not in {"observed-pass", "observed-degraded", "short-smoke"}:
@@ -75,6 +79,13 @@ def _public_entry(raw: Mapping[str, Any]) -> Dict[str, Any]:
     registry = raw.get("worker_registry")
     if not isinstance(registry, str) or not registry.strip():
         raise CatalogError("worker_registry must be a non-empty path for %s" % profile_id)
+    try:
+        max_tokens = int(raw.get("max_tokens", 256))
+        default_max_tokens = int(raw.get("default_max_tokens", min(128, max_tokens)))
+    except (TypeError, ValueError) as exc:
+        raise CatalogError("token budgets must be integers for %s" % profile_id) from exc
+    if not 1 <= default_max_tokens <= max_tokens <= 256:
+        raise CatalogError("token budgets are invalid for %s" % profile_id)
     # Never expose source paths, artifact paths, tokens or free-form command
     # fragments to an unauthenticated browser.
     return {
@@ -84,13 +95,15 @@ def _public_entry(raw: Mapping[str, Any]) -> Dict[str, Any]:
         "languages": list(languages),
         "technical_status": technical,
         "quality_status": quality,
+        "text_integrity_status": text_integrity,
         "selectable": bool(raw["selectable"]),
         "reason": str(raw["reason"]),
         "board_results": {
             str(board): str(result) for board, result in board_results.items()
         },
         "worker_registry": registry,
-        "max_tokens": int(raw.get("max_tokens", 64)),
+        "default_max_tokens": default_max_tokens,
+        "max_tokens": max_tokens,
         "quality_detail": str(raw.get("quality_detail", "")),
         "technical_detail": str(raw.get("technical_detail", "")),
     }

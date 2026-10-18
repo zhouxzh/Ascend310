@@ -25,7 +25,7 @@ flowchart LR
 | Teaching experiments | Qwen1.5 1.8B, Qwen2/Qwen2.5 0.5B/1.5B, TinyLlama and DeepSeek profiles when their artifacts are present |
 | Public model name | `ascend-edge-chat` |
 | API | `GET /v1/models`, `POST /v1/chat/completions`, JSON, SSE |
-| Not included | Speech, ASR/TTS, device protocol, retrieval, hot model switching |
+| Not included | Speech, ASR/TTS, device protocol, retrieval, simultaneous multi-model loading |
 
 8T hardware does not inherit the 20T result and is not part of this release validation.
 
@@ -90,20 +90,31 @@ Historical experiments are preserved under [docs/archive/](docs/archive/); they 
 
 The browser lists the teaching catalog from `configs/tutorial-model-catalog.json`. A
 model marked `selectable` has a measured technical path and may be tested even when
-its `quality_status` is `failed` or `pending`. The selector never hot-switches a
-loaded NPU model: choose a profile, stop the worker, and restart it with the
-matching registry entry.
+its `quality_status` is `failed` or `pending`. In teaching mode, selecting a model
+from the browser performs a controlled worker restart: the UI verifies the pinned
+registry and local cache, stops the current worker, starts the selected profile,
+waits for NPU health, and clears the browser conversation. If startup fails, it
+automatically attempts to restore the previous worker. It never accepts a model
+path, arbitrary command, or Python expression from the browser. The selector is
+disabled while a reply is generating; after the browser receives a terminal SSE
+event, the server also waits briefly for stream cleanup before switching.
 
 ```bash
+# The UI can perform this controlled restart. This command remains useful for
+# terminal-based recovery or a headless board.
 ASCEND_EDGE_CHAT_PROFILE=qwen2-1.5b-instruct-mindspore \
-  ascend-edge-chat worker \
-  --profile qwen2-1.5b-instruct-mindspore \
+  ascend-edge-chat worker --profile qwen2-1.5b-instruct-mindspore \
   --registry configs/tutorial-models.json
 ```
 
-The tutorial records the observed reason for each result. For example, Qwen2 and
-Qwen2.5 profiles can pass NPU/API gates while producing `U+FFFD`; that is a
-tokenizer/decoding quality result, not evidence that the NPU cannot run them.
+The tutorial records runtime, text-integrity and semantic-quality evidence
+separately. For example, Qwen2 and Qwen2.5 profiles can pass NPU/API gates
+while producing `U+FFFD`; that is a tokenizer/decoding text-integrity
+observation, not evidence that the NPU cannot run them or a sufficient basis
+for a Chinese semantic-quality verdict. The page sends a per-request output
+budget. The normal default is `128` tokens and the verified service ceiling is
+`256`; a token is not a Chinese-character count, and the context budget still
+requires `prompt_tokens + max_tokens <= 1024`.
 
 ## Common Faults
 

@@ -44,8 +44,10 @@ LOGGER = logging.getLogger("ascend_edge_chat.mindspore_chat.providers")
 
 DEFAULT_CONTEXT_LENGTH = 1024
 DEFAULT_MAX_TOKENS = 32
-# The release worker uses a deliberately conservative generation budget.
-MAX_MAX_TOKENS = 64
+# The worker keeps a fixed 1024-token context contract.  A 256-token output
+# ceiling leaves room for the prompt while avoiding an accidental unbounded
+# decode.  Individual profiles can apply a smaller verified limit.
+MAX_MAX_TOKENS = 256
 STREAM_READER_POLL_SECONDS = 0.05
 _NPU_SOC_RE = re.compile(r"\b(?:Ascend\s*)?(310B[0-9A-Za-z]+)\b", re.IGNORECASE)
 
@@ -620,6 +622,13 @@ class MindSporeChatProvider:
         self.revision = _revision(profile)
         self.mirror = _mirror(profile)
         self.context_length = _context_length(profile)
+        # A tokenizer bundle is permitted to omit ``chat_template`` only
+        # when the reviewed, fixed profile supplies one.  This must be bound
+        # to the instance: leaving the class default in place silently sends
+        # an undefined prompt format to ``generate`` on those bundles.
+        configured_template = _value(profile, "chat_template", default=None)
+        if configured_template is not None:
+            self.profile_chat_template = str(configured_template)
         self.generation_timeout = float(generation_timeout)
         if self.generation_timeout <= 0:
             raise ValueError("generation_timeout must be positive")
@@ -1778,6 +1787,20 @@ class Qwen15MindSporeProvider(MindSporeChatProvider):
     allow_generic_template_fallback = False
 
 
+class Qwen2MindSporeProvider(MindSporeChatProvider):
+    """Qwen2-family adapter that requires an explicit ChatML template.
+
+    MindNLP 0.4.1 can load a tokenizer-only Qwen2 bundle without its optional
+    ``tokenizer_config.json``.  Its generic fallback is Qwen1.5-shaped and
+    produces plausible first answers before decoding a new ``<|user|>`` turn.
+    Failing closed here makes a missing profile template a startup error
+    rather than an apparently successful but corrupt conversation.
+    """
+
+    provider_name = "mindspore-qwen2"
+    allow_generic_template_fallback = False
+
+
 def provider_class_for_profile(profile: Any) -> Any:
     profile_id = _profile_id(profile).lower()
     candidate_kind = str(_value(profile, "candidate_kind", default="native_mindspore")).strip().lower()
@@ -1796,6 +1819,8 @@ def provider_class_for_profile(profile: Any) -> Any:
         )
     if profile_id == "qwen1.5-0.5b-chat":
         return Qwen15MindSporeProvider
+    if profile_id.startswith(("qwen2-", "qwen2.")):
+        return Qwen2MindSporeProvider
     # The teaching registry deliberately exposes the same generic MindNLP
     # causal-LM adapter for every profile whose technical gates were actually
     # exercised.  Quality failures, slow output, or a short-smoke cap are
@@ -1912,6 +1937,7 @@ __all__ = [
     "ProviderUnavailable",
     "MindSporeChatProvider",
     "Qwen15MindSporeProvider",
+    "Qwen2MindSporeProvider",
     "create_provider",
     "provider_class_for_profile",
     "environment_fingerprint",

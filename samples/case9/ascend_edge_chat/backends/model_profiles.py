@@ -758,7 +758,16 @@ class ChatModelProfile:
             if missing:
                 raise ProfileError(name + " is missing keys: " + ", ".join(missing))
         else:
-            _exact_keys(raw, tuple(sorted(base_keys)), name)
+            # Schema v1 teaching registries predate the explicit template
+            # field.  Accept it as optional reviewed metadata without
+            # forcing old, frozen evidence registries to change schema.
+            allowed_v1_keys = base_keys | {"chat_template"}
+            extras = sorted(set(raw) - allowed_v1_keys)
+            missing = sorted(base_keys - set(raw))
+            if extras:
+                raise ProfileError(name + " has unknown keys: " + ", ".join(extras))
+            if missing:
+                raise ProfileError(name + " is missing keys: " + ", ".join(missing))
         profile_id = _string(raw["id"], name + ".id", pattern=_PROFILE_ID_RE)
         display_name = _string(raw["display_name"], name + ".display_name")
         model_id = _string(raw["model_id"], name + ".model_id")

@@ -20,8 +20,8 @@
       "runtime": {
         "provider": "mindspore",
         "context_length": 1024,
-        "default_max_tokens": 32,
-        "max_tokens": 64,
+        "default_max_tokens": 128,
+        "max_tokens": 256,
         "temperature": 0.0,
         "top_p": 1.0
       },

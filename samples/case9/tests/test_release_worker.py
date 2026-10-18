@@ -16,6 +16,14 @@ class ReleaseWorkerTests(unittest.TestCase):
         )
         self.assertEqual(request.model, MODEL_ID)
         self.assertEqual(request.max_tokens, 32)
+        extended = _parse_request(
+            {
+                "model": MODEL_ID,
+                "messages": [{"role": "user", "content": "请继续"}],
+                "max_tokens": 256,
+            }
+        )
+        self.assertEqual(extended.max_tokens, 256)
         with self.assertRaises(RequestError):
             _parse_request({"model": "other", "messages": [{"role": "user", "content": "你好"}]})
 

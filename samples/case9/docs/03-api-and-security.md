@@ -51,7 +51,7 @@ curl http://127.0.0.1:7861/v1/chat/completions \
   }'
 ```
 
-The release accepts `system`, `user`, and `assistant` roles. It accepts only greedy decoding (`temperature=0`, `top_p=1`), one request at a time, context at most 1024 tokens, and `max_tokens` at most 64. It rejects model changes, non-loopback upstreams, arbitrary paths, and arbitrary expressions.
+The release accepts `system`, `user`, and `assistant` roles. It accepts only greedy decoding (`temperature=0`, `top_p=1`), one request at a time, context at most 1024 tokens, and `max_tokens` at most 256. The browser's normal default is 128, while individual profiles may expose a smaller verified ceiling. It rejects model changes, non-loopback upstreams, arbitrary paths, and arbitrary expressions.
 
 For `stream:true`, the gateway emits standard `data:` SSE chunks and one terminal `data: [DONE]`. It rewrites the internal worker model identifier to `ascend-edge-chat` before sending the result to the client.
 

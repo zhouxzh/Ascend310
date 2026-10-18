@@ -7,12 +7,19 @@ from ascend_edge_chat.backends.model_profiles import load_profiles
 
 
 class TeachingModelCatalogTests(unittest.TestCase):
-    def test_quality_failure_does_not_hide_a_technically_tested_model(self) -> None:
+    def test_template_recheck_does_not_become_a_quality_verdict(self) -> None:
         entries = catalog_by_id()
         qwen2 = entries["qwen2-1.5b-instruct-mindspore"]
         self.assertEqual(qwen2["technical_status"], "observed-pass")
-        self.assertEqual(qwen2["quality_status"], "failed")
+        self.assertEqual(qwen2["quality_status"], "pending")
+        self.assertEqual(qwen2["text_integrity_status"], "passed")
         self.assertTrue(qwen2["selectable"])
+
+    def test_catalog_exposes_default_and_hard_token_budgets(self) -> None:
+        entries = catalog_by_id()
+        qwen2 = entries["qwen2-1.5b-instruct-mindspore"]
+        self.assertEqual(qwen2["default_max_tokens"], 128)
+        self.assertEqual(qwen2["max_tokens"], 192)
 
     def test_unrun_loader_is_not_selectable(self) -> None:
         entries = catalog_by_id()

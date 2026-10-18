@@ -238,7 +238,9 @@ class ConversationStore:
 
 
 class StreamingLLM(Protocol):
-    async def stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: list[dict[str, str]], *, max_tokens: Optional[int] = None
+    ) -> AsyncIterator[str]:
         """Yield assistant text deltas."""
 
     # OpenAI-compatible implementations should set this after the stream's
@@ -305,12 +307,22 @@ class OpenAIChatClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+    async def stream(
+        self, messages: list[dict[str, str]], *, max_tokens: Optional[int] = None
+    ) -> AsyncIterator[str]:
         # A client instance is serialized by the text UI, so this per-stream
         # field is safe and prevents a previous request's reason leaking into
         # the next turn.
         self.last_finish_reason = None
-        payload = {"model": self.model, "messages": messages, "stream": True}
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "stream": True,
+        }
+        if max_tokens is not None:
+            if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or max_tokens < 1:
+                raise LocalLLMError("max_tokens must be a positive integer")
+            payload["max_tokens"] = max_tokens
         headers = {
             "Accept": "text/event-stream",
             "Content-Type": "application/json",

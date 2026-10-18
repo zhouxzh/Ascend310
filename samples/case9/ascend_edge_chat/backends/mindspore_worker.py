@@ -760,13 +760,20 @@ class MindSporeChatService:
         if request.model != MODEL_ID:
             raise ProviderRequestError("model is not available")
         try:
+            profile_max_tokens = _strict_nonnegative_int(
+                _profile_value(self.profile, "max_tokens", default=MAX_GENERATION_TOKENS),
+                "profile max_tokens",
+                upper=MAX_GENERATION_TOKENS,
+            )
             requested_max_tokens = _strict_nonnegative_int(
-                request.max_tokens, "max_tokens", upper=MAX_GENERATION_TOKENS
+                request.max_tokens, "max_tokens", upper=profile_max_tokens
             )
         except ValueError as exc:
             raise ProviderRequestError(str(exc)) from exc
         if requested_max_tokens < 1:
-            raise ProviderRequestError("max_tokens must be between 1 and %d" % MAX_GENERATION_TOKENS)
+            raise ProviderRequestError(
+                "max_tokens must be between 1 and %d for this profile" % profile_max_tokens
+            )
 
         counter = getattr(self.provider, "count_tokens", None)
         if not callable(counter):

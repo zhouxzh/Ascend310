@@ -35,12 +35,14 @@ from .upstream import CompletionStream, OpenAICompatibleUpstream, UpstreamClient
 LOGGER = logging.getLogger("ascend_edge_chat.gateway")
 _MAX_SINGLE_MESSAGE_CHARACTERS = 16_000
 _RELEASE_UPSTREAM_MODEL = "ascend-edge-chat-worker"
-_RELEASE_MAX_TOKENS = 64
+_RELEASE_DEFAULT_MAX_TOKENS = 128
+_RELEASE_MAX_TOKENS = 256
 _RELEASE_MAX_INPUT_CHARACTERS = 4000
 
 _FIXED_CONTEXT_UPSTREAM_LIMITS = {
     _RELEASE_UPSTREAM_MODEL: {
         "label": "Ascend Edge Chat MindSpore worker",
+        "default_max_tokens": _RELEASE_DEFAULT_MAX_TOKENS,
         "max_tokens": _RELEASE_MAX_TOKENS,
         "max_input_characters": _RELEASE_MAX_INPUT_CHARACTERS,
     },
@@ -658,7 +660,7 @@ def _adapt_upstream_payload(payload: dict[str, Any], settings: Settings) -> dict
     if max_tokens is None:
         # Pydantic omits an unset optional field. Supplying the release default
         # avoids delegating an accidental, shorter default to the worker.
-        max_tokens = int(fixed_context_limits["max_tokens"])
+        max_tokens = int(fixed_context_limits["default_max_tokens"])
     if max_tokens > fixed_context_limits["max_tokens"]:
         raise GatewayAPIError(
             f"{fixed_context_limits['label']} upstream accepts max_tokens <= "

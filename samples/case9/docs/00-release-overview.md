@@ -38,12 +38,12 @@ The public model identifier is `ascend-edge-chat`. The internal worker identifie
 
 The default runtime profile is defined in `configs/release-model.json`; its accompanying lock is `configs/release-artifacts.lock.json`. The profile pins the Qwen repository revision, artifact file paths, exact byte sizes, SHA-256 digests, runtime limits, and target SoC. Classroom experiments use `configs/tutorial-models.json` and are described for students in `configs/tutorial-model-catalog.json`.
 
-The release does not accept a model path, model revision, provider name, or Python expression from a browser or API request. Extension work must use the controlled profile and provider workflow in [Extension Guide](05-extension-guide.md).
+The release does not accept a model path, model revision, provider name, or Python expression from a browser or API request. The teaching selector accepts only a profile ID already present in the checked-in catalog and registry. It restarts the single worker, waits for its health signal, and rolls back to the previous profile on startup failure. Extension work must use the controlled profile and provider workflow in [Extension Guide](05-extension-guide.md).
 
 ## Non-Goals
 
 - no claim of production availability or safety certification;
-- no hot model switching or automatic backend failover (a profile change requires a worker restart);
+- no simultaneous multi-model loading or automatic backend failover (a teaching profile change is a controlled worker restart);
 - no CPU, cloud, Torch, vLLM, MindIE, or alternate-framework fallback;
 - no support claim for a model merely because an artifact can be downloaded; selectable entries require measured technical evidence;
 - no 8T performance or quality assertion derived from a 20T run.

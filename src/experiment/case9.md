@@ -21,7 +21,7 @@ title: 案例 9：智能聊天机器人
 
 ## 2. 系统架构
 
-浏览器不直接访问模型，也不知道网关密钥。网页进程在服务器端保存密钥，再调用回环地址上的网关。网关验证请求后，将固定的内部模型名转发给回环地址上的 MindSpore worker。worker 一次只加载一个 profile 并串行执行生成，避免多个大模型同时争用边缘 NPU。页面可以选择教学目录中的实验模型，但模型切换必须停止并重启 worker，不能在请求中偷偷替换模型。
+浏览器不直接访问模型，也不知道网关密钥。网页进程在服务器端保存密钥，再调用回环地址上的网关。网关验证请求后，将固定的内部模型名转发给回环地址上的 MindSpore worker。worker 一次只加载一个 profile 并串行执行生成，避免多个大模型同时争用边缘 NPU。页面可以选择教学目录中的实验模型；选择后由服务端按受控流程停止旧 worker、启动固定 profile、检查健康状态并清空会话，不能在请求中传入任意模型路径或替换模型代码。
 
 ```mermaid
 flowchart LR
@@ -159,8 +159,12 @@ ascend-edge-chat ui
 
 页面会列出教学目录。`selectable=true` 表示已有技术运行证据，哪怕
 `quality_status` 是 `failed` 或 `pending` 也仍可选；`blocked`/`not-run` 表示
-尚未完成 loader、工件或 NPU 前置门，暂时不能启动。页面选择不同模型后会提示
-重启命令，而不是热切换已经占用 NPU 的进程。
+尚未完成 loader、工件或 NPU 前置门，暂时不能启动。页面选择不同模型后会执行
+受控的 worker 重启：先检查固定 registry 和本地缓存，停止当前 worker，使用
+CANN 启动脚本加载目标 profile，并等待 `/health` 返回目标模型。切换成功后会清空
+浏览器会话；若目标启动失败，会尝试恢复原模型。它不是在同一进程中同时加载多个
+模型，也不允许网页提交路径、shell 命令或 Python 表达式。生成期间，页面会禁用
+选择器；收到终止 SSE 事件后，服务端还会等待一个短暂的流式收尾窗口再开始切换。
 
 ```bash
 export ASCEND_EDGE_CHAT_PROFILE=qwen2-1.5b-instruct-mindspore
@@ -169,9 +173,9 @@ ascend-edge-chat worker \
   --registry configs/tutorial-models.json
 ```
 
-如果选择的模型没有完整本地缓存，启动器会在加载 MindSpore 前失败；它不会
-自动改用 CPU、云端或未锁定的远程权重。完成测试后停止该 worker，再恢复默认
-profile：
+如果选择的模型没有完整本地缓存，页面会在停止当前 worker 前报告失败；它不会
+自动改用 CPU、云端或未锁定的远程权重。下面的命令仍可用于无浏览器的恢复操作，
+或者在自动回滚也失败后恢复默认 profile：
 
 ```bash
 ascend-edge-chat worker --profile qwen1.5-0.5b-chat
@@ -205,7 +209,7 @@ curl http://127.0.0.1:7861/v1/chat/completions \
 
 - 仅接受 `system`、`user`、`assistant` 三种角色；
 - 仅支持 greedy 解码：`temperature=0`、`top_p=1`；
-- 最大上下文为 1024 token，最大输出为 64 token；
+- 最大上下文为 1024 token；网页默认输出预算为 128 token，服务硬上限为 256 token，具体 profile 可以声明更小上限；
 - 单进程、单请求串行执行；
 - 请求体最大 256 KiB；
 - 超时或运行时错误时 fail-closed，不自动切换后端。
@@ -219,7 +223,7 @@ curl http://127.0.0.1:7861/v1/chat/completions \
 1. SoC、CANN、Python、MindSpore、MindNLP、驱动和模型 SHA-256；
 2. worker NPU 初始化和单 token 生成；
 3. `/health`、`/v1/models`、JSON 与 SSE；
-4. `8`、`16`、`32`、`64` token 的 UTF-8、结束原因和截断检查；
+4. `8`、`16`、`32`、`64`、`128`、`256` token 的 UTF-8、结束原因和截断检查；
 5. 连续 10 轮短请求的 PID、RSS、文件描述符和 NPU 快照；
 6. 浏览器页面通过网关完成一次对话；
 7. 明确 warmup、轮数、百分位算法的首 token、总延迟和 token/s；
@@ -238,16 +242,69 @@ NPU 不能运行。
 | --- | --- | --- | --- |
 | Qwen1.5 0.5B | 20T 机器门通过 | 待人工审核 | 默认基线，先用它验证环境和协议 |
 | Qwen1.5 1.8B | 20T 机器门通过 | 待人工审核 | 更大模型，速度和内存需要单独测量 |
-| Qwen2 0.5B/1.5B | 20T API、长输出、稳定性通过 | 中文探测含 `U+FFFD` | tokenizer/解码文本完整性问题；不是 NPU 加载失败 |
+| Qwen2 0.5B/1.5B | 20T API、长输出、稳定性通过 | 语义质量待人工复核 | Qwen2-1.5B 已定位并修复缺失 ChatML 模板导致的角色标记续写；这不是 NPU 加载失败 |
 | Qwen2.5 0.5B | 修正客户端超时后机器门通过 | 待审核 | 早期 30 秒超时误杀了测试，不能当作模型崩溃 |
-| Qwen2.5 1.5B | 低占用路径可运行；另有高占用 `Alloc failed` | 中文探测含 `U+FFFD` | 内存占用路径和文本解码问题必须分开记录 |
-| TinyLlama 1.1B | 短请求可运行；长输出退化 | 中文弱，长输出出现 `U+FFFD`/TBE | 主要面向英文，短 smoke 仍适合课堂复现边界 |
-| DeepSeek-R1 Distill 1.5B | 两板有 NPU/API 证据，速度较慢 | 推理前缀或事实错误 | `<think>` 预算和模型行为影响结果，不代表没有 NPU 推理 |
+| Qwen2.5 1.5B | 低占用路径可运行；另有高占用 `Alloc failed` | 历史探测含 `U+FFFD`，语义质量待复核 | 内存占用路径和文本解码问题必须分开记录 |
+| TinyLlama 1.1B | 短请求可运行；长输出退化 | 中文语义质量待复核；历史长输出出现文本完整性/TBE 问题 | 主要面向英文，短 smoke 仍适合课堂复现边界 |
+| DeepSeek-R1 Distill 1.5B | 两板有 NPU/API 证据，速度较慢 | 中文语义质量待复核 | `<think>` 预算和模型行为影响结果，不代表没有 NPU 推理 |
 | Qwen3 0.6B | 未进入加载 | 未测试 | 当前 MindNLP 没有 loader，属于前置阻断 |
 | MiniCPM3 4B | 未测试 | 未测试 | 专用 loader、权重和内存门尚未完成 |
 
 学生应先复制原始响应，再分析 tokenizer、chat template、`finish_reason`、
-设备内存和 `npu-smi`。不要把中文质量表格改写成硬件兼容性结论。
+请求的 `max_tokens`、设备内存和 `npu-smi`。不要把中文质量表格改写成硬件兼容性结论。
+
+### 9.1 长度、文本完整性与中文语义质量
+
+`max_tokens` 是本轮**最多新生成多少 tokenizer token**，不是“最多多少汉字”。
+同一段中文可能被分成一个或多个 token；它还受 `prompt_tokens + max_tokens <=
+1024` 的上下文上限约束。页面默认发出 `128`，可以在页面的“最大输出 token”
+下拉菜单中选择当前模型允许的档位；普通 Qwen 教学 profile 当前可选
+`32/64/96/128/192/256`。如果模型没有在上限前输出 EOS，接口返回 `finish_reason=length`，页面会
+保留已生成文本并提示截断。这是长度门结果，不是模型崩溃，也不能直接作为中文
+质量差的证据。
+
+质量验收必须单独进行。针对每个 profile，以新会话、greedy 解码、`max_tokens=256`
+（或该 profile 的已验证上限）运行同一组 10 条中文提示，保存完整 JSON/SSE、模型
+revision、提示与完成 token 数、`finish_reason`。先标注是否出现 `U+FFFD` 等文本
+完整性异常；`finish_reason=length` 的回答标为“未完成”，不计入语义失败。随后由
+至少两名评审者对相关性、事实性、流畅性和完成度分别打 0/1/2 分，并保留分歧。
+只有该人工流程才能把 `quality_status` 标为通过或失败；历史短预算中的替换字符
+只能保留为 tokenizer/解码的待复核观察。
+
+### 9.2 20T 长输出边界实测示例
+
+不要把配置文件中的 `max_tokens` 当作已验证能力。以 20T 的
+`Qwen2 1.5B Instruct` 为例，在 `Ascend310B1`、CANN `8.0.0`、MindSpore
+`2.4.10`、MindNLP `0.4.1` 上，先发现其 tokenizer 目录没有
+`tokenizer_config.json`，默认模板为空。旧通用回退错误使用 Qwen1.5 风格的
+`<|user|>` / `<|assistant|>`，于是模型在第一轮回答后继续生成下一轮角色标记。将
+审核后的 Qwen2 ChatML 模板固定到 profile 后，经网页 SSE 链路的强制长输出测试中：
+`64` token 在 `80.029 s`、`128` token 在 `158.946 s`、`192` token 在
+`238.133 s` 均跑满，三轮都返回 `finish_reason=length`，无 `U+FFFD` 和角色标记，
+worker 恢复健康。`256` token 请求仍在产生长段 SSE 输出后失去 worker 终态，
+日志含 TBE `main process disappeared` 与资源清理警告，而不是显存用尽记录。因此该
+profile 的页面下拉菜单和 worker 当前只允许到 `192`，服务的全局 `256` 上限仍保留给
+需要单独验收的其他 profile。
+
+这组数据说明三件事：token 预算与汉字数无一一对应；速度和可完成的最大长度必须
+分开测量；一次 worker 退出只能说明该软件、模型 revision、提示词和 watchdog 组合
+的失败，不能外推成整个 310B 产品族不支持该模型。学生应保存每一档的 SSE、
+`finish_reason`、完成 token 数、worker 健康状态和 `npu-smi` 快照，再更新 profile
+的可选档位。
+
+可在板端以如下命令重复长度门。应从较小档位逐级升高，并在前一档 worker 已恢复
+健康后才运行后一档：
+
+```bash
+python scripts/verify/output_budget_probe.py \
+  --profile qwen2-1.5b-instruct-mindspore \
+  --budgets 128,192 \
+  --timeout 330 \
+  --output run/output-budget-$(date -u +%Y%m%dT%H%M%SZ).json
+```
+
+该工具调用和网页相同的 SSE 路由。若 worker 消失，它会保留“unavailable”观察，
+不能把该次运行写成成功，也不能用配置中的全局上限代替板端结果。
 
 ## 10. 二次开发
 

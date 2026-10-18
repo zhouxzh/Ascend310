@@ -3,16 +3,17 @@
 ## Extension Boundary
 
 Ascend Edge Chat ships one immutable default release profile and a separate
-teaching catalog. A second model is not a hot browser switch: it must be
-introduced through source code, a pinned profile, verified artifacts, test
-coverage, and an independent board validation report. Once its technical path
-has been observed, it may be exposed in the teaching selector even when its
-language-quality result is failed or pending.
+teaching catalog. A second model must first be introduced through source code,
+a pinned profile, verified artifacts, test coverage, and an independent board
+validation report. Once its technical path has been observed, it may be exposed
+in the teaching selector even when its language-quality result is failed or
+pending. Selecting it in the browser performs a controlled stop/start of the
+single NPU worker; it is not an in-process or concurrent model swap.
 
 ```mermaid
 flowchart LR
     accTitle: Controlled extension workflow
-    accDescr: A new model passes source, artifact, and board gates before an operator can promote it into a future release profile. It is never selected from an API request or browser control.
+    accDescr: A new model passes source, artifact, and board gates before it can enter the controlled teaching selector and later be promoted into a release profile.
 
     provider["Backend provider"] --> profile["Pinned model profile"]
     profile --> artifacts["Verified artifacts"]
@@ -49,7 +50,8 @@ Create a new release profile only in a new release branch. It must include:
 
 Use `release-model.json` as a structural reference, but do not add multiple
 profiles to the released `v0.1.0` configuration. Classroom profiles belong in
-`configs/tutorial-models.json` and are started explicitly with `--profile`.
+`configs/tutorial-models.json` and can be launched by the controlled teaching
+selector or explicitly with `--profile`.
 The artifact acquisition implementation rejects a release configuration
 containing more than one profile; the tutorial launcher instead performs a
 minimum local-cache preflight and preserves the separate artifact reports.
