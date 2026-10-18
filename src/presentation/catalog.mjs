@@ -8,11 +8,6 @@
 
 export const presentationSections = Object.freeze([
   {
-    id: "overview",
-    title: "课程总览",
-    sidebarTitle: "全书导览",
-  },
-  {
     id: "book",
     title: "理论章节课件",
     sidebarTitle: "理论章节",
@@ -30,29 +25,6 @@ export const presentationSections = Object.freeze([
 ]);
 
 export const presentationCatalog = Object.freeze([
-  {
-    id: "overview",
-    section: "overview",
-    order: 0,
-    slug: "00-course-overview",
-    source: "00-course-overview.md",
-    title: "《昇腾310B实战》课程导览",
-    shortTitle: "课程导览",
-    sources: [
-      "src/book/README.md",
-      "src/experiment/README.md",
-      "src/appendix/README.md",
-    ],
-    samples: ["samples/README.md"],
-    status: "ready",
-    build: true,
-    lessonPlan: [
-      "教材结构与学习路径",
-      "十章理论主线",
-      "九个案例的能力递进",
-      "附录索引与证据规则",
-    ],
-  },
   {
     id: "book-01",
     section: "book",

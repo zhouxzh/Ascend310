@@ -3,13 +3,6 @@ import { sidebar } from "vuepress-theme-hope";
 // BEGIN GENERATED PRESENTATION SIDEBAR
 const presentationChildren = [
   {
-    text: "全书导览",
-    collapsible: true,
-    children: [
-        { text: "课程导览", link: "/presentation/00-course-overview.html" },
-    ],
-  },
-  {
     text: "理论章节",
     collapsible: true,
     children: [

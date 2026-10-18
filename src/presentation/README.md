@@ -11,12 +11,6 @@ editLink: false
 ## 课件目录
 
 <!-- BEGIN GENERATED PRESENTATION INDEX -->
-### 课程总览
-
-| 单元 | 状态 | 放映版 |
-|---|---|---|
-| 《昇腾310B实战》课程导览 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/00-course-overview.html) |
-
 ### 理论章节课件
 
 | 单元 | 状态 | 放映版 |
@@ -72,7 +66,6 @@ editLink: false
 src/presentation/
 ├─ catalog.mjs                        课件单一清单
 ├─ theme.css                          Marp 主题
-├─ 00-course-overview.md              课程总览
 ├─ 10-chapter1.md ... 19-chapter10.md 理论章节课件
 ├─ 20-case1.md ... 28-case9.md        案例课件
 ├─ 30-appendix1.md ... 36-appendix7.md 附录课件
