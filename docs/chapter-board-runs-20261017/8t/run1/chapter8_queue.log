@@ -1,0 +1,5 @@
+mode: simulate
+serial:   65.91 FPS, wall=455.19 ms
+pipeline: 119.84 FPS, wall=250.33 ms
+speedup:  1.818x
+metrics saved: /home/HwHiAiUser/Ascend310/samples/chapter8/outputs/pipeline_queue_demo.json

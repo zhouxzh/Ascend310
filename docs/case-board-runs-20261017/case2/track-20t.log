@@ -1,0 +1,10 @@
+Using device: npu
+Using model: /home/HwHiAiUser/Ascend310/cases/case2/models/ssd320_mobilenetv3_large_100.om
+Capture request: profile=auto, mjpeg=on
+Capture backend: FFMPEG, buffer=0
+Capture stream: size=768x576, fps=10.00
+Input size used: 320x320
+Output[0] shape=(1, 4, 3234)
+Output[1] shape=(1, 81, 3234)
+Press 'q' to quit.
+Video stream ended or camera frame read failed.

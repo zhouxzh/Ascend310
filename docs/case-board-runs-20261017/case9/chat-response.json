@@ -1,0 +1,1 @@
+{"id":"chatcmpl-1a271c51d64b4a73b044a868427eff67","object":"chat.completion","created":1792286146,"model":"ascend-edge-chat","choices":[{"index":0,"message":{"role":"assistant","content":"昇腾310B是昇腾系列的第31款产品"},"finish_reason":"length"}],"usage":{"prompt_tokens":31,"completion_tokens":16,"total_tokens":47}}

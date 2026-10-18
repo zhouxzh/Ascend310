@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/HwHiAiUser/Ascend310/samples/chapter9/02_perf_compare.py", line 178, in <module>
+    raise SystemExit(main())
+  File "/home/HwHiAiUser/Ascend310/samples/chapter9/02_perf_compare.py", line 131, in main
+    measure_model(
+  File "/home/HwHiAiUser/Ascend310/samples/chapter9/02_perf_compare.py", line 70, in measure_model
+    frame = load_frame(index, paths, height=height, width=width)
+  File "/home/HwHiAiUser/Ascend310/samples/chapter9/02_perf_compare.py", line 49, in load_frame
+    return load_rgb_frame(paths[index % len(paths)])
+  File "/home/HwHiAiUser/Ascend310/samples/chapter9/chapter9_utils.py", line 131, in load_rgb_frame
+    frame = np.asarray(Image.open(frame_path).convert("RGB"), dtype=np.uint8)
+  File "/usr/local/miniconda3/lib/python3.9/site-packages/PIL/Image.py", line 3247, in open
+    fp = builtins.open(filename, "rb")
+FileNotFoundError: [Errno 2] No such file or directory: '/home/HwHiAiUser/Ascend310/samples/chapter9/data/tiny_imagenet_train/0_00000.png'

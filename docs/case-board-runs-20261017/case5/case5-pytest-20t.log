@@ -1,0 +1,57 @@
+
+==================================== ERRORS ====================================
+______________ ERROR collecting tests/test_benchmark_contract.py _______________
+ImportError while importing test module '/home/HwHiAiUser/Ascend310/cases/case5/tests/test_benchmark_contract.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/test_benchmark_contract.py:3: in <module>
+    from time_frequency_dashboard.benchmark_volk_npu import (
+time_frequency_dashboard/benchmark_volk_npu.py:26: in <module>
+    import onnxruntime as ort
+E   ModuleNotFoundError: No module named 'onnxruntime'
+_______________ ERROR collecting tests/test_model_tool_safety.py _______________
+ImportError while importing test module '/home/HwHiAiUser/Ascend310/cases/case5/tests/test_model_tool_safety.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/test_model_tool_safety.py:12: in <module>
+    from time_frequency_dashboard.model.compile_inference_candidate import parse_shape as parse_atc_shape
+time_frequency_dashboard/model/compile_inference_candidate.py:13: in <module>
+    import onnx
+E   ModuleNotFoundError: No module named 'onnx'
+_______________ ERROR collecting tests/test_npu_spectrum_onnx.py _______________
+ImportError while importing test module '/home/HwHiAiUser/Ascend310/cases/case5/tests/test_npu_spectrum_onnx.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/test_npu_spectrum_onnx.py:3: in <module>
+    import onnx
+E   ModuleNotFoundError: No module named 'onnx'
+______________ ERROR collecting tests/test_om_output_diagnosis.py ______________
+ImportError while importing test module '/home/HwHiAiUser/Ascend310/cases/case5/tests/test_om_output_diagnosis.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/test_om_output_diagnosis.py:4: in <module>
+    import onnx
+E   ModuleNotFoundError: No module named 'onnx'
+_____________ ERROR collecting tests/test_rtl_iq_spectrum_onnx.py ______________
+ImportError while importing test module '/home/HwHiAiUser/Ascend310/cases/case5/tests/test_rtl_iq_spectrum_onnx.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/test_rtl_iq_spectrum_onnx.py:6: in <module>
+    import onnx
+E   ModuleNotFoundError: No module named 'onnx'
+_______________ ERROR collecting tests/test_volk_kernel_onnx.py ________________
+ImportError while importing test module '/home/HwHiAiUser/Ascend310/cases/case5/tests/test_volk_kernel_onnx.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/test_volk_kernel_onnx.py:3: in <module>
+    import onnx
+E   ModuleNotFoundError: No module named 'onnx'
+=========================== short test summary info ============================
+ERROR tests/test_benchmark_contract.py
+ERROR tests/test_model_tool_safety.py
+ERROR tests/test_npu_spectrum_onnx.py
+ERROR tests/test_om_output_diagnosis.py
+ERROR tests/test_rtl_iq_spectrum_onnx.py
+ERROR tests/test_volk_kernel_onnx.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 6 errors during collection !!!!!!!!!!!!!!!!!!!!
+6 errors in 2.31s

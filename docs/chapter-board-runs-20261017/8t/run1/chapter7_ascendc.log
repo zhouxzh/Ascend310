@@ -1,0 +1,15 @@
+======================== debug enter =======================
+The value of data_c is the same as the expected value.
+d: [[[2.3443532  1.1513867  1.2746078  2.004625  ]
+  [1.678138   1.727199   2.0778456  2.746571  ]
+  [0.45303398 1.2738013  0.75153923 2.2585611 ]]
+
+ [[2.1301208  0.17342915 0.95714426 0.18869218]
+  [1.7439588  0.53790724 2.8744655  1.2976867 ]
+  [0.3851337  2.5836096  0.82797617 1.10001   ]]]
+The actual output is the same as the expected output.
+
+---
+Ascend C kernel source: see add_custom.cpp
+Kernel compilation requires the TBE operator registration framework.
+======================== debug exit ========================

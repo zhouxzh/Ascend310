@@ -1,0 +1,13 @@
+[11995.535996]  venc_intf_create_chn+0x64/0xb8 [drv_venc]
+[11995.536002]  venc_ioctl+0xec/0x1a0 [drv_venc]
+[11995.536093] [ascend][HiDvpp][A631] [Venc]:h264e_create_chn [Line]:900 alloc encoder node buffer failed!
+[11995.536105] [ascend][HiDvpp][A631] [Venc]:venc_create_chn_by_type [Line]:1763 Error 0xa008800c: venc user function create chn error, chn type 96
+[11995.536115] [ascend][HiDvpp][A631] [Venc]:venc_create_chn [Line]:1976 pid:15407 userchn:0 device:0 chnl:0 create chnl failed!!
+Traceback (most recent call last):
+  File "/home/HwHiAiUser/Ascend310/samples/chapter6/venc/venc_minimal.py", line 205, in <module>
+    encode_one_frame(codec_name, entype, bitrate_kbps)
+  File "/home/HwHiAiUser/Ascend310/samples/chapter6/venc/venc_minimal.py", line 143, in encode_one_frame
+    desc, frame_cfg = create_venc_channel(codec_name, entype, bitrate_kbps)
+  File "/home/HwHiAiUser/Ascend310/samples/chapter6/venc/venc_minimal.py", line 128, in create_venc_channel
+    raise RuntimeError(f"{codec_name} venc_create_channel 失败: {ret} (0x{ret:x})")
+RuntimeError: H.264 Baseline venc_create_channel 失败: 507018 (0x7bc8a)

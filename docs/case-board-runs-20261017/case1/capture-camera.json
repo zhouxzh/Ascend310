@@ -1,0 +1,33 @@
+{
+  "board-8t": {
+    "health": {
+      "exitCode": 0,
+      "stdout": "{\"status\":\"ok\",\"ready\":true,\"camera_ready\":true,\"error\":null}",
+      "reason": "SSH 探测完成。"
+    },
+    "shot": {
+      "text": "页面：http://192.168.1.100:5000/users_page\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-users-camera.png\n尺寸：1440x900\n大小：86030 bytes\n浏览器：chrome.exe\n耗时：1331 ms",
+      "allowed": true,
+      "executed": true,
+      "url": "http://192.168.1.100:5000/users_page",
+      "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-users-camera.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 86030,
+      "durationMs": 1331,
+      "browser": "chrome.exe",
+      "stderr": "86030 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-users-camera.png\r\n",
+      "reason": "截图完成。"
+    }
+  },
+  "board-20t": {
+    "health": {
+      "exitCode": 0,
+      "stdout": "{\"status\":\"ok\",\"ready\":true,\"camera_ready\":true,\"error\":null}",
+      "reason": "SSH 探测完成。"
+    },
+    "shot": {
+      "removed": "real biometric thumbnail omitted from repository"
+    }
+  }
+}

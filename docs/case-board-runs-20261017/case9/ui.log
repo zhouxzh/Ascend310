@@ -1,0 +1,13 @@
+WARNING: Ascend Edge Chat's browser UI has no login. Every host on the same
+trusted LAN can send messages to this board. Do not expose port 7865 to the
+internet. The gateway token remains server-side.
+WARNING:ascend_edge_chat.ui:实验模式：文字聊天页面未启用浏览器鉴权；同一局域网内可访问此端口的主机都能发送请求。请只在可信实验网络使用。网关密钥只保留在服务端。
+INFO:     Started server process [7902]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:7865 (Press CTRL+C to quit)
+INFO:     127.0.0.1:44850 - "GET / HTTP/1.1" 200 OK
+INFO:     192.168.1.92:42117 - "GET / HTTP/1.1" 200 OK
+INFO:     192.168.1.92:42117 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6539 - "GET /api/history HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6539 - "GET /favicon.ico HTTP/1.1" 404 Not Found

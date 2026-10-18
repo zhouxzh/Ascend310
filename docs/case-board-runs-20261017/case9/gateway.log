@@ -1,0 +1,10 @@
+INFO:     Started server process [7901]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:7861 (Press CTRL+C to quit)
+INFO:ascend_edge_chat.gateway:request_id=7a017edb619d4cf5a94d4f34528fb27c method=GET path=/v1/models status=401
+INFO:     127.0.0.1:37794 - "GET /v1/models HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:37696 - "POST /v1/chat/completions HTTP/1.1" 401 Unauthorized
+INFO:httpx:HTTP Request: POST http://127.0.0.1:8090/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:ascend_edge_chat.gateway:request_id=b7bf8cc50afc45f8b546b05227a1d467 method=POST path=/v1/chat/completions status=200
+INFO:     127.0.0.1:36980 - "POST /v1/chat/completions HTTP/1.1" 200 OK

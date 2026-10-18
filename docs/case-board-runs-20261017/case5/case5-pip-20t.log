@@ -1,0 +1,33 @@
+Collecting onnx
+  Downloading onnx-1.19.1-cp39-cp39-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (18.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 18.0/18.0 MB 2.3 MB/s eta 0:00:00
+Collecting onnxruntime
+  Downloading onnxruntime-1.19.2-cp39-cp39-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (11.5 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.5/11.5 MB 3.1 MB/s eta 0:00:00
+Collecting protobuf>=4.25.1
+  Downloading protobuf-6.33.6-cp39-abi3-manylinux2014_aarch64.whl (324 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 324.6/324.6 kB 4.5 MB/s eta 0:00:00
+Requirement already satisfied: numpy>=1.22 in /usr/local/miniconda3/lib/python3.9/site-packages (from onnx) (1.22.4)
+Requirement already satisfied: ml_dtypes>=0.5.0 in ./.local/lib/python3.9/site-packages (from onnx) (0.5.0)
+Requirement already satisfied: typing_extensions>=4.7.1 in ./.local/lib/python3.9/site-packages (from onnx) (4.16.0)
+Requirement already satisfied: sympy in /usr/local/miniconda3/lib/python3.9/site-packages (from onnxruntime) (1.12)
+Requirement already satisfied: packaging in /usr/local/miniconda3/lib/python3.9/site-packages (from onnxruntime) (23.1)
+Collecting coloredlogs
+  Downloading coloredlogs-15.0.1-py2.py3-none-any.whl (46 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 46.0/46.0 kB 6.6 MB/s eta 0:00:00
+Collecting flatbuffers
+  Downloading flatbuffers-25.12.19-py2.py3-none-any.whl (26 kB)
+Collecting humanfriendly>=9.1
+  Downloading humanfriendly-10.0-py2.py3-none-any.whl (86 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 86.8/86.8 kB 3.5 MB/s eta 0:00:00
+Requirement already satisfied: mpmath>=0.19 in /usr/local/miniconda3/lib/python3.9/site-packages (from sympy->onnxruntime) (1.3.0)
+Installing collected packages: flatbuffers, protobuf, humanfriendly, onnx, coloredlogs, onnxruntime
+  WARNING: The script humanfriendly is installed in '/home/HwHiAiUser/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The scripts backend-test-tools, check-model and check-node are installed in '/home/HwHiAiUser/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script coloredlogs is installed in '/home/HwHiAiUser/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script onnxruntime_test is installed in '/home/HwHiAiUser/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+Successfully installed coloredlogs-15.0.1 flatbuffers-25.12.19 humanfriendly-10.0 onnx-1.19.1 onnxruntime-1.19.2 protobuf-6.33.6

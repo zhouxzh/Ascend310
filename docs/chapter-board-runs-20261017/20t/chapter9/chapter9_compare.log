@@ -1,0 +1,6 @@
+compared samples: 400
+top1 match rate:  100.00%
+mean top5 overlap: 4.9975
+max abs diff:     0.008928298950195312
+mean abs diff:    0.00040512
+report saved:     /home/HwHiAiUser/Ascend310/samples/chapter9/outputs/output_compare.json

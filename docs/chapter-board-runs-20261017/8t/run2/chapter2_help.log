@@ -1,0 +1,20 @@
+
+Usage:
+generate offline model inference output file example:
+./msame --model /home/HwHiAiUser/ljj/colorization.om --input /home/HwHiAiUser/ljj/colorization_input.bin     --output /home/HwHiAiUser/ljj/AMEXEC/out/output1 --outfmt TXT --loop 2
+
+arguments explain:
+  --model       Model file path
+  --input	Input data path(only accept binary data file) 	    If there are several file, please seprate by ','
+  --output	Output path(User needs to have permission to create directories)
+  --outfmt	Output file format (TXT or BIN)
+  --loop 	loop time(must in 1 to 100)
+  --dump	Enable dump (true or false)
+  --profiler	Enable profiler (true or false)
+  --device      Designated the device ID(must in 0 to 255)
+  --debug       Debug switch,print model information (true or false)
+  --outputSize  Set model output size, such as --outputSize "10000,10000"
+  --dymBatch    dynamic batch size param，such as --dymBatch 2
+  --dymHW       dynamic image size param, such as --dymHW "300,500"
+  --dymDims 	dynamic dims param, such as --dymDims "data:1,600;img_info:1,600"
+  --dymShape 	dynamic hape param, such as --dymShape "data:1,600;img_info:1,600"

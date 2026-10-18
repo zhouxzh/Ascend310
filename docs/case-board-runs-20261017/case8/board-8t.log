@@ -1,0 +1,20 @@
+2026-10-17 22:55:44,099 INFO webrtc_om Starting WebRTC H.264 OM app on 0.0.0.0:8080
+
+WebRTC H.264 app is starting. Open one of these URLs:
+  http://orangepiaipro:8080
+  http://192.168.1.100:8080
+  http://127.0.0.1:8080  (only from this board or SSH port forwarding)
+
+2026-10-17 22:55:53,166 INFO webrtc_om 127.0.0.1 [17/Oct/2026:22:55:53 +0800] "GET /health HTTP/1.1" 200 675 "-" "curl/7.81.0"
+2026-10-17 22:56:06,767 INFO webrtc_om 127.0.0.1 [17/Oct/2026:22:56:06 +0800] "GET /health HTTP/1.1" 200 675 "-" "curl/7.81.0"
+2026-10-17 22:56:06,783 INFO webrtc_om 127.0.0.1 [17/Oct/2026:22:56:06 +0800] "GET /models HTTP/1.1" 200 585 "-" "curl/7.81.0"
+2026-10-17 22:56:06,797 INFO webrtc_om 127.0.0.1 [17/Oct/2026:22:56:06 +0800] "GET /stats HTTP/1.1" 200 231 "-" "curl/7.81.0"
+2026-10-17 22:56:07,215 INFO webrtc_om 192.168.1.92 [17/Oct/2026:22:56:07 +0800] "GET / HTTP/1.1" 200 263 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36"
+2026-10-17 22:56:07,236 INFO webrtc_om 192.168.1.92 [17/Oct/2026:22:56:07 +0800] "GET /styles.css HTTP/1.1" 200 262 "http://192.168.1.100:8080/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36"
+2026-10-17 22:56:07,236 INFO webrtc_om 192.168.1.92 [17/Oct/2026:22:56:07 +0800] "GET /client.js HTTP/1.1" 200 277 "http://192.168.1.100:8080/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36"
+2026-10-17 22:56:07,320 INFO webrtc_om 192.168.1.92 [17/Oct/2026:22:56:07 +0800] "GET /models HTTP/1.1" 200 585 "http://192.168.1.100:8080/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36"
+2026-10-17 22:56:07,321 INFO webrtc_om 192.168.1.92 [17/Oct/2026:22:56:07 +0800] "GET /health HTTP/1.1" 200 675 "http://192.168.1.100:8080/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36"
+2026-10-17 22:56:07,343 INFO webrtc_om 192.168.1.92 [17/Oct/2026:22:56:07 +0800] "GET /favicon.ico HTTP/1.1" 404 174 "http://192.168.1.100:8080/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36"
+2026-10-17 22:56:22,231 INFO webrtc_om Shutting down server, closing 0 peer connections
+======== Running on http://0.0.0.0:8080 ========
+(Press CTRL+C to quit)

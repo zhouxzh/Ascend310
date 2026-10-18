@@ -1,0 +1,20 @@
+INFO:     Started server process [3965]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:5000 (Press CTRL+C to quit)
+[AscendSystem] Device 0 initialized.
+[AscendModel] Model /home/HwHiAiUser/Ascend310/cases/case1/models/face_detection.om loaded. ID: 1
+[AscendModel] Model /home/HwHiAiUser/Ascend310/cases/case1/models/face_recognition.om loaded. ID: 2
+INFO:     127.0.0.1:59890 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43302 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     192.168.1.92:22956 - "GET /users_page HTTP/1.1" 200 OK
+INFO:     192.168.1.92:48072 - "GET /assets/index-Ced6zFAt.css HTTP/1.1" 200 OK
+INFO:     192.168.1.92:22956 - "GET /assets/index-DW218dcQ.js HTTP/1.1" 200 OK
+INFO:     192.168.1.92:22956 - "GET /api/users?t=1792283425419 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:48072 - "GET /api/attendance HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6383 - "GET /api/health?t=1792283425419 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:15009 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [3965]

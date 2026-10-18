@@ -1,0 +1,48 @@
+{
+  "python_board-8t": {
+    "allowed": true,
+    "executed": true,
+    "target": "8T",
+    "exitCode": 0,
+    "durationMs": 375,
+    "reason": "SSH 探测完成。",
+    "stdoutTail": "3.9.2 | packaged by conda-forge | (default, Feb 21 2021, 05:02:26) \n[GCC 9.3.0]\n",
+    "stderrTail": ""
+  },
+  "python_board-20t": {
+    "allowed": true,
+    "executed": true,
+    "target": "20T",
+    "exitCode": 0,
+    "durationMs": 410,
+    "reason": "SSH 探测完成。",
+    "stdoutTail": "3.9.2 | packaged by conda-forge | (default, Feb 21 2021, 05:02:26) \n[GCC 9.3.0]\n",
+    "stderrTail": ""
+  },
+  "hf": {
+    "allowed": true,
+    "executed": true,
+    "target": "8T",
+    "exitCode": 0,
+    "durationMs": 1360,
+    "reason": "SSH 探测完成。",
+    "source": "hf",
+    "resolvedUrl": "https://hf-mirror.com/google-bert/bert-base-uncased/resolve/main/config.json",
+    "destination": "/tmp/ascend-hf-config2.json",
+    "stdoutTail": "",
+    "stderrTail": ""
+  },
+  "github": {
+    "allowed": true,
+    "executed": true,
+    "target": "8T",
+    "exitCode": 0,
+    "durationMs": 1591,
+    "reason": "SSH 探测完成。",
+    "source": "github",
+    "resolvedUrl": "https://gh-proxy.com/https://github.com/octocat/Hello-World/raw/master/README",
+    "destination": "/tmp/ascend-github-readme2.md",
+    "stdoutTail": "",
+    "stderrTail": ""
+  }
+}

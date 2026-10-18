@@ -1,0 +1,22 @@
+stamp=20261017T103041Z
+Linux orangepiaipro-20t 5.10.0+ #2 SMP Mon Sep 22 11:27:35 CST 2025 aarch64 aarch64 aarch64 GNU/Linux
+python=/usr/local/miniconda3/bin/python
+/usr/local/miniconda3/bin/python
+3.9.2 | packaged by conda-forge | (default, Feb 21 2021, 05:02:26)
+[GCC 9.3.0]
+--- npu-smi ---
++--------------------------------------------------------------------------------------------------------+
+| npu-smi 25.2.0                                   Version: 25.2.0                                       |
++-------------------------------+-----------------+------------------------------------------------------+
+| NPU     Name                  | Health          | Power(W)     Temp(C)           Hugepages-Usage(page) |
+| Chip    Device                | Bus-Id          | AICore(%)    Memory-Usage(MB)                        |
++===============================+=================+======================================================+
+| 0       310B1                 | Alarm           | 0.0          70                15    / 15            |
+| 0       0                     | NA              | 0            5042 / 23673                            |
++===============================+=================+======================================================+
+--- cannn ---
+# version: 1.0
+runtime_running_version=[7.6.0.1.220:8.0.0]
+compiler_running_version=[7.6.0.1.220:8.0.0]
+hccl_running_version=[7.6.0.1.220:8.0.0]
+opp_running_version=[7.6.0.1.220:8.0.0]

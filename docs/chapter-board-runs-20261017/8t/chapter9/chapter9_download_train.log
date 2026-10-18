@@ -1,0 +1,8 @@
+Generating train split:   0%|          | 0/100000 [00:00<?, ? examples/s]Generating train split:  10%|█         | 10000/100000 [00:00<00:01, 57730.24 examples/s]Generating train split:  20%|██        | 20000/100000 [00:00<00:01, 73660.03 examples/s]Generating train split:  30%|███       | 30000/100000 [00:00<00:00, 83353.42 examples/s]Generating train split:  50%|█████     | 50000/100000 [00:00<00:00, 99027.69 examples/s]Generating train split:  60%|██████    | 60000/100000 [00:00<00:00, 98185.79 examples/s]Generating train split:  80%|████████  | 80000/100000 [00:00<00:00, 100989.94 examples/s]Generating train split: 100%|██████████| 100000/100000 [00:01<00:00, 96409.92 examples/s]Generating train split: 100%|██████████| 100000/100000 [00:01<00:00, 92804.50 examples/s]
+Generating valid split:   0%|          | 0/10000 [00:00<?, ? examples/s]Generating valid split: 100%|██████████| 10000/10000 [00:00<00:00, 98717.84 examples/s]Generating valid split: 100%|██████████| 10000/10000 [00:00<00:00, 95437.45 examples/s]
+calibration list: /home/HwHiAiUser/Ascend310/samples/chapter9/data/calib_list.txt
+calibration images: /home/HwHiAiUser/Ascend310/samples/chapter9/data/tiny_imagenet_train
+calibration images available: 400
+hugging face endpoint: https://hf-mirror.com
+downloaded images: 400
+classes: 200

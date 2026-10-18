@@ -1,0 +1,100 @@
+/usr/local/miniconda3/lib/python3.9/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_id" has conflict with protected namespace "model_".
+
+You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+  warnings.warn(
+INFO:     Started server process [9050]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:7860 (Press CTRL+C to quit)
+INFO:     127.0.0.1:57160 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49312 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49324 - "GET /api/bootstrap HTTP/1.1" 200 OK
+INFO:     192.168.1.92:44210 - "GET / HTTP/1.1" 200 OK
+INFO:     192.168.1.92:23870 - "GET /assets/index-DsQH3qaP.css HTTP/1.1" 200 OK
+INFO:     192.168.1.92:44210 - "GET /assets/index-C_v2mMEQ.js HTTP/1.1" 200 OK
+INFO:     192.168.1.92:44210 - "GET /api/bootstrap HTTP/1.1" 200 OK
+INFO:     192.168.1.92:23870 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     192.168.1.92:64146 - "GET /api/cameras HTTP/1.1" 200 OK
+INFO:     192.168.1.92:12106 - "GET /api/candidates HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/candidate-runtimes HTTP/1.1" 200 OK
+INFO:     192.168.1.92:26880 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     192.168.1.92:26880 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     192.168.1.92:26880 - "GET /api/cameras//dev/video0/roi-guide?resolution=1280x720 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "POST /api/cameras//dev/video0/open?resolution=1280x720&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286629204&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286629294&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286629384&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286629474&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286629564&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286629654&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286629744&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286629834&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286629924&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286630014&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286630104&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+/home/HwHiAiUser/Ascend310/cases/case4/palmprint_workbench/runtime/adapters.py:502: Warning: acl.util.numpy_to_ptr will be deprecated. Please use acl.util.bytes_to_ptr instead.
+  pointer = numpy_to_ptr(value)
+INFO:     192.168.1.92:6144 - "POST /api/cameras//dev/video0/recognitions HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286630194&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286630284&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286630374&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286630464&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286630554&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286630644&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286630734&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286630824&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286630914&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286631004&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286631094&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286631184&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286631274&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286631364&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286631454&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286631544&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6144 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286631634&session=camera-mvd56lvu-3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55028 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55032 - "GET /api/bootstrap HTTP/1.1" 200 OK
+INFO:     192.168.1.92:64269 - "GET / HTTP/1.1" 200 OK
+INFO:     192.168.1.92:43036 - "GET /assets/index-DsQH3qaP.css HTTP/1.1" 200 OK
+INFO:     192.168.1.92:64269 - "GET /assets/index-C_v2mMEQ.js HTTP/1.1" 200 OK
+INFO:     192.168.1.92:64269 - "GET /api/bootstrap HTTP/1.1" 200 OK
+INFO:     192.168.1.92:43036 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     192.168.1.92:29227 - "GET /api/cameras HTTP/1.1" 200 OK
+INFO:     192.168.1.92:54656 - "GET /api/candidate-runtimes HTTP/1.1" 200 OK
+INFO:     192.168.1.92:44891 - "GET /api/candidates HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     192.168.1.92:44891 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     192.168.1.92:44891 - "GET /api/cameras//dev/video0/roi-guide?resolution=1280x720 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "POST /api/cameras//dev/video0/open?resolution=1280x720&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286654899&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286654989&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655079&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655169&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655259&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655349&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655439&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655529&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655619&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655709&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655799&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655889&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655979&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286656069&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286656159&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286656249&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286656339&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286656429&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286656519&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286656609&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286656699&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286656789&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286656879&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286656969&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286657059&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286657149&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286657239&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:6120 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286657329&session=camera-mvd575pl-3 HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [9050]

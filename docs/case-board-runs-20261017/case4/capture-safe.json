@@ -1,0 +1,14 @@
+{
+  "text": "页面：http://192.168.1.101:7860/\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case4\\board-20t-safe.png\n尺寸：1440x900\n大小：368764 bytes\n浏览器：msedge.exe\n耗时：8505 ms",
+  "allowed": true,
+  "executed": true,
+  "url": "http://192.168.1.101:7860/",
+  "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case4\\board-20t-safe.png",
+  "width": 1440,
+  "height": 900,
+  "bytes": 368764,
+  "durationMs": 8505,
+  "browser": "msedge.exe",
+  "stderr": "[28852:23892:1018/092555.154:ERROR:chrome\\browser\\importer\\edge_china_browsers\\edge_qqbrowser_importer_utils_win.cc:165] QQBrowser user data path not found.\r\n[28852:4516:1018/092555.776:ERROR:chrome\\browser\\task_manager\\providers\\fallback_task_provider.cc:126] Every renderer should have at least one task provided by a primary task provider. If a \"Renderer\" fallback task is shown, it is a bug. If you have repro steps, please file a new bug and tag it as a dependency of crbug.com/40528867.\r\n368764 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case4\\board-20t-safe.png\r\n",
+  "reason": "截图完成。"
+}

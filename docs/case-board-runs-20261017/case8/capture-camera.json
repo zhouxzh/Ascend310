@@ -1,0 +1,44 @@
+{
+  "board-8t": {
+    "health": {
+      "exitCode": 0,
+      "stdout": "{\"status\": \"ok\", \"runtime_target\": \"ascend-310b\", \"transport\": \"webrtc\", \"video_codec\": \"h264\", \"encoder\": \"cpu-libx264\", \"hardware_encode\": false, \"hardware_encode_requested\": false, \"encoder_last_error\": \"\", \"default_model\": \"YOLOv10n_gestures.om\", \"default_source\": \"/dev/video2\", \"default_device_id\": 0, \"default_encoder_mode\": \"cpu\", \"defaults\": {\"width\": 1280, \"height\": 720, \"fps\": 30, \"infer_every_n\": 1, \"conf\": 0.25, \"iou\": 0.45, \"bitrate_kbps\": 4000, \"camera_backend\": \"opencv\", \"camera_fourcc\": \"MJPG\"}}\n{\"models\": [{\"name\": \"YOLOv10n_gestures.om\", \"input\": \"640x640\", \"labels\": \"YOLOv10n_gestures_labels.txt\"}, {\"name\": \"YOLOv10n_hands.om\", \"input\": \"640x640\", \"labels\": \"YOLOv10n_hands_labels.txt\"}, {\"name\": \"YOLOv10x_gestures.om\", \"input\": \"640x640\", \"labels\": \"YOLOv10x_gestures_labels.txt\"}, {\"name\": \"YOLOv10x_hands.om\", \"input\": \"640x640\", \"labels\": \"YOLOv10x_hands_labels.txt\"}], \"default_model\": \"YOLOv10n_gestures.om\"}\n{\"encoder\": \"cpu-libx264\", \"encoder_active\": false, \"encoder_error\": \"\"}",
+      "reason": "SSH 探测完成。"
+    },
+    "shot": {
+      "text": "页面：http://192.168.1.100:8080/\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case8\\board-8t.png\n尺寸：1440x900\n大小：42754 bytes\n浏览器：chrome.exe\n耗时：725 ms",
+      "allowed": true,
+      "executed": true,
+      "url": "http://192.168.1.100:8080/",
+      "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case8\\board-8t.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 42754,
+      "durationMs": 725,
+      "browser": "chrome.exe",
+      "stderr": "42754 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case8\\board-8t.png\r\n",
+      "reason": "截图完成。"
+    }
+  },
+  "board-20t": {
+    "health": {
+      "exitCode": 0,
+      "stdout": "{\"status\": \"ok\", \"runtime_target\": \"ascend-310b\", \"transport\": \"webrtc\", \"video_codec\": \"h264\", \"encoder\": \"cpu-libx264\", \"hardware_encode\": false, \"hardware_encode_requested\": false, \"encoder_last_error\": \"\", \"default_model\": \"YOLOv10n_gestures.om\", \"default_source\": \"/dev/video0\", \"default_device_id\": 0, \"default_encoder_mode\": \"cpu\", \"defaults\": {\"width\": 1280, \"height\": 720, \"fps\": 30, \"infer_every_n\": 1, \"conf\": 0.25, \"iou\": 0.45, \"bitrate_kbps\": 4000, \"camera_backend\": \"opencv\", \"camera_fourcc\": \"MJPG\"}}\n{\"models\": [{\"name\": \"YOLOv10n_gestures.om\", \"input\": \"640x640\", \"labels\": \"YOLOv10n_gestures_labels.txt\"}, {\"name\": \"YOLOv10n_hands.om\", \"input\": \"640x640\", \"labels\": \"YOLOv10n_hands_labels.txt\"}, {\"name\": \"YOLOv10x_gestures.om\", \"input\": \"640x640\", \"labels\": \"YOLOv10x_gestures_labels.txt\"}, {\"name\": \"YOLOv10x_hands.om\", \"input\": \"640x640\", \"labels\": \"YOLOv10x_hands_labels.txt\"}], \"default_model\": \"YOLOv10n_gestures.om\"}\n{\"encoder\": \"cpu-libx264\", \"encoder_active\": false, \"encoder_error\": \"\"}",
+      "reason": "SSH 探测完成。"
+    },
+    "shot": {
+      "text": "页面：http://192.168.1.101:8080/\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case8\\board-20t.png\n尺寸：1440x900\n大小：42723 bytes\n浏览器：chrome.exe\n耗时：725 ms",
+      "allowed": true,
+      "executed": true,
+      "url": "http://192.168.1.101:8080/",
+      "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case8\\board-20t.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 42723,
+      "durationMs": 725,
+      "browser": "chrome.exe",
+      "stderr": "42723 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case8\\board-20t.png\r\n",
+      "reason": "截图完成。"
+    }
+  }
+}

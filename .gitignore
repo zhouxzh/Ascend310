@@ -66,6 +66,8 @@ cover/
 
 # Django stuff:
 *.log
+!docs/chapter-board-runs-20261017/**/*.log
+!docs/case-board-runs-20261017/**/*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal

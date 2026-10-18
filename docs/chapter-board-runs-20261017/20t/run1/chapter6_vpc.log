@@ -1,0 +1,4 @@
+VPC Resize    OK  640x480 → 320x240  大小=115200 bytes
+VPC CropResize OK  640x480 → 640x480 (中心319x239裁剪后放大)  大小=460800 bytes
+
+全部通过 — VPC 已就绪。

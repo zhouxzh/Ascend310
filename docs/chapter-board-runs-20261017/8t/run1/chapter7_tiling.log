@@ -1,0 +1,9 @@
+======================== debug enter =======================
+Matrix add verification: PASSED
+Shape: (128, 256), Total elements: 32768
+(Data size 128KB exceeds UB, Tiling is automatically applied)
+All verifications PASSED.
+---
+Ascend C kernel with manual Tiling: see mat_add_custom.cpp
+TBE DSL auto-tiling is handled by auto_schedule internally.
+======================== debug exit ========================

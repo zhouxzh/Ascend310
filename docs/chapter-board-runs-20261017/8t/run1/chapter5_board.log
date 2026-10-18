@@ -1,0 +1,83 @@
+
+=== RUN check_mindspore_env.py --output env-report.json ===
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:89: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  return self._float_to_str(self.smallest_subnormal)
+Building prefix dict from the default dictionary ...
+Loading model from cache /tmp/jieba.cache
+Loading model cost 2.197 seconds.
+Prefix dict has been built successfully.
+--- exit=0 result=pass
+
+=== RUN 01_tensor_ops.py  ===
+TIMEOUT after 120s
+--- exit=None result=missing
+
+=== RUN 02_cell_network.py  ===
+TIMEOUT after 120s
+--- exit=None result=missing
+
+=== RUN 03_dataset_pipeline.py  ===
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:89: UserWarning: The value of the smallest subnormal for <class 'numpy.float64'> type is zero.
+  return self._float_to_str(self.smallest_subnormal)
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:499: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  setattr(self, word, getattr(machar, word).flat[0])
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:89: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  return self._float_to_str(self.smallest_subnormal)
+--- exit=0 result=pass
+
+=== RUN 04_graph_mode.py --mode pynative --output 04_graph_mode_pynative.json ===
+  return self._float_to_str(self.smallest_subnormal)
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:499: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  setattr(self, word, getattr(machar, word).flat[0])
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:89: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  return self._float_to_str(self.smallest_subnormal)
+[WARNING] GE_ADPT(13376,dfffc3d05020,python):2026-10-17-18:40:00.890.269 [mindspore/ccsrc/transform/acl_ir/op_api_exec.cc:141] GetAscendDefaultCustomPath] Checking whether the so exists or if permission to access it is available: /usr/local/Ascend/ascend-toolkit/latest/opp/vendors/customize_vision/op_api/lib/libcust_opapi.so
+--- exit=0 result=pass
+
+=== RUN 04_graph_mode.py --mode graph --output 04_graph_mode_graph.json ===
+  return self._float_to_str(self.smallest_subnormal)
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:499: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  setattr(self, word, getattr(machar, word).flat[0])
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:89: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  return self._float_to_str(self.smallest_subnormal)
+[WARNING] GE_ADPT(13786,dfffe08e5020,python):2026-10-17-18:40:40.926.080 [mindspore/ccsrc/transform/acl_ir/op_api_exec.cc:141] GetAscendDefaultCustomPath] Checking whether the so exists or if permission to access it is available: /usr/local/Ascend/ascend-toolkit/latest/opp/vendors/customize_vision/op_api/lib/libcust_opapi.so
+--- exit=0 result=pass
+
+=== RUN 05_autograd_train.py  ===
+  return self._float_to_str(self.smallest_subnormal)
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:499: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  setattr(self, word, getattr(machar, word).flat[0])
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:89: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  return self._float_to_str(self.smallest_subnormal)
+[WARNING] GE_ADPT(14115,dffeedfbf120,python):2026-10-17-18:42:15.430.577 [mindspore/ccsrc/transform/acl_ir/op_api_exec.cc:141] GetAscendDefaultCustomPath] Checking whether the so exists or if permission to access it is available: /usr/local/Ascend/ascend-toolkit/latest/opp/vendors/customize_vision/op_api/lib/libcust_opapi.so
+--- exit=0 result=pass
+
+=== RUN 06_checkpoint_mindir.py  ===
+  return self._float_to_str(self.smallest_subnormal)
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:499: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  setattr(self, word, getattr(machar, word).flat[0])
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:89: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  return self._float_to_str(self.smallest_subnormal)
+[WARNING] GE_ADPT(15190,dfff1efdf120,python):2026-10-17-18:43:22.424.071 [mindspore/ccsrc/transform/acl_ir/op_api_exec.cc:141] GetAscendDefaultCustomPath] Checking whether the so exists or if permission to access it is available: /usr/local/Ascend/ascend-toolkit/latest/opp/vendors/customize_vision/op_api/lib/libcust_opapi.so
+--- exit=0 result=pass
+
+=== RUN 07_lite_inference.py  ===
+ascend build: BLOCKED rc=0
+[ERROR] ME(15378,dfffd1db7020,python):2026-10-17-18:43:34.260.836 [mindspore/lite/src/extendrt/cxx_api/model/model.cc:102] Build] Catch exception: This software can only support the maximum mind ir version: 1, please install the latest version to support the mind ir version: 2
+----------------------------------------------------
+- C++ Call Stack: (For framework developers)
+------------------------
+RESULT {"example": "07_lite_inference", "metrics": {"ascend_build": "blocked", "ascend_returncode": 0, "cpu_build": "blocked", "lite_version": "2.2.11", "mindir_bytes": 2796, "report": "/home/HwHiAiUser/Ascend310/samples/chapter5/outputs/07_lite_inference.json"}, "note": "RuntimeError: build_from_file failed! Error is Common error code. [ERROR] ME(15369,dffffbdc5020,python):2026-10-17-18:43:33.153.730 [mindspore/lite/src/extendrt/cxx_api/model/model.cc:102] Build] Catch exception: This software can only support the maximum mind ir version: 1, please install the lates", "status": "blocked"}
+--- exit=1 result=blocked
+
+=== summary ===
+check_mindspore_env.py     exit=0 status=pass
+01_tensor_ops.py           exit=None status=missing
+02_cell_network.py         exit=None status=missing
+03_dataset_pipeline.py     exit=0 status=pass
+04_graph_mode.py           exit=0 status=pass
+04_graph_mode.py           exit=0 status=pass
+05_autograd_train.py       exit=0 status=pass
+06_checkpoint_mindir.py    exit=0 status=pass
+07_lite_inference.py       exit=1 status=blocked
+summary: /home/HwHiAiUser/Ascend310/samples/chapter5/outputs/board-run-20261017-184334.json

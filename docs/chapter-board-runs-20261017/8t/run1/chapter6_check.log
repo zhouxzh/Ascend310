@@ -1,0 +1,4 @@
+ACL init OK  soc=Ascend310B4  cann=(1, 12, 0, 0)
+  venc_api=38 个可用函数
+
+全部检查通过 — CANN 已就绪。

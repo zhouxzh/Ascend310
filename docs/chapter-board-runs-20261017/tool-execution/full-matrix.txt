@@ -1,0 +1,20 @@
+{
+  "label": "8T",
+  "allowed": true,
+  "executed": true,
+  "exitCode": 0,
+  "durationMs": 743311,
+  "reason": "SSH 探测完成。",
+  "stdoutTail": "chapter\ttest\texit\tduration_ms\nchapter1\tno-sample\tN/A\t0\nchapter2_msame\tchapter2_msame\t0\t291\nchapter3_npu\tchapter3_npu\t0\t56908\nchapter3_cpu\tchapter3_cpu\t0\t11784\nchapter4_check\tchapter4_check\t0\t1595\nchapter5_env\tchapter5_env\t0\t61724\nchapter5_board\tchapter5_board\t1\t570426\nchapter6_check\tchapter6_check\t0\t4857\nchapter6_venc\tchapter6_venc\t1\t5121\nchapter6_vpc\tchapter6_vpc\t0\t5001\nchapter7_tbe\tchapter7_tbe\t0\t5646\nchapter7_ascendc\tchapter7_ascendc\t0\t5582\nchapter7_tiling\tchapter7_tiling\t0\t5569\nchapter8_cpu\tchapter8_cpu\t0\t1161\nchapter8_queue\tchapter8_queue\t0\t1088\nchapter8_baseline\tchapter8_baseline\t0\t5052\nchapter9_compare\tchapter9_compare\t1\t326\nchapter9_perf\tchapter9_perf\t1\t330\nOUT=/home/HwHiAiUser/Ascend310/chapter-runs/20261017T122232Z\n",
+  "stderrTail": ""
+}
+{
+  "label": "20T",
+  "allowed": true,
+  "executed": true,
+  "exitCode": 0,
+  "durationMs": 799400,
+  "reason": "SSH 探测完成。",
+  "stdoutTail": "chapter\ttest\texit\tduration_ms\nchapter1\tno-sample\tN/A\t0\nchapter2_msame\tchapter2_msame\t0\t309\nchapter3_npu\tchapter3_npu\t0\t78532\nchapter3_cpu\tchapter3_cpu\t0\t13166\nchapter4_check\tchapter4_check\t0\t1581\nchapter5_env\tchapter5_env\t0\t62837\nchapter5_board\tchapter5_board\t124\t600023\nchapter6_check\tchapter6_check\t0\t5306\nchapter6_venc\tchapter6_venc\t1\t5398\nchapter6_vpc\tchapter6_vpc\t0\t5249\nchapter7_tbe\tchapter7_tbe\t0\t5843\nchapter7_ascendc\tchapter7_ascendc\t0\t5753\nchapter7_tiling\tchapter7_tiling\t0\t5920\nchapter8_cpu\tchapter8_cpu\t0\t1450\nchapter8_queue\tchapter8_queue\t0\t1119\nchapter8_baseline\tchapter8_baseline\t0\t5289\nchapter9_compare\tchapter9_compare\t1\t361\nchapter9_perf\tchapter9_perf\t1\t355\nOUT=/home/HwHiAiUser/Ascend310/chapter-runs/20261017T122232Z\n",
+  "stderrTail": ""
+}

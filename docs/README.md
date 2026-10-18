@@ -11,11 +11,15 @@ _这是工程文档入口，不是项目首页，也不是教材正文。项目�
 | 运行一个案例 | 对应 `samples/caseN/README.md` | 依赖、启动命令、板端边界和常见故障 |
 | 学习理论 | [`src/book/README.md`](../src/book/README.md) | 全书章节和推荐学习路线 |
 | 阅读实践教程 | [`src/experiment/README.md`](../src/experiment/README.md) | 案例 1 到案例 9 的理论源稿 |
+| 使用教学演示与截图流程 | [`src/presentation/README.md`](../src/presentation/README.md) | 章节课件、案例课件、附录归档、双板截图清单与构建检查 |
 | 查板端命令 | [`src/appendix/appendix2.md`](../src/appendix/appendix2.md) | Linux、CANN、服务和证据边界 |
 | 查验收审查 | [`case-reviews/00-index.md`](case-reviews/00-index.md) | 各案例的风险和未解决问题，不是运行手册 |
 | 查看本次文档整理记录 | [`documentation-audit-20260907.md`](documentation-audit-20260907.md) | 本轮发现、取舍和未解决事项 |
 | 查看仓库目录规范 | [`00-repository-structure.md`](00-repository-structure.md) | README、源码、案例和生成物的职责边界 |
 | 查昇腾 310B 程序开发、工程目录与文档规范 | [`ascend310b-development-standard.md`](../tools/dsh-plugin-ascend310b-debug/docs/ascend310b-development-standard.md) | 代码结构、ACL/ATC 合同、样例目录、证据和 M0-M8 验收门 |
+| 查调试插件命令执行边界 | [`ascend310b-command-execution-matrix.md`](ascend310b-command-execution-matrix.md) | 只读诊断、显式任务、模型下载和禁止命令 |
+| 查 chapter2–9 双板运行对照 | [`ascend310b-chapter-board-comparison-20261017.md`](ascend310b-chapter-board-comparison-20261017.md) | 8T/20T 的样例状态、耗时、差异和原始日志入口 |
+| 查 case1–9 双板调试与前端截图 | [`case-board-runs-20261017/README.md`](case-board-runs-20261017/README.md) | 逐案例状态、截图、原始日志、摄像头复测和待办边界 |
 | 查案例 7 | [`samples/case7/docs/README.md`](../samples/case7/docs/README.md) | 智能相册的 7 份主题工程文档 |
 
 ## 🗂️ 文档分层

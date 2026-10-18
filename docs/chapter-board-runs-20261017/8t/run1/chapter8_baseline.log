@@ -1,0 +1,13 @@
+stage                count    mean_ms     p50_ms     p95_ms        fps
+------------------------------------------------------------------------
+alloc_dataset           10     0.0548     0.0539     0.0600   18244.41
+d2h                     10     0.1200     0.1195     0.1231    8330.92
+end_to_end              10     6.0424     6.0452     6.0720     165.50
+execute                 10     4.9787     4.9770     4.9868     200.86
+free_dataset            10     0.0299     0.0298     0.0306   33390.88
+h2d                     10     0.0360     0.0361     0.0383   27780.56
+inference_total         10     5.2432     5.2434     5.2523     190.72
+postprocess             10     0.0246     0.0231     0.0312   40601.55
+preprocess              10     0.7745     0.7849     0.8044    1291.07
+
+metrics saved: /home/HwHiAiUser/Ascend310/samples/chapter8/outputs/baseline_resnet_sync.json

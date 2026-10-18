@@ -1,0 +1,21 @@
+INFO:     Started server process [7403]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:7860 (Press CTRL+C to quit)
+INFO:     127.0.0.1:55002 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55018 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55026 - "GET /api/index/stats HTTP/1.1" 200 OK
+INFO:     192.168.1.92:51033 - "GET / HTTP/1.1" 200 OK
+INFO:     192.168.1.92:51033 - "GET /style.css?v=20260907-device-summary-v1 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:60780 - "GET /app.js?v=20260907-device-summary-v1 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:60780 - "GET /api/display/current?profile=jpeg&width=1414&height=708&orientation=landscape HTTP/1.1" 200 OK
+INFO:     192.168.1.92:51639 - "GET /api/display/status HTTP/1.1" 200 OK
+INFO:     192.168.1.92:3282 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     192.168.1.92:51033 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     192.168.1.92:51033 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     192.168.1.92:51033 - "POST /api/display/refresh HTTP/1.1" 200 OK
+INFO:     192.168.1.92:51033 - "GET /api/display/current?profile=jpeg&width=1414&height=708&orientation=landscape HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [7403]

@@ -1,0 +1,7 @@
+stage                count    mean_ms     p50_ms     p95_ms        fps
+------------------------------------------------------------------------
+naive_numpy             20     0.7756     0.7806     0.8298    1289.29
+workspace_reuse         20     0.3812     0.3757     0.4157    2623.04
+
+speedup(mean): 2.034x
+metrics saved: /home/HwHiAiUser/Ascend310/samples/chapter8/outputs/cpu_preprocess_benchmark.json

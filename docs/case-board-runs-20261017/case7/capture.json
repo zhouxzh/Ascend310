@@ -1,0 +1,44 @@
+{
+  "board-8t": {
+    "health": {
+      "exitCode": 0,
+      "stdout": "{\"status\":\"ready\",\"backend\":\"npu\",\"role\":\"smart_album_server\",\"npu\":{\"pyacl_available\":true,\"npu_smi_available\":true,\"device\":\"Ascend 310B4\",\"health\":\"Alarm\"},\"admitted_models\":[\"chinese_clip_rn50__npu__mixed_fp16\",\"mobileclip_s0__npu__mixed_fp16\",\"resnet50_feature__npu__mixed_fp16\"],\"missing_required_models\":[],\"index\":{\"total_photos\":0,\"available_photos\":0,\"unavailable_photos\":0,\"photos_with_faces\":0,\"embeddings_by_model\":{}},\"epaper_backend\":\"dry-run\",\"config_revision\":1,\"selection\":{\"selection_revision\":2,\"current\":null,\"weather\":{\"status\":\"ok\",\"temperature\":27.8,\"weather_code\":2,\"wind_speed\":13.1,\"updated_at\":1792285690.0277936},\"weather_error\":null,\"history_size\":0,\"semantic_preselection\":{\"queue_size\":0,\"ready\":false,\"source\":null,\"last_inference\":{\"model_id\":\"chinese_clip_rn50__npu__mixed_fp16\",\"status\":\"not_run\",\"duration_ms\":null,\"result_count\":0,\"at\":null,\"error\":null}}},\"devices\":0}\n[{\"model_id\":\"mobileclip_s0__npu__mixed_fp16\",\"display_name\":\"MobileCLIP-S0\",\"languages\":[\"en\",\"general\"],\"embedding_dim\":512,\"precision\":\"allow_fp32_to_fp16\",\"precision_mode\":\"allow_fp32_to_fp16\",\"components\":{\"image\":{\"precision_mode\":\"allow_fp32_to_fp16\",\"input_dtype\":\"float32\",\"output_dtype\":\"float32\",\"input_shape\":[1,3,256,256],\"keep_dtype\":null},\"text\":{\"precision_mode\":\"allow_fp32_to_fp16\",\"input_dtype\":\"int64\",\"output_dtype\":\"float32\",\"input_shape\":[1,77],\"keep_dtype\":null}},\"precision_strategy\":{\"kind\":\"selective_mixed_precision\",\"candidate_id\":\"C0\",\"admitted_at\":1787824190.2594466,\"numerical_threshold\":0.995},\"status\":\"admitted\",\"supports_text\":true},{\"model_id\":\"chinese_clip_rn50__npu__mixed_fp16\",\"display_name\":\"Chinese-CLIP RN50\",\"languages\":[\"zh\"],\"embedding_dim\":1024,\"precision\":\"allow_fp32_to_fp16\",\"precision_mode\":\"allow_fp32_to_fp16\",\"components\":{\"image\":{\"precision_mode\":\"allow_fp32_to_fp16\",\"input_dtype\":\"float32\",\"output_dtype\":\"float32\",\"input_shape\":[1,3,224,224],\"keep_dtype\":null},\"text\":{\"precision_mode\":\"allow_fp32_to_fp16\",\"input_dtype\":\"int64\",\"output_dtype\":\"float32\",\"input_shape\":[1,52],\"keep_dtype\":null}},\"precision_strategy\":null,\"status\":\"admitted\",\"supports_text\":true},{\"model_id\":\"resnet50_feature__npu__mixed_fp16\",\"display_name\":\"ResNet50 visual similarity\",\"languages\":[],\"embedding_dim\":2048,\"precision\":\"allow_fp32_to_fp16\",\"precision_mode\":\"allow_fp32_to_fp16\",\"components\":{\"image\":{\"precision_mode\":\"allow_fp32_to_fp16\",\"input_dtype\":\"float32\",\"output_dtype\":\"float32\",\"input_shape\":[1,3,224,224],\"keep_dtype\":null}},\"precision_strategy\":null,\"status\":\"admitted\",\"supports_text\":false}]\n{\"total_photos\":0,\"available_photos\":0,\"unavailable_photos\":0,\"photos_with_faces\":0,\"embeddings_by_model\":{}}",
+      "reason": "SSH 探测完成。"
+    },
+    "shot": {
+      "text": "页面：http://192.168.1.100:7860/\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case7\\board-8t.png\n尺寸：1440x900\n大小：51940 bytes\n浏览器：chrome.exe\n耗时：2358 ms",
+      "allowed": true,
+      "executed": true,
+      "url": "http://192.168.1.100:7860/",
+      "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case7\\board-8t.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 51940,
+      "durationMs": 2358,
+      "browser": "chrome.exe",
+      "stderr": "51940 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case7\\board-8t.png\r\n",
+      "reason": "截图完成。"
+    }
+  },
+  "board-20t": {
+    "health": {
+      "exitCode": 0,
+      "stdout": "{\"status\":\"ready\",\"backend\":\"npu\",\"role\":\"smart_album_server\",\"npu\":{\"pyacl_available\":true,\"npu_smi_available\":true,\"device\":\"Ascend 310B\",\"health\":\"Alarm\"},\"admitted_models\":[\"chinese_clip_rn50__npu__mixed_fp16\",\"mobileclip_s0__npu__mixed_fp16\",\"resnet50_feature__npu__mixed_fp16\"],\"missing_required_models\":[],\"index\":{\"total_photos\":0,\"available_photos\":0,\"unavailable_photos\":0,\"photos_with_faces\":0,\"embeddings_by_model\":{}},\"epaper_backend\":\"dry-run\",\"config_revision\":1,\"selection\":{\"selection_revision\":2,\"current\":null,\"weather\":{\"status\":\"ok\",\"temperature\":27.8,\"weather_code\":2,\"wind_speed\":13.1,\"updated_at\":1792285698.4454029},\"weather_error\":null,\"history_size\":0,\"semantic_preselection\":{\"queue_size\":0,\"ready\":false,\"source\":null,\"last_inference\":{\"model_id\":\"chinese_clip_rn50__npu__mixed_fp16\",\"status\":\"not_run\",\"duration_ms\":null,\"result_count\":0,\"at\":null,\"error\":null}}},\"devices\":0}\n[{\"model_id\":\"mobileclip_s0__npu__mixed_fp16\",\"display_name\":\"MobileCLIP-S0\",\"languages\":[\"en\",\"general\"],\"embedding_dim\":512,\"precision\":\"allow_fp32_to_fp16\",\"precision_mode\":\"allow_fp32_to_fp16\",\"components\":{\"image\":{\"precision_mode\":\"allow_fp32_to_fp16\",\"input_dtype\":\"float32\",\"output_dtype\":\"float32\",\"input_shape\":[1,3,256,256],\"keep_dtype\":null},\"text\":{\"precision_mode\":\"allow_fp32_to_fp16\",\"input_dtype\":\"int64\",\"output_dtype\":\"float32\",\"input_shape\":[1,77],\"keep_dtype\":null}},\"precision_strategy\":{\"kind\":\"selective_mixed_precision\",\"candidate_id\":\"C0\",\"admitted_at\":1787824190.2594466,\"numerical_threshold\":0.995},\"status\":\"admitted\",\"supports_text\":true},{\"model_id\":\"chinese_clip_rn50__npu__mixed_fp16\",\"display_name\":\"Chinese-CLIP RN50\",\"languages\":[\"zh\"],\"embedding_dim\":1024,\"precision\":\"allow_fp32_to_fp16\",\"precision_mode\":\"allow_fp32_to_fp16\",\"components\":{\"image\":{\"precision_mode\":\"allow_fp32_to_fp16\",\"input_dtype\":\"float32\",\"output_dtype\":\"float32\",\"input_shape\":[1,3,224,224],\"keep_dtype\":null},\"text\":{\"precision_mode\":\"allow_fp32_to_fp16\",\"input_dtype\":\"int64\",\"output_dtype\":\"float32\",\"input_shape\":[1,52],\"keep_dtype\":null}},\"precision_strategy\":null,\"status\":\"admitted\",\"supports_text\":true},{\"model_id\":\"resnet50_feature__npu__mixed_fp16\",\"display_name\":\"ResNet50 visual similarity\",\"languages\":[],\"embedding_dim\":2048,\"precision\":\"allow_fp32_to_fp16\",\"precision_mode\":\"allow_fp32_to_fp16\",\"components\":{\"image\":{\"precision_mode\":\"allow_fp32_to_fp16\",\"input_dtype\":\"float32\",\"output_dtype\":\"float32\",\"input_shape\":[1,3,224,224],\"keep_dtype\":null}},\"precision_strategy\":null,\"status\":\"admitted\",\"supports_text\":false}]\n{\"total_photos\":0,\"available_photos\":0,\"unavailable_photos\":0,\"photos_with_faces\":0,\"embeddings_by_model\":{}}",
+      "reason": "SSH 探测完成。"
+    },
+    "shot": {
+      "text": "页面：http://192.168.1.101:7860/\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case7\\board-20t.png\n尺寸：1440x900\n大小：51940 bytes\n浏览器：chrome.exe\n耗时：2238 ms",
+      "allowed": true,
+      "executed": true,
+      "url": "http://192.168.1.101:7860/",
+      "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case7\\board-20t.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 51940,
+      "durationMs": 2238,
+      "browser": "chrome.exe",
+      "stderr": "51940 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case7\\board-20t.png\r\n",
+      "reason": "截图完成。"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+
+=== interpreter ===
+python_version: 3.9.2
+python_executable: /usr/local/miniconda3/bin/python
+machine: aarch64
+python_no_user_site:
+cann_toolkit_env: /usr/local/Ascend/ascend-toolkit/latest
+
+=== modules ===
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:499: UserWarning: The value of the smallest subnormal for <class 'numpy.float64'> type is zero.
+  setattr(self, word, getattr(machar, word).flat[0])
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:89: UserWarning: The value of the smallest subnormal for <class 'numpy.float64'> type is zero.
+  return self._float_to_str(self.smallest_subnormal)
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:499: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  setattr(self, word, getattr(machar, word).flat[0])
+/usr/local/miniconda3/lib/python3.9/site-packages/numpy/core/getlimits.py:89: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  return self._float_to_str(self.smallest_subnormal)
+Building prefix dict from the default dictionary ...
+Dumping model to file cache /tmp/jieba.cache
+Loading model cost 2.220 seconds.
+Prefix dict has been built successfully.
+mindspore: 2.4.10 <- /home/HwHiAiUser/.local/lib/python3.9/site-packages/mindspore/__init__.py
+mindspore_lite: import failed -> ImportError: /home/HwHiAiUser/.local/lib/python3.9/site-packages/mindspore_lite/lib/libmindspore_converter.so: undefined symbol: _ZTIN9mindspore3ops8PoolGradE
+mindnlp: unknown <- /home/HwHiAiUser/.local/lib/python3.9/site-packages/mindnlp/__init__.py
+acl: unknown <- /usr/local/Ascend/ascend-toolkit/latest/python/site-packages/acl.so
+
+=== ascend device probe ===
+ascend add fp32: [2.0, 4.0]
+RESULT {"example": "check_mindspore_env", "metrics": {"acl": "unknown", "device_probe": "pass", "mindnlp": "unknown", "mindspore": "2.4.10", "mindspore_file": "/home/HwHiAiUser/.local/lib/python3.9/site-packages/mindspore/__init__.py", "mindspore_lite": "missing", "report": "/home/HwHiAiUser/Ascend310/samples/chapter5/outputs/env-report.json"}, "status": "pass"}

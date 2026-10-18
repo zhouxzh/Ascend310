@@ -1,0 +1,15 @@
+/home/HwHiAiUser/.conda/envs/case9-ms240-cann80/lib/python3.9/site-packages/numpy/core/getlimits.py:549: UserWarning: The value of the smallest subnormal for <class 'numpy.float64'> type is zero.
+  setattr(self, word, getattr(machar, word).flat[0])
+/home/HwHiAiUser/.conda/envs/case9-ms240-cann80/lib/python3.9/site-packages/numpy/core/getlimits.py:89: UserWarning: The value of the smallest subnormal for <class 'numpy.float64'> type is zero.
+  return self._float_to_str(self.smallest_subnormal)
+/home/HwHiAiUser/.conda/envs/case9-ms240-cann80/lib/python3.9/site-packages/numpy/core/getlimits.py:549: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  setattr(self, word, getattr(machar, word).flat[0])
+/home/HwHiAiUser/.conda/envs/case9-ms240-cann80/lib/python3.9/site-packages/numpy/core/getlimits.py:89: UserWarning: The value of the smallest subnormal for <class 'numpy.float32'> type is zero.
+  return self._float_to_str(self.smallest_subnormal)
+Qwen2ForCausalLM has generative capabilities, as `prepare_inputs_for_generation` is explicitly overwritten. However, it doesn't directly inherit from `GenerationMixin`.`PreTrainedModel` will NOT inherit from `GenerationMixin`, and this model will lose the ability to call `generate` and other related functions.
+  - If you are the owner of the model architecture code, please modify your model class such that it inherits from `GenerationMixin` (after `PreTrainedModel`, otherwise you'll get an exception).
+  - If you are not the owner of the model architecture class, please contact the model code owner to update it.
+Sliding Window Attention is enabled but not implemented for `eager`; unexpected results may be encountered.
+[WARNING] GE_ADPT(7455,dffed699f120,python):2026-10-18-09:14:28.338.039 [mindspore/ccsrc/transform/acl_ir/op_api_exec.cc:141] GetAscendDefaultCustomPath] Checking whether the so exists or if permission to access it is available: /usr/local/Ascend/ascend-toolkit/latest/opp/vendors/customize_vision/op_api/lib/libcust_opapi.so
+2026-10-18 09:14:30,614 INFO MindSpore chat service listening on 127.0.0.1:8090 profile=qwen1.5-0.5b-chat generation_timeout=300.0s
+.2026-10-18 09:15:46,462 INFO peer=127.0.0.1 "POST /v1/chat/completions HTTP/1.1" 200 -

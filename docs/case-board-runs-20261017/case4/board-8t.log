@@ -1,0 +1,29 @@
+/usr/local/miniconda3/lib/python3.9/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_id" has conflict with protected namespace "model_".
+
+You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+  warnings.warn(
+INFO:     Started server process [8572]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:7860 (Press CTRL+C to quit)
+INFO:     127.0.0.1:52608 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52610 - "GET /api/bootstrap HTTP/1.1" 200 OK
+INFO:     192.168.1.92:51745 - "GET / HTTP/1.1" 200 OK
+INFO:     192.168.1.92:15870 - "GET /assets/index-DsQH3qaP.css HTTP/1.1" 200 OK
+INFO:     192.168.1.92:51745 - "GET /assets/index-C_v2mMEQ.js HTTP/1.1" 200 OK
+INFO:     192.168.1.92:51745 - "GET /api/bootstrap HTTP/1.1" 200 OK
+INFO:     192.168.1.92:15870 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     192.168.1.92:54777 - "GET /api/cameras HTTP/1.1" 200 OK
+INFO:     192.168.1.92:22316 - "GET /api/candidates HTTP/1.1" 200 OK
+INFO:     192.168.1.92:20109 - "GET /api/candidate-runtimes HTTP/1.1" 200 OK
+INFO:     192.168.1.92:31386 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     192.168.1.92:22316 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     192.168.1.92:22316 - "GET /api/cameras//dev/video0/roi-guide?resolution=1280x720 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:31386 - "POST /api/cameras//dev/video0/open?resolution=1280x720&session=camera-mvd574k5-3 HTTP/1.1" 200 OK
+INFO:     192.168.1.92:31386 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286653407&session=camera-mvd574k5-3 HTTP/1.1" 503 Service Unavailable
+INFO:     192.168.1.92:31386 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286654417&session=camera-mvd574k5-3 HTTP/1.1" 503 Service Unavailable
+INFO:     192.168.1.92:31386 - "GET /api/cameras//dev/video0/frame?resolution=1280x720&preview=true&max_width=960&quality=72&t=1792286655427&session=camera-mvd574k5-3 HTTP/1.1" 503 Service Unavailable
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [8572]

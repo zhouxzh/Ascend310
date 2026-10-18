@@ -1,0 +1,24 @@
+{
+  "observed_at": "2026-10-18T08:30:00+08:00",
+  "8t": {
+    "usb_camera_nodes": ["/dev/video2", "/dev/video3"],
+    "capture_device": "/dev/video2",
+    "frames_read": 3,
+    "frame_shape": [480, 640, 3],
+    "case1_camera_index": 2,
+    "case1_health": {"status": "ok", "ready": true, "camera_ready": true},
+    "case8_source": "/dev/video2",
+    "case8_health": {"status": "ok", "encoder": "cpu-libx264"}
+  },
+  "20t": {
+    "usb_camera_nodes": ["/dev/video0", "/dev/video1"],
+    "capture_device": "/dev/video0",
+    "frames_read": 3,
+    "frame_shape": [480, 640, 3],
+    "case1_camera_index": 0,
+    "case1_health": {"status": "ok", "ready": true, "camera_ready": true},
+    "case8_source": "/dev/video0",
+    "case8_health": {"status": "ok", "encoder": "cpu-libx264"}
+  },
+  "privacy": "Live camera frames and biometric thumbnails are not stored in repository screenshots."
+}

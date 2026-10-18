@@ -1,0 +1,101 @@
+{
+  "py8": {
+    "allowed": true,
+    "executed": true,
+    "target": "8T",
+    "exitCode": 0,
+    "durationMs": 357,
+    "reason": "SSH 探测完成。",
+    "stdoutTail": "3.9.2 | packaged by conda-forge | (default, Feb 21 2021, 05:02:26) \n[GCC 9.3.0]\n",
+    "stderrTail": ""
+  },
+  "py20": {
+    "allowed": true,
+    "executed": true,
+    "target": "20T",
+    "exitCode": 0,
+    "durationMs": 407,
+    "reason": "SSH 探测完成。",
+    "stdoutTail": "3.9.2 | packaged by conda-forge | (default, Feb 21 2021, 05:02:26) \n[GCC 9.3.0]\n",
+    "stderrTail": ""
+  },
+  "hf": {
+    "allowed": true,
+    "executed": true,
+    "target": "8T",
+    "exitCode": 0,
+    "durationMs": 1734,
+    "reason": "SSH 探测完成。",
+    "source": "hf",
+    "resolvedUrl": "https://hf-mirror.com/google-bert/bert-base-uncased/resolve/main/config.json",
+    "destination": "/tmp/ascend-hf-config.json",
+    "stdoutTail": "",
+    "stderrTail": ""
+  },
+  "github": {
+    "allowed": true,
+    "executed": true,
+    "target": "8T",
+    "exitCode": 0,
+    "durationMs": 2350,
+    "reason": "SSH 探测完成。",
+    "source": "github",
+    "resolvedUrl": "https://gh-proxy.com/https://github.com/octocat/Hello-World/raw/master/README",
+    "destination": "/tmp/ascend-github-readme.md",
+    "stdoutTail": "",
+    "stderrTail": ""
+  },
+  "huawei20": {
+    "allowed": true,
+    "executed": true,
+    "target": "20T",
+    "exitCode": 0,
+    "durationMs": 9156,
+    "reason": "SSH 探测完成。",
+    "source": "huawei",
+    "resolvedUrl": "https://obs-9be7.obs.cn-east-2.myhuaweicloud.com/003_Atc_Models/resnet50/resnet50.onnx",
+    "destination": "/home/HwHiAiUser/Ascend310/samples/chapter2/sample_resnet_quick_start/model/resnet50.onnx",
+    "stdoutTail": "",
+    "stderrTail": ""
+  },
+  "atc8": {
+    "allowed": true,
+    "executed": true,
+    "target": "8T",
+    "exitCode": 0,
+    "durationMs": 154826,
+    "reason": "SSH 探测完成。",
+    "stdoutTail": "ATC start working now, please wait for a moment.\n..............\nATC run success, welcome to the next use.\n\n",
+    "stderrTail": ""
+  },
+  "atc20": {
+    "allowed": true,
+    "executed": true,
+    "target": "20T",
+    "exitCode": 0,
+    "durationMs": 208820,
+    "reason": "SSH 探测完成。",
+    "stdoutTail": "ATC start working now, please wait for a moment.\n.................\nATC run success, welcome to the next use.\n\n",
+    "stderrTail": ""
+  },
+  "msame8": {
+    "allowed": true,
+    "executed": true,
+    "target": "8T",
+    "exitCode": 0,
+    "durationMs": 5181,
+    "reason": "SSH 探测完成。",
+    "stdoutTail": "[INFO] acl init success\n[INFO] open device 0 success\n[INFO] create context success\n[INFO] create stream success\n[INFO] get run mode success\n[INFO] load model model/resnet50.om success\n[INFO] create model description success\n[INFO] get input dynamic gear count success\n[INFO] create model output success\nout/tool-run/20261017_20_22_15_191288\n[INFO] start to process file:data/dog1_224_float32.bin\n[INFO] model execute success\nInference time: 13.232ms\n[INFO] get max dynamic batch size success\n[INFO] output data success\nInference average time: 13.232000 ms\n[INFO] destroy model input success\n[INFO] unload model success, model Id is 1\n[INFO] pid: 22642 Execute sample success\n[INFO] end to destroy stream\n[INFO] end to destroy context\n[INFO] end to reset device is 0\n[INFO] end to finalize acl\n",
+    "stderrTail": ""
+  },
+  "msame20": {
+    "allowed": true,
+    "executed": true,
+    "target": "20T",
+    "exitCode": 0,
+    "durationMs": 5348,
+    "reason": "SSH 探测完成。",
+    "stdoutTail": "[INFO] acl init success\n[INFO] open device 0 success\n[INFO] create context success\n[INFO] create stream success\n[INFO] get run mode success\n[INFO] load model model/resnet50.om success\n[INFO] create model description success\n[INFO] get input dynamic gear count success\n[INFO] create model output success\nout/tool-run/20261017_20_22_20_464947\n[INFO] start to process file:data/dog1_224_float32.bin\n[INFO] model execute success\nInference time: 11.748ms\n[INFO] get max dynamic batch size success\n[INFO] output data success\nInference average time: 11.748000 ms\n[INFO] destroy model input success\n[INFO] unload model success, model Id is 1\n[INFO] pid: 20993 Execute sample success\n[INFO] end to destroy stream\n[INFO] end to destroy context\n[INFO] end to reset device is 0\n[INFO] end to finalize acl\n",
+    "stderrTail": ""
+  }
+}

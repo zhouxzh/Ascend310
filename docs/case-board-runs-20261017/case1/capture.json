@@ -1,0 +1,104 @@
+{
+  "board-8t": {
+    "health": {
+      "exitCode": 0,
+      "stdout": "{\"status\":\"degraded\",\"ready\":true,\"camera_ready\":false,\"error\":\"摄像头尚未产生画面\"}",
+      "reason": "SSH 探测完成。"
+    },
+    "screenshots": {
+      "home": {
+        "text": "页面：http://192.168.1.100:5000/\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-home.png\n尺寸：1440x900\n大小：96876 bytes\n浏览器：chrome.exe\n耗时：942 ms",
+        "allowed": true,
+        "executed": true,
+        "url": "http://192.168.1.100:5000/",
+        "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-home.png",
+        "width": 1440,
+        "height": 900,
+        "bytes": 96876,
+        "durationMs": 942,
+        "browser": "chrome.exe",
+        "stderr": "96876 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-home.png\r\n",
+        "reason": "截图完成。"
+      },
+      "users": {
+        "text": "页面：http://192.168.1.100:5000/users_page\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-users.png\n尺寸：1440x900\n大小：86142 bytes\n浏览器：chrome.exe\n耗时：941 ms",
+        "allowed": true,
+        "executed": true,
+        "url": "http://192.168.1.100:5000/users_page",
+        "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-users.png",
+        "width": 1440,
+        "height": 900,
+        "bytes": 86142,
+        "durationMs": 941,
+        "browser": "chrome.exe",
+        "stderr": "86142 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-users.png\r\n",
+        "reason": "截图完成。"
+      },
+      "attendance": {
+        "text": "页面：http://192.168.1.100:5000/attendance_page\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-attendance.png\n尺寸：1440x900\n大小：92536 bytes\n浏览器：chrome.exe\n耗时：942 ms",
+        "allowed": true,
+        "executed": true,
+        "url": "http://192.168.1.100:5000/attendance_page",
+        "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-attendance.png",
+        "width": 1440,
+        "height": 900,
+        "bytes": 92536,
+        "durationMs": 942,
+        "browser": "chrome.exe",
+        "stderr": "92536 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-8t-attendance.png\r\n",
+        "reason": "截图完成。"
+      }
+    }
+  },
+  "board-20t": {
+    "health": {
+      "exitCode": 0,
+      "stdout": "{\"status\":\"degraded\",\"ready\":true,\"camera_ready\":false,\"error\":\"无法打开摄像头\"}",
+      "reason": "SSH 探测完成。"
+    },
+    "screenshots": {
+      "home": {
+        "text": "页面：http://192.168.1.101:5000/\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-20t-home.png\n尺寸：1440x900\n大小：96876 bytes\n浏览器：chrome.exe\n耗时：963 ms",
+        "allowed": true,
+        "executed": true,
+        "url": "http://192.168.1.101:5000/",
+        "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-20t-home.png",
+        "width": 1440,
+        "height": 900,
+        "bytes": 96876,
+        "durationMs": 963,
+        "browser": "chrome.exe",
+        "stderr": "96876 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-20t-home.png\r\n",
+        "reason": "截图完成。"
+      },
+      "users": {
+        "text": "页面：http://192.168.1.101:5000/users_page\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-20t-users.png\n尺寸：1440x900\n大小：86142 bytes\n浏览器：chrome.exe\n耗时：957 ms",
+        "allowed": true,
+        "executed": true,
+        "url": "http://192.168.1.101:5000/users_page",
+        "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-20t-users.png",
+        "width": 1440,
+        "height": 900,
+        "bytes": 86142,
+        "durationMs": 957,
+        "browser": "chrome.exe",
+        "stderr": "86142 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-20t-users.png\r\n",
+        "reason": "截图完成。"
+      },
+      "attendance": {
+        "text": "页面：http://192.168.1.101:5000/attendance_page\n截图：D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-20t-attendance.png\n尺寸：1440x900\n大小：92536 bytes\n浏览器：chrome.exe\n耗时：905 ms",
+        "allowed": true,
+        "executed": true,
+        "url": "http://192.168.1.101:5000/attendance_page",
+        "path": "D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-20t-attendance.png",
+        "width": 1440,
+        "height": 900,
+        "bytes": 92536,
+        "durationMs": 905,
+        "browser": "chrome.exe",
+        "stderr": "92536 bytes written to file D:\\Github\\Ascend310\\docs\\case-board-runs-20261017\\case1\\board-20t-attendance.png\r\n",
+        "reason": "截图完成。"
+      }
+    }
+  }
+}
