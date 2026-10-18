@@ -426,6 +426,53 @@ function auditFile(context) {
 		}
 	}
 
+	// --- layout: wide tables and very long code blocks ----------------------
+	// These two shapes are what break the PDF page and the web column: a table
+	// with eight columns cannot fit A4 or a 1440px content column, and a
+	// hundred-line block becomes a wall of text in both outputs.
+	const TABLE_COLUMN_LIMIT = 7;
+	const CODE_LINE_LIMIT = 80;
+	if (!assetPart) {
+		let inFence = false;
+		let blockStart = 0;
+		let blockLines = 0;
+		for (let i = 0; i < lines.length; i += 1) {
+			const line = lines[i];
+			if (/^\s*(?:```|~~~)/u.test(line)) {
+				if (!inFence) {
+					inFence = true;
+					blockStart = i + 1;
+					blockLines = 0;
+				} else {
+					inFence = false;
+					if (blockLines > CODE_LINE_LIMIT) {
+						push(
+							'layout-code-long',
+							'warning',
+							blockStart,
+							`代码块 ${blockLines} 行，超过 ${CODE_LINE_LIMIT} 行；PDF 与网页都会变成整页代码，建议拆段或链接到 samples/`
+						);
+					}
+				}
+				continue;
+			}
+			if (inFence) {
+				blockLines += 1;
+				continue;
+			}
+			if (!/^\s*\|/u.test(line)) continue;
+			const columns = (line.match(/\|/gu) ?? []).length - 1;
+			if (columns > TABLE_COLUMN_LIMIT) {
+				push(
+					'layout-table-wide',
+					'warning',
+					i + 1,
+					`表格 ${columns} 列，超过 ${TABLE_COLUMN_LIMIT} 列；A4 与网页内容列都放不下`
+				);
+			}
+		}
+	}
+
 	// --- explicit anchors ---------------------------------------------------
 	// An anchor that carries the `src-` convention must name this file's own
 	// part and stem; appendix files reusing a copied `src-experiment-caseN-`

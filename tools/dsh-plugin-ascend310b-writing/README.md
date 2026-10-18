@@ -223,6 +223,31 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 | `site-sitemap-missing` | warning | 缺少 `sitemap.xml` 或 `robots.txt` |
 
 实测：当前站点 71 页、369 个资源，断链 0、缺失资源 0，检查耗时约 100 ms。
+## 图表与排版检查
+
+图片与结构图同属"会同时破坏 PDF 和网页"的一类问题：
+
+| 规则 | 级别 | 判据 |
+| --- | --- | --- |
+| `image-too-heavy` | warning | 单张图片 > 1.5 MB（网页变慢、PDF 变大） |
+| `image-too-wide` | info | 像素尺寸 > 3200×2400（PDF/网页都会缩小显示） |
+| `image-alt-missing` | warning | `![](…)` 缺少替代文字 |
+| `image-orphan` | info | 图片没有被任何正文引用（同类超过 8 条时汇总） |
+| `dot-pair-missing` | error | `.dot` 没有同名 PNG |
+| `dot-png-stale` | error | PNG 早于 `.dot`（改图后未重新渲染） |
+| `dot-invalid` | error | 缺少 `graph`/`digraph` 声明 |
+| `dot-cjk-font` | warning | 含中文但没指定中文字体（渲染成方框） |
+| `dot-label-too-long` | warning | 节点标签单行 > 36 字 |
+| `dot-orphan` | info | 结构图 PNG 没有被正文引用 |
+
+排版规则同时作用于 PDF 与网页：
+
+| 规则 | 级别 | 判据 |
+| --- | --- | --- |
+| `layout-table-wide` | warning | Markdown 表格 > 7 列（A4 与网页内容列都放不下） |
+| `layout-code-long` | warning | 单个代码块 > 80 行 |
+
+当前实测：198 张源图片、52 个 `.dot`；2 张超重、5 个结构图标签过长、1 个中文图未设字体。
 ## 审计规则
 
 正文规则（`ascend310b_writing_audit`，作用于工作区）：

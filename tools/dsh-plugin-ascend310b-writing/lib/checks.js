@@ -21,6 +21,7 @@ import { collectCodeDrift, collectCodeFindings, collectDriftPairs } from './code
 import { collectDeckFindings } from './deck.js';
 import { collectCoursewareFindings } from './courseware.js';
 import { collectSiteFindings } from './site.js';
+import { collectFigureFindings } from './figures.js';
 
 /** One row of a two-cell Markdown table whose first cell is a backticked path. */
 const TABLE_ROW = /^\|\s*`([^`]+)`\s*\|\s*([^|]*?)\s*\|\s*$/u;
@@ -667,12 +668,13 @@ export function evaluatePushGate({ root, rev = 'HEAD', settings }) {
 	const courseware = collectCoursewareFindings({ root, settings: s });
 	const latexMap = collectLatexChapterFindings({ root, settings: s });
 	const site = collectSiteFindings({ root, settings: s });
+	const figures = collectFigureFindings({ root, settings: s });
 	// The git-history walk costs seconds, so it belongs here and not in the audit.
 	const drift = collectCodeDrift({ root, pairs: collectDriftPairs({ root, settings: s }) });
 	const audit = auditRepo({
 		root,
 		maxFindings: 400,
-		extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings, ...latexMap.findings, ...site.findings, ...drift],
+		extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings, ...latexMap.findings, ...site.findings, ...figures.findings, ...drift],
 		settings: s
 	});
 	const commit = collectCommitFindings({ root, rev });

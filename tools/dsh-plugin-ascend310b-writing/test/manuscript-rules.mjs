@@ -138,6 +138,36 @@ check(
 	'a comment in frontmatter must not disturb the H1 count'
 );
 
+// --- layout: wide tables and very long code blocks --------------------------
+// Eight columns cannot fit A4 or the web content column, and a 90-line block
+// becomes a wall of code in both outputs.
+writeFileSync(
+	join(root, 'src', 'book', 'chapter3.md'),
+	[
+		'---',
+		'title: "第3章：排版形状"',
+		'---',
+		'',
+		'| a | b | c | d | e | f | g | h |',
+		'| --- | --- | --- | --- | --- | --- | --- | --- |',
+		'| 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |',
+		'',
+		'```python',
+		...Array.from({ length: 90 }, (_value, index) => `x${index} = ${index}`),
+		'```',
+		''
+	].join('\n')
+);
+const layout = auditRepo({ root, maxFindings: 300 });
+check(
+	layout.findings.some((finding) => finding.rule === 'layout-table-wide' && finding.file.endsWith('chapter3.md')),
+	'an eight-column table must be reported'
+);
+check(
+	layout.findings.some((finding) => finding.rule === 'layout-code-long' && finding.file.endsWith('chapter3.md')),
+	'a 90-line code block must be reported'
+);
+
 rmSync(root, { recursive: true, force: true });
 
 if (failures.length > 0) {
