@@ -1,11 +1,11 @@
 /**
- * Install both Ascend310 DSH plugins into a DSH profile.
+ * Install both Ascend310 DSH plugins into a DSH profile from packed tarballs.
  *
- * This is the new-machine path. It does not copy files or create a hand-made
- * junction: it calls the official `dsh plugin add <absolute path>` command,
- * which forwards the install to pnpm inside the selected profile. The profile
- * records the plugin as a dependency, so uninstalling and reinstalling are
- * ordinary DSH/pnpm operations.
+ * Why not `dsh plugin add <folder>`? A folder install is a pnpm `link:`; Node
+ * then resolves the plugin from its real path in this repository, where the
+ * DSH host packages (`@deepseek-ai/dsh-tools`, Client APIs) are not present, so
+ * the plugin fails at import time. Packing first makes pnpm install a real copy
+ * inside the profile, where the DSH loader can resolve those packages.
  *
  * Usage:
  *   node scripts/install-dsh-plugins.mjs
@@ -13,7 +13,7 @@
  *   node scripts/install-dsh-plugins.mjs --check
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -26,12 +26,13 @@ const checkOnly = args.includes('--check');
 const profileIndex = args.indexOf('--profile');
 const profile = profileIndex >= 0 && args[profileIndex + 1] ? args[profileIndex + 1] : 'desktop';
 
-const plugins = [
+const pluginDirs = [
 	join(repoRoot, 'tools', 'dsh-plugin-ascend310b-writing'),
 	join(repoRoot, 'tools', 'dsh-plugin-ascend310b-debug')
 ];
 const dshHome = process.env.DSH_HOME ?? join(homedir(), '.dsh');
 const profileDir = join(dshHome, 'profiles', profile);
+const packDir = join(dshHome, 'plugin-packs');
 
 /** Locate the DSH CLI without hard-coding a machine path. */
 function findDsh() {
@@ -65,6 +66,20 @@ if (dsh === '') {
 	process.exit(1);
 }
 
+/** Run npm pack and return the tarball path. */
+function pack(pluginDir) {
+	const result = spawnSync('npm', ['pack', '--pack-destination', packDir], {
+		cwd: pluginDir,
+		encoding: 'utf8'
+	});
+	if (result.status !== 0) {
+		console.error((result.stderr || result.stdout).trim());
+		return '';
+	}
+	const name = result.stdout.trim().split(/\r?\n/u).find((line) => line.endsWith('.tgz'));
+	return name ? join(packDir, name) : '';
+}
+
 function installedManifest(name) {
 	const manifest = join(profileDir, 'node_modules', name, 'package.json');
 	if (!existsSync(manifest)) return null;
@@ -75,48 +90,75 @@ function installedManifest(name) {
 	}
 }
 
-let failed = false;
-const valid = [];
-for (const pluginDir of plugins) {
+function installedSpecifier(name) {
+	try {
+		const profileManifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'));
+		return profileManifest.dependencies?.[name] ?? '';
+	} catch {
+		return '';
+	}
+}
+
+const plugins = [];
+for (const pluginDir of pluginDirs) {
 	const manifestPath = join(pluginDir, 'package.json');
 	if (!existsSync(manifestPath)) {
 		console.error(`  缺少插件清单：${manifestPath}`);
-		failed = true;
-		continue;
+		process.exit(1);
 	}
 	try {
-		valid.push({ dir: pluginDir, pkg: JSON.parse(readFileSync(manifestPath, 'utf8')) });
+		plugins.push({ dir: pluginDir, pkg: JSON.parse(readFileSync(manifestPath, 'utf8')) });
 	} catch (error) {
 		console.error(`  ${manifestPath} 不是有效 JSON：${error.message}`);
-		failed = true;
+		process.exit(1);
 	}
 }
 
-// Add both in one pnpm transaction. Installing them one at a time makes pnpm
-// prune the previous plugin because it is not yet in the dependency tree.
-if (!checkOnly && valid.length > 0) {
-	console.log(`\n安装 ${valid.map((entry) => entry.pkg.name).join(' + ')} → profile ${profile}`);
-	const result = spawnSync(
-		dsh,
-		['plugin', '--profile', profile, 'add', ...valid.map((entry) => entry.dir)],
-		{ stdio: 'inherit', env: process.env }
-	);
-	if ((result.status ?? 1) !== 0) failed = true;
+if (!checkOnly) {
+	mkdirSync(packDir, { recursive: true });
+	const tarballs = [];
+	for (const { dir, pkg } of plugins) {
+		console.log(`\n打包 ${pkg.name}@${pkg.version}`);
+		const tarball = pack(dir);
+		if (tarball === '') process.exit(1);
+		tarballs.push(tarball);
+		console.log(`  ${tarball}`);
+	}
+
+	// Remove old link/file specs first; otherwise pnpm can keep an existing
+	// `link:` at the same version and report "Already up to date".
+	spawnSync(dsh, ['plugin', '--profile', profile, 'remove', ...plugins.map((entry) => entry.pkg.name)], {
+		stdio: 'ignore',
+		env: process.env
+	});
+	console.log(`\n安装到 profile ${profile}`);
+	const added = spawnSync(dsh, ['plugin', '--profile', profile, 'add', ...tarballs], {
+		stdio: 'inherit',
+		env: process.env
+	});
+	if ((added.status ?? 1) !== 0) process.exit(1);
 }
 
-for (const { pkg } of valid) {
+let failed = false;
+for (const { pkg } of plugins) {
 	const installed = installedManifest(pkg.name);
+	const specifier = installedSpecifier(pkg.name);
 	if (installed === null) {
 		console.error(`  未安装：${pkg.name}`);
 		failed = true;
 		continue;
 	}
-	console.log(`  OK  ${pkg.name} ${installed.version}`);
+	if (specifier.startsWith('link:')) {
+		console.error(`  ${pkg.name} 仍是 link: 安装，Node 从仓库真实路径无法解析 DSH host 包；请重跑本脚本。`);
+		failed = true;
+		continue;
+	}
+	console.log(`  OK  ${pkg.name} ${installed.version}  (${specifier})`);
 }
 
 if (checkOnly) {
 	console.log(`\nDSH profile：${profileDir}`);
-	console.log(failed ? '插件不完整。' : '两个插件均已安装。');
+	console.log(failed ? '插件安装不完整。' : '两个插件均已按 tarball 方式安装。');
 } else if (!failed) {
 	console.log('\n安装完成。重启 DSH，并在插件页确认两个插件已启用。');
 	console.log('项目级 skill 由仓库 .dsh/skills 自动加载，无需另装。');

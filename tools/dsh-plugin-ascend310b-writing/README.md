@@ -216,25 +216,25 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 
 ## 新电脑安装插件
 
-前置：安装 DSH 桌面版，克隆本仓库。插件使用 DSH 官方命令安装，不需要手工复制目录或创建 Junction：
+前置：安装 DSH 桌面版，克隆本仓库。插件必须**先打包成 tarball 再安装**：
 
 ```bash
-node scripts/install-dsh-plugins.mjs            # 安装写作 + 调试插件到 desktop profile
-node scripts/install-dsh-plugins.mjs --check    # 只核对是否已安装
+node scripts/install-dsh-plugins.mjs            # 打包并安装写作 + 调试插件
+node scripts/install-dsh-plugins.mjs --check    # 只核对安装方式与版本
 node scripts/install-dsh-plugins.mjs --profile <名称>
 ```
 
-脚本内部执行的是：
+原因：`dsh plugin add <源码目录>` 会生成 `link:` 依赖。Node 会按仓库真实路径解析插件的 `@deepseek-ai/dsh-tools` 等 DSH host 包，而仓库里没有这些包，插件启动时会导入失败。
 
-```bash
-dsh plugin --profile desktop add <仓库>/tools/dsh-plugin-ascend310b-writing <仓库>/tools/dsh-plugin-ascend310b-debug
-```
+脚本会：
 
-DSH 把它记录为 `link:<绝对路径>` 依赖。换电脑或移动仓库后，重新运行脚本即可；不要把本机绝对路径提交到仓库。
+1. 在 `~/.dsh/plugin-packs/` 生成两个 `.tgz`；
+2. 从 profile 移除旧的 `link:` 依赖；
+3. 用 `dsh plugin add <tarball...>` 安装真实副本；
+4. 核对 profile 中记录的是 `file:`，不是 `link:`。
 
-也可以在 DSH 的 **插件 → 添加插件** 中输入插件的绝对路径，效果相同。
+也可以在 DSH 的 **插件 → 添加插件** 中直接选择这两个 tarball。修改插件源码后重新运行脚本，并在 DSH 中重启；项目级 skill 由仓库 `.dsh/skills` 自动加载，不需要额外安装。
 
-安装后重启 DSH；项目级 skill 由仓库 `.dsh/skills` 自动加载，不需要额外安装。
 ## Skill 安装
 
 插件通过 `skills/` 携带写作 skill，但 **DSH 只从 `$DSH_HOME/skills/<name>/SKILL.md` 读取**，不会自动从已安装插件里复制。安装或更新：
