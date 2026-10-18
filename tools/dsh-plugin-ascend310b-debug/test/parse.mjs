@@ -77,9 +77,11 @@ equal(transcript.board?.soc, 'Ascend310B4', '无节标记的纯终端记录也�
 
 // --- generated script -----------------------------------------------------
 const script = buildProbeScript();
-for (const section of ['npu_smi_info', 'cann_version_cfg', 'driver_version_info', 'acl_import', 'devices', 'mac', 'machine_id', 'ip_address']) {
+for (const section of ['npu_smi_info', 'cann_version_cfg', 'driver_version_info', 'acl_import', 'devices', 'mac', 'machine_id', 'ip_address', 'primary_ip']) {
 	check(script.includes(`abs_section ${section}`), `探测脚本应包含 ${section} 节`);
 }
+check(!script.includes('abs_section firmware_version_info'), '默认探测不应请求不可读的固件版本文件');
+check(!script.includes('abs_section firmware_access'), '默认探测不应把固件文件权限作为版本探测项');
 check(!/(^|\s)(rm|mv|dd|mkfs)(\s|$)/.test(script), '探测脚本不应包含写操作');
 check(script.includes('read-only environment probe'), '脚本应自述为只读探测');
 

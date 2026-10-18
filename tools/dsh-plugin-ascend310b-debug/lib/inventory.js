@@ -28,7 +28,6 @@ export const SYSTEM_FIELDS = Object.freeze([
 	'kernel',
 	'driverVersion',
 	'cannVersion',
-	'firmwareVersion',
 	'npuSmiVersion',
 	'pythonVersion',
 	'machineId',

@@ -81,22 +81,29 @@ for (const file of files) {
 	});
 }
 
-// The bundled skill must carry valid frontmatter with a name and a description.
-const skillPath = join(root, 'skills', 'ascend310b-debug', 'SKILL.md');
-let skill = null;
-try {
-	skill = readFileSync(skillPath, 'utf8');
-} catch {
-	failures.push('skills/ascend310b-debug/SKILL.md 不存在');
-}
-if (skill !== null) {
-	if (!skill.startsWith('---\n')) failures.push('SKILL.md 必须以 YAML frontmatter 开头');
+// Every bundled skill must carry valid frontmatter and match its directory name.
+const skillsRoot = join(root, 'skills');
+const skillNames = readdirSync(skillsRoot, { withFileTypes: true })
+	.filter((entry) => entry.isDirectory())
+	.map((entry) => entry.name)
+	.sort();
+if (skillNames.length === 0) failures.push('skills/ 下没有任何 skill');
+for (const skillName of skillNames) {
+	const skillPath = join(skillsRoot, skillName, 'SKILL.md');
+	let skill = null;
+	try {
+		skill = readFileSync(skillPath, 'utf8');
+	} catch {
+		failures.push(`skills/${skillName}/SKILL.md 不存在`);
+	}
+	if (skill === null) continue;
+	if (!skill.startsWith('---\n')) failures.push(`skills/${skillName}/SKILL.md 必须以 YAML frontmatter 开头`);
 	const frontmatter = skill.slice(4, skill.indexOf('\n---', 3));
-	if (!/^name:\s*\S+/m.test(frontmatter)) failures.push('SKILL.md frontmatter 缺少 name');
-	if (!/^description:\s*\S+/m.test(frontmatter)) failures.push('SKILL.md frontmatter 缺少 description');
+	if (!/^name:\s*\S+/m.test(frontmatter)) failures.push(`skills/${skillName}/SKILL.md frontmatter 缺少 name`);
+	if (!/^description:\s*\S+/m.test(frontmatter)) failures.push(`skills/${skillName}/SKILL.md frontmatter 缺少 description`);
 	const declared = /^name:\s*(\S+)/m.exec(frontmatter)?.[1];
-	if (declared !== 'ascend310b-debug') {
-		failures.push(`SKILL.md 的 name 必须与目录名一致（${declared} ≠ ascend310b-debug）`);
+	if (declared !== skillName) {
+		failures.push(`skills/${skillName}/SKILL.md 的 name 必须与目录名一致（${declared} ≠ ${skillName}）`);
 	}
 }
 
@@ -171,6 +178,6 @@ if (failures.length > 0) {
 }
 console.log('portability test passed');
 console.log(`  scanned files : ${files.length}`);
-console.log(`  skill         : ${skill === null ? '(missing)' : 'ascend310b-debug/SKILL.md'}`);
+console.log(`  skill         : ${skillNames.join(', ')}`);
 console.log(`  standard      : ${standard === null ? '(missing)' : 'docs/ascend310b-development-standard.md'}`);
 console.log(`  manifest files: ${(manifest.files ?? []).join(', ')}`);

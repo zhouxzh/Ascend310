@@ -72,6 +72,8 @@ git diff --check
 
 插件采用“复制到 DSH profile”的源码安装方式，不依赖仓库根目录的 Node 依赖。每个插件的 README 都给出安装、配置和自检命令；昇腾310B调试插件的源码审核记录在 [`installation-audit.md`](tools/dsh-plugin-ascend310b-debug/docs/installation-audit.md)。
 
+配套的项目级 skills 已提交在 [`.dsh/skills/`](.dsh/skills/)：`ascend310b-cann-development` 负责 310B 程序开发、CANN 合同和板端验收，`ascend310b-debug` 负责故障定位；写作侧按 `ascend310b-writing-theory`（理论章节）、`ascend310b-writing-case`（9 个案例）、`ascend310b-writing-presentation`（Marp 课件）和 `ascend310b-writing-docs`（代码工程 docs）分工。插件内的 [`skills/`](tools/dsh-plugin-ascend310b-debug/skills/) 是源文件；修改后运行 `npm run skills:sync` 和 `npm run skills:check`。
+
 ## 案例运行原则
 
 进入具体案例后，始终先阅读该案例的 `README.md`。它只给出当前默认环境、启动命令、部署边界和最短排障路径。需要 API、模型、硬件验收或历史记录时，再从该案例的 `docs/README.md` 进入专题文档。

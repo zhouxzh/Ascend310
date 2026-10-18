@@ -229,7 +229,6 @@ function publicInventory(config) {
 				tier: board.system?.tier ?? null,
 				driver: board.system?.driverVersion ?? null,
 				cann: board.system?.cannVersion ?? null,
-				firmware: board.system?.firmwareVersion ?? null,
 				firstSeen: board.firstSeen ?? null,
 				lastSeen: board.lastSeen ?? null,
 				lastChangeAt: board.lastChangeAt ?? null,

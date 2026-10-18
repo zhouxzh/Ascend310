@@ -53,7 +53,6 @@ const rows = [
 	['npu-smi', fact('npuSmiVersion')],
 	['CANN', fact('cannVersion')],
 	['驱动', fact('driverVersion')],
-	['固件', fact('firmwareVersion')],
 	['Python', [fact('pythonExecutable'), fact('pythonVersion')].filter(Boolean).join(' ') || null],
 	['aclImport（面板取值）', fact('aclImport')],
 	['aclImportSourced（source CANN 后）', fact('aclImportSourced')],
@@ -113,7 +112,6 @@ const html = `<!doctype html>
 			<div class="card"><div class="label">内存</div><div class="value">${escape(report.board?.memoryUsedMb === null ? null : `${report.board?.memoryUsedMb} / ${report.board?.memoryTotalMb} MB`)}</div></div>
 			<div class="card"><div class="label">CANN</div><div class="value">${escape(fact('cannVersion'))}</div></div>
 			<div class="card"><div class="label">驱动</div><div class="value">${escape(fact('driverVersion'))}</div></div>
-			<div class="card"><div class="label">固件</div><div class="value">${escape(fact('firmwareVersion'))}</div></div>
 		</div>
 	</div>
 	<div class="section">

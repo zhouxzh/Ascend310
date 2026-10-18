@@ -17,7 +17,10 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const index = readFileSync(join(root, 'lib/index.js'), 'utf8');
-const skill = readFileSync(join(root, 'skills/ascend310b-writing/SKILL.md'), 'utf8');
+const skill = readdirSync(join(root, 'skills'), { withFileTypes: true })
+	.filter((entry) => entry.isDirectory())
+	.map((entry) => readFileSync(join(root, 'skills', entry.name, 'SKILL.md'), 'utf8'))
+	.join('\n');
 const readme = readFileSync(join(root, 'README.md'), 'utf8');
 
 const toolNames = new Set(

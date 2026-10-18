@@ -372,7 +372,7 @@ export function assessVersionPairing(facts) {
 			evidence: EVIDENCE.UNTESTED,
 			reasons: [`未采集到 ${missing.join('、')}，无法判断版本配套。`],
 			nextActions: [
-				'在板端执行 ascend_probe 的默认只读脚本（npu-smi info、驱动/固件版本文件、CANN version.cfg），把输出交给工具解析。',
+				'在板端执行 ascend_probe 的默认只读脚本（npu-smi、驱动版本文件、CANN version.cfg），把输出交给工具解析；当前 310B 默认不采集固件版本，固件需要时由有权限的用户另行提供外部证据。',
 				'不要把未采集的版本写成一个推测值；缺失项应保留为未采集。'
 			],
 			releaseLine: null,

@@ -261,8 +261,7 @@ window.__ModuleLoader__.load({
 								"td",
 								null,
 								h("div", { className: "ad-mono" }, `CANN ${board.cann ?? "未采集"}`),
-								h("div", { className: "ad-mono" }, `驱动 ${board.driver ?? "未采集"}`),
-								h("div", { className: "ad-note" }, `固件 ${board.firmware ?? "未采集"}`)
+								h("div", { className: "ad-mono" }, `驱动 ${board.driver ?? "未采集"}`)
 							),
 							h(
 								"td",
@@ -522,7 +521,7 @@ window.__ModuleLoader__.load({
 					"div",
 					{ className: "ad-head" },
 					h("h2", { className: "ad-title" }, PANEL_TITLE),
-					h("span", { className: "ad-sub" }, "昇腾 310B1 / 310B4 板卡、驱动、固件、CANN 版本探测与分层调试"),
+					h("span", { className: "ad-sub" }, "昇腾 310B1 / 310B4 板卡、驱动、CANN 版本探测与分层调试"),
 					h(
 						"span",
 						{ className: "ad-mono" },
@@ -629,7 +628,6 @@ window.__ModuleLoader__.load({
 					h(Card, { label: "健康 / 温度", value: board.health ? `${board.health} · ${board.temperatureC ?? "—"} C` : null, source: "Alarm 只作为诊断背景" }),
 					h(Card, { label: "CANN", value: factValue(payload, "cannVersion"), source: facts.cannVersion?.source ?? "未采集" }),
 					h(Card, { label: "驱动", value: factValue(payload, "driverVersion"), source: facts.driverVersion?.source ?? "未采集" }),
-					h(Card, { label: "固件", value: factValue(payload, "firmwareVersion"), source: facts.firmwareVersion?.source ?? "未采集" }),
 					h(Card, { label: "PyACL", value: factValue(payload, "aclImport"), source: "import acl" })
 				),
 				h(
@@ -699,7 +697,7 @@ window.__ModuleLoader__.load({
 					h(
 						"table",
 						{ className: "ad-table" },
-						h("thead", null, h("tr", null, h("th", null, "板卡"), h("th", null, "SoC / 档位"), h("th", null, "CANN"), h("th", null, "驱动"), h("th", null, "固件"), h("th", null, "证据"))),
+						h("thead", null, h("tr", null, h("th", null, "板卡"), h("th", null, "SoC / 档位"), h("th", null, "CANN"), h("th", null, "驱动"), h("th", null, "证据"))),
 						h(
 							"tbody",
 							null,
@@ -711,7 +709,6 @@ window.__ModuleLoader__.load({
 									h("td", null, `${stack.soc} / ${stack.tier}`),
 									h("td", { className: "ad-mono" }, stack.cann),
 									h("td", { className: "ad-mono" }, stack.driver),
-									h("td", { className: "ad-mono" }, stack.firmware),
 									h("td", null, stack.status)
 								)
 							)

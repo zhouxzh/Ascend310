@@ -390,7 +390,7 @@ export const ENTRIES = Object.freeze([
 		rootCause:
 			'Toolkit、算子包（ops）与加速库（NNAL）可以分层升级。跨发布线组合会让 atc、runtime 与已生成 OM 处在不同版本线上。',
 		steps: [
-			{ probe: 'cann', do: '分别记录 Toolkit version.cfg、compiler/version.info、驱动与固件版本，不要只写一个“CANN 版本”。', stop: '缺少任何一项时不要把组合写成已验证。' },
+			{ probe: 'cann', do: '分别记录 Toolkit version.cfg、compiler/version.info 和驱动版本；固件只有在有可信外部证据时才记录，不要只写一个“CANN 版本”。', stop: '缺少任何一项关键版本时不要把组合写成已验证。' },
 			{ probe: 'cann', do: '优先使用同一发布线的 Toolkit 与 ops；跨版本组合需要单独的回归报告。', stop: '编译通过不代表废弃接口可以长期保留。' },
 			{ probe: 'conversion', do: '升级 CANN 后重新跑一次 ATC 与 OM 加载，旧 OM 不自动获得新版本行为。', stop: '升级后的验收按五道门顺序执行。' }
 		],

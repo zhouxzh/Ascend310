@@ -4,7 +4,7 @@
 
 DSH 插件：面向**昇腾 310B**（Ascend 310B1 / 310B4）程序调试。它把两件事合到一起：
 
-- **板端事实采集**：从真实开发板读出 SoC、npu-smi、CANN、驱动、固件、Python/PyACL、设备节点与内核模块，并给出**版本配套判定**（含证据级别）。
+- **板端事实采集**：从真实开发板读出 SoC、npu-smi、CANN、驱动、Python/PyACL、设备节点与内核模块，并给出**版本配套判定**（含证据级别）。当前 310B 板卡不为非特权 SSH 用户暴露可信固件版本，因此默认探测不采集固件版本；也不会用驱动号代替固件号。
 - **分层调试路由**：把症状（`import acl` 失败、ATC 报错、OM 加载失败、VENC/DVPP、摄像头、MindSpore/MindIR、服务健康但推理失败、性能不达标……）映射到具体的检查顺序、停止条件、只读命令和教材样例入口。
 
 面板名字固定为 **昇腾310B调试**，侧栏、面板标题和工具卡片一致使用这个全名，避免只写 `310B` 让人分不清是哪家芯片。
@@ -95,13 +95,13 @@ Copy-Item -Path (Join-Path $plugin '*') -Destination $dest -Recurse -Force
 
 ### 动态 IP、发现与多板
 
-`ascend_discover` 只在显式给出的私有 IPv4 CIDR 中工作，不会扫描公网。它先探测 22 端口，再用和 `ascend_probe` 相同的只读脚本读取主机名、eth0 MAC、板型、驱动、CANN、固件和 Python，然后按 MAC 写入本地资产表：
+`ascend_discover` 只在显式给出的私有 IPv4 CIDR 中工作，不会扫描公网。它先探测 22 端口，再用和 `ascend_probe` 相同的只读脚本读取主机名、eth0 MAC、板型、驱动、CANN 和 Python，然后按 MAC 写入本地资产表：
 
 ```text
 DSH_HOME/ascend310b-inventory.json
 ```
 
-同一块板换 IP 会归并为同一条记录；重装系统、驱动、固件或 CANN 变化会写入 `changes`。发现到的板卡会以 target id（例如 `ascend-c0742bfddd7a`）出现在面板和 `target` 选择中，不需要手工把 IP 写进 `targets`。资产表包含 MAC，禁止提交到 Git 或放进插件包。
+同一块板换 IP 会归并为同一条记录；重装系统、驱动或 CANN 变化会写入 `changes`。发现到的板卡会以 target id（例如 `ascend-c0742bfddd7a`）出现在面板和 `target` 选择中，不需要手工把 IP 写进 `targets`。资产表包含 MAC，禁止提交到 Git 或放进插件包。固件版本不进入资产指纹：当前板端没有可信、可读的版本来源。
 
 调用示例：
 
@@ -117,13 +117,13 @@ ascend_probe target=ascend-c0742bfddd7a
 
 对 10 块以上开发板，建议每块板第一次通过串口设置唯一主机名，之后用 `discovery.cidrs` 做周期扫描；串口不是持续发现通道，主要用于首次配置和网络故障恢复。当前版本实现的是网络发现，串口自动登录/探测仍需手工或后续扩展。
 
-4) 技能文件不会被插件自动发现，需要单独放置：
+4) 技能文件不会被插件自动发现，需要单独放置。插件包含 `ascend310b-debug` 和 `ascend310b-cann-development` 两个 skill：
 
 ```powershell
-New-Item -ItemType Directory -Force "$env:USERPROFILE\.dsh\skills\ascend310b-debug" | Out-Null
-Copy-Item -Force `
-  "$plugin\skills\ascend310b-debug\SKILL.md" `
-  "$env:USERPROFILE\.dsh\skills\ascend310b-debug\SKILL.md"
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.dsh\skills" | Out-Null
+Copy-Item -Path "$plugin\skills\*" `
+  -Destination "$env:USERPROFILE\.dsh\skills" `
+  -Recurse -Force
 ```
 
 5) 重启桌面应用（host 半边的工具需要重启后才会注册；浏览器面板刷新即可）。

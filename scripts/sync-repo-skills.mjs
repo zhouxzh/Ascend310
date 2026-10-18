@@ -20,7 +20,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -33,13 +33,23 @@ const sources = [
 	join(repoRoot, 'tools', 'dsh-plugin-ascend310b-debug', 'skills')
 ];
 
+/** Collect all files in a skill directory, including future references/. */
+function walk(directory, found = []) {
+	for (const entry of readdirSync(directory, { withFileTypes: true })) {
+		const path = join(directory, entry.name);
+		if (entry.isDirectory()) walk(path, found);
+		else if (entry.isFile()) found.push(path);
+	}
+	return found;
+}
+
 const skills = [];
 for (const sourceRoot of sources) {
 	if (!existsSync(sourceRoot)) continue;
 	for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
 		if (!entry.isDirectory()) continue;
-		const file = join(sourceRoot, entry.name, 'SKILL.md');
-		if (existsSync(file)) skills.push({ name: entry.name, source: file });
+		const sourceDir = join(sourceRoot, entry.name);
+		if (existsSync(join(sourceDir, 'SKILL.md'))) skills.push({ name: entry.name, sourceDir });
 	}
 }
 if (skills.length === 0) {
@@ -48,30 +58,35 @@ if (skills.length === 0) {
 }
 
 let drift = 0;
-for (const { name, source } of skills) {
+let filesCopied = 0;
+for (const { name, sourceDir } of skills) {
 	const targetDir = join(targetRoot, name);
-	const target = join(targetDir, 'SKILL.md');
-	const shipped = readFileSync(source, 'utf8');
-	const installed = existsSync(target) ? readFileSync(target, 'utf8') : null;
-	if (installed === shipped) {
-		console.log(`  OK    .dsh/skills/${name}`);
-		continue;
+	let skillDrift = 0;
+	for (const source of walk(sourceDir)) {
+		const rel = relative(sourceDir, source).replaceAll('\\', '/');
+		const target = join(targetDir, rel);
+		const shipped = readFileSync(source, 'utf8');
+		const installed = existsSync(target) ? readFileSync(target, 'utf8') : null;
+		if (installed === shipped) continue;
+		skillDrift += 1;
+		if (checkOnly) {
+			console.log(`  差异  .dsh/skills/${name}/${rel}  ${installed === null ? '未生成' : '内容不同'}`);
+			continue;
+		}
+		mkdirSync(dirname(target), { recursive: true });
+		writeFileSync(target, shipped, 'utf8');
+		filesCopied += 1;
 	}
-	drift += 1;
-	if (checkOnly) {
-		console.log(`  差异  .dsh/skills/${name}  ${installed === null ? '未生成' : '内容不同'}`);
-		continue;
-	}
-	mkdirSync(targetDir, { recursive: true });
-	writeFileSync(target, shipped, 'utf8');
-	console.log(`  已同步 .dsh/skills/${name}`);
+	drift += skillDrift;
+	if (skillDrift === 0) console.log(`  OK    .dsh/skills/${name}`);
+	else if (!checkOnly) console.log(`  已同步 .dsh/skills/${name}（${skillDrift} 个文件）`);
 }
 
 if (checkOnly && drift > 0) {
-	console.error(`\n${drift} 个项目 skill 与插件内版本不一致；运行 node scripts/sync-repo-skills.mjs。`);
+	console.error(`\n${drift} 个 skill 文件与插件内版本不一致；运行 node scripts/sync-repo-skills.mjs。`);
 	process.exit(1);
 }
 console.log(
-	`\n${skills.length} 个项目 skill ${checkOnly ? '已核对' : '已同步'}（${targetRoot}）。` +
+	`\n${skills.length} 个项目 skill ${checkOnly ? '已核对' : `已同步（${filesCopied} 个文件）`}（${targetRoot}）。` +
 		' DSH 以 rank 100 读取该目录，优先于用户目录。'
 );

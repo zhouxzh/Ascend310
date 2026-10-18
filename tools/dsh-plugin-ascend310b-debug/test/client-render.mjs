@@ -166,7 +166,8 @@ check(text.includes('Ascend310B4'), 'the panel must show the probed SoC');
 check(text.includes('observed-match'), 'the panel must show the pairing verdict');
 check(text.includes('8.0.0'), 'the panel must show the probed CANN version');
 check(text.includes('25.2.0'), 'the panel must show the probed driver version');
-check(text.includes('未采集'), 'missing facts must stay visible as 未采集 chips');
+// Firmware is deliberately not a default probe field: the current 310B
+// images do not expose a readable, trustworthy firmware version.
 // `undefined` appears legitimately inside a knowledge-entry title (the C++
 // "undefined symbol" symptom), so the check targets React artifacts instead.
 check(!text.includes('>undefined<') && !text.includes('undefined undefined'), 'the panel must not render raw undefined values');

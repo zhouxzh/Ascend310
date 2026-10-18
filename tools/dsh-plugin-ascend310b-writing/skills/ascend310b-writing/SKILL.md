@@ -9,6 +9,20 @@ description: Ascend310 教材仓库的中文技术写作规范与守门流程。
 VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条：
 **改 Markdown 源文件，跑检查，让生成物自己更新。**
 
+## 专用 skill 路由
+
+本 skill 是总守门规则。按当前写作对象优先加载对应专用 skill：
+
+| 写作对象 | 专用 skill | 主要范围 |
+| --- | --- | --- |
+| 理论教程 | `ascend310b-writing-theory` | `src/book/`、第1章至第10章、sidebar、理论索引 |
+| 实践案例 | `ascend310b-writing-case` | `src/experiment/`、案例1至案例9、case4 自包含 |
+| Presentation | `ascend310b-writing-presentation` | `src/presentation/`、Marp 主题、真实浏览器课件验收 |
+| 代码工程 docs | `ascend310b-writing-docs` | `samples/caseN/README.md`、`docs/`、部署/API/验证/限制 |
+| 跨对象规则 | 本 skill | 冻结命名、链接、图片、标点、PDF、push gate 和写作进度 |
+
+先判断对象，再打开专用 skill；不要把案例运行手册写成理论章节，也不要把代码 docs 当成课件或案例正文。
+
 ## 先看规则，再动手
 
 - 章节、案例、附录的公开名称是冻结的（见仓库 `AGENTS.md` 的

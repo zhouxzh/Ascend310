@@ -44,7 +44,8 @@
 | HF、华为云、GitHub 下载没有统一来源策略 | 用户需要手写不同的下载命令，HF/GitHub 容易失败 | 新增 `ascend_model_download`：华为云直连、HF 强制 `hf-mirror.com`、GitHub 默认 `gh-proxy.com` 网页代理；目标限制在工作区或 `/tmp` |
 | 调试结果只有日志，没有前端页面证据 | 教程无法保存 case 的 UI 实测截图 | 新增 `ascend_ui_capture`，用宿主机 Edge/Chrome headless 截图，强制 `.png`、artifactRoot 边界和 `allowStateChange`；补浏览器实际截图测试 |
 | 只能使用固定 IP 的 `targets`，动态 DHCP 和多板实验室无法发现板卡 | IP 变化后工具找不到板，10 块以上只能手工维护地址 | 新增 `ascend_discover`：只扫描显式私有 CIDR，SSH 探测后按 MAC 建本地资产表；发现的 ID 直接成为动态 target，无需改静态列表 |
-| 系统重装、驱动/CANN 升级后没有历史，容易把旧结论套到新系统 | 同一块板换系统后仍被当成旧环境 | `ascend_probe`/`ascend_check`/面板探测和 `ascend_discover` 都更新资产表的系统指纹；记录 hostname、OS、kernel、driver、firmware、CANN、Python、machine-id 变化，并保留变更历史 |
+| 系统重装、驱动/CANN 升级后没有历史，容易把旧结论套到新系统 | 同一块板换系统后仍被当成旧环境 | `ascend_probe`/`ascend_check`/面板探测和 `ascend_discover` 都更新资产表的系统指纹；记录 hostname、OS、kernel、driver、CANN、Python、machine-id 变化，并保留变更历史 |
+| 310B 的固件版本在非特权 SSH 下不可靠：`npu-smi` 无版本、固件目录不可读、安装信息只有安装类型 | 面板长期显示“未采集”，还会让用户误以为漏解析 | 默认探测不再请求固件版本文件；资产表和前端不把固件版本作为字段；需要时由有权限的用户手工采集并作为外部证据记录 |
 | 板卡需要稳定身份，但 machine-id 在克隆镜像中重复、npu-smi 序列号为 NA | 用 machine-id 或主机名会把多块 8T 合并成一块 | 探测脚本新增 eth0 MAC 和 machine-id 字段；资产表以 MAC 为唯一键，MAC 缺失时明确标为 hostname fallback |
 | 同一块板同时出现在静态 `targets` 和发现 target 中，用户看到两个开发板 | 两块板被显示成四个 target，无法判断真实硬件数量 | 静态 target 通过 MAC/主机名/IP 与资产表合并；发现 target 只保留未配置板，面板按 MAC 显示物理开发板 |
 | 前端把状态卡、事实表、样例、版本历史和原始输出一次性堆叠 | 信息层级混乱，难以完成发现、选择和探测 | 面板改为“概览 / 开发板资产 / 调试 / 原始输出”四个页签；发现结果进入资产页，版本与原始证据放入原始页 |

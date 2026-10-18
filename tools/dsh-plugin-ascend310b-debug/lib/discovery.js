@@ -246,7 +246,6 @@ export async function discoverNetwork({
 			tier: result.board.system.tier,
 			driver: result.board.system.driverVersion,
 			cann: result.board.system.cannVersion,
-			firmware: result.board.system.firmwareVersion,
 			status: result.status,
 			changes: result.changes,
 			identity: candidate.mac === null ? 'hostname-fallback' : 'mac'

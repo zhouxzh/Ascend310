@@ -76,6 +76,7 @@ abs_section kernel; uname -r 2>&1 || true; abs_end kernel
 abs_section os_release; test -r /etc/os-release && cat /etc/os-release || echo "MISSING /etc/os-release"; abs_end os_release
 abs_section hostname; hostname 2>&1 || true; abs_end hostname
 abs_section ip_address; hostname -I 2>/dev/null || true; abs_end ip_address
+abs_section primary_ip; ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}'; abs_end primary_ip
 abs_section date; date --iso-8601=seconds 2>&1 || true; abs_end date
 abs_section id; id 2>&1 || true; abs_end id
 
@@ -95,12 +96,10 @@ abs_section dt_model; sed -n 's/^[[:space:]]*Model[[:space:]]*:[[:space:]]*//p; 
 
 abs_section ascend_toolkit; readlink -f /usr/local/Ascend/ascend-toolkit/latest 2>/dev/null || echo "UNRESOLVED /usr/local/Ascend/ascend-toolkit/latest"; abs_end ascend_toolkit
 abs_section ascend_driver; readlink -f /usr/local/Ascend/driver 2>/dev/null || echo "UNRESOLVED /usr/local/Ascend/driver"; abs_end ascend_driver
-abs_section ascend_firmware; readlink -f /usr/local/Ascend/firmware 2>/dev/null || echo "UNRESOLVED /usr/local/Ascend/firmware"; abs_end ascend_firmware
 
 abs_section cann_version_cfg; cat /usr/local/Ascend/ascend-toolkit/latest/version.cfg 2>/dev/null || cat /usr/local/Ascend/ascend-toolkit/version.cfg 2>/dev/null || echo "NOT_FOUND"; abs_end cann_version_cfg
 abs_section cann_version_info; for f in /usr/local/Ascend/ascend-toolkit/latest/compiler/version.info /usr/local/Ascend/ascend-toolkit/latest/version.info; do if [ -r "$f" ]; then echo "--- $f"; sed -n '1,40p' "$f"; fi; done 2>/dev/null; abs_end cann_version_info
 abs_section driver_version_info; for f in /var/davinci/driver/version.info /usr/local/Ascend/driver/version.info /usr/local/Ascend/driver/version.cfg /etc/ascend_install.info; do if [ -r "$f" ]; then echo "--- $f"; sed -n '1,40p' "$f"; fi; done 2>/dev/null; abs_end driver_version_info
-abs_section firmware_version_info; for f in /usr/local/Ascend/firmware/version.info /usr/local/Ascend/firmware/version.cfg; do if [ -r "$f" ]; then echo "--- $f"; sed -n '1,40p' "$f"; fi; done 2>/dev/null; abs_end firmware_version_info
 
 abs_section env; for v in ASCEND_HOME_PATH ASCEND_TOOLKIT_HOME ASCEND_AICPU_PATH ASCEND_OPP_PATH LD_LIBRARY_PATH PYTHONNOUSERSITE; do printf '%s=' "$v"; printenv "$v" 2>/dev/null || true; done; abs_end env
 abs_section set_env; for f in /usr/local/Ascend/ascend-toolkit/set_env.sh /usr/local/Ascend/ascend-toolkit/latest/set_env.sh; do if [ -r "$f" ]; then echo "PRESENT $f"; fi; done; abs_end set_env
@@ -356,7 +355,9 @@ export function buildEnvironmentReport(sections) {
 	set('kernel', cleanLine(sections.kernel), 'kernel', cleanLine(sections.kernel));
 	set('arch', cleanLine(sections.arch), 'arch', cleanLine(sections.arch));
 	set('hostname', cleanLine(sections.hostname), 'hostname', cleanLine(sections.hostname));
-	set('ipAddress', parseIpAddress(sections.ip_address), 'ip_address', cleanLine(sections.ip_address));
+	const primaryIp = parseIpAddress(sections.primary_ip);
+	const fallbackIp = parseIpAddress(sections.ip_address);
+	set('ipAddress', primaryIp ?? fallbackIp, 'primary_ip', cleanLine(sections.primary_ip) ?? cleanLine(sections.ip_address));
 	set('probeTime', cleanLine(sections.date), 'date', cleanLine(sections.date));
 	set('loginUser', cleanLine(sections.id), 'id', cleanLine(sections.id));
 	set('boardModel', cleanLine(sections.dt_model)?.replace(/\u0000/g, '').trim() || null, 'dt_model', cleanLine(sections.dt_model));
@@ -435,6 +436,9 @@ export function buildEnvironmentReport(sections) {
 		firstMatchingValue(firmwareInfo, ['FirmwareVersion', 'firmware', 'Firmware', 'Version']) ??
 		findVersion(sections, ['npu_smi_board', 'npu_smi_info'], /Firmware\s*Version\s*[:=]\s*([0-9][0-9A-Za-z.\-]*)/i)?.value ??
 		null;
+	// Kept only for old raw transcripts and explicit external evidence. The
+	// default 310B probe no longer asks for firmware files: current boards do
+	// not expose a reliable version to the unprivileged SSH user.
 	set('firmwareVersion', firmwareVersion, 'firmware_version_info', firmwareInfo.FirmwareVersion ?? null);
 
 	set(
@@ -442,12 +446,6 @@ export function buildEnvironmentReport(sections) {
 		cleanLine(sections.ascend_driver)?.startsWith('UNRESOLVED') === true ? null : cleanLine(sections.ascend_driver),
 		'ascend_driver',
 		cleanLine(sections.ascend_driver)
-	);
-	set(
-		'ascendFirmwarePath',
-		cleanLine(sections.ascend_firmware)?.startsWith('UNRESOLVED') === true ? null : cleanLine(sections.ascend_firmware),
-		'ascend_firmware',
-		cleanLine(sections.ascend_firmware)
 	);
 
 	set('ascendHomePath', envValue(sections, 'env', 'ASCEND_HOME_PATH'), 'env', envValue(sections, 'env', 'ASCEND_HOME_PATH'));

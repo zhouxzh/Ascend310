@@ -41,6 +41,7 @@ Ascend310/
 │   └── chapter2/ ... chapter8/ # 章节级代码示例
 ├── scripts/                  # 仓库级构建、发布和文档工具
 ├── package.json              # VuePress、幻灯片和 PDF 的本地工具链
+├── .dsh/skills/              # DSH 项目级 skills 安装副本，随仓库提交
 ├── latex/                    # 生成的 LaTeX/PDF 输出，禁止手工修改
 └── .github/                  # CI、Issue 和仓库自动化配置
 ```
@@ -73,6 +74,7 @@ caseN/
 - 跨案例的审查、结构规范和文档治理写入根 `docs/`。
 - CANN、ATC、ACL、照片、数据库、FAISS、OM、日志和个人数据属于运行时资产，不写入书稿源文件。
 - `latex/`、`src/.vuepress/dist/` 和 VuePress 缓存属于生成物；修改必须回到 `src/` 或脚本源文件。
+- DSH skill 的源文件放在插件 `skills/`，项目级副本放在 `.dsh/skills/`；修改源文件后运行 `npm run skills:sync`，不要手工维护两份内容。
 
 ## 5. 迁移顺序
 
@@ -92,6 +94,7 @@ caseN/
 rg -n "README|docs/|samples/|src/|latex/" README.md docs samples src --glob "*.md"
 git diff --check
 pnpm docs:build
+npm run skills:check
 ```
 
 发现入口职责冲突时，优先修改本规范和对应索引，不在多个 README 中复制同一段说明。

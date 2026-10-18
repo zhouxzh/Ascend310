@@ -1,6 +1,6 @@
 ---
 name: ascend310b-debug
-description: 昇腾 310B（Ascend 310B1/310B4）程序调试工作流。当用户要调试 Ascend310 教材样例、案例或自写程序，需要确认开发板型号、CANN/驱动/固件版本配套，定位 import acl、ATC 转换、OM 加载、DVPP/VENC、摄像头 V4L2、torch_npu/MindSpore 运行时、服务健康但推理失败、性能不达标等问题，或需要把症状映射到对应样例入口与只读板端命令时使用。触发后先 asc_probe 采集真实板端事实，再 ascend_debug_plan 生成分层计划，按停止条件逐层定位；缺证据时写 untested，不写成不支持。
+description: 昇腾 310B（Ascend 310B1/310B4）程序调试工作流。当用户要调试 Ascend310 教材样例、案例或自写程序，需要确认开发板型号、CANN/驱动版本配套，定位 import acl、ATC 转换、OM 加载、DVPP/VENC、摄像头 V4L2、torch_npu/MindSpore 运行时、服务健康但推理失败、性能不达标等问题，或需要把症状映射到对应样例入口与只读板端命令时使用。触发后先 asc_probe 采集真实板端事实，再 ascend_debug_plan 生成分层计划，按停止条件逐层定位；缺证据时写 untested，不写成不支持。
 ---
 
 # 昇腾 310B 程序调试
@@ -13,7 +13,7 @@ description: 昇腾 310B（Ascend 310B1/310B4）程序调试工作流。当用�
 
 ## 三条硬规则
 
-1. **版本必须来自板端。** 板卡型号、SoC、CANN、驱动、固件、npu-smi、固件号一律由 `ascend_probe` 或 `ascend_check` 从板端读取。任何"应该是 8.0"的推断都不能写进结论。
+1. **版本必须来自板端。** 板卡型号、SoC、CANN、驱动和 npu-smi 版本一律由 `ascend_probe` 或 `ascend_check` 从板端读取。当前 310B 的非特权探测不采集固件版本，不能把驱动号当作固件号；任何"应该是 8.0"的推断都不能写进结论。
 2. **证据分层标注。** 只能用 `documented`、`inferred`、`observed-pass`、`observed-fail`、`untested`。文档没写某个型号，是 `unknown`/`untested`，不是 `unsupported`。
 3. **先只读，后显式执行。** `ascend_board_exec` 只执行白名单内的只读命令；下载、ATC、Python、pytest、msame 和教程脚本使用 `ascend_board_run`，并显式设置 `allowStateChange: true`。硬件复位、`npu-smi set/upgrade`、关机和破坏性操作仍由用户手工执行。
 
@@ -49,8 +49,8 @@ description: 昇腾 310B（Ascend 310B1/310B4）程序调试工作流。当用�
 
 ## 报告纪律
 
-- 结论必须带完整组合：SoC 档位（8T/20T）、系统日期、驱动、固件、Toolkit/ops/NNAL、Python 与框架插件。
+- 结论必须带完整组合：SoC 档位（8T/20T）、系统日期、驱动、CANN/Toolkit/ops/NNAL、Python 与框架插件；当前 310B 默认探测不提供固件版本。
 - 分开写四类证据：转换证据、数值一致性、任务精度、性能。数值烟测通过不等于精度达标。
 - 8T 与 20T 的结果是两个证据集，不合并、不排名。
 - 板端跑不出来的项目写清楚是"未在本板验证"，不要用本机结果替代。
-- 把每一次失败限定在"被测试的组合"上（模型版本、加载器版本、CANN/驱动/固件、SoC、输入、命令），不要升级成对整个硬件或框架的判断。
+- 把每一次失败限定在"被测试的组合"上（模型版本、加载器版本、CANN/驱动、SoC、输入、命令），不要升级成对整个硬件或框架的判断。

@@ -16,7 +16,7 @@ DeepSeek Harness 插件（bundle）。
 | 工具链体检 | `lib/toolchain.js` + `lib/doctor.js` | 探测 bash/pandoc/latexmk/xelatex/python3/pnpm/node（含 Anaconda/conda），给按平台分类的安装命令，判断哪些能力可用 |
 | 平台适配 | `drivers/env-windows.mjs` + `drivers/env-linux.mjs` | Windows（Git Bash / WSL）与 POSIX 各自怎么起 shell、怎么翻译路径、怎么满足 `python3` |
 | 浏览器端 | `lib/client.js` | 侧边栏「写作」入口与面板：字数卡片、各分部进度、审计发现列表 |
-| 技能 | `skills/ascend310b-writing/SKILL.md` | 自然语言触发的中文技术写作流程 |
+| 技能 | `skills/ascend310b-writing*/SKILL.md` | 总守门规则，以及 theory、case、presentation、code docs 四个专用写作 skill |
 | 组合 | `cordis.patch.yml` | 声明本包的 bundle patch，把 Host 行插入组合 |
 
 九个工具各回答一个不同的问题：
@@ -58,12 +58,22 @@ DeepSeek Harness 插件（bundle）。
 
 重启 Harness 后，侧边栏出现「写作」入口，模型获得两个新工具。
 
-技能是纯文件，复制到技能目录即可被 `dsh-skill-filesystem` 扫描到：
+技能是纯文件，复制到技能目录即可被 `dsh-skill-filesystem` 扫描到。插件包含一个总守门 skill 和四个专用 skill：
 
 ```powershell
-Copy-Item -Recurse -Force "<仓库>\tools\dsh-plugin-ascend310b-writing\skills\ascend310b-writing" `
-  "$env:USERPROFILE\.dsh\skills\ascend310b-writing"
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.dsh\skills" | Out-Null
+Copy-Item -Recurse -Force `
+  "<仓库>\tools\dsh-plugin-ascend310b-writing\skills\*" `
+  "$env:USERPROFILE\.dsh\skills"
 ```
+
+专用入口：
+
+- `ascend310b-writing-theory`：理论章节和附录理论内容；
+- `ascend310b-writing-case`：案例1至案例9；
+- `ascend310b-writing-presentation`：Marp 课件；
+- `ascend310b-writing-docs`：代码工程 README、`docs/`、API/部署/验证文档；
+- `ascend310b-writing`：跨对象共同规则和路由。
 
 ## 配置
 

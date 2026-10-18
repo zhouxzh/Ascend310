@@ -49,7 +49,7 @@ console.log(`目标        : ${result.display ?? selector}（exit ${result.code}
 console.log(`板卡        : ${report.board === null ? '未识别' : `${report.board.chip} / ${report.board.soc} / ${report.board.tier} / Health ${report.board.health}`}`);
 console.log(`系统        : ${show('hostname')} · ${show('os')} · kernel ${show('kernel')}`);
 console.log(`CANN        : ${show('cannVersion')}（包 ${show('cannPackageVersion')}）`);
-console.log(`驱动 / 固件 : ${show('driverVersion')} / ${show('firmwareVersion')}`);
+console.log(`驱动        : ${show('driverVersion')}`);
 console.log(`npu-smi     : ${show('npuSmiVersion')}`);
 console.log(`Python      : ${show('pythonExecutable')} ${show('pythonVersion')}`);
 console.log(`import acl  : source 后 ${show('aclImportSourced')}；裸 shell ${show('aclImportBare')}（面板取值 ${show('aclImport')}）`);
