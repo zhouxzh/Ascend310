@@ -17,7 +17,6 @@ footer: "案例 3：智能电子琴"
 
 ## 神经网络控制量，CPU 合成声音
 
-案例课件 · 教师授课版
 
 <div class="source">依据：<a href="../experiment/case3.md">src/experiment/case3.md</a>；实现：<a href="../../samples/case3/README.md"><code>samples/case3</code></a></div>
 

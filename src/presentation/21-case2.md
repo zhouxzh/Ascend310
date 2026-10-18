@@ -17,7 +17,6 @@ footer: "案例 2：目标跟踪检测"
 
 ## 检测看见目标，跟踪维持身份
 
-案例课件 · 教师授课版
 
 <div class="source">依据：<a href="../experiment/case2.md">src/experiment/case2.md</a>；实现：<a href="../../samples/case2/README.md"><code>samples/case2</code></a></div>
 

@@ -17,7 +17,6 @@ footer: "第7章：算子开发实战"
 
 ## 从 TBE DSL 原型到 Ascend C 硬件证据
 
-理论章节课件 · 教师授课版
 
 <div class="source">依据：<a href="../book/chapter7.md">src/book/chapter7.md</a>；样例：<a href="../../samples/chapter7/add_tbe/add.py"><code>samples/chapter7</code></a></div>
 

@@ -15,7 +15,7 @@ footer: "附录 4：Vibe Coding"
 
 <div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
-**DSH 桌面版 + 写作插件 + 调试插件**
+## DSH 桌面版、写作插件与调试插件
 
 对应教材：`src/appendix/appendix4.md`
 

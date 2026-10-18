@@ -17,7 +17,6 @@ footer: "案例 4：掌纹识别"
 
 ## NPU-only 工作台与候选模型边界
 
-案例课件 · 教师授课版
 
 <div class="source">教材：<a href="../experiment/case4.md"><code>src/experiment/case4.md</code></a>；样例：<a href="../../samples/case4/README.md"><code>samples/case4</code></a></div>
 

@@ -17,7 +17,8 @@ footer: "案例 9：智能聊天机器人"
 
 <div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
-案例课件 · 教师授课版
+## 从本地模型到可复核的对话服务
+
 
 对应教材：`src/experiment/case9.md`
 

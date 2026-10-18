@@ -17,7 +17,8 @@ footer: "附录 5：ROS2 基础"
 
 <div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
-附录课件 · 教师授课版
+## 从节点通信到可复核的机器人链路
+
 
 对应教材：`src/appendix/appendix5.md`
 

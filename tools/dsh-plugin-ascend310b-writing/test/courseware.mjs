@@ -131,6 +131,29 @@ const longTitle = auditCoursewareText({
 });
 check(longTitle.some((finding) => finding.rule === 'deck-title-too-long'), 'a slide title over 30 characters must be reported');
 
+// --- cover semantics -------------------------------------------------------
+const metaLabel = auditCoursewareText({
+	file: 'src/presentation/40-cover-test.md',
+	text: [
+		'---', 'marp: true', 'theme: ascend310', 'paginate: true', 'size: 16:9', '---', '',
+		'<!-- _class: cover -->', '', '# 第1章：测试', '', '理论章节课件 · 教师授课版', '',
+		'## 从问题到证据', '', '对应教材：`src/book/chapter1.md`', ''
+	].join('\n')
+});
+check(metaLabel.some((finding) => finding.rule === 'deck-cover-meta-label'), 'an administrative cover label must be reported');
+check(metaLabel.some((finding) => finding.rule === 'deck-cover-byline-missing'), 'a cover without author and email must be reported');
+
+const goodCover = auditCoursewareText({
+	file: 'src/presentation/41-cover-test.md',
+	text: [
+		'---', 'marp: true', 'theme: ascend310', 'paginate: true', 'size: 16:9', '---', '',
+		'<!-- _class: cover -->', '', '# 第1章：测试', '', '<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>', '',
+		'## 从问题到证据', '', '对应教材：`src/book/chapter1.md`', ''
+	].join('\n')
+});
+check(!goodCover.some((finding) => finding.rule === 'deck-cover-meta-label'), 'a content cover must not be reported as a meta label');
+check(!goodCover.some((finding) => finding.rule === 'deck-cover-byline-missing'), 'a cover with byline must not be reported as missing one');
+
 rmSync(root, { recursive: true, force: true });
 
 if (failures.length > 0) {

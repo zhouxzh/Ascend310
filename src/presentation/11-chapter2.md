@@ -17,7 +17,6 @@ footer: "第2章：CANN软件栈核心组件解析"
 
 ## 从 ONNX 到可核验的 OM 推理
 
-理论章节课件 · 教师授课版
 
 <div class="source">依据：<a href="../book/chapter2.md">src/book/chapter2.md</a>；样例：<a href="../../samples/chapter2/sample_resnet_quick_start/README.md"><code>samples/chapter2/sample_resnet_quick_start</code></a></div>
 

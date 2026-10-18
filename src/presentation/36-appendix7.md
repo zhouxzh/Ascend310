@@ -17,7 +17,8 @@ footer: "附录 7：CANN 升级"
 
 <div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
-附录课件 · 教师授课版
+## 从版本核对到可回退的升级流程
+
 
 对应教材：`src/appendix/appendix7.md`
 

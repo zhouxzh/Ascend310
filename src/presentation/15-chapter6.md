@@ -17,7 +17,6 @@ footer: "第6章：DVPP视频处理基础"
 
 ## 从 NV12 数据流到可核验的媒体链路
 
-理论章节课件 · 教师授课版
 
 <div class="source">依据：<a href="../book/chapter6.md"><code>src/book/chapter6.md</code></a>；样例：<a href="../../samples/chapter6/README.md"><code>samples/chapter6</code></a></div>
 

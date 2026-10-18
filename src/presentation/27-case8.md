@@ -17,7 +17,6 @@ footer: "案例 8：实时手势识别"
 
 ## 从 YOLOv10 OM 到 WebRTC 的分层证据
 
-案例课件 · 教师授课版
 
 <div class="source">教材：<a href="../experiment/case8.md"><code>src/experiment/case8.md</code></a>；样例：<a href="../../samples/case8/README.md"><code>samples/case8</code></a></div>
 

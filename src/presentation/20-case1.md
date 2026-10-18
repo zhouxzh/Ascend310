@@ -17,7 +17,6 @@ footer: "案例 1：智能考勤机"
 
 ## 从摄像头图像到本地考勤事件
 
-案例课件 · 教师授课版
 
 <div class="source">依据：<a href="../experiment/case1.md">src/experiment/case1.md</a>；实现：<a href="../../samples/case1/README.md"><code>samples/case1</code></a></div>
 

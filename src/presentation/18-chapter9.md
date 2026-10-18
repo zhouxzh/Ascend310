@@ -17,7 +17,6 @@ footer: "第9章：模型量化案例教学"
 
 ## 从 400 张对齐样本到可回退的量化决策
 
-理论章节课件 · 教师授课版
 
 <div class="source">依据：<a href="../book/chapter9.md">src/book/chapter9.md</a>；样例：<a href="../../samples/chapter9/README.md"><code>samples/chapter9</code></a></div>
 

@@ -17,7 +17,6 @@ footer: "案例 5：智能数据采集分析仪"
 
 ## 从真实信号到可追溯的 NPU 结果
 
-案例课件 · 教师授课版
 
 <div class="source">教材：<a href="../experiment/case5.md"><code>src/experiment/case5.md</code></a>；实现：<a href="../../samples/case5/README.md"><code>samples/case5/README.md</code></a></div>
 

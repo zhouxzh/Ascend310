@@ -17,7 +17,6 @@ footer: "第8章：性能分析与优化"
 
 ## 先测量，再定位，最后验证优化
 
-理论章节课件 · 教师授课版
 
 <div class="source">依据：<a href="../book/chapter8.md">src/book/chapter8.md</a>；样例：<a href="../../samples/chapter8/README.md"><code>samples/chapter8</code></a></div>
 

@@ -17,7 +17,8 @@ footer: "附录 6：工具箱与 FAQ"
 
 <div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
-附录课件 · 教师授课版
+## 从环境自检到常见故障定位
+
 
 对应教材：`src/appendix/appendix6.md`
 

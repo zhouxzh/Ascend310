@@ -17,7 +17,6 @@ footer: "案例 7：智能相册"
 
 ## 从照片索引到局域网设备协同
 
-案例课件 · 教师授课版
 
 <div class="source">依据：<a href="../experiment/case7.md">src/experiment/case7.md</a>；实现：<a href="../../samples/case7/README.md"><code>samples/case7</code></a></div>
 

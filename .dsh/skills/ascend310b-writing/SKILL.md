@@ -62,6 +62,16 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
 | 来源可追溯 | 写明对应 `src/` 或 `samples/` 路径 | `deck-source-missing` |
 | 脚手架标记 | 占位课件必须带 `<!-- presentation-scaffold: id -->` | `deck-scaffold` |
 
+### 封面写法
+
+封面只放四样东西：
+
+1. 标题（章节/案例名，冻结写法）；
+2. 一句内容承诺：学生学完能判断什么、做出什么；
+3. 作者与邮箱：`周贤中 · zhouxzh@gdut.edu.cn`，用 `<div class="byline">`；
+4. 依据与样例路径（可放在页脚）。
+
+不要出现“教师授课版”“理论章节课件”“案例课件”这类自我标注。读者打开的就是课件，不需要被告知这是课件；这类标签由 `deck-cover-meta-label` 拦截，缺署名由 `deck-cover-byline-missing` 拦截。
 ### 信息密度（本轮新增）
 
 课件要"讲得满"，不是"字满"：每页都要有可讲的内容，但不要用大段文字填满。

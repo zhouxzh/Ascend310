@@ -17,7 +17,6 @@ footer: "第5章：MindSpore开发基础"
 
 ## 从 Tensor 与 Cell 到 MindIR 交付边界
 
-理论章节课件 · 教师授课版
 
 <div class="source">依据：<a href="../book/chapter5.md">src/book/chapter5.md</a>；样例：<a href="../../samples/chapter5/README.md"><code>samples/chapter5</code></a></div>
 

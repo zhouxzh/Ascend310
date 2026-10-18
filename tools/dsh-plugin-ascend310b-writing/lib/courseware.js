@@ -130,6 +130,31 @@ export function auditCoursewareText({ file, text }) {
 			}
 		});
 	}
+	// --- cover semantics ---------------------------------------------------
+	// A cover should state what the audience will learn, not announce its own
+	// administrative identity. "理论章节课件 · 教师授课版" tells a student
+	// nothing and reads like a template left in the deck.
+	if (!isLegacy) {
+		const firstSlide = splitSlides(text)[0]?.lines.join('\n') ?? '';
+		if (/教师授课版|教师版|授课版|理论章节课件|案例课件|附录课件|课程导览/u.test(firstSlide)) {
+			findings.push({
+				rule: 'deck-cover-meta-label',
+				severity: 'warning',
+				file,
+				line: 1,
+				message: '封面出现“教师授课版/理论章节课件”这类自我标注；封面应写内容承诺，不要告诉读者“这是课件”'
+			});
+		}
+		if (!/class="byline"|[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/u.test(firstSlide)) {
+			findings.push({
+				rule: 'deck-cover-byline-missing',
+				severity: 'warning',
+				file,
+				line: 1,
+				message: '封面没有作者与邮箱；请在标题下保留 byline'
+			});
+		}
+	}
 	// --- Marp metadata ------------------------------------------------------
 	for (const required of ['marp', 'theme', 'paginate', 'size']) {
 		if (!new RegExp(`^${required}:`, 'mu').test(frontmatter)) {

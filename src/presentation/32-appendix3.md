@@ -17,7 +17,8 @@ footer: "附录 3：Python 基础"
 
 <div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
-附录课件 · 教师授课版
+## 从语法基础到可运行的数据处理脚本
+
 
 对应教材：`src/appendix/appendix3.md`
 

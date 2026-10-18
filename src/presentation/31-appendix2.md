@@ -17,7 +17,8 @@ footer: "附录 2：Ubuntu 教程"
 
 <div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
-附录课件 · 教师授课版
+## 从终端操作到可复现的远程开发环境
+
 
 对应教材：`src/appendix/appendix2.md`
 

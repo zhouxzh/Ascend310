@@ -17,7 +17,8 @@ footer: "附录 1：开发板环境"
 
 <div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
-附录课件 · 教师授课版
+## 从开箱检查到可复现的运行环境
+
 
 对应教材：`src/appendix/appendix1.md`
 

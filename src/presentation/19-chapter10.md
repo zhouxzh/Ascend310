@@ -17,7 +17,6 @@ footer: "第10章：AI项目交付闭环"
 
 ## 从需求契约到可回滚的交付证据
 
-理论章节课件 · 教师授课版
 
 <div class="source">教材：<a href="../book/chapter10.md"><code>src/book/chapter10.md</code></a>；样例：<a href="../../samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD</code></a></div>
 

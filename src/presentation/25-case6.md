@@ -17,7 +17,8 @@ footer: "案例 6：智能小车"
 
 <div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
-案例课件 · 教师授课版
+## 从底盘控制到传感器闭环
+
 
 对应教材：`src/experiment/case6.md`
 

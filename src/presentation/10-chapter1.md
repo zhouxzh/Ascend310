@@ -17,7 +17,6 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 ## 从云边边界到可验证的算力选择
 
-理论章节课件 · 教师授课版
 
 <div class="source">依据：<a href="../book/chapter1.md">src/book/chapter1.md</a>、<a href="../appendix/appendix1.md">src/appendix/appendix1.md</a></div>
 
