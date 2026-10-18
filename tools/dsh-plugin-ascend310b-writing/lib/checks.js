@@ -23,6 +23,7 @@ import { collectCoursewareFindings } from './courseware.js';
 import { collectSiteFindings } from './site.js';
 import { collectFigureFindings } from './figures.js';
 import { collectDeckWebFindings } from './deck-web.js';
+import { collectCiStatus } from './ci.js';
 
 /** One row of a two-cell Markdown table whose first cell is a backticked path. */
 const TABLE_ROW = /^\|\s*`([^`]+)`\s*\|\s*([^|]*?)\s*\|\s*$/u;
@@ -683,6 +684,7 @@ export function evaluatePushGate({ root, rev = 'HEAD', settings }) {
 	const dirty = dirtyManuscripts(root, s);
 	const render = collectRenderFindings({ root, settings: s });
 	const artifacts = collectArtifactFindings({ root, settings: s });
+	const ci = collectCiStatus({ root });
 
 	const renderErrors = render.findings.filter((finding) => finding.severity === 'error').length;
 	const items = [
@@ -726,6 +728,18 @@ export function evaluatePushGate({ root, rev = 'HEAD', settings }) {
 				artifacts.findings.length === 0
 					? `${artifacts.pairs} 对源/产物的锚点一致`
 					: `${artifacts.findings.length} 条产物问题（用 ascend310b_writing_render 看原因）`
+		},
+		{
+			id: 'pages-ci',
+			blocking: false,
+			ok: ci.status === 'success' || !ci.available,
+			detail: ci.available
+				? ci.status === 'success'
+					? `GitHub Pages 最近一次构建成功（run #${ci.run?.number ?? '?'}）`
+					: ci.status === 'failure'
+						? `GitHub Pages 最近一次构建失败（run #${ci.run?.number ?? '?'}）；用 ascend310b_writing_ci 看日志`
+						: `GitHub Pages 状态：${ci.status}`
+				: 'gh 不可用，跳过远端 Pages 检查'
 		}
 	];
 

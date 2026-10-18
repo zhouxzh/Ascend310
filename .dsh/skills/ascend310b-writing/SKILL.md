@@ -75,6 +75,14 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
 | 来源可追溯 | 写明对应 `src/` 或 `samples/` 路径 | `deck-source-missing` |
 | 脚手架标记 | 占位课件必须带 `<!-- presentation-scaffold: id -->` | `deck-scaffold` |
 
+### 远端 Pages 构建
+
+push 之后必须用 `ascend310b_writing_ci` 确认 GitHub Pages 工作流成功，而不是只看本地 `docs:build`。本地构建成功只证明源码能构建；Actions 是全新检出，可能因为被忽略的模型文件、大小写路径或缺锁文件而失败。
+
+- `ci-pages-failed`：读 run 日志里的失败步骤与错误行，先修源码，再推送；
+- `ci-pages-pending`：等待完成；
+- `ci-remote-behind`：本地还有未推送提交，远端构建不代表它们；
+- 失败日志里的路径如果指向 `.gitignore` 中的运行时产物（如 `.om`），应修 CI 校验逻辑，不要把模型文件塞进仓库。
 ### 封面写法
 
 封面只放四样东西：

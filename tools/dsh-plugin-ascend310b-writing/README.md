@@ -27,7 +27,7 @@ DeepSeek Harness 插件（bundle）。
 | `ascend310b_writing_audit` | 正文本身对不对（含 `AGENTS.md` 冻结名表的双向比对），以及演示文稿与站点产物是否过期 |
 | `ascend310b_writing_audit` + `rev` | 这次提交发布出去会不会断链 |
 | `ascend310b_writing_render` | 渲染出来的 PDF 有没有坏字符，生成物是否落后于源 |
-| `ascend310b_writing_push_check` | 现在能不能推，以及哪一项只有人能确认 |
+| `ascend310b_writing_ci` | 读取最近一次 GitHub Pages 工作流运行、提交、失败步骤与日志 |`n| `ascend310b_writing_push_check` | 现在能不能推，以及哪一项只有人能确认 |
 | `ascend310b_writing_build` | 构建（走仓库自己的转换器），并在同一任务里核对产物 |
 | `ascend310b_writing_style` | 哪些句子读起来像产品宣传稿/AI 输出（只提示，不判定） |
 | `ascend310b_writing_progress` | 篇幅和剩余工作量 |
@@ -199,7 +199,7 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 | `deck-title-too-long` | warning | 页面标题超过 30 字 |`n| `deck-web-density-low` | warning | 生成网页的单页信息量低于学术报告下限 |
 | `deck-web-density-high` | warning | 生成网页的单页信息量超过上限（表格行/列、代码行） |
 | `deck-web-density-uneven` | warning | 同一课件正文/表格页密度跨度 ≥ 2.8 倍 |
-| `deck-web-theme-drift` | warning | 生成页面不是统一的 `ascend310` 主题 || `deck-theme-unsupported` | warning | 未使用统一的 `ascend310`（Metropolis 风格）主题 |`n| `deck-cover-meta-label` | warning | 封面出现“教师授课版/理论章节课件”等自我标注 |`n| `deck-cover-byline-missing` | warning | 封面缺作者与邮箱 |
+| `ci-pages-failed` | error | GitHub Pages 最近一次构建失败（含失败步骤摘要） |`n| `ci-pages-pending` | info | Pages 构建仍在运行 |`n| `ci-run-missing` | warning | 找不到 Pages 工作流运行记录 |`n| `ci-remote-behind` | info | 本地 HEAD 尚未推送，远端构建不代表本地 |`n| `deck-web-theme-drift` | warning | 生成页面不是统一的 `ascend310` 主题 || `deck-theme-unsupported` | warning | 未使用统一的 `ascend310`（Metropolis 风格）主题 |`n| `deck-cover-meta-label` | warning | 封面出现“教师授课版/理论章节课件”等自我标注 |`n| `deck-cover-byline-missing` | warning | 封面缺作者与邮箱 |
 | `deck-slide-overflow` | error | 单页估算高度超过安全高度 |
 | `deck-code-too-long` | warning | 单页代码超过 22 行 |
 | `deck-table-too-wide` | warning | 表格超过 6 列 / 10 行 |

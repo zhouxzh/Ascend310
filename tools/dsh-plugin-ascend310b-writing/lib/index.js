@@ -30,6 +30,7 @@ import { collectDeckFindings } from './deck.js';
 import { collectSiteFindings, describeSite } from './site.js';
 import { collectFigureFindings, describeFigures } from './figures.js';
 import { collectDeckWebFindings, describeDeckWeb } from './deck-web.js';
+import { collectCiStatus } from './ci.js';
 import { collectCoursewareFindings } from './courseware.js';
 import { analyzeStyle, formatStyle } from './style.js';
 import { planBuild, resolveBuildEnvironment, runBuild } from './build.js';
@@ -509,6 +510,53 @@ export function apply(ctx, config) {
 			presentCall: (args) => ({
 				card: 'generic',
 				title: '推送前检查',
+				kind: 'other',
+				rawInput: args
+			})
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend310b_writing_ci',
+			description:
+				'Inspect the latest GitHub Pages deployment run for this repository. Reports the workflow run, ' +
+				'its commit, whether it succeeded, and the failing step/message when it failed. Use it after a push ' +
+				'to verify that the site actually deployed, or when GitHub sends a failure notice. Requires the gh CLI ' +
+				'authenticated once.',
+			parameters: {
+				root: ROOT_PARAMETER,
+				runId: {
+					type: 'string',
+					description: 'Optional Actions run id to inspect instead of the latest Pages run.'
+				}
+			},
+			output: {
+				schema: {
+					type: 'object',
+					additionalProperties: false,
+					properties: {
+						text: { type: 'string', required: true },
+						status: { type: 'string', required: true },
+						conclusion: { type: 'string', required: true },
+						runUrl: { type: 'string', required: true }
+					}
+				},
+				render: (_args, value) => [{ type: 'text', text: value.text }]
+			},
+			execute(args) {
+				const root = resolveRoot(config, args.root);
+				const ci = collectCiStatus({ root, runId: args.runId });
+				return Promise.resolve({
+					text: ci.text,
+					status: ci.status,
+					conclusion: ci.conclusion,
+					runUrl: ci.run?.url ?? ''
+				});
+			},
+			presentCall: (args) => ({
+				card: 'generic',
+				title: 'GitHub Pages 构建',
 				kind: 'other',
 				rawInput: args
 			})

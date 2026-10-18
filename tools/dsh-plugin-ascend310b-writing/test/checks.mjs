@@ -180,7 +180,7 @@ console.log(`\n${gate.text}`);
 check(typeof gate.ready === 'boolean', 'the gate must report a boolean verdict');
 check(
 	gate.items.map((item) => item.id).join(',') ===
-		'manuscript-audit,commit-tree,uncommitted-manuscripts,render,artifacts',
+		'manuscript-audit,commit-tree,uncommitted-manuscripts,render,artifacts,pages-ci',
 	`unexpected gate items: ${gate.items.map((item) => item.id).join(',')}`
 );
 check(

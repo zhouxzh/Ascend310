@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 import {
   presentationCatalog,
@@ -193,9 +194,22 @@ for (const capture of plan.captures ?? []) {
       fail(`${capture.id} 的原生截图缺少 applicationFiles`);
     } else {
       for (const source of capture.applicationFiles) {
-        if (!fs.existsSync(path.join(repoRoot, source))) {
-          fail(`${capture.id} 的应用源码不存在：${source}`);
+        if (fs.existsSync(path.join(repoRoot, source))) continue;
+        // Board-generated artifacts such as .om files are ignored by Git:
+        // they exist on the machine that captured the screenshot but not in a
+        // fresh CI checkout. Their hash is still recorded in the manifest; the
+        // missing file is a warning, not a build failure.
+        const ignored =
+          spawnSync("git", ["check-ignore", "-q", "--", source], {
+            cwd: repoRoot,
+          }).status === 0;
+        if (ignored) {
+          warnings.push(
+            `${capture.id} 引用的运行时产物不在仓库中（已忽略）：${source}`,
+          );
+          continue;
         }
+        fail(`${capture.id} 的应用源码不存在：${source}`);
       }
     }
   }
