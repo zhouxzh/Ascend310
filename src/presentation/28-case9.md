@@ -36,6 +36,7 @@ footer: "案例 9：智能聊天机器人"
 - 用工件锁固定发布模型与版本
 - 启动 OpenAI 兼容接口并完成调用
 - 按验收方法记录回答质量与失败边界
+- 实测限于 20T / Ascend310B1；8T / Ascend310B4 不继承本讲结论
 
 > 本讲主线：架构 → 模型锁 → 服务 → 调用 → 验收
 
@@ -161,7 +162,19 @@ footer: "案例 9：智能聊天机器人"
 -->
 ---
 
-<!-- _class: center -->
+<!-- _class: visual -->
+
+## 20T 对话界面证据
+
+![20T 版 Ascend Edge Chat 前端页面](../experiment/img9/case9-board-20t-ui.png)
+
+<div class="source">图片：<a href="../experiment/img9/case9-board-20t-ui.png"><code>src/experiment/img9/case9-board-20t-ui.png</code></a>；说明：<a href="../experiment/case9.md#9-教学模型的实测结果与原因"><code>src/experiment/case9.md</code></a></div>
+
+<!--
+界面截图只证明 20T 前端页面与本地服务的展示路径；回答质量、模型速度和长稳结论必须回到实测记录，不能从截图外推。
+-->
+
+---
 
 ## 验收方法
 

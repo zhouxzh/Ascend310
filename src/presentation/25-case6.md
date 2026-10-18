@@ -180,7 +180,19 @@ footer: "案例 6：智能小车"
 -->
 ---
 
-<!-- _class: center -->
+<!-- _class: screenshot -->
+
+## 8T 与 20T 界面证据
+
+<div class="screenshot-grid"><figure><img src="../experiment/img6/case6-board-8t-ui.png" alt="8T 版智能小车 Gradio 页面"><figcaption>8T 板端界面：只证明静态页面与板端服务路径。</figcaption></figure><figure><img src="../experiment/img6/case6-board-20t-ui.png" alt="20T 版智能小车 Gradio 页面"><figcaption>20T 板端界面：与 8T 分栏保存，不合并为同一结论。</figcaption></figure></div>
+
+<div class="source">图片：<a href="../experiment/img6/case6-board-8t-ui.png"><code>src/experiment/img6/case6-board-8t-ui.png</code></a>、<a href="../experiment/img6/case6-board-20t-ui.png"><code>src/experiment/img6/case6-board-20t-ui.png</code></a>；说明：<a href="../experiment/case6.md#板端实测记录"><code>src/experiment/case6.md</code>「板端实测记录」</a></div>
+
+<!--
+界面截图只证明页面加载与板端服务路径，不证明车道线准确率、驾驶控制闭环或长期稳定性。8T 与 20T 的证据不能合并排队。
+-->
+
+---
 
 ## 板端实测记录
 
