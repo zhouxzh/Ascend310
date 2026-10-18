@@ -222,6 +222,26 @@ node scripts/install-skill.mjs --check  # 只核对，不一致时退出码 1
 
 `package.json` 里对应 `pnpm run skills:install` 与 `pnpm run skills:check`。
 
+### 项目级 skill（推荐）
+
+DSH 的 skill 搜索顺序是：
+
+| rank | 来源 | 路径 |
+| --- | --- | --- |
+| 100 | `project-dsh` | `<仓库>/.dsh/skills` |
+| 200 | `project-agents` | `<仓库>/.agents/skills` |
+| 300 | `custom` | 配置里的自定义目录 |
+| 之后 | 用户级 | `~/.dsh/skills` |
+
+因此仓库里额外维护 `.dsh/skills/`：新克隆的仓库**无需安装**就能拿到本仓库的写作与调试规则，且优先于用户目录里的旧版本。它由脚本从两个插件生成，避免出现第三份手抄：
+
+```bash
+node scripts/sync-repo-skills.mjs          # 生成/更新 .dsh/skills
+node scripts/sync-repo-skills.mjs --check  # 只核对，不一致退出码 1
+```
+
+仓库根对应 `pnpm run skills:sync` 与 `pnpm run skills:check`。
+
 DSH 在**会话启动时**加载 skill：更新后新建会话才会拿到新内容。当前会话的 skill 目录里能看到 `ascend310b-writing`，说明加载链路本身是通的；`--check` 用来防止"仓库里改了、实际用的还是旧版"。
 ## 参考项目
 
