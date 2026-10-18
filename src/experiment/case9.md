@@ -263,7 +263,7 @@ NPU 不能运行。
 
 为新模型建立固定 revision、文件大小、SHA-256、tokenizer、chat template、许可证、目标 SoC 和运行时指纹。先完成本地 JSON/SSE 契约测试，再在每一种目标硬件上完成上述 NPU、稳定性、性能和人工质量门。技术门通过即可进入教学目录；质量结论必须原样保留。只有经过独立复核并人工批准的模型才能进入正式发布配置。
 
-## 11. 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case9-board-evidence}
+## 11. 板端实测记录 {#src-experiment-case9-board-evidence}
 
 本案例的发布目标是 **Ascend310B1 / 20T**，本轮在 20T 上使用已验证的 `case9-ms240-cann80` 环境运行；8T 不是该版本的发布目标，因此没有 8T 结果，也没有把 20T 结果混入 8T。原始日志与响应保存在 [`docs/case-board-runs-20261017/case9/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case9/README.md)。
 

@@ -4,12 +4,12 @@ size: 16:9
 theme: ascend310
 paginate: true
 header: "《昇腾310B实战》教材配套演示"
-footer: "附录 1：开发板与基础环境"
+footer: "附录 1：开发板环境"
 ---
 
 <!-- _class: cover -->
 
-# 附录 1：开发板与基础环境
+# 附录 1：开发板环境
 
 昇腾310B 教材配套演示
 

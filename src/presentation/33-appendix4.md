@@ -4,14 +4,14 @@ theme: ascend310
 paginate: true
 size: 16:9
 header: "《昇腾310B实战》教材配套演示"
-footer: "附录 4：Vibe Coding 基础"
+footer: "附录 4：Vibe Coding"
 ---
 
 <!-- presentation-scaffold: appendix-04 -->
 
 <!-- _class: cover -->
 
-# 附录 4：Vibe Coding 基础
+# 附录 4：Vibe Coding
 
 附录课件 · 教师授课版
 

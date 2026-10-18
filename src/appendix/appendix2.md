@@ -1,12 +1,12 @@
 ---
-title: "附录 2：基于昇腾 310B 的 Ubuntu 教程"
+title: "附录 2：Ubuntu 教程"
 author: [周贤中]
 subject: "Markdown"
 keywords: [昇腾310B, Ubuntu, Linux, SSH, VNC, NFS, CANN, PyACL]
 lang: zh-cn
 ---
 
-# 附录 2：基于昇腾 310B 的 Ubuntu 教程
+# 附录 2：Ubuntu 教程
 
 本附录把 Ubuntu 基础操作、远程访问、网络配置和昇腾 310B 板端命令整理为一条可复用的学习路径。它面向三类位置：负责编辑代码和文档的**开发机**、负责连接网络和发起远程操作的 **Ubuntu 主机**、真正运行 CANN、PyACL、OM 推理和摄像头程序的 **310B 板端**。同一个命令在不同位置执行，得到的结果和证明范围不同，因此每一步都要先确认命令在哪台机器、哪个用户、哪个 shell 和哪个软件环境中运行。
 
@@ -1082,7 +1082,7 @@ reboot
 
 新版本 Ubuntu 默认不一定启用 `rc.local`，而且它不提供服务依赖、重启策略和日志单位。除非目标系统已有明确要求，优先使用 systemd。
 
-## 13. 昇腾 310B 的 CANN、PyACL、NPU、ATC 与 OM
+## 13. CANN、PyACL、NPU、ATC 与 OM
 
 ### 13.1 在同一 shell 加载 Conda 和 CANN
 

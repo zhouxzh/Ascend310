@@ -1,12 +1,12 @@
 ---
-title: "附录 5：ROS2 基础教程"
+title: "附录 5：ROS2 基础"
 author: [周贤中]
 subject: "Markdown"
 keywords: [ROS2, Humble, DDS, colcon, launch, TF2, URDF, SSH, VNC]
 lang: zh-cn
 ---
 
-# 附录 5：ROS2 基础教程
+# 附录 5：ROS2 基础
 
 本附录以 ROS2 Humble 为主要示例版本，介绍机器人软件框架的定位、DDS 通信底层、工作空间与功能包、四种通信模型、命令行工具、可视化与数据记录、Python launch、TF2 与 URDF、传感器与底盘接口、SSH/VNC 远程操作、多机通信、程序自启动，以及一条明确标记为未验证的 ROS2 与昇腾 310B 推理服务集成路径。
 
@@ -955,7 +955,7 @@ journalctl -u wheeltec-ros2.service -n 100
 - 出现异常时先读日志，再考虑重启。
 - 重启前确认旧进程已经退出，避免遗留进程占用串口。
 
-## 12. proposed / untested：ROS2 与昇腾 310B 推理服务的集成路径
+## 12. ROS2 与 310B 推理集成（proposed）
 
 > **证据标记：proposed + untested。** 本节描述的是设计路径，不是已验证方案。本教材没有在昇腾 310B 上运行过 ROS2，也没有把本仓库的推理代码接入任何 ROS2 节点。文中不包含性能、精度与延迟结论；这些数据必须在板端按完整协议测量并留存日志后才能给出。
 

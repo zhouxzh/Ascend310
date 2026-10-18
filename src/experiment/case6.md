@@ -427,7 +427,7 @@ flowchart TB
 - 本项目**不需要**训练脚本——场景分类头尚未训练，但推理框架完整，参考
   案例8即可完成训练
 
-## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case6-board-evidence}
+## 板端实测记录 {#src-experiment-case6-board-evidence}
 
 本节记录 8T 与 20T 两块开发板上的启动与页面结果。原始日志与截图保存在 [`docs/case-board-runs-20261017/case6/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case6/README.md)。
 

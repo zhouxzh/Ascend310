@@ -4,14 +4,14 @@ theme: ascend310
 paginate: true
 size: 16:9
 header: "《昇腾310B实战》教材配套演示"
-footer: "附录 5：ROS2 基础教程"
+footer: "附录 5：ROS2 基础"
 ---
 
 <!-- presentation-scaffold: appendix-05 -->
 
 <!-- _class: cover -->
 
-# 附录 5：ROS2 基础教程
+# 附录 5：ROS2 基础
 
 附录课件 · 教师授课版
 

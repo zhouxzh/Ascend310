@@ -1,12 +1,12 @@
 ---
-title: "附录 7：CANN 升级与版本配套"
+title: "附录 7：CANN 升级"
 author: [周贤中]
 subject: "CANN、驱动与固件的版本管理"
 keywords: [CANN, Ascend HDK, PyTorch, 驱动, 固件, 版本配套, 升级]
 lang: zh-cn
 ---
 
-# 附录 7：CANN 升级与版本配套
+# 附录 7：CANN 升级
 
 ## 本附录解决的问题
 

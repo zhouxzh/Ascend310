@@ -2150,8 +2150,8 @@ decoder 内部，让解码阶段只关注这些目标类别。这样做的意义
 
 这样既提升了代码可读性，也减少了初始化阶段的 Python 循环开销。
 
-\subsubsection{SSD300 与 SSDLite320 使用不同的 default boxes
-设计}\label{src-experiment-case2-h75}
+\subsubsection{SSD300 与 SSDLite320 的 default
+boxes}\label{src-experiment-case2-h75}
 
 当前 decoder.py 中保留了两个明确区分的入口：
 
@@ -2514,8 +2514,7 @@ python scripts/tracking_app.py --device npu --source 0 --track-center-distance-t
   再结合当前仓库代码，对照本节总结理解这些优化为什么能够改善实时效果。
 \end{enumerate}
 
-\section{板端实测记录（2026-10-17 至
-2026-10-18）}\label{src-experiment-case2-board-evidence}
+\section{板端实测记录}\label{src-experiment-case2-board-evidence}
 
 本节记录 8T 与 20T 两块开发板上的实际运行结果。原始日志保存在
 \href{https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case2/README.md}{\passthrough{\lstinline!docs/case-board-runs-20261017/case2/!}}。本案例没有浏览器前端，因此没有

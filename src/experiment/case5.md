@@ -875,7 +875,7 @@ Case 5 的两条实验链面对不同物理信号，却使用了相同的工程�
 
 [^7]: Huawei. "CANN 8.0 ATC keep_dtype." <https://www.hiascend.com/document/detail/en/canncommercial/800/devaids/atc/atlasatcparam_16_0074.html>
 
-## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case5-board-evidence}
+## 板端实测记录 {#src-experiment-case5-board-evidence}
 
 本节记录 8T 与 20T 两块开发板上的纯 Python 回归结果。原始日志保存在 [`docs/case-board-runs-20261017/case5/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case5/README.md)。前端为 PySide6/PyQtGraph 触摸仪表盘，不是浏览器页面，本轮没有保存 UI 截图。
 

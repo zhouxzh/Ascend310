@@ -4,14 +4,14 @@ theme: ascend310
 paginate: true
 size: 16:9
 header: "《昇腾310B实战》教材配套演示"
-footer: "附录 2：基于昇腾 310B 的 Ubuntu 教程"
+footer: "附录 2：Ubuntu 教程"
 ---
 
 <!-- presentation-scaffold: appendix-02 -->
 
 <!-- _class: cover -->
 
-# 附录 2：基于昇腾 310B 的 Ubuntu 教程
+# 附录 2：Ubuntu 教程
 
 附录课件 · 教师授课版
 

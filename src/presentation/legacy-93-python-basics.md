@@ -4,12 +4,12 @@ size: 16:9
 theme: ascend310
 paginate: true
 header: "《昇腾310B实战》教材配套演示"
-footer: "附录 3：Python 编程基础"
+footer: "附录 3：Python 基础"
 ---
 
 <!-- _class: cover -->
 
-# 附录 3：Python 编程基础
+# 附录 3：Python 基础
 
 - 专题安排：3 课时，每课时 45 分钟
 - 目标：掌握模型部署与样例代码中最常用的 Python 语法和标准库

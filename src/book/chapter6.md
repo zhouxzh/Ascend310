@@ -439,7 +439,7 @@ export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/li
 
 ---
 
-#### 问题 #3：venc_create_channel 返回 507018 — bitrate 单位错误 {#src-book-chapter6-h27}
+#### 问题 #3：bitrate 单位错误 {#src-book-chapter6-h27}
 
 **现象**：
 ```
@@ -464,7 +464,7 @@ media.venc_set_channel_desc_max_bit_rate(desc, 2_000)       # kbps = 2 Mbps
 
 ---
 
-#### 问题 #4：venc_create_channel 返回 507018 — GOP 为 0 {#src-book-chapter6-h28}
+#### 问题 #4：GOP 为 0 {#src-book-chapter6-h28}
 
 **现象**：
 ```
@@ -483,7 +483,7 @@ media.venc_set_channel_desc_key_frame_interval(desc, 30)  # GOP=30
 
 ---
 
-#### 问题 #5：venc_set_channel_desc_channel_id 不存在 {#src-book-chapter6-h29}
+#### 问题 #5：通道 ID 接口不存在 {#src-book-chapter6-h29}
 
 **现象**：
 ```
@@ -581,7 +581,7 @@ python samples/chapter6/venc/bench_venc.py        # -> H.264/H.265 VENC vs CPU �
 
 ---
 
-#### 走读：ACL 初始化 — [`check_cann.py`](https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter6/check_cann.py) {#src-book-chapter6-h35}
+#### 走读：ACL 初始化 — `check_cann.py` {#src-book-chapter6-h35}
 
 ```python
 import acl
@@ -594,7 +594,7 @@ ret = acl.rt.set_context(ctx)       # (4) 绑定上下文到当前线程
 
 这四个调用是**固定的**，顺序不能变。任何使用 CANN 的 Python 进程都需要它们。
 
-#### 走读：最小编码 — [`venc_minimal.py`](https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter6/venc/venc_minimal.py) {#src-book-chapter6-h36}
+#### 走读：最小编码 — `venc_minimal.py` {#src-book-chapter6-h36}
 
 这是理解 VENC 的核心文件。脚本用同一帧确定性 NV12 输入，分别创建 H.264 Baseline 与 H.265 Main 通道并编码一帧。两个路径的 API 基本一致，主要差异是 `entype`：
 
@@ -639,7 +639,7 @@ def callback_thread(_args):                  # 独立线程处理回调
 
 ---
 
-#### 走读：封装与基准 — [`bench_venc.py`](https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter6/venc/bench_venc.py) {#src-book-chapter6-h37}
+#### 走读：封装与基准 — `bench_venc.py` {#src-book-chapter6-h37}
 
 `bench_venc.py` 将原始 VENC API 封装为可复用的 `CannVenc` 类，然后做 **H.264/H.265 双分辨率扫描** 对比硬件 vs CPU 编码性能。整个文件 ~380 行，分为 6 个部分。
 
@@ -2015,7 +2015,7 @@ VPC Resize 与 VENC 不同——**不是所有分辨率都远超 CPU**。VPC 与
 
 ### 常见问题与调试 {#src-book-chapter6-h104}
 
-#### 问题 #1：310B 不支持 dvpp_vpc_convert_color_async {#src-book-chapter6-h105}
+#### 问题 #1：CSC 接口不可用 {#src-book-chapter6-h105}
 
 **现象**：`dvpp_vpc_convert_color_async` 返回 `100000`（ACL_ERROR_INVALID_PARAM）。
 
@@ -2039,7 +2039,7 @@ media.dvpp_set_pic_desc_height_stride(pic, sh)
 media.dvpp_set_pic_desc_size(pic, size)
 ```
 
-#### 问题 #3：dvpp_create_roi_config 不接受 keyword 参数 {#src-book-chapter6-h107}
+#### 问题 #3：ROI 参数类型错误 {#src-book-chapter6-h107}
 
 **现象**：`dvpp_create_roi_config()` + `dvpp_set_roi_config()` 不存在或报错。
 
@@ -2571,7 +2571,7 @@ Browser offer does not contain video/H265. Use a WebRTC HEVC-capable browser.
 
 **性能日志**：`recv()` 每 150 帧打印一次 `Track FPS`，方便在设备端直接观察链路帧率；`_camera_read()` 前 5 帧打印单帧解码耗时。
 
-#### `cann_encoder.py` — VENC 硬件编码 + aiortc 兼容 {#src-book-chapter6-h151}
+#### `cann_encoder.py`：VENC 与 aiortc {#src-book-chapter6-h151}
 
 这是连接 CANN VENC 和 aiortc 的桥接层，包含三个核心组件：
 

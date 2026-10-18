@@ -95,7 +95,7 @@ python3 01_baseline_resnet_sync.py --runs 100
 
 这种计时不能替代硬件 Profiling，但它有两个优势：代码改动小，能快速判断优化是否有方向。
 
-### 8.3.2 msprof：观察 ACL API、Memcpy 和 NPU Timeline {#src-book-chapter8-h5}
+### 8.3.2 msprof：ACL 与 NPU Timeline {#src-book-chapter8-h5}
 
 `msprof` 是 CANN 提供的性能采集工具。它能记录 Host 侧 ACL API 调用、Runtime 任务、Stream Timeline、AI Core 指标和部分系统资源信息。
 
@@ -243,7 +243,7 @@ python3 03_cpu_preprocess_benchmark.py --runs 100 --resolution 1920x1080
 2. 使用 AIPP 做归一化和部分颜色格式处理。
 3. 使用视频链路时，让 VDEC/JPEGD 的输出直接衔接 VPC 或模型输入。
 
-## 8.7 案例四：DVPP VPC resize 与 CPU resize {#src-book-chapter8-h12}
+## 8.7 案例四：VPC 与 CPU resize {#src-book-chapter8-h12}
 
 脚本 `04_dvpp_resize_vs_cpu.py` 生成 NV12 测试帧，将 1080p 图像缩小到 540p，对比 CPU resize 和 DVPP VPC resize：
 

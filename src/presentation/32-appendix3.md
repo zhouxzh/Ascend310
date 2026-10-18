@@ -4,14 +4,14 @@ theme: ascend310
 paginate: true
 size: 16:9
 header: "《昇腾310B实战》教材配套演示"
-footer: "附录 3：Python 编程基础"
+footer: "附录 3：Python 基础"
 ---
 
 <!-- presentation-scaffold: appendix-03 -->
 
 <!-- _class: cover -->
 
-# 附录 3：Python 编程基础
+# 附录 3：Python 基础
 
 附录课件 · 教师授课版
 

@@ -543,7 +543,7 @@ API 成功或 ACL 数值通过不能替代真实电子纸刷新结论。
 - 微雪 E6 驱动板型号和 GPIO/SPI 接线尚未确认，真实实屏刷新是独立后续验收。
 - 通用 ESP-IDF 客户端需要具体 ESP32 变体、显示控制器、总线、GPIO、电源、Flash/PSRAM 和 IDF 版本后才能安全实现；当前先使用 HTTP 协议和上游 PhotoFrame。
 
-## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case7-board-evidence}
+## 板端实测记录 {#src-experiment-case7-board-evidence}
 
 本节记录 8T 与 20T 两块开发板上的服务与页面结果。原始日志、接口结果与截图保存在 [`docs/case-board-runs-20261017/case7/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case7/README.md)。
 

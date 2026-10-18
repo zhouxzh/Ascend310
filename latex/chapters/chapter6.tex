@@ -935,8 +935,7 @@ export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/li
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
-\subsubsection{问题 \#3：venc\_create\_channel 返回 507018 --- bitrate
-单位错误}\label{src-book-chapter6-h27}
+\subsubsection{问题 \#3：bitrate 单位错误}\label{src-book-chapter6-h27}
 
 \textbf{现象}：
 
@@ -967,8 +966,7 @@ media.venc_set_channel_desc_max_bit_rate(desc, 2_000)       # kbps = 2 Mbps
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
-\subsubsection{问题 \#4：venc\_create\_channel 返回 507018 --- GOP 为
-0}\label{src-book-chapter6-h28}
+\subsubsection{问题 \#4：GOP 为 0}\label{src-book-chapter6-h28}
 
 \textbf{现象}：
 
@@ -993,8 +991,8 @@ media.venc_set_channel_desc_key_frame_interval(desc, 30)  # GOP=30
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
-\subsubsection{问题 \#5：venc\_set\_channel\_desc\_channel\_id
-不存在}\label{src-book-chapter6-h29}
+\subsubsection{问题 \#5：通道 ID
+接口不存在}\label{src-book-chapter6-h29}
 
 \textbf{现象}：
 
@@ -1135,7 +1133,7 @@ python samples/chapter6/venc/bench_venc.py        # -> H.264/H.265 VENC vs CPU �
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
 \subsubsection{\texorpdfstring{走读：ACL 初始化 ---
-\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter6/check_cann.py}{\texttt{check\_cann.py}}}{走读：ACL 初始化 --- check\_cann.py}}\label{src-book-chapter6-h35}
+\texttt{check\_cann.py}}{走读：ACL 初始化 --- check\_cann.py}}\label{src-book-chapter6-h35}
 
 \begin{lstlisting}[language=Python]
 import acl
@@ -1150,7 +1148,7 @@ ret = acl.rt.set_context(ctx)       # (4) 绑定上下文到当前线程
 进程都需要它们。
 
 \subsubsection{\texorpdfstring{走读：最小编码 ---
-\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter6/venc/venc_minimal.py}{\texttt{venc\_minimal.py}}}{走读：最小编码 --- venc\_minimal.py}}\label{src-book-chapter6-h36}
+\texttt{venc\_minimal.py}}{走读：最小编码 --- venc\_minimal.py}}\label{src-book-chapter6-h36}
 
 这是理解 VENC 的核心文件。脚本用同一帧确定性 NV12 输入，分别创建 H.264
 Baseline 与 H.265 Main 通道并编码一帧。两个路径的 API
@@ -1208,7 +1206,7 @@ padding 到 16 对齐 -\textgreater{}
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
 \subsubsection{\texorpdfstring{走读：封装与基准 ---
-\href{https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter6/venc/bench_venc.py}{\texttt{bench\_venc.py}}}{走读：封装与基准 --- bench\_venc.py}}\label{src-book-chapter6-h37}
+\texttt{bench\_venc.py}}{走读：封装与基准 --- bench\_venc.py}}\label{src-book-chapter6-h37}
 
 \passthrough{\lstinline!bench\_venc.py!} 将原始 VENC API 封装为可复用的
 \passthrough{\lstinline!CannVenc!} 类，然后做 \textbf{H.264/H.265
@@ -3284,8 +3282,7 @@ CPU：\passthrough{\lstinline!cv2.cvtColor(YUYV->BGR) + bgr\_to\_nv12()!}。VPC
 
 \subsection{常见问题与调试}\label{src-book-chapter6-h104}
 
-\subsubsection{问题 \#1：310B 不支持
-dvpp\_vpc\_convert\_color\_async}\label{src-book-chapter6-h105}
+\subsubsection{问题 \#1：CSC 接口不可用}\label{src-book-chapter6-h105}
 
 \textbf{现象}：\passthrough{\lstinline!dvpp\_vpc\_convert\_color\_async!}
 返回 \passthrough{\lstinline!100000!}（ACL\_ERROR\_INVALID\_PARAM）。
@@ -3319,8 +3316,7 @@ media.dvpp_set_pic_desc_height_stride(pic, sh)
 media.dvpp_set_pic_desc_size(pic, size)
 \end{lstlisting}
 
-\subsubsection{问题 \#3：dvpp\_create\_roi\_config 不接受 keyword
-参数}\label{src-book-chapter6-h107}
+\subsubsection{问题 \#3：ROI 参数类型错误}\label{src-book-chapter6-h107}
 
 \textbf{现象}：\passthrough{\lstinline!dvpp\_create\_roi\_config()!} +
 \passthrough{\lstinline!dvpp\_set\_roi\_config()!} 不存在或报错。
@@ -4199,9 +4195,8 @@ mmap）；该后端或摄像头初始化失败时直接报告错误。需要 PyA
 \passthrough{\lstinline!Track FPS!}，方便在设备端直接观察链路帧率；\passthrough{\lstinline!\_camera\_read()!}
 前 5 帧打印单帧解码耗时。
 
-\subsubsection{\texorpdfstring{\texttt{cann\_encoder.py} --- VENC
-硬件编码 + aiortc
-兼容}{cann\_encoder.py --- VENC 硬件编码 + aiortc 兼容}}\label{src-book-chapter6-h151}
+\subsubsection{\texorpdfstring{\texttt{cann\_encoder.py}：VENC 与
+aiortc}{cann\_encoder.py：VENC 与 aiortc}}\label{src-book-chapter6-h151}
 
 这是连接 CANN VENC 和 aiortc 的桥接层，包含三个核心组件：
 

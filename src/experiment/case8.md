@@ -154,7 +154,7 @@ python scripts/webrtc_om_app.py
 因此 CPU 编码可以作为明确的对照路径，但不能作为 CANN VENC 失败后的隐藏
 回退。
 
-## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case8-board-evidence}
+## 板端实测记录 {#src-experiment-case8-board-evidence}
 
 本节记录 8T 与 20T 两块开发板上的服务、摄像头与页面结果。原始日志、接口结果与截图保存在 [`docs/case-board-runs-20261017/case8/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case8/README.md)。
 

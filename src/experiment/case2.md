@@ -1322,7 +1322,7 @@ python scripts/tracking_app.py --track-classes person,bus
 
 这样既提升了代码可读性，也减少了初始化阶段的 Python 循环开销。
 
-#### SSD300 与 SSDLite320 使用不同的 default boxes 设计 {#src-experiment-case2-h75}
+#### SSD300 与 SSDLite320 的 default boxes {#src-experiment-case2-h75}
 
 当前 decoder.py 中保留了两个明确区分的入口：
 
@@ -1517,7 +1517,7 @@ python scripts/tracking_app.py --device npu --source 0 --track-center-distance-t
 1. 先按前文把 MobileNet-SSD、NMS、卡尔曼滤波和数据关联的原理主线理清。
 2. 再结合当前仓库代码，对照本节总结理解这些优化为什么能够改善实时效果。
 
-## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case2-board-evidence}
+## 板端实测记录 {#src-experiment-case2-board-evidence}
 
 本节记录 8T 与 20T 两块开发板上的实际运行结果。原始日志保存在 [`docs/case-board-runs-20261017/case2/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case2/README.md)。本案例没有浏览器前端，因此没有 UI 截图，不能把“日志中没有 OpenCV 窗口”解释为 UI 通过。
 

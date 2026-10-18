@@ -1,5 +1,5 @@
 ---
-title: "附录 4：Vibe Coding 基础"
+title: "附录 4：Vibe Coding"
 author: [周贤中]
 date: 2026-08-31
 subject: "昇腾310B教程补充材料"
@@ -7,7 +7,7 @@ keywords: [Vibe Coding, DSH, Agent, 昇腾310B, 代码审查]
 lang: zh-cn
 ---
 
-# 附录 4：Vibe Coding 基础
+# 附录 4：Vibe Coding
 
 > **本章导读**
 > 目标：掌握 Vibe Coding 的基本流程，用 DSH 生成、运行并审查 Python 代码。

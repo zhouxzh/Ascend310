@@ -1,5 +1,5 @@
 ---
-title: "附录 6：工具箱、FAQ 与参数模板"
+title: "附录 6：工具箱与 FAQ"
 author: [周贤中]
 date: 2026-06-08
 subject: "Markdown"
@@ -7,7 +7,7 @@ keywords: [附录, FAQ, Checklist, 术语, 故障排查, 模板]
 lang: zh-cn
 ---
 
-# 附录 6：工具箱、FAQ 与参数模板
+# 附录 6：工具箱与 FAQ
 
 ## 内容概览 {#src-appendix-appendix6-h1}
 

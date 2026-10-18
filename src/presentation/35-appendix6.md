@@ -4,14 +4,14 @@ theme: ascend310
 paginate: true
 size: 16:9
 header: "《昇腾310B实战》教材配套演示"
-footer: "附录 6：工具箱、FAQ 与参数模板"
+footer: "附录 6：工具箱与 FAQ"
 ---
 
 <!-- presentation-scaffold: appendix-06 -->
 
 <!-- _class: cover -->
 
-# 附录 6：工具箱、FAQ 与参数模板
+# 附录 6：工具箱与 FAQ
 
 附录课件 · 教师授课版
 

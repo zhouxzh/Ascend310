@@ -315,7 +315,7 @@ MJPEG 预览和教学性的陌生人自动登记。它们有助于暴露基本�
 提供可观察的本地事件存储。学习重点不是记住某个未经测量的延迟数字，而是
 建立从资产检查到板端证据的完整推理链，并能说明每个结论的适用范围。
 
-## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case1-board-evidence}
+## 板端实测记录 {#src-experiment-case1-board-evidence}
 
 本节记录 8T（Ascend310B4）与 20T（Ascend310B1）两块开发板上的实际运行结果。原始日志、HTTP 状态与截图保存在 [`docs/case-board-runs-20261017/case1/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case1/README.md)，本节只摘录其中可核对的部分。
 

@@ -87,13 +87,13 @@ upgrade and version pairing; do not swap them.
 
 | Source | Frozen title |
 | --- | --- |
-| `src/appendix/appendix1.md` | 附录 1：开发板与基础环境 |
-| `src/appendix/appendix2.md` | 附录 2：基于昇腾 310B 的 Ubuntu 教程 |
-| `src/appendix/appendix3.md` | 附录 3：Python 编程基础 |
-| `src/appendix/appendix4.md` | 附录 4：Vibe Coding 基础 |
-| `src/appendix/appendix5.md` | 附录 5：ROS2 基础教程 |
-| `src/appendix/appendix6.md` | 附录 6：工具箱、FAQ 与参数模板 |
-| `src/appendix/appendix7.md` | 附录 7：CANN 升级与版本配套 |
+| `src/appendix/appendix1.md` | 附录 1：开发板环境 |
+| `src/appendix/appendix2.md` | 附录 2：Ubuntu 教程 |
+| `src/appendix/appendix3.md` | 附录 3：Python 基础 |
+| `src/appendix/appendix4.md` | 附录 4：Vibe Coding |
+| `src/appendix/appendix5.md` | 附录 5：ROS2 基础 |
+| `src/appendix/appendix6.md` | 附录 6：工具箱与 FAQ |
+| `src/appendix/appendix7.md` | 附录 7：CANN 升级 |
 
 ## Documentation preview and push policy
 

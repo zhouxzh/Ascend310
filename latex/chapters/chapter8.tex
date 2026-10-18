@@ -138,8 +138,7 @@ python3 01_baseline_resnet_sync.py --runs 100
 这种计时不能替代硬件
 Profiling，但它有两个优势：代码改动小，能快速判断优化是否有方向。
 
-\subsection{msprof：观察 ACL API、Memcpy 和 NPU
-Timeline}\label{src-book-chapter8-h5}
+\subsection{msprof：ACL 与 NPU Timeline}\label{src-book-chapter8-h5}
 
 \passthrough{\lstinline!msprof!} 是 CANN 提供的性能采集工具。它能记录
 Host 侧 ACL API 调用、Runtime 任务、Stream Timeline、AI Core
@@ -367,8 +366,7 @@ CPU。若预处理耗时已经接近或超过模型执行耗时，应优先考�
   使用视频链路时，让 VDEC/JPEGD 的输出直接衔接 VPC 或模型输入。
 \end{enumerate}
 
-\section{案例四：DVPP VPC resize 与 CPU
-resize}\label{src-book-chapter8-h12}
+\section{案例四：VPC 与 CPU resize}\label{src-book-chapter8-h12}
 
 脚本 \passthrough{\lstinline!04\_dvpp\_resize\_vs\_cpu.py!} 生成 NV12
 测试帧，将 1080p 图像缩小到 540p，对比 CPU resize 和 DVPP VPC resize：

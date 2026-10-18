@@ -1,5 +1,5 @@
 ---
-title: "附录 3：Python 编程基础"
+title: "附录 3：Python 基础"
 author: [周贤中]
 date: 2026-08-31
 subject: "昇腾310B教程补充材料"
@@ -7,7 +7,7 @@ keywords: [Python, 标准库, 昇腾310B, 模型部署]
 lang: zh-cn
 ---
 
-# 附录 3：Python 编程基础
+# 附录 3：Python 基础
 
 > **本章导读**
 > 目标：用 Python 检查昇腾 310B 模型部署中常见的配置、清单和结果数据。

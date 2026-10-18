@@ -4,14 +4,14 @@ theme: ascend310
 paginate: true
 size: 16:9
 header: "《昇腾310B实战》教材配套演示"
-footer: "附录 7：CANN 升级与版本配套"
+footer: "附录 7：CANN 升级"
 ---
 
 <!-- presentation-scaffold: appendix-07 -->
 
 <!-- _class: cover -->
 
-# 附录 7：CANN 升级与版本配套
+# 附录 7：CANN 升级
 
 附录课件 · 教师授课版
 

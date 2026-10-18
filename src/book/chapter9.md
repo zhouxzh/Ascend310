@@ -528,7 +528,7 @@ with recorder.time("postprocess"):
 FP16 的输出对齐很好，但端到端收益比较温和。这提示我们：如果希望进一步压缩模型
 执行时间，可以继续尝试 INT8；但也要保持同样的验证标准。
 
-## 9.9 如何编写 INT8 PTQ 程序：准备配置，再收集激活范围 {#src-book-chapter9-h9}
+## 9.9 INT8 PTQ 程序：配置与激活范围 {#src-book-chapter9-h9}
 
 INT8 不能只靠 ATC 参数完成。本章采用 AMCT PTQ 生成 deploy ONNX，再交给 ATC
 转换为 INT8 OM。
