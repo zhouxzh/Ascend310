@@ -117,8 +117,9 @@ blockquote {
   color: var(--ink);
 }
 
-table {
+section table {
   width: 100%;
+  display: table;
   border-collapse: collapse;
   background: var(--paper);
   font-size: 18px;
