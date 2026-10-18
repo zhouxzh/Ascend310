@@ -50,6 +50,29 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
 
 演示文稿不是教材的摘要，而是**上课直接照着讲的材料**。规范如下，`ascend310b_writing_audit` 会逐条检查。
 
+### 基本课件要求（缺一项就不算完成件）
+
+| 要求 | 判据 | 规则 |
+| --- | --- | --- |
+| 封面页 | 第一页带 `<!-- _class: cover -->` | `deck-cover-missing` |
+| 学习目标或主线 | 回答"这讲解决什么问题"，不要从背景铺垫开始 | 人工检查 |
+| 每页一个论点 | 标题是断言，不是话题（"板端最小验证顺序" ✓，"关于验证" ✗） | `deck-title-too-long` |
+| 小结或课堂任务 | 最后必须有收束与自检 | `deck-summary-missing` |
+| 讲师备注 | 每页至少一句"强调什么/常见误区/提问点" | `deck-notes-sparse` |
+| 来源可追溯 | 写明对应 `src/` 或 `samples/` 路径 | `deck-source-missing` |
+| 脚手架标记 | 占位课件必须带 `<!-- presentation-scaffold: id -->` | `deck-scaffold` |
+
+### 信息密度（本轮新增）
+
+课件要"讲得满"，不是"字满"：每页都要有可讲的内容，但不要用大段文字填满。
+
+| 指标 | 下限 | 规则 |
+| --- | --- | --- |
+| 单页正文（散文页，无代码/表格/图） | ≥ 40 字 | `deck-slide-underfull` |
+| 整份课件 | ≥ 6 页且 ≥ 800 字 | `deck-content-thin` |
+| 页面标题 | ≤ 30 字 | `deck-title-too-long` |
+
+实测当前 28 份课件：散文页共 90 页，没有一页低于 40 字；真正稀疏的是 9 份 **4 页脚手架**（约 380 字），它们被单独标为 `deck-scaffold`，不计入完成件。
 ### 结构与元数据
 
 frontmatter 必填四项，缺一不可：`marp: true`、`theme: ascend310`、`paginate: true`、`size: 16:9`（16:9 = 1280×720）。

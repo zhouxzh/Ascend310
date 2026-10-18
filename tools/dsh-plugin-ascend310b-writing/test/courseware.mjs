@@ -94,6 +94,43 @@ const collected = collectCoursewareFindings({ root, settings: resolveSettings({ 
 check(collected.decks === 1, `one deck expected, got ${collected.decks}`);
 check(collected.findings.every((finding) => finding.file.startsWith('src/presentation/')), 'findings must point at the deck');
 
+// --- density and teaching structure ---------------------------------------
+const thin = auditCoursewareText({
+	file: 'src/presentation/10-chapter1.md',
+	text: ['---', 'marp: true', 'theme: ascend310', 'paginate: true', 'size: 16:9', '---', '', '<!-- _class: cover -->', '', '# 只有封面', '', '对应教材：`src/book/chapter1.md`', ''].join('\n')
+});
+check(thin.some((finding) => finding.rule === 'deck-content-thin'), 'a four-slide deck must be reported as thin');
+check(thin.some((finding) => finding.rule === 'deck-summary-missing'), 'a deck without a summary must be reported');
+check(!thin.some((finding) => finding.rule === 'deck-cover-missing'), 'a deck with a cover must not be reported as missing one');
+
+const underfull = auditCoursewareText({
+	file: 'src/presentation/11-chapter2.md',
+	text: [
+		'---', 'marp: true', 'theme: ascend310', 'paginate: true', 'size: 16:9', '---', '',
+		'<!-- _class: cover -->', '', '# 封面', '', '对应教材：`src/book/chapter2.md`', '',
+		'---', '', '## 只有一句话', '', '这一页几乎什么都没有。', '',
+		'---', '', '## 小结', '', '- 回顾今天的内容', ''
+	].join('\n')
+});
+check(underfull.some((finding) => finding.rule === 'deck-slide-underfull'), 'a prose slide under 40 characters must be reported');
+
+const scaffold = auditCoursewareText({
+	file: 'src/presentation/30-appendix1.md',
+	text: ['---', 'marp: true', 'theme: ascend310', 'paginate: true', 'size: 16:9', '---', '', '<!-- presentation-scaffold: appendix-01 -->', '', '# 附录占位', '', '对应教材：`src/appendix/appendix1.md`', ''].join('\n')
+});
+check(scaffold.some((finding) => finding.rule === 'deck-scaffold'), 'a scaffold deck must be reported as such');
+check(!scaffold.some((finding) => finding.rule === 'deck-content-thin'), 'a scaffold deck must not be counted as thin content');
+
+const longTitle = auditCoursewareText({
+	file: 'src/presentation/12-chapter3.md',
+	text: [
+		'---', 'marp: true', 'theme: ascend310', 'paginate: true', 'size: 16:9', '---', '',
+		'<!-- _class: cover -->', '', '# 封面', '', '对应教材：`src/book/chapter3.md`', '',
+		'---', '', '## 这是一个刻意写得很长很长并且明显超过三十个字符上限的幻灯片标题文案', '', '正文内容足够长，用来避免触发信息密度不足的规则，因此这里重复补充一些说明文字。', ''
+	].join('\n')
+});
+check(longTitle.some((finding) => finding.rule === 'deck-title-too-long'), 'a slide title over 30 characters must be reported');
+
 rmSync(root, { recursive: true, force: true });
 
 if (failures.length > 0) {

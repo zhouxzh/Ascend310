@@ -24,6 +24,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { splitSlides } from './deck.js';
 import { join } from 'node:path';
 
 /** Smallest content font that stays legible from the back of a classroom. */
@@ -46,6 +47,89 @@ export function auditCoursewareText({ file, text }) {
 	const body = stripFrontmatter(text);
 	const frontmatter = text.slice(0, text.length - body.length);
 
+	// --- density and teaching structure ------------------------------------
+	// A deck is not a document: every slide must carry one idea, and a slide
+	// that carries almost nothing wastes a projector frame. Placeholder decks
+	// (the `presentation-scaffold` marker) are reported as such instead of being
+	// counted as finished teaching material.
+	const isScaffold = /presentation-scaffold:/u.test(text);
+	const isLegacy = /\/legacy-|archive/u.test(file);
+	if (isScaffold) {
+		findings.push({
+			rule: 'deck-scaffold',
+			severity: 'info',
+			file,
+			line: 1,
+			message: '脚手架课件（presentation-scaffold）；补齐内容前不计为完成件'
+		});
+	} else if (!isLegacy) {
+		const slides = splitSlides(text);
+		const cjk = (text.match(/[\u4e00-\u9fff]/gu) ?? []).length;
+		if (slides.length < 6 || cjk < 800) {
+			findings.push({
+				rule: 'deck-content-thin',
+				severity: 'warning',
+				file,
+				line: 1,
+				message: `课件只有 ${slides.length} 页、${cjk} 字；信息密度过低，补足工程细节或合并为更少的实质页`
+			});
+		}
+		if (!/_class:\s*cover/u.test(text)) {
+			findings.push({
+				rule: 'deck-cover-missing',
+				severity: 'warning',
+				file,
+				line: 1,
+				message: '缺少封面页（<!-- _class: cover -->）'
+			});
+		}
+		// A closing slide does not have to be titled "小结": "课堂交付",
+		// "本讲结论边界" and "下一步" all close the lesson. Only the last two
+		// slides are considered, so an early mention cannot satisfy the rule.
+		const closingPattern = /小结|总结|回顾|课堂任务|思考题|练习|结论|交付|证据边界|下一步|检查清单|使用顺序/u;
+		const closing = slides
+			.slice(-2)
+			.some((slide) => closingPattern.test(/^#{1,3}\s+(.+?)(?:\s+\{#[^}]+\})?\s*$/mu.exec(slide.lines.join('\n'))?.[1] ?? ''));
+		if (!closing) {
+			findings.push({
+				rule: 'deck-summary-missing',
+				severity: 'warning',
+				file,
+				line: 1,
+				message: '最后两页没有小结、课堂交付或结论边界页，学生没有收束与自检环节'
+			});
+		}
+		slides.forEach((slide, index) => {
+			const body = slide.lines.join('\n');
+			const className = /_class:\s*(\w+)/u.exec(body)?.[1] ?? '';
+			if (['cover', 'section'].includes(className)) return;
+			const heading = /^#{1,3}\s+(.+?)(?:\s+\{#[^}]+\})?\s*$/mu.exec(body)?.[1]?.trim() ?? '';
+			if ([...heading].length > 30) {
+				findings.push({
+					rule: 'deck-title-too-long',
+					severity: 'warning',
+					file,
+					line: slide.startLine,
+					message: `第 ${index + 1} 页标题 ${[...heading].length} 字，超过 30 字：${heading.slice(0, 30)}`
+				});
+			}
+			const hasCode = /^\s*(?:```|~~~)/mu.test(body);
+			const hasTable = /^\s*\|/mu.test(body);
+			const hasImage = /!\[|<img\b/iu.test(body);
+			if (hasCode || hasTable || hasImage) return;
+			const prose = body.replace(/^#{1,3}\s+.*$/mu, '').replace(/<!--[\s\S]*?-->/gu, '');
+			const proseCjk = (prose.match(/[\u4e00-\u9fff]/gu) ?? []).length;
+			if (proseCjk < 40) {
+				findings.push({
+					rule: 'deck-slide-underfull',
+					severity: 'warning',
+					file,
+					line: slide.startLine,
+					message: `第 ${index + 1} 页正文只有 ${proseCjk} 字且没有代码/表格/图片，信息密度过低：${heading.slice(0, 30)}`
+				});
+			}
+		});
+	}
 	// --- Marp metadata ------------------------------------------------------
 	for (const required of ['marp', 'theme', 'paginate', 'size']) {
 		if (!new RegExp(`^${required}:`, 'mu').test(frontmatter)) {

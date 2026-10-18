@@ -189,24 +189,39 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 改写方法见技能文档的「去 AI 味」一节。
 ## 课件规范检查
 
-`src/presentation/` 的 Marp 课件有一套独立规则，回答"这份课件能不能拿去上课"：
+| 规则 | 级别 | 判据 |
+| --- | --- | --- |
+| `deck-scaffold` | info | 占位课件（`presentation-scaffold` 标记），不计为完成件 |
+| `deck-content-thin` | warning | 少于 6 页或少于 800 字 |
+| `deck-slide-underfull` | warning | 散文页正文少于 40 字且无代码/表格/图片 |
+| `deck-cover-missing` | warning | 缺少 `_class: cover` 封面 |
+| `deck-summary-missing` | warning | 缺少小结或课堂任务 |
+| `deck-title-too-long` | warning | 页面标题超过 30 字 |
+| `deck-slide-overflow` | error | 单页估算高度超过安全高度 |
+| `deck-code-too-long` | warning | 单页代码超过 22 行 |
+| `deck-table-too-wide` | warning | 表格超过 6 列 / 10 行 |
+| `deck-font-too-small` | error | 代码或表格字号低于 18px |
+| `deck-source-missing` | error | 没有指向教材或样例的来源 |
+| `deck-metadata-missing` | warning | 缺 Marp 全局指令 |
+| `deck-image-no-alt` | error | 图片缺 alt（MD045） |
+| `deck-code-no-language` | warning | 代码块无语言（MD040） |
+| `deck-bare-url` | warning | 正文裸 URL（MD034） |
+| `deck-notes-sparse` | info | 讲师备注覆盖低于 20% |
+| `deck-code-untraceable` | info | 代码块未标来源 |
 
-| 规则 | 级别 | 判据 | 来源 |
-| --- | --- | --- | --- |
-| `deck-slide-overflow` | error | 单页估算高度 > 640px（主题 720px + `overflow:hidden` 会裁切） | 本仓库实测 |
-| `deck-code-too-long` | warning | 单页代码 > 22 行 | 同上 |
-| `deck-table-too-wide` | warning | 表格 > 6 列或 > 10 行 | 同上 |
-| `deck-font-too-small` | error | 代码/表格字号 < 18px | 投影可读性 |
-| `deck-source-missing` | error | 课件没有指向 `src/` 或 `samples/` 的来源 | 可追溯 |
-| `deck-metadata-missing` | warning | frontmatter 缺 `marp/theme/paginate/size` | Marp 元数据 |
-| `deck-image-no-alt` | error | 图片无 alt | markdownlint MD045 |
-| `deck-code-no-language` | warning | 代码块无语言标记 | markdownlint MD040 |
-| `deck-bare-url` | warning | 正文裸 URL（行内代码除外） | markdownlint MD034 |
-| `deck-notes-sparse` | info | 讲师备注覆盖 < 20% | Marp 演讲者视图 |
-| `deck-code-untraceable` | info | 少于一半代码块标了来源文件 | 可追溯 |
+容量超出时用 `node scripts/split-decks.mjs --write <课件>` 分页，不要缩小字号。
 
-容量超出时用 `node scripts/split-decks.mjs --write <课件>` 分页，**不要缩小字号**。
-规范全文见技能文档的「课件制作规范（Marp）」一节。
+## 参考项目
+
+课件规范不是凭空写的，以下开源项目的规则被直接采纳或改写：
+
+| 项目 | 采用的内容 |
+| --- | --- |
+| [Marp CLI](https://github.com/marp-team/marp-cli) / [Marp Core](https://github.com/marp-team/marp-core) | 16:9 = 1280×720；全局指令（`theme/paginate/size`）；讲师备注与 `--notes`/`--pdf-notes`；官方说明"自动缩放只解决横向"——纵向溢出必须分页 |
+| [markdownlint](https://github.com/DavidAnson/markdownlint) | MD045 图片 alt、MD040 代码语言、MD034 禁止裸 URL（行内代码例外），以及 accessibility 规则分组 |
+| [Slidev](https://github.com/slidevjs/slidev) | Markdown-first 的课件组织方式；演讲者模式、代码高亮、图表与 PDF/PNG 导出作为"基本课件能力"的参照 |
+| [reveal.js](https://github.com/hakimel/reveal.js) | 演讲者视图、PDF 导出、代码高亮与嵌套页面结构的同类实践 |
+
 ## 网页教材检查
 
 `ascend310b_writing_audit` 不只审 Markdown 和 PDF，也读**构建后的站点**（`src/.vuepress/dist`），因为读者打开的是网页：

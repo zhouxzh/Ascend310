@@ -58,7 +58,7 @@ footer: "第4章：PyACL应用开发基础"
 
 <!-- _class: visual -->
 
-## Device 包含 Context，Context 包含 Stream
+## Device、Context 与 Stream 的层级
 
 ![Device、Context、Stream 关系图](../book/img4/device_context_stream.png)
 
