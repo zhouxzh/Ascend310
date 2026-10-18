@@ -414,6 +414,9 @@ val_dataset = TensorDataset(
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=batch_size)
 
+```
+
+```python
 # ==========================================
 # 4. 定义模型结构
 # ==========================================
@@ -474,10 +477,9 @@ def validate(model, loader, criterion):
             batch_x = batch_x.to(device)
             batch_y = batch_y.to(device)
             outputs = model(batch_x)
-            loss = criterion(outputs, batch_y)
-            total_loss += loss.item() * batch_x.size(0)
-    return total_loss / len(loader.dataset)
+```
 
+```python
 # ==========================================
 # 6. 执行训练循环
 # ==========================================
@@ -538,6 +540,9 @@ import matplotlib.pyplot as plt
 
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
+```
+
+```python
 # 1. 损失曲线：观察模型是否收敛
 axes[0, 0].plot(train_losses, label='Train Loss')
 axes[0, 0].plot(val_losses, label='Val Loss')
@@ -675,8 +680,9 @@ class DoubleLayerPerceptron(nn.Module):
             nn.Linear(hidden_dim, 1)          # 隐藏层到输出层（回归任务输出维度为1）
         )
     def forward(self, x):
-        return self.net(x)
+```
 
+```python
 # 实例化模型并迁移至 NPU
 model = DoubleLayerPerceptron(X_train.shape[1]).to(device)
 # 回归任务常用的均方误差损失函数
@@ -737,12 +743,9 @@ all_predictions = []
 all_targets = []
 
 with torch.no_grad():
-    for batch_x, batch_y in val_loader:
-        batch_x = batch_x.to(device)
-        predictions = model(batch_x)
-        all_predictions.extend(predictions.cpu().numpy())
-        all_targets.extend(batch_y.cpu().numpy())
+```
 
+```python
 # 将标准化后的数据逆转回原始价格单位
 all_predictions = scaler_y.inverse_transform(np.array(all_predictions))
 all_targets = scaler_y.inverse_transform(np.array(all_targets))
@@ -893,24 +896,9 @@ class LeNet(nn.Module):
 def plot_metrics(script_dir, train_acc_history, test_acc_history, train_loss_history, test_loss_history):
     """
     绘制并保存训练过程中的精度和损失曲线
-    """
-    plt.figure(figsize=(10, 4))
-    # Accuracy subplot (左图：精度曲线)
-    plt.subplot(1, 2, 1)
-    plt.plot(train_acc_history, label="Train Acc")
-    plt.plot(test_acc_history, label="Test Acc")
-    plt.xlabel("Epoch"); plt.ylabel("Accuracy"); plt.title("Accuracy"); plt.legend()
-    # Loss subplot (右图：损失曲线)
-    plt.subplot(1, 2, 2)
-    plt.plot(train_loss_history, label="Train Loss")
-    plt.plot(test_loss_history, label="Test Loss")
-    plt.xlabel("Epoch"); plt.ylabel("Loss"); plt.title("Loss"); plt.legend()
-    plt.tight_layout()
-    # 保存图片到脚本所在目录
-    out_path = os.path.join(script_dir, "accuracy_loss_curve.png")
-    plt.savefig(out_path, bbox_inches="tight")
-    print(f"Saved accuracy & loss curve to: {out_path}")
+```
 
+```python
 def load_data(script_dir, batch_size=256):
     """
     加载 MNIST 数据集并进行预处理
@@ -991,6 +979,9 @@ def train_and_eval(train_loader, test_loader, epochs=10, lr=0.01):
         # --- 测试阶段 ---
         model.eval() # 设置模型为评估模式
         correct_t = 0; total_t = 0
+```
+
+```python
         running_loss_t = 0.0
         with torch.no_grad(): # 验证时不计算梯度，节省显存和计算资源
             for inputs, labels in test_loader:
@@ -1240,25 +1231,9 @@ def load_data(script_dir, batch_size=4):
     # 定义预处理流程：
     # 1. Resize: 将 CIFAR-10 的 32x32 图像调整为 224x224，以匹配 AlexNet 输入要求
     # 2. ToTensor: 将图像数据转换为 Tensor (C, H, W)，并将像素值归一化到 [0, 1]
-    # 3. Normalize: 对 RGB 三个通道进行标准化
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        transforms.Lambda(lambda x: x.half())
-    ])
-    
-    # 使用 torchvision.datasets 下载并加载 CIFAR-10 数据
-    # 传入 transform 参数，DataLoader 读取数据时会自动进行 Resize 和 ToTensor
-    train_ds = datasets.CIFAR10(data_root, train=True, download=True, transform=transform)
-    test_ds = datasets.CIFAR10(data_root, train=False, download=True, transform=transform)
-    
-    # 构建 DataLoader
-    # 相比原代码一次性加载到内存，这里使用 lazy loading 方式，避免 Resize 后占用过多内存
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
-    return train_loader, val_loader
+```
 
+```python
 def train_and_eval(train_loader, val_loader, epochs=10, lr=0.01):
     """
     执行模型训练与验证循环
@@ -1319,20 +1294,9 @@ def train_and_eval(train_loader, val_loader, epochs=10, lr=0.01):
                 outputs = model(inputs)
                 loss_v = criterion(outputs, labels)
                 running_loss_v += loss_v.item() * labels.size(0)
-                preds = outputs.argmax(dim=1)
-                correct_v += (preds == labels).sum().item()
-                total_v += labels.size(0)
-        
-        # 计算本 epoch 的平均验证精度和损失
-        val_acc = correct_v / total_v
-        val_loss = running_loss_v / total_v
-        val_acc_history.append(val_acc)
-        val_loss_history.append(val_loss)
-        t.set_postfix(train_acc =f"{train_acc:.4f}", val_loss=f"{val_loss:.4f}", val_acc=f"{val_acc:.4f}", lr=f'{optimizer.param_groups[0]["lr"]:.6f}')
+```
 
-    # 返回训练/验证指标历史
-    return train_acc_history, val_acc_history, train_loss_history, val_loss_history
-
+```python
 def plot_metrics(script_dir, train_acc, val_acc, train_loss, val_loss):
     """
     绘制训练和验证的精度与损失曲线
@@ -1520,21 +1484,9 @@ def load_data(script_dir, batch_size=4):
     # 2. Normalize: 对 RGB 三个通道进行标准化
     # 注意：针对CIFAR-10优化的VGG使用原始32x32输入，不需要Resize到224
     transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
-    
-    # 使用 torchvision.datasets 下载并加载 CIFAR-10 数据
-    # 传入 transform 参数，DataLoader 读取数据时会自动进行 Resize 和 ToTensor
-    train_ds = datasets.CIFAR10(data_root, train=True, download=True, transform=transform)
-    test_ds = datasets.CIFAR10(data_root, train=False, download=True, transform=transform)
-    
-    # 构建 DataLoader
-    # 相比原代码一次性加载到内存，这里使用 lazy loading 方式，避免 Resize 后占用过多内存
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
-    return train_loader, val_loader
+```
 
+```python
 def train_and_eval(train_loader, val_loader, epochs=10, lr=0.01):
     """
     执行模型训练与验证循环
@@ -1595,20 +1547,9 @@ def train_and_eval(train_loader, val_loader, epochs=10, lr=0.01):
                 outputs = model(inputs)
                 loss_v = criterion(outputs, labels)
                 running_loss_v += loss_v.item() * labels.size(0)
-                preds = outputs.argmax(dim=1)
-                correct_v += (preds == labels).sum().item()
-                total_v += labels.size(0)
-        
-        # 计算本 epoch 的平均验证精度和损失
-        val_acc = correct_v / total_v
-        val_loss = running_loss_v / total_v
-        val_acc_history.append(val_acc)
-        val_loss_history.append(val_loss)
-        t.set_postfix(train_acc =f"{train_acc:.4f}", val_loss=f"{val_loss:.4f}", val_acc=f"{val_acc:.4f}", lr=f'{optimizer.param_groups[0]["lr"]:.6f}')
+```
 
-    # 返回训练/验证指标历史
-    return train_acc_history, val_acc_history, train_loss_history, val_loss_history
-
+```python
 def plot_metrics(script_dir, train_acc, val_acc, train_loss, val_loss):
     """
     绘制训练和验证的精度与损失曲线
@@ -1760,16 +1701,9 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
-        out = out.view(out.size(0), -1)
-        out = self.linear(out)
-        return out
+```
 
+```python
 def ResNet18():
     return ResNet(BasicBlock, [2, 2, 2, 2])
   
@@ -1850,6 +1784,9 @@ def train_and_eval(train_loader, val_loader, epochs=10, lr=0.01):
         
         # 计算本 epoch 的平均训练精度和损失
         train_acc = correct / total
+```
+
+```python
         train_loss = running_loss / total
         train_acc_history.append(train_acc)
         train_loss_history.append(train_loss)

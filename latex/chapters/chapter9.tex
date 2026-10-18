@@ -1224,43 +1224,30 @@ python 05_validate_accuracy.py --samples 200
 
 但正式结论应使用完整验证集。本轮 PNG 数据重跑后的结果如下：
 
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.0968}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1290}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1290}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1290}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1290}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1290}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1290}}
-  >{\raggedleft\arraybackslash}p{(\linewidth - 14\tabcolsep) * \real{0.1290}}@{}}
+\begin{longtable}[]{@{}lllll@{}}
 \toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-模型
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Top1
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Top5
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Top1 相对 FP32
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-Top5 相对 FP32
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-平均推理耗时/ms
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-95\% 分位耗时/ms
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
-平均加速比
-\end{minipage} \\
+模型 & Top1 & Top5 & Top1 相对 FP32 & Top5 相对 FP32 \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-FP32 OM & 62.43\% & 82.68\% & 0.00 pp & 0.00 pp & 3.4808 & 3.5081 &
-1.00x \\
-FP16 OM & 62.43\% & 82.68\% & 0.00 pp & 0.00 pp & 3.1410 & 3.1659 &
-1.11x \\
-INT8 OM & 62.44\% & 82.67\% & +0.01 pp & -0.01 pp & 1.4999 & 1.5196 &
-2.32x \\
+FP32 OM & 62.43\% & 82.68\% & 0.00 pp & 0.00 pp \\
+FP16 OM & 62.43\% & 82.68\% & 0.00 pp & 0.00 pp \\
+INT8 OM & 62.44\% & 82.67\% & +0.01 pp & -0.01 pp \\
+\end{longtable}
+
+耗时与加速比见下表。
+
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+模型 & 平均推理耗时/ms & 95\% 分位耗时/ms & 平均加速比 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+FP32 OM & 3.4808 & 3.5081 & 1.00x \\
+FP16 OM & 3.1410 & 3.1659 & 1.11x \\
+INT8 OM & 1.4999 & 1.5196 & 2.32x \\
 \end{longtable}
 
 这组结果说明：

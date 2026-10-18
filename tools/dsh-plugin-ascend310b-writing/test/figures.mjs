@@ -60,7 +60,7 @@ write('src/book/img1/orphan.png', pngHeader(20, 20));
 write('src/book/img1/diagram.png', pngHeader(800, 600));
 write(
 	'src/book/img1/diagram.dot',
-	['digraph G {', '  label="这是一个非常非常长的中文标签，用来触发结构图标签的长度规则，确保它超过三十六个字符的长度上限";', '  a -> b;', '}'].join('\n')
+	['digraph G {', '  label="这是一个非常非常长的中文标签，用来触发结构图标签的长度规则，确保它明显超过四十四个字符的长度上限要求";', '  a -> b;', '}'].join('\n')
 );
 // The PNG is older than its source, i.e. the diagram was edited but not rebuilt.
 const stale = new Date(Date.now() - 86_400_000);

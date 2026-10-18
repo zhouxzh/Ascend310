@@ -663,25 +663,9 @@ class ResNet(nn.Module):
         layers = []
         layers.append(block(self.inplanes, planes, stride, downsample))
         self.inplanes = planes * block.expansion
-        for _ in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-        return nn.Sequential(*layers)
+```
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        # x = self.maxpool(x) # 移除
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.dropout(x) # 应用 Dropout
-        x = self.fc(x)
-        return x
-
+```python
 def train_resnet18_on_tiny_imagenet():
     # 定义保存路径
     data_dir = './data'
@@ -762,6 +746,9 @@ def train_resnet18_on_tiny_imagenet():
         
         # 移除 tqdm，使用简单的迭代
         for i, (images, labels) in enumerate(train_loader):
+```
+
+```python
             images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(images)
@@ -1076,6 +1063,9 @@ class AclResource:
         if ret != 0: print("Model execute failed")
 
         # 取回结果 (Device -> Host)
+```
+
+```python
         host_out_buffer, ret = acl.rt.malloc_host(output_size)
         acl.rt.memcpy(host_out_buffer, output_size, dev_out_ptr, output_size, 2) # 2: ACL_MEMCPY_DEVICE_TO_HOST
         
@@ -1136,11 +1126,9 @@ def preprocess(image):
 
 # 推理计数和计时
 total_images = 0
-correct_count = 0
-start_time = time.time()
+```
 
-print("开始推理...")
-
+```python
 # 逐张图片推理
 for item in tqdm.tqdm(dataset):
     image = item['image'] # 获取 PIL 图像

@@ -348,21 +348,39 @@ python3 05_pipeline_queue_demo.py --frames 100
 以下表格由 `samples/chapter8/tools/summarize_metrics.py` 汇总远端 JSON 指标生成。由于测试时设备状态为 `Alarm`，数据更适合作为章节教学样例和相对趋势参考；正式项目验收应在设备健康状态正常、无其他进程干扰时重新跑完整评测。
 
 <!-- CHAPTER7_REMOTE_RESULTS_START -->
-| 案例 | 变体 | 平均耗时(ms) | p95(ms) | FPS | 样本数 | 加速比 | 说明 |
-|---|---|---:|---:|---:|---:|---:|---|
-| ResNet18 同步推理 | `naive_alloc_each_frame` | 4.5088 | 4.712 | 221.791 | 100 |  | 每帧申请/释放 ACL 输入输出 Buffer 和 Dataset |
-| ResNet18 Buffer 复用 | `naive_alloc_each_frame` | 4.6047 | 6.8023 | 217.1708 | 100 |  | 对照组 |
-| ResNet18 Buffer 复用 | `reuse_acl_buffers` | 3.2072 | 3.3509 | 311.7963 | 100 | 1.436 | 模型加载后一次性创建输入输出 Buffer 和 Dataset |
-| CPU 预处理 | `naive_numpy` | 0.62 | 0.6821 | 1612.8023 | 200 |  | 每帧创建中间数组 |
-| CPU 预处理 | `workspace_reuse` | 0.3583 | 0.4154 | 2791.1275 | 200 | 1.731 | 复用 resize/CHW 工作区 |
-| DVPP VPC Resize | `cpu_cv2_resize` | 2.6013 | 2.6659 | 384.4225 | 60 |  | CPU resize NV12 Y/UV |
-| DVPP VPC Resize | `dvpp_vpc_resize` | 3.5966 | 3.7102 | 278.0433 | 60 | 0.723 | DVPP VPC resize + H2D/D2H |
-| AIPP 预处理下沉 | `cpu_preprocess` | 3.2319 | 3.3155 | 309.4136 | 100 |  | CPU 完成 resize/normalize/HWC->CHW 后推理 |
-| AIPP 预处理下沉 | `static_aipp_rgb` | 2.6076 | 2.6283 | 383.5017 | 100 | 1.239 | AIPP 接收 RGB888_U8 并在模型输入侧归一化 |
-| Queue Pipeline | `pyacl_serial` | 3.1943 | 3.2332 | 313.0536 | 100 |  | Pre -> Infer -> Post 串行 |
-| Queue Pipeline | `pyacl_queue_pipeline` | 3.993 | 100.0494 | 250.4402 | 100 | 0.8 | 三段线程通过 Queue 解耦 |
-| Queue Pipeline | `simulate_serial` | 15.1757 | 15.1942 | 65.8947 | 200 |  | Pre -> Infer -> Post 串行 |
-| Queue Pipeline | `simulate_queue_pipeline` | 8.1233 | 157.4201 | 123.1021 | 200 | 1.868 | 三段线程通过 Queue 解耦 |
+| 案例 | 变体 | 平均耗时(ms) | p95(ms) | FPS |
+| --- | --- | --- | --- | --- |
+| ResNet18 同步推理 | `naive_alloc_each_frame` | 4.5088 | 4.712 | 221.791 |
+| ResNet18 Buffer 复用 | `naive_alloc_each_frame` | 4.6047 | 6.8023 | 217.1708 |
+| ResNet18 Buffer 复用 | `reuse_acl_buffers` | 3.2072 | 3.3509 | 311.7963 |
+| CPU 预处理 | `naive_numpy` | 0.62 | 0.6821 | 1612.8023 |
+| CPU 预处理 | `workspace_reuse` | 0.3583 | 0.4154 | 2791.1275 |
+| DVPP VPC Resize | `cpu_cv2_resize` | 2.6013 | 2.6659 | 384.4225 |
+| DVPP VPC Resize | `dvpp_vpc_resize` | 3.5966 | 3.7102 | 278.0433 |
+| AIPP 预处理下沉 | `cpu_preprocess` | 3.2319 | 3.3155 | 309.4136 |
+| AIPP 预处理下沉 | `static_aipp_rgb` | 2.6076 | 2.6283 | 383.5017 |
+| Queue Pipeline | `pyacl_serial` | 3.1943 | 3.2332 | 313.0536 |
+| Queue Pipeline | `pyacl_queue_pipeline` | 3.993 | 100.0494 | 250.4402 |
+| Queue Pipeline | `simulate_serial` | 15.1757 | 15.1942 | 65.8947 |
+| Queue Pipeline | `simulate_queue_pipeline` | 8.1233 | 157.4201 | 123.1021 |
+
+样本数、加速比与每个变体的说明见下表。
+
+| 案例 | 样本数 | 加速比 | 说明 |
+| --- | --- | --- | --- |
+| ResNet18 同步推理 | 100 |  | 每帧申请/释放 ACL 输入输出 Buffer 和 Dataset |
+| ResNet18 Buffer 复用 | 100 |  | 对照组 |
+| ResNet18 Buffer 复用 | 100 | 1.436 | 模型加载后一次性创建输入输出 Buffer 和 Dataset |
+| CPU 预处理 | 200 |  | 每帧创建中间数组 |
+| CPU 预处理 | 200 | 1.731 | 复用 resize/CHW 工作区 |
+| DVPP VPC Resize | 60 |  | CPU resize NV12 Y/UV |
+| DVPP VPC Resize | 60 | 0.723 | DVPP VPC resize + H2D/D2H |
+| AIPP 预处理下沉 | 100 |  | CPU 完成 resize/normalize/HWC->CHW 后推理 |
+| AIPP 预处理下沉 | 100 | 1.239 | AIPP 接收 RGB888_U8 并在模型输入侧归一化 |
+| Queue Pipeline | 100 |  | Pre -> Infer -> Post 串行 |
+| Queue Pipeline | 100 | 0.8 | 三段线程通过 Queue 解耦 |
+| Queue Pipeline | 200 |  | Pre -> Infer -> Post 串行 |
+| Queue Pipeline | 200 | 1.868 | 三段线程通过 Queue 解耦 |
 <!-- CHAPTER7_REMOTE_RESULTS_END -->
 
 从这组数据可以得到五个结论：

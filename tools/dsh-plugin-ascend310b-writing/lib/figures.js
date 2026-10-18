@@ -28,7 +28,7 @@ const WIDE_IMAGE_PX = 3200;
 const TALL_IMAGE_PX = 2400;
 // A Graphviz label can hold several lines separated by `\l`; the box is only
 // cramped when one line is long, so the limit applies per line.
-const LONG_DOT_LABEL = 36;
+const LONG_DOT_LABEL = 44;
 const CJK = /[\u4e00-\u9fff]/u;
 const CJK_FONTS = /(?:Noto|Source Han|思源|SimHei|SimSun|Microsoft YaHei|WenQuanYi|PingFang|Heiti|黑体)/iu;
 
@@ -249,7 +249,13 @@ export function collectFigureFindings({ root, settings }) {
 				message: '缺少 graph/digraph 声明，Graphviz 无法解析'
 			});
 		}
-		if (CJK.test(text) && !CJK_FONTS.test(text)) {
+		// Only rendered labels need a CJK font. Comments routinely contain
+		// Chinese explanations and must not trigger the font rule.
+		const rendered = text
+			.replace(/\/\*[\s\S]*?\*\//gu, ' ')
+			.replace(/\/\/[^\n]*/gu, ' ')
+			.replace(/^\s*#[^\n]*/gmu, ' ');
+		if (CJK.test(rendered) && !CJK_FONTS.test(text)) {
 			findings.push({
 				rule: 'dot-cjk-font',
 				severity: 'warning',

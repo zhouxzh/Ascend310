@@ -35,8 +35,9 @@ Qwen1.5-0.5B-Chat。它是技术预览，不包含语音、ASR/TTS、设备协�
 浏览器不直接访问模型，也不知道网关密钥。网页进程在服务器端保存密钥，再调用回环地址上的网关。网关验证请求后，将固定的内部模型名转发给回环地址上的
 MindSpore worker。worker 一次只加载一个 profile
 并串行执行生成，避免多个大模型同时争用边缘
-NPU。页面可以选择教学目录中的实验模型，但模型切换必须停止并重启
-worker，不能在请求中偷偷替换模型。
+NPU。页面可以选择教学目录中的实验模型；选择后由服务端按受控流程停止旧
+worker、启动固定
+profile、检查健康状态并清空会话，不能在请求中传入任意模型路径或替换模型代码。
 
 \begin{lstlisting}
 flowchart LR
@@ -227,8 +228,12 @@ ascend-edge-chat ui
 \passthrough{\lstinline!failed!} 或 \passthrough{\lstinline!pending!}
 也仍可选；\passthrough{\lstinline!blocked!}/\passthrough{\lstinline!not-run!}
 表示 尚未完成 loader、工件或 NPU
-前置门，暂时不能启动。页面选择不同模型后会提示
-重启命令，而不是热切换已经占用 NPU 的进程。
+前置门，暂时不能启动。页面选择不同模型后会执行 受控的 worker
+重启：先检查固定 registry 和本地缓存，停止当前 worker，使用 CANN
+启动脚本加载目标 profile，并等待 \passthrough{\lstinline!/health!}
+返回目标模型。切换成功后会清空
+浏览器会话；若目标启动失败，会尝试恢复原模型。它不是在同一进程中同时加载多个
+模型，也不允许网页提交路径、shell 命令或 Python 表达式。
 
 \begin{lstlisting}[language=bash]
 export ASCEND_EDGE_CHAT_PROFILE=qwen2-1.5b-instruct-mindspore
@@ -237,9 +242,10 @@ ascend-edge-chat worker \
   --registry configs/tutorial-models.json
 \end{lstlisting}
 
-如果选择的模型没有完整本地缓存，启动器会在加载 MindSpore 前失败；它不会
-自动改用 CPU、云端或未锁定的远程权重。完成测试后停止该
-worker，再恢复默认 profile：
+如果选择的模型没有完整本地缓存，页面会在停止当前 worker
+前报告失败；它不会 自动改用
+CPU、云端或未锁定的远程权重。下面的命令仍可用于无浏览器的恢复操作，
+或者在自动回滚也失败后恢复默认 profile：
 
 \begin{lstlisting}[language=bash]
 ascend-edge-chat worker --profile qwen1.5-0.5b-chat
