@@ -214,6 +214,27 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 
 容量超出时用 `node scripts/split-decks.mjs --write <课件>` 分页，不要缩小字号。
 
+## 新电脑安装插件
+
+前置：安装 DSH 桌面版，克隆本仓库。插件使用 DSH 官方命令安装，不需要手工复制目录或创建 Junction：
+
+```bash
+node scripts/install-dsh-plugins.mjs            # 安装写作 + 调试插件到 desktop profile
+node scripts/install-dsh-plugins.mjs --check    # 只核对是否已安装
+node scripts/install-dsh-plugins.mjs --profile <名称>
+```
+
+脚本内部执行的是：
+
+```bash
+dsh plugin --profile desktop add <仓库>/tools/dsh-plugin-ascend310b-writing <仓库>/tools/dsh-plugin-ascend310b-debug
+```
+
+DSH 把它记录为 `link:<绝对路径>` 依赖。换电脑或移动仓库后，重新运行脚本即可；不要把本机绝对路径提交到仓库。
+
+也可以在 DSH 的 **插件 → 添加插件** 中输入插件的绝对路径，效果相同。
+
+安装后重启 DSH；项目级 skill 由仓库 `.dsh/skills` 自动加载，不需要额外安装。
 ## Skill 安装
 
 插件通过 `skills/` 携带写作 skill，但 **DSH 只从 `$DSH_HOME/skills/<name>/SKILL.md` 读取**，不会自动从已安装插件里复制。安装或更新：
