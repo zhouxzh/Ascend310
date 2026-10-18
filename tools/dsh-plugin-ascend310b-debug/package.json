@@ -1,8 +1,8 @@
 {
   "name": "dsh-plugin-ascend310b-debug",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "private": true,
-  "description": "昇腾310B调试：面向昇腾 310B1/310B4 的程序调试助手，提供板卡/驱动/固件/CANN 版本探测、版本配套门禁、按症状的调试计划、samples 程序索引与只读板端命令执行；其他芯片明确标记为不适用",
+  "description": "昇腾310B调试：面向昇腾 310B1/310B4 的程序调试与教程执行助手，提供板卡/驱动/固件/CANN 版本探测、私有网段发现与 MAC 资产表、分层调试计划、samples 索引、只读诊断、显式任务执行，以及华为云/HF mirror/GitHub proxy 下载；其他芯片明确标记为不适用",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -37,7 +37,7 @@
   },
   "scripts": {
     "smoke": "node test/smoke.mjs",
-    "test": "node test/parse.mjs && node test/compat.mjs && node test/scope.mjs && node test/planner.mjs && node test/shell.mjs && node test/client-mount.mjs && node test/client-render.mjs && node test/portability.mjs && node test/smoke.mjs"
+    "test": "node test/parse.mjs && node test/compat.mjs && node test/scope.mjs && node test/planner.mjs && node test/shell.mjs && node test/discovery.mjs && node test/client-mount.mjs && node test/client-render.mjs && node test/portability.mjs && node test/capture.mjs && node test/smoke.mjs"
   },
   "engines": {
     "node": ">=18"

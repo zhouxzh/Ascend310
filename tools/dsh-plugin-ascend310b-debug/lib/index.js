@@ -17,7 +17,7 @@
 import { readFileSync } from 'node:fs';
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { defineTool } from '@deepseek-ai/dsh-tools';
@@ -35,7 +35,10 @@ import {
 import { buildPlan, renderPlan } from './plan.js';
 import { AREAS, ENTRIES } from './knowledge.js';
 import { buildProbeScript, parseProbeOutput } from './probe.js';
-import { isSafeHost, runLocalScript, runRemoteScript, validateReadOnlyCommand } from './shell.js';
+import { inventoryPath, inventoryTargets, observeBoard, readInventory, saveInventory, systemFromFacts } from './inventory.js';
+import { captureScreenshot, findBrowser } from './capture.js';
+import { discoverNetwork, registerDiscoveryTool } from './discovery.js';
+import { isSafeHost, runLocalScript, runLocalShell, runRemoteScript, runRemoteShell, shellQuote, validateReadOnlyCommand, validateTaskCommand } from './shell.js';
 
 const require = createRequire(import.meta.url);
 
@@ -50,6 +53,9 @@ const REPORT_PATH = '/ascend310b-debug/report.json';
 
 /** Route that runs the probe against a configured target. */
 const PROBE_PATH = '/ascend310b-debug/probe';
+
+/** Route that discovers boards and refreshes the local inventory. */
+const DISCOVER_PATH = '/ascend310b-debug/discover';
 
 /** Maximum stdout kept in a tool response. */
 const MAX_EXCERPT = 4000;
@@ -80,6 +86,20 @@ function resolveRepoRoot(config, argument) {
 	);
 }
 
+/** Normalize a host for target/inventory matching. */
+function normalizedHost(value) {
+	return String(value ?? '').trim().toLowerCase().replace(/\.$/, '');
+}
+
+/** Merge discovered metadata into one configured target. */
+function attachDiscovered(target, entry) {
+	target.mac = target.mac ?? entry.mac ?? null;
+	target.discoveredId = target.discoveredId ?? entry.id ?? null;
+	target.observedIp = target.observedIp ?? entry.host ?? null;
+	target.hostname = target.hostname ?? entry.hostname ?? null;
+	return target;
+}
+
 /** Normalize the configured target list into a lookup table. */
 function targetTable(config) {
 	const table = new Map();
@@ -92,12 +112,40 @@ function targetTable(config) {
 			label: typeof entry.label === 'string' && entry.label !== '' ? entry.label : entry.id,
 			transport,
 			host: transport === 'local' ? 'localhost' : String(entry.host ?? ''),
+			hostname: null,
+			mac: null,
+			discoveredId: null,
+			observedIp: null,
 			user: typeof entry.user === 'string' && entry.user.trim() !== '' ? entry.user.trim() : null,
 			port: Number.isInteger(entry.port) ? entry.port : null,
 			identityFile: typeof entry.identityFile === 'string' ? entry.identityFile : null,
 			workdir: typeof entry.workdir === 'string' ? entry.workdir : null,
 			note: typeof entry.note === 'string' ? entry.note : null
 		});
+	}
+	const discovered = inventoryTargets(
+		readInventory(inventoryPath(config)),
+		typeof config?.discovery?.user === 'string' ? config.discovery.user.trim() : null
+	);
+	const merged = new Set();
+	for (const entry of discovered) {
+		if (entry.configuredId && table.has(entry.configuredId)) {
+			attachDiscovered(table.get(entry.configuredId), entry);
+			merged.add(entry.configuredId);
+			continue;
+		}
+		const hostNames = [entry.host, entry.hostname, entry.hostname ? `${entry.hostname}.local` : null]
+			.map(normalizedHost)
+			.filter(Boolean);
+		const target = [...table.values()].find(
+			(candidate) => candidate.transport === 'ssh' && !merged.has(candidate.id) && hostNames.includes(normalizedHost(candidate.host))
+		);
+		if (target !== undefined) {
+			attachDiscovered(target, entry);
+			merged.add(target.id);
+		} else if (!table.has(entry.id)) {
+			table.set(entry.id, entry);
+		}
 	}
 	return table;
 }
@@ -151,11 +199,57 @@ function publicTargets(config) {
 		label: target.label,
 		transport: target.transport,
 		host: target.host,
+		hostname: target.hostname ?? null,
+		mac: target.mac ?? null,
+		discoveredId: target.discoveredId ?? null,
+		observedIp: target.observedIp ?? null,
 		user: target.user,
 		port: target.port,
 		isDefault: target.id === defaultId,
 		note: target.note
 	}));
+}
+
+/** Public inventory summaries for the Assets tab (never expose SSH secrets). */
+function publicInventory(config) {
+	const inventory = readInventory(inventoryPath(config));
+	return Object.values(inventory.boards ?? {})
+		.filter((board) => board !== null && typeof board === 'object')
+		.map((board) => {
+			const latestChange = Array.isArray(board.changes) && board.changes.length > 0
+				? board.changes[board.changes.length - 1]
+				: null;
+			return {
+				id: board.id,
+				mac: board.mac ?? null,
+				hostname: board.hostname ?? null,
+				lastIp: board.lastIp ?? null,
+				model: board.system?.boardModel ?? null,
+				soc: board.system?.soc ?? null,
+				tier: board.system?.tier ?? null,
+				driver: board.system?.driverVersion ?? null,
+				cann: board.system?.cannVersion ?? null,
+				firmware: board.system?.firmwareVersion ?? null,
+				firstSeen: board.firstSeen ?? null,
+				lastSeen: board.lastSeen ?? null,
+				lastChangeAt: board.lastChangeAt ?? null,
+				configuredId: board.configuredId ?? null,
+				changesCount: Array.isArray(board.changes) ? board.changes.length : 0,
+				latestChange: latestChange === null
+					? null
+					: {
+							at: latestChange.at,
+							fromIp: latestChange.fromIp ?? null,
+							toIp: latestChange.toIp ?? null,
+							fields: (latestChange.fields ?? []).map((field) => ({
+								name: field.name,
+								from: field.from ?? null,
+								to: field.to ?? null
+							}))
+						}
+			};
+		})
+		.sort((left, right) => String(right.lastSeen ?? '').localeCompare(String(left.lastSeen ?? '')));
 }
 
 /** Flatten probe output into the JSON-safe shape the tools return. */
@@ -257,6 +351,204 @@ function sampleIndexFor(config, argument) {
 	}
 }
 
+/** Resolve the default remote workspace for a target. */
+function defaultTaskCwd(target) {
+	if (typeof target?.workdir === 'string' && target.workdir.trim() !== '') return target.workdir.trim();
+	if (target?.transport === 'local') return process.cwd();
+	if (target?.user) return `/home/${target.user}`;
+	return '/tmp';
+}
+
+/** Check whether a POSIX path is inside an allowed remote root. */
+function isRemotePathInside(root, candidate) {
+	const normalizedRoot = root.replace(/\/+$/, '');
+	const normalizedCandidate = candidate.replace(/\/+$/, '');
+	return normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(`${normalizedRoot}/`);
+}
+
+/** Resolve a task working directory without allowing escape outside the user's workspace. */
+function resolveTaskCwd(target, requested) {
+	const defaultCwd = defaultTaskCwd(target);
+	if (typeof requested !== 'string' || requested.trim() === '') return defaultCwd;
+	const candidate = requested.trim();
+	if (target?.transport === 'local') return candidate;
+	if (!candidate.startsWith('/') || candidate.split('/').includes('..')) {
+		throw new Error('任务 cwd 必须是开发板上的绝对 POSIX 路径，且不能包含 ..。');
+	}
+	const base = defaultTaskCwd(target);
+	const allowed =
+		isRemotePathInside(base, candidate) ||
+		isRemotePathInside('/tmp', candidate) ||
+		(target?.user ? isRemotePathInside(`/home/${target.user}`, candidate) : false);
+	if (!allowed) throw new Error(`任务 cwd 必须位于 ${base}、/home/${target?.user ?? '<user>'} 或 /tmp 下。`);
+	return candidate;
+}
+
+/** Join a remote POSIX path with a relative destination. */
+function remotePath(cwd, value) {
+	if (typeof value !== 'string' || value.trim() === '') throw new Error('下载目标路径为空。');
+	const candidate = value.trim();
+	if (candidate.split('/').includes('..')) throw new Error('下载目标不能包含 ..。');
+	return candidate.startsWith('/') ? candidate : `${cwd.replace(/\/+$/, '')}/${candidate}`;
+}
+
+/** Resolve a host-side screenshot path under the configured artifact root. */
+function resolveCapturePath(config, output) {
+	if (typeof output !== 'string' || output.trim() === '') throw new Error('截图输出路径为空。');
+	const root = resolve(config?.artifactRoot ?? process.cwd());
+	const candidate = resolve(root, output.trim());
+	const rel = relative(root, candidate);
+	if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) throw new Error('截图输出必须位于 artifactRoot 内。');
+	if (!candidate.toLowerCase().endsWith('.png')) throw new Error('截图输出必须是 .png 文件。');
+	return candidate;
+}
+
+/** Encode one URL path segment, keeping it usable by wget/curl. */
+function encodePathPart(value) {
+	return encodeURIComponent(value).replaceAll('%2F', '/');
+}
+
+/** Normalize a model download request and return the actual URL and command. */
+function normalizeDownload({ source, url, repoId, filename, revision = 'main', githubProxy }) {
+	if (source === 'hf') {
+		if (typeof repoId !== 'string' || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repoId)) {
+			throw new Error('HF 下载需要合法的 repoId，例如 `org/model`。');
+		}
+		if (typeof filename !== 'string' || filename.trim() === '') throw new Error('HF 下载需要 filename。');
+		if (typeof revision !== 'string' || !/^[A-Za-z0-9_.\/-]+$/.test(revision) || revision.split('/').includes('..')) {
+			throw new Error('HF revision 不合法。');
+		}
+		const repo = repoId.split('/').map(encodePathPart).join('/');
+		const file = filename.split('/').map(encodePathPart).join('/');
+		return {
+			url: `https://hf-mirror.com/${repo}/resolve/${encodePathPart(revision)}/${file}`,
+			commandUrl: null
+		};
+	}
+	if (typeof url !== 'string' || url.trim() === '') throw new Error(`${source} 下载需要 url。`);
+	let parsed;
+	try {
+		parsed = new URL(url.trim());
+	} catch {
+		throw new Error('下载 URL 不合法。');
+	}
+	if (!/^https?:$/.test(parsed.protocol)) throw new Error('下载 URL 必须是 HTTP(S)。');
+	if (source === 'huawei') {
+		if (!/(^|\.)myhuaweicloud\.com$|(^|\.)huaweicloud\.com$/i.test(parsed.hostname)) {
+			throw new Error('华为云下载只接受 huaweicloud.com 或 myhuaweicloud.com 域名。');
+		}
+		return { url: parsed.toString(), commandUrl: null };
+	}
+	if (source === 'github') {
+		if (!/(^|\.)github\.com$|(^|\.)githubusercontent\.com$/i.test(parsed.hostname)) {
+			throw new Error('GitHub 下载只接受 github.com 或 githubusercontent.com URL。');
+		}
+		const prefix = typeof githubProxy === 'string' && githubProxy.trim() !== ''
+			? githubProxy.trim()
+			: 'https://gh-proxy.com/';
+		if (!/^https?:\/\//i.test(prefix)) throw new Error('GitHub 网页代理必须以 http:// 或 https:// 开头。');
+		return { url: `${prefix.replace(/\/?$/, '/')}${parsed.toString()}`, commandUrl: null };
+	}
+	return { url: parsed.toString(), commandUrl: null };
+}
+
+/** Build a wget/curl command for a normalized download. */
+function downloadCommand(url, destination) {
+	const directory = destination.slice(0, destination.lastIndexOf('/')) || '/tmp';
+	const quotedDirectory = shellQuote(directory);
+	const quotedDestination = shellQuote(destination);
+	const quotedUrl = shellQuote(url);
+	return `mkdir -p ${quotedDirectory} && if command -v wget >/dev/null 2>&1; then wget -q -O ${quotedDestination} ${quotedUrl}; else curl -fL --retry 3 -o ${quotedDestination} ${quotedUrl}; fi`;
+}
+
+/**
+ * Add the board's common tutorial environment without hiding the user's
+ * command. `base` makes `python`, `atc` and conda activation available; `none`
+ * runs the command in the bare SSH shell.
+ */
+function prepareTaskCommand(command, environment) {
+	if (environment !== 'base') return command;
+	return [
+		'set +u',
+		'export PATH=/usr/local/miniconda3/bin:$PATH',
+		'if [ -r /usr/local/Ascend/ascend-toolkit/set_env.sh ]; then . /usr/local/Ascend/ascend-toolkit/set_env.sh >/dev/null 2>&1 || true; fi',
+		'if [ -r /usr/local/miniconda3/etc/profile.d/conda.sh ]; then . /usr/local/miniconda3/etc/profile.d/conda.sh >/dev/null 2>&1 || true; fi',
+		command
+	].join('; ');
+}
+
+/**
+ * Run an explicitly approved task command on a configured board.
+ *
+ * @returns {Promise<object>} normalized task result.
+ */
+async function runTask({ config, targetSelector, command, cwd, timeoutMs = 120000, allowStateChange, allowPrivileged = false, allowDestructive = false, dryRun = false, environment = 'base' }) {
+	if (allowStateChange !== true) {
+		return {
+			allowed: false,
+			executed: false,
+			command: String(command ?? ''),
+			target: '未执行',
+			cwd: '',
+			exitCode: -1,
+			durationMs: 0,
+			reason: '任务执行需要显式 allowStateChange=true；只读诊断请继续使用 ascend_board_exec。',
+			stdout: '',
+			stderr: ''
+		};
+	}
+	const taskCommand = prepareTaskCommand(command, environment);
+	const verdict = validateTaskCommand(taskCommand, { allowPrivileged, allowDestructive });
+	if (!verdict.ok) {
+		return {
+			allowed: false,
+			executed: false,
+			command: taskCommand,
+			target: '未执行',
+			cwd: '',
+			exitCode: -1,
+			durationMs: 0,
+			reason: verdict.reason,
+			stdout: '',
+			stderr: ''
+		};
+	}
+	const target = resolveTarget(config, targetSelector);
+	const workingDir = resolveTaskCwd(target, cwd);
+	const started = Date.now();
+	if (dryRun) {
+		return {
+			allowed: true,
+			executed: false,
+			command: taskCommand,
+			target: target.label,
+			cwd: workingDir,
+			exitCode: 0,
+			durationMs: 0,
+			reason: `预检通过：${verdict.reason} 未执行（dryRun）。`,
+			stdout: '',
+			stderr: ''
+		};
+	}
+	const result =
+		target.transport === 'local'
+			? await runLocalShell({ script: taskCommand, cwd: workingDir, timeoutMs })
+			: await runRemoteShell({ script: taskCommand, target, cwd: workingDir, timeoutMs });
+	const durationMs = Date.now() - started;
+	return {
+		allowed: true,
+		executed: true,
+		command: taskCommand,
+		target: target.label,
+		cwd: workingDir,
+		exitCode: Number.isInteger(result.code) ? result.code : result.ok ? 0 : 1,
+		durationMs,
+		reason: result.reason,
+		stdout: excerpt(result.stdout ?? ''),
+		stderr: excerpt(result.stderr ?? '')
+	};
+}
+
 /** Build the environment report used by both routes and tools. */
 function environmentReport({ environment, target, source }) {
 	return assembleReport({
@@ -265,6 +557,55 @@ function environmentReport({ environment, target, source }) {
 		source,
 		pairing: assessVersionPairing(environment.facts ?? {})
 	});
+}
+
+/**
+ * Record a probe result in the local inventory when it came from a real SSH
+ * board. Snapshots and the local host are not board identities.
+ */
+function recordEnvironment(config, result) {
+	if (result?.target?.transport !== 'ssh' || typeof result.target.host !== 'string') return null;
+	const facts = result.environment?.facts ?? {};
+	const mac = facts.macAddress?.value ?? null;
+	if (typeof mac !== 'string' || mac === '') return null;
+	const path = inventoryPath(config);
+	const inventory = readInventory(path);
+	const system = systemFromFacts(facts);
+	system.tier = system.tier ?? (facts.socTier?.value ? String(facts.socTier.value) : null);
+	const ipAddress = facts.ipAddress?.value ?? (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(result.target.host) ? result.target.host : null);
+	const observed = observeBoard(inventory, {
+		ip: ipAddress,
+		user: result.target.user,
+		mac,
+		hostname: facts.hostname?.value ?? null,
+		configuredId: result.target.id,
+		system
+	});
+	if (observed.status !== 'unchanged') {
+		try {
+			saveInventory(path, observed.inventory);
+		} catch {
+			// A read-only probe must still succeed if the local inventory path is
+			// not writable; the report indicates the probe result, not the cache.
+			return null;
+		}
+	}
+	return { path, status: observed.status, changes: observed.changes };
+}
+
+/** Render the local inventory change summary for a text response. */
+function inventoryNote(change) {
+	if (change === null) return '';
+	if (change.status === 'system-changed' && change.changes.length > 0) {
+		return [
+			'',
+			'### 本地资产表检测到系统变化',
+			...change.changes.map((field) => `- ${field.name}: ${field.from ?? '未记录'} -> ${field.to ?? '未记录'}`),
+			`- 资产表：${change.path}`
+		].join('\n');
+	}
+	if (change.status === 'new') return ['', '### 本地资产表', `- 新板已记录：${change.path}`].join('\n');
+	return '';
 }
 
 /**
@@ -383,6 +724,54 @@ const STEP_SCHEMA = {
 	}
 };
 
+/** JSON schema shared by explicit task and download execution. */
+const TASK_SCHEMA = {
+	type: 'object',
+	additionalProperties: false,
+	properties: {
+		text: { type: 'string', required: true },
+		allowed: { type: 'boolean', required: true },
+		executed: { type: 'boolean', required: true },
+		command: { type: 'string', required: true },
+		target: { type: 'string', required: true },
+		cwd: { type: 'string', required: true },
+		exitCode: { type: 'integer', required: true },
+		durationMs: { type: 'integer', required: true },
+		reason: { type: 'string', required: true },
+		stdout: { type: 'string' },
+		stderr: { type: 'string' }
+	}
+};
+
+const DOWNLOAD_SCHEMA = {
+	...TASK_SCHEMA,
+	properties: {
+		...TASK_SCHEMA.properties,
+		source: { type: 'string', required: true },
+		resolvedUrl: { type: 'string', required: true },
+		destination: { type: 'string', required: true }
+	}
+};
+
+const CAPTURE_SCHEMA = {
+	type: 'object',
+	additionalProperties: false,
+	properties: {
+		text: { type: 'string', required: true },
+		allowed: { type: 'boolean', required: true },
+		executed: { type: 'boolean', required: true },
+		url: { type: 'string', required: true },
+		path: { type: 'string', required: true },
+		width: { type: 'integer', required: true },
+		height: { type: 'integer', required: true },
+		bytes: { type: 'integer', required: true },
+		durationMs: { type: 'integer', required: true },
+		browser: { type: 'string', required: true },
+		stderr: { type: 'string' },
+		reason: { type: 'string', required: true }
+	}
+};
+
 /** Register the tools and, when present, the panel routes. */
 export function apply(ctx, config) {
 	ctx.tools.register(
@@ -463,12 +852,14 @@ export function apply(ctx, config) {
 					timeoutMs: Number.isInteger(args.timeoutMs) ? args.timeoutMs : 60000
 				});
 				const report = environmentReport(result);
+				const inventoryChange = recordEnvironment(config, result);
 				const text = [
 					`目标：${result.target.label}（${result.target.transport}${result.target.host ? ` ${result.target.user ? `${result.target.user}@` : ''}${result.target.host}` : ''}）`,
 					`传输结论：${result.transport.reason}`,
 					report.scope?.applicable === true ? '' : `适用范围：${report.scope?.message ?? '未识别到 SoC。'}`,
 					'',
 					report.text,
+					inventoryNote(inventoryChange),
 					'',
 					'原始输出节选：',
 					'```text',
@@ -569,6 +960,7 @@ export function apply(ctx, config) {
 					timeoutMs: 60000
 				});
 				const report = environmentReport(result);
+				const inventoryChange = recordEnvironment(config, result);
 				const index = readSampleIndex(repoRoot);
 				const soc = result.environment.facts?.soc?.value ?? null;
 				const relevant = indexQuery(index, { query: [soc, 'atc', 'acl'].filter(Boolean).join(' '), limit: 8 });
@@ -588,6 +980,7 @@ export function apply(ctx, config) {
 				const text = outOfScope
 					? [
 							report.text,
+							inventoryNote(inventoryChange),
 							'',
 							'### 不适用范围',
 							`- ${report.scope.message}`,
@@ -595,6 +988,7 @@ export function apply(ctx, config) {
 						].join('\n')
 					: [
 							report.text,
+							inventoryNote(inventoryChange),
 							...(repoNote === null ? [] : ['', `> ${repoNote}`]),
 							'',
 							'### 相关 samples 程序',
@@ -977,10 +1371,254 @@ export function apply(ctx, config) {
 		})
 	);
 
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend_board_run',
+			description:
+				'Run an explicitly approved task command on an Ascend 310B board: downloading models, creating a workspace, ' +
+				'converting ONNX with ATC, running Python/pytest/msame, or executing a tutorial shell script. Unlike ' +
+				'`ascend_board_exec`, this tool changes files and may execute build/test code. It requires ' +
+				'`allowStateChange:true`; `sudo`, recursive deletion and board reset/upgrade commands require separate ' +
+				'explicit switches. Use `dryRun:true` first. The command runs in a constrained board workspace and returns ' +
+				'exit code, duration, stdout and stderr.',
+			parameters: {
+				target: { type: 'string', description: 'Configured target id, configured `user@host`, or `local`.' },
+				command: { type: 'string', description: 'Shell command to run, for example `python sample.py` or `bash run.sh`.' },
+				cwd: { type: 'string', description: 'Absolute board working directory. Defaults to the target workdir/home.' },
+				timeoutMs: { type: 'integer', description: 'Execution timeout in milliseconds. Defaults to 120000.' },
+				allowStateChange: {
+					type: 'boolean',
+					description: 'Required true to acknowledge that this task writes files or executes sample code.'
+				},
+				allowPrivileged: { type: 'boolean', description: 'Allow sudo. Defaults to false.' },
+				allowDestructive: { type: 'boolean', description: 'Allow rm -r/-f. Defaults to false.' },
+				environment: {
+					type: 'string',
+					enum: ['base', 'none'],
+					description: 'Use the board base Python/CANN/conda environment, or a bare shell. Defaults to base.'
+				},
+				dryRun: { type: 'boolean', description: 'Validate and show the task without executing it.' }
+			},
+			output: { schema: TASK_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.text }] },
+			async execute(args) {
+				const task = await runTask({
+					config,
+					targetSelector: args.target,
+					command: args.command,
+					cwd: args.cwd,
+					timeoutMs: Number.isInteger(args.timeoutMs) && args.timeoutMs > 0 ? args.timeoutMs : 120000,
+					allowStateChange: args.allowStateChange === true,
+					allowPrivileged: args.allowPrivileged === true,
+					allowDestructive: args.allowDestructive === true,
+					environment: args.environment === 'none' ? 'none' : 'base',
+					dryRun: args.dryRun === true
+				});
+				const text = [
+					`目标：${task.target}${task.cwd === '' ? '' : `（${task.cwd}）`}`,
+					`状态：${task.allowed ? (task.executed ? (task.exitCode === 0 ? '已执行' : '已执行（失败）') : '未执行') : '已拒绝'}`,
+					`命令：${task.command}`,
+					`说明：${task.reason}`,
+					...(task.executed
+						? [
+								`退出码：${task.exitCode}`,
+								`耗时：${task.durationMs} ms`,
+								'',
+								'stdout:',
+								'```text',
+								task.stdout ?? '',
+								'```',
+								...(task.stderr ? ['stderr:', '```text', task.stderr, '```'] : [])
+							]
+						: [])
+				].join('\n');
+				return { ...task, text };
+			},
+			presentCall: (args) => ({ card: 'generic', title: '板端任务执行', kind: 'other', rawInput: args })
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend_model_download',
+			description:
+				'Download a tutorial asset to a configured Ascend 310B board. Huawei OBS URLs download directly. ' +
+				'Hugging Face downloads use `https://hf-mirror.com` instead of huggingface.co. GitHub URLs are rewritten ' +
+				'through a web proxy (default `https://gh-proxy.com/`). Set `allowStateChange:true`; use `dryRun:true` to ' +
+				'inspect the resolved URL and command without writing. The destination must be a file path under the board ' +
+				'workspace or /tmp.',
+			parameters: {
+				target: { type: 'string', description: 'Configured target id, configured `user@host`, or `local`.' },
+				source: {
+					type: 'string',
+					enum: ['huawei', 'hf', 'github', 'direct'],
+					description: 'Download source policy.'
+				},
+				url: { type: 'string', description: 'Huawei cloud, GitHub, or direct HTTP(S) URL.' },
+				repoId: { type: 'string', description: 'Hugging Face repository id, for example `org/model`.' },
+				filename: { type: 'string', description: 'Hugging Face file path to download.' },
+				revision: { type: 'string', description: 'Hugging Face revision. Defaults to main.' },
+				destination: { type: 'string', description: 'Destination file path on the board.' },
+				cwd: { type: 'string', description: 'Board working directory used to resolve a relative destination.' },
+				githubProxy: { type: 'string', description: 'GitHub web proxy prefix. Defaults to https://gh-proxy.com/.' },
+				timeoutMs: { type: 'integer', description: 'Download timeout in milliseconds. Defaults to 300000.' },
+				allowStateChange: { type: 'boolean', description: 'Required true to write the destination file.' },
+				dryRun: { type: 'boolean', description: 'Validate and show the resolved URL without downloading.' }
+			},
+			output: { schema: DOWNLOAD_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.text }] },
+			async execute(args) {
+				try {
+					const target = resolveTarget(config, args.target);
+					const workingDir = resolveTaskCwd(target, args.cwd);
+					const destination = remotePath(workingDir, args.destination);
+					resolveTaskCwd(target, destination);
+					const resolved = normalizeDownload({
+						source: args.source,
+						url: args.url,
+						repoId: args.repoId,
+						filename: args.filename,
+						revision: args.revision ?? 'main',
+						githubProxy: args.githubProxy ?? config?.githubProxy
+					});
+					const command = downloadCommand(resolved.url, destination);
+					const task = await runTask({
+						config,
+						targetSelector: args.target,
+						command,
+						cwd: workingDir,
+						timeoutMs: Number.isInteger(args.timeoutMs) && args.timeoutMs > 0 ? args.timeoutMs : 300000,
+						allowStateChange: args.allowStateChange === true,
+						environment: 'none',
+						dryRun: args.dryRun === true
+					});
+					const output = {
+						...task,
+						source: args.source,
+						resolvedUrl: resolved.url,
+						destination,
+						text: [
+							`下载源：${args.source}`,
+							`解析 URL：${resolved.url}`,
+							`目标文件：${destination}`,
+							`状态：${task.allowed ? (task.executed ? (task.exitCode === 0 ? '已下载' : '下载失败') : '未执行') : '已拒绝'}`,
+							`命令：${command}`,
+							`说明：${task.reason}`,
+							...(task.executed
+								? [`退出码：${task.exitCode}`, `耗时：${task.durationMs} ms`, 'stdout:', '```text', task.stdout ?? '', '```', ...(task.stderr ? ['stderr:', '```text', task.stderr, '```'] : [])]
+								: [])
+						].join('\n')
+					};
+					return output;
+				} catch (error) {
+					const reason = String(error?.message ?? error);
+					return {
+						text: `下载请求被拒绝：${reason}`,
+						allowed: false,
+						executed: false,
+						command: '',
+						target: '未执行',
+						cwd: '',
+						exitCode: -1,
+						durationMs: 0,
+						reason,
+						source: String(args.source ?? ''),
+						resolvedUrl: '',
+						destination: String(args.destination ?? '')
+					};
+				}
+			},
+			presentCall: (args) => ({ card: 'generic', title: '模型下载', kind: 'other', rawInput: args })
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend_ui_capture',
+			description:
+				'Capture an Ascend tutorial frontend URL to a PNG using the host machine\'s Edge/Chrome headless browser. ' +
+				'This is host-side output: start the board service first with `ascend_board_run`, then capture its HTTP URL. ' +
+				'Requires `allowStateChange:true` to write the PNG. The output must be under artifactRoot (default: current ' +
+				'workspace) and must end in .png. Returns path, dimensions, bytes and elapsed time.',
+			parameters: {
+				url: { type: 'string', description: 'HTTP(S) frontend URL, for example http://192.0.2.10:7860/.' },
+				output: { type: 'string', description: 'PNG path under artifactRoot.' },
+				width: { type: 'integer', description: 'Viewport width. Defaults to 1440.' },
+				height: { type: 'integer', description: 'Viewport height. Defaults to 900.' },
+				waitMs: { type: 'integer', description: 'Virtual time budget before screenshot. Defaults to 1000.' },
+				timeoutMs: { type: 'integer', description: 'Browser timeout in milliseconds. Defaults to 30000.' },
+				browserPath: { type: 'string', description: 'Optional Edge/Chrome executable path.' },
+				allowStateChange: { type: 'boolean', description: 'Required true to write the screenshot file.' }
+			},
+			output: { schema: CAPTURE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.text }] },
+			async execute(args) {
+				const width = Number.isInteger(args.width) ? args.width : 1440;
+				const height = Number.isInteger(args.height) ? args.height : 900;
+				const path = String(args.output ?? '');
+				if (args.allowStateChange !== true) {
+					return {
+						text: '截图需要显式 allowStateChange=true。',
+						allowed: false,
+						executed: false,
+						url: String(args.url ?? ''),
+						path,
+						width,
+						height,
+						bytes: 0,
+						durationMs: 0,
+						browser: '',
+						reason: '截图会写入宿主机文件，需要显式确认。'
+					};
+				}
+				try {
+					const output = resolveCapturePath(config, args.output);
+					const result = await captureScreenshot({
+						url: args.url,
+						output,
+						width,
+						height,
+						waitMs: Number.isInteger(args.waitMs) ? args.waitMs : 1000,
+						timeoutMs: Number.isInteger(args.timeoutMs) && args.timeoutMs > 0 ? args.timeoutMs : 30000,
+						browserPath: args.browserPath ?? config?.browserPath
+					});
+					return {
+						text: [
+							`页面：${result.url}`,
+							`截图：${result.path}`,
+							`尺寸：${result.width}x${result.height}`,
+							`大小：${result.bytes} bytes`,
+							`浏览器：${result.browser}`,
+							`耗时：${result.durationMs} ms`
+						].join('\n'),
+						allowed: true,
+						executed: true,
+						...result,
+						reason: '截图完成。'
+					};
+				} catch (error) {
+					const reason = String(error?.message ?? error);
+					return {
+						text: `截图失败：${reason}`,
+						allowed: false,
+						executed: false,
+						url: String(args.url ?? ''),
+						path,
+						width,
+						height,
+						bytes: 0,
+						durationMs: 0,
+						browser: findBrowser({ browserPath: args.browserPath ?? config?.browserPath }) ?? '',
+						reason
+					};
+				}
+			},
+			presentCall: (args) => ({ card: 'generic', title: '前端截图', kind: 'other', rawInput: args })
+		})
+	);
+
+	registerDiscoveryTool(ctx, config, defineTool);
+
 	// The browser panel reads the same report over HTTP. A headless composition
 	// keeps the tools and simply skips these two routes.
-	ctx.inject(['webServer'], (scope) => {
-		const json = (response, status, value) => {
+	ctx.inject(['webServer'], (scope) => {		const json = (response, status, value) => {
 			const body = JSON.stringify(value);
 			response.writeHead(status, {
 				'content-type': 'application/json; charset=utf-8',
@@ -1014,6 +1652,7 @@ export function apply(ctx, config) {
 					source: 'not-probed',
 					target,
 					targets: publicTargets(config),
+					boards: publicInventory(config),
 					board: null,
 					facts: {},
 					scope: {
@@ -1086,6 +1725,7 @@ export function apply(ctx, config) {
 				const rawText = typeof payload.rawText === 'string' ? payload.rawText : undefined;
 				const result = await collectEnvironment({ config, targetSelector: targetId, rawText, timeoutMs: 60000 });
 				const report = environmentReport(result);
+				const inventoryChange = recordEnvironment(config, result);
 				const samples = sampleIndexFor(config);
 				const repoRoot = samples.repoRoot;
 				const index = samples.index;
@@ -1098,11 +1738,13 @@ export function apply(ctx, config) {
 					source: result.source,
 					target: result.target,
 					targets: publicTargets(config),
+					boards: publicInventory(config),
 					board: report.board,
 					facts: serializeEnvironment(result.environment).facts,
 					scope: report.scope,
 					pairing: report.pairing,
 					missingCore: result.environment.missingCore ?? [],
+					inventoryChange: inventoryChange ?? null,
 					transport: { ok: result.transport.ok, reason: result.transport.reason, display: result.transport.display },
 					rawExcerpt: excerpt(result.rawText),
 					knowledge: ENTRIES.map((entry) => ({
@@ -1133,6 +1775,38 @@ export function apply(ctx, config) {
 			}
 		};
 
+		const discoverHandler = async (request, response) => {
+			try {
+				let body = '';
+				for await (const chunk of request) {
+					body += chunk;
+					if (body.length > 1_000_000) {
+						json(response, 413, { ok: false, error: '发现请求体超过 1 MB。' });
+						return;
+					}
+				}
+				const payload = body.trim() === '' ? {} : JSON.parse(body);
+				const discovery = config?.discovery ?? {};
+				const cidrs = Array.isArray(payload.cidrs) && payload.cidrs.length > 0
+					? payload.cidrs
+					: discovery.cidrs;
+				const result = await discoverNetwork({
+					cidrs,
+					user: typeof payload.user === 'string' ? payload.user : discovery.user ?? config?.targets?.[0]?.user ?? null,
+					port: Number.isInteger(payload.port) ? payload.port : discovery.port ?? 22,
+					scanConcurrency: Number.isInteger(payload.concurrency) ? payload.concurrency : discovery.scanConcurrency ?? 24,
+					probeConcurrency: Number.isInteger(discovery.probeConcurrency) ? discovery.probeConcurrency : 4,
+					scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 500,
+					probeTimeoutMs: Number.isInteger(payload.timeoutMs) ? payload.timeoutMs : discovery.probeTimeoutMs ?? 60000,
+					path: typeof payload.inventoryPath === 'string' ? payload.inventoryPath : discovery.inventoryPath,
+					config
+				});
+				json(response, 200, { ok: true, ...result, targets: publicTargets(config), boards: publicInventory(config) });
+			} catch (error) {
+				json(response, 500, { ok: false, error: String(error?.message ?? error) });
+			}
+		};
+
 		scope.effect(
 			() => scope.webServer.register({ kind: 'exact', path: REPORT_PATH, handler: reportHandler }),
 			'ascend310b-debug: report route'
@@ -1140,6 +1814,10 @@ export function apply(ctx, config) {
 		scope.effect(
 			() => scope.webServer.register({ kind: 'exact', path: PROBE_PATH, handler: probeHandler }),
 			'ascend310b-debug: probe route'
+		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: DISCOVER_PATH, handler: discoverHandler }),
+			'ascend310b-debug: discover route'
 		);
 	});
 }

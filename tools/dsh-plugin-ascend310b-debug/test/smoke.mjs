@@ -123,6 +123,7 @@ const routes = [];
 const effects = [];
 const config = {
 	repoRoot: repoRoot ?? undefined,
+	inventoryPath: join(pluginRoot, 'test', '.no-inventory.json'),
 	defaultTarget: 'board-8t',
 	targets: [
 		{ id: 'board-8t', label: '8T 板', host: '198.51.100.10', user: 'HwHiAiUser', note: '8T/310B4' },
@@ -152,21 +153,63 @@ try {
 
 	host.apply(fakeCtx, config);
 
-	for (const name of ['ascend_probe', 'ascend_check', 'ascend_debug_plan', 'ascend_sample_index', 'ascend_board_exec']) {
+	for (const name of ['ascend_probe', 'ascend_check', 'ascend_debug_plan', 'ascend_sample_index', 'ascend_board_exec', 'ascend_board_run', 'ascend_model_download', 'ascend_ui_capture', 'ascend_discover']) {
 		check(registeredTools.has(name), `tool ${name} must be registered`);
 	}
-	check(routes.length === 2, `expected two panel routes, got ${routes.length}`);
+	check(routes.length === 3, `expected three panel routes, got ${routes.length}`);
 	check(routes.every((route) => route.kind === 'exact'), 'panel routes must be exact matches');
-	check(effects.length === 2, 'each route must be registered through an effect');
+	check(effects.length === 3, 'each route must be registered through an effect');
 	check(
-		routes.map((route) => route.path).join(',') === '/ascend310b-debug/report.json,/ascend310b-debug/probe',
-		'routes must expose the report and probe endpoints'
+		routes.map((route) => route.path).join(',') ===
+			'/ascend310b-debug/report.json,/ascend310b-debug/probe,/ascend310b-debug/discover',
+		'routes must expose the report, probe and discover endpoints'
 	);
 
 	// --- target resolution ------------------------------------------------
 	const resolved = host.resolveTarget(config);
 	check(resolved.id === 'board-8t', 'the configured defaultTarget must win');
 	check(host.resolveTarget(config, 'board-20t').host === '198.51.100.11', 'a target id must select that board');
+
+	const mac = 'c0:74:2b:fd:dd:7a';
+	const discoveredId = 'ascend-c0742bfddd7a';
+	try {
+		writeFileSync(
+			config.inventoryPath,
+			JSON.stringify({
+				version: 1,
+				boards: {
+					[mac]: {
+						id: discoveredId,
+						identity: mac,
+						mac,
+						user: 'HwHiAiUser',
+						lastIp: '198.51.100.10',
+						hostname: 'orangepiaipro',
+						system: { hostname: 'orangepiaipro', soc: 'Ascend310B4', tier: '8T' },
+						changes: [],
+						history: []
+					}
+				}
+			}),
+			'utf8'
+		);
+		const merged = host.resolveTarget(config, 'board-8t');
+		check(merged.mac === mac, 'a configured target must inherit the discovered MAC');
+		let duplicate = false;
+		try {
+			host.resolveTarget(config, discoveredId);
+		} catch {
+			duplicate = true;
+		}
+		check(duplicate, 'a configured target and its discovered MAC target must render as one board');
+	} finally {
+		rmSync(config.inventoryPath, { force: true });
+	}
+
+	const discoverTool = registeredTools.get('ascend_discover');
+	const rejectedScan = await discoverTool.execute({ cidrs: ['8.8.8.0/24'] }, {});
+	validateOutput('ascend_discover', rejectedScan);
+	check(rejectedScan.scanned === 0 && rejectedScan.errors.length > 0, 'a public CIDR must be refused without scanning');
 	check(host.resolveTarget(config, 'HwHiAiUser@198.51.100.11').id === 'board-20t', 'user@host must select that board');
 	check(host.resolveTarget(config, 'local').transport === 'local', 'the "local" selector must remain available');
 	let ambiguous = null;
@@ -263,6 +306,109 @@ try {
 	validateOutput('ascend_board_exec', redirected);
 	check(redirected.allowed === false, 'a redirecting command must be refused');
 
+	// --- explicit task and download execution ----------------------------
+	const runTool = registeredTools.get('ascend_board_run');
+	const taskPreview = await runTool.execute(
+		{
+			target: 'board-8t',
+			command: 'python samples/chapter5/check_mindspore_env.py',
+			cwd: '/home/HwHiAiUser/Ascend310',
+			allowStateChange: true,
+			dryRun: true
+		},
+		{}
+	);
+	validateOutput('ascend_board_run', taskPreview);
+	check(taskPreview.allowed === true && taskPreview.executed === false, 'an approved dry-run task must be previewed');
+	check(taskPreview.text.includes('python samples/chapter5/check_mindspore_env.py'), 'task preview must echo the command');
+	const taskRefusal = await runTool.execute(
+		{ target: 'board-8t', command: 'wget -O /tmp/x https://example.com/x', cwd: '/tmp' },
+		{}
+	);
+	validateOutput('ascend_board_run', taskRefusal);
+	check(taskRefusal.allowed === false, 'a task without allowStateChange must be refused');
+
+	const downloadTool = registeredTools.get('ascend_model_download');
+	const hfPreview = await downloadTool.execute(
+		{
+			target: 'board-8t',
+			source: 'hf',
+			repoId: 'org/model',
+			filename: 'config.json',
+			destination: '/tmp/model-config.json',
+			allowStateChange: true,
+			dryRun: true
+		},
+		{}
+	);
+	validateOutput('ascend_model_download', hfPreview);
+	check(hfPreview.resolvedUrl.startsWith('https://hf-mirror.com/'), 'HF downloads must use the mirror');
+	const githubPreview = await downloadTool.execute(
+		{
+			target: 'board-8t',
+			source: 'github',
+			url: 'https://github.com/example/repo/raw/main/README.md',
+			destination: '/tmp/github-readme.md',
+			allowStateChange: true,
+			dryRun: true
+		},
+		{}
+	);
+	validateOutput('ascend_model_download', githubPreview);
+	check(githubPreview.resolvedUrl.startsWith('https://gh-proxy.com/https://github.com/'), 'GitHub downloads must use the web proxy');
+	const huaweiPreview = await downloadTool.execute(
+		{
+			target: 'board-8t',
+			source: 'huawei',
+			url: 'https://obs.example.myhuaweicloud.com/model.onnx',
+			destination: '/tmp/model.onnx',
+			allowStateChange: true,
+			dryRun: true
+		},
+		{}
+	);
+	validateOutput('ascend_model_download', huaweiPreview);
+	check(huaweiPreview.resolvedUrl.includes('myhuaweicloud.com'), 'Huawei cloud downloads must stay direct');
+	const badHuawei = await downloadTool.execute(
+		{
+			target: 'board-8t',
+			source: 'huawei',
+			url: 'https://example.com/model.onnx',
+			destination: '/tmp/model.onnx',
+			allowStateChange: true,
+			dryRun: true
+		},
+		{}
+	);
+	validateOutput('ascend_model_download', badHuawei);
+	check(badHuawei.allowed === false, 'Huawei source policy must reject non-Huawei hosts');
+	const badTask = await runTool.execute(
+		{
+			target: 'board-8t',
+			command: 'npu-smi set -t health -i 0 -c 0',
+			cwd: '/home/HwHiAiUser/Ascend310',
+			allowStateChange: true,
+			dryRun: true
+		},
+		{}
+	);
+	validateOutput('ascend_board_run', badTask);
+	check(badTask.allowed === false, 'the task runner must still reject hardware mutation');
+
+	const captureTool = registeredTools.get('ascend_ui_capture');
+	const captureRefusal = await captureTool.execute(
+		{ url: 'http://127.0.0.1:8080/', output: 'screenshots/case.png' },
+		{}
+	);
+	validateOutput('ascend_ui_capture', captureRefusal);
+	check(captureRefusal.allowed === false, 'screenshots must require explicit allowStateChange');
+	const captureOutside = await captureTool.execute(
+		{ url: 'http://127.0.0.1:8080/', output: '../outside.png', allowStateChange: true },
+		{}
+	);
+	validateOutput('ascend_ui_capture', captureOutside);
+	check(captureOutside.allowed === false, 'screenshots must reject paths outside artifactRoot');
+
 	// --- HTTP route with a saved board transcript -------------------------
 	const probeRoute = routes.find((route) => route.path === '/ascend310b-debug/probe');
 	const response = {
@@ -300,6 +446,26 @@ try {
 	);
 	check(payload.scope?.applicable === true, 'the probe route must mark a 310B board as in scope');
 	check(payload.scope?.supportedSocs?.includes('Ascend310B4'), 'the scope must list the SoCs the plugin supports');
+
+	const discoverRoute = routes.find((route) => route.path === '/ascend310b-debug/discover');
+	const discoverResponse = {
+		status: null,
+		body: '',
+		writeHead(status) {
+			this.status = status;
+		},
+		end(chunk) {
+			this.body = chunk ?? '';
+		}
+	};
+	const discoverRequest = {
+		async *[Symbol.asyncIterator]() {
+			yield JSON.stringify({ cidrs: ['8.8.8.0/24'] });
+		}
+	};
+	await discoverRoute.handler(discoverRequest, discoverResponse);
+	check(discoverResponse.status === 500, 'the discover route must reject a public CIDR without scanning');
+	check(String(JSON.parse(discoverResponse.body).error).includes('私有'), 'the discover route must explain the CIDR refusal');
 
 	// The same route must refuse to imply its procedures apply to another chip.
 	const foreignResponse = {

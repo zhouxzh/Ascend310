@@ -24,6 +24,9 @@ import { basename, join, relative, sep } from 'node:path';
  */
 const FACT_FIELDS = Object.freeze([
 	['hostname', '主机名'],
+	['ipAddress', '当前 IPv4'],
+	['macAddress', 'MAC 地址'],
+	['machineId', 'machine-id'],
 	['boardModel', '设备树型号'],
 	['os', '操作系统'],
 	['kernel', '内核'],

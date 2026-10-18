@@ -4,7 +4,7 @@
  * Usage: node test/parse.mjs
  */
 
-import { buildProbeScript, parseNpuSmiInfo, parseOsRelease, parseProbeOutput, parseVersionCfg } from '../lib/probe.js';
+import { buildProbeScript, parseIpAddress, parseMacSection, parseNpuSmiInfo, parseOsRelease, parseProbeOutput, parseVersionCfg } from '../lib/probe.js';
 import { NPU_SMI_310B1, NPU_SMI_310B4, PROBE_8T_CANN80, PROBE_20T_CANN80, PROBE_ATLAS_CANN92 } from './fixtures.mjs';
 
 const failures = [];
@@ -35,6 +35,17 @@ const cfg = parseVersionCfg('version=[7.6.0.1.220]\nruntime_running_version=[7.6
 equal(cfg.runtime_running_version, '7.6.0.1.220:8.0.0', '应解析 version.cfg 的键值');
 const os = parseOsRelease('PRETTY_NAME="Ubuntu 22.04.5 LTS"\nNAME="Ubuntu"\n');
 equal(os.PRETTY_NAME, 'Ubuntu 22.04.5 LTS', '应去掉 os-release 的引号');
+equal(
+	parseMacSection('eth0=c0:74:2b:fd:dd:7a\nwlan0=aa:bb:cc:dd:ee:ff\n'),
+	'c0:74:2b:fd:dd:7a',
+	'MAC 解析应优先 eth0，而不是任意接口'
+);
+equal(parseIpAddress('10.0.0.100 2001:db8::1\n'), '10.0.0.100', 'IP 解析应优先使用 IPv4');
+equal(
+	parseProbeOutput('===ABS_BEGIN:mac===\neth0=c0:74:2b:fd:dd:7a\n===ABS_END:mac===\n===ABS_BEGIN:machine_id===\nabc123\n===ABS_END:machine_id===\n').facts.macAddress.value,
+	'c0:74:2b:fd:dd:7a',
+	'环境报告应保留 MAC 事实'
+);
 
 // --- end-to-end transcripts ----------------------------------------------
 const eight = parseProbeOutput(PROBE_8T_CANN80);
@@ -66,7 +77,7 @@ equal(transcript.board?.soc, 'Ascend310B4', '无节标记的纯终端记录也�
 
 // --- generated script -----------------------------------------------------
 const script = buildProbeScript();
-for (const section of ['npu_smi_info', 'cann_version_cfg', 'driver_version_info', 'acl_import', 'devices']) {
+for (const section of ['npu_smi_info', 'cann_version_cfg', 'driver_version_info', 'acl_import', 'devices', 'mac', 'machine_id', 'ip_address']) {
 	check(script.includes(`abs_section ${section}`), `探测脚本应包含 ${section} 节`);
 }
 check(!/(^|\s)(rm|mv|dd|mkfs)(\s|$)/.test(script), '探测脚本不应包含写操作');

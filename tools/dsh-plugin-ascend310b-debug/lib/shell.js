@@ -330,9 +330,53 @@ export function validateReadOnlyCommand(command) {
 	return validateArguments(base, tokens);
 }
 
+/**
+ * Validate a command that is explicitly allowed to change files or run a
+ * tutorial build/install step.
+ *
+ * This is intentionally separate from {@link validateReadOnlyCommand}. Even a
+ * task command may not change the accelerator mode, reset/upgrade firmware, or
+ * perform a destructive filesystem operation unless the caller opts in.
+ *
+ * @param {string} command - shell command to run.
+ * @param {object} [options] - task policy switches.
+ * @param {boolean} [options.allowPrivileged] - permit `sudo`.
+ * @param {boolean} [options.allowDestructive] - permit `rm -r/-f` and raw disk writes.
+ * @returns {{ok: boolean, reason: string}} verdict with a reason.
+ */
+export function validateTaskCommand(command, { allowPrivileged = false, allowDestructive = false } = {}) {
+	if (typeof command !== 'string' || command.trim() === '') {
+		return { ok: false, reason: '命令为空。' };
+	}
+	const text = command.trim();
+	if (text.includes('\u0000')) return { ok: false, reason: '命令不能包含 NUL 字符。' };
+	if (text.length > 20000) return { ok: false, reason: '任务命令过长（>20000 字符）。' };
+	if (/\bnpu-smi\s+(?:set|reset|upgrade)\b/i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许修改 NPU 健康、复位或升级固件；这些操作只能由用户手工执行。' };
+	}
+	if (/(?:^|[;&|]\s*)(?:reboot|shutdown|poweroff)\b/i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许重启或关闭开发板。' };
+	}
+	if (/\bmkfs(?:\.|\s)/i.test(text) || /\bdd\b[^;&|]*\bof\s*=\s*\/dev\//i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许格式化磁盘或直接写块设备。' };
+	}
+	if (!allowDestructive && /\brm\s+-[A-Za-z]*[rf]/i.test(text)) {
+		return { ok: false, reason: '递归/强制删除需要显式 allowDestructive=true。' };
+	}
+	if (!allowPrivileged && /\bsudo\b/i.test(text)) {
+		return { ok: false, reason: 'sudo 需要显式 allowPrivileged=true；教程默认执行不需要提权。' };
+	}
+	return { ok: true, reason: '任务命令通过策略检查。' };
+}
+
 /** Escape one argv element for POSIX `sh`. */
 function quote(value) {
 	return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+/** Public form of POSIX shell quoting for task/download command construction. */
+export function shellQuote(value) {
+	return quote(value);
 }
 
 /**
@@ -442,4 +486,18 @@ export async function runLocalScript({ script, cwd, timeoutMs = 60000, exec = ex
 				? '本机探测完成。注意：开发机没有 NPU 运行时，这只能证明本机环境，不能证明板端。'
 				: `本机探测退出码 ${result.code}：${result.stderr.trim().split('\n')[0] ?? ''}`
 	};
+}
+
+/** Run one explicitly approved task command over SSH, optionally in a cwd. */
+export async function runRemoteShell({ script, target, cwd, timeoutMs = 60000, exec = execFileCapture }) {
+	const command = cwd ? `cd ${quote(cwd)} && ${script}` : script;
+	const result = await runRemoteScript({ script: command, target, timeoutMs, exec });
+	return { ...result, command };
+}
+
+/** Run one explicitly approved task command on the local host. */
+export async function runLocalShell({ script, cwd, timeoutMs = 60000, exec = execFileCapture }) {
+	const command = cwd ? `cd ${quote(cwd)} && ${script}` : script;
+	const result = await runLocalScript({ script: command, timeoutMs, exec });
+	return { ...result, command };
 }

@@ -171,6 +171,9 @@ check(text.includes('未采集'), 'missing facts must stay visible as 未采集 
 // "undefined symbol" symptom), so the check targets React artifacts instead.
 check(!text.includes('>undefined<') && !text.includes('undefined undefined'), 'the panel must not render raw undefined values');
 check(text.includes('昇腾310B调试'), 'the panel title must name the chip family');
+check(text.includes('实时监控'), 'the panel must expose a live-monitor control');
+check(text.includes('发现开发板'), 'the panel must expose a discovery control');
+check(text.includes('开发板资产'), 'the panel must expose a MAC-keyed asset tab');
 check(!text.includes('310B 调试'), 'the old title without 昇腾 must be gone');
 check(text.includes('已确认是昇腾 310B'), 'an in-scope board must say so explicitly');
 

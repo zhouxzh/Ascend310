@@ -15,7 +15,7 @@ description: 昇腾 310B（Ascend 310B1/310B4）程序调试工作流。当用�
 
 1. **版本必须来自板端。** 板卡型号、SoC、CANN、驱动、固件、npu-smi、固件号一律由 `ascend_probe` 或 `ascend_check` 从板端读取。任何"应该是 8.0"的推断都不能写进结论。
 2. **证据分层标注。** 只能用 `documented`、`inferred`、`observed-pass`、`observed-fail`、`untested`。文档没写某个型号，是 `unknown`/`untested`，不是 `unsupported`。
-3. **只读。** `ascend_board_exec` 只执行白名单内的只读命令。任何需要改动板卡状态的操作（安装、升级、重启、改权限、写设备）由用户自己执行，助手负责给出命令和回退条件。
+3. **先只读，后显式执行。** `ascend_board_exec` 只执行白名单内的只读命令；下载、ATC、Python、pytest、msame 和教程脚本使用 `ascend_board_run`，并显式设置 `allowStateChange: true`。硬件复位、`npu-smi set/upgrade`、关机和破坏性操作仍由用户手工执行。
 
 ## 标准顺序
 
@@ -28,6 +28,10 @@ description: 昇腾 310B（Ascend 310B1/310B4）程序调试工作流。当用�
 3. `ascend_debug_plan`——用症状或领域生成分层计划，从最早的门开始，按每步的停止条件推进。
 4. `ascend_sample_index`——定位可参照的样例程序；先看样例目录的 README，再执行命令。
 5. 需要探针没覆盖的信息时，用 `ascend_board_exec` 打一条只读命令；不确定就先 `run: false` 看等价调用。
+6. 多板或 IP 会变化的实验室：用 `ascend_discover` 扫描显式私有 CIDR；它按 MAC 建本地资产表，并记录驱动/CANN/系统重装变化。串口只用于首次配置和网络故障恢复，不做持续扫描。
+7. 下载教程资产：`ascend_model_download`。华为云 OBS 直接下载；HF 自动改写到 `hf-mirror.com`；GitHub 自动使用网页代理。先 `dryRun: true`，再显式 `allowStateChange: true`。
+8. 运行章节程序：`ascend_board_run`。先 `dryRun: true` 核对 cwd 和命令；默认 `environment: "base"` 会加载 base Python、CANN 和 conda，再执行 `atc`、`python`、`pytest`、`msame` 或测试脚本，并保存退出码、耗时和输出。
+9. 前端页面可用后使用 `ascend_ui_capture` 保存 PNG；截图输出必须在工作区内，并记录 URL、viewport、字节数和耗时。截图是 UI 证据，不能替代 API/真实推理检查。
 
 ## 分层与常见落点
 

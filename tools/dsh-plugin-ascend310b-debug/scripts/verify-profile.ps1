@@ -130,6 +130,7 @@ Write-Utf8 (Join-Path $profileRoot 'cordis.patch.yml') @"
   name: $packageName
   config:
     repoRoot: $RepoRoot
+    inventoryPath: '$profileRoot\inventory.json'
     defaultTarget: smoke-8t
     targets: $targetsJson
 "@

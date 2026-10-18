@@ -75,6 +75,7 @@ abs_section arch; uname -m 2>&1 || true; abs_end arch
 abs_section kernel; uname -r 2>&1 || true; abs_end kernel
 abs_section os_release; test -r /etc/os-release && cat /etc/os-release || echo "MISSING /etc/os-release"; abs_end os_release
 abs_section hostname; hostname 2>&1 || true; abs_end hostname
+abs_section ip_address; hostname -I 2>/dev/null || true; abs_end ip_address
 abs_section date; date --iso-8601=seconds 2>&1 || true; abs_end date
 abs_section id; id 2>&1 || true; abs_end id
 
@@ -129,6 +130,8 @@ abs_section acl_import; for p in python3 python; do if command -v "$p" >/dev/nul
 abs_section conda; echo "CONDA_PREFIX=\${CONDA_PREFIX-}"; echo "CONDA_DEFAULT_ENV=\${CONDA_DEFAULT_ENV-}"; abs_end conda
 
 abs_section devices; ls -l /dev/davinci* /dev/devmm* /dev/hisi_hdc 2>/dev/null || echo "NOT_FOUND /dev/davinci*"; abs_end devices
+abs_section mac; for p in /sys/class/net/*; do iface=$(basename "$p"); [ "$iface" = lo ] && continue; if [ -r "$p/address" ]; then printf '%s=' "$iface"; cat "$p/address" 2>/dev/null || true; fi; done; abs_end mac
+abs_section machine_id; cat /etc/machine-id 2>/dev/null || echo "NOT_FOUND"; abs_end machine_id
 abs_section modules; lsmod 2>/dev/null | grep -E 'drv|ascend|hisi' || echo "NO_MATCH_OR_PERMISSION"; abs_end modules
 abs_section health; if [ -n "$NPU_SMI" ]; then "$NPU_SMI" info 2>/dev/null | sed -n '1,12p'; else echo "NOT_FOUND"; fi; abs_end health
 `;
@@ -279,6 +282,24 @@ function findVersion(sections, names, pattern) {
 	return null;
 }
 
+/** Extract the first non-loopback IPv4 address from `hostname -I`. */
+export function parseIpAddress(text) {
+	if (typeof text !== 'string') return null;
+	const addresses = text.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) ?? [];
+	return addresses.find((address) => !address.startsWith('127.') && !address.startsWith('169.254.')) ?? addresses[0] ?? null;
+}
+
+/** Extract the physical MAC address, preferring eth0 over other interfaces. */
+export function parseMacSection(text) {
+	if (typeof text !== 'string') return null;
+	const found = [];
+	for (const rawLine of text.split(/\r?\n/)) {
+		const match = /^([A-Za-z0-9_.:-]+)=([0-9a-f]{2}(?::[0-9a-f]{2}){5})$/i.exec(rawLine.trim());
+		if (match !== null) found.push({ iface: match[1], mac: match[2].toLowerCase() });
+	}
+	return (found.find((item) => item.iface === 'eth0') ?? found[0])?.mac ?? null;
+}
+
 /** Read `key=value` from the CANN `version.cfg` content. */
 export function parseVersionCfg(text) {
 	const result = {};
@@ -335,9 +356,17 @@ export function buildEnvironmentReport(sections) {
 	set('kernel', cleanLine(sections.kernel), 'kernel', cleanLine(sections.kernel));
 	set('arch', cleanLine(sections.arch), 'arch', cleanLine(sections.arch));
 	set('hostname', cleanLine(sections.hostname), 'hostname', cleanLine(sections.hostname));
+	set('ipAddress', parseIpAddress(sections.ip_address), 'ip_address', cleanLine(sections.ip_address));
 	set('probeTime', cleanLine(sections.date), 'date', cleanLine(sections.date));
 	set('loginUser', cleanLine(sections.id), 'id', cleanLine(sections.id));
 	set('boardModel', cleanLine(sections.dt_model)?.replace(/\u0000/g, '').trim() || null, 'dt_model', cleanLine(sections.dt_model));
+	set('macAddress', parseMacSection(sections.mac), 'mac', cleanLine(sections.mac));
+	set(
+		'machineId',
+		cleanLine(sections.machine_id) === 'NOT_FOUND' ? null : cleanLine(sections.machine_id),
+		'machine_id',
+		cleanLine(sections.machine_id)
+	);
 
 	const devices = parseNpuSmiInfo(sections.npu_smi_info ?? sections.__raw__ ?? '');
 	const device = devices[0] ?? null;

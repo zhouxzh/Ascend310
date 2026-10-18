@@ -11,7 +11,7 @@
 
 import assert from 'node:assert/strict';
 
-import { buildSshArgs, isSafeHost, isSafeUser, validateReadOnlyCommand } from '../lib/shell.js';
+import { buildSshArgs, isSafeHost, isSafeUser, runRemoteShell, validateReadOnlyCommand, validateTaskCommand } from '../lib/shell.js';
 
 const failures = [];
 const check = (name, run) => {
@@ -147,6 +147,48 @@ check('SSH argv never goes through a local shell', () => {
 	assert.ok(args.includes('2222'));
 	assert.ok(args.includes('BatchMode=yes'));
 });
+
+// Explicit task commands may download/build/run, but hardware and destructive
+// operations remain blocked unless the caller opts in separately.
+for (const command of [
+	'wget -O model.onnx https://example.com/model.onnx',
+	'atc --model=model.onnx --output=model --soc_version=Ascend310B4',
+	'./msame --model model.om --input input.bin --output out',
+	'python sample.py',
+	'bash run.sh',
+	'source /usr/local/Ascend/ascend-toolkit/set_env.sh && python sample.py'
+]) {
+	check(`task allows: ${command}`, () => assert.equal(validateTaskCommand(command).ok, true));
+}
+
+for (const command of [
+	'npu-smi set -t health -i 0 -c 0',
+	'reboot',
+	'mkfs.ext4 /dev/mmcblk0',
+	'sudo apt-get install opencv'
+]) {
+	check(`task blocks: ${command}`, () => assert.equal(validateTaskCommand(command).ok, false));
+}
+check('task blocks destructive rm by default', () => assert.equal(validateTaskCommand('rm -rf /tmp/x').ok, false));
+check('task permits rm only with explicit opt-in', () => assert.equal(validateTaskCommand('rm -rf /tmp/x', { allowDestructive: true }).ok, true));
+check('task permits sudo only with explicit opt-in', () => assert.equal(validateTaskCommand('sudo true', { allowPrivileged: true }).ok, true));
+
+try {
+	let captured = null;
+	await runRemoteShell({
+		script: 'python sample.py',
+		cwd: '/home/HwHiAiUser/Ascend310/samples',
+		target: { host: '192.0.2.10', user: 'HwHiAiUser' },
+		exec: async ({ args }) => {
+			captured = args;
+			return { stdout: 'ok', stderr: '', code: 0, timedOut: false };
+		}
+	});
+	assert.ok(captured?.at(-1).includes("cd '/home/HwHiAiUser/Ascend310/samples'"));
+	assert.ok(captured?.at(-1).includes('python sample.py'));
+} catch (error) {
+	failures.push(`task cwd construction: ${error?.message ?? error}`);
+}
 
 if (failures.length > 0) {
 	console.error(`shell tests FAILED (${failures.length}):`);

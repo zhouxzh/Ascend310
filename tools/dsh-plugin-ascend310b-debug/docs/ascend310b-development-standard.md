@@ -314,6 +314,8 @@ project/
 
 ### 4.11 安全边界
 
+- 只读诊断使用 `ascend_board_exec`；下载、ATC、Python、pytest、msame 和教程脚本只能通过 `ascend_board_run` 执行，且必须显式设置 `allowStateChange:true`。
+- HF 下载使用 `https://hf-mirror.com`；GitHub 下载使用网页代理；华为云 OBS 直连。下载目标限制在工作区或 `/tmp`。
 - 优先使用 SSH 公钥认证；禁止在仓库、脚本参数或日志中保存密码。
 - 只读诊断和状态修改必须分开。安装、升级、重启、改权限和写设备只能由用户明确执行。
 - 部署脚本不得使用未经验证的递归删除或宽泛同步目标。

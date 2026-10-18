@@ -5,7 +5,7 @@ DSH bundle，不依赖仓库根目录的 `node_modules`。
 
 | 插件 | 可见名称 | 用途 | 源码与安装说明 | 审核记录 |
 | --- | --- | --- | --- | --- |
-| `dsh-plugin-ascend310b-debug` | 昇腾310B调试 | 板端事实探测、版本配套判定、分层调试计划、样例索引、只读诊断命令 | [`dsh-plugin-ascend310b-debug/README.md`](dsh-plugin-ascend310b-debug/README.md) | [`installation-audit.md`](dsh-plugin-ascend310b-debug/docs/installation-audit.md) |
+| `dsh-plugin-ascend310b-debug` | 昇腾310B调试 | 板端事实探测、版本配套判定、分层调试计划、样例索引、只读诊断、显式任务执行与模型下载 | [`dsh-plugin-ascend310b-debug/README.md`](dsh-plugin-ascend310b-debug/README.md) | [`installation-audit.md`](dsh-plugin-ascend310b-debug/docs/installation-audit.md) |
 
 ## 通用安装步骤
 

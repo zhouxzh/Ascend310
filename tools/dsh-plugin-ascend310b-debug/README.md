@@ -71,18 +71,51 @@ Copy-Item -Path (Join-Path $plugin '*') -Destination $dest -Recurse -Force
       - id: board-8t
         label: 开发板 1（8T / Ascend310B4）
         transport: ssh
-        host: <8T 开发板 IP>
+        host: orangepiaipro.local       # 优先唯一主机名，不写固定 IP
         user: <SSH 用户>
         note: 8T 证据集；结果不与 20T 合并
       - id: board-20t
         label: 开发板 2（20T / Ascend310B1）
         transport: ssh
-        host: <20T 开发板 IP>
+        host: orangepiaipro-20t.local
         user: <SSH 用户>
         note: 20T 证据集；与 8T 分开记录
+    discovery:
+      cidrs: ["10.0.0.0/24"]          # 只允许私有 IPv4；按实际局域网修改
+      user: <SSH 用户>
+      port: 22
+      scanConcurrency: 24
+      probeConcurrency: 4
+      scanTimeoutMs: 500
+      probeTimeoutMs: 60000
+      # inventoryPath: <本地资产表；默认 DSH_HOME/ascend310b-inventory.json>
 ```
 
-只需要本机解析探测记录时，可以省略 `targets`；需要 SSH 探测时再填板卡配置。
+只需要本机解析探测记录时，可以省略 `targets`；需要 SSH 探测时再填板卡配置。动态 IP 环境应给每块板唯一的 mDNS/DNS 主机名，或使用 DHCP 保留地址；`ascend_discover` 会把发现的板卡按 MAC 写入本地资产表，并记录系统变化。
+
+### 动态 IP、发现与多板
+
+`ascend_discover` 只在显式给出的私有 IPv4 CIDR 中工作，不会扫描公网。它先探测 22 端口，再用和 `ascend_probe` 相同的只读脚本读取主机名、eth0 MAC、板型、驱动、CANN、固件和 Python，然后按 MAC 写入本地资产表：
+
+```text
+DSH_HOME/ascend310b-inventory.json
+```
+
+同一块板换 IP 会归并为同一条记录；重装系统、驱动、固件或 CANN 变化会写入 `changes`。发现到的板卡会以 target id（例如 `ascend-c0742bfddd7a`）出现在面板和 `target` 选择中，不需要手工把 IP 写进 `targets`。资产表包含 MAC，禁止提交到 Git 或放进插件包。
+
+调用示例：
+
+```text
+ascend_discover cidrs=["10.0.0.0/24"]
+```
+
+发现到的板卡可直接作为 target：
+
+```text
+ascend_probe target=ascend-c0742bfddd7a
+```
+
+对 10 块以上开发板，建议每块板第一次通过串口设置唯一主机名，之后用 `discovery.cidrs` 做周期扫描；串口不是持续发现通道，主要用于首次配置和网络故障恢复。当前版本实现的是网络发现，串口自动登录/探测仍需手工或后续扩展。
 
 4) 技能文件不会被插件自动发现，需要单独放置：
 
@@ -115,16 +148,22 @@ cp -R "$plugin"/. "$dest"/
 | 工具 | 作用 | 关键参数 |
 | --- | --- | --- |
 | `ascend_probe` | 在目标板执行**只读**探测脚本并解析 | `target`、`rawText`（解析已有记录）、`timeoutMs` |
+| `ascend_discover` | 扫描私有网段、按 MAC 建资产表并记录驱动/CANN/系统变化 | `cidrs`、`user`、`port`、`concurrency`、`timeoutMs`、`inventoryPath` |
 | `ascend_check` | 用 `rawText` 或现场探测得到环境报告 | `target`、`rawText`、`repoRoot` |
 | `ascend_debug_plan` | 按症状/领域生成分层调试计划 | `symptom`、`area`、`target`、`rawText`、`maxEntries` |
 | `ascend_sample_index` | 检索 `samples/` 里的样例入口与测试命令 | `query`、`archetype`、`limit`、`repoRoot` |
 | `ascend_board_exec` | 执行**单条只读**诊断命令 | `command`、`target`、`run`、`timeoutMs` |
+| `ascend_board_run` | 显式执行下载、ATC、Python、pytest、msame 或教程脚本 | `command`、`cwd`、`target`、`allowStateChange`、`environment`、`dryRun`、`timeoutMs` |
+| `ascend_model_download` | 下载华为云、HF mirror 或 GitHub 网页代理资产 | `source`、`url`/`repoId`、`filename`、`destination`、`githubProxy`、`allowStateChange` |
+| `ascend_ui_capture` | 用宿主机 Edge/Chrome 截取开发板前端页面 | `url`、`output`、`width`、`height`、`waitMs`、`allowStateChange` |
 
-浏览器侧另有 **昇腾310B调试** 面板：板卡/驱动/固件/CANN 卡片、版本配套判定、已记录版本组合、样例检索和探测原文。面板在探测之前所有版本字段显示**未采集**；探测到非 310B 芯片时，面板顶部会明确写出“不适用”。
+浏览器侧另有 **昇腾310B调试** 面板：顶部是探测动作，左侧是按 MAC 去重的开发板列表，右侧按“概览 / 开发板资产 / 调试 / 原始输出”分区。概览只保留关键状态卡和版本配套；资产页显示完整资产和系统变化；调试页放症状和样例；原始页放完整事实、原始探测和仓库版本组合。面板在探测之前所有版本字段显示**未采集**；探测到非 310B 芯片时，面板顶部会明确写出“不适用”。
+
+面板默认显示**上一次探测快照**：点“运行探测”执行一次只读探测，点“刷新”只重新读取报告缓存。左侧点击任一开发板会立即执行**一次**该板的只读探测并更新概览；即使没有开启实时监控，切换板子也会刷新当前板信息。需要持续观察板卡状态时，点“实时监控”开启 60 秒轮询；它每 60 秒重新执行一次只读探测并更新温度、内存、健康状态和版本字段，再点“停止实时”结束。点“发现开发板”会按 profile 中的 `discovery.cidrs` 扫描局域网，按 MAC 更新资产表和 target 列表。轮询是快照更新，不是采样率更高的板端指标流。
 
 ### HTTP 路由
 
-面板使用两条只读路由：`GET /ascend310b-debug/report.json` 返回最近一次探测形成的报告；带 `?fresh=1` 时绕过 120 秒缓存，但仍不执行板端探测。实时探测使用 `POST /ascend310b-debug/probe`，面板右上角的“运行探测”按钮调用这条路由。
+面板使用三条路由：`GET /ascend310b-debug/report.json` 返回最近一次探测形成的报告；带 `?fresh=1` 时绕过 120 秒缓存，但仍不执行板端探测。`POST /ascend310b-debug/probe` 执行实时探测，`POST /ascend310b-debug/discover` 执行局域网发现；面板右上角的“运行探测”和“发现开发板”按钮分别调用它们。
 
 ### 面板预览
 
@@ -134,19 +173,39 @@ cp -R "$plugin"/. "$dest"/
 node scripts/render-panel-preview.mjs <探测记录文件> data/panel-preview.html data/panel-preview.svg
 ```
 
-## `ascend_board_exec` 的只读边界
+## 只读诊断与任务执行
 
-命令必须先通过白名单校验，再考虑执行：
+`ascend_board_exec` 仍然是严格只读工具。它只接受白名单内的诊断程序，并拒绝管道、链式命令、重定向、命令替换、包安装、服务重启和设备写操作。`run: false` 只校验并返回等价调用，不执行。
 
-- 拒绝任何管道、`;`、`&&`、`||`、单个 `&`、反引号、`$( )`、重定向与进程替换。`cat file | bash` 这类单管道绕行也会被拒绝。
-- 拒绝变更类子串：`rm`、`mv`、`dd`、`mkfs`、`sudo`、`apt`、`pip install`、`systemctl restart`、`reboot`、`upgrade-tool`、git 写操作等。
-- 程序名必须是 `PATH` 中的裸命令名，`./npu-smi` 或 `/tmp/npu-smi` 不能借用白名单。
-- 命令首词必须在只读白名单内（`npu-smi`、`uname`、`cat`、`grep`、`ls`、`stat`、`readlink`、`sha256sum`、`df`、`free`、`lsmod`、`dmesg`、`v4l2-ctl`、`ps`、`ss`……）。
-- 有变更子命令或写参数的程序按参数逐一校验：`npu-smi` 只允许 `info`；`v4l2-ctl` 只允许枚举/查询选项；`dmesg` 不允许清空或改控制台级别；`hostname` 和 `date` 不允许设置操作。
-- 会执行任意代码或写产物的程序不进入白名单：`bash`、`source`、`python -c`、`atc`、`msame`、`curl`、`pip`、`conda`、`sed -i`。
-- `run: false` 只校验并返回等价调用，不执行。
+教程下载、模型转换和样例运行使用独立的 `ascend_board_run`：
 
-需要改动板卡状态时，插件会把命令和回退条件交给用户，由用户执行。调试计划里出现的 `source`、`python -c`、`atc`、`conda activate` 和管道命令是供人阅读、在已激活环境中手工执行的步骤，不表示 `ascend_board_exec` 会接受它们。
+- 默认 `environment: "base"` 会加载 `/usr/local/miniconda3`、CANN `set_env.sh` 和 conda 初始化；需要裸 SSH shell 时显式设为 `"none"`；
+- 必须显式传入 `allowStateChange: true`；
+- 默认拒绝 `sudo` 和递归/强制删除，分别在需要时传入 `allowPrivileged`、`allowDestructive`；
+- 仍拒绝 `npu-smi set/reset/upgrade`、重启、关机和直接写块设备；
+- 支持 `source`、`conda activate`、`python`、`pytest`、`bash`、`atc`、`msame`、`wget` 和 `curl`；
+- `dryRun: true` 只显示解析后的命令，不执行。
+
+`ascend_model_download` 的下载路由：
+
+- 华为云 OBS：保留原始 `huaweicloud.com` / `myhuaweicloud.com` URL，直接下载；
+- Hugging Face：把请求解析到 `https://hf-mirror.com/<repo>/resolve/<revision>/<file>`；
+- GitHub：使用网页代理，默认 `https://gh-proxy.com/https://github.com/...`，可通过 `githubProxy` 或 profile 的 `config.githubProxy` 替换；
+- 不把模型二进制、ONNX、OM 或数据集写进插件源码或 Git。
+
+调试计划中出现的 `source`、`python -c`、`atc`、`conda activate`、`wget` 和管道命令是教程实际步骤；只读工具不会执行它们，必须改用 `ascend_board_run`，并在 `dryRun` 通过后显式运行。
+
+## 前端截图
+
+`ascend_ui_capture` 在宿主机用 Edge/Chrome 无头模式访问开发板 HTTP 页面并保存 PNG：
+
+- 先用 `ascend_board_run` 启动并确认页面可访问；
+- 传 `url`、`output`、`allowStateChange: true`；
+- 默认视口 `1440x900`，可指定 `width`、`height`、`waitMs`；
+- 输出必须在插件 `artifactRoot`（默认当前工作区）内且以 `.png` 结尾；
+- 返回截图路径、尺寸、字节数、浏览器和耗时。
+
+这解决 chapter/case 的“运行日志有了，但前端交互结果没有证据”的问题；截图不替代 API/健康检查，二者都要保存。
 
 ## 版本配套判定
 
@@ -192,7 +251,7 @@ powershell -File scripts/verify-profile.ps1 -RepoRoot <仓库>    # 用一次性
 powershell -File scripts/check-patch-compose.ps1                # 验证 profile patch 能被解析并生效
 ```
 
-`npm test` 覆盖：解析、版本判定、适用范围（310B 内/外/未确认）、调试计划、样例检索（含中文症状）、只读命令白名单与绕过回归、浏览器半装配、面板渲染（含非 310B 拒绝提示）、可移植性与冒烟路由。
+`npm test` 覆盖：解析、版本判定、适用范围（310B 内/外/未确认）、调试计划、样例检索（含中文症状）、只读命令白名单与绕过回归、显式任务执行策略、HF/GitHub/Huawei 下载 URL 归一化、浏览器半装配、面板渲染（含非 310B 拒绝提示）、可移植性与冒烟路由。
 
 **主机半改动需要重启 DSH 才会生效。** 桌面 Electron profile 由应用托管，`dsh --profile desktop` 会拒绝执行，所以改动后用 `verify-profile.ps1` 先在一次性 profile 里验证；浏览器半会热更新，主机半（工具与路由）要重启应用。重启前可以用 `live-probe.mjs` 直接确认板端探测结果。
 
