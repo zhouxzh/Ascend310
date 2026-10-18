@@ -259,6 +259,10 @@ section.section h2 {
   font-weight: 400;
 }
 
+section.center {
+  justify-content: center;
+}
+
 section.visual {
   justify-content: center;
 }
