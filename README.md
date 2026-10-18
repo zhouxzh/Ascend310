@@ -62,6 +62,8 @@ git diff --check
 
 正式电子书的 Markdown 到 LaTeX/PDF 转换入口是 `convert-vuepress.sh`；生成文件位于 `latex/`，不要直接编辑生成的 `.tex` 或 PDF。
 
+教学演示的源文件和目录清单在 [`src/presentation/README.md`](src/presentation/README.md)。构建前运行 `pnpm docs:slides:check`，完整放映页由 `pnpm docs:slides` 生成；只重建一份课件可用 `node scripts/build_presentation.mjs --only=<slug>`。
+
 ## 配套 DSH 插件
 
 [`tools/`](tools/README.md) 存放与本教材配套、可独立安装的 DeepSeek Harness 插件：

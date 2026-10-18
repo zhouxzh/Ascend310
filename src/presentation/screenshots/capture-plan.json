@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "defaults": {
+    "viewport": {
+      "width": 1920,
+      "height": 1080,
+      "deviceScaleFactor": 1
+    },
+    "waitUntil": "networkidle2",
+    "timeoutMs": 30000,
+    "settleMs": 800
+  },
+  "originTokens": {
+    "BOARD_8T_ORIGIN": "Ascend310B4 / 8T board origin",
+    "BOARD_20T_ORIGIN": "Ascend310B1 / 20T board origin"
+  },
+  "captures": [
+    {
+      "id": "chapter6-webrtc-demo",
+      "kind": "browser",
+      "deck": "book-06",
+      "board": "board-8t",
+      "url": "{{BOARD_8T_ORIGIN}}:8080/",
+      "output": "book/chapter6-webrtc-demo-1920x1080.png",
+      "waitForSelector": "body",
+      "description": "8T 板端静态 HTTP 服务渲染的 WebRTC 接收页；aiortc 后端因隔离环境依赖未就绪，截图只记录前端。",
+      "privacy": "demo-source-no-personal-data",
+      "evidenceBoundary": "证明板载 web/ 前端可以由 8T HTTP 服务加载并完成布局渲染，不证明信令、媒体接收、编解码或 VENC 硬编路径。"
+    },
+    {
+      "id": "case1-attendance-main",
+      "kind": "browser",
+      "deck": "case-01",
+      "board": "board-8t",
+      "url": "{{BOARD_8T_ORIGIN}}:5000/",
+      "output": "cases/case1-attendance-main-1920x1080.png",
+      "waitForSelector": "body",
+      "description": "8T 板端静态 HTTP 服务加载的案例1预构建 React 前端；后端 API 未连接。",
+      "privacy": "synthetic-or-anonymous-face-only",
+      "evidenceBoundary": "证明考勤页面布局与前端资产可由 8T 加载，不证明模型推理、身份识别、数据库写入或人员识别精度。"
+    },
+    {
+      "id": "case2-tracking-window",
+      "kind": "native",
+      "deck": "case-02",
+      "board": "board-8t",
+      "output": "cases/case2-tracking-window-744x453.png",
+      "applicationFiles": [
+        "samples/case2/scripts/detection_app.py",
+        "samples/case2/ssdlite/npu_backend.py",
+        "samples/case2/models/ssd320_mobilenetv3_small_050.om"
+      ],
+      "privacy": "public-non-biometric-test-video-no-window-ip",
+      "evidenceBoundary": "证明 8T 上的 NPU 检测应用窗口显示模型、设备、单帧分段计时和公开测试视频；单张截图不证明准确率、长稳、跟踪ID或生产性能。"
+    },
+    {
+      "id": "case3-performance-main",
+      "kind": "browser",
+      "deck": "case-03",
+      "board": "board-8t",
+      "url": "{{BOARD_8T_ORIGIN}}:8765/",
+      "output": "cases/case3-performance-main-1920x1080.png",
+      "waitForSelector": "body",
+      "hideSelectors": [
+        ".system-strip"
+      ],
+      "description": "8T 板端 /home/HwHiAiUser/Ascend310/cases/case3 的 run_webui.py 正在提供 8765 前端页面；截图隐藏系统环境条。",
+      "privacy": "no-device-identifiers-or-audio-artifacts",
+      "evidenceBoundary": "证明该8T板端案例3 Web工作台前端可加载并呈现运行状态，不证明音频设备、MIDI、DDSP推理、音质或端到端时延。"
+    },
+    {
+      "id": "case4-palmprint-live-idle",
+      "kind": "browser",
+      "deck": "case-04",
+      "board": "board-8t",
+      "url": "{{BOARD_8T_ORIGIN}}:7860/",
+      "output": "cases/case4-palmprint-live-idle-1920x1080.png",
+      "waitForSelector": "body",
+      "description": "8T 板端静态 HTTP 服务加载的案例4预构建 React 前端；FastAPI与NPU服务未连接。",
+      "privacy": "synthetic-roi-and-anonymous-templates-only",
+      "evidenceBoundary": "证明掌纹工作台前端布局与资产可由 8T 加载，不证明摄像头、NPU推理、候选模型准入、EER或Rank-1。"
+    },
+    {
+      "id": "case5-signal-dashboard",
+      "kind": "native",
+      "deck": "case-05",
+      "board": "board-8t",
+      "output": "cases/case5-signal-dashboard-1920x1080.png",
+      "applicationFiles": [
+        "samples/case5/time_frequency_dashboard/ui/main_window.py"
+      ],
+      "privacy": "synthetic-signal-or-public-capture",
+      "evidenceBoundary": "证明桌面仪表盘的窗口和会话布局，不替代原始采集与 QC 证据。"
+    },
+    {
+      "id": "case6-drive-main",
+      "kind": "browser",
+      "deck": "case-06",
+      "board": "board-8t",
+      "url": "{{BOARD_8T_ORIGIN}}:7860/",
+      "output": "cases/case6-drive-main-1920x1080.png",
+      "waitForSelector": "body",
+      "description": "8T 板端 Gradio 小车页面；模型目录为空，应用按代码回退到未训练/随机的 CPU 分类器。",
+      "privacy": "public-road-image-or-synthetic-scene",
+      "evidenceBoundary": "证明 Gradio 前端与系统状态页可由 8T 渲染并展示CPU回退提示，不证明NPU、模型训练、车道检测结果、驾驶控制或真实道路准确率。"
+    },
+    {
+      "id": "case6-system-info",
+      "kind": "browser",
+      "deck": "case-06",
+      "board": "board-8t",
+      "url": "{{BOARD_8T_ORIGIN}}:7860/",
+      "output": "cases/case6-system-info-1920x1080.png",
+      "waitForSelector": "body",
+      "actions": [
+        {
+          "type": "click",
+          "selector": "#component-14-button"
+        }
+      ],
+      "settleMs": 1200,
+      "description": "8T 板端 Gradio 系统信息页；模型目录为空，页面显示当前后端与模型状态。",
+      "privacy": "no-user-data",
+      "evidenceBoundary": "证明系统信息页真实展示了8T上的Gradio应用状态和CPU回退/模型缺失情况，不证明NPU推理或驾驶功能。"
+    },
+    {
+      "id": "case7-album-search",
+      "kind": "browser",
+      "deck": "case-07",
+      "board": "board-8t",
+      "url": "{{BOARD_8T_ORIGIN}}:7860/",
+      "output": "cases/case7-album-search-1920x1080.png",
+      "waitForSelector": "body",
+      "description": "8T 板端静态 HTTP 服务加载的案例7 web/index.html；FastAPI、数据库与模型服务未连接。",
+      "privacy": "synthetic-photos-without-exif-or-identifiers",
+      "evidenceBoundary": "证明相册前端布局与资产可由 8T 加载，不证明照片库、模型检索、触摸屏、NPU、精度或ESP32/电子纸链路。"
+    },
+    {
+      "id": "case8-gesture-live",
+      "kind": "browser",
+      "deck": "case-08",
+      "board": "board-8t",
+      "url": "{{BOARD_8T_ORIGIN}}:8080/webrtc_index.html",
+      "output": "cases/case8-gesture-live-1920x1080.png",
+      "waitForSelector": "body",
+      "description": "8T 板端静态 HTTP 服务加载的案例8 WebRTC 客户端页面；aiohttp、模型与摄像头服务未连接。",
+      "privacy": "public-gesture-clip-no-identifiable-person",
+      "evidenceBoundary": "证明手势WebRTC客户端前端布局与资产可由8T加载，不证明信令、摄像头、OM推理、检测叠加、视频帧率或VENC。"
+    },
+    {
+      "id": "case9-chat-ready",
+      "kind": "browser",
+      "deck": "case-09",
+      "board": "board-20t",
+      "url": "{{BOARD_20T_ORIGIN}}:7865/",
+      "output": "cases/case9-chat-ready-1920x1080.png",
+      "waitForSelector": "body",
+      "privacy": "fixed-non-sensitive-prompt-no-token",
+      "evidenceBoundary": "证明文字聊天页面和就绪状态，不证明模型质量、首字延迟或正式准入。"
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-17T15:47:40.587627+00:00",
+  "policy": "Derived copies remove the header/footer environment strip and known device fields. Original files are not linked from the deck.",
+  "assets": [
+    {
+      "id": "case3-touch-performance",
+      "source": "src/experiment/img3/case3-ui-touch-performance.png",
+      "sourceSha256": "415ea48e363d0735255f047e776619cc15b3a6fe6eb61bcb4a499bea61a5b201",
+      "output": "src/presentation/screenshots/cases/historical/case3-touch-performance-redacted.png",
+      "outputSha256": "9e58ef65e87c6e79b2c61dd9c67e81c792f0ff4196b4c0541286c9b9f8277769",
+      "outputBytes": 40793,
+      "transform": {
+        "cropTopPx": 230,
+        "cropBottomPx": 55,
+        "redactions": [],
+        "label": "设备信息已脱敏"
+      },
+      "evidence": "historical UI acceptance capture; not a current board deployment"
+    },
+    {
+      "id": "case3-midi-keyboard",
+      "source": "src/experiment/img3/case3-ui-midi-keyboard.png",
+      "sourceSha256": "2f65d469e9d1db3dd7437c1db043325f3ea64f9aa4212c98e297291524e9da8f",
+      "output": "src/presentation/screenshots/cases/historical/case3-midi-keyboard-redacted.png",
+      "outputSha256": "c3fc9e93faa8eb4b13a3119e28008e49deee21fab89528e74f81b29ba0b19f0a",
+      "outputBytes": 42527,
+      "transform": {
+        "cropTopPx": 230,
+        "cropBottomPx": 55,
+        "redactions": [],
+        "label": "设备信息已脱敏"
+      },
+      "evidence": "historical UI acceptance capture; not a current board deployment"
+    },
+    {
+      "id": "case3-midi-ddsp-library",
+      "source": "src/experiment/img3/case3-ui-midi-ddsp-library.png",
+      "sourceSha256": "ef083155b6282b6f05f25f5e274b62eff7240bad23b394f0da148b99004e9df2",
+      "output": "src/presentation/screenshots/cases/historical/case3-midi-ddsp-library-redacted.png",
+      "outputSha256": "fd3d0f01af6ad3caa078171af14b07946439484257c01583b98a1f5ae84d5da4",
+      "outputBytes": 118880,
+      "transform": {
+        "cropTopPx": 180,
+        "cropBottomPx": 55,
+        "redactions": [
+          [
+            20,
+            738,
+            900,
+            822
+          ]
+        ],
+        "label": "设备信息已脱敏"
+      },
+      "evidence": "historical UI acceptance capture; not a current board deployment"
+    },
+    {
+      "id": "case3-midi-ddsp-render",
+      "source": "src/experiment/img3/case3-ui-midi-ddsp-render.png",
+      "sourceSha256": "cb79f45a5742d13bbcc873f2c308f4e4c28136f39e0a8f89f0916a7a74f33b38",
+      "output": "src/presentation/screenshots/cases/historical/case3-midi-ddsp-render-redacted.png",
+      "outputSha256": "9de08bb7f90e518ab54d7cfc93afbbe96fcc30614b5149b3e29d8b05e6bec6fb",
+      "outputBytes": 390331,
+      "transform": {
+        "cropTopPx": 180,
+        "cropBottomPx": 55,
+        "redactions": [],
+        "label": "设备信息已脱敏"
+      },
+      "evidence": "historical UI acceptance capture; not a current board deployment"
+    },
+    {
+      "id": "case3-vst-tone",
+      "source": "src/experiment/img3/case3-ui-ddsp-vst-tone.png",
+      "sourceSha256": "638b3a7b82fa394ae21bb79c0ba0be4ed9b2672f8c96c967549a465ab49f9007",
+      "output": "src/presentation/screenshots/cases/historical/case3-vst-tone-redacted.png",
+      "outputSha256": "6324ba67667a0bbbb78b14b32d150cccda0e5bef00da405c834390b25a11a15e",
+      "outputBytes": 73546,
+      "transform": {
+        "cropTopPx": 180,
+        "cropBottomPx": 55,
+        "redactions": [
+          [
+            1035,
+            188,
+            1905,
+            306
+          ]
+        ],
+        "label": "设备信息已脱敏"
+      },
+      "evidence": "historical UI acceptance capture; not a current board deployment"
+    },
+    {
+      "id": "case3-vst-gate",
+      "source": "src/experiment/img3/case3-ui-ddsp-vst-gate.png",
+      "sourceSha256": "4f5b847f522b398829e7ab14906e88ff3ad4068a7c440b604e699a4dad474eb5",
+      "output": "src/presentation/screenshots/cases/historical/case3-vst-gate-redacted.png",
+      "outputSha256": "6e8f61f1bdfde73284f002dcac39fc2a935c8460f2ce4b5f8cb326329c3d6485",
+      "outputBytes": 81547,
+      "transform": {
+        "cropTopPx": 180,
+        "cropBottomPx": 55,
+        "redactions": [
+          [
+            1035,
+            188,
+            1905,
+            306
+          ]
+        ],
+        "label": "设备信息已脱敏"
+      },
+      "evidence": "historical UI acceptance capture; not a current board deployment"
+    },
+    {
+      "id": "case5-hantek-dashboard",
+      "source": "src/experiment/img5/case5-hantek-dashboard-1920x1080.png",
+      "sourceSha256": "f4e663f1d2c201b692d11cf395a8d928603a8ec0faa3eae5a176c5ff860ddd70",
+      "output": "src/presentation/screenshots/cases/historical/case5-hantek-dashboard-1920x1010.png",
+      "outputSha256": "1b072d0d40e4b6839ad9335cf933f4e6d3368a16ca317ed5d6dfc8a157509d88",
+      "outputBytes": 125078,
+      "transform": {
+        "cropTopPx": 80,
+        "cropBottomPx": 70,
+        "redactions": [],
+        "label": "设备信息已脱敏"
+      },
+      "evidence": "historical UI acceptance capture; not a current board deployment"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { defineClientConfig } from "vuepress/client";
 
-const presentationHtmlPath = /^\/Ascend310\/presentation\/\d{2}-[^/]+\.html(?:$|[?#])/u;
+const presentationHtmlPath =
+  /^\/Ascend310\/presentation\/(?:\d{2}-|legacy-\d{2}-)[^/]+\.html(?:$|[?#])/u;
 
 export default defineClientConfig({
   enhance() {

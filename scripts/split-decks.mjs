@@ -162,8 +162,10 @@ function reflowDeck(text) {
 
 const args = process.argv.slice(2);
 const write = args.includes('--write');
+const includeArchive = args.includes('--include-archive');
 const explicit = args.filter((argument) => !argument.startsWith('--'));
-const files = explicit.length > 0 ? explicit : readdirSync(PRESENTATION_DIR).filter((name) => /^\d{2}-.*\.md$/u.test(name)).map((name) => join(PRESENTATION_DIR, name));
+const defaultPattern = includeArchive ? /^(?:\d{2}-|legacy-\d{2}-).*\.md$/u : /^\d{2}-.*\.md$/u;
+const files = explicit.length > 0 ? explicit : readdirSync(PRESENTATION_DIR).filter((name) => defaultPattern.test(name)).map((name) => join(PRESENTATION_DIR, name));
 
 let changed = 0;
 for (const file of files) {

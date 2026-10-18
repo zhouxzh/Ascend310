@@ -1,0 +1,1293 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "privacy": "synthetic-or-anonymous-only",
+    "boardEvidenceSets": [
+      "Ascend310B4 / 8T",
+      "Ascend310B1 / 20T"
+    ],
+    "requirements": [
+      "capture id",
+      "presentation deck id",
+      "board tier",
+      "page path",
+      "viewport",
+      "captured timestamp",
+      "PNG byte count",
+      "SHA-256",
+      "privacy classification",
+      "evidence boundary",
+      "application asset SHA-256 and combined digest"
+    ]
+  },
+  "boardSnapshots": {
+    "board-8t": {
+      "capturedAt": "2026-10-17T21:48:35+08:00",
+      "hostname": "orangepiaipro",
+      "soc": "Ascend310B4",
+      "tier": "8T",
+      "os": "Ubuntu 22.04.3 LTS",
+      "cann": "8.0.0",
+      "driver": "25.2.0",
+      "npuSmi": "25.2.0",
+      "health": "Alarm",
+      "temperatureC": 78,
+      "firmware": "unknown"
+    },
+    "board-20t": {
+      "capturedAt": "2026-10-17T21:49:15+08:00",
+      "hostname": "orangepiaipro-20t",
+      "soc": "Ascend310B1",
+      "tier": "20T",
+      "os": "Ubuntu 22.04.3 LTS",
+      "cann": "8.0.0",
+      "driver": "25.2.0",
+      "npuSmi": "25.2.0",
+      "health": "Alarm",
+      "temperatureC": 68,
+      "firmware": "unknown"
+    }
+  },
+  "captures": [
+    {
+      "id": "case1-attendance-main",
+      "kind": "browser",
+      "deck": "case-01",
+      "board": "board-8t",
+      "description": "8T 板端静态 HTTP 服务加载的案例1预构建 React 前端；后端 API 未连接。",
+      "page": "/",
+      "origin": "http://192.168.1.100:5000",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "capturedAt": "2026-10-17T15:25:46.983Z",
+      "output": "cases/case1-attendance-main-1920x1080.png",
+      "bytes": 112381,
+      "sha256": "af1a51d03b5338bab1f708fbfc7f2154703d963127f9d3648d0282101a610df2",
+      "privacy": "synthetic-or-anonymous-face-only",
+      "evidenceBoundary": "证明考勤页面布局与前端资产可由 8T 加载，不证明模型推理、身份识别、数据库写入或人员识别精度。",
+      "applicationDigest": "1bc8e1fcbaf76bd43926d8ff89c26ac521f975410f87dcc83755fde929f69026",
+      "applicationAssets": [
+        {
+          "type": "document",
+          "url": "http://192.168.1.100:5000/",
+          "status": 200,
+          "bytes": 461,
+          "sha256": "c3c667bd4f5926e32d00e717e981b680bbefd934e6fa412f17760e020350ad4e"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:5000/assets/index-Ced6zFAt.css",
+          "status": 200,
+          "bytes": 15129,
+          "sha256": "c19e04011e6c80da7f1ccb25ab403ba4a641ea2f8cae7188cfb8c476a77228ed"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:5000/assets/index-DW218dcQ.js",
+          "status": 200,
+          "bytes": 179998,
+          "sha256": "0de534512ce6c1697134823788c921348e187b67109ee310840b7150cecdf058"
+        }
+      ]
+    },
+    {
+      "id": "case2-tracking-window",
+      "kind": "native",
+      "deck": "case-02",
+      "board": "board-8t",
+      "description": "",
+      "page": "board-desktop",
+      "viewport": {
+        "width": 744,
+        "height": 453,
+        "deviceScaleFactor": 1
+      },
+      "capturedAt": "2026-10-17T15:47:05.737Z",
+      "output": "cases/case2-tracking-window-744x453.png",
+      "bytes": 429686,
+      "sha256": "7bde5515c91b8843000cf6a40021347e350e87aa799126ecf3727d83b9820ab1",
+      "privacy": "public-non-biometric-test-video-no-window-ip",
+      "evidenceBoundary": "证明 8T 上的 NPU 检测应用窗口显示模型、设备、单帧分段计时和公开测试视频；单张截图不证明准确率、长稳、跟踪ID或生产性能。",
+      "applicationDigest": "782a224ce9f14c681ffce8dd77e2640cb6aee28ae80cffa4d6fc88146e5d3c6c",
+      "applicationAssets": [
+        {
+          "type": "source",
+          "path": "samples/case2/scripts/detection_app.py",
+          "bytes": 5603,
+          "sha256": "03eed98ce8b063a29dce4a8c523d03ccfa50a863bd15f5a74d1c2597b6ec1911"
+        },
+        {
+          "type": "source",
+          "path": "samples/case2/ssdlite/npu_backend.py",
+          "bytes": 6519,
+          "sha256": "cd3bb6184783e5bf20d4aec3200ae16116342973a83ef4e67a682e2831f25640"
+        },
+        {
+          "type": "source",
+          "path": "samples/case2/models/ssd320_mobilenetv3_small_050.om",
+          "bytes": 6151542,
+          "sha256": "ce8eeb676591560939f948fad2f3a4237d47b7ef31228d83648df98b1be73b3b"
+        }
+      ],
+      "dataManifest": null
+    },
+    {
+      "id": "case3-performance-main",
+      "kind": "browser",
+      "deck": "case-03",
+      "board": "board-8t",
+      "description": "8T 板端 /home/HwHiAiUser/Ascend310/cases/case3 的 run_webui.py 正在提供 8765 前端页面；截图隐藏系统环境条。",
+      "page": "/",
+      "origin": "http://192.168.1.100:8765",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "capturedAt": "2026-10-17T15:52:53.236Z",
+      "output": "cases/case3-performance-main-1920x1080.png",
+      "bytes": 94106,
+      "sha256": "dc85e13522a2cff521d15ffb6c201efc189171d3050551429735d4fd274a945f",
+      "privacy": "no-device-identifiers-or-audio-artifacts",
+      "evidenceBoundary": "证明该8T板端案例3 Web工作台前端可加载并呈现运行状态，不证明音频设备、MIDI、DDSP推理、音质或端到端时延。",
+      "applicationDigest": "d517ff144a5c91de6bcea19d4fdbeecda8c3e5a4518732b47ede217d294eef27",
+      "applicationAssets": [
+        {
+          "type": "document",
+          "url": "http://192.168.1.100:8765/",
+          "status": 200,
+          "bytes": 474,
+          "sha256": "2c288d49d8961bda7c4e6484ec93f19502e4658d4002c661c47137ff0e190011"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:8765/assets/circle-stop-BzPQttxi.js",
+          "status": 200,
+          "bytes": 362,
+          "sha256": "d97b31c4d27d832177b3a421b50d7028b2848856c399101f29deb2d96cd7fef7"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:8765/assets/download-DbvqC0sd.js",
+          "status": 200,
+          "bytes": 431,
+          "sha256": "900512ba448681125efe979a9c20e08bd3469a91a8b03575a743bd7cea02784a"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:8765/assets/index-BnXGmRYV.js",
+          "status": 200,
+          "bytes": 213991,
+          "sha256": "eabaae30c58b69a731f7e33caf23fbba3869253cb257cfb16164f2d50af70fc6"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:8765/assets/index-DBB8IWTm.css",
+          "status": 200,
+          "bytes": 132237,
+          "sha256": "4cd616be160fdad741e310b9920d6ab812084dad4f533cf4f68dab704ece2ec2"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:8765/assets/RealtimePerformanceView-WubqmdlL.js",
+          "status": 200,
+          "bytes": 37449,
+          "sha256": "853942166c3ffe200bbb75bddb2128db12e2a39447bbb0096481fa1a1e196d5c"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:8765/assets/timbres-DMTKZBz7.js",
+          "status": 200,
+          "bytes": 1418,
+          "sha256": "3a4d98d7cdc21ae7713c49029cd2ea8effbcff10d7ded8c11d27a5394ae94867"
+        }
+      ]
+    },
+    {
+      "id": "case4-palmprint-live-idle",
+      "kind": "browser",
+      "deck": "case-04",
+      "board": "board-8t",
+      "description": "8T 板端静态 HTTP 服务加载的案例4预构建 React 前端；FastAPI与NPU服务未连接。",
+      "page": "/",
+      "origin": "http://192.168.1.100:7860",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "capturedAt": "2026-10-17T15:25:53.398Z",
+      "output": "cases/case4-palmprint-live-idle-1920x1080.png",
+      "bytes": 192060,
+      "sha256": "0c8bea9ccdd2abf0a6154f27e049cb01bc9b126599bc0db866bbb885d1f3aae0",
+      "privacy": "synthetic-roi-and-anonymous-templates-only",
+      "evidenceBoundary": "证明掌纹工作台前端布局与资产可由 8T 加载，不证明摄像头、NPU推理、候选模型准入、EER或Rank-1。",
+      "applicationDigest": "3a9f9f152985f986ba8c15d10cc47770894cf628d38f6443faab7d86e619286f",
+      "applicationAssets": [
+        {
+          "type": "document",
+          "url": "http://192.168.1.100:7860/",
+          "status": 200,
+          "bytes": 461,
+          "sha256": "61a05169a5add88cbea67f0eb1b8ee4883736e7c33cc44021511e9899df0fc5f"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/index-C_v2mMEQ.js",
+          "status": 200,
+          "bytes": 220475,
+          "sha256": "4747e4c1cae98380a865e1b9dc1a95429d0e2d25055e4108639c4cfc8c378681"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/index-DsQH3qaP.css",
+          "status": 200,
+          "bytes": 36036,
+          "sha256": "b4b70042e9a0710a1e72f3466bfd17e29a35ee06e3797d51922ebda9e156f432"
+        }
+      ]
+    },
+    {
+      "id": "case6-drive-main",
+      "kind": "browser",
+      "deck": "case-06",
+      "board": "board-8t",
+      "description": "8T 板端 Gradio 小车页面；模型目录为空，应用按代码回退到未训练/随机的 CPU 分类器。",
+      "page": "/",
+      "origin": "http://192.168.1.100:7860",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "capturedAt": "2026-10-17T15:50:31.525Z",
+      "output": "cases/case6-drive-main-1920x1080.png",
+      "bytes": 51530,
+      "sha256": "de015d0c1473c8fddc1bc1b37830b3543da87b979cd29d4d6b86700196702833",
+      "privacy": "public-road-image-or-synthetic-scene",
+      "evidenceBoundary": "证明 Gradio 前端与系统状态页可由 8T 渲染并展示CPU回退提示，不证明NPU、模型训练、车道检测结果、驾驶控制或真实道路准确率。",
+      "applicationDigest": "47fb6df91dc60aaf4710e322460e18ac8039766d639686185613c200bf03f6f1",
+      "applicationAssets": [
+        {
+          "type": "document",
+          "url": "http://192.168.1.100:7860/",
+          "status": 200,
+          "bytes": 17355,
+          "sha256": "8b5b60e281f8b94dc04d3d4bfea76177ec99a7ad3b25ab37ea21f200dc0863e9"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/BlockLabel-BXXlQleC.js",
+          "status": 200,
+          "bytes": 1729,
+          "sha256": "99dd302274566bd3ce1ee17e2833ebc0b9a57933ac9e914fc8ae98b3cc9bb8f1"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Blocks-Dw_9NR1K.js",
+          "status": 200,
+          "bytes": 125952,
+          "sha256": "33cb6a5f9adb46dccb681883a3c1c2a172826b266e316e3b49f57c5af04de7ce"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Blocks-yLdzXwzS.css",
+          "status": 200,
+          "bytes": 11014,
+          "sha256": "3cde4a7bbe56193a3b87f90bf3381f4c231e056a8882ec5d42c1744c9924ce2f"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Button-CTZL5Nos.css",
+          "status": 200,
+          "bytes": 2268,
+          "sha256": "9a2d8a45633051fd46375099ddae3c725bd0e8edff43603ec0cf7280436f1ff6"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Button-uOcat6Z0.js",
+          "status": 200,
+          "bytes": 10515,
+          "sha256": "f9db9d5cfcc5fee8a59504e0ae03ae186491c9c176a2ba2ff2736aa9fab98b01"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Check-CZUQOzJl.js",
+          "status": 200,
+          "bytes": 632,
+          "sha256": "1f9ffb9c2443d6c0e3faf08aa11f7ec84c4baa336d01199539bdea53a074b164"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Copy-B6RcHnoK.js",
+          "status": 200,
+          "bytes": 712,
+          "sha256": "da8bdf6e5a584df238aa563b7a1abfc3dc20705ee4cda15b12bb341ccf1e0ab6"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Download-DVtk-Jv3.js",
+          "status": 200,
+          "bytes": 636,
+          "sha256": "e3dcad18fdfebc0e3f5eeec400f0841d8afdb82222ea91f4b2e6596a0a2fdb79"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/DownloadLink-BgAM71ly.js",
+          "status": 200,
+          "bytes": 3834,
+          "sha256": "d8803017bc298662692e731e431555027c74e4772bc389451e6ea7d80e2b21ac"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/DropdownArrow-BJ6rp2o2.js",
+          "status": 200,
+          "bytes": 584,
+          "sha256": "7385bbab142dee59786acf14f73d0fec3e9f74d73b929c1cede235564b6653bc"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Empty-CLiqUlWX.js",
+          "status": 200,
+          "bytes": 1762,
+          "sha256": "11814a7a679d491013943e58884c050f529107722c34bdb8341212ad44c9f749"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Example-BOThR97Y.css",
+          "status": 200,
+          "bytes": 42892,
+          "sha256": "dcd15410f2ccf227af74b0b02535c1ab3c17cb5f3034e57ae2d77c82e44921e4"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Example-C7XUkkid.js",
+          "status": 200,
+          "bytes": 1590,
+          "sha256": "1cf48e12c1de3b54675a5313204470c4ef4017e3487a21103381c1b0c01a2278"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Example-Cj3ii62O.css",
+          "status": 200,
+          "bytes": 149,
+          "sha256": "6ded08d8c9a6eb684b6578f6988ea51224807231556a827014ddda47c47242dc"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Example-CoyKMtl3.js",
+          "status": 200,
+          "bytes": 2311,
+          "sha256": "1b4e27107728e860883122a7b26bb94e479361c2acf9c2f00680bccd8321eb23"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Example-DikqVAPo.css",
+          "status": 200,
+          "bytes": 448,
+          "sha256": "bcfbe567d2deeaaaa2fd848dcc7a93801ab0ab8eea1d30c1817500a846857dbf"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Example-DXkut_Rg.js",
+          "status": 200,
+          "bytes": 1831,
+          "sha256": "9c1d4c5cb5d84f41e73c0b3ada490e8dac61322285bb2c0476464db590ef7348"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Example.svelte_svelte_type_style_lang-qahm4PWk.js",
+          "status": 200,
+          "bytes": 346090,
+          "sha256": "0edf3731d074333545c8bfe9970091650b48795a56aa494af6a05e8d47191597"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/file-url-BIHPd7vS.js",
+          "status": 200,
+          "bytes": 970,
+          "sha256": "29c61b9d7545651661ae28fd45ac445f3ec0daad287d0f0d855cb72b1834d801"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Image-B8dFOee4.css",
+          "status": 200,
+          "bytes": 37,
+          "sha256": "c2f962bb4529b3384a1d91fbb4eb009ce0150fa299ff1080958f41eafefb5b0e"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Image-Bsh8Umrh.js",
+          "status": 200,
+          "bytes": 870,
+          "sha256": "c720d0acabc812cc33745683a7dcf1d4fd6948513a736676f4ece92fbe3a20fc"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Image-DG8jX6JY.js",
+          "status": 200,
+          "bytes": 1171,
+          "sha256": "1ad8454002f5d72a123f9b4fb1e25639a72f9d7dfc60f2feb038a3bd768fe08b"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/ImagePreview-CieM3r9y.js",
+          "status": 200,
+          "bytes": 7271,
+          "sha256": "cf350966547a8c180f430f9b013a3a69c369111fe04bdde9c5463e87b29e9b76"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/ImagePreview-DlqNSi_R.css",
+          "status": 200,
+          "bytes": 906,
+          "sha256": "8736033152f6044156fc8fa14295e4eb513d7287c891a986f750480701654df7"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/ImageUploader-B6gmy4oE.js",
+          "status": 200,
+          "bytes": 22851,
+          "sha256": "3bc44c513ea864d29ccad0202fe3f2cea9ef4b575eae3594e7fd0b4067e67fe4"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/ImageUploader-r0sXxVKa.css",
+          "status": 200,
+          "bytes": 3286,
+          "sha256": "ce3575a806a3f15d97671b9d35c6b7bcfcd960f0e2ec907160e88546870deb99"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-3Ud1cpPD.js",
+          "status": 200,
+          "bytes": 3842,
+          "sha256": "4e07d3a37002c6b9a6528bd08793187ffeb999b30011cd68425aeb6657b0b09b"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-8jBbArya.js",
+          "status": 200,
+          "bytes": 5075,
+          "sha256": "92843fe19d680c6abc7f5e433c6d6a0dbbb8207c6258c63d58fdcdba8bd0aba6"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-BEyjvDG_.css",
+          "status": 200,
+          "bytes": 13626,
+          "sha256": "5d5056be676b67ac5cafa957ebddb59065433f1be149afd12e74a686bae63e81"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-C43SQM_O.css",
+          "status": 200,
+          "bytes": 555,
+          "sha256": "56cdedcd65728bae8520c0cbe1c892367c7e363f5f7007aa1d6be3449caf5bfe"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-CaGZNVQT.js",
+          "status": 200,
+          "bytes": 2458,
+          "sha256": "5f65c39d57c006ca7ab12b884bd3fb1e8ef733b82ff1086c6ca841c852e474e6"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-CptIZeFZ.css",
+          "status": 200,
+          "bytes": 497,
+          "sha256": "2853eb31f8b598326ae1c1f3e8b31814a57144375f31eaa92e7f26cbd62dd46c"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-CwNLzWTz.js",
+          "status": 200,
+          "bytes": 3517,
+          "sha256": "34079752294c277d85ea83fdd1371614fafa65728cbce4b19bff53feba7cb268"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-D21IHG0c.js",
+          "status": 200,
+          "bytes": 76640,
+          "sha256": "cf24c6a4e790fd180cf9a190f8b5af715a2dcb1b5e3f1794861ed8c789bf9580"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-D3f6Hf9S.css",
+          "status": 200,
+          "bytes": 2680,
+          "sha256": "ce30a9c97ccbbc94ce821b6a32fe0d9b30402f3c55a2da6eea92267cb3a76800"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/index-D5ROCp7B.js",
+          "status": 200,
+          "bytes": 122133,
+          "sha256": "aca466886412331bc6a7b6d2a4f07b5701ad41a66b53fe3779003840aba7b68b"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-D8AsxGpL.js",
+          "status": 200,
+          "bytes": 5049,
+          "sha256": "14bddb08cada6b4520322f36718d933da917f6b9351cfa7d9c926d5e6ab213e8"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-D8Ugac1I.js",
+          "status": 200,
+          "bytes": 14562,
+          "sha256": "a3f963412d3eef0f3276b46a93eeeb2cd8647e7ce6f9dc08bc89b0ad4257bb8b"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-DgbvCnJk.js",
+          "status": 200,
+          "bytes": 13484,
+          "sha256": "d27953c62956f3d3d9982379224c8e116cbd48750fe6da5b1463b317d5f971bc"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/index-DuXXhepF.css",
+          "status": 200,
+          "bytes": 25951,
+          "sha256": "1f6f1a80d644e7eac543cd49840709aefc96c2aa0030ba0f636887721b439c03"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-DwSO5GE1.js",
+          "status": 200,
+          "bytes": 3091,
+          "sha256": "560b35443deb6b4f583c16276e5706f7a6eb78032937201f55b62f1dd410a00c"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-thdqX2vf.css",
+          "status": 200,
+          "bytes": 242,
+          "sha256": "d43fcb36a9ec2601f310845006dd4a9d1949d8f6818e40b6ee58c7a362a68a70"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-Xv8ZQETB.css",
+          "status": 200,
+          "bytes": 860,
+          "sha256": "82a4fd03663c7a4db80f7d32ed93a114cffa2431a19171d84e2e49a89c825353"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index.svelte_svelte_type_style_lang-D199jKmZ.js",
+          "status": 200,
+          "bytes": 5355,
+          "sha256": "bfbe2ff38b0e125140dc0bc638a94967d2a656191cb6d0b930d386b65edb74e2"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Minimize-X5PPawdt.js",
+          "status": 200,
+          "bytes": 1381,
+          "sha256": "7f83199136d415799be0e36f9eaf19c8fd2db0de4dd158776f84047c7c69f509"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/ModifyUpload-C849vsWf.css",
+          "status": 200,
+          "bytes": 2102,
+          "sha256": "c498fefa7744e095dc0ef93e9adccdac04d58e9d20e0e93ee104db76e8b1a902"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/prism-python-Bw3EYPE-.js",
+          "status": 200,
+          "bytes": 21342,
+          "sha256": "a9787f556d9d2131e949c4f16764d3e121304611d9e554f195b5c35925e99430"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/SelectSource-lBfDLlH8.js",
+          "status": 200,
+          "bytes": 6200,
+          "sha256": "bc95cc3b883e20753a473775b884416876cb92168ebb0c82d4b486b6b890fefb"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/ShareButton-OlciWAJu.js",
+          "status": 200,
+          "bytes": 2140,
+          "sha256": "d440314afaf97e6781366651f87db6e4fe540940e9461843650ba42342aaa77b"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/svelte/svelte.js",
+          "status": 200,
+          "bytes": 104399,
+          "sha256": "02df3ebbefec4435a32e1a28d63a2caf0d56ea0d30e6646791a9582447220c46"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Tabs-DhLS2PCT.js",
+          "status": 200,
+          "bytes": 4959,
+          "sha256": "2a506d90f5efa4d4fb37bafd3125e5e4f050a880aa9c896b23142cd4ca05aaa2"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Tabs-DX5TEub2.css",
+          "status": 200,
+          "bytes": 1016,
+          "sha256": "a57f85ff1ee3e6c7b913d8b848e54ee317cbb7b5f7085e729cdab681576d2287"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Textbox-D8IAzrZj.css",
+          "status": 200,
+          "bytes": 1789,
+          "sha256": "dde6f8ccd00a3c10db81a9aa990cb8ed042b3899e8cf219930ba619479ba95ad"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Upload-46YxStuW.js",
+          "status": 200,
+          "bytes": 12755,
+          "sha256": "a44ba6e5e7156c960bd1e303423efa49a973fa741145fba825e09298af965086"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Upload-Cp8Go_XF.js",
+          "status": 200,
+          "bytes": 1945,
+          "sha256": "1fe53345fbe34bcb5557e20534c3118d12a3012b07360ca6055821454082765c"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/UploadText-Dnj0K08n.js",
+          "status": 200,
+          "bytes": 4276,
+          "sha256": "e61b93c8c88bbb0031ffef6781a8a50d697518e29673dfcd8277e84949d334a8"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/utils-Gtzs_Zla.js",
+          "status": 200,
+          "bytes": 575,
+          "sha256": "ce8993f80cb80fb87e7ace485b50806bfadedd4eff5e50f4083fa40bbfc4e07f"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/theme.css?v=8898858b3f86e03cbbf8de3b3667f43de9ce8f454c6d05b7a05fabed58edfc03",
+          "status": 200,
+          "bytes": 18425,
+          "sha256": "8898858b3f86e03cbbf8de3b3667f43de9ce8f454c6d05b7a05fabed58edfc03"
+        },
+        {
+          "type": "stylesheet",
+          "url": "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap",
+          "status": 200,
+          "bytes": 3874,
+          "sha256": "67fda302c2a4bbed6f9ad342400a697f639acea013513ee6d3f85e0d8b623e51"
+        },
+        {
+          "type": "stylesheet",
+          "url": "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap",
+          "status": 200,
+          "bytes": 3774,
+          "sha256": "d88fe125f626991d6b19bab897dd16220e7ba26ba796e60ccf93c2f13e475ca8"
+        }
+      ]
+    },
+    {
+      "id": "case6-system-info",
+      "kind": "browser",
+      "deck": "case-06",
+      "board": "board-8t",
+      "description": "8T 板端 Gradio 系统信息页；模型目录为空，页面显示当前后端与模型状态。",
+      "page": "/",
+      "origin": "http://192.168.1.100:7860",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "capturedAt": "2026-10-17T15:51:28.848Z",
+      "output": "cases/case6-system-info-1920x1080.png",
+      "bytes": 78578,
+      "sha256": "6d8927c17f9daf47f8c60bc6f686f8ddb68553aa4dce7dc4639475c7cff28834",
+      "privacy": "no-user-data",
+      "evidenceBoundary": "证明系统信息页真实展示了8T上的Gradio应用状态和CPU回退/模型缺失情况，不证明NPU推理或驾驶功能。",
+      "applicationDigest": "2a77e0494700b2090641a061c20f12762d1ce46fe2bfe218c679b02b23804f82",
+      "applicationAssets": [
+        {
+          "type": "document",
+          "url": "http://192.168.1.100:7860/",
+          "status": 200,
+          "bytes": 17355,
+          "sha256": "8b5b60e281f8b94dc04d3d4bfea76177ec99a7ad3b25ab37ea21f200dc0863e9"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/BlockLabel-BXXlQleC.js",
+          "status": 200,
+          "bytes": 1729,
+          "sha256": "99dd302274566bd3ce1ee17e2833ebc0b9a57933ac9e914fc8ae98b3cc9bb8f1"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Blocks-Dw_9NR1K.js",
+          "status": 200,
+          "bytes": 125952,
+          "sha256": "33cb6a5f9adb46dccb681883a3c1c2a172826b266e316e3b49f57c5af04de7ce"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Blocks-yLdzXwzS.css",
+          "status": 200,
+          "bytes": 11014,
+          "sha256": "3cde4a7bbe56193a3b87f90bf3381f4c231e056a8882ec5d42c1744c9924ce2f"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Button-CTZL5Nos.css",
+          "status": 200,
+          "bytes": 2268,
+          "sha256": "9a2d8a45633051fd46375099ddae3c725bd0e8edff43603ec0cf7280436f1ff6"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Button-uOcat6Z0.js",
+          "status": 200,
+          "bytes": 10515,
+          "sha256": "f9db9d5cfcc5fee8a59504e0ae03ae186491c9c176a2ba2ff2736aa9fab98b01"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Check-CZUQOzJl.js",
+          "status": 200,
+          "bytes": 632,
+          "sha256": "1f9ffb9c2443d6c0e3faf08aa11f7ec84c4baa336d01199539bdea53a074b164"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Copy-B6RcHnoK.js",
+          "status": 200,
+          "bytes": 712,
+          "sha256": "da8bdf6e5a584df238aa563b7a1abfc3dc20705ee4cda15b12bb341ccf1e0ab6"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Download-DVtk-Jv3.js",
+          "status": 200,
+          "bytes": 636,
+          "sha256": "e3dcad18fdfebc0e3f5eeec400f0841d8afdb82222ea91f4b2e6596a0a2fdb79"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/DownloadLink-BgAM71ly.js",
+          "status": 200,
+          "bytes": 3834,
+          "sha256": "d8803017bc298662692e731e431555027c74e4772bc389451e6ea7d80e2b21ac"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/DropdownArrow-BJ6rp2o2.js",
+          "status": 200,
+          "bytes": 584,
+          "sha256": "7385bbab142dee59786acf14f73d0fec3e9f74d73b929c1cede235564b6653bc"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Empty-CLiqUlWX.js",
+          "status": 200,
+          "bytes": 1762,
+          "sha256": "11814a7a679d491013943e58884c050f529107722c34bdb8341212ad44c9f749"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Example-BOThR97Y.css",
+          "status": 200,
+          "bytes": 42892,
+          "sha256": "dcd15410f2ccf227af74b0b02535c1ab3c17cb5f3034e57ae2d77c82e44921e4"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Example-C7XUkkid.js",
+          "status": 200,
+          "bytes": 1590,
+          "sha256": "1cf48e12c1de3b54675a5313204470c4ef4017e3487a21103381c1b0c01a2278"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Example-Cj3ii62O.css",
+          "status": 200,
+          "bytes": 149,
+          "sha256": "6ded08d8c9a6eb684b6578f6988ea51224807231556a827014ddda47c47242dc"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Example-CoyKMtl3.js",
+          "status": 200,
+          "bytes": 2311,
+          "sha256": "1b4e27107728e860883122a7b26bb94e479361c2acf9c2f00680bccd8321eb23"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Example-DikqVAPo.css",
+          "status": 200,
+          "bytes": 448,
+          "sha256": "bcfbe567d2deeaaaa2fd848dcc7a93801ab0ab8eea1d30c1817500a846857dbf"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Example-DXkut_Rg.js",
+          "status": 200,
+          "bytes": 1831,
+          "sha256": "9c1d4c5cb5d84f41e73c0b3ada490e8dac61322285bb2c0476464db590ef7348"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Example.svelte_svelte_type_style_lang-qahm4PWk.js",
+          "status": 200,
+          "bytes": 346090,
+          "sha256": "0edf3731d074333545c8bfe9970091650b48795a56aa494af6a05e8d47191597"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/file-url-BIHPd7vS.js",
+          "status": 200,
+          "bytes": 970,
+          "sha256": "29c61b9d7545651661ae28fd45ac445f3ec0daad287d0f0d855cb72b1834d801"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Image-B8dFOee4.css",
+          "status": 200,
+          "bytes": 37,
+          "sha256": "c2f962bb4529b3384a1d91fbb4eb009ce0150fa299ff1080958f41eafefb5b0e"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Image-Bsh8Umrh.js",
+          "status": 200,
+          "bytes": 870,
+          "sha256": "c720d0acabc812cc33745683a7dcf1d4fd6948513a736676f4ece92fbe3a20fc"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Image-DG8jX6JY.js",
+          "status": 200,
+          "bytes": 1171,
+          "sha256": "1ad8454002f5d72a123f9b4fb1e25639a72f9d7dfc60f2feb038a3bd768fe08b"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/ImagePreview-CieM3r9y.js",
+          "status": 200,
+          "bytes": 7271,
+          "sha256": "cf350966547a8c180f430f9b013a3a69c369111fe04bdde9c5463e87b29e9b76"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/ImagePreview-DlqNSi_R.css",
+          "status": 200,
+          "bytes": 906,
+          "sha256": "8736033152f6044156fc8fa14295e4eb513d7287c891a986f750480701654df7"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/ImageUploader-B6gmy4oE.js",
+          "status": 200,
+          "bytes": 22851,
+          "sha256": "3bc44c513ea864d29ccad0202fe3f2cea9ef4b575eae3594e7fd0b4067e67fe4"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/ImageUploader-r0sXxVKa.css",
+          "status": 200,
+          "bytes": 3286,
+          "sha256": "ce3575a806a3f15d97671b9d35c6b7bcfcd960f0e2ec907160e88546870deb99"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-3Ud1cpPD.js",
+          "status": 200,
+          "bytes": 3842,
+          "sha256": "4e07d3a37002c6b9a6528bd08793187ffeb999b30011cd68425aeb6657b0b09b"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-8jBbArya.js",
+          "status": 200,
+          "bytes": 5075,
+          "sha256": "92843fe19d680c6abc7f5e433c6d6a0dbbb8207c6258c63d58fdcdba8bd0aba6"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-BEyjvDG_.css",
+          "status": 200,
+          "bytes": 13626,
+          "sha256": "5d5056be676b67ac5cafa957ebddb59065433f1be149afd12e74a686bae63e81"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-C43SQM_O.css",
+          "status": 200,
+          "bytes": 555,
+          "sha256": "56cdedcd65728bae8520c0cbe1c892367c7e363f5f7007aa1d6be3449caf5bfe"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-CaGZNVQT.js",
+          "status": 200,
+          "bytes": 2458,
+          "sha256": "5f65c39d57c006ca7ab12b884bd3fb1e8ef733b82ff1086c6ca841c852e474e6"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-CptIZeFZ.css",
+          "status": 200,
+          "bytes": 497,
+          "sha256": "2853eb31f8b598326ae1c1f3e8b31814a57144375f31eaa92e7f26cbd62dd46c"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-CwNLzWTz.js",
+          "status": 200,
+          "bytes": 3517,
+          "sha256": "34079752294c277d85ea83fdd1371614fafa65728cbce4b19bff53feba7cb268"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-D21IHG0c.js",
+          "status": 200,
+          "bytes": 76640,
+          "sha256": "cf24c6a4e790fd180cf9a190f8b5af715a2dcb1b5e3f1794861ed8c789bf9580"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-D3f6Hf9S.css",
+          "status": 200,
+          "bytes": 2680,
+          "sha256": "ce30a9c97ccbbc94ce821b6a32fe0d9b30402f3c55a2da6eea92267cb3a76800"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/index-D5ROCp7B.js",
+          "status": 200,
+          "bytes": 122133,
+          "sha256": "aca466886412331bc6a7b6d2a4f07b5701ad41a66b53fe3779003840aba7b68b"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-D8AsxGpL.js",
+          "status": 200,
+          "bytes": 5049,
+          "sha256": "14bddb08cada6b4520322f36718d933da917f6b9351cfa7d9c926d5e6ab213e8"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-D8Ugac1I.js",
+          "status": 200,
+          "bytes": 14562,
+          "sha256": "a3f963412d3eef0f3276b46a93eeeb2cd8647e7ce6f9dc08bc89b0ad4257bb8b"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-DgbvCnJk.js",
+          "status": 200,
+          "bytes": 13484,
+          "sha256": "d27953c62956f3d3d9982379224c8e116cbd48750fe6da5b1463b317d5f971bc"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/index-DuXXhepF.css",
+          "status": 200,
+          "bytes": 25951,
+          "sha256": "1f6f1a80d644e7eac543cd49840709aefc96c2aa0030ba0f636887721b439c03"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index-DwSO5GE1.js",
+          "status": 200,
+          "bytes": 3091,
+          "sha256": "560b35443deb6b4f583c16276e5706f7a6eb78032937201f55b62f1dd410a00c"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-thdqX2vf.css",
+          "status": 200,
+          "bytes": 242,
+          "sha256": "d43fcb36a9ec2601f310845006dd4a9d1949d8f6818e40b6ee58c7a362a68a70"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Index-Xv8ZQETB.css",
+          "status": 200,
+          "bytes": 860,
+          "sha256": "82a4fd03663c7a4db80f7d32ed93a114cffa2431a19171d84e2e49a89c825353"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Index.svelte_svelte_type_style_lang-D199jKmZ.js",
+          "status": 200,
+          "bytes": 5355,
+          "sha256": "bfbe2ff38b0e125140dc0bc638a94967d2a656191cb6d0b930d386b65edb74e2"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Minimize-X5PPawdt.js",
+          "status": 200,
+          "bytes": 1381,
+          "sha256": "7f83199136d415799be0e36f9eaf19c8fd2db0de4dd158776f84047c7c69f509"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/ModifyUpload-C849vsWf.css",
+          "status": 200,
+          "bytes": 2102,
+          "sha256": "c498fefa7744e095dc0ef93e9adccdac04d58e9d20e0e93ee104db76e8b1a902"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/prism-python-Bw3EYPE-.js",
+          "status": 200,
+          "bytes": 21342,
+          "sha256": "a9787f556d9d2131e949c4f16764d3e121304611d9e554f195b5c35925e99430"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/SelectSource-lBfDLlH8.js",
+          "status": 200,
+          "bytes": 6200,
+          "sha256": "bc95cc3b883e20753a473775b884416876cb92168ebb0c82d4b486b6b890fefb"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/ShareButton-OlciWAJu.js",
+          "status": 200,
+          "bytes": 2140,
+          "sha256": "d440314afaf97e6781366651f87db6e4fe540940e9461843650ba42342aaa77b"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/svelte/svelte.js",
+          "status": 200,
+          "bytes": 104399,
+          "sha256": "02df3ebbefec4435a32e1a28d63a2caf0d56ea0d30e6646791a9582447220c46"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Tabs-DhLS2PCT.js",
+          "status": 200,
+          "bytes": 4959,
+          "sha256": "2a506d90f5efa4d4fb37bafd3125e5e4f050a880aa9c896b23142cd4ca05aaa2"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Tabs-DX5TEub2.css",
+          "status": 200,
+          "bytes": 1016,
+          "sha256": "a57f85ff1ee3e6c7b913d8b848e54ee317cbb7b5f7085e729cdab681576d2287"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/assets/Textbox-D8IAzrZj.css",
+          "status": 200,
+          "bytes": 1789,
+          "sha256": "dde6f8ccd00a3c10db81a9aa990cb8ed042b3899e8cf219930ba619479ba95ad"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Upload-46YxStuW.js",
+          "status": 200,
+          "bytes": 12755,
+          "sha256": "a44ba6e5e7156c960bd1e303423efa49a973fa741145fba825e09298af965086"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/Upload-Cp8Go_XF.js",
+          "status": 200,
+          "bytes": 1945,
+          "sha256": "1fe53345fbe34bcb5557e20534c3118d12a3012b07360ca6055821454082765c"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/UploadText-Dnj0K08n.js",
+          "status": 200,
+          "bytes": 4276,
+          "sha256": "e61b93c8c88bbb0031ffef6781a8a50d697518e29673dfcd8277e84949d334a8"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/assets/utils-Gtzs_Zla.js",
+          "status": 200,
+          "bytes": 575,
+          "sha256": "ce8993f80cb80fb87e7ace485b50806bfadedd4eff5e50f4083fa40bbfc4e07f"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/theme.css?v=8898858b3f86e03cbbf8de3b3667f43de9ce8f454c6d05b7a05fabed58edfc03",
+          "status": 200,
+          "bytes": 18425,
+          "sha256": "8898858b3f86e03cbbf8de3b3667f43de9ce8f454c6d05b7a05fabed58edfc03"
+        },
+        {
+          "type": "script",
+          "url": "https://cdnjs.cloudflare.com/ajax/libs/iframe-resizer/4.3.1/iframeResizer.contentWindow.min.js",
+          "status": 200,
+          "bytes": 13719,
+          "sha256": "eb6a63fa34bcb7e95e07214e1708e26344fdd98956c28c188079c5464960bf43"
+        },
+        {
+          "type": "stylesheet",
+          "url": "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap",
+          "status": 200,
+          "bytes": 3874,
+          "sha256": "67fda302c2a4bbed6f9ad342400a697f639acea013513ee6d3f85e0d8b623e51"
+        },
+        {
+          "type": "stylesheet",
+          "url": "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap",
+          "status": 200,
+          "bytes": 3774,
+          "sha256": "d88fe125f626991d6b19bab897dd16220e7ba26ba796e60ccf93c2f13e475ca8"
+        }
+      ]
+    },
+    {
+      "id": "case7-album-search",
+      "kind": "browser",
+      "deck": "case-07",
+      "board": "board-8t",
+      "description": "8T 板端静态 HTTP 服务加载的案例7 web/index.html；FastAPI、数据库与模型服务未连接。",
+      "page": "/",
+      "origin": "http://192.168.1.100:7860",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "capturedAt": "2026-10-17T15:36:32.957Z",
+      "output": "cases/case7-album-search-1920x1080.png",
+      "bytes": 44830,
+      "sha256": "013544c6e8a0b95f399962fec6bb4820683fbd7e8d6871863c4768ca3596fa24",
+      "privacy": "synthetic-photos-without-exif-or-identifiers",
+      "evidenceBoundary": "证明相册前端布局与资产可由 8T 加载，不证明照片库、模型检索、触摸屏、NPU、精度或ESP32/电子纸链路。",
+      "applicationDigest": "6ec10d7a767735ac8ea3b6409b921dc6acbca098895bec8512cfcfa85d4ac053",
+      "applicationAssets": [
+        {
+          "type": "document",
+          "url": "http://192.168.1.100:7860/",
+          "status": 200,
+          "bytes": 10709,
+          "sha256": "f78a661d7157269d94c3c3c63fa3faf90769103f3a9f07c88195448ca59a2473"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:7860/app.js?v=20260907-device-summary-v1",
+          "status": 200,
+          "bytes": 103062,
+          "sha256": "95211a9224b045a739b99e1fdbf340f9080188c897c56018e83a25ab903df4b7"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:7860/style.css?v=20260907-device-summary-v1",
+          "status": 200,
+          "bytes": 34077,
+          "sha256": "195f65357f14b571d86875068fa676e077f36160664c3e9433501045e82478c5"
+        }
+      ]
+    },
+    {
+      "id": "case8-gesture-live",
+      "kind": "browser",
+      "deck": "case-08",
+      "board": "board-8t",
+      "description": "8T 板端静态 HTTP 服务加载的案例8 WebRTC 客户端页面；aiohttp、模型与摄像头服务未连接。",
+      "page": "/webrtc_index.html",
+      "origin": "http://192.168.1.100:8080",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "capturedAt": "2026-10-17T15:36:35.505Z",
+      "output": "cases/case8-gesture-live-1920x1080.png",
+      "bytes": 54754,
+      "sha256": "c1cd97fa4c18426933699a936bd21b7a0831ddffc77d750987cd9ae60de6c838",
+      "privacy": "public-gesture-clip-no-identifiable-person",
+      "evidenceBoundary": "证明手势WebRTC客户端前端布局与资产可由8T加载，不证明信令、摄像头、OM推理、检测叠加、视频帧率或VENC。",
+      "applicationDigest": "2a26d0647a586a4643043087643dd3615a75588d422447fb48ff519341524618",
+      "applicationAssets": [
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:8080/client.js",
+          "status": 404,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:8080/styles.css",
+          "status": 404,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "type": "document",
+          "url": "http://192.168.1.100:8080/webrtc_index.html",
+          "status": 200,
+          "bytes": 5260,
+          "sha256": "bd0b6b9bd3d96d84baddb1e7f095cb07a2e71bf68e89c6354be8d2ee6a40e5c0"
+        }
+      ]
+    },
+    {
+      "id": "chapter6-webrtc-demo",
+      "kind": "browser",
+      "deck": "book-06",
+      "board": "board-8t",
+      "description": "8T 板端静态 HTTP 服务渲染的 WebRTC 接收页；aiortc 后端因隔离环境依赖未就绪，截图只记录前端。",
+      "page": "/",
+      "origin": "http://192.168.1.100:8080",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "capturedAt": "2026-10-17T14:52:55.638Z",
+      "output": "book/chapter6-webrtc-demo-1920x1080.png",
+      "bytes": 231915,
+      "sha256": "7e0002ba5f7f73d9191e7b6fd044ef71ff1b62698f0186fbd3eee1f60392a69a",
+      "privacy": "demo-source-no-personal-data",
+      "evidenceBoundary": "证明板载 web/ 前端可以由 8T HTTP 服务加载并完成布局渲染，不证明信令、媒体接收、编解码或 VENC 硬编路径。",
+      "applicationDigest": "15e2018e51c9be3eb48452aed80db776f733dd43793a2d0f8a431572a2432ea2",
+      "applicationAssets": [
+        {
+          "type": "document",
+          "url": "http://192.168.1.100:8080/",
+          "status": 200,
+          "bytes": 4263,
+          "sha256": "2d75631a12bd13c4df3aae3aab3bfb492e1fbcc0d2abb9274f3a459b923b83bf"
+        },
+        {
+          "type": "script",
+          "url": "http://192.168.1.100:8080/client.js",
+          "status": 200,
+          "bytes": 15739,
+          "sha256": "faabbc568d4a196fb9ecb9a2de6d851e96acd3e2a4751cf8b2165f8856f8d70b"
+        },
+        {
+          "type": "stylesheet",
+          "url": "http://192.168.1.100:8080/styles.css",
+          "status": 200,
+          "bytes": 4046,
+          "sha256": "7eb447fbe1f01e1242c3d88283cdeb8d65cd03294f1e8beaa71b7c2f3733a5b3"
+        }
+      ]
+    }
+  ]
+}

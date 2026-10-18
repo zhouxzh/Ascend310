@@ -14,6 +14,7 @@ export default defineUserConfig({
   pagePatterns: [
     "**/*.md",
     "!presentation/[0-9][0-9]-*.md",
+    "!presentation/legacy-*.md",
     "!.vuepress",
     "!node_modules",
   ],

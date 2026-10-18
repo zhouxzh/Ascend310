@@ -210,7 +210,41 @@ section.visual {
 section.visual h2,
 section.visual h3 { margin-bottom: 0.22em; }
 
-section.visual img { max-height: 500px; }
+section.visual img { max-height: 480px; }
+
+section.screenshot {
+  justify-content: flex-start;
+}
+
+section.screenshot h2,
+section.screenshot h3 {
+  margin-bottom: 0.22em;
+}
+
+section.screenshot img {
+  max-height: 500px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  box-shadow: 0 8px 22px rgb(23 35 43 / 14%);
+}
+
+section.screenshot .screenshot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+section.screenshot .screenshot-grid img {
+  max-height: 390px;
+}
+
+section.screenshot figcaption {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.2;
+}
 
 .source {
   position: absolute;
