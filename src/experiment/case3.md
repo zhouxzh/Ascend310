@@ -708,7 +708,7 @@ curl -fsS http://127.0.0.1:8765/api/v1/status
 
 ## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case3-board-evidence}
 
-本节记录 8T 与 20T 两块开发板上的 WebUI 运行结果。原始日志与截图保存在 [`docs/case-board-runs-20261017/case3/`](../../docs/case-board-runs-20261017/case3/README.md)。
+本节记录 8T 与 20T 两块开发板上的 WebUI 运行结果。原始日志与截图保存在 [`docs/case-board-runs-20261017/case3/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case3/README.md)。
 
 | 项目 | 8T | 20T |
 | --- | --- | --- |

@@ -1519,7 +1519,7 @@ python scripts/tracking_app.py --device npu --source 0 --track-center-distance-t
 
 ## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case2-board-evidence}
 
-本节记录 8T 与 20T 两块开发板上的实际运行结果。原始日志保存在 [`docs/case-board-runs-20261017/case2/`](../../docs/case-board-runs-20261017/case2/README.md)。本案例没有浏览器前端，因此没有 UI 截图，不能把“日志中没有 OpenCV 窗口”解释为 UI 通过。
+本节记录 8T 与 20T 两块开发板上的实际运行结果。原始日志保存在 [`docs/case-board-runs-20261017/case2/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case2/README.md)。本案例没有浏览器前端，因此没有 UI 截图，不能把“日志中没有 OpenCV 窗口”解释为 UI 通过。
 
 | 项目 | 8T | 20T |
 | --- | --- | --- |

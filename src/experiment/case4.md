@@ -77,7 +77,7 @@ rm -rf "$PALMPRINT_ROOT/data/templates"
 
 ## 板端实测记录（2026-10-18 复测） {#src-experiment-case4-board-evidence}
 
-本节记录 8T（Ascend310B4）上摄像头问题的定位与复测结果。原始枚举、取帧与识别输出保存在 [`docs/case-board-runs-20261018/case4/`](../../docs/case-board-runs-20261018/case4/README.md)。
+本节记录 8T（Ascend310B4）上摄像头问题的定位与复测结果。原始枚举、取帧与识别输出保存在 [`docs/case-board-runs-20261018/case4/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261018/case4/README.md)。
 
 ### 摄像头在 8T 上失效的原因
 
