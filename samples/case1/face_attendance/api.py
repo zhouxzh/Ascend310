@@ -9,6 +9,7 @@ import base64
 import binascii
 import asyncio
 import json
+import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -162,7 +163,8 @@ def create_app(
     """Create the ASGI application without opening hardware resources."""
 
     uploads = Path(upload_dir or UPLOAD_DIR)
-    app_runtime = runtime or FaceAttendanceRuntime(upload_dir=uploads)
+    camera_index = int(os.environ.get("CASE1_CAMERA_INDEX", "0"))
+    app_runtime = runtime or FaceAttendanceRuntime(upload_dir=uploads, camera_index=camera_index)
     # ``template_dir`` remains accepted for callers upgrading from the Flask
     # sample, but is intentionally ignored: the runtime serves only the
     # compiled React application.

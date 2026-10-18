@@ -1,6 +1,6 @@
 # samples 配套代码说明
 
-本目录只负责“代码在哪里、如何进入和运行”。它不是全仓库文档索引；工程文档请从 [`../docs/README.md`](../docs/README.md) 开始，目录职责请看 [`CASE_LAYOUT.md`](CASE_LAYOUT.md)。CANN、PyACL、ATC、OM、DVPP 和 `npu-smi` 相关命令必须在真实 Ascend 310B 设备执行；普通开发机只适合文档、语法、前端和不依赖硬件的单元测试。
+本目录只负责“代码在哪里、如何进入和运行”。它不是全仓库文档索引；工程文档请从 [`../docs/README.md`](../docs/README.md) 开始，目录职责请看 [`CASE_LAYOUT.md`](CASE_LAYOUT.md)。CANN、PyACL、ATC、OM、DVPP 和 `npu-smi` 相关命令必须在真实 Ascend 310B 设备执行；普通开发机只适合文档、语法、前端和不依赖硬件的单元测试。章节样例的 8T/20T 实测数据见 [chapter2–9 双板对照记录](../docs/ascend310b-chapter-board-comparison-20261017.md)，实践案例的前端截图和运行证据见 [case1–9 双板调试记录](../docs/case-board-runs-20261017/README.md)。
 
 案例的稳定 ID、语义关键词和迁移状态见 [实践案例目录规范](CASE_LAYOUT.md) 与 [案例索引](case-index.json)。仓库级工程文档入口见 [`../docs/README.md`](../docs/README.md)；根 README 只负责项目首页和本地书稿起步。
 

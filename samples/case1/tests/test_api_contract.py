@@ -16,7 +16,7 @@ if str(CASE_ROOT) not in sys.path:
 
 from fastapi.testclient import TestClient
 
-from face_attendance import database
+from face_attendance import api, database
 from face_attendance.api import create_app
 
 
@@ -210,3 +210,19 @@ def test_upload_type_size_and_name_boundaries(tmp_path, monkeypatch):
             data={"name": "   "},
             files={"image": ("face.jpg", b"image", "image/jpeg")},
         ).status_code == 400
+
+
+def test_camera_index_can_be_selected_for_usb_device(tmp_path, monkeypatch):
+    captured = {}
+
+    class CapturingRuntime(FakeRuntime):
+        def __init__(self, upload_dir, camera_index):
+            super().__init__()
+            captured["upload_dir"] = upload_dir
+            captured["camera_index"] = camera_index
+
+    monkeypatch.setenv("CASE1_CAMERA_INDEX", "2")
+    monkeypatch.setattr(api, "FaceAttendanceRuntime", CapturingRuntime)
+    api.create_app(upload_dir=tmp_path / "uploads")
+
+    assert captured["camera_index"] == 2

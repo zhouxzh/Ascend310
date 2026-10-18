@@ -116,6 +116,8 @@ cd ..
 python app.py --host 127.0.0.1 --port 5000
 ```
 
+如果 USB 摄像头不是 `/dev/video0`（例如 8T 的 USB 摄像头在 `/dev/video2`），用 `CASE1_CAMERA_INDEX=2 python app.py ...` 指定设备索引。默认仍为 `0`，不改变已有部署。
+
 默认只监听本机。可信实验网络中如需从其他设备访问，可显式使用受控的
 `--host`，并在实验结束后停止服务；不要开启调试模式、自动重载或多个 worker。
 
