@@ -68,15 +68,31 @@ if (dsh === '') {
 
 /** Run npm pack and return the tarball path. */
 function pack(pluginDir) {
-	const result = spawnSync('npm', ['pack', '--pack-destination', packDir], {
+	// Spawning npm.cmd from Node is unreliable on Windows (and quoting through
+	// cmd.exe breaks the destination path). Execute npm's JS entry point with the
+	// current Node binary instead.
+	const npmCli = join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+	const useCli = existsSync(npmCli);
+	const command = useCli ? process.execPath : 'npm';
+	const commandArgs = useCli
+		? [npmCli, 'pack', '--pack-destination', packDir]
+		: ['pack', '--pack-destination', packDir];
+	const result = spawnSync(command, commandArgs, {
 		cwd: pluginDir,
 		encoding: 'utf8'
 	});
-	if (result.status !== 0) {
-		console.error((result.stderr || result.stdout).trim());
+	if (result.error) {
+		console.error(result.error.message);
 		return '';
 	}
-	const name = result.stdout.trim().split(/\r?\n/u).find((line) => line.endsWith('.tgz'));
+	if (result.status !== 0) {
+		console.error(((result.stderr || '') + (result.stdout || '')).trim());
+		return '';
+	}
+	const name = (result.stdout ?? '')
+		.trim()
+		.split(/\r?\n/u)
+		.find((line) => line.endsWith('.tgz'));
 	return name ? join(packDir, name) : '';
 }
 

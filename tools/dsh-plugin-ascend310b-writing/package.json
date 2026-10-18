@@ -19,6 +19,7 @@
   },
   "files": [
     "lib",
+    "drivers",
     "skills",
     "cordis.patch.yml",
     "README.md"
