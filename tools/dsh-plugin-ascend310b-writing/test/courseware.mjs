@@ -78,12 +78,12 @@ write(
 		parts: [{ key: 'presentation', label: '配套演示', dir: 'src/presentation', filePattern: '^\\d{2}-[a-z0-9-]+\\.md$', assets: true }]
 	})
 );
-write('src/presentation/theme.css', ['section pre { font-size: 13px; }', 'section table { font-size: 18px; }', 'section::after { font-size: 14px; }'].join('\n'));
+write('src/presentation/theme.css', ['section pre { font-size: 13px; }', 'section table { font-size: 20px; }', 'section::after { font-size: 14px; }'].join('\n'));
 const small = auditTheme({ root, themePath: 'src/presentation/theme.css' });
-check(small.length === 1, `only the content rule below 18px may be reported, got ${small.length}`);
+check(small.length === 1, `only the content rule below 20px may be reported, got ${small.length}`);
 check(small[0]?.message.includes('13px'), 'the finding must name the offending size');
 
-write('src/presentation/theme.css', ['section pre { font-size: 18px; }', 'section table { font-size: 18px; }', 'section::after { font-size: 12px; }'].join('\n'));
+write('src/presentation/theme.css', ['section pre { font-size: 20px; }', 'section table { font-size: 20px; }', 'section::after { font-size: 12px; }'].join('\n'));
 check(auditTheme({ root, themePath: 'src/presentation/theme.css' }).length === 0, 'a 12px footer is peripheral and must not be reported');
 
 write(
@@ -175,4 +175,4 @@ if (failures.length > 0) {
 }
 console.log('courseware test passed');
 console.log('  markdownlint：alt（MD045）/ 语言标记（MD040）/ 裸 URL（MD034，行内代码除外）');
-console.log('  Marp：元数据、讲师备注覆盖；本仓库：教材可追溯、主题字号下限 18px');
+console.log('  Marp：元数据、讲师备注覆盖；本仓库：教材可追溯、主题字号下限 20px');

@@ -203,7 +203,7 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 | `deck-slide-overflow` | error | 单页估算高度超过安全高度 |
 | `deck-code-too-long` | warning | 单页代码超过 22 行 |
 | `deck-table-too-wide` | warning | 表格超过 6 列 / 10 行 |
-| `deck-font-too-small` | error | 代码或表格字号低于 18px |
+| `deck-font-too-small` | error | 代码或表格字号低于 20px |
 | `deck-source-missing` | error | 没有指向教材或样例的来源 |
 | `deck-metadata-missing` | warning | 缺 Marp 全局指令 |
 | `deck-image-no-alt` | error | 图片缺 alt（MD045） |

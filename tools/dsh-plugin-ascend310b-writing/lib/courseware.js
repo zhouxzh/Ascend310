@@ -28,7 +28,7 @@ import { splitSlides } from './deck.js';
 import { join } from 'node:path';
 
 /** Smallest content font that stays legible from the back of a classroom. */
-export const MIN_CONTENT_FONT_PX = 18;
+export const MIN_CONTENT_FONT_PX = 20;
 
 /** A deck should teach at least this share of its slides with a note. */
 const MIN_NOTE_SHARE = 0.2;
