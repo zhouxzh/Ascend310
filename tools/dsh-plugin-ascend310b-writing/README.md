@@ -207,6 +207,22 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 
 容量超出时用 `node scripts/split-decks.mjs --write <课件>` 分页，**不要缩小字号**。
 规范全文见技能文档的「课件制作规范（Marp）」一节。
+## 网页教材检查
+
+`ascend310b_writing_audit` 不只审 Markdown 和 PDF，也读**构建后的站点**（`src/.vuepress/dist`），因为读者打开的是网页：
+
+| 规则 | 级别 | 判据 |
+| --- | --- | --- |
+| `site-not-built` | error | `dist/index.html` 不存在 |
+| `site-page-missing` | error | 某篇正文没有对应的 `.html` 页面 |
+| `site-link-broken` | error | 站内链接指向不存在的页面 |
+| `site-fragment-missing` | error | `#锚点` 在目标页中不存在 |
+| `site-asset-missing` | error | `src` 指向不存在的资源（CSS/JS/图片） |
+| `site-unrendered` | error | 正文里残留 `{#…}`、`:::` 等未渲染标记（代码块内不算） |
+| `site-empty-page` | warning | 页面没有 h1 或正文过短（404/作者页除外） |
+| `site-sitemap-missing` | warning | 缺少 `sitemap.xml` 或 `robots.txt` |
+
+实测：当前站点 71 页、369 个资源，断链 0、缺失资源 0，检查耗时约 100 ms。
 ## 审计规则
 
 正文规则（`ascend310b_writing_audit`，作用于工作区）：

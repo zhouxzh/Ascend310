@@ -17,6 +17,7 @@ import {
 	collectAssetFindings,
 	collectCommitFindings,
 	collectFrozenNameFindings,
+	collectLatexChapterFindings,
 	collectRenderFindings,
 	describeCommit,
 	describeFrozenNames,
@@ -26,6 +27,7 @@ import { diagnose } from './doctor.js';
 import { collectVuepressFindings } from './vuepress.js';
 import { collectCodeFindings } from './code.js';
 import { collectDeckFindings } from './deck.js';
+import { collectSiteFindings, describeSite } from './site.js';
 import { collectCoursewareFindings } from './courseware.js';
 import { analyzeStyle, formatStyle } from './style.js';
 import { planBuild, resolveBuildEnvironment, runBuild } from './build.js';
@@ -267,6 +269,14 @@ function runAudit({ root, scope, maxFindings, rev, config }) {
 	notes.push(describeDeck(deck));
 	const courseware = collectCoursewareFindings({ root, settings });
 	extraFindings.push(...courseware.findings);
+	const latexMap = collectLatexChapterFindings({ root, settings });
+	extraFindings.push(...latexMap.findings);
+	const site = collectSiteFindings({ root, settings });
+	extraFindings.push(...site.findings);
+	notes.push(describeSite(site));
+	if (latexMap.available) {
+		notes.push(`PDF 章节表：${latexMap.chapters} 章，与源文比对 ${latexMap.findings.length} 处不一致。`);
+	}
 	const report = auditRepo({ root, scope, maxFindings, extraFindings, settings });
 	return {
 		text: [report.text, '', ...notes].join('\n'),
@@ -844,11 +854,13 @@ export function apply(ctx, config) {
 			const code = collectCodeFindings({ root, settings });
 			const deck = collectDeckFindings({ root, settings });
 			const courseware = collectCoursewareFindings({ root, settings });
+			const latexMap = collectLatexChapterFindings({ root, settings });
+			const site = collectSiteFindings({ root, settings });
 			const audit = auditRepo({
 				root,
 				scope: 'all',
 				maxFindings: 400,
-				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings],
+				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings, ...latexMap.findings, ...site.findings],
 				settings
 			});
 			const progress = progressReport({ root, scope: 'all', settings });

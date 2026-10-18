@@ -20,6 +20,7 @@ import { collectVuepressFindings } from './vuepress.js';
 import { collectCodeDrift, collectCodeFindings, collectDriftPairs } from './code.js';
 import { collectDeckFindings } from './deck.js';
 import { collectCoursewareFindings } from './courseware.js';
+import { collectSiteFindings } from './site.js';
 
 /** One row of a two-cell Markdown table whose first cell is a backticked path. */
 const TABLE_ROW = /^\|\s*`([^`]+)`\s*\|\s*([^|]*?)\s*\|\s*$/u;
@@ -664,12 +665,14 @@ export function evaluatePushGate({ root, rev = 'HEAD', settings }) {
 	const code = collectCodeFindings({ root, settings: s });
 	const deck = collectDeckFindings({ root, settings: s });
 	const courseware = collectCoursewareFindings({ root, settings: s });
+	const latexMap = collectLatexChapterFindings({ root, settings: s });
+	const site = collectSiteFindings({ root, settings: s });
 	// The git-history walk costs seconds, so it belongs here and not in the audit.
 	const drift = collectCodeDrift({ root, pairs: collectDriftPairs({ root, settings: s }) });
 	const audit = auditRepo({
 		root,
 		maxFindings: 400,
-		extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings, ...drift],
+		extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings, ...latexMap.findings, ...site.findings, ...drift],
 		settings: s
 	});
 	const commit = collectCommitFindings({ root, rev });
@@ -860,4 +863,92 @@ export function collectAssetFindings({ root, settings }) {
 
 	findings.sort((left, right) => left.file.localeCompare(right.file) || left.rule.localeCompare(right.rule));
 	return { findings, decks, slidesMissing, slidesStale, site };
+}
+
+/**
+ * Compare the hand-maintained chapter table in `latex/book.tex` with the source
+ * chapters it is supposed to include.
+ *
+ * `convert-vuepress.sh` converts `src/book/chapterN.md` to
+ * `latex/chapters/chapterN.tex`, but the `\chapter{...}` titles and their
+ * `\input{}` order live in `latex/book.tex`, which is edited by hand. When a new
+ * chapter is inserted, that table can silently fall out of step: the PDF then
+ * prints one chapter's title above another chapter's body, or drops a chapter
+ * entirely, while every Markdown file still looks correct. That is exactly the
+ * class of defect a source-only audit cannot see.
+ *
+ * @param {object} options - inputs.
+ * @param {string} options.root - repository root.
+ * @param {object} [options.settings] - resolved layout.
+ * @returns {{ findings: Array<object>, available: boolean, chapters: number }} The result.
+ */
+export function collectLatexChapterFindings({ root, settings }) {
+	const s = settings ?? resolveSettings({ root });
+	const book = s.parts.find((part) => part.key === 'book');
+	const logPath = s.latex?.log ?? DEFAULT_SETTINGS.latex.log;
+	const bookTex = join(root, logPath.replace(/book\.log$/u, 'book.tex'));
+	if (book === undefined || !existsSync(bookTex)) {
+		return { findings: [], available: false, chapters: 0 };
+	}
+	let tex;
+	try {
+		tex = readFileSync(bookTex, 'utf8');
+	} catch {
+		return { findings: [], available: false, chapters: 0 };
+	}
+
+	const mappings = new Map();
+	for (const match of tex.matchAll(/\\chapter\{([^}]*)\}\s*\\input\{chapters\/chapter(\d+)\.tex\}/gu)) {
+		mappings.set(Number(match[2]), match[1].trim());
+	}
+	const normalize = (value) =>
+		value
+			.replace(/^第\s*\d+\s*章\s*[：:]\s*/u, '')
+			.replace(/["'“”]/gu, '')
+			.replace(/\s+/gu, '')
+			.trim();
+
+	const file = relative(root, bookTex).split(sep).join('/');
+	const findings = [];
+	// `listPartFiles` reports whether a name is numbered, not which number it
+	// carries, so the chapter index is parsed from the file name itself.
+	const sources = listPartFiles(root, book)
+		.map((entry) => ({ ...entry, index: Number(/chapter(\d+)\.md$/u.exec(entry.file)?.[1] ?? Number.NaN) }))
+		.filter((entry) => Number.isInteger(entry.index));
+	for (const { file: source, index: numbered } of sources) {
+		const { title } = documentTitleOf(source, book);
+		const actual = mappings.get(numbered);
+		if (actual === undefined) {
+			findings.push({
+				rule: 'latex-chapter-missing',
+				severity: 'error',
+				file,
+				line: 1,
+				message: `PDF 章节表缺少第 ${numbered} 章（源标题：${title}）`
+			});
+			continue;
+		}
+		if (normalize(actual) !== normalize(title)) {
+			findings.push({
+				rule: 'latex-chapter-title',
+				severity: 'error',
+				file,
+				line: 1,
+				message: `第 ${numbered} 章标题与正文错位：book.tex 写「${actual}」，源文是「${title}」`
+			});
+		}
+	}
+	const known = new Set(sources.map((entry) => entry.index));
+	for (const [index, title] of mappings) {
+		if (known.has(index)) continue;
+		findings.push({
+			rule: 'latex-chapter-extra',
+			severity: 'error',
+			file,
+			line: 1,
+			message: `book.tex 包含第 ${index} 章（${title}），但 src/book 下没有对应章节`
+		});
+	}
+	findings.sort((left, right) => left.rule.localeCompare(right.rule));
+	return { findings, available: true, chapters: mappings.size };
 }
