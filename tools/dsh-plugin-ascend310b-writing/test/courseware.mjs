@@ -154,6 +154,18 @@ const goodCover = auditCoursewareText({
 check(!goodCover.some((finding) => finding.rule === 'deck-cover-meta-label'), 'a content cover must not be reported as a meta label');
 check(!goodCover.some((finding) => finding.rule === 'deck-cover-byline-missing'), 'a cover with byline must not be reported as missing one');
 
+// --- unified theme ---------------------------------------------------------
+const wrongTheme = auditCoursewareText({
+	file: 'src/presentation/42-theme-test.md',
+	text: [
+		'---', 'marp: true', 'theme: gaia', 'paginate: true', 'size: 16:9', '---', '',
+		'<!-- _class: cover -->', '', '# 第1章：测试', '',
+		'<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>', '',
+		'## 从问题到证据', ''
+	].join('\n')
+});
+check(wrongTheme.some((finding) => finding.rule === 'deck-theme-unsupported'), 'a deck outside the unified theme must be reported');
+
 rmSync(root, { recursive: true, force: true });
 
 if (failures.length > 0) {

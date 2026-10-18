@@ -1,18 +1,21 @@
 /* @theme ascend310 */
-/* A restrained, source-first Marp theme for the repository's teaching decks. */
+/* Metropolis-inspired Marp theme: dark slate, one orange accent, thin rules. */
 @import 'default';
 
 :root {
-  --ink: #17232b;
-  --muted: #5d6b72;
-  --paper: #f5f8f7;
-  --panel: #ffffff;
-  --teal: #087f73;
+  --ink: #1b2a2f;
+  --muted: #6b7c80;
+  --paper: #ffffff;
+  --panel: #f4f7f7;
+  --teal: #2e7d6f;
   --teal-dark: #07544f;
-  --amber: #c76b12;
+  --amber: #eb811b;
   --red: #a43b3b;
-  --line: #d4dfdd;
-  --code: #13232a;
+  --line: #d8e2e1;
+  --code: #1f2d31;
+  --bg-dark: #23373b;
+  --bg-darker: #1b2b2f;
+  --accent-soft: #f6d7b0;
 }
 
 section {
@@ -20,23 +23,33 @@ section {
   width: 1280px;
   height: 720px;
   overflow: hidden;
-  padding: 62px 72px 88px;
+  padding: 62px 72px 84px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
   color: var(--ink);
   background: var(--paper);
-  font-family: "Aptos", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+  font-family: "Fira Sans", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif;
   font-size: 22px;
-  line-height: 1.2;
+  line-height: 1.24;
   letter-spacing: 0;
+}
+
+section::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 5px;
+  background: var(--amber);
 }
 
 section::after {
   color: var(--muted);
-  right: 72px;
-  bottom: 22px;
+  right: 40px;
+  bottom: 20px;
   font-size: 14px;
 }
 
@@ -44,8 +57,8 @@ header,
 footer {
   position: absolute;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1;
+  font-size: 13px;
+  line-height: 1.15;
   letter-spacing: 0;
 }
 
@@ -53,22 +66,22 @@ header {
   top: 24px;
   left: 72px;
   font-weight: 600;
+  text-transform: uppercase;
 }
 
 footer {
-  right: 72px;
-  bottom: 22px;
   left: 72px;
+  right: 96px;
+  bottom: 20px;
   text-align: left;
-  padding-right: 72px;
 }
 
 h1,
 h2,
 h3 {
   flex: 0 0 auto;
-  margin: 0 0 0.42em;
-  color: var(--teal-dark);
+  margin: 0 0 0.4em;
+  color: var(--ink);
   font-weight: 750;
   line-height: 1.08;
   letter-spacing: 0;
@@ -76,7 +89,7 @@ h3 {
 
 h1 { font-size: 42px; }
 h2 { font-size: 32px; }
-h3 { font-size: 25px; }
+h3 { font-size: 25px; color: var(--teal); }
 
 p,
 ul,
@@ -89,25 +102,25 @@ pre {
 }
 
 ul,
-ol {
-  padding-left: 1.25em;
-}
+ol { padding-left: 1.25em; }
 
-li { margin: 0.18em 0; }
+li { margin: 0.16em 0; }
 
-strong { color: var(--teal-dark); }
+strong { color: var(--teal); }
+
+a { color: var(--teal); }
 
 blockquote {
-  padding: 0.45em 0.8em;
-  border-left: 5px solid var(--amber);
-  background: #fff8ef;
-  color: #34434a;
+  padding: 14px 20px 14px 22px;
+  border-left: 7px solid var(--amber);
+  background: var(--panel);
+  color: var(--ink);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--panel);
+  background: var(--paper);
   font-size: 18px;
   line-height: 1.15;
 }
@@ -121,17 +134,20 @@ td {
 
 th {
   color: #fff;
-  background: var(--teal);
+  background: var(--bg-dark);
+  border-bottom: 2px solid var(--amber);
   font-weight: 700;
+  text-align: left;
 }
 
-tr:nth-child(even) td { background: #f0f6f4; }
+tr:nth-child(even) td { background: #f2f6f5; }
 
 code {
-  color: #075e58;
-  background: #e5f1ef;
+  color: var(--teal-dark);
+  background: #e7efee;
   border-radius: 3px;
   padding: 0.06em 0.25em;
+  font-family: "Fira Code", "Cascadia Mono", Consolas, monospace;
 }
 
 pre {
@@ -139,15 +155,15 @@ pre {
   width: 100%;
   max-height: 430px;
   overflow: hidden;
-  padding: 13px 16px;
+  padding: 14px 18px;
   border: 0;
-  border-left: 5px solid var(--teal);
-  border-radius: 5px;
+  border-left: 6px solid var(--amber);
+  border-radius: 0;
   background: var(--code);
   color: #e7f1ef;
-  font-family: "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+  font-family: "Fira Code", "Cascadia Mono", Consolas, monospace;
   font-size: 18px;
-  line-height: 1.18;
+  line-height: 1.22;
   white-space: pre-wrap;
 }
 
@@ -180,8 +196,13 @@ figcaption {
 section.cover,
 section.title {
   justify-content: center;
-  background: var(--teal-dark);
-  color: #f4fbf9;
+  background: var(--bg-dark);
+  color: #f7fbfa;
+}
+
+section.cover::before,
+section.title::before {
+  height: 10px;
 }
 
 section.cover h1,
@@ -191,13 +212,27 @@ section.title h2 {
   color: #fff;
 }
 
+section.cover h1,
+section.title h1 { font-size: 54px; }
+
+section.cover h2,
+section.title h2 {
+  color: #cfe3e0;
+  font-size: 29px;
+  font-weight: 400;
+}
+
 section.cover p,
-section.title p { color: #d9efeb; }
+section.title p,
+section.cover li,
+section.title li {
+  color: #d8e8e5;
+}
 
 section.cover .byline,
 section.title .byline {
   margin: 0.1em 0 0.9em;
-  color: #d9efeb;
+  color: var(--accent-soft);
   font-size: 20px;
   font-weight: 600;
   line-height: 1.35;
@@ -206,12 +241,22 @@ section.title .byline {
 
 section.section {
   justify-content: center;
-  background: var(--teal);
+  background: var(--bg-dark);
   color: #fff;
 }
 
+section.section::before { height: 10px; }
+
 section.section h1,
 section.section h2 { color: #fff; }
+
+section.section h1 { font-size: 58px; }
+
+section.section h2 {
+  color: #cfe3e0;
+  font-size: 30px;
+  font-weight: 400;
+}
 
 section.visual {
   justify-content: center;
@@ -234,8 +279,7 @@ section.screenshot h3 {
 section.screenshot img {
   max-height: 500px;
   border: 1px solid var(--line);
-  border-radius: 5px;
-  box-shadow: 0 8px 22px rgb(23 35 43 / 14%);
+  box-shadow: 0 8px 22px rgb(27 43 47 / 14%);
 }
 
 section.screenshot .screenshot-grid {
@@ -259,7 +303,7 @@ section.screenshot figcaption {
 .source {
   position: absolute;
   right: 72px;
-  bottom: 45px;
+  bottom: 43px;
   left: 72px;
   margin: 0;
   color: var(--muted);
@@ -269,6 +313,12 @@ section.screenshot figcaption {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+section.cover .source,
+section.title .source,
+section.section .source {
+  color: #9fb3b6;
 }
 
 .source a {
@@ -290,15 +340,15 @@ section.screenshot figcaption {
 
 .callout {
   padding: 14px 18px;
-  border-left: 6px solid var(--amber);
-  background: #fff8ef;
+  border-left: 7px solid var(--amber);
+  background: var(--panel);
 }
 
 .compact {
   font-size: 18px;
   line-height: 1.14;
   padding-top: 58px;
-  padding-bottom: 88px;
+  padding-bottom: 84px;
 }
 
 section.compact h1 { font-size: 36px; }

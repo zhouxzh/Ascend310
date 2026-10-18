@@ -130,6 +130,20 @@ export function auditCoursewareText({ file, text }) {
 			}
 		});
 	}
+	// --- visual identity ---------------------------------------------------
+	// All decks share the Metropolis-inspired `ascend310` theme. A deck that
+	// points at gaia/default will render with a different palette and footer,
+	// which is exactly how the courseware set starts to look assembled from
+	// unrelated templates.
+	if (!isLegacy && !/^theme:\s*ascend310\s*$/mu.test(text)) {
+		findings.push({
+			rule: 'deck-theme-unsupported',
+			severity: 'warning',
+			file,
+			line: 1,
+			message: '课件没有使用统一主题 `ascend310`（Metropolis 风格）；请改回 theme: ascend310'
+		});
+	}
 	// --- cover semantics ---------------------------------------------------
 	// A cover should state what the audience will learn, not announce its own
 	// administrative identity. "理论章节课件 · 教师授课版" tells a student
