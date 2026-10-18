@@ -1242,7 +1242,7 @@ H =
 
 这表示我们能够直接观测到的是目标中心位置，而不是速度。
 
-这一实现虽然经过简化，但其价值十分明确，因为它将``运动预测''与``观测修正''这两个概念直接落实到了矩阵运算之中。
+这一实现虽然经过简化，但其价值明确，因为它将``运动预测''与``观测修正''这两个概念直接落实到了矩阵运算之中。
 
 \subsection{卡尔曼滤波器的发展历史与作者信息}\label{src-experiment-case2-h44}
 
@@ -1266,7 +1266,7 @@ Problems，系统建立了线性动态系统状态估计的现代形式。
 
 例如，雷达跟踪飞机、导弹制导、航天器轨道估计，本质上都属于这一类问题。
 
-卡尔曼滤波器之所以具有里程碑意义，是因为它把``预测''和``校正''统一进了一个递推框架中：
+卡尔曼滤波器的关键在于把``预测''和``校正''统一进一个递推框架：
 
 \begin{itemize}
 \tightlist
@@ -1640,7 +1640,7 @@ fallback_matches = self._match_by_center_distance(...)
   当 IOU 不足但中心运动关系合理时，还允许进入中心距离补充匹配。
 \end{itemize}
 
-由此可见，匈牙利算法提供的是全局分配框架，而不是完整的业务规则集合。
+匈牙利算法提供的是全局分配框架，而不是完整的业务规则集合。
 
 \subsection{匈牙利算法相对于贪心匹配的优势}\label{src-experiment-case2-h54}
 
@@ -1721,7 +1721,7 @@ IOU，但只要场景中存在多目标竞争，使用全局分配通常都比�
 \section{可视化代码如何帮助理解算法结果}\label{src-experiment-case2-h57}
 
 在 utils/postprocessing.py 中，draw\_detections 与 draw\_tracks
-分别负责绘制检测结果和跟踪结果。尽管这部分并不直接构成算法主体，但其作用十分重要，因为可视化能够将抽象状态转化为可直接观察的现象。
+分别负责绘制检测结果和跟踪结果。尽管这部分并不直接构成算法主体，但其作用重要，因为可视化能够将抽象状态转化为可直接观察的现象。
 
 其中，draw\_tracks 中有两点尤其值得关注：
 
@@ -2216,7 +2216,7 @@ detection\_app.py 和 tracking\_app.py 中把以下时间分开统计：
   \passthrough{\lstinline!Draw!}：绘制与显示时间。
 \end{itemize}
 
-这对边缘设备非常重要，因为摄像头读取、视频解码、模型预处理和模型推理往往处于不同瓶颈路径上，必须分开分析。
+这对边缘设备重要，因为摄像头读取、视频解码、模型预处理和模型推理往往处于不同瓶颈路径上，必须分开分析。
 
 \subsubsection{摄像头实时输入增加了更适合实时场景的参数}\label{src-experiment-case2-h78}
 
@@ -2513,6 +2513,60 @@ python scripts/tracking_app.py --device npu --source 0 --track-center-distance-t
 \item
   再结合当前仓库代码，对照本节总结理解这些优化为什么能够改善实时效果。
 \end{enumerate}
+
+\section{板端实测记录（2026-10-17 至
+2026-10-18）}\label{src-experiment-case2-board-evidence}
+
+本节记录 8T 与 20T 两块开发板上的实际运行结果。原始日志保存在
+\href{https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case2/README.md}{\passthrough{\lstinline!docs/case-board-runs-20261017/case2/!}}。本案例没有浏览器前端，因此没有
+UI 截图，不能把``日志中没有 OpenCV 窗口''解释为 UI 通过。
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+项目 & 8T & 20T \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+SoC & \passthrough{\lstinline!Ascend310B4!} &
+\passthrough{\lstinline!Ascend310B1!} \\
+CANN & 8.0.0 & 8.0.0 \\
+驱动 & 25.2.0 & 25.2.0 \\
+Python & 3.9.2 & 3.9.2 \\
+Health & Alarm（已知状态，不作为失败判据） & Alarm（同上） \\
+\end{longtable}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+项目
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+8T
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+20T
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!detection\_app!} & exit 0 & exit 0 \\
+\passthrough{\lstinline!tracking\_app!} & exit 0 & exit 0 \\
+NPU 模型 & 加载成功 & 加载成功 \\
+输入解析 & 768×576，10 fps & 768×576，10 fps \\
+输出形状 & \passthrough{\lstinline!(1,4,3234)!} +
+\passthrough{\lstinline!(1,81,3234)!} &
+\passthrough{\lstinline!(1,4,3234)!} +
+\passthrough{\lstinline!(1,81,3234)!} \\
+输出视频 & 已生成到板端 \passthrough{\lstinline!/tmp!} & 已生成到板端
+\passthrough{\lstinline!/tmp!} \\
+\end{longtable}
+
+\textbf{证据等级}：检测与跟踪链路、NPU 模型加载为
+\passthrough{\lstinline!observed-pass!}。
+\textbf{本轮未验证}：检测/跟踪精度评估、真实摄像头输入、浏览器界面（本案例无前端）。
 
 \section{章节总结}\label{src-experiment-case2-h92}
 

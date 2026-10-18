@@ -599,6 +599,57 @@ flowchart TB
   案例8即可完成训练
 \end{itemize}
 
+\section{板端实测记录（2026-10-17 至
+2026-10-18）}\label{src-experiment-case6-board-evidence}
+
+本节记录 8T 与 20T 两块开发板上的启动与页面结果。原始日志与截图保存在
+\href{https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case6/README.md}{\passthrough{\lstinline!docs/case-board-runs-20261017/case6/!}}。
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+项目 & 8T & 20T \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+SoC & \passthrough{\lstinline!Ascend310B4!} &
+\passthrough{\lstinline!Ascend310B1!} \\
+CANN & 8.0.0 & 8.0.0 \\
+驱动 & 25.2.0 & 25.2.0 \\
+Python & 3.9.2 & 3.9.2 \\
+Health & Alarm（已知状态，不作为失败判据） & Alarm（同上） \\
+\end{longtable}
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+项目 & 8T & 20T \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+HTTP \passthrough{\lstinline!/!} & 200 & 200 \\
+Gradio & 启动成功 & 启动成功 \\
+ResNet18 CPU 权重 & 启动时下载成功 & 启动时下载成功 \\
+页面截图 & 通过 & 通过 \\
+\end{longtable}
+
+\textbf{证据等级}：Gradio 启动链路与页面渲染为
+\passthrough{\lstinline!observed-pass!}。
+\textbf{本轮未验证}：未上传道路图像，车道线检测与场景分类推理均为
+\passthrough{\lstinline!untested!}。
+
+\begin{figure}
+\centering
+\pandocbounded{\includegraphics[keepaspectratio,alt={8T 版智能小车 Gradio 页面}]{cases/img6/case6-board-8t-ui.png}}
+\caption{8T 版智能小车 Gradio 页面}
+\end{figure}
+
+\begin{figure}
+\centering
+\pandocbounded{\includegraphics[keepaspectratio,alt={20T 版智能小车 Gradio 页面}]{cases/img6/case6-board-20t-ui.png}}
+\caption{20T 版智能小车 Gradio 页面}
+\end{figure}
+
 \section{效果演示}\label{src-experiment-case6-h30}
 
 \subsection{预期效果}\label{src-experiment-case6-h31}

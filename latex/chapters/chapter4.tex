@@ -16,10 +16,10 @@ PyTorch 移植到昇腾 310B
 为了解决上述痛点，PyACL（Python Ascend Computing
 Language）应运而生。作为 AscendCL 的 Python 绑定版本，PyACL 通过 CPython
 封装底层 C
-接口，在保留硬件高性能特性的同时，大幅降低了开发门槛。它允许开发者通过简洁的
-Python 语法调用昇腾处理器的强大能力，无缝衔接主流 AI 框架和数据处理库。
+接口，在保留硬件高性能特性的同时，大幅降低了开发门槛。它允许开发者用
+Python 直接调用昇腾处理器，并对接主流 AI 框架与数据处理库。
 
-需要特别指出的是，\textbf{昇腾 310B 是一款定位为推理（Inference）的 AI
+\textbf{注意：昇腾 310B 是一款定位为推理（Inference）的 AI
 处理器，算力与显存资源受限，并不适合进行大规模的模型训练}。在实际应用中，标准的开发流水线如下：
 
 \begin{enumerate}
@@ -253,7 +253,7 @@ Found 1 Ascend devices.
 以确保资源被正确回收。如果缺少资源释放环节，可能会引发内存泄漏、NPU
 算力资源被持续占用或设备状态异常，进而影响后续任务的执行甚至导致系统崩溃。
 
-值得注意的是，对于上述简单的设备查询程序，即使没有显式调用初始化和资源释放接口，程序通常也能够返回正确的结果。例如，我们可以将代码简化为如下一行的命令并在终端执行：
+对于上述简单的设备查询程序，即使没有显式调用初始化和资源释放接口，程序通常也能够返回正确的结果。例如，我们可以将代码简化为如下一行的命令并在终端执行：
 
 \begin{lstlisting}[language=bash]
 python -c "import acl; print(f'Found {acl.rt.get_device_count()[0]} Ascend devices.')"
@@ -367,8 +367,7 @@ width=100\% .center\}
   \passthrough{\lstinline!acl.rt.destroy\_stream!} 销毁 Stream，再调用
   \passthrough{\lstinline!acl.rt.destroy\_context!} 销毁
   Context。最后调用 \passthrough{\lstinline!acl.rt.reset\_device!}
-  重置设备以彻底释放 Device 资源。需要特别说明的是，若未显式创建 Context
-  与
+  重置设备以彻底释放 Device 资源。注意：若未显式创建 Context 与
   Stream（即使用系统默认资源），开发者\textbf{不能}调用相应的销毁接口；在这种情况下，直接调用
   \passthrough{\lstinline!reset\_device!} 即可隐式地销毁关联的默认
   Context 与 Stream 资源。
@@ -635,7 +634,7 @@ DMA 访问异常。
 是最符合直觉的编程方式，它遵循严格的``请求-响应''逻辑。正如我们在 Host
 到 Host 拷贝示例中所见，当 Host 线程发起一个同步指令时（如
 \passthrough{\lstinline!acl.rt.memcpy!}），CPU
-会挂起当前线程，像监工一样死死盯着任务，直到任务彻底完成后才会恢复执行下一行代码。这种模式的优点显而易见：逻辑简单，数据一致性由代码执行顺序天然保证，非常适合初学者进行功能验证或定位
+会挂起当前线程，像监工一样死死盯着任务，直到任务彻底完成后才会恢复执行下一行代码。这种模式的优点是：逻辑简单，数据一致性由代码执行顺序天然保证，非常适合初学者进行功能验证或定位
 BUG。但其缺点也同样致命：它完全抹杀了硬件并行的可能性。试想，当 CPU
 在傻傻等待数据从 Host 搬运到 Device 时，昂贵的 NPU
 计算单元可能正处于空闲状态，导致系统整体吞吐量下降。
@@ -1048,7 +1047,7 @@ PyTorch 插件主要用于推理加速，且端侧设备训练算力有限，我
 CIFAR-10
 数据集。而在本章，我们将采用更贴近实际生产的标准开发流程，并引入
 \textbf{Tiny-ImageNet} 数据集进行实战演练。我们首先利用 Nvidia 显卡配合
-CUDA 和 PyTorch 对 ResNet-18 进行训练，获取模型权重；随后将其转换为 ONNX
+CUDA 和 PyTorch 对 ResNet-18 训练，获取模型权重；随后将其转换为 ONNX
 模型，并最终转换为昇腾特定的 OM 模型。我们将分别在\textbf{昇腾 310B
 (NPU-8T)}、\textbf{昇腾 310B (CPU)}、\textbf{树莓派 5B (CPU)} 以及RTX
 5090D上进行推理测试，重点对比 OnnxRuntime 与 PyACL 的性能差异，深入分析
@@ -1085,14 +1084,13 @@ PyACL 的推理性能，可直接跳转至
 \hyperref[src-book-chapter4-h27]{环境配置与模型转换}。
 \end{quote}
 
-如果你希望自行训练模型以便进行测试，可以参考本节的模型训练部分。我们需要一台配备
+如果你希望自行训练模型以便测试，可以参考本节的模型训练部分。我们需要一台配备
 Nvidia 显卡并已正确安装 CUDA 驱动的服务器。本例中，我们使用 GeForce
 5090D 显卡。对于图像分类任务，Nvidia GeForce
 系列显卡已能很好地满足需求。我们选用 Tiny-ImageNet
-数据集进行训练，该数据集相比完整版 ImageNet
-体积更小，便于测试和实验。使用 GeForce 5090D 训练一次大约需要
-1\textasciitilde2 小时；而若采用完整的 ImageNet
-数据集，单卡训练可能需要长达一周的时间。
+数据集训练，该数据集相比完整版 ImageNet 体积更小，便于测试和实验。使用
+GeForce 5090D 训练一次大约需要 1\textasciitilde2 小时；而若采用完整的
+ImageNet 数据集，单卡训练可能需要长达一周的时间。
 
 我们需要从 Hugging Face 下载 Tiny-ImageNet 数据集，为此首先需要使用 pip
 安装 Hugging Face 的 CLI 工具。
@@ -1480,9 +1478,9 @@ atc --model=model/resnet18_tiny_imagenet.onnx \
 
 为了在昇腾 310B 上加载 OM 模型并执行推理，我们需要编写一个完整的 Python
 脚本。该脚本不仅负责调用底层 PyACL
-接口，还需要处理数据的预处理（Preprocessing）与后处理（Postprocessing）。本节将通过解析
-\passthrough{\lstinline!inference\_npu.py!} 的关键代码片段，深入讲解
-PyACL 应用的构建逻辑。
+接口，还需要处理数据的预处理（Preprocessing）与后处理（Postprocessing）。下面解析
+\passthrough{\lstinline!inference\_npu.py!} 的关键代码，说明 PyACL
+应用的构建逻辑。
 
 完整的推理代码逻辑被封装在 \passthrough{\lstinline!AclResource!}
 类中，它管理着从初始化到资源释放的整个生命周期。
@@ -1491,7 +1489,7 @@ PyACL 应用的构建逻辑。
 
 在类的 \passthrough{\lstinline!init!}
 方法中，我们依次完成系统初始化、Device 指定、Context
-创建以及模型加载。值得注意的是，模型加载后，我们需要获取``模型描述''（Model
+创建以及模型加载。模型加载后需要获取``模型描述''（Model
 Description），它包含了模型输入输出张量的维度、大小和类型信息，这对于后续申请内存至关重要。
 
 \begin{lstlisting}[language=Python]
@@ -2010,7 +2008,7 @@ Ascend 310B CPU & OnnxRuntime & CPU (Arm Cortex-A55) & 5.02 &
 \textasciitilde1.9\% \\
 \end{longtable}
 
-通过数据对比，我们可以清晰地看到昇腾 310B NPU 的强大优势：
+数据对比如下：
 
 \begin{itemize}
 \tightlist
@@ -2346,8 +2344,8 @@ C++/设备侧、引入 DVPP 和多 Stream 异步流水线 \\
 顺序，释放按逆序------是写出健壮 PyACL
 程序的前提。在此基础上，异构内存管理（Host 与 Device
 间的四种拷贝路径）与同步等待机制（Event、Stream Sync、Stream Wait
-Event、Device Sync 四种粒度）构成了性能优化的核心手段。特别是在昇腾 310B
-这类 CPU 算力较弱（Cortex-A55）的边缘设备上，\textbf{全链路异步 + Event
+Event、Device Sync 四种粒度）构成了性能优化的核心手段。在昇腾 310B 这类
+CPU 算力较弱（Cortex-A55）的边缘设备上，\textbf{全链路异步 + Event
 驱动的多 Stream 协作}是榨干 NPU 性能的关键策略。
 
 在应用实践层面，本章通过 ResNet-18（图像分类）和

@@ -508,6 +508,83 @@ NPU，SQLite 则
 提供可观察的本地事件存储。学习重点不是记住某个未经测量的延迟数字，而是
 建立从资产检查到板端证据的完整推理链，并能说明每个结论的适用范围。
 
+\section{板端实测记录（2026-10-17 至
+2026-10-18）}\label{src-experiment-case1-board-evidence}
+
+本节记录 8T（Ascend310B4）与
+20T（Ascend310B1）两块开发板上的实际运行结果。原始日志、HTTP
+状态与截图保存在
+\href{https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case1/README.md}{\passthrough{\lstinline!docs/case-board-runs-20261017/case1/!}}，本节只摘录其中可核对的部分。
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+项目 & 8T & 20T \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+SoC & \passthrough{\lstinline!Ascend310B4!} &
+\passthrough{\lstinline!Ascend310B1!} \\
+CANN & 8.0.0 & 8.0.0 \\
+驱动 & 25.2.0 & 25.2.0 \\
+Python & 3.9.2 & 3.9.2 \\
+Health & Alarm（已知状态，不作为失败判据） & Alarm（同上） \\
+\end{longtable}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+项目
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+8T
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+20T
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+USB 摄像头节点 &
+\passthrough{\lstinline!/dev/video2!}、\passthrough{\lstinline!/dev/video3!}
+&
+\passthrough{\lstinline!/dev/video0!}、\passthrough{\lstinline!/dev/video1!} \\
+实际读取 & 3 帧，480×640×3 & 3 帧，480×640×3 \\
+摄像头索引 & \passthrough{\lstinline!CASE1\_CAMERA\_INDEX=2!} &
+\passthrough{\lstinline!CASE1\_CAMERA\_INDEX=0!} \\
+\passthrough{\lstinline!/api/health!} &
+\passthrough{\lstinline!status=ok!}、\passthrough{\lstinline!camera\_ready=true!}
+&
+\passthrough{\lstinline!status=ok!}、\passthrough{\lstinline!camera\_ready=true!} \\
+模型加载 & 两个 OM 均加载成功 & 两个 OM 均加载成功 \\
+真实识别日志 & 本次未出现识别记录 & 出现同一用户的识别记录 \\
+API/布局测试 & 10 passed，4.39s & 10 passed，2.89s \\
+\end{longtable}
+
+8T 的 \passthrough{\lstinline!/dev/video0!} 是 ISP 虚拟节点，USB
+摄像头实际为 \passthrough{\lstinline!/dev/video2!}；代码通过
+\passthrough{\lstinline!CASE1\_CAMERA\_INDEX!} 选择设备。20T
+的识别日志只证明链路产生了匹配结果，不提供准确率结论，也未保存真实人脸截图。
+
+\textbf{证据等级}：摄像头读取、健康检查、模型加载与页面渲染为
+\passthrough{\lstinline!observed-pass!}。
+\textbf{本轮未验证}：识别准确率、多人脸/遮挡/姿态鲁棒性、长时间稳定性；8T
+未产生识别记录。
+
+\begin{figure}
+\centering
+\pandocbounded{\includegraphics[keepaspectratio,alt={8T 版智能考勤机前端总览（摄像头接入前）}]{cases/img1/case1-board-8t-home.png}}
+\caption{8T 版智能考勤机前端总览（摄像头接入前）}
+\end{figure}
+
+\begin{figure}
+\centering
+\pandocbounded{\includegraphics[keepaspectratio,alt={20T 版智能考勤机前端总览（摄像头接入前）}]{cases/img1/case1-board-20t-home.png}}
+\caption{20T 版智能考勤机前端总览（摄像头接入前）}
+\end{figure}
+
 \section{参考文献}\label{ux53c2ux8003ux6587ux732e}
 
 \begin{enumerate}

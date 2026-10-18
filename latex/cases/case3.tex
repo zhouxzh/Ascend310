@@ -1753,6 +1753,62 @@ NaN/Inf \\
 本地测试不得运行 PyACL、ATC、OM 推理或
 \passthrough{\lstinline!npu-smi!}；这些结果必须来自真实 Ascend 310B。
 
+\section{板端实测记录（2026-10-17 至
+2026-10-18）}\label{src-experiment-case3-board-evidence}
+
+本节记录 8T 与 20T 两块开发板上的 WebUI 运行结果。原始日志与截图保存在
+\href{https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case3/README.md}{\passthrough{\lstinline!docs/case-board-runs-20261017/case3/!}}。
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+项目 & 8T & 20T \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+SoC & \passthrough{\lstinline!Ascend310B4!} &
+\passthrough{\lstinline!Ascend310B1!} \\
+CANN & 8.0.0 & 8.0.0 \\
+驱动 & 25.2.0 & 25.2.0 \\
+Python & 3.9.2 & 3.9.2 \\
+Health & Alarm（已知状态，不作为失败判据） & Alarm（同上） \\
+\end{longtable}
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+项目 & 8T & 20T \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+HTTP \passthrough{\lstinline!/!} & 200 & 200 \\
+NPU & \passthrough{\lstinline!available=true!}，310B4 Alarm &
+\passthrough{\lstinline!available=true!}，310B1 Alarm \\
+FastAPI/Uvicorn & 正常 & 正常 \\
+\passthrough{\lstinline!acl!} & 导入成功 & 导入成功 \\
+\passthrough{\lstinline!mido!} / \passthrough{\lstinline!rtmidi!} /
+\passthrough{\lstinline!sounddevice!} & 缺失 & 缺失 \\
+当前乐器 & \passthrough{\lstinline!FILM-FDN 钢琴!} & 空 \\
+音频输出 & 无可用设备 & 无可用设备 \\
+\end{longtable}
+
+\textbf{证据等级}：WebUI 渲染与状态接口为
+\passthrough{\lstinline!observed-pass!}。 \textbf{本轮未验证}：MIDI
+输入、音频输入输出、真实 DDSP/VST
+推理（依赖缺失、无音频设备），不能记录为音频链路通过。
+
+\begin{figure}
+\centering
+\pandocbounded{\includegraphics[keepaspectratio,alt={8T 版 MIDI-DDSP Studio 前端页面}]{cases/img3/case3-board-8t-ui.png}}
+\caption{8T 版 MIDI-DDSP Studio 前端页面}
+\end{figure}
+
+\begin{figure}
+\centering
+\pandocbounded{\includegraphics[keepaspectratio,alt={20T 版 MIDI-DDSP Studio 前端页面}]{cases/img3/case3-board-20t-ui.png}}
+\caption{20T 版 MIDI-DDSP Studio 前端页面}
+\end{figure}
+
 \section{系统分层、总结与参考资料}\label{src-experiment-case3-code-and-references}
 
 \subsection{软件分层}\label{src-experiment-case3-directory-tree}

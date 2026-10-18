@@ -1628,7 +1628,7 @@ NPU 成功 \\
 本次板端审查中，Hantek 停止后同一 Python 进程重新启动 RTL-SDR OM
 时出现的 CANN 生命周期错误 & 保留日志和失败 JSONL，确认 USB
 已释放后关闭并重新启动仪表盘；不得改用 CPU
-检测器。该跨来源重初始化问题不应被写成已通过的无缝切换验收 \\
+检测器。该跨来源重初始化问题不应被写成已通过的直接切换验收 \\
 Hantek 频谱不更新 & NPU 没有 ready 或未形成完整窗口 &
 检查后端、采样率、帧缺口和队列计数 \\
 CH2 数值异常 & Little Bee 模式、匝数、去零或削顶不正确 &
@@ -1720,3 +1720,57 @@ checkpoint，当前软件标签和框数仅服务于兼容性显示，不能代�
 \end{itemize}
 
 \subsection{外部资料}\label{src-experiment-case5-external-references}
+
+\section{板端实测记录（2026-10-17 至
+2026-10-18）}\label{src-experiment-case5-board-evidence}
+
+本节记录 8T 与 20T 两块开发板上的纯 Python 回归结果。原始日志保存在
+\href{https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case5/README.md}{\passthrough{\lstinline!docs/case-board-runs-20261017/case5/!}}。前端为
+PySide6/PyQtGraph 触摸仪表盘，不是浏览器页面，本轮没有保存 UI 截图。
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+项目 & 8T & 20T \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+SoC & \passthrough{\lstinline!Ascend310B4!} &
+\passthrough{\lstinline!Ascend310B1!} \\
+CANN & 8.0.0 & 8.0.0 \\
+驱动 & 25.2.0 & 25.2.0 \\
+Python & 3.9.2 & 3.9.2 \\
+Health & Alarm（已知状态，不作为失败判据） & Alarm（同上） \\
+\end{longtable}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+项目
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+8T
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+20T
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+初次 pytest 收集 & 失败，缺 \passthrough{\lstinline!onnx!} & 失败，缺
+\passthrough{\lstinline!onnx!} \\
+安装
+\passthrough{\lstinline!onnx!}/\passthrough{\lstinline!onnxruntime!} 后
+pytest & 227 passed / 17 skipped，5.34s & 227 passed / 17
+skipped，5.74s \\
+硬件测试 & 未运行 & 未运行 \\
+\end{longtable}
+
+17 个跳过项是硬件/可选依赖门。第一次运行在收集阶段因缺少
+\passthrough{\lstinline!onnx!} 退出，按开发依赖安装后两板均完成回归。
+
+\textbf{证据等级}：纯 Python 测试回归为
+\passthrough{\lstinline!observed-pass!}。 \textbf{本轮未验证}：Hantek
+6022BE、RTL-SDR、libsigrok、FFTW 与 OM 的实机链路，UI 截图。

@@ -200,6 +200,81 @@ python scripts/webrtc_om_app.py
 因此 CPU 编码可以作为明确的对照路径，但不能作为 CANN VENC 失败后的隐藏
 回退。
 
+\section{板端实测记录（2026-10-17 至
+2026-10-18）}\label{src-experiment-case8-board-evidence}
+
+本节记录 8T 与 20T
+两块开发板上的服务、摄像头与页面结果。原始日志、接口结果与截图保存在
+\href{https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case8/README.md}{\passthrough{\lstinline!docs/case-board-runs-20261017/case8/!}}。
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+项目 & 8T & 20T \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+SoC & \passthrough{\lstinline!Ascend310B4!} &
+\passthrough{\lstinline!Ascend310B1!} \\
+CANN & 8.0.0 & 8.0.0 \\
+驱动 & 25.2.0 & 25.2.0 \\
+Python & 3.9.2 & 3.9.2 \\
+Health & Alarm（已知状态，不作为失败判据） & Alarm（同上） \\
+\end{longtable}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+项目
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+8T
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+20T
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+HTTP 服务 & 启动成功 & 启动成功 \\
+\passthrough{\lstinline!/health!} &
+200，\passthrough{\lstinline!status=ok!} &
+200，\passthrough{\lstinline!status=ok!} \\
+\passthrough{\lstinline!/models!} & 4 个 OM 可见 & 4 个 OM 可见 \\
+摄像头节点 &
+\passthrough{\lstinline!/dev/video2!}、\passthrough{\lstinline!/dev/video3!}
+&
+\passthrough{\lstinline!/dev/video0!}、\passthrough{\lstinline!/dev/video1!} \\
+配置的 source & \passthrough{\lstinline!/dev/video2!} &
+\passthrough{\lstinline!/dev/video0!} \\
+USB 帧读取 & 3 帧，480×640×3 & 3 帧，480×640×3 \\
+H.264 编码 &
+\passthrough{\lstinline!cpu-libx264!}（本次显式关闭硬件编码） &
+\passthrough{\lstinline!cpu-libx264!} \\
+WebRTC Peer & 未建立 & 未建立 \\
+\end{longtable}
+
+8T 的 USB 摄像头不是 \passthrough{\lstinline!/dev/video0!}，服务以
+\passthrough{\lstinline!--source /dev/video2!} 启动。
+
+\textbf{证据等级}：HTTP 服务、模型清单、摄像头设备与帧读取、页面渲染为
+\passthrough{\lstinline!observed-pass!}。 \textbf{本轮未验证}：WebRTC
+Peer 建立、手势推理、硬件 VENC，不能写成完整视频链路通过。
+
+\begin{figure}
+\centering
+\pandocbounded{\includegraphics[keepaspectratio,alt={8T 版实时手势识别页面}]{cases/img8/case8-board-8t-ui.png}}
+\caption{8T 版实时手势识别页面}
+\end{figure}
+
+\begin{figure}
+\centering
+\pandocbounded{\includegraphics[keepaspectratio,alt={20T 版实时手势识别页面}]{cases/img8/case8-board-20t-ui.png}}
+\caption{20T 版实时手势识别页面}
+\end{figure}
+
 \section{验收顺序}\label{ux9a8cux6536ux987aux5e8f}
 
 \begin{enumerate}

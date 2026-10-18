@@ -134,6 +134,113 @@ CCNet；不要升级版本 \\
 只记录设备状态，不单独判断模型或程序结果 \\
 \end{longtable}
 
+\section{板端实测记录（2026-10-18
+复测）}\label{src-experiment-case4-board-evidence}
+
+本节记录
+8T（Ascend310B4）上摄像头问题的定位与复测结果。原始枚举、取帧与识别输出保存在
+\href{https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261018/case4/README.md}{\passthrough{\lstinline!docs/case-board-runs-20261018/case4/!}}。
+
+\subsection{摄像头在 8T
+上失效的原因}\label{ux6444ux50cfux5934ux5728-8t-ux4e0aux5931ux6548ux7684ux539fux56e0}
+
+失效原因不是模型或
+API，而是\textbf{设备编号漂移}。\passthrough{\lstinline!/dev/videoN!}
+的编号会随上电与插拔顺序变化，而默认设备固定为
+\passthrough{\lstinline!/dev/video0!}：
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule\noalign{}
+& 2026-10-17 记录 & 2026-10-18 复测 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+USB 摄像头 & \passthrough{\lstinline!/dev/video2!} &
+\textbf{\passthrough{\lstinline!/dev/video0!}}、\passthrough{\lstinline!/dev/video1!} \\
+ISP 虚拟节点 & \passthrough{\lstinline!/dev/video0!} &
+\passthrough{\lstinline!/dev/video2!}、\passthrough{\lstinline!/dev/video3!} \\
+\end{longtable}
+
+两个节点的能力完全不同：
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+节点
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+驱动
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+像素格式
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+能否出帧
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!/dev/video0!} &
+\passthrough{\lstinline!uvcvideo!}（USB Composite Device） & MJPG
+1920×1080@25fps & 是 \\
+\passthrough{\lstinline!/dev/video2!} &
+\passthrough{\lstinline!vin-media!}（\passthrough{\lstinline!vin-media\_mainpath!}）
+& 宽度/高度 0×0，像素格式为空 & 否 \\
+\end{longtable}
+
+上次运行时默认设备正好指向 ISP 节点，因此页面预览必然失败。
+
+\subsection{修复}\label{ux4feeux590d}
+
+设备发现原先只检查 \passthrough{\lstinline!VIDIOC\_QUERYCAP!}
+的能力位，而 ISP 节点也声明
+\passthrough{\lstinline!VIDEO\_CAPTURE\_MPLANE!}，于是被误认为摄像头。现在在能力位检查之后追加
+\passthrough{\lstinline!VIDIOC\_G\_FMT!}，要求宽度与高度都大于
+0，\passthrough{\lstinline!0×0!} 的 ISP 节点不再进入候选列表。修改位于
+\passthrough{\lstinline!samples/case4/palmprint\_workbench/runtime/camera.py!}，并补充了对应单元测试。
+
+\subsection{复测结果}\label{ux590dux6d4bux7ed3ux679c}
+
+环境：Ascend310B4 / 8T，CANN 8.0.0，驱动 25.2.0，Python 3.9.2，Health
+Alarm（已知状态，不作为失败判据）。
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+项目
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+结果
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!/api/health!} &
+\passthrough{\lstinline!status=ok!}、\passthrough{\lstinline!runtime\_importable=true!}、\passthrough{\lstinline!model\_ready=true!}、\passthrough{\lstinline!admitted\_model\_ids=["ccnet"]!} \\
+模型资产 & ONNX 与 OM 的字节数和 SHA-256 均匹配 \\
+\passthrough{\lstinline!/dev/video0!} 取帧 & HTTP 200，50 348 字节
+JPEG，1280×720，0.46 s \\
+\passthrough{\lstinline!/dev/video2!} 取帧 & HTTP
+503，\passthrough{\lstinline!returned no frame!} \\
+识别链路 & ROI 29.70 ms、预处理 3.30 ms、模型 45.85 ms、检索 0.90 ms \\
+NPU 显存 & 推理前 2039 MB，推理后 3302 MB \\
+\end{longtable}
+
+识别请求返回
+\passthrough{\lstinline!outcome=no\_templates!}：模板库为空，因此链路走通但没有可匹配对象，不能记录为身份匹配成功。
+
+\textbf{证据等级}：摄像头枚举、取帧、健康检查、模型加载、ROI 与 NPU
+推理计时的结果为
+\passthrough{\lstinline!observed-pass!}；\passthrough{\lstinline!/dev/video2!}、\passthrough{\lstinline!/dev/video3!}
+取帧失败为 \passthrough{\lstinline!observed-fail!}。
+\textbf{本轮未验证}：模板注册与身份匹配、EER/Rank-1
+等识别指标、长时间稳定性、硬件触发与补光。
+
 \section{版本冻结}\label{ux7248ux672cux51bbux7ed3}
 
 人工测试期间不升级 Python、依赖、驱动、CANN
