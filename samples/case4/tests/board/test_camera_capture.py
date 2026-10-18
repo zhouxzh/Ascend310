@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import struct
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -71,6 +72,47 @@ class CameraCaptureTests(unittest.TestCase):
             (2, str(dev / "video2"), "USB Palm Camera"),
             (10, str(dev / "video10"), ""),
         ])
+
+    def test_capture_probe_rejects_capture_node_with_empty_format(self):
+        """The ISP media node advertises capture but reports a 0x0 format.
+
+        Device numbering is not stable: `/dev/video0` can be either the USB
+        camera or the ISP node depending on enumeration order.  The probe must
+        therefore check a real pixel format, not just capability bits.
+        """
+
+        from palmprint_workbench.runtime.camera import (
+            _VIDIOC_G_FMT,
+            _VIDIOC_QUERYCAP,
+            _is_video_capture_node,
+        )
+
+        def fake_ioctl(descriptor, request, buffer, mutate):
+            del descriptor, mutate
+            if request == _VIDIOC_QUERYCAP:
+                # capabilities: DEVICE_CAPS; device caps: multi-planar capture.
+                struct.pack_into("=II", buffer, 84, 0x80000000, 0x04201000)
+            elif request == _VIDIOC_G_FMT:
+                struct.pack_into("=II", buffer, 4, 0, 0)
+            return 0
+
+        with patch("os.open", return_value=5), patch("os.close"), patch(
+            "fcntl.ioctl", side_effect=fake_ioctl
+        ):
+            self.assertFalse(_is_video_capture_node(Path("/dev/video2")))
+
+        def fake_usb_ioctl(descriptor, request, buffer, mutate):
+            del descriptor, mutate
+            if request == _VIDIOC_QUERYCAP:
+                struct.pack_into("=II", buffer, 84, 0x80000000, 0x04200001)
+            elif request == _VIDIOC_G_FMT:
+                struct.pack_into("=II", buffer, 4, 1280, 720)
+            return 0
+
+        with patch("os.open", return_value=5), patch("os.close"), patch(
+            "fcntl.ioctl", side_effect=fake_usb_ioctl
+        ):
+            self.assertTrue(_is_video_capture_node(Path("/dev/video0")))
 
     def test_list_v4l2_devices_groups_nodes_of_one_physical_camera(self):
         with tempfile.TemporaryDirectory() as directory:

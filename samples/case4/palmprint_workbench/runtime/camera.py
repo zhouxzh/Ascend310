@@ -35,6 +35,13 @@ _V4L2_CAPABILITY_SIZE = 104
 # Linux's VIDIOC_QUERYCAP = _IOR('V', 0, struct v4l2_capability).  The UAPI
 # structure has a fixed 104-byte layout across the supported 32/64-bit boards.
 _VIDIOC_QUERYCAP = (2 << 30) | (_V4L2_CAPABILITY_SIZE << 16) | (ord("V") << 8)
+# ``struct v4l2_format`` is 208 bytes on both 32- and 64-bit Linux builds.  The
+# first field is the buffer type and the pixel format's width/height follow it,
+# which lets one layout serve both single-planar and multi-planar nodes.
+_V4L2_FORMAT_SIZE = 208
+_VIDIOC_G_FMT = (3 << 30) | (_V4L2_FORMAT_SIZE << 16) | (ord("V") << 8) | 4
+_V4L2_BUF_TYPE_VIDEO_CAPTURE = 1
+_V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE = 9
 
 
 class CameraError(RuntimeError):
@@ -83,7 +90,15 @@ class CameraFrame:
 
 
 def _is_video_capture_node(path: Path) -> bool:
-    """Return whether a V4L2 node advertises a frame-capture capability."""
+    """Return whether a V4L2 node can actually deliver an image frame.
+
+    Capability bits alone are not enough on this board: the ISP media node
+    ``vin-media_mainpath`` advertises ``VIDEO_CAPTURE_MPLANE`` but reports a
+    0x0 pixel format and never returns frames.  Querying ``VIDIOC_G_FMT`` and
+    requiring a non-zero width and height filters that node out, so device
+    numbering drift (``/dev/video0`` being either the USB camera or the ISP
+    node depending on enumeration order) can no longer select a dead device.
+    """
 
     if fcntl is None:
         return False
@@ -98,9 +113,18 @@ def _is_video_capture_node(path: Path) -> bool:
         effective_caps = (
             device_caps if capabilities & _V4L2_CAP_DEVICE_CAPS else capabilities
         )
-        return bool(
-            effective_caps & (_V4L2_CAP_VIDEO_CAPTURE | _V4L2_CAP_VIDEO_CAPTURE_MPLANE)
-        )
+        if effective_caps & _V4L2_CAP_VIDEO_CAPTURE:
+            buffer_type = _V4L2_BUF_TYPE_VIDEO_CAPTURE
+        elif effective_caps & _V4L2_CAP_VIDEO_CAPTURE_MPLANE:
+            buffer_type = _V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE
+        else:
+            return False
+
+        pixel_format = bytearray(_V4L2_FORMAT_SIZE)
+        struct.pack_into("=I", pixel_format, 0, buffer_type)
+        fcntl.ioctl(descriptor, _VIDIOC_G_FMT, pixel_format, True)
+        width, height = struct.unpack_from("=II", pixel_format, 4)
+        return width > 0 and height > 0
     except OSError:
         return False
     finally:
