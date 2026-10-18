@@ -4,7 +4,7 @@ editLink: false
 
 # 教材配套演示
 
-本目录提供与《昇腾310B实战》正文一一对应的教学课件。理论教程 10 章、实践案例 9 个、附录 7 份各自拥有独立 Marp 放映文件；旧版占位式专题不再进入教学主线，统一收进附录归档。
+本目录提供与《昇腾310B实战》正文一一对应的教学课件。理论教程 10 章、实践案例 9 个、附录 7 份各自拥有独立 Marp 放映文件。
 
 课件的编号、冻结标题、源文件、样例路径、制作状态和构建输出只在一处维护：[catalog.mjs](./catalog.mjs)。侧栏、构建脚本和检查脚本都读取这份清单。
 
@@ -57,31 +57,12 @@ editLink: false
 | 附录 5：ROS2 基础 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/34-appendix5.html) |
 | 附录 6：工具箱与 FAQ | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/35-appendix6.html) |
 | 附录 7：CANN 升级 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/36-appendix7.html) |
-
-### 旧版课件归档
-
-| 单元 | 状态 | 放映版 |
-|---|---|---|
-| 附录归档：旧版专题课件 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/89-legacy-archive.html) |
-| 旧版课件：全书导览 | 旧版归档 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/legacy-90-repository-map.html) |
-| 旧版课件：开发板与基础环境 | 旧版归档 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/legacy-91-hardware-basics.html) |
-| 旧版课件：Ubuntu 与板端操作 | 旧版归档 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/legacy-92-ubuntu-basics.html) |
-| 旧版课件：Python 编程基础 | 旧版归档 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/legacy-93-python-basics.html) |
-| 旧版课件：Vibe Coding 基础 | 旧版归档 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/legacy-94-vibe-coding.html) |
-| 旧版课件：智能考勤机 | 旧版归档 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/legacy-95-face-recognition.html) |
-| 旧版课件：目标跟踪检测 | 旧版归档 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/legacy-96-object-tracking.html) |
-| 旧版课件：智能电子琴 | 旧版归档 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/legacy-97-smart-piano.html) |
-| 旧版课件：智能聊天机器人 | 旧版归档 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/legacy-98-chatbot.html) |
-| 旧版课件：ROS2 基础 | 旧版归档 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/legacy-99-ros-basics.html) |
 <!-- END GENERATED PRESENTATION INDEX -->
-
-旧版 10 份课件保留原文和放映版本，但不再作为新版章节、案例或附录的主入口。归档原因和对应关系见 `89-legacy-archive.md`。
 
 ## 当前制作状态
 
 - `ready`：已完成并通过本目录检查的导览、章节、案例或附录课件。
 - `scaffold`：已有封面、教学主线、来源页和讲师备注，正文正在逐份替换。
-- `legacy`：旧版专题只用于追溯，不进入新版教学主线。
 
 制作状态以 `catalog.mjs` 的 `status` 字段为准。课件正文完成后，把对应条目从 `scaffold` 改为 `ready`，再移除源文件中的 `presentation-scaffold` 标记。
 
@@ -95,8 +76,6 @@ src/presentation/
 ├─ 10-chapter1.md ... 19-chapter10.md 理论章节课件
 ├─ 20-case1.md ... 28-case9.md        案例课件
 ├─ 30-appendix1.md ... 36-appendix7.md 附录课件
-├─ 89-legacy-archive.md               旧版归档说明
-├─ legacy-90...99 旧版源文件          仅由归档清单构建
 └─ screenshots/
    ├─ capture-plan.json               截图任务
    └─ capture-manifest.json           截图文件、哈希与证据边界

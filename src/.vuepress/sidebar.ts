@@ -53,23 +53,6 @@ const presentationChildren = [
         { text: "CANN 升级与版本配套（制作中）", link: "/presentation/36-appendix7.html" },
     ],
   },
-  {
-    text: "旧版归档",
-    collapsible: true,
-    children: [
-        { text: "旧版专题课件", link: "/presentation/89-legacy-archive.html" },
-        { text: "旧版全书导览", link: "/presentation/legacy-90-repository-map.html" },
-        { text: "开发板与基础环境", link: "/presentation/legacy-91-hardware-basics.html" },
-        { text: "Ubuntu 与板端操作", link: "/presentation/legacy-92-ubuntu-basics.html" },
-        { text: "Python 编程基础", link: "/presentation/legacy-93-python-basics.html" },
-        { text: "Vibe Coding 基础", link: "/presentation/legacy-94-vibe-coding.html" },
-        { text: "旧版智能考勤机", link: "/presentation/legacy-95-face-recognition.html" },
-        { text: "旧版目标跟踪检测", link: "/presentation/legacy-96-object-tracking.html" },
-        { text: "旧版智能电子琴", link: "/presentation/legacy-97-smart-piano.html" },
-        { text: "旧版智能聊天机器人", link: "/presentation/legacy-98-chatbot.html" },
-        { text: "旧版 ROS2 基础", link: "/presentation/legacy-99-ros-basics.html" },
-    ],
-  },
 ];
 // END GENERATED PRESENTATION SIDEBAR
 
