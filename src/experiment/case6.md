@@ -427,6 +427,32 @@ flowchart TB
 - 本项目**不需要**训练脚本——场景分类头尚未训练，但推理框架完整，参考
   案例8即可完成训练
 
+## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case6-board-evidence}
+
+本节记录 8T 与 20T 两块开发板上的启动与页面结果。原始日志与截图保存在 [`docs/case-board-runs-20261017/case6/`](../../docs/case-board-runs-20261017/case6/README.md)。
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| SoC | `Ascend310B4` | `Ascend310B1` |
+| CANN | 8.0.0 | 8.0.0 |
+| 驱动 | 25.2.0 | 25.2.0 |
+| Python | 3.9.2 | 3.9.2 |
+| Health | Alarm（已知状态，不作为失败判据） | Alarm（同上） |
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| HTTP `/` | 200 | 200 |
+| Gradio | 启动成功 | 启动成功 |
+| ResNet18 CPU 权重 | 启动时下载成功 | 启动时下载成功 |
+| 页面截图 | 通过 | 通过 |
+
+**证据等级**：Gradio 启动链路与页面渲染为 `observed-pass`。
+**本轮未验证**：未上传道路图像，车道线检测与场景分类推理均为 `untested`。
+
+![8T 版智能小车 Gradio 页面](img6/case6-board-8t-ui.png)
+
+![20T 版智能小车 Gradio 页面](img6/case6-board-20t-ui.png)
+
 ## 4. 效果演示 {#src-experiment-case6-h30}
 
 ### 预期效果 {#src-experiment-case6-h31}

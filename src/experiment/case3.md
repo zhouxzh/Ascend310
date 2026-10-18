@@ -706,6 +706,35 @@ curl -fsS http://127.0.0.1:8765/api/v1/status
 
 本地测试不得运行 PyACL、ATC、OM 推理或 `npu-smi`；这些结果必须来自真实 Ascend 310B。
 
+## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case3-board-evidence}
+
+本节记录 8T 与 20T 两块开发板上的 WebUI 运行结果。原始日志与截图保存在 [`docs/case-board-runs-20261017/case3/`](../../docs/case-board-runs-20261017/case3/README.md)。
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| SoC | `Ascend310B4` | `Ascend310B1` |
+| CANN | 8.0.0 | 8.0.0 |
+| 驱动 | 25.2.0 | 25.2.0 |
+| Python | 3.9.2 | 3.9.2 |
+| Health | Alarm（已知状态，不作为失败判据） | Alarm（同上） |
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| HTTP `/` | 200 | 200 |
+| NPU | `available=true`，310B4 Alarm | `available=true`，310B1 Alarm |
+| FastAPI/Uvicorn | 正常 | 正常 |
+| `acl` | 导入成功 | 导入成功 |
+| `mido` / `rtmidi` / `sounddevice` | 缺失 | 缺失 |
+| 当前乐器 | `FILM-FDN 钢琴` | 空 |
+| 音频输出 | 无可用设备 | 无可用设备 |
+
+**证据等级**：WebUI 渲染与状态接口为 `observed-pass`。
+**本轮未验证**：MIDI 输入、音频输入输出、真实 DDSP/VST 推理（依赖缺失、无音频设备），不能记录为音频链路通过。
+
+![8T 版 MIDI-DDSP Studio 前端页面](img3/case3-board-8t-ui.png)
+
+![20T 版 MIDI-DDSP Studio 前端页面](img3/case3-board-20t-ui.png)
+
 ## 12. 系统分层、总结与参考资料 {#src-experiment-case3-code-and-references}
 
 ### 12.1 软件分层 {#src-experiment-case3-directory-tree}

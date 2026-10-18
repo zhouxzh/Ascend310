@@ -75,6 +75,50 @@ rm -rf "$PALMPRINT_ROOT/data/templates"
 | ACL 异常退出、设备 reset 或进程意外退出 | 停止测试，保存时间/PID/模型/摘要，重启当前版本或回退 CCNet；不要升级版本 |
 | `Health: Alarm` | 只记录设备状态，不单独判断模型或程序结果 |
 
+## 板端实测记录（2026-10-18 复测） {#src-experiment-case4-board-evidence}
+
+本节记录 8T（Ascend310B4）上摄像头问题的定位与复测结果。原始枚举、取帧与识别输出保存在 [`docs/case-board-runs-20261018/case4/`](../../docs/case-board-runs-20261018/case4/README.md)。
+
+### 摄像头在 8T 上失效的原因
+
+失效原因不是模型或 API，而是**设备编号漂移**。`/dev/videoN` 的编号会随上电与插拔顺序变化，而默认设备固定为 `/dev/video0`：
+
+| | 2026-10-17 记录 | 2026-10-18 复测 |
+| --- | --- | --- |
+| USB 摄像头 | `/dev/video2` | **`/dev/video0`**、`/dev/video1` |
+| ISP 虚拟节点 | `/dev/video0` | `/dev/video2`、`/dev/video3` |
+
+两个节点的能力完全不同：
+
+| 节点 | 驱动 | 像素格式 | 能否出帧 |
+| --- | --- | --- | --- |
+| `/dev/video0` | `uvcvideo`（USB Composite Device） | MJPG 1920×1080@25fps | 是 |
+| `/dev/video2` | `vin-media`（`vin-media_mainpath`） | 宽度/高度 0×0，像素格式为空 | 否 |
+
+上次运行时默认设备正好指向 ISP 节点，因此页面预览必然失败。
+
+### 修复
+
+设备发现原先只检查 `VIDIOC_QUERYCAP` 的能力位，而 ISP 节点也声明 `VIDEO_CAPTURE_MPLANE`，于是被误认为摄像头。现在在能力位检查之后追加 `VIDIOC_G_FMT`，要求宽度与高度都大于 0，`0×0` 的 ISP 节点不再进入候选列表。修改位于 `samples/case4/palmprint_workbench/runtime/camera.py`，并补充了对应单元测试。
+
+### 复测结果
+
+环境：Ascend310B4 / 8T，CANN 8.0.0，驱动 25.2.0，Python 3.9.2，Health Alarm（已知状态，不作为失败判据）。
+
+| 项目 | 结果 |
+| --- | --- |
+| `/api/health` | `status=ok`、`runtime_importable=true`、`model_ready=true`、`admitted_model_ids=["ccnet"]` |
+| 模型资产 | ONNX 与 OM 的字节数和 SHA-256 均匹配 |
+| `/dev/video0` 取帧 | HTTP 200，50 348 字节 JPEG，1280×720，0.46 s |
+| `/dev/video2` 取帧 | HTTP 503，`returned no frame` |
+| 识别链路 | ROI 29.70 ms、预处理 3.30 ms、模型 45.85 ms、检索 0.90 ms |
+| NPU 显存 | 推理前 2039 MB，推理后 3302 MB |
+
+识别请求返回 `outcome=no_templates`：模板库为空，因此链路走通但没有可匹配对象，不能记录为身份匹配成功。
+
+**证据等级**：摄像头枚举、取帧、健康检查、模型加载、ROI 与 NPU 推理计时的结果为 `observed-pass`；`/dev/video2`、`/dev/video3` 取帧失败为 `observed-fail`。
+**本轮未验证**：模板注册与身份匹配、EER/Rank-1 等识别指标、长时间稳定性、硬件触发与补光。
+
 ## 7. 版本冻结
 
 人工测试期间不升级 Python、依赖、驱动、CANN 或应用版本。发现问题时停止当前模型、记录复现步骤、回退 CCNet，并在人工测试结束后单独规划下一版本。人工测试通过后，再更新准入证据、release manifest、版本号和完整验收记录。

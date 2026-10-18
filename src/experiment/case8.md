@@ -154,6 +154,38 @@ python scripts/webrtc_om_app.py
 因此 CPU 编码可以作为明确的对照路径，但不能作为 CANN VENC 失败后的隐藏
 回退。
 
+## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case8-board-evidence}
+
+本节记录 8T 与 20T 两块开发板上的服务、摄像头与页面结果。原始日志、接口结果与截图保存在 [`docs/case-board-runs-20261017/case8/`](../../docs/case-board-runs-20261017/case8/README.md)。
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| SoC | `Ascend310B4` | `Ascend310B1` |
+| CANN | 8.0.0 | 8.0.0 |
+| 驱动 | 25.2.0 | 25.2.0 |
+| Python | 3.9.2 | 3.9.2 |
+| Health | Alarm（已知状态，不作为失败判据） | Alarm（同上） |
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| HTTP 服务 | 启动成功 | 启动成功 |
+| `/health` | 200，`status=ok` | 200，`status=ok` |
+| `/models` | 4 个 OM 可见 | 4 个 OM 可见 |
+| 摄像头节点 | `/dev/video2`、`/dev/video3` | `/dev/video0`、`/dev/video1` |
+| 配置的 source | `/dev/video2` | `/dev/video0` |
+| USB 帧读取 | 3 帧，480×640×3 | 3 帧，480×640×3 |
+| H.264 编码 | `cpu-libx264`（本次显式关闭硬件编码） | `cpu-libx264` |
+| WebRTC Peer | 未建立 | 未建立 |
+
+8T 的 USB 摄像头不是 `/dev/video0`，服务以 `--source /dev/video2` 启动。
+
+**证据等级**：HTTP 服务、模型清单、摄像头设备与帧读取、页面渲染为 `observed-pass`。
+**本轮未验证**：WebRTC Peer 建立、手势推理、硬件 VENC，不能写成完整视频链路通过。
+
+![8T 版实时手势识别页面](img8/case8-board-8t-ui.png)
+
+![20T 版实时手势识别页面](img8/case8-board-20t-ui.png)
+
 ## 验收顺序
 
 1. 检查 CANN 环境和 `import acl`。

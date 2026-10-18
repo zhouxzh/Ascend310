@@ -315,6 +315,37 @@ MJPEG 预览和教学性的陌生人自动登记。它们有助于暴露基本�
 提供可观察的本地事件存储。学习重点不是记住某个未经测量的延迟数字，而是
 建立从资产检查到板端证据的完整推理链，并能说明每个结论的适用范围。
 
+## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case1-board-evidence}
+
+本节记录 8T（Ascend310B4）与 20T（Ascend310B1）两块开发板上的实际运行结果。原始日志、HTTP 状态与截图保存在 [`docs/case-board-runs-20261017/case1/`](../../docs/case-board-runs-20261017/case1/README.md)，本节只摘录其中可核对的部分。
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| SoC | `Ascend310B4` | `Ascend310B1` |
+| CANN | 8.0.0 | 8.0.0 |
+| 驱动 | 25.2.0 | 25.2.0 |
+| Python | 3.9.2 | 3.9.2 |
+| Health | Alarm（已知状态，不作为失败判据） | Alarm（同上） |
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| USB 摄像头节点 | `/dev/video2`、`/dev/video3` | `/dev/video0`、`/dev/video1` |
+| 实际读取 | 3 帧，480×640×3 | 3 帧，480×640×3 |
+| 摄像头索引 | `CASE1_CAMERA_INDEX=2` | `CASE1_CAMERA_INDEX=0` |
+| `/api/health` | `status=ok`、`camera_ready=true` | `status=ok`、`camera_ready=true` |
+| 模型加载 | 两个 OM 均加载成功 | 两个 OM 均加载成功 |
+| 真实识别日志 | 本次未出现识别记录 | 出现同一用户的识别记录 |
+| API/布局测试 | 10 passed，4.39s | 10 passed，2.89s |
+
+8T 的 `/dev/video0` 是 ISP 虚拟节点，USB 摄像头实际为 `/dev/video2`；代码通过 `CASE1_CAMERA_INDEX` 选择设备。20T 的识别日志只证明链路产生了匹配结果，不提供准确率结论，也未保存真实人脸截图。
+
+**证据等级**：摄像头读取、健康检查、模型加载与页面渲染为 `observed-pass`。
+**本轮未验证**：识别准确率、多人脸/遮挡/姿态鲁棒性、长时间稳定性；8T 未产生识别记录。
+
+![8T 版智能考勤机前端总览（摄像头接入前）](img1/case1-board-8t-home.png)
+
+![20T 版智能考勤机前端总览（摄像头接入前）](img1/case1-board-20t-home.png)
+
 ## 参考文献
 
 1. Deng, J., Guo, J., Xue, N., and Zafeiriou, S. *ArcFace: Additive Angular

@@ -874,3 +874,27 @@ Case 5 的两条实验链面对不同物理信号，却使用了相同的工程�
 [^6]: Huawei. "CANN 8.0 ATC precision_mode." <https://www.hiascend.com/document/detail/en/canncommercial/800/devaids/atc/atlasatcparam_16_0068.html>
 
 [^7]: Huawei. "CANN 8.0 ATC keep_dtype." <https://www.hiascend.com/document/detail/en/canncommercial/800/devaids/atc/atlasatcparam_16_0074.html>
+
+## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case5-board-evidence}
+
+本节记录 8T 与 20T 两块开发板上的纯 Python 回归结果。原始日志保存在 [`docs/case-board-runs-20261017/case5/`](../../docs/case-board-runs-20261017/case5/README.md)。前端为 PySide6/PyQtGraph 触摸仪表盘，不是浏览器页面，本轮没有保存 UI 截图。
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| SoC | `Ascend310B4` | `Ascend310B1` |
+| CANN | 8.0.0 | 8.0.0 |
+| 驱动 | 25.2.0 | 25.2.0 |
+| Python | 3.9.2 | 3.9.2 |
+| Health | Alarm（已知状态，不作为失败判据） | Alarm（同上） |
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| 初次 pytest 收集 | 失败，缺 `onnx` | 失败，缺 `onnx` |
+| 安装 `onnx`/`onnxruntime` 后 pytest | 227 passed / 17 skipped，5.34s | 227 passed / 17 skipped，5.74s |
+| 硬件测试 | 未运行 | 未运行 |
+
+17 个跳过项是硬件/可选依赖门。第一次运行在收集阶段因缺少 `onnx` 退出，按开发依赖安装后两板均完成回归。
+
+**证据等级**：纯 Python 测试回归为 `observed-pass`。
+**本轮未验证**：Hantek 6022BE、RTL-SDR、libsigrok、FFTW 与 OM 的实机链路，UI 截图。
+

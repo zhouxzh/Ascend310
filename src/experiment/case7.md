@@ -543,6 +543,34 @@ API 成功或 ACL 数值通过不能替代真实电子纸刷新结论。
 - 微雪 E6 驱动板型号和 GPIO/SPI 接线尚未确认，真实实屏刷新是独立后续验收。
 - 通用 ESP-IDF 客户端需要具体 ESP32 变体、显示控制器、总线、GPIO、电源、Flash/PSRAM 和 IDF 版本后才能安全实现；当前先使用 HTTP 协议和上游 PhotoFrame。
 
+## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case7-board-evidence}
+
+本节记录 8T 与 20T 两块开发板上的服务与页面结果。原始日志、接口结果与截图保存在 [`docs/case-board-runs-20261017/case7/`](../../docs/case-board-runs-20261017/case7/README.md)。
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| SoC | `Ascend310B4` | `Ascend310B1` |
+| CANN | 8.0.0 | 8.0.0 |
+| 驱动 | 25.2.0 | 25.2.0 |
+| Python | 3.9.2 | 3.9.2 |
+| Health | Alarm（已知状态，不作为失败判据） | Alarm（同上） |
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| `/api/health` | `status=ready`，`backend=npu` | `status=ready`，`backend=npu` |
+| PyACL | 可用 | 可用 |
+| admitted models | 3 个 | 3 个 |
+| `/api/index/stats` | 0 张照片，空索引 | 0 张照片，空索引 |
+| 电子纸后端 | `dry-run` | `dry-run` |
+| 页面截图 | 通过 | 通过 |
+
+**证据等级**：服务就绪、模型注册与页面渲染为 `observed-pass`。
+**本轮未验证**：相册无照片，照片上传、NPU 索引、搜索、电子纸真实刷新与 PhotoFrame 设备链路均未执行；`dry-run` 不是实体电子纸刷新通过。
+
+![8T 版智能相册页面](img7/case7-board-8t-ui.png)
+
+![20T 版智能相册页面](img7/case7-board-20t-ui.png)
+
 ## 参考资料 {#src-experiment-case7-references}
 
 - [Apple MobileCLIP](https://github.com/apple/ml-mobileclip)

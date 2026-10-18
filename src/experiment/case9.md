@@ -214,6 +214,29 @@ curl http://127.0.0.1:7861/v1/chat/completions \
 
 为新模型建立固定 revision、文件大小、SHA-256、tokenizer、chat template、许可证、目标 SoC 和运行时指纹。先完成本地 JSON/SSE 契约测试，再在每一种目标硬件上完成上述 NPU、稳定性、性能和人工质量门。只有经过独立复核的模型才能进入新的发布配置；不能因为模型可下载、可导入或能加载就宣称支持。
 
+## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case9-board-evidence}
+
+本案例的发布目标是 **Ascend310B1 / 20T**，本轮在 20T 上使用已验证的 `case9-ms240-cann80` 环境运行；8T 不是该版本的发布目标，因此没有 8T 结果，也没有把 20T 结果混入 8T。原始日志与响应保存在 [`docs/case-board-runs-20261017/case9/`](../../docs/case-board-runs-20261017/case9/README.md)。
+
+| 项目 | 20T |
+| --- | --- |
+| SoC | `Ascend310B1` |
+| CANN / 驱动 | 8.0.0 / 25.2.0 |
+| Python | 3.9.2 |
+| release preflight | 通过；MindSpore 2.4.10、MindNLP 0.4.1、ACL 导入成功 |
+| worker | 启动并监听 `127.0.0.1:8090` |
+| gateway | 启动并监听 `127.0.0.1:7861` |
+| UI | HTTP 200，监听 `0.0.0.0:7865` |
+| 真实 chat completion | 通过；`finish_reason=length`，16 completion tokens |
+| UI 截图 | 通过，1440×900 |
+
+请求使用固定 Qwen1.5-0.5B Chat 模型与低 token 预算，返回内容是生成结果，不代表准确率或长上下文能力；UI 未启用登录，仅用于可信局域网。
+
+**证据等级**：worker/gateway/UI 启动与一次真实 completion 为 `observed-pass`（20T）。
+**本轮未验证**：回答质量评估、长上下文、并发、8T 兼容性。
+
+![20T 版 Ascend Edge Chat 前端页面](img9/case9-board-20t-ui.png)
+
 ## 10. 小结
 
 Ascend Edge Chat 将网页、鉴权网关和 NPU worker 分离，使文字聊天服务具备清晰的网络边界、模型完整性边界和二次开发边界。固定发布模型和严格工件校验提高了复现性；回环 worker、Bearer 网关和局域网安全提示降低了误配置风险。后续扩展应以实测硬件证据为准，而不是以目录中存在的历史实验、模型名称或文档推断为准。

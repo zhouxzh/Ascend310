@@ -1517,6 +1517,29 @@ python scripts/tracking_app.py --device npu --source 0 --track-center-distance-t
 1. 先按前文把 MobileNet-SSD、NMS、卡尔曼滤波和数据关联的原理主线理清。
 2. 再结合当前仓库代码，对照本节总结理解这些优化为什么能够改善实时效果。
 
+## 板端实测记录（2026-10-17 至 2026-10-18） {#src-experiment-case2-board-evidence}
+
+本节记录 8T 与 20T 两块开发板上的实际运行结果。原始日志保存在 [`docs/case-board-runs-20261017/case2/`](../../docs/case-board-runs-20261017/case2/README.md)。本案例没有浏览器前端，因此没有 UI 截图，不能把“日志中没有 OpenCV 窗口”解释为 UI 通过。
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| SoC | `Ascend310B4` | `Ascend310B1` |
+| CANN | 8.0.0 | 8.0.0 |
+| 驱动 | 25.2.0 | 25.2.0 |
+| Python | 3.9.2 | 3.9.2 |
+| Health | Alarm（已知状态，不作为失败判据） | Alarm（同上） |
+
+| 项目 | 8T | 20T |
+| --- | --- | --- |
+| `detection_app` | exit 0 | exit 0 |
+| `tracking_app` | exit 0 | exit 0 |
+| NPU 模型 | 加载成功 | 加载成功 |
+| 输入解析 | 768×576，10 fps | 768×576，10 fps |
+| 输出形状 | `(1,4,3234)` + `(1,81,3234)` | `(1,4,3234)` + `(1,81,3234)` |
+| 输出视频 | 已生成到板端 `/tmp` | 已生成到板端 `/tmp` |
+
+**证据等级**：检测与跟踪链路、NPU 模型加载为 `observed-pass`。
+**本轮未验证**：检测/跟踪精度评估、真实摄像头输入、浏览器界面（本案例无前端）。
 
 ## 章节总结 {#src-experiment-case2-h92}
 
