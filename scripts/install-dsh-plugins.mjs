@@ -13,7 +13,8 @@
  *   node scripts/install-dsh-plugins.mjs --check
  */
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -61,6 +62,33 @@ function findDsh() {
 }
 
 const dsh = findDsh();
+
+function runDsh(dshArgs, options = {}) {
+	if (process.platform === 'win32') {
+		const installRoot = process.env.LOCALAPPDATA
+			? join(process.env.LOCALAPPDATA, 'Programs', 'DeepSeek Harness')
+			: '';
+		const exe = join(installRoot, 'DeepSeek Harness.exe');
+		const cli = join(
+			installRoot,
+			'resources',
+			'app.asar',
+			'dsh',
+			'node_modules',
+			'@deepseek-ai',
+			'dsh-desktop-host',
+			'lib',
+			'cli.js'
+		);
+		if (existsSync(exe)) {
+			return spawnSync(exe, ['--expose-internals', cli, ...dshArgs], {
+				...options,
+				env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+			});
+		}
+	}
+	return spawnSync(dsh, dshArgs, { ...options, shell: process.platform === 'win32' });
+}
 if (dsh === '') {
 	console.error('找不到 dsh CLI。请先安装 DSH 桌面版，或把 dsh 加入 PATH。');
 	process.exit(1);
@@ -93,7 +121,15 @@ function pack(pluginDir) {
 		.trim()
 		.split(/\r?\n/u)
 		.find((line) => line.endsWith('.tgz'));
-	return name ? join(packDir, name) : '';
+	if (!name) return '';
+	const tarball = join(packDir, name);
+	// A same-name/same-version tarball makes pnpm reuse its cached copy and
+	// silently keep an older package. Name every pack by its content hash so a
+	// code change is always a new specifier.
+	const hash = createHash('sha256').update(readFileSync(tarball)).digest('hex').slice(0, 12);
+	const hashed = join(packDir, `${name.replace(/\.tgz$/u, '')}-${hash}.tgz`);
+	renameSync(tarball, hashed);
+	return hashed;
 }
 
 function installedManifest(name) {
@@ -141,18 +177,16 @@ if (!checkOnly) {
 		console.log(`  ${tarball}`);
 	}
 
-	// Remove old link/file specs first; otherwise pnpm can keep an existing
-	// `link:` at the same version and report "Already up to date".
-	spawnSync(dsh, ['plugin', '--profile', profile, 'remove', ...plugins.map((entry) => entry.pkg.name)], {
-		stdio: 'ignore',
-		env: process.env
-	});
 	console.log(`\n安装到 profile ${profile}`);
-	const added = spawnSync(dsh, ['plugin', '--profile', profile, 'add', ...tarballs], {
-		stdio: 'inherit',
-		env: process.env
+	const added = runDsh(['plugin', '--profile', profile, 'add', ...tarballs], {
+		stdio: 'inherit'
 	});
-	if ((added.status ?? 1) !== 0) process.exit(1);
+	// The installed-file verification below is the authoritative check.
+	if ((added.status ?? 1) !== 0) {
+		console.warn(
+			`  dsh plugin add 返回 ${added.status}（${added.error?.message ?? '无错误信息'}），继续核对安装结果`
+		);
+	}
 }
 
 let failed = false;
@@ -166,6 +200,14 @@ for (const { pkg } of plugins) {
 	}
 	if (specifier.startsWith('link:')) {
 		console.error(`  ${pkg.name} 仍是 link: 安装，Node 从仓库真实路径无法解析 DSH host 包；请重跑本脚本。`);
+		failed = true;
+		continue;
+	}
+	const missing = (installed.files ?? []).filter(
+		(entry) => !existsSync(join(profileDir, 'node_modules', pkg.name, entry))
+	);
+	if (missing.length > 0) {
+		console.error(`  ${pkg.name} 安装副本缺少 package.json files 中的：${missing.join('、')}`);
 		failed = true;
 		continue;
 	}
