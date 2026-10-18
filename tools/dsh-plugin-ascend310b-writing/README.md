@@ -211,6 +211,18 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 
 容量超出时用 `node scripts/split-decks.mjs --write <课件>` 分页，不要缩小字号。
 
+## Skill 安装
+
+插件通过 `skills/` 携带写作 skill，但 **DSH 只从 `$DSH_HOME/skills/<name>/SKILL.md` 读取**，不会自动从已安装插件里复制。安装或更新：
+
+```bash
+node scripts/install-skill.mjs          # 安装/更新到 ~/.dsh/skills
+node scripts/install-skill.mjs --check  # 只核对，不一致时退出码 1
+```
+
+`package.json` 里对应 `pnpm run skills:install` 与 `pnpm run skills:check`。
+
+DSH 在**会话启动时**加载 skill：更新后新建会话才会拿到新内容。当前会话的 skill 目录里能看到 `ascend310b-writing`，说明加载链路本身是通的；`--check` 用来防止"仓库里改了、实际用的还是旧版"。
 ## 参考项目
 
 课件规范不是凭空写的，以下开源项目的规则被直接采纳或改写：

@@ -32,7 +32,7 @@
     }
   },
   "scripts": {
-    "smoke": "node test/smoke.mjs"
+    "smoke": "node test/smoke.mjs",`n    "skills:install": "node scripts/install-skill.mjs",`n    "skills:check": "node scripts/install-skill.mjs --check"
   },
   "license": "MIT"
 }
