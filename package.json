@@ -5,7 +5,9 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "skills:sync": "node scripts/sync-repo-skills.mjs",`n    "skills:check": "node scripts/sync-repo-skills.mjs --check",`n    "docs:slides": "node scripts/build_presentation.mjs",
+    "skills:sync": "node scripts/sync-repo-skills.mjs",
+    "skills:check": "node scripts/sync-repo-skills.mjs --check",
+    "docs:slides": "node scripts/build_presentation.mjs",
     "docs:slides:check": "node scripts/check_presentation_catalog.mjs && node scripts/sync_presentation_sidebar.mjs --check && node scripts/sync_presentation_readme.mjs --check",
     "docs:slides:index:write": "node scripts/sync_presentation_sidebar.mjs --write && node scripts/sync_presentation_readme.mjs --write",
     "docs:slides:scaffold": "node scripts/scaffold-presentations.mjs",
