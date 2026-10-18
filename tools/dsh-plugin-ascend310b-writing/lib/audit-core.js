@@ -152,9 +152,20 @@ export function readManuscript(file) {
 	const text = readFileSync(file, 'utf8');
 	const lines = text.split(/\r?\n/u);
 	const headings = [];
+	// A leading YAML block is metadata, not Markdown: a `#` comment inside it
+	// (portfolio.md carries one) is not a heading and must not be audited as one.
+	let start = 0;
+	if (lines[0]?.trim() === '---') {
+		for (let i = 1; i < lines.length; i += 1) {
+			if (lines[i].trim() === '---') {
+				start = i + 1;
+				break;
+			}
+		}
+	}
 	let fenced = false;
 	let fence = '';
-	for (let i = 0; i < lines.length; i += 1) {
+	for (let i = start; i < lines.length; i += 1) {
 		const line = lines[i];
 		const fenceMatch = /^\s*(`{3,}|~{3,})/u.exec(line);
 		if (fenceMatch !== null) {
@@ -382,6 +393,37 @@ function auditFile(context) {
 			);
 		}
 		previous = heading.level;
+	}
+
+	// --- heading length and shape -------------------------------------------
+	// A heading is a signpost: it has to stay scannable in the sidebar, the
+	// table of contents and the PDF bookmarks. The budgets are calibrated on
+	// this manuscript (H2 p90 is 25 characters); a heading that exceeds them is
+	// almost always carrying prose that belongs in the paragraph below it.
+	// A link is never part of a heading: it breaks the bookmark text.
+	const HEADING_LIMITS = { 1: 24, 2: 32, 3: 33, 4: 40, 5: 40, 6: 40 };
+	if (!assetPart) {
+		for (const heading of headings) {
+			const visible = heading.text.replace(/\[([^\]]*)\]\([^)]*\)/gu, '$1');
+			const length = [...visible].length;
+			const limit = HEADING_LIMITS[heading.level] ?? 40;
+			if (length > limit) {
+				push(
+					'heading-too-long',
+					'warning',
+					heading.line,
+					`H${heading.level} 标题 ${length} 字，超过 ${limit} 字上限：${visible.slice(0, 40)}`
+				);
+			}
+			if (/\]\(https?:/u.test(heading.text)) {
+				push(
+					'heading-has-link',
+					'warning',
+					heading.line,
+					`标题里含链接，链接应放在正文：${visible.slice(0, 40)}`
+				);
+			}
+		}
 	}
 
 	// --- explicit anchors ---------------------------------------------------

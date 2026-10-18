@@ -104,6 +104,40 @@ check(
 	'inert runs must not be reported as hard breaks'
 );
 
+// --- heading shape ----------------------------------------------------------
+// A long heading is prose in disguise, a link in a heading breaks the bookmark
+// text, and a YAML `#` comment is metadata rather than a heading.
+writeFileSync(
+	join(root, 'src', 'book', 'chapter2.md'),
+	[
+		'---',
+		'title: "第2章：标题形状"',
+		'# avatar: https://example.test/avatar.png',
+		'---',
+		'',
+		'## 简短标题',
+		'',
+		'## 这是一个刻意写得很长很长用来触发标题长度规则的二级标题超过三十二个字符',
+		'',
+		'## 走读 [`check.py`](https://example.test/check.py)',
+		''
+	].join('\n')
+);
+const shaped = auditRepo({ root, maxFindings: 200 });
+const longHeads = shaped.findings.filter((finding) => finding.rule === 'heading-too-long');
+const linkHeads = shaped.findings.filter((finding) => finding.rule === 'heading-has-link');
+check(longHeads.length === 1, `one long heading expected, got ${longHeads.length}`);
+check(longHeads[0]?.file.endsWith('chapter2.md'), 'the long heading must be reported on chapter2');
+check(linkHeads.length === 1, `one linked heading expected, got ${linkHeads.length}`);
+check(
+	!shaped.findings.some((finding) => finding.file.endsWith('chapter2.md') && finding.line === 3),
+	'a YAML comment in frontmatter must not be parsed as a heading'
+);
+check(
+	!shaped.findings.some((finding) => finding.file.endsWith('chapter2.md') && finding.rule === 'h1-count'),
+	'a comment in frontmatter must not disturb the H1 count'
+);
+
 rmSync(root, { recursive: true, force: true });
 
 if (failures.length > 0) {
