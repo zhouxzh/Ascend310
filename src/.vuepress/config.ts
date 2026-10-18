@@ -28,7 +28,20 @@ export default defineUserConfig({
   description: "基于昇腾310B的边缘计算与人工智能推理部署开源教材",
 
   bundler: viteBundler({
-    viteOptions: {},
+    viteOptions: {
+      server: {
+        watch: {
+          // Atomic writers (and another agent editing case9) create locked
+          // .tmpdir/.tmp files under src/experiment. Watching them makes Vite
+          // die with EBUSY; generated dist files are also not source.
+          ignored: [
+            "**/.*.tmpdir/**",
+            "**/*.tmp",
+            "**/.vuepress/dist/**",
+          ],
+        },
+      },
+    },
     vuePluginOptions: {},
   }),
 
