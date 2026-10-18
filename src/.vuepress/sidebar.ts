@@ -47,7 +47,7 @@ const presentationChildren = [
         { text: "开发板与基础环境（制作中）", link: "/presentation/30-appendix1.html" },
         { text: "基于昇腾 310B 的 Ubuntu 教程（制作中）", link: "/presentation/31-appendix2.html" },
         { text: "Python 编程基础（制作中）", link: "/presentation/32-appendix3.html" },
-        { text: "Vibe Coding 基础（制作中）", link: "/presentation/33-appendix4.html" },
+        { text: "Vibe Coding 基础", link: "/presentation/33-appendix4.html" },
         { text: "ROS2 基础教程（制作中）", link: "/presentation/34-appendix5.html" },
         { text: "工具箱、FAQ 与参数模板（制作中）", link: "/presentation/35-appendix6.html" },
         { text: "CANN 升级与版本配套（制作中）", link: "/presentation/36-appendix7.html" },

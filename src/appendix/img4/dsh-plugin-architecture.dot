@@ -1,0 +1,21 @@
+digraph DSHPluginArchitecture {
+  rankdir=LR;
+  graph [fontname="Noto Sans SC", fontsize=12, bgcolor="white", pad="0.3", nodesep="0.45", ranksep="0.7"];
+  node [shape=box, style="rounded,filled", fontname="Noto Sans SC", fontsize=11, color="#7a8b94", fillcolor="#f5f8f7", margin="0.18,0.12"];
+  edge [color="#5d6b72", arrowsize=0.7, fontname="Noto Sans SC", fontsize=10];
+
+  desktop [label="DSH 桌面版\n工作区：Ascend310", fillcolor="#dcefe9", color="#087f73"];
+  skills  [label="Skills\n.dsh/skills（项目级，优先）\n~/.dsh/skills（用户级）", fillcolor="#fff3d6", color="#c76b12"];
+  writing [label="写作插件\nascend310b-writing", fillcolor="#e8f1fb", color="#2f6fa8"];
+  debug   [label="调试插件\nascend310b-debug", fillcolor="#f3e9f7", color="#7a4a95"];
+  repo    [label="教材仓库\nsrc/ 正文与图片\nsamples/ 代码\ndocs/ 板端证据", fillcolor="#eef1f2"];
+  output  [label="生成物\nLaTeX / PDF\nVuePress 站点 / 课件", fillcolor="#eef1f2"];
+
+  desktop -> skills [label="先读规则"];
+  desktop -> writing [label="注册工具"];
+  desktop -> debug [label="注册工具"];
+  writing -> repo [label="审计与修改"];
+  debug -> repo [label="板端探测与调试"];
+  repo -> output [label="构建"];
+  writing -> output [label="检查产物"];
+}

@@ -89,76 +89,148 @@ flowchart LR
 - [luo-junyu/Awesome-Agent-Papers](https://github.com/luo-junyu/Awesome-Agent-Papers)：以论文为主的 LLM Agent 综述和进展。
 - [Shubhamsaboo/awesome-llm-apps](https://github.com/Shubhamsaboo/awesome-llm-apps)：Agent、RAG 和应用案例合集。
 
-## 3. DSH 配置与安全检查
+## 3. DSH 桌面版安装与插件配置
 
-### 3.1 确认环境
+### 3.1 为什么统一用桌面版
 
-昇腾 310B 自带 Anaconda，本附录不安装 Python 环境。先确认基础命令可用：
+本课程统一使用 **DSH 桌面版**（DeepSeek Harness Desktop）。它是带图形界面的安装包，模型、工作区、插件和 Skill 都在界面里配置，不需要学生先装 Node.js，也不需要记命令行参数。
 
-```bash
-python --version
-conda --version
-dsh web
-```
+| 方式 | 学生需要准备 | 常见问题 | 课程是否采用 |
+| --- | --- | --- | --- |
+| **DSH 桌面版** | 下载安装包，双击安装 | 几乎没有环境依赖 | **采用** |
+| `npx` / `npm` 安装 | Node.js、npm、网络代理、PATH | 版本冲突、命令找不到、公司网络装不上 | **不再介绍** |
+| 源码运行 | Git、Node、pnpm、构建工具 | 步骤多，出错点分散 | 仅插件开发者使用 |
 
-能看到 `python` 和 `conda` 版本即可继续。`dsh web` 启动后，浏览器打开：
+> **不要再用 `npx` 安装 DSH。** 课堂上出现的“命令找不到”“装完打不开”“版本和老师不一样”，绝大多数都来自这一步。桌面版已经把运行时打包好了。
 
-```text
-http://127.0.0.1:3080
-```
+### 3.2 安装桌面版
 
-DSH 的官方仓库在：
+1. 从课程提供的官方安装包获取 Windows x64 版本，文件名类似 `DeepSeek Harness Setup <版本>.exe`；也可以从官方仓库了解版本与文档：<https://github.com/deepseek-ai/deepseek-harness>。
+2. 双击安装包，按默认选项安装到当前用户目录。若 Windows 弹出 SmartScreen，先确认安装包来自课程或官方渠道，再选择“更多信息，再选择“仍要运行””。
+3. 安装完成后从开始菜单启动 **DeepSeek Harness**。首次启动会自动创建用户配置目录 `%USERPROFILE%\.dsh`。
+4. 打开 `设置中的“关于”`，确认版本号。本教材验证的版本是 **0.2.1-rc.2**；版本不同不影响本附录的界面操作，但插件工具名以实际安装为准。
+5. macOS 学生使用课程提供的 macOS 安装包，步骤相同：拖入“应用程序”、首次打开允许、确认版本。
 
-<https://github.com/deepseek-ai/deepseek-harness>
+安装完成后**不需要**再执行 `npm install`、`npx` 或 `pnpm`。如果终端里还在跟着旧教程敲这些命令，直接跳过。
 
-![DSH 官方仓库](./img4/dsh-github.png)
+### 3.3 配置模型与工作区
 
-![DSH 启动与验证示例](./img4/terminal-verify.png)
+DSH 需要两样配置才能开始工作：模型 API Key 和工作区。
 
-### 3.2 配置模型与工作区
-
-DSH 需要两样配置才能开始工作：模型 API Key 和工作区。先到 DeepSeek 开放平台申请 API Key：
-
-<https://platform.deepseek.com/>
-
-申请后打开 DSH 的 `Settings → Models`，粘贴 API Key 并保存。然后在主界面点击 `Choose workspace`，选择本仓库根目录。昇腾 310B 上常见路径为：
+1. 到 DeepSeek 开放平台申请 API Key：<https://platform.deepseek.com/>。
+2. 在 DSH 中点开 `设置中的“模型”`，粘贴 API Key 并保存。
+3. 回到主界面，点击工作区选择器，选择本仓库根目录：
 
 ```text
-~/Documents/Ascend310
+Windows 开发机：D:\Github\Ascend310
+昇腾 310B 板端：~/Documents/Ascend310
 ```
 
-Windows 开发机上类似：
+4. 新建一个会话，先问一句：
 
 ```text
-D:\Github\Ascend310
+请告诉我当前工作区路径，以及你加载了哪些 skill。
 ```
 
-![DSH 模型与工作区配置示意图](./img4/webui-config.png)
+只有回答的路径是本仓库，才继续后面的任务。
+
+![DSH 桌面版主界面](./img4/dsh-webui-main.png)
 
 API Key 只保存在本地设置里，不要写进教程、代码、聊天内容或 GitHub。
 
-### 3.3 DSH 界面
+### 3.4 安装写作插件与调试插件
 
-![DSH Web 界面](./img4/dsh-webui-main.png)
-
-| 区域 | 作用 | 常见操作 |
-|---|---|---|
-| 左侧会话栏 | 新建会话、切换历史会话 | 点“新会话”开始一个干净任务 |
-| 中部消息区 | 你与 Agent 的对话记录 | 滚动查看每一步 |
-| 底部输入框 | 输入自然语言任务 | 回车发送 |
-| 工具行 | 显示 Agent 正在读取、编辑、运行什么 | 点击查看工具执行详情 |
-| 右上角状态 | 当前工作区、模型、安全模式 | 确认工作区是否正确 |
-| 设置 | API Key、模型、工作区配置 | 只配置一次，之后不要随意修改 |
-
-每次开始任务前，先问一句：
+本仓库自带两个 DSH 插件，源码分别在：
 
 ```text
-请告诉我当前工作区路径。
+tools/dsh-plugin-ascend310b-writing/   写作插件
+tools/dsh-plugin-ascend310b-debug/     程序调试插件
 ```
 
-如果 DSH 回答的路径不是本仓库，先改回本仓库再继续。
+在 DSH 的插件/扩展设置中添加这两个**本地插件目录**，启用后新建会话。插件注册的是工具（tools），模型通过调用工具完成检查；它们和 Skill 是两层东西，下一节会说明。
 
-### 3.4 安全规则
+![DSH 插件与 Skill 的协作关系](./img4/dsh-plugin-architecture.png)
+
+**写作插件 `ascend310b-writing`** 管的是“教材有没有写对”：
+
+| 工具 | 作用 |
+| --- | --- |
+| `ascend310b_writing_audit` | 审 Markdown、命名、锚点、链接、图片、标点、PDF 章节表、网页产物 |
+| `ascend310b_writing_render` | 读 LaTeX 日志：缺字形、未定义引用、版面溢出、产物是否过期 |
+| `ascend310b_writing_push_check` | 推送前门槛：审计、提交内链接、产物新鲜度、预览确认 |
+| `ascend310b_writing_style` | 找出营销腔、空话、元话语、对话残留 |
+| `ascend310b_writing_progress` | 章节字数、图、代码块、阅读时长、sidebar 覆盖 |
+| `ascend310b_writing_build` | 用仓库自己的转换器出 LaTeX/PDF 与站点 |
+| `ascend310b_writing_toolchain` | 检查 pandoc、latexmk、xelatex、pnpm 等构建工具 |
+
+**调试插件 `ascend310b-debug`** 管的是“程序在板端为什么不对”：
+
+| 工具 | 作用 |
+| --- | --- |
+| `ascend_probe` | 只读采集 SoC、CANN、驱动、固件、Python、设备节点 |
+| `ascend_check` | 按仓库记录的版本配套判断环境，给出升级顺序与验收门 |
+| `ascend_debug_plan` | 按 ACL、ATC、OM、DVPP、摄像头、框架、服务、性能、量化分层给排查计划 |
+| `ascend_board_exec` | 在板端执行**只读**诊断命令 |
+| `ascend_board_run` | 经确认后在板端运行样例、转换、测试等会改变状态的任务 |
+| `ascend_sample_index` | 从仓库样例中找与症状匹配的入口 |
+| `ascend_model_download` | 通过课程代理下载模型资产 |
+
+写作插件产出“可交付的教材”，调试插件产出“可复核的板端证据”，两者共用同一个仓库，但**证据边界不同**：教材通过审计不等于板端跑通，板端跑通也不等于教材写对。
+
+### 3.5 Skill：给模型的操作规程
+
+Skill 是一份 `SKILL.md`，写清楚“什么时候用、按什么顺序做、哪些结论不能下”。它不直接执行命令，而是让模型在正确的时机调用正确的工具。
+
+DSH 按下面的优先级查找 Skill：
+
+| 优先级 | 位置 | 适用场景 |
+| --- | --- | --- |
+| 100 | `<仓库>/.dsh/skills` | 本仓库自带，新克隆即生效 |
+| 200 | `<仓库>/.agents/skills` | 其他 Agent 工具的约定目录 |
+| 300 | DSH 配置里的自定义目录 | 个人扩展 |
+| 之后 | `~/.dsh/skills` | 用户级安装，跨仓库可用 |
+
+本仓库的两个 Skill 已放在项目级目录：
+
+```text
+.dsh/skills/ascend310b-writing/SKILL.md
+.dsh/skills/ascend310b-debug/SKILL.md
+```
+
+它们由插件里的版本生成，避免手抄出第三份。改了插件里的 Skill 后执行：
+
+```bash
+pnpm run skills:sync    # 同步到 .dsh/skills
+pnpm run skills:check   # 只核对，不一致时退出码为 1
+```
+
+如果只想装到当前用户：
+
+```bash
+node tools/dsh-plugin-ascend310b-writing/scripts/install-skill.mjs
+node tools/dsh-plugin-ascend310b-writing/scripts/install-skill.mjs --check
+```
+
+**Skill 在会话启动时加载**，所以更新后要新建会话。判断是否生效，可以直接问：
+
+```text
+你现在能用哪些 skill？写作任务应该先调用哪个工具？
+```
+
+### 3.6 界面与常用操作
+
+| 区域 | 作用 | 常见操作 |
+| --- | --- | --- |
+| 左侧会话栏 | 新建会话、切换历史会话 | 每个独立任务开一个新会话 |
+| 中部消息区 | 你与 Agent 的对话记录 | 滚动查看每一步工具调用 |
+| 底部输入框 | 输入自然语言任务 | 回车发送 |
+| 工作区选择器 | 决定 Agent 能读写哪个目录 | 每次开始前确认是 `Ascend310` |
+| 设置 | 模型、工作区、插件、Skill | 只配置一次，之后不要随意改 |
+| 工具执行卡片 | 显示读取、编辑、运行了什么 | 展开看命令与输出 |
+
+每次开始任务前，先确认工作区；任务结束后，先看工具输出，再看 Agent 的总结。
+
+### 3.7 安全规则
 
 Agent 能做的事情和真人操作电脑一样有后果。看不懂的命令、不确定的文件修改，都可能破坏课程项目或系统环境。使用 DSH 时遵守五条规则：
 
@@ -171,13 +243,12 @@ Agent 能做的事情和真人操作电脑一样有后果。看不懂的命令�
 常见风险与应对：
 
 | 风险 | 表现 | 应对 |
-|---|---|---|
+| --- | --- | --- |
 | 选错工作区 | DSH 找不到文件，或修改了别的目录 | 先问当前工作区路径，再重新选择 |
 | 危险命令 | Agent 要删除文件、安装依赖或改系统配置 | 停下来，要求解释，确认后再继续 |
 | 生成看不懂的代码 | 代码能运行，但自己讲不清每一行 | 让 DSH 逐行解释，能复述后再验收 |
 | Key 泄露 | API Key 出现在代码或文档中 | 删除 Key，重新生成，绝不提交 |
 | 长任务失控 | Agent 连续修改多个文件 | 拆成小任务，每步检查一次结果 |
-
 ## 4. 第一次 Vibe Coding 任务
 
 本附录的第一个任务不使用外部数据，改为读取本仓库中的模型清单：
@@ -287,8 +358,12 @@ DSH 完成任务后，按以下顺序验收：
 - [ ] 能说出 Vibe Coding 的完整循环。
 - [ ] 能区分 Agent、大模型、工具和工作区。
 - [ ] `python --version` 和 `conda --version` 已确认可用。
-- [ ] DSH 已启动，浏览器可以打开 `http://127.0.0.1:3080`。
+- [ ] DSH 桌面版已安装并能从开始菜单启动，`设置中的“关于”` 能看到版本号。
+- [ ] 没有使用 `npx`、`npm` 或 `pnpm` 安装 DSH。
 - [ ] 已配置 API Key 和本仓库工作区。
+- [ ] 写作插件与调试插件已启用，新会话能看到对应工具。
+- [ ] 问“你现在能用哪些 skill？”时，回答包含 `ascend310b-writing` 与 `ascend310b-debug`。
+- [ ] `pnpm run skills:check` 通过。
 - [ ] 能背出 5 条安全规则。
 - [ ] 第一次任务只读取 `samples/case7/models/registry.json`，没有修改原文件。
 - [ ] 能解释生成脚本中的 `json`、`Path` 和 `for` 循环。
@@ -298,6 +373,10 @@ DSH 完成任务后，按以下顺序验收：
 
 | 现象 | 可能原因 | 处理方式 |
 |---|---|---|
+| 还在跟着旧教程用 `npx` 安装 | 教程版本过旧 | 停止安装，改用课程提供的 DSH 桌面版安装包 |
+| 桌面版装完却找不到命令 | 把桌面版当成 CLI 使用 | 从开始菜单启动图形界面，不需要终端命令 |
+| 插件工具没有出现 | 插件目录未启用或没有新建会话 | 在插件设置中启用两个目录，重启并新建会话 |
+| Skill 没有生效 | 用了旧会话或用户目录有旧版本 | 新建会话；执行 `pnpm run skills:sync` 后复查 |
 | DSH 找不到文件 | 工作区不在本仓库 | 先问当前工作区路径，再重新选择 |
 | DSH 修改了原文件 | 文件边界不清晰 | 明确只读路径，检查计划后再批准 |
 | DSH 使用了 pandas | 提示词没有限制依赖 | 明确只用标准库 `json` 和 `pathlib` |

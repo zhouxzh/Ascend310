@@ -53,7 +53,7 @@ editLink: false
 | 附录 1：开发板环境 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/30-appendix1.html) |
 | 附录 2：Ubuntu 教程 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/31-appendix2.html) |
 | 附录 3：Python 基础 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/32-appendix3.html) |
-| 附录 4：Vibe Coding | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/33-appendix4.html) |
+| 附录 4：Vibe Coding | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/33-appendix4.html) |
 | 附录 5：ROS2 基础 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/34-appendix5.html) |
 | 附录 6：工具箱与 FAQ | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/35-appendix6.html) |
 | 附录 7：CANN 升级 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/36-appendix7.html) |

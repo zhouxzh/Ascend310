@@ -491,13 +491,13 @@ export const presentationCatalog = Object.freeze([
     shortTitle: "Vibe Coding 基础",
     sources: ["src/appendix/appendix4.md"],
     samples: ["samples/case1/fusion_result.json"],
-    status: "scaffold",
+    status: "ready",
     build: true,
     lessonPlan: [
-      "任务拆分与上下文准备",
-      "DSH安全使用和提示设计",
-      "生成、运行和审查代码",
-      "可复现交付与失败边界",
+      "DSH 桌面版安装与工作区",
+      "写作插件与调试插件分工",
+      "Skill 的优先级与生效",
+      "安全边界与证据链",
     ],
   },
   {
