@@ -9,8 +9,6 @@ header: "《昇腾310B实战》教材配套演示"
 footer: "案例 9：智能聊天机器人"
 ---
 
-<!-- presentation-scaffold: case-09 -->
-
 <!-- _class: cover -->
 
 # 案例 9：智能聊天机器人
@@ -30,51 +28,203 @@ footer: "案例 9：智能聊天机器人"
 
 ---
 
-## 本讲教学主线
+<!-- _class: center -->
 
-1. 边缘聊天服务的信任与算力边界
-2. 模型工件锁和环境准备
-3. worker、网关与文字界面
-4. OpenAI兼容JSON和SSE验收
+## 本讲目标与路线
 
-课堂结束时，学生应能沿着这 4 个节点复述设计、运行入口和证据边界。
+- 理解本地模型服务的系统架构
+- 用工件锁固定发布模型与版本
+- 启动 OpenAI 兼容接口并完成调用
+- 按验收方法记录回答质量与失败边界
 
-<div class="source">教材：`src/experiment/case9.md`；样例：`samples/case9`</div>
+> 本讲主线：架构 → 模型锁 → 服务 → 调用 → 验收
+
+<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a></div>
 
 <!--
-授课提示：逐项带读，不逐字念稿；每讲完一个节点就指出对应教材小节。
+先给学生路线图；后续每页都对应这里的一项，最后回到小结。
 -->
-
-
 ---
 
-<!-- _class: screenshot -->
+<!-- _class: section -->
 
-## 前端界面证据
+# 01
 
-> 本页预留真实前端截图；采集后必须写明开发板档位、页面路径、视口、隐私场景和截图清单编号。
-
-<div class="source">待接入：`src/presentation/screenshots/capture-manifest.json`；来源：`samples/case9`</div>
-
-<!--
-授课提示：截图只展示合成数据或匿名数据。先让学生识别页面上的输入、运行状态和结果区域。
--->
-
+## 架构与模型锁
 ---
 
-## 配套源码与课堂产出
+<!-- _class: center -->
 
-| 项目 | 本讲入口 |
-|---|---|
-| 教材正文 | `src/experiment/case9.md` |
-| 可运行样例 | `samples/case9` |
-| 截图清单 | `src/presentation/screenshots/capture-manifest.json` |
-| 课件清单 | `src/presentation/catalog.mjs` |
+## 系统架构
 
-课堂产出必须包含实际运行的命令、界面或日志，以及失败时停在哪一层。
+- 三个端口承担不同角色：
+- 网页没有浏览器登录功能。因此，同一可达网段中的主机都可以发送消息。不要做端口映射，不要将 7865 放到公网反向代理之后，也不要在不可信网络使用本页面。
+- 7865：0.0.0.0
 
-<div class="source">课件制作中：case-09；完成正文、截图和讲师备注后移除 scaffold 标记。</div>
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 2. 系统架构</div>
 
 <!--
-授课提示：最后留下一个可检查的课堂任务；学生提交运行入口、结果和未完成边界。
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 发布模型与工件锁
+
+- 下载或离线导入都必须执行相同的完整性流程：
+- model.safetensors：模型权重
+- tokenizer.json：tokenizer 数据
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 3. 发布模型与工件锁</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 环境准备
+
+- 本节聚焦：4. 环境准备 的输入、操作与证据边界。
+- 先把输入、版本与命令固定下来，再判断结果是否可复现。
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 4. 环境准备</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 获取或导入模型
+
+- 通过离线目录导入时：
+- 两种方法都会先写入临时文件，再检查服务端声明长度、本地实际长度和 SHA-256。校验失败的临时文件会被删除，已验证的目标文件不会被覆盖。可在启动前再次核验：
+- 本节聚焦：5. 获取或导入模型 的输入、操作与证据边界。
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 5. 获取或导入模型</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 启动服务
+
+- 分别打开三个终端，在项目根目录执行：
+- 本节聚焦：6. 启动服务 的输入、操作与证据边界。
+- 先把输入、版本与命令固定下来，再判断结果是否可复现。
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 6. 启动服务</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: section -->
+
+# 02
+
+## 服务、调用与验收
+---
+
+<!-- _class: center -->
+
+## 调用 OpenAI 兼容接口
+
+- 网关公开模型名固定为 ascend-edge-chat。调用方必须携带 Bearer 密钥。
+- 将 stream 设置为 true 可获得 Server-Sent Events。网关会将 worker 的内部模型名改写为公开模型名，再把增量返回给客户端。
+- 仅接受 system、user、assistant 三种角色；
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 7. 调用 OpenAI 兼容接口</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 验收方法
+
+- 不能用“服务已启动”代替模型验收。每个目标板都应独立记录以下证据：
+- SoC、CANN、Python、MindSpore、MindNLP、驱动和模型 SHA-256；
+- worker NPU 初始化和单 token 生成；
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 8. 验收方法</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 教学模型的实测结果与原因
+
+- 下表是本案例已有板端证据的摘要。observed-pass 只说明机器和接口路径
+- 通过；它不等同于中文回答优秀。相反，quality_status=failed 也不等同于
+- 学生应先复制原始响应，再分析 tokenizer、chat template、finish_reason、
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 9. 教学模型的实测结果与原因</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 二次开发
+
+- 新模型不是通过任意请求参数注入路径或 Python 代码。教学模型通过受控 registry
+- 和目录加入页面；正式发布模型仍需要独立锁文件。新模型需要实现
+- BackendProvider 协议，并提供：
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 10. 二次开发</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 本章小结
+
+- 模型、服务和接口是三份独立合同
+- 工件锁让部署可复现、可回退
+- 教学模型的实测结果必须绑定运行条件
+- 未验证项必须标为 untested 或 blocked。
+
+> 下一讲：把对话服务接入更完整的应用链路。
+
+<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a></div>
+
+<!--
+用三句话收束；提醒学生把未验证项写成 untested 或 blocked。
 -->

@@ -9,8 +9,6 @@ header: "《昇腾310B实战》教材配套演示"
 footer: "附录 1：开发板环境"
 ---
 
-<!-- presentation-scaffold: appendix-01 -->
-
 <!-- _class: cover -->
 
 # 附录 1：开发板环境
@@ -28,51 +26,170 @@ footer: "附录 1：开发板环境"
 
 ---
 
-## 本讲教学主线
+<!-- _class: center -->
 
-1. 开发板、接口与配件
-2. 系统安装与启动
-3. 网络与SSH
-4. npu-smi与CANN环境检查
+## 本讲目标与路线
 
-课堂结束时，学生应能沿着这 4 个节点复述设计、运行入口和证据边界。
+- 识别开发板接口与配件边界
+- 完成系统镜像校验、刷写与启动
+- 配置网络与 SSH 远程连接
+- 用最小命令验证开发环境
 
-<div class="source">教材：`src/appendix/appendix1.md`；样例：`无独立样例`</div>
+> 本讲主线：硬件 → 系统 → 网络 → 远程 → 验证
+
+<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a></div>
 
 <!--
-授课提示：逐项带读，不逐字念稿；每讲完一个节点就指出对应教材小节。
+先给学生路线图；后续每页都对应这里的一项，最后回到小结。
 -->
-
-
 ---
 
-<!-- _class: visual -->
+<!-- _class: section -->
 
-## 本章运行证据
+# 01
 
-> 本页预留本章最关键的板端运行界面、日志或结果图。没有实测证据时保留待采集说明，不把示意图写成通过结论。
-
-<div class="source">来源：`src/appendix/appendix1.md`；运行入口：`无独立样例`</div>
-
-<!--
-授课提示：先指出这是什么证据，再解释它能证明什么、不能证明什么。
--->
-
+## 硬件与系统安装
 ---
 
-## 配套源码与课堂产出
+<!-- _class: center -->
 
-| 项目 | 本讲入口 |
-|---|---|
-| 教材正文 | `src/appendix/appendix1.md` |
-| 可运行样例 | `无独立样例` |
-| 截图清单 | `src/presentation/screenshots/capture-manifest.json` |
-| 课件清单 | `src/presentation/catalog.mjs` |
+## 昇腾310B开发板介绍
 
-课堂产出必须包含实际运行的命令、界面或日志，以及失败时停在哪一层。
+- 子主题：开发板详细视图
+- 子主题：开发板硬件规格
+- 本节聚焦：昇腾310B开发板介绍 的输入、操作与证据边界。
 
-<div class="source">课件制作中：appendix-01；完成正文、截图和讲师备注后移除 scaffold 标记。</div>
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 昇腾310B开发板介绍</div>
 
 <!--
-授课提示：最后留下一个可检查的课堂任务；学生提交运行入口、结果和未完成边界。
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 配件准备
+
+- 为了顺利进行开发，请准备以下配件：
+- 建议使用容量64GB及以上、速率为Class10级以上的闪迪（SanDisk）品牌TF卡。虽然最小支持32GB，但为了避免开发过程中出现磁盘空间不足的问题，推荐使用更大容量。
+- 用于在电脑上读写TF卡以刷写系统镜像。建议选择USB 3.0速率的读卡器，以减少系统刷写的等待时间。
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 配件准备</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 操作系统安装
+
+- 首先，访问香橙派官网的技术支持页面。
+- 在页面下方找到“官方镜像”区域。官方提供了预装昇腾NPU应用环境及软件的Ubuntu和openEuler镜像，极大地方便了开发者快速上手。
+- #### Ubuntu
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 操作系统安装</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 启动开发板
+
+- 将刷写好的TF卡插入开发板插槽。
+- 确认拨码开关均拨至右侧（TF卡启动模式）。
+- 将HDMI线连接至HDMI0接口（靠近USB 3.0接口的那个）。
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 启动开发板</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: section -->
+
+# 02
+
+## 网络、远程与验证
+---
+
+<!-- _class: center -->
+
+## 网络连接
+
+- 开发板板载了WiFi模块，可以通过命令行工具nmcli轻松连接无线网络。
+- 将替换为你的WiFi名称，替换为密码。
+- 如果不熟悉命令参数，也可以使用nmtui提供的终端图形界面连接WiFi：
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 网络连接</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 远程连接 (SSH)
+
+- 为了方便开发，通常我们会使用个人电脑通过SSH远程连接到开发板。
+- 使用上述ip addr命令获取开发板的IP地址（通常在wlan0或eth0接口下）。
+- 使用SSH客户端连接
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 远程连接 (SSH)</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 验证开发环境
+
+- 系统启动并连接网络后，我们需要验证昇腾AI处理器的状态以及开发环境是否正常。
+- 使用npu-smi工具查看NPU的详细信息，包括温度、功耗、算力利用率等。
+- 如果能看到类似以下的输出，说明NPU工作正常：
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 验证开发环境</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 本章小结
+
+- 先确认硬件与配件，再安装系统
+- 网络与 SSH 是后续所有实验的入口
+- 环境验证必须保留命令输出
+- 未验证项必须标为 untested 或 blocked。
+
+> 下一讲：进入 Ubuntu 与 Linux 基础操作。
+
+<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a></div>
+
+<!--
+用三句话收束；提醒学生把未验证项写成 untested 或 blocked。
 -->

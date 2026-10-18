@@ -26,6 +26,35 @@ footer: "案例 3：智能电子琴"
 
 ---
 
+<!-- _class: center -->
+
+## 本讲目标与路线
+
+- 分清实时演奏、MIDI 渲染与音色转换
+- 理解神经网络控制量与 CPU 合成分工
+- 核对三套模型与转换路径
+- 按四层证据验收界面、模型与音频
+
+> 本讲主线：时间尺度 → 模型合同 → 音频证据
+
+<div class="source">教材：<a href="../experiment/case3.md"><code>src/experiment/case3.md</code></a></div>
+
+<!--
+先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
+-->
+---
+
+
+<!-- _class: section -->
+
+# 01
+
+## 工作台与职责边界
+
+---
+
+<!-- _class: center -->
+
 ## 一个工作台，三种时间尺度
 
 | 任务 | 输入 | 模型输出 | 产物 |
@@ -58,6 +87,8 @@ footer: "案例 3：智能电子琴"
 
 ---
 
+<!-- _class: center -->
+
 ## 三套模型不能互换
 
 | 维度 | Piano-DDSP | MIDI-DDSP | DDSP-VST |
@@ -78,6 +109,8 @@ footer: "案例 3：智能电子琴"
 
 ---
 
+<!-- _class: center -->
+
 ## 模型来源与转换路径
 
 | 模型族 | 上游来源 | ONNX形成 | 板端产物 |
@@ -96,6 +129,8 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 
 ---
 
+<!-- _class: center -->
+
 ## 后端用资源互斥保护硬件
 
 - 实时钢琴与VST Effect共享同一资源锁。
@@ -111,6 +146,17 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 -->
 
 ---
+
+
+<!-- _class: section -->
+
+# 02
+
+## 界面与音频证据
+
+---
+
+<!-- _class: center -->
 
 ## 界面证据分成“本轮”和“历史”两组
 
@@ -226,6 +272,8 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 
 ---
 
+<!-- _class: center -->
+
 ## 两个钢琴卷帘采用不同时间模型
 
 | 卷帘 | 时间来源 | 绘制策略 | 边界 |
@@ -245,6 +293,8 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 
 ---
 
+<!-- _class: center -->
+
 ## 设备选择必须具体到输入与输出
 
 - 触摸屏只提供13或25键屏幕琴键。
@@ -260,6 +310,8 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## FastAPI 用三种通信承载不同状态
 
@@ -280,6 +332,8 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 
 ---
 
+<!-- _class: center -->
+
 ## 证据必须覆盖四层，而不是一张截图
 
 | 证据层 | 需要证明 |
@@ -299,6 +353,8 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 
 ---
 
+<!-- _class: center -->
+
 ## 隐私与证据发布边界
 
 - 截图裁去IP、主机名、设备序列号和账号信息。
@@ -314,6 +370,8 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 课堂任务：界面、模型、音频各交一证
 

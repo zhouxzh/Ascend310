@@ -9,8 +9,6 @@ header: "《昇腾310B实战》教材配套演示"
 footer: "附录 6：工具箱与 FAQ"
 ---
 
-<!-- presentation-scaffold: appendix-06 -->
-
 <!-- _class: cover -->
 
 # 附录 6：工具箱与 FAQ
@@ -28,51 +26,173 @@ footer: "附录 6：工具箱与 FAQ"
 
 ---
 
-## 本讲教学主线
+<!-- _class: center -->
 
-1. 常见故障排查路径
-2. ATC参数模板
-3. 性能和质量检查表
-4. 术语与参考资料
+## 本讲目标与路线
 
-课堂结束时，学生应能沿着这 4 个节点复述设计、运行入口和证据边界。
+- 用报错速查表定位常见问题
+- 套用模型转换参数模板
+- 执行性能与质量 Checklist
+- 按 FAQ 与版本路线回落
 
-<div class="source">教材：`src/appendix/appendix6.md`；样例：`无独立样例`</div>
+> 本讲主线：报错 → 模板 → Checklist → FAQ → 版本
+
+<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a></div>
 
 <!--
-授课提示：逐项带读，不逐字念稿；每讲完一个节点就指出对应教材小节。
+先给学生路线图；后续每页都对应这里的一项，最后回到小结。
 -->
-
-
 ---
 
-<!-- _class: visual -->
+<!-- _class: section -->
 
-## 本章运行证据
+# 01
 
-> 本页预留本章最关键的板端运行界面、日志或结果图。没有实测证据时保留待采集说明，不把示意图写成通过结论。
-
-<div class="source">来源：`src/appendix/appendix6.md`；运行入口：`无独立样例`</div>
-
-<!--
-授课提示：先指出这是什么证据，再解释它能证明什么、不能证明什么。
--->
-
+## 报错与转换模板
 ---
 
-## 配套源码与课堂产出
+<!-- _class: center -->
 
-| 项目 | 本讲入口 |
-|---|---|
-| 教材正文 | `src/appendix/appendix6.md` |
-| 可运行样例 | `无独立样例` |
-| 截图清单 | `src/presentation/screenshots/capture-manifest.json` |
-| 课件清单 | `src/presentation/catalog.mjs` |
+## 内容概览
 
-课堂产出必须包含实际运行的命令、界面或日志，以及失败时停在哪一层。
+- 本附录聚焦“查得快、用得稳”：常见报错速查、转换参数模板、性能/质量 Checklist、术语字典、推荐资源与社区贡献规范。可作为日常开发随手翻阅的工具章节。
+- 本节聚焦：内容概览 的输入、操作与证据边界。
+- 先把输入、版本与命令固定下来，再判断结果是否可复现。
 
-<div class="source">课件制作中：appendix-06；完成正文、截图和讲师备注后移除 scaffold 标记。</div>
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 内容概览</div>
 
 <!--
-授课提示：最后留下一个可检查的课堂任务；学生提交运行入口、结果和未完成边界。
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 常见报错速查
+
+- 分类：报错/现象，先判断属于环境、模型还是运行层。
+- ATC：E19001 Op Not Supported，先核对目标 SoC 与算子清单。
+- ATC：Shape 推断失败，核对输入形状、动态维度和模型合同。
+- 运行：OM 加载失败时先查版本、平台与文件完整性。
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 常见报错速查</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 模型转换参数模板合集
+
+- 子主题：分类模型 (ResNet)
+- 子主题：YOLO 动态分辨率
+- 子主题：INT8 量化（示例）
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 模型转换参数模板合集</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 性能与质量 Checklist（执行勾项）
+
+- [ ] Profiling 无明显 Idle gap > 10%
+- [ ] H2D + D2H 占比 < 25%
+- [ ] Postprocess 占比 < 20%
+- [ ] 性能记录输入尺寸、精度、warmup、loops 与 repeats
+- [ ] 质量验证输出对齐、精度回退与失败边界
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 性能与质量 Checklist（执行勾项）</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: section -->
+
+# 02
+
+## 质量、FAQ 与版本
+---
+
+<!-- _class: center -->
+
+## 术语表（扩展）
+
+- OM：Ascend 离线模型二进制格式
+- ACL：Ascend 计算语言 API 层
+- ATC：模型转换/编译工具
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 术语表（扩展）</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## FAQ
+
+- 模型转换慢怎么办？：使用 SSD，关闭调试日志，检查不必要动态 shape。
+- 精度下降如何定位？：离线脚本层级 Dump 比对，逐层二分。
+- 如何减少内存占用？：启用内存池 + 减少中间冗余张量 + 固定 batch。
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · FAQ</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 实践任务
+
+- 为你的项目添加 1 条本地常见错误记录（含根因与解决）。
+- 复制分类 ATC 模板并改写为检测模型版本（含动态尺寸）。
+- 在术语表补充 3 个任务相关术语（并验证唯一性）。
+
+> 本页结论要能回到教材原文、命令输出或板端记录。
+
+<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 实践任务</div>
+
+<!--
+授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+-->
+---
+
+<!-- _class: center -->
+
+## 本章小结
+
+- 先定位错误层，再套模板
+- Checklist 必须逐项有证据
+- 版本路线决定回退与迁移顺序
+- 未验证项必须标为 untested 或 blocked。
+
+> 下一讲：进入 CANN 升级与版本配套。
+
+<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a></div>
+
+<!--
+用三句话收束；提醒学生把未验证项写成 untested 或 blocked。
 -->

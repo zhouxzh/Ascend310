@@ -26,6 +26,35 @@ footer: "第6章：DVPP视频处理基础"
 
 ---
 
+<!-- _class: center -->
+
+## 本讲目标与路线
+
+- 理解 DVPP 通道与异步回调
+- 掌握 NV12、stride 与缓冲区约束
+- 对照 VENC、VDEC、VPC 与 JPEG 的能力
+- 用分层证据排查媒体链
+
+> 本讲主线：数据格式 → 硬件通道 → 证据链
+
+<div class="source">教材：<a href="../book/chapter6.md"><code>src/book/chapter6.md</code></a></div>
+
+<!--
+先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
+-->
+---
+
+
+<!-- _class: section -->
+
+# 01
+
+## DVPP 编程模型
+
+---
+
+<!-- _class: center -->
+
 ## DVPP 把媒体处理放到专用单元
 
 DVPP 处理图像和视频的格式转换、缩放、裁剪与编解码，不承担神经网络图执行。
@@ -57,6 +86,8 @@ DVPP 处理图像和视频的格式转换、缩放、裁剪与编解码，不承
 
 ---
 
+<!-- _class: center -->
+
 ## 编程模型：显式通道加异步回调
 
 1. 初始化 ACL，设置 Device、Context 和 Stream。
@@ -72,6 +103,8 @@ DVPP 处理图像和视频的格式转换、缩放、裁剪与编解码，不承
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## NV12 的宽度、stride 和缓冲区大小
 
@@ -106,6 +139,8 @@ DVPP 处理图像和视频的格式转换、缩放、裁剪与编解码，不承
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## VENC 参数决定能否建立合法通道
 
@@ -163,6 +198,17 @@ H.264 Baseline venc_create_channel 失败: 507018 (0x7bc8a)
 
 ---
 
+
+<!-- _class: section -->
+
+# 02
+
+## VPC、JPEG 与媒体链路
+
+---
+
+<!-- _class: center -->
+
 ## VPC：双板最小样例确实通过
 
 | 操作 | 8T / Ascend310B4 | 20T / Ascend310B1 | 证据 |
@@ -180,6 +226,8 @@ VPC 通过只能证明这两条图像处理路径。教材记录的 CANN 8.3.RC1
 
 ---
 
+<!-- _class: center -->
+
 ## JPEG 编解码是 NV12 与压缩帧的闭环
 
 1. JPEGE 读取 NV12，预测输出缓冲，提交异步编码。
@@ -195,6 +243,8 @@ JPEGE 的输出是 JPEG 字节，不是 stream_desc；JPEGD 则从 JPEG 信息�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## WebRTC 把 DVPP 接入浏览器媒体链
 
@@ -232,6 +282,8 @@ JPEGE 的输出是 JPEG 字节，不是 stream_desc；JPEGD 则从 JPEG 信息�
 
 ---
 
+<!-- _class: center -->
+
 ## 截图清单把图片绑定到证据边界
 
 | 字段 | 本次记录 |
@@ -250,6 +302,8 @@ JPEGE 的输出是 JPEG 字节，不是 stream_desc；JPEGD 则从 JPEG 信息�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 双板证据矩阵
 
@@ -290,6 +344,8 @@ python samples/chapter6/jpeg/jpeg_minimal.py
 
 ---
 
+<!-- _class: center -->
+
 ## 媒体故障按层排查
 
 1. `import acl` 失败：先查 Python、CANN 环境变量与架构。
@@ -305,6 +361,8 @@ python samples/chapter6/jpeg/jpeg_minimal.py
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 课堂交付：一条分层证据链
 

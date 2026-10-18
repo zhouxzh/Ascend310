@@ -26,6 +26,35 @@ footer: "第5章：MindSpore开发基础"
 
 ---
 
+<!-- _class: center -->
+
+## 本讲目标与路线
+
+- 区分 MindSpore、MindSpore Lite、MindNLP 与 CANN
+- 用 Tensor、Cell 与 ops 建最小网络
+- 完成训练、CKPT 与 MindIR 保存
+- 说明 Lite 与双板结果的证据边界
+
+> 本讲主线：运行时 → 训练闭环 → 交付边界
+
+<div class="source">教材：<a href="../book/chapter5.md"><code>src/book/chapter5.md</code></a></div>
+
+<!--
+先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
+-->
+---
+
+
+<!-- _class: section -->
+
+# 01
+
+## 运行时与张量
+
+---
+
+<!-- _class: center -->
+
 ## “MindSpore”不是单一运行时
 
 | 组件 | 职责 | 不能混淆的对象 |
@@ -59,6 +88,8 @@ footer: "第5章：MindSpore开发基础"
 
 ---
 
+<!-- _class: center -->
+
 ## 8T 基础闭环先固定版本与导入路径
 
 | 项目 | 实测值 |
@@ -78,6 +109,8 @@ Alarm 不单独构成失败。版本与导入路径决定实际加载的是哪�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 三组证据必须分栏保存
 
@@ -140,6 +173,8 @@ Cell 相当于带参数的模块，construct 是图入口；ops 是不可训练�
 
 ---
 
+<!-- _class: center -->
+
 ## 数据管道先保证可复现
 
 | 阶段 | 本课样例 | 验证信号 |
@@ -158,6 +193,17 @@ Cell 相当于带参数的模块，construct 是图入口；ops 是不可训练�
 -->
 
 ---
+
+
+<!-- _class: section -->
+
+# 02
+
+## 训练、保存与端侧边界
+
+---
+
+<!-- _class: center -->
 
 ## 先在 PyNative 调通，再切 Graph
 
@@ -178,6 +224,8 @@ Cell 相当于带参数的模块，construct 是图入口；ops 是不可训练�
 
 ---
 
+<!-- _class: center -->
+
 ## 自动微分的关键是参数被优化器看见
 
 - `value_and_grad` 同时返回损失与梯度。
@@ -193,6 +241,8 @@ Cell 相当于带参数的模块，construct 是图入口；ops 是不可训练�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 8T 训练记录：链路通过，不作性能榜
 
@@ -214,6 +264,8 @@ Health Alarm 只是诊断背景，不是自动失败原因。这里的耗时不�
 
 ---
 
+<!-- _class: center -->
+
 ## CKPT 与 MindIR 解决两个问题
 
 | 工件 | 用途 | 8T 实测 |
@@ -233,6 +285,8 @@ CKPT 是参数字典，MindIR 带计算图和参数。导出成功不等于 Lite
 
 ---
 
+<!-- _class: center -->
+
 ## 8T 的 Lite 阻断发生在格式校验
 
 | 检查层 | 8T 记录 | 结论 |
@@ -251,6 +305,8 @@ CPU 后端先失败说明问题在格式版本检查，不能拿它证明 Ascend
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 双板基础子集：只比较这组 MindSpore 结果
 
@@ -294,6 +350,8 @@ CPU 后端先失败说明问题在格式版本检查，不能拿它证明 Ascend
 
 ---
 
+<!-- _class: center -->
+
 ## 8T Qwen3 loader 检查是另一证据组
 
 | 检查项 | 8T 观测 |
@@ -313,6 +371,8 @@ Qwen3 检查发生在 8T，不属于上一页的 20T 模型表。它没有下载
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 一次实验必须留下六类证据
 
@@ -334,6 +394,8 @@ Qwen3 检查发生在 8T，不属于上一页的 20T 模型表。它没有下载
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 排障顺序与课堂任务
 

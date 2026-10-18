@@ -26,6 +26,35 @@ footer: "案例 8：实时手势识别"
 
 ---
 
+<!-- _class: center -->
+
+## 本讲目标与路线
+
+- 理解 YOLOv10 OM 的固定输入契约
+- 走通 ONNX 导出与板端 OM 验证
+- 区分摄像头、编码与 WebRTC 三层证据
+- 按层停止故障，不把静态前端当验收
+
+> 本讲主线：模型 → 推理 → 媒体 → WebRTC
+
+<div class="source">教材：<a href="../experiment/case8.md"><code>src/experiment/case8.md</code></a></div>
+
+<!--
+先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
+-->
+---
+
+
+<!-- _class: section -->
+
+# 01
+
+## 从模型到 WebRTC 的五层链路
+
+---
+
+<!-- _class: center -->
+
 ## 一条链路，五个独立证据层
 
 | 层级 | 关键对象 | 最低证据 |
@@ -45,6 +74,8 @@ footer: "案例 8：实时手势识别"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## HaGRID 模型有固定输入契约
 
@@ -83,6 +114,8 @@ footer: "案例 8：实时手势识别"
 
 ---
 
+<!-- _class: center -->
+
 ## OM 推理按四道门验证
 
 1. 核对权重、ONNX、标签和元数据路径及 SHA-256。
@@ -99,6 +132,8 @@ footer: "案例 8：实时手势识别"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 检测后处理决定画面是否可信
 
@@ -148,6 +183,8 @@ footer: "案例 8：实时手势识别"
 
 ---
 
+<!-- _class: center -->
+
 ## 编码器选择是显式策略
 
 | 模式 | OM 推理 | H.264 编码 | 失败行为 |
@@ -181,6 +218,8 @@ CPU 编码是显式对照，不是自动降级。验收 CANN VENC 时，必须�
 
 ---
 
+<!-- _class: center -->
+
 ## 截图清单保留失败边界
 
 | 字段 | 本次证据 |
@@ -192,6 +231,8 @@ CPU 编码是显式对照，不是自动降级。验收 CANN VENC 时，必须�
 | SHA-256 | `c1cd97fa4c18426933699a936bd21b7a0831ddffc77d750987cd9ae60de6c838` |
 | HTTP 资产 | HTML 200；`client.js` 与 `styles.css` 为 404 |
 
+> HTML 200 但 JS/CSS 404 说明页面未完成交互初始化，不能写成 WebRTC 端到端通过。
+
 <div class="source">清单：<a href="screenshots/capture-manifest.json"><code>src/presentation/screenshots/capture-manifest.json</code></a>；样例：<a href="../../samples/case8"><code>samples/case8</code></a></div>
 
 <!--
@@ -199,6 +240,17 @@ CPU 编码是显式对照，不是自动降级。验收 CANN VENC 时，必须�
 -->
 
 ---
+
+
+<!-- _class: section -->
+
+# 02
+
+## 板端证据与失败边界
+
+---
+
+<!-- _class: center -->
 
 ## 摄像头权限和实际格式分开记录
 
@@ -220,6 +272,8 @@ CPU 编码是显式对照，不是自动降级。验收 CANN VENC 时，必须�
 
 ---
 
+<!-- _class: center -->
+
 ## 官方 Atlas：单独记录其完整软件栈
 
 | 项目 | 观测值 |
@@ -240,6 +294,8 @@ CPU 编码是显式对照，不是自动降级。验收 CANN VENC 时，必须�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## Orange Pi：一个板型也要分行记录
 
@@ -281,6 +337,8 @@ python scripts/webrtc_om_app.py
 
 ---
 
+<!-- _class: center -->
+
 ## 故障按层停止
 
 1. 页面资源或 Peer 异常：检查 HTML、JS、CSS、`/offer`、SDP、ICE 和浏览器日志。
@@ -296,6 +354,8 @@ python scripts/webrtc_om_app.py
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 课堂交付：手势链路证据卡
 
@@ -315,6 +375,8 @@ python scripts/webrtc_om_app.py
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 本讲结论边界
 

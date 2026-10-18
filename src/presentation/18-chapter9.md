@@ -26,6 +26,26 @@ footer: "第9章：模型量化案例教学"
 
 ---
 
+<!-- _class: center -->
+
+## 本讲目标与路线
+
+- 判断瓶颈是否在模型执行
+- 建立 FP32/FP16 可比基线
+- 理解 AMCT 校准与 INT8 四阶段
+- 保持可回退的量化证据链
+
+> 本讲主线：基线 → FP16 → INT8 → 回退
+
+<div class="source">教材：<a href="../book/chapter9.md"><code>src/book/chapter9.md</code></a></div>
+
+<!--
+先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
+-->
+---
+
+<!-- _class: center -->
+
 ## 先确认瓶颈是否在模型执行
 
 - 采集、解码、CPU 预处理、H2D、后处理都可能主导端到端时间。
@@ -42,7 +62,15 @@ footer: "第9章：模型量化案例教学"
 
 ---
 
-<!-- _class: visual -->
+<!-- _class: section -->
+
+# 01
+
+## 量化路线与数值格式
+
+---
+
+<!-- _class: center -->
 
 ## 量化路线：先基准，再 FP16，最后 INT8
 
@@ -55,6 +83,8 @@ footer: "第9章：模型量化案例教学"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 三种数值格式解决不同问题
 
@@ -73,6 +103,8 @@ FP16 和 INT8 的风险不同。FP16 通常不需要校准；INT8 必须通过�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 校准集和验证集必须分开
 
@@ -117,6 +149,8 @@ FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp1
 
 ---
 
+<!-- _class: center -->
+
 ## 输出对齐不等于验证集准确率
 
 - Top1 match 只比较两个模型在同一输入上的第一名类别。
@@ -133,6 +167,17 @@ FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp1
 -->
 
 ---
+
+
+<!-- _class: section -->
+
+# 02
+
+## FP16 基线与 INT8 校准
+
+---
+
+<!-- _class: center -->
 
 ## 双板 FP16 输出对齐：400张图
 
@@ -152,6 +197,8 @@ FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp1
 
 ---
 
+<!-- _class: center -->
+
 ## 双板 10 个计时样本的性能记录
 
 | 精度 | 8T Execute mean | 20T Execute mean | 计时样本 | warmup/命令 |
@@ -170,6 +217,8 @@ FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp1
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 这些数字不能扩大解释
 
@@ -200,6 +249,8 @@ FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp1
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## PTQ 的四个关键阶段
 
@@ -241,6 +292,8 @@ atc --model=model/resnet18_tiny_imagenet_int8_deploy.onnx \
 
 ---
 
+<!-- _class: center -->
+
 ## 当前 INT8 证据状态
 
 | 证据层 | 当前状态 | 缺失内容 |
@@ -261,6 +314,8 @@ atc --model=model/resnet18_tiny_imagenet_int8_deploy.onnx \
 
 ---
 
+<!-- _class: center -->
+
 ## 完整验证与 sweep 只用于后续计划
 
 - 完整验证必须在独立10000张验证集上计算 Top1/Top5。
@@ -276,6 +331,8 @@ atc --model=model/resnet18_tiny_imagenet_int8_deploy.onnx \
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 回退顺序应保持证据可追踪
 
@@ -296,6 +353,8 @@ atc --model=model/resnet18_tiny_imagenet_int8_deploy.onnx \
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 课堂任务：提交一张量化证据卡
 

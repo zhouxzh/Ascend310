@@ -26,6 +26,37 @@ footer: "第8章：性能分析与优化"
 
 ---
 
+<!-- _class: center -->
+
+## 本讲目标与路线
+
+- 把一帧推理拆成可测阶段
+- 固定基线变量与计时样本
+- 用 msprof 定位时间去向
+- 把优化动作绑定到可观测症状
+
+- 区分实验记录、优化结论与尚未验证的边界
+
+> 本讲主线：基线 → 测量 → 假设 → 验证
+
+<div class="source">教材：<a href="../book/chapter8.md"><code>src/book/chapter8.md</code></a></div>
+
+<!--
+先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
+-->
+---
+
+
+<!-- _class: section -->
+
+# 01
+
+## 基线、计时与 profiler
+
+---
+
+<!-- _class: center -->
+
 ## 一帧推理是一条可分段链路
 
 `采集 → CPU 或 DVPP 预处理 → H2D → execute → D2H → 后处理`
@@ -48,6 +79,8 @@ footer: "第8章：性能分析与优化"
 
 ---
 
+<!-- _class: center -->
+
 ## 可比较的基线必须锁住变量
 
 - 固定模型、输入尺寸、batch 和精度模式。
@@ -63,6 +96,8 @@ footer: "第8章：性能分析与优化"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## msprof 看的是时间去了哪里
 
@@ -82,6 +117,17 @@ Python 分段计时用于快速定位，msprof 用于检查 ACL、内存搬运�
 -->
 
 ---
+
+
+<!-- _class: section -->
+
+# 02
+
+## 六类优化假设
+
+---
+
+<!-- _class: center -->
 
 ## 六个脚本对应六种优化假设
 
@@ -126,6 +172,8 @@ acl.rt.memcpy(host_out, output_size, output_ptr,
 
 ---
 
+<!-- _class: center -->
+
 ## 双板 ResNet18：10 个计时样本
 
 | 板卡 | 计时样本 | Execute mean | End-to-end mean | warmup记录 |
@@ -145,6 +193,8 @@ acl.rt.memcpy(host_out, output_size, output_ptr,
 
 ---
 
+<!-- _class: center -->
+
 ## 为什么不能把这10次叫完整基准
 
 - 样本数只有10次，不能代表长稳和周期波动。
@@ -160,6 +210,8 @@ acl.rt.memcpy(host_out, output_size, output_ptr,
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## Buffer 复用消除每帧资源生命周期
 
@@ -178,6 +230,8 @@ Buffer 复用是确定内存生命周期，不是单纯追求一个加速比。�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## CPU 预处理：本次双板记录
 
@@ -198,6 +252,8 @@ Buffer 复用是确定内存生命周期，不是单纯追求一个加速比。�
 
 ---
 
+<!-- _class: center -->
+
 ## DVPP VPC：完整调用成本不一定更低
 
 - CPU resize 与 DVPP VPC 的输入格式和路径不同。
@@ -213,6 +269,8 @@ Buffer 复用是确定内存生命周期，不是单纯追求一个加速比。�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## AIPP：改变输入合同，才可能减少 Host 工作
 
@@ -230,6 +288,8 @@ AIPP 的比较对象是两条不同输入合同。先校验预处理后的数值
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## Queue Pipeline：吞吐收益需要足够重的阶段
 
@@ -251,6 +311,8 @@ AIPP 的比较对象是两条不同输入合同。先校验预处理后的数值
 
 ---
 
+<!-- _class: center -->
+
 ## 优化动作要对应可观测症状
 
 | 症状 | 优先工具 | 候选动作 |
@@ -271,6 +333,8 @@ AIPP 的比较对象是两条不同输入合同。先校验预处理后的数值
 
 ---
 
+<!-- _class: center -->
+
 ## 验收一次优化至少回答五个问题
 
 1. 改动前后的代码路径是否只差一个变量？
@@ -286,6 +350,8 @@ AIPP 的比较对象是两条不同输入合同。先校验预处理后的数值
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 课堂任务：做一张优化证据卡
 

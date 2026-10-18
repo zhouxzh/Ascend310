@@ -26,6 +26,35 @@ footer: "案例 2：目标跟踪检测"
 
 ---
 
+<!-- _class: center -->
+
+## 本讲目标与路线
+
+- 分清检测与跟踪各自回答的问题
+- 理解 SSD 解码、NMS 与轨迹生命周期
+- 用同一协议设计基准与参数实验
+- 说明单帧截图的证据边界
+
+> 本讲主线：检测 → 跟踪 → 基准 → 边界
+
+<div class="source">教材：<a href="../experiment/case2.md"><code>src/experiment/case2.md</code></a></div>
+
+<!--
+先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
+-->
+---
+
+
+<!-- _class: section -->
+
+# 01
+
+## 检测、跟踪与轨迹
+
+---
+
+<!-- _class: center -->
+
 ## 检测回答“在哪”，跟踪回答“是谁”
 
 | 问题 | 检测器 | 跟踪器 |
@@ -73,6 +102,8 @@ footer: "案例 2：目标跟踪检测"
 
 ---
 
+<!-- _class: center -->
+
 ## MobileNet-SSD适合做教学前端
 
 - MobileNet使用深度可分离卷积降低计算量。
@@ -88,6 +119,8 @@ footer: "案例 2：目标跟踪检测"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## SSD输出必须经过解码与NMS
 
@@ -110,6 +143,8 @@ footer: "案例 2：目标跟踪检测"
 
 ---
 
+<!-- _class: center -->
+
 ## DeepSORT用运动与几何维持轨迹
 
 - 卡尔曼滤波预测轨迹在下一帧的位置和尺寸。
@@ -125,6 +160,8 @@ footer: "案例 2：目标跟踪检测"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 卡尔曼滤波预测，匈牙利算法匹配
 
@@ -145,6 +182,8 @@ footer: "案例 2：目标跟踪检测"
 
 ---
 
+<!-- _class: center -->
+
 ## 轨迹生命周期决定何时显示
 
 - 新检测创建暂定轨迹。
@@ -160,6 +199,8 @@ footer: "案例 2：目标跟踪检测"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 检测到跟踪的桥接只有一份合同
 
@@ -177,7 +218,15 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 
 ---
 
-<!-- _class: screenshot -->
+<!-- _class: section -->
+
+# 02
+
+## 板端窗口与证据边界
+
+---
+
+<!-- _class: center -->
 
 ## 真实8T NPU OpenCV检测窗口
 
@@ -191,6 +240,8 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 
 ---
 
+<!-- _class: center -->
+
 ## 截图证据卡：单帧窗口不是基准
 
 | 字段 | 值 |
@@ -202,6 +253,10 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 | SHA-256 | `7bde5515c91b8843000cf6a40021347e350e87aa799126ecf3727d83b9820ab1` |
 | application digest | `782a224ce9f14c681ffce8dd77e2640cb6aee28ae80cffa4d6fc88146e5d3c6c` |
 
+> 一张窗口截图证明界面与 NPU 路径已加载，不证明跟踪 ID、准确率、长稳或生产性能。
+
+> 截图与基准实验是两份交付物，不能互相替代。
+
 <div class="source">清单：<a href="screenshots/capture-manifest.json"><code>capture-manifest.json</code> / case2-tracking-window</a></div>
 
 <!--
@@ -209,6 +264,8 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 一张窗口图能证明什么，不能证明什么
 
@@ -229,6 +286,8 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 
 ---
 
+<!-- _class: center -->
+
 ## 基准实验必须与截图分开设计
 
 - 固定输入源、分辨率、模型、阈值和设备。
@@ -244,6 +303,8 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 参数实验一次只改一个变量
 
@@ -266,6 +327,8 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 
 ---
 
+<!-- _class: center -->
+
 ## 后端和模型合同先于画面
 
 - `--device npu`只接受对应OM，CPU路径不能作为NPU证据。
@@ -281,6 +344,8 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 验收阶梯与课堂任务
 

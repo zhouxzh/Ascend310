@@ -26,6 +26,35 @@ footer: "第3章：昇腾PyTorch扩展迁移基础"
 
 ---
 
+<!-- _class: center -->
+
+## 本讲目标与路线
+
+- 分清 PyTorch、torch_npu 与 CANN 三层
+- 核对版本并用最小烟测看见 NPU 张量
+- 完成线性回归、MLP、LeNet、AlexNet 迁移
+- 按同一协议记录双板训练结果
+
+> 本讲主线：环境 → 烟测 → 迁移 → 证据
+
+<div class="source">教材：<a href="../book/chapter3.md"><code>src/book/chapter3.md</code></a></div>
+
+<!--
+先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
+-->
+---
+
+
+<!-- _class: section -->
+
+# 01
+
+## 框架、桥接与硬件
+
+---
+
+<!-- _class: center -->
+
 ## 先分清三层：框架、桥接层和硬件
 
 | 层次 | 主要职责 | 首先要验证什么 |
@@ -44,6 +73,8 @@ footer: "第3章：昇腾PyTorch扩展迁移基础"
 
 ---
 
+<!-- _class: center -->
+
 ## torch_npu 保留 PyTorch 开发方式
 
 - 常见算子、自动微分与优化器继续沿用 PyTorch 接口。
@@ -59,6 +90,8 @@ footer: "第3章：昇腾PyTorch扩展迁移基础"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 安装前先过版本门
 
@@ -79,6 +112,8 @@ footer: "第3章：昇腾PyTorch扩展迁移基础"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 两套记录不能拼成一个版本结论
 
@@ -118,6 +153,17 @@ print(a + a)
 
 ---
 
+
+<!-- _class: section -->
+
+# 02
+
+## 从脚本迁移到训练证据
+
+---
+
+<!-- _class: center -->
+
 ## 手工迁移只改五类位置
 
 1. 导入 `torch_npu`，确认设备后端可用。
@@ -148,6 +194,8 @@ print(a + a)
 
 ---
 
+<!-- _class: center -->
+
 ## 双板 50 epochs：保留同一协议的两个结果
 
 | 板卡 | SoC | 结果 | 任务墙钟 | 最终拟合参数 |
@@ -164,6 +212,8 @@ print(a + a)
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 20T 较慢，不等于“算力更低”
 
@@ -209,6 +259,8 @@ LeNet 教材实现把 Sigmoid 调整为 ReLU，并使用 FP16。曲线说明该�
 
 ---
 
+<!-- _class: center -->
+
 ## 兼容性测试要覆盖算子和边界
 
 | 测试区域 | 覆盖内容 | 教材记录 |
@@ -242,6 +294,8 @@ LeNet 教材实现把 Sigmoid 调整为 ReLU，并使用 FP16。曲线说明该�
 
 ---
 
+<!-- _class: center -->
+
 ## 三个卷积网络：适配点各不相同
 
 | 网络 | 迁移适配 | 精度与资源边界 |
@@ -259,6 +313,8 @@ LeNet 教材实现把 Sigmoid 调整为 ReLU，并使用 FP16。曲线说明该�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 每类结果只能证明自己的那一层
 
@@ -279,6 +335,8 @@ CPU 路径可以用于语义参考，但任何 NPU 结论都必须来自 NPU 设
 
 ---
 
+<!-- _class: center -->
+
 ## 迁移失败时按固定顺序排查
 
 1. 查 CANN、Python、PyTorch、torch_npu 的版本与导入路径。
@@ -294,6 +352,8 @@ CPU 路径可以用于语义参考，但任何 NPU 结论都必须来自 NPU 设
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 课堂交付：一页迁移证据卡
 

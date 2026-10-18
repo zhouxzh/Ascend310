@@ -26,6 +26,35 @@ footer: "案例 4：掌纹识别"
 
 ---
 
+<!-- _class: center -->
+
+## 本讲目标与路线
+
+- 理解 NPU-only 运行时硬边界
+- 走通采集、注册与识别的候选语义
+- 区分候选清单与准入名单
+- 用合成图像和匿名模板保护隐私
+
+> 本讲主线：运行时边界 → 候选 → 准入 → 证据
+
+<div class="source">教材：<a href="../experiment/case4.md"><code>src/experiment/case4.md</code></a></div>
+
+<!--
+先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
+-->
+---
+
+
+<!-- _class: section -->
+
+# 01
+
+## NPU-only 工作台
+
+---
+
+<!-- _class: center -->
+
 ## NPU-only 是运行时硬边界
 
 | 边界 | 在线工作台 | 离线研究 |
@@ -45,6 +74,8 @@ footer: "案例 4：掌纹识别"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 工作台由四层组成
 
@@ -79,6 +110,8 @@ footer: "案例 4：掌纹识别"
 
 ---
 
+<!-- _class: center -->
+
 ## 截图元数据必须与图片绑定
 
 | 字段 | 本次证据 |
@@ -100,6 +133,8 @@ footer: "案例 4：掌纹识别"
 
 ---
 
+<!-- _class: center -->
+
 ## 合成图像与匿名模板是课堂底线
 
 - 截图和课堂演示只使用合成 ROI 或匿名模板。
@@ -115,6 +150,17 @@ footer: "案例 4：掌纹识别"
 -->
 
 ---
+
+
+<!-- _class: section -->
+
+# 02
+
+## 候选、准入与证据
+
+---
+
+<!-- _class: center -->
 
 ## 模型范围：一个默认模型，五个待人工测试候选
 
@@ -137,6 +183,8 @@ CCNet 是当前默认和回滚模型；五个 CompNet 只在 manual_test profile
 
 ---
 
+<!-- _class: center -->
+
 ## 候选清单不等于准入名单
 
 - `candidate_manifest.json` 保留 28 项研究审计。
@@ -152,6 +200,8 @@ CCNet 是当前默认和回滚模型；五个 CompNet 只在 manual_test profile
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 准入证据必须逐层通过
 
@@ -174,6 +224,8 @@ CCNet 是当前默认和回滚模型；五个 CompNet 只在 manual_test profile
 
 ---
 
+<!-- _class: center -->
+
 ## 采集页面先区分上传与摄像头
 
 | 输入方式 | 前端动作 | 服务端动作 |
@@ -191,6 +243,8 @@ CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不�
 
 ---
 
+<!-- _class: center -->
+
 ## 注册流程固定模板命名空间
 
 1. 为同一人员分配稳定的本地编号。
@@ -206,6 +260,8 @@ CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 识别结果要保留“候选”语义
 
@@ -238,6 +294,8 @@ CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 版本冻结是人工测试的前置条件
 
@@ -280,6 +338,8 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 
 ---
 
+<!-- _class: center -->
+
 ## 失败时保留现场并回退
 
 - PyACL 不可用：确认同一 shell 的 Python 与 `acl.__file__`。
@@ -295,6 +355,8 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 课堂交付：一张候选与证据对照卡
 

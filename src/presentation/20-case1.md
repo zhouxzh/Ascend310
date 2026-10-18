@@ -26,6 +26,35 @@ footer: "案例 1：智能考勤机"
 
 ---
 
+<!-- _class: center -->
+
+## 本讲目标与路线
+
+- 走通采集、检测、特征、比对与记录链路
+- 理解 NPU 与 CPU 的职责边界
+- 用最小证据验证 8T 前端与推理
+- 明确教学演示不是生产身份认证
+
+> 本讲主线：采集 → 检测 → 比对 → 事件
+
+<div class="source">教材：<a href="../experiment/case1.md"><code>src/experiment/case1.md</code></a></div>
+
+<!--
+先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
+-->
+---
+
+
+<!-- _class: section -->
+
+# 01
+
+## 系统链路与边界
+
+---
+
+<!-- _class: center -->
+
 ## 系统边界先于功能清单
 
 | 边界 | 本案例承担 | 不用于证明 |
@@ -74,6 +103,8 @@ footer: "案例 1：智能考勤机"
 
 ---
 
+<!-- _class: center -->
+
 ## 截图证据卡：只证明前端已加载
 
 | 字段 | 值 |
@@ -94,6 +125,17 @@ footer: "案例 1：智能考勤机"
 
 ---
 
+
+<!-- _class: section -->
+
+# 02
+
+## 板端运行与证据
+
+---
+
+<!-- _class: center -->
+
 ## 四个层次由单一硬件所有者协调
 
 | 层次 | 主要职责 |
@@ -113,6 +155,8 @@ footer: "案例 1：智能考勤机"
 
 ---
 
+<!-- _class: center -->
+
 ## 一次请求的串行主线
 
 1. FastAPI 接收并限制 multipart 或 base64 图像。
@@ -128,6 +172,8 @@ footer: "案例 1：智能考勤机"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 两个模型各有固定张量合同
 
@@ -145,6 +191,8 @@ footer: "案例 1：智能考勤机"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 四道证据门不能互相替代
 
@@ -165,6 +213,8 @@ footer: "案例 1：智能考勤机"
 
 ---
 
+<!-- _class: center -->
+
 ## PyACL资源必须形成闭环
 
 - 启动时完成 ACL 初始化、设备、Context 和 Stream 创建。
@@ -180,6 +230,8 @@ footer: "案例 1：智能考勤机"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## FastAPI 与 React 只承担各自边界
 
@@ -200,6 +252,8 @@ FastAPI使用ASGI不代表硬件调用应并发化。OpenCV、PyACL和sqlite3都
 
 ---
 
+<!-- _class: center -->
+
 ## 检测之后才轮到比对
 
 - 检测输出先过滤分数、恢复坐标并执行 NMS。
@@ -216,6 +270,8 @@ FastAPI使用ASGI不代表硬件调用应并发化。OpenCV、PyACL和sqlite3都
 
 ---
 
+<!-- _class: center -->
+
 ## 生物特征数据默认是敏感数据
 
 - API用户列表不返回 embedding。
@@ -231,6 +287,8 @@ FastAPI使用ASGI不代表硬件调用应并发化。OpenCV、PyACL和sqlite3都
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 失败状态也是界面合同的一部分
 
@@ -252,6 +310,8 @@ FastAPI使用ASGI不代表硬件调用应并发化。OpenCV、PyACL和sqlite3都
 
 ---
 
+<!-- _class: center -->
+
 ## 验收必须逐级进行
 
 | 层级 | 通过条件 |
@@ -272,6 +332,8 @@ FastAPI使用ASGI不代表硬件调用应并发化。OpenCV、PyACL和sqlite3都
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 课堂交付：功能图与证据图各一张
 

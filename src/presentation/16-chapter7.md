@@ -26,6 +26,35 @@ footer: "第7章：算子开发实战"
 
 ---
 
+<!-- _class: center -->
+
+## 本讲目标与路线
+
+- 判断什么时候需要自定义算子
+- 理解 TBE DSL 与 Ascend C 的分工
+- 写出算子接口合同与最小验证骨架
+- 区分编译、运行与硬件执行证据
+
+> 本讲主线：算子合同 → TBE 原型 → Ascend C 证据
+
+<div class="source">教材：<a href="../book/chapter7.md"><code>src/book/chapter7.md</code></a></div>
+
+<!--
+先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
+-->
+---
+
+
+<!-- _class: section -->
+
+# 01
+
+## 算子合同与 TBE DSL
+
+---
+
+<!-- _class: center -->
+
 ## 什么时候需要自定义算子
 
 - CANN 算子库没有模型所需的算子。
@@ -43,6 +72,8 @@ footer: "第7章：算子开发实战"
 
 ---
 
+<!-- _class: center -->
+
 ## 310B 的计算单元与存储层次
 
 - Cube Unit 承担矩阵乘法、卷积等高密度计算。
@@ -58,6 +89,8 @@ footer: "第7章：算子开发实战"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## TBE DSL 与 Ascend C 的分工
 
@@ -93,6 +126,8 @@ footer: "第7章：算子开发实战"
 
 ---
 
+<!-- _class: center -->
+
 ## 算子首先是一份接口合同
 
 | 合同项 | 需要定义 |
@@ -112,6 +147,8 @@ footer: "第7章：算子开发实战"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## TBE DSL 的加法主线
 
@@ -169,6 +206,17 @@ The actual output is the same as the expected output.
 
 ---
 
+
+<!-- _class: section -->
+
+# 02
+
+## Ascend C 与硬件证据
+
+---
+
+<!-- _class: center -->
+
 ## Ascend C 把数据流显式写出来
 
 - Host 端准备输入、Tiling 参数并调用 Kernel。
@@ -212,6 +260,8 @@ extern "C" __global__ __aicore__ void add_custom(
 
 ---
 
+<!-- _class: center -->
+
 ## Tiling 把大数据切进片上缓冲
 
 | 参数 | 含义 | 约束 |
@@ -230,6 +280,8 @@ Tiling 不只是按大小切分，还要同时考虑搬运次数、并行度、�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 矩阵加法 PASSED 仍是 TBE 等价验证
 
@@ -250,6 +302,8 @@ Tiling 不只是按大小切分，还要同时考虑搬运次数、并行度、�
 
 ---
 
+<!-- _class: center -->
+
 ## 双板证据表：只记通过到哪一层
 
 | 样例 | 8T / 20T 结果 | 实际验证层 |
@@ -269,6 +323,8 @@ Tiling 不只是按大小切分，还要同时考虑搬运次数、并行度、�
 
 ---
 
+<!-- _class: center -->
+
 ## 补齐 Ascend C 硬件证据的五步
 
 1. 用 `msopgen` 生成算子工程与注册骨架。
@@ -284,6 +340,8 @@ Tiling 不只是按大小切分，还要同时考虑搬运次数、并行度、�
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 课堂任务：三层证据逐项勾选
 

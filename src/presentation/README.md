@@ -35,22 +35,22 @@ editLink: false
 | 案例 3：智能电子琴 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/22-case3.html) |
 | 案例 4：掌纹识别 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/23-case4.html) |
 | 案例 5：智能数据采集分析仪 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/24-case5.html) |
-| 案例 6：智能小车 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/25-case6.html) |
+| 案例 6：智能小车 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/25-case6.html) |
 | 案例 7：智能相册 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/26-case7.html) |
 | 案例 8：实时手势识别 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/27-case8.html) |
-| 案例 9：智能聊天机器人 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/28-case9.html) |
+| 案例 9：智能聊天机器人 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/28-case9.html) |
 
 ### 附录课件
 
 | 单元 | 状态 | 放映版 |
 |---|---|---|
-| 附录 1：开发板环境 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/30-appendix1.html) |
-| 附录 2：Ubuntu 教程 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/31-appendix2.html) |
-| 附录 3：Python 基础 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/32-appendix3.html) |
+| 附录 1：开发板环境 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/30-appendix1.html) |
+| 附录 2：Ubuntu 教程 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/31-appendix2.html) |
+| 附录 3：Python 基础 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/32-appendix3.html) |
 | 附录 4：Vibe Coding | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/33-appendix4.html) |
-| 附录 5：ROS2 基础 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/34-appendix5.html) |
-| 附录 6：工具箱与 FAQ | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/35-appendix6.html) |
-| 附录 7：CANN 升级 | 制作中 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/36-appendix7.html) |
+| 附录 5：ROS2 基础 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/34-appendix5.html) |
+| 附录 6：工具箱与 FAQ | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/35-appendix6.html) |
+| 附录 7：CANN 升级 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/36-appendix7.html) |
 <!-- END GENERATED PRESENTATION INDEX -->
 
 ## 当前制作状态

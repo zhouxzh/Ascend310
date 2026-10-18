@@ -324,7 +324,7 @@ export const presentationCatalog = Object.freeze([
     shortTitle: "智能小车",
     sources: ["src/experiment/case6.md"],
     samples: ["samples/case6"],
-    status: "scaffold",
+    status: "ready",
     build: true,
     lessonPlan: [
       "小车硬件与软件环境",
@@ -382,7 +382,7 @@ export const presentationCatalog = Object.freeze([
     shortTitle: "智能聊天机器人",
     sources: ["src/experiment/case9.md"],
     samples: ["samples/case9"],
-    status: "scaffold",
+    status: "ready",
     build: true,
     lessonPlan: [
       "边缘聊天服务的信任与算力边界",
@@ -401,7 +401,7 @@ export const presentationCatalog = Object.freeze([
     shortTitle: "开发板与基础环境",
     sources: ["src/appendix/appendix1.md"],
     samples: [],
-    status: "scaffold",
+    status: "ready",
     build: true,
     lessonPlan: [
       "开发板、接口与配件",
@@ -420,7 +420,7 @@ export const presentationCatalog = Object.freeze([
     shortTitle: "基于昇腾 310B 的 Ubuntu 教程",
     sources: ["src/appendix/appendix2.md"],
     samples: [],
-    status: "scaffold",
+    status: "ready",
     build: true,
     lessonPlan: [
       "文件、用户和权限",
@@ -439,7 +439,7 @@ export const presentationCatalog = Object.freeze([
     shortTitle: "Python 编程基础",
     sources: ["src/appendix/appendix3.md"],
     samples: ["samples/case1/fusion_result.json"],
-    status: "scaffold",
+    status: "ready",
     build: true,
     lessonPlan: [
       "变量、容器与表达式",
@@ -477,7 +477,7 @@ export const presentationCatalog = Object.freeze([
     shortTitle: "ROS2 基础教程",
     sources: ["src/appendix/appendix5.md"],
     samples: [],
-    status: "scaffold",
+    status: "ready",
     build: true,
     lessonPlan: [
       "DDS、工作空间和功能包",
@@ -496,7 +496,7 @@ export const presentationCatalog = Object.freeze([
     shortTitle: "工具箱、FAQ 与参数模板",
     sources: ["src/appendix/appendix6.md"],
     samples: [],
-    status: "scaffold",
+    status: "ready",
     build: true,
     lessonPlan: [
       "常见故障排查路径",
@@ -515,7 +515,7 @@ export const presentationCatalog = Object.freeze([
     shortTitle: "CANN 升级与版本配套",
     sources: ["src/appendix/appendix7.md"],
     samples: [],
-    status: "scaffold",
+    status: "ready",
     build: true,
     lessonPlan: [
       "驱动、固件、HDK与CANN的边界",

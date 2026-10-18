@@ -25,6 +25,8 @@ footer: "附录 4：Vibe Coding"
 
 ---
 
+<!-- _class: center -->
+
 ## 本讲目标与路线
 
 - 装好 DSH 桌面版，能确认版本、模型和工作区
@@ -40,6 +42,8 @@ footer: "附录 4：Vibe Coding"
 
 ---
 
+<!-- _class: center -->
+
 ## 为什么统一用桌面版
 
 | 方式 | 学生要准备 | 常见问题 |
@@ -50,6 +54,8 @@ footer: "附录 4：Vibe Coding"
 
 课堂只采用桌面版；旧教程里的 `npx` 命令直接跳过。
 
+> 桌面版自带运行时；旧教程里的 npm、npx 安装方式不再适用于本课程。
+
 <div class="source">教材：`src/appendix/appendix4.md` §3.1</div>
 
 <!--
@@ -58,12 +64,25 @@ footer: "附录 4：Vibe Coding"
 
 ---
 
+
+<!-- _class: section -->
+
+# 01
+
+## 桌面版与工作区
+
+---
+
+<!-- _class: center -->
+
 ## 安装与首次启动
 
 1. 运行课程提供的 Windows x64 安装包
 2. 默认选项安装，从开始菜单启动
 3. 打开 `设置 → 关于`，确认版本
 4. 本教材验证版本：`0.2.1-rc.2`
+
+> 安装包已包含运行环境；学生不需要再安装 Node.js、npm 或 pnpm。
 
 <div class="source">教材：`src/appendix/appendix4.md` §3.2</div>
 
@@ -107,7 +126,15 @@ footer: "附录 4：Vibe Coding"
 
 ---
 
-<!-- _class: visual -->
+<!-- _class: section -->
+
+# 02
+
+## 插件与 Skill
+
+---
+
+<!-- _class: center -->
 
 ## 插件与 Skill 的协作关系
 
@@ -121,12 +148,16 @@ footer: "附录 4：Vibe Coding"
 
 ---
 
+<!-- _class: center -->
+
 ## 两个插件如何分工
 
 | 插件 | 管什么 | 典型工具 |
 | --- | --- | --- |
 | 写作插件 | 教材是否写对 | `audit` / `render` / `push_check` |
 | 调试插件 | 板端为什么不对 | `ascend_probe` / `ascend_debug_plan` |
+
+> 写作插件检查文档与产物，调试插件读取板端事实；两类结论不能互相替代。
 
 <div class="source">图片：`src/appendix/img4/dsh-plugin-architecture.png`；源码：`tools/dsh-plugin-ascend310b-*`</div>
 
@@ -135,6 +166,8 @@ footer: "附录 4：Vibe Coding"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 写作插件能做什么
 
@@ -154,6 +187,8 @@ footer: "附录 4：Vibe Coding"
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 调试插件能做什么
 
@@ -218,6 +253,8 @@ pnpm run skills:check
 
 ---
 
+<!-- _class: center -->
+
 ## 安全边界
 
 1. 先看计划，再批准执行
@@ -233,6 +270,8 @@ pnpm run skills:check
 -->
 
 ---
+
+<!-- _class: center -->
 
 ## 课堂任务与小结
 
