@@ -3,6 +3,8 @@ marp: true
 theme: ascend310
 paginate: true
 size: 16:9
+author: "周贤中"
+email: "zhouxzh@gdut.edu.cn"
 header: "《昇腾310B实战》教材配套演示"
 footer: "第5章：MindSpore开发基础"
 ---
@@ -10,6 +12,8 @@ footer: "第5章：MindSpore开发基础"
 <!-- _class: cover -->
 
 # 第5章：MindSpore开发基础
+
+<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
 ## 从 Tensor 与 Cell 到 MindIR 交付边界
 

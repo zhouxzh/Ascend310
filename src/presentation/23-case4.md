@@ -3,6 +3,8 @@ marp: true
 theme: ascend310
 paginate: true
 size: 16:9
+author: "周贤中"
+email: "zhouxzh@gdut.edu.cn"
 header: "《昇腾310B实战》教材配套演示"
 footer: "案例 4：掌纹识别"
 ---
@@ -10,6 +12,8 @@ footer: "案例 4：掌纹识别"
 <!-- _class: cover -->
 
 # 案例 4：掌纹识别
+
+<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
 ## NPU-only 工作台与候选模型边界
 

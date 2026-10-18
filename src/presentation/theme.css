@@ -194,6 +194,16 @@ section.title h2 {
 section.cover p,
 section.title p { color: #d9efeb; }
 
+section.cover .byline,
+section.title .byline {
+  margin: 0.1em 0 0.9em;
+  color: #d9efeb;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
 section.section {
   justify-content: center;
   background: var(--teal);

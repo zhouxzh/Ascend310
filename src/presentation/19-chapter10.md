@@ -3,6 +3,8 @@ marp: true
 theme: ascend310
 paginate: true
 size: 16:9
+author: "周贤中"
+email: "zhouxzh@gdut.edu.cn"
 header: "《昇腾310B实战》教材配套演示"
 footer: "第10章：AI项目交付闭环"
 ---
@@ -10,6 +12,8 @@ footer: "第10章：AI项目交付闭环"
 <!-- _class: cover -->
 
 # 第10章：AI项目交付闭环
+
+<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
 ## 从需求契约到可回滚的交付证据
 

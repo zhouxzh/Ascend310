@@ -3,6 +3,8 @@ marp: true
 theme: ascend310
 paginate: true
 size: 16:9
+author: "周贤中"
+email: "zhouxzh@gdut.edu.cn"
 header: "《昇腾310B实战》教材配套演示"
 footer: "案例 8：实时手势识别"
 ---
@@ -10,6 +12,8 @@ footer: "案例 8：实时手势识别"
 <!-- _class: cover -->
 
 # 案例 8：实时手势识别
+
+<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
 ## 从 YOLOv10 OM 到 WebRTC 的分层证据
 

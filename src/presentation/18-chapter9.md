@@ -3,6 +3,8 @@ marp: true
 theme: ascend310
 paginate: true
 size: 16:9
+author: "周贤中"
+email: "zhouxzh@gdut.edu.cn"
 header: "《昇腾310B实战》教材配套演示"
 footer: "第9章：模型量化案例教学"
 ---
@@ -10,6 +12,8 @@ footer: "第9章：模型量化案例教学"
 <!-- _class: cover -->
 
 # 第9章：模型量化案例教学
+
+<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
 ## 从 400 张对齐样本到可回退的量化决策
 

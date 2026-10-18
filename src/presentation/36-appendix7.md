@@ -3,6 +3,8 @@ marp: true
 theme: ascend310
 paginate: true
 size: 16:9
+author: "周贤中"
+email: "zhouxzh@gdut.edu.cn"
 header: "《昇腾310B实战》教材配套演示"
 footer: "附录 7：CANN 升级"
 ---
@@ -12,6 +14,8 @@ footer: "附录 7：CANN 升级"
 <!-- _class: cover -->
 
 # 附录 7：CANN 升级
+
+<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
 附录课件 · 教师授课版
 

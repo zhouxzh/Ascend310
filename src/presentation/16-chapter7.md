@@ -3,6 +3,8 @@ marp: true
 theme: ascend310
 paginate: true
 size: 16:9
+author: "周贤中"
+email: "zhouxzh@gdut.edu.cn"
 header: "《昇腾310B实战》教材配套演示"
 footer: "第7章：算子开发实战"
 ---
@@ -10,6 +12,8 @@ footer: "第7章：算子开发实战"
 <!-- _class: cover -->
 
 # 第7章：算子开发实战
+
+<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
 ## 从 TBE DSL 原型到 Ascend C 硬件证据
 

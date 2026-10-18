@@ -3,6 +3,8 @@ marp: true
 theme: ascend310
 paginate: true
 size: 16:9
+author: "周贤中"
+email: "zhouxzh@gdut.edu.cn"
 header: "《昇腾310B实战》教材配套演示"
 footer: "第1章：昇腾310B边缘计算基础"
 ---
@@ -10,6 +12,8 @@ footer: "第1章：昇腾310B边缘计算基础"
 <!-- _class: cover -->
 
 # 第1章：昇腾310B边缘计算基础
+
+<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
 ## 从云边边界到可验证的算力选择
 

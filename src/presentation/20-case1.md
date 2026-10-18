@@ -3,6 +3,8 @@ marp: true
 theme: ascend310
 paginate: true
 size: 16:9
+author: "周贤中"
+email: "zhouxzh@gdut.edu.cn"
 header: "《昇腾310B实战》教材配套演示"
 footer: "案例 1：智能考勤机"
 ---
@@ -10,6 +12,8 @@ footer: "案例 1：智能考勤机"
 <!-- _class: cover -->
 
 # 案例 1：智能考勤机
+
+<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
 ## 从摄像头图像到本地考勤事件
 

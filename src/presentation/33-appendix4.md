@@ -3,6 +3,8 @@ marp: true
 theme: ascend310
 paginate: true
 size: 16:9
+author: "周贤中"
+email: "zhouxzh@gdut.edu.cn"
 header: "《昇腾310B实战》教材配套演示"
 footer: "附录 4：Vibe Coding"
 ---
@@ -10,6 +12,8 @@ footer: "附录 4：Vibe Coding"
 <!-- _class: cover -->
 
 # 附录 4：Vibe Coding
+
+<div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
 **DSH 桌面版 + 写作插件 + 调试插件**
 
