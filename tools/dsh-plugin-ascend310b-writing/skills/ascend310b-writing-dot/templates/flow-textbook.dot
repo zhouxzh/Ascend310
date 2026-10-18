@@ -1,0 +1,45 @@
+digraph flow_textbook {
+  graph [
+    rankdir=TB,
+    fontname="Noto Sans CJK SC",
+    fontsize=16,
+    size="7.2,4.2",
+    ratio="compress",
+    dpi=160,
+    pad="0.08",
+    nodesep="0.24",
+    ranksep="0.38",
+    splines="polyline",
+    bgcolor="transparent"
+  ];
+  node [
+    fontname="Noto Sans CJK SC",
+    fontsize=16,
+    margin="0.14,0.10",
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#F5F7FA",
+    color="#607D8B"
+  ];
+  edge [
+    fontname="Noto Sans CJK SC",
+    fontsize=13,
+    color="#546E7A",
+    arrowsize="0.7"
+  ];
+
+  start [label="输入", fillcolor="#E8F5E9"];
+  probe [label="ascend_probe\n确认真实环境"];
+  preflight [label="环境门\nCANN / ACL / 设备"];
+  contract [label="输入输出合同"];
+  run [label="最小运行"];
+  numeric [label="数值/任务验收"];
+  done [label="记录证据", fillcolor="#E8F5E9"];
+  blocked [label="停止并修正", shape=diamond, fillcolor="#FFF3E0"];
+
+  start -> probe -> preflight;
+  preflight -> blocked [label="失败"];
+  preflight -> contract [label="通过"];
+  contract -> run -> numeric -> done;
+  numeric -> blocked [label="失败"];
+}

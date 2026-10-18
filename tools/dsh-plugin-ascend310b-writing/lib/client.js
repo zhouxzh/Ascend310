@@ -19,6 +19,7 @@ window.__ModuleLoader__.load({
 .tw-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
 .tw-title{font-size:16px;font-weight:600;margin:0}
 .tw-sub{color:var(--dsw-alias-label-tertiary);font-size:12px}
+.tw-note{color:var(--dsw-alias-label-tertiary);font-size:12px;margin-top:8px}
 .tw-actions{margin-left:auto;display:flex;gap:8px}
 .tw-button{border:.5px solid var(--dsw-alias-border-l3);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:6px;padding:4px 12px;font:inherit;cursor:pointer}
 .tw-button:hover{background:var(--dsw-alias-interactive-bg-hover)}
@@ -40,6 +41,10 @@ window.__ModuleLoader__.load({
 .tw-sev-error{color:var(--dsw-alias-state-error-primary)}
 .tw-sev-warning{color:var(--dsw-alias-state-warning-primary,#c98a00)}
 .tw-sev-info{color:var(--dsw-alias-label-tertiary)}
+.tw-status{display:inline-block;border-radius:999px;padding:1px 7px;font-size:11px;border:.5px solid var(--dsw-alias-border-l2)}
+.tw-status-ok{color:var(--dsw-alias-state-success-primary,#2f9e44);border-color:var(--dsw-alias-state-success-primary,#2f9e44)}
+.tw-status-warn{color:var(--dsw-alias-state-warning-primary,#c98a00);border-color:var(--dsw-alias-state-warning-primary,#c98a00)}
+.tw-status-bad{color:var(--dsw-alias-state-error-primary,#d92d20);border-color:var(--dsw-alias-state-error-primary,#d92d20)}
 .tw-empty{color:var(--dsw-alias-label-tertiary);padding:12px 0}
 .tw-error{color:var(--dsw-alias-state-error-primary);white-space:pre-wrap}
 `;
@@ -124,6 +129,52 @@ window.__ModuleLoader__.load({
 			);
 		}
 
+		/** Code-doc coverage by sample, including README/docs/code drift. */
+		function CodeDocsTable(props) {
+			const entries = props.entries ?? [];
+			if (entries.length === 0) return h("div", { className: "tw-empty" }, "没有找到代码样例目录。");
+			const status = (value) => {
+				if (value === "complete") return ["完整", "tw-status-ok"];
+				if (value === "missing") return ["缺 README", "tw-status-bad"];
+				return ["仅 README", "tw-status-warn"];
+			};
+			return h(
+				"table",
+				{ className: "tw-table" },
+				h(
+					"thead",
+					null,
+					h(
+						"tr",
+						null,
+						h("th", null, "样例目录"),
+						h("th", null, "README"),
+						h("th", { className: "tw-num" }, "代码"),
+						h("th", { className: "tw-num" }, "docs"),
+						h("th", null, "状态"),
+						h("th", null, "同步提示")
+					)
+				),
+				h(
+					"tbody",
+					null,
+					entries.map((entry) => {
+						const [label, className] = status(entry.status);
+						return h(
+							"tr",
+							{ key: entry.sample },
+							h("td", { className: "tw-file" }, entry.sample),
+							h("td", null, entry.readme ? "有" : "缺"),
+							h("td", { className: "tw-num" }, num(entry.codeFiles)),
+							h("td", { className: "tw-num" }, num(entry.docs)),
+							h("td", null, h("span", { className: `tw-status ${className}` }, label)),
+							h("td", { className: "tw-note" }, (entry.issues ?? []).join("；") || "—")
+						);
+					})
+				)
+			);
+		}
+
 		/** The finding list, most severe first. */
 		function FindingList(props) {
 			const findings = props.findings ?? [];
@@ -187,7 +238,7 @@ window.__ModuleLoader__.load({
 				"div",
 				{ className: "tw-head" },
 				h("h2", { className: "tw-title" }, "写作"),
-				h("span", { className: "tw-sub" }, "教程写作守门员：命名规范、锚点、链接与进度"),
+				h("span", { className: "tw-sub" }, "教程写作守门员：命名规范、锚点、链接、代码文档与跨对象同步"),
 				h(
 					"div",
 					{ className: "tw-actions" },
@@ -210,9 +261,12 @@ window.__ModuleLoader__.load({
 				);
 			}
 
-			const { audit, progress, root, generatedAt } = state.payload;
+			const { audit, progress, codeDocs = {}, root, generatedAt } = state.payload;
 			const findings = onlyProblems ? (audit.findings ?? []).filter((finding) => finding.severity !== "info") : (audit.findings ?? []);
 			const totals = progress.totals ?? {};
+			const codeSummary = codeDocs.summary ?? {};
+			const codeEntries = codeDocs.entries ?? [];
+			const codeFindings = codeDocs.findings ?? [];
 
 			return h(
 				"div",
@@ -226,10 +280,32 @@ window.__ModuleLoader__.load({
 					h(Card, { label: "中文字", value: num(totals.cjk) }),
 					h(Card, { label: "图", value: num(totals.figures) }),
 					h(Card, { label: "代码块", value: num(totals.codeBlocks) }),
+					h(Card, { label: "代码 docs", value: `${num(codeSummary.withDocs)}/${num(codeSummary.samples)}` }),
+					h(Card, { label: "代码文件", value: num(codeSummary.codeFiles) }),
+					h(Card, { label: "同步问题", value: num(codeSummary.findings) }),
 					h(Card, { label: "错误", value: num(audit.summary?.errors) }),
 					h(Card, { label: "警告", value: num(audit.summary?.warnings) })
 				),
 				h("div", { className: "tw-section" }, h("h3", null, "各分部进度"), h(ProgressTable, { parts: progress.parts })),
+				h(
+					"div",
+					{ className: "tw-section" },
+					h("h3", null, `代码文档与样例同步（${codeSummary.samples ?? 0} 个样例目录）`),
+					h(CodeDocsTable, { entries: codeEntries }),
+					h(
+						"div",
+						{ className: "tw-note" },
+						`README ${num(codeSummary.readmes)} 个，详细 docs ${num(codeSummary.withDocs)} 个，仅 README ${num(codeSummary.readmeOnly)} 个，缺 README ${num(codeSummary.missingReadme)} 个，docs 文件 ${num(codeSummary.docsFiles)} 个。`
+					)
+				),
+				codeFindings.length > 0
+					? h(
+							"div",
+							{ className: "tw-section" },
+							h("h3", null, "跨对象同步问题"),
+							h(FindingList, { findings: codeFindings })
+						)
+					: null,
 				h(
 					"div",
 					{ className: "tw-section" },

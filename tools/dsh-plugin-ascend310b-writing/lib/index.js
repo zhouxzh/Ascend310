@@ -26,11 +26,13 @@ import {
 import { diagnose } from './doctor.js';
 import { collectVuepressFindings } from './vuepress.js';
 import { collectCodeFindings } from './code.js';
+import { collectCodeDocs } from './code-docs.js';
 import { collectDeckFindings } from './deck.js';
 import { collectSiteFindings, describeSite } from './site.js';
 import { collectFigureFindings, describeFigures } from './figures.js';
 import { collectDeckWebFindings, describeDeckWeb } from './deck-web.js';
 import { collectDeckRenderFindings } from './deck-render.js';
+import { collectPageLayoutFindings } from './page-layout.js';
 import { collectCiStatus } from './ci.js';
 import { collectCoursewareFindings } from './courseware.js';
 import { analyzeStyle, formatStyle } from './style.js';
@@ -172,6 +174,11 @@ function describeCode(code) {
 	return `代码交叉检查：${code.manuscripts} 个文件、${code.tokens} 处路径引用（${missing} 处失效、${generated} 处运行时产物）。`;
 }
 
+function describeCodeDocs(codeDocs) {
+	const summary = codeDocs.summary;
+	return `代码文档：${summary.samples} 个样例目录、${summary.readmes} 个 README、${summary.withDocs} 个含详细 docs（${summary.docsFiles} 个文档，${summary.findings} 个同步问题）。`;
+}
+
 function describeVuepress(vuepress) {
 	if (!vuepress.available) return '站点配置：没有找到 src/.vuepress 的配置文件，跳过。';
 	const broken = vuepress.findings.filter((finding) => finding.severity === 'error').length;
@@ -268,6 +275,9 @@ function runAudit({ root, scope, maxFindings, rev, config }) {
 	const code = collectCodeFindings({ root, settings });
 	extraFindings.push(...code.findings);
 	notes.push(describeCode(code));
+	const codeDocs = collectCodeDocs({ root });
+	extraFindings.push(...codeDocs.findings);
+	notes.push(describeCodeDocs(codeDocs));
 	const deck = collectDeckFindings({ root, settings });
 	extraFindings.push(...deck.findings);
 	notes.push(describeDeck(deck));
@@ -405,6 +415,58 @@ export function apply(ctx, config) {
 			presentCall: (args) => ({
 				card: 'generic',
 				title: '课件真实渲染',
+				kind: 'other',
+				rawInput: args
+			})
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend310b_writing_page_layout',
+			description:
+				'Open a local VuePress page in a real browser and check horizontal page overflow, images/SVGs ' +
+				'outside the viewport, and internal table/code scrolling at desktop and mobile widths. Use after ' +
+				'pnpm run docs:dev; it is a mechanical layout check, not a substitute for human visual review.',
+			parameters: {
+				root: ROOT_PARAMETER,
+				url: {
+					type: 'string',
+					required: true,
+					description: 'Local page URL, for example http://127.0.0.1:8080/Ascend310/experiment/case9.html.'
+				},
+				viewports: {
+					type: 'string',
+					description: 'Comma-separated WIDTHxHEIGHT viewports; defaults to 1440x1000,390x844.'
+				}
+			},
+			output: {
+				schema: {
+					type: 'object',
+					additionalProperties: false,
+					properties: {
+						text: { type: 'string', required: true },
+						ok: { type: 'boolean', required: true },
+						issues: { type: 'array', required: true, items: { type: 'string' } },
+						results: { type: 'array', required: true, items: { type: 'object' } }
+					}
+				},
+				render: (_args, value) => [{ type: 'text', text: value.text }]
+			},
+			execute(args) {
+				const root = resolveRoot(config, args.root);
+				const result = collectPageLayoutFindings({
+					root,
+					url: args.url,
+					viewports: typeof args.viewports === 'string' && args.viewports.trim() !== ''
+						? args.viewports.trim()
+						: '1440x1000,390x844'
+				});
+				return Promise.resolve(result);
+			},
+			presentCall: (args) => ({
+				card: 'generic',
+				title: '本地网页排版',
 				kind: 'other',
 				rawInput: args
 			})
@@ -645,6 +707,45 @@ export function apply(ctx, config) {
 							}
 						},
 						missingFromSidebar: { type: 'array', required: true, items: { type: 'string' } }
+						,
+						codeDocs: {
+							type: 'object',
+							required: true,
+							additionalProperties: false,
+							properties: {
+								summary: {
+									type: 'object',
+									required: true,
+									additionalProperties: false,
+									properties: {
+										samples: { type: 'integer', required: true },
+										readmes: { type: 'integer', required: true },
+										withDocs: { type: 'integer', required: true },
+										readmeOnly: { type: 'integer', required: true },
+										missingReadme: { type: 'integer', required: true },
+										codeFiles: { type: 'integer', required: true },
+										docsFiles: { type: 'integer', required: true },
+										findings: { type: 'integer', required: true },
+										indexedCases: { type: 'integer', required: true }
+									}
+								},
+								findings: {
+									type: 'array',
+									required: true,
+									items: {
+										type: 'object',
+										additionalProperties: false,
+										properties: {
+											file: { type: 'string', required: true },
+											line: { type: 'integer', required: true },
+											severity: { type: 'string', required: true },
+											rule: { type: 'string', required: true },
+											message: { type: 'string', required: true }
+										}
+									}
+								}
+							}
+						}
 					}
 				},
 				render: (_args, value) => [{ type: 'text', text: value.text }]
@@ -652,11 +753,17 @@ export function apply(ctx, config) {
 			execute(args) {
 				const root = resolveRoot(config, args.root);
 				const scope = SCOPES.includes(args.scope) ? args.scope : 'all';
-				const report = progressReport({ root, scope, settings: settingsFor(config, root) });
+				const settings = settingsFor(config, root);
+				const report = progressReport({ root, scope, settings });
+				const codeDocs = collectCodeDocs({ root });
 				return Promise.resolve({
-					text: report.text,
+					text: [report.text, '', codeDocs.text].join('\n'),
 					totals: report.totals,
-					missingFromSidebar: report.missingFromSidebar
+					missingFromSidebar: report.missingFromSidebar,
+					codeDocs: {
+						summary: codeDocs.summary,
+						findings: codeDocs.findings
+					}
 				});
 			},
 			presentCall: (args) => ({
@@ -958,6 +1065,7 @@ export function apply(ctx, config) {
 			const assets = collectAssetFindings({ root, settings });
 			const vuepress = collectVuepressFindings({ root, settings, frozenRows: frozen.tableRows });
 			const code = collectCodeFindings({ root, settings });
+			const codeDocs = collectCodeDocs({ root });
 			const deck = collectDeckFindings({ root, settings });
 			const courseware = collectCoursewareFindings({ root, settings });
 			const latexMap = collectLatexChapterFindings({ root, settings });
@@ -968,7 +1076,7 @@ export function apply(ctx, config) {
 				root,
 				scope: 'all',
 				maxFindings: 400,
-				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...deck.findings, ...courseware.findings, ...latexMap.findings, ...site.findings, ...figures.findings, ...deckWeb.findings],
+				extraFindings: [...frozen.findings, ...assets.findings, ...vuepress.findings, ...code.findings, ...codeDocs.findings, ...deck.findings, ...courseware.findings, ...latexMap.findings, ...site.findings, ...figures.findings, ...deckWeb.findings],
 				settings
 			});
 			const progress = progressReport({ root, scope: 'all', settings });
@@ -992,6 +1100,12 @@ export function apply(ctx, config) {
 					totals: progress.totals,
 					parts: progress.parts,
 					missingFromSidebar: progress.missingFromSidebar
+				},
+				codeDocs: {
+					generatedAt: codeDocs.generatedAt,
+					summary: codeDocs.summary,
+					entries: codeDocs.entries,
+					findings: codeDocs.findings
 				}
 			};
 			cache = { at: now, value };

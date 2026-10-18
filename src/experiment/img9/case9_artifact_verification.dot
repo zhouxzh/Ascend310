@@ -1,0 +1,40 @@
+digraph case9_artifact_verification {
+  graph [
+    rankdir=TB,
+    fontname="Noto Sans CJK SC",
+    fontsize=16,
+    size="7.2,4.2",
+    ratio="fill",
+    dpi=160,
+    pad="0.08",
+    nodesep="0.25",
+    ranksep="0.38",
+    splines="polyline",
+    bgcolor="transparent"
+  ];
+  node [
+    fontname="Noto Sans CJK SC",
+    fontsize=16,
+    margin="0.14,0.10",
+    height="0.56",
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#F5F7FA",
+    color="#607D8B"
+  ];
+  edge [
+    fontname="Noto Sans CJK SC",
+    fontsize=13,
+    color="#546E7A",
+    arrowsize="0.7"
+  ];
+
+  source [label="固定 revision 工件", fillcolor="#E8F5E9"];
+  part [label="写入 .part 临时文件"];
+  bytes [label="核对文件大小"];
+  hash [label="核对 SHA-256"];
+  rename [label="原子改名"];
+  runtime [label="worker 可加载", fillcolor="#E8F5E9"];
+
+  source -> part -> bytes -> hash -> rename -> runtime;
+}

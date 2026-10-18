@@ -46,10 +46,15 @@ description: Ascend310 教材理论章节写作。用于新增、改写、重命
 - `AGENTS.md` 冻结名表（仅用户明确要求改名时）；
 - 如有配对课件，更新 `src/presentation/` 和 `src/presentation/README.md`。
 
+## 本地网页与人工校验
+
+理论章节修改后必须确认 `pnpm run docs:dev` 正在运行，并打开对应 `book/...html` 页面。运行 `node scripts/check_page_layout.mjs --url <URL>` 检查桌面与移动视口；内容、公式、图片、锚点和 sidebar 都必须由用户在本地网页上人工确认。`docs:build` 和自动 audit 通过只算机械证据；最终状态先写 `human-review: pending`，用户确认后才能通过。
+
 ## 停止条件
 
 - 冻结标题或编号冲突。
 - 正文标题与文件编号不一致。
 - 新增章节没有 sidebar 或索引。
 - 图片/链接目标不存在。
+- 没有本地网页人工校验，却被描述为最终完成。
 - 仅本地构建通过但板端结论尚未验证时，不得写成 `observed-pass`。

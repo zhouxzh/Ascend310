@@ -29,10 +29,28 @@ The public model identifier is `ascend-edge-chat`. The internal worker identifie
 | Browser text UI | Supported technical preview | Trusted LAN only; no browser login |
 | OpenAI JSON and SSE | Supported technical preview | Bounded messages, greedy decoding, one request at a time |
 | MindSpore Qwen1.5-0.5B | Observed-pass on 20T | Human Chinese-quality review remains pending; still testable |
+| Teaching Qwen2-0.5B profile | Observed-pass machine/API path on 20T (2026-10-18) | Active teaching profile during the final acceptance run; semantic quality pending |
 | Teaching catalog | Qwen1.5 1.8B, Qwen2/Qwen2.5, TinyLlama, DeepSeek | Selectable when technical evidence exists; quality is a separate field |
 | Ascend 310B4 / 8T | Untested for this release | Does not inherit the 20T result |
 | Audio and device protocols | Out of scope | Not installed or started |
 | Retrieval augmentation | Not included | No release API or runtime configuration enables it |
+
+## Current 20T Validation
+
+The active teaching profile during the `2026-10-18` board run was
+`qwen2-0.5b-instruct-mindspore`. The browser route `:7865 -> :7861 -> :8090`
+completed gateway and UI contracts, JSON, SSE, output budgets from 8 through 64
+tokens, ten short stability requests, and ten Chinese probes. The preserved
+board report is `run/case9-acceptance-20261018-20t-spaced2.json`; it is ignored
+board evidence, not a checked-in artifact.
+
+The first unspaced acceptance loop hit HTTP 429 because request bodies arrived
+faster than the service admission boundary. A spaced run passed. Do not turn
+that client-burst observation into an NPU failure, and do not omit the
+single-request admission limit from the deployment description. Chinese answer
+quality remains pending; the technical machine path and semantic quality are
+separate claims. Detailed values are in
+[Validation and Limitations](04-validation-and-limitations.md).
 
 ## Release Model
 

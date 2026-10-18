@@ -19,6 +19,48 @@ The following measurements were recorded on `2026-10-16` for the 20T reference b
 
 The complete historical evidence remains in `docs/archive/legacy-pre-release/`. The table is a boundary statement, not a benchmark promise for another board, CANN release, ambient load, prompt, or model revision.
 
+## 2026-10-18 20T Acceptance
+
+The active board service was validated after the code changes, with the
+`qwen2-0.5b-instruct-mindspore` teaching profile. The browser path was
+`:7865 -> :7861 -> :8090`; the board was `Ascend310B1 / 20T`, CANN `8.0.0`,
+driver `25.2.0`, and Python `3.9.2`. The raw board report is
+`run/case9-acceptance-20261018-20t-spaced2.json` under the deployment directory
+and is ignored by Git.
+
+| Evidence item | 2026-10-18 result |
+| --- | --- |
+| Gateway contract | `/v1/models`, invalid bearer rejection, and unknown-model rejection passed |
+| UI contract | `/api/config` and a real `/api/chat` response passed |
+| JSON completion | HTTP 200, non-empty response, `finish_reason=stop` in the direct check |
+| SSE completion | HTTP 200, terminal `[DONE]`-equivalent completion, `finish_reason=stop` |
+| Output-budget checks | 8/16/32 tokens returned `length`; 64-token request returned `stop` after 46 completion tokens |
+| Stability | 10/10 short requests returned “测试通过” |
+| Chinese probes | 10/10 requests completed the machine path; semantic quality is pending |
+| One performance sample | First token 723.051 ms; completion 1370.604 ms; 1.459 token/s |
+| Test-time worker state | Worker remained healthy after the run |
+| Test-time NPU snapshot | 19,540 / 23,673 MB used; `npu-smi` still reported the 310B1 |
+| UI screenshot | 1440×900, `src/experiment/img9/case9-board-20t-ui.png` |
+
+The first complete harness run had no inter-request delay and failed in the
+stability loop with:
+
+```text
+HTTP 429: Too many request bodies are being read
+```
+
+That is a request-admission result, not an NPU or model failure. The subsequent
+run used one-second spacing for JSON requests and two-second spacing for
+streaming requests, and passed. The service is intentionally serial and bounded;
+the test harness must not burst submissions.
+
+This run does not establish p50/p95 performance because only one performance
+sample was taken. It also does not establish Chinese semantic quality. A direct
+Chinese prompt received an English apology; that is a quality observation for
+that answer, while the machine path remained `observed-pass`. Use the
+ten-prompt, fresh-session, human-review protocol below before changing
+`quality_status`.
+
 ## 2026-10-18 Output-Budget Recheck
 
 The earlier 64-token UI/worker ceiling was a service policy, not an observed

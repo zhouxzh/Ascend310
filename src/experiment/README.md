@@ -40,7 +40,7 @@
 
 ### 案例 9：智能聊天机器人
 [查看案例](./case9.md)
-在昇腾310B上把聊天模型运行成 OpenAI 兼容的 JSON/SSE 文本服务，经候选网关和文字页面访问。正式基线是 Qwen2.5 静态 KV 的 ONNX 到 OM 到原生 ACL 链路，当前实验首选是 MindSpore/MindNLP 的 Qwen1.5 候选；音频、ASR/TTS 和 XiaoZhi 设备链路本轮暂停，不作验收。
+在昇腾 20T 上把 MindSpore/MindNLP 聊天模型运行成 OpenAI 兼容的 JSON/SSE 文本服务，经网关和文字页面访问；2026-10-18 以 Qwen2 0.5B 教学 profile 完成 20T 机器验收，正式发布仍使用锁定的 Qwen1.5 基础模型。质量、8T、音频、ASR/TTS 和设备链路本轮不作为已通过结论。
 
 ---
 

@@ -19,9 +19,18 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
 | 实践案例 | `ascend310b-writing-case` | `src/experiment/`、案例1至案例9、case4 自包含 |
 | Presentation | `ascend310b-writing-presentation` | `src/presentation/`、Marp 主题、真实浏览器课件验收 |
 | 代码工程 docs | `ascend310b-writing-docs` | `samples/caseN/README.md`、`docs/`、部署/API/验证/限制 |
+| 代码 API/docstring/参考 | `ascend310b-code-docs` | 源码 API、CLI、docstring、README 和可运行示例 |
+| 学术论证/论文式写作 | `ascend310b-writing-academic` | claim-evidence-citation、方法、实验、结果、限制 |
+| 教材课程计划 | `ascend310b-curriculum-planning` | 章节/案例/样例/课件的学习目标、先修和评估矩阵 |
+| VuePress | `ascend310b-writing-vuepress` | `src/.vuepress/`、sidebar、路由、静态资源和站点构建 |
+| LaTeX/PDF | `ascend310b-writing-latex` | `convert-vuepress.sh`、`latex/`、字体、锚点、构建日志 |
+| Markdown | `ascend310b-writing-markdown` | CommonMark/GFM、标题、链接、图片、表格和标点 |
+| Graphviz DOT | `ascend310b-writing-dot` | 系统架构图、数据流图、程序流程图和 `.dot` 源 |
 | 跨对象规则 | 本 skill | 冻结命名、链接、图片、标点、PDF、push gate 和写作进度 |
 
 先判断对象，再打开专用 skill；不要把案例运行手册写成理论章节，也不要把代码 docs 当成课件或案例正文。
+
+已发布 Presentation 的“对应教材”必须使用 GitHub Pages HTML 链接，“配套样例”必须使用 GitHub `samples/` 目录链接；不要在已发布课件中保留 `../experiment/*.md` 等本地相对导航。
 
 ## 先看规则，再动手
 
@@ -46,8 +55,9 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
    （`latex/`、`src/.vuepress/dist`、`src/.vuepress/.cache`）。
 3. 复跑 `ascend310b_writing_audit`，直到 error 归零；warning 若有意保留
    （例如 Markdown 强制换行的行尾空格），在回复里说明。
-4. 需要站点预览时跑 `pnpm run docs:dev`，把本地地址交给用户确认；
-   未经用户确认不要 push，也不要因为 `docs:build` 通过就认为可以 push。
+4. 修改章节、案例、附录或代码 docs 后，**必须同步更新本地网页并让人工查看**：
+   运行或复用 `pnpm run docs:dev`，把本地 URL 交给用户，等待 HMR/刷新后确认页面内容。
+   同时运行 `ascend310b_writing_page_layout`（或 `node scripts/check_page_layout.mjs --url <URL>`），检查 1440px 和 390px 视口的横向溢出、图片/SVG 越界和内部滚动。不要把 `docs:build`、HTTP 200 或自动审计通过当成人工验收；未经用户确认不要 push。
    演示文稿改动必须先跑 `pnpm run docs:slides`，再用 `ascend310b_writing_deck_render`
    （可带 `deck` 只查一份）确认真实浏览器中 0 裁切、0 图片未加载，并逐页截图检查封面、
    目标页、章节页、内容页和小结页。源码估算高度不能代替真实渲染。
@@ -62,6 +72,16 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
    真实课件裁切/图片失败）和提示项（未提交正文、PDF 渲染结论、产物新鲜度）分开列，并在最后点名唯一
    无法机械验证的一项：站点预览是否已由用户确认。
 7. 要汇报篇幅或剩余工作量时跑 `ascend310b_writing_progress`。
+
+## 本地网页同步与人工校验
+
+- 修改任何会进入 VuePress 的教材内容后，必须确认 `pnpm run docs:dev` 正在运行；已有服务可复用，但必须验证目标页面返回 200 且在浏览器中显示最新内容。
+- 给用户明确的本地 URL：正文用对应 `experiment/`、`book/` 或 `appendix/` 页面；课件用 `presentation/<deck>.html`。
+- 运行 `ascend310b_writing_page_layout` 或 `node scripts/check_page_layout.mjs --url <URL>`，桌面和移动视口都必须无页面横向滚动、无图片/SVG 越界；代码块/表格内部滚动单独记录。
+- HMR 只能证明开发服务器在运行；仍要刷新页面并检查正文、图片、链接、锚点和课件版面。
+- 自动化完成时把最终状态写成 `human-review: pending`。只有用户明确确认本地网页内容正确后，才能改为通过。
+- `docs:build` 成功、自动审计 0 error、HTTP 200 都不等于人工验收通过。
+- 未完成人工校验时不得 commit 后再把它描述成最终发布结果，也不得 push。
 
 ## 课件制作规范（Marp）
 

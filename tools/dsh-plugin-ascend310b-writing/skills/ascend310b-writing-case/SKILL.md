@@ -48,10 +48,15 @@ description: Ascend310 实践案例教程写作。用于案例1至案例9的 src
 - 性能：标明 8T/20T、warmup、iterations、repeats 和报告路径。
 - 无法在板端验证的内容写 `untested` 或 `blocked`。
 
+## 本地网页与人工校验
+
+案例正文修改后必须确认 `pnpm run docs:dev` 正在运行，并打开对应的 `experiment/caseN.html`。运行 `node scripts/check_page_layout.mjs --url <URL>`，检查桌面与移动视口的图片、SVG、表格和代码块；用户还需要人工检查案例步骤、样例入口和证据表。本地 HMR、HTTP 200、`docs:build` 或自动 audit 通过都不能代替这次检查。最终状态先写 `human-review: pending`，用户确认后才能通过。
+
 ## 停止条件
 
 - 案例标题、编号或 sidebar 不一致。
 - `case4.md` 依赖其他仓库文档。
 - 链接/图片目标不存在。
 - 样例入口和正文命令不一致。
+- 没有本地网页人工校验，却被描述为最终完成。
 - 板端证据缺失却要写“通过”。

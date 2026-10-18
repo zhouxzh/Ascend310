@@ -23,16 +23,9 @@ title: 案例 9：智能聊天机器人
 
 浏览器不直接访问模型，也不知道网关密钥。网页进程在服务器端保存密钥，再调用回环地址上的网关。网关验证请求后，将固定的内部模型名转发给回环地址上的 MindSpore worker。worker 一次只加载一个 profile 并串行执行生成，避免多个大模型同时争用边缘 NPU。页面可以选择教学目录中的实验模型；选择后由服务端按受控流程停止旧 worker、启动固定 profile、检查健康状态并清空会话，不能在请求中传入任意模型路径或替换模型代码。
 
-```mermaid
-flowchart LR
-    accTitle: Ascend Edge Chat text-chat architecture
-    accDescr: A browser uses the trusted-LAN UI. The server-side UI forwards requests through a loopback-only authenticated gateway to a loopback-only MindSpore worker, which performs inference on the Ascend NPU.
+![Ascend Edge Chat 系统架构：浏览器经 UI、网关、worker 到 NPU](img9/case9_system_architecture.png)
 
-    browser["浏览器\n局域网"] --> ui["文字界面\n0.0.0.0:7865"]
-    ui -->|"服务器端 Bearer 密钥"| gateway["网关\n127.0.0.1:7861"]
-    gateway -->|"固定内部模型名"| worker["MindSpore worker\n127.0.0.1:8090"]
-    worker --> npu["Ascend NPU"]
-```
+源图：`img9/case9_system_architecture.dot`。整张图统一使用 `Noto Sans CJK SC`，节点 16 pt、边标签 13 pt，采用两列纵向布局，避免在教材正文中出现过宽或字号过小的横向流程。
 
 三个端口承担不同角色：
 
@@ -60,17 +53,9 @@ flowchart LR
 
 下载或离线导入都必须执行相同的完整性流程：
 
-```mermaid
-flowchart LR
-    accTitle: Model artifact verification
-    accDescr: A pinned artifact is first placed in a temporary part file, then checked by byte count and SHA-256 before an atomic rename makes it usable by the worker.
+![模型工件下载与原子校验流程](img9/case9_artifact_verification.png)
 
-    source["固定 revision 的工件"] --> part[".part 临时文件"]
-    part --> bytes["大小核验"]
-    bytes --> hash["SHA-256 核验"]
-    hash --> rename["原子改名"]
-    rename --> runtime["worker 可加载工件"]
-```
+源图：`img9/case9_artifact_verification.dot`。
 
 模型目录应位于源代码目录之外，例如 `/opt/ascend-edge-chat-data`。模型、日志、缓存和报告都不应提交到 Git。源代码使用 Apache-2.0；锁定的 Qwen revision 使用 [Tongyi Qianwen Research License Agreement](https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/blob/4d14e384a4b037942bb3f3016665157c8bcb70ea/LICENSE)，仅覆盖非商业用途；商业使用需要向模型发布方另行取得许可。不能从代码许可证推断模型使用权。
 
@@ -242,7 +227,7 @@ NPU 不能运行。
 | --- | --- | --- | --- |
 | Qwen1.5 0.5B | 20T 机器门通过 | 待人工审核 | 默认基线，先用它验证环境和协议 |
 | Qwen1.5 1.8B | 20T 机器门通过 | 待人工审核 | 更大模型，速度和内存需要单独测量 |
-| Qwen2 0.5B/1.5B | 20T API、长输出、稳定性通过 | 语义质量待人工复核 | Qwen2-1.5B 已定位并修复缺失 ChatML 模板导致的角色标记续写；这不是 NPU 加载失败 |
+| Qwen2 0.5B/1.5B | 2026-10-18 20T：JSON/SSE、长度、10 次稳定性通过（Qwen2 0.5B）；Qwen2 1.5B 另有长输出证据 | 语义质量待人工复核 | 当前 20T 教学验收使用 Qwen2 0.5B；Qwen2-1.5B 已定位并修复缺失 ChatML 模板，不能把模板问题写成 NPU 加载失败 |
 | Qwen2.5 0.5B | 修正客户端超时后机器门通过 | 待审核 | 早期 30 秒超时误杀了测试，不能当作模型崩溃 |
 | Qwen2.5 1.5B | 低占用路径可运行；另有高占用 `Alloc failed` | 历史探测含 `U+FFFD`，语义质量待复核 | 内存占用路径和文本解码问题必须分开记录 |
 | TinyLlama 1.1B | 短请求可运行；长输出退化 | 中文语义质量待复核；历史长输出出现文本完整性/TBE 问题 | 主要面向英文，短 smoke 仍适合课堂复现边界 |
@@ -322,26 +307,51 @@ python scripts/verify/output_budget_probe.py \
 
 ## 11. 板端实测记录 {#src-experiment-case9-board-evidence}
 
-本案例的发布目标是 **Ascend310B1 / 20T**，本轮在 20T 上使用已验证的 `case9-ms240-cann80` 环境运行；8T 不是该版本的发布目标，因此没有 8T 结果，也没有把 20T 结果混入 8T。原始日志与响应保存在 [`docs/case-board-runs-20261017/case9/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case9/README.md)。
+### 11.1 2026-10-18 20T 验收
 
-| 项目 | 20T |
+本轮在 **Ascend310B1 / 20T** 的真实开发板上，对已经启动的 Ascend Edge Chat 服务执行最终验收。运行中的教学 profile 是 `qwen2-0.5b-instruct-mindspore`，不是正式发布默认的 Qwen1.5 profile；因此下面的结果只证明该 profile 和该软件组合在当前 20T 板上可运行，不代表其他模型或 8T 也通过。
+
+| 项目 | 实测值 |
 | --- | --- |
-| SoC | `Ascend310B1` |
+| SoC / 档位 | `Ascend310B1` / 20T |
 | CANN / 驱动 | 8.0.0 / 25.2.0 |
-| Python | 3.9.2 |
-| release preflight | 通过；MindSpore 2.4.10、MindNLP 0.4.1、ACL 导入成功 |
-| worker | 启动并监听 `127.0.0.1:8090` |
-| gateway | 启动并监听 `127.0.0.1:7861` |
-| UI | HTTP 200，监听 `0.0.0.0:7865` |
-| 真实 chat completion | 通过；`finish_reason=length`，16 completion tokens |
-| UI 截图 | 通过，1440×900 |
+| Python | 3.9.2（base conda） |
+| 设备健康 | `Alarm`，73 C；不作为单独阻塞条件 |
+| worker | `127.0.0.1:8090`，profile `qwen2-0.5b-instruct-mindspore` |
+| gateway | `127.0.0.1:7861` |
+| UI | `0.0.0.0:7865`，浏览器页面 HTTP 200 |
+| 模型公开名 | `ascend-edge-chat` |
+| 网关契约 | `/v1/models`、Bearer 拒绝、未知模型拒绝均通过 |
+| UI 契约 | `/api/config`、真实 `/api/chat` 均通过 |
+| JSON / SSE | 两条浏览器同链路请求均为 HTTP 200，`finish_reason=stop` |
+| 长度门 | 8 / 16 / 32 token 达到预算并返回 `length`；64 token 在生成 46 token 后 `stop` |
+| 稳定性 | 10/10 个短请求成功，返回“测试通过” |
+| 中文探针 | 10 条均完成机器链路；回答内容与人工语义质量另行判断 |
+| 性能 | 本轮只运行 1 个流式性能样本：首 token 723.051 ms、完成 1370.604 ms、1.459 token/s |
+| 验收报告 | 板端 `run/case9-acceptance-20261018-20t-spaced2.json`（ignored evidence） |
+| UI 截图 | 1440×900，保存为 `src/experiment/img9/case9-board-20t-ui.png` |
+| 测试后进程 | UI RSS 约 55.6 MB；gateway RSS 约 53.5 MB；worker RSS 约 3.57 GB |
+| 测试后 NPU | 19,540 / 23,673 MB 已用；设备仍可查询 |
 
-请求使用固定 Qwen1.5-0.5B Chat 模型与低 token 预算，返回内容是生成结果，不代表准确率或长上下文能力；UI 未启用登录，仅用于可信局域网。
+本轮第一次运行完整验收脚本时，在没有请求间隔的情况下连续发送请求，稳定性段收到 HTTP 429：
 
-**证据等级**：worker/gateway/UI 启动与一次真实 completion 为 `observed-pass`（20T）。
-**本轮未验证**：回答质量评估、长上下文、并发、8T 兼容性。
+```text
+Too many request bodies are being read
+```
+
+这属于测试客户端突发请求触发的服务 admission 限制，不是 NPU 推理失败。加入请求间隔和流式收尾等待后，同一服务、同一模型、同一 20T 板通过完整机器验收。因此文档不能把第一次 429 写成模型或设备结论，也不能用第二次结果掩盖服务确实有单请求串行/限流边界。
+
+中文质量仍需单独判断。直接请求“请用一句中文介绍昇腾310B开发板”时，模型返回了英文道歉句，说明这次生成在技术上完成、但内容质量不通过本次中文语义期望；它不会反向否定 NPU/网关/UI 的 `observed-pass`。
 
 ![20T 版 Ascend Edge Chat 前端页面](img9/case9-board-20t-ui.png)
+
+**证据等级**：环境、worker、gateway、UI、JSON、SSE、10 次短稳定请求为 `observed-pass`（20T）；中文语义质量、长文质量、并发和 8T 兼容性仍为 `untested`。性能只记录单样本，不把 p50/p95 当成多轮基准。
+
+### 11.2 2026-10-17 历史记录
+
+更早的 20T 记录使用固定 Qwen1.5-0.5B Chat 和低 token 预算，完成了 worker/gateway/UI 启动、一次真实 completion 和 1440×900 UI 截图；它是本案例的历史基线，不与 2026-10-18 的 Qwen2 教学 profile 结果合并。旧原始日志与响应保存在 [`docs/case-board-runs-20261017/case9/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case9/README.md)。
+
+8T / Ascend310B4 不是该版本发布目标，没有继承本节的 20T 结论，也没有混入 8T 结果。
 
 ## 12. 小结
 

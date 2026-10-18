@@ -1,0 +1,48 @@
+digraph case9_system_architecture {
+  graph [
+    rankdir=TB,
+    fontname="Noto Sans CJK SC",
+    fontsize=16,
+    size="7.2,4.2",
+    ratio="compress",
+    dpi=160,
+    pad="0.08",
+    nodesep="0.28",
+    ranksep="0.42",
+    splines="polyline",
+    bgcolor="transparent"
+  ];
+  node [
+    fontname="Noto Sans CJK SC",
+    fontsize=16,
+    margin="0.14,0.10",
+    height="0.56",
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#F5F7FA",
+    color="#607D8B"
+  ];
+  edge [
+    fontname="Noto Sans CJK SC",
+    fontsize=13,
+    color="#546E7A",
+    arrowsize="0.7"
+  ];
+
+  browser [label="浏览器\n可信局域网", fillcolor="#E8F5E9"];
+  ui [label="UI :7865\n保存密钥", fillcolor="#E3F2FD"];
+  gateway [label="Gateway :7861\nBearer 鉴权"];
+  worker [label="MindSpore worker\n:8090，串行", fillcolor="#E8F5E9"];
+  model [label="模型加载\n与输出", shape=note];
+  npu [label="Ascend 310B1 / 20T", fillcolor="#FFF3E0"];
+
+  { rank=same; browser; ui; }
+  { rank=same; gateway; worker; }
+  { rank=same; model; npu; }
+
+  browser -> ui [label="HTTP(S)"];
+  ui -> gateway [label="回环"];
+  gateway -> worker [label="固定模型名"];
+  worker -> model;
+  model -> npu [label="NPU"];
+}

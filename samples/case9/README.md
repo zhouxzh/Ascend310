@@ -29,6 +29,12 @@ flowchart LR
 
 8T hardware does not inherit the 20T result and is not part of this release validation.
 
+## Current 20T validation
+
+On `2026-10-18`, the running teaching profile `qwen2-0.5b-instruct-mindspore` was exercised through the browser route `:7865 -> :7861 -> :8090` on an `Ascend310B1 / 20T` board. Gateway and UI contracts, JSON, SSE, 8/16/32/64-token length checks, 10 short stability requests, and 10 Chinese probes completed. The preserved raw report is on the board at `run/case9-acceptance-20261018-20t-spaced2.json`; it is ignored by Git. One performance sample measured 723.051 ms first token, 1370.604 ms completion, and 1.459 token/s. This is a single-sample observation, not a p50 benchmark.
+
+An earlier no-interval run received HTTP 429 in the stability loop (`Too many request bodies are being read`). The subsequent spaced run passed; the 429 is a request-admission observation, not a model or NPU failure. Chinese semantic quality remains pending: one direct Chinese prompt returned an English apology, so technical completion and answer quality must be reported separately. See [validation and limitations](docs/04-validation-and-limitations.md) for the detailed evidence table.
+
 ## Quick Start
 
 On a 20T board with matching CANN, MindSpore, and MindNLP already installed, copy this repository to a new deployment directory. These commands do not install or upgrade drivers, CANN, MindSpore, or model frameworks.

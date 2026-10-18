@@ -4,13 +4,13 @@
 DeepSeek Harness 插件（bundle）。
 
 它把仓库 `AGENTS.md` 里的冻结命名规则、Markdown 卫生要求、LaTeX 渲染与产物
-新鲜度、演示文稿的真实浏览器布局、推送前门槛和写作进度，变成九个模型可直接调用的工具和一个 Web 侧边栏面板。
+新鲜度、VuePress 页面真实排版、演示文稿的真实浏览器布局、推送前门槛和写作进度，变成十个模型可直接调用的工具和一个 Web 侧边栏面板。
 
 ## 组成
 
 | 面 | 文件 | 作用 |
 | --- | --- | --- |
-| 主机端 | `lib/index.js` | 注册 `ascend310b_writing_audit`、`ascend310b_writing_deck_render`、`ascend310b_writing_render`、`ascend310b_writing_push_check`、`ascend310b_writing_ci`、`ascend310b_writing_toolchain`、`ascend310b_writing_progress`、`ascend310b_writing_build`、`ascend310b_writing_style` 九个工具；组成里有 Web 服务器时额外注册 `/ascend310b-writing/report.json` 只读路由 |
+| 主机端 | `lib/index.js` | 注册 `ascend310b_writing_audit`、`ascend310b_writing_page_layout`、`ascend310b_writing_deck_render`、`ascend310b_writing_render`、`ascend310b_writing_push_check`、`ascend310b_writing_ci`、`ascend310b_writing_toolchain`、`ascend310b_writing_progress`、`ascend310b_writing_build`、`ascend310b_writing_style` 十个工具；组成里有 Web 服务器时额外注册 `/ascend310b-writing/report.json` 只读路由 |
 | 审计内核 | `lib/audit-core.js` | 正文审计、行尾分级与进度统计；纯 Node ESM，无 Harness 依赖，可单独运行与测试 |
 | 跨产物检查 | `lib/checks.js` | 读 Markdown 之外的证据：`AGENTS.md` 冻结名表、LaTeX 构建日志、生成物与源的锚点差、Git 提交树 |
 | 工具链体检 | `lib/toolchain.js` + `lib/doctor.js` | 探测 bash/pandoc/latexmk/xelatex/python3/pnpm/node（含 Anaconda/conda），给按平台分类的安装命令，判断哪些能力可用 |
@@ -19,7 +19,7 @@ DeepSeek Harness 插件（bundle）。
 | 技能 | `skills/ascend310b-writing*/SKILL.md` | 总守门规则，以及 theory、case、presentation、code docs 四个专用写作 skill |
 | 组合 | `cordis.patch.yml` | 声明本包的 bundle patch，把 Host 行插入组合 |
 
-九个工具各回答一个不同的问题：
+十个工具各回答一个不同的问题：
 
 | 工具 | 回答的问题 |
 | --- | --- |
@@ -27,6 +27,7 @@ DeepSeek Harness 插件（bundle）。
 | `ascend310b_writing_audit` | 正文本身对不对（含 `AGENTS.md` 冻结名表的双向比对），以及演示文稿与站点产物是否过期 |
 | `ascend310b_writing_audit` + `rev` | 这次提交发布出去会不会断链 |
 | `ascend310b_writing_deck_render` | 生成后的 1280×720 课件有没有真实裁切、图片未加载 |
+| `ascend310b_writing_page_layout` | 本地 VuePress 页面在桌面/移动视口有没有横向溢出、图片/SVG 越界 |
 | `ascend310b_writing_render` | 渲染出来的 PDF 有没有坏字符，生成物是否落后于源 |
 | `ascend310b_writing_ci` | 读取最近一次 GitHub Pages 工作流运行、提交、失败步骤与日志 |
 | `ascend310b_writing_push_check` | 现在能不能推，以及哪一项只有人能确认 |
@@ -56,9 +57,9 @@ DeepSeek Harness 插件（bundle）。
    ]
    ```
 
-重启 Harness 后，侧边栏出现「写作」入口，模型获得两个新工具。
+重启 Harness 后，侧边栏出现「写作」入口，模型获得这些写作工具。
 
-技能是纯文件，复制到技能目录即可被 `dsh-skill-filesystem` 扫描到。插件包含一个总守门 skill 和四个专用 skill：
+技能是纯文件，复制到技能目录即可被 `dsh-skill-filesystem` 扫描到。插件包含一个总守门 skill 和十一个专用 skill：
 
 ```powershell
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.dsh\skills" | Out-Null
@@ -73,7 +74,23 @@ Copy-Item -Recurse -Force `
 - `ascend310b-writing-case`：案例1至案例9；
 - `ascend310b-writing-presentation`：Marp 课件；
 - `ascend310b-writing-docs`：代码工程 README、`docs/`、API/部署/验证文档；
+- `ascend310b-code-docs`：源码 API、CLI、docstring、README 和可运行示例；
+- `ascend310b-writing-academic`：claim-evidence-citation、方法、实验、结果和限制；
+- `ascend310b-curriculum-planning`：章节、案例、样例和课件的学习目标、先修和评估矩阵；
+- `ascend310b-writing-vuepress`：VuePress 页面、sidebar、路由和站点构建；
+- `ascend310b-writing-latex`：LaTeX/PDF、字体、锚点和构建日志；
+- `ascend310b-writing-markdown`：CommonMark/GFM、Markdownlint 和正文卫生；
+- `ascend310b-writing-dot`：Graphviz DOT 架构图、数据流图和程序流程图；
 - `ascend310b-writing`：跨对象共同规则和路由。
+
+## 本地网页与人工验收
+
+修改任何会进入 VuePress 的教材、案例、代码 docs 或 Presentation 后，必须启动或复用 `pnpm run docs:dev`，把对应本地 URL 交给用户。开发服务器 HMR、HTTP 200、`docs:build` 和自动 audit 只是机械证据；最终状态先写 `human-review: pending`，只有用户明确确认本地网页内容正确后才算完成。
+
+- 正文：打开对应的 `book/`、`experiment/` 或 `appendix/` 页面；
+- 课件：打开对应的 `presentation/<deck>.html`，同时完成真实 1280×720 浏览器检查；
+- 页面排版：运行 `node scripts/check_page_layout.mjs --url <URL>`，检查 1440px 和 390px 视口的横向溢出、图片/SVG 越界和内部滚动；
+- 没有本地人工确认，不得把结果描述为最终交付或 push。
 
 ## 配置
 
@@ -200,7 +217,26 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 **永不阻塞**：不进推送门槛、不产生 error。同一个词在某个句子里可能恰好准确，判断权在作者。
 改写方法见技能文档的「去 AI 味」一节。
 
+## DOT 图画布
+
+系统架构图和流程图必须按教材载体控制尺寸，而不是生成一张任意大的图片：
+
+| 载体 | 推荐画布 | 最大像素 |
+| --- | --- | --- |
+| 教材网页/PDF | `size="7.2,4.2"`，160–180 dpi | 约 1600×1000 |
+| Presentation 16:9 | `size="8.5,4.8"`，`ratio="fill"`，144 dpi | 1280×720 |
+
+`ascend310b-writing-dot` 提供：
+
+- [`architecture-textbook.dot`](skills/ascend310b-writing-dot/templates/architecture-textbook.dot)：教材正文两列纵向架构图模板；
+- [`architecture-slide.dot`](skills/ascend310b-writing-dot/templates/architecture-slide.dot)：16:9 系统架构图模板；
+- [`flow-textbook.dot`](skills/ascend310b-writing-dot/templates/flow-textbook.dot)：教材纵向流程图模板。
+
+节点超过 8 个、需要缩小字体或图片超过画布时，必须拆成“总览图 + 细节图”。模板渲染和尺寸检查由 `test/dot-templates.mjs` 验证。
+
 ## 课件规范检查
+
+已发布课件的“对应教材”必须链接 GitHub Pages HTML（例如 `https://zhouxzh.github.io/Ascend310/experiment/case9.html`），“配套样例”必须链接 GitHub `samples/<name>/` 目录；不要在生成后的课件中保留 `../experiment/*.md` 等本地相对教材导航。该规则由 `ascend310b-writing-presentation` skill 和 `test/skills.mjs` 共同约束。
 
 | 规则 | 级别 | 判据 |
 | --- | --- | --- |
@@ -325,6 +361,9 @@ DSH 在**会话启动时**加载 skill：更新后新建会话才会拿到新内
 | `site-sitemap-missing` | warning | 缺少 `sitemap.xml` 或 `robots.txt` |
 
 实测：当前站点 71 页、369 个资源，断链 0、缺失资源 0，检查耗时约 100 ms。
+
+VuePress 发布前还要运行 `ascend310b_writing_page_layout`（或 `node scripts/check_page_layout.mjs --url <本地页面 URL>`）：在 1440×1000 和 390×844 视口检查页面横向滚动、图片/SVG 越界，并把代码块/表格内部滚动单独报告。该工具只做机械排版检查，不能替代人工视觉验收。
+
 ## 图表与排版检查
 
 图片与结构图同属"会同时破坏 PDF 和网页"的一类问题：

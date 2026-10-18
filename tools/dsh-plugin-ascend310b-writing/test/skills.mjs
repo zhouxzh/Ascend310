@@ -13,10 +13,17 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const skillsRoot = join(root, 'skills');
 const expected = [
 	'ascend310b-writing',
+	'ascend310b-code-docs',
+	'ascend310b-curriculum-planning',
+	'ascend310b-writing-academic',
 	'ascend310b-writing-case',
 	'ascend310b-writing-docs',
+	'ascend310b-writing-dot',
+	'ascend310b-writing-latex',
+	'ascend310b-writing-markdown',
 	'ascend310b-writing-presentation',
-	'ascend310b-writing-theory'
+	'ascend310b-writing-theory',
+	'ascend310b-writing-vuepress'
 ];
 const failures = [];
 const actual = readdirSync(skillsRoot, { withFileTypes: true })
@@ -55,6 +62,32 @@ const umbrella = readFileSync(join(skillsRoot, 'ascend310b-writing', 'SKILL.md')
 for (const name of expected.slice(1)) {
 	if (!umbrella.includes(`\`${name}\``)) failures.push(`总 skill 未路由到 ${name}`);
 }
+const presentation = readFileSync(join(skillsRoot, 'ascend310b-writing-presentation', 'SKILL.md'), 'utf8');
+if (!presentation.includes('GitHub Pages')) failures.push('Presentation skill 未规定 GitHub Pages 教材链接');
+if (!presentation.includes('https://github.com/zhouxzh/Ascend310/tree/main/samples/')) {
+	failures.push('Presentation skill 未规定 GitHub samples 链接');
+}
+if (!presentation.includes('../experiment/*.md')) failures.push('Presentation skill 未明确禁止本地教材相对链接');
+if (!umbrella.includes('已发布 Presentation')) failures.push('总 skill 未同步已发布课件链接规则');
+
+const humanReviewSkills = [
+	'ascend310b-writing',
+	'ascend310b-writing-theory',
+	'ascend310b-writing-case',
+	'ascend310b-writing-docs',
+	'ascend310b-writing-markdown',
+	'ascend310b-writing-presentation',
+	'ascend310b-writing-vuepress'
+];
+for (const name of humanReviewSkills) {
+	const text = readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
+	if (!text.includes('human-review: pending')) failures.push(`${name}: 未声明 human-review: pending`);
+	if (!text.includes('check_page_layout.mjs')) failures.push(`${name}: 未要求检查本地页面排版`);
+}
+for (const name of ['ascend310b-writing', 'ascend310b-writing-theory', 'ascend310b-writing-case', 'ascend310b-writing-docs', 'ascend310b-writing-markdown', 'ascend310b-writing-vuepress']) {
+	const text = readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
+	if (!text.includes('docs:dev')) failures.push(`${name}: 未要求启动 docs:dev 本地网页`);
+}
 
 if (failures.length > 0) {
 	console.error(`writing skills test FAILED (${failures.length} 处):`);
@@ -62,4 +95,4 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 console.log(`writing skills test passed (${expected.length} 个写作 skills)`);
-console.log('  umbrella: theory / case / presentation / docs');
+console.log('  umbrella: theory / case / presentation / docs / code-docs / academic / curriculum / vuepress / latex / markdown / dot');

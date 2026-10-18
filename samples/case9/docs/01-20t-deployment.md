@@ -86,6 +86,23 @@ curl -N -H "Authorization: Bearer $ASCEND_EDGE_CHAT_GATEWAY_API_KEY" \
 
 Then browse to `http://<board-ip>:7865/` and submit a short prompt. The model runs one request at a time; a second request receives a bounded busy response rather than queueing unbounded work.
 
+## 2026-10-18 Service Validation
+
+The running 20T service was validated from the browser route with the active
+teaching profile `qwen2-0.5b-instruct-mindspore`. The UI `/api/config` and
+`/api/chat` returned HTTP 200, the gateway accepted only the configured bearer
+token and public model, and the service completed JSON, SSE, 8/16/32/64-token
+length checks, ten short stability requests, and ten Chinese probes. The raw
+report is retained on the board at
+`run/case9-acceptance-20261018-20t-spaced2.json`.
+
+The first unspaced run hit `HTTP 429 Too many request bodies are being read`.
+That is an admission-boundary observation caused by the test client's burst,
+not an NPU error. Add a delay between requests and wait for streaming cleanup
+when reproducing the acceptance run. The 32/64 budget labels are tokenizer
+tokens, not Chinese-character counts. Human Chinese semantic review remains
+pending.
+
 ## Rollback
 
 This release does not replace a prior service automatically. To roll back, stop only the three foreground release processes, keep model files and logs for diagnosis, and start the previously validated deployment from its own directory. Do not delete shared Conda caches, CANN installation directories, or unknown board workloads.

@@ -15,15 +15,14 @@ footer: "案例 9：智能聊天机器人"
 
 <div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
-## 从本地模型到可复核的对话服务
+## 把本地模型变成可验收的对话服务
 
+对应教材：[GitHub Pages · 案例 9](https://zhouxzh.github.io/Ascend310/experiment/case9.html)
 
-对应教材：`src/experiment/case9.md`
-
-配套样例：`samples/case9`
+配套样例：[GitHub · samples/case9](https://github.com/zhouxzh/Ascend310/tree/main/samples/case9)
 
 <!--
-授课提示：用一句话说明本讲要解决的工程问题，再核对教材和样例路径。
+授课提示：先说明本讲不是“跑通一次生成”就结束，而是把模型、服务链和证据边界一起交付。
 -->
 
 ---
@@ -32,19 +31,20 @@ footer: "案例 9：智能聊天机器人"
 
 ## 本讲目标与路线
 
-- 理解本地模型服务的系统架构
-- 用工件锁固定发布模型与版本
-- 启动 OpenAI 兼容接口并完成调用
-- 按验收方法记录回答质量与失败边界
-- 实测限于 20T / Ascend310B1；8T / Ascend310B4 不继承本讲结论
+- 说清浏览器、网关、worker 和 NPU 的职责
+- 用工件锁固定模型版本与完整性
+- 启动 OpenAI 兼容的 JSON/SSE 服务
+- 用 20T 实测区分“机器通过”与“回答质量”
+- 识别串行服务的 429、截断和 worker 健康边界
 
-> 本讲主线：架构 → 模型锁 → 服务 → 调用 → 验收
+> 路线：架构 → 模型锁 → 环境 → 服务 → API → 20T 验收 → 二次开发
 
-<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a></div>
+<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
 
 <!--
-先给学生路线图；后续每页都对应这里的一项，最后回到小结。
+授课提示：强调 8T/20T 独立证据，本讲的实测页只讲 20T。
 -->
+
 ---
 
 <!-- _class: section -->
@@ -52,192 +52,232 @@ footer: "案例 9：智能聊天机器人"
 # 01
 
 ## 架构与模型锁
+
 ---
 
-<!-- _class: center -->
+## 三个进程，三种网络边界
 
-## 系统架构
+| 进程 | 监听 | 职责 | 安全边界 |
+| --- | --- | --- | --- |
+| 浏览器 UI | `0.0.0.0:7865` | 对话、模型选择、SSE 展示 | 仅可信局域网，无登录 |
+| 网关 | `127.0.0.1:7861` | Bearer 鉴权、协议适配、限流 | 不直接暴露 |
+| MindSpore worker | `127.0.0.1:8090` | 单模型加载、串行生成 | 不直接暴露 |
 
-- 三个端口承担不同角色：
-- 网页没有浏览器登录功能。因此，同一可达网段中的主机都可以发送消息。不要做端口映射，不要将 7865 放到公网反向代理之后，也不要在不可信网络使用本页面。
-- 7865：0.0.0.0
+浏览器不知道网关密钥；密钥由 UI 服务端持有。教学模型切换会重启目标 worker，而不是在请求中接受任意路径或 Python 代码。
 
-> 本页结论要能回到教材原文、命令输出或板端记录。
-
-<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 2. 系统架构</div>
+<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 系统架构</div>
 
 <!--
-授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+授课提示：先让学生指出哪些端口可被局域网访问，再解释为什么不能把 7865 暴露到公网。
 -->
+
 ---
 
-<!-- _class: center -->
+## 模型锁不是模型名称
 
-## 发布模型与工件锁
+发布工件锁固定：
 
-- 下载或离线导入都必须执行相同的完整性流程：
-- model.safetensors：模型权重
-- tokenizer.json：tokenizer 数据
+- `model.safetensors` 与 tokenizer/词表/配置
+- revision、文件大小和 SHA-256
+- 目标 SoC 与运行时边界
 
-> 本页结论要能回到教材原文、命令输出或板端记录。
+```text
+固定 revision -> .part 临时文件 -> 大小核验 -> SHA-256 -> 原子改名 -> worker 加载
+```
 
-<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 3. 发布模型与工件锁</div>
+源码：`src/experiment/case9.md` 发布模型与工件锁。
 
-<!--
-授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
--->
----
+正式发布默认模型仍是 Qwen1.5-0.5B；本轮 20T 教学验收使用 `qwen2-0.5b-instruct-mindspore`，两者不能混写。
 
-<!-- _class: center -->
-
-## 环境准备
-
-- 本节聚焦：4. 环境准备 的输入、操作与证据边界。
-- 先把输入、版本与命令固定下来，再判断结果是否可复现。
-
-> 本页结论要能回到教材原文、命令输出或板端记录。
-
-<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 4. 环境准备</div>
+<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 发布模型与工件锁</div>
 
 <!--
-授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+授课提示：问学生“模型名相同但 revision 不同，能否复现？”引到工件锁。
 -->
----
 
-<!-- _class: center -->
-
-## 获取或导入模型
-
-- 通过离线目录导入时：
-- 两种方法都会先写入临时文件，再检查服务端声明长度、本地实际长度和 SHA-256。校验失败的临时文件会被删除，已验证的目标文件不会被覆盖。可在启动前再次核验：
-- 本节聚焦：5. 获取或导入模型 的输入、操作与证据边界。
-
-> 本页结论要能回到教材原文、命令输出或板端记录。
-
-<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 5. 获取或导入模型</div>
-
-<!--
-授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
--->
----
-
-<!-- _class: center -->
-
-## 启动服务
-
-- 分别打开三个终端，在项目根目录执行：
-- 本节聚焦：6. 启动服务 的输入、操作与证据边界。
-- 先把输入、版本与命令固定下来，再判断结果是否可复现。
-
-> 本页结论要能回到教材原文、命令输出或板端记录。
-
-<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 6. 启动服务</div>
-
-<!--
-授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
--->
 ---
 
 <!-- _class: section -->
 
 # 02
 
-## 服务、调用与验收
+## 环境、服务与调用
+
 ---
 
-<!-- _class: center -->
+## 启动前必须证明环境门
 
-## 调用 OpenAI 兼容接口
+```bash
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate <validated-env>
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+bash scripts/verify/release-preflight.sh
+```
 
-- 网关公开模型名固定为 ascend-edge-chat。调用方必须携带 Bearer 密钥。
-- 将 stream 设置为 true 可获得 Server-Sent Events。网关会将 worker 的内部模型名改写为公开模型名，再把增量返回给客户端。
-- 仅接受 system、user、assistant 三种角色；
+源码：`samples/case9/scripts/verify/release-preflight.sh`。
 
-> 本页结论要能回到教材原文、命令输出或板端记录。
+预检要看到：
 
-<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 7. 调用 OpenAI 兼容接口</div>
+- Python 解释器与 `PYTHONNOUSERSITE`
+- `import acl`、MindSpore、MindNLP
+- 设备节点、`npu-smi` 与模型哈希
+- 网关配置
+
+<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 环境准备</div>
 
 <!--
-授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+授课提示：裸 SSH 能 import 不等于服务进程能 import；启动进程必须自己 source CANN。
 -->
+
+---
+
+## 服务入口与一次最小调用
+
+三个进程分别启动：
+
+```bash
+bash scripts/run/start-worker.sh
+bash scripts/run/start-gateway.sh
+bash scripts/run/start-ui.sh
+```
+
+源码：`samples/case9/scripts/run/`。
+
+公开模型名固定为 `ascend-edge-chat`，OpenAI 兼容入口：
+
+```text
+GET  /v1/models
+POST /v1/chat/completions
+```
+
+源码：`samples/case9/ascend_edge_chat/api/gateway.py`。
+
+网关只允许 greedy 解码、单请求串行和受限输出预算；超时或 worker 不可用时 fail-closed，不自动切 CPU 或云端。
+
+<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 启动服务与接口</div>
+
+<!--
+授课提示：提醒 Bearer 密钥只在服务器端；示例命令不要写入截图或 git。
+-->
+
+---
+
+## API 验收必须同时覆盖 JSON 与 SSE
+
+| 检查 | 预期 |
+| --- | --- |
+| `/v1/models` | 只暴露 `ascend-edge-chat` |
+| 错误 Bearer | 401，不泄露上游细节 |
+| 未知模型 | 拒绝 |
+| JSON completion | 非空文本、合法 finish reason |
+| SSE completion | start、delta、terminal、完整文本 |
+| 长度门 | `stop` 或明确 `length`，不能静默丢弃 |
+
+网页、网关和 worker 都要能独立定位；端口 200 只说明有进程在监听，不说明模型已经生成。
+
+<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 验收方法</div>
+
+<!--
+授课提示：把“HTTP 200”和“数值/文本验收”明确分开。
+-->
+
+---
+
+<!-- _class: section -->
+
+# 03
+
+## 20T 实测与质量边界
+
+---
+
+## 2026-10-18 的 20T 验收记录
+
+| 项目 | 实测 |
+| --- | --- |
+| 硬件 | Ascend310B1 / 20T |
+| 运行时 | CANN 8.0.0，Python 3.9.2 |
+| 教学 profile | `qwen2-0.5b-instruct-mindspore` |
+| UI / 网关 / worker | 200 / 健康 / 健康 |
+| JSON + SSE | 均完成 |
+| 长度门 | 8/16/32 `length`；64 `stop`（46 token） |
+| 稳定性 | 10/10 短请求通过 |
+| 单性能样本 | 首 token 723.051 ms；完成 1370.604 ms；1.459 token/s |
+
+这些数字只属于这次 20T、这个模型 revision、这组提示和当前环境。
+
+<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 板端实测记录</div>
+
+<!--
+授课提示：强调只有单性能样本，不能把 723 ms 写成 p50，也不能外推到 8T。
+-->
+
+---
+
+## 429、截断和质量是三种不同问题
+
+- 第一次无间隔验收在稳定性段收到 HTTP 429：请求 body 突发，属于服务 admission
+- 加请求间隔和流式收尾等待后，同一服务完成验收
+- `finish_reason=length` 表示预算耗尽，不是 NPU 崩溃
+- 直接中文提问曾返回英文道歉句：机器路径完成，中文语义质量不通过该次期望
+- 质量状态必须经过固定提示、完整响应和人工评审，不能由“页面有回复”替代
+
+> 结论：技术门 `observed-pass`；中文质量、长稳 p50/p95、并发和 8T 仍是 `untested` 或待复核。
+
+<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 长度、完整性与质量</div>
+
+<!--
+授课提示：让学生复述“429 是测试客户端突发，不是模型失败”；同时不要反过来掩盖质量失败。
+-->
+
 ---
 
 <!-- _class: visual -->
 
-## 20T 对话界面证据
+## 20T 浏览器界面证据
 
 ![20T 版 Ascend Edge Chat 前端页面](../experiment/img9/case9-board-20t-ui.png)
 
-<div class="source">图片：<a href="../experiment/img9/case9-board-20t-ui.png"><code>src/experiment/img9/case9-board-20t-ui.png</code></a>；说明：<a href="../experiment/case9.md#9-教学模型的实测结果与原因"><code>src/experiment/case9.md</code></a></div>
+<div class="source">图片：<a href="../experiment/img9/case9-board-20t-ui.png"><code>src/experiment/img9/case9-board-20t-ui.png</code></a>；接口证据见 <a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
 
 <!--
-界面截图只证明 20T 前端页面与本地服务的展示路径；回答质量、模型速度和长稳结论必须回到实测记录，不能从截图外推。
+授课提示：截图只证明页面和本地服务展示路径，不证明回答质量、长上下文或性能。
 -->
 
 ---
 
-## 验收方法
+## 二次开发不是改一个模型名
 
-- 不能用“服务已启动”代替模型验收。每个目标板都应独立记录以下证据：
-- SoC、CANN、Python、MindSpore、MindNLP、驱动和模型 SHA-256；
-- worker NPU 初始化和单 token 生成；
+新模型要经过：
 
-> 本页结论要能回到教材原文、命令输出或板端记录。
+1. 固定 revision、工件大小和 SHA-256
+2. tokenizer、chat template 和目标运行时
+3. 板端 loader、NPU 初始化和单 token 生成
+4. JSON/SSE、长度、稳定性、性能和人工质量门
+5. 只在证据满足时更新教学目录或正式发布配置
 
-<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 8. 验收方法</div>
+页面只接受已注册的 profile ID，不接受任意路径、shell 命令或 Python 表达式。
 
-<!--
-授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
--->
----
-
-<!-- _class: center -->
-
-## 教学模型的实测结果与原因
-
-- 下表是本案例已有板端证据的摘要。observed-pass 只说明机器和接口路径
-- 通过；它不等同于中文回答优秀。相反，quality_status=failed 也不等同于
-- 学生应先复制原始响应，再分析 tokenizer、chat template、finish_reason、
-
-> 本页结论要能回到教材原文、命令输出或板端记录。
-
-<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 9. 教学模型的实测结果与原因</div>
+<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 二次开发</div>
 
 <!--
-授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
+授课提示：把“可运行模型”和“正式发布模型”分开；教学目录不是质量背书。
 -->
+
 ---
-
-<!-- _class: center -->
-
-## 二次开发
-
-- 新模型不是通过任意请求参数注入路径或 Python 代码。教学模型通过受控 registry
-- 和目录加入页面；正式发布模型仍需要独立锁文件。新模型需要实现
-- BackendProvider 协议，并提供：
-
-> 本页结论要能回到教材原文、命令输出或板端记录。
-
-<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a> · 10. 二次开发</div>
-
-<!--
-授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
--->
----
-
-<!-- _class: center -->
 
 ## 本章小结
 
-- 模型、服务和接口是三份独立合同
-- 工件锁让部署可复现、可回退
-- 教学模型的实测结果必须绑定运行条件
-- 未验证项必须标为 untested 或 blocked。
+- 架构边界：UI 面向局域网，网关和 worker 保持回环
+- 工件边界：模型 revision、文件和哈希必须锁定
+- 服务边界：JSON/SSE、串行、限流、fail-closed
+- 证据边界：机器通过、长度、稳定性、性能、质量分开记录
+- 20T 本轮机器验收通过；8T、并发、p50/p95 和中文语义质量未继承
 
-> 下一讲：把对话服务接入更完整的应用链路。
+> 下一讲：把已验证的对话服务接入完整案例应用链路。
 
-<div class="source">教材：<a href="../experiment/case9.md"><code>src/experiment/case9.md</code></a></div>
+<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 小结</div>
 
 <!--
-用三句话收束；提醒学生把未验证项写成 untested 或 blocked。
+授课提示：收束时让学生说出一个 observed-pass 和一个仍为 untested 的项。
 -->
