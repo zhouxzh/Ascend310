@@ -1,8 +1,8 @@
 {
   "name": "dsh-plugin-ascend310b-writing",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
-  "description": "教程写作守门员：Ascend310 教材仓库的 Markdown 命名规范、锚点、链接、标点审计与写作进度统计",
+  "description": "教程写作守门员：Ascend310 教材仓库的 Markdown 命名规范、锚点、链接、标点审计、写作进度统计，并内置 scientific-writing 与 nature-polishing 学术写作 skills",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

@@ -33,6 +33,11 @@ const sources = [
 	join(repoRoot, 'tools', 'dsh-plugin-ascend310b-debug', 'skills')
 ];
 
+// These directories are support data for a sibling skill, not standalone
+// skills. They must still be copied because the sibling references them with
+// relative paths such as `../nature-shared/...`.
+const supportDirectories = new Set(['nature-shared']);
+
 /** Collect all files in a skill directory, including future references/. */
 function walk(directory, found = []) {
 	for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -49,7 +54,10 @@ for (const sourceRoot of sources) {
 	for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
 		if (!entry.isDirectory()) continue;
 		const sourceDir = join(sourceRoot, entry.name);
-		if (existsSync(join(sourceDir, 'SKILL.md'))) skills.push({ name: entry.name, sourceDir });
+		const hasSkillFile = existsSync(join(sourceDir, 'SKILL.md'));
+		if (hasSkillFile || supportDirectories.has(entry.name)) {
+			skills.push({ name: entry.name, sourceDir });
+		}
 	}
 }
 if (skills.length === 0) {

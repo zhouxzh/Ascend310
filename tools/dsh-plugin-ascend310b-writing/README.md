@@ -16,7 +16,7 @@ DeepSeek Harness 插件（bundle）。
 | 工具链体检 | `lib/toolchain.js` + `lib/doctor.js` | 探测 bash/pandoc/latexmk/xelatex/python3/pnpm/node（含 Anaconda/conda），给按平台分类的安装命令，判断哪些能力可用 |
 | 平台适配 | `drivers/env-windows.mjs` + `drivers/env-linux.mjs` | Windows（Git Bash / WSL）与 POSIX 各自怎么起 shell、怎么翻译路径、怎么满足 `python3` |
 | 浏览器端 | `lib/client.js` | 侧边栏「写作」入口与面板：字数卡片、各分部进度、审计发现列表 |
-| 技能 | `skills/ascend310b-writing*/SKILL.md` | 总守门规则，以及 theory、case、presentation、code docs 四个专用写作 skill |
+| 技能 | `skills/*/SKILL.md` | 总守门规则、theory/case/presentation/code docs 等专用写作 skill，并内置 `scientific-writing` 与 `nature-polishing`；`nature-shared` 是后者的支持目录 |
 | 组合 | `cordis.patch.yml` | 声明本包的 bundle patch，把 Host 行插入组合 |
 
 十个工具各回答一个不同的问题：
@@ -34,6 +34,23 @@ DeepSeek Harness 插件（bundle）。
 | `ascend310b_writing_build` | 构建（走仓库自己的转换器），并在同一任务里核对产物 |
 | `ascend310b_writing_style` | 哪些句子读起来像产品宣传稿/AI 输出（只提示，不判定） |
 | `ascend310b_writing_progress` | 篇幅和剩余工作量 |
+
+## 内置学术写作 Skills
+
+| Skill | 上游 | 许可证 | 安装内容 |
+| --- | --- | --- | --- |
+| `scientific-writing` | [K-Dense-AI/scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills) `593377b` | MIT | 完整 skill：SKILL、references、assets、离线 Python CLI |
+| `nature-polishing` | [Yuan1z0825/nature-skills](https://github.com/Yuan1z0825/nature-skills) `233ed09` | Apache-2.0 | 完整润色路由、manifest、static 片段、references |
+| `nature-shared` | 同上 | Apache-2.0 | 仅供 `nature-polishing` 相对引用的支持语料，不含 `SKILL.md`，不会出现在 skill 列表中 |
+
+来源、提交与本地修正分别记录在各目录的 `SOURCE.md` 和 `LICENSE`。同步到项目级目录：
+
+```bash
+pnpm run skills:sync
+pnpm run skills:check
+```
+
+`nature-shared` 是支持目录而不是第三个 skill；同步脚本和安装脚本都会复制它，但 DSH 不会把它注册为独立 skill。新增 skill 后需要新建 DSH 会话，当前会话的 skill 目录不会热更新。
 
 ## 安装
 

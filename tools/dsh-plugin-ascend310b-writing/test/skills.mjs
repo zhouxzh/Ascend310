@@ -5,7 +5,7 @@
  * specialized skill. This test keeps the frontmatter, scope and routing honest.
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,6 +25,9 @@ const expected = [
 	'ascend310b-writing-theory',
 	'ascend310b-writing-vuepress'
 ];
+const external = ['scientific-writing', 'nature-polishing'];
+const supportOnly = ['nature-shared'];
+const allowed = new Set([...expected, ...external, ...supportOnly]);
 const failures = [];
 const actual = readdirSync(skillsRoot, { withFileTypes: true })
 	.filter((entry) => entry.isDirectory())
@@ -32,7 +35,10 @@ const actual = readdirSync(skillsRoot, { withFileTypes: true })
 	.sort();
 
 for (const name of expected) if (!actual.includes(name)) failures.push(`缺少 writing skill：${name}`);
-for (const name of actual) if (!expected.includes(name)) failures.push(`未登记的 writing skill：${name}`);
+for (const name of [...external, ...supportOnly]) {
+	if (!actual.includes(name)) failures.push(`缺少 vendored skill/support：${name}`);
+}
+for (const name of actual) if (!allowed.has(name)) failures.push(`未登记的 writing skill：${name}`);
 
 for (const name of expected) {
 	const path = join(skillsRoot, name, 'SKILL.md');
@@ -56,6 +62,39 @@ for (const name of expected) {
 	if (text.length < 500) failures.push(`${name}: 内容过短`);
 	if (!text.includes('310B')) failures.push(`${name}: 缺少 310B 仓库范围`);
 	if (!/^## /m.test(text)) failures.push(`${name}: 缺少工作流章节`);
+}
+
+for (const name of external) {
+	const path = join(skillsRoot, name, 'SKILL.md');
+	let text = '';
+	try {
+		text = readFileSync(path, 'utf8');
+	} catch {
+		failures.push(`${name}: SKILL.md 不存在`);
+		continue;
+	}
+	if (!text.startsWith('---\n')) failures.push(`${name}: 缺少 frontmatter`);
+	const end = text.indexOf('\n---', 4);
+	if (end < 0) {
+		failures.push(`${name}: frontmatter 未闭合`);
+		continue;
+	}
+	const frontmatter = text.slice(4, end);
+	const declared = /^name:\s*(\S+)/m.exec(frontmatter)?.[1];
+	if (declared !== name) failures.push(`${name}: name 不匹配（${declared}）`);
+	if (!/^description:\s*\S+/m.test(frontmatter)) failures.push(`${name}: 缺少 description`);
+	if (text.length < 2000) failures.push(`${name}: 内容过短`);
+	if (!existsSync(join(skillsRoot, name, 'SOURCE.md'))) {
+		failures.push(`${name}: 缺少上游来源说明`);
+	}
+}
+if (existsSync(join(skillsRoot, 'nature-shared', 'SKILL.md'))) {
+	failures.push('nature-shared: 支持目录不能包含 SKILL.md，否则会暴露为独立 skill');
+}
+for (const required of ['core', 'journal-formats', 'scripts', 'manifest.yaml', 'LICENSE']) {
+	if (!existsSync(join(skillsRoot, 'nature-shared', required))) {
+		failures.push(`nature-shared: 缺少支持文件 ${required}`);
+	}
 }
 
 const umbrella = readFileSync(join(skillsRoot, 'ascend310b-writing', 'SKILL.md'), 'utf8');
@@ -94,5 +133,6 @@ if (failures.length > 0) {
 	for (const failure of failures) console.error(`  - ${failure}`);
 	process.exit(1);
 }
-console.log(`writing skills test passed (${expected.length} 个写作 skills)`);
+console.log(`writing skills test passed (${expected.length} 个本地 skills + ${external.length} 个 vendored skills)`);
 console.log('  umbrella: theory / case / presentation / docs / code-docs / academic / curriculum / vuepress / latex / markdown / dot');
+console.log('  vendored: scientific-writing / nature-polishing（nature-shared 为支持目录）');

@@ -11,7 +11,7 @@
  * Usage: node test/docs.mjs
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,7 +19,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const index = readFileSync(join(root, 'lib/index.js'), 'utf8');
 const skill = readdirSync(join(root, 'skills'), { withFileTypes: true })
 	.filter((entry) => entry.isDirectory())
-	.map((entry) => readFileSync(join(root, 'skills', entry.name, 'SKILL.md'), 'utf8'))
+	.flatMap((entry) => {
+		const path = join(root, 'skills', entry.name, 'SKILL.md');
+		return existsSync(path) ? [readFileSync(path, 'utf8')] : [];
+	})
 	.join('\n');
 const readme = readFileSync(join(root, 'README.md'), 'utf8');
 

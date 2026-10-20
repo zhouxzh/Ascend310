@@ -39,8 +39,13 @@ function walk(directory, found = []) {
 	return found;
 }
 
+const supportDirectories = new Set(['nature-shared']);
 const skills = readdirSync(sourceRoot, { withFileTypes: true })
-	.filter((entry) => entry.isDirectory() && existsSync(join(sourceRoot, entry.name, 'SKILL.md')))
+	.filter(
+		(entry) =>
+			entry.isDirectory() &&
+			(existsSync(join(sourceRoot, entry.name, 'SKILL.md')) || supportDirectories.has(entry.name))
+	)
 	.map((entry) => entry.name);
 
 if (skills.length === 0) {
