@@ -1,0 +1,49 @@
+name: Remove redundant Case 3 HF runtime branch
+
+on:
+  push:
+    branches:
+      - release/case3-hf-runtime
+    paths:
+      - .github/workflows/cleanup-case3-hf-runtime-branch.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Delete redundant branch only
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPOSITORY: zhouxzh/piano-ddsp-ascend310
+          HF_BRANCH: case3-runtime-v1.0.1
+          HF_TAG: case3-runtime-v1.0.1
+        run: |
+          python -m pip install --disable-pip-version-check huggingface_hub==0.36.2
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_REPOSITORY"]
+          branch_name = os.environ["HF_BRANCH"]
+          tag_name = os.environ["HF_TAG"]
+          refs = api.list_repo_refs(repo_id=repo_id, repo_type="model")
+          branch = next((item for item in refs.branches if item.name == branch_name), None)
+          tag = next((item for item in refs.tags if item.name == tag_name), None)
+          if branch is None:
+              print(f"branch {branch_name} already absent")
+          elif tag is None:
+              raise RuntimeError(f"refusing deletion: tag {tag_name} is absent")
+          elif branch.target_commit != tag.target_commit:
+              raise RuntimeError(
+                  f"refusing deletion: branch {branch.target_commit} != tag {tag.target_commit}"
+              )
+          else:
+              api.delete_branch(repo_id=repo_id, repo_type="model", branch=branch_name)
+              print(f"deleted redundant branch {branch_name}; kept tag {tag_name}")
+          PY
