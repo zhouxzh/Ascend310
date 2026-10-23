@@ -18,7 +18,8 @@
 
 \begin{lstlisting}[language=bash]
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd <release-root>
 export PALMPRINT_ROOT="$PWD"

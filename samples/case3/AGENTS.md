@@ -7,7 +7,7 @@ These instructions apply to the entire `case3` directory.
 This file is the implementation contract for future agents working on case3.
 It records the product intent, architectural boundaries, and accepted UX
 decisions. Detailed operator instructions and API descriptions remain in
-`doc/02-webui.md`; do not duplicate that document here.
+`docs/02-webui.md`; do not duplicate that document here.
 
 ## Project Intent
 
@@ -28,8 +28,8 @@ decisions. Detailed operator instructions and API descriptions remain in
 ## Sources of Truth
 
 - `AGENTS.md`: engineering constraints and design contract.
-- `doc/02-webui.md`: detailed WebUI behavior, deployment, controls, and API guide.
-- `doc/04-piano-ddsp.md`: Piano-DDSP model and runtime contract.
+- `docs/02-webui.md`: detailed WebUI behavior, deployment, controls, and API guide.
+- `docs/04-piano-ddsp.md`: Piano-DDSP model and runtime contract.
 - `webui/src/`: browser implementation.
 - `midi_ddsp_webui/`: FastAPI service, jobs, MIDI analysis, playback, and audio
   library index.
@@ -49,9 +49,10 @@ decisions. Detailed operator instructions and API descriptions remain in
 
 ## Remote Board Safety
 
-- Use the board's existing CANN and Conda `base` environment. The authorized
-  deployment exception is `python -m pip install -r requirements.txt` and a
-  subsequent pytest check in that environment.
+- Use the board's existing CANN and unified Conda `ascend` environment with
+  `PYTHONNOUSERSITE=1`. The authorized deployment exception is
+  `python -m pip install -r requirements.txt` and a subsequent pytest check in
+  that environment.
 - Do not install Node/npm, use `conda install`, run `apt install`, remove or
   upgrade unrelated packages, or initialize software on the remote board.
 - If a system or CANN dependency is missing, stop that step, preserve the
@@ -326,7 +327,7 @@ their time models.
   commands.
 - Preserve the current `/api/v1/realtime/*`, MIDI-DDSP library, piano-roll,
   artifact, job, device, Bluetooth, and speaker-test contracts described in
-  `doc/02-webui.md`.
+  `docs/02-webui.md`.
 - The legacy `POST /api/v1/midi-ddsp/recordings/{job_id}/play` endpoint delegates
   to the same playback implementation as version playback; keep it compatible.
 - The service is LAN-only and has no authentication. Keep mutating HTTP and
@@ -385,9 +386,9 @@ npm run test:e2e
 - Stage a new `dist` separately, verify hashes, then stop the current service and
   atomically switch the directory. Keep a rollback copy until HTTP and
   Playwright checks pass; remove only that verified temporary backup afterward.
-- Activate the board's existing CANN and conda `base` environment. Do not fall
-  back to system Python; install only this repository's `requirements.txt` via
-  pip, then verify pytest.
+- Activate the board's existing CANN and unified conda `ascend` environment,
+  then set `PYTHONNOUSERSITE=1`. Do not fall back to system Python; install only
+  this repository's `requirements.txt` via pip, then verify pytest.
 - Start with the existing `scripts/run_webui.py`; do not edit shell startup or
   create a new system service as part of routine deployment.
 - Verify `/`, `/api/v1/status`, WebSocket connection, process PID, served asset

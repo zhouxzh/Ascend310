@@ -242,7 +242,7 @@ manifest.json 是发布包的身份证。路径存在不等于内容正确，必
 
 图片只帮助梳理交付对象；SSD300 是否通过，仍要由当前版本的实测证据回答。
 
-<div class="source">图片：<a href="../book/img4/inference.png"><code>src/book/img4/inference.png</code></a>；正文：<a href="../book/chapter4.md#模型推理开发流程解析"><code>src/book/chapter4.md</code>「模型推理开发流程解析」</a>；样例：<a href="../../samples/chapter4/SSD"><code>samples/chapter4/SSD</code></a></div>
+<div class="source">图片：<a href="../book/img4/inference.png"><code>src/book/img4/inference.png</code></a>；正文：<a href="../book/chapter4.md#src-book-chapter4-h21"><code>src/book/chapter4.md</code>「模型推理开发流程解析」</a>；样例：<a href="../../samples/chapter4/SSD"><code>samples/chapter4/SSD</code></a></div>
 
 <!--
 这张教材图描述通用推理流程，不是本章项目的验收截图。不要把架构图、示意图或样例路径当成板端执行结果。

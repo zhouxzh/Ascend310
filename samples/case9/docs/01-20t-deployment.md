@@ -17,6 +17,8 @@ chmod 600 .env
 
 Edit `.env` and replace `ASCEND_EDGE_CHAT_GATEWAY_API_KEY` with a random ASCII token of at least 24 characters. Do not put the token in a browser, a client-side script, a commit, or a shell history capture.
 
+The gateway, worker, and UI launch scripts automatically source `./.env` when it is readable. Set `ASCEND_EDGE_CHAT_ENV_FILE` to use a different private environment file. The file is sourced before conda/CANN activation and must remain mode `0600`; explicit assignments in the file take precedence over same-named shell variables, so review it before starting a service.
+
 ## Service Dependency Closure
 
 The worker must run without user-site packages. If preflight reports that FastAPI, Pydantic, Uvicorn, or dotenv is absent, download the reviewed wheels on a connected machine or the board into a regular directory, verify them against `configs/release-service-requirements.txt`, then install only that local wheelhouse:
@@ -92,9 +94,8 @@ The running 20T service was validated from the browser route with the active
 teaching profile `qwen2-0.5b-instruct-mindspore`. The UI `/api/config` and
 `/api/chat` returned HTTP 200, the gateway accepted only the configured bearer
 token and public model, and the service completed JSON, SSE, 8/16/32/64-token
-length checks, ten short stability requests, and ten Chinese probes. The raw
-report is retained on the board at
-`run/case9-acceptance-20261018-20t-spaced2.json`.
+length checks, ten short stability requests, and ten Chinese probes. The dated
+raw acceptance report is retained on the board as ignored deployment evidence.
 
 The first unspaced run hit `HTTP 429 Too many request bodies are being read`.
 That is an admission-boundary observation caused by the test client's burst,

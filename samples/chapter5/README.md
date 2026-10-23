@@ -44,7 +44,7 @@ python check_mindspore_env.py
 - **不要设置 `PYTHONNOUSERSITE=1`**。已验证的 wheel 安装在用户 site，隔离后会出现
   假的“缺包”结论；同一台板上 conda 目录里可能残留另一个版本的 `dist-info`。
 
-## 1. 环境核验
+## 环境核验
 
 ```bash
 python check_mindspore_env.py                 # 含 Ascend 设备加法探测
@@ -55,7 +55,7 @@ python check_mindspore_env.py --skip-device-probe
 最后写入 `outputs/env-report.json`。当前板端结果：`mindspore 2.4.10` 与
 `mindspore_lite 2.2.11` 均从用户 site 加载，`acl` 来自 CANN，设备加法探测通过。
 
-## 2. 张量与算子路径
+## 张量与算子路径
 
 ```bash
 python 01_tensor_ops.py
@@ -67,7 +67,7 @@ python 01_tensor_ops.py
 （`EZ1001 ... not support under keep type mode`）；`fp16` 矩阵乘通过，且与 CPU
 `fp32` 基准在 `1e-2` 内一致。
 
-## 3. 网络：`nn.Cell` 与 `ops`
+## 网络：`nn.Cell` 与 `ops`
 
 ```bash
 python 02_cell_network.py
@@ -87,7 +87,7 @@ python 02_cell_network.py --skip-probes      # 只跑可用的 fp16 网络
 子进程做设备计算时，实测会出现子进程长期不返回，失败现象从“报 `EZ1001`”退化为
 “没有回包”；把探测前置后结论重新可复现。
 
-## 4. 数据管道
+## 数据管道
 
 ```bash
 python 03_dataset_pipeline.py
@@ -100,7 +100,7 @@ python 03_dataset_pipeline.py
 一个容易踩的坑：`map` 的 Python 函数要返回**显式 dtype 的 numpy 数组**。返回未定型的
 标量会得到 `Failed to create tensor from numpy array, data type is unknown`。
 
-## 5. PyNative 与静态图
+## PyNative 与静态图
 
 ```bash
 python 04_graph_mode.py --mode pynative
@@ -114,7 +114,7 @@ python 04_graph_mode.py --mode graph
 `Mindspore can not compile temporary source code in terminal`，所以样例必须以文件
 形式运行。
 
-## 6. 自动微分与训练
+## 自动微分与训练
 
 ```bash
 python 05_autograd_train.py
@@ -128,7 +128,7 @@ python 05_autograd_train.py --steps 50 --log-every 10
 脚本还会在独立子进程里探测 `nn.Dense` 的 `fp32` 梯度路径，实测以 `EZ1001` 结束
 （也曾超过探测预算不返回），按 `observed-fail` / `blocked` 记录，不影响主训练结论。
 
-## 7. CKPT 与 MindIR
+## CKPT 与 MindIR
 
 ```bash
 python 06_checkpoint_mindir.py
@@ -138,7 +138,7 @@ python 06_checkpoint_mindir.py
 当前板端结果：CKPT `60` 字节（`sha256: ca20a69f...`），重新加载后的最大绝对误差
 `0.0`；MindIR `2796` 字节（`sha256: 12ade3bb...`）。
 
-## 8. MindSpore Lite 边界
+## MindSpore Lite 边界
 
 ```bash
 python 07_lite_inference.py

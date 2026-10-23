@@ -289,14 +289,11 @@
       "archetype": "npu-service",
       "archetypeLabel": "NPU 服务与前后端",
       "entry": null,
-      "test": "npm test",
+      "test": null,
       "capabilities": [
         "ascend",
         "network",
-        "conda",
-        "model-asset",
-        "frontend",
-        "test"
+        "conda"
       ]
     },
     {

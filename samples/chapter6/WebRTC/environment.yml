@@ -1,11 +1,13 @@
-name: webrtc
+# Reference only: use the board's existing validated `ascend` environment.
+# Do not recreate or replace that environment from this file.
+name: ascend
 channels:
   - conda-forge
 dependencies:
-  - python=3.11
+  - python=3.9.25
   - pip
   - pip:
-      - aiohttp
-      - aiortc
-      - av
-      - numpy
+      - aiohttp==3.10.10
+      - aiortc==1.9.0
+      - av==12.3.0
+      - numpy==1.26.4

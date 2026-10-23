@@ -31,7 +31,8 @@ if ([string]::IsNullOrWhiteSpace($ProfilePatch)) {
 }
 $ProfilePatch = (Resolve-Path $ProfilePatch).Path
 
-$root = Join-Path $dshHome 'profiles\patchcheck'
+$rootName = 'patchcheck-' + [guid]::NewGuid().ToString('N')
+$root = Join-Path $dshHome "profiles\$rootName"
 $pluginName = ([System.IO.File]::ReadAllText(
     (Join-Path $PluginRoot 'package.json'),
     [System.Text.Encoding]::UTF8
@@ -52,6 +53,13 @@ for ($i = $start + 1; $i -lt $lines.Count; $i++) {
     if ($lines[$i] -match '^- id: ') { $end = $i; break }
 }
 $rows = ($lines[$start..($end - 1)] -join "`n").TrimEnd() + "`n"
+# Never write profile passwords into a temp YAML or dump. The values are not
+# needed to validate YAML structure or patch resolution.
+$rows = [regex]::Replace(
+    $rows,
+    '(?m)^(\s*(?:password|sudoPassword|rootPassword)\s*:\s*).*$',
+    '$1''<redacted>'''
+)
 
 Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path (Join-Path $root 'node_modules') | Out-Null
@@ -64,16 +72,15 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 )
 Copy-Item -Recurse -Force $PluginRoot (Join-Path $root "node_modules\$pluginName")
 
-$patch = Join-Path $env:TEMP 'ascend310-patchcheck.yml'
+$patch = Join-Path $env:TEMP ("ascend310-patchcheck-" + [guid]::NewGuid().ToString('N') + '.yml')
 [System.IO.File]::WriteAllText($patch, $rows, $utf8)
 
 $dump = ''
-$dumpFile = Join-Path $env:TEMP 'ascend310-patchcheck-dump.txt'
-Remove-Item $dumpFile -Force -ErrorAction SilentlyContinue
+$dumpFile = Join-Path $env:TEMP ("ascend310-patchcheck-dump-" + [guid]::NewGuid().ToString('N') + '.txt')
 try {
     # `dsh` writes diagnostics on stderr; the file keeps them out of the console
     # so the composed tree can be inspected without mixed formatting.
-    & cmd /c "dsh --profile patchcheck --patch `"$patch`" --dump-config > `"$dumpFile`" 2>&1"
+    & cmd /c "dsh --profile $rootName --patch `"$patch`" --dump-config > `"$dumpFile`" 2>&1"
     if (Test-Path $dumpFile) {
         $dump = [System.IO.File]::ReadAllText($dumpFile, [System.Text.Encoding]::UTF8)
     }
@@ -102,9 +109,7 @@ foreach ($targetId in $targetIds) {
 }
 
 if ($failures.Count -gt 0) {
-    Set-Content (Join-Path $env:TEMP 'ascend310-patchcheck-dump.txt') -Value $dump -Encoding UTF8
-    Write-Error ("patch composition FAILED:`n  - " + ($failures -join "`n  - ") +
-        "`n  dump kept at $(Join-Path $env:TEMP 'ascend310-patchcheck-dump.txt')")
+    Write-Error ("patch composition FAILED:`n  - " + ($failures -join "`n  - "))
     exit 1
 }
 Write-Host "patch composition passed: $pluginName resolved, $($targetIds.Count) target rows carried from the real profile patch"

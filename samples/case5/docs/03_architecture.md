@@ -2,6 +2,22 @@
 
 本文件解释 Case 5 的两条数据路径如何共享同一套工程约束。实际安装和运行顺序见 [README](../README.md)；这里不重复板端命令。
 
+## 板端运行环境
+
+Case 5 的 Python 运行时统一使用板端已有 Conda 环境 `ascend`（Python 3.9.25），并在启动前设置：
+
+```bash
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+```
+
+- CANN、驱动、固件和系统库仍由板端拥有，不复制进 Conda 环境。
+- `base` 只用于系统诊断和明确排障，不作为案例服务、pytest 或模型脚本的默认环境。
+- 启动脚本 `scripts/run_*.sh` 和 USB 诊断脚本必须保持同一环境与 user-site 隔离。
+- 8T 与 20T 可以共用环境名称，但证据集独立记录，不能互相继承。
+
 ## 两条主线
 
 ```text

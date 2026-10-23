@@ -255,6 +255,12 @@ flowchart LR
 7. Do not automatically copy board-generated OM files back to the local
    controller. Copy them only on an explicit request, then verify SHA-256 and
    keep them ignored by Git.
+8. Case publication tests must acquire code from a public GitHub repository at
+   an exact commit and models from Hugging Face at an exact revision (using
+   `hf-mirror.com` by default on the board). Do not treat `scp`/`rsync` copies
+   of author-local source, checkpoints, ONNX/OM files, datasets, or tokenizers
+   as reproducible release evidence; an explicitly labeled offline bundle must
+   carry source, revision, bytes, SHA-256, and license.
 
 For a board-side CompNet campaign, use the candidate-specific commands rather
 than the legacy static model as a proxy:
@@ -273,6 +279,37 @@ python palmprint_benchmark.py evaluate --model compnet_tongji_600 \
 
 Run each eligible CompNet variant independently. Keep the resulting
 `reports/runs/` files on the board as evidence; they remain ignored by Git.
+
+## Unified Python environment
+
+All Ascend 310B cases use one user-owned conda environment:
+
+```text
+name: ascend
+Python: 3.9.25
+ABI: cpython-39-aarch64-linux-gnu
+```
+
+- Case services, tests, model scripts, and Web backends must run in `ascend`.
+- Do not fall back to `base` for case execution; `base` is limited to system
+  diagnosis and explicit troubleshooting.
+- Do not use `pip install --user`. Set `PYTHONNOUSERSITE=1` in case launch
+  scripts and tests so `~/.local` cannot silently satisfy dependencies.
+- CANN, NPU driver, firmware, and system tools remain board-owned and must not
+  be copied into the conda environment.
+- The debug plugin and `ascend310b-env-check` skill must validate the
+  environment name, Python/ABI, user-site isolation, PyACL import, and full
+  package coverage.
+- Keep case-specific environments only as rollback material until every case
+  passes on a matching NPU driver/CANN combination. After full acceptance,
+  generate a lock file, remove duplicate environments, and clean user-site
+  Python packages through a separately reviewed migration.
+- CANN 8.0.RC3 official installation documentation supports Python 3.7.x
+  through 3.10.x. This repository chooses the already validated Python 3.9.25
+  for stability; a passing local Python 3.11 experiment does not override the
+  official matrix.
+- 8T and 20T share the same environment name but retain independent board
+  evidence.
 
 ## Ascend 310B board deployment
 
@@ -303,7 +340,8 @@ Run each eligible CompNet variant independently. Keep the resulting
 
   ```bash
   source /usr/local/miniconda3/etc/profile.d/conda.sh
-  conda activate base
+  conda activate ascend
+  export PYTHONNOUSERSITE=1
   source /usr/local/Ascend/ascend-toolkit/set_env.sh
   cd ~/Documents/palmprint-recognition
   bash setup.sh
@@ -359,6 +397,10 @@ images in screenshots, issue reports, or source control.
   evidence. Use a two-digit numeric prefix and a descriptive ASCII slug, for
   example `00-document-index.md` or
   `02-device-deployment-and-acceptance-report.md`.
+- Keep only the frozen H1/frontmatter number (`第N章：`, `案例 N：`,
+  `附录 N：`). H2-H6 headings are semantic and do not repeat `1.`, `1.1`, or
+  `4.1`; VuePress and LaTeX generate section numbering. This also applies
+  inside sample `docs/`, whose filenames carry reading order.
 - Make every heading describe the content directly. Name a table's section for
   the data it contains, not with generic wording such as "results" or
   "migration". Audit headings after a structural rewrite.

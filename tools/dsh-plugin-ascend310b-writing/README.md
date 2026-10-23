@@ -15,7 +15,7 @@ DeepSeek Harness 插件（bundle）。
 | 跨产物检查 | `lib/checks.js` | 读 Markdown 之外的证据：`AGENTS.md` 冻结名表、LaTeX 构建日志、生成物与源的锚点差、Git 提交树 |
 | 工具链体检 | `lib/toolchain.js` + `lib/doctor.js` | 探测 bash/pandoc/latexmk/xelatex/python3/pnpm/node（含 Anaconda/conda），给按平台分类的安装命令，判断哪些能力可用 |
 | 平台适配 | `drivers/env-windows.mjs` + `drivers/env-linux.mjs` | Windows（Git Bash / WSL）与 POSIX 各自怎么起 shell、怎么翻译路径、怎么满足 `python3` |
-| 浏览器端 | `lib/client.js` | 侧边栏「写作」入口与面板：字数卡片、各分部进度、审计发现列表 |
+| 浏览器端 | `lib/client.js` | 侧边栏「写作」入口与紧凑工作区：概览、分部进度、代码文档、问题清单四个可切换视图，带问题搜索和只看问题筛选 |
 | 技能 | `skills/*/SKILL.md` | 总守门规则、theory/case/presentation/code docs 等专用写作 skill，并内置 `scientific-writing` 与 `nature-polishing`；`nature-shared` 是后者的支持目录 |
 | 组合 | `cordis.patch.yml` | 声明本包的 bundle patch，把 Host 行插入组合 |
 
@@ -32,7 +32,7 @@ DeepSeek Harness 插件（bundle）。
 | `ascend310b_writing_ci` | 读取最近一次 GitHub Pages 工作流运行、提交、失败步骤与日志 |
 | `ascend310b_writing_push_check` | 现在能不能推，以及哪一项只有人能确认 |
 | `ascend310b_writing_build` | 构建（走仓库自己的转换器），并在同一任务里核对产物 |
-| `ascend310b_writing_style` | 哪些句子读起来像产品宣传稿/AI 输出（只提示，不判定） |
+| `ascend310b_writing_style` | 哪些句子读起来像产品宣传稿/AI 输出（只做诊断，不代替润色） |
 | `ascend310b_writing_progress` | 篇幅和剩余工作量 |
 
 ## 内置学术写作 Skills
@@ -90,15 +90,17 @@ Copy-Item -Recurse -Force `
 - `ascend310b-writing-theory`：理论章节和附录理论内容；
 - `ascend310b-writing-case`：案例1至案例9；
 - `ascend310b-writing-presentation`：Marp 课件；
-- `ascend310b-writing-docs`：代码工程 README、`docs/`、API/部署/验证文档；
+- `ascend310b-writing-docs`：代码工程 README、`docs/`、API/部署/验证文档，以及每个 case 统一的 `docs/troubleshooting.md` 问题台账（测试设备、服务、模型或 UI 出问题后必须登记）；
 - `ascend310b-code-docs`：源码 API、CLI、docstring、README 和可运行示例；
-- `ascend310b-writing-academic`：claim-evidence-citation、方法、实验、结果和限制；
+- `ascend310b-writing-academic`：教材润色、去 AI 味、claim-evidence-citation、方法、实验、结果和限制，输出可替换正文与 Revision notes；
 - `ascend310b-curriculum-planning`：章节、案例、样例和课件的学习目标、先修和评估矩阵；
-- `ascend310b-writing-vuepress`：VuePress 页面、sidebar、路由和站点构建；
+- `ascend310b-writing-vuepress`：开源网页教材的主题、navbar、sidebar、base、frontmatter 和 GitHub Pages；
 - `ascend310b-writing-latex`：LaTeX/PDF、字体、锚点和构建日志；
 - `ascend310b-writing-markdown`：CommonMark/GFM、Markdownlint 和正文卫生；
 - `ascend310b-writing-dot`：Graphviz DOT 架构图、数据流图和程序流程图；
 - `ascend310b-writing`：跨对象共同规则和路由。
+
+教材、案例和课件是学生读的完成稿。`.dot` 路径、Graphviz 字体名、pt/dpi、画布自检和 `human-review: pending` 属于生产备注，只能留在写作 skill、仓库源文件和课件页脚 HTML 来源链接中，不能进入读者可见正文。
 
 ## 本地网页与人工验收
 
@@ -420,6 +422,7 @@ VuePress 发布前还要运行 `ascend310b_writing_page_layout`（或 `node scri
 | `sidebar-missing` | error | 正文必须出现在 `src/.vuepress/sidebar.ts` |
 | `empty-body` | error | 正文不得为空 |
 | `heading-jump` | warning | 标题层级不得跳跃 |
+| `heading-manual-number` | error | 教材 H2-H6 不得手写 `1.`、`1.1`、`4.1`；章节编号由站点/PDF 生成，按文件汇总 |
 | `trailing-whitespace` | warning | 行尾多余空白，且**已证明不影响渲染**（单空格 / 整行只有空格 / 下一行是空行或块级起点）；可安全删除 |
 | `hard-break-effective` | warning | 行尾 ≥2 个空格构成 Markdown 硬换行；附带同一列表的一致性证据（「另外 N 项都没有这样写」），要留要删由作者定 |
 | `tab-indent` / `crlf` / `no-final-newline` | warning | 行尾与换行卫生 |
@@ -433,6 +436,7 @@ VuePress 发布前还要运行 `ascend310b_writing_page_layout`（或 `node scri
 | `sample-path-missing` | error | 正文引用的 `samples/…`、`scripts/…`、`tools/…` 路径在仓库里找不到 |
 | `sample-path-generated` | info | 引用的是被 gitignore 的运行时产物，确认正文写清了怎么生成 |
 | `doc-code-drift` | warning | 被引用的代码文件在这段正文之后改过（只在推送门槛里跑，走近期 git 历史） |
+| `code-docs-manual-heading-number` | error | `samples/caseN/docs/` 与 case README 的 H2-H6 不得手写章节编号；文件名或标题层级负责顺序，按文件汇总 |
 
 **路径怎么解析**（这是这类检查最容易误报的地方）：`scripts/xxx.py` 在书里通常是相对于**案例自己的目录**，
 甚至相对于某个子工程。所以一个 token 命中以下任一条就算存在：仓库根目录；该文对应的 `samples/caseN`

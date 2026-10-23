@@ -36,36 +36,35 @@
 		<div class="cards">
 			<div class="card"><div class="label">芯片</div><div class="value">310B4</div></div>
 			<div class="card"><div class="label">档位</div><div class="value">8T</div></div>
-			<div class="card"><div class="label">健康</div><div class="value">Alarm</div></div>
-			<div class="card"><div class="label">温度</div><div class="value">79 ℃</div></div>
-			<div class="card"><div class="label">内存</div><div class="value">1993 / 15610 MB</div></div>
+			<div class="card"><div class="label">健康</div><div class="value">OK</div></div>
+			<div class="card"><div class="label">温度</div><div class="value">45 ℃</div></div>
+			<div class="card"><div class="label">内存</div><div class="value">2433 / 7564 MB</div></div>
 			<div class="card"><div class="label">CANN</div><div class="value">8.0.0</div></div>
 			<div class="card"><div class="label">驱动</div><div class="value">25.2.0</div></div>
-			<div class="card"><div class="label">固件</div><div class="value">未采集</div></div>
 		</div>
 	</div>
 	<div class="section">
 		<div>版本配套：<span class="badge">observed-match · observed-pass</span></div>
 		<div class="note">探测到的组合与仓库已记录的组合 orangepi-aipro-live-8t-cann8 一致：Orange Pi AI Pro（香橙派 AI Pro，hostname orangepiaipro） / Ascend310B4 / CANN 8.0.0 / 驱动 25.2.0。</div>
+		<div class="note">这是完整组合记录。</div>
 		<div class="note">本插件对有源板卡的一次只读探测记录：npu-smi 25.2.0，Health Alarm，温度 78C，内存 1896/15610 MB，/dev/davinci0 与 drv_davinci 均在，source CANN 后 import acl 成功、atc 位于 /usr/local/Ascend/ascend-toolkit/latest/bin/atc。设备层与 CANN 层为 observed-pass，模型加载、数值与性能仍是未验证。</div>
 	</div>
 	<div class="section">
 		<table>
 			<tr><th>芯片</th><td>310B4 / Ascend310B4</td></tr>
 			<tr><th>档位</th><td>8T</td></tr>
-			<tr><th>健康</th><td>Alarm</td></tr>
-			<tr><th>操作系统</th><td>Ubuntu 22.04.3 LTS 22.04.3 LTS (Jammy Jellyfish)</td></tr>
+			<tr><th>健康</th><td>OK</td></tr>
+			<tr><th>操作系统</th><td>Ubuntu 22.04.5 LTS 22.04.5 LTS (Jammy Jellyfish)</td></tr>
 			<tr><th>内核</th><td>5.10.0+</td></tr>
 			<tr><th>架构</th><td>aarch64</td></tr>
 			<tr><th>npu-smi</th><td>25.2.0</td></tr>
 			<tr><th>CANN</th><td>8.0.0</td></tr>
 			<tr><th>驱动</th><td>25.2.0</td></tr>
-			<tr><th>固件</th><td>未采集</td></tr>
-			<tr><th>Python</th><td>/usr/local/miniconda3/bin/python3 3.9.2</td></tr>
+			<tr><th>Python</th><td>/usr/local/miniconda3/bin/python 3.9.2</td></tr>
 			<tr><th>aclImport（面板取值）</th><td>ok</td></tr>
-			<tr><th>aclImportSourced（source CANN 后）</th><td>ok</td></tr>
-			<tr><th>aclImportBare（裸 SSH）</th><td>ok</td></tr>
-			<tr><th>ATC</th><td>ATC start working now, please wait for a moment.</td></tr>
+			<tr><th>aclImportSourced（source CANN 后）</th><td>未采集</td></tr>
+			<tr><th>aclImportBare（裸 SSH）</th><td>未采集</td></tr>
+			<tr><th>ATC</th><td>8.0.0</td></tr>
 			<tr><th>设备节点</th><td>present</td></tr>
 		</table>
 	</div>
@@ -84,9 +83,9 @@
 	</div>
 	<div class="section">
 		<table>
-			<tr><th>样例索引</th><td>15 条（有入口 7 条，有测试命令 5 条）</td></tr>
-			<tr><th>已识别路径</th><td>atc-conversion、camera-v4l2、dvpp-video、framework-migration、npu-service、quantization</td></tr>
-			<tr><th>探测时间</th><td>2026-10-17T09:53:36+08:00</td></tr>
+			<tr><th>样例索引</th><td>15 条（有入口 7 条，有测试命令 4 条）</td></tr>
+			<tr><th>已识别路径</th><td>atc-conversion、camera-v4l2、dvpp-video、framework-migration、npu-service、performance、pyacl-inference、quantization</td></tr>
+			<tr><th>探测时间</th><td>2026-10-17T09:40:00+08:00</td></tr>
 		</table>
 	</div>
 </div>

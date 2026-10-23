@@ -65,7 +65,7 @@ footer: "案例 3：智能电子琴"
 
 设备页只查看和测试资源，不参与音乐生成。三条链共享NPU与音频设备，但状态和验收协议不同。
 
-<div class="source">教材：<a href="../experiment/case3.md#系统功能"><code>src/experiment/case3.md</code>「系统功能」</a></div>
+<div class="source">教材：<a href="../experiment/case3.md#src-experiment-case3-capabilities"><code>src/experiment/case3.md</code>「系统功能」</a></div>
 
 <!--
 先让学生建立三种任务模型。实时演奏关注毫秒级反馈，文件渲染关注整曲上下文，DDSP-VST关注实体音频双工链路。
@@ -79,7 +79,7 @@ footer: "案例 3：智能电子琴"
 
 ![案例3开发电脑与Ascend 310B开发板边界](../experiment/img3/case3-runtime-boundary.png)
 
-<div class="source">图片：<a href="../experiment/img3/case3-runtime-boundary.png"><code>src/experiment/img3/case3-runtime-boundary.png</code></a>；出处：<a href="../experiment/case3.md#开发电脑与开发板的职责边界"><code>src/experiment/case3.md</code>「开发电脑与开发板的职责边界」</a></div>
+<div class="source">图片：<a href="../experiment/img3/case3-runtime-boundary.png"><code>src/experiment/img3/case3-runtime-boundary.png</code></a>；出处：<a href="../experiment/case3.md#src-experiment-case3-runtime-boundary"><code>src/experiment/case3.md</code>「开发电脑与开发板的职责边界」</a></div>
 
 <!--
 左侧负责源码、固定revision、ONNX检查与前端构建；右侧负责ATC、OM、PyACL、音频和FastAPI。不要把CANN或实体音频操作搬到开发电脑。
@@ -101,7 +101,7 @@ footer: "案例 3：智能电子琴"
 
 模型名称相近，不表示输入、状态或输出合同可以互相替代。
 
-<div class="source">教材：<a href="../experiment/case3.md#三套网络对比"><code>src/experiment/case3.md</code>「三套网络对比」</a></div>
+<div class="source">教材：<a href="../experiment/case3.md#src-experiment-case3-model-comparison"><code>src/experiment/case3.md</code>「三套网络对比」</a></div>
 
 <!--
 重点比较时间模型与上下文。MIDI-DDSP需要完整前后文，不能直接塞入4ms实时按键路径；DDSP-VST只处理单音输入。
@@ -121,7 +121,7 @@ footer: "案例 3：智能电子琴"
 
 MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM，不能混写。
 
-<div class="source">教材：<a href="../experiment/case3.md#模型转换与-ascend-部署"><code>src/experiment/case3.md</code> §6</a></div>
+<div class="source">教材：<a href="../experiment/case3.md#src-experiment-case3-model-deployment"><code>src/experiment/case3.md</code> §6</a></div>
 
 <!--
 上游来源决定迁移方法。把循环状态显式化，并在连续多帧上对齐输出，是两类TFLite模型进入ONNX和OM前的关键。
@@ -139,7 +139,7 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 - 停止、异常和设备断开都释放模型、音频与MIDI资源。
 - 浏览器只提交目录ID和有界参数，服务端解析真实路径。
 
-<div class="source">教材：<a href="../experiment/case3.md#资源互斥与实时钢琴"><code>src/experiment/case3.md</code> §7.2、§7.4</a></div>
+<div class="source">教材：<a href="../experiment/case3.md#src-experiment-case3-resource-coordinator"><code>src/experiment/case3.md</code> §7.2、§7.4</a></div>
 
 <!--
 资源锁不是性能优化，而是正确性条件。多个任务同时打开OM或音频设备会产生无法归因的状态。
@@ -166,7 +166,7 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 - 历史派生图：证明当时的功能布局，不冒充本轮音频、时延或模型验收。
 - 两组都不替代API、OM、音频设备和听感证据。
 
-<div class="source">本轮清单：`capture-manifest.json`；历史派生清单：<a href="screenshots/historical-derivations.json"><code>historical-derivations.json</code></a>；教材：<a href="../experiment/case3.md#逐页界面与操作说明"><code>src/experiment/case3.md</code> §9</a></div>
+<div class="source">本轮清单：`capture-manifest.json`；历史派生清单：<a href="screenshots/historical-derivations.json"><code>historical-derivations.json</code></a>；教材：<a href="../experiment/case3.md#src-experiment-case3-ui-guide"><code>src/experiment/case3.md</code> §9</a></div>
 
 <!--
 先总说明再展示。学生必须把“界面可用”与“模型、音频、时延可用”分开，不能根据截图填写性能或音质结论。后续当前截图是唯一本轮8T证据，历史图不得改变这个边界。
@@ -285,7 +285,7 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 
 两个滚帘不共享状态，也不能互相替代。
 
-<div class="source">教材：<a href="../experiment/case3.md#两个钢琴卷帘的时间模型"><code>src/experiment/case3.md</code> §8.2</a></div>
+<div class="source">教材：<a href="../experiment/case3.md#src-experiment-case3-canvas"><code>src/experiment/case3.md</code> §8.2</a></div>
 
 <!--
 实时卷帘服务于现场反馈，文件卷帘服务于整曲定位。引擎和状态必须分开，否则刷新或回放会造成错误轨迹。
@@ -303,7 +303,7 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 - 设备丢失时明确停止，不静默切换到另一台设备。
 - 蓝牙延迟属于音频链路，不能归因于NPU推理。
 
-<div class="source">教材：<a href="../experiment/case3.md#实时演奏--midi-键盘"><code>src/experiment/case3.md</code> §9.2、§9.10</a></div>
+<div class="source">教材：<a href="../experiment/case3.md#src-experiment-case3-ui-midi-keyboard"><code>src/experiment/case3.md</code> §9.2、§9.10</a></div>
 
 <!--
 设备路径必须显式。尤其PulseAudio monitor只是回放监视，不是麦克风；自动改路会破坏实验归因。
@@ -324,7 +324,7 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 
 客户端提交目录ID与有界参数，服务端负责真实模型和设备解析。
 
-<div class="source">教材：<a href="../experiment/case3.md#通信语义"><code>src/experiment/case3.md</code> §7.4</a></div>
+<div class="source">教材：<a href="../experiment/case3.md#src-experiment-case3-api"><code>src/experiment/case3.md</code> §7.4</a></div>
 
 <!--
 状态快照与事件流配合使用。断线恢复先读快照，再接续事件；浏览器永远不提交任意文件路径或设备命令。
@@ -345,7 +345,7 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 
 本课1张本轮截图与6张历史派生图只覆盖第一层。实时延迟、音频质量和模型一致性仍要独立记录。
 
-<div class="source">教材：<a href="../experiment/case3.md#从零复现实验"><code>src/experiment/case3.md</code> §10</a></div>
+<div class="source">教材：<a href="../experiment/case3.md#src-experiment-case3-reproduction"><code>src/experiment/case3.md</code> §10</a></div>
 
 <!--
 四个证据层不能互相替代。尤其HTTP 200或页面动画不能证明OM推理和实体音频输出。
@@ -363,7 +363,7 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 - 日志不保留用户音频、模型路径和完整环境变量。
 - 发布截图时同时记录页面、视口和证据边界。
 
-<div class="source">AGENTS约束：<a href="../../AGENTS.md#documentation-workflow"><code>AGENTS.md</code>「Documentation workflow」</a>；教材：<a href="../experiment/case3.md#逐页界面与操作说明"><code>src/experiment/case3.md</code> §9</a></div>
+<div class="source">AGENTS约束：<a href="../../AGENTS.md#documentation-workflow"><code>AGENTS.md</code>「Documentation workflow」</a>；教材：<a href="../experiment/case3.md#src-experiment-case3-ui-guide"><code>src/experiment/case3.md</code> §9</a></div>
 
 <!--
 本轮截图隐藏系统状态条；历史图使用物理裁切/脱敏派生文件，原图不再直链。两类截图都没有真实音频内容；发布新增截图时仍要重新核对设备和隐私字段。
@@ -385,7 +385,7 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 
 完成标准是能说明每条证据只证明了哪一层，不能把既有UI验收图扩展成当前8T音频或时延结论。
 
-<div class="source">作业：<a href="../experiment/case3.md#从零复现实验"><code>src/experiment/case3.md</code> §10</a>；样例：<a href="../../samples/case3/doc/02-webui.md"><code>samples/case3/doc/02-webui.md</code></a></div>
+<div class="source">作业：<a href="../experiment/case3.md#src-experiment-case3-reproduction"><code>src/experiment/case3.md</code> §10</a>；样例：<a href="../../samples/case3/docs/02-webui.md"><code>samples/case3/docs/02-webui.md</code></a></div>
 
 <!--
 收尾再次强调“既有UI截图”标签。任何模型、音频或时延结论都需要本轮设备、命令、原始日志和对应验收协议。

@@ -23,8 +23,8 @@ When H.265 is selected:
 - Reference runtime is the Ascend 310B host reachable as `310`.
 - Remote project path:
   `/home/HwHiAiUser/Documents/Ascend310/samples/chapter6/WebRTC`
-- Remote Python:
-  `/home/HwHiAiUser/.conda/envs/npu/bin/python`
+- Remote Python: the interpreter from the validated conda environment `ascend`
+  (resolve it with `command -v python` after activation).
 - CANN environment:
   `source /usr/local/Ascend/ascend-toolkit/set_env.sh`
 - WebRTC VENC validation uses the same Orange Pi AI Pro `20241128` system and
@@ -41,10 +41,13 @@ Run on `310`:
 
 ```bash
 cd ~/Documents/Ascend310/samples/chapter6/WebRTC
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-/home/HwHiAiUser/.conda/envs/npu/bin/python -V
-/home/HwHiAiUser/.conda/envs/npu/bin/python -c "import aiortc, av, aiohttp, numpy; print(aiortc.__version__, av.__version__)"
-/home/HwHiAiUser/.conda/envs/npu/bin/python -c "from aiortc import RTCRtpSender; print(RTCRtpSender.getCapabilities('video').codecs)"
+python -V
+python -c "import aiortc, av, aiohttp, numpy, acl; print(aiortc.__version__, av.__version__)"
+python -c "from aiortc import RTCRtpSender; print(RTCRtpSender.getCapabilities('video').codecs)"
 ```
 
 Expected outcome:
@@ -178,8 +181,11 @@ Run on `310`:
 
 ```bash
 cd ~/Documents/Ascend310/samples/chapter6/WebRTC
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-/home/HwHiAiUser/.conda/envs/npu/bin/python server.py \
+python server.py \
   --host 0.0.0.0 \
   --port 8080 \
   --source dvpp_camera \

@@ -6,12 +6,17 @@
 
 ## 运行前提
 
-在 Ascend 310B 上先加载 CANN 环境：
+在 Ascend 310B 上先激活统一 Python 环境并加载 CANN：
 
 ```bash
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd ~/Documents/Ascend310/samples/chapter8
-PY=/home/HwHiAiUser/.conda/envs/npu/bin/python
+PY="$(command -v python)"
+python -V
+python -c "import acl; print(acl.__file__)"
 ```
 
 第 8 章默认使用 Hugging Face 仓库 `zhouxzh/resnet18_tiny_imagenet` 中的 OM 模型。首次运行前先下载到本章目录：

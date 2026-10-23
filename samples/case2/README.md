@@ -61,7 +61,7 @@ case2/
 
 ## 代码入口
 
-### 1. detection 入口
+### detection 入口
 
 `scripts/detection_app.py` 是当前仓库最核心的运行入口，负责完成整条检测链路：
 
@@ -77,7 +77,7 @@ case2/
 * `cpu`：使用 ONNXRuntime 加载 `.onnx` 模型
 * `npu`：使用 Ascend ACL 加载 `.om` 模型
 
-### 2. tracking 入口
+### tracking 入口
 
 `scripts/tracking_app.py` 建立在 detection 链路之上。它会先执行 SSD 检测，再把检测框转换为跟踪器输入，最后输出带有轨迹 ID 的结果。
 
@@ -85,22 +85,27 @@ case2/
 
 * 复用 detection 的模型加载和视频输入流程
 * 将每帧检测结果转成 `[x1, y1, x2, y2, score, class_id]` 格式
-* 使用简化版 DeepSORT 风格跟踪器完成关联与轨迹维护
+* 使用简化版 IoU+Kalman 跟踪器完成关联与轨迹维护；没有外观 embedding
 * 绘制目标 ID、类别、分数和运动拖尾
+
+## 工程文档
+
+完整的架构、检测、跟踪、模型转换、运行和问题台账见 [docs/README.md](docs/README.md)。
 
 ## 快速开始
 
-### 1. 安装依赖
+### 安装依赖
 
 仓库根目录下的依赖文件名当前是 `requirements.txt`。
 
 可直接执行：
 
 ```bash
-conda create -n npu
-conda activate npu
-conda install python=3.11
-pip install -r requirementstxt
+# 如果统一 ascend 环境尚未创建
+conda create -n ascend python=3.9.25
+conda activate ascend
+export PYTHONNOUSERSITE=1
+python -m pip install -r requirements.txt
 ```
 
 其中主要依赖包括：
@@ -110,9 +115,9 @@ pip install -r requirementstxt
 * `onnxruntime`，仅 CPU 推理需要
 * `scipy`，tracking 的匈牙利匹配需要
 
-如果你要运行 NPU 模式，还需要额外安装 Ascend ACL Python 运行时。
+NPU 模式不通过 pip 安装 ACL；它由板端 CANN Toolkit 提供。启动进程必须自行 source `set_env.sh`。
 
-### 2. 准备模型
+### 准备模型
 
 模型目录为 `models/`。当前模型下载脚本默认使用 Hugging Face 仓库 `zhouxzh/SSDLite320`，该仓库目前发布的是 `.onnx` 模型；如果要运行 NPU 模式，需要先在 Ascend 310B 设备上把 `.onnx` 转成 `.om`。
 
@@ -157,7 +162,7 @@ python scripts/convert_onnx_to_om.py --soc-version Ascend310B4
 
 如果只想查看转换命令而不执行 ATC，可使用 `--dry-run`。
 
-### 3. 准备测试视频
+### 准备测试视频
 
 如果没有 USB 摄像头，可以使用 OpenCV 官方提供的测试视频进行演示。
 

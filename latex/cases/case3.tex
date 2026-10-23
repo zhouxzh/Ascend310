@@ -765,7 +765,7 @@ ONNX 首先按照 \href{https://onnx.ai/onnx/}{ONNX
 尤其需要考察全局状态与逐声部状态的长期累积误差；MIDI-DDSP
 需要保持双向上下文、自回归采样和整曲统计；DDSP-VST 则需要联合验证
 Feature 与 Control
-的控制周期。详细转换命令、张量夹具和报告格式见\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/03-om-deployment.md}{模型与
+的控制周期。详细转换命令、张量夹具和报告格式见\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/03-om-deployment.md}{模型与
 OM 部署文档}。
 
 \subsection{运行时模型边界}\label{src-experiment-case3-runtime-model-boundary}
@@ -868,7 +868,7 @@ WebSocket 事件 & 音符边沿、踏板变化、作业进度、设备变化和�
 大型产物采用独立传输，避免混入控制消息 \\
 \end{longtable}
 
-通信接口的核心约束是：客户端提交目录标识和有界参数，服务端解析实际模型与设备；实时事件负责同步变化，状态快照负责断线后的重新对齐。具体端点和字段属于实现合同，见\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/02-webui.md}{WebUI
+通信接口的核心约束是：客户端提交目录标识和有界参数，服务端解析实际模型与设备；实时事件负责同步变化，状态快照负责断线后的重新对齐。具体端点和字段属于实现合同，见\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/02-webui.md}{WebUI
 与 API
 指南}。由于服务直接控制音频与模型资源，部署范围应限定在可信网络中。
 
@@ -1570,9 +1570,9 @@ ONNX。进入 ATC
 
 ONNX 到 OM 的转换和 PyACL 验证必须在真实 Ascend
 开发板上完成，开发电脑不安装或模拟
-CANN。各模型族的输入形状、循环状态和精度判据不同，应依据\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/03-om-deployment.md}{模型与
+CANN。各模型族的输入形状、循环状态和精度判据不同，应依据\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/03-om-deployment.md}{模型与
 OM
-部署文档}与\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/04-piano-ddsp.md}{Piano-DDSP
+部署文档}与\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/04-piano-ddsp.md}{Piano-DDSP
 合同}执行，并保留足以复核图变换和数值对照的实验记录。
 
 \subsection{部署、原子切换和启动}\label{src-experiment-case3-deploy}
@@ -1718,7 +1718,7 @@ source/sink、线程退出和资源锁 &
 profile & 使用板端已有设施；缺少系统组件时报告，不在部署中安装 \\
 \end{longtable}
 
-更多板端日志、ATC/OOM、音频和兼容性案例见\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/11-troubleshooting.md}{测试故障排查记录}与\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/06-audio-output.md}{音频输出说明}。
+更多板端日志、ATC/OOM、音频和兼容性案例见\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/11-troubleshooting.md}{测试故障排查记录}与\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/06-audio-output.md}{音频输出说明}。
 
 \subsection{测试矩阵}\label{src-experiment-case3-test-matrix}
 
@@ -1858,26 +1858,26 @@ NPU；其二，界面刷新、设备切换和文件索引不会直接改变正�
   \href{https://github.com/zhouxzh/Ascend310/tree/main/samples/case3}{Case3
   代码总览}
 \item
-  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/01-overview.md}{系统分层设计}
+  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/01-overview.md}{系统分层设计}
 \item
-  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/02-webui.md}{WebUI、操作与
+  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/02-webui.md}{WebUI、操作与
   API}
 \item
-  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/04-piano-ddsp.md}{Piano-DDSP
+  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/04-piano-ddsp.md}{Piano-DDSP
   模型与实时合同}
 \item
-  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/13-midi-ddsp-vs-ddsp-vst.md}{MIDI-DDSP
+  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/13-midi-ddsp-vs-ddsp-vst.md}{MIDI-DDSP
   与 DDSP-VST 对比}
 \item
-  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/05-midi-ddsp-realtime.md}{MIDI-DDSP
+  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/05-midi-ddsp-realtime.md}{MIDI-DDSP
   实时与离线边界}
 \item
-  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/03-om-deployment.md}{模型与
+  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/03-om-deployment.md}{模型与
   OM 部署}
 \item
-  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/06-audio-output.md}{音频输出与设备边界}
+  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/06-audio-output.md}{音频输出与设备边界}
 \item
-  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/doc/11-troubleshooting.md}{测试故障排查}
+  \href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/11-troubleshooting.md}{测试故障排查}
 \end{itemize}
 
 \subsection{总结}\label{src-experiment-case3-summary}

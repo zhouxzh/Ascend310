@@ -3,6 +3,14 @@ set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${root_dir}"
+
+env_file="${ASCEND_EDGE_CHAT_ENV_FILE:-${root_dir}/.env}"
+if [[ -r "${env_file}" ]]; then
+  set -a
+  source "${env_file}"
+  set +a
+fi
+
 : "${ASCEND_EDGE_CHAT_DATA_DIR:?set an absolute ASCEND_EDGE_CHAT_DATA_DIR}"
 conda_profile="${ASCEND_EDGE_CHAT_CONDA_PROFILE:-/usr/local/miniconda3/etc/profile.d/conda.sh}"
 conda_env="${ASCEND_EDGE_CHAT_CONDA_ENV:?set ASCEND_EDGE_CHAT_CONDA_ENV to the validated MindSpore environment}"

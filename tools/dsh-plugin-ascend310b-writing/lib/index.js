@@ -445,10 +445,11 @@ export function apply(ctx, config) {
 					type: 'object',
 					additionalProperties: false,
 					properties: {
+						available: { type: 'boolean', required: true },
 						text: { type: 'string', required: true },
 						ok: { type: 'boolean', required: true },
 						issues: { type: 'array', required: true, items: { type: 'string' } },
-						results: { type: 'array', required: true, items: { type: 'object' } }
+						results: { type: 'array', required: true, items: { type: 'object', additionalProperties: true } }
 					}
 				},
 				render: (_args, value) => [{ type: 'text', text: value.text }]
@@ -854,8 +855,9 @@ export function apply(ctx, config) {
 				'元话语 (telling the reader what you are about to say) and 对话残留 (chat phrasing that leaked into the ' +
 				'manuscript), and also reports paragraph/sentence shape and paired constructions. Every hit is a ' +
 				'candidate for a human to read once — none of it is an error, nothing here blocks a push, and a phrase ' +
-				'may be exactly right in its own sentence. Use it when asked to 润色 or 去 AI 味, then rewrite following ' +
-				'the skill and re-run ascend310b_writing_audit to confirm the structure still holds.',
+				'may be exactly right in its own sentence. This is a diagnostic scan, not a polisher: when asked to ' +
+				'润色 or 去 AI 味, load the textbook polishing protocol in ascend310b-writing-academic, produce ' +
+				'replaceable prose and Revision notes, then re-run ascend310b_writing_audit.',
 			parameters: {
 				scope: SCOPE_PARAMETER,
 				root: ROOT_PARAMETER

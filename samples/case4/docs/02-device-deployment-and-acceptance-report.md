@@ -1,16 +1,17 @@
 # 02 - 设备部署与人工功能验收
 
-## 1. 设备边界
+## 设备边界
 
 目标设备为 Ascend 310B4 / 8T。服务通过手动激活 conda/CANN 后启动，板端不需要 Node.js，也不会自动安装依赖、下载数据、转换模型或构建 EDCC。
 
 源码包和板端资产包分开同步。OM、数据集、模板和原始报告不进入 Git；同步源码时不使用 `rsync --delete`。
 
-## 2. 手动启动
+## 手动启动
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd <release-root>
 export PALMPRINT_ROOT="$PWD"
@@ -36,7 +37,7 @@ curl --fail http://127.0.0.1:7860/
 
 `bootstrap` 在 manual_test profile 应返回 CCNet 和五个 CompNet，均为 `npu/mixed_fp16`；CompNet 的状态必须包含 `manual_test_pending=true`。
 
-## 3. HTTP 和模板功能
+## HTTP 和模板功能
 
 逐模型执行以下闭环：
 
@@ -56,7 +57,7 @@ find "$PALMPRINT_ROOT/data/captures" -type f
 
 同步源码时必须排除 `data/` 和 `reports/`。切换发行目录后若要继续内测，人工复制整个 `data/` 目录；程序不会自动迁移或删除历史图片。
 
-## 4. 触摸屏和前端
+## 触摸屏和前端
 
 在 1280×720、1024×768、375×812 三种尺寸检查：
 
@@ -66,11 +67,13 @@ find "$PALMPRINT_ROOT/data/captures" -type f
 - 刷新、返回、关闭和错误提示可触摸操作；
 - API 不可用时显示空服务状态，不显示伪造模型。
 
-## 5. 摄像头
+## 摄像头
 
 通过 `/api/cameras` 确认节点和实际分辨率，优先使用 1280×720 MJPG。连续预览至少 100 帧，记录首帧时间、稳定帧间隔和实际输出尺寸；拍照识别后关闭预览，确认设备释放，再重新打开一次。摄像头切换、分辨率切换和浏览器刷新必须验证新的预览会话不会被旧请求关闭；物理热插拔后还要验证设备列表刷新、句柄自动重建和再次打开。
 
-## 6. 人工测试记录
+aarch64 上 `struct v4l2_format` 的格式 union 按 8 字节对齐，自动发现必须从偏移 8 读取 width/height，而不是从 buffer-type 后的偏移 4 读取。该偏移错误会让真实 USB 摄像头被误判为非视频节点；完整复现和回归见 [测试问题台账](05-troubleshooting.md#case4-iss-20261023-01aarch64-v4l2-格式偏移导致真实摄像头被过滤)。
+
+## 人工测试记录
 
 每个模型单独记录：
 
@@ -87,7 +90,7 @@ find "$PALMPRINT_ROOT/data/captures" -type f
 
 使用合成 ROI 或匿名测试图，不保存真实掌纹图像到源码仓库。
 
-## 7. 常见问题
+## 常见问题
 
 - PyACL 不可用：重新加载同一 shell 的 conda/CANN，确认 `import acl`。
 - 模型不在列表：确认 `PALMPRINT_PROFILE=manual_test`、registry、OM SHA 和 bootstrap。
@@ -96,11 +99,11 @@ find "$PALMPRINT_ROOT/data/captures" -type f
 - ACL 异常退出、设备 reset 或服务意外退出：停止当前测试，保存时间/PID/模型/报告摘要，重启当前版本或回退 CCNet；不升级版本。
 - `Health: Alarm`：仅记录设备状态，不单独判断模型或程序结果。
 
-## 8. 当前阶段结论
+## 当前阶段结论
 
 本文件定义人工测试方法，不宣称五个 CompNet 已通过稳定性或跨域正式验收。当前版本冻结；人工测试出现问题时先记录和回退，下一版本另行规划。
 
-## 9. 全候选板端测试
+## 全候选板端测试
 
 板端测试目标为 Ascend 310B4 / 8T，当前开发板地址为 `192.168.8.178`。本地控制器不得运行 PyACL、ATC、`npu-smi` 或摄像头测试；必须在已激活 conda/CANN 的板端 shell 中执行。
 

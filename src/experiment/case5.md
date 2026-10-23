@@ -11,9 +11,9 @@
 | Hantek 固定 DFT | 核心实验 | `CAL` 连通、两通道数据帧合同、固定窗口、真实 OM 频谱和会话追溯 |
 | RTL-SDR 时频检测 | 扩展实验 | CU8 采集、时频预处理、OM 张量合同和主机流水线预算；不包括调制类别准确率 |
 
-## 1. 从波形到可解释事件 {#src-experiment-case5-overview}
+## 从波形到可解释事件 {#src-experiment-case5-overview}
 
-### 1.1 本章要回答的学习问题 {#src-experiment-case5-outcomes}
+### 本章要回答的学习问题 {#src-experiment-case5-outcomes}
 
 设采集系统在一段时间内获得样本 $x[n]$。仅显示 $x[n]$ 时，读者只能观察幅值随时间变化；若希望说明“何时出现了某一频率成分”或“哪一段频带包含一个候选信号”，还必须定义分析窗口、频率坐标、模型输入和结果回溯关系。本章用下列问题组织学习：
 
@@ -25,7 +25,7 @@
 
 完成本章后，读者应能用自己的话说明输入窗口、CPU/NPU 分工、模型输出、实时预算和证据边界；能完成一条安全的 Hantek 固定 DFT 实验，并能在已有 `accepted` manifest 的开发板上开展 RTL-SDR 扩展实验。
 
-### 1.2 证据等级与实验边界 {#src-experiment-case5-runtime-boundary}
+### 证据等级与实验边界 {#src-experiment-case5-runtime-boundary}
 
 教学实验中的结论必须与证据相称。当前 Hantek 记录证明了 CH1 的 `CAL` 方波连通与固定 DFT OM 界面；Little Bee 的真实 CH2 接入、幅相标定和双通道测量验收仍待完成。RTL-SDR 记录证明了接天线条件下的连续采集、时频预处理与 NPU 推理流水线；无标签真实 IQ 不能推出调制识别准确率。
 
@@ -38,9 +38,9 @@
 
 本地开发电脑用于 `pytest`、ONNX 图和 NumPy 参考；Ascend 310B 才用于 ATC、OM、真实采集和 NPU 延迟；Hantek/Little Bee 与 RTL-SDR 才提供真实模拟波形或 IQ。这个边界不是流程负担，而是防止把模拟测试写成硬件验收的前提。
 
-## 2. 实验器材、接线与安全 {#src-experiment-case5-hardware}
+## 实验器材、接线与安全 {#src-experiment-case5-hardware}
 
-### 2.1 Hantek 采集与扩展测量 {#src-experiment-case5-hantek-bom}
+### Hantek 采集与扩展测量 {#src-experiment-case5-hantek-bom}
 
 | 器材 | 本案例中的用途 |
 | --- | --- |
@@ -67,7 +67,7 @@
 
 *图 5-2 `CAL` 连通时的 PulseView 界面示例；CH2 当时没有作为已标定电流通道使用。该图只说明最小采集基线，不能替代会话记录或计量标定。*
 
-### 2.2 RTL-SDR 实验 {#src-experiment-case5-rtl-bom}
+### RTL-SDR 实验 {#src-experiment-case5-rtl-bom}
 
 RTL-SDR 主线至少需要一只受 `rtl_sdr` 工具支持的接收机，以及与实验频段匹配的天线或受控线缆。当前板端记录使用 RTL-SDR Blog V4，但程序的核心合同是 CU8 复数 IQ，并不把部署包绑定到某一接收机销售型号。
 
@@ -80,9 +80,9 @@ RTL-SDR 主线至少需要一只受 `rtl_sdr` 工具支持的接收机，以及�
 
 中心频率、增益和 PPM 都是接收配置，不是校准结论。某个地点在 100 MHz 使用 40.2 dB 增益没有明显字节级削顶，并不意味着其他天线、频率和环境也应采用相同增益。
 
-## 3. 读懂时域、频域和复数 IQ {#src-experiment-case5-signal-theory}
+## 读懂时域、频域和复数 IQ {#src-experiment-case5-signal-theory}
 
-### 3.1 从一段波形得到什么 {#src-experiment-case5-time-domain}
+### 从一段波形得到什么 {#src-experiment-case5-time-domain}
 
 设一个窗口包含 $N$ 个样本 $x[n]$。均值描述波形的直流偏置：
 
@@ -110,7 +110,7 @@ $$
 
 均值可用于观察偏置，原始 RMS 适合比较窗口整体幅值，AC RMS 则对应去直流后的交流成分，峰峰值对脉冲和削顶更敏感。当前 `CaptureProcessor` 已经对最新采集块计算每路的原始 `mean`、`rms` 和 `peak_to_peak`，而送入 OM 的完整分析窗口会另行去直流。Hantek 工作区和 `analysis.jsonl` 尚未持久化这些统计量，因此本章不把它们列为已经完成的端到端功能。
 
-### 3.2 窗口长度决定观察尺度 {#src-experiment-case5-window-resolution}
+### 窗口长度决定观察尺度 {#src-experiment-case5-window-resolution}
 
 采样率为 $f_s$、窗口包含 $N$ 点时，窗口时间跨度和 DFT 频率间隔分别为：
 
@@ -128,7 +128,7 @@ Hantek 主线固定为由驱动读回并与 OM 合同一致的 $f_s=1\,000\,000\
 
 *图 5-3 采样窗口的尺度取舍。Hantek 当前合同把 $f_s=1$ MS/s 和 $N=10\,000$ 固定为 10 ms 与 100 Hz；改变任一量都要求重新审查窗口预算和模型合同。图源见 `img5/case5-sampling-window-resolution.dot`。*
 
-### 3.3 为什么要去直流和加窗 {#src-experiment-case5-window-function}
+### 为什么要去直流和加窗 {#src-experiment-case5-window-function}
 
 Hantek 数据在进入 OM 前先执行逐通道去直流：
 
@@ -152,7 +152,7 @@ $$
 
 界面将它标注为“相对 $1\ \mathrm{V}^2$，未校准”。它不是 dBm、dBFS，也不应在未完成测量链标定时称为标准 dBV。
 
-### 3.4 实值波形与复数 IQ {#src-experiment-case5-complex-iq}
+### 实值波形与复数 IQ {#src-experiment-case5-complex-iq}
 
 Hantek 的每个通道都是实值时间序列。对实值信号，正频率和负频率互为共轭，因此仪表盘只显示单边频谱。
 
@@ -176,9 +176,9 @@ $$
 
 *图 5-5 IQ 到时频图的映射。2.048 MS/s 下，1024 点的一行覆盖 0.5 ms，频率 bin 间隔为 2 kHz；纵轴经过 `fftshift` 和上下翻转，图像顶端对应中心频率上方约 $f_s/2$。这是当前实现的名义频率坐标，尚不构成射频频率标定。图源见 `img5/case5-iq-to-spectrogram-mapping.dot`。*
 
-## 4. 双主线系统架构 {#src-experiment-case5-architecture}
+## 双主线系统架构 {#src-experiment-case5-architecture}
 
-### 4.1 先划清两种 OM 的计算边界 {#src-experiment-case5-data-flow}
+### 先划清两种 OM 的计算边界 {#src-experiment-case5-data-flow}
 
 这张图解决“同样部署为 OM 是否就同样属于人工智能”的问题。两条主线都把固定形状张量交给 Ascend 310B，但 Hantek 的图只实现预先写死的 DFT 投影；RTL-SDR 的图才包含由训练确定的卷积、特征融合和检测参数。
 
@@ -192,7 +192,7 @@ Hantek 路径首先把具体驱动返回值转换为公共 `BridgeFrameV1`。从
 
 RTL-SDR 路径不复用双通道电压帧，因为它面对的是复数 IQ 和第三方模型合同。它使用 `CapturedIqBatch` 保留批次序号、原始样本偏移、主机接收时间和分阶段耗时，再由 `RtlSdrService` 统一服务 CLI 和 Qt 工作区。
 
-### 4.2 三种模型合同不能混用 {#src-experiment-case5-model-contracts}
+### 三种模型合同不能混用 {#src-experiment-case5-model-contracts}
 
 | 路径 | 输入 | 核心 NPU 任务 | 输出与用途 |
 | --- | --- | --- | --- |
@@ -202,7 +202,7 @@ RTL-SDR 路径不复用双通道电压帧，因为它面对的是复数 IQ 和�
 
 第一种合同驱动 Hantek 频谱与瀑布。第二种合同只用于理解复数 IQ、验证 NPU DFT 和比较 CPU/NPU 算法，不被正式 SDR 工作区调用。第三种合同才是当前 RTL-SDR 正式界面的检测路径，其中 CPU FFTW 生成模型规定的 Blackman 时频输入，NPU 执行神经网络检测。它的 51 个评分通道来自部署合同；该 checkpoint 的训练记录采用单类监督，因此这些通道不能被解释为 51 种调制类别，不能由张量维度或 UI 标签表自行推出。
 
-### 4.3 实时系统为什么需要有界队列 {#src-experiment-case5-bounded-queues}
+### 实时系统为什么需要有界队列 {#src-experiment-case5-bounded-queues}
 
 采集、NPU 和绘图不会永远保持相同速度。如果输入队列无限增长，短暂的推理或界面卡顿最终会耗尽内存，而且读者看到的仍是几秒前的旧结果。
 
@@ -210,11 +210,11 @@ Case 5 的分析输入队列默认容量为 2。队列满时，`LatestQueue` 丢
 
 `InstrumentCoordinator` 还保证 Hantek 与 RTL-SDR 不会同时占用 NPU 和设备控制路径。切换页面不会自动打开硬件；旧来源、队列和 NPU runner 完全停止后，另一条链才能启动。
 
-## 5. 从时频图到神经网络检测 {#src-experiment-case5-neural-detection}
+## 从时频图到神经网络检测 {#src-experiment-case5-neural-detection}
 
 本节讨论的不是“怎样运行一个 OM 文件”，而是一个更基础的问题：模型看到的是什么、网络怎样把像素组织成候选事件、以及什么证据才足以支持模型结论。后面的板端命令只是在这条认识链完成后，把已经定义清楚的合同部署到 NPU。
 
-### 5.1 模型看到的是标准化的时频形态 {#src-experiment-case5-spectrogram-representation}
+### 模型看到的是标准化的时频形态 {#src-experiment-case5-spectrogram-representation}
 
 正式 RTL-SDR 模型不直接读取原始 I/Q。设复数序列为 $z[n]$，Blackman 窗为 $w[n]$，每行长度为 $N=1024$，当前实现不重叠地构造时频图：
 
@@ -242,7 +242,7 @@ $$
 
 把它还原为名义时间和频率范围。这个映射使检测结果可以与 CU8 批次、中心频率和采样率关联；但由于每幅图独立归一化、接收链增益未校准，它不能给出绝对接收功率，也不自动消除本振偏差或天线误差。
 
-### 5.2 先限定模型证据能够说明什么 {#src-experiment-case5-model-evidence}
+### 先限定模型证据能够说明什么 {#src-experiment-case5-model-evidence}
 
 本章选用经审查的 `gr-spectrumdetect` 候选作为部署对象。部署端不引入 PyTorch，只接收审查后的静态 ONNX、OM 和 manifest；来源版本、工件哈希、输入名和准入记录保存在本章的配套资料中。这里关注的是可复查的证据类型，而不是某一次构建的工件编号。
 
@@ -259,7 +259,7 @@ $$
 
 若要研究 51 类调制识别，首先需要获得或重新训练一个具有多类监督语义的模型，而不是只为当前 checkpoint 追加一次本地评测。随后才应建立带控制发射源、注入路径或可靠标注的训练/验证/测试集，并按独立采集会话划分数据，报告召回率、精确率、IoU 阈值下的 mAP 以及混淆矩阵。本文记录的无标签真实 IQ 只用于评估采集、预处理、NPU 推理和实时预算，不能替代多类模型的任务精度实验。[^2] [^3]
 
-### 5.3 YOLO11s 如何从图像形成候选框 {#src-experiment-case5-yolo-architecture}
+### YOLO11s 如何从图像形成候选框 {#src-experiment-case5-yolo-architecture}
 
 这张图解决“`[1,55,21504]` 从哪里来”的问题。它是按输入输出合同和上游 YOLO11s 架构整理的教学拓扑，而不是由图像生成模型猜测的网络示意。候选模型的可执行合同见 [`candidate_catalog.py`](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/time_frequency_dashboard/model/candidate_catalog.py)，工件准入与数值复核过程见[配套资料 07](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/docs/07_ascend310b_heterogeneous_signal_processing.md)。
 
@@ -304,7 +304,7 @@ $$
 
 这个公式说明检测网络为何同时学习“框在哪里”和“该框的评分是什么”；它是 YOLO 检测训练的概念说明，不是对本项目上游训练超参数或精度的重新复现。对当前 checkpoint，类别项在单类监督语义下服务于候选信号区域，`single_cls=True` 限制优先于部署侧的标签表。
 
-### 5.4 从 NPU 张量到候选区域 {#src-experiment-case5-yolo-decode}
+### 从 NPU 张量到候选区域 {#src-experiment-case5-yolo-decode}
 
 这张图解决“神经网络输出后还发生了什么”的问题。ONNX 没有嵌入 NMS；OM 输出先在 CPU 上完成确定性的解码和抑制，才成为界面叠加框和 JSONL 记录。
 
@@ -314,9 +314,9 @@ $$
 
 这一段 CPU 后处理不构成 CPU 推理回退：卷积、特征融合和头部计算已经由 OM 完成，CPU 只执行框坐标换算、阈值筛选、NMS 和物理坐标映射。当前实现保留按评分通道分组的兼容逻辑，但它不能被表述为语义正确的 class-aware NMS；单类部署的正式后处理应改用单一候选得分和 class-agnostic NMS。在该源代码完成相应修订前，本章只把当前输出用于验证张量合同、数值有限性和流水线连通。若初始化时 OM 无法加载，实时入口显示或记录 `NPU unavailable`；若已运行的 OM 返回 NaN、Inf 或不满足 manifest 的形状，RTL 服务会终止本次运行并写入失败记录。两种失败都不会用另一个 CPU 检测器伪造 NPU 成功。
 
-## 6. 核心实验：从 CAL 方波到固定分析窗口 {#src-experiment-case5-hantek-capture}
+## 核心实验：从 CAL 方波到固定分析窗口 {#src-experiment-case5-hantek-capture}
 
-### 6.1 先确认 USB，而不是直接启动仪表盘 {#src-experiment-case5-usb-diagnostics}
+### 先确认 USB，而不是直接启动仪表盘 {#src-experiment-case5-usb-diagnostics}
 
 USB 诊断程序只枚举已知设备，不打开示波器，也不上传固件。这样可以先区分“没有识别到设备”“当前用户没有权限”和“设备被其他程序占用”。在开发板的项目根目录执行：
 
@@ -329,7 +329,7 @@ python -m time_frequency_dashboard.acquisition.usb_diagnostics
 
 **检查点：** 只有设备已识别且当前用户可访问时才继续。诊断阶段没有方波并不表示采集失败，因为它根本没有打开 ADC。
 
-### 6.2 用 PulseView 建立最小真实基线 {#src-experiment-case5-pulseview-baseline}
+### 用 PulseView 建立最小真实基线 {#src-experiment-case5-pulseview-baseline}
 
 首次接线时，将 CH1 探头接到 6022BE 的 `CAL` 输出，用 PulseView 选择 Hantek 6022BE、1 MHz 和 10 k samples，观察类似图 5-2 的方波。这个步骤把问题限制在设备、驱动和探头三项，不涉及 Case 5 的 Python、OM 或界面。
 
@@ -337,7 +337,7 @@ python -m time_frequency_dashboard.acquisition.usb_diagnostics
 
 **检查点：** 能看到真实 CAL 方波，并且切换到 Case 5 前已经关闭 PulseView。不要把这一步写成 NPU 验收。
 
-### 6.3 编译长期运行的 sigrok 采集桥 {#src-experiment-case5-build-bridge}
+### 编译长期运行的 sigrok 采集桥 {#src-experiment-case5-build-bridge}
 
 Case 5 不要求安装 `pyhantek6022`，也不再编译 OpenHantek 桥。板端使用系统 `libsigrok` 的 `hantek-6xxx` 驱动，由一个小型 C 程序把回调转换成稳定的二进制帧。
 
@@ -364,7 +364,7 @@ class BridgeFrame:
 
 `sequence` 用于发现用户态帧缺口，`host_receive_ns` 是主机接收时间，`sample_rate_hz` 是驱动实际返回的采样率，`flags` 当前至少包含削顶标志。设备驱动没有提供 FIFO 溢出、ADC 序号或跨 USB 回调缺口元数据，所以桥序号连续只能证明桥到 Python 的帧没有丢失，不能证明物理 ADC 绝对无间隙。
 
-### 6.4 从连续帧组成固定分析窗口 {#src-experiment-case5-window-assembly}
+### 从连续帧组成固定分析窗口 {#src-experiment-case5-window-assembly}
 
 采集回调的块大小不应成为模型输入形状。`WindowAssembler` 将连续帧拼成 10,000 点窗口；一旦发现序号跳变、主机时间倒退或采样率变化，就清空未完成窗口，从下一帧重新开始：
 
@@ -400,7 +400,7 @@ self.latest_statistics = (
 
 *图 5-9 Hantek 实时窗口形成流程。任何帧序号、主机时间或采样率连续性错误都会重置未完成窗口；形成 `[1,2,10000]` 后才进入容量为 2 的最新任务队列。队列满时丢弃旧分析任务并计数，不能把跨越缺口的样本拼成正常频谱。图源见 `img5/case5-hantek-acquisition-flow.dot`。*
 
-### 6.5 扩展任务：Little Bee B1 的接入准备 {#src-experiment-case5-little-bee}
+### 扩展任务：Little Bee B1 的接入准备 {#src-experiment-case5-little-bee}
 
 如需开展后续双通道扩展实验，才将 Little Bee 输出经 SMA-BNC 接入 CH2。开始采集前，应在探头本体上完成 `Reset/Zero`，记录工作模式、匝数、电池状态和连接方式；被测回路的隔离和允许测量范围必须已按第 2 节确认。
 
@@ -412,9 +412,9 @@ $$
 
 默认参数下，$S=1.00\ \mathrm{V/A}$、$N_{\mathrm{turns}}=1$。这只是按公开说明进行的声明换算，配置版本为 `declared-cyan-1.0V-per-A-1turn`。当前成品探头尚未完成本机幅值、零点漂移和相位标定，因此 CH2 只能作为趋势性电流，不用于输出计量级功率、相位角或功率因数，也不属于本章核心实验的验收条件。
 
-## 7. 在 310B 上完成固定 DFT {#src-experiment-case5-hantek-npu}
+## 在 310B 上完成固定 DFT {#src-experiment-case5-hantek-npu}
 
-### 7.1 把 DFT 写成静态 ONNX 图 {#src-experiment-case5-dft-onnx}
+### 把 DFT 写成静态 ONNX 图 {#src-experiment-case5-dft-onnx}
 
 传统 FFT 算法并不是本实验要部署的图。这里预先用 NumPy 生成带 Hann 窗的正弦、余弦投影矩阵，再用标准 ONNX 算子表达固定 DFT。输入窗口与矩阵相乘后，实部和虚部平方并成对求和，得到线性频谱功率。
 
@@ -439,7 +439,7 @@ nodes = [
 
 *图 5-10 固定 DFT 的板端验证与发布流程。只有真实 OM 输出形状正确、全为有限值并满足数值门限时，频谱和瀑布才接收线性功率；失败路径明确显示 `NPU unavailable`，没有 CPU FFT 回退。图源见 `img5/case5-hantek-om-flow.dot`。*
 
-### 7.2 在开发板生成并验证 OM {#src-experiment-case5-prepare-hantek-om}
+### 在开发板生成并验证 OM {#src-experiment-case5-prepare-hantek-om}
 
 以下命令只能在 Ascend 310B 开发板执行。`prepare_models` 先生成 ONNX，再调用板端 ATC 转为 OM；`verify_npu_model` 使用同一测试输入比较数值参考与真实 OM 输出。
 
@@ -447,7 +447,8 @@ nodes = [
 cd ~/Documents/case5
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 
 python -m time_frequency_dashboard.model.prepare_models
 python -m time_frequency_dashboard.model.verify_npu_model
@@ -457,7 +458,7 @@ python -m time_frequency_dashboard.model.verify_npu_model
 
 **检查点：** 生成 ONNX 成功不等于 NPU 验证成功。只有 `aclruntime.InferenceSession` 实际加载 OM 并完成推理，才能记录 `NPU (Ascend 310B)`。
 
-### 7.3 启动仪表盘并读懂结果 {#src-experiment-case5-run-dashboard}
+### 启动仪表盘并读懂结果 {#src-experiment-case5-run-dashboard}
 
 确认 PulseView 和 `sigrok-cli` 已退出，运行：
 
@@ -486,7 +487,7 @@ bash scripts/run_dashboard.sh --sigrok-bridge build/sigrok_capture_bridge
 
 CAL 方波的基频约为 1 kHz，理想方波还会出现奇次谐波。在频谱页观察这些离散成分，比只看时域方波更容易理解频域为什么能描述波形边沿。但本次显示仍是未校准的相对功率，不应根据峰值直接推断探头带宽或精确电压。
 
-### 7.4 NPU 不可用时系统怎样表现 {#src-experiment-case5-no-fallback}
+### NPU 不可用时系统怎样表现 {#src-experiment-case5-no-fallback}
 
 Hantek 的 `AscendOmRunner` 只有在 OM 文件存在、`aclruntime` 可导入、session 建立成功且输出名称可读取后才进入 ready 状态。初始化失败时，Hantek 顶部明确显示 `NPU unavailable`；已经开始的 Hantek 分析若返回 NaN、Inf、错误形状或运行异常，分析 worker 停止发布新频谱行并转入同一不可用状态。
 
@@ -494,9 +495,9 @@ RTL-SDR 的状态语义应单独阅读：初始化或 OM 合同预检失败时�
 
 系统没有 Hantek CPU FFT fallback。模拟源可以帮助调试采集、队列和界面，但没有 OM 时不会生成一条 CPU 频谱冒充 NPU 结果。这个失败状态是可验证设计的一部分，而不是缺少功能。
 
-## 8. 保存并复核一次会话 {#src-experiment-case5-hantek-session}
+## 保存并复核一次会话 {#src-experiment-case5-hantek-session}
 
-### 8.1 会话目录记录了什么 {#src-experiment-case5-session-files}
+### 会话目录记录了什么 {#src-experiment-case5-session-files}
 
 每次开始 Hantek 采集时，程序都会在 `data/hantek_sessions/` 下创建一个新的 UTC 时间目录，不覆盖旧证据。
 
@@ -510,7 +511,7 @@ RTL-SDR 的状态语义应单独阅读：初始化或 OM 合同预检失败时�
 
 原始数据默认最多写入 1 GiB。达到上限或写队列满时，程序记录存储丢帧，不会让内存无限增长。分析 JSON 使用 `allow_nan=False`，因此 NaN 或 Inf 不能悄悄进入可追溯记录。
 
-### 8.2 从一条结果追到原始窗口 {#src-experiment-case5-session-trace}
+### 从一条结果追到原始窗口 {#src-experiment-case5-session-trace}
 
 假设 `analysis.jsonl` 中某条结果记录了 `first_sequence=120`、`last_sequence=121`。复核时可以按下面的顺序追踪：
 
@@ -528,13 +529,13 @@ RTL-SDR 的状态语义应单独阅读：初始化或 OM 合同预检失败时�
 
 *图 5-12 单条 Hantek 分析结果的追溯路径。`analysis.jsonl` 给出窗口范围和 OM 结果，`raw_index.jsonl` 定位原始块；`manifest.json` 约束采样率、探头和模型，`summary.json` 报告会话完整性。缺少任一环节时，不能声称该窗口完全可复核。图源见 `img5/case5-session-trace-flow.dot`。*
 
-### 8.3 当前仍未完成的部分 {#src-experiment-case5-hantek-limitations}
+### 当前仍未完成的部分 {#src-experiment-case5-hantek-limitations}
 
 当前代码已经计算最新采集块的均值、RMS 和峰峰值，但 Hantek UI 与 `analysis.jsonl` 尚未持久化这些字段。Little Bee 的真实双通道接入、幅值标定、相位延迟和同步验收也尚未完成。因此，本章能够验收的是两通道数据帧合同、固定窗口、NPU 频谱、瀑布、后端状态和结果追溯；不能验收计量级功率、功率因数或故障分类。
 
-## 9. 扩展实验：从 RTL-SDR IQ 到时频检测 {#src-experiment-case5-rtl-sdr}
+## 扩展实验：从 RTL-SDR IQ 到时频检测 {#src-experiment-case5-rtl-sdr}
 
-### 9.1 先用固定 DFT 理解 IQ 频谱 {#src-experiment-case5-rtl-dft-demo}
+### 先用固定 DFT 理解 IQ 频谱 {#src-experiment-case5-rtl-dft-demo}
 
 正式检测模型包含时频预处理、目标检测和模型准入，第一次接触时不容易判断错误来自哪一层。旧固定复数 DFT Demo 提供了一条更小的教学路径：先生成一个频率已知的复数正弦波，确认 OM 的峰值频点正确，再接入真实接收机。
 
@@ -544,7 +545,8 @@ RTL-SDR 的状态语义应单独阅读：初始化或 OM 合同预检失败时�
 cd ~/Documents/case5
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 
 command -v rtl_sdr
 python -m time_frequency_dashboard.model.prepare_rtl_iq_model
@@ -575,7 +577,7 @@ bash scripts/run_rtl_sdr_npu_demo.sh \
 
 40.2 dB 只是当前板卡、天线和 100 MHz 环境的实测起点，不是通用增益标定。若改用其他频段，应先通过独立短采集检查 CU8 端点削顶和 I/Q 方差。
 
-### 9.2 正式 RTL-SDR 服务的数据流 {#src-experiment-case5-rtl-service}
+### 正式 RTL-SDR 服务的数据流 {#src-experiment-case5-rtl-service}
 
 正式 CLI 与仪表盘共同调用 `RtlSdrService`。一次运行按以下顺序发生：
 
@@ -595,7 +597,7 @@ bash scripts/run_rtl_sdr_npu_demo.sh \
 
 *图 5-13a RTL-SDR 实时服务流程。原始 CU8 先归档并绑定 SHA256；输入队列积压时丢弃最旧待推理批次；FFTW 生成时频图后由 OM 执行检测。初始化失败时入口拒绝 NPU 运行；执行期输出异常则以失败记录终止本次 run，二者都不会改用 CPU 检测器。图源见 `img5/case5-rtl-service-flow.dot`。*
 
-### 9.3 谁计算时频图，谁完成检测 {#src-experiment-case5-rtl-cpu-npu-boundary}
+### 谁计算时频图，谁完成检测 {#src-experiment-case5-rtl-cpu-npu-boundary}
 
 当前正式模型是频谱图目标检测器。CPU 使用 FFTW 按 manifest 中的结构化合同执行 CU8 解码、1024 点无重叠 Blackman 窗、功率、`fftshift`、dB 归一化、黑热图和 RGB 复制，得到真正送入 OM 的 `[1,3,1024,1024]` 输入。
 
@@ -613,9 +615,9 @@ bash scripts/run_rtl_sdr_npu_demo.sh \
 
 *图 5-13c RTL-SDR 时频检测页。灰度图是 CPU FFTW/Blackman 预处理后实际送入 OM 的 `[1,3,1024,1024]` 图像；绿色框来自 OM 神经网络输出的 CPU 确定性解码。为保证触摸屏可读性，界面保留全部框和结果表，但只标注一组不重叠的高置信度框。`bpsk` 是当前单类 checkpoint 的部署映射文字，不能解释为已验证的 BPSK 识别或 51 类调制识别。名义 RF 轴尚未校准。*
 
-## 10. 模型准入与真实板端运行 {#src-experiment-case5-rtl-admission}
+## 模型准入与真实板端运行 {#src-experiment-case5-rtl-admission}
 
-### 10.1 为什么一个 OM 文件还不够 {#src-experiment-case5-manifest-admission}
+### 为什么一个 OM 文件还不够 {#src-experiment-case5-manifest-admission}
 
 ATC 能够生成 OM，只说明图在当前工具链下可编译。要进入实时入口，还必须回答：这个模型来自哪里？权重是否与审查版本一致？ONNX 与 OM 是否被修改？NPU 输出是否与参考数值一致？P95 推理时间是否小于一个输入窗口？预处理是否与模型训练和验证时一致？
 
@@ -636,13 +638,13 @@ Case 5 用版本化 manifest 保存这些答案。正式入口只展示同时满
 
 *图 5-14 模型准入与证据附着流程。来源、哈希、数值比较和窗口预算共同决定 `accepted`；真实运行的 CU8、JSONL 和只读 QC 形成新的 sibling manifest 证据，而不是改写原始 manifest。图源见 `img5/case5-model-admission-flow.dot`。*
 
-### 10.2 从模型原理到板端候选 {#src-experiment-case5-yolo-model}
+### 从模型原理到板端候选 {#src-experiment-case5-yolo-model}
 
 第 5 节已经从数据表示、YOLO11s 结构和后处理解释了这个候选。进入板端前，需要依次完成来源审查、ONNX 与 OM 工件核对、输入预处理复核、数值比较和窗口预算测量；这些信息由 manifest 绑定。部署仓库不包含训练环境和 PyTorch，上游权重只在隔离的准备环境中读取，部署侧只接收经过审查的 ONNX、OM 和 manifest。
 
 若基础混合精度不能满足数值门限，板端准备流程可以采用 CANN 的局部精度保护机制。它只处理已发现的数值敏感边界，不改变模型训练语义，也不能把单类训练权重的通道布局变成多类识别。具体参数、工件名和重建命令随工具链演进，应以[配套资料 07](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/docs/07_ascend310b_heterogeneous_signal_processing.md)为准；不得通过手工修改 `status` 把 candidate 变成 accepted。[^6] [^7]
 
-### 10.3 运行一次完整的真实窗口实验 {#src-experiment-case5-run-rtl}
+### 运行一次完整的真实窗口实验 {#src-experiment-case5-run-rtl}
 
 当 `models/generated/inference/` 中已经存在通过准入的 manifest 时，先进行 10 秒级短运行：
 
@@ -669,7 +671,7 @@ $$
 
 **检查点：** 当前 UI 的通道索引或调制名称都不能作为类别输出；它们至多说明采集、预处理、OM 输出和兼容解码链路连通。由于该 checkpoint 采用 `single_cls=True`，现有框数也不能作为真实时频事件数量。要开展类别识别或候选区域性能评价，必须先修订为语义一致的单类后处理，或换用具有多类监督语义的模型并进行独立评测。
 
-### 10.4 对同一份证据执行只读复核 {#src-experiment-case5-rtl-qc}
+### 对同一份证据执行只读复核 {#src-experiment-case5-rtl-qc}
 
 运行完成后，用只读汇总器重新读取 JSONL 所绑定的同一份 CU8：
 
@@ -696,9 +698,9 @@ python -m time_frequency_dashboard.model.attach_pipeline_realtime_evidence \
 
 至少 600 秒、输入状态为 `antenna_connected` 或 `lab_cabled`、零丢批且每批处理不超过窗口预算，才会被标记为连续管线通过。短运行只完成窗口级 smoke test。
 
-## 11. 性能结果与工程判断 {#src-experiment-case5-performance}
+## 性能结果与工程判断 {#src-experiment-case5-performance}
 
-### 11.1 Hantek 采集吞吐说明了什么 {#src-experiment-case5-hantek-throughput}
+### Hantek 采集吞吐说明了什么 {#src-experiment-case5-hantek-throughput}
 
 表 5-1 给出一次板端采集回调测量的结果。它只统计主机从 `libsigrok 0.5.2` 收到的模拟样本，不包含 Qt 绘制、会话存储或 NPU 推理；完整试验条件见[配套资料 01](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/docs/01_hantek6022be.md)。
 
@@ -711,7 +713,7 @@ python -m time_frequency_dashboard.model.attach_pipeline_realtime_evidence \
 
 30 MS/s 和 48 MS/s 请求没有继续提高有效速率。Case 5 主线因此使用驱动读回并与 OM 合同一致的 1 MS/s 作为频率轴采样率，而不按设备宣传值推断运行能力。表中的“有效速率”是主机回调吞吐量，不能代替频率轴采样率；这些数字也不能证明跨 USB 回调的 ADC 样本绝对无间隙。
 
-### 11.2 RTL-SDR 连续流水线 {#src-experiment-case5-rtl-soak}
+### RTL-SDR 连续流水线 {#src-experiment-case5-rtl-soak}
 
 表 5-2 摘录一次已接天线的连续板端运行：中心频率 100 MHz、采样率 2.048 MS/s、固定请求增益 40.2 dB、模型窗口 512 ms。除非另有说明，时延均从主机获得完整 IQ 批次后开始计时；“NPU 调用边界”包括张量准备、主机到设备传输、OM 执行、设备到主机传输和输出复制，不是射频首个样本到界面显示的端到端时延。完整环境与原始记录见[配套资料 07](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/docs/07_ascend310b_heterogeneous_signal_processing.md)。
 
@@ -727,7 +729,7 @@ python -m time_frequency_dashboard.model.attach_pipeline_realtime_evidence \
 
 后采集最大处理时间小于 512 ms，且生产批次与完成批次相等、零丢批，因此这次记录满足本章定义的连续管线条件。它只证明该板卡、这组参数和这次输入条件下的主机流水线，不证明射频幅值已经校准；当前兼容解码产生的框数和显示标签也不能作为类别结论或真实事件计数，因为 checkpoint 的 `single_cls=True` 训练语义不支持 51 类调制识别，且这次真实 IQ 没有地面真值。
 
-### 11.3 NPU 并不天然快于最佳 CPU 算法 {#src-experiment-case5-cpu-npu-comparison}
+### NPU 并不天然快于最佳 CPU 算法 {#src-experiment-case5-cpu-npu-comparison}
 
 旧固定复数 DFT 教学路径使用同一份真实 CU8，对 1024 点、batch 16 的不同实现进行了 50 次预热和 300 次重复测量。计时从主机输入数组可用开始，到主机可读取输出为止；初始化时间不计入，OM 数据包含主机与设备之间的数据传输：
 
@@ -742,9 +744,9 @@ OM 比相同算法的 CPU 稠密 DFT 快，但明显慢于 FFTW。原因不是�
 
 是否迁移到 NPU，应同时检查数值、P95、输入窗口预算、最佳 CPU 基线和 CPU 释放价值，而不是只看一次推理是否成功。
 
-## 12. 从零复现、验收与故障排查 {#src-experiment-case5-reproduction}
+## 从零复现、验收与故障排查 {#src-experiment-case5-reproduction}
 
-### 12.1 本地开发检查 {#src-experiment-case5-local-checks}
+### 本地开发检查 {#src-experiment-case5-local-checks}
 
 本地开发机只验证 Python、NumPy、ONNX 和 Qt 隔离逻辑：
 
@@ -756,7 +758,7 @@ python -m compileall -q time_frequency_dashboard
 
 pytest 覆盖帧协议、窗口缺口、单位换算、有界队列、ONNX 与 NumPy 数值对照、会话存储、NPU 不可用状态、仪表盘资源互斥、RTL manifest 和 JSONL/QC 合同。测试跳过硬件项并不表示硬件已经通过。
 
-### 12.2 开发板准备 {#src-experiment-case5-board-setup}
+### 开发板准备 {#src-experiment-case5-board-setup}
 
 在开发板上进入固定目录，由用户手动安装系统依赖：
 
@@ -772,13 +774,14 @@ sudo apt-get install -y libsigrok-dev sigrok-cli gcc pkg-config libfftw3-single3
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 python -m pip install -r requirements-board.txt
 ```
 
 `requirements-board.txt` 不包含 CANN、ACL、系统 sigrok 包或 PyTorch。CANN 使用开发板已有环境。
 
-### 12.3 Hantek 验收顺序 {#src-experiment-case5-hantek-acceptance}
+### Hantek 验收顺序 {#src-experiment-case5-hantek-acceptance}
 
 1. 运行 USB 诊断，确认设备存在且当前用户可写；
 2. 用 PulseView 和 `CAL` 完成最小真实基线，随后关闭 PulseView；
@@ -800,7 +803,7 @@ python -m pytest -q tests/test_hardware_capture_and_inference.py
 
 该测试必须先取得至少两个包含 CH1/CH2 的真实 Hantek 帧窗口，再把窗口送入 OM，检查输出形状 `[1,2,201,1]` 和有限值。它验证两通道帧合同和 NPU 频谱链路，不验证 CH2 的 Little Bee 电流标定。没有设置环境变量时的跳过不能写成“硬件测试通过”。
 
-### 12.4 RTL-SDR 验收顺序 {#src-experiment-case5-rtl-acceptance}
+### RTL-SDR 验收顺序 {#src-experiment-case5-rtl-acceptance}
 
 1. 用 `command -v rtl_sdr` 和 `rtl_test -t` 确认工具与接收机可用；
 2. 生成并验证旧固定 IQ DFT OM，先运行 `--source tone`；
@@ -812,7 +815,7 @@ python -m pytest -q tests/test_hardware_capture_and_inference.py
 
 Hantek 与 RTL-SDR 在仪表盘中互斥。切换前必须先停止当前来源，等待采集进程、队列和 NPU runner 完全退出。互斥只证明应用层不会并行分配设备，不自动证明某一 CANN 版本可以在同一 Python 进程中完成任意 OM 的反复重初始化；这项行为仍需按板端环境单独验收。
 
-### 12.5 常见故障 {#src-experiment-case5-troubleshooting}
+### 常见故障 {#src-experiment-case5-troubleshooting}
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
@@ -829,9 +832,9 @@ Hantek 与 RTL-SDR 在仪表盘中互斥。切换前必须先停止当前来源�
 | RTL 后采集延迟超过 512 ms | CPU 预处理、排队或 NPU 超出窗口预算 | 检查逐阶段 P95/max 和丢批，不得宣称实时通过 |
 | 检测框很多但无法解释 | 当前 checkpoint 为单类区域检测，且真实 IQ 没有地面真值或接收链过载 | 检查 QC；只能报告候选区域链路连通，不能把软件标签写成多类准确率 |
 
-## 13. 思考题、总结与参考资料 {#src-experiment-case5-summary}
+## 思考题、总结与参考资料 {#src-experiment-case5-summary}
 
-### 13.1 思考与改进任务 {#src-experiment-case5-exercises}
+### 思考与改进任务 {#src-experiment-case5-exercises}
 
 1. 如果 Hantek 窗口从 10,000 点扩大到 20,000 点，时间跨度、频率间隔、OM 输入形状和更新率分别怎样变化？
 2. `LatestQueue` 满时为什么丢弃最旧分析窗口？如果应用目标改为离线证据采集，队列策略应怎样改变？
@@ -842,13 +845,13 @@ Hantek 与 RTL-SDR 在仪表盘中互斥。切换前必须先停止当前来源�
 7. 设计一个带已知标签的受控射频实验，使检测准确率与链路实时性能够分别评价。
 8. 为什么 `[1,55,21504]` 的张量合同不足以证明 51 类调制识别？说明为什么必须先换用具有多类监督语义的模型，再建立训练、标注和独立评测证据。
 
-### 13.2 可迁移的方法 {#src-experiment-case5-conclusion}
+### 可迁移的方法 {#src-experiment-case5-conclusion}
 
 Case 5 的两条实验链面对不同物理信号，却使用了相同的工程方法。第一，先建立稳定的采集合同，把具体设备格式隔离在适配层。第二，把连续数据整理成固定窗口，让时间、序号和原始文件始终可追溯。第三，只把适合固定形状和较高计算量的任务交给 NPU，并用最佳 CPU 实现作为比较基线。第四，后端状态、模型版本、延迟和错误必须进入界面和记录，不能在失败时悄悄替换结果。第五，把模型标签视为可检验的科学假设：对于本章这个 `single_cls=True` checkpoint，当前软件标签和框数仅服务于兼容性显示，不能代表类别或事件数量。要进行多类调制识别，必须替换为多类监督模型，并给出独立标签与适当指标。
 
 这套方法比某一个示波器或某一个模型更重要。更换采集设备时，公共处理和存储合同仍然成立；更换模型时，manifest 和固定窗口预算仍然约束运行；增加新分析任务时，读者也能明确回答“输入是什么、谁计算、输出是什么、怎样验证、结果依据在哪里”。
 
-### 13.3 Case 5 专项文档 {#src-experiment-case5-project-references}
+### Case 5 专项文档 {#src-experiment-case5-project-references}
 
 - [01 Hantek 6022BE：sigrok 驱动和实机采集](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/docs/01_hantek6022be.md)
 - [02 Little Bee B1：开源电流与磁场探头](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/docs/02_little_bee_b1.md)
@@ -859,7 +862,7 @@ Case 5 的两条实验链面对不同物理信号，却使用了相同的工程�
 - [07 昇腾 310B 异构信号处理评估与 SDR-NPU 指引](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/docs/07_ascend310b_heterogeneous_signal_processing.md)
 - [Case 5 代码入口与板端命令](https://github.com/zhouxzh/Ascend310/blob/main/samples/case5/README.md)
 
-### 13.4 外部资料 {#src-experiment-case5-external-references}
+### 外部资料 {#src-experiment-case5-external-references}
 
 [^1]: Weston Braun. "Little Bee B1 Operating Instructions." 固定审查提交：[9157c50a5d6e](https://github.com/westonb/little-bee-B1/blob/9157c50a5d6e56ba746725cb0de5875efac7d5e7/getting-started/README.md)。
 

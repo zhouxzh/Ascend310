@@ -108,7 +108,7 @@ export function probeState(bucketId, facts = {}) {
 		case 'performance':
 			return 'untested';
 		case 'service':
-			return has('soc') && has('aclImport') ? 'collected' : 'untested';
+			return has('serviceHealth') || has('serviceProcess') ? 'collected' : 'untested';
 		case 'sanity':
 			return 'untested';
 		default:

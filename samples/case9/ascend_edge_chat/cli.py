@@ -54,6 +54,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     ui.add_argument("--host", default=os.environ.get("ASCEND_EDGE_CHAT_UI_HOST", "0.0.0.0"))
     ui.add_argument("--port", default=int(os.environ.get("ASCEND_EDGE_CHAT_UI_PORT", "7865")), type=int)
 
+    voice = commands.add_parser("voice", help="start the loopback board-owned voice agent")
+    voice.add_argument("--host", default=None, help="loopback host; defaults to ASCEND_EDGE_CHAT_VOICE_HOST")
+    voice.add_argument("--port", default=None, type=int, help="loopback port; defaults to ASCEND_EDGE_CHAT_VOICE_PORT")
+    voice.add_argument("--check-config", action="store_true")
+
     verify = commands.add_parser("verify", help="validate the model lock and local artifacts")
     verify.add_argument("--data-dir", type=Path)
 
@@ -74,6 +79,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _gateway(args.host, args.port, args.check_config)
         if args.command == "ui":
             return _ui(args.host, args.port)
+        if args.command == "voice":
+            return _voice(args.host, args.port, args.check_config)
         root = data_root(str(args.data_dir) if getattr(args, "data_dir", None) else None)
         if args.command == "verify":
             print(json.dumps(report(verify_artifacts(root)), ensure_ascii=False, indent=2))
@@ -174,6 +181,21 @@ def _ui(host: str, port: int) -> int:
 
     web.main(["--host", host, "--port", str(port)])
     return 0
+
+
+def _voice(host: str | None, port: int | None, check_config: bool) -> int:
+    """Start the optional loopback board-owned voice agent lazily."""
+
+    from .voice import agent
+
+    arguments: list[str] = []
+    if host is not None:
+        arguments.extend(["--host", host])
+    if port is not None:
+        arguments.extend(["--port", str(port)])
+    if check_config:
+        arguments.append("--check-config")
+    return agent.main(arguments)
 
 
 if __name__ == "__main__":

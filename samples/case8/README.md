@@ -75,32 +75,35 @@ ls -l /dev/video0 /dev/video1
 
 ## 快速部署
 
-在 PC 或 GPU 工作站导出 ONNX：
+发布复现必须在板端从固定源码 commit 和 Hugging Face 模型 revision 重建。PC 上导出 ONNX 只能作为开发步骤，不能作为公开复现证据。
 
 ```bash
-cd samples/case8
-python weights/export_yolo_to_onnx.py \
-  --weights weights/YOLOv10n_gestures.pt \
-  --output-dir models --imgsz 640 --batch 1 --opset 13 --device cpu
+# 在板端获取固定源码，不复制作者电脑上的 samples/case8
+git clone https://github.com/zhouxzh/Ascend310.git "$HOME/Ascend310-case-run/case8/src"
+git -C "$HOME/Ascend310-case-run/case8/src" checkout --detach <commit-sha>
+cd "$HOME/Ascend310-case-run/case8/src/samples/case8"
+
+# 模型必须来自固定 HF revision；没有公开模型 manifest 时，离线包只能标为 offline-bundle
+export HF_ENDPOINT=https://hf-mirror.com
+hf download <owner>/<case8-model-repo> \
+  --revision <revision-sha> \
+  --local-dir weights
 ```
 
-同步项目和模型伴随文件到开发板：
-
-```bash
-rsync -av samples/case8/ \
-  HwHiAiUser@192.168.1.100:/home/HwHiAiUser/Documents/case8/
-```
+如果该案例暂时还没有公开的 Hugging Face 模型仓库，应先补齐 `weights/README.md` 中的来源、revision、文件大小、SHA-256 和许可证，再允许发布测试；不要把本地 `.pt`/ONNX/OM 直接复制到板端。
 
 在开发板上加载 CANN 并转换 OM：
 
 ```bash
-ssh HwHiAiUser@192.168.1.100
+cd "$HOME/Ascend310-case-run/case8/src/samples/case8"
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-cd /home/HwHiAiUser/Documents/case8
 SOC_VERSION=Ascend310B4 bash scripts/atc_convert.sh
 ```
+
+开发阶段的 PC 导出命令仍然可以用于制作候选 ONNX，但不是发布测试的下载来源。
 
 先做 OM 推理冒烟：
 

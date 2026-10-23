@@ -108,6 +108,63 @@ if (!presentation.includes('https://github.com/zhouxzh/Ascend310/tree/main/sampl
 }
 if (!presentation.includes('../experiment/*.md')) failures.push('Presentation skill 未明确禁止本地教材相对链接');
 if (!umbrella.includes('已发布 Presentation')) failures.push('总 skill 未同步已发布课件链接规则');
+if (!umbrella.includes('一次写作任务只加载本 skill 加')) {
+	failures.push('总 skill 未限制一次只加载一个对象 skill');
+}
+const vuepress = readFileSync(join(skillsRoot, 'ascend310b-writing-vuepress', 'SKILL.md'), 'utf8');
+if (!vuepress.includes('vuepress-theme-hope')) failures.push('VuePress skill 未锁定 hope 主题');
+if (!vuepress.includes('base: /Ascend310/')) failures.push('VuePress skill 未锁定站点 base');
+if (!vuepress.includes('navbar.ts')) failures.push('VuePress skill 未覆盖 navbar 模板');
+if (!vuepress.includes('BEGIN GENERATED PRESENTATION SIDEBAR')) {
+	failures.push('VuePress skill 未保护生成侧栏');
+}
+if (!umbrella.includes('读者稿与生产备注')) failures.push('总 skill 未区分读者稿与生产备注');
+const docsSkill = readFileSync(join(skillsRoot, 'ascend310b-writing-docs', 'SKILL.md'), 'utf8');
+for (const required of ['troubleshooting.md', 'CASE<N>-ISS-YYYYMMDD-NN', '根因状态', '回归结果', 'code-docs-manual-heading-number']) {
+	if (!docsSkill.includes(required)) failures.push(`Docs skill 缺少测试问题台账规则：${required}`);
+}
+for (const required of ['heading-manual-number', '1.1', '4.1', '自动编号']) {
+	if (!umbrella.includes(required)) failures.push(`总 skill 缺少章节编号规则：${required}`);
+}
+const numberingSkills = {
+	'ascend310b-writing-case': ['heading-manual-number', '1.1', '4.1'],
+	'ascend310b-writing-theory': ['heading-manual-number', '4.1'],
+	'ascend310b-writing-markdown': ['1.1', '4.1', '自动编号'],
+	'ascend310b-writing-latex': ['4.1', '4.2.1', '自动编号'],
+	'ascend310b-writing-vuepress': ['1.1', '4.1', '自动编号']
+};
+for (const [name, requiredItems] of Object.entries(numberingSkills)) {
+	const text = readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
+	for (const required of requiredItems) {
+		if (!text.includes(required)) failures.push(`${name}: 缺少章节编号规则：${required}`);
+	}
+}
+const troubleshootingTemplate = join(skillsRoot, 'ascend310b-writing-docs', 'references', 'troubleshooting-template.md');
+if (!existsSync(troubleshootingTemplate)) {
+	failures.push('Docs skill 缺少 troubleshooting-template.md');
+} else {
+	const template = readFileSync(troubleshootingTemplate, 'utf8');
+	for (const required of ['测试环境快照', '问题索引', '复现步骤', '原始证据', '根因状态', '回归验证', '剩余边界']) {
+		if (!template.includes(required)) failures.push(`troubleshooting template 缺少：${required}`);
+	}
+}
+const academic = readFileSync(join(skillsRoot, 'ascend310b-writing-academic', 'SKILL.md'), 'utf8');
+for (const required of ['教材润色模式', 'Revision notes', '可直接替换的润色正文', '不能代替人工改写']) {
+	if (!academic.includes(required)) failures.push(`Academic skill 缺少润色协议：${required}`);
+}
+const readerFacing = [
+	'ascend310b-writing-case',
+	'ascend310b-writing-dot',
+	'ascend310b-writing-presentation',
+	'ascend310b-writing-theory',
+	'ascend310b-writing-markdown'
+];
+for (const name of readerFacing) {
+	const text = readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
+	if (!text.includes('.dot') || !text.includes('字体名')) {
+		failures.push(`${name}: 未禁止把 DOT 源路径或字体名写入读者正文`);
+	}
+}
 
 const humanReviewSkills = [
 	'ascend310b-writing',

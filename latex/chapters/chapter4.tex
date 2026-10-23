@@ -848,8 +848,7 @@ GHz (大) / 1.8 GHz (小) & \textasciitilde{} 5000+ 分 \\
   快速把任务分发完并脱身，才能掩盖 A55 核心性能不足的缺陷。
 \end{itemize}
 
-\paragraph{1.
-优先策略：全链路异步与细粒度同步}\label{src-book-chapter4-h15}
+\paragraph{优先策略：全链路异步与细粒度同步}\label{src-book-chapter4-h15}
 
 在昇腾 310B 平台上，由于 CPU
 算力相对有限，最理想的流水线策略是实施``全链路异步''设计，即让 CPU
@@ -881,7 +880,7 @@ acl.rt.stream_wait_event(stream_infer, event_decode_done)
 acl.mdl.execute_async(..., stream_infer)
 \end{lstlisting}
 
-\paragraph{2. 数据传输优化：Host Pinned Memory
+\paragraph{数据传输优化：Host Pinned Memory
 的强制管理}\label{src-book-chapter4-h16}
 
 实现异步传输的高性能前提是 Host 侧内存的稳定性。在使用
@@ -915,7 +914,7 @@ acl.rt.synchronize_stream(stream)
 acl.rt.free_host(host_ptr)
 \end{lstlisting}
 
-\paragraph{3. 多 Stream
+\paragraph{多 Stream
 协作范式：生产者-消费者模型}\label{src-book-chapter4-h17}
 
 构建基于生产者-消费者模型的多 Stream 协作机制，是挖掘 310B
@@ -949,7 +948,7 @@ for image in images:
     post_process(stream_c)
 \end{lstlisting}
 
-\paragraph{4. 避免滥用全局同步与调试建议}\label{src-book-chapter4-h18}
+\paragraph{避免滥用全局同步与调试建议}\label{src-book-chapter4-h18}
 
 在追求高性能的同时，必须警惕对同步接口的滥用。最典型的反模式是在每一帧的处理循环中都调用
 \passthrough{\lstinline!acl.rt.synchronize\_device()!}，这种做法相当于强制将所有并行的流水线``拍扁''为串行执行，完全浪费了
@@ -1109,17 +1108,17 @@ echo 'export HF_ENDPOINT=https://hf-mirror.com' >> ~/.bashrc
 source ~/.bashrc
 \end{lstlisting}
 
-为了避免影响服务器上已有的虚拟环境，建议提前安装
-Anaconda，并通过以下命令新建独立的环境：
+为了避免影响服务器上已有的虚拟环境，应使用仓库统一约定的 Conda 环境：
 
 \begin{lstlisting}[language=bash]
-conda create -n torch
-conda activate torch
-conda install python=3.11
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
+python -V
 \end{lstlisting}
 
-此处选择 Python 3.11
-作为示例，实际可根据需求选择合适的版本，但不建议使用过新或过旧的版本，以减少兼容性问题。
+该环境使用 Python 3.9.25。若环境中缺少本章依赖，只安装用户态 Python
+包，不重建或覆盖已由板端维护的 CANN 环境。
 
 随后，使用 pip 安装所需依赖：
 

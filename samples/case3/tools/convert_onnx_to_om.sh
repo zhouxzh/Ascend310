@@ -184,7 +184,8 @@ activate_conda_base() {
     [[ -n "$conda_script" ]] || die "conda profile script not found"
     # shellcheck disable=SC1090
     source "$conda_script"
-    conda activate "${CONDA_ENV:-base}" || die "failed to activate conda environment"
+    conda activate "${CONDA_ENV:-ascend}" || die "failed to activate conda environment"
+    export PYTHONNOUSERSITE=1
 }
 
 source_cann_env() {

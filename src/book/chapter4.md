@@ -428,7 +428,7 @@ PyACL 提供了四种不同粒度的同步等待机制，以适应从简单的�
 *   **Python 代码仅做胶水**：Python 逻辑应仅限于流程控制、参数配置和极少量的后处理。业务主体必须由底层的 C++ 算子或 NPU 模型承担。
 *   **异步是救命稻草**：由于 CPU 处理每一行 Python 代码都比其他平台慢，因此更不能让 CPU 傻傻等待 NPU（同步）。只有利用 `stream_wait_event` 让 CPU 快速把任务分发完并脱身，才能掩盖 A55 核心性能不足的缺陷。
 
-##### 1. 优先策略：全链路异步与细粒度同步 {#src-book-chapter4-h15}
+##### 优先策略：全链路异步与细粒度同步 {#src-book-chapter4-h15}
 
 在昇腾 310B 平台上，由于 CPU 算力相对有限，最理想的流水线策略是实施“全链路异步”设计，即让 CPU 专注于指令分发，而将繁重的计算负载全权交由 NPU 负责。开发者应尽量避免使用 `acl.rt.memcpy` 等同步阻塞接口，转而全面采用 `acl.rt.memcpy_async` 配合 Event 机制。这种方法的核心原则在于，凡是能通过 Device 侧 `stream_wait_event` 解决的任务依赖，绝不让 Host 侧的 CPU 介入干预。例如，在典型的多级推理流水线中，我们可以安排 Stream A 负责视频解码（DVPP），Stream B 负责模型推理。当 Stream A 完成解码任务后，只需在流中记录一个 Event，而 Stream B 仅需等待该 Event 触发即可启动推理。整个交互过程中，CPU 仅需极低开销下发几条控制指令，完全无需挂起等待解码结束，从而能腾出宝贵算力去处理复杂的业务逻辑或网络通信，实现真正的软硬件解耦与并行。
 
@@ -448,7 +448,7 @@ acl.rt.stream_wait_event(stream_infer, event_decode_done)
 acl.mdl.execute_async(..., stream_infer)
 ```
 
-##### 2. 数据传输优化：Host Pinned Memory 的强制管理 {#src-book-chapter4-h16}
+##### 数据传输优化：Host Pinned Memory 的强制管理 {#src-book-chapter4-h16}
 
 实现异步传输的高性能前提是 Host 侧内存的稳定性。在使用 `acl.rt.memcpy_async` 进行 Host 到 Device 的数据搬运时，源端的 Host 内存**必须**是通过 `acl.rt.malloc_host` 申请的页锁定内存（Pinned Memory）。普通的 `malloc` 申请的内存可能会被操作系统分页机制换出到磁盘交换区，导致 DMA 控制器无法安全、准确地访问数据。此外，内存的生命周期管理至关重要。在释放 Host 侧指针之前，必须通过 `acl.rt.synchronize_stream` 等手段确保所有涉及该内存块的 Stream 任务都已彻底执行完毕。如果过早释放内存，NPU 正尝试读取数据时地址已失效，将导致读取到野指针数据，引发难以复现的推理错误或系统崩溃。
 
@@ -470,7 +470,7 @@ acl.rt.synchronize_stream(stream)
 acl.rt.free_host(host_ptr)
 ```
 
-##### 3. 多 Stream 协作范式：生产者-消费者模型 {#src-book-chapter4-h17}
+##### 多 Stream 协作范式：生产者-消费者模型 {#src-book-chapter4-h17}
 
 构建基于生产者-消费者模型的多 Stream 协作机制，是挖掘 310B 硬件潜能、提升应用帧率（FPS）的关键手段。具体的实施路径是将通过 Stream 的划分将任务解耦为“预处理”、“推理”和“后处理”等独立阶段，通过 Event 机制实现流水线衔接。这种模式下，前一个阶段完成后记录 Event，后一个阶段感应 Event 并启动，就像工厂流水线一样运转。其最大优势在于避免了 CPU 使用 `while` 循环去轮询 NPU 的状态，极大降低了 CPU 占用率。对于昇腾 310B 这类嵌入式 SoC 而言，节省下来的 CPU 开销意味着开发者可以在 Python 层运行更复杂的逻辑判断，从而提升整个系统的智能化水平。
 
@@ -494,7 +494,7 @@ for image in images:
     post_process(stream_c)
 ```
 
-##### 4. 避免滥用全局同步与调试建议 {#src-book-chapter4-h18}
+##### 避免滥用全局同步与调试建议 {#src-book-chapter4-h18}
 
 在追求高性能的同时，必须警惕对同步接口的滥用。最典型的反模式是在每一帧的处理循环中都调用 `acl.rt.synchronize_device()`，这种做法相当于强制将所有并行的流水线“拍扁”为串行执行，完全浪费了 NPU 的并行处理能力。全局同步应当被严格限制在程序初始化（确保设备状态复位）、调试阶段（精确定位错误发生的算子）或进程退出阶段（安全回收所有资源）。对于开发者而言，调试异步程序确实存在挑战，因为报错行往往滞后于实际错误发生点。因此，建议遵循“从同步到异步”的演进路线：在开发初期，全部使用同步接口（如 `synchronize_stream`）确保逻辑正确性和内存安全；进入性能调优阶段后，再逐步替换为异步接口并引入 Event 机制，配合 Profiling 工具观察流水线中的空隙（Bubble），逐步压榨硬件性能。
 
@@ -560,15 +560,16 @@ export HF_ENDPOINT=https://hf-mirror.com
 echo 'export HF_ENDPOINT=https://hf-mirror.com' >> ~/.bashrc
 source ~/.bashrc
 ```
-为了避免影响服务器上已有的虚拟环境，建议提前安装 Anaconda，并通过以下命令新建独立的环境：
+为了避免影响服务器上已有的虚拟环境，应使用仓库统一约定的 Conda 环境：
 
 ```bash
-conda create -n torch
-conda activate torch
-conda install python=3.11
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
+python -V
 ```
 
-此处选择 Python 3.11 作为示例，实际可根据需求选择合适的版本，但不建议使用过新或过旧的版本，以减少兼容性问题。
+该环境使用 Python 3.9.25。若环境中缺少本章依赖，只安装用户态 Python 包，不重建或覆盖已由板端维护的 CANN 环境。
 
 随后，使用 pip 安装所需依赖：
 

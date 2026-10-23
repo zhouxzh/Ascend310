@@ -66,7 +66,7 @@ footer: "第2章：CANN软件栈核心组件解析"
 
 ATC 成功、OM 存在、推理成功是三道独立的门。任何一道没有证据，都不能用下一道的结果替代。
 
-<div class="source">教材：<a href="../book/chapter2.md#cann异构计算架构"><code>src/book/chapter2.md</code> §CANN异构计算架构、ATC模型转换详解</a></div>
+<div class="source">教材：<a href="../book/chapter2.md#src-book-chapter2-h1"><code>src/book/chapter2.md</code> §CANN异构计算架构、ATC模型转换详解</a></div>
 
 <!--
 先建立证据分层。学生最容易把 ATC 打印 success 当成推理已经通过，后面用双板记录纠正这个误解。
@@ -80,7 +80,7 @@ ATC 成功、OM 存在、推理成功是三道独立的门。任何一道没有�
 
 ![CANN 异构计算软件栈与生态层次图](../book/img2/CANN_Architecture.png)
 
-<div class="source">图片：<a href="../book/img2/CANN_Architecture.png"><code>src/book/img2/CANN_Architecture.png</code></a>；出处：<a href="../book/chapter2.md#cann的架构"><code>src/book/chapter2.md</code>「CANN的架构」</a></div>
+<div class="source">图片：<a href="../book/img2/CANN_Architecture.png"><code>src/book/img2/CANN_Architecture.png</code></a>；出处：<a href="../book/chapter2.md#src-book-chapter2-h4"><code>src/book/chapter2.md</code>「CANN的架构」</a></div>
 
 <!--
 从上到下带读：应用、AscendCL、服务层、编译层、执行层和基础层。强调 ATC 只属于编译层，不负责应用服务和运行时资源生命周期。
@@ -102,7 +102,7 @@ ATC 成功、OM 存在、推理成功是三道独立的门。任何一道没有�
 
 CANN 的复杂度来自跨层协作。排障时必须先确定故障发生在哪一层。
 
-<div class="source">教材：<a href="../book/chapter2.md#cann的架构"><code>src/book/chapter2.md</code>「CANN的架构」</a></div>
+<div class="source">教材：<a href="../book/chapter2.md#src-book-chapter2-h4"><code>src/book/chapter2.md</code>「CANN的架构」</a></div>
 
 <!--
 让学生用自己的话说明 ATC、Runtime、AIPP 和 DVPP 各自在哪一层，避免把所有问题都归因于 NPU。
@@ -123,7 +123,7 @@ CANN 的复杂度来自跨层协作。排障时必须先确定故障发生在哪
 
 共同点是都需要把模型或程序转换成设备指令。差异在抽象层次、硬件耦合和软件生态。
 
-<div class="source">教材：<a href="../book/chapter2.md#cann与cuda"><code>src/book/chapter2.md</code>「CANN与CUDA」</a></div>
+<div class="source">教材：<a href="../book/chapter2.md#src-book-chapter2-h3"><code>src/book/chapter2.md</code>「CANN与CUDA」</a></div>
 
 <!--
 不要把生态成熟度描述成单一输赢。课堂重点是理解两套栈的抽象对象和证据工具不同。
@@ -141,7 +141,7 @@ CANN 的复杂度来自跨层协作。排障时必须先确定故障发生在哪
 - **Tensor Proto** 保存权重、形状和数据类型。
 - ATC 只支持目标 CANN 版本实际覆盖的算子、控制流和数据类型。
 
-<div class="source">教材：<a href="../book/chapter2.md#onnx格式介绍"><code>src/book/chapter2.md</code>「ONNX格式介绍」</a></div>
+<div class="source">教材：<a href="../book/chapter2.md#src-book-chapter2-h10"><code>src/book/chapter2.md</code>「ONNX格式介绍」</a></div>
 
 <!--
 让学生区分“ONNX 文件能打开”和“ONNX 合同能被目标 CANN/ATC 接受”。动态控制流、自定义算子和极端 Shape 都要单独核对。
@@ -153,7 +153,7 @@ CANN 的复杂度来自跨层协作。排障时必须先确定故障发生在哪
 
 <div class="split"><figure><img src="../book/img2/atc.png" alt="ATC 流程与图优化示意图"><figcaption>ATC 将框架模型解析为统一 IR，再经图优化生成 OM。</figcaption></figure><div><ol><li>环境准备并确认目标 SoC。</li><li>解析 ONNX，形成统一 IR Graph。</li><li>执行图准备、拆分、融合与编译。</li><li>生成离线模型，交给运行时执行。</li></ol></div></div>
 
-<div class="source">图片：<a href="../book/img2/atc.png"><code>src/book/img2/atc.png</code></a>；出处：<a href="../book/chapter2.md#atc工具介绍"><code>src/book/chapter2.md</code>「ATC工具介绍」</a></div>
+<div class="source">图片：<a href="../book/img2/atc.png"><code>src/book/img2/atc.png</code></a>；出处：<a href="../book/chapter2.md#src-book-chapter2-h9"><code>src/book/chapter2.md</code>「ATC工具介绍」</a></div>
 
 <!--
 图中左侧是模型输入，右侧是单算子路径；下方汇入 OM。课堂强调 ATC 是编译阶段，不是运行时服务。
@@ -171,7 +171,7 @@ CANN 的复杂度来自跨层协作。排障时必须先确定故障发生在哪
 - 规划权重重排与内存复用。
 - 输出 OM，并留下转换日志和融合摘要。
 
-<div class="source">教材：<a href="../book/chapter2.md#atc工具使用流程"><code>src/book/chapter2.md</code>「ATC工具使用流程」</a></div>
+<div class="source">教材：<a href="../book/chapter2.md#src-book-chapter2-h11"><code>src/book/chapter2.md</code>「ATC工具使用流程」</a></div>
 
 <!--
 转换成功是编译结果，不是精度或性能结果。融合摘要只能说明图优化发生了什么，不能替代运行和数值验证。
@@ -194,7 +194,7 @@ CANN 的复杂度来自跨层协作。排障时必须先确定故障发生在哪
 
 `Name` 为 `310B4` 或 `310B1` 时，目标参数分别追加 `Ascend` 前缀。健康状态单独记录，不能替代版本检查。
 
-<div class="source">教材：<a href="../book/chapter2.md#cann的快速安装"><code>src/book/chapter2.md</code>「CANN的快速安装」</a>；环境：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §2.2</a></div>
+<div class="source">教材：<a href="../book/chapter2.md#src-book-chapter2-h5"><code>src/book/chapter2.md</code>「CANN的快速安装」</a>；环境：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §2.2</a></div>
 
 <!--
 先确认板卡和环境，再运行 ATC。8T 与 20T 用各自的 soc_version，不能复用同一个编译目标来掩盖版本身份。
@@ -215,7 +215,7 @@ atc \
   --soc_version=Ascend310B4
 ```
 
-<div class="source">命令：<a href="../../samples/chapter2/sample_resnet_quick_start/README.md"><code>samples/chapter2/sample_resnet_quick_start</code></a>；教材：<a href="../book/chapter2.md#模型转换-以resnet50为例"><code>src/book/chapter2.md</code>「模型转换-以ResNet50为例」</a></div>
+<div class="source">命令：<a href="../../samples/chapter2/sample_resnet_quick_start/README.md"><code>samples/chapter2/sample_resnet_quick_start</code></a>；教材：<a href="../book/chapter2.md#src-book-chapter2-h12"><code>src/book/chapter2.md</code>「模型转换-以ResNet50为例」</a></div>
 
 8T 使用 `Ascend310B4`；20T 使用 `Ascend310B1`。命令结构相同，不代表 OM 字节相同或结果可以互相继承。
 
@@ -262,7 +262,7 @@ ls -lh model/resnet50.om
 sha256sum model/resnet50.om
 ```
 
-<div class="source">命令依据：<a href="../book/chapter2.md#atc工具使用流程"><code>src/book/chapter2.md</code>「ATC工具使用流程」</a>；加载证据：<a href="../../docs/chapter-board-runs-20261017/tool-execution/tool-matrix.json"><code>tool-matrix.json</code> 的 `msame8`、`msame20`</a></div>
+<div class="source">命令依据：<a href="../book/chapter2.md#src-book-chapter2-h11"><code>src/book/chapter2.md</code>「ATC工具使用流程」</a>；加载证据：<a href="../../docs/chapter-board-runs-20261017/tool-execution/tool-matrix.json"><code>tool-matrix.json</code> 的 `msame8`、`msame20`</a></div>
 
 - 路径要能对应转换批次和目标 SoC。
 - 文件大小必须非零，哈希用于区分同名的不同工件。
@@ -287,7 +287,7 @@ sha256sum model/resnet50.om
 - 执行推理，把结果写到指定目录。
 - 卸载模型，并按顺序释放流、上下文和设备。
 
-<div class="source">教材：<a href="../book/chapter2.md#模型推理工具msame工具概览"><code>src/book/chapter2.md</code>「msame工具概览」</a></div>
+<div class="source">教材：<a href="../book/chapter2.md#src-book-chapter2-h14"><code>src/book/chapter2.md</code>「msame工具概览」</a></div>
 
 <!--
 把 msame 定位成运行时烟测工具。它证明加载和执行链，不证明数据预处理一致，也不替代完整精度和性能基准。
@@ -299,7 +299,7 @@ sha256sum model/resnet50.om
 
 <div class="split"><figure><img src="../book/img2/dog1_1024_683.jpg" alt="ResNet50 示例输入图片"><figcaption>教材中的示例图片，仅用于说明输入预处理。</figcaption></figure><div><ol><li>读取为 RGB。</li><li>缩放到 256×256。</li><li>中心裁剪到 224×224。</li><li>转为 float32 并按通道归一化。</li><li>变为 NCHW，加入 batch 维。</li></ol></div></div>
 
-<div class="source">图片与流程：<a href="../book/chapter2.md#图片预处理"><code>src/book/chapter2.md</code>「图片预处理」</a>；<code>src/book/img2/dog1_1024_683.jpg</code></div>
+<div class="source">图片与流程：<a href="../book/chapter2.md#src-book-chapter2-h16"><code>src/book/chapter2.md</code>「图片预处理」</a>；<code>src/book/img2/dog1_1024_683.jpg</code></div>
 
 <!--
 预处理必须与训练和 ATC 的输入合同一致。顺序、均值、方差、颜色通道或布局任一改变，都可能让 msame 正常执行但输出异常。

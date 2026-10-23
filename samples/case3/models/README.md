@@ -47,16 +47,55 @@ Published release assets are downloaded from `zhouxzh/piano-ddsp-ascend310` with
 `tools/download_model_release.py`. The downloader requires a fixed revision,
 downloads `SHA256SUMS` first, resumes partial files, and records the resolved
 commit. It does not create or delete TFLite files, old ONNX files, checkpoints,
-or upstream material. Piano-DDSP currently pins Hugging Face commit
-`c41911aa7de454aeacf0b3edbb2d06a0801fb3ff`. Each OM bundle preserves source/OM hashes, raw ATC
-logs, the exact command, environment evidence, and the PyACL-validated I/O
-contract. Completed bundles are immutable; rollback atomically changes only
-`models/piano_ddsp/active-bundle.json`.
+or upstream material. Piano-DDSP pins source commit
+`c41911aa7de454aeacf0b3edbb2d06a0801fb3ff` directly. Each OM bundle preserves
+source/OM hashes, raw ATC logs, the exact command, environment evidence, and the
+PyACL-validated I/O contract. Completed bundles are immutable; rollback
+atomically changes only `models/piano_ddsp/active-bundle.json`.
 
-The assembled DDSP-VST Effect release is staged locally under
-`models/ddsp_vst_effect/release-v1.0.0/` with its license, source/ONNX/OM hashes,
-ATC log, and validation reports. It must not be described as a Hugging Face
-release or assigned a download revision until an authenticated upload succeeds.
+The Hugging Face repository intentionally keeps only one moving branch (`main`)
+and one immutable release tag (`case3-runtime-v1.0.1`). The historical
+`model-suite-v1.0.0` and `model-suite-v1.0.1` Git tags were retired from the
+revision selector. `model-suite-v1.0.1` remains the internal model-release
+identifier and source commit pin, not a second branch or active HF tag.
+
+The complete Ascend 310B runtime overlay is published as:
+
+```text
+repository: zhouxzh/piano-ddsp-ascend310
+tag: case3-runtime-v1.0.1
+commit: bd04b503920860896fbbf504993046ea099b45f8
+prefix: ascend310b4-runtime-v1.0.1/
+files: 166
+SHA256SUMS: e178f3db214437e45a00660f509b4b19611b3a1d44cb554f37c732292a347660
+```
+
+It contains the Piano-DDSP FP32 bundle, MIDI-DDSP stateful bundle, DDSP-VST
+Feature and 22 Control OMs, metadata, active-bundle pointer, ATC provenance,
+validation evidence, licenses, and runtime checksum manifest. Source ONNX,
+TFLite, training checkpoints, datasets, MIDI inputs, and rendered WAV files are
+not duplicated in this runtime overlay.
+
+```bash
+hf download zhouxzh/piano-ddsp-ascend310 \
+  --repo-type model \
+  --revision case3-runtime-v1.0.1 \
+  --include "ascend310b4-runtime-v1.0.1/*" \
+  --local-dir artifacts/case3-runtime
+
+cd artifacts/case3-runtime/ascend310b4-runtime-v1.0.1
+sha256sum -c SHA256SUMS
+```
+
+A public cold-download verification from `huggingface.co` passed all 166 checks
+in GitHub Actions run `39926902169`. The earlier `case3-runtime-v1.0.0` staging
+tag was invalidated and deleted before release.
+
+The DDSP-VST Effect release is included in the fixed runtime overlay above,
+with its license, source/ONNX/OM hashes, ATC log, and validation reports. Its
+standalone source remains staged locally under
+`models/ddsp_vst_effect/release-v1.0.0/`; consumers should use the immutable
+runtime tag rather than a moving branch.
 
 Piano-DDSP FP32 bundles must record `precision_mode_v2=origin`. A model is not
 runtime-eligible until its hashed validation report passes at least 10,000

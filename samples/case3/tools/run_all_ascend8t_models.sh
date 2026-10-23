@@ -124,7 +124,8 @@ activate_environment() {
     }
     # shellcheck disable=SC1090
     source "$conda_script"
-    conda activate base || exit 1
+    conda activate ascend || exit 1
+    export PYTHONNOUSERSITE=1
 
     local cann_script=""
     for candidate in \

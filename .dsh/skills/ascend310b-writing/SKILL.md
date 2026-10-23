@@ -18,9 +18,9 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
 | 理论教程 | `ascend310b-writing-theory` | `src/book/`、第1章至第10章、sidebar、理论索引 |
 | 实践案例 | `ascend310b-writing-case` | `src/experiment/`、案例1至案例9、case4 自包含 |
 | Presentation | `ascend310b-writing-presentation` | `src/presentation/`、Marp 主题、真实浏览器课件验收 |
-| 代码工程 docs | `ascend310b-writing-docs` | `samples/caseN/README.md`、`docs/`、部署/API/验证/限制 |
+| 代码工程 docs / 测试问题台账 | `ascend310b-writing-docs` | `samples/caseN/README.md`、`docs/`、部署/API/验证/限制、`troubleshooting.md` |
 | 代码 API/docstring/参考 | `ascend310b-code-docs` | 源码 API、CLI、docstring、README 和可运行示例 |
-| 学术论证/论文式写作 | `ascend310b-writing-academic` | claim-evidence-citation、方法、实验、结果、限制 |
+| 教材润色/学术论证 | `ascend310b-writing-academic` | 读者化改写、去 AI 味、claim-evidence-citation、Revision notes |
 | 教材课程计划 | `ascend310b-curriculum-planning` | 章节/案例/样例/课件的学习目标、先修和评估矩阵 |
 | VuePress | `ascend310b-writing-vuepress` | `src/.vuepress/`、sidebar、路由、静态资源和站点构建 |
 | LaTeX/PDF | `ascend310b-writing-latex` | `convert-vuepress.sh`、`latex/`、字体、锚点、构建日志 |
@@ -28,9 +28,68 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
 | Graphviz DOT | `ascend310b-writing-dot` | 系统架构图、数据流图、程序流程图和 `.dot` 源 |
 | 跨对象规则 | 本 skill | 冻结命名、链接、图片、标点、PDF、push gate 和写作进度 |
 
-先判断对象，再打开专用 skill；不要把案例运行手册写成理论章节，也不要把代码 docs 当成课件或案例正文。
+先判断对象，再打开专用 skill。一次写作任务只加载本 skill 加**一个**对象 skill；不要把全部 writing skill 同时打开。
+
+| 用户在改什么 | 加载 |
+| --- | --- |
+| 第1–10章理论 | `ascend310b-writing-theory` |
+| 案例1–9教材正文 | `ascend310b-writing-case` |
+| Marp 课件 | `ascend310b-writing-presentation` |
+| `samples/*/docs`、案例 README 的部署/验证 | `ascend310b-writing-docs` |
+| 源码 docstring、CLI、API 表 | `ascend310b-code-docs` |
+| 站点主题、navbar、sidebar、base、Pages | `ascend310b-writing-vuepress` |
+| PDF/缺字形 | `ascend310b-writing-latex` |
+| 结构图 | `ascend310b-writing-dot` |
+| 标点、标题、链接卫生 | `ascend310b-writing-markdown` |
+| 论文式论证 | `ascend310b-writing-academic` |
+| 课程计划/先修矩阵 | `ascend310b-curriculum-planning` |
+
+不要把案例运行手册写成理论章节，也不要把代码 docs 当成课件或案例正文。`nature-polishing` 只用于已有学术散文的润色，不替代本仓库教材写作。
 
 已发布 Presentation 的“对应教材”必须使用 GitHub Pages HTML 链接，“配套样例”必须使用 GitHub `samples/` 目录链接；不要在已发布课件中保留 `../experiment/*.md` 等本地相对导航。
+
+## 读者稿与生产备注
+
+教材、案例和课件是给学生读的完成稿，不是作者工作台。参考 `nature-polishing` 的读者工作流：先判断“这页对我有没有用”，再看证据和边界。生产备注不能进入读者可见正文。
+
+禁止写入 `src/book/`、`src/experiment/`、`src/appendix/` 和课件可见区的内容包括：
+
+- `.dot` 源路径、`源图：`、`源码：` 这类仓库内部标注；
+- Graphviz 字体名、pt/dpi、`rankdir`、画布尺寸和排版自检说明；
+- `human-review: pending`、审计规则名、插件工具名、作者自检清单；
+- 只对作者有用、对学生无运行价值的仓库路径注释。
+
+图片用一句面向读者的 alt 说明职责或流程即可。`.dot` 源、字体和画布检查留在 `ascend310b-writing-dot`、同目录源文件和课件页脚的 HTML 来源链接中。代码命令可以出现在教程里，但那是学生要执行的入口，不是作者的排版备注。
+
+## 章节编号
+
+全书采用“源文件语义标题、渲染器自动编号”：
+
+- H1 保留冻结标题：`# 案例 4：掌纹识别`、frontmatter 中的 `title: 第4章：PyACL应用开发基础`、`# 附录 4：Vibe Coding`。
+- H2–H6 **不手写** `1.`、`1.1`、`4.1`、`3.1.2` 等章节编号。
+- 案例 4 在 PDF 中仍会显示为实践案例部分的第 4 章：`4.1`、`4.2`、`4.2.1`，这些编号由 LaTeX/PDF 生成，不写进 Markdown。
+- VuePress 如果显示编号，由主题、CSS counter 或渲染插件生成，不在标题文本里重复。
+- 每个标题保留显式稳定锚点：`{#src-<部分>-<文件名>-h<n>}`。
+- 工程 docs 的文件名用 `NN-*.md` 表示阅读顺序，文件内 H2–H6 同样不写编号。
+- `ascend310b_writing_audit` 的 `heading-manual-number` 和代码 docs 的 `code-docs-manual-heading-number` 会阻断手写编号；按文件汇总为 error。
+
+正确示例：
+
+```markdown
+# 案例 4：掌纹识别
+
+## 案例目标 {#src-experiment-case4-goal}
+
+### 环境检查 {#src-experiment-case4-environment-check}
+```
+
+错误示例：
+
+```markdown
+## 1. 案例目标
+### 1.1 环境检查
+## 4.1 案例目标
+```
 
 ## 先看规则，再动手
 
@@ -120,6 +179,7 @@ push 之后必须用 `ascend310b_writing_ci` 确认 GitHub Pages 工作流成功
 - `ci-pages-pending`：等待完成；
 - `ci-remote-behind`：本地还有未推送提交，远端构建不代表它们；
 - 失败日志里的路径如果指向 `.gitignore` 中的运行时产物（如 `.om`），应修 CI 校验逻辑，不要把模型文件塞进仓库。
+- 案例发布验证必须能从 GitHub 固定 commit 获取源码、从 Hugging Face 固定 revision 获取模型；不要用作者本地模型或未提交源码的 `scp`/`rsync` 副本替代公开来源，完整门禁见 `ascend310b-case-testing`。
 ### 封面写法
 
 封面只放四样东西：
@@ -201,11 +261,14 @@ Marp 支持演讲者备注（HTML 注释），放映时按 `p` 打开演讲者�
 > [Marp Core](https://github.com/marp-team/marp-core)（16:9 尺寸、`size` 指令、auto-scaling 仅横向）、
 > [markdownlint](https://github.com/DavidAnson/markdownlint)（MD034 / MD040 / MD045，accessibility 标签）。
 
-## 去 AI 味（用户要求润色时才做）
+## 教材润色（用户要求润色时才做）
 
-这是这本书最常被抱怨的问题：**内容是对的，但读起来像产品宣传稿或大模型输出**。先跑
-`ascend310b_writing_style` 拿到候选句，再按下面的方法改。**它是提示不是判定**：同一个词在某句
-里可能恰好准确，逐句判断，不要机械替换。
+润色不是只跑一遍风格扫描。用户要求“润色、正式出版、人类可读、去 AI 味、压缩”时，必须加载
+`ascend310b-writing-academic` 的「教材润色模式」，先做读者、段落任务和 claim/evidence 诊断，
+再输出可替换正文与 `Revision notes:`。`ascend310b_writing_style` 只用来找候选句，不能代替改写。
+
+这是这本书最常被抱怨的问题：**内容是对的，但读起来像产品宣传稿或大模型输出**。同一句话里的
+某个词可能恰好准确，逐句判断，不要机械替换。
 
 ### 四类问题与改法
 

@@ -204,7 +204,7 @@ FAISS是派生缓存，SQLite与受管文件才是可恢复的组合。模型变
 
 没有当前准入报告的模型不能被服务选择，也不能以CPU结果替代。
 
-<div class="source">教材：<a href="../experiment/case7.md#昇腾310b模型迁移方法"><code>src/experiment/case7.md</code>「昇腾310B模型迁移方法」</a></div>
+<div class="source">教材：<a href="../experiment/case7.md#昇腾-310b-模型迁移方法"><code>src/experiment/case7.md</code>「昇腾310B模型迁移方法」</a></div>
 
 <!--
 准入是模型、板卡、版本和查询合同的联合结论。文件存在、ATC成功或单次输出有限都只是其中一层。
@@ -363,7 +363,7 @@ E6 dry-run只证明旋转、裁剪、量化和192000字节帧协议，不证明�
 
 页面能打开只对应第一列的一部分，不是整条相册链路通过。
 
-<div class="source">样例：<a href="../../samples/case7/README.md"><code>samples/case7/README.md</code> 检查与重启</a>；教材：<a href="../experiment/case7.md#测试性能与验收方法"><code>src/experiment/case7.md</code> §测试</a></div>
+<div class="source">样例：<a href="../../samples/case7/README.md"><code>samples/case7/README.md</code> 检查与重启</a>；教材：<a href="../experiment/case7.md#测试、性能与验收方法"><code>src/experiment/case7.md</code> §测试</a></div>
 
 <!--
 按健康、索引、搜索、显示、设备拉图的顺序验收。每一步都有独立接口和原始证据。
@@ -403,7 +403,7 @@ E6 dry-run只证明旋转、裁剪、量化和192000字节帧协议，不证明�
 
 当前只可确认静态前端加载；其余四层必须重新执行并保留原始日志。
 
-<div class="source">作业：<a href="../experiment/case7.md#测试性能与验收方法"><code>src/experiment/case7.md</code> §测试</a>；实现：<a href="../../samples/case7/README.md"><code>samples/case7</code></a></div>
+<div class="source">作业：<a href="../experiment/case7.md#测试、性能与验收方法"><code>src/experiment/case7.md</code> §测试</a>；实现：<a href="../../samples/case7/README.md"><code>samples/case7</code></a></div>
 
 <!--
 最终要求学生逐层勾选。空库截图不能填“搜索”或“设备”两栏，后端未连接时也不能填任何NPU证据。

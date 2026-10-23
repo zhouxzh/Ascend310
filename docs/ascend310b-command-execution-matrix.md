@@ -9,6 +9,7 @@
 | `ascend_probe` | 否 | 固定只读环境探测 |
 | `ascend_board_exec` | 否 | 单条只读诊断，白名单和参数校验 |
 | `ascend_board_run` | 是，必须 `allowStateChange:true` | 下载、ATC、Python、pytest、msame、教程脚本 |
+| `ascend_apt_install` | 是，必须 `allowStateChange:true`；仅 SSH | 通过 `HwHiAiUser + sudo` 安装受控 apt 系统包 |
 | `ascend_model_download` | 是，必须 `allowStateChange:true` | 华为云/HF mirror/GitHub proxy 资产下载 |
 | `ascend_ui_capture` | 宿主机写 PNG，必须 `allowStateChange:true` | 开发板前端页面截图 |
 
@@ -47,6 +48,23 @@ Hugging Face 原始站不直接作为默认下载入口；GitHub 原始站不直
 
 这些命令可以在 `cwd` 指定的工作区运行，并返回退出码、耗时、stdout、stderr。运行前应先用 `dryRun:true` 检查命令。
 
+`ascend_board_run` 默认激活统一案例环境 `ascend`，并设置
+`PYTHONNOUSERSITE=1`；环境不存在时任务直接失败，不静默回退 `base`。
+`base` 只能通过显式 `environment: "base"` 用于系统诊断，`"none"` 用于裸
+SSH shell。`ascend` 固定 Python 3.9.25；CANN、NPU driver 和固件仍由板端
+系统提供。
+
+### 4.1 apt 系统程序安装
+
+`ascend_apt_install` 是独立的系统安装工具。公版默认密码未修改时，它使用 profile 的 `sudoPassword`，通过 `HwHiAiUser` 和 `sudo -S` 执行固定操作：
+
+```text
+apt-get update
+apt-get install -y --no-install-recommends <validated-packages>
+```
+
+包名必须符合 apt 名称字符集，一次最多 24 个；密码只通过 SSH stdin 发送，不进入命令行、日志、skill 或 Git。执行前必须显式 `allowStateChange:true`，并建议先 `dryRun:true` 检查目标和命令。安装结果与真实摄像头、音频、VPU 或 NPU 功能验收分开记录。
+
 ## 5. 仍不允许或需要额外开关的命令
 
 | 命令类别 | 默认行为 | 原因 |
@@ -55,7 +73,7 @@ Hugging Face 原始站不直接作为默认下载入口；GitHub 原始站不直
 | `reboot`、`shutdown`、`poweroff` | 始终拒绝 | 中断开发板 |
 | `mkfs`、直接 `dd` 写块设备 | 始终拒绝 | 破坏文件系统/设备 |
 | `rm -r`、`rm -f` | 需要 `allowDestructive:true` | 可能删除工作区或系统文件 |
-| `sudo` | 需要 `allowPrivileged:true` | 提权安装/系统修改 |
+| `sudo` | 需要 `allowPrivileged:true`；apt 安装使用 `ascend_apt_install` | 提权安装/系统修改 |
 | `npu-smi` 写操作 | 只能由用户手工执行 | 插件不代替硬件运维 |
 
 ## 6. 章节命令审计

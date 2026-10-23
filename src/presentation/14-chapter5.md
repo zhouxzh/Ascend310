@@ -66,7 +66,7 @@ footer: "第5章：MindSpore开发基础"
 
 四个组件各有版本和 ABI。一个组件导入成功，不能证明另一组件的执行路径可用。
 
-<div class="source">教材：<a href="../book/chapter5.md#mindspore开发基础"><code>src/book/chapter5.md</code> §本章组件边界</a></div>
+<div class="source">教材：<a href="../book/chapter5.md#src-book-chapter5-h2"><code>src/book/chapter5.md</code> §本章组件边界</a></div>
 
 <!--
 先拆词再写代码。全量 MindSpore 与 Lite 是两个运行时；MindNLP 是上层模型与加载器，不是设备运行时。
@@ -80,7 +80,7 @@ footer: "第5章：MindSpore开发基础"
 
 ![MindSpore 与 Ascend 310B 软件栈关系图](../book/img5/mindspore_ascend_stack.png)
 
-<div class="source">图片：<a href="../book/img5/mindspore_ascend_stack.png"><code>src/book/img5/mindspore_ascend_stack.png</code></a>；出处：<a href="../book/chapter5.md#从框架到硬件的纵向分层"><code>src/book/chapter5.md</code>「从框架到硬件的纵向分层」</a></div>
+<div class="source">图片：<a href="../book/img5/mindspore_ascend_stack.png"><code>src/book/img5/mindspore_ascend_stack.png</code></a>；出处：<a href="../book/chapter5.md#src-book-chapter5-h3"><code>src/book/chapter5.md</code>「从框架到硬件的纵向分层」</a></div>
 
 <!--
 从上向下看用户代码、MindSpore、MindIR/算子图、CANN、驱动固件和硬件。图编译失败与 ACL 初始化失败属于不同层。
@@ -122,7 +122,7 @@ Alarm 不单独构成失败。版本与导入路径决定实际加载的是哪�
 
 20T 的基础子集不能证明 MindNLP 大模型可用；8T 的 MindIR 结果也不能外推到 20T。
 
-<div class="source">教材：<a href="../book/chapter5.md#mindspore开发基础"><code>src/book/chapter5.md</code> §两套板端证据</a>；双板记录：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>docs/ascend310b-chapter-board-comparison-20261017.md</code> §2</a></div>
+<div class="source">教材：<a href="../book/chapter5.md#src-book-chapter5-h2"><code>src/book/chapter5.md</code> §两套板端证据</a>；双板记录：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>docs/ascend310b-chapter-board-comparison-20261017.md</code> §2</a></div>
 
 <!--
 这是全章的证据分栏规则。后续每张表都要注明来自哪一组，不能把 Qwen 模型状态和 Lite 错误混在一条结论里。
@@ -140,7 +140,7 @@ a = Tensor([[1.0, 2.0], [3.0, 4.0]], ms.float16)
 print(ops.matmul(a, a).asnumpy())
 ```
 
-<div class="source">代码与结果：<a href="../../samples/chapter5/01_tensor_ops.py"><code>samples/chapter5/01_tensor_ops.py</code></a>；教材：<a href="../book/chapter5.md#张量数据类型与设备上下文"><code>src/book/chapter5.md</code> §5.4</a></div>
+<div class="source">代码与结果：<a href="../../samples/chapter5/01_tensor_ops.py"><code>samples/chapter5/01_tensor_ops.py</code></a>；教材：<a href="../book/chapter5.md#src-book-chapter5-h9"><code>src/book/chapter5.md</code> §5.4</a></div>
 
 同板记录：`fp16` 矩阵乘通过；`fp32` 矩阵乘在取回数值时被 `EZ1001` 拒绝。只打印 shape 会出现 2/2 假阳性。
 
@@ -163,7 +163,7 @@ class Fp16Linear(nn.Cell):
         return ops.matmul(x, self.weight) + self.bias
 ```
 
-<div class="source">代码：<a href="../../samples/chapter5/chapter5_models.py"><code>samples/chapter5/chapter5_models.py</code></a>；教材：<a href="../book/chapter5.md#用-cell-与-ops-构建网络"><code>src/book/chapter5.md</code> §5.5</a></div>
+<div class="source">代码：<a href="../../samples/chapter5/chapter5_models.py"><code>samples/chapter5/chapter5_models.py</code></a>；教材：<a href="../book/chapter5.md#src-book-chapter5-h10"><code>src/book/chapter5.md</code> §5.5</a></div>
 
 显式 `fp16` 参数与输入是 8T 记录中的可运行路径。`nn.Dense(...).to_float(fp16)` 出现过多结果不一致，不能作为交付写法。
 
@@ -186,7 +186,7 @@ Cell 相当于带参数的模块，construct 是图入口；ops 是不可训练�
 
 `map` 返回未定型标量会在数据管道阶段失败。不要在这个阶段访问设备上下文。
 
-<div class="source">样例：<a href="../../samples/chapter5/03_dataset_pipeline.py"><code>samples/chapter5/03_dataset_pipeline.py</code></a>；教材：<a href="../book/chapter5.md#数据集与预处理"><code>src/book/chapter5.md</code> §5.6</a></div>
+<div class="source">样例：<a href="../../samples/chapter5/03_dataset_pipeline.py"><code>samples/chapter5/03_dataset_pipeline.py</code></a>；教材：<a href="../book/chapter5.md#src-book-chapter5-h13"><code>src/book/chapter5.md</code> §5.6</a></div>
 
 <!--
 数据管道的错误归数据管道，不要归 NPU。固定随机源、dtype 和批次形状，才有可比较的训练曲线。
@@ -216,7 +216,7 @@ Cell 相当于带参数的模块，construct 是图入口；ops 是不可训练�
 
 `ms.jit` 需要真实源码文件；图模式中不要依赖 Python 副作用或随张量值变化的控制流。
 
-<div class="source">样例：<a href="../../samples/chapter5/04_graph_mode.py"><code>samples/chapter5/04_graph_mode.py</code></a>；教材：<a href="../book/chapter5.md#静态图与函数式编程"><code>src/book/chapter5.md</code> §5.7</a></div>
+<div class="source">样例：<a href="../../samples/chapter5/04_graph_mode.py"><code>samples/chapter5/04_graph_mode.py</code></a>；教材：<a href="../book/chapter5.md#src-book-chapter5-h16"><code>src/book/chapter5.md</code> §5.7</a></div>
 
 <!--
 两种模式得到同一个结果，只能证明这段最小计算一致。图模式不等同于更快，本章没有做性能比较。
@@ -234,7 +234,7 @@ Cell 相当于带参数的模块，construct 是图入口；ops 是不可训练�
 - 用取回的 loss 数值确认参数真的变化。
 - 图模式与 PyNative 结果要做一致性对照。
 
-<div class="source">样例：<a href="../../samples/chapter5/05_autograd_train.py"><code>samples/chapter5/05_autograd_train.py</code></a>；教材：<a href="../book/chapter5.md#自动微分优化器与训练循环"><code>src/book/chapter5.md</code> §5.8</a></div>
+<div class="source">样例：<a href="../../samples/chapter5/05_autograd_train.py"><code>samples/chapter5/05_autograd_train.py</code></a>；教材：<a href="../book/chapter5.md#src-book-chapter5-h19"><code>src/book/chapter5.md</code> §5.8</a></div>
 
 <!--
 重点解释参数可见性和 dtype。训练结果必须包含 loss 数值和退出状态，不能只看脚本是否启动。
@@ -364,7 +364,7 @@ CPU 后端先失败说明问题在格式版本检查，不能拿它证明 Ascend
 
 这页只说明 8T 当前 MindNLP loader 能力，不是“Qwen3 在 310B4 上永久不可运行”的硬件结论。
 
-<div class="source">来源：<a href="../../samples/case9/docs/archive/legacy-pre-release/35-qwen3-loader-compatibility-check-20260903.md"><code>35-qwen3-loader-compatibility-check-20260903.md</code> L3-L14、L29-L43</a>；教材：<a href="../book/chapter5.md#mindnlp与大模型加载"><code>src/book/chapter5.md</code> §5.11</a></div>
+<div class="source">来源：<a href="../../samples/case9/docs/archive/legacy-pre-release/35-qwen3-loader-compatibility-check-20260903.md"><code>35-qwen3-loader-compatibility-check-20260903.md</code> L3-L14、L29-L43</a>；教材：<a href="../book/chapter5.md#src-book-chapter5-h28"><code>src/book/chapter5.md</code> §5.11</a></div>
 
 <!--
 Qwen3 检查发生在 8T，不属于上一页的 20T 模型表。它没有下载或加载权重，因此只能证明 loader 缺失，不能扩写成模型运行失败或硬件不支持。
@@ -387,7 +387,7 @@ Qwen3 检查发生在 8T，不属于上一页的 20T 模型表。它没有下载
 
 缺任何一项都不能把一次运行当作可复用结论。
 
-<div class="source">教材：<a href="../book/chapter5.md#在310b上运行的边界与证据记录"><code>src/book/chapter5.md</code> §5.12</a></div>
+<div class="source">教材：<a href="../book/chapter5.md#src-book-chapter5-h31"><code>src/book/chapter5.md</code> §5.12</a></div>
 
 <!--
 要求学生按六类证据记录。失败与阻断必须保留；CPU 结果可以作数值参考，但不能填补 NPU 证据。
@@ -405,7 +405,7 @@ Qwen3 检查发生在 8T，不属于上一页的 20T 模型表。它没有下载
 4. 导出 CKPT/MindIR，记录哈希；Lite 先过格式检查。
 5. MindNLP 按模型、loader、工件与 8T/20T 证据组记录。
 
-<div class="source">任务：<a href="../book/chapter5.md#实践任务"><code>src/book/chapter5.md</code> §5.15</a>；记录规范：<a href="../../samples/chapter5/README.md"><code>samples/chapter5/README.md</code></a></div>
+<div class="source">任务：<a href="../book/chapter5.md#src-book-chapter5-h36"><code>src/book/chapter5.md</code> §5.15</a>；记录规范：<a href="../../samples/chapter5/README.md"><code>samples/chapter5/README.md</code></a></div>
 
 <!--
 最后检查证据组标签。8T基础、双板基础子集、20T MindNLP三者不能共用性能数字，也不能互相替代通过结论。

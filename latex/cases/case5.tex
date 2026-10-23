@@ -903,7 +903,8 @@ OM；\passthrough{\lstinline!verify\_npu\_model!}
 cd ~/Documents/case5
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 
 python -m time_frequency_dashboard.model.prepare_models
 python -m time_frequency_dashboard.model.verify_npu_model
@@ -1104,7 +1105,8 @@ OM 的峰值频点正确，再接入真实接收机。
 cd ~/Documents/case5
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 
 command -v rtl_sdr
 python -m time_frequency_dashboard.model.prepare_rtl_iq_model
@@ -1509,7 +1511,8 @@ sudo apt-get install -y libsigrok-dev sigrok-cli gcc pkg-config libfftw3-single3
 
 \begin{lstlisting}[language=bash]
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 python -m pip install -r requirements-board.txt
 \end{lstlisting}
 

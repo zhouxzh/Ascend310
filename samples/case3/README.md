@@ -4,7 +4,7 @@
 板端验证脚本。系统接收触控钢琴、实体 MIDI、MIDI 文件或实体麦克风输入，
 使用 PyACL 调用 OM 模型，并通过已连接的 USB、蓝牙或板载音频设备播放。
 
-详细设计、板端记录和操作步骤见 [doc/](doc/README.md)。
+详细设计、板端记录和操作步骤见 [docs/](docs/README.md)。
 
 ## 三条模型链路
 
@@ -46,7 +46,7 @@ python scripts/run_webui.py
 `/usr/local/Ascend/ascend-toolkit/set_env.sh` 和 Conda `base` 重新执行自身；该过程
 只设置当前服务进程的环境，不修改 shell 启动文件。随后程序打印本机和局域网访问
 地址，默认监听 `0.0.0.0:8765`。安装依赖、全屏启动、逐页操作、12 张实机截图、构建、
-同步和接口索引统一见 [WebUI 操作、部署与 API](doc/02-webui.md)。
+同步和接口索引统一见 [WebUI 操作、部署与 API](docs/02-webui.md)。
 
 ### 板载触摸屏全屏打开
 
@@ -85,7 +85,7 @@ Piano-DDSP 使用开发板已有的 CANN 8.0.0 和 Conda `base`。部署脚本�
 ## 模型与板端命令
 
 早期 `realtime_ddsp.py` 的 DDSP-VST MIDI Synth/ONNX 命令已退出当前使用流程，只保留为
-[历史实时 DDSP 路径](doc/14-realtime-ddsp.md)。当前 DDSP-VST 是 WebUI 中的麦克风 Effect，
+[历史实时 DDSP 路径](docs/14-realtime-ddsp.md)。当前 DDSP-VST 是 WebUI 中的麦克风 Effect，
 运行时必须使用 Feature OM 和 Control OM；实时触控与实体 MIDI 演奏统一使用 Piano-DDSP。
 
 ### 已发布模型下载
@@ -106,6 +106,25 @@ python tools/download_model_release.py \
 
 下载报告会保存解析后的提交 SHA。不要用移动的分支名替代发布 revision，也不要让部署脚本
 依赖本地 `.tflite`、checkpoint 或旧 ONNX 文件。
+
+完整 Ascend 310B runtime overlay 使用固定 tag `case3-runtime-v1.0.1`：
+
+```bash
+hf download zhouxzh/piano-ddsp-ascend310 \
+  --repo-type model \
+  --revision case3-runtime-v1.0.1 \
+  --include "ascend310b4-runtime-v1.0.1/*" \
+  --local-dir artifacts/case3-runtime
+
+cd artifacts/case3-runtime/ascend310b4-runtime-v1.0.1
+sha256sum -c SHA256SUMS
+```
+
+该 tag 固定到 commit `bd04b503920860896fbbf504993046ea099b45f8`，包含
+Piano-DDSP、MIDI-DDSP 和 DDSP-VST 的运行 OM、metadata、校验清单、许可证和验证证据。
+GitHub Actions run `39926902169` 已从官方 Hugging Face 冷下载并验证 166 个文件。
+HF 仓库只保留 `main` branch 和该唯一 runtime tag；Piano source 固定到 commit
+`c41911aa7de454aeacf0b3edbb2d06a0801fb3ff`，不再占用额外 tag。
 
 ### Piano-DDSP 模型与板端转换
 
@@ -140,7 +159,7 @@ PulseAudio `platform-sound` 路径曾触发 ALSA 内核 hard lock，因此 Piano
 不会使用该 Pulse sink。后续 `hw:0,0`、48 kHz 双声道直连测试也在 1024 帧后阻塞，
 内核持续报告 DMA period IRQ 错误且音频流无法正常停止。ALSA 虽宣告两个声道，
 厂商脚本只验证单声道；因此板载 3.5 mm 不作为 Piano-DDSP 实时立体声输出，详见
-[音频输出文档](doc/06-audio-output.md)。重复故障后，WebUI 的板载项改为独立、可终止的
+[音频输出文档](docs/06-audio-output.md)。重复故障后，WebUI 的板载项改为独立、可终止的
 `aplay` 单声道兼容后端，不再在 WebUI 进程内打开 PortAudio；该降级路径不属于
 实时立体声或低延时验收范围。
 
@@ -167,7 +186,7 @@ case3/
 ├── midi/                       # MIDI 曲库、MuseScore 工程和确定性测试夹具
 ├── midi_wav/                   # MIDI 曲库对应的单/双声道试听音频
 ├── _upstream/                  # 固定版本的第三方参考源码
-└── doc/                        # 设计和实测文档
+└── docs/                        # 设计和实测文档
 ```
 
 统一实时会话由 `midi_ddsp_webui/realtime_session.py` 管理。会话从开始到停止始终持有
@@ -223,7 +242,7 @@ DISPLAY=:0 XAUTHORITY=/home/HwHiAiUser/.Xauthority \
 Codex 自动化测试的必需辅助工具，但不是 WebUI 生产运行依赖；正常启动
 `python scripts/run_webui.py`、执行 OM 推理或从其他电脑访问 8765 端口都不依赖它。
 详细实机方法和截图命名见
-[WebUI 触摸屏终审与实机压测](doc/09-webui-acceptance.md#74-xdotool-物理-kiosk-复核)。
+[WebUI 触摸屏终审与实机压测](docs/09-webui-acceptance.md#xdotool-物理-kiosk-复核)。
 
 ```bash
 python -m pytest -q
@@ -242,26 +261,26 @@ python tools/validate_webui_runtime.py
 ```
 
 真实 OM、音频和 600 秒 DDSP-VST 双工命令见
-[WebUI 实机验收](doc/09-webui-acceptance.md)，不得以旧 MIDI Synth 冒烟命令替代 Effect 验收。
+[WebUI 实机验收](docs/09-webui-acceptance.md)，不得以旧 MIDI Synth 冒烟命令替代 Effect 验收。
 
 ## 文档
 
 | 文档 | 内容 |
 | :--- | :--- |
-| [项目概览](doc/01-overview.md) | 项目边界、硬件和系统链路 |
-| [MIDI 测试素材](doc/08-midi-test-tracks.md) | 确定性生成夹具、复现命令和使用边界 |
-| [模型与 OM 部署](doc/03-om-deployment.md) | 已发布模型下载、ATC、校验值和日志判定 |
-| [MIDI-DDSP 历史导出](doc/12-midi-ddsp-export.md) | 历史 TensorFlow 基准、模型结构、张量契约和验证记录 |
-| [两套模型对比](doc/13-midi-ddsp-vs-ddsp-vst.md) | 历史迁移背景和模型差异，不是当前用户入口 |
-| [历史实时 DDSP 路径](doc/14-realtime-ddsp.md) | 已退役的 DDSP-VST MIDI Synth/ONNX 对照资料 |
-| [MIDI-DDSP 播放](doc/05-midi-ddsp-realtime.md) | 完整渲染缓存、复音声部化、多 voice stem 和原版混响 |
-| [Piano-DDSP 实时系统](doc/04-piano-ddsp.md) | 固定模型来源、实时运行时、API、部署和验收 |
-| [Ascend 音频输出](doc/06-audio-output.md) | 板载、USB、蓝牙和扬声器测试 |
-| [板端实测结果](doc/10-benchmark-results.md) | DDSP-VST 板端结果 |
-| [WebUI 操作、部署与 API](doc/02-webui.md) | 四个工作区、12 张实机截图、全屏启动、构建部署和接口索引 |
-| [WebUI 实机验收](doc/09-webui-acceptance.md) | 12 页面视觉审核、四视口回归、UI/API 压测和 600 秒 Effect 结果 |
-| [故障排查](doc/11-troubleshooting.md) | SSH、音频、ATC、OM 和兼容问题 |
-| [第三方参考仓库](doc/15-upstream-repositories.md) | 固定提交和保留规则 |
+| [项目概览](docs/01-overview.md) | 项目边界、硬件和系统链路 |
+| [MIDI 测试素材](docs/08-midi-test-tracks.md) | 确定性生成夹具、复现命令和使用边界 |
+| [模型与 OM 部署](docs/03-om-deployment.md) | 已发布模型下载、ATC、校验值和日志判定 |
+| [MIDI-DDSP 历史导出](docs/12-midi-ddsp-export.md) | 历史 TensorFlow 基准、模型结构、张量契约和验证记录 |
+| [两套模型对比](docs/13-midi-ddsp-vs-ddsp-vst.md) | 历史迁移背景和模型差异，不是当前用户入口 |
+| [历史实时 DDSP 路径](docs/14-realtime-ddsp.md) | 已退役的 DDSP-VST MIDI Synth/ONNX 对照资料 |
+| [MIDI-DDSP 播放](docs/05-midi-ddsp-realtime.md) | 完整渲染缓存、复音声部化、多 voice stem 和原版混响 |
+| [Piano-DDSP 实时系统](docs/04-piano-ddsp.md) | 固定模型来源、实时运行时、API、部署和验收 |
+| [Ascend 音频输出](docs/06-audio-output.md) | 板载、USB、蓝牙和扬声器测试 |
+| [板端实测结果](docs/10-benchmark-results.md) | DDSP-VST 板端结果 |
+| [WebUI 操作、部署与 API](docs/02-webui.md) | 四个工作区、12 张实机截图、全屏启动、构建部署和接口索引 |
+| [WebUI 实机验收](docs/09-webui-acceptance.md) | 12 页面视觉审核、四视口回归、UI/API 压测和 600 秒 Effect 结果 |
+| [故障排查](docs/11-troubleshooting.md) | SSH、音频、ATC、OM 和兼容问题 |
+| [第三方参考仓库](docs/15-upstream-repositories.md) | 固定提交和保留规则 |
 
 本案例对应的书稿源文件是
 [`src/experiment/case3.md`](../../src/experiment/case3.md)。

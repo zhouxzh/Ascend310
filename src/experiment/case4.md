@@ -1,18 +1,19 @@
 # 案例 4：掌纹识别
 
-## 1. 案例目标
+## 案例目标
 
 本案例在 Ascend 310B4 / 8T 开发板上运行 FastAPI + React 掌纹识别工作台。生产推理固定使用 NPU `mixed_fp16`；CPU、EDCC、origin 和离线候选比较不进入在线接口。
 
 本版本是冻结的人工测试发布。CCNet 为默认/回滚模型；`manual_test` profile 可逐一测试五个 CompNet。五个 CompNet 的状态为 `manual_test_pending`，不能把人工测试前的状态写成稳定验收通过。
 
-## 2. 手动环境
+## 手动环境
 
 在开发板同一个 shell 中执行：
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd <release-root>
 export PALMPRINT_ROOT="$PWD"
@@ -29,13 +30,13 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 
 源码不会自动安装依赖、下载数据、构建 EDCC、转换模型或修改系统环境。OM 从固定来源取得后，必须按 `om_manifest.json` 核对字节数和 SHA-256。
 
-## 3. API 和界面
+## API 和界面
 
 启动后检查 `/api/health`、`/api/bootstrap`、`/api/candidates` 和 `/`。manual_test profile 的 bootstrap 应返回 CCNet 与五个 canonical CompNet，均为 `npu/mixed_fp16`。
 
 触摸屏逐页检查：系统状态、上传识别、模板注册、候选审计。测试 1280×720、1024×768 和 375×812；按钮不重叠，状态文本不溢出，API 不可用时显示空服务状态。
 
-## 4. 六模型人工测试
+## 六模型人工测试
 
 canonical ID 为：
 
@@ -58,11 +59,11 @@ rm -rf "$PALMPRINT_ROOT/data/captures"
 rm -rf "$PALMPRINT_ROOT/data/templates"
 ```
 
-## 5. 摄像头测试
+## 摄像头测试
 
 先检查 `/api/cameras`，优先选择 1280×720 MJPG。连续预览 100 帧，记录首帧时间、稳定帧间隔和实际输出尺寸；拍照识别后关闭预览，确认设备释放，再重新打开一次。若画面滞后，先降低预览分辨率并确认没有其他进程占用设备。
 
-## 6. 常见问题
+## 常见问题
 
 | 现象 | 处理 |
 | --- | --- |
@@ -119,11 +120,11 @@ rm -rf "$PALMPRINT_ROOT/data/templates"
 **证据等级**：摄像头枚举、取帧、健康检查、模型加载、ROI 与 NPU 推理计时的结果为 `observed-pass`；`/dev/video2`、`/dev/video3` 取帧失败为 `observed-fail`。
 **本轮未验证**：模板注册与身份匹配、EER/Rank-1 等识别指标、长时间稳定性、硬件触发与补光。
 
-## 7. 版本冻结
+## 版本冻结
 
 人工测试期间不升级 Python、依赖、驱动、CANN 或应用版本。发现问题时停止当前模型、记录复现步骤、回退 CCNet，并在人工测试结束后单独规划下一版本。人工测试通过后，再更新准入证据、release manifest、版本号和完整验收记录。
 
-## 8. 全候选模型测试
+## 全候选模型测试
 
 工作台运行通道只保留六个已有 OM 且契约可验证的 NPU embedding。候选清单仍保留完整 28 项审计记录；其余 22 个分类器、ROI、掌静脉、EDCC、SDK 或缺少可复现资产的项目已从 API/UI 候选矩阵归档，不会被服务加载，也不能被强制转换成掌纹 512 维 embedding。
 

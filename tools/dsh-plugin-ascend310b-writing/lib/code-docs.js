@@ -13,6 +13,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
+import { hasManualSectionNumber } from './audit-core.js';
 import { listFiles } from './code.js';
 
 const SAMPLE_DIR = /^(?:chapter|case|appendix)\d+$/u;
@@ -50,6 +51,25 @@ function isMeaningfulDoc(path) {
 
 function firstHeading(text) {
 	return text.split(/\r?\n/u).map((line) => /^#\s+(.+?)\s*$/u.exec(line)?.[1]).find(Boolean) ?? null;
+}
+
+function manualSectionHeadings(text) {
+	const headings = [];
+	let fenced = false;
+	const lines = text.split(/\r?\n/u);
+	for (let index = 0; index < lines.length; index += 1) {
+		const line = lines[index];
+		if (/^\s*(`{3,}|~{3,})/u.test(line)) {
+			fenced = !fenced;
+			continue;
+		}
+		if (fenced) continue;
+		const match = /^(#{2,6})\s+(.*)$/u.exec(line);
+		if (match !== null && hasManualSectionNumber(match[2])) {
+			headings.push({ level: match[1].length, line: index + 1, text: match[2].trim() });
+		}
+	}
+	return headings;
 }
 
 /**
@@ -92,6 +112,27 @@ export function collectCodeDocs({ root }) {
 		const newestCodeAt = newest(root, codeTimes);
 		const newestDocsAt = newest(root, docTimes);
 		const issues = [];
+
+		// Active engineering docs use semantic H2-H6 headings. The filename
+		// carries reading order; manual 1./1.1 prefixes duplicate it. Archived
+		// evidence is historical and therefore reported by neither this rule nor
+		// the current docs freshness check.
+		const activeDocs = docs.filter((file) => !file.startsWith('docs/archive/'));
+		const manualTargets = [...activeDocs, ...(readme ? ['README.md'] : [])];
+		const manualDocFindings = [];
+		for (const targetRel of manualTargets) {
+			const manual = manualSectionHeadings(readFileSync(join(absolute, targetRel), 'utf8'));
+			if (manual.length === 0) continue;
+			manualDocFindings.push({ targetRel, manual });
+			findings.push({
+				file: `${sampleRel}/${targetRel}`,
+				line: manual[0].line,
+				severity: 'error',
+				rule: 'code-docs-manual-heading-number',
+				message: `${sampleRel}/${targetRel} 有 ${manual.length} 个 H2-H6 手写章节编号；文件名或标题层级负责顺序，标题应直接命名内容，首个：「${manual[0].text}」`
+			});
+		}
+		if (manualDocFindings.length > 0) issues.push('手写章节编号');
 
 		if (!readme) {
 			issues.push('README 缺失');

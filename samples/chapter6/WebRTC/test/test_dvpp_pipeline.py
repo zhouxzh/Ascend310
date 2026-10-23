@@ -85,15 +85,15 @@ async def main():
     )
     parser.add_argument(
         "--python",
-        default=os.environ.get(
-            "E2E_PYTHON",
-            os.path.expanduser("~/.conda/envs/mediapipe/bin/python"),
-        ),
+        default=os.environ.get("E2E_PYTHON", sys.executable),
         help="Path to Python interpreter on the target device",
     )
     parser.add_argument(
         "--cwd",
-        default=os.environ.get("E2E_CWD", os.path.expanduser("~/Documents/WebRTC")),
+        default=os.environ.get(
+            "E2E_CWD",
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        ),
         help="Working directory on the target device for server.py",
     )
     parser.add_argument(

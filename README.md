@@ -70,14 +70,15 @@ git diff --check
 
 - [`昇腾310B调试`](tools/dsh-plugin-ascend310b-debug/README.md)：只面向 Ascend 310B1/310B4，提供板端事实探测、版本配套判定、分层调试计划、样例索引和只读诊断命令。其他芯片会被标记为不适用。
 
-插件采用“复制到 DSH profile”的源码安装方式，不依赖仓库根目录的 Node 依赖。每个插件的 README 都给出安装、配置和自检命令；昇腾310B调试插件的源码审核记录在 [`installation-audit.md`](tools/dsh-plugin-ascend310b-debug/docs/installation-audit.md)。
+插件通过仓库根目录的 `node scripts/install-dsh-plugins.mjs --profile desktop` 打包安装：安装器会生成带内容哈希的 tarball、调用 `dsh plugin add`，并核对安装版本和文件内容；不要手工复制或软链源码目录。每个插件的 README 都给出配置和自检命令；昇腾310B调试插件的源码审核记录在 [`installation-audit.md`](tools/dsh-plugin-ascend310b-debug/docs/installation-audit.md)。
 
-配套的项目级 skills 已提交在 [`.dsh/skills/`](.dsh/skills/)：`ascend310b-cann-development` 负责 310B 程序开发、CANN 合同和板端验收，`ascend310b-debug` 负责故障定位；写作侧按 `ascend310b-writing-theory`（理论章节）、`ascend310b-writing-case`（9 个案例）、`ascend310b-writing-presentation`（Marp 课件）、`ascend310b-writing-docs`（仓库/案例 docs）、`ascend310b-code-docs`（源码 API/docstring）、`ascend310b-writing-academic`（学术论证）、`ascend310b-curriculum-planning`（教材计划）、`ascend310b-writing-vuepress`、`ascend310b-writing-latex`、`ascend310b-writing-markdown` 和 `ascend310b-writing-dot` 分工。插件内的 [`skills/`](tools/dsh-plugin-ascend310b-writing/skills/) 是源文件；修改后运行 `npm run skills:sync` 和 `npm run skills:check`。
+配套的项目级 skills 已提交在 [`.dsh/skills/`](.dsh/skills/)：`ascend310b-cann-development` 负责 310B 程序开发、CANN 合同和板端验收，`ascend310b-case-testing` 负责从 GitHub commit 与 Hugging Face revision 重建案例，`ascend310b-debug` 负责故障定位；写作侧按 `ascend310b-writing-theory`（理论章节）、`ascend310b-writing-case`（9 个案例）、`ascend310b-writing-presentation`（Marp 课件）、`ascend310b-writing-docs`（仓库/案例 docs）、`ascend310b-code-docs`（源码 API/docstring）、`ascend310b-writing-academic`（学术论证）、`ascend310b-curriculum-planning`（教材计划）、`ascend310b-writing-vuepress`、`ascend310b-writing-latex`、`ascend310b-writing-markdown` 和 `ascend310b-writing-dot` 分工。插件内的 [`skills/`](tools/dsh-plugin-ascend310b-writing/skills/) 是源文件；修改后运行 `npm run skills:sync` 和 `npm run skills:check`。
 
 ## 案例运行原则
 
 进入具体案例后，始终先阅读该案例的 `README.md`。它只给出当前默认环境、启动命令、部署边界和最短排障路径。需要 API、模型、硬件验收或历史记录时，再从该案例的 `docs/README.md` 进入专题文档。
 
+- 案例发布测试从 GitHub 固定 commit 获取程序、从 Hugging Face 固定 revision 获取模型；不要把作者电脑上的模型、ONNX/OM、数据集或未提交源码复制到板端后当作复现证据。
 - 模型、数据集、个人照片、数据库、FAISS、OM 和运行报告默认不提交版本库。
 - 文档中的板卡、CANN、驱动、固件、IP 和模型 hash 必须与同一份证据关联。
 - “通过”必须区分语法检查、转换、ACL 数值、任务质量、性能、UI 和硬件验收，不能用一种证据替代另一种。

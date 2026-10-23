@@ -84,6 +84,7 @@ class CameraCaptureTests(unittest.TestCase):
         from palmprint_workbench.runtime.camera import (
             _VIDIOC_G_FMT,
             _VIDIOC_QUERYCAP,
+            _V4L2_FORMAT_WIDTH_OFFSET,
             _is_video_capture_node,
         )
 
@@ -93,7 +94,7 @@ class CameraCaptureTests(unittest.TestCase):
                 # capabilities: DEVICE_CAPS; device caps: multi-planar capture.
                 struct.pack_into("=II", buffer, 84, 0x80000000, 0x04201000)
             elif request == _VIDIOC_G_FMT:
-                struct.pack_into("=II", buffer, 4, 0, 0)
+                struct.pack_into("=II", buffer, _V4L2_FORMAT_WIDTH_OFFSET, 0, 0)
             return 0
 
         with patch("os.open", return_value=5), patch("os.close"), patch(
@@ -106,7 +107,7 @@ class CameraCaptureTests(unittest.TestCase):
             if request == _VIDIOC_QUERYCAP:
                 struct.pack_into("=II", buffer, 84, 0x80000000, 0x04200001)
             elif request == _VIDIOC_G_FMT:
-                struct.pack_into("=II", buffer, 4, 1280, 720)
+                struct.pack_into("=II", buffer, _V4L2_FORMAT_WIDTH_OFFSET, 1280, 720)
             return 0
 
         with patch("os.open", return_value=5), patch("os.close"), patch(
@@ -162,16 +163,25 @@ class CameraCaptureTests(unittest.TestCase):
     def test_capability_probe_accepts_video_capture_node(self):
         from palmprint_workbench.runtime import camera as camera_module
 
-        def write_capability(_descriptor, _request, payload, _mutate):
+        def write_capability(_descriptor, request, payload, _mutate):
             import struct
 
-            struct.pack_into(
-                "=II",
-                payload,
-                84,
-                camera_module._V4L2_CAP_DEVICE_CAPS,
-                camera_module._V4L2_CAP_VIDEO_CAPTURE,
-            )
+            if request == camera_module._VIDIOC_QUERYCAP:
+                struct.pack_into(
+                    "=II",
+                    payload,
+                    84,
+                    camera_module._V4L2_CAP_DEVICE_CAPS,
+                    camera_module._V4L2_CAP_VIDEO_CAPTURE,
+                )
+            elif request == camera_module._VIDIOC_G_FMT:
+                struct.pack_into(
+                    "=II",
+                    payload,
+                    camera_module._V4L2_FORMAT_WIDTH_OFFSET,
+                    1280,
+                    720,
+                )
 
         with patch.object(camera_module.os, "open", return_value=17), patch.object(
             camera_module.os, "close"

@@ -64,7 +64,7 @@ footer: "第7章：算子开发实战"
 
 典型路径是先用 TBE DSL 快速验证功能，再决定是否用 Ascend C 重写热点。
 
-<div class="source">教材：<a href="../book/chapter7.md#算子开发的两条主流路径"><code>src/book/chapter7.md</code>「算子开发的两条主流路径」</a></div>
+<div class="source">教材：<a href="../book/chapter7.md#src-book-chapter7-h6"><code>src/book/chapter7.md</code>「算子开发的两条主流路径」</a></div>
 
 <!--
 自定义算子不是默认选项。先确认内置算子、图优化或模型改写不能解决问题，再承担编译、注册和验收成本。
@@ -82,7 +82,7 @@ footer: "第7章：算子开发实战"
 - Global Memory 经 L1 或 Unified Buffer 进入计算单元。
 - MTE 负责多级缓冲之间的搬运、对齐与格式重排。
 
-<div class="source">教材：<a href="../book/chapter7.md#昇腾310b处理器与达芬奇架构"><code>src/book/chapter7.md</code>「昇腾310B处理器与达芬奇架构」</a></div>
+<div class="source">教材：<a href="../book/chapter7.md#src-book-chapter7-h2"><code>src/book/chapter7.md</code>「昇腾310B处理器与达芬奇架构」</a></div>
 
 <!--
 把“算力”拆成计算单元与数据搬运。很多算子瓶颈不是 Cube 算得慢，而是数据无法及时、安全地进入片上缓冲。
@@ -104,7 +104,7 @@ footer: "第7章：算子开发实战"
 
 两条路线不是互斥关系。本次双板记录只完成了第一条路线的功能验证。
 
-<div class="source">教材：<a href="../book/chapter7.md#声明式-vs-命令式"><code>src/book/chapter7.md</code>「声明式 vs 命令式」</a></div>
+<div class="source">教材：<a href="../book/chapter7.md#src-book-chapter7-h17"><code>src/book/chapter7.md</code>「声明式 vs 命令式」</a></div>
 
 <!--
 明确两条路线的抽象层级。TBE 代码短不代表平台自动完成 NPU 编译，Ascend C 源码存在也不代表已在硬件运行。
@@ -118,7 +118,7 @@ footer: "第7章：算子开发实战"
 
 ![TBE DSL 体系结构](../book/img7/dsl_architecture.png)
 
-<div class="source">图片：<a href="../book/img7/dsl_architecture.png"><code>src/book/img7/dsl_architecture.png</code></a>；出处：<a href="../book/chapter7.md#tbe-dsl-快速概览"><code>src/book/chapter7.md</code>「TBE DSL快速概览」</a></div>
+<div class="source">图片：<a href="../book/img7/dsl_architecture.png"><code>src/book/img7/dsl_architecture.png</code></a>；出处：<a href="../book/chapter7.md#src-book-chapter7-h12"><code>src/book/chapter7.md</code>「TBE DSL快速概览」</a></div>
 
 <!--
 从上到下带读计算描述层、调度层、编译层、TVM 和 CCE 后端。图展示的是设计路径，不等于本次双板已经完成对应硬件编译。
@@ -140,7 +140,7 @@ footer: "第7章：算子开发实战"
 
 原型或 `.ini` 写错时，计算代码可能正确，但图引擎仍无法找到或正确调用算子。
 
-<div class="source">教材：<a href="../book/chapter7.md#理解算子开发的核心概念"><code>src/book/chapter7.md</code>「理解算子开发的核心概念」</a></div>
+<div class="source">教材：<a href="../book/chapter7.md#src-book-chapter7-h34"><code>src/book/chapter7.md</code>「理解算子开发的核心概念」</a></div>
 
 <!--
 让学生先写接口卡片，再写代码。OpType、输入输出、属性和信息库必须一致，否则后面编译和注册会脱节。
@@ -158,7 +158,7 @@ footer: "第7章：算子开发实战"
 4. 用 `auto_schedule` 生成调度。
 5. 用 `build` 与 `run` 进入验证路径。
 
-<div class="source">样例：<a href="../../samples/chapter7/add_tbe/add.py"><code>samples/chapter7/add_tbe/add.py</code></a>、<a href="../../samples/chapter7/add_tbe/run.py"><code>run.py</code></a>；教材：<a href="../book/chapter7.md#初体验使用tbe-dsl快速实现第一个算子向量加法"><code>src/book/chapter7.md</code> 第7.2节</a></div>
+<div class="source">样例：<a href="../../samples/chapter7/add_tbe/add.py"><code>samples/chapter7/add_tbe/add.py</code></a>、<a href="../../samples/chapter7/add_tbe/run.py"><code>run.py</code></a>；教材：<a href="../book/chapter7.md#src-book-chapter7-h11"><code>src/book/chapter7.md</code> 第7.2节</a></div>
 
 <!--
 分清 add.py 和 run.py。前者描述算子实现与编译入口，后者验证等价 TBE DSL 计算；两者都不能代替 Ascend C 自定义算子包安装。
@@ -179,7 +179,7 @@ tvm.testing.assert_allclose(
 
 这段代码验证计算逻辑与参考值一致，但日志中的 `debug enter` 不能自动等同于 NPU Kernel 已安装并执行。
 
-<div class="source">代码：<a href="../../samples/chapter7/add_tbe/run.py"><code>samples/chapter7/add_tbe/run.py</code></a>；教材：<a href="../book/chapter7.md#编写验证代码runpy"><code>src/book/chapter7.md</code>「编写验证代码（run.py）」</a></div>
+<div class="source">代码：<a href="../../samples/chapter7/add_tbe/run.py"><code>samples/chapter7/add_tbe/run.py</code></a>；教材：<a href="../book/chapter7.md#src-book-chapter7-h27"><code>src/book/chapter7.md</code>「编写验证代码（run.py）」</a></div>
 
 <!--
 注意 run.py 使用 TBE testing/debug 环境。它证明等价 DSL 计算的数值断言通过，不是 Ascend C 算子包加载或 NPU 执行证据。
@@ -225,7 +225,7 @@ The actual output is the same as the expected output.
 - 每个 Tile 执行 CopyIn、Compute、CopyOut。
 - 多核偏移、双缓冲和 UB 容量由开发者管理。
 
-<div class="source">教材：<a href="../book/chapter7.md#ascend-c-的编程模型"><code>src/book/chapter7.md</code>「Ascend C的编程模型」</a></div>
+<div class="source">教材：<a href="../book/chapter7.md#src-book-chapter7-h43"><code>src/book/chapter7.md</code>「Ascend C的编程模型」</a></div>
 
 <!--
 将 Ascend C 的控制点与 TBE 自动调度对比。重点是开发者要负责数据搬运与多核分配，而不只是写一个加法表达式。
@@ -252,7 +252,7 @@ extern "C" __global__ __aicore__ void add_custom(
 }
 ```
 
-<div class="source">源码：<a href="../../samples/chapter7/add_ascendc/add_custom.cpp"><code>samples/chapter7/add_ascendc/add_custom.cpp</code></a>；教材：<a href="../book/chapter7.md#向量加法的-ascend-c-实现"><code>src/book/chapter7.md</code>「向量加法的Ascend C实现」</a></div>
+<div class="source">源码：<a href="../../samples/chapter7/add_ascendc/add_custom.cpp"><code>samples/chapter7/add_ascendc/add_custom.cpp</code></a>；教材：<a href="../book/chapter7.md#src-book-chapter7-h49"><code>src/book/chapter7.md</code>「向量加法的Ascend C实现」</a></div>
 
 <!--
 这段源码证明实现骨架存在，不证明它已通过 msopgen、自定义算子包安装、ACL 加载和 NPU 执行。
@@ -273,7 +273,7 @@ extern "C" __global__ __aicore__ void add_custom(
 
 Tiling 不只是按大小切分，还要同时考虑搬运次数、并行度、对齐和边界尾部。
 
-<div class="source">教材：<a href="../book/chapter7.md#tiling分片计算的基本思想"><code>src/book/chapter7.md</code>「Tiling（分片计算）的基本思想」</a></div>
+<div class="source">教材：<a href="../book/chapter7.md#src-book-chapter7-h37"><code>src/book/chapter7.md</code>「Tiling（分片计算）的基本思想」</a></div>
 
 <!--
 用矩阵加法的 128×256 数据说明：数据超出 UB 时需要分片；Ascend C 的 Tiling 参数由 Host 计算并传给 Kernel。
@@ -333,7 +333,7 @@ Tiling 不只是按大小切分，还要同时考虑搬运次数、并行度、�
 4. 在真实板卡用 AscendCL 加载和执行，保存退出码与原始日志。
 5. 对同一输入比较 CPU 参考值、NPU 输出与边界 shape。
 
-<div class="source">教材：<a href="../book/chapter7.md#编译与运行"><code>src/book/chapter7.md</code>「编译与运行」</a>；证据边界：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §4 chapter7</a></div>
+<div class="source">教材：<a href="../book/chapter7.md#src-book-chapter7-h50"><code>src/book/chapter7.md</code>「编译与运行」</a>；证据边界：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §4 chapter7</a></div>
 
 <!--
 给出可执行的闭环。每步都要产物和日志；仅生成 C++ 源码、打印 PASSED 或运行 TBE DSL 等价脚本都不够。

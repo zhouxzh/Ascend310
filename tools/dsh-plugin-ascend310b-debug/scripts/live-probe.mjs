@@ -13,6 +13,7 @@
  *   set DSH_ASCEND310B_TARGET=user@host && node scripts/live-probe.mjs
  */
 
+import { assessUnifiedEnvironment } from '../lib/compat.js';
 import { buildProbeScript, parseProbeOutput } from '../lib/probe.js';
 import { runRemoteScript } from '../lib/shell.js';
 
@@ -43,6 +44,7 @@ if (result.code !== 0 && result.stdout.trim() === '') {
 
 const report = parseProbeOutput(result.stdout);
 const facts = report.facts;
+const unified = assessUnifiedEnvironment(facts);
 const show = (key) => (facts[key] === undefined ? '未采集' : facts[key].value);
 
 console.log(`目标        : ${result.display ?? selector}（exit ${result.code}${result.timedOut ? '，超时' : ''}）`);
@@ -52,6 +54,9 @@ console.log(`CANN        : ${show('cannVersion')}（包 ${show('cannPackageVersi
 console.log(`驱动        : ${show('driverVersion')}`);
 console.log(`npu-smi     : ${show('npuSmiVersion')}`);
 console.log(`Python      : ${show('pythonExecutable')} ${show('pythonVersion')}`);
+console.log(`ascend 环境 : ${show('ascendEnvPresent')} · ${show('ascendEnvVersion')} · ${show('ascendEnvAbi')} · 启动策略隔离 ${show('ascendEnvPolicyIsolated')} · 裸解释器隔离 ${show('ascendEnvIsolated')}`);
+console.log(`ascend ACL  : ${show('ascendEnvAclImport')}；aclruntime ${show('ascendEnvAclruntime')}；MindSpore context ${show('ascendEnvMindsporeContext')}；统一环境判定 ${unified.verdict}`);
+console.log(`ascend 包   : ${show('ascendEnvPackages')}`);
 console.log(`import acl  : source 后 ${show('aclImportSourced')}；裸 shell ${show('aclImportBare')}（面板取值 ${show('aclImport')}）`);
 console.log(`atc         : ${show('atcVersion')}（在 PATH: ${show('atcOnPath')}）`);
 console.log(`设备节点    : ${show('deviceNodes')}；内核模块 ${show('kernelModules')}`);

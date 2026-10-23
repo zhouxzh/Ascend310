@@ -17,7 +17,7 @@ lang: zh-cn
 
 Vibe Coding 是用自然语言描述目标，由 AI Agent 写代码并运行，人负责审查和验证。DSH 是这套流程中的执行环境，DeepSeek 负责理解任务和生成方案。本附录只讲基础流程，不要求提前掌握完整 Python 语法。
 
-## 1. Vibe Coding 是什么
+## Vibe Coding 是什么
 
 Vibe Coding 的基本流程是：人负责目标、边界和结果，Agent 负责代码生成、运行和修改。它的完整循环是：
 
@@ -44,7 +44,7 @@ Vibe Coding 适合探索代码、生成初稿、解释报错和快速迭代。�
 - [datawhalechina/easy-vibe](https://github.com/datawhalechina/easy-vibe)：从零开始学 AI 编程，用“先看示例 + 自己动手做”组织课程。
 - [datawhalechina/vibe-vibe](https://github.com/datawhalechina/vibe-vibe)：系统化的 Vibe Coding 教程，强调从“写代码”转向“对话式创作”。
 
-## 2. Agent 与 DSH 基础
+## Agent 与 DSH 基础
 
 AI Agent 不是普通的聊天机器人。聊天机器人只负责生成回答，Agent 还可以读取文件、运行命令、修改代码和搜索网页。DSH（DeepSeek Harness）是一个能执行这些操作的 Agent 工作环境。
 
@@ -89,9 +89,9 @@ flowchart LR
 - [luo-junyu/Awesome-Agent-Papers](https://github.com/luo-junyu/Awesome-Agent-Papers)：以论文为主的 LLM Agent 综述和进展。
 - [Shubhamsaboo/awesome-llm-apps](https://github.com/Shubhamsaboo/awesome-llm-apps)：Agent、RAG 和应用案例合集。
 
-## 3. DSH 桌面版安装与插件配置
+## DSH 桌面版安装与插件配置
 
-### 3.1 为什么统一用桌面版
+### 为什么统一用桌面版
 
 本课程统一使用 **DSH 桌面版**（DeepSeek Harness Desktop）。它是带图形界面的安装包，模型、工作区、插件和 Skill 都在界面里配置，不需要学生先装 Node.js，也不需要记命令行参数。
 
@@ -103,7 +103,7 @@ flowchart LR
 
 > **不要再用 `npx` 安装 DSH。** 课堂上出现的“命令找不到”“装完打不开”“版本和老师不一样”，绝大多数都来自这一步。桌面版已经把运行时打包好了。
 
-### 3.2 安装桌面版
+### 安装桌面版
 
 1. 从课程提供的官方安装包获取 Windows x64 版本，文件名类似 `DeepSeek Harness Setup <版本>.exe`；也可以从官方仓库了解版本与文档：<https://github.com/deepseek-ai/deepseek-harness>。
 2. 双击安装包，按默认选项安装到当前用户目录。若 Windows 弹出 SmartScreen，先确认安装包来自课程或官方渠道，再选择“更多信息，再选择“仍要运行””。
@@ -113,7 +113,7 @@ flowchart LR
 
 安装完成后**不需要**再执行 `npm install`、`npx` 或 `pnpm`。如果终端里还在跟着旧教程敲这些命令，直接跳过。
 
-### 3.3 配置模型与工作区
+### 配置模型与工作区
 
 DSH 需要两样配置才能开始工作：模型 API Key 和工作区。
 
@@ -138,7 +138,7 @@ Windows 开发机：D:\Github\Ascend310
 
 API Key 只保存在本地设置里，不要写进教程、代码、聊天内容或 GitHub。
 
-### 3.4 安装写作插件与调试插件
+### 安装写作插件与调试插件
 
 本仓库自带两个 DSH 插件，源码分别在：
 
@@ -177,7 +177,7 @@ tools/dsh-plugin-ascend310b-debug/     程序调试插件
 
 写作插件产出“可交付的教材”，调试插件产出“可复核的板端证据”，两者共用同一个仓库，但**证据边界不同**：教材通过审计不等于板端跑通，板端跑通也不等于教材写对。
 
-### 3.5 Skill：给模型的操作规程
+### Skill：给模型的操作规程
 
 Skill 是一份 `SKILL.md`，写清楚“什么时候用、按什么顺序做、哪些结论不能下”。它不直接执行命令，而是让模型在正确的时机调用正确的工具。
 
@@ -217,7 +217,7 @@ node tools/dsh-plugin-ascend310b-writing/scripts/install-skill.mjs --check
 你现在能用哪些 skill？写作任务应该先调用哪个工具？
 ```
 
-### 3.6 界面与常用操作
+### 界面与常用操作
 
 | 区域 | 作用 | 常见操作 |
 | --- | --- | --- |
@@ -230,7 +230,7 @@ node tools/dsh-plugin-ascend310b-writing/scripts/install-skill.mjs --check
 
 每次开始任务前，先确认工作区；任务结束后，先看工具输出，再看 Agent 的总结。
 
-### 3.7 安全规则
+### 安全规则
 
 Agent 能做的事情和真人操作电脑一样有后果。看不懂的命令、不确定的文件修改，都可能破坏课程项目或系统环境。使用 DSH 时遵守五条规则：
 
@@ -249,7 +249,7 @@ Agent 能做的事情和真人操作电脑一样有后果。看不懂的命令�
 | 生成看不懂的代码 | 代码能运行，但自己讲不清每一行 | 让 DSH 逐行解释，能复述后再验收 |
 | Key 泄露 | API Key 出现在代码或文档中 | 删除 Key，重新生成，绝不提交 |
 | 长任务失控 | Agent 连续修改多个文件 | 拆成小任务，每步检查一次结果 |
-## 4. 第一次 Vibe Coding 任务
+## 第一次 Vibe Coding 任务
 
 本附录的第一个任务不使用外部数据，改为读取本仓库中的模型清单：
 
@@ -259,7 +259,7 @@ samples/case7/models/registry.json
 
 文件里包含 `models` 列表，每个模型有 `model_id`、`status`、`embedding_dim` 和 `precision_mode` 等字段。
 
-### 4.1 提示词
+### 提示词
 
 在 DSH 中输入：
 
@@ -275,7 +275,7 @@ samples/case7/models/registry.json
 
 提示词包含了目标、数据路径、输出位置、约束和验收标准。DSH 应该先制定计划，再读取文件，再生成脚本。
 
-### 4.2 参考脚本
+### 参考脚本
 
 DSH 生成的代码可能不完全相同，下面是一个可运行的参考写法：
 
@@ -292,7 +292,7 @@ for model in models:
     print(model["model_id"], model["status"], model["embedding_dim"], model["precision_mode"])
 ```
 
-### 4.3 预期输出
+### 预期输出
 
 当前仓库实测输出：
 
@@ -305,7 +305,7 @@ resnet50_feature__npu__mixed_fp16 admitted 2048 allow_fp32_to_fp16
 
 如果 DSH 的输出和上面不一致，先检查工作区路径、文件内容和代码，不要直接接受结果。
 
-### 4.4 验收步骤
+### 验收步骤
 
 DSH 完成任务后，按以下顺序验收：
 
@@ -315,9 +315,9 @@ DSH 完成任务后，按以下顺序验收：
 4. 自己运行一次脚本，确认输出与文件内容一致。
 5. 用一句话说明脚本读取了哪个字段、计算了什么、输出了什么。
 
-## 5. 提示词与审查方法
+## 提示词与审查方法
 
-### 5.1 提示词结构
+### 提示词结构
 
 | 要素 | 要求 | 示例 |
 |---|---|---|
@@ -329,7 +329,7 @@ DSH 完成任务后，按以下顺序验收：
 
 好的提示词让 Agent 少猜测。坏的提示词只有一句话，例如“帮我分析一下”，这时 Agent 可能选错文件、改变工作区或生成无法验证的结论。
 
-### 5.2 审查清单
+### 审查清单
 
 | 项目 | 检查内容 |
 |---|---|
@@ -340,7 +340,7 @@ DSH 完成任务后，按以下顺序验收：
 | 安全 | 是否没有删除、上传、安装系统级依赖，是否没有泄露 Key |
 | 记录 | 是否保留了 DSH 修改代码的过程 |
 
-## 6. 参考资料 {#src-appendix-appendix4-references}
+## 参考资料 {#src-appendix-appendix4-references}
 
 - [datawhalechina/easy-vibe](https://github.com/datawhalechina/easy-vibe)：从零开始学 AI 编程，用“先看示例 + 自己动手做”组织课程。
 - [datawhalechina/vibe-vibe](https://github.com/datawhalechina/vibe-vibe)：系统化的 Vibe Coding 教程，强调从“写代码”转向“对话式创作”。
@@ -353,7 +353,7 @@ DSH 完成任务后，按以下顺序验收：
 - [DSH 官方仓库](https://github.com/deepseek-ai/deepseek-harness)
 - [DeepSeek 开放平台](https://platform.deepseek.com/)
 
-## 7. 验证清单 {#src-appendix-appendix4-validation}
+## 验证清单 {#src-appendix-appendix4-validation}
 
 - [ ] 能说出 Vibe Coding 的完整循环。
 - [ ] 能区分 Agent、大模型、工具和工作区。
@@ -369,7 +369,7 @@ DSH 完成任务后，按以下顺序验收：
 - [ ] 能解释生成脚本中的 `json`、`Path` 和 `for` 循环。
 - [ ] 脚本输出与文件内容一致。
 
-## 8. 常见错误与坑 {#src-appendix-appendix4-pitfalls}
+## 常见错误与坑 {#src-appendix-appendix4-pitfalls}
 
 | 现象 | 可能原因 | 处理方式 |
 |---|---|---|
@@ -385,7 +385,7 @@ DSH 完成任务后，按以下顺序验收：
 | 输出与文件不一致 | 没有自己运行脚本 | 重新运行，检查路径、字段和输出 |
 | DSH 页面打不开 | 启动命令还在运行，或端口被占用 | 等显示 `URL: http://127.0.0.1:3080` 后再刷新 |
 
-## 9. 作业 {#src-appendix-appendix4-assignment}
+## 作业 {#src-appendix-appendix4-assignment}
 
 1. 用自己的话写 300 字以内的“Vibe Coding 安全说明”，至少包含：Vibe Coding 是什么、5 条安全规则、3 个绝对不执行的操作、为什么每条结论都要自己验证。把说明写入 `tmp/appendix4/<姓名>/safety.md`。
 2. 写一份 150 字以内的“提示词设计说明”，解释为什么提示词要包含目标、路径、输出位置和约束。把说明整理成 `tmp/appendix4/<姓名>/prompt-notes.md`。
@@ -393,7 +393,7 @@ DSH 完成任务后，按以下顺序验收：
 4. 让 DSH 增加一个统计维度，例如统计 `status == "admitted"` 的模型数量，或者按 `embedding_dim` 排序。
 5. 把 DSH 生成的代码逐行审查一遍，说明哪几行最可能出错，为什么。
 
-## 10. 评分要点
+## 评分要点
 
 | 项目 | 要求 |
 |---|---|

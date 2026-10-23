@@ -17,6 +17,8 @@ Markdown 源 -> convert-vuepress.sh -> latex/*.tex -> XeLaTeX -> PDF
 
 `src/` 是源，`latex/chapters/`、`latex/cases/`、`latex/appendices/`、`latex/*.tex` 和 PDF 是生成物。生成物不手工编辑。
 
+案例在“实践案例”部分按章自动编号：`案例 4` 对应 `4.1`、`4.2`、`4.2.1`。这些编号由 LaTeX 的 `chapter/section/subsection` 生成，不能通过修改生成的 `.tex` 或 PDF 补齐，也不能在 Markdown H2–H6 中手写。
+
 ## 工作流
 
 1. 先运行 `ascend310b_writing_audit`，清理 Markdown 标题、锚点、链接和图片错误。

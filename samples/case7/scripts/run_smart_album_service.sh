@@ -72,7 +72,8 @@ stop_service
 
 # shellcheck disable=SC1091
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 # shellcheck disable=SC1091
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
 export PYTHONPATH="${PYTHONPATH:-}"

@@ -16,6 +16,11 @@ dependencies = [
   "uvicorn[standard]>=0.30,<0.40",
 ]
 
+[project.optional-dependencies]
+voice = [
+  "sherpa-onnx==1.13.6",
+]
+
 [project.scripts]
 ascend-edge-chat = "ascend_edge_chat.cli:main"
 

@@ -320,7 +320,8 @@ Orange Pi 的记录必须连同系统日期、驱动、固件和 CANN 一起读�
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 python scripts/infer_om_camera.py --benchmark-runs 20 --warmup-runs 5 --print-model-info
 python scripts/infer_om_camera.py --source /dev/video0 --max-frames 60 --no-window

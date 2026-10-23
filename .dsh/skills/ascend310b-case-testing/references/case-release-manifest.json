@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "case": "caseN",
+  "source": {
+    "repo": "https://github.com/owner/repo.git",
+    "commit": "<40-character-sha>",
+    "checkout": "detached"
+  },
+  "model": {
+    "repo": "<owner>/<hf-model>",
+    "revision": "<immutable-revision-sha>",
+    "endpoint": "https://hf-mirror.com",
+    "files": [
+      {
+        "name": "<relative-file-name>",
+        "bytes": 0,
+        "sha256": "<64-hex-sha256>",
+        "license": "<license>"
+      }
+    ]
+  },
+  "acquisition": {
+    "mode": "online",
+    "source_command": "git clone ... && git checkout --detach <sha>",
+    "model_command": "hf download ... --revision <sha>"
+  },
+  "board": {
+    "soc": "Ascend310B1|Ascend310B4",
+    "tier": "20T|8T",
+    "cann": "<observed-version>",
+    "driver": "<observed-version>",
+    "conda_env": "ascend"
+  },
+  "result": {
+    "status": "observed-pass|observed-fail|untested|blocked",
+    "command": "<exact test command>",
+    "raw_report": "<board report path>"
+  }
+}

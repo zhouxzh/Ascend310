@@ -66,7 +66,7 @@ footer: "案例 2：目标跟踪检测"
 
 检测质量直接约束跟踪上限，但跟踪ID不能从单张检测框推导。
 
-<div class="source">教材：<a href="../experiment/case2.md#目标跟踪对时序关联的要求"><code>src/experiment/case2.md</code>「目标跟踪对时序关联的要求」</a></div>
+<div class="source">教材：<a href="../experiment/case2.md#src-experiment-case2-h4"><code>src/experiment/case2.md</code>「目标跟踪对时序关联的要求」</a></div>
 
 <!--
 先用问题区分检测和跟踪。只有检测框没有时间关联，就不会产生稳定ID。
@@ -80,7 +80,7 @@ footer: "案例 2：目标跟踪检测"
 
 ![案例2程序流程图](../experiment/img2/流程图.png)
 
-<div class="source">图片：<a href="../experiment/img2/流程图.png"><code>src/experiment/img2/流程图.png</code></a>；出处：<a href="../experiment/case2.md#教程定位"><code>src/experiment/case2.md</code>「教程定位」</a></div>
+<div class="source">图片：<a href="../experiment/img2/流程图.png"><code>src/experiment/img2/流程图.png</code></a>；出处：<a href="../experiment/case2.md#src-experiment-case2-h1"><code>src/experiment/case2.md</code>「教程定位」</a></div>
 
 <!--
 按读取、预处理、NPU推理、解码、NMS、跟踪关联和绘制带读。检测入口和跟踪入口共享前半段，从检测结果转换后分叉。
@@ -94,7 +94,7 @@ footer: "案例 2：目标跟踪检测"
 
 ![案例2检测跟踪主线](../experiment/img2/主线图.png)
 
-<div class="source">图片：<a href="../experiment/img2/主线图.png"><code>src/experiment/img2/主线图.png</code></a>；出处：<a href="../experiment/case2.md#第3课时运行检测与跟踪"><code>src/experiment/case2.md</code>「运行检测与跟踪」</a></div>
+<div class="source">图片：<a href="../experiment/img2/主线图.png"><code>src/experiment/img2/主线图.png</code></a>；出处：<a href="../experiment/case2.md#src-experiment-case2-h62"><code>src/experiment/case2.md</code>「运行检测与跟踪」</a></div>
 
 <!--
 图中把检测模型、检测输出、轨迹预测、关联更新、轨迹生命周期和可视化串起来。每个环节都需要自己的验证证据。
@@ -112,7 +112,7 @@ footer: "案例 2：目标跟踪检测"
 - 单阶段结构便于说明检测到跟踪的完整链路。
 - 仓库同时支持MobileNet和ResNet骨干。
 
-<div class="source">教材：<a href="../experiment/case2.md#mobilenet-ssd-作为检测前端的依据"><code>src/experiment/case2.md</code>「MobileNet-SSD作为检测前端的依据」</a></div>
+<div class="source">教材：<a href="../experiment/case2.md#src-experiment-case2-h5"><code>src/experiment/case2.md</code>「MobileNet-SSD作为检测前端的依据」</a></div>
 
 <!--
 深度可分离卷积降低计算量，SSD多尺度检测兼顾大小目标。骨干模型选择需要在速度与表达能力之间取舍。
@@ -135,7 +135,7 @@ footer: "案例 2：目标跟踪检测"
 
 推理成功只表示原始输出存在，解码和NMS才把它变成可用检测结果。
 
-<div class="source">教材：<a href="../experiment/case2.md#decoderpy-如何体现-ssd-的核心思想"><code>src/experiment/case2.md</code>「decoder.py如何体现SSD的核心思想」</a></div>
+<div class="source">教材：<a href="../experiment/case2.md#src-experiment-case2-h28"><code>src/experiment/case2.md</code>「decoder.py如何体现SSD的核心思想」</a></div>
 
 <!--
 重点解释先验框、偏移恢复、分数筛选和NMS。模型执行成功不等于检测框编号、类别或坐标一定正确。
@@ -153,7 +153,7 @@ footer: "案例 2：目标跟踪检测"
 - 中心和尺寸平滑降低框抖动。
 - 类别约束阻止不同类别错误关联。
 
-<div class="source">教材：<a href="../experiment/case2.md#deepsort-作为跟踪后端的选择依据"><code>src/experiment/case2.md</code>「DeepSORT作为跟踪后端的选择依据」</a></div>
+<div class="source">教材：<a href="../experiment/case2.md#src-experiment-case2-h17"><code>src/experiment/case2.md</code>「DeepSORT作为跟踪后端的选择依据」</a></div>
 
 <!--
 本案例保留DeepSORT的运动预测、匹配和生命周期主线，但不包含外观ReID。长时间遮挡和身份重识别必须另行验证。
@@ -174,7 +174,7 @@ footer: "案例 2：目标跟踪检测"
 
 预测降低搜索范围，全局匹配避免贪心算法在同一目标之间重复分配。
 
-<div class="source">教材：<a href="../experiment/case2.md#卡尔曼滤波在做什么"><code>src/experiment/case2.md</code>「卡尔曼滤波在做什么」</a>、<a href="../experiment/case2.md#数据关联为什么使用-iou--匈牙利算法"><code>「IOU+匈牙利算法」</a></div>
+<div class="source">教材：<a href="../experiment/case2.md#src-experiment-case2-h45"><code>src/experiment/case2.md</code>「卡尔曼滤波在做什么」</a>、<a href="../experiment/case2.md#src-experiment-case2-h49"><code>「IOU+匈牙利算法」</a></div>
 
 <!--
 卡尔曼滤波器提供预测，匈牙利算法在当前帧求全局匹配。匹配失败后，还要依据轨迹生命周期创建、保持或删除目标。
@@ -192,7 +192,7 @@ footer: "案例 2：目标跟踪检测"
 - `pan ic`/停止需要清理状态。
 - 类别过滤减少无关框与后处理。
 
-<div class="source">教材：<a href="../experiment/case2.md#轨迹生命周期参数如何影响最终效果"><code>src/experiment/case2.md</code>「轨迹生命周期参数如何影响最终效果」</a></div>
+<div class="source">教材：<a href="../experiment/case2.md#src-experiment-case2-h56"><code>src/experiment/case2.md</code>「轨迹生命周期参数如何影响最终效果」</a></div>
 
 <!--
 轨迹生命周期是ID稳定的重要条件。参数没有通用最优值，应以目标速度、漏检率和遮挡时长设计实验。
@@ -210,7 +210,7 @@ footer: "案例 2：目标跟踪检测"
 4. 跟踪器预测轨迹、关联检测框并更新状态。
 5. 绘制ID、类别、分数和拖尾；无界面时保存视频。
 
-<div class="source">教材：<a href="../experiment/case2.md#本案例的代码结构与总体流程"><code>src/experiment/case2.md</code>「代码结构与总体流程」</a></div>
+<div class="source">教材：<a href="../experiment/case2.md#src-experiment-case2-h20"><code>src/experiment/case2.md</code>「代码结构与总体流程」</a></div>
 
 <!--
 detection_app和tracking_app共享检测前半段。跟踪验证必须包含检测输出转换、状态更新和ID可视化。
@@ -296,7 +296,7 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 - 检测与跟踪实验使用相同后半段口径。
 - 保存原始JSON与视频，不只保留截图。
 
-<div class="source">教材：<a href="../experiment/case2.md#检测链路的性能拆分实验"><code>src/experiment/case2.md</code>「检测链路的性能拆分实验」</a></div>
+<div class="source">教材：<a href="../experiment/case2.md#src-experiment-case2-h64"><code>src/experiment/case2.md</code>「检测链路的性能拆分实验」</a></div>
 
 <!--
 先定义协议再运行性能测试。单帧窗口适合确认设备和可视链路，平均值、P95、FPS与长稳必须另做。
@@ -319,7 +319,7 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 
 所有实验都要使用同一视频片段，并保留检测框和轨迹视频。
 
-<div class="source">教材：<a href="../experiment/case2.md#实验设计"><code>src/experiment/case2.md</code>「实验设计」</a></div>
+<div class="source">教材：<a href="../experiment/case2.md#src-experiment-case2-h62"><code>src/experiment/case2.md</code>「实验设计」</a></div>
 
 <!--
 参数实验不能让模型、输入、分辨率和评测片段同时变化。否则无法判断ID变化来自哪个因素。
@@ -359,7 +359,7 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 
 课堂交付：截图证据卡、检测视频、跟踪视频、参数表和原始指标；单帧截图不能替代后四项。
 
-<div class="source">教材：<a href="../experiment/case2.md#如何评价这个案例方案"><code>src/experiment/case2.md</code>「如何评价这个案例方案」</a></div>
+<div class="source">教材：<a href="../experiment/case2.md#src-experiment-case2-h58"><code>src/experiment/case2.md</code>「如何评价这个案例方案」</a></div>
 
 <!--
 收尾按验收阶梯检查。本轮真实截图只能勾选单帧检测的一部分，连续检测、跟踪ID和性能仍需原始视频与报告。

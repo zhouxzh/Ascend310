@@ -1,8 +1,8 @@
 {
   "name": "dsh-plugin-ascend310b-writing",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
-  "description": "教程写作守门员：Ascend310 教材仓库的 Markdown 命名规范、锚点、链接、标点审计、写作进度统计，并内置 scientific-writing 与 nature-polishing 学术写作 skills",
+  "description": "教程写作守门员：Ascend310 教材仓库的 Markdown 审计、正式出版润色、网页排版与写作进度，并内置 scientific-writing 与 nature-polishing 学术写作 skills",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -34,7 +34,7 @@
   },
   "scripts": {
     "smoke": "node test/smoke.mjs",
-    "test": "node test/smoke.mjs && node test/docs.mjs && node test/skills.mjs && node test/dot-templates.mjs && node test/code-docs.mjs && node test/panel-render.mjs && node test/portability.mjs",
+    "test": "node test/smoke.mjs && node test/docs.mjs && node test/skills.mjs && node test/dot-templates.mjs && node test/code-docs.mjs && node test/panel-render.mjs && node test/host-schema.mjs && node test/portability.mjs",
     "skills:install": "node scripts/install-skill.mjs",
     "skills:check": "node scripts/install-skill.mjs --check"
   },

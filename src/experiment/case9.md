@@ -6,9 +6,9 @@ title: 案例 9：智能聊天机器人
 
 本案例实现 **Ascend Edge Chat**：一个部署在昇腾边缘设备上的文字聊天服务。它将浏览器文字界面、带 Bearer 鉴权的 OpenAI 兼容网关和 MindSpore 推理 worker 分成三个进程。这样既能在局域网中提供易用的聊天页面，也能让后续应用通过标准接口调用模型。
 
-本案例的发布基线是 Ascend 310B1 / 20T，默认模型为 Qwen1.5-0.5B-Chat。它是技术预览，不包含语音、ASR/TTS、设备协议或知识检索。教学目录还保留所有已经出现技术运行证据的模型；模型是否能运行与中文回答质量分开判断。其他硬件、模型或软件版本不能直接继承本案例的结论，必须重新执行本章的验证门。
+本案例的发布基线是 Ascend 310B1 / 20T，默认模型为 Qwen1.5-0.5B-Chat。它是技术预览；文字聊天是当前唯一有 20T 运行证据的发布链。源码包含默认关闭的浏览器与板端双模式语音控制面，但 ASR/TTS、USB/3.5mm 录放音、HTTPS 浏览器语音和设备协议均未通过验收，不能写成发布能力。教学目录还保留所有已经出现技术运行证据的模型；模型是否能运行与中文回答质量分开判断。其他硬件、模型或软件版本不能直接继承本案例的结论，必须重新执行本章的验证门。
 
-## 1. 学习目标
+## 学习目标
 
 完成本章后，你应能：
 
@@ -19,13 +19,11 @@ title: 案例 9：智能聊天机器人
 5. 为一个新模型设计受控的 Provider、模型配置、工件锁和板端验收流程；
 6. 区分“技术可运行”“输出质量”和“正式发布准入”三个不同结论。
 
-## 2. 系统架构
+## 系统架构
 
-浏览器不直接访问模型，也不知道网关密钥。网页进程在服务器端保存密钥，再调用回环地址上的网关。网关验证请求后，将固定的内部模型名转发给回环地址上的 MindSpore worker。worker 一次只加载一个 profile 并串行执行生成，避免多个大模型同时争用边缘 NPU。页面可以选择教学目录中的实验模型；选择后由服务端按受控流程停止旧 worker、启动固定 profile、检查健康状态并清空会话，不能在请求中传入任意模型路径或替换模型代码。
+浏览器不接触模型和网关密钥。密钥保存在 UI 服务进程中；请求经回环地址上的网关鉴权后，再由网关转发给 MindSpore worker。worker 一次只加载一个模型 profile，并按顺序执行生成，避免多个模型同时占用 NPU。切换到教学模型时，服务端会停止旧 worker、启动指定 profile、检查健康状态并清空会话。客户端只能选择已注册的 profile，不能提交任意模型路径或替换模型代码。
 
 ![Ascend Edge Chat 系统架构：浏览器经 UI、网关、worker 到 NPU](img9/case9_system_architecture.png)
-
-源图：`img9/case9_system_architecture.dot`。整张图统一使用 `Noto Sans CJK SC`，节点 16 pt、边标签 13 pt，采用两列纵向布局，避免在教材正文中出现过宽或字号过小的横向流程。
 
 三个端口承担不同角色：
 
@@ -37,7 +35,41 @@ title: 案例 9：智能聊天机器人
 
 网页没有浏览器登录功能。因此，同一可达网段中的主机都可以发送消息。不要做端口映射，不要将 `7865` 放到公网反向代理之后，也不要在不可信网络使用本页面。
 
-## 3. 发布模型与工件锁
+### 双模式语音交互（设计中，未验收）
+
+语音扩展有两个互斥的音频所有权模式，二者不能互相替代验收结果：
+
+| 模式 | 麦克风与扬声器所有者 | 关键边界 | 当前状态 |
+| --- | --- | --- | --- |
+| `board` | 20T 板连接的 USB/3.5mm 设备 | `voice-agent` 直接打开 ALSA，浏览器只看状态/文字 | 仅设备枚举事实；语音闭环 `untested` |
+| `browser` | 访问页面的浏览器 | 浏览器采集/播放，UI 代理到 loopback `voice-agent` | HTTPS、权限、音频和闭环均 `untested` |
+
+板端模式的路径是：
+
+```text
+USB 麦克风 -> voice-agent -> VAD -> ASR -> :7861 网关 -> :8090 worker
+USB 音箱   <- voice-agent <- TTS <- 完整文本或按句文本
+```
+
+第一版板端模式必须半双工运行：`LISTENING -> SPEECH -> SILENCE_HOLD -> ASR -> LLM -> TTS -> PLAYING -> COOLDOWN`。
+播放时停止采集，或在将来以独立证据验证回声控制；不能一边播放一边把扬声器声音当作下一轮输入。VAD 阈值、静音时长、最大话语时长和冷却时长均为待测参数，不能从文字聊天的成功推导。
+
+浏览器模式的路径是：`HTTPS 浏览器录音 -> UI 代理 -> loopback voice-agent -> ASR -> 网关/worker -> TTS -> UI 代理 -> 浏览器播放`。远程浏览器的麦克风权限要求安全上下文；当前 `http://<board-ip>:7865/` 的文字页面不能被当作浏览器录音已可用的证据。浏览器不能直接访问 `127.0.0.1:7862`，因为那是浏览器自身的 loopback；也不能访问开发板 ALSA 或直接访问 voice-agent。
+
+当前语音核心的源码合同已限制为 `disabled`、`browser` 和 `board` 三种模式。`browser` 模式只处理受限的 16 kHz、单声道、S16 WAV；`board` 模式才会枚举和打开 ALSA。源码合同不等同于当前 20T 语音服务、ASR 或 TTS 已通过。
+
+20T 板的 ALSA 枚举会随 USB 外设连接状态变化。`2026-10-20` 的只读快照曾看到板载
+`ascend310b` ALSA 卡的播放节点 `/dev/snd/pcmC0D0p`、采集节点
+`/dev/snd/pcmC0D1c`，以及 Jieli USB Composite Device 的采集节点
+`/dev/snd/pcmC1D0c`；未看到 USB playback PCM。`2026-10-21` 的一次重新枚举只保留板载
+card 0，Jieli USB 设备已不在当前系统中；连接 UGREEN 1080P 摄像头后，系统又枚举到
+`hw:1,0` 的 USB capture 端。其实际参数是 S16_LE、双声道、16–48 kHz，不能套用强制
+单声道采集；语音模块会在内存中下混为 ASR/VAD 所需的 16 kHz 单声道 PCM。没有 USB playback PCM 条目，且两次快照中节点均为 `root:audio`、模式 `0660`，
+`HwHiAiUser` 未显示在 `audio` 组中。USB 枚举不等于已成功录音或播放；实际启用前，管理员需按当前板端枚举审查账户权限，例如选择加入 `audio` 组后重新登录并用 `id -nG` 复核，不能让服务以 root 身份绕过权限。
+
+两种模式的 USB/3.5mm 采集播放、权限生效、HTTPS、浏览器权限、VAD、ASR、TTS、隐私和十轮闭环均为 `untested`。ASR/TTS 即使先在 CPU 隔离进程运行，也只能说明音频服务路径，不构成 NPU 语音推理证据。详细的模型锁、隐私边界和分模式人工验收门见[语音模式与板端终端方案](https://github.com/zhouxzh/Ascend310/blob/main/samples/case9/docs/08-board-voice-terminal-plan.md)。
+
+## 发布模型与工件锁
 
 模型来自 [Qwen1.5-0.5B-Chat](https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat)。程序不会根据模型名称自动下载任何版本，而是读取 `configs/release-model.json` 中的固定 revision、文件名、大小和 SHA-256。
 
@@ -55,13 +87,11 @@ title: 案例 9：智能聊天机器人
 
 ![模型工件下载与原子校验流程](img9/case9_artifact_verification.png)
 
-源图：`img9/case9_artifact_verification.dot`。
-
 模型目录应位于源代码目录之外，例如 `/opt/ascend-edge-chat-data`。模型、日志、缓存和报告都不应提交到 Git。源代码使用 Apache-2.0；锁定的 Qwen revision 使用 [Tongyi Qianwen Research License Agreement](https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat/blob/4d14e384a4b037942bb3f3016665157c8bcb70ea/LICENSE)，仅覆盖非商业用途；商业使用需要向模型发布方另行取得许可。不能从代码许可证推断模型使用权。
 
 正式发布锁只包含默认 Qwen1.5 profile。教学实验使用 `configs/tutorial-model-catalog.json` 展示模型的技术状态、质量状态和失败原因，使用 `configs/tutorial-models.json` 作为显式 worker registry。这样既不会污染正式发布工件锁，也不会把“中文质量失败”误写成“模型不能运行”。
 
-## 4. 环境准备
+## 环境准备
 
 本案例不安装或升级驱动、固件、CANN、OPP、MindSpore 或 MindNLP。先在目标开发板上选择一个已经验证的 Conda 环境，再在同一个 shell 中激活 CANN 环境。
 
@@ -95,7 +125,7 @@ bash scripts/verify/release-preflight.sh
 
 预检会显示 Python 可执行文件，导入 `acl`、MindSpore 与 MindNLP，显示 `npu-smi info`，核对所有模型文件，并解析网关配置。预检失败时应先定位环境、CANN 或模型文件问题；不能为了获得响应而自动改用 CPU、云端或其他推理框架。
 
-## 5. 获取或导入模型
+## 获取或导入模型
 
 通过镜像下载时：
 
@@ -115,7 +145,7 @@ bash scripts/import/import-model.sh /mnt/offline/qwen1.5-0.5b
 ascend-edge-chat verify --data-dir "$ASCEND_EDGE_CHAT_DATA_DIR"
 ```
 
-## 6. 启动服务
+## 启动服务
 
 分别打开三个终端，在项目根目录执行：
 
@@ -140,7 +170,7 @@ ascend-edge-chat gateway --check-config
 ascend-edge-chat ui
 ```
 
-### 6.1 选择教学模型
+### 选择教学模型
 
 页面会列出教学目录。`selectable=true` 表示已有技术运行证据，哪怕
 `quality_status` 是 `failed` 或 `pending` 也仍可选；`blocked`/`not-run` 表示
@@ -168,7 +198,7 @@ ascend-edge-chat worker --profile qwen1.5-0.5b-chat
 
 `app.py` 与 `text_chat_app.py` 仅为短期兼容包装器。新部署和二次开发脚本应使用 `ascend-edge-chat` 命令。
 
-## 7. 调用 OpenAI 兼容接口
+## 调用 OpenAI 兼容接口
 
 网关公开模型名固定为 `ascend-edge-chat`。调用方必须携带 Bearer 密钥。
 
@@ -201,7 +231,7 @@ curl http://127.0.0.1:7861/v1/chat/completions \
 
 浏览器会话只保存在 UI 进程内存中，最多保留 4 条消息和 4,000 个字符。清空会话、重启页面服务或停止进程都会丢弃这些消息。
 
-## 8. 验收方法
+## 验收方法
 
 不能用“服务已启动”代替模型验收。每个目标板都应独立记录以下证据：
 
@@ -217,7 +247,7 @@ curl http://127.0.0.1:7861/v1/chat/completions \
 
 本案例在 20T 参考硬件的历史测量中记录过约 `672 ms` 的首 token p50、约 `1.31 s` 的完成 p50 与约 `1.53 token/s` 的吞吐 p50。该数据只描述特定日期、环境、负载和提示词条件，不能外推到 8T、另一块 20T 板、不同 CANN、不同模型 revision 或并发负载。
 
-## 9. 教学模型的实测结果与原因
+## 教学模型的实测结果与原因
 
 下表是本案例已有板端证据的摘要。`observed-pass` 只说明机器和接口路径
 通过；它不等同于中文回答优秀。相反，`quality_status=failed` 也不等同于
@@ -238,7 +268,7 @@ NPU 不能运行。
 学生应先复制原始响应，再分析 tokenizer、chat template、`finish_reason`、
 请求的 `max_tokens`、设备内存和 `npu-smi`。不要把中文质量表格改写成硬件兼容性结论。
 
-### 9.1 长度、文本完整性与中文语义质量
+### 长度、文本完整性与中文语义质量
 
 `max_tokens` 是本轮**最多新生成多少 tokenizer token**，不是“最多多少汉字”。
 同一段中文可能被分成一个或多个 token；它还受 `prompt_tokens + max_tokens <=
@@ -256,7 +286,7 @@ revision、提示与完成 token 数、`finish_reason`。先标注是否出现 `
 只有该人工流程才能把 `quality_status` 标为通过或失败；历史短预算中的替换字符
 只能保留为 tokenizer/解码的待复核观察。
 
-### 9.2 20T 长输出边界实测示例
+### 20T 长输出边界实测示例
 
 不要把配置文件中的 `max_tokens` 当作已验证能力。以 20T 的
 `Qwen2 1.5B Instruct` 为例，在 `Ascend310B1`、CANN `8.0.0`、MindSpore
@@ -291,7 +321,7 @@ python scripts/verify/output_budget_probe.py \
 该工具调用和网页相同的 SSE 路由。若 worker 消失，它会保留“unavailable”观察，
 不能把该次运行写成成功，也不能用配置中的全局上限代替板端结果。
 
-## 10. 二次开发
+## 二次开发
 
 新模型不是通过任意请求参数注入路径或 Python 代码。教学模型通过受控 registry
 和目录加入页面；正式发布模型仍需要独立锁文件。新模型需要实现
@@ -305,9 +335,9 @@ python scripts/verify/output_budget_probe.py \
 
 为新模型建立固定 revision、文件大小、SHA-256、tokenizer、chat template、许可证、目标 SoC 和运行时指纹。先完成本地 JSON/SSE 契约测试，再在每一种目标硬件上完成上述 NPU、稳定性、性能和人工质量门。技术门通过即可进入教学目录；质量结论必须原样保留。只有经过独立复核并人工批准的模型才能进入正式发布配置。
 
-## 11. 板端实测记录 {#src-experiment-case9-board-evidence}
+## 板端实测记录 {#src-experiment-case9-board-evidence}
 
-### 11.1 2026-10-18 20T 验收
+### 2026-10-18 20T 验收
 
 本轮在 **Ascend310B1 / 20T** 的真实开发板上，对已经启动的 Ascend Edge Chat 服务执行最终验收。运行中的教学 profile 是 `qwen2-0.5b-instruct-mindspore`，不是正式发布默认的 Qwen1.5 profile；因此下面的结果只证明该 profile 和该软件组合在当前 20T 板上可运行，不代表其他模型或 8T 也通过。
 
@@ -347,12 +377,12 @@ Too many request bodies are being read
 
 **证据等级**：环境、worker、gateway、UI、JSON、SSE、10 次短稳定请求为 `observed-pass`（20T）；中文语义质量、长文质量、并发和 8T 兼容性仍为 `untested`。性能只记录单样本，不把 p50/p95 当成多轮基准。
 
-### 11.2 2026-10-17 历史记录
+### 2026-10-17 历史记录
 
 更早的 20T 记录使用固定 Qwen1.5-0.5B Chat 和低 token 预算，完成了 worker/gateway/UI 启动、一次真实 completion 和 1440×900 UI 截图；它是本案例的历史基线，不与 2026-10-18 的 Qwen2 教学 profile 结果合并。旧原始日志与响应保存在 [`docs/case-board-runs-20261017/case9/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case9/README.md)。
 
 8T / Ascend310B4 不是该版本发布目标，没有继承本节的 20T 结论，也没有混入 8T 结果。
 
-## 12. 小结
+## 小结
 
 Ascend Edge Chat 将网页、鉴权网关和 NPU worker 分离，使文字聊天服务具备清晰的网络边界、模型完整性边界和二次开发边界。固定发布模型和严格工件校验提高了复现性；回环 worker、Bearer 网关和局域网安全提示降低了误配置风险。后续扩展应以实测硬件证据为准，而不是以目录中存在的历史实验、模型名称或文档推断为准。

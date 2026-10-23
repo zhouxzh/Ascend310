@@ -7,13 +7,13 @@ keywords: [AI项目交付, SSD300, 实时检测, 需求拆解, 评测体系, Bas
 lang: zh-cn
 ---
 
-## 10.1 章节总览 {#src-book-chapter10-h1}
+## 章节总览 {#src-book-chapter10-h1}
 
 本章以“基于 COCO SSD300 的实验室实时检测告警系统”为贯穿案例，建立从需求澄清->指标体系->评测集->迭代节奏->资产沉淀->交付与回归的一套闭环方法论，让技术决策基于指标与风险敞口，而非经验臆测。核心理念：可量化、可比较、可复用、可追溯。
 
 案例默认使用 Hugging Face 仓库 `zhouxzh/SSD300` 中的 `ssd300_resnet50.onnx` / `ssd300_resnet50.om`。其中 `ssd300_` 表示输入尺寸为 300×300，和后续 `ssd320_` SSDLite320 模型区分。实验室告警逻辑只基于 COCO 检测结果做后处理，例如 ROI 闯入、人数统计、背包/电脑/水杯等物品遗留提醒，不重新训练模型，也不额外构建专用数据集。
 
-## 10.2 需求澄清 Canvas {#src-book-chapter10-h2}
+## 需求澄清 Canvas {#src-book-chapter10-h2}
 
 | 维度 | 要素 | 问题提示 | 示例 |
 | ---- | ---- | -------- | ---- |
@@ -27,7 +27,7 @@ lang: zh-cn
 
 输出：`requirement.yaml`（版本化），后续所有评审基于此文档。
 
-## 10.3 指标分层与优先级 {#src-book-chapter10-h3}
+## 指标分层与优先级 {#src-book-chapter10-h3}
 
 | 层级 | 类别 | 指标 | 说明 | 失败后果 |
 | ---- | ---- | ---- | ---- | -------- |
@@ -40,7 +40,7 @@ lang: zh-cn
 
 优先级：先保障 A（体验+功能可用），再稳定 B（质量/稳定），最后优化 C（资源效率）。
 
-## 10.4 Baseline 策略与控制变量法 {#src-book-chapter10-h4}
+## Baseline 策略与控制变量法 {#src-book-chapter10-h4}
 
 Baseline 目标：建立 “最小改动可运行” 标尺。原则：
 
@@ -49,7 +49,7 @@ Baseline 目标：建立 “最小改动可运行” 标尺。原则：
 3. 一次仅改变单个变量（batch、精度、线程数）。
 基线存档：`baseline/<date>-<commit>/metrics.json`；对比脚本生成差异报告。
 
-## 10.5 评测集设计原则 {#src-book-chapter10-h5}
+## 评测集设计原则 {#src-book-chapter10-h5}
 
 | 原则 | 内容 |
 | ---- | ---- |
@@ -76,7 +76,7 @@ dataset_eval/
 ```
 提供 Hash 列表，防止样本被替换而影响回归可信度。
 
-## 10.6 迭代计划与看板 {#src-book-chapter10-h6}
+## 迭代计划与看板 {#src-book-chapter10-h6}
 
 四阶段：
 
@@ -89,7 +89,7 @@ dataset_eval/
 
 看板列：Backlog -> Doing -> Review -> Bench -> Done；性能/精度任务需进入 Bench 列执行对比脚本通过后才可 Done。
 
-## 10.7 资产沉淀文档体系 {#src-book-chapter10-h7}
+## 资产沉淀文档体系 {#src-book-chapter10-h7}
 
 | 文档 | 内容 | 更新频率 |
 | ---- | ---- | -------- |
@@ -103,7 +103,7 @@ dataset_eval/
 
 MODEL_CARD 需包含：数据来源、训练超参摘要、输入契约、已知局限、许可（如 Apache-2.0）、安全与偏见说明（若涉及识别敏感属性声明避免用途）。
 
-## 10.8 交付目录与不可变产物 {#src-book-chapter10-h8}
+## 交付目录与不可变产物 {#src-book-chapter10-h8}
 
 ```
 release/
@@ -129,7 +129,7 @@ release/
 ```
 manifest.json 字段：`{version, commit, build_time, model_hashes, dependencies}`。
 
-## 10.9 上线前综合 Checklist {#src-book-chapter10-h9}
+## 上线前综合 Checklist {#src-book-chapter10-h9}
 
 | 类别 | 检查项 | 通过标准 |
 | ---- | ------ | -------- |
@@ -142,21 +142,21 @@ manifest.json 字段：`{version, commit, build_time, model_hashes, dependencies
 | 配置 | 签名校验一致 | Hash 匹配 |
 | 回滚 | 验证上一版本可用 | 切换 < 30s |
 
-## 10.10 验收、回归与漂移监测 {#src-book-chapter10-h10}
+## 验收、回归与漂移监测 {#src-book-chapter10-h10}
 
 交付后 7 天加密监控：记录时延、精度漂移（采样对比模型输出变化）。
 漂移检测：相同输入集合（Shadow Set）每天抽样跑一次 -> 统计 logits KL 散度/TopK 变化率，高于阈值（如 KL > 0.05）触发报警（潜在数据分布变化或模型文件损坏）。
 回归集版本化：`eval_set_vX`；若需替换样本 -> 新增版本，不覆盖旧数据。
 
-## 10.11 风险管理与决策日志 {#src-book-chapter10-h11}
+## 风险管理与决策日志 {#src-book-chapter10-h11}
 
 风险登记表：`risk_log.md` 每条包含：ID、描述、影响、概率、缓解、当前状态。决策日志（Decision Record, ADR）：记录架构/模型/精度策略选择及备选方案放弃理由，以便新成员快速建立上下文。
 
-## 10.12 章节小结 {#src-book-chapter10-h12}
+## 章节小结 {#src-book-chapter10-h12}
 
 方法论的核心不是流程文档堆砌，而是“指标驱动 + 资产沉淀 + 可回滚”三支柱。通过契约化需求、标准化 Baseline、规范化评测与回归体系，使团队协作更高效、风险暴露更透明、交付结果更可信。
 
-## 10.13 实践任务 {#src-book-chapter10-h13}
+## 实践任务 {#src-book-chapter10-h13}
 
 1. 输出 `requirement.yaml`（含指标与约束）。
 2. 构建 30 张代表图像的 mini 评测集并附 Hash 列表。

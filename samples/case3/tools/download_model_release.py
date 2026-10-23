@@ -21,8 +21,11 @@ import urllib.request
 
 
 REPOSITORY = "zhouxzh/piano-ddsp-ascend310"
-DEFAULT_PIANO_REVISION = "model-suite-v1.0.1"
 DEFAULT_PIANO_COMMIT = "c41911aa7de454aeacf0b3edbb2d06a0801fb3ff"
+# Pin the immutable commit directly so the tutorial repository does not need a
+# separate source-release tag in the Hugging Face revision selector.
+DEFAULT_PIANO_REVISION = DEFAULT_PIANO_COMMIT
+LEGACY_PIANO_TAG = "model-suite-v1.0.1"
 DEFAULT_PIANO_MANIFEST_SHA256 = (
     "1a4a2500ae357577a4a6f7378c28d54235f543663b9b69cc3cf5938929c458d7"
 )
@@ -127,7 +130,7 @@ def validate_pinned_revision(repository: str, revision: str, commit: str) -> Non
     """Reject a moved default release tag before fetching model payloads."""
     if (
         repository == REPOSITORY
-        and revision == DEFAULT_PIANO_REVISION
+        and revision == LEGACY_PIANO_TAG
         and commit != DEFAULT_PIANO_COMMIT
     ):
         raise RuntimeError(

@@ -22,7 +22,7 @@ lang: zh-cn
 
 本章有两套互不混用的板端证据。第 5.3 至 5.10 节的框架基础结论全部来自本仓库新增的 `samples/chapter5/` 样例，它们在 `Ascend 310B4 / 8T` 开发板上完整运行过一轮，环境为 `aarch64` + CANN `8.0.0` + MindSpore `2.4.10` + MindSpore Lite `2.2.11`，原始报告保存在该目录的 `outputs/` 下。第 5.11 节的大模型结论来自 `Ascend 310B1 / 20T` 板上的既有验收记录，入口是 `samples/case9/docs/`。两块板的算力档位不同，版本结论与性能数字都不得互相引用。
 
-## 5.1 本章定位与学习路径 {#src-book-chapter5-h1}
+## 本章定位与学习路径 {#src-book-chapter5-h1}
 
 本章不重复第 3 章的 PyTorch 语法，也不替代第 4 章的 ACL 细节。它回答四个问题：
 
@@ -43,7 +43,7 @@ lang: zh-cn
 
 阅读本章需要的基础：Python 基础（附录 3）、会使用 SSH 登录开发板（附录 1、附录 2）、完成 CANN 环境变量配置（第 2 章）。若尚未在板上跑通 `import acl`，请先回到第 4 章，因为本章所有板端命令都假定 CANN 运行时可用。
 
-## 5.2 MindSpore 在异构计算栈中的位置 {#src-book-chapter5-h2}
+## MindSpore 在异构计算栈中的位置 {#src-book-chapter5-h2}
 
 ### 从框架到硬件的纵向分层 {#src-book-chapter5-h3}
 
@@ -71,7 +71,7 @@ lang: zh-cn
 
 对本书其余章节的衔接：第 4 章的 OM 路线与本章的 MindIR 路线是**两条并行的交付路径**，不要把 MindIR 当作 OM 使用，也不要假设 OM 能被 MindSpore 直接加载。
 
-## 5.3 环境与版本配套 {#src-book-chapter5-h5}
+## 环境与版本配套 {#src-book-chapter5-h5}
 
 ### 安装前必须确认的四件事 {#src-book-chapter5-h6}
 
@@ -116,7 +116,7 @@ python check_mindspore_env.py
 
 这些结论来自本仓库的两组记录：本轮 `Ascend 310B4 / 8T` 上 `mindnlp 0.4.1` 从用户 site 正常导入（`observed-pass`，见 `samples/chapter5/outputs/env-report.json`），而更早的报告中曾出现 `mindnlp` 不可导入、并与 Ascend 软件包版本不匹配的环境（`blocked`）；同一时期的 `Ascend 310B1 / 20T` 板使用 MindSpore `2.4.10` + MindNLP `0.4.1` 通过了完整机器门（`observed-pass`）。**不同板卡、不同环境的结论不能互推**：导入失败多数是路径与版本问题，不能当成硬件否定。
 
-## 5.4 张量、数据类型与设备上下文 {#src-book-chapter5-h9}
+## 张量、数据类型与设备上下文 {#src-book-chapter5-h9}
 
 MindSpore 的核心数据结构是 `Tensor`。它和 NumPy 数组的差别不在于“能不能存数据”，而在于**数据放在哪里、图如何追踪它**。设备上下文由 `set_context` 设定，**必须在创建张量之前调用**：
 
@@ -156,7 +156,7 @@ EZ1001: ... Self dtype DT_FLOAT or mat2 dtype DT_FLOAT not support under keep ty
 
 `Parameter` 是会被优化器更新的张量，`Tensor` 默认不是。这个区分在第 5.8 节训练循环中会直接影响“为什么梯度算了但权重没变”。
 
-## 5.5 用 Cell 与 ops 构建网络 {#src-book-chapter5-h10}
+## 用 Cell 与 ops 构建网络 {#src-book-chapter5-h10}
 
 ### 最小可运行的网络定义 {#src-book-chapter5-h11}
 
@@ -219,7 +219,7 @@ print(output.shape, output.asnumpy())
 
 自定义算子属于第 7 章的内容。本章只强调边界：**图模式下 Python 的控制流和副作用不会按普通脚本执行**，所以不要把“打印调试信息”当成确认算子执行顺序的手段。
 
-## 5.6 数据集与预处理 {#src-book-chapter5-h13}
+## 数据集与预处理 {#src-book-chapter5-h13}
 
 ### GeneratorDataset 的组织方式 {#src-book-chapter5-h14}
 
@@ -273,7 +273,7 @@ dataset = (
 
 在没有测量前不要假设“预处理一定慢”。第 8 章的全部优化方法都建立在先测量之上。
 
-## 5.7 静态图与函数式编程 {#src-book-chapter5-h16}
+## 静态图与函数式编程 {#src-book-chapter5-h16}
 
 ### 两种执行模式 {#src-book-chapter5-h17}
 
@@ -316,7 +316,7 @@ python 04_graph_mode.py --mode graph
 
 还有一个容易卡住的细节：`ms.jit` 需要真实源码文件。在 `python -c "..."` 这种临时源码里调用它会直接报 `Mindspore can not compile temporary source code in terminal`，所以凡涉及 `@ms.jit` 的验证都要先落成文件再运行。
 
-## 5.8 自动微分、优化器与训练循环 {#src-book-chapter5-h19}
+## 自动微分、优化器与训练循环 {#src-book-chapter5-h19}
 
 ### 损失函数与梯度函数 {#src-book-chapter5-h20}
 
@@ -392,7 +392,7 @@ python 05_autograd_train.py --steps 200 --lr 0.05
 
 自动微分对 dtype 比前向更严格。同一个脚本把 `nn.Dense` 的 `fp32` 参数送进 `value_and_grad` 时，多次探测都以 `EZ1001`（`The soc version does not support bf16 / fp32 for calculations`）结束（`observed-fail`）；也出现过超过 `120 s` 探测预算没有回包的情况（`blocked`）。两者指向同一个结论：**本板上可训练路径必须显式使用 fp16**，不要先写完标准 fp32 训练脚本再指望它跑通。
 
-## 5.9 保存与加载：CKPT 与 MindIR {#src-book-chapter5-h22}
+## 保存与加载：CKPT 与 MindIR {#src-book-chapter5-h22}
 
 ### 两种文件解决两个问题 {#src-book-chapter5-h23}
 
@@ -441,7 +441,7 @@ ms.export(
 
 第 4 条不是形式主义。本仓库的验收记录里，同一模型在不同板卡上出现过完全不同的结论，缺少硬件与版本标注的“已通过”无法复用。
 
-## 5.10 MindSpore Lite 与端侧推理 {#src-book-chapter5-h25}
+## MindSpore Lite 与端侧推理 {#src-book-chapter5-h25}
 
 ### Lite 是独立运行时 {#src-book-chapter5-h26}
 
@@ -490,7 +490,7 @@ please install the latest version to support the mind ir version: 2
 2. 两个后端都停在版本校验时，要换版本配套，而不是调参数；
 3. 只有 `build_from_file` 通过之后，讨论 placement 与端侧性能才有意义。
 
-## 5.11 MindNLP 与大模型加载 {#src-book-chapter5-h28}
+## MindNLP 与大模型加载 {#src-book-chapter5-h28}
 
 本节是本章唯一引用 `Ascend 310B1 / 20T` 板数据的部分。`samples/chapter5/` 的样例不下载、不加载任何大模型权重，8T 板上也没有运行过这一节的模型；本节用于说明“框架能跑通”与“某个模型能否加载”是两件事。
 
@@ -524,7 +524,7 @@ MindNLP 在 MindSpore 之上提供 Transformer 类模型实现、分词器和权
 
 工程上还应遵守两条纪律：下载入口可以换镜像（本仓库使用 `HF_ENDPOINT=https://hf-mirror.com`），但**镜像只改变传输路径，不改变固定 revision 与 SHA-256 校验的硬门**；同时只保持一个活动 worker，避免多个大模型同时占用设备内存。
 
-## 5.12 在 310B 上运行的边界与证据记录 {#src-book-chapter5-h31}
+## 在 310B 上运行的边界与证据记录 {#src-book-chapter5-h31}
 
 ### 三条不可逾越的记录边界 {#src-book-chapter5-h32}
 
@@ -558,7 +558,7 @@ MindNLP 在 MindSpore 之上提供 Transformer 类模型实现、分词器和权
 
 `outputs/` 已被仓库忽略：报告留在板上作为原始证据，不进版本库。凡是写进正文的数字，都必须能从这些报告回溯到具体的命令、退出码与版本组合。
 
-## 5.13 常见错误与排查 {#src-book-chapter5-h34}
+## 常见错误与排查 {#src-book-chapter5-h34}
 
 | 症状 | 可能原因 | 处理方式 |
 | --- | --- | --- |
@@ -578,7 +578,7 @@ MindNLP 在 MindSpore 之上提供 Transformer 类模型实现、分词器和权
 
 排查顺序建议固定为：**先确认运行时环境 $\to$ 再确认工件完整性 $\to$ 再确认框架加载 $\to$ 最后才是图执行与性能**。跳步会让不同层的问题混在一起。
 
-## 5.14 小结 {#src-book-chapter5-h35}
+## 小结 {#src-book-chapter5-h35}
 
 本章的核心结论可以压缩成八句话：
 
@@ -591,7 +591,7 @@ MindNLP 在 MindSpore 之上提供 Transformer 类模型实现、分词器和权
 7. MindNLP 决定大模型能否加载，其 loader 覆盖范围随版本变化，缺失属于软件边界；
 8. 所有板端结论必须带硬件档位、版本组合与证据等级，`blocked` 不等于 `unsupported`。
 
-## 5.15 实践任务 {#src-book-chapter5-h36}
+## 实践任务 {#src-book-chapter5-h36}
 
 1. **环境核验**：运行 `samples/chapter5/check_mindspore_env.py`，记录解释器路径、各模块版本与导入路径、CANN 版本，整理成一页环境记录。
 2. **dtype 边界**：运行 `01_tensor_ops.py`，然后把矩阵乘的 dtype 从 `fp16` 改成 `fp32`，分别用“只打印 shape”和“`.asnumpy()` 取数值”两种方式判断，记录两次结论的差异。

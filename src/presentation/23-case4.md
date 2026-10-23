@@ -67,7 +67,7 @@ footer: "案例 4：掌纹识别"
 
 在线 API 和模板通道只接受已准入的 NPU embedding。
 
-<div class="source">教材：<a href="../experiment/case4.md#1-案例目标"><code>src/experiment/case4.md</code> §1</a>；样例：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md#案例目标"><code>src/experiment/case4.md</code> §1</a>；样例：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
 
 <!--
 先划清在线与离线边界。CPU 或 EDCC 可以出现在研究记录中，但不能被工作台 API、模板命名空间或前端模型选择器暴露。
@@ -86,7 +86,7 @@ footer: "案例 4：掌纹识别"
 
 前端服务可达不等于后端已连接；API 可达也不等于 NPU 推理已执行。
 
-<div class="source">教材：<a href="../experiment/case4.md#3-api-和界面"><code>src/experiment/case4.md</code> §3</a>；样例：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md#api-和界面"><code>src/experiment/case4.md</code> §3</a>；样例：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
 
 <!--
 把 UI、API、推理和存储拆开定位。页面出现空状态时，先确认是前端静态服务、API、模型还是摄像头没有连接。
@@ -143,7 +143,7 @@ footer: "案例 4：掌纹识别"
 - 原始报告含设备与人员信息时必须脱敏后再引用。
 - 删除和清理操作由操作者显式执行；截图中的空结果不是识别失败率或质量指标。
 
-<div class="source">教材：<a href="../experiment/case4.md#4-六模型人工测试"><code>src/experiment/case4.md</code> §4</a>；截图规范：<a href="../experiment/img4/palmprint-ui-capture-manifest.json"><code>src/experiment/img4/palmprint-ui-capture-manifest.json</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md#六模型人工测试"><code>src/experiment/case4.md</code> §4</a>；截图规范：<a href="../experiment/img4/palmprint-ui-capture-manifest.json"><code>src/experiment/img4/palmprint-ui-capture-manifest.json</code></a></div>
 
 <!--
 隐私边界要落实到截图和存储。真实掌纹、模板和报告不能作为课件素材，匿名测试结束后还要确认临时模板已清理。
@@ -235,7 +235,7 @@ CCNet 是当前默认和回滚模型；五个 CompNet 只在 manual_test profile
 
 CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不使用固定猜测值。
 
-<div class="source">教材：<a href="../experiment/case4.md#5-摄像头测试"><code>src/experiment/case4.md</code> §5</a>；样例：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md#摄像头测试"><code>src/experiment/case4.md</code> §5</a>；样例：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
 
 <!--
 上传和摄像头是两条输入路径。截图中的摄像头未连接状态不能用来判断 V4L2、首帧时间、帧率或设备释放结果。
@@ -253,7 +253,7 @@ CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不�
 4. 核对 ROI 质量后生成 `PWST1` embedding 模板。
 5. 在 `<model_id>__npu__mixed_fp16` 命名空间中查询、识别、删除并重启验证。
 
-<div class="source">教材：<a href="../experiment/case4.md#4-六模型人工测试"><code>src/experiment/case4.md</code> §4</a>；运行说明：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md#六模型人工测试"><code>src/experiment/case4.md</code> §4</a>；运行说明：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
 
 <!--
 模板闭环是模型身份的一部分。换模型、换精度或换发行目录后继续使用旧模板，可能得到不可解释的结果。
@@ -271,7 +271,7 @@ CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不�
 - 未识别、空模板和 API 不可用必须显示不同状态。
 - 只有同一模型、同一模板命名空间的闭环才能进入人工测试记录；`Health: Alarm` 不能单独判成败。
 
-<div class="source">教材：<a href="../experiment/case4.md#3-api-和界面"><code>src/experiment/case4.md</code> §3</a>；工作台说明：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md#api-和界面"><code>src/experiment/case4.md</code> §3</a>；工作台说明：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
 
 <!--
 尤其要区分“没有识别结果”和“识别未命中”。截图中的空结果只是服务未连接，不是模型拒绝，也不是 EER 结果。
@@ -309,7 +309,7 @@ CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不�
 
 人工测试期间不升级 Python、依赖、驱动、CANN，也不修改准入策略。
 
-<div class="source">冻结规则：<a href="../../samples/case4/docs/01-model-evaluation-and-deployment-plan.md"><code>docs/01-model-evaluation-and-deployment-plan.md</code> §6</a>；教材：<a href="../experiment/case4.md#7-版本冻结"><code>src/experiment/case4.md</code> §7</a></div>
+<div class="source">冻结规则：<a href="../../samples/case4/docs/01-model-evaluation-and-deployment-plan.md"><code>docs/01-model-evaluation-and-deployment-plan.md</code> §6</a>；教材：<a href="../experiment/case4.md#版本冻结"><code>src/experiment/case4.md</code> §7</a></div>
 
 <!--
 冻结是为了让失败可归因。中途升级软件或切换模型会破坏对比条件，发现问题时只记录并回退，不在同一测试窗口里修复。
@@ -321,14 +321,15 @@ CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不�
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export PALMPRINT_PROFILE=manual_test
 python -m palmprint_workbench.tools.verify_assets --strict
 python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 ```
 
-<div class="source">命令：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a>；教材：<a href="../experiment/case4.md#2-手动环境"><code>src/experiment/case4.md</code> §2</a></div>
+<div class="source">命令：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a>；教材：<a href="../experiment/case4.md#手动环境"><code>src/experiment/case4.md</code> §2</a></div>
 
 随后只读检查 `/api/health`、`/api/bootstrap`、`/api/candidates` 和 `/`，再执行一次合成 ROI 或匿名上传。
 
@@ -348,7 +349,7 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 - ACL 异常、设备 reset、`err_ret=-512` 或清理失败：停止该候选，保留日志并回退 CCNet。
 - `Health: Alarm` 只记录诊断，不能单独判失败或通过。
 
-<div class="source">排障：<a href="../experiment/case4.md#6-常见问题"><code>src/experiment/case4.md</code> §6</a>；验收边界：<a href="../../samples/case4/docs/02-device-deployment-and-acceptance-report.md"><code>docs/02-device-deployment-and-acceptance-report.md</code></a></div>
+<div class="source">排障：<a href="../experiment/case4.md#常见问题"><code>src/experiment/case4.md</code> §6</a>；验收边界：<a href="../../samples/case4/docs/02-device-deployment-and-acceptance-report.md"><code>docs/02-device-deployment-and-acceptance-report.md</code></a></div>
 
 <!--
 回退 CCNet 是版本内恢复策略，不是把五个 CompNet 判为永久不支持。故障候选先阻断，后续用单独版本重新验收。

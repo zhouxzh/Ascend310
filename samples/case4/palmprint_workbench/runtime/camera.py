@@ -36,9 +36,10 @@ _V4L2_CAPABILITY_SIZE = 104
 # structure has a fixed 104-byte layout across the supported 32/64-bit boards.
 _VIDIOC_QUERYCAP = (2 << 30) | (_V4L2_CAPABILITY_SIZE << 16) | (ord("V") << 8)
 # ``struct v4l2_format`` is 208 bytes on both 32- and 64-bit Linux builds.  The
-# first field is the buffer type and the pixel format's width/height follow it,
-# which lets one layout serve both single-planar and multi-planar nodes.
+# enum buffer type occupies four bytes, but the format union is eight-byte
+# aligned on aarch64; width/height therefore start at offset 8.
 _V4L2_FORMAT_SIZE = 208
+_V4L2_FORMAT_WIDTH_OFFSET = 8
 _VIDIOC_G_FMT = (3 << 30) | (_V4L2_FORMAT_SIZE << 16) | (ord("V") << 8) | 4
 _V4L2_BUF_TYPE_VIDEO_CAPTURE = 1
 _V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE = 9
@@ -123,7 +124,7 @@ def _is_video_capture_node(path: Path) -> bool:
         pixel_format = bytearray(_V4L2_FORMAT_SIZE)
         struct.pack_into("=I", pixel_format, 0, buffer_type)
         fcntl.ioctl(descriptor, _VIDIOC_G_FMT, pixel_format, True)
-        width, height = struct.unpack_from("=II", pixel_format, 4)
+        width, height = struct.unpack_from("=II", pixel_format, _V4L2_FORMAT_WIDTH_OFFSET)
         return width > 0 and height > 0
     except OSError:
         return False

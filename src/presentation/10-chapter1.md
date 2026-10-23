@@ -69,7 +69,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 云和边不是替代关系；合理系统会同时使用端、边、云。
 
-<div class="source">教材：<a href="../book/chapter1.md#边缘计算简介"><code>src/book/chapter1.md</code>「边缘计算简介」</a></div>
+<div class="source">教材：<a href="../book/chapter1.md#src-book-chapter1-h1"><code>src/book/chapter1.md</code>「边缘计算简介」</a></div>
 
 <!--
 让学生先按数据源、时延和网络条件判断，不要从“哪个芯片更强”开始。
@@ -91,7 +91,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 下沉理由必须能被时延、带宽、隐私或离线能力量化，否则应先留在云端。
 
-<div class="source">教材：<a href="../book/chapter1.md#何时采用边缘计算"><code>src/book/chapter1.md</code>「何时采用边缘计算」</a></div>
+<div class="source">教材：<a href="../book/chapter1.md#src-book-chapter1-h5"><code>src/book/chapter1.md</code>「何时采用边缘计算」</a></div>
 
 <!--
 强调“边缘优先”不是默认答案，任何下沉决定都要有可观测指标。
@@ -121,7 +121,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 技术路线的差异，最终体现在它能完成哪类系统任务。
 
-<div class="source">教材：<a href="../book/chapter1.md#边缘计算卡的发展历史"><code>src/book/chapter1.md</code>「边缘计算卡的发展历史」</a></div>
+<div class="source">教材：<a href="../book/chapter1.md#src-book-chapter1-h6"><code>src/book/chapter1.md</code>「边缘计算卡的发展历史」</a></div>
 
 <!--
 带学生比较技术路线的目标，而不是背厂商时间线。
@@ -142,7 +142,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 选型时先写清模型、接口和实时约束，再比较具体型号。
 
-<div class="source">教材：<a href="../book/chapter1.md#常见的边缘计算卡"><code>src/book/chapter1.md</code>「常见的边缘计算卡」</a></div>
+<div class="source">教材：<a href="../book/chapter1.md#src-book-chapter1-h7"><code>src/book/chapter1.md</code>「常见的边缘计算卡」</a></div>
 
 <!--
 不要用跨厂商的单一 TOPS 数字直接排序，先确认各自能完成什么系统工作。
@@ -163,7 +163,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 每道门都要有证据；任何一门没有证据，候选就不能进入最终比较。
 
-<div class="source">教材：<a href="../book/chapter1.md#昇腾310b简介"><code>src/book/chapter1.md</code>「昇腾310B简介」</a></div>
+<div class="source">教材：<a href="../book/chapter1.md#src-book-chapter1-h11"><code>src/book/chapter1.md</code>「昇腾310B简介」</a></div>
 
 <!--
 把五道门写在黑板上，要求后续每个硬件选择都引用对应证据。
@@ -187,7 +187,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 ![Orange Pi AIpro 8T 开发板](../appendix/img1/aipro.png)
 
-<div class="source">图片：<a href="../appendix/img1/aipro.png"><code>src/appendix/img1/aipro.png</code></a>；说明：<a href="../appendix/appendix1.md#昇腾310b开发板介绍"><code>src/appendix/appendix1.md</code></a></div>
+<div class="source">图片：<a href="../appendix/img1/aipro.png"><code>src/appendix/img1/aipro.png</code></a>；说明：<a href="../appendix/appendix1.md#src-appendix-appendix1-h1"><code>src/appendix/appendix1.md</code></a></div>
 
 <!--
 这张图只证明 OrangePi AIpro 8T 整板外观，不代表 20T 板。正文的 310B 8T 模块表列出 LPDDR4X 4GB，而画册材料写整板可配 8GB/16GB，课堂必须区分模块规格与整板配置。
@@ -202,7 +202,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 <div class="split"><figure><img src="../appendix/img1/1.png" alt="Orange Pi AIpro 前面板接口标注图"><figcaption>真实开发板的正面接口标注，不代表其他板卡型号。</figcaption></figure><div><ul><li>显示：两路 HDMI，另有 MIPI-DSI。</li><li>视觉：两路 MIPI-CSI，可外接兼容摄像头。</li><li>调试：Micro USB 串口，不依赖图形桌面。</li><li>扩展：TF、M.2、千兆网口与 USB 3.0。</li></ul></div></div>
 
-<div class="source">图片：<a href="../appendix/img1/1.png"><code>src/appendix/img1/1.png</code></a>；接口：<a href="../appendix/appendix1.md#昇腾310b开发板介绍"><code>src/appendix/appendix1.md</code></a></div>
+<div class="source">图片：<a href="../appendix/img1/1.png"><code>src/appendix/img1/1.png</code></a>；接口：<a href="../appendix/appendix1.md#src-appendix-appendix1-h1"><code>src/appendix/appendix1.md</code></a></div>
 
 <!--
 先问实验需要哪些接口，再看板子是否具备。Type-C 的 USB 3.0 兼容边界、MIPI 摄像头型号和供电规格都要单独核对。
@@ -225,7 +225,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 两档共享核心架构与接口，但硬件资源不同；最终档位以 `npu-smi` 和实际板卡配置为准。
 
-<div class="source">教材：<a href="../book/chapter1.md#昇腾310b技术规格详解"><code>src/book/chapter1.md</code>「昇腾310B技术规格详解」</a></div>
+<div class="source">教材：<a href="../book/chapter1.md#src-book-chapter1-h12"><code>src/book/chapter1.md</code>「昇腾310B技术规格详解」</a></div>
 
 <!--
 表格只说明模块规格。不能把 20T 的理论参数直接换算成某个模型的帧率，也不能把模块内存与整板内存混写。
@@ -322,7 +322,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > “8T 足够”与“20T 更快”都不是结论，而是需要被测试验证的候选假设。
 
-<div class="source">教材：<a href="../book/chapter1.md#其他常见的边缘计算卡的对比"><code>src/book/chapter1.md</code>「其他边缘计算卡对比」</a></div>
+<div class="source">教材：<a href="../book/chapter1.md#src-book-chapter1-h13"><code>src/book/chapter1.md</code>「其他边缘计算卡对比」</a></div>
 
 <!--
 让学生把场景写成候选和验证项，而不是只写一个型号。强调具体模型、输入和协议决定结果。
@@ -343,7 +343,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 样机阶段忽略的现场约束，通常会在部署阶段以停机形式暴露。
 
-<div class="source">依据：<a href="../appendix/appendix1.md#配件准备"><code>src/appendix/appendix1.md</code>「配件准备」</a></div>
+<div class="source">依据：<a href="../appendix/appendix1.md#src-appendix-appendix1-h4"><code>src/appendix/appendix1.md</code>「配件准备」</a></div>
 
 <!--
 现场约束往往在样机阶段被忽略，到部署阶段才暴露。让学生先列硬约束，再看算力。
@@ -364,7 +364,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 失败、N/A 和 blocked 都是选型结论的一部分，不能删掉后只保留最好看的数据。
 
-<div class="source">依据：<a href="../book/chapter1.md#实践任务"><code>src/book/chapter1.md</code>「实践任务」</a>；<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §6</a></div>
+<div class="source">依据：<a href="../book/chapter1.md#src-book-chapter1-h14"><code>src/book/chapter1.md</code>「实践任务」</a>；<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §6</a></div>
 
 <!--
 强调双板实验要分开留证。失败、N/A 和 blocked 都是选型结论的一部分，不能删掉后只保留最好看的数据。
@@ -386,7 +386,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 完成标准：别人能按记录复现测试，并能说明结果为什么不能跨档位外推。
 
-<div class="source">作业要求：<a href="../book/chapter1.md#实践任务"><code>src/book/chapter1.md</code>「实践任务」</a>；证据口径：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code></a></div>
+<div class="source">作业要求：<a href="../book/chapter1.md#src-book-chapter1-h14"><code>src/book/chapter1.md</code>「实践任务」</a>；证据口径：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code></a></div>
 
 <!--
 收尾时让学生复述“场景、候选、证据、决策”四张卡。没有板端证据的部分必须标为 untested 或 blocked。

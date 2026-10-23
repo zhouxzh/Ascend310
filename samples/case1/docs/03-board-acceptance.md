@@ -21,7 +21,8 @@
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd samples/case1
 python -c "import acl, cv2, fastapi, uvicorn; print('runtime imports: ok')"

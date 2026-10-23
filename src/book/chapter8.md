@@ -11,7 +11,7 @@ lang: zh-cn
 
 本章使用的是 Tiny-ImageNet 版 ResNet18，输入为 64x64 RGB 图像，输出为 200 类分类结果。它的绝对 FPS 不能等同于标准 ImageNet 224x224 ResNet18，但内存生命周期、数据搬运、预处理下沉和流水线分析方法是通用的。
 
-## 8.1 性能优化先从可测量开始 {#src-book-chapter8-h1}
+## 性能优化先从可测量开始 {#src-book-chapter8-h1}
 
 性能优化的第一步不是改代码，而是把问题拆成可观测的阶段。边缘 AI 应用通常包含以下链路：
 
@@ -35,7 +35,7 @@ lang: zh-cn
 2. 一次只改一个变量。比如只改 Buffer 复用，不同时改 Batch 和预处理。
 3. 同时看端到端和分阶段耗时。只看 `acl.mdl.execute` 会忽略 H2D、D2H 和 Host 阻塞。
 
-## 8.2 第 8 章样例目录 {#src-book-chapter8-h2}
+## 第 8 章样例目录 {#src-book-chapter8-h2}
 
 本章代码位于 `samples/chapter8/`：
 
@@ -77,9 +77,9 @@ python3 tools/download_model.py
 python3 01_baseline_resnet_sync.py --runs 100
 ```
 
-## 8.3 工具箱：从轻量计时到系统 Profiling {#src-book-chapter8-h3}
+## 工具箱：从轻量计时到系统 Profiling {#src-book-chapter8-h3}
 
-### 8.3.1 Python 分段计时 {#src-book-chapter8-h4}
+### Python 分段计时 {#src-book-chapter8-h4}
 
 `perf_counter()` 适合做应用层粗粒度计时。第 8 章的样例通过 `StageRecorder` 记录每一帧的阶段耗时，并输出 JSON：
 
@@ -95,7 +95,7 @@ python3 01_baseline_resnet_sync.py --runs 100
 
 这种计时不能替代硬件 Profiling，但它有两个优势：代码改动小，能快速判断优化是否有方向。
 
-### 8.3.2 msprof：ACL 与 NPU Timeline {#src-book-chapter8-h5}
+### msprof：ACL 与 NPU Timeline {#src-book-chapter8-h5}
 
 `msprof` 是 CANN 提供的性能采集工具。它能记录 Host 侧 ACL API 调用、Runtime 任务、Stream Timeline、AI Core 指标和部分系统资源信息。
 
@@ -115,7 +115,7 @@ bash tools/profile_with_msprof.sh --name baseline -- \
 | Stream Timeline | NPU 计算任务之间是否有大片空白 | NPU 在等待 Host 下发任务或等待数据 |
 | AI Core Metrics | Pipe 利用率是否低 | 模型算子、Batch 或输入尺寸需要继续分析 |
 
-### 8.3.3 npu-smi：确认设备状态 {#src-book-chapter8-h6}
+### npu-smi：确认设备状态 {#src-book-chapter8-h6}
 
 `npu-smi info` 用于确认设备是否在线、温度是否异常、功耗是否接近限制。性能测试前后都应记录一次，避免把降频、设备异常或其他进程占用误判为代码问题。
 
@@ -123,7 +123,7 @@ bash tools/profile_with_msprof.sh --name baseline -- \
 npu-smi info
 ```
 
-### 8.3.4 msame / ais_bench：独立测模型上限 {#src-book-chapter8-h7}
+### msame / ais_bench：独立测模型上限 {#src-book-chapter8-h7}
 
 当应用端到端 FPS 不理想时，可以用 `msame` 或 `ais_bench` 单独测 OM 模型。它们绕过业务代码，只关注模型输入输出和 Runtime 执行，适合回答一个问题：模型本身的推理上限是多少？
 
@@ -137,7 +137,7 @@ ais_bench --model model/resnet18_tiny_imagenet.om --batchsize 1
 
 不同 CANN 版本和安装方式下，`ais_bench` 或 `msame` 的命令行参数可能略有差异；如果本机未安装该工具，可以跳过本节，继续使用本章 Python 分段计时脚本观察端到端瓶颈。
 
-### 8.3.5 ATC/AIPP 与 DVPP：把图像工作下沉到设备侧 {#src-book-chapter8-h8}
+### ATC/AIPP 与 DVPP：把图像工作下沉到设备侧 {#src-book-chapter8-h8}
 
 AIPP 能在模型输入侧完成颜色格式处理和归一化，减少 Host CPU 的像素遍历。示例配置位于：
 
@@ -159,7 +159,7 @@ bash tools/convert_aipp_resnet18.sh
 
 DVPP 适合处理视频编解码、JPEG 编解码、VPC resize/crop 等媒体任务。第 6 章已经介绍 DVPP API，本章只关心它在性能优化中的角色：减少 CPU 图像处理负担，并让数据尽量早地进入设备侧流水线。
 
-## 8.4 案例一：建立同步推理基线 {#src-book-chapter8-h9}
+## 案例一：建立同步推理基线 {#src-book-chapter8-h9}
 
 先运行基线：
 
@@ -196,7 +196,7 @@ acl.rt.memcpy(host_out, output_size, output_ptr, output_size, ACL_MEMCPY_DEVICE_
 
 如果 `alloc_dataset` 和 `free_dataset` 占比明显，说明优化方向不是模型，而是资源生命周期。
 
-## 8.5 案例二：复用 ACL Buffer 和 Dataset {#src-book-chapter8-h10}
+## 案例二：复用 ACL Buffer 和 Dataset {#src-book-chapter8-h10}
 
 推理服务通常会长时间运行，输入输出张量大小也是固定的。因此更合理的做法是在模型加载后一次性创建输入输出 Buffer 和 Dataset，在每帧循环里只做数据拷贝和执行：
 
@@ -220,7 +220,7 @@ python3 02_buffer_reuse_benchmark.py --runs 100
 
 如果模型很小，Buffer 复用的收益会明显；如果模型本身很大，收益占比会下降，但仍然能减少长尾抖动。
 
-## 8.6 案例三：CPU 预处理为什么容易成为瓶颈 {#src-book-chapter8-h11}
+## 案例三：CPU 预处理为什么容易成为瓶颈 {#src-book-chapter8-h11}
 
 很多边缘视觉应用在 NPU 推理前会做 resize、颜色转换、归一化和 HWC 到 CHW 转换。脚本 `03_cpu_preprocess_benchmark.py` 用确定性 RGB 图像模拟 1080p 摄像头帧：
 
@@ -243,7 +243,7 @@ python3 03_cpu_preprocess_benchmark.py --runs 100 --resolution 1920x1080
 2. 使用 AIPP 做归一化和部分颜色格式处理。
 3. 使用视频链路时，让 VDEC/JPEGD 的输出直接衔接 VPC 或模型输入。
 
-## 8.7 案例四：VPC 与 CPU resize {#src-book-chapter8-h12}
+## 案例四：VPC 与 CPU resize {#src-book-chapter8-h12}
 
 脚本 `04_dvpp_resize_vs_cpu.py` 生成 NV12 测试帧，将 1080p 图像缩小到 540p，对比 CPU resize 和 DVPP VPC resize：
 
@@ -257,7 +257,7 @@ python3 04_dvpp_resize_vs_cpu.py --frames 60 --resolution 1920x1080
 2. 是否每帧都重复创建 DVPP Channel、Stream 或配置对象。
 3. 是否存在多余的 H2D/D2H 拷贝。
 
-## 8.8 案例五：AIPP 把归一化下沉到模型输入侧 {#src-book-chapter8-h13}
+## 案例五：AIPP 把归一化下沉到模型输入侧 {#src-book-chapter8-h13}
 
 前面的基线脚本使用 CPU 完成 resize、归一化和 HWC 到 CHW 转换，然后把 `float32 NCHW` 输入拷贝到 Device。AIPP 的思路不同：让模型接收 `RGB888_U8` 图像，在模型输入侧完成均值、方差等处理。这样可以减少 Host CPU 的像素遍历，也能减少输入拷贝字节数。
 
@@ -303,7 +303,7 @@ python3 06_aipp_preprocess_compare.py --runs 100
 
 ATC 是离线转换步骤，第一次编译可能明显慢于普通推理脚本。如果转换耗时异常，应先检查板端负载、可用内存、CANN 日志和 AIPP 配置，再重新运行转换脚本。
 
-## 8.9 案例六：串行流程与 Queue Pipeline {#src-book-chapter8-h14}
+## 案例六：串行流程与 Queue Pipeline {#src-book-chapter8-h14}
 
 串行流程的单帧耗时为：
 
@@ -331,7 +331,7 @@ python3 05_pipeline_queue_demo.py --frames 100
 
 流水线优化的目标不是降低单帧端到端延迟，而是提高稳态吞吐。它会引入队列等待，因此 p95 latency 可能上升；如果业务目标是交互式低延迟，需要谨慎扩大队列深度。
 
-## 8.10 作者实测结果 {#src-book-chapter8-h15}
+## 作者实测结果 {#src-book-chapter8-h15}
 
 本节记录作者在一台 Ascend 310B 设备上得到的实测数据。读者自己的板端温度、CANN 版本、设备健康状态和后台进程不同，绝对数值会有差异；更重要的是复现实验方法和观察相对趋势。
 
@@ -341,7 +341,7 @@ python3 05_pipeline_queue_demo.py --frames 100
 | 设备名 | `orangepiaipro` |
 | 远端仓库 | `/home/HwHiAiUser/Documents/Ascend310` |
 | CANN 路径 | `/usr/local/Ascend/ascend-toolkit/latest` |
-| Python | `/home/HwHiAiUser/.conda/envs/npu/bin/python` |
+| Python（历史运行） | `/home/HwHiAiUser/.conda/envs/npu/bin/python`；仅保留为历史证据，当前复现使用 `ascend` |
 | 测试日期 | `2026-06-08` |
 | 设备状态 | `npu-smi` 显示 310B4，Health 为 `Alarm`，温度约 61 C，测试前后内存约 2939-3003 / 7545 MB |
 
@@ -400,9 +400,12 @@ outputs/msprof/baseline-remote-latest-20260608-083957/PROF_000001_20260608083959
 远端验证命令：
 
 ```bash
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd /home/HwHiAiUser/Documents/Ascend310/samples/chapter8
-PY=/home/HwHiAiUser/.conda/envs/npu/bin/python
+PY="$(command -v python)"
 $PY -m py_compile *.py tools/*.py
 $PY tools/download_model.py
 $PY 01_baseline_resnet_sync.py --runs 100 --output outputs/baseline_resnet_sync_remote_latest.json
@@ -429,11 +432,11 @@ Profiling 采集命令：
 
 ```bash
 bash tools/profile_with_msprof.sh --name baseline-remote-latest -- \
-  /home/HwHiAiUser/.conda/envs/npu/bin/python 01_baseline_resnet_sync.py \
+  "$PY" 01_baseline_resnet_sync.py \
     --runs 20 --output outputs/baseline_msprof_remote_latest.json
 ```
 
-## 8.11 调优 Checklist {#src-book-chapter8-h16}
+## 调优 Checklist {#src-book-chapter8-h16}
 
 | 现象 | 优先检查 | 常见优化 |
 |---|---|---|
@@ -444,7 +447,7 @@ bash tools/profile_with_msprof.sh --name baseline-remote-latest -- \
 | 模型单独基准也慢 | 算子或模型结构 | 改输入尺寸、精度模式、Batch、算子优化 |
 | Pipeline FPS 不升反降 | 队列太深或阶段不均衡 | 缩小队列、调整线程数、重新划分阶段 |
 
-## 8.12 练习任务 {#src-book-chapter8-h17}
+## 练习任务 {#src-book-chapter8-h17}
 
 1. 把 `01_baseline_resnet_sync.py` 的 `--runs` 从 100 增加到 1000，对比 p95 是否稳定。
 2. 用 `msprof` 分别采集基线和 Buffer 复用脚本，找出 Timeline 中 Host 空白是否减少。
@@ -452,6 +455,6 @@ bash tools/profile_with_msprof.sh --name baseline-remote-latest -- \
 4. 将自己的模型接入 `ReuseResNetRunner` 的思路，记录优化前后的 JSON 指标。
 5. 运行 `tools/download_model.py --all` 获取 AIPP OM，或使用 `tools/convert_aipp_resnet18.sh` 重新生成 AIPP OM，再运行 `06_aipp_preprocess_compare.py` 比较 CPU 归一化下沉前后的端到端耗时和输出差异。
 
-## 8.13 小结 {#src-book-chapter8-h18}
+## 小结 {#src-book-chapter8-h18}
 
 Ascend 310B 性能优化的核心是先定位瓶颈，再把瓶颈映射到合适的硬件或软件策略。小模型场景中，内存申请、同步和 Host 预处理往往比模型执行更值得关注；视频场景中，DVPP、AIPP 和流水线调度决定了端到端吞吐。调优的最终依据不是经验判断，而是可复现的指标、Timeline 和对比报告。

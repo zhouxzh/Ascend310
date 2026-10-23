@@ -11,10 +11,10 @@ import numpy as np
 CHAPTER_DIR = Path(__file__).resolve().parent
 SAMPLES_DIR = CHAPTER_DIR.parent
 REPO_ROOT = CHAPTER_DIR.parents[1]
-CHAPTER7_DIR = SAMPLES_DIR / "chapter7"
+CHAPTER8_DIR = SAMPLES_DIR / "chapter8"
 
-if str(CHAPTER7_DIR) not in sys.path:
-    sys.path.insert(0, str(CHAPTER7_DIR))
+if str(CHAPTER8_DIR) not in sys.path:
+    sys.path.insert(0, str(CHAPTER8_DIR))
 
 from perf_utils import (  # noqa: E402
     StageRecorder,

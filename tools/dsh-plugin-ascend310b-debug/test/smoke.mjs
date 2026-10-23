@@ -12,7 +12,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,6 +56,13 @@ writeFileSync(
 );
 
 const host = await import(new URL('../lib/index.js', import.meta.url).href);
+const ascendTask = host.internals.prepareTaskCommand('python -V', 'ascend');
+assert.match(ascendTask, /conda activate ascend/);
+assert.match(ascendTask, /PYTHONNOUSERSITE=1/);
+assert.match(ascendTask, /ascend-toolkit\/set_env\.sh/);
+assert.doesNotMatch(ascendTask, /conda activate base/);
+assert.equal(host.internals.prepareTaskCommand('hostname', 'none'), 'hostname');
+assert.match(host.internals.prepareTaskCommand('hostname', 'base'), /conda activate base/);
 
 const failures = [];
 const check = (condition, message) => {
@@ -74,6 +81,19 @@ function validateOutput(name, value) {
 		failures.push(`${name}: missing output schema`);
 		return;
 	}
+	const findUndefined = (node, path) => {
+		if (node === undefined) return;
+		if (node === null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			node.forEach((item, index) => findUndefined(item, `${path}[${index}]`));
+			return;
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (child === undefined) failures.push(`${path}.${key} is an own undefined property in ${name}`);
+			else findUndefined(child, `${path}.${key}`);
+		}
+	};
+	findUndefined(value, name);
 	const visit = (node, shape, path) => {
 		if (node === undefined) return;
 		if (shape === null || typeof shape !== 'object') return;
@@ -153,16 +173,16 @@ try {
 
 	host.apply(fakeCtx, config);
 
-	for (const name of ['ascend_probe', 'ascend_check', 'ascend_debug_plan', 'ascend_sample_index', 'ascend_board_exec', 'ascend_board_run', 'ascend_model_download', 'ascend_ui_capture', 'ascend_discover']) {
+	for (const name of ['ascend_probe', 'ascend_check', 'ascend_debug_plan', 'ascend_sample_index', 'ascend_board_exec', 'ascend_board_run', 'ascend_apt_install', 'ascend_model_download', 'ascend_ui_capture', 'ascend_discover', 'ascend_serial_probe', 'ascend_serial_exec']) {
 		check(registeredTools.has(name), `tool ${name} must be registered`);
 	}
-	check(routes.length === 3, `expected three panel routes, got ${routes.length}`);
+	check(routes.length === 4, `expected four panel routes, got ${routes.length}`);
 	check(routes.every((route) => route.kind === 'exact'), 'panel routes must be exact matches');
-	check(effects.length === 3, 'each route must be registered through an effect');
+	check(effects.length === 4, 'each route must be registered through an effect');
 	check(
 		routes.map((route) => route.path).join(',') ===
-			'/ascend310b-debug/report.json,/ascend310b-debug/probe,/ascend310b-debug/discover',
-		'routes must expose the report, probe and discover endpoints'
+			'/ascend310b-debug/report.json,/ascend310b-debug/probe,/ascend310b-debug/discover,/ascend310b-debug/serial-probe',
+		'routes must expose the report, probe, discover and serial-probe endpoints'
 	);
 
 	// --- target resolution ------------------------------------------------
@@ -231,6 +251,27 @@ try {
 	check(probeResult.text.includes('Ascend310B4'), 'the probe tool must print the board from the transcript');
 	check(probeResult.text.includes('8.0.0'), 'the probe tool must print the probed CANN version');
 	check(probeResult.text.includes('observed-match'), 'the probe tool must report the recorded version pairing');
+
+	const offlineProbe = host.buildProbeOutput({
+		result: {
+			target: { id: 'board-8t', label: '开发板 1（8T）', transport: 'ssh', host: 'orangepiaipro.local', user: 'HwHiAiUser' },
+			source: 'ssh',
+			environment: { facts: {}, missingCore: ['SoC', 'CANN', '驱动'], scope: null },
+			rawText: '',
+			transport: { ok: false, reason: 'SSH 退出码 255：Could not resolve hostname' }
+		},
+		report: {
+			board: null,
+			text: '',
+			scope: { applicable: 'unknown', message: '未识别到 SoC。' },
+			pairing: { verdict: 'incomplete', evidence: 'untested', reasons: [] }
+		}
+	});
+	validateOutput('ascend_probe', offlineProbe);
+	check(offlineProbe.ok === false, 'an unreachable target must return ok=false');
+	check(!Object.hasOwn(offlineProbe, 'board'), 'an unreachable target must omit board rather than return undefined');
+	check(offlineProbe.text.includes('offline/unreachable'), 'an unreachable target must identify itself as offline/unreachable');
+	check(offlineProbe.text.includes('不表示'), 'an offline target must not become an unsupported-hardware claim');
 
 	const planTool = registeredTools.get('ascend_debug_plan');
 	const planResult = await planTool.execute({ symptom: 'import acl 失败', rawText: PROBE_8T_CANN80, repoRoot }, {});
@@ -424,10 +465,40 @@ try {
 		}
 	};
 	const request = {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
 		async *[Symbol.asyncIterator]() {
 			yield JSON.stringify({ target: 'board-8t', rawText: PROBE_8T_CANN80 });
 		}
 	};
+	const routeResponse = () => ({
+		status: null,
+		headers: null,
+		body: '',
+		writeHead(status, headers) {
+			this.status = status;
+			this.headers = headers;
+		},
+		end(chunk) {
+			this.body = chunk ?? '';
+		}
+	});
+	const reportRoute = routes.find((route) => route.path === '/ascend310b-debug/report.json');
+	const wrongReportMethod = routeResponse();
+	await reportRoute.handler({ method: 'POST', headers: { 'content-type': 'application/json' } }, wrongReportMethod);
+	check(wrongReportMethod.status === 405, 'report route must reject POST with 405');
+	const wrongProbeMethod = routeResponse();
+	await probeRoute.handler({ method: 'GET', headers: {} }, wrongProbeMethod);
+	check(wrongProbeMethod.status === 405, 'probe route must reject GET with 405');
+	const wrongContentType = routeResponse();
+	await probeRoute.handler({ method: 'POST', headers: {} }, wrongContentType);
+	check(wrongContentType.status === 415, 'probe route must require application/json');
+	const wrongOrigin = routeResponse();
+	await probeRoute.handler(
+		{ method: 'POST', headers: { 'content-type': 'application/json', host: '127.0.0.1', origin: 'https://evil.example' } },
+		wrongOrigin
+	);
+	check(wrongOrigin.status === 403, 'probe route must reject a cross-origin POST');
 	await probeRoute.handler(request, response);
 	check(response.status === 200, `the probe route must answer 200, got ${response.status}: ${response.body.slice(0, 400)}`);
 	const payload = JSON.parse(response.body);
@@ -435,6 +506,7 @@ try {
 	check(payload.board?.soc === 'Ascend310B4', 'the probe route must return the parsed board');
 	check(Array.isArray(payload.targets) && payload.targets.length === 2, 'the probe route must return both configured targets');
 	check(Array.isArray(payload.knowledge) && payload.knowledge.length > 0, 'the probe route must return the knowledge router');
+	check(Array.isArray(payload.caseDependencies) && payload.caseDependencies.length === 9, 'the panel must return all 9 case dependency records');
 	check(
 		Array.isArray(payload.samples) && payload.samples.every((sample) => typeof sample.title === 'string'),
 		'the probe route must return sample entries'
@@ -459,6 +531,8 @@ try {
 		}
 	};
 	const discoverRequest = {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
 		async *[Symbol.asyncIterator]() {
 			yield JSON.stringify({ cidrs: ['8.8.8.0/24'] });
 		}
@@ -466,6 +540,28 @@ try {
 	await discoverRoute.handler(discoverRequest, discoverResponse);
 	check(discoverResponse.status === 500, 'the discover route must reject a public CIDR without scanning');
 	check(String(JSON.parse(discoverResponse.body).error).includes('私有'), 'the discover route must explain the CIDR refusal');
+
+	const serialRoute = routes.find((route) => route.path === '/ascend310b-debug/serial-probe');
+	const serialResponse = {
+		status: null,
+		body: '',
+		writeHead(status) {
+			this.status = status;
+		},
+		end(chunk) {
+			this.body = chunk ?? '';
+		}
+	};
+	const serialRequest = {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		async *[Symbol.asyncIterator]() {
+			yield '{}';
+		}
+	};
+	await serialRoute.handler(serialRequest, serialResponse);
+	check(serialResponse.status === 400, 'the serial route must reject missing serial configuration');
+	check(String(JSON.parse(serialResponse.body).error).includes('串口'), 'the serial route must explain invalid serial configuration');
 
 	// The same route must refuse to imply its procedures apply to another chip.
 	const foreignResponse = {
@@ -479,6 +575,8 @@ try {
 		}
 	};
 	const foreignRequest = {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
 		async *[Symbol.asyncIterator]() {
 			yield JSON.stringify({
 				rawText: '===ABS_BEGIN:npu_smi_info===\n| 0       310P3             | OK            | 12.8         45                0    / 0              |\n===ABS_END:npu_smi_info==='
@@ -544,5 +642,15 @@ try {
 		console.log(`  knowledge  : ${payload.knowledge.length}`);
 	}
 } finally {
-	rmSync(stubRoot, { recursive: true, force: true });
+	rmSync(stubDir, { recursive: true, force: true });
+	try {
+		rmdirSync(join(stubRoot, '@deepseek-ai'));
+	} catch {
+		// A real @deepseek-ai dependency tree is not test-owned.
+	}
+	try {
+		rmdirSync(stubRoot);
+	} catch {
+		// Keep a real dependency tree if one existed or another dependency remains.
+	}
 }

@@ -1,11 +1,11 @@
 ---
 name: ascend310b-cann-development
-description: 面向 Ascend 310B1/310B4（8T/20T）的 CANN 程序开发工作流。用于新写或改造 PyACL/ACL、ATC/OM、DVPP/VENC、摄像头 V4L2、torch_npu、MindSpore/MindIR/MindSpore Lite 程序，以及需要设计 310B 工程目录、接口契约、板端验证和性能/精度证据时。不得把 Ascend 910/950 的工作流、编译参数或性能结论直接套到 310B；先用 ascend_probe 确认真实板和软件组合，再按本 skill 的分层门推进。
+description: 面向 Ascend 310B1/310B4（8T/20T）的 CANN 程序开发工作流。用于新写或改造 PyACL/ACL、ATC/OM、DVPP/VENC、摄像头 V4L2、torch_npu、MindSpore/MindIR/MindSpore Lite 程序，以及需要设计 310B 工程目录、接口契约、板端验证和性能/精度证据时。案例发布复现必须从 GitHub 固定 commit 获取源码、从 Hugging Face 固定 revision 获取模型，不能把作者本地模型复制到板端。不得把 Ascend 910/950 的工作流、编译参数或性能结论直接套到 310B；先用 ascend_probe 确认真实板和软件组合，再按本 skill 的分层门推进。
 ---
 
 # 昇腾 310B CANN 程序开发
 
-这个 skill 负责**从程序结构到板端证据**的 310B 开发流程。它不替代调试 skill：开发时用它建立工程和验收门，失败后再用 `ascend310b-debug` 定位失败层。
+这个 skill 负责**从程序结构到板端证据**的 310B 开发流程。它不替代调试 skill：开发时用它建立工程和验收门，失败后再用 `ascend310b-debug` 定位失败层。案例发布测试先经过 `ascend310b-case-testing` 的 GitHub commit / Hugging Face revision 来源门，不能把作者本地模型复制到板端后当作复现结果。
 
 ## 1. 范围和硬件身份
 
@@ -31,7 +31,13 @@ description: 面向 Ascend 310B1/310B4（8T/20T）的 CANN 程序开发工作流
 | `aclImport` / `aclImportSourced` | 区分裸 SSH 与 source CANN 后的结果 |
 | `atcOnPath` / `setEnvPresent` | 判断转换链是否可达 |
 | `deviceNodes` / `kernelModules` | 先确认设备层存在，再写业务代码 |
-| `pythonExecutable` / `pythonVersion` | 记录实际解释器和包来源 |
+| `pythonExecutable` / `pythonVersion` | 记录系统解释器和包来源 |
+| `ascendEnvPresent` / `ascendEnvVersion` / `ascendEnvAbi` | 统一案例环境必须存在，Python 固定为 `3.9.25` / `cpython-39` |
+| `ascendEnvIsolated` | 必须禁用 user-site，案例不得依赖 `~/.local` |
+| `ascendEnvAclImport` | `ascend` 环境 source CANN 后必须可导入 PyACL |
+| `ascendEnvAclruntime` | `aclruntime` 是 case5 等 OM 推理路径的附加环境门 |
+| `ascendEnvMindsporeContext` | 必须实际设置 `device_target=Ascend`；仅有 MindSpore 包不等于与 CANN ABI 匹配 |
+| `ascendEnvPackages` | 统一环境必须覆盖所有案例依赖，不用 base/user-site 补洞 |
 | `ipAddress` / `hostname` / MAC | 作为当前网络信息，不作为硬件身份 |
 
 当前 310B 默认探测**不采集固件版本**：板端没有为非特权 SSH 用户提供可信、可读的版本来源。不要把驱动号伪装成固件号，也不要把“未采集”写成“版本不匹配”。固件只有在用户提供独立外部证据时才记录。
@@ -46,19 +52,44 @@ description: 面向 Ascend 310B1/310B4（8T/20T）的 CANN 程序开发工作流
 
 - `npu-smi` 能看到正确设备。
 - `source /usr/local/Ascend/ascend-toolkit/set_env.sh` 后 `import acl` 成功。
+- 所有案例使用统一 conda 环境 `ascend`，Python 固定为 `3.9.25`，不退回 `base`。
+- `ascend` 进程设置 `PYTHONNOUSERSITE=1`，不得依赖 `~/.local`。
+- `ascend` 内 source CANN 后 `import acl` 成功，需要 `aclruntime` 的案例也能导入它。
+- MindSpore 案例必须实际设置 `device_target=Ascend`；只通过 `find_spec` 不能证明 MindSpore/CANN ABI 兼容。
 - `atc` 在 PATH，版本与当前 CANN 同一条发布线。
 - `/dev/davinci*` 和驱动模块存在。
+- 需要音频/摄像头时，已读取并核对声卡、aplay/arecord、USB 和 V4L2 列表。
 - Python、conda 与用户级 site-packages 来源已记录。
 
-停止条件：设备不存在、CANN 变量缺失或 `import acl` 失败时，先修环境；不要用 CPU 或云端推理掩盖 NPU 门失败。
+停止条件：设备不存在、CANN 变量缺失、统一环境缺失/回退到 base/user-site，或 `import acl` 失败时，先修环境；不要用 CPU 或云端推理掩盖 NPU 门失败。
+
+### M0.5：网络不可见时的串口入口
+
+如果 SSH 和 `ascend_discover` 找不到开发板，但串口线已连接：
+
+- 使用 `ascend_serial_probe` 登录串口，读取主机名、接口、IPv4 和默认路由；
+- 使用 `ascend_serial_exec` 执行单条只读诊断，例如 `hostname -I`；
+- 串口凭据只从 profile 的 `serial` 配置读取，不写入仓库；
+- 取得 IP 后，再执行 `ascend_probe target=<用户>@<IPv4>` 进入正常 SSH 流程。
+
+串口工具不做网络配置修改；它只解决“板已开机但没有已知 IP”的恢复路径。
+
+### M0.7：源码和模型获取门
+
+发布/案例测试不能用作者电脑上的本地副本冒充可复现资产。先执行 `ascend310b-case-testing` 或按它的来源合同完成：
+
+- **程序**：从公开 GitHub 仓库在板端 `git clone`/`git fetch`，检出完整 commit SHA；记录仓库 URL、commit 和干净的 `git status --short`。禁止把本地未提交源码用 `scp`/`rsync` 复制后当作公开来源。
+- **模型**：从 Hugging Face 仓库按固定 revision 下载，默认使用 `HF_ENDPOINT=https://hf-mirror.com`；记录 repo、revision、文件清单、字节数和 SHA-256。优先使用 `ascend_model_download source=hf`，或板端 `hf download`。禁止从本地模型目录复制 `.safetensors`、ONNX、OM、tokenizer 或数据集来跳过下载。
+- **离线例外**：只有用户明确要求离线包且带完整来源/哈希时才能使用；报告标为 `offline-bundle`，不能宣称公开下载成功，也不能作为默认发布路径。
+- **失败处理**：GitHub/HF 不可达、commit/revision 不固定、哈希不符或工作树不干净时，测试标为 `blocked` 或 `untested`，不要改用作者本地缓存继续并写成 observed-pass。
 
 ### M1：工程门
 
 - 固定 Python/C++ 入口、配置、模型、输入和输出目录。
-- 外部模型、OM、数据集和运行报告与源码分离。
+- 外部模型、OM、数据集和运行报告与源码分离，并从既定 GitHub/HF 来源重新获取。
 - 明确 8T 或 20T，写入 README 和运行参数。
-- 不把板卡 IP、SSH 凭据或本机 checkout 路径写入源码。
-- 生成物（ONNX、OM、日志、截图）有明确目录和清理策略。
+- 不把板卡 IP、SSH 凭据、本地模型绝对路径或本机 checkout 路径写入源码。
+- 生成物（ONNX、OM、日志、截图）有明确目录和清理策略；OM 由板端从已校验的源模型生成，不把本地 OM 当作发布输入。
 
 ### M2：契约门
 

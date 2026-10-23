@@ -1,12 +1,12 @@
 # 01 - 模型评测与人工测试发布方案
 
-## 1. 目标
+## 目标
 
 当前版本冻结为人工测试发布。服务只使用 NPU `mixed_fp16` embedding；不在板端运行 CPU、EDCC、origin 或离线候选比较。
 
 `production` profile 只返回正式准入模型。`manual_test` profile 在每次请求前重新校验六个模型的输入输出契约、OM/ONNX/checkpoint 字节数和 SHA-256，然后允许人工功能测试。五个 CompNet 的 `manual_test_pending=true` 必须显示在 API 和界面中。
 
-## 2. 模型范围
+## 模型范围
 
 | 模型 | profile | 精度 | 人工测试状态 |
 | --- | --- | --- | --- |
@@ -19,7 +19,7 @@
 
 模型 ID 必须使用上述 canonical ID。模板命名空间固定为 `<model_id>__npu__mixed_fp16`。
 
-## 3. 资产和契约门禁
+## 资产和契约门禁
 
 人工测试前必须通过：
 
@@ -32,7 +32,7 @@
 
 人工测试不重新生成 OM、不升级 CANN、不改变驱动，也不自动下载数据集。
 
-## 4. 六模型人工测试
+## 六模型人工测试
 
 在 `PALMPRINT_PROFILE=manual_test` 下逐一执行：
 
@@ -44,7 +44,7 @@
 
 本阶段不运行新的 PolyU 排名、全量性能排名或转换任务。已有评测结果仅作为来源和契约审计信息，不作为本次人工通过结论。
 
-## 5. 通用故障处理
+## 通用故障处理
 
 | 现象 | 处理 |
 | --- | --- |
@@ -58,11 +58,11 @@
 
 具体日志只保存在板端私有证据目录，不在公开文档中展开历史时间线或个人设备信息。
 
-## 6. 版本冻结
+## 版本冻结
 
 人工测试期间不修改 `APP_VERSION`、release ID、依赖锁、驱动、CANN 或准入策略。发现问题时只建立问题记录并回退到 CCNet；人工测试全部完成后，再单独规划下一版本修复和重新验收。
 
-## 7. 全候选分任务测试
+## 全候选分任务测试
 
 `candidate_manifest.json` 中的 28 项候选必须全部有一条可追溯结论，但不强制使用同一个 embedding 适配器：
 
@@ -85,7 +85,8 @@ python -m tools.offline.candidate_campaign report --all
 ```bash
 ssh HwHiAiUser@192.168.8.178
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd <release-root>
 export PALMPRINT_ROOT="$PWD"

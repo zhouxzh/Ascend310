@@ -3,7 +3,7 @@
 ## 审查范围与方法
 
 本报告交叉阅读 `src/experiment/case3.md`、`samples/case3/README.md`、
-`samples/case3/doc/` 中的接口与部署说明，并检查章节引用的图像路径和主要
+`samples/case3/docs/` 中的接口与部署说明，并检查章节引用的图像路径和主要
 模型/运行时描述。审查仅判断文档与现有源文件的静态一致性；没有在开发机运行
 CANN、ATC、PyACL 或音频硬件测试。
 

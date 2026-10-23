@@ -13,7 +13,9 @@
  * @module dsh-plugin-ascend310b-debug/discovery
  */
 
+import { networkInterfaces } from 'node:os';
 import { Socket } from 'node:net';
+import { resolve } from 'node:path';
 
 import { assessBoardScope } from './compat.js';
 import { buildProbeScript, parseProbeOutput } from './probe.js';
@@ -55,6 +57,75 @@ export function isPrivateIPv4(value) {
 		(first === 192 && second === 168) ||
 		(first === 169 && second === 254)
 	);
+}
+
+/** Whether an IPv4 integer is useful for local LAN discovery. */
+export function isLocalScanCandidate(value) {
+	const first = Math.floor(value / 2 ** 24);
+	const second = Math.floor(value / 2 ** 16) % 256;
+	return isPrivateIPv4(value) && !(first === 169 && second === 254);
+}
+
+/**
+ * Infer a scan range from each active local private IPv4 interface.
+ *
+ * Use the interface's real prefix when it is /22-/30. A /22 is common when
+ * adjacent /24 lab ranges share one broadcast domain and must not be truncated
+ * to the first /24. Broader prefixes are capped at /24 to avoid unexpectedly
+ * scanning a corporate /16.
+ *
+ * @param {ReturnType<typeof networkInterfaces>} [interfaces] - injectable for tests.
+ * @returns {string[]} de-duplicated private CIDRs.
+ */
+export function inferLocalPrivateCidrs(interfaces = networkInterfaces()) {
+	const cidrs = new Set();
+	for (const entries of Object.values(interfaces ?? {})) {
+		for (const entry of entries ?? []) {
+			if (entry.internal === true) continue;
+			const family = String(entry.family ?? '').toLowerCase();
+			if (family !== 'ipv4' && family !== '4') continue;
+			const address = parseIPv4(entry.address);
+			if (address === null || !isLocalScanCandidate(address)) continue;
+			const mask = parseIPv4(entry.netmask);
+			let prefix = 24;
+			if (mask !== null) {
+				let bits = 0;
+				let sawZero = false;
+				let contiguous = true;
+				for (let bit = 31; bit >= 0; bit -= 1) {
+					const set = (mask & (2 ** bit)) !== 0;
+					if (set) {
+						if (sawZero) contiguous = false;
+						else bits += 1;
+					} else {
+						sawZero = true;
+					}
+				}
+				// A non-contiguous mask cannot be trusted for a scan range.
+				if (contiguous && bits >= 22 && bits <= 30) prefix = bits;
+			}
+			const block = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+			const network = (address & block) >>> 0;
+			cidrs.add(`${formatIPv4(network)}/${prefix}`);
+		}
+	}
+	return [...cidrs];
+}
+
+/**
+ * Resolve the scan list for a tool/panel request.
+ *
+ * Explicit per-call CIDRs are authoritative. Otherwise configured CIDRs are
+ * merged with active local private CIDRs (real prefix from /22 to /30) so
+ * hotspot and routed lab-network changes are discovered.
+ */
+export function resolveDiscoveryCidrs(explicit, configured, interfaces = networkInterfaces()) {
+	if (Array.isArray(explicit) && explicit.length > 0) return [...new Set(explicit)];
+	const cidrs = [
+		...(Array.isArray(configured) ? configured : []),
+		...inferLocalPrivateCidrs(interfaces)
+	];
+	return [...new Set(cidrs)];
 }
 
 /**
@@ -165,10 +236,12 @@ export async function probeCandidate({ host, user = null, port = 22, timeoutMs =
 	system.tier = system.tier ?? (facts.socTier?.value ? String(facts.socTier.value) : null);
 	return {
 		ip: host,
+		primaryIp: facts.primaryIp?.value ?? null,
 		ok: true,
 		soc: facts.soc?.value ?? null,
 		hostname: facts.hostname?.value ?? null,
 		mac: mac ?? null,
+		port,
 		system,
 		scope,
 		environment
@@ -215,12 +288,40 @@ export async function discoverNetwork({
 		timeoutMs: probeTimeoutMs,
 		exec
 	}));
+	// A board with Wi-Fi and Ethernet can answer on two addresses. Keep one
+	// observation per MAC, preferring the address the board itself reports as
+	// primary, rather than displaying the same physical board twice.
+	const uniqueProbed = [];
+	const byMac = new Map();
+	for (const candidate of probed) {
+		if (candidate.ok !== true) {
+			uniqueProbed.push(candidate);
+			continue;
+		}
+		if (candidate.mac === null) {
+			// Do not persist or expose a hostname-only executable identity.
+			continue;
+		}
+		const existing = byMac.get(candidate.mac);
+		if (existing === undefined) {
+			byMac.set(candidate.mac, candidate);
+			uniqueProbed.push(candidate);
+			continue;
+		}
+		const candidatePrimary = candidate.primaryIp === candidate.ip;
+		const existingPrimary = existing.primaryIp === existing.ip;
+		if (candidatePrimary && !existingPrimary) {
+			const index = uniqueProbed.indexOf(existing);
+			if (index >= 0) uniqueProbed[index] = candidate;
+			byMac.set(candidate.mac, candidate);
+		}
+	}
 	const inventoryFile = path ?? inventoryPath(config);
 	const inventory = readInventory(inventoryFile);
 	const found = [];
 	const errors = [];
 	const others = [];
-	for (const candidate of probed) {
+	for (const candidate of uniqueProbed) {
 		if (!candidate.ok) {
 			errors.push(`${candidate.ip}: ${candidate.error}`);
 			continue;
@@ -234,6 +335,7 @@ export async function discoverNetwork({
 			user,
 			mac: candidate.mac,
 			hostname: candidate.hostname,
+			port: candidate.port ?? port,
 			system: candidate.system
 		});
 		found.push({
@@ -318,17 +420,19 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 	ctx.tools.register(
 		defineTool({
 			name: 'ascend_discover',
-			description:
+				description:
 				'Discover Ascend 310B boards on explicitly provided private IPv4 CIDRs. It scans SSH, runs the same ' +
 				'read-only probe as ascend_probe, identifies each board by MAC address, stores a local inventory and ' +
-				'records OS/kernel/driver/firmware/CANN/Python changes across reinstalls. It never scans public ranges ' +
-				'and never changes a board. Discovered boards become usable as target ids without editing the static ' +
-				'target list.',
+				'records OS/kernel/driver/firmware/CANN/Python changes across reinstalls. Without explicit CIDRs it ' +
+				'merges discovery.cidrs with active local private interface prefixes (/22-/30, capped at /24 for broader ' +
+				'networks), including Wi-Fi hotspots. It never ' +
+				'scans public ranges and never changes a board. Discovered boards become usable as target ids without ' +
+				'editing the static target list.',
 			parameters: {
 				cidrs: {
 					type: 'array',
 					items: { type: 'string' },
-					description: 'Private IPv4 CIDRs to scan, for example ["10.0.0.0/24"]. Defaults to config.discovery.cidrs.'
+					description: 'Private IPv4 CIDRs to scan, for example ["10.0.0.0/24"]. Defaults to config.discovery.cidrs plus active local private CIDRs using the interface prefix.'
 				},
 				user: { type: 'string', description: 'SSH user. Defaults to config.discovery.user, then the first configured target user.' },
 				port: { type: 'integer', description: 'SSH port. Defaults to config.discovery.port, then 22.' },
@@ -411,14 +515,18 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 			},
 			async execute(args) {
 				const discovery = config?.discovery ?? {};
-				const cidrs = Array.isArray(args.cidrs) && args.cidrs.length > 0
-					? args.cidrs
-					: discovery.cidrs;
+				const cidrs = resolveDiscoveryCidrs(args.cidrs, discovery.cidrs);
 				const user = typeof args.user === 'string'
 					? args.user
 					: discovery.user ?? config?.targets?.[0]?.user ?? null;
 				let result;
 				try {
+					const configuredInventory = inventoryPath(config);
+					if (typeof args.inventoryPath === 'string' && args.inventoryPath.trim() !== '') {
+						if (resolve(args.inventoryPath.trim()) !== resolve(configuredInventory)) {
+							throw new Error('inventoryPath 只能使用 profile 中配置的资产表路径。');
+						}
+					}
 					result = await discoverNetwork({
 						cidrs,
 						user,
@@ -427,7 +535,7 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 						probeConcurrency: Number.isInteger(discovery.probeConcurrency) ? discovery.probeConcurrency : 4,
 						scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 500,
 						probeTimeoutMs: Number.isInteger(args.timeoutMs) ? args.timeoutMs : discovery.probeTimeoutMs ?? 60000,
-						path: typeof args.inventoryPath === 'string' ? args.inventoryPath : discovery.inventoryPath,
+						path: configuredInventory,
 						config
 					});
 				} catch (error) {

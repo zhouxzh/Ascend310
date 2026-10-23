@@ -32,13 +32,13 @@ case6/
 
 ## 快速开始
 
-### 1. 环境安装
+### 环境安装
 
 ```bash
 bash setup.sh
 ```
 
-### 2. 准备模型
+### 准备模型
 
 setup.sh 已自动执行此步骤。如需手动重做：
 
@@ -50,7 +50,7 @@ python3 prepare_models.py --onnx-only
 python3 prepare_models.py
 ```
 
-### 3. 启动服务
+### 启动服务
 
 ```bash
 python3 app.py
@@ -58,23 +58,26 @@ python3 app.py
 
 打开 http://127.0.0.1:7860，上传道路图像查看车道线和场景分类结果。
 
-### 4. 命令行选项
+### 命令行选项
 
 ```bash
 python3 app.py --port 8080        # 指定端口
-python3 app.py --share            # 生成公网分享链接
+python3 app.py --share            # 生成公网分享链接；无认证，仅限受控实验
 ```
 
 ## 运行模式
 
-### NPU 模式（默认）
+### NPU 模式
 
-在昇腾 310B 设备上自动检测并使用 OM 模型进行场景分类推理。
+只有在 `models/resnet18_scene.om` 存在、`import acl` 成功且 ACL/OM 初始化通过时，场景分类才使用 NPU。任何一步失败都会回退 CPU；页面“系统信息”会显示实际后端。
 
 ### CPU 回退
 
-没有 Ascend 310B 时自动回退到 PyTorch ResNet18。车道线检测始终在 CPU
-上运行（纯 OpenCV）。
+没有可用的 Ascend 运行时或 OM 时自动回退到 PyTorch ResNet18。若没有经过训练的 PTH，当前脚本会使用 ImageNet backbone 加随机初始化的 5 类 head，分类结果没有质量意义。车道线检测始终在 CPU 上运行（纯 OpenCV）。
+
+## 工程文档
+
+完整的架构、流水线、模型转换、页面操作、验证限制和问题台账见 [docs/README.md](docs/README.md)。
 
 ## 依赖说明
 

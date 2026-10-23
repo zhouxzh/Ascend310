@@ -9,7 +9,7 @@
  */
 
 import { createServer } from 'node:http';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,6 +31,7 @@ const address = server.address();
 const dir = mkdtempSync(join(tmpdir(), 'dsh-ascend-capture-test-'));
 const output = join(dir, 'capture.png');
 try {
+	writeFileSync(output, Buffer.alloc(2048, 0x41));
 	const result = await captureScreenshot({
 		url: `http://127.0.0.1:${address.port}/`,
 		output,
@@ -44,6 +45,7 @@ try {
 	if (!existsSync(output) || png.length < 1000) throw new Error(`screenshot too small: ${png.length}`);
 	if (png.subarray(1, 4).toString('ascii') !== 'PNG') throw new Error('output is not a PNG');
 	if (result.width !== 800 || result.height !== 600) throw new Error('capture dimensions mismatch');
+	if (!/^[0-9a-f]{64}$/u.test(result.sha256)) throw new Error('capture SHA-256 missing');
 	console.log('capture test passed');
 	console.log(`  browser : ${result.browser}`);
 	console.log(`  bytes   : ${result.bytes}`);

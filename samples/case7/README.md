@@ -4,7 +4,7 @@ Case7 把 Orange Pi AIpro / Ascend 310B 作为局域网相册服务器：手机�
 
 本文是从零运行的使用手册。系统架构、模型原理和迁移方法见 [`src/experiment/case7.md`](../../src/experiment/case7.md)；工程专题从 [`docs/README.md`](docs/README.md) 开始。
 
-## 1. 能力和边界
+## 能力和边界
 
 支持：
 
@@ -26,7 +26,7 @@ Case7 把 Orange Pi AIpro / Ascend 310B 作为局域网相册服务器：手机�
 
 服务只建议在可信局域网使用，不要直接暴露到公网。
 
-## 2. 设备和固定参数
+## 设备和固定参数
 
 | 设备 | profile_id | 尺寸 | 方向 |
 | --- | --- | --- | --- |
@@ -36,7 +36,7 @@ Case7 把 Orange Pi AIpro / Ascend 310B 作为局域网相册服务器：手机�
 
 Case7 不提供 360 度或任意安装角度。照片按 EXIF 方向归一化，再按设备 profile 进行横屏/竖屏 cover 裁剪。
 
-## 3. 端口和目录
+## 端口和目录
 
 所有手机、触摸屏和 ESP32 服务端请求统一使用 `7860`：
 
@@ -53,7 +53,7 @@ http://<BOARD_IP>:7860/
 
 照片不放在仓库发布目录。`models/`、`data/`、`photos/` 和 `reports/` 是模型、兼容数据和证据资产目录，不要复制个人照片进去。
 
-## 4. 部署和启动
+## 部署和启动
 
 在开发机进入 Case7 目录，先查看部署白名单：
 
@@ -76,7 +76,8 @@ bash scripts/deploy_ascend8t.sh \
 cd /home/HwHiAiUser/Documents/ai-album/current
 bash scripts/collect_system_status.sh
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 bash setup.sh board
 bash scripts/run_smart_album_service.sh --root "$PWD"
@@ -84,7 +85,7 @@ bash scripts/run_smart_album_service.sh --root "$PWD"
 
 启动脚本会检查 `acl`、FAISS、OpenCV、FastAPI、multipart 和模型注册表。不要在没有 CANN 环境的 shell 中直接启动生产服务。
 
-## 5. 检查和重启
+## 检查和重启
 
 ```bash
 curl http://127.0.0.1:7860/api/health
@@ -102,7 +103,7 @@ bash scripts/run_smart_album_service.sh --root "$PWD"
 
 默认日志为 `logs/smart_album.log`，PID 文件为 `run/smart_album.pid`。`Health: Alarm` 只记录为硬件诊断，不能单独视为服务失败。
 
-## 6. 打开手机和触摸屏
+## 打开手机和触摸屏
 
 手机或电脑浏览器访问：
 
@@ -119,7 +120,7 @@ bash scripts/launch_touchscreen_kiosk.sh
 
 触摸屏首页照片优先，触摸照片显示控制栏。8 秒无操作后控制栏和文件名水印一起隐藏。底部功能面板提供图库、智能搜索、上传、设备、设置和系统状态。
 
-## 7. 上传照片
+## 上传照片
 
 在页面底部选择 **上传**，可以选择一张、多张或一个文件夹，然后点击上传。文件夹中的非图片文件会自动忽略。
 
@@ -132,7 +133,7 @@ curl -F "files=@/path/to/photo.jpg" \
 
 接口会立即返回 `job_id`，进度查询见下一节。
 
-## 8. 上传进度和任务状态
+## 上传进度和任务状态
 
 页面同时显示文件传输进度和 NPU 索引进度。接口返回 `job_id` 后轮询：
 
@@ -142,7 +143,7 @@ curl http://<BOARD_IP>:7860/api/jobs/<job_id>
 
 任务状态通常依次为 `queued`、`running`、`completed` 或 `failed`；只有 `completed` 后，图库和首页才会使用新照片。
 
-## 9. 保存位置、去重和删除
+## 保存位置、去重和删除
 
 上传没有单张字节数和单次张数上限，但单张图片解码像素必须不超过 50 MP。实际总量受浏览器、局域网、磁盘和单线程索引速度限制。
 
@@ -155,7 +156,7 @@ curl -X DELETE \
   'http://<BOARD_IP>:7860/api/photos/<photo_id>?confirm=true'
 ```
 
-## 10. 触摸屏图库、搜索和切图
+## 触摸屏图库、搜索和切图
 
 - **图库**：点击缩略图将照片设为本机当前照片。
 - **智能搜索**：中文自动使用 Chinese-CLIP，英文自动使用 MobileCLIP；也可以手动选择模型。
@@ -166,7 +167,7 @@ curl -X DELETE \
 
 下一张不会每次请求天气。天气由后台刷新周期控制，切图只使用缓存天气状态。
 
-## 11. 注册 ESP32 电子相册
+## 注册 ESP32 电子相册
 
 注册前必须先让设备在线：按设备实体唤醒键或上电，等待串口启动日志出现 STA IPv4，或者从路由器 DHCP 租约读取 IP。深度休眠不能由 310B 网络唤醒。
 
@@ -188,7 +189,7 @@ http://<BOARD_IP>:7860/api/devices/<device_id>/photoframe
 
 首次请求返回 `200 image/jpeg`，相同 ETag 返回 `304 Not Modified`。设备被禁用后取图接口返回不可用状态。310B 不保证通过网络唤醒深度休眠设备。
 
-## 12. 设备方向和休眠
+## 设备方向和休眠
 
 - Waveshare 可选择横屏或竖屏；若画面倒置，先检查设备 profile 和固定安装补偿。
 - E1002 固定横屏，不能在页面选择竖屏。
@@ -196,7 +197,7 @@ http://<BOARD_IP>:7860/api/devices/<device_id>/photoframe
 - ESP32 固件是否在休眠后通过按键唤醒，以实际固件行为为准；串口日志是判断设备状态的首选证据。
 - URL Rotation 由 ESP32 自己按轮播时隙发起，服务器只按需生成 JPEG。
 
-## 13. 模型、COCO-CN 和 NPU 准入
+## 模型、COCO-CN 和 NPU 准入
 
 生产模型必须先完成 ONNX、ATC、ACL 和 hash 准入：
 
@@ -210,7 +211,7 @@ python prepare_models.py validate --model all --admit
 
 ATC 和 ACL 只在板端执行，并保持单线程。COCO-CN 固定 500 张测试协议、Recall 和性能记录见 [05-models-and-npu.md](docs/05-models-and-npu.md)。
 
-## 14. E6 dry-run
+## E6 dry-run
 
 ```bash
 python epaper_album.py --photo /path/to/photo.jpg --backend dry-run
@@ -218,7 +219,7 @@ python epaper_album.py --photo /path/to/photo.jpg --backend dry-run
 
 dry-run 验证 EXIF 旋转、800×480 cover 裁剪、六色量化、4-bit 高半字节优先打包和 192000-byte 帧。没有确认 SPI、GPIO、驱动板和 BUSY 接线前，不得宣称真实电子纸刷新通过。
 
-## 15. 主要故障
+## 主要故障
 
 | 现象 | 首先检查 |
 | --- | --- |
@@ -231,7 +232,7 @@ dry-run 验证 EXIF 旋转、800×480 cover 裁剪、六色量化、4-bit 高半
 | E1002 竖屏失败 | E1002 profile 只支持横屏 |
 | 电子纸不刷新 | dry-run 与真实硬件验收是两个独立结论 |
 
-## 16. 文档地图
+## 文档地图
 
 | 主题 | 文档 |
 | --- | --- |

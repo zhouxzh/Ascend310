@@ -11,13 +11,12 @@ description: Ascend310 代码文档写作与维护。用于 samples 下源码的
 
 用于代码附近的文档：
 
-- `samples/caseN/README.md` 的代码入口、安装、启动和测试说明；
-- `samples/caseN/docs/` 的架构、API、配置、部署、验证和限制；
 - Python/C++ 源文件中的 docstring 和接口注释；
 - `scripts/`、`tests/` 和生成脚本的用途、参数、退出码和失败处理；
-- 代码 API/CLI 的参考表和最小可运行示例。
+- 代码 API/CLI 的参考表和最小可运行示例；
+- 仅当 README 需要补函数签名或 CLI 表时，才改 `samples/*/README.md` 的参考段落。
 
-不用于理论章节、9 个案例的教材正文、论文式论证或 Marp 课件。
+部署、验证、限制和文档地图走 `ascend310b-writing-docs`。不用于理论章节、9 个案例的教材正文、论文式论证、Marp 课件或 VuePress 主题。
 
 本 skill 参考 Diátaxis 的教程/操作/参考/解释分层，以及高星文档 skill 的“代码是事实源”原则；它不使用外部项目专属 API。
 
@@ -64,3 +63,4 @@ description: Ascend310 代码文档写作与维护。用于 samples 下源码的
 - 代码、README、docstring 和测试互相矛盾。
 - 用生成 HTML/PDF 代替源 Markdown/docstring。
 - 把本地静态检查写成板端 `observed-pass`。
+- 把 DOT 字体、画布自检或插件内部标注写进学生可见教程。

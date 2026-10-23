@@ -37,24 +37,30 @@ Atlas 验证中，缺少这一步会出现首帧等待超时。`/dev/video0` 是
 节点，`/dev/video1` 可能是 metadata 节点。不要使用 `chmod 666` 替代用户组
 配置，也不要把 metadata 节点作为视频源。
 
-## 📦 同步项目
+## 📦 获取源码和模型
 
-不要把整个用户目录复制到开发板；只同步源码和已核对的模型伴随文件：
+发布测试从固定 GitHub commit 获取源码，从固定 Hugging Face revision 获取模型；不要把整个用户目录或作者本地模型复制到开发板：
 
 ```bash
-rsync -av \
-  samples/case8/ \
-  HwHiAiUser@192.168.1.100:/home/HwHiAiUser/Documents/case8/
+git clone https://github.com/zhouxzh/Ascend310.git \
+  "$HOME/Ascend310-case-run/case8/src"
+git -C "$HOME/Ascend310-case-run/case8/src" checkout --detach <commit-sha>
+cd "$HOME/Ascend310-case-run/case8/src/samples/case8"
+export HF_ENDPOINT=https://hf-mirror.com
+hf download <owner>/<case8-model-repo> \
+  --revision <revision-sha> \
+  --local-dir weights
 ```
 
-模型权重、数据集和运行报告按需同步，不用宽泛的 `--delete` 覆盖板端目录。
+模型权重、数据集和运行报告不进入 Git；下载后记录 repo、revision、文件大小、SHA-256 和许可证。离线包只能是明确标注的 `offline-bundle`，不能把本地 `.pt`、ONNX 或 OM 的 `scp`/`rsync` 当作在线 HF 下载证据。
 
 ## 🧪 激活板端环境
 
 ```bash
 ssh HwHiAiUser@192.168.1.100
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd /home/HwHiAiUser/Documents/case8
 ```
@@ -69,7 +75,7 @@ ls -l models/*.om models/*_labels.txt models/*_metadata.json
 
 ## 🔬 最小测试顺序
 
-### 1. OM 加载和 benchmark
+### OM 加载和 benchmark
 
 ```bash
 python scripts/infer_om_camera.py \
@@ -80,7 +86,7 @@ python scripts/infer_om_camera.py \
 
 通过标准：能够加载 OM，打印输入输出信息和延迟统计；这只验证 ACL 推理。
 
-### 2. 摄像头推理
+### 摄像头推理
 
 ```bash
 python scripts/infer_om_camera.py \
@@ -94,7 +100,7 @@ python scripts/infer_om_camera.py \
 
 通过标准：处理指定帧数并打印统计信息，退出时释放摄像头和 ACL 资源。
 
-### 3. 摄像头格式检查
+### 摄像头格式检查
 
 ```bash
 v4l2-ctl --device=/dev/video0 --list-formats-ext
@@ -103,7 +109,7 @@ v4l2-ctl --device=/dev/video0 --list-formats-ext
 优先选择支持 1280x720@30 的 MJPG；程序日志和 `/stats` 中的实际 FourCC
 才是最终采集模式，不以请求参数代替实际结果。
 
-### 4. WebRTC 服务
+### WebRTC 服务
 
 ```bash
 python scripts/webrtc_om_app.py

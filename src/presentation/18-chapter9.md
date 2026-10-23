@@ -54,7 +54,7 @@ footer: "第9章：模型量化案例教学"
 - INT8 需要校准，风险和验证成本更高。
 - 每一阶段都要同时看输出、精度和耗时。
 
-<div class="source">教材：<a href="../book/chapter9.md#从性能瓶颈到量化决策"><code>src/book/chapter9.md</code> §9.1</a></div>
+<div class="source">教材：<a href="../book/chapter9.md#src-book-chapter9-h1"><code>src/book/chapter9.md</code> §9.1</a></div>
 
 <!--
 先排除预处理、拷贝和后处理瓶颈。如果模型 execute 占比很小，INT8 即使更快也未必改善业务帧率。
@@ -76,7 +76,7 @@ footer: "第9章：模型量化案例教学"
 
 ![模型量化总流程](../book/img9/quantization_workflow.png)
 
-<div class="source">图片：<a href="../book/img9/quantization_workflow.png"><code>src/book/img9/quantization_workflow.png</code></a>；出处：<a href="../book/chapter9.md#模型量化案例教学"><code>src/book/chapter9.md</code> 章首</a></div>
+<div class="source">图片：<a href="../book/img9/quantization_workflow.png"><code>src/book/img9/quantization_workflow.png</code></a>；出处：<a href="../book/chapter9.md#src-book-chapter9-h1"><code>src/book/chapter9.md</code> 章首</a></div>
 
 <!--
 按三层读图：建立 FP32/FP16 基准、快速输出与性能验证、INT8 PTQ 和完整验证。校准 sweep 只有在需要解释波动时才启用。
@@ -96,7 +96,7 @@ footer: "第9章：模型量化案例教学"
 
 低精度会降低数据宽度和访存压力，但不会自动保证端到端加速或精度不下降。
 
-<div class="source">教材：<a href="../book/chapter9.md#必备理论fp32fp16int8-与-ptq"><code>src/book/chapter9.md</code> §9.2</a></div>
+<div class="source">教材：<a href="../book/chapter9.md#src-book-chapter9-h2"><code>src/book/chapter9.md</code> §9.2</a></div>
 
 <!--
 FP16 和 INT8 的风险不同。FP16 通常不需要校准；INT8 必须通过代表性数据估计激活范围。
@@ -116,7 +116,7 @@ FP16 和 INT8 的风险不同。FP16 通常不需要校准；INT8 必须通过�
 
 预处理必须统一为 RGB、64×64、NCHW、float32 和同一 mean/std。验证图不得进入校准。
 
-<div class="source">教材：<a href="../book/chapter9.md#如何编写数据准备代码让输入可复现"><code>src/book/chapter9.md</code> §9.4</a>、§9.5</div>
+<div class="source">教材：<a href="../book/chapter9.md#src-book-chapter9-h4"><code>src/book/chapter9.md</code> §9.4</a>、§9.5</div>
 
 <!--
 400张训练图用于校准和快速输出对齐，不是精度验证集。10000张验证图才用于Top1/Top5。
@@ -139,7 +139,7 @@ atc --model=model/resnet18_tiny_imagenet.onnx --framework=5 \
 
 FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp16`；`--output` 必须另取文件名。
 
-<div class="source">B4 命令：<a href="../../samples/chapter9/README.md"><code>samples/chapter9/README.md</code> 第2节</a>；教材：<a href="../book/chapter9.md#atc-转-fp32fp16先建立可比较的基准"><code>src/book/chapter9.md</code> §9.6</a></div>
+<div class="source">B4 命令：<a href="../../samples/chapter9/README.md"><code>samples/chapter9/README.md</code> 第2节</a>；教材：<a href="../book/chapter9.md#src-book-chapter9-h6"><code>src/book/chapter9.md</code> §9.6</a></div>
 
 本页只给出 8T 示例。20T 后续结果没有保留 ATC 命令和 B1 专用 OM provenance，因此不能用 B4 命令推断跨 SoC 复用成立；20T 要按 `Ascend310B1` 单独转换、记录哈希并重跑。
 
@@ -160,7 +160,7 @@ FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp1
 
 400张对齐样本说明“候选模型像不像 FP32”，不说明分类质量是否达标。
 
-<div class="source">教材：<a href="../book/chapter9.md#如何编写输出对齐程序先看模型是否像基准"><code>src/book/chapter9.md</code> §9.7</a></div>
+<div class="source">教材：<a href="../book/chapter9.md#src-book-chapter9-h7"><code>src/book/chapter9.md</code> §9.7</a></div>
 
 <!--
 强调两种“准确率”的区别。Top1 match 是模型间一致性，不是候选模型相对真标签的 accuracy。
@@ -242,7 +242,7 @@ FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp1
 
 ![INT8 PTQ 量化流程](../book/img9/int8_ptq_pipeline.png)
 
-<div class="source">图片：<a href="../book/img9/int8_ptq_pipeline.png"><code>src/book/img9/int8_ptq_pipeline.png</code></a>；出处：<a href="../book/chapter9.md#如何编写-int8-ptq-程序准备配置再收集激活范围"><code>src/book/chapter9.md</code> §9.9</a></div>
+<div class="source">图片：<a href="../book/img9/int8_ptq_pipeline.png"><code>src/book/img9/int8_ptq_pipeline.png</code></a>；出处：<a href="../book/chapter9.md#src-book-chapter9-h9"><code>src/book/chapter9.md</code> §9.9</a></div>
 
 <!--
 图中路径是文档化流程：FP32 ONNX 与校准集，经配置生成、激活校准、deploy ONNX，再由 ATC 转 INT8 OM。当前双板记录没有执行后续 INT8 步骤。
@@ -324,7 +324,7 @@ atc --model=model/resnet18_tiny_imagenet_int8_deploy.onnx \
 - 校准 sweep 是可选实验，不是主流程必需步骤。
 - 每个 sweep 点都要重新校准并生成独立 INT8 OM。
 
-<div class="source">流程：<a href="../book/chapter9.md#如何编写完整验证程序把多个-om-放到同一把尺上"><code>src/book/chapter9.md</code> §9.11、§9.12</a></div>
+<div class="source">流程：<a href="../book/chapter9.md#src-book-chapter9-h11"><code>src/book/chapter9.md</code> §9.11、§9.12</a></div>
 
 <!--
 完整验证与400张输出对齐是两种证据。sweep用于解释不同校准规模，不用于把已有INT8 OM复用成多个点。
@@ -346,7 +346,7 @@ atc --model=model/resnet18_tiny_imagenet_int8_deploy.onnx \
 
 如果 INT8 证据不完整或指标不达标，部署回退到已验证的 FP16，而不是继续调参掩盖问题。
 
-<div class="source">教材：<a href="../book/chapter9.md#如何设计报告和故障回退"><code>src/book/chapter9.md</code> §9.13</a></div>
+<div class="source">教材：<a href="../book/chapter9.md#src-book-chapter9-h13"><code>src/book/chapter9.md</code> §9.13</a></div>
 
 <!--
 回退不是失败，而是风险控制。任何 INT8 优化都必须保留原始日志、模型哈希、样本数量和失败原因。
@@ -368,7 +368,7 @@ atc --model=model/resnet18_tiny_imagenet_int8_deploy.onnx \
 
 当前可填 FP32/FP16 的400张对齐和10次性能；INT8 五项必须保留为 `untested`。
 
-<div class="source">作业：<a href="../book/chapter9.md#模型量化案例教学"><code>src/book/chapter9.md</code></a>；样例：<a href="../../samples/chapter9/README.md"><code>samples/chapter9/README.md</code></a></div>
+<div class="source">作业：<a href="../book/chapter9.md#src-book-chapter9-h1"><code>src/book/chapter9.md</code></a>；样例：<a href="../../samples/chapter9/README.md"><code>samples/chapter9/README.md</code></a></div>
 
 <!--
 最后逐项检查样本数和证据层级。没有INT8原始日志、工件和输出，就不能把流程页当成结果页。

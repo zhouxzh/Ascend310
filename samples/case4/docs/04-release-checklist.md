@@ -1,6 +1,6 @@
 # 04 - 发布与人工测试清单
 
-## 1. 版本状态
+## 版本状态
 
 - [x] 源码入口为 `palmprint_workbench`。
 - [x] 不提供 setup、启动、同步或诊断 shell 包装器。
@@ -11,7 +11,7 @@
 
 当前版本冻结。人工测试期间不升级依赖、驱动、CANN、应用版本、APP_VERSION 或 release ID。
 
-## 2. 本地门禁
+## 本地门禁
 
 ```bash
 python -m compileall -q app.py palmprint_workbench tools
@@ -27,7 +27,7 @@ python -m palmprint_workbench.tools.verify_assets --strict
 
 确认 `release_manifest.json`、`om_manifest.json`、registry 和候选清单的哈希与当前源码一致。
 
-## 3. 手动同步
+## 手动同步
 
 源码包和板端资产包分开同步，使用明确的 `USER@HOST`、版本目录和 `rsync`，不使用 `--delete`。排除 `data/`、模板、报告、缓存、模型构建目录和 `.env`。
 
@@ -35,7 +35,8 @@ python -m palmprint_workbench.tools.verify_assets --strict
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd <release-root>
 export PALMPRINT_ROOT="$PWD"
@@ -50,7 +51,7 @@ python -m palmprint_workbench.tools.verify_assets --strict
 python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 ```
 
-## 4. 启动检查
+## 启动检查
 
 - [ ] `/api/health` 返回服务、运行时、模型和模板 readiness。
 - [ ] `/api/bootstrap` 返回 CCNet 和五个 CompNet，全部为 NPU/mixed_fp16。
@@ -58,7 +59,7 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 - [ ] `/api/candidates` 只读，不能启动候选比较任务。
 - [ ] 首页和静态 bundle 加载成功。
 
-## 5. 六模型人工测试
+## 六模型人工测试
 
 每个模型都执行并记录：
 
@@ -82,7 +83,7 @@ rm -rf "$PALMPRINT_ROOT/data/templates"
 
 以上删除只允许操作者手动执行，服务不会自动清理历史图片。
 
-## 6. 触摸屏和摄像头
+## 触摸屏和摄像头
 
 - [ ] 在 1280×720、1024×768、375×812 检查四页布局。
 - [ ] 按钮、状态文本、错误提示和刷新操作不重叠或溢出。
@@ -90,7 +91,7 @@ rm -rf "$PALMPRINT_ROOT/data/templates"
 - [ ] 1280×720 MJPG 连续预览 100 帧。
 - [ ] 拍照识别、关闭预览、设备释放、再次打开均成功。
 
-## 7. 失败处理
+## 失败处理
 
 遇到识别失败、模板不可见、摄像头无法释放、服务意外退出、ACL 异常、设备 reset、模板损坏或 SHA 不一致：
 
@@ -102,15 +103,15 @@ rm -rf "$PALMPRINT_ROOT/data/templates"
 
 `Health: Alarm` 只作为设备诊断字段，不能单独判定失败；具体运行时异常按上述流程处理。
 
-## 8. 回滚
+## 回滚
 
 只停止确认过的新服务 PID，切换上一份已核验源码目录；不删除模型、数据集、模板或报告。回滚后重新检查 `/api/health`、`/api/bootstrap` 和首页。
 
-## 9. 发布结论
+## 发布结论
 
 人工测试完成前，本版本只称为“manual test release”。所有结果写入脱敏人工测试摘要；人工通过后才另行更新准入证据、release manifest 和版本号。
 
-## 10. 全候选测试清单
+## 全候选测试清单
 
 - [ ] `candidate_manifest.json` 28 项均有静态审计记录。
 - [ ] 每项已记录固定 revision、许可证、输入输出契约和资产 SHA-256，或明确 `blocked_*`/`not_applicable` 原因。

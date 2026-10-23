@@ -110,7 +110,8 @@ case "$PUSH_URL" in */) PUSH_URL="${PUSH_URL%/}" ;; esac
 if [[ -f /usr/local/miniconda3/etc/profile.d/conda.sh ]]; then
   # shellcheck disable=SC1091
   source /usr/local/miniconda3/etc/profile.d/conda.sh
-  conda activate base
+  conda activate ascend
+  export PYTHONNOUSERSITE=1
 fi
 if [[ -f /usr/local/Ascend/ascend-toolkit/set_env.sh ]]; then
   # shellcheck disable=SC1091

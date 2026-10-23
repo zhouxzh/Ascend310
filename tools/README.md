@@ -14,6 +14,10 @@ DSH bundle，不依赖仓库根目录的 `node_modules`。
 | Skill | 用途 | 源文件 |
 | --- | --- | --- |
 | `ascend310b-cann-development` | 310B CANN 程序开发、PyACL/ATC/DVPP/摄像头、接口合同和 M0-M7 验收门 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-cann-development/SKILL.md) |
+| `ascend310b-case-testing` | 案例从 GitHub 固定 commit、模型从 Hugging Face 固定 revision 下载，板端复现和发布证据 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-case-testing/SKILL.md) |
+| `ascend310b-camera-debug` | V4L2/USB/MIPI 摄像头枚举、格式、真实帧采集和采集到处理链的分层验收 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-camera-debug/SKILL.md) |
+| `ascend310b-microphone-debug` | ALSA/PulseAudio 麦克风枚举、录音合同、WAV 和电平验证 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-microphone-debug/SKILL.md) |
+| `ascend310b-speaker-debug` | ALSA/PulseAudio 喇叭/耳机/HDMI 路由、音量、静音和真实播放验证 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-speaker-debug/SKILL.md) |
 | `ascend310b-debug` | 失败分层、探针、诊断命令和停止条件 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-debug/SKILL.md) |
 | `ascend310b-npu-arch` | 310B1/310B4 架构、8T/20T 和平台差异核对 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-npu-arch/SKILL.md) |
 | `ascend310b-env-check` | 板端 CANN/ACL/Python/ATC/设备环境门 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-env-check/SKILL.md) |
@@ -38,6 +42,8 @@ DSH bundle，不依赖仓库根目录的 `node_modules`。
 
 修改源 skill 后运行 `npm run skills:sync`，再用 `npm run skills:check` 检查项目级副本。
 
+Skill 命名规范：目录名与 frontmatter `name` 必须一致，并统一使用 `ascend310b-` 前缀；专项调试使用 `ascend310b-<domain>-debug`，因此摄像头、麦克风和喇叭固定为 `ascend310b-camera-debug`、`ascend310b-microphone-debug`、`ascend310b-speaker-debug`。不要只改目录、只改 frontmatter 或只改文档引用。
+
 ## Skill 参考来源
 
 这些 skill 以官方/长期维护资料为参考，不把第三方仓库原文整包复制；外部规则进入 310B 流程前都经过本仓库边界和板端证据重写。
@@ -45,6 +51,9 @@ DSH bundle，不依赖仓库根目录的 `node_modules`。
 | Skill | 参考来源 | 采用内容 |
 | --- | --- | --- |
 | `ascend310b-npu-arch` 及 8 个 310B 调试/API 专项 skill | [CANNBot Skills](https://gitcode.com/cann/cannbot-skills)、[功能清单](https://gitcode.com/cann/cannbot-skills/blob/master/docs/feature-list.md) | 环境检查、API 限制、runtime/crash/precision/sync 审查思路；保留 310B 边界，不引用 A2/A3/950 结论 |
+| `ascend310b-camera-debug` | [Linux V4L2 API](https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/v4l2.html)、[v4l2-ctl 手册](https://manpages.debian.org/bookworm/v4l-utils/v4l2-ctl.1.en.html)、[OpenCV VideoCapture](https://docs.opencv.org/4.x/d8/dfe/classcv_1_1VideoCapture.html)、[GStreamer v4l2src](https://gstreamer.freedesktop.org/documentation/video4linux2/v4l2src.html) | 设备枚举、格式协商、真实读帧和低帧率/黑屏/EBUSY 分层检查 |
+| `ascend310b-microphone-debug` | [ALSA arecord/aplay](https://manpages.debian.org/bookworm/alsa-utils/arecord.1.en.html)、[ALSA project](https://www.alsa-project.org/wiki/)、[pactl](https://manpages.debian.org/bookworm/pulseaudio-utils/pactl.1.en.html)、[SoX](https://sox.sourceforge.net/sox.html) | 录音设备、硬件能力、WAV 采样合同、mute/增益和电平验证 |
+| `ascend310b-speaker-debug` | [ALSA aplay](https://manpages.debian.org/bookworm/alsa-utils/aplay.1.en.html)、[speaker-test](https://manpages.debian.org/bookworm/alsa-utils/speaker-test.1.en.html)、[pactl](https://manpages.debian.org/bookworm/pulseaudio-utils/pactl.1.en.html) | 播放 device、默认 sink、音量/静音、声道和真实发声验证 |
 | `ascend310b-writing-vuepress` | [VuePress Getting Started](https://vuepress.vuejs.org/guide/getting-started.html)、[VuePress Configuration](https://vuepress.vuejs.org/guide/configuration.html)、[VuePress Assets](https://vuepress.vuejs.org/guide/assets.html) | 源目录/生成目录分离、sidebar、路由、静态资源和 `docs:dev/docs:build` |
 | `ascend310b-writing-latex` | [LaTeX Project Documentation](https://www.latex-project.org/help/documentation/)、[Learn LaTeX](https://www.learnlatex.org/)、[CTAN](https://ctan.org/) | 源 Markdown 到 LaTeX/PDF、日志、字体、锚点和生成物边界 |
 | `ascend310b-writing-markdown` | [CommonMark Spec](https://spec.commonmark.org/)、[Markdown Guide](https://www.markdownguide.org/)、[markdownlint](https://github.com/DavidAnson/markdownlint) | 标题、链接、图片、表格、代码围栏、标点和机械卫生规则 |
@@ -92,14 +101,12 @@ DSH bundle，不依赖仓库根目录的 `node_modules`。
 ## 通用安装步骤
 
 1. 进入对应插件目录，先跑该目录 README 里列出的离线测试。
-2. 把整个插件目录复制到目标 DSH profile 的 `node_modules/<包名>/`。
-3. 在该 profile 的 `package.json` 里把包名加入 `dsh.profile.bundles`。
-4. 按插件 README 在 `cordis.patch.yml` 里写本机配置。板卡地址、仓库路径和 SSH 用户只放在 profile，不写进插件源码。
-5. 如果插件带有 `skills/`，把其中的技能目录复制到 `$DSH_HOME/skills/`；如果从仓库根目录启动 DSH，则使用已提交的 `.dsh/skills/` 项目级副本。
-6. 重启 DSH，确认侧栏入口和工具出现。
+2. 在仓库根目录运行 `node scripts/install-dsh-plugins.mjs --profile <profile>`；安装器会打包 tarball、调用 `dsh plugin add`，并校验版本和文件内容。
+3. 在该 profile 的 `cordis.patch.yml` 里写本机配置。板卡地址、仓库路径和 SSH 用户只放在 profile，不写进插件源码。
+4. 如果插件带有 `skills/`，在仓库根目录运行 `npm run skills:sync` 和 `npm run skills:check`；从仓库根目录启动 DSH 会读取已提交的 `.dsh/skills/` 项目级副本。
+5. 重启 DSH，确认侧栏入口和工具出现。
 
-桌面版 DSH 的 profile 由应用托管，不能用 `dsh --profile desktop` 在 shell 里直接启动或安装；
-文件复制和 profile 配置完成后必须重启桌面应用。
+桌面版 DSH 的 profile 由应用托管，不能在 shell 里直接启动；安装器完成 tarball/profile 变更后必须重启桌面应用。
 
 ## 边界
 

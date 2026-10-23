@@ -67,6 +67,7 @@ export const READ_ONLY_PREFIXES = Object.freeze([
 	'uptime',
 	'free',
 	'df',
+	'ip',
 	'ls',
 	'lsblk',
 	'readlink',
@@ -79,7 +80,6 @@ export const READ_ONLY_PREFIXES = Object.freeze([
 	'tail',
 	'grep',
 	'wc',
-	'printenv',
 	'lsmod',
 	'dmesg',
 	'v4l2-ctl',
@@ -90,6 +90,14 @@ export const READ_ONLY_PREFIXES = Object.freeze([
 	'ss',
 	'netstat',
 ]);
+
+/** Paths that must never be read through the model-facing diagnostic gate. */
+const SENSITIVE_PATH =
+	/(?:^|[\s"'=])(?:~?\/?|\/)?(?:\.ssh|\.gnupg|\.aws|\.bash_history|\.zsh_history|\.config|\.local|\.cache)(?:\/|\b)|\b(?:id_rsa|id_ed25519|authorized_keys|known_hosts|\.env|credentials)\b|\/etc\/shadow\b|\/proc\/[^/\s]+\/environ\b|\.docker\/config\.json|\.config\/gh\b/iu;
+
+/** Files that a read-only diagnostic command may inspect. */
+const SAFE_READ_PATH =
+	/^(?:\/dev\/(?:davinci|devmm|hisi_hdc|video|media|snd|v4l-subdev)|\/sys\/|\/proc\/(?:asound\/cards|cpuinfo|version|meminfo|net\/|device-tree\/)|\/etc\/(?:os-release|hostname|hosts|ascend_install\.info)$|\/usr\/local\/Ascend\/|\/var\/davinci\/|\/var\/log\/(?:syslog|kern\.log|dmesg|messages)(?:\/|$))/u;
 
 /** Substrings that indicate a command intends to change state. */
 const MUTATING_TOKENS = Object.freeze([
@@ -158,6 +166,16 @@ const HOSTNAME_READ_ONLY = new Set([
 	'--all-ip-addresses',
 	'-s',
 	'--short',
+]);
+
+/** `ip` options that only select or format a query. */
+const IP_READ_ONLY_FLAGS = new Set(['-4', '-6', '-o', '-br', '-brief', '-s', '-json', '-h', '-human']);
+
+/** `ip` subcommands that can execute another program or alter network state. */
+const IP_FORBIDDEN = new Set([
+	'add', 'delete', 'del', 'change', 'replace', 'flush', 'set', 'up', 'down',
+	'append', 'prepend', 'netns', 'exec', 'vrf', 'xfrm', 'tunnel', 'tuntap',
+	'mpls', 'rule', 'ntable', 'token'
 ]);
 
 /** `dmesg` flags that clear or reconfigure the kernel ring buffer. */
@@ -232,6 +250,28 @@ function validateArguments(base, tokens) {
 			return { ok: false, reason: `hostname 只允许查询选项，收到 ${unsafe}。` };
 		}
 		return { ok: true, reason: '允许：hostname 查询。' };
+	}
+	if (base === 'ip') {
+		for (const arg of args) {
+			if (IP_READ_ONLY_FLAGS.has(arg)) continue;
+			if (arg.startsWith('-')) {
+				return { ok: false, reason: `ip 不允许该选项：${arg}。` };
+			}
+			if (IP_FORBIDDEN.has(arg)) {
+				return { ok: false, reason: `ip 不允许网络修改或命令执行：${arg}。` };
+			}
+		}
+		return { ok: true, reason: '允许：ip 查询。' };
+	}
+	if (base === 'ps') {
+		const unsafe = args.find((arg) => {
+			const value = arg.toLowerCase();
+			return value === 'e' || value === 'eww' || /^[a-z]*e[a-z]*w/u.test(value) || /(?:^|,)e(?:,|$)/u.test(value);
+		});
+		if (unsafe !== undefined) {
+			return { ok: false, reason: `ps 不允许环境变量展开：${unsafe}。` };
+		}
+		return { ok: true, reason: '允许：ps 进程列表查询。' };
 	}
 	if (base === 'date') {
 		for (const arg of args) {
@@ -311,6 +351,9 @@ export function validateReadOnlyCommand(command) {
 		};
 	}
 	const lower = ` ${text.toLowerCase()} `;
+	if (SENSITIVE_PATH.test(text)) {
+		return { ok: false, reason: '命令涉及用户凭据、私钥或进程环境文件，禁止通过只读诊断读取。' };
+	}
 	for (const token of MUTATING_TOKENS) {
 		if (lower.includes(token)) return { ok: false, reason: `命令包含可能改变系统状态的操作：${token.trim()}` };
 	}
@@ -327,7 +370,23 @@ export function validateReadOnlyCommand(command) {
 			reason: `命令 ${base} 不在只读白名单内。允许的前缀：${READ_ONLY_PREFIXES.join('、')}。`
 		};
 	}
-	return validateArguments(base, tokens);
+	return validateReadPaths(base, tokens.slice(1)) ?? validateArguments(base, tokens);
+}
+
+/** Restrict file-reading commands to known diagnostic locations. */
+function validateReadPaths(base, args) {
+	const readers = new Set(['cat', 'head', 'tail', 'grep', 'wc', 'stat', 'file', 'sha256sum', 'md5sum', 'readlink', 'ls']);
+	if (!readers.has(base)) return null;
+	let paths = args.filter((arg) => !arg.startsWith('-') && !/^\d+$/u.test(arg));
+	if (base === 'grep' && paths.length > 1) paths = paths.slice(1);
+	if (base === 'ls' && paths.length === 0) return { ok: true, reason: '允许：ls 当前目录。' };
+	if (paths.length === 0) return { ok: false, reason: `${base} 必须指定可诊断的路径。` };
+	for (const target of paths) {
+		if (SAFE_READ_PATH.test(target)) continue;
+		if (base === 'ls' && /^\/(?:dev|sys|proc)(?:\/|$)/u.test(target)) continue;
+		return { ok: false, reason: `${base} 只允许读取设备、CANN、系统版本或日志路径：${target}` };
+	}
+	return { ok: true, reason: `允许：${base} 诊断路径。` };
 }
 
 /**
@@ -357,10 +416,38 @@ export function validateTaskCommand(command, { allowPrivileged = false, allowDes
 	if (/(?:^|[;&|]\s*)(?:reboot|shutdown|poweroff)\b/i.test(text)) {
 		return { ok: false, reason: '任务运行器不允许重启或关闭开发板。' };
 	}
+	if (/(?:^|[;&|]\s*)(?:\/sbin\/)?(?:reboot|shutdown|poweroff|halt|kexec)\b/i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许重启、关机或 kexec。' };
+	}
+	if (/\bbusybox\s+(?:reboot|shutdown|poweroff|halt)\b/i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许通过 busybox 重启或关闭开发板。' };
+	}
+	if (/\bsystemctl\s+(?:--[A-Za-z-]+\s+)*(?:reboot|poweroff|halt|kexec)\b/i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许通过 systemctl 重启或关闭开发板。' };
+	}
+	if (/\bsystemd-run\b[^;&|]*(?:reboot|poweroff|halt|kexec)\b/i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许通过 systemd-run 启动重启/关机命令。' };
+	}
+	if (/\b[A-Za-z_][A-Za-z0-9_]*\s*=\s*(?:rm|mv|dd|mkfs(?:\.\w+)?|reboot|poweroff|shutdown)\b/i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许通过变量间接执行破坏性命令。' };
+	}
+	if (/\b(?:su|doas|pkexec)\b/i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许 su/doas/pkexec；需要提权时只能使用显式 sudo 安装路径。' };
+	}
+	if (/\b(?:base64|xxd|openssl)\b[^;&|]*(?:-d|decode)|(?:\||;)\s*(?:ba|z)?sh\b|\beval\b|\bxargs\b/i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许编码后管道执行、eval 或 xargs 间接执行。' };
+	}
+	if (/\b(?:halt|kexec)\b(?:\s|$)/i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许停机或 kexec。' };
+	}
 	if (/\bmkfs(?:\.|\s)/i.test(text) || /\bdd\b[^;&|]*\bof\s*=\s*\/dev\//i.test(text)) {
 		return { ok: false, reason: '任务运行器不允许格式化磁盘或直接写块设备。' };
 	}
-	if (!allowDestructive && /\brm\s+-[A-Za-z]*[rf]/i.test(text)) {
+	if (!allowDestructive && (
+		/\brm\s+-[A-Za-z]*[rf]/i.test(text) ||
+		/\brm\s+(?:--recursive|--force)\b/i.test(text) ||
+		/\bfind\b[^;&|]*(?:-delete|-exec(?:dir)?)\b/i.test(text)
+	)) {
 		return { ok: false, reason: '递归/强制删除需要显式 allowDestructive=true。' };
 	}
 	if (!allowPrivileged && /\bsudo\b/i.test(text)) {
@@ -409,10 +496,47 @@ export function buildSshArgs(target, command) {
  * @param {string[]} options.args - argv.
  * @param {string} [options.cwd] - working directory.
  * @param {number} [options.timeoutMs] - timeout.
+ * @param {string|null} [options.input] - optional stdin payload.
  * @returns {Promise<object>} `{stdout, stderr, code, timedOut}`.
  */
-export function execFileCapture({ file, args, cwd, timeoutMs = 30000 }) {
-	const { execFile } = require('node:child_process');
+export function execFileCapture({ file, args, cwd, timeoutMs = 30000, input = null }) {
+	const { execFile, spawn } = require('node:child_process');
+	if (input !== null && input !== undefined) {
+		return new Promise((resolve) => {
+			const child = spawn(file, args, { cwd, windowsHide: true });
+			let stdout = '';
+			let stderr = '';
+			let timedOut = false;
+			let settled = false;
+			const finish = (code, error = null) => {
+				if (settled) return;
+				settled = true;
+				resolve({
+					stdout,
+					stderr,
+					code: typeof code === 'number' ? code : 1,
+					timedOut,
+					error: error === null ? null : String(error.message ?? error)
+				});
+			};
+			child.stdout.on('data', (chunk) => {
+				stdout += String(chunk);
+				if (stdout.length > 8 * 1024 * 1024) stdout = stdout.slice(-8 * 1024 * 1024);
+			});
+			child.stderr.on('data', (chunk) => {
+				stderr += String(chunk);
+				if (stderr.length > 8 * 1024 * 1024) stderr = stderr.slice(-8 * 1024 * 1024);
+			});
+			child.on('error', (error) => finish(1, error));
+			child.on('close', (code) => finish(code ?? 1));
+			child.stdin.end(String(input));
+			const timer = setTimeout(() => {
+				timedOut = true;
+				child.kill();
+			}, timeoutMs);
+			child.on('close', () => clearTimeout(timer));
+		});
+	}
 	return new Promise((resolve) => {
 		execFile(
 			file,
@@ -439,9 +563,10 @@ export function execFileCapture({ file, args, cwd, timeoutMs = 30000 }) {
  * @param {object} options.target - resolved target.
  * @param {number} [options.timeoutMs] - timeout in ms.
  * @param {function} [options.exec] - injectable executor for tests.
+ * @param {string|null} [options.input] - optional stdin payload.
  * @returns {Promise<object>} execution result plus the exact command shown.
  */
-export async function runRemoteScript({ script, target, timeoutMs = 60000, exec = execFileCapture }) {
+export async function runRemoteScript({ script, target, timeoutMs = 60000, exec = execFileCapture, input = null }) {
 	if (!isSafeHost(target.host)) {
 		return { ok: false, stdout: '', stderr: `非法主机名：${target.host}`, display: '', reason: '主机名不安全。' };
 	}
@@ -449,7 +574,7 @@ export async function runRemoteScript({ script, target, timeoutMs = 60000, exec 
 		return { ok: false, stdout: '', stderr: `非法 SSH 用户：${target.user}`, display: '', reason: 'SSH 用户不安全。' };
 	}
 	const args = buildSshArgs(target, script);
-	const result = await exec({ file: 'ssh', args, timeoutMs });
+	const result = await exec({ file: 'ssh', args, timeoutMs, input });
 	const display = target.user ? `ssh ${target.user}@${target.host}` : `ssh ${target.host}`;
 	return {
 		...result,
@@ -489,9 +614,9 @@ export async function runLocalScript({ script, cwd, timeoutMs = 60000, exec = ex
 }
 
 /** Run one explicitly approved task command over SSH, optionally in a cwd. */
-export async function runRemoteShell({ script, target, cwd, timeoutMs = 60000, exec = execFileCapture }) {
+export async function runRemoteShell({ script, target, cwd, timeoutMs = 60000, exec = execFileCapture, input = null }) {
 	const command = cwd ? `cd ${quote(cwd)} && ${script}` : script;
-	const result = await runRemoteScript({ script: command, target, timeoutMs, exec });
+	const result = await runRemoteScript({ script: command, target, timeoutMs, exec, input });
 	return { ...result, command };
 }
 

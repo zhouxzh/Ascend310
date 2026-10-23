@@ -85,7 +85,7 @@ case5/
 ## 采集实现规范
 
 - 当前 Hantek 6022BE 主路径统一使用系统 `libsigrok` 的 `hantek-6xxx` 驱动，并通过 `time_frequency_dashboard/acquisition/native/sigrok_capture_bridge.c` 输出 BridgeFrameV1；不要再把 `pyhantek6022` 或 OpenHantek 编译桥接作为运行前置条件。
-- `libsigrok-dev`、`sigrok-cli`、`gcc` 和 `pkg-config` 是板端 sigrok 桥编译依赖，必须由用户手动安装；Python `base` 环境只安装 `requirements-board.txt` 中的用户态包。
+- `libsigrok-dev`、`sigrok-cli`、`gcc` 和 `pkg-config` 是板端 sigrok 桥编译依赖，必须由用户手动安装；统一 Python `ascend` 环境只安装 `requirements-board.txt` 中的用户态包，并设置 `PYTHONNOUSERSITE=1`。
 - 所有硬件源必须输出统一的双通道帧契约，至少包含帧序号、主机接收时间、实际采样率、通道样本、削顶和连接状态。后续处理层不得直接解析某个示波器库的私有返回格式。
 - 板端用户态依赖统一记录在 `requirements-board.txt`；USB 排查先运行
   `python -m time_frequency_dashboard.acquisition.usb_diagnostics`，该程序只能枚举设备，
@@ -109,7 +109,7 @@ case5/
 - 普通测试使用 `assert`、`pytest.raises` 和 `pytest.approx`；NumPy 数值比较使用 `numpy.testing`；可选依赖使用 `pytest.importorskip` 明确跳过。
 - pytest 固定通过根目录 `pytest.ini` 从 `tests/` 收集，并使用 `--import-mode=importlib`，避免板端残留同名测试文件造成导入冲突。
 - 本地至少执行 `python -m pytest -q` 和 `python -m compileall -q time_frequency_dashboard`。ONNX 图测试必须与 NumPy 数值参考进行对照，不能因缺少训练框架而跳过。
-- 板端纯 Python pytest 可以在既有 `base` Conda 环境运行；USB、PySide6、CANN、ATC、ACL、OM 和 NPU 行为仍需单独进行真实硬件验收，不能由 pytest 模拟结果替代。
+- 板端纯 Python pytest 在统一 `ascend` Conda 环境运行；USB、PySide6、CANN、ATC、ACL、OM 和 NPU 行为仍需单独进行真实硬件验收，不能由 pytest 模拟结果替代。
 - 真实硬件集成测试固定为 `tests/test_hardware_capture_and_inference.py`，只有设置 `CASE5_RUN_HARDWARE_TESTS=1` 才运行；测试必须先取得真实双通道窗口，再调用 OM 推理。
 
 ## 昇腾模型实现规范

@@ -880,7 +880,13 @@ class MindSporeChatProvider:
         except ValueError as exc:
             raise ProviderUnavailable("ASCEND_EDGE_CHAT_DEVICE_ID must be an integer") from exc
         try:
-            set_context(device_target="Ascend", device_id=device_id)
+            context_options = {"device_target": "Ascend", "device_id": device_id}
+            max_device_memory = os.environ.get(
+                "ASCEND_EDGE_CHAT_MAX_DEVICE_MEMORY", ""
+            ).strip()
+            if max_device_memory:
+                context_options["max_device_memory"] = max_device_memory
+            set_context(**context_options)
             actual = get_context("device_target") if callable(get_context) else "Ascend"
         except Exception as exc:
             raise ProviderUnavailable("could not initialize MindSpore Ascend context: %s" % exc) from exc

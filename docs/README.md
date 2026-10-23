@@ -18,6 +18,8 @@ _这是工程文档入口，不是项目首页，也不是教材正文。项目�
 | 查看仓库目录规范 | [`00-repository-structure.md`](00-repository-structure.md) | README、源码、案例和生成物的职责边界 |
 | 查昇腾 310B 程序开发、工程目录与文档规范 | [`ascend310b-development-standard.md`](../tools/dsh-plugin-ascend310b-debug/docs/ascend310b-development-standard.md) | 代码结构、ACL/ATC 合同、样例目录、证据和 M0-M8 验收门 |
 | 查调试插件命令执行边界 | [`ascend310b-command-execution-matrix.md`](ascend310b-command-execution-matrix.md) | 只读诊断、显式任务、模型下载和禁止命令 |
+| 查统一 Python 环境状态 | [`ascend-unified-environment-status.md`](ascend-unified-environment-status.md) | `ascend`、Python 3.9.25、已验证案例、系统依赖和尚未完成的板端门 |
+| 查摄像头、麦克风和喇叭设置 | [`ascend310b-peripheral-setup.md`](ascend310b-peripheral-setup.md) | video/audio 组、设备节点、板载音频、USB 声卡和真实采集/播放验收 |
 | 查 chapter2–9 双板运行对照 | [`ascend310b-chapter-board-comparison-20261017.md`](ascend310b-chapter-board-comparison-20261017.md) | 8T/20T 的样例状态、耗时、差异和原始日志入口 |
 | 查 case1–9 双板调试与前端截图 | [`case-board-runs-20261017/README.md`](case-board-runs-20261017/README.md) | 逐案例状态、截图、原始日志、摄像头复测和待办边界 |
 | 查案例 7 | [`samples/case7/docs/README.md`](../samples/case7/docs/README.md) | 智能相册的 7 份主题工程文档 |
@@ -54,15 +56,15 @@ _这是工程文档入口，不是项目首页，也不是教材正文。项目�
 
 | 案例 | 理论源稿 | 可运行入口 | 工程文档位置 |
 | --- | --- | --- | --- |
-| 案例 1：智能考勤机 | [`case1.md`](../src/experiment/case1.md) | [`samples/case1/README.md`](../samples/case1/README.md) | `samples/case1/docs/` |
-| 案例 2：目标跟踪检测 | [`case2.md`](../src/experiment/case2.md) | [`samples/case2/README.md`](../samples/case2/README.md) | README 与代码内说明 |
-| 案例 3：智能电子琴 | [`case3.md`](../src/experiment/case3.md) | [`samples/case3/README.md`](../samples/case3/README.md) | `samples/case3/doc/`（历史兼容目录） |
-| 案例 4：掌纹识别 | [`case4.md`](../src/experiment/case4.md) | [`samples/case4/README.md`](../samples/case4/README.md) | `samples/case4/docs/` |
-| 案例 5：智能数据采集分析仪 | [`case5.md`](../src/experiment/case5.md) | [`samples/case5/README.md`](../samples/case5/README.md) | `samples/case5/docs/` |
-| 案例 6：智能小车 | [`case6.md`](../src/experiment/case6.md) | [`samples/case6/README.md`](../samples/case6/README.md) | README 与代码内说明 |
+| 案例 1：智能考勤机 | [`case1.md`](../src/experiment/case1.md) | [`samples/case1/README.md`](../samples/case1/README.md) | [`samples/case1/docs/README.md`](../samples/case1/docs/README.md) |
+| 案例 2：目标跟踪检测 | [`case2.md`](../src/experiment/case2.md) | [`samples/case2/README.md`](../samples/case2/README.md) | [`samples/case2/docs/README.md`](../samples/case2/docs/README.md) |
+| 案例 3：智能电子琴 | [`case3.md`](../src/experiment/case3.md) | [`samples/case3/README.md`](../samples/case3/README.md) | [`samples/case3/docs/README.md`](../samples/case3/docs/README.md) |
+| 案例 4：掌纹识别 | [`case4.md`](../src/experiment/case4.md) | [`samples/case4/README.md`](../samples/case4/README.md) | [`samples/case4/docs/00-document-index.md`](../samples/case4/docs/00-document-index.md) |
+| 案例 5：智能数据采集分析仪 | [`case5.md`](../src/experiment/case5.md) | [`samples/case5/README.md`](../samples/case5/README.md) | [`samples/case5/docs/README.md`](../samples/case5/docs/README.md) |
+| 案例 6：智能小车 | [`case6.md`](../src/experiment/case6.md) | [`samples/case6/README.md`](../samples/case6/README.md) | [`samples/case6/docs/README.md`](../samples/case6/docs/README.md) |
 | 案例 7：智能相册 | [`case7.md`](../src/experiment/case7.md) | [`samples/case7/README.md`](../samples/case7/README.md) | [`samples/case7/docs/README.md`](../samples/case7/docs/README.md) |
-| 案例 8：实时手势识别 | [`case8.md`](../src/experiment/case8.md) | [`samples/case8/README.md`](../samples/case8/README.md) | README 与代码内说明 |
-| 案例 9：智能聊天机器人 | [`case9.md`](../src/experiment/case9.md) | [`samples/case9/README.md`](../samples/case9/README.md) | `samples/case9/docs/00-case9-current-runbook.md`；其余编号文档按索引和归档说明阅读 |
+| 案例 8：实时手势识别 | [`case8.md`](../src/experiment/case8.md) | [`samples/case8/README.md`](../samples/case8/README.md) | [`samples/case8/docs/README.md`](../samples/case8/docs/README.md) |
+| 案例 9：智能聊天机器人 | [`case9.md`](../src/experiment/case9.md) | [`samples/case9/README.md`](../samples/case9/README.md) | [`samples/case9/docs/README.md`](../samples/case9/docs/README.md) |
 
 ### 案例 7：智能相册
 

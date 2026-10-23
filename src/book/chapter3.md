@@ -63,32 +63,29 @@ PyTorch框架和torch_npu插件二进制软件包安装的具体方法如下：
 
 #### 安装PyTorch框架 {#src-book-chapter3-h6}
 
-由于出厂的 Ubuntu 22.04 系统已预装 miniconda，我们可以直接利用该环境。预装的 miniconda 通常带有 `bash`，在 `base` 下直接安装 PyTorch 与 torch_npu 容易产生冲突，因此建议新建一个 conda 环境，例如使用下面这个命令创建名为 `npu` 的环境。
-```bash 
-conda create -n npu
-```
-然后利用下面这个命令进入`npu`虚拟环境：
+由于出厂的 Ubuntu 22.04 系统已预装 Miniconda，我们使用仓库统一约定的 `ascend` 环境；不要在 `base` 中直接安装 PyTorch 与 torch_npu。若该环境尚未创建，可使用：
 ```bash
-conda activate npu
+conda create -n ascend python=3.9.25
 ```
-若按照本教程第二章在昇腾 310B 开发板上安装了 CANN 8.3.RC1，则可用的 Python 版本为 3.8–3.11，对应支持的 PyTorch 版本为 2.1.0、2.6.0、2.7.1、2.8.0。这里选择安装 Python 3.11 与 PyTorch 2.8.0，先在新建的 `npu` 环境安装 Python 编译器：
+然后进入统一环境并隔离用户 site：
 ```bash
-conda install python=3.11
+conda activate ascend
+export PYTHONNOUSERSITE=1
 ```
-下载 PyTorch 二进制包时需与当前 Python 版本一致，可用 `python -V` 确认版本，输出示例为 `Python 3.11.14`。该环境还需安装 CANN 依赖的第三方库，可执行：
+若按照本教程第二章在昇腾 310B 开发板上安装了 CANN 8.3.RC1，则可用的 Python 版本为 3.8–3.11，对应支持的 PyTorch 版本为 2.1.0、2.6.0、2.7.1、2.8.0。本仓库统一选择 Python 3.9.25 与 PyTorch 2.8.0。下载 PyTorch 二进制包时需与当前 Python 版本和 ABI 一致，可用 `python -V` 确认版本。该环境还需安装 CANN 依赖的第三方库，可执行：
 ```bash
 pip3 install attrs cython 'numpy>=1.19.2,<=1.24.0' decorator \
     sympy cffi pyyaml pathlib2 psutil protobuf==3.20.0 scipy requests absl-py \
     cloudpickle ml-dtypes tornado jinja2 matplotlib tqdm
 ```
 
-在昇腾开发板上安装 PyTorch 可手动下载二进制包或直接用 pip 自动安装。若手动下载，需确保与 Python 和 CANN 版本严格匹配，可在[华为昇腾 PyTorch 官方安装指南](https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0004.html)选择对应的包。假设 Python 3.11、CANN 8.3.RC1，可参考以下命令下载：
+在昇腾开发板上安装 PyTorch 可手动下载二进制包或直接用 pip 自动安装。若手动下载，需确保与 Python 和 CANN 版本严格匹配，可在[华为昇腾 PyTorch 官方安装指南](https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0004.html)选择对应的包。在 Python 3.9 / CANN 8.3.RC1 组合下，PyTorch 2.8.0 的 aarch64 wheel 使用 `cp39` ABI：
 ```bash
-wget https://download.pytorch.org/whl/cpu/torch-2.8.0%2Bcpu-cp311-cp311-manylinux_2_28_aarch64.whl
+wget https://download.pytorch.org/whl/cpu/torch-2.8.0%2Bcpu-cp39-cp39-manylinux_2_28_aarch64.whl
 ```
-然后使用 pip3 安装：
+然后使用 pip 安装：
 ```bash
-pip3 install torch-2.8.0+cpu-cp311-cp311-manylinux_2_28_aarch64.whl
+python -m pip install torch-2.8.0+cpu-cp39-cp39-manylinux_2_28_aarch64.whl
 ```
 
 安装完成后，可通过以下命令验证：
@@ -101,13 +98,9 @@ python -c "import torch; print(torch.__version__)"
 ```
 
 #### 安装昇腾torch_npu插件 {#src-book-chapter3-h7}
-安装 torch_npu 时，版本需要与 PyTorch、Python、系统架构以及 CANN 保持一致。可前往[华为昇腾 PyTorch 官方安装指南](https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0004.html)选择匹配的二进制包。例如在 Python 3.11、PyTorch 2.8.0、CANN 8.3.RC1 场景下，选择 torch_npu 7.2.0，对应示例下载命令为：
+安装 torch_npu 时，版本需要与 PyTorch、Python、系统架构以及 CANN 保持一致。可前往[华为昇腾 PyTorch 官方安装指南](https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0004.html)选择匹配的二进制包。选择 torch_npu 7.2.0 时，wheel 的 Python ABI 必须与 `python -V` 的 3.9 版本一致；不要安装 `cp311` 文件。确认官方发布页确实提供对应 aarch64 Python 3.9 wheel 后，再执行下载和安装。
 ```bash
-wget https://gitcode.com/Ascend/pytorch/releases/download/v7.2.0-pytorch2.8.0/torch_npu-2.8.0-cp311-cp311-manylinux_2_28_aarch64.whl
-```
-下载后使用 pip3 安装：
-```bash
-pip3 install torch_npu-2.8.0-cp311-cp311-manylinux_2_28_aarch64.whl
+python -m pip install <匹配 torch_npu 7.2.0、PyTorch 2.8.0、Python 3.9 和 aarch64 的官方 wheel>
 ```
 **注意**：直接使用 `pip install torch_npu` 进行简易安装，可能导致程序与当前环境不兼容，或与已安装的 CANN 版本不完全适配。因此，建议谨慎采用该方式安装 torch_npu 插件。
 

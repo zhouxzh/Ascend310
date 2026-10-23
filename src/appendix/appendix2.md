@@ -12,9 +12,9 @@ lang: zh-cn
 
 本附录的命令来自 Ubuntu 基础教程中的文件结构、终端编辑器、SSH、VNC、NFS、Docker、热点与 WiFi、开机自启动、静态 IP 和无屏幕联网资料，并结合现有 310B 材料重新编排。外部资料中的 ROS 小车、树莓派、RDK X5、Orin 等名称只作为操作背景出现于命令示例的原始路径中，不能据此推断 310B 板的实际设备名、IP 地址、接口编号或运行结果。
 
-## 1. 教程定位与证据边界 {#src-appendix-appendix2-scope}
+## 教程定位与证据边界 {#src-appendix-appendix2-scope}
 
-### 1.1 三类操作位置
+### 三类操作位置
 
 | 位置 | 用途 | 能做什么 | 不能据此推断什么 |
 | --- | --- | --- | --- |
@@ -24,7 +24,7 @@ lang: zh-cn
 
 开发机和 Ubuntu 主机可以共享普通 Linux 操作，例如查看路径、编辑文本、管理网络和传输文件。板端操作则需要额外的证据控制：`source /usr/local/Ascend/ascend-toolkit/set_env.sh`、`npu-smi info`、`atc`、`python -c 'import acl'`、OM 加载、V4L2 摄像头访问和真实 NPU 推理都应在 310B 板上执行。
 
-### 1.2 板端专属操作
+### 板端专属操作
 
 以下操作默认只能在已经安装好驱动、CANN 和目标 Python 环境的 310B 板端执行：
 
@@ -39,7 +39,7 @@ v4l2-ctl --device=/dev/video0 --list-formats-ext
 
 `command -v atc` 检查实际调用的 ATC 路径，`import acl` 检查当前 Python 是否能够加载 PyACL，`npu-smi info` 读取 NPU 设备摘要。三者属于不同的证据层：ATC 存在不代表转换成功，PyACL 可导入不代表模型能运行，`npu-smi` 能输出也不代表某个 OM 已经通过数值和性能验证。
 
-### 1.3 证据状态
+### 证据状态
 
 记录结果时，使用下面五类标签，避免把先验知识写成已经观测到的事实：
 
@@ -53,7 +53,7 @@ v4l2-ctl --device=/dev/video0 --list-formats-ext
 
 一条命令的通过只能证明它对应的最小验证门。语法检查、HTTP 健康检查、ATC 转换、ACL 数值烟测、任务精度、性能测试和界面烟测必须分别记录。没有执行的板端测试不能写成“已验证”，没有采集到的日志不能补写。
 
-### 1.4 执行命令前的四个问题
+### 执行命令前的四个问题
 
 执行任何会改变文件、网络、用户、软件包或设备状态的命令前，先回答：
 
@@ -64,9 +64,9 @@ v4l2-ctl --device=/dev/video0 --list-formats-ext
 
 四个问题没有答案时，先执行只读检查，不要直接执行写入命令。
 
-## 2. Ubuntu 与 Linux 基础
+## Ubuntu 与 Linux 基础
 
-### 2.1 终端、用户和提示符
+### 终端、用户和提示符
 
 Ubuntu 的图形界面之外，终端是与 Linux 交互的主要入口。提示符 `$` 通常表示普通用户，`#` 通常表示 root 用户。进入 root 状态以后，所有命令的权限都会提高，误操作的后果也会放大。
 
@@ -88,7 +88,7 @@ exit
 
 也可以按 `Ctrl+D` 发送文件结束符。不要为了省事长期保留 root 终端，更不要在 root 终端中编辑项目文件。
 
-### 2.2 第一条环境检查命令
+### 第一条环境检查命令
 
 ~~~bash
 uname -a
@@ -100,7 +100,7 @@ ip route
 
 `uname -a` 查看内核和架构，`/etc/os-release` 查看 Ubuntu 版本，`date` 生成带时区含义的时间戳，`ip addr` 查看接口地址，`ip route` 查看默认路由。把这几条命令的输出和后续测试放在同一份记录中，才能说明测试环境。
 
-### 2.3 可审计 shell
+### 可审计 shell
 
 脚本或排障会话可以使用严格模式：
 
@@ -128,7 +128,7 @@ load_cann() {
 }
 ~~~
 
-### 2.4 命令权限与执行位置
+### 命令权限与执行位置
 
 同一句命令在开发机、Ubuntu 客户端和板端的结果可能不同。使用 `command -v` 查看实际可执行文件：
 
@@ -141,9 +141,9 @@ command -v npu-smi || true
 
 `|| true` 只适合让检查流程继续，不代表后面的命令可以跳过环境问题。若 `atc` 或 `npu-smi` 不存在，应记录当前机器和当前环境，而不是修改代码来掩盖缺失的板端依赖。
 
-## 3. 文件系统、路径与常用命令
+## 文件系统、路径与常用命令
 
-### 3.1 Ubuntu 目录结构
+### Ubuntu 目录结构
 
 | 目录 | 主要用途 |
 | --- | --- |
@@ -159,7 +159,7 @@ command -v npu-smi || true
 
 `/dev` 中的文件不是普通文档。`/dev/video0`、`/dev/snd` 和 `/dev/bus/usb` 对应真实设备，访问它们会改变设备状态或与硬件交互。`/etc` 下的文件通常需要 root 权限，修改前应备份并确认目标主机。
 
-### 3.2 绝对路径、相对路径和工作目录
+### 绝对路径、相对路径和工作目录
 
 绝对路径从 `/` 开始，例如 `/home/<user>/Documents/ascend310`。相对路径从当前工作目录开始，例如 `models/example.om`。使用 `..` 返回上一层：
 
@@ -190,7 +190,7 @@ mkdir -p "$target_dir"
 cp -a config.example.yaml "$target_dir/"
 ~~~
 
-### 3.3 创建、查看和复制
+### 创建、查看和复制
 
 ~~~bash
 mkdir -p reports/board/$(date --iso-8601=date)
@@ -212,7 +212,7 @@ file config.yaml
 
 `stat` 显示权限、所有者、字节数和名称，`file` 只根据文件内容给出格式线索，不能证明模型可以由 ACL 加载。
 
-### 3.4 查看文本和日志
+### 查看文本和日志
 
 ~~~bash
 head -n 40 service.log
@@ -230,7 +230,7 @@ grep -n 'ERROR\|WARN' service.log
 rg -n 'atc|acl|sha256|127\.0\.0\.1|0\.0\.0\.0' README.md docs scripts
 ~~~
 
-### 3.5 查找、容量和文件类型
+### 查找、容量和文件类型
 
 ~~~bash
 find . -maxdepth 2 -type f -print | sort
@@ -241,7 +241,7 @@ lsblk
 
 `find` 先用 `-maxdepth` 限制范围，避免扫描整个家目录或挂载盘；`du` 查看目录占用，`df` 查看文件系统剩余空间，两者含义不同。`lsblk` 只用于查看块设备树，不能未经确认就挂载或格式化设备。
 
-### 3.6 归档和校验
+### 归档和校验
 
 ~~~bash
 run_date="$(date --iso-8601=date)"
@@ -253,9 +253,9 @@ sha256sum models/example.om
 
 压缩前先确认内容。不要把照片、生物特征模板、数据库、模型二进制、密钥和 token 放入公开归档。`sha256sum` 只能证明字节一致，不能证明模型正确、可加载或数值正确。
 
-## 4. 用户、组、权限、sudo 与安全删除
+## 用户、组、权限、sudo 与安全删除
 
-### 4.1 Linux 用户和组
+### Linux 用户和组
 
 Ubuntu 安装时会创建一个普通用户，同时保留具有更高权限的 root 用户。普通用户在自己的主目录中通常不需要 `sudo`，访问 `/etc`、安装软件包或修改系统服务时才需要提权。
 
@@ -278,7 +278,7 @@ groups
 
 `ls -l` 的权限字符串分为三段。`rwxr-xr-x` 表示所有者可读写执行，组和其他用户可读可执行。`stat` 的 `%a` 给出八进制权限，`%U:%G` 给出所有者和组。
 
-### 4.2 修改权限
+### 修改权限
 
 给脚本增加所有者执行权限：
 
@@ -299,7 +299,7 @@ sudo chgrp developers path/to/directory
 
 `chown -R` 和 `chgrp -R` 会递归改变整棵树，执行前必须用 `find` 预览目标，并确认没有系统文件和共享资产混在其中。
 
-### 4.3 sudo
+### sudo
 
 `sudo` 表示以超级用户权限执行单条命令：
 
@@ -317,7 +317,7 @@ exit
 
 频繁使用系统管理命令时，应通过明确的 sudo 策略和组权限管理，而不是把普通用户长期改成 root。
 
-### 4.4 设备组权限
+### 设备组权限
 
 摄像头和音频设备常通过 `video`、`audio` 等组授权：
 
@@ -329,7 +329,7 @@ sudo usermod -aG video "$USER"
 
 执行 `usermod` 后需要重新登录，组变更才会进入新会话。不要用 `sudo python` 启动整个服务来绕开设备权限，因为这会改变服务的数据目录所有者、环境变量和日志归属。
 
-### 4.5 安全删除
+### 安全删除
 
 `rm` 不提供回收站。删除测试数据时，先把目标解析为绝对路径并验证：
 
@@ -345,9 +345,9 @@ rm -f -- "$target_dir"/*.jpg
 
 先运行 `find` 检查文件列表，再由操作者确认后执行删除。`rm -rf` 只应在脚本创建的隔离临时目录中使用，并且变量必须非空、路径必须已经解析。不要把变量为空、路径未验证的命令变成 `rm -rf "$HOME"`、`rm -rf .` 或对整个部署目录的递归删除。
 
-## 5. nano 与 vim 编辑器
+## nano 与 vim 编辑器
 
-### 5.1 nano
+### nano
 
 打开文件：
 
@@ -365,7 +365,7 @@ sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
 sudo nano /etc/apt/sources.list
 ~~~
 
-### 5.2 vim
+### vim
 
 打开文件：
 
@@ -404,9 +404,9 @@ vim 初始处于普通模式。按 `i` 或 `a` 进入插入模式，按 `Esc` �
 
 编辑器中的 `:q!` 会丢失未保存内容，只在确认不需要修改时使用。需要编辑 root 文件时使用 `sudo nano` 或 `sudo vim`，不要把来源不明的 `tee` 保存技巧直接粘贴到终端。保存后使用 `head`、`grep` 或 `git diff` 检查文件内容。
 
-## 6. APT、换源、Conda、pip 与 Python 路径
+## APT、换源、Conda、pip 与 Python 路径
 
-### 6.1 APT 软件包管理
+### APT 软件包管理
 
 APT 操作会改变系统状态。执行前记录 Ubuntu 版本和计划安装的包：
 
@@ -426,7 +426,7 @@ apt-cache policy package-name
 
 不要为了通过文档示例而重复安装或升级 CANN 相关包。板端已经验证过的 CANN、驱动和 Python 环境应保持原样，变更前先建立回滚方案。
 
-### 6.2 换源
+### 换源
 
 Ubuntu 的软件源配置通常位于 `/etc/apt/sources.list`，部分新版本还会使用 `/etc/apt/sources.list.d/` 下的 `.sources` 文件。先备份，再根据 Ubuntu 版本替换为合适的国内镜像：
 
@@ -438,13 +438,14 @@ sudo apt-get update
 
 换源时确认发行版代号与镜像仓库匹配。不要混用不同 Ubuntu 版本的仓库，不要把第三方 PPA 当作系统基础源。更新失败时先恢复备份并检查错误，不要把错误源继续保留。
 
-### 6.3 Conda 环境
+### Conda 环境
 
 先加载 Conda shell 函数，再激活环境：
 
 ~~~bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 python --version
 python -c 'import sys; print(sys.executable)'
 ~~~
@@ -461,7 +462,7 @@ python -c 'import sys; print(sys.executable)'
 
 环境名称和 Python 版本必须来自项目的版本要求。不要用其他版本的同名环境替换已经验证的板端环境。
 
-### 6.4 pip 与 Python 解释器
+### pip 与 Python 解释器
 
 优先使用 `python -m pip`，让 pip 对应当前解释器：
 
@@ -474,7 +475,7 @@ python -m pip list
 
 不要使用 `sudo pip install` 或 `sudo python`。前者会把包安装到系统目录并绕过 Conda，后者会改变脚本的解释器和文件所有权。安装失败时先记录 `python -m pip --version`、`which python`、`sys.executable` 和完整错误，再决定是否变更环境。
 
-### 6.5 Python 路径和动态库路径
+### Python 路径和动态库路径
 
 ~~~bash
 export PYTHONNOUSERSITE=1
@@ -486,9 +487,9 @@ python -c 'import os; print(os.environ.get("LD_LIBRARY_PATH", ""))'
 
 `PYTHONNOUSERSITE=1` 用于避免用户目录中的包遮蔽板端环境，但可能让实际启动环境中存在的用户站点包不可见。判断导入问题时，应比较隔离环境和真实启动环境的 `sys.executable` 与 `sys.path`。`PYTHONPATH` 和 `LD_LIBRARY_PATH` 只加入已经确认的项目目录或 CANN 目录。持久化修改应经过部署评审，不能临时写入 `/etc/profile` 后让所有用户和所有服务继承。
 
-## 7. 网络、静态 IP、WiFi、热点与同网段检查
+## 网络、静态 IP、WiFi、热点与同网段检查
 
-### 7.1 网络状态
+### 网络状态
 
 ~~~bash
 ip addr
@@ -500,7 +501,7 @@ ping -c 4 <target-ip>
 
 `ip addr` 查看接口地址，`ip route` 查看默认路由和网段，`nmcli connection show` 查看 NetworkManager 连接配置。`ping` 成功只说明网络层可达，不代表 SSH、VNC、NFS 或 NPU 服务已经可用。
 
-### 7.2 一般静态 IP 概念
+### 一般静态 IP 概念
 
 Ubuntu 图形桌面可以通过 NetworkManager 配置静态 IP。打开连接编辑器：
 
@@ -518,13 +519,13 @@ ping -c 4 <同网段设备IP>
 
 静态 IP 不等于端口已经开放。SSH 服务、VNC 共享开关、NFS 导出和防火墙都需要单独检查。不要在不确定目标网段和网关的情况下直接覆盖原配置，先在连接编辑器中记录原值，或保存一份配置备份。
 
-### 7.3 同网段判断
+### 同网段判断
 
 IPv4 地址由网络地址和主机地址组成，子网掩码决定两部分的分界。以 `255.255.255.0` 为例，前 24 位是网络地址，后 8 位是主机地址。`192.168.1.10` 和 `192.168.1.20` 与同一子网掩码进行按位与运算后，网络地址都是 `192.168.1.0`，因此属于同一网段。`192.168.0.100` 与 `192.168.1.100` 在同一掩码下不属于同一网段。
 
 排障时检查客户端和板端是否拿到同一网段的地址、是否连接到同一个热点或有线网络、网关是否一致。若客户端和板端存在多个网卡，应使用 `ip route get <目标IP>` 确认实际出口接口，不要只看某一个网卡的地址。
 
-### 7.4 创建 WiFi 热点
+### 创建 WiFi 热点
 
 图形界面通常从右上角网络图标进入 `Edit Connections`，点击加号，选择 `WiFi`，再点击 `Create`。命令行方式可以打开连接编辑器：
 
@@ -544,7 +545,7 @@ nm-connection-editor
 
 一个无线网卡通常不能同时作为热点又连接外部 WiFi。需要同时提供热点和连接上游网络时，应使用两个独立网卡，并分别确认设备名和驱动状态。
 
-### 7.5 热点与 WiFi 模式切换
+### 热点与 WiFi 模式切换
 
 图形界面中先断开当前热点或 WiFi，再选择要连接的网络。重新开启热点时，从网络设置菜单选择热点配置并启用。切换后检查：
 
@@ -557,7 +558,7 @@ nmcli connection show --active
 
 `iw dev` 是否可用取决于系统是否安装相关工具；即使命令不存在，也应记录 `nmcli device status` 和界面状态，而不是直接推断网卡损坏。切换过程中，已经连接的 SSH 会话可能短暂断开。使用无屏幕板端时，先准备好重新发现的 IP 的方法，再修改网络模式。
 
-### 7.6 自动连接优先级
+### 自动连接优先级
 
 热点和 WiFi 配置可以在 `General` 选项卡中设置 `Connect automatically with priority`。不同版本的教程对数值方向描述不一致：有的资料写“数值越大优先级越高”，有的资料写“数值越小优先级越高”。不要只照抄数字，应查看当前 NetworkManager 的实际配置并做一次重启验证：
 
@@ -567,7 +568,7 @@ nmcli -f connection.id,connection.autoconnect,connection.autoconnect-priority co
 
 记录哪一个连接在重启后实际被选中，再据此调整优先级。修改网络配置后，若板端没有屏幕，先确认仍能通过已有热点或串口获取 IP，防止失去远程入口。
 
-### 7.7 无屏幕联网的基本流程
+### 无屏幕联网的基本流程
 
 无屏幕板端的基本顺序是：默认热点可用，客户端连接热点，通过 SSH 登录，扫描可用 WiFi，选择目标 SSID 并输入密码，获取新的 IP，然后让客户端连接到同一 WiFi。切换时可能短暂断开当前热点，需要准备重新连接或通过串口查看 IP。
 
@@ -580,13 +581,13 @@ ip addr
 
 具体热点名称、默认 IP 和脚本路径必须来自当前板端的实际配置。不要把其他产品的示例热点名或脚本路径当作 310B 板的默认值。成功连接 WiFi 后，IP 可能改变；应记录 DHCP 分配的地址或为板端设置不冲突的静态地址。
 
-## 8. SSH 远程命令行控制
+## SSH 远程命令行控制
 
-### 8.1 客户端与服务端
+### 客户端与服务端
 
 SSH 使用客户端和服务端模型。310B 板端作为服务端运行 `sshd`，Ubuntu 主机作为客户端发起连接。客户端连接后看到的 shell 就是板端 shell，因此文件路径、权限、设备和运行时环境都以板端为准。
 
-### 8.2 安装和启动服务端
+### 安装和启动服务端
 
 在板端确认 SSH 状态：
 
@@ -617,7 +618,7 @@ sudo apt-get install openssh-client
 ssh -V
 ~~~
 
-### 8.3 网络连通性检查
+### 网络连通性检查
 
 先连接板端 WiFi 或有线网络，再检查同网段和可达性：
 
@@ -629,7 +630,7 @@ ping -c 4 192.168.0.100
 
 若无法 ping 通，依次检查：两台设备是否在同一网段、客户端是否连接了错误的网络、板端 IP 是否已经变化、路由出口是否正确、无线热点是否仍处于开启状态。`ping` 不通时不要直接反复执行 `ssh`，先把网络层问题定位清楚。
 
-### 8.4 登录
+### 登录
 
 源文档中的典型命令是：
 
@@ -646,7 +647,7 @@ ssh <user>@<board-ip> 'hostname; uname -a; npu-smi info'
 
 登录后提示符中的用户名和主机名会变化。若用户名仍是本地用户，说明没有进入远端 shell。需要执行单条板端命令时，把命令放在引号中，并确认引号内的变量是在远端还是本地展开。
 
-### 8.5 known_hosts 冲突
+### known_hosts 冲突
 
 第一次连接某台设备或设备身份发生变化时，可能出现主机密钥冲突。源文档给出的处理命令是：
 
@@ -657,7 +658,7 @@ ssh -Y wheeltec@192.168.0.100
 
 第一条命令只删除指定主机在 `known_hosts` 中的记录，第二条重新连接。执行删除前先确认 IP 确实属于目标板端，并核对新的主机密钥指纹。不要为了省事直接删除整个 `known_hosts`，也不要在未确认设备身份时盲目确认新密钥。
 
-### 8.6 同一网段排障
+### 同一网段排障
 
 如果 SSH 连接失败，检查客户端和板端的 IPv4 地址与子网掩码：
 
@@ -669,7 +670,7 @@ ping -c 4 <board-ip>
 
 静态 IP 必须位于同一网段，且不能与板端地址或其他设备冲突。若修改的是客户端地址，保留原配置；若修改的是板端地址，先确认自己有第二条访问通道。路由器、热点、交换机和防火墙都可能影响可达性。
 
-### 8.7 SSH 安全注意事项
+### SSH 安全注意事项
 
 - 使用强密码或 SSH 密钥，优先使用密钥登录。
 - 只允许可信网络访问 22 端口，不要把 SSH 直接暴露到公网。
@@ -678,13 +679,13 @@ ping -c 4 <board-ip>
 - 多人共用板端时，为每个用户分配账号，不要共享 root 密码。
 - 修改防火墙或 SSH 配置后，保留一个已登录会话，再从新会话验证，避免把自己锁在系统外。
 
-## 9. VNC 远程桌面控制
+## VNC 远程桌面控制
 
-### 9.1 客户端与服务端
+### 客户端与服务端
 
 VNC 也采用客户端和服务端模型。板端提供桌面服务，Ubuntu 主机或 Windows 主机运行 VNC 客户端。远程桌面适合查看图形窗口、图像预览和需要鼠标交互的程序；纯命令行任务优先使用 SSH。
 
-### 9.2 Ubuntu 客户端安装 Remmina
+### Ubuntu 客户端安装 Remmina
 
 源文档给出的 Remmina 安装命令是：
 
@@ -696,11 +697,11 @@ sudo apt install remmina remmina-plugin-rdp remmina-plugin-secret
 
 PPA 是否适合当前 Ubuntu 版本需要先确认。若系统仓库已经提供合适版本，也可以只安装 `remmina`。安装完成后从应用菜单启动，选择 VNC 协议，填写板端 IP 地址，再输入 VNC 密码。源文档示例 IP 为 `192.168.0.100`，实际使用时必须替换。
 
-### 9.3 Windows 客户端使用 MobaXterm
+### Windows 客户端使用 MobaXterm
 
 在 Windows 主机上启动 MobaXterm，点击左上角 `Session`，选择 `VNC`，填写板端 IP 地址，确认客户端已经连接到板端所在网络，然后点击 `OK` 并输入 VNC 密码。不同版本的菜单名称可能略有变化，但客户端、目标 IP、密码和网络可达性这几项不变。
 
-### 9.4 分辨率和画面质量
+### 分辨率和画面质量
 
 板端没有连接显示器时，VNC 分辨率可能较低。源文档给出的调整命令是：
 
@@ -710,19 +711,19 @@ xrandr --fb 1024x768
 
 `xrandr --fb` 设置当前 X 显示的帧缓冲尺寸。执行前先运行 `xrandr` 查看可用输出和模式，确认目标分辨率不会超出显示能力。若画面卡顿，可以在 Remmina 中降低画质、颜色深度或更新频率。图像质量和实时性需要权衡，不要把降低画质后的流畅度当作原始编码性能。
 
-### 9.5 共享开关
+### 共享开关
 
 部分 Ubuntu 桌面镜像使用共享设置提供 VNC。修改网线、IP 或网络模式后，VNC 可能断开，需要检查桌面设置中的 `Sharing` 和 `Screen Sharing` 是否仍为活动状态。带有远程桌面协议的版本可能还需要启用兼容 VNC 协议的选项。共享开关关闭时，SSH 可能仍正常，但 VNC 无法连接。
 
-### 9.6 屏幕和显示要求
+### 屏幕和显示要求
 
 部分板端镜像在没有连接显示器时不会生成可用的桌面帧缓冲。VNC 连接前可能需要连接真实屏幕或使用显示欺骗器。无屏幕场景应先确认 VNC 服务、共享开关、显示输出和分辨率，再判断是否为客户端问题。
 
-### 9.7 VNC 中打开终端
+### VNC 中打开终端
 
 大部分 VNC 客户端无法让 `Ctrl+Alt+T` 正确传递到远端桌面。源文档建议使用鼠标右键菜单中的终端入口。打开终端后，先用 `whoami`、`hostname` 和 `pwd` 确认会话确实运行在板端。
 
-### 9.8 SSH 与 VNC 的对比
+### SSH 与 VNC 的对比
 
 | 对比项 | SSH | VNC |
 | --- | --- | --- |
@@ -735,13 +736,13 @@ xrandr --fb 1024x768
 
 VNC 服务不要直接暴露到不可信网络。需要通过 SSH 隧道访问时，可以把本地端口转发到板端 VNC 端口，但应确认 VNC 监听地址和端口，并使用唯一强密码。
 
-## 10. NFS、SCP 与 rsync
+## NFS、SCP 与 rsync
 
-### 10.1 NFS 的角色
+### NFS 的角色
 
 NFS 把服务端目录映射到客户端挂载点。典型的板端作为服务端，Ubuntu 主机作为客户端。挂载后，客户端编辑文件就像编辑本地目录，但底层文件仍属于远端文件系统，断网、服务端关机或网络切换会造成挂载失效。
 
-### 10.2 服务端安装和导出
+### 服务端安装和导出
 
 板端安装服务端：
 
@@ -782,7 +783,7 @@ exportfs -v
 
 `exportfs -v` 查看当前导出，`systemctl status` 查看服务状态。修改 `/etc/exports` 后通常需要重新加载或重启服务。
 
-### 10.3 客户端安装和挂载
+### 客户端安装和挂载
 
 Ubuntu 客户端安装：
 
@@ -818,7 +819,7 @@ sudo umount -t nfs <server-ip>:/srv/ascend310-share /mnt/mount_nfs
 
 若服务端曾经关机，挂载可能变成失效状态，重新挂载前先卸载。不要对正在写入的共享目录执行 `umount -f`，除非已经确认没有进程使用并且接受数据风险。
 
-### 10.4 NFS 权限和安全
+### NFS 权限和安全
 
 源文档中的旧配置使用了宽泛权限。下面的命令只作为说明，不建议直接照抄：
 
@@ -829,7 +830,7 @@ sudo chown -R 777 nobody /path/to/share
 
 `chmod -R 777` 会向所有用户开放读写执行；`chown -R 777 nobody` 不是通用安全的用户和组写法。更合理的做法是创建专用组、设置 `u+rwX` 或组权限、把客户端限制在同一网段，并在不需要写入时使用只读导出。模型、数据、模板和报告目录应按实际所有者设置权限，不要用一次宽泛递归命令处理整个家目录。
 
-### 10.5 SCP 定向传输
+### SCP 定向传输
 
 SCP 使用 SSH 传输文件：
 
@@ -847,7 +848,7 @@ scp "$ssh_target:Documents/ascend310/reports/result.json" .
 ssh "$ssh_target" 'df -h "$HOME"; test -d "$HOME/Documents/ascend310/demo"'
 ~~~
 
-### 10.6 rsync 同步
+### rsync 同步
 
 rsync 适合目录同步和断点续传。先预览：
 
@@ -875,9 +876,9 @@ rsync -av --protect-args \
 
 同步后分别在本地和远端执行 `wc -c`、`sha256sum` 或清单检查。模型、OM、数据集和真实运行报告不应因为一次同步就进入 Git。
 
-## 11. Docker 基础与 ROS2 容器命令
+## Docker 基础与 ROS2 容器命令
 
-### 11.1 Docker 基本概念
+### Docker 基本概念
 
 Docker 使用镜像和容器组织应用。镜像包含文件系统和运行环境，容器是镜像的一次隔离运行实例。容器与宿主系统共享内核，但可以使用独立的文件系统、网络和进程空间。不要把容器当作可以随意获得所有硬件权限的沙箱。
 
@@ -900,7 +901,7 @@ docker images
 
 `docker ps` 只显示运行中的容器，`docker ps -a` 显示包括已停止的容器，`docker images` 显示本地镜像。
 
-### 11.2 通用容器生命周期命令
+### 通用容器生命周期命令
 
 ~~~bash
 docker start <container-name>
@@ -914,7 +915,7 @@ docker inspect <container-name>
 
 `docker exec -it` 进入正在运行的容器，`exit` 退出容器 shell 返回宿主。`docker update --restart=always` 会让容器随 Docker 服务自动启动，设置前应确认应用具备断电恢复和安全停机策略。
 
-### 11.3 教程中的 ROS2 容器命令
+### 教程中的 ROS2 容器命令
 
 部分镜像提供了封装脚本，树莓派 5 的 ROS2 示例命令名称为：
 
@@ -936,7 +937,7 @@ type ros2_restart
 
 进入容器后看到的用户提示符可能变化。容器状态异常时先查看 `docker ps -a`、`docker logs <container-name>` 和 `docker inspect`，不要直接删除容器或镜像。ROS2 节点、话题、launch 和工作空间编译属于 ROS2 内容，应放在附录 5 中讲解。
 
-### 11.4 源码目录、挂载和编译
+### 源码目录、挂载和编译
 
 容器可以把宿主目录挂载到容器路径。源文档提示容器内的源码可能已经映射到宿主目录，因此可以在宿主或容器中修改文件，但编译必须在安装了对应构建系统的容器中完成。使用前确认挂载关系：
 
@@ -948,7 +949,7 @@ docker exec -it <container-name> ls -la
 
 不要把宿主 `/`、`/etc`、Docker socket 或整个家目录挂载到不可信容器。需要摄像头、串口、USB 或 NPU 设备时，逐项确认设备节点和权限，不要直接使用 `--privileged`。
 
-### 11.5 图形窗口和 DISPLAY
+### 图形窗口和 DISPLAY
 
 容器中的图形程序需要显示服务器。源文档中的常见传递方式是：
 
@@ -965,9 +966,9 @@ xhost +
 
 该命令允许所有客户端连接显示服务器，范围过宽。受信多用户环境中应改为只允许当前本地用户，并在使用后恢复限制。SSH 会话的 `DISPLAY` 可能是 `localhost:10.0` 等转发地址，容器启动后新建的 SSH 会话不一定继承原有显示权限。
 
-## 12. 程序开机自启动：桌面项、启动应用和 systemd
+## 程序开机自启动：桌面项、启动应用和 systemd
 
-### 12.1 桌面自启动项
+### 桌面自启动项
 
 桌面环境可以读取 `~/.config/autostart/*.desktop` 自动启动程序：
 
@@ -995,7 +996,7 @@ chmod a+r ~/.config/autostart/myprogram.desktop
 
 用户级桌面项只适用于图形登录用户。服务账号、无桌面会话和系统级程序应使用 systemd，而不是依赖桌面自启动。
 
-### 12.2 启动脚本
+### 启动脚本
 
 一个最小脚本应明确 shebang、工作目录和环境：
 
@@ -1016,11 +1017,11 @@ bash -n script.sh
 
 源教程中的桌面脚本会调用终端模拟器并加载应用程序环境。若脚本只做桌面显示，`Terminal=true` 可以保留终端；若脚本管理后台服务，使用 systemd 并在服务单元中显式设置环境变量。
 
-### 12.3 Startup Applications
+### Startup Applications
 
 部分 Ubuntu 桌面提供 `Startup Applications` 图形工具。搜索 `startup` 打开该工具，点击 `Add`，填写名称和启动命令，保存后重启验证。它本质上仍是用户会话级自启动，不等价于系统服务。
 
-### 12.4 systemd 服务
+### systemd 服务
 
 无桌面或需要自动重启的程序使用 systemd。创建单元文件：
 
@@ -1060,7 +1061,7 @@ journalctl -u ascend310-demo.service -b --no-pager | tail -n 80
 
 systemd 不会自动继承交互式 shell 中临时 `source` 的环境。CANN、Conda、`PYTHONPATH` 和 `LD_LIBRARY_PATH` 应由包装脚本或服务单元显式设置。修改单元后重新执行 `daemon-reload`，停止或重启前先确认服务 PID 和影响范围。
 
-### 12.5 旧式 rc.local
+### 旧式 rc.local
 
 部分旧教程使用 `/etc/rc.local`：
 
@@ -1082,13 +1083,14 @@ reboot
 
 新版本 Ubuntu 默认不一定启用 `rc.local`，而且它不提供服务依赖、重启策略和日志单位。除非目标系统已有明确要求，优先使用 systemd。
 
-## 13. CANN、PyACL、NPU、ATC 与 OM
+## CANN、PyACL、NPU、ATC 与 OM
 
-### 13.1 在同一 shell 加载 Conda 和 CANN
+### 在同一 shell 加载 Conda 和 CANN
 
 ~~~bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 python --version
 python -c 'import sys; print(sys.executable)'
@@ -1098,7 +1100,7 @@ python -c 'import acl; print("PyACL import: ok")'
 
 `set_env.sh` 设置 ACL、运行时和工具链相关路径，`import acl` 验证当前解释器能否加载 PyACL。另一个终端中执行 `source` 不会影响当前服务进程。启动 ATC 或 NPU 服务时，Conda 和 CANN 必须在同一个 shell 或同一个包装脚本中加载。
 
-### 13.2 NPU 设备状态
+### NPU 设备状态
 
 ~~~bash
 npu-smi info
@@ -1106,7 +1108,7 @@ npu-smi info
 
 `npu-smi info` 输出设备、芯片和健康状态。310B4 / 8T 与 310B1 / 20T 属于不同算力层级，结果不能混合排名。已知板端出现 `Health: Alarm` 时，应把它作为诊断背景保存，但不能仅凭告警判定 ATC、ACL、精度或性能失败；相反，应继续检查 `acl` 导入失败、设备不存在、ATC 非零退出、OM 缺失、推理不一致、段错误和资源泄漏等具体现象。
 
-### 13.3 ATC 转换
+### ATC 转换
 
 ATC 把 ONNX 等前端模型转换为 OM。下面是最小示例：
 
@@ -1129,7 +1131,7 @@ SOC_VERSION=Ascend310B4 bash scripts/atc_convert.sh
 
 脚本可能写入日志、manifest 和中间目录。执行前确认输出路径，执行后保存完整 ATC 命令、CANN 版本、模型输入合同、退出码和日志。
 
-### 13.4 OM 工件检查
+### OM 工件检查
 
 转换完成后检查文件存在、字节数和摘要：
 
@@ -1148,7 +1150,7 @@ sha256sum -c SHA256SUMS.txt
 
 摘要一致只证明文件没有发生变化。OM 是否能够由 PyACL 加载、输入输出是否与合同一致、数值是否可接受，需要分别执行 ACL 烟测和数值比较。不同 CANN 版本、不同 SoC、不同精度和不同模型 ID 的 OM 不能混用。
 
-### 13.5 PyACL 与 OM 推理
+### PyACL 与 OM 推理
 
 PyACL 是 ACL 的 Python 接口。服务启动前执行最小导入检查：
 
@@ -1164,7 +1166,7 @@ bash scripts/run_palmprint_service.sh --host 127.0.0.1 --port 7860
 
 若 `import acl` 失败，记录 Python 路径、CANN 路径和完整错误，修复环境后重新启动服务。不要添加 CPU 推理回退，也不要用随机输出或模拟结果让健康检查通过。服务健康接口可以证明 HTTP 进程存活，不能证明 NPU 推理链已加载。
 
-### 13.6 环境变量边界
+### 环境变量边界
 
 ~~~bash
 export PYTHONNOUSERSITE=1
@@ -1174,9 +1176,9 @@ export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/lib64:${LD_LIBRA
 
 这些变量只针对当前 shell 和子进程。需要长期一致的环境应写入项目包装脚本或 systemd 单元，并经过部署评审。不要全局修改 `/etc/profile` 来让所有用户继承未经验证的 CANN 和 Python 路径。
 
-## 14. 板端设备、服务、日志、测试与证据边界
+## 板端设备、服务、日志、测试与证据边界
 
-### 14.1 系统状态报告
+### 系统状态报告
 
 ~~~bash
 uname -a
@@ -1193,7 +1195,7 @@ npu-smi info
 
 这份状态报告用于记录测试环境，不是性能测试。把它和后续 ATC、ACL、精度和性能命令放在同一报告目录中，便于追溯。
 
-### 14.2 摄像头和 V4L2
+### 摄像头和 V4L2
 
 ~~~bash
 ls -l /dev/video*
@@ -1213,7 +1215,7 @@ sudo usermod -aG video "$USER"
 
 重新登录后再验证。不要用 root 启动整个图形程序或 Python 服务来绕开设备权限。
 
-### 14.3 USB 和音频设备
+### USB 和音频设备
 
 ~~~bash
 lsusb
@@ -1237,7 +1239,7 @@ fuser -v "$usb_node"
 
 `fuser -v` 只用于定位占用者，确认进程属于哪个程序后再处理。不要按模糊名称批量结束进程。
 
-### 14.4 服务和端口
+### 服务和端口
 
 ~~~bash
 systemctl status ssh --no-pager
@@ -1249,7 +1251,7 @@ ss -lunp
 
 `systemctl --failed` 显示失败单元，`ss -ltnp` 显示 TCP 监听及进程，`ss -lunp` 显示 UDP 监听。服务绑定到 `127.0.0.1` 时只接受本机连接，绑定到 `0.0.0.0` 则对所有网卡开放。只有可信实验网络中的明确需求才使用 `0.0.0.0`。
 
-### 14.5 进程和日志
+### 进程和日志
 
 ~~~bash
 pgrep -af 'uvicorn|python|docker|npu'
@@ -1261,7 +1263,7 @@ sudo dmesg -T | tail -n 200
 
 `journalctl -b` 查看本次启动，`-u` 查看指定 systemd 单元，`-p err` 过滤错误级别。`dmesg` 查看内核消息，涉及 USB、摄像头、网络和驱动问题时尤其有用。公开报告只保留与故障相关的行，并删除用户名、IP、token、真实图像路径等隐私信息。
 
-### 14.6 安全停止服务
+### 安全停止服务
 
 只停止已经确认的 PID：
 
@@ -1282,7 +1284,7 @@ done
 
 先确认 PID 对应的命令、工作目录和用户，再发送 `TERM`。不要执行 `pkill python`、`killall python` 或按模糊名称批量结束进程，板端可能同时运行多个实验。
 
-### 14.7 本地测试
+### 本地测试
 
 开发机可以执行语法检查和纯 Python 测试：
 
@@ -1311,7 +1313,7 @@ BOARD_HARDWARE_TESTS=1 python -m pytest -q tests/test_board_hardware.py
 
 变量名应以项目实际脚本为准。普通单元测试不应隐式访问 NPU、摄像头、串口、音频设备或真实个人数据。
 
-### 14.8 证据门
+### 证据门
 
 | 证据门 | 能证明 | 不能证明 |
 | --- | --- | --- |
@@ -1328,9 +1330,9 @@ BOARD_HARDWARE_TESTS=1 python -m pytest -q tests/test_board_hardware.py
 
 每份报告至少记录硬件型号和算力层级、CANN 版本、模型 ID 和精度、输入合同、预热次数、循环次数、重复次数、百分位方法、输入来源、输出路径和原始日志。
 
-## 15. 故障排查与禁止命令模式
+## 故障排查与禁止命令模式
 
-### 15.1 常见故障
+### 常见故障
 
 | 现象 | 先执行 | 判断重点 |
 | --- | --- | --- |
@@ -1353,7 +1355,7 @@ BOARD_HARDWARE_TESTS=1 python -m pytest -q tests/test_board_hardware.py
 | 端口被占用 | `ss -ltnp`、`ps -fp <pid>` | 只停止确认属于目标服务的 PID |
 | 磁盘不足 | `df -h`、`du -sh <dir>` | 先归档报告，再清理隔离临时目录 |
 
-### 15.2 禁止或必须审查的命令模式
+### 禁止或必须审查的命令模式
 
 以下命令模式不应未经确认直接执行：
 

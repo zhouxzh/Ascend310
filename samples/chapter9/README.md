@@ -17,8 +17,10 @@ ResNet18-TinyImageNet ONNX 模型，演示一条完整但尽量简单的量化�
 ## 运行前提
 
 ```bash
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-conda activate npu
 cd ~/Documents/Ascend310/samples/chapter9
 ```
 
@@ -30,11 +32,12 @@ export TE_PARALLEL_COMPILER=1
 export MAX_COMPILE_CORE_NUMBER=1
 ```
 
-INT8 PTQ 还需要安装与 CANN 版本匹配的 AMCT ONNX。本章验证环境为：
+INT8 PTQ 还需要安装与 CANN 版本匹配的 AMCT ONNX。历史记录中的原验证组合是：
 CANN 8.3.RC1、aarch64、Python 3.11、ONNX 1.14.0、ONNX Runtime 1.16.0、
-AMCT ONNX 0.23.2。
+AMCT ONNX 0.23.2。仓库当前统一使用 `ascend` / Python 3.9.25；在 3.9.25 上重新
+完成 AMCT、ATC 和 OM 验证前，不能把 Python 3.11 的历史结果写成当前环境结论。
 
-## 1. 下载模型和 PNG 数据
+## 下载模型和 PNG 数据
 
 下载 FP32 ONNX：
 
@@ -70,7 +73,7 @@ data/val_list.txt         # 05_validate_accuracy.py 使用，格式为：路径 
 
 如果只想使用本地 Hugging Face cache，可加 `--offline`。
 
-## 2. ATC 转 FP32 和 FP16 OM
+## ATC 转 FP32 和 FP16 OM
 
 FP32 OM 用作精度参考：
 
@@ -100,7 +103,7 @@ atc \
   --log=info
 ```
 
-## 3. 快速验证 FP16
+## 快速验证 FP16
 
 `01_compare_outputs.py` 用同一批校准图片比较两个 OM 的输出是否接近。它不看
 真实标签，只回答“新模型是否像基准模型”。
@@ -122,7 +125,7 @@ python 02_perf_compare.py \
   --output outputs/perf_compare.json
 ```
 
-## 4. AMCT PTQ + ATC 转 INT8 OM
+## AMCT PTQ + ATC 转 INT8 OM
 
 先生成 AMCT 配置和中间 ONNX：
 
@@ -149,7 +152,7 @@ atc \
   --log=info
 ```
 
-## 5. 快速验证 INT8
+## 快速验证 INT8
 
 先和 FP32 OM 做输出对齐：
 
@@ -170,7 +173,7 @@ python 02_perf_compare.py \
   --output outputs/perf_compare.json
 ```
 
-## 6. 完整验证集 accuracy
+## 完整验证集 accuracy
 
 最终精度结论必须来自独立验证集，而不是 `01_compare_outputs.py` 的输出相似度：
 
@@ -187,7 +190,7 @@ p95 latency。默认评估 `data/val_list.txt` 中全部 10000 张验证图片�
 python 05_validate_accuracy.py --samples 200
 ```
 
-## 7. 校准样本数 sweep
+## 校准样本数 sweep
 
 如果要观察 INT8 对校准样本数量的敏感程度，运行：
 

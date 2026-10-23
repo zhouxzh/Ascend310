@@ -7,7 +7,10 @@ Bearer 鉴权的 OpenAI 兼容网关和 MindSpore 推理 worker
 分成三个进程。这样既能在局域网中提供易用的聊天页面，也能让后续应用通过标准接口调用模型。
 
 本案例的发布基线是 Ascend 310B1 / 20T，默认模型为
-Qwen1.5-0.5B-Chat。它是技术预览，不包含语音、ASR/TTS、设备协议或知识检索。教学目录还保留所有已经出现技术运行证据的模型；模型是否能运行与中文回答质量分开判断。其他硬件、模型或软件版本不能直接继承本案例的结论，必须重新执行本章的验证门。
+Qwen1.5-0.5B-Chat。它是技术预览；文字聊天是当前唯一有 20T
+运行证据的发布链。源码包含默认关闭的浏览器与板端双模式语音控制面，但
+ASR/TTS、USB/3.5mm 录放音、HTTPS
+浏览器语音和设备协议均未通过验收，不能写成发布能力。教学目录还保留所有已经出现技术运行证据的模型；模型是否能运行与中文回答质量分开判断。其他硬件、模型或软件版本不能直接继承本案例的结论，必须重新执行本章的验证门。
 
 \section{学习目标}\label{ux5b66ux4e60ux76eeux6807}
 
@@ -32,23 +35,19 @@ Qwen1.5-0.5B-Chat。它是技术预览，不包含语音、ASR/TTS、设备协�
 
 \section{系统架构}\label{ux7cfbux7edfux67b6ux6784}
 
-浏览器不直接访问模型，也不知道网关密钥。网页进程在服务器端保存密钥，再调用回环地址上的网关。网关验证请求后，将固定的内部模型名转发给回环地址上的
-MindSpore worker。worker 一次只加载一个 profile
-并串行执行生成，避免多个大模型同时争用边缘
-NPU。页面可以选择教学目录中的实验模型；选择后由服务端按受控流程停止旧
-worker、启动固定
-profile、检查健康状态并清空会话，不能在请求中传入任意模型路径或替换模型代码。
+浏览器不接触模型和网关密钥。密钥保存在 UI
+服务进程中；请求经回环地址上的网关鉴权后，再由网关转发给 MindSpore
+worker。worker 一次只加载一个模型
+profile，并按顺序执行生成，避免多个模型同时占用
+NPU。切换到教学模型时，服务端会停止旧 worker、启动指定
+profile、检查健康状态并清空会话。客户端只能选择已注册的
+profile，不能提交任意模型路径或替换模型代码。
 
-\begin{lstlisting}
-flowchart LR
-    accTitle: Ascend Edge Chat text-chat architecture
-    accDescr: A browser uses the trusted-LAN UI. The server-side UI forwards requests through a loopback-only authenticated gateway to a loopback-only MindSpore worker, which performs inference on the Ascend NPU.
-
-    browser["浏览器\n局域网"] --> ui["文字界面\n0.0.0.0:7865"]
-    ui -->|"服务器端 Bearer 密钥"| gateway["网关\n127.0.0.1:7861"]
-    gateway -->|"固定内部模型名"| worker["MindSpore worker\n127.0.0.1:8090"]
-    worker --> npu["Ascend NPU"]
-\end{lstlisting}
+\begin{figure}
+\centering
+\pandocbounded{\includegraphics[keepaspectratio,alt={Ascend Edge Chat 系统架构：浏览器经 UI、网关、worker 到 NPU}]{cases/img9/case9_system_architecture.png}}
+\caption{Ascend Edge Chat 系统架构：浏览器经 UI、网关、worker 到 NPU}
+\end{figure}
 
 三个端口承担不同角色：
 
@@ -70,6 +69,87 @@ MindSpore 推理 worker & 不向网络暴露 \\
 网页没有浏览器登录功能。因此，同一可达网段中的主机都可以发送消息。不要做端口映射，不要将
 \passthrough{\lstinline!7865!}
 放到公网反向代理之后，也不要在不可信网络使用本页面。
+
+\subsection{双模式语音交互（设计中，未验收）}\label{ux53ccux6a21ux5f0fux8bedux97f3ux4ea4ux4e92ux8bbeux8ba1ux4e2dux672aux9a8cux6536}
+
+语音扩展有两个互斥的音频所有权模式，二者不能互相替代验收结果：
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+模式
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+麦克风与扬声器所有者
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+关键边界
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+当前状态
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\passthrough{\lstinline!board!} & 20T 板连接的 USB/3.5mm 设备 &
+\passthrough{\lstinline!voice-agent!} 直接打开 ALSA，浏览器只看状态/文字
+& 仅设备枚举事实；语音闭环 \passthrough{\lstinline!untested!} \\
+\passthrough{\lstinline!browser!} & 访问页面的浏览器 &
+浏览器采集/播放，UI 代理到 loopback
+\passthrough{\lstinline!voice-agent!} & HTTPS、权限、音频和闭环均
+\passthrough{\lstinline!untested!} \\
+\end{longtable}
+
+板端模式的路径是：
+
+\begin{lstlisting}
+USB 麦克风 -> voice-agent -> VAD -> ASR -> :7861 网关 -> :8090 worker
+USB 音箱   <- voice-agent <- TTS <- 完整文本或按句文本
+\end{lstlisting}
+
+第一版板端模式必须半双工运行：\passthrough{\lstinline!LISTENING -> SPEECH -> SILENCE\_HOLD -> ASR -> LLM -> TTS -> PLAYING -> COOLDOWN!}。
+播放时停止采集，或在将来以独立证据验证回声控制；不能一边播放一边把扬声器声音当作下一轮输入。VAD
+阈值、静音时长、最大话语时长和冷却时长均为待测参数，不能从文字聊天的成功推导。
+
+浏览器模式的路径是：\passthrough{\lstinline!HTTPS 浏览器录音 -> UI 代理 -> loopback voice-agent -> ASR -> 网关/worker -> TTS -> UI 代理 -> 浏览器播放!}。远程浏览器的麦克风权限要求安全上下文；当前
+\passthrough{\lstinline!http://<board-ip>:7865/!}
+的文字页面不能被当作浏览器录音已可用的证据。浏览器不能直接访问
+\passthrough{\lstinline!127.0.0.1:7862!}，因为那是浏览器自身的
+loopback；也不能访问开发板 ALSA 或直接访问 voice-agent。
+
+当前语音核心的源码合同已限制为
+\passthrough{\lstinline!disabled!}、\passthrough{\lstinline!browser!} 和
+\passthrough{\lstinline!board!}
+三种模式。\passthrough{\lstinline!browser!} 模式只处理受限的 16
+kHz、单声道、S16 WAV；\passthrough{\lstinline!board!} 模式才会枚举和打开
+ALSA。源码合同不等同于当前 20T 语音服务、ASR 或 TTS 已通过。
+
+20T 板的 ALSA 枚举会随 USB
+外设连接状态变化。\passthrough{\lstinline!2026-10-20!}
+的只读快照曾看到板载 \passthrough{\lstinline!ascend310b!} ALSA
+卡的播放节点 \passthrough{\lstinline!/dev/snd/pcmC0D0p!}、采集节点
+\passthrough{\lstinline!/dev/snd/pcmC0D1c!}，以及 Jieli USB Composite
+Device 的采集节点 \passthrough{\lstinline!/dev/snd/pcmC1D0c!}；未看到
+USB playback PCM。\passthrough{\lstinline!2026-10-21!}
+的一次重新枚举只保留板载 card 0，Jieli USB 设备已不在当前系统中；连接
+UGREEN 1080P 摄像头后，系统又枚举到 \passthrough{\lstinline!hw:1,0!} 的
+USB capture 端。其实际参数是 S16\_LE、双声道、16--48 kHz，不能套用强制
+单声道采集；语音模块会在内存中下混为 ASR/VAD 所需的 16 kHz 单声道
+PCM。没有 USB playback PCM 条目，且两次快照中节点均为
+\passthrough{\lstinline!root:audio!}、模式
+\passthrough{\lstinline!0660!}， \passthrough{\lstinline!HwHiAiUser!}
+未显示在 \passthrough{\lstinline!audio!} 组中。USB
+枚举不等于已成功录音或播放；实际启用前，管理员需按当前板端枚举审查账户权限，例如选择加入
+\passthrough{\lstinline!audio!} 组后重新登录并用
+\passthrough{\lstinline!id -nG!} 复核，不能让服务以 root 身份绕过权限。
+
+两种模式的 USB/3.5mm
+采集播放、权限生效、HTTPS、浏览器权限、VAD、ASR、TTS、隐私和十轮闭环均为
+\passthrough{\lstinline!untested!}。ASR/TTS 即使先在 CPU
+隔离进程运行，也只能说明音频服务路径，不构成 NPU
+语音推理证据。详细的模型锁、隐私边界和分模式人工验收门见\href{https://github.com/zhouxzh/Ascend310/blob/main/samples/case9/docs/08-board-voice-terminal-plan.md}{语音模式与板端终端方案}。
 
 \section{发布模型与工件锁}\label{ux53d1ux5e03ux6a21ux578bux4e0eux5de5ux4ef6ux9501}
 
@@ -103,17 +183,11 @@ revision、文件名、大小和 SHA-256。
 
 下载或离线导入都必须执行相同的完整性流程：
 
-\begin{lstlisting}
-flowchart LR
-    accTitle: Model artifact verification
-    accDescr: A pinned artifact is first placed in a temporary part file, then checked by byte count and SHA-256 before an atomic rename makes it usable by the worker.
-
-    source["固定 revision 的工件"] --> part[".part 临时文件"]
-    part --> bytes["大小核验"]
-    bytes --> hash["SHA-256 核验"]
-    hash --> rename["原子改名"]
-    rename --> runtime["worker 可加载工件"]
-\end{lstlisting}
+\begin{figure}
+\centering
+\pandocbounded{\includegraphics[keepaspectratio,alt={模型工件下载与原子校验流程}]{cases/img9/case9_artifact_verification.png}}
+\caption{模型工件下载与原子校验流程}
+\end{figure}
 
 模型目录应位于源代码目录之外，例如
 \passthrough{\lstinline!/opt/ascend-edge-chat-data!}。模型、日志、缓存和报告都不应提交到
@@ -233,7 +307,9 @@ ascend-edge-chat ui
 启动脚本加载目标 profile，并等待 \passthrough{\lstinline!/health!}
 返回目标模型。切换成功后会清空
 浏览器会话；若目标启动失败，会尝试恢复原模型。它不是在同一进程中同时加载多个
-模型，也不允许网页提交路径、shell 命令或 Python 表达式。
+模型，也不允许网页提交路径、shell 命令或 Python
+表达式。生成期间，页面会禁用 选择器；收到终止 SSE
+事件后，服务端还会等待一个短暂的流式收尾窗口再开始切换。
 
 \begin{lstlisting}[language=bash]
 export ASCEND_EDGE_CHAT_PROFILE=qwen2-1.5b-instruct-mindspore
@@ -294,7 +370,8 @@ worker 的内部模型名改写为公开模型名，再把增量返回给客户�
   仅支持 greedy
   解码：\passthrough{\lstinline!temperature=0!}、\passthrough{\lstinline!top\_p=1!}；
 \item
-  最大上下文为 1024 token，最大输出为 64 token；
+  最大上下文为 1024 token；网页默认输出预算为 128 token，服务硬上限为
+  256 token，具体 profile 可以声明更小上限；
 \item
   单进程、单请求串行执行；
 \item
@@ -321,7 +398,7 @@ worker 的内部模型名改写为公开模型名，再把增量返回给客户�
   \passthrough{\lstinline!/health!}、\passthrough{\lstinline!/v1/models!}、JSON
   与 SSE；
 \item
-  \passthrough{\lstinline!8!}、\passthrough{\lstinline!16!}、\passthrough{\lstinline!32!}、\passthrough{\lstinline!64!}
+  \passthrough{\lstinline!8!}、\passthrough{\lstinline!16!}、\passthrough{\lstinline!32!}、\passthrough{\lstinline!64!}、\passthrough{\lstinline!128!}、\passthrough{\lstinline!256!}
   token 的 UTF-8、结束原因和截断检查；
 \item
   连续 10 轮短请求的 PID、RSS、文件描述符和 NPU 快照；
@@ -372,20 +449,21 @@ Qwen1.5 0.5B & 20T 机器门通过 & 待人工审核 &
 默认基线，先用它验证环境和协议 \\
 Qwen1.5 1.8B & 20T 机器门通过 & 待人工审核 &
 更大模型，速度和内存需要单独测量 \\
-Qwen2 0.5B/1.5B & 20T API、长输出、稳定性通过 & 中文探测含
-\passthrough{\lstinline!U+FFFD!} & tokenizer/解码文本完整性问题；不是
-NPU 加载失败 \\
+Qwen2 0.5B/1.5B & 2026-10-18 20T：JSON/SSE、长度、10 次稳定性通过（Qwen2
+0.5B）；Qwen2 1.5B 另有长输出证据 & 语义质量待人工复核 & 当前 20T
+教学验收使用 Qwen2 0.5B；Qwen2-1.5B 已定位并修复缺失 ChatML
+模板，不能把模板问题写成 NPU 加载失败 \\
 Qwen2.5 0.5B & 修正客户端超时后机器门通过 & 待审核 & 早期 30
 秒超时误杀了测试，不能当作模型崩溃 \\
 Qwen2.5 1.5B & 低占用路径可运行；另有高占用
-\passthrough{\lstinline!Alloc failed!} & 中文探测含
-\passthrough{\lstinline!U+FFFD!} &
+\passthrough{\lstinline!Alloc failed!} & 历史探测含
+\passthrough{\lstinline!U+FFFD!}，语义质量待复核 &
 内存占用路径和文本解码问题必须分开记录 \\
-TinyLlama 1.1B & 短请求可运行；长输出退化 & 中文弱，长输出出现
-\passthrough{\lstinline!U+FFFD!}/TBE & 主要面向英文，短 smoke
-仍适合课堂复现边界 \\
+TinyLlama 1.1B & 短请求可运行；长输出退化 &
+中文语义质量待复核；历史长输出出现文本完整性/TBE 问题 & 主要面向英文，短
+smoke 仍适合课堂复现边界 \\
 DeepSeek-R1 Distill 1.5B & 两板有 NPU/API 证据，速度较慢 &
-推理前缀或事实错误 & \passthrough{\lstinline!<think>!}
+中文语义质量待复核 & \passthrough{\lstinline!<think>!}
 预算和模型行为影响结果，不代表没有 NPU 推理 \\
 Qwen3 0.6B & 未进入加载 & 未测试 & 当前 MindNLP 没有
 loader，属于前置阻断 \\
@@ -393,8 +471,86 @@ MiniCPM3 4B & 未测试 & 未测试 & 专用 loader、权重和内存门尚未�
 \end{longtable}
 
 学生应先复制原始响应，再分析 tokenizer、chat
-template、\passthrough{\lstinline!finish\_reason!}、 设备内存和
+template、\passthrough{\lstinline!finish\_reason!}、 请求的
+\passthrough{\lstinline!max\_tokens!}、设备内存和
 \passthrough{\lstinline!npu-smi!}。不要把中文质量表格改写成硬件兼容性结论。
+
+\subsection{长度、文本完整性与中文语义质量}\label{ux957fux5ea6ux6587ux672cux5b8cux6574ux6027ux4e0eux4e2dux6587ux8bedux4e49ux8d28ux91cf}
+
+\passthrough{\lstinline!max\_tokens!} 是本轮\textbf{最多新生成多少
+tokenizer token}，不是``最多多少汉字''。 同一段中文可能被分成一个或多个
+token；它还受
+\passthrough{\lstinline!prompt\_tokens + max\_tokens <= 1024!}
+的上下文上限约束。页面默认发出
+\passthrough{\lstinline!128!}，可以在页面的``最大输出 token''
+下拉菜单中选择当前模型允许的档位；普通 Qwen 教学 profile 当前可选
+\passthrough{\lstinline!32/64/96/128/192/256!}。如果模型没有在上限前输出
+EOS，接口返回 \passthrough{\lstinline!finish\_reason=length!}，页面会
+保留已生成文本并提示截断。这是长度门结果，不是模型崩溃，也不能直接作为中文
+质量差的证据。
+
+质量验收必须单独进行。针对每个 profile，以新会话、greedy
+解码、\passthrough{\lstinline!max\_tokens=256!} （或该 profile
+的已验证上限）运行同一组 10 条中文提示，保存完整 JSON/SSE、模型
+revision、提示与完成 token
+数、\passthrough{\lstinline!finish\_reason!}。先标注是否出现
+\passthrough{\lstinline!U+FFFD!} 等文本
+完整性异常；\passthrough{\lstinline!finish\_reason=length!}
+的回答标为``未完成''，不计入语义失败。随后由
+至少两名评审者对相关性、事实性、流畅性和完成度分别打 0/1/2
+分，并保留分歧。 只有该人工流程才能把
+\passthrough{\lstinline!quality\_status!}
+标为通过或失败；历史短预算中的替换字符 只能保留为
+tokenizer/解码的待复核观察。
+
+\subsection{20T
+长输出边界实测示例}\label{t-ux957fux8f93ux51faux8fb9ux754cux5b9eux6d4bux793aux4f8b}
+
+不要把配置文件中的 \passthrough{\lstinline!max\_tokens!}
+当作已验证能力。以 20T 的 \passthrough{\lstinline!Qwen2 1.5B Instruct!}
+为例，在 \passthrough{\lstinline!Ascend310B1!}、CANN
+\passthrough{\lstinline!8.0.0!}、MindSpore
+\passthrough{\lstinline!2.4.10!}、MindNLP
+\passthrough{\lstinline!0.4.1!} 上，先发现其 tokenizer 目录没有
+\passthrough{\lstinline!tokenizer\_config.json!}，默认模板为空。旧通用回退错误使用
+Qwen1.5 风格的 \passthrough{\lstinline!<|user|>!} /
+\passthrough{\lstinline!<|assistant|>!}，于是模型在第一轮回答后继续生成下一轮角色标记。将
+审核后的 Qwen2 ChatML 模板固定到 profile 后，经网页 SSE
+链路的强制长输出测试中： \passthrough{\lstinline!64!} token 在
+\passthrough{\lstinline!80.029 s!}、\passthrough{\lstinline!128!} token
+在 \passthrough{\lstinline!158.946 s!}、\passthrough{\lstinline!192!}
+token 在 \passthrough{\lstinline!238.133 s!} 均跑满，三轮都返回
+\passthrough{\lstinline!finish\_reason=length!}，无
+\passthrough{\lstinline!U+FFFD!} 和角色标记， worker
+恢复健康。\passthrough{\lstinline!256!} token 请求仍在产生长段 SSE
+输出后失去 worker 终态， 日志含 TBE
+\passthrough{\lstinline!main process disappeared!}
+与资源清理警告，而不是显存用尽记录。因此该 profile 的页面下拉菜单和
+worker 当前只允许到 \passthrough{\lstinline!192!}，服务的全局
+\passthrough{\lstinline!256!} 上限仍保留给 需要单独验收的其他 profile。
+
+这组数据说明三件事：token
+预算与汉字数无一一对应；速度和可完成的最大长度必须 分开测量；一次 worker
+退出只能说明该软件、模型 revision、提示词和 watchdog 组合
+的失败，不能外推成整个 310B 产品族不支持该模型。学生应保存每一档的 SSE、
+\passthrough{\lstinline!finish\_reason!}、完成 token 数、worker
+健康状态和 \passthrough{\lstinline!npu-smi!} 快照，再更新 profile
+的可选档位。
+
+可在板端以如下命令重复长度门。应从较小档位逐级升高，并在前一档 worker
+已恢复 健康后才运行后一档：
+
+\begin{lstlisting}[language=bash]
+python scripts/verify/output_budget_probe.py \
+  --profile qwen2-1.5b-instruct-mindspore \
+  --budgets 128,192 \
+  --timeout 330 \
+  --output run/output-budget-$(date -u +%Y%m%dT%H%M%SZ).json
+\end{lstlisting}
+
+该工具调用和网页相同的 SSE 路由。若 worker
+消失，它会保留``unavailable''观察，
+不能把该次运行写成成功，也不能用配置中的全局上限代替板端结果。
 
 \section{二次开发}\label{ux4e8cux6b21ux5f00ux53d1}
 
@@ -424,11 +580,13 @@ NPU、稳定性、性能和人工质量门。技术门通过即可进入教学�
 
 \section{板端实测记录}\label{src-experiment-case9-board-evidence}
 
-本案例的发布目标是 \textbf{Ascend310B1 / 20T}，本轮在 20T 上使用已验证的
-\passthrough{\lstinline!case9-ms240-cann80!} 环境运行；8T
-不是该版本的发布目标，因此没有 8T 结果，也没有把 20T 结果混入
-8T。原始日志与响应保存在
-\href{https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case9/README.md}{\passthrough{\lstinline!docs/case-board-runs-20261017/case9/!}}。
+\subsection{2026-10-18 20T 验收}\label{t-ux9a8cux6536}
+
+本轮在 \textbf{Ascend310B1 / 20T} 的真实开发板上，对已经启动的 Ascend
+Edge Chat 服务执行最终验收。运行中的教学 profile 是
+\passthrough{\lstinline!qwen2-0.5b-instruct-mindspore!}，不是正式发布默认的
+Qwen1.5 profile；因此下面的结果只证明该 profile 和该软件组合在当前 20T
+板上可运行，不代表其他模型或 8T 也通过。
 
 \begin{longtable}[]{@{}
   >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
@@ -437,39 +595,81 @@ NPU、稳定性、性能和人工质量门。技术门通过即可进入教学�
 \begin{minipage}[b]{\linewidth}\raggedright
 项目
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-20T
+实测值
 \end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
-SoC & \passthrough{\lstinline!Ascend310B1!} \\
+SoC / 档位 & \passthrough{\lstinline!Ascend310B1!} / 20T \\
 CANN / 驱动 & 8.0.0 / 25.2.0 \\
-Python & 3.9.2 \\
-release preflight & 通过；MindSpore 2.4.10、MindNLP 0.4.1、ACL
-导入成功 \\
-worker & 启动并监听 \passthrough{\lstinline!127.0.0.1:8090!} \\
-gateway & 启动并监听 \passthrough{\lstinline!127.0.0.1:7861!} \\
-UI & HTTP 200，监听 \passthrough{\lstinline!0.0.0.0:7865!} \\
-真实 chat completion &
-通过；\passthrough{\lstinline!finish\_reason=length!}，16 completion
-tokens \\
-UI 截图 & 通过，1440×900 \\
+Python & 3.9.2（base conda） \\
+设备健康 & \passthrough{\lstinline!Alarm!}，73 C；不作为单独阻塞条件 \\
+worker & \passthrough{\lstinline!127.0.0.1:8090!}，profile
+\passthrough{\lstinline!qwen2-0.5b-instruct-mindspore!} \\
+gateway & \passthrough{\lstinline!127.0.0.1:7861!} \\
+UI & \passthrough{\lstinline!0.0.0.0:7865!}，浏览器页面 HTTP 200 \\
+模型公开名 & \passthrough{\lstinline!ascend-edge-chat!} \\
+网关契约 & \passthrough{\lstinline!/v1/models!}、Bearer
+拒绝、未知模型拒绝均通过 \\
+UI 契约 & \passthrough{\lstinline!/api/config!}、真实
+\passthrough{\lstinline!/api/chat!} 均通过 \\
+JSON / SSE & 两条浏览器同链路请求均为 HTTP
+200，\passthrough{\lstinline!finish\_reason=stop!} \\
+长度门 & 8 / 16 / 32 token 达到预算并返回
+\passthrough{\lstinline!length!}；64 token 在生成 46 token 后
+\passthrough{\lstinline!stop!} \\
+稳定性 & 10/10 个短请求成功，返回``测试通过'' \\
+中文探针 & 10 条均完成机器链路；回答内容与人工语义质量另行判断 \\
+性能 & 本轮只运行 1 个流式性能样本：首 token 723.051 ms、完成 1370.604
+ms、1.459 token/s \\
+验收报告 & 板端
+\passthrough{\lstinline!run/case9-acceptance-20261018-20t-spaced2.json!}（ignored
+evidence） \\
+UI 截图 & 1440×900，保存为
+\passthrough{\lstinline!src/experiment/img9/case9-board-20t-ui.png!} \\
+测试后进程 & UI RSS 约 55.6 MB；gateway RSS 约 53.5 MB；worker RSS 约
+3.57 GB \\
+测试后 NPU & 19,540 / 23,673 MB 已用；设备仍可查询 \\
 \end{longtable}
 
-请求使用固定 Qwen1.5-0.5B Chat 模型与低 token
-预算，返回内容是生成结果，不代表准确率或长上下文能力；UI
-未启用登录，仅用于可信局域网。
+本轮第一次运行完整验收脚本时，在没有请求间隔的情况下连续发送请求，稳定性段收到
+HTTP 429：
 
-\textbf{证据等级}：worker/gateway/UI 启动与一次真实 completion 为
-\passthrough{\lstinline!observed-pass!}（20T）。
-\textbf{本轮未验证}：回答质量评估、长上下文、并发、8T 兼容性。
+\begin{lstlisting}
+Too many request bodies are being read
+\end{lstlisting}
+
+这属于测试客户端突发请求触发的服务 admission 限制，不是 NPU
+推理失败。加入请求间隔和流式收尾等待后，同一服务、同一模型、同一 20T
+板通过完整机器验收。因此文档不能把第一次 429
+写成模型或设备结论，也不能用第二次结果掩盖服务确实有单请求串行/限流边界。
+
+中文质量仍需单独判断。直接请求``请用一句中文介绍昇腾310B开发板''时，模型返回了英文道歉句，说明这次生成在技术上完成、但内容质量不通过本次中文语义期望；它不会反向否定
+NPU/网关/UI 的 \passthrough{\lstinline!observed-pass!}。
 
 \begin{figure}
 \centering
 \pandocbounded{\includegraphics[keepaspectratio,alt={20T 版 Ascend Edge Chat 前端页面}]{cases/img9/case9-board-20t-ui.png}}
 \caption{20T 版 Ascend Edge Chat 前端页面}
 \end{figure}
+
+\textbf{证据等级}：环境、worker、gateway、UI、JSON、SSE、10
+次短稳定请求为
+\passthrough{\lstinline!observed-pass!}（20T）；中文语义质量、长文质量、并发和
+8T 兼容性仍为 \passthrough{\lstinline!untested!}。性能只记录单样本，不把
+p50/p95 当成多轮基准。
+
+\subsection{2026-10-17 历史记录}\label{ux5386ux53f2ux8bb0ux5f55}
+
+更早的 20T 记录使用固定 Qwen1.5-0.5B Chat 和低 token 预算，完成了
+worker/gateway/UI 启动、一次真实 completion 和 1440×900 UI
+截图；它是本案例的历史基线，不与 2026-10-18 的 Qwen2 教学 profile
+结果合并。旧原始日志与响应保存在
+\href{https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case9/README.md}{\passthrough{\lstinline!docs/case-board-runs-20261017/case9/!}}。
+
+8T / Ascend310B4 不是该版本发布目标，没有继承本节的 20T 结论，也没有混入
+8T 结果。
 
 \section{小结}\label{ux5c0fux7ed3}
 

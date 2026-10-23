@@ -120,12 +120,25 @@ writeFileSync(
 		'## 这是一个刻意写得很长很长用来触发标题长度规则的二级标题超过三十二个字符',
 		'',
 		'## 走读 [`check.py`](https://example.test/check.py)',
+		'',
+		'## 3. 手写章节编号',
+		'',
+		'### 3.1 手写子章节编号',
 		''
 	].join('\n')
 );
 const shaped = auditRepo({ root, maxFindings: 200 });
 const longHeads = shaped.findings.filter((finding) => finding.rule === 'heading-too-long');
 const linkHeads = shaped.findings.filter((finding) => finding.rule === 'heading-has-link');
+const manualHeads = shaped.findings.filter(
+	(finding) => finding.rule === 'heading-manual-number' && finding.file.endsWith('chapter2.md')
+);
+check(manualHeads.length === 1, `one aggregated manual-number finding expected, got ${manualHeads.length}`);
+check(manualHeads[0]?.severity === 'error', 'manual numbering must block the audit');
+check(
+	manualHeads[0]?.message.includes('2 个标题手写章节编号'),
+	`manual-number warning must aggregate both headings, got: ${manualHeads[0]?.message}`
+);
 check(longHeads.length === 1, `one long heading expected, got ${longHeads.length}`);
 check(longHeads[0]?.file.endsWith('chapter2.md'), 'the long heading must be reported on chapter2');
 check(linkHeads.length === 1, `one linked heading expected, got ${linkHeads.length}`);

@@ -262,7 +262,7 @@ FastAPI使用ASGI不代表硬件调用应并发化。OpenCV、PyACL和sqlite3都
 - 最高相似度超过阈值才允许打卡。
 - 阈值是当前工程参数，不是通用身份认证边界。
 
-<div class="source">教材：<a href="../experiment/case1.md#检测特征与比对"><code>src/experiment/case1.md</code>「检测、特征与比对」</a></div>
+<div class="source">教材：<a href="../experiment/case1.md#检测、特征与比对"><code>src/experiment/case1.md</code>「检测、特征与比对」</a></div>
 
 <!--
 最大人脸策略是单人演示的确定性选择，不是多人场景最优方案。阈值也不能从一次成功样例中证明。

@@ -15,7 +15,8 @@ case "$MODE" in
     fi
     # shellcheck disable=SC1091
     source /usr/local/miniconda3/etc/profile.d/conda.sh
-    conda activate base
+    conda activate ascend
+    export PYTHONNOUSERSITE=1
     export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
     export PYTHONPATH="${PYTHONPATH:-}"
     # shellcheck disable=SC1091
@@ -25,13 +26,13 @@ case "$MODE" in
     # packages. This keeps release activation deterministic on LAN-only boards
     # and avoids unnecessary memory/network pressure.
     if ! python -c 'import faiss; assert faiss.__version__ == "1.7.4"' >/dev/null 2>&1; then
-      python -m pip install --user --no-deps --only-binary=:all: --timeout 30 --retries 1 faiss-cpu==1.7.4
+      python -m pip install --no-deps --only-binary=:all: --timeout 30 --retries 1 faiss-cpu==1.7.4
     fi
     if ! python -c 'import periphery' >/dev/null 2>&1; then
-      python -m pip install --user --no-deps --timeout 30 --retries 1 python-periphery==2.4.1
+      python -m pip install --no-deps --timeout 30 --retries 1 python-periphery==2.4.1
     fi
     if ! python -c 'import multipart' >/dev/null 2>&1; then
-      python -m pip install --user --no-deps --timeout 30 --retries 1 'python-multipart>=0.0.9,<1.0'
+      python -m pip install --no-deps --timeout 30 --retries 1 'python-multipart>=0.0.9,<1.0'
     fi
     python -c 'import faiss, periphery, multipart; print("board dependencies passed")'
     ;;

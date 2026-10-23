@@ -57,9 +57,60 @@ equal(eight.facts.aclImport.value, 'ok', 'import acl 成功应记为 ok');
 equal(eight.facts.socTier.evidenceLabel, 'documented', '档位映射应标记为 documented');
 equal(eight.missingCore.length, 0, 'SoC、CANN、驱动齐全时 missingCore 应为空');
 
+const withDevices = parseProbeOutput(`${PROBE_8T_CANN80}
+===ABS_BEGIN:sound_cards===
+ 0 [AudioPCI    ]: AudioPCI - Ensoniq AudioPCI
+===ABS_END:sound_cards===
+===ABS_BEGIN:audio_playback===
+card 0: AudioPCI [AudioPCI], device 0: playback
+===ABS_END:audio_playback===
+===ABS_BEGIN:audio_capture===
+card 0: AudioPCI [AudioPCI], device 0: capture
+===ABS_END:audio_capture===
+===ABS_BEGIN:audio_sinks===
+0  alsa_output.pci-0000_00_1b.0.analog-stereo
+===ABS_END:audio_sinks===
+===ABS_BEGIN:usb_devices===
+Bus 001 Device 003: ID 046d:0825 Logitech, Inc. Webcam C270
+===ABS_END:usb_devices===
+===ABS_BEGIN:video_devices===
+HD Webcam C270 (usb-0000:00:14.0-1):
+	/dev/video0
+===ABS_END:video_devices===
+`);
+equal(withDevices.facts.soundCards.value.includes('AudioPCI'), true, '声卡块应保留');
+equal(withDevices.facts.audioPlayback.value.includes('playback'), true, '播放设备块应保留');
+equal(withDevices.facts.audioCapture.value.includes('capture'), true, '录音设备块应保留');
+equal(withDevices.facts.audioSinks.value.includes('alsa_output'), true, '音频 sink 应保留');
+equal(withDevices.facts.usbDevices.value.includes('Webcam'), true, 'USB 摄像头应保留');
+equal(withDevices.facts.videoDevices.value.includes('/dev/video0'), true, 'V4L2 视频节点应保留');
+
 const twenty = parseProbeOutput(PROBE_20T_CANN80);
 equal(twenty.board.tier, '20T', '310B1 应映射到 20T');
 equal(twenty.facts.soc.value, 'Ascend310B1', '20T 板 SoC 应为 Ascend310B1');
+
+const unified = parseProbeOutput(`${PROBE_20T_CANN80}
+===ABS_BEGIN:ascend_env===
+present=true
+prefix=/home/HwHiAiUser/.conda/envs/ascend
+executable=/home/HwHiAiUser/.conda/envs/ascend/bin/python
+version=3.9.25
+abi=cpython-39-aarch64-linux-gnu
+isolated=false
+policy_isolated=true
+packages=mindspore:true,fastapi:true,sherpa_onnx:true
+acl=ok
+aclruntime=ok
+mindspore_context=ok
+===ABS_END:ascend_env===
+`);
+equal(unified.facts.ascendEnvPresent.value, true, '应识别统一 ascend 环境');
+equal(unified.facts.ascendEnvVersion.value, '3.9.25', '应记录 ascend Python 版本');
+equal(unified.facts.ascendEnvIsolated.value, false, '应记录裸解释器 user-site 状态');
+equal(unified.facts.ascendEnvPolicyIsolated.value, true, '应记录启动策略 user-site 隔离');
+equal(unified.facts.ascendEnvAclImport.value, 'ok', '应记录 ascend 内 PyACL 导入');
+equal(unified.facts.ascendEnvAclruntime.value, 'ok', '应记录 ascend 内 aclruntime 导入');
+equal(unified.facts.ascendEnvMindsporeContext.value, 'ok', '应记录 MindSpore Ascend context');
 
 const atlas = parseProbeOutput(PROBE_ATLAS_CANN92);
 equal(atlas.facts.firmwareVersion.value, '7.8.0.5.216', '应从 npu-smi board 读出固件');
@@ -77,9 +128,11 @@ equal(transcript.board?.soc, 'Ascend310B4', '无节标记的纯终端记录也�
 
 // --- generated script -----------------------------------------------------
 const script = buildProbeScript();
-for (const section of ['npu_smi_info', 'cann_version_cfg', 'driver_version_info', 'acl_import', 'devices', 'mac', 'machine_id', 'ip_address', 'primary_ip']) {
+for (const section of ['npu_smi_info', 'cann_version_cfg', 'driver_version_info', 'acl_import', 'ascend_env', 'devices', 'sound_cards', 'audio_playback', 'audio_capture', 'audio_sinks', 'usb_devices', 'video_devices', 'mac', 'machine_id', 'ip_address', 'primary_ip']) {
 	check(script.includes(`abs_section ${section}`), `探测脚本应包含 ${section} 节`);
 }
+check(script.includes('.conda/envs/ascend'), '探测脚本应检查统一 ascend 环境');
+check(script.includes('PYTHONNOUSERSITE=1'), 'ascend 环境检查必须禁用 user-site');
 check(!script.includes('abs_section firmware_version_info'), '默认探测不应请求不可读的固件版本文件');
 check(!script.includes('abs_section firmware_access'), '默认探测不应把固件文件权限作为版本探测项');
 check(!/(^|\s)(rm|mv|dd|mkfs)(\s|$)/.test(script), '探测脚本不应包含写操作');

@@ -272,7 +272,7 @@ export const ENTRIES = Object.freeze([
 		steps: [
 			{ probe: 'device', do: '记录 npu-smi 输出、/dev/davinci*、/dev/devmm*、dmesg 尾部。', stop: '无设备行时先修驱动层，不要继续调模型。' },
 			{ probe: 'device', do: '确认驱动与固件是同一套 Ascend HDK 的配套组合。', stop: '覆盖升级顺序固定为先固件、再驱动、最后 CANN。' },
-			{ probe: 'device', do: 'Alarm 属于已知板况：记录为诊断背景，但不作为单独阻断项。', stop: '只有在设备缺失、加载失败或复位循环时才阻断。' }
+			{ probe: 'device', do: '仅在仓库已记录的 Ascend 310B4 / 8T 板况上，把 Alarm 记录为背景；其他 SKU 或新板不要套用该结论。', stop: '只有在设备缺失、加载失败或复位循环时才阻断。' }
 		],
 		commands: ['npu-smi info', 'ls -l /dev/davinci* /dev/devmm* 2>/dev/null', 'lsmod | grep -E "drv|ascend|hisi"', 'dmesg -T | tail -n 120'],
 		references: ['src/appendix/appendix7.md', 'AGENTS.md']
@@ -284,9 +284,9 @@ export const ENTRIES = Object.freeze([
 		stage: 'device',
 		symptoms: ['health', 'alarm', '告警', '温度', 'temperature'],
 		rootCause:
-			'该板 Health: Alarm 是仓库记录的已知板况。它本身不是 ATC、ACL、精度或性能失败的证据。',
+			'仓库记录的 Ascend 310B4 / 8T 样板上 Health: Alarm 是已知板况；不能外推到所有 310B。它本身不是 ATC、ACL、精度或性能失败的证据。',
 		steps: [
-			{ probe: 'device', do: '记录 Health、温度、功耗与内存，写入诊断背景。', stop: '不要因为 Alarm 单独阻止转换、推理或性能测量。' },
+			{ probe: 'device', do: '记录 Health、温度、功耗、内存，并同时记录 SoC/tier，确认是否为已记录的 310B4/8T 板况。', stop: '不要因为 Alarm 单独阻止转换、推理或性能测量；其他 SKU 需要按厂商健康判据判断。' },
 			{ probe: 'device', do: '继续检查具体失败：acl 缺失、设备不存在、ATC 非零退出、OM 缺失、推理不一致、退出码 139、设备复位、资源泄漏。', stop: '用具体失败替代告警作为判据。' }
 		],
 		commands: ['npu-smi info'],
@@ -358,7 +358,7 @@ export const ENTRIES = Object.freeze([
 			{ probe: 'device', do: '推理前后各采一次 npu-smi，确认设备真的有工作。', stop: '没有 NPU 活动时按启动环境问题处理。' }
 		],
 		commands: [
-			'source /usr/local/miniconda3/etc/profile.d/conda.sh && conda activate base',
+			'source /usr/local/miniconda3/etc/profile.d/conda.sh && conda activate ascend && export PYTHONNOUSERSITE=1',
 			'source /usr/local/Ascend/ascend-toolkit/set_env.sh',
 			'bash scripts/run_palmprint_service.sh --host 0.0.0.0 --port 7860',
 			'npu-smi info'

@@ -12,7 +12,7 @@ CANN_BOOTSTRAP_FLAG = "MIDI_DDSP_CANN_BOOTSTRAPPED"
 
 
 def ensure_board_runtime_environment() -> None:
-    """Re-exec this entrypoint with the board's existing CANN/base environment."""
+    """Re-exec this entrypoint with the board's unified CANN/ascend environment."""
     if importlib.util.find_spec("acl") is not None or not CANN_ENV_SCRIPT.is_file():
         return
     if os.environ.get(CANN_BOOTSTRAP_FLAG) == "1":
@@ -25,10 +25,11 @@ def ensure_board_runtime_environment() -> None:
             f"export {CANN_BOOTSTRAP_FLAG}=1",
             f"source {shlex.quote(str(CANN_ENV_SCRIPT))}",
             f"source {shlex.quote(str(CONDA_ENV_SCRIPT))}",
-            "conda activate base",
+            "conda activate ascend",
+            "export PYTHONNOUSERSITE=1",
             "exec "
             + shlex.join(
-                [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]]
+                ["python", str(Path(__file__).resolve()), *sys.argv[1:]]
             ),
         )
     )

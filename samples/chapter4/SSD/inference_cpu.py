@@ -7,6 +7,7 @@ import argparse
 import time
 import json
 # 引入项目中的工具用于解码
+from bbox_utils import scale_xyxy_boxes, xyxy_to_coco_xywh
 from utils_cpu import dboxes300_coco, Encoder, visualize_sample
 # 引入 pycocotools 用于评估 mAP
 from pycocotools.coco import COCO
@@ -26,21 +27,13 @@ def get_coco_ground_truth(val_ds_hf):
         objects = item.get('objects', {})
         if len(objects.get('bbox', [])) > 0:
             for bbox, cat in zip(objects['bbox'], objects['category']):
-                # Source is [xmin, ymin, xmax, ymax], Target COCO JSON is [x, y, w, h]
-                # Scale to 300x300
-                xmin, ymin, xmax, ymax = bbox
-                
-                bx = xmin * 300 / w
-                by = ymin * 300 / h
-                bw = (xmax - xmin) * 300 / w
-                bh = (ymax - ymin) * 300 / h
-                
+                bx, by, bw, bh = xyxy_to_coco_xywh(bbox, w, h)
                 coco_gt_dict["annotations"].append({
-                    "id": len(coco_gt_dict["annotations"]), 
+                    "id": len(coco_gt_dict["annotations"]),
                     "image_id": img_id,
-                    "category_id": cat + 1, 
-                    "bbox": [bx, by, bw, bh], 
-                    "area": bw*bh, 
+                    "category_id": cat + 1,
+                    "bbox": [bx, by, bw, bh],
+                    "area": bw * bh,
                     "iscrowd": 0
                 })
                 cat_ids.add(cat + 1)
@@ -90,20 +83,9 @@ def get_gt_data(item, orig_w, orig_h):
     if len(objects['bbox']) == 0:
         return np.array([]), np.array([])
 
-    boxes = np.array(objects['bbox']) # [x, y, w, h] from HF dataset
+    boxes = scale_xyxy_boxes(objects['bbox'], orig_w, orig_h)
     labels = np.array(objects['category']) + 1 # SSD category=0 is background
-    
-    # 计算缩放比例
-    scale_x = 300.0 / orig_w
-    scale_y = 300.0 / orig_h
-    
-    # 缩放 boxes
-    boxes[:, 0] *= scale_x # x
-    boxes[:, 1] *= scale_y # y
-    boxes[:, 2] *= scale_x # w
-    boxes[:, 3] *= scale_y # h
-    
-    return boxes.astype(np.float32), labels.astype(np.int64)
+    return boxes, labels.astype(np.int64)
 
 def visualize_validation_predictions(args, session, encoder, val_dataset):
     input_name = session.get_inputs()[0].name

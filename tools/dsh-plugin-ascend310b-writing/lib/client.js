@@ -15,12 +15,12 @@ window.__ModuleLoader__.load({
 
 		/** Class-name prefix keeping this plugin's styles out of every other panel. */
 		const CSS = `
-.tw-root{height:100%;overflow:auto;padding:20px 24px 40px;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;line-height:20px}
-.tw-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.tw-root{height:100%;overflow:auto;padding:18px 22px 40px;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;line-height:20px;max-width:1320px;margin:0 auto}
+.tw-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
 .tw-title{font-size:16px;font-weight:600;margin:0}
 .tw-sub{color:var(--dsw-alias-label-tertiary);font-size:12px}
 .tw-note{color:var(--dsw-alias-label-tertiary);font-size:12px;margin-top:8px}
-.tw-actions{margin-left:auto;display:flex;gap:8px}
+.tw-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 .tw-button{border:.5px solid var(--dsw-alias-border-l3);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:6px;padding:4px 12px;font:inherit;cursor:pointer}
 .tw-button:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .tw-button:disabled{opacity:.5;cursor:default}
@@ -28,7 +28,7 @@ window.__ModuleLoader__.load({
 .tw-card{border:.5px solid var(--dsw-alias-border-l1);border-radius:8px;padding:10px 12px}
 .tw-card b{display:block;font-size:20px;font-weight:600;line-height:26px}
 .tw-card span{color:var(--dsw-alias-label-tertiary);font-size:12px}
-.tw-section{margin-top:20px}
+.tw-section{margin-top:16px;padding-top:12px;border-top:.5px solid var(--dsw-alias-border-l1)}
 .tw-section h3{font-size:13px;font-weight:600;margin:0 0 8px}
 .tw-table{width:100%;border-collapse:collapse;font-size:12px}
 .tw-table th{text-align:left;color:var(--dsw-alias-label-tertiary);font-weight:500;border-bottom:.5px solid var(--dsw-alias-border-l1);padding:4px 8px}
@@ -47,6 +47,33 @@ window.__ModuleLoader__.load({
 .tw-status-bad{color:var(--dsw-alias-state-error-primary,#d92d20);border-color:var(--dsw-alias-state-error-primary,#d92d20)}
 .tw-empty{color:var(--dsw-alias-label-tertiary);padding:12px 0}
 .tw-error{color:var(--dsw-alias-state-error-primary);white-space:pre-wrap}
+.tw-heading{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tw-heading .tw-sub{margin:0}
+.tw-meta{display:flex;align-items:center;gap:7px;min-width:0;padding:4px 9px;border:.5px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-l1,#0000)}
+.tw-meta strong{font-size:12px;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tw-meta code{font-family:var(--ds-font-family-code);font-size:10px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}
+.tw-tabs{display:flex;gap:2px;border-bottom:.5px solid var(--dsw-alias-border-l1);margin:16px 0 0;overflow-x:auto;scrollbar-width:thin}
+.tw-tab{flex:none;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--dsw-alias-label-tertiary);padding:7px 12px;font:inherit;cursor:pointer}
+.tw-tab:hover{color:var(--dsw-alias-label-primary)}
+.tw-tab.tw-active{color:var(--dsw-alias-state-business-primary);border-bottom-color:var(--dsw-alias-state-business-primary);font-weight:600}
+.tw-overview-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr);gap:12px;margin-top:14px}
+.tw-panel-card{border:.5px solid var(--dsw-alias-border-l1);border-radius:7px;padding:11px 12px;min-width:0}
+.tw-panel-card h3{margin:0 0 8px;font-size:12px}
+.tw-severity{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.tw-severity div{border-top:2px solid var(--dsw-alias-border-l2);padding-top:7px}
+.tw-severity b{display:block;font-size:18px;line-height:22px}
+.tw-severity span{font-size:11px;color:var(--dsw-alias-label-tertiary)}
+.tw-quick-links{display:flex;flex-direction:column;gap:6px}
+.tw-quick-link{display:flex;justify-content:space-between;gap:8px;align-items:center;border:.5px solid var(--dsw-alias-border-l1);border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);padding:7px 9px;font:inherit;text-align:left;cursor:pointer}
+.tw-quick-link:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.tw-quick-link span{font-size:11px;color:var(--dsw-alias-label-tertiary)}
+.tw-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0 8px}
+.tw-search{flex:1;min-width:180px;box-sizing:border-box;border:.5px solid var(--dsw-alias-border-l3);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:6px;padding:5px 8px;font:inherit}
+.tw-section-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tw-section-head h3{margin:0 0 8px}
+.tw-overflow{overflow-x:auto;max-width:100%}
+@media(max-width:900px){.tw-overview-grid{grid-template-columns:1fr}}
+@media(max-width:720px){.tw-root{padding:14px 14px 32px}.tw-head{align-items:flex-start}.tw-actions{width:100%;margin-left:0}.tw-actions .tw-button{flex:1}.tw-meta{order:3;width:100%;box-sizing:border-box}.tw-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.tw-table{display:block;overflow-x:auto;white-space:nowrap}.tw-table td,.tw-table th{white-space:normal;min-width:90px}.tw-severity{grid-template-columns:repeat(3,minmax(0,1fr))}}
 `;
 
 		/** Install this plugin's stylesheet once, at materialization. */
@@ -211,6 +238,34 @@ window.__ModuleLoader__.load({
 			);
 		}
 
+		/** Compact workspace navigation for the writing panel. */
+		function TabBar(props) {
+			const tabs = [
+				["overview", "概览"],
+				["progress", "分部进度"],
+				["code", "代码文档"],
+				["findings", "问题清单"]
+			];
+			return h(
+				"div",
+				{ className: "tw-tabs", role: "tablist" },
+				tabs.map(([id, label]) =>
+					h(
+						"button",
+						{
+							key: id,
+							type: "button",
+							role: "tab",
+							"aria-selected": props.active === id,
+							className: props.active === id ? "tw-tab tw-active" : "tw-tab",
+							onClick: () => props.onChange(id)
+						},
+						label
+					)
+				)
+			);
+		}
+
 		/**
 		 * The Writing panel: totals, per-part progress, and the audit findings.
 		 * @returns the panel element.
@@ -218,11 +273,16 @@ window.__ModuleLoader__.load({
 		function WritingPanel() {
 			const [state, setState] = react.useState({ kind: "loading" });
 			const [onlyProblems, setOnlyProblems] = react.useState(false);
+			const [tab, setTab] = react.useState("overview");
+			const [query, setQuery] = react.useState("");
 
 			const load = react.useCallback((fresh) => {
 				setState((previous) => (previous.kind === "ready" ? previous : { kind: "loading" }));
 				fetch(fresh ? `${REPORT_URL}?fresh=1` : REPORT_URL, { headers: { accept: "application/json" } })
 					.then(async (response) => {
+						if (response.status === 404) {
+							throw new Error("写作 Host 路由未注册（404）。请确认 Host 端 dsh-plugin-ascend310b-writing 已加载并重启 DSH；当前 client/Host 版本可能不一致。");
+						}
 						if (!response.ok) throw new Error(`HTTP ${response.status}`);
 						return response.json();
 					})
@@ -237,8 +297,18 @@ window.__ModuleLoader__.load({
 			const head = h(
 				"div",
 				{ className: "tw-head" },
-				h("h2", { className: "tw-title" }, "写作"),
-				h("span", { className: "tw-sub" }, "教程写作守门员：命名规范、锚点、链接、代码文档与跨对象同步"),
+				h(
+					"div",
+					{ className: "tw-heading" },
+					h("h2", { className: "tw-title" }, "写作"),
+					h("span", { className: "tw-sub" }, "教程写作守门员：命名规范、锚点、链接、代码文档与跨对象同步")
+				),
+				h(
+					"div",
+					{ className: "tw-meta" },
+					h("strong", null, state.payload?.root ?? "等待读取仓库"),
+					h("code", null, state.payload?.generatedAt ? stamp(state.payload.generatedAt) : "尚未生成")
+				),
 				h(
 					"div",
 					{ className: "tw-actions" },
@@ -262,64 +332,176 @@ window.__ModuleLoader__.load({
 			}
 
 			const { audit, progress, codeDocs = {}, root, generatedAt } = state.payload;
-			const findings = onlyProblems ? (audit.findings ?? []).filter((finding) => finding.severity !== "info") : (audit.findings ?? []);
 			const totals = progress.totals ?? {};
 			const codeSummary = codeDocs.summary ?? {};
 			const codeEntries = codeDocs.entries ?? [];
-			const codeFindings = codeDocs.findings ?? [];
+			const allAuditFindings = audit.findings ?? [];
+			const allCodeFindings = codeDocs.findings ?? [];
+			const needle = String(query ?? "").trim().toLowerCase();
+			const matches = (finding) =>
+				needle === "" ||
+				[finding.file, finding.rule, finding.severity, finding.message].filter(Boolean).join(" ").toLowerCase().includes(needle);
+			const auditFindings = allAuditFindings.filter((finding) => (!onlyProblems || finding.severity !== "info") && matches(finding));
+			const codeFindings = allCodeFindings.filter((finding) => (!onlyProblems || finding.severity !== "info") && matches(finding));
+			const sidebarMissing = progress.missingFromSidebar ?? [];
+
+			const cards = h(
+				"div",
+				{ className: "tw-cards" },
+				h(Card, { label: "正文文件", value: num(totals.files) }),
+				h(Card, { label: "中文字", value: num(totals.cjk) }),
+				h(Card, { label: "图 / 代码块", value: `${num(totals.figures)} / ${num(totals.codeBlocks)}` }),
+				h(Card, { label: "代码 docs", value: `${num(codeSummary.withDocs)}/${num(codeSummary.samples)}` }),
+				h(Card, { label: "同步问题", value: num(codeSummary.findings) }),
+				h(Card, { label: "错误", value: num(audit.summary?.errors) }),
+				h(Card, { label: "警告", value: num(audit.summary?.warnings) })
+			);
+
+			const tabs = h(TabBar, { active: tab, onChange: setTab });
+
+			const progressSection = h(
+				"div",
+				{ className: "tw-section" },
+				h("div", { className: "tw-section-head" }, h("h3", null, "各分部进度")),
+				h(ProgressTable, { parts: progress.parts })
+			);
+
+			const codeSection = h(
+				"div",
+				{ className: "tw-section" },
+				h(
+					"div",
+					{ className: "tw-section-head" },
+					h("h3", null, `代码文档与样例同步（${codeSummary.samples ?? 0} 个样例目录）`),
+					h("span", { className: "tw-note" }, `README ${num(codeSummary.readmes)} · docs ${num(codeSummary.withDocs)} · 缺 README ${num(codeSummary.missingReadme)}`)
+				),
+				h(CodeDocsTable, { entries: codeEntries })
+			);
+
+			const codeIssues = codeFindings.length > 0
+				? h(
+						"div",
+						{ className: "tw-section" },
+						h("div", { className: "tw-section-head" }, h("h3", null, `跨对象同步问题（${codeFindings.length}）`)),
+						h(FindingList, { findings: codeFindings })
+					)
+				: null;
+
+			const auditSection = h(
+				"div",
+				{ className: "tw-section" },
+				h(
+					"div",
+					{ className: "tw-section-head" },
+					h("h3", null, `审计发现（${auditFindings.length}${audit.summary?.truncated ? "，已截断" : ""}）`),
+					h("span", { className: "tw-note" }, "错误 / 警告 / 提示")
+				),
+				h(FindingList, { findings: auditFindings })
+			);
+
+			const findingsFilters = h(
+				"div",
+				{ className: "tw-filters" },
+				h("input", {
+					className: "tw-search",
+					type: "search",
+					placeholder: "按文件、规则或说明筛选问题",
+					value: query,
+					onChange: (event) => setQuery(event.target.value)
+				}),
+				h("span", { className: "tw-note" }, `${auditFindings.length} 条`)
+			);
+
+			const sidebarSection = sidebarMissing.length > 0
+				? h(
+						"div",
+						{ className: "tw-section" },
+						h("div", { className: "tw-section-head" }, h("h3", null, "未加入 sidebar.ts"), h("span", { className: "tw-note" }, `${sidebarMissing.length} 个`)),
+						h("div", { className: "tw-file" }, sidebarMissing.join("、"))
+					)
+				: null;
+
+			const overview = h(
+				"div",
+				null,
+				h(
+					"div",
+					{ className: "tw-overview-grid" },
+					h(
+						"div",
+						{ className: "tw-panel-card" },
+						h("h3", null, "审计状态"),
+						h(
+							"div",
+							{ className: "tw-severity" },
+							h("div", null, h("b", null, num(audit.summary?.errors)), h("span", null, "错误")),
+							h("div", null, h("b", null, num(audit.summary?.warnings)), h("span", null, "警告")),
+							h("div", null, h("b", null, num(audit.summary?.infos)), h("span", null, "提示"))
+						),
+						h("div", { className: "tw-note" }, audit.summary?.truncated ? "审计结果已截断。" : "审计结果完整。")
+					),
+					h(
+						"div",
+						{ className: "tw-panel-card" },
+						h("h3", null, "快速进入"),
+						h(
+							"div",
+							{ className: "tw-quick-links" },
+							h("button", { className: "tw-quick-link", type: "button", onClick: () => setTab("progress") }, h("span", null, "各分部进度"), h("strong", null, `${num((progress.parts ?? []).length)} 个分部`)),
+							h("button", { className: "tw-quick-link", type: "button", onClick: () => setTab("code") }, h("span", null, "代码文档"), h("strong", null, `${num(codeSummary.withDocs)}/${num(codeSummary.samples)} 覆盖`)),
+							h("button", { className: "tw-quick-link", type: "button", onClick: () => setTab("findings") }, h("span", null, "问题清单"), h("strong", null, `${num(auditFindings.length)} 条`))
+						)
+					)
+				),
+				h(
+					"div",
+					{ className: "tw-section" },
+					h("div", { className: "tw-section-head" }, h("h3", null, "各分部进度"), h("span", { className: "tw-note" }, "按稿件分部统计")),
+					h(ProgressTable, { parts: progress.parts })
+				),
+				h(
+					"div",
+					{ className: "tw-section" },
+					h("div", { className: "tw-section-head" }, h("h3", null, `代码文档与样例同步（${codeSummary.samples ?? 0} 个样例目录）`), h("span", { className: "tw-note" }, "概览仅显示前 6 项")),
+					h(CodeDocsTable, { entries: codeEntries.slice(0, 6) }),
+					codeEntries.length > 6 ? h("div", { className: "tw-note" }, `还有 ${codeEntries.length - 6} 个样例目录，切换到“代码文档”查看。`) : null
+				),
+				codeFindings.length > 0
+					? h(
+							"div",
+							{ className: "tw-section" },
+							h("div", { className: "tw-section-head" }, h("h3", null, `跨对象同步问题（${codeFindings.length}）`), h("span", { className: "tw-note" }, "显示前 4 条")),
+							h(FindingList, { findings: codeFindings.slice(0, 4) })
+						)
+					: null,
+				auditFindings.length > 0
+					? h(
+							"div",
+							{ className: "tw-section" },
+							h("div", { className: "tw-section-head" }, h("h3", null, "最近审计发现"), h("span", { className: "tw-note" }, "显示前 5 条")),
+							h(FindingList, { findings: auditFindings.slice(0, 5) })
+						)
+					: null,
+				sidebarSection
+			);
+
+			const content =
+				tab === "progress"
+					? h("div", null, progressSection, sidebarSection)
+					: tab === "code"
+						? h("div", null, codeSection, codeIssues)
+						: tab === "findings"
+							? h("div", null, findingsFilters, auditSection, codeIssues, sidebarSection)
+							: overview;
 
 			return h(
 				"div",
 				{ className: "tw-root" },
 				head,
 				h("div", { className: "tw-sub" }, `${root} · ${stamp(generatedAt)}`),
-				h(
-					"div",
-					{ className: "tw-cards" },
-					h(Card, { label: "正文文件", value: num(totals.files) }),
-					h(Card, { label: "中文字", value: num(totals.cjk) }),
-					h(Card, { label: "图", value: num(totals.figures) }),
-					h(Card, { label: "代码块", value: num(totals.codeBlocks) }),
-					h(Card, { label: "代码 docs", value: `${num(codeSummary.withDocs)}/${num(codeSummary.samples)}` }),
-					h(Card, { label: "代码文件", value: num(codeSummary.codeFiles) }),
-					h(Card, { label: "同步问题", value: num(codeSummary.findings) }),
-					h(Card, { label: "错误", value: num(audit.summary?.errors) }),
-					h(Card, { label: "警告", value: num(audit.summary?.warnings) })
-				),
-				h("div", { className: "tw-section" }, h("h3", null, "各分部进度"), h(ProgressTable, { parts: progress.parts })),
-				h(
-					"div",
-					{ className: "tw-section" },
-					h("h3", null, `代码文档与样例同步（${codeSummary.samples ?? 0} 个样例目录）`),
-					h(CodeDocsTable, { entries: codeEntries }),
-					h(
-						"div",
-						{ className: "tw-note" },
-						`README ${num(codeSummary.readmes)} 个，详细 docs ${num(codeSummary.withDocs)} 个，仅 README ${num(codeSummary.readmeOnly)} 个，缺 README ${num(codeSummary.missingReadme)} 个，docs 文件 ${num(codeSummary.docsFiles)} 个。`
-					)
-				),
-				codeFindings.length > 0
-					? h(
-							"div",
-							{ className: "tw-section" },
-							h("h3", null, "跨对象同步问题"),
-							h(FindingList, { findings: codeFindings })
-						)
-					: null,
-				h(
-					"div",
-					{ className: "tw-section" },
-					h("h3", null, `审计发现（${findings.length}${audit.summary?.truncated ? "，已截断" : ""}）`),
-					h(FindingList, { findings })
-				),
-				(progress.missingFromSidebar ?? []).length > 0
-					? h(
-							"div",
-							{ className: "tw-section" },
-							h("h3", null, "未加入 sidebar.ts"),
-							h("div", { className: "tw-file" }, (progress.missingFromSidebar ?? []).join("、"))
-						)
-					: null
+				cards,
+				tabs,
+				content
 			);
 		}
 

@@ -6,7 +6,7 @@
 
 > **网络边界**：服务默认监听 `0.0.0.0`，只适用于隔离的受信局域网。项目不提供账号、TLS、模板多租户隔离或公网安全保证，禁止直接暴露到互联网。
 
-## 1. 环境要求
+## 环境要求
 
 本地构建机需要 Python 3.9--3.11、Node.js 18+、npm 和 Git。开发板需要：
 
@@ -17,7 +17,7 @@
 
 源码仓库不包含 checkpoint、ONNX、OM、数据集、模板、真实摄像头图像或原始运行报告。板端运行只要求已校验的 mixed-FP16 OM；参考 ONNX 可选，仅在导出和契约审计环境中使用。板端资产包可在许可证允许时单独携带数据集和模型，但模板、姓名、embedding 或密钥永远不进入发行包；默认按 `dataset_manifest.json` 从外部来源下载。请先阅读 [`docs/04-release-checklist.md`](docs/04-release-checklist.md)，确认源码包和板端资产包的边界。
 
-## 2. 本地构建与检查
+## 本地构建与检查
 
 在源码包根目录执行。源码包使用正式 `palmprint_workbench` 包；根目录的旧平铺模块和旧兼容入口不属于发布包：
 
@@ -40,7 +40,7 @@ python -m tools.board.verify_frontend_assets --dist frontend/dist --strict
 
 不要在本地执行 CANN、ATC、PyACL、`npu-smi`、DVPP 或板载摄像头测试；这些检查必须在开发板上完成。
 
-## 3. 手动配置开发板环境
+## 手动配置开发板环境
 
 通过 SSH 登录实际设备。文档中的 `USER@HOST` 和远端目录必须替换为当前部署目标，不要依赖固定主机名或 IP：
 
@@ -54,7 +54,8 @@ WSL/Git Bash 会话中执行整段同步命令。SSH 密钥、端口和远端目
 ssh USER@HOST
 cd ~/Documents/palmprint-recognition
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export PALMPRINT_ROOT="$PWD"
 # Some CANN installations do not add PyACL's Python package automatically.
@@ -98,7 +99,7 @@ export PALMPRINT_MAX_API_REPORT_BYTES=536870912
 
 完整变量说明见 [`.env.example`](.env.example)。其中的示例值不包含任何凭据；HF 下载 token 不得写入仓库、日志或截图。
 
-## 4. 手动同步与启动
+## 手动同步与启动
 
 在本地构建 `frontend/dist` 后，先创建板端版本目录，再用不删除远端文件的 `rsync` 同步源码和前端。以下命令只同步源码包，不触碰板端模型、数据集、模板和报告：
 
@@ -163,7 +164,7 @@ curl --fail http://127.0.0.1:7860/
 
 健康检查通过表示服务、模型资产和本地模板存储策略均已就绪；`inference_smoke` 仍不会主动加载 NPU，必须再人工执行一次上传或摄像头请求。若 health 返回 warning，先查看 `template_store` 字段和当前发行目录的 `data/` 权限。
 
-## 5. 手动备份与回滚
+## 手动备份与回滚
 
 部署新源码前，在板端为源码版本、生产 registry、候选清单、release manifest、前端 bundle 和服务 PID 建立一个带时间戳的备份。模型、数据集、模板、图片和报告不复制到源码包，也不在回滚时删除：
 
@@ -195,7 +196,7 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 
 在另一终端确认 PID、`/api/health`、`/api/bootstrap` 和首页恢复后，再处理旧版本目录。模板、图片、数据集、OM/ONNX 和报告始终由人工按各自清单管理；切换版本时需要人工复制完整 `data/` 目录。
 
-## 6. 工作台操作
+## 工作台操作
 
 - **实时识别**：production profile 选择 CCNet；manual_test profile 可逐一选择五个 CompNet，上传掌纹或选择摄像头，确认 ROI 质量后执行识别。页面中的 `manual_test_pending` 只表示等待人工验收。
 - **掌纹注册**：系统在开始采集时自动分配递增的人员编号，如 `P-000001`；显示名可选。左右掌分别是 `人员编号:left`、`人员编号:right`。完成一只掌后可直接登记同一人员的另一只掌，或开始下一位人员；自助模式自动采集并保存 5 张合格样本，管理员辅助模式可审阅、剔除并自动补满 5 张。
@@ -205,7 +206,7 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 
 摄像头先通过 `GET /api/cameras` 查看设备和实际支持的分辨率。若驱动支持 1920x1080，可在界面中选择该模式；预览请求保持串行，单次完成后约等待 80 ms，以避免积压旧帧。切换摄像头、切换分辨率或刷新设备列表时，前端会先登记新的预览会话；旧请求不会再关闭新设备。若运行中物理拔插摄像头，先在界面关闭预览，再刷新状态并重新打开；第一次读帧失败时服务会自动重建一次 V4L2 句柄。预览结束后关闭页面或调用关闭操作，释放 V4L2 设备。
 
-## 7. 模型资产与离线研究
+## 模型资产与离线研究
 
 源码包不包含模型二进制。运行时从受信的板端资产目录读取 `models/om/`；`models/registry.json` 只保存已准入模型的元数据。当前工作区已经从板端取回 CCNet 和五个 canonical CompNet mixed-FP16 OM，并按 [`om_manifest.json`](om_manifest.json) 核对字节数与 SHA-256；旧静态测试图不属于发布资产。这些文件保持 Git ignored，只用于生成独立资产包。
 
@@ -228,7 +229,7 @@ python -m tools.offline.benchmark audit --dataset polyu --spectrum B
 
 真实掌纹图像、数据集、模板和运行报告不得进入 Git 或截图；`ui_smoke_5_20_1` 只能验证界面和报告链路，不能作为正式精度排名。
 
-### 7.1 全候选分任务测试
+### 全候选分任务测试
 
 `candidate_manifest.json` 保留完整 28 项研究审计；生产/模板通道只暴露 6 个 NPU embedding（CCNet 和五个 CompNet）。另有 6 个已核验 OM 通过独立候选运行时实验页调用，包括分类器、ROI、双输入比较器、PPNet 和掌静脉分类器；它们不进入生产模板通道。其余候选因没有可复现 NPU 资产、来源/许可不完整，或属于 SDK/代码任务，继续保留审计记录供后续复核。使用下面的入口生成完整静态审计和脱敏状态索引：
 
@@ -260,7 +261,8 @@ curl --fail -F candidate_id=ppnet -F image=@<anonymous-image> \
 ```bash
 ssh HwHiAiUser@192.168.8.178
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd <release-root>
 python tools/board/collect_npu_trace.py --label <candidate-id> --interval 1 -- \
@@ -272,7 +274,7 @@ python tools/board/acl_lifecycle_probe.py --model <candidate-id> \
 
 每次只运行一个候选。报告位于被忽略的 `reports/candidates/`；出现 `139`、`err_ret=-512`、设备 reset、LPM/AICore/RAS 增量、清理失败或资源残留时停止该候选并记录问题，不修改生产 registry。
 
-## 8. 常见故障
+## 常见故障
 
 - **PyACL 不可用**：在启动服务的同一个 shell 中重新加载 conda 和 CANN，确认 `python -c "import acl"` 成功；不要添加 CPU fallback。
 - **模型不在下拉框**：确认服务使用 `PALMPRINT_PROFILE=manual_test`，再检查 `/api/bootstrap`、registry、OM 文件字节数和 SHA-256。production profile 默认只显示 CCNet。
@@ -285,7 +287,7 @@ python tools/board/acl_lifecycle_probe.py --model <candidate-id> \
 - **ACL 异常退出、设备 reset 或进程意外退出**：立即停止当前人工测试，保存时间、模型 ID、PID、HTTP 响应和报告摘要；重启当前版本，必要时回退到 CCNet。不要升级依赖、驱动、CANN 或应用版本，先建立问题记录。
 - **`Health: Alarm`**：只作为设备诊断字段记录，不能单独判断模型失败或成功；应继续检查实际请求、进程和模板链路。
 
-## 9. 常用接口
+## 常用接口
 
 | 接口 | 用途 |
 | --- | --- |

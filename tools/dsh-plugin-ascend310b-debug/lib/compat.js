@@ -148,6 +148,7 @@ export const OBSERVED_STACKS = Object.freeze([
 		firmware: '7.3.3.0.b309（B309）',
 		cann: '7.0',
 		status: EVIDENCE.OBSERVED_PASS,
+		scope: 'VENC only',
 		note: 'CANN 7.0 基线在 VENC 上通过；升级到 8.0 后同一组合继续通过。',
 		source: 'samples/case8/docs/05-known-issues-and-version-compatibility.md'
 	},
@@ -174,7 +175,7 @@ export const OBSERVED_STACKS = Object.freeze([
 		firmware: '未在报告中记录',
 		cann: '8.0',
 		status: EVIDENCE.OBSERVED_PASS,
-		note: '隔离环境 case9-ms240-cann80 记录 MindSpore 2.4.10 + MindNLP 0.4.1 + Python 3.9.25 的机器门通过。',
+		note: '统一 ascend 环境（Python 3.9.25）继承并继续验证 MindSpore 2.4.10 + MindNLP 0.4.1 机器门。',
 		source: 'samples/case9/README.md；samples/case9/docs/56-mindspore-20t-isolated-rerun-20261016.md'
 	},
 	{
@@ -309,11 +310,15 @@ export function matchObservedStacks(facts) {
 	const soc = facts?.soc?.value ?? null;
 	const driver = facts?.driverVersion?.value ?? null;
 	const cann = facts?.cannVersion?.value ?? null;
+	const firmware = facts?.firmwareVersion?.value ?? null;
+	const os = facts?.os?.value ?? null;
 	const matches = [];
 	for (const stack of OBSERVED_STACKS) {
 		if (soc === null || stack.soc !== soc) continue;
-		if (driver !== null && !versionAgrees(driver, stack.driver)) continue;
-		if (cann !== null && !versionAgrees(cann, stack.cann)) continue;
+		if (driver !== null && !versionExact(driver, stack.driver)) continue;
+		if (cann !== null && !versionExact(cann, stack.cann)) continue;
+		if (firmware !== null && /^[0-9]/u.test(String(stack.firmware)) && !versionExact(firmware, stack.firmware)) continue;
+		if (os !== null && /^[0-9]/u.test(String(stack.system)) && !versionExact(os, stack.system)) continue;
 		matches.push(stack);
 	}
 	return matches;
@@ -334,11 +339,39 @@ export function matchObservedStacks(facts) {
 function versionAgrees(probed, recorded) {
 	if (typeof probed !== 'string' || typeof recorded !== 'string') return false;
 	if (probed.trim() === recorded.trim()) return true;
-	const tokens = recorded.match(/\d+(?:\.\d+){1,3}/g) ?? [];
+	const probedVersion = parseVersion(probed);
+	if (probedVersion === null) return false;
+	const tokens = recorded.match(/\d+(?:\.(?:\d+|[Xx])){1,3}(?:[.\-]?[0-9A-Za-z.]+)?/g) ?? [];
 	for (const token of tokens) {
-		if (compareMajorMinor(probed, token) === 0) return true;
+		const recordedVersion = parseVersion(token.replace(/[Xx]/g, '0'));
+		if (recordedVersion === null) continue;
+		if (probedVersion.major !== recordedVersion.major || probedVersion.minor !== recordedVersion.minor) continue;
+		const patchToken = token.split('.')[2];
+		if (patchToken !== undefined && !/[Xx]/u.test(patchToken) && probedVersion.patch !== recordedVersion.patch) continue;
+		return true;
 	}
-	if (tokens.length === 0) return compareMajorMinor(probed, recorded) === 0;
+	return tokens.length === 0 && compareMajorMinor(probed, recorded) === 0;
+}
+
+/** Exact observed tuple matching: wildcards and patch drift are not accepted. */
+function versionExact(probed, recorded) {
+	if (typeof probed !== 'string' || typeof recorded !== 'string') return false;
+	if (probed.trim() === recorded.trim()) return true;
+	const probedVersion = parseVersion(probed);
+	if (probedVersion === null) return false;
+	const tokens = recorded.match(/\d+(?:\.\d+){1,3}(?:[.\-]?[0-9A-Za-z.]+)?/g) ?? [];
+	for (const token of tokens) {
+		const recordedVersion = parseVersion(token);
+		if (recordedVersion === null) continue;
+		if (
+			probedVersion.major === recordedVersion.major &&
+			probedVersion.minor === recordedVersion.minor &&
+			probedVersion.patch === recordedVersion.patch &&
+			(recordedVersion.tail === '' || probedVersion.tail.toLowerCase() === recordedVersion.tail.toLowerCase())
+		) {
+			return true;
+		}
+	}
 	return false;
 }
 
@@ -388,6 +421,9 @@ export function assessVersionPairing(facts) {
 			evidence: EVIDENCE.OBSERVED_PASS,
 			reasons: [
 				`探测到的组合与仓库已记录的组合 ${observed[0].id} 一致：${observed[0].board} / ${observed[0].soc} / CANN ${observed[0].cann} / 驱动 ${observed[0].driver}。`,
+				observed[0].scope === undefined
+					? '这是完整组合记录。'
+					: `该记录只覆盖 ${observed[0].scope}，不能外推为其它功能的 observed-pass。`,
 				observed[0].note
 			],
 			nextActions: [
@@ -448,6 +484,120 @@ export function assessVersionPairing(facts) {
 				],
 		releaseLine: release,
 		observedStacks: []
+	};
+}
+
+/** Unified conda environment contract for every case on an Ascend 310B board. */
+export const UNIFIED_ENV_NAME = 'ascend';
+export const UNIFIED_PYTHON_VERSION = '3.9.25';
+export const UNIFIED_PYTHON_ABI_PREFIX = 'cpython-39';
+export const UNIFIED_REQUIRED_PACKAGES = Object.freeze([
+	'mindspore',
+	'mindnlp',
+	'fastapi',
+	'httpx',
+	'pydantic',
+	'numpy',
+	'cv2',
+	'torch',
+	'torchvision',
+	'onnx',
+	'onnxruntime',
+	'sherpa_onnx',
+	'aiortc',
+	'av',
+	'gradio',
+	'faiss',
+	'PySide6',
+	'pyqtgraph',
+	'aiohttp',
+	'mido',
+	'sounddevice',
+	'python_multipart',
+	'cryptography',
+	'pandas',
+	'tokenizers',
+	'PIL',
+	'huggingface_hub',
+	'periphery',
+	'usb',
+	'rtmidi'
+]);
+
+/**
+ * Check the shared runtime contract.
+ *
+ * This is separate from the CANN/driver pairing verdict: a missing env is an
+ * application deployment failure, not evidence against the NPU stack.
+ */
+export function assessUnifiedEnvironment(facts) {
+	const presentFact = facts?.ascendEnvPresent;
+	if (presentFact === undefined) {
+		return {
+			verdict: 'incomplete',
+			evidence: EVIDENCE.UNTESTED,
+			reasons: ['探针没有提供 ascend 统一环境检查结果；需要重新运行 ascend_probe。'],
+			nextActions: [`创建并固定 Python ${UNIFIED_PYTHON_VERSION} 的 conda 环境 ${UNIFIED_ENV_NAME}，禁止案例使用 base 或 pip --user。`]
+		};
+	}
+	if (presentFact.value !== true) {
+		return {
+			verdict: 'failed',
+			evidence: EVIDENCE.OBSERVED_FAIL,
+			reasons: [`未找到 conda 环境 ${UNIFIED_ENV_NAME}；案例不得回退到 base 或 user-site。`],
+			nextActions: [`创建 conda 环境 ${UNIFIED_ENV_NAME}，解释器固定为 Python ${UNIFIED_PYTHON_VERSION}。`]
+		};
+	}
+	const version = facts?.ascendEnvVersion?.value ?? null;
+	const abi = facts?.ascendEnvAbi?.value ?? null;
+	const isolated = facts?.ascendEnvPolicyIsolated?.value === true || facts?.ascendEnvIsolated?.value === true;
+	const acl = facts?.ascendEnvAclImport?.value ?? null;
+	const aclruntime = facts?.ascendEnvAclruntime?.value ?? null;
+	const mindsporeContext = facts?.ascendEnvMindsporeContext?.value ?? null;
+	const packageText = facts?.ascendEnvPackages?.value ?? '';
+	const packageState = new Map(
+		String(packageText)
+			.split(',')
+			.filter(Boolean)
+			.map((item) => {
+				const [name, value] = item.split(':');
+				return [name, value === 'true'];
+			})
+	);
+	const missingPackages = UNIFIED_REQUIRED_PACKAGES.filter((name) => packageState.get(name) !== true);
+	const problems = [];
+	if (version !== UNIFIED_PYTHON_VERSION) {
+		problems.push(`Python 版本为 ${version ?? '未采集'}，统一环境要求 ${UNIFIED_PYTHON_VERSION}。`);
+	}
+	if (typeof abi !== 'string' || !abi.startsWith(UNIFIED_PYTHON_ABI_PREFIX)) {
+		problems.push(`Python ABI 为 ${abi ?? '未采集'}，统一环境要求 ${UNIFIED_PYTHON_ABI_PREFIX}。`);
+	}
+	if (!isolated) problems.push('ascend 环境未证明禁用了 user-site。');
+	if (acl !== 'ok') problems.push(`ascend 环境中 CANN source 后 PyACL 导入为 ${acl ?? '未采集'}。`);
+	if (aclruntime !== 'ok') problems.push(`ascend 环境中 CANN source 后 aclruntime 导入为 ${aclruntime ?? '未采集'}。`);
+	if (mindsporeContext !== 'ok') problems.push(`ascend 环境中 MindSpore Ascend context 为 ${mindsporeContext ?? '未采集'}。`);
+	if (missingPackages.length > 0) {
+		problems.push(`ascend 环境缺少统一案例包：${missingPackages.join('、')}。`);
+	}
+	if (problems.length === 0) {
+		return {
+			verdict: 'passed',
+			evidence: EVIDENCE.OBSERVED_PASS,
+			reasons: [
+				`${UNIFIED_ENV_NAME} 使用 Python ${version}，ABI ${abi}，已禁用 user-site。`,
+				'CANN source 后 PyACL 与 aclruntime 可导入，MindSpore Ascend context 可设置，统一案例关键包齐全。'
+			],
+			nextActions: ['继续逐个案例运行板端测试；全部通过后再生成不可变锁文件并清理旧环境。']
+		};
+	}
+	return {
+		verdict: 'failed',
+		evidence: EVIDENCE.OBSERVED_FAIL,
+		reasons: problems,
+		nextActions: [
+			'修复 ascend 环境；不要通过 base、user-site 或案例专用环境掩盖缺失依赖。',
+			'所有案例测试通过后再锁定完整依赖，并保留旧环境作为回滚直到验收结束。'
+		]
 	};
 }
 

@@ -127,8 +127,38 @@ abs_end acl_import_sourced
 abs_section python; for p in python3 python; do if command -v "$p" >/dev/null 2>&1; then "$p" -c "import sys; print('executable=' + sys.executable); print('version=' + sys.version.split()[0]); print('prefix=' + sys.prefix)" 2>&1; break; fi; done; abs_end python
 abs_section acl_import; for p in python3 python; do if command -v "$p" >/dev/null 2>&1; then "$p" -c "import acl; print('PyACL import: ok')" 2>&1; break; fi; done 2>&1 || true; abs_end acl_import
 abs_section conda; echo "CONDA_PREFIX=\${CONDA_PREFIX-}"; echo "CONDA_DEFAULT_ENV=\${CONDA_DEFAULT_ENV-}"; abs_end conda
+abs_section ascend_env
+ASCEND_ENV_PREFIX=""
+for candidate in "$HOME/.conda/envs/ascend" "/usr/local/miniconda3/envs/ascend" "/opt/miniconda3/envs/ascend" "/usr/local/anaconda3/envs/ascend" "$HOME/miniconda3/envs/ascend" "$HOME/anaconda3/envs/ascend"; do
+  if [ -x "$candidate/bin/python" ]; then ASCEND_ENV_PREFIX="$candidate"; break; fi
+done
+if [ -n "$ASCEND_ENV_PREFIX" ]; then
+  echo "present=true"
+  echo "prefix=$ASCEND_ENV_PREFIX"
+  # Record the launcher's actual user-site state without forcing the flag.
+  "$ASCEND_ENV_PREFIX/bin/python" -c 'import site,sys; print("executable=" + sys.executable); print("version=" + sys.version.split()[0]); print("isolated=" + str(not site.ENABLE_USER_SITE).lower())' 2>&1 || true
+  PYTHONNOUSERSITE=1 "$ASCEND_ENV_PREFIX/bin/python" -c 'import importlib.util,sys,sysconfig; print("policy_isolated=" + str(not __import__("site").ENABLE_USER_SITE).lower()); print("abi=" + str(sysconfig.get_config_var("SOABI"))); print("packages=" + ",".join(name + ":" + str(bool(importlib.util.find_spec(name))).lower() for name in ("mindspore","mindnlp","fastapi","httpx","pydantic","numpy","cv2","torch","torchvision","onnx","onnxruntime","sherpa_onnx","aiortc","av","gradio","faiss","PySide6","pyqtgraph","aiohttp","mido","sounddevice","python_multipart","cryptography","pandas","tokenizers","PIL","huggingface_hub","periphery","usb","rtmidi")))' 2>&1 || true
+  if [ -n "$CANN_SET_ENV" ]; then
+    ( . "$CANN_SET_ENV" >/dev/null 2>&1 || true; PYTHONNOUSERSITE=1 "$ASCEND_ENV_PREFIX/bin/python" -c "import acl; print('acl=ok')" 2>&1 || echo "acl=failed" )
+    ( . "$CANN_SET_ENV" >/dev/null 2>&1 || true; PYTHONNOUSERSITE=1 "$ASCEND_ENV_PREFIX/bin/python" -c "import aclruntime; print('aclruntime=ok')" 2>&1 || echo "aclruntime=failed" )
+    ( . "$CANN_SET_ENV" >/dev/null 2>&1 || true; PYTHONNOUSERSITE=1 "$ASCEND_ENV_PREFIX/bin/python" -c "import mindspore; mindspore.set_context(device_target='Ascend', device_id=0); print('mindspore_context=ok')" 2>&1 || echo "mindspore_context=failed" )
+  else
+    echo "acl=missing-cann"
+    echo "aclruntime=missing-cann"
+    echo "mindspore_context=missing-cann"
+  fi
+else
+  echo "present=false"
+fi
+abs_end ascend_env
 
 abs_section devices; ls -l /dev/davinci* /dev/devmm* /dev/hisi_hdc 2>/dev/null || echo "NOT_FOUND /dev/davinci*"; abs_end devices
+abs_section sound_cards; cat /proc/asound/cards 2>/dev/null || echo "NOT_FOUND /proc/asound/cards"; abs_end sound_cards
+abs_section audio_playback; if command -v aplay >/dev/null 2>&1; then aplay -l 2>&1; else echo "NOT_FOUND aplay"; fi; abs_end audio_playback
+abs_section audio_capture; if command -v arecord >/dev/null 2>&1; then arecord -l 2>&1; else echo "NOT_FOUND arecord"; fi; abs_end audio_capture
+abs_section audio_sinks; if command -v pactl >/dev/null 2>&1; then pactl list short sinks 2>&1 || true; else echo "NOT_FOUND pactl"; fi; abs_end audio_sinks
+abs_section usb_devices; if command -v lsusb >/dev/null 2>&1; then lsusb 2>&1; else echo "NOT_FOUND lsusb"; fi; abs_end usb_devices
+abs_section video_devices; if command -v v4l2-ctl >/dev/null 2>&1; then v4l2-ctl --list-devices 2>&1; else echo "NOT_FOUND v4l2-ctl"; fi; for p in /dev/video*; do [ -e "$p" ] && ls -l "$p"; done 2>/dev/null || true; abs_end video_devices
 abs_section mac; for p in /sys/class/net/*; do iface=$(basename "$p"); [ "$iface" = lo ] && continue; if [ -r "$p/address" ]; then printf '%s=' "$iface"; cat "$p/address" 2>/dev/null || true; fi; done; abs_end mac
 abs_section machine_id; cat /etc/machine-id 2>/dev/null || echo "NOT_FOUND"; abs_end machine_id
 abs_section modules; lsmod 2>/dev/null | grep -E 'drv|ascend|hisi' || echo "NO_MATCH_OR_PERMISSION"; abs_end modules
@@ -450,18 +480,49 @@ export function buildEnvironmentReport(sections) {
 
 	set('ascendHomePath', envValue(sections, 'env', 'ASCEND_HOME_PATH'), 'env', envValue(sections, 'env', 'ASCEND_HOME_PATH'));
 	set('toolkitHome', envValue(sections, 'env', 'ASCEND_TOOLKIT_HOME'), 'env', envValue(sections, 'env', 'ASCEND_TOOLKIT_HOME'));
-	set('ldLibraryPathSet', envValue(sections, 'env', 'LD_LIBRARY_PATH') !== null, 'env', 'LD_LIBRARY_PATH');
-	set('pythonNoUserSite', envValue(sections, 'env', 'PYTHONNOUSERSITE'), 'env', envValue(sections, 'env', 'PYTHONNOUSERSITE'));
-	set('setEnvPresent', /PRESENT/.test(sections.set_env ?? ''), 'set_env', cleanLine(sections.set_env));
+	if (cleanLine(sections.env) !== null) {
+		const ldLibraryPath = envValue(sections, 'env', 'LD_LIBRARY_PATH');
+		if (ldLibraryPath !== null) set('ldLibraryPathSet', true, 'env', 'LD_LIBRARY_PATH');
+		const pythonNoUserSite = envValue(sections, 'env', 'PYTHONNOUSERSITE');
+		if (pythonNoUserSite !== null) set('pythonNoUserSite', pythonNoUserSite, 'env', pythonNoUserSite);
+	}
+	const setEnvText = cleanLine(sections.set_env);
+	if (setEnvText !== null) set('setEnvPresent', /PRESENT/.test(setEnvText), 'set_env', setEnvText);
 	set('condaPrefix', envValue(sections, 'conda', 'CONDA_PREFIX'), 'conda', envValue(sections, 'conda', 'CONDA_PREFIX'));
 	set('condaEnv', envValue(sections, 'conda', 'CONDA_DEFAULT_ENV'), 'conda', envValue(sections, 'conda', 'CONDA_DEFAULT_ENV'));
+
+	const ascendEnvText = (sections.ascend_env ?? '').trim();
+	const ascendEnvPresent = /^present=true$/m.test(ascendEnvText);
+	const ascendEnvIsolated = /^isolated=true$/m.test(ascendEnvText);
+	const ascendEnvPolicyIsolated = /^policy_isolated=true$/m.test(ascendEnvText);
+	const ascendEnvAcl = envValue(sections, 'ascend_env', 'acl');
+	const ascendEnvAclruntime = envValue(sections, 'ascend_env', 'aclruntime');
+	const ascendEnvMindsporeContext = envValue(sections, 'ascend_env', 'mindspore_context');
+	if (ascendEnvText !== '') {
+		set('ascendEnvPresent', ascendEnvPresent, 'ascend_env', ascendEnvText, 'board-output');
+	}
+	if (ascendEnvPresent) {
+		set('ascendEnvPrefix', envValue(sections, 'ascend_env', 'prefix'), 'ascend_env');
+		set('ascendEnvPython', envValue(sections, 'ascend_env', 'executable'), 'ascend_env');
+		set('ascendEnvVersion', envValue(sections, 'ascend_env', 'version'), 'ascend_env');
+		set('ascendEnvAbi', envValue(sections, 'ascend_env', 'abi'), 'ascend_env');
+		set('ascendEnvIsolated', ascendEnvIsolated, 'ascend_env');
+		set('ascendEnvPolicyIsolated', ascendEnvPolicyIsolated, 'ascend_env');
+		set('ascendEnvAclImport', ascendEnvAcl, 'ascend_env');
+		set('ascendEnvAclruntime', ascendEnvAclruntime, 'ascend_env');
+		set('ascendEnvMindsporeContext', ascendEnvMindsporeContext, 'ascend_env');
+		set('ascendEnvPackages', envValue(sections, 'ascend_env', 'packages'), 'ascend_env');
+	}
 
 	const pythonText = sections.python ?? '';
 	set('pythonExecutable', envValue(sections, 'python', 'executable'), 'python', pythonText.split('\n')[0] ?? null);
 	set('pythonVersion', envValue(sections, 'python', 'version'), 'python', pythonText.split('\n')[1] ?? null);
 	const aclText = (sections.acl_import ?? '').trim();
 	const atcText = cleanLine(sections.atc_version);
-	set('atcVersion', atcText !== null && !/not on PATH/.test(atcText) ? atcText : null, 'atc_version', atcText);
+	const atcVersionText = (sections.atc_version ?? '').match(
+		/(?:ATC[^\n]*?|version\s*[:=]?\s*)(\d+\.\d+(?:\.\d+)?)/i
+	)?.[1] ?? null;
+	set('atcVersion', atcVersionText, 'atc_version', atcText);
 	set('atcOnPath', atcText !== null && !/not on PATH/.test(atcText), 'atc_version', atcText);
 
 	// A shell that has not sourced CANN is not evidence against the board, so the
@@ -494,7 +555,9 @@ export function buildEnvironmentReport(sections) {
 			};
 		}
 	} else {
-		set('aclImport', aclBareOk ? 'ok' : 'failed', 'acl_import', aclText, 'board-output');
+		if (aclText !== '') {
+			set('aclImport', aclBareOk ? 'ok' : 'failed', 'acl_import', aclText, 'board-output');
+		}
 	}
 
 	const atcSourcedText = cleanLine(sections.atc_version_sourced);
@@ -504,9 +567,14 @@ export function buildEnvironmentReport(sections) {
 			.split(/\r?\n/)
 			.map((line) => line.trim())
 			.find((line) => line.startsWith('path=') === false && line !== '');
+		const parsedAtcVersion = (sections.atc_version_sourced ?? '').match(
+			/(?:ATC[^\n]*?|version\s*[:=]?\s*)(\d+\.\d+(?:\.\d+)?)/i
+		)?.[1] ?? null;
 		// `atc --version` fails on some CANN builds; the resolved executable is
 		// then the version-independent evidence that ATC is installed.
-		set('atcVersion', versionText ?? atcPath, 'atc_version_sourced', atcPath ?? atcSourcedText);
+		if (parsedAtcVersion !== null) {
+			set('atcVersion', parsedAtcVersion, 'atc_version_sourced', versionText ?? atcPath);
+		}
 		set('atcPath', atcPath, 'atc_version_sourced', atcPath);
 		set('atcOnPath', atcPath !== null, 'atc_version_sourced', atcPath ?? atcSourcedText);
 	} else if (aclSourcedText === '' && atcText !== null && /not on PATH/.test(atcText)) {
@@ -518,18 +586,39 @@ export function buildEnvironmentReport(sections) {
 		);
 	}
 
-	set(
-		'deviceNodes',
-		/\/dev\/davinci/.test(sections.devices ?? '') ? 'present' : 'not-found',
-		'devices',
-		cleanLine(sections.devices)
-	);
-	set(
-		'kernelModules',
-		/NO_MATCH_OR_PERMISSION/.test(sections.modules ?? '') ? 'not-listed' : 'listed',
-		'modules',
-		cleanLine(sections.modules)
-	);
+	const deviceText = (sections.devices ?? '').trim();
+	if (deviceText !== '') {
+		set('deviceNodes', /\/dev\/davinci/.test(deviceText) ? 'present' : 'not-found', 'devices', cleanLine(deviceText));
+	}
+	const moduleText = (sections.modules ?? '').trim();
+	if (moduleText !== '') {
+		set(
+			'kernelModules',
+			/NO_MATCH_OR_PERMISSION/.test(moduleText) ? 'not-listed' : 'listed',
+			'modules',
+			cleanLine(moduleText)
+		);
+	}
+
+	const deviceBlock = (name) => {
+		const raw = sections[name];
+		if (typeof raw !== 'string' || raw.trim() === '') return null;
+		const value = cleanBlock(raw, 80);
+		if (value === null || /^NOT_FOUND\b/.test(value)) return 'not-found';
+		return value;
+	};
+	const soundCards = deviceBlock('sound_cards');
+	if (soundCards !== null) set('soundCards', soundCards, 'sound_cards', cleanLine(sections.sound_cards));
+	const audioPlayback = deviceBlock('audio_playback');
+	if (audioPlayback !== null) set('audioPlayback', audioPlayback, 'audio_playback', cleanLine(sections.audio_playback));
+	const audioCapture = deviceBlock('audio_capture');
+	if (audioCapture !== null) set('audioCapture', audioCapture, 'audio_capture', cleanLine(sections.audio_capture));
+	const audioSinks = deviceBlock('audio_sinks');
+	if (audioSinks !== null) set('audioSinks', audioSinks, 'audio_sinks', cleanLine(sections.audio_sinks));
+	const usbDevices = deviceBlock('usb_devices');
+	if (usbDevices !== null) set('usbDevices', usbDevices, 'usb_devices', cleanLine(sections.usb_devices));
+	const videoDevices = deviceBlock('video_devices');
+	if (videoDevices !== null) set('videoDevices', videoDevices, 'video_devices', cleanLine(sections.video_devices));
 
 	return {
 		facts,
@@ -605,6 +694,17 @@ export function cleanLine(text) {
 		.map((item) => item.trim())
 		.find((item) => item !== '');
 	return line ?? null;
+}
+
+/** Keep a bounded, human-readable multi-line device listing. */
+export function cleanBlock(text, maxLines = 80) {
+	if (typeof text !== 'string') return null;
+	const lines = text
+		.replace(/\r/gu, '')
+		.split('\n')
+		.map((line) => line.trimEnd())
+		.filter((line) => line.trim() !== '');
+	return lines.length === 0 ? null : lines.slice(0, maxLines).join('\n');
 }
 
 /**

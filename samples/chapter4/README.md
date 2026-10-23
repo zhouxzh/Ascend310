@@ -1,6 +1,6 @@
 # 第4章 代码样例
 
-本章代码围绕 PyACL 应用开发，涵盖环境验证、模型推理（ResNet-18）和目标检测（SSD / SSDLite）。
+本章代码围绕 PyACL 应用开发，涵盖环境验证、模型推理（ResNet-18）和目标检测（SSD / SSDLite）。环境门槛、模型接口、数据路径、验证层级和证据限制见 [docs/](docs/README.md)。
 
 ## 运行前提
 
@@ -26,7 +26,7 @@ python -c "import acl; print('PyACL OK')"
 
 | 文件 | 说明 |
 |------|------|
-| `train_resnet18_tiny_imagenet.py` | 在 GPU 上训练 ResNet-18（产出 ONNX 模型） |
+| `train_resnet18_tiny_imagenet.py` | 在 CUDA 或 CPU 上训练 ResNet-18（产出 ONNX 模型） |
 | `inference_npu.py` | PyACL 加载 .om 模型，NPU 推理 |
 | `inference_cpu.py` | CPU 推理（对比基准） |
 | `model/` | 预训练模型（ONNX + .om），从 HuggingFace 自动下载 |
@@ -69,8 +69,8 @@ python samples/chapter4/SSD/download_models.py --onnx --backbone resnet50
 export HF_ENDPOINT=https://hf-mirror.com
 python samples/chapter4/SSD/download_models.py --om --backbone resnet50
 
-# GPU 训练
-python samples/chapter4/SSD/train_cuda.py --device cuda --data /path/to/coco
+# GPU 训练（数据由脚本从 Hugging Face 加载）
+python samples/chapter4/SSD/train_cuda.py --device cuda
 
 # NPU 快速烟测，默认读取 samples/chapter4/SSD/models/ssd300_resnet50.om
 python samples/chapter4/SSD/inference_npu.py --device 0 --limit 20 --skip-map

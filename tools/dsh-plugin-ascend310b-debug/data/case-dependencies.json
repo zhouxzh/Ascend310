@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "source_policy": "Only dependencies explicitly documented in this repository are listed. Apt installation is never implied by mere device enumeration.",
+  "cases": [
+    {
+      "id": "case1",
+      "title": "智能考勤机",
+      "device": "USB 摄像头；8T/20T 节点可能不同",
+      "groups": ["video"],
+      "apt": [
+        {"name": "v4l-utils", "purpose": "v4l2-ctl 枚举摄像头、格式和节点", "level": "recommended", "source": "samples/case1/README.md"}
+      ],
+      "python": ["requirements.txt；OpenCV/FastAPI 等按项目文件安装"],
+      "source": "samples/case1/README.md"
+    },
+    {
+      "id": "case2",
+      "title": "目标跟踪检测",
+      "device": "USB 摄像头或视频文件",
+      "groups": ["video"],
+      "apt": [
+        {"name": "v4l-utils", "purpose": "实时摄像头枚举和格式检查", "level": "recommended", "source": "samples/case2/README.md"}
+      ],
+      "python": ["numpy", "opencv-python", "onnxruntime（CPU 模式）", "scipy"],
+      "source": "samples/case2/README.md"
+    },
+    {
+      "id": "case3",
+      "title": "智能电子琴",
+      "device": "USB 麦克风/摄像头 UAC、USB 声卡或板载 3.5mm",
+      "groups": ["audio"],
+      "apt": [
+        {"name": "libportaudio2", "purpose": "实时 PortAudio 音频运行库", "level": "required", "source": "samples/case3/doc/14-realtime-ddsp.md"},
+        {"name": "xdotool", "purpose": "Codex/物理触摸屏 kiosk 自动化验收", "level": "conditional", "source": "samples/case3/README.md"},
+        {"name": "onboard", "purpose": "触摸屏屏幕键盘", "level": "optional", "source": "samples/case3/doc/07-touchscreen-input.md"},
+        {"name": "alsa-utils", "purpose": "aplay/arecord 设备检查", "level": "recommended", "source": "docs/ascend310b-peripheral-setup.md"},
+        {"name": "sox", "purpose": "录音电平和文件检查", "level": "optional", "source": "samples/case3/doc/11-troubleshooting.md"}
+      ],
+      "python": ["requirements.txt"],
+      "source": "samples/case3/README.md"
+    },
+    {
+      "id": "case4",
+      "title": "掌纹识别",
+      "device": "USB 摄像头；设备号会漂移，必须显式选择",
+      "groups": ["video"],
+      "apt": [
+        {"name": "v4l-utils", "purpose": "摄像头枚举、格式和能力检查", "level": "recommended", "source": "samples/case4/README.md"}
+      ],
+      "python": ["requirements/board.lock"],
+      "source": "samples/case4/README.md"
+    },
+    {
+      "id": "case5",
+      "title": "智能数据采集分析仪",
+      "device": "Hantek 6022BE、RTL-SDR；USB 设备独占",
+      "groups": [],
+      "apt": [
+        {"name": "libsigrok-dev", "purpose": "Hantek hantek-6xxx 和 C 桥编译接口", "level": "required", "source": "samples/case5/README.md"},
+        {"name": "gcc", "purpose": "编译 sigrok capture bridge", "level": "required", "source": "samples/case5/README.md"},
+        {"name": "pkg-config", "purpose": "定位 libsigrok 依赖", "level": "required", "source": "samples/case5/README.md"},
+        {"name": "libfftw3-single3", "purpose": "RTL-SDR CPU FFTW 预处理", "level": "required", "source": "samples/case5/README.md"},
+        {"name": "rtl-sdr", "purpose": "rtl_sdr/rtl_test 接收机工具", "level": "required", "source": "samples/case5/README.md"},
+        {"name": "sigrok-cli", "purpose": "Hantek 人工排查", "level": "recommended", "source": "samples/case5/README.md"},
+        {"name": "pulseview", "purpose": "人工观察 Hantek 波形", "level": "optional", "source": "samples/case5/README.md"},
+        {"name": "libfftw3-dev", "purpose": "独立 FFTW C 基准", "level": "optional", "source": "samples/case5/README.md"},
+        {"name": "libxcb-cursor0", "purpose": "Qt/X11 光标库兼容修复", "level": "conditional", "source": "samples/case5/README.md"}
+      ],
+      "python": ["requirements-board.txt（PyUSB、PySide6、PyQtGraph）", "统一 ascend 环境提供 numpy/onnx/onnxruntime/aclruntime"],
+      "source": "samples/case5/README.md"
+    },
+    {
+      "id": "case6",
+      "title": "智能小车",
+      "device": "USB 摄像头或测试图片；车道线 OpenCV",
+      "groups": ["video"],
+      "apt": [
+        {"name": "python3-dev", "purpose": "编译 Python 扩展", "level": "required", "source": "samples/case6/setup.sh"},
+        {"name": "python3-pip", "purpose": "安装 Python 依赖", "level": "required", "source": "samples/case6/setup.sh"}
+      ],
+      "python": ["gradio", "torch", "torchvision", "opencv-python", "numpy", "onnx", "acl（NPU）"],
+      "source": "samples/case6/README.md"
+    },
+    {
+      "id": "case7",
+      "title": "智能相册",
+      "device": "NPU 索引、浏览器/触摸屏；无额外外设组",
+      "groups": [],
+      "apt": [],
+      "python": ["FAISS", "OpenCV", "FastAPI", "multipart", "CANN/PyACL"],
+      "source": "samples/case7/README.md"
+    },
+    {
+      "id": "case8",
+      "title": "实时手势识别",
+      "device": "USB 摄像头；V4L2、MJPG、VENC/WebRTC",
+      "groups": ["video"],
+      "apt": [
+        {"name": "v4l-utils", "purpose": "V4L2 节点、FourCC、分辨率和帧率检查", "level": "recommended", "source": "samples/case8/docs/04-deployment-and-testing.md"}
+      ],
+      "python": ["OpenCV", "aiortc", "PyAV", "NumPy", "CANN/PyACL"],
+      "source": "samples/case8/README.md"
+    },
+    {
+      "id": "case9",
+      "title": "智能聊天机器人",
+      "device": "USB/3.5mm 麦克风和音频输出；浏览器语音",
+      "groups": ["audio"],
+      "apt": [
+        {"name": "alsa-utils", "purpose": "arecord/aplay 设备检查", "level": "recommended", "source": "docs/ascend310b-peripheral-setup.md"},
+        {"name": "pulseaudio-utils", "purpose": "pactl source/sink 路由检查", "level": "recommended", "source": "docs/ascend310b-peripheral-setup.md"}
+      ],
+      "python": ["Python 3.9", "MindSpore", "MindNLP", "sherpa-onnx（语音模式）"],
+      "source": "samples/case9/README.md"
+    }
+  ]
+}

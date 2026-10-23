@@ -77,15 +77,20 @@ sudo apt install v4l-utils
 Python 环境：
 
 ```bash
-conda activate npu
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
 python -m pip install -r requirements.txt
 ```
 
-如果要跑硬编路径，还需要先设置 CANN 环境变量：
+`environment.yml` is only a reference file. Use the board's existing validated
+`ascend` environment; do not recreate or replace it from that file. Verify the
+interpreter and CANN imports before starting the service:
 
 ```bash
-export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64:/usr/local/Ascend/driver/lib64:$LD_LIBRARY_PATH"
-export PYTHONPATH="/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:$PYTHONPATH"
+python -V
+python -c "import aiohttp, aiortc, av, numpy, acl; print(aiortc.__version__, av.__version__)"
 ```
 
 硬件路径的板端前置条件是 Orange Pi AI Pro 日期戳 `20241128` 的系统及其配套

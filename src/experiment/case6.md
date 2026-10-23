@@ -1,6 +1,6 @@
 # 案例 6：智能小车
 
-## 1. 项目简介 {#src-experiment-case6-h1}
+## 项目简介 {#src-experiment-case6-h1}
 
 本项目基于昇腾 310B 平台，构建一个智能小车的视觉感知系统。系统结合
 **经典计算机视觉**和**深度学习**两种方法：使用 OpenCV 的 Canny 边缘
@@ -24,9 +24,9 @@
 案例6是全书第一个**显式结合经典 CV 与深度学习**的案例，展示了在实际
 工程中如何选择合适的技术方案——不是所有问题都需要神经网络。
 
-## 2. 内容大纲 {#src-experiment-case6-h3}
+## 内容大纲 {#src-experiment-case6-h3}
 
-### 2.1. 硬件准备 {#src-experiment-case6-h4}
+### 硬件准备 {#src-experiment-case6-h4}
 
 本项目只需要：
 
@@ -60,7 +60,7 @@ flowchart LR
     NPU -->|"场景分类结果"| UI
 ```
 
-### 2.2. 软件环境 {#src-experiment-case6-h5}
+### 软件环境 {#src-experiment-case6-h5}
 
 #### 操作系统与框架 {#src-experiment-case6-h6}
 
@@ -101,7 +101,7 @@ python3 prepare_models.py --onnx-only
 | `onnx` | ONNX 模型校验（仅 prepare_models.py） | 仅转换 |
 | `acl` (CANN 自带) | NPU 推理，随 CANN 安装 | 仅推理 |
 
-### 2.3. 车道线检测原理 {#src-experiment-case6-h9}
+### 车道线检测原理 {#src-experiment-case6-h9}
 
 车道线检测是一个经典的计算机视觉问题。车道线本质上是图像中的**直线**
 或**平滑曲线**，具有明显的边缘特征和固定的几何约束（位于画面下半部
@@ -154,7 +154,7 @@ flowchart TD
 6. **叠加绘制**：用 `cv2.addWeighted` 将车道线半透明叠加到原图上，并在
    两条车道线之间填充绿色区域标记可行驶车道
 
-### 2.4. 驾驶场景分类 {#src-experiment-case6-h12}
+### 驾驶场景分类 {#src-experiment-case6-h12}
 
 车道线检测告诉小车"路在哪里"，但还需要知道"是什么路"——高速公路还是
 城市街道？前方是否有交叉口？这需要语义层面的理解。
@@ -208,7 +208,7 @@ flowchart TD
 预处理步骤与案例7、案例8完全一致：缩放、色彩转换、ImageNet 归一化、
 维度重排。
 
-### 2.5. 模型转换与昇腾部署 {#src-experiment-case6-h15}
+### 模型转换与昇腾部署 {#src-experiment-case6-h15}
 
 ```mermaid
 flowchart TD
@@ -273,7 +273,7 @@ atc --model=models/resnet18_scene.onnx \
 CPU 回退模式下，`SceneClassifier` 会自动检测 `.pth` 文件，加载训练好的
 权重。如果只有基线模型，会在启动时打印警告。
 
-### 2.6. Web 界面 {#src-experiment-case6-h19}
+### Web 界面 {#src-experiment-case6-h19}
 
 ```mermaid
 flowchart TD
@@ -321,16 +321,16 @@ def get_classifier():
     return _classifier
 ```
 
-### 2.7. 用户手册 {#src-experiment-case6-h22}
+### 用户手册 {#src-experiment-case6-h22}
 
-#### 2.7.1 部署 {#src-experiment-case6-h23}
+#### 部署 {#src-experiment-case6-h23}
 
 1. 将项目代码拷贝到昇腾 310B 设备
 2. 运行 `bash setup.sh` 安装依赖并导出模型
 3. 启动服务：`python3 app.py`
 4. 浏览器打开 `http://<设备IP>:7860`
 
-#### 2.7.2 使用 {#src-experiment-case6-h24}
+#### 使用 {#src-experiment-case6-h24}
 
 1. 在「道路感知」页签上传一张包含道路的图像
 2. 观察车道线检测结果——绿色线条应覆盖路面上的车道标线
@@ -338,7 +338,7 @@ def get_classifier():
 4. 如果车道线检测不理想，可以在 [config.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case6/config.py) 中
    调整参数
 
-#### 2.7.3 调整车道线参数 {#src-experiment-case6-h25}
+#### 调整车道线参数 {#src-experiment-case6-h25}
 
 | 参数 | 默认值 | 调高效果 | 调低效果 |
 |------|--------|----------|----------|
@@ -348,7 +348,7 @@ def get_classifier():
 | `HOUGH_MAX_LINE_GAP` | 100 | 容忍更大断连 | 不连接断裂线 |
 | `ROI_TOP` | 0.6 | ROI 更小（忽略远处） | ROI 更大（包含远处） |
 
-#### 2.7.4 故障排除 {#src-experiment-case6-h26}
+#### 故障排除 {#src-experiment-case6-h26}
 
 | 问题 | 可能原因 | 解决方法 |
 |------|---------|---------|
@@ -358,7 +358,7 @@ def get_classifier():
 | NPU 初始化失败 | CANN 环境未配置 | `source /usr/local/Ascend/ascend-toolkit/set_env.sh` |
 | ATC 转换失败 | soc_version 不匹配 | `npu-smi info` 查看版本 |
 
-#### 2.7.5 如何训练场景分类模型 {#src-experiment-case6-h27}
+#### 如何训练场景分类模型 {#src-experiment-case6-h27}
 
 参考案例8的 `train.py` 模式：
 1. 准备驾驶场景数据集（按 5 个类别分文件夹存放图像）
@@ -366,7 +366,7 @@ def get_classifier():
 3. 训练完成后将 `.pth` 文件放到 `models/resnet18_scene.pth`
 4. 运行 `python3 prepare_models.py --force` 重新导出 ONNX/OM
 
-#### 2.7.6 与案例2的配合 {#src-experiment-case6-h28}
+#### 与案例2的配合 {#src-experiment-case6-h28}
 
 案例2提供了完整的 SSD 目标检测 + DeepSORT 跟踪。读者可以将案例2的
 `ssdlite/` 模块集成到本案中，实现：
@@ -378,7 +378,7 @@ def get_classifier():
 
 这四项共同构成一个完整的智能小车视觉感知栈。
 
-## 3. 源代码结构 {#src-experiment-case6-h29}
+## 源代码结构 {#src-experiment-case6-h29}
 
 ```text
 case6/
@@ -453,7 +453,7 @@ flowchart TB
 
 ![20T 版智能小车 Gradio 页面](img6/case6-board-20t-ui.png)
 
-## 4. 效果演示 {#src-experiment-case6-h30}
+## 效果演示 {#src-experiment-case6-h30}
 
 ### 预期效果 {#src-experiment-case6-h31}
 

@@ -530,8 +530,9 @@ p95 latency 可能上升；如果业务目标是交互式低延迟，需要谨�
 \passthrough{\lstinline!/home/HwHiAiUser/Documents/Ascend310!} \\
 CANN 路径 &
 \passthrough{\lstinline!/usr/local/Ascend/ascend-toolkit/latest!} \\
-Python &
-\passthrough{\lstinline!/home/HwHiAiUser/.conda/envs/npu/bin/python!} \\
+Python（历史运行） &
+\passthrough{\lstinline!/home/HwHiAiUser/.conda/envs/npu/bin/python!}；仅保留为历史证据，当前复现使用
+\passthrough{\lstinline!ascend!} \\
 测试日期 & \passthrough{\lstinline!2026-06-08!} \\
 设备状态 & \passthrough{\lstinline!npu-smi!} 显示 310B4，Health 为
 \passthrough{\lstinline!Alarm!}，温度约 61 C，测试前后内存约 2939-3003 /
@@ -678,9 +679,12 @@ outputs/msprof/baseline-remote-latest-20260608-083957/PROF_000001_20260608083959
 远端验证命令：
 
 \begin{lstlisting}[language=bash]
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd /home/HwHiAiUser/Documents/Ascend310/samples/chapter8
-PY=/home/HwHiAiUser/.conda/envs/npu/bin/python
+PY="$(command -v python)"
 $PY -m py_compile *.py tools/*.py
 $PY tools/download_model.py
 $PY 01_baseline_resnet_sync.py --runs 100 --output outputs/baseline_resnet_sync_remote_latest.json
@@ -707,7 +711,7 @@ Profiling 采集命令：
 
 \begin{lstlisting}[language=bash]
 bash tools/profile_with_msprof.sh --name baseline-remote-latest -- \
-  /home/HwHiAiUser/.conda/envs/npu/bin/python 01_baseline_resnet_sync.py \
+  "$PY" 01_baseline_resnet_sync.py \
     --runs 20 --output outputs/baseline_msprof_remote_latest.json
 \end{lstlisting}
 

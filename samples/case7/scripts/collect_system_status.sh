@@ -19,7 +19,8 @@ mkdir -p "$(dirname "$OUTPUT")"
   DISPLAY=:0 XAUTHORITY=/home/HwHiAiUser/.Xauthority xrandr --current 2>/dev/null || true
   DISPLAY=:0 XAUTHORITY=/home/HwHiAiUser/.Xauthority xinput list 2>/dev/null || true
   source /usr/local/miniconda3/etc/profile.d/conda.sh
-  conda activate base
+  conda activate ascend
+  export PYTHONNOUSERSITE=1
   export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
   export PYTHONPATH="${PYTHONPATH:-}"
   source /usr/local/Ascend/ascend-toolkit/set_env.sh

@@ -41,8 +41,8 @@ The active teaching profile during the `2026-10-18` board run was
 `qwen2-0.5b-instruct-mindspore`. The browser route `:7865 -> :7861 -> :8090`
 completed gateway and UI contracts, JSON, SSE, output budgets from 8 through 64
 tokens, ten short stability requests, and ten Chinese probes. The preserved
-board report is `run/case9-acceptance-20261018-20t-spaced2.json`; it is ignored
-board evidence, not a checked-in artifact.
+dated board report is ignored evidence on the deployment directory, not a
+checked-in artifact.
 
 The first unspaced acceptance loop hit HTTP 429 because request bodies arrived
 faster than the service admission boundary. A spaced run passed. Do not turn

@@ -1,6 +1,6 @@
 # 第3章 代码样例
 
-本章代码围绕 PyTorch + torch_npu 在昇腾 310B 上的迁移与训练，包含多个经典网络的 NPU vs CPU/CUDA 对比实验。
+本章代码围绕 PyTorch + torch_npu 在昇腾 310B 上的迁移与训练，包含多个经典网络的 NPU vs CPU/CUDA 对比实验。设备合同、训练参数、数据边界、测试口径和证据限制见 [docs/](docs/README.md)。
 
 ## 运行前提
 

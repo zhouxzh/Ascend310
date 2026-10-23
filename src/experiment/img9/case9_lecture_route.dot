@@ -1,0 +1,41 @@
+digraph case9_lecture_route {
+  graph [
+    rankdir=LR,
+    fontname="Noto Sans CJK SC",
+    fontsize=16,
+    size="8.5,2.4",
+    ratio="compress",
+    dpi=144,
+    pad="0.04",
+    nodesep="0.18",
+    ranksep="0.22",
+    splines="polyline",
+    bgcolor="transparent"
+  ];
+  node [
+    fontname="Noto Sans CJK SC",
+    fontsize=16,
+    margin="0.14,0.10",
+    height="0.56",
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#F5F7FA",
+    color="#607D8B"
+  ];
+  edge [
+    fontname="Noto Sans CJK SC",
+    fontsize=13,
+    color="#546E7A",
+    arrowsize="0.7"
+  ];
+
+  architecture [label="架构"];
+  lock [label="模型锁"];
+  env [label="环境"];
+  service [label="服务"];
+  api [label="API"];
+  accept [label="20T 验收", fillcolor="#E3F2FD"];
+  extend [label="二次开发"];
+
+  architecture -> lock -> env -> service -> api -> accept -> extend;
+}

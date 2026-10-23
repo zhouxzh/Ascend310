@@ -300,37 +300,55 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout", type=float, default=330.0)
     parser.add_argument("--performance-samples", type=int, default=30)
+    parser.add_argument("--json-interval", type=float, default=1.0)
+    parser.add_argument("--sse-interval", type=float, default=2.0)
     args = parser.parse_args()
     if not 1 <= args.performance_samples <= 30:
         parser.error("--performance-samples must be between 1 and 30")
+    if not 0.0 <= args.json_interval <= 10.0:
+        parser.error("--json-interval must be between 0 and 10 seconds")
+    if not 0.0 <= args.sse_interval <= 10.0:
+        parser.error("--sse-interval must be between 0 and 10 seconds")
 
     url = args.gateway.rstrip("/") + "/chat/completions"
     report: dict[str, Any] = {
         "model": "ascend-edge-chat",
         "gateway": args.gateway,
         "started_at_epoch": time.time(),
+        "request_intervals": {
+            "json_seconds": args.json_interval,
+            "sse_seconds": args.sse_interval,
+        },
         "length_checks": [],
         "stability": [],
         "chinese_probe": [],
         "performance": [],
     }
     report["gateway_contract"] = _check_gateway_contract(args.gateway, args.token, args.timeout)
+    time.sleep(args.json_interval)
     report["ui_contract"] = _check_ui(args.ui, args.timeout)
+    time.sleep(args.json_interval)
     for length in (8, 16, 32, 64):
         report["length_checks"].append(_completion(url, args.token, "请用中文回答：什么是边缘推理？", length, args.timeout))
+        time.sleep(args.json_interval)
     report["sse"] = _stream(url, args.token, args.timeout)
+    time.sleep(args.sse_interval)
     for _ in range(10):
         report["stability"].append(_completion(url, args.token, "请回答：测试通过。", 2, args.timeout))
+        time.sleep(args.json_interval)
     for prompt in PROBES:
         row = _completion(url, args.token, prompt, 16, args.timeout)
         row["prompt"] = prompt
         report["chinese_probe"].append(row)
+        time.sleep(args.json_interval)
     for _ in range(2):
         _stream(url, args.token, args.timeout, prompt="请回答：预热。", max_tokens=2)
+        time.sleep(args.sse_interval)
     for _ in range(args.performance_samples):
         report["performance"].append(
             _stream(url, args.token, args.timeout, prompt="请回答：性能测量。", max_tokens=2)
         )
+        time.sleep(args.sse_interval)
     first_timings = [float(item["first_token_ms"]) for item in report["performance"]]
     timings = [float(item["total_ms"]) for item in report["performance"]]
     tokens = [int(item["completion_tokens"]) for item in report["performance"]]

@@ -320,7 +320,7 @@ if (Test-Path -LiteralPath $MidiDdspManifest) {
     # OM artifacts are board-specific. Stage only checked ONNX export assets and
     # make the first origin bundle with the board's installed CANN toolchain.
     Copy-Tree "models/midi_ddsp/stateful_v2_batched/onnx"
-    Invoke-Remote "source /usr/local/Ascend/ascend-toolkit/set_env.sh; source /usr/local/miniconda3/etc/profile.d/conda.sh; conda activate base; cd '$RemoteRoot'; TE_PARALLEL_COMPILER=1 OMP_NUM_THREADS=1 MULTI_THREAD_COMPILE=0 VOICE_BATCH_SIZES=1 bash tools/convert_midi_ddsp_stateful_bundle.sh"
+    Invoke-Remote "source /usr/local/Ascend/ascend-toolkit/set_env.sh; source /usr/local/miniconda3/etc/profile.d/conda.sh; conda activate ascend; export PYTHONNOUSERSITE=1; cd '$RemoteRoot'; TE_PARALLEL_COMPILER=1 OMP_NUM_THREADS=1 MULTI_THREAD_COMPILE=0 VOICE_BATCH_SIZES=1 bash tools/convert_midi_ddsp_stateful_bundle.sh"
     $RemoteMidiDdspManifestHash = Get-TrimmedValue (Invoke-RemoteCapture "sha256sum '$RemoteMidiDdspBundle/manifest.json' | cut -d' ' -f1")
     if (-not $RemoteMidiDdspManifestHash) {
         throw "MIDI-DDSP bundle conversion did not produce: $RemoteMidiDdspBundle/manifest.json"
@@ -370,7 +370,7 @@ try {
     Invoke-Remote "if [ -d '$RemoteRoot/webui/dist' ] && [ ! -L '$RemoteRoot/webui/dist' ]; then mv '$RemoteRoot/webui/dist' '$RemoteRoot/webui/dist-releases/legacy-$DeployId'; fi; ln -s 'dist-releases/$DeployId' '$RemoteRoot/webui/.dist-next-$DeployId'; mv -Tf '$RemoteRoot/webui/.dist-next-$DeployId' '$RemoteRoot/webui/dist'"
     $RollbackDist = if ($PreviousDist -eq "directory") { "dist-releases/legacy-$DeployId" } else { $PreviousDist }
 
-    $BoardBootstrap = "source /usr/local/Ascend/ascend-toolkit/set_env.sh >/dev/null 2>&1 || source ~/Ascend/latest/set_env.sh >/dev/null 2>&1 || true; source /usr/local/miniconda3/etc/profile.d/conda.sh; conda activate base; cd '$RemoteRoot'; python -m pip install --upgrade-strategy only-if-needed -r requirements.txt; python -c 'import pytest; print(pytest.__version__)'; python scripts/check_webui_env.py"
+    $BoardBootstrap = "source /usr/local/Ascend/ascend-toolkit/set_env.sh >/dev/null 2>&1 || source ~/Ascend/latest/set_env.sh >/dev/null 2>&1 || true; source /usr/local/miniconda3/etc/profile.d/conda.sh; conda activate ascend; export PYTHONNOUSERSITE=1; cd '$RemoteRoot'; python -m pip install --upgrade-strategy only-if-needed -r requirements.txt; python -c 'import pytest; print(pytest.__version__)'; python scripts/check_webui_env.py"
     try {
         Invoke-Remote $BoardBootstrap
     } catch {

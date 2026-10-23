@@ -84,8 +84,7 @@ DDS、发现机制、环境变量与工具行为的背景说明 & documented \\
 \passthrough{\lstinline!ros2 topic list!} 与
 \passthrough{\lstinline!ros2 node info!} 的输出为准。
 
-\section{1.
-定位、DDS、去中心化发现与教材边界}\label{ux5b9aux4f4dddsux53bbux4e2dux5fc3ux5316ux53d1ux73b0ux4e0eux6559ux6750ux8fb9ux754c}
+\section{定位、DDS、去中心化发现与教材边界}\label{ux5b9aux4f4dddsux53bbux4e2dux5fc3ux5316ux53d1ux73b0ux4e0eux6559ux6750ux8fb9ux754c}
 
 \subsection{ROS2
 在机器人软件中的位置}\label{ros2-ux5728ux673aux5668ux4ebaux8f6fux4ef6ux4e2dux7684ux4f4dux7f6e}
@@ -152,8 +151,7 @@ DDS 的传输质量策略承担。
   的引入不会放宽这些边界。
 \end{itemize}
 
-\section{2.
-工作空间、功能包与构建系统}\label{ux5de5ux4f5cux7a7aux95f4ux529fux80fdux5305ux4e0eux6784ux5efaux7cfbux7edf}
+\section{工作空间、功能包与构建系统}\label{ux5de5ux4f5cux7a7aux95f4ux529fux80fdux5305ux4e0eux6784ux5efaux7cfbux7edf}
 
 \subsection{工作空间目录结构}\label{ux5de5ux4f5cux7a7aux95f4ux76eeux5f55ux7ed3ux6784}
 
@@ -357,8 +355,7 @@ setup(
 \passthrough{\lstinline!main!} 函数。功能包同名目录中还必须存在
 \passthrough{\lstinline!\_\_init\_\_.py!}，否则模块无法被正确导入。
 
-\section{3.
-节点、通信模型、接口与计算图}\label{ux8282ux70b9ux901aux4fe1ux6a21ux578bux63a5ux53e3ux4e0eux8ba1ux7b97ux56fe}
+\section{节点、通信模型、接口与计算图}\label{ux8282ux70b9ux901aux4fe1ux6a21ux578bux63a5ux53e3ux4e0eux8ba1ux7b97ux56fe}
 
 \subsection{节点与话题}\label{ux8282ux70b9ux4e0eux8bddux9898}
 
@@ -427,7 +424,7 @@ setup(
 
 定位问题时先看计算图是否符合预期，再进入具体话题的数据内容，可以避免在错误方向上反复读取数据。
 
-\section{4. 命令行工具}\label{ux547dux4ee4ux884cux5de5ux5177}
+\section{命令行工具}\label{ux547dux4ee4ux884cux5de5ux5177}
 
 教程给出的常用命令包括
 \passthrough{\lstinline!ros2 pkg!}、\passthrough{\lstinline!ros2 run!}、\passthrough{\lstinline!ros2 node!}、\passthrough{\lstinline!ros2 topic!}、\passthrough{\lstinline!ros2 interface!}、\passthrough{\lstinline!ros2 service!}、\passthrough{\lstinline!ros2 action!}、\passthrough{\lstinline!ros2 param!}。所有子命令都可以用
@@ -604,7 +601,7 @@ ros2 bag play rosbag2_lidar
 用于记录与回放机器人数据，详细用法见第 5
 节。这三条命令分别完成录制、查看元信息与回放。
 
-\section{5. rqt、rviz2 与 ros2 bag}\label{rqtrviz2-ux4e0e-ros2-bag}
+\section{rqt、rviz2 与 ros2 bag}\label{rqtrviz2-ux4e0e-ros2-bag}
 
 \subsection{rqt}\label{rqt}
 
@@ -698,7 +695,7 @@ bag
 文件属于实验记录，可能包含传感器原始数据。是否纳入版本控制取决于数据规模与隐私边界；本教材建议把
 bag 文件留在本地产物目录，只在必要时保留小型、脱敏的样例。
 
-\section{6. Python launch
+\section{Python launch
 文件与参数传递}\label{python-launch-ux6587ux4ef6ux4e0eux53c2ux6570ux4f20ux9012}
 
 \subsection{launch
@@ -853,7 +850,7 @@ ros2 launch turn_on_wheeltec_robot turn_on_wheeltec_robot.launch.py --show-args
 参数来源越多，越需要在启动日志中确认最终生效值。ROS2
 节点在参数不符时会给出警告或使用默认值，这两类信息都应当保留在日志中。
 
-\section{7. TF2 坐标变换与
+\section{TF2 坐标变换与
 URDF}\label{tf2-ux5750ux6807ux53d8ux6362ux4e0e-urdf}
 
 \subsection{TF2 的作用}\label{tf2-ux7684ux4f5cux7528}
@@ -1009,7 +1006,7 @@ colcon build --symlink-install --packages-select turn_on_wheeltec_robot
 \passthrough{\lstinline!--symlink-install!} 时，仅修改 launch 文件或
 YAML 参数可以省去重新编译步骤。
 
-\section{8. 相机、雷达、IMU
+\section{相机、雷达、IMU
 与串口底盘接口}\label{ux76f8ux673aux96f7ux8fbeimu-ux4e0eux4e32ux53e3ux5e95ux76d8ux63a5ux53e3}
 
 本节整理厂商教程中出现的话题与接口。这些接口属于 WHEELTEC 平台的
@@ -1183,7 +1180,7 @@ ros2 topic list
 
 相机内参文件与图像话题的对应关系必须在集成时核对。用错内参会让测距、跟随与视觉伺服出现系统性偏差，而且这种偏差在画面上通常不易察觉。
 
-\section{9. SSH 与 VNC 远程操作
+\section{SSH 与 VNC 远程操作
 ROS2}\label{ssh-ux4e0e-vnc-ux8fdcux7a0bux64cdux4f5c-ros2}
 
 \subsection{何时使用 SSH}\label{ux4f55ux65f6ux4f7fux7528-ssh}
@@ -1274,7 +1271,7 @@ rqt 插件组合调试 & VNC & 多窗口交互在完整桌面下更可靠 \\
   有序结束节点，或确认已配置的服务状态。
 \end{itemize}
 
-\section{10. 多机通信与
+\section{多机通信与
 ROS\_DOMAIN\_ID}\label{ux591aux673aux901aux4fe1ux4e0e-ros_domain_id}
 
 \subsection{域号与发现范围}\label{ux57dfux53f7ux4e0eux53d1ux73b0ux8303ux56f4}
@@ -1365,8 +1362,7 @@ ros2 doctor --report
 
 发现失败时的处理顺序是先确认域号与环境变量，再确认网段与组播，最后才考虑配置初始对等点或发现服务器。基础网络问题没有排除之前，改中间件参数通常只会增加变量。
 
-\section{11.
-自启动、日志与进程管理}\label{ux81eaux542fux52a8ux65e5ux5fd7ux4e0eux8fdbux7a0bux7ba1ux7406}
+\section{自启动、日志与进程管理}\label{ux81eaux542fux52a8ux65e5ux5fd7ux4e0eux8fdbux7a0bux7ba1ux7406}
 
 \subsection{日志位置}\label{ux65e5ux5fd7ux4f4dux7f6e}
 
@@ -1484,7 +1480,7 @@ rviz2。无论采用哪种方式，都应保证同一节点只被启动一次，
   重启前确认旧进程已经退出，避免遗留进程占用串口。
 \end{itemize}
 
-\section{12. ROS2 与 310B
+\section{ROS2 与 310B
 推理集成（proposed）}\label{ros2-ux4e0e-310b-ux63a8ux7406ux96c6ux6210proposed}
 
 \begin{quote}
@@ -1647,8 +1643,7 @@ Python 版本或依赖冲突 & 导入失败、ABI 不匹配 &
   所有结论绑定模型版本、精度、输入契约与日志路径。
 \end{itemize}
 
-\section{13.
-课堂练习与验收标准}\label{ux8bfeux5802ux7ec3ux4e60ux4e0eux9a8cux6536ux6807ux51c6}
+\section{课堂练习与验收标准}\label{ux8bfeux5802ux7ec3ux4e60ux4e0eux9a8cux6536ux6807ux51c6}
 
 \subsection{练习任务}\label{ux7ec3ux4e60ux4efbux52a1}
 

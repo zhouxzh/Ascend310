@@ -92,7 +92,8 @@ OM，可跳过 ATC，但仍要完成文件、合同和 ACL 烟测：
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cd samples/case1
 python -m pip install -r requirements.txt
@@ -172,3 +173,4 @@ curl http://127.0.0.1:5000/api/health
 - [`docs/01-model-contract.md`](docs/01-model-contract.md)
 - [`docs/02-fastapi-react-architecture.md`](docs/02-fastapi-react-architecture.md)
 - [`docs/03-board-acceptance.md`](docs/03-board-acceptance.md)
+- [`docs/04-troubleshooting.md`](docs/04-troubleshooting.md)

@@ -286,8 +286,10 @@ FP32、FP16、INT8 对比才是公平的。
 先在开发板上加载 CANN 环境，激活 Python 环境，并进入样例目录：
 
 \begin{lstlisting}[language=bash]
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-conda activate npu
 cd ~/Documents/Ascend310/samples/chapter9
 \end{lstlisting}
 

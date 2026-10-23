@@ -31,13 +31,9 @@ footer: "案例 9：智能聊天机器人"
 
 ## 本讲目标与路线
 
-- 说清浏览器、网关、worker 和 NPU 的职责
-- 用工件锁固定模型版本与完整性
-- 启动 OpenAI 兼容的 JSON/SSE 服务
-- 用 20T 实测区分“机器通过”与“回答质量”
-- 识别串行服务的 429、截断和 worker 健康边界
+本讲按这条路线走：先把职责和工件锁说清，再启动服务、验收 JSON/SSE，最后用 20T 实测把机器通过和质量分开。
 
-> 路线：架构 → 模型锁 → 环境 → 服务 → API → 20T 验收 → 二次开发
+![案例 9 本讲路线：架构、模型锁、环境、服务、API、20T 验收、二次开发](../experiment/img9/case9_lecture_route.png)
 
 <div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
 
@@ -85,8 +81,6 @@ footer: "案例 9：智能聊天机器人"
 固定 revision -> .part 临时文件 -> 大小核验 -> SHA-256 -> 原子改名 -> worker 加载
 ```
 
-源码：`src/experiment/case9.md` 发布模型与工件锁。
-
 正式发布默认模型仍是 Qwen1.5-0.5B；本轮 20T 教学验收使用 `qwen2-0.5b-instruct-mindspore`，两者不能混写。
 
 <div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 发布模型与工件锁</div>
@@ -114,8 +108,6 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 bash scripts/verify/release-preflight.sh
 ```
 
-源码：`samples/case9/scripts/verify/release-preflight.sh`。
-
 预检要看到：
 
 - Python 解释器与 `PYTHONNOUSERSITE`
@@ -141,16 +133,12 @@ bash scripts/run/start-gateway.sh
 bash scripts/run/start-ui.sh
 ```
 
-源码：`samples/case9/scripts/run/`。
-
 公开模型名固定为 `ascend-edge-chat`，OpenAI 兼容入口：
 
 ```text
 GET  /v1/models
 POST /v1/chat/completions
 ```
-
-源码：`samples/case9/ascend_edge_chat/api/gateway.py`。
 
 网关只允许 greedy 解码、单请求串行和受限输出预算；超时或 worker 不可用时 fail-closed，不自动切 CPU 或云端。
 

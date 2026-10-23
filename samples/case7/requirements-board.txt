@@ -1,3 +1,4 @@
-# Install with --no-deps in the already activated board base environment.
+# Install with --no-deps in the activated unified ascend environment.
+# Keep PYTHONNOUSERSITE=1 so dependencies cannot come from ~/.local.
 faiss-cpu==1.7.4
 python-periphery==2.4.1

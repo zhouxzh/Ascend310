@@ -25,25 +25,33 @@ flowchart LR
 | Teaching experiments | Qwen1.5 1.8B, Qwen2/Qwen2.5 0.5B/1.5B, TinyLlama and DeepSeek profiles when their artifacts are present |
 | Public model name | `ascend-edge-chat` |
 | API | `GET /v1/models`, `POST /v1/chat/completions`, JSON, SSE |
-| Not included | Speech, ASR/TTS, device protocol, retrieval, simultaneous multi-model loading |
+| Experimental voice control | Browser recording, ASR, LLM text reply, and browser-native TTS invocation passed with synthetic audio; real browser microphone recognition was operator-confirmed. The deterministic board ASR→LLM→eSpeak→Jieli path completed and the Chinese reply was audibly confirmed. Recognition accuracy and speech-quality scoring remain separate gates |
+| Not included in release scope | Device protocol, retrieval, simultaneous multi-model loading, or an accepted speech feature |
 
 8T hardware does not inherit the 20T result and is not part of this release validation.
 
 ## Current 20T validation
 
-On `2026-10-18`, the running teaching profile `qwen2-0.5b-instruct-mindspore` was exercised through the browser route `:7865 -> :7861 -> :8090` on an `Ascend310B1 / 20T` board. Gateway and UI contracts, JSON, SSE, 8/16/32/64-token length checks, 10 short stability requests, and 10 Chinese probes completed. The preserved raw report is on the board at `run/case9-acceptance-20261018-20t-spaced2.json`; it is ignored by Git. One performance sample measured 723.051 ms first token, 1370.604 ms completion, and 1.459 token/s. This is a single-sample observation, not a p50 benchmark.
+On `2026-10-18`, the running teaching profile `qwen2-0.5b-instruct-mindspore` was exercised through the browser route `:7865 -> :7861 -> :8090` on an `Ascend310B1 / 20T` board. Gateway and UI contracts, JSON, SSE, 8/16/32/64-token length checks, 10 short stability requests, and 10 Chinese probes completed. The preserved dated acceptance report remains on the board as ignored evidence; it is not a checked-in artifact. One performance sample measured 723.051 ms first token, 1370.604 ms completion, and 1.459 token/s. This is a single-sample observation, not a p50 benchmark.
+
+On `2026-10-23`, the unified `ascend` environment repeated the formal release acceptance with Qwen1.5-0.5B-Chat. The paced client used one-second JSON and two-second SSE intervals. All machine gates passed: gateway/UI contracts, 4 length checks, SSE with `stop`, 10/10 stability requests, 10 Chinese probes, and 30 performance samples with no `U+FFFD`. First-token p50/p95 were `705.746/747.193 ms`, completion p50/p95 were `1336.014/1412.012 ms`, and throughput p50/p95 were `1.497/1.569 token/s`. The raw report is retained on the board at `run/reports/release-20261023T013704Z/acceptance.json` with SHA-256 `4a0c19f11af4b39f84a030a0a669c753753fa72f6c7a5ae0d4d68bd244c068e0`. Human Chinese semantic review remains pending.
 
 An earlier no-interval run received HTTP 429 in the stability loop (`Too many request bodies are being read`). The subsequent spaced run passed; the 429 is a request-admission observation, not a model or NPU failure. Chinese semantic quality remains pending: one direct Chinese prompt returned an English apology, so technical completion and answer quality must be reported separately. See [validation and limitations](docs/04-validation-and-limitations.md) for the detailed evidence table.
 
+On `2026-10-21`, the browser path also completed one synthetic-microphone ASR-to-text turn on the 20T board. `sherpa-onnx 1.13.6` and the Apache-2.0 `sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23` int8 model now share the unified Python 3.9 `ascend` environment. The browser WAV upload returned HTTP 200, the recognized Chinese text reached the existing gateway, and the UI displayed the assistant's text reply. The operator then confirmed that a real browser microphone was also recognized through the same page. On `2026-10-22`, the browser path invoked `speechSynthesis` with the complete assistant reply and `zh-CN`; the automated browser test recorded the spoken text and reached the completion state. Actual speaker audibility and voice quality still require human listening review. These observations establish the technical browser ASR-to-text and browser-native TTS call paths, not recognition accuracy or board-audio behavior.
+
 ## Quick Start
 
-On a 20T board with matching CANN, MindSpore, and MindNLP already installed, copy this repository to a new deployment directory. These commands do not install or upgrade drivers, CANN, MindSpore, or model frameworks.
+On a 20T board with matching CANN, MindSpore, and MindNLP already installed, acquire this repository from GitHub at a fixed commit, then download the model from Hugging Face through the configured mirror. These commands do not install or upgrade drivers, CANN, MindSpore, or model frameworks.
 
 ```bash
+git clone https://github.com/zhouxzh/Ascend310.git /opt/ascend-edge-chat
+git -C /opt/ascend-edge-chat checkout --detach <commit-sha>
 cd /opt/ascend-edge-chat
-export ASCEND_EDGE_CHAT_CONDA_ENV='<validated-conda-environment>'
+export ASCEND_EDGE_CHAT_CONDA_ENV='ascend'
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate "$ASCEND_EDGE_CHAT_CONDA_ENV"
+export PYTHONNOUSERSITE=1
 python -m pip install --no-deps .
 export ASCEND_EDGE_CHAT_DATA_DIR=/opt/ascend-edge-chat-data
 cp configs/release.env.example .env
@@ -53,6 +61,8 @@ cp configs/release.env.example .env
 export ASCEND_EDGE_CHAT_WHEELHOUSE=/opt/ascend-edge-chat-wheelhouse
 bash scripts/verify/install-service-dependencies.sh
 
+# The downloader uses the locked Hugging Face repository/revision and
+# defaults to https://hf-mirror.com; no local model copy is required.
 bash scripts/import/download-model.sh
 bash scripts/verify/release-preflight.sh
 ```
@@ -67,6 +77,23 @@ bash scripts/run/start-ui.sh
 
 Open `http://<board-ip>:7865/`. The browser UI has **no login**. Every host that can reach port `7865` can submit prompts through this board. Use a trusted LAN only; never expose this port to the public internet.
 
+## Optional Voice Modes
+
+Voice control is disabled in the release environment by default. It has two exclusive modes:
+
+- `browser`: a secure-context browser records 16 kHz mono WAV, sends it through the UI's same-origin proxy to local ASR, and returns the assistant reply. If board TTS is configured, its finite WAV is played in the browser; otherwise the page uses browser-native `speechSynthesis` with a `zh-CN` preference. Use `http://localhost` for browser microphone testing; a remote browser needs HTTPS. The two-second self-test records and plays back entirely in browser memory and does not upload audio or require ASR/TTS.
+- `board`: the loopback voice agent owns selected USB/3.5mm ALSA devices, automatic VAD, ASR, TTS, and local playback. The browser only controls mode/device selection and shows text/status.
+
+The voice agent is a separate process but uses the same unified `ascend` environment. It does not source CANN, does not load the text worker, and does not install/download speech models:
+
+```bash
+# After the shared ascend environment and reviewed local speech artifacts exist.
+bash scripts/verify/voice-preflight.sh
+bash scripts/run/start-voice-agent.sh
+```
+
+`voice-preflight.sh` stops if the unified `ascend` environment is unavailable, no capture/playback ALSA endpoints are enumerated, or the current account cannot read a capture node and write a playback node through either group membership or ACL/direct permission. ASR and TTS are independently fail-closed. The current 20T setup has a reviewed local ASR model and system-level eSpeak NG for local speech; browser voice replies can also use the browser's native TTS. See [Voice Modes and Board Terminal Plan](docs/08-board-voice-terminal-plan.md) for the mode-specific evidence gates.
+
 ## Stable Commands
 
 ```bash
@@ -76,6 +103,7 @@ ascend-edge-chat model import --data-dir /opt/ascend-edge-chat-data --source /mn
 ascend-edge-chat worker
 ascend-edge-chat gateway --check-config
 ascend-edge-chat ui
+ascend-edge-chat voice --check-config
 ```
 
 `app.py` and `text_chat_app.py` are short-term compatibility wrappers. New automation must use the CLI or `scripts/run/`.

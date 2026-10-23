@@ -65,7 +65,7 @@ footer: "第3章：昇腾PyTorch扩展迁移基础"
 
 迁移问题时，先判断失败在 PyTorch 语义、torch_npu 桥接，还是 CANN 与硬件执行层。
 
-<div class="source">教材：<a href="../book/chapter3.md#架构速览"><code>src/book/chapter3.md</code>「架构速览」</a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h1"><code>src/book/chapter3.md</code>「架构速览」</a></div>
 
 <!--
 学生经常只看到一个 Python 异常，就把问题归到 NPU。先按三层定位，后面的验证才有意义。
@@ -83,7 +83,7 @@ footer: "第3章：昇腾PyTorch扩展迁移基础"
 - 可通过 `torch_npu.npu` 访问设备状态与同步接口。
 - 复杂模型仍要核对算子、精度和内存是否受支持。
 
-<div class="source">教材：<a href="../book/chapter3.md#核心能力纵览"><code>src/book/chapter3.md</code>「核心能力纵览」</a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h2"><code>src/book/chapter3.md</code>「核心能力纵览」</a></div>
 
 <!--
 强调 PyTorch 兼容性降低代码改写量，但不会自动保证所有算子在目标 CANN 和精度下都可用。
@@ -103,9 +103,9 @@ footer: "第3章：昇腾PyTorch扩展迁移基础"
 | PyTorch | 与 Python、架构匹配 | `torch.__version__` |
 | torch_npu | 与 PyTorch、CANN、架构匹配 | 插件版本与导入路径 |
 
-教材示例给出 Python 3.11、PyTorch 2.8.0、torch_npu 7.2.0、CANN 8.3.RC1 的一组组合，不是唯一的版本答案。
+教材示例使用统一 `ascend` 环境的 Python 3.9.25，并要求 PyTorch、torch_npu、CANN 与 ABI 精确匹配；具体 wheel 必须从官方配套页选择。
 
-<div class="source">教材：<a href="../book/chapter3.md#pytorch安装教程"><code>src/book/chapter3.md</code>「PyTorch安装教程」</a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h3"><code>src/book/chapter3.md</code>「PyTorch安装教程」</a></div>
 
 <!--
 版本组合必须来自可核对的配套表，不能从“最新版”推断兼容。双板旧记录也不能拿来替代当前安装核对。
@@ -126,7 +126,7 @@ footer: "第3章：昇腾PyTorch扩展迁移基础"
 
 安装示例用于说明配套关系；双板记录只支持当次 `torch_npu` 训练结果。两者不能互相补成“已完全匹配”。
 
-<div class="source">教材：<a href="../book/chapter3.md#安装昇腾torch_npu插件"><code>src/book/chapter3.md</code>「安装昇腾torch_npu插件」</a>；记录：<a href="../../docs/chapter-board-runs-20261017/8t/run1/meta.txt"><code>8T meta</code></a>、<a href="../../docs/chapter-board-runs-20261017/20t/run1/meta.txt"><code>20T meta</code></a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h7"><code>src/book/chapter3.md</code>「安装昇腾torch_npu插件」</a>；记录：<a href="../../docs/chapter-board-runs-20261017/8t/run1/meta.txt"><code>8T meta</code></a>、<a href="../../docs/chapter-board-runs-20261017/20t/run1/meta.txt"><code>20T meta</code></a></div>
 
 <!--
 这页专门防止证据拼接。教材中的版本是安装示例，双板实际记录是 Python 3.9.2 和 CANN 8.0.0，且日志没有保留框架插件版本号。
@@ -143,7 +143,7 @@ a = torch.randn(3, 4).npu()
 print(a + a)
 ```
 
-<div class="source">代码：<a href="../../samples/chapter3/README.md"><code>samples/chapter3/README.md</code></a>；教材：<a href="../book/chapter3.md#torch_npu安装后测试"><code>src/book/chapter3.md</code>「torch_npu安装后测试」</a></div>
+<div class="source">代码：<a href="../../samples/chapter3/README.md"><code>samples/chapter3/README.md</code></a>；教材：<a href="../book/chapter3.md#src-book-chapter3-h8"><code>src/book/chapter3.md</code>「torch_npu安装后测试」</a></div>
 
 输出中的 `device='npu:0'` 比“导入成功”更有价值。若出现 CANN 路径所有者警告，先记录它；若运算失败或没有 NPU 张量，不能把普通 CPU 结果当作迁移成功。
 
@@ -172,7 +172,7 @@ print(a + a)
 4. 检查 `.item()`、`.cpu()`、`.numpy()` 引起的同步与拷贝。
 5. 核对算子、数据类型和内存是否被当前版本支持。
 
-<div class="source">教材：<a href="../book/chapter3.md#torch_npu插件的使用"><code>src/book/chapter3.md</code>「torch_npu插件的使用」</a>；样例：<a href="../../samples/chapter3/linear_regression/linear_regression_npu.py"><code>samples/chapter3/linear_regression</code></a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h9"><code>src/book/chapter3.md</code>「torch_npu插件的使用」</a>；样例：<a href="../../samples/chapter3/linear_regression/linear_regression_npu.py"><code>samples/chapter3/linear_regression</code></a></div>
 
 <!--
 迁移要保持算法不变，只替换设备与必要兼容点。任何算子替换、精度改变和 batch 改变都要进入实验记录。
@@ -272,7 +272,7 @@ LeNet 教材实现把 Sigmoid 调整为 ReLU，并使用 FP16。曲线说明该�
 
 失败集中在 FP16 `AvgPool2d` 和 FP32 `MaxPool2d`。这说明“模型能训练”不能替代逐算子兼容性验证。
 
-<div class="source">教材：<a href="../book/chapter3.md#torch_npu插件兼容性测试套件"><code>src/book/chapter3.md</code>「torch_npu插件兼容性测试套件」</a>；样例：<a href="../../samples/chapter3/test"><code>samples/chapter3/test</code></a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h15"><code>src/book/chapter3.md</code>「torch_npu插件兼容性测试套件」</a>；样例：<a href="../../samples/chapter3/test"><code>samples/chapter3/test</code></a></div>
 
 <!--
 这里记录的是教材中的 CANN 8.3.RC1 + PyTorch 2.8.0 环境，不是双板任务记录。失败项和通过项都必须保留，不能用“多数通过”掩盖阻塞问题。
@@ -306,7 +306,7 @@ LeNet 教材实现把 Sigmoid 调整为 ReLU，并使用 FP16。曲线说明该�
 
 三者共用训练骨架，但算子替换、输入尺寸、精度和内存门槛必须分别记录。
 
-<div class="source">教材：<a href="../book/chapter3.md#现代卷积神经网络的移植"><code>src/book/chapter3.md</code>「现代卷积神经网络的移植」</a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h19"><code>src/book/chapter3.md</code>「现代卷积神经网络的移植」</a></div>
 
 <!--
 不能用一个网络通过就推断另一个网络可用。尤其关注池化替换、BN 与 FP16 稳定性，以及更深的图编译内存。
@@ -327,7 +327,7 @@ LeNet 教材实现把 Sigmoid 调整为 ReLU，并使用 FP16。曲线说明该�
 
 CPU 路径可以用于语义参考，但任何 NPU 结论都必须来自 NPU 设备张量和板端日志。
 
-<div class="source">依据：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §3、§5</a>；测试边界：<a href="../book/chapter3.md#测试目标与验证维度"><code>src/book/chapter3.md</code>「测试目标与验证维度」</a></div>
+<div class="source">依据：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §3、§5</a>；测试边界：<a href="../book/chapter3.md#src-book-chapter3-h16"><code>src/book/chapter3.md</code>「测试目标与验证维度」</a></div>
 
 <!--
 这是本章的证据纪律。CPU 能跑、Python 能导入、曲线好看，都不能替代 NPU 设备路径和板端原始记录。
@@ -345,7 +345,7 @@ CPU 路径可以用于语义参考，但任何 NPU 结论都必须来自 NPU 设
 4. 缩小 batch 与输入，判断是否由图编译或内存触发。
 5. 再恢复完整训练，记录设备、版本、日志和指标。
 
-<div class="source">教材：<a href="../book/chapter3.md#torch_npu插件兼容性测试套件"><code>src/book/chapter3.md</code>「兼容性测试套件」</a>；样例：<a href="../../samples/chapter3/test"><code>samples/chapter3/test</code></a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h15"><code>src/book/chapter3.md</code>「兼容性测试套件」</a>；样例：<a href="../../samples/chapter3/test"><code>samples/chapter3/test</code></a></div>
 
 <!--
 排查顺序从环境到设备，再到最小算子，最后才进完整模型。这样可以避免把 OOM、算子缺陷和版本不匹配混成同一个问题。
@@ -367,7 +367,7 @@ CPU 路径可以用于语义参考，但任何 NPU 结论都必须来自 NPU 设
 
 完成标准是另一位同学能按卡片复现同一路径，并解释哪些数字不能跨设备、跨版本或跨精度外推。
 
-<div class="source">作业：<a href="../book/chapter3.md#总结"><code>src/book/chapter3.md</code>「总结」</a>；原始记录：<a href="../../docs/chapter-board-runs-20261017/README.md"><code>docs/chapter-board-runs-20261017</code></a></div>
+<div class="source">作业：<a href="../book/chapter3.md#src-book-chapter3-h32"><code>src/book/chapter3.md</code>「总结」</a>；原始记录：<a href="../../docs/chapter-board-runs-20261017/README.md"><code>docs/chapter-board-runs-20261017</code></a></div>
 
 <!--
 最后检查学生是否同时提交通过证据和失败边界。没有 NPU 设备证据、没有版本、没有原始日志的结果不计为完成。

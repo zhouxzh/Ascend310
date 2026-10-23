@@ -14,7 +14,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -151,6 +151,33 @@ function installedSpecifier(name) {
 	}
 }
 
+/** Hash the files declared by the package manifest, excluding local deps. */
+function treeHash(root, entries) {
+	const hash = createHash('sha256');
+	const files = [];
+	const walk = (relativePath) => {
+		const absolute = join(root, relativePath);
+		if (!existsSync(absolute)) return;
+		const stats = statSync(absolute);
+		if (stats.isDirectory()) {
+			for (const name of readdirSync(absolute).sort()) {
+				if (name === 'node_modules' || name.endsWith('.tgz') || name.endsWith('.tmpdir')) continue;
+				walk(join(relativePath, name));
+			}
+			return;
+		}
+		if (stats.isFile() && !relativePath.endsWith('.tmp')) files.push([relativePath, absolute]);
+	};
+	for (const entry of entries ?? []) walk(entry);
+	for (const [relativePath, absolute] of files) {
+		hash.update(relativePath.replaceAll('\\', '/'));
+		hash.update('\0');
+		hash.update(readFileSync(absolute));
+		hash.update('\0');
+	}
+	return { hash: hash.digest('hex'), files: files.length };
+}
+
 const plugins = [];
 for (const pluginDir of pluginDirs) {
 	const manifestPath = join(pluginDir, 'package.json');
@@ -190,11 +217,16 @@ if (!checkOnly) {
 }
 
 let failed = false;
-for (const { pkg } of plugins) {
+for (const { dir, pkg } of plugins) {
 	const installed = installedManifest(pkg.name);
 	const specifier = installedSpecifier(pkg.name);
 	if (installed === null) {
 		console.error(`  未安装：${pkg.name}`);
+		failed = true;
+		continue;
+	}
+	if (installed.version !== pkg.version) {
+		console.error(`  ${pkg.name} 版本不一致：安装 ${installed.version ?? '未知'}，源码 ${pkg.version}`);
 		failed = true;
 		continue;
 	}
@@ -203,11 +235,21 @@ for (const { pkg } of plugins) {
 		failed = true;
 		continue;
 	}
+	const installedRoot = join(profileDir, 'node_modules', pkg.name);
 	const missing = (installed.files ?? []).filter(
-		(entry) => !existsSync(join(profileDir, 'node_modules', pkg.name, entry))
+		(entry) => !existsSync(join(installedRoot, entry))
 	);
 	if (missing.length > 0) {
 		console.error(`  ${pkg.name} 安装副本缺少 package.json files 中的：${missing.join('、')}`);
+		failed = true;
+		continue;
+	}
+	const sourceHash = treeHash(dir, pkg.files);
+	const installedHash = treeHash(installedRoot, pkg.files);
+	if (sourceHash.hash !== installedHash.hash || sourceHash.files !== installedHash.files) {
+		console.error(
+			`  ${pkg.name} 安装内容与源码不一致（source ${sourceHash.files} files, installed ${installedHash.files} files）。`
+		);
 		failed = true;
 		continue;
 	}

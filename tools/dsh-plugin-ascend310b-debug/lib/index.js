@@ -25,6 +25,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools';
 import { assembleReport, indexQuery, indexSampleIndex, loadSampleIndex } from './report.js';
 import {
 	assessVersionPairing,
+	assessUnifiedEnvironment,
 	ACCEPTANCE_GATES,
 	CANN_RELEASE_LINES,
 	OBSERVED_STACKS,
@@ -35,9 +36,12 @@ import {
 import { buildPlan, renderPlan } from './plan.js';
 import { AREAS, ENTRIES } from './knowledge.js';
 import { buildProbeScript, parseProbeOutput } from './probe.js';
-import { inventoryPath, inventoryTargets, observeBoard, readInventory, saveInventory, systemFromFacts } from './inventory.js';
+import { inventoryPath, inventoryTargets, normalizeMac, observeBoard, readInventory, saveInventory, systemFromFacts } from './inventory.js';
 import { captureScreenshot, findBrowser } from './capture.js';
-import { discoverNetwork, registerDiscoveryTool } from './discovery.js';
+import { loadCaseDependencies } from './dependencies.js';
+import { installAptPackages, validateAptPackages } from './install.js';
+import { discoverNetwork, isLocalScanCandidate, parseIPv4, probeCandidate, registerDiscoveryTool, resolveDiscoveryCidrs } from './discovery.js';
+import { runSerialCommand, runSerialProbe, validateSerialSettings } from './serial.js';
 import { isSafeHost, runLocalScript, runLocalShell, runRemoteScript, runRemoteShell, shellQuote, validateReadOnlyCommand, validateTaskCommand } from './shell.js';
 
 const require = createRequire(import.meta.url);
@@ -57,8 +61,45 @@ const PROBE_PATH = '/ascend310b-debug/probe';
 /** Route that discovers boards and refreshes the local inventory. */
 const DISCOVER_PATH = '/ascend310b-debug/discover';
 
+/** Route that reads network facts from the serial console. */
+const SERIAL_PATH = '/ascend310b-debug/serial-probe';
+
 /** Maximum stdout kept in a tool response. */
 const MAX_EXCERPT = 4000;
+
+/** Curated per-case system-program metadata from data/case-dependencies.json. */
+const CASE_DEPENDENCIES = loadCaseDependencies();
+
+/**
+ * Enforce the documented HTTP verb and a same-origin boundary for browser
+ * actions. Requests without an Origin header are allowed for CLI/tests and
+ * same-origin browser navigations; a supplied cross-origin Origin is rejected.
+ */
+function httpRequestError(request, methods) {
+	const method = String(request?.method ?? 'GET').toUpperCase();
+	if (!methods.includes(method)) return { status: 405, error: `只允许 ${methods.join('/')} 请求。` };
+	if (method !== 'GET' && method !== 'HEAD') {
+		const contentType = String(request?.headers?.['content-type'] ?? request?.headers?.['Content-Type'] ?? '');
+		if (!/^application\/json(?:\s*;|$)/iu.test(contentType)) {
+			return { status: 415, error: '变更请求必须使用 application/json。' };
+		}
+	}
+	const headers = request?.headers ?? {};
+	const origin = headers.origin ?? headers.Origin;
+	if (origin !== undefined && origin !== null && String(origin) !== '') {
+		try {
+			const host = String(headers.host ?? headers.Host ?? '');
+			if (new URL(String(origin)).host !== host) return { status: 403, error: '拒绝跨源请求。' };
+		} catch {
+			return { status: 403, error: 'Origin 无效。' };
+		}
+	}
+	const fetchSite = headers['sec-fetch-site'] ?? headers['Sec-Fetch-Site'];
+	if (fetchSite !== undefined && !['same-origin', 'none'].includes(String(fetchSite).toLowerCase())) {
+		return { status: 403, error: '拒绝非同源浏览器请求。' };
+	}
+	return null;
+}
 
 /** Cached report for the panel, keyed by target id. */
 const reportCache = new Map();
@@ -97,6 +138,12 @@ function attachDiscovered(target, entry) {
 	target.discoveredId = target.discoveredId ?? entry.id ?? null;
 	target.observedIp = target.observedIp ?? entry.host ?? null;
 	target.hostname = target.hostname ?? entry.hostname ?? null;
+	target.port = target.port ?? entry.port ?? null;
+	target.user = target.user ?? entry.user ?? null;
+	// Discovery is a live network observation. Prefer its concrete IPv4 for
+	// execution so a stale .local or DHCP address does not outlive the scan.
+	if (typeof entry.host === 'string' && parseIPv4(entry.host) !== null) target.host = entry.host;
+	target.lastSeen = target.lastSeen ?? entry.lastSeen ?? null;
 	return target;
 }
 
@@ -113,9 +160,10 @@ function targetTable(config) {
 			transport,
 			host: transport === 'local' ? 'localhost' : String(entry.host ?? ''),
 			hostname: null,
-			mac: null,
+			mac: normalizeMac(entry.mac),
 			discoveredId: null,
 			observedIp: null,
+			lastSeen: null,
 			user: typeof entry.user === 'string' && entry.user.trim() !== '' ? entry.user.trim() : null,
 			port: Number.isInteger(entry.port) ? entry.port : null,
 			identityFile: typeof entry.identityFile === 'string' ? entry.identityFile : null,
@@ -126,19 +174,45 @@ function targetTable(config) {
 	const discovered = inventoryTargets(
 		readInventory(inventoryPath(config)),
 		typeof config?.discovery?.user === 'string' ? config.discovery.user.trim() : null
-	);
+	).sort((left, right) => {
+		const leftAt = Date.parse(left.lastSeen ?? '') || 0;
+		const rightAt = Date.parse(right.lastSeen ?? '') || 0;
+		return rightAt - leftAt;
+	});
 	const merged = new Set();
+	const hostnameCounts = new Map();
+	const configuredIdCounts = new Map();
 	for (const entry of discovered) {
-		if (entry.configuredId && table.has(entry.configuredId)) {
-			attachDiscovered(table.get(entry.configuredId), entry);
+		const hostname = normalizedHost(entry.hostname);
+		if (hostname !== '') hostnameCounts.set(hostname, (hostnameCounts.get(hostname) ?? 0) + 1);
+		if (entry.configuredId) configuredIdCounts.set(entry.configuredId, (configuredIdCounts.get(entry.configuredId) ?? 0) + 1);
+	}
+	for (const entry of discovered) {
+		const configuredTarget = entry.configuredId ? table.get(entry.configuredId) : undefined;
+		const configuredIsUnique = entry.configuredId ? configuredIdCounts.get(entry.configuredId) === 1 : false;
+		if (
+			configuredTarget !== undefined &&
+			!merged.has(entry.configuredId) &&
+			(configuredTarget.mac !== null
+				? entry.mac !== null && configuredTarget.mac === entry.mac
+				: configuredIsUnique)
+		) {
+			attachDiscovered(configuredTarget, entry);
 			merged.add(entry.configuredId);
 			continue;
 		}
 		const hostNames = [entry.host, entry.hostname, entry.hostname ? `${entry.hostname}.local` : null]
 			.map(normalizedHost)
 			.filter(Boolean);
+		const hostnameIsUnique = normalizedHost(entry.hostname) !== '' && hostnameCounts.get(normalizedHost(entry.hostname)) === 1;
 		const target = [...table.values()].find(
-			(candidate) => candidate.transport === 'ssh' && !merged.has(candidate.id) && hostNames.includes(normalizedHost(candidate.host))
+			(candidate) =>
+				candidate.transport === 'ssh' &&
+				!merged.has(candidate.id) &&
+				hostNames.includes(normalizedHost(candidate.host)) &&
+				(candidate.mac !== null
+					? entry.mac !== null && candidate.mac === entry.mac
+					: hostnameIsUnique)
 		);
 		if (target !== undefined) {
 			attachDiscovered(target, entry);
@@ -203,11 +277,108 @@ function publicTargets(config) {
 		mac: target.mac ?? null,
 		discoveredId: target.discoveredId ?? null,
 		observedIp: target.observedIp ?? null,
+		lastSeen: target.lastSeen ?? null,
 		user: target.user,
 		port: target.port,
 		isDefault: target.id === defaultId,
 		note: target.note
 	}));
+}
+
+/**
+ * Probe addresses learned over serial and merge the result into the MAC-keyed
+ * inventory. The serial observation is retained even when SSH is unavailable.
+ */
+async function discoverSerialBoard(serial, config) {
+	const candidates = [];
+	const seen = new Set();
+	for (const value of [serial.ipAddress, ...(serial.hostnameIps ?? []), ...(serial.interfaces ?? []).map((entry) => entry.ipv4)]) {
+		if (typeof value !== 'string') continue;
+		const numeric = parseIPv4(value);
+		if (numeric === null || !isLocalScanCandidate(numeric)) continue;
+		if (/^(?:127\.|169\.254\.|172\.17\.)/u.test(value) || seen.has(value)) continue;
+		seen.add(value);
+		candidates.push(value);
+	}
+	const inventoryFile = inventoryPath(config);
+	const inventory = readInventory(inventoryFile);
+	const sshPort = Number.isInteger(config?.discovery?.port) ? config.discovery.port : 22;
+	const serialObservation = {
+		status: 'reachable',
+		port: serial.port,
+		user: serial.user,
+		ip: serial.ipAddress,
+		hostname: serial.hostname
+	};
+	const found = [];
+	const errors = [];
+	for (const ip of candidates) {
+		try {
+			const candidate = await probeCandidate({ host: ip, user: 'HwHiAiUser', port: sshPort, timeoutMs: 60000 });
+			if (candidate.ok === true && candidate.scope?.applicable === true) {
+				const observed = observeBoard(inventory, {
+					ip,
+					user: 'HwHiAiUser',
+					mac: candidate.mac,
+					hostname: candidate.hostname,
+					port: sshPort,
+					system: candidate.system,
+					serial: serialObservation
+				});
+				found.push({
+					id: observed.board.id,
+					mac: observed.board.mac,
+					ip: observed.board.lastIp,
+					hostname: observed.board.hostname,
+					model: observed.board.system.boardModel,
+					soc: observed.board.system.soc,
+					tier: observed.board.system.tier,
+					driver: observed.board.system.driverVersion,
+					cann: observed.board.system.cannVersion,
+					status: observed.status,
+					identity: 'mac'
+				});
+				break;
+			}
+			if (candidate.ok !== true) errors.push(`${ip}: ${candidate.error}`);
+		} catch (error) {
+			errors.push(`${ip}: ${String(error?.message ?? error)}`);
+		}
+	}
+	if (found.length === 0 && typeof serial.macAddress === 'string' && serial.macAddress !== '') {
+		const existing = inventory.boards?.[serial.macAddress] ?? null;
+		const verifiedSoc = /^Ascend310B[14]$/iu.test(String(existing?.system?.soc ?? ''));
+		if (!verifiedSoc) {
+			errors.push(
+				`串口 ${serial.port}: 已读取 MAC ${serial.macAddress}，但 SSH 未取得可确认的 Ascend310B1/310B4 SoC；未建立可执行 target。`
+			);
+		} else {
+			const observed = observeBoard(inventory, {
+				ip: serial.ipAddress,
+				user: 'HwHiAiUser',
+				mac: serial.macAddress,
+				hostname: serial.hostname,
+				port: sshPort,
+				system: existing.system,
+				serial: serialObservation
+			});
+			found.push({
+				id: observed.board.id,
+				mac: observed.board.mac,
+				ip: observed.board.lastIp,
+				hostname: observed.board.hostname,
+				model: observed.board.system.boardModel,
+				soc: observed.board.system.soc,
+				tier: observed.board.system.tier,
+				driver: observed.board.system.driverVersion,
+				cann: observed.board.system.cannVersion,
+				status: observed.status,
+				identity: 'serial-mac'
+			});
+		}
+	}
+	if (found.length > 0) saveInventory(inventoryFile, inventory);
+	return { found, errors, inventoryPath: inventoryFile, serial: serialObservation };
 }
 
 /** Public inventory summaries for the Assets tab (never expose SSH secrets). */
@@ -229,10 +400,13 @@ function publicInventory(config) {
 				tier: board.system?.tier ?? null,
 				driver: board.system?.driverVersion ?? null,
 				cann: board.system?.cannVersion ?? null,
+				memoryUsedMb: board.system?.memoryUsedMb ?? null,
+				memoryTotalMb: board.system?.memoryTotalMb ?? null,
 				firstSeen: board.firstSeen ?? null,
 				lastSeen: board.lastSeen ?? null,
 				lastChangeAt: board.lastChangeAt ?? null,
 				configuredId: board.configuredId ?? null,
+				serial: board.serial ?? null,
 				changesCount: Array.isArray(board.changes) ? board.changes.length : 0,
 				latestChange: latestChange === null
 					? null
@@ -432,6 +606,9 @@ function normalizeDownload({ source, url, repoId, filename, revision = 'main', g
 		throw new Error('下载 URL 不合法。');
 	}
 	if (!/^https?:$/.test(parsed.protocol)) throw new Error('下载 URL 必须是 HTTP(S)。');
+	if (parsed.username !== '' || parsed.password !== '') {
+		throw new Error('下载 URL 不允许包含用户名或密码；请使用受控凭据而不是 URL userinfo。');
+	}
 	if (source === 'huawei') {
 		if (!/(^|\.)myhuaweicloud\.com$|(^|\.)huaweicloud\.com$/i.test(parsed.hostname)) {
 			throw new Error('华为云下载只接受 huaweicloud.com 或 myhuaweicloud.com 域名。');
@@ -445,35 +622,79 @@ function normalizeDownload({ source, url, repoId, filename, revision = 'main', g
 		const prefix = typeof githubProxy === 'string' && githubProxy.trim() !== ''
 			? githubProxy.trim()
 			: 'https://gh-proxy.com/';
-		if (!/^https?:\/\//i.test(prefix)) throw new Error('GitHub 网页代理必须以 http:// 或 https:// 开头。');
+		let proxyUrl;
+		try {
+			proxyUrl = new URL(prefix);
+		} catch {
+			throw new Error('GitHub 网页代理 URL 不合法。');
+		}
+		if (!/^https?:$/.test(proxyUrl.protocol) || proxyUrl.username !== '' || proxyUrl.password !== '') {
+			throw new Error('GitHub 网页代理必须是 HTTP(S) URL，且不能包含 userinfo。');
+		}
 		return { url: `${prefix.replace(/\/?$/, '/')}${parsed.toString()}`, commandUrl: null };
 	}
 	return { url: parsed.toString(), commandUrl: null };
 }
 
-/** Build a wget/curl command for a normalized download. */
-function downloadCommand(url, destination) {
+/** Redact URL userinfo and common signed-query credentials for model output. */
+function redactDownloadUrl(value) {
+	try {
+		const parsed = new URL(String(value));
+		parsed.username = '';
+		parsed.password = '';
+		for (const key of [...parsed.searchParams.keys()]) {
+			if (/token|secret|signature|credential|auth|policy|key|sig/i.test(key)) {
+				parsed.searchParams.set(key, '<redacted>');
+			}
+		}
+		return parsed.toString();
+	} catch {
+		return '<invalid-url>';
+	}
+}
+
+/** Build an atomic wget/curl command for a normalized download. */
+function downloadCommand(url, destination, expectedSha256 = null) {
 	const directory = destination.slice(0, destination.lastIndexOf('/')) || '/tmp';
 	const quotedDirectory = shellQuote(directory);
 	const quotedDestination = shellQuote(destination);
 	const quotedUrl = shellQuote(url);
-	return `mkdir -p ${quotedDirectory} && if command -v wget >/dev/null 2>&1; then wget -q -O ${quotedDestination} ${quotedUrl}; else curl -fL --retry 3 -o ${quotedDestination} ${quotedUrl}; fi`;
+	const lines = [
+		`mkdir -p ${quotedDirectory}`,
+		`ASC_DOWNLOAD_PART=${quotedDestination}.part.$$`,
+		`trap 'rm -f "$ASC_DOWNLOAD_PART"' EXIT`,
+		`if command -v wget >/dev/null 2>&1; then wget -q -O "$ASC_DOWNLOAD_PART" ${quotedUrl}; else curl -fL --retry 3 -o "$ASC_DOWNLOAD_PART" ${quotedUrl}; fi`
+	];
+	if (expectedSha256 !== null) {
+		lines.push(
+			`ASC_DOWNLOAD_HASH="$(sha256sum "$ASC_DOWNLOAD_PART" | awk '{print $1}')"`,
+			`[ "$ASC_DOWNLOAD_HASH" = ${shellQuote(expectedSha256.toLowerCase())} ]`
+		);
+	}
+	lines.push(`mv -f "$ASC_DOWNLOAD_PART" ${quotedDestination}`, 'trap - EXIT');
+	return lines.join(' && ');
 }
 
 /**
  * Add the board's common tutorial environment without hiding the user's
- * command. `base` makes `python`, `atc` and conda activation available; `none`
- * runs the command in the bare SSH shell.
+ * command. `ascend` is the mandatory shared case environment; `base` is an
+ * explicit diagnostic fallback and `none` runs in the bare SSH shell.
  */
 function prepareTaskCommand(command, environment) {
-	if (environment !== 'base') return command;
-	return [
+	if (environment === 'none') return command;
+	const condaEnvironment = environment === 'ascend' ? 'ascend' : 'base';
+	const lines = [
 		'set +u',
 		'export PATH=/usr/local/miniconda3/bin:$PATH',
-		'if [ -r /usr/local/Ascend/ascend-toolkit/set_env.sh ]; then . /usr/local/Ascend/ascend-toolkit/set_env.sh >/dev/null 2>&1 || true; fi',
 		'if [ -r /usr/local/miniconda3/etc/profile.d/conda.sh ]; then . /usr/local/miniconda3/etc/profile.d/conda.sh >/dev/null 2>&1 || true; fi',
+		`if ! conda activate ${condaEnvironment} >/dev/null 2>&1; then echo "Required conda environment ${condaEnvironment} is unavailable" >&2; exit 2; fi`
+	];
+	if (environment === 'ascend') lines.push('export PYTHONNOUSERSITE=1');
+	lines.push(
+		'if [ -r /usr/local/Ascend/ascend-toolkit/set_env.sh ]; then . /usr/local/Ascend/ascend-toolkit/set_env.sh >/dev/null 2>&1 || true; fi',
 		command
-	].join('; ');
+	);
+	return lines.join('; ');
 }
 
 /**
@@ -481,7 +702,21 @@ function prepareTaskCommand(command, environment) {
  *
  * @returns {Promise<object>} normalized task result.
  */
-async function runTask({ config, targetSelector, command, cwd, timeoutMs = 120000, allowStateChange, allowPrivileged = false, allowDestructive = false, dryRun = false, environment = 'base' }) {
+async function runTask({ config, targetSelector, command, cwd, timeoutMs = 120000, allowStateChange, allowPrivileged = false, allowDestructive = false, dryRun = false, environment = 'ascend' }) {
+	if (typeof command !== 'string' || command.trim() === '') {
+		return {
+			allowed: false,
+			executed: false,
+			command: '',
+			target: '未执行',
+			cwd: '',
+			exitCode: -1,
+			durationMs: 0,
+			reason: '任务命令不能为空。',
+			stdout: '',
+			stderr: ''
+		};
+	}
 	if (allowStateChange !== true) {
 		return {
 			allowed: false,
@@ -513,6 +748,20 @@ async function runTask({ config, targetSelector, command, cwd, timeoutMs = 12000
 		};
 	}
 	const target = resolveTarget(config, targetSelector);
+	if (target.transport === 'local') {
+		return {
+			allowed: false,
+			executed: false,
+			command: taskCommand,
+			target: target.label,
+			cwd: '',
+			exitCode: -1,
+			durationMs: 0,
+			reason: '任务执行只允许配置的 SSH 开发板；local 不属于 310B 板端，也不能作为主机命令执行器。',
+			stdout: '',
+			stderr: ''
+		};
+	}
 	const workingDir = resolveTaskCwd(target, cwd);
 	const started = Date.now();
 	if (dryRun) {
@@ -577,17 +826,16 @@ function recordEnvironment(config, result) {
 		user: result.target.user,
 		mac,
 		hostname: facts.hostname?.value ?? null,
+		port: result.target.port,
 		configuredId: result.target.id,
 		system
 	});
-	if (observed.status !== 'unchanged') {
-		try {
-			saveInventory(path, observed.inventory);
-		} catch {
-			// A read-only probe must still succeed if the local inventory path is
-			// not writable; the report indicates the probe result, not the cache.
-			return null;
-		}
+	try {
+		saveInventory(path, observed.inventory);
+	} catch {
+		// A read-only probe must still succeed if the local inventory path is
+		// not writable; the report indicates the probe result, not the cache.
+		return null;
 	}
 	return { path, status: observed.status, changes: observed.changes };
 }
@@ -605,6 +853,107 @@ function inventoryNote(change) {
 	}
 	if (change.status === 'new') return ['', '### 本地资产表', `- 新板已记录：${change.path}`].join('\n');
 	return '';
+}
+
+/** Resolve serial settings from profile plus optional per-call overrides. */
+/** Resolve serial transport settings; serial identity is fixed to HwHiAiUser. */
+function serialSettings(config, args = {}) {
+	const serial = config?.serial ?? {};
+	return {
+		port: typeof args.port === 'string' && args.port !== '' ? args.port : serial.port,
+		baudRate: Number.isInteger(args.baudRate) ? args.baudRate : serial.baudRate ?? 115200,
+		user: 'HwHiAiUser',
+		password: serial.password,
+		allowAutoLogin: serial.allowAutoLogin === true,
+		timeoutMs: Number.isInteger(args.timeoutMs) && args.timeoutMs > 0 ? args.timeoutMs : serial.timeoutMs ?? 60000
+	};
+}
+
+/**
+ * Build the public probe result. Transport failures are a first-class offline
+ * result, not an exception and not an omitted optional field. In particular,
+ * `board` must not be present as `undefined`: the Host's lossless-JSON check
+ * rejects that even though `JSON.stringify` would silently drop it.
+ *
+ * @param {object} options - result, report and optional inventory change.
+ * @returns {object} tool-safe probe output.
+ */
+export function buildProbeOutput({ result, report, inventoryChange = null }) {
+	const offline = result.transport?.ok === false;
+	const targetText = `${result.target.label}（${result.target.transport}${result.target.host ? ` ${result.target.user ? `${result.target.user}@` : ''}${result.target.host}` : ''}）`;
+	const text = offline
+		? [
+				`目标：${targetText}`,
+				'连接状态：offline/unreachable',
+				`传输结论：${result.transport.reason}`,
+				'',
+				'### 目标不可达',
+				'- 未采集到 SoC、CANN 和驱动。',
+				`- 这不表示 ${result.target.id} 不支持 310B；设备可能未开机、未接入当前局域网，或主机名/地址失效。`,
+				'- 先确认开发板电源、网线和 SSID，再运行 `ascend_discover` 扫描当前私有网段。',
+				'- 不要把离线目标与另一块已在线开发板的结果合并。'
+			].join('\n')
+		: [
+				`目标：${targetText}`,
+				`传输结论：${result.transport.reason}`,
+				report.scope?.applicable === true ? '' : `适用范围：${report.scope?.message ?? '未识别到 SoC。'}`,
+				'',
+				report.text,
+				inventoryNote(inventoryChange),
+				'',
+				'原始输出节选：',
+				'```text',
+				excerpt(result.rawText),
+				'```'
+			]
+				.filter((line, index, all) => !(line === '' && index > 0 && all[index - 1] === ''))
+				.join('\n');
+	const output = {
+		text,
+		ok: !offline && report.board !== null,
+		target: {
+			id: result.target.id,
+			label: result.target.label,
+			transport: result.target.transport,
+			host: result.target.host ?? '',
+			user: result.target.user ?? ''
+		},
+		source: result.source,
+		facts: serializeEnvironment(result.environment).facts,
+		missingCore: result.environment.missingCore ?? [],
+		pairing: {
+			verdict: report.pairing.verdict,
+			evidence: report.pairing.evidence,
+			reasons: report.pairing.reasons
+		},
+		scope: report.scope ?? {
+			applicable: 'unknown',
+			message: '未识别到 SoC。',
+			supportedSocs: SUPPORTED_SOCS
+		},
+		rawExcerpt: excerpt(result.rawText)
+	};
+	if (report.board !== null && report.board !== undefined) {
+		const board = {};
+		for (const [key, type] of [
+			['soc', 'string'],
+			['chip', 'string'],
+			['tier', 'string'],
+			['health', 'string'],
+			['temperatureC', 'number'],
+			['memoryUsedMb', 'integer'],
+			['memoryTotalMb', 'integer']
+		]) {
+			const value = report.board[key];
+			if (value === null || value === undefined) continue;
+			if (type === 'number' && typeof value !== 'number') continue;
+			if (type === 'integer' && !Number.isInteger(value)) continue;
+			if (type === 'string' && typeof value !== 'string') continue;
+			board[key] = value;
+		}
+		if (Object.keys(board).length > 0) output.board = board;
+	}
+	return output;
 }
 
 /**
@@ -632,6 +981,11 @@ async function collectEnvironment({ config, targetSelector, rawText, timeoutMs, 
 			: await runRemoteScript({ script, target, timeoutMs, exec });
 	const environment = parseProbeOutput(transport.stdout ?? '');
 	return { target, source: target.transport, environment, rawText: transport.stdout ?? '', transport };
+}
+
+/** Clamp a caller-supplied timeout to a positive bounded value. */
+function timeoutOrDefault(value, fallback = 60000, max = 600000) {
+	return Number.isInteger(value) && value > 0 ? Math.min(value, max) : fallback;
 }
 
 /** Clamp an excerpt for tool output. */
@@ -742,13 +1096,33 @@ const TASK_SCHEMA = {
 	}
 };
 
+const APT_SCHEMA = {
+	type: 'object',
+	additionalProperties: false,
+	properties: {
+		text: { type: 'string', required: true },
+		allowed: { type: 'boolean', required: true },
+		executed: { type: 'boolean', required: true },
+		command: { type: 'string', required: true },
+		target: { type: 'string', required: true },
+		packages: { type: 'array', required: true, items: { type: 'string' } },
+		update: { type: 'boolean', required: true },
+		exitCode: { type: 'integer', required: true },
+		reason: { type: 'string', required: true },
+		stdout: { type: 'string', required: true },
+		stderr: { type: 'string', required: true }
+	}
+};
+
 const DOWNLOAD_SCHEMA = {
 	...TASK_SCHEMA,
 	properties: {
 		...TASK_SCHEMA.properties,
 		source: { type: 'string', required: true },
 		resolvedUrl: { type: 'string', required: true },
-		destination: { type: 'string', required: true }
+		destination: { type: 'string', required: true },
+		integrity: { type: 'string', required: true },
+		sha256: { type: 'string', required: true }
 	}
 };
 
@@ -764,6 +1138,7 @@ const CAPTURE_SCHEMA = {
 		width: { type: 'integer', required: true },
 		height: { type: 'integer', required: true },
 		bytes: { type: 'integer', required: true },
+		sha256: { type: 'string', required: true },
 		durationMs: { type: 'integer', required: true },
 		browser: { type: 'string', required: true },
 		stderr: { type: 'string' },
@@ -848,49 +1223,11 @@ export function apply(ctx, config) {
 					config,
 					targetSelector: args.target,
 					rawText: args.rawText,
-					timeoutMs: Number.isInteger(args.timeoutMs) ? args.timeoutMs : 60000
+					timeoutMs: timeoutOrDefault(args.timeoutMs, 60000, 300000)
 				});
 				const report = environmentReport(result);
 				const inventoryChange = recordEnvironment(config, result);
-				const text = [
-					`目标：${result.target.label}（${result.target.transport}${result.target.host ? ` ${result.target.user ? `${result.target.user}@` : ''}${result.target.host}` : ''}）`,
-					`传输结论：${result.transport.reason}`,
-					report.scope?.applicable === true ? '' : `适用范围：${report.scope?.message ?? '未识别到 SoC。'}`,
-					'',
-					report.text,
-					inventoryNote(inventoryChange),
-					'',
-					'原始输出节选：',
-					'```text',
-					excerpt(result.rawText),
-					'```'
-				].filter((line, index, all) => !(line === '' && index > 0 && all[index - 1] === '')).join('\n');
-				return {
-					text,
-					ok: result.transport.ok !== false && report.board !== null,
-					target: {
-						id: result.target.id,
-						label: result.target.label,
-						transport: result.target.transport,
-						host: result.target.host ?? '',
-						user: result.target.user ?? ''
-					},
-					source: result.source,
-					board: report.board ?? undefined,
-					facts: serializeEnvironment(result.environment).facts,
-					missingCore: result.environment.missingCore ?? [],
-					pairing: {
-						verdict: report.pairing.verdict,
-						evidence: report.pairing.evidence,
-						reasons: report.pairing.reasons
-					},
-					scope: report.scope ?? {
-						applicable: 'unknown',
-						message: '未识别到 SoC。',
-						supportedSocs: SUPPORTED_SOCS
-					},
-					rawExcerpt: excerpt(result.rawText)
-				};
+				return buildProbeOutput({ result, report, inventoryChange });
 			},
 			presentCall: (args) => ({
 				card: 'generic',
@@ -931,6 +1268,7 @@ export function apply(ctx, config) {
 						upgradeOrder: { type: 'array', required: true, items: { type: 'string' } },
 						acceptanceGates: { type: 'array', required: true, items: { type: 'string' } },
 						scope: { type: 'object', additionalProperties: true },
+						runtimeEnvironment: { type: 'object', additionalProperties: true, required: true },
 						releaseLine: {
 							type: 'object',
 							additionalProperties: true,
@@ -971,6 +1309,14 @@ export function apply(ctx, config) {
 							'samples/case8/docs/05-known-issues-and-version-compatibility.md'
 						].map((relative) => ({ path: relative, exists: existsSync(join(repoRoot, relative)) }));
 				const outOfScope = report.scope?.applicable === false;
+				const runtimeEnvironment = assessUnifiedEnvironment(result.environment.facts ?? {});
+				const runtimeLines = [
+					'',
+					'### 统一运行环境',
+					`- 结论：${runtimeEnvironment.verdict}（证据：${runtimeEnvironment.evidence}）`,
+					...runtimeEnvironment.reasons.map((reason) => `- ${reason}`),
+					...runtimeEnvironment.nextActions.map((action) => `- 下一步：${action}`)
+				];
 				const sampleLines = outOfScope
 					? ['- 设备不在昇腾 310B 范围内，本插件的样例索引不适用于该设备。']
 					: relevant.length === 0
@@ -989,6 +1335,7 @@ export function apply(ctx, config) {
 							report.text,
 							inventoryNote(inventoryChange),
 							...(repoNote === null ? [] : ['', `> ${repoNote}`]),
+							...runtimeLines,
 							'',
 							'### 相关 samples 程序',
 							...sampleLines,
@@ -1006,7 +1353,14 @@ export function apply(ctx, config) {
 							'### 五道验收门',
 							...ACCEPTANCE_GATES.map((gate, position) => `${position + 1}. ${gate}`)
 						].join('\n');
-				return {
+				const releaseLine = outOfScope || report.pairing.releaseLine === null || report.pairing.releaseLine === undefined
+					? null
+					: {
+							line: report.pairing.releaseLine.line,
+							documented: report.pairing.releaseLine.documented,
+							note: report.pairing.releaseLine.note ?? ''
+						};
+				const output = {
 					text,
 					verdict: outOfScope ? 'out-of-scope' : report.pairing.verdict,
 					evidence: outOfScope ? 'documented' : report.pairing.evidence,
@@ -1018,16 +1372,11 @@ export function apply(ctx, config) {
 						: report.pairing.nextActions,
 					upgradeOrder: outOfScope ? [] : [...UPGRADE_ORDER],
 					acceptanceGates: outOfScope ? [] : [...ACCEPTANCE_GATES],
-					scope: report.scope ?? null,
-					releaseLine:
-						outOfScope || report.pairing.releaseLine === null || report.pairing.releaseLine === undefined
-							? undefined
-							: {
-									line: report.pairing.releaseLine.line,
-									documented: report.pairing.releaseLine.documented,
-									note: report.pairing.releaseLine.note
-								}
+					scope: report.scope ?? { applicable: 'unknown', message: '未识别到 SoC。', supportedSocs: SUPPORTED_SOCS },
+					runtimeEnvironment
 				};
+				if (releaseLine !== null) output.releaseLine = releaseLine;
+				return output;
 			},
 			presentCall: (args) => ({
 				card: 'generic',
@@ -1113,7 +1462,7 @@ export function apply(ctx, config) {
 				}
 				const needsProbe = typeof args.target === 'string' || typeof args.rawText === 'string';
 				let facts = {};
-				let scope = null;
+				let scope = {};
 				if (needsProbe) {
 					const result = await collectEnvironment({
 						config,
@@ -1122,7 +1471,7 @@ export function apply(ctx, config) {
 						timeoutMs: 60000
 					});
 					facts = serializeEnvironment(result.environment).facts;
-					scope = result.environment.scope ?? null;
+					scope = result.environment.scope ?? {};
 				}
 				const queryText = [args.symptom, args.area].filter(Boolean).join(' ');
 				const samples = index === null ? [] : indexQuery(index, { query: queryText, limit: 6 });
@@ -1269,7 +1618,7 @@ export function apply(ctx, config) {
 				'chip is outside this plugin\'s scope.',
 			parameters: {
 				command: { type: 'string', description: 'Single read-only command line to execute.' },
-				target: { type: 'string', description: 'Configured target id, configured `user@host`, or `local`.' },
+				target: { type: 'string', description: 'Configured SSH target id or `user@host`; `local` is refused.' },
 				run: { type: 'boolean', description: 'Set false to validate and preview without executing. Defaults to true.' },
 				timeoutMs: { type: 'integer', description: 'Execution timeout in milliseconds. Defaults to 30000.' }
 			},
@@ -1295,6 +1644,19 @@ export function apply(ctx, config) {
 			async execute(args) {
 				const verdict = validateReadOnlyCommand(args.command);
 				const target = resolveTarget(config, args.target);
+				if (target.transport === 'local') {
+					const reason = '只读板端诊断不允许 local target；local 会读取控制器主机上的用户文件和凭据。';
+					return {
+						text: `命令被拒绝：${reason}`,
+						allowed: false,
+						executed: false,
+						command: String(args.command ?? ''),
+						target: target.label,
+						invocation: '',
+						reason,
+						exitCode: -1
+					};
+				}
 				const invocation =
 					target.transport === 'local'
 						? `bash -lc ${JSON.stringify(args.command ?? '')}`
@@ -1330,7 +1692,7 @@ export function apply(ctx, config) {
 					};
 				}
 				const script = args.command;
-				const timeoutMs = Number.isInteger(args.timeoutMs) ? args.timeoutMs : 30000;
+				const timeoutMs = timeoutOrDefault(args.timeoutMs, 30000, 300000);
 				const result =
 					target.transport === 'local'
 						? await runLocalScript({ script, cwd: target.workdir ?? undefined, timeoutMs })
@@ -1381,8 +1743,8 @@ export function apply(ctx, config) {
 				'explicit switches. Use `dryRun:true` first. The command runs in a constrained board workspace and returns ' +
 				'exit code, duration, stdout and stderr.',
 			parameters: {
-				target: { type: 'string', description: 'Configured target id, configured `user@host`, or `local`.' },
-				command: { type: 'string', description: 'Shell command to run, for example `python sample.py` or `bash run.sh`.' },
+				target: { type: 'string', description: 'Configured SSH target id or `user@host`; `local` is refused.' },
+				command: { type: 'string', required: true, description: 'Shell command to run, for example `python sample.py` or `bash run.sh`.' },
 				cwd: { type: 'string', description: 'Absolute board working directory. Defaults to the target workdir/home.' },
 				timeoutMs: { type: 'integer', description: 'Execution timeout in milliseconds. Defaults to 120000.' },
 				allowStateChange: {
@@ -1393,8 +1755,8 @@ export function apply(ctx, config) {
 				allowDestructive: { type: 'boolean', description: 'Allow rm -r/-f. Defaults to false.' },
 				environment: {
 					type: 'string',
-					enum: ['base', 'none'],
-					description: 'Use the board base Python/CANN/conda environment, or a bare shell. Defaults to base.'
+					enum: ['ascend', 'base', 'none'],
+					description: 'Use the mandatory shared conda environment `ascend` (recommended), the board base environment for explicit diagnostics, or a bare shell. Defaults to ascend.'
 				},
 				dryRun: { type: 'boolean', description: 'Validate and show the task without executing it.' }
 			},
@@ -1405,11 +1767,11 @@ export function apply(ctx, config) {
 					targetSelector: args.target,
 					command: args.command,
 					cwd: args.cwd,
-					timeoutMs: Number.isInteger(args.timeoutMs) && args.timeoutMs > 0 ? args.timeoutMs : 120000,
+					timeoutMs: timeoutOrDefault(args.timeoutMs, 120000, 600000),
 					allowStateChange: args.allowStateChange === true,
 					allowPrivileged: args.allowPrivileged === true,
 					allowDestructive: args.allowDestructive === true,
-					environment: args.environment === 'none' ? 'none' : 'base',
+					environment: args.environment === 'none' ? 'none' : args.environment === 'base' ? 'base' : 'ascend',
 					dryRun: args.dryRun === true
 				});
 				const text = [
@@ -1438,6 +1800,119 @@ export function apply(ctx, config) {
 
 	ctx.tools.register(
 		defineTool({
+			name: 'ascend_apt_install',
+			description:
+				'Explicitly install apt packages on an Ascend 310B board as HwHiAiUser using sudo. The default sudo ' +
+				'password is read from profile config.sudoPassword (falling back to serial.password); it is sent only ' +
+				'through SSH stdin. Package names are validated, update/install are fixed apt-get operations, and the ' +
+				'tool requires allowStateChange:true. Use dryRun:true first and record the returned command/log.',
+			parameters: {
+				target: { type: 'string', description: 'Configured target id or configured `user@host`.' },
+				packages: {
+					type: 'array',
+					required: true,
+					items: { type: 'string' },
+					description: 'apt package names, for example ["v4l-utils", "alsa-utils"]; maximum 24.'
+				},
+				update: { type: 'boolean', description: 'Run apt-get update before install. Defaults to true.' },
+				timeoutMs: { type: 'integer', description: 'Installation timeout in milliseconds. Defaults to 300000.' },
+				allowStateChange: { type: 'boolean', description: 'Required true to run apt-get.' },
+				dryRun: { type: 'boolean', description: 'Validate and show the command without executing it.' }
+			},
+			output: { schema: APT_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.text }] },
+			async execute(args) {
+				const packages = Array.isArray(args.packages) ? args.packages : [];
+				const validation = validateAptPackages(packages);
+				const target = resolveTarget(config, args.target);
+				const update = args.update !== false;
+				if (!validation.ok) {
+					return {
+						text: `apt 安装被拒绝：${validation.reason}`,
+						allowed: false,
+						executed: false,
+						command: '',
+						target: target.label,
+						packages: [],
+						update,
+						exitCode: -1,
+						reason: validation.reason,
+						stdout: '',
+						stderr: ''
+					};
+				}
+				if (args.allowStateChange !== true) {
+					const reason = 'apt 安装会修改板端系统，必须显式 allowStateChange=true。';
+					return {
+						text: `apt 安装被拒绝：${reason}`,
+						allowed: false,
+						executed: false,
+						command: '',
+						target: target.label,
+						packages: validation.packages,
+						update,
+						exitCode: -1,
+						reason,
+						stdout: '',
+						stderr: ''
+					};
+				}
+				const password = config?.sudoPassword ?? config?.serial?.password;
+				try {
+					const result = await installAptPackages({
+						target,
+						password,
+						packages: validation.packages,
+						update,
+						timeoutMs: timeoutOrDefault(args.timeoutMs, 300000, 600000),
+						dryRun: args.dryRun === true
+					});
+					const text = [
+						`目标：${target.label}`,
+						`状态：${result.allowed ? (result.executed ? (result.ok ? '安装完成' : '安装失败') : 'dry-run 未执行') : '已拒绝'}`,
+						`软件包：${(result.packages ?? validation.packages).join(' ')}`,
+						`更新索引：${update ? '是' : '否'}`,
+						`说明：${result.reason}`,
+						`命令：${result.command ?? ''}`,
+						...(result.executed
+							? ['', 'stdout:', '```text', result.stdout ?? '', '```', ...(result.stderr ? ['stderr:', '```text', result.stderr, '```'] : [])]
+							: [])
+					].join('\n');
+					return {
+						text,
+						allowed: result.allowed === true,
+						executed: result.executed === true,
+						command: result.command ?? '',
+						target: target.label,
+						packages: result.packages ?? validation.packages,
+						update,
+						exitCode: Number.isInteger(result.code) ? result.code : -1,
+						reason: result.reason ?? 'apt 安装结束。',
+						stdout: result.stdout ?? '',
+						stderr: result.stderr ?? ''
+					};
+				} catch (error) {
+					const reason = String(error?.message ?? error);
+					return {
+						text: `apt 安装失败：${reason}`,
+						allowed: true,
+						executed: false,
+						command: '',
+						target: target.label,
+						packages: validation.packages,
+						update,
+						exitCode: -1,
+						reason,
+						stdout: '',
+						stderr: ''
+					};
+				}
+			},
+			presentCall: (args) => ({ card: 'generic', title: 'apt 系统安装', kind: 'other', rawInput: args })
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
 			name: 'ascend_model_download',
 			description:
 				'Download a tutorial asset to a configured Ascend 310B board. Huawei OBS URLs download directly. ' +
@@ -1446,7 +1921,7 @@ export function apply(ctx, config) {
 				'inspect the resolved URL and command without writing. The destination must be a file path under the board ' +
 				'workspace or /tmp.',
 			parameters: {
-				target: { type: 'string', description: 'Configured target id, configured `user@host`, or `local`.' },
+				target: { type: 'string', description: 'Configured SSH target id or `user@host`; `local` is refused.' },
 				source: {
 					type: 'string',
 					enum: ['huawei', 'hf', 'github', 'direct'],
@@ -1457,6 +1932,7 @@ export function apply(ctx, config) {
 				filename: { type: 'string', description: 'Hugging Face file path to download.' },
 				revision: { type: 'string', description: 'Hugging Face revision. Defaults to main.' },
 				destination: { type: 'string', description: 'Destination file path on the board.' },
+				sha256: { type: 'string', description: 'Optional expected SHA-256 (64 hex characters); verified before the final rename.' },
 				cwd: { type: 'string', description: 'Board working directory used to resolve a relative destination.' },
 				githubProxy: { type: 'string', description: 'GitHub web proxy prefix. Defaults to https://gh-proxy.com/.' },
 				timeoutMs: { type: 'integer', description: 'Download timeout in milliseconds. Defaults to 300000.' },
@@ -1478,28 +1954,41 @@ export function apply(ctx, config) {
 						revision: args.revision ?? 'main',
 						githubProxy: args.githubProxy ?? config?.githubProxy
 					});
-					const command = downloadCommand(resolved.url, destination);
+					const expectedSha256 = typeof args.sha256 === 'string' && args.sha256.trim() !== ''
+						? args.sha256.trim().toLowerCase()
+						: null;
+					if (expectedSha256 !== null && !/^[0-9a-f]{64}$/u.test(expectedSha256)) {
+						throw new Error('sha256 必须是 64 位十六进制字符串。');
+					}
+					const command = downloadCommand(resolved.url, destination, expectedSha256);
 					const task = await runTask({
 						config,
 						targetSelector: args.target,
 						command,
 						cwd: workingDir,
-						timeoutMs: Number.isInteger(args.timeoutMs) && args.timeoutMs > 0 ? args.timeoutMs : 300000,
+						timeoutMs: timeoutOrDefault(args.timeoutMs, 300000, 600000),
 						allowStateChange: args.allowStateChange === true,
+						allowDestructive: true,
 						environment: 'none',
 						dryRun: args.dryRun === true
 					});
+					const displayUrl = redactDownloadUrl(resolved.url);
+					const displayCommand = downloadCommand(displayUrl, destination, expectedSha256);
 					const output = {
 						...task,
+						command: displayCommand,
 						source: args.source,
-						resolvedUrl: resolved.url,
+						resolvedUrl: displayUrl,
 						destination,
+						integrity: task.executed ? (expectedSha256 === null ? 'not-provided' : 'verified') : 'not-verified',
+						sha256: expectedSha256 ?? '',
 						text: [
 							`下载源：${args.source}`,
-							`解析 URL：${resolved.url}`,
+							`解析 URL：${displayUrl}`,
 							`目标文件：${destination}`,
+							`完整性：${expectedSha256 === null ? '未提供预期 SHA-256' : `SHA-256 ${expectedSha256}`}`,
 							`状态：${task.allowed ? (task.executed ? (task.exitCode === 0 ? '已下载' : '下载失败') : '未执行') : '已拒绝'}`,
-							`命令：${command}`,
+							`命令：${displayCommand}`,
 							`说明：${task.reason}`,
 							...(task.executed
 								? [`退出码：${task.exitCode}`, `耗时：${task.durationMs} ms`, 'stdout:', '```text', task.stdout ?? '', '```', ...(task.stderr ? ['stderr:', '```text', task.stderr, '```'] : [])]
@@ -1521,7 +2010,9 @@ export function apply(ctx, config) {
 						reason,
 						source: String(args.source ?? ''),
 						resolvedUrl: '',
-						destination: String(args.destination ?? '')
+						destination: String(args.destination ?? ''),
+						integrity: 'not-provided',
+						sha256: ''
 					};
 				}
 			},
@@ -1562,6 +2053,7 @@ export function apply(ctx, config) {
 						width,
 						height,
 						bytes: 0,
+						sha256: '',
 						durationMs: 0,
 						browser: '',
 						reason: '截图会写入宿主机文件，需要显式确认。'
@@ -1575,7 +2067,7 @@ export function apply(ctx, config) {
 						width,
 						height,
 						waitMs: Number.isInteger(args.waitMs) ? args.waitMs : 1000,
-						timeoutMs: Number.isInteger(args.timeoutMs) && args.timeoutMs > 0 ? args.timeoutMs : 30000,
+						timeoutMs: timeoutOrDefault(args.timeoutMs, 30000, 300000),
 						browserPath: args.browserPath ?? config?.browserPath
 					});
 					return {
@@ -1584,6 +2076,7 @@ export function apply(ctx, config) {
 							`截图：${result.path}`,
 							`尺寸：${result.width}x${result.height}`,
 							`大小：${result.bytes} bytes`,
+							`SHA-256：${result.sha256}`,
 							`浏览器：${result.browser}`,
 							`耗时：${result.durationMs} ms`
 						].join('\n'),
@@ -1603,6 +2096,7 @@ export function apply(ctx, config) {
 						width,
 						height,
 						bytes: 0,
+						sha256: '',
 						durationMs: 0,
 						browser: findBrowser({ browserPath: args.browserPath ?? config?.browserPath }) ?? '',
 						reason
@@ -1610,6 +2104,227 @@ export function apply(ctx, config) {
 				}
 			},
 			presentCall: (args) => ({ card: 'generic', title: '前端截图', kind: 'other', rawInput: args })
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend_serial_probe',
+			description:
+				'Open the board serial console (for example COM23 or /dev/ttyUSB0), log in only as HwHiAiUser with profile ' +
+				'serial credentials, and run a fixed read-only network probe. Returns hostname, IPv4 addresses, interfaces ' +
+				'and default route. Use this when the board has no known LAN address and SSH discovery cannot find it.',
+			parameters: {
+				port: { type: 'string', description: 'Serial port. Defaults to config.serial.port or auto.' },
+				baudRate: { type: 'integer', description: 'Baud rate. Defaults to config.serial.baudRate.' },
+				timeoutMs: { type: 'integer', description: 'Serial prompt/command timeout in milliseconds.' }
+			},
+			output: {
+				schema: {
+					type: 'object',
+					additionalProperties: false,
+					properties: {
+						ok: { type: 'boolean', required: true },
+						text: { type: 'string', required: true },
+						port: { type: 'string', required: true },
+						user: { type: 'string', required: true },
+						hostname: { type: 'string', required: true },
+						ipAddress: { type: 'string', required: true },
+						hostnameIps: { type: 'array', required: true, items: { type: 'string' } },
+						interfaces: {
+							type: 'array',
+							required: true,
+							items: {
+								type: 'object',
+								additionalProperties: false,
+								properties: {
+									name: { type: 'string', required: true },
+									ipv4: { type: 'string', required: true }
+								}
+							}
+						},
+						macAddress: { type: 'string', required: true },
+						foundCount: { type: 'integer', required: true },
+						defaultRoute: { type: 'string', required: true },
+						routes: { type: 'array', required: true, items: { type: 'string' } },
+						error: { type: 'string' }
+					}
+				},
+				render: (_args, value) => [{ type: 'text', text: value.text }]
+			},
+			async execute(args) {
+				const settings = serialSettings(config, args);
+				const validation = validateSerialSettings(settings);
+				if (!validation.ok) {
+					return {
+						ok: false,
+						text: `串口配置失败：${validation.reason}`,
+						port: String(settings.port ?? ''),
+						user: String(settings.user ?? ''),
+						hostname: '',
+						ipAddress: '',
+						hostnameIps: [],
+						interfaces: [],
+						macAddress: '',
+						foundCount: 0,
+						defaultRoute: '',
+						routes: [],
+						error: validation.reason
+					};
+				}
+				try {
+					const result = await runSerialProbe(settings);
+					const discovery = await discoverSerialBoard(result, config);
+					const lines = [
+						`串口：${result.port}（${settings.baudRate} 8N1）`,
+						`用户：${result.user}`,
+						`主机名：${result.hostname ?? '未采集'}`,
+						`当前 IPv4：${result.ipAddress ?? '未采集'}`,
+						`MAC：${result.macAddress ?? '未采集'}`,
+						`默认路由：${result.defaultRoute ?? '未采集'}`,
+						'',
+						'接口：',
+						...(result.interfaces.length === 0 ? ['- 未采集'] : result.interfaces.map((entry) => `- ${entry.name}: ${entry.ipv4}`)),
+						'',
+						`已写入设备列表：${discovery.found.length} 块`,
+						...(discovery.errors.length === 0 ? [] : ['网络探测提示：', ...discovery.errors.map((item) => `- ${item}`)]),
+						'后续可用：ascend_probe target=HwHiAiUser@<当前 IPv4>'
+					];
+					return {
+						ok: true,
+						text: lines.join('\n'),
+						port: result.port,
+						user: result.user,
+						hostname: result.hostname ?? '',
+						ipAddress: result.ipAddress ?? '',
+						hostnameIps: result.hostnameIps,
+						interfaces: result.interfaces,
+						macAddress: result.macAddress ?? '',
+						foundCount: discovery.found.length,
+						defaultRoute: result.defaultRoute ?? '',
+						routes: result.routes
+					};
+				} catch (error) {
+					const message = String(error?.message ?? error);
+					return {
+						ok: false,
+						text: `串口探测失败：${message}`,
+						port: String(settings.port ?? ''),
+						user: String(settings.user ?? ''),
+						hostname: '',
+						ipAddress: '',
+						hostnameIps: [],
+						interfaces: [],
+						macAddress: '',
+						foundCount: 0,
+						defaultRoute: '',
+						routes: [],
+						error: message
+					};
+				}
+			},
+			presentCall: (args) => ({ card: 'generic', title: '串口网络探测', kind: 'other', rawInput: args })
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend_serial_exec',
+			description:
+				'Run one read-only diagnostic command over the logged-in serial console as HwHiAiUser. This is the recovery ' +
+				'path when SSH is unavailable. Commands are checked by the same allowlist as ascend_board_exec; serial ' +
+				'credentials must come from profile serial configuration.',
+			parameters: {
+				command: { type: 'string', required: true, description: 'Single read-only command, e.g. hostname -I.' },
+				port: { type: 'string', description: 'Serial port. Defaults to config.serial.port or auto.' },
+				baudRate: { type: 'integer', description: 'Baud rate. Defaults to config.serial.baudRate.' },
+				timeoutMs: { type: 'integer', description: 'Serial prompt/command timeout in milliseconds.' }
+			},
+			output: {
+				schema: {
+					type: 'object',
+					additionalProperties: false,
+					properties: {
+						ok: { type: 'boolean', required: true },
+						allowed: { type: 'boolean', required: true },
+						executed: { type: 'boolean', required: true },
+						text: { type: 'string', required: true },
+						port: { type: 'string', required: true },
+						command: { type: 'string', required: true },
+						stdout: { type: 'string', required: true },
+						exitCode: { type: 'integer', required: true },
+						reason: { type: 'string', required: true }
+					}
+				},
+				render: (_args, value) => [{ type: 'text', text: value.text }]
+			},
+			async execute(args) {
+				const command = String(args.command ?? '');
+				const verdict = validateReadOnlyCommand(command);
+				const settings = serialSettings(config, args);
+				if (!verdict.ok) {
+					return {
+						ok: false,
+						allowed: false,
+						executed: false,
+						text: `串口命令被拒绝：${verdict.reason}`,
+						port: String(settings.port ?? ''),
+						command,
+						stdout: '',
+						exitCode: -1,
+						reason: verdict.reason
+					};
+				}
+				const validation = validateSerialSettings(settings);
+				if (!validation.ok) {
+					return {
+						ok: false,
+						allowed: true,
+						executed: false,
+						text: `串口配置失败：${validation.reason}`,
+						port: String(settings.port ?? ''),
+						command,
+						stdout: '',
+						exitCode: -1,
+						reason: validation.reason
+					};
+				}
+				try {
+					const result = await runSerialCommand(settings, command);
+					const ok = result.exitCode === 0;
+					return {
+						ok,
+						allowed: true,
+						executed: true,
+						text: [
+							`串口命令：${command}`,
+							`端口：${result.port}`,
+							`退出码：${result.exitCode}`,
+							'',
+							result.stdout || '（无输出）'
+						].join('\n'),
+						port: result.port,
+						command,
+						stdout: result.stdout,
+						exitCode: result.exitCode,
+						reason: ok ? '串口只读命令完成。' : `串口只读命令返回非零退出码 ${result.exitCode}。`
+					};
+				} catch (error) {
+					const reason = String(error?.message ?? error);
+					return {
+						ok: false,
+						allowed: true,
+						executed: false,
+						text: `串口命令失败：${reason}`,
+						port: String(settings.port ?? ''),
+						command,
+						stdout: '',
+						exitCode: -1,
+						reason
+					};
+				}
+			},
+			presentCall: (args) => ({ card: 'generic', title: '串口诊断', kind: 'other', rawInput: args })
 		})
 	);
 
@@ -1629,6 +2344,11 @@ export function apply(ctx, config) {
 
 		const reportHandler = async (request, response) => {
 			try {
+				const requestError = httpRequestError(request, ['GET', 'HEAD']);
+				if (requestError !== null) {
+					json(response, requestError.status, { ok: false, error: requestError.error });
+					return;
+				}
 				const url = new URL(request.url ?? REPORT_PATH, 'http://localhost');
 				const targetId = url.searchParams.get('target') ?? undefined;
 				const fresh = url.searchParams.get('fresh') === '1';
@@ -1676,6 +2396,7 @@ export function apply(ctx, config) {
 						symptoms: entry.symptoms
 					})),
 					areas: Object.values(AREAS),
+					caseDependencies: CASE_DEPENDENCIES,
 					samples: index.entries.map(panelSample),
 					versionLines: CANN_RELEASE_LINES.map((line) => ({ line: line.line, note: line.note ?? '' })),
 					observedStacks: OBSERVED_STACKS.map((stack) => ({
@@ -1711,6 +2432,11 @@ export function apply(ctx, config) {
 
 		const probeHandler = async (request, response) => {
 			try {
+				const requestError = httpRequestError(request, ['POST']);
+				if (requestError !== null) {
+					json(response, requestError.status, { ok: false, error: requestError.error });
+					return;
+				}
 				let body = '';
 				for await (const chunk of request) {
 					body += chunk;
@@ -1754,6 +2480,7 @@ export function apply(ctx, config) {
 						symptoms: entry.symptoms
 					})),
 					areas: Object.values(AREAS),
+					caseDependencies: CASE_DEPENDENCIES,
 					samples: index.entries.map(panelSample),
 					versionLines: CANN_RELEASE_LINES.map((line) => ({ line: line.line, note: line.note ?? '' })),
 					observedStacks: OBSERVED_STACKS.map((stack) => ({
@@ -1767,7 +2494,8 @@ export function apply(ctx, config) {
 						status: stack.status
 					}))
 				};
-				reportCache.set(result.target.id, { at: Date.now(), value });
+				if (value.ok === true) reportCache.set(result.target.id, { at: Date.now(), value });
+				else reportCache.delete(result.target.id);
 				json(response, 200, value);
 			} catch (error) {
 				json(response, 500, { ok: false, error: String(error?.message ?? error) });
@@ -1776,6 +2504,11 @@ export function apply(ctx, config) {
 
 		const discoverHandler = async (request, response) => {
 			try {
+				const requestError = httpRequestError(request, ['POST']);
+				if (requestError !== null) {
+					json(response, requestError.status, { ok: false, error: requestError.error });
+					return;
+				}
 				let body = '';
 				for await (const chunk of request) {
 					body += chunk;
@@ -1786,9 +2519,7 @@ export function apply(ctx, config) {
 				}
 				const payload = body.trim() === '' ? {} : JSON.parse(body);
 				const discovery = config?.discovery ?? {};
-				const cidrs = Array.isArray(payload.cidrs) && payload.cidrs.length > 0
-					? payload.cidrs
-					: discovery.cidrs;
+				const cidrs = resolveDiscoveryCidrs(payload.cidrs, discovery.cidrs);
 				const result = await discoverNetwork({
 					cidrs,
 					user: typeof payload.user === 'string' ? payload.user : discovery.user ?? config?.targets?.[0]?.user ?? null,
@@ -1797,10 +2528,56 @@ export function apply(ctx, config) {
 					probeConcurrency: Number.isInteger(discovery.probeConcurrency) ? discovery.probeConcurrency : 4,
 					scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 500,
 					probeTimeoutMs: Number.isInteger(payload.timeoutMs) ? payload.timeoutMs : discovery.probeTimeoutMs ?? 60000,
-					path: typeof payload.inventoryPath === 'string' ? payload.inventoryPath : discovery.inventoryPath,
+					path: inventoryPath(config),
 					config
 				});
+				// Discovery changes the inventory and target list. Do not let a
+				// report generated before the scan hide a newly found board for the
+				// full cache TTL.
+				reportCache.clear();
 				json(response, 200, { ok: true, ...result, targets: publicTargets(config), boards: publicInventory(config) });
+			} catch (error) {
+				json(response, 500, { ok: false, error: String(error?.message ?? error) });
+			}
+		};
+
+		const serialHandler = async (request, response) => {
+			try {
+				const requestError = httpRequestError(request, ['POST']);
+				if (requestError !== null) {
+					json(response, requestError.status, { ok: false, error: requestError.error });
+					return;
+				}
+				let body = '';
+				for await (const chunk of request) {
+					body += chunk;
+					if (body.length > 1_000_000) {
+						json(response, 413, { ok: false, error: '串口请求体超过 1 MB。' });
+						return;
+					}
+				}
+				const payload = body.trim() === '' ? {} : JSON.parse(body);
+				const settings = serialSettings(config, payload);
+				const validation = validateSerialSettings(settings);
+				if (!validation.ok) {
+					json(response, 400, { ok: false, error: validation.reason });
+					return;
+				}
+				const result = await runSerialProbe(settings);
+				const { rawText: _rawText, ...publicResult } = result;
+				const discovery = await discoverSerialBoard(publicResult, config);
+				// Serial discovery can add a board or update its serial status even
+				// when the previous report cache was populated from another view.
+				reportCache.clear();
+				json(response, 200, {
+					ok: true,
+					...publicResult,
+					found: discovery.found,
+					errors: discovery.errors,
+					inventoryPath: discovery.inventoryPath,
+					targets: publicTargets(config),
+					boards: publicInventory(config)
+				});
 			} catch (error) {
 				json(response, 500, { ok: false, error: String(error?.message ?? error) });
 			}
@@ -1818,6 +2595,10 @@ export function apply(ctx, config) {
 			() => scope.webServer.register({ kind: 'exact', path: DISCOVER_PATH, handler: discoverHandler }),
 			'ascend310b-debug: discover route'
 		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: SERIAL_PATH, handler: serialHandler }),
+			'ascend310b-debug: serial-probe route'
+		);
 	});
 }
 
@@ -1825,8 +2606,10 @@ export function apply(ctx, config) {
 export const internals = {
 	resolveRepoRoot,
 	resolveTarget,
+	targetTable,
 	readSampleIndex,
 	resolveInside,
 	isSafeHost,
+	prepareTaskCommand,
 	require
 };

@@ -66,7 +66,7 @@ footer: "第4章：PyACL应用开发基础"
 
 本课件把设备枚举和完整推理严格分开。
 
-<div class="source">依据：<a href="../book/chapter4.md#pyacl应用开发环境"><code>src/book/chapter4.md</code>「PyACL应用开发环境」</a>；<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §2.1</a></div>
+<div class="source">依据：<a href="../book/chapter4.md#src-book-chapter4-h4"><code>src/book/chapter4.md</code>「PyACL应用开发环境」</a>；<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §2.1</a></div>
 
 <!--
 先建立证据等级。学生最容易把 Found 1 Ascend devices 误写成完整推理通过，后面用原始日志纠正。
@@ -80,7 +80,7 @@ footer: "第4章：PyACL应用开发基础"
 
 ![PyACL 逻辑架构图](../book/img4/logic_arch.png)
 
-<div class="source">图片：<a href="../book/img4/logic_arch.png"><code>src/book/img4/logic_arch.png</code></a>；出处：<a href="../book/chapter4.md#pyacl的逻辑架构"><code>src/book/chapter4.md</code>「PyACL的逻辑架构」</a></div>
+<div class="source">图片：<a href="../book/img4/logic_arch.png"><code>src/book/img4/logic_arch.png</code></a>；出处：<a href="../book/chapter4.md#src-book-chapter4-h2"><code>src/book/chapter4.md</code>「PyACL的逻辑架构」</a></div>
 
 <!--
 从应用层向下带读 PyACL、AscendCL、Runtime、Driver 和 AI Core。出现错误时，先定位在哪一层，不要直接归因于硬件。
@@ -94,7 +94,7 @@ footer: "第4章：PyACL应用开发基础"
 
 ![Device、Context、Stream 关系图](../book/img4/device_context_stream.png)
 
-<div class="source">图片：<a href="../book/img4/device_context_stream.png"><code>src/book/img4/device_context_stream.png</code></a>；出处：<a href="../book/chapter4.md#基本概念与运行模型"><code>src/book/chapter4.md</code>「基本概念与运行模型」</a></div>
+<div class="source">图片：<a href="../book/img4/device_context_stream.png"><code>src/book/img4/device_context_stream.png</code></a>；出处：<a href="../book/chapter4.md#src-book-chapter4-h3"><code>src/book/chapter4.md</code>「基本概念与运行模型」</a></div>
 
 <!--
 一个设备可有多个上下文，一个上下文可有多个流，但流不能脱离所属上下文。释放顺序必须是 Stream、Context、Device。
@@ -119,7 +119,7 @@ acl.finalize()
 
 来源：`samples/chapter4/check_ascend_device/check_ascend_device.py` 与教材资源生命周期示例。
 
-<div class="source">教材：<a href="../book/chapter4.md#运行管理资源生命周期"><code>src/book/chapter4.md</code>「运行管理资源生命周期」</a>；样例：<a href="../../samples/chapter4/check_ascend_device/check_ascend_device.py"><code>samples/chapter4/check_ascend_device</code></a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h9"><code>src/book/chapter4.md</code>「运行管理资源生命周期」</a>；样例：<a href="../../samples/chapter4/check_ascend_device/check_ascend_device.py"><code>samples/chapter4/check_ascend_device</code></a></div>
 
 <!--
 真实工程必须检查每个 ret；这里突出顺序。显式资源按 Stream、Context、Device 逆序释放，最后 acl.finalize。
@@ -140,7 +140,7 @@ acl.finalize()
 
 Host 与 Device 内存相互隔离。输入张量必须按模型合同完成布局、精度和连续内存准备。
 
-<div class="source">教材：<a href="../book/chapter4.md#异构内存管理"><code>src/book/chapter4.md</code>「异构内存管理」</a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h10"><code>src/book/chapter4.md</code>「异构内存管理」</a></div>
 
 <!--
 记住数据流而不是死背常量。无论同步还是异步，Host 可读之前必须有明确的完成条件。
@@ -158,7 +158,7 @@ Host 与 Device 内存相互隔离。输入张量必须按模型合同完成布�
 - `stream_wait_event` 在设备侧建立跨流依赖，不阻塞 Host。
 - `synchronize_device` 范围最大，通常只用于调试或退出。
 
-<div class="source">教材：<a href="../book/chapter4.md#同步等待机制"><code>src/book/chapter4.md</code>「同步等待机制」</a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h11"><code>src/book/chapter4.md</code>「同步等待机制」</a></div>
 
 <!--
 向学生区分“Host 等待”与“Stream 等待”。异步任务投递成功不代表数据已经可读，也不代表资源可以立即释放。
@@ -180,7 +180,7 @@ Host 与 Device 内存相互隔离。输入张量必须按模型合同完成布�
 
 ![PyACL 模型推理应用开发与运行全流程](../book/img4/inference.png)
 
-<div class="source">图片：<a href="../book/img4/inference.png"><code>src/book/img4/inference.png</code></a>；出处：<a href="../book/chapter4.md#模型推理开发流程解析"><code>src/book/chapter4.md</code>「模型推理开发流程解析」</a></div>
+<div class="source">图片：<a href="../book/img4/inference.png"><code>src/book/img4/inference.png</code></a>；出处：<a href="../book/chapter4.md#src-book-chapter4-h21"><code>src/book/chapter4.md</code>「模型推理开发流程解析」</a></div>
 
 <!--
 主流程开发与应用运行逻辑要分开。运行阶段从导入、初始化、资源申请、数据传输，到执行、后处理、释放和去初始化。
@@ -198,7 +198,7 @@ Host 与 Device 内存相互隔离。输入张量必须按模型合同完成布�
 - 将缓冲封装成 Dataset，调用模型执行接口。
 - 取回结果后销毁描述、卸载模型并释放资源。
 
-<div class="source">教材：<a href="../book/chapter4.md#核心实现模型推理脚本"><code>src/book/chapter4.md</code>「核心实现：模型推理脚本」</a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h28"><code>src/book/chapter4.md</code>「核心实现：模型推理脚本」</a></div>
 
 <!--
 模型描述是内存申请和结果解析的依据。不要根据训练脚本猜输入大小，也不要把任意长度的 NumPy 数组直接送进 Device。
@@ -220,7 +220,7 @@ Host 与 Device 内存相互隔离。输入张量必须按模型合同完成布�
 
 训练和 ONNX 导出在 GPU 服务器完成，板端只负责 ATC 转换后的 PyACL 推理。
 
-<div class="source">教材：<a href="../book/chapter4.md#实例分析resnet-18"><code>src/book/chapter4.md</code>「实例分析（ResNet-18）」</a>；样例：<a href="../../samples/chapter4/resnet18/inference_npu.py"><code>samples/chapter4/resnet18</code></a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h24"><code>src/book/chapter4.md</code>「实例分析（ResNet-18）」</a>；样例：<a href="../../samples/chapter4/resnet18/inference_npu.py"><code>samples/chapter4/resnet18</code></a></div>
 
 <!--
 ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执行它。课件只能展示代码路径和模型合同，不能写成已在两板通过。
@@ -240,7 +240,7 @@ ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执�
 
 分类只做单向量解析；检测必须理解多输出、候选框和 NMS，不能用 ResNet18 结果替代。
 
-<div class="source">教材：<a href="../book/chapter4.md#目标检测推理"><code>src/book/chapter4.md</code>「目标检测推理」</a>；样例：<a href="../../samples/chapter4/SSD"><code>samples/chapter4/SSD</code></a>、<a href="../../samples/chapter4/SSDLite"><code>samples/chapter4/SSDLite</code></a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h31"><code>src/book/chapter4.md</code>「目标检测推理」</a>；样例：<a href="../../samples/chapter4/SSD"><code>samples/chapter4/SSD</code></a>、<a href="../../samples/chapter4/SSDLite"><code>samples/chapter4/SSDLite</code></a></div>
 
 <!--
 两个检测模型的输入尺寸、输出张量和后处理不同。双板运行记录没有部署这些资产，因此不能从设备枚举推导检测通过。
@@ -299,7 +299,7 @@ ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执�
 - 它不证明模型执行产生有效结果。
 - 它不证明业务精度、吞吐或长期稳定性。
 
-<div class="source">证据边界：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §4 chapter4、§5</a>；教材：<a href="../book/chapter4.md#环境验证"><code>src/book/chapter4.md</code>「环境验证」</a></div>
+<div class="source">证据边界：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §4 chapter4、§5</a>；教材：<a href="../book/chapter4.md#src-book-chapter4-h7"><code>src/book/chapter4.md</code>「环境验证」</a></div>
 
 <!--
 逐条让学生说明缺失了哪一级证据。特别禁止把设备检查、CPU ONNX 推理或 API 健康响应写成 NPU 完整推理。
@@ -321,7 +321,7 @@ ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执�
 
 不要跳到下一层。当前证据只完成了第一层的前半部分。
 
-<div class="source">教材：<a href="../book/chapter4.md#模型推理开发流程解析"><code>src/book/chapter4.md</code>「模型推理开发流程解析」</a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h21"><code>src/book/chapter4.md</code>「模型推理开发流程解析」</a></div>
 
 <!--
 排障顺序对应证据等级。当前双板记录停在设备枚举，所以不能出现“模型加载失败”或“精度差异”的结论。
@@ -343,7 +343,7 @@ ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执�
 
 错误码、命令行、板卡档位和版本必须一起保存。
 
-<div class="source">教材：<a href="../book/chapter4.md#pyacl应用开发环境"><code>src/book/chapter4.md</code>「PyACL应用开发环境」</a>；样例：<a href="../../samples/chapter4/README.md"><code>samples/chapter4/README.md</code></a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h4"><code>src/book/chapter4.md</code>「PyACL应用开发环境」</a>；样例：<a href="../../samples/chapter4/README.md"><code>samples/chapter4/README.md</code></a></div>
 
 <!--
 每一类故障先停在对应层。没有日志和版本时，只能写 blocked 或 unknown，不能写 unsupported。
@@ -364,7 +364,7 @@ ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执�
 
 在现有双板记录上只能勾选“枚举”。其余三级必须补做后才能称为完整推理通过。
 
-<div class="source">任务：<a href="../book/chapter4.md#总结"><code>src/book/chapter4.md</code>「总结」</a>；双板证据：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code></a></div>
+<div class="source">任务：<a href="../book/chapter4.md#src-book-chapter4-h35"><code>src/book/chapter4.md</code>「总结」</a>；双板证据：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code></a></div>
 
 <!--
 课堂任务不是再跑一遍设备查询，而是补齐从 OM 到单次推理再到应用输出的证据。没有完成的格子必须保留 untested。

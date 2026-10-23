@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Download the chapter 7 ResNet18-TinyImageNet model from Hugging Face."""
+"""Download the chapter 8 ResNet18-TinyImageNet model from Hugging Face."""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -14,6 +15,7 @@ from urllib.request import Request, urlopen
 
 
 DEFAULT_REPO = "zhouxzh/resnet18_tiny_imagenet"
+DEFAULT_REVISION = "dfcf5885dcf7beab3a5d6e2143c73d7973bead36"
 DEFAULT_ENDPOINT = os.environ.get("HF_ENDPOINT", "https://hf-mirror.com").rstrip("/")
 FALLBACK_ENDPOINT = "https://huggingface.co"
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -25,16 +27,45 @@ MODEL_FILES = {
     "aipp_om": "resnet18_tiny_imagenet_aipp.om",
     "aipp_cfg": "resnet18_rgb_static_aipp.cfg",
 }
+MODEL_SHA256 = {
+    "resnet18_tiny_imagenet.om": "0b9e112751181aab82b43963f1b975adf4abbcdeec7c919ee93e496c0df8d46d",
+    "resnet18_tiny_imagenet.onnx": "e461aecee8bfafe95cd4528d3e836783c7546a0bb201c98e25109cde51b3bd6e",
+    "resnet18_tiny_imagenet_aipp.om": "d1e864ae220533442c813029b58ab4fdc91adfe2a9406be8620d0c060b6a6307",
+}
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_expected_hash(path: Path, filename: str) -> None:
+    expected = MODEL_SHA256.get(filename)
+    if expected is None:
+        return
+    actual = sha256_file(path)
+    if actual != expected:
+        raise RuntimeError(
+            f"SHA-256 mismatch for {filename}: expected {expected}, got {actual}"
+        )
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Download chapter 7 ResNet18-TinyImageNet model files.")
+    parser = argparse.ArgumentParser(description="Download chapter 8 ResNet18-TinyImageNet model files.")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--om", action="store_true", help="Download only the OM file. This is the default.")
     group.add_argument("--onnx", action="store_true", help="Download only the ONNX file.")
     group.add_argument("--aipp", action="store_true", help="Download only the AIPP OM and AIPP config files.")
     group.add_argument("--all", action="store_true", help="Download all OM/ONNX/AIPP files.")
     parser.add_argument("--repo", default=DEFAULT_REPO, help=f"Hugging Face repo id (default: {DEFAULT_REPO}).")
+    parser.add_argument(
+        "--revision",
+        default=DEFAULT_REVISION,
+        help=f"Pinned Hugging Face revision (default: {DEFAULT_REVISION}).",
+    )
     parser.add_argument(
         "--endpoint",
         default=DEFAULT_ENDPOINT,
@@ -56,9 +87,9 @@ def build_api_url(endpoint: str, repo_id: str) -> str:
     return f"{endpoint.rstrip('/')}/api/models/{repo_id}"
 
 
-def build_download_url(endpoint: str, repo_id: str, filename: str) -> str:
+def build_download_url(endpoint: str, repo_id: str, revision: str, filename: str) -> str:
     quoted = quote(filename, safe="/")
-    return f"{endpoint.rstrip('/')}/{repo_id}/resolve/main/{quoted}?download=true"
+    return f"{endpoint.rstrip('/')}/{repo_id}/resolve/{revision}/{quoted}?download=true"
 
 
 def candidate_endpoints(endpoint: str) -> list[str]:
@@ -96,25 +127,41 @@ def selected_files(args: argparse.Namespace) -> list[str]:
     return [MODEL_FILES["om"]]
 
 
-def download_file(repo_id: str, endpoint: str, filename: str, output_dir: Path, *, force: bool, timeout: float) -> Path:
+def download_file(
+    repo_id: str,
+    endpoint: str,
+    revision: str,
+    filename: str,
+    output_dir: Path,
+    *,
+    force: bool,
+    timeout: float,
+) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / filename
     if target.exists() and not force:
+        verify_expected_hash(target, filename)
         print(f"exists: {target}")
         return target
 
-    url = build_download_url(endpoint, repo_id, filename)
+    url = build_download_url(endpoint, repo_id, revision, filename)
     print(f"download: {filename} -> {target}")
-    request = Request(url, headers={"User-Agent": "ascend310-chapter7/1.0"})
+    request = Request(url, headers={"User-Agent": "ascend310-chapter8/1.0"})
     tmp_target = target.with_name(target.name + ".tmp")
     with urlopen(request, timeout=timeout) as response, tmp_target.open("wb") as output:
         shutil.copyfileobj(response, output)
+    try:
+        verify_expected_hash(tmp_target, filename)
+    except Exception:
+        tmp_target.unlink(missing_ok=True)
+        raise
     tmp_target.replace(target)
     return target
 
 
 def download_with_fallback(
     repo_id: str,
+    revision: str,
     endpoints: list[str],
     filename: str,
     output_dir: Path,
@@ -125,7 +172,15 @@ def download_with_fallback(
     errors = []
     for endpoint in endpoints:
         try:
-            return download_file(repo_id, endpoint, filename, output_dir, force=force, timeout=timeout)
+            return download_file(
+                repo_id,
+                endpoint,
+                revision,
+                filename,
+                output_dir,
+                force=force,
+                timeout=timeout,
+            )
         except Exception as exc:
             errors.append(f"{endpoint}: {exc}")
     raise RuntimeError("; ".join(errors))
@@ -153,7 +208,15 @@ def main() -> int:
     failed = 0
     for filename in targets:
         try:
-            download_with_fallback(args.repo, endpoints, filename, output_dir, force=args.force, timeout=args.timeout)
+            download_with_fallback(
+                args.repo,
+                args.revision,
+                endpoints,
+                filename,
+                output_dir,
+                force=args.force,
+                timeout=args.timeout,
+            )
         except Exception as exc:
             failed += 1
             print(f"failed to download {filename}: {exc}", file=sys.stderr)

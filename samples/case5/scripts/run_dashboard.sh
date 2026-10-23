@@ -7,6 +7,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 set -u
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 cd "${PROJECT_ROOT}"
 exec python scripts/start_dashboard.py "$@"

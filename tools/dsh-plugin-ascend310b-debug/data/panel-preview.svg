@@ -1,31 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="796" viewBox="0 0 900 796" font-family="'Segoe UI','Microsoft YaHei',sans-serif">
-<rect width="900" height="796" fill="#ffffff"/>
-<rect x="12" y="12" width="876" height="772" rx="8" fill="none" stroke="#d5d9e0"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="774" viewBox="0 0 900 774" font-family="'Segoe UI','Microsoft YaHei',sans-serif">
+<rect width="900" height="774" fill="#ffffff"/>
+<rect x="12" y="12" width="876" height="750" rx="8" fill="none" stroke="#d5d9e0"/>
 <text x="28" y="60" font-size="20" font-weight="600" fill="#101828">昇腾310B调试</text>
 <text x="28" y="102" font-size="15" font-weight="600" fill="#101828">适用范围：昇腾 310B（支持）</text>
 <text x="28" y="144" font-size="15" font-weight="600" fill="#101828">版本配套：observed-match · observed-pass</text>
 <text x="28" y="172" font-size="13" font-weight="400" fill="#344054">探测到的组合与仓库已记录的组合 orangepi-aipro-live-8t-cann8 一致：Orange Pi AI Pro（香橙派 AI Pro，hostname orangepiaipro） / Ascend310B4 / CANN 8.0.0 / 驱动 25.2.0。</text>
-<text x="28" y="208" font-size="15" font-weight="600" fill="#101828">板卡：310B4 / Ascend310B4 / 8T / Health Alarm</text>
-<text x="28" y="236" font-size="13" font-weight="400" fill="#344054">温度 79 ℃ · 功率 0 W · 内存 1993 / 15610 MB</text>
+<text x="28" y="208" font-size="15" font-weight="600" fill="#101828">板卡：310B4 / Ascend310B4 / 8T / Health OK</text>
+<text x="28" y="236" font-size="13" font-weight="400" fill="#344054">温度 45 ℃ · 功率 12.8 W · 内存 2433 / 7564 MB</text>
 <text x="28" y="272" font-size="15" font-weight="600" fill="#101828">环境事实</text>
 <text x="28" y="300" font-size="13" font-weight="400" fill="#344054">芯片：310B4 / Ascend310B4</text>
 <text x="28" y="322" font-size="13" font-weight="400" fill="#344054">档位：8T</text>
-<text x="28" y="344" font-size="13" font-weight="400" fill="#344054">健康：Alarm</text>
-<text x="28" y="366" font-size="13" font-weight="400" fill="#344054">操作系统：Ubuntu 22.04.3 LTS 22.04.3 LTS (Jammy Jellyfish)</text>
+<text x="28" y="344" font-size="13" font-weight="400" fill="#344054">健康：OK</text>
+<text x="28" y="366" font-size="13" font-weight="400" fill="#344054">操作系统：Ubuntu 22.04.5 LTS 22.04.5 LTS (Jammy Jellyfish)</text>
 <text x="28" y="388" font-size="13" font-weight="400" fill="#344054">内核：5.10.0+</text>
 <text x="28" y="410" font-size="13" font-weight="400" fill="#344054">架构：aarch64</text>
 <text x="28" y="432" font-size="13" font-weight="400" fill="#344054">npu-smi：25.2.0</text>
 <text x="28" y="454" font-size="13" font-weight="400" fill="#344054">CANN：8.0.0</text>
 <text x="28" y="476" font-size="13" font-weight="400" fill="#344054">驱动：25.2.0</text>
-<text x="28" y="498" font-size="13" font-weight="400" fill="#344054">固件：未采集</text>
-<text x="28" y="520" font-size="13" font-weight="400" fill="#344054">Python：/usr/local/miniconda3/bin/python3 3.9.2</text>
-<text x="28" y="542" font-size="13" font-weight="400" fill="#344054">aclImport（面板取值）：ok</text>
-<text x="28" y="564" font-size="13" font-weight="400" fill="#344054">aclImportSourced（source CANN 后）：ok</text>
-<text x="28" y="586" font-size="13" font-weight="400" fill="#344054">aclImportBare（裸 SSH）：ok</text>
-<text x="28" y="608" font-size="13" font-weight="400" fill="#344054">ATC：ATC start working now, please wait for a moment.</text>
-<text x="28" y="630" font-size="13" font-weight="400" fill="#344054">设备节点：present</text>
-<text x="28" y="666" font-size="15" font-weight="600" fill="#101828">调试入口：知识库 15 条，覆盖 8 个领域</text>
-<text x="28" y="694" font-size="13" font-weight="400" fill="#344054">pyacl(2) · atc(1) · env(4) · framework(3) · camera(1) · service(1) · performance(2) · quant(1)</text>
-<text x="28" y="730" font-size="15" font-weight="600" fill="#101828">样例索引：15 条</text>
-<text x="28" y="758" font-size="13" font-weight="400" fill="#344054">有入口 7 条 · 有测试命令 5 条 · 已识别路径 atc-conversion、camera-v4l2、dvpp-video、framework-migration、npu-service、quantization</text>
+<text x="28" y="498" font-size="13" font-weight="400" fill="#344054">Python：/usr/local/miniconda3/bin/python 3.9.2</text>
+<text x="28" y="520" font-size="13" font-weight="400" fill="#344054">aclImport（面板取值）：ok</text>
+<text x="28" y="542" font-size="13" font-weight="400" fill="#344054">aclImportSourced（source CANN 后）：未采集</text>
+<text x="28" y="564" font-size="13" font-weight="400" fill="#344054">aclImportBare（裸 SSH）：未采集</text>
+<text x="28" y="586" font-size="13" font-weight="400" fill="#344054">ATC：8.0.0</text>
+<text x="28" y="608" font-size="13" font-weight="400" fill="#344054">设备节点：present</text>
+<text x="28" y="644" font-size="15" font-weight="600" fill="#101828">调试入口：知识库 15 条，覆盖 8 个领域</text>
+<text x="28" y="672" font-size="13" font-weight="400" fill="#344054">pyacl(2) · atc(1) · env(4) · framework(3) · camera(1) · service(1) · performance(2) · quant(1)</text>
+<text x="28" y="708" font-size="15" font-weight="600" fill="#101828">样例索引：15 条</text>
+<text x="28" y="736" font-size="13" font-weight="400" fill="#344054">有入口 7 条 · 有测试命令 4 条 · 已识别路径 atc-conversion、camera-v4l2、dvpp-video、framework-migration、npu-service、performance、pyacl-inference、quantization</text>
 </svg>

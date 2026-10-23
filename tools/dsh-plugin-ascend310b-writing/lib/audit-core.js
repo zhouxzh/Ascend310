@@ -148,6 +148,23 @@ export function splitFrontmatter(text) {
  * @returns {{ text: string, lines: string[], headings: Array<{ level: number, text: string, line: number, anchor?: string }> }}
  *   The raw text, its lines, and every ATX heading with its explicit anchor id.
  */
+const MANUAL_SECTION_NUMBER = /^(?:\d+\.\d+(?:\.\d+)*\.?|\d+[.、)])\s+/u;
+
+/**
+ * Detect a manually numbered section heading. Chapter/case/appendix numbers
+ * live in the frozen H1 or frontmatter; H2-H6 must stay semantic so the site
+ * and LaTeX can assign chapter-local numbers without duplicated prefixes.
+ *
+ * @param {string} text - heading text without the ATX marker or anchor.
+ * @returns {boolean} Whether the visible heading starts with manual numbering.
+ */
+export function hasManualSectionNumber(text) {
+	const visible = text.replace(/\{#[^}\s]+\}/u, '').trim();
+	// An IPv4 address or decimal measurement is content, not section numbering.
+	if (/^\d{1,3}(?:\.\d{1,3}){3}(?:\s|$)/u.test(visible)) return false;
+	return MANUAL_SECTION_NUMBER.test(visible);
+}
+
 export function readManuscript(file) {
 	const text = readFileSync(file, 'utf8');
 	const lines = text.split(/\r?\n/u);
@@ -393,6 +410,22 @@ function auditFile(context) {
 			);
 		}
 		previous = heading.level;
+	}
+
+	// Section numbers are rendered by VuePress/LaTeX. Keeping them in the
+	// source duplicates the chapter/case number and drifts when sections move.
+	if (!assetPart && ['book', 'experiment', 'appendix'].includes(part.key)) {
+		const manual = headings.filter(
+			(heading) => heading.level >= 2 && heading.level <= 6 && hasManualSectionNumber(heading.text)
+		);
+		if (manual.length > 0) {
+			push(
+				'heading-manual-number',
+				'error',
+				manual[0].line,
+				`H2-H6 有 ${manual.length} 个标题手写章节编号；保留语义标题，由站点/PDF 自动编号，首个：「${manual[0].text}」`
+			);
+		}
 	}
 
 	// --- heading length and shape -------------------------------------------

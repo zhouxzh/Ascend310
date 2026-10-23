@@ -205,7 +205,8 @@ set +u
 # shellcheck disable=SC1090
 source "$CONDA_SH" || die "failed to source conda.sh: $CONDA_SH"
 command -v conda >/dev/null 2>&1 || die "conda command unavailable after sourcing $CONDA_SH"
-conda activate base || die "failed to activate conda environment base"
+conda activate ascend || die "failed to activate conda environment ascend"
+export PYTHONNOUSERSITE=1
 set -u
 if [[ -z "$CANN_SET_ENV" ]]; then
   toolkit_hint="${ASCEND_TOOLKIT_HOME:-${ASCEND_HOME_PATH:-}}"

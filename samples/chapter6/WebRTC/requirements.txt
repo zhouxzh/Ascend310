@@ -1,5 +1,5 @@
-# Python 3.11
-aiohttp
-aiortc
-av
-numpy
+# Ascend 310B unified runtime: Python 3.9.25, conda env `ascend`.
+aiohttp==3.10.10
+aiortc==1.9.0
+av==12.3.0
+numpy==1.26.4

@@ -4,9 +4,30 @@
 
 案例的稳定 ID、语义关键词和迁移状态见 [实践案例目录规范](CASE_LAYOUT.md) 与 [案例索引](case-index.json)。仓库级工程文档入口见 [`../docs/README.md`](../docs/README.md)；根 README 只负责项目首页和本地书稿起步。
 
+## 发布复现来源
+
+案例测试必须能从公开来源重建，不以作者电脑上的运行目录为前置条件：
+
+- **程序**：在板端从固定的 GitHub 仓库和完整 commit SHA 检出；记录 `git status --short`，不把本地未提交源码复制过去冒充发布来源。
+- **模型**：从 Hugging Face 仓库按固定 revision 下载，默认使用 `HF_ENDPOINT=https://hf-mirror.com`；记录 repo、revision、文件清单、字节数、SHA-256 和许可证。
+- **禁止默认使用** `scp`/`rsync` 把作者本地的模型、ONNX、OM、数据集或未提交源码复制到开发板。离线包只能是明确的 `offline-bundle` 例外，并带完整来源和哈希。
+- 具体门禁、命令模板和报告字段见调试插件的 [`ascend310b-case-testing`](../tools/dsh-plugin-ascend310b-debug/skills/ascend310b-case-testing/SKILL.md)。
+
 ## 📚 章节代码
 
-`chapter2` 至 `chapter8` 分别对应 CANN/ATC、NPU 训练、PyACL、DVPP、自定义算子、性能优化和量化教程。每个目录的 README 说明其运行入口。
+`chapter2` 至 `chapter9` 分别对应 CANN/ATC、NPU 训练、PyACL、DVPP、自定义算子、性能优化和量化教程。每个目录的 README 说明运行入口，详细工程合同和证据边界从对应 docs 索引进入：
+
+| 章节样例 | 工程文档 |
+| --- | --- |
+| `chapter2` | [docs/README.md](chapter2/docs/README.md) |
+| `chapter3` | [docs/README.md](chapter3/docs/README.md) |
+| `chapter4` | [docs/README.md](chapter4/docs/README.md) |
+| `chapter5` | [docs/README.md](chapter5/docs/README.md) |
+| `chapter6` | [docs/README.md](chapter6/docs/README.md) |
+| `chapter7` | [docs/README.md](chapter7/docs/README.md) |
+| `chapter8` | [docs/README.md](chapter8/docs/README.md) |
+| `chapter9` | [docs/README.md](chapter9/docs/README.md) |
+
 
 ## 🧩 实践案例
 

@@ -14,7 +14,7 @@ WiFi、开机自启动、静态 IP 和无屏幕联网资料，并结合现有 31
 等名称只作为操作背景出现于命令示例的原始路径中，不能据此推断 310B
 板的实际设备名、IP 地址、接口编号或运行结果。
 
-\section{1. 教程定位与证据边界}\label{src-appendix-appendix2-scope}
+\section{教程定位与证据边界}\label{src-appendix-appendix2-scope}
 
 \subsection{三类操作位置}\label{ux4e09ux7c7bux64cdux4f5cux4f4dux7f6e}
 
@@ -118,8 +118,7 @@ PyACL，\passthrough{\lstinline!npu-smi info!} 读取 NPU
 
 四个问题没有答案时，先执行只读检查，不要直接执行写入命令。
 
-\section{2. Ubuntu 与 Linux
-基础}\label{ubuntu-ux4e0e-linux-ux57faux7840}
+\section{Ubuntu 与 Linux 基础}\label{ubuntu-ux4e0e-linux-ux57faux7840}
 
 \subsection{终端、用户和提示符}\label{ux7ec8ux7aefux7528ux6237ux548cux63d0ux793aux7b26}
 
@@ -220,8 +219,7 @@ command -v npu-smi || true
 \passthrough{\lstinline!atc!} 或 \passthrough{\lstinline!npu-smi!}
 不存在，应记录当前机器和当前环境，而不是修改代码来掩盖缺失的板端依赖。
 
-\section{3.
-文件系统、路径与常用命令}\label{ux6587ux4ef6ux7cfbux7edfux8defux5f84ux4e0eux5e38ux7528ux547dux4ee4}
+\section{文件系统、路径与常用命令}\label{ux6587ux4ef6ux7cfbux7edfux8defux5f84ux4e0eux5e38ux7528ux547dux4ee4}
 
 \subsection{Ubuntu 目录结构}\label{ubuntu-ux76eeux5f55ux7ed3ux6784}
 
@@ -369,7 +367,7 @@ sha256sum models/example.om
 token 放入公开归档。\passthrough{\lstinline!sha256sum!}
 只能证明字节一致，不能证明模型正确、可加载或数值正确。
 
-\section{4. 用户、组、权限、sudo
+\section{用户、组、权限、sudo
 与安全删除}\label{ux7528ux6237ux7ec4ux6743ux9650sudo-ux4e0eux5b89ux5168ux5220ux9664}
 
 \subsection{Linux 用户和组}\label{linux-ux7528ux6237ux548cux7ec4}
@@ -495,8 +493,7 @@ rm -f -- "$target_dir"/*.jpg
 \passthrough{\lstinline!rm -rf "$HOME"!}、\passthrough{\lstinline!rm -rf .!}
 或对整个部署目录的递归删除。
 
-\section{5. nano 与 vim
-编辑器}\label{nano-ux4e0e-vim-ux7f16ux8f91ux5668}
+\section{nano 与 vim 编辑器}\label{nano-ux4e0e-vim-ux7f16ux8f91ux5668}
 
 \subsection{nano}\label{nano}
 
@@ -588,7 +585,7 @@ vim 初始处于普通模式。按 \passthrough{\lstinline!i!} 或
 \passthrough{\lstinline!head!}、\passthrough{\lstinline!grep!} 或
 \passthrough{\lstinline!git diff!} 检查文件内容。
 
-\section{6. APT、换源、Conda、pip 与 Python
+\section{APT、换源、Conda、pip 与 Python
 路径}\label{aptux6362ux6e90condapip-ux4e0e-python-ux8defux5f84}
 
 \subsection{APT 软件包管理}\label{apt-ux8f6fux4ef6ux5305ux7ba1ux7406}
@@ -639,7 +636,8 @@ sudo apt-get update
 
 \begin{lstlisting}[language=bash]
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 python --version
 python -c 'import sys; print(sys.executable)'
 \end{lstlisting}
@@ -699,7 +697,7 @@ python -c 'import os; print(os.environ.get("LD_LIBRARY_PATH", ""))'
 目录。持久化修改应经过部署评审，不能临时写入
 \passthrough{\lstinline!/etc/profile!} 后让所有用户和所有服务继承。
 
-\section{7. 网络、静态
+\section{网络、静态
 IP、WiFi、热点与同网段检查}\label{ux7f51ux7edcux9759ux6001-ipwifiux70edux70b9ux4e0eux540cux7f51ux6bb5ux68c0ux67e5}
 
 \subsection{网络状态}\label{ux7f51ux7edcux72b6ux6001}
@@ -844,7 +842,7 @@ ip addr
 310B 板的默认值。成功连接 WiFi 后，IP 可能改变；应记录 DHCP
 分配的地址或为板端设置不冲突的静态地址。
 
-\section{8. SSH
+\section{SSH
 远程命令行控制}\label{ssh-ux8fdcux7a0bux547dux4ee4ux884cux63a7ux5236}
 
 \subsection{客户端与服务端}\label{ux5ba2ux6237ux7aefux4e0eux670dux52a1ux7aef}
@@ -972,7 +970,7 @@ ping -c 4 <board-ip>
   配置后，保留一个已登录会话，再从新会话验证，避免把自己锁在系统外。
 \end{itemize}
 
-\section{9. VNC
+\section{VNC
 远程桌面控制}\label{vnc-ux8fdcux7a0bux684cux9762ux63a7ux5236}
 
 \subsection{客户端与服务端}\label{ux5ba2ux6237ux7aefux4e0eux670dux52a1ux7aef-1}
@@ -1066,7 +1064,7 @@ VNC 服务不要直接暴露到不可信网络。需要通过 SSH
 隧道访问时，可以把本地端口转发到板端 VNC 端口，但应确认 VNC
 监听地址和端口，并使用唯一强密码。
 
-\section{10. NFS、SCP 与 rsync}\label{nfsscp-ux4e0e-rsync}
+\section{NFS、SCP 与 rsync}\label{nfsscp-ux4e0e-rsync}
 
 \subsection{NFS 的角色}\label{nfs-ux7684ux89d2ux8272}
 
@@ -1223,7 +1221,7 @@ rsync -av --protect-args \
 \passthrough{\lstinline!wc -c!}、\passthrough{\lstinline!sha256sum!}
 或清单检查。模型、OM、数据集和真实运行报告不应因为一次同步就进入 Git。
 
-\section{11. Docker 基础与 ROS2
+\section{Docker 基础与 ROS2
 容器命令}\label{docker-ux57faux7840ux4e0e-ros2-ux5bb9ux5668ux547dux4ee4}
 
 \subsection{Docker 基本概念}\label{docker-ux57faux672cux6982ux5ff5}
@@ -1343,7 +1341,7 @@ xhost +
 \passthrough{\lstinline!localhost:10.0!} 等转发地址，容器启动后新建的
 SSH 会话不一定继承原有显示权限。
 
-\section{12. 程序开机自启动：桌面项、启动应用和
+\section{程序开机自启动：桌面项、启动应用和
 systemd}\label{ux7a0bux5e8fux5f00ux673aux81eaux542fux52a8ux684cux9762ux9879ux542fux52a8ux5e94ux7528ux548c-systemd}
 
 \subsection{桌面自启动项}\label{ux684cux9762ux81eaux542fux52a8ux9879}
@@ -1478,15 +1476,15 @@ reboot
 \passthrough{\lstinline!rc.local!}，而且它不提供服务依赖、重启策略和日志单位。除非目标系统已有明确要求，优先使用
 systemd。
 
-\section{13. CANN、PyACL、NPU、ATC 与
-OM}\label{cannpyaclnpuatc-ux4e0e-om}
+\section{CANN、PyACL、NPU、ATC 与 OM}\label{cannpyaclnpuatc-ux4e0e-om}
 
 \subsection{在同一 shell 加载 Conda 和
 CANN}\label{ux5728ux540cux4e00-shell-ux52a0ux8f7d-conda-ux548c-cann}
 
 \begin{lstlisting}[language=bash]
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 python --version
 python -c 'import sys; print(sys.executable)'
@@ -1601,8 +1599,7 @@ export LD_LIBRARY_PATH="/usr/local/Ascend/ascend-toolkit/latest/lib64:${LD_LIBRA
 \passthrough{\lstinline!/etc/profile!} 来让所有用户继承未经验证的 CANN
 和 Python 路径。
 
-\section{14.
-板端设备、服务、日志、测试与证据边界}\label{ux677fux7aefux8bbeux5907ux670dux52a1ux65e5ux5fd7ux6d4bux8bd5ux4e0eux8bc1ux636eux8fb9ux754c}
+\section{板端设备、服务、日志、测试与证据边界}\label{ux677fux7aefux8bbeux5907ux670dux52a1ux65e5ux5fd7ux6d4bux8bd5ux4e0eux8bc1ux636eux8fb9ux754c}
 
 \subsection{系统状态报告}\label{ux7cfbux7edfux72b6ux6001ux62a5ux544a}
 
@@ -1795,8 +1792,7 @@ UI 烟测 & 页面或控件可以交互 & 后端真实硬件推理已经完成 \
 每份报告至少记录硬件型号和算力层级、CANN 版本、模型 ID
 和精度、输入合同、预热次数、循环次数、重复次数、百分位方法、输入来源、输出路径和原始日志。
 
-\section{15.
-故障排查与禁止命令模式}\label{ux6545ux969cux6392ux67e5ux4e0eux7981ux6b62ux547dux4ee4ux6a21ux5f0f}
+\section{故障排查与禁止命令模式}\label{ux6545ux969cux6392ux67e5ux4e0eux7981ux6b62ux547dux4ee4ux6a21ux5f0f}
 
 \subsection{常见故障}\label{ux5e38ux89c1ux6545ux969c}
 

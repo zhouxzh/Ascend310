@@ -98,6 +98,7 @@ check(rendered.includes('代码文档与样例同步'), 'panel must show code-do
 check(rendered.includes('samples/case1'), 'panel must list sample documentation rows');
 check(rendered.includes('代码 docs'), 'panel must show a code-docs card');
 check(rendered.includes('跨对象同步问题'), 'panel must show cross-object sync issues');
+check(rendered.includes('概览') && rendered.includes('分部进度') && rendered.includes('代码文档') && rendered.includes('问题清单'), 'panel must expose the four writing work areas');
 if (failures.length > 0) {
 	console.error('panel render test FAILED:');
 	for (const failure of failures) console.error(`  - ${failure}`);

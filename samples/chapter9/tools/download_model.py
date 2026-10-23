@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Download chapter 8 ResNet18-TinyImageNet ONNX model from Hugging Face."""
+"""Download chapter 9 ResNet18-TinyImageNet ONNX model from Hugging Face."""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -14,17 +15,40 @@ from urllib.request import Request, urlopen
 
 
 DEFAULT_REPO = "zhouxzh/resnet18_tiny_imagenet"
+DEFAULT_REVISION = "dfcf5885dcf7beab3a5d6e2143c73d7973bead36"
 DEFAULT_ENDPOINT = os.environ.get("HF_ENDPOINT", "https://hf-mirror.com").rstrip("/")
 FALLBACK_ENDPOINT = "https://huggingface.co"
 SCRIPT_DIR = Path(__file__).resolve().parent
 CHAPTER_DIR = SCRIPT_DIR.parent
 MODEL_DIR = CHAPTER_DIR / "model"
 MODEL_FILE = "resnet18_tiny_imagenet.onnx"
+EXPECTED_SHA256 = "e461aecee8bfafe95cd4528d3e836783c7546a0bb201c98e25109cde51b3bd6e"
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_sha256(path: Path) -> None:
+    actual = sha256_file(path)
+    if actual != EXPECTED_SHA256:
+        raise RuntimeError(
+            f"SHA-256 mismatch for {MODEL_FILE}: expected {EXPECTED_SHA256}, got {actual}"
+        )
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Download chapter 8 ResNet18-TinyImageNet ONNX model.")
+    parser = argparse.ArgumentParser(description="Download chapter 9 ResNet18-TinyImageNet ONNX model.")
     parser.add_argument("--repo", default=DEFAULT_REPO, help=f"Hugging Face repo id (default: {DEFAULT_REPO}).")
+    parser.add_argument(
+        "--revision",
+        default=DEFAULT_REVISION,
+        help=f"Pinned Hugging Face revision (default: {DEFAULT_REVISION}).",
+    )
     parser.add_argument(
         "--endpoint",
         default=DEFAULT_ENDPOINT,
@@ -40,8 +64,8 @@ def build_api_url(endpoint: str, repo_id: str) -> str:
     return f"{endpoint.rstrip('/')}/api/models/{repo_id}"
 
 
-def build_download_url(endpoint: str, repo_id: str, filename: str) -> str:
-    return f"{endpoint.rstrip('/')}/{repo_id}/resolve/main/{quote(filename, safe='/')}?download=true"
+def build_download_url(endpoint: str, repo_id: str, revision: str, filename: str) -> str:
+    return f"{endpoint.rstrip('/')}/{repo_id}/resolve/{revision}/{quote(filename, safe='/')}?download=true"
 
 
 def candidate_endpoints(endpoint: str) -> list[str]:
@@ -51,19 +75,33 @@ def candidate_endpoints(endpoint: str) -> list[str]:
     return endpoints
 
 
-def download_file(repo_id: str, endpoint: str, output_dir: Path, *, force: bool, timeout: float) -> Path:
+def download_file(
+    repo_id: str,
+    endpoint: str,
+    revision: str,
+    output_dir: Path,
+    *,
+    force: bool,
+    timeout: float,
+) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / MODEL_FILE
     if target.exists() and not force:
+        verify_sha256(target)
         print(f"exists: {target}")
         return target
 
-    url = build_download_url(endpoint, repo_id, MODEL_FILE)
+    url = build_download_url(endpoint, repo_id, revision, MODEL_FILE)
     print(f"download: {MODEL_FILE} -> {target}")
-    request = Request(url, headers={"User-Agent": "ascend310-chapter8/1.0"})
+    request = Request(url, headers={"User-Agent": "ascend310-chapter9/1.0"})
     tmp_target = target.with_name(target.name + ".tmp")
     with urlopen(request, timeout=timeout) as response, tmp_target.open("wb") as output:
         shutil.copyfileobj(response, output)
+    try:
+        verify_sha256(tmp_target)
+    except Exception:
+        tmp_target.unlink(missing_ok=True)
+        raise
     tmp_target.replace(target)
     return target
 
@@ -74,13 +112,27 @@ def main() -> int:
     endpoints = candidate_endpoints(args.endpoint)
 
     try:
-        download_file(args.repo, endpoints[0], output_dir, force=args.force, timeout=args.timeout)
+        download_file(
+            args.repo,
+            endpoints[0],
+            args.revision,
+            output_dir,
+            force=args.force,
+            timeout=args.timeout,
+        )
     except Exception as exc:
         print(f"failed from {endpoints[0]}: {exc}", file=sys.stderr)
         if endpoints[1:]:
             print(f"retry from {endpoints[1]} ...", file=sys.stderr)
             try:
-                download_file(args.repo, endpoints[1], output_dir, force=args.force, timeout=args.timeout)
+                download_file(
+                    args.repo,
+                    endpoints[1],
+                    args.revision,
+                    output_dir,
+                    force=args.force,
+                    timeout=args.timeout,
+                )
             except Exception as exc2:
                 print(f"failed from {endpoints[1]}: {exc2}", file=sys.stderr)
                 return 2

@@ -17,6 +17,7 @@ _按任务查找 Case7 当前部署、照片、显示、设备、模型、API �
 | MobileCLIP、Chinese-CLIP、ResNet 和 NPU 准入 | [05-models-and-npu.md](05-models-and-npu.md) |
 | 手机、触摸屏和 ESP32 HTTP 接口 | [06-api-reference.md](06-api-reference.md) |
 | 测试、验收和故障排查 | [07-validation-and-troubleshooting.md](07-validation-and-troubleshooting.md) |
+| 统一测试问题台账 | [08-troubleshooting.md](08-troubleshooting.md) |
 
 ## 先读哪份
 

@@ -12,7 +12,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { expandCidr, parseIPv4, probeCandidate } from '../lib/discovery.js';
+import {
+	expandCidr,
+	inferLocalPrivateCidrs,
+	parseIPv4,
+	probeCandidate,
+	resolveDiscoveryCidrs
+} from '../lib/discovery.js';
 import {
 	boardIdForMac,
 	inventoryPath,
@@ -44,6 +50,31 @@ try {
 	rejected = true;
 }
 check(rejected, '发现扫描必须拒绝公网 CIDR');
+
+const fakeInterfaces = {
+	Loopback: [
+		{ family: 'IPv4', address: '127.0.0.1', internal: true },
+		{ family: 'IPv6', address: '::1', internal: true }
+	],
+	Hotspot: [
+		{ family: 'IPv4', address: '10.73.137.1', internal: false },
+		{ family: 'IPv6', address: 'fe80::1', internal: false }
+	],
+	Wifi: [{ family: 4, address: '10.36.43.156', internal: false }],
+	Lab22: [{ family: 'IPv4', address: '10.42.8.235', netmask: '255.255.252.0', internal: false }],
+	Public: [{ family: 'IPv4', address: '8.8.8.8', internal: false }]
+};
+const inferred = inferLocalPrivateCidrs(fakeInterfaces);
+check(inferred.includes('10.73.137.0/24'), '应自动包含热点 /24 网段');
+check(inferred.includes('10.36.43.0/24'), '应自动包含其他活动私有 /24 网段');
+check(inferred.includes('10.42.8.0/22'), '应保留活动网卡的真实 /22 前缀');
+check(!inferred.includes('8.8.8.0/24'), '自动推导不得包含公网 /24');
+check(!inferred.includes('127.0.0.0/24'), '自动推导不得包含回环 /24');
+const mergedCidrs = resolveDiscoveryCidrs(null, ['10.55.3.0/24'], fakeInterfaces);
+check(mergedCidrs.includes('10.55.3.0/24'), '默认发现应保留显式配置网段');
+check(mergedCidrs.includes('10.73.137.0/24'), '默认发现应合并当前热点网段');
+const explicitCidrs = resolveDiscoveryCidrs(['10.0.0.0/30'], ['10.55.3.0/24'], fakeInterfaces);
+equal(explicitCidrs.join(','), '10.0.0.0/30', '单次显式 CIDR 应覆盖自动与配置网段');
 
 const probeText = [
 	'===ABS_BEGIN:hostname===',
@@ -81,11 +112,13 @@ const first = observeBoard(inventory, {
 	user: 'HwHiAiUser',
 	mac: 'c0:74:2b:fd:dd:7a',
 	hostname: 'orangepiaipro',
-	system: candidate.system
+	system: candidate.system,
+	serial: { status: 'reachable', port: 'COM7', user: 'HwHiAiUser', ip: '10.0.0.100', hostname: 'orangepiaipro' }
 }, '2026-10-18T01:00:00.000Z');
 inventory = first.inventory;
 equal(first.status, 'new', '第一次发现应为 new');
 equal(first.board.mac, 'c0:74:2b:fd:dd:7a', '资产表必须记录 MAC');
+equal(first.board.serial?.port, 'COM7', '串口发现状态必须写入资产表');
 
 const moved = observeBoard(inventory, {
 	ip: '10.0.0.120',
@@ -96,6 +129,7 @@ const moved = observeBoard(inventory, {
 }, '2026-10-18T01:05:00.000Z');
 equal(moved.status, 'ip-changed', '同一 MAC 换 IP 应归并为 ip-changed');
 equal(moved.inventory.boards['c0:74:2b:fd:dd:7a'].lastIp, '10.0.0.120', '资产表应更新当前 IP');
+equal(moved.board.serial?.port, 'COM7', '后续网络发现不能清空串口状态');
 const hostnameProbe = observeBoard(moved.inventory, {
 	ip: null,
 	user: 'HwHiAiUser',
@@ -118,6 +152,17 @@ equal(changed.status, 'system-changed', '驱动/CANN 变化应标为 system-chan
 check(changed.changes.some((field) => field.name === 'driverVersion'), '变更记录应包含驱动');
 check(changed.changes.some((field) => field.name === 'cannVersion'), '变更记录应包含 CANN');
 equal(changed.inventory.boards['c0:74:2b:fd:dd:7a'].changes.length, 1, '系统变更应写入历史');
+
+const partial = observeBoard(changed.inventory, {
+	ip: '10.0.0.120',
+	user: 'HwHiAiUser',
+	mac: 'c0:74:2b:fd:dd:7a',
+	hostname: 'orangepiaipro',
+	system: { hostname: 'orangepiaipro' }
+}, '2026-10-18T02:05:00.000Z');
+equal(partial.status, 'unchanged', '缺失的系统字段不能伪造变更');
+equal(partial.board.system.driverVersion, '25.5.0', '缺失驱动字段应保留上次证据');
+equal(partial.board.system.cannVersion, '9.2.0', '缺失 CANN 字段应保留上次证据');
 
 const directory = mkdtempSync(join(tmpdir(), 'ascend-inventory-'));
 try {

@@ -6,6 +6,7 @@ import argparse
 import time
 import json
 import acl
+from bbox_utils import scale_xyxy_boxes, xyxy_to_coco_xywh
 from utils_cpu import dboxes300_coco, Encoder, visualize_sample
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -235,13 +236,7 @@ def get_coco_ground_truth(val_ds_hf):
         objects = item.get("objects", {})
         if len(objects.get("bbox", [])) > 0:
             for bbox, cat in zip(objects["bbox"], objects["category"]):
-                xmin, ymin, bw_src, bh_src = bbox
-
-                bx = xmin * 300 / w
-                by = ymin * 300 / h
-                bw = bw_src * 300 / w
-                bh = bh_src * 300 / h
-
+                bx, by, bw, bh = xyxy_to_coco_xywh(bbox, w, h)
                 coco_gt_dict["annotations"].append(
                     {
                         "id": len(coco_gt_dict["annotations"]),
@@ -295,18 +290,9 @@ def get_gt_data(item, orig_w, orig_h):
     if len(objects["bbox"]) == 0:
         return np.array([]), np.array([])
 
-    boxes = np.array(objects["bbox"])
+    boxes = scale_xyxy_boxes(objects["bbox"], orig_w, orig_h)
     labels = np.array(objects["category"]) + 1
-
-    scale_x = 300.0 / orig_w
-    scale_y = 300.0 / orig_h
-
-    boxes[:, 0] *= scale_x
-    boxes[:, 1] *= scale_y
-    boxes[:, 2] *= scale_x
-    boxes[:, 3] *= scale_y
-
-    return boxes.astype(np.float32), labels.astype(np.int64)
+    return boxes, labels.astype(np.int64)
 
 
 def get_category_names(val_dataset):

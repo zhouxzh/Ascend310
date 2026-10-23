@@ -19,9 +19,9 @@ lang: zh-cn
 
 `for`、`if`、`dict`、`set`、异常处理等基础语法会在前几节展开，第 4 节补充 `samples/` 中高频出现的文件、JSON、命令行和异步写法。所有示例都只使用标准库，不引入 `pandas`，也不需要板端运行环境。
 
-## 1. 数据、类型与容器
+## 数据、类型与容器
 
-### 1.1 变量与基本类型
+### 变量与基本类型
 
 变量是给值起的名字。Python 中每个值都有类型，类型决定它可以参与哪些运算。检查类型用 `type()`，查看结果用 `print()`。
 
@@ -48,7 +48,7 @@ print(type(is_admitted))
 
 `str` 是文本，`int` 是整数，`float` 是小数，`bool` 是布尔值。模型 ID 适合存成 `str`，嵌入维度适合存成 `int`。
 
-### 1.2 数字运算与单位换算
+### 数字运算与单位换算
 
 模型文件大小经常需要在字节和 MiB 之间换算。`/` 是普通除法，`//` 是向下取整，`%` 是取余数，`round()` 控制显示精度。
 
@@ -73,7 +73,7 @@ print(bytes_size % 1024)
 
 `round()` 只改变显示结果，不改变原始变量。
 
-### 1.3 列表与元组
+### 列表与元组
 
 模型输入形状、预处理均值和标准差通常是有序数值。`list` 保存可增删的有序数据，`tuple` 保存创建后不修改的固定组合。
 
@@ -98,7 +98,7 @@ print(image_mean[0])
 
 列表索引从 0 开始，`-1` 表示最后一个元素。`len()` 返回元素个数。
 
-### 1.4 字典
+### 字典
 
 模型清单由多个字段组成，每个字段用一个键和对应的值表示。`dict` 保存键值对，适合描述一个模型条目。
 
@@ -123,7 +123,7 @@ mobileclip_s0
 
 键通常使用字符串，值可以是字符串、数字、列表或另一个字典。
 
-### 1.5 集合
+### 集合
 
 需要知道模型清单中出现过哪些精度模式时，用 `set` 去重。
 
@@ -140,9 +140,9 @@ print(precision_modes)
 
 集合不保留插入顺序，也不能通过索引取值。顺序不重要的去重任务才适合使用集合。
 
-## 2. 控制流
+## 控制流
 
-### 2.1 条件分支
+### 条件分支
 
 `if` 处理一个条件，`elif` 处理“否则如果”，`else` 是兜底。判断从上往下执行，先命中的分支生效。
 
@@ -165,7 +165,7 @@ else:
 
 比较运算符 `==` 判断是否相等，结果是一个布尔值。
 
-### 2.2 for 循环
+### for 循环
 
 `for` 循环依次取出列表中的元素，重复执行缩进块。累加前先设置 `total = 0`，这个初始值必须写在循环外。
 
@@ -189,7 +189,7 @@ print(max(feature_dims))
 2048
 ```
 
-### 2.3 range、enumerate 与 zip
+### range、enumerate 与 zip
 
 `range(n)` 生成从 0 到 `n - 1` 的整数序列。`enumerate()` 同时返回序号和元素，`zip()` 把多个序列按位置配对。
 
@@ -221,7 +221,7 @@ mobileclip_s0 512
 resnet50_feature 2048
 ```
 
-### 2.4 while、break 与 continue
+### while、break 与 continue
 
 `while` 在条件仍为真时重复执行。循环内必须修改条件变量，否则会无限循环。`continue` 跳过本次循环，`break` 立即结束整个循环。
 
@@ -264,7 +264,7 @@ for dim in dims:
 1024
 ```
 
-### 2.5 列表与字典推导式
+### 列表与字典推导式
 
 推导式用一行代码生成新列表或字典，适合结构简单的过滤和转换。
 
@@ -294,9 +294,9 @@ print(sizes_mib)
 {'mobileclip_s0': 125.79, 'resnet50_feature': 97.66}
 ```
 
-## 3. 函数与模型清单
+## 函数与模型清单
 
-### 3.1 函数封装
+### 函数封装
 
 函数把重复逻辑打包成可复用单元。下面函数接收模型列表，返回按精度模式统计的字典。
 
@@ -328,7 +328,7 @@ mixed_fp16: 1
 
 `dict.get(key, 0)` 在键不存在时返回默认值 0。`sorted()` 让输出顺序稳定。
 
-### 3.2 默认参数
+### 默认参数
 
 默认参数让调用更简洁，同时允许按名字覆盖默认值。
 
@@ -347,7 +347,7 @@ mobileclip_s0: mixed_fp16
 resnet50_feature: allow_fp32_to_fp16
 ```
 
-### 3.3 *args 与 **kwargs
+### *args 与 **kwargs
 
 `*values` 收集位置参数，`**options` 收集关键字参数。
 
@@ -364,7 +364,7 @@ summarize("models", 512, 1024, status="admitted")
 models (512, 1024) {'status': 'admitted'}
 ```
 
-### 3.4 lambda
+### lambda
 
 `lambda` 适合写一个短小的临时函数。
 
@@ -384,7 +384,7 @@ print([model["model_id"] for model in models])
 ['resnet50_feature', 'mobileclip_s0']
 ```
 
-### 3.5 f-string
+### f-string
 
 f-string 用 `f"..."` 开头，大括号内插入变量。
 
@@ -401,7 +401,7 @@ print(f"{model_id}: {embedding_dim} dim")
 mobileclip_s0: 512 dim
 ```
 
-### 3.6 类型注解
+### 类型注解
 
 类型注解帮助阅读代码，也方便工具检查错误。它不会改变运行结果。
 
@@ -410,7 +410,7 @@ def admitted_models(models: list[dict]) -> list[dict]:
     return [model for model in models if model.get("status") == "admitted"]
 ```
 
-### 3.7 dataclass
+### dataclass
 
 `dataclass` 自动生成初始化、比较和打印方法，适合保存结构清晰的记录。
 
@@ -433,7 +433,7 @@ print(record)
 ModelRecord(model_id='mobileclip_s0', embedding_dim=512, status='admitted')
 ```
 
-### 3.8 class 与 self
+### class 与 self
 
 `__init__` 是实例创建时执行的方法，`self` 指向当前实例。
 
@@ -455,9 +455,9 @@ print(checker.is_admitted())
 True
 ```
 
-## 4. 文件、JSON、命令行与异步
+## 文件、JSON、命令行与异步
 
-### 4.1 缺失键与类型转换
+### 缺失键与类型转换
 
 模型清单可能来自不同版本的脚本，字段并不总是一致。直接读取缺失字段会触发 `KeyError`，用 `dict.get()` 可以提供默认值。
 
@@ -497,7 +497,7 @@ None
 
 `None` 表示没有有效数值。统计前应先检查它，不要把 `None` 当成 0。
 
-### 4.2 pathlib 与 with open
+### pathlib 与 with open
 
 `Path` 提供跨平台的路径操作，`with open` 在读取或写入结束后自动关闭文件。
 
@@ -518,7 +518,7 @@ with path.open(encoding="utf-8") as f:
 mixed_fp16
 ```
 
-### 4.3 json.loads 与 json.dumps
+### json.loads 与 json.dumps
 
 模型配置常以 JSON 保存。`json.loads()` 把 JSON 文本转回 Python 对象，`json.dumps()` 把 Python 对象转成 JSON 文本。
 
@@ -555,7 +555,7 @@ print(json.dumps(config, ensure_ascii=False, indent=2))
 
 解析失败时，`json.loads()` 会抛出 `json.JSONDecodeError`。处理外部配置或日志时，先确认它确实是合法 JSON，再读取字段，不要把解析失败和字段缺失混为一谈。
 
-### 4.4 try / except / else / finally
+### try / except / else / finally
 
 `else` 在没有异常时执行，`finally` 无论是否异常都会执行。
 
@@ -577,7 +577,7 @@ converted
 done
 ```
 
-### 4.5 argparse
+### argparse
 
 `argparse` 用来解析命令行参数，样例脚本中常用来接收模型 ID、精度和路径。
 
@@ -597,7 +597,7 @@ print(args.model_id)
 resnet50_feature
 ```
 
-### 4.6 if __name__ == "__main__"
+### if __name__ == "__main__"
 
 被直接运行时会执行 `main()`，被其他模块导入时不会自动执行。
 
@@ -615,7 +615,7 @@ if __name__ == "__main__":
 check complete
 ```
 
-### 4.7 logging
+### logging
 
 `logging` 比 `print()` 更适合记录运行过程，样例服务中常用来区分普通日志和错误日志。
 
@@ -633,7 +633,7 @@ logger.info("model check complete")
 INFO:appendix3:model check complete
 ```
 
-### 4.8 subprocess
+### subprocess
 
 `subprocess.run()` 启动外部命令，`capture_output=True` 捕获标准输出。
 
@@ -646,7 +646,7 @@ print(result.stdout.strip())
 
 输出内容取决于本机 Python 版本。
 
-### 4.9 async / await
+### async / await
 
 `async def` 定义异步函数，`await` 等待异步结果。样例中的 WebRTC 和聊天服务大量使用这种写法。
 
@@ -668,9 +668,9 @@ asyncio.run(main())
 admitted
 ```
 
-## 5. 调试与验证
+## 调试与验证
 
-### 5.1 最小调试手段
+### 最小调试手段
 
 出错时先确认对象的真实内容，不要只看报错文字。`repr()` 可以显示字符串中的空格和引号。
 
@@ -696,7 +696,7 @@ python -m py_compile 脚本路径.py
 
 `py_compile` 只检查语法，不运行板端逻辑。昇腾 310B 的 CANN、ATC 和 ACL 检查仍应在真实开发板上完成。
 
-### 5.2 验证清单 {#src-appendix-appendix3-validation}
+### 验证清单 {#src-appendix-appendix3-validation}
 
 - [ ] 能说出 `int`、`float`、`str`、`bool` 的区别。
 - [ ] 能用列表保存输入形状或特征维度，并用循环完成求和。
@@ -706,7 +706,7 @@ python -m py_compile 脚本路径.py
 - [ ] 能阅读 `samples/` 中常见的列表推导、`enumerate`、`argparse` 和 `pathlib` 写法。
 - [ ] 示例只使用标准库，没有 `pandas` 或板端运行时依赖。
 
-### 5.3 常见错误与坑 {#src-appendix-appendix3-pitfalls}
+### 常见错误与坑 {#src-appendix-appendix3-pitfalls}
 
 | 现象 | 可能原因 | 处理方式 |
 | --- | --- | --- |
@@ -716,7 +716,7 @@ python -m py_compile 脚本路径.py
 | 统计结果比预期少 | 把字符串当成数字 | 先看 `type()`，必要时转换 |
 | 输出顺序每次不同 | 遍历集合或字典 | 需要稳定顺序时用 `sorted()` |
 
-## 6. 作业 {#src-appendix-appendix3-assignment}
+## 作业 {#src-appendix-appendix3-assignment}
 
 1. 新建一个脚本，统计 `feature_dims = [512, 1024, 2048, 512]` 的元素个数、最小值、最大值和去重后的维度集合。
 2. 写一个函数 `count_admitted(models)`，接收模型字典列表，返回 `status == "admitted"` 的模型数量。

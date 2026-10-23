@@ -63,7 +63,7 @@ INT8。
 如果这个横向对比已经满足项目目标，就可以进入部署评审；如果 INT8 精度不稳定、
 不达标，或者需要解释校准数据规模对精度的影响，再进入可选的校准样本数 sweep。
 
-## 9.1 从性能瓶颈到量化决策 {#src-book-chapter9-h1}
+## 从性能瓶颈到量化决策 {#src-book-chapter9-h1}
 
 在实际项目中，量化经常被误用成“只要模型慢，就先转 INT8”。这并不稳妥。
 量化优化的是模型计算和一部分模型相关的数据搬运。如果端到端瓶颈在摄像头采集、
@@ -102,7 +102,7 @@ FP16、INT8 的 Top1、Top5 和推理耗时。只有功能证据、性能证据�
 本章所有结论都围绕同一个原则：每次改变模型精度，都必须同时保留功能证据、
 性能证据和精度证据。
 
-## 9.2 必备理论：FP32、FP16、INT8 与 PTQ {#src-book-chapter9-h2}
+## 必备理论：FP32、FP16、INT8 与 PTQ {#src-book-chapter9-h2}
 
 FP32、FP16 和 INT8 的区别不只是“数字位数不同”。它们影响模型权重、激活值、
 算子选择、内存带宽和最终预测排序。
@@ -158,7 +158,7 @@ $$
 下降不可接受，再考虑 QAT（Quantization-Aware Training），也就是训练时模拟
 量化误差并重新微调模型。
 
-## 9.3 如何设计量化验证代码：先拆职责，再写脚本 {#src-book-chapter9-h3}
+## 如何设计量化验证代码：先拆职责，再写脚本 {#src-book-chapter9-h3}
 
 写量化案例代码时，最忌讳把下载数据、图片预处理、模型推理、计时、accuracy 统计、
 AMCT 校准和报告写入全部塞进一个大脚本。那样虽然第一次能跑通，但只要换模型、
@@ -219,13 +219,15 @@ write_report(output_path, metrics)
 本章的参考实现可以在 GitHub 仓库中查看：
 [samples/chapter9](https://github.com/zhouxzh/Ascend310/tree/main/samples/chapter9)。
 
-## 9.4 如何编写数据准备代码：让输入可复现 {#src-book-chapter9-h4}
+## 如何编写数据准备代码：让输入可复现 {#src-book-chapter9-h4}
 
 先在开发板上加载 CANN 环境，激活 Python 环境，并进入样例目录：
 
 ```bash
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-conda activate npu
 cd ~/Documents/Ascend310/samples/chapter9
 ```
 
@@ -308,7 +310,7 @@ Top1/Top5，所以 `val_list.txt` 必须保存 `路径 标签`。
 下载程序还应支持强制刷新和离线 cache，这样既方便完整重跑，也能在网络不稳定时
 继续教学实验。
 
-## 9.5 预处理：所有模型对比必须使用同一套输入 {#src-book-chapter9-h5}
+## 预处理：所有模型对比必须使用同一套输入 {#src-book-chapter9-h5}
 
 量化实验中最容易被忽略的是预处理。如果 FP32、FP16、INT8 三个模型使用的 resize、
 颜色通道、归一化或 layout 不一致，后面所有精度对比都没有意义。
@@ -345,7 +347,7 @@ input_tensor = image_chw[None, ...]
 | `astype(np.float32)` | 即使后续模型是 FP16/INT8，输入预处理仍用同一个 FP32 浮点张量作为比较基准 |
 | `IMAGENET_MEAN` 和 `IMAGENET_INV_STD` | 复用训练时的归一化方式，否则 accuracy 变化无法归因到量化 |
 
-## 9.6 ATC 转 FP32/FP16：先建立可比较的基准 {#src-book-chapter9-h6}
+## ATC 转 FP32/FP16：先建立可比较的基准 {#src-book-chapter9-h6}
 
 在做 INT8 之前，先从同一个 FP32 ONNX 转出 FP32 OM 和 FP16 OM。FP32 OM 是
 精度参考，FP16 OM 是第一阶段优化对象。
@@ -397,7 +399,7 @@ resnet18_tiny_imagenet_fp32.om
 resnet18_tiny_imagenet_fp16.om
 ```
 
-## 9.7 如何编写输出对齐程序：先看模型是否“像”基准 {#src-book-chapter9-h7}
+## 如何编写输出对齐程序：先看模型是否“像”基准 {#src-book-chapter9-h7}
 
 转换成功不等于模型可信。第一层检查是输出对齐：给 FP32 OM 和候选 OM 喂同一张图，
 看 Top1 是否一致、Top5 重合度和 logits 误差。
@@ -465,7 +467,7 @@ max_abs_diff = np.max(np.abs(base_logits - candidate_logits))
 
 这个结果说明 FP16 的输出排序几乎完全继承了 FP32，可以继续看性能。
 
-## 9.8 如何编写性能对比程序：把耗时拆成可解释阶段 {#src-book-chapter9-h8}
+## 如何编写性能对比程序：把耗时拆成可解释阶段 {#src-book-chapter9-h8}
 
 第二层检查是性能。性能程序如果只记录一个总耗时，很难解释“模型变快了但端到端
 没有明显变快”这种现象。因此要把一次推理拆成 CPU 预处理、数据拷贝、设备执行和
@@ -528,14 +530,14 @@ with recorder.time("postprocess"):
 FP16 的输出对齐很好，但端到端收益比较温和。这提示我们：如果希望进一步压缩模型
 执行时间，可以继续尝试 INT8；但也要保持同样的验证标准。
 
-## 9.9 INT8 PTQ 程序：配置与激活范围 {#src-book-chapter9-h9}
+## INT8 PTQ 程序：配置与激活范围 {#src-book-chapter9-h9}
 
 INT8 不能只靠 ATC 参数完成。本章采用 AMCT PTQ 生成 deploy ONNX，再交给 ATC
 转换为 INT8 OM。
 
 ![INT8 PTQ 量化流程](img9/int8_ptq_pipeline.png){#fig:chapter9_int8_ptq_pipeline width=100% .center}
 
-### 9.9.1 为什么选择 `amct_onnx`
+### 为什么选择 `amct_onnx`
 
 AMCT 的全称是 Ascend Model Compression Toolkit，即昇腾模型压缩工具包。它不是
 一个推理运行时，而是部署前的模型处理工具：根据校准数据估计量化参数，把原始
@@ -574,7 +576,7 @@ AMCT 的全称是 Ascend Model Compression Toolkit，即昇腾模型压缩工具
 deploy ONNX 转换而来，避免了“PyTorch 模型、ONNX 模型、OM 模型各自一套语义”
 带来的额外不确定性。
 
-### 9.9.2 AMCT ONNX 环境
+### AMCT ONNX 环境
 
 INT8 PTQ 需要额外安装 AMCT ONNX 工具包。CANN Toolkit 本身不一定自带
 `amct_onnx` Python 包。本章验证环境为：
@@ -597,7 +599,7 @@ python -c 'import amct_onnx as amct, onnx, onnxruntime as ort; print("amct_onnx:
 如果 `import amct_onnx` 失败，优先检查 AMCT 包是否与 CANN 版本匹配、wheel 架构
 是否与 `uname -m` 一致、当前 `python` 是否就是安装 AMCT 的环境。
 
-### 9.9.3 准备阶段：生成量化配置
+### 准备阶段：生成量化配置
 
 第一步运行：
 
@@ -671,7 +673,7 @@ amct.create_quant_config(
 配置生成和校准执行可以分开排错；sweep 实验也可以为 20、50、100、200、400
 张图片分别生成独立配置。
 
-### 9.9.4 校准阶段：用真实图片统计激活范围
+### 校准阶段：用真实图片统计激活范围
 
 第二步运行：
 
@@ -757,7 +759,7 @@ ONNX，再复制到固定路径 `model/resnet18_tiny_imagenet_int8_deploy.onnx`�
 的好处是：AMCT 内部输出文件名可以随版本变化，而后续 ATC 命令永远读取同一个
 稳定路径。
 
-### 9.9.5 ATC 转 INT8 OM
+### ATC 转 INT8 OM
 
 最后用 AMCT 生成的 deploy ONNX 转出 INT8 OM：
 
@@ -775,7 +777,7 @@ atc \
 这里不再设置 `--precision_mode`。deploy ONNX 已经包含 AMCT 校准后的量化信息，
 额外指定精度模式可能覆盖或破坏这些信息。
 
-## 9.10 快速验证 INT8：漂移更大不等于不能用 {#src-book-chapter9-h10}
+## 快速验证 INT8：漂移更大不等于不能用 {#src-book-chapter9-h10}
 
 INT8 转换后，先重复 FP16 阶段的两个快速检查。
 
@@ -809,7 +811,7 @@ INT8 的 logits 误差明显大于 FP16，这是低比特量化的正常现象�
 为零”，而是这些误差是否改变最终分类结论。如果 Top1 match 和 Top5 overlap 仍然
 较高，就说明可以进入完整验证集评估。
 
-## 9.11 如何编写完整验证程序：把多个 OM 放到同一把尺上 {#src-book-chapter9-h11}
+## 如何编写完整验证程序：把多个 OM 放到同一把尺上 {#src-book-chapter9-h11}
 
 快速输出对齐不能替代真实精度。最终结论必须来自带标签的验证集：
 
@@ -895,7 +897,7 @@ Top1 正确 6243 张，INT8 Top1 正确 6244 张；同时 Top5 是 FP32/FP16 正
 截断改变了少量边界样本的 logits 排序，有的样本从错变对，也有的样本从 Top5
 内掉出。这种微小正负波动应视为量化噪声范围内的排序抖动，而不是稳定收益。
 
-## 9.12 如何编写 sweep 实验：用最少胶水代码重复完整流程 {#src-book-chapter9-h12}
+## 如何编写 sweep 实验：用最少胶水代码重复完整流程 {#src-book-chapter9-h12}
 
 如果 INT8 的完整验证集精度已经满足项目要求，这一节可以不做。sweep 是一个可选的
 分析实验，用来回答更细的问题：校准图片到底需要多少张，精度曲线什么时候进入
@@ -971,7 +973,7 @@ sweep 程序会为每个样本数单独执行图中的流程：
 校准和 ATC 转换，不能只替换清单后复用旧 INT8 OM，因为量化参数已经固化在 deploy
 ONNX 和 OM 中。
 
-## 9.13 如何设计报告和故障回退 {#src-book-chapter9-h13}
+## 如何设计报告和故障回退 {#src-book-chapter9-h13}
 
 量化验证代码不能只把结果打印在终端。终端输出适合人看，但不适合复查、画图、
 写报告或比较多轮实验。更好的做法是让每个程序都写结构化报告：输入模型是谁、
@@ -1007,7 +1009,7 @@ ONNX 和 OM 中。
 
 ![量化失败时的回退检查顺序](img9/quantization_debug_order.png){#fig:chapter9_quantization_debug_order width=30% .center}
 
-## 9.14 小结 {#src-book-chapter9-h14}
+## 小结 {#src-book-chapter9-h14}
 
 这个案例的重点不是“把 ResNet18 转成 INT8”这么简单，而是建立一套可复用的量化
 评估方法。先用 FP32 建立精度参考，再用 FP16 做温和优化，最后用 INT8 PTQ 追求

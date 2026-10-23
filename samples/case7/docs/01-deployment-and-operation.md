@@ -51,7 +51,8 @@ cd /home/HwHiAiUser/Documents/ai-album/current
 bash scripts/collect_system_status.sh
 
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 bash setup.sh board

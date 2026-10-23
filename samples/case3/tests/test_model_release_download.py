@@ -67,10 +67,12 @@ class ModelReleaseDownloadTest(unittest.TestCase):
             self.assertEqual(target.read_bytes(), b"complete")
             self.assertEqual(opener.ranges, ["bytes=5-", None])
 
-    def test_default_release_rejects_a_moved_tag(self) -> None:
-        validate_pinned_revision(REPOSITORY, DEFAULT_PIANO_REVISION, DEFAULT_PIANO_COMMIT)
+    def test_default_release_rejects_a_moved_legacy_tag(self) -> None:
+        validate_pinned_revision(
+            REPOSITORY, "model-suite-v1.0.1", DEFAULT_PIANO_COMMIT
+        )
         with self.assertRaisesRegex(RuntimeError, "expected"):
-            validate_pinned_revision(REPOSITORY, DEFAULT_PIANO_REVISION, "0" * 40)
+            validate_pinned_revision(REPOSITORY, "model-suite-v1.0.1", "0" * 40)
 
     def test_download_rejects_moving_branch_names(self) -> None:
         for revision in ("main", "master", "HEAD"):

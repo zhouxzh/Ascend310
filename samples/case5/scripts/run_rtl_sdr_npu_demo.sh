@@ -7,6 +7,7 @@ cd "$project_root"
 
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 
 exec python -m time_frequency_dashboard.rtl_sdr_npu_demo "$@"

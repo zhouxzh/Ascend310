@@ -29,11 +29,12 @@ activate_environment() {
 
     # shellcheck disable=SC1090
     source "$conda_script"
-    conda activate base || die "failed to activate conda base"
+    conda activate ascend || die "failed to activate conda ascend"
+    export PYTHONNOUSERSITE=1
     # shellcheck disable=SC1090
     source "$cann_script"
 
-    command -v python >/dev/null || die "python not found in conda base"
+    command -v python >/dev/null || die "python not found in conda ascend"
     command -v atc >/dev/null || die "atc not found after loading CANN"
 }
 

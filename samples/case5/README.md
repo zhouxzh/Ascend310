@@ -20,6 +20,7 @@
 | [05 第三方代码与许可证](docs/05_third_party_licenses.md) | 引入或发布第三方实现前 | 来源、许可证和再发布义务 |
 | [06 RTL-SDR 服务说明](docs/06_rtl_sdr_npu_demo.md) | 运行 IQ DFT Demo 或实时检测前 | CU8、FFTW、OM、JSONL 和 QC |
 | [07 异构处理与模型准入](docs/07_ascend310b_heterogeneous_signal_processing.md) | 重新生成候选模型或解释性能时 | 数值准入、模型边界和板端证据 |
+| [测试问题台账](docs/08-troubleshooting.md) | 复现失败或核对历史问题时 | 统一记录 ATC、数值、模型合同和语义边界 |
 
 ## 目录职责
 
@@ -52,7 +53,7 @@ Hantek 分析队列容量为 2，RTL-SDR 推理队列默认容量为 4；队列�
 
 ## 板端准备
 
-### 1. 先确认运行边界
+### 先确认运行边界
 
 以下操作只在已部署 CANN 的 Ascend 310B 板端执行。项目脚本不会执行 `sudo`、安装系统包、强杀外部程序或重新生成不在当前步骤需要的模型。
 
@@ -60,13 +61,14 @@ Hantek 分析队列容量为 2，RTL-SDR 推理队列默认容量为 4；队列�
 cd ~/Documents/case5
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 python -c "import numpy, onnx, onnxruntime, aclruntime; print('CANN Python environment ready')"
 ```
 
 `aclruntime`、CANN 和 ATC 必须来自板端既有安装；不要在本仓库或本地 Windows 中用 pip 安装替代它们。上面的导入失败时，应先修复板端 CANN/Conda 环境，再继续模型步骤。
 
-### 2. 由管理员手动安装的系统程序
+### 由管理员手动安装的系统程序
 
 | 程序或库 | 用途 | 是否必需 |
 | --- | --- | --- |
@@ -88,18 +90,19 @@ sudo apt-get install -y libsigrok-dev sigrok-cli gcc pkg-config libfftw3-single3
 
 若需要人工看 `CAL`，另行安装 `pulseview`。Qt X11 报缺少 `libxcb-cursor0` 时再安装该包；只做独立 FFTW C 基准时再安装 `libfftw3-dev`。不要用 `sudo` 启动仪表盘。
 
-### 3. 安装本项目的 Python 用户态依赖
+### 安装本项目的 Python 用户态依赖
 
-`requirements-board.txt` 只包含 PyUSB、PySide6 和 PyQtGraph；它不安装 CANN、ACL、NumPy、ONNX 或 ONNX Runtime。模型生成和数值验证依赖的 `numpy`、`onnx`、`onnxruntime` 应已经存在于板端受管的 `base` 环境中，前一节的 import 检查就是它们的准入条件。`requirements-dev.txt` 是本地模型/测试依赖清单，不用来替代板端 CANN 环境。
+`requirements-board.txt` 只包含 PyUSB、PySide6 和 PyQtGraph；它不安装 CANN、ACL、NumPy、ONNX 或 ONNX Runtime。模型生成和数值验证依赖的 `numpy`、`onnx`、`onnxruntime` 应已经存在于板端受管的统一 `ascend` 环境中，前一节的 import 检查就是它们的准入条件。`requirements-dev.txt` 是本地模型/测试依赖清单，不用来替代板端 CANN 环境。
 
 ```bash
 cd ~/Documents/case5
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 python -m pip install -r requirements-board.txt
 ```
 
-### 4. 检查 USB 和设备互斥
+### 检查 USB 和设备互斥
 
 关闭 PulseView、`sigrok-cli`、GQRX、GNU Radio、SDR++、`rtl_test` 和旧仪表盘。诊断只枚举设备，不打开接口或上传固件：
 
@@ -121,7 +124,8 @@ cd ~/Documents/case5
 bash scripts/build_sigrok_capture_bridge.sh
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 python -m time_frequency_dashboard.model.prepare_models
 python -m time_frequency_dashboard.model.verify_npu_model
 ```
@@ -136,7 +140,8 @@ python -m time_frequency_dashboard.model.verify_npu_model
 cd ~/Documents/case5
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 python -m time_frequency_dashboard.model.prepare_rtl_iq_model
 python -m time_frequency_dashboard.model.verify_rtl_iq_model
 ```

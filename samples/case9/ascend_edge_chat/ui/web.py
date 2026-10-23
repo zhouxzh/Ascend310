@@ -21,13 +21,13 @@ import subprocess
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Callable, Mapping, Optional, Tuple
+from typing import Any, AsyncIterator, Callable, Literal, Mapping, Optional, Protocol, Tuple
 from urllib.parse import urlparse
 
 import uvicorn
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from ..version import __version__
 from ..runtime.config import load_release_environment
@@ -72,6 +72,175 @@ class ModelSwitchError(RuntimeError):
     def __init__(self, message: str, *, rollback: str = "unknown") -> None:
         super().__init__(message)
         self.rollback = rollback
+
+
+class VoiceAgentError(RuntimeError):
+    """A sanitized failure from the optional board-owned voice agent."""
+
+
+class VoiceAgentClient(Protocol):
+    """Thin loopback contract between the text UI and the voice-agent process.
+
+    The UI never imports microphone, ALSA, ASR, TTS, Torch, or Ascend runtime
+    code.  The concrete agent address comes from validated UI configuration and
+    exposes only these board-owned control-plane paths:
+
+    - ``GET /health``
+    - ``GET /api/config``
+    - ``GET /api/status``
+    - ``PUT /api/config`` with a subset of
+      ``{\"mode\", \"input_id\", \"output_id\", \"auto_listen\"}``
+
+    Modes are ``disabled``, ``browser`` and ``board``.  In board mode, only
+    agent-enumerated ``input_id`` and ``output_id`` values are accepted.  An
+    ``enabled`` compatibility field is normalized to ``auto_listen`` only; it
+    is never a separate device or model control.  Browser mode never starts
+    board capture.  The UI never passes paths, commands, model, gateway, or
+    ASR/TTS implementation choices to the agent.
+    """
+
+    async def health(self) -> Mapping[str, Any]:
+        """Return sanitized voice-agent health."""
+
+    async def config(self) -> Mapping[str, Any]:
+        """Return sanitized board-owned voice configuration and allowlists."""
+
+    async def status(self) -> Mapping[str, Any]:
+        """Return sanitized current voice-agent state."""
+
+    async def configure(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Apply a validated control-plane configuration subset."""
+
+    async def transcribe_browser_wav(self, wav: bytes) -> Mapping[str, Any]:
+        """Transcribe one bounded browser-origin WAV only in browser mode."""
+
+    async def synthesize_browser_wav(self, text: str) -> bytes:
+        """Synthesize one bounded assistant text into an in-memory WAV."""
+
+    async def aclose(self) -> None:
+        """Release optional loopback HTTP resources."""
+
+
+class LoopbackVoiceAgentClient:
+    """HTTP adapter for the fixed local voice-agent control contract."""
+
+    @staticmethod
+    def _response_detail(response: httpx.Response, fallback: str) -> str:
+        try:
+            body = response.json()
+        except ValueError:
+            return fallback
+        detail = body.get("detail") if isinstance(body, Mapping) else None
+        return detail.strip()[:400] if isinstance(detail, str) and detail.strip() else fallback
+
+    def __init__(self, base_url: str, timeout_seconds: float) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._client = httpx.AsyncClient(
+            base_url=self._base_url,
+            timeout=httpx.Timeout(timeout_seconds),
+            follow_redirects=False,
+            trust_env=False,
+        )
+
+    async def _json(
+        self,
+        method: str,
+        path: str,
+        payload: Optional[Mapping[str, Any]] = None,
+    ) -> Mapping[str, Any]:
+        try:
+            response = await self._client.request(method, path, json=payload)
+            response.raise_for_status()
+            body = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise VoiceAgentError("语音代理不可用，请检查板端 voice-agent。") from exc
+        if not isinstance(body, Mapping):
+            raise VoiceAgentError("语音代理返回格式无效。")
+        return body
+
+    async def health(self) -> Mapping[str, Any]:
+        return await self._json("GET", "/health")
+
+    async def config(self) -> Mapping[str, Any]:
+        return await self._json("GET", "/api/config")
+
+    async def status(self) -> Mapping[str, Any]:
+        return await self._json("GET", "/api/status")
+
+    async def configure(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+        return await self._json("PUT", "/api/config", dict(payload))
+
+    async def transcribe_browser_wav(self, wav: bytes) -> Mapping[str, Any]:
+        try:
+            response = await self._client.post(
+                "/v1/voice/browser/transcribe",
+                content=wav,
+                headers={"Content-Type": "audio/wav"},
+            )
+            response.raise_for_status()
+            body = response.json()
+        except httpx.HTTPStatusError as exc:
+            raise VoiceAgentError(
+                self._response_detail(
+                    exc.response,
+                    "浏览器语音识别不可用，请检查板端 voice-agent。",
+                )
+            ) from exc
+        except (httpx.HTTPError, ValueError) as exc:
+            raise VoiceAgentError("浏览器语音识别不可用，请检查板端 voice-agent。") from exc
+        if not isinstance(body, Mapping):
+            raise VoiceAgentError("浏览器语音识别响应格式无效。")
+        return body
+
+    async def synthesize_browser_wav(self, text: str) -> bytes:
+        try:
+            response = await self._client.post(
+                "/v1/voice/browser/synthesize",
+                json={"text": text},
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise VoiceAgentError(
+                self._response_detail(
+                    exc.response,
+                    "浏览器语音播报不可用，请检查板端 voice-agent。",
+                )
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise VoiceAgentError("浏览器语音播报不可用，请检查板端 voice-agent。") from exc
+        content_type = response.headers.get("content-type", "").lower()
+        if not content_type.startswith("audio/wav") or not response.content:
+            raise VoiceAgentError("浏览器语音播报响应不是有效 WAV。")
+        return bytes(response.content)
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+
+def _validate_voice_agent_url(value: str) -> str:
+    """Accept only a credential-free HTTP loopback endpoint for voice control."""
+
+    candidate = value.strip().rstrip("/")
+    parsed = urlparse(candidate)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise TextChatConfigurationError("voice_agent_url has an invalid port") from exc
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or port is None
+        or not 1 <= port <= 65_535
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {"", "/"}
+    ):
+        raise TextChatConfigurationError(
+            "voice_agent_url must be a loopback http URL without credentials"
+        )
+    return candidate
 
 
 def _project_root() -> Path:
@@ -382,6 +551,13 @@ class TextChatSettings:
     body_timeout_seconds: float = 15.0
     client_write_timeout_seconds: float = 30.0
     model_switch_wait_seconds: float = 5.0
+    # Voice control is opt-in.  Board mode owns ALSA capture/playback and must
+    # never ask the browser to acquire a microphone or speaker stream.
+    voice_enabled: bool = False
+    voice_mode: Literal["disabled", "board", "browser"] = "disabled"
+    voice_agent_url: str = "http://127.0.0.1:7862"
+    voice_control_timeout_seconds: float = 5.0
+    voice_browser_max_audio_bytes: int = 1_048_576
 
     def __post_init__(self) -> None:
         gateway_url = self.gateway_url.strip().rstrip("/")
@@ -423,6 +599,23 @@ class TextChatSettings:
                     "gateway_api_key must be a real ASCII token with at least 24 characters"
                 )
         object.__setattr__(self, "gateway_url", gateway_url)
+        if not isinstance(self.voice_enabled, bool):
+            raise TextChatConfigurationError("voice_enabled must be a boolean")
+        if self.voice_mode not in {"disabled", "board", "browser"}:
+            raise TextChatConfigurationError(
+                "voice_mode must be disabled, board, or browser"
+            )
+        object.__setattr__(
+            self, "voice_agent_url", _validate_voice_agent_url(self.voice_agent_url)
+        )
+        if not 0.1 <= self.voice_control_timeout_seconds <= 30.0:
+            raise TextChatConfigurationError(
+                "voice_control_timeout_seconds must be between 0.1 and 30"
+            )
+        if not 32_000 <= self.voice_browser_max_audio_bytes <= 8 * 1_024 * 1_024:
+            raise TextChatConfigurationError(
+                "voice_browser_max_audio_bytes must be between 32000 and 8388608"
+            )
         if not 1 <= self.port <= 65_535:
             raise TextChatConfigurationError("port must be between 1 and 65535")
         if not 0.1 <= self.llm_timeout_seconds <= 300.0:
@@ -470,6 +663,14 @@ class TextChatSettings:
             if not math.isfinite(value) or value < minimum:
                 raise TextChatConfigurationError(f"{name} must be a finite number >= {minimum}")
             return value
+
+        def boolean(name: str, default: bool) -> bool:
+            raw = os.environ.get(name, "1" if default else "0").strip().lower()
+            if raw in {"1", "true", "yes", "on"}:
+                return True
+            if raw in {"0", "false", "no", "off"}:
+                return False
+            raise TextChatConfigurationError(f"{name} must be a boolean")
 
         gateway_url = os.environ.get(
             "ASCEND_EDGE_CHAT_UI_GATEWAY_URL", "http://127.0.0.1:7861/v1"
@@ -527,6 +728,19 @@ class TextChatSettings:
             ),
             model_switch_wait_seconds=decimal(
                 "ASCEND_EDGE_CHAT_UI_MODEL_SWITCH_WAIT_SECONDS", 5.0, 0.1
+            ),
+            voice_enabled=boolean("ASCEND_EDGE_CHAT_VOICE_ENABLED", False),
+            voice_mode=os.environ.get("ASCEND_EDGE_CHAT_VOICE_MODE", "disabled").strip().lower()
+            or "disabled",
+            voice_agent_url=os.environ.get(
+                "ASCEND_EDGE_CHAT_VOICE_AGENT_URL", "http://127.0.0.1:7862"
+            ).strip()
+            or "http://127.0.0.1:7862",
+            voice_control_timeout_seconds=decimal(
+                "ASCEND_EDGE_CHAT_VOICE_CONTROL_TIMEOUT_SECONDS", 5.0, 0.1
+            ),
+            voice_browser_max_audio_bytes=integer(
+                "ASCEND_EDGE_CHAT_VOICE_BROWSER_MAX_AUDIO_BYTES", 1_048_576, 32_000
             ),
         )
 
@@ -771,6 +985,20 @@ async def _parse_chat_request(
     )
 
 
+def _browser_audio_origin_allowed(request: Request) -> bool:
+    """Allow browser audio only from HTTPS or a loopback development origin."""
+
+    origin = request.headers.get("origin", "").strip()
+    if not origin:
+        return False
+    parsed = urlparse(origin)
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        return False
+    if parsed.scheme == "https" and parsed.hostname:
+        return True
+    return parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+
+
 def _pending_prompt(conversation: Conversation, message: str) -> list[dict[str, str]]:
     """Build the next prompt without mutating the committed conversation."""
 
@@ -816,6 +1044,17 @@ TEXT_CHAT_HTML = r"""<!doctype html>
     .token-picker select { width: 9.5rem; min-height: 44px; border: 1px solid #aebbc5; border-radius: 6px; padding: 8px 10px; background: #fff; color: #17212b; font: inherit; }
     .token-hint { flex-basis: 100%; color: #52616d; font-size: .94rem; }
     .model-note { color: #704b0c; font-size: .94rem; margin: 10px 0 0; max-width: 800px; line-height: 1.55; }
+    .voice-panel { margin: 0 32px 16px; padding: 16px; border: 1px solid #cbd5dc; border-radius: 6px; background: #fff; }
+    .voice-panel[hidden] { display: none; }
+    .voice-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .voice-heading h2 { margin: 0; font-size: 1.1rem; }
+    .voice-summary { color: #52616d; font-size: .94rem; margin: 4px 0 0; }
+    .voice-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .voice-field { display: flex; flex-direction: column; gap: 5px; color: #3b4c59; font-size: .94rem; }
+    .voice-field select, .voice-field input { min-height: 42px; border: 1px solid #aebbc5; border-radius: 6px; padding: 7px 10px; background: #fff; color: #17212b; font: inherit; }
+    .voice-auto { display: flex; align-items: center; gap: 8px; min-height: 42px; color: #3b4c59; font-size: .94rem; }
+    .voice-note { color: #704b0c; font-size: .92rem; line-height: 1.5; margin: 12px 0 0; }
+    .voice-buttons { display: flex; gap: 10px; margin-top: 12px; }
     .status { border: 1px solid #c1ccd4; border-radius: 999px; padding: 8px 14px; font-size: .94rem; white-space: nowrap; background: #fff; }
     .status[data-kind="ok"] { color: #176b45; border-color: #9bd3b5; background: #effaf3; }
     .status[data-kind="busy"] { color: #7a5311; border-color: #e7c77e; background: #fff9e9; }
@@ -823,15 +1062,16 @@ TEXT_CHAT_HTML = r"""<!doctype html>
     .status[data-kind="warning"] { color: #7a5311; border-color: #e7c77e; background: #fff9e9; }
     .warning { margin: 0 32px 16px; padding: 13px 15px; border-left: 4px solid #c98516; background: #fff8e8; color: #63470f; font-size: .98rem; line-height: 1.55; }
     main { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 0 32px 26px; }
-    .messages { flex: 1; min-height: 380px; overflow-y: auto; padding: 14px 0 22px; }
-    .empty { color: #63737f; text-align: center; padding: 96px 16px; font-size: 1.08rem; }
+    .composer { border-bottom: 1px solid #cbd5dc; padding: 0 0 16px; margin-bottom: 10px; }
+    .composer-label { display: block; color: #3b4c59; font-size: .94rem; font-weight: 600; margin-bottom: 7px; }
+    textarea { width: 100%; min-height: 104px; max-height: 300px; resize: vertical; border: 1px solid #aebbc5; border-radius: 6px; padding: 14px 16px; font: inherit; font-size: 1.06rem; line-height: 1.6; background: #fff; }
+    .messages { flex: 1; min-height: 260px; overflow-y: auto; padding: 14px 0 22px; }
+    .empty { color: #63737f; text-align: center; padding: 72px 16px; font-size: 1.08rem; }
     .message { display: flex; margin: 14px 0; }
     .message.user { justify-content: flex-end; }
-    .bubble { max-width: min(860px, 90%); padding: 14px 18px; border-radius: 8px; font-size: 1.06rem; line-height: 1.72; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .bubble { max-width: min(860px, 90%); padding: 14px 18px; border-radius: 6px; font-size: 1.06rem; line-height: 1.72; white-space: pre-wrap; overflow-wrap: anywhere; }
     .message.user .bubble { color: #fff; background: #1f5f8b; }
     .message.assistant .bubble { background: #fff; border: 1px solid #d7dfe5; }
-    .composer { border-top: 1px solid #cbd5dc; padding-top: 18px; }
-    textarea { width: 100%; min-height: 118px; max-height: 300px; resize: vertical; border: 1px solid #aebbc5; border-radius: 6px; padding: 14px 16px; font: inherit; font-size: 1.06rem; line-height: 1.6; background: #fff; }
     textarea:focus { outline: 2px solid #7eb3d5; outline-offset: 1px; border-color: #4f8fb8; }
     .controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; }
     .hint { color: #52616d; font-size: .94rem; }
@@ -851,7 +1091,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       .token-picker select { width: 100%; }
       .warning { margin: 0 18px 14px; }
       main { padding: 0 18px 18px; }
-      .messages { min-height: 300px; }
+      .messages { min-height: 220px; }
       .bubble { max-width: 94%; }
       .controls { align-items: flex-start; flex-direction: column; }
       .buttons { width: 100%; }
@@ -878,23 +1118,71 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       <div id="status" class="status" data-kind="busy" role="status">连接中…</div>
     </header>
     <div class="warning" role="note">实验页面未启用浏览器鉴权，请只在可信局域网使用。</div>
+    <section id="voice-panel" class="voice-panel" aria-labelledby="voice-title">
+      <div class="voice-heading">
+        <div>
+          <h2 id="voice-title">语音控制</h2>
+          <p id="voice-summary" class="voice-summary">正在读取板端 voice-agent 状态…</p>
+        </div>
+        <span id="voice-state" class="status" data-kind="busy">读取中…</span>
+      </div>
+      <div class="voice-grid">
+        <label class="voice-field" for="voice-mode">语音模式
+          <select id="voice-mode" aria-label="选择语音模式">
+            <option value="disabled">关闭语音</option>
+            <option value="board">开发板 USB 音频</option>
+            <option value="browser">浏览器语音（HTTPS/localhost）</option>
+          </select>
+        </label>
+        <label class="voice-field" for="voice-input">麦克风
+          <select id="voice-input" aria-label="选择板端麦克风"></select>
+        </label>
+        <label class="voice-field" for="voice-output">扬声器
+          <select id="voice-output" aria-label="选择板端扬声器"></select>
+        </label>
+      </div>
+      <label class="voice-auto" for="voice-auto-listen">
+        <input id="voice-auto-listen" type="checkbox">
+        自动 VAD 静音切分并开始下一轮板端听取
+      </label>
+      <div class="voice-buttons">
+        <button id="voice-apply" type="button">保存语音配置</button>
+        <button id="voice-start" class="primary" type="button">开始板端监听</button>
+        <button id="voice-stop" type="button">停止并释放音频</button>
+        <button id="voice-self-test" type="button">录音回放自检（2 秒）</button>
+      </div>
+      <p id="voice-note" class="voice-note">板端模式直接使用开发板 USB 麦克风和扬声器；浏览器不会采集或播放音频。</p>
+    </section>
     <main>
-      <section id="messages" class="messages" aria-live="polite"><div id="empty" class="empty">输入一句话开始测试</div></section>
       <form id="composer" class="composer">
-        <textarea id="input" maxlength="700" placeholder="输入消息…" aria-label="消息"></textarea>
+        <label class="composer-label" for="input">文字输入（始终可用）</label>
+        <textarea id="input" maxlength="700" placeholder="输入消息…" aria-label="文字消息"></textarea>
         <div class="controls">
-          <span class="hint">Enter 发送，Shift+Enter 换行</span>
+          <span class="hint">文字与语音可切换；Enter 发送，Shift+Enter 换行</span>
           <div class="buttons">
             <button id="clear" type="button">清空</button>
-            <button id="send" class="primary" type="submit">发送</button>
+            <button id="send" class="primary" type="submit">发送文字</button>
           </div>
         </div>
       </form>
+      <section id="messages" class="messages" aria-live="polite"><div id="empty" class="empty">输入文字或选择语音模式开始测试</div></section>
     </main>
   </div>
   <script>
     (() => {
-      const state = { busy: false, assistant: null, terminal: false, truncated: false, activeProfile: '', selectedProfile: '', profiles: [] };
+      const state = {
+        busy: false,
+        assistant: null,
+        terminal: false,
+        truncated: false,
+        activeProfile: '',
+        selectedProfile: '',
+        profiles: [],
+        voice: null,
+        voiceBusy: false,
+        browserCapture: null,
+        browserAudio: null
+      };
       const messages = document.getElementById('messages');
       const empty = document.getElementById('empty');
       const input = document.getElementById('input');
@@ -906,6 +1194,17 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       const modelNote = document.getElementById('model-note');
       const maxTokens = document.getElementById('max-tokens');
       const tokenHint = document.getElementById('token-hint');
+      const voiceMode = document.getElementById('voice-mode');
+      const voiceInput = document.getElementById('voice-input');
+      const voiceOutput = document.getElementById('voice-output');
+      const voiceAutoListen = document.getElementById('voice-auto-listen');
+      const voiceApply = document.getElementById('voice-apply');
+      const voiceStart = document.getElementById('voice-start');
+      const voiceStop = document.getElementById('voice-stop');
+      const voiceSelfTest = document.getElementById('voice-self-test');
+      const voiceState = document.getElementById('voice-state');
+      const voiceSummary = document.getElementById('voice-summary');
+      const voiceNote = document.getElementById('voice-note');
       const TOKEN_BUDGETS = [32, 64, 96, 128, 192, 256];
 
       function setStatus(text, kind) {
@@ -920,6 +1219,377 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         input.disabled = value;
         profileSelect.disabled = value;
         maxTokens.disabled = value;
+      }
+
+      function setVoiceState(text, kind) {
+        voiceState.textContent = text;
+        voiceState.dataset.kind = kind || 'busy';
+      }
+
+      function browserAudioAllowed() {
+        const localHost = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+        return window.isSecureContext || localHost;
+      }
+
+      function browserSpeechOutputSupported() {
+        return typeof window.speechSynthesis?.speak === 'function' &&
+          typeof window.SpeechSynthesisUtterance === 'function' &&
+          typeof window.speechSynthesis.cancel === 'function';
+      }
+
+      function browserSpeechVoice() {
+        if (!browserSpeechOutputSupported() || typeof window.speechSynthesis.getVoices !== 'function') return null;
+        const voices = window.speechSynthesis.getVoices();
+        return voices.find((voice) => /^zh(?:-|_)/i.test(voice.lang || '')) || null;
+      }
+
+      async function speakWithBrowser(text) {
+        if (!browserSpeechOutputSupported()) {
+          throw new Error('当前浏览器不支持本地语音播报，且板端 TTS 未配置。');
+        }
+        window.speechSynthesis.cancel();
+        await new Promise((resolve, reject) => {
+          const utterance = new SpeechSynthesisUtterance(text);
+          const voice = browserSpeechVoice();
+          if (voice) {
+            utterance.voice = voice;
+            utterance.lang = voice.lang;
+          } else {
+            utterance.lang = 'zh-CN';
+          }
+          utterance.rate = 1;
+          utterance.pitch = 1;
+          utterance.volume = 1;
+          const timeout = window.setTimeout(() => {
+            window.speechSynthesis.cancel();
+            reject(new Error('浏览器语音播报超时。'));
+          }, Math.max(15000, Math.min(90000, text.length * 250)));
+          utterance.onend = () => {
+            window.clearTimeout(timeout);
+            resolve();
+          };
+          utterance.onerror = (event) => {
+            window.clearTimeout(timeout);
+            reject(new Error('浏览器语音播报失败：' + (event.error || 'unknown')));
+          };
+          window.speechSynthesis.speak(utterance);
+        });
+      }
+
+      function setVoiceBusy(value) {
+        state.voiceBusy = value;
+        const unavailable = state.voice?.available !== true;
+        const browserMode = voiceMode.value === 'browser';
+        const disabledMode = voiceMode.value === 'disabled';
+        const capturing = state.browserCapture !== null;
+        const asrUnavailable = browserMode && state.voice?.speech?.asr_ready !== true;
+        voiceMode.disabled = value || unavailable || capturing;
+        voiceInput.disabled = value || unavailable || browserMode || disabledMode || capturing;
+        voiceOutput.disabled = value || unavailable || browserMode || disabledMode || capturing;
+        voiceAutoListen.disabled = value || unavailable || browserMode || disabledMode || capturing;
+        voiceApply.disabled = value || unavailable || capturing;
+        voiceStart.disabled = value || unavailable || disabledMode || capturing || asrUnavailable || (browserMode && !browserAudioAllowed());
+        voiceStop.disabled = unavailable || disabledMode || (browserMode ? !capturing : value);
+        voiceSelfTest.disabled = value || !browserMode || capturing || !browserAudioAllowed();
+      }
+
+      function deviceOptions(select, devices, selected, placeholder) {
+        select.replaceChildren();
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = placeholder;
+        select.appendChild(empty);
+        (Array.isArray(devices) ? devices : []).forEach((device) => {
+          if (!device || typeof device.id !== 'string') return;
+          const option = document.createElement('option');
+          option.value = device.id;
+          option.textContent = typeof device.label === 'string' ? device.label : device.id;
+          select.appendChild(option);
+        });
+        select.value = typeof selected === 'string' ? selected : '';
+      }
+
+      function renderVoice(voice) {
+        state.voice = voice && typeof voice === 'object' ? voice : {
+          available: false, mode: 'disabled', state: 'disabled', reason: '语音状态不可用。'
+        };
+        const mode = ['disabled', 'browser', 'board'].includes(state.voice.mode) ? state.voice.mode : 'disabled';
+        voiceMode.value = mode;
+        deviceOptions(voiceInput, state.voice.input_devices, state.voice.input_id, '未选择板端麦克风');
+        deviceOptions(voiceOutput, state.voice.output_devices, state.voice.output_id, '未选择板端扬声器');
+        voiceAutoListen.checked = state.voice.auto_listen === true && mode === 'board';
+        const asrReady = state.voice.speech?.asr_ready === true;
+        const speechReady = state.voice.speech_ready === true;
+        const browserOutputReady = browserSpeechOutputSupported();
+        const stateText = state.voice.state === 'busy' ? '板端监听中' :
+          state.voice.state === 'idle' ? '板端就绪' :
+          state.voice.state === 'unavailable' && state.voice.available && mode === 'browser' && !asrReady ? '仅录音自检可用' :
+          state.voice.state === 'unavailable' && state.voice.available && mode === 'browser' && (speechReady || browserOutputReady) ? '录音识别与语音回复可用' :
+          state.voice.state === 'unavailable' && state.voice.available && mode === 'browser' ? '录音识别可用' :
+          state.voice.state === 'unavailable' && state.voice.available ? '语音模型未配置' :
+          state.voice.state === 'unavailable' ? '语音代理不可用' : '语音已关闭';
+        setVoiceState(stateText, state.voice.state === 'busy' ? 'busy' : state.voice.available ? 'ok' : 'warning');
+        if (mode === 'browser') {
+          voiceStart.textContent = !asrReady ? '语音识别未配置' :
+            state.browserCapture ? '浏览器录音中…' : '开始浏览器录音';
+          voiceStop.textContent = state.browserCapture ? '停止录音并识别' : '停止浏览器录音';
+          voiceSummary.textContent = browserAudioAllowed()
+            ? (!asrReady
+              ? '浏览器录音和回放自检可用；ASR 未配置，完整语音轮次暂不可用。'
+              : speechReady
+                ? '浏览器麦克风经同源代理转为内存 WAV；回复会由浏览器播放。'
+                : browserOutputReady
+                  ? '浏览器录音与识别可用；回复将由浏览器本地中文语音合成朗读。'
+                  : '浏览器录音与识别可用；当前浏览器不支持语音播报，回复将以文字显示。')
+            : '远程 HTTP 页面不能使用浏览器麦克风。';
+          voiceNote.textContent = browserAudioAllowed()
+            ? (asrReady && !speechReady && browserOutputReady
+              ? '浏览器录音、识别和本地语音播报可用；回复会在当前浏览器中朗读。'
+              : state.voice.browser_audio?.reason || '录音仅在内存中处理，不保存原始 WAV 或 PCM。')
+            : '浏览器语音必须通过 HTTPS；当前 HTTP 远程来源已被禁用。';
+        } else if (mode === 'board') {
+          voiceStart.textContent = '开始板端监听';
+          voiceStop.textContent = '停止并释放音频';
+          voiceSummary.textContent = state.voice.ready ? '开发板直接管理 USB 麦克风、VAD 和扬声器。' : '板端语音代理尚未通过设备或模型就绪门。';
+          voiceNote.textContent = '浏览器只配置板端 allowlist 中的设备 ID；不会读取、上传或播放原始 PCM。';
+        } else {
+          voiceStart.textContent = '开始板端监听';
+          voiceStop.textContent = '停止并释放音频';
+          voiceSummary.textContent = state.voice.reason || '语音功能当前关闭。';
+          voiceNote.textContent = '启用前需要板端 voice-agent、USB 音频设备和独立 ASR/TTS 验收。';
+        }
+        setVoiceBusy(state.voiceBusy);
+      }
+
+      function voicePayload(autoListenOverride) {
+        const mode = voiceMode.value;
+        const payload = { mode: mode };
+        if (mode === 'board') {
+          if (voiceInput.value) payload.input_id = voiceInput.value;
+          if (voiceOutput.value) payload.output_id = voiceOutput.value;
+          payload.auto_listen = autoListenOverride === undefined ? voiceAutoListen.checked : autoListenOverride;
+        } else {
+          payload.auto_listen = false;
+        }
+        return payload;
+      }
+
+      async function updateVoice(autoListenOverride) {
+        if (state.voiceBusy) return;
+        setVoiceBusy(true);
+        setVoiceState('更新板端语音配置…', 'busy');
+        try {
+          const response = await fetch('/api/voice/config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(voicePayload(autoListenOverride))
+          });
+          let payload = {};
+          try { payload = await response.json(); } catch (_) {}
+          if (!response.ok) throw new Error(payload.error?.message || 'HTTP ' + response.status);
+          renderVoice(payload);
+        } catch (error) {
+          setVoiceState('语音配置失败', 'error');
+          voiceNote.textContent = error instanceof Error ? error.message : '语音配置失败。';
+        } finally {
+          setVoiceBusy(false);
+        }
+      }
+
+      async function refreshVoice() {
+        try {
+          const response = await fetch('/api/voice/status');
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          renderVoice(await response.json());
+        } catch (_) {
+          renderVoice({ available: false, mode: 'disabled', state: 'unavailable', reason: '无法读取板端语音代理状态。' });
+        }
+      }
+
+      function flattenCapture(chunks) {
+        const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
+        const output = new Float32Array(length);
+        let offset = 0;
+        chunks.forEach((chunk) => { output.set(chunk, offset); offset += chunk.length; });
+        return output;
+      }
+
+      function resampleMono(input, inputRate, outputRate) {
+        if (inputRate === outputRate) return input;
+        const outputLength = Math.max(1, Math.round(input.length * outputRate / inputRate));
+        const output = new Float32Array(outputLength);
+        const ratio = inputRate / outputRate;
+        for (let index = 0; index < outputLength; index += 1) {
+          const position = index * ratio;
+          const left = Math.floor(position);
+          const right = Math.min(left + 1, input.length - 1);
+          const fraction = position - left;
+          output[index] = input[left] * (1 - fraction) + input[right] * fraction;
+        }
+        return output;
+      }
+
+      function pcmWav(samples, sampleRate) {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+        const write = (offset, value) => { view.setUint8(offset, value.charCodeAt(0)); };
+        ['R','I','F','F'].forEach((value, index) => write(index, value));
+        view.setUint32(4, 36 + samples.length * 2, true);
+        ['W','A','V','E','f','m','t',' '].forEach((value, index) => write(8 + index, value));
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        ['d','a','t','a'].forEach((value, index) => write(36 + index, value));
+        view.setUint32(40, samples.length * 2, true);
+        for (let index = 0; index < samples.length; index += 1) {
+          const value = Math.max(-1, Math.min(1, samples[index]));
+          view.setInt16(44 + index * 2, value < 0 ? value * 32768 : value * 32767, true);
+        }
+        return new Blob([buffer], { type: 'audio/wav' });
+      }
+
+      async function startBrowserCapture(purpose = 'turn') {
+        if (state.browserCapture || voiceMode.value !== 'browser') return;
+        if (!browserAudioAllowed()) {
+          setVoiceState('需要 HTTPS', 'warning');
+          voiceNote.textContent = '远程 HTTP 页面不能使用浏览器麦克风；请通过 HTTPS 或 localhost 访问。';
+          return;
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.AudioContext) {
+          setVoiceState('浏览器不支持录音', 'error');
+          voiceNote.textContent = '当前浏览器不支持 getUserMedia 或 Web Audio。';
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            video: false
+          });
+          const context = new AudioContext();
+          const source = context.createMediaStreamSource(stream);
+          const processor = context.createScriptProcessor(4096, 1, 1);
+          const silence = context.createGain();
+          silence.gain.value = 0;
+          const chunks = [];
+          const maximumBytes = Math.max(32000, Number(state.voice?.browser_audio?.max_bytes) || 1048576);
+          const maximumSamples = Math.floor((maximumBytes - 44) / 2);
+          let capturedSamples = 0;
+          processor.onaudioprocess = (event) => {
+            const channel = event.inputBuffer.getChannelData(0);
+            if (capturedSamples >= maximumSamples) return;
+            const accepted = channel.subarray(0, Math.min(channel.length, maximumSamples - capturedSamples));
+            chunks.push(new Float32Array(accepted));
+            capturedSamples += accepted.length;
+          };
+          source.connect(processor);
+          processor.connect(silence);
+          silence.connect(context.destination);
+          const maximumDurationMs = Math.max(1000, Math.floor(maximumSamples / 16000 * 1000));
+          const captureDurationMs = purpose === 'self-test' ? 2000 : maximumDurationMs;
+          const timeoutId = window.setTimeout(() => { void stopBrowserCapture(); }, captureDurationMs);
+          state.browserCapture = { stream, context, source, processor, silence, chunks, sampleRate: context.sampleRate, timeoutId, purpose };
+          renderVoice(state.voice);
+          setVoiceState(
+            purpose === 'self-test' ? '正在录音，2 秒后自动回放…' : '浏览器录音中…',
+            'busy'
+          );
+          if (purpose === 'self-test') {
+            voiceNote.textContent = '录音只保存在浏览器内存中；2 秒后自动停止并回放，不上传板卡。';
+          }
+        } catch (error) {
+          setVoiceState('浏览器录音失败', 'error');
+          voiceNote.textContent = error instanceof Error ? error.message : '无法取得浏览器麦克风权限。';
+        }
+      }
+
+      async function playLocalBrowserWav(wav) {
+        if (state.browserAudio) {
+          state.browserAudio.pause();
+          URL.revokeObjectURL(state.browserAudio.src);
+        }
+        const audio = new Audio(URL.createObjectURL(wav));
+        state.browserAudio = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(audio.src);
+          if (state.browserAudio === audio) state.browserAudio = null;
+        };
+        await audio.play();
+      }
+
+      async function stopBrowserCapture() {
+        const capture = state.browserCapture;
+        if (!capture) return;
+        state.browserCapture = null;
+        try {
+          window.clearTimeout(capture.timeoutId);
+          capture.processor.disconnect();
+          capture.source.disconnect();
+          capture.silence.disconnect();
+          capture.stream.getTracks().forEach((track) => track.stop());
+          await capture.context.close();
+          const samples = resampleMono(flattenCapture(capture.chunks), capture.sampleRate, 16000);
+          const wav = pcmWav(samples, 16000);
+          const maximumBytes = Math.max(32000, Number(state.voice?.browser_audio?.max_bytes) || 1048576);
+          // A local recording/playback self-test needs only enough PCM to prove
+          // the browser data path. ASR still keeps its one-second lower bound.
+          const minimumBytes = capture.purpose === 'self-test' ? 3200 : 32000;
+          if (wav.size < minimumBytes || wav.size > maximumBytes) {
+            throw new Error('录音时长或 WAV 大小不在允许范围内。');
+          }
+          if (capture.purpose === 'self-test') {
+            setVoiceState('本地回放自检中…', 'busy');
+            await playLocalBrowserWav(wav);
+            // Re-enable controls before publishing the terminal success state;
+            // renderVoice would otherwise overwrite the completion message with
+            // the independent ASR/TTS readiness state.
+            renderVoice(state.voice);
+            setVoiceState('浏览器录音回放完成', 'ok');
+            voiceNote.textContent = '浏览器已完成本地录音和播放；该自检没有上传音频，也不证明 ASR/TTS 或板端音频可用。';
+            return;
+          }
+          setVoiceState('上传并识别…', 'busy');
+          const response = await fetch('/api/voice/browser/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'audio/wav', 'Accept': 'application/json' },
+            body: wav
+          });
+          let payload = {};
+          try { payload = await response.json(); } catch (_) {}
+          if (!response.ok || typeof payload.transcript !== 'string') {
+            throw new Error(payload.error?.message || '浏览器语音识别失败。');
+          }
+          renderVoice(state.voice);
+          await sendMessage(null, { text: payload.transcript, speak: true });
+        } catch (error) {
+          renderVoice(state.voice);
+          setVoiceState('浏览器语音失败', 'error');
+          voiceNote.textContent = error instanceof Error ? error.message : '浏览器语音失败。';
+        }
+      }
+
+      async function playBrowserReply(text) {
+        if (voiceMode.value !== 'browser' || !text || state.truncated) return;
+        if (state.voice?.speech?.tts_ready !== true) {
+          await speakWithBrowser(text);
+          return;
+        }
+        const response = await fetch('/api/voice/browser/synthesize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'audio/wav' },
+          body: JSON.stringify({ text: text })
+        });
+        if (!response.ok) {
+          let payload = {};
+          try { payload = await response.json(); } catch (_) {}
+          throw new Error(payload.error?.message || '浏览器语音播报失败。');
+        }
+        const wav = await response.blob();
+        if (!wav.size || wav.type !== 'audio/wav') throw new Error('浏览器语音播报响应无效。');
+        await playLocalBrowserWav(wav);
       }
 
       function selectedProfileItem() {
@@ -1062,17 +1732,17 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         try { handleEvent(JSON.parse(data)); } catch (_) { setStatus('响应格式错误', 'error'); }
       }
 
-      async function sendMessage(event) {
-        event.preventDefault();
+      async function sendMessage(event, options = {}) {
+        if (event) event.preventDefault();
         if (state.busy) return;
         if (state.selectedProfile !== state.activeProfile) {
           setStatus('请先完成模型切换', 'error');
           return;
         }
-        const text = input.value.trim();
+        const text = typeof options.text === 'string' ? options.text.trim() : input.value.trim();
         if (!text) return;
         addMessage('user', text);
-        input.value = '';
+        if (typeof options.text !== 'string') input.value = '';
         state.assistant = null;
         state.terminal = false;
         state.truncated = false;
@@ -1109,6 +1779,19 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           buffer += decoder.decode();
           if (buffer.trim()) parseSseBlock(buffer);
           if (!state.terminal) throw new Error('响应在完成前中断');
+          if (options.speak && !state.truncated && state.assistant?.textContent) {
+            try {
+              await playBrowserReply(state.assistant.textContent);
+              setVoiceState('文字回复完成，浏览器语音播报完成', 'ok');
+              voiceNote.textContent = '回复已由浏览器语音合成朗读。';
+            } catch (audioError) {
+              const detail = audioError instanceof Error ? audioError.message : '浏览器语音播报失败。';
+              voiceNote.textContent = /TTS|SHERPA_TTS/i.test(detail)
+                ? 'TTS 模型未配置；本轮回复已完整显示为文字。'
+                : detail;
+              setVoiceState('文字回复完成，语音播报失败', 'warning');
+            }
+          }
           if (status.dataset.kind !== 'error' && status.dataset.kind !== 'warning') {
             setStatus('就绪', 'ok');
           }
@@ -1191,18 +1874,24 @@ TEXT_CHAT_HTML = r"""<!doctype html>
 
       async function initialize() {
         try {
-          const [configResponse, historyResponse] = await Promise.all([
-            fetch('/api/config'), fetch('/api/history')
+          const [configResponse, historyResponse, voiceResponse] = await Promise.all([
+            fetch('/api/config'), fetch('/api/history'), fetch('/api/voice/config')
           ]);
           if (!configResponse.ok || !historyResponse.ok) throw new Error('服务不可用');
           const config = await configResponse.json();
           const history = await historyResponse.json();
+          let voice = config.voice;
+          if (voiceResponse.ok) {
+            try { voice = await voiceResponse.json(); } catch (_) {}
+          }
           model.textContent = config.model || 'ascend-edge-chat';
           populateProfiles(config.profiles, config.active_profile);
           if (Number.isInteger(config.max_characters)) input.maxLength = config.max_characters;
           renderHistory(history.messages);
+          renderVoice(voice);
           setStatus('就绪', 'ok');
         } catch (_) {
+          renderVoice({ available: false, mode: 'disabled', state: 'unavailable', reason: '无法读取语音控制面。' });
           setStatus('连接失败', 'error');
         }
       }
@@ -1210,6 +1899,32 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       document.getElementById('composer').addEventListener('submit', sendMessage);
       clear.addEventListener('click', clearConversation);
       profileSelect.addEventListener('change', switchProfile);
+      voiceMode.addEventListener('change', () => {
+        setVoiceBusy(state.voiceBusy);
+        if (voiceMode.value === 'browser') {
+          voiceNote.textContent = browserAudioAllowed()
+            ? '浏览器录音会被转换为内存 WAV，经同源代理识别和播放；不会保存原始音频。'
+            : '远程 HTTP 页面不能使用浏览器麦克风；请切换到 HTTPS。';
+        }
+      });
+      voiceApply.addEventListener('click', () => { void updateVoice(); });
+      voiceStart.addEventListener('click', () => {
+        if (voiceMode.value === 'browser') {
+          void startBrowserCapture();
+        } else if (voiceMode.value === 'board') {
+          void updateVoice(true);
+        }
+      });
+      voiceStop.addEventListener('click', () => {
+        if (voiceMode.value === 'browser') {
+          void stopBrowserCapture();
+        } else if (voiceMode.value === 'board') {
+          void updateVoice(false);
+        }
+      });
+      voiceSelfTest.addEventListener('click', () => {
+        if (voiceMode.value === 'browser') void startBrowserCapture('self-test');
+      });
       input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
           event.preventDefault();
@@ -1227,8 +1942,9 @@ def create_text_chat_app(
     settings: Optional[TextChatSettings] = None,
     llm: Optional[StreamingLLM] = None,
     sessions: Optional[ConversationStore] = None,
+    voice_agent: Optional[VoiceAgentClient] = None,
 ) -> FastAPI:
-    """Build the text-only app with injectable client and session store."""
+    """Build the text UI with optional injectable board-owned voice control."""
 
     runtime_settings = settings or TextChatSettings.from_environ()
     try:
@@ -1254,6 +1970,12 @@ def create_text_chat_app(
         max_messages=runtime_settings.max_messages,
         max_characters=runtime_settings.max_characters,
     )
+    runtime_voice_agent: Optional[VoiceAgentClient] = voice_agent
+    if runtime_voice_agent is None and runtime_settings.voice_enabled:
+        runtime_voice_agent = LoopbackVoiceAgentClient(
+            runtime_settings.voice_agent_url,
+            runtime_settings.voice_control_timeout_seconds,
+        )
     # Python 3.9 binds asyncio synchronization primitives to the current
     # event loop at construction time.  App factories are commonly called
     # before TestClient/uvicorn starts that loop, so initialize lazily on the
@@ -1263,6 +1985,172 @@ def create_text_chat_app(
     request_lock: Optional[asyncio.Lock] = None
     active_profile_state = {"value": runtime_settings.active_profile}
     managed_worker = llm is None
+
+    def _voice_disabled_payload(reason: str) -> dict[str, Any]:
+        """Return a safe status when board voice is intentionally unavailable."""
+
+        return {
+            "available": False,
+            "mode": "disabled",
+            "input_id": None,
+            "output_id": None,
+            "auto_listen": False,
+            "enabled": False,
+            "ready": False,
+            "state": "disabled",
+            "input_devices": [],
+            "output_devices": [],
+            "reason": reason,
+            "browser_audio": {
+                "enabled": False,
+                "requires_https": runtime_settings.voice_mode == "browser",
+                "reason": (
+                    "浏览器语音尚未接入；远程浏览器录音必须通过 HTTPS。"
+                    if runtime_settings.voice_mode == "browser"
+                    else "板端模式由开发板直接采集和播放；浏览器不会使用麦克风或扬声器。"
+                ),
+            },
+        }
+
+    def _voice_mode(value: Any) -> Literal["disabled", "browser", "board"]:
+        if value in {"disabled", "browser", "board"}:
+            return value
+        return "disabled"
+
+    def _voice_device_id(value: Any) -> Optional[str]:
+        if not isinstance(value, str):
+            return None
+        candidate = value.strip()
+        if not candidate or len(candidate) > 128:
+            return None
+        if any(character in candidate for character in ("/", "\\", "\x00", "\r", "\n")):
+            return None
+        return candidate
+
+    def _voice_devices(value: Any) -> list[dict[str, str]]:
+        """Normalize agent-enumerated device IDs without accepting local paths."""
+
+        if not isinstance(value, list):
+            return []
+        result: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for item in value:
+            raw_id = item.get("id") if isinstance(item, Mapping) else item
+            device_id = _voice_device_id(raw_id)
+            if device_id is None or device_id in seen:
+                continue
+            seen.add(device_id)
+            label = item.get("label") if isinstance(item, Mapping) else device_id
+            result.append({"id": device_id, "label": str(label)[:160] or device_id})
+        return result
+
+    def _voice_payload(
+        status: Mapping[str, Any],
+        config: Mapping[str, Any],
+        health: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Expose bounded board-agent facts and agent-enumerated device IDs only."""
+
+        mode = _voice_mode(config.get("mode"))
+        state = status.get("state")
+        if state not in {"idle", "busy", "disabled", "unavailable"}:
+            state = "unavailable"
+        input_devices = _voice_devices(
+            config.get("input_devices", config.get("inputs", []))
+        )
+        output_devices = _voice_devices(
+            config.get("output_devices", config.get("outputs", []))
+        )
+        input_id = _voice_device_id(config.get("input_id"))
+        output_id = _voice_device_id(config.get("output_id"))
+        auto_listen = (
+            config.get("auto_listen")
+            if isinstance(config.get("auto_listen"), bool)
+            else config.get("enabled")
+        ) is True
+        return {
+            # A loopback agent with no admitted ASR/TTS backend is still a
+            # usable control plane: browser/board selection must remain visible
+            # while speech readiness is honestly reported as false.
+            "available": health.get("status") in {"ok", "ready", "unavailable"},
+            "speech_ready": status.get("ready") is True,
+            "mode": mode,
+            "input_id": input_id,
+            "output_id": output_id,
+            "auto_listen": auto_listen,
+            # Temporary compatibility alias; browser controls use auto_listen.
+            "enabled": auto_listen if mode == "board" else False,
+            "ready": status.get("ready") is True,
+            "state": state,
+            "active_turn": status.get("active_turn")
+            if isinstance(status.get("active_turn"), Mapping)
+            else None,
+            "latest_turn": status.get("latest_turn")
+            if isinstance(status.get("latest_turn"), Mapping)
+            else None,
+            "input_devices": input_devices,
+            "output_devices": output_devices,
+            "capture": config.get("capture") if isinstance(config.get("capture"), Mapping) else {},
+            "playback": config.get("playback") if isinstance(config.get("playback"), Mapping) else {},
+            "vad": config.get("vad") if isinstance(config.get("vad"), Mapping) else {},
+            "gateway": config.get("gateway") if isinstance(config.get("gateway"), Mapping) else {},
+            "speech": (
+                dict(status.get("speech"))
+                if isinstance(status.get("speech"), Mapping)
+                else dict(config.get("speech"))
+                if isinstance(config.get("speech"), Mapping)
+                else {}
+            ),
+            "browser_audio": {
+                "enabled": mode == "browser",
+                "requires_https": mode == "browser",
+                "max_bytes": runtime_settings.voice_browser_max_audio_bytes,
+                "reason": (
+                    "浏览器模式只接受 HTTPS 或 localhost 的 16 kHz 单声道 WAV；音频仅经同源代理在内存中转发。"
+                    if mode == "browser"
+                    else "板端模式由开发板直接采集和播放；浏览器不会使用麦克风或扬声器。"
+                ),
+            },
+        }
+
+    async def voice_snapshot(*, include_config: bool) -> dict[str, Any]:
+        """Read optional loopback voice-agent facts without breaking text chat."""
+
+        if runtime_voice_agent is None:
+            return _voice_disabled_payload("语音功能未启用。")
+        try:
+            health = await runtime_voice_agent.health()
+            status = await runtime_voice_agent.status()
+            config_payload = await runtime_voice_agent.config() if include_config else {}
+        except Exception:
+            LOGGER.warning("voice-agent status read failed", exc_info=True)
+            return _voice_disabled_payload("语音代理不可用，请检查板端 voice-agent。")
+        if not isinstance(health, Mapping) or not isinstance(status, Mapping):
+            return _voice_disabled_payload("语音代理状态无效。")
+        if not isinstance(config_payload, Mapping):
+            config_payload = {}
+        return _voice_payload(status, config_payload, health)
+
+    async def set_voice_config(payload: Mapping[str, Any]) -> dict[str, Any]:
+        """Forward the only permitted voice configuration fields to loopback."""
+
+        if runtime_voice_agent is None:
+            raise VoiceAgentError("语音功能未启用。")
+        try:
+            await runtime_voice_agent.configure(payload)
+            health = await runtime_voice_agent.health()
+            status = await runtime_voice_agent.status()
+            config_payload = await runtime_voice_agent.config()
+        except VoiceAgentError:
+            raise
+        except Exception as exc:
+            LOGGER.warning("voice-agent configuration update failed", exc_info=True)
+            raise VoiceAgentError("语音代理不可用，请检查板端 voice-agent。") from exc
+        if not isinstance(health, Mapping) or not isinstance(status, Mapping):
+            raise VoiceAgentError("语音代理返回格式无效。")
+        if not isinstance(config_payload, Mapping):
+            config_payload = {}
+        return _voice_payload(status, config_payload, health)
 
     def ensure_async_primitives() -> None:
         nonlocal body_read_slots, request_lock
@@ -1392,6 +2280,10 @@ def create_text_chat_app(
             close = getattr(runtime_llm, "aclose", None)
             if close is not None:
                 await close()
+            if runtime_voice_agent is not None:
+                voice_close = getattr(runtime_voice_agent, "aclose", None)
+                if voice_close is not None:
+                    await voice_close()
 
     app = FastAPI(
         title="Ascend Edge Chat text UI",
@@ -1405,6 +2297,7 @@ def create_text_chat_app(
     app.state.llm = runtime_llm
     app.state.sessions = runtime_sessions
     app.state.model_catalog = catalog
+    app.state.voice_agent = runtime_voice_agent
 
     def public_catalog() -> list[dict[str, Any]]:
         return _catalog_with_availability(catalog)
@@ -1439,6 +2332,7 @@ def create_text_chat_app(
             "active_profile": active_profile,
             "model_selection": "controlled-worker-switch",
             "sessions": runtime_sessions.session_count,
+            "voice": await voice_snapshot(include_config=False),
         }
 
     @app.get("/api/config")
@@ -1454,7 +2348,186 @@ def create_text_chat_app(
             "max_messages": runtime_settings.max_messages,
             "max_characters": runtime_settings.max_characters,
             "warning": SECURITY_WARNING,
+            "voice": await voice_snapshot(include_config=True),
         }
+
+    @app.get("/api/voice/config")
+    async def api_voice_config() -> dict[str, Any]:
+        """Return the board-agent configuration, including device allowlists."""
+
+        return await voice_snapshot(include_config=True)
+
+    @app.get("/api/voice/status")
+    async def api_voice_status() -> dict[str, Any]:
+        """Return current board-owned voice state without browser audio access."""
+
+        return await voice_snapshot(include_config=True)
+
+    @app.put("/api/voice/config")
+    async def update_voice_config(request: Request) -> JSONResponse:
+        """Apply a bounded board voice configuration subset through loopback."""
+
+        try:
+            body = await _read_json_object(
+                request,
+                runtime_settings.max_body_bytes,
+                runtime_settings.body_timeout_seconds,
+            )
+        except TextChatRequestError as exc:
+            return _error_response(exc.message, exc.status_code)
+        allowed = {"mode", "input_id", "output_id", "auto_listen", "enabled"}
+        unknown = set(body) - allowed
+        if unknown or not body:
+            return _error_response(
+                "语音配置只支持 mode、input_id、output_id、auto_listen 和兼容 enabled 字段。"
+            )
+        payload: dict[str, Any] = {}
+        mode = body.get("mode")
+        if mode is not None:
+            if mode not in {"disabled", "browser", "board"}:
+                return _error_response("mode 只能是 disabled、browser 或 board。")
+            payload["mode"] = mode
+        for key in ("input_id", "output_id"):
+            if key not in body:
+                continue
+            value = _voice_device_id(body[key])
+            if value is None:
+                return _error_response(f"{key} 必须是由板端枚举的设备标识。")
+            payload[key] = value
+        auto_listen = body.get("auto_listen")
+        enabled = body.get("enabled")
+        if auto_listen is not None and not isinstance(auto_listen, bool):
+            return _error_response("auto_listen 必须是布尔值。")
+        if enabled is not None and not isinstance(enabled, bool):
+            return _error_response("enabled 必须是布尔值。")
+        if auto_listen is not None and enabled is not None and auto_listen != enabled:
+            return _error_response("enabled 与 auto_listen 不能冲突。")
+        if auto_listen is not None:
+            payload["auto_listen"] = auto_listen
+        elif enabled is not None:
+            payload["auto_listen"] = enabled
+        if payload.get("mode") == "browser" and payload.get("auto_listen") is True:
+            return _error_response("browser 模式不会启动板端采集；请先完成 HTTPS 浏览器语音数据面。")
+        current = await voice_snapshot(include_config=True)
+        if current.get("available") is not True:
+            return _error_response(
+                str(current.get("reason", "语音代理不可用。")),
+                503,
+                "voice_agent_unavailable",
+            )
+        for key, allowlist_key in (("input_id", "input_devices"), ("output_id", "output_devices")):
+            if key not in payload:
+                continue
+            permitted = {
+                item.get("id")
+                for item in current.get(allowlist_key, [])
+                if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+            }
+            if payload[key] not in permitted:
+                return _error_response(
+                    f"{key} 不在当前板端设备 allowlist 中。",
+                    409,
+                    "voice_device_not_allowed",
+                )
+        try:
+            return JSONResponse(await set_voice_config(payload))
+        except VoiceAgentError as exc:
+            return _error_response(str(exc), 503, "voice_agent_unavailable")
+
+    async def browser_voice_ready(request: Request) -> Optional[JSONResponse]:
+        """Enforce browser-mode, HTTPS/localhost origin, and agent readiness."""
+
+        if not _browser_audio_origin_allowed(request):
+            return _error_response(
+                "浏览器语音仅允许 HTTPS 或 localhost 来源；远程 HTTP 页面不能访问麦克风或音频代理。",
+                403,
+                "browser_audio_https_required",
+            )
+        current = await voice_snapshot(include_config=True)
+        if current.get("available") is not True:
+            return _error_response(
+                str(current.get("reason", "语音代理不可用。")),
+                503,
+                "voice_agent_unavailable",
+            )
+        if current.get("mode") != "browser":
+            return _error_response(
+                "浏览器音频代理仅在 browser 模式可用；board 模式不会读取或返回浏览器音频。",
+                409,
+                "browser_audio_mode_required",
+            )
+        return None
+
+    @app.post("/api/voice/browser/transcribe")
+    async def browser_voice_transcribe(request: Request) -> JSONResponse:
+        """Proxy one bounded in-memory WAV to the loopback browser-ASR endpoint."""
+
+        blocked = await browser_voice_ready(request)
+        if blocked is not None:
+            return blocked
+        content_type = request.headers.get("content-type", "").lower()
+        if not (
+            content_type.startswith("audio/wav")
+            or content_type.startswith("audio/x-wav")
+        ):
+            return _error_response(
+                "浏览器语音识别只接受 audio/wav。",
+                415,
+                "browser_audio_wav_required",
+            )
+        try:
+            wav = await asyncio.wait_for(
+                _read_bounded_body(request, runtime_settings.voice_browser_max_audio_bytes),
+                timeout=runtime_settings.body_timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            return _error_response("浏览器音频上传超时。", 408)
+        except TextChatRequestError as exc:
+            return _error_response(exc.message, exc.status_code)
+        if runtime_voice_agent is None:
+            return _error_response("语音代理未配置。", 503, "voice_agent_unavailable")
+        try:
+            payload = await runtime_voice_agent.transcribe_browser_wav(wav)
+        except VoiceAgentError as exc:
+            return _error_response(str(exc), 409, "browser_transcription_failed")
+        transcript = payload.get("transcript") if isinstance(payload, Mapping) else None
+        if not isinstance(transcript, str) or not transcript.strip():
+            return _error_response("语音代理没有返回有效转写文本。", 502, "browser_transcription_invalid")
+        return JSONResponse({"transcript": transcript.strip()[: runtime_settings.max_characters]})
+
+    @app.post("/api/voice/browser/synthesize")
+    async def browser_voice_synthesize(request: Request) -> Response:
+        """Proxy bounded assistant text and return a no-store WAV only in browser mode."""
+
+        blocked = await browser_voice_ready(request)
+        if blocked is not None:
+            return blocked
+        try:
+            body = await _read_json_object(
+                request,
+                runtime_settings.max_body_bytes,
+                runtime_settings.body_timeout_seconds,
+            )
+        except TextChatRequestError as exc:
+            return _error_response(exc.message, exc.status_code)
+        if set(body) != {"text"} or not isinstance(body.get("text"), str):
+            return _error_response("浏览器语音播报只支持 text 字段。")
+        text = body["text"].strip()
+        if not text or len(text) > runtime_settings.max_characters:
+            return _error_response("浏览器语音播报文本为空或超过字符限制。")
+        if runtime_voice_agent is None:
+            return _error_response("语音代理未配置。", 503, "voice_agent_unavailable")
+        try:
+            wav = await runtime_voice_agent.synthesize_browser_wav(text)
+        except VoiceAgentError as exc:
+            return _error_response(str(exc), 409, "browser_synthesis_failed")
+        if not wav or len(wav) > runtime_settings.voice_browser_max_audio_bytes:
+            return _error_response("语音代理返回的 WAV 无效或超过大小限制。", 502, "browser_synthesis_invalid")
+        return Response(
+            content=wav,
+            media_type="audio/wav",
+            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+        )
 
     @app.get("/api/models")
     async def api_models() -> dict[str, Any]:

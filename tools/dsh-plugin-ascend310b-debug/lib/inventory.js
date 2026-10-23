@@ -14,7 +14,7 @@
  * @module dsh-plugin-ascend310b-debug/inventory
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -31,7 +31,9 @@ export const SYSTEM_FIELDS = Object.freeze([
 	'npuSmiVersion',
 	'pythonVersion',
 	'machineId',
-	'aclImport'
+	'aclImport',
+	'memoryUsedMb',
+	'memoryTotalMb'
 ]);
 
 /** Maximum retained change records per board. */
@@ -91,10 +93,38 @@ export function readInventory(path) {
 	}
 }
 
-/** Persist the inventory; the file stays local to this machine. */
+/** Persist the inventory atomically; the file stays local to this machine. */
 export function saveInventory(path, inventory) {
 	mkdirSync(dirname(path), { recursive: true });
-	writeFileSync(path, `${JSON.stringify({ ...inventory, version: 1 }, null, 2)}\n`, 'utf8');
+	const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
+	const lock = `${path}.lock`;
+	const started = Date.now();
+	while (true) {
+		try {
+			mkdirSync(lock);
+			break;
+		} catch (error) {
+			if (error?.code !== 'EEXIST') throw error;
+			if (Date.now() - started > 5000) throw new Error(`inventory lock timeout: ${lock}`);
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+		}
+	}
+	const body = `${JSON.stringify({ ...inventory, version: 1 }, null, 2)}\n`;
+	try {
+		writeFileSync(temporary, body, 'utf8');
+		try {
+			renameSync(temporary, path);
+		} catch (error) {
+			// Windows cannot replace an existing file with rename; remove only the
+			// destination after the complete temp file exists, then retry.
+			if (error?.code !== 'EEXIST' && error?.code !== 'EPERM') throw error;
+			rmSync(path, { force: true });
+			renameSync(temporary, path);
+		}
+	} finally {
+		rmSync(temporary, { force: true });
+		rmSync(lock, { recursive: true, force: true });
+	}
 	return inventory;
 }
 
@@ -143,7 +173,9 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 	const id = mac === null ? `hostname-${hostname ?? 'unknown'}` : boardIdForMac(mac);
 	const previous = inventory.boards?.[identity] ?? null;
 	const system = {};
-	for (const key of SYSTEM_FIELDS) system[key] = text(observation?.system?.[key]);
+	for (const key of SYSTEM_FIELDS) {
+		system[key] = text(observation?.system?.[key]) ?? previous?.system?.[key] ?? null;
+	}
 	const changes = previous === null ? [] : diffSystem(previous.system, system);
 	const ip = text(observation?.ip);
 	const ipChanged = ip !== null && previous !== null && previous.lastIp !== null && previous.lastIp !== ip;
@@ -160,7 +192,9 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 		lastChangeAt: null,
 		lastIp: null,
 		hostname: null,
+		port: null,
 		system: {},
+		serial: null,
 		changes: [],
 		history: []
 	};
@@ -169,9 +203,20 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 	board.mac = mac;
 	board.hostname = hostname;
 	board.lastIp = ip ?? previous?.lastIp ?? null;
+	board.port = Number.isInteger(observation?.port) ? observation.port : board.port ?? null;
 	board.user = text(observation?.user) ?? board.user;
 	board.label = text(observation?.label) ?? board.label;
 	board.configuredId = text(observation?.configuredId) ?? board.configuredId ?? null;
+	if (observation?.serial !== null && typeof observation?.serial === 'object') {
+		board.serial = {
+			status: text(observation.serial.status) ?? 'reachable',
+			port: text(observation.serial.port),
+			user: text(observation.serial.user),
+			ip: text(observation.serial.ip),
+			hostname: text(observation.serial.hostname) ?? hostname,
+			lastSeen: now
+		};
+	}
 	board.system = system;
 	board.lastSeen = now;
 	if (previous === null) {
@@ -200,6 +245,9 @@ export function inventoryTargets(inventory, defaultUser = null) {
 	const targets = [];
 	for (const board of Object.values(inventory?.boards ?? {})) {
 		if (board === null || typeof board !== 'object') continue;
+		// A hostname-only record or a serial console that has not proved a 310B
+		// SoC must never become an executable SSH target.
+		if (normalizeMac(board.mac) === null || !/^Ascend310B[14]$/iu.test(String(board.system?.soc ?? ''))) continue;
 		const host = text(board.lastIp) ?? text(board.hostname);
 		if (host === null) continue;
 		targets.push({
@@ -210,8 +258,9 @@ export function inventoryTargets(inventory, defaultUser = null) {
 			hostname: board.hostname ?? null,
 			mac: board.mac ?? null,
 			configuredId: board.configuredId ?? null,
+			lastSeen: board.lastSeen ?? null,
 			user: board.user ?? defaultUser,
-			port: null,
+			port: Number.isInteger(board.port) ? board.port : null,
 			identityFile: null,
 			workdir: null,
 			note: `发现板；MAC ${board.mac ?? '未读取'}`

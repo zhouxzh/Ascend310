@@ -35,7 +35,11 @@ const loaded = [];
 /** Build the report payload the same way the HTTP route would. */
 const stubRoot = join(pluginRoot, 'node_modules');
 const stubDir = join(stubRoot, '@deepseek-ai', 'dsh-tools');
-const { mkdirSync, rmSync, writeFileSync } = await import('node:fs');
+const { existsSync, mkdirSync, rmdirSync, rmSync, writeFileSync } = await import('node:fs');
+if (existsSync(stubDir)) {
+	console.error(`client-render test refuses to overwrite existing ${stubDir}`);
+	process.exit(1);
+}
 mkdirSync(stubDir, { recursive: true });
 writeFileSync(
 	join(stubDir, 'package.json'),
@@ -52,7 +56,17 @@ let host;
 try {
 	host = await import(new URL('../lib/index.js', import.meta.url).href);
 } finally {
-	rmSync(stubRoot, { recursive: true, force: true });
+	rmSync(stubDir, { recursive: true, force: true });
+	try {
+		rmdirSync(join(stubRoot, '@deepseek-ai'));
+	} catch {
+		// A real @deepseek-ai dependency tree is not test-owned.
+	}
+	try {
+		rmdirSync(stubRoot);
+	} catch {
+		// Keep a real dependency tree if one existed or another dependency remains.
+	}
 }
 
 const routes = [];
@@ -90,6 +104,8 @@ const response = {
 	}
 };
 const request = {
+	method: 'POST',
+	headers: { 'content-type': 'application/json' },
 	async *[Symbol.asyncIterator]() {
 		yield JSON.stringify({ target: 'board-8t', rawText: PROBE_8T_CANN80 });
 	}
@@ -100,6 +116,7 @@ let payload = JSON.parse(response.body);
 
 // --- mount the bundle with the payload already loaded --------------------
 let seeded = 0;
+let seededTab = 'overview';
 const reactStub = {
 	createElement(type, props, ...children) {
 		// Function components are invoked like React would, so the rendered text
@@ -109,9 +126,9 @@ const reactStub = {
 	},
 	useState: (initial) => {
 		seeded += 1;
-		// First state call is the load state, second is the target selector, third
-		// is the symptom query. Seed the panel as if the first fetch had resolved.
+		// First state call is the load state; fifth is the active tab.
 		if (seeded === 1) return [{ kind: 'ready', payload }, () => {}];
+		if (seeded === 5) return [seededTab, () => {}];
 		return [initial, () => {}];
 	},
 	useEffect: () => {},
@@ -166,6 +183,7 @@ check(text.includes('Ascend310B4'), 'the panel must show the probed SoC');
 check(text.includes('observed-match'), 'the panel must show the pairing verdict');
 check(text.includes('8.0.0'), 'the panel must show the probed CANN version');
 check(text.includes('25.2.0'), 'the panel must show the probed driver version');
+check(text.includes('2433 / 7564 MB'), 'the panel must show NPU memory used/total');
 // Firmware is deliberately not a default probe field: the current 310B
 // images do not expose a readable, trustworthy firmware version.
 // `undefined` appears legitimately inside a knowledge-entry title (the C++
@@ -173,10 +191,37 @@ check(text.includes('25.2.0'), 'the panel must show the probed driver version');
 check(!text.includes('>undefined<') && !text.includes('undefined undefined'), 'the panel must not render raw undefined values');
 check(text.includes('昇腾310B调试'), 'the panel title must name the chip family');
 check(text.includes('实时监控'), 'the panel must expose a live-monitor control');
-check(text.includes('发现开发板'), 'the panel must expose a discovery control');
+check(text.includes('串口发现'), 'the panel must expose a serial-discovery control');
+check(text.includes('局域网扫描'), 'the panel must expose a LAN scan control');
 check(text.includes('开发板资产'), 'the panel must expose a MAC-keyed asset tab');
+check(text.includes('外设'), 'the panel must expose a peripheral tab');
 check(!text.includes('310B 调试'), 'the old title without 昇腾 must be gone');
 check(text.includes('已确认是昇腾 310B'), 'an in-scope board must say so explicitly');
+
+seededTab = 'devices';
+seeded = 0;
+let deviceText = '';
+try {
+	deviceText = draw(panel({})).join(' ');
+} catch (error) {
+	failures.push(`the panel must render the peripheral inventory: ${error?.message ?? error}`);
+}
+check(deviceText.includes('已搭配外设'), 'the device view must label the connected peripheral inventory');
+check(deviceText.includes('摄像头 / V4L2'), 'the device view must show a camera group');
+check(deviceText.includes('USB 外设'), 'the device view must show a USB peripheral group');
+seededTab = 'overview';
+
+seededTab = 'debug';
+seeded = 0;
+let debugText = '';
+try {
+	debugText = draw(panel({})).join(' ');
+} catch (error) {
+	failures.push(`the panel must render the debug dependencies: ${error?.message ?? error}`);
+}
+check(debugText.includes('案例系统程序'), 'the debug panel must show per-case system-program requirements');
+check(debugText.includes('ascend_apt_install'), 'the debug panel must show the explicit apt dry-run hint');
+seededTab = 'overview';
 
 // The same panel must refuse to imply a 310B workflow for another accelerator.
 const savedPayload = payload;

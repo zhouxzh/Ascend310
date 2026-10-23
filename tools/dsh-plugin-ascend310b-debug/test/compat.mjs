@@ -9,7 +9,16 @@
  * Usage: node test/compat.mjs
  */
 
-import { ACCEPTANCE_GATES, assessVersionPairing, compareMajorMinor, matchObservedStacks, parseVersion, releaseLineFor } from '../lib/compat.js';
+import {
+	ACCEPTANCE_GATES,
+	assessUnifiedEnvironment,
+	assessVersionPairing,
+	compareMajorMinor,
+	matchObservedStacks,
+	parseVersion,
+	releaseLineFor,
+	UNIFIED_REQUIRED_PACKAGES
+} from '../lib/compat.js';
 import { parseProbeOutput } from '../lib/probe.js';
 import { PROBE_20T_CANN80, PROBE_8T_CANN80, PROBE_ATLAS_CANN92 } from './fixtures.mjs';
 
@@ -105,6 +114,34 @@ equal(matchObservedStacks({ soc: { value: 'Ascend310B1' }, cannVersion: { value:
 equal(matchObservedStacks({ soc: { value: 'Ascend310B4' }, cannVersion: { value: '9.2.0-beta.2' }, driverVersion: { value: '25.5.0' } }).length, 1, 'Atlas 组合应命中一条记录');
 equal(ACCEPTANCE_GATES.length, 5, '五道验收门必须保持为五项');
 check(ACCEPTANCE_GATES.includes('CANN 与 PyACL'), '验收门必须包含 CANN 与 PyACL');
+
+const completePackages = UNIFIED_REQUIRED_PACKAGES.map((name) => `${name}:true`).join(',');
+const unifiedPass = assessUnifiedEnvironment({
+	ascendEnvPresent: { value: true },
+	ascendEnvVersion: { value: '3.9.25' },
+	ascendEnvAbi: { value: 'cpython-39-aarch64-linux-gnu' },
+	ascendEnvIsolated: { value: false },
+	ascendEnvPolicyIsolated: { value: true },
+	ascendEnvAclImport: { value: 'ok' },
+	ascendEnvAclruntime: { value: 'ok' },
+	ascendEnvMindsporeContext: { value: 'ok' },
+	ascendEnvPackages: { value: completePackages }
+});
+equal(unifiedPass.verdict, 'passed', '完整的 Python 3.9.25 ascend 环境应通过统一环境门');
+const unifiedMissing = assessUnifiedEnvironment({ ascendEnvPresent: { value: false } });
+equal(unifiedMissing.verdict, 'failed', '缺少 ascend 环境必须失败，不能回退 base');
+const unifiedWrongVersion = assessUnifiedEnvironment({
+	ascendEnvPresent: { value: true },
+	ascendEnvVersion: { value: '3.11.17' },
+	ascendEnvAbi: { value: 'cpython-311-aarch64-linux-gnu' },
+	ascendEnvIsolated: { value: false },
+	ascendEnvPolicyIsolated: { value: true },
+	ascendEnvAclImport: { value: 'ok' },
+	ascendEnvAclruntime: { value: 'ok' },
+	ascendEnvMindsporeContext: { value: 'ok' },
+	ascendEnvPackages: { value: completePackages }
+});
+equal(unifiedWrongVersion.verdict, 'failed', '统一环境不能使用未获 CANN 8.0 官方矩阵覆盖的 Python 3.11');
 
 if (failures.length > 0) {
 	console.error('compat tests FAILED:');

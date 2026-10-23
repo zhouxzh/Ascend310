@@ -35,7 +35,7 @@ footer: "案例 5：智能数据采集分析仪"
 3. CPU 与 NPU 各自执行哪一段计算？
 4. 一条频谱或检测框怎样追溯到原始数据和模型合同？
 
-<div class="source">教材：<a href="../experiment/case5.md#1-从波形到可解释事件"><code>src/experiment/case5.md</code> 第 1 节</a></div>
+<div class="source">教材：<a href="../experiment/case5.md#src-experiment-case5-overview"><code>src/experiment/case5.md</code> 第 1 节</a></div>
 
 <!--
 四个问题对应采集合同、信号表示、计算边界和证据链。任何一层没有记录，都不能用一个漂亮的界面代替。
@@ -64,7 +64,7 @@ footer: "案例 5：智能数据采集分析仪"
 
 固定 DFT 没有训练参数；YOLO11s 才是学习模型。二者都要求 OM 真正执行。
 
-<div class="source">教材：<a href="../experiment/case5.md#4-双主线系统架构"><code>src/experiment/case5.md</code> §4</a></div>
+<div class="source">教材：<a href="../experiment/case5.md#src-experiment-case5-architecture"><code>src/experiment/case5.md</code> §4</a></div>
 
 <!--
 先区分算法类别，再区分执行位置。NPU是执行位置，不会把固定DFT变成神经网络，也不会让单类检测自动获得多类语义。
@@ -78,7 +78,7 @@ footer: "案例 5：智能数据采集分析仪"
 
 <div class="split"><figure><img src="../experiment/img5/case5-hardware-connections.png" alt="Hantek与RTL-SDR硬件连接和测量边界"><figcaption>Hantek 与 RTL-SDR 的接线和安全边界</figcaption></figure><div><ul><li>6022BE 双通道共地，不是隔离示波器。</li><li>核心实验只把 CH1 接到低压 <code>CAL</code> 输出。</li><li>Little Bee B1 的 CH2 幅相标定尚未完成。</li><li>仪器与接收机不能同时被多个程序占用。</li></ul></div></div>
 
-<div class="source">图片：<a href="../experiment/img5/case5-hardware-connections.png"><code>src/experiment/img5/case5-hardware-connections.png</code></a>；教材：<a href="../experiment/case5.md#2-实验器材接线与安全"><code>src/experiment/case5.md</code> §2</a></div>
+<div class="source">图片：<a href="../experiment/img5/case5-hardware-connections.png"><code>src/experiment/img5/case5-hardware-connections.png</code></a>；教材：<a href="../experiment/case5.md#src-experiment-case5-hardware"><code>src/experiment/case5.md</code> §2</a></div>
 
 <!--
 未确认量程、接地和隔离前禁止接入市电。CAL只证明采集连通，不能证明Little Bee、CH2或计量精度。
@@ -97,7 +97,7 @@ footer: "案例 5：智能数据采集分析仪"
 
 > 采样率与窗口点数共同决定时间跨度与频点间隔；两者改变，模型输入与实时预算也随之改变。
 
-<div class="source">教材：<a href="../experiment/case5.md#3-读懂时域频域和复数-iq"><code>src/experiment/case5.md</code> §3</a>；公式与固定合同</div>
+<div class="source">教材：<a href="../experiment/case5.md#src-experiment-case5-signal-theory"><code>src/experiment/case5.md</code> §3</a>；公式与固定合同</div>
 
 <!--
 窗口点数不是界面刷新参数，而是模型输入和实时预算的一部分。Hantek只保留0到20kHz的201个频点。
@@ -117,7 +117,7 @@ footer: "案例 5：智能数据采集分析仪"
 
 RTL 检测张量的 55 个值由 4 个框参数和 51 个评分组成，但训练采用单类监督，不能解释为 51 类调制识别。
 
-<div class="source">教材：<a href="../experiment/case5.md#三种模型合同不能混用"><code>src/experiment/case5.md</code> §4.2</a>；样例：<a href="../../samples/case5/README.md"><code>samples/case5/README.md</code> 固定分析契约</a></div>
+<div class="source">教材：<a href="../experiment/case5.md#src-experiment-case5-model-contracts"><code>src/experiment/case5.md</code> §4.2</a>；样例：<a href="../../samples/case5/README.md"><code>samples/case5/README.md</code> 固定分析契约</a></div>
 
 <!--
 这里必须同时讲形状和语义。张量有55个值不等于模型受过51类训练，更不能把部署标签表当作精度证据。
@@ -182,7 +182,7 @@ ONNX生成、ATC成功和OM发布是三个门。只有真实OM加载并返回有
 
 > 能从结果反查到原始窗口，才算完成一次可复核的分析。
 
-<div class="source">教材：<a href="../experiment/case5.md#8-保存并复核一次会话"><code>src/experiment/case5.md</code> §8</a>；会话文件合同</div>
+<div class="source">教材：<a href="../experiment/case5.md#src-experiment-case5-hantek-session"><code>src/experiment/case5.md</code> §8</a>；会话文件合同</div>
 
 <!--
 结果记录保存线性功率，显示层才做dB转换。追溯时从analysis.jsonl定位窗口，再经raw_index回到原始帧。
@@ -217,7 +217,7 @@ CPU生成的是模型输入而非NPU FFT。卷积、特征融合和检测头由O
 
 在 2.048 MS/s 下，1024 点一行覆盖 0.5 ms，完整 1024 行覆盖 0.512 s；每个频率 bin 为 2 kHz。
 
-<div class="source">图片：<a href="../experiment/img5/case5-iq-to-spectrogram-mapping.png"><code>case5-iq-to-spectrogram-mapping.png</code></a>；教材：<a href="../experiment/case5.md#51-模型看到的是标准化的时频形态"><code>src/experiment/case5.md</code> §5.1</a></div>
+<div class="source">图片：<a href="../experiment/img5/case5-iq-to-spectrogram-mapping.png"><code>case5-iq-to-spectrogram-mapping.png</code></a>；教材：<a href="../experiment/case5.md#src-experiment-case5-spectrogram-representation"><code>src/experiment/case5.md</code> §5.1</a></div>
 
 <!--
 这张图把像素坐标与窗长、采样率绑定。学生先要指出时间轴和频率轴分别从哪里来，不能把热力图颜色直接当作绝对功率。
@@ -241,7 +241,7 @@ CPU生成的是模型输入而非NPU FFT。卷积、特征融合和检测头由O
 
 > 热力图颜色只表示相对强度，不能替代物理坐标、绝对功率与校准信息。
 
-<div class="source">教材：<a href="../experiment/case5.md#51-模型看到的是标准化的时频形态"><code>src/experiment/case5.md</code> §5.1</a></div>
+<div class="source">教材：<a href="../experiment/case5.md#src-experiment-case5-spectrogram-representation"><code>src/experiment/case5.md</code> §5.1</a></div>
 
 <!--
 检测框只有在绑定中心频率、采样率和图像坐标后才有物理意义。名义坐标不等于完成射频计量校准。
@@ -255,7 +255,7 @@ CPU生成的是模型输入而非NPU FFT。卷积、特征融合和检测头由O
 
 <div class="split"><figure><img src="../experiment/img5/case5-yolo11s-architecture.png" alt="YOLO11s时频目标检测网络结构"><figcaption>YOLO11s 的多尺度时频检测结构</figcaption></figure><div><ul><li>Backbone 提取多尺度时频特征。</li><li>FPN/PAN 融合深浅层语义与定位信息。</li><li>三尺度 Detect Head 共产生 21,504 个候选位置。</li><li><code>[1,55,21504]</code> 是 4 个框参数加 51 个评分通道。</li></ul></div></div>
 
-<div class="source">图片：<a href="../experiment/img5/case5-yolo11s-architecture.png"><code>case5-yolo11s-architecture.png</code></a>；教材：<a href="../experiment/case5.md#53-yolo11s-如何从图像形成候选框"><code>src/experiment/case5.md</code> §5.3</a></div>
+<div class="source">图片：<a href="../experiment/img5/case5-yolo11s-architecture.png"><code>case5-yolo11s-architecture.png</code></a>；教材：<a href="../experiment/case5.md#src-experiment-case5-yolo-architecture"><code>src/experiment/case5.md</code> §5.3</a></div>
 
 <!--
 张量形状解释输出布局，不解释类别语义。当前权重采用single_cls=True，不能声称已训练成51类调制识别器。
@@ -269,7 +269,7 @@ CPU生成的是模型输入而非NPU FFT。卷积、特征融合和检测头由O
 
 <div class="split"><figure><img src="../experiment/img5/case5-yolo-detection-decode-flow.png" alt="YOLO11输出张量到时频检测事件的解码流程"><figcaption>从 OM 张量到时间–频率框</figcaption></figure><div><ul><li>CPU 将输出转成候选行并解码框坐标。</li><li>阈值筛选后执行 NMS，再映射到时间与频率。</li><li>单类部署采用单一候选得分和 class-agnostic NMS。</li><li>当前兼容代码的 51 通道索引只是张量布局信息。</li></ul></div></div>
 
-<div class="source">图片：<a href="../experiment/img5/case5-yolo-detection-decode-flow.png"><code>case5-yolo-detection-decode-flow.png</code></a>；教材：<a href="../experiment/case5.md#54-从-npu-张量到候选区域"><code>src/experiment/case5.md</code> §5.4</a></div>
+<div class="source">图片：<a href="../experiment/img5/case5-yolo-detection-decode-flow.png"><code>case5-yolo-detection-decode-flow.png</code></a>；教材：<a href="../experiment/case5.md#src-experiment-case5-yolo-decode"><code>src/experiment/case5.md</code> §5.4</a></div>
 
 <!--
 当前单类监督权重不能被软件标签表扩写成多类模型。无标签空口数据只能评价链路，不能给出检测准确率。
@@ -291,7 +291,7 @@ CPU生成的是模型输入而非NPU FFT。卷积、特征融合和检测头由O
 
 有界丢弃保护内存和结果新鲜度，但不会掩盖原始采集缺口。
 
-<div class="source">教材：<a href="../experiment/case5.md#43-实时系统为什么需要有界队列"><code>src/experiment/case5.md</code> §4.3</a>；实现：<a href="../../samples/case5/time_frequency_dashboard/instrument_coordinator.py"><code>instrument_coordinator.py</code></a></div>
+<div class="source">教材：<a href="../experiment/case5.md#src-experiment-case5-bounded-queues"><code>src/experiment/case5.md</code> §4.3</a>；实现：<a href="../../samples/case5/time_frequency_dashboard/instrument_coordinator.py"><code>instrument_coordinator.py</code></a></div>
 
 <!--
 队列满时丢旧任务是一种实时策略，随后必须通过丢帧、丢批和写入错误字段暴露代价。Hantek与RTL不能并行占用设备。
@@ -313,7 +313,7 @@ CPU生成的是模型输入而非NPU FFT。卷积、特征融合和检测头由O
 
 只有 `accepted` manifest 才能进入正式检测入口；CPU 结果不能填充 NPU 证据。
 
-<div class="source">准入流程：<a href="../../samples/case5/docs/07_ascend310b_heterogeneous_signal_processing.md"><code>samples/case5/docs/07_ascend310b_heterogeneous_signal_processing.md</code></a>；教材：<a href="../experiment/case5.md#10-模型准入与真实板端运行"><code>src/experiment/case5.md</code> §10</a></div>
+<div class="source">准入流程：<a href="../../samples/case5/docs/07_ascend310b_heterogeneous_signal_processing.md"><code>samples/case5/docs/07_ascend310b_heterogeneous_signal_processing.md</code></a>；教材：<a href="../experiment/case5.md#src-experiment-case5-rtl-admission"><code>src/experiment/case5.md</code> §10</a></div>
 
 <!--
 ATC成功只证明可编译，accepted还要覆盖来源、数值和窗口预算。accepted也不等于完整主机流水线已经连续通过。
@@ -334,7 +334,7 @@ ATC成功只证明可编译，accepted还要覆盖来源、数值和窗口预算
 
 所有时间与后端结论必须同时带模型 hash、板卡档位、CANN 版本和输入状态。
 
-<div class="source">教材：<a href="../experiment/case5.md#93-谁计算时频图谁完成检测"><code>src/experiment/case5.md</code> §9.3</a>；验收：<a href="../../samples/case5/README.md"><code>samples/case5/README.md</code> 测试与验收</a></div>
+<div class="source">教材：<a href="../experiment/case5.md#src-experiment-case5-rtl-cpu-npu-boundary"><code>src/experiment/case5.md</code> §9.3</a>；验收：<a href="../../samples/case5/README.md"><code>samples/case5/README.md</code> 测试与验收</a></div>
 
 <!--
 短运行能证明采集、预处理和NPU链路连通，但不能替代600秒连续运行或带标签准确率。历史界面也不能冒充本轮板端。
@@ -348,7 +348,8 @@ ATC成功只证明可编译，accepted还要覆盖来源、数值和窗口预算
 cd ~/Documents/case5
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate base
+conda activate ascend
+export PYTHONNOUSERSITE=1
 python -c "import numpy, onnx, onnxruntime, aclruntime"
 python -m time_frequency_dashboard.acquisition.usb_diagnostics
 bash scripts/build_sigrok_capture_bridge.sh
@@ -362,7 +363,7 @@ bash scripts/run_dashboard.sh --sigrok-bridge build/sigrok_capture_bridge
 RTL-SDR 入口需显式给出已准入 manifest、真实 RF 输入状态和运行时长；不要在未验证时省略这些字段。
 
 <!--
-这些命令必须在板端已有CANN与base环境执行。命令页只给入口，实际运行仍要按USB、模型哈希和RF输入状态逐项检查。
+这些命令必须在板端已有CANN与`ascend`环境执行。命令页只给入口，实际运行仍要按USB、模型哈希和RF输入状态逐项检查。
 -->
 
 ---
@@ -381,7 +382,7 @@ RTL-SDR 入口需显式给出已准入 manifest、真实 RF 输入状态和运�
 
 最终结论只能写到证据覆盖的层级：页面可打开、OM 可执行、短运行连通和连续实时性是四种不同结论。
 
-<div class="source">教材：<a href="../experiment/case5.md#11-测试性能与验收方法"><code>src/experiment/case5.md</code> §11</a>；实现：<a href="../../samples/case5/README.md"><code>samples/case5/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case5.md#src-experiment-case5-reproduction"><code>src/experiment/case5.md</code> §11</a>；实现：<a href="../../samples/case5/README.md"><code>samples/case5/README.md</code></a></div>
 
 <!--
 收尾让学生逐层勾选，不允许用界面截图填满NPU、连续实时性或检测准确率。historical evidence必须保持历史标签。

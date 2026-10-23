@@ -28,6 +28,10 @@ const ALLOWED = [
 	'npu-smi info -t proc-mem -i 0 -c 0',
 	'uname -a',
 	'hostname -f',
+	'hostname -I',
+	'ip -4 -o addr show scope global',
+	'ip -4 route',
+	'ip route get 1.1.1.1',
 	'date -u +%s',
 	'free -m',
 	'df -h',
@@ -53,6 +57,9 @@ const BLOCKED = [
 	'npu-smi reset -i 0',
 	'npu-smi upgrade -t mcu -f file.bin',
 	'hostname evil-board',
+	'ip addr add 192.0.2.10/24 dev eth0',
+	'ip link set eth0 up',
+	'ip route add default via 192.0.2.1',
 	'date 102710002026',
 	'date -s 2026-10-17',
 	'date -s20261017',
@@ -83,6 +90,13 @@ const BLOCKED = [
 	'cat /etc/hostname > /tmp/out',
 	'cat /tmp/$(whoami)',
 	'cat /tmp/`whoami`',
+	'cat /home/HwHiAiUser/.ssh/id_rsa',
+	'cat /home/HwHiAiUser/.bash_history',
+	'grep -R TOKEN /home/HwHiAiUser',
+	'ip netns exec blue /tmp/payload',
+	'ps axew',
+	'ps auxeww',
+	'ps -eo pid,args,e',
 	'./npu-smi info',
 	'/usr/local/bin/npu-smi info',
 	'rm -rf /tmp/x',
@@ -170,6 +184,16 @@ for (const command of [
 	check(`task blocks: ${command}`, () => assert.equal(validateTaskCommand(command).ok, false));
 }
 check('task blocks destructive rm by default', () => assert.equal(validateTaskCommand('rm -rf /tmp/x').ok, false));
+check('task blocks long-form destructive rm by default', () => assert.equal(validateTaskCommand('rm --recursive --force /tmp/x').ok, false));
+check('task blocks systemctl with options', () => assert.equal(validateTaskCommand('systemctl --no-block reboot').ok, false));
+check('task blocks indirect reboot paths', () => assert.equal(validateTaskCommand('/sbin/reboot').ok, false));
+check('task blocks shell-indirected destructive commands', () => assert.equal(validateTaskCommand('x=rm; $x --recursive --force /tmp/x').ok, false));
+check('task blocks systemd-run reboot', () => assert.equal(validateTaskCommand('systemd-run --unit=x /sbin/reboot').ok, false));
+check('task blocks encoded shell execution', () =>
+	assert.equal(validateTaskCommand('echo cm0gLXJmIC90bXAvZGVtbw== | base64 -d | sh').ok, false)
+);
+check('task blocks non-sudo elevation', () => assert.equal(validateTaskCommand('doas true').ok, false));
+check('task blocks su', () => assert.equal(validateTaskCommand('su -c true').ok, false));
 check('task permits rm only with explicit opt-in', () => assert.equal(validateTaskCommand('rm -rf /tmp/x', { allowDestructive: true }).ok, true));
 check('task permits sudo only with explicit opt-in', () => assert.equal(validateTaskCommand('sudo true', { allowPrivileged: true }).ok, true));
 

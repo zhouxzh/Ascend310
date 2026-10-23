@@ -71,7 +71,7 @@ footer: "第8章：性能分析与优化"
 
 只看 `execute` 会漏掉预处理、Host 与 Device 拷贝、同步等待和后处理。
 
-<div class="source">教材：<a href="../book/chapter8.md#性能优化先从可测量开始"><code>src/book/chapter8.md</code> §8.1</a></div>
+<div class="source">教材：<a href="../book/chapter8.md#src-book-chapter8-h1"><code>src/book/chapter8.md</code> §8.1</a></div>
 
 <!--
 先把端到端链路拆开，再决定计时边界。一个“优化”如果只减少 execute，却让端到端 p95 变差，就不能直接验收。
@@ -89,7 +89,7 @@ footer: "第8章：性能分析与优化"
 - 同时记录端到端与分阶段耗时。
 - 固定 CANN、Python、驱动、板卡和运行协议。
 
-<div class="source">教材：<a href="../book/chapter8.md#性能优化先从可测量开始"><code>src/book/chapter8.md</code> §8.1</a>；记录：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code></a></div>
+<div class="source">教材：<a href="../book/chapter8.md#src-book-chapter8-h1"><code>src/book/chapter8.md</code> §8.1</a>；记录：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code></a></div>
 
 <!--
 10次记录的作用是验证脚本和展示方法，不足以宣布生产 SLA。尤其设备仍有 Health Alarm 等背景因素时必须标注。
@@ -110,7 +110,7 @@ footer: "第8章：性能分析与优化"
 
 Python 分段计时用于快速定位，msprof 用于检查 ACL、内存搬运与 NPU 时间线。
 
-<div class="source">教材：<a href="../book/chapter8.md#工具箱从轻量计时到系统-profiling"><code>src/book/chapter8.md</code> §8.3</a>；工具：<a href="../../samples/chapter8/tools/profile_with_msprof.sh"><code>samples/chapter8/tools/profile_with_msprof.sh</code></a></div>
+<div class="source">教材：<a href="../book/chapter8.md#src-book-chapter8-h3"><code>src/book/chapter8.md</code> §8.3</a>；工具：<a href="../../samples/chapter8/tools/profile_with_msprof.sh"><code>samples/chapter8/tools/profile_with_msprof.sh</code></a></div>
 
 <!--
 计时工具和 Profiling 不是互相替代关系。先知道哪个阶段可疑，再用 Timeline 解释为什么可疑。
@@ -162,7 +162,7 @@ acl.rt.memcpy(host_out, output_size, output_ptr,
               output_size, ACL_MEMCPY_DEVICE_TO_HOST)
 ```
 
-<div class="source">代码：<a href="../../samples/chapter8/01_baseline_resnet_sync.py"><code>samples/chapter8/01_baseline_resnet_sync.py</code></a>；教材：<a href="../book/chapter8.md#案例一建立同步推理基线"><code>src/book/chapter8.md</code> §8.4</a></div>
+<div class="source">代码：<a href="../../samples/chapter8/01_baseline_resnet_sync.py"><code>samples/chapter8/01_baseline_resnet_sync.py</code></a>；教材：<a href="../book/chapter8.md#src-book-chapter8-h9"><code>src/book/chapter8.md</code> §8.4</a></div>
 
 它每帧申请、执行并释放资源，是为了让 `alloc_dataset` 和 `free_dataset` 的成本暴露出来。
 
@@ -203,7 +203,7 @@ acl.rt.memcpy(host_out, output_size, output_ptr,
 - `Execute` 与端到端包含不同的计时代码边界。
 - 8T与20T是两个独立证据集，不能合并成一张排名表。
 
-<div class="source">范围：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §3、§5</a>；教材：<a href="../book/chapter8.md#作者实测结果"><code>src/book/chapter8.md</code> §8.10</a></div>
+<div class="source">范围：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §3、§5</a>；教材：<a href="../book/chapter8.md#src-book-chapter8-h15"><code>src/book/chapter8.md</code> §8.10</a></div>
 
 <!--
 重点训练“数字要带范围”。离开模型、输入、代码路径和板卡版本，性能数字没有可复用意义。
@@ -223,7 +223,7 @@ acl.rt.memcpy(host_out, output_size, output_ptr,
 
 判断标准是 `alloc_dataset` 和 `free_dataset` 从循环中消失，同时端到端耗时是否改善。
 
-<div class="source">代码：<a href="../../samples/chapter8/02_buffer_reuse_benchmark.py"><code>samples/chapter8/02_buffer_reuse_benchmark.py</code></a>；教材：<a href="../book/chapter8.md#案例二复用-acl-buffer-和-dataset"><code>src/book/chapter8.md</code> §8.5</a></div>
+<div class="source">代码：<a href="../../samples/chapter8/02_buffer_reuse_benchmark.py"><code>samples/chapter8/02_buffer_reuse_benchmark.py</code></a>；教材：<a href="../book/chapter8.md#src-book-chapter8-h10"><code>src/book/chapter8.md</code> §8.5</a></div>
 
 <!--
 Buffer 复用是确定内存生命周期，不是单纯追求一个加速比。必须验证资源没有提前释放，且输出仍然正确。
@@ -262,7 +262,7 @@ Buffer 复用是确定内存生命周期，不是单纯追求一个加速比。�
 - 输入太小时，调用开销可能超过计算收益。
 - 真正的视频链路应尽量复用资源并保持设备侧数据。
 
-<div class="source">代码：<a href="../../samples/chapter8/04_dvpp_resize_vs_cpu.py"><code>samples/chapter8/04_dvpp_resize_vs_cpu.py</code></a>；教材：<a href="../book/chapter8.md#案例四dvpp-vpc-resize-与-cpu-resize"><code>src/book/chapter8.md</code> §8.7</a></div>
+<div class="source">代码：<a href="../../samples/chapter8/04_dvpp_resize_vs_cpu.py"><code>samples/chapter8/04_dvpp_resize_vs_cpu.py</code></a>；教材：<a href="../book/chapter8.md#src-book-chapter8-h12"><code>src/book/chapter8.md</code> §8.7</a></div>
 
 <!--
 不要预设“用了 DVPP 就一定更快”。本次课件不加入新的 DVPP 数字，只讲比较方法和固定开销来源。
@@ -325,7 +325,7 @@ AIPP 的比较对象是两条不同输入合同。先校验预处理后的数值
 
 先证明瓶颈位置，再选择动作。优化名称不能代替证据。
 
-<div class="source">教材：<a href="../book/chapter8.md#调优-checklist"><code>src/book/chapter8.md</code> §8.11</a></div>
+<div class="source">教材：<a href="../book/chapter8.md#src-book-chapter8-h16"><code>src/book/chapter8.md</code> §8.11</a></div>
 
 <!--
 要求学生从症状出发，而不是从 API 出发。每个动作都要说明预期改善哪个指标，以及失败时如何回退。
@@ -343,7 +343,7 @@ AIPP 的比较对象是两条不同输入合同。先校验预处理后的数值
 4. 结果是否绑定模型、输入、板卡和版本？
 5. 失败或退化是否保留原始日志？
 
-<div class="source">教材：<a href="../book/chapter8.md#性能优化先从可测量开始"><code>src/book/chapter8.md</code> §8.1</a>；记录：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code></a></div>
+<div class="source">教材：<a href="../book/chapter8.md#src-book-chapter8-h1"><code>src/book/chapter8.md</code> §8.1</a>；记录：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code></a></div>
 
 <!--
 验收报告必须让下一位同学能复现。没有运行次数、阶段边界和版本，任何加速比都不能复用。
@@ -365,7 +365,7 @@ AIPP 的比较对象是两条不同输入合同。先校验预处理后的数值
 
 在现有记录中，ResNet18 只能填写“本次10次”；CPU 和 Queue 记录必须标注各自模式和样本数。
 
-<div class="source">作业：<a href="../book/chapter8.md#练习任务"><code>src/book/chapter8.md</code> §8.12</a>；原始记录：<a href="../../docs/chapter-board-runs-20261017/README.md"><code>chapter-board-runs-20261017</code></a></div>
+<div class="source">作业：<a href="../book/chapter8.md#src-book-chapter8-h17"><code>src/book/chapter8.md</code> §8.12</a>；原始记录：<a href="../../docs/chapter-board-runs-20261017/README.md"><code>chapter-board-runs-20261017</code></a></div>
 
 <!--
 最后检查学生有没有把不同实验混成一张性能表。正确的结论必须带样本数、阶段边界和证据组。

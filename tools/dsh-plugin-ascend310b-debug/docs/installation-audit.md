@@ -1,20 +1,20 @@
 # 昇腾310B调试插件安装与源码审核
 
-审核日期：2026-10-17
+审核日期：2026-10-23
 审核对象：`tools/dsh-plugin-ascend310b-debug/`
-结论：**可以交付给其他 DSH 用户按 README 的文件拷贝方式安装。** 本机离线门禁全部通过；真实板端结论仍只覆盖已经记录过的板卡组合，不由源码审核代替。
+结论：**可以通过仓库安装器打包安装，并由 profile 配置提供板卡地址。** 本机离线门禁全部通过；真实板端结论仍只覆盖已经记录过的板卡组合，不由源码审核代替。
 
 ## 交付边界
 
 | 项目 | 结论 |
 | --- | --- |
 | 包名 | `dsh-plugin-ascend310b-debug` |
-| 版本 | `1.2.0` |
+| 版本 | `1.7.0` |
 | 可见名称 | `昇腾310B调试` |
 | 适用芯片 | `Ascend310B1` / `Ascend310B4`（20T / 8T） |
 | 其他芯片 | 明确标记 `scope.applicable=false`，不返回 310B 调试程序 |
-| 安装方式 | 从本仓库 `tools/` 复制到 DSH profile 的 `node_modules/` |
-| 运行时依赖 | Node.js ≥ 18；主机侧只用 `node:` 内置模块与 DSH 提供的 `@deepseek-ai/dsh-tools` |
+| 安装方式 | 仓库根目录执行 `node scripts/install-dsh-plugins.mjs --profile desktop`，通过带内容哈希的 tarball 安装并校验内容 |
+| 运行时依赖 | Node.js ≥ 18；主机侧只用 `node:` 内置模块与 DSH 提供的 `@deepseek-ai/dsh-tools`；串口会话在 Linux/macOS 需要 PowerShell 7 `pwsh` |
 | 板端依赖 | SSH 公钥登录、`bash`、`npu-smi`、CANN/驱动；探测只读，任务需显式 `allowStateChange` |
 | 发布方式 | `private: true`，面向源码分发；不作为公共 npm 包发布 |
 
@@ -40,7 +40,7 @@
 | 已配置仓库根目录时仍优先读取包内快照，生成脚本声称的一致性测试也不存在 | 样例变更后工具可能继续显示旧入口或旧分类 | 有 checkout 时扫描 `samples/`；无 checkout 时回退包内快照；补无仓库根目录和中文查询测试 |
 | `ascend_check` 无仓库根目录时直接抛错，且“五道验收门”只有文字没有结构化输出 | 纯版本检查被无关配置阻断，工具描述与实际返回不一致 | `ascend_check` 回退包内样例并省略未校验文档；新增 `acceptanceGates` 字段和回归断言 |
 | `knowledge.js` 引用不存在的 `samples/chapter4/check_ascend_device.py`；README 对 `fresh=1` 的描述与实现不符 | 样例入口和面板路由说明不可信 | 引用改为 `samples/chapter4/README.md`；README 明确 `fresh=1` 只绕过缓存、不执行探测 |
-| 教程需要的 `wget`、`atc`、`python`、`msame` 和测试脚本无法由调试工具执行 | 插件只能看不能跑，chapter2 等章节无法完成下载、转换和推理 | 新增 `ascend_board_run`，要求显式 `allowStateChange:true`，默认加载 base Python/CANN/conda 环境并限制 cwd；保留只读 `ascend_board_exec` |
+| 教程需要的 `wget`、`atc`、`python`、`msame` 和测试脚本无法由调试工具执行 | 插件只能看不能跑，chapter2 等章节无法完成下载、转换和推理 | 新增 `ascend_board_run`，要求显式 `allowStateChange:true`，默认加载统一 `ascend` 环境并设置 `PYTHONNOUSERSITE=1`；`base` 仅用于显式诊断 |
 | HF、华为云、GitHub 下载没有统一来源策略 | 用户需要手写不同的下载命令，HF/GitHub 容易失败 | 新增 `ascend_model_download`：华为云直连、HF 强制 `hf-mirror.com`、GitHub 默认 `gh-proxy.com` 网页代理；目标限制在工作区或 `/tmp` |
 | 调试结果只有日志，没有前端页面证据 | 教程无法保存 case 的 UI 实测截图 | 新增 `ascend_ui_capture`，用宿主机 Edge/Chrome headless 截图，强制 `.png`、artifactRoot 边界和 `allowStateChange`；补浏览器实际截图测试 |
 | 只能使用固定 IP 的 `targets`，动态 DHCP 和多板实验室无法发现板卡 | IP 变化后工具找不到板，10 块以上只能手工维护地址 | 新增 `ascend_discover`：只扫描显式私有 CIDR，SSH 探测后按 MAC 建本地资产表；发现的 ID 直接成为动态 target，无需改静态列表 |
@@ -69,8 +69,8 @@ npm pack --dry-run
 | 发现与资产表 | 私网 CIDR 校验、SSH 探测、MAC 去重、IP 变化、驱动/CANN 变更 | 通过；本地 /24 实测发现 8T/20T，二次探测为 unchanged，MAC 和系统指纹已写入本地资产表 |
 | 一次性 profile | 路由、CANN/驱动解析、8T 夹具、非 310B 拒绝、下发 bundle 含新名称 | 通过 |
 | patch 组合 | 桌面 profile 的插件行能被解析并带到目标列表 | 通过 |
-| 新执行工具实板验证 | `ascend_board_run` 的 base Python、`ascend_model_download` 的 HF mirror/GitHub proxy/Huawei OBS、ATC、`msame` | 通过；8T/20T 的 Python 0 退出，HF/GitHub/Huawei 下载成功，ATC 与 `msame` 均成功 |
-| 截图工具 | 宿主机 Edge/Chrome headless、PNG 尺寸/签名、输出路径边界 | 通过；本地 HTTP 测试页生成 800x600 PNG，大小 >10KB |
+| 新执行工具实板验证 | `ascend_board_run` 的统一 `ascend` 环境、`ascend_model_download` 的 HF mirror/GitHub proxy/Huawei OBS、ATC、`msame` | 通过；8T/20T 的 Python 0 退出，HF/GitHub/Huawei 下载成功，ATC 与 `msame` 均成功 |
+| 截图工具 | 宿主机 Edge/Chrome headless、PNG 尺寸/签名/非空像素/SHA-256、输出路径边界 | 通过；本地 HTTP 测试页生成 800x600 PNG，并记录字节数与 SHA-256 |
 | 打包清单 | `npm pack --dry-run` 包含 `lib/`、`data/`、`docs/`（含开发规范）、`skills/`、`LICENSE`、README | 通过 |
 | 隐私扫描 | 不包含固定板卡 IP、本机用户名、检出目录或用户主目录 | 通过 |
 
@@ -89,23 +89,14 @@ npm pack --dry-run
 cd <教材仓库根目录>\tools\dsh-plugin-ascend310b-debug
 npm test
 
-# 2. 复制到桌面 profile
-$plugin = Join-Path "<教材仓库根目录>" "tools\dsh-plugin-ascend310b-debug"
-$dest = "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-plugin-ascend310b-debug"
-New-Item -ItemType Directory -Force $dest | Out-Null
-Copy-Item -Path (Join-Path $plugin '*') -Destination $dest -Recurse -Force
+# 2. 打包并通过 DSH profile 安装；安装器会校验版本和内容哈希
+cd <教材仓库根目录>
+node scripts/install-dsh-plugins.mjs --profile desktop
 
-# 3. 在 desktop/package.json 的 dsh.profile.bundles 加入
-#    dsh-plugin-ascend310b-debug
+# 3. 在 desktop/cordis.patch.yml 增加插件行和本机 repoRoot/targets
+#    技能由仓库 .dsh/skills 同步；安装器不再复制单个技能文件。
 
-# 4. 在 desktop/cordis.patch.yml 增加插件行和本机 repoRoot/targets
-
-# 5. 复制技能文件
-New-Item -ItemType Directory -Force "$env:USERPROFILE\.dsh\skills\ascend310b-debug" | Out-Null
-Copy-Item -Force "$plugin\skills\ascend310b-debug\SKILL.md" `
-  "$env:USERPROFILE\.dsh\skills\ascend310b-debug\SKILL.md"
-
-# 6. 重启 DSH，确认侧栏出现“昇腾310B调试”
+# 4. 重启 DSH，确认侧栏出现“昇腾310B调试”
 ```
 
 完整配置示例见 [`../README.md`](../README.md) 的“安装”一节。
