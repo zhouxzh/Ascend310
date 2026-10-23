@@ -1,0 +1,50 @@
+name: Remove legacy Case 3 source tags
+
+on:
+  push:
+    branches:
+      - release/case3-hf-runtime
+    paths:
+      - .github/workflows/cleanup-case3-source-tags.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Preserve commits and remove historical tags
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPOSITORY: zhouxzh/piano-ddsp-ascend310
+        run: |
+          python -m pip install --disable-pip-version-check huggingface_hub==0.36.2
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_REPOSITORY"]
+          source_commit = "c41911aa7de454aeacf0b3edbb2d06a0801fb3ff"
+          runtime_tag = "case3-runtime-v1.0.1"
+          obsolete_tags = ("model-suite-v1.0.0", "model-suite-v1.0.1")
+
+          api.repo_info(repo_id=repo_id, repo_type="model", revision=source_commit)
+          refs = api.list_repo_refs(repo_id=repo_id, repo_type="model")
+          if not any(item.name == runtime_tag for item in refs.tags):
+              raise RuntimeError(f"refusing cleanup: runtime tag {runtime_tag} is absent")
+
+          for tag in obsolete_tags:
+              if any(item.name == tag for item in refs.tags):
+                  api.delete_tag(repo_id=repo_id, repo_type="model", tag=tag)
+                  print(f"deleted retired tag {tag}")
+              else:
+                  print(f"retired tag {tag} already absent")
+
+          refs = api.list_repo_refs(repo_id=repo_id, repo_type="model")
+          print("remaining branches:", ",".join(item.name for item in refs.branches))
+          print("remaining tags:", ",".join(item.name for item in refs.tags))
+          PY
