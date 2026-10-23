@@ -68,14 +68,17 @@ jobs:
           if not isinstance(commit, CommitInfo) or not commit.oid:
               raise RuntimeError(f"unexpected upload result: {commit!r}")
 
-          api.create_tag(
-              repo_id=repo_id,
-              repo_type="model",
-              tag=tag,
-              revision=commit.oid,
-          )
           refs = api.list_repo_refs(repo_id=repo_id, repo_type="model")
           tag_ref = next((item for item in refs.tags if item.name == tag), None)
+          if tag_ref is None:
+              api.create_tag(
+                  repo_id=repo_id,
+                  repo_type="model",
+                  tag=tag,
+                  revision=commit.oid,
+              )
+              refs = api.list_repo_refs(repo_id=repo_id, repo_type="model")
+              tag_ref = next((item for item in refs.tags if item.name == tag), None)
           if tag_ref is None:
               raise RuntimeError(f"tag {tag} was not created")
           if tag_ref.target_commit != commit.oid:
@@ -86,3 +89,35 @@ jobs:
 
           print(f"uploaded runtime commit: {commit.oid}")
           PY
+
+  verify-public-download:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install Hugging Face client
+        run: python -m pip install --disable-pip-version-check huggingface_hub==0.36.2
+
+      - name: Download public fixed revision
+        env:
+          HF_REPOSITORY: zhouxzh/piano-ddsp-ascend310
+          HF_TAG: case3-runtime-v1.0.1
+        run: |
+          python - <<'PY'
+          import os
+          from huggingface_hub import snapshot_download
+
+          snapshot_download(
+              repo_id=os.environ["HF_REPOSITORY"],
+              repo_type="model",
+              revision=os.environ["HF_TAG"],
+              allow_patterns="ascend310b4-runtime-v1.0.1/*",
+              local_dir="public-download",
+              max_workers=4,
+          )
+          PY
+
+      - name: Verify public checksums
+        run: |
+          cd public-download/ascend310b4-runtime-v1.0.1
+          sha256sum -c SHA256SUMS
