@@ -1,0 +1,46 @@
+name: Verify public Case 3 HF runtime
+
+on:
+  push:
+    branches:
+      - release/case3-hf-runtime
+    paths:
+      - .github/workflows/verify-case3-hf-runtime.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install Hugging Face client
+        run: python -m pip install --disable-pip-version-check huggingface_hub==0.36.2
+
+      - name: Download public fixed revision
+        run: |
+          python - <<'PY'
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              repo_id="zhouxzh/piano-ddsp-ascend310",
+              repo_type="model",
+              revision="case3-runtime-v1.0.1",
+              allow_patterns="ascend310b4-runtime-v1.0.1/*",
+              local_dir="public-download",
+              max_workers=4,
+          )
+          PY
+
+      - name: Verify public checksums
+        run: |
+          cd public-download/ascend310b4-runtime-v1.0.1
+          sha256sum -c SHA256SUMS
+
+      - name: Verify canonical runtime trees
+        run: |
+          test -f public-download/ascend310b4-runtime-v1.0.1/models/om/ddsp_vst_feature_mixed_float16.om
+          test -f public-download/ascend310b4-runtime-v1.0.1/models/midi_ddsp/bundles/google-urmp-stateful-v2-batched-origin/manifest.json
+          test -f public-download/ascend310b4-runtime-v1.0.1/models/piano_ddsp/bundles/model-suite-v1.0.1-gru-unrolled-fp32-origin/manifest.json
+          test -f public-download/ascend310b4-runtime-v1.0.1/models/piano_ddsp/active-bundle.json
