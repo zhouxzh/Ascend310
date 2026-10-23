@@ -1,0 +1,38 @@
+name: Clean invalid Case 3 HF runtime tag
+
+on:
+  push:
+    branches:
+      - release/case3-hf-runtime
+    paths:
+      - .github/workflows/cleanup-invalid-case3-hf-runtime.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Remove invalid HF tag and branch
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPOSITORY: zhouxzh/piano-ddsp-ascend310
+        run: |
+          python -m pip install --disable-pip-version-check huggingface_hub==0.36.2
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_REPOSITORY"]
+          refs = api.list_repo_refs(repo_id=repo_id, repo_type="model")
+          if any(item.name == "case3-runtime-v1.0.0" for item in refs.tags):
+              api.delete_tag(repo_id=repo_id, repo_type="model", tag="case3-runtime-v1.0.0")
+              print("deleted tag case3-runtime-v1.0.0")
+          if any(item.name == "case3-runtime-v1.0.0" for item in refs.branches):
+              api.delete_branch(repo_id=repo_id, repo_type="model", branch="case3-runtime-v1.0.0")
+              print("deleted branch case3-runtime-v1.0.0")
+          PY
