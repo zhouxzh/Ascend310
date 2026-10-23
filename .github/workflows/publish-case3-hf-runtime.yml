@@ -1,0 +1,89 @@
+name: Publish Case 3 runtime to Hugging Face
+
+on:
+  push:
+    branches:
+      - release/case3-hf-runtime
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_REPOSITORY: zhouxzh/piano-ddsp-ascend310
+      HF_BRANCH: case3-runtime-v1.0.0
+      HF_TAG: case3-runtime-v1.0.0
+      RELEASE_TAG: case3-runtime-v1.0.0-staging
+      ARCHIVE_NAME: ascend310b4-runtime-v1.0.0.tar.gz
+      ARCHIVE_SHA256: 743ff75015ebb3478cd45675fd48ff35405abaa6546e51ed77a4aada554cb81c
+    steps:
+      - name: Download staging asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/release"
+          gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${ARCHIVE_NAME}" \
+            --dir "${RUNNER_TEMP}/release"
+
+      - name: Verify staging archive
+        run: |
+          cd "${RUNNER_TEMP}/release"
+          echo "${ARCHIVE_SHA256}  ${ARCHIVE_NAME}" | sha256sum -c -
+          tar -xzf "${ARCHIVE_NAME}"
+          cd ascend310b4-runtime-v1.0.0
+          sha256sum -c SHA256SUMS
+
+      - name: Install Hugging Face client
+        run: python -m pip install --disable-pip-version-check huggingface_hub==0.36.2
+
+      - name: Upload fixed runtime revision
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from huggingface_hub import CommitInfo, HfApi
+          from huggingface_hub.errors import EntryNotFoundError
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_REPOSITORY"]
+          branch = os.environ["HF_BRANCH"]
+          tag = os.environ["HF_TAG"]
+          root = Path(os.environ["RUNNER_TEMP"]) / "release" / "ascend310b4-runtime-v1.0.0"
+
+          api.create_branch(repo_id=repo_id, repo_type="model", branch=branch, exist_ok=True)
+          commit = api.upload_folder(
+              repo_id=repo_id,
+              repo_type="model",
+              revision=branch,
+              folder_path=root,
+              path_in_repo="ascend310b4-runtime-v1.0.0",
+              commit_message="Publish verified Ascend 310B case3 runtime",
+          )
+          if not isinstance(commit, CommitInfo) or not commit.oid:
+              raise RuntimeError(f"unexpected upload result: {commit!r}")
+
+          try:
+              existing = api.get_tag(repo_id=repo_id, repo_type="model", tag=tag)
+          except EntryNotFoundError:
+              api.create_tag(
+                  repo_id=repo_id,
+                  repo_type="model",
+                  tag=tag,
+                  revision=commit.oid,
+              )
+              print(f"created immutable tag {tag} at {commit.oid}")
+          else:
+              target = getattr(getattr(existing, "target_commit", None), "id", None)
+              if target != commit.oid:
+                  raise RuntimeError(f"tag {tag} already points to {target}, not {commit.oid}")
+              print(f"tag {tag} already points to {commit.oid}")
+
+          print(f"uploaded runtime commit: {commit.oid}")
+          PY
