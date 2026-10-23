@@ -1,23 +1,38 @@
 #!/bin/bash
-# Case 6: Smart Car Perception — environment setup
-set -e
+# Case 6: Smart Car Perception - unified Ascend environment
+set -euo pipefail
 
-echo "=== Case 6: 智能小车视觉感知 - 环境安装 ==="
+CONDA_SH="${CONDA_SH:-/usr/local/miniconda3/etc/profile.d/conda.sh}"
+if [[ ! -r "${CONDA_SH}" ]]; then
+    echo "conda activation script not found: ${CONDA_SH}" >&2
+    exit 2
+fi
+# shellcheck disable=SC1090
+source "${CONDA_SH}"
+if ! conda activate ascend; then
+    echo "required conda environment 'ascend' is unavailable" >&2
+    exit 2
+fi
+export PYTHONNOUSERSITE=1
 
-# System dependencies
-echo "[1/3] Installing system packages ..."
-sudo apt update
-sudo apt install -y python3-dev python3-pip
+if [[ -r /usr/local/Ascend/ascend-toolkit/set_env.sh ]]; then
+    # shellcheck disable=SC1091
+    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+fi
 
-# Python packages
-echo "[2/3] Installing Python packages ..."
-pip3 install -r requirements.txt
+if [[ "$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" != "3.9" ]]; then
+    echo "case6 requires Python 3.9 from conda environment 'ascend'" >&2
+    exit 2
+fi
 
-# Prepare ResNet18 scene classifier (ONNX export; ATC if CANN available)
-echo "[3/3] Preparing ResNet18 scene classifier model ..."
-python3 prepare_models.py
+echo "=== Case 6: Smart Car Perception - unified environment ==="
+echo "[1/2] Installing Python packages into ascend ..."
+python -m pip install -r requirements.txt
+
+echo "[2/2] Preparing ResNet18 scene classifier (ONNX + ATC where available) ..."
+python prepare_models.py
 
 echo ""
-echo "=== 安装完成 ==="
-echo "启动服务:  python3 app.py"
-echo "如需重新转换模型: python3 prepare_models.py --force"
+echo "=== setup complete ==="
+echo "Start: python app.py"
+echo "Recover model: python prepare_models.py --force"

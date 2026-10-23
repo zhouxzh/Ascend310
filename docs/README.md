@@ -22,6 +22,7 @@ _这是工程文档入口，不是项目首页，也不是教材正文。项目�
 | 查摄像头、麦克风和喇叭设置 | [`ascend310b-peripheral-setup.md`](ascend310b-peripheral-setup.md) | video/audio 组、设备节点、板载音频、USB 声卡和真实采集/播放验收 |
 | 查 chapter2–9 双板运行对照 | [`ascend310b-chapter-board-comparison-20261017.md`](ascend310b-chapter-board-comparison-20261017.md) | 8T/20T 的样例状态、耗时、差异和原始日志入口 |
 | 查 case1–9 双板调试与前端截图 | [`case-board-runs-20261017/README.md`](case-board-runs-20261017/README.md) | 逐案例状态、截图、原始日志、摄像头复测和待办边界 |
+| 查 case1–9 图片尺寸与实际缩放合规性 | [`case-image-audit-20261023.md`](case-image-audit-20261023.md) | 73 张源图的 warning/error、浏览器缩放结果和逐案修复顺序 |
 | 查案例 7 | [`samples/case7/docs/README.md`](../samples/case7/docs/README.md) | 智能相册的 7 份主题工程文档 |
 
 ## 🗂️ 文档分层

@@ -34,7 +34,7 @@
   },
   "scripts": {
     "smoke": "node test/smoke.mjs",
-    "test": "node test/smoke.mjs && node test/docs.mjs && node test/skills.mjs && node test/dot-templates.mjs && node test/code-docs.mjs && node test/panel-render.mjs && node test/host-schema.mjs && node test/portability.mjs",
+    "test": "node test/smoke.mjs && node test/docs.mjs && node test/skills.mjs && node test/figures.mjs && node test/dot-templates.mjs && node test/code-docs.mjs && node test/panel-render.mjs && node test/host-schema.mjs && node test/portability.mjs",
     "skills:install": "node scripts/install-skill.mjs",
     "skills:check": "node scripts/install-skill.mjs --check"
   },

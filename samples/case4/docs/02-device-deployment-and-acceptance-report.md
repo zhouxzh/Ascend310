@@ -103,6 +103,25 @@ aarch64 上 `struct v4l2_format` 的格式 union 按 8 字节对齐，自动发�
 
 本文件定义人工测试方法，不宣称五个 CompNet 已通过稳定性或跨域正式验收。当前版本冻结；人工测试出现问题时先记录和回退，下一版本另行规划。
 
+### 2026-10-23 生产 CCNet 板端 smoke
+
+Orange Pi `.249`（Ascend310B4 / 8T、CANN 8.0、driver 25.2.0）使用统一
+conda `ascend` Python 3.9.25 和 `PYTHONNOUSERSITE=1`。部署生产
+`palm_ccnet_mixed_fp16.om` 后：
+
+- OM 131,904,474 bytes，SHA-256
+  `8465fbf483524a1b373618e5e67b2903c522a32f0fc3b3ee6a4b40881295b7f1`
+  与 registry 一致。
+- `/api/health` 返回 `model_ready=true`；registry 仅准入 `ccnet`。
+- 两次 `POST /api/recognitions` 使用合成 128×128 ROI，模型耗时分别为
+  `46.93 ms` 和 `44.16 ms`；第二次热路径总耗时 `48.07 ms`。
+- 空模板库返回 `outcome=no_templates`、`accepted=false`，符合合同。
+- ACL lifecycle 显示 `initialized=true`、`device_set=true`、
+  `active_runners=1`，没有初始化错误。
+
+该结果证明生产 CCNet 的 NPU 推理和 API 合同通过，不提供 EER、Rank-1、
+跨域或真实掌纹模板结论。
+
 ## 全候选板端测试
 
 板端测试目标为 Ascend 310B4 / 8T，当前开发板地址为 `192.168.8.178`。本地控制器不得运行 PyACL、ATC、`npu-smi` 或摄像头测试；必须在已激活 conda/CANN 的板端 shell 中执行。

@@ -426,7 +426,8 @@ export function apply(ctx, config) {
 			name: 'ascend310b_writing_page_layout',
 			description:
 				'Open a local VuePress page in a real browser and check horizontal page overflow, images/SVGs ' +
-				'outside the viewport, and internal table/code scrolling at desktop and mobile widths. Use after ' +
+				'outside the viewport, over-downscaled source images, and internal table/code scrolling at desktop ' +
+				'and mobile widths. Use after ' +
 				'pnpm run docs:dev; it is a mechanical layout check, not a substitute for human visual review.',
 			parameters: {
 				root: ROOT_PARAMETER,

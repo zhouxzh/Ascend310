@@ -231,7 +231,7 @@ source tag 已删除，source 通过 commit `c41911aa7de454aeacf0b3edbb2d06a0801
 | case7 | `246 passed`；3 个 admitted 模型全部 ready；一张合成图完成 3 个 NPU embedding；中文/英文文本搜索均命中 | 中文查询走 Chinese-CLIP，英文走 MobileCLIP；未使用真实个人照片 |
 | case8 | OM camera 5 帧、4 次推理、NPU 90.31 ms；WebRTC + NPU + CPU libx264 建立 `connected`，14.3 FPS、NPU 87.5 ms | CANN VENC 仍因已知 CANN 8.0/driver 25.2 `507018` 失败，不能用 CPU 编码替代硬编结论 |
 | case9 | `62 passed`；release preflight passed | 在线 Qwen 加载时板卡 SSH 失联，未生成 token |
-| case6 | ONNX 导出成功，contract 为 `1×3×224×224 → 1×5` | ATC 运行超过 10 分钟并再次触发 `.249` SSH banner 超时；OM 未产出。模型为 ImageNet backbone + 随机分类头，不能用于场景精度声明 |
+| case6 | `.212`/CANN7 与 20T/CANN8 均完成 ONNX、ATC、OM 和 NPU 分类，`use_npu=true`；20T OM SHA-256 `5b4e080fcc1d294bd894614181aadd8173a06738cd6dbb1f8c76f4d79de5161d` | `.249`/CANN8/8T 待恢复复测；模型无训练分类头，分类精度不作声明 |
 
 Qwen 模型在 `.249` 已完整传输并通过同一 SHA-256：
 
@@ -261,6 +261,20 @@ HBM 又会保留到下一次重启才能释放。因此该次在线推理记为
 宣称 8T 模型不兼容。可以继续前需要串口日志或调整 MindSpore context/HBM
 策略。
 
+2026-10-23 又在 `.212`（CANN 7 / MindSpore 2.2.14）用 Qwen1.5-0.5B
+做了独立重试。7 个 artifact 均通过字节数和 SHA-256 校验，worker 已开始
+构造 MindNLP/Qwen2 模型；在 Ascend kernel runtime 初始化时仍失败：
+
+```text
+Device HBM total size: 7912181760
+Device HBM free size: 2649354240
+Free memory size is less than half of total memory size
+```
+
+进程已退出，没有 health/token 输出，也未发现残留 worker。该结果把边界
+精确到 MindSpore kernel runtime 的 HBM 初始化，不是 tokenizer、权重文件或
+网络下载失败。
+
 ## 已执行验证
 
 | 案例 | 验证结果 | 边界 |
@@ -270,7 +284,7 @@ HBM 又会保留到下一次重启才能释放。因此该次在线推理记为
 | case3 | `.249` 统一环境：`257 passed, 2 skipped`、真实 Piano OM 和 WebUI API | 真实音频演奏仍需 Jieli 重枚举后的人工验收 |
 | case4 | `.249` 统一环境：CCNet OM ready，真实识别热路径 48.07 ms | 空模板库；无真实掌纹指标 |
 | case5 | `243 passed, 1 skipped` | 20T 统一环境单元测试；真实采集/OM 仍单列 |
-| case6 | ONNX 导出成功并核对 `1×3×224×224 → 1×5`；ONNX 已在 `.249` 生成 | ATC 超时并触发 SSH banner 超时，OM/app NPU 未验证；模型精度未训练 |
+| case6 | `.212`/CANN7 与 20T/CANN8：setup、ONNX、ATC、OM、`SceneClassifier use_npu=true` 通过 | 模型无训练分类头；`.249`/8T CANN8 待恢复复测 |
 | case7 | `.249` 统一环境：`246 passed`、3 个 NPU embedding、中文/英文文本搜索命中 | 合成照片，无个人照片 |
 | case8 | `.249` 统一环境：OM camera 与 WebRTC/NPU 通过；VENC `507018` fail-closed | CPU libx264 只证明降级视频链路，不证明硬件 VENC |
 | case9 | `57 passed`；20T release acceptance 与语音可听通过；8T `62 passed` | 8T Qwen 在线加载被 HBM/runtime 初始化计数阻断 |
@@ -281,11 +295,67 @@ HBM 又会保留到下一次重启才能释放。因此该次在线推理记为
 ATC 记为 `observed-fail (resource/runtime stall)`，OM 和 app NPU 均未验收。
 只有 SSH/串口恢复并确认 ATC 进程与 HBM 后，才能重试。
 
+改在 `.212`（CANN 7.0/driver 23.0.0）复测后，默认 ATC 因多个
+`ForkServerPoolWorker` 并发而被系统以退出码 `137` 杀死；以
+`TE_PARALLEL_COMPILER=1` 重跑约 144 秒成功生成 OM。合成道路图分类返回
+`use_npu=true`。同月在 20T/CANN 8 上执行同一 `setup.sh` 和固定
+`TE_PARALLEL_COMPILER=1` 路径，约 254 秒生成 22 MB OM，NPU 分类返回
+`use_npu=true`。因此 ATC 并发修复已在 CANN 7 和 CANN 8 软件组上复现，
+但 20T 结果不能替代 `.249` 的 8T 复测。`prepare_models.py` 已把该并发
+限制写成默认值；模型仍是 ImageNet backbone 加随机 5 类头，不能据此声明
+场景分类质量。
+
 case8 的 VENC 结果与
 [已知问题](../samples/case8/docs/05-known-issues-and-version-compatibility.md)
 一致：CANN 8.0/driver 25.2/firmware B309 在通道创建阶段返回 `507018`。
 同一版本的 OM 推理正常；显式 CPU libx264 仅作为页面声明的降级路径，
 不能替代 CANN VENC 硬件验收。
+
+## 依赖锁候选
+
+两个板级兼容组已经从实际 `ascend` 环境生成 `pip freeze`：
+
+| 组 | 来源 | 行数 | SHA-256 |
+| --- | --- | --- | --- |
+| CANN 8.0 / driver 25.2 | 20T `ascend-pip-freeze-20t-20261023-after-jieba.txt` | 153 | `d5fb5facfa9031fb28a9c64c88a6c0b84d227cb9459b98929b2fa8b86f42c662` |
+| CANN 7.0 / driver 23.0 | 8T `.212` `ascend-pip-freeze-8t-20261023-after-jieba.txt` | 152 | `3354e353fef4c1552cd7c4f58f490036d1c7a85163ba4cb0a6b4ae5d05aaa763` |
+
+冻结快照中的 `aclruntime`、`auto_tune`、`dataflow`、`hccl`、`op_compile_tool`
+等条目来自 CANN 安装目录或临时 wheel 路径，属于系统运行时，不进入可直接
+从 PyPI 安装的 requirements。两个兼容组的主要差异为：
+
+```text
+mindspore: 2.4.10 (CANN8) / 2.2.14 (CANN7)
+mindnlp:   0.4.1  (CANN8) / 0.3.1  (CANN7)
+cryptography: 42.0.8 / 50.0.2
+```
+
+其余通用包以当前统一环境为准。已生成候选锁：
+
+```text
+dependencies/ascend-py39-cann80.lock
+  SHA-256: 1c40f765af29e1ce0fa81425008cff18da93ab536b874f75323f905d3ea37a02
+dependencies/ascend-py39-cann70.lock
+  SHA-256: 0b1867ebce32d110a484bffe73afbda380d16954cd8aa8d7af6dd9998f207fa9
+```
+
+两份锁均已在对应板端通过 `pip install --dry-run`。CANN 7 组补齐了
+MindNLP 0.3.1 所需的 `jieba==0.42.1`；CANN 8 组同步该版本。
+`pip check` 仅剩 `op-compile-tool` 将 Python 标准库误报为 pip 依赖的问题。
+正式锁文件仍需在剩余外部硬件门关闭后确认，并同时保留组名、CANN/driver/SoC、
+wheel 来源和系统提供包白名单。
+
+## 环境清理预检
+
+| 板卡 | `ascend` | 旧 conda 环境 | `~/.local` | user-site 独有包 |
+| --- | --- | --- | --- | --- |
+| 8T `.212` | 2.8 GB | 无 | 971 MB | `mindspore-lite==2.2.11`；另有 `asttokens` 旧版本 |
+| 20T | 3.3 GB | `case9-ms240-cann80` 1.8 GB；`case9-voice` 128 MB | 2.3 GB | `download`、`mindspore-lite`；另有 35 个旧版本 |
+
+当前案例代码在 `PYTHONNOUSERSITE=1` 下均由 `ascend` 满足；
+`mindspore-lite` 只出现在 case9 归档文档，不被当前 case9 代码导入。
+清理仍不执行：它必须等 VENC、case9 8T runtime、Jieli 音频和 case6
+CANN 8 复测完成后，避免失去回滚材料。
 
 ## 服务迁移
 
@@ -318,7 +388,7 @@ Jieli 输出和 case9 voice-agent，均正常。
 
 ## 尚未完成
 
-1. 恢复 `.249` SSH/串口，确认 case6 ATC 进程和 HBM 后重试；当前只有 ONNX。
+1. 恢复 `.249` SSH/串口，使用已固化的 `TE_PARALLEL_COMPILER=1` 复测 case6 CANN 8 ATC。
 2. case8 CANN VENC 等供应商修复 firmware/driver；当前硬件路径为 `507018`。
 3. 重新插拔 Jieli，完成 case3 真实音频与 case9 8T 板载语音验收。
 4. case5 缺少真实 SDR/采集前端，保留 20T 单元测试结论。

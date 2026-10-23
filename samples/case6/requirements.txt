@@ -1,7 +1,7 @@
-gradio>=4.0,<6.0
-numpy>=1.21,<2.0
-onnx>=1.14
-opencv-python>=4.8
-Pillow>=9.0
-torch>=2.0
-torchvision>=0.15
+gradio==4.44.0
+numpy==1.26.4
+onnx==1.19.1
+opencv-python-headless==4.10.0.84
+Pillow==10.4.0
+torch==2.1.0
+torchvision==0.16.0

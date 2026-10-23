@@ -123,3 +123,22 @@ React/MJPEG 检查：通过 / 失败（报告路径：）
 登记验证，原因是目标板在该时段的视频节点没有输出有效帧。上述结果不能推出
 摄像头帧率、识别准确率、端到端延迟或自动考勤有效性；接入并配置摄像头后，
 应重新执行“功能闭环”和“MJPEG 首帧”步骤，并保存独立原始报告。
+
+## 2026-10-23 统一环境复测
+
+Orange Pi `.249`（Ascend310B4 / 8T、CANN 8.0、driver 25.2.0）使用 conda
+`ascend` Python 3.9.25、`PYTHONNOUSERSITE=1` 和 UGREEN `/dev/video0`：
+
+| 项目 | 结果 |
+| --- | --- |
+| 生产 OM | `face_detection.om` 2,806,388 bytes；`face_recognition.om` 8,369,832 bytes，均完成 SHA-256 核对 |
+| 服务 | `GET /api/health` 返回 `status=ok`、`ready=true`、`camera_ready=true` |
+| 前端 | `GET /` HTTP 200 |
+| 摄像头抓拍 | `POST /api/camera/capture` HTTP 200，返回 `capture_*.jpg` |
+| 推理入口 | 合成 128×128 图调用 `POST /api/clockin` HTTP 200，返回 `match=false, similarity=-1.0` |
+
+合成图没有可匹配的授权身份，因此不构造随机 embedding，也不把
+`match=false` 解释为模型精度。真实人脸注册、匹配和自动考勤仍需要经同意的
+样本；Jieli 重启后未枚举也不影响本表中的相机与 NPU 服务结论。本轮服务在
+case6 ATC 导致 `.249` SSH 管理通道失联前没有执行 graceful stop，资源释放
+证据不计入本轮通过项。

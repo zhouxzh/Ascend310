@@ -91,6 +91,20 @@ venc_create_chn_by_type Error 0xa008800c chn type 96
 最小 VENC 示例也复现同样错误，因此不是 WebRTC 页面、摄像头输入或 OM 推
 理的首要原因。
 
+2026-10-23 在 Orange Pi `.249`（Ascend310B4 / 8T、CANN 8.0、driver
+25.2.0、Health Alarm）再次验证：
+
+- `YOLOv10n_gestures.om` camera 入口处理 5 帧、4 次推理，NPU 平均
+  `90.31 ms`。
+- 浏览器建立真实 PeerConnection 并选择 CANN VENC 时，`/stats` 返回
+  `cann-venc-h264-error`，错误仍为 `venc_create_channel failed: 507018`。
+- 显式选择 CPU libx264 后，同一 OM、UGREEN MJPG 和 WebRTC 链路成功：
+  `connected`、1280×720、`14.3 FPS`、NPU `87.5 ms`、无 pipeline/drop
+  错误。
+
+因此本次再次确认 OM、相机和 WebRTC 服务正常，失败被隔离在硬件 VENC
+通道创建；CPU libx264 结果不作为硬件 VENC 的通过证据。
+
 ## 🧭 结论边界
 
 `iommu_map -34` 表示当前组合在 DVPP 保护内存映射阶段无法分配/映射编码器

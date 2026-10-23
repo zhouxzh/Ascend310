@@ -19,13 +19,19 @@
  * @module dsh-plugin-ascend310b-writing/figures
  */
 
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
-const HEAVY_IMAGE_BYTES = 1.5 * 1024 * 1024;
-const WIDE_IMAGE_PX = 3200;
-const TALL_IMAGE_PX = 2400;
+const WARN_IMAGE_BYTES = 1 * 1024 * 1024;
+const ERROR_IMAGE_BYTES = 1.5 * 1024 * 1024;
+const WARN_IMAGE_WIDTH = 1600;
+const WARN_IMAGE_HEIGHT = 1000;
+const ERROR_IMAGE_WIDTH = 2400;
+const ERROR_IMAGE_HEIGHT = 1500;
+const DEFAULT_GRAPHVIZ_DPI = 96;
+const IMAGE_BASELINE = 'docs/image-audit-baseline.json';
 // A Graphviz label can hold several lines separated by `\l`; the box is only
 // cramped when one line is long, so the limit applies per line.
 const LONG_DOT_LABEL = 44;
@@ -47,6 +53,32 @@ export function imageSize(file) {
 	}
 	if (buffer.length > 24 && buffer[0] === 0x89 && buffer.toString('ascii', 1, 4) === 'PNG') {
 		return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+	}
+	if (
+		buffer.length >= 30 &&
+		buffer.toString('ascii', 0, 4) === 'RIFF' &&
+		buffer.toString('ascii', 8, 12) === 'WEBP'
+	) {
+		const chunk = buffer.toString('ascii', 12, 16);
+		if (chunk === 'VP8X') {
+			return {
+				width: 1 + buffer.readUIntLE(24, 3),
+				height: 1 + buffer.readUIntLE(27, 3)
+			};
+		}
+		if (chunk === 'VP8L' && buffer[20] === 0x2f) {
+			const bits = buffer.readUInt32LE(21);
+			return {
+				width: 1 + (bits & 0x3fff),
+				height: 1 + ((bits >>> 14) & 0x3fff)
+			};
+		}
+		if (chunk === 'VP8 ' && buffer[23] === 0x9d && buffer[24] === 0x01 && buffer[25] === 0x2a) {
+			return {
+				width: buffer.readUInt16LE(26) & 0x3fff,
+				height: buffer.readUInt16LE(28) & 0x3fff
+			};
+		}
 	}
 	if (buffer.length > 4 && buffer[0] === 0xff && buffer[1] === 0xd8) {
 		let offset = 2;
@@ -128,6 +160,17 @@ export function collectFigureFindings({ root, settings }) {
 	const docs = manuscripts(settings, root);
 	const referenced = new Set();
 	const findings = [];
+	const baseline = new Map();
+	try {
+		const payload = JSON.parse(readFileSync(join(root, IMAGE_BASELINE), 'utf8'));
+		for (const entry of payload.entries ?? []) {
+			if (typeof entry.rule === 'string' && typeof entry.file === 'string') {
+				baseline.set(`${entry.rule}\0${entry.file.replaceAll('\\', '/')}`, false);
+			}
+		}
+	} catch {
+		// A missing or malformed baseline must not hide new findings.
+	}
 
 	// --- alternative text and missing targets ------------------------------
 	for (const { file, text } of docs) {
@@ -160,33 +203,57 @@ export function collectFigureFindings({ root, settings }) {
 		}
 	}
 	let heavy = 0;
+	const imageHashes = new Map();
 	for (const file of imageFiles) {
 		const rel = relative(root, file).split(sep).join('/');
 		let bytes = 0;
 		try {
 			bytes = statSync(file).size;
+			const hash = createHash('sha256').update(readFileSync(file)).digest('hex');
+			const group = imageHashes.get(hash) ?? [];
+			group.push(rel);
+			imageHashes.set(hash, group);
 		} catch {
 			continue;
 		}
-		if (bytes > HEAVY_IMAGE_BYTES) {
+		if (bytes > ERROR_IMAGE_BYTES) {
+			heavy += 1;
+			findings.push({
+				rule: 'image-too-heavy',
+				severity: 'error',
+				file: rel,
+				line: 1,
+				message: `图片 ${(bytes / 1024 / 1024).toFixed(2)} MB，超过 ${(ERROR_IMAGE_BYTES / 1024 / 1024).toFixed(1)} MB 硬上限；先压缩或拆图再引用`
+			});
+		} else if (bytes > WARN_IMAGE_BYTES) {
 			heavy += 1;
 			findings.push({
 				rule: 'image-too-heavy',
 				severity: 'warning',
 				file: rel,
 				line: 1,
-				message: `图片 ${(bytes / 1024 / 1024).toFixed(2)} MB，超过 ${(HEAVY_IMAGE_BYTES / 1024 / 1024).toFixed(1)} MB；网页会变慢、PDF 会变大，先压缩再引用`
+				message: `图片 ${(bytes / 1024 / 1024).toFixed(2)} MB，超过 ${(WARN_IMAGE_BYTES / 1024 / 1024).toFixed(1)} MB；应压缩后再引用`
 			});
 		}
 		const size = imageSize(file);
-		if (size !== null && (size.width > WIDE_IMAGE_PX || size.height > TALL_IMAGE_PX)) {
-			findings.push({
-				rule: 'image-too-wide',
-				severity: 'info',
-				file: rel,
-				line: 1,
-				message: `图片 ${size.width}×${size.height} 超过 ${WIDE_IMAGE_PX}×${TALL_IMAGE_PX}；网页显示尺寸与 PDF 页面都会被缩小`
-			});
+		if (size !== null) {
+			if (size.width > ERROR_IMAGE_WIDTH || size.height > ERROR_IMAGE_HEIGHT) {
+				findings.push({
+					rule: 'image-too-wide',
+					severity: 'error',
+					file: rel,
+					line: 1,
+					message: `图片 ${size.width}×${size.height} 超过 ${ERROR_IMAGE_WIDTH}×${ERROR_IMAGE_HEIGHT} 硬上限；必须拆图或重新生成`
+				});
+			} else if (size.width > WARN_IMAGE_WIDTH || size.height > WARN_IMAGE_HEIGHT) {
+				findings.push({
+					rule: 'image-too-wide',
+					severity: 'warning',
+					file: rel,
+					line: 1,
+					message: `图片 ${size.width}×${size.height} 超过教材目标 ${WARN_IMAGE_WIDTH}×${WARN_IMAGE_HEIGHT}；网页显示时会明显缩小`
+				});
+			}
 		}
 		if (!referenced.has(resolve(file).toLowerCase())) {
 			findings.push({
@@ -197,6 +264,16 @@ export function collectFigureFindings({ root, settings }) {
 				message: '没有任何正文引用这张图片'
 			});
 		}
+	}
+	for (const group of imageHashes.values()) {
+		if (group.length < 2) continue;
+		findings.push({
+			rule: 'image-duplicate',
+			severity: 'warning',
+			file: group[0],
+			line: 1,
+			message: `图片字节完全相同：${group.join(', ')}；有不同板端/状态标签时不能当作独立证据`
+		});
 	}
 
 	// --- Graphviz sources ---------------------------------------------------
@@ -249,6 +326,38 @@ export function collectFigureFindings({ root, settings }) {
 				message: '缺少 graph/digraph 声明，Graphviz 无法解析'
 			});
 		}
+		const sizeMatch = /\bsize\s*=\s*"([0-9.]+)\s*,\s*([0-9.]+)(?:\s*!)?\s*"/u.exec(text);
+		if (sizeMatch === null) {
+			findings.push({
+				rule: 'dot-size-missing',
+				severity: 'warning',
+				file: rel,
+				line: 1,
+				message: 'DOT 没有显式 graph size；生成结果不可按教材/课件画布验收'
+			});
+		} else {
+			const dpiMatch = /\bdpi\s*=\s*([0-9]+)/u.exec(text);
+			const dpi = dpiMatch === null ? DEFAULT_GRAPHVIZ_DPI : Number(dpiMatch[1]);
+			const width = Math.round(Number(sizeMatch[1]) * dpi);
+			const height = Math.round(Number(sizeMatch[2]) * dpi);
+			if (width > ERROR_IMAGE_WIDTH || height > ERROR_IMAGE_HEIGHT) {
+				findings.push({
+					rule: 'dot-canvas-too-large',
+					severity: 'error',
+					file: rel,
+					line: 1,
+					message: `DOT 画布约 ${width}×${height}px，超过 ${ERROR_IMAGE_WIDTH}×${ERROR_IMAGE_HEIGHT} 硬上限`
+				});
+			} else if (width > WARN_IMAGE_WIDTH || height > WARN_IMAGE_HEIGHT) {
+				findings.push({
+					rule: 'dot-canvas-too-large',
+					severity: 'warning',
+					file: rel,
+					line: 1,
+					message: `DOT 画布约 ${width}×${height}px，超过教材目标 ${WARN_IMAGE_WIDTH}×${WARN_IMAGE_HEIGHT}`
+				});
+			}
+		}
 		// Only rendered labels need a CJK font. Comments routinely contain
 		// Chinese explanations and must not trigger the font rule.
 		const rendered = text
@@ -287,6 +396,24 @@ export function collectFigureFindings({ root, settings }) {
 		}
 	}
 
+	for (const finding of findings) {
+		const key = `${finding.rule}\0${finding.file.replaceAll('\\', '/')}`;
+		if (finding.severity !== 'error' || !baseline.has(key)) continue;
+		baseline.set(key, true);
+		finding.severity = 'warning';
+		finding.message += `；已列入 ${IMAGE_BASELINE} 历史基线，修复前仍为 warning`;
+	}
+	for (const [key, matched] of baseline) {
+		if (matched) continue;
+		const [rule, file] = key.split('\0');
+		findings.push({
+			rule: 'image-baseline-stale',
+			severity: 'info',
+			file,
+			line: 1,
+			message: `${IMAGE_BASELINE} 中的 ${rule} 记录已不再命中；修复后请删除该基线项`
+		});
+	}
 	findings.sort((left, right) => left.file.localeCompare(right.file) || left.rule.localeCompare(right.rule));
 	// Inspectorial rules (orphans, oversized dimensions) can legitimately hit
 	// dozens of files at once. Keep the first few as concrete examples and

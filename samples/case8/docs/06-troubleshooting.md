@@ -6,21 +6,21 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 测试日期 | 2025-09-25 |
-| 开发板 | Orange Pi Ascend 310B4 / 8T |
+| 测试日期 | 2026-10-23 |
+| 开发板 | Orange Pi Ascend 310B4 / 8T `.249` |
 | SoC / 档位 | Ascend 310B4 / 8T |
-| CANN / 驱动 | CANN 8.0 / 9.0；驱动 25.2.0 |
-| Python / 框架 | 见板端 VENC 测试环境 |
-| 模型 / revision | VENC 独立最小测试与 case8 WebRTC 程序 |
-| 代码提交 | 未记录 |
-| 输入与命令 | 独立 ACL H.264 VENC 最小测试；case8 WebRTC |
-| 原始证据 | 板端日志；当前文档保留关键错误摘要 |
+| CANN / 驱动 | CANN 8.0；驱动 25.2.0 |
+| Python / 框架 | conda `ascend` Python 3.9.25；aiortc/PyAV/PyACL |
+| 模型 / revision | `YOLOv10n_gestures.om` |
+| 代码提交 | 待发布 commit；使用当前工作树 |
+| 输入与命令 | UGREEN `/dev/video0` MJPG 1280×720；CANN VENC 与 CPU libx264 对照 |
+| 原始证据 | `/stats` encoder error `507018`；CPU 路径 `connected`、14.3 FPS、NPU 87.5 ms |
 
 ## 问题索引
 
 | ID | 状态 | 级别 | 首次发现 | 问题摘要 | 回归结果 |
 | --- | --- | --- | --- | --- | --- |
-| `CASE8-ISS-20250925-01` | `open` | `blocker` | 2025-09-25 | CANN 8.0/9.0 的 H.264 VENC 在通道创建阶段失败 | 旧 CANN 7.0 通过；新系统未修复 |
+| `CASE8-ISS-20250925-01` | `open` | `blocker` | 2025-09-25 | CANN 8.0/9.0 的 H.264 VENC 在通道创建阶段失败 | 2026-10-23 再次复现 `507018`；OM/WebRTC 与显式 CPU 编码路径正常 |
 
 ## CASE8-ISS-20250925-01：DVPP VENC IOMMU/通道创建失败
 
@@ -67,7 +67,7 @@ venc_create_chn_by_type Error 0xa008800c chn type 96
 
 - 临时处理：失败时明确报错并停止连接，不自动切换 CPU。
 - 未采用方案：没有刷固件、替换驱动、重装 CANN、修改 IOMMU 或宣称 CPU `libx264` 是 NPU VENC 的修复。
-- 回归：官方 Atlas 310B4 的 CANN 9.2.0-beta.2 组合在正确用户组和重新插拔摄像头后通过，但不能据此认定 Orange Pi 系统已修复。
+- 回归：官方 Atlas 310B4 的 CANN 9.2.0-beta.2 组合在正确用户组和重新插拔摄像头后通过，但不能据此认定 Orange Pi 系统已修复。2026-10-23 在 `.249` 的真实 WebRTC 连接仍在首帧触发 `507018`；同机显式 CPU libx264 路径完成 1280×720 推流，说明故障边界仍是硬件 VENC。
 
 ### 证据与关联
 

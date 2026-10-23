@@ -139,6 +139,18 @@ for (const [name, requiredItems] of Object.entries(numberingSkills)) {
 		if (!text.includes(required)) failures.push(`${name}: 缺少章节编号规则：${required}`);
 	}
 }
+const imageStandards = {
+	'ascend310b-writing': ['1600×1000', '2400×1500', '1.5 MB'],
+	'ascend310b-writing-vuepress': ['1600×1000', '2400×1500', '2.5', '3 倍'],
+	'ascend310b-writing-markdown': ['1600×1000', '2400×1500'],
+	'ascend310b-writing-dot': ['1600×1000', '2400×1500']
+};
+for (const [name, requiredItems] of Object.entries(imageStandards)) {
+	const text = readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
+	for (const required of requiredItems) {
+		if (!text.includes(required)) failures.push(`${name}: 缺少图片尺寸规则：${required}`);
+	}
+}
 const troubleshootingTemplate = join(skillsRoot, 'ascend310b-writing-docs', 'references', 'troubleshooting-template.md');
 if (!existsSync(troubleshootingTemplate)) {
 	failures.push('Docs skill 缺少 troubleshooting-template.md');

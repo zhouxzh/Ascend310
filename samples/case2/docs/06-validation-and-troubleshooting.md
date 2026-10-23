@@ -4,13 +4,29 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 测试日期 | 尚无统一带日期的板端报告 |
-| 开发板 | 未记录 |
-| SoC / 档位 | 8T/20T 必须分开 |
-| CANN / 驱动 | 未记录 |
-| Python / 框架 | `requirements.txt`；ONNX Runtime/PyACL 按 backend |
-| 模型 / revision | ONNX/OM 文件名、大小、SHA-256 必须记录 |
-| 输入与命令 | 见下方命令；原始输出需另存 |
+| 测试日期 | 2026-10-23 |
+| 开发板 | Orange Pi `.249`，Ascend310B4 / 8T |
+| SoC / 档位 | Ascend310B4 / 8T |
+| CANN / 驱动 | CANN 8.0 / driver 25.2.0 |
+| Python / 框架 | conda `ascend` Python 3.9.25；PyACL |
+| 模型 / revision | `ssd320_mobilenetv2_050.om`，6,061,476 bytes，SHA-256 `d795943d5a8ea2b59afa91dc97140a5eaf199bee1f7970f1f59738a879818b1d` |
+| 输入与命令 | `demo/vtest.avi`；检测与跟踪均使用 `--device npu --no-display` |
+
+## 板端实测结果
+
+```text
+ssd320_mobilenetv2_050.om
+input:  320x320
+output: (1,4,3234), (1,81,3234)
+video:  768x576@10, FFMPEG, MJPG
+```
+
+- `detection_app.py` 完整处理 vtest，输出 `output/case2-ssd.mp4`，17,118,578 bytes。
+- `tracking_app.py` 完整处理 vtest，输出 `output/case2-tracking.mp4`，18,376,244 bytes。
+- 两个进程退出码均为 0，没有 NPU/decoder/视频写入错误。
+
+该结果是单模型、单视频文件 smoke，不是 mAP、MOTA/IDF1 或实时摄像头
+性能结论。其余 14 个 SSD 候选模型尚未逐一做板端验收。
 
 ## 本地检查
 

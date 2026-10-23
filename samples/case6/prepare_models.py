@@ -127,7 +127,12 @@ def convert_om(onnx_path, om_path):
     ]
 
     print(f"[ATC] Running: {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
+    # ATC's default parallel compiler workers can exhaust memory on an 8T
+    # board and trigger the OOM killer. Keep this conversion deterministic and
+    # bounded unless the operator explicitly raises the limit.
+    env = os.environ.copy()
+    env.setdefault("TE_PARALLEL_COMPILER", "1")
+    subprocess.run(cmd, check=True, env=env)
     print(f"[ATC] OK  — {om_path}")
 
 

@@ -38,6 +38,10 @@ case6/
 bash setup.sh
 ```
 
+`setup.sh` 只使用已有的 conda `ascend` Python 3.9 环境，并设置
+`PYTHONNOUSERSITE=1`；它不执行 `sudo apt`、不回退 base，也不使用
+`pip --user`。系统级 OpenCV/PortAudio 等依赖由操作者按开发板镜像预先安装。
+
 ### 准备模型
 
 setup.sh 已自动执行此步骤。如需手动重做：
@@ -49,6 +53,9 @@ python3 prepare_models.py --onnx-only
 # ONNX → OM 转换 (需在昇腾设备上运行)
 python3 prepare_models.py
 ```
+
+脚本在 8T 上默认设置 `TE_PARALLEL_COMPILER=1`，避免 ATC 并行编译子进程
+耗尽内存后触发 OOM killer。需要提高并行度时，应由操作者显式覆盖该环境变量。
 
 ### 启动服务
 

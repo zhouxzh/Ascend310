@@ -51,6 +51,25 @@ git diff --check
 | E1002 选择竖屏 | profile 合同 | E1002 只允许横屏 |
 | E6 dry-run 通过但实屏不刷新 | SPI/GPIO/驱动板接线 | dry-run 不等于实屏验收，单独确认硬件映射和 BUSY 信号 |
 
+## 2026-10-23 8T 板端记录
+
+Orange Pi `.249`（Ascend310B4 / 8T、CANN 8.0、driver 25.2.0）使用 conda
+`ascend` Python 3.9.25：
+
+- `tests`：`246 passed`。
+- `/api/health`：`status=ready`、`backend=npu`，三个 admitted 模型
+  `mobileclip_s0`、`chinese_clip_rn50`、`resnet50_feature` 均无缺失。
+- 上传一张 640×480 合成图，任务约 11.96 秒完成；`embedding_total=3`，
+  `embedding_completed=3`。
+- 中文查询“黄色和红色的几何图形”由 Chinese-CLIP 返回同一照片，
+  score `0.502389`。
+- 英文查询“yellow and red geometric artwork”由 MobileCLIP 返回同一照片，
+  score `0.241618`。
+- `/api/index/stats` 显示三个模型各有 1 个 embedding。
+
+该结果覆盖上传、NPU 索引和文本检索，不包含 COCO-CN Recall、P50/P95、
+触摸屏人工操作、ESP32 PhotoFrame 或真实电子纸刷新。
+
 ## 证据分层
 
 | 验证层 | 结论范围 |

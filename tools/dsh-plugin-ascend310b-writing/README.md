@@ -27,7 +27,7 @@ DeepSeek Harness 插件（bundle）。
 | `ascend310b_writing_audit` | 正文本身对不对（含 `AGENTS.md` 冻结名表的双向比对），以及演示文稿与站点产物是否过期 |
 | `ascend310b_writing_audit` + `rev` | 这次提交发布出去会不会断链 |
 | `ascend310b_writing_deck_render` | 生成后的 1280×720 课件有没有真实裁切、图片未加载 |
-| `ascend310b_writing_page_layout` | 本地 VuePress 页面在桌面/移动视口有没有横向溢出、图片/SVG 越界 |
+| `ascend310b_writing_page_layout` | 本地 VuePress 页面在桌面/移动视口有没有横向溢出、图片/SVG 越界，以及原图被过度缩小 |
 | `ascend310b_writing_render` | 渲染出来的 PDF 有没有坏字符，生成物是否落后于源 |
 | `ascend310b_writing_ci` | 读取最近一次 GitHub Pages 工作流运行、提交、失败步骤与日志 |
 | `ascend310b_writing_push_check` | 现在能不能推，以及哪一项只有人能确认 |
@@ -108,7 +108,7 @@ Copy-Item -Recurse -Force `
 
 - 正文：打开对应的 `book/`、`experiment/` 或 `appendix/` 页面；
 - 课件：打开对应的 `presentation/<deck>.html`，同时完成真实 1280×720 浏览器检查；
-- 页面排版：运行 `node scripts/check_page_layout.mjs --url <URL>`，检查 1440px 和 390px 视口的横向溢出、图片/SVG 越界和内部滚动；
+- 页面排版：运行 `node scripts/check_page_layout.mjs --url <URL>`，检查 1440px 和 390px 视口的横向溢出、图片/SVG 越界、内部滚动，以及正文图片自然尺寸/显示宽度是否超过 2.5× 或 3×；
 - 没有本地人工确认，不得把结果描述为最终交付或 push。
 
 ## 配置
@@ -381,7 +381,7 @@ DSH 在**会话启动时**加载 skill：更新后新建会话才会拿到新内
 
 实测：当前站点 71 页、369 个资源，断链 0、缺失资源 0，检查耗时约 100 ms。
 
-VuePress 发布前还要运行 `ascend310b_writing_page_layout`（或 `node scripts/check_page_layout.mjs --url <本地页面 URL>`）：在 1440×1000 和 390×844 视口检查页面横向滚动、图片/SVG 越界，并把代码块/表格内部滚动单独报告。该工具只做机械排版检查，不能替代人工视觉验收。
+VuePress 发布前还要运行 `ascend310b_writing_page_layout`（或 `node scripts/check_page_layout.mjs --url <本地页面 URL>`）：在 1440×1000 和 390×844 视口检查页面横向滚动、图片/SVG 越界，并把代码块/表格内部滚动单独报告。正文图片在桌面视口自然宽度超过显示宽度 2.5× 会警告，超过 3× 会失败；移动端只报告过度缩放，不升级为硬失败。该工具只做机械排版检查，不能替代人工视觉验收。
 
 ## 图表与排版检查
 
@@ -389,14 +389,18 @@ VuePress 发布前还要运行 `ascend310b_writing_page_layout`（或 `node scri
 
 | 规则 | 级别 | 判据 |
 | --- | --- | --- |
-| `image-too-heavy` | warning | 单张图片 > 1.5 MB（网页变慢、PDF 变大） |
-| `image-too-wide` | info | 像素尺寸 > 3200×2400（PDF/网页都会缩小显示） |
+| `image-too-heavy` | warning / error | 单张图片 > 1 MB warning，> 1.5 MB error |
+| `image-too-wide` | warning / error | > 1600×1000 warning，> 2400×1500 error；教材图片硬上限 |
 | `image-alt-missing` | warning | `![](…)` 缺少替代文字 |
+| `image-duplicate` | warning | 两张图片字节完全相同，不能冒充不同板端/状态证据 |
+| `image-baseline-stale` | info | 历史超限图已修复，删除对应的 baseline 记录 |
 | `image-orphan` | info | 图片没有被任何正文引用（同类超过 8 条时汇总） |
 | `dot-pair-missing` | error | `.dot` 没有同名 PNG |
 | `dot-png-stale` | error | PNG 早于 `.dot`（改图后未重新渲染） |
 | `dot-invalid` | error | 缺少 `graph`/`digraph` 声明 |
 | `dot-cjk-font` | warning | 含中文但没指定中文字体（渲染成方框） |
+| `dot-size-missing` | warning | DOT 没有显式 `graph.size` |
+| `dot-canvas-too-large` | warning / error | DPI 换算后超过 `1600×1000` / `2400×1500` |
 | `dot-label-too-long` | warning | 节点标签单行 > 36 字 |
 | `dot-orphan` | info | 结构图 PNG 没有被正文引用 |
 
