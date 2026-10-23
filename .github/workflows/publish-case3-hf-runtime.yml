@@ -16,11 +16,11 @@ jobs:
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_REPOSITORY: zhouxzh/piano-ddsp-ascend310
-      HF_BRANCH: case3-runtime-v1.0.0
-      HF_TAG: case3-runtime-v1.0.0
-      RELEASE_TAG: case3-runtime-v1.0.0-staging
-      ARCHIVE_NAME: ascend310b4-runtime-v1.0.0.tar.gz
-      ARCHIVE_SHA256: 743ff75015ebb3478cd45675fd48ff35405abaa6546e51ed77a4aada554cb81c
+      HF_BRANCH: case3-runtime-v1.0.1
+      HF_TAG: case3-runtime-v1.0.1
+      RELEASE_TAG: case3-runtime-v1.0.1-staging
+      ARCHIVE_NAME: ascend310b4-runtime-v1.0.1.tar.gz
+      ARCHIVE_SHA256: bb39ec28bff627211785e95ef67e2ff2532ca43d2f6051d8b54a411700b33cfe
     steps:
       - name: Download staging asset
         env:
@@ -37,7 +37,7 @@ jobs:
           cd "${RUNNER_TEMP}/release"
           echo "${ARCHIVE_SHA256}  ${ARCHIVE_NAME}" | sha256sum -c -
           tar -xzf "${ARCHIVE_NAME}"
-          cd ascend310b4-runtime-v1.0.0
+          cd ascend310b4-runtime-v1.0.1
           sha256sum -c SHA256SUMS
 
       - name: Install Hugging Face client
@@ -54,7 +54,7 @@ jobs:
           repo_id = os.environ["HF_REPOSITORY"]
           branch = os.environ["HF_BRANCH"]
           tag = os.environ["HF_TAG"]
-          root = Path(os.environ["RUNNER_TEMP"]) / "release" / "ascend310b4-runtime-v1.0.0"
+          root = Path(os.environ["RUNNER_TEMP"]) / "release" / "ascend310b4-runtime-v1.0.1"
 
           api.create_branch(repo_id=repo_id, repo_type="model", branch=branch, exist_ok=True)
           commit = api.upload_folder(
@@ -62,7 +62,7 @@ jobs:
               repo_type="model",
               revision=branch,
               folder_path=root,
-              path_in_repo="ascend310b4-runtime-v1.0.0",
+              path_in_repo="ascend310b4-runtime-v1.0.1",
               commit_message="Publish verified Ascend 310B case3 runtime",
           )
           if not isinstance(commit, CommitInfo) or not commit.oid:
