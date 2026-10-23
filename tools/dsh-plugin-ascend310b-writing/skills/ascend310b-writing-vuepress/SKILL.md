@@ -33,11 +33,11 @@ description: Ascend310 开源网页教材的 VuePress 站点模板与配置。�
 当前站点必须保持：
 
 ```text
-base: /Ascend310/
+base: /
 lang: zh-CN
 title: 昇腾310B实战
 theme: vuepress-theme-hope
-hostname: https://zhouxzh.github.io
+hostname: https://310b.cn
 repo: zhouxzh/Ascend310
 docsDir: src
 ```
@@ -89,7 +89,7 @@ title: 案例 9：智能聊天机器人
 ## 路由与资源
 
 - 页面链接使用仓库内相对路径，不用裸 URL 代替内部链接。
-- `public/` 资源路径以站点 `base` `/Ascend310/` 为基准。
+- `public/` 资源路径以站点 `base` `/` 和正式域名 `https://310b.cn/` 为基准。
 - 移动、改名页面后同步检查图片和课件 HTML 路径。
 - 链接到生成物、截图或报告时，确认 CI 新检出中仍然存在。
 - 页面出现在 sidebar 之前，先在对应 README 登记。

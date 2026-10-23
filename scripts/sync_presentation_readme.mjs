@@ -15,7 +15,7 @@ const beginMarker = "<!-- BEGIN GENERATED PRESENTATION INDEX -->";
 const endMarker = "<!-- END GENERATED PRESENTATION INDEX -->";
 const write = process.argv.includes("--write");
 const check = process.argv.includes("--check");
-const base = "https://zhouxzh.github.io/Ascend310";
+const base = "https://310b.cn";
 
 const statusLabel = {
   ready: "可用",

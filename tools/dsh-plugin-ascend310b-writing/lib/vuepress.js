@@ -290,9 +290,11 @@ export function collectVuepressFindings({ root, settings, frozenRows = [] }) {
 		}
 	}
 	if (hostname !== null && repo !== null && base !== null) {
-		const expectedHost = `https://${repo.split('/')[0]}.github.io`;
+		const cnamePath = join(root, publicDir, 'CNAME');
+		const cname = existsSync(cnamePath) ? readFileSync(cnamePath, 'utf8').trim() : '';
+		const expectedHost = cname === '' ? `https://${repo.split('/')[0]}.github.io` : `https://${cname}`;
 		if (hostname.replace(/\/$/u, '') !== expectedHost) {
-			push('vuepress-hostname-mismatch', 'warning', `${CONFIG_DIR}/theme.ts`, 1, `hostname「${hostname}」与 GitHub Pages 地址「${expectedHost}」不一致`);
+			push('vuepress-hostname-mismatch', 'warning', `${CONFIG_DIR}/theme.ts`, 1, `hostname「${hostname}」与 Pages 正式地址「${expectedHost}」不一致`);
 		}
 	}
 

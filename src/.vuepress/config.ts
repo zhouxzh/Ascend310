@@ -6,7 +6,7 @@ import markdownItAttrs from 'markdown-it-attrs';
 import theme from "./theme.js";
 
 export default defineUserConfig({
-  base: "/Ascend310/",
+  base: "/",
 
   // Numbered presentation Markdown files are Marp sources. Their generated
   // HTML is copied into the public directory and must not be rebuilt as
@@ -20,7 +20,7 @@ export default defineUserConfig({
   ],
 
   head: [
-    ["link", { rel: "icon", href: "/Ascend310/favicon.ico" }],
+    ["link", { rel: "icon", href: "/favicon.ico" }],
   ],
 
   lang: "zh-CN",

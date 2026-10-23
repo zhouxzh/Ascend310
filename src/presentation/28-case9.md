@@ -17,7 +17,7 @@ footer: "案例 9：智能聊天机器人"
 
 ## 把本地模型变成可验收的对话服务
 
-对应教材：[GitHub Pages · 案例 9](https://zhouxzh.github.io/Ascend310/experiment/case9.html)
+对应教材：[GitHub Pages · 案例 9](https://310b.cn/experiment/case9.html)
 
 配套样例：[GitHub · samples/case9](https://github.com/zhouxzh/Ascend310/tree/main/samples/case9)
 
@@ -35,7 +35,7 @@ footer: "案例 9：智能聊天机器人"
 
 ![案例 9 本讲路线：架构、模型锁、环境、服务、API、20T 验收、二次开发](../experiment/img9/case9_lecture_route.png)
 
-<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
 
 <!--
 授课提示：强调 8T/20T 独立证据，本讲的实测页只讲 20T。
@@ -61,7 +61,7 @@ footer: "案例 9：智能聊天机器人"
 
 浏览器不知道网关密钥；密钥由 UI 服务端持有。教学模型切换会重启目标 worker，而不是在请求中接受任意路径或 Python 代码。
 
-<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 系统架构</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 系统架构</div>
 
 <!--
 授课提示：先让学生指出哪些端口可被局域网访问，再解释为什么不能把 7865 暴露到公网。
@@ -83,7 +83,7 @@ footer: "案例 9：智能聊天机器人"
 
 正式发布默认模型仍是 Qwen1.5-0.5B；本轮 20T 教学验收使用 `qwen2-0.5b-instruct-mindspore`，两者不能混写。
 
-<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 发布模型与工件锁</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 发布模型与工件锁</div>
 
 <!--
 授课提示：问学生“模型名相同但 revision 不同，能否复现？”引到工件锁。
@@ -115,7 +115,7 @@ bash scripts/verify/release-preflight.sh
 - 设备节点、`npu-smi` 与模型哈希
 - 网关配置
 
-<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 环境准备</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 环境准备</div>
 
 <!--
 授课提示：裸 SSH 能 import 不等于服务进程能 import；启动进程必须自己 source CANN。
@@ -142,7 +142,7 @@ POST /v1/chat/completions
 
 网关只允许 greedy 解码、单请求串行和受限输出预算；超时或 worker 不可用时 fail-closed，不自动切 CPU 或云端。
 
-<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 启动服务与接口</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 启动服务与接口</div>
 
 <!--
 授课提示：提醒 Bearer 密钥只在服务器端；示例命令不要写入截图或 git。
@@ -163,7 +163,7 @@ POST /v1/chat/completions
 
 网页、网关和 worker 都要能独立定位；端口 200 只说明有进程在监听，不说明模型已经生成。
 
-<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 验收方法</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 验收方法</div>
 
 <!--
 授课提示：把“HTTP 200”和“数值/文本验收”明确分开。
@@ -194,7 +194,7 @@ POST /v1/chat/completions
 
 这些数字只属于这次 20T、这个模型 revision、这组提示和当前环境。
 
-<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 板端实测记录</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 板端实测记录</div>
 
 <!--
 授课提示：强调只有单性能样本，不能把 723 ms 写成 p50，也不能外推到 8T。
@@ -212,7 +212,7 @@ POST /v1/chat/completions
 
 > 结论：技术门 `observed-pass`；中文质量、长稳 p50/p95、并发和 8T 仍是 `untested` 或待复核。
 
-<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 长度、完整性与质量</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 长度、完整性与质量</div>
 
 <!--
 授课提示：让学生复述“429 是测试客户端突发，不是模型失败”；同时不要反过来掩盖质量失败。
@@ -226,7 +226,7 @@ POST /v1/chat/completions
 
 ![20T 版 Ascend Edge Chat 前端页面](../experiment/img9/case9-board-20t-ui.png)
 
-<div class="source">图片：<a href="../experiment/img9/case9-board-20t-ui.png"><code>src/experiment/img9/case9-board-20t-ui.png</code></a>；接口证据见 <a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
+<div class="source">图片：<a href="../experiment/img9/case9-board-20t-ui.png"><code>src/experiment/img9/case9-board-20t-ui.png</code></a>；接口证据见 <a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
 
 <!--
 授课提示：截图只证明页面和本地服务展示路径，不证明回答质量、长上下文或性能。
@@ -246,7 +246,7 @@ POST /v1/chat/completions
 
 页面只接受已注册的 profile ID，不接受任意路径、shell 命令或 Python 表达式。
 
-<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 二次开发</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 二次开发</div>
 
 <!--
 授课提示：把“可运行模型”和“正式发布模型”分开；教学目录不是质量背书。
@@ -264,7 +264,7 @@ POST /v1/chat/completions
 
 > 下一讲：把已验证的对话服务接入完整案例应用链路。
 
-<div class="source">教材：<a href="https://zhouxzh.github.io/Ascend310/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 小结</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 小结</div>
 
 <!--
 授课提示：收束时让学生说出一个 observed-pass 和一个仍为 untested 的项。

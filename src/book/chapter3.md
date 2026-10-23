@@ -34,7 +34,7 @@ Ascend Extension for PyTorch 是华为昇腾为 PyTorch 用户提供的深度适
 ### CANN环境准备 {#src-book-chapter3-h4}
 
 在昇腾310B开发板上安装PyTorch之前，必须必须安装匹配CANN版本的驱动与固件。
-如果没有安装CANN相关的工具包与驱动，请参考[《CANN 软件安装指南》](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html)或者本教程的[第二章](https://zhouxzh.github.io/Ascend310/book/chapter2.html)进行离线安装。
+如果没有安装CANN相关的工具包与驱动，请参考[《CANN 软件安装指南》](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html)或者本教程的[第二章](https://310b.cn/book/chapter2.html)进行离线安装。
 如果已安装 CANN 相关工具包与驱动，可按执行以下命令获取版本信息:
 ```bash
 cat /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/ascend_toolkit_install.info

@@ -434,7 +434,7 @@ export function apply(ctx, config) {
 				url: {
 					type: 'string',
 					required: true,
-					description: 'Local page URL, for example http://127.0.0.1:8080/Ascend310/experiment/case9.html.'
+					description: 'Local page URL, for example http://127.0.0.1:8080/experiment/case9.html.'
 				},
 				viewports: {
 					type: 'string',

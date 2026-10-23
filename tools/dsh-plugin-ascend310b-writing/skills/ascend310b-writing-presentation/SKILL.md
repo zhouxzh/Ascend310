@@ -17,14 +17,14 @@ description: Ascend310 教材演示文稿写作与验收。用于 src/presentati
 
 | 导航 | 必须使用 | 示例 |
 | --- | --- | --- |
-| 对应教材/案例 | GitHub Pages HTML | `https://zhouxzh.github.io/Ascend310/experiment/case9.html` |
+| 对应教材/案例 | GitHub Pages HTML | `https://310b.cn/experiment/case9.html` |
 | 配套代码/样例 | GitHub 仓库目录 | `https://github.com/zhouxzh/Ascend310/tree/main/samples/case9` |
 
 - 已发布课件禁止使用 `../experiment/*.md`、`../book/*.md` 或本地 checkout 路径作为教材导航。
 - 理论章节对应 `/book/chapterN.html`，实践案例对应 `/experiment/caseN.html`；不要把所有页面都链接到站点首页。
 - 教材锚点可以附加到 Pages URL；样例目录应链接到对应 `samples/<name>/`，不要链接到本机文件。
 - 每次改动生成源后，重新运行 `pnpm run docs:slides`，并用真实浏览器检查外链和页面裁切。
-- 生成 HTML 后抽查：教材链接应出现 `zhouxzh.github.io/Ascend310/`，样例链接应出现 `github.com/zhouxzh/Ascend310/tree/main/samples/`，不得残留本地相对的目标链接。
+- 生成 HTML 后抽查：教材链接应出现 `310b.cn/`，样例链接应出现 `github.com/zhouxzh/Ascend310/tree/main/samples/`，不得残留本地相对的目标链接。
 
 ## 固定结构
 

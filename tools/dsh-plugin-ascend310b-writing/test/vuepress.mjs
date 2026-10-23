@@ -41,7 +41,7 @@ write('src/presentation/01-orphan.md', '---\nmarp: true\n---\n\n# 没人链接�
 // missing logo and favicon, base drift, repo drift, a drifted frozen label.
 write(
 	'src/.vuepress/config.ts',
-	['export default defineUserConfig({', '  base: "/Ascend310/",', '  head: [["link", { rel: "icon", href: "/Ascend310/favicon.ico" }]],', '});', ''].join('\n')
+	['export default defineUserConfig({', '  base: "/",', '  head: [["link", { rel: "icon", href: "/favicon.ico" }]],', '});', ''].join('\n')
 );
 write(
 	'src/.vuepress/theme.ts',
@@ -136,16 +136,17 @@ writeClean('src/presentation/README.md', '---\ntitle: "演示"\n---\n\n索引。
 writeClean('src/presentation/00-deck.md', '---\nmarp: true\n---\n\n# 第1章：唯一\n');
 writeClean('src/.vuepress/public/logo.png', 'png');
 writeClean('src/.vuepress/public/favicon.ico', 'ico');
+writeClean('src/.vuepress/public/CNAME', '310b.cn\n');
 writeClean('src/.vuepress/public/presentation/00-deck.html', '<html></html>');
-writeClean('src/.vuepress/config.ts', 'export default defineUserConfig({ base: "/Ascend310/", head: [["link", { rel: "icon", href: "/Ascend310/favicon.ico" }]], });\n');
-writeClean('src/.vuepress/theme.ts', ['export default hopeTheme({', '  hostname: "https://zhouxzh.github.io",', '  logo: "logo.png",', '  repo: "zhouxzh/Ascend310",', '  docsDir: "src",', '});', ''].join('\n'));
+writeClean('src/.vuepress/config.ts', 'export default defineUserConfig({ base: "/", head: [["link", { rel: "icon", href: "/favicon.ico" }]], });\n');
+writeClean('src/.vuepress/theme.ts', ['export default hopeTheme({', '  hostname: "https://310b.cn",', '  logo: "logo.png",', '  repo: "zhouxzh/Ascend310",', '  docsDir: "src",', '});', ''].join('\n'));
 writeClean('src/.vuepress/sidebar.ts', ['export default sidebar({', '  "/": [', '    "",', '    {',
 	'      text: "理论教程",', '      link: "/book/",', '      prefix: "/book/",', '      children: ["chapter1.md"]',
 	'    },', '    {', '      text: "演示",', '      link: "/presentation/",', '      prefix: "/presentation/",',
 	'      children: [{ text: "唯一", link: "/presentation/00-deck.html" }]', '    }', '  ]', '});', ''].join('\n'));
 writeClean('src/.vuepress/navbar.ts', 'export default navbar(["/", "portfolio.md", { text: "理论教程", link: "/book/" }]);\n');
 writeClean('src/portfolio.md', '---\ntitle: "作者"\n---\n\n作者页。\n');
-writeClean('src/.vuepress/client.ts', 'const pattern = /^\\/Ascend310\\/presentation\\//u;\n');
+writeClean('src/.vuepress/client.ts', 'const pattern = /^\\/presentation\\//u;\n');
 execFileSync('git', ['init', '-q'], { cwd: clean, stdio: ['ignore', 'pipe', 'pipe'] });
 execFileSync('git', ['remote', 'add', 'origin', 'https://github.com/zhouxzh/Ascend310.git'], {
 	cwd: clean,
@@ -166,5 +167,5 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 console.log('vuepress test passed');
-console.log('  抓到：缺页面、缺导航、放映页链接断、文稿无链接、缺 logo/favicon、冻结标签漂移、base/repo/hostname 漂移');
+console.log('  抓到：缺页面、缺导航、放映页链接断、文稿无链接、缺 logo/favicon、冻结标签漂移、base/repo/hostname 漂移；CNAME 自定义域名可正确匹配');
 console.log('  干净配置：0 条');

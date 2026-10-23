@@ -255,7 +255,7 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 
 ## 课件规范检查
 
-已发布课件的“对应教材”必须链接 GitHub Pages HTML（例如 `https://zhouxzh.github.io/Ascend310/experiment/case9.html`），“配套样例”必须链接 GitHub `samples/<name>/` 目录；不要在生成后的课件中保留 `../experiment/*.md` 等本地相对教材导航。该规则由 `ascend310b-writing-presentation` skill 和 `test/skills.mjs` 共同约束。
+已发布课件的“对应教材”必须链接 GitHub Pages HTML（例如 `https://310b.cn/experiment/case9.html`），“配套样例”必须链接 GitHub `samples/<name>/` 目录；不要在生成后的课件中保留 `../experiment/*.md` 等本地相对教材导航。该规则由 `ascend310b-writing-presentation` skill 和 `test/skills.mjs` 共同约束。
 
 | 规则 | 级别 | 判据 |
 | --- | --- | --- |

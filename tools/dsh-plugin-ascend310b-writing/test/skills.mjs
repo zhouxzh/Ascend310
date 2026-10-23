@@ -106,6 +106,9 @@ if (!presentation.includes('GitHub Pages')) failures.push('Presentation skill �
 if (!presentation.includes('https://github.com/zhouxzh/Ascend310/tree/main/samples/')) {
 	failures.push('Presentation skill 未规定 GitHub samples 链接');
 }
+if (!presentation.includes('https://310b.cn/experiment/case9.html')) {
+	failures.push('Presentation skill 未锁定正式教材域名');
+}
 if (!presentation.includes('../experiment/*.md')) failures.push('Presentation skill 未明确禁止本地教材相对链接');
 if (!umbrella.includes('已发布 Presentation')) failures.push('总 skill 未同步已发布课件链接规则');
 if (!umbrella.includes('一次写作任务只加载本 skill 加')) {
@@ -113,7 +116,8 @@ if (!umbrella.includes('一次写作任务只加载本 skill 加')) {
 }
 const vuepress = readFileSync(join(skillsRoot, 'ascend310b-writing-vuepress', 'SKILL.md'), 'utf8');
 if (!vuepress.includes('vuepress-theme-hope')) failures.push('VuePress skill 未锁定 hope 主题');
-if (!vuepress.includes('base: /Ascend310/')) failures.push('VuePress skill 未锁定站点 base');
+if (!vuepress.includes('base: /')) failures.push('VuePress skill 未锁定站点根路径');
+if (!vuepress.includes('hostname: https://310b.cn')) failures.push('VuePress skill 未锁定正式域名');
 if (!vuepress.includes('navbar.ts')) failures.push('VuePress skill 未覆盖 navbar 模板');
 if (!vuepress.includes('BEGIN GENERATED PRESENTATION SIDEBAR')) {
 	failures.push('VuePress skill 未保护生成侧栏');

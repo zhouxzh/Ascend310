@@ -15,42 +15,42 @@ editLink: false
 
 | 单元 | 状态 | 放映版 |
 |---|---|---|
-| 第1章：昇腾310B边缘计算基础 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/10-chapter1.html) |
-| 第2章：CANN软件栈核心组件解析 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/11-chapter2.html) |
-| 第3章：昇腾PyTorch扩展迁移基础 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/12-chapter3.html) |
-| 第4章：PyACL应用开发基础 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/13-chapter4.html) |
-| 第5章：MindSpore开发基础 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/14-chapter5.html) |
-| 第6章：DVPP视频处理基础 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/15-chapter6.html) |
-| 第7章：算子开发实战 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/16-chapter7.html) |
-| 第8章：性能分析与优化 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/17-chapter8.html) |
-| 第9章：模型量化案例教学 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/18-chapter9.html) |
-| 第10章：AI项目交付闭环 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/19-chapter10.html) |
+| 第1章：昇腾310B边缘计算基础 | 可用 | [打开放映版](https://310b.cn/presentation/10-chapter1.html) |
+| 第2章：CANN软件栈核心组件解析 | 可用 | [打开放映版](https://310b.cn/presentation/11-chapter2.html) |
+| 第3章：昇腾PyTorch扩展迁移基础 | 可用 | [打开放映版](https://310b.cn/presentation/12-chapter3.html) |
+| 第4章：PyACL应用开发基础 | 可用 | [打开放映版](https://310b.cn/presentation/13-chapter4.html) |
+| 第5章：MindSpore开发基础 | 可用 | [打开放映版](https://310b.cn/presentation/14-chapter5.html) |
+| 第6章：DVPP视频处理基础 | 可用 | [打开放映版](https://310b.cn/presentation/15-chapter6.html) |
+| 第7章：算子开发实战 | 可用 | [打开放映版](https://310b.cn/presentation/16-chapter7.html) |
+| 第8章：性能分析与优化 | 可用 | [打开放映版](https://310b.cn/presentation/17-chapter8.html) |
+| 第9章：模型量化案例教学 | 可用 | [打开放映版](https://310b.cn/presentation/18-chapter9.html) |
+| 第10章：AI项目交付闭环 | 可用 | [打开放映版](https://310b.cn/presentation/19-chapter10.html) |
 
 ### 案例课件
 
 | 单元 | 状态 | 放映版 |
 |---|---|---|
-| 案例 1：智能考勤机 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/20-case1.html) |
-| 案例 2：目标跟踪检测 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/21-case2.html) |
-| 案例 3：智能电子琴 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/22-case3.html) |
-| 案例 4：掌纹识别 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/23-case4.html) |
-| 案例 5：智能数据采集分析仪 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/24-case5.html) |
-| 案例 6：智能小车 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/25-case6.html) |
-| 案例 7：智能相册 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/26-case7.html) |
-| 案例 8：实时手势识别 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/27-case8.html) |
-| 案例 9：智能聊天机器人 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/28-case9.html) |
+| 案例 1：智能考勤机 | 可用 | [打开放映版](https://310b.cn/presentation/20-case1.html) |
+| 案例 2：目标跟踪检测 | 可用 | [打开放映版](https://310b.cn/presentation/21-case2.html) |
+| 案例 3：智能电子琴 | 可用 | [打开放映版](https://310b.cn/presentation/22-case3.html) |
+| 案例 4：掌纹识别 | 可用 | [打开放映版](https://310b.cn/presentation/23-case4.html) |
+| 案例 5：智能数据采集分析仪 | 可用 | [打开放映版](https://310b.cn/presentation/24-case5.html) |
+| 案例 6：智能小车 | 可用 | [打开放映版](https://310b.cn/presentation/25-case6.html) |
+| 案例 7：智能相册 | 可用 | [打开放映版](https://310b.cn/presentation/26-case7.html) |
+| 案例 8：实时手势识别 | 可用 | [打开放映版](https://310b.cn/presentation/27-case8.html) |
+| 案例 9：智能聊天机器人 | 可用 | [打开放映版](https://310b.cn/presentation/28-case9.html) |
 
 ### 附录课件
 
 | 单元 | 状态 | 放映版 |
 |---|---|---|
-| 附录 1：开发板环境 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/30-appendix1.html) |
-| 附录 2：Ubuntu 教程 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/31-appendix2.html) |
-| 附录 3：Python 基础 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/32-appendix3.html) |
-| 附录 4：Vibe Coding | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/33-appendix4.html) |
-| 附录 5：ROS2 基础 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/34-appendix5.html) |
-| 附录 6：工具箱与 FAQ | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/35-appendix6.html) |
-| 附录 7：CANN 升级 | 可用 | [打开放映版](https://zhouxzh.github.io/Ascend310/presentation/36-appendix7.html) |
+| 附录 1：开发板环境 | 可用 | [打开放映版](https://310b.cn/presentation/30-appendix1.html) |
+| 附录 2：Ubuntu 教程 | 可用 | [打开放映版](https://310b.cn/presentation/31-appendix2.html) |
+| 附录 3：Python 基础 | 可用 | [打开放映版](https://310b.cn/presentation/32-appendix3.html) |
+| 附录 4：Vibe Coding | 可用 | [打开放映版](https://310b.cn/presentation/33-appendix4.html) |
+| 附录 5：ROS2 基础 | 可用 | [打开放映版](https://310b.cn/presentation/34-appendix5.html) |
+| 附录 6：工具箱与 FAQ | 可用 | [打开放映版](https://310b.cn/presentation/35-appendix6.html) |
+| 附录 7：CANN 升级 | 可用 | [打开放映版](https://310b.cn/presentation/36-appendix7.html) |
 <!-- END GENERATED PRESENTATION INDEX -->
 
 ## 当前制作状态
@@ -114,7 +114,7 @@ node scripts/build_presentation.mjs --only=10-chapter1
 pnpm run docs:dev
 ```
 
-本地入口为 `http://localhost:8080/Ascend310/presentation/`。放映页中按 `f` 全屏，按 `p` 打开讲师视图。
+本地入口为 `http://localhost:8080/presentation/`。放映页中按 `f` 全屏，按 `p` 打开讲师视图。
 
 ## 前端截图
 

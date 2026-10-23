@@ -4,11 +4,11 @@ import navbar from "./navbar.js";
 import sidebar from "./sidebar.js";
 
 export default hopeTheme({
-  hostname: "https://zhouxzh.github.io",
+  hostname: "https://310b.cn",
 
   author: {
     name: "Xianzhong Zhou",
-    url: "https://zhouxzh.github.io/Ascend310/book/",
+    url: "https://310b.cn/book/",
   },
 
   logo: "logo.png",

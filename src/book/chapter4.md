@@ -63,7 +63,7 @@ PyACL的程序逻辑架构图如下图所示：
 ### PyACL应用开发环境 {#src-book-chapter4-h4}
 
 #### CANN 安装 {#src-book-chapter4-h5}
-要部署 PyACL 的开发环境和运行环境，首先需要安装与目标 CANN 版本匹配的驱动和固件。虽然昇腾 310B 开发板通常预装了基础环境，但为了获得最新的特性支持，建议按照[本教程第二章](https://zhouxzh.github.io/Ascend310/book/chapter2.html)或[《CANN 软件安装指南》](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html)升级至较新的 CANN 版本（如 CANN 8.3）。
+要部署 PyACL 的开发环境和运行环境，首先需要安装与目标 CANN 版本匹配的驱动和固件。虽然昇腾 310B 开发板通常预装了基础环境，但为了获得最新的特性支持，建议按照[本教程第二章](https://310b.cn/book/chapter2.html)或[《CANN 软件安装指南》](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/83RC1/index/index.html)升级至较新的 CANN 版本（如 CANN 8.3）。
 
 CANN 软件包安装完成后，**无需额外安装独立的 Python 绑定库**，PyACL 相关模块已包含在 CANN Toolkit 中。但为了确保系统能正确找到 `acl` 模块，必须加载必要的环境变量。
 
