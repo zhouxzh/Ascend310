@@ -34,6 +34,7 @@
 | `CHATBOT-ISS-20261025-05` | `resolved` | `major` | 2026-10-25 | HF mirror 缓存重定向以 chunked 响应返回 tokenizer，下载器误报 Content-Length 缺失 | 允许无声明长度，但仍强制实际 bytes/SHA；全新目录 9/9 工件下载通过 |
 | `CHATBOT-ISS-20261025-06` | `resolved` | `major` | 2026-10-25 | 随机 Gateway token 以 `-` 开头时被 argparse 当成选项，正式验收未启动 | `--token=`/`--model-source=` 使用等号形式，参数测试通过 |
 | `CHATBOT-ISS-20261025-07` | `resolved` | `major` | 2026-10-25 | `.env` 只被 shell source 未导出，验收子进程误用 20T 模型 provenance | `set -a` 导出 `.env`；公开 8T 正式验收 `machine_status=passed` |
+| `CHATBOT-ISS-20261025-08` | `mitigated` | `major` | 2026-10-25 | 多模态 USB 麦克风/喇叭停留在蓝牙/无线/仅播放模式时没有枚举为音频输入 | 切到有线 USB 音频模式并重新插入后出现 `EDIFIER M16 Pro`；喇叭听音通过，USB 麦克风 capture 仍不可用 |
 
 ## CHATBOT-ISS-20261018-01：验收突发流量触发 HTTP 429
 
@@ -171,6 +172,27 @@
 - 根因：`confirmed`。脚本只 `source .env`，没有 `export`；父 shell 能读取变量，但直接启动的 Python 验收进程看不到 `ASCEND_EDGE_CHAT_BACKEND=acl-static-kv` 和 data dir，退回 MindSpore 默认分支。
 - 修复：source 前后使用 `set -a` / `set +a`，把 `.env` 显式传播给验收子进程；新增 shell 合同测试。
 - 回归：从公开 commit 和全新 HF 数据目录执行完整验收，来源、九项工件、JSON/SSE、长度、稳定性、中文探针和 30 样本性能均通过，`machine_status=passed`。
+
+## CHATBOT-ISS-20261025-08：多模态 USB 音频设备必须先切到有线模式
+
+- 状态：`mitigated`
+- 判定层级：`USB device mode / ALSA enumeration`
+- 环境：Ascend310B4 / 8T；USB `EDIFIER M16 Pro`；CANN 8.0.0；统一 `ascend` 环境。
+- 症状：设备最初未出现在 `lsusb` 的 USB Audio 项、`/proc/asound/cards`、`arecord -l` 和 `aplay -l` 中，系统只看到板载 `ascend310b` 声卡。
+- 根因：`confirmed by operator`。多模态音箱/麦克风可能默认处于蓝牙、无线、充电或仅播放模式；切换设备到有线 USB 音频/会议模式并直接重新插入 Host 口后才完成 USB Audio 枚举。
+- 最小检查：
+
+  ```bash
+  lsusb -t
+  cat /proc/asound/cards
+  arecord -l
+  aplay -l
+  ```
+
+- 修复后的现场：`lsusb` 显示 `2d99:a020 EDIFIER M16 Pro`，ALSA 枚举为 `card 1: Pro`，`plughw:CARD=Pro,DEV=0` 播放 48 kHz 双声道 440 Hz 测试音，操作者确认听到声音。
+- 麦克风边界：`arecord -l` 仍未出现该卡的 capture 端点；USB descriptor 是 playback-only，`arecord -D plughw:CARD=Pro,DEV=0` 返回设备不存在。不得把 PulseAudio monitor、板载 capture 或其他输入 source 当成该麦克风。
+- 处理：先切换实体设备到明确的有线 USB 音频或通话模式，再重新插拔并检查三层枚举。若 `aplay -l` 有设备而 `arecord -l` 没有，停在 USB capture endpoint 层，不要把“喇叭有声”写成“麦克风可用”。
+- 回归/剩余工作：喇叭 `observed-pass`；麦克风 `blocked`，需要设备提供 capture endpoint，或改用已验证的 USB capture 设备。
 
 ## CHATBOT-ISS-20261024-03：自动语音失败资源累积
 

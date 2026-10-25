@@ -220,6 +220,38 @@ budget. The normal default is `128` tokens and the verified service ceiling is
 `256`; a token is not a Chinese-character count, and the context budget still
 requires `prompt_tokens + max_tokens <= 1024`.
 
+## Check Multimodal USB Audio Devices
+
+A microphone/speaker combination may boot in Bluetooth, wireless, charging, or
+playback-only mode. Before diagnosing ALSA or the application, switch the device
+to its **wired USB audio** or conference mode as described by its manual, then
+reconnect it directly to a USB Host port. Re-enumerate the device:
+
+```bash
+lsusb -t
+arecord -l
+aplay -l
+```
+
+All three layers must agree:
+
+- `lsusb` must show a new USB Audio device, not only the Wi-Fi adapter.
+- `aplay -l` must show its playback PCM before speaker testing.
+- `arecord -l` must show its capture PCM before microphone testing.
+
+A device can expose playback but no microphone. PulseAudio monitor sources are
+not microphones. If `aplay -l` shows the device but `arecord -l` does not, stop
+at the USB mode/endpoint layer: do not substitute the onboard capture device or
+the monitor source. An audible playback test does not prove that the microphone
+is available.
+
+The EDIFIER M16 Pro observed on the 8T board illustrates this check. Before the
+wired mode/reconnect sequence, the system exposed only the onboard `ascend310b`
+card. It later appeared as `2d99:a020 EDIFIER M16 Pro` with ALSA `card 1, device
+0`; a 48 kHz stereo test tone was audibly confirmed. Its current USB descriptor
+still exposed only a playback OUT endpoint, so microphone capture was not
+claimed.
+
 ## Common Faults
 
 | Symptom | Check | Response |
@@ -228,6 +260,7 @@ requires `prompt_tokens + max_tokens <= 1024`.
 | Preflight cannot import FastAPI or Pydantic | Inspect the active environment with `PYTHONNOUSERSITE=1` | Install the reviewed hash-locked service closure |
 | Gateway exits during startup | Verify the gateway key, backend, upstream model, and loopback port | Run `ascend-edge-chat gateway --check-config` |
 | UI loads but replies fail | Check backend `:8084` or `:8090`, then gateway `:7861`, then the UI log | Keep each process in the foreground and inspect the first failing service |
+| Multimodal USB microphone/speaker is absent or playback-only | Confirm the device is switched to wired USB audio/conference mode, then reconnect it directly to a Host port | Recheck `lsusb -t`, `arecord -l`, and `aplay -l`; never use onboard capture or a monitor as a substitute |
 | 8T artifact verification fails | Compare bytes and SHA-256 with `configs/release-8t-static-kv.lock.json` | Remove only the rejected data-directory file and rerun `acl download` |
 | 8T UI says external worker unavailable | Check `/health` on `127.0.0.1:8084` for `ready`, `healthy`, model id, descriptor flag, and launch policy | Restart the ACL worker only after the artifact/Soc gate passes |
 | 20T model verification fails | Compare bytes and SHA-256 with `configs/release-model.json` | Delete only the failed artifact and re-import or re-download it |
