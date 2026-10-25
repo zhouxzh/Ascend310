@@ -25,6 +25,7 @@ from ..backends.model_profiles import (
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MODEL_CONFIG = PROJECT_ROOT / "configs" / "release-model.json"
 DEFAULT_LOCK = PROJECT_ROOT / "configs" / "release-artifacts.lock.json"
+DEFAULT_TUTORIAL_LOCK = PROJECT_ROOT / "configs" / "tutorial-artifacts.lock.json"
 DEFAULT_MIRROR = "https://hf-mirror.com"
 RELEASE_PROFILE_ID = "qwen1.5-0.5b-chat"
 _CHUNK_SIZE = 1024 * 1024
@@ -96,13 +97,99 @@ def verify_release_lock(config_path: Path = DEFAULT_MODEL_CONFIG, lock_path: Pat
         raise ArtifactError("release artifact lock must contain an HTTPS license_url")
 
 
-def verify_artifacts(
-    root: Path,
+def _tutorial_lock_artifacts(
+    profile: ChatModelProfile,
+    lock_path: Path = DEFAULT_TUTORIAL_LOCK,
+) -> tuple[ArtifactSpec, ...]:
+    """Load immutable artifact facts for a selectable teaching profile."""
+
+    try:
+        document = json.loads(lock_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ArtifactError("invalid tutorial artifact lock: %s" % exc) from exc
+    if not isinstance(document, Mapping) or document.get("schema_version") != 1:
+        raise ArtifactError("tutorial artifact lock schema_version must be 1")
+    profiles = document.get("profiles")
+    if not isinstance(profiles, Mapping):
+        raise ArtifactError("tutorial artifact lock profiles must be an object")
+    entry = profiles.get(profile.id)
+    if not isinstance(entry, Mapping):
+        raise ArtifactError("tutorial artifact lock is missing profile: %s" % profile.id)
+    if entry.get("repository") != profile.repository or entry.get("revision") != profile.revision:
+        raise ArtifactError("tutorial artifact lock does not match profile revision: %s" % profile.id)
+    raw_artifacts = entry.get("artifacts")
+    if not isinstance(raw_artifacts, list) or not raw_artifacts:
+        raise ArtifactError("tutorial artifact lock has no artifacts: %s" % profile.id)
+    artifacts: list[ArtifactSpec] = []
+    for index, raw in enumerate(raw_artifacts):
+        if not isinstance(raw, Mapping):
+            raise ArtifactError("tutorial artifact lock entry is invalid: %s" % profile.id)
+        required = {"name", "kind", "filename", "bytes", "sha256"}
+        if set(raw) != required:
+            raise ArtifactError("tutorial artifact lock entry has invalid fields: %s" % profile.id)
+        try:
+            artifacts.append(
+                ArtifactSpec.from_mapping(
+                    {
+                        "name": raw["name"],
+                        "kind": raw["kind"],
+                        "filename": raw["filename"],
+                        "url": "locked://tutorial-artifact",
+                        "expected_bytes": raw["bytes"],
+                        "sha256": raw["sha256"],
+                    },
+                    index,
+                )
+            )
+        except ProfileError as exc:
+            raise ArtifactError("tutorial artifact lock entry is invalid: %s" % profile.id) from exc
+    names = [artifact.name for artifact in artifacts]
+    if len(names) != len(set(names)):
+        raise ArtifactError("tutorial artifact lock has duplicate names: %s" % profile.id)
+    return tuple(artifacts)
+
+
+def tutorial_profile_artifact_specs(
+    profile: ChatModelProfile,
     *,
-    config_path: Path = DEFAULT_MODEL_CONFIG,
+    lock_path: Path = DEFAULT_TUTORIAL_LOCK,
+) -> tuple[ArtifactSpec, ...]:
+    """Return the locked teaching artifact list without touching model files."""
+
+    return _tutorial_lock_artifacts(profile, lock_path)
+
+
+def verify_tutorial_profile_artifacts(
+    root: Path,
+    profile: ChatModelProfile,
+    *,
+    lock_path: Path = DEFAULT_TUTORIAL_LOCK,
 ) -> list[VerifiedArtifact]:
-    verify_release_lock(config_path)
-    profile = release_profile(config_path)
+    """Verify a teaching cache against its immutable profile artifact lock."""
+
+    directory = artifact_directory(profile, root)
+    verified: list[VerifiedArtifact] = []
+    for artifact in _tutorial_lock_artifacts(profile, lock_path):
+        target = _artifact_target(directory, artifact)
+        _verify_file(target, artifact)
+        verified.append(
+            VerifiedArtifact(artifact.name, target, artifact.expected_bytes, artifact.sha256)
+        )
+    return verified
+
+
+def verify_profile_artifacts(
+    root: Path,
+    profile: ChatModelProfile,
+) -> list[VerifiedArtifact]:
+    """Verify every declared artifact for a release or teaching profile.
+
+    Teaching profiles execute arbitrary weight formats through MindNLP just as
+    the release profile does.  A file merely being present is not sufficient:
+    every executable profile must declare bytes and SHA-256 so a stale cache or
+    different tokenizer cannot become a silently accepted lesson asset.
+    """
+
     directory = artifact_directory(profile, root)
     verified: list[VerifiedArtifact] = []
     for artifact in profile.artifacts:
@@ -113,6 +200,15 @@ def verify_artifacts(
             VerifiedArtifact(artifact.name, target, artifact.expected_bytes, artifact.sha256)
         )
     return verified
+
+
+def verify_artifacts(
+    root: Path,
+    *,
+    config_path: Path = DEFAULT_MODEL_CONFIG,
+) -> list[VerifiedArtifact]:
+    verify_release_lock(config_path)
+    return verify_profile_artifacts(root, release_profile(config_path))
 
 
 def download_artifacts(
@@ -136,6 +232,41 @@ def download_artifacts(
     return verify_artifacts(root, config_path=config_path)
 
 
+def _verify_offline_bundle_manifest(source: Path, profile: ChatModelProfile) -> None:
+    """Require provenance alongside a manually transferred release bundle."""
+
+    manifest_path = source / "offline-bundle.manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ArtifactError("offline bundle manifest is missing or invalid") from exc
+    if not isinstance(manifest, Mapping) or manifest.get("schema_version") != 1:
+        raise ArtifactError("offline bundle manifest schema_version must be 1")
+    expected = {
+        "source_kind": "offline-bundle",
+        "repository": profile.repository,
+        "revision": profile.revision,
+        "license": profile.license,
+    }
+    for key, value in expected.items():
+        if manifest.get(key) != value:
+            raise ArtifactError("offline bundle manifest %s does not match release profile" % key)
+    entries = manifest.get("artifacts")
+    if not isinstance(entries, list) or len(entries) != len(profile.artifacts):
+        raise ArtifactError("offline bundle manifest artifact list does not match release profile")
+    observed = {
+        (entry.get("name"), entry.get("filename"), entry.get("bytes"), entry.get("sha256"))
+        for entry in entries
+        if isinstance(entry, Mapping)
+    }
+    expected_artifacts = {
+        (item.name, item.filename, item.expected_bytes, item.sha256)
+        for item in profile.artifacts
+    }
+    if observed != expected_artifacts:
+        raise ArtifactError("offline bundle manifest artifacts do not match release lock")
+
+
 def import_artifacts(
     root: Path,
     source: Path,
@@ -146,6 +277,7 @@ def import_artifacts(
     if not source.is_absolute() or not source.is_dir() or source.is_symlink():
         raise ArtifactError("offline source must be an absolute regular directory")
     profile = release_profile(config_path)
+    _verify_offline_bundle_manifest(source, profile)
     root.mkdir(parents=True, exist_ok=True)
     directory = artifact_directory(profile, root)
     directory.mkdir(parents=True, exist_ok=True)
@@ -262,6 +394,26 @@ def _mirror_url(url: str, mirror: str) -> str:
     if endpoint.scheme != "https" or not endpoint.netloc or endpoint.path not in {"", "/"}:
         raise ArtifactError("mirror must be an HTTPS origin without a path")
     return urlunsplit((endpoint.scheme, endpoint.netloc, original.path, original.query, ""))
+
+
+__all__ = [
+    "ArtifactError",
+    "DEFAULT_LOCK",
+    "DEFAULT_MODEL_CONFIG",
+    "DEFAULT_TUTORIAL_LOCK",
+    "VerifiedArtifact",
+    "artifact_directory",
+    "data_root",
+    "download_artifacts",
+    "import_artifacts",
+    "release_profile",
+    "report",
+    "tutorial_profile_artifact_specs",
+    "verify_artifacts",
+    "verify_profile_artifacts",
+    "verify_release_lock",
+    "verify_tutorial_profile_artifacts",
+]
 
 
 def _sha256(path: Path) -> str:

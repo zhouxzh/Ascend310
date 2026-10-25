@@ -34,7 +34,7 @@ digraph case9_lecture_route {
   env [label="环境"];
   service [label="服务"];
   api [label="API"];
-  accept [label="20T 验收", fillcolor="#E3F2FD"];
+  accept [label="8T / 20T 验收", fillcolor="#E3F2FD"];
   extend [label="二次开发"];
 
   architecture -> lock -> env -> service -> api -> accept -> extend;

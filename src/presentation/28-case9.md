@@ -31,14 +31,14 @@ footer: "案例 9：智能聊天机器人"
 
 ## 本讲目标与路线
 
-本讲按这条路线走：先把职责和工件锁说清，再启动服务、验收 JSON/SSE，最后用 20T 实测把机器通过和质量分开。
+本讲先把职责和工件锁说清，再启动服务、验收 JSON/SSE，最后分别查看 20T MindSpore 和 8T ACL 的机器证据。
 
-![案例 9 本讲路线：架构、模型锁、环境、服务、API、20T 验收、二次开发](../experiment/img9/case9_lecture_route.png)
+![案例 9 本讲路线：架构、模型锁、环境、服务、API、双目标验收、二次开发](../experiment/img9/case9_lecture_route.png)
 
 <div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
 
 <!--
-授课提示：强调 8T/20T 独立证据，本讲的实测页只讲 20T。
+授课提示：8T 与 20T 是两条独立发布路径，不能互相继承延迟、模型或质量结论。
 -->
 
 ---
@@ -51,15 +51,16 @@ footer: "案例 9：智能聊天机器人"
 
 ---
 
-## 三个进程，三种网络边界
+## 四个端口，两类互斥后端
 
 | 进程 | 监听 | 职责 | 安全边界 |
 | --- | --- | --- | --- |
-| 浏览器 UI | `0.0.0.0:7865` | 对话、模型选择、SSE 展示 | 仅可信局域网，无登录 |
-| 网关 | `127.0.0.1:7861` | Bearer 鉴权、协议适配、限流 | 不直接暴露 |
-| MindSpore worker | `127.0.0.1:8090` | 单模型加载、串行生成 | 不直接暴露 |
+| 浏览器 UI | `0.0.0.0:7865` | 对话、SSE 展示、受控切换 | 仅可信局域网，无登录 |
+| 网关 | `127.0.0.1:7861` | Bearer 鉴权、协议适配、限额 | 不直接暴露 |
+| 20T MindSpore | `127.0.0.1:8090` | 一个教学 profile，串行生成 | 不直接暴露 |
+| 8T ACL static-KV | `127.0.0.1:8084` | 固定 51/49 OM，串行生成 | 不直接暴露，禁止切换 |
 
-浏览器不知道网关密钥；密钥由 UI 服务端持有。教学模型切换会重启目标 worker，而不是在请求中接受任意路径或 Python 代码。
+浏览器不知道网关密钥；密钥由 UI 服务端持有。20T 教学模型切换会重启目标 worker；8T ACL 后端固定，页面只观察健康状态。
 
 <div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 系统架构</div>
 
@@ -73,15 +74,15 @@ footer: "案例 9：智能聊天机器人"
 
 发布工件锁固定：
 
-- `model.safetensors` 与 tokenizer/词表/配置
-- revision、文件大小和 SHA-256
-- 目标 SoC 与运行时边界
+- 20T：safetensors、tokenizer、词表和配置
+- 8T：公开 ONNX、B4 OM、tokenizer、双合同和许可证
+- revision、文件大小、SHA-256、目标 SoC 与运行时边界
 
 ```text
-固定 revision -> .part 临时文件 -> 大小核验 -> SHA-256 -> 原子改名 -> worker 加载
+固定 revision -> .part 临时文件 -> 长度核验 -> SHA-256 -> 原子改名 -> 后端加载
 ```
 
-正式发布默认模型仍是 Qwen1.5-0.5B；本轮 20T 教学验收使用 `qwen2-0.5b-instruct-mindspore`，两者不能混写。
+8T 公开锁把历史 schema-1 OM 来源保留为 provenance，再派生 schema-2 运行时锁；不能用文件同名或 20T OM 替代 B4 OM。
 
 <div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 发布模型与工件锁</div>
 
@@ -102,18 +103,18 @@ footer: "案例 9：智能聊天机器人"
 ## 启动前必须证明环境门
 
 ```bash
-source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate <validated-env>
+conda activate ascend
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-bash scripts/verify/release-preflight.sh
+bash scripts/verify/release-preflight.sh     # 20T
+bash scripts/verify/release-8t-preflight.sh  # 8T
 ```
 
 预检要看到：
 
-- Python 解释器与 `PYTHONNOUSERSITE`
-- `import acl`、MindSpore、MindNLP
-- 设备节点、`npu-smi` 与模型哈希
-- 网关配置
+- Python 3.9.25 与 `PYTHONNOUSERSITE=1`
+- `import acl` 与目标运行时
+- `npu-smi`、SoC 和全部工件哈希
+- 网关/UI 后端、端口和固定模型名
 
 <div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 环境准备</div>
 
@@ -125,22 +126,20 @@ bash scripts/verify/release-preflight.sh
 
 ## 服务入口与一次最小调用
 
-三个进程分别启动：
+20T 分别启动三个进程；8T 使用一个前台 launcher：
 
 ```bash
+# 20T
 bash scripts/run/start-worker.sh
 bash scripts/run/start-gateway.sh
 bash scripts/run/start-ui.sh
+# 8T
+bash scripts/run/run-release-8t.sh
 ```
 
-公开模型名固定为 `ascend-edge-chat`，OpenAI 兼容入口：
+公开模型名固定为 `ascend-edge-chat`，OpenAI 兼容入口仍是 `/v1/models` 和 `/v1/chat/completions`。8T 内部模型固定为 Qwen2.5 static-KV，默认 16 token、上限 80；20T 由所选 MindSpore profile 决定较小上限。
 
-```text
-GET  /v1/models
-POST /v1/chat/completions
-```
-
-网关只允许 greedy 解码、单请求串行和受限输出预算；超时或 worker 不可用时 fail-closed，不自动切 CPU 或云端。
+网关只允许 greedy 解码、单请求串行和受限输出预算；后端不可用时 fail-closed，不自动切 CPU 或云端。
 
 <div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 启动服务与接口</div>
 
@@ -202,6 +201,29 @@ POST /v1/chat/completions
 
 ---
 
+## 2026-10-25 的 8T 发布链
+
+| 项目 | 实测 |
+| --- | --- |
+| 硬件 / 软件 | Ascend310B4 / 8T；CANN 8.0.0 |
+| 公开工件 | HF revision `0f516070…`；九项 bytes/SHA 通过 |
+| 运行时 | Python 3.9.25、ACL、schema-2 B4 OM lock |
+| 模型合同 | 51 输入 / 49 输出；48 个 split KV |
+| 链路 | `7865 -> 7861 -> 8084` |
+| 健康门 | ready、healthy、descriptor、launch policy 全部通过 |
+| API | Bearer 拒绝、JSON、SSE、UI chat 通过 |
+| 固定后端 | 模型切换返回 409；停止后端口与 NPU 显存释放 |
+
+这页是单板短请求机器证据；完整长度、稳定性、性能 p50/p95 和人工中文质量仍未继承。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 8T 发布链验收</div>
+
+<!--
+授课提示：强调公开工件锁和 B4 专用 OM；不能把 20T 的 1.5 token/s 或其他 OM 搬到 8T。
+-->
+
+---
+
 ## 429、截断和质量是三种不同问题
 
 - 第一次无间隔验收在稳定性段收到 HTTP 429：请求 body 突发，属于服务 admission
@@ -210,7 +232,7 @@ POST /v1/chat/completions
 - 直接中文提问曾返回英文道歉句：机器路径完成，中文语义质量不通过该次期望
 - 质量状态必须经过固定提示、完整响应和人工评审，不能由“页面有回复”替代
 
-> 结论：技术门 `observed-pass`；中文质量、长稳 p50/p95、并发和 8T 仍是 `untested` 或待复核。
+> 结论：两条技术短链均 `observed-pass`；中文质量、长稳 p50/p95、并发和跨目标继承仍未完成。
 
 <div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 长度、完整性与质量</div>
 
@@ -230,6 +252,20 @@ POST /v1/chat/completions
 
 <!--
 授课提示：截图只证明页面和本地服务展示路径，不证明回答质量、长上下文或性能。
+-->
+
+---
+
+<!-- _class: visual -->
+
+## 8T 固定后端浏览器证据
+
+![8T 版 Ascend Edge Chat 前端页面](../experiment/img9/case9-board-8t-ui.png)
+
+<div class="source">图片：<a href="../experiment/img9/case9-board-8t-ui.png"><code>src/experiment/img9/case9-board-8t-ui.png</code></a>；接口证据见 <a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
+
+<!--
+授课提示：页面显示模型健康、默认 16 token 和不可切换；截图不证明中文语义质量或性能。
 -->
 
 ---
@@ -256,11 +292,11 @@ POST /v1/chat/completions
 
 ## 本章小结
 
-- 架构边界：UI 面向局域网，网关和 worker 保持回环
-- 工件边界：模型 revision、文件和哈希必须锁定
-- 服务边界：JSON/SSE、串行、限流、fail-closed
+- 架构边界：UI 面向局域网；网关和两类 NPU 后端保持回环
+- 工件边界：20T safetensors 与 8T ONNX/OM 分别固定 revision 和哈希
+- 服务边界：JSON/SSE、串行、限流、固定后端和 fail-closed
 - 证据边界：机器通过、长度、稳定性、性能、质量分开记录
-- 20T 本轮机器验收通过；8T、并发、p50/p95 和中文语义质量未继承
+- 20T MindSpore 与 8T ACL 短链分别通过；性能和中文质量不跨目标继承
 
 > 下一讲：把已验证的对话服务接入完整案例应用链路。
 

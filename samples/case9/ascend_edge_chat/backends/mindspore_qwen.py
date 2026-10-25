@@ -3,8 +3,8 @@
 The module deliberately has no import-time dependency on MindSpore or
 MindNLP.  This is important on the controller (and for protocol tests), and
 also keeps the adapter from accidentally importing a Torch based backend.
-The board launcher loads this module in the already provisioned ``base``
-environment and :class:`MindSporeChatProvider.load` performs the imports.
+The board launcher loads this module in the already provisioned unified
+``ascend`` environment and :class:`MindSporeChatProvider.load` performs the imports.
 
 Providers expose a deliberately small interface used by
 ``mindspore_chat_service``:
@@ -50,6 +50,31 @@ DEFAULT_MAX_TOKENS = 32
 MAX_MAX_TOKENS = 256
 STREAM_READER_POLL_SECONDS = 0.05
 _NPU_SOC_RE = re.compile(r"\b(?:Ascend\s*)?(310B[0-9A-Za-z]+)\b", re.IGNORECASE)
+_NPU_MEMORY_ROW_RE = re.compile(
+    r"^\|\s*(?P<npu>\d+)\s+(?P<device>\d+)\s*\|[^|]*\|(?P<memory>[^|]*)\|"
+)
+# These are deliberately separate lower bounds. They are a conservative
+# capacity check over npu-smi's device accounting, not a claim that its
+# reported free amount is the allocator-visible MindSpore HBM pool.
+_HBM_POLICY_BY_SOC = {
+    "310B1": {
+        "tier": "20T",
+        # 20T Qwen1.5-0.5B loaded with 8938 MB accounted free. Keep the
+        # default below that measured successful point while still avoiding an
+        # obviously occupied device; operators may tighten it per experiment.
+        "default_min_accounted_free_mb": 8192,
+        "environment": "ASCEND_EDGE_CHAT_MIN_ACCOUNTED_FREE_HBM_MB_20T",
+    },
+    "310B4": {
+        "tier": "8T",
+        # An 8T board reports roughly 7545 MB in total. Qwen1.5-0.5B reached
+        # MindSpore's allocator with only about 3.1 GB free after construction,
+        # then failed. Leave enough pre-load headroom to avoid repeating that
+        # failure; operators with new measured evidence may override this gate.
+        "default_min_accounted_free_mb": 6144,
+        "environment": "ASCEND_EDGE_CHAT_MIN_ACCOUNTED_FREE_HBM_MB_8T",
+    },
+}
 
 
 class ProviderError(RuntimeError):
@@ -70,6 +95,23 @@ class ProviderTimeout(ProviderError):
 
 class ProviderBusy(ProviderError):
     """A provider is already serving another request."""
+
+
+class HbmPreflightError(ProviderUnavailable):
+    """The selected 310B device has insufficient accounted headroom."""
+
+    def __init__(self, details: Mapping[str, Any]) -> None:
+        self.details = dict(details)
+        super().__init__(
+            "HBM preflight %s on %s/%s: accounted free %s MB, required %s MB"
+            % (
+                self.details.get("code", "failed"),
+                self.details.get("soc", "unknown"),
+                self.details.get("tier", "unknown"),
+                self.details.get("accounted_free_mb", "unknown"),
+                self.details.get("minimum_accounted_free_mb", "unknown"),
+            )
+        )
 
 
 @dataclass(frozen=True)
@@ -234,8 +276,8 @@ def _cache_directory(profile: Any) -> Optional[Path]:
     return candidate
 
 
-def _probe_npu_model() -> Optional[str]:
-    """Read the visible 310B model without importing an optional runtime."""
+def _npu_smi_info() -> Optional[str]:
+    """Read one bounded npu-smi snapshot without importing a framework."""
 
     executable = shutil.which("npu-smi")
     if not executable:
@@ -254,8 +296,117 @@ def _probe_npu_model() -> Optional[str]:
         return None
     if completed.returncode != 0:
         return None
-    values = sorted({match.group(1).upper() for match in _NPU_SOC_RE.finditer(completed.stdout or "")})
+    return completed.stdout or ""
+
+
+def _probe_npu_model() -> Optional[str]:
+    """Read the visible 310B model without importing an optional runtime."""
+
+    output = _npu_smi_info()
+    if not output:
+        return None
+    values = sorted({match.group(1).upper() for match in _NPU_SOC_RE.finditer(output)})
     return values[0] if len(values) == 1 else None
+
+
+def _accounted_hbm_from_npu_smi(output: str, device_id: int) -> Optional[Dict[str, int]]:
+    """Parse the selected device's npu-smi accounting row in MB.
+
+    The result deliberately retains the ``accounted`` name. MindSpore's
+    allocator-visible HBM can differ from this device-wide accounting and must
+    not be inferred by subtraction in application code.
+    """
+
+    if "Memory-Usage(MB)" not in output:
+        return None
+    for line in output.splitlines():
+        match = _NPU_MEMORY_ROW_RE.match(line)
+        if match is None or int(match.group("device")) != device_id:
+            continue
+        values = re.search(r"(?P<used>\d+)\s*/\s*(?P<total>\d+)", match.group("memory"))
+        if values is None:
+            continue
+        used_mb = int(values.group("used"))
+        total_mb = int(values.group("total"))
+        if total_mb < used_mb or total_mb <= 0:
+            return None
+        return {
+            "accounted_used_mb": used_mb,
+            "accounted_total_mb": total_mb,
+            "accounted_free_mb": total_mb - used_mb,
+        }
+    return None
+
+
+def _minimum_accounted_hbm_mb(observed_soc: str) -> Dict[str, Any]:
+    policy = _HBM_POLICY_BY_SOC.get(str(observed_soc).upper())
+    if policy is None:
+        return {
+            "status": "failed",
+            "code": "hbm_policy_missing",
+            "soc": "Ascend" + str(observed_soc).upper(),
+            "tier": "unknown",
+        }
+    raw = os.environ.get(str(policy["environment"]), "").strip()
+    minimum = int(policy["default_min_accounted_free_mb"])
+    if raw:
+        try:
+            override = int(raw)
+        except ValueError as exc:
+            details = {
+                "status": "failed",
+                "code": "hbm_policy_invalid",
+                "soc": "Ascend" + str(observed_soc).upper(),
+                "tier": policy["tier"],
+                "minimum_accounted_free_mb": raw,
+                "policy_environment": policy["environment"],
+            }
+            raise HbmPreflightError(details) from exc
+        if override < 1:
+            details = {
+                "status": "failed",
+                "code": "hbm_policy_invalid",
+                "soc": "Ascend" + str(observed_soc).upper(),
+                "tier": policy["tier"],
+                "minimum_accounted_free_mb": override,
+                "policy_environment": policy["environment"],
+            }
+            raise HbmPreflightError(details)
+        minimum = override
+    return {
+        "status": "configured",
+        "soc": "Ascend" + str(observed_soc).upper(),
+        "tier": policy["tier"],
+        "minimum_accounted_free_mb": minimum,
+        "policy_environment": policy["environment"],
+    }
+
+
+def _check_hbm_headroom(observed_soc: str, device_id: int) -> Dict[str, Any]:
+    """Require tier-specific device accounting headroom before model loading."""
+
+    details = _minimum_accounted_hbm_mb(observed_soc)
+    if details.get("status") == "failed":
+        raise HbmPreflightError(details)
+    output = _npu_smi_info()
+    accounting = _accounted_hbm_from_npu_smi(output or "", device_id)
+    details.update(
+        {
+            "device_id": device_id,
+            "source": "npu-smi.info",
+            "allocator_free_mb": None,
+            "allocator_free_observed": False,
+        }
+    )
+    if accounting is None:
+        details.update({"status": "failed", "code": "hbm_accounting_unavailable"})
+        raise HbmPreflightError(details)
+    details.update(accounting)
+    if int(accounting["accounted_free_mb"]) < int(details["minimum_accounted_free_mb"]):
+        details.update({"status": "failed", "code": "hbm_accounted_headroom_insufficient"})
+        raise HbmPreflightError(details)
+    details.update({"status": "passed", "code": "hbm_accounted_headroom_passed"})
+    return details
 
 
 def _cann_version() -> Optional[str]:
@@ -641,6 +792,7 @@ class MindSporeChatProvider:
         self._device_id: Optional[int] = None
         self._npu_model: Optional[str] = None
         self._cann_version: Optional[str] = None
+        self._hbm_preflight: Dict[str, Any] = {"status": "not_checked"}
         self._placement_status = "not_checked"
         self._placement_evidence: List[Dict[str, str]] = []
         self._config_normalization: Optional[Dict[str, str]] = None
@@ -879,19 +1031,6 @@ class MindSporeChatProvider:
             device_id = int(raw_device_id)
         except ValueError as exc:
             raise ProviderUnavailable("ASCEND_EDGE_CHAT_DEVICE_ID must be an integer") from exc
-        try:
-            context_options = {"device_target": "Ascend", "device_id": device_id}
-            max_device_memory = os.environ.get(
-                "ASCEND_EDGE_CHAT_MAX_DEVICE_MEMORY", ""
-            ).strip()
-            if max_device_memory:
-                context_options["max_device_memory"] = max_device_memory
-            set_context(**context_options)
-            actual = get_context("device_target") if callable(get_context) else "Ascend"
-        except Exception as exc:
-            raise ProviderUnavailable("could not initialize MindSpore Ascend context: %s" % exc) from exc
-        if str(actual).lower() != "ascend":
-            raise ProviderUnavailable("MindSpore selected %s instead of Ascend" % actual)
         observed_soc = _probe_npu_model()
         if not observed_soc:
             raise ProviderUnavailable("npu-smi did not report a visible Ascend 310B device")
@@ -916,6 +1055,27 @@ class MindSporeChatProvider:
                 "profile expects one of %s but npu-smi reported %s"
                 % (", ".join("Ascend" + item for item in expected_socs), observed_soc)
             )
+        try:
+            # Check device-wide accounting before creating an Ascend context.
+            # This cannot prove allocator-visible free HBM, but it prevents a
+            # known occupied board from reaching model/context allocation.
+            self._hbm_preflight = _check_hbm_headroom(observed_soc, device_id)
+        except HbmPreflightError as exc:
+            self._hbm_preflight = dict(exc.details)
+            raise
+        try:
+            context_options = {"device_target": "Ascend", "device_id": device_id}
+            max_device_memory = os.environ.get(
+                "ASCEND_EDGE_CHAT_MAX_DEVICE_MEMORY", ""
+            ).strip()
+            if max_device_memory:
+                context_options["max_device_memory"] = max_device_memory
+            set_context(**context_options)
+            actual = get_context("device_target") if callable(get_context) else "Ascend"
+        except Exception as exc:
+            raise ProviderUnavailable("could not initialize MindSpore Ascend context: %s" % exc) from exc
+        if str(actual).lower() != "ascend":
+            raise ProviderUnavailable("MindSpore selected %s instead of Ascend" % actual)
         self._device_target = str(actual)
         self._device_id = device_id
         self._npu_model = "Ascend" + observed_soc
@@ -1778,6 +1938,7 @@ class MindSporeChatProvider:
             "environment_fingerprint": env.get("fingerprint"),
             "npu_model": self._npu_model or os.environ.get("ASCEND_SOC_VERSION") or os.environ.get("ASCEND_EDGE_CHAT_NPU_MODEL") or "unknown",
             "cann_version": self._cann_version or _cann_version() or "unknown",
+            "hbm_preflight": dict(self._hbm_preflight),
             "device_target": self._device_target,
             "device_id": self._device_id,
             "placement_status": self._placement_status,
@@ -1936,6 +2097,7 @@ __all__ = [
     "DEFAULT_MAX_TOKENS",
     "MAX_MAX_TOKENS",
     "GenerationResult",
+    "HbmPreflightError",
     "ProviderBusy",
     "ProviderError",
     "ProviderRequestError",

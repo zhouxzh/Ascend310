@@ -4,10 +4,51 @@ set -euo pipefail
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${root_dir}"
 source "${root_dir}/.env"
+[[ "${ASCEND_EDGE_CHAT_BACKEND:-mindspore}" != "acl-static-kv" ]] || {
+  echo "use scripts/verify/run-release-8t-acceptance.sh for acl-static-kv" >&2
+  exit 2
+}
+: "${ASCEND_EDGE_CHAT_MODEL_SOURCE:?set ASCEND_EDGE_CHAT_MODEL_SOURCE to hf or offline-bundle}"
+case "${ASCEND_EDGE_CHAT_MODEL_SOURCE}" in
+  hf|offline-bundle) ;;
+  *) echo "ASCEND_EDGE_CHAT_MODEL_SOURCE must be hf or offline-bundle" >&2; exit 2 ;;
+esac
+cleanup_timeout_seconds="${ASCEND_EDGE_CHAT_CLEANUP_TIMEOUT_SECONDS:-30}"
+[[ "${cleanup_timeout_seconds}" =~ ^[1-9][0-9]*$ ]] || {
+  echo "ASCEND_EDGE_CHAT_CLEANUP_TIMEOUT_SECONDS must be a positive integer" >&2
+  exit 2
+}
 report_root="${ASCEND_EDGE_CHAT_REPORT_DIR:-${root_dir}/run/reports}"
 run_id="release-$(date -u +%Y%m%dT%H%M%SZ)"
 run_dir="${report_root}/${run_id}"
 mkdir -p "${run_dir}"
+
+stop_pid() {
+  local label="$1"
+  local pid="$2"
+  [[ "${pid}" =~ ^[1-9][0-9]*$ ]] || return 0
+  kill -0 "${pid}" 2>/dev/null || return 0
+  echo "stopping ${label} pid=${pid}" >&2
+  kill -TERM "${pid}" 2>/dev/null || true
+  local deadline=$((SECONDS + cleanup_timeout_seconds))
+  while kill -0 "${pid}" 2>/dev/null; do
+    if (( SECONDS >= deadline )); then
+      echo "${label} pid=${pid} did not exit after ${cleanup_timeout_seconds}s; sending KILL" >&2
+      kill -KILL "${pid}" 2>/dev/null || true
+      break
+    fi
+    sleep 0.2
+  done
+  wait "${pid}" 2>/dev/null || true
+}
+
+cleanup() {
+  stop_pid monitor "${monitor_pid:-}"
+  stop_pid ui "${ui_pid:-}"
+  stop_pid gateway "${gateway_pid:-}"
+  stop_pid worker "${worker_pid:-}"
+}
+trap cleanup EXIT INT TERM
 
 for port in 7861 7865 8090; do
   if ss -ltn "sport = :${port}" | grep -q LISTEN; then
@@ -15,20 +56,6 @@ for port in 7861 7865 8090; do
     exit 2
   fi
 done
-
-cleanup() {
-  if [[ -n "${monitor_pid:-}" ]] && kill -0 "${monitor_pid}" 2>/dev/null; then
-    kill "${monitor_pid}" 2>/dev/null || true
-    wait "${monitor_pid}" 2>/dev/null || true
-  fi
-  for pid in "${ui_pid:-}" "${gateway_pid:-}" "${worker_pid:-}"; do
-    if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
-      kill "${pid}" 2>/dev/null || true
-      wait "${pid}" 2>/dev/null || true
-    fi
-  done
-}
-trap cleanup EXIT INT TERM
 
 capture_processes() {
   local phase="$1"
@@ -80,6 +107,7 @@ conda activate "${ASCEND_EDGE_CHAT_CONDA_ENV}"
 export PYTHONNOUSERSITE=1
 python scripts/verify/release_acceptance.py \
   --token "${ASCEND_EDGE_CHAT_GATEWAY_API_KEY}" \
+  --model-source "${ASCEND_EDGE_CHAT_MODEL_SOURCE}" \
   --output "${run_dir}/acceptance.json" \
   >"${run_dir}/acceptance-path.log" 2>&1
 capture_processes after

@@ -2,37 +2,41 @@
 
 ## Scope
 
-Ascend Edge Chat `v0.1.0` is a portable text-chat reference service for Ascend edge hardware. It provides one immutable default release profile, an OpenAI-compatible gateway, and a browser interface for a trusted local network. The teaching catalog is intentionally broader: it exposes measured technical experiments without treating language quality as a runtime gate.
+Ascend Edge Chat `v0.2.0` is a portable text-chat reference service for Ascend edge hardware. It provides an OpenAI-compatible gateway, a browser interface for a trusted local network, and two separately validated NPU backends. The teaching catalog is intentionally broader: it exposes measured technical experiments without treating language quality as a runtime gate.
 
-The release target is `Ascend310B1 / 20T`. The tested runtime tuple is Python `3.9.25`, MindSpore `2.4.10`, MindNLP `0.4.1`, and CANN `8.0.0`. This tuple is an observed deployment target, not a claim that every Ascend board or runtime version behaves identically.
+The 20T release uses Ascend310B1 with Python `3.9.25`, MindSpore `2.4.10`, MindNLP `0.4.1`, and CANN `8.0.0`. The 8T release uses Ascend310B4, the same Python/CANN line, and a locked native ACL/OM static-KV backend. Neither tuple inherits the other target's runtime or quality evidence.
 
 ## Runtime Architecture
 
 ```mermaid
 flowchart TB
     accTitle: Ascend Edge Chat process boundaries
-    accDescr: The browser accesses only the UI. The UI owns the gateway token. Gateway and worker stay on loopback, and the worker serializes requests before invoking the NPU.
+    accDescr: The browser accesses only the UI. The UI owns the gateway token. The gateway selects one loopback backend, either the MindSpore worker on 20T or the fixed ACL static-KV service on 8T.
 
     lan["Trusted LAN client"] --> ui["UI\n0.0.0.0:7865"]
     ui -->|"server-side Bearer token"| gateway["Gateway\n127.0.0.1:7861"]
-    gateway -->|"fixed internal model ID"| worker["MindSpore worker\n127.0.0.1:8090"]
-    worker --> serial["single request admission"]
-    serial --> npu["Ascend 310B1 / 20T"]
+    gateway -->|"Ascend310B1"| ms["MindSpore worker\n127.0.0.1:8090"]
+    gateway -->|"Ascend310B4"| acl["ACL static-KV\n127.0.0.1:8084"]
+    ms --> serial1["single request admission"]
+    acl --> serial2["single request admission"]
+    serial1 --> npu1["Ascend 310B1 / 20T"]
+    serial2 --> npu2["Ascend 310B4 / 8T"]
 ```
 
-The public model identifier is `ascend-edge-chat`. The internal worker identifier is not configurable by API requests.
+The public model identifier is `ascend-edge-chat`. The selected internal worker identifier and port are not configurable by API requests; the gateway rejects backend/model/port cross-wiring.
 
 ## Support Matrix
 
 | Layer | Release state | Boundary |
 | --- | --- | --- |
-| Browser text UI | Supported technical preview | Trusted LAN only; no browser login |
-| OpenAI JSON and SSE | Supported technical preview | Bounded messages, greedy decoding, one request at a time |
-| MindSpore Qwen1.5-0.5B | Observed-pass on 20T | Human Chinese-quality review remains pending; still testable |
-| Teaching Qwen2-0.5B profile | Observed-pass machine/API path on 20T (2026-10-18) | Active teaching profile during the final acceptance run; semantic quality pending |
+| Browser text UI | Supported formal release surface | Trusted LAN only; no browser login |
+| OpenAI JSON and SSE | Supported formal release surface | Bounded messages, greedy decoding, one request at a time |
+| MindSpore Qwen1.5-0.5B on 20T | Observed-pass machine path | Human Chinese-quality review remains pending; still testable |
+| Qwen2.5 static KV on 8T | Observed-pass machine path | Public HF artifacts, fixed 51/49 contract, output cap 80; semantic quality pending |
+| Teaching Qwen2-0.5B profile | Observed-pass machine/API path on 20T | Teaching-only comparison; semantic quality pending |
 | Teaching catalog | Qwen1.5 1.8B, Qwen2/Qwen2.5, TinyLlama, DeepSeek | Selectable when technical evidence exists; quality is a separate field |
-| Ascend 310B4 / 8T | Untested for this release | Does not inherit the 20T result |
-| Audio and device protocols | Out of scope | Not installed or started |
+| Cross-target inheritance | Not allowed | 8T and 20T retain separate artifacts, performance, and quality evidence |
+| Audio and device protocols | Out of scope for the 8T text release | Not installed or started |
 | Retrieval augmentation | Not included | No release API or runtime configuration enables it |
 
 ## Current 20T Validation
@@ -54,9 +58,9 @@ separate claims. Detailed values are in
 
 ## Release Model
 
-The default runtime profile is defined in `configs/release-model.json`; its accompanying lock is `configs/release-artifacts.lock.json`. The profile pins the Qwen repository revision, artifact file paths, exact byte sizes, SHA-256 digests, runtime limits, and target SoC. Classroom experiments use `configs/tutorial-models.json` and are described for students in `configs/tutorial-model-catalog.json`.
+The 20T runtime profile is defined in `configs/release-model.json`; its accompanying lock is `configs/release-artifacts.lock.json`. The 8T static-KV release is defined by `configs/release-8t-static-kv.lock.json` and its fixed external catalog `configs/release-8t-model-catalog.json`. Both lock their source revision, artifacts, exact bytes, SHA-256 values, runtime limits, and target SoC.
 
-The release does not accept a model path, model revision, provider name, or Python expression from a browser or API request. The teaching selector accepts only a profile ID already present in the checked-in catalog and registry. It restarts the single worker, waits for its health signal, and rolls back to the previous profile on startup failure. Extension work must use the controlled profile and provider workflow in [Extension Guide](05-extension-guide.md).
+The release does not accept a model path, model revision, provider name, or Python expression from a browser or API request. On 20T the teaching selector accepts only a profile ID already present in the checked-in catalog and registry. On 8T the ACL backend is fixed and browser model switching is rejected. Extension work must use the controlled profile and provider workflow in [Extension Guide](05-extension-guide.md).
 
 ## Non-Goals
 
@@ -64,4 +68,4 @@ The release does not accept a model path, model revision, provider name, or Pyth
 - no simultaneous multi-model loading or automatic backend failover (a teaching profile change is a controlled worker restart);
 - no CPU, cloud, Torch, vLLM, MindIE, or alternate-framework fallback;
 - no support claim for a model merely because an artifact can be downloaded; selectable entries require measured technical evidence;
-- no 8T performance or quality assertion derived from a 20T run.
+- no cross-target performance or quality assertion between 8T and 20T.

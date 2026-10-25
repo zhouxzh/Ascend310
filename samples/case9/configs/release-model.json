@@ -13,7 +13,7 @@
       "revision_pinned": true,
       "mirror": "https://hf-mirror.com",
       "board": {
-        "host": "192.168.1.101",
+        "host": "unspecified",
         "soc": "Ascend310B1",
         "tier": "20T"
       },

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ascend-edge-chat"
-version = "0.1.0"
+version = "0.2.0"
 description = "Ascend 310B text chat service with a MindSpore backend"
 requires-python = ">=3.9"
 license = {text = "Apache-2.0"}
@@ -19,6 +19,10 @@ dependencies = [
 [project.optional-dependencies]
 voice = [
   "sherpa-onnx==1.13.6",
+]
+acl-static-kv = [
+  "numpy==1.26.4",
+  "tokenizers==0.19.1",
 ]
 
 [project.scripts]

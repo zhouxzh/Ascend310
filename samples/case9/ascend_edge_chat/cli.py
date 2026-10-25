@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import suppress
 import json
 import os
 from pathlib import Path
+import signal
 from typing import Sequence
 
 from .artifacts.model_store import (
@@ -18,8 +20,19 @@ from .artifacts.model_store import (
     report,
     verify_artifacts,
     verify_release_lock,
+    verify_tutorial_profile_artifacts,
 )
 from .backends.model_profiles import load_profiles, resolve_safe_path
+from .artifacts.static_release_store import (
+    DEFAULT_HF_MIRROR,
+    DEFAULT_STATIC_RELEASE_LOCK,
+    StaticReleaseError,
+    download_static_release_artifacts,
+    import_static_release_artifacts,
+    load_static_release_lock,
+    static_release_root,
+    verify_static_release_artifacts,
+)
 from .runtime.config import load_release_environment
 from .version import PROJECT_NAME, __version__
 
@@ -71,6 +84,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     offline.add_argument("--data-dir", type=Path)
     offline.add_argument("--source", required=True, type=Path)
 
+    acl = commands.add_parser("acl", help="manage the public Ascend310B4 static-KV release")
+    acl_commands = acl.add_subparsers(dest="acl_command", required=True)
+    acl_verify = acl_commands.add_parser("verify", help="verify the public B4 artifact lock")
+    acl_verify.add_argument("--data-dir", type=Path)
+    acl_verify.add_argument("--lock", type=Path, default=DEFAULT_STATIC_RELEASE_LOCK)
+    acl_download = acl_commands.add_parser("download", help="download only locked public HF artifacts")
+    acl_download.add_argument("--data-dir", type=Path)
+    acl_download.add_argument("--lock", type=Path, default=DEFAULT_STATIC_RELEASE_LOCK)
+    acl_download.add_argument("--mirror", default=os.environ.get("HF_ENDPOINT", DEFAULT_HF_MIRROR))
+    acl_import = acl_commands.add_parser("import", help="import a labeled offline artifact bundle")
+    acl_import.add_argument("--data-dir", type=Path)
+    acl_import.add_argument("--lock", type=Path, default=DEFAULT_STATIC_RELEASE_LOCK)
+    acl_import.add_argument("--source", required=True, type=Path)
+    acl_import.add_argument("--require-manifest", action="store_true")
+
+    acl_worker = commands.add_parser("acl-worker", help="start the loopback Ascend310B4 ACL/OM service")
+    acl_worker.add_argument("--data-dir", type=Path)
+    acl_worker.add_argument("--lock", type=Path, default=DEFAULT_STATIC_RELEASE_LOCK)
+    acl_worker.add_argument("--host", default="127.0.0.1")
+    acl_worker.add_argument("--port", default=8084, type=int)
+    acl_worker.add_argument("--max-tokens", default=80, type=int)
+    acl_worker.add_argument("--execution-timeout", default=240.0, type=float)
+    acl_worker.add_argument("--device-id", default=0, type=int)
+
     args = parser.parse_args(list(argv) if argv is not None else None)
     try:
         if args.command == "worker":
@@ -81,6 +118,51 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _ui(args.host, args.port)
         if args.command == "voice":
             return _voice(args.host, args.port, args.check_config)
+        if args.command in {"acl", "acl-worker"}:
+            selected_data_dir = args.data_dir or os.environ.get("ASCEND_EDGE_CHAT_DATA_DIR")
+            if not selected_data_dir:
+                raise StaticReleaseError("--data-dir or ASCEND_EDGE_CHAT_DATA_DIR is required")
+            acl_root = static_release_root(selected_data_dir)
+            if args.command == "acl-worker":
+                try:
+                    return _acl_worker(
+                        acl_root,
+                        args.lock,
+                        args.host,
+                        args.port,
+                        args.max_tokens,
+                        args.execution_timeout,
+                        args.device_id,
+                    )
+                except RuntimeError as exc:
+                    raise StaticReleaseError("static KV worker failed: %s" % exc) from exc
+            if args.acl_command == "verify":
+                print(json.dumps(verify_static_release_artifacts(acl_root, lock_path=args.lock), ensure_ascii=False, indent=2))
+                return 0
+            if args.acl_command == "download":
+                print(
+                    json.dumps(
+                        download_static_release_artifacts(
+                            acl_root, mirror=args.mirror, lock_path=args.lock
+                        ),
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                )
+                return 0
+            print(
+                json.dumps(
+                    import_static_release_artifacts(
+                        acl_root,
+                        args.source,
+                        lock_path=args.lock,
+                        require_manifest=args.require_manifest,
+                    ),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 0
         root = data_root(str(args.data_dir) if getattr(args, "data_dir", None) else None)
         if args.command == "verify":
             print(json.dumps(report(verify_artifacts(root)), ensure_ascii=False, indent=2))
@@ -90,43 +172,73 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         print(json.dumps(report(import_artifacts(root, args.source)), ensure_ascii=False, indent=2))
         return 0
-    except ArtifactError as exc:
+    except (ArtifactError, StaticReleaseError) as exc:
         parser.error(str(exc))
         return 2
 
 
-def _verify_tutorial_cache(root: Path, profile: object) -> None:
-    """Verify the minimum local files before loading a non-release profile.
+def _static_release_paths(root: Path, lock_path: Path) -> tuple[dict[str, Path], dict[str, str]]:
+    verified = verify_static_release_artifacts(root, lock_path=lock_path)
+    release = load_static_release_lock(lock_path)
+    paths = {item.name: root / item.destination for item in release.artifacts}
+    return paths, verified["runtime_locks"]
 
-    Tutorial artifacts intentionally carry metadata-only hashes in the runtime
-    registry.  The acquisition/reproducibility records retain the real hashes;
-    this preflight only prevents a missing or partial cache from becoming an
-    implicit network download.
+
+def _acl_worker(
+    root: Path,
+    lock_path: Path,
+    host: str,
+    port: int,
+    max_tokens: int,
+    execution_timeout: float,
+    device_id: int,
+) -> int:
+    from .static_kv.launch import start_release_service
+
+    paths, runtime_locks = _static_release_paths(root, lock_path)
+    server, service = start_release_service(
+        host=host,
+        port=port,
+        om=paths["b4-om"],
+        tokenizer=paths["tokenizer"],
+        tokenizer_config=paths["tokenizer-config"],
+        controller_contract=paths["controller-contract"],
+        runtime_contract=paths["b4-descriptor-contract"],
+        om_lock=Path(runtime_locks["runtime_om_lock"]),
+        tokenizer_lock=Path(runtime_locks["tokenizer_lock"]),
+        max_tokens=max_tokens,
+        execution_timeout_seconds=execution_timeout,
+        device_id=device_id,
+    )
+
+    def stop_on_signal(_signum: int, _frame: object) -> None:
+        raise KeyboardInterrupt
+
+    previous_term = signal.signal(signal.SIGTERM, stop_on_signal)
+    try:
+        server.serve_forever(poll_interval=0.5)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        signal.signal(signal.SIGTERM, previous_term)
+        server.server_close()
+        with suppress(Exception):
+            service.runtime.close()
+    return 0
+
+
+def _verify_tutorial_cache(root: Path, profile: object) -> None:
+    """Verify a teaching profile with the same immutable contract as release.
+
+    A selectable lesson profile is executable code plus model data.  Its local
+    cache must therefore satisfy the declared byte and digest lock before a
+    worker starts; availability is never inferred from filenames alone.
     """
 
-    cache_dir = resolve_safe_path(profile.cache_dir, root, allow_missing=True)
-    if not cache_dir.is_dir() or cache_dir.is_symlink():
-        raise ArtifactError("tutorial model cache is missing: %s" % cache_dir)
-    required = ["config.json"]
-    if not any((cache_dir / name).is_file() for name in ("tokenizer.json", "tokenizer.model", "sentencepiece.model")):
-        required.append("tokenizer.json or tokenizer.model")
-    if not any(
-        item.is_file()
-        and not item.name.startswith(".")
-        and item.name.lower().endswith((".safetensors", ".bin", ".ckpt"))
-        for item in cache_dir.iterdir()
-    ):
-        required.append("model.safetensors or checkpoint")
-    missing = [name for name in required if (name == "config.json" and not (cache_dir / name).is_file())]
-    if len(required) > 1 and not any((cache_dir / name).is_file() for name in ("tokenizer.json", "tokenizer.model", "sentencepiece.model")):
-        missing.append("tokenizer")
-    if len(required) > 1 and not any(
-        item.is_file() and item.name.lower().endswith((".safetensors", ".bin", ".ckpt"))
-        for item in cache_dir.iterdir()
-    ):
-        missing.append("weights")
-    if missing:
-        raise ArtifactError("tutorial model cache is incomplete (%s): %s" % (profile.id, ", ".join(dict.fromkeys(missing))))
+    try:
+        verify_tutorial_profile_artifacts(root, profile)
+    except ArtifactError as exc:
+        raise ArtifactError("tutorial model cache is unavailable (%s)" % profile.id) from exc
 
 
 def _worker(host: str, port: int, profile_id: str, registry_path: Path) -> int:

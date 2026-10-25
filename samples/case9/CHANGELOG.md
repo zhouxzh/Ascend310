@@ -2,6 +2,15 @@
 
 All notable changes to Ascend Edge Chat are recorded here.
 
+## v0.2.0 - 2026-10-25
+
+- Added a second formal release backend, `acl-static-kv`, for Ascend310B4 / 8T.
+- Locked the Qwen2.5-0.5B-Instruct static-KV ONNX, tokenizer, contracts, B4 OM, license, and public Hugging Face revision.
+- Added the tracked 51-input/49-output ACL runtime and public artifact verifier.
+- Added fixed `:8084 -> :7861 -> :7865` lifecycle and acceptance entry points for the 8T backend.
+- Kept the MindSpore static-KV requirement boundary unchanged: the main MindSpore route does not require OM conversion.
+- The 8T backend exposes only `ascend-edge-chat`, defaults to 16 output tokens, and caps output at 80.
+
 ## v0.1.0 - 2026-10-17
 
 - Introduced the portable `ascend_edge_chat` package and `ascend-edge-chat` CLI.

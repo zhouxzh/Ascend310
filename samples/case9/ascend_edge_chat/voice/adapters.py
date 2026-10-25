@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import io
+import logging
 import shutil
 import struct
 import subprocess
@@ -23,6 +24,9 @@ import httpx
 
 from .config import VoiceSettings
 from .protocol import SpeechRecognizer, SpeechSynthesizer, SynthesizedAudio
+
+
+LOGGER = logging.getLogger("ascend_edge_chat.voice.adapters")
 
 
 class SpeechAdapterError(RuntimeError):
@@ -105,9 +109,10 @@ class SherpaOnnxRecognizer:
             Path(name) if Path(name).is_absolute() else (root / name if root is not None else Path(name))
             for name in tuple(value or default for value, default in zip(configured, defaults))
         )
-        missing = [str(path) for path in paths if not path.is_file()]
+        missing = [path for path in paths if not path.is_file()]
         if missing:
-            raise SpeechAdapterError("sherpa ASR model files are missing: " + ", ".join(missing))
+            LOGGER.warning("sherpa ASR model files are missing: %s", ", ".join(map(str, missing)))
+            raise SpeechAdapterError("sherpa ASR model files are not ready")
         return paths  # type: ignore[return-value]
 
     def readiness(self) -> tuple[bool, str]:
@@ -176,9 +181,10 @@ class SherpaOnnxSynthesizer:
         model = root / self._settings.sherpa_tts_model
         tokens = root / self._settings.sherpa_tts_tokens
         data = root / self._settings.sherpa_tts_data_dir
-        missing = [str(path) for path in (model, tokens, data) if not path.exists()]
+        missing = [path for path in (model, tokens, data) if not path.exists()]
         if missing:
-            raise SpeechAdapterError("sherpa TTS model files are missing: " + ", ".join(missing))
+            LOGGER.warning("sherpa TTS model files are missing: %s", ", ".join(map(str, missing)))
+            raise SpeechAdapterError("sherpa TTS model files are not ready")
         return model, tokens, data
 
     def readiness(self) -> tuple[bool, str]:

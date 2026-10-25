@@ -120,7 +120,10 @@ async def _stop_process(process: asyncio.subprocess.Process) -> None:
         await asyncio.wait_for(process.wait(), timeout=1.5)
     except asyncio.TimeoutError:
         process.kill()
-        await process.wait()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=1.5)
+        except asyncio.TimeoutError as exc:
+            raise AudioDeviceError("arecord did not exit after termination") from exc
 
 
 class AlsaAudioIO:
@@ -200,10 +203,20 @@ class AlsaAudioIO:
                 ))
                 pre_roll: list[bytes] = []
                 utterance = bytearray()
+                deadline = asyncio.get_running_loop().time() + max_duration_seconds
                 while True:
-                    raw_frame = await process.stdout.readexactly(
-                        vad.settings.frame_bytes * capture_channels
-                    )
+                    remaining = deadline - asyncio.get_running_loop().time()
+                    if remaining <= 0:
+                        raise AudioDeviceError("arecord capture exceeded its time limit")
+                    try:
+                        raw_frame = await asyncio.wait_for(
+                            process.stdout.readexactly(
+                                vad.settings.frame_bytes * capture_channels
+                            ),
+                            timeout=remaining,
+                        )
+                    except asyncio.TimeoutError as exc:
+                        raise AudioDeviceError("arecord capture timed out") from exc
                     frame = downmix_pcm16le(raw_frame, capture_channels)
                     decision = vad.feed(frame)
                     if decision.state == VadState.WAITING:

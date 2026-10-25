@@ -10,12 +10,12 @@
       "technical_status": "observed-pass",
       "quality_status": "pending",
       "selectable": true,
-      "reason": "默认技术预览；20T 上已完成 worker、JSON、SSE、长输出、稳定性和性能门。",
-      "technical_detail": "20T 20T gap batch 9/9 machine gates; 8T has historical API and performance evidence but strict placement evidence is incomplete.",
+      "reason": "默认技术预览；20T 上已完成 worker、JSON、SSE、长输出、稳定性和性能门。当前 8T HBM/runtime 初始化失败，必须保留为 blocked 证据。",
+      "technical_detail": "20T gap batch 9/9 machine gates completed. Current 8T Qwen1.5-0.5B attempts fail during MindSpore HBM initialization and are not selectable through the 20T registry.",
       "quality_detail": "中文和英文人工质量尚未完成正式评分；不得把长度截断当作质量结论。",
       "board_results": {
         "Ascend310B1/20T": "observed-pass",
-        "Ascend310B4/8T": "observed-degraded"
+        "Ascend310B4/8T": "blocked"
       },
       "worker_registry": "configs/release-model.json",
       "default_max_tokens": 128,
@@ -129,11 +129,11 @@
       "text_integrity_status": "observed-issue",
       "selectable": true,
       "reason": "短请求可以启动和生成；长输出曾触发 U+FFFD/TBE 失败，学生可用它复现边界。",
-      "technical_detail": "8T/20T short API smoke passed; 32/48-token long-output evidence contains U+FFFD and can enter fail-closed watchdog path.",
+      "technical_detail": "20T short API smoke passed; 32/48-token long-output evidence contains U+FFFD and can enter fail-closed watchdog path. Current 8T registry lacks an independently validated startup contract.",
       "quality_detail": "TinyLlama 主要面向英文；历史长输出出现文本完整性问题。中文人工质量尚未用完整输出独立评分。",
       "board_results": {
         "Ascend310B1/20T": "short-smoke",
-        "Ascend310B4/8T": "short-smoke"
+        "Ascend310B4/8T": "not-run"
       },
       "worker_registry": "configs/tutorial-models.json",
       "max_tokens": 8
@@ -147,12 +147,12 @@
       "quality_status": "pending",
       "text_integrity_status": "pending",
       "selectable": true,
-      "reason": "两种板卡都有 NPU/API 运行证据；速度较慢且中文常以推理前缀或事实错误结束。",
-      "technical_detail": "8T and 20T machine gates were recorded; 20T total latency p50/p95 was about 3938/4009 ms at the historical protocol.",
+      "reason": "20T 已有 NPU/API 运行证据；速度较慢且中文常以推理前缀或事实错误结束。8T 需要使用带独立目标与哈希锁的 profile 重新验证。",
+      "technical_detail": "20T machine gates were recorded; 20T total latency p50/p95 was about 3938/4009 ms at the historical protocol. The current teaching registry does not declare an independently startable 8T target.",
       "quality_detail": "历史短预算可见 <think> 前缀与事实错误；必须先给予完成回答的输出预算，再进行人工中文质量评分。",
       "board_results": {
         "Ascend310B1/20T": "observed-degraded",
-        "Ascend310B4/8T": "observed-pass"
+        "Ascend310B4/8T": "not-run"
       },
       "worker_registry": "configs/tutorial-models.json",
       "default_max_tokens": 64,

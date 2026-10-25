@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "profiles": {
+    "qwen1.5-0.5b-chat": {
+      "repository": "Qwen/Qwen1.5-0.5B-Chat",
+      "revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "bytes": 1239173352, "sha256": "72453a8ccb338811935ab95a3a6ffa86b586807bf5b3dc327f28b5389b5636e6"},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "bytes": 7028015, "sha256": "f7c9b2dba4a296b1aa76c16a34b8225c0c118978400d4bb66bff0902d702f5b8"},
+        {"name": "config", "kind": "config", "filename": "config.json", "bytes": 661, "sha256": "adac3bb8bf1b15c74312a2835e3796f6b352d817ff726960e1d5c2cd171da951"},
+        {"name": "tokenizer-config", "kind": "tokenizer_metadata", "filename": "tokenizer_config.json", "bytes": 1287, "sha256": "482bd979881423375ca5414e4e0d94cd7c5349dbb17fffd46b4d36d71e62a1bc"},
+        {"name": "vocab", "kind": "tokenizer_metadata", "filename": "vocab.json", "bytes": 2776833, "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"},
+        {"name": "merges", "kind": "tokenizer_metadata", "filename": "merges.txt", "bytes": 1671839, "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"},
+        {"name": "generation-config", "kind": "generation_metadata", "filename": "generation_config.json", "bytes": 206, "sha256": "5cf6fb81bd473eeb55678afbaee79e8d5f8b6e9bc2f942c30ee94721a0a91945"}
+      ]
+    },
+    "qwen1.5-1.8b-mindspore": {
+      "repository": "Qwen/Qwen1.5-1.8B-Chat",
+      "revision": "e482ee3f73c375a627a16fdf66fd0c8279743ca6",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "bytes": 3673690696, "sha256": "a38426c7c167d39c4a9fc2e1d71d4bb03b8fdd5f83c80dcbc3b5ceaaf327ef00"},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "bytes": 7028015, "sha256": "f7c9b2dba4a296b1aa76c16a34b8225c0c118978400d4bb66bff0902d702f5b8"},
+        {"name": "config", "kind": "config", "filename": "config.json", "bytes": 662, "sha256": "94945a8fd612236cdcb752ccf024ee12c2486a50f4395e702075eb2d95086e9f"},
+        {"name": "tokenizer-config", "kind": "tokenizer_metadata", "filename": "tokenizer_config.json", "bytes": 1287, "sha256": "482bd979881423375ca5414e4e0d94cd7c5349dbb17fffd46b4d36d71e62a1bc"},
+        {"name": "vocab", "kind": "tokenizer_metadata", "filename": "vocab.json", "bytes": 2776833, "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"},
+        {"name": "merges", "kind": "tokenizer_metadata", "filename": "merges.txt", "bytes": 1671839, "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"},
+        {"name": "generation-config", "kind": "generation_metadata", "filename": "generation_config.json", "bytes": 206, "sha256": "5cf6fb81bd473eeb55678afbaee79e8d5f8b6e9bc2f942c30ee94721a0a91945"}
+      ]
+    },
+    "qwen2-0.5b-instruct-mindspore": {
+      "repository": "Qwen/Qwen2-0.5B-Instruct",
+      "revision": "befdd363d82258f10fa0cbf9f76a4210347dd432",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "bytes": 988097824, "sha256": "130282af0dfa9fe5840737cc49a0d339d06075f83c5a315c3372c9a0740d0b96"},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "bytes": 7028015, "sha256": "f7c9b2dba4a296b1aa76c16a34b8225c0c118978400d4bb66bff0902d702f5b8"},
+        {"name": "config", "kind": "config", "filename": "config.json", "bytes": 659, "sha256": "b8271b908470964d4b2ad6810388389f47c3f6b29521fee4811c44ea35b43855"}
+      ]
+    },
+    "qwen2-1.5b-instruct-mindspore": {
+      "repository": "Qwen/Qwen2-1.5B-Instruct",
+      "revision": "b139ca2b8d7ba579ed727ffcd7060075666a808b",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "bytes": 3087467144, "sha256": "302e327795994403cb1e3cb6a3345c76b246b894d14078c936b570c83a4e9057"},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "bytes": 7028015, "sha256": "f7c9b2dba4a296b1aa76c16a34b8225c0c118978400d4bb66bff0902d702f5b8"},
+        {"name": "config", "kind": "config", "filename": "config.json", "bytes": 660, "sha256": "c7c639130f24ad16c233dd74a6febd558a028c43dc78027be587c193a9a2a7a0"}
+      ]
+    },
+    "qwen2.5-0.5b-mindspore": {
+      "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "bytes": 988097824, "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "bytes": 7031645, "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"},
+        {"name": "config", "kind": "config", "filename": "config.json", "bytes": 659, "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45"},
+        {"name": "tokenizer-config", "kind": "tokenizer_metadata", "filename": "tokenizer_config.json", "bytes": 7305, "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583"},
+        {"name": "generation-config", "kind": "generation_metadata", "filename": "generation_config.json", "bytes": 242, "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6"},
+        {"name": "merges", "kind": "tokenizer_metadata", "filename": "merges.txt", "bytes": 1671839, "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"}
+      ]
+    },
+    "qwen2.5-1.5b-mindspore": {
+      "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+      "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "bytes": 3087467144, "sha256": "dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee"},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "bytes": 7031645, "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"},
+        {"name": "config", "kind": "config", "filename": "config.json", "bytes": 660, "sha256": "98d2ff8cc47488d08a2b0b3acf4eb99ef210779b42bd48605f6b8e36acdbf670"},
+        {"name": "tokenizer-config", "kind": "tokenizer_metadata", "filename": "tokenizer_config.json", "bytes": 7305, "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583"},
+        {"name": "generation-config", "kind": "generation_metadata", "filename": "generation_config.json", "bytes": 242, "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6"},
+        {"name": "merges", "kind": "tokenizer_metadata", "filename": "merges.txt", "bytes": 1671839, "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"},
+        {"name": "vocab", "kind": "tokenizer_metadata", "filename": "vocab.json", "bytes": 2776833, "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"}
+      ]
+    },
+    "tinyllama-1.1b-mindspore": {
+      "repository": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "bytes": 2200119864, "sha256": "6e6001da2106d4757498752a021df6c2bdc332c650aae4bae6b0c004dcf14933"},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "bytes": 1842767, "sha256": "bcd04f0eadf90287bd26e1a183ac487d8a141b09b06aecb7725bbdd343640f2e"},
+        {"name": "config", "kind": "config", "filename": "config.json", "bytes": 608, "sha256": "486bedda3a6988332e60d9638a09ca4b260d34ebcf1b19e22cf3b140b63d8fe9"},
+        {"name": "generation-config", "kind": "config", "filename": "generation_config.json", "bytes": 124, "sha256": "18046d04f5bd8b4998095ecabdd17a1bf0053d9acdccead4a05be4a3575f3c5c"},
+        {"name": "special-tokens-map", "kind": "tokenizer_metadata", "filename": "special_tokens_map.json", "bytes": 551, "sha256": "82d96d7a9e6ced037f12394b7ea6a5b02e6ca87e0d11edaa8d60d9be857ce7db"},
+        {"name": "tokenizer-config", "kind": "tokenizer_metadata", "filename": "tokenizer_config.json", "bytes": 1289, "sha256": "7b41ba7d0eb91e77914ca3dafde559ea3e19878769b7e68409e89bed5222e77a"},
+        {"name": "tokenizer-model", "kind": "tokenizer", "filename": "tokenizer.model", "bytes": 499723, "sha256": "9e556afd44213b6bd1be2b850ebbbd98f5481437a8021afaf58ee7fb1818d347"}
+      ]
+    },
+    "deepseek-r1-qwen-1.5b-mindspore": {
+      "repository": "MindSpore-Lab/DeepSeek-R1-Distill-Qwen-1.5B-FP16",
+      "revision": "0a28897fe71fdd30de350b667ae588601a85990f",
+      "artifacts": [
+        {"name": "model", "kind": "weights", "filename": "model.safetensors", "bytes": 3554214416, "sha256": "706e1bfd7cb0680fbf73df6a2506766e447246e4291d7054c8b395dc3583419c"},
+        {"name": "tokenizer", "kind": "tokenizer", "filename": "tokenizer.json", "bytes": 7031660, "sha256": "88145e3c3249adc2546ede277e9819d6e405e19072456e4b521cbc724bd60773"},
+        {"name": "config", "kind": "config", "filename": "config.json", "bytes": 751, "sha256": "5144478ee3982b0698022588e965afd9f437ab6e418895ed156bc16972b8a86c"},
+        {"name": "generation-config", "kind": "config", "filename": "generation_config.json", "bytes": 145, "sha256": "71b075a544000dc786ccc30106a03fe7eab40fc510842ee7b3475ccdfcd3d794"},
+        {"name": "tokenizer-config", "kind": "tokenizer_metadata", "filename": "tokenizer_config.json", "bytes": 3071, "sha256": "8ac8c85fb242563c2260baec0909debd69d718af6a0b3d90e6cab62b4d341cd5"}
+      ]
+    }
+  }
+}

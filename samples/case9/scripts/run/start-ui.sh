@@ -21,6 +21,7 @@ export PYTHONNOUSERSITE=1
 cat >&2 <<'WARNING'
 WARNING: Ascend Edge Chat's browser UI has no login. Every host on the same
 trusted LAN can send messages to this board. Do not expose port 7865 to the
-internet. The gateway token remains server-side.
+internet. The gateway token remains server-side. The selected release backend
+determines whether model switching is available.
 WARNING
 exec python -m ascend_edge_chat ui "$@"

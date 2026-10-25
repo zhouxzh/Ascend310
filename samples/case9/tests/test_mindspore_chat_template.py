@@ -3,10 +3,13 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Optional
 import unittest
+from unittest.mock import patch
 
 from ascend_edge_chat.backends.mindspore_qwen import (
+    HbmPreflightError,
     MindSporeChatProvider,
     Qwen2MindSporeProvider,
+    _check_hbm_headroom,
     provider_class_for_profile,
 )
 from ascend_edge_chat.backends.model_profiles import load_profiles
@@ -62,6 +65,66 @@ class MindSporeChatTemplateTests(unittest.TestCase):
         provider = Qwen2MindSporeProvider(_profile(), model=object(), tokenizer=object())
         with self.assertRaisesRegex(Exception, "no usable chat template"):
             provider._render_messages([{"role": "user", "content": "你好"}])
+
+    def test_hbm_preflight_records_20t_device_accounting_without_claiming_allocator_free(self) -> None:
+        snapshot = """\
+| NPU     Name                  | Health          | Power(W)     Temp(C)           Hugepages-Usage(page) |
+| Chip    Device                | Bus-Id          | AICore(%)    Memory-Usage(MB)                        |
+| 0       310B1                 | Alarm           | 0.0          70                15    / 15            |
+| 0       0                     | NA              | 0            10000/ 23673                            |
+"""
+        with patch(
+            "ascend_edge_chat.backends.mindspore_qwen._npu_smi_info",
+            return_value=snapshot,
+        ), patch.dict(
+            "os.environ",
+            {"ASCEND_EDGE_CHAT_MIN_ACCOUNTED_FREE_HBM_MB_20T": "8192"},
+        ):
+            report = _check_hbm_headroom("310B1", 0)
+
+        self.assertEqual(report["status"], "passed")
+        self.assertEqual(report["tier"], "20T")
+        self.assertEqual(report["accounted_free_mb"], 13673)
+        self.assertFalse(report["allocator_free_observed"])
+        self.assertIsNone(report["allocator_free_mb"])
+
+    def test_hbm_preflight_rejects_8t_qwen_before_known_allocator_failure(self) -> None:
+        snapshot = """\
+| NPU     Name                  | Health          | Power(W)     Temp(C)           Hugepages-Usage(page) |
+| Chip    Device                | Bus-Id          | AICore(%)    Memory-Usage(MB)                        |
+| 0       310B4                 | Alarm           | 0.0          45                15    / 15            |
+| 0       0                     | NA              | 0            2225 / 7545                             |
+"""
+        with patch(
+            "ascend_edge_chat.backends.mindspore_qwen._npu_smi_info",
+            return_value=snapshot,
+        ), self.assertRaises(HbmPreflightError) as captured:
+            _check_hbm_headroom("310B4", 0)
+
+        self.assertEqual(captured.exception.details["code"], "hbm_accounted_headroom_insufficient")
+        self.assertEqual(captured.exception.details["tier"], "8T")
+        self.assertEqual(captured.exception.details["accounted_free_mb"], 5320)
+        self.assertEqual(captured.exception.details["minimum_accounted_free_mb"], 6144)
+
+    def test_hbm_preflight_rejects_low_20t_device_headroom_before_model_load(self) -> None:
+        snapshot = """\
+| NPU     Name                  | Health          | Power(W)     Temp(C)           Hugepages-Usage(page) |
+| Chip    Device                | Bus-Id          | AICore(%)    Memory-Usage(MB)                        |
+| 0       310B1                 | Alarm           | 0.0          70                15    / 15            |
+| 0       0                     | NA              | 0            16000/ 23673                            |
+"""
+        with patch(
+            "ascend_edge_chat.backends.mindspore_qwen._npu_smi_info",
+            return_value=snapshot,
+        ), patch.dict(
+            "os.environ",
+            {"ASCEND_EDGE_CHAT_MIN_ACCOUNTED_FREE_HBM_MB_20T": "8192"},
+        ), self.assertRaises(HbmPreflightError) as captured:
+            _check_hbm_headroom("310B1", 0)
+
+        self.assertEqual(captured.exception.details["code"], "hbm_accounted_headroom_insufficient")
+        self.assertEqual(captured.exception.details["tier"], "20T")
+        self.assertEqual(captured.exception.details["accounted_free_mb"], 7673)
 
 
 if __name__ == "__main__":

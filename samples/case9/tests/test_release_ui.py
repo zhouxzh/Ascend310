@@ -32,7 +32,99 @@ class _LengthLimitedLLM(_FakeLLM):
     last_finish_reason = "length"
 
 
+_ACL_STATIC_KV_MODEL = "qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om"
+
+
+def _acl_static_kv_health() -> dict[str, object]:
+    return {
+        "ready": True,
+        "healthy": True,
+        "model": _ACL_STATIC_KV_MODEL,
+        "backend": "acl_om",
+        "sequence_length": 1024,
+        "descriptor_validated": True,
+    }
+
+
 class ReleaseUiTests(unittest.TestCase):
+    def test_external_acl_worker_uses_real_health_with_an_injected_provider(self) -> None:
+        settings = TextChatSettings(
+            gateway_api_key="server-only-token-0123456789",
+            worker_mode="external",
+        )
+        llm = _FakeLLM()
+        probe = mock.AsyncMock(return_value=_acl_static_kv_health())
+        with mock.patch.object(web, "_worker_health", probe):
+            with TestClient(create_text_chat_app(settings, llm=llm)) as client:
+                page = client.get("/")
+                health = client.get("/health")
+                config = client.get("/api/config")
+                chat = client.post("/api/chat", json={"message": "ACL 测试", "stream": False})
+                switch = client.post("/api/select-model", json={"profile": _ACL_STATIC_KV_MODEL})
+
+        self.assertEqual(settings.worker_health_url, "http://127.0.0.1:8084/health")
+        self.assertIn("budgets.includes(fallback)", page.text)
+        self.assertEqual(health.json()["status"], "ok")
+        self.assertTrue(health.json()["worker"]["healthy"])
+        self.assertFalse(config.json()["model_switching"])
+        self.assertEqual(config.json()["active_profile"], _ACL_STATIC_KV_MODEL)
+        self.assertEqual(config.json()["profiles"][0]["default_max_tokens"], 16)
+        self.assertEqual(config.json()["profiles"][0]["max_tokens"], 80)
+        self.assertEqual(chat.status_code, 200)
+        self.assertEqual(llm.last_max_tokens, 16)
+        self.assertEqual(switch.status_code, 409)
+        self.assertEqual(switch.json()["error"]["type"], "model_switch_failed")
+        self.assertTrue(probe.await_args_list)
+        self.assertTrue(
+            all(call.args == ("http://127.0.0.1:8084/health",) for call in probe.await_args_list)
+        )
+
+    def test_external_acl_worker_does_not_treat_an_injected_provider_as_healthy(self) -> None:
+        settings = TextChatSettings(
+            gateway_api_key="server-only-token-0123456789",
+            worker_mode="external",
+        )
+        offline = mock.AsyncMock(side_effect=web.ModelSwitchError("ACL worker offline"))
+        with mock.patch.object(web, "_worker_health", offline):
+            with TestClient(create_text_chat_app(settings, llm=_FakeLLM())) as client:
+                health = client.get("/health")
+                chat = client.post("/api/chat", json={"message": "ACL 离线", "stream": False})
+
+        self.assertEqual(health.json()["status"], "degraded")
+        self.assertFalse(health.json()["worker"]["healthy"])
+        self.assertEqual(chat.status_code, 503)
+        self.assertEqual(chat.json()["error"]["type"], "worker_unavailable")
+        self.assertTrue(offline.await_args_list)
+
+    def test_external_acl_worker_requires_explicit_healthy_true(self) -> None:
+        settings = TextChatSettings(
+            gateway_api_key="server-only-token-0123456789",
+            worker_mode="external",
+        )
+        unhealthy = dict(_acl_static_kv_health())
+        unhealthy["healthy"] = False
+        probe = mock.AsyncMock(return_value=unhealthy)
+        with mock.patch.object(web, "_worker_health", probe):
+            with TestClient(create_text_chat_app(settings, llm=_FakeLLM())) as client:
+                health = client.get("/health")
+        self.assertEqual(health.json()["status"], "degraded")
+        self.assertFalse(health.json()["worker"]["healthy"])
+
+    def test_ui_health_and_chat_reflect_missing_worker(self) -> None:
+        settings = TextChatSettings(gateway_api_key="server-only-token-0123456789")
+        offline = mock.AsyncMock(side_effect=web.ModelSwitchError("worker offline"))
+        with mock.patch.object(web, "_worker_health", offline):
+            with TestClient(create_text_chat_app(settings)) as client:
+                health = client.get("/health")
+                config = client.get("/api/config")
+                chat = client.post("/api/chat", json={"message": "测试", "stream": False})
+        self.assertEqual(health.status_code, 200)
+        self.assertEqual(health.json()["status"], "degraded")
+        self.assertFalse(health.json()["worker"]["healthy"])
+        self.assertFalse(config.json()["worker"]["healthy"])
+        self.assertEqual(chat.status_code, 503)
+        self.assertEqual(chat.json()["error"]["type"], "worker_unavailable")
+
     def test_model_switch_waits_for_streaming_cleanup_lock(self) -> None:
         async def exercise() -> None:
             lock = asyncio.Lock()

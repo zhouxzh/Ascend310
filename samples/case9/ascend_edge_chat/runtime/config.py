@@ -23,8 +23,24 @@ except ImportError:  # pragma: no cover - surfaced as a normal dependency error
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_PREFIX = "ASCEND_EDGE_CHAT_"
 _LOOPBACK_UPSTREAM_HOSTS = {"localhost", "127.0.0.1", "::1"}
-_RELEASE_WORKER_MODEL = "ascend-edge-chat-worker"
+BACKEND_MINDSPORE = "mindspore"
+BACKEND_ACL_STATIC_KV = "acl-static-kv"
+MINDSPORE_UPSTREAM_MODEL = "ascend-edge-chat-worker"
+ACL_STATIC_KV_UPSTREAM_MODEL = "qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om"
 _RELEASE_TIMEOUT_SECONDS = 300.0
+
+_BACKEND_CONTRACTS = {
+    BACKEND_MINDSPORE: {
+        "upstream_model": MINDSPORE_UPSTREAM_MODEL,
+        "port": 8090,
+        "context_tokens": 1024,
+    },
+    BACKEND_ACL_STATIC_KV: {
+        "upstream_model": ACL_STATIC_KV_UPSTREAM_MODEL,
+        "port": 8084,
+        "context_tokens": 1024,
+    },
+}
 
 
 class ConfigurationError(ValueError):
@@ -99,8 +115,24 @@ def _boolean(environ: Mapping[str, str], name: str, default: bool) -> bool:
     raise ConfigurationError(f"{ENV_PREFIX}{name} must be true or false")
 
 
-def _upstream_base_url(environ: Mapping[str, str]) -> str:
-    value = _required(environ, "UPSTREAM_BASE_URL").rstrip("/")
+def _backend(environ: Mapping[str, str]) -> str:
+    value = environ.get("BACKEND", BACKEND_MINDSPORE).strip().lower()
+    if value not in _BACKEND_CONTRACTS:
+        raise ConfigurationError(
+            "ASCEND_EDGE_CHAT_BACKEND must be mindspore or acl-static-kv"
+        )
+    return value
+
+
+def _validate_upstream_base_url(value: str, backend: str) -> str:
+    """Validate the immutable loopback endpoint selected by one backend."""
+
+    contract = _BACKEND_CONTRACTS.get(backend)
+    if contract is None:
+        raise ConfigurationError(
+            "ASCEND_EDGE_CHAT_BACKEND must be mindspore or acl-static-kv"
+        )
+    value = value.strip().rstrip("/")
     try:
         parsed = urlparse(value)
     except ValueError as exc:
@@ -126,14 +158,34 @@ def _upstream_base_url(environ: Mapping[str, str]) -> str:
     if port is not None and not 1 <= port <= 65535:
         raise ConfigurationError("ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL port must be between 1 and 65535")
 
-    # The release gateway is deliberately local-only. It must never become a
-    # relay to a cloud or LAN inference endpoint through an environment edit.
+    # The gateway must never become a cloud/LAN relay through an environment
+    # edit, and no backend may be pointed at the other backend's worker port.
     normalized_hostname = hostname.lower().strip("[]")
     if normalized_hostname not in _LOOPBACK_UPSTREAM_HOSTS:
         raise ConfigurationError(
             "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL must point to the loopback worker"
         )
+    acl_static_kv_port = int(_BACKEND_CONTRACTS[BACKEND_ACL_STATIC_KV]["port"])
+    if backend == BACKEND_ACL_STATIC_KV and port != acl_static_kv_port:
+        raise ConfigurationError(
+            "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL for acl-static-kv must use loopback port %d"
+            % acl_static_kv_port
+        )
+    if backend == BACKEND_MINDSPORE and port == acl_static_kv_port:
+        raise ConfigurationError(
+            "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL port 8084 is reserved for acl-static-kv"
+        )
+    if backend == BACKEND_ACL_STATIC_KV and (
+        parsed.scheme != "http" or parsed.path.rstrip("/") != "/v1"
+    ):
+        raise ConfigurationError(
+            "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL for acl-static-kv must be an http loopback /v1 URL"
+        )
     return value
+
+
+def _upstream_base_url(environ: Mapping[str, str], backend: str) -> str:
+    return _validate_upstream_base_url(_required(environ, "UPSTREAM_BASE_URL"), backend)
 
 
 @dataclass(frozen=True)
@@ -156,7 +208,26 @@ class Settings:
     stream_max_seconds: float
     stream_max_bytes: int
     log_level: str
+    backend: str = BACKEND_MINDSPORE
+    upstream_context_tokens: int = 1024
     stream_write_timeout_seconds: float = 30.0
+
+    def __post_init__(self) -> None:
+        contract = _BACKEND_CONTRACTS.get(self.backend)
+        if contract is None:
+            raise ConfigurationError(
+                "ASCEND_EDGE_CHAT_BACKEND must be mindspore or acl-static-kv"
+            )
+        if self.upstream_model != contract["upstream_model"]:
+            raise ConfigurationError(
+                "ASCEND_EDGE_CHAT_UPSTREAM_MODEL does not match backend %s" % self.backend
+            )
+        if self.upstream_context_tokens != contract["context_tokens"]:
+            raise ConfigurationError(
+                "ASCEND_EDGE_CHAT_UPSTREAM_CONTEXT_TOKENS does not match backend %s"
+                % self.backend
+            )
+        _validate_upstream_base_url(self.upstream_base_url, self.backend)
 
     @classmethod
     def from_environ(
@@ -168,10 +239,12 @@ class Settings:
         if log_level not in {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"}:
             raise ConfigurationError("ASCEND_EDGE_CHAT_LOG_LEVEL must be a standard Python log level")
 
-        upstream_model = values.get("UPSTREAM_MODEL", _RELEASE_WORKER_MODEL).strip()
-        if upstream_model != _RELEASE_WORKER_MODEL:
+        backend = _backend(values)
+        contract = _BACKEND_CONTRACTS[backend]
+        upstream_model = values.get("UPSTREAM_MODEL", str(contract["upstream_model"])).strip()
+        if upstream_model != contract["upstream_model"]:
             raise ConfigurationError(
-                "ASCEND_EDGE_CHAT_UPSTREAM_MODEL must be ascend-edge-chat-worker"
+                "ASCEND_EDGE_CHAT_UPSTREAM_MODEL does not match backend %s" % backend
             )
         if "RAG_ENABLED" in values or "RAG_DOCUMENTS_DIR" in values:
             raise ConfigurationError(
@@ -180,7 +253,7 @@ class Settings:
         return cls(
             gateway_api_key=_gateway_secret(values),
             public_model_id="ascend-edge-chat",
-            upstream_base_url=_upstream_base_url(values),
+            upstream_base_url=_upstream_base_url(values, backend),
             upstream_api_key=values.get("UPSTREAM_API_KEY", "").strip(),
             upstream_model=upstream_model,
             upstream_timeout_seconds=_decimal(
@@ -205,6 +278,8 @@ class Settings:
                 values, "STREAM_MAX_SECONDS", _RELEASE_TIMEOUT_SECONDS, 1.0
             ),
             stream_max_bytes=_integer(values, "STREAM_MAX_BYTES", 2_097_152, 1024),
+            backend=backend,
+            upstream_context_tokens=int(contract["context_tokens"]),
             stream_write_timeout_seconds=_decimal(
                 values, "STREAM_WRITE_TIMEOUT_SECONDS", 30.0, 0.1
             ),

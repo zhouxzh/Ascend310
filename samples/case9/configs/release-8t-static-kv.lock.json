@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "project": "Ascend Edge Chat",
+  "profile": "qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om",
+  "release_status": "formal-machine",
+  "license": "Apache-2.0",
+  "license_url": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/blob/7ae557604adf67be50417f59c2c2f167def9a775/LICENSE",
+  "source": {
+    "repository": "zhouxzh/ascend310b-llm-om-zoo",
+    "revision": "0f516070e1c0566e3c652d43c488cd3cfbad89a3",
+    "mirror": "https://hf-mirror.com"
+  },
+  "base_model": {
+    "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "7ae557604adf67be50417f59c2c2f167def9a775"
+  },
+  "target": {
+    "soc": "Ascend310B4",
+    "tier": "8T",
+    "cann": "8.0.0",
+    "python": "3.9.25"
+  },
+  "artifacts": [
+    {
+      "name": "onnx",
+      "source_path": "models/qwen2.5-0.5b-instruct-static-kv-1024/common/qwen25-static-kv-1024-v2.onnx",
+      "destination": "common/qwen25-static-kv-1024-v2.onnx",
+      "bytes": 1261082122,
+      "sha256": "b4870df5da9c8cbef4163ceb65d4dc13433f2fd8ed5d2083ef3223d07d1a3c0e"
+    },
+    {
+      "name": "tokenizer",
+      "source_path": "models/qwen2.5-0.5b-instruct-static-kv-1024/common/tokenizer.json",
+      "destination": "common/tokenizer.json",
+      "bytes": 7031645,
+      "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"
+    },
+    {
+      "name": "tokenizer-config",
+      "source_path": "models/qwen2.5-0.5b-instruct-static-kv-1024/common/tokenizer_config.json",
+      "destination": "common/tokenizer_config.json",
+      "bytes": 7305,
+      "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583"
+    },
+    {
+      "name": "license",
+      "source_path": "licenses/qwen/LICENSE",
+      "destination": "licenses/qwen-LICENSE",
+      "bytes": 11343,
+      "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e"
+    },
+    {
+      "name": "controller-contract",
+      "source_path": "models/qwen2.5-0.5b-instruct-static-kv-1024/common/qwen25-static-kv-1024-fp32-contract.json",
+      "destination": "contracts/qwen25-static-kv-1024-v2-controller-contract.json",
+      "bytes": 34912,
+      "sha256": "fcc423f24fdf36c5d364ad7bd535943fb0c8545ab546a5724ab0261330639498"
+    },
+    {
+      "name": "b4-om",
+      "source_path": "models/qwen2.5-0.5b-instruct-static-kv-1024/ascend310b4-cann8.0/qwen25-static-kv-1024-v2.om",
+      "destination": "Ascend310B4/qwen25-static-kv-1024-v2.om",
+      "bytes": 1266010586,
+      "sha256": "f6650e52ff3908288763ef7957832ade606b0e554fa8fde986932f1ca1140eb8"
+    },
+    {
+      "name": "b4-descriptor-contract",
+      "source_path": "models/qwen2.5-0.5b-instruct-static-kv-1024/ascend310b4-cann8.0/qwen25-static-kv-1024-v2-om-contract.json",
+      "destination": "Ascend310B4/qwen25-static-kv-1024-v2-om-contract.json",
+      "bytes": 32172,
+      "sha256": "923255c717165a2529e15563f2acd5cb1e31b67769e2a4afa4d3233053e310b6"
+    },
+    {
+      "name": "tokenizer-lock",
+      "source_path": "models/qwen2.5-0.5b-instruct-static-kv-1024/common/tokenizer.json.lock.json",
+      "destination": "upstream/common/tokenizer.json.lock.json",
+      "bytes": 258,
+      "sha256": "02643b3266f05fe36f5067f0142d0a6f2346bc13722702c901b9d8550f779aab"
+    },
+    {
+      "name": "b4-om-upstream-lock",
+      "source_path": "models/qwen2.5-0.5b-instruct-static-kv-1024/ascend310b4-cann8.0/qwen25-static-kv-1024-v2.om.lock.json",
+      "destination": "upstream/Ascend310B4/qwen25-static-kv-1024-v2.om.lock.json",
+      "bytes": 1421,
+      "sha256": "7d6b35de8261ce3e5f077a6d6d3b6e19df43a2fba2470a2ef30c0d217a8c2770"
+    }
+  ]
+}

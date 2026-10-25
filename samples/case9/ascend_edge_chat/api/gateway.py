@@ -27,24 +27,39 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..runtime.config import ConfigurationError, Settings, load_settings
+from ..runtime.config import (
+    ACL_STATIC_KV_UPSTREAM_MODEL,
+    BACKEND_ACL_STATIC_KV,
+    MINDSPORE_UPSTREAM_MODEL,
+    ConfigurationError,
+    Settings,
+    load_settings,
+)
 from ..version import __version__
 from .upstream import CompletionStream, OpenAICompatibleUpstream, UpstreamClient, UpstreamError
 
 
 LOGGER = logging.getLogger("ascend_edge_chat.gateway")
 _MAX_SINGLE_MESSAGE_CHARACTERS = 16_000
-_RELEASE_UPSTREAM_MODEL = "ascend-edge-chat-worker"
 _RELEASE_DEFAULT_MAX_TOKENS = 128
 _RELEASE_MAX_TOKENS = 256
 _RELEASE_MAX_INPUT_CHARACTERS = 4000
+_ACL_STATIC_KV_DEFAULT_MAX_TOKENS = 16
+_ACL_STATIC_KV_MAX_TOKENS = 80
+_ACL_STATIC_KV_MAX_INPUT_CHARACTERS = 4000
 
 _FIXED_CONTEXT_UPSTREAM_LIMITS = {
-    _RELEASE_UPSTREAM_MODEL: {
+    MINDSPORE_UPSTREAM_MODEL: {
         "label": "Ascend Edge Chat MindSpore worker",
         "default_max_tokens": _RELEASE_DEFAULT_MAX_TOKENS,
         "max_tokens": _RELEASE_MAX_TOKENS,
         "max_input_characters": _RELEASE_MAX_INPUT_CHARACTERS,
+    },
+    ACL_STATIC_KV_UPSTREAM_MODEL: {
+        "label": "Ascend Edge Chat ACL static-KV worker",
+        "default_max_tokens": _ACL_STATIC_KV_DEFAULT_MAX_TOKENS,
+        "max_tokens": _ACL_STATIC_KV_MAX_TOKENS,
+        "max_input_characters": _ACL_STATIC_KV_MAX_INPUT_CHARACTERS,
     },
 }
 
@@ -774,9 +789,11 @@ async def _stream_bytes(
 
 
 def _active_public_model_id(settings: Settings) -> Optional[str]:
-    """Return the public model id for the fixed release worker."""
+    """Return the stable public model id for either admitted loopback backend."""
 
-    if settings.upstream_model == _RELEASE_UPSTREAM_MODEL:
+    if settings.backend == BACKEND_ACL_STATIC_KV:
+        return settings.public_model_id
+    if settings.upstream_model == MINDSPORE_UPSTREAM_MODEL:
         return settings.public_model_id
     return None
 

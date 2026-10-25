@@ -7,16 +7,17 @@ cd "${root_dir}"
 conda_profile="${ASCEND_EDGE_CHAT_CONDA_PROFILE:-/usr/local/miniconda3/etc/profile.d/conda.sh}"
 conda_env="${ASCEND_EDGE_CHAT_CONDA_ENV:?set ASCEND_EDGE_CHAT_CONDA_ENV to the validated MindSpore environment}"
 wheelhouse="${ASCEND_EDGE_CHAT_WHEELHOUSE:?set ASCEND_EDGE_CHAT_WHEELHOUSE to the reviewed local wheel directory}"
-requirements="${root_dir}/configs/release-service-requirements.txt"
+requirements="${ASCEND_EDGE_CHAT_REQUIREMENTS_FILE:-${root_dir}/configs/release-service-requirements.txt}"
 
 [[ -r "${conda_profile}" ]] || { echo "Conda profile not found: ${conda_profile}" >&2; exit 2; }
+[[ -f "${requirements}" && ! -L "${requirements}" ]] || { echo "Requirements file must be a regular file: ${requirements}" >&2; exit 2; }
 [[ -d "${wheelhouse}" && ! -L "${wheelhouse}" ]] || { echo "Wheelhouse must be a regular directory: ${wheelhouse}" >&2; exit 2; }
 source "${conda_profile}"
 conda activate "${conda_env}"
 export PYTHONNOUSERSITE=1
 
 python -m pip install --disable-pip-version-check --no-index --no-deps \
-  --require-hashes --find-links "${wheelhouse}" -r "${requirements}"
+  --only-binary=:all: --require-hashes --find-links "${wheelhouse}" -r "${requirements}"
 
 python - <<'PY'
 import importlib

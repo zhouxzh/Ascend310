@@ -1,8 +1,8 @@
 """Loopback-only OpenAI-compatible service for MindSpore chat profiles.
 
-The service is intentionally implemented with Python's standard library.  A
-board worker can therefore run it in the existing MindSpore base environment
-without adding another web framework or importing a Torch runtime.  Model
+The service is intentionally implemented with Python's standard library. A
+board worker therefore runs in the unified ``ascend`` environment without
+adding another web framework or importing a Torch runtime.  Model
 loading and generation are delegated to an injected provider (normally one
 created by :func:`mindspore_chat_providers.create_provider`).
 
@@ -41,7 +41,9 @@ from .mindspore_qwen import (
     ProviderError,
     create_provider,
 )
+from ..artifacts.model_store import DEFAULT_MODEL_CONFIG, RELEASE_PROFILE_ID
 from .model_profiles import quality_admission_check
+from .runtime_preflight import RuntimePreflightError, validate_runtime_lock
 
 
 LOGGER = logging.getLogger("ascend_edge_chat.mindspore_chat.service")
@@ -1644,10 +1646,23 @@ def _main(argv: Optional[Sequence[str]] = None) -> int:
         # deployment can use its local lock/manifest without falling back to
         # the controller checkout's default registry.
         registry_path = os.environ.get("ASCEND_EDGE_CHAT_MODEL_PROFILES", "").strip()
-        profiles = load_profiles(registry_path) if registry_path else load_profiles()
+        resolved_registry = (
+            os.path.realpath(registry_path)
+            if registry_path
+            else os.path.realpath(str(DEFAULT_MODEL_CONFIG))
+        )
+        profiles = load_profiles(resolved_registry)
         profile = profiles.get(args.profile)
         if profile is None:
             raise ValueError("unknown profile %r" % args.profile)
+        strict_release = (
+            os.path.realpath(str(DEFAULT_MODEL_CONFIG)) == resolved_registry
+            and args.profile == RELEASE_PROFILE_ID
+        )
+        try:
+            validate_runtime_lock(strict_target=strict_release)
+        except RuntimePreflightError as exc:
+            raise ValueError("runtime preflight failed: %s" % exc.as_json()) from exc
         status, observed_soc, reason = _profile_admission(
             profile, observed_soc=_probe_current_soc()
         )

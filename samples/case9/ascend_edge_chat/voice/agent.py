@@ -32,6 +32,7 @@ import threading
 import time
 import uuid
 import wave
+from collections import OrderedDict
 from dataclasses import dataclass, replace
 from typing import Optional
 
@@ -55,6 +56,11 @@ from .protocol import (
 
 LOGGER = logging.getLogger("ascend_edge_chat.voice_agent")
 _LOOPBACK_CLIENTS = {"127.0.0.1", "::1", "localhost", "testclient"}
+_MAX_RETAINED_TURNS = 32
+_AUTO_LISTEN_MAX_CONSECUTIVE_FAILURES = 3
+_AUTO_LISTEN_RETRY_BASE_SECONDS = 1.0
+_AUTO_LISTEN_RETRY_MAX_SECONDS = 8.0
+_AUTO_LISTEN_IDLE_SECONDS = 0.15
 
 
 class VoiceAgentError(RuntimeError):
@@ -102,7 +108,8 @@ class VoiceAgent:
         self._input_id: Optional[str] = None
         self._output_id: Optional[str] = None
         self._auto_listen = False
-        self._turns: dict[str, VoiceTurn] = {}
+        self._auto_listen_failures = 0
+        self._turns: OrderedDict[str, VoiceTurn] = OrderedDict()
         self._active_turn_id: Optional[str] = None
         self._active_task: Optional[asyncio.Task[None]] = None
         self._supervisor_task: Optional[asyncio.Task[None]] = None
@@ -159,11 +166,52 @@ class VoiceAgent:
         return AlsaAudioIO(self.settings, capture_device=capture.backend_id, playback_device=playback.backend_id)
 
     def _new_turn(self) -> VoiceTurn:
+        self._trim_turn_history()
         now = self._now_ms()
         turn = VoiceTurn(uuid.uuid4().hex, VoiceTurnState.LISTENING, now, now)
         self._turns[turn.id] = turn
         self._active_turn_id = turn.id
         return turn
+
+    def _trim_turn_history(self) -> None:
+        """Keep completed/cancelled voice transcripts in a fixed memory budget."""
+
+        while len(self._turns) >= _MAX_RETAINED_TURNS:
+            oldest_id, oldest_turn = next(iter(self._turns.items()))
+            if oldest_id == self._active_turn_id or not oldest_turn.terminal:
+                return
+            self._turns.popitem(last=False)
+
+    def _record_auto_listen_failure(self) -> Optional[float]:
+        """Back off repeated board-audio failures and eventually fail closed."""
+
+        with self._state_lock:
+            if self._mode != VoiceMode.BOARD or not self._auto_listen:
+                return None
+            self._auto_listen_failures += 1
+            failures = self._auto_listen_failures
+            if failures >= _AUTO_LISTEN_MAX_CONSECUTIVE_FAILURES:
+                self._auto_listen = False
+                LOGGER.warning(
+                    "stopped board auto-listen after %d consecutive voice-turn failures",
+                    failures,
+                )
+                return None
+        delay = min(
+            _AUTO_LISTEN_RETRY_BASE_SECONDS * (2 ** (failures - 1)),
+            _AUTO_LISTEN_RETRY_MAX_SECONDS,
+        )
+        LOGGER.warning(
+            "board auto-listen turn failed; retrying in %.1f seconds (failure %d/%d)",
+            delay,
+            failures,
+            _AUTO_LISTEN_MAX_CONSECUTIVE_FAILURES,
+        )
+        return delay
+
+    def _reset_auto_listen_failures(self) -> None:
+        with self._state_lock:
+            self._auto_listen_failures = 0
 
     def _update(self, turn: VoiceTurn, state: VoiceTurnState, error: str = "") -> None:
         if turn.terminal:
@@ -194,6 +242,7 @@ class VoiceAgent:
             if mode != VoiceMode.BOARD:
                 auto_listen = False
             self._mode, self._input_id, self._output_id, self._auto_listen = mode, input_id, output_id, auto_listen
+            self._auto_listen_failures = 0
         if mode == VoiceMode.BOARD and auto_listen:
             await self._ensure_supervisor()
         else:
@@ -224,8 +273,8 @@ class VoiceAgent:
         with self._state_lock:
             if self._active_task is not None and not self._active_task.done():
                 raise VoiceAgentError("a board-side voice turn is already active")
-            turn = self._new_turn()
             audio = self._selected_audio()
+            turn = self._new_turn()
             self._active_task = asyncio.create_task(self._run_board_turn(turn, audio), name=f"voice-turn-{turn.id}")
             return turn
 
@@ -267,16 +316,25 @@ class VoiceAgent:
     async def _run_forever(self) -> None:
         try:
             while self._mode == VoiceMode.BOARD and self._auto_listen:
+                retry_delay: Optional[float] = None
                 try:
                     turn = await self.start_board_turn()
                     task = self._active_task
                     if task is not None:
-                        with contextlib.suppress(asyncio.CancelledError):
-                            await task
+                        await task
+                    if turn.state == VoiceTurnState.FAILED:
+                        retry_delay = self._record_auto_listen_failure()
+                    else:
+                        self._reset_auto_listen_failures()
                 except VoiceAgentError:
-                    await asyncio.sleep(0.25)
-                if self._mode == VoiceMode.BOARD and self._auto_listen:
-                    await asyncio.sleep(0.15)
+                    retry_delay = self._record_auto_listen_failure()
+
+                if retry_delay is not None:
+                    await asyncio.sleep(retry_delay)
+                    continue
+                if self._mode != VoiceMode.BOARD or not self._auto_listen:
+                    return
+                await asyncio.sleep(_AUTO_LISTEN_IDLE_SECONDS)
         except asyncio.CancelledError:
             raise
 
@@ -329,7 +387,7 @@ class VoiceAgent:
 
     def status(self) -> dict[str, object]:
         active = self._turns.get(self._active_turn_id) if self._active_turn_id else None
-        latest = max(self._turns.values(), key=lambda item: item.updated_at_ms, default=None)
+        latest = next(reversed(self._turns.values()), None)
         return {"mode": self._mode.value, "enabled": self._auto_listen, "auto_listen": self._auto_listen, "ready": self.ready, "state": self._state_for().value, "active_turn": active.as_dict() if active else None, "latest_turn": latest.as_dict() if latest else None, "speech": self.speech_readiness()}
 
     def health(self) -> dict[str, object]:
@@ -397,11 +455,19 @@ def _require_loopback(request: Request) -> None:
 def create_voice_agent_app(settings: Optional[VoiceSettings] = None, *, agent: Optional[VoiceAgent] = None) -> FastAPI:
     runtime_settings = settings or VoiceSettings.from_environ()
     runtime_agent = agent or create_default_agent(runtime_settings)
-    app = FastAPI(title="Ascend Edge Chat board voice agent", version="0.1.0")
 
-    @app.on_event("shutdown")
-    async def shutdown() -> None:
-        await runtime_agent.aclose()
+    @contextlib.asynccontextmanager
+    async def lifespan(_: FastAPI):
+        try:
+            yield
+        finally:
+            await runtime_agent.aclose()
+
+    app = FastAPI(
+        title="Ascend Edge Chat board voice agent",
+        version="0.1.0",
+        lifespan=lifespan,
+    )
 
     @app.get("/health")
     async def health() -> dict[str, object]:

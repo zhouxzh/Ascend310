@@ -185,7 +185,7 @@ Before publishing a release tag, verify the package on the target board with the
 1. environment fingerprint, CANN setup, NPU visibility, and model hashes;
 2. worker NPU initialization and one-token generation;
 3. gateway authentication, `/v1/models`, JSON completion, and SSE completion;
-4. `8`, `16`, `32`, `64`, `128`, and `256` token outputs, including UTF-8, terminal reason and truncation checks;
+4. all target-admitted output budgets, including UTF-8, terminal reason and truncation checks; the 20T profile set reaches 256, while the 8T static-KV path checks 8/16/32/64 under its 80-token ceiling;
 5. ten serial requests with worker PID, RSS, file descriptors, and NPU snapshots;
 6. browser UI chat through the gateway;
 7. recorded latency and token/s parameters, including warmup and percentile method;
@@ -193,8 +193,8 @@ Before publishing a release tag, verify the package on the target board with the
 
 ## 2026-10-23 Unified Environment Acceptance
 
-The formal release acceptance was repeated on the same 20T board from the
-unified `ascend` environment: Python `3.9.25`, MindSpore `2.4.10`, MindNLP
+The technical-preview machine acceptance was repeated on the same 20T board
+from the unified `ascend` environment: Python `3.9.25`, MindSpore `2.4.10`, MindNLP
 `0.4.1`, CANN `8.0.0`, and driver `25.2.0`.
 
 | Gate | Result |
@@ -226,6 +226,75 @@ on the board at
 `run/reports/release-20261023T013704Z/acceptance.json`, 12,266 bytes, SHA-256
 `4a0c19f11af4b39f84a030a0a669c753753fa72f6c7a5ae0d4d68bd244c068e0`.
 Human Chinese semantic review remains pending.
+
+## 2026-10-25 Ascend310B4 Static-KV ACL Route
+
+An exploratory conversion run on an Orange Pi AI Pro 8T board used
+`Ascend310B4`, CANN `8.0.0`, driver `25.2.0`, and the unified Python `3.9.25`
+`ascend` environment. The Qwen2.5-0.5B static-KV ONNX was 1,261,082,122 bytes,
+SHA-256
+`b4870df5da9c8cbef4163ceb65d4dc13433f2fd8ed5d2083ef3223d07d1a3c0e`;
+the tokenizer was 7,031,645 bytes, SHA-256
+`c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539`;
+and the controller contract SHA-256 was
+`fcc423f24fdf36c5d364ad7bd535943fb0c8545ab546a5724ab0261330639498`.
+
+The first ATC attempts failed before graph compilation because the isolated
+environment lacked `decorator`, `sympy`, `scipy`, `attrs`, and `psutil`.
+After installing those ATC dependencies, the default eight CANN compile
+workers exhausted the board's 7.4 GiB host memory; `dmesg` recorded an
+out-of-memory kill of `atc.bin`. Repeating with
+`MAX_COMPILE_CORE_NUMBER=1` completed the conversion using the contract-derived
+51 inputs and `--soc_version=Ascend310B4 --precision_mode=must_keep_origin_dtype`.
+
+| Gate | Result |
+| --- | --- |
+| Native B4 OM | 1,266,010,489 bytes, SHA-256 `76396189f4d52ca34affa87d8670d32e0b8c5ea658b50d1b8bb3a36f689cb507` |
+| OM lock | schema 2, native `soc_version=Ascend310B4`, controller and runtime contract hashes verified |
+| Descriptor | 51 inputs / 49 outputs; 24 key/value pairs, shape `1x2x1024x64`, `float32` |
+| PyACL smoke | `你好！`; 30 prompt tokens / 2 completion tokens |
+| JSON API | HTTP 200; 8 completion tokens; static KV reused across serialized executions |
+| Device cache update | `false`; exercised the host-copy KV update fallback |
+
+The test service remained loopback-only on port `8084` and was stopped after
+the request. This is `observed-pass` for one converter, descriptor, PyACL,
+short-generation, and API sequence on one B4 board. It is not a performance,
+long-generation, Chinese-quality, or stability result.
+
+The conversion above is development evidence because its source bundle and
+working tree were not public. The formal release path now downloads the nine
+locked artifacts from public Hugging Face repository
+`zhouxzh/ascend310b-llm-om-zoo` at revision
+`0f516070e1c0566e3c652d43c488cd3cfbad89a3`. The base checkpoint
+`Qwen/Qwen2.5-0.5B-Instruct` was independently verified at revision
+`7ae557604adf67be50417f59c2c2f167def9a775`.
+
+The public B4 OM is 1,266,010,586 bytes, SHA-256
+`f6650e52ff3908288763ef7957832ade606b0e554fa8fde986932f1ca1140eb8`.
+A second 8T run verified all nine public artifacts and their derived schema-2
+locks, then exercised the complete fixed chain `7865 -> 7861 -> 8084`:
+unauthorized gateway access returned 401; `/v1/models` exposed only
+`ascend-edge-chat`; gateway JSON and SSE completed; the browser `/api/chat`
+completed; and a model-switch request returned 409. ACL health reported
+`ready=true`, `healthy=true`, `launch_policy=PASS`, and
+`descriptor_validated=true`. Stopping the launcher released all three ports and
+the ACL process's NPU memory.
+
+The release downloader was also run into a fresh empty data directory. It
+downloaded all nine files from the fixed HF revision, verified actual bytes and
+SHA-256 even when the mirror returned a chunked response without
+`Content-Length`, and derived both runtime locks. That verified directory then
+became the operational 8T data root.
+
+This public-artifact chain is `observed-pass` for one B4/CANN8 machine path.
+The local release candidate has `118` passing application tests, both static-KV
+reproducibility bundles pass their byte/SHA checks, and all formal 8T shell
+entry points pass `bash -n`. The formal acceptance script still requires the
+tracked release code to be at the current public GitHub `main` commit; a clean
+public-commit run, full output lengths, stability, performance percentiles, and
+human Chinese semantic review remain separate gates. The normal MindSpore
+worker path on 8T remains blocked by the HBM initialization boundary described
+below.
 
 The deterministic board voice path also completed under the unified
 environment: bundled Chinese WAV → sherpa-onnx ASR → gateway/worker LLM →
@@ -290,9 +359,9 @@ substitutes for those gates. The remaining hardware and speech gates stay
 
 - The worker serializes all requests; latency increases for concurrent users.
 - The public UI has no browser login and is suitable only for a restricted LAN.
-- Context is capped at 1024 tokens. The browser defaults to 128 output tokens and the service ceiling is 256, subject to each profile's declared ceiling. Qwen2 1.5B is currently capped at 192 by its measured 20T boundary.
+- Context is capped at 1024 tokens. The 20T MindSpore browser defaults to 128 output tokens and has a 256-token ceiling, subject to each profile's declaration; Qwen2 1.5B is capped at 192 by its measured boundary. The 8T static-KV browser defaults to 16 and caps output at 80.
 - Retrieval augmentation is not part of this release; keeping it outside the gateway preserves the fixed prompt budget.
 - The test baseline uses a shared hardware image; it is not a clean-room production certification.
-- The release does not verify Ascend310B4 / 8T. Run the full gate independently before describing that hardware as supported.
+- The release does not verify the MindSpore chat path on Ascend310B4 / 8T. Current 8T Qwen1.5-0.5B attempts on CANN 7 and CANN 8 both reached MindSpore kernel runtime initialization but failed because allocator-visible HBM fell below the runtime threshold; no token was generated. The worker now records a device-accounting HBM preflight before loading, but that check is a fail-fast diagnostic rather than evidence that the model will fit. The separate static-KV ACL route has a formal public-artifact release path recorded above; that result does not make the MindSpore release path 8T-supported or transfer the MindSpore quality/performance evidence.
 - The `SN0002 1080P USB Camera` (`2bdf:0289`) can be used for UVC video, but its UAC microphone path is incompatible with the tested Orange Pi AI Pro 20T and 8T system images; capture stops with `Input/output error` and it must not be selected as a voice input. Details and separate per-board evidence are in [Voice Modes and Board Terminal Plan](08-board-voice-terminal-plan.md#known-camera-microphone-incompatibility).
 - Historical alternative models, conversion paths, speech experiments, and device integrations are archived evidence only.

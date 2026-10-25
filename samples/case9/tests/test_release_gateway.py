@@ -21,6 +21,18 @@ class _Stream:
         return self._iterate()
 
 
+_ACL_STATIC_KV_MODEL = "qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om"
+
+
+class _AclStaticKvStream(_Stream):
+    async def _iterate(self) -> AsyncIterator[bytes]:
+        yield (
+            b'data: {"model":"qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om",'
+            b'"choices":[{"delta":{"content":"ok"}}]}\n\n'
+        )
+        yield b"data: [DONE]\n\n"
+
+
 class _Upstream:
     async def complete(self, payload, request_id):
         return {
@@ -37,13 +49,18 @@ class _Upstream:
         return None
 
 
-def _settings() -> Settings:
+def _settings(*, backend: str = "mindspore") -> Settings:
+    acl_static_kv = backend == "acl-static-kv"
     return Settings(
         gateway_api_key="gateway-token-0123456789",
         public_model_id="ascend-edge-chat",
-        upstream_base_url="http://127.0.0.1:8090/v1",
+        upstream_base_url=(
+            "http://127.0.0.1:8084/v1" if acl_static_kv else "http://127.0.0.1:8090/v1"
+        ),
         upstream_api_key="",
-        upstream_model="ascend-edge-chat-worker",
+        upstream_model=(
+            _ACL_STATIC_KV_MODEL if acl_static_kv else "ascend-edge-chat-worker"
+        ),
         upstream_timeout_seconds=30.0,
         request_max_bytes=262144,
         request_body_timeout_seconds=15.0,
@@ -55,10 +72,64 @@ def _settings() -> Settings:
         stream_max_seconds=30.0,
         stream_max_bytes=65536,
         log_level="INFO",
+        backend=backend,
     )
 
 
 class ReleaseGatewayTests(unittest.TestCase):
+    def test_acl_static_kv_maps_the_public_model_and_enforces_80_tokens(self) -> None:
+        class RecordingUpstream(_Upstream):
+            def __init__(self) -> None:
+                self.payloads = []
+
+            async def complete(self, payload, request_id):
+                self.payloads.append(payload)
+                return await super().complete(payload, request_id)
+
+        settings = _settings(backend="acl-static-kv")
+        upstream = RecordingUpstream()
+        headers = {"Authorization": "Bearer " + settings.gateway_api_key}
+        with TestClient(create_app(settings, upstream=upstream)) as client:
+            defaulted = client.post(
+                "/v1/chat/completions",
+                headers=headers,
+                json={"model": "ascend-edge-chat", "messages": [{"role": "user", "content": "你好"}]},
+            )
+            rejected = client.post(
+                "/v1/chat/completions",
+                headers=headers,
+                json={"model": "ascend-edge-chat", "max_tokens": 81, "messages": [{"role": "user", "content": "你好"}]},
+            )
+
+        self.assertEqual(defaulted.status_code, 200)
+        self.assertEqual(defaulted.json()["model"], "ascend-edge-chat")
+        self.assertEqual(upstream.payloads[-1]["model"], _ACL_STATIC_KV_MODEL)
+        self.assertEqual(upstream.payloads[-1]["max_tokens"], 16)
+        self.assertEqual(rejected.status_code, 400)
+        self.assertIn("max_tokens <= 80", rejected.json()["error"]["message"])
+
+    def test_acl_static_kv_stream_hides_the_internal_model_id(self) -> None:
+        class StaticKvUpstream(_Upstream):
+            async def stream(self, payload, request_id):
+                del payload, request_id
+                return _AclStaticKvStream()
+
+        settings = _settings(backend="acl-static-kv")
+        with TestClient(create_app(settings, upstream=StaticKvUpstream())) as client:
+            response = client.post(
+                "/v1/chat/completions",
+                headers={"Authorization": "Bearer " + settings.gateway_api_key},
+                json={
+                    "model": "ascend-edge-chat",
+                    "stream": True,
+                    "messages": [{"role": "user", "content": "你好"}],
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('"model":"ascend-edge-chat"', response.text)
+        self.assertNotIn(_ACL_STATIC_KV_MODEL, response.text)
+
     def test_models_and_completion_require_release_model(self) -> None:
         settings = _settings()
         app = create_app(settings, upstream=_Upstream())

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "purpose": "fixed release catalog for the Ascend310B4 static-KV ACL backend",
+  "models": [
+    {
+      "id": "qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om",
+      "display_name": "Qwen2.5 0.5B Static KV (8T)",
+      "runtime": "ACL/OM static KV",
+      "languages": ["zh", "en"],
+      "technical_status": "observed-pass",
+      "quality_status": "pending",
+      "text_integrity_status": "pending",
+      "selectable": false,
+      "reason": "Formal 8T release backend; the public artifact bundle and native ACL path are locked separately from the 20T MindSpore release.",
+      "technical_detail": "The fixed backend uses one prefill plus serialized decode calls against a B4/CANN8 OM. The gateway exposes only ascend-edge-chat and maps requests to the locked ACL model id.",
+      "quality_detail": "Short Chinese smoke output and clean UTF-8 passed; the full human semantic review remains separate from runtime availability.",
+      "board_results": {
+        "Ascend310B1/20T": "not-run",
+        "Ascend310B4/8T": "observed-pass"
+      },
+      "worker_registry": "configs/release-8t-static-kv.lock.json",
+      "default_max_tokens": 16,
+      "max_tokens": 80
+    }
+  ]
+}

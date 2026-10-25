@@ -12,12 +12,35 @@ from unittest.mock import patch
 from ascend_edge_chat.voice.adapters import EspeakNgSynthesizer, build_speech_adapters
 from ascend_edge_chat.voice.alsa import (
     AlsaAudioIO,
+    AudioDeviceError,
     downmix_pcm16le,
     discover_voice_devices,
     enumerate_alsa_devices,
 )
 from ascend_edge_chat.voice.config import VoiceConfigurationError, VoiceSettings
 from ascend_edge_chat.voice.vad import EnergyVad, VadSettings, VadState, pcm_rms
+
+
+class _BlockedStdout:
+    async def readexactly(self, count: int) -> bytes:
+        self.count = count
+        await asyncio.Event().wait()
+        return b""
+
+
+class _StoppedProcess:
+    def __init__(self) -> None:
+        self.returncode = None
+        self.stdout = _BlockedStdout()
+        self.stderr = None
+        self.terminated = False
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.returncode = 0
+
+    async def wait(self) -> int:
+        return 0
 
 
 class VoiceCoreTests(unittest.TestCase):
@@ -172,6 +195,35 @@ class VoiceCoreTests(unittest.TestCase):
         vad = EnergyVad()
         with self.assertRaises(ValueError):
             vad.feed(b"\x00")
+
+    def test_capture_timeout_stops_arecord(self) -> None:
+        async def exercise() -> None:
+            settings = VoiceSettings(capture_device_channels=1)
+            audio = AlsaAudioIO(
+                settings,
+                capture_device="hw:1,0",
+                playback_device="hw:2,0",
+            )
+            process = _StoppedProcess()
+
+            async def create_process(*args, **kwargs):
+                del args, kwargs
+                return process
+
+            start = asyncio.get_running_loop().time()
+            with patch("ascend_edge_chat.voice.alsa.shutil.which", return_value="/usr/bin/arecord"), patch(
+                "ascend_edge_chat.voice.alsa.asyncio.create_subprocess_exec",
+                new=create_process,
+            ):
+                with self.assertRaisesRegex(AudioDeviceError, "capture timed out"):
+                    await audio.capture_utterance(max_duration_seconds=1.0)
+
+            elapsed = asyncio.get_running_loop().time() - start
+            self.assertTrue(process.terminated)
+            self.assertEqual(process.stdout.count, settings.capture_frame_bytes)
+            self.assertLess(elapsed, 1.5)
+
+        asyncio.run(exercise())
 
 
 if __name__ == "__main__":

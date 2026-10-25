@@ -2,11 +2,11 @@
 
 ## Preconditions
 
-Use this procedure only on the validated 20T hardware class. It does not install a driver, firmware, CANN toolkit, OPP package, MindSpore, or MindNLP. First choose the existing Conda environment that contains the tested runtime.
+Use this procedure only on the validated 20T hardware class. It does not install a driver, firmware, CANN toolkit, OPP package, MindSpore, or MindNLP. The process must use the repository-wide Conda environment `ascend`; it must not fall back to `base` or user-site packages.
 
 ```bash
 cd /opt/ascend-edge-chat
-export ASCEND_EDGE_CHAT_CONDA_ENV='<validated-conda-environment>'
+export ASCEND_EDGE_CHAT_CONDA_ENV='ascend'
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate "$ASCEND_EDGE_CHAT_CONDA_ENV"
 python -m pip install --no-deps .
@@ -17,7 +17,7 @@ chmod 600 .env
 
 Edit `.env` and replace `ASCEND_EDGE_CHAT_GATEWAY_API_KEY` with a random ASCII token of at least 24 characters. Do not put the token in a browser, a client-side script, a commit, or a shell history capture.
 
-The gateway, worker, and UI launch scripts automatically source `./.env` when it is readable. Set `ASCEND_EDGE_CHAT_ENV_FILE` to use a different private environment file. The file is sourced before conda/CANN activation and must remain mode `0600`; explicit assignments in the file take precedence over same-named shell variables, so review it before starting a service.
+The gateway, worker, and UI launch scripts automatically source `./.env` when it is readable. Set `ASCEND_EDGE_CHAT_ENV_FILE` to use a different private environment file. The file is sourced before conda/CANN activation and must remain mode `0600`; explicit assignments in the file take precedence over same-named shell variables, so review it before starting a service. The browser UI has no authentication: reachable LAN clients can submit chat and, when voice mode is enabled, read sanitized voice status or request allowlisted board-audio controls. Keep port `7865` on a trusted LAN.
 
 ## Service Dependency Closure
 
@@ -36,7 +36,7 @@ The installer uses `--no-index --no-deps --require-hashes`; it neither upgrades 
 bash scripts/verify/release-preflight.sh
 ```
 
-The preflight records the active Python executable, imports `acl`, MindSpore, and MindNLP, shows `npu-smi info`, validates every locked model artifact, and parses gateway configuration. Stop here if it fails. A successful import is not a generation result; the next steps perform API verification.
+The preflight fail-closes unless the active process is the unified `ascend` environment with Python `3.9.25`, ABI `cpython-39-aarch64-linux-gnu`, `PYTHONNOUSERSITE=1`, PyACL, the locked MindSpore/MindNLP and CANN versions. It then records the active import origins, shows `npu-smi info`, validates every locked model artifact, and parses gateway configuration. Stop here if it fails. A successful import is not a generation result; the next steps perform API verification.
 
 ## Model Installation
 
@@ -44,15 +44,17 @@ For online acquisition through the configured Hugging Face mirror:
 
 ```bash
 bash scripts/import/download-model.sh
+export ASCEND_EDGE_CHAT_MODEL_SOURCE=hf
 ```
 
 For an offline source directory containing exactly the locked file names:
 
 ```bash
 bash scripts/import/import-model.sh /mnt/offline/qwen1.5-0.5b
+export ASCEND_EDGE_CHAT_MODEL_SOURCE=offline-bundle
 ```
 
-Both methods write a hidden `.part` file, check the declared byte size and SHA-256, then atomically rename it. An incomplete or mismatched file is removed; a verified existing file is retained.
+Both methods write a hidden `.part` file, check the declared byte size and SHA-256, then atomically rename it. An incomplete or mismatched file is removed; a verified existing file is retained. An offline source must additionally contain `offline-bundle.manifest.json` declaring `offline-bundle`, repository, revision, license, and every artifact's bytes/SHA-256. Offline provenance remains labelled `offline-bundle`; it is not evidence of an online Hugging Face download.
 
 ## Start and Stop
 
@@ -71,7 +73,7 @@ bash scripts/run/start-ui.sh
 
 All three commands intentionally run in the foreground. Stop the identified process with `Ctrl+C` in its own terminal. Do not kill unrelated NPU processes and do not use a broad process-name match.
 
-The worker and gateway bind only loopback. The UI binds `0.0.0.0:7865` to allow trusted-LAN access. Use a firewall or VLAN to limit access to port `7865`.
+The worker and gateway bind only loopback. The UI binds `0.0.0.0:7865` to allow trusted-LAN access. The tutorial UI intentionally has no browser login: a reachable LAN client can submit chat and, when the voice feature is enabled, read sanitized voice status or request allowlisted board-audio mode/device changes. Use a firewall or VLAN to limit access to port `7865`.
 
 ## Health Checks
 
@@ -86,7 +88,7 @@ curl -N -H "Authorization: Bearer $ASCEND_EDGE_CHAT_GATEWAY_API_KEY" \
   -d '{"model":"ascend-edge-chat","stream":true,"messages":[{"role":"user","content":"请用一句中文介绍你自己。"}],"temperature":0,"top_p":1,"max_tokens":16}'
 ```
 
-Then browse to `http://<board-ip>:7865/` and submit a short prompt. The model runs one request at a time; a second request receives a bounded busy response rather than queueing unbounded work.
+Then browse to `http://<board-ip>:7865/` and submit a short prompt. The UI health payload includes `worker.reachable`, `worker.ready`, and `worker.healthy`; HTTP reachability of `:7865` or `:7861` alone is not model readiness. The model runs one request at a time; a second request receives a bounded busy response rather than queueing unbounded work. Before loading a model, the worker also checks tier-specific `npu-smi` HBM accounting. That preflight fails early on known high-occupancy boards; passing it is a load precondition, not a guarantee that the allocator will fit every profile.
 
 ## 2026-10-18 Service Validation
 

@@ -32,17 +32,24 @@ digraph case9_system_architecture {
   browser [label="浏览器\n可信局域网", fillcolor="#E8F5E9"];
   ui [label="UI :7865\n保存密钥", fillcolor="#E3F2FD"];
   gateway [label="Gateway :7861\nBearer 鉴权"];
-  worker [label="MindSpore worker\n:8090，串行", fillcolor="#E8F5E9"];
-  model [label="模型加载\n与输出", shape=note];
-  npu [label="Ascend 310B1 / 20T", fillcolor="#FFF3E0"];
+  mindspore [label="MindSpore worker :8090\nAscend310B1 / 20T", fillcolor="#E8F5E9"];
+  acl [label="ACL static-KV :8084\nAscend310B4 / 8T", fillcolor="#FFF8E1"];
+  model_ms [label="safetensors\ntokenizer", shape=note];
+  model_acl [label="ONNX → OM\n固定 51/49 合同", shape=note];
+  npu_ms [label="Ascend 310B1 / 20T", fillcolor="#FFF3E0"];
+  npu_acl [label="Ascend 310B4 / 8T", fillcolor="#FFF3E0"];
 
   { rank=same; browser; ui; }
-  { rank=same; gateway; worker; }
-  { rank=same; model; npu; }
+  { rank=same; mindspore; acl; }
+  { rank=same; model_ms; model_acl; }
+  { rank=same; npu_ms; npu_acl; }
 
   browser -> ui [label="HTTP(S)"];
   ui -> gateway [label="回环"];
-  gateway -> worker [label="固定模型名"];
-  worker -> model;
-  model -> npu [label="NPU"];
+  gateway -> mindspore [label="20T"];
+  gateway -> acl [label="8T"];
+  mindspore -> model_ms;
+  acl -> model_acl;
+  model_ms -> npu_ms [label="NPU"];
+  model_acl -> npu_acl [label="PyACL"];
 }

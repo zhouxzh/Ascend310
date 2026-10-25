@@ -20,21 +20,23 @@ decode behavior, model training language, context budget, or output limits.
 
 ## Current Teaching Entries
 
-The browser reads `configs/tutorial-model-catalog.json`. Entries marked
-`selectable=true` have an observed technical path and can be started with the
-tutorial registry. Entries marked `blocked` or `not-run` stay visible so the
-student can distinguish an untested prerequisite from a measured failure.
+The browser reads `configs/tutorial-model-catalog.json`. It presents historical
+8T/20T evidence separately, but enables an entry only when the current SoC is
+declared by its registry, every locked artifact file exists, and the startup
+path verifies the full bytes/SHA-256 lock. Entries marked `blocked` or `not-run`
+stay visible so the student can distinguish an untested prerequisite from a
+measured failure.
 
 | Profile | Technical result | Quality result | Why the result matters |
 | --- | --- | --- | --- |
-| `qwen1.5-0.5b-chat` | 20T observed pass; 8T degraded evidence | Pending | Default baseline and the reference for the service protocol |
+| `qwen1.5-0.5b-chat` | 20T observed pass; current 8T attempts blocked at HBM/runtime initialization | Pending | Default 20T baseline; 8T does not inherit this profile |
 | `qwen1.5-1.8b-mindspore` | 20T machine gates observed pass | Pending | Larger Qwen1.5 comparison; 8T must be measured independently |
 | `qwen2-0.5b-instruct-mindspore` | 20T API, 64-token, stability and performance pass | Pending | Historical `U+FFFD` is a tokenizer/decode observation, not an NPU or semantic-quality verdict |
 | `qwen2-1.5b-instruct-mindspore` | 20T machine gates observed pass; corrected ChatML template reaches 64/128/192 token length gates | Pending | A missing tokenizer template once caused Qwen1.5-style role markers; the profile template fixes that path, while 256 tokens still fail closed |
 | `qwen2.5-0.5b-mindspore` | 20T corrected-timeout machine gates pass | Pending | The earlier context-only/30-second timeout report is a debugging lesson, not the final technical result |
 | `qwen2.5-1.5b-mindspore` | 20T low-occupancy path observed degraded | Pending | Low-occupancy API path ran; a separate high-occupancy run produced `Alloc failed` |
-| `tinyllama-1.1b-mindspore` | Short smoke on both tiers; long output degraded | Pending | English-oriented model; long output showed a text-integrity/TBE boundary that needs a separate quality run |
-| `deepseek-r1-qwen-1.5b-mindspore` | Both tiers have NPU/API evidence; slow | Pending | `<think>` can consume a short budget before the final answer; it needs a completed-response review |
+| `tinyllama-1.1b-mindspore` | 20T short smoke; current teaching registry has no independently startable 8T contract | Pending | English-oriented model; long output showed a text-integrity/TBE boundary that needs a separate quality run |
+| `deepseek-r1-qwen-1.5b-mindspore` | 20T degraded evidence; current teaching registry has no independently startable 8T contract | Pending | `<think>` can consume a short budget before the final answer; it needs a completed-response review |
 | `qwen3-0.6b-mindspore` | Blocked before loading | Not run | MindNLP 0.4.1 has no loader; no claim is made about the hardware itself |
 | `minicpm3-4b-mindspore` | Not run | Not run | Dedicated loader, artifact and memory gates remain future work |
 
@@ -60,10 +62,10 @@ ascend-edge-chat worker \
 ```
 
 Before starting, set `ASCEND_EDGE_CHAT_DATA_DIR` to the directory containing
-the selected profile's verified local cache. The launcher checks `config.json`,
-the tokenizer, and at least one weight/checkpoint file. It refuses a missing or
-partial cache and never falls back to downloading an unpinned model during
-startup.
+the selected profile's verified local cache. The launcher verifies the complete
+teaching artifact lock: every declared filename, byte count, SHA-256, repository
+and revision must match. It refuses a missing, partial or hash-mismatched cache
+and never falls back to downloading an unpinned model during startup.
 
 After the worker is ready, start the gateway and UI as usual. On the teaching
 page, select an available profile and wait for the status to return to “就绪”

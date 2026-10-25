@@ -30,9 +30,17 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from ..version import __version__
-from ..runtime.config import load_release_environment
+from ..runtime.config import (
+    ACL_STATIC_KV_UPSTREAM_MODEL,
+    load_release_environment,
+)
 from ..model_catalog import DEFAULT_CATALOG_PATH, CatalogError, catalog_by_id, load_catalog
-from ..artifacts.model_store import ArtifactError, data_root
+from ..artifacts.model_store import (
+    ArtifactError,
+    data_root,
+    tutorial_profile_artifact_specs,
+    verify_tutorial_profile_artifacts,
+)
 from ..backends.model_profiles import ProfileError, load_profiles, resolve_safe_path
 
 from .session import (
@@ -47,10 +55,18 @@ from .session import (
 LOGGER = logging.getLogger("ascend_edge_chat.ui")
 SESSION_COOKIE = "ascend_edge_chat_session"
 SECURITY_WARNING = (
-    "实验模式：文字聊天页面未启用浏览器鉴权；同一局域网内可访问此端口的主机都能发送请求和切换教学模型。"
-    "切换会清空会话；生成期间页面会暂时禁用模型选择器。"
-    "请只在可信实验网络使用。网关密钥只保留在服务端。"
+    "教程实验模式：页面未启用浏览器鉴权。可信局域网内可访问此端口的主机都能发送请求、"
+    "切换教学模型，以及在 voice-agent 就绪时选择允许的板端音频设备并开启/停止板端监听。"
+    "切换会清空会话；生成期间页面会暂时禁用模型选择器。不要把端口 7865 暴露到不可信网络；"
+    "网关密钥只保留在服务端。"
 )
+_MANAGED_WORKER_MODE = "managed"
+_EXTERNAL_WORKER_MODE = "external"
+_MANAGED_WORKER_HEALTH_URL = "http://127.0.0.1:8090/health"
+_ACL_STATIC_KV_WORKER_HEALTH_URL = "http://127.0.0.1:8084/health"
+_ACL_STATIC_KV_CONTEXT_TOKENS = 1024
+_ACL_STATIC_KV_DEFAULT_MAX_TOKENS = 16
+_ACL_STATIC_KV_MAX_TOKENS = 80
 
 
 class TextChatConfigurationError(ValueError):
@@ -265,42 +281,46 @@ def _worker_registry_path(catalog_entry: Mapping[str, Any]) -> Path:
 
 
 def _verify_switch_cache(root: Path, profile: Any) -> None:
-    """Reject missing/partial teaching artifacts before stopping the worker."""
+    """Verify immutable teaching artifacts before stopping the current worker."""
 
     try:
-        cache_dir = resolve_safe_path(profile.cache_dir, root, allow_missing=True)
-    except ProfileError as exc:
-        raise ModelSwitchError("模型缓存路径无效。") from exc
-    if not cache_dir.is_dir() or cache_dir.is_symlink():
-        raise ModelSwitchError("目标模型缓存不存在：%s" % profile.id)
-    if not (cache_dir / "config.json").is_file():
-        raise ModelSwitchError("目标模型缺少 config.json：%s" % profile.id)
-    if not any(
-        (cache_dir / name).is_file()
-        for name in ("tokenizer.json", "tokenizer.model", "sentencepiece.model")
-    ):
-        raise ModelSwitchError("目标模型缺少 tokenizer：%s" % profile.id)
-    if not any(
-        item.is_file()
-        and not item.name.startswith(".")
-        and item.name.lower().endswith((".safetensors", ".bin", ".ckpt"))
-        for item in cache_dir.iterdir()
-    ):
-        raise ModelSwitchError("目标模型缺少权重文件：%s" % profile.id)
+        verify_tutorial_profile_artifacts(root, profile)
+    except ArtifactError as exc:
+        LOGGER.info("teaching profile verification failed: profile=%s", getattr(profile, "id", "unknown"), exc_info=True)
+        raise ModelSwitchError("目标模型缓存哈希校验失败。") from exc
+
+
+def _observed_soc() -> str:
+    """Return the local 310B SoC identifier without importing MindSpore.
+
+    A teaching catalog may contain models evaluated on both 8T and 20T boards.
+    The browser must not advertise one board's evidence as an executable choice
+    on the other board.  Missing `npu-smi` is treated as unknown so local unit
+    tests can still inspect the catalog.
+    """
+
+    try:
+        from ..backends.mindspore_qwen import _probe_npu_model
+
+        raw = _probe_npu_model()
+    except Exception:
+        raw = None
+    return "Ascend" + str(raw).upper() if raw else ""
 
 
 def _catalog_with_availability(
     catalog: list[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Attach local-cache availability without treating quality as a gate."""
+    """Attach local-cache and current-SoC availability without exposing paths."""
 
     try:
         model_root = data_root()
-    except ArtifactError as exc:
+    except ArtifactError:
         return [
-            dict(item, available=False, availability_reason="模型目录不可用：%s" % exc)
+            dict(item, available=False, availability_reason="模型目录不可用，请检查板端日志。")
             for item in catalog
         ]
+    observed_soc = _observed_soc()
     result: list[dict[str, Any]] = []
     for item in catalog:
         public = dict(item)
@@ -312,23 +332,61 @@ def _catalog_with_availability(
         try:
             registry = load_profiles(_worker_registry_path(public))
             profile = registry.get(str(public["id"]))
-            _verify_switch_cache(model_root, profile)
-        except (ModelSwitchError, OSError, ProfileError) as exc:
+            if observed_soc and not profile.supports_soc(observed_soc):
+                raise ModelSwitchError("该模型没有当前板型的独立启动证据。")
+            cache_dir = resolve_safe_path(profile.cache_dir, model_root, allow_missing=True)
+            if not cache_dir.is_dir() or cache_dir.is_symlink():
+                raise ModelSwitchError("目标模型缓存不可用。")
+            missing = [
+                artifact.name
+                for artifact in tutorial_profile_artifact_specs(profile)
+                if not (cache_dir / artifact.filename).is_file()
+            ]
+            if missing:
+                raise ModelSwitchError("目标模型缓存不完整。")
+        except (ModelSwitchError, OSError, ProfileError):
+            LOGGER.info("teaching model cache is unavailable: profile=%s", public.get("id"), exc_info=True)
             public["available"] = False
-            public["availability_reason"] = str(exc)
+            public["availability_reason"] = "目标模型缓存或当前板型不可用，请检查板端日志。"
         else:
             public["available"] = True
-            public["availability_reason"] = "本机缓存完整，可由页面启动。"
+            public["availability_reason"] = "本机缓存存在；启动前会校验完整哈希。"
         result.append(public)
     return result
 
 
-async def _worker_health() -> Mapping[str, Any]:
-    """Read the loopback worker health without exposing its endpoint."""
+def _validate_worker_health_url(value: str, expected_port: int) -> str:
+    """Allow only the fixed loopback health endpoint for one worker mode."""
+
+    candidate = value.strip().rstrip("/")
+    try:
+        parsed = urlparse(candidate)
+        port = parsed.port
+    except ValueError as exc:
+        raise TextChatConfigurationError("worker_health_url has an invalid port") from exc
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or port != expected_port
+        or parsed.path.rstrip("/") != "/health"
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise TextChatConfigurationError(
+            "worker_health_url must be the loopback /health endpoint on port %d"
+            % expected_port
+        )
+    return candidate
+
+
+async def _worker_health(health_url: str = _MANAGED_WORKER_HEALTH_URL) -> Mapping[str, Any]:
+    """Read one configured loopback worker health response without exposing its URL."""
 
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            response = await client.get("http://127.0.0.1:8090/health")
+        async with httpx.AsyncClient(timeout=3.0, follow_redirects=False, trust_env=False) as client:
+            response = await client.get(health_url)
             response.raise_for_status()
             payload = response.json()
     except (httpx.HTTPError, ValueError) as exc:
@@ -541,6 +599,8 @@ class TextChatSettings:
     gateway_api_key: str = ""
     model: str = "ascend-edge-chat"
     active_profile: str = "qwen1.5-0.5b-chat"
+    worker_mode: Literal["managed", "external"] = _MANAGED_WORKER_MODE
+    worker_health_url: str = _MANAGED_WORKER_HEALTH_URL
     catalog_path: str = str(DEFAULT_CATALOG_PATH)
     # The MindSpore worker is serial and has a board-side watchdog.
     llm_timeout_seconds: float = 300.0
@@ -582,8 +642,35 @@ class TextChatSettings:
             )
         if self.model.strip() != "ascend-edge-chat":
             raise TextChatConfigurationError("model must be the fixed public model ascend-edge-chat")
-        if not self.active_profile.strip():
+        if self.worker_mode not in {_MANAGED_WORKER_MODE, _EXTERNAL_WORKER_MODE}:
+            raise TextChatConfigurationError("worker_mode must be managed or external")
+        active_profile = self.active_profile.strip()
+        if not active_profile:
             raise TextChatConfigurationError("active_profile must not be empty")
+        if self.worker_mode == _EXTERNAL_WORKER_MODE:
+            # The ACL static-KV service is a fixed external worker, not a
+            # profile that the browser can start, stop, or substitute.
+            if active_profile == "qwen1.5-0.5b-chat":
+                active_profile = ACL_STATIC_KV_UPSTREAM_MODEL
+            if active_profile != ACL_STATIC_KV_UPSTREAM_MODEL:
+                raise TextChatConfigurationError(
+                    "external worker mode requires the fixed ACL static-KV profile"
+                )
+            expected_health_port = 8084
+            health_url = (
+                _ACL_STATIC_KV_WORKER_HEALTH_URL
+                if self.worker_health_url == _MANAGED_WORKER_HEALTH_URL
+                else self.worker_health_url
+            )
+        else:
+            expected_health_port = 8090
+            health_url = self.worker_health_url
+        object.__setattr__(self, "active_profile", active_profile)
+        object.__setattr__(
+            self,
+            "worker_health_url",
+            _validate_worker_health_url(health_url, expected_health_port),
+        )
         catalog = Path(self.catalog_path).expanduser()
         if not catalog.is_absolute():
             raise TextChatConfigurationError("catalog_path must be an absolute path")
@@ -705,14 +792,32 @@ class TextChatSettings:
             raise TextChatConfigurationError(
                 "ASCEND_EDGE_CHAT_UI_GATEWAY_API_KEY must be a real ASCII token with at least 24 characters"
             )
+        worker_mode = os.environ.get(
+            "ASCEND_EDGE_CHAT_UI_WORKER_MODE", _MANAGED_WORKER_MODE
+        ).strip().lower() or _MANAGED_WORKER_MODE
+        default_health_url = (
+            _ACL_STATIC_KV_WORKER_HEALTH_URL
+            if worker_mode == _EXTERNAL_WORKER_MODE
+            else _MANAGED_WORKER_HEALTH_URL
+        )
+        default_profile = (
+            ACL_STATIC_KV_UPSTREAM_MODEL
+            if worker_mode == _EXTERNAL_WORKER_MODE
+            else "qwen1.5-0.5b-chat"
+        )
         return cls(
             host=os.environ.get("ASCEND_EDGE_CHAT_UI_HOST", "0.0.0.0").strip() or "0.0.0.0",
             port=integer("ASCEND_EDGE_CHAT_UI_PORT", 7865, 1),
             gateway_url=gateway_url,
             gateway_api_key=api_key,
             model="ascend-edge-chat",
-            active_profile=os.environ.get("ASCEND_EDGE_CHAT_PROFILE", "qwen1.5-0.5b-chat").strip()
-            or "qwen1.5-0.5b-chat",
+            active_profile=os.environ.get("ASCEND_EDGE_CHAT_PROFILE", default_profile).strip()
+            or default_profile,
+            worker_mode=worker_mode,
+            worker_health_url=os.environ.get(
+                "ASCEND_EDGE_CHAT_UI_WORKER_HEALTH_URL", default_health_url
+            ).strip()
+            or default_health_url,
             catalog_path=os.environ.get(
                 "ASCEND_EDGE_CHAT_MODEL_CATALOG", str(DEFAULT_CATALOG_PATH)
             ).strip()
@@ -1178,6 +1283,8 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         activeProfile: '',
         selectedProfile: '',
         profiles: [],
+        modelSwitching: false,
+        worker: { healthy: false, reason: '正在读取本地模型状态…' },
         voice: null,
         voiceBusy: false,
         browserCapture: null,
@@ -1214,11 +1321,20 @@ TEXT_CHAT_HTML = r"""<!doctype html>
 
       function setBusy(value) {
         state.busy = value;
-        send.disabled = value;
+        const workerUnavailable = state.worker?.healthy !== true;
+        send.disabled = value || workerUnavailable;
         clear.disabled = value;
-        input.disabled = value;
-        profileSelect.disabled = value;
+        input.disabled = value || workerUnavailable;
+        profileSelect.disabled = value || state.modelSwitching !== true;
         maxTokens.disabled = value;
+      }
+
+      function renderWorker(worker) {
+        state.worker = worker && typeof worker === 'object' ? worker : {
+          healthy: false,
+          reason: '无法读取本地模型 worker 状态。'
+        };
+        setBusy(state.busy);
       }
 
       function setVoiceState(text, kind) {
@@ -1602,9 +1718,10 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         const fallback = Math.min(maximum, Math.max(1, Number(item?.default_max_tokens) || Math.min(128, maximum)));
         const current = Number(maxTokens.value);
         const budgets = TOKEN_BUDGETS.filter((budget) => budget <= maximum);
+        if (!budgets.includes(fallback)) budgets.push(fallback);
         if (!budgets.includes(maximum)) budgets.push(maximum);
-        const selected = !resetValue && budgets.includes(current) ? current :
-          (budgets.includes(fallback) ? fallback : budgets[budgets.length - 1]);
+        budgets.sort((left, right) => left - right);
+        const selected = !resetValue && budgets.includes(current) ? current : fallback;
         maxTokens.replaceChildren();
         budgets.forEach((budget) => {
           const option = document.createElement('option');
@@ -1619,8 +1736,10 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       function requestedTokenBudget() {
         const item = selectedProfileItem();
         const maximum = Math.max(1, Number(item?.max_tokens) || 256);
+        const fallback = Math.min(maximum, Math.max(1, Number(item?.default_max_tokens) || 16));
         const value = Number(maxTokens.value);
         const budgets = TOKEN_BUDGETS.filter((budget) => budget <= maximum);
+        if (!budgets.includes(fallback)) budgets.push(fallback);
         if (!budgets.includes(maximum)) budgets.push(maximum);
         if (!budgets.includes(value)) {
           throw new Error('请选择当前模型允许的输出 token 档位。');
@@ -1806,6 +1925,10 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       }
 
       async function switchProfile() {
+        if (state.modelSwitching !== true) {
+          profileSelect.value = state.activeProfile;
+          return;
+        }
         const target = profileSelect.value;
         if (!target || target === state.activeProfile) {
           updateModelNote();
@@ -1844,6 +1967,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           state.activeProfile = payload.active_profile || target;
           state.selectedProfile = state.activeProfile;
           profileSelect.value = state.activeProfile;
+          if (payload.health) renderWorker(payload.health);
           updateTokenControl(true);
           renderHistory([]);
           setStatus('就绪', 'ok');
@@ -1855,7 +1979,6 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           setStatus('切换失败', 'error');
           modelNote.textContent = (error instanceof Error ? error.message : '模型切换失败') + ' 当前模型未改变。';
         } finally {
-          profileSelect.disabled = false;
           setBusy(false);
         }
       }
@@ -1880,16 +2003,23 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           if (!configResponse.ok || !historyResponse.ok) throw new Error('服务不可用');
           const config = await configResponse.json();
           const history = await historyResponse.json();
+          state.modelSwitching = config.model_switching === true;
+          setBusy(state.busy);
           let voice = config.voice;
           if (voiceResponse.ok) {
             try { voice = await voiceResponse.json(); } catch (_) {}
           }
           model.textContent = config.model || 'ascend-edge-chat';
           populateProfiles(config.profiles, config.active_profile);
+          renderWorker(config.worker);
           if (Number.isInteger(config.max_characters)) input.maxLength = config.max_characters;
           renderHistory(history.messages);
           renderVoice(voice);
-          setStatus('就绪', 'ok');
+          if (state.worker?.healthy === true) {
+            setStatus('就绪', 'ok');
+          } else {
+            setStatus(state.worker?.reason || '本地模型未就绪', 'warning');
+          }
         } catch (_) {
           renderVoice({ available: false, mode: 'disabled', state: 'unavailable', reason: '无法读取语音控制面。' });
           setStatus('连接失败', 'error');
@@ -1952,7 +2082,10 @@ def create_text_chat_app(
         catalog_index = catalog_by_id(Path(runtime_settings.catalog_path))
     except (CatalogError, OSError) as exc:
         raise TextChatConfigurationError("无法加载教学模型目录: %s" % exc) from exc
-    if runtime_settings.active_profile not in catalog_index:
+    if (
+        runtime_settings.worker_mode == _MANAGED_WORKER_MODE
+        and runtime_settings.active_profile not in catalog_index
+    ):
         raise TextChatConfigurationError(
             "active_profile 不在教学模型目录中: %s" % runtime_settings.active_profile
         )
@@ -1984,7 +2117,8 @@ def create_text_chat_app(
     body_read_slots: Optional[asyncio.Semaphore] = None
     request_lock: Optional[asyncio.Lock] = None
     active_profile_state = {"value": runtime_settings.active_profile}
-    managed_worker = llm is None
+    external_worker = runtime_settings.worker_mode == _EXTERNAL_WORKER_MODE
+    managed_worker = not external_worker and llm is None
 
     def _voice_disabled_payload(reason: str) -> dict[str, Any]:
         """Return a safe status when board voice is intentionally unavailable."""
@@ -2160,12 +2294,12 @@ def create_text_chat_app(
             request_lock = asyncio.Lock()
 
     async def refresh_active_profile() -> str:
-        """Synchronize UI metadata with the worker after an operator restart."""
+        """Synchronize managed worker metadata after an operator restart."""
 
         if not managed_worker:
             return str(active_profile_state["value"])
         try:
-            health = await _worker_health()
+            health = await _worker_health(runtime_settings.worker_health_url)
         except ModelSwitchError:
             return str(active_profile_state["value"])
         profile_id = health.get("profile")
@@ -2178,11 +2312,67 @@ def create_text_chat_app(
             active_profile_state["value"] = profile_id
         return str(active_profile_state["value"])
 
+    async def worker_snapshot() -> dict[str, Any]:
+        """Return real external health; injected LLMs never imply worker health."""
+
+        active_profile = str(active_profile_state["value"])
+        if not external_worker and llm is not None:
+            return {
+                "managed": False,
+                "mode": runtime_settings.worker_mode,
+                "reachable": True,
+                "ready": True,
+                "healthy": True,
+                "profile": active_profile,
+                "reason": "injected test provider",
+            }
+        health_url = runtime_settings.worker_health_url
+        try:
+            payload = await _worker_health(health_url)
+        except ModelSwitchError:
+            return {
+                "managed": managed_worker,
+                "mode": runtime_settings.worker_mode,
+                "reachable": False,
+                "ready": False,
+                "healthy": False,
+                "profile": active_profile,
+                "reason": "外部 ACL worker 未运行或启动失败。" if external_worker else "本地模型 worker 未运行或启动失败。",
+            }
+        if not external_worker:
+            ready = payload.get("ready") is True
+            healthy = payload.get("healthy") is True
+            profile = payload.get("profile") if isinstance(payload.get("profile"), str) else active_profile
+            reason = "" if ready and healthy else "本地模型 worker 未就绪。"
+        else:
+            ready = payload.get("ready") is True
+            healthy = (
+                ready
+                and payload.get("healthy") is True
+                and payload.get("model") == ACL_STATIC_KV_UPSTREAM_MODEL
+                and payload.get("backend") == "acl_om"
+                and payload.get("sequence_length") == _ACL_STATIC_KV_CONTEXT_TOKENS
+                and payload.get("descriptor_validated") is True
+            )
+            profile = ACL_STATIC_KV_UPSTREAM_MODEL
+            reason = "" if healthy else "外部 ACL static-KV worker 健康契约未满足。"
+        return {
+            "managed": managed_worker,
+            "mode": runtime_settings.worker_mode,
+            "reachable": True,
+            "ready": ready,
+            "healthy": healthy,
+            "profile": profile,
+            "reason": reason,
+        }
+
     async def switch_worker_profile(target_profile: str) -> Mapping[str, Any]:
         """Switch between validated teaching workers with rollback on failure."""
 
         await refresh_active_profile()
         current_profile = str(active_profile_state["value"])
+        if external_worker:
+            raise ModelSwitchError("ACL static-KV external worker 使用固定模型，浏览器不能切换模型。")
         if not managed_worker:
             if target_profile == current_profile:
                 return {"active_profile": current_profile, "switched": False}
@@ -2299,7 +2489,34 @@ def create_text_chat_app(
     app.state.model_catalog = catalog
     app.state.voice_agent = runtime_voice_agent
 
+    def external_catalog() -> list[dict[str, Any]]:
+        """Expose one immutable browser label for the fixed ACL worker."""
+
+        return [
+            {
+                "id": ACL_STATIC_KV_UPSTREAM_MODEL,
+                "display_name": "Qwen2.5-0.5B-Instruct ACL static-KV (fixed external worker)",
+                "runtime": "ACL/OM static KV",
+                "languages": ["zh", "en"],
+                "technical_status": "observed-pass",
+                "quality_status": "pending",
+                "text_integrity_status": "pending",
+                "selectable": False,
+                "reason": "该 backend 由 loopback ACL worker 管理，浏览器不能切换或重启模型。",
+                "board_results": {"Ascend310B4/8T": "observed-pass"},
+                "worker_registry": "configs/release-8t-static-kv.lock.json",
+                "default_max_tokens": _ACL_STATIC_KV_DEFAULT_MAX_TOKENS,
+                "max_tokens": _ACL_STATIC_KV_MAX_TOKENS,
+                "quality_detail": "",
+                "technical_detail": "",
+                "available": True,
+                "availability_reason": "由外部 worker 健康契约决定当前可用性。",
+            }
+        ]
+
     def public_catalog() -> list[dict[str, Any]]:
+        if external_worker:
+            return external_catalog()
         return _catalog_with_availability(catalog)
 
     @app.middleware("http")
@@ -2322,15 +2539,17 @@ def create_text_chat_app(
     @app.get("/healthz")
     async def health() -> dict[str, Any]:
         active_profile = await refresh_active_profile()
+        worker = await worker_snapshot()
         return {
-            "status": "ok",
+            "status": "ok" if worker["healthy"] else "degraded",
             "service": "ascend-edge-chat-ui",
             "mode": "unauthenticated-lan-experiment",
             "warning": SECURITY_WARNING,
             "gateway": runtime_settings.gateway_url,
             "model": runtime_settings.model,
             "active_profile": active_profile,
-            "model_selection": "controlled-worker-switch",
+            "worker": worker,
+            "model_selection": "external-fixed-worker" if external_worker else "controlled-worker-switch",
             "sessions": runtime_sessions.session_count,
             "voice": await voice_snapshot(include_config=False),
         }
@@ -2338,11 +2557,13 @@ def create_text_chat_app(
     @app.get("/api/config")
     async def api_config() -> dict[str, Any]:
         active_profile = await refresh_active_profile()
+        worker = await worker_snapshot()
         return {
             "model": runtime_settings.model,
             "active_profile": active_profile,
-            "model_selection": "controlled-worker-switch",
-            "model_switching": True,
+            "worker": worker,
+            "model_selection": "external-fixed-worker" if external_worker else "controlled-worker-switch",
+            "model_switching": not external_worker,
             "profiles": public_catalog(),
             "streaming": True,
             "max_messages": runtime_settings.max_messages,
@@ -2536,7 +2757,7 @@ def create_text_chat_app(
         active_profile = await refresh_active_profile()
         return {
             "active_profile": active_profile,
-            "selection": "controlled-worker-switch",
+            "selection": "external-fixed-worker" if external_worker else "controlled-worker-switch",
             "models": public_catalog(),
         }
 
@@ -2667,6 +2888,13 @@ def create_text_chat_app(
         finally:
             if body_slot_acquired:
                 body_read_slots.release()
+        worker = await worker_snapshot()
+        if worker["healthy"] is not True:
+            return _error_response(
+                "本地模型 worker 未就绪，请检查 8090 worker 日志后重试。",
+                503,
+                "worker_unavailable",
+            )
         if requested_profile is not None and requested_profile != active_profile_state["value"]:
             return _error_response(
                 "当前 worker 运行的是 %s；请先在网页模型选择器中完成切换，再发送消息。"
@@ -2674,11 +2902,15 @@ def create_text_chat_app(
                 409,
                 "model_switch_required",
             )
-        active_entry = catalog_index.get(active_profile_state["value"])
-        if active_entry is None:
-            return _error_response("当前模型不在教学目录中，拒绝发送请求。", 503)
-        profile_max_tokens = int(active_entry["max_tokens"])
-        profile_default_tokens = int(active_entry["default_max_tokens"])
+        if external_worker:
+            profile_max_tokens = _ACL_STATIC_KV_MAX_TOKENS
+            profile_default_tokens = _ACL_STATIC_KV_DEFAULT_MAX_TOKENS
+        else:
+            active_entry = catalog_index.get(active_profile_state["value"])
+            if active_entry is None:
+                return _error_response("当前模型不在教学目录中，拒绝发送请求。", 503)
+            profile_max_tokens = int(active_entry["max_tokens"])
+            profile_default_tokens = int(active_entry["default_max_tokens"])
         max_tokens = profile_default_tokens if requested_max_tokens is None else requested_max_tokens
         if max_tokens > profile_max_tokens:
             return _error_response(

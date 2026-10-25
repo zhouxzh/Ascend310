@@ -451,7 +451,11 @@ def _parse_board_targets(
         target_name = "%s[%d]" % (name, index)
         board = _object(item, target_name)
         _exact_keys(board, ("host", "soc", "tier"), target_name)
-        host = _string(board["host"], target_name + ".host", pattern=re.compile(r"^[0-9a-fA-F:.]+$"))
+        host = _string(
+            board["host"],
+            target_name + ".host",
+            pattern=re.compile(r"^(?:[0-9a-fA-F:.]+|unspecified)$"),
+        )
         soc = _string(board["soc"], target_name + ".soc", pattern=re.compile(r"^Ascend[0-9A-Za-z]+$"))
         tier = _string(board["tier"], target_name + ".tier", pattern=re.compile(r"^[0-9]+T$"))
         normalized_soc = _normalize_soc(soc)
@@ -785,7 +789,11 @@ class ChatModelProfile:
 
         board = _object(raw["board"], name + ".board")
         _exact_keys(board, ("host", "soc", "tier"), name + ".board")
-        board_host = _string(board["host"], name + ".board.host", pattern=re.compile(r"^[0-9a-fA-F:.]+$"))
+        board_host = _string(
+            board["host"],
+            name + ".board.host",
+            pattern=re.compile(r"^(?:[0-9a-fA-F:.]+|unspecified)$"),
+        )
         board_soc = _string(board["soc"], name + ".board.soc", pattern=re.compile(r"^Ascend[0-9A-Za-z]+$"))
         board_tier = _string(board["tier"], name + ".board.tier", pattern=re.compile(r"^[0-9]+T$"))
 

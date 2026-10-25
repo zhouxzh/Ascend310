@@ -4,13 +4,15 @@ import asyncio
 import io
 import unittest
 import wave
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 from ascend_edge_chat.voice.agent import VoiceAgent, create_default_agent, create_voice_agent_app
 from ascend_edge_chat.voice.adapters import UnavailableRecognizer, UnavailableSynthesizer
+from ascend_edge_chat.voice.alsa import AudioDeviceError
 from ascend_edge_chat.voice.config import VoiceSettings
-from ascend_edge_chat.voice.protocol import SynthesizedAudio, VoiceDevice, VoiceMode
+from ascend_edge_chat.voice.protocol import SynthesizedAudio, VoiceDevice, VoiceMode, VoiceTurnState
 
 
 class _Recognizer:
@@ -29,6 +31,15 @@ class _Synthesizer:
 class _Chat:
     async def complete(self, text: str) -> str:
         return "收到：" + text
+
+
+class _FailingAudio:
+    async def capture_utterance(self, *, max_duration_seconds: float) -> bytes:
+        del max_duration_seconds
+        raise AudioDeviceError("capture failed")
+
+    async def play_pcm(self, audio: SynthesizedAudio) -> None:
+        del audio
 
 
 def _wav() -> bytes:
@@ -85,6 +96,7 @@ class VoiceAgentTests(unittest.TestCase):
         self.assertEqual(config["speech"]["backend"], "sherpa-onnx")
         self.assertFalse(config["speech"]["asr_ready"])
         self.assertIn("sherpa", config["speech"]["asr_reason"].lower())
+        self.assertNotIn("C:/not-admitted", config["speech"]["asr_reason"])
 
     def test_unavailable_speech_backend_returns_controlled_error(self) -> None:
         settings = VoiceSettings(
@@ -183,6 +195,43 @@ class VoiceAgentTests(unittest.TestCase):
             )
         self.assertEqual(accepted.status_code, 200)
         self.assertEqual(rejected.status_code, 422)
+
+    def test_turn_history_evicts_old_terminal_turns(self) -> None:
+        agent = _agent()
+        latest_id = ""
+        for _ in range(36):
+            turn = agent._new_turn()
+            latest_id = turn.id
+            agent._update(turn, VoiceTurnState.COMPLETED)
+            agent._active_turn_id = None
+
+        self.assertEqual(len(agent._turns), 32)
+        self.assertIn(latest_id, agent._turns)
+        self.assertEqual(agent.status()["latest_turn"]["id"], latest_id)
+
+    def test_auto_listen_stops_after_repeated_capture_failures(self) -> None:
+        async def exercise() -> None:
+            agent = _agent()
+            agent._mode = VoiceMode.BOARD
+            agent._input_id = "input-0"
+            agent._output_id = "output-0"
+            agent._auto_listen = True
+            agent._selected_audio = lambda: _FailingAudio()  # type: ignore[method-assign]
+            with patch(
+                "ascend_edge_chat.voice.agent._AUTO_LISTEN_RETRY_BASE_SECONDS", 0.0
+            ), patch(
+                "ascend_edge_chat.voice.agent._AUTO_LISTEN_IDLE_SECONDS", 0.0
+            ):
+                await asyncio.wait_for(agent._run_forever(), timeout=1.0)
+
+            self.assertFalse(agent._auto_listen)
+            self.assertEqual(agent._auto_listen_failures, 3)
+            self.assertEqual(len(agent._turns), 3)
+            self.assertTrue(
+                all(turn.state == VoiceTurnState.FAILED for turn in agent._turns.values())
+            )
+
+        asyncio.run(exercise())
 
 
 if __name__ == "__main__":

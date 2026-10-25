@@ -12,4 +12,5 @@
 | [07-teaching-model-catalog.md](07-teaching-model-catalog.md) | Technical model selection, observed outcomes, and quality explanations |
 | [08-board-voice-terminal-plan.md](08-board-voice-terminal-plan.md) | Planned board/browser voice modes, USB audio, HTTPS, VAD, ASR/TTS boundaries, and untested acceptance gates |
 | [09-troubleshooting.md](09-troubleshooting.md) | Unified issue ledger for admission, tokenizer/template, answer quality, and USB audio failures |
+| [10-8t-static-kv-release.md](10-8t-static-kv-release.md) | Formal Ascend310B4 static-KV release, public artifact lock, lifecycle, and acceptance |
 | [archive/](archive/) | Historical experiments; not current release capabilities |

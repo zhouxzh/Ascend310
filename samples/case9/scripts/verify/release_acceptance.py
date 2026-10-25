@@ -4,14 +4,22 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 from pathlib import Path
+import platform
+import re
 import statistics
+import subprocess
+import sys
 import time
 from typing import Any, Iterable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+
+EXPECTED_SOURCE_REPOSITORY = "https://github.com/zhouxzh/Ascend310.git"
 
 PROBES = (
     "请用一句话介绍你自己。",
@@ -292,6 +300,244 @@ def _percentile(values: Iterable[float], fraction: float) -> float:
     return round(ordered[index], 3)
 
 
+def _run_command(argv: list[str], *, cwd: Path | None = None) -> dict[str, Any]:
+    """Capture a provenance command without hiding its exit status."""
+
+    try:
+        completed = subprocess.run(
+            argv,
+            cwd=str(cwd) if cwd else None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            check=False,
+            timeout=15,
+        )
+        return {"argv": argv, "returncode": completed.returncode, "output": completed.stdout}
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"argv": argv, "returncode": None, "output": str(exc)}
+
+
+def _source_provenance(root: Path) -> dict[str, Any]:
+    remote = _run_command(["git", "config", "--get", "remote.origin.url"], cwd=root)
+    commit = _run_command(["git", "rev-parse", "HEAD"], cwd=root)
+    status = _run_command(["git", "status", "--short"], cwd=root)
+    public_head = _run_command(["git", "ls-remote", "origin", "refs/heads/main"], cwd=root)
+    remote_url = str(remote.get("output", "")).strip()
+    # Never persist credentials embedded in an author-local Git remote.
+    remote_url = re.sub(r"//[^/@]+@", "//", remote_url)
+    if remote_url == "git@github.com:zhouxzh/Ascend310.git":
+        remote_url = EXPECTED_SOURCE_REPOSITORY
+    commit_value = str(commit.get("output", "")).strip()
+    status_value = str(status.get("output", ""))
+    public_match = re.match(
+        r"([0-9a-fA-F]{40})\s+refs/heads/main(?:\s|$)",
+        str(public_head.get("output", "")).strip(),
+    )
+    public_commit = public_match.group(1).lower() if public_match else None
+    return {
+        "repository": remote_url or None,
+        "commit": commit_value if re.fullmatch(r"[0-9a-fA-F]{40}", commit_value) else None,
+        "public_main_commit": public_commit,
+        "working_tree_clean": not bool(status_value.strip()) and status.get("returncode") == 0,
+        "status": status_value,
+        "commands": [remote, commit, status, public_head],
+    }
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _static_kv_model_provenance(root: Path, source_kind: str) -> dict[str, Any]:
+    """Collect the public HF artifact tuple for the 8T static-KV backend."""
+
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from ascend_edge_chat.artifacts.static_release_store import (  # noqa: PLC0415
+        DEFAULT_STATIC_RELEASE_LOCK,
+        StaticReleaseError,
+        verify_static_release_artifacts,
+    )
+
+    data_dir_raw = os.environ.get("ASCEND_EDGE_CHAT_DATA_DIR", "").strip()
+    if not data_dir_raw:
+        raise ValueError("ASCEND_EDGE_CHAT_DATA_DIR is required for acl-static-kv")
+    data_dir = Path(data_dir_raw).expanduser()
+    try:
+        verified = verify_static_release_artifacts(data_dir, lock_path=DEFAULT_STATIC_RELEASE_LOCK)
+    except StaticReleaseError as exc:
+        raise ValueError(str(exc)) from exc
+    if source_kind != "hf":
+        raise ValueError("the 8T formal static-KV release accepts source_kind=hf only")
+    return {
+        "source_kind": source_kind,
+        "repository": verified["source_repository"],
+        "revision": verified["source_revision"],
+        "base_model_repository": "Qwen/Qwen2.5-0.5B-Instruct",
+        "base_model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+        "license": "Apache-2.0",
+        "mirror": "https://hf-mirror.com",
+        "target": verified["target"],
+        "profile_status": "formal",
+        "admission_eligible": True,
+        "admission_reason": "Public artifacts, target SoC, and runtime descriptor are locked; human language-quality review remains independent.",
+        "artifacts": [
+            {
+                **item,
+                "expected_bytes": item["bytes"],
+                "observed_bytes": item["bytes"],
+                "observed_sha256": item["sha256"],
+                "verified_by": "ascend-edge-chat acl verify",
+            }
+            for item in verified["artifacts"]
+        ],
+        "runtime_locks": verified.get("runtime_locks", {}),
+        "data_directory": str(data_dir),
+    }
+
+
+def _model_provenance(root: Path, source_kind: str) -> dict[str, Any]:
+    if os.environ.get("ASCEND_EDGE_CHAT_BACKEND") == "acl-static-kv":
+        return _static_kv_model_provenance(root, source_kind)
+    config_path = root / "configs" / "release-model.json"
+    document = json.loads(config_path.read_text(encoding="utf-8"))
+    profiles = document.get("profiles") if isinstance(document, dict) else None
+    if not isinstance(profiles, list) or len(profiles) != 1 or not isinstance(profiles[0], dict):
+        raise ValueError("release model config must contain exactly one profile")
+    profile = profiles[0]
+    revision = profile.get("revision")
+    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", revision):
+        raise ValueError("release model revision must be a full 40-hex commit")
+    if source_kind not in {"hf", "offline-bundle"}:
+        raise ValueError("model source must be hf or offline-bundle")
+    data_dir_raw = os.environ.get("ASCEND_EDGE_CHAT_DATA_DIR", "").strip()
+    data_dir = Path(data_dir_raw).expanduser() if data_dir_raw else None
+    cache_dir = profile.get("cache_dir")
+    artifacts: list[dict[str, Any]] = []
+    for artifact in profile.get("artifacts", []):
+        if not isinstance(artifact, dict):
+            continue
+        filename = artifact.get("filename")
+        path = data_dir / cache_dir / filename if data_dir and isinstance(cache_dir, str) and isinstance(filename, str) else None
+        artifacts.append(
+            {
+                "name": artifact.get("name"),
+                "filename": filename,
+                "expected_bytes": artifact.get("expected_bytes"),
+                "sha256": artifact.get("sha256"),
+                "observed_bytes": path.stat().st_size if path and path.is_file() else None,
+                "observed_sha256": _sha256_file(path) if path and path.is_file() else None,
+                "verified_by": "ascend-edge-chat verify",
+            }
+        )
+    return {
+        "source_kind": source_kind,
+        "repository": profile.get("repository"),
+        "revision": revision,
+        "tokenizer_revision": profile.get("tokenizer_revision"),
+        "license": profile.get("license"),
+        "mirror": profile.get("mirror"),
+        "profile_status": profile.get("status"),
+        "admission_eligible": (
+            profile.get("admission", {}).get("eligible")
+            if isinstance(profile.get("admission"), dict)
+            else None
+        ),
+        "admission_reason": (
+            profile.get("admission", {}).get("reason")
+            if isinstance(profile.get("admission"), dict)
+            else None
+        ),
+        "artifacts": artifacts,
+        "data_directory": str(data_dir) if data_dir else None,
+    }
+
+
+def _environment_provenance() -> dict[str, Any]:
+    packages: dict[str, str | None] = {}
+    try:
+        import importlib.metadata
+
+        package_names = (
+            ("numpy", "tokenizers", "fastapi", "httpx", "pydantic", "uvicorn")
+            if os.environ.get("ASCEND_EDGE_CHAT_BACKEND") == "acl-static-kv"
+            else ("mindspore", "mindnlp", "fastapi", "httpx", "pydantic", "uvicorn")
+        )
+        for name in package_names:
+            try:
+                packages[name] = importlib.metadata.version(name)
+            except importlib.metadata.PackageNotFoundError:
+                packages[name] = None
+    except ImportError:
+        packages = {}
+    return {
+        "python": sys.version.split()[0],
+        "python_executable": sys.executable,
+        "python_abi": getattr(sys.implementation, "cache_tag", None),
+        "machine": platform.machine(),
+        "conda_env": os.environ.get("CONDA_DEFAULT_ENV"),
+        "python_no_user_site": os.environ.get("PYTHONNOUSERSITE"),
+        "packages": packages,
+        "npu_smi": _run_command(["npu-smi", "info"]),
+    }
+
+
+def _provenance(root: Path, source_kind: str) -> dict[str, Any]:
+    source = _source_provenance(root)
+    model = _model_provenance(root, source_kind)
+    environment = _environment_provenance()
+    status = "passed"
+    reasons: list[str] = []
+    if source.get("repository") != EXPECTED_SOURCE_REPOSITORY:
+        status = "blocked"
+        reasons.append("source repository is not the public locked GitHub repository")
+    if not source.get("commit"):
+        status = "blocked"
+        reasons.append("source commit is not a full 40-hex SHA")
+    if source.get("public_main_commit") != source.get("commit"):
+        status = "blocked"
+        reasons.append("source commit is not the current public main commit")
+    if not source.get("working_tree_clean"):
+        status = "blocked"
+        reasons.append("source working tree is not clean")
+    if not model.get("revision"):
+        status = "blocked"
+        reasons.append("model revision is missing")
+    # This repository is a tutorial. A technical-preview profile may complete
+    # machine acceptance while Chinese semantic review remains pending. Record
+    # that scope explicitly instead of using admission as a startup or report
+    # gate; source and artifact identity remain mandatory for reproducibility.
+    if model.get("profile_status") == "admitted" and model.get("admission_eligible") is True:
+        model["evidence_label"] = "formal-admitted"
+    elif model.get("profile_status") == "formal":
+        model["evidence_label"] = "formal-machine-release"
+    else:
+        model["evidence_label"] = "technical-preview"
+    for artifact in model.get("artifacts", []):
+        if artifact.get("observed_bytes") != artifact.get("expected_bytes"):
+            status = "blocked"
+            reasons.append("artifact byte count mismatch: %s" % artifact.get("name"))
+        if artifact.get("observed_sha256") != artifact.get("sha256"):
+            status = "blocked"
+            reasons.append("artifact SHA-256 mismatch: %s" % artifact.get("name"))
+    if model.get("source_kind") == "offline-bundle":
+        model["evidence_label"] = "offline-bundle"
+    return {
+        "status": status,
+        "reasons": reasons,
+        "source": source,
+        "model": model,
+        "environment": environment,
+        "commands": source.get("commands", []) + [environment["npu_smi"]],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="run bounded Ascend Edge Chat API acceptance")
     parser.add_argument("--gateway", default="http://127.0.0.1:7861/v1")
@@ -302,7 +548,15 @@ def main() -> int:
     parser.add_argument("--performance-samples", type=int, default=30)
     parser.add_argument("--json-interval", type=float, default=1.0)
     parser.add_argument("--sse-interval", type=float, default=2.0)
+    parser.add_argument(
+        "--model-source",
+        choices=("hf", "offline-bundle"),
+        default=os.environ.get("ASCEND_EDGE_CHAT_MODEL_SOURCE", ""),
+        help="how the locked model entered the board data directory",
+    )
     args = parser.parse_args()
+    if not args.model_source:
+        parser.error("--model-source or ASCEND_EDGE_CHAT_MODEL_SOURCE is required")
     if not 1 <= args.performance_samples <= 30:
         parser.error("--performance-samples must be between 1 and 30")
     if not 0.0 <= args.json_interval <= 10.0:
@@ -310,10 +564,20 @@ def main() -> int:
     if not 0.0 <= args.sse_interval <= 10.0:
         parser.error("--sse-interval must be between 0 and 10 seconds")
 
+    root = Path(__file__).resolve().parents[2]
+    try:
+        provenance = _provenance(root, args.model_source)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        parser.error("could not collect release provenance: %s" % exc)
+    if provenance["status"] != "passed":
+        parser.error("release provenance is blocked: %s" % "; ".join(provenance["reasons"]))
+
     url = args.gateway.rstrip("/") + "/chat/completions"
     report: dict[str, Any] = {
         "model": "ascend-edge-chat",
+        "backend": os.environ.get("ASCEND_EDGE_CHAT_BACKEND", "mindspore"),
         "gateway": args.gateway,
+        "provenance": provenance,
         "started_at_epoch": time.time(),
         "request_intervals": {
             "json_seconds": args.json_interval,
