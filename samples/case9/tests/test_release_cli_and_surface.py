@@ -61,3 +61,11 @@ class ReleaseCliAndSurfaceTests(unittest.TestCase):
         self.assertIn("--model-source", client)
         self.assertIn("working_tree_clean", client)
         self.assertIn("offline-bundle", client)
+
+    def test_static_acceptance_passes_token_and_model_source_with_equals(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "scripts" / "verify" / "run-release-8t-acceptance.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('--token="${ASCEND_EDGE_CHAT_GATEWAY_API_KEY}"', script)
+        self.assertIn('--model-source="${ASCEND_EDGE_CHAT_MODEL_SOURCE}"', script)

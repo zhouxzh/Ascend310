@@ -105,8 +105,8 @@ source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate "${ASCEND_EDGE_CHAT_CONDA_ENV:-ascend}"
 export PYTHONNOUSERSITE=1
 python scripts/verify/release_acceptance.py \
-  --token "${ASCEND_EDGE_CHAT_GATEWAY_API_KEY}" \
-  --model-source "${ASCEND_EDGE_CHAT_MODEL_SOURCE}" \
+  --token="${ASCEND_EDGE_CHAT_GATEWAY_API_KEY}" \
+  --model-source="${ASCEND_EDGE_CHAT_MODEL_SOURCE}" \
   --output "${run_dir}/acceptance.json" \
   >"${run_dir}/acceptance-path.log" 2>&1
 capture_processes after
