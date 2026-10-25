@@ -10,6 +10,7 @@ All notable changes to Ascend Edge Chat are recorded here.
 - Added fixed `:8084 -> :7861 -> :7865` lifecycle and acceptance entry points for the 8T backend.
 - Kept the MindSpore static-KV requirement boundary unchanged: the main MindSpore route does not require OM conversion.
 - The 8T backend exposes only `ascend-edge-chat`, defaults to 16 output tokens, and caps output at 80.
+- The public-source 8T acceptance passed with nine locked HF artifacts, 10/10 stability requests, length checks, JSON/SSE/UI contracts, and a 30-sample two-token performance set.
 
 ## v0.1.0 - 2026-10-17
 

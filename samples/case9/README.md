@@ -85,6 +85,15 @@ and SSE results, descriptor checks, and machine latency. It is intentionally
 slower than the MindSpore path because the static graph executes one token per
 ACL invocation.
 
+The acceptance at public source commit
+`c11c96eb625403a2e160792c6428f2eaa341018b` returned
+`machine_status=passed`. All nine HF artifacts, gateway/UI, JSON/SSE, output
+budgets 8/16/32/64, 10/10 stability requests, and 10 Chinese machine probes
+passed. Across 30 two-token SSE samples, first-token latency was
+`10623.506 ms` p50 / `10656.206 ms` p95, total latency was `10755.880 ms` p50 /
+`10786.937 ms` p95, and throughput was `0.186 token/s`. Human Chinese semantic
+quality remains pending.
+
 ## Current 20T validation
 
 On `2026-10-18`, the running teaching profile `qwen2-0.5b-instruct-mindspore` was exercised through the browser route `:7865 -> :7861 -> :8090` on an `Ascend310B1 / 20T` board. Gateway and UI contracts, JSON, SSE, 8/16/32/64-token length checks, 10 short stability requests, and 10 Chinese probes completed. The preserved dated acceptance report remains on the board as ignored evidence; it is not a checked-in artifact. One performance sample measured 723.051 ms first token, 1370.604 ms completion, and 1.459 token/s. This is a single-sample observation, not a p50 benchmark.

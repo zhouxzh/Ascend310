@@ -412,24 +412,31 @@ Too many request bodies are being read
 | SoC / 档位 | `Ascend310B4` / 8T |
 | CANN / 驱动 | 8.0.0 / 25.2.0 |
 | Python | 3.9.25，统一 `ascend` 环境，user-site 禁用 |
+| 公开源码 commit | `c11c96eb625403a2e160792c6428f2eaa341018b`，干净工作树且等于当时公开 `main` |
 | ONNX | 1,261,082,122 bytes；SHA-256 `b4870d…a3c0e` |
 | tokenizer | 7,031,645 bytes；SHA-256 `c03821…e87539` |
 | B4 OM | 1,266,010,586 bytes；SHA-256 `f6650e…40eb8` |
 | descriptor | 51 输入 / 49 输出，24 层 split KV，形状 `1×2×1024×64` |
 | 运行时锁 | schema 2，绑定 B4、OM、tokenizer、controller contract 和 runtime contract |
 | ACL health | `ready=true`、`healthy=true`、`launch_policy=PASS`、`descriptor_validated=true` |
-| gateway | `/v1/models` 仅返回 `ascend-edge-chat`；无 Bearer 返回 401 |
-| JSON | 4-token 请求 HTTP 200，公开模型名正确 |
-| SSE | 2-token 增量与终止事件完整 |
-| UI | `/api/config` 报告外部固定 worker；真实 `/api/chat` HTTP 200 |
+| gateway | `/v1/models` 仅返回 `ascend-edge-chat`；无 Bearer 401，错误模型 404 |
+| JSON / SSE / UI | 正式契约均通过；SSE 公开模型名、增量、终止和 usage 完整 |
+| 长度门 | 8/16 token 返回 `length`；32/64 token 在 24 token 后自然 `stop` |
+| 稳定性 | 10/10 个短请求返回“测试通过” |
+| 中文探针 | 10/10 完成机器链路；语义质量仍待人工审核 |
+| 性能 | 30 个 2-token SSE 样本：首 token p50/p95 `10623.506/10656.206 ms`，总耗时 p50/p95 `10755.880/10786.937 ms`，`0.186 token/s` |
 | 模型切换 | 请求其他 profile 返回 409，固定 ACL backend 不允许网页切换 |
-| 资源释放 | 停止 launcher 后 `8084/7861/7865` 均无监听，NPU 显存回落 |
+| 资源释放 | 手动清理记录 PID 后 `8084/7861/7865` 均无监听，NPU 显存回落 |
 
 公开 HF 工件中的 B4 OM 可直接用于本次锁定的 CANN 8.0 运行环境。此前在另一台 B4 上从 ONNX 重新 ATC 得到的 OM SHA-256 为 `763961…cb507`，与本轮公开 OM `f6650e…40eb8` 不同；两者不能互相替代。正式路径固定公开 OM 哈希，重新转换的结果必须建立新的锁并用目标板完整验收。
 
 ![8T 版 Ascend Edge Chat 固定 ACL 后端页面](img9/case9-board-8t-ui.png)
 
-**证据等级**：公开 HF 工件完整性、schema-2 锁、ACL 加载、descriptor、单次 JSON/SSE、UI 固定 worker 和停止清理为 `observed-pass`（8T）。完整长度门、稳定性、性能 p50/p95 和人工中文语义质量必须由正式 8T 验收脚本重新产生；不能继承 20T 的结果。
+正式验收报告为 `machine_status=passed`，JSON 的 SHA-256 是
+`6e47b32c5b2b7006ad9ad9e8669d4472396d6a1be49d04fdf395594167df342d`。
+由于外部命令执行器在 600 秒断开，脚本自带 cleanup trap 未收到完整退出流程；操作者按记录 PID 手动停止三个服务并验证端口、ACL 进程和 NPU 显存均已释放。报告本身在断开前已经写完。
+
+**证据等级**：公开源码/HF 来源、schema-2 锁、ACL 与 descriptor、gateway/UI、JSON/SSE、长度、10 次稳定性、10 条中文机器探针和 30 样本性能为 `observed-pass`（8T formal machine）。人工中文语义质量、并发和长期稳定性仍需独立评审；不能继承 20T 的结果。性能很低是每次 ACL 执行只生成一个 token 的静态图特性，不是 API 中转或普通网络延迟。
 
 ### 2026-10-17 历史记录
 

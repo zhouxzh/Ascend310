@@ -201,20 +201,20 @@ bash scripts/run/run-release-8t.sh
 
 ---
 
-## 2026-10-25 的 8T 发布链
+## 2026-10-25 的 8T 正式验收
 
 | 项目 | 实测 |
 | --- | --- |
-| 硬件 / 软件 | Ascend310B4 / 8T；CANN 8.0.0 |
-| 公开工件 | HF revision `0f516070…`；九项 bytes/SHA 通过 |
-| 运行时 | Python 3.9.25、ACL、schema-2 B4 OM lock |
-| 模型合同 | 51 输入 / 49 输出；48 个 split KV |
-| 链路 | `7865 -> 7861 -> 8084` |
+| 硬件 / 软件 | Ascend310B4 / 8T；CANN 8.0.0；Python 3.9.25 |
+| 公开来源 | Git commit `c11c96e…` 干净且等于 public main；HF 九项 bytes/SHA 通过 |
+| 运行时 / 合同 | ACL、schema-2 lock、51 输入 / 49 输出、48 split KV |
 | 健康门 | ready、healthy、descriptor、launch policy 全部通过 |
 | API | Bearer 拒绝、JSON、SSE、UI chat 通过 |
-| 固定后端 | 模型切换返回 409；停止后端口与 NPU 显存释放 |
+| 长度 / 稳定性 | 8/16 `length`；32/64 自然 `stop`（24）；10/10 短请求通过 |
+| 性能 | 30 个 2-token 样本：首 token p50 `10.624 s`，总耗时 p50 `10.756 s`，`0.186 token/s` |
+| 固定后端 | 模型切换 409；清理后端口关闭，NPU 显存回落 |
 
-这页是单板短请求机器证据；完整长度、稳定性、性能 p50/p95 和人工中文质量仍未继承。
+`machine_status=passed`。性能慢来自静态图每 token 一次 ACL 执行，不是 DeepSeek/API 中转；人工中文质量仍待评审。
 
 <div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 8T 发布链验收</div>
 
@@ -232,7 +232,7 @@ bash scripts/run/run-release-8t.sh
 - 直接中文提问曾返回英文道歉句：机器路径完成，中文语义质量不通过该次期望
 - 质量状态必须经过固定提示、完整响应和人工评审，不能由“页面有回复”替代
 
-> 结论：两条技术短链均 `observed-pass`；中文质量、长稳 p50/p95、并发和跨目标继承仍未完成。
+> 结论：20T MindSpore 与 8T ACL 机器门均通过；中文质量、并发和跨目标继承仍不能替代。
 
 <div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 长度、完整性与质量</div>
 

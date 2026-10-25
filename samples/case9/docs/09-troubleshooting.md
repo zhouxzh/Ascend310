@@ -32,6 +32,8 @@
 | `CHATBOT-ISS-20261025-03` | `resolved` | `major` | 2026-10-25 | 公开 B4 OM 仍是 schema-1 lock，严格 runtime 拒绝加载 | 保留公开 lock，并生成 data-dir 内 schema-2 lock |
 | `CHATBOT-ISS-20261025-04` | `resolved` | `major` | 2026-10-25 | ACL execution timeout 300 秒超过 runtime 240 秒硬上限 | 8T ACL 默认/示例统一为 240 秒，全链路启动通过 |
 | `CHATBOT-ISS-20261025-05` | `resolved` | `major` | 2026-10-25 | HF mirror 缓存重定向以 chunked 响应返回 tokenizer，下载器误报 Content-Length 缺失 | 允许无声明长度，但仍强制实际 bytes/SHA；全新目录 9/9 工件下载通过 |
+| `CHATBOT-ISS-20261025-06` | `resolved` | `major` | 2026-10-25 | 随机 Gateway token 以 `-` 开头时被 argparse 当成选项，正式验收未启动 | `--token=`/`--model-source=` 使用等号形式，参数测试通过 |
+| `CHATBOT-ISS-20261025-07` | `resolved` | `major` | 2026-10-25 | `.env` 只被 shell source 未导出，验收子进程误用 20T 模型 provenance | `set -a` 导出 `.env`；公开 8T 正式验收 `machine_status=passed` |
 
 ## CHATBOT-ISS-20261018-01：验收突发流量触发 HTTP 429
 
@@ -151,6 +153,24 @@
 - 根因：`confirmed`。HF 镜像将 tokenizer 307 重定向到缓存地址，最终响应使用 `Transfer-Encoding: chunked`，没有 `Content-Length`；下载器把“缺少声明长度”误当成“长度不一致”。
 - 修复：仅当服务端明确提供 `Content-Length` 时比较声明值；无论该头是否存在，都继续执行实际 bytes 与 SHA-256 校验，避免降低完整性门。
 - 回归：单元测试覆盖 chunked 成功、错误声明长度、坏字节和坏哈希；8T 全新数据目录从固定 HF revision 下载 9/9 工件并派生 schema-2 锁通过。
+
+## CHATBOT-ISS-20261025-06：随机 Token 被命令行解析成选项
+
+- 状态：`resolved`
+- 判定层级：`acceptance launcher / argument parsing`
+- 症状：正式验收服务已经就绪，但 `release_acceptance.py` 报 `argument --token: expected one argument`，未创建报告。
+- 根因：`confirmed`。随机生成的 URL-safe token 以 `-` 开头，空格分隔形式让它被 argparse 识别为另一个选项。
+- 修复：静态验收统一使用 `--token="${...}"` 和 `--model-source="${...}"`；随机 token 内容和长度规则不变。
+- 回归：单元测试固定检查等号形式；公开 commit 的正式验收通过。
+
+## CHATBOT-ISS-20261025-07：验收子进程没有继承 `.env`
+
+- 状态：`resolved`
+- 判定层级：`acceptance launcher / environment propagation`
+- 症状：服务链和静态 ACL 健康均通过，但 provenance 转去校验 20T `model.safetensors/tokenizer/config`，并报七项 byte/SHA mismatch。
+- 根因：`confirmed`。脚本只 `source .env`，没有 `export`；父 shell 能读取变量，但直接启动的 Python 验收进程看不到 `ASCEND_EDGE_CHAT_BACKEND=acl-static-kv` 和 data dir，退回 MindSpore 默认分支。
+- 修复：source 前后使用 `set -a` / `set +a`，把 `.env` 显式传播给验收子进程；新增 shell 合同测试。
+- 回归：从公开 commit 和全新 HF 数据目录执行完整验收，来源、九项工件、JSON/SSE、长度、稳定性、中文探针和 30 样本性能均通过，`machine_status=passed`。
 
 ## CHATBOT-ISS-20261024-03：自动语音失败资源累积
 

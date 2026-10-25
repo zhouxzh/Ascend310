@@ -175,6 +175,16 @@ The report includes:
 The static graph executes one token per ACL invocation. Its latency is expected
 to be much higher than the 20T MindSpore path and must be recorded separately.
 
+The public source commit
+`c11c96eb625403a2e160792c6428f2eaa341018b` returned
+`machine_status=passed`. The report verified clean public provenance, nine HF
+artifacts, gateway/UI, JSON/SSE, output budgets 8/16/32/64, 10/10 stability
+requests, and 10 Chinese machine probes. Thirty two-token SSE samples measured
+first-token p50/p95 `10623.506/10656.206 ms`, total p50/p95
+`10755.880/10786.937 ms`, and `0.186 token/s` at both percentiles. Human
+Chinese semantic review remains pending; the low static-graph throughput is not
+a network or API-proxy measurement.
+
 ## Failure handling
 
 | Failure | Stop condition |

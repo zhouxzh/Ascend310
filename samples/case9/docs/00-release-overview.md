@@ -32,7 +32,7 @@ The public model identifier is `ascend-edge-chat`. The selected internal worker 
 | Browser text UI | Supported formal release surface | Trusted LAN only; no browser login |
 | OpenAI JSON and SSE | Supported formal release surface | Bounded messages, greedy decoding, one request at a time |
 | MindSpore Qwen1.5-0.5B on 20T | Observed-pass machine path | Human Chinese-quality review remains pending; still testable |
-| Qwen2.5 static KV on 8T | Observed-pass machine path | Public HF artifacts, fixed 51/49 contract, output cap 80; semantic quality pending |
+| Qwen2.5 static KV on 8T | Formal machine acceptance passed | Public source/HF artifacts, fixed 51/49 contract, output cap 80; semantic quality pending |
 | Teaching Qwen2-0.5B profile | Observed-pass machine/API path on 20T | Teaching-only comparison; semantic quality pending |
 | Teaching catalog | Qwen1.5 1.8B, Qwen2/Qwen2.5, TinyLlama, DeepSeek | Selectable when technical evidence exists; quality is a separate field |
 | Cross-target inheritance | Not allowed | 8T and 20T retain separate artifacts, performance, and quality evidence |

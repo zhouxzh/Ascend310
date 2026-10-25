@@ -286,15 +286,33 @@ SHA-256 even when the mirror returned a chunked response without
 `Content-Length`, and derived both runtime locks. That verified directory then
 became the operational 8T data root.
 
-This public-artifact chain is `observed-pass` for one B4/CANN8 machine path.
+The full public-commit acceptance then returned `machine_status=passed`.
+The source was clean GitHub commit
+`c11c96eb625403a2e160792c6428f2eaa341018b`, which matched public `main`
+during the run. Provenance recorded the HF repository/revision, all nine
+artifact hashes, the schema-2 runtime locks, Python 3.9.25, B4/CANN 8.0, and
+formal-machine release status. Gateway model-name, Bearer rejection, model
+rejection, UI config/chat, JSON, SSE, 10/10 stability requests, 10 Chinese
+machine probes, and output budgets 8/16/32/64 all passed. The 32- and 64-token
+requests stopped naturally after 24 completion tokens.
+
+The performance set contains 30 two-token SSE samples. First-token latency was
+`10623.506 ms` p50 / `10656.206 ms` p95, total latency was `10755.880 ms` p50 /
+`10786.937 ms` p95, and throughput was `0.186 token/s` for both percentiles.
+This is the expected consequence of the current one-token-per-ACL-execution
+static graph and is not evidence of an API proxy or network delay. The
+acceptance JSON SHA-256 is
+`6e47b32c5b2b7006ad9ad9e8669d4472396d6a1be49d04fdf395594167df342d`;
+the board report remains ignored evidence rather than a Git artifact. The
+external 600-second command runner disconnected before the script's own cleanup
+trap, so the operator stopped the recorded PIDs manually and verified that all
+three ports closed and NPU memory fell to `4215 / 7546 MB`.
+
 The local release candidate has `120` passing application tests, both static-KV
 reproducibility bundles pass their byte/SHA checks, and all formal 8T shell
-entry points pass `bash -n`. The formal acceptance script still requires the
-tracked release code to be at the current public GitHub `main` commit; a clean
-public-commit run, full output lengths, stability, performance percentiles, and
-human Chinese semantic review remain separate gates. The normal MindSpore
-worker path on 8T remains blocked by the HBM initialization boundary described
-below.
+entry points pass `bash -n`. Human Chinese semantic review remains separate.
+The normal MindSpore worker path on 8T remains blocked by the HBM
+initialization boundary described below.
 
 The deterministic board voice path also completed under the unified
 environment: bundled Chinese WAV → sherpa-onnx ASR → gateway/worker LLM →
