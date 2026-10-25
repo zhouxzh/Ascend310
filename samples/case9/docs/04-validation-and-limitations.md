@@ -373,11 +373,81 @@ fully human-reviewed spoken voice turn. The synthetic and manual samples are not
 substitutes for those gates. The remaining hardware and speech gates stay
 `untested` until collected.
 
+## Output Token and Watchdog Calibration
+
+Output length is bounded by the model context, not by the nominal device-memory
+size:
+
+```text
+completion_tokens <= context_length - prompt_tokens
+```
+
+The 8T static-KV graph uses a fixed 1024-token cache, so 80, 128 and 256 output
+tokens used nearly the same NPU working set. The 240-second ACL watchdog is an
+application fail-closed policy inherited from the historical `240/270/300 s`
+ACL/gateway/UI timeout budget. PyACL synchronous execution cannot be safely
+interrupted from the Python thread, so a deadline marks the backend unhealthy
+and requires restart. No hardware specification or timeout sweep established
+240 seconds as a calibrated hardware limit.
+
+| Target | Mode | Prompt | Completion | Finish | Elapsed | Resource observation |
+| --- | --- | ---: | ---: | --- | ---: | --- |
+| 8T | validated product limit | 55 | 80 | `length` | 225.071 s | NPU about 5.9 GB; 240 s watchdog nearly exhausted |
+| 8T | test worker, watchdog 3600 s | 55 | 128 | `length` | 516.0 s | worker healthy; NPU about 5.9 GB |
+| 8T | test worker, watchdog 3600 s | 55 | 256 | `length` | 1983.8 s | worker healthy; NPU about 5.9 GB; RSS about 1.91 GiB |
+| 20T | release profile | 171 | 256 | `length` | 143.984 s | MindSpore worker healthy |
+| 20T | temporary max-1024 profile | 171 | 850 | `length` | 507.982 s | NPU peak 14,444/23,673 MB; RSS about 4.01 GiB |
+| 20T | temporary max-1024 profile | 171 | 853 | `length` | 483.612 s | `total_tokens=1024`; worker healthy |
+
+For the 8T prompt containing 55 tokens, the mathematical context ceiling is
+`1024 - 55 = 969` completion tokens. The 20T prompt used here contains 171
+tokens, so its exact observed ceiling is `1024 - 171 = 853`. This does not
+replace a complete-output generation test for 969 tokens; such a test would take
+far longer than the practical acceptance window.
+
+The release policy therefore stays conservative: 8T exposes only 64/80 tokens,
+with 80 as its current watchdog-compatible maximum; the 20T release profile
+defaults to 128 and caps at 256. The larger 8T and 20T values above are
+experimental capacity evidence, not product defaults.
+
+## Quantized ONNX Screening
+
+Fourteen unique public Qwen quantized graph files have been screened, including
+two earlier int8 graphs and twelve candidates pinned in
+`configs/online-quantized-qwen-candidates.json`. The newer set covers Qwen1.5
+uint8/q4/q4f16, Qwen2.5 GQA and MHA uint8/q4/q4f16, and two ORT/AMD int4 routes.
+
+All twelve newer candidates are blocked at the static operator/domain gate.
+Representative ATC conversions were split across the boards: three patterns on
+B4 and three on B1. All six exited 255 and produced no OM. The failures are ATC
+parser or domain-version errors that occur before OM allocation, so they are not
+caused by 8T memory pressure. The earlier two int8 graphs also failed ATC on
+both boards.
+
+No candidate reached PyACL, accuracy, quality, or performance testing. Future
+screening assigns different candidates to one board first and repeats a target
+on the second board only after an OM is generated. See
+[Quantized ONNX Screening](11-quantized-onnx-screening.md),
+`CHATBOT-ISS-20261025-11`, and `CHATBOT-ISS-20261025-12` in the troubleshooting
+ledger.
+
+PyACL cannot load ONNX directly. Other checkpoints are candidates only after a
+static export passes the target CANN ATC operator parser and produces an OM with
+a verified descriptor.
+
+A bounded graph-surgery experiment migrated Qwen1.5 q4f16 by unpacking 168
+`MatMulNBits` nodes into FP16 `MatMul`. The derived ONNX matched the original
+ORT graph at cosine `0.99999994`, passed ATC on both B4 and B1, and executed in
+PyACL. At the fixed short decode shape it produced `5.95` token/s on 8T and
+`10.23` token/s on 20T, effectively identical to the official FP16 model on
+each board. The migration therefore restores runnability but does not preserve
+INT4 execution or deliver a quantization speed benefit.
+
 ## Known Limits
 
 - The worker serializes all requests; latency increases for concurrent users.
 - The public UI has no browser login and is suitable only for a restricted LAN.
-- Context is capped at 1024 tokens. The 20T MindSpore browser defaults to 128 output tokens and has a 256-token ceiling, subject to each profile's declaration; Qwen2 1.5B is capped at 192 by its measured boundary. The 8T static-KV browser defaults to 16 and caps output at 80.
+- Context is capped at 1024 tokens. The 20T MindSpore browser defaults to 128 output tokens and has a 256-token ceiling, subject to each profile's declaration; Qwen2 1.5B is capped at 192 by its measured boundary. The 8T static-KV browser defaults to 64 and caps output at 80.
 - Retrieval augmentation is not part of this release; keeping it outside the gateway preserves the fixed prompt budget.
 - The test baseline uses a shared hardware image; it is not a clean-room production certification.
 - The release does not verify the MindSpore chat path on Ascend310B4 / 8T. Current 8T Qwen1.5-0.5B attempts on CANN 7 and CANN 8 both reached MindSpore kernel runtime initialization but failed because allocator-visible HBM fell below the runtime threshold; no token was generated. The worker now records a device-accounting HBM preflight before loading, but that check is a fail-fast diagnostic rather than evidence that the model will fit. The separate static-KV ACL route has a formal public-artifact release path recorded above; that result does not make the MindSpore release path 8T-supported or transfer the MindSpore quality/performance evidence.

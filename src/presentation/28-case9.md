@@ -137,7 +137,7 @@ bash scripts/run/start-ui.sh
 bash scripts/run/run-release-8t.sh
 ```
 
-公开模型名固定为 `ascend-edge-chat`，OpenAI 兼容入口仍是 `/v1/models` 和 `/v1/chat/completions`。8T 内部模型固定为 Qwen2.5 static-KV，默认 16 token、上限 80；20T 由所选 MindSpore profile 决定较小上限。
+公开模型名固定为 `ascend-edge-chat`，OpenAI 兼容入口仍是 `/v1/models` 和 `/v1/chat/completions`。8T 内部模型固定为 Qwen2.5 static-KV，用户可选 64/80，默认 64；20T 默认 128、发布 profile 上限 256。
 
 网关只允许 greedy 解码、单请求串行和受限输出预算；后端不可用时 fail-closed，不自动切 CPU 或云端。
 
@@ -224,6 +224,27 @@ bash scripts/run/run-release-8t.sh
 
 ---
 
+## Token 上限不是显存容量
+
+```text
+completion_tokens <= 1024 - prompt_tokens
+```
+
+| 目标 | 正式默认 / 上限 | 无 watchdog 压力测试 |
+| --- | --- | --- |
+| 8T ACL | 64 / 80 | 128、256 token 完整执行；256 约 33 分钟，显存仍约 5.9 GB |
+| 20T MindSpore | 128 / 256 | 171+853=1024 token 完整执行；853 约 8 分钟 |
+
+8T 固定 KV 窗口使显存近似恒定。240 秒 ACL watchdog 是 fail-closed 工程策略，不是硬件标定；80 token 已耗时约 225 秒。实验上限不能直接当作产品上限。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a> · 长度、文本完整性与中文语义质量</div>
+
+<!--
+授课提示：强调正式发布参数与绕过 watchdog 的容量实验分开记录；不能把 969/853 这类 context 上限直接宣传为默认输出。
+-->
+
+---
+
 ## 429、截断和质量是三种不同问题
 
 - 第一次无间隔验收在稳定性段收到 HTTP 429：请求 body 突发，属于服务 admission
@@ -265,7 +286,7 @@ bash scripts/run/run-release-8t.sh
 <div class="source">图片：<a href="../experiment/img9/case9-board-8t-ui.png"><code>src/experiment/img9/case9-board-8t-ui.png</code></a>；接口证据见 <a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
 
 <!--
-授课提示：页面显示模型健康、默认 16 token 和不可切换；截图不证明中文语义质量或性能。
+授课提示：页面显示模型健康、默认 64 token、仅可选 64/80 且不可切换；截图不证明中文语义质量或性能。
 -->
 
 ---
@@ -277,7 +298,7 @@ bash scripts/run/run-release-8t.sh
 1. 固定 revision、工件大小和 SHA-256
 2. tokenizer、chat template 和目标运行时
 3. 板端 loader、NPU 初始化和单 token 生成
-4. JSON/SSE、长度、稳定性、性能和人工质量门
+4. ONNX 先过目标 ATC parser；再跑 JSON/SSE、长度、稳定性、性能和质量门
 5. 只在证据满足时更新教学目录或正式发布配置
 
 页面只接受已注册的 profile ID，不接受任意路径、shell 命令或 Python 表达式。

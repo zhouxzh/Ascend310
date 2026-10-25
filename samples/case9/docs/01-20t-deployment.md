@@ -106,6 +106,29 @@ when reproducing the acceptance run. The 32/64 budget labels are tokenizer
 tokens, not Chinese-character counts. Human Chinese semantic review remains
 pending.
 
+## Output Token and Timeout Validation
+
+The release profile `qwen1.5-0.5b-chat` defaults to 128 output tokens and caps
+at 256. On `2026-10-25`, a repeat-pattern probe with 171 prompt tokens generated
+all 256 output tokens in `143.984 s`, returned `finish_reason=length`, and left
+the worker healthy.
+
+A temporary test checkout raised the profile and gateway ceilings to exercise
+the 1024-token context boundary. It generated 850 tokens in `507.982 s` with
+NPU peak `14,444 / 23,673 MB`, then 853 tokens in `483.612 s` with
+`total_tokens=1024`. The latter is the exact ceiling for that prompt:
+
+```text
+171 prompt tokens + 853 completion tokens = 1024 context tokens
+```
+
+The temporary test then stopped and the tracked files were restored. These
+larger values are capacity evidence, not release defaults.
+
+MindSpore uses a separate 300-second default watchdog, configurable up to 600
+seconds. It is independent of the 8T ACL runtime's 240-second limit. Do not copy
+the 8T static-KV timeout or OM limits into the 20T deployment.
+
 ## Rollback
 
 This release does not replace a prior service automatically. To roll back, stop only the three foreground release processes, keep model files and logs for diagnosis, and start the previously validated deployment from its own directory. Do not delete shared Conda caches, CANN installation directories, or unknown board workloads.

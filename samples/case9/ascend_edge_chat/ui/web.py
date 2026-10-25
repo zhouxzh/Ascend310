@@ -65,7 +65,7 @@ _EXTERNAL_WORKER_MODE = "external"
 _MANAGED_WORKER_HEALTH_URL = "http://127.0.0.1:8090/health"
 _ACL_STATIC_KV_WORKER_HEALTH_URL = "http://127.0.0.1:8084/health"
 _ACL_STATIC_KV_CONTEXT_TOKENS = 1024
-_ACL_STATIC_KV_DEFAULT_MAX_TOKENS = 16
+_ACL_STATIC_KV_DEFAULT_MAX_TOKENS = 64
 _ACL_STATIC_KV_MAX_TOKENS = 80
 
 
@@ -1715,9 +1715,10 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       function updateTokenControl(resetValue) {
         const item = selectedProfileItem();
         const maximum = Math.max(1, Number(item?.max_tokens) || 256);
-        const fallback = Math.min(maximum, Math.max(1, Number(item?.default_max_tokens) || Math.min(128, maximum)));
+        const minimum = state.modelSwitching ? 1 : Math.min(64, maximum);
+        const fallback = Math.min(maximum, Math.max(minimum, Number(item?.default_max_tokens) || Math.min(128, maximum)));
         const current = Number(maxTokens.value);
-        const budgets = TOKEN_BUDGETS.filter((budget) => budget <= maximum);
+        const budgets = TOKEN_BUDGETS.filter((budget) => budget >= minimum && budget <= maximum);
         if (!budgets.includes(fallback)) budgets.push(fallback);
         if (!budgets.includes(maximum)) budgets.push(maximum);
         budgets.sort((left, right) => left - right);
@@ -1736,9 +1737,10 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       function requestedTokenBudget() {
         const item = selectedProfileItem();
         const maximum = Math.max(1, Number(item?.max_tokens) || 256);
-        const fallback = Math.min(maximum, Math.max(1, Number(item?.default_max_tokens) || 16));
+        const minimum = state.modelSwitching ? 1 : Math.min(64, maximum);
+        const fallback = Math.min(maximum, Math.max(minimum, Number(item?.default_max_tokens) || Math.min(128, maximum)));
         const value = Number(maxTokens.value);
-        const budgets = TOKEN_BUDGETS.filter((budget) => budget <= maximum);
+        const budgets = TOKEN_BUDGETS.filter((budget) => budget >= minimum && budget <= maximum);
         if (!budgets.includes(fallback)) budgets.push(fallback);
         if (!budgets.includes(maximum)) budgets.push(maximum);
         if (!budgets.includes(value)) {

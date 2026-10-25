@@ -190,7 +190,7 @@ bash scripts/verify/release-8t-preflight.sh
 bash scripts/run/run-release-8t.sh
 ```
 
-该路径的拓扑是 `:7865 -> :7861 -> :8084`。网关继续只暴露 `ascend-edge-chat`，内部模型 id 为 `qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om`；客户端不能指定内部模型或端口。8T 默认生成 16 个 token，硬上限为 80，浏览器模型选择器被禁用。服务健康必须同时满足 `ready=true`、`healthy=true`、`backend=acl_om`、`sequence_length=1024` 和 `descriptor_validated=true`，否则 UI 返回降级状态并拒绝聊天。
+该路径的拓扑是 `:7865 -> :7861 -> :8084`。网关继续只暴露 `ascend-edge-chat`，内部模型 id 为 `qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om`；客户端不能指定内部模型或端口。8T 默认生成 64 个 token，硬上限为 80，浏览器模型选择器被禁用。服务健康必须同时满足 `ready=true`、`healthy=true`、`backend=acl_om`、`sequence_length=1024` 和 `descriptor_validated=true`，否则 UI 返回降级状态并拒绝聊天。
 
 8T 的公开工件锁固定 ONNX、tokenizer、controller contract、B4 OM、descriptor、两套来源锁和 Apache-2.0 许可证，共九个文件。板端生成 OM 的旧实验仍保留为诊断资料，但正式路径使用公开 HF revision 中与 B4/CANN8 匹配的 OM，并在每次服务启动前重新验证字节数和 SHA-256。
 
@@ -241,7 +241,7 @@ curl http://127.0.0.1:7861/v1/chat/completions \
 
 - 仅接受 `system`、`user`、`assistant` 三种角色；
 - 仅支持 greedy 解码：`temperature=0`、`top_p=1`；
-- 最大上下文为 1024 token；20T MindSpore 网页默认输出预算为 128 token、硬上限为 256 token；8T 静态 KV 默认 16 token、硬上限为 80 token；
+- 最大上下文为 1024 token；20T MindSpore 网页默认输出预算为 128 token、硬上限为 256 token；8T 静态 KV 默认 64 token、硬上限为 80 token；
 - 单进程、单请求串行执行；
 - 请求体最大 256 KiB；
 - 超时或运行时错误时 fail-closed，不自动切换后端。
@@ -299,10 +299,39 @@ NPU 不能运行。
 `max_tokens` 是本轮**最多新生成多少 tokenizer token**，不是“最多多少汉字”。
 同一段中文可能被分成一个或多个 token；它还受 `prompt_tokens + max_tokens <=
 1024` 的上下文上限约束。20T 页面默认发出 `128`，普通 Qwen 教学 profile
-当前可选 `32/64/96/128/192/256`；8T 静态 KV 页面默认 `16`，可选
-`16/32/64/80`。如果模型没有在上限前输出 EOS，接口返回 `finish_reason=length`，页面会
+当前可选 `32/64/96/128/192/256`；8T 静态 KV 页面默认 `64`，用户可选
+`64/80`，低于 64 的档位只保留给内部协议和性能诊断，不在正常页面提供。如果模型没有在上限前输出 EOS，接口返回 `finish_reason=length`，页面会
 保留已生成文本并提示截断。这是长度门结果，不是模型崩溃，也不能直接作为中文
 质量差的证据。
+
+8T 长度验收还使用固定问题“简单介绍一下昇腾310B”配合
+`max_tokens=80`。实测 prompt 为 38 token，completion 为 41 token，返回 54
+个字符并以 `finish_reason=stop` 正常结束，证明 80-token 上限不是只能返回
+空壳的标称值；新的 64-token 默认预算也不会截断这次 41-token 回答。该小模型
+的回答出现重复句，所以这项只证明长度和终止协议，中文语义质量仍需单独评审。
+复杂回答仍可能在 80 token 上限处返回 `length`。
+
+`max_tokens` 也不是显存容量的直接函数。8T 静态图固定使用 1024-token KV
+窗口，因此生成 80、128 或 256 token 时，NPU 工作集基本不变。使用临时测试
+worker 将 ACL 上限提高到 1024、执行超时提高到 3600 秒后，8T 对 55-token
+prompt 分别完成了 80、128 和 256 token；256 token 耗时约 `1983.8 s`，
+`finish_reason=length`，worker 仍健康且 NPU 显存维持约 `5.9 GB`。该 prompt
+的理论 context 上限是 `1024-55=969` token，但完整生成969 token 的耗时不适合
+作为发布交互，也不能把理论值写成已完整实测。
+
+20T MindSpore 路径的正式配置为默认128、平台上限256。相同长输出方法下，
+171-token prompt 完成256 token 用时 `143.984 s`。在临时测试 checkout 中把
+worker/gateway/profile 上限提高到1024后，同一 prompt 完成850 token 用时约
+`507.982 s`，又完成853 token 用时 `483.612 s`，`total_tokens=1024` 且 worker
+健康。因此该次20T测试的最大完成数是 `1024-171=853` token。8T 与20T的
+数字分别属于自己的运行时和模型，不能互相替代。
+
+8T ACL 的240秒 watchdog 是应用层的 fail-closed 超时。PyACL 同步执行无法从
+Python 线程安全中断，超过时限只能取消请求、毒化 backend 并要求重启。历史
+方案将 ACL/gateway/UI预算设为 `240/270/300 s`，并没有硬件规格证明240秒是
+精确校准值。8T 的80-token压力请求已耗时约225秒，说明正式上限80与240秒
+watchdog只有很小余量；提高正式上限必须同时重新设计超时、取消、流式心跳和
+容量预算，而不能只改一个数字。
 
 质量验收必须单独进行。针对每个 profile，以新会话、greedy 解码、`max_tokens=256`
 （或该 profile 的已验证上限）运行同一组 10 条中文提示，保存完整 JSON/SSE、模型

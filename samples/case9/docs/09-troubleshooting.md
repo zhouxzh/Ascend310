@@ -28,13 +28,18 @@
 | `CHATBOT-ISS-20261024-02` | `open` | `blocker` | 2026-10-24 | 8T Qwen1.5-0.5B 在 MindSpore kernel runtime 初始化阶段 HBM 不足 | 8T 在模型加载前按设备账本预检 fail-closed；无 token 生成 |
 | `CHATBOT-ISS-20261024-03` | `resolved` | `major` | 2026-10-24 | 自动语音监听连续失败可无界积累 turn 或卡住 arecord | turn 历史有界、失败退避/自动停止、采集超时终止子进程 |
 | `CHATBOT-ISS-20261025-01` | `resolved` | `major` | 2026-10-25 | 8T ATC 缺少隔离环境依赖，且默认 8 编译进程触发主机 OOM | 补齐依赖并固定 `MAX_COMPILE_CORE_NUMBER=1`；原生 B4 OM、PyACL 和 JSON 通过 |
-| `CHATBOT-ISS-20261025-02` | `resolved` | `major` | 2026-10-25 | 8T UI 漏掉 profile 默认 16-token 档位，页面误选 80 | fallback 加入候选并成为初始选择；8T 桌面截图复核为 16 |
+| `CHATBOT-ISS-20261025-02` | `resolved` | `major` | 2026-10-25 | 历史 8T UI 漏掉当时 profile 的 16-token 默认档位，页面误选 80 | fallback 加入候选并成为初始选择；当前默认预算后来提高到 64 |
 | `CHATBOT-ISS-20261025-03` | `resolved` | `major` | 2026-10-25 | 公开 B4 OM 仍是 schema-1 lock，严格 runtime 拒绝加载 | 保留公开 lock，并生成 data-dir 内 schema-2 lock |
 | `CHATBOT-ISS-20261025-04` | `resolved` | `major` | 2026-10-25 | ACL execution timeout 300 秒超过 runtime 240 秒硬上限 | 8T ACL 默认/示例统一为 240 秒，全链路启动通过 |
 | `CHATBOT-ISS-20261025-05` | `resolved` | `major` | 2026-10-25 | HF mirror 缓存重定向以 chunked 响应返回 tokenizer，下载器误报 Content-Length 缺失 | 允许无声明长度，但仍强制实际 bytes/SHA；全新目录 9/9 工件下载通过 |
 | `CHATBOT-ISS-20261025-06` | `resolved` | `major` | 2026-10-25 | 随机 Gateway token 以 `-` 开头时被 argparse 当成选项，正式验收未启动 | `--token=`/`--model-source=` 使用等号形式，参数测试通过 |
 | `CHATBOT-ISS-20261025-07` | `resolved` | `major` | 2026-10-25 | `.env` 只被 shell source 未导出，验收子进程误用 20T 模型 provenance | `set -a` 导出 `.env`；公开 8T 正式验收 `machine_status=passed` |
 | `CHATBOT-ISS-20261025-08` | `mitigated` | `major` | 2026-10-25 | 多模态 USB 麦克风/喇叭停留在蓝牙/无线/仅播放模式时没有枚举为音频输入 | 切到有线 USB 音频模式并重新插入后出现 `EDIFIER M16 Pro`；喇叭听音通过，USB 麦克风 capture 仍不可用 |
+| `CHATBOT-ISS-20261025-09` | `resolved` | `major` | 2026-10-25 | 8T 页面默认 16 token，正常中文回答很容易过早截断 | 默认预算提高到 64，正常页面只提供 64/80；gateway/UI/catalog 回归通过 |
+| `CHATBOT-ISS-20261025-10` | `mitigated` | `major` | 2026-10-25 | 240 秒 ACL watchdog 是工程安全预算而非硬件标定，80 token 已消耗约225秒 | 绕过 watchdog 完成8T 128/256 token和20T 256/853 token；正式配置仍保留保守上限 |
+| `CHATBOT-ISS-20261025-11` | `blocked` | `major` | 2026-10-25 | 两个公开 Qwen2.5 int8 ONNX 均含 ATC 未注册的量化算子，无法生成 OM | 8T/B4 和20T/B1 的 ATC 均 exit255；PyACL 门未开始 |
+| `CHATBOT-ISS-20261025-12` | `blocked` | `major` | 2026-10-25 | 扩展筛选的12个公开 Qwen 量化 ONNX 全部被算子或 vendor domain 阻断 | 静态图全部 blocked；三个代表族在单板上执行 ATC，均 exit255 |
+| `CHATBOT-ISS-20261025-13` | `mitigated` | `major` | 2026-10-25 | q4f16原图不能ATC，但可反量化为FP16后运行；该派生模型没有INT4收益 | 双板ATC/PyACL通过；固定shape速率与官方FP16相同 |
 
 ## CHATBOT-ISS-20261018-01：验收突发流量触发 HTTP 429
 
@@ -123,10 +128,10 @@
 
 - 状态：`resolved`
 - 判定层级：`UI / output budget`
-- 症状：8T external ACL profile 声明默认 16、上限 80，但页面把 `32/64/80` 作为档位，因 16 不在档位数组而自动选中 80。
+- 症状：历史 8T external ACL profile 当时声明默认 16、上限 80，但页面把 `32/64/80` 作为档位，因 16 不在档位数组而自动选中 80。
 - 根因：`confirmed`。前端 token budget 列表没有把 profile 的 `default_max_tokens` 加入候选，也没有为它生成 option。
 - 修复：将 fallback/default 纳入排序后的预算集合，初始选择严格使用 profile 默认值；请求校验接受同一个集合。
-- 回归：UI 单元测试检查 fallback 生成逻辑；8T 页面重新截图验证默认显示 16 token。
+- 回归：UI 单元测试检查 fallback 生成逻辑；当时 8T 页面截图验证默认显示 16 token。后续正常聊天可用性调整将默认值提高到 64，见 `CHATBOT-ISS-20261025-09`。
 
 ## CHATBOT-ISS-20261025-03：公开 B4 OM 锁仍是 schema 1
 
@@ -193,6 +198,78 @@
 - 麦克风边界：`arecord -l` 仍未出现该卡的 capture 端点；USB descriptor 是 playback-only，`arecord -D plughw:CARD=Pro,DEV=0` 返回设备不存在。不得把 PulseAudio monitor、板载 capture 或其他输入 source 当成该麦克风。
 - 处理：先切换实体设备到明确的有线 USB 音频或通话模式，再重新插拔并检查三层枚举。若 `aplay -l` 有设备而 `arecord -l` 没有，停在 USB capture endpoint 层，不要把“喇叭有声”写成“麦克风可用”。
 - 回归/剩余工作：喇叭 `observed-pass`；麦克风 `blocked`，需要设备提供 capture endpoint，或改用已验证的 USB capture 设备。
+
+## CHATBOT-ISS-20261025-09：16-token 默认预算不适合正常聊天
+
+- 状态：`resolved`
+- 判定等级：`UI/API default budget`
+- 症状：8T 页面默认请求 16 token，短句或自我介绍常在完整回答前返回 `finish_reason=length`。
+- 根因：`confirmed`。16 token 适合冒烟和延迟测试，但不足以覆盖普通中文回答；80 token 硬上限本身并非问题。
+- 修复：把 ACL 固定 profile、gateway 和 UI 的默认值统一提高到 64；正常页面只提供 `64/80` 两个档位，80 为硬上限。低于 64 的 API 预算仍仅供自动化协议和性能诊断，不作为用户选项。后端模型和 1024-token 上下文未改变。
+- 回归：gateway、UI 和 catalog 测试检查默认值为 64。板端固定问题“请简单介绍一下昇腾310B”在 `max_tokens=80` 下返回 41 个 completion token、54 个字符、`finish_reason=stop`，说明 80-token 硬上限能生成一段完整回答；41 token 也低于新的 64-token 默认值。
+- 质量边界：该回答虽然正常结束，但出现重复句，不能据此宣称中文语义质量通过。
+- 剩余边界：64 token 仍不是汉字数保证，复杂回答可能达到预算并以 `length` 结束；页面必须保留该终止原因，不能把截断当作完整回答。
+
+## CHATBOT-ISS-20261025-10：240 秒 watchdog 的来源与 token 上限实验
+
+- 状态：`mitigated`
+- 判定层级：`ACL runtime safety policy / generation budget`
+- 来源：`confirmed as engineering policy`。历史静态 ACL 方案把预算固定为 ACL `240 s`、gateway `270 s`、UI `300 s`。代码注释说明 PyACL 同步执行无法由 Python 线程安全中断，因此超时只能取消请求、毒化 backend、标记 unhealthy 并要求重启。没有证据表明 240 秒来自硬件规格或穷举校准。
+- 当前风险：8T 的 80-token 压力请求耗时 `225.071 s`，距离 240 秒只剩约 15 秒。该配置可以用于受控短回答，但不是更高输出预算的余量证明。
+- 绕过 watchdog 的 8T 实验：临时测试 worker 使用 `max_tokens=1024`、`execution_timeout=3600 s`，同一 B4 OM 和 1024 context：
+  - 80 token：80 completion、`length`、约 `225.1 s`，NPU 约 `5.9 GB`。
+  - 128 token：128 completion、`length`、约 `516.0 s`，worker healthy，`watchdog_triggered=false`。
+  - 256 token：256 completion、`length`、约 `1983.8 s`，worker healthy，NPU 仍约 `5.9 GB`。
+  - prompt 55 token 时，context 理论上限为 `1024-55=969`；未用完整生成等待约两小时，不能写成 observed-pass。
+- 20T 实验：公开 MindSpore profile 正式默认128、上限256；同一长输出方法下：
+  - 256 token：256 completion、`length`、约 `144.0 s`。
+  - 临时把 worker/gateway/profile 上限提高到1024后，171-token prompt 生成850 token约 `508.0 s`，再生成853 token约 `483.6 s`，`context_used=1024`、`length`，worker healthy。
+  - 20T 的该 prompt 最大可接受 completion 为 `1024-171=853`。
+- 结论：实际 token 上限由 `context_length - prompt_tokens` 决定，不由显存总量直接决定。8T 静态 KV 在固定窗口下显存近似恒定；20T MindSpore 的 worker RSS/NPU 使用量随模型/序列状态变化，但850/853 token 未 OOM。
+- 未采用：直接把正式 8T 上限提升到128/256。单次请求会达到8到33分钟，当前产品交互和240秒清理策略无法承受；如要提升，必须同时重新设计 watchdog、流式心跳、取消和容量预算。
+- 正式保留：8T UI默认64、上限80；20T默认128、平台上限256。实验上限不等于发布上限。
+
+## CHATBOT-ISS-20261025-11：公开 int8 ONNX 在 ATC 转换层被拒绝
+
+- 状态：`blocked`
+- 判定层级：`ONNX operator compatibility / ATC conversion`
+- 环境：Ascend310B4 / 8T 与 Ascend310B1 / 20T；均为 CANN 8.0.0、驱动25.2.0、统一 `ascend` 环境。
+- 候选：
+  - `onnx-community/Qwen2.5-0.5B-Instruct@22942cb7...`，`model_int8.onnx`，512,096,557 bytes，SHA-256 `41834041...16100`。
+  - `Ringoacid/Qwen2.5-0.5B-onnx-attention-int8@8b6afbb2...`，`generate_int8.onnx` 3,254,466 bytes + external data494,222,848 bytes，SHA-256 `7c547253...d421` 和 `8da9f4b7...b00d`。
+- 合同：两个图均为51输入/49输出、动态 batch/cache；分别含168个 `MatMulInteger`、96个 `DynamicQuantizeLinear` 和2个 `DequantizeLinear`。
+- 复现：给51个输入指定静态 decode shape后，分别在 B4 和 B1 上执行 `atc --framework=5 --precision_mode=must_keep_origin_dtype`。
+- 结果：四个 ATC 调用全部 exit255，CANN 报 `No parser is registered`，没有生成任何 OM。两个板上的 unsupported 计数一致。
+- 边界：这是 ATC conversion 失败，不是 PyACL 加载失败，也不是精度或性能结果。不能把 `.onnx` 交给 PyACL 直接运行。
+- 处理方向：先导出不含 ORT 量化算子的标准 FP16/FP32 静态 ONNX，建立 CPU/框架 golden，再走 CANN 支持的 ATC 量化和校准路径；出现自定义算子时必须有版本匹配的自定义 OPP。
+- 数据清理：实验结束后已删除两台板上的候选 ONNX、外部权重、派生模型、OM 和临时日志；公开来源、revision、哈希及结论保留在 `11-quantized-onnx-screening.md`，可按固定 revision 重建。
+
+## CHATBOT-ISS-20261025-12：公开 Qwen 量化 ONNX 扩展筛选全部阻断
+
+- 状态：`blocked`
+- 判定层级：`ONNX domain/operator compatibility`
+- 候选：12个唯一公开文件，来自 Qwen1.5-0.5B-Chat、Qwen2.5-0.5B-Instruct GQA、Qwen2.5-0.5B-Instruct MHA、Hazem ORT int4 和 AMD Ryzen AI int4。完整 repo、revision、字节数和 SHA-256 见 `configs/online-quantized-qwen-candidates.json`。
+- 静态检查：12/12 命中禁止的量化算子或 `com.microsoft` domain。主要是 `MatMulInteger`、`DynamicQuantizeLinear`、`DequantizeLinear`、`MatMulNBits`、`GroupQueryAttention`、`MultiHeadAttention`、`RotaryEmbedding` 和 vendor normalization。
+- 8T ATC：Qwen1.5 uint8 exit255（量化 parser）；Qwen1.5 q4 exit255（两个 domain version）；Qwen2.5 GQA uint8 exit255（两个 domain version）。
+- 20T ATC：Qwen1.5 uint8 exit255（量化 parser）；Qwen1.5 q4f16 和 Qwen2.5 MHA uint8 exit255（两个 domain version）。
+- 结果：六个代表性 ATC 均未生成 OM；其余文件复用已经确认的运算符模式，未做重复 ATC。
+- 根因边界：失败发生在图解析/算子注册层，早于 OM 分配和 NPU 执行，不是8T/20T内存不足。
+- 后续效率：不同新候选先分配到一块板做图门和 ATC；只有生成 OM 的候选才在另一块板独立复验。
+- 工具：`scripts/verify/screen-online-quantized-onnx.py` 对候选锁执行字节/SHA、ONNX checker、domain、operator 和动态 shape 检查。详细记录见 `11-quantized-onnx-screening.md`。
+
+## CHATBOT-ISS-20261025-13：q4f16图迁移成功但不保留INT4
+
+- 状态：`mitigated`
+- 判定层级：`ONNX graph surgery / ATC / PyACL performance`
+- 来源：`onnx-community/Qwen1.5-0.5B-Chat-ONNX@6d413dd9...` 的 `model_q4f16.onnx`，SHA-256 `320e83b2...11cf`。
+- 根因：原图含168个 `com.microsoft.MatMulNBits`。CANN 8.0不能解析第二个domain和该贡献算子。
+- 迁移：按q4字节内相邻K元素的低/高半字节布局解包，默认zero point为8，scale顺序为 `[N,K_blocks]`，生成标准FP16 `MatMul`。同时给embedding的隐式 `Transpose` 写入显式 `perm=[1,0]`。
+- 结果：生成928,515,726字节派生ONNX，SHA-256 `9707358b...d090`；8T与20T独立生成相同哈希。
+- 数值：对原ORT q4f16图，logits cosine `0.99999994`、Top-1一致、Top-5交集5/5、最大KV差 `0.00390625`。
+- 转换与运行：B4和B1 ATC均通过，PyACL均加载51输入/49输出OM并返回相同Top-1 token。
+- 速率：短shape下8T约`5.95 token/s`、20T约`10.23 token/s`，与同仓库官方FP16模型差异低于0.05%。B4长上下文execute-only约`2.57 token/s`，也与FP16相同。
+- 结论：迁移解决的是ATC可转换性，不是NPU INT4执行。派生模型将463MB的q4 ONNX扩展为886MB FP16 ONNX，没有观察到量化性能收益。
+- 原始与派生哈希、四块OM及两轮基准见 `12-q4f16-onnx-migration-and-decode-rate.md`。
 
 ## CHATBOT-ISS-20261024-03：自动语音失败资源累积
 

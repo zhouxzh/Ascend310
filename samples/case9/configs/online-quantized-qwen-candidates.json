@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "purpose": "Public quantized Qwen ONNX candidates screened before any ATC or PyACL claim.",
+  "artifact_policy": {
+    "source": "huggingface",
+    "mirror": "https://hf-mirror.com",
+    "fixed_revision_required": true,
+    "local_layout": "<artifacts-root>/<candidate-id>/<basename>"
+  },
+  "screening_policy": {
+    "allowed_domains": [
+      "",
+      "ai.onnx",
+      "ai.onnx.ml"
+    ],
+    "blocked_operator_types": [
+      "DequantizeLinear",
+      "DynamicQuantizeLinear",
+      "GatherBlockQuantized",
+      "GroupQueryAttention",
+      "MatMulInteger",
+      "MatMulNBits",
+      "MultiHeadAttention",
+      "QLinearConv",
+      "QLinearMatMul",
+      "QuantizeLinear",
+      "RotaryEmbedding",
+      "SimplifiedLayerNormalization",
+      "SkipSimplifiedLayerNormalization"
+    ]
+  },
+  "candidates": [
+    {
+      "id": "qwen15-quantized",
+      "family": "qwen1.5-0.5b-chat",
+      "repository": "onnx-community/Qwen1.5-0.5B-Chat-ONNX",
+      "revision": "6d413dd9a252749e0760902c93331e3e4e65b73c",
+      "base_model_repository": "Qwen/Qwen1.5-0.5B-Chat",
+      "base_model_revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+      "license_status": "upstream Apache-2.0; downstream repository does not declare a separate license",
+      "screening_priority": 2,
+      "files": [
+        {
+          "role": "graph",
+          "filename": "onnx/model_quantized.onnx",
+          "bytes": 465055504,
+          "sha256": "c48e0fd398a6c9732c7787ceee577bf9754dc6f79cee1840f75c4b87f66543ac"
+        }
+      ]
+    },
+    {
+      "id": "qwen15-uint8",
+      "family": "qwen1.5-0.5b-chat",
+      "repository": "onnx-community/Qwen1.5-0.5B-Chat-ONNX",
+      "revision": "6d413dd9a252749e0760902c93331e3e4e65b73c",
+      "base_model_repository": "Qwen/Qwen1.5-0.5B-Chat",
+      "base_model_revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+      "license_status": "upstream Apache-2.0; downstream repository does not declare a separate license",
+      "screening_priority": 1,
+      "files": [
+        {
+          "role": "graph",
+          "filename": "onnx/model_uint8.onnx",
+          "bytes": 465055589,
+          "sha256": "e8c44fecbe09d9cf0c2e2ecee0198e2002ecf61f0e2b4c9bb1fe1b7277393293"
+        }
+      ]
+    },
+    {
+      "id": "qwen15-q4",
+      "family": "qwen1.5-0.5b-chat",
+      "repository": "onnx-community/Qwen1.5-0.5B-Chat-ONNX",
+      "revision": "6d413dd9a252749e0760902c93331e3e4e65b73c",
+      "base_model_repository": "Qwen/Qwen1.5-0.5B-Chat",
+      "base_model_revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+      "license_status": "upstream Apache-2.0; downstream repository does not declare a separate license",
+      "screening_priority": 1,
+      "files": [
+        {
+          "role": "graph",
+          "filename": "onnx/model_q4.onnx",
+          "bytes": 816038594,
+          "sha256": "0e8ce9bb36b10a78989625663b9cd2888529320214577eced3789f457a6364ee"
+        }
+      ]
+    },
+    {
+      "id": "qwen15-q4f16",
+      "family": "qwen1.5-0.5b-chat",
+      "repository": "onnx-community/Qwen1.5-0.5B-Chat-ONNX",
+      "revision": "6d413dd9a252749e0760902c93331e3e4e65b73c",
+      "base_model_repository": "Qwen/Qwen1.5-0.5B-Chat",
+      "base_model_revision": "4d14e384a4b037942bb3f3016665157c8bcb70ea",
+      "license_status": "upstream Apache-2.0; downstream repository does not declare a separate license",
+      "screening_priority": 1,
+      "files": [
+        {
+          "role": "graph",
+          "filename": "onnx/model_q4f16.onnx",
+          "bytes": 485369358,
+          "sha256": "320e83b2f9e996dd77ba933e820c8f6c78b5d60b5a7fa8ed62f8453143eb11cf"
+        }
+      ]
+    },
+    {
+      "id": "qwen25-gqa-uint8",
+      "family": "qwen2.5-0.5b-instruct-gqa",
+      "repository": "onnx-community/Qwen2.5-0.5B-Instruct-ONNX-GQA",
+      "revision": "39a3be48ec853c1b28e89b82011266f27eb73a39",
+      "base_model_repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "base_model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "license_status": "upstream Apache-2.0; downstream repository does not declare a separate license",
+      "screening_priority": 1,
+      "aliases": [
+        "onnx/model_quantized.onnx"
+      ],
+      "files": [
+        {
+          "role": "graph",
+          "filename": "onnx/model_uint8.onnx",
+          "bytes": 502904546,
+          "sha256": "863ba5e328fc2ce592897d17a5b5c8ed9a73d524219d01a22ad90465df088720"
+        }
+      ]
+    },
+    {
+      "id": "qwen25-gqa-q4",
+      "family": "qwen2.5-0.5b-instruct-gqa",
+      "repository": "onnx-community/Qwen2.5-0.5B-Instruct-ONNX-GQA",
+      "revision": "39a3be48ec853c1b28e89b82011266f27eb73a39",
+      "base_model_repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "base_model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "license_status": "upstream Apache-2.0; downstream repository does not declare a separate license",
+      "screening_priority": 1,
+      "files": [
+        {
+          "role": "graph",
+          "filename": "onnx/model_q4.onnx",
+          "bytes": 776999645,
+          "sha256": "fb0f7267de1930f176a05dcd0fc457539fc288ed33bc1997c4b931c3d5216b42"
+        }
+      ]
+    },
+    {
+      "id": "qwen25-gqa-q4f16",
+      "family": "qwen2.5-0.5b-instruct-gqa",
+      "repository": "onnx-community/Qwen2.5-0.5B-Instruct-ONNX-GQA",
+      "revision": "39a3be48ec853c1b28e89b82011266f27eb73a39",
+      "base_model_repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "base_model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "license_status": "upstream Apache-2.0; downstream repository does not declare a separate license",
+      "screening_priority": 2,
+      "files": [
+        {
+          "role": "graph",
+          "filename": "onnx/model_q4f16.onnx",
+          "bytes": 478028810,
+          "sha256": "f9e766ea8deb90257b85939d85197fad12476c443eb78542cc646a3809a63d45"
+        }
+      ]
+    },
+    {
+      "id": "qwen25-mha-uint8",
+      "family": "qwen2.5-0.5b-instruct-mha",
+      "repository": "onnx-community/Qwen2.5-0.5B-Instruct-ONNX-MHA",
+      "revision": "b1e71b59c0c33ee49eb562303578961795624293",
+      "base_model_repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "base_model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "license_status": "upstream Apache-2.0; downstream repository does not declare a separate license",
+      "screening_priority": 1,
+      "aliases": [
+        "onnx/model_quantized.onnx"
+      ],
+      "files": [
+        {
+          "role": "graph",
+          "filename": "onnx/model_uint8.onnx",
+          "bytes": 503267767,
+          "sha256": "dd7cafab41f5a797c151c559f96ba68dbe7d8d693f944c34149ef32adb652c07"
+        }
+      ]
+    },
+    {
+      "id": "qwen25-mha-q4",
+      "family": "qwen2.5-0.5b-instruct-mha",
+      "repository": "onnx-community/Qwen2.5-0.5B-Instruct-ONNX-MHA",
+      "revision": "b1e71b59c0c33ee49eb562303578961795624293",
+      "base_model_repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "base_model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "license_status": "upstream Apache-2.0; downstream repository does not declare a separate license",
+      "screening_priority": 2,
+      "files": [
+        {
+          "role": "graph",
+          "filename": "onnx/model_q4.onnx",
+          "bytes": 777326354,
+          "sha256": "60e105dee084373137dd810d0d5f47c3a0cfe14c2dd3c25f723fba3169e011f6"
+        }
+      ]
+    },
+    {
+      "id": "qwen25-mha-q4f16",
+      "family": "qwen2.5-0.5b-instruct-mha",
+      "repository": "onnx-community/Qwen2.5-0.5B-Instruct-ONNX-MHA",
+      "revision": "b1e71b59c0c33ee49eb562303578961795624293",
+      "base_model_repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "base_model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "license_status": "upstream Apache-2.0; downstream repository does not declare a separate license",
+      "screening_priority": 1,
+      "files": [
+        {
+          "role": "graph",
+          "filename": "onnx/model_q4f16.onnx",
+          "bytes": 478355493,
+          "sha256": "2a8e924345337b83796bd98bc130ab0ec0163188d50be55a1bf14b95808c55b8"
+        }
+      ]
+    },
+    {
+      "id": "hazem-int4-block32",
+      "family": "qwen2.5-0.5b-instruct",
+      "repository": "hazemmabbas/Qwen2.5-0.5B-int4-block-32-acc-3-Instruct-onnx-cpu",
+      "revision": "5c2e56e94edeb740724f082a0b2dc433ae095481",
+      "base_model_repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "base_model_revision": "not-recorded-by-candidate",
+      "license_status": "not declared by candidate repository",
+      "screening_priority": 3,
+      "files": [
+        {
+          "role": "graph",
+          "filename": "qwen-2.5-32k-500m-instruct.onnx",
+          "bytes": 175377,
+          "sha256": "8eacb605cbf786a1b71af958780619c022fa76c5310d2fa9418a7eba82272d72"
+        },
+        {
+          "role": "external-data",
+          "filename": "qwen-2.5-32k-500m-instruct.onnx.data",
+          "bytes": 861939200,
+          "sha256": "96a87e09a1ef31fd5901a28f655d8530d2c09799786dac785567550e30b11c64"
+        }
+      ]
+    },
+    {
+      "id": "amd-int4-fp16",
+      "family": "qwen2.5-0.5b-instruct",
+      "repository": "amd/Qwen2.5-0.5B-Instruct-quantized_int4-float16-cpu-onnx",
+      "revision": "7d826c831528165f5289bbb0975894b078f1da7b",
+      "base_model_repository": "Qwen/Qwen2.5-0.5B-Instruct",
+      "base_model_revision": "not-recorded-by-candidate",
+      "license_status": "not declared by candidate repository",
+      "screening_priority": 3,
+      "files": [
+        {
+          "role": "graph",
+          "filename": "model.onnx",
+          "bytes": 191883,
+          "sha256": "3076b3a8a345a12bc643f67dbaf613d1b28a01f318ea567ceb9f225818bedc11"
+        },
+        {
+          "role": "external-data",
+          "filename": "model.onnx.data",
+          "bytes": 817777152,
+          "sha256": "af4710a516141f3e8b4b3cd66606d4d0ee96aba10ebfead711aa80c437b9441b"
+        }
+      ]
+    }
+  ]
+}

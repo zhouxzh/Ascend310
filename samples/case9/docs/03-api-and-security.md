@@ -64,7 +64,7 @@ curl http://127.0.0.1:7861/v1/chat/completions \
   }'
 ```
 
-The release accepts `system`, `user`, and `assistant` roles. It accepts only greedy decoding (`temperature=0`, `top_p=1`) with one request at a time and a 1024-token context. The 20T MindSpore path defaults to 128 output tokens and caps at 256, subject to the selected profile. The 8T ACL path defaults to 16 and caps at 80. It rejects backend/model/port cross-wiring, non-loopback upstreams, arbitrary paths, and arbitrary expressions. The 8T UI disables model switching.
+The release accepts `system`, `user`, and `assistant` roles. It accepts only greedy decoding (`temperature=0`, `top_p=1`) with one request at a time and a 1024-token context. The 20T MindSpore path defaults to 128 output tokens and caps at 256, subject to the selected profile. The 8T ACL UI offers only 64 or 80 output tokens, defaults to 64, and caps at 80; lower API values remain diagnostic-only. It rejects backend/model/port cross-wiring, non-loopback upstreams, arbitrary paths, and arbitrary expressions. The 8T UI disables model switching.
 
 For `stream:true`, the gateway emits standard `data:` SSE chunks and one terminal `data: [DONE]`. It rewrites the internal worker model identifier to `ascend-edge-chat` before sending the result to the client.
 
@@ -73,8 +73,8 @@ For `stream:true`, the gateway emits standard `data:` SSE chunks and one termina
 - request body: 256 KiB maximum;
 - browser message history: at most four messages and 4,000 characters in server memory;
 - gateway and worker: one in-flight request;
-- MindSpore worker watchdog: 300 seconds by default;
-- ACL execution watchdog: 240 seconds maximum;
+- MindSpore worker watchdog: 300 seconds by default, configurable up to 600;
+- ACL execution watchdog: 240 seconds maximum, an application fail-closed policy rather than a hardware-derived token limit;
 - browser write timeout: 30 seconds;
 - worker error or timeout: fail closed instead of falling back to CPU, cloud, or another model.
 

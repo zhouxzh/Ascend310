@@ -26,11 +26,13 @@ flowchart LR
 | Public model name | `ascend-edge-chat` |
 | API | `GET /v1/models`, `POST /v1/chat/completions`, JSON, SSE |
 | 8T model source | `zhouxzh/ascend310b-llm-om-zoo`, fixed revision and nine artifact hashes |
-| 8T output budget | default `16`, maximum `80`; fixed context `1024` |
+| 8T output budget | UI choices `64/80`; default `64`, maximum `80`; fixed context `1024` |
+| 20T output budget | default `128`, release profile maximum `256`; fixed context `1024` |
 | 8T model switching | disabled; the external ACL backend is immutable per launch |
-| Voice control | Separate experimental capability; disabled in the 8T text release |
+| 20T model switching | controlled MindSpore worker restart across catalog profiles |
+| Voice control | Separate experimental capability; disabled in both text release environments |
 
-The 8T release does not inherit MindSpore results from 20T, and the 20T release does not inherit the ACL/OM runtime from 8T. Chinese semantic quality remains a separate review for both targets.
+The 8T release does not inherit MindSpore results from 20T, and the 20T release does not inherit the ACL/OM runtime from 8T. Output is context-limited: `prompt_tokens + completion_tokens <= 1024`. The configured budgets are product limits, not device-memory capacities or guarantees that a model will use every token. Chinese semantic quality remains a separate review for both targets.
 
 ## 8T Static-KV Release
 
@@ -182,6 +184,7 @@ ascend-edge-chat acl-worker --data-dir /opt/ascend-edge-chat-data-8t
 - [Release overview](docs/00-release-overview.md)
 - [20T deployment](docs/01-20t-deployment.md)
 - [8T static-KV release](docs/10-8t-static-kv-release.md)
+- [Quantized ONNX screening](docs/11-quantized-onnx-screening.md)
 - [Model artifacts](docs/02-model-artifacts.md)
 - [API and security](docs/03-api-and-security.md)
 - [Validation and limitations](docs/04-validation-and-limitations.md)

@@ -19,7 +19,7 @@
         "Ascend310B4/8T": "observed-pass"
       },
       "worker_registry": "configs/release-8t-static-kv.lock.json",
-      "default_max_tokens": 16,
+      "default_max_tokens": 64,
       "max_tokens": 80
     }
   ]

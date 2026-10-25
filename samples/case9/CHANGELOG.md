@@ -9,8 +9,10 @@ All notable changes to Ascend Edge Chat are recorded here.
 - Added the tracked 51-input/49-output ACL runtime and public artifact verifier.
 - Added fixed `:8084 -> :7861 -> :7865` lifecycle and acceptance entry points for the 8T backend.
 - Kept the MindSpore static-KV requirement boundary unchanged: the main MindSpore route does not require OM conversion.
-- The 8T backend exposes only `ascend-edge-chat`, defaults to 16 output tokens, and caps output at 80.
+- The 8T backend exposes only `ascend-edge-chat`; its normal UI offers 64/80 output tokens, defaults to 64, and caps at 80. The 20T MindSpore profile defaults to 128 and caps at 256.
 - The public-source 8T acceptance passed with nine locked HF artifacts, 10/10 stability requests, length checks, JSON/SSE/UI contracts, and a 30-sample two-token performance set.
+- Documented the application-level watchdog policy and context formula. A watchdog-disabled test completed 256 tokens on 8T and 853 tokens on 20T; these are capacity evidence, not release defaults.
+- Added a fixed-revision lock and static screening tool for 12 unique public quantized Qwen ONNX candidates. All hit unsupported quantization or `com.microsoft` operators; six representative ATC runs across B4/B1 produced no OM.
 
 ## v0.1.0 - 2026-10-17
 

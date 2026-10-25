@@ -18,7 +18,8 @@ different runtimes, model artifacts, output budgets, and acceptance evidence.
 | Base model revision | `7ae557604adf67be50417f59c2c2f167def9a775` |
 | License | Apache-2.0 |
 | Context | 1024 tokens |
-| Default output budget | 16 tokens |
+| Default output budget | 64 tokens |
+| Browser output choices | 64 or 80 tokens |
 | Maximum output budget | 80 tokens |
 | Public model name | `ascend-edge-chat` |
 | Internal ACL model id | `qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om` |
@@ -184,6 +185,24 @@ first-token p50/p95 `10623.506/10656.206 ms`, total p50/p95
 `10755.880/10786.937 ms`, and `0.186 token/s` at both percentiles. Human
 Chinese semantic review remains pending; the low static-graph throughput is not
 a network or API-proxy measurement.
+
+A separate output-budget probe asked the fixed question
+`请简单介绍一下昇腾310B` with `max_tokens=80`. It used 38 prompt tokens, returned
+41 completion tokens and 54 characters, and finished with
+`finish_reason=stop`. This demonstrates that the configured ceiling can produce
+a complete paragraph rather than being a nominal limit only. It does not prove
+semantic quality: the small model repeated part of the sentence. The new
+64-token default would not truncate this measured 41-token response, but longer
+answers can still end with `finish_reason=length`.
+
+The 240-second execution watchdog is an application fail-closed budget, not a
+B4 memory specification. With a temporary test worker at `max_tokens=1024` and
+`execution_timeout=3600`, 128 and 256 completion tokens completed while preserving
+`watchdog_triggered=false`; 256 tokens took about 1984 seconds and kept NPU
+usage near `5.9 GB`. The release remains capped at 80 because 80 tokens already
+take about 225 seconds under the current product watchdog. For a prompt of 55
+tokens, the 1024-token context ceiling is 969 output tokens, but that full
+generation has not been completed and is not advertised as a release limit.
 
 ## Failure handling
 

@@ -104,7 +104,7 @@ class ReleaseGatewayTests(unittest.TestCase):
         self.assertEqual(defaulted.status_code, 200)
         self.assertEqual(defaulted.json()["model"], "ascend-edge-chat")
         self.assertEqual(upstream.payloads[-1]["model"], _ACL_STATIC_KV_MODEL)
-        self.assertEqual(upstream.payloads[-1]["max_tokens"], 16)
+        self.assertEqual(upstream.payloads[-1]["max_tokens"], 64)
         self.assertEqual(rejected.status_code, 400)
         self.assertIn("max_tokens <= 80", rejected.json()["error"]["message"])
 
