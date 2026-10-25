@@ -69,3 +69,5 @@ class ReleaseCliAndSurfaceTests(unittest.TestCase):
         )
         self.assertIn('--token="${ASCEND_EDGE_CHAT_GATEWAY_API_KEY}"', script)
         self.assertIn('--model-source="${ASCEND_EDGE_CHAT_MODEL_SOURCE}"', script)
+        self.assertIn("set -a", script)
+        self.assertIn('source "${root_dir}/.env"', script)

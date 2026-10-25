@@ -3,7 +3,9 @@ set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${root_dir}"
+set -a
 source "${root_dir}/.env"
+set +a
 
 [[ "${ASCEND_EDGE_CHAT_BACKEND:-}" == "acl-static-kv" ]] || {
   echo "this acceptance script only runs the acl-static-kv backend" >&2
