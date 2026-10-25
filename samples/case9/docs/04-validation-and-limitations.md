@@ -287,7 +287,7 @@ SHA-256 even when the mirror returned a chunked response without
 became the operational 8T data root.
 
 This public-artifact chain is `observed-pass` for one B4/CANN8 machine path.
-The local release candidate has `118` passing application tests, both static-KV
+The local release candidate has `119` passing application tests, both static-KV
 reproducibility bundles pass their byte/SHA checks, and all formal 8T shell
 entry points pass `bash -n`. The formal acceptance script still requires the
 tracked release code to be at the current public GitHub `main` commit; a clean

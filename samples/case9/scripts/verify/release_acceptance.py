@@ -329,6 +329,11 @@ def _source_provenance(root: Path) -> dict[str, Any]:
     remote_url = re.sub(r"//[^/@]+@", "//", remote_url)
     if remote_url == "git@github.com:zhouxzh/Ascend310.git":
         remote_url = EXPECTED_SOURCE_REPOSITORY
+    gh_proxy_prefix = "https://gh-proxy.com/"
+    if remote_url.startswith(gh_proxy_prefix):
+        proxied = remote_url[len(gh_proxy_prefix):]
+        if proxied.startswith("https://github.com/"):
+            remote_url = proxied
     commit_value = str(commit.get("output", "")).strip()
     status_value = str(status.get("output", ""))
     public_match = re.match(

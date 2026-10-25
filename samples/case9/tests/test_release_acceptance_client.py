@@ -137,6 +137,32 @@ class ReleaseAcceptanceClientTests(unittest.TestCase):
         self.assertEqual(source["public_main_commit"], "a" * 40)
         self.assertTrue(source["working_tree_clean"])
 
+    def test_source_provenance_normalizes_the_public_github_proxy(self) -> None:
+        responses = iter(
+            (
+                {
+                    "argv": ["git", "config"],
+                    "returncode": 0,
+                    "output": "https://gh-proxy.com/https://github.com/zhouxzh/Ascend310.git\n",
+                },
+                {"argv": ["git", "rev-parse"], "returncode": 0, "output": "a" * 40 + "\n"},
+                {"argv": ["git", "status"], "returncode": 0, "output": ""},
+                {
+                    "argv": ["git", "ls-remote"],
+                    "returncode": 0,
+                    "output": "a" * 40 + "\trefs/heads/main\n",
+                },
+            )
+        )
+        with mock.patch.object(
+            release_acceptance,
+            "_run_command",
+            side_effect=lambda *args, **kwargs: next(responses),
+        ):
+            source = release_acceptance._source_provenance(ROOT)
+        self.assertEqual(source["repository"], release_acceptance.EXPECTED_SOURCE_REPOSITORY)
+        self.assertEqual(source["public_main_commit"], "a" * 40)
+
     def test_provenance_blocks_dirty_source_tree(self) -> None:
         with mock.patch.object(
             release_acceptance,
