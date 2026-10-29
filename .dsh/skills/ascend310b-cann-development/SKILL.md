@@ -38,7 +38,7 @@ description: 面向 Ascend 310B1/310B4（8T/20T）的 CANN 程序开发工作流
 | `ascendEnvAclruntime` | `aclruntime` 是 case5 等 OM 推理路径的附加环境门 |
 | `ascendEnvMindsporeContext` | 必须实际设置 `device_target=Ascend`；仅有 MindSpore 包不等于与 CANN ABI 匹配 |
 | `ascendEnvPackages` | 统一环境必须覆盖所有案例依赖，不用 base/user-site 补洞 |
-| `ipAddress` / `hostname` / MAC | 作为当前网络信息，不作为硬件身份 |
+| `ipAddress` / `hostname` / MAC | IP 和 hostname 是当前网络信息；同一块板的多个 MAC 是别名，不能把单个 MAC 或 machine-id 当成整板唯一身份 |
 
 当前 310B 默认探测**不采集固件版本**：板端没有为非特权 SSH 用户提供可信、可读的版本来源。不要把驱动号伪装成固件号，也不要把“未采集”写成“版本不匹配”。固件只有在用户提供独立外部证据时才记录。
 
@@ -230,7 +230,7 @@ warmup、loops、repeats、线程数、计时边界、P50/P95、报告路径
 - `ascend_model_download`：先 `dryRun: true`，再显式允许写入。
 - `ascend_ui_capture`：有真实前端时保存 UI 证据，不能代替推理证据。
 
-仓库中的 `docs/ascend310b-development-standard.md` 是工程目录、代码合同、文档和 M0-M8 验收门的规范真源。`samples/` 是运行入口；先读对应 `README.md`，不要从旧文档复制一个与当前模型不匹配的命令。
+仓库中的 `tools/dsh-plugin-ascend310b-debug/docs/ascend310b-development-standard.md` 是工程目录、代码合同、文档和 M0-M8 验收门的规范真源。`samples/` 是运行入口；先读对应 `README.md`，不要从旧文档复制一个与当前模型不匹配的命令。
 
 ## 8. 外部 CANNBot Skills 的使用边界
 

@@ -7,3 +7,7 @@
 # The root also ignores data/ for model datasets. The plugin's data/ directory
 # holds a small generated sample index and panel previews that must ship with it.
 !data/
+
+# Local test inventories and persisted reports.
+test/.no-inventory.json
+test/ascend310b-reports.json

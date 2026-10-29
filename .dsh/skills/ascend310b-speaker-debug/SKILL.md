@@ -11,7 +11,7 @@ description: Debug speaker and headphone playback on Ascend 310B1/310B4 boards t
 
 ## 本仓库已记录的板端设置
 
-完整记录见插件包内 `docs/ascend310b-peripheral-setup.md`。
+完整记录见插件包内 `docs/peripheral-setup.md`。
 
 - 板载 ALSA 声卡名为 `ascend310b`，3.5mm 使用 `Deviceid 2`。当前记录只稳定验证了单声道；双声道离线播放可能出现强噪声，实时双声道可能阻塞写入。可靠双声道应使用外接 USB 声卡。
 - 音频用户组按现场设备权限检查；若节点为 `root:audio`、`0660` 且 `HwHiAiUser` 不在 `audio` 组，管理员执行 `sudo usermod -aG audio HwHiAiUser`，退出并重新登录后复核。
@@ -56,7 +56,11 @@ amixer sget Master
 
 ## 真实播放
 
-播放会输出声音，必须由用户明确执行或由 `ascend_board_run` 显式运行。使用板端已有 WAV 或任务允许生成的测试音：
+扬声器和麦克风可以独立测试，不存在强制先后顺序。优先使用插件工具 `ascend_speaker_test`：先 `dryRun: true`，再由用户显式 `allowStateChange: true`。工具在 `/tmp/ascend310b-debug/peripherals` 生成低幅度正弦 WAV，通过 ALSA `aplay` 或 Pulse `paplay` 播放，不修改系统音量，返回设备、路由和哈希；`heard=null`，必须由操作员确认是否实际听到。扬声器确认不是麦克风录音的前置条件；麦克风录音完成后仍可用 `ascend_play_recording` 通过当前输出设备回放录音。
+
+蓝牙喇叭/耳机先在系统侧完成 BlueZ 配对/连接，并确认 Pulse card profile（A2DP 或 HFP/HSP），再选择 `audioSinks` 中的 `bluez_sink.*` 或 Pulse 默认 sink。命令退出码为 0 不等于人耳听音通过。
+
+需要手工复现时，通过 `ascend_board_run` 显式运行，使用板端已有 WAV 或任务允许生成的测试音：
 
 ```bash
 aplay -D plughw:0,0 /usr/share/sounds/alsa/Front_Center.wav

@@ -11,7 +11,7 @@ description: Debug microphone capture on Ascend 310B1/310B4 boards through ALSA/
 
 ## 本仓库已记录的板端设置
 
-完整记录见插件包内 `docs/ascend310b-peripheral-setup.md`。
+完整记录见插件包内 `docs/peripheral-setup.md`。
 
 - 部分镜像中 `HwHiAiUser` 不在 `audio` 组。若设备为 `root:audio`、`0660`，管理员执行 `sudo usermod -aG audio HwHiAiUser`，退出并重新登录，再用 `id -nG` 和 `arecord -l` 复核。
 - 不要让服务以 root 绕过权限；也不要把 PulseAudio `.monitor` 当作麦克风。
@@ -47,7 +47,11 @@ arecord -D plughw:0,0 --dump-hw-params -d 1 /dev/null
 
 ## 真实录音
 
-采集会写入文件，必须通过 `ascend_board_run` 显式执行，并选择任务允许的输出路径：
+麦克风可以独立测试，不需要先完成扬声器测试。优先使用插件工具 `ascend_microphone_record`：`backend: "alsa"` 用于 `default`/`hw:`/`plughw:`，`backend: "pulse"` 用于蓝牙或 PipeWire source。先 `dryRun: true`，再显式 `allowStateChange: true`。工具在 `/tmp/ascend310b-debug/peripherals` 生成 PCM16 WAV，并按请求时长约束实际采集；结果同时给出 WAV 实际时长、采集阶段耗时与操作总耗时，用 RMS、峰值、全零比例和削波比例给出波形证据。录音成功后使用 `ascend_play_recording` 通过已确认的扬声器回放该 WAV，人工确认能听到后才算输入输出闭环；波形非零本身不等于语音质量通过。
+
+蓝牙耳机麦克风先在系统侧完成 BlueZ 配对/连接，再选择 `audioSources` 中的 `bluez_input.*` 或 Pulse 默认 source。`.monitor` 不能作为麦克风。
+
+需要手工复现时，通过 `ascend_board_run` 显式执行，并选择任务允许的输出路径：
 
 ```bash
 arecord -D plughw:0,0 -f S16_LE -r 48000 -c 1 -d 5 /tmp/mic-test.wav

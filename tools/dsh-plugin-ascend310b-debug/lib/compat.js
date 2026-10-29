@@ -550,11 +550,18 @@ export function assessUnifiedEnvironment(facts) {
 	}
 	const version = facts?.ascendEnvVersion?.value ?? null;
 	const abi = facts?.ascendEnvAbi?.value ?? null;
-	const isolated = facts?.ascendEnvPolicyIsolated?.value === true || facts?.ascendEnvIsolated?.value === true;
+	// The policy probe is the launch contract. The direct interpreter field is
+	// diagnostic only and must not make a non-isolated launch pass.
+	const isolated = facts?.ascendEnvPolicyIsolated?.value === true;
 	const acl = facts?.ascendEnvAclImport?.value ?? null;
 	const aclruntime = facts?.ascendEnvAclruntime?.value ?? null;
 	const mindsporeContext = facts?.ascendEnvMindsporeContext?.value ?? null;
 	const packageText = facts?.ascendEnvPackages?.value ?? '';
+	const importText = facts?.ascendEnvImports?.value ?? null;
+	const importState = importText === null ? null : new Map(String(importText).split(',').filter(Boolean).map((item) => {
+		const separator = item.indexOf(':');
+		return separator < 0 ? [item, false] : [item.slice(0, separator), item.slice(separator + 1) === 'ok'];
+	}));
 	const packageState = new Map(
 		String(packageText)
 			.split(',')
@@ -565,6 +572,7 @@ export function assessUnifiedEnvironment(facts) {
 			})
 	);
 	const missingPackages = UNIFIED_REQUIRED_PACKAGES.filter((name) => packageState.get(name) !== true);
+	const missingImports = importState === null ? [] : UNIFIED_REQUIRED_PACKAGES.filter((name) => importState.get(name) !== true);
 	const problems = [];
 	if (version !== UNIFIED_PYTHON_VERSION) {
 		problems.push(`Python 版本为 ${version ?? '未采集'}，统一环境要求 ${UNIFIED_PYTHON_VERSION}。`);
@@ -578,6 +586,9 @@ export function assessUnifiedEnvironment(facts) {
 	if (mindsporeContext !== 'ok') problems.push(`ascend 环境中 MindSpore Ascend context 为 ${mindsporeContext ?? '未采集'}。`);
 	if (missingPackages.length > 0) {
 		problems.push(`ascend 环境缺少统一案例包：${missingPackages.join('、')}。`);
+	}
+	if (missingImports.length > 0) {
+		problems.push(`ascend 环境关键包实际导入失败：${missingImports.join('、')}。`);
 	}
 	if (problems.length === 0) {
 		return {

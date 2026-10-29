@@ -29,7 +29,7 @@ description: 昇腾 310B（Ascend 310B1/310B4）程序调试工作流。当用�
 3. `ascend_debug_plan`——用症状或领域生成分层计划，从最早的门开始，按每步的停止条件推进。
 4. `ascend_sample_index`——定位可参照的样例程序；先看样例目录的 README，再执行命令。
 5. 需要探针没覆盖的信息时，用 `ascend_board_exec` 打一条只读命令；不确定就先 `run: false` 看等价调用。
-6. 多板或 IP 会变化的实验室：用 `ascend_discover` 做局域网扫描；它按 MAC 建本地资产表，并记录驱动/CANN/系统重装变化。**同一 hostname 不等于同一块板**，多块出厂镜像可能都叫 `orangepiaipro`；不同 MAC 必须保留为不同 target。网络找不到板时，用 `ascend_serial_probe` 做串口发现：`serial.port: auto` 自动枚举 CH340/CH343 等 USB 串口，读取 IPv4/MAC 后再尝试 SSH 探测并写入设备列表。需要单条诊断时用 `ascend_serial_exec`。串口工具只使用 `HwHiAiUser`，不做 root 串口探测。
+6. 多板或 IP 会变化的实验室：用 `ascend_discover` 做局域网扫描；它为一台物理板建立稳定的逻辑板卡 ID，并保存该板所有物理网口 MAC 作为别名，记录驱动/CANN/系统重装变化。**同一 hostname、相同 machine-id 都不等于同一块板**；出厂镜像可能克隆这些值，不能据此合并。验证顺序是：先匹配已保存的任一网口 MAC 别名，再确认 SoC/档位和板级证据；无法用别名唯一匹配时保留为不同记录，不能猜合并。网络找不到板时，用 `ascend_serial_probe` 做串口发现：`serial.port: auto` 自动枚举 CH340/CH343 等 USB 串口，读取 IPv4/MAC 后再尝试 SSH 探测并写入设备列表。需要单条诊断时用 `ascend_serial_exec`。串口工具只使用 `HwHiAiUser`，不做 root 串口探测。
 7. 案例发布复现：先从公开 GitHub 仓库在板端检出固定 commit（记录 commit 和干净工作树）；模型必须从 HF 固定 revision 下载，默认 `HF_ENDPOINT=https://hf-mirror.com`，再用 `ascend_model_download source=hf` 或板端 `hf download`。禁止从作者电脑用 `scp`/`rsync` 复制模型、ONNX、OM 或数据集后当作下载证据；完整门见 `ascend310b-case-testing`。
 8. 下载单个教程资产：`ascend_model_download`。华为云 OBS 直接下载；HF 自动改写到 `hf-mirror.com`；GitHub 自动使用网页代理。先 `dryRun: true`，确认来源/目标后，再显式 `allowStateChange: true`。
 9. 运行章节程序：`ascend_board_run`。先 `dryRun: true` 核对 cwd 和命令；默认 `environment: "ascend"` 会加载统一 ascend 环境、CANN，并禁用 user-site，再执行 `atc`、`python`、`pytest`、`msame` 或测试脚本，并保存退出码、耗时和输出。`base` 只用于显式系统诊断。

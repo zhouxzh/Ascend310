@@ -268,10 +268,11 @@ export const ENTRIES = Object.freeze([
 		area: 'env',
 		stage: 'device',
 		symptoms: ['device not found', 'no device', '设备不存在', '驱动', 'driver', 'devmm', 'davinci', 'reset', '复位'],
-		rootCause: '驱动/固件与内核不配套、设备节点未创建，或设备进入复位循环。',
+		rootCause: '候选原因包括驱动/内核组合不匹配、设备节点未创建或设备复位；必须用本板输出逐项验证，不能仅凭症状认定固件不匹配。',
 		steps: [
-			{ probe: 'device', do: '记录 npu-smi 输出、/dev/davinci*、/dev/devmm*、dmesg 尾部。', stop: '无设备行时先修驱动层，不要继续调模型。' },
-			{ probe: 'device', do: '确认驱动与固件是同一套 Ascend HDK 的配套组合。', stop: '覆盖升级顺序固定为先固件、再驱动、最后 CANN。' },
+			{ probe: 'device', do: '记录 npu-smi 输出、/dev/davinci*、/dev/devmm*、lsmod 和同一时间窗口的 dmesg。', stop: '无设备行或模块未加载时先停在设备/驱动层，不继续调模型。' },
+			{ probe: 'device', do: '只有在读到可信固件版本且能查到该板型/内核的厂商配套矩阵时，才核对固件、驱动与 CANN；固件不可读或资料未覆盖时标为 untested。', stop: '不能把驱动号当固件号，也不能据未采集固件触发升级建议。' },
+			{ probe: 'device', do: '若用户依据适用的厂商维护说明计划升级，单独核对板型、目标版本、回退方案和停机窗口。', stop: '本调试计划不规定通用升级次序；没有明确证据和用户授权时不升级固件、驱动或 CANN。' },
 			{ probe: 'device', do: '仅在仓库已记录的 Ascend 310B4 / 8T 板况上，把 Alarm 记录为背景；其他 SKU 或新板不要套用该结论。', stop: '只有在设备缺失、加载失败或复位循环时才阻断。' }
 		],
 		commands: ['npu-smi info', 'ls -l /dev/davinci* /dev/devmm* 2>/dev/null', 'lsmod | grep -E "drv|ascend|hisi"', 'dmesg -T | tail -n 120'],
@@ -351,11 +352,12 @@ export const ENTRIES = Object.freeze([
 		stage: 'service',
 		symptoms: ['health check', 'api', 'http 500', '健康检查', '服务', 'uvicorn', 'app.py', '进程'],
 		rootCause:
-			'服务进程没有 CANN 环境。这样 HTTP 端口可以正常应答，但任何真实推理都会失败。',
+			'CANN 环境未加载是候选原因之一，但 HTTP 健康只证明路由可响应；真实推理失败还可能来自 OM 加载、输入合同、设备状态、算子、HBM 或应用逻辑。先用启动环境和真实请求证据定位，不按 health 单独归因。',
 		steps: [
-			{ probe: 'service', do: '用案例的启动脚本重启服务（它带 import acl 预检），不要用裸 python app.py 绕过。', stop: '只重启被确认的 PID。' },
-			{ probe: 'service', do: '依次验证监听端口、GET /api/health、GET /api/bootstrap、静态首页，再发一次真实推理请求。', stop: '静态页通过不代表 NPU 可用。' },
-			{ probe: 'device', do: '推理前后各采一次 npu-smi，确认设备真的有工作。', stop: '没有 NPU 活动时按启动环境问题处理。' }
+			{ probe: 'cann', do: '确认服务进程的解释器与启动环境；source CANN 后在同一 ascend Python 中执行 import acl，并检查 ACL 初始化日志。', stop: '若 acl/import 或初始化失败，停在环境/运行时层；通过后继续检查模型，不重复重启。' },
+			{ probe: 'load', do: '核对模型路径与 SHA-256，确认启动日志包含 OM 加载成功；按模型合同检查输入名称、shape、dtype 和预处理。', stop: '缺 OM、哈希不符或合同失败时停在资产/模型层，不把它归为 CANN 环境缺失。' },
+			{ probe: 'service', do: '依次验证监听端口、GET /api/health、GET /api/bootstrap，再发一次真实推理请求并保留响应和服务日志。', stop: '静态页/health 通过不等于推理通过；按实际错误码继续分层。' },
+			{ probe: 'device', do: '记录请求前后 npu-smi 内存/AICore，并检查设备错误和服务端异常。', stop: '无 NPU 活动是线索而非单一根因；还需确认请求是否进入模型执行路径。' }
 		],
 		commands: [
 			'source /usr/local/miniconda3/etc/profile.d/conda.sh && conda activate ascend && export PYTHONNOUSERSITE=1',

@@ -11,7 +11,7 @@ description: Debug camera capture on Ascend 310B1/310B4 boards by separating V4L
 
 ## 本仓库已记录的板端设置
 
-完整记录见插件包内 `docs/ascend310b-peripheral-setup.md`。
+完整记录见插件包内 `docs/peripheral-setup.md`。
 
 - 目标系统常见 V4L2 节点为 `root:video`、`0660`。若 `HwHiAiUser` 不在 `video` 组，管理员执行 `sudo usermod -aG video HwHiAiUser`，然后退出并重新登录，再拔插 USB 摄像头。
 - 重新登录后检查 `id` 包含 `video`，再执行 `ls -l /dev/video*`、`v4l2-ctl --list-devices`。不要用 `chmod 666` 绕过权限。
@@ -51,7 +51,9 @@ lsusb
 
 ## 真实采集
 
-需要写入测试图像时，通过 `ascend_board_run` 显式执行，不要把它当成只读命令：
+优先使用插件工具 `ascend_camera_capture`：格式、分辨率和 FPS 来自板端 `v4l2-ctl -d <device> --list-formats-ext` 的实际输出，不使用猜测表。先 `dryRun: true` 核对设备与参数，再显式 `allowStateChange: true` 采集。工具固定使用 `ascend` 环境读取非空帧，优先 OpenCV；`cv2` 不可用时回退到 ffmpeg 抓帧和 Pillow 图像统计。产物位于 `/tmp/ascend310b-debug/peripherals`，并返回实际尺寸、FourCC、FPS/采集后端、JPEG、SHA-256 和图像统计。两条路径都失败时停在采集层，不进入 DVPP/NPU 结论。
+
+需要手工复现时，通过 `ascend_board_run` 显式执行，不要把它当成只读命令：
 
 ```bash
 v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=/tmp/camera-frame.raw

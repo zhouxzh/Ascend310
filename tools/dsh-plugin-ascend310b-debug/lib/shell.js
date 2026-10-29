@@ -413,11 +413,8 @@ export function validateTaskCommand(command, { allowPrivileged = false, allowDes
 	if (/\bnpu-smi\s+(?:set|reset|upgrade)\b/i.test(text)) {
 		return { ok: false, reason: '任务运行器不允许修改 NPU 健康、复位或升级固件；这些操作只能由用户手工执行。' };
 	}
-	if (/(?:^|[;&|]\s*)(?:reboot|shutdown|poweroff)\b/i.test(text)) {
-		return { ok: false, reason: '任务运行器不允许重启或关闭开发板。' };
-	}
-	if (/(?:^|[;&|]\s*)(?:\/sbin\/)?(?:reboot|shutdown|poweroff|halt|kexec)\b/i.test(text)) {
-		return { ok: false, reason: '任务运行器不允许重启、关机或 kexec。' };
+	if (/(?:^|[;&|]\s*)(?:(?:sudo\s+(?:-[^\s]+\s+)*(?:--\s+)?)?)(?:\/usr\/sbin\/|\/sbin\/)?(?:reboot|shutdown|poweroff|halt|kexec)\b/i.test(text)) {
+		return { ok: false, reason: '任务运行器不允许重启、关闭或 kexec 开发板。' };
 	}
 	if (/\bbusybox\s+(?:reboot|shutdown|poweroff|halt)\b/i.test(text)) {
 		return { ok: false, reason: '任务运行器不允许通过 busybox 重启或关闭开发板。' };
@@ -615,14 +612,14 @@ export async function runLocalScript({ script, cwd, timeoutMs = 60000, exec = ex
 
 /** Run one explicitly approved task command over SSH, optionally in a cwd. */
 export async function runRemoteShell({ script, target, cwd, timeoutMs = 60000, exec = execFileCapture, input = null }) {
-	const command = cwd ? `cd ${quote(cwd)} && ${script}` : script;
+	const command = cwd ? `cd ${quote(cwd)} && { ${script}; }` : script;
 	const result = await runRemoteScript({ script: command, target, timeoutMs, exec, input });
 	return { ...result, command };
 }
 
 /** Run one explicitly approved task command on the local host. */
 export async function runLocalShell({ script, cwd, timeoutMs = 60000, exec = execFileCapture }) {
-	const command = cwd ? `cd ${quote(cwd)} && ${script}` : script;
+	const command = cwd ? `cd ${quote(cwd)} && { ${script}; }` : script;
 	const result = await runLocalScript({ script: command, timeoutMs, exec });
 	return { ...result, command };
 }

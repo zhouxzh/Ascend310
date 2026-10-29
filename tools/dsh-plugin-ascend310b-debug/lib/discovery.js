@@ -13,12 +13,13 @@
  * @module dsh-plugin-ascend310b-debug/discovery
  */
 
+import { createSocket } from 'node:dgram';
 import { networkInterfaces } from 'node:os';
 import { Socket } from 'node:net';
 import { resolve } from 'node:path';
 
 import { assessBoardScope } from './compat.js';
-import { buildProbeScript, parseProbeOutput } from './probe.js';
+import { buildIdentityProbeScript, buildProbeScript, parseProbeOutput } from './probe.js';
 import { runRemoteScript } from './shell.js';
 import {
 	inventoryPath,
@@ -79,7 +80,11 @@ export function isLocalScanCandidate(value) {
  */
 export function inferLocalPrivateCidrs(interfaces = networkInterfaces()) {
 	const cidrs = new Set();
-	for (const entries of Object.values(interfaces ?? {})) {
+	// Hyper-V, WSL, Docker and VM adapters are not the physical lab LAN. They
+	// create large, unreachable ranges and can send discovery into a NAT subnet.
+	const virtualInterface = /(?:^|[\s_(])(?:vethernet|wsl|hyper-v|vmware|virtualbox|docker|veth|br-|utun|loopback|tap|tun)(?:$|[\s_)])/i;
+	for (const [name, entries] of Object.entries(interfaces ?? {})) {
+		if (virtualInterface.test(name)) continue;
 		for (const entry of entries ?? []) {
 			if (entry.internal === true) continue;
 			const family = String(entry.family ?? '').toLowerCase();
@@ -115,18 +120,81 @@ export function inferLocalPrivateCidrs(interfaces = networkInterfaces()) {
 /**
  * Resolve the scan list for a tool/panel request.
  *
- * Explicit per-call CIDRs are authoritative. Otherwise configured CIDRs are
- * merged with active local private CIDRs (real prefix from /22 to /30) so
- * hotspot and routed lab-network changes are discovered.
+ * Explicit per-call CIDRs are authoritative. A configured scan range is also
+ * authoritative when present, so a stale or offline lab range does not force a
+ * scan of every virtual/physical interface. If neither is configured, infer
+ * active private interfaces as a convenience.
  */
 export function resolveDiscoveryCidrs(explicit, configured, interfaces = networkInterfaces()) {
 	if (Array.isArray(explicit) && explicit.length > 0) return [...new Set(explicit)];
-	const cidrs = [
-		...(Array.isArray(configured) ? configured : []),
-		...inferLocalPrivateCidrs(interfaces)
-	];
-	return [...new Set(cidrs)];
+	if (Array.isArray(configured) && configured.length > 0) return [...new Set(configured)];
+	return inferLocalPrivateCidrs(interfaces);
 }
+
+/** Return whether an IPv4 address belongs to a CIDR. */
+function cidrContainsAddress(cidr, address) {
+	const match = /^([0-9.]+)\/([0-9]{1,2})$/.exec(String(cidr));
+	const numericAddress = parseIPv4(address);
+	const numericNetwork = parseIPv4(match?.[1]);
+	const prefix = Number(match?.[2]);
+	if (numericAddress === null || numericNetwork === null || !Number.isInteger(prefix)) return false;
+	const mask = (0xffffffff << (32 - prefix)) >>> 0;
+	return ((numericAddress & mask) >>> 0) === ((numericNetwork & mask) >>> 0);
+}
+
+/**
+ * Ask the host routing table which local address would be used for an
+ * outbound UDP socket. No packet is sent; the connect() callback only selects
+ * the route. This follows Wi-Fi/Ethernet changes without a fixed gateway.
+ */
+export function defaultLocalAddress(timeoutMs = 1000) {
+	return new Promise((resolveAddress) => {
+		const socket = createSocket('udp4');
+		let settled = false;
+		const finish = (value) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			try {
+				socket.close();
+			} catch {
+				// Socket may already be closed after a route error.
+			}
+			resolveAddress(value);
+		};
+		const timer = setTimeout(() => finish(null), timeoutMs);
+		socket.once('error', () => finish(null));
+		try {
+			socket.connect(53, '1.1.1.1', () => finish(socket.address().address ?? null));
+		} catch {
+			finish(null);
+		}
+	});
+}
+
+/**
+ * Resolve the fast default scan scope.
+ *
+ * Explicit/configured CIDRs remain authoritative. Otherwise prefer the
+ * currently routed physical interface instead of scanning every active
+ * physical interface. This keeps a normal /24 scan near 254 addresses even
+ * when a laptop also has a USB Ethernet or management network.
+ */
+export async function resolveDiscoveryCidrsForScan(
+	explicit,
+	configured,
+	interfaces = networkInterfaces(),
+	defaultAddress = defaultLocalAddress
+) {
+	if (Array.isArray(explicit) && explicit.length > 0) return [...new Set(explicit)];
+	if (Array.isArray(configured) && configured.length > 0) return [...new Set(configured)];
+	const active = inferLocalPrivateCidrs(interfaces);
+	if (active.length <= 1) return active;
+	const routedAddress = await defaultAddress();
+	const routedCidr = active.find((cidr) => cidrContainsAddress(cidr, routedAddress));
+	return routedCidr ? [routedCidr] : active;
+}
+
 
 /**
  * Expand one CIDR into candidate host addresses.
@@ -218,9 +286,9 @@ async function mapLimit(items, limit, worker) {
  * @param {object} options - probe options.
  * @returns {Promise<object>} candidate result.
  */
-export async function probeCandidate({ host, user = null, port = 22, timeoutMs = 30000, exec } = {}) {
+export async function probeCandidate({ host, user = null, port = 22, timeoutMs = 30000, light = false, exec } = {}) {
 	const result = await runRemoteScript({
-		script: buildProbeScript(),
+		script: light ? buildIdentityProbeScript() : buildProbeScript(),
 		target: { host, user, port },
 		timeoutMs,
 		exec
@@ -232,6 +300,15 @@ export async function probeCandidate({ host, user = null, port = 22, timeoutMs =
 	const scope = assessBoardScope(environment);
 	const facts = environment.facts ?? {};
 	const mac = normalizeMac(facts.macAddress?.value);
+	const reportedInterfaces = Array.isArray(facts.macInterfaces?.value) ? facts.macInterfaces.value : [];
+	const interfaceMacs = reportedInterfaces
+		.map((entry) => ({ iface: String(entry?.iface ?? ''), mac: normalizeMac(entry?.mac) }))
+		.filter((entry) => entry.iface !== '' && entry.mac !== null);
+	const macs = [...new Set([
+		...(Array.isArray(facts.macAddresses?.value) ? facts.macAddresses.value.map(normalizeMac) : []),
+		...interfaceMacs.map((entry) => entry.mac),
+		...(mac === null ? [] : [mac])
+	].filter(Boolean))];
 	const system = systemFromFacts(facts);
 	system.tier = system.tier ?? (facts.socTier?.value ? String(facts.socTier.value) : null);
 	return {
@@ -240,7 +317,9 @@ export async function probeCandidate({ host, user = null, port = 22, timeoutMs =
 		ok: true,
 		soc: facts.soc?.value ?? null,
 		hostname: facts.hostname?.value ?? null,
-		mac: mac ?? null,
+		mac: mac ?? macs[0] ?? null,
+		macs,
+		interfaceMacs,
 		port,
 		system,
 		scope,
@@ -268,10 +347,10 @@ export async function discoverNetwork({
 	cidrs,
 	user = null,
 	port = 22,
-	scanConcurrency = 24,
+	scanConcurrency = 64,
 	probeConcurrency = 4,
-	scanTimeoutMs = 500,
-	probeTimeoutMs = 60000,
+	scanTimeoutMs = 350,
+	probeTimeoutMs = 10000,
 	path,
 	config = {},
 	exec
@@ -286,11 +365,12 @@ export async function discoverNetwork({
 		user,
 		port,
 		timeoutMs: probeTimeoutMs,
+		light: true,
 		exec
 	}));
-	// A board with Wi-Fi and Ethernet can answer on two addresses. Keep one
-	// observation per MAC, preferring the address the board itself reports as
-	// primary, rather than displaying the same physical board twice.
+	// A board with Wi-Fi and multiple Ethernet ports can answer on several
+	// addresses. Deduplicate by any interface MAC alias, not by the currently
+	// routed MAC, and prefer the address the board reports as primary.
 	const uniqueProbed = [];
 	const byMac = new Map();
 	for (const candidate of probed) {
@@ -298,23 +378,29 @@ export async function discoverNetwork({
 			uniqueProbed.push(candidate);
 			continue;
 		}
-		if (candidate.mac === null) {
+		const aliases = candidate.macs?.length > 0 ? candidate.macs : [candidate.mac].filter(Boolean);
+		if (aliases.length === 0) {
 			// Do not persist or expose a hostname-only executable identity.
 			continue;
 		}
-		const existing = byMac.get(candidate.mac);
+		const existing = aliases.map((mac) => byMac.get(mac)).find(Boolean);
 		if (existing === undefined) {
-			byMac.set(candidate.mac, candidate);
+			for (const mac of aliases) byMac.set(mac, candidate);
 			uniqueProbed.push(candidate);
 			continue;
 		}
 		const candidatePrimary = candidate.primaryIp === candidate.ip;
 		const existingPrimary = existing.primaryIp === existing.ip;
-		if (candidatePrimary && !existingPrimary) {
-			const index = uniqueProbed.indexOf(existing);
-			if (index >= 0) uniqueProbed[index] = candidate;
-			byMac.set(candidate.mac, candidate);
-		}
+		const chosen = candidatePrimary && !existingPrimary ? candidate : existing;
+		const merged = {
+			...chosen,
+			mac: chosen.mac ?? existing.mac,
+			macs: [...new Set([...(existing.macs ?? []), ...(candidate.macs ?? []), existing.mac, candidate.mac].filter(Boolean))],
+			interfaceMacs: [...(existing.interfaceMacs ?? []), ...(candidate.interfaceMacs ?? [])]
+		};
+		const index = uniqueProbed.indexOf(existing);
+		if (index >= 0) uniqueProbed[index] = merged;
+		for (const mac of merged.macs) byMac.set(mac, merged);
 	}
 	const inventoryFile = path ?? inventoryPath(config);
 	const inventory = readInventory(inventoryFile);
@@ -334,6 +420,8 @@ export async function discoverNetwork({
 			ip: candidate.ip,
 			user,
 			mac: candidate.mac,
+			macs: candidate.macs,
+			interfaceMacs: candidate.interfaceMacs,
 			hostname: candidate.hostname,
 			port: candidate.port ?? port,
 			system: candidate.system
@@ -354,7 +442,7 @@ export async function discoverNetwork({
 		});
 	}
 	if (found.length > 0) saveInventory(inventoryFile, inventory);
-	return { scanned: targets.length, open: open.length, found, others, errors, inventoryPath: inventoryFile };
+	return { scanned: targets.length, cidrs: [...cidrs], open: open.length, found, others, errors, inventoryPath: inventoryFile };
 }
 
 /** Remove null/undefined fields before a tool schema sees them. */
@@ -363,6 +451,7 @@ function compactBoard(board) {
 	for (const key of ['mac', 'hostname', 'model', 'soc', 'tier', 'driver', 'cann', 'firmware', 'identity']) {
 		if (typeof board[key] === 'string' && board[key] !== '') output[key] = board[key];
 	}
+	if (Array.isArray(board.macs) && board.macs.length > 0) output.macs = board.macs;
 	output.changes = (Array.isArray(board.changes) ? board.changes : []).map((change) => ({
 		...(typeof change.at === 'string' ? { at: change.at } : {}),
 		...(typeof change.fromIp === 'string' ? { fromIp: change.fromIp } : {}),
@@ -379,6 +468,7 @@ function compactBoard(board) {
 /** Render a short human-readable discovery report. */
 function renderDiscovery(result) {
 	const lines = [
+		`扫描网段：${(result.cidrs ?? []).join('、') || '未记录'}。`,
 		`扫描地址：${result.scanned} 个；SSH 开放：${result.open} 个。`,
 		'',
 		'### 已识别开发板',
@@ -387,7 +477,7 @@ function renderDiscovery(result) {
 			: result.found.map((board) => {
 					const detail = [
 						`- ${board.id}：${board.ip}${board.hostname ? `（${board.hostname}）` : ''}`,
-						board.mac ? `  - MAC：${board.mac}` : null,
+						board.mac ? `  - MAC：${board.mac}${Array.isArray(board.macs) && board.macs.length > 1 ? `（另有 ${board.macs.length - 1} 个网口别名）` : ''}` : null,
 						board.model || board.soc ? `  - 型号：${board.model ?? board.soc}${board.tier ? ` / ${board.tier}` : ''}` : null,
 						board.driver || board.cann ? `  - 驱动：${board.driver ?? '未采集'}；CANN：${board.cann ?? '未采集'}` : null,
 						`  - 状态：${board.status}`,
@@ -396,7 +486,7 @@ function renderDiscovery(result) {
 					return detail.join('\n');
 				})),
 		'',
-		`资产表：${result.inventoryPath}`
+		`记录文件：${result.inventoryPath}`
 	];
 	if (result.others.length > 0) {
 		lines.push('', '### 非 310B 主机');
@@ -436,8 +526,8 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 				},
 				user: { type: 'string', description: 'SSH user. Defaults to config.discovery.user, then the first configured target user.' },
 				port: { type: 'integer', description: 'SSH port. Defaults to config.discovery.port, then 22.' },
-				concurrency: { type: 'integer', description: 'TCP scan concurrency. Defaults to config.discovery.scanConcurrency, then 24.' },
-				timeoutMs: { type: 'integer', description: 'SSH probe timeout in milliseconds. Defaults to config.discovery.probeTimeoutMs, then 60000.' },
+				concurrency: { type: 'integer', description: 'TCP scan concurrency. Defaults to config.discovery.scanConcurrency, then 64.' },
+				timeoutMs: { type: 'integer', description: 'SSH probe timeout in milliseconds. Defaults to config.discovery.probeTimeoutMs, then 10000.' },
 				inventoryPath: { type: 'string', description: 'Inventory JSON path. Defaults to config location or DSH_HOME/ascend310b-inventory.json.' }
 			},
 			output: {
@@ -447,6 +537,7 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 					properties: {
 						text: { type: 'string', required: true },
 						scanned: { type: 'integer', required: true },
+						cidrs: { type: 'array', required: true, items: { type: 'string' } },
 						open: { type: 'integer', required: true },
 						found: {
 							type: 'array',
@@ -459,6 +550,7 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 									ip: { type: 'string', required: true },
 									status: { type: 'string', required: true },
 									mac: { type: 'string' },
+									macs: { type: 'array', items: { type: 'string' } },
 									hostname: { type: 'string' },
 									model: { type: 'string' },
 									soc: { type: 'string' },
@@ -515,7 +607,7 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 			},
 			async execute(args) {
 				const discovery = config?.discovery ?? {};
-				const cidrs = resolveDiscoveryCidrs(args.cidrs, discovery.cidrs);
+				const cidrs = await resolveDiscoveryCidrsForScan(args.cidrs, discovery.cidrs);
 				const user = typeof args.user === 'string'
 					? args.user
 					: discovery.user ?? config?.targets?.[0]?.user ?? null;
@@ -531,10 +623,10 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 						cidrs,
 						user,
 						port: Number.isInteger(args.port) ? args.port : discovery.port ?? 22,
-						scanConcurrency: Number.isInteger(args.concurrency) ? args.concurrency : discovery.scanConcurrency ?? 24,
+						scanConcurrency: Number.isInteger(args.concurrency) ? args.concurrency : discovery.scanConcurrency ?? 64,
 						probeConcurrency: Number.isInteger(discovery.probeConcurrency) ? discovery.probeConcurrency : 4,
-						scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 500,
-						probeTimeoutMs: Number.isInteger(args.timeoutMs) ? args.timeoutMs : discovery.probeTimeoutMs ?? 60000,
+						scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 350,
+						probeTimeoutMs: Number.isInteger(args.timeoutMs) ? args.timeoutMs : discovery.probeTimeoutMs ?? 10000,
 						path: configuredInventory,
 						config
 					});
@@ -543,6 +635,7 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 					return {
 						text: `发现失败：${message}`,
 						scanned: 0,
+						cidrs: [],
 						open: 0,
 						found: [],
 						others: [],
@@ -559,6 +652,7 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 				return {
 					text: renderDiscovery({ ...result, found }),
 					scanned: result.scanned,
+					cidrs: result.cidrs ?? [],
 					open: result.open,
 					found,
 					others,

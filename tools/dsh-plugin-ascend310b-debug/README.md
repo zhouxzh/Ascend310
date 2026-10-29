@@ -39,7 +39,7 @@ npm test
 
 ```powershell
 cd <教材仓库根目录>
-node scripts/install-dsh-plugins.mjs --profile desktop
+node tools/install-dsh-plugins.mjs --profile desktop
 ```
 
 安装完成后，在 `%USERPROFILE%\.dsh\profiles\desktop\cordis.patch.yml` 中保留或更新本机 `dsh-plugin-ascend310b-debug` 配置块（**板卡地址只写在这里，不写进插件**）。如果已经有同 `id` 的插件行，只更新它的 `config`，不要重复添加：
@@ -67,13 +67,13 @@ node scripts/install-dsh-plugins.mjs --profile desktop
         user: <SSH 用户>
         note: 20T 证据集；与 8T 分开记录
     discovery:
-      cidrs: ["10.0.0.0/24"]          # 可选；只允许私有 IPv4，活动本机私有网段按真实 /22-/30 自动合并
+      cidrs: []                       # 默认每次扫描动态推导；需要时再填固定覆盖网段
       user: <SSH 用户>
       port: 22
-      scanConcurrency: 24
+      scanConcurrency: 64
       probeConcurrency: 4
-      scanTimeoutMs: 500
-      probeTimeoutMs: 60000
+      scanTimeoutMs: 350
+      probeTimeoutMs: 10000
       # inventoryPath: <本地资产表；默认 DSH_HOME/ascend310b-inventory.json>
     serial:
       port: auto                    # 自动枚举 CH340/CH343/ttyUSB；也可显式填 COM14
@@ -86,7 +86,7 @@ node scripts/install-dsh-plugins.mjs --profile desktop
 
 串口凭据只放在 profile 的本机配置中，不写进插件源码、skill、README 示例或 Git。`port: auto` 会枚举当前存在的 USB 串口；只有 profile 显式设置 `allowAutoLogin: true` 时才允许向候选串口逐个尝试登录。高安全环境应显式填写 `port: COM<N>` 或 `/dev/ttyUSB<N>`，避免密码被发送到无关适配器。`ascend_serial_probe` 会自动登录并执行只读网络探测；`ascend_serial_exec` 用于网络不可用时的单条只读诊断。串口工具只使用 `HwHiAiUser`，不提供 root 串口探测。
 
-只需要本机解析探测记录时，可以省略 `targets`；需要 SSH 探测时再填板卡配置。动态 IP 环境应给每块板唯一的 mDNS/DNS 主机名，或使用 DHCP 保留地址；`ascend_discover` 会把发现的板卡按 MAC 写入本地资产表，并记录系统变化。
+只需要本机解析探测记录时，可以省略 `targets`；需要 SSH 探测时再填板卡配置。动态 IP 环境应给每块板唯一的 mDNS/DNS 主机名，或使用 DHCP 保留地址；`ascend_discover` 会保存一块逻辑板卡及其全部物理网口 MAC 别名，并记录系统变化。主机名和 IP 只用于当前网络定位。
 
 ### 统一案例运行环境
 
@@ -114,15 +114,22 @@ CPython 3.9 aarch64 ABI
 
 ### 动态 IP、发现与多板
 
-`ascend_discover` 只扫描私有 IPv4 网段，不会扫描公网。未显式传入 `cidrs` 时，它会把 profile 中的 `discovery.cidrs` 与当前活动网卡实际前缀（`/22` 到 `/30`；更宽的网络安全截为 `/24`）自动合并，因此电脑在 `192.168.8.x/22`、开发板在 `192.168.9.x` 时仍可发现开发板。单次调用显式传入的 `cidrs` 仍然具有最高优先级，不会自动追加其他网段。发现器先探测 22 端口，再用和 `ascend_probe` 相同的只读脚本读取主机名、eth0 MAC、板型、驱动、CANN 和 Python，然后按 MAC 写入本地资产表：
+`ascend_discover` 只扫描私有 IPv4 网段，不会扫描公网。默认不配置固定 CIDR：每次扫描先根据当前默认路由确定实际联网的物理网卡，只扫描该网卡的真实 `/22`–`/30` 网段；WSL、Hyper-V、Docker 等虚拟网卡会被排除。这样换 WiFi、换实验室或换有线网络不需要改配置或重启，也不会因为同时插着 USB 网卡就扫描两个 `/24`。显式传入 `cidrs` 或配置 `discovery.cidrs` 时才固定扫描范围；单次调用参数优先级最高。发现器先探测 22 端口，再用和 `ascend_probe` 相同的只读脚本读取主机名、全部物理网口 MAC、板型、驱动、CANN 和 Python，然后按逻辑板卡 ID 写入本地资产表：
 
 ```text
 DSH_HOME/ascend310b-inventory.json
 ```
 
-同一块板换 IP 会归并为同一条记录；重装系统、驱动或 CANN 变化会写入 `changes`。发现到的板卡会以 target id（例如 `ascend-c0742bfddd7a`）出现在面板和 `target` 选择中，不需要手工把 IP 写进 `targets`。**多块板可以有相同 hostname**，例如两台出厂镜像都叫 `orangepiaipro`；hostname 只用于显示或回退，MAC 才是物理板身份，不同 MAC 必须保留为不同 target。资产表包含 MAC，禁止提交到 Git 或放进插件包。固件版本不进入资产指纹：当前板端没有可信、可读的版本来源。
+同一块板换 IP、换有线/无线网口会归并为同一条记录；重装系统、驱动或 CANN 变化会写入 `changes`，但不会改变逻辑板卡 ID。发现到的板卡会以 target id（例如 `ascend-c0742bfddd7a`）出现在面板和 `target` 选择中，不需要手工把 IP 写进 `targets`。**多块板可以有相同 hostname**，例如两台出厂镜像都叫 `orangepiaipro`；hostname 只用于显示或回退，不能作为物理板身份。`machine-id` 也不能作为唯一身份，因为克隆镜像可能相同。资产表保留所有物理网口 MAC 别名，并用逻辑板卡 ID 区分不同板卡；资产表包含 MAC，禁止提交到 Git 或放进插件包。固件版本不进入资产指纹：当前板端没有可信、可读的版本来源。
 
-如果某块已配置的板没有开机，或者当前网段找不到它的主机名，`ascend_probe` 对那个 target 返回 `offline/unreachable`，并明确“未采集到 SoC、CANN、驱动”。这只是网络电源事实，不能写成 310B 不支持，也不能拿另一块在线板的结果替代。网络迁移后先运行不带参数的 `ascend_discover`，它会自动包含当前热点或有线网的私有 `/24`，再检查 `targets` 中的固定地址或 mDNS 名称。
+板卡身份规则：
+
+- **同一块板**：观察到至少一个已知物理网口 MAC 别名，或用户在资产表中明确建立别名绑定。换 IP、换 WiFi、换有线网口、重装同一镜像或升级 CANN 时，逻辑 ID 不变；OS/hostname/machine-id 变化只记录为系统变化。
+- **不同开发板**：没有共享物理网口 MAC 别名，且没有显式绑定。即使 hostname、machine-id、板型和 OS 完全相同，也必须保留为不同板卡。
+- **无法判断**：所有已知 MAC 都变化、网卡被更换，且没有可验证的板级唯一序列号时，不能自动猜测是同一块板。此时保留新记录，需要用户明确绑定；`hisi,boardid` 等值只能作为辅助证据，不能在未验证唯一性前单独当身份键。
+
+
+如果某块已配置的板没有开机，或者当前网段找不到它的主机名，`ascend_probe` 对那个 target 返回 `offline/unreachable`，并明确“未采集到 SoC、CANN、驱动”。这只是网络电源事实，不能写成 310B 不支持，也不能拿另一块在线板的结果替代。网络迁移后直接重新扫描即可；如果开发板接在非默认路由的有线副网卡上，临时调用 `ascend_discover cidrs=[...]`，不要把临时网段写死到 profile。
 
 调用示例：
 
@@ -137,7 +144,7 @@ ascend_discover cidrs=["10.42.0.0/24"]
 ascend_probe target=ascend-c0742bfddd7a
 ```
 
-对 10 块以上开发板，建议每块板第一次通过串口设置唯一主机名，之后用 `discovery.cidrs` 做周期扫描；网络找不到时，先用 `ascend_serial_probe` 从串口读取当前 IP，再回到 SSH。串口工具只执行只读网络/诊断命令，不做网络配置修改。
+对 10 块以上开发板，建议每块板第一次通过串口设置唯一主机名，之后用当前活动网段做周期扫描；如果实验室有多个固定网段，再在 `discovery.cidrs` 中显式列出。网络找不到时，先用 `ascend_serial_probe` 从串口读取当前 IP，再回到 SSH。串口工具只执行只读网络/诊断命令，不做网络配置修改。
 
 4) 技能文件不会被插件自动发现，需要单独放置。插件当前包含 14 个 310B skill，完整清单见 [`tools/README.md`](../README.md)。命名规范固定为：目录名、frontmatter `name` 和文档引用必须完全一致，全部使用 `ascend310b-` 前缀；专项调试 skill 使用 `ascend310b-<domain>-debug`，其中设备专项固定为 `ascend310b-camera-debug`、`ascend310b-microphone-debug`、`ascend310b-speaker-debug`。
 
@@ -172,25 +179,38 @@ cp -R "$plugin"/. "$dest"/
 | 工具 | 作用 | 关键参数 |
 | --- | --- | --- |
 | `ascend_probe` | 在目标板执行**只读**探测脚本并解析 | `target`、`rawText`（解析已有记录）、`timeoutMs` |
-| `ascend_discover` | 扫描私有网段、按 MAC 建资产表并记录驱动/CANN/系统变化 | `cidrs`、`user`、`port`、`concurrency`、`timeoutMs`、`inventoryPath` |
+| `ascend_discover` | 扫描私有网段、按逻辑板卡 ID 和多网口 MAC 别名建资产表并记录驱动/CANN/系统变化 | `cidrs`、`user`、`port`、`concurrency`、`timeoutMs`、`inventoryPath` |
 | `ascend_serial_probe` | 以 HwHiAiUser 串口登录后读取主机名、IPv4、接口、MAC 和默认路由，并自动尝试 SSH 写入设备列表 | `port`、`baudRate`、`timeoutMs` |
 | `ascend_serial_exec` | 以 HwHiAiUser 执行一条只读诊断命令 | `command`、`port`、`baudRate`、`timeoutMs` |
 | `ascend_check` | 用 `rawText` 或现场探测得到环境报告 | `target`、`rawText`、`repoRoot` |
 | `ascend_debug_plan` | 按症状/领域生成分层调试计划 | `symptom`、`area`、`target`、`rawText`、`maxEntries` |
 | `ascend_sample_index` | 检索 `samples/` 里的样例入口与测试命令 | `query`、`archetype`、`limit`、`repoRoot` |
 | `ascend_board_exec` | 执行**单条只读**诊断命令 | `command`、`target`、`run`、`timeoutMs` |
+| `ascend_camera_capture` | 从 V4L2 摄像头读取非空帧，优先 OpenCV、缺少 `cv2` 时回退 ffmpeg，输出实际尺寸/FourCC/FPS、JPEG 与哈希 | `target`、`device`、`width`、`height`、`pixelFormat`、`frameCount`、`allowStateChange`、`dryRun` |
+| `ascend_microphone_record` | 从 ALSA 或 PulseAudio/PipeWire source 按请求秒数录制 PCM16 WAV，返回实际 WAV 时长、采集耗时、总耗时、RMS、峰值、全零和削波比例 | `target`、`backend`、`device`、`sampleRate`、`channels`、`durationSec`、`allowStateChange`、`dryRun` |
+| `ascend_speaker_test` | 生成低幅度正弦 WAV，通过 ALSA 或 PulseAudio/PipeWire sink 播放；人耳结论保持未确认 | `target`、`backend`、`device`、`frequency`、`durationSec`、`allowStateChange`、`dryRun` |
+| `ascend_play_recording` | 通过已确认的 ALSA/Pulse sink 回放插件刚录制的麦克风 WAV；只接受固定录音目录中的路径 | `target`、`backend`、`device`、`recording`、`allowStateChange`、`dryRun` |
 | `ascend_board_run` | 显式执行下载、ATC、Python、pytest、msame 或教程脚本 | `command`、`cwd`、`target`、`allowStateChange`、`environment`、`dryRun`、`timeoutMs` |
 | `ascend_apt_install` | 通过 `HwHiAiUser + sudo` 安装受控 apt 软件包，密码仅走 SSH stdin | `target`、`packages`、`update`、`allowStateChange`、`dryRun`、`timeoutMs` |
 | `ascend_model_download` | 下载华为云、HF mirror 或 GitHub 网页代理资产，支持临时文件原子替换和可选 SHA-256 校验 | `source`、`url`/`repoId`、`filename`、`destination`、`githubProxy`、`sha256`、`allowStateChange` |
 | `ascend_ui_capture` | 用宿主机 Edge/Chrome 截取开发板前端页面 | `url`、`output`、`width`、`height`、`waitMs`、`allowStateChange` |
 
-浏览器侧另有 **昇腾310B调试** 面板：顶部是当前板卡和探测动作，左侧是按 MAC 去重的开发板列表，右侧按“概览 / 设备 / 开发板资产 / 调试 / 原始输出”分区。板卡名称统一规范为 `Orange Pi AI Pro 8T` / `Orange Pi AI Pro 20T`，概览同时显示 SoC、健康/温度、NPU 已用/总内存、CANN、驱动和外设计数；设备页按摄像头、音频播放、音频采集、音频 Sink、USB 外设分组显示已枚举设备和可展开的原始输出。资产页显示完整资产和系统变化；调试页放症状、样例和按 case 汇总的系统程序依赖；原始页放完整事实、原始探测和仓库版本组合。调试页的系统程序区只显示文档记录的 apt/Python/设备/用户组依赖和 `ascend_apt_install` dry-run 提示，不会从浏览器自动提权安装。面板在探测之前所有版本字段显示**未采集**；探测到非 310B 芯片时，面板顶部会明确写出“不适用”。
+浏览器侧另有 **昇腾310B调试** 面板：顶部是当前板卡和探测动作，左侧是按逻辑板卡 ID 去重的开发板列表（同一块板的多个网口 MAC 显示为别名），右侧按“概览 / 摄像头 / 音频接口 / 开发板记录 / 调试 / 原始输出”分区。板卡名称统一规范为 `Orange Pi AI Pro 8T / 20T · <总内存> GB` 的形式，例如 `Orange Pi AI Pro 8T · 7.4 GB`；内存总量是固定硬件信息，CANN、驱动、健康状态和实时内存占用只放在详情字段，不进入设备名。概览同时显示 SoC、健康/温度、NPU 已用/总内存、CANN、驱动和外设计数；摄像头页提供带有设备名称、`/dev/videoN`、Video Capture/Metadata/多平面能力标识的 V4L2 枚举与单帧采集，采集成功后直接在固定预览框中显示 JPEG 并支持打开原图；像素格式、分辨率和 FPS 下拉均来自该节点 `v4l2-ctl --list-formats-ext` 的实际输出，并完整列出所有报告的格式、尺寸和帧率，metadata-only 节点会明确禁用；音频接口页在同一屏左侧显示麦克风输入、右侧显示扬声器输出，下方录音回放直接使用右侧当前 Sink，不需要切换模式。麦克风和扬声器可以独立测试，不存在强制先后顺序。麦克风设备优先排列 USB/摄像头等外接输入；板载 capture 节点仍会列出，但不会因为排在最前就被默认使用。输入设备打不开时会返回具体 ALSA/Pulse 错误和设备名。麦克风录音完成后，可直接通过当前扬声器设备回放这段 WAV，再进行人工确认；如果回放无声，再单独检查扬声器和输出路由。枚举区同时列出 ALSA card/device 或 Pulse source/sink 名称、Pulse card/profile 和蓝牙配对/连接详情。蓝牙设备先在系统侧完成配对/连接，插件从 PulseAudio/PipeWire 已连接的 source/sink 进行录音或播放，不自动配对。开发板记录页显示当前选中板的身份、IP/MAC、内存、软件变化和串口状态，左侧列表负责选择与展开历史，避免同一份全量列表重复出现；调试页放症状、样例和按 case 汇总的系统程序依赖；原始页放完整事实、原始探测和仓库版本组合。调试页的系统程序区只显示文档记录的 apt/Python/设备/用户组依赖和 `ascend_apt_install` dry-run 提示，不会从浏览器自动提权安装。面板在探测之前所有版本字段显示**未采集**；探测到非 310B 芯片时，面板顶部会明确写出“不适用”。
 
-面板默认显示**上一次探测快照**：点“运行探测”执行一次只读探测，点“刷新”只重新读取报告缓存。左侧点击任一开发板会立即执行**一次**该板的只读探测并更新概览；即使没有开启实时监控，切换板子也会刷新当前板信息。需要持续观察板卡状态时，点“实时监控”开启 60 秒轮询；它每 60 秒重新执行一次只读探测并更新温度、内存、健康状态和版本字段，再点“停止实时”结束。点“串口发现”会通过 profile 的串口登录读取当前板卡主机名、IPv4、接口、MAC 和默认路由，并自动尝试 SSH 探测后写入设备列表；点“局域网扫描”会按 profile 的 `discovery.cidrs` 与本机活动网段扫描，按 MAC 更新资产表和 target 列表。轮询是快照更新，不是采样率更高的板端指标流。
+面板启动时直接读取**最近一次保存的设备信息**，不会自动反复执行整板探测。更新动作按项目需要分开：
+
+- “检查在线”：只检查当前开发板 SSH 端口是否可达，不读取 CANN、驱动或外设。
+- “更新系统信息”：只更新硬件、操作系统、NPU、CANN、驱动和 ATC 事实，不执行 Python/conda 环境导入。
+- “更新摄像头信息”：只更新 V4L2/USB 设备、格式、分辨率和 FPS。
+- “更新音频接口信息”：只更新 ALSA、PulseAudio/PipeWire 和蓝牙事实。
+
+摄像头、音频和 USB 卡片分别显示所属类别的更新时间，系统刷新不会把外设旧数据伪装成刚更新。刷新采用固定高度状态槽，在线检查中的旧结果会明确标为“上次检测”，不会加删板卡行或推挤主工作区。
+
+左侧点击任一开发板只切换该板的历史报告，不会因为历史板离线而启动阻塞式 SSH 探测。绿色只表示**本次 SSH 可达**，红色表示本次不可达，灰色表示尚未检测。历史变更显示为独立的“已变更”徽标，不再覆盖在线颜色。点“串口发现”会通过 profile 的串口登录读取当前板卡主机名、IPv4、接口、MAC 和默认路由，并自动尝试 SSH 探测后写入设备列表；点“局域网扫描”默认只扫描当前默认路由所在物理网段，profile 的 `discovery.cidrs` 非空时才作为固定覆盖，并在结果中显示实际 CIDR、SSH 开放数和记录文件路径。
 
 ### HTTP 路由
 
-面板使用四条路由：`GET /ascend310b-debug/report.json` 返回最近一次探测形成的报告；带 `?fresh=1` 时绕过 120 秒缓存，但仍不执行板端探测。`POST /ascend310b-debug/probe` 执行实时探测，`POST /ascend310b-debug/discover` 执行局域网扫描，`POST /ascend310b-debug/serial-probe` 执行串口发现并尝试 SSH 写入资产；面板右上角的“串口发现”“局域网扫描”等按钮调用这些路由。
+面板使用十四条路由：`GET /ascend310b-debug/report.json` 返回最近一次探测形成的报告；带 `?fresh=1` 时绕过 120 秒缓存，但仍不执行板端探测。`POST /ascend310b-debug/liveness` 并行检查 target 的 SSH 端口，只返回本次传输可达性；`POST /ascend310b-debug/probe` 执行整板环境探测；`system-refresh`、`camera-refresh`、`audio-refresh` 分别只刷新系统、V4L2/USB 和 ALSA/Pulse/Bluetooth facts，`POST /ascend310b-debug/discover` 执行局域网扫描，`GET /ascend310b-debug/camera-preview` 只返回固定目录中的 `camera-*.jpg`，`POST /ascend310b-debug/camera-capture`、`microphone-record`、`speaker-test`、`play-recording` 分别执行固定外设动作，录音和回放证据位于 `/tmp/ascend310b-debug/peripherals`，`POST /ascend310b-debug/bind` 将由用户明确确认的发现板绑定到已有配置，`POST /ascend310b-debug/serial-probe` 执行串口发现并尝试 SSH 写入开发板记录。面板右上角的“检查在线”“串口发现”“局域网扫描”，以及系统、摄像头、音频页内的分类更新按钮调用这些路由。
 
 ### 面板预览
 

@@ -39,7 +39,8 @@ const reactStub = {
 	createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
 	useState: (initial) => [initial, () => {}],
 	useEffect: () => {},
-	useCallback: (fn) => fn
+	useCallback: (fn) => fn,
+	useRef: (initial) => ({ current: initial })
 };
 
 const modules = { react: reactStub };

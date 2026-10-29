@@ -13,7 +13,7 @@
 | 可见名称 | `昇腾310B调试` |
 | 适用芯片 | `Ascend310B1` / `Ascend310B4`（20T / 8T） |
 | 其他芯片 | 明确标记 `scope.applicable=false`，不返回 310B 调试程序 |
-| 安装方式 | 仓库根目录执行 `node scripts/install-dsh-plugins.mjs --profile desktop`，通过带内容哈希的 tarball 安装并校验内容 |
+| 安装方式 | 仓库根目录执行 `node tools/install-dsh-plugins.mjs --profile desktop`，通过带内容哈希的 tarball 安装并校验内容 |
 | 运行时依赖 | Node.js ≥ 18；主机侧只用 `node:` 内置模块与 DSH 提供的 `@deepseek-ai/dsh-tools`；串口会话在 Linux/macOS 需要 PowerShell 7 `pwsh` |
 | 板端依赖 | SSH 公钥登录、`bash`、`npu-smi`、CANN/驱动；探测只读，任务需显式 `allowStateChange` |
 | 发布方式 | `private: true`，面向源码分发；不作为公共 npm 包发布 |
@@ -91,7 +91,7 @@ npm test
 
 # 2. 打包并通过 DSH profile 安装；安装器会校验版本和内容哈希
 cd <教材仓库根目录>
-node scripts/install-dsh-plugins.mjs --profile desktop
+node tools/install-dsh-plugins.mjs --profile desktop
 
 # 3. 在 desktop/cordis.patch.yml 增加插件行和本机 repoRoot/targets
 #    技能由仓库 .dsh/skills 同步；安装器不再复制单个技能文件。

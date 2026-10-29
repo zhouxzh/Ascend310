@@ -68,6 +68,9 @@ const failures = [];
 const check = (condition, message) => {
 	if (!condition) failures.push(message);
 };
+check(host.internals.downloadIntegrity({ executed: true, exitCode: 0 }, 'a'.repeat(64)) === 'verified', 'successful hashed download must be verified');
+check(host.internals.downloadIntegrity({ executed: true, exitCode: 1 }, 'a'.repeat(64)) === 'not-verified', 'failed hashed download must not be verified');
+check(host.internals.downloadIntegrity({ executed: false, exitCode: 0 }, 'a'.repeat(64)) === 'not-verified', 'dry-run download must not be verified');
 
 /**
  * Minimal validator for the subset of the tool output schema this plugin uses.
@@ -173,16 +176,16 @@ try {
 
 	host.apply(fakeCtx, config);
 
-	for (const name of ['ascend_probe', 'ascend_check', 'ascend_debug_plan', 'ascend_sample_index', 'ascend_board_exec', 'ascend_board_run', 'ascend_apt_install', 'ascend_model_download', 'ascend_ui_capture', 'ascend_discover', 'ascend_serial_probe', 'ascend_serial_exec']) {
+	for (const name of ['ascend_probe', 'ascend_camera_capture', 'ascend_microphone_record', 'ascend_speaker_test', 'ascend_play_recording', 'ascend_check', 'ascend_debug_plan', 'ascend_sample_index', 'ascend_board_exec', 'ascend_board_run', 'ascend_apt_install', 'ascend_model_download', 'ascend_ui_capture', 'ascend_discover', 'ascend_serial_probe', 'ascend_serial_exec']) {
 		check(registeredTools.has(name), `tool ${name} must be registered`);
 	}
-	check(routes.length === 4, `expected four panel routes, got ${routes.length}`);
+	check(routes.length === 14, `expected fourteen panel routes, got ${routes.length}`);
 	check(routes.every((route) => route.kind === 'exact'), 'panel routes must be exact matches');
-	check(effects.length === 4, 'each route must be registered through an effect');
+	check(effects.length === 14, 'each route must be registered through an effect');
 	check(
 		routes.map((route) => route.path).join(',') ===
-			'/ascend310b-debug/report.json,/ascend310b-debug/probe,/ascend310b-debug/discover,/ascend310b-debug/serial-probe',
-		'routes must expose the report, probe, discover and serial-probe endpoints'
+			'/ascend310b-debug/report.json,/ascend310b-debug/probe,/ascend310b-debug/discover,/ascend310b-debug/liveness,/ascend310b-debug/camera-refresh,/ascend310b-debug/audio-refresh,/ascend310b-debug/system-refresh,/ascend310b-debug/camera-preview,/ascend310b-debug/camera-capture,/ascend310b-debug/microphone-record,/ascend310b-debug/speaker-test,/ascend310b-debug/play-recording,/ascend310b-debug/bind,/ascend310b-debug/serial-probe',
+		'routes must expose report, probe, discovery, liveness, category refreshes, camera preview/capture, audio and serial/bind endpoints'
 	);
 
 	// --- target resolution ------------------------------------------------
@@ -347,6 +350,55 @@ try {
 	validateOutput('ascend_board_exec', redirected);
 	check(redirected.allowed === false, 'a redirecting command must be refused');
 
+	// --- peripheral action contracts -------------------------------------
+	const cameraTool = registeredTools.get('ascend_camera_capture');
+	const cameraPreview = await cameraTool.execute(
+		{ target: 'board-8t', device: '/dev/video0', allowStateChange: true, dryRun: true },
+		{}
+	);
+	validateOutput('ascend_camera_capture', cameraPreview);
+	check(cameraPreview.dryRun === true && cameraPreview.executed === false, 'camera dry-run must not open the device');
+	check(cameraPreview.output.startsWith('/tmp/ascend310b-debug/peripherals/'), 'camera evidence must stay in the fixed temp root');
+	const cameraRefusal = await cameraTool.execute({ target: 'board-8t', device: '/dev/video0' }, {});
+	validateOutput('ascend_camera_capture', cameraRefusal);
+	check(cameraRefusal.ok === false && cameraRefusal.executed === false, 'camera capture without allowStateChange must be refused');
+
+	const microphoneTool = registeredTools.get('ascend_microphone_record');
+	const microphonePreview = await microphoneTool.execute(
+		{ target: 'board-8t', backend: 'pulse', device: '@DEFAULT_SOURCE@', allowStateChange: true, dryRun: true },
+		{}
+	);
+	validateOutput('ascend_microphone_record', microphonePreview);
+	check(microphonePreview.dryRun === true, 'microphone dry-run must not record');
+	check(microphonePreview.output.endsWith('.wav'), 'microphone evidence must be a WAV');
+
+	const speakerTool = registeredTools.get('ascend_speaker_test');
+	const speakerPreview = await speakerTool.execute(
+		{ target: 'board-8t', backend: 'pulse', device: '@DEFAULT_SINK@', allowStateChange: true, dryRun: true },
+		{}
+	);
+	validateOutput('ascend_speaker_test', speakerPreview);
+	check(speakerPreview.dryRun === true, 'speaker dry-run must not play');
+	check(speakerPreview.evidence === 'untested', 'speaker command success cannot claim audible evidence');
+
+	const recordingPath = '/tmp/ascend310b-debug/peripherals/microphone-2026-10-26T08-00-00-000Z.wav';
+	const recordingTool = registeredTools.get('ascend_play_recording');
+	const recordingPreview = await recordingTool.execute(
+		{ target: 'board-8t', backend: 'pulse', device: '@DEFAULT_SINK@', recording: recordingPath, allowStateChange: true, dryRun: true },
+		{}
+	);
+	validateOutput('ascend_play_recording', recordingPreview);
+	check(recordingPreview.action === 'play-recording', 'recorded playback must retain its action name');
+	check(recordingPreview.dryRun === true && recordingPreview.executed === false, 'recorded playback dry-run must not play');
+	check(recordingPreview.output === recordingPath, 'recorded playback must preserve the source recording path');
+	check(recordingPreview.evidence === 'untested', 'recorded playback cannot claim audible success');
+	const recordingRefusal = await recordingTool.execute(
+		{ target: 'board-8t', recording: '/tmp/arbitrary.wav', allowStateChange: true, dryRun: true },
+		{}
+	);
+	validateOutput('ascend_play_recording', recordingRefusal);
+	check(recordingRefusal.ok === false && recordingRefusal.executed === false, 'arbitrary recorded playback paths must be refused');
+
 	// --- explicit task and download execution ----------------------------
 	const runTool = registeredTools.get('ascend_board_run');
 	const taskPreview = await runTool.execute(
@@ -384,6 +436,21 @@ try {
 	);
 	validateOutput('ascend_model_download', hfPreview);
 	check(hfPreview.resolvedUrl.startsWith('https://hf-mirror.com/'), 'HF downloads must use the mirror');
+	const sensitiveDownload = await downloadTool.execute(
+		{
+			target: 'board-8t',
+			source: 'hf',
+			repoId: 'org/model',
+			filename: 'config.json',
+			cwd: '/home/HwHiAiUser/.ssh',
+			destination: 'authorized_keys',
+			allowStateChange: true,
+			dryRun: true
+		},
+		{}
+	);
+	validateOutput('ascend_model_download', sensitiveDownload);
+	check(sensitiveDownload.allowed === false, 'model downloads must reject sensitive home directories');
 	const githubPreview = await downloadTool.execute(
 		{
 			target: 'board-8t',
@@ -540,6 +607,148 @@ try {
 	await discoverRoute.handler(discoverRequest, discoverResponse);
 	check(discoverResponse.status === 500, 'the discover route must reject a public CIDR without scanning');
 	check(String(JSON.parse(discoverResponse.body).error).includes('私有'), 'the discover route must explain the CIDR refusal');
+
+	const livenessRoute = routes.find((route) => route.path === '/ascend310b-debug/liveness');
+	const livenessResponse = {
+		status: null,
+		body: '',
+		writeHead(status) {
+			this.status = status;
+		},
+		end(chunk) {
+			this.body = chunk ?? '';
+		}
+	};
+	const livenessRequest = {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		async *[Symbol.asyncIterator]() {
+			yield JSON.stringify({ targets: ['missing-target'] });
+		}
+	};
+	await livenessRoute.handler(livenessRequest, livenessResponse);
+	const livenessPayload = JSON.parse(livenessResponse.body);
+	check(livenessResponse.status === 200 && livenessPayload.ok === true, 'the liveness route must return a transport status payload');
+	check(Array.isArray(livenessPayload.targets) && livenessPayload.targets.length === 0, 'an unknown liveness target must not trigger a network probe');
+
+	const previewRoute = routes.find((candidate) => candidate.path === '/ascend310b-debug/camera-preview');
+	const previewResponse = {
+		status: null,
+		body: '',
+		writeHead(status) {
+			this.status = status;
+		},
+		end(chunk) {
+			this.body = chunk ?? '';
+		}
+	};
+	await previewRoute.handler(
+		{ method: 'GET', headers: {}, url: '/ascend310b-debug/camera-preview?target=board-8t&file=/etc/passwd' },
+		previewResponse
+	);
+	check(previewResponse.status === 422, 'camera preview must reject arbitrary files before SSH access');
+
+	const peripheralRoutes = [
+		{
+			path: '/ascend310b-debug/camera-capture',
+			body: { target: 'board-8t', device: '/dev/video0', allowStateChange: true, dryRun: true }
+		},
+		{
+			path: '/ascend310b-debug/microphone-record',
+			body: { target: 'board-8t', backend: 'pulse', device: '@DEFAULT_SOURCE@', allowStateChange: true, dryRun: true }
+		},
+		{
+			path: '/ascend310b-debug/speaker-test',
+			body: { target: 'board-8t', backend: 'pulse', device: '@DEFAULT_SINK@', allowStateChange: true, dryRun: true }
+		},
+		{
+			path: '/ascend310b-debug/play-recording',
+			body: {
+				target: 'board-8t',
+				backend: 'pulse',
+				device: '@DEFAULT_SINK@',
+				recording: '/tmp/ascend310b-debug/peripherals/microphone-2026-10-26T08-00-00-000Z.wav',
+				allowStateChange: true,
+				dryRun: true
+			}
+		}
+	];
+	for (const entry of peripheralRoutes) {
+		const route = routes.find((candidate) => candidate.path === entry.path);
+		const response = {
+			status: null,
+			body: '',
+			writeHead(status) {
+				this.status = status;
+			},
+			end(chunk) {
+				this.body = chunk ?? '';
+			}
+		};
+		const request = {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			async *[Symbol.asyncIterator]() {
+				yield JSON.stringify(entry.body);
+			}
+		};
+		await route.handler(request, response);
+		const payload = JSON.parse(response.body);
+		check(response.status === 200 && payload.ok === true, `${entry.path} must accept a validated dry-run`);
+		check(payload.result?.dryRun === true && payload.result?.executed === false, `${entry.path} dry-run must not open hardware`);
+	}
+
+	const invalidRecordingRoute = routes.find((route) => route.path === '/ascend310b-debug/play-recording');
+	const invalidRecordingResponse = {
+		status: null,
+		body: '',
+		writeHead(status) {
+			this.status = status;
+		},
+		end(chunk) {
+			this.body = chunk ?? '';
+		}
+	};
+	const invalidRecordingRequest = {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		async *[Symbol.asyncIterator]() {
+			yield JSON.stringify({
+				target: 'board-8t',
+				recording: '/tmp/arbitrary.wav',
+				allowStateChange: true,
+				dryRun: true
+			});
+		}
+	};
+	await invalidRecordingRoute.handler(invalidRecordingRequest, invalidRecordingResponse);
+	const invalidRecordingPayload = JSON.parse(invalidRecordingResponse.body);
+	check(invalidRecordingResponse.status === 422, 'invalid recorded-audio paths must return HTTP 422');
+	check(
+		invalidRecordingPayload.ok === false && invalidRecordingPayload.result?.action === 'play-recording',
+		'invalid recorded-audio routes must return the standard failure result'
+	);
+
+	const bindRoute = routes.find((route) => route.path === '/ascend310b-debug/bind');
+	const bindResponse = {
+		status: null,
+		body: '',
+		writeHead(status) {
+			this.status = status;
+		},
+		end(chunk) {
+			this.body = chunk ?? '';
+		}
+	};
+	const bindRequest = {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		async *[Symbol.asyncIterator]() {
+			yield '{}';
+		}
+	};
+	await bindRoute.handler(bindRequest, bindResponse);
+	check(bindResponse.status === 400, 'the bind route must require both target ids');
 
 	const serialRoute = routes.find((route) => route.path === '/ascend310b-debug/serial-probe');
 	const serialResponse = {

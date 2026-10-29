@@ -17,7 +17,8 @@ import {
 	inferLocalPrivateCidrs,
 	parseIPv4,
 	probeCandidate,
-	resolveDiscoveryCidrs
+	resolveDiscoveryCidrs,
+	resolveDiscoveryCidrsForScan
 } from '../lib/discovery.js';
 import {
 	boardIdForMac,
@@ -62,6 +63,7 @@ const fakeInterfaces = {
 	],
 	Wifi: [{ family: 4, address: '10.36.43.156', internal: false }],
 	Lab22: [{ family: 'IPv4', address: '10.42.8.235', netmask: '255.255.252.0', internal: false }],
+	'vEthernet (WSL (Hyper-V firewall))': [{ family: 'IPv4', address: '172.24.144.1', netmask: '255.255.240.0', internal: false }],
 	Public: [{ family: 'IPv4', address: '8.8.8.8', internal: false }]
 };
 const inferred = inferLocalPrivateCidrs(fakeInterfaces);
@@ -69,10 +71,17 @@ check(inferred.includes('10.73.137.0/24'), '应自动包含热点 /24 网段');
 check(inferred.includes('10.36.43.0/24'), '应自动包含其他活动私有 /24 网段');
 check(inferred.includes('10.42.8.0/22'), '应保留活动网卡的真实 /22 前缀');
 check(!inferred.includes('8.8.8.0/24'), '自动推导不得包含公网 /24');
+check(!inferred.includes('172.24.144.0/20'), '自动推导不得扫描 WSL/Hyper-V 虚拟网卡');
 check(!inferred.includes('127.0.0.0/24'), '自动推导不得包含回环 /24');
-const mergedCidrs = resolveDiscoveryCidrs(null, ['10.55.3.0/24'], fakeInterfaces);
-check(mergedCidrs.includes('10.55.3.0/24'), '默认发现应保留显式配置网段');
-check(mergedCidrs.includes('10.73.137.0/24'), '默认发现应合并当前热点网段');
+const configuredCidrs = resolveDiscoveryCidrs(null, ['10.55.3.0/24'], fakeInterfaces);
+equal(configuredCidrs.join(','), '10.55.3.0/24', '显式配置的扫描网段应优先且不自动扩散');
+const autoCidrs = resolveDiscoveryCidrs(null, [], fakeInterfaces);
+check(autoCidrs.includes('10.73.137.0/24'), '未配置网段时应使用活动热点网段');
+check(!autoCidrs.includes('10.55.3.0/24'), '未配置网段时不应凭空加入配置值');
+const routedCidrs = await resolveDiscoveryCidrsForScan(null, [], fakeInterfaces, async () => '10.36.43.156');
+equal(routedCidrs.join(','), '10.36.43.0/24', '默认扫描应只选择当前默认路由所在网段');
+const noRouteCidrs = await resolveDiscoveryCidrsForScan(null, [], fakeInterfaces, async () => null);
+check(noRouteCidrs.length > 1, '无法取得默认路由时应保留活动网段作为回退');
 const explicitCidrs = resolveDiscoveryCidrs(['10.0.0.0/30'], ['10.55.3.0/24'], fakeInterfaces);
 equal(explicitCidrs.join(','), '10.0.0.0/30', '单次显式 CIDR 应覆盖自动与配置网段');
 
@@ -119,6 +128,59 @@ inventory = first.inventory;
 equal(first.status, 'new', '第一次发现应为 new');
 equal(first.board.mac, 'c0:74:2b:fd:dd:7a', '资产表必须记录 MAC');
 equal(first.board.serial?.port, 'COM7', '串口发现状态必须写入资产表');
+const switchedInterface = observeBoard(inventory, {
+	ip: '10.0.0.110',
+	user: 'HwHiAiUser',
+	mac: 'aa:bb:cc:dd:ee:ff',
+	macs: ['aa:bb:cc:dd:ee:ff', 'c0:74:2b:fd:dd:7a'],
+	hostname: 'orangepiaipro',
+	system: candidate.system
+}, '2026-10-18T01:03:00.000Z');
+equal(switchedInterface.board.id, first.board.id, '有线切无线后应沿用同一逻辑板卡 ID');
+equal(switchedInterface.board.macs.length, 2, '资产表应保留有线与无线 MAC 别名');
+equal(switchedInterface.status, 'ip-changed', '网口切换但 MAC 别名匹配时应只记录 IP 变化');
+inventory = switchedInterface.inventory;
+const otherBoard = observeBoard({
+	...inventory,
+	boards: { ...inventory.boards }
+}, {
+	ip: '10.0.0.111',
+	user: 'HwHiAiUser',
+	mac: 'c0:74:2b:fd:df:83',
+	hostname: 'orangepiaipro',
+	system: candidate.system
+}, '2026-10-18T01:04:00.000Z');
+check(otherBoard.board.id !== first.board.id, '不同 MAC 的板即使 machine-id/hostname 相同也必须保持独立');
+
+const legacyMerge = observeBoard({
+	version: 1,
+	boards: {
+		'c0:74:2b:fd:dd:7a': {
+			id: 'ascend-c0742bfddd7a',
+			mac: 'c0:74:2b:fd:dd:7a',
+			lastSeen: '2026-10-18T00:01:00.000Z',
+			system: { soc: 'Ascend310B4' },
+			changes: [],
+			history: []
+		},
+		'aa:bb:cc:dd:ee:ff': {
+			id: 'ascend-aabbccddeeff',
+			mac: 'aa:bb:cc:dd:ee:ff',
+			lastSeen: '2026-10-18T00:02:00.000Z',
+			system: { soc: 'Ascend310B4' },
+			changes: [],
+			history: []
+		}
+	}
+}, {
+	ip: '10.0.0.130',
+	mac: 'c0:74:2b:fd:dd:7a',
+	macs: ['c0:74:2b:fd:dd:7a', 'aa:bb:cc:dd:ee:ff'],
+	hostname: 'orangepiaipro',
+	system: { soc: 'Ascend310B4' }
+}, '2026-10-18T01:05:00.000Z');
+equal(Object.keys(legacyMerge.inventory.boards).length, 1, '同时观察到多个已知 MAC 时应合并旧的重复记录');
+equal(legacyMerge.board.macs.length, 2, '合并后的旧记录应保留全部 MAC 别名');
 
 const moved = observeBoard(inventory, {
 	ip: '10.0.0.120',

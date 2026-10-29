@@ -196,6 +196,9 @@ check('task blocks non-sudo elevation', () => assert.equal(validateTaskCommand('
 check('task blocks su', () => assert.equal(validateTaskCommand('su -c true').ok, false));
 check('task permits rm only with explicit opt-in', () => assert.equal(validateTaskCommand('rm -rf /tmp/x', { allowDestructive: true }).ok, true));
 check('task permits sudo only with explicit opt-in', () => assert.equal(validateTaskCommand('sudo true', { allowPrivileged: true }).ok, true));
+for (const command of ['sudo reboot', 'sudo -- reboot', 'sudo /sbin/reboot', 'sudo shutdown -h now', 'sudo poweroff']) {
+	check(`task always blocks privileged power command: ${command}`, () => assert.equal(validateTaskCommand(command, { allowPrivileged: true }).ok, false));
+}
 
 try {
 	let captured = null;

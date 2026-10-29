@@ -137,7 +137,17 @@ if [ -n "$ASCEND_ENV_PREFIX" ]; then
   echo "prefix=$ASCEND_ENV_PREFIX"
   # Record the launcher's actual user-site state without forcing the flag.
   "$ASCEND_ENV_PREFIX/bin/python" -c 'import site,sys; print("executable=" + sys.executable); print("version=" + sys.version.split()[0]); print("isolated=" + str(not site.ENABLE_USER_SITE).lower())' 2>&1 || true
-  PYTHONNOUSERSITE=1 "$ASCEND_ENV_PREFIX/bin/python" -c 'import importlib.util,sys,sysconfig; print("policy_isolated=" + str(not __import__("site").ENABLE_USER_SITE).lower()); print("abi=" + str(sysconfig.get_config_var("SOABI"))); print("packages=" + ",".join(name + ":" + str(bool(importlib.util.find_spec(name))).lower() for name in ("mindspore","mindnlp","fastapi","httpx","pydantic","numpy","cv2","torch","torchvision","onnx","onnxruntime","sherpa_onnx","aiortc","av","gradio","faiss","PySide6","pyqtgraph","aiohttp","mido","sounddevice","python_multipart","cryptography","pandas","tokenizers","PIL","huggingface_hub","periphery","usb","rtmidi")))' 2>&1 || true
+  PYTHONNOUSERSITE=1 "$ASCEND_ENV_PREFIX/bin/python" -c 'import importlib,importlib.util,sys,sysconfig; names=("mindspore","mindnlp","fastapi","httpx","pydantic","numpy","cv2","torch","torchvision","onnx","onnxruntime","sherpa_onnx","aiortc","av","gradio","faiss","PySide6","pyqtgraph","aiohttp","mido","sounddevice","python_multipart","cryptography","pandas","tokenizers","PIL","huggingface_hub","periphery","usb","rtmidi"); results=[]
+for name in names:
+ try: importlib.import_module(name); results.append(name+":ok")
+ except Exception as exc: results.append(name+":"+type(exc).__name__)
+print("policy_isolated=" + str(not __import__("site").ENABLE_USER_SITE).lower()); print("abi=" + str(sysconfig.get_config_var("SOABI"))); print("packages=" + ",".join(name + ":" + str(bool(importlib.util.find_spec(name))).lower() for name in names)); print("imports=" + ",".join(results))' 2>&1 || true
+  PYTHONNOUSERSITE=1 "$ASCEND_ENV_PREFIX/bin/python" -c 'import importlib
+results=[]
+for name in ("torch_npu","mindspore_lite"):
+ try: importlib.import_module(name); results.append(name+":ok")
+ except Exception as exc: results.append(name+":"+type(exc).__name__)
+print("optional_imports="+",".join(results))' 2>&1 || true
   if [ -n "$CANN_SET_ENV" ]; then
     ( . "$CANN_SET_ENV" >/dev/null 2>&1 || true; PYTHONNOUSERSITE=1 "$ASCEND_ENV_PREFIX/bin/python" -c "import acl; print('acl=ok')" 2>&1 || echo "acl=failed" )
     ( . "$CANN_SET_ENV" >/dev/null 2>&1 || true; PYTHONNOUSERSITE=1 "$ASCEND_ENV_PREFIX/bin/python" -c "import aclruntime; print('aclruntime=ok')" 2>&1 || echo "aclruntime=failed" )
@@ -157,8 +167,16 @@ abs_section sound_cards; cat /proc/asound/cards 2>/dev/null || echo "NOT_FOUND /
 abs_section audio_playback; if command -v aplay >/dev/null 2>&1; then aplay -l 2>&1; else echo "NOT_FOUND aplay"; fi; abs_end audio_playback
 abs_section audio_capture; if command -v arecord >/dev/null 2>&1; then arecord -l 2>&1; else echo "NOT_FOUND arecord"; fi; abs_end audio_capture
 abs_section audio_sinks; if command -v pactl >/dev/null 2>&1; then pactl list short sinks 2>&1 || true; else echo "NOT_FOUND pactl"; fi; abs_end audio_sinks
+abs_section audio_sources; if command -v pactl >/dev/null 2>&1; then pactl list short sources 2>&1 || true; else echo "NOT_FOUND pactl"; fi; abs_end audio_sources
+abs_section pulse_cards; if command -v pactl >/dev/null 2>&1; then pactl list short cards 2>&1 || true; else echo "NOT_FOUND pactl"; fi; abs_end pulse_cards
+abs_section pulse_card_details; if command -v pactl >/dev/null 2>&1; then pactl list cards 2>&1 || true; else echo "NOT_FOUND pactl"; fi; abs_end pulse_card_details
+abs_section bluetooth_controller; if command -v bluetoothctl >/dev/null 2>&1; then timeout 3 bluetoothctl show 2>&1 || true; else echo "NOT_FOUND bluetoothctl"; fi; abs_end bluetooth_controller
+abs_section bluetooth_devices; if command -v bluetoothctl >/dev/null 2>&1; then bluetooth_devices="$(timeout 3 bluetoothctl devices 2>&1 || true)"; if printf '%s\n' "$bluetooth_devices" | grep -q '^Device '; then printf '%s\n' "$bluetooth_devices"; else echo "NO_PAIRED_DEVICES"; fi; else echo "NOT_FOUND bluetoothctl"; fi; abs_end bluetooth_devices
+abs_section bluetooth_info; if command -v bluetoothctl >/dev/null 2>&1; then bluetooth_devices="$(timeout 3 bluetoothctl devices 2>/dev/null || true)"; if printf '%s\n' "$bluetooth_devices" | grep -q '^Device '; then printf '%s\n' "$bluetooth_devices" | while read -r _ mac _; do [ -n "$mac" ] && timeout 3 bluetoothctl info "$mac" 2>&1; done; else echo "NO_PAIRED_DEVICES"; fi; fi; abs_end bluetooth_info
 abs_section usb_devices; if command -v lsusb >/dev/null 2>&1; then lsusb 2>&1; else echo "NOT_FOUND lsusb"; fi; abs_end usb_devices
 abs_section video_devices; if command -v v4l2-ctl >/dev/null 2>&1; then v4l2-ctl --list-devices 2>&1; else echo "NOT_FOUND v4l2-ctl"; fi; for p in /dev/video*; do [ -e "$p" ] && ls -l "$p"; done 2>/dev/null || true; abs_end video_devices
+abs_section video_details; if command -v v4l2-ctl >/dev/null 2>&1; then for p in /dev/video*; do [ -e "$p" ] || continue; echo "DEVICE=$p"; v4l2-ctl -d "$p" --info 2>&1 || true; done; else echo "NOT_FOUND v4l2-ctl"; fi; abs_end video_details
+abs_section video_formats; if command -v v4l2-ctl >/dev/null 2>&1; then for p in /dev/video*; do [ -e "$p" ] || continue; echo "DEVICE=$p"; v4l2-ctl -d "$p" --list-formats-ext 2>&1 || true; done; else echo "NOT_FOUND v4l2-ctl"; fi; abs_end video_formats
 abs_section mac; for p in /sys/class/net/*; do iface=$(basename "$p"); [ "$iface" = lo ] && continue; if [ -r "$p/address" ]; then printf '%s=' "$iface"; cat "$p/address" 2>/dev/null || true; fi; done; abs_end mac
 abs_section machine_id; cat /etc/machine-id 2>/dev/null || echo "NOT_FOUND"; abs_end machine_id
 abs_section modules; lsmod 2>/dev/null | grep -E 'drv|ascend|hisi' || echo "NO_MATCH_OR_PERMISSION"; abs_end modules
@@ -175,6 +193,121 @@ abs_section health; if [ -n "$NPU_SMI" ]; then "$NPU_SMI" info 2>/dev/null | sed
  */
 export function buildProbeScript() {
 	return PROBE_SCRIPT;
+}
+
+/**
+ * Build the lightweight camera-only probe. It avoids CANN, Python, audio and
+ * Bluetooth discovery so refreshing camera capabilities is not delayed by a
+ * full board environment probe.
+ *
+ * @returns {string} shell script text.
+ */
+function buildSelectedProbeScript(sectionNames, { includeNpuSmi = false } = {}) {
+	const firstSection = PROBE_SCRIPT.indexOf('\nabs_section uname');
+	if (firstSection < 0) throw new Error('probe script section boundary is missing');
+	const sections = [];
+	for (const name of sectionNames) {
+		const startMarker = `\nabs_section ${name}`;
+		const start = PROBE_SCRIPT.indexOf(startMarker);
+		if (start < 0) throw new Error(`probe section is missing: ${name}`);
+		const endMarker = `abs_end ${name}`;
+		const end = PROBE_SCRIPT.indexOf(endMarker, start);
+		if (end < 0) throw new Error(`probe section end is missing: ${name}`);
+		sections.push(PROBE_SCRIPT.slice(start + 1, end + endMarker.length));
+	}
+	let npuInit = '';
+	if (includeNpuSmi) {
+		const npuStart = PROBE_SCRIPT.indexOf('NPU_SMI="$(command -v npu-smi');
+		const npuEnd = PROBE_SCRIPT.indexOf('abs_section npu_smi_path', npuStart);
+		if (npuStart >= 0 && npuEnd >= 0) npuInit = PROBE_SCRIPT.slice(npuStart, npuEnd);
+	}
+	return `${PROBE_SCRIPT.slice(0, firstSection)}\n${npuInit}${sections.join('\n')}\n`;
+}
+
+/** Build a system-only refresh script without audio, Bluetooth or V4L2. */
+export function buildSystemProbeScript() {
+	return buildSelectedProbeScript([
+		'uname', 'arch', 'kernel', 'os_release', 'hostname', 'ip_address', 'primary_ip', 'date', 'id',
+		'npu_smi_path', 'npu_smi_version', 'npu_smi_info', 'npu_smi_board',
+		'os_sp', 'dt_model', 'ascend_toolkit', 'ascend_driver',
+		'cann_version_cfg', 'cann_version_info', 'driver_version_info', 'env',
+		'atc_version', 'devices', 'mac', 'machine_id', 'modules', 'health'
+	], { includeNpuSmi: true });
+}
+
+/** Build an audio/Bluetooth-only refresh script without CANN or V4L2. */
+export function buildAudioProbeScript() {
+	return buildSelectedProbeScript([
+		'sound_cards', 'audio_playback', 'audio_capture', 'audio_sinks', 'audio_sources',
+		'pulse_cards', 'pulse_card_details', 'bluetooth_controller', 'bluetooth_devices',
+		'bluetooth_info', 'usb_devices'
+	]);
+}
+
+export function buildCameraProbeScript() {
+	return `#!/bin/sh
+# read-only camera device probe
+abs_section() { echo "===ABS_BEGIN:$1==="; }
+abs_end() { echo "===ABS_END:$1==="; }
+
+abs_section video_devices
+if command -v v4l2-ctl >/dev/null 2>&1; then v4l2-ctl --list-devices 2>&1; else echo "NOT_FOUND v4l2-ctl"; fi
+for p in /dev/video*; do [ -e "$p" ] && ls -l "$p"; done 2>/dev/null || true
+abs_end video_devices
+
+abs_section video_details
+if command -v v4l2-ctl >/dev/null 2>&1; then
+  count=0
+  for p in /dev/video*; do
+    [ -e "$p" ] || continue
+    [ "$count" -ge 8 ] && break
+    count=$((count + 1))
+    echo "DEVICE=$p"
+    timeout 2 v4l2-ctl -d "$p" --info 2>&1 || true
+  done
+else
+  echo "NOT_FOUND v4l2-ctl"
+fi
+abs_end video_details
+
+abs_section video_formats
+if command -v v4l2-ctl >/dev/null 2>&1; then
+  count=0
+  for p in /dev/video*; do
+    [ -e "$p" ] || continue
+    [ "$count" -ge 8 ] && break
+    count=$((count + 1))
+    echo "DEVICE=$p"
+    timeout 5 v4l2-ctl -d "$p" --list-formats-ext 2>&1 || true
+  done
+else
+  echo "NOT_FOUND v4l2-ctl"
+fi
+abs_end video_formats
+
+abs_section usb_devices
+if command -v lsusb >/dev/null 2>&1; then lsusb 2>&1; else echo "NOT_FOUND lsusb"; fi
+abs_end usb_devices
+`;
+}
+
+/**
+ * Return a lightweight discovery script. It collects identity, routing,
+ * model/SoC and NPU facts only; full CANN, Python, ACL, audio and video checks
+ * remain on the explicit `ascend_probe` path. Scanning should not wait for
+ * environment checks that are irrelevant to "which board is at this address".
+ *
+ * @returns {string} shell script text.
+ */
+export function buildIdentityProbeScript() {
+	const marker = '\nabs_section ascend_toolkit';
+	const end = PROBE_SCRIPT.indexOf(marker);
+	if (end < 0) throw new Error('probe identity section boundary is missing');
+	return `${PROBE_SCRIPT.slice(0, end)}
+abs_section mac; for p in /sys/class/net/*; do iface=$(basename "$p"); [ "$iface" = lo ] && continue; if [ -r "$p/address" ]; then printf '%s=' "$iface"; cat "$p/address" 2>/dev/null || true; fi; done; abs_end mac
+abs_section machine_id; cat /etc/machine-id 2>/dev/null || echo "NOT_FOUND"; abs_end machine_id
+abs_section health; if [ -n "$NPU_SMI" ]; then "$NPU_SMI" info 2>/dev/null | sed -n '1,12p'; else echo "NOT_FOUND"; fi; abs_end health
+`;
 }
 
 /**
@@ -318,14 +451,31 @@ export function parseIpAddress(text) {
 	return addresses.find((address) => !address.startsWith('127.') && !address.startsWith('169.254.')) ?? addresses[0] ?? null;
 }
 
-/** Extract the physical MAC address, preferring eth0 over other interfaces. */
-export function parseMacSection(text) {
-	if (typeof text !== 'string') return null;
-	const found = [];
+/** Whether an interface name can identify the physical board, not a container/bond. */
+export function isIdentityMacInterface(iface) {
+	const name = String(iface ?? '').trim().toLowerCase();
+	if (name === '') return false;
+	if (/^(?:lo|docker|veth|virbr|br-|bond|dummy|tun|tap|can|bluetooth)/.test(name)) return false;
+	return /^(?:eth|en|wl|wlan|usb)/.test(name);
+}
+
+/** Parse every non-loopback interface MAC reported by the board. */
+export function parseMacEntries(text) {
+	if (typeof text !== 'string') return [];
+	const found = new Map();
 	for (const rawLine of text.split(/\r?\n/)) {
 		const match = /^([A-Za-z0-9_.:-]+)=([0-9a-f]{2}(?::[0-9a-f]{2}){5})$/i.exec(rawLine.trim());
-		if (match !== null) found.push({ iface: match[1], mac: match[2].toLowerCase() });
+		if (match === null) continue;
+		const iface = match[1].toLowerCase();
+		const mac = match[2].toLowerCase();
+		found.set(`${iface}:${mac}`, { iface, mac });
 	}
+	return [...found.values()];
+}
+
+/** Extract one canonical physical MAC, preferring eth0 for compatibility. */
+export function parseMacSection(text) {
+	const found = parseMacEntries(text).filter((item) => isIdentityMacInterface(item.iface));
 	return (found.find((item) => item.iface === 'eth0') ?? found[0])?.mac ?? null;
 }
 
@@ -391,7 +541,12 @@ export function buildEnvironmentReport(sections) {
 	set('probeTime', cleanLine(sections.date), 'date', cleanLine(sections.date));
 	set('loginUser', cleanLine(sections.id), 'id', cleanLine(sections.id));
 	set('boardModel', cleanLine(sections.dt_model)?.replace(/\u0000/g, '').trim() || null, 'dt_model', cleanLine(sections.dt_model));
+	const macEntries = parseMacEntries(sections.mac).filter((entry) => isIdentityMacInterface(entry.iface));
 	set('macAddress', parseMacSection(sections.mac), 'mac', cleanLine(sections.mac));
+	if (macEntries.length > 1) {
+		set('macAddresses', macEntries.map((entry) => entry.mac), 'mac', cleanLine(sections.mac));
+		set('macInterfaces', macEntries, 'mac', cleanLine(sections.mac));
+	}
 	set(
 		'machineId',
 		cleanLine(sections.machine_id) === 'NOT_FOUND' ? null : cleanLine(sections.machine_id),
@@ -512,6 +667,8 @@ export function buildEnvironmentReport(sections) {
 		set('ascendEnvAclruntime', ascendEnvAclruntime, 'ascend_env');
 		set('ascendEnvMindsporeContext', ascendEnvMindsporeContext, 'ascend_env');
 		set('ascendEnvPackages', envValue(sections, 'ascend_env', 'packages'), 'ascend_env');
+		set('ascendEnvImports', envValue(sections, 'ascend_env', 'imports'), 'ascend_env');
+		set('ascendEnvOptionalImports', envValue(sections, 'ascend_env', 'optional_imports'), 'ascend_env');
 	}
 
 	const pythonText = sections.python ?? '';
@@ -615,10 +772,26 @@ export function buildEnvironmentReport(sections) {
 	if (audioCapture !== null) set('audioCapture', audioCapture, 'audio_capture', cleanLine(sections.audio_capture));
 	const audioSinks = deviceBlock('audio_sinks');
 	if (audioSinks !== null) set('audioSinks', audioSinks, 'audio_sinks', cleanLine(sections.audio_sinks));
+	const audioSources = deviceBlock('audio_sources');
+	if (audioSources !== null) set('audioSources', audioSources, 'audio_sources', cleanLine(sections.audio_sources));
+	const pulseCards = deviceBlock('pulse_cards');
+	if (pulseCards !== null) set('pulseCards', pulseCards, 'pulse_cards', cleanLine(sections.pulse_cards));
+	const pulseCardDetails = deviceBlock('pulse_card_details');
+	if (pulseCardDetails !== null) set('pulseCardDetails', pulseCardDetails, 'pulse_card_details', cleanLine(sections.pulse_card_details));
+	const bluetoothController = deviceBlock('bluetooth_controller');
+	if (bluetoothController !== null) set('bluetoothController', bluetoothController, 'bluetooth_controller', cleanLine(sections.bluetooth_controller));
+	const bluetoothDevices = deviceBlock('bluetooth_devices');
+	if (bluetoothDevices !== null) set('bluetoothDevices', bluetoothDevices, 'bluetooth_devices', cleanLine(sections.bluetooth_devices));
+	const bluetoothInfo = deviceBlock('bluetooth_info');
+	if (bluetoothInfo !== null) set('bluetoothInfo', bluetoothInfo, 'bluetooth_info', cleanLine(sections.bluetooth_info));
 	const usbDevices = deviceBlock('usb_devices');
 	if (usbDevices !== null) set('usbDevices', usbDevices, 'usb_devices', cleanLine(sections.usb_devices));
 	const videoDevices = deviceBlock('video_devices');
 	if (videoDevices !== null) set('videoDevices', videoDevices, 'video_devices', cleanLine(sections.video_devices));
+	const videoDetails = deviceBlock('video_details');
+	if (videoDetails !== null) set('videoDetails', videoDetails, 'video_details', cleanLine(sections.video_details));
+	const videoFormats = deviceBlock('video_formats');
+	if (videoFormats !== null) set('videoFormats', videoFormats, 'video_formats', cleanLine(sections.video_formats));
 
 	return {
 		facts,

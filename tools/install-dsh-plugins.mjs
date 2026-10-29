@@ -8,9 +8,9 @@
  * inside the profile, where the DSH loader can resolve those packages.
  *
  * Usage:
- *   node scripts/install-dsh-plugins.mjs
- *   node scripts/install-dsh-plugins.mjs --profile desktop
- *   node scripts/install-dsh-plugins.mjs --check
+ *   node tools/install-dsh-plugins.mjs
+ *   node tools/install-dsh-plugins.mjs --profile desktop
+ *   node tools/install-dsh-plugins.mjs --check
  */
 
 import { createHash } from 'node:crypto';

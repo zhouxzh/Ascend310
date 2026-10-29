@@ -15,8 +15,8 @@
  * and `--check` fails when the two drift apart.
  *
  * Usage:
- *   node scripts/sync-repo-skills.mjs          # write .dsh/skills
- *   node scripts/sync-repo-skills.mjs --check  # verify only, exit 1 on drift
+ *   node tools/sync-repo-skills.mjs          # write .dsh/skills
+ *   node tools/sync-repo-skills.mjs --check  # verify only, exit 1 on drift
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -91,7 +91,7 @@ for (const { name, sourceDir } of skills) {
 }
 
 if (checkOnly && drift > 0) {
-	console.error(`\n${drift} 个 skill 文件与插件内版本不一致；运行 node scripts/sync-repo-skills.mjs。`);
+	console.error(`\n${drift} 个 skill 文件与插件内版本不一致；运行 node tools/sync-repo-skills.mjs。`);
 	process.exit(1);
 }
 console.log(

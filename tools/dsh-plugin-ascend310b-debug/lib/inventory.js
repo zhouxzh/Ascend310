@@ -1,11 +1,13 @@
 /**
  * Persistent board inventory for discovered Ascend 310B boards.
  *
- * The network address is deliberately not the identity. A board is keyed by
- * its physical MAC address, so a DHCP address change, reinstall or temporary
+ * The network address is deliberately not the identity. A board is keyed by a
+ * stable logical record whose MAC aliases cover every observed interface, so a
+ * DHCP change, a wired-to-wireless switch, an OS reinstall or a temporary
  * offline state does not create a second board. The inventory records the
- * latest observed system tuple (OS, kernel, driver, firmware, CANN, Python and
- * machine-id) and appends a change record when that tuple moves.
+ * latest observed system tuple (OS, kernel, driver, CANN, Python and
+ * machine-id) and appends a change record when that tuple moves. Machine-id is
+ * evidence, not identity: cloned board images can share it.
  *
  * The inventory is a local deployment file, not part of the repository. It is
  * written below `DSH_HOME` by default and contains MAC addresses, so it must
@@ -77,6 +79,35 @@ export function boardIdForMac(mac) {
 	return `ascend-${normalized.replaceAll(':', '')}`;
 }
 
+/** Normalize a set of MAC aliases without inventing an identity from a hostname. */
+export function normalizeMacs(values) {
+	const result = [];
+	const seen = new Set();
+	for (const value of Array.isArray(values) ? values : [values]) {
+		const normalized = normalizeMac(value);
+		if (normalized !== null && !seen.has(normalized)) {
+			seen.add(normalized);
+			result.push(normalized);
+		}
+	}
+	return result;
+}
+
+/** Return every MAC alias retained for one board, including legacy records. */
+function boardMacs(board) {
+	return normalizeMacs([board?.mac, ...(Array.isArray(board?.macs) ? board.macs : [])]);
+}
+
+/** Find an existing board by any known network-interface MAC. */
+function matchingBoardEntries(inventory, macs) {
+	const wanted = new Set(normalizeMacs(macs));
+	if (wanted.size === 0) return [];
+	return Object.entries(inventory.boards ?? {}).filter(([key, board]) => {
+		if (board === null || typeof board !== 'object') return false;
+		return boardMacs(board).some((mac) => wanted.has(mac)) || wanted.has(normalizeMac(key));
+	});
+}
+
 /** Read the inventory, tolerating absence or a partially written file. */
 export function readInventory(path) {
 	try {
@@ -87,7 +118,15 @@ export function readInventory(path) {
 		const boards = parsed.boards !== null && typeof parsed.boards === 'object' && !Array.isArray(parsed.boards)
 			? parsed.boards
 			: {};
-		return { version: 1, boards, updatedAt: parsed.updatedAt ?? null };
+		return {
+			...parsed,
+			version: 1,
+			boards,
+			updatedAt: parsed.updatedAt ?? null,
+			preferences: parsed.preferences !== null && typeof parsed.preferences === 'object' && !Array.isArray(parsed.preferences)
+				? parsed.preferences
+				: {}
+		};
 	} catch {
 		return { version: 1, boards: {}, updatedAt: null };
 	}
@@ -157,9 +196,10 @@ export function diffSystem(previous, next) {
 /**
  * Merge one discovery observation into the inventory.
  *
- * Identity is the MAC address. A board with no MAC is retained as a
- * `hostname` fallback for diagnosis, but it is marked unstable because it
- * cannot survive a DHCP change or a reinstall reliably.
+ * Identity is a stable logical board record matched by any known interface MAC
+ * alias. A board with no MAC is retained as a `hostname` fallback for
+ * diagnosis, but it is marked unstable because it cannot survive a DHCP change
+ * or a reinstall reliably.
  *
  * @param {object} inventory - inventory object from {@link readInventory}.
  * @param {object} observation - observed board fields.
@@ -167,11 +207,26 @@ export function diffSystem(previous, next) {
  * @returns {{inventory: object, board: object, status: string, changes: object[]}}
  */
 export function observeBoard(inventory, observation, now = new Date().toISOString()) {
-	const mac = normalizeMac(observation?.mac);
+	const explicitMac = normalizeMac(observation?.mac);
+	const observedMacs = normalizeMacs([
+		explicitMac,
+		...(Array.isArray(observation?.macs) ? observation.macs : [])
+	]);
 	const hostname = text(observation?.hostname);
-	const identity = mac === null ? `hostname:${hostname ?? 'unknown'}` : mac;
-	const id = mac === null ? `hostname-${hostname ?? 'unknown'}` : boardIdForMac(mac);
-	const previous = inventory.boards?.[identity] ?? null;
+	const matches = matchingBoardEntries(inventory, observedMacs)
+		.sort((left, right) => (Date.parse(right[1]?.lastSeen ?? '') || 0) - (Date.parse(left[1]?.lastSeen ?? '') || 0));
+	const previousEntry = matches[0] ?? null;
+	const previousKey = previousEntry?.[0] ?? null;
+	const previous = previousEntry?.[1] ?? null;
+	// Legacy inventories may contain one record per interface. If the probe
+	// reports several aliases, merge those records rather than creating a third.
+	const previousMacs = previous === null
+		? []
+		: normalizeMacs(matches.flatMap(([, board]) => boardMacs(board)));
+	const canonicalMac = normalizeMac(previous?.mac) ?? explicitMac ?? previousMacs[0] ?? null;
+	const macs = normalizeMacs([canonicalMac, ...previousMacs, ...observedMacs]);
+	const identity = previous?.identity ?? previousKey ?? canonicalMac ?? `hostname:${hostname ?? 'unknown'}`;
+	const id = previous?.id ?? (canonicalMac === null ? `hostname-${hostname ?? 'unknown'}` : boardIdForMac(canonicalMac));
 	const system = {};
 	for (const key of SYSTEM_FIELDS) {
 		system[key] = text(observation?.system?.[key]) ?? previous?.system?.[key] ?? null;
@@ -183,7 +238,8 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 	const board = previous ?? {
 		id,
 		identity,
-		mac,
+		mac: canonicalMac,
+		macs,
 		label: null,
 		user: null,
 		configuredId: null,
@@ -200,7 +256,8 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 	};
 	board.id = id;
 	board.identity = identity;
-	board.mac = mac;
+	board.mac = canonicalMac;
+	board.macs = macs;
 	board.hostname = hostname;
 	board.lastIp = ip ?? previous?.lastIp ?? null;
 	board.port = Number.isInteger(observation?.port) ? observation.port : board.port ?? null;
@@ -232,7 +289,12 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 		board.history = board.history.slice(-MAX_HISTORY);
 	}
 	if (previous === null) board.changes = [];
-	inventory.boards[identity] = board;
+	if (previousKey === null) {
+		inventory.boards[identity] = board;
+	} else {
+		for (const [key] of matches) delete inventory.boards[key];
+		inventory.boards[previousKey] = board;
+	}
 	inventory.updatedAt = now;
 	return { inventory, board, status, changes };
 }
@@ -250,6 +312,7 @@ export function inventoryTargets(inventory, defaultUser = null) {
 		if (normalizeMac(board.mac) === null || !/^Ascend310B[14]$/iu.test(String(board.system?.soc ?? ''))) continue;
 		const host = text(board.lastIp) ?? text(board.hostname);
 		if (host === null) continue;
+		const macs = boardMacs(board);
 		targets.push({
 			id: board.id,
 			label: board.label ?? `${board.system?.boardModel ?? 'Ascend 310B'} ${board.mac?.slice(-8) ?? board.hostname ?? ''}`.trim(),
@@ -257,13 +320,17 @@ export function inventoryTargets(inventory, defaultUser = null) {
 			host,
 			hostname: board.hostname ?? null,
 			mac: board.mac ?? null,
+			macs,
+			memoryUsedMb: board.system?.memoryUsedMb ?? null,
+			memoryTotalMb: board.system?.memoryTotalMb ?? null,
 			configuredId: board.configuredId ?? null,
 			lastSeen: board.lastSeen ?? null,
 			user: board.user ?? defaultUser,
 			port: Number.isInteger(board.port) ? board.port : null,
 			identityFile: null,
 			workdir: null,
-			note: `发现板；MAC ${board.mac ?? '未读取'}`
+			isConfigured: false,
+			note: `发现板；MAC 别名 ${macs.join(', ') || '未读取'}`
 		});
 	}
 	return targets;

@@ -14,8 +14,7 @@
  * @module dsh-plugin-ascend310b-debug
  */
 
-import { readFileSync } from 'node:fs';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,12 +34,24 @@ import {
 } from './compat.js';
 import { buildPlan, renderPlan } from './plan.js';
 import { AREAS, ENTRIES } from './knowledge.js';
-import { buildProbeScript, parseProbeOutput } from './probe.js';
+import { buildAudioProbeScript, buildCameraProbeScript, buildProbeScript, buildSystemProbeScript, parseProbeOutput } from './probe.js';
 import { inventoryPath, inventoryTargets, normalizeMac, observeBoard, readInventory, saveInventory, systemFromFacts } from './inventory.js';
 import { captureScreenshot, findBrowser } from './capture.js';
 import { loadCaseDependencies } from './dependencies.js';
 import { installAptPackages, validateAptPackages } from './install.js';
-import { discoverNetwork, isLocalScanCandidate, parseIPv4, probeCandidate, registerDiscoveryTool, resolveDiscoveryCidrs } from './discovery.js';
+import {
+	CAMERA_IMAGE_PATH,
+	buildCameraCommand,
+	buildMicrophoneCommand,
+	buildRecordedPlaybackCommand,
+	buildSpeakerCommand,
+	normalizeCameraOptions,
+	normalizeMicrophoneOptions,
+	normalizeRecordedPlaybackOptions,
+	normalizeSpeakerOptions,
+	parsePeripheralResult
+} from './peripherals.js';
+import { discoverNetwork, isLocalScanCandidate, parseIPv4, probeCandidate, registerDiscoveryTool, resolveDiscoveryCidrsForScan, tcpOpen } from './discovery.js';
 import { runSerialCommand, runSerialProbe, validateSerialSettings } from './serial.js';
 import { isSafeHost, runLocalScript, runLocalShell, runRemoteScript, runRemoteShell, shellQuote, validateReadOnlyCommand, validateTaskCommand } from './shell.js';
 
@@ -63,6 +74,22 @@ const DISCOVER_PATH = '/ascend310b-debug/discover';
 
 /** Route that reads network facts from the serial console. */
 const SERIAL_PATH = '/ascend310b-debug/serial-probe';
+
+/** Route that explicitly binds a configured target to a discovered board. */
+const BIND_PATH = '/ascend310b-debug/bind';
+
+/** Route that checks current SSH reachability without running a board probe. */
+const LIVENESS_PATH = '/ascend310b-debug/liveness';
+
+/** Dedicated routes for fixed peripheral actions. */
+const CAMERA_REFRESH_PATH = '/ascend310b-debug/camera-refresh';
+const CAMERA_PREVIEW_PATH = '/ascend310b-debug/camera-preview';
+const AUDIO_REFRESH_PATH = '/ascend310b-debug/audio-refresh';
+const SYSTEM_REFRESH_PATH = '/ascend310b-debug/system-refresh';
+const CAMERA_CAPTURE_PATH = '/ascend310b-debug/camera-capture';
+const MICROPHONE_RECORD_PATH = '/ascend310b-debug/microphone-record';
+const SPEAKER_TEST_PATH = '/ascend310b-debug/speaker-test';
+const PLAY_RECORDING_PATH = '/ascend310b-debug/play-recording';
 
 /** Maximum stdout kept in a tool response. */
 const MAX_EXCERPT = 4000;
@@ -104,6 +131,70 @@ function httpRequestError(request, methods) {
 /** Cached report for the panel, keyed by target id. */
 const reportCache = new Map();
 
+/** Persisted board snapshot fields shown by the panel. */
+const SAVED_REPORT_FIELDS = [
+	'ok',
+	'probedAt',
+	'generatedAt',
+	'cameraUpdatedAt',
+	'categoryUpdatedAt',
+	'source',
+	'target',
+	'board',
+	'facts',
+	'scope',
+	'pairing',
+	'missingCore',
+	'inventoryChange',
+	'transport',
+	'rawExcerpt'
+];
+
+/** Local file holding the last successful panel report for each target. */
+function savedReportsPath(config) {
+	const configured = config?.reportStorePath;
+	if (typeof configured === 'string' && configured.trim() !== '') return resolve(configured.trim());
+	return join(dirname(inventoryPath(config)), 'ascend310b-reports.json');
+}
+
+function readSavedReports(config) {
+	const path = savedReportsPath(config);
+	if (!existsSync(path)) return {};
+	try {
+		const parsed = JSON.parse(readFileSync(path, 'utf8'));
+		return parsed?.reports !== null && typeof parsed?.reports === 'object' ? parsed.reports : {};
+	} catch {
+		return {};
+	}
+}
+
+function readSavedReport(config, targetId) {
+	const saved = readSavedReports(config)[targetId];
+	return saved !== null && typeof saved === 'object' ? saved : null;
+}
+
+function rememberSavedReport(config, value) {
+	if (value?.ok !== true || typeof value?.target?.id !== 'string') return;
+	try {
+		const reports = readSavedReports(config);
+		const saved = {};
+		for (const field of SAVED_REPORT_FIELDS) {
+			if (value[field] !== undefined) saved[field] = value[field];
+		}
+		saved.target = publicTargets(config).find((target) => target.id === value.target.id) ?? {
+			id: value.target.id,
+			label: value.target.label ?? value.target.id,
+			transport: value.target.transport ?? 'ssh',
+			host: value.target.host ?? '',
+			user: value.target.user ?? ''
+		};
+		reports[value.target.id] = saved;
+		saveInventory(savedReportsPath(config), { reports });
+	} catch {
+		// A cache-write failure must not discard a probe result already produced.
+	}
+}
+
 /**
  * Resolve the repository root from the call argument, plugin config, or
  * environment. No checkout path is baked in: a hardcoded root would silently
@@ -132,9 +223,21 @@ function normalizedHost(value) {
 	return String(value ?? '').trim().toLowerCase().replace(/\.$/, '');
 }
 
+/** Whether a discovered target carries a MAC alias. */
+function entryHasMac(entry, mac) {
+	const wanted = normalizeMac(mac);
+	if (wanted === null) return false;
+	return [entry?.mac, ...(Array.isArray(entry?.macs) ? entry.macs : [])]
+		.map(normalizeMac)
+		.some((candidate) => candidate === wanted);
+}
+
 /** Merge discovered metadata into one configured target. */
 function attachDiscovered(target, entry) {
 	target.mac = target.mac ?? entry.mac ?? null;
+	target.macs = [...new Set([...(target.macs ?? []), ...(entry.macs ?? []), target.mac, entry.mac].filter(Boolean))];
+	target.memoryUsedMb = entry.memoryUsedMb ?? target.memoryUsedMb ?? null;
+	target.memoryTotalMb = entry.memoryTotalMb ?? target.memoryTotalMb ?? null;
 	target.discoveredId = target.discoveredId ?? entry.id ?? null;
 	target.observedIp = target.observedIp ?? entry.host ?? null;
 	target.hostname = target.hostname ?? entry.hostname ?? null;
@@ -168,11 +271,16 @@ function targetTable(config) {
 			port: Number.isInteger(entry.port) ? entry.port : null,
 			identityFile: typeof entry.identityFile === 'string' ? entry.identityFile : null,
 			workdir: typeof entry.workdir === 'string' ? entry.workdir : null,
-			note: typeof entry.note === 'string' ? entry.note : null
+			note: typeof entry.note === 'string' ? entry.note : null,
+			isConfigured: true
 		});
 	}
+	const inventory = readInventory(inventoryPath(config));
+	const bindings = inventory.preferences?.bindings !== null && typeof inventory.preferences?.bindings === 'object'
+		? inventory.preferences.bindings
+		: {};
 	const discovered = inventoryTargets(
-		readInventory(inventoryPath(config)),
+		inventory,
 		typeof config?.discovery?.user === 'string' ? config.discovery.user.trim() : null
 	).sort((left, right) => {
 		const leftAt = Date.parse(left.lastSeen ?? '') || 0;
@@ -180,6 +288,19 @@ function targetTable(config) {
 		return rightAt - leftAt;
 	});
 	const merged = new Set();
+	const boundEntries = new Set();
+	for (const [configuredId, discoveredId] of Object.entries(bindings)) {
+		const configuredTarget = table.get(configuredId);
+		const entry = discovered.find((candidate) => candidate.id === discoveredId);
+		if (configuredTarget === undefined || entry === undefined) continue;
+		// An explicit user binding overrides a stale configured MAC. This is the
+		// only path that may attach a different MAC set to a configured target.
+		configuredTarget.mac = null;
+		configuredTarget.macs = [];
+		attachDiscovered(configuredTarget, entry);
+		merged.add(configuredId);
+		boundEntries.add(entry.id);
+	}
 	const hostnameCounts = new Map();
 	const configuredIdCounts = new Map();
 	for (const entry of discovered) {
@@ -188,13 +309,14 @@ function targetTable(config) {
 		if (entry.configuredId) configuredIdCounts.set(entry.configuredId, (configuredIdCounts.get(entry.configuredId) ?? 0) + 1);
 	}
 	for (const entry of discovered) {
+		if (boundEntries.has(entry.id)) continue;
 		const configuredTarget = entry.configuredId ? table.get(entry.configuredId) : undefined;
 		const configuredIsUnique = entry.configuredId ? configuredIdCounts.get(entry.configuredId) === 1 : false;
 		if (
 			configuredTarget !== undefined &&
 			!merged.has(entry.configuredId) &&
 			(configuredTarget.mac !== null
-				? entry.mac !== null && configuredTarget.mac === entry.mac
+				? entryHasMac(entry, configuredTarget.mac)
 				: configuredIsUnique)
 		) {
 			attachDiscovered(configuredTarget, entry);
@@ -211,7 +333,7 @@ function targetTable(config) {
 				!merged.has(candidate.id) &&
 				hostNames.includes(normalizedHost(candidate.host)) &&
 				(candidate.mac !== null
-					? entry.mac !== null && candidate.mac === entry.mac
+					? entryHasMac(entry, candidate.mac)
 					: hostnameIsUnique)
 		);
 		if (target !== undefined) {
@@ -275,14 +397,57 @@ function publicTargets(config) {
 		host: target.host,
 		hostname: target.hostname ?? null,
 		mac: target.mac ?? null,
+		macs: Array.isArray(target.macs) ? target.macs : (target.mac ? [target.mac] : []),
+		memoryUsedMb: target.memoryUsedMb ?? null,
+		memoryTotalMb: target.memoryTotalMb ?? null,
 		discoveredId: target.discoveredId ?? null,
 		observedIp: target.observedIp ?? null,
 		lastSeen: target.lastSeen ?? null,
 		user: target.user,
 		port: target.port,
 		isDefault: target.id === defaultId,
+		isConfigured: target.isConfigured === true,
 		note: target.note
 	}));
+}
+
+/**
+ * Check whether each selected target accepts an SSH connection right now.
+ *
+ * This is intentionally a transport-level liveness check: a green result means
+ * "SSH port reachable", not "the full 310B environment passed". Full identity
+ * and environment evidence still comes from ascend_probe.
+ */
+async function checkTargetLiveness(config, { targetIds = null, timeoutMs = 1500 } = {}) {
+	const table = targetTable(config);
+	const requested = Array.isArray(targetIds) && targetIds.length > 0
+		? new Set(targetIds.map(String))
+		: null;
+	const targets = [...table.values()].filter((target) => requested === null || requested.has(target.id));
+	const effectiveTimeout = Math.max(250, Math.min(Number(timeoutMs) || 1500, 5000));
+	const results = await Promise.all(targets.map(async (target) => {
+		if (target.transport === 'local') {
+			return { id: target.id, host: target.host, port: null, online: true, state: 'local', reason: '本机目标。' };
+		}
+		if (!isSafeHost(target.host)) {
+			return { id: target.id, host: target.host, port: target.port ?? 22, online: false, state: 'invalid', reason: '目标地址无效。' };
+		}
+		const port = Number.isInteger(target.port) ? target.port : 22;
+		const reachable = await tcpOpen(target.host, port, effectiveTimeout);
+		return {
+			id: target.id,
+			host: target.host,
+			port,
+			online: reachable,
+			state: reachable ? 'ssh-open' : 'unreachable',
+			reason: reachable ? `SSH ${target.host}:${port} 可达。` : `SSH ${target.host}:${port} 不可达。`
+		};
+	}));
+	return {
+		checkedAt: new Date().toISOString(),
+		timeoutMs: effectiveTimeout,
+		targets: results
+	};
 }
 
 /**
@@ -314,12 +479,14 @@ async function discoverSerialBoard(serial, config) {
 	const errors = [];
 	for (const ip of candidates) {
 		try {
-			const candidate = await probeCandidate({ host: ip, user: 'HwHiAiUser', port: sshPort, timeoutMs: 60000 });
+			const candidate = await probeCandidate({ host: ip, user: 'HwHiAiUser', port: sshPort, timeoutMs: 20000, light: true });
 			if (candidate.ok === true && candidate.scope?.applicable === true) {
 				const observed = observeBoard(inventory, {
 					ip,
 					user: 'HwHiAiUser',
 					mac: candidate.mac,
+					macs: candidate.macs,
+					interfaceMacs: candidate.interfaceMacs,
 					hostname: candidate.hostname,
 					port: sshPort,
 					system: candidate.system,
@@ -346,7 +513,10 @@ async function discoverSerialBoard(serial, config) {
 		}
 	}
 	if (found.length === 0 && typeof serial.macAddress === 'string' && serial.macAddress !== '') {
-		const existing = inventory.boards?.[serial.macAddress] ?? null;
+		const serialMac = normalizeMac(serial.macAddress);
+		const existing = Object.values(inventory.boards ?? {}).find(
+			(board) => board !== null && [board.mac, ...(Array.isArray(board.macs) ? board.macs : [])].map(normalizeMac).includes(serialMac)
+		) ?? inventory.boards?.[serial.macAddress] ?? null;
 		const verifiedSoc = /^Ascend310B[14]$/iu.test(String(existing?.system?.soc ?? ''));
 		if (!verifiedSoc) {
 			errors.push(
@@ -357,6 +527,7 @@ async function discoverSerialBoard(serial, config) {
 				ip: serial.ipAddress,
 				user: 'HwHiAiUser',
 				mac: serial.macAddress,
+				macs: [serial.macAddress],
 				hostname: serial.hostname,
 				port: sshPort,
 				system: existing.system,
@@ -381,6 +552,37 @@ async function discoverSerialBoard(serial, config) {
 	return { found, errors, inventoryPath: inventoryFile, serial: serialObservation };
 }
 
+/** Remember the last board selected in the panel without changing the profile. */
+function rememberLastTarget(config, targetId) {
+	if (typeof targetId !== 'string' || targetId.trim() === '') return;
+	try {
+		const path = inventoryPath(config);
+		const inventory = readInventory(path);
+		if (inventory.preferences?.lastTarget === targetId) return;
+		inventory.preferences = { ...(inventory.preferences ?? {}), lastTarget: targetId };
+		saveInventory(path, inventory);
+	} catch {
+		// A read-only or unavailable inventory must not break report loading.
+	}
+}
+
+/** Store an explicit user binding between a configured target and a discovered board. */
+function rememberBinding(config, configuredId, discoveredId) {
+	const path = inventoryPath(config);
+	const inventory = readInventory(path);
+	const configuredTargets = Array.isArray(config?.targets) ? config.targets : [];
+	if (!configuredTargets.some((target) => target?.id === configuredId)) {
+		throw new Error(`未找到配置目标：${configuredId}`);
+	}
+	const board = Object.values(inventory.boards ?? {}).find((candidate) => candidate?.id === discoveredId);
+	if (board === undefined) throw new Error(`未找到开发板记录：${discoveredId}`);
+	inventory.preferences = {
+		...(inventory.preferences ?? {}),
+		bindings: { ...(inventory.preferences?.bindings ?? {}), [configuredId]: discoveredId }
+	};
+	saveInventory(path, inventory);
+}
+
 /** Public inventory summaries for the Assets tab (never expose SSH secrets). */
 function publicInventory(config) {
 	const inventory = readInventory(inventoryPath(config));
@@ -393,6 +595,7 @@ function publicInventory(config) {
 			return {
 				id: board.id,
 				mac: board.mac ?? null,
+				macs: Array.isArray(board.macs) ? board.macs : (board.mac ? [board.mac] : []),
 				hostname: board.hostname ?? null,
 				lastIp: board.lastIp ?? null,
 				model: board.system?.boardModel ?? null,
@@ -565,6 +768,27 @@ function remotePath(cwd, value) {
 	return candidate.startsWith('/') ? candidate : `${cwd.replace(/\/+$/, '')}/${candidate}`;
 }
 
+/** Restrict model downloads to an explicit workspace or the temporary directory. */
+function resolveDownloadDestination(target, cwd, value) {
+	const destination = remotePath(cwd, value);
+	const roots = ['/tmp'];
+	if (target?.user) {
+		const home = `/home/${target.user}`;
+		// Only conventional case workspaces are trusted as download roots. A
+		// profile workdir must not turn an arbitrary home subdirectory into a
+		// model-write target (for example /home/user/.ssh).
+		const configuredWorkdir = typeof target.workdir === 'string' ? target.workdir.trim() : '';
+		if (configuredWorkdir === `${home}/Ascend310` || configuredWorkdir.startsWith(`${home}/Documents/`)) {
+			roots.push(configuredWorkdir);
+		}
+		roots.push(`${home}/Documents`);
+	}
+	if (!roots.some((root) => isRemotePathInside(root, destination))) {
+		throw new Error(`下载目标必须位于 /tmp、配置的工作区或 /home/${target?.user ?? 'HwHiAiUser'}/Documents 下。`);
+	}
+	return destination;
+}
+
 /** Resolve a host-side screenshot path under the configured artifact root. */
 function resolveCapturePath(config, output) {
 	if (typeof output !== 'string' || output.trim() === '') throw new Error('截图输出路径为空。');
@@ -579,6 +803,12 @@ function resolveCapturePath(config, output) {
 /** Encode one URL path segment, keeping it usable by wget/curl. */
 function encodePathPart(value) {
 	return encodeURIComponent(value).replaceAll('%2F', '/');
+}
+
+/** Derive an integrity status only from a successful atomic download task. */
+export function downloadIntegrity(task, expectedSha256) {
+	if (task?.executed !== true || task?.exitCode !== 0) return 'not-verified';
+	return expectedSha256 === null ? 'not-provided' : 'verified';
 }
 
 /** Normalize a model download request and return the actual URL and command. */
@@ -797,6 +1027,157 @@ async function runTask({ config, targetSelector, command, cwd, timeoutMs = 12000
 	};
 }
 
+/** Run one fixed peripheral task and normalize its JSON evidence. */
+async function runPeripheralAction({ config, action, targetSelector, command, normalized, allowStateChange, dryRun, timeoutMs }) {
+	const task = await runTask({
+		config,
+		targetSelector,
+		command,
+		timeoutMs,
+		allowStateChange,
+		dryRun,
+		environment: 'ascend'
+	});
+	const parsed = task.executed ? parsePeripheralResult(task.stdout) : null;
+	const operationOk = task.allowed === true && task.exitCode === 0 && (task.executed === false || parsed?.ok === true);
+	const evidence = !task.executed
+		? 'untested'
+		: parsed?.ok !== true
+			? 'observed-fail'
+			: action === 'camera-capture'
+				? 'frame-capture'
+				: action === 'microphone-record'
+					? 'waveform-analysis'
+					: 'playback-command';
+	let text = '';
+	if (dryRun && task.allowed) {
+		text = [`外设动作预检通过：${action}`, `目标：${task.target}`, `输出：${normalized.output}`, '未执行（dryRun）。'].join('\n');
+	} else if (!task.allowed || !task.executed) {
+		text = [`外设动作被拒绝或未执行：${action}`, task.reason].join('\n');
+	} else if (!parsed) {
+		text = [`外设动作未返回可解析证据：${action}`, `退出码：${task.exitCode}`, task.stderr || task.stdout || task.reason].join('\n');
+	} else if (!operationOk) {
+		text = [`外设动作失败：${action}`, `退出码：${task.exitCode}`, parsed.error ?? task.reason].join('\n');
+	} else if (action === 'camera-capture') {
+		text = [
+			'摄像头采集完成，已取得非空帧。',
+			`设备：${parsed.device}`,
+			`实际：${parsed.actualWidth}x${parsed.actualHeight} · ${parsed.fourcc || 'FourCC 未采集'} · ${parsed.actualFps === null || parsed.actualFps === undefined ? 'FPS 未采集' : `${parsed.actualFps} fps`}`,
+			`平均亮度：${parsed.meanLuminance}；Laplacian 方差：${parsed.laplacianVariance}`,
+			`文件：${normalized.output}`,
+			`SHA-256：${parsed.sha256}`
+		].join('\n');
+	} else if (action === 'microphone-record') {
+		text = [
+			parsed.signalDetected === true ? '麦克风采集完成，检测到非零 PCM。' : '麦克风采集完成，但没有检测到可信 PCM 信号。',
+			`设备：${parsed.device}`,
+			`WAV：${parsed.sampleRate} Hz / ${parsed.channels} ch / 请求 ${parsed.requestedDurationSec ?? normalized.durationSec} s / 实际 ${parsed.durationSec} s`,
+			`采集阶段耗时：${parsed.captureElapsedSec ?? '未采集'} s；操作总耗时：${task.durationMs} ms`,
+			`RMS：${parsed.rms}；峰值：${parsed.peak}；全零比例：${parsed.zeroRatio}；削波比例：${parsed.clippingRatio}`,
+			`文件：${normalized.output}`,
+			'SHA-256：' + parsed.sha256,
+			'这是波形证据，不表示语音质量或 ASR 通过。'
+		].join('\n');
+	} else if (action === 'speaker-test') {
+		text = [
+			'喇叭测试音播放命令完成。',
+			`设备：${parsed.device}`,
+			`当前输出路由：${parsed.outputRoute}`,
+			`测试音：${parsed.frequency} Hz / ${parsed.durationSec} s`,
+			`文件：${normalized.output}`,
+			`SHA-256：${parsed.sha256}`,
+			'heard=null：命令成功不代表人耳已经听到，需要操作员确认。'
+		].join('\n');
+	} else {
+		text = [
+			'录音回放命令完成。',
+			`设备：${parsed.device}`,
+			`输出路由：${parsed.outputRoute}`,
+			`源录音：${parsed.sourceRecording}`,
+			`WAV：${parsed.sampleRate} Hz / ${parsed.channels} ch / ${parsed.durationSec} s`,
+			`SHA-256：${parsed.sha256}`,
+			'heard=null：这只证明播放命令完成，不代表人耳已经听到。'
+		].join('\n');
+	}
+	return {
+		text,
+		ok: operationOk,
+		executed: task.executed === true,
+		dryRun: dryRun === true,
+		action,
+		target: task.target,
+		command: task.command,
+		output: normalized.output,
+		exitCode: Number.isInteger(task.exitCode) ? task.exitCode : -1,
+		durationMs: Number.isInteger(task.durationMs) ? task.durationMs : 0,
+		evidence,
+		data: parsed ?? {},
+		stdout: task.stdout ?? '',
+		stderr: task.stderr ?? ''
+	};
+}
+
+/** Execute one fixed peripheral action. */
+async function executePeripheralOperation(config, action, payload = {}) {
+	try {
+		if (action === 'camera-capture') {
+			const normalized = normalizeCameraOptions(payload);
+			return await runPeripheralAction({
+				config,
+				action,
+				targetSelector: payload.target,
+				command: buildCameraCommand(normalized),
+				normalized,
+				allowStateChange: payload.allowStateChange === true,
+				dryRun: payload.dryRun === true,
+				timeoutMs: timeoutOrDefault(payload.timeoutMs, 60000, 180000)
+			});
+		}
+		if (action === 'microphone-record') {
+			const normalized = normalizeMicrophoneOptions(payload);
+			return await runPeripheralAction({
+				config,
+				action,
+				targetSelector: payload.target,
+				command: buildMicrophoneCommand(normalized),
+				normalized,
+				allowStateChange: payload.allowStateChange === true,
+				dryRun: payload.dryRun === true,
+				timeoutMs: timeoutOrDefault(payload.timeoutMs, (normalized.durationSec + 15) * 1000, 120000)
+			});
+		}
+		if (action === 'speaker-test') {
+			const normalized = normalizeSpeakerOptions(payload);
+			return await runPeripheralAction({
+				config,
+				action,
+				targetSelector: payload.target,
+				command: buildSpeakerCommand(normalized),
+				normalized,
+				allowStateChange: payload.allowStateChange === true,
+				dryRun: payload.dryRun === true,
+				timeoutMs: timeoutOrDefault(payload.timeoutMs, (normalized.durationSec + 15) * 1000, 120000)
+			});
+		}
+		if (action === 'play-recording') {
+			const normalized = normalizeRecordedPlaybackOptions(payload);
+			return await runPeripheralAction({
+				config,
+				action,
+				targetSelector: payload.target,
+				command: buildRecordedPlaybackCommand(normalized),
+				normalized,
+				allowStateChange: payload.allowStateChange === true,
+				dryRun: payload.dryRun === true,
+				timeoutMs: 120000
+			});
+		}
+		return peripheralFailure(action || 'peripheral', `未知外设动作：${action || '(empty)'}`);
+	} catch (error) {
+		return peripheralFailure(action || 'peripheral', String(error?.message ?? error));
+	}
+}
+
 /** Build the environment report used by both routes and tools. */
 function environmentReport({ environment, target, source }) {
 	return assembleReport({
@@ -983,6 +1364,64 @@ async function collectEnvironment({ config, targetSelector, rawText, timeoutMs, 
 	return { target, source: target.transport, environment, rawText: transport.stdout ?? '', transport };
 }
 
+/** Collect one category without running the full environment probe. */
+async function collectCategoryEnvironment({ config, targetSelector, script, label, timeoutMs = 30000, exec }) {
+	const target = resolveTarget(config, targetSelector);
+	if (target.transport === 'local') throw new Error(`${label}刷新只允许已配置的 SSH 开发板。`);
+	const transport = await runRemoteScript({
+		script,
+		target,
+		timeoutMs: timeoutOrDefault(timeoutMs, 30000, 60000),
+		exec
+	});
+	const environment = parseProbeOutput(transport.stdout ?? '');
+	return {
+		target,
+		environment,
+		facts: serializeEnvironment(environment).facts,
+		rawText: transport.stdout ?? '',
+		transport
+	};
+}
+
+async function collectCameraEnvironment(options) {
+	return collectCategoryEnvironment({ ...options, script: buildCameraProbeScript(), label: '摄像头' });
+}
+
+/** Merge fresh camera facts into the saved panel report without losing board facts. */
+function mergeSavedFacts(config, target, facts, category, updatedAt = new Date().toISOString(), metadata = {}) {
+	const reports = readSavedReports(config);
+	const previous = reports[target.id] !== null && typeof reports[target.id] === 'object' ? reports[target.id] : {};
+	const publicTarget = publicTargets(config).find((candidate) => candidate.id === target.id) ?? {
+		id: target.id,
+		label: target.label ?? target.id,
+		transport: target.transport ?? 'ssh',
+		host: target.host ?? '',
+		user: target.user ?? ''
+	};
+	const categoryUpdatedAt = previous.categoryUpdatedAt !== null && typeof previous.categoryUpdatedAt === 'object'
+		? { ...previous.categoryUpdatedAt, [category]: updatedAt }
+		: { [category]: updatedAt };
+	const value = {
+		...previous,
+		...metadata,
+		ok: true,
+		generatedAt: updatedAt,
+		...(category === 'camera' ? { cameraUpdatedAt: updatedAt } : {}),
+		categoryUpdatedAt,
+		source: previous.source ?? target.transport ?? 'ssh',
+		target: publicTarget,
+		facts: { ...(previous.facts ?? {}), ...facts }
+	};
+	rememberSavedReport(config, value);
+	reportCache.delete(target.id);
+	return value;
+}
+
+function mergeSavedCameraFacts(config, target, facts, updatedAt = new Date().toISOString()) {
+	return mergeSavedFacts(config, target, facts, 'camera', updatedAt);
+}
+
 /** Clamp a caller-supplied timeout to a positive bounded value. */
 function timeoutOrDefault(value, fallback = 60000, max = 600000) {
 	return Number.isInteger(value) && value > 0 ? Math.min(value, max) : fallback;
@@ -1146,6 +1585,46 @@ const CAPTURE_SCHEMA = {
 	}
 };
 
+const PERIPHERAL_SCHEMA = {
+	type: 'object',
+	additionalProperties: false,
+	properties: {
+		text: { type: 'string', required: true },
+		ok: { type: 'boolean', required: true },
+		executed: { type: 'boolean', required: true },
+		dryRun: { type: 'boolean', required: true },
+		action: { type: 'string', required: true },
+		target: { type: 'string', required: true },
+		command: { type: 'string', required: true },
+		output: { type: 'string', required: true },
+		exitCode: { type: 'integer', required: true },
+		durationMs: { type: 'integer', required: true },
+		evidence: { type: 'string', required: true },
+		data: { type: 'object', additionalProperties: true, required: true },
+		stdout: { type: 'string', required: true },
+		stderr: { type: 'string', required: true }
+	}
+};
+
+function peripheralFailure(action, message) {
+	return {
+		text: `外设操作失败：${action}\n${message}`,
+		ok: false,
+		executed: false,
+		dryRun: false,
+		action,
+		target: '未执行',
+		command: '',
+		output: '',
+		exitCode: -1,
+		durationMs: 0,
+		evidence: 'untested',
+		data: { error: message },
+		stdout: '',
+		stderr: message
+	};
+}
+
 /** Register the tools and, when present, the panel routes. */
 export function apply(ctx, config) {
 	ctx.tools.register(
@@ -1235,6 +1714,109 @@ export function apply(ctx, config) {
 				kind: 'other',
 				rawInput: args
 			})
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend_camera_capture',
+			description:
+				'Capture one or more frames from a configured V4L2 camera on an Ascend 310B board using a fixed ' +
+				'Python/OpenCV task. Requires frame.read to return a non-empty frame and writes one JPEG under ' +
+				'/tmp/ascend310b-debug/peripherals. Returns actual dimensions, FPS, FourCC, mean luminance, Laplacian ' +
+				'variance, bytes and SHA-256. allowStateChange:true is required; use dryRun first.',
+			parameters: {
+				target: { type: 'string', description: 'Configured SSH target id or `user@host`; local is refused.' },
+				device: { type: 'string', required: true, description: 'V4L2 device matching /dev/videoN.' },
+				width: { type: 'integer', description: 'Requested width, 160-1920. Defaults to 640.' },
+				height: { type: 'integer', description: 'Requested height, 120-1080. Defaults to 480.' },
+				pixelFormat: { type: 'string', enum: ['MJPG', 'YUYV'], description: 'Requested V4L2 pixel format. Defaults to MJPG.' },
+				frameCount: { type: 'integer', description: 'Frames to read, 1-10. Defaults to 1.' },
+				timeoutMs: { type: 'integer', description: 'Task timeout in milliseconds. Defaults to 60000.' },
+				dryRun: { type: 'boolean', description: 'Validate and show the fixed capture task without executing.' },
+				allowStateChange: { type: 'boolean', description: 'Required true to open the camera and write a JPEG.' }
+			},
+			output: { schema: PERIPHERAL_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.text }] },
+			async execute(args) {
+				return executePeripheralOperation(config, 'camera-capture', args);
+			},
+			presentCall: (args) => ({ card: 'generic', title: '310B 摄像头采集', kind: 'other', rawInput: args })
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend_microphone_record',
+			description:
+				'Record a fixed WAV from an ALSA or PulseAudio/PipeWire source on an Ascend 310B board. backend=auto ' +
+				'uses ALSA for default/hw:/plughw: selectors and Pulse otherwise. Pulse .monitor sources are rejected. ' +
+				'The fixed Python task returns duration, RMS, peak, zero ratio and clipping ratio as evidence, not a ' +
+				'quality verdict. allowStateChange:true is required; use dryRun first.',
+			parameters: {
+				target: { type: 'string', description: 'Configured SSH target id or `user@host`; local is refused.' },
+				backend: { type: 'string', enum: ['auto', 'alsa', 'pulse'], description: 'Capture backend. Defaults to auto.' },
+				device: { type: 'string', description: 'ALSA PCM or Pulse source. Auto uses default/@DEFAULT_SOURCE@ when omitted.' },
+				sampleRate: { type: 'integer', description: 'Sample rate, 8000-48000 Hz. Defaults to 16000.' },
+				channels: { type: 'integer', description: 'Channel count, 1-2. Defaults to 1.' },
+				durationSec: { type: 'number', description: 'Recording duration, 1-10 seconds. Defaults to 3.' },
+				dryRun: { type: 'boolean', description: 'Validate and show the fixed recording task without executing.' },
+				allowStateChange: { type: 'boolean', description: 'Required true to open the microphone and write a WAV.' }
+			},
+			output: { schema: PERIPHERAL_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.text }] },
+			async execute(args) {
+				return executePeripheralOperation(config, 'microphone-record', args);
+			},
+			presentCall: (args) => ({ card: 'generic', title: '310B 麦克风录音', kind: 'other', rawInput: args })
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend_speaker_test',
+			description:
+				'Generate a fixed sine WAV with Python stdlib and play it through an ALSA or PulseAudio/PipeWire sink ' +
+				'on an Ascend 310B board. Does not change system volume. Returns path, hash and current output route with ' +
+				'heard=null; operator confirmation is required. allowStateChange:true is required; use dryRun first.',
+			parameters: {
+				target: { type: 'string', description: 'Configured SSH target id or `user@host`; local is refused.' },
+				backend: { type: 'string', enum: ['auto', 'alsa', 'pulse'], description: 'Playback backend. Defaults to auto.' },
+				device: { type: 'string', description: 'ALSA PCM or Pulse sink. Auto uses default/@DEFAULT_SINK@ when omitted.' },
+				frequency: { type: 'number', description: 'Sine frequency, 200-2000 Hz. Defaults to 440.' },
+				durationSec: { type: 'number', description: 'Playback duration, 0.25-5 seconds. Defaults to 1.' },
+				sampleRate: { type: 'integer', description: 'Sample rate, 8000-48000 Hz. Defaults to 48000.' },
+				channels: { type: 'integer', description: 'Channel count, 1-2. Defaults to 1.' },
+				dryRun: { type: 'boolean', description: 'Validate and show the fixed playback task without executing.' },
+				allowStateChange: { type: 'boolean', description: 'Required true to generate a WAV and play it.' }
+			},
+			output: { schema: PERIPHERAL_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.text }] },
+			async execute(args) {
+				return executePeripheralOperation(config, 'speaker-test', args);
+			},
+			presentCall: (args) => ({ card: 'generic', title: '310B 喇叭测试', kind: 'other', rawInput: args })
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend_play_recording',
+			description:
+				'Validate and play a microphone WAV recorded by this plugin through an ALSA or PulseAudio/PipeWire sink ' +
+				'on an Ascend 310B board. The recording path is restricted to the plugin fixed peripheral directory. ' +
+				'Does not change system volume. Returns WAV metadata/hash and output route with heard=null; ' +
+				'allowStateChange:true is required and audible success must be confirmed separately.',
+			parameters: {
+				target: { type: 'string', description: 'Configured SSH target id or `user@host`; local is refused.' },
+				backend: { type: 'string', enum: ['auto', 'alsa', 'pulse'], description: 'Playback backend. Defaults to auto.' },
+				device: { type: 'string', description: 'ALSA PCM or Pulse sink. Auto uses default/@DEFAULT_SINK@ when omitted.' },
+				recording: { type: 'string', required: true, description: 'Fixed microphone-<timestamp>.wav path under /tmp/ascend310b-debug/peripherals.' },
+				dryRun: { type: 'boolean', description: 'Validate the recorded WAV playback task without executing.' },
+				allowStateChange: { type: 'boolean', description: 'Required true to open the sink and play the recorded WAV.' }
+			},
+			output: { schema: PERIPHERAL_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.text }] },
+			async execute(args) {
+				return executePeripheralOperation(config, 'play-recording', args);
+			},
+			presentCall: (args) => ({ card: 'generic', title: '310B 录音回放', kind: 'other', rawInput: args })
 		})
 	);
 
@@ -1944,7 +2526,7 @@ export function apply(ctx, config) {
 				try {
 					const target = resolveTarget(config, args.target);
 					const workingDir = resolveTaskCwd(target, args.cwd);
-					const destination = remotePath(workingDir, args.destination);
+					const destination = resolveDownloadDestination(target, workingDir, args.destination);
 					resolveTaskCwd(target, destination);
 					const resolved = normalizeDownload({
 						source: args.source,
@@ -1980,7 +2562,7 @@ export function apply(ctx, config) {
 						source: args.source,
 						resolvedUrl: displayUrl,
 						destination,
-						integrity: task.executed ? (expectedSha256 === null ? 'not-provided' : 'verified') : 'not-verified',
+						integrity: downloadIntegrity(task, expectedSha256),
 						sha256: expectedSha256 ?? '',
 						text: [
 							`下载源：${args.source}`,
@@ -2350,12 +2932,32 @@ export function apply(ctx, config) {
 					return;
 				}
 				const url = new URL(request.url ?? REPORT_PATH, 'http://localhost');
-				const targetId = url.searchParams.get('target') ?? undefined;
+				const requestedTargetId = url.searchParams.get('target');
+				const rememberedTargetId = readInventory(inventoryPath(config)).preferences?.lastTarget;
+				const targetId = requestedTargetId ?? (typeof rememberedTargetId === 'string' ? rememberedTargetId : undefined);
 				const fresh = url.searchParams.get('fresh') === '1';
 				const samples = sampleIndexFor(config);
 				const repoRoot = samples.repoRoot;
-				const target = resolveTarget(config, targetId);
+				let target;
+				try {
+					target = resolveTarget(config, targetId);
+				} catch (error) {
+					// A deleted/renamed remembered target must not make the panel blank.
+					if (requestedTargetId !== null) throw error;
+					target = resolveTarget(config);
+				}
+				if (requestedTargetId !== null) rememberLastTarget(config, target.id);
 				const key = target.id;
+				const targets = publicTargets(config);
+				const publicTarget = targets.find((candidate) => candidate.id === key) ?? {
+					id: target.id,
+					label: target.label,
+					transport: target.transport,
+					host: target.host ?? '',
+					user: target.user ?? '',
+					port: target.port ?? null,
+					isConfigured: target.isConfigured === true
+				};
 				const cached = reportCache.get(key);
 				if (!fresh && cached !== undefined && Date.now() - cached.at < 120000) {
 					json(response, 200, cached.value);
@@ -2369,8 +2971,8 @@ export function apply(ctx, config) {
 					generatedAt: new Date().toISOString(),
 					probedAt: null,
 					source: 'not-probed',
-					target,
-					targets: publicTargets(config),
+					target: publicTarget,
+					targets,
 					boards: publicInventory(config),
 					board: null,
 					facts: {},
@@ -2384,7 +2986,7 @@ export function apply(ctx, config) {
 					pairing: {
 						verdict: 'incomplete',
 						evidence: 'untested',
-						reasons: ['面板尚未探测。点击「运行探测」后才会读取板端版本。'],
+						reasons: ['尚无设备信息。设备插拔或配置变化后点击「更新设备信息」。'],
 						nextActions: []
 					},
 					missingCore: ['soc', 'cannVersion', 'driverVersion'],
@@ -2410,17 +3012,22 @@ export function apply(ctx, config) {
 						status: stack.status
 					}))
 				};
-				if (cached?.value !== undefined) {
+				const retained = cached?.value ?? readSavedReport(config, key);
+				if (retained !== null && retained !== undefined) {
 					// Keep the last successful probe visible until a new one runs.
 					Object.assign(value, {
-						probedAt: cached.value.probedAt,
-						source: cached.value.source,
-						target: cached.value.target,
-						board: cached.value.board,
-						facts: cached.value.facts,
-						scope: cached.value.scope,
-						pairing: cached.value.pairing,
-						missingCore: cached.value.missingCore
+						probedAt: retained.probedAt,
+						cameraUpdatedAt: retained.cameraUpdatedAt,
+						categoryUpdatedAt: retained.categoryUpdatedAt,
+						source: retained.source,
+						board: retained.board,
+						facts: retained.facts,
+						scope: retained.scope,
+						pairing: retained.pairing,
+						missingCore: retained.missingCore,
+						inventoryChange: retained.inventoryChange ?? null,
+						transport: retained.transport,
+						rawExcerpt: retained.rawExcerpt
 					});
 				}
 				reportCache.set(key, { at: Date.now(), value });
@@ -2451,6 +3058,7 @@ export function apply(ctx, config) {
 				const result = await collectEnvironment({ config, targetSelector: targetId, rawText, timeoutMs: 60000 });
 				const report = environmentReport(result);
 				const inventoryChange = recordEnvironment(config, result);
+				rememberLastTarget(config, result.target.id);
 				const samples = sampleIndexFor(config);
 				const repoRoot = samples.repoRoot;
 				const index = samples.index;
@@ -2494,8 +3102,12 @@ export function apply(ctx, config) {
 						status: stack.status
 					}))
 				};
-				if (value.ok === true) reportCache.set(result.target.id, { at: Date.now(), value });
-				else reportCache.delete(result.target.id);
+				if (value.ok === true) {
+					reportCache.set(result.target.id, { at: Date.now(), value });
+					rememberSavedReport(config, value);
+				} else {
+					reportCache.delete(result.target.id);
+				}
 				json(response, 200, value);
 			} catch (error) {
 				json(response, 500, { ok: false, error: String(error?.message ?? error) });
@@ -2519,15 +3131,15 @@ export function apply(ctx, config) {
 				}
 				const payload = body.trim() === '' ? {} : JSON.parse(body);
 				const discovery = config?.discovery ?? {};
-				const cidrs = resolveDiscoveryCidrs(payload.cidrs, discovery.cidrs);
+				const cidrs = await resolveDiscoveryCidrsForScan(payload.cidrs, discovery.cidrs);
 				const result = await discoverNetwork({
 					cidrs,
 					user: typeof payload.user === 'string' ? payload.user : discovery.user ?? config?.targets?.[0]?.user ?? null,
 					port: Number.isInteger(payload.port) ? payload.port : discovery.port ?? 22,
-					scanConcurrency: Number.isInteger(payload.concurrency) ? payload.concurrency : discovery.scanConcurrency ?? 24,
+					scanConcurrency: Number.isInteger(payload.concurrency) ? payload.concurrency : discovery.scanConcurrency ?? 64,
 					probeConcurrency: Number.isInteger(discovery.probeConcurrency) ? discovery.probeConcurrency : 4,
-					scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 500,
-					probeTimeoutMs: Number.isInteger(payload.timeoutMs) ? payload.timeoutMs : discovery.probeTimeoutMs ?? 60000,
+					scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 350,
+					probeTimeoutMs: Number.isInteger(payload.timeoutMs) ? payload.timeoutMs : discovery.probeTimeoutMs ?? 10000,
 					path: inventoryPath(config),
 					config
 				});
@@ -2541,8 +3153,216 @@ export function apply(ctx, config) {
 			}
 		};
 
-		const serialHandler = async (request, response) => {
+		const livenessHandler = async (request, response) => {
 			try {
+				const requestError = httpRequestError(request, ['POST']);
+				if (requestError !== null) {
+					json(response, requestError.status, { ok: false, error: requestError.error });
+					return;
+				}
+				let body = '';
+				for await (const chunk of request) {
+					body += chunk;
+					if (body.length > 256 * 1024) {
+						json(response, 413, { ok: false, error: '在线检测请求体超过 256 KB。' });
+						return;
+					}
+				}
+				const payload = body.trim() === '' ? {} : JSON.parse(body);
+				const targetIds = Array.isArray(payload.targets)
+					? [...new Set(payload.targets.filter((value) => typeof value === 'string' && value.trim() !== '').map((value) => value.trim()))].slice(0, 200)
+					: null;
+				const result = await checkTargetLiveness(config, {
+					targetIds,
+					timeoutMs: payload.timeoutMs
+				});
+				json(response, 200, { ok: true, ...result });
+			} catch (error) {
+				json(response, 400, { ok: false, error: String(error?.message ?? error) });
+			}
+		};
+
+		const categoryRefreshSpecs = {
+			camera: { label: '摄像头', script: buildCameraProbeScript },
+			audio: { label: '音频接口', script: buildAudioProbeScript },
+			system: { label: '系统信息', script: buildSystemProbeScript }
+		};
+		const categoryRefreshHandler = (category) => async (request, response) => {
+			const startedAt = Date.now();
+			const spec = categoryRefreshSpecs[category];
+			try {
+				const requestError = httpRequestError(request, ['POST']);
+				if (requestError !== null) {
+					json(response, requestError.status, { ok: false, error: requestError.error });
+					return;
+				}
+				let body = '';
+				for await (const chunk of request) {
+					body += chunk;
+					if (body.length > 64 * 1024) {
+						json(response, 413, { ok: false, error: `${spec.label}刷新请求体超过 64 KB。` });
+						return;
+					}
+				}
+				const payload = body.trim() === '' ? {} : JSON.parse(body);
+				const result = await collectCategoryEnvironment({
+					config,
+					targetSelector: typeof payload.target === 'string' ? payload.target : undefined,
+					script: spec.script(),
+					label: spec.label,
+					timeoutMs: timeoutOrDefault(payload.timeoutMs, category === 'system' ? 45000 : 30000, 60000)
+				});
+				if (result.transport.ok === false) {
+					json(response, 502, { ok: false, error: result.transport.reason });
+					return;
+				}
+				const updatedAt = new Date().toISOString();
+				let metadata = {};
+				if (category === 'system') {
+					const report = environmentReport({
+						environment: result.environment,
+						target: result.target,
+						source: result.target.transport
+					});
+					metadata = {
+						probedAt: updatedAt,
+						source: result.target.transport,
+						board: report.board,
+						pairing: report.pairing,
+						scope: report.scope,
+						transport: report.transport
+					};
+				}
+				mergeSavedFacts(config, result.target, result.facts, category, updatedAt, metadata);
+				json(response, 200, {
+					ok: true,
+					category,
+					target: publicTargets(config).find((target) => target.id === result.target.id) ?? null,
+					facts: result.facts,
+					...metadata,
+					updatedAt,
+					durationMs: Date.now() - startedAt
+				});
+			} catch (error) {
+				json(response, 400, { ok: false, error: String(error?.message ?? error), durationMs: Date.now() - startedAt });
+			}
+		};
+		const cameraRefreshHandler = categoryRefreshHandler('camera');
+		const audioRefreshHandler = categoryRefreshHandler('audio');
+		const systemRefreshHandler = categoryRefreshHandler('system');
+
+		const cameraPreviewHandler = async (request, response) => {
+			try {
+				const requestError = httpRequestError(request, ['GET']);
+				if (requestError !== null) {
+					json(response, requestError.status, { ok: false, error: requestError.error });
+					return;
+				}
+				const url = new URL(request.url ?? '', 'http://127.0.0.1');
+				const file = url.searchParams.get('file') ?? '';
+				if (!CAMERA_IMAGE_PATH.test(file)) {
+					json(response, 422, { ok: false, error: '只允许读取插件固定目录中的 camera-*.jpg。' });
+					return;
+				}
+				const target = resolveTarget(config, url.searchParams.get('target') ?? undefined);
+				if (target.transport === 'local') {
+					json(response, 422, { ok: false, error: '摄像头预览只允许已配置的 SSH 开发板。' });
+					return;
+				}
+				const transport = await runRemoteScript({
+					target,
+					timeoutMs: 15000,
+					script: `size=$(wc -c < '${file}') || exit 1; [ "$size" -le 5242880 ] || exit 13; base64 < '${file}'`
+				});
+				if (transport.ok === false) {
+					json(response, 502, { ok: false, error: transport.reason });
+					return;
+				}
+				const image = Buffer.from(String(transport.stdout ?? '').replace(/\s+/gu, ''), 'base64');
+				if (image.length < 4 || image.length > 5 * 1024 * 1024 || image[0] !== 0xff || image[1] !== 0xd8 || image[2] !== 0xff) {
+					json(response, 422, { ok: false, error: '板端文件不是有效的受限大小 JPEG。' });
+					return;
+				}
+				response.writeHead(200, {
+					'content-type': 'image/jpeg',
+					'content-length': image.length,
+					'cache-control': 'no-store',
+					'x-content-type-options': 'nosniff'
+				});
+				response.end(image);
+			} catch (error) {
+				json(response, 400, { ok: false, error: String(error?.message ?? error) });
+			}
+		};
+
+		const peripheralHandler = (action) => async (request, response) => {
+			try {
+				const requestError = httpRequestError(request, ['POST']);
+				if (requestError !== null) {
+					json(response, requestError.status, { ok: false, error: requestError.error });
+					return;
+				}
+				let body = '';
+				for await (const chunk of request) {
+					body += chunk;
+					if (body.length > 64 * 1024) {
+						json(response, 413, { ok: false, error: '外设请求体超过 64 KB。' });
+						return;
+					}
+				}
+				const payload = body.trim() === '' ? {} : JSON.parse(body);
+				const result = await executePeripheralOperation(config, action, payload);
+				json(response, result.ok === true ? 200 : 422, {
+					ok: result.ok === true,
+					result,
+					...(result.ok === true ? {} : { error: result.text })
+				});
+			} catch (error) {
+				json(response, 400, { ok: false, error: String(error?.message ?? error) });
+			}
+		};
+		const cameraCaptureHandler = peripheralHandler('camera-capture');
+		const microphoneRecordHandler = peripheralHandler('microphone-record');
+		const speakerTestHandler = peripheralHandler('speaker-test');
+		const playRecordingHandler = peripheralHandler('play-recording');
+
+		const bindHandler = async (request, response) => {
+			try {
+				const requestError = httpRequestError(request, ['POST']);
+				if (requestError !== null) {
+					json(response, requestError.status, { ok: false, error: requestError.error });
+					return;
+				}
+				let body = '';
+				for await (const chunk of request) {
+					body += chunk;
+					if (body.length > 1_000_000) {
+						json(response, 413, { ok: false, error: '绑定请求体超过 1 MB。' });
+						return;
+					}
+				}
+				const payload = body.trim() === '' ? {} : JSON.parse(body);
+				const configuredId = typeof payload.configuredTarget === 'string' ? payload.configuredTarget : '';
+				const discoveredId = typeof payload.discoveredTarget === 'string' ? payload.discoveredTarget : '';
+				if (configuredId === '' || discoveredId === '') {
+					json(response, 400, { ok: false, error: '必须同时指定 configuredTarget 和 discoveredTarget。' });
+					return;
+				}
+				rememberBinding(config, configuredId, discoveredId);
+				reportCache.clear();
+				json(response, 200, {
+					ok: true,
+					configuredTarget: configuredId,
+					discoveredTarget: discoveredId,
+					targets: publicTargets(config),
+					boards: publicInventory(config)
+				});
+			} catch (error) {
+				json(response, 400, { ok: false, error: String(error?.message ?? error) });
+			}
+		};
+
+		const serialHandler = async (request, response) => {			try {
 				const requestError = httpRequestError(request, ['POST']);
 				if (requestError !== null) {
 					json(response, requestError.status, { ok: false, error: requestError.error });
@@ -2596,6 +3416,46 @@ export function apply(ctx, config) {
 			'ascend310b-debug: discover route'
 		);
 		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: LIVENESS_PATH, handler: livenessHandler }),
+			'ascend310b-debug: liveness route'
+		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: CAMERA_REFRESH_PATH, handler: cameraRefreshHandler }),
+			'ascend310b-debug: camera-refresh route'
+		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: AUDIO_REFRESH_PATH, handler: audioRefreshHandler }),
+			'ascend310b-debug: audio-refresh route'
+		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: SYSTEM_REFRESH_PATH, handler: systemRefreshHandler }),
+			'ascend310b-debug: system-refresh route'
+		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: CAMERA_PREVIEW_PATH, handler: cameraPreviewHandler }),
+			'ascend310b-debug: camera-preview route'
+		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: CAMERA_CAPTURE_PATH, handler: cameraCaptureHandler }),
+			'ascend310b-debug: camera-capture route'
+		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: MICROPHONE_RECORD_PATH, handler: microphoneRecordHandler }),
+			'ascend310b-debug: microphone-record route'
+		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: SPEAKER_TEST_PATH, handler: speakerTestHandler }),
+			'ascend310b-debug: speaker-test route'
+		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: PLAY_RECORDING_PATH, handler: playRecordingHandler }),
+			'ascend310b-debug: play-recording route'
+		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: BIND_PATH, handler: bindHandler }),
+			'ascend310b-debug: bind route'
+		);
+		scope.effect(
 			() => scope.webServer.register({ kind: 'exact', path: SERIAL_PATH, handler: serialHandler }),
 			'ascend310b-debug: serial-probe route'
 		);
@@ -2611,5 +3471,11 @@ export const internals = {
 	resolveInside,
 	isSafeHost,
 	prepareTaskCommand,
+	downloadIntegrity,
+	checkTargetLiveness,
+	readSavedReport,
+	rememberSavedReport,
+	mergeSavedFacts,
+	mergeSavedCameraFacts,
 	require
 };
