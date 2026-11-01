@@ -467,7 +467,7 @@ async function checkTargetLiveness(config, { targetIds = null, timeoutMs = 1500 
  * Probe addresses learned over serial and merge the result into the MAC-keyed
  * inventory. The serial observation is retained even when SSH is unavailable.
  */
-export async function discoverSerialBoard(serial, config) {
+export async function discoverSerialBoard(serial, config, { signal = null, onEvent = null } = {}) {
 	const candidates = [];
 	const seen = new Set();
 	for (const value of [serial.ipAddress, ...(serial.hostnameIps ?? []), ...(serial.interfaces ?? []).map((entry) => entry.ipv4)]) {
@@ -492,8 +492,10 @@ export async function discoverSerialBoard(serial, config) {
 	const errors = [];
 	let inventoryChanged = false;
 	for (const ip of candidates) {
+		if (signal?.aborted === true) throw Object.assign(new Error('串口后的 SSH 验证已取消。'), { code: 'ABORT_ERR' });
+		onEvent?.({ at: new Date().toISOString(), phase: 'ssh-verify', status: 'running', detail: `trying SSH ${ip}:${sshPort}`, data: { ip, port: sshPort } });
 		try {
-			const candidate = await probeCandidate({ host: ip, user: 'HwHiAiUser', port: sshPort, timeoutMs: 20000, light: true });
+			const candidate = await probeCandidate({ host: ip, user: 'HwHiAiUser', port: sshPort, timeoutMs: 20000, light: true, signal });
 			if (candidate.ok === true && candidate.scope?.applicable === true) {
 				const observed = observeBoard(inventory, {
 					ip,
@@ -522,9 +524,14 @@ export async function discoverSerialBoard(serial, config) {
 				});
 				break;
 			}
-			if (candidate.ok !== true) errors.push(`${ip}: ${candidate.error}`);
+			if (candidate.ok !== true) {
+				errors.push(`${ip}: ${candidate.error}`);
+				onEvent?.({ at: new Date().toISOString(), phase: 'ssh-verify', status: 'failed', detail: `${ip}: ${candidate.error}`, data: { ip, port: sshPort } });
+			}
 		} catch (error) {
+			if (error?.code === 'ABORT_ERR' || signal?.aborted === true) throw error;
 			errors.push(`${ip}: ${String(error?.message ?? error)}`);
+			onEvent?.({ at: new Date().toISOString(), phase: 'ssh-verify', status: 'failed', detail: `${ip}: ${String(error?.message ?? error)}`, data: { ip, port: sshPort } });
 		}
 	}
 	if (found.length === 0 && typeof serial.macAddress === 'string' && serial.macAddress !== '') {
@@ -1289,7 +1296,17 @@ function persistSerialSessionSafely(config, log, settings) {
 
 async function withSerialSessionLog(config, { operation, settings, commands, signal }, runner) {
 	const log = createSerialSessionLog({ operation, settings, commands });
-	const onEvent = (event) => appendSerialSessionPhase(log, event.phase, event);
+	let streamedTranscript = '';
+	const onEvent = (event) => {
+		if (event?.phase === 'transcript') {
+			if (typeof event.text === 'string') streamedTranscript = event.text;
+			return;
+		}
+		appendSerialSessionPhase(log, event.phase, {
+			...event,
+			durationMs: event.durationMs ?? null
+		});
+	};
 	try {
 		appendSerialSessionPhase(log, 'validation', { status: 'ok', detail: 'serial settings accepted' });
 		const result = await runner(onEvent);
@@ -1300,7 +1317,7 @@ async function withSerialSessionLog(config, { operation, settings, commands, sig
 		const partial = Array.isArray(result?.discovery?.errors) && result.discovery.errors.length > 0 && (result.discovery.found?.length ?? 0) === 0;
 		finishSerialSessionLog(log, {
 			status: partial ? 'partial' : 'success',
-			transcript: result?.rawText ?? result?.transcriptExcerpt ?? '',
+			transcript: result?.rawText ?? result?.transcriptExcerpt ?? streamedTranscript,
 			error: partial ? result.discovery.errors.join(' | ') : null
 		});
 		const serialLogWarning = persistSerialSessionSafely(config, log, settings);
@@ -1309,7 +1326,7 @@ async function withSerialSessionLog(config, { operation, settings, commands, sig
 		const status = error?.code === 'ABORT_ERR' || signal?.aborted === true ? 'cancelled' : 'failed';
 		finishSerialSessionLog(log, {
 			status,
-			transcript: typeof error?.serialTranscript === 'string' ? error.serialTranscript : '',
+			transcript: typeof error?.serialTranscript === 'string' ? error.serialTranscript : streamedTranscript,
 			error: String(error?.message ?? error)
 		});
 		persistSerialSessionSafely(config, log, settings);
@@ -1334,7 +1351,7 @@ async function runSerialProbeAndDiscovery(config, settings, signal, onEvent) {
 		data: { hostname: result.hostname ?? null, ipAddress: result.ipAddress ?? null, macAddress: result.macAddress ?? null }
 	});
 	onEvent({ at: new Date().toISOString(), phase: 'ssh-verify', status: 'running', detail: 'verifying serial-reported addresses over SSH' });
-	const discovery = await discoverSerialBoard(result, config);
+	const discovery = await discoverSerialBoard(result, config, { signal, onEvent });
 	const status = discovery.found.length > 0 ? 'ok' : discovery.errors.length > 0 ? 'warning' : 'skipped';
 	onEvent({
 		at: new Date().toISOString(),

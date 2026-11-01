@@ -305,12 +305,13 @@ async function mapLimit(items, limit, worker, signal = null) {
  * @param {object} options - probe options.
  * @returns {Promise<object>} candidate result.
  */
-export async function probeCandidate({ host, user = null, port = 22, timeoutMs = 30000, light = false, exec } = {}) {
+export async function probeCandidate({ host, user = null, port = 22, timeoutMs = 30000, light = false, exec, signal } = {}) {
 	const result = await runRemoteScript({
 		script: light ? buildIdentityProbeScript() : buildProbeScript(),
 		target: { host, user, port },
 		timeoutMs,
-		exec
+		exec,
+		signal
 	});
 	if (result.ok !== true) {
 		return { ip: host, ok: false, error: result.reason ?? result.stderr ?? 'SSH 探测失败' };
@@ -388,7 +389,8 @@ export async function discoverNetwork({
 		port,
 		timeoutMs: probeTimeoutMs,
 		light: true,
-		exec
+		exec,
+		signal
 	}), signal);
 	// A board with Wi-Fi and multiple Ethernet ports can answer on several
 	// addresses. Deduplicate by any interface MAC alias, not by the currently

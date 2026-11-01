@@ -505,11 +505,11 @@ export function buildSshArgs(target, command) {
  * @param {string|null} [options.input] - optional stdin payload.
  * @returns {Promise<object>} `{stdout, stderr, code, timedOut}`.
  */
-export function execFileCapture({ file, args, cwd, timeoutMs = 30000, input = null }) {
+export function execFileCapture({ file, args, cwd, timeoutMs = 30000, input = null, signal }) {
 	const { execFile, spawn } = require('node:child_process');
 	if (input !== null && input !== undefined) {
 		return new Promise((resolve) => {
-			const child = spawn(file, args, { cwd, windowsHide: true });
+			const child = spawn(file, args, { cwd, windowsHide: true, signal });
 			let stdout = '';
 			let stderr = '';
 			let timedOut = false;
@@ -547,7 +547,7 @@ export function execFileCapture({ file, args, cwd, timeoutMs = 30000, input = nu
 		execFile(
 			file,
 			args,
-			{ cwd, timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, windowsHide: true },
+			{ cwd, timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, windowsHide: true, signal },
 			(error, stdout, stderr) => {
 				resolve({
 					stdout: String(stdout ?? ''),
@@ -572,7 +572,8 @@ export function execFileCapture({ file, args, cwd, timeoutMs = 30000, input = nu
  * @param {string|null} [options.input] - optional stdin payload.
  * @returns {Promise<object>} execution result plus the exact command shown.
  */
-export async function runRemoteScript({ script, target, timeoutMs = 60000, exec = execFileCapture, input = null }) {
+export async function runRemoteScript({ script, target, timeoutMs = 60000, exec = execFileCapture, input = null, signal }) {
+	signal?.throwIfAborted();
 	if (!isSafeHost(target.host)) {
 		return { ok: false, stdout: '', stderr: `非法主机名：${target.host}`, display: '', reason: '主机名不安全。' };
 	}
@@ -580,7 +581,8 @@ export async function runRemoteScript({ script, target, timeoutMs = 60000, exec 
 		return { ok: false, stdout: '', stderr: `非法 SSH 用户：${target.user}`, display: '', reason: 'SSH 用户不安全。' };
 	}
 	const args = buildSshArgs(target, script);
-	const result = await exec({ file: 'ssh', args, timeoutMs, input });
+	const result = await exec({ file: 'ssh', args, timeoutMs, input, signal });
+	signal?.throwIfAborted();
 	const display = target.user ? `ssh ${target.user}@${target.host}` : `ssh ${target.host}`;
 	return {
 		...result,
