@@ -10,10 +10,10 @@ lang: zh-cn
 # 附录 4：Vibe Coding
 
 > **本章导读**
-> 目标：掌握 Vibe Coding 的基本流程，用 DSH 生成、运行并审查 Python 代码。
+> 目标：掌握 Vibe Coding 的基本流程，用 DSH 生成、运行并审查小型本地程序。
 > 环境：昇腾 310B 自带 Anaconda，本附录不安装 Python 环境。
-> 数据：`samples/case7/models/registry.json`
-> 输出：`tmp/appendix4/<姓名>/vibe_models.py`
+> 数据：脚本内置的 5 天学习时长数组，不依赖 case、模型或数据集。
+> 输出：`tmp/appendix4/<姓名>/study_minutes.py` 与 `study_minutes.png`
 
 Vibe Coding 是用自然语言描述目标，由 AI Agent 写代码并运行，人负责审查和验证。DSH 是这套流程中的执行环境，DeepSeek 负责理解任务和生成方案。本附录只讲基础流程，不要求提前掌握完整 Python 语法。
 
@@ -323,69 +323,89 @@ Agent 能做的事情和真人操作电脑一样有后果。看不懂的命令�
 | 长任务失控 | Agent 连续修改多个文件 | 拆成小任务，每步检查一次结果 |
 ## 第一次 Vibe Coding 任务
 
-本附录的第一个任务不使用外部数据，改为读取本仓库中的模型清单：
+第一次练习不应要求学生知道某个 case 的目录、模型格式或数据字段。公开入门课程通常先让学习者完成一个可见的小结果，再逐步引入项目结构和数据：`easy-vibe` 用简单游戏建立第一次反馈，`vibe-vibe` 将首个练习设计为短时间内可打开的网页。本课程采用同一原则，但把题目换成一张由**内置数字**生成的学习时长统计图。
 
-```text
-samples/case7/models/registry.json
-```
+练习数据直接写在脚本中：5 天的学习分钟数。学生不需要下载数据集、连接开发板或认识案例目录，却能看到两种可验证的结果：终端中的总时长、均值、最大/最小值，以及保存到本地的柱状图。这比纯打印一行“Hello”多了一层真实计算，也比直接进入案例数据更容易理解。
 
-文件里包含 `models` 列表，每个模型有 `model_id`、`status`、`embedding_dim` 和 `precision_mode` 等字段。
-
-### 提示词
+### 第一轮：计算并生成一张图
 
 在 DSH 中输入：
 
 ```text
-请先告诉我当前工作区路径，确认后开始。
-请读取 samples/case7/models/registry.json，不要修改原文件。
-用标准库 json 输出：
-1. models 数量；
-2. 每个模型的 model_id、status、embedding_dim、precision_mode。
-代码保存到 tmp/appendix4/<姓名>/vibe_models.py。
-只允许读取，不安装任何依赖。
+先告诉我当前工作区路径，确认后再执行。
+先检查当前 Python 能否导入 numpy 和 matplotlib；如果任一模块不可导入，停止并报告缺少什么，不要安装任何依赖。
+只在 tmp/appendix4/<姓名>/ 中创建 study_minutes.py。
+在脚本内写入 5 天学习时长数组：[25, 40, 30, 50, 35]，单位为分钟。
+使用 numpy 计算总时长、平均值、最大值和最小值，并在终端以中文标签输出。
+使用 matplotlib 生成 5 根柱状图，横轴使用 Day 1 到 Day 5，纵轴使用 Minutes；保存为同目录 study_minutes.png。
+只修改这两个新文件，不读取 samples/，不访问网络，不安装依赖，也不修改其他文件。
+运行脚本后报告终端输出和 PNG 的完整路径。
 ```
 
-提示词包含了目标、数据路径、输出位置、约束和验收标准。DSH 应该先制定计划，再读取文件，再生成脚本。
+这份提示词给出了输入数据、输出位置、允许的库、禁止的动作和可观察的验收标准。对初学者而言，第一轮不必理解 NPU 或案例工程；关键是看见数组如何进入计算，数值如何变成一张图。
 
-### 参考脚本
+### 参考实现
 
-DSH 生成的代码可能不完全相同，下面是一个可运行的参考写法：
+Agent 生成的版本可能不同。一个满足最小要求的脚本如下：
 
 ```python
-import json
 from pathlib import Path
 
-path = Path("samples/case7/models/registry.json")
-data = json.loads(path.read_text(encoding="utf-8"))
-models = data["models"]
+import matplotlib.pyplot as plt
+import numpy as np
 
-print("models:", len(models))
-for model in models:
-    print(model["model_id"], model["status"], model["embedding_dim"], model["precision_mode"])
+minutes = np.array([25, 40, 30, 50, 35])
+days = np.arange(1, len(minutes) + 1)
+
+print("总时长:", int(minutes.sum()), "分钟")
+print("平均时长:", float(minutes.mean()), "分钟")
+print("最大时长:", int(minutes.max()), "分钟")
+print("最小时长:", int(minutes.min()), "分钟")
+
+plt.bar(days, minutes)
+plt.xlabel("Day")
+plt.ylabel("Minutes")
+plt.xticks(days)
+plt.tight_layout()
+plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 ```
 
-### 预期输出
+这里的 `minutes` 是输入，`numpy` 负责数组计算，`matplotlib` 负责把同一组数字画成图。图中使用英文轴标签，避免初次运行时因中文字体缺失造成无关报错；终端输出仍使用中文标签。
 
-当前仓库实测输出：
+### 预期结果
+
+使用上面的数组时，终端应包含：
 
 ```text
-models: 3
-mobileclip_s0__npu__mixed_fp16 admitted 512 allow_fp32_to_fp16
-chinese_clip_rn50__npu__mixed_fp16 admitted 1024 allow_fp32_to_fp16
-resnet50_feature__npu__mixed_fp16 admitted 2048 allow_fp32_to_fp16
+总时长: 180 分钟
+平均时长: 36.0 分钟
+最大时长: 50 分钟
+最小时长: 25 分钟
 ```
 
-如果 DSH 的输出和上面不一致，先检查工作区路径、文件内容和代码，不要直接接受结果。
+目录中还应出现 `study_minutes.png`，图中应有 5 根高度分别为 25、40、30、50、35 的柱子。数值或柱子不一致时，不要立刻让 Agent 重写全部代码；先让它说明数组、求和和绘图各在哪一行。
+
+### 第二轮：只增加一个图形元素
+
+确认第一轮的数字和图片正确后，再提出**一个**可验证的修改：
+
+```text
+不要修改 minutes 数组、文件位置或依赖。请在 study_minutes.png 中增加一条表示平均值的虚线，
+并添加图例。运行后说明你增加了哪两行绘图逻辑，以及新的平均线应位于哪个数值。
+```
+
+第一轮先验证“计算和出图”，第二轮只验证“一处修改是否准确”。将修改限制在一个问题上，学生才能看见 Agent 的变更是否真正对应了自己的要求。
 
 ### 验收步骤
 
-DSH 完成任务后，按以下顺序验收：
+完成后按下面顺序验收：
 
-1. 检查计划：是否只读取指定 JSON，不修改原文件。
-2. 检查命令：是否只运行 Python，不执行安装或删除命令。
-3. 检查代码：是否使用标准库 `json` 和 `pathlib`，没有 pandas。
-4. 自己运行一次脚本，确认输出与文件内容一致。
-5. 用一句话说明脚本读取了哪个字段、计算了什么、输出了什么。
+1. 检查计划：只创建 `tmp/appendix4/<姓名>/study_minutes.py` 与 `study_minutes.png`，没有读取 case 或修改其他文件。
+2. 检查环境：若 `numpy` 或 `matplotlib` 不可导入，Agent 是否停止并报告，而不是擅自安装。
+3. 检查数值：总时长为 180，平均值为 36.0，最大值为 50，最小值为 25。
+4. 检查图片：`study_minutes.png` 存在且有 5 根柱子；横轴是 Day 1 到 Day 5。
+5. 检查修改：第二轮只增加平均值虚线和图例，平均线位于 36.0。
+6. 用一句话记录：输入数组是什么、`numpy` 计算了什么、图片如何证明结果生效。
 
 ## 提示词与审查方法
 
@@ -393,11 +413,11 @@ DSH 完成任务后，按以下顺序验收：
 
 | 要素 | 要求 | 示例 |
 |---|---|---|
-| 目标 | 说明要做什么 | 读取模型清单并输出摘要 |
-| 数据路径 | 给出明确路径 | `samples/case7/models/registry.json` |
-| 输出位置 | 说明代码保存到哪里 | `tmp/appendix4/<姓名>/vibe_models.py` |
-| 约束 | 说明允许和禁止的操作 | 只读、只用标准库、不装依赖 |
-| 验收标准 | 说明怎样算完成 | 输出模型数量、ID、状态、维度 |
+| 目标 | 说明要做什么 | 计算 5 天学习时长并画出柱状图 |
+| 输入 | 明确由谁提供内容 | 提示词中的 `[25, 40, 30, 50, 35]`，不依赖仓库数据 |
+| 输出位置 | 说明文件保存到哪里 | `tmp/appendix4/<姓名>/study_minutes.py` 与 `study_minutes.png` |
+| 约束 | 说明允许和禁止的操作 | 仅 `numpy`、`matplotlib`，不安装依赖、不读 case、不访问网络 |
+| 验收标准 | 说明怎样算完成 | 数值为 180/36.0/50/25，PNG 有 5 根对应的柱子 |
 
 好的提示词让 Agent 少猜测。坏的提示词只有一句话，例如“帮我分析一下”，这时 Agent 可能选错文件、改变工作区或生成无法验证的结论。
 
@@ -439,9 +459,9 @@ DSH 完成任务后，按以下顺序验收：
 - [ ] 问“你现在能用哪些 skill？”时，回答包含 `ascend310b-writing` 与 `ascend310b-debug`。
 - [ ] `pnpm run skills:check` 通过。
 - [ ] 能背出 5 条安全规则。
-- [ ] 第一次任务只读取 `samples/case7/models/registry.json`，没有修改原文件。
-- [ ] 能解释生成脚本中的 `json`、`Path` 和 `for` 循环。
-- [ ] 脚本输出与文件内容一致。
+- [ ] 第一次任务只创建 `tmp/appendix4/<姓名>/study_minutes.py` 与 `study_minutes.png`，没有读取 case、模型或数据集。
+- [ ] 能解释输入数组、`numpy` 统计量和 `matplotlib` 柱状图之间的关系。
+- [ ] 终端数值为 180/36.0/50/25，图片中有 5 根对应的柱子和 36.0 的平均值虚线。
 
 ## 常见错误与坑 {#src-appendix-appendix4-pitfalls}
 
@@ -456,19 +476,22 @@ DSH 完成任务后，按以下顺序验收：
 | 串口已读到 IP，但 SSH 仍失败 | 地址不在当前网段、22 端口不可达、`sshd` 或公钥认证未就绪 | 使用记录中的 IP/MAC 核对网络与 SSH；不要把串口成功当成 SSH、CANN 或 NPU 通过 |
 | DSH 找不到文件 | 工作区不在本仓库 | 先问当前工作区路径，再重新选择 |
 | DSH 修改了原文件 | 文件边界不清晰 | 明确只读路径，检查计划后再批准 |
-| DSH 使用了 pandas | 提示词没有限制依赖 | 明确只用标准库 `json` 和 `pathlib` |
+| `numpy` 或 `matplotlib` 导入失败 | 当前 Python 环境没有该库，或选错了解释器 | 停止并报告模块名与解释器路径；不要让 Agent 自动安装，先由教师确认环境 |
+| 数值正确但没有 PNG | 缺少 `savefig`、输出路径不对，或脚本未运行到绘图语句 | 让 Agent 指出保存图片的那一行，确认 `study_minutes.png` 与脚本同目录 |
+| 图中中文显示成方块 | 系统没有对应中文字体 | 首例保持 Day/Minutes 英文轴标签；不要为了画图安装字体 |
+| Agent 一开始就读取 case 或安装依赖 | 提示词没有限制首例范围 | 重申只使用脚本内置数组；不读取 `samples/`，不安装依赖，不访问网络 |
 | 代码能运行但讲不清 | 直接接受了生成结果 | 让 DSH 逐行解释，自己复述后再保存 |
 | API Key 出现在代码中 | 配置时把 Key 当数据传给了 Agent | 删除 Key 并重新生成，绝不提交 |
-| 输出与文件不一致 | 没有自己运行脚本 | 重新运行，检查路径、字段和输出 |
+| 数字与图形不一致 | 修改数组后没有重新运行，或绘图使用了另一变量 | 先比对 `minutes` 数组、终端输出和 5 根柱子的高度，再只修对应一处 |
 | DSH 页面打不开 | 启动命令还在运行，或端口被占用 | 等显示 `URL: http://127.0.0.1:3080` 后再刷新 |
 
 ## 作业 {#src-appendix-appendix4-assignment}
 
 1. 用自己的话写 300 字以内的“Vibe Coding 安全说明”，至少包含：Vibe Coding 是什么、5 条安全规则、3 个绝对不执行的操作、为什么每条结论都要自己验证。把说明写入 `tmp/appendix4/<姓名>/safety.md`。
 2. 写一份 150 字以内的“提示词设计说明”，解释为什么提示词要包含目标、路径、输出位置和约束。把说明整理成 `tmp/appendix4/<姓名>/prompt-notes.md`。
-3. 让 DSH 读取 `samples/case7/models/registry.json`，输出 `models` 数量、每个模型的 `model_id`、`status`、`embedding_dim` 和 `precision_mode`。把脚本保存为 `tmp/appendix4/<姓名>/vibe_models.py`。
-4. 让 DSH 增加一个统计维度，例如统计 `status == "admitted"` 的模型数量，或者按 `embedding_dim` 排序。
-5. 把 DSH 生成的代码逐行审查一遍，说明哪几行最可能出错，为什么。
+3. 让 DSH 在 `tmp/appendix4/<姓名>/study_minutes.py` 中把第 6 天的学习时长 45 分钟加入数组。先说明新的总时长 225 分钟和平均值 37.5 分钟，再修改并运行。
+4. 让 DSH 只增加一条表示平均值的虚线和图例；检查图片中的平均线是否位于新平均值，不修改数组以外的计算规则。
+5. 把 DSH 生成的代码逐行审查一遍，指出哪一段定义输入数组、哪一段计算统计量、哪一段保存图片，以及哪一种修改可能让数值和图形不一致。
 
 ## 评分要点
 
@@ -478,5 +501,5 @@ DSH 完成任务后，按以下顺序验收：
 | 安全 | 能背出红线，看不懂的命令会停下来解释 |
 | 提示词 | 提示词包含目标、路径、输出位置、约束和验收标准 |
 | 代码审查 | 能逐行解释生成脚本，能指出风险和修改点 |
-| 结果验证 | 输出与 `samples/case7/models/registry.json` 一致 |
+| 结果验证 | 终端统计量与数组一致，PNG 存在，柱子高度与平均值线都能解释 |
 | AI 协作 | 保留 DSH 修改代码的记录，并说明每处修改为什么安全 |
