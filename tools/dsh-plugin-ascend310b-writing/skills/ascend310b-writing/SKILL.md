@@ -58,8 +58,9 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
 - Graphviz 字体名、pt/dpi、`rankdir`、画布尺寸和排版自检说明；
 - `human-review: pending`、审计规则名、插件工具名、作者自检清单；
 - 只对作者有用、对学生无运行价值的仓库路径注释。
+- 个人计算机绝对路径、临时目录、完整 SHA-256、精确字节数、运行时间戳、任务 ID 或原始命令回显。它们属于工程证据，不是初学者的阅读入口。
 
-图片用一句面向读者的 alt 说明职责或流程即可。`.dot` 源、字体和画布检查留在 `ascend310b-writing-dot`、同目录源文件和课件页脚的 HTML 来源链接中。代码命令可以出现在教程里，但那是学生要执行的入口，不是作者的排版备注。
+正式读者稿只保留“这张图/这次运行证明什么、适用边界是什么”和可见结果。图片用一句面向读者的 alt 说明职责或流程即可。完整哈希、字节数、绝对路径、原始日志和清单只在 `samples/caseN/docs/evidence/`、受控工程 docs、发布复现记录或仓库 `tmp/` 下的学习记录中保留；不要将它们复制到 `src/` 正文或课件可见区。`.dot` 源、字体和画布检查留在 `ascend310b-writing-dot`、同目录源文件和课件页脚的 HTML 来源链接中。代码命令可以出现在教程里，但那是学生要执行的入口，不是作者的排版备注。
 
 教材正文图目标为 `1600×1000` / `1 MB`，硬上限为 `2400×1500` / `1.5 MB`；浏览器实际缩放超过 2.5 倍为 warning，超过 3 倍为失败。超限图必须拆图或重新生成，不能靠 Markdown/CSS 缩小。不同板端、不同状态的两张截图如果字节完全相同，只能作为同一证据，不能当成两次独立采集。历史超限图只允许通过 `docs/image-audit-baseline.json` 精确冻结为 warning；新图或未登记超限仍是 error，修复后必须删除对应基线项。
 
@@ -109,9 +110,10 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
    并说明哪些能力可用。正文检查不需要任何外部工具；只有出 PDF 才需要工具链。
    本仓库里 `python3` 缺失不算故障——若你用 Anaconda，插件会自动找到
    `anaconda3` 的 python 并在构建时提供 `python3`。
-1. 跑 `ascend310b_writing_audit`（可带 `scope` 限定 book/experiment/appendix）。
+1. 正式教材、案例、附录和课件跑 `ascend310b_writing_audit`（可带 `scope` 限定 book/experiment/appendix）。
    先看 error，再看 warning；info 是风格提示。它会顺带把 `AGENTS.md`
    冻结名表和正文实际标题双向比对。
+   学生尚未发布的实验记录位于仓库临时学习目录时，改用 `ascend310b_writing_record_audit`；它只审这一份记录的 Markdown、代码块、图片和链接，不替代正式教材审计。
 2. 按规则修**源 Markdown**，不要改生成物
    （`latex/`、`src/.vuepress/dist`、`src/.vuepress/.cache`）。
 3. 复跑 `ascend310b_writing_audit`，直到 error 归零；warning 若有意保留

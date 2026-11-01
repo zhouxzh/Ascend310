@@ -13,7 +13,7 @@ lang: zh-cn
 > 目标：掌握 Vibe Coding 的基本流程，用 DSH 生成、运行并审查小型本地程序。
 > 环境：昇腾 310B 自带 Anaconda，本附录不安装 Python 环境。
 > 数据：脚本内置的 5 天学习时长数组，不依赖 case、模型或数据集。
-> 输出：`tmp/appendix4/<姓名>/study_minutes.py` 与 `study_minutes.png`
+> 输出：个人临时学习目录中的 `study_minutes.py` 与 `study_minutes.png`
 
 Vibe Coding 是用自然语言描述目标，由 AI Agent 写代码并运行，人负责审查和验证。DSH 是这套流程中的执行环境，DeepSeek 负责理解任务和生成方案。本附录只讲基础流程，不要求提前掌握完整 Python 语法。
 
@@ -122,8 +122,8 @@ DSH 需要两样配置才能开始工作：模型 API Key 和工作区。
 3. 回到主界面，点击工作区选择器，选择本仓库根目录：
 
 ```text
-Windows 开发机：D:\Github\Ascend310
-昇腾 310B 板端：~/Documents/Ascend310
+开发机：选择自己克隆的教材仓库根目录
+昇腾 310B 板端：选择教师指定的课程工作区
 ```
 
 4. 新建一个会话，先问一句：
@@ -334,7 +334,7 @@ Agent 能做的事情和真人操作电脑一样有后果。看不懂的命令�
 ```text
 先告诉我当前工作区路径，确认后再执行。
 先检查当前 Python 能否导入 numpy 和 matplotlib；如果任一模块不可导入，停止并报告缺少什么，不要安装任何依赖。
-只在 tmp/appendix4/<姓名>/ 中创建 study_minutes.py。
+只在我的个人临时学习目录中创建 study_minutes.py。
 在脚本内写入 5 天学习时长数组：[25, 40, 30, 50, 35]，单位为分钟。
 使用 numpy 计算总时长、平均值、最大值和最小值，并在终端以中文标签输出。
 使用 matplotlib 生成 5 根柱状图，横轴使用 Day 1 到 Day 5，纵轴使用 Minutes；保存为同目录 study_minutes.png。
@@ -388,6 +388,13 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 
 目录中还应出现 `study_minutes.png`，图中应有 5 根高度分别为 25、40、30、50、35 的柱子。数值或柱子不一致时，不要立刻让 Agent 重写全部代码；先让它说明数组、求和和绘图各在哪一行。
 
+控制机上的一次实际运行得到下图。控制机为 Intel CPU 的开发机；这张图证明本机 Python 环境完成了数组计算和绘图，不表示 310B 或 NPU 已经通过。
+
+![Intel 控制机生成的五天学习时长柱状图](./img4/study-minutes-local-intel.png)
+
+- 控制机使用 Anaconda、NumPy 与 Matplotlib 完成了本次普通 Python 计算和绘图。
+- 图中五根柱子从左到右对应 25、40、30、50、35 分钟；数值与终端统计一致。
+
 ### 第二轮：只增加一个图形元素
 
 确认第一轮的数字和图片正确后，再提出**一个**可验证的修改：
@@ -403,7 +410,7 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 
 完成后按下面顺序验收：
 
-1. 检查计划：只创建 `tmp/appendix4/<姓名>/study_minutes.py` 与 `study_minutes.png`，没有读取 case 或修改其他文件。
+1. 检查计划：只创建个人临时学习目录中的 `study_minutes.py` 与 `study_minutes.png`，没有读取 case 或修改其他文件。
 2. 检查环境：若 `numpy` 或 `matplotlib` 不可导入，Agent 是否停止并报告，而不是擅自安装。
 3. 检查数值：总时长为 180，平均值为 36.0，最大值为 50，最小值为 25。
 4. 检查图片：`study_minutes.png` 存在且有 5 根柱子；横轴是 Day 1 到 Day 5。
@@ -416,19 +423,19 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 
 本例只做 NumPy 和 Matplotlib 的普通 Python 计算，不调用 NPU、ACL、ATC 或模型推理。课程板卡的 Anaconda `base` 环境可直接用于这类非 NPU 小练习，因此这里显式使用 `environment: "base"`。这不是案例运行环境的替代方案：正式案例仍使用统一的 `ascend` 环境，不能因为这个例子能在 `base` 中运行，就把 NPU 程序迁回 `base`。
 
-在 DSH 中输入。把 `<当前板 target id>` 替换为左侧开发板记录中实际显示的 target，例如 `board-8t` 或一次发现产生的 `ascend-...`：
+在 DSH 中输入。把 `<当前板>` 替换为左侧开发板记录中实际选择的设备：
 
 ```text
-先使用 ascend_probe 对 <当前板 target id> 做只读探测，告诉我实际 SoC、当前 SSH 状态和 base 环境是否可作为普通 Python 计算环境。
+先使用 ascend_probe 对 <当前板> 做只读探测，告诉我实际 SoC、当前 SSH 状态和 base 环境是否可作为普通 Python 计算环境。
 不要运行 NPU 推理，也不要安装任何依赖。
 
 然后为同一组数据 [25, 40, 30, 50, 35] 准备一个板端任务：
-- 在 /tmp/appendix4/<姓名>/ 中只创建 study_minutes_board.py 和 study_minutes_board.png；
+- 只在教师指定的临时练习目录中创建 study_minutes_board.py 和 study_minutes_board.png；
 - 使用 environment: "base"；
 - 先检查 numpy 和 matplotlib 能否导入；不可导入时停止并报告；
 - 用 numpy 输出总时长、平均值、最大值、最小值；
 - 用 matplotlib 的 Agg 后端保存柱状图；
-- 先调用 ascend_board_run dryRun: true，展示将执行的命令、cwd 和输出路径；
+- 先调用 ascend_board_run dryRun: true，展示将执行的命令、工作目录和输出文件名；
 - 等我确认后，才使用 allowStateChange: true 实际运行。
 ```
 
@@ -440,28 +447,55 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 | `base` 中的导入检查 | 该板的普通 Python 环境能否导入两个库 | 统一案例 `ascend` 环境已经验收 |
 | `ascend_board_run` 的退出码、四个统计量和 PNG 路径 | 同一数组是否在板端完成计算和出图 | NPU 性能、数值精度或业务质量已经通过 |
 
+#### 本次 8T 板端实测
+
+下面是本附录这组数组在一块 8T 310B 开发板上的实际记录。它是一次普通 Python 绘图的 **observed-pass**，不应与 NPU 模型验收混写。
+
+| 项目 | 实际结果 |
+| --- | --- |
+| 目标板 | 8T 310B 开发板；SSH 探测完成 |
+| Python 环境 | Anaconda `base`；NumPy 与 Matplotlib 均可导入 |
+| 运行结果 | 退出码 0；总时长 180，平均值 36.0，最大值 50，最小值 25 |
+| 图片证据 | 成功生成柱状图，五根柱子从左到右对应 25、40、30、50、35 分钟 |
+
+下图是该板端运行的可见结果。它与控制机图的柱子高度一致，说明同一输入数组在两套普通 Python 环境中得到同一统计和图形；它们仍应作为两次独立运行分别记录，不能只凭视觉相同把文件当成同一产物。
+
+![8T 310B base 环境生成的五天学习时长柱状图](./img4/study-minutes-board-8t.png)
+
+第一次 dry-run 暴露了临时工作目录尚未创建的问题，真实执行在由脚本创建专属目录后通过。这说明 dry-run 应同时核对命令和工作目录；临时输出目录不能只写在脚本正文中而忽略任务启动目录。
+
+本次 `npu-smi` 同时报告 `Health Alarm`、温度约 79–81 ℃。这些是需要保留的设备诊断事实，但没有单独阻断本例，因为这里没有执行 NPU 推理；若后续运行 ACL、模型或性能任务，仍应从具体失败信号而不是单凭 Alarm 判断。
+
 若板端运行失败，先报告失败发生在环境激活、库导入、文件写入还是绘图阶段，再决定下一步；不要让 Agent 自动安装软件包或把失败归因于 310B 的 NPU。
 
 ### 第三个例子：用写作插件审计同一练习 {#src-appendix-appendix4-writing-plugin-example}
 
-第二个例子产生了数字、图片和一段可解释的结论。写作插件的任务不是检查任意临时脚本，而是检查**准备发布到教材或说明文档的 Markdown 源**是否满足标题、锚点、链接、图片和排版规则。因此，学生不应把 `tmp/` 下的草稿当作正式教材提交；应先把它视为练习记录，再用写作插件检查这份附录中对同一练习的正式说明。
+第二个例子产生了数字、图片和一段可解释的结论。下一步不是直接改正式教材，而是先把结果写成一份小型实验记录。写作插件的 `ascend310b_writing_record_audit` 专门审指定的临时 Markdown 记录：它检查标题层级、代码块语言、相对图片与链接、中文标点、编码和行尾，但不把正式教材的冻结标题、sidebar 或锚点要求强加给学生草稿。
 
-在 DSH 中输入：
+先让 Agent 在与图表同一临时学习目录中创建 `study_minutes_record.md`，记录至少包括：输入数组、控制机环境与结果、8T 的环境/结果、两张图片和“本例不是 NPU 推理”的边界。然后在 DSH 中输入：
 
 ```text
-不要修改任何文件。运行 ascend310b_writing_audit，root 指向当前教材仓库，scope 设为 appendix。
-只筛选并解释 src/appendix/appendix4.md 的发现：
-1. “第一次 Vibe Coding 任务”中的标题层级是否连续；
-2. Python、text 代码块是否有语言标记；
-3. 是否仍引用 case、模型清单或不存在的相对文件；
-4. study_minutes.py 和 study_minutes.png 的路径说明是否都位于 tmp/appendix4/<姓名>/；
-5. 将附录其他历史图片或其他案例造成的 warning 单独列出，不要把它们说成这个练习失败。
-最后给出一份不修改文件的审计摘要。
+不要修改任何文件。运行 ascend310b_writing_record_audit：
+- root 指向当前教材仓库；
+- file 使用刚创建的临时学习记录相对路径。
+
+解释这份记录是否存在：
+1. 标题层级跳跃、手写编号或没有语言标记的代码块；
+2. 不能解析的相对图片或链接；
+3. 中文半角标点、行尾空白、CRLF 或末尾缺换行；
+4. 路径逃逸或不在临时学习工作区下的文件访问。
+只报告这份学习记录的发现；不要修改记录，也不要运行全书审计。
 ```
 
-这个例子把同一张统计图从“能跑”推进到“说明可发布”。学生应理解两类结果的区别：`numpy` 和 `matplotlib` 的输出证明计算与绘图发生；写作审计证明教材源的标题、链接和 Markdown 结构符合规则。两者都通过，仍不等于 NPU 推理、模型精度或案例交付已经通过。
+本工具只允许仓库指定临时工作区下的相对 Markdown 路径，并拒绝绝对路径、`..` 和指向仓库外的符号链接。这样学生可以实际使用写作插件养成记录习惯，又不会让 Agent 读取任意本机文档。
 
-如果以后确实要把自己的学习记录写进正式教材，应先让 Agent 显示拟修改的 Markdown diff，人工确认后再编辑 `src/`，随后重新运行写作审计和本地网页预览；不要直接把 `tmp/` 中的练习文件移动到教材目录。
+#### 本次学习记录审计结果
+
+本次对一份包含两张已存在图、输入数组、控制机与 8T 环境/结果以及 NPU 边界说明的学习记录运行 `ascend310b_writing_record_audit`：扫描 1 个记录文件，结果为 0 个 error、0 个 warning、0 个提示。没有出现标题层级、链接、图片、编码或 Markdown 卫生问题。
+
+当学生准备把记录迁入正式教材时，再使用 `ascend310b_writing_audit scope=appendix` 审计 `src/` 中的正文，并补做本地网页预览。正式教材审计还会检查冻结标题、sidebar、锚点和跨产物问题，不能与这份临时记录审计混为一谈。
+
+这个例子把同一张统计图从“能跑”推进到“记录能审”。学生应理解三类证据的区别：`numpy` 和 `matplotlib` 的输出证明计算与绘图发生；调试插件证明哪块板和哪个环境执行了任务；学习记录审计证明临时 Markdown 的结构、路径和卫生合格。三者都通过，仍不等于 NPU 推理、模型精度或案例交付已经通过。
 
 ## 提示词与审查方法
 
@@ -471,7 +505,7 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 |---|---|---|
 | 目标 | 说明要做什么 | 计算 5 天学习时长并画出柱状图 |
 | 输入 | 明确由谁提供内容 | 提示词中的 `[25, 40, 30, 50, 35]`，不依赖仓库数据 |
-| 输出位置 | 说明文件保存到哪里 | `tmp/appendix4/<姓名>/study_minutes.py` 与 `study_minutes.png` |
+| 输出位置 | 说明文件保存到哪里 | 个人临时学习目录中的 `study_minutes.py` 与 `study_minutes.png` |
 | 约束 | 说明允许和禁止的操作 | 仅 `numpy`、`matplotlib`，不安装依赖、不读 case、不访问网络 |
 | 验收标准 | 说明怎样算完成 | 数值为 180/36.0/50/25，PNG 有 5 根对应的柱子 |
 
@@ -515,12 +549,12 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 - [ ] 问“你现在能用哪些 skill？”时，回答包含 `ascend310b-writing` 与 `ascend310b-debug`。
 - [ ] `pnpm run skills:check` 通过。
 - [ ] 能背出 5 条安全规则。
-- [ ] 第一次任务只创建 `tmp/appendix4/<姓名>/study_minutes.py` 与 `study_minutes.png`，没有读取 case、模型或数据集。
+- [ ] 第一次任务只创建个人临时学习目录中的 `study_minutes.py` 与 `study_minutes.png`，没有读取 case、模型或数据集。
 - [ ] 能解释输入数组、`numpy` 统计量和 `matplotlib` 柱状图之间的关系。
 - [ ] 终端数值为 180/36.0/50/25，图片中有 5 根对应的柱子和 36.0 的平均值虚线。
 - [ ] 通过 `ascend_probe` 确认了第二例实际使用的 310B target，并先通过 `ascend_board_run` 的 `dryRun` 核对板端 `base` 环境、cwd 和写入范围。
 - [ ] 能说明此处 `base` 只用于非 NPU 的 Python 绘图练习，正式案例仍使用 `ascend` 环境。
-- [ ] 能运行 `ascend310b_writing_audit scope=appendix`，只报告与本附录首例相关的发现，不把其他历史 warning 误记为本次失败。
+- [ ] 能运行 `ascend310b_writing_record_audit` 审计个人临时学习记录，并解释它与正式 `ascend310b_writing_audit scope=appendix` 的职责差异。
 
 ## 常见错误与坑 {#src-appendix-appendix4-pitfalls}
 
@@ -546,13 +580,14 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 
 ## 作业 {#src-appendix-appendix4-assignment}
 
-1. 用自己的话写 300 字以内的“Vibe Coding 安全说明”，至少包含：Vibe Coding 是什么、5 条安全规则、3 个绝对不执行的操作、为什么每条结论都要自己验证。把说明写入 `tmp/appendix4/<姓名>/safety.md`。
-2. 写一份 150 字以内的“提示词设计说明”，解释为什么提示词要包含目标、路径、输出位置和约束。把说明整理成 `tmp/appendix4/<姓名>/prompt-notes.md`。
-3. 让 DSH 在 `tmp/appendix4/<姓名>/study_minutes.py` 中把第 6 天的学习时长 45 分钟加入数组。先说明新的总时长 225 分钟和平均值 37.5 分钟，再修改并运行。
+1. 用自己的话写 300 字以内的“Vibe Coding 安全说明”，至少包含：Vibe Coding 是什么、5 条安全规则、3 个绝对不执行的操作、为什么每条结论都要自己验证。保存到个人临时学习目录。
+2. 写一份 150 字以内的“提示词设计说明”，解释为什么提示词要包含目标、路径、输出位置和约束。保存到个人临时学习目录。
+3. 让 DSH 在个人临时学习目录的 `study_minutes.py` 中把第 6 天的学习时长 45 分钟加入数组。先说明新的总时长 225 分钟和平均值 37.5 分钟，再修改并运行。
 4. 让 DSH 只增加一条表示平均值的虚线和图例；检查图片中的平均线是否位于新平均值，不修改数组以外的计算规则。
 5. 使用调试插件对一块已配置的 310B 先做 `ascend_probe`，再对同一学习时长数组运行 `ascend_board_run` 的 `dryRun`。在记录中写明 target、`environment: "base"`、cwd、预期输出和为什么这不是 NPU 推理验收。
-6. 不修改任何文件，运行写作插件的 `ascend310b_writing_audit scope=appendix`，筛选附录 4 的发现；说明哪些属于自己的学习时长例子，哪些是其他附录或历史图片的 warning。
-7. 把 DSH 生成的代码逐行审查一遍，指出哪一段定义输入数组、哪一段计算统计量、哪一段保存图片，以及哪一种修改可能让数值和图形不一致。
+6. 在同一个人临时学习目录写一份 `study_minutes_record.md`，包含输入、控制机结果、8T 结果、两张图片和 NPU 边界；用 `ascend310b_writing_record_audit` 审计它，修正所有 error 后保留审计摘要。
+7. 解释 `ascend310b_writing_record_audit` 与 `ascend310b_writing_audit scope=appendix` 分别审什么文件、为什么不能混用。
+8. 把 DSH 生成的代码逐行审查一遍，指出哪一段定义输入数组、哪一段计算统计量、哪一段保存图片，以及哪一种修改可能让数值和图形不一致。
 
 ## 评分要点
 
@@ -564,5 +599,5 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 | 代码审查 | 能逐行解释生成脚本，能指出风险和修改点 |
 | 板端边界 | 能说明 target、SSH、`base` 绘图、`ascend` 案例环境和 NPU 推理分别证明什么 |
 | 结果验证 | 终端统计量与数组一致，PNG 存在，柱子高度与平均值线都能解释 |
-| 写作审计 | 能解释附录审计对正式教材源的作用，不把其他历史 warning 归咎于本例 |
+| 写作审计 | 能用记录审计检查自己的 `tmp` 实验记录，并解释它与正式附录审计的区别 |
 | AI 协作 | 保留 DSH 修改代码的记录，并说明每处修改为什么安全 |

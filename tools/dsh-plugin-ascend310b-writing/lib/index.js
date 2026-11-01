@@ -11,7 +11,7 @@
 
 import { defineTool } from '@deepseek-ai/dsh-tools';
 
-import { PARTS, auditRepo, progressReport, resolveSettings, sortFindings } from './audit-core.js';
+import { PARTS, auditLearnerRecord, auditRepo, progressReport, resolveSettings, sortFindings } from './audit-core.js';
 import {
 	collectArtifactFindings,
 	collectAssetFindings,
@@ -366,6 +366,65 @@ export function apply(ctx, config) {
 			presentCall: (args) => ({
 				card: 'generic',
 				title: '写作审计',
+				kind: 'other',
+				rawInput: args
+			})
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend310b_writing_record_audit',
+			description:
+				'Audit one learner experiment Markdown record under repository tmp/ only. The required file must be a ' +
+				'repository-relative tmp/*.md path; absolute paths, traversal, arbitrary documents and symlinks that ' +
+				'escape the repository are refused. Checks strict UTF-8 readability, line endings and trailing whitespace, ' +
+				'heading jumps/manual numbering, fenced-code language labels, local Markdown image/link targets and Chinese ' +
+				'half-width punctuation. It does not apply frozen-title, sidebar or heading-anchor rules.',
+			parameters: {
+				root: ROOT_PARAMETER,
+				file: {
+					type: 'string',
+					required: true,
+					description: 'Required repository-relative Markdown record path. It must begin with tmp/ and end with .md.'
+				},
+				maxFindings: {
+					type: 'integer',
+					description: 'Maximum number of findings to return, after ordering by severity. Defaults to 400.'
+				}
+			},
+			output: {
+				schema: {
+					type: 'object',
+					additionalProperties: false,
+					properties: {
+						text: { type: 'string', required: true },
+						summary: {
+							type: 'object',
+							additionalProperties: false,
+							required: true,
+							properties: {
+								files: { type: 'integer', required: true },
+								errors: { type: 'integer', required: true },
+								warnings: { type: 'integer', required: true },
+								infos: { type: 'integer', required: true },
+								truncated: { type: 'boolean', required: true }
+							}
+						},
+						findings: { type: 'array', required: true, items: FINDING_SCHEMA }
+					}
+				},
+				render: (_args, value) => [{ type: 'text', text: value.text }]
+			},
+			execute(args) {
+				const root = resolveRoot(config, args.root);
+				const maxFindings = Number.isInteger(args.maxFindings) && args.maxFindings > 0 ? args.maxFindings : 400;
+				const report = auditLearnerRecord({ root, file: args.file, maxFindings });
+				return Promise.resolve({ text: report.text, summary: report.summary, findings: report.findings });
+			},
+			presentCall: (args) => ({
+				card: 'generic',
+				title: '学习实验记录审计',
 				kind: 'other',
 				rawInput: args
 			})

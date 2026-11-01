@@ -9,8 +9,8 @@
  * @module dsh-plugin-ascend310b-writing/audit-core
  */
 
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from 'node:path';
 import { DEFAULT_SETTINGS, resolveSettings } from './settings.js';
 
 /**
@@ -40,6 +40,14 @@ const HALF_WIDTH_IN_CJK = /[\u4e00-\u9fff][,;:!?][\u4e00-\u9fff]/u;
 const HALF_WIDTH_BRACKET = /[\u4e00-\u9fff][()][\u4e00-\u9fff]/u;
 /** Two spaces that should be one inside Chinese prose. */
 const DOUBLE_SPACE_IN_CJK = /[\u4e00-\u9fff] {2,}[\u4e00-\u9fff]/u;
+/** A full cryptographic digest belongs in engineering evidence, not reader prose. */
+const FULL_SHA256 = /\b[a-f0-9]{64}\b/iu;
+/** Exact artifact bytes belong in an evidence manifest or engineering record. */
+const ARTIFACT_BYTES = /\b\d{4,}[\s\u00a0]*(?:bytes|字节)\b/iu;
+/** A machine-specific Windows home/checkout path is not portable reader guidance. */
+const MACHINE_WINDOWS_PATH = /\b[A-Za-z]:\\(?:Users|Github|Documents)\\(?!<)/u;
+/** Internal scratch/build paths expose an author workflow rather than a reader task. */
+const INTERNAL_TEMP_PATH = /(?:^|[\s`])\/(?:tmp\/(?:appendix|writing|presentation|package|test|debug)[\w./-]*|var\/folders\/[^\s`]+)/u;
 /** Inline code spans, removed before a prose rule reads a line. */
 const INLINE_CODE = /`[^`]*`/gu;
 /**
@@ -592,6 +600,24 @@ function auditFile(context) {
 		if (DOUBLE_SPACE_IN_CJK.test(prose)) {
 			push('cjk-double-space', 'info', i + 1, '中文之间出现连续空格');
 		}
+		// Reader-facing chapters explain what a result means. Full digests, byte
+		// counts and author-machine paths are useful for engineering evidence, but
+		// make a tutorial look like an internal run log and cannot be reused by a
+		// learner on another machine. Fenced commands remain exempt above.
+		if (['book', 'experiment', 'appendix'].includes(part.key)) {
+			if (FULL_SHA256.test(line)) {
+				push('reader-evidence-digest', 'warning', i + 1, '读者可见正文出现完整 SHA-256；保留可理解的结果和边界，把完整哈希放到工程证据或学习记录。');
+			}
+			if (ARTIFACT_BYTES.test(line)) {
+				push('reader-evidence-bytes', 'warning', i + 1, '读者可见正文出现精确字节数；除非它直接解释学习结果，否则移到工程证据或学习记录。');
+			}
+			if (MACHINE_WINDOWS_PATH.test(line)) {
+				push('reader-machine-path', 'warning', i + 1, '读者可见正文出现个人 Windows 路径；改为“教材仓库根目录”或读者自己的工作区。');
+			}
+			if (INTERNAL_TEMP_PATH.test(line)) {
+				push('reader-internal-path', 'warning', i + 1, '读者可见正文出现内部临时路径；改为“个人临时学习目录”或教师指定目录。');
+			}
+		}
 	}
 	if (text.includes('\r\n')) push('crlf', 'warning', 1, '文件包含 CRLF 行尾，仓库统一使用 LF');
 	if (text !== '' && !text.endsWith('\n')) push('no-final-newline', 'warning', lines.length, '文件末尾缺少换行');
@@ -653,6 +679,261 @@ export function sortFindings(findings) {
 			left.line - right.line ||
 			left.rule.localeCompare(right.rule)
 	);
+}
+
+/**
+ * Return whether an absolute path is a descendant of a canonical root.
+ *
+ * @param {string} root - canonical repository root.
+ * @param {string} candidate - canonical or resolved candidate path.
+ * @returns {boolean} Whether the candidate is strictly inside root.
+ */
+function isInsideRoot(root, candidate) {
+	const pathFromRoot = relative(root, candidate);
+	return (
+		pathFromRoot !== '' &&
+		pathFromRoot !== '..' &&
+		!pathFromRoot.startsWith(`..${sep}`) &&
+		!isAbsolute(pathFromRoot)
+	);
+}
+
+/**
+ * Validate and canonicalize the one learner record a focused audit may read.
+ *
+ * This intentionally accepts only POSIX-shaped paths below `tmp/`. Resolving
+ * both the root and the file through the filesystem catches a final-file or
+ * intermediate-directory symlink that points outside the repository.
+ *
+ * @param {object} options - record location inputs.
+ * @param {string} options.root - repository root.
+ * @param {string} options.file - repository-relative record path.
+ * @returns {{ root: string, file: string, path: string }} Canonical root, display path and canonical file path.
+ * @throws {Error} When the requested record is outside the allowed scope.
+ */
+export function resolveLearnerRecord({ root, file }) {
+	if (typeof root !== 'string' || root.trim() === '') throw new Error('记录审计需要有效的仓库根目录。');
+	if (typeof file !== 'string' || file.trim() === '') throw new Error('记录审计需要 file 参数。');
+	if (
+		isAbsolute(file) ||
+		win32.isAbsolute(file) ||
+		posix.isAbsolute(file) ||
+		file.includes('\\') ||
+		!file.startsWith('tmp/') ||
+		!file.endsWith('.md')
+	) {
+		throw new Error('记录审计只允许仓库相对的 tmp/*.md 路径。');
+	}
+	const segments = file.split('/');
+	if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
+		throw new Error('记录审计拒绝包含空段、当前目录或上级目录的 file 路径。');
+	}
+
+	let canonicalRoot;
+	try {
+		canonicalRoot = realpathSync(root);
+	} catch {
+		throw new Error(`记录审计的仓库根目录不存在或不可读取：${root}`);
+	}
+	if (!statSync(canonicalRoot).isDirectory()) throw new Error('记录审计的 root 必须是目录。');
+
+	const requested = resolve(canonicalRoot, ...segments);
+	if (!isInsideRoot(canonicalRoot, requested)) throw new Error('记录审计拒绝仓库外的 file 路径。');
+	if (!existsSync(requested)) throw new Error(`记录审计文件不存在：${file}`);
+
+	let canonicalFile;
+	try {
+		canonicalFile = realpathSync(requested);
+	} catch {
+		throw new Error(`记录审计无法解析文件：${file}`);
+	}
+	if (!isInsideRoot(canonicalRoot, canonicalFile)) {
+		throw new Error(`记录审计拒绝指向仓库外的符号链接：${file}`);
+	}
+	if (!statSync(canonicalFile).isFile()) throw new Error(`记录审计目标不是普通文件：${file}`);
+	return { root: canonicalRoot, file: segments.join('/'), path: canonicalFile };
+}
+
+/**
+ * Read one learner record as UTF-8 without silently replacing invalid bytes.
+ *
+ * @param {string} path - canonical record path.
+ * @returns {string} The decoded Markdown text.
+ * @throws {TypeError} When the file is not valid UTF-8.
+ */
+export function readUtf8Strict(path) {
+	return new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(path));
+}
+
+/**
+ * Audit one learner experiment record below `tmp/` without applying book-level
+ * publication conventions such as frozen names, sidebar membership or anchors.
+ *
+ * @param {object} options - record audit inputs.
+ * @param {string} options.root - repository root.
+ * @param {string} options.file - repository-relative `tmp/*.md` path.
+ * @param {number} [options.maxFindings] - cap on returned findings.
+ * @returns {object} Structured record audit report.
+ */
+export function auditLearnerRecord({ root, file, maxFindings = 400 }) {
+	const record = resolveLearnerRecord({ root, file });
+	const findings = [];
+	const push = (rule, severity, line, message) => {
+		if (findings.length < HARD_FINDING_LIMIT) findings.push({ rule, severity, file: record.file, line, message });
+	};
+	let text;
+	try {
+		text = readUtf8Strict(record.path);
+	} catch (error) {
+		if (error instanceof TypeError) {
+			push('utf8-invalid', 'error', 1, '文件不是可严格解码的 UTF-8 文本。');
+		} else {
+			push('record-unreadable', 'error', 1, `无法读取文件：${error.message}`);
+		}
+		return finalizeRecordAudit({ root: record.root, file: record.file, findings, maxFindings });
+	}
+
+	const lines = text.split(/\r?\n/u);
+	const { headings } = readManuscript(record.path);
+	let previous = 0;
+	for (const heading of headings) {
+		if (previous !== 0 && heading.level > previous + 1) {
+			push('heading-jump', 'warning', heading.line, `标题层级从 H${previous} 跳到 H${heading.level}：${heading.text}`);
+		}
+		previous = heading.level;
+		if (heading.level >= 2 && hasManualSectionNumber(heading.text)) {
+			push('heading-manual-number', 'error', heading.line, `标题手写章节编号：${heading.text}`);
+		}
+	}
+
+	let fenced = false;
+	let fence = '';
+	for (let i = 0; i < lines.length; i += 1) {
+		const line = lines[i];
+		const fenceMatch = /^\s*(`{3,}|~{3,})(.*)$/u.exec(line);
+		if (fenceMatch !== null) {
+			if (!fenced) {
+				fenced = true;
+				fence = fenceMatch[1][0];
+				if (fenceMatch[2].trim() === '') {
+					push('code-fence-language', 'error', i + 1, '围栏代码块缺少语言标记。');
+				}
+			} else if (fenceMatch[1][0] === fence) {
+				fenced = false;
+			}
+			continue;
+		}
+		if (fenced) continue;
+
+		const trailing = /[ \t]+$/u.exec(line);
+		if (trailing !== null) push('trailing-whitespace', 'warning', i + 1, '行尾有多余空白。');
+		if (line.startsWith('>') || line.startsWith('    ')) continue;
+		const prose = line.replace(INLINE_CODE, INLINE_CODE_SENTINEL);
+		if (HALF_WIDTH_IN_CJK.test(prose)) {
+			push('cjk-halfwidth-punct', 'warning', i + 1, '中文之间出现半角标点，请改用全角标点。');
+		}
+		if (HALF_WIDTH_BRACKET.test(prose)) {
+			push('cjk-halfwidth-bracket', 'warning', i + 1, '中文之间出现半角括号，请改用全角括号。');
+		}
+	}
+	if (text.includes('\r\n')) push('crlf', 'warning', 1, '文件包含 CRLF 行尾，记录应使用 LF。');
+	if (text !== '' && !text.endsWith('\n')) push('no-final-newline', 'warning', lines.length, '文件末尾缺少换行。');
+
+	for (const entry of collectTargets(lines)) {
+		if (!isLocalTarget(entry.target)) continue;
+		let target;
+		try {
+			target = resolveTarget(record.path, entry.target);
+		} catch {
+			push('target-invalid', 'error', entry.line, `链接目标无法解码：${entry.target}`);
+			continue;
+		}
+		if (!isInsideRoot(record.root, target)) {
+			push(
+				entry.kind === 'image' ? 'image-outside-root' : 'link-outside-root',
+				'error',
+				entry.line,
+				`${entry.kind === 'image' ? '图片' : '链接'}目标超出仓库：${entry.target}`
+			);
+			continue;
+		}
+		if (!existsSync(target)) {
+			push(
+				entry.kind === 'image' ? 'image-missing' : 'link-missing',
+				'error',
+				entry.line,
+				`${entry.kind === 'image' ? '图片' : '链接'}目标不存在：${entry.target}`
+			);
+			continue;
+		}
+		try {
+			if (!isInsideRoot(record.root, realpathSync(target))) {
+				push(
+					entry.kind === 'image' ? 'image-outside-root' : 'link-outside-root',
+					'error',
+					entry.line,
+					`${entry.kind === 'image' ? '图片' : '链接'}目标的符号链接超出仓库：${entry.target}`
+				);
+			}
+		} catch {
+			push('target-unreadable', 'error', entry.line, `无法解析链接目标：${entry.target}`);
+		}
+	}
+	return finalizeRecordAudit({ root: record.root, file: record.file, findings, maxFindings });
+}
+
+/**
+ * Sort, cap and render one learner record's findings with the normal schema.
+ *
+ * @param {object} report - report pieces.
+ * @param {string} report.root - canonical repository root.
+ * @param {string} report.file - repository-relative record file.
+ * @param {Array<object>} report.findings - raw findings.
+ * @param {number} report.maxFindings - returned finding cap.
+ * @returns {object} The structured and rendered report.
+ */
+function finalizeRecordAudit({ root, file, findings, maxFindings }) {
+	sortFindings(findings);
+	const cap = Number.isInteger(maxFindings) && maxFindings > 0 ? maxFindings : 400;
+	const kept = findings.slice(0, cap);
+	const count = (severity) => findings.filter((finding) => finding.severity === severity).length;
+	const summary = {
+		files: 1,
+		errors: count('error'),
+		warnings: count('warning'),
+		infos: count('info'),
+		truncated: kept.length < findings.length
+	};
+	return {
+		root,
+		file,
+		generatedAt: new Date().toISOString(),
+		summary,
+		findings: kept,
+		text: formatRecordAudit({ root, file, summary, findings: kept })
+	};
+}
+
+/**
+ * Render one learner record audit using the ordinary finding presentation.
+ *
+ * @param {object} report - the record report to render.
+ * @returns {string} Human-readable audit report.
+ */
+export function formatRecordAudit({ root, file, summary, findings }) {
+	const lines = [
+		`学习实验记录审计 · ${file} · ${root}`,
+		`扫描 1 个记录文件：${summary.errors} 个错误，${summary.warnings} 个警告，${summary.infos} 个提示`
+	];
+	if (findings.length === 0) lines.push('没有发现问题。');
+	else {
+		for (const finding of findings) {
+			const mark = finding.severity === 'error' ? 'x' : finding.severity === 'warning' ? '!' : '-';
+			lines.push(`  ${mark} L${finding.line} [${finding.rule}] ${finding.message}`);
+		}
+	}
+	if (summary.truncated) lines.push('结果已达到上限，请提高 maxFindings。');
+	return lines.join('\n');
 }
 
 /**

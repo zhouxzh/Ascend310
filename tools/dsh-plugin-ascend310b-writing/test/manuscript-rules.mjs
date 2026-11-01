@@ -151,6 +151,41 @@ check(
 	'a comment in frontmatter must not disturb the H1 count'
 );
 
+// --- reader-visible evidence details ----------------------------------------
+// Reader prose should explain outcomes instead of exposing a local checkout,
+// an exact artifact digest or a byte count. Commands inside fenced code remain
+// legitimate executable instruction and must not be reported.
+writeFileSync(
+	join(root, 'src', 'book', 'chapter4.md'),
+	[
+		'---',
+		'title: "第4章：读者证据边界"',
+		'---',
+		'',
+		'结果图来自 C:\\Users\\author\\run.png，文件为 12345 bytes。',
+		'完整 SHA-256 为 `0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`。',
+		'临时图位于 /tmp/appendix4-private/result.png。',
+		'',
+		'```bash',
+		'sha256sum model.om',
+		'cd /tmp/appendix4-private',
+		'```',
+		''
+	].join('\n'),
+	'utf8'
+);
+const readerEvidence = auditRepo({ root, maxFindings: 300 });
+for (const rule of ['reader-evidence-digest', 'reader-evidence-bytes', 'reader-machine-path', 'reader-internal-path']) {
+	check(
+		readerEvidence.findings.some((finding) => finding.rule === rule && finding.file.endsWith('chapter4.md')),
+		`reader-visible evidence must report ${rule}`
+	);
+}
+check(
+	!readerEvidence.findings.some((finding) => finding.file.endsWith('chapter4.md') && finding.line >= 10 && finding.rule.startsWith('reader-')),
+	'commands in fenced blocks must remain exempt from reader-evidence warnings'
+);
+
 // --- layout: wide tables and very long code blocks --------------------------
 // Eight columns cannot fit A4 or the web content column, and a 90-line block
 // becomes a wall of code in both outputs.

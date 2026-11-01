@@ -4,13 +4,13 @@
 DeepSeek Harness 插件（bundle）。
 
 它把仓库 `AGENTS.md` 里的冻结命名规则、Markdown 卫生要求、LaTeX 渲染与产物
-新鲜度、VuePress 页面真实排版、演示文稿的真实浏览器布局、推送前门槛和写作进度，变成十个模型可直接调用的工具和一个 Web 侧边栏面板。
+新鲜度、VuePress 页面真实排版、演示文稿的真实浏览器布局、推送前门槛和写作进度，变成十一个模型可直接调用的工具和一个 Web 侧边栏面板。
 
 ## 组成
 
 | 面 | 文件 | 作用 |
 | --- | --- | --- |
-| 主机端 | `lib/index.js` | 注册 `ascend310b_writing_audit`、`ascend310b_writing_page_layout`、`ascend310b_writing_deck_render`、`ascend310b_writing_render`、`ascend310b_writing_push_check`、`ascend310b_writing_ci`、`ascend310b_writing_toolchain`、`ascend310b_writing_progress`、`ascend310b_writing_build`、`ascend310b_writing_style` 十个工具；组成里有 Web 服务器时额外注册 `/ascend310b-writing/report.json` 只读路由 |
+| 主机端 | `lib/index.js` | 注册 `ascend310b_writing_audit`、`ascend310b_writing_record_audit`、`ascend310b_writing_page_layout`、`ascend310b_writing_deck_render`、`ascend310b_writing_render`、`ascend310b_writing_push_check`、`ascend310b_writing_ci`、`ascend310b_writing_toolchain`、`ascend310b_writing_progress`、`ascend310b_writing_build`、`ascend310b_writing_style` 十一个工具；组成里有 Web 服务器时额外注册 `/ascend310b-writing/report.json` 只读路由 |
 | 审计内核 | `lib/audit-core.js` | 正文审计、行尾分级与进度统计；纯 Node ESM，无 Harness 依赖，可单独运行与测试 |
 | 跨产物检查 | `lib/checks.js` | 读 Markdown 之外的证据：`AGENTS.md` 冻结名表、LaTeX 构建日志、生成物与源的锚点差、Git 提交树 |
 | 工具链体检 | `lib/toolchain.js` + `lib/doctor.js` | 探测 bash/pandoc/latexmk/xelatex/python3/pnpm/node（含 Anaconda/conda），给按平台分类的安装命令，判断哪些能力可用 |
@@ -19,12 +19,13 @@ DeepSeek Harness 插件（bundle）。
 | 技能 | `skills/*/SKILL.md` | 总守门规则、theory/case/presentation/code docs 等专用写作 skill，并内置 `scientific-writing` 与 `nature-polishing`；`nature-shared` 是后者的支持目录 |
 | 组合 | `cordis.patch.yml` | 声明本包的 bundle patch，把 Host 行插入组合 |
 
-十个工具各回答一个不同的问题：
+十一个工具各回答一个不同的问题：
 
 | 工具 | 回答的问题 |
 | --- | --- |
 | `ascend310b_writing_toolchain` | 这台机器 + 这个仓库现在能做什么，缺什么、怎么装 |
 | `ascend310b_writing_audit` | 正文本身对不对（含 `AGENTS.md` 冻结名表的双向比对），以及演示文稿与站点产物是否过期 |
+| `ascend310b_writing_record_audit` | 一份仓库 `tmp/` 下的学习实验记录是否存在 Markdown、代码块、链接、图片、标点或编码问题；不套用正式教材的冻结标题和 sidebar 规则 |
 | `ascend310b_writing_audit` + `rev` | 这次提交发布出去会不会断链 |
 | `ascend310b_writing_deck_render` | 生成后的 1280×720 课件有没有真实裁切、图片未加载 |
 | `ascend310b_writing_page_layout` | 本地 VuePress 页面在桌面/移动视口有没有横向溢出、图片/SVG 越界，以及原图被过度缩小 |
@@ -305,9 +306,9 @@ node scripts/doctor.mjs <仓库根目录> --json # 机器可读，便于安装�
 前置：安装 DSH 桌面版，克隆本仓库。插件必须**先打包成 tarball 再安装**：
 
 ```bash
-node scripts/install-dsh-plugins.mjs            # 打包并安装写作 + 调试插件
-node scripts/install-dsh-plugins.mjs --check    # 只核对安装方式与版本
-node scripts/install-dsh-plugins.mjs --profile <名称>
+node tools/install-dsh-plugins.mjs            # 打包并安装写作 + 调试插件
+node tools/install-dsh-plugins.mjs --check    # 只核对安装方式与版本
+node tools/install-dsh-plugins.mjs --profile <名称>
 ```
 
 原因：`dsh plugin add <源码目录>` 会生成 `link:` 依赖。Node 会按仓库真实路径解析插件的 `@deepseek-ai/dsh-tools` 等 DSH host 包，而仓库里没有这些包，插件启动时会导入失败。
@@ -346,8 +347,8 @@ DSH 的 skill 搜索顺序是：
 因此仓库里额外维护 `.dsh/skills/`：新克隆的仓库**无需安装**就能拿到本仓库的写作与调试规则，且优先于用户目录里的旧版本。它由脚本从两个插件生成，避免出现第三份手抄：
 
 ```bash
-node scripts/sync-repo-skills.mjs          # 生成/更新 .dsh/skills
-node scripts/sync-repo-skills.mjs --check  # 只核对，不一致退出码 1
+node tools/sync-repo-skills.mjs          # 生成/更新 .dsh/skills
+node tools/sync-repo-skills.mjs --check  # 只核对，不一致退出码 1
 ```
 
 仓库根对应 `pnpm run skills:sync` 与 `pnpm run skills:check`。
