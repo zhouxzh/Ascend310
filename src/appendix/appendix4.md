@@ -351,8 +351,11 @@ Agent 生成的版本可能不同。一个满足最小要求的脚本如下：
 ```python
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 minutes = np.array([25, 40, 30, 50, 35])
 days = np.arange(1, len(minutes) + 1)
@@ -406,6 +409,59 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 4. 检查图片：`study_minutes.png` 存在且有 5 根柱子；横轴是 Day 1 到 Day 5。
 5. 检查修改：第二轮只增加平均值虚线和图例，平均线位于 36.0。
 6. 用一句话记录：输入数组是什么、`numpy` 计算了什么、图片如何证明结果生效。
+
+### 第二个例子：用调试插件在 310B 上复现图表 {#src-appendix-appendix4-debug-plugin-example}
+
+第一个例子在开发机上建立了“输入数组 → 数值 → 图片”的关系。接下来把**同一个脚本**交给已经配置好的 310B 开发板运行，学习调试插件怎样把目标板、运行环境、命令和输出连在一起。
+
+本例只做 NumPy 和 Matplotlib 的普通 Python 计算，不调用 NPU、ACL、ATC 或模型推理。课程板卡的 Anaconda `base` 环境可直接用于这类非 NPU 小练习，因此这里显式使用 `environment: "base"`。这不是案例运行环境的替代方案：正式案例仍使用统一的 `ascend` 环境，不能因为这个例子能在 `base` 中运行，就把 NPU 程序迁回 `base`。
+
+在 DSH 中输入。把 `<当前板 target id>` 替换为左侧开发板记录中实际显示的 target，例如 `board-8t` 或一次发现产生的 `ascend-...`：
+
+```text
+先使用 ascend_probe 对 <当前板 target id> 做只读探测，告诉我实际 SoC、当前 SSH 状态和 base 环境是否可作为普通 Python 计算环境。
+不要运行 NPU 推理，也不要安装任何依赖。
+
+然后为同一组数据 [25, 40, 30, 50, 35] 准备一个板端任务：
+- 在 /tmp/appendix4/<姓名>/ 中只创建 study_minutes_board.py 和 study_minutes_board.png；
+- 使用 environment: "base"；
+- 先检查 numpy 和 matplotlib 能否导入；不可导入时停止并报告；
+- 用 numpy 输出总时长、平均值、最大值、最小值；
+- 用 matplotlib 的 Agg 后端保存柱状图；
+- 先调用 ascend_board_run dryRun: true，展示将执行的命令、cwd 和输出路径；
+- 等我确认后，才使用 allowStateChange: true 实际运行。
+```
+
+这里的 `dryRun` 不是模拟结果，而是让学生先核对目标板、`base` 环境、工作目录和写入范围。确认后实际运行时，应保留以下证据：
+
+| 证据 | 应回答的问题 | 不应扩大为 |
+| --- | --- | --- |
+| `ascend_probe` 的 SoC/SSH 输出 | 这次操作对应哪块板，SSH 是否可达 | CANN、PyACL 或模型推理已经通过 |
+| `base` 中的导入检查 | 该板的普通 Python 环境能否导入两个库 | 统一案例 `ascend` 环境已经验收 |
+| `ascend_board_run` 的退出码、四个统计量和 PNG 路径 | 同一数组是否在板端完成计算和出图 | NPU 性能、数值精度或业务质量已经通过 |
+
+若板端运行失败，先报告失败发生在环境激活、库导入、文件写入还是绘图阶段，再决定下一步；不要让 Agent 自动安装软件包或把失败归因于 310B 的 NPU。
+
+### 第三个例子：用写作插件审计同一练习 {#src-appendix-appendix4-writing-plugin-example}
+
+第二个例子产生了数字、图片和一段可解释的结论。写作插件的任务不是检查任意临时脚本，而是检查**准备发布到教材或说明文档的 Markdown 源**是否满足标题、锚点、链接、图片和排版规则。因此，学生不应把 `tmp/` 下的草稿当作正式教材提交；应先把它视为练习记录，再用写作插件检查这份附录中对同一练习的正式说明。
+
+在 DSH 中输入：
+
+```text
+不要修改任何文件。运行 ascend310b_writing_audit，root 指向当前教材仓库，scope 设为 appendix。
+只筛选并解释 src/appendix/appendix4.md 的发现：
+1. “第一次 Vibe Coding 任务”中的标题层级是否连续；
+2. Python、text 代码块是否有语言标记；
+3. 是否仍引用 case、模型清单或不存在的相对文件；
+4. study_minutes.py 和 study_minutes.png 的路径说明是否都位于 tmp/appendix4/<姓名>/；
+5. 将附录其他历史图片或其他案例造成的 warning 单独列出，不要把它们说成这个练习失败。
+最后给出一份不修改文件的审计摘要。
+```
+
+这个例子把同一张统计图从“能跑”推进到“说明可发布”。学生应理解两类结果的区别：`numpy` 和 `matplotlib` 的输出证明计算与绘图发生；写作审计证明教材源的标题、链接和 Markdown 结构符合规则。两者都通过，仍不等于 NPU 推理、模型精度或案例交付已经通过。
+
+如果以后确实要把自己的学习记录写进正式教材，应先让 Agent 显示拟修改的 Markdown diff，人工确认后再编辑 `src/`，随后重新运行写作审计和本地网页预览；不要直接把 `tmp/` 中的练习文件移动到教材目录。
 
 ## 提示词与审查方法
 
@@ -462,6 +518,9 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 - [ ] 第一次任务只创建 `tmp/appendix4/<姓名>/study_minutes.py` 与 `study_minutes.png`，没有读取 case、模型或数据集。
 - [ ] 能解释输入数组、`numpy` 统计量和 `matplotlib` 柱状图之间的关系。
 - [ ] 终端数值为 180/36.0/50/25，图片中有 5 根对应的柱子和 36.0 的平均值虚线。
+- [ ] 通过 `ascend_probe` 确认了第二例实际使用的 310B target，并先通过 `ascend_board_run` 的 `dryRun` 核对板端 `base` 环境、cwd 和写入范围。
+- [ ] 能说明此处 `base` 只用于非 NPU 的 Python 绘图练习，正式案例仍使用 `ascend` 环境。
+- [ ] 能运行 `ascend310b_writing_audit scope=appendix`，只报告与本附录首例相关的发现，不把其他历史 warning 误记为本次失败。
 
 ## 常见错误与坑 {#src-appendix-appendix4-pitfalls}
 
@@ -491,7 +550,9 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 2. 写一份 150 字以内的“提示词设计说明”，解释为什么提示词要包含目标、路径、输出位置和约束。把说明整理成 `tmp/appendix4/<姓名>/prompt-notes.md`。
 3. 让 DSH 在 `tmp/appendix4/<姓名>/study_minutes.py` 中把第 6 天的学习时长 45 分钟加入数组。先说明新的总时长 225 分钟和平均值 37.5 分钟，再修改并运行。
 4. 让 DSH 只增加一条表示平均值的虚线和图例；检查图片中的平均线是否位于新平均值，不修改数组以外的计算规则。
-5. 把 DSH 生成的代码逐行审查一遍，指出哪一段定义输入数组、哪一段计算统计量、哪一段保存图片，以及哪一种修改可能让数值和图形不一致。
+5. 使用调试插件对一块已配置的 310B 先做 `ascend_probe`，再对同一学习时长数组运行 `ascend_board_run` 的 `dryRun`。在记录中写明 target、`environment: "base"`、cwd、预期输出和为什么这不是 NPU 推理验收。
+6. 不修改任何文件，运行写作插件的 `ascend310b_writing_audit scope=appendix`，筛选附录 4 的发现；说明哪些属于自己的学习时长例子，哪些是其他附录或历史图片的 warning。
+7. 把 DSH 生成的代码逐行审查一遍，指出哪一段定义输入数组、哪一段计算统计量、哪一段保存图片，以及哪一种修改可能让数值和图形不一致。
 
 ## 评分要点
 
@@ -501,5 +562,7 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 | 安全 | 能背出红线，看不懂的命令会停下来解释 |
 | 提示词 | 提示词包含目标、路径、输出位置、约束和验收标准 |
 | 代码审查 | 能逐行解释生成脚本，能指出风险和修改点 |
+| 板端边界 | 能说明 target、SSH、`base` 绘图、`ascend` 案例环境和 NPU 推理分别证明什么 |
 | 结果验证 | 终端统计量与数组一致，PNG 存在，柱子高度与平均值线都能解释 |
+| 写作审计 | 能解释附录审计对正式教材源的作用，不把其他历史 warning 归咎于本例 |
 | AI 协作 | 保留 DSH 修改代码的记录，并说明每处修改为什么安全 |
