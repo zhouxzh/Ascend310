@@ -5,7 +5,16 @@
  * keeps the prompt/marker/network parsing deterministic and offline.
  */
 
-import { cleanSerialOutput, extractMarkedOutput, formatSerialError, parseSerialNetwork, parseSerialPortList, validateSerialSettings } from '../lib/serial.js';
+import {
+	cleanSerialOutput,
+	extractMarkedOutput,
+	formatSerialError,
+	parseSerialNetwork,
+	parseSerialPortList,
+	runSerialSession,
+	serialSessionTimeoutMs,
+	validateSerialSettings
+} from '../lib/serial.js';
 
 const failures = [];
 const check = (condition, message) => {
@@ -61,6 +70,21 @@ check(
 	formatSerialError('COM7', '<S S="Error">UnauthorizedAccessException: access denied</S>').includes('占用'),
 	'busy serial errors must be explained without CLIXML'
 );
+
+equal(serialSessionTimeoutMs({ timeoutMs: 60000 }, 5), 145000, 'serial session has a bounded host deadline');
+equal(serialSessionTimeoutMs({ timeoutMs: 120000 }, 100), 300000, 'serial host deadline is capped');
+const cancelled = new AbortController();
+cancelled.abort();
+try {
+	await runSerialSession({
+		settings: { port: 'COM23', baudRate: 115200, user: 'HwHiAiUser', password: 'x', timeoutMs: 1000 },
+		commands: ['hostname'],
+		signal: cancelled.signal
+	});
+	failures.push('an already-cancelled serial session must reject before spawning');
+} catch (error) {
+	equal(error?.code, 'ABORT_ERR', 'serial cancellation code');
+}
 
 if (failures.length > 0) {
 	console.error(`serial test FAILED (${failures.length} 处):`);

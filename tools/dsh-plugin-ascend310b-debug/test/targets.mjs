@@ -66,9 +66,18 @@ try {
 	const table = internals.targetTable(config);
 	const board8t = table.get('board-8t');
 	const second = table.get('ascend-c0742bfddf83');
-	if (board8t?.mac !== 'c0:74:2b:fd:f6:96') failures.push('configured target must bind the newest matching MAC');
-	if (board8t?.host !== '10.42.8.212') failures.push('configured target must use the observed IPv4 for execution');
-	if (second?.mac !== 'c0:74:2b:fd:df:83') failures.push('same-hostname second board must remain a separate target');
+	if (board8t?.mac !== 'c0:74:2b:fd:f6:96') failures.push('configured target must retain matching MAC metadata from history');
+	if (board8t?.host !== 'orangepiaipro.local') failures.push('stale discovered IP must not override the configured execution host');
+	if (second !== undefined) failures.push('stale inventory-only board must remain history, not an executable target');
+	const freshPath = join(directory, 'fresh-inventory.json');
+	const freshInventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+	freshInventory.boards['c0:74:2b:fd:f6:96'].lastSeen = new Date().toISOString();
+	writeFileSync(freshPath, JSON.stringify(freshInventory), 'utf8');
+	const freshTable = internals.targetTable({
+		inventoryPath: freshPath,
+		targets: [{ id: 'board-8t', label: 'configured 8T', transport: 'ssh', host: 'orangepiaipro.local', user: 'HwHiAiUser' }]
+	});
+	if (freshTable.get('board-8t')?.host !== '10.42.8.212') failures.push('fresh discovered IP should override the configured hostname');
 	const macBound = internals.targetTable({
 		inventoryPath,
 		targets: [{ id: 'board-8t', transport: 'ssh', host: 'orangepiaipro.local', mac: 'c0:74:2b:fd:df:83' }]
@@ -80,8 +89,8 @@ try {
 		inventoryPath,
 		targets: [{ id: 'board-8t', transport: 'ssh', host: 'orangepiaipro.local', mac: 'aa:bb:cc:dd:ee:ff' }]
 	});
-	if (aliasBound.get('board-8t')?.host !== '10.42.8.212') {
-		failures.push('configured MAC must match any retained interface alias');
+	if (aliasBound.get('board-8t')?.mac !== 'aa:bb:cc:dd:ee:ff' || aliasBound.get('board-8t')?.host !== 'orangepiaipro.local') {
+		failures.push('configured MAC alias may match history but stale IP must not replace the configured host');
 	}
 	const boundPath = join(directory, 'bound-inventory.json');
 	const boundInventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
@@ -91,8 +100,8 @@ try {
 		inventoryPath: boundPath,
 		targets: [{ id: 'board-8t', transport: 'ssh', host: 'orangepiaipro.local', mac: 'c0:74:2b:fd:f6:96' }]
 	});
-	if (explicitlyBound.get('board-8t')?.mac !== 'c0:74:2b:fd:df:83' || explicitlyBound.get('board-8t')?.host !== '10.42.8.249') {
-		failures.push('explicit binding must override a stale configured MAC only when the user asked for it');
+	if (explicitlyBound.get('board-8t')?.mac !== 'c0:74:2b:fd:df:83' || explicitlyBound.get('board-8t')?.host !== 'orangepiaipro.local') {
+		failures.push('explicit binding may update identity metadata but stale IP must not replace the configured host');
 	}
 	const ambiguous = internals.targetTable({
 		inventoryPath,
@@ -112,6 +121,25 @@ try {
 	}, { timeoutMs: 250 });
 	if (invalidLiveness.targets?.[0]?.online !== false || invalidLiveness.targets?.[0]?.state !== 'invalid') {
 		failures.push('invalid liveness targets must be reported offline, not attempted');
+	}
+	const aliasInventoryPath = join(directory, 'alias-inventory.json');
+	internals.recordEnvironment({ inventoryPath: aliasInventoryPath }, {
+		target: { id: 'board-alias', transport: 'ssh', host: '198.51.100.30', user: 'HwHiAiUser', port: 22 },
+		environment: {
+			facts: {
+				macAddress: { value: 'c0:74:2b:fd:f6:96' },
+				macAddresses: { value: ['c0:74:2b:fd:f6:96', '80:9d:65:1a:08:34'] },
+				hostname: { value: 'orangepiaipro' },
+				ipAddress: { value: '198.51.100.30' },
+				soc: { value: 'Ascend310B4' },
+				socTier: { value: '8T' }
+			}
+		}
+	});
+	const aliasInventory = JSON.parse(readFileSync(aliasInventoryPath, 'utf8'));
+	const aliasBoard = Object.values(aliasInventory.boards ?? {})[0];
+	if (!aliasBoard?.macs?.includes('c0:74:2b:fd:f6:96') || !aliasBoard?.macs?.includes('80:9d:65:1a:08:34')) {
+		failures.push('full environment probes must persist every stable MAC alias');
 	}
 	const reportStorePath = join(directory, 'reports.json');
 	const reportConfig = { ...config, reportStorePath };
@@ -152,7 +180,7 @@ try {
 		{ driverVersion: { value: '25.2.0', source: 'system-refresh' } },
 		'system',
 		'2026-10-29T12:01:00.000Z',
-		{ probedAt: '2026-10-29T12:01:00.000Z', board: { soc: 'Ascend310B4' }, scope: { applicable: true }, missingCore: [], pairing: { verdict: 'observed-match' }, transport: { ok: true } }
+		{ probedAt: '2026-10-29T12:01:00.000Z', board: { soc: 'Ascend310B4' }, scope: { applicable: true }, missingCore: ['driverVersion'], pairing: { verdict: 'observed-match' }, transport: { ok: true, reason: 'SSH 探测完成。', display: 'ssh board' } }
 	);
 	const systemMerged = internals.readSavedReport(reportConfig, 'board-8t');
 	if (systemMerged?.board?.soc !== 'Ascend310B4' || systemMerged?.facts?.videoFormats?.value !== 'DEVICE=/dev/video0') {
@@ -160,6 +188,12 @@ try {
 	}
 	if (!systemMerged?.categoryUpdatedAt?.camera || !systemMerged?.categoryUpdatedAt?.system) {
 		failures.push('category refresh timestamps must be retained independently');
+	}
+	if (systemMerged?.transport?.reason !== 'SSH 探测完成。' || systemMerged?.transport?.display !== 'ssh board') {
+		failures.push('system refresh must persist the actual transport result');
+	}
+	if (systemMerged?.missingCore?.[0] !== 'driverVersion') {
+		failures.push('system refresh must persist the environment missingCore list');
 	}
 } finally {
 	rmSync(directory, { recursive: true, force: true });

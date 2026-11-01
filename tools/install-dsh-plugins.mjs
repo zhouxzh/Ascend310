@@ -14,7 +14,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -61,7 +61,11 @@ function findDsh() {
 	return '';
 }
 
-const dsh = findDsh();
+// `--check` only inspects an existing profile and must remain usable in CI or on
+// a controller where the desktop launcher is not installed. Resolve dsh lazily
+// for the mutating install path instead of making a read-only consistency check
+// depend on the executable.
+const dsh = checkOnly ? '' : findDsh();
 
 function runDsh(dshArgs, options = {}) {
 	if (process.platform === 'win32') {
@@ -89,7 +93,7 @@ function runDsh(dshArgs, options = {}) {
 	}
 	return spawnSync(dsh, dshArgs, { ...options, shell: process.platform === 'win32' });
 }
-if (dsh === '') {
+if (!checkOnly && dsh === '') {
 	console.error('找不到 dsh CLI。请先安装 DSH 桌面版，或把 dsh 加入 PATH。');
 	process.exit(1);
 }
@@ -128,6 +132,13 @@ function pack(pluginDir) {
 	// code change is always a new specifier.
 	const hash = createHash('sha256').update(readFileSync(tarball)).digest('hex').slice(0, 12);
 	const hashed = join(packDir, `${name.replace(/\.tgz$/u, '')}-${hash}.tgz`);
+	// Re-running the installer can produce the same content hash. Keep the
+	// existing immutable pack and remove only the freshly generated duplicate;
+	// rename-over-existing is not reliable on Windows.
+	if (existsSync(hashed)) {
+		unlinkSync(tarball);
+		return hashed;
+	}
 	renameSync(tarball, hashed);
 	return hashed;
 }

@@ -455,8 +455,10 @@ export function parseIpAddress(text) {
 export function isIdentityMacInterface(iface) {
 	const name = String(iface ?? '').trim().toLowerCase();
 	if (name === '') return false;
-	if (/^(?:lo|docker|veth|virbr|br-|bond|dummy|tun|tap|can|bluetooth)/.test(name)) return false;
-	return /^(?:eth|en|wl|wlan|usb)/.test(name);
+	if (/^(?:lo|docker|veth|virbr|br-|bond|dummy|tun|tap|can|bluetooth|usb|enx|wlx)/.test(name)) return false;
+	// Board-integrated Ethernet/Wi-Fi remain stable aliases. USB NIC names
+	// (`usb*`, `enx*`, `wlx*`) are movable evidence, not physical identity.
+	return /^(?:eth\d+|en[odps][A-Za-z0-9_.-]*|wlan\d+)$/.test(name);
 }
 
 /** Parse every non-loopback interface MAC reported by the board. */

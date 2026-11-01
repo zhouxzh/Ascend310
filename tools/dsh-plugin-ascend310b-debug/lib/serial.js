@@ -14,9 +14,37 @@ import { accessSync, constants as fsConstants, readdirSync } from 'node:fs';
 const DEFAULT_BAUD = 115200;
 const DEFAULT_TIMEOUT = 60000;
 const MAX_TIMEOUT = 120000;
+const MAX_SESSION_TIMEOUT = 300000;
+const SERIAL_ENUMERATION_TIMEOUT = 15000;
 const SERIAL_PORT = /^(?:COM\d+|\/dev\/tty[A-Za-z0-9._-]+)$/iu;
 const SERIAL_USER = /^[A-Za-z0-9._-]+$/u;
 const MARKER = 'ASC_SERIAL_RESULT_';
+
+function emitSerialEvent(onEvent, phase, status = 'ok', detail = '', data = null) {
+	if (typeof onEvent !== 'function') return;
+	try {
+		onEvent({ at: new Date().toISOString(), phase, status, detail, ...(data === null ? {} : { data }) });
+	} catch {
+		// Logging/telemetry callbacks must never alter the serial operation.
+	}
+}
+
+function emitSerialFailureStage(onEvent, detail, port) {
+	const text = String(detail ?? '');
+	let phase = 'commands';
+	if (/UnauthorizedAccessException|AccessDenied|being used|被占用|拒绝访问|不存在|does not exist/iu.test(text)) phase = 'open-port';
+	else if (/waiting for .*login|login:\\s|login prompt/iu.test(text)) phase = 'login-prompt';
+	else if (/waiting for .*password|login incorrect|authentication|认证|密码/iu.test(text)) phase = 'authentication';
+	else if (/identity|id -un/iu.test(text)) phase = 'identity';
+	else if (/shell|[#$]\\s*$/iu.test(text)) phase = 'shell-prompt';
+	emitSerialEvent(onEvent, phase, 'failed', text, { port });
+}
+
+function attachSerialTranscript(error, stdout, stderr) {
+	const value = `${String(stdout ?? '')}${stdout && stderr ? '\n' : ''}${String(stderr ?? '')}`;
+	error.serialTranscript = value;
+	return error;
+}
 
 /** Commands used by `ascend_serial_probe`; all are read-only. */
 export const SERIAL_PROBE_COMMANDS = Object.freeze([
@@ -149,6 +177,16 @@ export function publicSerialSettings(settings) {
 	};
 }
 
+/** Bound the complete host-side session independently of per-prompt waits. */
+export function serialSessionTimeoutMs(settings, commandCount) {
+	const promptTimeout = Number.isInteger(settings?.timeoutMs) ? settings.timeoutMs : DEFAULT_TIMEOUT;
+	const commands = Number.isInteger(commandCount) && commandCount > 0 ? commandCount : 1;
+	return Math.min(
+		MAX_SESSION_TIMEOUT,
+		Math.max(10000, promptTimeout + commands * Math.min(promptTimeout, 15000) + 10000)
+	);
+}
+
 /** Parse the machine-readable candidate list emitted by the Windows helper. */
 export function parseSerialPortList(text) {
 	const marker = '__SERIAL_LIST__';
@@ -168,7 +206,13 @@ export function parseSerialPortList(text) {
  * devices are excluded; a missing adapter is an empty list, not a guessed COM
  * number.
  */
-export function listSerialPorts() {
+export function listSerialPorts({ signal, onEvent } = {}) {
+	emitSerialEvent(onEvent, 'enumerate', 'running', 'enumerating serial ports');
+	if (signal?.aborted === true) {
+		const error = new Error('串口枚举已取消。');
+		error.code = 'ABORT_ERR';
+		return Promise.reject(error);
+	}
 	if (process.platform !== 'win32') {
 		try {
 			return Promise.resolve(
@@ -229,6 +273,30 @@ Write-Output ('__SERIAL_LIST__' + ([ordered]@{ ports = $items } | ConvertTo-Json
 		});
 		let stdout = '';
 		let stderr = '';
+		let settled = false;
+		let timedOut = false;
+		const finish = (operation) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			signal?.removeEventListener?.('abort', abort);
+			operation();
+		};
+		const abort = () => {
+			child.kill();
+			finish(() => {
+				const error = new Error('串口枚举已取消，辅助进程已终止。');
+				error.code = 'ABORT_ERR';
+				reject(error);
+			});
+		};
+		const timer = setTimeout(() => {
+			timedOut = true;
+			child.kill();
+			finish(() => reject(new Error(`串口枚举超过 ${SERIAL_ENUMERATION_TIMEOUT} ms，已终止辅助进程。`)));
+		}, SERIAL_ENUMERATION_TIMEOUT);
+		signal?.addEventListener?.('abort', abort, { once: true });
+		if (signal?.aborted === true) abort();
 		child.stdout.setEncoding('utf8');
 		child.stderr.setEncoding('utf8');
 		child.stdout.on('data', (chunk) => {
@@ -237,24 +305,32 @@ Write-Output ('__SERIAL_LIST__' + ([ordered]@{ ports = $items } | ConvertTo-Json
 		child.stderr.on('data', (chunk) => {
 			stderr += chunk;
 		});
-		child.on('error', (error) => reject(new Error(`无法启动串口枚举器：${error.message}`)));
-		child.on('close', (code) => {
+		child.on('error', (error) => finish(() => reject(new Error(`无法启动串口枚举器：${error.message}`))));
+		child.on('close', (code) => finish(() => {
+			if (timedOut) {
+				reject(new Error(`串口枚举超过 ${SERIAL_ENUMERATION_TIMEOUT} ms，已终止辅助进程。`));
+				return;
+			}
 			const ports = parseSerialPortList(stdout);
 			if (ports.length > 0 || code === 0) resolve(ports);
 			else reject(new Error(`串口枚举失败（exit ${code ?? 'unknown'}）：${cleanSerialOutput(stderr).slice(0, 500)}`));
-		});
+		}));
 	});
 }
 
 /** Try an operation on an explicitly configured port or each candidate port. */
-async function withAutoPort(settings, operation) {
-	if (settings.port !== 'auto') return operation(settings);
+async function withAutoPort(settings, operation, signal, onEvent) {
+	if (settings.port !== 'auto') {
+		emitSerialEvent(onEvent, 'port-attempt', 'running', `using configured port ${settings.port}`, { port: settings.port });
+		return operation(settings);
+	}
 	if (typeof settings.password === 'string' && settings.password !== '' && settings.allowAutoLogin !== true) {
 		throw new Error(
 			'串口 auto 登录会向多个设备发送密码；请显式配置 port，或在 profile 设置 serial.allowAutoLogin: true 确认该风险。'
 		);
 	}
-	const candidates = await listSerialPorts();
+	const candidates = await listSerialPorts({ signal, onEvent });
+	emitSerialEvent(onEvent, 'enumerate', 'ok', `found ${candidates.length} candidate port(s)`, { count: candidates.length });
 	if (candidates.length === 0) {
 		throw new Error('未发现可用的 USB 串口（CH340/CH343/ttyUSB），请检查 USB 线和驱动。');
 	}
@@ -265,9 +341,11 @@ async function withAutoPort(settings, operation) {
 			port: candidate.port,
 			timeoutMs: Math.min(settings.timeoutMs, 15000)
 		};
+		emitSerialEvent(onEvent, 'port-attempt', 'running', `trying ${candidate.port}`, { port: candidate.port });
 		try {
 			return await operation(concrete);
 		} catch (error) {
+			emitSerialEvent(onEvent, 'port-attempt', 'failed', String(error?.message ?? error), { port: candidate.port });
 			const message = String(error?.message ?? error);
 			attempts.push(`${candidate.port}: ${message.slice(0, 160)}`);
 			// A rejected password will be rejected on every other adapter too;
@@ -297,6 +375,7 @@ $port.WriteTimeout = 1500
 $port.NewLine = [System.Environment]::NewLine
 $port.DtrEnable = $true
 $port.RtsEnable = $true
+try {
 $port.Open()
 # Some CH343/USB bridges do not deliver the current login prompt until a
 # harmless newline wakes the console. This does not execute a command.
@@ -399,13 +478,16 @@ printf '__BEGIN__\n'; __COMMAND__; __asc_status=$?; printf '__STATUS__=%s\n' $__
     $sections["command$i"] = $chunk.Trim()
   }
 }
-$port.Close()
 $result = [ordered]@{
   identity = $identity
   sections = $sections
   transcript = $transcript.ToString()
 }
 Write-Output ('__ASC_SERIAL_RESULT__' + ($result | ConvertTo-Json -Compress -Depth 8))
+} finally {
+  if ($port.IsOpen) { $port.Close() }
+  $port.Dispose()
+}
 `;
 }
 
@@ -420,12 +502,23 @@ function powershellExecutable() {
  * @param {object} options - session inputs.
  * @param {object} options.settings - validated serial settings.
  * @param {string[]} options.commands - read-only commands.
+ * @param {AbortSignal} [options.signal] - aborts and terminates the host helper.
  * @returns {Promise<object>} parsed JSON emitted by the serial helper.
  */
-export function runSerialSession({ settings, commands }) {
+export function runSerialSession({ settings, commands, signal, onEvent }) {
 	const validation = validateSerialSettings(settings);
 	if (!validation.ok) return Promise.reject(new Error(validation.reason));
 	if (!Array.isArray(commands) || commands.length === 0) return Promise.reject(new Error('串口命令为空。'));
+	if (signal?.aborted === true) {
+		const error = new Error('串口会话已取消。');
+		error.code = 'ABORT_ERR';
+		return Promise.reject(error);
+	}
+	emitSerialEvent(onEvent, 'port-open', 'running', `opening ${settings.port}`, { port: settings.port });
+	emitSerialEvent(onEvent, 'prompt', 'running', 'waiting for login or shell prompt');
+	emitSerialEvent(onEvent, 'authenticate', 'running', `authenticating ${settings.user}`);
+	emitSerialEvent(onEvent, 'identity', 'running', 'verifying shell identity');
+	commands.forEach((command, index) => emitSerialEvent(onEvent, 'command', 'running', `command ${index + 1}`, { index: index + 1, command }));
 	const token = `ASC${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 	const script = serialPowerShellScript();
 	const encodedScript = Buffer.from(script, 'utf16le').toString('base64');
@@ -447,7 +540,43 @@ export function runSerialSession({ settings, commands }) {
 		});
 		let stdout = '';
 		let stderr = '';
+		let settled = false;
+		let timedOut = false;
+		let cancelled = false;
 		const limit = 2 * 1024 * 1024;
+		const hostTimeoutMs = serialSessionTimeoutMs(settings, commands.length);
+		const cleanup = () => {
+			clearTimeout(timer);
+			signal?.removeEventListener?.('abort', abort);
+		};
+		const finish = (operation) => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			operation();
+		};
+		const abort = () => {
+			cancelled = true;
+			emitSerialEvent(onEvent, 'session', 'cancelled', 'serial helper aborted');
+			child.kill();
+			finish(() => {
+				const error = attachSerialTranscript(new Error('串口会话已取消，辅助进程已终止。'), stdout, stderr);
+				error.code = 'ABORT_ERR';
+				reject(error);
+			});
+		};
+		const timer = setTimeout(() => {
+			timedOut = true;
+			emitSerialEvent(onEvent, 'session', 'timeout', `host timeout ${hostTimeoutMs} ms`);
+			child.kill();
+			finish(() => {
+				const error = attachSerialTranscript(new Error(`串口会话超过宿主总超时 ${hostTimeoutMs} ms，辅助进程已终止。`), stdout, stderr);
+				error.code = 'SERIAL_TIMEOUT';
+				reject(error);
+			});
+		}, hostTimeoutMs);
+		signal?.addEventListener?.('abort', abort, { once: true });
+		if (signal?.aborted === true) abort();
 		child.stdout.setEncoding('utf8');
 		child.stderr.setEncoding('utf8');
 		child.stdout.on('data', (chunk) => {
@@ -458,30 +587,52 @@ export function runSerialSession({ settings, commands }) {
 			stderr += chunk;
 			if (stderr.length > limit) stderr = stderr.slice(-limit);
 		});
-		child.on('error', (error) => reject(new Error(`串口辅助进程无法启动：${error.message}`)));
-		child.on('close', (code) => {
+		child.on('error', (error) => finish(() => {
+			emitSerialEvent(onEvent, 'open-port', 'failed', error.message, { port: settings.port });
+			reject(attachSerialTranscript(new Error(`串口辅助进程无法启动：${error.message}`), stdout, stderr));
+		}));
+		child.on('close', (code) => finish(() => {
+			if (cancelled) {
+				const error = new Error('串口会话已取消，辅助进程已终止。');
+				error.code = 'ABORT_ERR';
+				reject(error);
+				return;
+			}
+			if (timedOut) {
+				const error = new Error(`串口会话超过宿主总超时 ${hostTimeoutMs} ms，辅助进程已终止。`);
+				error.code = 'SERIAL_TIMEOUT';
+				reject(error);
+				return;
+			}
 			const marker = '__ASC_SERIAL_RESULT__';
 			const at = stdout.lastIndexOf(marker);
 			if (at >= 0) {
 				try {
 					const result = JSON.parse(stdout.slice(at + marker.length).trim());
+					emitSerialEvent(onEvent, 'port-open', 'ok', `opened ${settings.port}`, { port: settings.port });
+					emitSerialEvent(onEvent, 'prompt', 'ok', 'login or shell prompt detected');
+					emitSerialEvent(onEvent, 'authenticate', 'ok', `authenticated ${settings.user}`);
+					emitSerialEvent(onEvent, 'identity', 'ok', `verified ${result.identity ?? settings.user}`);
+					commands.forEach((command, index) => emitSerialEvent(onEvent, 'command', 'ok', `command ${index + 1} completed`, { index: index + 1, command }));
 					resolve({ ...result, token });
 					return;
 				} catch (error) {
-					reject(new Error(`串口返回不是有效 JSON：${error.message}`));
+					emitSerialEvent(onEvent, 'commands', 'failed', `invalid serial result JSON: ${error.message}`);
+					reject(attachSerialTranscript(new Error(`串口返回不是有效 JSON：${error.message}`), stdout, stderr));
 					return;
 				}
 			}
 			const detail = formatSerialError(settings.port, stderr || stdout);
-			reject(new Error(`串口会话失败（exit ${code ?? 'unknown'}）：${detail}`));
-		});
+			emitSerialFailureStage(onEvent, detail, settings.port);
+			reject(attachSerialTranscript(new Error(`串口会话失败（exit ${code ?? 'unknown'}）：${detail}`), stdout, stderr));
+		}));
 	});
 }
 
 /** Run the fixed network probe and parse its output. */
-export async function runSerialProbe(settings) {
+export async function runSerialProbe(settings, { signal, onEvent } = {}) {
 	return withAutoPort(settings, async (concrete) => {
-		const result = await runSerialSession({ settings: concrete, commands: SERIAL_PROBE_COMMANDS });
+		const result = await runSerialSession({ settings: concrete, commands: SERIAL_PROBE_COMMANDS, signal, onEvent });
 		const sections = result.sections ?? {};
 		const network = parseSerialNetwork({
 			hostname: sections.command1,
@@ -491,13 +642,13 @@ export async function runSerialProbe(settings) {
 			macs: sections.command5
 		}, result.transcript);
 		return { ...network, port: concrete.port, user: concrete.user };
-	});
+	}, signal, onEvent);
 }
 
 /** Run exactly one validated read-only command over the serial console. */
-export async function runSerialCommand(settings, command) {
+export async function runSerialCommand(settings, command, { signal, onEvent } = {}) {
 	return withAutoPort(settings, async (concrete) => {
-		const result = await runSerialSession({ settings: concrete, commands: [command] });
+		const result = await runSerialSession({ settings: concrete, commands: [command], signal, onEvent });
 		const status = Number(result.sections?.status1);
 		return {
 			port: concrete.port,
@@ -505,5 +656,5 @@ export async function runSerialCommand(settings, command) {
 			exitCode: Number.isInteger(status) && status >= 0 ? status : 1,
 			transcriptExcerpt: cleanSerialOutput(result.transcript).slice(0, 8000)
 		};
-	});
+	}, signal, onEvent);
 }

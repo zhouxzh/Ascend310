@@ -12,7 +12,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -147,6 +147,7 @@ const effects = [];
 const config = {
 	repoRoot: repoRoot ?? undefined,
 	inventoryPath: join(pluginRoot, 'test', '.no-inventory.json'),
+	serialLogDir: join(pluginRoot, 'test', '.serial-sessions'),
 	defaultTarget: 'board-8t',
 	targets: [
 		{ id: 'board-8t', label: '8T 板', host: '198.51.100.10', user: 'HwHiAiUser', note: '8T/310B4' },
@@ -179,14 +180,23 @@ try {
 	for (const name of ['ascend_probe', 'ascend_camera_capture', 'ascend_microphone_record', 'ascend_speaker_test', 'ascend_play_recording', 'ascend_check', 'ascend_debug_plan', 'ascend_sample_index', 'ascend_board_exec', 'ascend_board_run', 'ascend_apt_install', 'ascend_model_download', 'ascend_ui_capture', 'ascend_discover', 'ascend_serial_probe', 'ascend_serial_exec']) {
 		check(registeredTools.has(name), `tool ${name} must be registered`);
 	}
-	check(routes.length === 14, `expected fourteen panel routes, got ${routes.length}`);
+	check(routes.length === 16, `expected sixteen panel routes, got ${routes.length}`);
 	check(routes.every((route) => route.kind === 'exact'), 'panel routes must be exact matches');
-	check(effects.length === 14, 'each route must be registered through an effect');
+	check(effects.length === 16, 'each route must be registered through an effect');
 	check(
 		routes.map((route) => route.path).join(',') ===
-			'/ascend310b-debug/report.json,/ascend310b-debug/probe,/ascend310b-debug/discover,/ascend310b-debug/liveness,/ascend310b-debug/camera-refresh,/ascend310b-debug/audio-refresh,/ascend310b-debug/system-refresh,/ascend310b-debug/camera-preview,/ascend310b-debug/camera-capture,/ascend310b-debug/microphone-record,/ascend310b-debug/speaker-test,/ascend310b-debug/play-recording,/ascend310b-debug/bind,/ascend310b-debug/serial-probe',
-		'routes must expose report, probe, discovery, liveness, category refreshes, camera preview/capture, audio and serial/bind endpoints'
+			'/ascend310b-debug/report.json,/ascend310b-debug/probe,/ascend310b-debug/discover,/ascend310b-debug/liveness,/ascend310b-debug/camera-refresh,/ascend310b-debug/audio-refresh,/ascend310b-debug/system-refresh,/ascend310b-debug/camera-preview,/ascend310b-debug/camera-capture,/ascend310b-debug/microphone-record,/ascend310b-debug/speaker-test,/ascend310b-debug/play-recording,/ascend310b-debug/bind,/ascend310b-debug/serial-probe,/ascend310b-debug/serial-sessions,/ascend310b-debug/serial-sessions/clear',
+		'routes must expose report, probe, discovery, liveness, category refreshes, peripherals, serial/bind and serial-session endpoints'
 	);
+	const serialSessionsRoute = routes.find((route) => route.path === '/ascend310b-debug/serial-sessions');
+	const serialClearRoute = routes.find((route) => route.path === '/ascend310b-debug/serial-sessions/clear');
+	check(serialSessionsRoute !== undefined && serialClearRoute !== undefined, 'serial session list/detail and clear routes must exist');
+	const serialListResponse = { status: null, body: '', writeHead(status) { this.status = status; }, end(chunk) { this.body = chunk ?? ''; } };
+	await serialSessionsRoute.handler({ method: 'GET', url: '/ascend310b-debug/serial-sessions', headers: {} }, serialListResponse);
+	check(serialListResponse.status === 200 && Array.isArray(JSON.parse(serialListResponse.body).sessions), 'serial session list route must return a sessions array');
+	const serialClearRefused = { status: null, body: '', writeHead(status) { this.status = status; }, end(chunk) { this.body = chunk ?? ''; } };
+	await serialClearRoute.handler({ method: 'POST', headers: { 'content-type': 'application/json' }, async *[Symbol.asyncIterator]() { yield '{}'; } }, serialClearRefused);
+	check(serialClearRefused.status === 400, 'serial session clear route must require confirm=true');
 
 	// --- target resolution ------------------------------------------------
 	const resolved = host.resolveTarget(config);
@@ -235,6 +245,25 @@ try {
 	check(rejectedScan.scanned === 0 && rejectedScan.errors.length > 0, 'a public CIDR must be refused without scanning');
 	check(host.resolveTarget(config, 'HwHiAiUser@198.51.100.11').id === 'board-20t', 'user@host must select that board');
 	check(host.resolveTarget(config, 'local').transport === 'local', 'the "local" selector must remain available');
+
+	try {
+		const serialOnly = await host.discoverSerialBoard({
+			port: 'COM23',
+			user: 'HwHiAiUser',
+			ipAddress: '198.51.100.20',
+			hostnameIps: [],
+			interfaces: [],
+			hostname: 'serial-only-board',
+			macAddress: 'c0:74:2b:fd:f7:4e'
+		}, config);
+		check(serialOnly.found.length === 0, 'an unverified serial-only board must not be returned as a loadable found target');
+		check(serialOnly.errors.some((message) => message.includes('不返回不可加载')), 'serial-only discovery must explain the load boundary');
+		const inventory = JSON.parse(readFileSync(config.inventoryPath, 'utf8'));
+		check(Object.values(inventory.boards ?? {}).some((board) => board?.mac === 'c0:74:2b:fd:f7:4e'), 'serial-only discovery must still persist the asset record');
+	} finally {
+		rmSync(config.inventoryPath, { force: true });
+	}
+
 	let ambiguous = null;
 	try {
 		host.resolveTarget({ targets: config.targets });
@@ -851,6 +880,7 @@ try {
 		console.log(`  knowledge  : ${payload.knowledge.length}`);
 	}
 } finally {
+	rmSync(config.serialLogDir, { recursive: true, force: true });
 	rmSync(stubDir, { recursive: true, force: true });
 	try {
 		rmdirSync(join(stubRoot, '@deepseek-ai'));

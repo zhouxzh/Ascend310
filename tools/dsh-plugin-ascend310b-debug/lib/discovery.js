@@ -244,35 +244,54 @@ export function expandCidrs(cidrs, maxHosts = MAX_SCAN_HOSTS) {
 	return hosts;
 }
 
-/** Check whether one TCP port accepts a connection. */
-export function tcpOpen(host, port = 22, timeoutMs = 500) {
+/** Build the shared cancellation error used by network discovery. */
+function discoveryAbortError() {
+	const error = new Error('局域网扫描已取消。');
+	error.code = 'ABORT_ERR';
+	return error;
+}
+
+function throwIfDiscoveryAborted(signal) {
+	if (signal?.aborted === true) throw discoveryAbortError();
+}
+
+/** Check whether one TCP port accepts an abortable connection. */
+export function tcpOpen(host, port = 22, timeoutMs = 500, signal = null) {
 	return new Promise((resolve) => {
 		const socket = new Socket();
 		let settled = false;
 		const finish = (open) => {
 			if (settled) return;
 			settled = true;
+			signal?.removeEventListener?.('abort', abort);
 			socket.destroy();
 			resolve(open);
 		};
+		const abort = () => finish(false);
+		signal?.addEventListener?.('abort', abort, { once: true });
+		if (signal?.aborted === true) {
+			abort();
+			return;
+		}
 		socket.setTimeout(timeoutMs, () => finish(false));
 		socket.once('error', () => finish(false));
 		socket.connect(port, host, () => finish(true));
 	});
 }
 
-/** Run async functions with a fixed concurrency. */
-async function mapLimit(items, limit, worker) {
+/** Run async functions with fixed concurrency and stop scheduling on abort. */
+async function mapLimit(items, limit, worker, signal = null) {
 	const results = new Array(items.length);
 	let cursor = 0;
 	const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
-		while (cursor < items.length) {
+		while (cursor < items.length && signal?.aborted !== true) {
 			const index = cursor;
 			cursor += 1;
 			results[index] = await worker(items[index], index);
 		}
 	});
 	await Promise.all(workers);
+	throwIfDiscoveryAborted(signal);
 	return results;
 }
 
@@ -341,6 +360,7 @@ export async function probeCandidate({ host, user = null, port = 22, timeoutMs =
  * @param {string} [options.path] - inventory file.
  * @param {object} [options.config] - plugin configuration.
  * @param {function} [options.exec] - injectable executor for tests.
+ * @param {AbortSignal} [options.signal] - stops scheduling and prevents inventory writes.
  * @returns {Promise<object>} discovery result.
  */
 export async function discoverNetwork({
@@ -353,13 +373,15 @@ export async function discoverNetwork({
 	probeTimeoutMs = 10000,
 	path,
 	config = {},
-	exec
+	exec,
+	signal = null
 } = {}) {
+	throwIfDiscoveryAborted(signal);
 	const targets = expandCidrs(cidrs);
 	const open = [];
 	await mapLimit(targets, scanConcurrency, async (host) => {
-		if (await tcpOpen(host, port, scanTimeoutMs)) open.push(host);
-	});
+		if (await tcpOpen(host, port, scanTimeoutMs, signal)) open.push(host);
+	}, signal);
 	const probed = await mapLimit(open, probeConcurrency, (host) => probeCandidate({
 		host,
 		user,
@@ -367,7 +389,7 @@ export async function discoverNetwork({
 		timeoutMs: probeTimeoutMs,
 		light: true,
 		exec
-	}));
+	}), signal);
 	// A board with Wi-Fi and multiple Ethernet ports can answer on several
 	// addresses. Deduplicate by any interface MAC alias, not by the currently
 	// routed MAC, and prefer the address the board reports as primary.
@@ -441,6 +463,7 @@ export async function discoverNetwork({
 			identity: candidate.mac === null ? 'hostname-fallback' : 'mac'
 		});
 	}
+	throwIfDiscoveryAborted(signal);
 	if (found.length > 0) saveInventory(inventoryFile, inventory);
 	return { scanned: targets.length, cidrs: [...cidrs], open: open.length, found, others, errors, inventoryPath: inventoryFile };
 }

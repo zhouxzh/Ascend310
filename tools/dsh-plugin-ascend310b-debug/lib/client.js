@@ -19,6 +19,8 @@ window.__ModuleLoader__.load({
 		const DISCOVER_URL = "/ascend310b-debug/discover";
 		/** Serial network-probe route registered by the host half. */
 		const SERIAL_URL = "/ascend310b-debug/serial-probe";
+		const SERIAL_SESSIONS_URL = "/ascend310b-debug/serial-sessions";
+		const SERIAL_SESSIONS_CLEAR_URL = "/ascend310b-debug/serial-sessions/clear";
 		/** Fixed peripheral operation routes registered by the host half. */
 		const CAMERA_REFRESH_URL = "/ascend310b-debug/camera-refresh";
 		const CAMERA_PREVIEW_URL = "/ascend310b-debug/camera-preview";
@@ -35,19 +37,17 @@ window.__ModuleLoader__.load({
 
 		/** Class-name prefix keeping this plugin's styles out of other panels. */
 		const CSS = `
-.ad-root{height:100%;overflow:auto;padding:18px 22px 40px;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;line-height:20px;max-width:1320px;margin:0 auto}
-.ad-head{display:grid;grid-template-columns:minmax(220px,.65fr) minmax(0,2fr) auto;align-items:start;gap:14px 20px;padding-bottom:12px;border-bottom:.5px solid var(--dsw-alias-border-l1)}
+.ad-root{height:100%;min-height:0;max-height:100%;overflow:hidden;display:flex;flex-direction:column;padding:14px 18px 16px;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;line-height:20px;max-width:1320px;margin:0 auto}
+.ad-head{flex:none;display:grid;grid-template-columns:minmax(180px,.5fr) minmax(0,1.5fr) auto;align-items:end;gap:10px 16px;min-height:72px;padding-bottom:10px;border-bottom:.5px solid var(--dsw-alias-border-l1)}
 .ad-title{font-size:16px;font-weight:600;margin:0}
 .ad-sub{color:var(--dsw-alias-label-tertiary);font-size:12px}
 .ad-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.ad-current-group{display:flex;flex-direction:column;gap:7px;min-width:0}
-.ad-current-line{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
-.ad-current-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-height:30px}
-.ad-current-actions .ad-button{min-width:104px;min-height:30px;box-sizing:border-box}
-.ad-discovery-group{display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:0}
-.ad-discovery-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-height:30px}
-.ad-discovery-actions .ad-button{min-width:104px;min-height:30px;box-sizing:border-box}
-.ad-action-label{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:14px;white-space:nowrap}
+.ad-current-group{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ad-current-line{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:nowrap;min-height:30px}
+.ad-head-actions-group{display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:0}
+.ad-head-actions{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;min-height:30px}
+.ad-head-actions .ad-button{min-width:104px;min-height:30px;box-sizing:border-box}
+.ad-action-label{height:14px;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:14px;white-space:nowrap}
 .ad-button{border:.5px solid var(--dsw-alias-border-l3);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-radius:6px;padding:4px 12px;font:inherit;cursor:pointer;white-space:nowrap}
 .ad-refresh-button{min-width:146px;justify-content:center}
 .ad-button:hover{background:var(--dsw-alias-interactive-bg-hover)}
@@ -78,10 +78,7 @@ window.__ModuleLoader__.load({
 .ad-empty-state p{margin:0;color:var(--dsw-alias-label-tertiary);font-size:12px;max-width:620px}
 .ad-operation-status{min-height:22px;margin-top:7px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dsw-alias-label-tertiary)}
 .ad-inline-status{height:20px;margin-top:6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px;line-height:20px;color:var(--dsw-alias-label-tertiary)}
-.ad-global-status{height:22px;margin:0 0 8px;font-size:11px;line-height:22px;color:var(--dsw-alias-label-tertiary)}
-.ad-global-status>summary{cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;list-style-position:inside}
-.ad-global-status[open]{height:auto;max-height:96px;overflow:auto}
-.ad-global-detail{white-space:normal;line-height:1.5;padding:4px 0 6px 16px}
+.ad-global-status{flex:none;height:22px;margin:8px 0 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px;line-height:22px;color:var(--dsw-alias-label-tertiary)}
 .ad-global-status.ad-error{color:var(--dsw-alias-state-error-primary,#d92d20);font-weight:500}
 .ad-system-notice{height:18px;margin:0 0 7px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
 .ad-system-hint{height:20px;margin-bottom:7px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px;line-height:20px;color:var(--dsw-alias-label-tertiary)}
@@ -100,7 +97,7 @@ window.__ModuleLoader__.load({
 .ad-banner{border:.5px solid var(--dsw-alias-state-warning-primary,#c98a00);border-radius:8px;padding:8px 11px;margin-top:12px;font-size:12px;color:var(--dsw-alias-label-secondary)}
 .ad-banner.ad-scope-block{border-color:var(--dsw-alias-state-error-primary,#d92d20);color:var(--dsw-alias-state-error-primary,#d92d20);font-weight:500}
 .ad-scope-ok{margin-top:10px;font-size:12px;color:var(--dsw-alias-label-tertiary)}
-.ad-tabs{display:flex;gap:2px;border-bottom:.5px solid var(--dsw-alias-border-l1);margin:14px 0 0}
+.ad-tabs{flex:none;display:flex;gap:2px;border-bottom:.5px solid var(--dsw-alias-border-l1);margin:0}
 .ad-tab{border:0;border-bottom:2px solid transparent;background:transparent;color:var(--dsw-alias-label-tertiary);padding:6px 12px 7px;font:inherit;font-weight:600;cursor:pointer}
 .ad-tab:hover{color:var(--dsw-alias-label-primary)}
 .ad-tab.ad-active{color:var(--dsw-alias-state-business-primary);border-bottom-color:var(--dsw-alias-state-business-primary)}
@@ -113,13 +110,13 @@ window.__ModuleLoader__.load({
 .ad-change{color:var(--dsw-alias-state-warning-primary,#c98a00);font-size:12px}
 .ad-stack{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .ad-stack span{border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;padding:1px 8px;color:var(--dsw-alias-label-tertiary);font-size:11px}
-.ad-toolbar-note{margin-top:10px}
-.ad-workbench{display:grid;grid-template-columns:248px minmax(0,1fr);gap:20px;margin-top:14px;align-items:start}
-.ad-rail{border-right:.5px solid var(--dsw-alias-border-l1);padding-right:14px;min-width:0}
+.ad-toolbar-note{margin-top:8px}
+.ad-workbench{flex:1 1 0;min-height:0;height:0;display:grid;grid-template-columns:248px minmax(0,1fr);gap:18px;margin-top:10px;align-items:stretch;overflow:hidden}
+.ad-rail{display:flex;flex-direction:column;min-height:0;height:100%;overflow:hidden;border-right:.5px solid var(--dsw-alias-border-l1);padding-right:14px}
 .ad-rail-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:9px}
 .ad-rail-head h3{font-size:13px;font-weight:600;margin:0}
-.ad-board-list{display:flex;flex-direction:column;gap:6px}
-.ad-history-toggle{align-self:flex-start;padding:3px 9px;font-size:11px;color:var(--dsw-alias-label-secondary)}
+.ad-board-list{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.ad-history-toggle{flex:none;align-self:flex-start;min-height:24px;padding:3px 9px;font-size:11px;color:var(--dsw-alias-label-secondary)}
 .ad-rail-heading{font-size:11px;font-weight:600;color:var(--dsw-alias-label-tertiary);text-transform:uppercase;letter-spacing:0;padding:2px 1px}
 .ad-board-item{display:block;width:100%;text-align:left;border:.5px solid var(--dsw-alias-border-l1);border-radius:7px;background:transparent;color:var(--dsw-alias-label-primary);padding:8px 9px;font:inherit;cursor:pointer}
 .ad-board-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
@@ -129,15 +126,19 @@ window.__ModuleLoader__.load({
 .ad-board-flag{flex:none;border:.5px solid var(--dsw-alias-state-warning-primary,#c98a00);border-radius:999px;padding:0 5px;color:var(--dsw-alias-state-warning-primary,#c98a00);font-size:9px;font-weight:500;line-height:15px}
 .ad-board-dot{width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-label-tertiary);flex:none}
 .ad-board-dot.ad-online{background:var(--dsw-alias-state-success-primary,#2f9e44)}
+.ad-board-dot.ad-serial{background:var(--dsw-alias-state-warning-primary,#c98a00)}
 .ad-board-dot.ad-offline{background:var(--dsw-alias-state-danger-primary,#d64545)}
 .ad-board-dot.ad-changed{background:var(--dsw-alias-state-warning-primary,#c98a00)}
 .ad-board-meta{display:-webkit-box;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:15px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:normal;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .ad-board-mac{font-family:var(--ds-font-family-code);font-size:10px;color:var(--dsw-alias-label-tertiary);margin-top:2px;overflow:hidden;text-overflow:ellipsis}
-.ad-main{min-width:0}
+.ad-main{min-width:0;min-height:0;height:100%;overflow:hidden;display:flex;flex-direction:column}
+.ad-panels{flex:1 1 0;min-height:0;height:0;position:relative;overflow:hidden}
+.ad-panel{position:absolute;inset:0;overflow:auto;visibility:hidden;pointer-events:none}
+.ad-panel.ad-active{visibility:visible;pointer-events:auto}
 .ad-empty-rail{border:.5px dashed var(--dsw-alias-border-l2);border-radius:7px;padding:10px;color:var(--dsw-alias-label-tertiary);font-size:12px}
 .ad-heading{display:flex;flex-direction:column;gap:2px;min-width:0}
 .ad-heading .ad-sub{margin:0}
-.ad-current{display:flex;align-items:center;gap:7px;min-width:0;margin-left:2px;padding:4px 9px;border:.5px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-l1,#0000)}
+.ad-current{display:flex;align-items:center;gap:7px;min-width:0;min-height:30px;box-sizing:border-box;margin-left:2px;padding:4px 9px;border:.5px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-l1,#0000)}
 .ad-current strong{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ad-current code{font-family:var(--ds-font-family-code);font-size:10px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}
 .ad-state-badge{border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;padding:1px 7px;color:var(--dsw-alias-label-secondary);font-size:10px;white-space:nowrap}
@@ -169,7 +170,7 @@ window.__ModuleLoader__.load({
 .ad-audio-pane-head h4{margin:0;font-size:13px}
 .ad-audio-pane .ad-test-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .ad-audio-result{height:178px;overflow:auto;margin-top:10px;padding-top:8px;border-top:.5px solid var(--dsw-alias-border-l1)}
-.ad-audio-playback{margin-top:10px}
+.ad-audio-playback{height:188px;overflow:auto;margin-top:10px}
 .ad-audio-playback-route{margin:0 0 8px;font-size:11px;color:var(--dsw-alias-label-tertiary);overflow-wrap:anywhere}
 .ad-result-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .ad-result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:6px;margin-top:8px}
@@ -188,6 +189,15 @@ window.__ModuleLoader__.load({
 .ad-camera-preview img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;image-rendering:auto}
 .ad-recording-playback{height:150px;overflow:auto;margin-top:10px;padding:10px;border:.5px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-l1,#0000)}
 .ad-playback-button{min-width:190px}
+.ad-serial-layout{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(0,1.2fr);gap:12px;min-height:0}
+.ad-serial-list,.ad-serial-detail{min-width:0;border:.5px solid var(--dsw-alias-border-l1);border-radius:8px;padding:10px;background:var(--dsw-alias-bg-l1,#0000)}
+.ad-serial-list{max-height:100%;overflow:auto}
+.ad-serial-detail{overflow:auto}
+.ad-serial-row{width:100%;text-align:left;border:0;border-bottom:.5px solid var(--dsw-alias-border-l1);padding:8px 6px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer}
+.ad-serial-row.ad-selected{background:var(--dsw-alias-interactive-bg-hover)}
+.ad-serial-meta{display:block;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px;overflow-wrap:anywhere}
+.ad-serial-timeline{margin:8px 0 0;padding-left:18px}
+.ad-serial-transcript{max-height:280px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
 .ad-peripheral-card{border:.5px solid var(--dsw-alias-border-l1);border-radius:7px;padding:10px;min-width:0;background:var(--dsw-alias-bg-l1,#0000)}
 .ad-peripheral-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .ad-peripheral-head strong{font-size:12px}
@@ -201,15 +211,14 @@ window.__ModuleLoader__.load({
 .ad-peripheral-raw pre{max-height:110px;overflow:auto;white-space:pre-wrap;font-size:10px;margin:6px 0 0;font-family:var(--ds-font-family-code)}
 .ad-raw-details summary{cursor:pointer;font-weight:600;font-size:12px;margin-bottom:10px}
 .ad-device-list{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-.ad-workbench{grid-template-columns:minmax(220px,268px) minmax(0,1fr);gap:18px}
-.ad-rail{position:sticky;top:12px;max-height:calc(100vh - 36px);overflow:auto}
+.ad-workbench{grid-template-columns:minmax(220px,268px) minmax(0,1fr)}
 .ad-board-item{min-height:62px}
 .ad-board-title{font-size:11px}
 .ad-section{padding-top:13px;border-top:.5px solid var(--dsw-alias-border-l1)}
 .ad-section:first-child{border-top:0;padding-top:0}
 .ad-tabs{overflow-x:auto;white-space:nowrap;scrollbar-width:thin}
 .ad-tab{flex:none}
-@media(max-width:720px){.ad-root{padding:14px 14px 32px}.ad-head{grid-template-columns:1fr;align-items:flex-start}.ad-current-group{order:2;width:100%;margin-left:0}.ad-current-line{width:100%}.ad-current{width:100%;flex:1}.ad-current-actions{width:100%}.ad-current-actions .ad-button{flex:1}.ad-discovery-group{order:3;width:100%;margin-left:0;align-items:stretch}.ad-discovery-actions .ad-button{flex:1}.ad-actions .ad-select{flex:1;min-width:180px}.ad-toolbar .ad-button{flex:1}.ad-table{display:block;overflow-x:auto;white-space:nowrap}.ad-table td,.ad-table th{white-space:normal;min-width:90px}.ad-workbench{grid-template-columns:1fr;gap:12px}.ad-rail{position:static;max-height:none;border-right:0;border-bottom:.5px solid var(--dsw-alias-border-l1);padding:0 0 10px}.ad-board-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));max-height:220px;overflow:auto}.ad-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ad-peripheral-grid{grid-template-columns:1fr}.ad-audio-grid{grid-template-columns:1fr}.ad-audio-pane .ad-test-grid{grid-template-columns:1fr}}
+@media(max-width:720px){.ad-root{padding:12px 12px 16px}.ad-head{grid-template-columns:1fr;min-height:0;align-items:stretch}.ad-current-group{order:2;width:100%;margin-left:0}.ad-current-line{width:100%;flex-wrap:wrap}.ad-current{width:100%;flex:1}.ad-head-actions-group{order:3;width:100%;margin-left:0;align-items:stretch}.ad-head-actions .ad-button{flex:1}.ad-actions .ad-select{flex:1;min-width:180px}.ad-toolbar .ad-button{flex:1}.ad-table{display:block;overflow-x:auto;white-space:nowrap}.ad-table td,.ad-table th{white-space:normal;min-width:90px}.ad-workbench{grid-template-columns:1fr;overflow:hidden}.ad-rail{height:240px;border-right:0;border-bottom:.5px solid var(--dsw-alias-border-l1);padding:0 0 10px}.ad-board-list{display:flex;flex-direction:column}.ad-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ad-peripheral-grid{grid-template-columns:1fr}.ad-audio-grid{grid-template-columns:1fr}.ad-audio-pane .ad-test-grid{grid-template-columns:1fr}.ad-serial-layout{grid-template-columns:1fr}.ad-serial-list{max-height:240px}}
 `;
 
 		/** Install this plugin's stylesheet once. */
@@ -244,6 +253,10 @@ window.__ModuleLoader__.load({
 			return serial.status === "reachable" ? `串口在线${port}${when}` : `串口${port}${when}`;
 		}
 
+		function serialLive(board) {
+			return board?.serial?.status === "reachable" && isRecent(board.serial.lastSeen);
+		}
+
 		/** Make cached and live panel data visibly different. */
 		function dataState(payload, kind) {
 			if (kind === "loading" && payload) return "正在读取已保存信息";
@@ -258,12 +271,6 @@ window.__ModuleLoader__.load({
 			return Number.isFinite(number) && number >= 0 ? `${(number / 1024).toFixed(1)} GB` : "未采集";
 		}
 
-		/** Fixed hardware capacity shown in the device name, never live usage. */
-		function memoryNameSuffix(memoryTotalMb) {
-			const value = Number(memoryTotalMb);
-			return Number.isFinite(value) && value > 0 ? ` · ${memoryGb(value)}` : "";
-		}
-
 		/** Canonical display name shared by the rail, asset table and header. */
 		function boardName(board = {}) {
 			const model = typeof board.model === "string" ? board.model.replace(/\s+/g, " ").trim() : "";
@@ -273,7 +280,7 @@ window.__ModuleLoader__.load({
 			if (/310B4/i.test(soc) || /\b8T\b/i.test(tier) || /\b8T\b/i.test(model)) name = "Orange Pi AI Pro 8T";
 			else if (/310B1/i.test(soc) || /\b20T\b/i.test(tier) || /\b20T\b/i.test(model)) name = "Orange Pi AI Pro 20T";
 			else name = model || board.hostname || board.id || "未命名开发板";
-			return `${name}${memoryNameSuffix(board.memoryTotalMb ?? board.system?.memoryTotalMb)}`;
+			return name;
 		}
 
 		/** Canonical name for a configured target before inventory is available. */
@@ -288,7 +295,7 @@ window.__ModuleLoader__.load({
 					? known
 					: label || target.host || target.id || "未命名开发板";
 			}
-			return `${name}${memoryNameSuffix(target.memoryTotalMb ?? target.system?.memoryTotalMb)}`;
+			return name;
 		}
 
 		/** Compact hardware identifier used beside a canonical name. */
@@ -303,6 +310,38 @@ window.__ModuleLoader__.load({
 
 		function boardHasMac(board, mac) {
 			return typeof mac === "string" && boardMacs(board).includes(mac);
+		}
+
+		function targetMacs(target) {
+			return [target?.mac, ...(Array.isArray(target?.macs) ? target.macs : [])]
+				.filter((mac, index, all) => typeof mac === "string" && mac !== "" && all.indexOf(mac) === index);
+		}
+
+		/**
+		 * Bind a rail row to the target whose SSH liveness it may inherit.
+		 * A leftover configuredId is not identity: old NICs of the same 8T
+		 * must not inherit the live board's SSH state.
+		 */
+		function liveTargetForBoard(board, targets) {
+			const aliases = boardMacs(board);
+			return (targets ?? []).find((target) =>
+				target.discoveredId === board.id ||
+				target.id === board.id ||
+				targetMacs(target).some((mac) => aliases.includes(mac))
+			) ?? null;
+		}
+
+		function boardForTarget(target, boards) {
+			if (!target) return null;
+			return (boards ?? []).find((board) => liveTargetForBoard(board, [target]) !== null) ?? null;
+		}
+
+		function boardRailCount(boards, targets) {
+			const matched = new Set((boards ?? []).map((board) => liveTargetForBoard(board, targets)?.id).filter(Boolean));
+			const unmatched = (targets ?? []).filter((target) =>
+				!matched.has(target.id) && !(boards ?? []).some((board) => liveTargetForBoard(board, [target]) !== null)
+			);
+			return (boards ?? []).length + unmatched.length;
 		}
 
 		/** Readable text from a fact, preserving a missing value as null. */
@@ -917,12 +956,12 @@ window.__ModuleLoader__.load({
 							onClick: props.onRefresh,
 							title: "设备插拔或配置变化后，手动更新一次设备枚举"
 						},
-						refreshing ? `更新中 ${refreshElapsedSec}s…` : props.refreshLabel ?? "更新设备信息"
+						refreshing ? `更新中 ${refreshElapsedSec}s…` : props.refreshLabel ?? "更新摄像头信息"
 					)
 				),
 				h(
 					"div",
-					{ className: props.refreshFailed ? "ad-inline-status ad-error" : "ad-inline-status", role: "status", title: props.refreshMessage ?? "" },
+					{ className: props.refreshFailed ? "ad-inline-status ad-error" : "ad-inline-status", role: props.refreshFailed ? "alert" : "status", "aria-live": props.refreshFailed ? "assertive" : "polite", title: props.refreshMessage ?? "" },
 					props.refreshMessage ?? ""
 				),
 				h(
@@ -1248,7 +1287,7 @@ window.__ModuleLoader__.load({
 						props.refreshing ? `更新中 ${props.refreshElapsedSec ?? 0}s…` : "更新音频接口信息"
 					)
 				),
-				h("div", { className: props.refreshFailed ? "ad-inline-status ad-error" : "ad-inline-status", role: "status", title: props.refreshMessage ?? "" }, props.refreshMessage ?? ""),
+				h("div", { className: props.refreshFailed ? "ad-inline-status ad-error" : "ad-inline-status", role: props.refreshFailed ? "alert" : "status", "aria-live": props.refreshFailed ? "assertive" : "polite", title: props.refreshMessage ?? "" }, props.refreshMessage ?? ""),
 				h(
 					"div",
 					{ className: "ad-audio-grid" },
@@ -1360,7 +1399,7 @@ window.__ModuleLoader__.load({
 		function CameraFormats(props) {
 			const formats = props.inventory?.videoFormats?.get?.(props.device)?.formats ?? [];
 			if (formats.length === 0) {
-				return h("div", { className: "ad-empty" }, "尚无该节点的格式列表；设备插拔后点击「更新设备信息」从 v4l2-ctl 重新采集。");
+				return h("div", { className: "ad-empty" }, "尚无该节点的格式列表；设备插拔后点击「更新摄像头信息」从 v4l2-ctl 重新采集。");
 			}
 			return h(
 				"div",
@@ -1414,7 +1453,7 @@ window.__ModuleLoader__.load({
 		function FactTable(props) {
 			const facts = props.facts ?? {};
 			const keys = Object.keys(facts);
-			if (keys.length === 0) return h("div", { className: "ad-empty" }, "尚无设备信息：设备插拔或配置变化后点击「更新设备信息」。");
+			if (keys.length === 0) return h("div", { className: "ad-empty" }, "尚无设备信息：设备插拔或配置变化后点击对应页的更新按钮。");
 			return h(
 				"table",
 				{ className: "ad-table" },
@@ -1454,7 +1493,7 @@ window.__ModuleLoader__.load({
 				["videoFormats", "摄像头格式与分辨率", "v4l2-ctl --list-formats-ext"]
 			];
 			const hasAny = fields.some(([key]) => factValue(props, key) !== null);
-			if (!hasAny) return h("div", { className: "ad-empty" }, "尚无外设信息：插拔设备后点击「更新设备信息」。");
+			if (!hasAny) return h("div", { className: "ad-empty" }, "尚无外设信息：插拔设备后点击对应页的更新按钮。");
 			return h(
 				"div",
 				{ className: "ad-device-list" },
@@ -1551,6 +1590,7 @@ window.__ModuleLoader__.load({
 				["overview", "概览"],
 				["camera", "摄像头"],
 				["audio", "音频接口"],
+				["serial-records", "串口记录"],
 				["assets", "开发板记录"],
 				["debug", "调试"],
 				["raw", "原始输出"]
@@ -1763,27 +1803,27 @@ window.__ModuleLoader__.load({
 			const targets = props.targets ?? [];
 			const liveness = props.liveness?.byTarget ?? {};
 			const checking = props.liveness?.kind === "checking";
-			const matchedTarget = (board) =>
-				targets.find(
-					(target) =>
-						target.id === board.configuredId ||
-						target.discoveredId === board.id ||
-						boardMacs(board).includes(target.mac)
-				);
 			const boardRows = boards.map((board) => {
-				const target = matchedTarget(board);
+				const target = liveTargetForBoard(board, targets);
 				const recent = isRecent(board.lastSeen);
 				const liveState = liveness[target?.id ?? board.id];
 				const online = liveState === true;
 				const offline = liveState === false;
+				const serialOnline = serialLive(board);
 				const status = checking
 					? online
 						? "上次检测 SSH 可达（正在重新检查）"
-						: offline
-							? "上次检测 SSH 不可达（正在重新检查）"
-							: "正在检查 SSH 连通性"
+						: serialOnline
+							? "串口已登录（正在检查 SSH）"
+							: offline
+								? "上次检测 SSH 不可达（正在重新检查）"
+								: "正在检查 SSH 连通性"
 					: online
 					? "本次检测 SSH 可达"
+					: serialOnline
+						? offline
+							? "串口已登录，SSH 不可达"
+							: "串口已登录"
 					: offline
 						? "本次检测 SSH 不可达"
 						: recent
@@ -1802,17 +1842,14 @@ window.__ModuleLoader__.load({
 					seenAt: board.lastSeen ?? "",
 					changed: board.changesCount > 0,
 					online,
+					serialOnline,
 					offline
 				};
 			});
 			const representedTargets = new Set(boardRows.map((row) => row.targetId));
 			const targetRows = targets
 				.filter((target) => !representedTargets.has(target.id))
-				.filter((target) => !boards.some((board) => {
-					const aliases = boardMacs(board);
-					const targetAliases = [target.mac, ...(Array.isArray(target.macs) ? target.macs : [])].filter(Boolean);
-					return targetAliases.some((mac) => aliases.includes(mac)) || target.id === board.configuredId || target.id === board.discoveredId;
-				}))
+				.filter((target) => !boards.some((board) => liveTargetForBoard(board, [target])))
 				.map((target) => {
 					const liveState = liveness[target.id];
 					const online = liveState === true;
@@ -1827,28 +1864,31 @@ window.__ModuleLoader__.load({
 						seenAt: target.lastSeen ?? "",
 						changed: false,
 						online,
+						serialOnline: false,
 						offline
 					};
 				});
 			const rows = [...boardRows, ...targetRows];
 			if (rows.length === 0) return h("div", { className: "ad-empty-rail" }, "没有已登记开发板。");
 			const sorted = [...rows].sort((left, right) => (Date.parse(right.seenAt) || 0) - (Date.parse(left.seenAt) || 0));
-			// Keep rail membership independent of a liveness result. Otherwise a
-			// single online check adds/removes cards and pushes mobile content down.
-			const selectedRow = sorted.find((row) => row.targetId === props.selected);
-			const primaryRows = [...(selectedRow ? [selectedRow] : []), ...sorted.filter((row) => row !== selectedRow)].slice(0, 6);
+			// SSH-online, recently serial-logged, and the current selection stay
+			// visible. A serial-found board must not disappear just because this
+			// PC cannot open SSH to its Wi-Fi address.
+			const primary = sorted.filter((row) => row.online || row.serialOnline || row.targetId === props.selected);
+			const primaryRows = primary.length > 0 ? primary : sorted.slice(0, 1);
 			const historyRows = sorted.filter((row) => !primaryRows.includes(row));
 			const needle = String(props.query ?? "").trim().toLowerCase();
 			const matches = (row) => [row.title, row.mac, row.aliases, row.detail].filter(Boolean).join(" ").toLowerCase().includes(needle);
 			const visible = needle === ""
 				? showHistory ? sorted : primaryRows
 				: sorted.filter(matches);
-			if (visible.length === 0) return h("div", { className: "ad-empty-rail" }, "没有匹配的开发板。");
 			return h(
 				"div",
 				{ className: "ad-board-list" },
-				h("div", { className: "ad-rail-heading" }, needle === "" ? "常用与当前选择" : "搜索结果"),
-				visible.map((row) =>
+				h("div", { className: "ad-rail-heading" }, needle === "" ? "在线与当前选择" : "搜索结果"),
+				visible.length === 0
+					? h("div", { className: "ad-empty-rail" }, "没有匹配的开发板。")
+					: visible.map((row) =>
 					h(
 						"button",
 						{
@@ -1863,8 +1903,9 @@ window.__ModuleLoader__.load({
 							{ className: "ad-board-title" },
 							// Liveness wins over historical change state. A board that was
 							// just found must be green even when older probes recorded changes.
-							h("i", { className: `ad-board-dot${row.online ? " ad-online" : row.offline ? " ad-offline" : row.changed ? " ad-changed" : ""}` }),
+							h("i", { className: `ad-board-dot${row.online ? " ad-online" : row.serialOnline ? " ad-serial" : row.offline ? " ad-offline" : row.changed ? " ad-changed" : ""}` }),
 							h("span", { className: "ad-board-name" }, row.title),
+							row.serialOnline && !row.online ? h("span", { className: "ad-board-flag" }, "串口") : null,
 							row.changed ? h("span", { className: "ad-board-flag" }, "已变更") : null
 						),
 						h("span", { className: "ad-board-meta" }, row.detail),
@@ -1872,17 +1913,18 @@ window.__ModuleLoader__.load({
 						h("span", { className: "ad-board-mac" }, row.mac ? `MAC ${row.mac}` : "MAC 未采集")
 					)
 				),
-				needle === "" && historyRows.length > 0
-					? h(
-							"button",
-							{
-								className: "ad-button ad-history-toggle",
-								type: "button",
-								onClick: () => setShowHistory((value) => !value)
-							},
-							showHistory ? "收起历史记录" : `显示历史记录（${historyRows.length}）`
-						)
-					: null
+				h(
+					"button",
+					{
+						className: "ad-button ad-history-toggle",
+						type: "button",
+						disabled: historyRows.length === 0 || needle !== "",
+						onClick: () => setShowHistory((value) => !value)
+					},
+					historyRows.length === 0
+						? "没有历史记录"
+						: showHistory ? "收起历史记录" : `显示历史记录（${historyRows.length}）`
+				)
 			);
 		}
 
@@ -1947,6 +1989,115 @@ window.__ModuleLoader__.load({
 			);
 		}
 
+		function serialSessionId(session, index = 0) {
+			return String(session?.id ?? session?.sessionId ?? session?.recordId ?? `session-${index}`);
+		}
+
+		function serialSessionTime(session) {
+			return session?.startedAt ?? session?.createdAt ?? session?.timestamp ?? session?.at ?? null;
+		}
+
+		function serialDuration(session) {
+			const value = Number(session?.durationMs ?? session?.elapsedMs);
+			return Number.isFinite(value) && value >= 0 ? `${value} ms` : "未记录";
+		}
+
+		function serialPhaseLabel(stage = {}) {
+			const phase = String(stage.phase ?? stage.name ?? stage.stage ?? "");
+			const labels = {
+				start: "开始会话",
+				validation: "校验配置",
+				enumerate: "枚举串口",
+				"port-attempt": "选择端口",
+				"port-open": "打开端口",
+				prompt: "等待登录提示",
+				authenticate: "登录认证",
+				identity: "确认用户身份",
+				command: "执行只读命令",
+				"network-facts": "读取网络信息",
+				"ssh-verify": "验证 SSH",
+				finish: "结束会话"
+			};
+			return labels[phase] ?? (phase || "未命名阶段");
+		}
+
+		function serialPhaseDuration(timeline, index, detail) {
+			const explicit = Number(timeline[index]?.durationMs ?? timeline[index]?.elapsedMs);
+			if (Number.isFinite(explicit) && explicit >= 0) return `${explicit} ms`;
+			const start = Date.parse(timeline[index]?.at ?? "");
+			const end = Date.parse(timeline[index + 1]?.at ?? detail?.endedAt ?? "");
+			return Number.isFinite(start) && Number.isFinite(end) && end >= start ? `${end - start} ms` : "耗时未记录";
+		}
+
+		function SerialSessionsPage(props) {
+			const state = props.state ?? { phase: "idle", sessions: [] };
+			const sessions = state.sessions ?? [];
+			const detail = state.detail ?? null;
+			const timeline = Array.isArray(detail?.timeline) ? detail.timeline : Array.isArray(detail?.phases) ? detail.phases : [];
+			const transcript = String(detail?.transcript ?? detail?.transcriptExcerpt ?? detail?.redactedTranscript ?? "");
+			return h(
+				"div",
+				{ className: "ad-section" },
+				h(
+					"div",
+					{ className: "ad-asset-head" },
+					h("h3", null, "串口会话记录"),
+					h(
+						"div",
+						{ className: "ad-actions" },
+						h("button", { className: "ad-button", type: "button", disabled: state.phase === "loading" || state.phase === "clearing", onClick: props.onRefresh }, state.phase === "loading" ? "刷新中…" : "刷新记录"),
+						h("button", { className: "ad-button", type: "button", disabled: sessions.length === 0 || state.phase === "clearing", onClick: props.onClear }, state.phase === "clearing" ? "清理中…" : "清理记录")
+					)
+				),
+				state.message ? h("div", { className: state.phase === "failed" ? "ad-error" : "ad-inline-status", role: state.phase === "failed" ? "alert" : "status", "aria-live": state.phase === "failed" ? "assertive" : "polite" }, state.message) : null,
+				h(
+					"div",
+					{ className: "ad-serial-layout" },
+					h(
+						"div",
+						{ className: "ad-serial-list", "aria-label": "串口会话列表" },
+						sessions.length === 0
+							? h("div", { className: "ad-empty" }, state.phase === "loading" ? "正在读取串口记录…" : "暂无串口记录。")
+							: sessions.map((session, index) => {
+								const id = serialSessionId(session, index);
+								return h(
+									"button",
+									{ key: id, className: `ad-serial-row${state.selectedId === id ? " ad-selected" : ""}`, type: "button", onClick: () => props.onSelect(id), "aria-pressed": state.selectedId === id },
+									h("strong", null, stamp(serialSessionTime(session)) || "时间未记录"),
+									h("span", { className: "ad-serial-meta" }, `${session.port ?? session.serialPort ?? "端口未记录"} · ${session.conclusion ?? session.verdict ?? session.status ?? "结论未记录"} · ${serialDuration(session)}`)
+								);
+							})
+					),
+					h(
+						"div",
+						{ className: "ad-serial-detail" },
+						detail === null
+							? h("div", { className: "ad-empty" }, sessions.length > 0 ? "请选择一条串口记录。" : "暂无详情。")
+							: h(
+								"div",
+								null,
+								h("h4", null, `会话 ${serialSessionId(detail)}`),
+								h("div", { className: "ad-note" }, `${stamp(serialSessionTime(detail)) || "时间未记录"} · ${detail.port ?? detail.serialPort ?? "端口未记录"} · ${serialDuration(detail)}`),
+								h("div", { className: "ad-note" }, `结论：${detail.conclusion ?? detail.verdict ?? detail.status ?? "未记录"}`),
+								h("div", { className: "ad-note" }, `设备：${detail.hostname ?? "hostname 未记录"} · ${detail.ipAddress ?? detail.ip ?? "IP 未记录"} · ${detail.macAddress ?? detail.mac ?? "MAC 未记录"}`),
+								timeline.length > 0
+									? h("ol", { className: "ad-serial-timeline" }, timeline.map((stage, index) =>
+										h(
+											"li",
+											{ key: stage.id ?? `${stage.phase ?? stage.name ?? "stage"}-${index}` },
+											`${serialPhaseLabel(stage)} · ${stage.status ?? stage.result ?? "未记录"} · ${stamp(stage.at) || "时间未记录"} · ${serialPhaseDuration(timeline, index, detail)}`,
+											stage.detail ? h("div", { className: "ad-note" }, stage.detail) : null
+										)
+									))
+									: null,
+								h("h4", null, "脱敏 Transcript"),
+								h("pre", { className: "ad-pre ad-serial-transcript" }, transcript || "无 transcript。")
+							)
+					)
+				)
+			);
+		}
+
 		/**
 		 * The Ascend 310B debugging panel.
 		 *
@@ -1977,14 +2128,20 @@ window.__ModuleLoader__.load({
 			const [cameraRefresh, setCameraRefresh] = react.useState({ phase: "idle", elapsedSec: 0, message: "" });
 			const [audioRefresh, setAudioRefresh] = react.useState({ phase: "idle", elapsedSec: 0, message: "" });
 			const [systemRefresh, setSystemRefresh] = react.useState({ phase: "idle", elapsedSec: 0, message: "" });
+			const [serialSessions, setSerialSessions] = react.useState({ phase: "idle", sessions: [], selectedId: "", detail: null, message: "" });
 			const selectedRef = react.useRef("");
 			const viewGeneration = react.useRef(0);
 			const livenessGeneration = react.useRef(0);
 			const mountedRef = react.useRef(true);
+			const rootRef = react.useRef(null);
 			const tabRefs = react.useRef({});
 			const loadController = react.useRef(null);
 			const discoveryController = react.useRef(null);
 			const serialController = react.useRef(null);
+			const serialSessionsController = react.useRef(null);
+			const serialSessionsGeneration = react.useRef(0);
+			const bindingController = react.useRef(null);
+			const bindingGeneration = react.useRef(0);
 			const livenessController = react.useRef(null);
 			const peripheralController = react.useRef(null);
 			const peripheralGeneration = react.useRef(0);
@@ -2023,6 +2180,9 @@ window.__ModuleLoader__.load({
 					setPlaybackConfirmed(null);
 					setCameraRefresh({ phase: "idle", elapsedSec: 0, message: "" });
 					setAudioRefresh({ phase: "idle", elapsedSec: 0, message: "" });
+					bindingGeneration.current += 1;
+					bindingController.current?.abort();
+					bindingController.current = null;
 					setSystemRefresh({ phase: "idle", elapsedSec: 0, message: "" });
 				}
 				selectedRef.current = next;
@@ -2274,11 +2434,27 @@ window.__ModuleLoader__.load({
 			mountedRef.current = true;
 			void load(false);
 			void checkLiveness();
+			const pinRoot = () => {
+				const el = rootRef.current;
+				if (!el || typeof el.getBoundingClientRect !== "function") return;
+				const top = el.getBoundingClientRect().top;
+				const height = Math.max(420, Math.floor(window.innerHeight - top - 8));
+				el.style.height = `${height}px`;
+			};
+			pinRoot();
+			const resizeObserver = typeof ResizeObserver === "function" && rootRef.current
+				? new ResizeObserver(pinRoot)
+				: null;
+			resizeObserver?.observe(rootRef.current);
+			window.addEventListener("resize", pinRoot);
 			return () => {
+				resizeObserver?.disconnect();
+				window.removeEventListener("resize", pinRoot);
 				mountedRef.current = false;
 				viewGeneration.current += 1;
 				livenessGeneration.current += 1;
 				peripheralGeneration.current += 1;
+				bindingGeneration.current += 1;
 				playbackGeneration.current += 1;
 				cameraRefreshGeneration.current += 1;
 				audioRefreshGeneration.current += 1;
@@ -2286,6 +2462,8 @@ window.__ModuleLoader__.load({
 				abortAll();
 				livenessController.current?.abort();
 				peripheralController.current?.abort();
+				bindingController.current?.abort();
+				serialSessionsController.current?.abort();
 				playbackController.current?.abort();
 				cameraRefreshController.current?.abort();
 				audioRefreshController.current?.abort();
@@ -2356,9 +2534,11 @@ window.__ModuleLoader__.load({
 							? previous
 							: {
 								...previous,
+								...(category === "system" ? { staleError: null, switching: false } : {}),
 								payload: {
 									...previous.payload,
 									...(category === "system" ? {
+										target: payload.target ?? previous.payload.target,
 										probedAt: payload.probedAt,
 										source: payload.source,
 										board: payload.board,
@@ -2442,6 +2622,72 @@ window.__ModuleLoader__.load({
 			const [serial, setSerial] = react.useState({ kind: "idle" });
 			const [bindingConfig, setBindingConfig] = react.useState("");
 			const [binding, setBinding] = react.useState({ kind: "idle" });
+			const refreshSerialSessions = react.useCallback(async (selectedId = serialSessions.selectedId) => {
+				const generation = ++serialSessionsGeneration.current;
+				serialSessionsController.current?.abort();
+				const controller = new AbortController();
+				serialSessionsController.current = controller;
+				setSerialSessions((previous) => ({ ...previous, phase: "loading", message: "" }));
+				try {
+					const response = await fetch(SERIAL_SESSIONS_URL, { headers: { accept: "application/json" }, signal: controller.signal });
+					const body = await response.json();
+					if (!response.ok || body.ok === false) throw new Error(body.error ?? `HTTP ${response.status}`);
+					const sessions = Array.isArray(body.sessions) ? body.sessions : Array.isArray(body.records) ? body.records : Array.isArray(body.items) ? body.items : [];
+					if (!mountedRef.current || generation !== serialSessionsGeneration.current) return null;
+					const nextId = selectedId && sessions.some((item, index) => serialSessionId(item, index) === selectedId) ? selectedId : serialSessionId(sessions[0], 0);
+					setSerialSessions({ phase: "ready", sessions, selectedId: nextId || "", detail: null, message: "" });
+					if (nextId) {
+						const detailResponse = await fetch(`${SERIAL_SESSIONS_URL}?id=${encodeURIComponent(nextId)}`, { headers: { accept: "application/json" }, signal: controller.signal });
+						const detailBody = await detailResponse.json();
+						if (detailResponse.ok && detailBody.ok !== false && mountedRef.current && generation === serialSessionsGeneration.current) setSerialSessions((previous) => ({ ...previous, detail: detailBody.session ?? detailBody.record ?? detailBody }));
+					}
+					return sessions;
+				} catch (error) {
+					if (error?.name === "AbortError" || !mountedRef.current || generation !== serialSessionsGeneration.current) return null;
+					setSerialSessions((previous) => ({ ...previous, phase: "failed", message: String(error?.message ?? error) }));
+					return null;
+				} finally {
+					if (serialSessionsController.current === controller) serialSessionsController.current = null;
+				}
+			}, [serialSessions.selectedId]);
+			const selectSerialSession = react.useCallback(async (id) => {
+				const generation = ++serialSessionsGeneration.current;
+				serialSessionsController.current?.abort();
+				const controller = new AbortController();
+				serialSessionsController.current = controller;
+				setSerialSessions((previous) => ({ ...previous, selectedId: id, detail: null, phase: "loading", message: "" }));
+				try {
+					const response = await fetch(`${SERIAL_SESSIONS_URL}?id=${encodeURIComponent(id)}`, { headers: { accept: "application/json" }, signal: controller.signal });
+					const body = await response.json();
+					if (!response.ok || body.ok === false) throw new Error(body.error ?? `HTTP ${response.status}`);
+					if (mountedRef.current && generation === serialSessionsGeneration.current) setSerialSessions((previous) => ({ ...previous, phase: "ready", detail: body.session ?? body.record ?? body, message: "" }));
+				} catch (error) {
+					if (error?.name !== "AbortError" && mountedRef.current && generation === serialSessionsGeneration.current) setSerialSessions((previous) => ({ ...previous, phase: "failed", message: String(error?.message ?? error) }));
+				} finally {
+					if (serialSessionsController.current === controller) serialSessionsController.current = null;
+				}
+			}, []);
+			const clearSerialSessions = react.useCallback(async () => {
+				if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm("确认清理全部串口记录？此操作不可恢复。")) return;
+				const generation = ++serialSessionsGeneration.current;
+				serialSessionsController.current?.abort();
+				const controller = new AbortController();
+				serialSessionsController.current = controller;
+				setSerialSessions((previous) => ({ ...previous, phase: "clearing", message: "" }));
+				try {
+					const response = await fetch(SERIAL_SESSIONS_CLEAR_URL, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify({ confirm: true }), signal: controller.signal });
+					const body = await response.json();
+					if (!response.ok || body.ok === false) throw new Error(body.error ?? `HTTP ${response.status}`);
+					if (mountedRef.current && generation === serialSessionsGeneration.current) setSerialSessions({ phase: "ready", sessions: [], selectedId: "", detail: null, message: "串口记录已清理。" });
+				} catch (error) {
+					if (error?.name !== "AbortError" && mountedRef.current && generation === serialSessionsGeneration.current) setSerialSessions((previous) => ({ ...previous, phase: "failed", message: String(error?.message ?? error) }));
+				} finally {
+					if (serialSessionsController.current === controller) serialSessionsController.current = null;
+				}
+			}, []);
+			react.useEffect(() => {
+				if (tab === "serial-records") void refreshSerialSessions();
+			}, [tab, refreshSerialSessions]);
 			const runSerial = react.useCallback(async () => {
 				const generation = viewGeneration.current;
 				abortAll("load");
@@ -2459,8 +2705,10 @@ window.__ModuleLoader__.load({
 					if (!response.ok || payload.ok !== true) throw new Error(payload.error ?? `HTTP ${response.status}`);
 					if (!isCurrent(generation, controller)) return null;
 					setSerial({ kind: "done", payload });
+					void refreshSerialSessions();
 					void checkLiveness();
-					await load(true, selectedRef.current);
+					const foundId = payload.found?.[0]?.id;
+					await load(true, foundId || selectedRef.current);
 					return payload;
 				} catch (error) {
 					if (error?.name === "AbortError" || !isCurrent(generation, controller)) {
@@ -2482,23 +2730,33 @@ window.__ModuleLoader__.load({
 
 			const runBind = react.useCallback(async () => {
 				const discoveredTarget = selectedRef.current;
-				if (discoveredTarget === "" || bindingConfig === "") return null;
+				const configuredTarget = bindingConfig;
+				if (discoveredTarget === "" || configuredTarget === "") return null;
+				const generation = ++bindingGeneration.current;
+				bindingController.current?.abort();
+				const controller = new AbortController();
+				bindingController.current = controller;
 				setBinding({ kind: "running" });
 				try {
 					const response = await fetch(BIND_URL, {
 						method: "POST",
 						headers: { "content-type": "application/json", accept: "application/json" },
-						body: JSON.stringify({ configuredTarget: bindingConfig, discoveredTarget })
+						signal: controller.signal,
+						body: JSON.stringify({ configuredTarget, discoveredTarget })
 					});
 					const payload = await response.json();
 					if (!response.ok || payload.ok !== true) throw new Error(payload.error ?? `HTTP ${response.status}`);
+					if (!mountedRef.current || generation !== bindingGeneration.current || selectedRef.current !== discoveredTarget) return null;
 					setBinding({ kind: "done", payload });
 					void checkLiveness();
-					await load(true, bindingConfig);
+					await load(true, configuredTarget);
 					return payload;
 				} catch (error) {
+					if (error?.name === "AbortError" || generation !== bindingGeneration.current) return null;
 					setBinding({ kind: "failed", message: String(error?.message ?? error) });
 					return null;
+				} finally {
+					if (bindingController.current === controller) bindingController.current = null;
 				}
 			}, [bindingConfig, checkLiveness, load]);
 
@@ -2528,12 +2786,7 @@ window.__ModuleLoader__.load({
 									(() => {
 										const current = payload?.targets?.find((target) => target.id === selected);
 										if (!current) return "未选择开发板";
-										const currentBoard = (payload.boards ?? []).find(
-											(board) =>
-												boardMacs(board).includes(current.mac) ||
-												current.discoveredId === board.id ||
-												current.id === board.configuredId
-										);
+										const currentBoard = boardForTarget(current, payload.boards);
 										const liveBoard = payload.board
 											? {
 													...current,
@@ -2571,71 +2824,67 @@ window.__ModuleLoader__.load({
 										text
 									);
 								})()
-							),
-							h(
-								"div",
-								{ className: "ad-current-actions" },
-								h(
-									"button",
-									{
-										className: "ad-button ad-primary",
-										type: "button",
-										disabled: liveness.kind === "checking",
-										title: "只检查开发板 SSH 连接，不读取任何设备信息",
-										onClick: () => checkLiveness()
-									},
-									liveness.kind === "checking" ? "检查中…" : "检查在线"
-								)
 							)
 						)
 					),
 					h(
 						"div",
-						{ className: "ad-discovery-group" },
-						h("span", { className: "ad-action-label" }, "发现开发板"),
+						{ className: "ad-head-actions-group" },
+						h("span", { className: "ad-action-label" }, "操作"),
 						h(
 							"div",
-							{ className: "ad-discovery-actions" },
-							serial.kind === "running"
-								? h("button", { className: "ad-button", type: "button", onClick: cancelSerial }, "取消串口发现")
-								: h(
-										"button",
-										{
-											className: "ad-button",
-											type: "button",
-											disabled: busy,
-											title: "通过串口登录，读取板卡网络/MAC，并自动尝试 SSH 探测后写入设备列表",
-											onClick: runSerial
-										},
-										"串口发现"
-									),
-							discovery.kind === "running"
-								? h("button", { className: "ad-button", type: "button", onClick: cancelDiscovery }, "取消扫描")
-								: h(
-										"button",
-										{
-											className: "ad-button",
-											type: "button",
-											disabled: busy,
-											title: "默认扫描当前活动物理网卡；配置 discovery.cidrs 时才固定覆盖范围，按 MAC 更新开发板记录和 target 列表",
-											onClick: runDiscovery
-										},
-										"局域网扫描"
-									)
+							{ className: "ad-head-actions" },
+							h(
+								"button",
+								{
+									className: "ad-button ad-primary",
+									type: "button",
+									disabled: liveness.kind === "checking",
+									title: "只检查开发板 SSH 连接，不读取任何设备信息",
+									onClick: () => checkLiveness()
+								},
+								liveness.kind === "checking" ? "检查中…" : "检查在线"
+							),
+							h(
+								"button",
+								{
+									className: "ad-button",
+									type: "button",
+									disabled: busy && serial.kind !== "running",
+									title: serial.kind === "running"
+										? "取消当前串口发现"
+										: "通过串口登录，读取板卡网络/MAC，并自动尝试 SSH 探测后写入设备列表",
+									onClick: serial.kind === "running" ? cancelSerial : runSerial
+								},
+								serial.kind === "running" ? "取消串口发现" : "串口发现"
+							),
+							h(
+								"button",
+								{
+									className: "ad-button",
+									type: "button",
+									disabled: busy && discovery.kind !== "running",
+									title: discovery.kind === "running"
+										? "取消当前局域网扫描"
+										: "默认扫描当前活动物理网卡；配置 discovery.cidrs 时才固定覆盖范围，按 MAC 更新开发板记录和 target 列表",
+									onClick: discovery.kind === "running" ? cancelDiscovery : runDiscovery
+								},
+								discovery.kind === "running" ? "取消扫描" : "局域网扫描"
+							)
 						)
 					)
 				);
 
 			if (state.kind === "idle") {
-				return h("div", { className: "ad-root" }, head(state.payload, false), h("div", { className: "ad-note", role: "status", "aria-live": "polite" }, state.message ?? "等待操作。"));
+				return h("div", { className: "ad-root", ref: rootRef }, head(state.payload, false), h("div", { className: "ad-note", role: "status", "aria-live": "polite" }, state.message ?? "等待操作。"));
 			}
 			if (state.kind === "loading" && !state.payload) {
-				return h("div", { className: "ad-root" }, head(state.payload, true), h("div", { className: "ad-empty", role: "status", "aria-live": "polite" }, "正在读取插件配置…"));
+				return h("div", { className: "ad-root", ref: rootRef }, head(state.payload, true), h("div", { className: "ad-empty", role: "status", "aria-live": "polite" }, "正在读取插件配置…"));
 			}
 			if (state.kind === "failed" && !state.payload) {
 				return h(
 					"div",
-					{ className: "ad-root" },
+					{ className: "ad-root", ref: rootRef },
 					head(state.payload, false),
 					h("div", { className: "ad-error", role: "alert", "aria-live": "assertive" }, `读取失败：${state.message}`),
 					state.payload?.targets ? h("div", { className: "ad-section" }, h("h3", null, "开发板"), h(Targets, { targets: state.payload.targets })) : null
@@ -2726,9 +2975,9 @@ window.__ModuleLoader__.load({
 				h(
 					"div",
 					null,
-					!hasProbe
-						? h("div", { className: "ad-system-hint" }, "尚未获取系统信息。点击右上方“更新系统信息”只读取硬件、OS、NPU、CANN、驱动和 ATC。")
-						: null,
+					h("div", { className: "ad-system-hint" }, !hasProbe
+						? "尚未获取系统信息。点击右上方“更新系统信息”只读取硬件、OS、NPU、CANN、驱动和 ATC。"
+						: ""),
 					h(
 						"div",
 						{ className: "ad-overview-grid" },
@@ -2760,13 +3009,7 @@ window.__ModuleLoader__.load({
 
 			const assets = (() => {
 				const selectedTarget = (payload.targets ?? []).find((target) => target.id === selected);
-				const selectedBoard = (payload.boards ?? []).find(
-					(board) =>
-						selectedTarget !== undefined &&
-						(board.id === selectedTarget.discoveredId ||
-							board.configuredId === selectedTarget.id ||
-							boardMacs(board).includes(selectedTarget.mac))
-				);
+				const selectedBoard = boardForTarget(selectedTarget, payload.boards);
 				return h(
 					"div",
 					{ className: "ad-section" },
@@ -2973,12 +3216,19 @@ window.__ModuleLoader__.load({
 				)
 			);
 
+			const serialRecordsPage = h(SerialSessionsPage, {
+				state: serialSessions,
+				onRefresh: () => refreshSerialSessions(),
+				onSelect: (id) => selectSerialSession(id),
+				onClear: () => clearSerialSessions()
+			});
 			const globalStatusItems = [];
 			if (state.staleError) globalStatusItems.push({ error: true, text: `当前显示的是最近一次成功快照：${state.staleError}` });
 			if (liveness.kind === "failed") globalStatusItems.push({ error: true, text: `在线检查失败：${liveness.message}` });
 			if (serial.kind === "failed") globalStatusItems.push({ error: true, text: `串口探测失败：${serial.message}` });
 			if (serial.kind === "cancelled") globalStatusItems.push({ error: false, text: "串口发现已取消。" });
 			if (serial.kind === "done") globalStatusItems.push({ error: false, text: `串口：${serial.payload.port} · ${serial.payload.hostname ?? "主机名未采集"} · ${serial.payload.ipAddress ?? "IP 未采集"} · ${serial.payload.macAddress ?? "MAC 未采集"} · 已写入 ${(serial.payload.found ?? []).length} 块` });
+			if (serial.kind === "done" && serial.payload.serialLogWarning) globalStatusItems.push({ error: true, text: serial.payload.serialLogWarning });
 			if (discovery.kind === "failed") globalStatusItems.push({ error: true, text: `发现失败：${discovery.message}` });
 			if (discovery.kind === "cancelled") globalStatusItems.push({ error: false, text: "局域网扫描已取消。" });
 			if (discovery.kind === "done") globalStatusItems.push({ error: false, text: `发现完成：${discovery.payload.found?.length ?? 0} 块开发板；扫描 ${(discovery.payload.cidrs ?? []).join("、") || "未记录网段"}；SSH 开放 ${discovery.payload.open ?? 0} 个；记录文件 ${discovery.payload.inventoryPath ?? ""}` });
@@ -2987,18 +3237,29 @@ window.__ModuleLoader__.load({
 				error: globalStatusItems.some((item) => item.error),
 				text: globalStatusItems.map((item) => item.text).join(" · ")
 			};
+			const pages = [
+				["overview", overview],
+				["camera", cameraPage],
+				["audio", audioPage],
+				["serial-records", serialRecordsPage],
+				["assets", assets],
+				["debug", debug],
+				["raw", raw]
+			];
 			return h(
 				"div",
-				{ className: "ad-root" },
+				{ className: "ad-root", ref: rootRef },
 				head(payload, state.kind === "loading"),
-				globalStatus.text === ""
-					? h("div", { className: "ad-global-status", role: "status", "aria-live": "polite" })
-					: h(
-							"details",
-							{ className: globalStatus.error ? "ad-global-status ad-error" : "ad-global-status", role: "alert" },
-							h("summary", null, globalStatus.text),
-							h("div", { className: "ad-global-detail" }, globalStatusItems.map((item, index) => h("div", { key: index }, item.text)))
-						),
+				h(
+					"div",
+					{
+						className: globalStatus.error ? "ad-global-status ad-error" : "ad-global-status",
+						role: globalStatus.error ? "alert" : "status",
+						"aria-live": globalStatus.error ? "assertive" : "polite",
+						title: globalStatus.text
+					},
+					globalStatus.text
+				),
 				h(
 					"div",
 					{ className: "ad-workbench" },
@@ -3009,10 +3270,11 @@ window.__ModuleLoader__.load({
 							"div",
 							{ className: "ad-rail-head" },
 							h("h3", null, "开发板"),
-							h("span", { className: "ad-note" }, `${(payload.boards ?? []).length || (payload.targets ?? []).length} 台`)
+							h("span", { className: "ad-note" }, `${boardRailCount(payload.boards, payload.targets)} 台`)
 						),
 						h("input", {
 							className: "ad-select",
+							"aria-label": "搜索开发板",
 							style: { width: "100%", boxSizing: "border-box", marginBottom: "9px" },
 							value: boardQuery,
 							placeholder: "搜索主机名 / MAC / IP",
@@ -3030,17 +3292,24 @@ window.__ModuleLoader__.load({
 					h(
 						"main",
 						{ className: "ad-main" },
-						h(TabBar, { active: tab, onChange: setTab }),
+						h(TabBar, { active: tab, onChange: setTab, tabRefs }),
 						h(
 							"div",
-							{
-								className: "ad-toolbar-note",
-								role: "tabpanel",
-								id: `ad-panel-${tab}`,
-								"aria-labelledby": `ad-tab-${tab}`,
-								tabIndex: 0
-							},
-							tab === "overview" ? overview : tab === "camera" ? cameraPage : tab === "audio" ? audioPage : tab === "assets" ? assets : tab === "debug" ? debug : raw
+							{ className: "ad-panels" },
+							pages.map(([id, node]) =>
+								h(
+									"div",
+									{
+										key: id,
+										className: `ad-panel${tab === id ? " ad-active" : ""}`,
+										"aria-hidden": tab !== id,
+										role: "tabpanel",
+										id: `ad-panel-${id}`,
+										"aria-labelledby": `ad-tab-${id}`
+									},
+									node
+								)
+							)
 						)
 					)
 				)

@@ -86,6 +86,20 @@ node tools/install-dsh-plugins.mjs --profile desktop
 
 串口凭据只放在 profile 的本机配置中，不写进插件源码、skill、README 示例或 Git。`port: auto` 会枚举当前存在的 USB 串口；只有 profile 显式设置 `allowAutoLogin: true` 时才允许向候选串口逐个尝试登录。高安全环境应显式填写 `port: COM<N>` 或 `/dev/ttyUSB<N>`，避免密码被发送到无关适配器。`ascend_serial_probe` 会自动登录并执行只读网络探测；`ascend_serial_exec` 用于网络不可用时的单条只读诊断。串口工具只使用 `HwHiAiUser`，不提供 root 串口探测。
 
+#### 串口会话记录
+
+串口发现的成功、失败和取消都会形成一条宿主机本地记录，默认目录为：
+
+```text
+$DSH_HOME/ascend310b-debug/serial-sessions/
+```
+
+每条记录包含会话 ID、开始/结束时间、COM/tty 端口、波特率、用户、结论、总耗时、hostname/IP/MAC、分阶段时间线和脱敏 transcript。密码、token、key 等凭据会被替换，ANSI 与不可见控制字符会被清理，单条 transcript 最多保留 64 KiB。hostname、IP、MAC 和 COM 口仍属于机器环境信息，因此记录只保存在本机，不提交 Git，也不复制到教材截图或公开问题单。
+
+日志按原子写入并保留可恢复备份；默认最多 50 条、30 天、合计 20 MiB，超限后从最旧记录开始清理。面板的“串口记录”页可查看列表、阶段时间线和脱敏 transcript；“清理记录”需要二次确认，并且只删除宿主机诊断历史，不修改开发板。
+
+排错时先看阶段和结论：COM 口占用通常停在打开端口；登录超时通常停在等待 `login:`、`password:` 或 shell prompt；串口已经读到 IP/MAC 而 SSH 仍失败时，应继续检查板卡地址、网段、22 端口和公钥认证，不能把“串口登录成功”写成“SSH 或 NPU 已通过”。
+
 只需要本机解析探测记录时，可以省略 `targets`；需要 SSH 探测时再填板卡配置。动态 IP 环境应给每块板唯一的 mDNS/DNS 主机名，或使用 DHCP 保留地址；`ascend_discover` 会保存一块逻辑板卡及其全部物理网口 MAC 别名，并记录系统变化。主机名和 IP 只用于当前网络定位。
 
 ### 统一案例运行环境
@@ -146,18 +160,21 @@ ascend_probe target=ascend-c0742bfddd7a
 
 对 10 块以上开发板，建议每块板第一次通过串口设置唯一主机名，之后用当前活动网段做周期扫描；如果实验室有多个固定网段，再在 `discovery.cidrs` 中显式列出。网络找不到时，先用 `ascend_serial_probe` 从串口读取当前 IP，再回到 SSH。串口工具只执行只读网络/诊断命令，不做网络配置修改。
 
-4) 技能文件不会被插件自动发现，需要单独放置。插件当前包含 14 个 310B skill，完整清单见 [`tools/README.md`](../README.md)。命名规范固定为：目录名、frontmatter `name` 和文档引用必须完全一致，全部使用 `ascend310b-` 前缀；专项调试 skill 使用 `ascend310b-<domain>-debug`，其中设备专项固定为 `ascend310b-camera-debug`、`ascend310b-microphone-debug`、`ascend310b-speaker-debug`。
+### Skill 安装
+
+插件 tarball 会携带当前版本的 14 个 310B skill，完整清单见 [`tools/README.md`](../README.md)。DSH 不会从已安装插件自动复制 skill。推荐在仓库根目录运行 `npm run skills:sync`，用 `npm run skills:check` 验证 `.dsh/skills/` 与两个插件源文件一致；如果需要用户级安装，可将本插件 `skills/` 目录复制到 `$DSH_HOME/skills/`：
+
+```powershell
+$plugin = "<教材仓库根目录>\tools\dsh-plugin-ascend310b-debug"
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.dsh\skills" | Out-Null
+Copy-Item -Recurse -Force "$plugin\skills\*" "$env:USERPROFILE\.dsh\skills"
+```
+
+目录名、frontmatter `name` 和文档引用必须完全一致，全部使用 `ascend310b-` 前缀；专项调试 skill 使用 `ascend310b-<domain>-debug`，其中设备专项固定为 `ascend310b-camera-debug`、`ascend310b-microphone-debug`、`ascend310b-speaker-debug`。
 
 案例测试使用 `ascend310b-case-testing`：程序从 GitHub 固定 commit 在板端检出，模型从 Hugging Face 固定 revision（默认 `hf-mirror.com`）下载；不能把作者电脑上的模型、ONNX/OM、数据集或未提交源码通过 `scp`/`rsync` 复制后当作发布证据。离线包只能标为 `offline-bundle`，并附带来源、revision、字节数和 SHA-256。
 
-```powershell
-New-Item -ItemType Directory -Force "$env:USERPROFILE\.dsh\skills" | Out-Null
-Copy-Item -Path "$plugin\skills\*" `
-  -Destination "$env:USERPROFILE\.dsh\skills" `
-  -Recurse -Force
-```
-
-5) 重启桌面应用（host 半边的工具需要重启后才会注册；浏览器面板刷新即可）。
+项目级 skill 更新后需要新建 DSH 会话；host 半边的工具需要重启桌面应用，浏览器面板刷新即可。
 
 SSH 采用**公钥认证**（`BatchMode=yes`），不会读取或保存密码。首次连接使用 `StrictHostKeyChecking=accept-new`；更严格的环境应先手工核对并写入目标板指纹。板端首次配置见教材附录 1 的 SSH 免密章节。
 
@@ -204,9 +221,9 @@ cp -R "$plugin"/. "$dest"/
 - “更新摄像头信息”：只更新 V4L2/USB 设备、格式、分辨率和 FPS。
 - “更新音频接口信息”：只更新 ALSA、PulseAudio/PipeWire 和蓝牙事实。
 
-摄像头、音频和 USB 卡片分别显示所属类别的更新时间，系统刷新不会把外设旧数据伪装成刚更新。刷新采用固定高度状态槽，在线检查中的旧结果会明确标为“上次检测”，不会加删板卡行或推挤主工作区。
+摄像头、音频和 USB 卡片分别显示所属类别的更新时间，系统刷新不会把外设旧数据伪装成刚更新。刷新采用固定高度状态槽，在线检查中的旧结果会明确标为“上次检测”。面板外壳钉在视口剩余高度里：顶栏和状态槽不随操作增高，概述/摄像头/音频等页签叠在同一矩形中只切换可见性，离线设备折叠只在左侧列表内部滚动，不会把右侧工作区往下推。
 
-左侧点击任一开发板只切换该板的历史报告，不会因为历史板离线而启动阻塞式 SSH 探测。绿色只表示**本次 SSH 可达**，红色表示本次不可达，灰色表示尚未检测。历史变更显示为独立的“已变更”徽标，不再覆盖在线颜色。点“串口发现”会通过 profile 的串口登录读取当前板卡主机名、IPv4、接口、MAC 和默认路由，并自动尝试 SSH 探测后写入设备列表；点“局域网扫描”默认只扫描当前默认路由所在物理网段，profile 的 `discovery.cidrs` 非空时才作为固定覆盖，并在结果中显示实际 CIDR、SSH 开放数和记录文件路径。
+左侧点击任一开发板只切换该板的历史报告，不会因为历史板离线而启动阻塞式 SSH 探测。绿色只表示**本次 SSH 可达**，红色表示本次不可达，灰色表示尚未检测；本次明确离线的非当前设备会默认折叠到“显示历史记录”中。历史变更显示为独立的“已变更”徽标，不再覆盖在线颜色。点“串口发现”会通过 profile 的串口登录读取当前板卡主机名、IPv4、接口、MAC 和默认路由，并自动尝试 SSH 探测后写入设备列表；点“局域网扫描”默认只扫描当前默认路由所在物理网段，profile 的 `discovery.cidrs` 非空时才作为固定覆盖，并在结果中显示实际 CIDR、SSH 开放数和记录文件路径。
 
 ### HTTP 路由
 

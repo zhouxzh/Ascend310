@@ -377,6 +377,9 @@ export function validateReadOnlyCommand(command) {
 function validateReadPaths(base, args) {
 	const readers = new Set(['cat', 'head', 'tail', 'grep', 'wc', 'stat', 'file', 'sha256sum', 'md5sum', 'readlink', 'ls']);
 	if (!readers.has(base)) return null;
+	if (base === 'grep' && args.some((arg) => arg === '-f' || arg === '--file' || arg.startsWith('--file='))) {
+		return { ok: false, reason: 'grep 不允许从外部 pattern 文件读取规则；请使用 -e 或直接 pattern。' };
+	}
 	let paths = args.filter((arg) => !arg.startsWith('-') && !/^\d+$/u.test(arg));
 	if (base === 'grep' && paths.length > 1) paths = paths.slice(1);
 	if (base === 'ls' && paths.length === 0) return { ok: true, reason: '允许：ls 当前目录。' };
@@ -413,7 +416,13 @@ export function validateTaskCommand(command, { allowPrivileged = false, allowDes
 	if (/\bnpu-smi\s+(?:set|reset|upgrade)\b/i.test(text)) {
 		return { ok: false, reason: '任务运行器不允许修改 NPU 健康、复位或升级固件；这些操作只能由用户手工执行。' };
 	}
-	if (/(?:^|[;&|]\s*)(?:(?:sudo\s+(?:-[^\s]+\s+)*(?:--\s+)?)?)(?:\/usr\/sbin\/|\/sbin\/)?(?:reboot|shutdown|poweroff|halt|kexec)\b/i.test(text)) {
+	const powerCommand = '(?:\\/usr\\/sbin\\/|\\/sbin\\/)?(?:reboot|shutdown|poweroff|halt|kexec)';
+	const sudoPrefix = '(?:sudo\\s+(?:-[^\\s]+\\s+)*(?:--\\s+)?)?';
+	if (
+		new RegExp(`(?:^|[;&|]\\s*)${sudoPrefix}${powerCommand}\\b`, 'i').test(text) ||
+		new RegExp(`\\b${sudoPrefix}(?:env(?:\\s+(?:-[^\\s]+|[A-Za-z_][A-Za-z0-9_]*=[^\\s]+))*|command|nohup)\\s+${powerCommand}\\b`, 'i').test(text) ||
+		/\b(?:sudo\s+)?(?:ba|da|z)?sh\s+-c\s+[^;&|]*(?:reboot|shutdown|poweroff|halt|kexec)\b/i.test(text)
+	) {
 		return { ok: false, reason: '任务运行器不允许重启、关闭或 kexec 开发板。' };
 	}
 	if (/\bbusybox\s+(?:reboot|shutdown|poweroff|halt)\b/i.test(text)) {

@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-ascend310b-debug",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "private": true,
   "description": "昇腾310B调试：面向昇腾 310B1/310B4 的程序调试与教程执行助手，提供板卡/驱动/CANN 版本探测、私有网段发现与 MAC 资产表、分层调试计划、摄像头/麦克风/喇叭实测、samples 索引、只读诊断、显式任务执行，以及华为云/HF mirror/GitHub proxy 下载；其他芯片明确标记为不适用",
   "type": "module",
@@ -20,7 +20,24 @@
     "docs",
     "scripts",
     "skills",
-    "test",
+    "test/capture.mjs",
+    "test/client-mount.mjs",
+    "test/client-render.mjs",
+    "test/compat.mjs",
+    "test/discovery.mjs",
+    "test/fixtures.mjs",
+    "test/install.mjs",
+    "test/parse.mjs",
+    "test/peripheral.mjs",
+    "test/planner.mjs",
+    "test/portability.mjs",
+    "test/scope.mjs",
+    "test/serial-log.mjs",
+    "test/serial.mjs",
+    "test/shell.mjs",
+    "test/skills.mjs",
+    "test/smoke.mjs",
+    "test/targets.mjs",
     "cordis.patch.yml",
     "README.md"
   ],
@@ -37,7 +54,7 @@
   },
   "scripts": {
     "smoke": "node test/smoke.mjs",
-    "test": "node test/parse.mjs && node test/compat.mjs && node test/scope.mjs && node test/planner.mjs && node test/shell.mjs && node test/install.mjs && node test/targets.mjs && node test/discovery.mjs && node test/serial.mjs && node test/client-mount.mjs && node test/client-render.mjs && node test/portability.mjs && node test/skills.mjs && node test/capture.mjs && node test/peripheral.mjs && node test/smoke.mjs"
+    "test": "node test/parse.mjs && node test/compat.mjs && node test/scope.mjs && node test/planner.mjs && node test/shell.mjs && node test/install.mjs && node test/targets.mjs && node test/discovery.mjs && node test/serial-log.mjs && node test/serial.mjs && node test/client-mount.mjs && node test/client-render.mjs && node test/portability.mjs && node test/skills.mjs && node test/capture.mjs && node test/peripheral.mjs && node test/smoke.mjs"
   },
   "engines": {
     "node": ">=18"

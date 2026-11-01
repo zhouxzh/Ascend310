@@ -285,7 +285,36 @@ apt-get install -y --no-install-recommends <validated-packages>
 3. 操作员确认是否听到录音。若回放无声，再单独检查扬声器、静音、音量和输出路由。
 4. 扬声器测试也可以单独执行，用于先确认输出链路；它不是麦克风录音的前置条件。
 
-## 7. 蓝牙音频
+## 7. 串口会话记录与排错
+
+`ascend_serial_probe` 的成功、失败和取消都会写入宿主机本地会话记录。默认目录是：
+
+```text
+$DSH_HOME/ascend310b-debug/serial-sessions/
+```
+
+记录用于回答“卡在哪一层”，不是开发板运行日志的替代品。每条会话至少包含：
+
+- 会话 ID、开始/结束时间、总耗时和结论；
+- 实际 COM/tty 端口、波特率和登录用户；
+- hostname、当前 IPv4、MAC 与默认路由（成功读取时）；
+- 打开端口、等待登录提示、发送用户名、等待密码提示、验证 shell 身份、执行只读网络命令、尝试 SSH 等阶段时间线；
+- 脱敏后的 transcript，最多 64 KiB。
+
+保存前会清除 ANSI 和不可见控制字符，并替换密码、token、key 等凭据。脱敏不会删除 hostname、IP、MAC 或 COM 口；这些字段仍可能暴露实验室网络和设备身份，因此会话文件只能保留在本机，不上传、不提交 Git，也不直接贴到公开问题单。默认保留上限为 50 条、30 天和总计 20 MiB，任一上限超出时从最旧记录开始清理。写入采用同目录临时文件原子替换，并保留可用于恢复的备份。
+
+面板“串口记录”页按时间列出会话，点选后可查看结论、各阶段耗时和脱敏 transcript。清理记录必须二次确认；清理只删除宿主机日志，不会修改串口、网络或开发板状态。
+
+按下列信号排错：
+
+| 记录停点或错误 | 判断边界 | 下一步 |
+| --- | --- | --- |
+| 打开 COM/tty 失败，包含 `AccessDenied`、`being used` 或“拒绝访问” | 端口被串口终端占用，或当前用户没有权限 | 关闭 PuTTY/串口监视器等占用程序；确认端口名与访问权限后重试 |
+| 停在 `login:`、`password:` 或 shell prompt，出现 `serial-timeout` | 端口/波特率、线缆、登录提示或凭据未通过 | 核对 115200 8N1、串口线、显式 COM 口和 HwHiAiUser 凭据；不要连续尝试多个未知端口 |
+| 已读取 hostname/IP/MAC，但后续 SSH 失败 | 串口登录成功，网络或 SSH 仍未通过 | 核对 IP 所在网段、22 端口、公钥和 `sshd`；不要把串口成功写成 SSH、CANN 或 NPU 通过 |
+| 会话显示 cancelled | 用户取消或面板卸载终止了宿主辅助进程 | 先确认是否仍需该诊断，再重新运行；取消记录本身不是板端故障 |
+
+## 8. 蓝牙音频
 
 蓝牙音频分两层处理：
 
@@ -318,7 +347,7 @@ bluetoothctl connect <MAC>
 
 选择 `.monitor` 作为麦克风会被拒绝。系统自带 ALSA `hw:`/`plughw:` 路径不能代替 Pulse 路由；蓝牙设备应使用 `parecord`/`paplay` 路径，也就是插件里的 Pulse 后端。
 
-## 8. 一键检查顺序
+## 9. 一键检查顺序
 
 ```text
 1. id / id -nG
@@ -333,9 +362,10 @@ bluetoothctl connect <MAC>
 
 推荐先运行插件的 `ascend_probe`，它会把 `soundCards`、`audioPlayback`、`audioCapture`、`audioSources`、`audioSinks`、`pulseCards`、`pulseCardDetails`、`bluetoothController`、`bluetoothDevices`、`bluetoothInfo`、`usbDevices` 和 `videoDevices` 列入环境报告；设备枚举成功之后，再按上述流程做真实采集/播放。
 
-## 9. 变更记录
+## 10. 变更记录
 
 | 日期 | 记录 |
 | --- | --- |
 | 2026-10-22 | 汇总 case1/case3/case4/case8/case9 的摄像头、麦克风、板载音频和 USB 声卡设置；加入 25% 首测音量安全线 |
 | 2026-10-26 | 增加插件外设采集工具、Pulse source/sink 与 BlueZ/Pulse card 只读枚举、固定证据目录和蓝牙音频路由说明 |
+| 2026-11-01 | 增加串口会话日志位置、字段、脱敏、保留、清理和 COM/登录/SSH 分层排错说明 |

@@ -183,6 +183,8 @@ for (const command of [
 ]) {
 	check(`task blocks: ${command}`, () => assert.equal(validateTaskCommand(command).ok, false));
 }
+check('grep blocks pattern files outside diagnostic roots', () => assert.equal(validateReadOnlyCommand('grep -f /etc/passwd /var/log/syslog').ok, false));
+check('grep blocks long-form pattern files', () => assert.equal(validateReadOnlyCommand('grep --file=/etc/passwd /var/log/syslog').ok, false));
 check('task blocks destructive rm by default', () => assert.equal(validateTaskCommand('rm -rf /tmp/x').ok, false));
 check('task blocks long-form destructive rm by default', () => assert.equal(validateTaskCommand('rm --recursive --force /tmp/x').ok, false));
 check('task blocks systemctl with options', () => assert.equal(validateTaskCommand('systemctl --no-block reboot').ok, false));
@@ -196,7 +198,10 @@ check('task blocks non-sudo elevation', () => assert.equal(validateTaskCommand('
 check('task blocks su', () => assert.equal(validateTaskCommand('su -c true').ok, false));
 check('task permits rm only with explicit opt-in', () => assert.equal(validateTaskCommand('rm -rf /tmp/x', { allowDestructive: true }).ok, true));
 check('task permits sudo only with explicit opt-in', () => assert.equal(validateTaskCommand('sudo true', { allowPrivileged: true }).ok, true));
-for (const command of ['sudo reboot', 'sudo -- reboot', 'sudo /sbin/reboot', 'sudo shutdown -h now', 'sudo poweroff']) {
+for (const command of [
+	'sudo reboot', 'sudo -- reboot', 'sudo /sbin/reboot', 'sudo shutdown -h now', 'sudo poweroff',
+	'env reboot', 'sudo env reboot', 'command /sbin/reboot', 'nohup reboot', 'sh -c reboot'
+]) {
 	check(`task always blocks privileged power command: ${command}`, () => assert.equal(validateTaskCommand(command, { allowPrivileged: true }).ok, false));
 }
 

@@ -20,7 +20,9 @@ import {
 	normalizeRecordedPlaybackOptions,
 	normalizeSpeakerOptions,
 	parsePeripheralResult,
-	peripheralOutputPath
+	peripheralLockKey,
+	peripheralOutputPath,
+	withPeripheralLock
 } from '../lib/peripherals.js';
 
 const failures = [];
@@ -80,15 +82,17 @@ check('speaker validates frequency and sub-second duration', () => {
 	assert.throws(() => normalizeSpeakerOptions({ durationSec: 5.01 }, now));
 });
 
-check('output paths are fixed and timestamped', () => {
+check('output paths are fixed, timestamped and collision resistant', () => {
 	assert.equal(
-		peripheralOutputPath('camera', now),
-		'/tmp/ascend310b-debug/peripherals/camera-2026-10-26T08-00-00-000Z.jpg'
+		peripheralOutputPath('camera', now, '0123456789ab'),
+		'/tmp/ascend310b-debug/peripherals/camera-2026-10-26T08-00-00-000Z-0123456789ab.jpg'
 	);
 	assert.equal(
-		peripheralOutputPath('microphone', now),
-		'/tmp/ascend310b-debug/peripherals/microphone-2026-10-26T08-00-00-000Z.wav'
+		peripheralOutputPath('microphone', now, 'abcdef012345'),
+		'/tmp/ascend310b-debug/peripherals/microphone-2026-10-26T08-00-00-000Z-abcdef012345.wav'
 	);
+	assert.notEqual(peripheralOutputPath('camera', now), peripheralOutputPath('camera', now));
+	assert.throws(() => peripheralOutputPath('camera', now, 'not-a-nonce'));
 	assert.throws(() => peripheralOutputPath('other', now));
 });
 
@@ -99,12 +103,16 @@ check('camera command is fixed and valid', () => {
 	assert.match(command, /frame\.read/u);
 	assert.match(command, /ffmpeg/u);
 	assert.match(command, /from PIL import Image/u);
+	assert.match(command, /cleanup_outputs/u);
+	assert.match(command, /remove_failed_output/u);
+	assert.match(command, /finally:\n    if cap is not None/u);
 	assert.equal(command.includes('base64'), false);
 	assert.equal(validateTaskCommand(command).ok, true);
 });
 
 check('camera preview paths are strictly limited to generated JPEGs', () => {
 	assert.equal(CAMERA_IMAGE_PATH.test(`${PERIPHERAL_OUTPUT_ROOT}/camera-2026-10-29T09-30-00-000Z.jpg`), true);
+	assert.equal(CAMERA_IMAGE_PATH.test(`${PERIPHERAL_OUTPUT_ROOT}/camera-2026-10-29T09-30-00-000Z-0123456789ab.jpg`), true);
 	assert.equal(CAMERA_IMAGE_PATH.test(`${PERIPHERAL_OUTPUT_ROOT}/camera-../../etc/passwd.jpg`), false);
 	assert.equal(CAMERA_IMAGE_PATH.test(`${PERIPHERAL_OUTPUT_ROOT}/camera-2026-10-29T09-30-00-000Z.wav`), false);
 	assert.equal(CAMERA_IMAGE_PATH.test('/tmp/other/camera-2026-10-29T09-30-00-000Z.jpg'), false);
@@ -120,6 +128,9 @@ check('microphone commands select arecord or parecord', () => {
 	assert.match(pulseDefault, /get-default-source/u);
 	assert.match(pulse, /communicate\(timeout=cfg\["durationSec"\]\)/u);
 	assert.match(pulse, /send_signal\(signal\.SIGINT\)/u);
+	assert.match(pulse, /cleanup_outputs/u);
+	assert.match(pulse, /remove_failed_output/u);
+	assert.match(pulse, /proc\.terminate\(\)/u);
 	assert.match(pulse, /录音时长异常/u);
 	assert.match(alsa, /ALSA 输入设备无法打开或录音失败/u);
 	assert.match(pulseDefault, /PulseAudio 默认输入是输出监视源/u);
@@ -136,6 +147,8 @@ check('speaker commands select aplay or paplay and keep heard null', () => {
 	assert.match(pulse, /bluez_sink\.00_11_22_33_44_55\.a2dp_sink/u);
 	assert.match(pulseDefault, /get-default-sink/u);
 	assert.match(pulse, /"heard": None/u);
+	assert.match(pulse, /cleanup_outputs/u);
+	assert.match(pulse, /remove_failed_output/u);
 	assert.equal(validateTaskCommand(alsa).ok, true);
 	assert.equal(validateTaskCommand(pulse).ok, true);
 });
@@ -180,6 +193,7 @@ check('recorded playback uses fixed aplay/paplay script and keeps audible result
 	assert.match(pulse, /"sourceRecording": recording/u);
 	assert.match(pulse, /"heard": None/u);
 	assert.match(pulse, /"volumeChanged": False/u);
+	assert.match(pulse, /cleanup_outputs\(recording\)/u);
 	assert.equal(validateTaskCommand(alsa).ok, true);
 	assert.equal(validateTaskCommand(pulse).ok, true);
 });
@@ -188,6 +202,27 @@ check('peripheral JSON parses the last object', () => {
 	assert.deepEqual(parsePeripheralResult('log\n{"ok":true,"rms":4}\n'), { ok: true, rms: 4 });
 	assert.equal(parsePeripheralResult('not json'), null);
 });
+
+const cameraLock = peripheralLockKey('board-8t', { device: '/dev/video0' });
+const otherTargetLock = peripheralLockKey('board-20t', { device: '/dev/video0' });
+assert.notEqual(cameraLock, otherTargetLock, 'locks must include the target identity');
+let releaseLock;
+const firstOperation = withPeripheralLock(cameraLock, () => new Promise((resolve) => {
+	releaseLock = resolve;
+}));
+await assert.rejects(
+	withPeripheralLock(cameraLock, async () => 'unexpected'),
+	(error) => error?.code === 'PERIPHERAL_BUSY',
+	'a concurrent operation on the same target/device must be rejected'
+);
+assert.equal(await withPeripheralLock(otherTargetLock, async () => 'other-board'), 'other-board');
+releaseLock('done');
+assert.equal(await firstOperation, 'done');
+assert.equal(await withPeripheralLock(cameraLock, async () => 'unlocked'), 'unlocked', 'the lock must release in finally');
+await assert.rejects(withPeripheralLock(cameraLock, async () => {
+	throw new Error('expected');
+}), /expected/u);
+assert.equal(await withPeripheralLock(cameraLock, async () => 'after-error'), 'after-error', 'a failed operation must release the lock');
 
 if (failures.length > 0) {
 	console.error('peripheral tests FAILED:');

@@ -8,11 +8,12 @@
  * Usage: node test/discovery.mjs
  */
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+	discoverNetwork,
 	expandCidr,
 	inferLocalPrivateCidrs,
 	parseIPv4,
@@ -20,6 +21,7 @@ import {
 	resolveDiscoveryCidrs,
 	resolveDiscoveryCidrsForScan
 } from '../lib/discovery.js';
+import { isIdentityMacInterface } from '../lib/probe.js';
 import {
 	boardIdForMac,
 	inventoryPath,
@@ -42,6 +44,10 @@ equal(parseIPv4('10.0.0.100'), 167772260, 'IPv4 解析应得到无符号整数')
 equal(normalizeMac('C0:74:2B:FD:DD:7A'), 'c0:74:2b:fd:dd:7a', 'MAC 应统一为小写');
 equal(normalizeMac('not-a-mac'), null, '非法 MAC 应返回 null');
 equal(boardIdForMac('c0:74:2b:fd:dd:7a'), 'ascend-c0742bfddd7a', 'target id 应由 MAC 稳定生成');
+check(isIdentityMacInterface('eth0'), '板载 eth0 应作为稳定身份');
+check(isIdentityMacInterface('wlan0'), '板载 wlan0 应作为稳定身份别名');
+check(!isIdentityMacInterface('enx001122334455'), '可移动 USB NIC enx* 不得作为稳定身份');
+check(!isIdentityMacInterface('wlx001122334455'), '可移动 USB Wi-Fi wlx* 不得作为稳定身份');
 
 check(expandCidr('10.0.0.0/30').length === 2, '/30 应只有两个主机地址');
 let rejected = false;
@@ -84,6 +90,15 @@ const noRouteCidrs = await resolveDiscoveryCidrsForScan(null, [], fakeInterfaces
 check(noRouteCidrs.length > 1, '无法取得默认路由时应保留活动网段作为回退');
 const explicitCidrs = resolveDiscoveryCidrs(['10.0.0.0/30'], ['10.55.3.0/24'], fakeInterfaces);
 equal(explicitCidrs.join(','), '10.0.0.0/30', '单次显式 CIDR 应覆盖自动与配置网段');
+const cancelledScan = new AbortController();
+cancelledScan.abort();
+let cancelledError = null;
+try {
+	await discoverNetwork({ cidrs: ['10.0.0.0/30'], signal: cancelledScan.signal });
+} catch (error) {
+	cancelledError = error;
+}
+check(cancelledError?.code === 'ABORT_ERR', '已取消的局域网扫描必须停止，不得继续探测或写资产表');
 
 const probeText = [
 	'===ABS_BEGIN:hostname===',
@@ -192,14 +207,23 @@ const moved = observeBoard(inventory, {
 equal(moved.status, 'ip-changed', '同一 MAC 换 IP 应归并为 ip-changed');
 equal(moved.inventory.boards['c0:74:2b:fd:dd:7a'].lastIp, '10.0.0.120', '资产表应更新当前 IP');
 equal(moved.board.serial?.port, 'COM7', '后续网络发现不能清空串口状态');
-const hostnameProbe = observeBoard(moved.inventory, {
+const changedAfterMove = observeBoard(moved.inventory, {
+	ip: '10.0.0.121',
+	user: 'HwHiAiUser',
+	mac: 'c0:74:2b:fd:dd:7a',
+	hostname: 'orangepiaipro',
+	system: { ...candidate.system, cannVersion: '9.0.0' }
+}, '2026-10-18T01:06:00.000Z');
+equal(changedAfterMove.board.changes.at(-1)?.fromIp, '10.0.0.120', '系统变化必须记录变化前的 IP');
+equal(changedAfterMove.board.changes.at(-1)?.toIp, '10.0.0.121', '系统变化必须记录变化后的 IP');
+const hostnameProbe = observeBoard(changedAfterMove.inventory, {
 	ip: null,
 	user: 'HwHiAiUser',
 	mac: 'c0:74:2b:fd:dd:7a',
 	hostname: 'orangepiaipro',
-	system: candidate.system
-}, '2026-10-18T01:06:00.000Z');
-equal(hostnameProbe.inventory.boards['c0:74:2b:fd:dd:7a'].lastIp, '10.0.0.120', '主机名探测不能把当前 IP 清空');
+	system: changedAfterMove.board.system
+}, '2026-10-18T01:07:00.000Z');
+equal(hostnameProbe.inventory.boards['c0:74:2b:fd:dd:7a'].lastIp, '10.0.0.121', '主机名探测不能把当前 IP 清空');
 equal(hostnameProbe.status, 'unchanged', '没有新 IP 的主机名探测不应伪造网络变化');
 
 const changedSystem = { ...candidate.system, driverVersion: '25.5.0', cannVersion: '9.2.0' };
@@ -213,7 +237,7 @@ const changed = observeBoard(moved.inventory, {
 equal(changed.status, 'system-changed', '驱动/CANN 变化应标为 system-changed');
 check(changed.changes.some((field) => field.name === 'driverVersion'), '变更记录应包含驱动');
 check(changed.changes.some((field) => field.name === 'cannVersion'), '变更记录应包含 CANN');
-equal(changed.inventory.boards['c0:74:2b:fd:dd:7a'].changes.length, 1, '系统变更应写入历史');
+equal(changed.inventory.boards['c0:74:2b:fd:dd:7a'].changes.length, 2, '每次系统变更应追加到历史');
 
 const partial = observeBoard(changed.inventory, {
 	ip: '10.0.0.120',
@@ -230,13 +254,37 @@ const directory = mkdtempSync(join(tmpdir(), 'ascend-inventory-'));
 try {
 	const path = join(directory, 'inventory.json');
 	saveInventory(path, changed.inventory);
+	const staleLock = `${path}.lock`;
+	mkdirSync(staleLock);
+	utimesSync(staleLock, new Date(0), new Date(0));
+	saveInventory(path, changed.inventory);
+	check(!existsSync(staleLock), '陈旧 inventory 锁应自动恢复并在写入后清理');
 	const loaded = readInventory(path);
 	equal(loaded.boards['c0:74:2b:fd:dd:7a'].mac, 'c0:74:2b:fd:dd:7a', '资产表应能持久化 MAC');
+	const recoveryPath = join(directory, 'recoverable-inventory.json');
+	writeFileSync(recoveryPath, '{broken', 'utf8');
+	writeFileSync(`${recoveryPath}.bak`, JSON.stringify(loaded), 'utf8');
+	const recovered = readInventory(recoveryPath);
+	equal(recovered.boards['c0:74:2b:fd:dd:7a'].mac, 'c0:74:2b:fd:dd:7a', '主文件损坏或替换中断时应读取可恢复备份');
 	equal(inventoryPath({}, { DSH_HOME: directory }), join(directory, 'ascend310b-inventory.json'), '默认资产表路径应位于 DSH_HOME');
-	const targets = inventoryTargets(loaded, 'HwHiAiUser');
+	const targets = inventoryTargets(loaded, 'HwHiAiUser', Date.parse('2026-10-18T02:10:00.000Z'));
 	equal(targets[0].id, 'ascend-c0742bfddd7a', '资产表应生成稳定 target id');
 	equal(targets[0].host, '10.0.0.120', '动态 target 应使用最近一次 IP');
+	const staleTargets = inventoryTargets(loaded, 'HwHiAiUser', Date.parse('2026-10-18T03:00:01.000Z'));
+	equal(staleTargets[0]?.recent, false, '超过新鲜度窗口的记录必须显式标记为历史');
 	check(targets[0].note.includes('c0:74:2b:fd:dd:7a'), 'target 备注应保留 MAC');
+	const dockerOnly = inventoryTargets({
+		boards: {
+			'c0:74:2b:fd:dd:7a': {
+				id: 'ascend-c0742bfddd7a',
+				mac: 'c0:74:2b:fd:dd:7a',
+				hostname: 'orangepiaipro',
+				lastIp: '172.17.0.1',
+				system: { soc: 'Ascend310B4', tier: '8T' }
+			}
+		}
+	});
+	equal(dockerOnly.length, 0, 'docker leftover IPs must not become SSH targets');
 } finally {
 	rmSync(directory, { recursive: true, force: true });
 }

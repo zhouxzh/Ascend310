@@ -4,12 +4,23 @@
  * shell fragments.
  */
 
+import { randomBytes } from 'node:crypto';
+
 export const PERIPHERAL_OUTPUT_ROOT = '/tmp/ascend310b-debug/peripherals';
 export const CAMERA_DEVICE = /^\/dev\/video\d{1,2}$/u;
 export const ALSA_DEVICE = /^(?:default|(?:plug)?hw:\d+,\d+|(?:plug)?hw:CARD=[A-Za-z0-9_.-]+,DEV=\d+)$/u;
 export const PULSE_DEVICE = /^[A-Za-z0-9_.:@-]{1,160}$/u;
-export const RECORDED_AUDIO_PATH = /^\/tmp\/ascend310b-debug\/peripherals\/microphone-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.wav$/u;
-export const CAMERA_IMAGE_PATH = /^\/tmp\/ascend310b-debug\/peripherals\/camera-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.jpg$/u;
+const OUTPUT_NONCE = /-[0-9a-f]{12}/u;
+export const RECORDED_AUDIO_PATH = new RegExp(
+	`^/tmp/ascend310b-debug/peripherals/microphone-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z(?:${OUTPUT_NONCE.source})?\\.wav$`,
+	'u'
+);
+export const CAMERA_IMAGE_PATH = new RegExp(
+	`^/tmp/ascend310b-debug/peripherals/camera-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z(?:${OUTPUT_NONCE.source})?\\.jpg$`,
+	'u'
+);
+
+const activePeripheralLocks = new Set();
 
 function numberInRange(value, fallback, min, max, label, integer = true) {
 	const number = Number(value ?? fallback);
@@ -34,13 +45,37 @@ export function detectAudioBackend(backend, device) {
 	return /^(?:default|(?:plug)?hw:)/u.test(selector) ? 'alsa' : 'pulse';
 }
 
-/** Return the fixed artifact path for one operation. */
-export function peripheralOutputPath(kind, now = Date.now()) {
+/** Return a collision-resistant artifact path for one operation. */
+export function peripheralOutputPath(kind, now = Date.now(), nonce = randomBytes(6).toString('hex')) {
 	const names = { camera: 'camera', microphone: 'microphone', speaker: 'speaker' };
 	const extensions = { camera: 'jpg', microphone: 'wav', speaker: 'wav' };
 	if (!(kind in names)) throw new Error('未知外设输出类型。');
+	if (!/^[0-9a-f]{12}$/u.test(nonce)) throw new Error('外设输出 nonce 必须是 12 位小写十六进制。');
 	const stamp = new Date(now).toISOString().replace(/[:.]/gu, '-');
-	return `${PERIPHERAL_OUTPUT_ROOT}/${names[kind]}-${stamp}.${extensions[kind]}`;
+	return `${PERIPHERAL_OUTPUT_ROOT}/${names[kind]}-${stamp}-${nonce}.${extensions[kind]}`;
+}
+
+/** Build a lock identity from the resolved target and physical/logical device. */
+export function peripheralLockKey(targetId, normalized) {
+	const target = String(targetId ?? '').trim();
+	const device = String(normalized?.device ?? '').trim();
+	if (target === '' || device === '') throw new Error('外设锁需要 target 和 device。');
+	return JSON.stringify([target, normalized?.backend ?? 'device', device]);
+}
+
+/** Reject concurrent use of the same device on the same target and always unlock. */
+export async function withPeripheralLock(key, operation) {
+	if (activePeripheralLocks.has(key)) {
+		const error = new Error('同一目标上的该外设正在执行另一个操作，请等待完成后重试。');
+		error.code = 'PERIPHERAL_BUSY';
+		throw error;
+	}
+	activePeripheralLocks.add(key);
+	try {
+		return await operation();
+	} finally {
+		activePeripheralLocks.delete(key);
+	}
 }
 
 /** Validate camera arguments. */
@@ -124,8 +159,43 @@ export function normalizeRecordedPlaybackOptions(options = {}) {
 	return { backend, device, recording, output: recording };
 }
 
+const OUTPUT_MAINTENANCE_SCRIPT = String.raw`
+def cleanup_outputs(current):
+    root = os.path.dirname(current)
+    os.makedirs(root, exist_ok=True)
+    current_real = os.path.realpath(current)
+    retained_count = 1
+    retained_bytes = os.path.getsize(current) if os.path.isfile(current) else 0
+    entries = []
+    for entry in os.scandir(root):
+        if not entry.is_file(follow_symlinks=False) or os.path.realpath(entry.path) == current_real:
+            continue
+        if not entry.name.startswith(("camera-", "microphone-", "speaker-")) or not entry.name.endswith((".jpg", ".wav")):
+            continue
+        stat = entry.stat(follow_symlinks=False)
+        entries.append((stat.st_mtime, stat.st_size, entry.path))
+    entries.sort(reverse=True)
+    for _, size, path in entries:
+        if retained_count < 32 and retained_bytes + size <= 256 * 1024 * 1024:
+            retained_count += 1
+            retained_bytes += size
+            continue
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+
+def remove_failed_output(path):
+    try:
+        if os.path.isfile(path):
+            os.remove(path)
+    except OSError:
+        pass
+`;
+
 const CAMERA_SCRIPT = String.raw`
 import hashlib, json, os, subprocess, sys
+${OUTPUT_MAINTENANCE_SCRIPT}
 
 try:
     import cv2
@@ -136,7 +206,7 @@ except Exception as cv_error:
 cfg = CONFIG
 cap = None
 try:
-    os.makedirs(os.path.dirname(cfg["output"]), exist_ok=True)
+    cleanup_outputs(cfg["output"])
     if cv2 is not None:
         capture_backend = "opencv"
         cap = cv2.VideoCapture(cfg["device"], cv2.CAP_V4L2)
@@ -219,30 +289,33 @@ try:
         "sha256": hashlib.sha256(data).hexdigest(),
         "cv2Error": cv2_error if cv2 is None else None
     }
-    if cap is not None:
-        cap.release()
+    cleanup_outputs(cfg["output"])
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
 except Exception as exc:
+    remove_failed_output(cfg["output"])
+    print(json.dumps({"ok": False, "error": type(exc).__name__ + ": " + str(exc), "device": cfg.get("device")}, ensure_ascii=False))
+    sys.exit(2)
+finally:
     if cap is not None:
         try:
             cap.release()
         except Exception:
             pass
-    print(json.dumps({"ok": False, "error": type(exc).__name__ + ": " + str(exc), "device": cfg.get("device")}, ensure_ascii=False))
-    sys.exit(2)
 `;
 
 const MICROPHONE_SCRIPT = String.raw`
 import array, hashlib, json, math, os, signal, subprocess, sys, time, wave
+${OUTPUT_MAINTENANCE_SCRIPT}
 
 cfg = CONFIG
 cmd = None
+proc = None
 resolved_device = cfg["device"]
 capture_started = None
 capture_elapsed_sec = None
 try:
-    os.makedirs(os.path.dirname(cfg["output"]), exist_ok=True)
+    cleanup_outputs(cfg["output"])
     capture_started = time.monotonic()
     if cfg["backend"] == "alsa":
         cmd = ["arecord", "-D", cfg["device"], "-f", "S16_LE", "-r", str(cfg["sampleRate"]), "-c", str(cfg["channels"]), "-d", str(cfg["durationSec"]), cfg["output"]]
@@ -321,22 +394,33 @@ try:
         "humanConfirmationRequired": True,
         "command": cmd
     }
+    cleanup_outputs(cfg["output"])
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
 except Exception as exc:
     capture_elapsed_sec = round(time.monotonic() - capture_started, 3) if capture_started is not None else None
+    remove_failed_output(cfg["output"])
     print(json.dumps({"ok": False, "error": type(exc).__name__ + ": " + str(exc), "captureElapsedSec": capture_elapsed_sec, "command": cmd, "requested": cfg}, ensure_ascii=False))
     sys.exit(2)
+finally:
+    if proc is not None and hasattr(proc, "poll") and proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=2)
 `;
 
 const SPEAKER_SCRIPT = String.raw`
 import hashlib, json, math, os, struct, subprocess, sys, wave
+${OUTPUT_MAINTENANCE_SCRIPT}
 
 cfg = CONFIG
 cmd = None
 resolved_device = cfg["device"]
 try:
-    os.makedirs(os.path.dirname(cfg["output"]), exist_ok=True)
+    cleanup_outputs(cfg["output"])
     total = max(1, int(cfg["sampleRate"] * cfg["durationSec"]))
     with wave.open(cfg["output"], "wb") as wav:
         wav.setnchannels(cfg["channels"])
@@ -380,21 +464,25 @@ try:
         "volumeChanged": False,
         "command": cmd
     }
+    cleanup_outputs(cfg["output"])
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
 except Exception as exc:
+    remove_failed_output(cfg["output"])
     print(json.dumps({"ok": False, "error": type(exc).__name__ + ": " + str(exc), "command": cmd, "requested": cfg}, ensure_ascii=False))
     sys.exit(2)
 `;
 
 const RECORDED_PLAYBACK_SCRIPT = String.raw`
 import hashlib, json, os, subprocess, sys, wave
+${OUTPUT_MAINTENANCE_SCRIPT}
 
 cfg = CONFIG
 cmd = None
 resolved_device = cfg["device"]
 try:
     recording = cfg["recording"]
+    cleanup_outputs(recording)
     if not os.path.isfile(recording):
         raise RuntimeError("录音文件不存在")
     if os.path.getsize(recording) > 200 * 1024 * 1024:

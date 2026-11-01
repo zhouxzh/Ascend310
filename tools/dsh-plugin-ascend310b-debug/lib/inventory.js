@@ -16,7 +16,7 @@
  * @module dsh-plugin-ascend310b-debug/inventory
  */
 
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -43,6 +43,12 @@ const MAX_CHANGES = 50;
 
 /** Maximum retained IP/system history entries per board. */
 const MAX_HISTORY = 20;
+
+/** Discovery addresses are executable only while the observation is fresh. */
+export const EXECUTABLE_TARGET_MAX_AGE_MS = 15 * 60 * 1000;
+
+/** A synchronous inventory write cannot legitimately hold the lock this long. */
+const STALE_LOCK_MS = 30 * 1000;
 
 /**
  * Resolve the local inventory file.
@@ -108,28 +114,29 @@ function matchingBoardEntries(inventory, macs) {
 	});
 }
 
-/** Read the inventory, tolerating absence or a partially written file. */
+/** Read the inventory, falling back to the recoverable Windows backup. */
 export function readInventory(path) {
-	try {
-		const parsed = JSON.parse(readFileSync(path, 'utf8'));
-		if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-			return { version: 1, boards: {}, updatedAt: null };
+	for (const candidate of [path, `${path}.bak`]) {
+		try {
+			const parsed = JSON.parse(readFileSync(candidate, 'utf8'));
+			if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+			const boards = parsed.boards !== null && typeof parsed.boards === 'object' && !Array.isArray(parsed.boards)
+				? parsed.boards
+				: {};
+			return {
+				...parsed,
+				version: 1,
+				boards,
+				updatedAt: parsed.updatedAt ?? null,
+				preferences: parsed.preferences !== null && typeof parsed.preferences === 'object' && !Array.isArray(parsed.preferences)
+					? parsed.preferences
+					: {}
+			};
+		} catch {
+			// Try the backup left by an interrupted Windows replacement.
 		}
-		const boards = parsed.boards !== null && typeof parsed.boards === 'object' && !Array.isArray(parsed.boards)
-			? parsed.boards
-			: {};
-		return {
-			...parsed,
-			version: 1,
-			boards,
-			updatedAt: parsed.updatedAt ?? null,
-			preferences: parsed.preferences !== null && typeof parsed.preferences === 'object' && !Array.isArray(parsed.preferences)
-				? parsed.preferences
-				: {}
-		};
-	} catch {
-		return { version: 1, boards: {}, updatedAt: null };
 	}
+	return { version: 1, boards: {}, updatedAt: null };
 }
 
 /** Persist the inventory atomically; the file stays local to this machine. */
@@ -144,6 +151,14 @@ export function saveInventory(path, inventory) {
 			break;
 		} catch (error) {
 			if (error?.code !== 'EEXIST') throw error;
+			try {
+				if (existsSync(lock) && Date.now() - statSync(lock).mtimeMs > STALE_LOCK_MS) {
+					rmSync(lock, { recursive: true, force: true });
+					continue;
+				}
+			} catch {
+				// Race with another process releasing the lock; retry below.
+			}
 			if (Date.now() - started > 5000) throw new Error(`inventory lock timeout: ${lock}`);
 			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
 		}
@@ -154,11 +169,23 @@ export function saveInventory(path, inventory) {
 		try {
 			renameSync(temporary, path);
 		} catch (error) {
-			// Windows cannot replace an existing file with rename; remove only the
-			// destination after the complete temp file exists, then retry.
+			// Windows cannot replace an existing file with rename. Move the old
+			// inventory to a readable backup first so a crash cannot erase it.
 			if (error?.code !== 'EEXIST' && error?.code !== 'EPERM') throw error;
-			rmSync(path, { force: true });
-			renameSync(temporary, path);
+			const backup = `${path}.bak`;
+			rmSync(backup, { force: true });
+			let movedPrevious = false;
+			if (existsSync(path)) {
+				renameSync(path, backup);
+				movedPrevious = true;
+			}
+			try {
+				renameSync(temporary, path);
+			} catch (replacementError) {
+				if (movedPrevious && !existsSync(path) && existsSync(backup)) renameSync(backup, path);
+				throw replacementError;
+			}
+			if (movedPrevious) rmSync(backup, { force: true });
 		}
 	} finally {
 		rmSync(temporary, { force: true });
@@ -233,7 +260,8 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 	}
 	const changes = previous === null ? [] : diffSystem(previous.system, system);
 	const ip = text(observation?.ip);
-	const ipChanged = ip !== null && previous !== null && previous.lastIp !== null && previous.lastIp !== ip;
+	const previousIp = previous?.lastIp ?? null;
+	const ipChanged = ip !== null && previous !== null && previousIp !== null && previousIp !== ip;
 	const status = previous === null ? 'new' : changes.length > 0 ? 'system-changed' : ipChanged ? 'ip-changed' : 'unchanged';
 	const board = previous ?? {
 		id,
@@ -281,7 +309,7 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 		board.history.push({ at: now, ip, system });
 	} else {
 		if (changes.length > 0) {
-			board.changes.push({ at: now, fields: changes, fromIp: previous.lastIp, toIp: ip });
+			board.changes.push({ at: now, fields: changes, fromIp: previousIp, toIp: ip });
 			board.changes = board.changes.slice(-MAX_CHANGES);
 			board.lastChangeAt = now;
 		}
@@ -303,14 +331,20 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
  * Convert inventory boards into the target shape consumed by the host half.
  * Configured targets win when their id collides with a discovered id.
  */
-export function inventoryTargets(inventory, defaultUser = null) {
+export function inventoryTargets(inventory, defaultUser = null, now = Date.now()) {
 	const targets = [];
 	for (const board of Object.values(inventory?.boards ?? {})) {
 		if (board === null || typeof board !== 'object') continue;
 		// A hostname-only record or a serial console that has not proved a 310B
 		// SoC must never become an executable SSH target.
 		if (normalizeMac(board.mac) === null || !/^Ascend310B[14]$/iu.test(String(board.system?.soc ?? ''))) continue;
-		const host = text(board.lastIp) ?? text(board.hostname);
+		const observedAt = Date.parse(board.lastSeen ?? '');
+		const recent = Number.isFinite(observedAt) && now - observedAt >= 0 && now - observedAt <= EXECUTABLE_TARGET_MAX_AGE_MS;
+		const ip = text(board.lastIp);
+		// Docker, loopback and link-local leftovers stay in history; they are
+		// not SSH identities. Checking 172.17.0.1 would probe this machine.
+		if (ip !== null && /^(?:127\.|169\.254\.|172\.17\.)/u.test(ip)) continue;
+		const host = ip ?? text(board.hostname);
 		if (host === null) continue;
 		const macs = boardMacs(board);
 		targets.push({
@@ -325,6 +359,7 @@ export function inventoryTargets(inventory, defaultUser = null) {
 			memoryTotalMb: board.system?.memoryTotalMb ?? null,
 			configuredId: board.configuredId ?? null,
 			lastSeen: board.lastSeen ?? null,
+			recent,
 			user: board.user ?? defaultUser,
 			port: Number.isInteger(board.port) ? board.port : null,
 			identityFile: null,

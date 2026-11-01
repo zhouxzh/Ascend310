@@ -49,10 +49,21 @@ import {
 	normalizeMicrophoneOptions,
 	normalizeRecordedPlaybackOptions,
 	normalizeSpeakerOptions,
-	parsePeripheralResult
+	parsePeripheralResult,
+	peripheralLockKey,
+	withPeripheralLock
 } from './peripherals.js';
 import { discoverNetwork, isLocalScanCandidate, parseIPv4, probeCandidate, registerDiscoveryTool, resolveDiscoveryCidrsForScan, tcpOpen } from './discovery.js';
-import { runSerialCommand, runSerialProbe, validateSerialSettings } from './serial.js';
+import { SERIAL_PROBE_COMMANDS, runSerialCommand, runSerialProbe, validateSerialSettings } from './serial.js';
+import {
+	appendSerialSessionPhase,
+	clearSerialSessionLogs,
+	createSerialSessionLog,
+	finishSerialSessionLog,
+	listSerialSessionLogs,
+	persistSerialSessionLog,
+	readSerialSessionLog
+} from './serial-log.js';
 import { isSafeHost, runLocalScript, runLocalShell, runRemoteScript, runRemoteShell, shellQuote, validateReadOnlyCommand, validateTaskCommand } from './shell.js';
 
 const require = createRequire(import.meta.url);
@@ -74,6 +85,8 @@ const DISCOVER_PATH = '/ascend310b-debug/discover';
 
 /** Route that reads network facts from the serial console. */
 const SERIAL_PATH = '/ascend310b-debug/serial-probe';
+const SERIAL_SESSIONS_PATH = '/ascend310b-debug/serial-sessions';
+const SERIAL_SESSION_CLEAR_PATH = '/ascend310b-debug/serial-sessions/clear';
 
 /** Route that explicitly binds a configured target to a discovered board. */
 const BIND_PATH = '/ascend310b-debug/bind';
@@ -245,7 +258,7 @@ function attachDiscovered(target, entry) {
 	target.user = target.user ?? entry.user ?? null;
 	// Discovery is a live network observation. Prefer its concrete IPv4 for
 	// execution so a stale .local or DHCP address does not outlive the scan.
-	if (typeof entry.host === 'string' && parseIPv4(entry.host) !== null) target.host = entry.host;
+	if (entry.recent === true && typeof entry.host === 'string' && parseIPv4(entry.host) !== null) target.host = entry.host;
 	target.lastSeen = target.lastSeen ?? entry.lastSeen ?? null;
 	return target;
 }
@@ -339,7 +352,7 @@ function targetTable(config) {
 		if (target !== undefined) {
 			attachDiscovered(target, entry);
 			merged.add(target.id);
-		} else if (!table.has(entry.id)) {
+		} else if (!table.has(entry.id) && entry.recent === true) {
 			table.set(entry.id, entry);
 		}
 	}
@@ -454,7 +467,7 @@ async function checkTargetLiveness(config, { targetIds = null, timeoutMs = 1500 
  * Probe addresses learned over serial and merge the result into the MAC-keyed
  * inventory. The serial observation is retained even when SSH is unavailable.
  */
-async function discoverSerialBoard(serial, config) {
+export async function discoverSerialBoard(serial, config) {
 	const candidates = [];
 	const seen = new Set();
 	for (const value of [serial.ipAddress, ...(serial.hostnameIps ?? []), ...(serial.interfaces ?? []).map((entry) => entry.ipv4)]) {
@@ -477,6 +490,7 @@ async function discoverSerialBoard(serial, config) {
 	};
 	const found = [];
 	const errors = [];
+	let inventoryChanged = false;
 	for (const ip of candidates) {
 		try {
 			const candidate = await probeCandidate({ host: ip, user: 'HwHiAiUser', port: sshPort, timeoutMs: 20000, light: true });
@@ -492,6 +506,7 @@ async function discoverSerialBoard(serial, config) {
 					system: candidate.system,
 					serial: serialObservation
 				});
+				inventoryChanged = true;
 				found.push({
 					id: observed.board.id,
 					mac: observed.board.mac,
@@ -518,21 +533,18 @@ async function discoverSerialBoard(serial, config) {
 			(board) => board !== null && [board.mac, ...(Array.isArray(board.macs) ? board.macs : [])].map(normalizeMac).includes(serialMac)
 		) ?? inventory.boards?.[serial.macAddress] ?? null;
 		const verifiedSoc = /^Ascend310B[14]$/iu.test(String(existing?.system?.soc ?? ''));
-		if (!verifiedSoc) {
-			errors.push(
-				`串口 ${serial.port}: 已读取 MAC ${serial.macAddress}，但 SSH 未取得可确认的 Ascend310B1/310B4 SoC；未建立可执行 target。`
-			);
-		} else {
-			const observed = observeBoard(inventory, {
-				ip: serial.ipAddress,
-				user: 'HwHiAiUser',
-				mac: serial.macAddress,
-				macs: [serial.macAddress],
-				hostname: serial.hostname,
-				port: sshPort,
-				system: existing.system,
-				serial: serialObservation
-			});
+		const observed = observeBoard(inventory, {
+			ip: serial.ipAddress,
+			user: 'HwHiAiUser',
+			mac: serial.macAddress,
+			macs: [serial.macAddress],
+			hostname: serial.hostname,
+			port: sshPort,
+			system: existing?.system,
+			serial: serialObservation
+		});
+		inventoryChanged = true;
+		if (verifiedSoc) {
 			found.push({
 				id: observed.board.id,
 				mac: observed.board.mac,
@@ -546,9 +558,13 @@ async function discoverSerialBoard(serial, config) {
 				status: observed.status,
 				identity: 'serial-mac'
 			});
+		} else {
+			errors.push(
+				`串口 ${serial.port}: 已按 MAC ${serial.macAddress} 登记，但 SSH 未确认 Ascend310B1/Ascend310B4 SoC；已保留资产记录，但不返回不可加载的 found target。`
+			);
 		}
 	}
-	if (found.length > 0) saveInventory(inventoryFile, inventory);
+	if (inventoryChanged) saveInventory(inventoryFile, inventory);
 	return { found, errors, inventoryPath: inventoryFile, serial: serialObservation };
 }
 
@@ -1117,64 +1133,72 @@ async function runPeripheralAction({ config, action, targetSelector, command, no
 	};
 }
 
+/** Lock real device access by resolved target and device; previews/refusals do not acquire hardware. */
+async function runLockedPeripheralAction({ config, payload, normalized, ...options }) {
+	const operation = (targetSelector = payload.target) => runPeripheralAction({
+		config,
+		...options,
+		targetSelector,
+		normalized,
+		allowStateChange: payload.allowStateChange === true,
+		dryRun: payload.dryRun === true
+	});
+	if (payload.allowStateChange !== true || payload.dryRun === true) return operation();
+	const target = resolveTarget(config, payload.target);
+	const key = peripheralLockKey(target.id, normalized);
+	return withPeripheralLock(key, () => operation(target.id));
+}
+
 /** Execute one fixed peripheral action. */
 async function executePeripheralOperation(config, action, payload = {}) {
 	try {
 		if (action === 'camera-capture') {
 			const normalized = normalizeCameraOptions(payload);
-			return await runPeripheralAction({
+			return await runLockedPeripheralAction({
 				config,
+				payload,
 				action,
-				targetSelector: payload.target,
 				command: buildCameraCommand(normalized),
 				normalized,
-				allowStateChange: payload.allowStateChange === true,
-				dryRun: payload.dryRun === true,
 				timeoutMs: timeoutOrDefault(payload.timeoutMs, 60000, 180000)
 			});
 		}
 		if (action === 'microphone-record') {
 			const normalized = normalizeMicrophoneOptions(payload);
-			return await runPeripheralAction({
+			return await runLockedPeripheralAction({
 				config,
+				payload,
 				action,
-				targetSelector: payload.target,
 				command: buildMicrophoneCommand(normalized),
 				normalized,
-				allowStateChange: payload.allowStateChange === true,
-				dryRun: payload.dryRun === true,
 				timeoutMs: timeoutOrDefault(payload.timeoutMs, (normalized.durationSec + 15) * 1000, 120000)
 			});
 		}
 		if (action === 'speaker-test') {
 			const normalized = normalizeSpeakerOptions(payload);
-			return await runPeripheralAction({
+			return await runLockedPeripheralAction({
 				config,
+				payload,
 				action,
-				targetSelector: payload.target,
 				command: buildSpeakerCommand(normalized),
 				normalized,
-				allowStateChange: payload.allowStateChange === true,
-				dryRun: payload.dryRun === true,
 				timeoutMs: timeoutOrDefault(payload.timeoutMs, (normalized.durationSec + 15) * 1000, 120000)
 			});
 		}
 		if (action === 'play-recording') {
 			const normalized = normalizeRecordedPlaybackOptions(payload);
-			return await runPeripheralAction({
+			return await runLockedPeripheralAction({
 				config,
+				payload,
 				action,
-				targetSelector: payload.target,
 				command: buildRecordedPlaybackCommand(normalized),
 				normalized,
-				allowStateChange: payload.allowStateChange === true,
-				dryRun: payload.dryRun === true,
 				timeoutMs: 120000
 			});
 		}
 		return peripheralFailure(action || 'peripheral', `未知外设动作：${action || '(empty)'}`);
 	} catch (error) {
-		return peripheralFailure(action || 'peripheral', String(error?.message ?? error));
+		return peripheralFailure(action || 'peripheral', String(error?.message ?? error), error?.code);
 	}
 }
 
@@ -1197,6 +1221,9 @@ function recordEnvironment(config, result) {
 	const facts = result.environment?.facts ?? {};
 	const mac = facts.macAddress?.value ?? null;
 	if (typeof mac !== 'string' || mac === '') return null;
+	const macs = Array.isArray(facts.macAddresses?.value)
+		? facts.macAddresses.value.filter((value) => typeof value === 'string' && value !== '')
+		: [mac];
 	const path = inventoryPath(config);
 	const inventory = readInventory(path);
 	const system = systemFromFacts(facts);
@@ -1206,6 +1233,7 @@ function recordEnvironment(config, result) {
 		ip: ipAddress,
 		user: result.target.user,
 		mac,
+		macs,
 		hostname: facts.hostname?.value ?? null,
 		port: result.target.port,
 		configuredId: result.target.id,
@@ -1248,6 +1276,76 @@ function serialSettings(config, args = {}) {
 		allowAutoLogin: serial.allowAutoLogin === true,
 		timeoutMs: Number.isInteger(args.timeoutMs) && args.timeoutMs > 0 ? args.timeoutMs : serial.timeoutMs ?? 60000
 	};
+}
+
+function persistSerialSessionSafely(config, log, settings) {
+	try {
+		persistSerialSessionLog(config, log, { secrets: [settings.password] });
+		return null;
+	} catch (error) {
+		return `串口记录保存失败：${String(error?.message ?? error)}`;
+	}
+}
+
+async function withSerialSessionLog(config, { operation, settings, commands, signal }, runner) {
+	const log = createSerialSessionLog({ operation, settings, commands });
+	const onEvent = (event) => appendSerialSessionPhase(log, event.phase, event);
+	try {
+		appendSerialSessionPhase(log, 'validation', { status: 'ok', detail: 'serial settings accepted' });
+		const result = await runner(onEvent);
+		for (const key of ['hostname', 'ipAddress', 'macAddress']) {
+			if (typeof result?.[key] === 'string' && result[key] !== '') log[key] = result[key];
+		}
+		if (typeof result?.port === 'string' && result.port !== '') log.port = result.port;
+		const partial = Array.isArray(result?.discovery?.errors) && result.discovery.errors.length > 0 && (result.discovery.found?.length ?? 0) === 0;
+		finishSerialSessionLog(log, {
+			status: partial ? 'partial' : 'success',
+			transcript: result?.rawText ?? result?.transcriptExcerpt ?? '',
+			error: partial ? result.discovery.errors.join(' | ') : null
+		});
+		const serialLogWarning = persistSerialSessionSafely(config, log, settings);
+		return serialLogWarning === null ? result : { ...result, serialLogWarning };
+	} catch (error) {
+		const status = error?.code === 'ABORT_ERR' || signal?.aborted === true ? 'cancelled' : 'failed';
+		finishSerialSessionLog(log, {
+			status,
+			transcript: typeof error?.serialTranscript === 'string' ? error.serialTranscript : '',
+			error: String(error?.message ?? error)
+		});
+		persistSerialSessionSafely(config, log, settings);
+		throw error;
+	}
+}
+
+function logSerialValidationFailure(config, operation, settings, commands, reason) {
+	const log = createSerialSessionLog({ operation, settings, commands });
+	appendSerialSessionPhase(log, 'validation', { status: 'failed', detail: reason });
+	finishSerialSessionLog(log, { status: 'failed', error: reason });
+	persistSerialSessionSafely(config, log, settings);
+}
+
+async function runSerialProbeAndDiscovery(config, settings, signal, onEvent) {
+	const result = await runSerialProbe(settings, { signal, onEvent });
+	onEvent({
+		at: new Date().toISOString(),
+		phase: 'network-facts',
+		status: 'ok',
+		detail: `hostname=${result.hostname ?? 'unknown'} ip=${result.ipAddress ?? 'unknown'} mac=${result.macAddress ?? 'unknown'}`,
+		data: { hostname: result.hostname ?? null, ipAddress: result.ipAddress ?? null, macAddress: result.macAddress ?? null }
+	});
+	onEvent({ at: new Date().toISOString(), phase: 'ssh-verify', status: 'running', detail: 'verifying serial-reported addresses over SSH' });
+	const discovery = await discoverSerialBoard(result, config);
+	const status = discovery.found.length > 0 ? 'ok' : discovery.errors.length > 0 ? 'warning' : 'skipped';
+	onEvent({
+		at: new Date().toISOString(),
+		phase: 'ssh-verify',
+		status,
+		detail: discovery.found.length > 0
+			? `verified ${discovery.found.length} board(s)`
+			: discovery.errors.join(' | ') || 'no SSH-verifiable address reported',
+		data: { foundCount: discovery.found.length, errors: discovery.errors }
+	});
+	return { ...result, discovery };
 }
 
 /**
@@ -1606,7 +1704,7 @@ const PERIPHERAL_SCHEMA = {
 	}
 };
 
-function peripheralFailure(action, message) {
+function peripheralFailure(action, message, code = null) {
 	return {
 		text: `外设操作失败：${action}\n${message}`,
 		ok: false,
@@ -1619,7 +1717,7 @@ function peripheralFailure(action, message) {
 		exitCode: -1,
 		durationMs: 0,
 		evidence: 'untested',
-		data: { error: message },
+		data: { error: message, ...(code === null || code === undefined ? {} : { errorCode: String(code) }) },
 		stdout: '',
 		stderr: message
 	};
@@ -2738,6 +2836,7 @@ export function apply(ctx, config) {
 				const settings = serialSettings(config, args);
 				const validation = validateSerialSettings(settings);
 				if (!validation.ok) {
+					logSerialValidationFailure(config, 'probe', settings, SERIAL_PROBE_COMMANDS, validation.reason);
 					return {
 						ok: false,
 						text: `串口配置失败：${validation.reason}`,
@@ -2755,8 +2854,12 @@ export function apply(ctx, config) {
 					};
 				}
 				try {
-					const result = await runSerialProbe(settings);
-					const discovery = await discoverSerialBoard(result, config);
+					const result = await withSerialSessionLog(
+						config,
+						{ operation: 'probe', settings, commands: SERIAL_PROBE_COMMANDS },
+						(onEvent) => runSerialProbeAndDiscovery(config, settings, null, onEvent)
+					);
+					const discovery = result.discovery;
 					const lines = [
 						`串口：${result.port}（${settings.baudRate} 8N1）`,
 						`用户：${result.user}`,
@@ -2859,6 +2962,7 @@ export function apply(ctx, config) {
 				}
 				const validation = validateSerialSettings(settings);
 				if (!validation.ok) {
+					logSerialValidationFailure(config, 'exec', settings, [command], validation.reason);
 					return {
 						ok: false,
 						allowed: true,
@@ -2872,7 +2976,11 @@ export function apply(ctx, config) {
 					};
 				}
 				try {
-					const result = await runSerialCommand(settings, command);
+					const result = await withSerialSessionLog(
+						config,
+						{ operation: 'exec', settings, commands: [command] },
+						(onEvent) => runSerialCommand(settings, command, { onEvent })
+					);
 					const ok = result.exitCode === 0;
 					return {
 						ok,
@@ -3115,6 +3223,13 @@ export function apply(ctx, config) {
 		};
 
 		const discoverHandler = async (request, response) => {
+			const controller = new AbortController();
+			const abort = () => controller.abort();
+			const responseClosed = () => {
+				if (response.writableEnded !== true) abort();
+			};
+			request.once?.('aborted', abort);
+			response.once?.('close', responseClosed);
 			try {
 				const requestError = httpRequestError(request, ['POST']);
 				if (requestError !== null) {
@@ -3141,15 +3256,22 @@ export function apply(ctx, config) {
 					scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 350,
 					probeTimeoutMs: Number.isInteger(payload.timeoutMs) ? payload.timeoutMs : discovery.probeTimeoutMs ?? 10000,
 					path: inventoryPath(config),
-					config
+					config,
+					signal: controller.signal
 				});
+				if (controller.signal.aborted) return;
 				// Discovery changes the inventory and target list. Do not let a
 				// report generated before the scan hide a newly found board for the
 				// full cache TTL.
 				reportCache.clear();
 				json(response, 200, { ok: true, ...result, targets: publicTargets(config), boards: publicInventory(config) });
 			} catch (error) {
-				json(response, 500, { ok: false, error: String(error?.message ?? error) });
+				if (!controller.signal.aborted) {
+					json(response, 500, { ok: false, error: String(error?.message ?? error) });
+				}
+			} finally {
+				request.removeListener?.('aborted', abort);
+				response.removeListener?.('close', responseClosed);
 			}
 		};
 
@@ -3230,7 +3352,12 @@ export function apply(ctx, config) {
 						board: report.board,
 						pairing: report.pairing,
 						scope: report.scope,
-						transport: report.transport
+						missingCore: result.environment.missingCore ?? [],
+						transport: {
+							ok: result.transport.ok,
+							reason: result.transport.reason,
+							display: result.transport.display
+						}
 					};
 				}
 				mergeSavedFacts(config, result.target, result.facts, category, updatedAt, metadata);
@@ -3312,7 +3439,8 @@ export function apply(ctx, config) {
 				}
 				const payload = body.trim() === '' ? {} : JSON.parse(body);
 				const result = await executePeripheralOperation(config, action, payload);
-				json(response, result.ok === true ? 200 : 422, {
+				const status = result.ok === true ? 200 : result.data?.errorCode === 'PERIPHERAL_BUSY' ? 409 : 422;
+				json(response, status, {
 					ok: result.ok === true,
 					result,
 					...(result.ok === true ? {} : { error: result.text })
@@ -3362,7 +3490,59 @@ export function apply(ctx, config) {
 			}
 		};
 
-		const serialHandler = async (request, response) => {			try {
+		const serialSessionsHandler = async (request, response) => {
+			const requestError = httpRequestError(request, ['GET', 'HEAD']);
+			if (requestError !== null) {
+				json(response, requestError.status, { ok: false, error: requestError.error });
+				return;
+			}
+			const id = new URL(request.url ?? SERIAL_SESSIONS_PATH, 'http://localhost').searchParams.get('id');
+			if (id === null || id === '') {
+				json(response, 200, { ok: true, sessions: listSerialSessionLogs(config) });
+				return;
+			}
+			const log = readSerialSessionLog(config, id);
+			if (log === null) {
+				json(response, 404, { ok: false, error: '未找到串口会话日志。' });
+				return;
+			}
+			json(response, 200, { ok: true, session: log });
+		};
+		const serialLogClearHandler = async (request, response) => {
+			try {
+				const requestError = httpRequestError(request, ['POST']);
+				if (requestError !== null) {
+					json(response, requestError.status, { ok: false, error: requestError.error });
+					return;
+				}
+				let body = '';
+				for await (const chunk of request) {
+					body += chunk;
+					if (body.length > 64 * 1024) {
+						json(response, 413, { ok: false, error: '清理请求体超过 64 KB。' });
+						return;
+					}
+				}
+				const payload = body.trim() === '' ? {} : JSON.parse(body);
+				if (payload.confirm !== true) {
+					json(response, 400, { ok: false, error: '清理串口日志必须显式传入 confirm=true。' });
+					return;
+				}
+				json(response, 200, { ok: true, ...clearSerialSessionLogs(config, { confirm: true }) });
+			} catch (error) {
+				json(response, 400, { ok: false, error: String(error?.message ?? error) });
+			}
+		};
+
+		const serialHandler = async (request, response) => {
+			const controller = new AbortController();
+			const abort = () => controller.abort();
+			const responseClosed = () => {
+				if (response.writableEnded !== true) abort();
+			};
+			request.once?.('aborted', abort);
+			response.once?.('close', responseClosed);
+			try {
 				const requestError = httpRequestError(request, ['POST']);
 				if (requestError !== null) {
 					json(response, requestError.status, { ok: false, error: requestError.error });
@@ -3380,12 +3560,17 @@ export function apply(ctx, config) {
 				const settings = serialSettings(config, payload);
 				const validation = validateSerialSettings(settings);
 				if (!validation.ok) {
+					logSerialValidationFailure(config, 'panel-probe', settings, SERIAL_PROBE_COMMANDS, validation.reason);
 					json(response, 400, { ok: false, error: validation.reason });
 					return;
 				}
-				const result = await runSerialProbe(settings);
-				const { rawText: _rawText, ...publicResult } = result;
-				const discovery = await discoverSerialBoard(publicResult, config);
+				const result = await withSerialSessionLog(
+					config,
+					{ operation: 'panel-probe', settings, commands: SERIAL_PROBE_COMMANDS, signal: controller.signal },
+					(onEvent) => runSerialProbeAndDiscovery(config, settings, controller.signal, onEvent)
+				);
+				if (controller.signal.aborted) return;
+				const { rawText: _rawText, discovery, ...publicResult } = result;
 				// Serial discovery can add a board or update its serial status even
 				// when the previous report cache was populated from another view.
 				reportCache.clear();
@@ -3399,7 +3584,12 @@ export function apply(ctx, config) {
 					boards: publicInventory(config)
 				});
 			} catch (error) {
-				json(response, 500, { ok: false, error: String(error?.message ?? error) });
+				if (!controller.signal.aborted) {
+					json(response, 500, { ok: false, error: String(error?.message ?? error) });
+				}
+			} finally {
+				request.removeListener?.('aborted', abort);
+				response.removeListener?.('close', responseClosed);
 			}
 		};
 
@@ -3459,6 +3649,14 @@ export function apply(ctx, config) {
 			() => scope.webServer.register({ kind: 'exact', path: SERIAL_PATH, handler: serialHandler }),
 			'ascend310b-debug: serial-probe route'
 		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: SERIAL_SESSIONS_PATH, handler: serialSessionsHandler }),
+			'ascend310b-debug: serial-sessions route'
+		);
+		scope.effect(
+			() => scope.webServer.register({ kind: 'exact', path: SERIAL_SESSION_CLEAR_PATH, handler: serialLogClearHandler }),
+			'ascend310b-debug: serial-sessions-clear route'
+		);
 	});
 }
 
@@ -3473,6 +3671,7 @@ export const internals = {
 	prepareTaskCommand,
 	downloadIntegrity,
 	checkTargetLiveness,
+	recordEnvironment,
 	readSavedReport,
 	rememberSavedReport,
 	mergeSavedFacts,

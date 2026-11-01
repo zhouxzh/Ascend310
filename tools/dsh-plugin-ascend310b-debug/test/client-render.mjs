@@ -123,6 +123,7 @@ let payload = JSON.parse(response.body);
 let seeded = 0;
 let seededKind = 'ready';
 let seededSelected = 'board-8t';
+let seededLiveness;
 let seededTab = 'overview';
 let seededPeripheralMode = 'camera';
 let seededPeripheralState = null;
@@ -142,6 +143,7 @@ const reactStub = {
 		if (seeded === 1) return [{ kind: seededKind, payload }, () => {}];
 		if (seeded === 2) return [seededSelected, () => {}];
 		if (seeded === 4) return [seededTab, () => {}];
+		if (seeded === 7 && seededLiveness !== undefined) return [seededLiveness, () => {}];
 		if (seeded === 8) return [seededPeripheralMode, () => {}];
 		if (seeded === 10 && seededPeripheralState !== null) return [seededPeripheralState, () => {}];
 		if (seeded === 12 && seededSpeakerConfirmed !== undefined) return [seededSpeakerConfirmed, () => {}];
@@ -214,7 +216,8 @@ check(text.includes('observed-match'), 'the panel must show the pairing verdict'
 check(text.includes('8.0.0'), 'the panel must show the probed CANN version');
 check(text.includes('25.2.0'), 'the panel must show the probed driver version');
 check(/\d+\.\d GB \/ 7\.4 GB/.test(text), 'the panel must show NPU memory used/total in GB');
-check(text.includes('Orange Pi AI Pro 8T · 7.4 GB'), 'the fixed memory capacity must appear in the device name in GB');
+check(text.includes('Orange Pi AI Pro 8T'), 'the canonical 8T device name must be visible');
+check(!text.includes('Orange Pi AI Pro 8T · 7.4 GB'), 'NPU HBM capacity must not be presented as part of the physical device name');
 // Firmware is deliberately not a default probe field: the current 310B
 // images do not expose a readable, trustworthy firmware version.
 // `undefined` appears legitimately inside a knowledge-entry title (the C++
@@ -222,7 +225,139 @@ check(text.includes('Orange Pi AI Pro 8T · 7.4 GB'), 'the fixed memory capacity
 check(!text.includes('>undefined<') && !text.includes('undefined undefined'), 'the panel must not render raw undefined values');
 check(text.includes('昇腾310B调试'), 'the panel title must name the chip family');
 check(text.includes('检查在线'), 'the primary action must be an online check');
+check(bundleSource.includes('ad-head-actions'), 'online check, serial discovery and LAN scan must share one action row');
 check(text.includes('更新系统信息'), 'overview must expose a system-only refresh action');
+seededSelected = 'board-20t';
+seededLiveness = { kind: 'done', byTarget: { 'board-20t': true, 'board-8t': false }, checkedAt: '2026-10-30T00:00:00.000Z', message: '' };
+seeded = 0;
+const livenessTree = panel({});
+const railNode = findNode(livenessTree, (node) => node.props?.className === 'ad-rail')[0];
+const foldedRailText = draw(railNode).join(' ');
+check(foldedRailText.includes('显示历史记录（1）'), 'offline devices must be folded into history after liveness completes');
+check(!foldedRailText.includes('Orange Pi AI Pro 8T'), 'an offline non-selected device must not remain in the primary rail');
+check(bundleSource.includes('A leftover configuredId is not identity'), 'stale inventory records must not inherit SSH liveness from a configured id');
+
+const originalPayloadForStale = payload;
+payload = {
+	...originalPayloadForStale,
+	boards: [
+		{
+			id: 'ascend-c0742bfdf696',
+			mac: 'c0:74:2b:fd:f6:96',
+			macs: ['c0:74:2b:fd:f6:96'],
+			hostname: 'orangepiaipro',
+			lastIp: '198.51.100.10',
+			soc: 'Ascend310B4',
+			tier: '8T',
+			model: 'Orange Pi Ai Pro',
+			configuredId: 'board-8t',
+			lastSeen: '2026-10-30T07:54:28.768Z',
+			changesCount: 0
+		},
+		{
+			id: 'ascend-c0742bfddd7a',
+			mac: 'c0:74:2b:fd:dd:7a',
+			macs: ['c0:74:2b:fd:dd:7a'],
+			hostname: 'orangepiaipro',
+			lastIp: '172.17.0.1',
+			soc: 'Ascend310B4',
+			tier: '8T',
+			model: 'Orange Pi Ai Pro 8T',
+			configuredId: 'board-8t',
+			lastSeen: '2026-10-18T13:50:49.955Z',
+			changesCount: 0
+		},
+		{
+			id: 'ascend-c0742bf81276',
+			mac: 'c0:74:2b:f8:12:76',
+			macs: ['c0:74:2b:f8:12:76'],
+			hostname: 'orangepiaipro-20t',
+			lastIp: '198.51.100.11',
+			soc: 'Ascend310B1',
+			tier: '20T',
+			model: 'OPi Ai Pro 20T',
+			configuredId: 'board-20t',
+			lastSeen: '2026-10-30T07:54:28.768Z',
+			changesCount: 0
+		}
+	],
+	targets: [
+		{ id: 'board-8t', label: '8T 板', host: '198.51.100.10', mac: 'c0:74:2b:fd:f6:96', macs: ['c0:74:2b:fd:f6:96'], discoveredId: 'ascend-c0742bfdf696', lastSeen: '2026-10-30T07:54:28.768Z' },
+		{ id: 'board-20t', label: '20T 板', host: '198.51.100.11', mac: 'c0:74:2b:f8:12:76', macs: ['c0:74:2b:f8:12:76'], discoveredId: 'ascend-c0742bf81276', lastSeen: '2026-10-30T07:54:28.768Z' },
+		{ id: 'ascend-c0742bfddd7a', label: 'stale 8T', host: '172.17.0.1', mac: 'c0:74:2b:fd:dd:7a', macs: ['c0:74:2b:fd:dd:7a'], lastSeen: '2026-10-18T13:50:49.955Z' }
+	]
+};
+seededSelected = 'board-20t';
+seededLiveness = { kind: 'done', byTarget: { 'board-20t': true, 'board-8t': true, 'ascend-c0742bfddd7a': false }, checkedAt: '2026-10-30T00:00:00.000Z', message: '' };
+seeded = 0;
+const staleRailText = draw(findNode(panel({}), (node) => node.props?.className === 'ad-rail')[0]).join(' ');
+check(staleRailText.includes('显示历史记录（1）'), 'stale 8T NIC records that share configuredId must fold into history');
+check(staleRailText.includes('c0:74:2b:fd:f6:96'), 'the currently reachable 8T board must remain in the primary rail');
+check(!staleRailText.includes('c0:74:2b:fd:dd:7a'), 'an unreachable historical 8T MAC must not stay in the primary rail');
+seededSelected = 'board-8t';
+seededTab = 'assets';
+seeded = 0;
+const assetsTree = panel({});
+const activeAssetsPanel = findNode(assetsTree, (node) => node.props?.className === 'ad-panel ad-active')[0];
+const assetsText = draw(activeAssetsPanel).join(' ');
+check(assetsText.includes('c0:74:2b:fd:f6:96'), 'the assets page must show the target whose MAC/discovered id matches board-8t');
+check(!assetsText.includes('c0:74:2b:fd:dd:7a'), 'the assets page must not select a stale board merely because configuredId matches');
+seededSelected = 'board-20t';
+seededTab = 'overview';
+
+const serialSeen = new Date().toISOString();
+payload = {
+	...originalPayloadForStale,
+	boards: [
+		{
+			id: 'ascend-c0742bfdf74e',
+			mac: 'c0:74:2b:fd:f7:4e',
+			macs: ['c0:74:2b:fd:f7:4e'],
+			hostname: 'orangepiaipro',
+			lastIp: '198.51.100.20',
+			soc: 'Ascend310B4',
+			tier: '8T',
+			model: 'Orange Pi Ai Pro 8T',
+			configuredId: null,
+			lastSeen: serialSeen,
+			changesCount: 0,
+			serial: { status: 'reachable', port: 'COM6', user: 'HwHiAiUser', ip: '198.51.100.20', hostname: 'orangepiaipro', lastSeen: serialSeen }
+		},
+		{
+			id: 'ascend-c0742bf81276',
+			mac: 'c0:74:2b:f8:12:76',
+			macs: ['c0:74:2b:f8:12:76'],
+			hostname: 'orangepiaipro-20t',
+			lastIp: '198.51.100.11',
+			soc: 'Ascend310B1',
+			tier: '20T',
+			model: 'OPi Ai Pro 20T',
+			configuredId: 'board-20t',
+			lastSeen: '2026-10-30T07:54:28.768Z',
+			changesCount: 0
+		}
+	],
+	targets: [
+		{ id: 'board-20t', label: '20T 板', host: '198.51.100.11', mac: 'c0:74:2b:f8:12:76', macs: ['c0:74:2b:f8:12:76'], discoveredId: 'ascend-c0742bf81276', lastSeen: '2026-10-30T07:54:28.768Z' },
+		{ id: 'ascend-c0742bfdf74e', label: 'serial 8T', host: '198.51.100.20', mac: 'c0:74:2b:fd:f7:4e', macs: ['c0:74:2b:fd:f7:4e'], lastSeen: serialSeen }
+	]
+};
+seededSelected = 'board-20t';
+seededLiveness = { kind: 'done', byTarget: { 'board-20t': true, 'ascend-c0742bfdf74e': false }, checkedAt: serialSeen, message: '' };
+seeded = 0;
+const serialRailText = draw(findNode(panel({}), (node) => node.props?.className === 'ad-rail')[0]).join(' ');
+check(serialRailText.includes('c0:74:2b:fd:f7:4e'), 'a recently serial-logged 8T must stay in the primary rail even when SSH is down');
+check(serialRailText.includes('串口已登录，SSH 不可达'), 'the primary rail must say serial login succeeded when SSH is down');
+payload = originalPayloadForStale;
+check(bundleSource.includes('overflow:hidden;display:flex;flex-direction:column'), 'the panel shell must use a fixed flex layout instead of growing the page');
+check(bundleSource.includes('className: "ad-panels"'), 'tab pages must stay mounted so switching does not remount the workbench');
+check(bundleSource.includes('position:absolute;inset:0'), 'tab pages must occupy one shared rectangle instead of changing the page height');
+check(!bundleSource.includes('hidden: tab !== id'), 'inactive tabs must not use hidden/display:none, which collapses the workbench');
+check(bundleSource.includes('el.style.height'), 'the panel shell must pin itself to the remaining viewport height');
+check(bundleSource.includes('没有历史记录'), 'the history toggle must keep a reserved slot even when no devices are folded');
+check(!bundleSource.includes('ad-global-detail'), 'global status must not expand and push the workbench');
+seededSelected = 'board-8t';
+seededLiveness = undefined;
 seededKind = 'loading';
 seeded = 0;
 let switchingText = '';
@@ -239,7 +374,12 @@ check(!text.includes('每 60 秒刷新') && !text.includes('自动探测'), 'the
 check(text.includes('串口发现'), 'the panel must expose a serial-discovery control');
 check(text.includes('局域网扫描'), 'the panel must expose a LAN scan control');
 check(text.includes('开发板记录'), 'the panel must expose a board-record tab');
+check(text.includes('串口记录'), 'the panel must expose a serial-records tab');
 check(text.includes('摄像头') && text.includes('音频接口'), 'the panel must expose dedicated camera and audio tabs');
+check(bundleSource.includes('/ascend310b-debug/serial-sessions'), 'serial records must use the serial sessions route');
+check(bundleSource.includes('/ascend310b-debug/serial-sessions/clear'), 'serial records must use the clear route');
+check(bundleSource.includes('window.confirm'), 'serial record clearing must require browser confirmation');
+check(bundleSource.includes('串口会话记录') && bundleSource.includes('脱敏 Transcript'), 'serial records must render session details and redacted transcript');
 check(!text.includes('310B 调试'), 'the old title without 昇腾 must be gone');
 check(text.includes('已确认是昇腾 310B'), 'an in-scope board must say so explicitly');
 check(
@@ -252,9 +392,19 @@ check(bundleSource.includes('mountedRef'), 'panel requests must stop committing 
 check(bundleSource.includes('staleError'), 'probe failures must preserve the last successful payload');
 check(bundleSource.includes('aria-label'), 'interactive query and binding controls need accessible labels');
 check(
-	bundleSource.includes('row.online ? " ad-online" : row.offline ? " ad-offline" : row.changed ? " ad-changed"'),
-	'live SSH state must take precedence over offline and historical-change colors'
+	bundleSource.includes('row.online ? " ad-online" : row.serialOnline ? " ad-serial" : row.offline ? " ad-offline" : row.changed ? " ad-changed"'),
+	'live SSH state must take precedence over serial, offline and historical-change colors'
 );
+check(bundleSource.includes('foundId || selectedRef.current'), 'serial discovery must switch to the board it just found');
+check(bundleSource.includes('const selectedBoard = boardForTarget(selectedTarget, payload.boards)'), 'assets must match a target to inventory by MAC/discovered identity, not stale configuredId');
+check(bundleSource.includes('const currentBoard = boardForTarget(current, payload.boards)'), 'the header must use the same physical-board identity matcher as the rail');
+check(bundleSource.includes('generation !== bindingGeneration.current || selectedRef.current !== discoveredTarget'), 'a binding response must not commit after the user switches boards');
+check(bundleSource.includes('signal: controller.signal') && bundleSource.includes('bindingController'), 'binding requests must be abortable');
+check(bundleSource.includes('h(TabBar, { active: tab, onChange: setTab, tabRefs })'), 'the tab bar must receive refs so arrow-key navigation can move focus');
+check(bundleSource.includes('boardRailCount(payload.boards, payload.targets)'), 'the board count must include inventory boards and unmatched configured targets');
+check(bundleSource.includes('"aria-label": "搜索开发板"'), 'the board search input must have an accessible name');
+check(bundleSource.includes('typeof ResizeObserver === "function"'), 'panel height must also react to host layout changes through ResizeObserver');
+check(bundleSource.includes('staleError: null') && bundleSource.includes('target: payload.target ?? previous.payload.target'), 'system refresh must clear stale errors and commit refreshed target identity');
 check(!bundleSource.includes('LIVENESS_INTERVAL_MS') && !bundleSource.includes('LIVE_INTERVAL_MS'), 'the panel must not schedule automatic board probes or liveness checks');
 check(bundleSource.includes('本次检测 SSH 不可达'), 'inventory rows must distinguish current offline state from history');
 check(
@@ -378,7 +528,7 @@ check(bundleSource.includes('AUDIO_REFRESH_URL') && bundleSource.includes('SYSTE
 check(!bundleSource.includes('onClick: () => runProbe()'), 'the UI must not expose a global all-in-one device refresh');
 check(!bundleSource.includes('const runProbe'), 'the frontend must not retain a dead all-in-one probe path');
 check(bundleSource.includes('更新中 ${refreshElapsedSec}s…'), 'camera refresh must show elapsed progress instead of a silent wait');
-check(bundleSource.includes('ad-global-status') && bundleSource.includes('ad-global-detail'), 'async status messages must use an expandable bounded layout slot');
+check(bundleSource.includes('ad-global-status') && !bundleSource.includes('ad-global-detail'), 'async status messages must use a reserved one-line slot that does not expand');
 check(bundleSource.includes('ad-playback-button'), 'recorded playback action must keep a fixed-width slot');
 check(bundleSource.includes('probedAt: payload.probedAt'), 'system refresh must commit board metadata together with system facts');
 check(bundleSource.includes('上次检测 SSH 可达（正在重新检查）'), 'liveness checks must label retained state as previous, not current');

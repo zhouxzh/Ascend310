@@ -135,6 +135,14 @@ for (const entry of manifest.files ?? []) {
 		failures.push(`package.json files 列出的 ${entry} 不存在`);
 	}
 }
+// Runtime reports and inventories are deliberately kept out of the packed
+// package. Keep test sources explicit so npm's `files` allow-list cannot pull
+// generated JSON state into a release tarball.
+for (const entry of manifest.files ?? []) {
+	if (/^test\//u.test(entry) && !entry.endsWith('.mjs')) {
+		failures.push(`测试运行态文件不得进入发布包：${entry}`);
+	}
+}
 if (manifest.name !== 'dsh-plugin-ascend310b-debug') {
 	failures.push(`package.json name 必须是 dsh-plugin-ascend310b-debug，实际为 ${manifest.name}`);
 }

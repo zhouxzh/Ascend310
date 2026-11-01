@@ -18,7 +18,8 @@
     The plugin package directory. Defaults to the package containing this script.
 
 .PARAMETER Port
-    Port for the throwaway instance. Defaults to 19399.
+    Port for the throwaway instance. Defaults to 0, which asks the script to
+    reserve an available loopback port before starting DSH.
 
 .PARAMETER RepoRoot
     Textbook checkout written into the throwaway profile's patch layer. Defaults
@@ -30,7 +31,8 @@
 [CmdletBinding()]
 param(
     [string]$PluginRoot = '',
-    [int]$Port = 19399,
+    [ValidateRange(0, 65535)]
+    [int]$Port = 0,
     [string]$RepoRoot = ''
 )
 
@@ -41,7 +43,10 @@ if ([string]::IsNullOrWhiteSpace($PluginRoot)) {
 }
 $PluginRoot = (Resolve-Path $PluginRoot).Path
 $dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
-$profileRoot = Join-Path $dshHome 'profiles\ascendcheck'
+# Never reuse or delete a user's named profile. The verifier owns only this
+# generated profile and removes it during cleanup.
+$profileName = 'ascendcheck-' + [guid]::NewGuid().ToString('N')
+$profileRoot = Join-Path $dshHome (Join-Path 'profiles' $profileName)
 # Windows PowerShell 5.1 decodes Get-Content without -Encoding as ANSI, which
 # mangles the UTF-8 description, so the manifest is read and parsed as UTF-8.
 $packageManifest = [System.IO.File]::ReadAllText(
@@ -55,9 +60,21 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     $RepoRoot = if ($env:DSH_ASCEND310B_ROOT) { $env:DSH_ASCEND310B_ROOT } else { (Get-Location).Path }
 }
 
-if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) {
+if ($Port -eq 0) {
+    $reservation = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $reservation.Start()
+    try {
+        $Port = ([System.Net.IPEndPoint]$reservation.LocalEndpoint).Port
+    } finally {
+        $reservation.Stop()
+    }
+} elseif (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) {
     throw "port $Port is already in use; pick another with -Port"
 }
+$preexistingOwners = @(
+    Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique
+)
 
 function Write-Utf8([string]$Path, [string]$Text) {
     [System.IO.File]::WriteAllText($Path, $Text, $utf8)
@@ -104,8 +121,7 @@ crw-rw-rw- 1 root root 240, 0 Jan  1 00:00 /dev/davinci0
 ===ABS_END:devices===
 '@
 
-Write-Host "building throwaway profile at $profileRoot"
-Remove-Item -Recurse -Force $profileRoot -ErrorAction SilentlyContinue
+Write-Host "building throwaway profile '$profileName' at $profileRoot"
 New-Item -ItemType Directory -Force -Path (Join-Path $profileRoot 'node_modules') | Out-Null
 
 Write-Utf8 (Join-Path $profileRoot 'package.json') @"
@@ -139,7 +155,7 @@ Copy-Item -Recurse -Force $PluginRoot (Join-Path $profileRoot "node_modules\$pac
 
 $log = Join-Path $env:TEMP "dsh-ascend-verify-$Port.log"
 Remove-Item $log, "$log.err" -Force -ErrorAction SilentlyContinue
-$process = Start-Process -FilePath 'dsh' -ArgumentList @('--profile', 'ascendcheck', '--no-open', '--port', "$Port") `
+$process = Start-Process -FilePath 'dsh' -ArgumentList @('--profile', $profileName, '--no-open', '--port', "$Port") `
     -RedirectStandardOutput $log -RedirectStandardError "$log.err" -PassThru -WindowStyle Hidden
 
 $failures = @()
@@ -270,13 +286,17 @@ try {
         $failures += "index fetch failed: $($_.Exception.Message)"
     }
 } finally {
-    # `dsh` is a launcher script, so the listening process is a grandchild of the
-    # one Start-Process returned: kill the whole tree by the port owner.
+    # `dsh` can launch a child host process. Terminate only listeners that
+    # appeared after this verifier started; never kill a pre-existing/system PID.
     $listeners = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-    foreach ($owner in ($listeners.OwningProcess | Select-Object -Unique)) {
-        cmd /c "taskkill /F /T /PID $owner" | Out-Null
+    foreach ($owner in @($listeners.OwningProcess | Select-Object -Unique)) {
+        if ($owner -gt 4 -and $preexistingOwners -notcontains $owner) {
+            cmd /c "taskkill /F /T /PID $owner" | Out-Null
+        }
     }
-    if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+    if ($null -ne $process -and -not $process.HasExited) {
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    }
     Start-Sleep -Seconds 2
     Remove-Item -Recurse -Force $profileRoot -ErrorAction SilentlyContinue
 }

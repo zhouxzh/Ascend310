@@ -8,6 +8,11 @@
 # holds a small generated sample index and panel previews that must ship with it.
 !data/
 
-# Local test inventories and persisted reports.
+# Local test inventories and persisted reports. Tests may create these files while
+# exercising the host half; they are disposable state, never package content.
 test/.no-inventory.json
+test/.client-render-inventory.json
 test/ascend310b-reports.json
+test/*-reports.json
+test/*-inventory.json
+test/.serial-sessions/
