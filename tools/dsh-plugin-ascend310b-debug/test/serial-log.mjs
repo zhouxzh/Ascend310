@@ -170,7 +170,7 @@ try {
 	check(readFileSync(persisted.path, 'utf8') === readFileSync(`${persisted.path}.bak`, 'utf8'), 'replacement must refresh both copies');
 
 	const invalidConfig = configFor('invalid');
-	for (const id of ['../escaped', '..\\escaped', join(root, 'absolute'), `${log.id}/child`, `${log.id}\\child`, `${log.id}\n`, `${log.id}\0`, log.id.toUpperCase(), log.id.replace(/-4([0-9a-f]{3})-/u, '-1$1-'), `2026-02-30T00-00-00.000Z-${log.id.slice(-36)}`, `.-${log.id.slice(-36)}`, null, 123]) {
+	for (const id of ['../escaped', '..\\escaped', join(root, 'absolute'), `${log.id}/child`, `${log.id}\\child`, `${log.id}\n`, `${log.id}\0`, log.id.toUpperCase(), log.id.replace(/Z-/u, 'X-'), log.id.replace(/-4[0-9a-f]{3}-/u, '-5abc-'), `2026-02-30T00-00-00.000Z-${log.id.slice(-36)}`, `.-${log.id.slice(-36)}`, null, 123]) {
 		throws(() => persistSerialSessionLog(invalidConfig, { ...log, id }), `persist must reject malformed id ${JSON.stringify(id)}`);
 		check(readSerialSessionLog(invalidConfig, id) === null, 'read must reject malformed ids');
 	}

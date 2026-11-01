@@ -228,14 +228,25 @@ function parseLog(path, id) {
 
 function logFiles(directory) {
 	if (!pathStat(directory)?.isDirectory()) return [];
+	let names;
+	try {
+		names = readdirSync(directory);
+	} catch {
+		return [];
+	}
 	const entries = new Map();
-	for (const name of readdirSync(directory)) {
+	for (const name of names) {
 		const match = /^(.*)\.json(?:\.bak)?$/u.exec(name);
 		const id = match?.[1];
 		const at = logTime(id);
 		if (at === null) continue;
 		const file = join(directory, name);
-		const stat = regularFile(file);
+		let stat;
+		try {
+			stat = regularFile(file);
+		} catch {
+			continue;
+		}
 		if (!stat) continue;
 		const entry = entries.get(id) ?? { id, path: join(directory, `${id}.json`), files: [], bytes: 0, at };
 		entry.files.push(file);
