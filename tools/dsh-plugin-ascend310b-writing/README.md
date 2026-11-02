@@ -103,6 +103,14 @@ Copy-Item -Recurse -Force `
 
 教材、案例和课件是学生读的完成稿。`.dot` 路径、Graphviz 字体名、pt/dpi、画布自检和 `human-review: pending` 属于生产备注，只能留在写作 skill、仓库源文件和课件页脚 HTML 来源链接中，不能进入读者可见正文。
 
+## 语言边界
+
+仓库自有的学生教材、案例正文、样例README、活动工程`docs/`、附录和课件正文必须使用简体中文。代码、命令、API、路径、环境变量、模型名、版本号、原始日志和外部引用保留英文；技术英文不能把整段说明变成英文。
+
+`prose-language`会剔除围栏代码、行内代码、链接目标和URL后检查正文。教材、学生记录和课件中的纯英文或明显英文主导正文按error阻断；样例README、活动工程docs和CHANGELOG作为历史工程语料按warning提示，避免未完成的存量翻译阻断其他写作修复，新写和改写的工程说明仍应使用简体中文。
+
+插件内置的`scientific-writing`和`nature-polishing`是英文论文工具：前者主体为英文，后者只支持`en`或`zh-to-en`。它们只能在用户明确要求英文论文、英文润色或中译英时使用，不能作为中文教材的默认润色路径。中文教材润色使用`ascend310b-writing-academic`。
+
 ## 本地网页与人工验收
 
 修改任何会进入 VuePress 的教材、案例、代码 docs 或 Presentation 后，必须启动或复用 `pnpm run docs:dev`，把对应本地 URL 交给用户。开发服务器 HMR、HTTP 200、`docs:build` 和自动 audit 只是机械证据；最终状态先写 `human-review: pending`，只有用户明确确认本地网页内容正确后才算完成。
@@ -427,12 +435,15 @@ VuePress 发布前还要运行 `ascend310b_writing_page_layout`（或 `node scri
 | `sidebar-missing` | error | 正文必须出现在 `src/.vuepress/sidebar.ts` |
 | `empty-body` | error | 正文不得为空 |
 | `heading-jump` | warning | 标题层级不得跳跃 |
+| `duplicate-heading` / `duplicate-section-label` | warning | 同一文件不得出现重复标题；正文中独立的“参考资料：”“小结：”等标签不得与已有章节标题重名 |
 | `heading-manual-number` | error | 教材 H2-H6 不得手写 `1.`、`1.1`、`4.1`；章节编号由站点/PDF 生成，按文件汇总 |
 | `trailing-whitespace` | warning | 行尾多余空白，且**已证明不影响渲染**（单空格 / 整行只有空格 / 下一行是空行或块级起点）；可安全删除 |
 | `hard-break-effective` | warning | 行尾 ≥2 个空格构成 Markdown 硬换行；附带同一列表的一致性证据（「另外 N 项都没有这样写」），要留要删由作者定 |
 | `tab-indent` / `crlf` / `no-final-newline` | warning | 行尾与换行卫生 |
 | `cjk-halfwidth-punct` / `cjk-halfwidth-bracket` | warning | 中文之间的半角标点与括号（行内代码除外） |
 | `cjk-double-space` | info | 中文之间的连续空格 |
+| `table-density` / `table-section-overuse` | warning | 文件超过12个表格或单个H2超过8个表格时提示复核。只有多个项目共享多个字段、需要横向比较时才适合用表；顺序、分类、单维功能和概念解释优先用列表或段落 |
+| `cjk-latin-space` | warning | 中西文边界出现字面空格；按作者规范删除，例如使用`Python3.9`、`8T开发板`、共`5`个。英文单词之间和英文与数字之间的常规空格保留；按文件汇总，避免历史语料淹没其他问题 |
 
 代码交叉检查规则（正文与 `samples/` 下真实代码的对齐，回答"文档和代码还一致吗"）：
 

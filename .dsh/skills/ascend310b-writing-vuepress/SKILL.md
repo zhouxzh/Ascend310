@@ -27,6 +27,7 @@ description: Ascend310 开源网页教材的 VuePress 站点模板与配置。�
 - `src/.vuepress/dist/`、`.temp/`、`.cache/`
 - `src/presentation/NN-*.md`（Marp 源，走 `ascend310b-writing-presentation`）
 - 案例/理论正文（走 case/theory skill）
+- 根目录 `docs/`：只供维护者使用，不属于学生教程，绝不纳入 VuePress 页面、navbar 或 sidebar，也不在本 skill 中改写为教材。
 
 ## 站点模板契约
 
@@ -70,16 +71,16 @@ title: 案例 9：智能聊天机器人
 - 内部跳转用仓库相对 Markdown 路径；已发布课件里的“对应教材”用 GitHub Pages HTML。
 - frontmatter 只写 VuePress/theme-hope 支持的字段。
 
-新增页面时一次改全：源 Markdown、对应 README 索引、`sidebar.ts`、必要时 `navbar.ts` 和冻结名表。
+新增页面时跨职责一次改全：源 Markdown 的案例内容由 `ascend310b-writing-case`、理论/附录内容由 `ascend310b-writing-theory` 编写；本 skill 在页面接入中只负责 VuePress 元数据、对应 README 导航索引、`sidebar.ts` 和必要的 `navbar.ts`，不代写正文或决定教学结构。冻结名表仅在用户明确要求新增或改名时按仓库规则同步，不能为了站点接入擅改冻结名。
 
 ## 工作流
 
 1. 运行 `ascend310b_writing_audit`，先处理 Markdown error。
 2. 改 `.vuepress` 配置或分区 README，不改生成目录。
-3. 新增/改名页面时同步 sidebar、README 和冻结名。
+3. 新增/改名页面时，由 case/theory skill 完成正文；本 skill 同步页面元数据、sidebar 和 README 导航索引，并核对经用户授权的冻结名变更。
 4. 运行或复用 `pnpm run docs:dev`，打开对应本地 URL。
 5. 运行 `node scripts/check_page_layout.mjs --url <URL>`。
-6. 用 `pnpm docs:build` 验证静态构建；成功不等于人工通过，状态先写 `human-review: pending`。
+6. 用 `pnpm docs:build` 验证静态构建；成功不等于人工通过，`human-review: pending` 只记在外部任务或审查元数据中，不写进学生可见正文、导航文案或页面 frontmatter。
 7. 推送前运行 `ascend310b_writing_push_check`，推送后运行 `ascend310b_writing_ci`。
 
 ## 本地网页与人工校验

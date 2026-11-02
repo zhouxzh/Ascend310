@@ -1,11 +1,11 @@
 ---
 name: ascend310b-code-docs
-description: Ascend310 代码文档写作与维护。用于 samples 下源码的 README、API/CLI 参考、架构说明、配置说明、docstring、示例和测试命令文档；要求从代码、测试和板端事实出发，拒绝编造 API，不把代码文档写成案例教材或论文。
+description: Ascend310 代码参考文档写作与维护。用于 samples 下源码的 docstring、接口注释、API/CLI 参考、最小调用示例、脚本和测试参数说明，以及 README 中的函数签名或 CLI 参考段落；部署、架构、配置操作与验证文档交给 ascend310b-writing-docs。要求从代码、测试和板端事实出发，拒绝编造 API，不把代码参考写成案例教材或论文。
 ---
 
 # 代码文档写作
 
-本 skill 用于 Ascend310 教材中面向 310B 的代码工程文档。
+本 skill 用于 Ascend310 教材中面向 310B 的代码工程文档。docstring、接口说明和参考段落的解释文字使用简体中文；函数名、类型名、参数、命令和标准错误消息保留原形。整段英文说明应改写为中文；`prose-language`是文字说明的阻断项。
 
 ## 范围
 
@@ -32,12 +32,12 @@ description: Ascend310 代码文档写作与维护。用于 samples 下源码的
 
 | 类型 | 放置位置 | 要求 |
 | --- | --- | --- |
-| Tutorial | 案例 README 或 `docs/01-...` | 从零到第一个成功结果 |
-| How-to | `docs/` | 一个任务、前置条件、步骤和停止条件 |
-| Reference | `docs/` 或代码注释 | 签名、参数、返回值、错误和版本 |
-| Explanation | `docs/` | 设计、边界、取舍和证据 |
+| Runnable sample path | 案例 README | 由 `ascend310b-writing-docs` 维护源码/模型获取、环境、运行命令和预期结果 |
+| How-to | 样例 `docs/` | 由 `ascend310b-writing-docs` 维护任务步骤和停止条件 |
+| Reference | 样例 `docs/`、README 参考段落或代码注释 | 本 skill 维护签名、参数、返回值、错误和版本 |
+| Explanation | 样例 `docs/` | 由 `ascend310b-writing-docs` 维护设计、边界、取舍和证据 |
 
-不要把所有内容塞进一个 README。教程写路径，参考写合同，解释写原因。
+本 skill 只修改代码参考合同及其最小调用示例，不因此接管 README 运行指南或工程架构文档。保留 README 已有的源码/模型获取与运行命令，不得替换为结果引用或文档链接。代码参考不承担案例教学的情境问题、概念铺垫或练习；这些内容交给 `ascend310b-writing-case`。这里的 `docs/` 指样例工程文档；根 `docs/` 仅供维护者治理使用，不进入 VuePress。
 
 ## API 与 docstring
 
@@ -53,8 +53,8 @@ description: Ascend310 代码文档写作与维护。用于 samples 下源码的
 1. 运行代码级测试或 `--help`/最小输入，保留输出。
 2. 检查文档中的路径、命令、环境变量和引用存在。
 3. 运行 `ascend310b_writing_audit` 检查 Markdown、链接和图片。
-4. 若命令依赖开发板，标注 `untested`，交由 `ascend310b-board` 或板端工具验证。
-5. 推送前运行 `ascend310b_writing_push_check`。
+4. 若命令依赖开发板，标注 `untested`，交由 `ascend310b-env-check`、`ascend310b-case-testing` 或适用的板端工具验证。
+5. 推送前运行 `ascend310b_writing_push_check`。人工审查未完成时，`human-review: pending` 只保留在外部任务或审查元数据中，不写入发布正文、docstring 或生成的 API 参考。
 
 ## 停止条件
 

@@ -87,6 +87,9 @@ for (const name of external) {
 	if (!existsSync(join(skillsRoot, name, 'SOURCE.md'))) {
 		failures.push(`${name}: 缺少上游来源说明`);
 	}
+	if (!text.includes('Ascend310 local routing guard') || !text.includes('Chinese learner material')) {
+		failures.push(`${name}: 缺少将英文 skill 隔离出中文教材任务的本地路由门`);
+	}
 }
 if (existsSync(join(skillsRoot, 'nature-shared', 'SKILL.md'))) {
 	failures.push('nature-shared: 支持目录不能包含 SKILL.md，否则会暴露为独立 skill');
@@ -111,8 +114,10 @@ if (!presentation.includes('https://310b.cn/experiment/case9.html')) {
 }
 if (!presentation.includes('../experiment/*.md')) failures.push('Presentation skill 未明确禁止本地教材相对链接');
 if (!umbrella.includes('已发布 Presentation')) failures.push('总 skill 未同步已发布课件链接规则');
-if (!umbrella.includes('一次写作任务只加载本 skill 加')) {
-	failures.push('总 skill 未限制一次只加载一个对象 skill');
+if (!umbrella.includes('主内容 skill + 必要辅助 skill')) failures.push('总 skill 未允许按需组合主内容 skill 与辅助 skill');
+if (umbrella.includes('一次写作任务只加载本 skill 加')) failures.push('总 skill 仍错误禁止案例正文与制作辅助 skill 组合');
+for (const required of ['writing-case', 'writing-dot', 'writing-vuepress', 'writing-latex']) {
+	if (!umbrella.includes(required)) failures.push(`总 skill 未说明跨对象辅助路由：${required}`);
 }
 const vuepress = readFileSync(join(skillsRoot, 'ascend310b-writing-vuepress', 'SKILL.md'), 'utf8');
 if (!vuepress.includes('vuepress-theme-hope')) failures.push('VuePress skill 未锁定 hope 主题');
@@ -124,19 +129,77 @@ if (!vuepress.includes('BEGIN GENERATED PRESENTATION SIDEBAR')) {
 }
 if (!umbrella.includes('读者稿与生产备注')) failures.push('总 skill 未区分读者稿与生产备注');
 const docsSkill = readFileSync(join(skillsRoot, 'ascend310b-writing-docs', 'SKILL.md'), 'utf8');
-for (const required of ['troubleshooting.md', 'CASE<N>-ISS-YYYYMMDD-NN', '根因状态', '回归结果', 'code-docs-manual-heading-number']) {
+for (const required of ['samples/caseN/docs/NN-troubleshooting.md', 'CASE<N>-ISS-YYYYMMDD-NN', '根因状态', '回归结果', 'code-docs-manual-heading-number']) {
 	if (!docsSkill.includes(required)) failures.push(`Docs skill 缺少测试问题台账规则：${required}`);
 }
+if (!docsSkill.includes('不得创建根 `docs/troubleshooting.md`')) failures.push('Docs skill 未禁止把案例台账放进根 docs');
+if (!docsSkill.includes('根目录 `docs/` 仅供维护者') || !docsSkill.includes('不进入 VuePress')) failures.push('Docs skill 未说明根 docs 的维护者边界');
+const codeDocs = readFileSync(join(skillsRoot, 'ascend310b-code-docs', 'SKILL.md'), 'utf8');
+if (!codeDocs.includes('ascend310b-writing-case')) failures.push('Code docs 未把教学叙事交给 writing-case');
+if (codeDocs.includes('ascend310b-board')) failures.push('Code docs 引用了不存在的 ascend310b-board skill');
+const dotSkill = readFileSync(join(skillsRoot, 'ascend310b-writing-dot', 'SKILL.md'), 'utf8');
+if (!dotSkill.includes('只负责辅助图像资产')) failures.push('DOT skill 未说明其辅助生产范围');
+const latex = readFileSync(join(skillsRoot, 'ascend310b-writing-latex', 'SKILL.md'), 'utf8');
+if (!latex.includes('不是正文写作提纲')) failures.push('LaTeX skill 未区分生成编号与案例教学结构');
 for (const required of ['heading-manual-number', '1.1', '4.1', '自动编号']) {
 	if (!umbrella.includes(required)) failures.push(`总 skill 缺少章节编号规则：${required}`);
 }
+const caseSkill = readFileSync(join(skillsRoot, 'ascend310b-writing-case', 'SKILL.md'), 'utf8');
+for (const required of ['面向初学者', '学习目标', '先理解：核心概念', '先跑通：最小闭环', '形成性', '迁移练习', '工程 docs', '教师示范', '提示下练习', '独立任务', '报告式']) {
+	if (!caseSkill.includes(required)) failures.push(`Case skill 缺少教学型案例规则：${required}`);
+}
+if (!existsSync(join(skillsRoot, 'ascend310b-writing-case', 'references', 'case-teaching-plan.md'))) {
+	failures.push('Case skill 缺少 case-teaching-plan.md 教学设计模板');
+}
+if (!caseSkill.includes('不得链接或依赖任何其他仓库文档')) failures.push('Case skill 未保护 case4 自包含规则');
+const theorySkill = readFileSync(join(skillsRoot, 'ascend310b-writing-theory', 'SKILL.md'), 'utf8');
+if (!theorySkill.includes('worked example') || !theorySkill.includes('理解检查')) failures.push('Theory skill 未要求概念示例与理解检查');
+const curriculumSkill = readFileSync(join(skillsRoot, 'ascend310b-curriculum-planning', 'SKILL.md'), 'utf8');
+if (!curriculumSkill.includes('形成性检查点') || !curriculumSkill.includes('不适用的非教学参考对象须说明理由')) failures.push('Curriculum skill 未要求教学检查点及非教学对象说明');
+const academicSkill = readFileSync(join(skillsRoot, 'ascend310b-writing-academic', 'SKILL.md'), 'utf8');
+if (!academicSkill.includes('有界实验小节') || !academicSkill.includes('不要求每个概念解释')) failures.push('Academic skill 未将实验报告门限定到证据段落');
+for (const name of ['ascend310b-writing', 'ascend310b-writing-markdown', 'ascend310b-writing-academic']) {
+	const text = readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
+	for (const required of ['中西文', 'cjk-latin-space', '使用Python3.9']) {
+		if (!text.includes(required)) failures.push(`${name}: 缺少作者中西文无空格规则：${required}`);
+	}
+}
+for (const name of ['ascend310b-writing', 'ascend310b-writing-markdown']) {
+	const text = readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
+	for (const required of ['表格、列表与段落', 'table-density', '编号列表', '概念']) {
+		if (!text.includes(required)) failures.push(`${name}: 缺少表格/列表/段落选择规则：${required}`);
+	}
+}
+const languageSkills = [
+	'ascend310b-writing',
+	'ascend310b-writing-case',
+	'ascend310b-writing-theory',
+	'ascend310b-writing-docs',
+	'ascend310b-writing-presentation',
+	'ascend310b-writing-markdown',
+	'ascend310b-writing-academic',
+	'ascend310b-writing-dot',
+	'ascend310b-code-docs',
+	'ascend310b-curriculum-planning'
+];
+for (const name of languageSkills) {
+	const text = readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
+	for (const required of ['简体中文', 'prose-language']) {
+		if (!text.includes(required)) failures.push(`${name}: 缺少中文正文硬规则：${required}`);
+	}
+}
+for (const name of ['nature-polishing', 'scientific-writing']) {
+	const text = readFileSync(join(skillsRoot, 'ascend310b-writing', 'SKILL.md'), 'utf8');
+	if (!text.includes(name)) failures.push(`总 skill 未隔离英文专用 vendored skill：${name}`);
+}
 const numberingSkills = {
 	'ascend310b-writing-case': ['heading-manual-number', '1.1', '4.1'],
-	'ascend310b-writing-theory': ['heading-manual-number', '4.1'],
+	'ascend310b-writing-theory': ['heading-manual-number', '不手写章节编号'],
 	'ascend310b-writing-markdown': ['1.1', '4.1', '自动编号'],
 	'ascend310b-writing-latex': ['4.1', '4.2.1', '自动编号'],
 	'ascend310b-writing-vuepress': ['1.1', '4.1', '自动编号']
 };
+
 for (const [name, requiredItems] of Object.entries(numberingSkills)) {
 	const text = readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
 	for (const required of requiredItems) {
@@ -194,6 +257,7 @@ const humanReviewSkills = [
 for (const name of humanReviewSkills) {
 	const text = readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
 	if (!text.includes('human-review: pending')) failures.push(`${name}: 未声明 human-review: pending`);
+	if (!text.includes('外部任务') && !text.includes('审查元数据')) failures.push(`${name}: 未将 human-review 状态限定在正文外`);
 	if (!text.includes('check_page_layout.mjs')) failures.push(`${name}: 未要求检查本地页面排版`);
 }
 for (const name of ['ascend310b-writing', 'ascend310b-writing-theory', 'ascend310b-writing-case', 'ascend310b-writing-docs', 'ascend310b-writing-markdown', 'ascend310b-writing-vuepress']) {

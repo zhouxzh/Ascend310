@@ -81,7 +81,9 @@ const latexScript = latex.steps[0].args[latex.steps[0].args.length - 1];
 check(latex.steps[0].args[0] === '-lc', 'the step must run through a login shell');
 check(latexScript.includes('bash ./convert-vuepress.sh'), `the step must run the repository converter, got: ${latexScript}`);
 check(latexScript.includes('/d/') || latexScript.includes('/c/') || latexScript.includes('/mnt/'), 'the checkout path must be spelled for the shell');
-check(latexScript.includes('ascend310b-writing-bin'), 'an alias-only Python must get a temporary python3 shim');
+check(latexScript.includes('writing-build-bin'), 'an alias-only Python must get a temporary python3 shim');
+check(latexScript.includes('/tmp/writing-build-bin'), 'the shim must use the repository tmp workspace');
+check(latexScript.includes("trap 'rm -rf"), 'the temporary shim must be cleaned when the build exits');
 check(latexScript.includes('export PATH='), 'the shim must be exported for the build only');
 
 const missingTool = planBuild({

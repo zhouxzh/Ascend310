@@ -29,6 +29,11 @@ check(report.entries.some((entry) => entry.sample === 'samples/case4'), '应覆�
 check(report.entries.some((entry) => entry.codeFiles > 0), '应统计代码文件');
 check(report.text.includes('代码文档覆盖'), '报告应包含代码文档标题');
 check(Array.isArray(report.findings), 'findings 必须是数组');
+const languageFindings = report.findings.filter((finding) => finding.rule === 'prose-language');
+check(
+	languageFindings.every((finding) => finding.severity === 'warning'),
+	`活动样例 README/docs 的英文主导问题应提示但不阻断：${languageFindings.map((finding) => finding.file).join(', ')}`
+);
 
 const fixtureRoot = join(tmpdir(), `tw-code-docs-numbering-${Date.now()}`);
 mkdirSync(join(fixtureRoot, 'samples', 'case1', 'docs'), { recursive: true });

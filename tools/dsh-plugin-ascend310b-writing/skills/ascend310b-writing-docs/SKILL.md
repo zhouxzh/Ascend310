@@ -12,18 +12,23 @@ description: Ascend310 代码工程文档与测试问题台账写作。用于 sa
 - `samples/caseN/README.md`：最短启动路径；
 - `samples/caseN/docs/`：部署、API、配置、验证、限制和专题设计；
 - `samples/caseN/scripts/`、`tests/` 和入口脚本的说明；
-- `samples/README.md`、`samples/case-index.json` 的工程入口；
-- 必要的仓库级 `docs/` 工程审查文档。
+- `samples/README.md`、`samples/case-index.json` 的工程入口。
+
+根 `docs/` 只放面向维护者的仓库治理、发布流程、环境矩阵和跨项目审计摘要，不属于学生教材，也不进入 VuePress；不接收案例部署、API、模型、排障或原始证据文档。案例审查也放在对应 `samples/caseN/docs/`。
 
 不把理论教材、案例教学正文、Marp 课件或 VuePress 主题改写塞入本流程。源码 docstring 和 CLI 参考表走 `ascend310b-code-docs`。
+
+## 语言要求
+
+仓库自有的样例`README.md`、活动`docs/*.md`、更新记录和测试台账必须使用简体中文。代码、命令、API、路径、环境变量、模型名、版本号和日志原文保留英文，但步骤、解释、表头、告警、结论和证据边界必须用中文写。上游英文材料的逐字引用放在引用块或代码块中，并补中文解释；整段英文教程不能通过。`prose-language`是新写或改写文档的阻断项。
 
 ## 文档分层
 
 ```text
-README.md          最短运行、前置条件、一条成功路径
-docs/README.md     代码工程的文档地图
-docs/NN-*.md       部署/API/配置/验证/限制等专题
-docs/             截图、原始日志和证据的引用位置
+samples/caseN/README.md          最短运行、前置条件、一条成功路径
+samples/caseN/docs/README.md     该案例代码工程的文档地图
+samples/caseN/docs/NN-*.md       部署、API、配置、验证、限制和审查
+samples/caseN/docs/evidence/     用户明确要求随仓库保留时的脱敏证据
 ```
 
 文件名用两位数字前缀表示阅读顺序；README 和 docs 文件内的 H2–H6 **不写** `1.`、`1.1` 等章节编号。标题只命名内容，编号由索引或渲染层负责。`code-docs-manual-heading-number` 会报告 README/docs 正文中的手写编号。
@@ -40,6 +45,15 @@ docs/             截图、原始日志和证据的引用位置
 
 标题直接命名内容，不用“结果”“相关工作”等空泛标题。运行命令必须写清 cwd、环境激活、输入、预期结果和失败停止条件。
 
+## 面向读者的文档分层
+
+- 面向学生的样例 README 保留短前置条件、固定版本的源码和模型获取命令、可执行运行路径、预期结果和必要限制；不能只链接部署文档，不要塞入全量环境哈希、原始日志或根因台账。
+- 根目录 `docs/` 仅供维护者记录仓库治理、发布策略、环境矩阵摘要和跨项目审计；它不进入 VuePress，不存放案例排障台账或单案例工程说明。
+- `samples/caseN/docs/` 与 troubleshooting 是面向工程读者的文档，可公开发布，并非天然私有；记录详细环境、证据摘要与路径、根因台账、修复前后的回归结果和剩余边界。
+- 原始日志、截图和测试输出默认留在板端报告目录；只有用户明确授权保留时，才脱敏后存入 `samples/caseN/docs/evidence/` 或指定外部归档，不得自动收进教材正文或根 `docs/`。
+- 完整 SHA-256、精确字节数、绝对路径、运行 ID、时间戳与原始命令属于工程证据：可以写在发布复现、证据清单或问题台账中，但学生教材、案例正文和课件只保留可解释的结果、方法和边界。
+- README 可以链接工程文档补充细节，但不能用链接、日志或问题记录替代学生可执行的源码/模型获取与最短运行路径。
+
 ## 源码、模型和部署来源
 
 部署文档必须让读者能从公开来源重建现场：
@@ -51,13 +65,7 @@ docs/             截图、原始日志和证据的引用位置
 
 ## 测试问题统一记录
 
-任何测试中发现的问题都必须进入该 case 的唯一问题台账。按该 case 的 docs 编号规范使用：
-
-```text
-samples/caseN/docs/NN-troubleshooting.md
-```
-
-如果该 case 没有编号约定，才使用 `docs/troubleshooting.md`。首次创建时复制 [troubleshooting-template.md](references/troubleshooting-template.md)，并在 `samples/caseN/docs/README.md` 或该 case 的文档索引增加条目。问题 ID 使用 `CASE<N>-ISS-YYYYMMDD-NN`。禁止把失败原因只写在聊天记录、临时日志、提交说明或另一个专题文档里。
+每个案例的测试问题进入该案例唯一的 `samples/caseN/docs/NN-troubleshooting.md`，并从 `samples/caseN/docs/README.md` 登记入口。案例台账归属于样例工程，不得在根维护者文档目录创建案例排障台账。首次创建时复制 [troubleshooting-template.md](references/troubleshooting-template.md)。问题 ID 使用 `CASE<N>-ISS-YYYYMMDD-NN`。禁止把失败原因只写在聊天记录、临时日志、提交说明或另一个专题文档里。
 
 每个问题至少记录：
 
@@ -108,13 +116,13 @@ UI/API 服务
 2. 修改代码工程文档和必要的索引；不改生成物。
 3. 复跑 `ascend310b_writing_audit`。
 4. 如果文档引用了接口、脚本或测试，实际运行对应本地检查；板端依赖标记并交给目标板验证。
-5. 测试一旦失败，先更新该 case 的 `docs/NN-troubleshooting.md`（无编号约定时用 `docs/troubleshooting.md`），再更新相关验证/限制文档的结论和链接。
-6. 如果文档进入 VuePress，确认 `pnpm run docs:dev` 正在运行，并打开对应本地网页让用户人工检查；构建和 HTTP 200 不等于人工通过。
+5. 测试一旦失败，先更新该 case 的 `samples/caseN/docs/NN-troubleshooting.md`，再更新相关验证/限制文档的结论和链接；不得创建根 `docs/troubleshooting.md`。
+6. 如果样例工程文档进入 VuePress，确认 `pnpm run docs:dev` 正在运行，并打开对应本地网页让用户人工检查；根 `docs/` 不进入 VuePress，非站点文档按实际阅读载体审查。构建和 HTTP 200 不等于人工通过。
 7. 推送前运行 `ascend310b_writing_push_check`。
 
 ## 本地网页与人工校验
 
-代码 docs 的 Markdown 进入站点后，和教材正文一样必须做本地网页验收。运行 `node scripts/check_page_layout.mjs --url <URL>` 检查桌面与移动视口的横向溢出和图片/SVG 越界；最终状态先写 `human-review: pending`；用户确认页面、命令、示例和限制后才算完成。没有人工确认时不得把它描述为最终交付。
+样例工程 docs 的 Markdown 进入站点后，和教材正文一样必须做本地网页验收；根 `docs/` 不进入 VuePress，非站点文档在实际阅读载体中审查。站点页面运行 `node scripts/check_page_layout.mjs --url <URL>` 检查桌面与移动视口的横向溢出和图片/SVG 越界。`human-review: pending` 只保留在外部任务或审查元数据中，不写入发布的 Markdown 正文或课件；用户确认相应呈现、命令、示例和限制后才算通过人工审查。没有人工确认时不得把它描述为最终交付。
 
 ## 停止条件
 
@@ -124,5 +132,6 @@ UI/API 服务
 - 测试发现问题但没有登记到该 case 的唯一 troubleshooting 台账。
 - 问题台账没有环境、复现、原始证据、根因状态或回归结果。
 - 文档把未验证的板端结果写成 observed-pass。
+- `prose-language`报告正文以英文为主，却没有改成中文。
 - 没有本地网页人工校验，却被描述为最终完成。
 - 需要提交模型、OM、数据集、日志或截图才能“解释”文档时，先确认仓库资产边界。

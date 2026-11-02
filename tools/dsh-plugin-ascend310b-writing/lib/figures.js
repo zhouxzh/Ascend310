@@ -31,7 +31,7 @@ const WARN_IMAGE_HEIGHT = 1000;
 const ERROR_IMAGE_WIDTH = 2400;
 const ERROR_IMAGE_HEIGHT = 1500;
 const DEFAULT_GRAPHVIZ_DPI = 96;
-const IMAGE_BASELINE = 'docs/image-audit-baseline.json';
+const IMAGE_BASELINE = 'tools/dsh-plugin-ascend310b-writing/data/image-audit-baseline.json';
 // A Graphviz label can hold several lines separated by `\l`; the box is only
 // cramped when one line is long, so the limit applies per line.
 const LONG_DOT_LABEL = 44;

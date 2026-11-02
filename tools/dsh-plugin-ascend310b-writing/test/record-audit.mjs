@@ -56,6 +56,48 @@ check(clean.summary.errors === 0 && clean.summary.warnings === 0, `clean record 
 check(clean.findings.length === 0, 'clean record must return no findings');
 
 writeFileSync(
+	join(records, 'spacing.md'),
+	[
+		'# 学习记录',
+		'',
+		'使用 Python 3.9运行，共 5 个样本。',
+		'`使用 Python 3.9` 保持原样。',
+		''
+	].join('\n'),
+	'utf8'
+);
+const spacing = auditLearnerRecord({ root, file: 'tmp/records/spacing.md' });
+const spacingFindings = spacing.findings.filter((finding) => finding.rule === 'cjk-latin-space');
+check(spacingFindings.length === 1, `one aggregated spacing finding expected, got ${spacing.text}`);
+check(
+	spacingFindings[0]?.line === 3 && spacingFindings[0]?.message.includes('2 处'),
+	`record spacing finding must report two occurrences, got: ${spacingFindings[0]?.message}`
+);
+
+writeFileSync(
+	join(records, 'duplicates.md'),
+	[
+		'# 学习记录',
+		'',
+		'## 参考资料',
+		'',
+		'第一节。',
+		'',
+		'## 参考资料',
+		'',
+		'参考资料：',
+		'',
+		'- 示例。',
+		''
+	].join('\n'),
+	'utf8'
+);
+const duplicates = auditLearnerRecord({ root, file: 'tmp/records/duplicates.md' });
+const duplicateRules = rules(duplicates);
+check(duplicateRules.has('duplicate-heading'), 'duplicate record headings must be reported');
+check(duplicateRules.has('duplicate-section-label'), 'duplicate record section labels must be reported');
+
+writeFileSync(
 	join(records, 'hygiene.md'),
 	[
 		'# 学习记录',

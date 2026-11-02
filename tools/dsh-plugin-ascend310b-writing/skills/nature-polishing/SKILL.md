@@ -5,6 +5,12 @@ description: Polish, translate, or tighten existing academic prose while preserv
 
 # Nature-Style Academic Polishing — Router
 
+## Ascend310 local routing guard
+
+Do **not** use this skill for repository-authored Chinese learner material. It supports only `en` and `zh-to-en`; loading it for a Chinese textbook, case README, sample docs, appendix, or slide deck can translate the output into English.
+
+Use it only when the user explicitly requests an English manuscript, English academic polishing, or Chinese-to-English translation. For Chinese Ascend310 teaching prose, use `ascend310b-writing-academic` and keep the output in Simplified Chinese. Technical identifiers may stay in English, but the explanatory prose must not.
+
 ## Routing protocol
 
 For a new polishing task, follow the routing below. For follow-up edits, reuse established task choices and already loaded guidance; read additional fragments only when the requested scope changes.

@@ -111,7 +111,7 @@ const heavyFinding = report.findings.find((finding) => finding.file.endsWith('he
 check(wideFinding?.severity === 'error', 'over 2400x1500 must be a blocking error');
 check(warnFinding?.severity === 'warning', 'over 1600x1000 must be a warning');
 check(heavyFinding?.severity === 'error', 'over 1.5 MB must be a blocking error');
-write('docs/image-audit-baseline.json', JSON.stringify({
+write('tools/dsh-plugin-ascend310b-writing/data/image-audit-baseline.json', JSON.stringify({
 	version: 1,
 	entries: [
 		{ rule: 'image-too-wide', file: 'src/book/img1/wide.png' },

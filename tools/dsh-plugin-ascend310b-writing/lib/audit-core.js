@@ -11,6 +11,7 @@
 
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from 'node:path';
+import { proseLanguageFinding } from './prose-language.js';
 import { DEFAULT_SETTINGS, resolveSettings } from './settings.js';
 
 /**
@@ -40,6 +41,61 @@ const HALF_WIDTH_IN_CJK = /[\u4e00-\u9fff][,;:!?][\u4e00-\u9fff]/u;
 const HALF_WIDTH_BRACKET = /[\u4e00-\u9fff][()][\u4e00-\u9fff]/u;
 /** Two spaces that should be one inside Chinese prose. */
 const DOUBLE_SPACE_IN_CJK = /[\u4e00-\u9fff] {2,}[\u4e00-\u9fff]/u;
+/** The author's Chinese-academic style forbids literal spaces at CJK/Latin boundaries. */
+const CJK_LATIN_SPACE = /[\u4e00-\u9fff][\u0020\u3000]+[A-Za-z0-9]|[A-Za-z0-9][\u0020\u3000]+[\u4e00-\u9fff]/gu;
+
+/** Count CJK/Latin boundary spaces without involving line-end whitespace. */
+function countCjkLatinSpaces(text) {
+	return [...String(text ?? '').matchAll(CJK_LATIN_SPACE)].length;
+}
+
+/** A file with this many tables needs a table/list/prose review. */
+const TABLE_FILE_LIMIT = 12;
+/** One H2 section with this many tables is usually reference-heavy. */
+const TABLE_SECTION_LIMIT = 8;
+
+/** Whether a line is the delimiter row of a pipe table. */
+function isTableDelimiter(line) {
+	const cells = String(line ?? '')
+		.trim()
+		.replace(/^\|/u, '')
+		.replace(/\|$/u, '')
+		.split('|');
+	return cells.length >= 2 && cells.every((cell) => /^:?-{3,}:?$/u.test(cell.trim()));
+}
+
+/** Count pipe tables by file and H2 section, ignoring fenced code. */
+function collectTableStats(lines) {
+	let fenced = false;
+	let fence = '';
+	let section = '(preface)';
+	let sectionLine = 1;
+	const bySection = new Map();
+	const starts = [];
+	for (let i = 0; i < lines.length; i += 1) {
+		const fenceMatch = /^\s*(`{3,}|~{3,})/u.exec(lines[i]);
+		if (fenceMatch !== null) {
+			if (!fenced) {
+				fenced = true;
+				fence = fenceMatch[1][0];
+			} else if (fenceMatch[1][0] === fence) {
+				fenced = false;
+			}
+			continue;
+		}
+		if (fenced) continue;
+		if (/^## /u.test(lines[i])) {
+			section = lines[i].replace(/\s*\{#[^}]+\}\s*$/u, '');
+			sectionLine = i + 1;
+		}
+		if (!/^\s*\|/u.test(lines[i]) || !isTableDelimiter(lines[i + 1])) continue;
+		starts.push(i + 1);
+		const current = bySection.get(section) ?? { line: sectionLine, count: 0 };
+		current.count += 1;
+		bySection.set(section, current);
+	}
+	return { total: starts.length, firstLine: starts[0] ?? 1, sections: [...bySection].map(([name, value]) => ({ name, ...value })) };
+}
 /** A full cryptographic digest belongs in engineering evidence, not reader prose. */
 const FULL_SHA256 = /\b[a-f0-9]{64}\b/iu;
 /** Exact artifact bytes belong in an evidence manifest or engineering record. */
@@ -171,6 +227,19 @@ export function hasManualSectionNumber(text) {
 	// An IPv4 address or decimal measurement is content, not section numbering.
 	if (/^\d{1,3}(?:\.\d{1,3}){3}(?:\s|$)/u.test(visible)) return false;
 	return MANUAL_SECTION_NUMBER.test(visible);
+}
+
+/** Normalize heading and standalone-label text for duplicate detection. */
+function sectionTextKey(text) {
+	return String(text ?? '')
+		.replace(/\[([^\]]+)\]\([^)]*\)/gu, '$1')
+		.replace(/`([^`]*)`/gu, '$1')
+		.replace(/^\s*\*\*(.*?)\*\*\s*$/u, '$1')
+		.replace(/^\s*__(.*?)__\s*$/u, '$1')
+		.replace(/[\s*_~]+/gu, '')
+		.replace(/[：:]+$/u, '')
+		.trim()
+		.toLowerCase();
 }
 
 export function readManuscript(file) {
@@ -420,6 +489,23 @@ function auditFile(context) {
 		previous = heading.level;
 	}
 
+	const headingKeys = new Map();
+	for (const heading of assetPart ? [] : headings) {
+		const key = sectionTextKey(heading.text);
+		if (key === '') continue;
+		const first = headingKeys.get(key);
+		if (first === undefined) {
+			headingKeys.set(key, heading);
+			continue;
+		}
+		push(
+			'duplicate-heading',
+			'warning',
+			heading.line,
+			`标题「${heading.text}」与第${first.line}行标题重复；合并章节或改成不同语义标题。`
+		);
+	}
+
 	// Section numbers are rendered by VuePress/LaTeX. Keeping them in the
 	// source duplicates the chapter/case number and drifts when sections move.
 	if (!assetPart && ['book', 'experiment', 'appendix'].includes(part.key)) {
@@ -546,6 +632,8 @@ function auditFile(context) {
 	// --- prose hygiene ------------------------------------------------------
 	let fenced = false;
 	let fence = '';
+	let cjkLatinSpaceCount = 0;
+	let firstCjkLatinSpaceLine = null;
 	for (let i = 0; i < lines.length; i += 1) {
 		const line = lines[i];
 		const fenceMatch = /^\s*(`{3,}|~{3,})/u.exec(line);
@@ -585,12 +673,33 @@ function auditFile(context) {
 			}
 		}
 		if (/^\t/u.test(line)) push('tab-indent', 'warning', i + 1, '使用制表符缩进，请改为空格');
-		if (line.startsWith('>') || line.startsWith('    ')) continue;
+		if (line.startsWith('    ')) continue;
 		// Prose rules read the line with each inline code span replaced by a
 		// sentinel, so a half-width mark inside `like(this)` is never reported
 		// as a Chinese punctuation fault, and removing a span cannot invent a
 		// run of spaces between the characters that surrounded it.
 		const prose = line.replace(INLINE_CODE, INLINE_CODE_SENTINEL);
+		if (i + 1 >= bodyLine) {
+			const count = countCjkLatinSpaces(prose);
+			if (count > 0) {
+				cjkLatinSpaceCount += count;
+				firstCjkLatinSpaceLine ??= i + 1;
+			}
+			const labelLine = line.trim();
+			if (!/^(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|\||>)/u.test(labelLine)) {
+				const label = /^([^:：\n]{1,30})[:：]$/u.exec(labelLine)?.[1]?.trim() ?? '';
+				const heading = label === '' ? undefined : headingKeys.get(sectionTextKey(label));
+				if (heading !== undefined) {
+					push(
+						'duplicate-section-label',
+						'warning',
+						i + 1,
+						`正文出现与第${heading.line}行章节标题同名的独立标签「${label}」；删除标签并合并到该章节，或改成普通引导语。`
+					);
+				}
+			}
+		}
+		if (line.startsWith('>')) continue;
 		if (HALF_WIDTH_IN_CJK.test(prose)) {
 			push('cjk-halfwidth-punct', 'warning', i + 1, '中文之间出现半角标点，请改用全角标点');
 		}
@@ -618,6 +727,35 @@ function auditFile(context) {
 				push('reader-internal-path', 'warning', i + 1, '读者可见正文出现内部临时路径；改为“个人临时学习目录”或教师指定目录。');
 			}
 		}
+	}
+	if (cjkLatinSpaceCount > 0) {
+		push(
+			'cjk-latin-space',
+			'warning',
+			firstCjkLatinSpaceLine,
+			`本文件有 ${cjkLatinSpaceCount} 处中西文边界空格；按作者规范删除，例如“使用Python3.9”“共5个”。英文单词之间及英文与数字的常规空格保留。`
+		);
+	}
+	const tableStats = collectTableStats(lines);
+	if (tableStats.total > TABLE_FILE_LIMIT) {
+		push(
+			'table-density',
+			'warning',
+			tableStats.firstLine,
+			`本文件有 ${tableStats.total} 个表格，超过建议上限 ${TABLE_FILE_LIMIT}；逐表判断是否存在多个共享字段的横向比较，顺序、分类和单维清单改用列表或段落。`
+		);
+	}
+	for (const section of tableStats.sections.filter((entry) => entry.count > TABLE_SECTION_LIMIT)) {
+		push(
+			'table-section-overuse',
+			'warning',
+			section.line,
+			`${section.name.replace(/^##\s*/u, '')}有 ${section.count} 个表格，单节超过 ${TABLE_SECTION_LIMIT} 个；只有参数、兼容性或证据矩阵适合连续用表。`
+		);
+	}
+	if (!assetPart) {
+		const language = proseLanguageFinding(rel, body, bodyLine - 1);
+		if (language !== null && findings.length < maxFindings) findings.push(language);
 	}
 	if (text.includes('\r\n')) push('crlf', 'warning', 1, '文件包含 CRLF 行尾，仓库统一使用 LF');
 	if (text !== '' && !text.endsWith('\n')) push('no-final-newline', 'warning', lines.length, '文件末尾缺少换行');
@@ -794,8 +932,10 @@ export function auditLearnerRecord({ root, file, maxFindings = 400 }) {
 	}
 
 	const lines = text.split(/\r?\n/u);
+	const { body, bodyLine } = splitFrontmatter(text);
 	const { headings } = readManuscript(record.path);
 	let previous = 0;
+	const headingKeys = new Map();
 	for (const heading of headings) {
 		if (previous !== 0 && heading.level > previous + 1) {
 			push('heading-jump', 'warning', heading.line, `标题层级从 H${previous} 跳到 H${heading.level}：${heading.text}`);
@@ -804,10 +944,20 @@ export function auditLearnerRecord({ root, file, maxFindings = 400 }) {
 		if (heading.level >= 2 && hasManualSectionNumber(heading.text)) {
 			push('heading-manual-number', 'error', heading.line, `标题手写章节编号：${heading.text}`);
 		}
+		const key = sectionTextKey(heading.text);
+		if (key === '') continue;
+		const first = headingKeys.get(key);
+		if (first === undefined) {
+			headingKeys.set(key, heading);
+		} else {
+			push('duplicate-heading', 'warning', heading.line, `标题「${heading.text}」与第${first.line}行标题重复；合并章节或改成不同语义标题。`);
+		}
 	}
 
 	let fenced = false;
 	let fence = '';
+	let cjkLatinSpaceCount = 0;
+	let firstCjkLatinSpaceLine = null;
 	for (let i = 0; i < lines.length; i += 1) {
 		const line = lines[i];
 		const fenceMatch = /^\s*(`{3,}|~{3,})(.*)$/u.exec(line);
@@ -827,8 +977,29 @@ export function auditLearnerRecord({ root, file, maxFindings = 400 }) {
 
 		const trailing = /[ \t]+$/u.exec(line);
 		if (trailing !== null) push('trailing-whitespace', 'warning', i + 1, '行尾有多余空白。');
-		if (line.startsWith('>') || line.startsWith('    ')) continue;
+		if (line.startsWith('    ')) continue;
 		const prose = line.replace(INLINE_CODE, INLINE_CODE_SENTINEL);
+		if (i + 1 >= bodyLine) {
+			const count = countCjkLatinSpaces(prose);
+			if (count > 0) {
+				cjkLatinSpaceCount += count;
+				firstCjkLatinSpaceLine ??= i + 1;
+			}
+			const labelLine = line.trim();
+			if (!/^(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|\||>)/u.test(labelLine)) {
+				const label = /^([^:：\n]{1,30})[:：]$/u.exec(labelLine)?.[1]?.trim() ?? '';
+				const heading = label === '' ? undefined : headingKeys.get(sectionTextKey(label));
+				if (heading !== undefined) {
+					push(
+						'duplicate-section-label',
+						'warning',
+						i + 1,
+						`正文出现与第${heading.line}行章节标题同名的独立标签「${label}」；删除标签并合并到该章节，或改成普通引导语。`
+					);
+				}
+			}
+		}
+		if (line.startsWith('>')) continue;
 		if (HALF_WIDTH_IN_CJK.test(prose)) {
 			push('cjk-halfwidth-punct', 'warning', i + 1, '中文之间出现半角标点，请改用全角标点。');
 		}
@@ -836,6 +1007,16 @@ export function auditLearnerRecord({ root, file, maxFindings = 400 }) {
 			push('cjk-halfwidth-bracket', 'warning', i + 1, '中文之间出现半角括号，请改用全角括号。');
 		}
 	}
+	if (cjkLatinSpaceCount > 0) {
+		push(
+			'cjk-latin-space',
+			'warning',
+			firstCjkLatinSpaceLine,
+			`本记录有 ${cjkLatinSpaceCount} 处中西文边界空格；按作者规范删除，例如“使用Python3.9”“共5个”。英文单词之间及英文与数字的常规空格保留。`
+		);
+	}
+	const language = proseLanguageFinding(record.file, body, bodyLine - 1);
+	if (language !== null) push(language.rule, language.severity, language.line, language.message);
 	if (text.includes('\r\n')) push('crlf', 'warning', 1, '文件包含 CRLF 行尾，记录应使用 LF。');
 	if (text !== '' && !text.endsWith('\n')) push('no-final-newline', 'warning', lines.length, '文件末尾缺少换行。');
 

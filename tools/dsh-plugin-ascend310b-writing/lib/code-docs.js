@@ -15,6 +15,7 @@ import { join, relative, sep } from 'node:path';
 
 import { hasManualSectionNumber } from './audit-core.js';
 import { listFiles } from './code.js';
+import { proseLanguageFinding } from './prose-language.js';
 
 const SAMPLE_DIR = /^(?:chapter|case|appendix)\d+$/u;
 const CODE_EXTENSIONS = new Set([
@@ -133,6 +134,25 @@ export function collectCodeDocs({ root }) {
 			});
 		}
 		if (manualDocFindings.length > 0) issues.push('手写章节编号');
+
+		const languageTargets = [
+			...activeDocs.filter((file) => !file.startsWith('docs/evidence/')),
+			...(readme ? ['README.md'] : [])
+		];
+		if (files.includes('CHANGELOG.md')) languageTargets.push('CHANGELOG.md');
+		let nonChinese = 0;
+		for (const targetRel of languageTargets) {
+			const targetFile = `${sampleRel}/${targetRel}`;
+			const language = proseLanguageFinding(targetFile, readFileSync(join(absolute, targetRel), 'utf8'));
+			if (language === null) continue;
+			nonChinese += 1;
+			findings.push({
+				...language,
+				severity: 'warning',
+				message: `工程文档语言提示：${language.message}`
+			});
+		}
+		if (nonChinese > 0) issues.push('正文不是中文');
 
 		if (!readme) {
 			issues.push('README 缺失');

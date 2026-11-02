@@ -1,6 +1,6 @@
 ---
 name: ascend310b-writing-markdown
-description: Ascend310 教材 Markdown 写作规范。用于 CommonMark/GFM 语法、frontmatter、标题层级、锚点、链接、图片、表格、代码块、中文标点、markdownlint 规则和 Markdown 卫生检查；不用于 VuePress 配置、LaTeX 生成物或课件排版。
+description: Ascend310 教材 Markdown 写作规范。用于 CommonMark/GFM 语法、frontmatter、标题层级、锚点、链接、图片、表格、代码块、中文标点、中西文无字面空格规范、markdownlint 规则和 Markdown 卫生检查；不用于 VuePress 配置、LaTeX 生成物或课件排版。
 ---
 
 # Markdown 写作规范
@@ -11,7 +11,7 @@ description: Ascend310 教材 Markdown 写作规范。用于 CommonMark/GFM 语�
 
 本仓库教材的源是 Markdown。VuePress、LaTeX、PDF、HTML 和截图都是生成物；不要在生成物里修内容。
 
-本 skill 采用 CommonMark 的通用语法、Markdown Guide 的常用写法、markdownlint 的机械规则，以及本仓库额外的中文教程规范。若通用规则与仓库规则冲突，以仓库 `AGENTS.md` 和现有正文为准。
+本 skill 采用 CommonMark 的通用语法、Markdown Guide 的常用写法、markdownlint 的机械规则，以及本仓库额外的中文教程规范。若通用规则与仓库规则冲突，以仓库 `AGENTS.md` 和现有正文为准。仓库自有的学生Markdown正文使用简体中文；技术标识、命令和外部原文保留英文，不能写成英文教程。`prose-language`是正文语言的阻断规则。
 
 ## 标题与锚点
 
@@ -23,10 +23,11 @@ description: Ascend310 教材 Markdown 写作规范。用于 CommonMark/GFM 语�
   `{#src-<部分>-<文件名>-h<n>}`。
 - 标题前保留空行，避免 `{#id}` 被转换器当普通文字。
 - 标题直接命名内容，避免“关于……”“结果”“相关工作”这类空标题。
+- 同一文件不得重复同名标题。正文中的“参考资料：”“小结：”等独立标签也不能与已有章节标题重名，否则目录会出现两个入口或语义重复。
 
 ## 链接与图片
 
-- 内部链接使用相对路径；不要用裸 URL 代替仓库链接。
+- 允许的内部链接使用相对路径；不要用裸 URL 代替仓库链接。`src/experiment/case4.md` 只可链接自己的源码、图片和外部来源，不得链接或依赖任何其他仓库文档。
 - 图片必须有 alt，并放在页面可解析的相对目录。
 - 教材正文图目标不超过 `1600×1000`、`1 MB`；`2400×1500` 或 `1.5 MB` 是硬上限。超限时拆图、重新生成或压缩，不能只在 Markdown 中缩小显示。
 - 移动/改名图片时同步更新所有引用。
@@ -42,18 +43,37 @@ description: Ascend310 教材 Markdown 写作规范。用于 CommonMark/GFM 语�
 - 数学/箭头需要正确字体时使用数学模式。
 - 删除行尾空白；统一 LF 和最终换行。
 
+## 表格、列表与段落
+
+先判断内容关系，再选形式：
+
+- 表格用于至少3个项目共享至少2个字段、读者需要横向比较的场合，例如参数、兼容性、证据差异和工具输入输出边界。
+- 编号列表用于有顺序、依赖或验收步骤的内容。
+- 无序列表用于分类、条件、例子和单维功能清单。
+- 普通段落用于概念解释、因果关系、取舍、背景和多个常见产品的介绍。
+- 两项比较、只有一列有效信息、连续操作步骤、长句解释和概念定义不使用表格。
+- 不能为了“整齐”把每节都做成表格。同类工具如果只有“名称+作用”一列有效信息，优先用列表；只有需要比较输入、输出和边界时才用表。
+- `table-density`和`table-section-overuse`提示表格过多；命中后逐表判断，不机械删除，也不把需要横向比较的矩阵改成难读的长段落。
+
+## 中西文空格
+
+- 汉字与英文、数字之间不留字面空格：写`使用Python3.9`、`昇腾310B`、`共5个样本`。
+- 英文单词之间保留词间空格；英文与数字或单位按语义处理，如`Python 3.9`、`5 kg`。
+- 型号和固定名称保持原形，如`GPT-4`、`SHA-256`、`8T`。
+- 代码块、行内代码、URL和文件路径不改写。`cjk-latin-space`提示必须清理的文字边界，不能因为历史正文仍有很多命中就忽略新写内容。
+
 ## 写作流程
 
 1. 运行 `ascend310b_writing_audit`。
 2. 只改源 Markdown，按 error → warning → info 顺序处理。
 3. 复跑 audit；冻结名和 sidebar 由交叉检查确认。
-4. 确认 `pnpm run docs:dev` 正在运行，并打开对应本地网页让用户人工检查 Markdown 的最终呈现；状态先写 `human-review: pending`。
+4. 对进入 VuePress 的 Markdown，确认 `pnpm run docs:dev` 正在运行，并打开对应本地网页让用户人工检查最终呈现；非站点文档按实际阅读载体审查；`human-review: pending` 只保留在外部任务或审查元数据中，不写成正文行或发布内容。
 5. 需要去 AI 味时单独运行 `ascend310b_writing_style`，逐句判断，不机械替换。
 6. 推送前运行 `ascend310b_writing_push_check`。
 
 ## 本地网页与人工校验
 
-Markdown 源修改后必须进入本地 VuePress 页面查看，同时运行 `node scripts/check_page_layout.mjs --url <URL>` 检查桌面与移动视口的横向溢出。自动 audit、站点构建和 HTTP 200 不是人工验收；只有用户明确确认页面后才算完成。
+进入 VuePress 的教材 Markdown 源修改后必须查看对应本地页面，同时运行 `node scripts/check_page_layout.mjs --url <URL>` 检查桌面与移动视口的横向溢出。根 `docs/` 是维护者治理文档，不进入 VuePress；其他非站点 Markdown 按其实际阅读载体审查。自动 audit、站点构建和 HTTP 200 不是人工验收；只有用户明确确认相应呈现后才算通过人工审查。
 
 ## 停止条件
 

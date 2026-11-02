@@ -9,6 +9,8 @@ description: Ascend310 教材 Graphviz DOT 图写作与画布适配。用于系�
 
 用于教材、案例和代码 docs 中的系统架构图、数据流图、程序流程图和模块关系图。DOT 源文件是图的可编辑真源，PNG/SVG 是生成物。
 
+本 skill 只负责辅助图像资产的制作、引用和版面验收，不决定正文结构或教学顺序。案例正文由 `ascend310b-writing-case`、理论正文由 `ascend310b-writing-theory` 组织；图服务于正文中的具体学习问题，不能用架构图替代概念解释或把正文改成部署报告。图中节点、边界、箭头和说明标签使用简体中文；端口、API、模型名等必要标识保留原形。图片所在正文仍由主内容skill负责，`prose-language`不能用图替代中文解释来规避。
+
 优先使用 Graphviz `dot` 布局表达方向明确的流程图；只有确实需要力导向布局时才考虑其他布局引擎。
 
 ## 教材画布契约
@@ -29,7 +31,7 @@ DOT 不是越大越详细。先选目标载体，再限制画布：
 graph [
   rankdir=LR,
   fontname="Noto Sans CJK SC",
-  fontsize=12,
+  fontsize=16,
   size="8.5,4.8",
   ratio="fill",
   dpi=144,
@@ -41,7 +43,7 @@ graph [
 ];
 node [
   fontname="Noto Sans CJK SC",
-  fontsize=12,
+  fontsize=16,
   margin="0.10,0.06",
   height="0.42",
   shape="box",
@@ -51,7 +53,7 @@ node [
 ];
 edge [
   fontname="Noto Sans CJK SC",
-  fontsize=10,
+  fontsize=13,
   color="#546E7A",
   arrowsize="0.7"
 ];
@@ -77,7 +79,7 @@ fontname="Noto Sans CJK SC"
 - 教材节点正文 `fontsize` 不小于 16，边标签不小于 13；不要用 12 号字再加宽画布。
 - 节点要有足够 `margin` 和 `height`，中文标签优先两行，不要依赖自动换行。
 - 生成后按教材实际显示宽度检查，不要只看原图：内容列缩放后，正文仍应清楚可读。
-- 图片一旦提交，字体已栅格化；换字体后必须重新生成 PNG/SVG，不能只改 DOT。
+- PNG 中的文字已栅格化；SVG 通常保留文本并依赖查看环境的字体，不因提交而栅格化。换字体后必须重新生成 PNG/SVG，不能只改 DOT，并在目标网页/PDF 中复核字体与布局。
 
 ## 系统架构图规则
 
@@ -87,7 +89,7 @@ fontname="Noto Sans CJK SC"
 2. 每个边界最多 3 个主要节点，标签 2 行以内；
 3. 数据方向统一，通常 `rankdir=LR`；反馈边可用 `constraint=false`；
 4. 用 `subgraph cluster_*` 表示安全边界、进程边界或硬件边界；
-5. 端口、密钥、loopback 等关键约束写进节点或边标签；
+5. 概念图只在解释当前学习问题确有必要时标注端口、密钥机制、loopback 等关键约束；不放真实密钥，不把部署参数清单塞进概念图，完整工程细节交由代码 docs；
 6. 超过 8 个主节点就拆成“总览图 + 细节图”，不要缩成不可读的大图；
 7. 图内不放未验证的性能数字、兼容性结论或本机路径。
 
@@ -109,9 +111,9 @@ fontname="Noto Sans CJK SC"
 ```dot
 digraph workflow {
   rankdir=LR;
-  graph [fontname="Noto Sans CJK SC", bgcolor="transparent"];
-  node [shape=box, style="rounded,filled", fillcolor="#f5f7fa"];
-  edge [color="#546e7a"];
+  graph [fontname="Noto Sans CJK SC", fontsize=16, size="7.2,4.2", ratio="compress", dpi=180, pad="0.08", nodesep="0.28", ranksep="0.48", bgcolor="transparent"];
+  node [fontname="Noto Sans CJK SC", fontsize=16, margin="0.10,0.06", height="0.42", shape=box, style="rounded,filled", fillcolor="#f5f7fa"];
+  edge [fontname="Noto Sans CJK SC", fontsize=13, color="#546e7a"];
   start [label="输入"];
   process [label="ATC/ACL"];
   start -> process;
@@ -123,11 +125,11 @@ digraph workflow {
 - 用 `subgraph cluster_*` 表示硬件、进程或阶段边界；
 - 中文字体必须实际存在或使用站点/PDF 可用字体，生成后检查；
 - 不把超大模型图塞进一页，按子系统拆图；
-- 不把 DOT 源和生成图混在一个目录层级中，保持可追溯。
+- DOT 源与对应 PNG/SVG 必须同目录保留，使用相同文件主名，保持可追溯。
 
 ## 生成与引用
 
-先生成到源图同目录或明确的 `imgN/` 目录。网页/PDF 优先 SVG，固定像素场景再生成 PNG：
+先把 DOT 源放在对应的 `imgN/` 等图像资产目录，再生成到源图同目录。网页/PDF 优先 SVG，固定像素场景再生成 PNG：
 
 ```bash
 dot -V

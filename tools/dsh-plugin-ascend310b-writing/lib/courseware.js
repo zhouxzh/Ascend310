@@ -25,6 +25,7 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { splitSlides } from './deck.js';
+import { proseLanguageFinding } from './prose-language.js';
 import { join } from 'node:path';
 
 /** Smallest content font that stays legible from the back of a classroom. */
@@ -55,6 +56,10 @@ export function auditCoursewareText({ file, text }) {
 	// counted as finished teaching material.
 	const isScaffold = /presentation-scaffold:/u.test(text);
 	const isLegacy = /\/legacy-|archive/u.test(file);
+	if (!isLegacy) {
+		const language = proseLanguageFinding(file, text);
+		if (language !== null) findings.push(language);
+	}
 	if (isScaffold) {
 		findings.push({
 			rule: 'deck-scaffold',

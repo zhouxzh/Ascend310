@@ -319,8 +319,8 @@ export function apply(ctx, config) {
 			description:
 				'Audit the tutorial manuscript for the repository\'s frozen naming rules and Markdown hygiene. ' +
 				'Checks chapter/case/appendix title shape and punctuation, heading-level jumps, explicit heading ' +
-				'anchor prefixes, missing image and link targets, sidebar coverage, Chinese half-width punctuation, ' +
-				'trailing whitespace, CRLF line endings, and a missing final newline. ' +
+				'anchor prefixes, missing image and link targets, sidebar coverage, Simplified-Chinese learner prose, ' +
+				'Chinese half-width punctuation, trailing whitespace, CRLF line endings, and a missing final newline. ' +
 				'It also cross-checks the frozen-name tables in AGENTS.md against the titles the manuscripts ' +
 				'actually publish, in both directions. Pass `rev` before pushing to additionally verify that ' +
 				'every relative reference resolves inside that commit. ' +
@@ -378,9 +378,10 @@ export function apply(ctx, config) {
 			description:
 				'Audit one learner experiment Markdown record under repository tmp/ only. The required file must be a ' +
 				'repository-relative tmp/*.md path; absolute paths, traversal, arbitrary documents and symlinks that ' +
-				'escape the repository are refused. Checks strict UTF-8 readability, line endings and trailing whitespace, ' +
-				'heading jumps/manual numbering, fenced-code language labels, local Markdown image/link targets and Chinese ' +
-				'half-width punctuation. It does not apply frozen-title, sidebar or heading-anchor rules.',
+				'escape the repository are refused. Checks strict UTF-8 readability, Simplified-Chinese learner prose, ' +
+				'line endings and trailing whitespace, heading jumps/manual numbering, fenced-code language labels, local ' +
+				'Markdown image/link targets and Chinese half-width punctuation. It does not apply frozen-title, sidebar ' +
+				'or heading-anchor rules.',
 			parameters: {
 				root: ROOT_PARAMETER,
 				file: {

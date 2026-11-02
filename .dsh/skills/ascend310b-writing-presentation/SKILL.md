@@ -5,7 +5,7 @@ description: Ascend310 教材演示文稿写作与验收。用于 src/presentati
 
 # Presentation 写作
 
-只处理 Ascend310 教材中面向 310B 的 Marp 课件，不处理教材正文或代码工程 docs。
+只处理 Ascend310 教材中面向 310B 的 Marp 课件，不处理教材正文或代码工程 docs。课件可见正文和讲师备注使用简体中文；代码、命令、API、路径、模型名和必要英文术语保留原形，`prose-language`报告的英文主导课件不能通过。
 
 ## 范围
 
@@ -38,7 +38,7 @@ description: Ascend310 教材演示文稿写作与验收。用于 src/presentati
 - 明确的学习目标或主线；
 - 正文按“每页一个论点”组织；
 - 小结或课堂任务；
-- 每页讲师备注；
+- 每页讲师备注；备注可保留在 Marp/HTML 注释中，并编译到讲师视图使用，但不得出现在面向学生投影的幻灯可见区域；
 - 对应 `src/` 或 `samples/` 的来源。
 
 封面只写标题、内容承诺、作者/邮箱和来源，不写“教师授课版”等行政标签。页脚使用冻结名，页眉使用教材名，不自行更换主题、字号体系或页脚位置。
@@ -54,7 +54,7 @@ description: Ascend310 教材演示文稿写作与验收。用于 src/presentati
    - 主题一致；
    - 封面、目标、章节、内容和小结页逐页检查。
 5. 源码高度估算只能预警，不能代替真实渲染。
-6. 打开本地 `presentation/<deck>.html` 页面，让用户人工检查封面、内容、链接、字号和课堂节奏；可用 `node scripts/check_page_layout.mjs --url <URL>` 补充检查图片/SVG 越界，最终状态先写 `human-review: pending`。
+6. 打开本地 `presentation/<deck>.html` 页面，让用户人工检查封面、内容、链接、字号和课堂节奏；可用 `node scripts/check_page_layout.mjs --url <URL>` 补充检查图片/SVG 越界，`human-review: pending` 只保留在外部任务或审查元数据中，不写入发布的幻灯正文或讲师备注；此限制不禁止正常教学备注编译到讲师视图或 HTML 注释中。
 7. 推送前运行 `ascend310b_writing_push_check`，再按 `ascend310b_writing_ci` 检查 Pages 构建。
 
 ## 内容规则

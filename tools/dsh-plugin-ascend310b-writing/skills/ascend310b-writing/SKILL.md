@@ -1,6 +1,6 @@
 ---
 name: ascend310b-writing
-description: Ascend310 教材仓库的中文技术写作规范与守门流程。在新增、重命名或改写章节/案例/附录，调整 sidebar 与索引，审查 Markdown 命名、锚点、链接、图片、标点与行尾，出 LaTeX/PDF 后检查缺字形与产物新鲜度，检查 Marp 课件的真实浏览器裁切与信息密度，准备 commit/push 前做推送门槛检查，或需要统计写作进度与篇幅、以及用户要求润色/去 AI 味时使用。触发后先跑 ascend310b_writing_audit，课件改动再跑 ascend310b_writing_deck_render，出 PDF 后跑 ascend310b_writing_render，推送前跑 ascend310b_writing_push_check。
+description: Ascend310 教材仓库的中文技术写作规范与守门流程。在新增、重命名或改写章节/案例/附录，调整 sidebar 与索引，审查 Markdown 命名、锚点、链接、图片、标点、中西文无字面空格规范与行尾，出 LaTeX/PDF 后检查缺字形与产物新鲜度，检查 Marp 课件的真实浏览器裁切与信息密度，准备 commit/push 前做推送门槛检查，或需要统计写作进度与篇幅、以及用户要求润色/去 AI 味时使用。触发后先跑 ascend310b_writing_audit，课件改动再跑 ascend310b_writing_deck_render，出 PDF 后跑 ascend310b_writing_render，推送前跑 ascend310b_writing_push_check。
 ---
 
 # 教程写作守门
@@ -28,27 +28,39 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
 | Graphviz DOT | `ascend310b-writing-dot` | 系统架构图、数据流图、程序流程图和 `.dot` 源 |
 | 跨对象规则 | 本 skill | 冻结命名、链接、图片、标点、PDF、push gate 和写作进度 |
 
-先判断对象，再打开专用 skill。一次写作任务只加载本 skill 加**一个**对象 skill；不要把全部 writing skill 同时打开。
+采用“主内容 skill + 必要辅助 skill”：先根据交付物选择一个主内容 skill，再按需加载制作或审查辅助规则，不一次加载全部 skills。案例正文由 `ascend310b-writing-case` 管教学顺序，配图可叠加 `ascend310b-writing-dot`，路由可叠加 `ascend310b-writing-vuepress`，请求 PDF 时可叠加 `ascend310b-writing-latex`。辅助规则不能把教材章节改成实验报告或制作清单；硬件事实、证据真实性和安全边界始终保留。
 
-| 用户在改什么 | 加载 |
-| --- | --- |
-| 第1–10章理论 | `ascend310b-writing-theory` |
-| 案例1–9教材正文 | `ascend310b-writing-case` |
-| Marp 课件 | `ascend310b-writing-presentation` |
-| `samples/*/docs`、案例 README 的部署/验证 | `ascend310b-writing-docs` |
-| 源码 docstring、CLI、API 表 | `ascend310b-code-docs` |
-| 站点主题、navbar、sidebar、base、Pages | `ascend310b-writing-vuepress` |
-| PDF/缺字形 | `ascend310b-writing-latex` |
-| 结构图 | `ascend310b-writing-dot` |
-| 标点、标题、链接卫生 | `ascend310b-writing-markdown` |
-| 论文式论证 | `ascend310b-writing-academic` |
-| 课程计划/先修矩阵 | `ascend310b-curriculum-planning` |
+| 用户在改什么 | 主内容 skill | 可选辅助 skill |
+| --- | --- | --- |
+| 第1–10章理论 | `ascend310b-writing-theory` | `writing-dot`、`writing-latex`、`writing-markdown`、`writing-vuepress` |
+| 案例1–9教材正文 | `ascend310b-writing-case` | `writing-dot`、`writing-latex`、`writing-markdown`、`writing-vuepress`、`ascend310b-case-testing` |
+| Marp 课件 | `ascend310b-writing-presentation` | `writing-dot`、`writing-markdown`、`writing-vuepress` |
+| `samples/*/docs`、案例 README 的部署/验证 | `ascend310b-writing-docs` | `ascend310b-case-testing`、`writing-markdown` |
+| 源码 docstring、CLI、API 表 | `ascend310b-code-docs` | `writing-markdown` |
+| 站点主题、navbar、sidebar、base、Pages | `ascend310b-writing-vuepress` | `writing-markdown` |
+| PDF/缺字形 | 对应主内容 skill | `ascend310b-writing-latex` |
+| 结构图 | 对应主内容 skill | `ascend310b-writing-dot` |
+| 论文式论证/学术润色 | `ascend310b-writing-academic` | 按对象加载 theory/case，不用论文结构替代教材结构 |
+| 课程计划/先修矩阵 | `ascend310b-curriculum-planning` | 只规划，不代写学生正文 |
 
-不要把案例运行手册写成理论章节，也不要把代码 docs 当成课件或案例正文。`nature-polishing` 只用于已有学术散文的润色，不替代本仓库教材写作。
+`writing-case` 管案例教学叙事，`writing-docs` 管运行/部署/验证资料，`code-docs` 管 API/CLI 参考，`writing-dot` 管图资产，`writing-vuepress` 管站点壳与导航，`writing-latex` 管生成和排版。发生跨对象任务时按“主内容 skill + 必要辅助 skill”组合；同一任务不因此把全部 skill 都加载。
+
 
 已发布 Presentation 的“对应教材”必须使用 GitHub Pages HTML 链接，“配套样例”必须使用 GitHub `samples/` 目录链接；不要在已发布课件中保留 `../experiment/*.md` 等本地相对导航。
 
+## 正文语言
+
+仓库自有的学生教材、案例正文、样例README、活动工程`docs/`、理论章节、附录和课件正文默认使用简体中文。英文只用于必须保持原形的技术内容：代码、命令、API、路径、环境变量、模型名、版本号、日志原文、外部引用和许可证文本。
+
+- 英文技术词不能让整段说明变成英文；每段的主体、步骤、判断、告警、结论和学习提示必须用中文。
+- 成段英文说明、英文标题、英文表头和英文任务提示都不合格，不能因为结构、链接或代码正确而通过。
+- 引用上游英文原文时保留原文，但必须用中文说明它证明什么、读者该看哪一部分。
+- `ascend310b_writing_audit` 和代码文档检查会报告 `prose-language`。新写或改写的本校稿必须清零，不得当作可保留warning。
+- `scientific-writing` 与 `nature-polishing` 仅用于用户明确要求的英文论文、英文润色或中译英任务，不得用于中文教材的默认润色；中文教材润色走`ascend310b-writing-academic`。
+
 ## 读者稿与生产备注
+
+内容按主责归属存放：学生教程在 `src/`；案例运行与工程资料在 `samples/caseN/docs/`；插件专属说明在 `tools/`。根目录 `docs/` 只放仓库治理、发布策略、环境矩阵摘要和跨项目审计，不进入 VuePress，不存放案例正文、单案例命令或原始证据。需要保留的原始证据须经用户授权，留在所属案例或指定外部归档，不自动提交 Git。
 
 教材、案例和课件是给学生读的完成稿，不是作者工作台。参考 `nature-polishing` 的读者工作流：先判断“这页对我有没有用”，再看证据和边界。生产备注不能进入读者可见正文。
 
@@ -62,7 +74,7 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
 
 正式读者稿只保留“这张图/这次运行证明什么、适用边界是什么”和可见结果。图片用一句面向读者的 alt 说明职责或流程即可。完整哈希、字节数、绝对路径、原始日志和清单只在 `samples/caseN/docs/evidence/`、受控工程 docs、发布复现记录或仓库 `tmp/` 下的学习记录中保留；不要将它们复制到 `src/` 正文或课件可见区。`.dot` 源、字体和画布检查留在 `ascend310b-writing-dot`、同目录源文件和课件页脚的 HTML 来源链接中。代码命令可以出现在教程里，但那是学生要执行的入口，不是作者的排版备注。
 
-教材正文图目标为 `1600×1000` / `1 MB`，硬上限为 `2400×1500` / `1.5 MB`；浏览器实际缩放超过 2.5 倍为 warning，超过 3 倍为失败。超限图必须拆图或重新生成，不能靠 Markdown/CSS 缩小。不同板端、不同状态的两张截图如果字节完全相同，只能作为同一证据，不能当成两次独立采集。历史超限图只允许通过 `docs/image-audit-baseline.json` 精确冻结为 warning；新图或未登记超限仍是 error，修复后必须删除对应基线项。
+教材正文图目标为 `1600×1000` / `1 MB`，硬上限为 `2400×1500` / `1.5 MB`；浏览器实际缩放超过 2.5 倍为 warning，超过 3 倍为失败。超限图必须拆图或重新生成，不能靠 Markdown/CSS 缩小。不同板端、不同状态的两张截图如果字节完全相同，只能作为同一证据，不能当成两次独立采集。历史超限图只允许通过 `tools/dsh-plugin-ascend310b-writing/data/image-audit-baseline.json` 精确冻结为 warning；新图或未登记超限仍是 error，修复后必须删除对应基线项。
 
 ## 章节编号
 
@@ -103,6 +115,26 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
   `README.md` 索引，以及 `src/presentation/` 下配对的 Marp 幻灯。
 - 不要把 `src/experiment/case4.md` 改成依赖其他仓库文档；它必须自包含。
 
+## 中西文边界
+
+作者采用中文论文式排版：汉字与英文、数字之间不留字面空格。写`使用Python3.9运行`、`昇腾310B开发板`、`共5个样本`，不写`使用 Python 3.9 运行`、`昇腾 310B开发板`、`共 5 个样本`。
+
+- 英文单词之间保留正常的词间空格，如`large language model`。
+- 英文与数字、单位的空格按语义和规范处理，如`Python 3.9`、`5 kg`；型号保持原形，如`GPT-4`、`SHA-256`、`8T`。
+- 不修改代码、URL、文件路径和行内代码；行内代码两端的Markdown排版空格不改。
+- `cjk-latin-space`负责提示中西文边界的字面空格。该规则对历史正文按文件汇总，但新写和改写段落必须清零，不得作为可保留warning。
+- 禁止用全局正则直接替换整本书，避免破坏链接、命令、型号和渲染标记；只修改审阅过的正文段落。
+
+## 表格、列表与段落
+
+形式由内容关系决定，不为了版面整齐默认用表：
+
+- 表格只用于多个项目共享多个字段、需要横向比较的参数、兼容性、证据差异或工具边界。
+- 编号列表用于有顺序和依赖的步骤；无序列表用于分类、条件、例子和单维功能项。
+- 概念、因果、取舍、背景和多个产品的介绍优先用段落，不要压成表格。
+- 两项比较、只有一列有效信息、连续操作步骤和长句解释不使用表格。
+- `table-density`与`table-section-overuse`超过阈值时逐表复核。工具清单若只有“名称+作用”，优先列表；需要同时比较输入、输出和边界时才保留表格。
+
 ## 标准流程
 
 0. **换机器或第一次用**：先跑 `ascend310b_writing_toolchain`。它报告这台机器缺哪些构建
@@ -117,8 +149,8 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
 2. 按规则修**源 Markdown**，不要改生成物
    （`latex/`、`src/.vuepress/dist`、`src/.vuepress/.cache`）。
 3. 复跑 `ascend310b_writing_audit`，直到 error 归零；warning 若有意保留
-   （例如 Markdown 强制换行的行尾空格），在回复里说明。
-4. 修改章节、案例、附录或代码 docs 后，**必须同步更新本地网页并让人工查看**：
+   （例如 Markdown 强制换行的行尾空格），在回复里说明。`cjk-latin-space`不属于可保留warning：新写或改写的正文必须删除中西文边界空格。
+4. 修改进入站点的章节、案例、附录或样例代码 docs 后，**必须同步更新本地网页并让人工查看**；仅修改 skill、插件说明或不进入 VuePress 的根目录治理 docs 时，只做对应文档/测试检查，不为此启动站点：
    运行或复用 `pnpm run docs:dev`，把本地 URL 交给用户，等待 HMR/刷新后确认页面内容。
    同时运行 `ascend310b_writing_page_layout`（或 `node scripts/check_page_layout.mjs --url <URL>`），检查 1440px 和 390px 视口的横向溢出、图片/SVG 越界和内部滚动。不要把 `docs:build`、HTTP 200 或自动审计通过当成人工验收；未经用户确认不要 push。
    演示文稿改动必须先跑 `pnpm run docs:slides`，再用 `ascend310b_writing_deck_render`
@@ -142,7 +174,7 @@ VuePress 站点与 LaTeX/PDF 都是生成物。写作改动的判据只有一条
 - 给用户明确的本地 URL：正文用对应 `experiment/`、`book/` 或 `appendix/` 页面；课件用 `presentation/<deck>.html`。
 - 运行 `ascend310b_writing_page_layout` 或 `node scripts/check_page_layout.mjs --url <URL>`，桌面和移动视口都必须无页面横向滚动、无图片/SVG 越界；代码块/表格内部滚动单独记录。
 - HMR 只能证明开发服务器在运行；仍要刷新页面并检查正文、图片、链接、锚点和课件版面。
-- 自动化完成时把最终状态写成 `human-review: pending`。只有用户明确确认本地网页内容正确后，才能改为通过。
+- 自动化完成时，在外部任务或审查元数据中记录 `human-review: pending`，不写入发布正文。只有用户明确确认本地网页内容正确后，才能改为通过。
 - `docs:build` 成功、自动审计 0 error、HTTP 200 都不等于人工验收通过。
 - 未完成人工校验时不得 commit 后再把它描述成最终发布结果，也不得 push。
 
@@ -313,14 +345,14 @@ Marp 支持演讲者备注（HTML 注释），放映时按 `p` 打开演讲者�
 > [stop-slop-zh](https://github.com/VincentOld/stop-slop-zh)（12 类套话词表）。
 > 本插件的词表是按**本书实际语料**校准的，不是照搬：例如 `首先` 在本书 44 次全是合法步骤词，因此不报。
 
-### 改写的六条硬规则
+### 按段落任务改写
 
-1. **一个形容词都不留如果它能被数字替换**："性能大幅提升" → "端到端延迟从 42 ms 降到 23 ms"。
-2. **每段第一句必须是事实或动作**，不是评价（"这一设计很重要" ×）。
-3. **步骤写命令**，不写"我们需要……"；读者要能照抄。
-4. **标题直接命名内容**，不用"是什么/为什么/怎么办"三段式。
-5. **节奏要有长短**：连续三段长度接近就调整（报告里的段落长度 ± 值可以参考）。
-6. **改完必须复跑 `ascend310b_writing_audit`**，确认没破坏锚点、链接、冻结名。
+1. 删除无信息的评价词；只有原始证据支持时才用数字替换，不为消除形容词编造测量值。
+2. 论证段可先给结论；教学段允许以问题、情境、类比或例子开头，再展开机制和边界。不要把所有段落压成事实清单。
+3. 可执行操作步骤写清目录、命令、预期输出和失败分支；概念推导、预测题和迁移练习不必写成命令。教材必须让学生知道为什么这样做，而不只是照抄。
+4. 标题直接命名具体内容；允许有教学价值的提问式标题，避免每章机械套同一组“是什么/为什么/怎么办”。
+5. 段落长短由论证和教学任务决定，不为制造长短变化拆散解释。风格扫描只是候选提示，不能据标点数量判断作者或自动删句。
+6. 改完复跑 `ascend310b_writing_audit`，并人工检查先修、理论解释、示例和练习是否连贯；机械检查不证明教材质量。
 
 ### 边界
 
@@ -337,6 +369,7 @@ Marp 支持演讲者备注（HTML 注释），放映时按 `p` 打开演讲者�
 | `frozen-table-missing` | 编号正文没登记进冻结名表 | 新增章节/案例/附录后，在 `AGENTS.md` 对应表格补一行 |
 | `anchor-prefix` | 显式锚点用了别的文件前缀 | 锚点要写成 `{#src-<部分>-<文件名>-h<n>}`，附录文件不要沿用案例的 `src-experiment-caseN-` |
 | `heading-jump` | 标题层级跳跃 | 从 H2 到 H3，不要直接跳到 H4 |
+| `duplicate-heading` / `duplicate-section-label` | 同名标题或正文标签冒充章节标题 | 同一文件合并重复章节；`参考资料：`、`小结：`等标签不能与已有标题重名 |
 | `image-missing` / `link-missing` | 相对图片或链接目标不存在 | 图片放在同级 `img1/` 等目录，路径相对当前 Markdown |
 | `commit-link-missing` | 提交树里引用的目标没进这次提交 | 检查是不是把被引用目录排除在提交之外了 |
 | `render-missing-character` | 字体没有该字形 | 该字符在 PDF 里会缺失；改用数学模式（`$\to$`）或换成有该字形的字体 |
@@ -345,6 +378,9 @@ Marp 支持演讲者备注（HTML 注释），放映时按 `p` 打开演讲者�
 | `render-log-stale` | 日志早于最新正文 | 先重新构建再据日志下结论 |
 | `sidebar-missing` | 正文未出现在 sidebar.ts | 新章节要同时加入 `sidebar.ts` 与对应 `README.md` |
 | `cjk-halfwidth-punct` | 中文之间用了半角标点 | 正文用全角 `，；：！？`，代码与行内代码保持半角 |
+| `cjk-latin-space` | 汉字与英文、数字之间有字面空格 | 删除边界空格，写`使用Python3.9`、`8T开发板`、`共5个`；英文词间和英文数字间的正常空格保留 |
+| `table-density` / `table-section-overuse` | 文件中或单个H2内表格过多 | 逐表复核；只有共享多个字段、需要横向比较时用表，顺序、分类和单维清单改用列表或段落 |
+| `prose-language` | 剔除代码后正文仍以英文为主 | 把标题、解释、步骤、表头和结论改为简体中文；命令、API、路径和型号保留原形 |
 | `trailing-whitespace` | 行尾多余空白，**已证明不影响渲染** | 直接删；`scripts/fix-hygiene.mjs --apply` 只处理这一类 |
 | `hard-break-effective` | 行尾 ≥2 空格构成硬换行 | 会真的断行。先看提示里"同列表另外 N 项是否也这样写"，再决定留或删，别默认删 |
 | `crlf` | 文件是 CRLF 行尾 | 统一转为 LF |
@@ -352,7 +388,7 @@ Marp 支持演讲者备注（HTML 注释），放映时按 `p` 打开演讲者�
 
 ## 边界
 
-- 只读检查，不改文件；要改正文时用编辑工具逐个改，不要整体重写章节。
+- 审核请求默认只读；明确要求修改时编辑源文件。用户要求教材结构重写时允许整体重组章节，但应先确定教学主线，保留事实、引用和可复现命令，不把局部润色擅自扩大为全章改写。
 - 不要把模型权重、ONNX/OM、数据集、截图放进 Git（用户明确要求的小样本除外）。
 - 涉及板端才能验证的结论（CANN、ATC、ACL、NPU 性能），本地不得下判断，
   按仓库 `AGENTS.md` 的证据分级记录为 `untested` 或 `documented`。

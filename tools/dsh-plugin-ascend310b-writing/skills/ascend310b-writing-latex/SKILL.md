@@ -17,7 +17,7 @@ Markdown 源 -> convert-vuepress.sh -> latex/*.tex -> XeLaTeX -> PDF
 
 `src/` 是源，`latex/chapters/`、`latex/cases/`、`latex/appendices/`、`latex/*.tex` 和 PDF 是生成物。生成物不手工编辑。
 
-案例在“实践案例”部分按章自动编号：`案例 4` 对应 `4.1`、`4.2`、`4.2.1`。这些编号由 LaTeX 的 `chapter/section/subsection` 生成，不能通过修改生成的 `.tex` 或 PDF 补齐，也不能在 Markdown H2–H6 中手写。
+案例在“实践案例”部分按章自动编号：`案例 4` 的节、小节可显示为 `4.1`、`4.2`、`4.2.1`。这些只是 LaTeX 根据源标题层级通过 `chapter/section/subsection` 生成的节编号，不是正文写作提纲或工程报告结构；正文教学顺序由 case/theory skill 决定。不能通过修改生成的 `.tex` 或 PDF 补齐编号，也不能在 Markdown H2–H6 中手写。
 
 ## 工作流
 
@@ -36,7 +36,7 @@ Markdown 源 -> convert-vuepress.sh -> latex/*.tex -> XeLaTeX -> PDF
 ## 字体与特殊字符
 
 - 缺字形先改源 Markdown，不修改生成 `.tex`。
-- 数学箭头、符号优先用数学模式，例如 `$\\to$`。
+- 数学箭头、符号优先用数学模式，例如 `$\to$`。
 - 中文正文使用全角标点；代码块和行内代码保留代码语法。
 - 标题前保留空行，避免 `{#id}` 被解析为普通文本。
 - 不把 PDF 页面截图当作数值、性能或硬件验收证据。

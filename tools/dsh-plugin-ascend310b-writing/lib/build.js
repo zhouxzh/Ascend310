@@ -36,9 +36,6 @@ const LATEX_REQUIRED = ['bash', 'pandoc', 'latexmk', 'xelatex'];
 /** The tools the site build needs. */
 const SITE_REQUIRED = ['pnpm', 'node'];
 
-/** Where the temporary `python3` shim is written, inside the shell's view. */
-const SHIM_DIR = '/tmp/ascend310b-writing-bin';
-
 /**
  * A failure signature this project has hit: `xdvipdfmx` cannot replace
  * `book.pdf` while another process holds it, which happens after a viewer or a
@@ -81,15 +78,19 @@ function quote(adapter, value) {
  *
  * @param {object} adapter - the platform adapter.
  * @param {object} pythonPlan - the adapter's python plan.
+ * @param {string} root - repository root containing the visible tmp workspace.
  * @returns {string} A shell fragment ending with `export PATH=…`.
  */
-function pythonShimCommand(adapter, pythonPlan) {
+function pythonShimCommand(adapter, pythonPlan, root) {
 	const interpreter = quote(adapter, adapter.toShellPath(pythonPlan.interpreter));
+	const shimDir = quote(adapter, adapter.toShellPath(join(root, 'tmp', 'writing-build-bin')));
 	return [
-		`mkdir -p ${SHIM_DIR}`,
-		`printf '#!/bin/sh\\nexec "%s" "$@"\\n' ${interpreter} > ${SHIM_DIR}/python3`,
-		`chmod +x ${SHIM_DIR}/python3`,
-		`export PATH="${SHIM_DIR}:$PATH"`
+		`SHIM_DIR=${shimDir}`,
+		`mkdir -p "$SHIM_DIR"`,
+		`trap 'rm -rf "$SHIM_DIR"' EXIT`,
+		`printf '#!/bin/sh\\nexec "%s" "$@"\\n' ${interpreter} > "$SHIM_DIR/python3"`,
+		`chmod +x "$SHIM_DIR/python3"`,
+		`export PATH="$SHIM_DIR:$PATH"`
 	].join(' && ');
 }
 
@@ -127,7 +128,7 @@ export function planBuild({ root, target, adapter, components, settings }) {
 		if (shell === null) blockers.push('没有可用的 shell，无法运行 convert-vuepress.sh');
 
 		const fragments = [];
-		if (python.kind === 'shim') fragments.push(pythonShimCommand(adapter, python));
+		if (python.kind === 'shim') fragments.push(pythonShimCommand(adapter, python, root));
 		fragments.push(`cd ${quote(adapter, adapter.toShellPath(root))}`);
 		fragments.push('bash ./convert-vuepress.sh');
 		if (shell !== null) {

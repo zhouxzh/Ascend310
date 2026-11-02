@@ -11,6 +11,12 @@ metadata:
 
 # Scientific Writing
 
+## Ascend310 local routing guard
+
+Do **not** use this English-language skill for repository-authored Chinese learner material. It is available only when the user explicitly requests an English scientific manuscript or an English research-writing task.
+
+For Chinese Ascend310 textbooks, cases, sample docs, appendices, or slides, use the relevant `ascend310b-*` writing skill. Keep commands, API names, paths, model identifiers, citations, and quoted source text in their original language, but write the explanatory prose in Simplified Chinese.
+
 ## Purpose
 
 Produce clear scientific prose without inventing evidence or concealing uncertainty.

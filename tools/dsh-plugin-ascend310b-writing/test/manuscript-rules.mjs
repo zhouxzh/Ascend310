@@ -151,6 +151,112 @@ check(
 	'a comment in frontmatter must not disturb the H1 count'
 );
 
+// --- author spacing convention ---------------------------------------------
+// The author's Chinese-academic style uses no literal space at a Han/Latin or
+// Han/digit boundary. English word spaces and English/version spaces remain.
+writeFileSync(
+	join(root, 'src', 'book', 'chapter5.md'),
+	[
+		'---',
+		'title: "第5章：中文 English"',
+		'---',
+		'',
+		'使用 Python 3.9运行，共 5 个样本。',
+		'正确写法：使用Python3.9运行，共5个样本。',
+		'`使用 Python 3.9` 与 `Python 3.9` 保持原样。',
+		'',
+		'```text',
+		'中文 English',
+		'```',
+		''
+	].join('\n'),
+	'utf8'
+);
+const spacing = auditRepo({ root, maxFindings: 300 });
+const spacingFindings = spacing.findings.filter(
+	(finding) => finding.file.endsWith('chapter5.md') && finding.rule === 'cjk-latin-space'
+);
+check(spacingFindings.length === 1, `one aggregated spacing finding expected, got ${spacingFindings.length}`);
+check(
+	spacingFindings[0]?.line === 5 && spacingFindings[0]?.message.includes('2 处'),
+	`spacing finding must report two body occurrences, got: ${spacingFindings[0]?.message}`
+);
+check(
+	spacingFindings[0]?.severity === 'warning',
+	'the legacy-corpus spacing guard must remain a warning while new prose must fix it'
+);
+
+// --- table/list/prose selection --------------------------------------------
+// A tutorial can use a matrix for shared columns, but a long run of tables is
+// usually a sign that one-dimensional content should be lists or prose.
+const tableLines = [
+	'---',
+	'title: "第6章：表格密度"',
+	'---',
+	'',
+	'## 表格密度',
+	'',
+	'下面刻意放置多个表格，用来触发文件级和章节级密度检查。'
+];
+for (let index = 0; index < 13; index += 1) {
+	tableLines.push(
+		'',
+		`段落${index + 1}。`,
+		'',
+		'| 项目 | 说明 |',
+		'| --- | --- |',
+		`| 项目${index + 1} | 单维说明 |`
+	);
+}
+tableLines.push('');
+writeFileSync(join(root, 'src', 'book', 'chapter6.md'), tableLines.join('\n'), 'utf8');
+const tableDensity = auditRepo({ root, maxFindings: 400 }).findings.filter(
+	(finding) => finding.file.endsWith('chapter6.md') && finding.rule.startsWith('table-')
+);
+check(
+	tableDensity.some((finding) => finding.rule === 'table-density'),
+	'a file above the table limit must request a table/list/prose review'
+);
+check(
+	tableDensity.some((finding) => finding.rule === 'table-section-overuse'),
+	'a section above the table limit must request a table/list/prose review'
+);
+
+// --- duplicate headings and labels -----------------------------------------
+writeFileSync(
+	join(root, 'src', 'book', 'chapter7.md'),
+	[
+		'---',
+		'title: "第7章：重复章节"',
+		'---',
+		'',
+		'## 参考资料',
+		'',
+		'第一节。',
+		'',
+		'## 参考资料',
+		'',
+		'第二节。',
+		'',
+		'参考资料：',
+		'',
+		'- 示例条目。',
+		''
+	].join('\n'),
+	'utf8'
+);
+const duplicateSections = auditRepo({ root, maxFindings: 400 }).findings.filter(
+	(finding) => finding.file.endsWith('chapter7.md')
+);
+check(
+	duplicateSections.some((finding) => finding.rule === 'duplicate-heading'),
+	'duplicate heading text must be reported'
+);
+check(
+	duplicateSections.some((finding) => finding.rule === 'duplicate-section-label'),
+	'a standalone label matching a section heading must be reported'
+);
+
 // --- reader-visible evidence details ----------------------------------------
 // Reader prose should explain outcomes instead of exposing a local checkout,
 // an exact artifact digest or a byte count. Commands inside fenced code remain
