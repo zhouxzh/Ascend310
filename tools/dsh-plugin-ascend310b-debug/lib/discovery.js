@@ -15,7 +15,7 @@
 
 import { createSocket } from 'node:dgram';
 import { networkInterfaces } from 'node:os';
-import { Socket } from 'node:net';
+import { isIP, Socket } from 'node:net';
 import { resolve } from 'node:path';
 
 import { assessBoardScope } from './compat.js';
@@ -255,17 +255,28 @@ function throwIfDiscoveryAborted(signal) {
 	if (signal?.aborted === true) throw discoveryAbortError();
 }
 
-/** Check whether one TCP port accepts an abortable connection. */
-export function tcpOpen(host, port = 22, timeoutMs = 500, signal = null) {
+/** Normalize the connected address so IPv4-mapped IPv6 is not a second board. */
+function connectedAddress(value) {
+	const address = typeof value === 'string' ? value.trim() : '';
+	return address.startsWith('::ffff:') ? address.slice(7) : address;
+}
+
+/**
+ * Check whether one TCP port accepts an abortable connection and return the
+ * address that actually answered. Hostnames are not identities: two target
+ * records can name the same physical SSH endpoint through DNS and an IP.
+ */
+export function tcpProbe(host, port = 22, timeoutMs = 500, signal = null) {
 	return new Promise((resolve) => {
 		const socket = new Socket();
 		let settled = false;
 		const finish = (open) => {
 			if (settled) return;
 			settled = true;
+			const remoteAddress = open ? connectedAddress(socket.remoteAddress) || null : null;
 			signal?.removeEventListener?.('abort', abort);
 			socket.destroy();
-			resolve(open);
+			resolve({ open, remoteAddress });
 		};
 		const abort = () => finish(false);
 		signal?.addEventListener?.('abort', abort, { once: true });
@@ -275,8 +286,18 @@ export function tcpOpen(host, port = 22, timeoutMs = 500, signal = null) {
 		}
 		socket.setTimeout(timeoutMs, () => finish(false));
 		socket.once('error', () => finish(false));
-		socket.connect(port, host, () => finish(true));
+		// Discovery and configured board names operate on the private IPv4 LAN.
+		// Force the A record for hostnames so Windows does not probe an AAAA
+		// address while the same board's inventory entry carries its IPv4.
+		const address = String(host ?? '').replace(/^\[|\]$/gu, '');
+		const family = isIP(address) === 6 ? 6 : 4;
+		socket.connect({ port, host: address, family }, () => finish(true));
 	});
+}
+
+/** Check whether one TCP port accepts an abortable connection. */
+export async function tcpOpen(host, port = 22, timeoutMs = 500, signal = null) {
+	return (await tcpProbe(host, port, timeoutMs, signal)).open;
 }
 
 /** Run async functions with fixed concurrency and stop scheduling on abort. */

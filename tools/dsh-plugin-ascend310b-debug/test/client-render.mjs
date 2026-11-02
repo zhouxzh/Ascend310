@@ -294,7 +294,102 @@ const staleRailText = draw(findNode(panel({}), (node) => node.props?.className =
 check(staleRailText.includes('显示历史记录（1）'), 'stale 8T NIC records that share configuredId must fold into history');
 check(staleRailText.includes('c0:74:2b:fd:f6:96'), 'the currently reachable 8T board must remain in the primary rail');
 check(!staleRailText.includes('c0:74:2b:fd:dd:7a'), 'an unreachable historical 8T MAC must not stay in the primary rail');
+
+const stalePayloadForRail = payload;
+payload = {
+	...originalPayloadForStale,
+	boards: [
+		{
+			id: 'ascend-c0742bfdf696',
+			mac: 'c0:74:2b:fd:f6:96',
+			macs: ['c0:74:2b:fd:f6:96'],
+			hostname: 'orangepiaipro',
+			lastIp: '198.51.100.212',
+			soc: 'Ascend310B4',
+			tier: '8T',
+			model: 'Orange Pi Ai Pro 8T',
+			configuredId: 'board-8t',
+			lastSeen: '2026-10-30T08:13:09.843Z',
+			changesCount: 0
+		},
+		{
+			id: 'ascend-c0742bfdf74e',
+			mac: 'c0:74:2b:fd:f7:4e',
+			macs: ['c0:74:2b:fd:f7:4e'],
+			hostname: 'orangepiaipro',
+			lastIp: '198.51.100.107',
+			soc: 'Ascend310B4',
+			tier: '8T',
+			model: 'Orange Pi Ai Pro 8T',
+			configuredId: null,
+			lastSeen: new Date().toISOString(),
+			changesCount: 0
+		},
+		{
+			id: 'ascend-c0742bf81276',
+			mac: 'c0:74:2b:f8:12:76',
+			macs: ['c0:74:2b:f8:12:76'],
+			hostname: 'orangepiaipro-20t',
+			lastIp: '198.51.100.101',
+			soc: 'Ascend310B1',
+			tier: '20T',
+			model: 'OPi Ai Pro 20T',
+			configuredId: 'board-20t',
+			lastSeen: new Date().toISOString(),
+			changesCount: 0
+		}
+	],
+	targets: [
+		{
+			id: 'board-8t',
+			label: '8T 板',
+			host: 'orangepiaipro.local',
+			mac: 'c0:74:2b:fd:f6:96',
+			macs: ['c0:74:2b:fd:f6:96'],
+			discoveredId: 'ascend-c0742bfdf696',
+			lastSeen: '2026-10-30T08:13:09.843Z',
+			isConfigured: true
+		},
+		{
+			id: 'ascend-c0742bfdf74e',
+			label: '发现 8T',
+			host: '198.51.100.107',
+			mac: 'c0:74:2b:fd:f7:4e',
+			macs: ['c0:74:2b:fd:f7:4e'],
+			lastSeen: new Date().toISOString(),
+			isConfigured: false
+		},
+		{
+			id: 'board-20t',
+			label: '20T 板',
+			host: '198.51.100.101',
+			mac: 'c0:74:2b:f8:12:76',
+			macs: ['c0:74:2b:f8:12:76'],
+			discoveredId: 'ascend-c0742bf81276',
+			lastSeen: new Date().toISOString(),
+			isConfigured: true
+		}
+	]
+};
+seededSelected = 'board-20t';
+seededLiveness = {
+	kind: 'done',
+	byTarget: { 'board-8t': true, 'ascend-c0742bfdf74e': true, 'board-20t': true },
+	duplicateOf: { 'board-8t': 'ascend-c0742bfdf74e' },
+	conflicts: [{ endpoint: '198.51.100.107:22', targetIds: ['board-8t', 'ascend-c0742bfdf74e'] }],
+	checkedAt: new Date().toISOString(),
+	message: ''
+};
+seeded = 0;
+const duplicateEndpointTree = panel({});
+const duplicateEndpointPanelText = draw(duplicateEndpointTree).join(' ');
+const duplicateEndpointRailText = draw(findNode(duplicateEndpointTree, (node) => node.props?.className === 'ad-rail')[0]).join(' ');
+check(duplicateEndpointRailText.includes('c0:74:2b:fd:f7:4e'), 'the observed MAC row must represent a shared SSH endpoint');
+check(!duplicateEndpointRailText.includes('c0:74:2b:fd:f6:96'), 'a stale configured MAC row must not light up separately for the same endpoint');
+check(duplicateEndpointPanelText.includes('同一 SSH 端点对应多个身份记录'), 'the panel must explain that duplicate endpoint identities require a binding');
+payload = stalePayloadForRail;
 seededSelected = 'board-8t';
+seededLiveness = { kind: 'done', byTarget: { 'board-20t': true, 'board-8t': true, 'ascend-c0742bfddd7a': false }, checkedAt: '2026-10-30T00:00:00.000Z', message: '' };
 seededTab = 'assets';
 seeded = 0;
 const assetsTree = panel({});
@@ -392,7 +487,7 @@ check(bundleSource.includes('mountedRef'), 'panel requests must stop committing 
 check(bundleSource.includes('staleError'), 'probe failures must preserve the last successful payload');
 check(bundleSource.includes('aria-label'), 'interactive query and binding controls need accessible labels');
 check(
-	bundleSource.includes('row.online ? " ad-online" : row.serialOnline ? " ad-serial" : row.offline ? " ad-offline" : row.changed ? " ad-changed"'),
+	bundleSource.includes('row.online ? " ad-online" : row.serialOnline ? " ad-serial" : row.offline ? " ad-offline" : row.duplicate || row.changed ? " ad-changed"'),
 	'live SSH state must take precedence over serial, offline and historical-change colors'
 );
 check(bundleSource.includes('foundId || selectedRef.current'), 'serial discovery must switch to the board it just found');

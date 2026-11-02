@@ -103,6 +103,34 @@ try {
 	if (explicitlyBound.get('board-8t')?.mac !== 'c0:74:2b:fd:df:83' || explicitlyBound.get('board-8t')?.host !== 'orangepiaipro.local') {
 		failures.push('explicit binding may update identity metadata but stale IP must not replace the configured host');
 	}
+	const clearBindingPath = join(directory, 'clear-binding-inventory.json');
+	const clearBindingInventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+	clearBindingInventory.boards['c0:74:2b:fd:df:83'].configuredId = 'board-8t';
+	writeFileSync(clearBindingPath, JSON.stringify(clearBindingInventory), 'utf8');
+	internals.rememberBinding(
+		{
+			inventoryPath: clearBindingPath,
+			targets: [{ id: 'board-8t', transport: 'ssh', host: 'orangepiaipro.local' }]
+		},
+		'board-8t',
+		'ascend-c0742bfddf83'
+	);
+	const clearBindingResult = JSON.parse(readFileSync(clearBindingPath, 'utf8'));
+	if (clearBindingResult.boards['c0:74:2b:fd:f6:96']?.configuredId !== null) {
+		failures.push('explicit binding must clear stale configuredId labels from other physical-board records');
+	}
+	if (clearBindingResult.boards['c0:74:2b:fd:df:83']?.configuredId !== 'board-8t') {
+		failures.push('explicit binding must retain configuredId on the selected physical-board record');
+	}
+	const publicBoards = internals.publicInventory({
+		inventoryPath: clearBindingPath,
+		targets: [{ id: 'board-8t', transport: 'ssh', host: 'orangepiaipro.local' }]
+	});
+	const publicStaleBoard = publicBoards.find((board) => board.id === 'ascend-c0742bfdf696');
+	const publicBoundBoard = publicBoards.find((board) => board.id === 'ascend-c0742bfddf83');
+	if (publicStaleBoard?.configuredId !== null || publicBoundBoard?.configuredId !== 'board-8t') {
+		failures.push('the panel inventory must expose only the explicitly bound board as associated with a configured target');
+	}
 	const ambiguous = internals.targetTable({
 		inventoryPath,
 		targets: [{ id: 'board-x', transport: 'ssh', host: 'orangepiaipro.local' }]
@@ -140,6 +168,91 @@ try {
 	const aliasBoard = Object.values(aliasInventory.boards ?? {})[0];
 	if (!aliasBoard?.macs?.includes('c0:74:2b:fd:f6:96') || !aliasBoard?.macs?.includes('80:9d:65:1a:08:34')) {
 		failures.push('full environment probes must persist every stable MAC alias');
+	}
+	const endpointAnnotated = internals.annotateLivenessEndpoints([
+		{
+			id: 'board-8t',
+			remoteAddress: '198.51.100.107',
+			port: 22,
+			online: true,
+			mac: 'c0:74:2b:fd:f6:96',
+			macs: ['c0:74:2b:fd:f6:96'],
+			isConfigured: true
+		},
+		{
+			id: 'ascend-c0742bfdf74e',
+			remoteAddress: '198.51.100.107',
+			port: 22,
+			online: true,
+			mac: 'c0:74:2b:fd:f7:4e',
+			macs: ['c0:74:2b:fd:f7:4e'],
+			isConfigured: false
+		},
+		{
+			id: 'board-20t',
+			remoteAddress: '198.51.100.101',
+			port: 22,
+			online: true,
+			mac: 'c0:74:2b:f8:12:76',
+			macs: ['c0:74:2b:f8:12:76'],
+			isConfigured: true
+		}
+	]);
+	if (endpointAnnotated.conflicts.length !== 1) failures.push('one physical endpoint reached by two identities must produce one conflict');
+	if (endpointAnnotated.targets[0]?.duplicateOf !== 'ascend-c0742bfdf74e') {
+		failures.push('the observed MAC record must be canonical when a configured hostname reaches the same endpoint');
+	}
+	if (endpointAnnotated.targets[2]?.duplicateOf !== undefined) {
+		failures.push('different SSH endpoints must remain independently online');
+	}
+	const mismatchPath = join(directory, 'mismatch-inventory.json');
+	writeFileSync(
+		mismatchPath,
+		JSON.stringify({
+			version: 1,
+			boards: {
+				'c0:74:2b:fd:f7:4e': {
+					id: 'ascend-c0742bfdf74e',
+					mac: 'c0:74:2b:fd:f7:4e',
+					macs: ['c0:74:2b:fd:f7:4e'],
+					hostname: 'orangepiaipro',
+					lastIp: '198.51.100.107',
+					firstSeen: '2026-11-01T22:00:00.000Z',
+					lastSeen: '2026-11-01T23:00:00.000Z',
+					configuredId: 'board-8t',
+					system: { soc: 'Ascend310B4', tier: '8T' },
+					changes: [],
+					history: []
+				}
+			}
+		}),
+		'utf8'
+	);
+	const mismatchChange = internals.recordEnvironment({ inventoryPath: mismatchPath }, {
+		target: {
+			id: 'board-8t',
+			transport: 'ssh',
+			host: 'orangepiaipro.local',
+			user: 'HwHiAiUser',
+			port: 22,
+			mac: 'c0:74:2b:fd:f6:96',
+			macs: ['c0:74:2b:fd:f6:96'],
+			isConfigured: true
+		},
+		environment: {
+			facts: {
+				macAddress: { value: 'c0:74:2b:fd:f7:4e' },
+				macAddresses: { value: ['c0:74:2b:fd:f7:4e'] },
+				hostname: { value: 'orangepiaipro' },
+				ipAddress: { value: '198.51.100.107' },
+				soc: { value: 'Ascend310B4' },
+				socTier: { value: '8T' }
+			}
+		}
+	});
+	const mismatchInventory = JSON.parse(readFileSync(mismatchPath, 'utf8'));
+	if (mismatchChange?.identityMismatch?.configuredId !== 'board-8t' || mismatchInventory.boards['c0:74:2b:fd:f7:4e']?.configuredId !== null) {
+		failures.push('a stale configured MAC must not stamp or retain a discovered board as its configured identity');
 	}
 	const reportStorePath = join(directory, 'reports.json');
 	const reportConfig = { ...config, reportStorePath };

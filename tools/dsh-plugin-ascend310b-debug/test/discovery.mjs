@@ -9,6 +9,7 @@
  */
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -19,7 +20,8 @@ import {
 	parseIPv4,
 	probeCandidate,
 	resolveDiscoveryCidrs,
-	resolveDiscoveryCidrsForScan
+	resolveDiscoveryCidrsForScan,
+	tcpProbe
 } from '../lib/discovery.js';
 import { isIdentityMacInterface } from '../lib/probe.js';
 import {
@@ -48,6 +50,17 @@ check(isIdentityMacInterface('eth0'), '板载 eth0 应作为稳定身份');
 check(isIdentityMacInterface('wlan0'), '板载 wlan0 应作为稳定身份别名');
 check(!isIdentityMacInterface('enx001122334455'), '可移动 USB NIC enx* 不得作为稳定身份');
 check(!isIdentityMacInterface('wlx001122334455'), '可移动 USB Wi-Fi wlx* 不得作为稳定身份');
+
+const localServer = createServer((socket) => socket.end());
+await new Promise((resolve, reject) => {
+	localServer.once('error', reject);
+	localServer.listen(0, '127.0.0.1', resolve);
+});
+const localPort = localServer.address().port;
+const localProbe = await tcpProbe('localhost', localPort, 1000);
+await new Promise((resolve) => localServer.close(resolve));
+check(localProbe.open, 'TCP probe must report a listening local port');
+equal(localProbe.remoteAddress, '127.0.0.1', 'hostname probes must prefer the private IPv4 address used by discovery');
 
 check(expandCidr('10.0.0.0/30').length === 2, '/30 应只有两个主机地址');
 let rejected = false;

@@ -141,7 +141,7 @@ DSH_HOME/ascend310b-inventory.json
 - **同一块板**：观察到至少一个已知物理网口 MAC 别名，或用户在资产表中明确建立别名绑定。换 IP、换 WiFi、换有线网口、重装同一镜像或升级 CANN 时，逻辑 ID 不变；OS/hostname/machine-id 变化只记录为系统变化。
 - **不同开发板**：没有共享物理网口 MAC 别名，且没有显式绑定。即使 hostname、machine-id、板型和 OS 完全相同，也必须保留为不同板卡。
 - **无法判断**：所有已知 MAC 都变化、网卡被更换，且没有可验证的板级唯一序列号时，不能自动猜测是同一块板。此时保留新记录，需要用户明确绑定；`hisi,boardid` 等值只能作为辅助证据，不能在未验证唯一性前单独当身份键。
-
+- **同一 SSH 端点**：配置的主机名和一条发现记录可能解析到同一个 IP。在线检查按实际连接到的 `IP:port` 去重，只点亮一个端点；若两边 MAC 不同，仍保留为身份冲突并提示显式绑定，绝不自动合并。环境探测也不会把 MAC 不匹配的板写入配置目标的身份关联。
 
 如果某块已配置的板没有开机，或者当前网段找不到它的主机名，`ascend_probe` 对那个 target 返回 `offline/unreachable`，并明确“未采集到 SoC、CANN、驱动”。这只是网络电源事实，不能写成 310B 不支持，也不能拿另一块在线板的结果替代。网络迁移后直接重新扫描即可；如果开发板接在非默认路由的有线副网卡上，临时调用 `ascend_discover cidrs=[...]`，不要把临时网段写死到 profile。
 
@@ -223,11 +223,11 @@ cp -R "$plugin"/. "$dest"/
 
 摄像头、音频和 USB 卡片分别显示所属类别的更新时间，系统刷新不会把外设旧数据伪装成刚更新。刷新采用固定高度状态槽，在线检查中的旧结果会明确标为“上次检测”。面板外壳钉在视口剩余高度里：顶栏和状态槽不随操作增高，概述/摄像头/音频等页签叠在同一矩形中只切换可见性，离线设备折叠只在左侧列表内部滚动，不会把右侧工作区往下推。
 
-左侧点击任一开发板只切换该板的历史报告，不会因为历史板离线而启动阻塞式 SSH 探测。绿色只表示**本次 SSH 可达**，红色表示本次不可达，灰色表示尚未检测；本次明确离线的非当前设备会默认折叠到“显示历史记录”中。历史变更显示为独立的“已变更”徽标，不再覆盖在线颜色。点“串口发现”会通过 profile 的串口登录读取当前板卡主机名、IPv4、接口、MAC 和默认路由，并自动尝试 SSH 探测后写入设备列表；点“局域网扫描”默认只扫描当前默认路由所在物理网段，profile 的 `discovery.cidrs` 非空时才作为固定覆盖，并在结果中显示实际 CIDR、SSH 开放数和记录文件路径。
+左侧点击任一开发板只切换该板的历史报告，不会因为历史板离线而启动阻塞式 SSH 探测。绿色只表示**本次 SSH 可达**，红色表示本次不可达，灰色表示尚未检测；本次明确离线的非当前设备会默认折叠到“显示历史记录”中。不同 target 实际连到同一个 SSH 端点时只显示一个在线端点；MAC 不一致会标为“身份冲突”，要求用户在开发板记录中显式绑定。历史变更显示为独立的“已变更”徽标，不再覆盖在线颜色。点“串口发现”会通过 profile 的串口登录读取当前板卡主机名、IPv4、接口、MAC 和默认路由，并自动尝试 SSH 探测后写入设备列表；点“局域网扫描”默认只扫描当前默认路由所在物理网段，profile 的 `discovery.cidrs` 非空时才作为固定覆盖，并在结果中显示实际 CIDR、SSH 开放数和记录文件路径。
 
 ### HTTP 路由
 
-面板使用十六条同源路由：`GET /ascend310b-debug/report.json` 返回最近一次探测形成的报告；带 `?fresh=1` 时绕过 120 秒缓存，但仍不执行板端探测。`POST /ascend310b-debug/liveness` 并行检查 target 的 SSH 端口，只返回本次传输可达性；`POST /ascend310b-debug/probe` 执行整板环境探测；`system-refresh`、`camera-refresh`、`audio-refresh` 分别只刷新系统、V4L2/USB 和 ALSA/Pulse/Bluetooth facts，`POST /ascend310b-debug/discover` 执行局域网扫描，`GET /ascend310b-debug/camera-preview` 只返回固定目录中的 `camera-*.jpg`，`POST /ascend310b-debug/camera-capture`、`microphone-record`、`speaker-test`、`play-recording` 分别执行固定外设动作，录音和回放证据位于 `/tmp/ascend310b-debug/peripherals`，`POST /ascend310b-debug/bind` 将由用户明确确认的发现板绑定到已有配置，`POST /ascend310b-debug/serial-probe` 执行串口发现并尝试 SSH 写入开发板记录，`GET /ascend310b-debug/serial-sessions` 读取本机串口会话列表或一条详情，`POST /ascend310b-debug/serial-sessions/clear` 在显式确认后清理本机会话记录。面板右上角的“检查在线”“串口发现”“局域网扫描”，以及系统、摄像头、音频页内的分类更新按钮调用这些路由。
+面板使用十六条同源路由：`GET /ascend310b-debug/report.json` 返回最近一次探测形成的报告；带 `?fresh=1` 时绕过 120 秒缓存，但仍不执行板端探测。`POST /ascend310b-debug/liveness` 并行检查 target 的 SSH 端口，按实际远端 `IP:port` 去重同一端点并返回需要显式绑定的 MAC 身份冲突；`POST /ascend310b-debug/probe` 执行整板环境探测；`system-refresh`、`camera-refresh`、`audio-refresh` 分别只刷新系统、V4L2/USB 和 ALSA/Pulse/Bluetooth facts，`POST /ascend310b-debug/discover` 执行局域网扫描，`GET /ascend310b-debug/camera-preview` 只返回固定目录中的 `camera-*.jpg`，`POST /ascend310b-debug/camera-capture`、`microphone-record`、`speaker-test`、`play-recording` 分别执行固定外设动作，录音和回放证据位于 `/tmp/ascend310b-debug/peripherals`，`POST /ascend310b-debug/bind` 将由用户明确确认的发现板绑定到已有配置，`POST /ascend310b-debug/serial-probe` 执行串口发现并尝试 SSH 写入开发板记录，`GET /ascend310b-debug/serial-sessions` 读取本机串口会话列表或一条详情，`POST /ascend310b-debug/serial-sessions/clear` 在显式确认后清理本机会话记录。面板右上角的“检查在线”“串口发现”“局域网扫描”，以及系统、摄像头、音频页内的分类更新按钮调用这些路由。
 
 ### 面板预览
 

@@ -291,7 +291,11 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 	board.port = Number.isInteger(observation?.port) ? observation.port : board.port ?? null;
 	board.user = text(observation?.user) ?? board.user;
 	board.label = text(observation?.label) ?? board.label;
-	board.configuredId = text(observation?.configuredId) ?? board.configuredId ?? null;
+	if (observation?.clearConfiguredId === true) {
+		board.configuredId = null;
+	} else {
+		board.configuredId = text(observation?.configuredId) ?? board.configuredId ?? null;
+	}
 	if (observation?.serial !== null && typeof observation?.serial === 'object') {
 		board.serial = {
 			status: text(observation.serial.status) ?? 'reachable',

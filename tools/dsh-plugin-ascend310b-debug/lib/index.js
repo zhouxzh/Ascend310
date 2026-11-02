@@ -53,7 +53,7 @@ import {
 	peripheralLockKey,
 	withPeripheralLock
 } from './peripherals.js';
-import { discoverNetwork, isLocalScanCandidate, parseIPv4, probeCandidate, registerDiscoveryTool, resolveDiscoveryCidrsForScan, tcpOpen } from './discovery.js';
+import { discoverNetwork, isLocalScanCandidate, parseIPv4, probeCandidate, registerDiscoveryTool, resolveDiscoveryCidrsForScan, tcpProbe } from './discovery.js';
 import { SERIAL_PROBE_COMMANDS, runSerialCommand, runSerialProbe, validateSerialSettings } from './serial.js';
 import {
 	appendSerialSessionPhase,
@@ -424,12 +424,54 @@ function publicTargets(config) {
 	}));
 }
 
+/** All MAC aliases attached to one liveness result. */
+function livenessMacs(entry) {
+	return [...new Set([entry?.mac, ...(Array.isArray(entry?.macs) ? entry.macs : [])]
+		.map(normalizeMac)
+		.filter(Boolean))];
+}
+
+/**
+ * A hostname and an IP can reach the same SSH endpoint. Count that endpoint
+ * once for online lamps, while keeping both identity records visible as a
+ * conflict that requires an explicit binding. Never merge their MACs here.
+ */
+function annotateLivenessEndpoints(results) {
+	const groups = new Map();
+	for (const result of results) {
+		if (result.online !== true || typeof result.remoteAddress !== 'string' || result.remoteAddress === '') continue;
+		const endpoint = `${result.remoteAddress}:${result.port ?? 22}`;
+		result.endpoint = endpoint;
+		const group = groups.get(endpoint) ?? [];
+		group.push(result);
+		groups.set(endpoint, group);
+	}
+	const conflicts = [];
+	for (const [endpoint, group] of groups) {
+		if (group.length < 2) continue;
+		const canonical = group.find((entry) => entry.isConfigured !== true && livenessMacs(entry).length > 0) ?? group[0];
+		const targetIds = group.map((entry) => entry.id);
+		for (const entry of group) {
+			entry.sameEndpointTargetIds = targetIds.filter((id) => id !== entry.id);
+			if (entry.id === canonical.id) continue;
+			entry.duplicateOf = canonical.id;
+			const observed = livenessMacs(entry);
+			const expected = livenessMacs(canonical);
+			entry.identityConflict = observed.length > 0 && expected.length > 0 && !observed.some((mac) => expected.includes(mac));
+		}
+		if (group.some((entry) => entry.duplicateOf !== undefined && entry.identityConflict === true)) {
+			conflicts.push({ endpoint, targetIds });
+		}
+	}
+	return { targets: results, conflicts };
+}
+
 /**
  * Check whether each selected target accepts an SSH connection right now.
  *
  * This is intentionally a transport-level liveness check: a green result means
  * "SSH port reachable", not "the full 310B environment passed". Full identity
- * and environment evidence still comes from ascend_probe.
+ * and environment evidence still come from ascend_probe.
  */
 async function checkTargetLiveness(config, { targetIds = null, timeoutMs = 1500 } = {}) {
 	const table = targetTable(config);
@@ -439,27 +481,35 @@ async function checkTargetLiveness(config, { targetIds = null, timeoutMs = 1500 
 	const targets = [...table.values()].filter((target) => requested === null || requested.has(target.id));
 	const effectiveTimeout = Math.max(250, Math.min(Number(timeoutMs) || 1500, 5000));
 	const results = await Promise.all(targets.map(async (target) => {
+		const identity = {
+			mac: target.mac ?? null,
+			macs: Array.isArray(target.macs) ? target.macs : [],
+			isConfigured: target.isConfigured === true
+		};
 		if (target.transport === 'local') {
-			return { id: target.id, host: target.host, port: null, online: true, state: 'local', reason: '本机目标。' };
+			return { id: target.id, host: target.host, port: null, ...identity, online: true, state: 'local', reason: '本机目标。' };
 		}
 		if (!isSafeHost(target.host)) {
-			return { id: target.id, host: target.host, port: target.port ?? 22, online: false, state: 'invalid', reason: '目标地址无效。' };
+			return { id: target.id, host: target.host, port: target.port ?? 22, ...identity, online: false, state: 'invalid', reason: '目标地址无效。' };
 		}
 		const port = Number.isInteger(target.port) ? target.port : 22;
-		const reachable = await tcpOpen(target.host, port, effectiveTimeout);
+		const probe = await tcpProbe(target.host, port, effectiveTimeout);
 		return {
 			id: target.id,
 			host: target.host,
 			port,
-			online: reachable,
-			state: reachable ? 'ssh-open' : 'unreachable',
-			reason: reachable ? `SSH ${target.host}:${port} 可达。` : `SSH ${target.host}:${port} 不可达。`
+			...identity,
+			remoteAddress: probe.remoteAddress,
+			online: probe.open,
+			state: probe.open ? 'ssh-open' : 'unreachable',
+			reason: probe.open ? `SSH ${target.host}:${port} 可达。` : `SSH ${target.host}:${port} 不可达。`
 		};
 	}));
+	const annotated = annotateLivenessEndpoints(results);
 	return {
 		checkedAt: new Date().toISOString(),
 		timeoutMs: effectiveTimeout,
-		targets: results
+		...annotated
 	};
 }
 
@@ -599,6 +649,9 @@ function rememberBinding(config, configuredId, discoveredId) {
 	}
 	const board = Object.values(inventory.boards ?? {}).find((candidate) => candidate?.id === discoveredId);
 	if (board === undefined) throw new Error(`未找到开发板记录：${discoveredId}`);
+	for (const candidate of Object.values(inventory.boards ?? {})) {
+		if (candidate?.id !== discoveredId && candidate?.configuredId === configuredId) candidate.configuredId = null;
+	}
 	inventory.preferences = {
 		...(inventory.preferences ?? {}),
 		bindings: { ...(inventory.preferences?.bindings ?? {}), [configuredId]: discoveredId }
@@ -609,12 +662,30 @@ function rememberBinding(config, configuredId, discoveredId) {
 /** Public inventory summaries for the Assets tab (never expose SSH secrets). */
 function publicInventory(config) {
 	const inventory = readInventory(inventoryPath(config));
+	const bindings = inventory.preferences?.bindings !== null && typeof inventory.preferences?.bindings === 'object'
+		? inventory.preferences.bindings
+		: {};
+	const configuredIds = new Set(
+		(Array.isArray(config?.targets) ? config.targets : [])
+			.map((target) => target?.id)
+			.filter((id) => typeof id === 'string' && id !== '')
+	);
+	const boundBoardIds = new Map(
+		Object.entries(bindings)
+			.filter(([configuredId]) => configuredIds.has(configuredId))
+			.map(([configuredId, boardId]) => [boardId, configuredId])
+	);
 	return Object.values(inventory.boards ?? {})
 		.filter((board) => board !== null && typeof board === 'object')
 		.map((board) => {
 			const latestChange = Array.isArray(board.changes) && board.changes.length > 0
 				? board.changes[board.changes.length - 1]
 				: null;
+			const boundConfiguredId = boundBoardIds.get(board.id) ?? null;
+			const rawConfiguredId = configuredIds.has(board.configuredId) ? board.configuredId : null;
+			const staleConfiguredId = rawConfiguredId && bindings[rawConfiguredId] && bindings[rawConfiguredId] !== board.id
+				? null
+				: rawConfiguredId;
 			return {
 				id: board.id,
 				mac: board.mac ?? null,
@@ -631,7 +702,7 @@ function publicInventory(config) {
 				firstSeen: board.firstSeen ?? null,
 				lastSeen: board.lastSeen ?? null,
 				lastChangeAt: board.lastChangeAt ?? null,
-				configuredId: board.configuredId ?? null,
+				configuredId: boundConfiguredId ?? staleConfiguredId,
 				serial: board.serial ?? null,
 				changesCount: Array.isArray(board.changes) ? board.changes.length : 0,
 				latestChange: latestChange === null
@@ -1228,22 +1299,33 @@ function recordEnvironment(config, result) {
 	const facts = result.environment?.facts ?? {};
 	const mac = facts.macAddress?.value ?? null;
 	if (typeof mac !== 'string' || mac === '') return null;
-	const macs = Array.isArray(facts.macAddresses?.value)
-		? facts.macAddresses.value.filter((value) => typeof value === 'string' && value !== '')
-		: [mac];
+	const observedMacs = [...new Set([
+		mac,
+		...(Array.isArray(facts.macAddresses?.value) ? facts.macAddresses.value : [])
+	].map(normalizeMac).filter(Boolean))];
+	const expectedMacs = [...new Set([
+		result.target.mac,
+		...(Array.isArray(result.target.macs) ? result.target.macs : [])
+	].map(normalizeMac).filter(Boolean))];
+	const configuredProbe = result.target.isConfigured === true;
+	const identityMatches = !configuredProbe || expectedMacs.length === 0 || observedMacs.some((value) => expectedMacs.includes(value));
 	const path = inventoryPath(config);
 	const inventory = readInventory(path);
 	const system = systemFromFacts(facts);
 	system.tier = system.tier ?? (facts.socTier?.value ? String(facts.socTier.value) : null);
 	const ipAddress = facts.ipAddress?.value ?? (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(result.target.host) ? result.target.host : null);
+	const identityMismatch = configuredProbe && expectedMacs.length > 0 && !identityMatches
+		? { configuredId: result.target.id, expectedMacs, observedMacs }
+		: null;
 	const observed = observeBoard(inventory, {
 		ip: ipAddress,
 		user: result.target.user,
 		mac,
-		macs,
+		macs: observedMacs,
 		hostname: facts.hostname?.value ?? null,
 		port: result.target.port,
-		configuredId: result.target.id,
+		configuredId: configuredProbe && identityMatches ? result.target.id : null,
+		clearConfiguredId: identityMismatch !== null,
 		system
 	});
 	try {
@@ -1253,22 +1335,38 @@ function recordEnvironment(config, result) {
 		// not writable; the report indicates the probe result, not the cache.
 		return null;
 	}
-	return { path, status: observed.status, changes: observed.changes };
+	return { path, status: observed.status, changes: observed.changes, identityMismatch };
 }
 
 /** Render the local inventory change summary for a text response. */
 function inventoryNote(change) {
 	if (change === null) return '';
+	const mismatch = change.identityMismatch
+		? [
+				'',
+				'### 配置目标身份不一致',
+				`- target：${change.identityMismatch.configuredId}`,
+				`- 配置 MAC：${change.identityMismatch.expectedMacs.join(', ')}`,
+				`- 实际 MAC：${change.identityMismatch.observedMacs.join(', ') || '未读取'}`,
+				'- 未把本次探测自动写为该配置目标的身份关联；请在面板中显式绑定。'
+			].join('\n')
+		: '';
 	if (change.status === 'system-changed' && change.changes.length > 0) {
-		return [
+		const lines = [
 			'',
 			'### 本地资产表检测到系统变化',
 			...change.changes.map((field) => `- ${field.name}: ${field.from ?? '未记录'} -> ${field.to ?? '未记录'}`),
 			`- 资产表：${change.path}`
-		].join('\n');
+		];
+		if (mismatch !== '') lines.push(mismatch);
+		return lines.join('\n');
 	}
-	if (change.status === 'new') return ['', '### 本地资产表', `- 新板已记录：${change.path}`].join('\n');
-	return '';
+	if (change.status === 'new') {
+		const lines = ['', '### 本地资产表', `- 新板已记录：${change.path}`];
+		if (mismatch !== '') lines.push(mismatch);
+		return lines.join('\n');
+	}
+	return mismatch;
 }
 
 /** Resolve serial settings from profile plus optional per-call overrides. */
@@ -3682,13 +3780,16 @@ export const internals = {
 	resolveRepoRoot,
 	resolveTarget,
 	targetTable,
+	publicInventory,
 	readSampleIndex,
 	resolveInside,
 	isSafeHost,
 	prepareTaskCommand,
 	downloadIntegrity,
+	annotateLivenessEndpoints,
 	checkTargetLiveness,
 	recordEnvironment,
+	rememberBinding,
 	readSavedReport,
 	rememberSavedReport,
 	mergeSavedFacts,

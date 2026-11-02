@@ -1802,22 +1802,27 @@ window.__ModuleLoader__.load({
 			const boards = props.boards ?? [];
 			const targets = props.targets ?? [];
 			const liveness = props.liveness?.byTarget ?? {};
+			const duplicateOf = props.liveness?.duplicateOf ?? {};
 			const checking = props.liveness?.kind === "checking";
 			const boardRows = boards.map((board) => {
 				const target = liveTargetForBoard(board, targets);
+				const targetId = target?.id ?? board.id;
 				const recent = isRecent(board.lastSeen);
-				const liveState = liveness[target?.id ?? board.id];
-				const online = liveState === true;
+				const liveState = liveness[targetId];
+				const duplicate = liveState === true && typeof duplicateOf[targetId] === "string";
+				const online = liveState === true && !duplicate;
 				const offline = liveState === false;
 				const serialOnline = serialLive(board);
 				const status = checking
-					? online
+					? liveState === true
 						? "上次检测 SSH 可达（正在重新检查）"
 						: serialOnline
 							? "串口已登录（正在检查 SSH）"
 							: offline
 								? "上次检测 SSH 不可达（正在重新检查）"
 								: "正在检查 SSH 连通性"
+					: duplicate
+						? `同一 SSH 端点已归入 ${duplicateOf[targetId]}，身份待绑定`
 					: online
 					? "本次检测 SSH 可达"
 					: serialOnline
@@ -1833,7 +1838,7 @@ window.__ModuleLoader__.load({
 								: "未探测";
 				return {
 					key: `board:${board.id}`,
-					targetId: target?.id ?? board.id,
+					targetId,
 					title: `${boardName(board)}${macSuffix(board.mac)}`,
 					secondary: target ? targetName(target) : "",
 					mac: board.mac,
@@ -1842,6 +1847,7 @@ window.__ModuleLoader__.load({
 					seenAt: board.lastSeen ?? "",
 					changed: board.changesCount > 0,
 					online,
+					duplicate,
 					serialOnline,
 					offline
 				};
@@ -1852,7 +1858,8 @@ window.__ModuleLoader__.load({
 				.filter((target) => !boards.some((board) => liveTargetForBoard(board, [target])))
 				.map((target) => {
 					const liveState = liveness[target.id];
-					const online = liveState === true;
+					const duplicate = liveState === true && typeof duplicateOf[target.id] === "string";
+					const online = liveState === true && !duplicate;
 					const offline = liveState === false;
 					return {
 						key: `target:${target.id}`,
@@ -1860,10 +1867,11 @@ window.__ModuleLoader__.load({
 						title: `${targetName(target)}${macSuffix(target.mac)}`,
 						mac: target.mac,
 						aliases: (Array.isArray(target.macs) ? target.macs : [target.mac]).filter(Boolean).join(" "),
-						detail: `${target.host} · ${checking ? online ? "上次检测可达（正在重新检查）" : offline ? "上次检测不可达（正在重新检查）" : "正在检查 SSH 连通性" : online ? "本次检测 SSH 可达" : offline ? "本次检测 SSH 不可达" : isRecent(target.lastSeen) ? "最近 15 分钟发现（尚未做本次连通性检测）" : "未建档或未探测"}`,
+						detail: `${target.host} · ${checking ? liveState === true ? "上次检测可达（正在重新检查）" : offline ? "上次检测不可达（正在重新检查）" : "正在检查 SSH 连通性" : duplicate ? `同一 SSH 端点已归入 ${duplicateOf[target.id]}，身份待绑定` : online ? "本次检测 SSH 可达" : offline ? "本次检测 SSH 不可达" : isRecent(target.lastSeen) ? "最近 15 分钟发现（尚未做本次连通性检测）" : "未建档或未探测"}`,
 						seenAt: target.lastSeen ?? "",
 						changed: false,
 						online,
+						duplicate,
 						serialOnline: false,
 						offline
 					};
@@ -1903,9 +1911,10 @@ window.__ModuleLoader__.load({
 							{ className: "ad-board-title" },
 							// Liveness wins over historical change state. A board that was
 							// just found must be green even when older probes recorded changes.
-							h("i", { className: `ad-board-dot${row.online ? " ad-online" : row.serialOnline ? " ad-serial" : row.offline ? " ad-offline" : row.changed ? " ad-changed" : ""}` }),
+							h("i", { className: `ad-board-dot${row.online ? " ad-online" : row.serialOnline ? " ad-serial" : row.offline ? " ad-offline" : row.duplicate || row.changed ? " ad-changed" : ""}` }),
 							h("span", { className: "ad-board-name" }, row.title),
 							row.serialOnline && !row.online ? h("span", { className: "ad-board-flag" }, "串口") : null,
+							row.duplicate ? h("span", { className: "ad-board-flag" }, "身份冲突") : null,
 							row.changed ? h("span", { className: "ad-board-flag" }, "已变更") : null
 						),
 						h("span", { className: "ad-board-meta" }, row.detail),
@@ -2213,9 +2222,16 @@ window.__ModuleLoader__.load({
 					const byTarget = Object.fromEntries(
 						(payload.targets ?? []).map((entry) => [entry.id, entry.online === true])
 					);
+					const duplicateOf = Object.fromEntries(
+						(payload.targets ?? [])
+							.filter((entry) => entry.online === true && typeof entry.duplicateOf === "string")
+							.map((entry) => [entry.id, entry.duplicateOf])
+					);
 					setLiveness({
 						kind: "done",
 						byTarget,
+						duplicateOf,
+						conflicts: Array.isArray(payload.conflicts) ? payload.conflicts : [],
 						checkedAt: payload.checkedAt ?? new Date().toISOString(),
 						message: ""
 					});
@@ -3225,6 +3241,10 @@ window.__ModuleLoader__.load({
 			const globalStatusItems = [];
 			if (state.staleError) globalStatusItems.push({ error: true, text: `当前显示的是最近一次成功快照：${state.staleError}` });
 			if (liveness.kind === "failed") globalStatusItems.push({ error: true, text: `在线检查失败：${liveness.message}` });
+			if ((liveness.conflicts ?? []).length > 0) {
+				const details = liveness.conflicts.map((entry) => `${entry.endpoint}（${(entry.targetIds ?? []).join("、")}）`).join("；");
+				globalStatusItems.push({ error: true, text: `同一 SSH 端点对应多个身份记录：${details}。请在开发板记录中显式绑定，未自动合并 MAC。` });
+			}
 			if (serial.kind === "failed") globalStatusItems.push({ error: true, text: `串口探测失败：${serial.message}` });
 			if (serial.kind === "cancelled") globalStatusItems.push({ error: false, text: "串口发现已取消。" });
 			if (serial.kind === "done") globalStatusItems.push({ error: false, text: `串口：${serial.payload.port} · ${serial.payload.hostname ?? "主机名未采集"} · ${serial.payload.ipAddress ?? "IP 未采集"} · ${serial.payload.macAddress ?? "MAC 未采集"} · 已写入 ${(serial.payload.found ?? []).length} 块` });
