@@ -443,6 +443,7 @@ VuePress 发布前还要运行 `ascend310b_writing_page_layout`（或 `node scri
 | `cjk-halfwidth-punct` / `cjk-halfwidth-bracket` | warning | 中文之间的半角标点与括号（行内代码除外） |
 | `cjk-double-space` | info | 中文之间的连续空格 |
 | `table-density` / `table-section-overuse` | warning | 文件超过12个表格或单个H2超过8个表格时提示复核。只有多个项目共享多个字段、需要横向比较时才适合用表；顺序、分类、单维功能和概念解释优先用列表或段落 |
+| `list-section-density` | warning | 概念型H2超过10个列表项时提示复核。安装、步骤、安全、检查、作业和参考资料等天然清单不触发；因果、比较和连续解释关系应写成段落 |
 | `cjk-latin-space` | warning | 中西文边界出现字面空格；按作者规范删除，例如使用`Python3.9`、`8T开发板`、共`5`个。英文单词之间和英文与数字之间的常规空格保留；按文件汇总，避免历史语料淹没其他问题 |
 
 代码交叉检查规则（正文与 `samples/` 下真实代码的对齐，回答"文档和代码还一致吗"）：

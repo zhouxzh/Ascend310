@@ -53,6 +53,10 @@ function countCjkLatinSpaces(text) {
 const TABLE_FILE_LIMIT = 12;
 /** One H2 section with this many tables is usually reference-heavy. */
 const TABLE_SECTION_LIMIT = 8;
+/** A conceptual H2 section with this many list items is probably over-fragmented. */
+const LIST_SECTION_LIMIT = 10;
+/** Sections whose primary form is legitimately a checklist or procedure. */
+const LIST_ORIENTED_SECTION = /(?:参考|文献|验证|检查|作业|练习|评分|常见错误|安装|配置|步骤|流程|安全|提示词|功能详解|操作)/u;
 
 /** Whether a line is the delimiter row of a pipe table. */
 function isTableDelimiter(line) {
@@ -95,6 +99,37 @@ function collectTableStats(lines) {
 		bySection.set(section, current);
 	}
 	return { total: starts.length, firstLine: starts[0] ?? 1, sections: [...bySection].map(([name, value]) => ({ name, ...value })) };
+}
+
+/** Count list items by H2 section, ignoring fenced code. */
+function collectListStats(lines) {
+	let fenced = false;
+	let fence = '';
+	let section = '(preface)';
+	let sectionLine = 1;
+	const bySection = new Map();
+	for (let i = 0; i < lines.length; i += 1) {
+		const fenceMatch = /^\s*(`{3,}|~{3,})/u.exec(lines[i]);
+		if (fenceMatch !== null) {
+			if (!fenced) {
+				fenced = true;
+				fence = fenceMatch[1][0];
+			} else if (fenceMatch[1][0] === fence) {
+				fenced = false;
+			}
+			continue;
+		}
+		if (fenced) continue;
+		if (/^## /u.test(lines[i])) {
+			section = lines[i].replace(/\s*\{#[^}]+\}\s*$/u, '');
+			sectionLine = i + 1;
+		}
+		if (!/^\s*(?:[-*+]|\d+[.)])\s+/u.test(lines[i])) continue;
+		const current = bySection.get(section) ?? { line: sectionLine, count: 0 };
+		current.count += 1;
+		bySection.set(section, current);
+	}
+	return [...bySection].map(([name, value]) => ({ name, ...value }));
 }
 /** A full cryptographic digest belongs in engineering evidence, not reader prose. */
 const FULL_SHA256 = /\b[a-f0-9]{64}\b/iu;
@@ -754,6 +789,16 @@ function auditFile(context) {
 		);
 	}
 	if (!assetPart) {
+		for (const section of collectListStats(lines).filter(
+			(entry) => entry.count > LIST_SECTION_LIMIT && !LIST_ORIENTED_SECTION.test(entry.name)
+		)) {
+			push(
+				'list-section-density',
+				'warning',
+				section.line,
+				`${section.name.replace(/^##\s*/u, '')}有 ${section.count} 个列表项，超过概念说明建议上限 ${LIST_SECTION_LIMIT}；存在因果、比较或连续解释关系的内容应改写为段落，只保留真正的步骤、条件和并列枚举。`
+			);
+		}
 		const language = proseLanguageFinding(rel, body, bodyLine - 1);
 		if (language !== null && findings.length < maxFindings) findings.push(language);
 	}

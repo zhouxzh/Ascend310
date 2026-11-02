@@ -257,6 +257,30 @@ check(
 	'a standalone label matching a section heading must be reported'
 );
 
+// --- conceptual list density ----------------------------------------------
+const listLines = [
+	'---',
+	'title: "第8章：列表密度"',
+	'---',
+	'',
+	'## 概念说明',
+	'',
+	'下面这些条目应当先判断是否存在连续解释关系。'
+];
+for (let index = 0; index < 11; index += 1) listLines.push(`- 概念条目${index + 1}`);
+listLines.push('', '## 验证清单', '');
+for (let index = 0; index < 15; index += 1) listLines.push(`- [ ] 检查项${index + 1}`);
+listLines.push('');
+writeFileSync(join(root, 'src', 'book', 'chapter8.md'), listLines.join('\n'), 'utf8');
+const listDensity = auditRepo({ root, maxFindings: 400 }).findings.filter(
+	(finding) => finding.file.endsWith('chapter8.md') && finding.rule === 'list-section-density'
+);
+check(listDensity.length === 1, `one conceptual list-density warning expected, got ${listDensity.length}`);
+check(
+	listDensity[0]?.line === 5,
+	'checklist sections must be exempt from conceptual list-density warnings'
+);
+
 // --- reader-visible evidence details ----------------------------------------
 // Reader prose should explain outcomes instead of exposing a local checkout,
 // an exact artifact digest or a byte count. Commands inside fenced code remain

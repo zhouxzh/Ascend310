@@ -166,7 +166,7 @@ for (const name of ['ascend310b-writing', 'ascend310b-writing-markdown', 'ascend
 }
 for (const name of ['ascend310b-writing', 'ascend310b-writing-markdown']) {
 	const text = readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
-	for (const required of ['表格、列表与段落', 'table-density', '编号列表', '概念']) {
+	for (const required of ['表格、列表与段落', 'table-density', 'list-section-density', '编号列表', '概念']) {
 		if (!text.includes(required)) failures.push(`${name}: 缺少表格/列表/段落选择规则：${required}`);
 	}
 }
