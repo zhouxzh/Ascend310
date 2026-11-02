@@ -34,7 +34,7 @@ import uuid
 import wave
 from collections import OrderedDict
 from dataclasses import dataclass, replace
-from typing import Optional
+from typing import Callable, Optional
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
@@ -47,7 +47,13 @@ from .adapters import (
     adapter_readiness,
     build_speech_adapters,
 )
-from .alsa import AlsaAudioIO, AudioDeviceError, discover_voice_devices
+from .alsa import (
+    AlsaAudioIO,
+    AudioDeviceError,
+    NoSpeechDetected,
+    PushToTalkRecorder,
+    discover_voice_devices,
+)
 from .config import VoiceConfigurationError, VoiceSettings
 from .protocol import (
     LoopbackChat, SpeechRecognizer, SpeechSynthesizer, SynthesizedAudio,
@@ -100,10 +106,12 @@ class VoiceAgent:
         synthesizer: SpeechSynthesizer,
         chat: LoopbackChat,
         devices: Optional[list[VoiceDevice]] = None,
+        device_reader: Optional[Callable[[], list[VoiceDevice]]] = None,
     ):
         self.settings = settings
         self._adapters = _Adapters(recognizer, synthesizer, chat)
         self._devices = list(devices) if devices is not None else []
+        self._device_reader = device_reader or discover_voice_devices
         self._mode = VoiceMode(settings.initial_mode)
         self._input_id: Optional[str] = None
         self._output_id: Optional[str] = None
@@ -113,7 +121,20 @@ class VoiceAgent:
         self._active_turn_id: Optional[str] = None
         self._active_task: Optional[asyncio.Task[None]] = None
         self._supervisor_task: Optional[asyncio.Task[None]] = None
+        self._audio_test_recorder: Optional[PushToTalkRecorder] = None
+        self._audio_test_io: Optional[AlsaAudioIO] = None
+        self._audio_playback_task: Optional[asyncio.Task[None]] = None
+        self._audio_phase = "idle"
+        self._device_error = ""
+        self._audio_lock: Optional[asyncio.Lock] = None
         self._state_lock = threading.Lock()
+
+    def _audio_operation_lock(self) -> asyncio.Lock:
+        """Create the audio transition lock only inside a running event loop."""
+
+        if self._audio_lock is None:
+            self._audio_lock = asyncio.Lock()
+        return self._audio_lock
 
     def speech_readiness(self) -> dict[str, object]:
         """Report configured speech backend readiness without loading model weights."""
@@ -141,7 +162,13 @@ class VoiceAgent:
             return VoiceAgentState.UNAVAILABLE
         if self._mode == VoiceMode.DISABLED:
             return VoiceAgentState.DISABLED
-        if self._active_task is not None and not self._active_task.done():
+        if self._mode == VoiceMode.BOARD and self._device_error:
+            return VoiceAgentState.UNAVAILABLE
+        if (
+            (self._active_task is not None and not self._active_task.done())
+            or self._audio_test_recorder is not None
+            or (self._audio_playback_task is not None and not self._audio_playback_task.done())
+        ):
             return VoiceAgentState.BUSY
         return VoiceAgentState.IDLE
 
@@ -153,12 +180,35 @@ class VoiceAgent:
                 return device
         raise VoiceAgentError(f"selected {direction} device is not in the agent allowlist")
 
-    def _refresh_devices(self) -> None:
-        if not self._devices:
+    def _refresh_devices(self, *, force: bool = False) -> None:
+        if not force and self._devices:
+            return
+        try:
+            self._devices = list(self._device_reader())
+        except AudioDeviceError:
+            self._devices = []
+        if self._mode != VoiceMode.BOARD:
+            self._device_error = ""
+            return
+        available = {(device.id, device.direction) for device in self._devices}
+        disconnected: list[str] = []
+        if self._input_id and (self._input_id, "capture") not in available:
+            disconnected.append("microphone")
+            self._input_id = None
+        if self._output_id and (self._output_id, "playback") not in available:
+            disconnected.append("speaker")
+            self._output_id = None
+        if disconnected:
+            self._auto_listen = False
+            self._device_error = "selected " + " and ".join(disconnected) + " disconnected"
+            if self._active_task is not None and not self._active_task.done():
+                self._active_task.cancel()
             try:
-                self._devices = discover_voice_devices()
-            except AudioDeviceError:
-                self._devices = []
+                asyncio.get_running_loop().create_task(self.cancel_audio_test())
+            except RuntimeError:
+                pass
+        elif self._input_id and self._output_id:
+            self._device_error = ""
 
     def _selected_audio(self) -> AlsaAudioIO:
         capture = self._device(self._input_id, "capture")
@@ -213,23 +263,32 @@ class VoiceAgent:
         with self._state_lock:
             self._auto_listen_failures = 0
 
-    def _update(self, turn: VoiceTurn, state: VoiceTurnState, error: str = "") -> None:
+    def _update(
+        self,
+        turn: VoiceTurn,
+        state: VoiceTurnState,
+        error: str = "",
+        error_code: str = "",
+    ) -> None:
         if turn.terminal:
             return
         turn.state = state
         turn.updated_at_ms = self._now_ms()
         if error:
             turn.error = error[:240]
+        if error_code:
+            turn.error_code = error_code[:80]
 
     async def apply_config(self, request: VoiceConfigRequest) -> dict[str, object]:
         """Atomically validate an allowlisted mode/device update."""
 
-        with self._state_lock:
+        async with self._audio_operation_lock():
+            await self._cancel_audio_test_locked()
             mode = request.mode if request.mode is not None else self._mode
             input_id = request.input_id if request.input_id is not None else self._input_id
             output_id = request.output_id if request.output_id is not None else self._output_id
             auto_listen = request.auto_listen if request.auto_listen is not None else self._auto_listen
-            self._refresh_devices()
+            self._refresh_devices(force=True)
             if request.input_id is not None:
                 self._device(input_id, "capture")
             if request.output_id is not None:
@@ -243,10 +302,11 @@ class VoiceAgent:
                 auto_listen = False
             self._mode, self._input_id, self._output_id, self._auto_listen = mode, input_id, output_id, auto_listen
             self._auto_listen_failures = 0
-        if mode == VoiceMode.BOARD and auto_listen:
-            await self._ensure_supervisor()
-        else:
-            await self._stop_board_tasks()
+            self._device_error = ""
+            if mode == VoiceMode.BOARD and auto_listen:
+                await self._ensure_supervisor()
+            else:
+                await self._stop_board_tasks()
         return self.public_config()
 
     async def _ensure_supervisor(self) -> None:
@@ -266,17 +326,117 @@ class VoiceAgent:
                     await task
 
     async def start_board_turn(self) -> VoiceTurn:
-        if self._mode != VoiceMode.BOARD:
-            raise VoiceAgentError("board capture is only available in board mode")
-        if not self.ready:
-            raise VoiceAgentError("voice agent is unavailable: ASR, TTS, or gateway credentials are not configured")
-        with self._state_lock:
+        async with self._audio_operation_lock():
+            if self._mode != VoiceMode.BOARD:
+                raise VoiceAgentError("board capture is only available in board mode")
+            if self._device_error:
+                raise VoiceAgentError(self._device_error)
+            if not self.ready:
+                raise VoiceAgentError("voice agent is unavailable: ASR, TTS, or gateway credentials are not configured")
+            if self._audio_test_recorder is not None or self._audio_playback_task is not None:
+                raise VoiceAgentError("a push-to-talk audio operation is active")
             if self._active_task is not None and not self._active_task.done():
                 raise VoiceAgentError("a board-side voice turn is already active")
             audio = self._selected_audio()
             turn = self._new_turn()
+            self._audio_phase = "turn"
             self._active_task = asyncio.create_task(self._run_board_turn(turn, audio), name=f"voice-turn-{turn.id}")
             return turn
+
+    async def start_audio_test(self) -> dict[str, object]:
+        """Start press-and-hold microphone capture without invoking ASR or TTS."""
+
+        async with self._audio_operation_lock():
+            if self._mode != VoiceMode.BOARD:
+                raise VoiceAgentError("audio test is only available in board mode")
+            if self._device_error:
+                raise VoiceAgentError(self._device_error)
+            if self._audio_test_recorder is not None or self._audio_playback_task is not None:
+                raise VoiceAgentError("an audio test is already active")
+            if self._active_task is not None and not self._active_task.done():
+                raise VoiceAgentError("a board-side voice turn is already active")
+            self._auto_listen = False
+            await self._stop_board_tasks()
+            audio = self._selected_audio()
+            recorder = audio.begin_push_to_talk(max_duration_seconds=10.0)
+            self._audio_test_recorder = recorder
+            self._audio_test_io = audio
+            self._audio_phase = "ptt_starting"
+            try:
+                await recorder.start()
+            except Exception:
+                self._audio_test_recorder = None
+                self._audio_test_io = None
+                self._audio_phase = "idle"
+                raise
+            self._audio_phase = "ptt_recording"
+            return {
+                "state": "recording",
+                "max_duration_seconds": 10.0,
+                "input_id": self._input_id,
+                "output_id": self._output_id,
+            }
+
+    async def stop_audio_test(self) -> dict[str, object]:
+        """Stop capture, condition the PCM in memory, and replay it locally."""
+
+        async with self._audio_operation_lock():
+            recorder = self._audio_test_recorder
+            audio_io = self._audio_test_io
+            if recorder is None or audio_io is None:
+                raise VoiceAgentError("no audio test is recording")
+            self._audio_test_recorder = None
+            self._audio_test_io = None
+            self._audio_phase = "ptt_stopping"
+            try:
+                audio = await recorder.stop()
+            except Exception:
+                self._audio_phase = "idle"
+                await recorder.cancel()
+                raise
+            playback_task = asyncio.create_task(audio_io.play_pcm(audio), name="voice-audio-test-playback")
+            self._audio_playback_task = playback_task
+            self._audio_phase = "ptt_playing"
+        try:
+            await playback_task
+        except asyncio.CancelledError:
+            raise VoiceAgentError("audio test playback cancelled")
+        finally:
+            if self._audio_playback_task is playback_task:
+                self._audio_playback_task = None
+                self._audio_phase = "idle"
+        duration_seconds = len(audio.pcm) / (
+            audio.sample_rate_hz * audio.channels * audio.sample_width_bytes
+        )
+        return {
+            "state": "completed",
+            "duration_seconds": round(duration_seconds, 3),
+            "sample_rate_hz": audio.sample_rate_hz,
+            "channels": audio.channels,
+            "played": True,
+        }
+
+    async def _cancel_audio_test_locked(self) -> None:
+        recorder = self._audio_test_recorder
+        playback_task = self._audio_playback_task
+        self._audio_test_recorder = None
+        self._audio_test_io = None
+        self._audio_playback_task = None
+        self._audio_phase = "idle"
+        if playback_task is not None and not playback_task.done():
+            playback_task.cancel()
+        if recorder is not None:
+            await recorder.cancel()
+        if playback_task is not None:
+            with contextlib.suppress(asyncio.CancelledError, VoiceAgentError):
+                await playback_task
+
+    async def cancel_audio_test(self) -> dict[str, object]:
+        """Release a held capture or cancel replay without leaving a child process."""
+
+        async with self._audio_operation_lock():
+            await self._cancel_audio_test_locked()
+        return {"state": "cancelled"}
 
     async def _run_board_turn(self, turn: VoiceTurn, audio: AlsaAudioIO) -> None:
         try:
@@ -285,6 +445,8 @@ class VoiceAgent:
         except asyncio.CancelledError:
             self._update(turn, VoiceTurnState.CANCELLED, "voice turn cancelled")
             raise
+        except NoSpeechDetected as exc:
+            self._update(turn, VoiceTurnState.FAILED, str(exc), "no_speech")
         except (AudioDeviceError, SpeechAdapterError, VoiceAgentError, ValueError) as exc:
             self._update(turn, VoiceTurnState.FAILED, str(exc))
         except Exception:  # pragma: no cover
@@ -294,12 +456,14 @@ class VoiceAgent:
             with self._state_lock:
                 if self._active_turn_id == turn.id:
                     self._active_turn_id = None
+                if self._audio_phase == "turn":
+                    self._audio_phase = "idle"
 
     async def _run_pipeline(self, turn: VoiceTurn, pcm: bytes, playback: Optional[VoicePlayback]) -> SynthesizedAudio:
         self._update(turn, VoiceTurnState.TRANSCRIBING)
         transcript = await self._adapters.recognizer.transcribe(pcm, sample_rate_hz=self.settings.capture_sample_rate_hz)
         if not isinstance(transcript, str) or not transcript.strip():
-            raise VoiceAgentError("ASR returned no recognized speech")
+            raise NoSpeechDetected("ASR returned no recognized speech")
         turn.transcript = transcript.strip()[: self.settings.max_text_characters]
         self._update(turn, VoiceTurnState.THINKING)
         reply = await self._adapters.chat.complete(turn.transcript)
@@ -323,7 +487,10 @@ class VoiceAgent:
                     if task is not None:
                         await task
                     if turn.state == VoiceTurnState.FAILED:
-                        retry_delay = self._record_auto_listen_failure()
+                        if turn.error_code == "no_speech":
+                            self._reset_auto_listen_failures()
+                        else:
+                            retry_delay = self._record_auto_listen_failure()
                     else:
                         self._reset_auto_listen_failures()
                 except VoiceAgentError:
@@ -365,7 +532,7 @@ class VoiceAgent:
         return self._turns[requested]
 
     def public_config(self) -> dict[str, object]:
-        self._refresh_devices()
+        self._refresh_devices(force=True)
         inputs = [device.as_dict() for device in self._devices if device.direction == "capture"]
         outputs = [device.as_dict() for device in self._devices if device.direction == "playback"]
         return {
@@ -378,9 +545,35 @@ class VoiceAgent:
             "auto_listen": self._auto_listen,
             "enabled": self._auto_listen,  # compatibility alias for the initial thin UI
             "ready": self.ready,
-            "capture": {"sample_rate_hz": 16000, "channels": 1, "sample_width_bytes": 2, "frame_ms": self.settings.frame_ms},
+            "capture": {
+                "sample_rate_hz": 16000,
+                "channels": 1,
+                "sample_width_bytes": 2,
+                "frame_ms": self.settings.frame_ms,
+                "plugin": self.settings.capture_plugin,
+                "auto_gain": {
+                    "enabled": self.settings.auto_gain_enabled,
+                    "target_rms": self.settings.auto_gain_target_rms,
+                    "max_gain": self.settings.auto_gain_max_gain,
+                },
+            },
             "playback": {"sample_rate_hz": self.settings.playback_sample_rate_hz},
-            "vad": {"speech_rms_threshold": self.settings.speech_rms_threshold, "start_speech_frames": self.settings.start_speech_frames, "stop_silence_ms": self.settings.stop_silence_ms},
+            "llm": {"max_reply_tokens": self.settings.max_reply_tokens},
+            "audio_test": {
+                "recording": self._audio_test_recorder is not None,
+                "playing": self._audio_playback_task is not None,
+                "max_duration_seconds": 10.0,
+            },
+            "device_error": self._device_error,
+            "vad": {
+                "speech_rms_threshold": self.settings.speech_rms_threshold,
+                "start_speech_frames": self.settings.start_speech_frames,
+                "stop_silence_ms": self.settings.stop_silence_ms,
+                "adaptive": self.settings.adaptive_vad_enabled,
+                "noise_floor_initial_rms": self.settings.noise_floor_initial_rms,
+                "noise_floor_multiplier": self.settings.noise_floor_multiplier,
+                "calibration_frames": self.settings.noise_floor_calibration_frames,
+            },
             "gateway": {"loopback": True, "configured": bool(self.settings.gateway_api_key)},
             "speech": self.speech_readiness(),
         }
@@ -388,7 +581,26 @@ class VoiceAgent:
     def status(self) -> dict[str, object]:
         active = self._turns.get(self._active_turn_id) if self._active_turn_id else None
         latest = next(reversed(self._turns.values()), None)
-        return {"mode": self._mode.value, "enabled": self._auto_listen, "auto_listen": self._auto_listen, "ready": self.ready, "state": self._state_for().value, "active_turn": active.as_dict() if active else None, "latest_turn": latest.as_dict() if latest else None, "speech": self.speech_readiness()}
+        last_completed = next(
+            (
+                turn
+                for turn in reversed(self._turns.values())
+                if turn.state == VoiceTurnState.COMPLETED
+            ),
+            None,
+        )
+        return {
+            "mode": self._mode.value,
+            "enabled": self._auto_listen,
+            "auto_listen": self._auto_listen,
+            "ready": self.ready,
+            "state": self._state_for().value,
+            "active_turn": active.as_dict() if active else None,
+            "latest_turn": latest.as_dict() if latest else None,
+            "last_completed_turn": last_completed.as_dict() if last_completed else None,
+            "device_error": self._device_error,
+            "speech": self.speech_readiness(),
+        }
 
     def health(self) -> dict[str, object]:
         return {"status": "ready" if self.ready else "unavailable", "mode": self._mode.value, "state": self._state_for().value, "enabled": self._auto_listen, "speech": self.speech_readiness()}
@@ -526,6 +738,27 @@ def create_voice_agent_app(settings: Optional[VoiceSettings] = None, *, agent: O
             return (await runtime_agent.start_board_turn()).as_dict()
         except VoiceAgentError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post("/v1/voice/audio-test/start")
+    async def start_audio_test(request: Request) -> dict[str, object]:
+        _require_loopback(request)
+        try:
+            return await runtime_agent.start_audio_test()
+        except (AudioDeviceError, VoiceAgentError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post("/v1/voice/audio-test/stop")
+    async def stop_audio_test(request: Request) -> dict[str, object]:
+        _require_loopback(request)
+        try:
+            return await runtime_agent.stop_audio_test()
+        except (AudioDeviceError, VoiceAgentError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post("/v1/voice/audio-test/cancel")
+    async def cancel_audio_test(request: Request) -> dict[str, object]:
+        _require_loopback(request)
+        return await runtime_agent.cancel_audio_test()
 
     return app
 

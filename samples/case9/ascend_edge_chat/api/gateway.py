@@ -488,12 +488,28 @@ def create_app(
 
     @app.get("/health")
     @app.get("/healthz")
-    async def health() -> dict[str, Any]:
-        return {
-            "status": "ok",
-            "service": "ascend-edge-chat-gateway",
-            "model": runtime_settings.public_model_id,
-        }
+    async def health() -> Response:
+        try:
+            upstream_health = await runtime_upstream.health()
+        except UpstreamError as exc:
+            status = 504 if exc.status_code == 504 else 503
+            return JSONResponse(
+                status_code=status,
+                content={
+                    "status": "degraded",
+                    "service": "ascend-edge-chat-gateway",
+                    "model": runtime_settings.public_model_id,
+                    "upstream": {"ready": False, "error": str(exc)},
+                },
+            )
+        return JSONResponse(
+            content={
+                "status": "ok",
+                "service": "ascend-edge-chat-gateway",
+                "model": runtime_settings.public_model_id,
+                "upstream": dict(upstream_health),
+            }
+        )
 
     @app.get("/v1/models", dependencies=[Depends(require_gateway_key)])
     async def list_models() -> dict[str, Any]:

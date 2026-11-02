@@ -243,10 +243,11 @@ class StreamingLLM(Protocol):
     ) -> AsyncIterator[str]:
         """Yield assistant text deltas."""
 
-    # OpenAI-compatible implementations should set this after the stream's
-    # terminal chunk.  Test doubles may omit it; callers then treat a clean
-    # [DONE] without a reason as a normal stop.
+    # OpenAI-compatible implementations should set these after the stream's
+    # terminal chunk. Test doubles may omit them; callers then treat a clean
+    # [DONE] without a reason as a normal stop and omit token-rate metrics.
     last_finish_reason: Optional[str]
+    last_usage: Optional[dict[str, int]]
 
     async def aclose(self) -> None:
         """Release the HTTP client."""
@@ -292,6 +293,7 @@ class OpenAIChatClient:
         self.model = model.strip() or "ascend-edge-chat"
         self.timeout_seconds = timeout_seconds
         self.last_finish_reason: Optional[str] = None
+        self.last_usage: Optional[dict[str, int]] = None
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout_seconds),
             follow_redirects=False,
@@ -310,10 +312,10 @@ class OpenAIChatClient:
     async def stream(
         self, messages: list[dict[str, str]], *, max_tokens: Optional[int] = None
     ) -> AsyncIterator[str]:
-        # A client instance is serialized by the text UI, so this per-stream
-        # field is safe and prevents a previous request's reason leaking into
-        # the next turn.
+        # A client instance is serialized by the text UI, so these per-stream
+        # fields cannot leak terminal metadata from the previous turn.
         self.last_finish_reason = None
+        self.last_usage = None
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -419,6 +421,21 @@ class OpenAIChatClient:
         if isinstance(payload.get("error"), dict):
             message = payload["error"].get("message", "The local LLM returned an error")
             raise LocalLLMError(str(message)[:300])
+        usage = payload.get("usage")
+        if isinstance(usage, dict):
+            prompt_tokens = usage.get("prompt_tokens")
+            completion_tokens = usage.get("completion_tokens")
+            total_tokens = usage.get("total_tokens")
+            values = (prompt_tokens, completion_tokens, total_tokens)
+            if (
+                all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in values)
+                and total_tokens == prompt_tokens + completion_tokens
+            ):
+                self.last_usage = {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": total_tokens,
+                }
         choices = payload.get("choices")
         if not isinstance(choices, list) or not choices:
             return None

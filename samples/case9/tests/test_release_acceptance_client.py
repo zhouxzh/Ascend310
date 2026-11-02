@@ -95,6 +95,19 @@ class _Handler(BaseHTTPRequestHandler):
         )
 
 
+def _environment_snapshot(soc: str = "310B1") -> dict[str, object]:
+    raw_soc = soc.replace("Ascend", "")
+    tier = "20T" if raw_soc == "310B1" else "8T"
+    return {
+        "npu_smi": {
+            "argv": ["npu-smi", "info"],
+            "output": "| NPU Name | Health | Power(W) Temp(C) |\\n| 0 %s | Alarm | 0 67 |\\n" % raw_soc,
+        },
+        "board_soc": "Ascend" + raw_soc,
+        "board_tier": tier,
+    }
+
+
 class ReleaseAcceptanceClientTests(unittest.TestCase):
     def setUp(self) -> None:
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
@@ -126,15 +139,15 @@ class ReleaseAcceptanceClientTests(unittest.TestCase):
             (
                 {"argv": ["git", "config"], "returncode": 0, "output": "https://token@example.test/org/repo.git\n"},
                 {"argv": ["git", "rev-parse"], "returncode": 0, "output": "a" * 40 + "\n"},
+                {"argv": ["git", "branch"], "returncode": 0, "output": "  origin/main\n"},
                 {"argv": ["git", "status"], "returncode": 0, "output": ""},
-                {"argv": ["git", "ls-remote"], "returncode": 0, "output": "a" * 40 + "\trefs/heads/main\n"},
             )
         )
         with mock.patch.object(release_acceptance, "_run_command", side_effect=lambda *args, **kwargs: next(responses)):
-            source = release_acceptance._source_provenance(ROOT)
+            source = release_acceptance._source_provenance(ROOT, "a" * 40)
         self.assertEqual(source["repository"], "https://example.test/org/repo.git")
         self.assertEqual(source["commit"], "a" * 40)
-        self.assertEqual(source["public_main_commit"], "a" * 40)
+        self.assertEqual(source["expected_commit"], "a" * 40)
         self.assertTrue(source["working_tree_clean"])
 
     def test_source_provenance_normalizes_the_public_github_proxy(self) -> None:
@@ -146,12 +159,8 @@ class ReleaseAcceptanceClientTests(unittest.TestCase):
                     "output": "https://gh-proxy.com/https://github.com/zhouxzh/Ascend310.git\n",
                 },
                 {"argv": ["git", "rev-parse"], "returncode": 0, "output": "a" * 40 + "\n"},
+                {"argv": ["git", "branch"], "returncode": 0, "output": "  origin/main\n"},
                 {"argv": ["git", "status"], "returncode": 0, "output": ""},
-                {
-                    "argv": ["git", "ls-remote"],
-                    "returncode": 0,
-                    "output": "a" * 40 + "\trefs/heads/main\n",
-                },
             )
         )
         with mock.patch.object(
@@ -159,9 +168,9 @@ class ReleaseAcceptanceClientTests(unittest.TestCase):
             "_run_command",
             side_effect=lambda *args, **kwargs: next(responses),
         ):
-            source = release_acceptance._source_provenance(ROOT)
+            source = release_acceptance._source_provenance(ROOT, "a" * 40)
         self.assertEqual(source["repository"], release_acceptance.EXPECTED_SOURCE_REPOSITORY)
-        self.assertEqual(source["public_main_commit"], "a" * 40)
+        self.assertEqual(source["expected_commit"], "a" * 40)
 
     def test_provenance_blocks_dirty_source_tree(self) -> None:
         with mock.patch.object(
@@ -170,31 +179,33 @@ class ReleaseAcceptanceClientTests(unittest.TestCase):
             return_value={
                 "repository": release_acceptance.EXPECTED_SOURCE_REPOSITORY,
                 "commit": "a" * 40,
-                "public_main_commit": "a" * 40,
+                "expected_commit": "a" * 40,
+                "commit_reachable_from_public_main": True,
                 "working_tree_clean": False,
                 "commands": [],
             },
         ), mock.patch.object(
             release_acceptance,
             "_model_provenance",
-            return_value={"source_kind": "hf", "revision": "b" * 40},
+            return_value={"source_kind": "hf", "revision": "b" * 40, "board_targets": [{"soc": "Ascend310B1", "tier": "20T"}]},
         ), mock.patch.object(
             release_acceptance,
             "_environment_provenance",
-            return_value={"npu_smi": {"argv": ["npu-smi", "info"]}},
+            return_value=_environment_snapshot(),
         ):
-            provenance = release_acceptance._provenance(ROOT, "hf")
+            provenance = release_acceptance._provenance(ROOT, "hf", "a" * 40)
         self.assertEqual(provenance["status"], "blocked")
         self.assertIn("source working tree is not clean", provenance["reasons"])
 
-    def test_provenance_blocks_a_commit_not_on_public_main(self) -> None:
+    def test_provenance_blocks_a_head_not_matching_the_fixed_release_commit(self) -> None:
         with mock.patch.object(
             release_acceptance,
             "_source_provenance",
             return_value={
                 "repository": release_acceptance.EXPECTED_SOURCE_REPOSITORY,
                 "commit": "a" * 40,
-                "public_main_commit": "b" * 40,
+                "expected_commit": "b" * 40,
+                "commit_reachable_from_public_main": True,
                 "working_tree_clean": True,
                 "commands": [],
             },
@@ -205,11 +216,11 @@ class ReleaseAcceptanceClientTests(unittest.TestCase):
         ), mock.patch.object(
             release_acceptance,
             "_environment_provenance",
-            return_value={"npu_smi": {"argv": ["npu-smi", "info"]}},
+            return_value=_environment_snapshot(),
         ):
-            provenance = release_acceptance._provenance(ROOT, "hf")
+            provenance = release_acceptance._provenance(ROOT, "hf", "b" * 40)
         self.assertEqual(provenance["status"], "blocked")
-        self.assertIn("source commit is not the current public main commit", provenance["reasons"])
+        self.assertIn("source HEAD does not match the requested fixed commit", provenance["reasons"])
 
     def test_model_provenance_labels_offline_bundle(self) -> None:
         with mock.patch.object(
@@ -218,7 +229,8 @@ class ReleaseAcceptanceClientTests(unittest.TestCase):
             return_value={
                 "repository": release_acceptance.EXPECTED_SOURCE_REPOSITORY,
                 "commit": "a" * 40,
-                "public_main_commit": "a" * 40,
+                "expected_commit": "a" * 40,
+                "commit_reachable_from_public_main": True,
                 "working_tree_clean": True,
                 "commands": [],
             },
@@ -230,13 +242,14 @@ class ReleaseAcceptanceClientTests(unittest.TestCase):
                 "revision": "b" * 40,
                 "profile_status": "admitted",
                 "admission_eligible": True,
+                "board_targets": [{"soc": "Ascend310B1", "tier": "20T"}],
             },
         ), mock.patch.object(
             release_acceptance,
             "_environment_provenance",
-            return_value={"npu_smi": {"argv": ["npu-smi", "info"]}},
+            return_value=_environment_snapshot(),
         ):
-            provenance = release_acceptance._provenance(ROOT, "offline-bundle")
+            provenance = release_acceptance._provenance(ROOT, "offline-bundle", "a" * 40)
         self.assertEqual(provenance["status"], "passed")
         self.assertEqual(provenance["model"]["source_kind"], "offline-bundle")
         self.assertEqual(provenance["model"]["evidence_label"], "offline-bundle")
@@ -275,7 +288,8 @@ class ReleaseAcceptanceClientTests(unittest.TestCase):
             return_value={
                 "repository": release_acceptance.EXPECTED_SOURCE_REPOSITORY,
                 "commit": "a" * 40,
-                "public_main_commit": "a" * 40,
+                "expected_commit": "a" * 40,
+                "commit_reachable_from_public_main": True,
                 "working_tree_clean": True,
                 "commands": [],
             },
@@ -287,24 +301,65 @@ class ReleaseAcceptanceClientTests(unittest.TestCase):
                 "revision": "b" * 40,
                 "profile_status": "formal",
                 "admission_eligible": True,
+                "board_targets": [{"soc": "Ascend310B1", "tier": "20T"}],
             },
         ), mock.patch.object(
             release_acceptance,
             "_environment_provenance",
-            return_value={"npu_smi": {"argv": ["npu-smi", "info"]}},
+            return_value=_environment_snapshot(),
         ):
-            provenance = release_acceptance._provenance(ROOT, "hf")
+            provenance = release_acceptance._provenance(ROOT, "hf", "a" * 40)
         self.assertEqual(provenance["status"], "passed")
-        self.assertEqual(provenance["model"]["evidence_label"], "formal-machine-release")
+        self.assertEqual(provenance["model"]["evidence_label"], "formal-machine-quality-pending")
 
-    def test_provenance_labels_a_technical_preview_profile_without_blocking_it(self) -> None:
+    def test_provenance_accepts_either_declared_board_for_the_shared_model(self) -> None:
+        for soc, tier in (("Ascend310B1", "20T"), ("Ascend310B4", "8T")):
+            with self.subTest(soc=soc), mock.patch.object(
+                release_acceptance,
+                "_source_provenance",
+                return_value={
+                    "repository": release_acceptance.EXPECTED_SOURCE_REPOSITORY,
+                    "commit": "a" * 40,
+                    "expected_commit": "a" * 40,
+                    "commit_reachable_from_public_main": True,
+                    "working_tree_clean": True,
+                    "commands": [],
+                },
+            ), mock.patch.object(
+                release_acceptance,
+                "_model_provenance",
+                return_value={
+                    "source_kind": "hf",
+                    "revision": "b" * 40,
+                    "profile_status": "stability_passed",
+                    "admission_eligible": False,
+                    "board_targets": [
+                        {"soc": "Ascend310B1", "tier": "20T"},
+                        {"soc": "Ascend310B4", "tier": "8T"},
+                    ],
+                },
+            ), mock.patch.object(
+                release_acceptance,
+                "_environment_provenance",
+                return_value={
+                    "npu_smi": {"argv": ["npu-smi", "info"], "output": "| 0 %s | Alarm | 0 70 |" % soc.replace("Ascend", "")},
+                    "board_soc": soc,
+                    "board_tier": tier,
+                },
+            ):
+                provenance = release_acceptance._provenance(ROOT, "hf", "a" * 40)
+            self.assertEqual(provenance["status"], "passed", provenance["reasons"])
+            self.assertEqual(provenance["board"], {"soc": soc, "tier": tier})
+
+    def test_provenance_labels_shared_profile_with_quality_pending_as_machine_quality_pending(self) -> None:
         with mock.patch.object(
             release_acceptance,
             "_source_provenance",
             return_value={
                 "repository": release_acceptance.EXPECTED_SOURCE_REPOSITORY,
                 "commit": "a" * 40,
-                "public_main_commit": "a" * 40,
+                "expected_commit": "a" * 40,
+                "commit_reachable_from_public_main": True,
                 "working_tree_clean": True,
                 "commands": [],
             },
@@ -314,14 +369,15 @@ class ReleaseAcceptanceClientTests(unittest.TestCase):
             return_value={
                 "source_kind": "hf",
                 "revision": "b" * 40,
-                "profile_status": "experimental_isolated",
+                "profile_status": "stability_passed",
                 "admission_eligible": False,
+                "board_targets": [{"soc": "Ascend310B1", "tier": "20T"}, {"soc": "Ascend310B4", "tier": "8T"}],
             },
         ), mock.patch.object(
             release_acceptance,
             "_environment_provenance",
-            return_value={"npu_smi": {"argv": ["npu-smi", "info"]}},
+            return_value=_environment_snapshot(),
         ):
-            provenance = release_acceptance._provenance(ROOT, "hf")
+            provenance = release_acceptance._provenance(ROOT, "hf", "a" * 40)
         self.assertEqual(provenance["status"], "passed")
-        self.assertEqual(provenance["model"]["evidence_label"], "technical-preview")
+        self.assertEqual(provenance["model"]["evidence_label"], "formal-machine-quality-pending")

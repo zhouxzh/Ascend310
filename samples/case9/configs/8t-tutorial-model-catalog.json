@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "purpose": "8T 16GB manual classroom validation using the unified Case9 worker",
+  "models": [
+    {
+      "id": "qwen1.5-0.5b-chat",
+      "display_name": "Qwen1.5 0.5B Chat / 8T 16GB",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["zh", "en"],
+      "technical_status": "observed-pass",
+      "quality_status": "pending",
+      "selectable": true,
+      "reason": "16GB 8T已完成Ascend初始化、模型加载、JSON和SSE人工校验；中文质量仍需人工评价。",
+      "technical_detail": "Ascend310B4 context_verified; BF16 compatibility adapter enabled; Qwen1.5-0.5B generation passed.",
+      "quality_detail": "本配置用于人工校验，不把短回复当作质量评分。",
+      "board_results": {"Ascend310B4/8T": "observed-pass"},
+      "worker_registry": "configs/8t-16gb-mindspore-experiment.json",
+      "default_max_tokens": 32,
+      "max_tokens": 256
+    }
+  ]
+}

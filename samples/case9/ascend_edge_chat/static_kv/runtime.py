@@ -35,6 +35,8 @@ MODEL_ID = "qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om"
 VOCABULARY_SIZE = 151936
 DEFAULT_MAX_GENERATION_TOKENS = 80
 HARD_MAX_GENERATION_TOKENS = 80
+FORCED_DECODE_MAX_GENERATION_TOKENS = 1024
+FORCED_DECODE_MAX_TIMEOUT_SECONDS = 14_400.0
 # The 310B4 graph needs roughly one serialized NPU execution per generated
 # token.  Stop at the first complete sentence once a modest minimum has been
 # reached, so the default 80-token allowance is a hard safety ceiling rather
@@ -399,6 +401,8 @@ class Qwen25AclRuntime:
         device_id: int = 0,
         max_tokens: int = DEFAULT_MAX_GENERATION_TOKENS,
         execution_timeout_seconds: float = MAX_EXECUTION_TIMEOUT_SECONDS,
+        sentence_stop_enabled: bool = True,
+        force_continue: bool = False,
     ) -> None:
         self.om_path = Path(om_path).expanduser()
         self.tokenizer_path = Path(tokenizer_path).expanduser()
@@ -413,14 +417,34 @@ class Qwen25AclRuntime:
             controller_contract.validate_static_expectations()
         except Exception as exc:
             raise RuntimeUnavailable("static KV contract validation failed") from exc
-        if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or not 1 <= max_tokens <= HARD_MAX_GENERATION_TOKENS:
-            raise RuntimeUnavailable(f"max_tokens must be between 1 and {HARD_MAX_GENERATION_TOKENS}")
-        if not isinstance(execution_timeout_seconds, (int, float)) or execution_timeout_seconds <= 0:
-            raise RuntimeUnavailable("execution_timeout_seconds must be positive")
+        if not isinstance(force_continue, bool):
+            raise RuntimeUnavailable("force_continue must be boolean")
+        max_generation_tokens = (
+            FORCED_DECODE_MAX_GENERATION_TOKENS
+            if force_continue
+            else HARD_MAX_GENERATION_TOKENS
+        )
+        if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or not 1 <= max_tokens <= max_generation_tokens:
+            raise RuntimeUnavailable(f"max_tokens must be between 1 and {max_generation_tokens}")
+        max_timeout = (
+            FORCED_DECODE_MAX_TIMEOUT_SECONDS
+            if force_continue
+            else MAX_EXECUTION_TIMEOUT_SECONDS
+        )
+        if (
+            isinstance(execution_timeout_seconds, bool)
+            or not isinstance(execution_timeout_seconds, (int, float))
+            or not 1.0 <= float(execution_timeout_seconds) <= max_timeout
+        ):
+            raise RuntimeUnavailable(f"execution_timeout_seconds must be between 1 and {int(max_timeout)}")
         self.contract = contract
         self.device_id = int(device_id)
         self.max_tokens = int(max_tokens)
-        self.execution_timeout_seconds = min(float(execution_timeout_seconds), MAX_EXECUTION_TIMEOUT_SECONDS)
+        self.execution_timeout_seconds = float(execution_timeout_seconds)
+        self.force_continue = force_continue
+        if not isinstance(sentence_stop_enabled, bool):
+            raise RuntimeUnavailable("sentence_stop_enabled must be boolean")
+        self.sentence_stop_enabled = sentence_stop_enabled and not force_continue
         self._backend: Any = backend or NativeQwen25Backend(device_id=self.device_id)
         self._tokenizer = tokenizer
         self.tokenizer_config_path = Path(tokenizer_config_path).expanduser() if tokenizer_config_path else None
@@ -556,6 +580,11 @@ class Qwen25AclRuntime:
             "sequence_length": int(getattr(contract, "static_sequence_length", 1024)),
             "max_tokens": int(self.max_tokens),
             "sentence_stop_min_tokens": SENTENCE_STOP_MIN_TOKENS,
+            "sentence_stop_enabled": self.sentence_stop_enabled,
+            "force_continue": self.force_continue,
+            "eos_masked_ids": [int(getattr(contract, "eos_token_id", 151645))]
+            if self.force_continue and contract is not None
+            else [],
             "descriptor_validated": self._descriptor is not None,
             "request_buffer_reuse": bool(getattr(self._backend, "supports_request_reuse", False)),
             "device_cache_update": bool(getattr(self._backend, "supports_device_cache_update", False)),
@@ -629,7 +658,13 @@ class Qwen25AclRuntime:
                 self._check_cancelled()
                 _, cache, logits = self._run_step(token_id, real_length, cache, deadline, request_handle)
                 real_length += 1
-                next_id = _greedy_next_id(logits, self._vocabulary_size())
+                next_id = _greedy_next_id(
+                    logits,
+                    self._vocabulary_size(),
+                    excluded_token_ids=(int(getattr(self.contract, "eos_token_id", 151645)),)
+                    if self.force_continue
+                    else (),
+                )
             if next_id is None:
                 raise RuntimeUnavailable("Qwen2.5 produced no logits for the prompt")
 
@@ -647,8 +682,11 @@ class Qwen25AclRuntime:
                 generated.append(token_id)
                 text = self._decode(generated)
                 at_eos = token_id == eos_id
+                if self.force_continue and at_eos:
+                    raise RuntimeUnavailable("force-continue selected the excluded EOS token")
                 at_sentence_boundary = (
-                    len(generated) >= sentence_stop_min
+                    self.sentence_stop_enabled
+                    and len(generated) >= sentence_stop_min
                     and _ends_with_sentence_boundary(text)
                 )
                 at_limit = len(generated) >= limit or real_length >= sequence_length
@@ -659,7 +697,13 @@ class Qwen25AclRuntime:
                     break
                 _, cache, logits = self._run_step(token_id, real_length, cache, deadline, request_handle)
                 real_length += 1
-                next_id = _greedy_next_id(logits, self._vocabulary_size())
+                next_id = _greedy_next_id(
+                    logits,
+                    self._vocabulary_size(),
+                    excluded_token_ids=(int(getattr(self.contract, "eos_token_id", 151645)),)
+                    if self.force_continue
+                    else (),
+                )
                 yield GenerationResult(text, len(prompt_ids), len(generated), "in_progress", False)
         finally:
             try:
@@ -951,12 +995,25 @@ def _is_logits_descriptor(item: Any) -> bool:
     )
 
 
-def _greedy_next_id(row: Any, vocabulary_size: int = VOCABULARY_SIZE) -> int:
+def _greedy_next_id(
+    row: Any,
+    vocabulary_size: int = VOCABULARY_SIZE,
+    excluded_token_ids: Sequence[int] = (),
+) -> int:
     np = _numpy()
     values = np.asarray(row)
     if values.ndim != 1 or values.shape[0] != vocabulary_size or not bool(np.isfinite(values).all()):
         raise RuntimeUnavailable("logits vocabulary dimension or values are invalid")
-    return int(np.argmax(values))
+    if not excluded_token_ids:
+        return int(np.argmax(values))
+    masked = np.array(values, copy=True)
+    for token_id in excluded_token_ids:
+        if isinstance(token_id, bool) or not isinstance(token_id, int) or not 0 <= token_id < vocabulary_size:
+            raise RuntimeUnavailable("excluded token id is outside the vocabulary")
+        masked[token_id] = -np.inf
+    if not bool(np.isfinite(masked).any()):
+        raise RuntimeUnavailable("force-continue excluded every vocabulary token")
+    return int(np.argmax(masked))
 
 
 def _is_token_cache_shape(full_shape: Sequence[int], token_shape: Sequence[int]) -> bool:

@@ -48,6 +48,15 @@ def _decimal(source: Mapping[str, str], name: str, default: float, minimum: floa
     return value
 
 
+def _boolean(source: Mapping[str, str], name: str, default: bool) -> bool:
+    raw = source.get(name, "true" if default else "false").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    raise VoiceConfigurationError(f"{VOICE_ENV_PREFIX}{name} must be a boolean")
+
+
 def _loopback_url(source: Mapping[str, str]) -> str:
     value = source.get("GATEWAY_URL", "http://127.0.0.1:7861/v1").strip().rstrip("/")
     try:
@@ -82,14 +91,24 @@ class VoiceSettings:
     # 0 uses stereo capture, the most common UVC microphone contract. VAD/ASR
     # still consume downmixed mono PCM; set 1 only after device enumeration.
     capture_device_channels: int = 0
+    capture_plugin: str = "plughw"
     playback_sample_rate_hz: int = 22_050
     channels: int = 1
     sample_width_bytes: int = 2
     frame_ms: int = 20
-    speech_rms_threshold: float = 450.0
+    speech_rms_threshold: float = 180.0
     start_speech_frames: int = 3
     stop_silence_ms: int = 800
+    adaptive_vad_enabled: bool = True
+    noise_floor_initial_rms: float = 80.0
+    noise_floor_multiplier: float = 3.0
+    noise_floor_decay: float = 0.95
+    noise_floor_calibration_frames: int = 10
+    auto_gain_enabled: bool = True
+    auto_gain_target_rms: float = 2_400.0
+    auto_gain_max_gain: float = 16.0
     max_capture_seconds: float = 30.0
+    max_reply_tokens: int = 32
     max_text_characters: int = 1_200
     max_browser_audio_bytes: int = 1_048_576
     speech_backend: str = "unavailable"
@@ -122,6 +141,8 @@ class VoiceSettings:
             raise VoiceConfigurationError("capture_sample_rate_hz is fixed at 16000 for the initial ASR contract")
         if self.capture_device_channels not in {0, 1, 2}:
             raise VoiceConfigurationError("capture_device_channels must be 0 (auto), 1, or 2")
+        if self.capture_plugin not in {"plughw", "dsnoop", "pulse"}:
+            raise VoiceConfigurationError("capture_plugin must be plughw, dsnoop, or pulse")
         if not 8_000 <= self.playback_sample_rate_hz <= 48_000:
             raise VoiceConfigurationError("playback_sample_rate_hz must be between 8000 and 48000")
         if self.channels != 1 or self.sample_width_bytes != 2:
@@ -134,8 +155,22 @@ class VoiceSettings:
             raise VoiceConfigurationError("start_speech_frames must be positive")
         if not 200 <= self.stop_silence_ms <= 5_000:
             raise VoiceConfigurationError("stop_silence_ms must be between 200 and 5000")
+        if not 1.0 <= self.noise_floor_initial_rms <= 2_000.0:
+            raise VoiceConfigurationError("noise_floor_initial_rms must be between 1 and 2000")
+        if not 1.2 <= self.noise_floor_multiplier <= 10.0:
+            raise VoiceConfigurationError("noise_floor_multiplier must be between 1.2 and 10")
+        if not 0.5 <= self.noise_floor_decay <= 0.999:
+            raise VoiceConfigurationError("noise_floor_decay must be between 0.5 and 0.999")
+        if not 1 <= self.noise_floor_calibration_frames <= 100:
+            raise VoiceConfigurationError("noise_floor_calibration_frames must be between 1 and 100")
+        if not 100.0 <= self.auto_gain_target_rms <= 12_000.0:
+            raise VoiceConfigurationError("auto_gain_target_rms must be between 100 and 12000")
+        if not 1.0 <= self.auto_gain_max_gain <= 32.0:
+            raise VoiceConfigurationError("auto_gain_max_gain must be between 1 and 32")
         if not 1.0 <= self.max_capture_seconds <= 60.0:
             raise VoiceConfigurationError("max_capture_seconds must be between 1 and 60")
+        if not 1 <= self.max_reply_tokens <= 256:
+            raise VoiceConfigurationError("max_reply_tokens must be between 1 and 256")
         if not 1 <= self.max_text_characters <= 4_000:
             raise VoiceConfigurationError("max_text_characters must be between 1 and 4000")
         if not 32_000 <= self.max_browser_audio_bytes <= 8 * 1_024 * 1_024:
@@ -184,12 +219,24 @@ class VoiceSettings:
             initial_mode=values.get("MODE", "disabled").strip().lower() or "disabled",
             capture_sample_rate_hz=_integer(values, "CAPTURE_SAMPLE_RATE_HZ", 16_000, 8_000, 48_000),
             capture_device_channels=_integer(values, "CAPTURE_DEVICE_CHANNELS", 0, 0, 2),
+            capture_plugin=values.get("CAPTURE_PLUGIN", "plughw").strip().lower(),
             playback_sample_rate_hz=_integer(values, "PLAYBACK_SAMPLE_RATE_HZ", 22_050, 8_000, 48_000),
             frame_ms=_integer(values, "FRAME_MS", 20, 10, 30),
-            speech_rms_threshold=_decimal(values, "SPEECH_RMS_THRESHOLD", 450.0, 1.0, 32_767.0),
+            speech_rms_threshold=_decimal(values, "SPEECH_RMS_THRESHOLD", 180.0, 1.0, 32_767.0),
             start_speech_frames=_integer(values, "START_SPEECH_FRAMES", 3, 1, 50),
             stop_silence_ms=_integer(values, "STOP_SILENCE_MS", 800, 200, 5_000),
+            adaptive_vad_enabled=_boolean(values, "ADAPTIVE_VAD_ENABLED", True),
+            noise_floor_initial_rms=_decimal(values, "NOISE_FLOOR_INITIAL_RMS", 80.0, 1.0, 2_000.0),
+            noise_floor_multiplier=_decimal(values, "NOISE_FLOOR_MULTIPLIER", 3.0, 1.2, 10.0),
+            noise_floor_decay=_decimal(values, "NOISE_FLOOR_DECAY", 0.95, 0.5, 0.999),
+            noise_floor_calibration_frames=_integer(
+                values, "NOISE_FLOOR_CALIBRATION_FRAMES", 10, 1, 100
+            ),
+            auto_gain_enabled=_boolean(values, "AUTO_GAIN_ENABLED", True),
+            auto_gain_target_rms=_decimal(values, "AUTO_GAIN_TARGET_RMS", 2_400.0, 100.0, 12_000.0),
+            auto_gain_max_gain=_decimal(values, "AUTO_GAIN_MAX_GAIN", 16.0, 1.0, 32.0),
             max_capture_seconds=_decimal(values, "MAX_CAPTURE_SECONDS", 30.0, 1.0, 60.0),
+            max_reply_tokens=_integer(values, "MAX_REPLY_TOKENS", 32, 1, 256),
             max_text_characters=_integer(values, "MAX_TEXT_CHARACTERS", 1_200, 1, 4_000),
             max_browser_audio_bytes=_integer(values, "MAX_BROWSER_AUDIO_BYTES", 1_048_576, 32_000, 8 * 1_024 * 1_024),
             speech_backend=values.get("SPEECH_BACKEND", "unavailable").strip().lower(),

@@ -92,6 +92,23 @@ def verify_release_lock(config_path: Path = DEFAULT_MODEL_CONFIG, lock_path: Pat
     for key, value in expected.items():
         if lock.get(key) != value:
             raise ArtifactError("release artifact lock %s does not match model config" % key)
+    target = lock.get("target")
+    if not isinstance(target, Mapping):
+        raise ArtifactError("release artifact lock target must be an object")
+    raw_boards = target.get("boards")
+    expected_boards = [
+        {"soc": str(item.get("soc")), "tier": str(item.get("tier"))}
+        for item in profile.board_targets
+    ]
+    if not isinstance(raw_boards, list):
+        raise ArtifactError("release artifact lock must list supported board targets")
+    observed_boards = []
+    for item in raw_boards:
+        if not isinstance(item, Mapping) or set(item) != {"soc", "tier"}:
+            raise ArtifactError("release artifact lock board target is invalid")
+        observed_boards.append({"soc": str(item["soc"]), "tier": str(item["tier"])})
+    if sorted(observed_boards, key=lambda item: item["soc"]) != sorted(expected_boards, key=lambda item: item["soc"]):
+        raise ArtifactError("release artifact lock board targets do not match model profile")
     license_url = lock.get("license_url")
     if not isinstance(license_url, str) or not license_url.startswith("https://"):
         raise ArtifactError("release artifact lock must contain an HTTPS license_url")

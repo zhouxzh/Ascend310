@@ -20,6 +20,10 @@ class ReleaseConfigTests(unittest.TestCase):
         self.assertEqual(profile.revision, "4d14e384a4b037942bb3f3016665157c8bcb70ea")
         self.assertEqual(profile.board_soc, "Ascend310B1")
         self.assertEqual(profile.board_tier, "20T")
+        self.assertEqual(
+            {(item["soc"], item["tier"]) for item in profile.board_targets},
+            {("Ascend310B1", "20T"), ("Ascend310B4", "8T")},
+        )
         self.assertEqual(profile.license, "Tongyi Qianwen Research License Agreement")
         self.assertTrue(all(item.expected_bytes and item.sha256 for item in profile.artifacts))
 
@@ -30,6 +34,28 @@ class ReleaseConfigTests(unittest.TestCase):
         lock = json.loads(DEFAULT_LOCK.read_text(encoding="utf-8"))
         self.assertEqual(lock["license"], "Tongyi Qianwen Research License Agreement")
         self.assertTrue(lock["license_url"].startswith("https://huggingface.co/"))
+
+    def test_shared_release_catalog_declares_mindspore_on_both_boards(self) -> None:
+        import json
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        catalog = json.loads((root / "configs" / "release-model-catalog.json").read_text(encoding="utf-8"))
+        entry = catalog["models"][0]
+        self.assertEqual(entry["id"], "qwen1.5-0.5b-chat")
+        self.assertEqual(entry["worker_registry"], "configs/release-model.json")
+        self.assertEqual(
+            entry["board_results"],
+            {"Ascend310B1/20T": "observed-pass", "Ascend310B4/8T": "observed-pass"},
+        )
+        for filename, soc, tier in (
+            ("20t-backend-catalog.json", "Ascend310B1", "20T"),
+            ("8t-backend-catalog.json", "Ascend310B4", "8T"),
+        ):
+            backend_catalog = json.loads((root / "configs" / filename).read_text(encoding="utf-8"))
+            self.assertEqual(backend_catalog["target"], {"soc": soc, "tier": tier})
+            self.assertEqual(backend_catalog["backends"][0]["id"], "mindspore")
+            self.assertEqual(backend_catalog["backends"][0]["default_model"], entry["id"])
 
     def test_settings_use_only_release_namespace(self) -> None:
         settings = Settings.from_environ(
@@ -68,15 +94,14 @@ class ReleaseConfigTests(unittest.TestCase):
         self.assertEqual(settings.upstream_context_tokens, 1024)
         self.assertEqual(settings.public_model_id, "ascend-edge-chat")
 
-    def test_mindspore_keeps_non_acl_loopback_test_ports_compatible(self) -> None:
-        settings = Settings.from_environ(
-            {
-                "ASCEND_EDGE_CHAT_GATEWAY_API_KEY": "a" * 24,
-                "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL": "http://127.0.0.1:8091/v1",
-            }
-        )
-        self.assertEqual(settings.backend, "mindspore")
-        self.assertEqual(settings.upstream_base_url, "http://127.0.0.1:8091/v1")
+    def test_mindspore_rejects_nonproduction_loopback_ports(self) -> None:
+        with self.assertRaises(ConfigurationError):
+            Settings.from_environ(
+                {
+                    "ASCEND_EDGE_CHAT_GATEWAY_API_KEY": "a" * 24,
+                    "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL": "http://127.0.0.1:8091/v1",
+                }
+            )
 
     def test_backend_rejects_model_or_port_cross_wiring(self) -> None:
         baseline = {
@@ -155,9 +180,29 @@ class ReleaseConfigTests(unittest.TestCase):
         root = __import__("pathlib").Path(__file__).resolve().parents[1]
         text = (root / "configs" / "release-8t-service-requirements.txt").read_text(encoding="utf-8")
         self.assertIn("-r release-service-requirements.txt", text)
-        self.assertIn("numpy-1.26.4-cp39-cp39", text)
-        self.assertIn("tokenizers-0.19.1-cp39-cp39", text)
+        self.assertIn("numpy==1.26.4", text)
+        self.assertIn("tokenizers==0.19.1", text)
+        self.assertNotIn("https://", text)
         self.assertEqual(text.count("--hash=sha256:"), 2)
+
+    def test_8t_preflight_locks_static_runtime_dependency_versions(self) -> None:
+        root = __import__("pathlib").Path(__file__).resolve().parents[1]
+        text = (root / "scripts" / "verify" / "release-8t-preflight.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("import importlib.metadata", text)
+        self.assertIn('(\"numpy\", \"1.26.4\")', text)
+        self.assertIn('(\"tokenizers\", \"0.19.1\")', text)
+        self.assertIn("8T release requires %s==%s, got %s", text)
+
+    def test_dependency_installer_requires_ascend_and_local_wheelhouse(self) -> None:
+        root = __import__("pathlib").Path(__file__).resolve().parents[1]
+        text = (root / "scripts" / "verify" / "install-service-dependencies.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('[[ "${conda_env}" == "ascend" ]]', text)
+        self.assertIn("--no-index --no-deps", text)
+        self.assertIn('--find-links "${wheelhouse}"', text)
 
     def test_release_preflight_uses_the_shared_runtime_lock(self) -> None:
         root = __import__("pathlib").Path(__file__).resolve().parents[1]
@@ -165,10 +210,15 @@ class ReleaseConfigTests(unittest.TestCase):
         self.assertIn("validate_runtime_lock", text)
         self.assertIn("PYTHONNOUSERSITE=1", text)
         self.assertNotIn("EXPECTED_PYTHON", text)
+        self.assertNotIn("gateway --check-config", text)
 
     def test_runtime_lock_accepts_the_unified_ascend_environment(self) -> None:
         lock = {
             "target": {
+                "boards": [
+                    {"soc": "Ascend310B1", "tier": "20T"},
+                    {"soc": "Ascend310B4", "tier": "8T"},
+                ],
                 "python": "3.9.25",
                 "cann": "8.0.0",
                 "mindspore": "2.4.10",
@@ -178,6 +228,8 @@ class ReleaseConfigTests(unittest.TestCase):
         observed = {
             "python": "3.9.25",
             "soabi": UNIFIED_SOABI,
+            "board_soc": "Ascend310B1",
+            "board_tier": "20T",
             "conda_env": UNIFIED_CONDA_ENV,
             "python_no_user_site": "1",
             "user_site_enabled": False,
@@ -194,6 +246,10 @@ class ReleaseConfigTests(unittest.TestCase):
     def test_tutorial_runtime_keeps_unified_gate_without_requiring_release_versions(self) -> None:
         lock = {
             "target": {
+                "boards": [
+                    {"soc": "Ascend310B1", "tier": "20T"},
+                    {"soc": "Ascend310B4", "tier": "8T"},
+                ],
                 "python": "3.9.25",
                 "cann": "8.0.0",
                 "mindspore": "2.4.10",
@@ -203,6 +259,8 @@ class ReleaseConfigTests(unittest.TestCase):
         observed = {
             "python": "3.9.25",
             "soabi": UNIFIED_SOABI,
+            "board_soc": "Ascend310B1",
+            "board_tier": "20T",
             "conda_env": UNIFIED_CONDA_ENV,
             "python_no_user_site": "1",
             "user_site_enabled": False,
@@ -217,6 +275,10 @@ class ReleaseConfigTests(unittest.TestCase):
     def test_runtime_lock_reports_package_drift_without_falling_back(self) -> None:
         lock = {
             "target": {
+                "boards": [
+                    {"soc": "Ascend310B1", "tier": "20T"},
+                    {"soc": "Ascend310B4", "tier": "8T"},
+                ],
                 "python": "3.9.25",
                 "cann": "8.0.0",
                 "mindspore": "2.4.10",
@@ -226,6 +288,8 @@ class ReleaseConfigTests(unittest.TestCase):
         observed = {
             "python": "3.9.25",
             "soabi": UNIFIED_SOABI,
+            "board_soc": "Ascend310B1",
+            "board_tier": "20T",
             "conda_env": UNIFIED_CONDA_ENV,
             "python_no_user_site": "1",
             "user_site_enabled": False,

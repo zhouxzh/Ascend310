@@ -70,9 +70,15 @@ class VoiceDevice:
     label: str
     direction: str
     backend_id: str
+    model: str = ""
 
     def as_dict(self) -> dict[str, str]:
-        return {"id": self.id, "label": self.label, "direction": self.direction}
+        return {
+            "id": self.id,
+            "label": self.label,
+            "direction": self.direction,
+            "model": self.model,
+        }
 
 
 @dataclass
@@ -86,6 +92,7 @@ class VoiceTurn:
     transcript: str = ""
     reply: str = ""
     error: str = ""
+    error_code: str = ""
 
     @property
     def terminal(self) -> bool:
@@ -105,6 +112,8 @@ class VoiceTurn:
             payload["reply"] = self.reply
         if self.error:
             payload["error"] = self.error
+        if self.error_code:
+            payload["error_code"] = self.error_code
         return payload
 
 

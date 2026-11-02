@@ -1,141 +1,95 @@
-# Voice Modes and Board Terminal Plan
+# 语音模式与开发板终端方案
 
-## Status and Scope
+## 状态与范围
 
-This document defines two **experimental, partially validated** voice modes for
-Ascend Edge Chat. Neither is a `v0.1.0` release capability, and neither changes
-the text gateway, MindSpore worker, model lock, or the existing 20T text
-acceptance result.
+本文为Ascend Edge Chat定义两种**实验性、部分验证**的语音模式。两者都不是`v0.1.0`版本能力，也都不改变文本网关、MindSpore工作进程、模型锁或现有的20T文本验收结果。
 
-| Mode | Audio owner | Intended purpose | Current evidence |
+| 模式 | 音频归属方 | 预期用途 | 当前证据 |
 | --- | --- | --- | --- |
-| `board` | USB/3.5mm devices connected to the 20T board | Independent board voice terminal | Audio hardware enumeration only; VAD, board capture, board playback, board ASR/TTS, and board turns are `untested` |
-| `browser` | The remote browser's microphone and speaker | HTTPS-gated browser voice chat | Browser capture/playback self-test and one synthetic ASR-to-text turn are `observed-pass`; TTS and the full W0-W7 gate remain incomplete |
+| `board` | 连接到20T板的USB/3.5mm设备 | 独立开发板语音终端 | 仅完成音频硬件枚举；VAD、开发板采集、开发板播放、开发板ASR/TTS以及开发板轮次均为`untested` |
+| `browser` | 远程浏览器的麦克风和扬声器 | 受HTTPS门控的浏览器语音聊天 | 浏览器采集/播放自检和一次合成ASR到文本轮次为`observed-pass`；TTS和完整的W0-W7门仍未完成 |
 
-The intended hardware target is `Ascend310B1 / 20T`. An 8T result must be
-measured separately and must not inherit any result in this document. Every
-remaining ASR, TTS, VAD, USB-device, browser-audio, and end-to-end voice item
-stays `untested` until its own raw board/browser evidence and human review exist.
+预期硬件目标是`Ascend310B1 / 20T`。8T结果必须单独测量，不得继承本文中的任何结果。在每项ASR、TTS、VAD、USB设备、浏览器音频和端到端语音项目各自具备原始板端/浏览器证据与人工审查之前，其状态都保持为`untested`。
 
-## Runtime Boundaries and Current Core Contract
+## 运行时边界与当前核心契约
 
-The voice core has a loopback-only contract implemented under
-`ascend_edge_chat/voice/`. It accepts only the modes `disabled`, `browser`, and
-`board`; callers cannot select ALSA strings, model paths, gateway hosts, shell
-commands, or raw board PCM through HTTP. Its currently defined loopback
-endpoints are `/health`, `/api/config`, `/api/status`, and the browser-mode
-conversion endpoints `/v1/voice/browser/transcribe` and
-`/v1/voice/browser/synthesize`. The 20T board currently runs this service with
-reviewed browser ASR, while board ALSA ownership and TTS remain inactive.
+语音核心在`ascend_edge_chat/voice/`下实现了一个仅回环契约。它只接受`disabled`、`browser`和`board`模式；调用方不能通过HTTP选择ALSA字符串、模型路径、网关主机、shell命令或原始板端PCM。当前定义的仅回环端点为`/health`、`/api/config`、`/api/status`，以及浏览器模式下的转换端点`/v1/voice/browser/transcribe`和`/v1/voice/browser/synthesize`。20T板当前运行该服务时使用经审查的浏览器ASR，而开发板ALSA归属和TTS仍处于非活动状态。
 
-The shared LLM boundary remains unchanged:
+共享LLM边界保持不变：
 
 ```text
-                 +-> existing loopback gateway :7861 -> MindSpore worker :8090
+                 +-> 现有回环网关:7861 -> MindSpore worker:8090
                  |
-board mode:      voice-agent owns board ALSA input/output
-browser mode:    HTTPS browser -> UI proxy -> loopback voice-agent
+开发板模式:      voice-agent拥有板端ALSA输入/输出
+浏览器模式:      HTTPS浏览器 -> UI代理 -> 回环voice-agent
 ```
 
-### Board Mode
+### 开发板模式
 
 ```text
-USB microphone
-  -> local voice-agent
-  -> VAD silence segmentation
+USB麦克风
+  -> 本地voice-agent
+  -> VAD静音分段
   -> ASR
-  -> existing loopback gateway :7861
-  -> existing MindSpore worker :8090
+  -> 现有回环网关:7861
+  -> 现有MindSpore worker:8090
   -> TTS
-  -> USB speaker or USB audio adapter
+  -> USB扬声器或USB音频适配器
 
-Browser UI :7865
-  -> status, transcript, diagnostics, and text fallback only
+浏览器UI:7865
+  -> 仅状态、转录文本、诊断信息和文本回退
 ```
 
-In `board` mode, the browser must not invoke `getUserMedia`, play the TTS
-response, or access board ALSA. The board-local voice agent owns selected
-capture/playback devices and calls the existing loopback gateway. The public
-OpenAI gateway and NPU worker must not acquire audio devices or absorb ASR/TTS
-logic.
+在`board`模式下，浏览器不得调用`getUserMedia`、播放TTS响应或访问开发板ALSA。开发板本地的语音代理负责所选的采集/播放设备，并调用现有回环网关。公共OpenAI网关和NPU工作进程不得占用音频设备，也不得吸收ASR/TTS逻辑。
 
-### Browser Mode
+### 浏览器模式
 
 ```text
-Browser microphone (HTTPS secure context)
-  -> browser-recorded 16 kHz mono WAV
-  -> HTTPS UI proxy
-  -> loopback voice-agent browser-transcribe
-  -> existing gateway :7861 -> worker :8090
-  -> loopback voice-agent browser-synthesize
-  -> finite WAV response through UI proxy
-  -> browser speaker
+浏览器麦克风（HTTPS安全上下文）
+  -> 浏览器录制的16 kHz单声道WAV
+  -> HTTPS UI代理
+  -> 回环voice-agent browser-transcribe
+  -> 现有网关:7861 -> worker:8090
+  -> 回环voice-agent browser-synthesize
+  -> 经UI代理返回有限WAV响应
+  -> 浏览器扬声器
 ```
 
-`browser` mode never opens board ALSA and never returns board-captured PCM.
-The voice core accepts only a bounded finite 16 kHz, mono, signed-16-bit PCM
-WAV upload for browser transcription, and returns only a bounded finite WAV for
-browser synthesis. The browser must not address `127.0.0.1:7862` directly:
-that address would refer to the browser's own machine, not the board. The UI
-server proxies only the reviewed loopback contract; raw board-captured PCM never
-enters a browser response.
+`browser`模式从不打开开发板ALSA，也从不返回开发板采集的PCM。语音核心只接受有界、有限的16 kHz单声道有符号16位PCM WAV上传用于浏览器转录，并且只返回有界、有限的WAV用于浏览器合成。浏览器不得直接访问`127.0.0.1:7862`：该地址会指向浏览器自己的机器，而不是开发板。UI服务器只代理经审查的仅回环契约；开发板采集的原始PCM绝不进入浏览器响应。
 
-Remote browser microphone access requires a secure browser context. The current
-trusted-LAN text UI at `http://<board-ip>:7865/` is not evidence that
-`getUserMedia` will be permitted. Browser mode is blocked until a reviewed HTTPS
-termination and certificate path are configured, then separately accepted by
-browser permission, capture, upload, synthesis, playback, and privacy gates.
+远程浏览器麦克风访问需要安全浏览器上下文。当前位于`http://<board-ip>:7865/`的可信局域网文本UI并不能证明`getUserMedia`会获得许可。在配置经审查的HTTPS终止和证书路径，并分别通过浏览器权限、采集、上传、合成、播放和隐私门之前，浏览器模式处于阻塞状态。
 
-| Process | Board mode responsibility | Browser mode responsibility | Exposure |
+| 进程 | 开发板模式职责 | 浏览器模式职责 | 暴露范围 |
 | --- | --- | --- | --- |
-| `voice-agent` | Capture, VAD, ASR, request correlation, TTS, local playback | Bounded WAV conversion only; no board ALSA | Loopback only |
-| Gateway | Existing Bearer validation and JSON/SSE LLM contract | Same | `127.0.0.1:7861` |
-| MindSpore worker | Existing serial LLM generation | Same | `127.0.0.1:8090` |
-| Browser UI | Status, transcript, recovery controls, text fallback | HTTPS proxy, browser permission/status, transcript, finite audio playback | Trusted LAN only; HTTPS required for microphone access |
+| `voice-agent` | 采集、VAD、ASR、请求关联、TTS、本地播放 | 仅进行有界WAV转换；不访问开发板ALSA | 仅回环 |
+| Gateway | 现有Bearer校验和JSON/SSE LLM契约 | 相同 | `127.0.0.1:7861` |
+| MindSpore worker | 现有串行LLM生成 | 相同 | `127.0.0.1:8090` |
+| Browser UI | 状态、转录文本、恢复控制、文本回退 | HTTPS代理、浏览器权限/状态、转录文本、有限音频播放 | 仅可信局域网；麦克风访问需要HTTPS |
 
-This is a teaching example, not a multi-user production voice service. It adds
-no extra voice-operation token beyond the existing gateway Bearer contract. The
-voice agent is loopback-only, device selection is restricted to its enumerated
-allowlist, browser audio is proxied through the UI, and raw board-captured PCM
-is never returned to the browser. A production deployment should add its own
-operator authentication and HTTPS policy before exposing device controls beyond
-a trusted teaching LAN.
+这是一个教学示例，不是多用户生产语音服务。它不增加超出既有网关Bearer契约的额外语音操作令牌。语音代理仅支持回环，设备选择被限制在其枚举允许列表中，浏览器音频通过UI代理，并且开发板采集的原始PCM绝不返回浏览器。生产部署在将设备控制暴露到可信教学局域网之外之前，应添加自己的运维人员身份验证和HTTPS策略。
 
-## Observed 20T Audio Facts
+## 已观察到的20T音频事实
 
-Audio-device identity is dynamic and must be checked immediately before a board
-voice run. Two read-only snapshots of the current `Ascend310B1 / 20T` board show
-why no card/device number may be hard-coded:
+音频设备标识是动态的，必须在每次开发板语音运行前即时检查。当前`Ascend310B1 / 20T`板的两个只读快照说明了为什么不能硬编码任何声卡/设备编号：
 
-| Snapshot | Observation | Evidence meaning |
+| 快照 | 观察结果 | 证据含义 |
 | --- | --- | --- |
-| `2026-10-20T10:52:23+08:00` | Board ALSA card `0 [ascend310b]`, playback `/dev/snd/pcmC0D0p`, capture `/dev/snd/pcmC0D1c` | The kernel exposes board audio nodes; this does not establish 3.5mm routing or audible output |
-| `2026-10-20T10:52:23+08:00` | Jieli USB Composite Device appeared as card 1, with capture `01-00` / `/dev/snd/pcmC1D0c` | Historical USB capture enumeration only; no USB playback PCM entry was observed |
-| `2026-10-21T08:27:52+08:00` | Only card 0 and its playback/capture entries remained in `/proc/asound/pcm` | The earlier USB device was not currently enumerated; board mode must not start against stale device IDs |
-| `2026-10-21T08:48:35+08:00` | UGREEN Camera 1080P appeared as card 1, `hw:1,0`, capture-only, S16_LE, 2 channels, 16–48 kHz | The camera microphone is currently enumerated but requires stereo capture/downmix; no USB playback entry exists |
-| Both snapshots | Node owner/mode `root:audio`, `0660` | A service user needs membership in `audio` or another reviewed access policy |
-| Both snapshots | `HwHiAiUser`, `HwDmUser`, `HwBaseUser` | `HwHiAiUser` was not observed in `audio` during these inspections |
+| `2026-10-20T10:52:23+08:00` | 开发板ALSA声卡`0 [ascend310b]`，播放`/dev/snd/pcmC0D0p`，采集`/dev/snd/pcmC0D1c` | 内核暴露了开发板音频节点；这不能证明3.5mm路由或可听输出 |
+| `2026-10-20T10:52:23+08:00` | Jieli USB Composite Device显示为声卡1，采集为`01-00` / `/dev/snd/pcmC1D0c` | 仅为历史USB采集枚举；未观察到USB播放PCM条目 |
+| `2026-10-21T08:27:52+08:00` | `/proc/asound/pcm`中仅剩声卡0及其播放/采集条目 | 先前的USB设备当时未枚举；开发板模式不得针对过期设备ID启动 |
+| `2026-10-21T08:48:35+08:00` | UGREEN Camera 1080P显示为声卡1、`hw:1,0`，仅支持采集、S16_LE、2声道、16–48 kHz | 摄像头麦克风当前已枚举，但需要立体声采集/下混；不存在USB播放条目 |
+| 两个快照 | 节点所有者/模式为`root:audio`、`0660` | 服务用户需要属于`audio`组，或采用另一项经审查的访问策略 |
+| 两个快照 | `HwHiAiUser`、`HwDmUser`、`HwBaseUser` | 在这些检查期间未观察到`HwHiAiUser`属于`audio`组 |
 
-Neither snapshot proves useful microphone samples, audible speaker output,
-VAD, ASR, TTS, or physical 3.5mm routing. The missing USB playback entry does
-not prove that no speaker can ever work, but it blocks a USB-speaker acceptance
-claim until the selected output device is currently enumerated and tested.
-`npu-smi`, LLM JSON, and browser HTTP results are unrelated to audio acceptance.
+两个快照都不能证明可用的麦克风采样、可听的扬声器输出、VAD、ASR、TTS或物理3.5mm路由。缺少USB播放条目不能证明扬声器永远无法工作，但在所选输出设备当前已枚举并经过测试之前，它阻止任何USB扬声器验收结论。`npu-smi`、LLM JSON和浏览器HTTP结果与音频验收无关。
 
-A `2026-10-21T09:09+08:00` run of the synchronized
-`voice-preflight.sh` stopped before any audio operation because
-`ASCEND_EDGE_CHAT_VOICE_CONDA_ENV` is not configured on this board. This is an
-expected fail-closed deployment result, not evidence for or against the USB
-microphone, playback, ASR, or TTS.
+一次`2026-10-21T09:09+08:00`的同步`voice-preflight.sh`运行在任何音频操作开始前停止，因为该板上未配置`ASCEND_EDGE_CHAT_VOICE_CONDA_ENV`。这是预期的失败关闭部署结果，不是支持或反对USB麦克风、播放、ASR或TTS的证据。
 
-## Hardware and Permission Prerequisites
+## 硬件与权限前置条件
 
-Use a USB microphone plus USB speaker or USB audio adapter for the first board
-audio iteration. Its ALSA identity must be enumerated on the actual board;
-never hard-code `card 0`, `/dev/snd/pcmC0D1c`, or a historical USB name.
+首次开发板音频迭代应使用USB麦克风加USB扬声器或USB音频适配器。必须在实际开发板上枚举其ALSA标识；绝不硬编码`card 0`、`/dev/snd/pcmC0D1c`或历史USB名称。
 
-An operator must manually collect the following before starting any voice
-process:
+运维人员必须在启动任何语音进程前手动收集以下信息：
 
 ```bash
 id -nG
@@ -146,66 +100,36 @@ aplay -l
 ls -l /dev/snd
 ```
 
-The service account must have reviewed access to the selected capture and
-playback nodes. Group membership and ACL/direct node permissions are both
-valid; access must be proven on the current device nodes rather than inferred
-from group names. If the selected access policy requires the `audio` group and
-`HwHiAiUser` is not a member, an administrator may choose to add the user:
+服务账号必须对所选采集和播放节点具有经审查的访问权限。组成员关系和ACL/直接节点权限都是有效方式；必须在当前设备节点上证明访问权限，而不是根据组名推断。如果所选访问策略要求`audio`组，而`HwHiAiUser`不是成员，管理员可以选择添加该用户：
 
 ```bash
 sudo usermod -aG audio HwHiAiUser
 ```
 
-This is a manual host-permission change, not a voice-service deployment command. The
-operator must log out and log in again, then re-run `id -nG` to prove the new
-group is active. Do not run a voice service as `root` merely to bypass device
-permissions.
+这是手动主机权限变更，不是语音服务部署命令。运维人员必须注销并重新登录，然后重新运行`id -nG`以证明新组已生效。不要仅仅为了绕过设备权限而以`root`身份运行语音服务。
 
-For each selected USB device, retain only non-sensitive identity evidence:
-manufacturer/product name, ALSA card/device number, capture or playback role,
-and the command output. Do not store raw microphone audio as hardware evidence.
+对于每个所选USB设备，只保留非敏感身份证据：制造商/产品名称、ALSA声卡/设备编号、采集或播放角色以及命令输出。不要把原始麦克风音频存为硬件证据。
 
-### Known Camera Microphone Incompatibility
+### 已知摄像头麦克风不兼容
 
-The `SN0002 1080P USB Camera` (`USB ID 2bdf:0289`, serial prefix
-`46435000_P030C00_SN0002`) is **not usable for microphone capture** on the tested
-Orange Pi AI Pro system images. Its UVC video interface can still enumerate and
-stream video; the incompatibility is specifically in the camera's UAC audio
-microphone path.
+在已测试的Orange Pi AI Pro系统镜像上，`SN0002 1080P USB Camera`（`USB ID 2bdf:0289`，序列号前缀`46435000_P030C00_SN0002`）**不能用于麦克风采集**。其UVC视频接口仍可枚举并传输视频；不兼容具体位于摄像头的UAC音频麦克风路径。
 
-| Board evidence set | Video | Microphone capture | Observation |
+| 开发板证据集 | 视频 | 麦克风采集 | 观察结果 |
 | --- | --- | --- | --- |
-| `Ascend310B1 / 20T` | UVC video device enumerated and concurrent video stream started | Failed | `arecord` received 22 samples and then reported `pcm_read:2221: read error: Input/output error` |
-| `Ascend310B4 / 8T` | UVC video device enumerated; video mode not separately re-streamed during this microphone test | Failed | The same camera reproduced the same 22-sample failure; this is a separate 8T result, not inherited from 20T |
+| `Ascend310B1 / 20T` | UVC视频设备已枚举，并发视频流已启动 | 失败 | `arecord`接收22个采样后报告`pcm_read:2221: read error: Input/output error` |
+| `Ascend310B4 / 8T` | UVC视频设备已枚举；本次麦克风测试期间未单独重新传输视频模式 | 失败 | 同一摄像头复现了相同的22个采样失败；这是独立的8T结果，并非继承自20T |
 
-The failure reproduced with direct USB connection, through the board USB path,
-with `hw:1,0` and `plughw:1,0`, with adjusted ALSA periods/buffers, at 100%
-microphone gain, with USB autosuspend disabled, and through PulseAudio/PipeWire.
-Kernel evidence included `usb_set_interface failed (-110)`, endpoint
-`cannot set freq 16000 to ep 0x82`, `device descriptor read/64, error -71`, and
-USB disconnect/reset cycles. The standard Linux `snd-usb-audio` driver was
-already loaded; replacing or installing a generic sound driver is not a
-supported fix.
+该失败在直接USB连接、通过开发板USB路径、使用`hw:1,0`和`plughw:1,0`、调整ALSA周期/缓冲区、将麦克风增益设为100%、禁用USB自动挂起以及通过PulseAudio/PipeWire等条件下均复现。内核证据包括`usb_set_interface failed (-110)`、端点`cannot set freq 16000 to ep 0x82`、`device descriptor read/64, error -71`，以及USB断开/复位循环。标准Linux`snd-usb-audio`驱动已经加载；替换或安装通用声音驱动不是受支持的修复方法。
 
-As a control on the 8T evidence set, a `UGREEN Camera 1080P`
-(`USB ID 0c45:2283`) exposed stereo 16 kHz `S16_LE` capture and produced 48,011
-frames in 3.001 seconds with non-zero RMS and no I/O error. This establishes
-that the 8T capture path can work with a compatible UVC/UAC camera, while the
-`SN0002` microphone path remains incompatible.
+在8T证据集上作为对照，`UGREEN Camera 1080P`（`USB ID 0c45:2283`）暴露了立体声16 kHz `S16_LE`采集，并在3.001秒内产生48,011帧，RMS非零且无I/O错误。这证明8T采集路径可以在兼容的UVC/UAC摄像头上工作，而`SN0002`麦克风路径仍不兼容。
 
-Operational rule: the `SN0002` camera may be used for video, but it must not be
-selected as the board voice input. Use a reviewed external USB microphone or
-3.5 mm input for microphone capture. Do not infer that the whole camera is
-unusable, and do not treat a driver reinstall as a remedy without new evidence
-from the vendor or kernel.
+操作规则：`SN0002`摄像头可用于视频，但不得选作开发板语音输入。麦克风采集应使用经审查的外接USB麦克风或3.5mm输入。不要推断整个摄像头不可用，也不要在没有来自供应商或内核的新证据时将重装驱动视为补救措施。
 
-## Half-Duplex VAD State Machine
+## 半双工VAD状态机
 
-### Board Mode
+### 开发板模式
 
-The requested independent-terminal interaction is automatic VAD silence
-segmentation, not browser push-to-talk and not a wake-word claim. The first
-board-local design is strictly half duplex:
+所需的独立终端交互是自动VAD静音分段，不是浏览器按键说话，也不是唤醒词能力。首个开发板本地设计严格为半双工：
 
 ```text
 IDLE
@@ -220,142 +144,102 @@ IDLE
   -> IDLE
 ```
 
-- `LISTENING` accepts capture only after the selected device is available.
-- `SPEECH` starts only after a configured VAD threshold is met.
-- `SILENCE_HOLD` ends an utterance only after a configured continuous-silence
-  duration; the threshold must be measured with the actual microphone.
-- `ASR`, `LLM`, and `TTS` process one utterance at a time.
-- `PLAYING` disables capture or applies a separately validated echo-control
-  policy. The first version must not listen while it plays TTS.
-- `COOLDOWN` prevents a speaker tail from immediately creating another turn.
-- Cancellation, device removal, ASR failure, gateway failure, TTS failure, or
-  playback failure must return to a safe `IDLE` state after releasing the
-  capture/playback handle.
+- `LISTENING`仅在所选设备可用后才接受采集。
+- `SPEECH`在自适应能量VAD超过配置的起始帧数后开始。前200ms用于校准本地噪声底；后续静音帧通过有界指数平滑更新噪声底。绝对RMS下限可防止数字静音被判定为语音。
+- `SILENCE_HOLD`仅在达到配置的连续静音时长后结束一次话语。语音起始使用高于释放的阈值，使正常语音衰减不会被切分成孤立音节。
+- 受VAD边界约束的话语在ASR前经过有界软件AGC。增益根据高于校准噪声底的活动帧估计，限制在配置范围内，并统一应用以保持单次话语内部一致。全零PCM绝不放大。
+- `ASR`、`LLM`和`TTS`一次处理一次话语。语音模式补全请求使用独立的有界令牌预算，而不是完整文本聊天预算，以保持本地播放的交互性。
+- 在有界监听窗口内未检测到语音（包括空ASR转录）时，返回`LISTENING`，且不增加连续失败计数器。只有设备、LLM、TTS或播放失败参与失败关闭重试预算。
+- 开发板语音面板包含按住式诊断。指针按下开始有界的内存内采集；指针抬起应用噪声底校准和AGC，然后通过所选开发板输出端播放采集的PCM，不调用ASR、LLM或TTS。指针取消、页面失焦或可见性丢失会中止并释放采集。
+- `PLAYING`禁用采集或应用另行验证的回声控制策略。第一版不得在播放TTS时监听。
+- `COOLDOWN`防止扬声器尾音立即触发另一个轮次。
+- 取消、设备移除、ASR失败、网关失败、TTS失败或播放失败必须在释放采集/播放句柄后返回安全的`IDLE`状态。
 
-The silence duration, speech threshold, maximum utterance duration, cooldown,
-and any echo policy are `untested` tuning parameters. Do not publish default
-values until a recorded board test shows their behavior in the intended room.
+静音时长、语音阈值、最大话语时长、冷却时间以及任何回声策略都是`untested`调优参数。在记录在案的开发板测试展示其在目标房间中的行为之前，不要发布默认值。
 
-### Browser Mode
+### 浏览器模式
 
-Browser mode may use its own reviewed recording-stop or browser-side VAD policy,
-but that policy is not the board ALSA VAD and must be accepted separately. The
-current loopback voice-agent contract receives one already-finished bounded WAV
-upload; it does not claim continuous browser listening or a wake-word service.
-Browser playback must not start a board-side VAD turn, and board playback must
-not be returned as raw board PCM to a browser.
+浏览器模式可使用其自身经审查的录制停止或浏览器侧VAD策略，但该策略不是开发板ALSA VAD，必须单独验收。当前仅回环voice-agent契约接收一个已经完成的有界WAV上传；它不声称支持连续浏览器监听或唤醒词服务。浏览器播放不得启动开发板侧VAD轮次，开发板播放也不得作为原始开发板PCM返回浏览器。
 
-The UI also exposes a localhost-only “browser recording playback self-test”. It
-records and plays back in the current browser memory without calling ASR/TTS or
-uploading the WAV. Passing this self-test proves browser permission, capture,
-WAV conversion, and browser playback only; it does not pass W0-W7 or any board
-voice gate.
+UI还提供一个仅限本地主机的“浏览器录音播放自检”。它在当前浏览器内存中录制和播放，不调用ASR/TTS，也不上传WAV。通过此自检只能证明浏览器权限、采集、WAV转换和浏览器播放；它不能通过W0-W7或任何开发板语音门。
 
-## ASR and TTS Candidate Boundary
+## ASR与TTS候选边界
 
-Historical repository material mentioned the same sherpa-onnx Zipformer family
-and a Chinese VITS/Piper-style TTS candidate. On `2026-10-21`, browser ASR was
-newly reviewed and admitted for technical testing in an isolated Python 3.9
-environment:
+历史仓库材料提到了同一sherpa-onnx Zipformer系列以及一个中文VITS/Piper风格TTS候选。在`2026-10-21`，浏览器ASR经过新审查，并在隔离的Python 3.9环境中获准用于技术测试：
 
-| Item | Observed value |
+| 项目 | 观察值 |
 | --- | --- |
-| ASR runtime | `sherpa-onnx 1.13.6`, `sherpa-onnx-core 1.13.6`, CPU, Python 3.9.25 |
-| ASR model | `sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23`, int8 encoder/decoder/joiner |
-| License evidence | Model archive `README.md` declares `apache-2.0` |
-| Archive SHA-256 | `2cbd71b640d9c37d3784f29367333a4577b0398b62e9deeed418170b081cba8b` |
-| Encoder SHA-256 | `1c556ea57cec304e55ec4b72e52c1cc098bb01476ed7d90f3de939fe126487b1` |
-| Decoder SHA-256 | `22f123bb8cba9b38974b3df18a3f45e7081f4985ebb2e075d9f21f618c468bbf` |
+| ASR运行时 | `sherpa-onnx 1.13.6`、`sherpa-onnx-core 1.13.6`、CPU、Python 3.9.25 |
+| ASR模型 | `sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23`，int8编码器/解码器/joiner |
+| 许可证证据 | 模型归档`README.md`声明`apache-2.0` |
+| 归档SHA-256 | `2cbd71b640d9c37d3784f29367333a4577b0398b62e9deeed418170b081cba8b` |
+| 编码器SHA-256 | `1c556ea57cec304e55ec4b72e52c1cc098bb01476ed7d90f3de939fe126487b1` |
+| 解码器SHA-256 | `22f123bb8cba9b38974b3df18a3f45e7081f4985ebb2e075d9f21f618c468bbf` |
 | Joiner SHA-256 | `a7cf9d82757bdcf786059454495a9ca95e4bd7347f72473fc08d794475c36169` |
 | Tokens SHA-256 | `8b294db9045d6e5f94647f4c1eec1af4da143a75053c399611444b378ff966ac` |
-| Offline sample | Bundled 16 kHz Chinese WAV produced a non-empty transcript |
-| Browser bridge | Chromium synthetic microphone returned HTTP 200 and reached the text gateway |
+| 离线样本 | 随附16 kHz中文WAV产生了非空转录 |
+| 浏览器桥接 | Chromium合成麦克风返回HTTP 200并到达文本网关 |
 
-This evidence admits one ASR technical path only. It does not establish ASR
-accuracy, physical-microphone quality, board-mode behavior, hostile-client
-privacy, or performance percentiles. TTS remains unconfigured and fail-closed.
+该证据只允许一条ASR技术路径。它不能证明ASR准确率、物理麦克风质量、开发板模式行为、恶意客户端隐私或性能百分位数。TTS仍未配置并处于失败关闭状态。
 
-Additional speech artifacts still require a runtime manifest that records:
+额外语音制品仍需要运行时清单，记录以下内容：
 
-- upstream repository and immutable revision;
-- exact archive/model files, byte counts, and SHA-256 values;
-- license and redistribution status for ASR, TTS, and voice data;
-- Python/runtime package versions and whether they import Torch, Torch-NPU, or
-  Torchaudio;
-- selected CPU/NPU execution boundary;
-- input PCM contract and output PCM contract;
-- target SoC, CANN/driver fingerprint, and board date.
+- 上游仓库和不可变修订；
+- 精确的归档/模型文件、字节数和SHA-256值；
+- ASR、TTS和语音数据的许可证与再分发状态；
+- Python/运行时软件包版本，以及它们是否导入Torch、Torch-NPU或Torchaudio；
+- 所选CPU/NPU执行边界；
+- 输入PCM契约和输出PCM契约；
+- 目标SoC、CANN/驱动指纹和开发板日期。
 
-The current text worker remains the only NPU path with current 20T acceptance
-evidence. ASR/TTS must not silently reuse that claim. A CPU ASR/TTS result is
-an audio-service result, not an Ascend inference result.
+当前文本工作进程仍是唯一具备当前20T验收证据的NPU路径。ASR/TTS不得静默复用该结论。CPU ASR/TTS结果是音频服务结果，不是昇腾推理结果。
 
-## Privacy and Operator Controls
+## 隐私与运维控制
 
-The default planned privacy policy is in-memory audio only:
+默认规划的隐私策略是仅使用内存内音频：
 
-- do not persist PCM, WAV, or synthesized speech by default;
-- do not place raw audio in logs, reports, browser responses, or Git;
-- retain only timestamps, state transitions, byte/sample counts, durations,
-  non-secret error categories, and explicitly approved aggregate metrics;
-- require an explicit, time-bounded, operator-controlled debug capture mode
-  before retaining any consented audio sample;
-- expose a local stop/cancel control that interrupts capture, LLM request, TTS,
-  and playback, then releases device handles;
-- serialize voice turns until concurrency and audio-device behavior are
-  independently validated.
+- 默认不持久化PCM、WAV或合成语音；
+- 不将原始音频放入日志、报告、浏览器响应或Git；
+- 仅保留时间戳、状态转换、字节/采样数、时长、非机密错误类别以及明确批准的聚合指标；
+- 在保留任何经同意的音频样本之前，要求显式、有时间限制、由运维人员控制的调试采集模式；
+- 提供本地停止/取消控件，用于中断采集、LLM请求、TTS和播放，然后释放设备句柄；
+- 在并发和音频设备行为得到独立验证之前，串行化语音轮次。
 
-Browser transcript/status controls must not imply that browser microphone
-permission is used in board mode. In browser mode, the browser's own microphone
-permission, recorded WAV, finite synthesis response, and browser speaker are a
-separate privacy surface: obtain user permission through HTTPS, enforce the
-bounded WAV contract, avoid persistent recordings, and show mode/status clearly.
-The teaching UI must still prevent browser code from directly addressing board
-ALSA or the loopback voice-agent endpoint.
+浏览器转录文本/状态控件不得暗示开发板模式会使用浏览器麦克风权限。在浏览器模式下，浏览器自身的麦克风权限、录制的WAV、有限合成响应和浏览器扬声器构成单独的隐私面：通过HTTPS取得用户许可、强制执行有界WAV契约、避免持久录制，并清楚显示模式/状态。教学UI仍必须防止浏览器代码直接访问开发板ALSA或仅回环voice-agent端点。
 
-## Manual Acceptance Gates
+## 人工验收门
 
-Run the mode-specific gates in order and retain raw command output or ignored
-board/browser reports. A failed gate stops the next one; a board-mode result
-never promotes a browser-mode gate, and the reverse is also true.
+按顺序运行模式特定的门，并保留原始命令输出或忽略的板端/浏览器报告。任一失败门都会阻止下一门；开发板模式结果绝不能让浏览器模式门升级，反之亦然。
 
-### Board Mode Gates
+### 开发板模式门
 
-| Gate | Required evidence | Current state |
+| 门 | 所需证据 | 当前状态 |
 | --- | --- | --- |
-| B0 hardware identity | Enumerated USB/3.5mm capture and playback devices; account permissions; unplug/replug identity check | `observed-pass`: UGREEN capture `hw:0,0` and Jieli playback `hw:1,0` enumerated after replug on 20T |
-| B1 capture | Selected microphone produces the declared PCM format, duration, sample count, and non-silent level without persisting raw audio | `observed-pass`: UGREEN stereo capture was non-silent without I/O errors |
-| B2 playback | Selected speaker plays a declared PCM format; an operator confirms audible output | `observed-pass`: Jieli `hw:1,0` played the synthesized Chinese reply and the operator confirmed audibility |
-| B3 VAD | Quiet-room, speech-start, silence-end, cancellation, and playback-suppression trials; false trigger/miss counts | `untested` |
-| B4 ASR | Fixed consented Chinese prompt set, transcript output, reference text, error-rate protocol, and failure samples | `partial`: one bundled Chinese sample returned a non-empty transcript |
-| B5 LLM bridge | Correlated local ASR text reaches the existing loopback gateway and one serial LLM result returns | `observed-pass`: deterministic ASR text reached the gateway and returned a Chinese reply |
-| B6 TTS | Fixed text set, output PCM contract, first playable audio time, playback completion, and human listening review | `observed-pass`: eSpeak returned 22,050 Hz mono PCM, Jieli playback completed, and the operator confirmed hearing the Chinese reply; quality scoring remains separate |
-| B7 end-to-end | At least ten sequential board voice turns with capture-end, ASR-end, first-token, first-audio, playback-end timestamps, resource snapshots, and human review | `partial`: one deterministic ASR→LLM→eSpeak→Jieli chain completed; ten-turn timing is absent |
-| B8 recovery/privacy | Device unplug, cancel, malformed audio, ASR/TTS/gateway failure, allowlist rejection, and no-raw-audio-persistence checks | `partial`: unplug/replug inventory recovery, unit contracts and allowlist rejection are covered; full failure matrix remains manual |
+| B0硬件标识 | 已枚举的USB/3.5mm采集和播放设备；账号权限；拔出/重新插入标识检查 | `observed-pass`：20T重新插入后枚举到UGREEN采集`hw:0,0`和Jieli播放`hw:1,0` |
+| B1采集 | 所选麦克风产生声明的PCM格式、时长、采样数和非静音电平，且不持久化原始音频 | `observed-pass`：UGREEN立体声采集为非静音且无I/O错误 |
+| B2播放 | 所选扬声器播放声明的PCM格式；运维人员确认可听输出 | `observed-pass`：Jieli `hw:1,0`播放了合成的中文回复，运维人员确认可听 |
+| B3 VAD | 安静房间、语音开始、静音结束、取消和播放抑制试验；误触发/漏触发计数 | `untested` |
+| B4 ASR | 固定且经同意的中文提示集、转录输出、参考文本、错误率协议和失败样本 | `partial`：一个随附中文样本返回了非空转录 |
+| B5 LLM桥接 | 关联的本地ASR文本到达现有回环网关，并返回一个串行LLM结果 | `observed-pass`：确定性ASR文本到达网关并返回中文回复 |
+| B6 TTS | 固定文本集、输出PCM契约、首个可播放音频时间、播放完成和人工听审 | `observed-pass`：eSpeak返回22,050 Hz单声道PCM，Jieli播放完成，运维人员确认听到中文回复；质量评分仍单独进行 |
+| B7端到端 | 至少十次连续开发板语音轮次，包含采集结束、ASR结束、首令牌、首音频、播放结束时间戳、资源快照和人工审查 | `partial`：完成了一条确定性的ASR→LLM→eSpeak→Jieli链路；缺少十轮计时 |
+| B8恢复/隐私 | 设备拔出、取消、畸形音频、ASR/TTS/网关失败、允许列表拒绝和无原始音频持久化检查 | `partial`：已覆盖拔出/重新插入清单恢复、单元契约和允许列表拒绝；完整失败矩阵仍为手动 |
 
-### Browser Mode Gates
+### 浏览器模式门
 
-| Gate | Required evidence | Current state |
+| 门 | 所需证据 | 当前状态 |
 | --- | --- | --- |
-| W0 secure context | Reviewed HTTPS termination, certificate chain, trusted origin, and browser `getUserMedia` permission prompt | `partial`: localhost secure context and synthetic permission passed; production HTTPS chain untested |
-| W1 browser capture | User-authorized browser microphone produces a bounded 16 kHz mono WAV; board ALSA remains unopened | `observed-pass`: synthetic and operator-confirmed real browser microphone capture produced bounded WAV |
-| W2 browser recording-stop/VAD | Recording-stop policy, silence behavior, cancellation, and no unsolicited capture behavior | `partial`: manual stop and two-second self-test stop passed; silence/cancel untested |
-| W3 browser ASR | Valid/invalid WAV handling, transcript output, reference prompt set, and error protocol through the UI proxy | `observed-pass`: bundled and operator-confirmed real-microphone turns returned non-empty transcripts through HTTP 200 |
-| W4 LLM bridge | Browser transcript reaches the existing server-side gateway without exposing the gateway token | `observed-pass`: recognized turns reached the gateway and returned text |
-| W5 browser TTS/playback | Finite backend WAV through the UI proxy or browser-native `speechSynthesis` completion, followed by human listening review | `partial`: browser-native `zh-CN` synthesis call completed in automation and board eSpeak is now available; human audibility/quality remains pending |
-| W6 privacy/recovery | Permission denial, HTTPS failure, oversized/malformed WAV, mode switch, cancel, and no board-ALSA access | `partial`: invalid/mode/error contracts are unit-tested; browser denial/cancel remain manual |
-| W7 end-to-end | At least ten sequential browser voice turns with browser capture-end, ASR-end, first-token, first-audio, playback-end timestamps and human review | `partial`: synthetic ASR-to-text-to-browser-synthesis and real-microphone ASR-to-text turns passed; human listening and turn timing remain absent |
+| W0安全上下文 | 经审查的HTTPS终止、证书链、可信来源和浏览器`getUserMedia`权限提示 | `partial`：本地主机安全上下文和合成权限已通过；生产HTTPS链未测试 |
+| W1浏览器采集 | 经用户授权的浏览器麦克风产生有界16 kHz单声道WAV；开发板ALSA保持未打开 | `observed-pass`：合成麦克风和运维人员确认的真实浏览器麦克风采集均产生了有界WAV |
+| W2浏览器录制停止/VAD | 录制停止策略、静音行为、取消和无未经请求的采集行为 | `partial`：手动停止和两秒自检停止已通过；静音/取消未测试 |
+| W3浏览器ASR | 通过UI代理处理有效/无效WAV、转录输出、参考提示集和错误协议 | `observed-pass`：随附样本和运维人员确认的真实麦克风轮次均通过HTTP 200返回非空转录 |
+| W4 LLM桥接 | 浏览器转录到达现有服务器侧网关，且不暴露网关令牌 | `observed-pass`：识别出的轮次到达网关并返回文本 |
+| W5浏览器TTS/播放 | 通过UI代理返回有限后端WAV，或完成浏览器原生`speechSynthesis`，随后进行人工听审 | `partial`：浏览器原生`zh-CN`合成调用已在自动化中完成，开发板eSpeak现已可用；人工可听性/质量仍待完成 |
+| W6隐私/恢复 | 权限拒绝、HTTPS失败、超大/畸形WAV、模式切换、取消和无开发板ALSA访问 | `partial`：无效/模式/错误契约已有单元测试；浏览器拒绝/取消仍为手动 |
+| W7端到端 | 至少十次连续浏览器语音轮次，包含浏览器采集结束、ASR结束、首令牌、首音频、播放结束时间戳和人工审查 | `partial`：合成的ASR到文本到浏览器合成以及真实麦克风ASR到文本轮次已通过；人工听审和轮次计时仍缺失 |
 
-No HTTP 200, text-chat response, ALSA node, secure URL, imported package, or one
-audible sound is sufficient to promote any later gate. Do not calculate p50/p95
-until the timing boundary, warmup, turn count, and raw report path are fixed.
+任何HTTP 200、文本聊天响应、ALSA节点、安全URL、已导入软件包或一次可听声音都不足以让任何后续门升级。在计时边界、预热、轮次数和原始报告路径固定之前，不要计算p50/p95。
 
-## Promotion Rule
+## 升级规则
 
-Board mode may be described as an experimental feature only after B0 through B8
-have current-board evidence, the ASR/TTS artifacts and licenses are reviewed,
-and an operator accepts the privacy and listening-quality review. Browser mode
-may be described as an experimental feature only after W0 through W7 have
-separate secure-context, browser, proxy, and privacy evidence. Either mode may
-enter a release scope only after a separate human approval. Until then, this
-deployment remains a text-chat release with documented dual-mode voice design.
+只有在B0至B8均具备当前开发板证据、ASR/TTS制品和许可证均经审查，并且运维人员接受隐私与听审质量审查后，开发板模式才可描述为实验性功能。只有在W0至W7分别具备安全上下文、浏览器、代理和隐私证据后，浏览器模式才可描述为实验性功能。任一模式只有在单独人工批准后才能进入发布范围。在此之前，本部署仍是文本聊天版本，并带有已记录的双模式语音设计。

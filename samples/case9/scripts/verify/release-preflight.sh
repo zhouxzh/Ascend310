@@ -40,7 +40,9 @@ from ascend_edge_chat.backends.runtime_preflight import validate_runtime_lock
 
 report = validate_runtime_lock()
 print("runtime_lock=%s" % report["status"])
-for name in ("acl", "mindspore", "mindnlp", "fastapi", "pydantic", "httpx", "uvicorn", "dotenv"):
+# dotenv is optional: every supported launcher exports the reviewed env file
+# before Python starts, and runtime.config safely handles its absence.
+for name in ("acl", "mindspore", "mindnlp", "fastapi", "pydantic", "httpx", "uvicorn"):
     module = importlib.import_module(name)
     print("%s=%s" % (name, getattr(module, "__file__", "<built-in>")))
 print("python=%s" % sys.executable)
@@ -48,4 +50,5 @@ print("python_abi=%s" % sys.implementation.cache_tag)
 PY
 npu-smi info
 python -m ascend_edge_chat verify --data-dir "${ASCEND_EDGE_CHAT_DATA_DIR}"
-python -m ascend_edge_chat gateway --check-config
+# The supervisor owns the gateway's upstream tuple.  It injects the selected
+# loopback worker only after this preflight and then validates gateway health.

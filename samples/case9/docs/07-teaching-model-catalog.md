@@ -1,58 +1,37 @@
-# Teaching Model Catalog
+# 教学模型目录
 
-## Why Technical Running and Quality Are Separate
+## 为何将技术运行与质量分开
 
-This project is a test tutorial. A model that loads, executes on the Ascend
-device, and answers through the API remains useful for teaching even when the
-answer is slow, English-only, truncated, or factually weak. The catalog
-therefore keeps two independent conclusions:
+本项目是一份测试教程。一个模型即使回答缓慢、仅使用英文、被截断或事实性较弱，只要能够加载、在昇腾设备上执行并通过API作答，就仍具有教学价值。因此，目录保留两项独立结论：
 
-- `technical_status`: whether the tested runtime path can be reproduced;
-- `text_integrity_status`: whether the decoded UTF-8 text was complete and free
-  of replacement characters under the recorded generation budget;
-- `quality_status`: an independent human semantic-quality conclusion from
-  complete responses with recorded prompts, token budgets and model revision.
+- `technical_status`：已测试的运行时路径是否可以复现；
+- `text_integrity_status`：在记录的生成预算下，解码后的UTF-8文本是否完整且不含替换字符；
+- `quality_status`：基于完整回答、记录的提示词、token预算和模型revision作出的人工语义质量独立结论。
 
-A text-integrity issue and a max-token cut-off do not make a technically tested
-profile disappear, and neither is by itself a Chinese semantic-quality result.
-They tell the student what to investigate next: tokenizer files, chat template,
-decode behavior, model training language, context budget, or output limits.
+文本完整性问题与达到最大token的截断都不会使一个已通过技术测试的配置消失，二者本身也都不构成中文语义质量结论。它们提示学生下一步应检查：tokenizer文件、chat template、解码行为、模型训练语言、上下文预算或输出限制。
 
-## Current Teaching Entries
+## 当前教学条目
 
-The browser reads `configs/tutorial-model-catalog.json`. It presents historical
-8T/20T evidence separately, but enables an entry only when the current SoC is
-declared by its registry, every locked artifact file exists, and the startup
-path verifies the full bytes/SHA-256 lock. Entries marked `blocked` or `not-run`
-stay visible so the student can distinguish an untested prerequisite from a
-measured failure.
+浏览器读取`configs/tutorial-model-catalog.json`。它会分别呈现历史8T/20T证据，但仅当当前SoC已由其注册表声明、每个锁定的产物文件均存在，并且启动路径校验完整的字节数/SHA-256锁时，才会启用某个条目。标记为`blocked`或`not-run`的条目仍保持可见，使学生能够区分未测试的前置条件与实测失败。
 
-| Profile | Technical result | Quality result | Why the result matters |
+| 配置 | 技术结果 | 质量结果 | 结果意义 |
 | --- | --- | --- | --- |
-| `qwen1.5-0.5b-chat` | 20T observed pass; current 8T attempts blocked at HBM/runtime initialization | Pending | Default 20T baseline; 8T does not inherit this profile |
-| `qwen1.5-1.8b-mindspore` | 20T machine gates observed pass | Pending | Larger Qwen1.5 comparison; 8T must be measured independently |
-| `qwen2-0.5b-instruct-mindspore` | 20T API, 64-token, stability and performance pass | Pending | Historical `U+FFFD` is a tokenizer/decode observation, not an NPU or semantic-quality verdict |
-| `qwen2-1.5b-instruct-mindspore` | 20T machine gates observed pass; corrected ChatML template reaches 64/128/192 token length gates | Pending | A missing tokenizer template once caused Qwen1.5-style role markers; the profile template fixes that path, while 256 tokens still fail closed |
-| `qwen2.5-0.5b-mindspore` | 20T corrected-timeout machine gates pass | Pending | The earlier context-only/30-second timeout report is a debugging lesson, not the final technical result |
-| `qwen2.5-1.5b-mindspore` | 20T low-occupancy path observed degraded | Pending | Low-occupancy API path ran; a separate high-occupancy run produced `Alloc failed` |
-| `tinyllama-1.1b-mindspore` | 20T short smoke; current teaching registry has no independently startable 8T contract | Pending | English-oriented model; long output showed a text-integrity/TBE boundary that needs a separate quality run |
-| `deepseek-r1-qwen-1.5b-mindspore` | 20T degraded evidence; current teaching registry has no independently startable 8T contract | Pending | `<think>` can consume a short budget before the final answer; it needs a completed-response review |
-| `qwen3-0.6b-mindspore` | Blocked before loading | Not run | MindNLP 0.4.1 has no loader; no claim is made about the hardware itself |
-| `minicpm3-4b-mindspore` | Not run | Not run | Dedicated loader, artifact and memory gates remain future work |
+| `qwen1.5-0.5b-chat` | 20T观测通过；当前8T尝试在HBM/运行时初始化阶段被阻断 | Pending（待定） | 默认20T基线；8T不继承该配置 |
+| `qwen1.5-1.8b-mindspore` | 20T机器门禁观测通过 | Pending（待定） | 更大的Qwen1.5对照；8T必须独立测量 |
+| `qwen2-0.5b-instruct-mindspore` | 20T API、64-token、稳定性和性能通过 | Pending（待定） | 历史上的`U+FFFD`是tokenizer/解码观察结果，不是NPU或语义质量判定 |
+| `qwen2-1.5b-instruct-mindspore` | 20T机器门禁观测通过；修正后的ChatML模板达到64/128/192 token长度门禁 | Pending（待定） | 缺少tokenizer模板曾导致Qwen1.5风格角色标记；该配置模板修复了这条路径，但256 token仍以fail-closed方式失败 |
+| `qwen2.5-0.5b-mindspore` | 20T修正超时后的机器门禁通过 | Pending（待定） | 此前的仅上下文/30秒超时报告是一条调试教训，不是最终技术结果 |
+| `qwen2.5-1.5b-mindspore` | 20T低占用路径观测为降级 | Pending（待定） | 低占用API路径运行过；另一次高占用运行产生`Alloc failed` |
+| `tinyllama-1.1b-mindspore` | 20T短时冒烟测试；当前教学注册表没有可独立启动的8T契约 | Pending（待定） | 面向英文的模型；长输出暴露出需要单独质量运行的文本完整性/TBE边界 |
+| `deepseek-r1-qwen-1.5b-mindspore` | 20T降级证据；当前教学注册表没有可独立启动的8T契约 | Pending（待定） | `<think>`可能在最终回答前耗尽短预算；需要完成回答审查 |
+| `qwen3-0.6b-mindspore` | 加载前被阻断 | Not run（未运行） | MindNLP 0.4.1没有加载器；不对硬件本身作任何判断 |
+| `minicpm3-4b-mindspore` | Not run（未运行） | Not run（未运行） | 专用加载器、产物和内存门禁仍属未来工作 |
 
-The table is intentionally not a leaderboard. 8T and 20T results are separate
-evidence sets, and a quality label does not replace the raw response files.
+本表刻意不作为排行榜。8T与20T结果属于彼此独立的证据集，质量标签不能替代原始回答文件。
 
-## Starting a Teaching Profile
+## 启动教学配置
 
-The worker remains single-model and single-request. This avoids loading several
-large checkpoints into the same 310B device. The page selector can switch a
-model, but it does so as a controlled restart: it validates the selected
-catalog/registry/cache entry, stops the reported worker PID, launches the fixed
-profile through the CANN-aware launcher, waits for `/health`, and clears browser
-sessions. It rolls back to the prior profile if the new worker fails to start.
-The selector never receives an arbitrary model path, shell command, or Python
-expression.
+worker仍采用单模型、单请求模式。这样可以避免将多个大型检查点加载到同一个310B设备。页面选择器可以切换模型，但切换方式为受控重启：它校验所选目录/注册表/缓存条目，停止已报告的worker PID，通过能感知CANN的启动器启动固定配置，等待`/health`，并清除浏览器会话。如果新worker启动失败，它会回滚到先前的配置。选择器绝不会接收任意模型路径、shell命令或Python表达式。
 
 ```bash
 export ASCEND_EDGE_CHAT_PROFILE=qwen2-1.5b-instruct-mindspore
@@ -61,61 +40,26 @@ ascend-edge-chat worker \
   --registry configs/tutorial-models.json
 ```
 
-Before starting, set `ASCEND_EDGE_CHAT_DATA_DIR` to the directory containing
-the selected profile's verified local cache. The launcher verifies the complete
-teaching artifact lock: every declared filename, byte count, SHA-256, repository
-and revision must match. It refuses a missing, partial or hash-mismatched cache
-and never falls back to downloading an unpinned model during startup.
+启动前，将`ASCEND_EDGE_CHAT_DATA_DIR`设为包含所选配置经过验证的本地缓存的目录。启动器会校验完整的教学产物锁：每个声明的文件名、字节数、SHA-256、仓库和revision都必须匹配。它会拒绝缺失、不完整或哈希不匹配的缓存，并且绝不在启动期间回退到下载未固定模型。
 
-After the worker is ready, start the gateway and UI as usual. On the teaching
-page, select an available profile and wait for the status to return to “就绪”
-before sending a prompt. The selector clears the current session because a
-conversation built with one chat template must not be carried into another
-model. If the model cache is incomplete or the worker fails to become healthy,
-the UI shows the failure and restores the prior worker when possible.
-The selector is disabled during generation; it becomes available after the
-terminal SSE event and a short server-side cleanup window.
+worker就绪后，照常启动gateway和UI。在教学页面中，选择一个可用配置，并等待状态返回“就绪”后再发送提示词。选择器会清除当前会话，因为使用一种chat template构建的对话不得带入另一个模型。如果模型缓存不完整或worker未能进入健康状态，UI会显示该失败，并在可能时恢复先前的worker。选择器在生成期间禁用；在终止SSE事件和短暂的服务端清理窗口结束后，它才恢复可用。
 
-## Interpreting a Failed Quality Probe
+## 解释失败的质量探针
 
-Use the following order when a selectable model produces a poor answer:
+当可选模型给出较差回答时，按以下顺序处理：
 
-1. Save the complete JSON/SSE response and the exact profile revision.
-2. Record the requested `max_tokens`, actual completion-token count,
-   `finish_reason`, and whether the output was a model stop or a
-   context/max-token cut-off. A `length` finish is a length result, not a
-   semantic failure.
-3. Compare tokenizer and chat-template files with the profile revision.
-4. Check `npu-smi`, worker health, and the provider placement fields. A quality
-   failure must not be relabeled as an NPU failure without a device/runtime
-   error.
-5. Record the result under the profile's `quality_detail`; keep the technical
-   status unchanged unless the runtime itself fails.
+1. 保存完整的JSON/SSE响应和确切的配置revision。
+2. 记录请求的`max_tokens`、实际completion-token数、`finish_reason`，以及输出是模型停止还是上下文/最大token截断。以`length`结束属于长度结果，不是语义失败。
+3. 将tokenizer和chat-template文件与配置revision进行对照。
+4. 检查`npu-smi`、worker健康状况和提供方放置字段。没有设备/运行时错误时，不得将质量失败重新标记为NPU失败。
+5. 将结果记录在该配置的`quality_detail`下；除非运行时本身失败，否则保持技术状态不变。
 
-### Human Chinese-Quality Protocol
+### 人工中文质量协议
 
-Run each profile with the same 10 Chinese prompts, a fresh conversation, greedy
-decoding and `max_tokens=256` (or the profile's documented ceiling). Preserve
-the raw JSON/SSE response, profile revision, prompt-token count, completion-token
-count and `finish_reason`. A response ending with `length` is marked
-**incomplete** and is not scored as a failed answer. First record UTF-8/text
-integrity separately. Then have at least two reviewers score relevance,
-factuality, fluency and completion on a 0/1/2 rubric; retain the per-reviewer
-scores and disagreements. Only this review may change `quality_status` to
-`passed` or `failed`.
+对每个配置使用相同的10条中文提示词、全新对话、贪婪解码和`max_tokens=256`（或该配置记录的封顶值）运行。保留原始JSON/SSE响应、配置revision、prompt-token数、completion-token数和`finish_reason`。以`length`结束的回答会标记为**不完整**，不作为失败回答评分。首先单独记录UTF-8/文本完整性。然后由至少两名审查者按0/1/2评分量表评估相关性、事实性、流畅性和完整性；保留每位审查者的分数和分歧。只有这项审查可以将`quality_status`改为`passed`或`failed`。
 
-For TinyLlama, Chinese quality remains a hypothesis because its training target
-is primarily English. For DeepSeek-R1 Distill, a visible thinking prefix can
-consume a short budget before the final answer. For Qwen2/Qwen2.5, replacement
-characters remain a text-integrity issue worth debugging even though the NPU/API
-gates passed.
+对于TinyLlama，中文质量仍属假设，因为其训练目标以英文为主。对于DeepSeek-R1 Distill，可见的思考前缀可能在最终回答前耗尽短预算。对于Qwen2/Qwen2.5，替换字符仍是值得调试的文本完整性问题，即使NPU/API门禁已经通过。
 
-## What Is Not Selectable Yet
+## 尚不可选择的模型
 
-Qwen3 is visible but not selectable because the installed MindNLP 0.4.1 did not
-provide its loader. MiniCPM3 is visible but not selectable because its dedicated
-loader, 4B artifact and memory gate were not run. These are `blocked` or
-`not-run` prerequisites, not statements that Ascend 310B can never run those
-models. A future experiment may move an entry to `short-smoke` or
-`observed-pass` after collecting the same environment, artifact, NPU, API and
-performance evidence.
+Qwen3可见但不可选择，因为安装的MindNLP 0.4.1未提供其加载器。MiniCPM3可见但不可选择，因为其专用加载器、4B产物和内存门禁尚未运行。这些是`blocked`或`not-run`前置条件，不代表Ascend 310B永远无法运行这些模型。未来实验在收集相同的环境、产物、NPU、API和性能证据后，可以将某个条目改为`short-smoke`或`observed-pass`。

@@ -1,71 +1,61 @@
-# Release Overview
+# 发布概览
 
-## Scope
+## 范围
 
-Ascend Edge Chat `v0.2.0` is a portable text-chat reference service for Ascend edge hardware. It provides an OpenAI-compatible gateway, a browser interface for a trusted local network, and two separately validated NPU backends. The teaching catalog is intentionally broader: it exposes measured technical experiments without treating language quality as a runtime gate.
+Ascend Edge Chat的`v0.2.0`版本是一个面向昇腾边缘硬件的共享文本聊天应用。两款受支持的板卡均使用相同的OpenAI兼容网关、浏览器UI、MindSpore工作进程、固定版本Qwen1.5-0.5B模型和前台启动器。板卡特定配置会选择HBM预检阈值，并分别记录证据。监督器还可将第二个、已加入允许列表的PyACL/static-KV后端作为比较选项提供；其OM、tokenizer、张量契约、精度和KV缓存路径仍与MindSpore不同。
 
-The 20T release uses Ascend310B1 with Python `3.9.25`, MindSpore `2.4.10`, MindNLP `0.4.1`, and CANN `8.0.0`. The 8T release uses Ascend310B4, the same Python/CANN line, and a locked native ACL/OM static-KV backend. Neither tuple inherits the other target's runtime or quality evidence.
+共享MindSpore环境使用Python版本`3.9.25`、MindSpore版本`2.4.10`、MindNLP版本`0.4.1`和CANN版本`8.0.0`。Ascend310B1/20T与Ascend310B4/8T是同一配置档的独立板卡目标。8T static-KV锁和20T B1候选锁作为可选PyACL路径保留，而不是作为不同的默认聊天应用。
 
-## Runtime Architecture
+## 运行时架构
 
 ```mermaid
 flowchart TB
-    accTitle: Ascend Edge Chat process boundaries
-    accDescr: The browser accesses only the UI. The UI owns the gateway token. The gateway selects one loopback backend, either the MindSpore worker on 20T or the fixed ACL static-KV service on 8T.
+    accTitle: Ascend Edge Chat进程边界
+    accDescr: 两块板卡均使用一个浏览器UI、环回网关和默认MindSpore工作进程。监督器可选择一个单独锁定的PyACL static-KV候选。
 
-    lan["Trusted LAN client"] --> ui["UI\n0.0.0.0:7865"]
-    ui -->|"server-side Bearer token"| gateway["Gateway\n127.0.0.1:7861"]
-    gateway -->|"Ascend310B1"| ms["MindSpore worker\n127.0.0.1:8090"]
-    gateway -->|"Ascend310B4"| acl["ACL static-KV\n127.0.0.1:8084"]
-    ms --> serial1["single request admission"]
-    acl --> serial2["single request admission"]
-    serial1 --> npu1["Ascend 310B1 / 20T"]
-    serial2 --> npu2["Ascend 310B4 / 8T"]
+    lan["可信局域网客户端"] --> ui["共享UI\n0.0.0.0:7865"]
+    ui -->|"服务端Bearer令牌"| gateway["共享网关\n127.0.0.1:7861"]
+    gateway --> supervisor["后端监督器\n127.0.0.1:7863"]
+    supervisor -->|"B1/20T和B4/8T上的默认路径"| ms["MindSpore工作进程\n127.0.0.1:8090"]
+    supervisor -. "可选的锁定候选" .-> acl["PyACL static-KV工作进程\n127.0.0.1:8084"]
+    ms --> npu1["当前昇腾NPU"]
+    acl --> npu2["当前昇腾NPU"]
 ```
 
-The public model identifier is `ascend-edge-chat`. The selected internal worker identifier and port are not configurable by API requests; the gateway rejects backend/model/port cross-wiring.
+公开模型标识符为`ascend-edge-chat`。选定的内部工作进程标识符和端口不能通过API请求配置；网关会拒绝后端、模型和端口的交叉错配。
 
-## Support Matrix
+## 支持矩阵
 
-| Layer | Release state | Boundary |
+| 层级 | 发布状态 | 边界 |
 | --- | --- | --- |
-| Browser text UI | Supported formal release surface | Trusted LAN only; no browser login |
-| OpenAI JSON and SSE | Supported formal release surface | Bounded messages, greedy decoding, one request at a time |
-| MindSpore Qwen1.5-0.5B on 20T | Observed-pass machine path | Human Chinese-quality review remains pending; still testable |
-| Qwen2.5 static KV on 8T | Formal machine acceptance passed | Public source/HF artifacts, fixed 51/49 contract, output cap 80; semantic quality pending |
-| Teaching Qwen2-0.5B profile | Observed-pass machine/API path on 20T | Teaching-only comparison; semantic quality pending |
-| Teaching catalog | Qwen1.5 1.8B, Qwen2/Qwen2.5, TinyLlama, DeepSeek | Selectable when technical evidence exists; quality is a separate field |
-| Cross-target inheritance | Not allowed | 8T and 20T retain separate artifacts, performance, and quality evidence |
-| Audio and device protocols | Out of scope for the 8T text release | Not installed or started |
-| Retrieval augmentation | Not included | No release API or runtime configuration enables it |
+| 浏览器文本UI | 受支持的正式发布面 | 仅限可信局域网；无浏览器登录 |
+| OpenAI JSON与SSE | 受支持的正式发布面 | 有界消息、贪心解码、一次处理一个请求 |
+| 共享MindSpore Qwen1.5-0.5B路径 | B1/20T和B4/8T上的机器路径为Observed-pass | 同一配置档、工作进程、网关和UI；板卡特定的HBM门禁与证据；人工中文质量审查pending |
+| PyACL/static-KV比较路径 | 可选、候选锁定的后端 | 独立的OM、tokenizer、张量契约、串行化KV解码和token预算；仅当目标板卡的候选门禁通过时才能选择 |
+| 教学Qwen2-0.5B配置档 | 20T上的机器/API路径为Observed-pass | 仅用于教学比较；语义质量pending |
+| 教学目录 | Qwen1.5 1.8B、Qwen2/Qwen2.5、TinyLlama、DeepSeek | 存在技术证据时可选择；质量是独立字段 |
+| 跨目标继承 | 不允许 | 8T和20T分别保留产物、性能和质量证据 |
+| 音频与设备协议 | 可选实验能力 | 共享文本启动中禁用；在ALSA输出设备卡死问题未解决期间，20T上排除 |
+| 检索增强 | 不包含 | 没有可启用该能力的发布API或运行时配置 |
 
-## Current 20T Validation
+## 当前20T验证
 
-The active teaching profile during the `2026-10-18` board run was
-`qwen2-0.5b-instruct-mindspore`. The browser route `:7865 -> :7861 -> :8090`
-completed gateway and UI contracts, JSON, SSE, output budgets from 8 through 64
-tokens, ten short stability requests, and ten Chinese probes. The preserved
-dated board report is ignored evidence on the deployment directory, not a
-checked-in artifact.
+在`2026-10-18`板端运行期间，活动教学配置档为`qwen2-0.5b-instruct-mindspore`。浏览器访问路径`:7865 -> :7861 -> :8090`
+完成了网关和UI契约、JSON、SSE、8至64个token的输出预算检查、十次短稳定性请求和十次中文探测。保留的带日期板端报告是部署目录中被Git忽略的证据，而不是已检入产物。
 
-The first unspaced acceptance loop hit HTTP 429 because request bodies arrived
-faster than the service admission boundary. A spaced run passed. Do not turn
-that client-burst observation into an NPU failure, and do not omit the
-single-request admission limit from the deployment description. Chinese answer
-quality remains pending; the technical machine path and semantic quality are
-separate claims. Detailed values are in
-[Validation and Limitations](04-validation-and-limitations.md).
+首次无间隔验收循环触发了HTTP 429，因为请求体到达速度快于服务准入边界。加入间隔后的运行通过。不要把这一客户端突发观测转写成NPU故障，也不要在部署说明中省略单请求准入限制。中文回答质量仍处于pending状态；技术机器路径和语义质量是彼此独立的结论。详细数值见
+[验证与限制](04-validation-and-limitations.md)。
 
-## Release Model
+## 发布模型
 
-The 20T runtime profile is defined in `configs/release-model.json`; its accompanying lock is `configs/release-artifacts.lock.json`. The 8T static-KV release is defined by `configs/release-8t-static-kv.lock.json` and its fixed external catalog `configs/release-8t-model-catalog.json`. Both lock their source revision, artifacts, exact bytes, SHA-256 values, runtime limits, and target SoC.
+共享MindSpore配置档由`configs/release-model.json`、其产物锁和公共`configs/release-model-catalog.json`定义。该配置档同时声明`Ascend310B1/20T`和`Ascend310B4/8T`；每块板卡的结果仍独立记录。可选PyACL候选由目标特定的`20t-backend-catalog.json`和`8t-backend-catalog.json`描述，并拥有各自的候选锁和数据目录。
 
-The release does not accept a model path, model revision, provider name, or Python expression from a browser or API request. On 20T the teaching selector accepts only a profile ID already present in the checked-in catalog and registry. On 8T the ACL backend is fixed and browser model switching is rejected. Extension work must use the controlled profile and provider workflow in [Extension Guide](05-extension-guide.md).
+浏览器绝不会提供模型路径、OM路径、命令、环境变量值、哈希或Python表达式。它只能从环回监督器的允许列表提交一个后端和模型ID。两块板卡均以MindSpore启动；选择PyACL是一条显式替代执行路径。扩展工作必须使用[扩展指南](05-extension-guide.md)中的受控配置档和提供方工作流。
 
-## Non-Goals
+## 非目标
 
-- no claim of production availability or safety certification;
-- no simultaneous multi-model loading or automatic backend failover (a teaching profile change is a controlled worker restart);
-- no CPU, cloud, Torch, vLLM, MindIE, or alternate-framework fallback;
-- no support claim for a model merely because an artifact can be downloaded; selectable entries require measured technical evidence;
-- no cross-target performance or quality assertion between 8T and 20T.
+- 不声称具备生产可用性或安全认证；
+- 不同时加载多个模型，也不自动进行后端故障转移（更换教学配置档属于受控的工作进程重启）；
+- 不使用CPU、云、Torch、vLLM、MindIE或其他框架回退；
+- 不会仅因产物可下载就声称支持某个模型；可选项需要已测得的技术证据；
+- 不在8T与20T之间作出跨目标的性能或质量断言。

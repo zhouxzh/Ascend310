@@ -12,7 +12,7 @@ import site
 import sysconfig
 from typing import Any, Dict, Mapping, Optional
 
-from .mindspore_qwen import _cann_version
+from .mindspore_qwen import _cann_version, _probe_npu_model
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -84,9 +84,12 @@ def _observe_runtime() -> Dict[str, Any]:
             imports[name] = False
         else:
             imports[name] = True
+    observed_soc = _probe_npu_model()
     return {
         "python": platform.python_version(),
         "soabi": sysconfig.get_config_var("SOABI"),
+        "board_soc": "Ascend" + observed_soc if observed_soc else None,
+        "board_tier": {"310B1": "20T", "310B4": "8T"}.get(observed_soc or ""),
         "conda_env": os.environ.get("CONDA_DEFAULT_ENV"),
         "python_no_user_site": os.environ.get("PYTHONNOUSERSITE"),
         "user_site_enabled": bool(site.ENABLE_USER_SITE),
@@ -123,6 +126,18 @@ def validate_runtime_lock_data(
         )
     required = ("cann", "mindspore", "mindnlp", "python")
     missing = [name for name in required if not isinstance(target.get(name), str) or not target[name]]
+    boards = target.get("boards")
+    if strict_target and (
+        not isinstance(boards, list)
+        or not boards
+        or any(
+            not isinstance(item, Mapping)
+            or item.get("soc") not in {"Ascend310B1", "Ascend310B4"}
+            or item.get("tier") not in {"20T", "8T"}
+            for item in boards
+        )
+    ):
+        missing.append("boards[Ascend310B1/20T,Ascend310B4/8T]")
     if missing:
         raise RuntimePreflightError(
             {
@@ -133,6 +148,15 @@ def validate_runtime_lock_data(
         )
 
     errors = []
+    if strict_target:
+        allowed_boards = {
+            (item["soc"], item["tier"])
+            for item in boards
+            if isinstance(item, Mapping)
+        }
+        observed_board = (observed.get("board_soc"), observed.get("board_tier"))
+        if observed_board not in allowed_boards:
+            errors.append(_error("board", sorted(allowed_boards), observed_board))
     if observed.get("conda_env") != UNIFIED_CONDA_ENV:
         errors.append(_error("conda_env", UNIFIED_CONDA_ENV, observed.get("conda_env")))
     if observed.get("python_no_user_site") != "1":
@@ -173,6 +197,7 @@ def validate_runtime_lock_data(
         "strict_target": strict_target,
         "expected": {
             "conda_env": UNIFIED_CONDA_ENV,
+            "boards": target.get("boards") if strict_target else "Ascend310B1 or Ascend310B4",
             "python": target["python"],
             "soabi": UNIFIED_SOABI,
             "cann": target["cann"] if strict_target else "sourced CANN runtime",

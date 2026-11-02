@@ -12,6 +12,10 @@ requirements="${ASCEND_EDGE_CHAT_REQUIREMENTS_FILE:-${root_dir}/configs/release-
 [[ -r "${conda_profile}" ]] || { echo "Conda profile not found: ${conda_profile}" >&2; exit 2; }
 [[ -f "${requirements}" && ! -L "${requirements}" ]] || { echo "Requirements file must be a regular file: ${requirements}" >&2; exit 2; }
 [[ -d "${wheelhouse}" && ! -L "${wheelhouse}" ]] || { echo "Wheelhouse must be a regular directory: ${wheelhouse}" >&2; exit 2; }
+[[ "${conda_env}" == "ascend" ]] || {
+  echo "Release dependencies require the unified conda environment named ascend" >&2
+  exit 2
+}
 source "${conda_profile}"
 conda activate "${conda_env}"
 export PYTHONNOUSERSITE=1

@@ -33,6 +33,9 @@ class ReleaseWorkerTests(unittest.TestCase):
         with self.assertRaises(RequestError):
             _parse_request({"model": "other", "messages": [{"role": "user", "content": "你好"}]})
 
+    def test_shared_stability_status_is_activatable(self) -> None:
+        self.assertIn("stability_passed", mindspore_worker._ACTIVATABLE_ADMISSION_STATUSES)
+
     def test_prefix_delta_never_repeats_prior_text(self) -> None:
         self.assertEqual(_prefix_delta("你好", "你好世界"), "世界")
         self.assertEqual(_prefix_delta("你好", "你好"), "")

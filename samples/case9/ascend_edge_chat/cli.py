@@ -34,6 +34,8 @@ from .artifacts.static_release_store import (
     verify_static_release_artifacts,
 )
 from .runtime.config import load_release_environment
+from .static_kv.candidates import CandidateError, DEFAULT_CANDIDATE_CATALOG, load_acl_candidate
+from .static_kv.b1_store import B1DownloadError, DEFAULT_B1_DOWNLOAD_LOCK, download_b1_candidate
 from .version import PROJECT_NAME, __version__
 
 
@@ -72,6 +74,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     voice.add_argument("--port", default=None, type=int, help="loopback port; defaults to ASCEND_EDGE_CHAT_VOICE_PORT")
     voice.add_argument("--check-config", action="store_true")
 
+    supervisor = commands.add_parser("backend-supervisor", help="run the controlled 20T backend supervisor")
+    supervisor.add_argument("--host", default="127.0.0.1")
+    supervisor.add_argument("--port", default=7863, type=int)
+    supervisor.add_argument("--candidate-data-dir", type=Path, required=True)
+    supervisor.add_argument("--catalog", type=Path, default=DEFAULT_CANDIDATE_CATALOG)
+    supervisor.add_argument("--mindspore-catalog", type=Path)
+
     verify = commands.add_parser("verify", help="validate the model lock and local artifacts")
     verify.add_argument("--data-dir", type=Path)
 
@@ -108,6 +117,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     acl_worker.add_argument("--execution-timeout", default=240.0, type=float)
     acl_worker.add_argument("--device-id", default=0, type=int)
 
+    acl_candidate = commands.add_parser(
+        "acl-candidate-worker",
+        help="start one allowlisted Ascend310B1 offline ACL/OM candidate",
+    )
+    acl_candidate.add_argument("--candidate", required=True)
+    acl_candidate.add_argument("--data-dir", type=Path, required=True)
+    acl_candidate.add_argument("--catalog", type=Path, default=DEFAULT_CANDIDATE_CATALOG)
+    acl_candidate.add_argument("--host", default="127.0.0.1")
+    acl_candidate.add_argument("--port", default=8084, type=int)
+    acl_candidate.add_argument("--max-tokens", type=int)
+    acl_candidate.add_argument("--execution-timeout", default=240.0, type=float)
+    acl_candidate.add_argument("--device-id", default=0, type=int)
+    acl_candidate.add_argument("--disable-sentence-stop", action="store_true")
+    acl_candidate.add_argument("--force-continue", action="store_true")
+    acl_candidate.add_argument("--allow-legacy-environment", action="store_true")
+
+    acl_candidate_download = commands.add_parser(
+        "acl-candidate-download",
+        help="download one fixed-revision Ascend310B1 offline ACL candidate",
+    )
+    acl_candidate_download.add_argument("--data-dir", type=Path, required=True)
+    acl_candidate_download.add_argument("--lock", type=Path, default=DEFAULT_B1_DOWNLOAD_LOCK)
+
     args = parser.parse_args(list(argv) if argv is not None else None)
     try:
         if args.command == "worker":
@@ -118,6 +150,32 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _ui(args.host, args.port)
         if args.command == "voice":
             return _voice(args.host, args.port, args.check_config)
+        if args.command == "backend-supervisor":
+            from .backend_supervisor import main as supervisor_main
+            return supervisor_main([
+                "--host", args.host,
+                "--port", str(args.port),
+                "--candidate-data-dir", str(args.candidate_data_dir),
+                "--catalog", str(args.catalog),
+                *(["--mindspore-catalog", str(args.mindspore_catalog)] if args.mindspore_catalog else []),
+            ])
+        if args.command == "acl-candidate-download":
+            print(json.dumps(download_b1_candidate(args.data_dir, lock_path=args.lock), ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "acl-candidate-worker":
+            return _acl_candidate_worker(
+                args.candidate,
+                args.data_dir,
+                args.catalog,
+                args.host,
+                args.port,
+                args.max_tokens,
+                args.execution_timeout,
+                args.device_id,
+                args.disable_sentence_stop,
+                args.force_continue,
+                args.allow_legacy_environment,
+            )
         if args.command in {"acl", "acl-worker"}:
             selected_data_dir = args.data_dir or os.environ.get("ASCEND_EDGE_CHAT_DATA_DIR")
             if not selected_data_dir:
@@ -172,7 +230,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         print(json.dumps(report(import_artifacts(root, args.source)), ensure_ascii=False, indent=2))
         return 0
-    except (ArtifactError, StaticReleaseError) as exc:
+    except (ArtifactError, StaticReleaseError, CandidateError) as exc:
         parser.error(str(exc))
         return 2
 
@@ -209,6 +267,65 @@ def _acl_worker(
         max_tokens=max_tokens,
         execution_timeout_seconds=execution_timeout,
         device_id=device_id,
+    )
+
+    def stop_on_signal(_signum: int, _frame: object) -> None:
+        raise KeyboardInterrupt
+
+    previous_term = signal.signal(signal.SIGTERM, stop_on_signal)
+    try:
+        server.serve_forever(poll_interval=0.5)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        signal.signal(signal.SIGTERM, previous_term)
+        server.server_close()
+        with suppress(Exception):
+            service.runtime.close()
+    return 0
+
+
+def _acl_candidate_worker(
+    candidate_id: str,
+    data_dir: Path,
+    catalog_path: Path,
+    host: str,
+    port: int,
+    max_tokens: int | None,
+    execution_timeout: float,
+    device_id: int,
+    disable_sentence_stop: bool = False,
+    force_continue: bool = False,
+    allow_legacy_environment: bool = False,
+) -> int:
+    """Start one allowlisted B1 offline candidate without path-valued CLI input."""
+
+    from .static_kv.launch import start_release_service
+
+    candidate = load_acl_candidate(
+        candidate_id,
+        data_dir=data_dir,
+        catalog_path=catalog_path,
+    )
+    selected_tokens = candidate.default_max_tokens if max_tokens is None else max_tokens
+    server, service = start_release_service(
+        host=host,
+        port=port,
+        om=candidate.om,
+        tokenizer=candidate.tokenizer,
+        tokenizer_config=candidate.tokenizer_config,
+        controller_contract=candidate.controller_contract,
+        runtime_contract=candidate.runtime_contract,
+        om_lock=candidate.lock_path,
+        tokenizer_lock=candidate.tokenizer_lock,
+        max_tokens=selected_tokens,
+        execution_timeout_seconds=execution_timeout,
+        device_id=device_id,
+        expected_soc_version=candidate.soc_version,
+        sentence_stop_enabled=not disable_sentence_stop,
+        force_continue=force_continue,
+        experimental_candidate=True,
+        allow_legacy_environment=allow_legacy_environment,
     )
 
     def stop_on_signal(_signum: int, _frame: object) -> None:

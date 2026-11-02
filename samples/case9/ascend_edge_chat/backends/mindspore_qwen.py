@@ -22,10 +22,13 @@ chunking or UTF-8 boundaries never result in repeated output.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import gc
 import importlib
 import importlib.metadata
 import json
 import logging
+import math
+import mmap
 from numbers import Integral
 import os
 from pathlib import Path
@@ -34,6 +37,7 @@ import re
 import signal
 import shutil
 import sys
+import struct
 import subprocess
 import threading
 import time
@@ -112,6 +116,98 @@ class HbmPreflightError(ProviderUnavailable):
                 self.details.get("minimum_accounted_free_mb", "unknown"),
             )
         )
+
+
+def _bf16_bytes_to_float16(raw: bytes, shape: Sequence[int], numpy: Any) -> Any:
+    """Decode little-endian safetensors BF16 bytes without ``ml_dtypes``."""
+
+    elements = math.prod(int(value) for value in shape)
+    expected = elements * 2
+    if len(raw) != expected:
+        raise ValueError(
+            "BF16 tensor byte span does not match shape: expected %d, observed %d"
+            % (expected, len(raw))
+        )
+    bits = numpy.frombuffer(raw, dtype=numpy.dtype("<u2"))
+    float32 = (bits.astype(numpy.uint32) << 16).view(numpy.float32)
+    return float32.reshape(tuple(shape)).astype(numpy.float16)
+
+
+def _install_mindnlp_bf16_loader_compat(mindspore: Any) -> bool:
+    """Patch only the MindNLP loader whose BF16 NumPy dtype has wrong width."""
+
+    numpy = importlib.import_module("numpy")
+    serialization = importlib.import_module("mindnlp.core.serialization")
+    np_types = getattr(serialization, "_NP_TYPES", {})
+    bf16_type = np_types.get("BF16") if isinstance(np_types, Mapping) else None
+    try:
+        itemsize = numpy.dtype(bf16_type).itemsize
+    except (TypeError, ValueError):
+        itemsize = 0
+    if itemsize == 2:
+        return False
+
+    standard_types = {
+        "F64": numpy.float64,
+        "F32": numpy.float32,
+        "F16": numpy.float16,
+        "I64": numpy.int64,
+        "U64": numpy.uint64,
+        "I32": numpy.int32,
+        "U32": numpy.uint32,
+        "I16": numpy.int16,
+        "U16": numpy.uint16,
+        "I8": numpy.int8,
+        "U8": numpy.uint8,
+        "BOOL": numpy.bool_,
+    }
+
+    def safe_load_file_compat(filename: str) -> Dict[str, Any]:
+        path = Path(filename)
+        with path.open("rb") as stream:
+            header_size_raw = stream.read(8)
+            if len(header_size_raw) != 8:
+                raise ValueError("safetensors header is truncated")
+            header_size = struct.unpack("<Q", header_size_raw)[0]
+            if header_size <= 0 or header_size > 100 * 1024 * 1024:
+                raise ValueError("safetensors header size is invalid")
+            header = json.loads(stream.read(header_size))
+            mapped = mmap.mmap(stream.fileno(), 0, access=mmap.ACCESS_READ)
+            try:
+                data_base = 8 + header_size
+                result: Dict[str, Any] = {}
+                for name, info in header.items():
+                    if name == "__metadata__":
+                        continue
+                    shape = tuple(int(value) for value in info["shape"])
+                    begin, end = (int(value) for value in info["data_offsets"])
+                    if not 0 <= begin <= end <= len(mapped) - data_base:
+                        raise ValueError("safetensors tensor offset is invalid")
+                    raw = mapped[data_base + begin : data_base + end]
+                    dtype = str(info["dtype"])
+                    if dtype == "BF16":
+                        array = _bf16_bytes_to_float16(raw, shape, numpy)
+                    else:
+                        numpy_dtype = standard_types.get(dtype)
+                        if numpy_dtype is None:
+                            raise ValueError("unsupported safetensors dtype: %s" % dtype)
+                        expected = math.prod(shape) * numpy.dtype(numpy_dtype).itemsize
+                        if len(raw) != expected:
+                            raise ValueError("safetensors tensor byte span does not match shape")
+                        array = numpy.frombuffer(raw, dtype=numpy_dtype).reshape(shape).copy()
+                    result[name] = mindspore.Tensor.from_numpy(array)
+                return result
+            finally:
+                mapped.close()
+
+    serialization.safe_load_file = safe_load_file_compat
+    modeling_utils = importlib.import_module("mindnlp.transformers.modeling_utils")
+    modeling_utils.safe_load_file = safe_load_file_compat
+    LOGGER.warning(
+        "enabled MindNLP BF16 loader compatibility: observed NumPy itemsize=%s",
+        itemsize,
+    )
+    return True
 
 
 @dataclass(frozen=True)
@@ -796,6 +892,8 @@ class MindSporeChatProvider:
         self._placement_status = "not_checked"
         self._placement_evidence: List[Dict[str, str]] = []
         self._config_normalization: Optional[Dict[str, str]] = None
+        self._bf16_loader_compat = False
+        self._memory_recycle_status = "not_run"
         self._loaded = model is not None and tokenizer is not None
         self._healthy = True
         self._busy = False
@@ -895,6 +993,9 @@ class MindSporeChatProvider:
                 self._mindspore = importlib.import_module("mindspore")
                 self._configure_ascend_context()
                 transformers = importlib.import_module("mindnlp.transformers")
+                self._bf16_loader_compat = _install_mindnlp_bf16_loader_compat(
+                    self._mindspore
+                )
                 tokenizer_loader = getattr(transformers, self.tokenizer_class_name, None)
                 model_loader = getattr(transformers, self.model_class_name, None)
                 if tokenizer_loader is None:
@@ -1857,6 +1958,34 @@ class MindSporeChatProvider:
             daemon=True,
         ).start()
 
+    def _recycle_runtime_memory(self) -> None:
+        """Release framework caches after model references are dropped."""
+
+        mindspore = self._mindspore
+        if mindspore is None:
+            self._memory_recycle_status = "not_applicable"
+            return
+        gc.collect()
+        actions = []
+        recycle = getattr(mindspore, "ms_memory_recycle", None)
+        if callable(recycle):
+            try:
+                recycle()
+                actions.append("ms_memory_recycle")
+            except Exception:
+                LOGGER.warning("MindSpore ms_memory_recycle failed", exc_info=True)
+        hal = getattr(mindspore, "hal", None)
+        empty_cache = getattr(hal, "empty_cache", None) if hal is not None else None
+        if callable(empty_cache):
+            try:
+                empty_cache()
+                actions.append("hal.empty_cache")
+            except Exception:
+                LOGGER.warning("MindSpore hal.empty_cache failed", exc_info=True)
+        gc.collect()
+        self._memory_recycle_status = "+".join(actions) if actions else "unavailable"
+        LOGGER.info("MindSpore runtime memory recycle status=%s", self._memory_recycle_status)
+
     def close(self) -> None:
         self.cancel()
         with self._generation_state_lock:
@@ -1894,6 +2023,7 @@ class MindSporeChatProvider:
                 LOGGER.debug("model close hook failed", exc_info=True)
         self.model = None
         self.tokenizer = None
+        self._recycle_runtime_memory()
         self._loaded = False
         self._busy = False
 
@@ -1944,6 +2074,8 @@ class MindSporeChatProvider:
             "placement_status": self._placement_status,
             "placement_evidence": list(self._placement_evidence),
             "config_normalization": dict(self._config_normalization or {}),
+            "bf16_loader_compat": bool(self._bf16_loader_compat),
+            "memory_recycle_status": self._memory_recycle_status,
             "admission": "admitted" if admission else str(profile_status),
             "admission_status": str(profile_status),
         }

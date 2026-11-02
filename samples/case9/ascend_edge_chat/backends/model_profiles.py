@@ -765,7 +765,7 @@ class ChatModelProfile:
             # Schema v1 teaching registries predate the explicit template
             # field.  Accept it as optional reviewed metadata without
             # forcing old, frozen evidence registries to change schema.
-            allowed_v1_keys = base_keys | {"chat_template"}
+            allowed_v1_keys = base_keys | {"chat_template", "board_targets"}
             extras = sorted(set(raw) - allowed_v1_keys)
             missing = sorted(base_keys - set(raw))
             if extras:

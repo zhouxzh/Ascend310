@@ -6,6 +6,7 @@ import unittest
 from fastapi.testclient import TestClient
 
 from ascend_edge_chat.api.gateway import create_app
+from ascend_edge_chat.api.upstream import UpstreamError
 from ascend_edge_chat.runtime.config import Settings
 
 
@@ -34,6 +35,9 @@ class _AclStaticKvStream(_Stream):
 
 
 class _Upstream:
+    async def health(self):
+        return {"ready": True, "healthy": True}
+
     async def complete(self, payload, request_id):
         return {
             "id": request_id,
@@ -145,6 +149,40 @@ class ReleaseGatewayTests(unittest.TestCase):
         self.assertEqual(models.json()["data"][0]["id"], "ascend-edge-chat")
         self.assertEqual(completion.status_code, 200)
         self.assertEqual(completion.json()["model"], "ascend-edge-chat")
+
+    def test_health_reports_upstream_readiness(self) -> None:
+        with TestClient(create_app(_settings(), upstream=_Upstream())) as client:
+            response = client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ok")
+        self.assertTrue(response.json()["upstream"]["ready"])
+
+    def test_health_degrades_when_upstream_is_not_ready(self) -> None:
+        class UnreadyUpstream(_Upstream):
+            async def health(self):
+                raise UpstreamError("The upstream worker is not ready", 503)
+
+        with TestClient(create_app(_settings(), upstream=UnreadyUpstream())) as client:
+            response = client.get("/health")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["status"], "degraded")
+        self.assertFalse(response.json()["upstream"]["ready"])
+
+    def test_gateway_preserves_upstream_timeout_status(self) -> None:
+        class TimeoutUpstream(_Upstream):
+            async def complete(self, payload, request_id):
+                del payload, request_id
+                raise UpstreamError("The upstream LLM timed out", 504)
+
+        settings = _settings(backend="acl-static-kv")
+        with TestClient(create_app(settings, upstream=TimeoutUpstream())) as client:
+            response = client.post(
+                "/v1/chat/completions",
+                headers={"Authorization": "Bearer " + settings.gateway_api_key},
+                json={"model": "ascend-edge-chat", "messages": [{"role": "user", "content": "你好"}]},
+            )
+        self.assertEqual(response.status_code, 504)
+        self.assertEqual(response.json()["error"]["code"], "upstream_error")
 
     def test_gateway_rejects_missing_key(self) -> None:
         with TestClient(create_app(_settings(), upstream=_Upstream())) as client:

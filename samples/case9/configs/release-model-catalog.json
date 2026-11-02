@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "purpose": "one shared MindSpore release model for Ascend310B1/20T and Ascend310B4/8T",
+  "models": [
+    {
+      "id": "qwen1.5-0.5b-chat",
+      "display_name": "Qwen1.5 0.5B Chat",
+      "runtime": "MindSpore/MindNLP",
+      "languages": ["zh", "en"],
+      "technical_status": "observed-pass",
+      "quality_status": "pending",
+      "text_integrity_status": "pending",
+      "selectable": true,
+      "reason": "One locked model and worker implementation is used on both 310B tiers; board limits and evidence remain separate.",
+      "technical_detail": "Qwen1.5-0.5B-Chat, fixed Hugging Face revision, shared MindSpore worker on Ascend310B1/20T and Ascend310B4/8T.",
+      "quality_detail": "Technical execution does not establish Chinese answer quality; review remains separate.",
+      "board_results": {
+        "Ascend310B1/20T": "observed-pass",
+        "Ascend310B4/8T": "observed-pass"
+      },
+      "worker_registry": "configs/release-model.json",
+      "default_max_tokens": 32,
+      "max_tokens": 256
+    }
+  ]
+}

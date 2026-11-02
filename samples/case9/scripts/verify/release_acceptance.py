@@ -319,11 +319,13 @@ def _run_command(argv: list[str], *, cwd: Path | None = None) -> dict[str, Any]:
         return {"argv": argv, "returncode": None, "output": str(exc)}
 
 
-def _source_provenance(root: Path) -> dict[str, Any]:
+def _source_provenance(root: Path, expected_commit: str) -> dict[str, Any]:
+    if not re.fullmatch(r"[0-9a-fA-F]{40}", expected_commit):
+        raise ValueError("source commit must be a full 40-hex SHA")
     remote = _run_command(["git", "config", "--get", "remote.origin.url"], cwd=root)
     commit = _run_command(["git", "rev-parse", "HEAD"], cwd=root)
+    reachable = _run_command(["git", "branch", "--remotes", "--contains", expected_commit], cwd=root)
     status = _run_command(["git", "status", "--short"], cwd=root)
-    public_head = _run_command(["git", "ls-remote", "origin", "refs/heads/main"], cwd=root)
     remote_url = str(remote.get("output", "")).strip()
     # Never persist credentials embedded in an author-local Git remote.
     remote_url = re.sub(r"//[^/@]+@", "//", remote_url)
@@ -335,19 +337,16 @@ def _source_provenance(root: Path) -> dict[str, Any]:
         if proxied.startswith("https://github.com/"):
             remote_url = proxied
     commit_value = str(commit.get("output", "")).strip()
+    reachable_value = str(reachable.get("output", ""))
     status_value = str(status.get("output", ""))
-    public_match = re.match(
-        r"([0-9a-fA-F]{40})\s+refs/heads/main(?:\s|$)",
-        str(public_head.get("output", "")).strip(),
-    )
-    public_commit = public_match.group(1).lower() if public_match else None
     return {
         "repository": remote_url or None,
         "commit": commit_value if re.fullmatch(r"[0-9a-fA-F]{40}", commit_value) else None,
-        "public_main_commit": public_commit,
+        "expected_commit": expected_commit,
+        "commit_reachable_from_public_main": "origin/main" in reachable_value.split(),
         "working_tree_clean": not bool(status_value.strip()) and status.get("returncode") == 0,
         "status": status_value,
-        "commands": [remote, commit, status, public_head],
+        "commands": [remote, commit, reachable, status],
     }
 
 
@@ -389,6 +388,9 @@ def _static_kv_model_provenance(root: Path, source_kind: str) -> dict[str, Any]:
         "license": "Apache-2.0",
         "mirror": "https://hf-mirror.com",
         "target": verified["target"],
+        "board_targets": [
+            {"soc": verified["target"]["soc"], "tier": verified["target"]["tier"]}
+        ],
         "profile_status": "formal",
         "admission_eligible": True,
         "admission_reason": "Public artifacts, target SoC, and runtime descriptor are locked; human language-quality review remains independent.",
@@ -459,6 +461,7 @@ def _model_provenance(root: Path, source_kind: str) -> dict[str, Any]:
             if isinstance(profile.get("admission"), dict)
             else None
         ),
+        "board_targets": profile.get("board_targets", []),
         "artifacts": artifacts,
         "data_directory": str(data_dir) if data_dir else None,
     }
@@ -493,21 +496,52 @@ def _environment_provenance() -> dict[str, Any]:
     }
 
 
-def _provenance(root: Path, source_kind: str) -> dict[str, Any]:
-    source = _source_provenance(root)
+def _board_from_npu_smi(environment: dict[str, Any]) -> dict[str, str | None]:
+    snapshot = environment.get("npu_smi")
+    output = snapshot.get("output", "") if isinstance(snapshot, dict) else ""
+    match = re.search(r"\|\s*\d+\s+(310B[14])\s*\|", str(output))
+    soc = match.group(1) if match else None
+    return {
+        "soc": "Ascend" + soc if soc else None,
+        "tier": {"310B1": "20T", "310B4": "8T"}.get(soc or ""),
+    }
+
+
+def _provenance(root: Path, source_kind: str, expected_commit: str) -> dict[str, Any]:
+    source = _source_provenance(root, expected_commit)
     model = _model_provenance(root, source_kind)
     environment = _environment_provenance()
+    board = _board_from_npu_smi(environment)
     status = "passed"
     reasons: list[str] = []
+    supported_boards = model.get("board_targets")
+    if not isinstance(supported_boards, list) and isinstance(model.get("target"), dict):
+        static_target = model["target"]
+        if isinstance(static_target.get("soc"), str) and isinstance(static_target.get("tier"), str):
+            supported_boards = [{"soc": static_target["soc"], "tier": static_target["tier"]}]
+    if not isinstance(board.get("soc"), str):
+        status = "blocked"
+        reasons.append("npu-smi did not identify the target 310B SoC")
+    elif not isinstance(supported_boards, list) or not any(
+        isinstance(item, dict)
+        and item.get("soc") == board.get("soc")
+        and item.get("tier") == board.get("tier")
+        for item in supported_boards
+    ):
+        status = "blocked"
+        reasons.append("locked MindSpore profile does not declare this board target")
     if source.get("repository") != EXPECTED_SOURCE_REPOSITORY:
         status = "blocked"
         reasons.append("source repository is not the public locked GitHub repository")
     if not source.get("commit"):
         status = "blocked"
         reasons.append("source commit is not a full 40-hex SHA")
-    if source.get("public_main_commit") != source.get("commit"):
+    if source.get("commit") != expected_commit:
         status = "blocked"
-        reasons.append("source commit is not the current public main commit")
+        reasons.append("source HEAD does not match the requested fixed commit")
+    if source.get("commit_reachable_from_public_main") is not True:
+        status = "blocked"
+        reasons.append("fixed source commit is not reachable from public origin/main")
     if not source.get("working_tree_clean"):
         status = "blocked"
         reasons.append("source working tree is not clean")
@@ -520,8 +554,8 @@ def _provenance(root: Path, source_kind: str) -> dict[str, Any]:
     # gate; source and artifact identity remain mandatory for reproducibility.
     if model.get("profile_status") == "admitted" and model.get("admission_eligible") is True:
         model["evidence_label"] = "formal-admitted"
-    elif model.get("profile_status") == "formal":
-        model["evidence_label"] = "formal-machine-release"
+    elif model.get("profile_status") in {"formal", "stability_passed"}:
+        model["evidence_label"] = "formal-machine-quality-pending"
     else:
         model["evidence_label"] = "technical-preview"
     for artifact in model.get("artifacts", []):
@@ -538,6 +572,7 @@ def _provenance(root: Path, source_kind: str) -> dict[str, Any]:
         "reasons": reasons,
         "source": source,
         "model": model,
+        "board": board,
         "environment": environment,
         "commands": source.get("commands", []) + [environment["npu_smi"]],
     }
@@ -554,12 +589,19 @@ def main() -> int:
     parser.add_argument("--json-interval", type=float, default=1.0)
     parser.add_argument("--sse-interval", type=float, default=2.0)
     parser.add_argument(
+        "--source-commit",
+        default=os.environ.get("ASCEND_EDGE_CHAT_SOURCE_COMMIT", ""),
+        help="fixed public Git commit checked out in detached HEAD",
+    )
+    parser.add_argument(
         "--model-source",
         choices=("hf", "offline-bundle"),
         default=os.environ.get("ASCEND_EDGE_CHAT_MODEL_SOURCE", ""),
         help="how the locked model entered the board data directory",
     )
     args = parser.parse_args()
+    if not re.fullmatch(r"[0-9a-fA-F]{40}", args.source_commit):
+        parser.error("--source-commit or ASCEND_EDGE_CHAT_SOURCE_COMMIT must be a full 40-hex public commit SHA")
     if not args.model_source:
         parser.error("--model-source or ASCEND_EDGE_CHAT_MODEL_SOURCE is required")
     if not 1 <= args.performance_samples <= 30:
@@ -571,7 +613,7 @@ def main() -> int:
 
     root = Path(__file__).resolve().parents[2]
     try:
-        provenance = _provenance(root, args.model_source)
+        provenance = _provenance(root, args.model_source, args.source_commit)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         parser.error("could not collect release provenance: %s" % exc)
     if provenance["status"] != "passed":

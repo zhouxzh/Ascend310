@@ -165,21 +165,16 @@ def _validate_upstream_base_url(value: str, backend: str) -> str:
         raise ConfigurationError(
             "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL must point to the loopback worker"
         )
-    acl_static_kv_port = int(_BACKEND_CONTRACTS[BACKEND_ACL_STATIC_KV]["port"])
-    if backend == BACKEND_ACL_STATIC_KV and port != acl_static_kv_port:
+    expected_port = int(contract["port"])
+    if port != expected_port:
         raise ConfigurationError(
-            "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL for acl-static-kv must use loopback port %d"
-            % acl_static_kv_port
+            "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL for %s must use loopback port %d"
+            % (backend, expected_port)
         )
-    if backend == BACKEND_MINDSPORE and port == acl_static_kv_port:
+    if parsed.scheme != "http" or parsed.path.rstrip("/") != "/v1":
         raise ConfigurationError(
-            "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL port 8084 is reserved for acl-static-kv"
-        )
-    if backend == BACKEND_ACL_STATIC_KV and (
-        parsed.scheme != "http" or parsed.path.rstrip("/") != "/v1"
-    ):
-        raise ConfigurationError(
-            "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL for acl-static-kv must be an http loopback /v1 URL"
+            "ASCEND_EDGE_CHAT_UPSTREAM_BASE_URL for %s must be an http loopback /v1 URL"
+            % backend
         )
     return value
 

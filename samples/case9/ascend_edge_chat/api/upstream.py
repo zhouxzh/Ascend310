@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 import json
-from typing import Any, Optional, Protocol
+from typing import Any, Mapping, Optional, Protocol
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
@@ -31,6 +32,9 @@ class CompletionStream(Protocol):
 
 
 class UpstreamClient(Protocol):
+    async def health(self) -> Mapping[str, Any]:
+        """Return a bounded readiness snapshot from the loopback worker."""
+
     async def complete(self, payload: dict[str, Any], request_id: str) -> dict[str, Any]:
         """Return a non-streaming OpenAI response."""
 
@@ -62,10 +66,13 @@ class _HttpxCompletionStream:
 
 
 class OpenAICompatibleUpstream:
-    """Forwards a normalized request to an OpenAI Chat Completions endpoint."""
+    """Forwards a normalized request to one loopback chat worker."""
+
+    _HEALTH_TIMEOUT_SECONDS = 3.0
 
     def __init__(self, settings: Settings):
         self._chat_url = _chat_completions_url(settings.upstream_base_url)
+        self._health_url = _health_url(settings.upstream_base_url)
         self._api_key = settings.upstream_api_key
         # Reuse the bounded stream budget for a non-streaming response.  The
         # endpoint must never accept an unbounded JSON body from an upstream
@@ -80,6 +87,34 @@ class OpenAICompatibleUpstream:
     async def aclose(self) -> None:
         await self._client.aclose()
 
+    async def health(self) -> Mapping[str, Any]:
+        try:
+            response = await self._client.get(
+                self._health_url, timeout=self._HEALTH_TIMEOUT_SECONDS
+            )
+        except httpx.TimeoutException as exc:
+            raise UpstreamError("The upstream worker health check timed out", 504) from exc
+        except httpx.RequestError as exc:
+            raise UpstreamError("The upstream worker is unavailable", 503) from exc
+        try:
+            if response.status_code != 200:
+                raise UpstreamError(
+                    "The upstream worker is not ready", response.status_code
+                )
+            if not _is_json_content_type(response.headers.get("content-type")):
+                raise UpstreamError("The upstream worker returned invalid health JSON", 502)
+            try:
+                payload = response.json()
+            except (TypeError, ValueError) as exc:
+                raise UpstreamError("The upstream worker returned invalid health JSON", 502) from exc
+        finally:
+            await response.aclose()
+        if not isinstance(payload, Mapping):
+            raise UpstreamError("The upstream worker returned invalid health JSON", 502)
+        if payload.get("ready") is not True or payload.get("healthy", True) is not True:
+            raise UpstreamError("The upstream worker is not ready", 503)
+        return dict(payload)
+
     async def complete(self, payload: dict[str, Any], request_id: str) -> dict[str, Any]:
         request = self._client.build_request(
             "POST", self._chat_url, headers=self._headers(request_id), json=payload
@@ -93,7 +128,10 @@ class OpenAICompatibleUpstream:
 
         try:
             if not response.is_success:
-                raise UpstreamError(f"The upstream LLM returned HTTP {response.status_code}")
+                raise UpstreamError(
+                    f"The upstream LLM returned HTTP {response.status_code}",
+                    _upstream_status(response.status_code),
+                )
             if not _is_json_content_type(response.headers.get("content-type")):
                 raise UpstreamError("The upstream LLM did not return JSON")
             declared_length = response.headers.get("content-length")
@@ -140,7 +178,9 @@ class OpenAICompatibleUpstream:
         if response.status_code != 200:
             status = response.status_code
             await response.aclose()
-            raise UpstreamError(f"The upstream LLM returned HTTP {status}")
+            raise UpstreamError(
+                f"The upstream LLM returned HTTP {status}", _upstream_status(status)
+            )
         if not _is_sse_content_type(response.headers.get("content-type")):
             await response.aclose()
             raise UpstreamError("The upstream LLM did not return a Server-Sent Event stream")
@@ -155,6 +195,17 @@ class OpenAICompatibleUpstream:
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
         return headers
+
+
+def _upstream_status(status_code: int) -> int:
+    """Preserve worker readiness and timeout semantics across the gateway."""
+
+    return int(status_code) if int(status_code) in {503, 504} else 502
+
+
+def _health_url(base_url: str) -> str:
+    parsed = urlsplit(base_url)
+    return urlunsplit((parsed.scheme, parsed.netloc, "/health", "", ""))
 
 
 def _chat_completions_url(base_url: str) -> str:

@@ -3,8 +3,11 @@ set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${root_dir}"
+
+env_file="${ASCEND_EDGE_CHAT_ENV_FILE:-${root_dir}/.env}"
+[[ -r "${env_file}" ]] || { echo "Release environment file is not readable: ${env_file}" >&2; exit 2; }
 set -a
-source "${root_dir}/.env"
+source "${env_file}"
 set +a
 
 [[ "${ASCEND_EDGE_CHAT_BACKEND:-}" == "acl-static-kv" ]] || {
@@ -14,6 +17,10 @@ set +a
 : "${ASCEND_EDGE_CHAT_MODEL_SOURCE:?set ASCEND_EDGE_CHAT_MODEL_SOURCE to hf or offline-bundle}"
 
 cleanup_timeout_seconds="${ASCEND_EDGE_CHAT_CLEANUP_TIMEOUT_SECONDS:-30}"
+[[ "${cleanup_timeout_seconds}" =~ ^[1-9][0-9]*$ ]] || {
+  echo "ASCEND_EDGE_CHAT_CLEANUP_TIMEOUT_SECONDS must be a positive integer" >&2
+  exit 2
+}
 report_root="${ASCEND_EDGE_CHAT_REPORT_DIR:-${root_dir}/run/reports}"
 run_id="release-8t-$(date -u +%Y%m%dT%H%M%SZ)"
 run_dir="${report_root}/${run_id}"

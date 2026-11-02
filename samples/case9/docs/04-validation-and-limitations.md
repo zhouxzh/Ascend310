@@ -1,134 +1,78 @@
-# Validation and Limitations
+# 验证与限制
 
-## Observed Release Baseline
+## 观测到的发布基线
 
-The following measurements were recorded on `2026-10-16` for the 20T reference board before the release restructuring. The revalidation procedure in [20T Deployment](01-20t-deployment.md) must be run again against the packaged release before a tag or public release is created.
+以下测量结果于`2026-10-16`在发布结构调整前记录于20T参考板。在创建标签或公开发布之前，必须使用打包后的发布版本重新运行[20T部署](01-20t-deployment.md)中的复验流程。
 
-| Evidence item | Observed value | Evidence type |
+| 证据项 | 观测值 | 证据类型 |
 | --- | ---: | --- |
-| SoC | Ascend310B1 / 20T | Observed-pass environment identity |
-| CANN | 8.0.0 | Observed-pass environment identity |
-| Python | 3.9.25 | Observed-pass environment identity |
-| MindSpore / MindNLP | 2.4.10 / 0.4.1 | Observed-pass import and worker load |
-| Model revision | `4d14e384a4b037942bb3f3016665157c8bcb70ea` | Locked artifact identity |
-| JSON and SSE | 11/11 machine checks | Observed-pass protocol checks |
-| Short stability loop | 10/10 requests | Observed-pass machine check |
-| First-token p50 / p95 | 671.868 ms / 723.280 ms | Historical performance measurement |
-| Completion p50 / p95 | 1310.003 ms / 1401.746 ms | Historical performance measurement |
-| Throughput p50 / p95 | 1.531 / 1.642 token/s | Historical performance measurement |
+| SoC | Ascend310B1 / 20T | Observed-pass环境身份 |
+| CANN | 8.0.0 | Observed-pass环境身份 |
+| Python | 3.9.25 | Observed-pass环境身份 |
+| MindSpore / MindNLP | 2.4.10 / 0.4.1 | Observed-pass导入及工作进程加载 |
+| 模型修订版本 | `4d14e384a4b037942bb3f3016665157c8bcb70ea` | 锁定产物身份 |
+| JSON和SSE | 11/11机器检查 | Observed-pass协议检查 |
+| 短稳定性循环 | 10/10请求 | Observed-pass机器检查 |
+| 首令牌p50 / p95 | 671.868 ms / 723.280 ms | 历史性能测量 |
+| 完成p50 / p95 | 1310.003 ms / 1401.746 ms | 历史性能测量 |
+| 吞吐量p50 / p95 | 1.531 / 1.642 token/s | 历史性能测量 |
 
-The complete historical evidence remains in `docs/archive/legacy-pre-release/`. The table is a boundary statement, not a benchmark promise for another board, CANN release, ambient load, prompt, or model revision.
+完整的历史证据仍保留在`docs/archive/legacy-pre-release/`中。该表是边界声明，并不是对其他板卡、CANN发布版本、环境负载、提示词或模型修订版本的基准承诺。
 
-## 2026-10-18 20T Acceptance
+## 2026-10-18 20T验收
 
-The active board service was validated after the code changes, with the
-`qwen2-0.5b-instruct-mindspore` teaching profile. The browser path was
-`:7865 -> :7861 -> :8090`; the board was `Ascend310B1 / 20T`, CANN `8.0.0`,
-driver `25.2.0`, and Python `3.9.2`. The dated raw board report remains under
-the deployment directory as ignored evidence and is not committed to Git.
+代码变更后，使用`qwen2-0.5b-instruct-mindspore`教学配置档验证了活动板端服务。浏览器路径为`:7865 -> :7861 -> :8090`；板卡为`Ascend310B1 / 20T`，CANN为`8.0.0`，驱动为`25.2.0`，Python为`3.9.2`。带日期的原始板端报告仍作为被忽略的证据保留在部署目录下，未提交到Git。
 
-| Evidence item | 2026-10-18 result |
+| 证据项 | 2026-10-18结果 |
 | --- | --- |
-| Gateway contract | `/v1/models`, invalid bearer rejection, and unknown-model rejection passed |
-| UI contract | `/api/config` and a real `/api/chat` response passed |
-| JSON completion | HTTP 200, non-empty response, `finish_reason=stop` in the direct check |
-| SSE completion | HTTP 200, terminal `[DONE]`-equivalent completion, `finish_reason=stop` |
-| Output-budget checks | 8/16/32 tokens returned `length`; 64-token request returned `stop` after 46 completion tokens |
-| Stability | 10/10 short requests returned “测试通过” |
-| Chinese probes | 10/10 requests completed the machine path; semantic quality is pending |
-| One performance sample | First token 723.051 ms; completion 1370.604 ms; 1.459 token/s |
-| Test-time worker state | Worker remained healthy after the run |
-| Test-time NPU snapshot | 19,540 / 23,673 MB used; `npu-smi` still reported the 310B1 |
-| UI screenshot | 1440×900 current 20T UI evidence image |
+| 网关契约 | `/v1/models`、无效Bearer拒绝和未知模型拒绝均`passed` |
+| UI契约 | `/api/config`和一次真实`/api/chat`响应均`passed` |
+| JSON完成 | 直接检查中返回HTTP 200、非空响应和`finish_reason=stop` |
+| SSE完成 | HTTP 200、与终止`[DONE]`等价的完成，以及`finish_reason=stop` |
+| 输出预算检查 | 8/16/32个令牌返回`length`；64令牌请求在生成46个完成令牌后返回`stop` |
+| 稳定性 | 10/10个短请求返回“测试通过” |
+| 中文探针 | 10/10个请求完成了机器路径；语义质量待定 |
+| 一个性能样本 | 首令牌723.051 ms；完成1370.604 ms；1.459 token/s |
+| 测试时工作进程状态 | 运行后工作进程仍健康 |
+| 测试时NPU快照 | 已用19,540 / 23,673 MB；`npu-smi`仍报告310B1 |
+| UI截图 | 1440×900的当前20T UI证据图 |
 
-The first complete harness run had no inter-request delay and failed in the
-stability loop with:
+首次完整测试框架运行没有请求间延迟，并在稳定性循环中失败，报错如下：
 
 ```text
 HTTP 429: Too many request bodies are being read
 ```
 
-That is a request-admission result, not an NPU or model failure. The subsequent
-run used one-second spacing for JSON requests and two-second spacing for
-streaming requests, and passed. The service is intentionally serial and bounded;
-the test harness must not burst submissions.
+这是请求准入结果，而不是NPU或模型失败。后续运行对JSON请求使用一秒间隔，对流式请求使用两秒间隔，测试通过。服务有意采用串行且有界的设计；测试框架不得突发提交请求。
 
-This run does not establish p50/p95 performance because only one performance
-sample was taken. It also does not establish Chinese semantic quality. A direct
-Chinese prompt received an English apology; that is a quality observation for
-that answer, while the machine path remained `observed-pass`. Use the
-ten-prompt, fresh-session, human-review protocol below before changing
-`quality_status`.
+本次运行没有建立p50/p95性能结论，因为只采集了一个性能样本。它也没有建立中文语义质量结论。直接的中文提示词收到了一段英文道歉；这是针对该答案的质量观察，而机器路径仍为`observed-pass`。在更改`quality_status`之前，请使用下文所述的十提示词、全新会话、人工审查协议。
 
-## 2026-10-18 Output-Budget Recheck
+## 2026-10-18输出预算复查
 
-The earlier 64-token UI/worker ceiling was a service policy, not an observed
-memory limit. It made a normal long answer appear to fail when its decoder did
-not emit EOS before the limit. The runtime now defaults to 128 output tokens
-and has a configured 256-token ceiling, while retaining the 1024-token context
-contract and each profile's separate maximum.
+早先的64令牌UI/工作进程上限是一项服务策略，而不是观测到的内存限制。当解码器在达到上限前未发出EOS时，它会让正常的长回答看起来像是失败了。运行时现在默认输出128个令牌，并设置256令牌的配置上限，同时保留1024令牌的上下文契约和每个配置档各自的最大值。
 
-On the 20T board, `qwen2-1.5b-instruct-mindspore` was retested after the
-change. A two-paragraph Chinese prompt with `max_tokens=128` used 44 prompt
-tokens and 69 completion tokens, returned `finish_reason=stop`, and completed
-in 108,956 ms. A separate sequence-generation request with `max_tokens=96`
-returned `finish_reason=length` after reaching the requested output budget. In
-both runs the worker remained healthy; neither run is memory-exhaustion or
-runtime-crash evidence. The raw board artifacts are retained under the
-deployment's ignored `run/quality-recheck-20261018T122702Z/` and
-`run/token-budget-96-20261018T123030Z/` directories.
+在20T板卡上，变更后重新测试了`qwen2-1.5b-instruct-mindspore`。一个使用`max_tokens=128`的两段中文提示词使用了44个提示词令牌和69个完成令牌，返回`finish_reason=stop`，并在108,956 ms内完成。另一个使用`max_tokens=96`的独立序列生成请求在达到所请求的输出预算后返回`finish_reason=length`。两次运行中工作进程都保持健康；两次运行都不是内存耗尽或运行时崩溃证据。原始板端产物保留在部署目录中被忽略的`run/quality-recheck-20261018T122702Z/`和`run/token-budget-96-20261018T123030Z/`目录下。
 
-The first response declined to describe Ascend 310B, so it is a factuality
-observation for one completed answer. It is not a complete Chinese-quality
-assessment. A semantic-quality result must use the protocol below.
+首个响应拒绝描述昇腾310B，因此这是针对一个已完成答案的事实性观察。它不是完整的中文质量评估。语义质量结果必须使用下文协议。
 
-### Qwen2 1.5B Output-Budget Boundary On 20T
+### 20T上的Qwen2 1.5B输出预算边界
 
-On `2026-10-18`, `qwen2-1.5b-instruct-mindspore` was measured through the
-same browser SSE route used by students: `:7865 -> :7861 -> :8090`. The board
-was `Ascend310B1 / 20T`, CANN `8.0.0`, MindSpore `2.4.10`, MindNLP `0.4.1`,
-and the profile revision was `b139ca2b8d7ba579ed727ffcd7060075666a808b`.
-The original run used a Qwen2 tokenizer directory containing only
-`config.json`, `model.safetensors`, and `tokenizer.json`: it has no
-`tokenizer_config.json` or `generation_config.json`. MindNLP 0.4.1 therefore
-had no tokenizer template. The generic provider fell back to a Qwen1.5-shaped
-prompt, which explained the visible `<|user|>` / `<|assistant|>` continuation.
-This is a prompt-contract error, not an NPU-memory conclusion.
+`2026-10-18`，通过学生使用的同一浏览器SSE路由`:7865 -> :7861 -> :8090`测量了`qwen2-1.5b-instruct-mindspore`。板卡为`Ascend310B1 / 20T`，CANN为`8.0.0`，MindSpore为`2.4.10`，MindNLP为`0.4.1`，配置档修订版本为`b139ca2b8d7ba579ed727ffcd7060075666a808b`。原始运行使用的Qwen2分词器目录仅包含`config.json`、`model.safetensors`和`tokenizer.json`：其中没有`tokenizer_config.json`或`generation_config.json`。因此MindNLP 0.4.1没有分词器模板。通用提供器回退到Qwen1.5形状的提示词，这解释了可见的`<|user|>` / `<|assistant|>`续写。这是提示词契约错误，而不是NPU内存结论。
 
-The profile now carries the reviewed Qwen2 ChatML text template. The board-side
-contract checker rendered `<|im_start|>user ... <|im_end|>` followed by
-`<|im_start|>assistant`, and the adapter rejects a Qwen2/Qwen2.5 profile that
-lacks that template instead of falling back. Forced long-output prompts were
-then issued through the same browser SSE route used by students. Every
-successful row reached the requested budget with `finish_reason=length`; the
-worker returned to `healthy=true`, `busy=false`, and `cache_cleanup=idle`.
+该配置档现在带有经过审查的Qwen2 ChatML文本模板。板端契约检查器渲染出`<|im_start|>user ... <|im_end|>`，其后是`<|im_start|>assistant`，而适配器会拒绝缺少该模板的Qwen2/Qwen2.5配置档，而不是回退。随后通过学生使用的同一浏览器SSE路由发出强制长输出提示词。每个成功行都达到所请求的预算，并带有`finish_reason=length`；工作进程恢复到`healthy=true`、`busy=false`和`cache_cleanup=idle`。
 
-| Requested output budget | Observed completion tokens | Terminal state | Wall time | Text integrity | Interpretation |
+| 请求的输出预算 | 观测到的完成令牌数 | 终止状态 | 实际耗时 | 文本完整性 | 解释 |
 | ---: | ---: | --- | ---: | --- | --- |
-| 64 | 64 | `length`, worker healthy | 80.029 s | no `U+FFFD` or role marker | Observed-pass after template correction |
-| 128 | 128 | `length`, worker healthy | 158.946 s | no `U+FFFD` or role marker | Observed-pass after template correction |
-| 192 | 192 | `length`, worker healthy | 238.133 s | no `U+FFFD` or role marker | Observed-pass after template correction |
-| 256 | partial SSE, worker exited before terminal event | a long partial response was streamed | not a valid latency metric | no terminal response retained | Observed-fail after template correction |
+| 64 | 64 | `length`，工作进程健康 | 80.029 s | 无`U+FFFD`或角色标记 | 模板修正后的Observed-pass |
+| 128 | 128 | `length`，工作进程健康 | 158.946 s | 无`U+FFFD`或角色标记 | 模板修正后的Observed-pass |
+| 192 | 192 | `length`，工作进程健康 | 238.133 s | 无`U+FFFD`或角色标记 | 模板修正后的Observed-pass |
+| 256 | 部分SSE，工作进程在终止事件前退出 | 已流式输出一段较长的部分响应 | 不是有效的延迟指标 | 未保留终止响应 | 模板修正后的Observed-fail |
 
-The corrected 256-token request again did **not** show an out-of-memory
-condition: NPU memory fell to about `10,269/23,673 MB` after the worker
-exited. The worker log instead records
-`TBE Subprocess[task_distribute] ... main process disappeared` and semaphore
-cleanup warnings. This is a fail-closed runtime result for the tested
-combination, not evidence that all 256-token requests or all 310B devices are
-unsupported. It is, however, enough evidence to retain the profile's
-conservative 192-token UI ceiling.
+修正后的256令牌请求再次**没有**显示内存耗尽情况：工作进程退出后，NPU内存降至约`10,269/23,673 MB`。工作进程日志反而记录了`TBE Subprocess[task_distribute] ... main process disappeared`和信号量清理警告。这是所测试组合的失败关闭运行时结果，不是所有256令牌请求或所有310B设备都不受支持的证据。不过，这已足以作为保留该配置档保守的192令牌UI上限的证据。
 
-The browser catalog and worker profile now cap this specific profile at `192`
-tokens. The service-wide maximum remains 256 for profiles that have their own
-successful evidence. Raw ignored board evidence is retained at
-`artifacts/template-contract-20261018/` below the board data directory. The
-directory contains the rendered prompt contract, raw 64/128/192 SSE streams,
-the 256-token partial stream, NPU snapshots, and worker logs. They remain
-ignored board evidence rather than source-controlled artifacts.
+浏览器目录和工作进程配置档现在将这一特定配置档的上限设为`192`个令牌。对于拥有各自成功证据的配置档，服务全局最大值仍为256。被忽略的原始板端证据保留在板端数据目录下的`artifacts/template-contract-20261018/`中。该目录包含渲染后的提示词契约、原始64/128/192 SSE流、256令牌部分流、NPU快照和工作进程日志。它们仍作为被忽略的板端证据保留，而不是纳入源代码控制的产物。
 
-To reproduce this gate on a board, start with the active profile's small
-budget, increase one option at a time, and retain the generated ignored JSON:
+要在板卡上复现此门禁，请从活动配置档的小预算开始，逐个选项增加，并保留生成的被忽略JSON：
 
 ```bash
 python scripts/verify/output_budget_probe.py \
@@ -138,318 +82,150 @@ python scripts/verify/output_budget_probe.py \
   --output run/output-budget-$(date -u +%Y%m%dT%H%M%SZ).json
 ```
 
-The client uses the browser's SSE route, records an unavailable worker as an
-observation rather than deleting the run, and must not be used to claim a
-higher budget before the worker is healthy again.
+该客户端使用浏览器的SSE路由，将不可用工作进程记录为一次观测，而不是删除该次运行，并且在工作进程恢复健康之前，不得用来声称达到更高预算。
 
-The tested MindSpore loader did not expose parameter-level device placement. Its NPU evidence is therefore `context_verified`: `mindspore.set_context(device_target="Ascend")` succeeded and `npu-smi` reported the expected 310B1 device. This is stronger than an import check, but it is not equivalent to a parameter-placement trace; release records must preserve that distinction.
+所测试的MindSpore加载器未暴露参数级设备放置信息。因此其NPU证据为`context_verified`：`mindspore.set_context(device_target="Ascend")`成功，且`npu-smi`报告了预期的310B1设备。这比导入检查更有力，但不等同于参数放置跟踪；发布记录必须保留这一区别。
 
-## Quality State
+## 质量状态
 
-The default Qwen1.5 profile passed automated completion-integrity checks for a
-ten-prompt Chinese probe. Human Chinese-quality review is **pending**. This
-limits the release claim, but it does not make the model unavailable to a
-student testing the NPU path.
+默认Qwen1.5配置档通过了针对十提示词中文探针的自动化完成完整性检查。人工中文质量审查为**pending**。这限制了发布声明，但不会使该模型无法供测试NPU路径的学生使用。
 
-The teaching catalog intentionally includes the following technical/quality
-separations:
+教学目录有意包含以下技术证据与质量证据的区分：
 
-| Profile | Technical evidence | Quality observation | Interpretation |
+| 配置档 | 技术证据 | 质量观察 | 解释 |
 | --- | --- | --- | --- |
-| Qwen1.5 0.5B | 20T machine gates passed | Pending | Baseline is runnable; quality still needs human labels |
-| Qwen2 0.5B / 1.5B | 20T API, long-output and stability evidence | Historical probes included `U+FFFD`; semantic review pending | Runtime works; tokenizer/decode output needs investigation before a quality conclusion |
-| Qwen2.5 0.5B | Corrected-timeout 20T gates passed | Pending | Earlier 30-second client timeout was a test-harness error, not a model verdict |
-| Qwen2.5 1.5B | Low-occupancy API path passed; separate high-occupancy run had `Alloc failed` | Historical probes included `U+FFFD`; semantic review pending | Selectable as a degraded experiment with a memory warning |
-| TinyLlama 1.1B | Short smoke passed on both tiers | English-oriented; long output had `U+FFFD`/TBE failure | Short test remains useful; long-output limitation is documented |
-| DeepSeek-R1 Distill 1.5B | NPU/API gates recorded on both tiers | `<think>` prefix and factual errors | Slow or poor answers are model behavior, not proof of no NPU execution |
+| Qwen1.5 0.5B | 20T机器门禁通过 | Pending | 基线可运行；质量仍需人工标注 |
+| Qwen2 0.5B / 1.5B | 20T API、长输出和稳定性证据 | 历史探针包含`U+FFFD`；语义审查待定 | 运行时可用；在得出质量结论前需要调查分词器/解码输出 |
+| Qwen2.5 0.5B | 修正超时后的20T门禁通过 | Pending | 早先的30秒客户端超时是测试框架错误，不是模型判定 |
+| Qwen2.5 1.5B | 低占用API路径通过；独立的高占用运行出现`Alloc failed` | 历史探针包含`U+FFFD`；语义审查待定 | 可作为带内存警告的降级实验选择 |
+| TinyLlama 1.1B | 两个档位上的短冒烟测试均通过 | 偏向英文；长输出出现`U+FFFD`/TBE失败 | 短测试仍有用；长输出限制已记录 |
+| DeepSeek-R1 Distill 1.5B | 两个档位均记录了NPU/API门禁 | `<think>`前缀和事实性错误 | 回答缓慢或质量差是模型行为，不能证明未执行NPU推理 |
 
-The browser selector follows the technical column. A failed or pending quality
-entry remains selectable; a missing loader or a model that was never run is
-shown as `blocked`/`not-run` and cannot be started until its prerequisite test
-is completed. This is a teaching boundary, not a quality endorsement.
+浏览器选择器依据技术证据列。质量失败或待定的条目仍可选择；缺少加载器或从未运行过的模型显示为`blocked`/`not-run`，在其前置测试完成前不能启动。这是教学边界，不是质量背书。
 
-`U+FFFD`, malformed text, a `length` terminal reason, and factual weakness are
-different observations. The first two are text-integrity evidence; `length`
-means the answer is incomplete under that particular output budget; only a
-completed response can enter semantic scoring. For Chinese quality, run the
-same ten prompts in fresh sessions at `max_tokens=256` or the profile's lower
-ceiling, retain raw JSON/SSE plus token counts and terminal reason, then have
-two human reviewers independently score relevance, factuality, fluency and
-completion on a 0/1/2 scale. Only this review may set a profile's
-`quality_status` to `passed` or `failed`.
+`U+FFFD`、畸形文本、`length`终止原因和事实性薄弱是不同观察。前两者是文本完整性证据；`length`表示答案在该特定输出预算下不完整；只有完成的响应才能进入语义评分。对于中文质量，在新的会话中以`max_tokens=256`或配置档的较低上限运行同一组十个提示词，保留原始JSON/SSE以及令牌计数和终止原因，然后由两名人工审查者按0/1/2评分量表独立评分相关性、事实性、流畅度和完整性。只有此审查可以将配置档的`quality_status`设为`passed`或`failed`。
 
-## Revalidation Gates
+## 复验门禁
 
-Before publishing a release tag, verify the package on the target board with the locked environment and artifact set:
+在发布版本标签之前，请使用锁定环境和产物集在目标板卡上验证软件包：
 
-1. environment fingerprint, CANN setup, NPU visibility, and model hashes;
-2. worker NPU initialization and one-token generation;
-3. gateway authentication, `/v1/models`, JSON completion, and SSE completion;
-4. all target-admitted output budgets, including UTF-8, terminal reason and truncation checks; the 20T profile set reaches 256, while the 8T static-KV path checks 8/16/32/64 under its 80-token ceiling;
-5. ten serial requests with worker PID, RSS, file descriptors, and NPU snapshots;
-6. browser UI chat through the gateway;
-7. recorded latency and token/s parameters, including warmup and percentile method;
-8. explicit human review of the Chinese probe set.
+1. 环境指纹、CANN设置、NPU可见性和模型哈希；
+2. 工作进程NPU初始化和单令牌生成；
+3. 网关身份验证、`/v1/models`、JSON完成和SSE完成；
+4. 所有目标板准入的输出预算，包括UTF-8、终止原因和截断检查；20T配置档集达到256，而8T static-KV路径在其80令牌上限下检查8/16/32/64；
+5. 十个串行请求，并记录工作进程PID、RSS、文件描述符和NPU快照；
+6. 通过网关进行浏览器UI聊天；
+7. 记录的延迟和token/s参数，包括预热和百分位数方法；
+8. 对中文探针集进行明确的人工审查。
 
-## 2026-10-23 Unified Environment Acceptance
+## 2026-10-23统一环境验收
 
-The technical-preview machine acceptance was repeated on the same 20T board
-from the unified `ascend` environment: Python `3.9.25`, MindSpore `2.4.10`, MindNLP
-`0.4.1`, CANN `8.0.0`, and driver `25.2.0`.
+在同一块20T板卡上，从统一的`ascend`环境重复了技术预览机器验收：Python为`3.9.25`，MindSpore为`2.4.10`，MindNLP为`0.4.1`，CANN为`8.0.0`，驱动为`25.2.0`。
 
-| Gate | Result |
+| 门禁 | 结果 |
 | --- | --- |
-| Gateway and UI contracts | passed |
-| JSON output budgets | 4/4 completed |
-| SSE | completed with `finish_reason=stop` |
-| Stability | 10/10 |
-| Chinese probes | 10/10 machine-complete |
-| Performance samples | 30/30 |
-| Invalid UTF-8 / `U+FFFD` | not detected |
-| First-token p50 / p95 | 705.746 / 747.193 ms |
-| Completion p50 / p95 | 1336.014 / 1412.012 ms |
-| Throughput p50 / p95 | 1.497 / 1.569 token/s |
+| 网关和UI契约 | passed |
+| JSON输出预算 | 4/4 completed |
+| SSE | completed，且`finish_reason=stop` |
+| 稳定性 | 10/10 |
+| 中文探针 | 10/10 machine-complete |
+| 性能样本 | 30/30 |
+| 无效UTF-8 / `U+FFFD` | not detected |
+| 首令牌p50 / p95 | 705.746 / 747.193 ms |
+| 完成p50 / p95 | 1336.014 / 1412.012 ms |
+| 吞吐量p50 / p95 | 1.497 / 1.569 token/s |
 
-The paced client used one-second JSON and two-second SSE intervals. A first
-attempt without pacing reproduced the documented `HTTP 429: Too many request
-bodies are being read`; the paced run then passed. These are now explicit
-`release_acceptance.py` controls: `--json-interval` and `--sse-interval` accept
-`0..10` seconds and are recorded in the report.
+限速客户端对JSON使用一秒间隔，对SSE使用两秒间隔。首次未限速的尝试复现了已记录的`HTTP 429: Too many request bodies are being read`；随后限速运行通过。这些现在都是`release_acceptance.py`的显式控制项：`--json-interval`和`--sse-interval`接受`0..10`秒，并会记录在报告中。
 
-The MindSpore backend also accepts optional
-`ASCEND_EDGE_CHAT_MAX_DEVICE_MEMORY`; when set, it is forwarded to
-`mindspore.set_context(max_device_memory=...)`. This only changes the context
-memory cap. It does not prove parameter placement, model fit, or generation
-success, so the selected value and any allocation failure must be recorded
-separately. The raw report is retained
-on the board at
-`run/reports/release-20261023T013704Z/acceptance.json`, 12,266 bytes, SHA-256
-`4a0c19f11af4b39f84a030a0a669c753753fa72f6c7a5ae0d4d68bd244c068e0`.
-Human Chinese semantic review remains pending.
+MindSpore后端还接受可选的`ASCEND_EDGE_CHAT_MAX_DEVICE_MEMORY`；设置后，该变量会转发给`mindspore.set_context(max_device_memory=...)`。这只会改变上下文内存上限。它不能证明参数放置、模型适配或生成成功，因此所选值和任何分配失败都必须单独记录。原始报告保留在板端`run/reports/release-20261023T013704Z/acceptance.json`，大小为12,266字节，SHA-256为`4a0c19f11af4b39f84a030a0a669c753753fa72f6c7a5ae0d4d68bd244c068e0`。人工中文语义审查仍待进行。
 
-## 2026-10-25 Ascend310B4 Static-KV ACL Route
+## 2026-10-25 Ascend310B4 static-KV ACL路线
 
-An exploratory conversion run on an Orange Pi AI Pro 8T board used
-`Ascend310B4`, CANN `8.0.0`, driver `25.2.0`, and the unified Python `3.9.25`
-`ascend` environment. The Qwen2.5-0.5B static-KV ONNX was 1,261,082,122 bytes,
-SHA-256
-`b4870df5da9c8cbef4163ceb65d4dc13433f2fd8ed5d2083ef3223d07d1a3c0e`;
-the tokenizer was 7,031,645 bytes, SHA-256
-`c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539`;
-and the controller contract SHA-256 was
-`fcc423f24fdf36c5d364ad7bd535943fb0c8545ab546a5724ab0261330639498`.
+在Orange Pi AI Pro 8T板卡上进行的一次探索性转换运行使用了`Ascend310B4`、CANN `8.0.0`、驱动`25.2.0`和统一的Python `3.9.25` `ascend`环境。Qwen2.5-0.5B static-KV ONNX为1,261,082,122字节，SHA-256为`b4870df5da9c8cbef4163ceb65d4dc13433f2fd8ed5d2083ef3223d07d1a3c0e`；分词器为7,031,645字节，SHA-256为`c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539`；控制器契约为SHA-256 `fcc423f24fdf36c5d364ad7bd535943fb0c8545ab546a5724ab0261330639498`。
 
-The first ATC attempts failed before graph compilation because the isolated
-environment lacked `decorator`, `sympy`, `scipy`, `attrs`, and `psutil`.
-After installing those ATC dependencies, the default eight CANN compile
-workers exhausted the board's 7.4 GiB host memory; `dmesg` recorded an
-out-of-memory kill of `atc.bin`. Repeating with
-`MAX_COMPILE_CORE_NUMBER=1` completed the conversion using the contract-derived
-51 inputs and `--soc_version=Ascend310B4 --precision_mode=must_keep_origin_dtype`.
+最初的ATC尝试在图编译之前失败，因为隔离环境缺少`decorator`、`sympy`、`scipy`、`attrs`和`psutil`。安装这些ATC依赖后，默认的八个CANN编译工作进程耗尽了板卡7.4 GiB主机内存；`dmesg`记录到`atc.bin`被内存不足终止。使用`MAX_COMPILE_CORE_NUMBER=1`重复后，使用契约推导出的51个输入和`--soc_version=Ascend310B4 --precision_mode=must_keep_origin_dtype`完成了转换。
 
-| Gate | Result |
+| 门禁 | 结果 |
 | --- | --- |
-| Native B4 OM | 1,266,010,489 bytes, SHA-256 `76396189f4d52ca34affa87d8670d32e0b8c5ea658b50d1b8bb3a36f689cb507` |
-| OM lock | schema 2, native `soc_version=Ascend310B4`, controller and runtime contract hashes verified |
-| Descriptor | 51 inputs / 49 outputs; 24 key/value pairs, shape `1x2x1024x64`, `float32` |
-| PyACL smoke | `你好！`; 30 prompt tokens / 2 completion tokens |
-| JSON API | HTTP 200; 8 completion tokens; static KV reused across serialized executions |
-| Device cache update | `false`; exercised the host-copy KV update fallback |
+| 原生B4 OM | 1,266,010,489字节，SHA-256 `76396189f4d52ca34affa87d8670d32e0b8c5ea658b50d1b8bb3a36f689cb507` |
+| OM锁 | schema 2，原生`soc_version=Ascend310B4`，控制器和运行时契约哈希已验证 |
+| 描述符 | 51个输入 / 49个输出；24个键/值对，形状`1x2x1024x64`，`float32` |
+| PyACL冒烟测试 | `你好！`；30个提示词令牌 / 2个完成令牌 |
+| JSON API | HTTP 200；8个完成令牌；static KV在串行执行之间复用 |
+| 设备缓存更新 | `false`；执行了主机复制KV更新回退路径 |
 
-The test service remained loopback-only on port `8084` and was stopped after
-the request. This is `observed-pass` for one converter, descriptor, PyACL,
-short-generation, and API sequence on one B4 board. It is not a performance,
-long-generation, Chinese-quality, or stability result.
+测试服务仅监听回环地址的`8084`端口，并在请求后停止。对于一块B4板卡上的一个转换器、描述符、PyACL、短生成和API序列，这是`observed-pass`。它不是性能、长生成、中文质量或稳定性结果。
 
-The conversion above is development evidence because its source bundle and
-working tree were not public. The formal release path now downloads the nine
-locked artifacts from public Hugging Face repository
-`zhouxzh/ascend310b-llm-om-zoo` at revision
-`0f516070e1c0566e3c652d43c488cd3cfbad89a3`. The base checkpoint
-`Qwen/Qwen2.5-0.5B-Instruct` was independently verified at revision
-`7ae557604adf67be50417f59c2c2f167def9a775`.
+上述转换属于开发证据，因为其源代码包和工作树并未公开。正式发布路径现在从公共Hugging Face仓库`zhouxzh/ascend310b-llm-om-zoo`的修订版本`0f516070e1c0566e3c652d43c488cd3cfbad89a3`下载九个锁定产物。基础检查点`Qwen/Qwen2.5-0.5B-Instruct`已在修订版本`7ae557604adf67be50417f59c2c2f167def9a775`上独立验证。
 
-The public B4 OM is 1,266,010,586 bytes, SHA-256
-`f6650e52ff3908288763ef7957832ade606b0e554fa8fde986932f1ca1140eb8`.
-A second 8T run verified all nine public artifacts and their derived schema-2
-locks, then exercised the complete fixed chain `7865 -> 7861 -> 8084`:
-unauthorized gateway access returned 401; `/v1/models` exposed only
-`ascend-edge-chat`; gateway JSON and SSE completed; the browser `/api/chat`
-completed; and a model-switch request returned 409. ACL health reported
-`ready=true`, `healthy=true`, `launch_policy=PASS`, and
-`descriptor_validated=true`. Stopping the launcher released all three ports and
-the ACL process's NPU memory.
+公开B4 OM为1,266,010,586字节，SHA-256为`f6650e52ff3908288763ef7957832ade606b0e554fa8fde986932f1ca1140eb8`。第二次8T运行验证了全部九个公共产物及其推导出的schema-2锁，然后执行了完整的固定链路`7865 -> 7861 -> 8084`：未授权的网关访问返回401；`/v1/models`只暴露`ascend-edge-chat`；网关JSON和SSE完成；浏览器`/api/chat`完成；模型切换请求返回409。ACL健康状态报告`ready=true`、`healthy=true`、`launch_policy=PASS`和`descriptor_validated=true`。停止启动器后释放了全部三个端口和ACL进程的NPU内存。
 
-The release downloader was also run into a fresh empty data directory. It
-downloaded all nine files from the fixed HF revision, verified actual bytes and
-SHA-256 even when the mirror returned a chunked response without
-`Content-Length`, and derived both runtime locks. That verified directory then
-became the operational 8T data root.
+发布下载器也在一个全新的空数据目录中运行。它从固定HF修订版本下载了全部九个文件，即使镜像返回不含`Content-Length`的分块响应，也验证了实际字节和SHA-256，并推导出两个运行时锁。该已验证目录随后成为可操作的8T数据根目录。
 
-The full public-commit acceptance then returned `machine_status=passed`.
-The source was clean GitHub commit
-`c11c96eb625403a2e160792c6428f2eaa341018b`, which matched public `main`
-during the run. Provenance recorded the HF repository/revision, all nine
-artifact hashes, the schema-2 runtime locks, Python 3.9.25, B4/CANN 8.0, and
-formal-machine release status. Gateway model-name, Bearer rejection, model
-rejection, UI config/chat, JSON, SSE, 10/10 stability requests, 10 Chinese
-machine probes, and output budgets 8/16/32/64 all passed. The 32- and 64-token
-requests stopped naturally after 24 completion tokens.
+随后，基于公开提交的完整验收返回`machine_status=passed`。源代码为干净的GitHub提交`c11c96eb625403a2e160792c6428f2eaa341018b`，运行期间与公开`main`一致。来源记录包含HF仓库/修订版本、全部九个产物哈希、schema-2运行时锁、Python 3.9.25、B4/CANN 8.0以及正式机器发布状态。网关模型名、Bearer拒绝、模型拒绝、UI配置/聊天、JSON、SSE、10/10稳定性请求、10个中文机器探针和输出预算8/16/32/64全部通过。32令牌和64令牌请求在生成24个完成令牌后自然停止。
 
-The performance set contains 30 two-token SSE samples. First-token latency was
-`10623.506 ms` p50 / `10656.206 ms` p95, total latency was `10755.880 ms` p50 /
-`10786.937 ms` p95, and throughput was `0.186 token/s` for both percentiles.
-This is the expected consequence of the current one-token-per-ACL-execution
-static graph and is not evidence of an API proxy or network delay. The
-acceptance JSON SHA-256 is
-`6e47b32c5b2b7006ad9ad9e8669d4472396d6a1be49d04fdf395594167df342d`;
-the board report remains ignored evidence rather than a Git artifact. The
-external 600-second command runner disconnected before the script's own cleanup
-trap, so the operator stopped the recorded PIDs manually and verified that all
-three ports closed and NPU memory fell to `4215 / 7546 MB`.
+性能集包含30个双令牌SSE样本。首令牌延迟为p50 `10623.506 ms` / p95 `10656.206 ms`，总延迟为p50 `10755.880 ms` / p95 `10786.937 ms`，两个百分位数的吞吐量均为`0.186 token/s`。这是当前每次ACL执行生成一个令牌的静态图的预期结果，并不是API代理或网络延迟的证据。验收JSON的SHA-256为`6e47b32c5b2b7006ad9ad9e8669d4472396d6a1be49d04fdf395594167df342d`；板端报告仍是被忽略的证据，而不是Git产物。外部600秒命令运行器在脚本自身的清理陷阱执行前断开，因此操作员手动停止了记录的PID，并验证全部三个端口均已关闭、NPU内存降至`4215 / 7546 MB`。
 
-The local release candidate has `120` passing application tests, both static-KV
-reproducibility bundles pass their byte/SHA checks, and all formal 8T shell
-entry points pass `bash -n`. Human Chinese semantic review remains separate.
-The normal MindSpore worker path on 8T remains blocked by the HBM
-initialization boundary described below.
+本地发布候选版本有`120`个通过的应用程序测试，两个static-KV可复现性包都通过其字节/SHA检查，且所有正式8T shell入口点都通过`bash -n`。人工中文语义审查仍需单独完成。8T上的常规MindSpore工作进程路径仍受下文所述HBM初始化边界阻塞。
 
-The deterministic board voice path also completed under the unified
-environment: bundled Chinese WAV → sherpa-onnx ASR → gateway/worker LLM →
-eSpeak NG 22,050 Hz mono WAV → ALSA playback. It reported
-`PIPELINE_PLAYBACK_COMPLETE`. The Jieli USB speaker was initially absent from
-the USB/ALSA inventory, so a temporary board `hw:2,0` run completed without a
-confirmed audible source. After reconnecting Jieli, the same pipeline selected
-`hw:1,0` and the operator confirmed hearing the Chinese reply. This is
-`observed-pass` for the current 20T deterministic board voice chain; speech
-quality and ten-turn timing remain separate gates. The UGREEN USB microphone
-remained visible as capture `hw:0,0`.
+确定性板端语音路径也在统一环境下完成：内置中文WAV → sherpa-onnx ASR → 网关/工作进程LLM → eSpeak NG 22,050 Hz单声道WAV → ALSA播放。它报告`PIPELINE_PLAYBACK_COMPLETE`。Jieli USB扬声器最初不在USB/ALSA清单中，因此一次临时的板端`hw:2,0`运行虽完成，但没有确认可听见的音源。重新连接Jieli后，同一流水线选择了`hw:1,0`，操作员确认听到了中文回复。对于当前20T确定性板端语音链，这是`observed-pass`；语音质量和十轮计时仍是独立门禁。UGREEN USB麦克风仍作为采集设备`hw:0,0`可见。
 
-## Planned Voice Mode Evidence
+## 计划中的语音模式证据
 
-Two voice modes are implemented separately from this text release. Board mode
-uses board-local USB/3.5mm devices, automatic VAD silence segmentation, ASR, the
-existing loopback LLM path, TTS, and board-local playback. Browser mode uses a
-remote browser's microphone/speaker through an HTTPS or localhost UI proxy to
-the loopback voice agent; browser mode must never open board ALSA or receive
-board PCM.
+两种语音模式已在此文本发布版本之外单独实现。板端模式使用板端本地USB/3.5mm设备、自动VAD静音分段、ASR、现有回环LLM路径、TTS和板端本地播放。浏览器模式通过HTTPS或localhost UI代理，使用远程浏览器的麦克风/扬声器连接到回环语音代理；浏览器模式绝不能打开板端ALSA或接收板端PCM。
 
-On `2026-10-21`, a Chromium synthetic microphone completed the two-second
-browser recording and playback self-test through the `127.0.0.1` UI tunnel on
-the 20T board. The generated in-memory WAV was 16 kHz, mono, signed 16-bit,
-57,388 bytes, RMS `2880.5`, and peak `32767`; the page started one browser
-playback and reported completion. This is `observed-pass` for the browser
-capture/encoding/playback data path only.
+`2026-10-21`，在20T板卡上，一个Chromium合成麦克风通过`127.0.0.1` UI隧道完成了两秒浏览器录音和播放自检。生成的内存WAV为16 kHz、单声道、有符号16位、57,388字节，RMS为`2880.5`，峰值为`32767`；页面启动了一次浏览器播放并报告完成。仅对浏览器采集/编码/播放数据路径而言，这是`observed-pass`。
 
-The same board then ran the shared Python 3.9 `ascend` environment with
-`sherpa-onnx 1.13.6` and the Apache-2.0
-`sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23` int8 model. The archive
-SHA-256 is `2cbd71b640d9c37d3784f29367333a4577b0398b62e9deeed418170b081cba8b`;
-the encoder, decoder, joiner, and tokens SHA-256 values are recorded in the
-[board voice plan](08-board-voice-terminal-plan.md). A bundled 16 kHz Chinese
-sample transcribed offline, then a Chromium synthetic-microphone turn produced
-HTTP 200 from `/api/voice/browser/transcribe`, sent the recognized text through
-the existing gateway, and displayed an assistant text reply. This is
-`observed-pass` for one ASR-to-text technical sample in browser mode.
+同一块板卡随后使用共享的Python 3.9 `ascend`环境和`sherpa-onnx 1.13.6`，以及采用Apache-2.0的`sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23` int8模型。归档文件SHA-256为`2cbd71b640d9c37d3784f29367333a4577b0398b62e9deeed418170b081cba8b`；编码器、解码器、joiner和tokens的SHA-256值记录在[板端语音计划](08-board-voice-terminal-plan.md)中。一个内置16 kHz中文样本离线转写成功，随后一次Chromium合成麦克风轮次从`/api/voice/browser/transcribe`返回HTTP 200，将识别文本通过现有网关发送，并显示助手文本回复。对于浏览器模式中的一个ASR转文本技术样本，这是`observed-pass`。
 
-Board-side TTS is now available through system-level eSpeak NG and the unified
-`ascend` environment. The deterministic ASR→LLM→TTS→ALSA path reached
-`PIPELINE_PLAYBACK_COMPLETE` on the board output. On `2026-10-22`, the UI added
-a browser-native TTS fallback using `SpeechSynthesisUtterance` and
-`speechSynthesis` with `zh-CN` preference. A Chromium synthetic voice-input turn
-completed recording, ASR, the LLM response, and the speech-synthesis call; the
-automated probe recorded the full assistant text passed to the browser and the
-UI reached “浏览器语音播报完成.” This is `observed-pass` for the browser
-speech-synthesis call path, not proof of audible speaker output or voice
-quality. Human listening review, USB/Jieli audibility on the current date, and
-the browser/OS voice inventory remain separate gates.
+板端TTS现在可通过系统级eSpeak NG和统一的`ascend`环境使用。确定性的ASR→LLM→TTS→ALSA路径在板端输出上达到`PIPELINE_PLAYBACK_COMPLETE`。`2026-10-22`，UI增加了浏览器原生TTS回退，使用`SpeechSynthesisUtterance`和`speechSynthesis`，优先使用`zh-CN`。一次Chromium合成语音输入轮次完成了录音、ASR、LLM响应和语音合成调用；自动探针记录了传给浏览器的完整助手文本，UI显示“浏览器语音播报完成.”对于浏览器语音合成调用路径，这是`observed-pass`，而不是可听扬声器输出或语音质量的证明。人工试听审查、测量当日的USB/Jieli可听性以及浏览器/操作系统语音清单仍是独立门禁。
 
-The operator subsequently confirmed that a real browser microphone was
-recognized through the same page. This is `observed-pass` for the
-physical-browser microphone to ASR-to-text technical path, but not for a fixed
-reference prompt set, word/character error rate, board-local microphone, speaker
-audibility, USB/3.5mm routing, VAD, board TTS, hostile-client audio privacy, or a
-fully human-reviewed spoken voice turn. The synthetic and manual samples are not
-substitutes for those gates. The remaining hardware and speech gates stay
-`untested` until collected.
+操作员随后确认，真实浏览器麦克风已通过同一页面被识别。对于物理浏览器麦克风到ASR转文本技术路径，这是`observed-pass`，但并未覆盖固定参考提示词集、词/字符错误率、板端本地麦克风、扬声器可听性、USB/3.5mm路由、VAD、板端TTS、恶意客户端音频隐私或完整人工审查的口语语音轮次。合成样本和手动样本不能替代这些门禁。其余硬件和语音门禁在采集前保持`untested`。
 
-## Output Token and Watchdog Calibration
+## 输出令牌与看门狗校准
 
-Output length is bounded by the model context, not by the nominal device-memory
-size:
+输出长度受模型上下文限制，而不是受标称设备内存大小限制：
 
 ```text
 completion_tokens <= context_length - prompt_tokens
 ```
 
-The 8T static-KV graph uses a fixed 1024-token cache, so 80, 128 and 256 output
-tokens used nearly the same NPU working set. The 240-second ACL watchdog is an
-application fail-closed policy inherited from the historical `240/270/300 s`
-ACL/gateway/UI timeout budget. PyACL synchronous execution cannot be safely
-interrupted from the Python thread, so a deadline marks the backend unhealthy
-and requires restart. No hardware specification or timeout sweep established
-240 seconds as a calibrated hardware limit.
+8T static-KV图使用固定的1024令牌缓存，因此80、128和256个输出令牌使用的NPU工作集几乎相同。240秒ACL看门狗是一项应用层失败关闭策略，继承自历史`240/270/300 s`的ACL/网关/UI超时预算。PyACL同步执行无法从Python线程安全中断，因此截止时间会将后端标记为不健康并要求重启。没有硬件规范或超时扫描将240秒确立为经校准的硬件限制。
 
-| Target | Mode | Prompt | Completion | Finish | Elapsed | Resource observation |
+| 目标 | 模式 | 提示词 | 完成 | 终止原因 | 耗时 | 资源观察 |
 | --- | --- | ---: | ---: | --- | ---: | --- |
-| 8T | validated product limit | 55 | 80 | `length` | 225.071 s | NPU about 5.9 GB; 240 s watchdog nearly exhausted |
-| 8T | test worker, watchdog 3600 s | 55 | 128 | `length` | 516.0 s | worker healthy; NPU about 5.9 GB |
-| 8T | test worker, watchdog 3600 s | 55 | 256 | `length` | 1983.8 s | worker healthy; NPU about 5.9 GB; RSS about 1.91 GiB |
-| 20T | release profile | 171 | 256 | `length` | 143.984 s | MindSpore worker healthy |
-| 20T | temporary max-1024 profile | 171 | 850 | `length` | 507.982 s | NPU peak 14,444/23,673 MB; RSS about 4.01 GiB |
-| 20T | temporary max-1024 profile | 171 | 853 | `length` | 483.612 s | `total_tokens=1024`; worker healthy |
+| 8T | 已验证产品上限 | 55 | 80 | `length` | 225.071 s | NPU约5.9 GB；240秒看门狗几乎耗尽 |
+| 8T | 测试工作进程，看门狗3600 s | 55 | 128 | `length` | 516.0 s | 工作进程健康；NPU约5.9 GB |
+| 8T | 测试工作进程，看门狗3600 s | 55 | 256 | `length` | 1983.8 s | 工作进程健康；NPU约5.9 GB；RSS约1.91 GiB |
+| 20T | 发布配置档 | 171 | 256 | `length` | 143.984 s | MindSpore工作进程健康 |
+| 20T | 临时max-1024配置档 | 171 | 850 | `length` | 507.982 s | NPU峰值14,444/23,673 MB；RSS约4.01 GiB |
+| 20T | 临时max-1024配置档 | 171 | 853 | `length` | 483.612 s | `total_tokens=1024`；工作进程健康 |
 
-For the 8T prompt containing 55 tokens, the mathematical context ceiling is
-`1024 - 55 = 969` completion tokens. The 20T prompt used here contains 171
-tokens, so its exact observed ceiling is `1024 - 171 = 853`. This does not
-replace a complete-output generation test for 969 tokens; such a test would take
-far longer than the practical acceptance window.
+对于包含55个令牌的8T提示词，数学上下文上限为`1024 - 55 = 969`个完成令牌。此处使用的20T提示词包含171个令牌，因此其精确观测上限为`1024 - 171 = 853`。这不能替代针对969个令牌的完整输出生成测试；此类测试耗时将远超实际验收窗口。
 
-The release policy therefore stays conservative: 8T exposes only 64/80 tokens,
-with 80 as its current watchdog-compatible maximum; the 20T release profile
-defaults to 128 and caps at 256. The larger 8T and 20T values above are
-experimental capacity evidence, not product defaults.
+因此，发布策略保持保守：8T只暴露64/80个令牌，其中80是当前与看门狗兼容的最大值；20T发布配置档默认128，上限256。上述更大的8T和20T值属于实验容量证据，不是产品默认值。
 
-## Quantized ONNX Screening
+## 量化ONNX筛选
 
-Fourteen unique public Qwen quantized graph files have been screened, including
-two earlier int8 graphs and twelve candidates pinned in
-`configs/online-quantized-qwen-candidates.json`. The newer set covers Qwen1.5
-uint8/q4/q4f16, Qwen2.5 GQA and MHA uint8/q4/q4f16, and two ORT/AMD int4 routes.
+已筛选十四个唯一的公共Qwen量化图文件，其中包括两个较早的int8图和`configs/online-quantized-qwen-candidates.json`中固定的十二个候选文件。较新的集合涵盖Qwen1.5 uint8/q4/q4f16、Qwen2.5 GQA和MHA uint8/q4/q4f16，以及两条ORT/AMD int4路线。
 
-All twelve newer candidates are blocked at the static operator/domain gate.
-Representative ATC conversions were split across the boards: three patterns on
-B4 and three on B1. All six exited 255 and produced no OM. The failures are ATC
-parser or domain-version errors that occur before OM allocation, so they are not
-caused by 8T memory pressure. The earlier two int8 graphs also failed ATC on
-both boards.
+全部十二个较新候选都在静态算子/域门禁处被阻塞。代表性ATC转换分摊到两块板卡上：B4上三种模式，B1上三种模式。六次转换全部退出码255，且未生成OM。失败是发生在OM分配之前的ATC解析器或域版本错误，因此不是由8T内存压力造成的。较早的两个int8图在两块板卡上的ATC转换也都失败。
 
-No candidate reached PyACL, accuracy, quality, or performance testing. Future
-screening assigns different candidates to one board first and repeats a target
-on the second board only after an OM is generated. See
-[Quantized ONNX Screening](11-quantized-onnx-screening.md),
-`CHATBOT-ISS-20261025-11`, and `CHATBOT-ISS-20261025-12` in the troubleshooting
-ledger.
+没有候选进入PyACL、准确性、质量或性能测试。未来的筛选会先给一块板卡分配不同候选，并仅在生成OM后才会在第二块板卡上重复某个目标。参见[量化ONNX筛选](11-quantized-onnx-screening.md)、故障排查台账中的`CHATBOT-ISS-20261025-11`和`CHATBOT-ISS-20261025-12`。
 
-PyACL cannot load ONNX directly. Other checkpoints are candidates only after a
-static export passes the target CANN ATC operator parser and produces an OM with
-a verified descriptor.
+PyACL不能直接加载ONNX。只有在静态导出通过目标CANN ATC算子解析器并生成具有已验证描述符的OM之后，其他检查点才成为候选。
 
-A bounded graph-surgery experiment migrated Qwen1.5 q4f16 by unpacking 168
-`MatMulNBits` nodes into FP16 `MatMul`. The derived ONNX matched the original
-ORT graph at cosine `0.99999994`, passed ATC on both B4 and B1, and executed in
-PyACL. At the fixed short decode shape it produced `5.95` token/s on 8T and
-`10.23` token/s on 20T, effectively identical to the official FP16 model on
-each board. The migration therefore restores runnability but does not preserve
-INT4 execution or deliver a quantization speed benefit.
+一项有界图手术实验通过将168个`MatMulNBits`节点解包为FP16 `MatMul`，迁移了Qwen1.5 q4f16。推导出的ONNX在余弦值`0.99999994`处与原始ORT图匹配，在B4和B1上均通过ATC，并在PyACL中执行。在固定短解码形状下，它在8T上产生`5.95` token/s，在20T上产生`10.23` token/s，与每块板卡上的官方FP16模型实际上相同。因此，该迁移恢复了可运行性，但没有保留INT4执行，也没有带来量化加速收益。
 
-## Known Limits
+## 已知限制
 
-- The worker serializes all requests; latency increases for concurrent users.
-- The public UI has no browser login and is suitable only for a restricted LAN.
-- Context is capped at 1024 tokens. The 20T MindSpore browser defaults to 128 output tokens and has a 256-token ceiling, subject to each profile's declaration; Qwen2 1.5B is capped at 192 by its measured boundary. The 8T static-KV browser defaults to 64 and caps output at 80.
-- Retrieval augmentation is not part of this release; keeping it outside the gateway preserves the fixed prompt budget.
-- The test baseline uses a shared hardware image; it is not a clean-room production certification.
-- The release does not verify the MindSpore chat path on Ascend310B4 / 8T. Current 8T Qwen1.5-0.5B attempts on CANN 7 and CANN 8 both reached MindSpore kernel runtime initialization but failed because allocator-visible HBM fell below the runtime threshold; no token was generated. The worker now records a device-accounting HBM preflight before loading, but that check is a fail-fast diagnostic rather than evidence that the model will fit. The separate static-KV ACL route has a formal public-artifact release path recorded above; that result does not make the MindSpore release path 8T-supported or transfer the MindSpore quality/performance evidence.
-- The `SN0002 1080P USB Camera` (`2bdf:0289`) can be used for UVC video, but its UAC microphone path is incompatible with the tested Orange Pi AI Pro 20T and 8T system images; capture stops with `Input/output error` and it must not be selected as a voice input. Details and separate per-board evidence are in [Voice Modes and Board Terminal Plan](08-board-voice-terminal-plan.md#known-camera-microphone-incompatibility).
-- Historical alternative models, conversion paths, speech experiments, and device integrations are archived evidence only.
+- 两块受支持的板卡默认都使用同一MindSpore工作进程路径；它们的HBM阈值、温度/负载快照和验证证据仍各自归属具体板卡。在16GB B4上，模型启动需要经过观测过的空闲HBM预检，并且可能被其他NPU预留阻塞。
+- 20T有一段已确认的ALSA接收端内核硬锁历史，曾导致NMI看门狗和操作系统内核恐慌重启。PulseAudio/PipeWire隔离在有限时长的空闲浸泡和五次MindSpore请求期间缓解了该问题；语音仍被禁用，底层设备/驱动触发因素尚未解决。参见[问题台账](09-troubleshooting.md#chatbot-iss-20261102-01)。
+- 工作进程串行处理所有请求；并发用户会增加延迟。
+- 公共UI没有浏览器登录，仅适用于受限局域网。
+- 上下文上限为1024个令牌。共享MindSpore浏览器为保守的跨档位启动默认输出32个令牌，配置档上限为256个令牌，具体受每块板卡的HBM预检和当前系统负载约束。可选的PyACL static-KV候选具有单独的令牌预算和串行解码延迟。
+- 检索增强不属于此发布版本；将其置于网关之外可保留固定提示词预算。
+- 测试基线使用共享硬件镜像；它不是洁净室生产认证。
+- 同一MindSpore聊天路径现在已在Ascend310B4/8T和Ascend310B1/20T上为`observed-pass`，并具有单独的内存预检和板端记录。8T在`2026-10-31`进行的运行要求模型加载前有9556MB已计入可用内存，并在加载后达到256个生成令牌。这并不保证在任意并发NPU使用下都能启动：如果板卡特定HBM预检失败，请在加载前停止。早先的CANN7/CANN8分配器失败仍是历史失败组合，并不是MindSpore无法在8T上运行的笼统结论。
+- `SN0002 1080P USB Camera`（`2bdf:0289`）可用于UVC视频，但其UAC麦克风路径与所测试的Orange Pi AI Pro 20T和8T系统镜像不兼容；采集会以`Input/output error`停止，不得将其选作语音输入。详细信息和按板卡分开的证据见[语音模式与板端终端计划](08-board-voice-terminal-plan.md#known-camera-microphone-incompatibility)。
+- 历史替代模型、转换路径、语音实验和设备集成仅作为归档证据保留。

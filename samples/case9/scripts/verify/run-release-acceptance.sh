@@ -9,6 +9,11 @@ source "${root_dir}/.env"
   exit 2
 }
 : "${ASCEND_EDGE_CHAT_MODEL_SOURCE:?set ASCEND_EDGE_CHAT_MODEL_SOURCE to hf or offline-bundle}"
+: "${ASCEND_EDGE_CHAT_SOURCE_COMMIT:?set ASCEND_EDGE_CHAT_SOURCE_COMMIT to the fixed public commit}"
+[[ "${ASCEND_EDGE_CHAT_SOURCE_COMMIT}" =~ ^[0-9a-fA-F]{40}$ ]] || {
+  echo "ASCEND_EDGE_CHAT_SOURCE_COMMIT must be a full 40-hex commit SHA" >&2
+  exit 2
+}
 case "${ASCEND_EDGE_CHAT_MODEL_SOURCE}" in
   hf|offline-bundle) ;;
   *) echo "ASCEND_EDGE_CHAT_MODEL_SOURCE must be hf or offline-bundle" >&2; exit 2 ;;
@@ -45,12 +50,13 @@ stop_pid() {
 cleanup() {
   stop_pid monitor "${monitor_pid:-}"
   stop_pid ui "${ui_pid:-}"
+  stop_pid backend-supervisor "${supervisor_pid:-}"
   stop_pid gateway "${gateway_pid:-}"
   stop_pid worker "${worker_pid:-}"
 }
 trap cleanup EXIT INT TERM
 
-for port in 7861 7865 8090; do
+for port in 7861 7863 7865 8090; do
   if ss -ltn "sport = :${port}" | grep -q LISTEN; then
     echo "release acceptance requires unused port ${port}" >&2
     exit 2
@@ -61,7 +67,7 @@ capture_processes() {
   local phase="$1"
   {
     printf 'timestamp_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    for item in "worker:${worker_pid:-}" "gateway:${gateway_pid:-}" "ui:${ui_pid:-}"; do
+    for item in "backend-supervisor:${supervisor_pid:-}" "worker:${worker_pid:-}" "gateway:${gateway_pid:-}" "ui:${ui_pid:-}"; do
       local label="${item%%:*}"
       local pid="${item#*:}"
       if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
@@ -78,8 +84,33 @@ capture_processes() {
 
 bash scripts/verify/release-preflight.sh >"${run_dir}/preflight.log" 2>&1
 npu-smi info >"${run_dir}/npu-before.log" 2>&1 || true
-bash scripts/run/start-worker.sh >"${run_dir}/worker.log" 2>&1 & worker_pid=$!
-bash scripts/run/start-gateway.sh >"${run_dir}/gateway.log" 2>&1 & gateway_pid=$!
+supervisor_url="${ASCEND_EDGE_CHAT_BACKEND_SUPERVISOR_URL:-}"
+if [[ -n "${supervisor_url}" ]]; then
+  [[ "${supervisor_url}" == "http://127.0.0.1:${ASCEND_EDGE_CHAT_BACKEND_SUPERVISOR_PORT:-7863}" ]] || {
+    echo "release acceptance requires the fixed loopback supervisor URL" >&2
+    exit 2
+  }
+  bash scripts/run/start-backend-supervisor.sh >"${run_dir}/supervisor.log" 2>&1 & supervisor_pid=$!
+  supervisor_ready=0
+  for _ in $(seq 1 30); do
+    if curl --fail --silent --show-error "${supervisor_url}/api/status" >"${run_dir}/supervisor-status.json"; then
+      supervisor_ready=1
+      break
+    fi
+    kill -0 "${supervisor_pid}" 2>/dev/null || { echo "backend supervisor exited; see ${run_dir}" >&2; exit 1; }
+    sleep 1
+  done
+  (( supervisor_ready == 1 )) || { echo "backend supervisor did not become ready; see ${run_dir}" >&2; exit 1; }
+  default_model="${ASCEND_EDGE_CHAT_PROFILE:-qwen1.5-0.5b-chat}"
+  curl --fail --silent --show-error --max-time 240 \
+    -H 'Content-Type: application/json' \
+    -d "{\"backend\":\"mindspore\",\"model\":\"${default_model}\"}" \
+    "${supervisor_url}/api/select" >"${run_dir}/backend-selection.json"
+  worker_pid="${supervisor_pid}"
+else
+  bash scripts/run/start-worker.sh >"${run_dir}/worker.log" 2>&1 & worker_pid=$!
+  bash scripts/run/start-gateway.sh >"${run_dir}/gateway.log" 2>&1 & gateway_pid=$!
+fi
 bash scripts/run/start-ui.sh >"${run_dir}/ui.log" 2>&1 & ui_pid=$!
 
 for _ in $(seq 1 60); do
@@ -107,6 +138,7 @@ conda activate "${ASCEND_EDGE_CHAT_CONDA_ENV}"
 export PYTHONNOUSERSITE=1
 python scripts/verify/release_acceptance.py \
   --token "${ASCEND_EDGE_CHAT_GATEWAY_API_KEY}" \
+  --source-commit "${ASCEND_EDGE_CHAT_SOURCE_COMMIT}" \
   --model-source "${ASCEND_EDGE_CHAT_MODEL_SOURCE}" \
   --output "${run_dir}/acceptance.json" \
   >"${run_dir}/acceptance-path.log" 2>&1

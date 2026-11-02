@@ -1,8 +1,8 @@
-# 20T Deployment
+# 20T部署
 
-## Preconditions
+## 前置条件
 
-Use this procedure only on the validated 20T hardware class. It does not install a driver, firmware, CANN toolkit, OPP package, MindSpore, or MindNLP. The process must use the repository-wide Conda environment `ascend`; it must not fall back to `base` or user-site packages.
+仅在已验证的20T硬件档上使用此流程。该流程不安装驱动、固件、CANN工具包、OPP包、MindSpore或MindNLP。本流程必须使用仓库统一的Conda环境`ascend`；不得回退到`base`或用户站点包。
 
 ```bash
 cd /opt/ascend-edge-chat
@@ -15,67 +15,67 @@ cp configs/release.env.example .env
 chmod 600 .env
 ```
 
-Edit `.env` and replace `ASCEND_EDGE_CHAT_GATEWAY_API_KEY` with a random ASCII token of at least 24 characters. Do not put the token in a browser, a client-side script, a commit, or a shell history capture.
+编辑`.env`，并将`ASCEND_EDGE_CHAT_GATEWAY_API_KEY`替换为一个至少24个字符的随机ASCII令牌。不要将令牌放入浏览器、客户端脚本、提交或shell历史记录捕获中。
 
-The gateway, worker, and UI launch scripts automatically source `./.env` when it is readable. Set `ASCEND_EDGE_CHAT_ENV_FILE` to use a different private environment file. The file is sourced before conda/CANN activation and must remain mode `0600`; explicit assignments in the file take precedence over same-named shell variables, so review it before starting a service. The browser UI has no authentication: reachable LAN clients can submit chat and, when voice mode is enabled, read sanitized voice status or request allowlisted board-audio controls. Keep port `7865` on a trusted LAN.
+网关、工作进程和UI启动脚本在`./.env`可读时会自动加载该文件。设置`ASCEND_EDGE_CHAT_ENV_FILE`可使用其他私有环境文件。该文件在激活conda/CANN之前加载，并且必须保持`0600`权限模式；文件中的显式赋值优先于同名shell变量，因此启动服务前请先审查该文件。浏览器UI没有身份认证：可达的局域网客户端可以提交聊天，并且在启用语音模式时可读取经过脱敏的语音状态或请求允许列表内的板端音频控制。请将端口`7865`保持在可信局域网内。
 
-## Service Dependency Closure
+## 服务依赖闭包
 
-The worker must run without user-site packages. If preflight reports that FastAPI, Pydantic, Uvicorn, or dotenv is absent, download the reviewed wheels on a connected machine or the board into a regular directory, verify them against `configs/release-service-requirements.txt`, then install only that local wheelhouse:
+工作进程必须在没有用户站点包的情况下运行。如果预检报告缺少FastAPI、Pydantic、Uvicorn或dotenv，请在已连接网络的机器或板卡上将已审查的wheel下载到普通目录，对照`configs/release-service-requirements.txt`核验，然后仅从该本地wheelhouse安装：
 
 ```bash
 export ASCEND_EDGE_CHAT_WHEELHOUSE=/opt/ascend-edge-chat-wheelhouse
 bash scripts/verify/install-service-dependencies.sh
 ```
 
-The installer uses `--no-index --no-deps --require-hashes`; it neither upgrades CANN/MindSpore nor installs a model or another inference framework. Record this service-layer installation in the deployment evidence.
+安装器使用`--no-index --no-deps --require-hashes`；它既不会升级CANN/MindSpore，也不会安装模型或其他推理框架。请将这次服务层安装记录到部署证据中。
 
-## Environment Check
+## 环境检查
 
 ```bash
 bash scripts/verify/release-preflight.sh
 ```
 
-The preflight fail-closes unless the active process is the unified `ascend` environment with Python `3.9.25`, ABI `cpython-39-aarch64-linux-gnu`, `PYTHONNOUSERSITE=1`, PyACL, the locked MindSpore/MindNLP and CANN versions. It then records the active import origins, shows `npu-smi info`, validates every locked model artifact, and parses gateway configuration. Stop here if it fails. A successful import is not a generation result; the next steps perform API verification.
+除非活动进程使用统一的`ascend`环境，且Python版本为`3.9.25`、ABI为`cpython-39-aarch64-linux-gnu`、设置了`PYTHONNOUSERSITE=1`，并具备PyACL以及锁定版本的MindSpore/MindNLP和CANN，否则预检会故障关闭。随后，它会记录活动导入来源、显示`npu-smi info`、校验每个锁定的模型产物并解析网关配置。如果预检失败，请在此停止。导入成功不等于生成结果；后续步骤将执行API验证。
 
-## Model Installation
+## 模型安装
 
-For online acquisition through the configured Hugging Face mirror:
+通过已配置的Hugging Face镜像在线获取：
 
 ```bash
 bash scripts/import/download-model.sh
 export ASCEND_EDGE_CHAT_MODEL_SOURCE=hf
 ```
 
-For an offline source directory containing exactly the locked file names:
+使用仅包含锁定文件名的离线源目录：
 
 ```bash
 bash scripts/import/import-model.sh /mnt/offline/qwen1.5-0.5b
 export ASCEND_EDGE_CHAT_MODEL_SOURCE=offline-bundle
 ```
 
-Both methods write a hidden `.part` file, check the declared byte size and SHA-256, then atomically rename it. An incomplete or mismatched file is removed; a verified existing file is retained. An offline source must additionally contain `offline-bundle.manifest.json` declaring `offline-bundle`, repository, revision, license, and every artifact's bytes/SHA-256. Offline provenance remains labelled `offline-bundle`; it is not evidence of an online Hugging Face download.
+两种方式都会写入隐藏的`.part`文件，检查声明的字节数和SHA-256，然后原子重命名。不完整或不匹配的文件会被删除；已验证的现有文件会保留。离线来源还必须包含`offline-bundle.manifest.json`，其中声明`offline-bundle`、仓库、修订、许可证以及每个产物的字节数/SHA-256。离线来源信息仍标记为`offline-bundle`；它不能作为在线Hugging Face下载的证据。
 
-## Start and Stop
+## 启动与停止
 
-Open three board terminals in the deployment directory:
+在部署目录中打开三个板端终端：
 
 ```bash
-# Terminal 1
+# 终端1
 bash scripts/run/start-worker.sh
 
-# Terminal 2
+# 终端2
 bash scripts/run/start-gateway.sh
 
-# Terminal 3
+# 终端3
 bash scripts/run/start-ui.sh
 ```
 
-All three commands intentionally run in the foreground. Stop the identified process with `Ctrl+C` in its own terminal. Do not kill unrelated NPU processes and do not use a broad process-name match.
+三条命令都故意在前台运行。请在其所属终端中使用`Ctrl+C`停止已识别的进程。不要终止无关的NPU进程，也不要使用宽泛的进程名匹配。
 
-The worker and gateway bind only loopback. The UI binds `0.0.0.0:7865` to allow trusted-LAN access. The tutorial UI intentionally has no browser login: a reachable LAN client can submit chat and, when the voice feature is enabled, read sanitized voice status or request allowlisted board-audio mode/device changes. Use a firewall or VLAN to limit access to port `7865`.
+工作进程和网关仅绑定环回地址。UI绑定`0.0.0.0:7865`以允许可信局域网访问。教程UI有意不设浏览器登录：可达的局域网客户端可以提交聊天，并且在启用语音功能时可读取经过脱敏的语音状态或请求允许列表内的板端音频模式/设备变更。请使用防火墙或VLAN限制对端口`7865`的访问。
 
-## Health Checks
+## 健康检查
 
 ```bash
 curl http://127.0.0.1:8090/health
@@ -88,47 +88,28 @@ curl -N -H "Authorization: Bearer $ASCEND_EDGE_CHAT_GATEWAY_API_KEY" \
   -d '{"model":"ascend-edge-chat","stream":true,"messages":[{"role":"user","content":"请用一句中文介绍你自己。"}],"temperature":0,"top_p":1,"max_tokens":16}'
 ```
 
-Then browse to `http://<board-ip>:7865/` and submit a short prompt. The UI health payload includes `worker.reachable`, `worker.ready`, and `worker.healthy`; HTTP reachability of `:7865` or `:7861` alone is not model readiness. The model runs one request at a time; a second request receives a bounded busy response rather than queueing unbounded work. Before loading a model, the worker also checks tier-specific `npu-smi` HBM accounting. That preflight fails early on known high-occupancy boards; passing it is a load precondition, not a guarantee that the allocator will fit every profile.
+然后浏览到`http://<board-ip>:7865/`并提交一条简短提示。UI健康载荷包含`worker.reachable`、`worker.ready`和`worker.healthy`；仅`:7865`或`:7861`的HTTP可达并不代表模型就绪。模型一次运行一个请求；第二个请求会收到有界的忙碌响应，而不是无界排队工作。加载模型前，工作进程还会检查特定档位的`npu-smi` HBM统计。该预检会在已知高占用板卡上提前失败；通过预检只是加载前置条件，并不保证分配器能容纳每个配置档。
 
-## 2026-10-18 Service Validation
+## 2026-10-18服务验证
 
-The running 20T service was validated from the browser route with the active
-teaching profile `qwen2-0.5b-instruct-mindspore`. The UI `/api/config` and
-`/api/chat` returned HTTP 200, the gateway accepted only the configured bearer
-token and public model, and the service completed JSON, SSE, 8/16/32/64-token
-length checks, ten short stability requests, and ten Chinese probes. The dated
-raw acceptance report is retained on the board as ignored deployment evidence.
+已运行的20T服务通过浏览器访问路径，以活动教学配置档`qwen2-0.5b-instruct-mindspore`完成验证。UI的`/api/config`和`/api/chat`返回HTTP 200，网关仅接受配置的Bearer令牌和公共模型，服务完成了JSON、SSE、8/16/32/64个token的长度检查、十次短稳定性请求和十次中文探测。带日期的原始验收报告保留在板端，作为被Git忽略的部署证据。
 
-The first unspaced run hit `HTTP 429 Too many request bodies are being read`.
-That is an admission-boundary observation caused by the test client's burst,
-not an NPU error. Add a delay between requests and wait for streaming cleanup
-when reproducing the acceptance run. The 32/64 budget labels are tokenizer
-tokens, not Chinese-character counts. Human Chinese semantic review remains
-pending.
+首次无间隔运行触发了`HTTP 429 Too many request bodies are being read`。这是由测试客户端突发请求造成的准入边界观测，不是NPU错误。在复现验收运行时，请在请求之间加入延迟，并等待流式清理完成。32/64预算标签表示tokenizer token数，而不是中文字符数。人工中文语义审查仍处于pending状态。
 
-## Output Token and Timeout Validation
+## 输出token与超时验证
 
-The release profile `qwen1.5-0.5b-chat` defaults to 128 output tokens and caps
-at 256. On `2026-10-25`, a repeat-pattern probe with 171 prompt tokens generated
-all 256 output tokens in `143.984 s`, returned `finish_reason=length`, and left
-the worker healthy.
+发布配置档`qwen1.5-0.5b-chat`默认输出128个token，上限为256个token。在`2026-10-25`，一个包含171个提示token的重复模式探测生成了全部256个输出token，耗时`143.984 s`，返回`finish_reason=length`，且工作进程保持健康。
 
-A temporary test checkout raised the profile and gateway ceilings to exercise
-the 1024-token context boundary. It generated 850 tokens in `507.982 s` with
-NPU peak `14,444 / 23,673 MB`, then 853 tokens in `483.612 s` with
-`total_tokens=1024`. The latter is the exact ceiling for that prompt:
+一个临时测试检出副本调高了配置档和网关上限，以测试1024-token上下文边界。它以NPU峰值`14,444 / 23,673 MB`在`507.982 s`内生成了850个token，随后在`483.612 s`内生成了853个token，且`total_tokens=1024`。后者是该提示的精确上限：
 
 ```text
 171 prompt tokens + 853 completion tokens = 1024 context tokens
 ```
 
-The temporary test then stopped and the tracked files were restored. These
-larger values are capacity evidence, not release defaults.
+临时测试随后停止，已跟踪文件也已恢复。这些较大数值是容量证据，不是发布默认值。
 
-MindSpore uses a separate 300-second default watchdog, configurable up to 600
-seconds. It is independent of the 8T ACL runtime's 240-second limit. Do not copy
-the 8T static-KV timeout or OM limits into the 20T deployment.
+MindSpore使用独立的默认300秒看门狗，最长可配置到600秒。它独立于8T ACL运行时的240秒限制。不要把8T static-KV超时或OM限制复制到20T部署中。
 
-## Rollback
+## 回滚
 
-This release does not replace a prior service automatically. To roll back, stop only the three foreground release processes, keep model files and logs for diagnosis, and start the previously validated deployment from its own directory. Do not delete shared Conda caches, CANN installation directories, or unknown board workloads.
+本次发布不会自动替换先前服务。要回滚，请仅停止三个前台发布进程，保留模型文件和日志用于诊断，并从先前已验证部署自己的目录启动该部署。不要删除共享Conda缓存、CANN安装目录或未知的板端工作负载。

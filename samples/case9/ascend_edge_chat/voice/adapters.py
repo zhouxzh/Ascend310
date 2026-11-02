@@ -351,7 +351,12 @@ class LoopbackGatewayChat:
             response = await self._client.post(
                 self._settings.gateway_url + "/chat/completions",
                 headers={"Authorization": "Bearer " + self._settings.gateway_api_key},
-                json={"model": self._settings.public_model_id, "stream": False, "messages": [{"role": "user", "content": text}]},
+                json={
+                    "model": self._settings.public_model_id,
+                    "stream": False,
+                    "max_tokens": self._settings.max_reply_tokens,
+                    "messages": [{"role": "user", "content": text}],
+                },
             )
         except httpx.TimeoutException as exc:
             raise SpeechAdapterError("loopback gateway timed out") from exc

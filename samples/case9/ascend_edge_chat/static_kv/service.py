@@ -149,14 +149,21 @@ def make_server(host: str, port: int, service: Qwen25StaticKvService) -> Threadi
                 self._error("Not found", 404, "not_found")
                 return
             try:
-                request = _parse_request(self._read_body())
+                request = _parse_request(
+                    self._read_body(),
+                    max_allowed_tokens=int(
+                        getattr(service.runtime, "max_tokens", MAX_MAX_TOKENS)
+                    ),
+                )
                 if request.stream:
                     self._send_sse(request)
                 else:
                     self._json(200, service.complete(request))
             except (RuntimeRequestError, RuntimeBusy) as exc:
                 self._error(str(exc), 409 if isinstance(exc, RuntimeBusy) else 400)
-            except (RuntimeUnavailable, RuntimeExecutionTimeout) as exc:
+            except RuntimeExecutionTimeout as exc:
+                self._error(str(exc), 504, "timeout")
+            except RuntimeUnavailable as exc:
                 self._error(str(exc), 503, "model_unavailable")
             except (BrokenPipeError, ConnectionResetError):
                 service.runtime.cancel()
@@ -200,7 +207,10 @@ def make_server(host: str, port: int, service: Qwen25StaticKvService) -> Threadi
             except (RuntimeRequestError, RuntimeBusy) as exc:
                 service.runtime.cancel()
                 self._write_sse_error(str(exc), "busy" if isinstance(exc, RuntimeBusy) else "invalid_request_error")
-            except (RuntimeUnavailable, RuntimeExecutionTimeout) as exc:
+            except RuntimeExecutionTimeout as exc:
+                service.runtime.cancel()
+                self._write_sse_error(str(exc), "timeout")
+            except RuntimeUnavailable as exc:
                 service.runtime.cancel()
                 self._write_sse_error(str(exc), "model_unavailable")
             except Exception:
@@ -227,7 +237,11 @@ def make_server(host: str, port: int, service: Qwen25StaticKvService) -> Threadi
     return StaticKvHttpServer((host, int(port)), Handler)
 
 
-def _parse_request(raw: Mapping[str, Any]) -> CompletionRequest:
+def _parse_request(
+    raw: Mapping[str, Any],
+    *,
+    max_allowed_tokens: int = MAX_MAX_TOKENS,
+) -> CompletionRequest:
     allowed = {"model", "messages", "stream", "max_tokens", "temperature", "top_p"}
     if set(raw) - allowed:
         raise RuntimeRequestError("unsupported chat completion field")
@@ -254,9 +268,16 @@ def _parse_request(raw: Mapping[str, Any]) -> CompletionRequest:
     stream = raw.get("stream", False)
     if not isinstance(stream, bool):
         raise RuntimeRequestError("stream must be boolean")
-    max_tokens = raw.get("max_tokens", DEFAULT_MAX_TOKENS)
-    if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or not 1 <= max_tokens <= MAX_MAX_TOKENS:
-        raise RuntimeRequestError(f"max_tokens must be between 1 and {MAX_MAX_TOKENS}")
+    if (
+        isinstance(max_allowed_tokens, bool)
+        or not isinstance(max_allowed_tokens, int)
+        or not 1 <= max_allowed_tokens <= 1024
+    ):
+        raise RuntimeUnavailable("service max token contract is invalid")
+    default_tokens = min(DEFAULT_MAX_TOKENS, max_allowed_tokens)
+    max_tokens = raw.get("max_tokens", default_tokens)
+    if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or not 1 <= max_tokens <= max_allowed_tokens:
+        raise RuntimeRequestError(f"max_tokens must be between 1 and {max_allowed_tokens}")
     for key, expected in (("temperature", 0.0), ("top_p", 1.0)):
         if key in raw and raw[key] is not None and not _is_expected_number(raw[key], expected):
             raise RuntimeRequestError(f"only greedy decoding is supported; {key} must be {expected}")

@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "model_id": "qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om",
+  "soc_version": "Ascend310B1",
+  "chip_tier": "20T",
+  "bytes": 1266009438,
+  "sha256": "6bca884fbce746efdb02f8c9294cad5b2faa6c8b96cac9ec8c83730126298609",
+  "controller_contract_sha256": "fcc423f24fdf36c5d364ad7bd535943fb0c8545ab546a5724ab0261330639498",
+  "runtime_contract_sha256": "3ff15ccf682e85e32f521417aa7204347ff5ab4fb0608edd18f3c9a639af3c21",
+  "provenance": {
+    "mode": "offline-experimental",
+    "source": "historical B1 artifact authorized by the operator",
+    "historical_recorded_at_utc": "2026-08-27T05:42:02.183266+00:00"
+  }
+}

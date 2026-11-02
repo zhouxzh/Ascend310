@@ -22,6 +22,7 @@ from numbers import Integral
 import os
 import queue
 import select
+import signal
 import socket
 import threading
 import time
@@ -83,7 +84,7 @@ REQUEST_CANCEL_REPLAY_DEADLINE_SECONDS = 2.0
 # is known; aggregate metadata must not be promoted merely because another
 # board passed its checks.
 _ACTIVATABLE_ADMISSION_STATUSES = frozenset(
-    {"admitted", "experimental_dirty_base", "experimental_isolated"}
+    {"admitted", "stability_passed", "experimental_dirty_base", "experimental_isolated"}
 )
 _TECHNICAL_ADMISSION_STATUSES = frozenset(
     {
@@ -306,7 +307,7 @@ class MindSporeChatService:
             self._mark_failure(message)
             self._close_provider_after_start_failure()
             raise ProviderUnavailable(message)
-        if effective_status not in {"admitted", "experimental_dirty_base", "experimental_isolated"}:
+        if effective_status not in _ACTIVATABLE_ADMISSION_STATUSES:
             message = "selected MindSpore profile is not activatable: %s" % (profile_status or "missing status")
             self._mark_failure(message)
             self._close_provider_after_start_failure()
@@ -1683,6 +1684,19 @@ def _main(argv: Optional[Sequence[str]] = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     service = create_service(profile, generation_timeout=generation_timeout)
     server = service.make_server(args.host, args.port)
+    previous_handlers: Dict[int, Any] = {}
+
+    def request_shutdown(signum: int, _frame: Any) -> None:
+        LOGGER.info("received signal %d; stopping MindSpore worker cleanly", signum)
+        threading.Thread(
+            target=server.shutdown,
+            name="ascend_edge_chat-ms-signal-shutdown",
+            daemon=True,
+        ).start()
+
+    for signum in (signal.SIGTERM, signal.SIGINT):
+        previous_handlers[signum] = signal.getsignal(signum)
+        signal.signal(signum, request_shutdown)
     try:
         LOGGER.info(
             "MindSpore chat service listening on %s:%d profile=%s generation_timeout=%.1fs",
@@ -1695,6 +1709,8 @@ def _main(argv: Optional[Sequence[str]] = None) -> int:
     except KeyboardInterrupt:
         pass
     finally:
+        for signum, handler in previous_handlers.items():
+            signal.signal(signum, handler)
         server.server_close()
         service.close()
     return 0

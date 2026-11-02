@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "target": {
+    "soc": "Ascend310B4",
+    "tier": "8T"
+  },
+  "backends": [
+    {
+      "id": "mindspore",
+      "display_name": "MindSpore / MindNLP",
+      "runtime": "mindspore",
+      "models": "release-model-catalog",
+      "default_model": "qwen1.5-0.5b-chat",
+      "reason": "两档板卡共用的默认MindSpore聊天程序；仅内存门限和验收证据按板卡区分。"
+    },
+    {
+      "id": "acl-static-kv",
+      "display_name": "PyACL 固定KV",
+      "runtime": "acl-static-kv",
+      "default_model": "qwen2.5-0.5b-instruct-static-kv-1024-b4-local",
+      "reason": "16GB 8T板本地B4候选，仅用于隔离容量实验。",
+      "models": [
+        {
+          "id": "qwen2.5-0.5b-instruct-static-kv-1024-b4-local",
+          "display_name": "Qwen2.5 0.5B 固定KV PyACL（B4本地实验）",
+          "runtime": "ACL/OM static KV",
+          "technical_status": "not-run",
+          "quality_status": "pending",
+          "selectable": false,
+          "reason": "历史B4 OM来自隔离实验环境，尚未在统一ascend环境和共享supervisor路径复验；保留standalone ACL实验记录，不在共享UI中启用。",
+          "default_max_tokens": 32,
+          "max_tokens": 80,
+          "candidate_lock": "configs/8t-b4-experiment-candidate.lock.json",
+          "artifacts": {
+            "om": "om/qwen25-static-kv-1024-v2.om",
+            "tokenizer": "common/tokenizer.json",
+            "tokenizer_config": "common/tokenizer_config.json",
+            "tokenizer_lock": "common/tokenizer.json.lock.json",
+            "controller_contract": "contracts/qwen25-static-kv-1024-fp32-contract.json",
+            "runtime_contract": "contracts/qwen25-static-kv-1024-v2-om-contract.json"
+          }
+        }
+      ]
+    }
+  ]
+}

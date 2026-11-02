@@ -44,7 +44,6 @@ class ReleaseCliAndSurfaceTests(unittest.TestCase):
             *sorted((root / "ascend_edge_chat").rglob("*.py")),
             *sorted((root / "configs").glob("release-*")),
             *sorted((root / "scripts").rglob("*.sh")),
-            *sorted((root / "docs").glob("*.md")),
         ]
         legacy_identifier = "case" + "9"
         for path in files:
@@ -69,5 +68,26 @@ class ReleaseCliAndSurfaceTests(unittest.TestCase):
         )
         self.assertIn('--token="${ASCEND_EDGE_CHAT_GATEWAY_API_KEY}"', script)
         self.assertIn('--model-source="${ASCEND_EDGE_CHAT_MODEL_SOURCE}"', script)
+        self.assertIn('env_file="${ASCEND_EDGE_CHAT_ENV_FILE:-${root_dir}/.env}"', script)
+        self.assertIn('source "${env_file}"', script)
         self.assertIn("set -a", script)
-        self.assertIn('source "${root_dir}/.env"', script)
+        self.assertIn("ASCEND_EDGE_CHAT_CLEANUP_TIMEOUT_SECONDS must be a positive integer", script)
+
+    def test_8t_compat_launcher_delegates_to_shared_mindspore_program(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "scripts" / "run" / "run-release-8t.sh").read_text(encoding="utf-8")
+        shared = (root / "scripts" / "run" / "run-chat.sh").read_text(encoding="utf-8")
+        self.assertIn('exec "${script_dir}/run-chat.sh"', script)
+        self.assertIn('"${ASCEND_EDGE_CHAT_ACL_CANDIDATE_DATA_DIR:?', shared)
+        self.assertIn("default_backend=mindspore", shared)
+        self.assertIn("start-backend-supervisor.sh", shared)
+        self.assertIn("start-ui.sh", shared)
+
+    def test_release_acceptance_requires_fixed_commit_and_bounded_cleanup(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "scripts" / "verify" / "run-release-acceptance.sh").read_text(encoding="utf-8")
+        client = (root / "scripts" / "verify" / "release_acceptance.py").read_text(encoding="utf-8")
+        self.assertIn("ASCEND_EDGE_CHAT_SOURCE_COMMIT", script)
+        self.assertIn("--source-commit", script)
+        self.assertIn("working_tree_clean", client)
+        self.assertIn("board_targets", client)

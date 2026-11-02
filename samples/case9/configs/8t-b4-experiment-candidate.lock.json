@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "model_id": "qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om",
+  "soc_version": "Ascend310B4",
+  "chip_tier": "8T-16GB",
+  "bytes": 1266010586,
+  "sha256": "f6650e52ff3908288763ef7957832ade606b0e554fa8fde986932f1ca1140eb8",
+  "controller_contract_sha256": "fcc423f24fdf36c5d364ad7bd535943fb0c8545ab546a5724ab0261330639498",
+  "runtime_contract_sha256": "923255c717165a2529e15563f2acd5cb1e31b67769e2a4afa4d3233053e310b6",
+  "provenance": {
+    "mode": "board-local-experimental",
+    "source": "existing B4 artifact on operator-connected 16GB 8T board",
+    "environment": "case9-acl-om Python 3.9.16; not the unified ascend 3.9.25 environment"
+  }
+}

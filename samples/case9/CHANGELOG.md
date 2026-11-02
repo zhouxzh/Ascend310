@@ -1,27 +1,27 @@
-# Changelog
+# 变更日志
 
-All notable changes to Ascend Edge Chat are recorded here.
+此处记录Ascend Edge Chat的所有重要变更。
 
 ## v0.2.0 - 2026-10-25
 
-- Added a second formal release backend, `acl-static-kv`, for Ascend310B4 / 8T.
-- Locked the Qwen2.5-0.5B-Instruct static-KV ONNX, tokenizer, contracts, B4 OM, license, and public Hugging Face revision.
-- Added the tracked 51-input/49-output ACL runtime and public artifact verifier.
-- Added fixed `:8084 -> :7861 -> :7865` lifecycle and acceptance entry points for the 8T backend.
-- Kept the MindSpore static-KV requirement boundary unchanged: the main MindSpore route does not require OM conversion.
-- The 8T backend exposes only `ascend-edge-chat`; its normal UI offers 64/80 output tokens, defaults to 64, and caps at 80. The 20T MindSpore profile defaults to 128 and caps at 256.
-- The public-source 8T acceptance passed with nine locked HF artifacts, 10/10 stability requests, length checks, JSON/SSE/UI contracts, and a 30-sample two-token performance set.
-- Documented the application-level watchdog policy and context formula. A watchdog-disabled test completed 256 tokens on 8T and 853 tokens on 20T; these are capacity evidence, not release defaults.
-- Added a fixed-revision lock and static screening tool for 12 unique public quantized Qwen ONNX candidates. All hit unsupported quantization or `com.microsoft` operators; six representative ATC runs across B4/B1 produced no OM.
+- 为Ascend310B4 / 8T新增第二个正式发布后端`acl-static-kv`。
+- 锁定Qwen2.5-0.5B-Instruct static-KV ONNX、tokenizer、契约、B4 OM、许可证和公开Hugging Face revision。
+- 新增纳入版本跟踪的51输入/49输出ACL运行时和公开产物验证器。
+- 为8T后端新增固定的`:8084 -> :7861 -> :7865`生命周期和验收入口。
+- MindSpore static-KV的必须条件边界保持不变：主MindSpore路径不需要OM转换。
+- 8T后端只公开`ascend-edge-chat`；其常规UI提供64/80输出token选项，默认64，上限80。20T MindSpore配置默认128，上限256。
+- 基于公开源码的8T验收通过，覆盖9个锁定HF产物、10/10次稳定性请求、长度检查、JSON/SSE/UI契约和30个样本的双token性能集。
+- 记录了应用级watchdog策略和上下文公式。禁用watchdog的测试在8T上完成256 token，在20T上完成853 token；这些是容量证据，不是发布默认值。
+- 为12个唯一公开量化Qwen ONNX候选新增固定revision锁和静态筛选工具。所有候选均命中不受支持的量化或`com.microsoft`算子；B4/B1上6次代表性ATC运行均未生成OM。
 
 ## v0.1.0 - 2026-10-17
 
-- Introduced the portable `ascend_edge_chat` package and `ascend-edge-chat` CLI.
-- Released one locked MindSpore profile: Qwen1.5-0.5B-Chat for Ascend 310B1 / 20T.
-- Added verified Hugging Face mirror download and offline import with byte-size and SHA-256 checks.
-- Added loopback-only worker and gateway, server-side Bearer authentication, and a trusted-LAN browser UI warning.
-- Archived experimental model, audio, conversion, and device-protocol routes outside the release surface.
+- 引入可移植的`ascend_edge_chat`包和`ascend-edge-chat` CLI。
+- 发布一个锁定MindSpore配置：面向Ascend 310B1 / 20T的Qwen1.5-0.5B-Chat。
+- 新增经过验证的Hugging Face镜像下载和离线导入，并进行字节数与SHA-256检查。
+- 新增仅限回环的工作进程与网关、服务器端Bearer鉴权，以及可信局域网浏览器UI警告。
+- 将实验性模型、音频、转换和设备协议路径归档到发布范围之外。
 
-## Versioning Policy
+## 版本策略
 
-The project follows semantic versioning. A model revision, hardware target, runtime tuple, or public API incompatibility needs a recorded validation update before it is advertised as a supported release capability.
+项目遵循语义化版本控制。模型revision、硬件目标、运行时元组或公开API不兼容时，必须先记录验证更新，之后才能将其作为受支持的发布能力对外宣传。

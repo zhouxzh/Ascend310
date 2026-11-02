@@ -13,6 +13,7 @@ from ascend_edge_chat.ui.web import SECURITY_WARNING, TextChatSettings, create_t
 
 class _FakeLLM:
     last_finish_reason = "stop"
+    last_usage = {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5}
 
     def __init__(self) -> None:
         self.last_max_tokens = None
@@ -30,6 +31,10 @@ class _FakeLLM:
 
 class _LengthLimitedLLM(_FakeLLM):
     last_finish_reason = "length"
+
+
+class _InvalidUsageLLM(_FakeLLM):
+    last_usage = {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 99}
 
 
 _ACL_STATIC_KV_MODEL = "qwen2.5-0.5b-instruct-static-kv-1024-fp32-acl-om"
@@ -153,7 +158,7 @@ class ReleaseUiTests(unittest.TestCase):
             self.assertFalse(web._pid_alive(12345))
         process_kill.assert_not_called()
 
-    def test_ui_exposes_warning_but_not_gateway_key(self) -> None:
+    def test_ui_keeps_security_warning_server_side_and_hides_the_banner(self) -> None:
         settings = TextChatSettings(gateway_api_key="server-only-token-0123456789")
         with TestClient(create_text_chat_app(settings, llm=_FakeLLM())) as client:
             page = client.get("/")
@@ -162,6 +167,7 @@ class ReleaseUiTests(unittest.TestCase):
             chat = client.post("/api/chat", json={"message": "请介绍自己", "stream": False})
         self.assertEqual(page.status_code, 200)
         self.assertNotIn(settings.gateway_api_key, page.text)
+        self.assertNotIn("实验页面未启用浏览器鉴权", page.text)
         self.assertIn("测试模型", page.text)
         self.assertIn('<select id="max-tokens"', page.text)
         self.assertIn("最大输出 token", page.text)
@@ -176,6 +182,154 @@ class ReleaseUiTests(unittest.TestCase):
         self.assertTrue(any(item["id"] == "tinyllama-1.1b-mindspore" for item in config.json()["profiles"]))
         self.assertEqual(chat.status_code, 200)
         self.assertEqual(chat.json()["model"], "ascend-edge-chat")
+
+    def test_chat_composer_stays_in_normal_flow_after_messages(self) -> None:
+        settings = TextChatSettings(gateway_api_key="server-only-token-0123456789")
+        with TestClient(create_text_chat_app(settings, llm=_FakeLLM())) as client:
+            page = client.get("/")
+
+        self.assertEqual(page.status_code, 200)
+        self.assertNotIn("position: sticky", page.text)
+        self.assertLess(
+            page.text.index('<section id="messages"'),
+            page.text.index('<form id="composer"'),
+        )
+
+    def test_chat_workspace_keeps_readable_typography(self) -> None:
+        settings = TextChatSettings(gateway_api_key="server-only-token-0123456789")
+        with TestClient(create_text_chat_app(settings, llm=_FakeLLM())) as client:
+            page = client.get("/")
+
+        workspace_css = page.text.split(
+            "/* Chat workspace: a fixed application shell with a normal-flow bottom composer. */",
+            1,
+        )[1].split("</style>", 1)[0]
+        self.assertIn("font-size: 18px;", workspace_css)
+        self.assertIn("font-size: 1rem; line-height: 1.75;", workspace_css)
+        self.assertIn("textarea { width: 100%; min-height: 64px;", workspace_css)
+        self.assertIn("button { min-height: 40px;", workspace_css)
+
+    def test_npu_smi_board_parser_keeps_alarm_as_diagnostic(self) -> None:
+        output = """| npu-smi 25.2.0 Version: 25.2.0 |
+| 0       310B1                 | Alarm           | 0.0          70                1060 / 1060 |
+| 0       0                     | NA              | 0            14080 / 23673                  |
+"""
+        parsed = web._parse_npu_smi_board_info(output)
+        self.assertTrue(parsed["available"])
+        self.assertEqual(parsed["soc"], "Ascend 310B1")
+        self.assertEqual(parsed["compute_tier"], "20T")
+        self.assertEqual(parsed["health"], "Alarm")
+        self.assertEqual(parsed["temperature_c"], 70)
+        self.assertEqual(parsed["memory"]["used_mb"], 14080)
+        self.assertEqual(parsed["memory"]["total_mb"], 23673)
+        self.assertEqual(parsed["driver_version"], "25.2.0")
+
+        parsed_b4 = web._parse_npu_smi_board_info(output.replace("310B1", "310B4"))
+        self.assertEqual(parsed_b4["compute_tier"], "8T")
+
+    def test_board_info_api_is_structured_and_fail_soft(self) -> None:
+        settings = TextChatSettings(gateway_api_key="server-only-token-0123456789")
+        snapshot = {
+            "available": True,
+            "soc": "Ascend 310B4",
+            "compute_tier": "8T",
+            "health": "Alarm",
+            "temperature_c": 79,
+            "memory": {"used_mb": 13879, "total_mb": 15610, "source": "npu-smi device accounting"},
+            "driver_version": "25.2.0",
+            "cann_version": "8.0.0",
+            "observed_at_unix": 123,
+            "refresh_interval_seconds": 5,
+        }
+        with mock.patch.object(web, "_cached_board_hardware_snapshot", return_value=snapshot):
+            with TestClient(create_text_chat_app(settings, llm=_FakeLLM())) as client:
+                response = client.get("/api/board-info")
+                chat = client.post("/api/chat", json={"message": "板端信息", "stream": False})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["board"], {"soc": "Ascend310B4", "tier": "8T"})
+        self.assertEqual(payload["npu"]["health"], "Alarm")
+        self.assertEqual(payload["npu"]["memory"]["free_mb"], 1731)
+        self.assertEqual(payload["cann"]["version"], "8.0.0")
+        self.assertNotIn("raw", response.text.lower())
+        self.assertEqual(chat.status_code, 200)
+
+    def test_runtime_controls_live_in_accessible_sidebar_drawer(self) -> None:
+        settings = TextChatSettings(gateway_api_key="server-only-token-0123456789")
+        with TestClient(create_text_chat_app(settings, llm=_FakeLLM())) as client:
+            page = client.get("/")
+
+        sidebar = page.text.split('<aside id="settings-sidebar"', 1)[1].split("</aside>", 1)[0]
+        header = page.text.split("<header>", 1)[1].split("</header>", 1)[0]
+        for control_id in ("backend-select", "profile-select", "max-tokens"):
+            self.assertIn(f'id="{control_id}"', sidebar)
+            self.assertNotIn(f'id="{control_id}"', header)
+        self.assertIn('id="settings-toggle"', header)
+        self.assertIn('id="settings-close"', sidebar)
+        self.assertIn('id="sidebar-scrim"', page.text)
+        self.assertIn("settingsSidebar.inert", page.text)
+        self.assertIn("content.inert = open", page.text)
+        self.assertIn("aria-modal", page.text)
+        self.assertIn("trapSettingsFocus", page.text)
+        self.assertIn(".sidebar button { flex: 0 0 auto; }", page.text)
+        self.assertIn("refreshRuntimeSettings", page.text)
+        self.assertIn("snapshotRuntimeSelection", page.text)
+        self.assertIn("restoreRuntimeSelection", page.text)
+        self.assertIn("event.key === 'Escape'", page.text)
+        for field_id in (
+            "board-soc", "board-tier", "board-memory", "board-temperature",
+            "board-health", "board-cann", "board-driver", "board-backend", "board-model",
+        ):
+            self.assertIn(f'id="{field_id}"', sidebar)
+        self.assertIn("/api/board-info", page.text)
+        self.assertIn("window.setInterval(() => { void refreshBoardInfo(); }, 5000)", page.text)
+        self.assertIn("内存为npu-smi设备级统计", page.text)
+
+    def test_frontend_uses_chinese_brand_and_real_usage_rate_contract(self) -> None:
+        settings = TextChatSettings(gateway_api_key="server-only-token-0123456789")
+        with TestClient(create_text_chat_app(settings, llm=_FakeLLM())) as client:
+            page = client.get("/")
+            streamed = client.post(
+                "/api/chat", json={"message": "速率测试", "stream": True}
+            )
+
+        self.assertIn("<title>昇腾310B智能聊天机器人</title>", page.text)
+        self.assertIn("<h1>昇腾310B智能聊天机器人</h1>", page.text)
+        self.assertIn('id="generation-rate"', page.text)
+        self.assertIn("performance.now()", page.text)
+        self.assertIn("生成速率 ", page.text)
+        self.assertIn(
+            '"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}',
+            streamed.text,
+        )
+
+    def test_openai_client_preserves_valid_terminal_usage(self) -> None:
+        client = web.OpenAIChatClient()
+        try:
+            content = client._decode_event(
+                [
+                    '{"choices":[{"delta":{},"finish_reason":"stop"}],'
+                    '"usage":{"prompt_tokens":7,"completion_tokens":4,"total_tokens":11}}'
+                ]
+            )
+            self.assertIsNone(content)
+            self.assertEqual(
+                client.last_usage,
+                {"prompt_tokens": 7, "completion_tokens": 4, "total_tokens": 11},
+            )
+        finally:
+            asyncio.run(client.aclose())
+
+    def test_invalid_token_usage_is_not_exposed_as_a_rate_input(self) -> None:
+        settings = TextChatSettings(gateway_api_key="server-only-token-0123456789")
+        with TestClient(create_text_chat_app(settings, llm=_InvalidUsageLLM())) as client:
+            streamed = client.post(
+                "/api/chat", json={"message": "无效 usage", "stream": True}
+            )
+
+        self.assertNotIn('"usage"', streamed.text)
 
     def test_ui_forwards_profile_bounded_token_budget(self) -> None:
         settings = TextChatSettings(gateway_api_key="server-only-token-0123456789")

@@ -1,29 +1,18 @@
-# Quantized ONNX Screening
+# 量化ONNX筛选
 
-## Scope
+## 范围
 
-This record answers whether public quantized Qwen ONNX files can be downloaded
-and sent directly through ATC and PyACL on Ascend 310B without local
-quantization.
+本记录回答以下问题：公共量化Qwen ONNX文件能否在不进行本地量化的前提下下载，并直接送入Ascend 310B上的ATC和PyACL。
 
-The answer is no for every candidate screened so far. PyACL loads OM, not ONNX.
-An ONNX file must first pass the target CANN version's ATC parser. Artifact
-integrity, graph domain, operator support, shape freezing, OM generation, PyACL
-execution, numerical consistency, quality, and performance are separate gates.
+对于迄今筛选过的每个候选，答案都是否定的。PyACL加载OM，而不是ONNX。ONNX文件必须先通过目标CANN版本的ATC解析器。制品完整性、图域、算子支持、形状冻结、OM生成、PyACL执行、数值一致性、质量和性能是彼此独立的门。
 
-No local AMCT quantization was performed for these results.
+这些结果未执行本地AMCT量化。
 
-## Candidate Lock
+## 候选锁定
 
-[`online-quantized-qwen-candidates.json`](../configs/online-quantized-qwen-candidates.json)
-pins 12 unique public candidates by repository, full revision, bytes, SHA-256,
-license status, family, and screening priority. Equivalent files are recorded
-as aliases rather than downloaded twice.
+[`online-quantized-qwen-candidates.json`](../configs/online-quantized-qwen-candidates.json)按仓库、完整修订、字节数、SHA-256、许可证状态、系列和筛选优先级固定12个唯一公共候选。等价文件记为别名，而不是下载两次。
 
-The static screening tool is
-[`screen-online-quantized-onnx.py`](../scripts/verify/screen-online-quantized-onnx.py).
-It hashes the selected graph, checks the ONNX model without loading external
-weights, records domains/operators/shapes, and marks the candidate as:
+静态筛选工具是[`screen-online-quantized-onnx.py`](../scripts/verify/screen-online-quantized-onnx.py)。它会计算所选图的哈希，在不加载外部权重的情况下检查ONNX模型，记录域/算子/形状，并将候选标记为：
 
 ```text
 untested
@@ -33,77 +22,59 @@ blocked-operator
 atc-eligible
 ```
 
-`atc-eligible` only means the static graph has no known blocker. It is not an
-ATC, OM, PyACL, numerical, or quality pass.
+`atc-eligible`仅表示静态图没有已知阻塞项。它不代表通过ATC、OM、PyACL、数值或质量门。
 
-## Candidate Families
+## 候选系列
 
-| Family | Unique public files | Screening result |
+| 系列 | 唯一公共文件 | 筛选结果 |
 | --- | --- | --- |
-| Qwen1.5 0.5B Chat | `model_quantized`, `model_uint8`, `model_q4`, `model_q4f16` | all blocked |
-| Qwen2.5 0.5B Instruct GQA | `model_uint8` (also published as `model_quantized`), `model_q4`, `model_q4f16` | all blocked |
-| Qwen2.5 0.5B Instruct MHA | `model_uint8` (also published as `model_quantized`), `model_q4`, `model_q4f16` | all blocked |
-| Qwen2.5 0.5B ORT int4 | Hazem block-32 graph and external data | blocked before weight download |
-| Qwen2.5 0.5B AMD int4 | AMD Ryzen AI graph and external data | blocked before weight download |
+| Qwen1.5 0.5B Chat | `model_quantized`、`model_uint8`、`model_q4`、`model_q4f16` | 全部阻塞 |
+| Qwen2.5 0.5B Instruct GQA | `model_uint8`（也以`model_quantized`发布）、`model_q4`、`model_q4f16` | 全部阻塞 |
+| Qwen2.5 0.5B Instruct MHA | `model_uint8`（也以`model_quantized`发布）、`model_q4`、`model_q4f16` | 全部阻塞 |
+| Qwen2.5 0.5B ORT int4 | Hazem block-32图和外部数据 | 在下载权重前阻塞 |
+| Qwen2.5 0.5B AMD int4 | AMD Ryzen AI图和外部数据 | 在下载权重前阻塞 |
 
-The exact bytes and hashes remain authoritative in the candidate lock.
+精确字节数和哈希仍以候选锁为准。
 
-## Previous Int8 Evidence
+## 先前的Int8证据
 
-Two earlier public int8 candidates were downloaded on both boards:
+两个较早的公共int8候选已在两块板上下载：
 
-| Candidate | Revision | Graph |
+| 候选 | 修订 | 图 |
 | --- | --- | --- |
-| `onnx-community/Qwen2.5-0.5B-Instruct` int8 | `22942cb7d7ba4cc81bb4673549ca4d4614469b5e` | `onnx/model_int8.onnx`, 512,096,557 bytes |
-| `Ringoacid/Qwen2.5-0.5B-onnx-attention-int8` | `8b6afbb2b94c52523779b7dba6f5e7ac8d24ef9f` | graph 3,254,466 bytes plus external data 494,222,848 bytes |
+| `onnx-community/Qwen2.5-0.5B-Instruct` int8 | `22942cb7d7ba4cc81bb4673549ca4d4614469b5e` | `onnx/model_int8.onnx`，512,096,557字节 |
+| `Ringoacid/Qwen2.5-0.5B-onnx-attention-int8` | `8b6afbb2b94c52523779b7dba6f5e7ac8d24ef9f` | 图3,254,466字节，另加外部数据494,222,848字节 |
 
-Both boards rejected both graphs at ATC conversion with unsupported
-`MatMulInteger`, `DynamicQuantizeLinear`, and `DequantizeLinear` operators.
-Neither produced an OM.
+两块板都在ATC转换阶段拒绝了这两个图，原因是`MatMulInteger`、`DynamicQuantizeLinear`和`DequantizeLinear`算子不受支持。两者均未生成OM。
 
-## Operator Fingerprints
+## 算子指纹
 
-The public files are genuine quantized graphs, but they target ONNX Runtime
-execution providers rather than CANN:
+公共文件是真正的量化图，但它们面向的是ONNX Runtime执行提供程序，而不是CANN：
 
-- Qwen1.5 `quantized` and `uint8` contain 168 `MatMulInteger`, 96
-  `DynamicQuantizeLinear`, and two `DequantizeLinear` nodes.
-- Qwen1.5 `q4` and `q4f16` contain 168 `com.microsoft.MatMulNBits` nodes.
-- Qwen2.5 GQA `uint8` contains 120 `MatMulInteger`, 96
-  `DynamicQuantizeLinear`, 24 `com.microsoft.GroupQueryAttention`, and 48
-  `com.microsoft.SkipSimplifiedLayerNormalization` nodes.
-- Qwen2.5 GQA `q4` and `q4f16` contain 120 `MatMulNBits`, 24
-  `GroupQueryAttention`, and 48 `SkipSimplifiedLayerNormalization` nodes.
-- Qwen2.5 MHA `uint8` contains 168 `MatMulInteger`, 96
-  `DynamicQuantizeLinear`, 24 `com.microsoft.MultiHeadAttention`, 48
-  `com.microsoft.RotaryEmbedding`, and 48
-  `SkipSimplifiedLayerNormalization` nodes.
-- Qwen2.5 MHA `q4` and `q4f16` replace `MatMulInteger` with 168
-  `MatMulNBits` nodes while retaining the vendor attention and normalization
-  operators.
-- Hazem and AMD int4 graphs contain 121 `MatMulNBits`, 24
-  `GroupQueryAttention`, and other `com.microsoft` nodes. Their graph files are
-  only about 175-192 KB, but their external weights are about 818-862 MB. The
-  static operator gate stopped the test before downloading those weights.
+- Qwen1.5 `quantized`和`uint8`包含168个`MatMulInteger`、96个`DynamicQuantizeLinear`和两个`DequantizeLinear`节点。
+- Qwen1.5 `q4`和`q4f16`包含168个`com.microsoft.MatMulNBits`节点。
+- Qwen2.5 GQA `uint8`包含120个`MatMulInteger`、96个`DynamicQuantizeLinear`、24个`com.microsoft.GroupQueryAttention`和48个`com.microsoft.SkipSimplifiedLayerNormalization`节点。
+- Qwen2.5 GQA `q4`和`q4f16`包含120个`MatMulNBits`、24个`GroupQueryAttention`和48个`SkipSimplifiedLayerNormalization`节点。
+- Qwen2.5 MHA `uint8`包含168个`MatMulInteger`、96个`DynamicQuantizeLinear`、24个`com.microsoft.MultiHeadAttention`、48个`com.microsoft.RotaryEmbedding`和48个`SkipSimplifiedLayerNormalization`节点。
+- Qwen2.5 MHA `q4`和`q4f16`以168个`MatMulNBits`节点替换`MatMulInteger`，同时保留供应商注意力与归一化算子。
+- Hazem和AMD int4图包含121个`MatMulNBits`、24个`GroupQueryAttention`以及其他`com.microsoft`节点。其图文件仅约175-192 KB，但外部权重约为818-862 MB。静态算子门在下载这些权重前停止了测试。
 
-CANN 8.0's ATC parser does not register these operator/domain combinations for
-the tested 310B targets.
+CANN 8.0的ATC解析器未为已测试的310B目标注册这些算子/域组合。
 
-## ATC Results
+## ATC结果
 
-The following representative unique operator families were submitted to ATC
-with static one-token decode shapes:
+以下具有代表性的唯一算子系列在静态单令牌解码形状下提交给ATC：
 
-| Board | Candidate | ATC result | Stop layer | OM |
+| 开发板 | 候选 | ATC结果 | 停止层 | OM |
 | --- | --- | --- | --- | --- |
-| Ascend310B4 / 8T | Qwen1.5 uint8 | exit 255 | `MatMulInteger` / dynamic quant parser | no |
-| Ascend310B4 / 8T | Qwen1.5 q4 | exit 255 | two domain-version entries; `MatMulNBits` graph | no |
-| Ascend310B4 / 8T | Qwen2.5 GQA uint8 | exit 255 | two domain-version entries; custom GQA graph | no |
-| Ascend310B1 / 20T | Qwen1.5 uint8 | exit 255 | `MatMulInteger` / dynamic quant parser | no |
-| Ascend310B1 / 20T | Qwen1.5 q4f16 | exit 255 | two domain-version entries; `MatMulNBits` graph | no |
-| Ascend310B1 / 20T | Qwen2.5 MHA uint8 | exit 255 | two domain-version entries; custom MHA graph | no |
+| Ascend310B4 / 8T | Qwen1.5 uint8 | exit 255 | `MatMulInteger` / 动态量化解析器 | no |
+| Ascend310B4 / 8T | Qwen1.5 q4 | exit 255 | 两个domain-version条目；`MatMulNBits`图 | no |
+| Ascend310B4 / 8T | Qwen2.5 GQA uint8 | exit 255 | 两个domain-version条目；自定义GQA图 | no |
+| Ascend310B1 / 20T | Qwen1.5 uint8 | exit 255 | `MatMulInteger` / 动态量化解析器 | no |
+| Ascend310B1 / 20T | Qwen1.5 q4f16 | exit 255 | 两个domain-version条目；`MatMulNBits`图 | no |
+| Ascend310B1 / 20T | Qwen2.5 MHA uint8 | exit 255 | 两个domain-version条目；自定义MHA图 | no |
 
-Representative errors:
+代表性错误：
 
 ```text
 No parser is registered for Op [...], optype [ai.onnx::14::MatMulInteger]
@@ -112,33 +83,25 @@ No parser is registered for Op [...], optype [ai.onnx::14::DequantizeLinear]
 E16005: The model has [2] [--domain_version] fields, but only one is allowed.
 ```
 
-These are conversion/parser failures, not memory failures. ATC rejects the graph
-before OM allocation or NPU execution. The board service's NPU memory does not
-participate in this decision.
+这些是转换/解析器失败，不是内存失败。ATC在OM分配或NPU执行前拒绝该图。开发板服务的NPU内存不参与此判定。
 
-The remaining unique files were stopped at the static operator/domain gate
-because they reuse an already reproduced failing family. They were not assigned
-redundant ATC runs.
+其余唯一文件在静态算子/域门处停止，因为它们复用了已经复现的失败系列。它们未被分配重复的ATC运行。
 
-## Efficient Distributed Screening
+## 高效分布式筛选
 
-The initial matrix repeated representative ATC tests on both boards. After the
-results were stable, the procedure was narrowed:
+初始矩阵在两块板上重复了代表性ATC测试。结果稳定后，流程被收窄：
 
-1. Assign different new candidates to 8T and 20T.
-2. The first board performs static graph screening and ATC.
-3. If ATC produces no OM, do not repeat that candidate on the second board.
-4. If ATC produces an OM, then convert and validate the same source ONNX
-   independently on the second board.
-5. Only OM-producing candidates proceed to PyACL descriptor, smoke,
-   continuous generation, numerical, and performance gates.
+1. 将不同的新候选分配给8T和20T。
+2. 第一块板执行静态图筛选和ATC。
+3. 如果ATC未生成OM，不在第二块板上重复该候选。
+4. 如果ATC生成了OM，则在第二块板上独立转换并校验同一源ONNX。
+5. 只有生成OM的候选才进入PyACL描述符、冒烟、连续生成、数值和性能门。
 
-This reduces duplicate parser failures without merging the two boards' evidence
-sets.
+这减少了重复的解析器失败，同时没有合并两块板的证据集。
 
-## PyACL and Generation
+## PyACL与生成
 
-No candidate in this campaign produced an OM. Therefore:
+本次工作中没有候选生成OM。因此：
 
 ```text
 PyACL descriptor: not reached
@@ -149,41 +112,31 @@ accuracy: not reached
 performance: not reached
 ```
 
-A one-token ONNX smoke would not have been sufficient for chat eligibility even
-if an OM had been produced. The graph would still need correct KV feedback,
-tokenizer behavior, stop handling, and continuous generation.
+即使已生成OM，单令牌ONNX冒烟也不足以满足聊天资格。该图仍需要正确的KV反馈、tokenizer行为、停止处理和连续生成。
 
-## Supported Direction
+## 支持方向
 
-A language model is a PyACL candidate only when:
+语言模型只有在满足以下条件时才是PyACL候选：
 
-1. The graph has a fixed contract or can be frozen to a target shape by ATC.
-2. Every operator and domain is accepted by the target CANN parser.
-3. KV-cache layout and update semantics are explicit.
-4. ATC emits a nonempty OM for the correct SoC.
-5. The OM descriptor matches the runtime contract.
-6. PyACL loads, executes, and feeds cache outputs back correctly.
-7. A fixed golden supports numerical comparison.
-8. Quality and performance are measured separately.
+1. 图具有固定契约，或可由ATC冻结到目标形状。
+2. 目标CANN解析器接受每个算子和域。
+3. KV缓存布局与更新语义明确。
+4. ATC为正确的SoC生成非空OM。
+5. OM描述符与运行时契约匹配。
+6. PyACL加载、执行并正确反馈缓存输出。
+7. 固定golden支持数值比较。
+8. 质量和性能分别测量。
 
-The current public ORT quantization formats do not satisfy the first two gates.
-A future viable route is an ATC-native quantized export or a standard static
-graph that uses only registered operators. Installing custom OPPs or changing
-CANN is outside this campaign.
+当前公共ORT量化格式不满足前两个门。未来可行路线是ATC原生量化导出，或使用仅含已注册算子的标准静态图。安装自定义OPP或更改CANN不在本次工作范围内。
 
-## Decision
+## 决策
 
-- All 12 newly locked public candidates are blocked at static graph inspection.
-- Six representative unique candidates were submitted to ATC; all six exited
-  255 and produced no OM.
-- The earlier two int8 candidates also failed ATC on both boards.
-- Memory exhaustion is not the cause of these failures.
-- No original quantized public Qwen ONNX has reached PyACL in this campaign.
-- Public ONNX availability is not evidence of Ascend compatibility.
-- The formal FP32 static-KV release remains unchanged.
+- 全部12个新锁定的公共候选均在静态图检查阶段阻塞。
+- 六个代表性唯一候选提交给ATC；六个均以255退出且未生成OM。
+- 较早的两个int8候选也在两块板上ATC失败。
+- 内存耗尽不是这些失败的原因。
+- 本次工作中没有任何原始量化公共Qwen ONNX到达PyACL。
+- 公共ONNX可用性不是昇腾兼容性的证据。
+- 正式FP32静态KV发布保持不变。
 
-A later graph-surgery experiment successfully dequantized Qwen1.5 `q4f16` into
-standard FP16, converted it for B4 and B1, and executed it through PyACL. That
-derived model has matching FP16 numerical behavior but no INT4 execution or
-measurable speed advantage. See
-[Q4F16 ONNX Migration and Decode Rate](12-q4f16-onnx-migration-and-decode-rate.md).
+后续图手术实验成功将Qwen1.5 `q4f16`反量化为标准FP16，为B4和B1完成转换，并通过PyACL执行。该派生模型具有匹配的FP16数值行为，但没有INT4执行或可测量速度优势。参见[Q4F16 ONNX迁移与解码速率](12-q4f16-onnx-migration-and-decode-rate.md)。

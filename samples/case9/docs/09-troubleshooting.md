@@ -6,15 +6,15 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 测试日期 | 2026-10-18；摄像头问题归档于 2026-10-20；8T 发布链为 2026-10-25 |
-| 开发板 | Ascend310B1 / 20T 与 Ascend310B4 / 8T 分开记录 |
-| SoC / 档位 | 20T MindSpore；8T ACL static-KV |
+| 测试日期 | 2026-10-18至2026-11-02；板级问题按SoC分开记录 |
+| 开发板 | Ascend310B1/20T与Ascend310B4/8T，独立地址和独立验收 |
+| SoC / 档位 | 两板默认共享MindSpore/MindNLP程序；PyACL static-KV为可选候选 |
 | CANN / 驱动 | CANN 8.0.0 / driver 25.2.0 |
-| Python / 框架 | Python 3.9.2 历史记录；统一 `ascend` 3.9.25；MindSpore 2.4.10/MindNLP 0.4.1 与 ACL/OM 分开 |
-| 模型 / revision | Qwen1.5/Qwen2.5 教学 profile 与公开 8T Qwen2.5 static-KV；revision 见各条目 |
-| 代码提交 | 历史记录以部署目录为准；8T 正式验收要求公开 `main` 当前提交 |
-| 输入与命令 | OpenAI JSON/SSE；浏览器 UI；USB UAC 麦克风；8T `8084 -> 7861 -> 7865` |
-| 原始证据 | 板端 ignored evidence；公开 HF 工件清单见 `release-8t-static-kv.lock.json` |
+| Python / 框架 | 统一`ascend` Python 3.9.25；MindSpore 2.4.10 / MindNLP 0.4.1 |
+| 模型 / revision | 默认Qwen1.5-0.5B-Chat固定HF revision；可选PyACL候选单独锁定 |
+| 代码提交 | 发布验收必须使用固定公开40位commit和干净工作树；当前工作区结果不是发布复现 |
+| 输入与命令 | OpenAI JSON/SSE；统一浏览器UI；可选loopback PyACL候选 |
+| 原始证据 | 原始报告保留在各板ignored report目录；8T/20T证据不合并 |
 
 ## 问题索引
 
@@ -40,6 +40,8 @@
 | `CHATBOT-ISS-20261025-11` | `blocked` | `major` | 2026-10-25 | 两个公开 Qwen2.5 int8 ONNX 均含 ATC 未注册的量化算子，无法生成 OM | 8T/B4 和20T/B1 的 ATC 均 exit255；PyACL 门未开始 |
 | `CHATBOT-ISS-20261025-12` | `blocked` | `major` | 2026-10-25 | 扩展筛选的12个公开 Qwen 量化 ONNX 全部被算子或 vendor domain 阻断 | 静态图全部 blocked；三个代表族在单板上执行 ATC，均 exit255 |
 | `CHATBOT-ISS-20261025-13` | `mitigated` | `major` | 2026-10-25 | q4f16原图不能ATC，但可反量化为FP16后运行；该派生模型没有INT4收益 | 双板ATC/PyACL通过；固定shape速率与官方FP16相同 |
+| `CHATBOT-ISS-20261026-01` | `resolved` | `major` | 2026-10-26 | 8T外接USB摄像头麦克风与USB喇叭需要独立硬件验收 | C922 UAC采集和EDIFIER播放通过；完整语音应用未验证 |
+| `CHATBOT-ISS-20261102-01` | `mitigated` | `blocker` | 2026-11-02 | 20T PulseAudio板载ALSA sink触发NMI watchdog硬锁及OS panic重启 | runtime-mask音频后12分钟空载及MindSpore 5轮推理无硬锁；LPM告警仍周期出现，根因待驱动/硬件方确认 |
 
 ## CHATBOT-ISS-20261018-01：验收突发流量触发 HTTP 429
 
@@ -103,14 +105,29 @@
 
 ## CHATBOT-ISS-20261024-02：8T Qwen HBM 初始化失败
 
-- 状态：`open`
+- 状态：`mitigated`
 - 判定层级：`MindSpore runtime / HBM`
-- 环境：Ascend310B4 / 8T；`.212` 使用 CANN 7.0 / MindSpore 2.2.14 / MindNLP 0.3.1，`.249` 使用 CANN 8.0 / MindSpore 2.4.10 / MindNLP 0.4.1。
-- 输入与模型：Qwen1.5-0.5B-Chat，锁定 revision `4d14e384a4b037942bb3f3016665157c8bcb70ea`；权重 SHA-256 已通过。
-- 症状：模型 tokenizer 和 decoder layer 构造后，MindSpore kernel runtime 报 HBM free 小于总量一半或 `max_device_memory` 大于 allocator 当前可接受范围；worker 未监听 8090，未生成 token。
-- 根因：`unknown`。已排除 artifact hash、tokenizer 缺失和 CANN source/ACL import；当前证据指向 8T 上 MindSpore HBM 初始化与运行时保留占用的组合边界。
-- 临时处理：加载前读取 `npu-smi` 设备账本。8T 默认要求至少 6144 MB accounted free，不满足时在模型构图前 fail-closed；该数值是防止已观测失败的预检，不是“模型一定能运行”的承诺。
-- 回归：20T/CANN8 同一 profile 完成 runtime lock、worker health 和 8-token JSON；8T MindSpore 路径仍标为 `blocked`，不继承 20T 结果。独立的 Qwen2.5 静态 KV ACL 实验已在 B4 上通过短生成和 8-token JSON，但不改变本条 MindSpore 判定。
+- 环境：Ascend310B4 / 8T；早期`.212`为CANN7.0/MindSpore2.2.14/MindNLP0.3.1，`.249`为CANN8.0/MindSpore2.4.10/MindNLP0.4.1；通过门的16GB复测使用统一`ascend` Python3.9.25、CANN8.0、driver25.2.0。
+- 输入与模型：Qwen1.5-0.5B-Chat，revision`4d14e384a4b037942bb3f3016665157c8bcb70ea`；权重SHA-256已通过。
+- 症状：早期低空闲HBM状态下，MindSpore kernel runtime在tokenizer/decoder layer构造后初始化失败；worker未监听8090、未生成token。
+- 根因：`confirmed`为设备可用HBM不足触发分配失败；不同保留内存状态下是否存在其他B4 runtime边界仍需分开报告。
+- 处理：共享MindSpore worker启动前读取npu-smi设备账本；8T默认要求至少6144MB accounted free，不满足则在模型构图前fail-closed。此阈值是已观察失败组合的安全预检，不保证所有占用状态都可加载。
+- 回归：2026-10-31 16GB B4清洁启动后，模型在加载前约3727/15610MB已用、accounted free 9556MB时加载并完成非流式/SSE及256-token输出门；20T结果独立记录。旧的低HBM失败历史保留，不据此把B4整体标为不支持。
+
+## CHATBOT-ISS-20261102-01：20T板载音频sink硬锁导致整板重启
+
+- 状态：`mitigated`
+- 级别：`blocker`（仅限共享音频/板级稳定性路径；隔离音频后的文字聊天可用）
+- 环境：Orange Pi AI Pro 20T，Ascend310B1/20T，Ubuntu22.04.3，kernel5.10.0+，CANN8.0.0，driver25.2.0，统一`ascend` Python3.9.25；UART COM23/115200。
+- 输入与命令：未连接外部音频设备；登录桌面后系统自动启动PulseAudio、PipeWire和板载`ascend310b` ALSA sink。服务清单和逐次32-token非音频推理见本问题证据。
+- 症状：多次整板重启；设备黑匣子记为`OS_PANIC` / `reboot_reason=OS_PANIC`。NMI watchdog报告CPU0/CPU2 hard lockup，最早panic调用栈线程为`alsa-sink-ascen`，位于`queued_spin_lock_slowpath -> snd_pcm_group_lock_irq -> snd_pcm_sync_ptr/snd_pcm_common_ioctl -> snd_pcm_ioctl`。部分同启动周期出现`xHCI host controller not responding`。
+- 同期背景事件：LPM约每301秒记录`Get soc power/current failed`和event `0x80E3A203`；8T也有相同周期性LPM事件但未出现相同音频sink硬锁。LPM是相关底层线索，但仅凭现有证据不能认定为唯一根因。
+- 根因状态：`hypothesis`。音频sink内核自旋锁硬锁和watchdog->OS panic链条为`confirmed`；导致ALSA锁挂起的底层硬件/驱动触发仍`unknown`，需厂商按黑匣子进一步分析。
+- 隔离处理：以HwHiAiUser对当前user systemd units执行`systemctl --user mask --runtime --now pulseaudio.service pulseaudio.socket pipewire.service pipewire.socket pipewire-media-session.service`，并停止Case9 voice-agent；未改系统持久配置、CANN、driver或固件。XFCE音量面板插件进程可保留，但PulseAudio daemon/socket及`alsa-sink-ascen`线程必须缺席。
+- 回归证据：隔离后12分钟空载，uptime从27增至39分钟；LPM计数10增至14，NMI hard-lock计数保持0，xHCI host-controller-dead计数保持0。随后MindSpore Qwen1.5-0.5B成功加载，5轮32-token SSE请求全部返回usage=30 prompt/32 completion/62 total；累计观察约18分钟，无硬锁或重启。该测试证明隔离下文字路径可运行，不证明长期稳定性或音频路径已修复。
+- 当前残余风险：音频服务unit runtime-mask仅对本次开机有效；整板重启后unit会恢复启用，需在启动策略中再次隔离。20T语音功能保持关闭。不得为继续测试而取消隔离并重新引发已知硬锁。
+- 证据位置：控制器`tmp/case9/20t-isolation-watch.log`和`tmp/case9/20t-serial-isolation.log`；板端`/var/log/npu/hisi_logs/device-0/<timestamp>/bbox/{bbox_info.txt,lpm.txt,kbox.txt}`及`log/kernel.log`。用户授权后可提供脱敏副本给板卡供应商；原始黑匣子不提交Git。
+- 后续行动：保持音频隔离用于20T文字测试；向供应商提交SoC/driver/CANN tuple、LPM事件和OS panic kbox；由供应商确认电源测量失败、ALSA锁挂起和xHCI死亡是否相关后，再设计一次受控音频A/B。固件升级、reset、panic策略修改或永久mask前须另行审核。
 
 ## CHATBOT-ISS-20261025-01：8T ATC 依赖缺失与编译内存耗尽
 
@@ -270,6 +287,106 @@
 - 速率：短shape下8T约`5.95 token/s`、20T约`10.23 token/s`，与同仓库官方FP16模型差异低于0.05%。B4长上下文execute-only约`2.57 token/s`，也与FP16相同。
 - 结论：迁移解决的是ATC可转换性，不是NPU INT4执行。派生模型将463MB的q4 ONNX扩展为886MB FP16 ONNX，没有观察到量化性能收益。
 - 原始与派生哈希、四块OM及两轮基准见 `12-q4f16-onnx-migration-and-decode-rate.md`。
+
+## CHATBOT-ISS-20261026-01：8T USB音频硬件验证
+
+- 状态：`resolved`
+- 判定层级：`ALSA/PulseAudio hardware path`
+- 开发板：Ascend310B4 / 8T，CANN 8.0.0，驱动25.2.0。
+- 喇叭：Logitech以外的外接设备为`EDIFIER M16 Pro`，USB `2d99:a020`，ALSA `CARD=Pro,DEV=0`，只有playback端点。默认sink为该USB sink，25%音量、未静音。直接ALSA播放和PulseAudio `paplay`均成功，用户人耳确认发声。
+- 麦克风：Logitech `C922 Pro Stream Webcam`，USB `046d:085c`，同时提供UVC（`/dev/video2`、`/dev/video3`）和UAC capture（`CARD=Webcam,DEV=0`，32 kHz stereo）。PulseAudio source为`alsa_input.usb-046d_C922...analog-stereo`，不是monitor。
+- 路由与增益：C922硬件`Mic Capture Volume`从0提高到实际读数12，`Mic Capture Switch=on`；Pulse source为80%、未静音，并设为默认source。
+- 采集证据：增益前5秒WAV为160,000帧、32 kHz、双声道，已经有非零信号；提高增益后6秒录音峰值最高3631；15秒敲击测试在约6.8–8.7秒出现明确冲击峰，最高3168；不带`--device`的`parecord`从默认source录得RMS461、峰值3087的非零PCM，证明应用默认输入路径指向实体麦克风。
+- 语音软件：已在统一`ascend`环境安装`sherpa-onnx 1.13.6`，安装系统`espeak-ng 1.50`，并从`csukuangfj/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23@204ad334...`下载校验int8 ASR模型；官方测试WAV能转写为中文。
+- 服务状态：voice-agent已启动并监听`127.0.0.1:7862`，ASR/TTS readiness均为true，设备已绑定为`alsa-capture-2-0`和`alsa-playback-1-0`。
+- 剩余问题：实际C922语音turn出现ASR空文本和一次`arecord capture timed out`，自动监听已停止；需要继续校准VAD阈值/输入增益并完成真实语音闭环，不能宣称语音对话已通过。
+- 自动化改进：程序加入200ms噪声底校准、动态VAD阈值和有界软件AGC；合成PCM单元测试通过，但尚未在8T真实房间和C922上完成验收。
+- 部署状态：2026-10-26已同步到8T正式checkout并重启voice-agent、UI、gateway和ACL worker；板端定向测试`32 passed`。语音接口确认AGC启用、动态VAD启用、C922与EDIFIER型号可见，设备已重新绑定且`auto_listen=false`。
+- 设备变化与修复：后续现场USB摄像头变为`Jieli Technology USB Composite Device`（`4c4a:4a55`），其输入不接受直接`hw:2,0`的2声道16kHz合同，报`Channels count non available`。音频枚举已保留实际USB型号，录音统一通过`plughw`完成格式/声道转换。
+- 监听交互：固定30秒窗口无语音时由普通失败改为`no_speech`，不再累计三次失败后停止监听；语音回复预算改为32 token，前端每1.5秒刷新turn状态并显示识别文本、回复或错误。
+- USB热插拔：voice-agent原先永久缓存第一次ALSA设备枚举；现改为每次读取配置和turn状态都重新枚举。2026-10-26在8T将摄像头更换为Jieli `4c4a:4a55`后，接口已刷新为新设备，不再保留旧C922标签。
+- 双板统一部署：8T正式checkout和20T `case9-20t-max-token-7c60983` 已同步相同的`web.py`、voice核心及测试文件，关键文件SHA-256一致。两板定向测试分别通过。
+- 20T音频：C922 capture绑定`alsa-capture-0-0`，板载3.5mm playback绑定`alsa-playback-1-0`；`Deviceid=2`、Playback 25%，短WAV播放命令成功。20T双板和8T文本聊天API均完成一次非流式回复；20T 16-token结果为截断，需单独记录模型质量。
+- 按住说话回放：现有语音面板增加指针按住录音、松开内存回放，不经过ASR/LLM/TTS。停止`arecord`时预期的EINTR返回不再被误判为失败；voice-agent启动时补齐用户`XDG_RUNTIME_DIR`和DBus地址以支持PulseAudio回退。8T API实测完成1.0秒录音并成功从板载3.5mm播放。
+- 原始WAV仅保留在板端`/tmp`，不是发布工件；可删除并重新生成。
+
+## CASE9-ISS-20261030-01：20T B1 固定KV候选的64-token后重启观察
+
+- 状态：`open`
+- 判定层级：`runtime stability / board restart`
+- 测试环境：Ascend310B1 / 20T，CANN 8.0.0，driver 25.2.0，统一`ascend` Python 3.9.25；B1 static-KV OM为1,266,009,438 bytes、SHA-256 `6bca884fbce746efdb02f8c9294cad5b2faa6c8b96cac9ec8c83730126298609`。
+- 症状：初始候选目录允许32/64/80 token，但worker错误地把候选默认值32作为实例硬上限，64-token请求首先返回`max_tokens must be between 1 and 32`。修复后实例健康上报`max_tokens=80`，64-token UI请求抵达ACL并在gateway日志中记录HTTP 200，之后开发板SSH中断并在`2026-10-30 18:40:45`重新启动。
+- 最小复现：以独立`127.0.0.1:8086`启动B1 ACL候选，运行`bash scripts/verify/run-20t-b1-static-kv-token-ceiling.sh`；不要使用正式UI端口或8T B4 OM。
+- 根因：`unknown`。重启前的内核环形日志在重启后不可用，不能把重启归因于64-token请求、ACL执行、音频或网络。
+- 临时处理：浏览器B1候选默认32 token，可选32/64/80作为实验请求预算；运行时实例上限为80。64/80不应表述为重启自由的稳定性保证。
+- 回归：独立8086逐档请求8至80均HTTP 200且worker健康；正常解码提示自然在5或18 token停止。新增仅限B1隔离实验的强制解码模式，屏蔽合同EOS并关闭句末停；80、128和256档分别实际生成80/128/256 token并以`length`结束，耗时188.726/465.970/1829.767秒，各档boot ID前后一致且worker健康。详见 [20T B1 Static-KV Token Ceiling](14-20t-b1-static-kv-token-ceiling.md)。
+- 剩余边界：当前观测到的强制运行时上限为256 token。512档正在独立8086 worker上运行；只有其满足`length`、boot ID、健康与NPU内存门，才继续768和上下文余量。
+
+## CASE9-ISS-20261031-01：16GB 8T MindSpore加载前HBM基线污染
+
+- 状态：`resolved`
+- 判定层级：`environment / model load / API smoke`
+- 测试环境：Ascend310B4 / 8T，NPU总内存15,610 MB，CANN 8.0.0，driver 25.2.0；统一`ascend`环境，Python 3.9.25、MindSpore 2.4.10、MindNLP 0.4.1，`PYTHONNOUSERSITE=1`。
+- 初始事件：旧NPU记账占用13,982/15,610 MB时，worker按HBM门拒绝加载；该次是脏基线，不是16GB能力结论。
+- 根因与适配：清洁重启后HBM门通过；8T旧MindNLP序列化器把BF16 NumPy itemsize识别为8，统一worker启用程序级BF16兼容适配，不修改系统Python或替换8T环境包。
+- 结果：Qwen1.5-0.5B完成MindSpore Ascend模型加载；health为`context_verified`、`bf16_loader_compat=true`；非流式8-token生成HTTP 200/12秒，SSE 8-token生成HTTP 200/5秒并收到`[DONE]`。加载前后系统RAM与NPU内存见 [16GB 8T MindSpore Validation](16-8t-16gb-mindspore-validation.md)。
+- 清理：worker停止，8090释放；NPU记账从14144降至5355 MB，系统RAM used从10062降至1288 MB。
+
+## CASE9-ISS-20261101-01：8T MindSpore切换后的NPU内存累积与串口硬件事件
+
+- 状态：`mitigated`
+- 判定层级：`device / driver / runtime cleanup`
+- 测试环境：16GB Ascend310B4 / 8T，CANN 8.0.0，driver 25.2.0，统一`ascend` Python 3.9.25；COM6串口115200持续可用。
+- 症状：历史MindSpore/ACL测试后会出现SSH超时或用户感知的“死机”。本次重启后以串口监控，开机干净NPU记账为2224/15610 MB；Qwen1.5加载、32-token与256-token生成均完成，SSH和串口未中断。
+- 串口设备证据：MindSpore启动前已出现APEI `recoverable`硬件事件和MATA RAS `error_code=0x50e`；LPM `0x80E3A203` / bbox `0xa6193215`约每5分钟出现，空闲和MindSpore `launch_queue`负载期间都可见。没有Kernel panic、OOM、watchdog/lockup或device reset证据，不能把单次LPM事件写成死机根因。
+- 可重复机制：同一boot会话中，NPU记账从2224 MB基线上升；Qwen1.5停止后仍约5304 MB，随后Qwen2.5仅初始化context并被HBM门拒绝后仍约7234 MB。无业务进程时记账仍累积，导致后续模型可用HBM减少；严格8192 MB门阻止了继续加载和潜在失稳。
+- 根因状态：`hypothesis`。当前证据支持“框架/驱动清理不完全导致同一boot内存累积”是直接风险机制；板端MATA RAS是独立的硬件/驱动风险线索。尚未复现真正整板死机，不能确定两者谁是最终根因。
+- 修复：统一worker的`close()`新增释放模型引用、Python GC、调用`mindspore.ms_memory_recycle()`与`mindspore.hal.empty_cache()`；注册SIGTERM优雅停机，health新增`memory_recycle_status`。本地回归15项通过；板端日志确认收到SIGTERM并记录`ms_memory_recycle+hal.empty_cache`，但干净重启后的加载→停止对照仍从2266升至4976 MB，残留约2710 MB。
+- 当前结论：worker生命周期修复已生效，但设备记账仍未回到基线；根因继续标为`hypothesis`，下一层应检查MindSpore/CANN/驱动的设备内存生命周期，不能继续通过重复模型切换扩大风险。
+- 证据路径：板端`/home/HwHiAiUser/Documents/ascend-edge-chat-ms-8t/reports/serial-debug-qwen15-20261101T1512/`；256-token请求实际完成256、`length`。Qwen2.5-0.5B资产通过校验，但首次启动因可用HBM 7576 MB低于8192 MB门而在权重加载前停止。
+
+## CASE9-ISS-20261101-05：20T 2048全上下文FP16 PyACL OM输出损坏
+
+- 状态：`observed-degraded`
+- 判定层级：`task-quality / text integrity`
+- 测试环境：Ascend310B1 / 20T，CANN 8.0.0、driver 25.2.0，统一`ascend` Python 3.9.25；Qwen2.5-0.5B static 2048 B1 OM，FP16全上下文合同，3个`[1,2048] int64`输入和约622MB logits输出。
+- 结果：纯PyACL控制器在统一环境加载、描述符验证和health均通过。8-token loopback API返回HTTP 200，耗时59.358秒。
+- 症状：回答为` Holden Holden Holden 纲纲 radiation�`，含重复无关词和U+FFFD替换字符。
+- 根因状态：`unknown`。执行路径通过但文本质量/完整性失败，可能涉及静态2048导出、输出选择、精度或tokenizer合同；不是当前B1 static-KV候选的替代品。
+- 清理：8091已释放；停止后系统可用RAM约22.9GiB、NPU记账6090/23673MB。
+- 下一步：不将该OM加入浏览器目录；若继续研究，先建立相同prompt的MindSpore/PyACL logits数值比较和tokenizer对照。
+
+## CASE9-ISS-20261101-04：8T Qwen1.5 1.8B首次生成连续内存分配失败
+
+- 状态：`observed-fail`
+- 判定层级：`runtime / memory allocation`
+- 测试环境：Ascend310B4 / 8T，CANN 8.0.0、driver 25.2.0，统一`ascend` Python 3.9.25，MindSpore 2.4.10、MindNLP 0.4.1；模型`Qwen1.5-1.8B-Chat@e482ee3f73c375a627a16fdf66fd0c8279743ca6`，七项固定revision资产从hf-mirror下载且哈希通过。
+- 最小复现：模型达到health ready；提交8-token中文问候，HTTP返回503，worker fail-closed。
+- 原始错误：`MindSpore generation failed: Alloc failed, size:632186368, stream_id:0`。加载期HBM检查显示约8382 MB设备记账余量，但首次生成需要额外连续约603 MiB分配。
+- 内存证据：失败时`MemAvailable`降至约930 MiB、匿名页约9.6 GiB；优雅停止后可用RAM恢复约13.7 GiB、匿名页约927 MiB，8090释放且NPU记账回到1957/15610 MB。
+- 根因状态：`confirmed`为当前组合的生成期内存分配不足；不是下载完整性、模型加载失败、设备节点丢失或系统死机。未采用降低安全门或CPU回退。
+- 下一步：该模型不作为16GB 8T正常服务候选；若需继续，应评估量化/更低内存图或在20T上独立验证。
+
+## CASE9-ISS-20261101-03：8T Qwen2.5 1.5B长输出文本替换字符
+
+- 状态：`observed-degraded`
+- 判定层级：`text integrity / generation`
+- 测试环境：Ascend310B4 / 8T，CANN 8.0.0、driver 25.2.0，统一`ascend` Python 3.9.25，MindSpore 2.4.10，MindNLP 0.4.1；模型`Qwen2.5-1.5B-Instruct@989aa7980e4cf806f80c7fef2b1adb7bc71aa306`，七项资产哈希通过。
+- 结果：中文和英文32/64/96-token长文均HTTP 200、无U+FFFD、无角色标记并保持worker健康。中文128-token长文重复两次均完成128 token和`finish_reason=length`，且每次恰有1个U+FFFD；英文128-token长文完成128 token、无U+FFFD。
+- 资源证据：128-token运行期间NPU可达高占用；SIGTERM优雅停止后8090释放、NPU回到2320/15610 MB、系统匿名页和可用内存恢复。
+- 根因状态：`hypothesis`。异常随中文长输出预算出现而可重复，英文同预算未复现；当前更像中文tokenizer/解码或文本序列化边界问题，不是模型加载、设备崩溃或一般性内存不足结论。中文128以上预算不作为正常聊天推荐预算；英文128在本轮完整通过。
+- 下一步：保留中英文32/64为当前干净预算；若需提高中文预算，应收集出错位置附近的token id、UTF-8字节和SSE增量后再定位。
+
+## CASE9-ISS-20261101-02：8T DeepSeek-R1 1.5B MindSpore TBE主进程退出
+
+- 状态：`observed-fail`
+- 判定层级：`model-load / TBE`
+- 测试环境：Ascend310B4 / 8T，16GB系统/NPU内存，CANN 8.0.0，driver 25.2.0，统一`ascend` Python 3.9.25、MindSpore 2.4.10、MindNLP 0.4.1；模型`DeepSeek-R1-Distill-Qwen-1.5B@0a28897fe71fdd30de350b667ae588601a85990f`，五项资产哈希通过。
+- 最小复现：启动同一Case9 MindSpore worker，使用8-token预算和B4实验profile；未达到health ready。
+- 症状：加载期记录`Free memory size is less than half of total memory size`，随后出现8次`TBE Subprocess[task_distribute] ... main process disappeared!`；resource tracker报告30个遗留semaphore。没有成功HTTP请求。
+- 设备证据：worker已退出，8090已释放，NPU记账回到1571/15610 MB；没有将该模型失败写成整板死机或硬件不支持。
+- 根因状态：`unknown`。失败发生在MindSpore/TBE加载层，需在独立干净boot下用更完整的TBE/plog证据继续定位；不得通过CPU回退或跳过TBE取得通过结果。
+- 下一步：继续验证其他独立候选；DeepSeek重试前保留原始worker日志，收集TBE/plog和同版本20T对照。
 
 ## CHATBOT-ISS-20261024-03：自动语音失败资源累积
 

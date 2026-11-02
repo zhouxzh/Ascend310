@@ -37,6 +37,7 @@ export PYTHONNOUSERSITE=1
 
 python - <<'PY'
 import importlib
+import importlib.metadata
 import platform
 import site
 import sys
@@ -48,6 +49,14 @@ if site.ENABLE_USER_SITE:
 for name in ("acl", "numpy", "tokenizers", "fastapi", "pydantic", "httpx", "uvicorn", "dotenv"):
     module = importlib.import_module(name)
     print("%s=%s" % (name, getattr(module, "__file__", "<built-in>")))
+for distribution, expected in (("numpy", "1.26.4"), ("tokenizers", "0.19.1")):
+    try:
+        actual = importlib.metadata.version(distribution)
+    except importlib.metadata.PackageNotFoundError as exc:
+        raise SystemExit("8T release dependency is missing: %s" % distribution) from exc
+    print("%s_version=%s" % (distribution, actual))
+    if actual != expected:
+        raise SystemExit("8T release requires %s==%s, got %s" % (distribution, expected, actual))
 print("python=%s" % sys.executable)
 print("python_abi=%s" % sys.implementation.cache_tag)
 PY

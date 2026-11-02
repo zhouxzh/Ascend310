@@ -14,10 +14,13 @@ import logging
 import math
 import os
 from pathlib import Path
+import re
 import secrets
+import shutil
 import signal
 import string
 import subprocess
+import threading
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -133,6 +136,15 @@ class VoiceAgentClient(Protocol):
     async def synthesize_browser_wav(self, text: str) -> bytes:
         """Synthesize one bounded assistant text into an in-memory WAV."""
 
+    async def start_audio_test(self) -> Mapping[str, Any]:
+        """Start board-local hold-to-record capture without ASR/TTS."""
+
+    async def stop_audio_test(self) -> Mapping[str, Any]:
+        """Stop capture and replay the bounded recording to the selected board sink."""
+
+    async def cancel_audio_test(self) -> Mapping[str, Any]:
+        """Cancel a held board-local recording without playback."""
+
     async def aclose(self) -> None:
         """Release optional loopback HTTP resources."""
 
@@ -163,11 +175,23 @@ class LoopbackVoiceAgentClient:
         method: str,
         path: str,
         payload: Optional[Mapping[str, Any]] = None,
+        *,
+        timeout_seconds: Optional[float] = None,
     ) -> Mapping[str, Any]:
         try:
-            response = await self._client.request(method, path, json=payload)
+            request_options: dict[str, Any] = {"json": payload}
+            if timeout_seconds is not None:
+                request_options["timeout"] = timeout_seconds
+            response = await self._client.request(method, path, **request_options)
             response.raise_for_status()
             body = response.json()
+        except httpx.HTTPStatusError as exc:
+            raise VoiceAgentError(
+                self._response_detail(
+                    exc.response,
+                    "语音代理不可用，请检查板端 voice-agent。",
+                )
+            ) from exc
         except (httpx.HTTPError, ValueError) as exc:
             raise VoiceAgentError("语音代理不可用，请检查板端 voice-agent。") from exc
         if not isinstance(body, Mapping):
@@ -229,6 +253,19 @@ class LoopbackVoiceAgentClient:
             raise VoiceAgentError("浏览器语音播报响应不是有效 WAV。")
         return bytes(response.content)
 
+    async def start_audio_test(self) -> Mapping[str, Any]:
+        return await self._json("POST", "/v1/voice/audio-test/start")
+
+    async def stop_audio_test(self) -> Mapping[str, Any]:
+        return await self._json(
+            "POST",
+            "/v1/voice/audio-test/stop",
+            timeout_seconds=35.0,
+        )
+
+    async def cancel_audio_test(self) -> Mapping[str, Any]:
+        return await self._json("POST", "/v1/voice/audio-test/cancel")
+
     async def aclose(self) -> None:
         await self._client.aclose()
 
@@ -288,6 +325,135 @@ def _verify_switch_cache(root: Path, profile: Any) -> None:
     except ArtifactError as exc:
         LOGGER.info("teaching profile verification failed: profile=%s", getattr(profile, "id", "unknown"), exc_info=True)
         raise ModelSwitchError("目标模型缓存哈希校验失败。") from exc
+
+
+_BOARD_TIER_BY_SOC = {"310B1": "20T", "310B4": "8T"}
+_NPU_SOC_PATTERN = re.compile(r"\b(?:Ascend\s*)?(310B[14])\b", re.IGNORECASE)
+
+
+def _parse_npu_smi_board_info(output: str) -> dict[str, Any]:
+    """Parse stable board fields from one bounded ``npu-smi info`` snapshot."""
+
+    result: dict[str, Any] = {
+        "available": False,
+        "soc": None,
+        "compute_tier": None,
+        "health": None,
+        "temperature_c": None,
+        "memory": {"used_mb": None, "total_mb": None, "source": "npu-smi device accounting"},
+        "driver_version": None,
+    }
+    version = re.search(
+        r"npu-smi\s+([0-9][^\s|]*)\s+Version:\s*([0-9][^\s|]*)",
+        output,
+        re.IGNORECASE,
+    )
+    if version:
+        result["driver_version"] = version.group(2)
+    for line in output.splitlines():
+        cells = [cell.strip() for cell in line.split("|") if cell.strip()]
+        if len(cells) < 3:
+            continue
+        soc_match = _NPU_SOC_PATTERN.search(cells[0])
+        if soc_match:
+            soc = soc_match.group(1).upper()
+            result["soc"] = "Ascend " + soc
+            result["compute_tier"] = _BOARD_TIER_BY_SOC.get(soc)
+            result["health"] = cells[1] or None
+            numeric = re.findall(r"\d+(?:\.\d+)?", cells[2])
+            if len(numeric) >= 2:
+                result["temperature_c"] = int(float(numeric[1]))
+            continue
+        identity = cells[0].split()
+        if len(identity) == 2 and all(part.isdigit() for part in identity):
+            memory = re.search(r"(?P<used>\d+)\s*/\s*(?P<total>\d+)", cells[2])
+            if memory:
+                used_mb = int(memory.group("used"))
+                total_mb = int(memory.group("total"))
+                if total_mb > 0 and 0 <= used_mb <= total_mb:
+                    result["memory"] = {
+                        "used_mb": used_mb,
+                        "total_mb": total_mb,
+                        "source": "npu-smi device accounting",
+                    }
+    result["available"] = result["soc"] is not None
+    return result
+
+
+def _read_cann_version() -> Optional[str]:
+    """Read CANN from known toolkit metadata without importing its runtime."""
+
+    roots: list[Path] = []
+    for name in ("ASCEND_TOOLKIT_HOME", "ASCEND_HOME_PATH", "ASCEND_INSTALL_PATH"):
+        raw = os.environ.get(name, "").strip()
+        if raw:
+            path = Path(raw).expanduser()
+            if path not in roots:
+                roots.append(path)
+    for path in (Path("/usr/local/Ascend/ascend-toolkit"), Path("/usr/local/Ascend/latest")):
+        if path not in roots:
+            roots.append(path)
+    for root in roots:
+        for relative in ("version.cfg", "latest/version.cfg", "version.info"):
+            path = root / relative
+            if not path.is_file():
+                continue
+            try:
+                content = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            match = re.search(r"running_version\s*=\s*\[[^:]+:([0-9][^\],\s]*)", content)
+            if match:
+                return match.group(1).strip('"\'')
+            match = re.search(r"(?:version_dir|Version)\s*[=:]\s*([0-9][^\s\r\n]*)", content)
+            if match:
+                return match.group(1).strip('"\'')
+    return None
+
+
+def _board_hardware_snapshot() -> dict[str, Any]:
+    """Collect a partial, fail-soft board snapshot for the teaching UI."""
+
+    empty = _parse_npu_smi_board_info("")
+    executable = shutil.which("npu-smi")
+    if executable:
+        try:
+            completed = subprocess.run(
+                [executable, "info"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                errors="replace",
+                timeout=3,
+                check=False,
+                stdin=subprocess.DEVNULL,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            completed = None
+        if completed is not None and completed.returncode == 0:
+            empty = _parse_npu_smi_board_info((completed.stdout or "")[:65536])
+    empty["cann_version"] = _read_cann_version()
+    empty["observed_at_unix"] = int(time.time())
+    empty["refresh_interval_seconds"] = 5
+    return empty
+
+
+_BOARD_INFO_CACHE_LOCK = threading.Lock()
+_BOARD_INFO_CACHE: dict[str, Any] = {"expires_at": 0.0, "snapshot": None}
+
+
+def _cached_board_hardware_snapshot() -> dict[str, Any]:
+    """Return one shared five-second snapshot without concurrent commands."""
+
+    now = time.monotonic()
+    with _BOARD_INFO_CACHE_LOCK:
+        cached = _BOARD_INFO_CACHE.get("snapshot")
+        if isinstance(cached, dict) and now < float(_BOARD_INFO_CACHE["expires_at"]):
+            return dict(cached)
+        snapshot = _board_hardware_snapshot()
+        _BOARD_INFO_CACHE["snapshot"] = dict(snapshot)
+        _BOARD_INFO_CACHE["expires_at"] = now + 5.0
+        return snapshot
 
 
 def _observed_soc() -> str:
@@ -602,6 +768,7 @@ class TextChatSettings:
     worker_mode: Literal["managed", "external"] = _MANAGED_WORKER_MODE
     worker_health_url: str = _MANAGED_WORKER_HEALTH_URL
     catalog_path: str = str(DEFAULT_CATALOG_PATH)
+    backend_supervisor_url: str = ""
     # The MindSpore worker is serial and has a board-side watchdog.
     llm_timeout_seconds: float = 300.0
     max_messages: int = 4
@@ -686,6 +853,11 @@ class TextChatSettings:
                     "gateway_api_key must be a real ASCII token with at least 24 characters"
                 )
         object.__setattr__(self, "gateway_url", gateway_url)
+        supervisor_url = self.backend_supervisor_url.strip()
+        if supervisor_url:
+            object.__setattr__(
+                self, "backend_supervisor_url", _validate_voice_agent_url(supervisor_url)
+            )
         if not isinstance(self.voice_enabled, bool):
             raise TextChatConfigurationError("voice_enabled must be a boolean")
         if self.voice_mode not in {"disabled", "board", "browser"}:
@@ -822,6 +994,9 @@ class TextChatSettings:
                 "ASCEND_EDGE_CHAT_MODEL_CATALOG", str(DEFAULT_CATALOG_PATH)
             ).strip()
             or str(DEFAULT_CATALOG_PATH),
+            backend_supervisor_url=os.environ.get(
+                "ASCEND_EDGE_CHAT_BACKEND_SUPERVISOR_URL", ""
+            ).strip(),
             llm_timeout_seconds=decimal("ASCEND_EDGE_CHAT_UI_LLM_TIMEOUT_SECONDS", 300.0, 0.1),
             max_messages=integer("ASCEND_EDGE_CHAT_UI_MAX_MESSAGES", 4, 2),
             max_characters=integer("ASCEND_EDGE_CHAT_UI_MAX_CHARACTERS", 4000, 1),
@@ -913,6 +1088,30 @@ async def _stream_with_deadline(
                 await close()
             except Exception:
                 LOGGER.debug("failed to close upstream text iterator", exc_info=True)
+
+
+def _validated_usage(llm: StreamingLLM) -> Optional[dict[str, int]]:
+    """Return terminal OpenAI token usage only when its totals are coherent."""
+
+    value = getattr(llm, "last_usage", None)
+    if not isinstance(value, Mapping):
+        return None
+    prompt_tokens = value.get("prompt_tokens")
+    completion_tokens = value.get("completion_tokens")
+    total_tokens = value.get("total_tokens")
+    values = (prompt_tokens, completion_tokens, total_tokens)
+    if not all(
+        isinstance(item, int) and not isinstance(item, bool) and item >= 0
+        for item in values
+    ):
+        return None
+    if total_tokens != prompt_tokens + completion_tokens:
+        return None
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+    }
 
 
 def _validated_finish_reason(llm: StreamingLLM) -> str:
@@ -1130,7 +1329,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ascend Edge Chat 文字聊天测试</title>
+  <title>昇腾310B智能聊天机器人</title>
   <style>
     :root {
       color-scheme: light;
@@ -1160,6 +1359,8 @@ TEXT_CHAT_HTML = r"""<!doctype html>
     .voice-auto { display: flex; align-items: center; gap: 8px; min-height: 42px; color: #3b4c59; font-size: .94rem; }
     .voice-note { color: #704b0c; font-size: .92rem; line-height: 1.5; margin: 12px 0 0; }
     .voice-buttons { display: flex; gap: 10px; margin-top: 12px; }
+    .voice-buttons button { touch-action: manipulation; user-select: none; }
+    #voice-self-test.recording { background: #8a2d27; border-color: #8a2d27; color: #fff; }
     .status { border: 1px solid #c1ccd4; border-radius: 999px; padding: 8px 14px; font-size: .94rem; white-space: nowrap; background: #fff; }
     .status[data-kind="ok"] { color: #176b45; border-color: #9bd3b5; background: #effaf3; }
     .status[data-kind="busy"] { color: #7a5311; border-color: #e7c77e; background: #fff9e9; }
@@ -1202,79 +1403,352 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       .buttons { width: 100%; }
       button { flex: 1; }
     }
+    .app-grid { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
+    .sidebar { background: #f1f1f0; border-right: 1px solid #e4e4e2; padding: 14px 12px; display: flex; flex-direction: column; gap: 14px; }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 8px 10px 16px; font-weight: 700; color: #1f1f1f; }
+    .brand-mark { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: #1f1f1f; color: #fff; font-size: 14px; }
+    .new-chat { width: 100%; display: flex; align-items: center; gap: 8px; justify-content: flex-start; border-color: #d6d6d2; background: #fff; border-radius: 8px; font-size: .92rem; }
+    .sidebar-label { padding: 8px 10px 2px; color: #777; font-size: .75rem; font-weight: 700; letter-spacing: .04em; }
+    .history-item { border: 0; background: transparent; text-align: left; padding: 9px 10px; min-height: 38px; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 7px; color: #555; font-size: .86rem; }
+    .sidebar-foot { margin-top: auto; padding: 10px; color: #777; font-size: .76rem; line-height: 1.45; }
+    .content { min-width: 0; min-height: 100vh; display: flex; flex-direction: column; background: #fff; }
+    .content > header { order: 1; }
+    .content > main { order: 2; }
+    .content > .voice-panel { order: 3; }
+    .content > .warning { order: 4; }
+    body { background: #f7f7f8; color: #252525; }
+    .shell { width: 100%; max-width: none; min-height: 100vh; display: block; }
+    header { padding: 0 28px; min-height: 64px; border-bottom: 1px solid #ececea; align-items: center; background: rgba(255,255,255,.94); }
+    header > div:first-child { display: flex; align-items: center; gap: 18px; min-width: 0; }
+    h1 { font-size: 1.05rem; white-space: nowrap; }
+    .subtle { margin: 0; color: #858585; font-size: .78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .model-picker { margin: 0; gap: 8px; font-size: .82rem; }
+    .model-picker select { min-width: 170px; min-height: 34px; border: 1px solid #e2e2df; border-radius: 7px; padding: 5px 9px; font-size: .82rem; }
+    .token-picker select { width: 88px; min-height: 34px; border: 1px solid #e2e2df; border-radius: 7px; padding: 5px 7px; font-size: .82rem; }
+    .token-hint, .model-note { display: none; }
+    main { padding: 0; flex: 1; width: min(860px, 100%); margin: 0 auto; }
+    .messages { min-height: 0; flex: 1; padding: 34px 22px 150px; }
+    .empty { padding: 22vh 16px 14vh; color: #8a8a88; font-size: 1rem; }
+    .message { margin: 22px 0; }
+    .bubble { max-width: min(720px, 92%); padding: 2px 0; border: 0 !important; border-radius: 0; background: transparent !important; color: #2b2b2b !important; font-size: .98rem; line-height: 1.75; }
+    .message.user .bubble { background: #f1f1f0 !important; color: #252525 !important; padding: 10px 14px; border-radius: 16px; max-width: min(620px, 82%); }
+    .composer-label { display: none; }
+    textarea { min-height: 54px; max-height: 220px; border: 0; padding: 6px 4px; resize: none; font-size: .98rem; background: transparent; }
+    textarea:focus { outline: none; border: 0; }
+    .controls { margin-top: 4px; }
+    button { min-height: 34px; padding: 6px 12px; border-radius: 8px; font-size: .82rem; }
+    button.primary { background: #252525; border-color: #252525; }
+    .voice-panel { margin: 0 28px 14px; border-color: #e4e4e2; background: #fafaf9; font-size: .82rem; }
+    @media (max-width: 820px) { .app-grid { display: block; } .sidebar { display: none; } header { padding: 0 16px; min-height: 58px; } .subtle { display: none; } .token-picker { display: none; } .warning { margin: 8px 16px 0; } .messages { padding: 24px 16px 140px; } .composer { width: calc(100% - 24px); } .voice-panel { margin: 0 16px 12px; } }
+
+    /* Chat workspace: a fixed application shell with a normal-flow bottom composer. */
+    :root {
+      --canvas: #f7f7f8;
+      --surface: #ffffff;
+      --sidebar: #f1f1f0;
+      --ink: #242424;
+      --muted: #747474;
+      --line: #e8e8e6;
+      --accent: #222222;
+      font-size: 18px;
+    }
+    [hidden] { display: none !important; }
+    html, body { height: 100%; }
+    body { margin: 0; overflow: hidden; background: var(--canvas); color: var(--ink); font-size: 1rem; line-height: 1.55; }
+    .app-grid { height: 100vh; height: 100dvh; min-height: 0; grid-template-columns: 280px minmax(0, 1fr); }
+    .sidebar { min-height: 0; padding: 14px 12px; overflow-y: auto; background: var(--sidebar); border-color: var(--line); }
+    .sidebar-scrim, .settings-toggle, .settings-close { display: none; }
+    .brand { padding: 6px 10px 16px; gap: 10px; font-size: 1rem; }
+    .brand-mark { width: 30px; height: 30px; border-radius: 8px; background: #222; font-size: .78rem; }
+    .brand-name { min-width: 0; font-size: .9rem; white-space: nowrap; }
+    .new-chat { min-height: 42px; padding: 8px 12px; border-color: #dadad7; border-radius: 8px; background: #fff; font-size: .92rem; }
+    .runtime-settings { margin: 2px 0 6px; padding: 10px 10px 14px; border-top: 1px solid #ddddda; border-bottom: 1px solid #ddddda; }
+    .runtime-settings .sidebar-label { padding: 0 0 9px; }
+    .sidebar-label { padding: 8px 10px 0; color: #767672; font-size: .82rem; letter-spacing: .04em; }
+    .board-info { padding: 9px 10px 12px; border-bottom: 1px solid #ddddda; }
+    .board-info .sidebar-label { padding: 0 0 8px; }
+    .board-info-list { display: grid; gap: 5px; margin: 0; }
+    .board-info-row { display: grid; grid-template-columns: minmax(72px, .8fr) minmax(0, 1.2fr); gap: 8px; align-items: baseline; }
+    .board-info-row dt { color: #767672; font-size: .75rem; }
+    .board-info-row dd { min-width: 0; margin: 0; overflow: hidden; color: #333; font-size: .78rem; font-weight: 600; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+    .board-info-row dd[data-kind="ok"] { color: #176b45; }
+    .board-info-row dd[data-kind="warning"] { color: #8a5b00; }
+    .board-info-note { margin: 8px 0 0; color: #858581; font-size: .68rem; line-height: 1.4; }
+    .history-item { min-height: 40px; padding: 8px 10px; border-radius: 7px; color: #555552; font-size: .9rem; }
+    .history-item:hover:not(:disabled) { background: #e8e8e5; }
+    .sidebar-foot { padding: 10px; color: #767672; font-size: .8rem; }
+    .content { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; background: var(--surface); }
+    .content > header,
+    .content > .warning,
+    .content > .voice-panel,
+    .content > main { order: 0; }
+
+    header {
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 16px;
+      min-height: 70px;
+      padding: 10px 24px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .96);
+    }
+    header > div.title-block { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+    h1 { margin: 0; font-size: 1.08rem; line-height: 1.35; letter-spacing: 0; white-space: nowrap; }
+    .subtle { max-width: 100%; margin: 0; overflow: hidden; color: var(--muted); font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
+    .generation-rate { margin: 1px 0 0; color: #61615d; font-size: .78rem; line-height: 1.35; white-space: nowrap; }
+    .generation-rate[data-kind="active"] { color: #7a5311; }
+    .generation-rate[data-kind="ready"] { color: #176b45; }
+    .model-picker { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 0; color: #555; font-size: .84rem; }
+    .model-picker > label { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .model-picker select, .token-picker select {
+      width: 100%;
+      min-width: 0;
+      min-height: 42px;
+      padding: 7px 10px;
+      border: 1px solid #d7d7d3;
+      border-radius: 8px;
+      background: #fff;
+      color: #292929;
+      font: inherit;
+      font-size: .88rem;
+    }
+    .runtime-label { margin-top: 2px; font-weight: 600; }
+    .token-picker { display: flex; align-items: stretch !important; flex-direction: column; }
+    #profile-select, .token-picker select { width: 100%; }
+    .token-hint, .model-note { display: none; }
+    .settings-toggle { align-items: center; justify-content: center; min-width: 58px; }
+    .settings-close { align-items: center; justify-content: center; width: 40px; min-height: 40px; margin-left: auto; padding: 0; border: 0; background: transparent; font-size: 1.35rem; line-height: 1; }
+    .status { flex: 0 0 auto; padding: 7px 12px; border-radius: 999px; font-size: .82rem; }
+    .warning { flex: 0 0 auto; margin: 8px 24px; padding: 8px 12px; border: 1px solid #f0dfb3; border-left: 3px solid #c58a1a; border-radius: 6px; background: #fffaf0; color: #624814; font-size: .84rem; }
+
+    .voice-panel { flex: 0 0 auto; margin: 0 24px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fafaf9; overflow: hidden; }
+    .voice-panel > summary { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px; color: #3f3f3f; cursor: pointer; list-style: none; user-select: none; }
+    .voice-panel > summary::-webkit-details-marker { display: none; }
+    .voice-toggle { width: 16px; color: #777; font-size: 1.2rem; line-height: 1; transform: rotate(0deg); transition: transform .16s ease; }
+    .voice-panel[open] .voice-toggle { transform: rotate(90deg); }
+    .voice-title { flex: 0 0 auto; font-size: .9rem; font-weight: 650; }
+    .voice-summary { flex: 1 1 auto; min-width: 0; margin: 0; overflow: hidden; color: #737373; font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
+    .voice-panel .status { padding: 5px 10px; font-size: .78rem; }
+    .voice-body { max-height: min(42vh, 340px); padding: 0 14px 14px; overflow-y: auto; }
+    .voice-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 5px; }
+    .voice-field { display: flex; flex-direction: column; gap: 5px; color: #555; font-size: .82rem; }
+    .voice-field select, .voice-field input { min-height: 40px; padding: 6px 9px; border: 1px solid #d7d7d3; border-radius: 7px; background: #fff; color: #292929; font-size: .88rem; }
+    .voice-auto { min-height: 38px; gap: 8px; color: #555; font-size: .82rem; }
+    .voice-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+    .voice-note { margin: 10px 0 0; color: #666; font-size: .82rem; }
+
+    main { flex: 1 1 auto; width: min(860px, 100%); min-height: 0; margin: 0 auto; padding: 0; display: flex; flex-direction: column; }
+    .messages { flex: 1 1 auto; min-height: 0; padding: 30px 22px 24px; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
+    .empty { margin: auto; padding: 32px 16px; color: #747470; text-align: center; font-size: 1rem; }
+    .message { flex: 0 0 auto; width: 100%; margin: 19px 0; }
+    .bubble { max-width: min(720px, 92%); padding: 2px 0; border: 0 !important; border-radius: 0; background: transparent !important; color: #242424 !important; font-size: 1rem; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .message.user .bubble { max-width: min(620px, 82%); padding: 11px 15px; border-radius: 14px; background: #f0f0ee !important; color: #242424 !important; }
+
+    .composer {
+      position: relative;
+      inset: auto;
+      z-index: 1;
+      flex: 0 0 auto;
+      width: 100%;
+      margin: 0;
+      padding: 12px 22px max(15px, env(safe-area-inset-bottom));
+      border: 0;
+      border-top: 1px solid var(--line);
+      border-radius: 0;
+      background: #fff;
+      box-shadow: none;
+    }
+    .composer-label { display: none; }
+    textarea { width: 100%; min-height: 64px; max-height: 200px; padding: 13px 14px; resize: none; overflow-y: auto; border: 1px solid #d7d7d3; border-radius: 11px; background: #fff; color: var(--ink); font-size: 1rem; line-height: 1.6; }
+    textarea:focus, textarea:focus-visible { border-color: #8f8f8a; outline: 2px solid #e5e5e1; outline-offset: 1px; }
+    .controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+    .hint { color: #73736f; font-size: .82rem; }
+    .buttons { display: flex; flex: 0 0 auto; gap: 8px; }
+    button { min-height: 40px; padding: 7px 14px; border: 1px solid #d7d7d3; border-radius: 8px; background: #fff; color: #292929; font-size: .88rem; }
+    button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+    button.primary:hover:not(:disabled) { background: #000; }
+    button:disabled { opacity: .48; cursor: not-allowed; }
+
+    @media (max-width: 1100px) {
+      header { gap: 5px 14px; padding: 9px 20px; }
+    }
+    @media (max-width: 820px) {
+      .app-grid { display: block; }
+      .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 20;
+        display: flex;
+        width: min(86vw, 320px);
+        height: 100vh;
+        height: 100dvh;
+        border-right: 1px solid #d8d8d5;
+        box-shadow: 10px 0 28px rgba(0, 0, 0, .13);
+        transform: translateX(-102%);
+        transition: transform .18s ease;
+      }
+      .settings-open .sidebar { transform: translateX(0); }
+      .sidebar button { flex: 0 0 auto; }
+      .sidebar-scrim {
+        position: fixed;
+        inset: 0;
+        z-index: 19;
+        display: block;
+        min-height: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: rgba(0, 0, 0, .28);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .18s ease;
+      }
+      .settings-open .sidebar-scrim { opacity: 1; pointer-events: auto; }
+      .settings-toggle, .settings-close { display: inline-flex; }
+      header { grid-template-columns: minmax(0, 1fr) auto; min-height: 0; gap: 6px 10px; padding: 10px 13px; }
+      header > div.title-block { grid-column: 1; grid-row: 1; }
+      header > #status { grid-column: 1; grid-row: 2; justify-self: start; }
+      header > .settings-toggle { grid-column: 2; grid-row: 1; align-self: start; }
+      .title-block .subtle { display: none; }
+      h1 { font-size: 1.02rem; white-space: normal; }
+      .generation-rate { white-space: normal; }
+      .warning { margin: 7px 12px; padding: 7px 10px; font-size: .84rem; }
+      .voice-panel { margin: 0 12px 7px; }
+      .voice-panel > summary { min-height: 44px; padding: 0 11px; gap: 8px; }
+      .voice-summary { font-size: .82rem; }
+      .voice-title { font-size: .9rem; }
+      .voice-body { max-height: 46vh; padding: 0 10px 10px; }
+      .voice-grid { grid-template-columns: 1fr; }
+      .voice-field select, .voice-field input { min-height: 42px; font-size: .9rem; }
+      .voice-buttons button { min-height: 42px; flex: 1 1 calc(50% - 4px); }
+      main { width: 100%; }
+      .messages { padding: 22px 14px 16px; }
+      .empty { padding: 24px 12px; font-size: 1rem; }
+      .message { margin: 15px 0; }
+      .bubble { max-width: 94%; font-size: 1rem; }
+      .message.user .bubble { max-width: 88%; }
+      .composer { padding: 10px 12px max(12px, env(safe-area-inset-bottom)); }
+      textarea { min-height: 60px; padding: 11px 12px; font-size: 1rem; }
+      .controls { margin-top: 7px; }
+      .hint { display: none; }
+      .buttons { width: auto; margin-left: auto; }
+      .buttons button { min-height: 42px; flex: 0 0 auto; }
+    }
   </style>
 </head>
 <body>
   <div class="shell">
-    <header>
-      <div>
-        <h1>Ascend Edge Chat</h1>
-        <p class="subtle">教学实验模式 · 技术可运行性与中文质量分开记录 · <span id="model">读取模型中…</span></p>
-        <div class="model-picker">
-          <label for="profile-select">测试模型</label>
-          <select id="profile-select" aria-label="选择测试模型"></select>
-          <label class="token-picker" for="max-tokens">最大输出 token
-            <select id="max-tokens" aria-label="选择最大输出 token" aria-describedby="token-hint"></select>
-          </label>
-          <span id="token-hint" class="token-hint">正在读取当前模型的输出预算…</span>
+    <div class="app-grid">
+      <aside id="settings-sidebar" class="sidebar" aria-label="会话与运行设置" tabindex="-1">
+        <div class="brand">
+          <span class="brand-mark">AI</span><span class="brand-name">昇腾310B智能聊天机器人</span>
+          <button id="settings-close" class="settings-close" type="button" title="关闭设置" aria-label="关闭设置">×</button>
         </div>
-        <p id="model-note" class="model-note">读取模型目录中…</p>
+        <button class="new-chat" id="new-chat" type="button"><span aria-hidden="true">＋</span> 新建聊天</button>
+        <section class="runtime-settings" aria-labelledby="runtime-settings-title">
+          <div id="runtime-settings-title" class="sidebar-label">运行设置</div>
+          <div class="model-picker">
+            <label id="backend-label" class="runtime-label" for="backend-select" hidden>运行后端</label>
+            <select id="backend-select" aria-label="选择运行后端" hidden></select>
+            <label class="runtime-label" for="profile-select">模型</label>
+            <select id="profile-select" aria-label="选择测试模型"></select>
+            <label class="runtime-label token-picker" for="max-tokens">最大输出 token
+              <select id="max-tokens" aria-label="选择最大输出 token" aria-describedby="token-hint"></select>
+            </label>
+            <span id="token-hint" class="token-hint">正在读取当前模型的输出预算…</span>
+            <p id="model-note" class="model-note">读取模型目录中…</p>
+          </div>
+        </section>
+        <section class="board-info" aria-labelledby="board-info-title">
+          <div id="board-info-title" class="sidebar-label">开发板信息</div>
+          <dl class="board-info-list">
+            <div class="board-info-row"><dt>芯片</dt><dd id="board-soc">读取中…</dd></div>
+            <div class="board-info-row"><dt>算力</dt><dd id="board-tier">读取中…</dd></div>
+            <div class="board-info-row"><dt>NPU内存</dt><dd id="board-memory">读取中…</dd></div>
+            <div class="board-info-row"><dt>温度</dt><dd id="board-temperature">读取中…</dd></div>
+            <div class="board-info-row"><dt>健康状态</dt><dd id="board-health">读取中…</dd></div>
+            <div class="board-info-row"><dt>CANN</dt><dd id="board-cann">读取中…</dd></div>
+            <div class="board-info-row"><dt>驱动</dt><dd id="board-driver">读取中…</dd></div>
+            <div class="board-info-row"><dt>后端</dt><dd id="board-backend">读取中…</dd></div>
+            <div class="board-info-row"><dt>模型</dt><dd id="board-model">读取中…</dd></div>
+          </dl>
+          <p class="board-info-note">内存为npu-smi设备级统计，不等同于模型独占显存。</p>
+        </section>
+        <div class="sidebar-label">最近对话</div>
+        <button class="history-item" type="button">关于昇腾310B</button>
+        <button class="history-item" type="button">模型能力测试</button>
+        <div class="sidebar-foot">教学实验模式<br>硬件、后端与输出预算均来自当前开发板。</div>
+      </aside>
+      <button id="sidebar-scrim" class="sidebar-scrim" type="button" tabindex="-1" aria-label="关闭设置"></button>
+      <div class="content">
+    <header>
+      <div class="title-block">
+        <h1>昇腾310B智能聊天机器人</h1>
+        <p class="subtle">本地聊天工作区 · <span id="model">读取模型中…</span></p>
+        <p id="generation-rate" class="generation-rate" aria-live="polite">输出速率 --</p>
       </div>
       <div id="status" class="status" data-kind="busy" role="status">连接中…</div>
+      <button id="settings-toggle" class="settings-toggle" type="button" aria-controls="settings-sidebar" aria-expanded="false">设置</button>
     </header>
-    <div class="warning" role="note">实验页面未启用浏览器鉴权，请只在可信局域网使用。</div>
-    <section id="voice-panel" class="voice-panel" aria-labelledby="voice-title">
-      <div class="voice-heading">
-        <div>
-          <h2 id="voice-title">语音控制</h2>
-          <p id="voice-summary" class="voice-summary">正在读取板端 voice-agent 状态…</p>
-        </div>
+    <details id="voice-panel" class="voice-panel" aria-labelledby="voice-title">
+      <summary class="voice-heading">
+        <span class="voice-toggle" aria-hidden="true">›</span>
+        <span id="voice-title" class="voice-title">语音控制</span>
+        <span id="voice-summary" class="voice-summary">正在读取板端 voice-agent 状态…</span>
         <span id="voice-state" class="status" data-kind="busy">读取中…</span>
-      </div>
-      <div class="voice-grid">
-        <label class="voice-field" for="voice-mode">语音模式
-          <select id="voice-mode" aria-label="选择语音模式">
-            <option value="disabled">关闭语音</option>
-            <option value="board">开发板 USB 音频</option>
-            <option value="browser">浏览器语音（HTTPS/localhost）</option>
-          </select>
+      </summary>
+      <div class="voice-body">
+        <div class="voice-grid">
+          <label class="voice-field" for="voice-mode">语音模式
+            <select id="voice-mode" aria-label="选择语音模式">
+              <option value="disabled">关闭语音</option>
+              <option value="board">开发板 USB 音频</option>
+              <option value="browser">浏览器语音（HTTPS/localhost）</option>
+            </select>
+          </label>
+          <label class="voice-field" for="voice-input">麦克风
+            <select id="voice-input" aria-label="选择板端麦克风"></select>
+          </label>
+          <label class="voice-field" for="voice-output">扬声器
+            <select id="voice-output" aria-label="选择板端扬声器"></select>
+          </label>
+        </div>
+        <label class="voice-auto" for="voice-auto-listen">
+          <input id="voice-auto-listen" type="checkbox">
+          自动 VAD 静音切分并开始下一轮板端听取
         </label>
-        <label class="voice-field" for="voice-input">麦克风
-          <select id="voice-input" aria-label="选择板端麦克风"></select>
-        </label>
-        <label class="voice-field" for="voice-output">扬声器
-          <select id="voice-output" aria-label="选择板端扬声器"></select>
-        </label>
+        <div class="voice-buttons">
+          <button id="voice-apply" type="button">保存语音配置</button>
+          <button id="voice-start" class="primary" type="button">开始板端监听</button>
+          <button id="voice-stop" type="button">停止并释放音频</button>
+          <button id="voice-self-test" type="button">按住说话并回放</button>
+        </div>
+        <p id="voice-note" class="voice-note">板端模式直接使用开发板 USB 麦克风和扬声器；浏览器不会采集或播放音频。</p>
       </div>
-      <label class="voice-auto" for="voice-auto-listen">
-        <input id="voice-auto-listen" type="checkbox">
-        自动 VAD 静音切分并开始下一轮板端听取
-      </label>
-      <div class="voice-buttons">
-        <button id="voice-apply" type="button">保存语音配置</button>
-        <button id="voice-start" class="primary" type="button">开始板端监听</button>
-        <button id="voice-stop" type="button">停止并释放音频</button>
-        <button id="voice-self-test" type="button">录音回放自检（2 秒）</button>
-      </div>
-      <p id="voice-note" class="voice-note">板端模式直接使用开发板 USB 麦克风和扬声器；浏览器不会采集或播放音频。</p>
-    </section>
+    </details>
     <main>
+      <section id="messages" class="messages" aria-live="polite"><div id="empty" class="empty">输入消息开始对话</div></section>
       <form id="composer" class="composer">
         <label class="composer-label" for="input">文字输入（始终可用）</label>
-        <textarea id="input" maxlength="700" placeholder="输入消息…" aria-label="文字消息"></textarea>
+        <textarea id="input" maxlength="700" placeholder="给模型发送消息…" aria-label="文字消息"></textarea>
         <div class="controls">
-          <span class="hint">文字与语音可切换；Enter 发送，Shift+Enter 换行</span>
+          <span class="hint">Enter 发送，Shift+Enter 换行</span>
           <div class="buttons">
             <button id="clear" type="button">清空</button>
-            <button id="send" class="primary" type="submit">发送文字</button>
+            <button id="send" class="primary" type="submit">发送</button>
           </div>
         </div>
       </form>
-      <section id="messages" class="messages" aria-live="polite"><div id="empty" class="empty">输入文字或选择语音模式开始测试</div></section>
     </main>
+      </div>
+    </div>
   </div>
   <script>
     (() => {
+      let voicePollTimer = null;
+      let boardInfoPollTimer = null;
       const state = {
         busy: false,
         assistant: null,
@@ -1284,11 +1758,24 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         selectedProfile: '',
         profiles: [],
         modelSwitching: false,
+        backendSwitching: false,
+        backendSupervisor: false,
+        backends: [],
+        activeBackend: '',
+        selectedBackend: '',
         worker: { healthy: false, reason: '正在读取本地模型状态…' },
         voice: null,
         voiceBusy: false,
+        voiceHoldActive: false,
+        voiceAudioBusy: false,
+        voiceAudioStartPromise: null,
+        voiceHoldReleasePending: false,
+        voiceHoldReleaseCancel: false,
         browserCapture: null,
-        browserAudio: null
+        browserAudio: null,
+        requestStartedAt: 0,
+        firstContentAt: 0,
+        boardInfo: null
       };
       const messages = document.getElementById('messages');
       const empty = document.getElementById('empty');
@@ -1296,8 +1783,11 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       const send = document.getElementById('send');
       const clear = document.getElementById('clear');
       const status = document.getElementById('status');
+      const generationRate = document.getElementById('generation-rate');
       const model = document.getElementById('model');
       const profileSelect = document.getElementById('profile-select');
+      const backendSelect = document.getElementById('backend-select');
+      const backendLabel = document.getElementById('backend-label');
       const modelNote = document.getElementById('model-note');
       const maxTokens = document.getElementById('max-tokens');
       const tokenHint = document.getElementById('token-hint');
@@ -1312,11 +1802,165 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       const voiceState = document.getElementById('voice-state');
       const voiceSummary = document.getElementById('voice-summary');
       const voiceNote = document.getElementById('voice-note');
+      const newChat = document.getElementById('new-chat');
+      const settingsSidebar = document.getElementById('settings-sidebar');
+      const settingsToggle = document.getElementById('settings-toggle');
+      const settingsClose = document.getElementById('settings-close');
+      const sidebarScrim = document.getElementById('sidebar-scrim');
+      const content = document.querySelector('.content');
+      const boardSoc = document.getElementById('board-soc');
+      const boardTier = document.getElementById('board-tier');
+      const boardMemory = document.getElementById('board-memory');
+      const boardTemperature = document.getElementById('board-temperature');
+      const boardHealth = document.getElementById('board-health');
+      const boardCann = document.getElementById('board-cann');
+      const boardDriver = document.getElementById('board-driver');
+      const boardBackend = document.getElementById('board-backend');
+      const boardModel = document.getElementById('board-model');
+      const settingsMedia = window.matchMedia('(max-width: 820px)');
       const TOKEN_BUDGETS = [32, 64, 96, 128, 192, 256];
+
+      function syncSettingsDrawer() {
+        const open = document.body.classList.contains('settings-open') && settingsMedia.matches;
+        if (!settingsMedia.matches) document.body.classList.remove('settings-open');
+        settingsToggle.setAttribute('aria-expanded', String(open));
+        settingsSidebar.inert = settingsMedia.matches && !open;
+        content.inert = open;
+        if (open) {
+          settingsSidebar.setAttribute('role', 'dialog');
+          settingsSidebar.setAttribute('aria-modal', 'true');
+          settingsSidebar.removeAttribute('aria-hidden');
+        } else {
+          settingsSidebar.removeAttribute('role');
+          settingsSidebar.removeAttribute('aria-modal');
+          if (settingsMedia.matches) {
+            settingsSidebar.setAttribute('aria-hidden', 'true');
+          } else {
+            settingsSidebar.removeAttribute('aria-hidden');
+          }
+        }
+      }
+
+      function setSettingsOpen(open, restoreFocus = true) {
+        const next = Boolean(open && settingsMedia.matches);
+        document.body.classList.toggle('settings-open', next);
+        syncSettingsDrawer();
+        if (next) {
+          settingsClose.focus();
+        } else if (restoreFocus && settingsMedia.matches) {
+          settingsToggle.focus();
+        }
+      }
+
+      function trapSettingsFocus(event) {
+        if (event.key !== 'Tab' || !document.body.classList.contains('settings-open')) return;
+        const focusable = Array.from(settingsSidebar.querySelectorAll(
+          'button:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+        )).filter((node) => !node.hidden && node.offsetParent !== null);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
 
       function setStatus(text, kind) {
         status.textContent = text;
         status.dataset.kind = kind || 'busy';
+      }
+
+      function setGenerationRate(text, kind, detail = '') {
+        generationRate.textContent = text;
+        generationRate.dataset.kind = kind || '';
+        generationRate.title = detail;
+      }
+
+      function renderGenerationRate(event, completedAt) {
+        const usage = event && typeof event.usage === 'object' ? event.usage : null;
+        const completionTokens = Number(usage?.completion_tokens);
+        const hasUsage = Number.isInteger(completionTokens) && completionTokens > 0;
+        const hasTiming = state.firstContentAt > 0 && completedAt > state.firstContentAt;
+        if (!hasUsage || !hasTiming) {
+          setGenerationRate('输出速率 暂无 token 统计', '');
+          return;
+        }
+        const generationSeconds = (completedAt - state.firstContentAt) / 1000;
+        const requestSeconds = state.requestStartedAt > 0
+          ? (completedAt - state.requestStartedAt) / 1000
+          : 0;
+        const ttftSeconds = state.requestStartedAt > 0
+          ? (state.firstContentAt - state.requestStartedAt) / 1000
+          : 0;
+        const tokensPerSecond = completionTokens / generationSeconds;
+        const endToEndRate = requestSeconds > 0 ? completionTokens / requestSeconds : 0;
+        setGenerationRate(
+          '生成速率 ' + tokensPerSecond.toFixed(2) + ' token/s · ' + completionTokens + ' token',
+          'ready',
+          '生成阶段从首段内容到完成，不含首 token 等待；TTFT ' + ttftSeconds.toFixed(2) +
+            ' 秒，端到端 ' + endToEndRate.toFixed(2) + ' token/s。'
+        );
+      }
+
+      function setBoardField(node, value, kind = '') {
+        const text = value === null || value === undefined || value === '' ? '未读取' : String(value);
+        node.textContent = text;
+        node.title = text;
+        node.dataset.kind = kind;
+      }
+
+      function formatBoardSoc(value) {
+        return typeof value === 'string' ? value.replace(/^Ascend\s*/i, 'Ascend ') : null;
+      }
+
+      function formatNpuMemory(memory) {
+        const used = Number(memory?.used_mb);
+        const total = Number(memory?.total_mb);
+        if (!Number.isFinite(used) || !Number.isFinite(total) || total <= 0) return null;
+        return (used / 1024).toFixed(1) + ' / ' + (total / 1024).toFixed(1) + ' GB';
+      }
+
+      function renderBoardInfo(info) {
+        state.boardInfo = info && typeof info === 'object' ? info : null;
+        const board = state.boardInfo?.board;
+        const npu = state.boardInfo?.npu;
+        const health = typeof npu?.health === 'string' ? npu.health : null;
+        const healthKind = /^(ok|normal|healthy)$/i.test(health || '')
+          ? 'ok'
+          : health ? 'warning' : '';
+        const backend = state.boardInfo?.runtime?.backend;
+        const backendDisplay = backend === 'mindspore'
+          ? 'MindSpore'
+          : backend === 'acl-static-kv' ? 'PyACL固定KV' : backend;
+        setBoardField(boardSoc, formatBoardSoc(board?.soc));
+        setBoardField(boardTier, board?.tier);
+        setBoardField(boardMemory, formatNpuMemory(npu?.memory));
+        setBoardField(boardTemperature, Number.isFinite(Number(npu?.temperature_c)) ? Number(npu.temperature_c) + '°C' : null);
+        setBoardField(boardHealth, health, healthKind);
+        setBoardField(boardCann, state.boardInfo?.cann?.version);
+        setBoardField(boardDriver, state.boardInfo?.driver?.version);
+        setBoardField(boardBackend, backendDisplay);
+        setBoardField(boardModel, state.boardInfo?.runtime?.model_display || state.boardInfo?.runtime?.model);
+      }
+
+      async function refreshBoardInfo() {
+        try {
+          const response = await fetch('/api/board-info', { cache: 'no-store' });
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          renderBoardInfo(await response.json());
+        } catch (_) {
+          if (!state.boardInfo) renderBoardInfo(null);
+        }
+      }
+
+      function startBoardInfoPolling() {
+        if (boardInfoPollTimer !== null) window.clearInterval(boardInfoPollTimer);
+        void refreshBoardInfo();
+        boardInfoPollTimer = window.setInterval(() => { void refreshBoardInfo(); }, 5000);
       }
 
       function setBusy(value) {
@@ -1326,6 +1970,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         clear.disabled = value;
         input.disabled = value || workerUnavailable;
         profileSelect.disabled = value || state.modelSwitching !== true;
+        backendSelect.disabled = value || state.backendSupervisor !== true || state.backendSwitching;
         maxTokens.disabled = value;
       }
 
@@ -1396,17 +2041,21 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         state.voiceBusy = value;
         const unavailable = state.voice?.available !== true;
         const browserMode = voiceMode.value === 'browser';
+        const boardMode = voiceMode.value === 'board';
         const disabledMode = voiceMode.value === 'disabled';
         const capturing = state.browserCapture !== null;
+        const audioTesting = state.voiceAudioBusy || state.voiceHoldActive;
         const asrUnavailable = browserMode && state.voice?.speech?.asr_ready !== true;
-        voiceMode.disabled = value || unavailable || capturing;
-        voiceInput.disabled = value || unavailable || browserMode || disabledMode || capturing;
-        voiceOutput.disabled = value || unavailable || browserMode || disabledMode || capturing;
-        voiceAutoListen.disabled = value || unavailable || browserMode || disabledMode || capturing;
-        voiceApply.disabled = value || unavailable || capturing;
-        voiceStart.disabled = value || unavailable || disabledMode || capturing || asrUnavailable || (browserMode && !browserAudioAllowed());
-        voiceStop.disabled = unavailable || disabledMode || (browserMode ? !capturing : value);
-        voiceSelfTest.disabled = value || !browserMode || capturing || !browserAudioAllowed();
+        voiceMode.disabled = value || unavailable || capturing || audioTesting;
+        voiceInput.disabled = value || unavailable || browserMode || disabledMode || capturing || audioTesting;
+        voiceOutput.disabled = value || unavailable || browserMode || disabledMode || capturing || audioTesting;
+        voiceAutoListen.disabled = value || unavailable || browserMode || disabledMode || capturing || audioTesting;
+        voiceApply.disabled = value || unavailable || capturing || audioTesting;
+        voiceStart.disabled = value || unavailable || disabledMode || capturing || audioTesting || asrUnavailable || (browserMode && !browserAudioAllowed());
+        voiceStop.disabled = unavailable || disabledMode || (browserMode ? !capturing : value || state.voiceHoldActive);
+        voiceSelfTest.disabled = value || unavailable || disabledMode || capturing ||
+          (state.voiceAudioBusy && !state.voiceHoldActive) ||
+          (browserMode ? !browserAudioAllowed() : !boardMode);
       }
 
       function deviceOptions(select, devices, selected, placeholder) {
@@ -1419,7 +2068,11 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           if (!device || typeof device.id !== 'string') return;
           const option = document.createElement('option');
           option.value = device.id;
-          option.textContent = typeof device.label === 'string' ? device.label : device.id;
+          const label = typeof device.label === 'string' ? device.label : device.id;
+          const model = typeof device.model === 'string' ? device.model.trim() : '';
+          option.textContent = model && !label.toLowerCase().includes(model.toLowerCase())
+            ? model + ' / ' + label
+            : label;
           select.appendChild(option);
         });
         select.value = typeof selected === 'string' ? selected : '';
@@ -1436,19 +2089,38 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         voiceAutoListen.checked = state.voice.auto_listen === true && mode === 'board';
         const asrReady = state.voice.speech?.asr_ready === true;
         const speechReady = state.voice.speech_ready === true;
+        const deviceError = typeof state.voice.device_error === 'string' ? state.voice.device_error : '';
         const browserOutputReady = browserSpeechOutputSupported();
-        const stateText = state.voice.state === 'busy' ? '板端监听中' :
+        const currentTurn = state.voice.active_turn || state.voice.latest_turn || null;
+        const completedTurn = state.voice.last_completed_turn || null;
+        const displayTurn = currentTurn && (currentTurn.transcript || currentTurn.reply)
+          ? currentTurn
+          : completedTurn || currentTurn;
+        const turnState = currentTurn && typeof currentTurn.state === 'string' ? currentTurn.state : '';
+        const boardStateText = {
+          listening: '等待语音', transcribing: '识别语音中', thinking: '模型思考中',
+          speaking: '播报回复中', completed: '语音回复完成', failed: '语音轮次失败',
+          cancelled: '语音轮次已取消'
+        }[turnState];
+        const stateText = mode === 'board' && boardStateText ? boardStateText :
+          state.voice.state === 'busy' ? '板端监听中' :
           state.voice.state === 'idle' ? '板端就绪' :
           state.voice.state === 'unavailable' && state.voice.available && mode === 'browser' && !asrReady ? '仅录音自检可用' :
           state.voice.state === 'unavailable' && state.voice.available && mode === 'browser' && (speechReady || browserOutputReady) ? '录音识别与语音回复可用' :
           state.voice.state === 'unavailable' && state.voice.available && mode === 'browser' ? '录音识别可用' :
           state.voice.state === 'unavailable' && state.voice.available ? '语音模型未配置' :
           state.voice.state === 'unavailable' ? '语音代理不可用' : '语音已关闭';
-        setVoiceState(stateText, state.voice.state === 'busy' ? 'busy' : state.voice.available ? 'ok' : 'warning');
+        setVoiceState(
+          stateText,
+          state.voice.state === 'busy' ? 'busy' :
+          turnState === 'failed' ? 'error' :
+          state.voice.available ? 'ok' : 'warning'
+        );
         if (mode === 'browser') {
           voiceStart.textContent = !asrReady ? '语音识别未配置' :
             state.browserCapture ? '浏览器录音中…' : '开始浏览器录音';
           voiceStop.textContent = state.browserCapture ? '停止录音并识别' : '停止浏览器录音';
+          voiceSelfTest.textContent = '录音回放自检（2秒）';
           voiceSummary.textContent = browserAudioAllowed()
             ? (!asrReady
               ? '浏览器录音和回放自检可用；ASR 未配置，完整语音轮次暂不可用。'
@@ -1466,11 +2138,30 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         } else if (mode === 'board') {
           voiceStart.textContent = '开始板端监听';
           voiceStop.textContent = '停止并释放音频';
+          voiceSelfTest.textContent = state.voiceHoldActive ? '正在录音，松开回放' :
+            state.voiceAudioBusy ? '正在回放…' : '按住说话并回放';
           voiceSummary.textContent = state.voice.ready ? '开发板直接管理 USB 麦克风、VAD 和扬声器。' : '板端语音代理尚未通过设备或模型就绪门。';
-          voiceNote.textContent = '浏览器只配置板端 allowlist 中的设备 ID；不会读取、上传或播放原始 PCM。';
+          const transcript = displayTurn && typeof displayTurn.transcript === 'string' ? displayTurn.transcript.trim() : '';
+          const reply = displayTurn && typeof displayTurn.reply === 'string' ? displayTurn.reply.trim() : '';
+          const error = currentTurn && typeof currentTurn.error === 'string' ? currentTurn.error.trim() : '';
+          if (deviceError) {
+            voiceNote.textContent = '音频设备已断开：' + deviceError;
+          } else if (currentTurn?.error_code === 'no_speech' && turnState === 'failed') {
+            voiceNote.textContent = '监听窗口内未检测到语音，系统会继续等待下一轮输入。';
+          } else if (turnState === 'failed' && error) {
+            voiceNote.textContent = '语音轮次失败：' + error;
+          } else if (transcript || reply) {
+            voiceNote.textContent = [
+              transcript ? '识别：' + transcript : '',
+              reply ? '回复：' + reply : ''
+            ].filter(Boolean).join('  ');
+          } else {
+            voiceNote.textContent = '按住“按住说话并回放”，松开后会直接从所选扬声器播放刚才的录音。';
+          }
         } else {
           voiceStart.textContent = '开始板端监听';
           voiceStop.textContent = '停止并释放音频';
+          voiceSelfTest.textContent = '按住说话并回放';
           voiceSummary.textContent = state.voice.reason || '语音功能当前关闭。';
           voiceNote.textContent = '启用前需要板端 voice-agent、USB 音频设备和独立 ASR/TTS 验收。';
         }
@@ -1513,13 +2204,111 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       }
 
       async function refreshVoice() {
+        if (state.voiceBusy || state.voiceHoldActive || state.voiceAudioBusy) return;
         try {
-          const response = await fetch('/api/voice/status');
+          const response = await fetch('/api/voice/status', { cache: 'no-store' });
           if (!response.ok) throw new Error('HTTP ' + response.status);
           renderVoice(await response.json());
         } catch (_) {
           renderVoice({ available: false, mode: 'disabled', state: 'unavailable', reason: '无法读取板端语音代理状态。' });
         }
+      }
+
+      function startVoicePolling() {
+        if (voicePollTimer !== null) return;
+        voicePollTimer = window.setInterval(() => {
+          if (!document.hidden) void refreshVoice();
+        }, 1500);
+      }
+
+      async function postVoiceAction(path) {
+        const response = await fetch(path, {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' }
+        });
+        let payload = {};
+        try { payload = await response.json(); } catch (_) {}
+        if (!response.ok) {
+          throw new Error(payload.error?.message || payload.detail || ('HTTP ' + response.status));
+        }
+        return payload;
+      }
+
+      async function finishBoardAudioTest(cancel = false) {
+        state.voiceAudioBusy = true;
+        voiceSelfTest.classList.remove('recording');
+        voiceNote.textContent = cancel ? '正在取消录音…' : '录音结束，正在回放…';
+        setVoiceState(cancel ? '取消录音' : '正在回放', 'busy');
+        setVoiceBusy(false);
+        try {
+          const payload = await postVoiceAction(
+            cancel ? '/api/voice/audio-test/cancel' : '/api/voice/audio-test/stop'
+          );
+          if (cancel) {
+            voiceNote.textContent = '录音已取消。';
+            setVoiceState('录音已取消', 'ok');
+          } else {
+            const duration = Number(payload.duration_seconds || 0);
+            voiceNote.textContent = `录音 ${duration.toFixed(2)} 秒，已通过所选扬声器回放。`;
+            setVoiceState('回放完成', 'ok');
+          }
+        } catch (error) {
+          try { await postVoiceAction('/api/voice/audio-test/cancel'); } catch (_) {}
+          voiceNote.textContent = error instanceof Error ? error.message : '录音回放失败。';
+          setVoiceState('回放失败', 'error');
+        } finally {
+          state.voiceAudioBusy = false;
+          setVoiceBusy(false);
+        }
+      }
+
+      async function startBoardAudioTest() {
+        if (state.voiceHoldActive || state.voiceAudioBusy || voiceMode.value !== 'board') return;
+        state.voiceHoldActive = true;
+        state.voiceAudioBusy = true;
+        state.voiceHoldReleasePending = false;
+        setVoiceBusy(false);
+        setVoiceState('准备录音', 'busy');
+        const startPromise = postVoiceAction('/api/voice/audio-test/start');
+        state.voiceAudioStartPromise = startPromise;
+        try {
+          await startPromise;
+          state.voiceAudioStartPromise = null;
+          if (state.voiceHoldReleasePending) {
+            const cancel = state.voiceHoldReleaseCancel;
+            state.voiceHoldReleasePending = false;
+            state.voiceHoldReleaseCancel = false;
+            state.voiceAudioBusy = false;
+            await finishBoardAudioTest(cancel);
+            return;
+          }
+          state.voiceAudioBusy = false;
+          voiceSelfTest.classList.add('recording');
+          voiceNote.textContent = '正在录音；松开按钮后立即回放。';
+          setVoiceState('正在录音', 'busy');
+        } catch (error) {
+          state.voiceAudioStartPromise = null;
+          state.voiceAudioBusy = false;
+          state.voiceHoldActive = false;
+          state.voiceHoldReleasePending = false;
+          state.voiceHoldReleaseCancel = false;
+          voiceNote.textContent = error instanceof Error ? error.message : '无法开始录音。';
+          setVoiceState('录音失败', 'error');
+        } finally {
+          setVoiceBusy(false);
+        }
+      }
+
+      async function stopBoardAudioTest(cancel = false) {
+        if (!state.voiceHoldActive && state.voiceAudioStartPromise === null) return;
+        state.voiceHoldActive = false;
+        if (state.voiceAudioStartPromise !== null) {
+          state.voiceHoldReleasePending = true;
+          state.voiceHoldReleaseCancel = cancel;
+          voiceNote.textContent = '正在结束录音…';
+          return;
+        }
+        await finishBoardAudioTest(cancel);
       }
 
       function flattenCapture(chunks) {
@@ -1712,6 +2501,33 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         return state.profiles.find((candidate) => candidate.id === state.selectedProfile) || null;
       }
 
+      function populateBackends(items, active) {
+        state.backends = Array.isArray(items) ? items : [];
+        state.backendSupervisor = state.backends.length > 0;
+        backendSelect.hidden = !state.backendSupervisor;
+        backendLabel.hidden = !state.backendSupervisor;
+        if (!state.backendSupervisor) return;
+        state.activeBackend = active || state.activeBackend || '';
+        backendSelect.replaceChildren();
+        state.backends.forEach((item) => {
+          if (!item || typeof item.id !== 'string') return;
+          const option = document.createElement('option');
+          option.value = item.id;
+          option.textContent = item.display_name || item.id;
+          backendSelect.appendChild(option);
+        });
+        const chosen = state.backends.some((item) => item.id === state.selectedBackend)
+          ? state.selectedBackend
+          : state.activeBackend || state.backends[0]?.id || '';
+        state.selectedBackend = chosen;
+        backendSelect.value = chosen;
+      }
+
+      function modelsForSelectedBackend() {
+        const backend = state.backends.find((item) => item.id === state.selectedBackend);
+        return Array.isArray(backend?.models) ? backend.models : [];
+      }
+
       function updateTokenControl(resetValue) {
         const item = selectedProfileItem();
         const maximum = Math.max(1, Number(item?.max_tokens) || 256);
@@ -1750,6 +2566,8 @@ TEXT_CHAT_HTML = r"""<!doctype html>
       }
 
       function updateModelNote() {
+        const activeItem = state.profiles.find((candidate) => candidate.id === state.activeProfile);
+        model.textContent = activeItem?.display_name || state.activeProfile || '尚未选择模型';
         const item = state.profiles.find((candidate) => candidate.id === state.selectedProfile);
         if (!item) return;
         const status = item.quality_status === 'failed' ? '中文质量未通过，但仍保留技术测试入口。' :
@@ -1817,7 +2635,9 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         if (!event || typeof event.type !== 'string') return;
         if (event.type === 'start') {
           setStatus('生成中…', 'busy');
+          setGenerationRate('输出速率 等待首 token…', 'active');
         } else if (event.type === 'delta' && typeof event.text === 'string') {
+          if (event.text && state.firstContentAt === 0) state.firstContentAt = performance.now();
           if (!state.assistant) state.assistant = addMessage('assistant', '');
           state.assistant.textContent += event.text;
           messages.scrollTop = messages.scrollHeight;
@@ -1831,6 +2651,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           }
           state.terminal = true;
           state.truncated = event.finish_reason === 'length';
+          renderGenerationRate(event, performance.now());
           if (state.truncated) {
             setStatus('达到 ' + maxTokens.value + ' token 输出上限，已保留当前文本', 'warning');
           } else {
@@ -1838,6 +2659,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           }
         } else if (event.type === 'error') {
           state.terminal = true;
+          setGenerationRate('输出速率 未完成', '');
           setStatus('请求失败', 'error');
           if (!state.assistant) state.assistant = addMessage('assistant', '');
           state.assistant.textContent = '错误：' + (event.message || '未知错误');
@@ -1867,6 +2689,9 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         state.assistant = null;
         state.terminal = false;
         state.truncated = false;
+        state.requestStartedAt = performance.now();
+        state.firstContentAt = 0;
+        setGenerationRate('输出速率 准备统计…', 'active');
         setBusy(true);
         setStatus('请求中…', 'busy');
         try {
@@ -1917,6 +2742,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
             setStatus('就绪', 'ok');
           }
         } catch (error) {
+          setGenerationRate('输出速率 未完成', '');
           setStatus('请求失败', 'error');
           if (!state.assistant) state.assistant = addMessage('assistant', '');
           state.assistant.textContent = '错误：' + (error instanceof Error ? error.message : '请求失败');
@@ -1926,29 +2752,53 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         }
       }
 
-      async function switchProfile() {
-        if (state.modelSwitching !== true) {
+      function snapshotRuntimeSelection() {
+        return {
+          activeBackend: state.activeBackend,
+          selectedBackend: state.selectedBackend,
+          activeProfile: state.activeProfile,
+          selectedProfile: state.selectedProfile,
+          profiles: state.profiles.slice(),
+          token: maxTokens.value
+        };
+      }
+
+      function restoreRuntimeSelection(snapshot) {
+        state.activeBackend = snapshot.activeBackend;
+        state.selectedBackend = snapshot.selectedBackend;
+        backendSelect.value = snapshot.selectedBackend;
+        populateProfiles(snapshot.profiles, snapshot.activeProfile);
+        state.selectedProfile = snapshot.selectedProfile || snapshot.activeProfile;
+        profileSelect.value = state.selectedProfile;
+        if (Array.from(maxTokens.options).some((option) => option.value === snapshot.token)) {
+          maxTokens.value = snapshot.token;
+        }
+        updateModelNote();
+      }
+
+      async function switchProfile(force = false) {
+        if (state.modelSwitching !== true && !state.backendSupervisor) {
           profileSelect.value = state.activeProfile;
-          return;
+          return false;
         }
         const target = profileSelect.value;
-        if (!target || target === state.activeProfile) {
+        if (!target || (target === state.activeProfile && !force)) {
           updateModelNote();
-          return;
+          return true;
         }
         if (state.busy) {
           state.selectedProfile = state.activeProfile;
           profileSelect.value = state.activeProfile;
           setStatus('当前回复正在生成，完成后可切换模型。', 'busy');
           updateModelNote();
-          return;
+          return false;
         }
         const item = state.profiles.find((candidate) => candidate.id === target);
         if (!item || !item.selectable || item.available === false) {
           profileSelect.value = state.activeProfile;
           state.selectedProfile = state.activeProfile;
           updateModelNote();
-          return;
+          return false;
         }
         state.selectedProfile = target;
         updateModelNote();
@@ -1956,17 +2806,22 @@ TEXT_CHAT_HTML = r"""<!doctype html>
         setBusy(true);
         setStatus('切换模型中…', 'busy');
         try {
-          const response = await fetch('/api/select-model', {
+          const response = await fetch(state.backendSupervisor ? '/api/select-backend' : '/api/select-model', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ profile: target })
+            body: JSON.stringify(state.backendSupervisor
+              ? { backend: state.selectedBackend, model: target }
+              : { profile: target })
           });
           let payload = {};
           try { payload = await response.json(); } catch (_) {}
           if (!response.ok) {
             throw new Error(payload.error?.message || 'HTTP ' + response.status);
           }
-          state.activeProfile = payload.active_profile || target;
+          state.activeBackend = payload.backend || state.selectedBackend;
+          state.selectedBackend = state.activeBackend;
+          backendSelect.value = state.activeBackend;
+          state.activeProfile = payload.active_profile || payload.model || target;
           state.selectedProfile = state.activeProfile;
           profileSelect.value = state.activeProfile;
           if (payload.health) renderWorker(payload.health);
@@ -1974,15 +2829,53 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           renderHistory([]);
           setStatus('就绪', 'ok');
           updateModelNote();
+          return true;
         } catch (error) {
           state.selectedProfile = state.activeProfile;
           profileSelect.value = state.activeProfile;
           updateTokenControl(true);
           setStatus('切换失败', 'error');
           modelNote.textContent = (error instanceof Error ? error.message : '模型切换失败') + ' 当前模型未改变。';
+          return false;
         } finally {
           setBusy(false);
         }
+      }
+
+      async function selectBackend() {
+        if (!state.backendSupervisor) return;
+        const target = backendSelect.value;
+        if (!target || target === state.activeBackend) return;
+        if (state.busy) {
+          backendSelect.value = state.activeBackend;
+          setStatus('当前回复正在生成，完成后可切换运行后端。', 'busy');
+          return;
+        }
+        const snapshot = snapshotRuntimeSelection();
+        state.backendSwitching = true;
+        state.selectedBackend = target;
+        const models = modelsForSelectedBackend();
+        const defaultModel = models.find((item) => item.selectable)?.id || '';
+        if (!defaultModel) {
+          restoreRuntimeSelection(snapshot);
+          state.backendSwitching = false;
+          setBusy(false);
+          setStatus('该后端没有可启动的登记模型。', 'warning');
+          return;
+        }
+        populateProfiles(models, '');
+        profileSelect.value = defaultModel;
+        state.selectedProfile = defaultModel;
+        state.modelSwitching = true;
+        const switched = await switchProfile(true);
+        state.backendSwitching = false;
+        if (!switched) {
+          restoreRuntimeSelection(snapshot);
+          setBusy(false);
+          backendSelect.focus();
+          return;
+        }
+        setBusy(false);
       }
 
       async function clearConversation() {
@@ -1994,6 +2887,24 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           setStatus('已清空', 'ok');
         } catch (error) {
           setStatus('清空失败', 'error');
+        }
+      }
+
+      async function refreshRuntimeSettings() {
+        if (state.busy) return;
+        try {
+          const response = await fetch('/api/config');
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          const config = await response.json();
+          state.modelSwitching = config.model_switching === true;
+          state.selectedBackend = config.active_backend || '';
+          populateBackends(config.backends, config.active_backend);
+          const backendModels = state.backendSupervisor ? modelsForSelectedBackend() : config.profiles;
+          populateProfiles(backendModels, config.active_profile);
+          renderWorker(config.worker);
+          setStatus(state.worker?.healthy === true ? '就绪' : (state.worker?.reason || '本地模型未就绪'), state.worker?.healthy === true ? 'ok' : 'warning');
+        } catch (_) {
+          setStatus('运行设置刷新失败', 'warning');
         }
       }
 
@@ -2011,12 +2922,15 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           if (voiceResponse.ok) {
             try { voice = await voiceResponse.json(); } catch (_) {}
           }
-          model.textContent = config.model || 'ascend-edge-chat';
-          populateProfiles(config.profiles, config.active_profile);
+          populateBackends(config.backends, config.active_backend);
+          const backendModels = state.backendSupervisor ? modelsForSelectedBackend() : config.profiles;
+          populateProfiles(backendModels, config.active_profile);
           renderWorker(config.worker);
           if (Number.isInteger(config.max_characters)) input.maxLength = config.max_characters;
           renderHistory(history.messages);
           renderVoice(voice);
+          startVoicePolling();
+          startBoardInfoPolling();
           if (state.worker?.healthy === true) {
             setStatus('就绪', 'ok');
           } else {
@@ -2024,13 +2938,39 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           }
         } catch (_) {
           renderVoice({ available: false, mode: 'disabled', state: 'unavailable', reason: '无法读取语音控制面。' });
+          startVoicePolling();
+          startBoardInfoPolling();
           setStatus('连接失败', 'error');
         }
       }
 
       document.getElementById('composer').addEventListener('submit', sendMessage);
       clear.addEventListener('click', clearConversation);
+      newChat.addEventListener('click', () => {
+        setSettingsOpen(false, false);
+        void clearConversation();
+      });
+      settingsToggle.addEventListener('click', () => {
+        setSettingsOpen(true);
+        void refreshRuntimeSettings();
+        void refreshBoardInfo();
+      });
+      settingsClose.addEventListener('click', () => { setSettingsOpen(false); });
+      sidebarScrim.addEventListener('click', () => { setSettingsOpen(false); });
+      document.addEventListener('keydown', (event) => {
+        trapSettingsFocus(event);
+        if (event.key === 'Escape' && document.body.classList.contains('settings-open')) {
+          event.preventDefault();
+          setSettingsOpen(false);
+        }
+      });
+      if (typeof settingsMedia.addEventListener === 'function') {
+        settingsMedia.addEventListener('change', syncSettingsDrawer);
+      } else {
+        settingsMedia.addListener(syncSettingsDrawer);
+      }
       profileSelect.addEventListener('change', switchProfile);
+      backendSelect.addEventListener('change', () => { void selectBackend(); });
       voiceMode.addEventListener('change', () => {
         setVoiceBusy(state.voiceBusy);
         if (voiceMode.value === 'browser') {
@@ -2054,8 +2994,47 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           void updateVoice(false);
         }
       });
-      voiceSelfTest.addEventListener('click', () => {
-        if (voiceMode.value === 'browser') void startBrowserCapture('self-test');
+      let boardPointerId = null;
+      voiceSelfTest.addEventListener('pointerdown', (event) => {
+        if (voiceMode.value !== 'board') return;
+        event.preventDefault();
+        boardPointerId = event.pointerId;
+        voiceSelfTest.setPointerCapture(event.pointerId);
+        void startBoardAudioTest();
+      });
+      voiceSelfTest.addEventListener('pointerup', (event) => {
+        if (voiceMode.value !== 'board' || boardPointerId !== event.pointerId) return;
+        event.preventDefault();
+        boardPointerId = null;
+        void stopBoardAudioTest(false);
+      });
+      voiceSelfTest.addEventListener('pointercancel', () => {
+        if (voiceMode.value !== 'board') return;
+        boardPointerId = null;
+        void stopBoardAudioTest(true);
+      });
+      voiceSelfTest.addEventListener('keydown', (event) => {
+        if (voiceMode.value !== 'board' || ![' ', 'Enter'].includes(event.key) || event.repeat) return;
+        event.preventDefault();
+        void startBoardAudioTest();
+      });
+      voiceSelfTest.addEventListener('keyup', (event) => {
+        if (voiceMode.value !== 'board' || ![' ', 'Enter'].includes(event.key)) return;
+        event.preventDefault();
+        void stopBoardAudioTest(false);
+      });
+      voiceSelfTest.addEventListener('click', (event) => {
+        if (voiceMode.value === 'browser') {
+          void startBrowserCapture('self-test');
+        } else if (voiceMode.value === 'board') {
+          event.preventDefault();
+        }
+      });
+      window.addEventListener('blur', () => {
+        if (state.voiceHoldActive) void stopBoardAudioTest(true);
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && state.voiceHoldActive) void stopBoardAudioTest(true);
       });
       input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
@@ -2063,6 +3042,7 @@ TEXT_CHAT_HTML = r"""<!doctype html>
           document.getElementById('composer').requestSubmit();
         }
       });
+      syncSettingsDrawer();
       initialize();
     })();
   </script>
@@ -2105,6 +3085,50 @@ def create_text_chat_app(
         max_messages=runtime_settings.max_messages,
         max_characters=runtime_settings.max_characters,
     )
+    supervisor_url = runtime_settings.backend_supervisor_url
+    supervisor_enabled = bool(supervisor_url)
+
+    async def backend_snapshot() -> dict[str, Any]:
+        if not supervisor_enabled:
+            return {"enabled": False, "ready": False, "backend": None, "model": None, "backends": []}
+        try:
+            async with httpx.AsyncClient(timeout=5.0, follow_redirects=False, trust_env=False) as client:
+                response = await client.get(supervisor_url + "/api/status")
+                response.raise_for_status()
+                payload = response.json()
+        except (httpx.HTTPError, ValueError):
+            return {"enabled": True, "ready": False, "backend": None, "model": None, "backends": [], "reason": "后端 supervisor 未运行。"}
+        if not isinstance(payload, Mapping):
+            return {"enabled": True, "ready": False, "backend": None, "model": None, "backends": [], "reason": "后端 supervisor 响应无效。"}
+        return {
+            "enabled": True,
+            "ready": payload.get("ready") is True,
+            "backend": payload.get("backend") if isinstance(payload.get("backend"), str) else None,
+            "model": payload.get("model") if isinstance(payload.get("model"), str) else None,
+            "backends": payload.get("backends") if isinstance(payload.get("backends"), list) else [],
+            "reason": payload.get("last_error") if isinstance(payload.get("last_error"), str) else "",
+        }
+
+    async def select_backend(backend: str, model: str) -> dict[str, Any]:
+        if not supervisor_enabled:
+            raise ModelSwitchError("后端 supervisor 未启用。")
+        try:
+            async with httpx.AsyncClient(timeout=190.0, follow_redirects=False, trust_env=False) as client:
+                response = await client.post(supervisor_url + "/api/select", json={"backend": backend, "model": model})
+                response.raise_for_status()
+                payload = response.json()
+        except httpx.HTTPStatusError as exc:
+            try:
+                detail = exc.response.json().get("detail")
+            except ValueError:
+                detail = None
+            raise ModelSwitchError(str(detail or "后端切换失败。")) from exc
+        except (httpx.HTTPError, ValueError) as exc:
+            raise ModelSwitchError("后端 supervisor 不可用。") from exc
+        if not isinstance(payload, Mapping):
+            raise ModelSwitchError("后端 supervisor 响应无效。")
+        runtime_sessions.clear_all()
+        return dict(payload)
     runtime_voice_agent: Optional[VoiceAgentClient] = voice_agent
     if runtime_voice_agent is None and runtime_settings.voice_enabled:
         runtime_voice_agent = LoopbackVoiceAgentClient(
@@ -2177,7 +3201,14 @@ def create_text_chat_app(
                 continue
             seen.add(device_id)
             label = item.get("label") if isinstance(item, Mapping) else device_id
-            result.append({"id": device_id, "label": str(label)[:160] or device_id})
+            model = item.get("model") if isinstance(item, Mapping) else ""
+            result.append(
+                {
+                    "id": device_id,
+                    "label": str(label)[:160] or device_id,
+                    "model": str(model or "")[:160],
+                }
+            )
         return result
 
     def _voice_payload(
@@ -2224,10 +3255,16 @@ def create_text_chat_app(
             "latest_turn": status.get("latest_turn")
             if isinstance(status.get("latest_turn"), Mapping)
             else None,
+            "last_completed_turn": status.get("last_completed_turn")
+            if isinstance(status.get("last_completed_turn"), Mapping)
+            else None,
             "input_devices": input_devices,
             "output_devices": output_devices,
             "capture": config.get("capture") if isinstance(config.get("capture"), Mapping) else {},
             "playback": config.get("playback") if isinstance(config.get("playback"), Mapping) else {},
+            "llm": config.get("llm") if isinstance(config.get("llm"), Mapping) else {},
+            "audio_test": config.get("audio_test") if isinstance(config.get("audio_test"), Mapping) else {},
+            "device_error": status.get("device_error") if isinstance(status.get("device_error"), str) else config.get("device_error") if isinstance(config.get("device_error"), str) else "",
             "vad": config.get("vad") if isinstance(config.get("vad"), Mapping) else {},
             "gateway": config.get("gateway") if isinstance(config.get("gateway"), Mapping) else {},
             "speech": (
@@ -2296,8 +3333,14 @@ def create_text_chat_app(
             request_lock = asyncio.Lock()
 
     async def refresh_active_profile() -> str:
-        """Synchronize managed worker metadata after an operator restart."""
+        """Synchronize the active controlled backend/model after a transition."""
 
+        if supervisor_enabled:
+            snapshot = await backend_snapshot()
+            model = snapshot.get("model")
+            if isinstance(model, str) and model:
+                active_profile_state["value"] = model
+            return str(active_profile_state["value"])
         if not managed_worker:
             return str(active_profile_state["value"])
         try:
@@ -2315,10 +3358,22 @@ def create_text_chat_app(
         return str(active_profile_state["value"])
 
     async def worker_snapshot() -> dict[str, Any]:
-        """Return real external health; injected LLMs never imply worker health."""
+        """Return health for the active managed or supervisor-owned backend."""
 
         active_profile = str(active_profile_state["value"])
-        if not external_worker and llm is not None:
+        supervisor = await backend_snapshot() if supervisor_enabled else None
+        active_backend = supervisor.get("backend") if supervisor else None
+        if supervisor_enabled and active_backend not in {"mindspore", "acl-static-kv"}:
+            return {
+                "managed": False,
+                "mode": "backend-supervisor",
+                "reachable": False,
+                "ready": False,
+                "healthy": False,
+                "profile": active_profile,
+                "reason": str(supervisor.get("reason") or "尚未选择推理后端。"),
+            }
+        if not external_worker and not supervisor_enabled and llm is not None:
             return {
                 "managed": False,
                 "mode": runtime_settings.worker_mode,
@@ -2328,20 +3383,21 @@ def create_text_chat_app(
                 "profile": active_profile,
                 "reason": "injected test provider",
             }
-        health_url = runtime_settings.worker_health_url
+        effective_external = external_worker or active_backend == "acl-static-kv"
+        health_url = _ACL_STATIC_KV_WORKER_HEALTH_URL if active_backend == "acl-static-kv" else runtime_settings.worker_health_url
         try:
             payload = await _worker_health(health_url)
         except ModelSwitchError:
             return {
-                "managed": managed_worker,
-                "mode": runtime_settings.worker_mode,
+                "managed": managed_worker and not supervisor_enabled,
+                "mode": "backend-supervisor" if supervisor_enabled else runtime_settings.worker_mode,
                 "reachable": False,
                 "ready": False,
                 "healthy": False,
                 "profile": active_profile,
                 "reason": "外部 ACL worker 未运行或启动失败。" if external_worker else "本地模型 worker 未运行或启动失败。",
             }
-        if not external_worker:
+        if not effective_external:
             ready = payload.get("ready") is True
             healthy = payload.get("healthy") is True
             profile = payload.get("profile") if isinstance(payload.get("profile"), str) else active_profile
@@ -2359,8 +3415,8 @@ def create_text_chat_app(
             profile = ACL_STATIC_KV_UPSTREAM_MODEL
             reason = "" if healthy else "外部 ACL static-KV worker 健康契约未满足。"
         return {
-            "managed": managed_worker,
-            "mode": runtime_settings.worker_mode,
+            "managed": managed_worker and not supervisor_enabled,
+            "mode": "backend-supervisor" if supervisor_enabled else runtime_settings.worker_mode,
             "reachable": True,
             "ready": ready,
             "healthy": healthy,
@@ -2521,6 +3577,13 @@ def create_text_chat_app(
             return external_catalog()
         return _catalog_with_availability(catalog)
 
+    async def public_backend_catalog() -> list[dict[str, Any]]:
+        if not supervisor_enabled:
+            return []
+        snapshot = await backend_snapshot()
+        entries = snapshot.get("backends")
+        return [dict(item) for item in entries if isinstance(item, Mapping)] if isinstance(entries, list) else []
+
     @app.middleware("http")
     async def disable_browser_caching(request: Request, call_next: Any) -> Any:
         response = await call_next(request)
@@ -2560,18 +3623,90 @@ def create_text_chat_app(
     async def api_config() -> dict[str, Any]:
         active_profile = await refresh_active_profile()
         worker = await worker_snapshot()
+        supervisor = await backend_snapshot()
+        selected_backend = supervisor.get("backend") if supervisor.get("enabled") else None
+        backend_entries = await public_backend_catalog()
+        profiles = public_catalog()
+        if supervisor.get("enabled"):
+            for entry in backend_entries:
+                if entry.get("id") == selected_backend and isinstance(entry.get("models"), list):
+                    profiles = [dict(item) for item in entry["models"] if isinstance(item, Mapping)]
+                    break
         return {
             "model": runtime_settings.model,
             "active_profile": active_profile,
+            "active_backend": selected_backend,
+            "backends": backend_entries,
+            "backend_supervisor": supervisor.get("enabled") is True,
             "worker": worker,
-            "model_selection": "external-fixed-worker" if external_worker else "controlled-worker-switch",
-            "model_switching": not external_worker,
-            "profiles": public_catalog(),
+            "model_selection": "backend-supervisor" if supervisor.get("enabled") else "external-fixed-worker" if external_worker else "controlled-worker-switch",
+            "model_switching": supervisor.get("enabled") is True or not external_worker,
+            "profiles": profiles,
             "streaming": True,
             "max_messages": runtime_settings.max_messages,
             "max_characters": runtime_settings.max_characters,
             "warning": SECURITY_WARNING,
             "voice": await voice_snapshot(include_config=True),
+        }
+
+    @app.get("/api/board-info")
+    async def api_board_info() -> dict[str, Any]:
+        """Return a sanitized, fail-soft board snapshot for the sidebar."""
+
+        hardware = await asyncio.to_thread(_cached_board_hardware_snapshot)
+        active_profile = await refresh_active_profile()
+        supervisor = await backend_snapshot()
+        backend = supervisor.get("backend") if supervisor.get("enabled") else None
+        if not isinstance(backend, str) or not backend:
+            backend = "acl-static-kv" if external_worker else "mindspore"
+        model_display = active_profile
+        entries = supervisor.get("backends") if isinstance(supervisor.get("backends"), list) else []
+        for entry in entries:
+            if not isinstance(entry, Mapping) or entry.get("id") != backend:
+                continue
+            models = entry.get("models") if isinstance(entry.get("models"), list) else []
+            for item in models:
+                if isinstance(item, Mapping) and item.get("id") == active_profile:
+                    display_name = item.get("display_name")
+                    if isinstance(display_name, str) and display_name.strip():
+                        model_display = display_name.strip()
+                    break
+        memory = hardware.get("memory") if isinstance(hardware.get("memory"), Mapping) else {}
+        used_mb = memory.get("used_mb") if isinstance(memory.get("used_mb"), int) else None
+        total_mb = memory.get("total_mb") if isinstance(memory.get("total_mb"), int) else None
+        errors: list[dict[str, str]] = []
+        if hardware.get("available") is not True:
+            errors.append({"source": "npu_smi", "code": "unavailable"})
+        if hardware.get("cann_version") is None:
+            errors.append({"source": "cann", "code": "unavailable"})
+        if hardware.get("driver_version") is None:
+            errors.append({"source": "driver", "code": "unavailable"})
+        status_value = "ok" if not errors else "partial" if hardware.get("available") else "unavailable"
+        soc = hardware.get("soc") if isinstance(hardware.get("soc"), str) else None
+        return {
+            "schema_version": 1,
+            "status": status_value,
+            "observed_at_ms": int(hardware.get("observed_at_unix", 0)) * 1000,
+            "refresh_interval_seconds": 5,
+            "board": {
+                "soc": soc.replace(" ", "") if soc else None,
+                "tier": hardware.get("compute_tier"),
+            },
+            "npu": {
+                "available": hardware.get("available") is True,
+                "health": hardware.get("health"),
+                "temperature_c": hardware.get("temperature_c"),
+                "memory": {
+                    "used_mb": used_mb,
+                    "total_mb": total_mb,
+                    "free_mb": total_mb - used_mb if used_mb is not None and total_mb is not None else None,
+                    "source": "npu-smi device accounting",
+                },
+            },
+            "driver": {"version": hardware.get("driver_version"), "source": "npu-smi.info"},
+            "cann": {"version": hardware.get("cann_version"), "source": "toolkit-version-file"},
+            "runtime": {"backend": backend, "model": active_profile, "model_display": model_display},
+            "errors": errors,
         }
 
     @app.get("/api/voice/config")
@@ -2656,6 +3791,53 @@ def create_text_chat_app(
             return JSONResponse(await set_voice_config(payload))
         except VoiceAgentError as exc:
             return _error_response(str(exc), 503, "voice_agent_unavailable")
+
+    async def board_audio_test_ready() -> Optional[JSONResponse]:
+        current = await voice_snapshot(include_config=True)
+        if current.get("available") is not True:
+            return _error_response(
+                str(current.get("reason", "语音代理不可用。")),
+                503,
+                "voice_agent_unavailable",
+            )
+        if current.get("mode") != "board":
+            return _error_response(
+                "按住说话回放只在开发板音频模式可用。",
+                409,
+                "board_audio_mode_required",
+            )
+        return None
+
+    @app.post("/api/voice/audio-test/start")
+    async def start_board_audio_test() -> JSONResponse:
+        blocked = await board_audio_test_ready()
+        if blocked is not None:
+            return blocked
+        assert runtime_voice_agent is not None
+        try:
+            return JSONResponse(await runtime_voice_agent.start_audio_test())
+        except VoiceAgentError as exc:
+            return _error_response(str(exc), 409, "audio_test_failed")
+
+    @app.post("/api/voice/audio-test/stop")
+    async def stop_board_audio_test() -> JSONResponse:
+        blocked = await board_audio_test_ready()
+        if blocked is not None:
+            return blocked
+        assert runtime_voice_agent is not None
+        try:
+            return JSONResponse(await runtime_voice_agent.stop_audio_test())
+        except VoiceAgentError as exc:
+            return _error_response(str(exc), 409, "audio_test_failed")
+
+    @app.post("/api/voice/audio-test/cancel")
+    async def cancel_board_audio_test() -> JSONResponse:
+        if runtime_voice_agent is None:
+            return _error_response("语音代理未配置。", 503, "voice_agent_unavailable")
+        try:
+            return JSONResponse(await runtime_voice_agent.cancel_audio_test())
+        except VoiceAgentError as exc:
+            return _error_response(str(exc), 409, "audio_test_failed")
 
     async def browser_voice_ready(request: Request) -> Optional[JSONResponse]:
         """Enforce browser-mode, HTTPS/localhost origin, and agent readiness."""
@@ -2798,6 +3980,45 @@ def create_text_chat_app(
         finally:
             request_lock.release()
 
+    @app.post("/api/select-backend")
+    async def select_backend_route(request: Request) -> JSONResponse:
+        ensure_async_primitives()
+        assert request_lock is not None
+        if not supervisor_enabled:
+            return _error_response("当前 UI 未启用后端 supervisor。", 409, "backend_supervisor_disabled")
+        try:
+            body = await _read_json_object(
+                request,
+                runtime_settings.max_body_bytes,
+                runtime_settings.body_timeout_seconds,
+            )
+        except TextChatRequestError as exc:
+            return _error_response(exc.message, exc.status_code)
+        if set(body) != {"backend", "model"}:
+            return _error_response("后端切换只支持 backend 和 model 字段。")
+        backend = body.get("backend")
+        model_id = body.get("model")
+        if not isinstance(backend, str) or not isinstance(model_id, str):
+            return _error_response("backend 和 model 必须是字符串。")
+        if not await _acquire_request_slot(request_lock, runtime_settings.model_switch_wait_seconds):
+            return _error_response("当前回复仍在生成，请等待完成后再切换后端。", 409, "backend_switch_busy")
+        try:
+            result = await select_backend(backend.strip(), model_id.strip())
+            active_profile_state["value"] = str(result.get("model") or model_id)
+            return JSONResponse(
+                {
+                    "backend": result.get("backend"),
+                    "model": result.get("model"),
+                    "active_profile": active_profile_state["value"],
+                    "switched": True,
+                    "worker": await worker_snapshot(),
+                }
+            )
+        except ModelSwitchError as exc:
+            return _error_response(str(exc), 409, "backend_switch_failed")
+        finally:
+            request_lock.release()
+
     @app.get("/api/history")
     async def history(request: Request) -> JSONResponse:
         session_id, conversation, is_new = _ensure_session(request, runtime_sessions)
@@ -2850,14 +4071,16 @@ def create_text_chat_app(
             assistant_text = "".join(parts).strip()
             if finish_reason == "stop":
                 _commit_turn(conversation, message, assistant_text)
-            yield _sse(
-                {
-                    "type": "done",
-                    "text": assistant_text,
-                    "finish_reason": finish_reason,
-                    "truncated": finish_reason == "length",
-                }
-            )
+            done_event: dict[str, Any] = {
+                "type": "done",
+                "text": assistant_text,
+                "finish_reason": finish_reason,
+                "truncated": finish_reason == "length",
+            }
+            usage = _validated_usage(runtime_llm)
+            if usage is not None:
+                done_event["usage"] = usage
+            yield _sse(done_event)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -2904,9 +4127,30 @@ def create_text_chat_app(
                 409,
                 "model_switch_required",
             )
-        if external_worker:
-            profile_max_tokens = _ACL_STATIC_KV_MAX_TOKENS
-            profile_default_tokens = _ACL_STATIC_KV_DEFAULT_MAX_TOKENS
+        supervisor = await backend_snapshot() if supervisor_enabled else None
+        if external_worker or (supervisor and supervisor.get("backend") == "acl-static-kv"):
+            if supervisor_enabled:
+                active_ids = {
+                    str(active_profile_state["value"]),
+                    str(supervisor.get("model") or ""),
+                }
+                active_entry = None
+                for backend in supervisor.get("backends", []):
+                    if not isinstance(backend, Mapping) or backend.get("id") != "acl-static-kv":
+                        continue
+                    for item in backend.get("models", []):
+                        if isinstance(item, Mapping) and item.get("id") in active_ids:
+                            active_entry = item
+                            break
+                    if active_entry is not None:
+                        break
+                if active_entry is None:
+                    return _error_response("当前 ACL 候选不在受控目录中，拒绝发送请求。", 503)
+                profile_max_tokens = int(active_entry["max_tokens"])
+                profile_default_tokens = int(active_entry["default_max_tokens"])
+            else:
+                profile_max_tokens = _ACL_STATIC_KV_MAX_TOKENS
+                profile_default_tokens = _ACL_STATIC_KV_DEFAULT_MAX_TOKENS
         else:
             active_entry = catalog_index.get(active_profile_state["value"])
             if active_entry is None:
@@ -2976,14 +4220,16 @@ def create_text_chat_app(
             assistant_text = "".join(parts).strip()
             if finish_reason == "stop":
                 _commit_turn(conversation, message, assistant_text)
-            response = JSONResponse(
-                {
-                    "message": assistant_text,
-                    "model": runtime_settings.model,
-                    "finish_reason": finish_reason,
-                    "truncated": finish_reason == "length",
-                }
-            )
+            response_payload: dict[str, Any] = {
+                "message": assistant_text,
+                "model": runtime_settings.model,
+                "finish_reason": finish_reason,
+                "truncated": finish_reason == "length",
+            }
+            usage = _validated_usage(runtime_llm)
+            if usage is not None:
+                response_payload["usage"] = usage
+            response = JSONResponse(response_payload)
             if is_new:
                 _set_session_cookie(response, session_id)
             return response

@@ -18,6 +18,8 @@ import sysconfig
 from typing import Any, Dict, Mapping, Optional, Tuple, Union
 
 from .runtime import (
+    FORCED_DECODE_MAX_GENERATION_TOKENS,
+    FORCED_DECODE_MAX_TIMEOUT_SECONDS,
     HARD_MAX_GENERATION_TOKENS,
     MAX_EXECUTION_TIMEOUT_SECONDS,
     Qwen25AclRuntime,
@@ -33,6 +35,7 @@ RELEASE_PYTHON_VERSION = "3.9.25"
 RELEASE_SOABI = "cpython-39-aarch64-linux-gnu"
 RELEASE_CANN_VERSION = "8.0.0"
 RELEASE_SOC_VERSION = "Ascend310B4"
+LEGACY_ACL_CONDA_ENV = "case" + "9-acl-om"
 _PROHIBITED_IMPORTED_MODULES = (
     "torch",
     "torch_npu",
@@ -191,6 +194,38 @@ def validate_release_environment(
     return report
 
 
+def validate_legacy_experimental_environment(
+    observed: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Admit the historic 8T ACL env only for explicitly labeled experiments."""
+
+    facts = dict(_observe_environment() if observed is None else observed)
+    errors = []
+    if facts.get("conda_env") != LEGACY_ACL_CONDA_ENV:
+        errors.append({"field": "conda_env", "expected": LEGACY_ACL_CONDA_ENV, "observed": facts.get("conda_env")})
+    if not str(facts.get("python", "")).startswith("3.9."):
+        errors.append({"field": "python", "expected": "3.9.x", "observed": facts.get("python")})
+    if facts.get("cann") != RELEASE_CANN_VERSION:
+        errors.append({"field": "cann", "expected": RELEASE_CANN_VERSION, "observed": facts.get("cann")})
+    if facts.get("python_no_user_site") != "1" or facts.get("user_site_enabled") is not False:
+        errors.append({"field": "user_site", "expected": "disabled", "observed": facts.get("user_site_enabled")})
+    acl_import = facts.get("acl_import")
+    if not isinstance(acl_import, Mapping) or acl_import.get("ok") is not True:
+        errors.append({"field": "acl_import", "expected": True, "observed": acl_import})
+    imported = facts.get("prohibited_imports", ())
+    if imported:
+        errors.append({"field": "process_imports", "expected": [], "observed": list(imported)})
+    report = {
+        "status": "passed" if not errors else "failed",
+        "launch_policy": "EXPERIMENTAL_LEGACY_ENV" if not errors else "FAIL",
+        "observed": facts,
+        "errors": errors,
+    }
+    if errors:
+        raise StaticKvLaunchError("legacy experimental environment gate failed: %s" % errors)
+    return report
+
+
 def _regular_path(value: Union[str, Path], label: str) -> Path:
     path = Path(value).expanduser()
     if path.is_symlink() or not path.is_file():
@@ -211,9 +246,9 @@ def validate_release_paths(
 ) -> Dict[str, Any]:
     """Validate explicit schema-2 artifact paths before opening ACL."""
 
-    if expected_soc_version != RELEASE_SOC_VERSION:
+    if expected_soc_version not in {"Ascend310B4", "Ascend310B1"}:
         raise StaticKvLaunchError(
-            "the formal StaticKV release target must be %s" % RELEASE_SOC_VERSION
+            "StaticKV target must be Ascend310B4 or Ascend310B1"
         )
     actual_soc = detect_soc_version()
     if actual_soc != expected_soc_version:
@@ -258,10 +293,21 @@ def create_release_service(
     max_tokens: int = 80,
     execution_timeout_seconds: float = MAX_EXECUTION_TIMEOUT_SECONDS,
     device_id: int = 0,
+    expected_soc_version: str = RELEASE_SOC_VERSION,
+    sentence_stop_enabled: bool = True,
+    force_continue: bool = False,
+    experimental_candidate: bool = False,
+    allow_legacy_environment: bool = False,
 ) -> Qwen25StaticKvService:
     """Build one validated, stopped StaticKV service from explicit paths."""
 
-    environment = validate_release_environment()
+    if not isinstance(allow_legacy_environment, bool):
+        raise StaticKvLaunchError("allow_legacy_environment must be boolean")
+    environment = (
+        validate_legacy_experimental_environment()
+        if allow_legacy_environment
+        else validate_release_environment()
+    )
     validate_release_paths(
         om=om,
         tokenizer=tokenizer,
@@ -270,19 +316,36 @@ def create_release_service(
         runtime_contract=runtime_contract,
         om_lock=om_lock,
         tokenizer_lock=tokenizer_lock,
+        expected_soc_version=expected_soc_version,
     )
-    if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or not 1 <= max_tokens <= HARD_MAX_GENERATION_TOKENS:
+    if not isinstance(force_continue, bool) or not isinstance(experimental_candidate, bool):
+        raise StaticKvLaunchError("force_continue and experimental_candidate must be boolean")
+    if force_continue and not experimental_candidate:
+        raise StaticKvLaunchError("force_continue is only admitted for an isolated candidate worker")
+    if force_continue and expected_soc_version not in {"Ascend310B1", "Ascend310B4"}:
+        raise StaticKvLaunchError("force_continue requires an isolated Ascend310B1 or Ascend310B4 candidate")
+    max_generation_tokens = (
+        FORCED_DECODE_MAX_GENERATION_TOKENS
+        if force_continue
+        else HARD_MAX_GENERATION_TOKENS
+    )
+    if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or not 1 <= max_tokens <= max_generation_tokens:
         raise StaticKvLaunchError(
-            "max_tokens must be between 1 and %d" % HARD_MAX_GENERATION_TOKENS
+            "max_tokens must be between 1 and %d" % max_generation_tokens
         )
+    max_timeout = (
+        FORCED_DECODE_MAX_TIMEOUT_SECONDS
+        if force_continue
+        else MAX_EXECUTION_TIMEOUT_SECONDS
+    )
     if (
         isinstance(execution_timeout_seconds, bool)
         or not isinstance(execution_timeout_seconds, (int, float))
-        or not 1.0 <= float(execution_timeout_seconds) <= MAX_EXECUTION_TIMEOUT_SECONDS
+        or not 1.0 <= float(execution_timeout_seconds) <= max_timeout
     ):
         raise StaticKvLaunchError(
             "execution_timeout_seconds must be between 1 and %d"
-            % int(MAX_EXECUTION_TIMEOUT_SECONDS)
+            % int(max_timeout)
         )
     runtime = Qwen25AclRuntime(
         om,
@@ -292,10 +355,12 @@ def create_release_service(
         tokenizer_config_path=tokenizer_config,
         lock_path=om_lock,
         tokenizer_lock_path=tokenizer_lock,
-        expected_soc_version=RELEASE_SOC_VERSION,
+        expected_soc_version=expected_soc_version,
         max_tokens=max_tokens,
         execution_timeout_seconds=float(execution_timeout_seconds),
         device_id=device_id,
+        sentence_stop_enabled=sentence_stop_enabled,
+        force_continue=force_continue,
     )
     return Qwen25StaticKvService(runtime, launch_policy=environment)
 
@@ -314,8 +379,13 @@ def start_release_service(
     max_tokens: int = 80,
     execution_timeout_seconds: float = MAX_EXECUTION_TIMEOUT_SECONDS,
     device_id: int = 0,
+    expected_soc_version: str = RELEASE_SOC_VERSION,
+    sentence_stop_enabled: bool = True,
+    force_continue: bool = False,
+    experimental_candidate: bool = False,
+    allow_legacy_environment: bool = False,
 ) -> Tuple[Any, Qwen25StaticKvService]:
-    """Open the exact B4 OM and return its loopback server plus service."""
+    """Open one explicitly validated B1/B4 StaticKV OM on loopback."""
 
     if host != "127.0.0.1":
         raise StaticKvLaunchError("StaticKV service must remain loopback-only")
@@ -332,6 +402,11 @@ def start_release_service(
         max_tokens=max_tokens,
         execution_timeout_seconds=execution_timeout_seconds,
         device_id=device_id,
+        expected_soc_version=expected_soc_version,
+        sentence_stop_enabled=sentence_stop_enabled,
+        force_continue=force_continue,
+        experimental_candidate=experimental_candidate,
+        allow_legacy_environment=allow_legacy_environment,
     )
     try:
         service.runtime.start()

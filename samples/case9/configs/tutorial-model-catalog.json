@@ -10,15 +10,15 @@
       "technical_status": "observed-pass",
       "quality_status": "pending",
       "selectable": true,
-      "reason": "默认技术预览；20T 上已完成 worker、JSON、SSE、长输出、稳定性和性能门。当前 8T HBM/runtime 初始化失败，必须保留为 blocked 证据。",
-      "technical_detail": "20T gap batch 9/9 machine gates completed. Current 8T Qwen1.5-0.5B attempts fail during MindSpore HBM initialization and are not selectable through the 20T registry.",
+      "reason": "共享MindSpore聊天路径在20T和8T上均已完成当前板端人工/机器检查；正式发布仍须使用固定源码commit和HF revision分别重跑验收。中文质量单独评估。",
+      "technical_detail": "同一Qwen1.5-0.5B profile和worker代码用于Ascend310B1/20T与Ascend310B4/8T；各档位内存门限和验收结果独立记录。",
       "quality_detail": "中文和英文人工质量尚未完成正式评分；不得把长度截断当作质量结论。",
       "board_results": {
         "Ascend310B1/20T": "observed-pass",
-        "Ascend310B4/8T": "blocked"
+        "Ascend310B4/8T": "observed-pass"
       },
       "worker_registry": "configs/release-model.json",
-      "default_max_tokens": 128,
+      "default_max_tokens": 32,
       "max_tokens": 256
     },
     {

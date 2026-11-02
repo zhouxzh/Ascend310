@@ -36,11 +36,19 @@ class _FakeVoiceAgent:
             "output_id": "usb-speaker-1",
             "auto_listen": False,
             "inputs": [
-                {"id": "usb-mic-1", "label": "USB 麦克风"},
+                {
+                    "id": "usb-mic-1",
+                    "label": "USB 麦克风",
+                    "model": "C922 Pro Stream Webcam",
+                },
                 {"id": "usb-mic-2", "label": "备用麦克风"},
             ],
             "outputs": [
-                {"id": "usb-speaker-1", "label": "USB 音箱"},
+                {
+                    "id": "usb-speaker-1",
+                    "label": "USB 音箱",
+                    "model": "EDIFIER M16 Pro",
+                },
             ],
             "capture": {"sample_rate_hz": 16000, "channels": 1, "frame_ms": 20},
             "playback": {"sample_rate_hz": 22050},
@@ -62,6 +70,7 @@ class _FakeVoiceAgent:
         self.configure_calls: list[dict[str, object]] = []
         self.transcribed: list[bytes] = []
         self.synthesized: list[str] = []
+        self.audio_test_calls: list[str] = []
 
     async def health(self) -> Mapping[str, object]:
         return {"status": "ready", "mode": self.config_payload["mode"]}
@@ -81,6 +90,18 @@ class _FakeVoiceAgent:
         self.status_payload["enabled"] = auto_listen if mode == "board" else False
         self.status_payload["state"] = "busy" if self.status_payload["enabled"] else "idle"
         return self.config_payload
+
+    async def start_audio_test(self) -> Mapping[str, object]:
+        self.audio_test_calls.append("start")
+        return {"state": "recording", "max_duration_seconds": 10.0}
+
+    async def stop_audio_test(self) -> Mapping[str, object]:
+        self.audio_test_calls.append("stop")
+        return {"state": "completed", "duration_seconds": 0.75, "played": True}
+
+    async def cancel_audio_test(self) -> Mapping[str, object]:
+        self.audio_test_calls.append("cancel")
+        return {"state": "cancelled"}
 
     async def transcribe_browser_wav(self, wav: bytes) -> Mapping[str, object]:
         self.transcribed.append(wav)
@@ -138,7 +159,12 @@ class VoiceUiControlPlaneTests(unittest.TestCase):
         self.assertIn('id="voice-output"', page.text)
         self.assertIn('id="voice-auto-listen"', page.text)
         self.assertIn('id="voice-self-test"', page.text)
-        self.assertIn("录音回放自检（2 秒）", page.text)
+        self.assertIn("录音回放自检（2秒）", page.text)
+        self.assertIn("按住说话并回放", page.text)
+        self.assertIn("startBoardAudioTest", page.text)
+        self.assertIn("stopBoardAudioTest", page.text)
+        self.assertIn("pointerdown", page.text)
+        self.assertIn("pointerup", page.text)
         self.assertIn("playLocalBrowserWav", page.text)
         self.assertIn("purpose === 'self-test'", page.text)
         self.assertIn("captureDurationMs", page.text)
@@ -164,14 +190,45 @@ class VoiceUiControlPlaneTests(unittest.TestCase):
         self.assertIn("/api/voice/browser/transcribe", page.text)
         self.assertIn("/api/voice/browser/synthesize", page.text)
         self.assertIn("isSecureContext", page.text)
+        self.assertIn("识别：", page.text)
+        self.assertIn("模型思考中", page.text)
+        self.assertIn("no_speech", page.text)
+        self.assertIn("last_completed_turn", page.text)
+        self.assertIn("backend-select", page.text)
+        self.assertIn("/api/select-backend", page.text)
+        self.assertIn("backendSupervisor", page.text)
+        self.assertIn("startVoicePolling", page.text)
+        self.assertIn("}, 1500)", page.text)
         self.assertEqual(config.status_code, 200)
         self.assertIn("voice", config.json())
         self.assertEqual(voice.status_code, 200)
         self.assertEqual(voice.json()["mode"], "board")
         self.assertEqual(voice.json()["input_devices"][0]["id"], "usb-mic-1")
+        self.assertEqual(
+            voice.json()["input_devices"][0]["model"],
+            "C922 Pro Stream Webcam",
+        )
+        self.assertEqual(
+            voice.json()["output_devices"][0]["model"],
+            "EDIFIER M16 Pro",
+        )
         self.assertTrue(voice.json()["speech"]["asr_ready"])
         self.assertTrue(voice.json()["speech"]["tts_ready"])
         self.assertTrue(voice.json()["browser_audio"]["enabled"] is False)
+
+    def test_board_audio_test_proxies_start_stop_and_cancel(self) -> None:
+        agent = _FakeVoiceAgent()
+        with TestClient(self._app(agent)) as client:
+            started = client.post("/api/voice/audio-test/start")
+            stopped = client.post("/api/voice/audio-test/stop")
+            cancelled = client.post("/api/voice/audio-test/cancel")
+        self.assertEqual(started.status_code, 200)
+        self.assertEqual(started.json()["state"], "recording")
+        self.assertEqual(stopped.status_code, 200)
+        self.assertEqual(stopped.json()["state"], "completed")
+        self.assertEqual(cancelled.status_code, 200)
+        self.assertEqual(cancelled.json()["state"], "cancelled")
+        self.assertEqual(agent.audio_test_calls, ["start", "stop", "cancel"])
 
     def test_board_control_accepts_only_agent_allowlist_ids(self) -> None:
         agent = _FakeVoiceAgent()

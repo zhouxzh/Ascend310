@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "target": {
+    "soc": "Ascend310B1",
+    "tier": "20T"
+  },
+  "backends": [
+    {
+      "id": "mindspore",
+      "display_name": "MindSpore / MindNLP",
+      "runtime": "mindspore",
+      "models": "release-catalog",
+      "default_model": "qwen1.5-0.5b-chat",
+      "reason": "两档板卡共用的默认MindSpore聊天程序；由统一ascend环境中的8090 worker运行。"
+    },
+    {
+      "id": "acl-static-kv",
+      "display_name": "PyACL 固定KV",
+      "runtime": "acl-static-kv",
+      "default_model": "qwen2.5-0.5b-instruct-static-kv-1024-b1-offline",
+      "reason": "离线实验候选。仅加载登记的Ascend310B1 OM、双合同与哈希锁，不使用8T OM。",
+      "models": [
+        {
+          "id": "qwen2.5-0.5b-instruct-static-kv-1024-b1-offline",
+          "display_name": "Qwen2.5 0.5B 固定KV PyACL（B1离线实验）",
+          "runtime": "ACL/OM static KV",
+          "technical_status": "historical-observed-pass",
+          "quality_status": "pending",
+          "selectable": true,
+          "reason": "操作员授权的历史B1 OM离线候选；当前20T切换时重新校验OM、tokenizer和双合同。",
+          "default_max_tokens": 32,
+          "max_tokens": 80,
+          "candidate_lock": "configs/20t-acl-b1-candidate.lock.json",
+          "data_dir_env": "ASCEND_EDGE_CHAT_ACL_CANDIDATE_DATA_DIR",
+          "artifacts": {
+            "om": "om/qwen25-static-kv-1024-b1.om",
+            "tokenizer": "common/tokenizer.json",
+            "tokenizer_config": "common/tokenizer_config.json",
+            "tokenizer_lock": "common/tokenizer.json.lock.json",
+            "controller_contract": "contracts/qwen25-static-kv-1024-fp32-contract.json",
+            "runtime_contract": "contracts/qwen25-static-kv-1024-v2-om-contract.json"
+          }
+        }
+      ]
+    }
+  ]
+}
