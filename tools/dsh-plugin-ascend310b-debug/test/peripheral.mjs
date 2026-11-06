@@ -99,13 +99,19 @@ check('output paths are fixed, timestamped and collision resistant', () => {
 check('camera command is fixed and valid', () => {
 	const command = buildCameraCommand(normalizeCameraOptions({ device: '/dev/video1', frameCount: 3 }, now));
 	assert.match(command, /^python -c '/u);
-	assert.match(command, /cv2\.VideoCapture/u);
-	assert.match(command, /frame\.read/u);
-	assert.match(command, /ffmpeg/u);
+	assert.doesNotMatch(command, /numpy\.core\.multiarray/u);
+	assert.doesNotMatch(command, /setattr\(_multiarray/u);
+	assert.doesNotMatch(command, /cv2\.VideoCapture/u);
+	assert.doesNotMatch(command, /ffmpeg/u);
+	assert.match(command, /v4l2-ctl/u);
+	assert.match(command, /stream-mmap/u);
+	assert.match(command, /def actual_format/u);
+	assert.match(command, /YCbCr;422/u);
 	assert.match(command, /from PIL import Image/u);
+	assert.match(command, /Pillow不可用/u);
 	assert.match(command, /cleanup_outputs/u);
 	assert.match(command, /remove_failed_output/u);
-	assert.match(command, /finally:\n    if cap is not None/u);
+	assert.match(command, /captureBackend": "v4l2-mmap/u);
 	assert.equal(command.includes('base64'), false);
 	assert.equal(validateTaskCommand(command).ok, true);
 });
@@ -230,7 +236,7 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 console.log('peripheral tests passed');
-console.log('  camera   : fixed Python/OpenCV frame.read contract');
+console.log('  camera   : direct V4L2 MJPG capture plus optional Pillow YUYV preview conversion');
 console.log('  microphone: fixed ALSA/Pulse WAV evidence');
 console.log('  speaker  : fixed WAV playback with heard=null');
 console.log('  recording: strict recorded-WAV path and playback contract');

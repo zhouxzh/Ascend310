@@ -2,7 +2,7 @@
 
 本项目包含一系列基于昇腾310B的简单、有趣且可复现的实战项目。各案例按实际需要提供源代码、数据集预处理脚本以及模型训练与部署指南，旨在强化您的动手实践能力。
 
-仓库文档按三层组织：理论正文在本目录，案例运行入口在 [samples/README.md](https://github.com/zhouxzh/Ascend310/blob/main/samples/README.md)，全仓库按任务索引在 [docs/README.md](https://github.com/zhouxzh/Ascend310/blob/main/docs/README.md)。案例的 `samples/caseN/README.md` 是可执行入口；编号 `docs/` 是工程专题和验收证据，不需要按编号顺序通读。
+教程正文在本目录；案例运行入口和工程文档分别在 [samples/README.md](https://github.com/zhouxzh/Ascend310/blob/main/samples/README.md) 及对应 `samples/caseN/docs/`；仓库治理、发布流程和环境矩阵在 [docs/README.md](https://github.com/zhouxzh/Ascend310/blob/main/docs/README.md)。案例的 `samples/caseN/README.md` 是可执行入口；案例 `docs/` 中的专题不需要按编号顺序通读。
 
 ## 案例列表
 

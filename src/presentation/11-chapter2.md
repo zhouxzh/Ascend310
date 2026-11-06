@@ -18,7 +18,7 @@ footer: "第2章：CANN软件栈核心组件解析"
 ## 从 ONNX 到可核验的 OM 推理
 
 
-<div class="source">依据：<a href="../book/chapter2.md">src/book/chapter2.md</a>；样例：<a href="../../samples/chapter2/sample_resnet_quick_start/README.md"><code>samples/chapter2/sample_resnet_quick_start</code></a></div>
+<div class="source">依据：<a href="../book/chapter2.md">src/book/chapter2.md</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter2/sample_resnet_quick_start/README.md"><code>samples/chapter2/sample_resnet_quick_start</code></a></div>
 
 <!--
 本章不只讲“把模型转过去”，而是讲模型如何经过 CANN、ATC、OM 和 msame 形成可复核的证据链。
@@ -194,7 +194,7 @@ CANN 的复杂度来自跨层协作。排障时必须先确定故障发生在哪
 
 `Name` 为 `310B4` 或 `310B1` 时，目标参数分别追加 `Ascend` 前缀。健康状态单独记录，不能替代版本检查。
 
-<div class="source">教材：<a href="../book/chapter2.md#src-book-chapter2-h5"><code>src/book/chapter2.md</code>「CANN的快速安装」</a>；环境：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §2.2</a></div>
+<div class="source">教材：<a href="../book/chapter2.md#src-book-chapter2-h5"><code>src/book/chapter2.md</code>「CANN的快速安装」</a>；环境：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §2.2</a></div>
 
 <!--
 先确认板卡和环境，再运行 ATC。8T 与 20T 用各自的 soc_version，不能复用同一个编译目标来掩盖版本身份。
@@ -215,7 +215,7 @@ atc \
   --soc_version=Ascend310B4
 ```
 
-<div class="source">命令：<a href="../../samples/chapter2/sample_resnet_quick_start/README.md"><code>samples/chapter2/sample_resnet_quick_start</code></a>；教材：<a href="../book/chapter2.md#src-book-chapter2-h12"><code>src/book/chapter2.md</code>「模型转换-以ResNet50为例」</a></div>
+<div class="source">命令：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter2/sample_resnet_quick_start/README.md"><code>samples/chapter2/sample_resnet_quick_start</code></a>；教材：<a href="../book/chapter2.md#src-book-chapter2-h12"><code>src/book/chapter2.md</code>「模型转换-以ResNet50为例」</a></div>
 
 8T 使用 `Ascend310B4`；20T 使用 `Ascend310B1`。命令结构相同，不代表 OM 字节相同或结果可以互相继承。
 
@@ -247,7 +247,7 @@ atc \
 
 这两行证明本次 ATC 进程成功结束，并分别记录了两块板的目标 SoC。它仍不证明 OM 文件完整、推理正确或结果准确。
 
-<div class="source">原始记录：<a href="../../docs/chapter-board-runs-20261017/tool-execution/tool-matrix.json"><code>docs/chapter-board-runs-20261017/tool-execution/tool-matrix.json</code> 的 `atc8`、`atc20`</a></div>
+<div class="source">原始记录：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter2/docs/README.md"><code>samples/chapter2/docs/README.md</code> 的 ATC 验收摘要</a></div>
 
 <!--
 只把 exitCode 0 和 ATC 成功行作为编译层证据。不要从“ATC 成功”跳到“模型可用”。
@@ -262,7 +262,7 @@ ls -lh model/resnet50.om
 sha256sum model/resnet50.om
 ```
 
-<div class="source">命令依据：<a href="../book/chapter2.md#src-book-chapter2-h11"><code>src/book/chapter2.md</code>「ATC工具使用流程」</a>；加载证据：<a href="../../docs/chapter-board-runs-20261017/tool-execution/tool-matrix.json"><code>tool-matrix.json</code> 的 `msame8`、`msame20`</a></div>
+<div class="source">命令依据：<a href="../book/chapter2.md#src-book-chapter2-h11"><code>src/book/chapter2.md</code>「ATC工具使用流程」</a>；加载证据：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter2/docs/README.md"><code>tool-matrix.json</code> 的 `msame8`、`msame20`</a></div>
 
 - 路径要能对应转换批次和目标 SoC。
 - 文件大小必须非零，哈希用于区分同名的不同工件。
@@ -331,7 +331,7 @@ sha256sum model/resnet50.om
 
 关键不是某一行单独出现，而是加载、执行、输出和释放形成连续闭环。
 
-<div class="source">双板结果：<a href="../../docs/chapter-board-runs-20261017/tool-execution/tool-matrix.json"><code>tool-matrix.json</code></a></div>
+<div class="source">双板结果：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter2/docs/README.md"><code>tool-matrix.json</code></a></div>
 
 <!--
 可以让学生指出每一行属于哪个阶段。只有前后顺序完整，才能排除只加载未执行、只执行未取回或未释放资源。
@@ -355,7 +355,7 @@ sha256sum model/resnet50.om
 
 相同软件版本降低了一部分干扰，但不能把两个 SoC 的结果合成一个硬件排名。
 
-<div class="source">环境：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>docs/ascend310b-chapter-board-comparison-20261017.md</code> §2.2</a>；原始快照：<a href="../../docs/chapter-board-runs-20261017/8t/run1/meta.txt"><code>8T meta</code></a>、<a href="../../docs/chapter-board-runs-20261017/20t/run1/meta.txt"><code>20T meta</code></a></div>
+<div class="source">环境：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>docs/release/environment-matrix.md</code> §2.2</a>；原始快照：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter2/docs/README.md"><code>8T meta</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter2/docs/README.md"><code>20T meta</code></a></div>
 
 <!--
 两块板处于同一 CANN 和驱动版本，但 SoC、内存和算力档位不同。Alarm 只记录为已知板况，不直接判定程序失败。
@@ -376,7 +376,7 @@ sha256sum model/resnet50.om
 
 这两块板各有独立的 ATC 目标与 OM 路径。11.748 ms 只表示本次 20T 记录中的一次 `msame` 报告值，不能外推成整机性能，也不能据此宣布 20T 全面更快。
 
-<div class="source">原始结果：<a href="../../docs/chapter-board-runs-20261017/tool-execution/tool-matrix.json"><code>tool-matrix.json</code> 的 `msame8`、`msame20`</a>；结论边界：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §3、§5</a></div>
+<div class="source">原始结果：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter2/docs/README.md"><code>tool-matrix.json</code> 的 `msame8`、`msame20`</a>；结论边界：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §3、§5</a></div>
 
 <!--
 必须把 13.232 ms 和 11.748 ms 读成两个独立记录，而不是平均值、吞吐或端到端时延。这里不重跑板端，只引用已有原始记录。
@@ -399,7 +399,7 @@ sha256sum model/resnet50.om
 
 原始 `run1` 日志保留了首次 `./msame: Permission denied`；后续成功结果来自 `tool-matrix.json`。失败记录不能删除，也不能仅凭这一行判定 NPU 故障。
 
-<div class="source">失败与修正：<a href="../../docs/chapter-board-runs-20261017/8t/run1/chapter2_msame.log"><code>8T raw log</code></a>、<a href="../../docs/chapter-board-runs-20261017/20t/run1/chapter2_msame.log"><code>20T raw log</code></a>、<a href="../../docs/chapter-board-runs-20261017/README.md"><code>记录说明</code></a></div>
+<div class="source">失败与修正：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter2/docs/README.md"><code>8T raw log</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter2/docs/README.md"><code>20T raw log</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter2/docs/README.md"><code>记录说明</code></a></div>
 
 <!--
 收束成四道门。强调缺失的 OM size/hash 必须保持“未记录”，不能为了让课件看起来完整而编数字。课堂作业要求学生补齐每道门的证据。

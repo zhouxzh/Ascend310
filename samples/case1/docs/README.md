@@ -7,5 +7,6 @@
 | [02-fastapi-react-architecture.md](02-fastapi-react-architecture.md) | FastAPI、React、worker 和数据库结构 |
 | [03-board-acceptance.md](03-board-acceptance.md) | 板端验收流程、证据和历史摘要 |
 | [04-troubleshooting.md](04-troubleshooting.md) | 统一测试问题台账 |
+| [05-review.md](05-review.md) | 案例安全、实现和证据边界审查 |
 
 快速运行入口见 [`../README.md`](../README.md)。

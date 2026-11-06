@@ -10,7 +10,7 @@ compatibility group:
 
 Both environments use Python 3.9.25 and must run with
 `PYTHONNOUSERSITE=1`. The lock files are provisional until the remaining
-hardware gates in `docs/ascend-unified-environment-status.md` close.
+hardware gates in `docs/release/environment-matrix.md` close.
 
 CANN-owned wheels such as `aclruntime`, `hccl`, `te`, and `op_compile_tool`
 are listed as comments because their installation paths are owned by the CANN

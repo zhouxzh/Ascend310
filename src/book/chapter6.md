@@ -269,7 +269,7 @@ H.264 视频编码是计算密集型任务。一块 640×480@30fps 的视频流�
 
 CANN（Compute Architecture for Neural Networks）是华为昇腾芯片的全栈软件栈，其层级结构如下：
 
-![CANN/ACL 与 DVPP 的调用层次](img6/cann_acl_dvpp_stack.png){#fig:cann_acl_dvpp_stack width=40% .center}
+![CANN/ACL 与 DVPP 的调用层次](img6/cann_acl_dvpp_stack.png){#fig:cann_acl_dvpp_stack width=50% .center}
 
 - **ACL**（Ascend Computing Language）：CANN 的核心编程接口，提供设备管理、内存管理、媒体处理等 API
 - **DVPP**（Digital Vision Pre-Processing）：数字视觉预处理模块，包含 VENC（编码）、VDEC（解码）、VPC（图像处理）、JPEG 编解码等
@@ -373,7 +373,7 @@ assert ret == 0
 
 通道模型详见 [通道模型](#channel-model)，这里只列出 VENC 特有的 API：
 
-![VENC 通道输入输出模型](img6/venc_channel_model.png){#fig:venc_channel_model width=75% .center}
+![VENC 通道输入输出模型](img6/venc_channel_model.png){#fig:venc_channel_model width=100% .center}
 
 | 函数 | 用途 |
 |------|------|
@@ -1037,7 +1037,7 @@ python samples/chapter6/venc/bench_venc.py
 
 **VDEC**（Video Decoder）是 DVPP 中的硬件视频解码模块。它将 H.264/H.265 压缩码流解码为 NV12 原始帧。
 
-![VDEC 通道输入输出模型](img6/vdec_channel_model.png){#fig:vdec_channel_model width=90% .center}
+![VDEC 通道输入输出模型](img6/vdec_channel_model.png){#fig:vdec_channel_model width=100% .center}
 
 #### H.264 与 H.265 基础 {#src-book-chapter6-h51}
 
@@ -1062,7 +1062,7 @@ VENC: NV12 -> [硬件编码] -> H.264/H.265 码流
 VDEC: H.264/H.265 码流 -> [硬件解码] -> NV12
 ```
 
-#### 硬件能力规格（Ascend 310B4） {#src-book-chapter6-h54}
+#### VDEC 硬件能力规格（Ascend 310B4） {#src-book-chapter6-h54}
 
 以下基于 CANN 8.3.RC1 + Ascend 310B4 实测和驱动常量定义。
 
@@ -1688,7 +1688,7 @@ H.265 路径不同：VDEC 在 480p 已经领先单线程 CPU，在 720p 以上�
 
 ### VDEC 调试与参数速查 {#src-book-chapter6-h81}
 
-#### 常用调试命令 {#src-book-chapter6-h82}
+#### VDEC 调试命令 {#src-book-chapter6-h82}
 
 ```bash
 # VDEC 驱动状态
@@ -1701,7 +1701,7 @@ dmesg | grep -i vdec | tail -10
 python samples/chapter6/vdec/vdec_minimal.py
 ```
 
-#### 参数速查表 {#src-book-chapter6-h83}
+#### VDEC 通道参数速查 {#src-book-chapter6-h83}
 
 #### VDEC 通道参数 {#vdec-params}
 
@@ -1892,7 +1892,7 @@ USB Camera YUYV -> CPU bgr_to_nv12() -> NV12 -> VPC resize -> NV12(720p) -> VENC
 
 如果未来 CANN 版本在 310B 上开放 CSC 支持，可通过 `dvpp_vpc_convert_color_async` 使用与 resize 完全相同的通道+Stream 模式调用。
 
-### 练习脚本走读 {#src-book-chapter6-h95}
+### VPC 练习脚本走读 {#src-book-chapter6-h95}
 
 完整代码见 [`samples/chapter6/vpc/vpc_minimal.py`](https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter6/vpc/vpc_minimal.py)。程序使用原始 `acl.media` API 演示两个核心操作：
 
@@ -1966,7 +1966,7 @@ acl.media.dvpp_destroy_channel_desc(ch_desc)
 acl.rt.destroy_stream(stream)
 ```
 
-#### 与项目的对应关系 {#src-book-chapter6-h100}
+#### VPC 样例文件对应关系 {#src-book-chapter6-h100}
 
 | 文件 | 角色 |
 |------|------|
@@ -1983,7 +1983,7 @@ acl.rt.destroy_stream(stream)
 
 **VPC Resize: NV12 to 1/2 Scale**（数据见下方结果解读表格）
 
-#### 结果解读 {#src-book-chapter6-h102}
+#### VPC 性能结果解读 {#src-book-chapter6-h102}
 
 VPC Resize 与 VENC 不同——**不是所有分辨率都远超 CPU**。VPC 与 CPU 在低分辨率下互有胜负（720p VPC 赢，1080p CPU 赢），这是 Stream 同步的固定开销与硬件加速之间的拉锯：
 
@@ -2013,7 +2013,7 @@ VPC Resize 与 VENC 不同——**不是所有分辨率都远超 CPU**。VPC 与
 
 ---
 
-### 常见问题与调试 {#src-book-chapter6-h104}
+### VPC 常见问题与调试 {#src-book-chapter6-h104}
 
 #### 问题 #1：CSC 接口不可用 {#src-book-chapter6-h105}
 
@@ -2093,7 +2093,7 @@ acl.media.dvpp_set_roi_config(crop_area, left, right, top, bottom)
 
 ### VPC 调试与参数速查 {#src-book-chapter6-h112}
 
-#### 常用调试命令 {#src-book-chapter6-h113}
+#### VPC 调试命令 {#src-book-chapter6-h113}
 
 ```bash
 # VPC 驱动状态
@@ -2109,7 +2109,7 @@ python samples/chapter6/vpc/vpc_minimal.py
 python samples/chapter6/vpc/bench_vpc.py
 ```
 
-#### 参数速查表 {#src-book-chapter6-h114}
+#### VPC 参数速查 {#src-book-chapter6-h114}
 
 **VPC 通道创建**
 
@@ -2159,7 +2159,7 @@ VENC 输出 H.264 码流，但 JPEGE 输出的是**独立的 JPEG 图片**——
 | 编码参数 | quality（1-100） | GOP、码率、帧率、profile |
 | 用途 | 截图、快照、缩略图 | 实时视频传输 |
 
-#### 硬件能力规格（Ascend 310B4） {#src-book-chapter6-h117}
+#### JPEG 编解码硬件规格（Ascend 310B4） {#src-book-chapter6-h117}
 
 | | JPEGE | JPEGD |
 |---|---|---|
@@ -2334,7 +2334,7 @@ acl.rt.memcpy(nv12_host.ctypes.data, out_size, out_buf, out_size,
               ACL_MEMCPY_DEVICE_TO_HOST)
 ```
 
-### 练习脚本走读 {#src-book-chapter6-h132}
+### JPEG 练习脚本走读 {#src-book-chapter6-h132}
 
 完整代码见 [`samples/chapter6/jpeg/jpeg_minimal.py`](https://github.com/zhouxzh/Ascend310/blob/master/samples/chapter6/jpeg/jpeg_minimal.py)。程序使用原始 `acl.media` API 演示 **JPEGE -> JPEGD 闭环**。
 
@@ -2391,7 +2391,7 @@ JPEGD OK  2097152 bytes JPEG -> 640x480 NV12  size=460800
 
 > JPEG 码流 2MB 是因为测试帧的渐变+棋盘格纹理压缩率低（确定性生成，非真实照片）。正常照片在 quality=85 下通常只有几十 KB。
 
-#### 与项目的对应关系 {#src-book-chapter6-h136}
+#### JPEG 样例文件对应关系 {#src-book-chapter6-h136}
 
 | 文件 | 角色 |
 |------|------|
@@ -2399,7 +2399,7 @@ JPEGD OK  2097152 bytes JPEG -> 640x480 NV12  size=460800
 
 ---
 
-### 场景推荐 {#src-book-chapter6-h137}
+### JPEG 应用场景推荐 {#src-book-chapter6-h137}
 
 | 场景 | 推荐方案 |
 |------|---------|
@@ -2417,7 +2417,7 @@ WebRTC NV12 帧 -> VPC resize(320×240) -> JPEGE(quality=80) -> JPEG 文件
 
 ---
 
-### 常见问题与调试 {#src-book-chapter6-h139}
+### JPEG 常见问题与调试 {#src-book-chapter6-h139}
 
 #### 问题 #1：JPEGE 输出不是 stream_desc {#src-book-chapter6-h140}
 
@@ -2447,7 +2447,7 @@ WebRTC NV12 帧 -> VPC resize(320×240) -> JPEGE(quality=80) -> JPEG 文件
 
 ### JPEG 编解码参数速查 {#src-book-chapter6-h143}
 
-#### 参数速查表 {#src-book-chapter6-h144}
+#### WebRTC 推流参数速查 {#src-book-chapter6-h144}
 
 **JPEGE 编码流程**
 
@@ -2640,7 +2640,7 @@ H.264 VENC，不是 CPU 编码；但测试分辨率为 640×480、持续 5 秒�
 | 历史 H.264 硬编 | `V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.264` | 基本稳定 `60 fps` | 历史日志中的 JPEGD 约 `4.9~9.5ms`，VENC 约 `6.3~6.5ms` |
 | 历史 H.265 硬编 | `V4L2 MJPEG -> DVPP JPEGD -> NV12 -> CANN VENC H.265` | 通常 `57~59 fps`，个别样本掉到 `35 fps` | 码流更小，但历史日志中稳定性弱于 H.264 |
 
-**关键结论**：
+**性能判读**：
 
 - 纯 CPU 路径在 `1920×1080@60` 请求下只能达到约 `15 fps`，主要瓶颈是 CPU JPEG 解码。
 - 只替换编码器并不能解决全链路瓶颈；如果 MJPEG 解码仍在 CPU 上，VENC 的收益会被前级吞掉。

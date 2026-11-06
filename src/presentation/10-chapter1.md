@@ -258,7 +258,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 第 1 章本身没有可执行样例，因此不产生本章性能数字。
 
-<div class="source">记录：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>docs/ascend310b-chapter-board-comparison-20261017.md</code> §2</a></div>
+<div class="source">记录：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>docs/release/environment-matrix.md</code> §2</a></div>
 
 <!--
 8T 与 20T 的每行都要分开保存。Alarm 是已知板况，只能作为诊断背景，不能当作通过或失败结论，也不能把两块板的数字合并排名。
@@ -279,7 +279,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 这些是两块板的记录值，不是第 1 章基准，也不是纯算子性能。
 
-<div class="source">记录：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>docs/ascend310b-chapter-board-comparison-20261017.md</code> §3、§5</a></div>
+<div class="source">记录：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>docs/release/environment-matrix.md</code> §3、§5</a></div>
 
 <!--
 重点讲“方向不同”，不要做整机排行榜。墙钟时间包含编译、数据管线和后台负载，不能把 78.532 s 解释成 NPU 算子慢了同样比例。
@@ -300,7 +300,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 只有固定模型、输入、版本与测量协议，TOPS 才具有比较意义。
 
-<div class="source">依据：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>docs/ascend310b-chapter-board-comparison-20261017.md</code> §1、§5</a></div>
+<div class="source">依据：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>docs/release/environment-matrix.md</code> §1、§5</a></div>
 
 <!--
 用具体测试路径解释差异来源。不要把“TOPS 更高”写成任何场景都更快。
@@ -364,7 +364,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 失败、N/A 和 blocked 都是选型结论的一部分，不能删掉后只保留最好看的数据。
 
-<div class="source">依据：<a href="../book/chapter1.md#src-book-chapter1-h14"><code>src/book/chapter1.md</code>「实践任务」</a>；<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §6</a></div>
+<div class="source">依据：<a href="../book/chapter1.md#src-book-chapter1-h14"><code>src/book/chapter1.md</code>「实践任务」</a>；<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §6</a></div>
 
 <!--
 强调双板实验要分开留证。失败、N/A 和 blocked 都是选型结论的一部分，不能删掉后只保留最好看的数据。
@@ -386,7 +386,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 完成标准：别人能按记录复现测试，并能说明结果为什么不能跨档位外推。
 
-<div class="source">作业要求：<a href="../book/chapter1.md#src-book-chapter1-h14"><code>src/book/chapter1.md</code>「实践任务」</a>；证据口径：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code></a></div>
+<div class="source">作业要求：<a href="../book/chapter1.md#src-book-chapter1-h14"><code>src/book/chapter1.md</code>「实践任务」</a>；证据口径：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code></a></div>
 
 <!--
 收尾时让学生复述“场景、候选、证据、决策”四张卡。没有板端证据的部分必须标为 untested 或 blocked。
@@ -406,7 +406,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 > 下一章：CANN 软件栈如何把模型变成可核验的 OM 推理。
 
-<div class="source">教材：<a href="../book/chapter1.md"><code>src/book/chapter1.md</code></a>；记录：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code></a></div>
+<div class="source">教材：<a href="../book/chapter1.md"><code>src/book/chapter1.md</code></a>；记录：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code></a></div>
 
 <!--
 用三句话收束：约束选择、档位边界、证据链。下一章从模型转换进入 CANN。

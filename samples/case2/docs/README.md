@@ -10,6 +10,7 @@
 | [04-model-download-and-conversion.md](04-model-download-and-conversion.md) | Hugging Face 下载、ONNX、ATC 和 SoC |
 | [05-runtime-and-operation.md](05-runtime-and-operation.md) | 摄像头/视频、显示、保存和计时 |
 | [06-validation-and-troubleshooting.md](06-validation-and-troubleshooting.md) | 验证边界和统一问题台账 |
+| [07-review.md](07-review.md) | 模型资产、接口和证据边界审查 |
 
 ## 代码入口
 

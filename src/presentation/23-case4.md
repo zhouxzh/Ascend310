@@ -18,7 +18,7 @@ footer: "案例 4：掌纹识别"
 ## NPU-only 工作台与候选模型边界
 
 
-<div class="source">教材：<a href="../experiment/case4.md"><code>src/experiment/case4.md</code></a>；样例：<a href="../../samples/case4/README.md"><code>samples/case4</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md"><code>src/experiment/case4.md</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4</code></a></div>
 
 <!--
 本案例讲的是 8T 板上的 NPU-only 掌纹工作台，不把前端可打开、候选 smoke 或某次数值对照提升为生产验收。
@@ -67,7 +67,7 @@ footer: "案例 4：掌纹识别"
 
 在线 API 和模板通道只接受已准入的 NPU embedding。
 
-<div class="source">教材：<a href="../experiment/case4.md#案例目标"><code>src/experiment/case4.md</code> §1</a>；样例：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md#案例目标"><code>src/experiment/case4.md</code> §1</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
 
 <!--
 先划清在线与离线边界。CPU 或 EDCC 可以出现在研究记录中，但不能被工作台 API、模板命名空间或前端模型选择器暴露。
@@ -86,7 +86,7 @@ footer: "案例 4：掌纹识别"
 
 前端服务可达不等于后端已连接；API 可达也不等于 NPU 推理已执行。
 
-<div class="source">教材：<a href="../experiment/case4.md#api-和界面"><code>src/experiment/case4.md</code> §3</a>；样例：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md#api-和界面"><code>src/experiment/case4.md</code> §3</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
 
 <!--
 把 UI、API、推理和存储拆开定位。页面出现空状态时，先确认是前端静态服务、API、模型还是摄像头没有连接。
@@ -125,7 +125,7 @@ footer: "案例 4：掌纹识别"
 
 截图不能替代 API、摄像头、NPU 请求、模板闭环或数据集指标。
 
-<div class="source">清单：<a href="screenshots/capture-manifest.json"><code>src/presentation/screenshots/capture-manifest.json</code></a>；样例入口：<a href="../../samples/case4"><code>samples/case4</code></a></div>
+<div class="source">清单：<a href="screenshots/capture-manifest.json"><code>src/presentation/screenshots/capture-manifest.json</code></a>；样例入口：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4"><code>samples/case4</code></a></div>
 
 <!--
 图片字节数、SHA-256 和 application digest 绑定静态资产。它们证明文件身份，不证明服务端已经启动或模型已经加载。
@@ -175,7 +175,7 @@ footer: "案例 4：掌纹识别"
 
 五个 CompNet 不得写成六个模型已通过，也不得自动进入 production。
 
-<div class="source">注册表：<a href="../../samples/case4/models/registry.json"><code>samples/case4/models/registry.json</code></a>；策略：<a href="../../samples/case4/docs/01-model-evaluation-and-deployment-plan.md"><code>docs/01-model-evaluation-and-deployment-plan.md</code></a></div>
+<div class="source">注册表：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/models/registry.json"><code>samples/case4/models/registry.json</code></a>；策略：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/docs/01-model-evaluation-and-deployment-plan.md"><code>docs/01-model-evaluation-and-deployment-plan.md</code></a></div>
 
 <!--
 CCNet 是当前默认和回滚模型；五个 CompNet 只在 manual_test profile 中等待人工测试。模型 ID、精度和状态必须一一对应。
@@ -193,7 +193,7 @@ CCNet 是当前默认和回滚模型；五个 CompNet 只在 manual_test profile
 - 其余候选按任务类型单独测试，不共享掌纹 embedding 适配器。
 - 下载 OM 或 ACL smoke 不会自动修改 production registry；`blocked`、`untested`、`manual_test_pending` 也不得显示为已准入。
 
-<div class="source">候选：<a href="../../samples/case4/candidate_manifest.json"><code>samples/case4/candidate_manifest.json</code></a>；说明：<a href="../../samples/case4/docs/03-model-candidate-audit.md"><code>docs/03-model-candidate-audit.md</code></a></div>
+<div class="source">候选：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/candidate_manifest.json"><code>samples/case4/candidate_manifest.json</code></a>；说明：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/docs/03-model-candidate-audit.md"><code>docs/03-model-candidate-audit.md</code></a></div>
 
 <!--
 候选数量、运行通道数量和准入数量是三个不同概念。不能在汇总页把“有 6 个 OM”写成“6 个模型已通过”。
@@ -216,7 +216,7 @@ CCNet 是当前默认和回滚模型；五个 CompNet 只在 manual_test profile
 
 任一门缺失，候选只能保持 blocked、untested 或 `manual_test_pending`。
 
-<div class="source">准入方案：<a href="../../samples/case4/docs/01-model-evaluation-and-deployment-plan.md"><code>docs/01-model-evaluation-and-deployment-plan.md</code></a>；OM 清单：<a href="../../samples/case4/om_manifest.json"><code>samples/case4/om_manifest.json</code></a></div>
+<div class="source">准入方案：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/docs/01-model-evaluation-and-deployment-plan.md"><code>docs/01-model-evaluation-and-deployment-plan.md</code></a>；OM 清单：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/om_manifest.json"><code>samples/case4/om_manifest.json</code></a></div>
 
 <!--
 把转换、运行、数值、质量和生命周期分成不同门。一次 ACL smoke 或一张界面截图不能填满整张准入表。
@@ -235,7 +235,7 @@ CCNet 是当前默认和回滚模型；五个 CompNet 只在 manual_test profile
 
 CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不使用固定猜测值。
 
-<div class="source">教材：<a href="../experiment/case4.md#摄像头测试"><code>src/experiment/case4.md</code> §5</a>；样例：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md#摄像头测试"><code>src/experiment/case4.md</code> §5</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
 
 <!--
 上传和摄像头是两条输入路径。截图中的摄像头未连接状态不能用来判断 V4L2、首帧时间、帧率或设备释放结果。
@@ -253,7 +253,7 @@ CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不�
 4. 核对 ROI 质量后生成 `PWST1` embedding 模板。
 5. 在 `<model_id>__npu__mixed_fp16` 命名空间中查询、识别、删除并重启验证。
 
-<div class="source">教材：<a href="../experiment/case4.md#六模型人工测试"><code>src/experiment/case4.md</code> §4</a>；运行说明：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md#六模型人工测试"><code>src/experiment/case4.md</code> §4</a>；运行说明：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
 
 <!--
 模板闭环是模型身份的一部分。换模型、换精度或换发行目录后继续使用旧模板，可能得到不可解释的结果。
@@ -271,7 +271,7 @@ CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不�
 - 未识别、空模板和 API 不可用必须显示不同状态。
 - 只有同一模型、同一模板命名空间的闭环才能进入人工测试记录；`Health: Alarm` 不能单独判成败。
 
-<div class="source">教材：<a href="../experiment/case4.md#api-和界面"><code>src/experiment/case4.md</code> §3</a>；工作台说明：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md#api-和界面"><code>src/experiment/case4.md</code> §3</a>；工作台说明：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
 
 <!--
 尤其要区分“没有识别结果”和“识别未命中”。截图中的空结果只是服务未连接，不是模型拒绝，也不是 EER 结果。
@@ -309,7 +309,7 @@ CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不�
 
 人工测试期间不升级 Python、依赖、驱动、CANN，也不修改准入策略。
 
-<div class="source">冻结规则：<a href="../../samples/case4/docs/01-model-evaluation-and-deployment-plan.md"><code>docs/01-model-evaluation-and-deployment-plan.md</code> §6</a>；教材：<a href="../experiment/case4.md#版本冻结"><code>src/experiment/case4.md</code> §7</a></div>
+<div class="source">冻结规则：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/docs/01-model-evaluation-and-deployment-plan.md"><code>docs/01-model-evaluation-and-deployment-plan.md</code> §6</a>；教材：<a href="../experiment/case4.md#版本冻结"><code>src/experiment/case4.md</code> §7</a></div>
 
 <!--
 冻结是为了让失败可归因。中途升级软件或切换模型会破坏对比条件，发现问题时只记录并回退，不在同一测试窗口里修复。
@@ -329,7 +329,7 @@ python -m palmprint_workbench.tools.verify_assets --strict
 python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 ```
 
-<div class="source">命令：<a href="../../samples/case4/README.md"><code>samples/case4/README.md</code></a>；教材：<a href="../experiment/case4.md#手动环境"><code>src/experiment/case4.md</code> §2</a></div>
+<div class="source">命令：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a>；教材：<a href="../experiment/case4.md#手动环境"><code>src/experiment/case4.md</code> §2</a></div>
 
 随后只读检查 `/api/health`、`/api/bootstrap`、`/api/candidates` 和 `/`，再执行一次合成 ROI 或匿名上传。
 
@@ -349,7 +349,7 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 - ACL 异常、设备 reset、`err_ret=-512` 或清理失败：停止该候选，保留日志并回退 CCNet。
 - `Health: Alarm` 只记录诊断，不能单独判失败或通过。
 
-<div class="source">排障：<a href="../experiment/case4.md#常见问题"><code>src/experiment/case4.md</code> §6</a>；验收边界：<a href="../../samples/case4/docs/02-device-deployment-and-acceptance-report.md"><code>docs/02-device-deployment-and-acceptance-report.md</code></a></div>
+<div class="source">排障：<a href="../experiment/case4.md#常见问题"><code>src/experiment/case4.md</code> §6</a>；验收边界：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/docs/02-device-deployment-and-acceptance-report.md"><code>docs/02-device-deployment-and-acceptance-report.md</code></a></div>
 
 <!--
 回退 CCNet 是版本内恢复策略，不是把五个 CompNet 判为永久不支持。故障候选先阻断，后续用单独版本重新验收。
@@ -372,7 +372,7 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 
 完成标准是能解释“哪些是前端证据、哪些是运行证据”，并明确五个 CompNet 仍为 `manual_test_pending`。
 
-<div class="source">教材：<a href="../experiment/case4.md"><code>src/experiment/case4.md</code></a>；候选清单：<a href="../../samples/case4/candidate_manifest.json"><code>samples/case4/candidate_manifest.json</code></a>；截图清单：<a href="screenshots/capture-manifest.json"><code>capture-manifest.json</code></a></div>
+<div class="source">教材：<a href="../experiment/case4.md"><code>src/experiment/case4.md</code></a>；候选清单：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/candidate_manifest.json"><code>samples/case4/candidate_manifest.json</code></a>；截图清单：<a href="screenshots/capture-manifest.json"><code>capture-manifest.json</code></a></div>
 
 <!--
 最终报告不能写“六模型通过”。正确写法是默认模型可回退、五个 CompNet 等待人工测试，前端截图只覆盖布局。

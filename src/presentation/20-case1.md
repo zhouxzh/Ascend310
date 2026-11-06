@@ -18,7 +18,7 @@ footer: "案例 1：智能考勤机"
 ## 从摄像头图像到本地考勤事件
 
 
-<div class="source">依据：<a href="../experiment/case1.md">src/experiment/case1.md</a>；实现：<a href="../../samples/case1/README.md"><code>samples/case1</code></a></div>
+<div class="source">依据：<a href="../experiment/case1.md">src/experiment/case1.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case1/README.md"><code>samples/case1</code></a></div>
 
 <!--
 本案例是教学演示，不是生产身份认证系统。课程目标是理解从采集、检测、特征、比对到记录和界面的完整链路。
@@ -184,7 +184,7 @@ footer: "案例 1：智能考勤机"
 
 摄像头 BGR 帧要完成缩放、归一化和 NCHW 转换。输出维度、dtype 和后处理必须与真实 OM 描述一致。
 
-<div class="source">样例：<a href="../../samples/case1/docs/01-model-contract.md"><code>samples/case1/docs/01-model-contract.md</code></a>；教材：<a href="../experiment/case1.md#模型与张量合同"><code>src/experiment/case1.md</code>「模型与张量合同」</a></div>
+<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case1/docs/01-model-contract.md"><code>samples/case1/docs/01-model-contract.md</code></a>；教材：<a href="../experiment/case1.md#模型与张量合同"><code>src/experiment/case1.md</code>「模型与张量合同」</a></div>
 
 <!--
 模型文件名不能证明网络来源或输出语义。必须同时检查ONNX、OM描述和板端数值，布局或归一化改变后要重跑合同检查。
@@ -325,7 +325,7 @@ FastAPI使用ASGI不代表硬件调用应并发化。OpenCV、PyACL和sqlite3都
 
 任何一层没有证据，都必须标为 `untested` 或 `blocked`。
 
-<div class="source">教材：<a href="../experiment/case1.md#实验步骤与证据记录"><code>src/experiment/case1.md</code>「实验步骤与证据记录」</a>；样例：<a href="../../samples/case1/docs/03-board-acceptance.md"><code>board acceptance</code></a></div>
+<div class="source">教材：<a href="../experiment/case1.md#实验步骤与证据记录"><code>src/experiment/case1.md</code>「实验步骤与证据记录」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case1/docs/03-board-acceptance.md"><code>board acceptance</code></a></div>
 
 <!--
 当前截图只覆盖静态前端加载的一小部分UI层，不能填写模型、ACL、API、识别率或性能证据。

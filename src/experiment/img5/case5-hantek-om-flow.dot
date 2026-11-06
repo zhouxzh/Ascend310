@@ -2,7 +2,7 @@ digraph Case5HantekOmFlow {
   graph [
     rankdir=TB,
     bgcolor="white",
-    size="7.4,9.3!",
+    size="7.2,8.3!",
     pad="0.14",
     nodesep="0.32",
     ranksep="0.44",

@@ -18,6 +18,7 @@ _按任务查找 Case7 当前部署、照片、显示、设备、模型、API �
 | 手机、触摸屏和 ESP32 HTTP 接口 | [06-api-reference.md](06-api-reference.md) |
 | 测试、验收和故障排查 | [07-validation-and-troubleshooting.md](07-validation-and-troubleshooting.md) |
 | 统一测试问题台账 | [08-troubleshooting.md](08-troubleshooting.md) |
+| 案例结构与发布风险审查 | [09-review.md](09-review.md) |
 
 ## 先读哪份
 
@@ -36,7 +37,7 @@ _按任务查找 Case7 当前部署、照片、显示、设备、模型、API �
 | 可执行运行步骤 | [`samples/case7/README.md`](../README.md) |
 | Case7 理论、架构和模型原理 | [`src/experiment/case7.md`](../../../src/experiment/case7.md) |
 | 当前工程命令和接口 | 本目录 01-07 |
-| 跨案例审查 | [`../../../docs/README.md`](../../../docs/README.md) |
+| 跨案例审查 | [`../../../docs/audits/20260907-case-reviews.md`](../../../docs/audits/20260907-case-reviews.md) |
 
 本目录只记录当前代码和当前推荐流程。旧板卡、旧 IP、旧 CANN 版本和早期设备发送实验不作为当前操作依据。
 

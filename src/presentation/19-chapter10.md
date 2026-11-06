@@ -18,7 +18,7 @@ footer: "第10章：AI项目交付闭环"
 ## 从需求契约到可回滚的交付证据
 
 
-<div class="source">教材：<a href="../book/chapter10.md"><code>src/book/chapter10.md</code></a>；样例：<a href="../../samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD</code></a></div>
+<div class="source">教材：<a href="../book/chapter10.md"><code>src/book/chapter10.md</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD</code></a></div>
 
 <!--
 本章讲的是交付方法，不把 checklist 的存在当成项目已经验收。SSD300 只是贯穿案例，当前课件不宣称它已经完成端到端验收。
@@ -67,7 +67,7 @@ footer: "第10章：AI项目交付闭环"
 
 这些是设计输入，不是验收结果。样例入口见 `samples/chapter4/SSD`。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h1"><code>src/book/chapter10.md</code> §10.1</a>；样例：<a href="../../samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD/README.md</code></a></div>
+<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h1"><code>src/book/chapter10.md</code> §10.1</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD/README.md</code></a></div>
 
 <!--
 先说明这是贯穿案例。实验室告警、SSD300 和指标目标用于组织方法，不代表当前仓库已经完成摄像头、模型和告警系统的联合验收。
@@ -242,7 +242,7 @@ manifest.json 是发布包的身份证。路径存在不等于内容正确，必
 
 图片只帮助梳理交付对象；SSD300 是否通过，仍要由当前版本的实测证据回答。
 
-<div class="source">图片：<a href="../book/img4/inference.png"><code>src/book/img4/inference.png</code></a>；正文：<a href="../book/chapter4.md#src-book-chapter4-h21"><code>src/book/chapter4.md</code>「模型推理开发流程解析」</a>；样例：<a href="../../samples/chapter4/SSD"><code>samples/chapter4/SSD</code></a></div>
+<div class="source">图片：<a href="../book/img4/inference.png"><code>src/book/img4/inference.png</code></a>；正文：<a href="../book/chapter4.md#src-book-chapter4-h21"><code>src/book/chapter4.md</code>「模型推理开发流程解析」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD"><code>samples/chapter4/SSD</code></a></div>
 
 <!--
 这张教材图描述通用推理流程，不是本章项目的验收截图。不要把架构图、示意图或样例路径当成板端执行结果。
@@ -329,7 +329,7 @@ manifest.json 是发布包的身份证。路径存在不等于内容正确，必
 
 SSD300 的真实验收需要当前版本的模型哈希、板端运行日志、评测报告、长稳记录和回滚演练。
 
-<div class="source">样例：<a href="../../samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD/README.md</code></a>；教材：<a href="../book/chapter10.md#src-book-chapter10-h1"><code>src/book/chapter10.md</code> 第10章</a></div>
+<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD/README.md</code></a>；教材：<a href="../book/chapter10.md#src-book-chapter10-h1"><code>src/book/chapter10.md</code> 第10章</a></div>
 
 <!--
 这一页专门防止把“存在样例入口”写成“系统已经验收”。下载脚本、推理脚本、架构图和 Checklist 都只是资源或方法，不是实际通过证据。
@@ -347,7 +347,7 @@ SSD300 的真实验收需要当前版本的模型哈希、板端运行日志、�
 4. 生成 Model Card、评测报告和发布 manifest。
 5. 模拟一个 Checklist 未通过项，完成风险与回滚记录；评价重点是证据可复现，而不是“代码已写完”。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h13"><code>src/book/chapter10.md</code> §10.13「实践任务」</a>；样例入口：<a href="../../samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD</code></a></div>
+<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h13"><code>src/book/chapter10.md</code> §10.13「实践任务」</a>；样例入口：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD</code></a></div>
 
 <!--
 最终交付必须同时包含通过项和未通过项。没有版本、哈希、原始日志和回滚记录的“全部通过”不构成可审查交付。

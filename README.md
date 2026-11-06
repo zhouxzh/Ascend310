@@ -13,29 +13,30 @@
 | 目标 | 入口 |
 | --- | --- |
 | 第一次了解仓库 | 本页 |
-| 查找工程文档、部署记录和审查结论 | [`docs/README.md`](docs/README.md) |
+| 查找仓库治理、发布流程和环境矩阵 | [`docs/README.md`](docs/README.md) |
 | 阅读完整理论教程 | [`src/book/README.md`](src/book/README.md) |
 | 阅读实践案例教程 | [`src/experiment/README.md`](src/experiment/README.md) |
 | 运行某个案例 | [`samples/README.md`](samples/README.md)，然后进入对应 `samples/caseN/README.md` |
 | 运行案例 7：智能相册 | [`samples/case7/README.md`](samples/case7/README.md) |
 | 安装配套 DSH 插件 | [`tools/README.md`](tools/README.md) |
-| 理解本仓库为什么这样分目录 | [`docs/00-repository-structure.md`](docs/00-repository-structure.md) |
+| 理解本仓库为什么这样分目录 | [`docs/governance/repository-structure.md`](docs/governance/repository-structure.md) |
 
-根 README 是项目首页和快速起步页；它不替代 `docs/README.md`。根 README 说明“项目是什么、怎样开始”，`docs/README.md` 说明“具体问题应该查哪份工程文档”。完整职责表以 [仓库目录与文档职责](docs/00-repository-structure.md) 为准。
+根 README 是项目首页和快速起步页；它不替代 `docs/README.md`。`src/` 承载教程正文，`samples/` 承载可运行代码和案例工程文档，`docs/` 只记录仓库治理、发布流程、环境矩阵和跨项目审计。完整职责表以 [仓库目录与文档职责](docs/governance/repository-structure.md) 为准。
 
 ## 仓库结构
 
 ```text
 Ascend310/
 ├── README.md                 # 项目首页和快速起步
-├── docs/                     # 工程文档总索引、结构规范、跨案例审查
+├── docs/                     # 仓库治理、发布流程、环境矩阵和跨项目审计
 ├── src/                      # VuePress/Pandoc 书稿源文件
 │   ├── book/                 # 理论教程
 │   ├── experiment/           # 实践案例教程
 │   └── appendix/             # 附录
 ├── samples/                  # 章节示例和 case1-case9 可运行代码
-├── tools/                    # 配套 DSH 插件（昇腾310B调试）
-├── scripts/                  # 仓库级构建和发布工具
+├── tools/                    # DSH 插件源码、插件安装和 skill 同步入口
+├── scripts/                  # 教材课件、网页和证据处理脚本
+├── tmp/                      # 唯一仓库内临时工作区；内容忽略，README 跟踪
 ├── latex/                    # 生成的 LaTeX/PDF，不手工编辑
 └── .github/                  # CI 和仓库自动化
 ```
@@ -70,9 +71,9 @@ git diff --check
 
 - [`昇腾310B调试`](tools/dsh-plugin-ascend310b-debug/README.md)：只面向 Ascend 310B1/310B4，提供板端事实探测、版本配套判定、分层调试计划、样例索引和只读诊断命令。其他芯片会被标记为不适用。
 
-插件通过仓库根目录的 `node scripts/install-dsh-plugins.mjs --profile desktop` 打包安装：安装器会生成带内容哈希的 tarball、调用 `dsh plugin add`，并核对安装版本和文件内容；不要手工复制或软链源码目录。每个插件的 README 都给出配置和自检命令；昇腾310B调试插件的源码审核记录在 [`installation-audit.md`](tools/dsh-plugin-ascend310b-debug/docs/installation-audit.md)。
+插件通过仓库根目录的 `node tools/install-dsh-plugins.mjs --profile desktop` 打包安装：安装器会生成带内容哈希的 tarball、调用 `dsh plugin add`，并核对安装版本和文件内容；不要手工复制或软链源码目录。每个插件的 README 都给出配置和自检命令；昇腾310B调试插件的源码审核记录在 [`installation-audit.md`](tools/dsh-plugin-ascend310b-debug/docs/installation-audit.md)。
 
-配套的项目级 skills 已提交在 [`.dsh/skills/`](.dsh/skills/)：`ascend310b-cann-development` 负责 310B 程序开发、CANN 合同和板端验收，`ascend310b-case-testing` 负责从 GitHub commit 与 Hugging Face revision 重建案例，`ascend310b-debug` 负责故障定位；写作侧按 `ascend310b-writing-theory`（理论章节）、`ascend310b-writing-case`（9 个案例）、`ascend310b-writing-presentation`（Marp 课件）、`ascend310b-writing-docs`（仓库/案例 docs）、`ascend310b-code-docs`（源码 API/docstring）、`ascend310b-writing-academic`（学术论证）、`ascend310b-curriculum-planning`（教材计划）、`ascend310b-writing-vuepress`、`ascend310b-writing-latex`、`ascend310b-writing-markdown` 和 `ascend310b-writing-dot` 分工。插件内的 [`skills/`](tools/dsh-plugin-ascend310b-writing/skills/) 是源文件；修改后运行 `npm run skills:sync` 和 `npm run skills:check`。
+配套的项目级 skills 已提交在 [`.dsh/skills/`](.dsh/skills/)：`ascend310b-cann-development` 负责 310B 程序开发、CANN 合同和板端验收，`ascend310b-case-testing` 负责从 GitHub commit 与 Hugging Face revision 重建案例，`ascend310b-debug` 负责故障定位；写作侧按 `ascend310b-writing-theory`（理论章节）、`ascend310b-writing-case`（面向初学者的案例教材）、`ascend310b-writing-presentation`（Marp 课件）、`ascend310b-writing-docs`（仓库/案例 docs）、`ascend310b-code-docs`（源码 API/docstring）、`ascend310b-writing-academic`（学术论证）、`ascend310b-curriculum-planning`（教材计划）、`ascend310b-writing-vuepress`、`ascend310b-writing-latex`、`ascend310b-writing-markdown` 和 `ascend310b-writing-dot` 分工。插件内的 [`skills/`](tools/dsh-plugin-ascend310b-writing/skills/) 是源文件；修改后运行 `npm run skills:sync` 和 `npm run skills:check`。
 
 ## 案例运行原则
 

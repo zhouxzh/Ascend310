@@ -10,6 +10,7 @@
 | [04-web-ui-and-operation.md](04-web-ui-and-operation.md) | Gradio 页面、参数、启动和停止 |
 | [05-validation-and-limitations.md](05-validation-and-limitations.md) | 本地检查、板端验收和证据边界 |
 | [06-troubleshooting.md](06-troubleshooting.md) | 统一测试问题台账 |
+| [07-review.md](07-review.md) | 输入合同、模型证据和部署边界审查 |
 
 ## 代码入口
 

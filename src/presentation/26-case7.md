@@ -18,7 +18,7 @@ footer: "案例 7：智能相册"
 ## 从照片索引到局域网设备协同
 
 
-<div class="source">依据：<a href="../experiment/case7.md">src/experiment/case7.md</a>；实现：<a href="../../samples/case7/README.md"><code>samples/case7</code></a></div>
+<div class="source">依据：<a href="../experiment/case7.md">src/experiment/case7.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/README.md"><code>samples/case7</code></a></div>
 
 <!--
 案例7不是单个图像分类脚本，而是手机上传、NPU索引、语义检索、触摸屏显示和ESP32电子纸拉图的完整系统。
@@ -182,7 +182,7 @@ ResNet50没有文本编码器。三个模型的向量维度和坐标空间不同
 - 每个模型拥有独立`IndexIDMap2`。
 - 上传任务完成三模型索引后才标记`completed`。
 
-<div class="source">教材：<a href="../experiment/case7.md#核心数据模型"><code>src/experiment/case7.md</code>「核心数据模型」</a>；实现：<a href="../../samples/case7/photo_index.py"><code>samples/case7/photo_index.py</code></a></div>
+<div class="source">教材：<a href="../experiment/case7.md#核心数据模型"><code>src/experiment/case7.md</code>「核心数据模型」</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/photo_index.py"><code>samples/case7/photo_index.py</code></a></div>
 
 <!--
 FAISS是派生缓存，SQLite与受管文件才是可恢复的组合。模型变化时需要建立新索引，不能沿用旧模型向量。
@@ -222,7 +222,7 @@ FAISS是派生缓存，SQLite与受管文件才是可恢复的组合。模型变
 - 上传索引任务与即时查询串行化。
 - 模型缺失、hash错误或ACL失败直接报错，不回退CPU。
 
-<div class="source">教材：<a href="../experiment/case7.md#npu-运行时与串行资源管理"><code>src/experiment/case7.md</code>「NPU运行时与串行资源管理」</a>；实现：<a href="../../samples/case7/embedding_backend.py"><code>samples/case7/embedding_backend.py</code></a></div>
+<div class="source">教材：<a href="../experiment/case7.md#npu-运行时与串行资源管理"><code>src/experiment/case7.md</code>「NPU运行时与串行资源管理」</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/embedding_backend.py"><code>samples/case7/embedding_backend.py</code></a></div>
 
 <!--
 单锁会降低吞吐，但能控制内存峰值和模型切换。生产回退会掩盖准入失败，因此必须失败关闭。
@@ -363,7 +363,7 @@ E6 dry-run只证明旋转、裁剪、量化和192000字节帧协议，不证明�
 
 页面能打开只对应第一列的一部分，不是整条相册链路通过。
 
-<div class="source">样例：<a href="../../samples/case7/README.md"><code>samples/case7/README.md</code> 检查与重启</a>；教材：<a href="../experiment/case7.md#测试、性能与验收方法"><code>src/experiment/case7.md</code> §测试</a></div>
+<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/README.md"><code>samples/case7/README.md</code> 检查与重启</a>；教材：<a href="../experiment/case7.md#测试、性能与验收方法"><code>src/experiment/case7.md</code> §测试</a></div>
 
 <!--
 按健康、索引、搜索、显示、设备拉图的顺序验收。每一步都有独立接口和原始证据。
@@ -381,7 +381,7 @@ E6 dry-run只证明旋转、裁剪、量化和192000字节帧协议，不证明�
 - 删除照片要二次确认，并同步维护索引状态。
 - 设备地址、硬件ID和序列日志不进入公开材料。
 
-<div class="source">样例：<a href="../../samples/case7/README.md"><code>samples/case7/README.md</code> 能力和边界、保存位置</a></div>
+<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/README.md"><code>samples/case7/README.md</code> 能力和边界、保存位置</a></div>
 
 <!--
 当前截图没有真实照片。后续补拍真实图库时必须使用合成或匿名照片，并隐藏EXIF、设备ID和路径。
@@ -403,7 +403,7 @@ E6 dry-run只证明旋转、裁剪、量化和192000字节帧协议，不证明�
 
 当前只可确认静态前端加载；其余四层必须重新执行并保留原始日志。
 
-<div class="source">作业：<a href="../experiment/case7.md#测试、性能与验收方法"><code>src/experiment/case7.md</code> §测试</a>；实现：<a href="../../samples/case7/README.md"><code>samples/case7</code></a></div>
+<div class="source">作业：<a href="../experiment/case7.md#测试、性能与验收方法"><code>src/experiment/case7.md</code> §测试</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/README.md"><code>samples/case7</code></a></div>
 
 <!--
 最终要求学生逐层勾选。空库截图不能填“搜索”或“设备”两栏，后端未连接时也不能填任何NPU证据。

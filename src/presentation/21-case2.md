@@ -18,7 +18,7 @@ footer: "案例 2：目标跟踪检测"
 ## 检测看见目标，跟踪维持身份
 
 
-<div class="source">依据：<a href="../experiment/case2.md">src/experiment/case2.md</a>；实现：<a href="../../samples/case2/README.md"><code>samples/case2</code></a></div>
+<div class="source">依据：<a href="../experiment/case2.md">src/experiment/case2.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case2/README.md"><code>samples/case2</code></a></div>
 
 <!--
 本案例先做单帧检测，再把检测结果送入DeepSORT风格跟踪器。课程重点是职责边界、身份关联和证据等级。
@@ -337,7 +337,7 @@ detection_app和tracking_app共享检测前半段。跟踪验证必须包含检�
 - NMS阈值和最大检测数属于输出合同的一部分。
 - 输入源断开、模型缺失或ACL失败必须明确退出。
 
-<div class="source">样例：<a href="../../samples/case2/README.md"><code>samples/case2/README.md</code> 模型准备、常用参数</a></div>
+<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case2/README.md"><code>samples/case2/README.md</code> 模型准备、常用参数</a></div>
 
 <!--
 模型文件、后端、输入尺寸和预处理必须成套。同名模型的OM格式不同，不能仅凭文件名判断合同。

@@ -9,10 +9,11 @@ import { presentationCatalog } from "../src/presentation/catalog.mjs";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const sourceDir = path.join(repoRoot, "src", "presentation");
-const stagingDir = path.join(repoRoot, "tmp", "presentation-build");
+const scratchRoot = path.join(repoRoot, "tmp");
+const stagingDir = path.join(scratchRoot, "presentation-build");
 const stagingAssetDir = path.join(stagingDir, "assets");
 const outputDir = path.join(repoRoot, "src", ".vuepress", "public", "presentation");
-const generatedOutputDir = path.join(repoRoot, "tmp", "presentation-output");
+const generatedOutputDir = path.join(scratchRoot, "presentation-output");
 const themePath = path.join(sourceDir, "theme.css");
 const repositoryWebRoot = "https://github.com/zhouxzh/Ascend310";
 const marpCliPath = path.join(repoRoot, "node_modules", "@marp-team", "marp-cli", "marp-cli.js");
@@ -236,6 +237,7 @@ function main() {
   });
   runMarp(generatedOutputDir);
   publishOutput();
+  console.log(`Scratch staging: ${stagingDir}`);
   console.log(
     `Built ${markdownFiles.length} presentation sources into ${outputDir}`,
   );

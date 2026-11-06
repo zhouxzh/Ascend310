@@ -1855,7 +1855,7 @@ if __name__ == "__main__":
     plot_metrics(script_dir, train_acc_history, val_acc_history, train_loss_history, val_loss_history)
 ```
 
-#### 实验结果对比分析 {#src-book-chapter3-h31}
+#### ResNet FP32 结果解读 {#src-book-chapter3-h31}
 
 本章节仅展示了 ResNet 在 FP32 全精度模式下的实验结果，未进行 FP16 半精度测试。这主要基于两方面深入考量：
 

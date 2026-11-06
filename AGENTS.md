@@ -14,13 +14,93 @@ documentation, generated material, or board assets.
 | `src/book/` | Theory/tutorial manuscript source | Markdown |
 | `src/experiment/` | Practical case manuscript source | Markdown |
 | `src/appendix/` | Appendix manuscript source | Markdown |
-| `samples/` | Runnable code, setup scripts, and model tooling paired with chapters/cases | Source files |
-| `docs/` | Repository-level structure, engineering-document index, and cross-case reviews | Markdown |
-| `docs/` in a sample | Numbered engineering plans, audits, and validation records | Markdown |
+| `samples/` | Runnable code, setup scripts, case-specific engineering docs, and validation records | Source files and Markdown |
+| `docs/` | Repository governance, release policy, environment matrix, and cross-project audits only | Markdown |
+| `docs/` in a sample | Numbered case-specific engineering plans, troubleshooting, and validation records | Markdown |
 | `src/.vuepress/` | Site navigation and presentation configuration | TypeScript/config |
 | `latex/` | Generated LaTeX/PDF outputs | Generated; do not hand-edit |
 | `notebook/` | Auxiliary learning materials | Source notebooks/scripts |
 | `tools/dsh-plugin-ascend310b-writing/` | DSH plugin that audits this manuscript (naming, anchors, links, LaTeX artifacts, push gate) | Node ESM source; machine-local helpers stay outside this repository |
+| `tmp/` | The only repository-local temporary working directory | Tracked `README.md`; generated contents ignored |
+
+## Root docs contract
+
+The root `docs/` directory is maintainer-facing repository documentation. It is
+not part of the learner-facing tutorial, is not included in VuePress, and must
+not duplicate content owned by `src/`, `samples/`, or `tools/`.
+
+### What root docs owns
+
+Root `docs/` owns only cross-project information that cannot belong to one
+chapter, one case, or one implementation directory:
+
+- repository structure and directory ownership;
+- documentation ownership and placement rules;
+- release process and publication checklists;
+- the supported environment/compatibility matrix at summary level;
+- time-stamped cross-project audit conclusions.
+
+### What root docs must not contain
+
+Root `docs/` must not contain:
+
+- chapter, case, or appendix tutorial content;
+- runnable commands whose primary purpose is operating one sample;
+- case-specific architecture, deployment, API, model, validation, or
+  troubleshooting documents;
+- raw terminal logs, screenshots, test output, datasets, model files, or
+  binary evidence;
+- plugin implementation/API documentation;
+- copies of text or tables owned by another directory.
+
+Root docs may link to the canonical owner in `src/`, `samples/`, or `tools/`,
+but must not reproduce or become the operational source for that content.
+
+### Fixed root docs structure
+
+Keep the root documentation structure small and stable:
+
+```text
+docs/
+├── README.md
+├── governance/
+│   ├── repository-structure.md
+│   └── documentation-ownership.md
+├── release/
+│   ├── release-checklist.md
+│   └── environment-matrix.md
+└── audits/
+    └── YYYYMMDD-<scope>.md
+```
+
+Rules:
+
+- `docs/README.md` is the only root documentation index.
+- `governance/` holds stable repository and documentation ownership rules.
+- `release/` holds living release and compatibility documents.
+- `audits/` holds dated, cross-project audit summaries only.
+- Do not add another root-level Markdown file or another subject directory
+  without an explicit documentation-structure decision.
+- Do not add deeper nesting unless a dated audit has several unavoidable files;
+  link to those files from the corresponding audit summary.
+
+### Canonical ownership elsewhere
+
+Place content by its primary owner, not by file type:
+
+| Content | Canonical location |
+| --- | --- |
+| Theory, experiments, appendices, learner instructions | `src/` |
+| Case run commands and case-specific engineering docs | `samples/caseN/docs/` |
+| Raw case evidence that the user explicitly asks to retain | `samples/caseN/docs/evidence/` or an explicitly designated external archive; never root `docs/` |
+| Runnable implementation and tests | `samples/caseN/` |
+| DSH plugin code and plugin-specific docs/data | `tools/` |
+| Generated site, presentation HTML, LaTeX, PDF | generated output directories; never root `docs/` |
+
+Case review reports belong to their case under `samples/caseN/docs/`.
+Command matrices and plugin installation records belong under `tools/`.
+A cross-case audit summary may remain in `docs/audits/`, but its raw evidence
+must remain with the owning sample or outside the repository.
 
 For the palmprint workbench, runtime modules use the `palmprint_` prefix:
 `palmprint_service.py`, `palmprint_benchmark.py`, and
@@ -155,6 +235,47 @@ flowchart LR
   limitation explicitly.
 - Use `apply_patch` for manual edits. Do not overwrite or revert unrelated
   user changes, generated output, model assets, or data.
+
+## Repository-local temporary workspace
+
+The repository has exactly one temporary workspace: `tmp/`. It exists so the
+human can inspect intermediate files and see what an agent or build command
+produced. Do not hide project intermediate data in an external or OS temporary
+directory.
+
+Use task-specific subdirectories:
+
+```text
+tmp/
+├── README.md
+├── presentation-build/
+├── downloads/
+├── test-runs/
+└── package-staging/
+```
+
+Rules:
+
+- `tmp/README.md` is tracked; all other `tmp/` contents are ignored by Git.
+- Use a descriptive subdirectory for every task. Do not put loose files directly
+  in `tmp/`.
+- Reuse a task directory when the same operation runs again, and remove stale
+  contents once they are no longer useful.
+- Do not create `.tmp/`, `scratch/`, or a second root-level temporary directory.
+- A transient file suffix such as `target.json.tmp` is allowed for atomic
+  same-directory replacement. It is a file, not a temporary directory, and must
+  be renamed or removed before the operation finishes.
+- Unit-test frameworks and browser engines may use isolated OS-managed temporary
+  storage for their own ephemeral state. Those directories must be created with
+  a unique name and removed automatically; they must not hold project artifacts.
+- Never store durable models, datasets, release artifacts, secrets, personal
+  data, or completed evidence packages in `tmp/`. Publish durable artifacts to
+  Hugging Face or GitHub Releases and commit only metadata, checksums, and
+  retrieval instructions.
+- A Git worktree is not temporary build data. Keep worktrees outside this
+  checkout at `D:\Github\Ascend310-worktrees\<branch-slug>\`.
+- Board-only output stays in the board's case `reports/` directory; commit a
+  small reviewed summary under `samples/caseN/docs/` only when required.
 
 ## Evidence-driven hypothesis and empirical validation
 
@@ -390,6 +511,13 @@ images in screenshots, issue reports, or source control.
 
 ## Documentation workflow
 
+- Repository-authored learner documentation, case README files, active sample
+  `docs/`, theory chapters, appendices, and slide bodies use Simplified Chinese.
+  Keep code, commands, API names, paths, model identifiers, versions, raw log
+  excerpts, citations, and upstream quotations in their original language;
+  technical English does not justify English prose. Upstream files and raw
+  evidence under an explicit archive/evidence allowlist may remain in their
+  original language, but the surrounding explanation is Chinese.
 - `README.md` is an operating guide only: prerequisites, build, deployment,
   launch, user workflow, and common operational faults. Do not put extensive
   model matrices, hashes, historic logs, or benchmark tables there.

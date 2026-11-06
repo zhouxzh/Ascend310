@@ -18,7 +18,7 @@ footer: "第3章：昇腾PyTorch扩展迁移基础"
 ## 从 PyTorch 脚本到 NPU 训练证据
 
 
-<div class="source">依据：<a href="../book/chapter3.md">src/book/chapter3.md</a>；样例：<a href="../../samples/chapter3/README.md"><code>samples/chapter3</code></a></div>
+<div class="source">依据：<a href="../book/chapter3.md">src/book/chapter3.md</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/README.md"><code>samples/chapter3</code></a></div>
 
 <!--
 本章主线不是背 API，而是让已有 PyTorch 代码在明确版本、设备和证据边界下迁移到 NPU。
@@ -126,7 +126,7 @@ footer: "第3章：昇腾PyTorch扩展迁移基础"
 
 安装示例用于说明配套关系；双板记录只支持当次 `torch_npu` 训练结果。两者不能互相补成“已完全匹配”。
 
-<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h7"><code>src/book/chapter3.md</code>「安装昇腾torch_npu插件」</a>；记录：<a href="../../docs/chapter-board-runs-20261017/8t/run1/meta.txt"><code>8T meta</code></a>、<a href="../../docs/chapter-board-runs-20261017/20t/run1/meta.txt"><code>20T meta</code></a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h7"><code>src/book/chapter3.md</code>「安装昇腾torch_npu插件」</a>；记录：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/docs/README.md"><code>8T meta</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/docs/README.md"><code>20T meta</code></a></div>
 
 <!--
 这页专门防止证据拼接。教材中的版本是安装示例，双板实际记录是 Python 3.9.2 和 CANN 8.0.0，且日志没有保留框架插件版本号。
@@ -143,7 +143,7 @@ a = torch.randn(3, 4).npu()
 print(a + a)
 ```
 
-<div class="source">代码：<a href="../../samples/chapter3/README.md"><code>samples/chapter3/README.md</code></a>；教材：<a href="../book/chapter3.md#src-book-chapter3-h8"><code>src/book/chapter3.md</code>「torch_npu安装后测试」</a></div>
+<div class="source">代码：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/README.md"><code>samples/chapter3/README.md</code></a>；教材：<a href="../book/chapter3.md#src-book-chapter3-h8"><code>src/book/chapter3.md</code>「torch_npu安装后测试」</a></div>
 
 输出中的 `device='npu:0'` 比“导入成功”更有价值。若出现 CANN 路径所有者警告，先记录它；若运算失败或没有 NPU 张量，不能把普通 CPU 结果当作迁移成功。
 
@@ -172,7 +172,7 @@ print(a + a)
 4. 检查 `.item()`、`.cpu()`、`.numpy()` 引起的同步与拷贝。
 5. 核对算子、数据类型和内存是否被当前版本支持。
 
-<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h9"><code>src/book/chapter3.md</code>「torch_npu插件的使用」</a>；样例：<a href="../../samples/chapter3/linear_regression/linear_regression_npu.py"><code>samples/chapter3/linear_regression</code></a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h9"><code>src/book/chapter3.md</code>「torch_npu插件的使用」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/linear_regression/linear_regression_npu.py"><code>samples/chapter3/linear_regression</code></a></div>
 
 <!--
 迁移要保持算法不变，只替换设备与必要兼容点。任何算子替换、精度改变和 batch 改变都要进入实验记录。
@@ -186,7 +186,7 @@ print(a + a)
 
 ![线性回归训练损失曲线](../book/img3/linear_regression_training_loss.png)
 
-<div class="source">图片：<a href="../book/img3/linear_regression_training_loss.png"><code>src/book/img3/linear_regression_training_loss.png</code></a>；代码：<a href="../../samples/chapter3/linear_regression/linear_regression_npu.py"><code>samples/chapter3/linear_regression</code></a></div>
+<div class="source">图片：<a href="../book/img3/linear_regression_training_loss.png"><code>src/book/img3/linear_regression_training_loss.png</code></a>；代码：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/linear_regression/linear_regression_npu.py"><code>samples/chapter3/linear_regression</code></a></div>
 
 <!--
 曲线证明这组代码在该记录中完成训练并收敛，不证明推理性能或整机吞吐。横轴是 epoch，纵轴是训练 MSE。
@@ -205,7 +205,7 @@ print(a + a)
 
 两块板使用同一份样例源码与同一套测试命令。时间来自任务工具墙钟，包含预热、图编译、数据处理和板端后台负载，不是纯 NPU 算子耗时。
 
-<div class="source">记录：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>docs/ascend310b-chapter-board-comparison-20261017.md</code> §4 chapter3</a></div>
+<div class="source">记录：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>docs/release/environment-matrix.md</code> §4 chapter3</a></div>
 
 <!--
 严格保留 8T 的 56.908 s 和 20T 的 78.532 s，不能互换，不能平均。最终参数相同说明本次训练路径得到了同组拟合值，不说明速度排名。
@@ -223,7 +223,7 @@ print(a + a)
 - 板端后台负载、温度和系统状态会改变实测结果。
 - `torch_npu` 的图编译策略与版本也会影响启动阶段。
 
-<div class="source">记录边界：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §4、§5</a></div>
+<div class="source">记录边界：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §4、§5</a></div>
 
 <!--
 这页解释为什么更高档位的单次墙钟可能更长。不能把总时间除以 epoch 就称为 NPU 算子性能。
@@ -237,7 +237,7 @@ print(a + a)
 
 ![多层感知机结构图](../book/img3/mlp_network.png)
 
-<div class="source">图片：<a href="../book/img3/mlp_network.png"><code>src/book/img3/mlp_network.png</code></a>；代码：<a href="../../samples/chapter3/california_housing/california_housing_mlp.py"><code>samples/chapter3/california_housing</code></a></div>
+<div class="source">图片：<a href="../book/img3/mlp_network.png"><code>src/book/img3/mlp_network.png</code></a>；代码：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/california_housing/california_housing_mlp.py"><code>samples/chapter3/california_housing</code></a></div>
 
 <!--
 MLP 通过隐藏层和非线性激活突破线性模型限制。迁移时要继续检查每层算子、激活函数和输入维度，而不是只把设备改成 NPU。
@@ -251,7 +251,7 @@ MLP 通过隐藏层和非线性激活突破线性模型限制。迁移时要继�
 
 ![LeNet 训练准确率与损失曲线](../book/img3/accuracy_loss_curve.png)
 
-<div class="source">图片：<a href="../book/img3/accuracy_loss_curve.png"><code>src/book/img3/accuracy_loss_curve.png</code></a>；代码：<a href="../../samples/chapter3/LeNet/lenet_npu.py"><code>samples/chapter3/LeNet</code></a></div>
+<div class="source">图片：<a href="../book/img3/accuracy_loss_curve.png"><code>src/book/img3/accuracy_loss_curve.png</code></a>；代码：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/LeNet/lenet_npu.py"><code>samples/chapter3/LeNet</code></a></div>
 
 <!--
 LeNet 教材实现把 Sigmoid 调整为 ReLU，并使用 FP16。曲线说明该配置在记录中完成训练，不能替代兼容性测试和最终质量评估。
@@ -272,7 +272,7 @@ LeNet 教材实现把 Sigmoid 调整为 ReLU，并使用 FP16。曲线说明该�
 
 失败集中在 FP16 `AvgPool2d` 和 FP32 `MaxPool2d`。这说明“模型能训练”不能替代逐算子兼容性验证。
 
-<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h15"><code>src/book/chapter3.md</code>「torch_npu插件兼容性测试套件」</a>；样例：<a href="../../samples/chapter3/test"><code>samples/chapter3/test</code></a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h15"><code>src/book/chapter3.md</code>「torch_npu插件兼容性测试套件」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/test"><code>samples/chapter3/test</code></a></div>
 
 <!--
 这里记录的是教材中的 CANN 8.3.RC1 + PyTorch 2.8.0 环境，不是双板任务记录。失败项和通过项都必须保留，不能用“多数通过”掩盖阻塞问题。
@@ -286,7 +286,7 @@ LeNet 教材实现把 Sigmoid 调整为 ReLU，并使用 FP16。曲线说明该�
 
 ![AlexNet NPU FP16 训练指标曲线](../book/img3/training_metrics.png)
 
-<div class="source">图片：<a href="../book/img3/training_metrics.png"><code>src/book/img3/training_metrics.png</code></a>；代码：<a href="../../samples/chapter3/AlexNet/alexnet_npu.py"><code>samples/chapter3/AlexNet</code></a></div>
+<div class="source">图片：<a href="../book/img3/training_metrics.png"><code>src/book/img3/training_metrics.png</code></a>；代码：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/AlexNet/alexnet_npu.py"><code>samples/chapter3/AlexNet</code></a></div>
 
 <!--
 这条曲线是教材历史训练结果，不属于本次双板 50 epochs 线性回归记录。它说明该配置曾完成训练，不能与双板墙钟或其他硬件直接排名。
@@ -327,7 +327,7 @@ LeNet 教材实现把 Sigmoid 调整为 ReLU，并使用 FP16。曲线说明该�
 
 CPU 路径可以用于语义参考，但任何 NPU 结论都必须来自 NPU 设备张量和板端日志。
 
-<div class="source">依据：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §3、§5</a>；测试边界：<a href="../book/chapter3.md#src-book-chapter3-h16"><code>src/book/chapter3.md</code>「测试目标与验证维度」</a></div>
+<div class="source">依据：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §3、§5</a>；测试边界：<a href="../book/chapter3.md#src-book-chapter3-h16"><code>src/book/chapter3.md</code>「测试目标与验证维度」</a></div>
 
 <!--
 这是本章的证据纪律。CPU 能跑、Python 能导入、曲线好看，都不能替代 NPU 设备路径和板端原始记录。
@@ -345,7 +345,7 @@ CPU 路径可以用于语义参考，但任何 NPU 结论都必须来自 NPU 设
 4. 缩小 batch 与输入，判断是否由图编译或内存触发。
 5. 再恢复完整训练，记录设备、版本、日志和指标。
 
-<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h15"><code>src/book/chapter3.md</code>「兼容性测试套件」</a>；样例：<a href="../../samples/chapter3/test"><code>samples/chapter3/test</code></a></div>
+<div class="source">教材：<a href="../book/chapter3.md#src-book-chapter3-h15"><code>src/book/chapter3.md</code>「兼容性测试套件」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/test"><code>samples/chapter3/test</code></a></div>
 
 <!--
 排查顺序从环境到设备，再到最小算子，最后才进完整模型。这样可以避免把 OOM、算子缺陷和版本不匹配混成同一个问题。
@@ -367,7 +367,7 @@ CPU 路径可以用于语义参考，但任何 NPU 结论都必须来自 NPU 设
 
 完成标准是另一位同学能按卡片复现同一路径，并解释哪些数字不能跨设备、跨版本或跨精度外推。
 
-<div class="source">作业：<a href="../book/chapter3.md#src-book-chapter3-h32"><code>src/book/chapter3.md</code>「总结」</a>；原始记录：<a href="../../docs/chapter-board-runs-20261017/README.md"><code>docs/chapter-board-runs-20261017</code></a></div>
+<div class="source">作业：<a href="../book/chapter3.md#src-book-chapter3-h32"><code>src/book/chapter3.md</code>「总结」</a>；原始记录：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter3/docs/README.md"><code>samples/chapter3/docs</code></a></div>
 
 <!--
 最后检查学生是否同时提交通过证据和失败边界。没有 NPU 设备证据、没有版本、没有原始日志的结果不计为完成。

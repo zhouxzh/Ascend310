@@ -461,15 +461,14 @@ Too many request bodies are being read
 
 ![8T 版 Ascend Edge Chat 固定 ACL 后端页面](img9/case9-board-8t-ui.png)
 
-正式验收报告为 `machine_status=passed`，JSON 的 SHA-256 是
-`6e47b32c5b2b7006ad9ad9e8669d4472396d6a1be49d04fdf395594167df342d`。
+正式验收报告为 `machine_status=passed`。完整 JSON 哈希记录在[工程验收与限制说明](https://github.com/zhouxzh/Ascend310/blob/main/samples/case9/docs/04-validation-and-limitations.md)，读者应以报告的状态、协议和资源释放结果理解本次验收。
 由于外部命令执行器在 600 秒断开，脚本自带 cleanup trap 未收到完整退出流程；操作者按记录 PID 手动停止三个服务并验证端口、ACL 进程和 NPU 显存均已释放。报告本身在断开前已经写完。
 
 **证据等级**：公开源码/HF 来源、schema-2 锁、ACL 与 descriptor、gateway/UI、JSON/SSE、长度、10 次稳定性、10 条中文机器探针和 30 样本性能为 `observed-pass`（8T formal machine）。人工中文语义质量、并发和长期稳定性仍需独立评审；不能继承 20T 的结果。性能很低是每次 ACL 执行只生成一个 token 的静态图特性，不是 API 中转或普通网络延迟。
 
 ### 2026-10-17 历史记录
 
-更早的 20T 记录使用固定 Qwen1.5-0.5B Chat 和低 token 预算，完成了 worker/gateway/UI 启动、一次真实 completion 和 1440×900 UI 截图；它是本案例的历史基线，不与 2026-10-18 的 Qwen2 教学 profile 结果合并。旧原始日志与响应保存在 [`docs/case-board-runs-20261017/case9/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case9/README.md)。
+更早的 20T 记录使用固定 Qwen1.5-0.5B Chat 和低 token 预算，完成了 worker/gateway/UI 启动、一次真实 completion 和 1440×900 UI 截图；它是本案例的历史基线，不与 2026-10-18 的 Qwen2 教学 profile 结果合并。旧原始日志与响应保存在 [`samples/case9/docs/04-validation-and-limitations.md`](https://github.com/zhouxzh/Ascend310/blob/main/samples/case9/docs/04-validation-and-limitations.md)。
 
 8T / Ascend310B4 已使用独立的静态 KV ACL 发布链完成上述短请求验证，不继承本节的 20T MindSpore 结论；两条路径的延迟、HBM 和模型工件不能混合统计。
 

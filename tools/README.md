@@ -27,9 +27,9 @@ DSH bundle，不依赖仓库根目录的 `node_modules`。
 | `ascend310b-precision-debug` | golden、容差、dtype/layout 和数值门 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-precision-debug/SKILL.md) |
 | `ascend310b-sync-audit` | SetFlag/WaitFlag、EnQue/DeQue、CrossCore 和 stream 同步审计 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-sync-audit/SKILL.md) |
 | `ascend310b-code-review` | 310B 代码审查、平台边界、资源和证据检查 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-code-review/SKILL.md) |
-| `ascend310b-writing` | 写作总守门和跨对象规则 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing/SKILL.md) |
+| `ascend310b-writing` | 中文正文硬门、写作总守门和跨对象规则 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing/SKILL.md) |
 | `ascend310b-writing-theory` | 第1章至第10章理论教程 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-theory/SKILL.md) |
-| `ascend310b-writing-case` | 案例1至案例9实践教程 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-case/SKILL.md) |
+| `ascend310b-writing-case` | 案例1至案例9的面向初学者实践教材：问题—概念—最小闭环—分步练习—证据解释—迁移任务 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-case/SKILL.md) |
 | `ascend310b-writing-presentation` | Marp/Presentation 课件 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-presentation/SKILL.md) |
 | `ascend310b-writing-docs` | 代码工程 README、`docs/`、API/部署/验证说明 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-docs/SKILL.md) |
 | `ascend310b-code-docs` | 源码 API、CLI、docstring 和可运行示例 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-code-docs/SKILL.md) |
@@ -59,7 +59,7 @@ Skill 命名规范：目录名与 frontmatter `name` 必须一致，并统一使
 | `ascend310b-writing-markdown` | [CommonMark Spec](https://spec.commonmark.org/)、[Markdown Guide](https://www.markdownguide.org/)、[markdownlint](https://github.com/DavidAnson/markdownlint) | 标题、链接、图片、表格、代码围栏、标点和机械卫生规则 |
 | `ascend310b-writing-dot` | [Graphviz DOT Language](https://graphviz.org/doc/info/lang.html)、[Graphviz Command Line](https://graphviz.org/doc/info/command.html)、[Graphviz Gallery](https://graphviz.org/gallery/) | 架构图/流程图语法、16:9 与教材画布、统一中文字体、模板、输出尺寸和版面检查 |
 | `ascend310b-writing-presentation` | [Marp CLI](https://github.com/marp-team/marp-cli)、[Marp Core](https://github.com/marp-team/marp-core)、[markdownlint](https://github.com/DavidAnson/markdownlint) | Marp 元数据、讲师备注、页面容量、真实浏览器验收 |
-| `ascend310b-writing-theory` / `case` / `docs` | 本仓库 `AGENTS.md`、`docs/00-repository-structure.md`、`src/`、`samples/` | 已冻结标题、章节/案例分层、代码工程文档和 310B 证据边界 |
+| `ascend310b-writing-theory` / `case` / `docs` | 本仓库 `AGENTS.md`、`docs/governance/repository-structure.md`、`src/`、`samples/` | 已冻结标题、章节/案例分层、代码工程文档和 310B 证据边界 |
 | `ascend310b-code-docs` | [mcollina/skills 的 Documentation skill](https://github.com/mcollina/skills/tree/main/skills/documentation)、[Diátaxis](https://diataxis.fr/) | 教程/How-to/Reference/Explanation 分层，从代码和测试反推 API 文档 |
 | `ascend310b-writing-academic` | [PaperOrchestra](https://github.com/Ar9av/PaperOrchestra)、[latex-arxiv-SKILL](https://github.com/appautomaton/latex-arxiv-SKILL)、[PaperFit](https://github.com/OpenRaiser/PaperFit) | claim-evidence-citation、方法/实验/结果/限制和版面验证；不复制论文生成流水线 |
 
@@ -101,7 +101,7 @@ Skill 命名规范：目录名与 frontmatter `name` 必须一致，并统一使
 ## 通用安装步骤
 
 1. 进入对应插件目录，先跑该目录 README 里列出的离线测试。
-2. 在仓库根目录运行 `node scripts/install-dsh-plugins.mjs --profile <profile>`；安装器会打包 tarball、调用 `dsh plugin add`，并校验版本和文件内容。
+2. 在仓库根目录运行 `node tools/install-dsh-plugins.mjs --profile <profile>`；安装器会打包 tarball、调用 `dsh plugin add`，并校验版本和文件内容。
 3. 在该 profile 的 `cordis.patch.yml` 里写本机配置。板卡地址、仓库路径和 SSH 用户只放在 profile，不写进插件源码。
 4. 如果插件带有 `skills/`，在仓库根目录运行 `npm run skills:sync` 和 `npm run skills:check`；从仓库根目录启动 DSH 会读取已提交的 `.dsh/skills/` 项目级副本。
 5. 重启 DSH，确认侧栏入口和工具出现。

@@ -18,7 +18,7 @@ footer: "第4章：PyACL应用开发基础"
 ## 从设备枚举到可核验的推理流水线
 
 
-<div class="source">依据：<a href="../book/chapter4.md">src/book/chapter4.md</a>；样例：<a href="../../samples/chapter4/README.md"><code>samples/chapter4</code></a></div>
+<div class="source">依据：<a href="../book/chapter4.md">src/book/chapter4.md</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/README.md"><code>samples/chapter4</code></a></div>
 
 <!--
 本章要讲清 PyACL 的生命周期，也要讲清证据边界。设备枚举成功只是第一级证据。
@@ -66,7 +66,7 @@ footer: "第4章：PyACL应用开发基础"
 
 本课件把设备枚举和完整推理严格分开。
 
-<div class="source">依据：<a href="../book/chapter4.md#src-book-chapter4-h4"><code>src/book/chapter4.md</code>「PyACL应用开发环境」</a>；<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §2.1</a></div>
+<div class="source">依据：<a href="../book/chapter4.md#src-book-chapter4-h4"><code>src/book/chapter4.md</code>「PyACL应用开发环境」</a>；<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §2.1</a></div>
 
 <!--
 先建立证据等级。学生最容易把 Found 1 Ascend devices 误写成完整推理通过，后面用原始日志纠正。
@@ -119,7 +119,7 @@ acl.finalize()
 
 来源：`samples/chapter4/check_ascend_device/check_ascend_device.py` 与教材资源生命周期示例。
 
-<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h9"><code>src/book/chapter4.md</code>「运行管理资源生命周期」</a>；样例：<a href="../../samples/chapter4/check_ascend_device/check_ascend_device.py"><code>samples/chapter4/check_ascend_device</code></a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h9"><code>src/book/chapter4.md</code>「运行管理资源生命周期」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/check_ascend_device/check_ascend_device.py"><code>samples/chapter4/check_ascend_device</code></a></div>
 
 <!--
 真实工程必须检查每个 ret；这里突出顺序。显式资源按 Stream、Context、Device 逆序释放，最后 acl.finalize。
@@ -220,7 +220,7 @@ Host 与 Device 内存相互隔离。输入张量必须按模型合同完成布�
 
 训练和 ONNX 导出在 GPU 服务器完成，板端只负责 ATC 转换后的 PyACL 推理。
 
-<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h24"><code>src/book/chapter4.md</code>「实例分析（ResNet-18）」</a>；样例：<a href="../../samples/chapter4/resnet18/inference_npu.py"><code>samples/chapter4/resnet18</code></a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h24"><code>src/book/chapter4.md</code>「实例分析（ResNet-18）」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/resnet18/inference_npu.py"><code>samples/chapter4/resnet18</code></a></div>
 
 <!--
 ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执行它。课件只能展示代码路径和模型合同，不能写成已在两板通过。
@@ -240,7 +240,7 @@ ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执�
 
 分类只做单向量解析；检测必须理解多输出、候选框和 NMS，不能用 ResNet18 结果替代。
 
-<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h31"><code>src/book/chapter4.md</code>「目标检测推理」</a>；样例：<a href="../../samples/chapter4/SSD"><code>samples/chapter4/SSD</code></a>、<a href="../../samples/chapter4/SSDLite"><code>samples/chapter4/SSDLite</code></a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h31"><code>src/book/chapter4.md</code>「目标检测推理」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD"><code>samples/chapter4/SSD</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSDLite"><code>samples/chapter4/SSDLite</code></a></div>
 
 <!--
 两个检测模型的输入尺寸、输出张量和后处理不同。双板运行记录没有部署这些资产，因此不能从设备枚举推导检测通过。
@@ -262,7 +262,7 @@ ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执�
 
 两块板的环境字段相同，仍是两个独立证据集；后续模型和性能结果不能合并排名。
 
-<div class="source">环境：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>docs/ascend310b-chapter-board-comparison-20261017.md</code> §2.2</a>；原始快照：<a href="../../docs/chapter-board-runs-20261017/8t/run1/meta.txt"><code>8T</code></a>、<a href="../../docs/chapter-board-runs-20261017/20t/run1/meta.txt"><code>20T</code></a></div>
+<div class="source">环境：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>docs/release/environment-matrix.md</code> §2.2</a>；原始快照：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/docs/README.md"><code>8T</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/docs/README.md"><code>20T</code></a></div>
 
 <!--
 双板环境相同不等于硬件相同。检查时也保留 Health Alarm 和温度背景，但它们不能单独决定推理成败。
@@ -281,7 +281,7 @@ ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执�
 
 本次最小部署只复制了设备检查目录。ResNet18、SSD、SSDLite 的模型和数据集未部署，因此完整推理状态是 `untested`。
 
-<div class="source">记录：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §2.1、§4 chapter4</a>；原始输出：<a href="../../docs/chapter-board-runs-20261017/8t/run1/chapter4_check.log"><code>8T log</code></a>、<a href="../../docs/chapter-board-runs-20261017/20t/run1/chapter4_check.log"><code>20T log</code></a></div>
+<div class="source">记录：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §2.1、§4 chapter4</a>；原始输出：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/docs/README.md"><code>8T log</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/docs/README.md"><code>20T log</code></a></div>
 
 <!--
 这张表是本章的证据锚点。两行 Found 1 只能支持枚举结论。没有 OM、没有输入、没有 execute、没有输出，就不能写推理通过。
@@ -299,7 +299,7 @@ ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执�
 - 它不证明模型执行产生有效结果。
 - 它不证明业务精度、吞吐或长期稳定性。
 
-<div class="source">证据边界：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §4 chapter4、§5</a>；教材：<a href="../book/chapter4.md#src-book-chapter4-h7"><code>src/book/chapter4.md</code>「环境验证」</a></div>
+<div class="source">证据边界：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §4 chapter4、§5</a>；教材：<a href="../book/chapter4.md#src-book-chapter4-h7"><code>src/book/chapter4.md</code>「环境验证」</a></div>
 
 <!--
 逐条让学生说明缺失了哪一级证据。特别禁止把设备检查、CPU ONNX 推理或 API 健康响应写成 NPU 完整推理。
@@ -343,7 +343,7 @@ ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执�
 
 错误码、命令行、板卡档位和版本必须一起保存。
 
-<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h4"><code>src/book/chapter4.md</code>「PyACL应用开发环境」</a>；样例：<a href="../../samples/chapter4/README.md"><code>samples/chapter4/README.md</code></a></div>
+<div class="source">教材：<a href="../book/chapter4.md#src-book-chapter4-h4"><code>src/book/chapter4.md</code>「PyACL应用开发环境」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/README.md"><code>samples/chapter4/README.md</code></a></div>
 
 <!--
 每一类故障先停在对应层。没有日志和版本时，只能写 blocked 或 unknown，不能写 unsupported。
@@ -364,7 +364,7 @@ ResNet18 是完整 PyACL 流程的教学实例，但当前双板记录没有执�
 
 在现有双板记录上只能勾选“枚举”。其余三级必须补做后才能称为完整推理通过。
 
-<div class="source">任务：<a href="../book/chapter4.md#src-book-chapter4-h35"><code>src/book/chapter4.md</code>「总结」</a>；双板证据：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code></a></div>
+<div class="source">任务：<a href="../book/chapter4.md#src-book-chapter4-h35"><code>src/book/chapter4.md</code>「总结」</a>；双板证据：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code></a></div>
 
 <!--
 课堂任务不是再跑一遍设备查询，而是补齐从 OM 到单次推理再到应用输出的证据。没有完成的格子必须保留 untested。

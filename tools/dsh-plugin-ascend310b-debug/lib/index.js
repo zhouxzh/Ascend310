@@ -1157,7 +1157,7 @@ async function runPeripheralAction({ config, action, targetSelector, command, no
 			'摄像头采集完成，已取得非空帧。',
 			`设备：${parsed.device}`,
 			`实际：${parsed.actualWidth}x${parsed.actualHeight} · ${parsed.fourcc || 'FourCC 未采集'} · ${parsed.actualFps === null || parsed.actualFps === undefined ? 'FPS 未采集' : `${parsed.actualFps} fps`}`,
-			`平均亮度：${parsed.meanLuminance}；Laplacian 方差：${parsed.laplacianVariance}`,
+			`转换：${parsed.conversionBackend ?? '未采集'}；平均亮度：${parsed.meanLuminance ?? '未采集'}；Laplacian 方差：${parsed.laplacianVariance ?? '未采集'}`,
 			`文件：${normalized.output}`,
 			`SHA-256：${parsed.sha256}`
 		].join('\n');
@@ -1934,10 +1934,11 @@ export function apply(ctx, config) {
 		defineTool({
 			name: 'ascend_camera_capture',
 			description:
-				'Capture one or more frames from a configured V4L2 camera on an Ascend 310B board using a fixed ' +
-				'Python/OpenCV task. Requires frame.read to return a non-empty frame and writes one JPEG under ' +
-				'/tmp/ascend310b-debug/peripherals. Returns actual dimensions, FPS, FourCC, mean luminance, Laplacian ' +
-				'variance, bytes and SHA-256. allowStateChange:true is required; use dryRun first.',
+				'Capture one or more frames from a configured V4L2 camera on an Ascend 310B board using direct v4l2-ctl ' +
+				'mmap capture. The fixed task does not import OpenCV, NumPy, Pillow, or FFmpeg; it validates MJPG ' +
+				'JPEG frames with Python standard-library parsing and writes one JPEG under ' +
+				'/tmp/ascend310b-debug/peripherals. Returns actual dimensions, FourCC, frame count, bytes and SHA-256. ' +
+				'allowStateChange:true is required; use dryRun first.',
 			parameters: {
 				target: { type: 'string', description: 'Configured SSH target id or `user@host`; local is refused.' },
 				device: { type: 'string', required: true, description: 'V4L2 device matching /dev/videoN.' },

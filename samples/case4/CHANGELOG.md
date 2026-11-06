@@ -1,41 +1,34 @@
-# Changelog
+# 变更日志
 
-All notable changes to the palmprint workbench are recorded here. This file
-describes source releases; board-side model and benchmark assets remain
-separate and are identified by `release_manifest.json`.
+此处记录掌纹识别工作台的所有重要变更。本文件描述源码发布；板端模型和
+基准测试资产保持独立，并由 `release_manifest.json` 标识。
 
-## Unreleased - manual deployment migration
+## 未发布 - 手动部署迁移
 
-- Completed the working-tree migration of production imports from the
-  historical flat modules into `palmprint_workbench`; the release allowlist
-  keeps only `app.py` as a thin process entry point and puts export, board
-  diagnostics, and offline baselines into `tools/` namespaces.
-- Defining a source package and a separate board asset package. OM binaries are
-  not source-package contents; the planned public asset repository is
-  `zhouxzh/ascend310-palmprint`, with a pinned commit and `om_manifest.json`
-  required before any download is treated as reproducible.
-- Documenting manual conda/CANN activation, dependency installation, explicit
-  SSH/rsync staging, service launch, verification, and rollback. No shell
-  installation, launch, deployment, or extraction wrapper is part of the
-  release workflow.
-- Keeping the production API NPU-only with `mixed_fp16` precision. CCNet
-  remains the default and rollback model; `PALMPRINT_PROFILE=manual_test`
-  exposes the five CompNet variants with `manual_test_pending=true` for the
-  frozen human-validation phase.
-- Public documentation now contains generic device/runtime troubleshooting
-  only. Detailed board incident logs remain outside the source release.
-- Retaining the distinction between conversion, numerical consistency,
-  recognition metrics, performance, UI smoke, and hardware diagnostics.
+- 已完成工作树中生产导入从历史扁平模块向 `palmprint_workbench` 的迁移；
+  发布允许列表只保留 `app.py` 作为精简的进程入口，并将导出、板端诊断和
+  离线基线放入 `tools/` 命名空间。
+- 定义源码包和独立的板端资产包。OM 二进制文件不属于源码包内容；计划中的
+  公共资产仓库为 `zhouxzh/ascend310-palmprint`，在任何下载被视为可复现之前，
+  必须具有固定的提交和 `om_manifest.json`。
+- 记录手动激活 conda/CANN、安装依赖、显式 SSH/rsync 暂存、启动服务、
+  验证和回滚。发布工作流不包含任何 shell 安装、启动、部署或解压包装器。
+- 生产 API 保持仅限 NPU，并使用 `mixed_fp16` 精度。CCNet 仍是默认模型和
+  回滚模型；`PALMPRINT_PROFILE=manual_test` 会暴露五个 CompNet 变体，并在
+  冻结的人工验证阶段将其标记为 `manual_test_pending=true`。
+- 公共文档现在仅包含通用的设备/运行时故障排查。详细的板端事故日志仍不纳入
+  源码发布。
+- 保持转换、数值一致性、识别指标、性能、UI 冒烟测试和硬件诊断之间的区分。
 
-The `1.0.0` release tag is not valid until the clean-clone, local, board, asset
-hash, license, and rollback gates in `docs/04-release-checklist.md` are all
-recorded in a signed `release_manifest.json`.
+只有在 `docs/04-release-checklist.md` 中的干净克隆、本地、板端、资产哈希、
+许可证和回滚检查项全部记录到经过签名的 `release_manifest.json` 后，`1.0.0`
+发布标签才有效。
 
-## 1.0.0 - planned manual deployment profile
+## 1.0.0 - 计划中的手动部署配置
 
-Reserved for the first verified source/asset release. Do not use this heading
-for a build whose manifest still has `template`, `draft`, or null hash fields.
+保留给首次经过验证的源码/资产发布。对于清单中仍含有 `template`、
+`draft` 或空哈希字段的构建，不要使用此标题。
 
 ## 0.1.0
 
-- Initial React/FastAPI workbench source and candidate audit records.
+- 初始 React/FastAPI 工作台源码和候选模型审计记录。

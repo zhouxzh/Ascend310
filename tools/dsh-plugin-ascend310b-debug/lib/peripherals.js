@@ -194,114 +194,146 @@ def remove_failed_output(path):
 `;
 
 const CAMERA_SCRIPT = String.raw`
-import hashlib, json, os, subprocess, sys
+import hashlib, json, os, re, subprocess, sys
 ${OUTPUT_MAINTENANCE_SCRIPT}
 
-try:
-    import cv2
-except Exception as cv_error:
-    cv2 = None
-    cv2_error = type(cv_error).__name__ + ": " + str(cv_error)
+def jpeg_size(data):
+    # Parse SOF markers without importing a decoder library.
+    if data[:2] != b"\\xff\\xd8":
+        raise RuntimeError("采集输出不是 JPEG")
+    index = 2
+    while index + 9 <= len(data):
+        while index < len(data) and data[index] != 0xFF:
+            index += 1
+        while index < len(data) and data[index] == 0xFF:
+            index += 1
+        if index >= len(data):
+            break
+        marker = data[index]
+        index += 1
+        if marker in (0xD8, 0xD9):
+            continue
+        if index + 2 > len(data):
+            break
+        length = int.from_bytes(data[index:index + 2], "big")
+        if length < 2 or index + length > len(data):
+            break
+        if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF) and length >= 7:
+            height = int.from_bytes(data[index + 3:index + 5], "big")
+            width = int.from_bytes(data[index + 5:index + 7], "big")
+            return width, height
+        index += length
+    raise RuntimeError("无法解析 JPEG 尺寸")
+
+def yuyv_to_rgb(data):
+    rgb = bytearray((len(data) // 2) * 3)
+    destination = 0
+    for source in range(0, len(data), 4):
+        y0, cb, y1, cr = data[source:source + 4]
+        chroma_blue = cb - 128
+        chroma_red = cr - 128
+        for luma in (y0, y1):
+            scaled_luma = max(0, luma - 16)
+            red = min(255, max(0, (298 * scaled_luma + 409 * chroma_red + 128) >> 8))
+            green = min(255, max(0, (298 * scaled_luma - 100 * chroma_blue - 208 * chroma_red + 128) >> 8))
+            blue = min(255, max(0, (298 * scaled_luma + 516 * chroma_blue + 128) >> 8))
+            rgb[destination:destination + 3] = bytes((red, green, blue))
+            destination += 3
+    return bytes(rgb)
+
+def actual_format(device):
+    proc = subprocess.run(["v4l2-ctl", "-d", device, "--get-fmt-video"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
+    if proc.returncode != 0:
+        raise RuntimeError("无法读取V4L2实际格式: " + proc.stderr[-2000:])
+    size = re.search(r"Width/Height\s*:\s*(\d+)\s*/\s*(\d+)", proc.stdout)
+    format_line = next((line for line in proc.stdout.splitlines() if "Pixel Format" in line), "")
+    if size is None or ":" not in format_line:
+        raise RuntimeError("V4L2未返回实际尺寸或像素格式")
+    fourcc = format_line.rsplit(":", 1)[1].strip().split()[0].strip(chr(39))
+    if not fourcc:
+        raise RuntimeError("V4L2未返回实际像素格式")
+    return int(size.group(1)), int(size.group(2)), fourcc
 
 cfg = CONFIG
-cap = None
+raw_output = cfg["output"] + ".raw"
 try:
     cleanup_outputs(cfg["output"])
-    if cv2 is not None:
-        capture_backend = "opencv"
-        cap = cv2.VideoCapture(cfg["device"], cv2.CAP_V4L2)
-        if not cap.isOpened():
-            cap.release()
-            cap = cv2.VideoCapture(cfg["device"])
-        if not cap.isOpened():
-            raise RuntimeError("VideoCapture 无法打开设备")
-        code = int(cap.get(cv2.CAP_PROP_FOURCC) or 0)
-        requested_code = cv2.VideoWriter_fourcc(*cfg["pixelFormat"])
-        cap.set(cv2.CAP_PROP_FOURCC, requested_code)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, cfg["width"])
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cfg["height"])
-        cap.set(cv2.CAP_PROP_FPS, cfg["fps"])
-        frame_ok = 0
-        failures = 0
-        frame = None
-        for _ in range(cfg["frameCount"]):
-            ok, candidate = cap.read()
-            if ok and candidate is not None and getattr(candidate, "size", 0) > 0:
-                frame_ok += 1
-                frame = candidate
-            else:
-                failures += 1
-        if frame is None:
-            raise RuntimeError("frame.read 未取得非空帧")
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if len(frame.shape) == 3 else frame
-        actual_code = int(cap.get(cv2.CAP_PROP_FOURCC) or code)
-        fourcc = "".join(chr((actual_code >> (8 * i)) & 0xFF) for i in range(4))
-        actual_width = int(frame.shape[1])
-        actual_height = int(frame.shape[0])
-        actual_fps = round(float(cap.get(cv2.CAP_PROP_FPS) or 0), 3)
-        mean_luminance = round(float(gray.mean()), 6)
-        laplacian_variance = round(float(cv2.Laplacian(gray, cv2.CV_64F).var()), 6)
-        saved = bool(cv2.imwrite(cfg["output"], frame))
-        if not saved:
-            raise RuntimeError("cv2.imwrite 写入 JPEG 失败")
+    cmd = [
+        "v4l2-ctl", "-d", cfg["device"],
+        "--set-fmt-video=width=" + str(cfg["width"]) + ",height=" + str(cfg["height"]) + ",pixelformat=" + cfg["pixelFormat"],
+        "--stream-mmap", "--stream-count=" + str(cfg["frameCount"]),
+        "--stream-to=" + raw_output
+    ]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20)
+    if proc.returncode != 0:
+        raise RuntimeError("V4L2采集失败: " + proc.stderr[-2000:])
+    actual_width, actual_height, fourcc = actual_format(cfg["device"])
+    if fourcc != cfg["pixelFormat"]:
+        raise RuntimeError("V4L2实际格式不匹配: 请求 " + cfg["pixelFormat"] + "，实际 " + fourcc)
+    with open(raw_output, "rb") as fh:
+        stream = fh.read()
+    if fourcc == "MJPG":
+        end = stream.rfind(b"\\xff\\xd9")
+        start = stream.rfind(b"\\xff\\xd8", 0, end)
+        if start < 0 or end < start:
+            raise RuntimeError("V4L2未返回完整MJPG帧")
+        data = stream[start:end + 2]
+        actual_width, actual_height = jpeg_size(data)
+        frame_ok = max(1, stream.count(b"\\xff\\xd8"))
+        conversion_backend = "none"
+    elif fourcc == "YUYV":
+        expected_bytes = actual_width * actual_height * 2
+        frame_ok = len(stream) // expected_bytes
+        if frame_ok < 1:
+            raise RuntimeError("V4L2未返回完整YUYV帧: 期望至少 " + str(expected_bytes) + " 字节，实际 " + str(len(stream)) + " 字节")
+        raw_frame = stream[-expected_bytes:]
+        try:
+            from PIL import Image
+        except Exception as pil_error:
+            raise RuntimeError("已读取YUYV原始帧，但Pillow不可用，无法生成预览JPEG: " + type(pil_error).__name__ + ": " + str(pil_error)) from pil_error
+        image = Image.frombytes("YCbCr", (actual_width, actual_height), raw_frame, "raw", "YCbCr;422")
+        image.convert("RGB").save(cfg["output"], format="JPEG", quality=90)
+        with open(cfg["output"], "rb") as fh:
+            data = fh.read()
+        if data[:2] != b"\\xff\\xd8":
+            raise RuntimeError("Pillow未生成有效JPEG")
+        conversion_backend = "Pillow"
     else:
-        from PIL import Image, ImageFilter, ImageStat
-        capture_backend = "ffmpeg+Pillow"
-        input_format = "mjpeg" if cfg["pixelFormat"] == "MJPG" else "yuyv422"
-        cmd = [
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-f", "v4l2", "-input_format", input_format,
-            "-video_size", str(cfg["width"]) + "x" + str(cfg["height"]),
-            "-i", cfg["device"], "-frames:v", "1", cfg["output"]
-        ]
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20)
-        if proc.returncode != 0:
-            raise RuntimeError("ffmpeg 采集失败: " + proc.stderr[-2000:])
-        image = Image.open(cfg["output"])
-        image.load()
-        gray_image = image.convert("L")
-        actual_width = image.width
-        actual_height = image.height
-        actual_fps = None
-        fourcc = cfg["pixelFormat"]
-        frame_ok = 1
-        failures = 0
-        mean_luminance = round(float(ImageStat.Stat(gray_image).mean[0]), 6)
-        edge_kernel = ImageFilter.Kernel((3, 3), (0, 1, 0, 1, -4, 1, 0, 1, 0), scale=1, offset=128)
-        laplacian_variance = round(float(ImageStat.Stat(gray_image.filter(edge_kernel)).var[0]), 6)
-    with open(cfg["output"], "rb") as fh:
-        data = fh.read()
+        raise RuntimeError("只支持MJPG或YUYV实际格式，收到 " + fourcc)
+    try:
+        os.remove(raw_output)
+    except OSError:
+        pass
     result = {
         "ok": True,
         "device": cfg["device"],
         "requested": cfg,
-        "captureBackend": capture_backend,
+        "captureBackend": "v4l2-mmap",
+        "conversionBackend": conversion_backend,
         "actualWidth": actual_width,
         "actualHeight": actual_height,
-        "actualFps": actual_fps,
+        "actualFps": None,
         "fourcc": fourcc,
         "frameCount": frame_ok,
-        "readFailures": failures,
-        "meanLuminance": mean_luminance,
-        "laplacianVariance": laplacian_variance,
+        "readFailures": max(0, cfg["frameCount"] - frame_ok),
+        "meanLuminance": None,
+        "laplacianVariance": None,
         "output": cfg["output"],
         "bytes": len(data),
-        "sha256": hashlib.sha256(data).hexdigest(),
-        "cv2Error": cv2_error if cv2 is None else None
+        "sha256": hashlib.sha256(data).hexdigest()
     }
     cleanup_outputs(cfg["output"])
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
 except Exception as exc:
+    try:
+        if os.path.isfile(raw_output):
+            os.remove(raw_output)
+    except OSError:
+        pass
     remove_failed_output(cfg["output"])
     print(json.dumps({"ok": False, "error": type(exc).__name__ + ": " + str(exc), "device": cfg.get("device")}, ensure_ascii=False))
     sys.exit(2)
-finally:
-    if cap is not None:
-        try:
-            cap.release()
-        except Exception:
-            pass
 `;
 
 const MICROPHONE_SCRIPT = String.raw`

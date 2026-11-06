@@ -18,7 +18,7 @@ footer: "第7章：算子开发实战"
 ## 从 TBE DSL 原型到 Ascend C 硬件证据
 
 
-<div class="source">依据：<a href="../book/chapter7.md">src/book/chapter7.md</a>；样例：<a href="../../samples/chapter7/add_tbe/add.py"><code>samples/chapter7</code></a></div>
+<div class="source">依据：<a href="../book/chapter7.md">src/book/chapter7.md</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/add_tbe/add.py"><code>samples/chapter7</code></a></div>
 
 <!--
 本章既讲算子怎么写，也讲“什么证据才算算子真的编译并在 NPU 上执行”。后一层是本次双板记录没有完成的边界。
@@ -158,7 +158,7 @@ footer: "第7章：算子开发实战"
 4. 用 `auto_schedule` 生成调度。
 5. 用 `build` 与 `run` 进入验证路径。
 
-<div class="source">样例：<a href="../../samples/chapter7/add_tbe/add.py"><code>samples/chapter7/add_tbe/add.py</code></a>、<a href="../../samples/chapter7/add_tbe/run.py"><code>run.py</code></a>；教材：<a href="../book/chapter7.md#src-book-chapter7-h11"><code>src/book/chapter7.md</code> 第7.2节</a></div>
+<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/add_tbe/add.py"><code>samples/chapter7/add_tbe/add.py</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/add_tbe/run.py"><code>run.py</code></a>；教材：<a href="../book/chapter7.md#src-book-chapter7-h11"><code>src/book/chapter7.md</code> 第7.2节</a></div>
 
 <!--
 分清 add.py 和 run.py。前者描述算子实现与编译入口，后者验证等价 TBE DSL 计算；两者都不能代替 Ascend C 自定义算子包安装。
@@ -179,7 +179,7 @@ tvm.testing.assert_allclose(
 
 这段代码验证计算逻辑与参考值一致，但日志中的 `debug enter` 不能自动等同于 NPU Kernel 已安装并执行。
 
-<div class="source">代码：<a href="../../samples/chapter7/add_tbe/run.py"><code>samples/chapter7/add_tbe/run.py</code></a>；教材：<a href="../book/chapter7.md#src-book-chapter7-h27"><code>src/book/chapter7.md</code>「编写验证代码（run.py）」</a></div>
+<div class="source">代码：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/add_tbe/run.py"><code>samples/chapter7/add_tbe/run.py</code></a>；教材：<a href="../book/chapter7.md#src-book-chapter7-h27"><code>src/book/chapter7.md</code>「编写验证代码（run.py）」</a></div>
 
 <!--
 注意 run.py 使用 TBE testing/debug 环境。它证明等价 DSL 计算的数值断言通过，不是 Ascend C 算子包加载或 NPU 执行证据。
@@ -198,7 +198,7 @@ The actual output is the same as the expected output.
 
 8T 与 20T 的 `add_tbe/run.py` 都打印上述关键断言。它证明 TBE DSL 功能验证通过，不证明 Ascend C 硬件算子通过。
 
-<div class="source">原始日志：<a href="../../docs/chapter-board-runs-20261017/8t/run1/chapter7_tbe.log"><code>8T chapter7_tbe.log</code></a>、<a href="../../docs/chapter-board-runs-20261017/20t/run1/chapter7_tbe.log"><code>20T chapter7_tbe.log</code></a></div>
+<div class="source">原始日志：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/docs/README.md"><code>8T chapter7_tbe.log</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/docs/README.md"><code>20T chapter7_tbe.log</code></a></div>
 
 <!--
 日志只保留关键行。两个板的随机输入不同，但都在各自输入上完成数值断言，不能据此比较速度或硬件能力。
@@ -252,7 +252,7 @@ extern "C" __global__ __aicore__ void add_custom(
 }
 ```
 
-<div class="source">源码：<a href="../../samples/chapter7/add_ascendc/add_custom.cpp"><code>samples/chapter7/add_ascendc/add_custom.cpp</code></a>；教材：<a href="../book/chapter7.md#src-book-chapter7-h49"><code>src/book/chapter7.md</code>「向量加法的Ascend C实现」</a></div>
+<div class="source">源码：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/add_ascendc/add_custom.cpp"><code>samples/chapter7/add_ascendc/add_custom.cpp</code></a>；教材：<a href="../book/chapter7.md#src-book-chapter7-h49"><code>src/book/chapter7.md</code>「向量加法的Ascend C实现」</a></div>
 
 <!--
 这段源码证明实现骨架存在，不证明它已通过 msopgen、自定义算子包安装、ACL 加载和 NPU 执行。
@@ -294,7 +294,7 @@ Tiling 不只是按大小切分，还要同时考虑搬运次数、并行度、�
 
 因此这次 PASSED 验证的是 TBE DSL 的等价矩阵加法与自动调度，不是手工 Tiling Kernel 的 NPU 执行。
 
-<div class="source">日志：<a href="../../docs/chapter-board-runs-20261017/8t/run1/chapter7_tiling.log"><code>8T chapter7_tiling.log</code></a>、<a href="../../docs/chapter-board-runs-20261017/20t/run1/chapter7_tiling.log"><code>20T chapter7_tiling.log</code></a>；源码：<a href="../../samples/chapter7/mat_add_tiling/run.py"><code>samples/chapter7/mat_add_tiling/run.py</code></a></div>
+<div class="source">日志：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/docs/README.md"><code>8T chapter7_tiling.log</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/docs/README.md"><code>20T chapter7_tiling.log</code></a>；源码：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/mat_add_tiling/run.py"><code>samples/chapter7/mat_add_tiling/run.py</code></a></div>
 
 <!--
 这是最容易误读的一页。输出里的 PASSED 和 TBE DSL auto-tiling 必须连在一起读，不能把它升级为手写 Ascend C Tiling 已在两板通过。
@@ -315,7 +315,7 @@ Tiling 不只是按大小切分，还要同时考虑搬运次数、并行度、�
 
 双板环境均记录 `Health: Alarm`，只作诊断背景。本记录没有运行 `msopgen`，也没有生成或安装自定义算子包。
 
-<div class="source">结论：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §1、§4 chapter7</a>；原始说明：<a href="../../docs/chapter-board-runs-20261017/20t/run1/chapter7_ascendc.log"><code>20T chapter7_ascendc.log</code></a></div>
+<div class="source">结论：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §1、§4 chapter7</a>；原始说明：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/docs/README.md"><code>20T chapter7_ascendc.log</code></a></div>
 
 <!--
 这张表把结论封死：三个脚本、两块板都通过，但三行都是 TBE DSL 层。Ascend C 未完成 msopgen、算子包安装、ACL 加载和 NPU 执行，必须写 untested。
@@ -333,7 +333,7 @@ Tiling 不只是按大小切分，还要同时考虑搬运次数、并行度、�
 4. 在真实板卡用 AscendCL 加载和执行，保存退出码与原始日志。
 5. 对同一输入比较 CPU 参考值、NPU 输出与边界 shape。
 
-<div class="source">教材：<a href="../book/chapter7.md#src-book-chapter7-h50"><code>src/book/chapter7.md</code>「编译与运行」</a>；证据边界：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §4 chapter7</a></div>
+<div class="source">教材：<a href="../book/chapter7.md#src-book-chapter7-h50"><code>src/book/chapter7.md</code>「编译与运行」</a>；证据边界：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §4 chapter7</a></div>
 
 <!--
 给出可执行的闭环。每步都要产物和日志；仅生成 C++ 源码、打印 PASSED 或运行 TBE DSL 等价脚本都不够。
@@ -354,7 +354,7 @@ Tiling 不只是按大小切分，还要同时考虑搬运次数、并行度、�
 
 课堂报告中必须分别写三行结论，禁止把三行合并成一句“算子已在 NPU 上通过”。
 
-<div class="source">依据：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §4 chapter7</a>；样例：<a href="../../samples/chapter7/add_ascendc"><code>samples/chapter7/add_ascendc</code></a>、<a href="../../samples/chapter7/mat_add_tiling"><code>mat_add_tiling</code></a></div>
+<div class="source">依据：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §4 chapter7</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/add_ascendc"><code>samples/chapter7/add_ascendc</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter7/mat_add_tiling"><code>mat_add_tiling</code></a></div>
 
 <!--
 最终要求学生按证据层逐项勾选。当前能勾的只有 TBE DSL 功能，Ascend C 编译与 NPU 执行都必须保留为 untested。

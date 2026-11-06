@@ -203,7 +203,7 @@ cp -R "$plugin"/. "$dest"/
 | `ascend_debug_plan` | 按症状/领域生成分层调试计划 | `symptom`、`area`、`target`、`rawText`、`maxEntries` |
 | `ascend_sample_index` | 检索 `samples/` 里的样例入口与测试命令 | `query`、`archetype`、`limit`、`repoRoot` |
 | `ascend_board_exec` | 执行**单条只读**诊断命令 | `command`、`target`、`run`、`timeoutMs` |
-| `ascend_camera_capture` | 从 V4L2 摄像头读取非空帧，优先 OpenCV、缺少 `cv2` 时回退 ffmpeg，输出实际尺寸/FourCC/FPS、JPEG 与哈希 | `target`、`device`、`width`、`height`、`pixelFormat`、`frameCount`、`allowStateChange`、`dryRun` |
+| `ascend_camera_capture` | 通过 `v4l2-ctl --stream-mmap`读取非空帧；MJPG直接保存相机JPEG，YUYV仅在已读取原始帧后用Pillow转为预览JPEG，不导入OpenCV、NumPy或FFmpeg | `target`、`device`、`width`、`height`、`pixelFormat`、`frameCount`、`allowStateChange`、`dryRun` |
 | `ascend_microphone_record` | 从 ALSA 或 PulseAudio/PipeWire source 按请求秒数录制 PCM16 WAV，返回实际 WAV 时长、采集耗时、总耗时、RMS、峰值、全零和削波比例 | `target`、`backend`、`device`、`sampleRate`、`channels`、`durationSec`、`allowStateChange`、`dryRun` |
 | `ascend_speaker_test` | 生成低幅度正弦 WAV，通过 ALSA 或 PulseAudio/PipeWire sink 播放；人耳结论保持未确认 | `target`、`backend`、`device`、`frequency`、`durationSec`、`allowStateChange`、`dryRun` |
 | `ascend_play_recording` | 通过已确认的 ALSA/Pulse sink 回放插件刚录制的麦克风 WAV；只接受固定录音目录中的路径 | `target`、`backend`、`device`、`recording`、`allowStateChange`、`dryRun` |
@@ -228,6 +228,12 @@ cp -R "$plugin"/. "$dest"/
 ### HTTP 路由
 
 面板使用十六条同源路由：`GET /ascend310b-debug/report.json` 返回最近一次探测形成的报告；带 `?fresh=1` 时绕过 120 秒缓存，但仍不执行板端探测。`POST /ascend310b-debug/liveness` 并行检查 target 的 SSH 端口，按实际远端 `IP:port` 去重同一端点并返回需要显式绑定的 MAC 身份冲突；`POST /ascend310b-debug/probe` 执行整板环境探测；`system-refresh`、`camera-refresh`、`audio-refresh` 分别只刷新系统、V4L2/USB 和 ALSA/Pulse/Bluetooth facts，`POST /ascend310b-debug/discover` 执行局域网扫描，`GET /ascend310b-debug/camera-preview` 只返回固定目录中的 `camera-*.jpg`，`POST /ascend310b-debug/camera-capture`、`microphone-record`、`speaker-test`、`play-recording` 分别执行固定外设动作，录音和回放证据位于 `/tmp/ascend310b-debug/peripherals`，`POST /ascend310b-debug/bind` 将由用户明确确认的发现板绑定到已有配置，`POST /ascend310b-debug/serial-probe` 执行串口发现并尝试 SSH 写入开发板记录，`GET /ascend310b-debug/serial-sessions` 读取本机串口会话列表或一条详情，`POST /ascend310b-debug/serial-sessions/clear` 在显式确认后清理本机会话记录。面板右上角的“检查在线”“串口发现”“局域网扫描”，以及系统、摄像头、音频页内的分类更新按钮调用这些路由。
+
+### CPU频率测量实验
+
+CPU频率不进入默认探测，也没有注册成工具或面板按钮。当前课程8T/20T镜像没有可用的`cpufreq`策略，`npu-smi cpu-freq-up`不受支持，`BogoMIPS`不能换算成频率。需要比较超频版和公版时，按[CPU频率测量实验](docs/cpu-frequency-measurement.md)使用显式`sudo`和ARM PMU周期计数做短时满载测量，并同时记录CPU温度、重复次数和8T/20T档位。
+
+该实验会短时占满一个CPU核心，属于主动测量而非被动读取。它不随`ascend_probe`执行，不能把结果写成NPU性能，也不建议为此启用root SSH账户。
 
 ### 面板预览
 

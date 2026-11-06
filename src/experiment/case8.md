@@ -156,7 +156,7 @@ python scripts/webrtc_om_app.py
 
 ## 板端实测记录 {#src-experiment-case8-board-evidence}
 
-本节记录 8T 与 20T 两块开发板上的服务、摄像头与页面结果。原始日志、接口结果与截图保存在 [`docs/case-board-runs-20261017/case8/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case8/README.md)。
+本节记录 8T 与 20T 两块开发板上的服务、摄像头与页面结果。完整验收结论见 [`samples/case8/docs/04-deployment-and-testing.md`](https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/04-deployment-and-testing.md)。
 
 | 项目 | 8T | 20T |
 | --- | --- | --- |

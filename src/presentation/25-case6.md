@@ -196,7 +196,7 @@ footer: "案例 6：智能小车"
 
 ## 板端实测记录
 
-- 本节记录 8T 与 20T 两块开发板上的启动与页面结果。原始日志与截图保存在 docs/case-board-runs-20261017/case6/。
+- 本节记录 8T 与 20T 两块开发板上的启动与页面结果。完整验收说明见 [samples/case6/docs/05-validation-and-limitations.md](https://github.com/zhouxzh/Ascend310/blob/main/samples/case6/docs/05-validation-and-limitations.md)。
 - 证据等级：Gradio 启动链路与页面渲染为 observed-pass。
 - 本轮未验证：未上传道路图像，车道线检测与场景分类推理均为 untested。
 

@@ -18,7 +18,7 @@ footer: "案例 8：实时手势识别"
 ## 从 YOLOv10 OM 到 WebRTC 的分层证据
 
 
-<div class="source">教材：<a href="../experiment/case8.md"><code>src/experiment/case8.md</code></a>；样例：<a href="../../samples/case8/README.md"><code>samples/case8</code></a></div>
+<div class="source">教材：<a href="../experiment/case8.md"><code>src/experiment/case8.md</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/README.md"><code>samples/case8</code></a></div>
 
 <!--
 本案例讲清硬件链路和证据边界。当前课件不把静态前端截图、HTTP 服务或一次 OM smoke 提升为完整 WebRTC 验收。
@@ -67,7 +67,7 @@ footer: "案例 8：实时手势识别"
 
 任一层的通过都不能替代下一层，尤其不能用 UI 截图替代媒体或 VENC。
 
-<div class="source">教材：<a href="../experiment/case8.md#系统流程"><code>src/experiment/case8.md</code>「系统流程」</a>；测试：<a href="../../samples/case8/docs/04-deployment-and-testing.md"><code>docs/04-deployment-and-testing.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case8.md#系统流程"><code>src/experiment/case8.md</code>「系统流程」</a>；测试：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/04-deployment-and-testing.md"><code>docs/04-deployment-and-testing.md</code></a></div>
 
 <!--
 先建立分层意识。页面显示“HTTP 检查中”或“Peer 未建立”时，不能继续声称摄像头、OM、检测叠加或 VENC 已经通过。
@@ -90,7 +90,7 @@ footer: "案例 8：实时手势识别"
 
 实际输入名、形状和输出必须从 OM 描述与元数据读取。
 
-<div class="source">教材：<a href="../experiment/case8.md#模型与数据集"><code>src/experiment/case8.md</code>「模型与数据集」</a>；契约：<a href="../../samples/case8/docs/03-model-dataset-and-conversion.md"><code>docs/03-model-dataset-and-conversion.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case8.md#模型与数据集"><code>src/experiment/case8.md</code>「模型与数据集」</a>；契约：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/03-model-dataset-and-conversion.md"><code>docs/03-model-dataset-and-conversion.md</code></a></div>
 
 <!--
 模型输入尺寸不是网页运行参数。摄像头分辨率变化只影响预处理，最终必须变成 640×640 的 NCHW 张量。
@@ -106,7 +106,7 @@ footer: "案例 8：实时手势识别"
 
 权重、ONNX、标签、元数据和 OM 必须来自同一次模型导出与转换记录。
 
-<div class="source">图源：<a href="../experiment/img8/case8_model_conversion.png"><code>src/experiment/img8/case8_model_conversion.png</code></a>；转换说明：<a href="../../samples/case8/docs/03-model-dataset-and-conversion.md"><code>docs/03-model-dataset-and-conversion.md</code></a></div>
+<div class="source">图源：<a href="../experiment/img8/case8_model_conversion.png"><code>src/experiment/img8/case8_model_conversion.png</code></a>；转换说明：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/03-model-dataset-and-conversion.md"><code>docs/03-model-dataset-and-conversion.md</code></a></div>
 
 <!--
 强调 ONNX 验证与 OM 验证是两个层。CPU ONNX 推理成功、ATC 打印成功和 ACL 执行成功分别记录，不能互相替代。
@@ -125,7 +125,7 @@ footer: "案例 8：实时手势识别"
 
 `ATC run success` 只证明转换完成；ACL 单帧通过也不证明 WebRTC 能持续编码。
 
-<div class="source">教材：<a href="../experiment/case8.md#om-推理"><code>src/experiment/case8.md</code>「OM 推理」</a>；验证顺序：<a href="../../samples/case8/docs/03-model-dataset-and-conversion.md"><code>docs/03-model-dataset-and-conversion.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case8.md#om-推理"><code>src/experiment/case8.md</code>「OM 推理」</a>；验证顺序：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/03-model-dataset-and-conversion.md"><code>docs/03-model-dataset-and-conversion.md</code></a></div>
 
 <!--
 本页只讲证据顺序，不宣称当前模型文件或所有资产已经存在。模型、ONNX、OM 和报告默认都不进入 Git。
@@ -143,7 +143,7 @@ footer: "案例 8：实时手势识别"
 - 绘制前检查坐标是否仍位于原图范围内。
 - 类别文字从同一批次标签文件读取；坐标或 NMS 错误会产生看似正常但错误的框。
 
-<div class="source">教材：<a href="../experiment/case8.md#om-推理"><code>src/experiment/case8.md</code>「OM 推理」</a>；程序说明：<a href="../../samples/case8/docs/02-program-analysis.md"><code>docs/02-program-analysis.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case8.md#om-推理"><code>src/experiment/case8.md</code>「OM 推理」</a>；程序说明：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/02-program-analysis.md"><code>docs/02-program-analysis.md</code></a></div>
 
 <!--
 后处理不是绘图附属品，而是检测结果的一部分。预处理、输出解码和绘制必须使用同一套缩放与标签信息。
@@ -159,7 +159,7 @@ footer: "案例 8：实时手势识别"
 
 工作站负责导出与同步，板端负责采集、OM 推理、后处理和推流，浏览器负责接收。
 
-<div class="source">图源：<a href="../experiment/img8/case8_system_arch.png"><code>src/experiment/img8/case8_system_arch.png</code></a>；设计：<a href="../../samples/case8/docs/01-project-design.md"><code>docs/01-project-design.md</code></a></div>
+<div class="source">图源：<a href="../experiment/img8/case8_system_arch.png"><code>src/experiment/img8/case8_system_arch.png</code></a>；设计：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/01-project-design.md"><code>docs/01-project-design.md</code></a></div>
 
 <!--
 带学生区分工作站、板端和浏览器。模型文件从工作站到板端只解决交付位置，不证明板端已经加载和执行。
@@ -175,7 +175,7 @@ footer: "案例 8：实时手势识别"
 
 采集、推理和渲染分别推进；H.264 默认走 CANN VENC，失败时必须停止连接。
 
-<div class="source">图源：<a href="../experiment/img8/case8_webrtc_pipeline.png"><code>src/experiment/img8/case8_webrtc_pipeline.png</code></a>；设计：<a href="../../samples/case8/docs/01-project-design.md"><code>docs/01-project-design.md</code></a></div>
+<div class="source">图源：<a href="../experiment/img8/case8_webrtc_pipeline.png"><code>src/experiment/img8/case8_webrtc_pipeline.png</code></a>；设计：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/01-project-design.md"><code>docs/01-project-design.md</code></a></div>
 
 <!--
 图中的“CPU 回退”必须按代码实际行为理解：默认不自动回退。只有用户明确选择 CPU libx264 时才走另一条编码路径。
@@ -194,7 +194,7 @@ footer: "案例 8：实时手势识别"
 
 `--no-hardware-encode` 只替换编码器，不把推理迁到 CPU，也不能作为 VENC 失败的隐藏回退。
 
-<div class="source">教材：<a href="../experiment/case8.md#webrtc-推流"><code>src/experiment/case8.md</code>「WebRTC 推流」</a>；样例：<a href="../../samples/case8/README.md"><code>samples/case8/README.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case8.md#webrtc-推流"><code>src/experiment/case8.md</code>「WebRTC 推流」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/README.md"><code>samples/case8/README.md</code></a></div>
 
 <!--
 CPU 编码是显式对照，不是自动降级。验收 CANN VENC 时，必须证明连接使用的是硬件编码路径。
@@ -233,7 +233,7 @@ CPU 编码是显式对照，不是自动降级。验收 CANN VENC 时，必须�
 
 > HTML 200 但 JS/CSS 404 说明页面未完成交互初始化，不能写成 WebRTC 端到端通过。
 
-<div class="source">清单：<a href="screenshots/capture-manifest.json"><code>src/presentation/screenshots/capture-manifest.json</code></a>；样例：<a href="../../samples/case8"><code>samples/case8</code></a></div>
+<div class="source">清单：<a href="screenshots/capture-manifest.json"><code>src/presentation/screenshots/capture-manifest.json</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8"><code>samples/case8</code></a></div>
 
 <!--
 截图清单同时记录 HTML 成功和 JS/CSS 404。缺失资源说明页面没有完成交互初始化，不能把“HTTP 检查中”解释成服务正在做端到端验收。
@@ -264,7 +264,7 @@ CPU 编码是显式对照，不是自动降级。验收 CANN VENC 时，必须�
 
 官方 Atlas 记录中的重新插拔摄像头是该平台的前置步骤，不自动套用到 Orange Pi。
 
-<div class="source">教材：<a href="../experiment/case8.md#摄像头权限"><code>src/experiment/case8.md</code>「摄像头权限」</a>；测试：<a href="../../samples/case8/docs/04-deployment-and-testing.md"><code>docs/04-deployment-and-testing.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case8.md#摄像头权限"><code>src/experiment/case8.md</code>「摄像头权限」</a>；测试：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/04-deployment-and-testing.md"><code>docs/04-deployment-and-testing.md</code></a></div>
 
 <!--
 权限、设备节点、FourCC 和实际尺寸是四条证据。截图中的摄像头下拉框只是静态控件，不能证明 V4L2 打开成功。
@@ -287,7 +287,7 @@ CPU 编码是显式对照，不是自动降级。验收 CANN VENC 时，必须�
 
 该结论是官方 Atlas 平台的 `observed-pass`，不能外推到 Orange Pi 系统。
 
-<div class="source">证据：<a href="../../samples/case8/docs/05-known-issues-and-version-compatibility.md"><code>docs/05-known-issues-and-version-compatibility.md</code>「官方 Atlas 验证」</a>；正文：<a href="../experiment/case8.md#官方-atlas-开发板验证"><code>src/experiment/case8.md</code></a></div>
+<div class="source">证据：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/05-known-issues-and-version-compatibility.md"><code>docs/05-known-issues-and-version-compatibility.md</code>「官方 Atlas 验证」</a>；正文：<a href="../experiment/case8.md#官方-atlas-开发板验证"><code>src/experiment/case8.md</code></a></div>
 
 <!--
 官方 Atlas 的固件、驱动和 CANN 必须作为一组记录。不能把这里的成功改写成 Orange Pi 同版本通过，也不能省略硬件平台。
@@ -308,7 +308,7 @@ CPU 编码是显式对照，不是自动降级。验收 CANN VENC 时，必须�
 
 新系统的失败停在 VENC 通道创建和 IOMMU 分配，不是页面、摄像头或 OM 的首要故障。
 
-<div class="source">证据：<a href="../../samples/case8/docs/05-known-issues-and-version-compatibility.md"><code>docs/05-known-issues-and-version-compatibility.md</code>「环境对照」</a>；正文：<a href="../experiment/case8.md#验收顺序"><code>src/experiment/case8.md</code>「验收顺序」</a></div>
+<div class="source">证据：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/05-known-issues-and-version-compatibility.md"><code>docs/05-known-issues-and-version-compatibility.md</code>「环境对照」</a>；正文：<a href="../experiment/case8.md#验收顺序"><code>src/experiment/case8.md</code>「验收顺序」</a></div>
 
 <!--
 Orange Pi 的记录必须连同系统日期、驱动、固件和 CANN 一起读。旧系统通过不能覆盖新系统失败，也不能把“固件 B309”当成单独充分条件。
@@ -328,7 +328,7 @@ python scripts/infer_om_camera.py --source /dev/video0 --max-frames 60 --no-wind
 python scripts/webrtc_om_app.py
 ```
 
-<div class="source">命令：<a href="../../samples/case8/docs/04-deployment-and-testing.md"><code>docs/04-deployment-and-testing.md</code></a>；样例：<a href="../../samples/case8/README.md"><code>samples/case8/README.md</code></a></div>
+<div class="source">命令：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/04-deployment-and-testing.md"><code>docs/04-deployment-and-testing.md</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/README.md"><code>samples/case8/README.md</code></a></div>
 
 先验证 OM，再接摄像头，最后启动 WebRTC；每步保存输出和失败层。
 
@@ -348,7 +348,7 @@ python scripts/webrtc_om_app.py
 4. VENC 失败：保存 `507018`、IOMMU/VENC 日志并停止，不自动切 CPU。
 5. `Health: Alarm`：记录设备状态，但不能单独判定功能通过或失败。
 
-<div class="source">排障：<a href="../experiment/case8.md#验收顺序"><code>src/experiment/case8.md</code>「验收顺序」</a>；版本边界：<a href="../../samples/case8/docs/05-known-issues-and-version-compatibility.md"><code>docs/05-known-issues-and-version-compatibility.md</code></a></div>
+<div class="source">排障：<a href="../experiment/case8.md#验收顺序"><code>src/experiment/case8.md</code>「验收顺序」</a>；版本边界：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/05-known-issues-and-version-compatibility.md"><code>docs/05-known-issues-and-version-compatibility.md</code></a></div>
 
 <!--
 每层只用自己的证据判断。当前静态截图停在 HTTP/Peer 层，因此既没有摄像头证据，也没有 OM 或 VENC 证据。
@@ -369,7 +369,7 @@ python scripts/webrtc_om_app.py
 | 设备 | 板型、SoC、固件、驱动、CANN 分行记录 |
 | 质量 | 数据集与精度结果，未执行则写 `untested` |
 
-<div class="source">验收：<a href="../../samples/case8/docs/04-deployment-and-testing.md"><code>docs/04-deployment-and-testing.md</code></a>；截图清单：<a href="screenshots/capture-manifest.json"><code>capture-manifest.json</code></a>；教材：<a href="../experiment/case8.md"><code>src/experiment/case8.md</code></a></div>
+<div class="source">验收：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/04-deployment-and-testing.md"><code>docs/04-deployment-and-testing.md</code></a>；截图清单：<a href="screenshots/capture-manifest.json"><code>capture-manifest.json</code></a>；教材：<a href="../experiment/case8.md"><code>src/experiment/case8.md</code></a></div>
 
 <!--
 最终报告必须写清每一层停在哪里。历史官方 Atlas 通过不等于当前 Orange Pi 通过，静态前端截图也不等于 WebRTC 实时识别通过。
@@ -387,7 +387,7 @@ python scripts/webrtc_om_app.py
 - Orange Pi 不同系统日期、CANN、驱动和固件必须逐行保留。
 - 五个验收层全部有证据后，才能称为实时手势识别链路通过。
 
-<div class="source">教材：<a href="../experiment/case8.md"><code>src/experiment/case8.md</code></a>；版本证据：<a href="../../samples/case8/docs/05-known-issues-and-version-compatibility.md"><code>docs/05-known-issues-and-version-compatibility.md</code></a></div>
+<div class="source">教材：<a href="../experiment/case8.md"><code>src/experiment/case8.md</code></a>；版本证据：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case8/docs/05-known-issues-and-version-compatibility.md"><code>docs/05-known-issues-and-version-compatibility.md</code></a></div>
 
 <!--
 收束时必须区分“能打开静态页面”和“浏览器持续收到带检测框的 H.264 视频”。后者需要信令、摄像头、OM 推理和 VENC 同时成立。

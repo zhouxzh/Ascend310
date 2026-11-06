@@ -245,7 +245,7 @@ pnpm run skills:check
 
 自检问题：`你现在能用哪些 skill？写作任务先调用哪个工具？`
 
-<div class="source">教材：`src/appendix/appendix4.md` §3.5；脚本：`scripts/sync-repo-skills.mjs`</div>
+<div class="source">教材：`src/appendix/appendix4.md` §3.5；脚本：`tools/sync-repo-skills.mjs`</div>
 
 <!--
 授课提示：让学生当场问一次，确认 skill 真的加载；这比记命令更重要。

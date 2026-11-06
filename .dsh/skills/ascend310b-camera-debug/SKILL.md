@@ -51,7 +51,7 @@ lsusb
 
 ## 真实采集
 
-优先使用插件工具 `ascend_camera_capture`：格式、分辨率和 FPS 来自板端 `v4l2-ctl -d <device> --list-formats-ext` 的实际输出，不使用猜测表。先 `dryRun: true` 核对设备与参数，再显式 `allowStateChange: true` 采集。工具固定使用 `ascend` 环境读取非空帧，优先 OpenCV；`cv2` 不可用时回退到 ffmpeg 抓帧和 Pillow 图像统计。产物位于 `/tmp/ascend310b-debug/peripherals`，并返回实际尺寸、FourCC、FPS/采集后端、JPEG、SHA-256 和图像统计。两条路径都失败时停在采集层，不进入 DVPP/NPU 结论。
+优先使用插件工具 `ascend_camera_capture`：格式、分辨率和 FPS 来自板端 `v4l2-ctl -d <device> --list-formats-ext` 的实际输出，不使用猜测表。先 `dryRun: true` 核对设备与参数，再显式 `allowStateChange: true` 采集。工具固定使用`v4l2-ctl --stream-mmap`读取非空帧：MJPG直接保存相机输出的JPEG，不导入OpenCV、NumPy或FFmpeg；YUYV先验证实际原始帧字节数，再仅用Pillow按`YCbCr;422`转换为预览JPEG。产物位于`/tmp/ascend310b-debug/peripherals`，并返回实际尺寸、FourCC、采集后端、JPEG和SHA-256；亮度与清晰度统计不作为这一硬件采集工具的证据。采集失败时停在采集层，不进入DVPP/NPU结论。
 
 需要手工复现时，通过 `ascend_board_run` 显式执行，不要把它当成只读命令：
 

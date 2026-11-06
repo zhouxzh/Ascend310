@@ -4,7 +4,8 @@ set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output_dir="${project_root}/data/sigrok_throughput"
-binary="/tmp/case5_sigrok_streaming_probe"
+binary="$(mktemp "${TMPDIR:-/tmp}/case5-sigrok-streaming.XXXXXX")"
+trap 'rm -f -- "${binary}"' EXIT
 duration_ms="${CASE5_SIGROK_DURATION_MS:-10000}"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 output_file="${output_dir}/${timestamp}.jsonl"

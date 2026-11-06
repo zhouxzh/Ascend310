@@ -26,6 +26,7 @@
 | 13 | [MIDI-DDSP 与 DDSP-VST 对比](13-midi-ddsp-vs-ddsp-vst.md) | 历史参考 | 两条上游路线的历史差异和迁移背景 |
 | 14 | [历史实时 DDSP 路径](14-realtime-ddsp.md) | 历史参考 | 已退役 DDSP-VST MIDI Synth/ONNX 对照 |
 | 15 | [Upstream 参考仓库](15-upstream-repositories.md) | 上游参考 | 第三方仓库、固定提交和保留规则 |
+| 16 | [案例审查报告](16-review.md) | 发布审查 | 文档、实现、证据边界和发布风险 |
 
 ## 证据与产物
 

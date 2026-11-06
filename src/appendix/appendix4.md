@@ -10,12 +10,12 @@ lang: zh-cn
 # 附录 4：Vibe Coding
 
 > **本章导读**
-> 目标：掌握 Vibe Coding 的基本流程，用 DSH 生成、运行并审查小型本地程序。
-> 环境：昇腾 310B 自带 Anaconda，本附录不安装 Python 环境。
-> 数据：脚本内置的 5 天学习时长数组，不依赖 case、模型或数据集。
-> 输出：个人临时学习目录中的 `study_minutes.py` 与 `study_minutes.png`
+> 目标：掌握Vibe Coding的基本流程，并通过三个连续练习完成本地计算、310B板端复现和实验记录审计。
+> 环境：控制机使用Anaconda中的普通Python环境；310B练习显式使用`base`，正式案例仍使用`ascend`。
+> 数据：脚本内置的5天学习时长数组，不依赖case、模型或数据集。
+> 输出：控制机与8T开发板的统计图、板端运行结果，以及通过审计的`study_minutes_record.md`。
 
-Vibe Coding 是用自然语言描述目标，由 AI Agent 写代码并运行，人负责审查和验证。DSH 是这套流程中的执行环境，DeepSeek 负责理解任务和生成方案。本附录只讲基础流程，不要求提前掌握完整 Python 语法。
+Vibe Coding是用自然语言描述目标，由AI Agent写代码并运行，人负责审查和验证。DSH是这套流程中的执行环境，DeepSeek负责理解任务和生成方案。本附录以基础流程为主线，随后提供调试插件参考和可选CPU频率实验，不要求提前掌握完整Python语法。
 
 ## Vibe Coding 是什么
 
@@ -25,17 +25,7 @@ Vibe Coding 的基本流程是：人负责目标、边界和结果，Agent 负�
 定义问题 → 要求最小版本 → 运行 → 反馈真实结果 → 追问 → 验证
 ```
 
-每一步都有明确负责人：
-
-| 工作 | 谁负责 | 检查重点 |
-|---|---|---|
-| 描述目标 | 你 | 要读什么、做什么、输出到哪里 |
-| 制定计划 | Agent | 计划是否只动指定文件 |
-| 生成代码 | Agent | 代码是否使用允许的工具和依赖 |
-| 运行代码 | Agent | 是否先展示命令，再执行 |
-| 解释代码 | Agent | 每一行是否都能讲清楚 |
-| 审查结果 | 你 | 输出是否来自真实文件，结论能否复现 |
-| 验证安全 | 你 | 是否修改了不该改的文件，是否泄露 Key |
+每一步都有明确负责人。你要先说明读取范围、目标、输出位置和禁止动作，再检查Agent给出的计划是否只修改指定文件。Agent负责生成最小代码、展示运行命令、返回真实输出，并解释输入、计算和保存结果的关键语句。代码运行后，你要核对数值与文件是否一致，确认没有越界修改或泄露Key，再决定是否接受这一轮结果。
 
 Vibe Coding 适合探索代码、生成初稿、解释报错和快速迭代。它不适合在完全看不懂代码、不了解文件边界或没有验证方法时直接信任结果。
 
@@ -44,28 +34,19 @@ Vibe Coding 适合探索代码、生成初稿、解释报错和快速迭代。�
 - [datawhalechina/easy-vibe](https://github.com/datawhalechina/easy-vibe)：从零开始学 AI 编程，用“先看示例 + 自己动手做”组织课程。
 - [datawhalechina/vibe-vibe](https://github.com/datawhalechina/vibe-vibe)：系统化的 Vibe Coding 教程，强调从“写代码”转向“对话式创作”。
 
-## Agent 与 DSH 基础
+## Agent与DSH基础
 
-AI Agent 不是普通的聊天机器人。聊天机器人只负责生成回答，Agent 还可以读取文件、运行命令、修改代码和搜索网页。DSH（DeepSeek Harness）是一个能执行这些操作的 Agent 工作环境。
+AI Agent不是某个具体产品名，也不是“聊天机器人”的同义词。普通聊天模式通常只返回回答；Agent模式则让模型在目标、工具、状态和权限边界内循环决策。它可能读取文件、运行命令、修改代码或搜索网页，但具体能做哪些操作取决于产品开放的权限。
 
-一个 Agent 通常由四部分组成：
+一个Agent通常由大模型、工具接口、状态与上下文、控制循环以及权限与工作区共同构成。大模型理解任务并决定下一步行动，工具接口负责执行文件、命令或网络操作，状态保存目标、历史结果和当前计划。控制循环把计划、工具调用和真实结果连接起来，权限与工作区则限定可见文件和可执行动作。缺少工具、状态或控制循环时，产品可能只是聊天界面或代码补全器。
 
-| 组成部分 | 作用 | DSH 中的例子 |
-|---|---|---|
-| 大模型 | 理解任务，生成计划和代码 | DeepSeek 大模型 |
-| 工具 | 执行文件、命令和网络操作 | 读写文件、运行命令、搜索网页 |
-| 记忆 | 记录目标和上下文 | 当前会话、长期目标 |
-| 工作区 | Agent 的活动范围 | 当前仓库根目录 |
+通用对话产品中，ChatGPT的普通聊天模式只生成回答；开启工具调用或代理能力后，可以在产品权限内搜索、操作文件或执行任务。面向软件工程的Agent还包括Claude Code和OpenHands：前者以命令行方式读取代码仓库、修改文件并运行测试，后者提供可连接容器和工作区的开源Agent平台。
 
-常见 Agent 可以按权限从低到高分类：
+GitHub Copilot和Cursor属于AI开发工具。两者都包含补全、聊天和Agent等不同模式，但补全器不是Agent，IDE本身也只是承载工具的软件形态。只有进入Agent模式并在受控环境中读取结果、继续决策时，才具备Agent式执行能力。
 
-| Agent | 类型 | 是否直接操作本地文件 | 适合用途 |
-|---|---|---|---|
-| ChatGPT | 网页/App 助手 | 通常不会 | 问答、写作、代码解释 |
-| AI IDE | 代码编辑器 | 会，但通常在打开的项目内 | 代码补全、修改当前项目 |
-| DSH | 本地 Agent | 会，可以运行命令 | 读取文件、生成脚本、执行验证 |
+DSH是本地Agent执行环境，把模型、工具、状态、控制循环和工作区权限组合在一起。判断一个模式是不是Agent，要看它是否能在权限内自主选择动作、调用工具、读取真实结果并据此继续执行，而不是看它是否提供聊天框。
 
-DSH 的工作方式是一个循环：理解目标，制定计划，调用工具，看到结果，再调整计划。下面是一个简化的流程：
+DSH的工作方式是一个循环：理解目标，制定计划，调用工具，看到结果，再调整计划。下面是一个简化的流程：
 
 ```mermaid
 flowchart TB
@@ -80,16 +61,7 @@ flowchart TB
 
 本教程使用 DeepSeek + DSH，因为 DeepSeek 的中文理解、代码和推理表现适合课程任务，DSH 提供了计划模式、工具调用和安全确认机制。模型 API 成本会随厂商调整，实际以官网为准。
 
-参考资料：
-
-- [Hannibal046/Awesome-LLM](https://github.com/Hannibal046/Awesome-LLM)：持续更新的大语言模型论文、工具和教程清单。
-- [WangRongsheng/awesome-LLM-resources](https://github.com/WangRongsheng/awesome-LLM-resources)：中文友好的 LLM、Agent、多模态与训练推理资料汇总。
-- [luban-agi/Awesome-AIGC-Tutorials](https://github.com/luban-agi/Awesome-AIGC-Tutorials)：面向入门学习的 LLM 和 AIGC 教程合集。
-- [e2b-dev/awesome-ai-agents](https://github.com/e2b-dev/awesome-ai-agents)：AI Agent 框架、论文、工具和项目清单。
-- [luo-junyu/Awesome-Agent-Papers](https://github.com/luo-junyu/Awesome-Agent-Papers)：以论文为主的 LLM Agent 综述和进展。
-- [Shubhamsaboo/awesome-llm-apps](https://github.com/Shubhamsaboo/awesome-llm-apps)：Agent、RAG 和应用案例合集。
-
-## DSH 桌面版安装与插件配置
+## DSH桌面版安装与插件配置
 
 ### 为什么统一用桌面版
 
@@ -158,109 +130,19 @@ node tools/install-dsh-plugins.mjs --profile desktop --check
 
 ![DSH 插件与 Skill 的协作关系](./img4/dsh-plugin-architecture.png)
 
-**写作插件 `ascend310b-writing`** 管的是“教材有没有写对”：
+**写作插件`ascend310b-writing`**管的是“教材有没有写对”。写作阶段主要使用`ascend310b_writing_audit`检查Markdown、命名、锚点、链接、图片、标点和网页产物，使用`ascend310b_writing_style`提示营销腔与空话，使用`ascend310b_writing_progress`统计字数、图表和阅读时长。排版阶段由`ascend310b_writing_render`读取LaTeX日志，检查缺字形、引用和版面问题；`ascend310b_writing_build`负责生成LaTeX/PDF与站点，`ascend310b_writing_toolchain`负责检查pandoc、latexmk、xelatex和pnpm等构建工具。最终由`ascend310b_writing_push_check`汇总审计、提交内链接、产物新鲜度和人工预览门槛。
 
-| 工具 | 作用 |
-| --- | --- |
-| `ascend310b_writing_audit` | 审 Markdown、命名、锚点、链接、图片、标点、PDF 章节表、网页产物 |
-| `ascend310b_writing_render` | 读 LaTeX 日志：缺字形、未定义引用、版面溢出、产物是否过期 |
-| `ascend310b_writing_push_check` | 推送前门槛：审计、提交内链接、产物新鲜度、预览确认 |
-| `ascend310b_writing_style` | 找出营销腔、空话、元话语、对话残留 |
-| `ascend310b_writing_progress` | 章节字数、图、代码块、阅读时长、sidebar 覆盖 |
-| `ascend310b_writing_build` | 用仓库自己的转换器出 LaTeX/PDF 与站点 |
-| `ascend310b_writing_toolchain` | 检查 pandoc、latexmk、xelatex、pnpm 等构建工具 |
+**调试插件`ascend310b-debug`**管的是“程序在板端为什么不对”。插件包含发现与身份、环境与版本、分层调试、受控执行、摄像头与音频五组工具。完整工具说明放在三个练习之后，读者可以先完成基础任务，再按需查阅。
 
-**调试插件 `ascend310b-debug`** 管的是“程序在板端为什么不对”。当前版本把发现、身份、环境、外设、执行和证据记录放在同一个工作台中，但每一项结论仍必须来自相应层次的真实输出。
+## DSH操作与安全 {#src-appendix-appendix4-dsh-operation-safety}
 
-| 分组 | 工具 | 解决的问题 |
-| --- | --- | --- |
-| 发现与身份 | `ascend_discover`、`ascend_serial_probe`、`ascend_serial_exec` | 扫描当前私有网段；SSH 不可用时由串口读取主机名、IP、MAC 和路由；记录一块板的稳定网口 MAC 别名 |
-| 环境与版本 | `ascend_probe`、`ascend_check` | 采集 SoC、NPU 状态、CANN、驱动、Python、PyACL、设备节点和内核模块；将实际组合与仓库记录的配套关系分开判定 |
-| 分层定位 | `ascend_debug_plan`、`ascend_sample_index`、`ascend_board_exec` | 将错误映射到 ACL、ATC、OM、DVPP、摄像头、框架、服务、性能或量化层；查找对应样例；执行一条白名单内的只读命令 |
-| 摄像头与音频 | `ascend_camera_capture`、`ascend_microphone_record`、`ascend_speaker_test`、`ascend_play_recording` | 枚举并实测 V4L2、麦克风和扬声器；返回实际尺寸、格式、WAV 波形或播放路由，而不是只看设备名 |
-| 受控执行 | `ascend_board_run`、`ascend_apt_install`、`ascend_model_download`、`ascend_ui_capture` | 在明确确认后下载、转换、运行样例、安装允许的软件包或采集前端截图；会写文件或运行代码的动作必须显式声明 `allowStateChange: true` |
-
-### 当前调试工作台 {#src-appendix-appendix4-debug-workbench}
-
-打开“昇腾310B调试”后，右侧工作台包含七个页签。它们不是七套独立工具，而是围绕同一块逻辑开发板逐步补充证据：
-
-| 页签 | 当前内容 | 什么时候使用 |
-| --- | --- | --- |
-| 概览 | SoC、档位、健康/温度、NPU 内存、CANN、驱动和分类更新时间 | 第一次判断这块板是谁、上次数据来自何时 |
-| 摄像头 | 设备名称、`/dev/videoN`、能力、FourCC、分辨率、FPS 与单帧预览 | 设备插拔后更新摄像头信息；需要真实帧时再采集 |
-| 音频接口 | ALSA、PulseAudio/PipeWire、蓝牙、麦克风录音、扬声器测试和录音回放 | 声卡能枚举不等于可录可放，应分别做实测 |
-| 串口记录 | COM/tty、阶段时间线、SSH 验证结果和脱敏 transcript | SSH 找不到板、串口占用、登录超时或网络恢复失败时 |
-| 开发板记录 | 逻辑板卡 ID、稳定 MAC 别名、IP、软件变化和显式绑定 | 多块同名板、DHCP 变化或历史记录需要分辨时 |
-| 调试 | 症状、分层计划、匹配样例和案例依赖 | 已有错误文本，需要决定下一条最小检查时 |
-| 原始输出 | 保存的 facts、版本组合与原始探测节选 | 需要核对模型结论是否真的由板端输出支持时 |
-
-面板启动时读取最近一次保存的设备信息，**不会**自动执行完整探测。顶栏三个按钮也有不同含义：
-
-- “检查在线”只检查 SSH 端口是否可达；绿色只表示本次 SSH 可达，不表示 CANN、PyACL、摄像头或推理已经通过；
-- “串口发现”从本机 COM/tty 登录，读取网络信息并尝试恢复 SSH 定位；串口可达、SSH 可达和 NPU 可用是三个不同结论；
-- “局域网扫描”只扫描当前私有网络范围，通过板端 MAC 和 SoC 确认身份，不把开放 22 端口的任意主机当成 310B。
-
-开发板按稳定物理网口 MAC 归档，不按 hostname 或临时 IP 归档。两块出厂主机名相同的板仍应是不同记录；同一块板换 DHCP 地址或切换有线/无线网络后，只有在观察到已知 MAC 别名时才归并。8T 与 20T 的环境、性能和精度证据必须分开保存。
-
-### 从“在线”到“可解释结论” {#src-appendix-appendix4-debug-order}
-
-遇到板端问题时，按下面顺序缩小范围。每一步只回答一个问题，避免一上来执行长时间整板探测：
-
-1. 点击“检查在线”。若 SSH 不可达，先检查电源、网线或 SSID；不要将离线写成硬件不支持。
-2. 没有已知地址时使用“串口发现”；没有串口时再使用“局域网扫描”。确认面板中的 MAC、IP 和逻辑板卡 ID 是否对应目标设备。
-3. 进入概览，点击“更新系统信息”，再用 `ascend_check` 判断 SoC、驱动和 CANN 的证据状态。版本配套完整不等于业务推理已经通过。
-4. 设备问题只更新相应类别：摄像头使用“更新摄像头信息”，音频使用“更新音频接口信息”。这样不会用旧外设数据伪装为刚刷新。
-5. 需要硬件证据时再执行一次明确的外设动作：摄像头必须取得非空帧；麦克风必须生成非空 PCM；扬声器播放命令完成后仍需人工确认是否听到。
-6. 有错误文本时转到调试页，或请求 `ascend_debug_plan`。先满足当前层的停止条件，再进入 ATC、OM 加载、服务、精度或性能层。
-7. 需要执行下载、ATC、测试或脚本时，先使用 `dryRun` 检查目标与命令；只有确认写入范围后才传 `allowStateChange: true`。
-
-### 用“串口记录”定位连接失败 {#src-appendix-appendix4-serial-records}
-
-开发板没有出现在 SSH 列表中时，不要反复猜 IP。先运行“串口发现”，再打开“串口记录”。每条记录列出会话时间、COM/tty、结论、耗时、hostname、IP、MAC 和阶段时间线；详情页保存已经脱敏的串口文本。
-
-记录停在不同位置，表示故障层次不同：
-
-- “打开端口”失败，通常是 PuTTY、串口监视器等程序占用了 COM，或当前用户没有权限；
-- “等待登录提示”“登录认证”或“确认用户身份”失败，应检查串口线、115200 8N1、端口选择和 `HwHiAiUser` 凭据；
-- “读取网络信息”完成而“验证 SSH”失败，说明串口链路正常，仍需检查网段、22 端口、`sshd` 和公钥认证；
-- 会话显示“已取消”，只说明本机取消了辅助进程，不等于开发板故障；
-- 会话显示 partial，通常表示串口已取得设备信息，但 SSH 身份验证尚未形成可执行 target。
-
-记录默认只保存在 DSH 本机数据目录中。密码、token、key、私钥文本和终端控制字符会被替换；hostname、IP、MAC、COM 口仍属于设备环境信息。单条 transcript 最多保留 64 KiB；默认最多 50 条、30 天、合计 20 MiB。清理记录只删除本机诊断历史，不会修改串口、网络或开发板。不要把完整记录提交到 GitHub 或直接粘贴到公开问题单。
-
-### 给 Agent 的调试提示词 {#src-appendix-appendix4-debug-prompts}
-
-Vibe Coding 不应把“帮我修好开发板”交给 Agent 直接执行。提示词要限定目标、证据、动作和停止条件。例如：
-
-```text
-只检查当前选择的昇腾 310B 是否 SSH 在线，不执行完整探测，也不要修改开发板。
-如果离线，说明下一步应使用串口发现还是局域网扫描。
-```
-
-```text
-读取最新一条串口记录。告诉我它停在打开端口、登录、身份确认、网络信息还是 SSH 验证；
-只引用脱敏 transcript 中必要的几行，不要清理任何记录，也不要执行写入操作。
-```
-
-```text
-更新当前板的摄像头信息，列出每个可采集节点的设备名、FourCC、分辨率和 FPS。
-不要采集图像；如果需要实测帧，先说明将写入哪个固定目录并等待确认。
-```
-
-写作插件产出“可交付的教材”，调试插件产出“可复核的板端证据”，两者共用同一个仓库，但**证据边界不同**：教材通过审计不等于板端跑通，板端跑通也不等于教材写对。
+开始写代码前，先确认Skill、界面操作和安全边界。
 
 ### Skill：给模型的操作规程
 
 Skill 是一份 `SKILL.md`，写清楚“什么时候用、按什么顺序做、哪些结论不能下”。它不直接执行命令，而是让模型在正确的时机调用正确的工具。
 
-DSH 按下面的优先级查找 Skill：
-
-| 优先级 | 位置 | 适用场景 |
-| --- | --- | --- |
-| 100 | `<仓库>/.dsh/skills` | 本仓库自带，新克隆即生效 |
-| 200 | `<仓库>/.agents/skills` | 其他 Agent 工具的约定目录 |
-| 300 | DSH 配置里的自定义目录 | 个人扩展 |
-| 之后 | `~/.dsh/skills` | 用户级安装，跨仓库可用 |
+DSH先读取仓库项目级目录`<仓库>/.dsh/skills`，因此新克隆的仓库可以立即获得本课程规则；随后才检查其他Agent工具约定的`<仓库>/.agents/skills`、DSH配置中的自定义目录和用户级`~/.dsh/skills`。项目级规则优先，避免旧用户版本覆盖课程要求。
 
 本仓库的两个 Skill 已放在项目级目录：
 
@@ -291,16 +173,7 @@ node tools/dsh-plugin-ascend310b-writing/scripts/install-skill.mjs --check
 
 ### 界面与常用操作
 
-| 区域 | 作用 | 常见操作 |
-| --- | --- | --- |
-| 左侧会话栏 | 新建会话、切换历史会话 | 每个独立任务开一个新会话 |
-| 中部消息区 | 你与 Agent 的对话记录 | 滚动查看每一步工具调用 |
-| 底部输入框 | 输入自然语言任务 | 回车发送 |
-| 工作区选择器 | 决定 Agent 能读写哪个目录 | 每次开始前确认是 `Ascend310` |
-| 设置 | 模型、工作区、插件、Skill | 只配置一次，之后不要随意改 |
-| 工具执行卡片 | 显示读取、编辑、运行了什么 | 展开看命令与输出 |
-
-每次开始任务前，先确认工作区；任务结束后，先看工具输出，再看 Agent 的总结。
+左侧会话栏用于新建和切换任务，中部消息区显示对话及每一步工具调用，底部输入框用于描述目标、边界和验收条件。工作区选择器决定Agent能够读写哪个目录，开始前应确认是`Ascend310`；模型、工作区、插件和Skill集中在设置中配置。工具执行卡片会显示读取、编辑或运行了什么，任务结束后应先核对真实工具结果，再接受Agent的总结。
 
 ### 安全规则
 
@@ -321,13 +194,43 @@ Agent 能做的事情和真人操作电脑一样有后果。看不懂的命令�
 | 生成看不懂的代码 | 代码能运行，但自己讲不清每一行 | 让 DSH 逐行解释，能复述后再验收 |
 | Key 泄露 | API Key 出现在代码或文档中 | 删除 Key，重新生成，绝不提交 |
 | 长任务失控 | Agent 连续修改多个文件 | 拆成小任务，每步检查一次结果 |
-## 第一次 Vibe Coding 任务
+
+## 提示词与审查方法 {#src-appendix-appendix4-prompts-review}
+
+### 提示词结构
+
+| 要素 | 要求 | 示例 |
+|---|---|---|
+| 目标 | 说明要做什么 | 计算 5 天学习时长并画出柱状图 |
+| 输入 | 明确由谁提供内容 | 提示词中的 `[25, 40, 30, 50, 35]`，不依赖仓库数据 |
+| 输出位置 | 说明文件保存到哪里 | 个人临时学习目录中的 `study_minutes.py` 与 `study_minutes.png` |
+| 约束 | 说明允许和禁止的操作 | 仅 `numpy`、`matplotlib`，不安装依赖、不读 case、不访问网络 |
+| 验收标准 | 说明怎样算完成 | 数值为 180/36.0/50/25，PNG 有 5 根对应的柱子 |
+
+好的提示词让 Agent 少猜测。坏的提示词只有一句话，例如“帮我分析一下”，这时 Agent 可能选错文件、改变工作区或生成无法验证的结论。
+
+### 审查清单
+
+每完成一轮，不要只盯着最后一张图，而要按 Agent 做事的顺序检查：
+
+1. 先看计划。它是否说明要读取什么、运行什么、把结果写到哪里？如果这些还不清楚，就先不批准执行。
+2. 再看命令和文件边界。每条命令是否看得懂？它会不会覆盖原文件、删除内容，或者访问工作区之外的位置？
+3. 然后看代码。输入数组在哪里，统计量由哪一行算出，图片由哪一行保存？遇到看不懂的语句，让 Agent 逐行解释，不要直接接受。
+4. 检查输出是不是这一次真实运行产生的。终端数值能否从输入数组算出来，图中的柱子和平均值线是否与这些数值一致？
+5. 检查安全边界。有没有在未说明的情况下安装依赖、上传文件或暴露 Key？一旦发现，先停下来处理，不要继续尝试。
+6. 最后看记录。读图、改图、重跑和最后结论是否都能对应到具体步骤？如果只留下结果，没有留下修改过程，下次就很难判断 Agent 到底改了什么。
+
+## 三个连续练习 {#src-appendix-appendix4-continuous-exercises}
+
+三个例子共用同一组学习时长数据，依次完成控制机计算、310B板端复现和实验记录审计。
+
+### 第一个例子：在控制机计算并生成图表 {#src-appendix-appendix4-first-example}
 
 第一次练习不应要求学生知道某个 case 的目录、模型格式或数据字段。公开入门课程通常先让学习者完成一个可见的小结果，再逐步引入项目结构和数据：`easy-vibe` 用简单游戏建立第一次反馈，`vibe-vibe` 将首个练习设计为短时间内可打开的网页。本课程采用同一原则，但把题目换成一张由**内置数字**生成的学习时长统计图。
 
 练习数据直接写在脚本中：5 天的学习分钟数。学生不需要下载数据集、连接开发板或认识案例目录，却能看到两种可验证的结果：终端中的总时长、均值、最大/最小值，以及保存到本地的柱状图。这比纯打印一行“Hello”多了一层真实计算，也比直接进入案例数据更容易理解。
 
-### 第一轮：计算并生成一张图
+#### 第一轮：计算并生成一张图
 
 在 DSH 中输入：
 
@@ -344,7 +247,7 @@ Agent 能做的事情和真人操作电脑一样有后果。看不懂的命令�
 
 这份提示词给出了输入数据、输出位置、允许的库、禁止的动作和可观察的验收标准。对初学者而言，第一轮不必理解 NPU 或案例工程；关键是看见数组如何进入计算，数值如何变成一张图。
 
-### 参考实现
+#### 参考实现
 
 Agent 生成的版本可能不同。一个满足最小要求的脚本如下：
 
@@ -375,7 +278,7 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 
 这里的 `minutes` 是输入，`numpy` 负责数组计算，`matplotlib` 负责把同一组数字画成图。图中使用英文轴标签，避免初次运行时因中文字体缺失造成无关报错；终端输出仍使用中文标签。
 
-### 预期结果
+#### 预期结果
 
 使用上面的数组时，终端应包含：
 
@@ -395,7 +298,7 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 - 控制机使用 Anaconda、NumPy 与 Matplotlib 完成了本次普通 Python 计算和绘图。
 - 图中五根柱子从左到右对应 25、40、30、50、35 分钟；数值与终端统计一致。
 
-### 第二轮：只增加一个图形元素
+#### 第二轮：只增加一个图形元素
 
 确认第一轮的数字和图片正确后，再提出**一个**可验证的修改：
 
@@ -406,7 +309,7 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 
 第一轮先验证“计算和出图”，第二轮只验证“一处修改是否准确”。将修改限制在一个问题上，学生才能看见 Agent 的变更是否真正对应了自己的要求。
 
-### 验收步骤
+#### 验收步骤
 
 完成后按下面顺序验收：
 
@@ -497,43 +400,174 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 
 这个例子把同一张统计图从“能跑”推进到“记录能审”。学生应理解三类证据的区别：`numpy` 和 `matplotlib` 的输出证明计算与绘图发生；调试插件证明哪块板和哪个环境执行了任务；学习记录审计证明临时 Markdown 的结构、路径和卫生合格。三者都通过，仍不等于 NPU 推理、模型精度或案例交付已经通过。
 
-## 提示词与审查方法
+## 调试插件功能详解 {#src-appendix-appendix4-debug-plugin-detail}
 
-### 提示词结构
+前三个练习只使用了少量调试工具。本部分作为插件参考手册，第一次阅读可以先浏览能力分组和工作台，遇到板端问题时再按需查阅。CPU频率测量放在本节末尾，作为独立可选实验，不进入默认探测。
 
-| 要素 | 要求 | 示例 |
-|---|---|---|
-| 目标 | 说明要做什么 | 计算 5 天学习时长并画出柱状图 |
-| 输入 | 明确由谁提供内容 | 提示词中的 `[25, 40, 30, 50, 35]`，不依赖仓库数据 |
-| 输出位置 | 说明文件保存到哪里 | 个人临时学习目录中的 `study_minutes.py` 与 `study_minutes.png` |
-| 约束 | 说明允许和禁止的操作 | 仅 `numpy`、`matplotlib`，不安装依赖、不读 case、不访问网络 |
-| 验收标准 | 说明怎样算完成 | 数值为 180/36.0/50/25，PNG 有 5 根对应的柱子 |
+调试插件不是“自动修好开发板”的按钮。它把问题拆成设备身份、传输、环境、转换、加载、服务、外设和性能等层；每一层只回答一个可以验证的问题。工具返回的结论必须和本次板端输出对应，不能把SSH可达、探测成功、外设枚举成功或一次推理成功互相替代。
 
-好的提示词让 Agent 少猜测。坏的提示词只有一句话，例如“帮我分析一下”，这时 Agent 可能选错文件、改变工作区或生成无法验证的结论。
+### 发现与身份 {#src-appendix-appendix4-debug-discovery-tools}
 
-### 审查清单
+| 工具 | 用途 | 主要结果 | 边界 |
+| --- | --- | --- | --- |
+| `ascend_discover` | 扫描当前私有IPv4网络，读取板端SoC和物理网口MAC，写入本机开发板记录 | 稳定逻辑板卡ID、MAC别名、IP、系统和软件变化 | 只扫描私有网段；开放22端口的任意主机不等于310B |
+| `ascend_serial_probe` | 从COM/tty登录HwHiAiUser，读取hostname、IPv4、MAC和默认路由，再尝试SSH验证 | 串口阶段时间线、网络信息和可按需写入的设备记录 | 串口登录成功不等于SSH、CANN或NPU已经可用 |
+| `ascend_serial_exec` | SSH不可用时执行一条白名单内的只读串口命令 | 单条板端输出 | 不接受任意shell、管道、重定向或写入命令 |
 
-每完成一轮，不要只盯着最后一张图，而要按 Agent 做事的顺序检查：
+`ascend_discover`和串口发现都按物理网口MAC建立逻辑板卡身份，不按hostname或临时IP猜合并。8T与20T的结果分别保存；同一台机器上出现两个名称相同的板子，也不能仅凭机器名合并。
 
-1. 先看计划。它是否说明要读取什么、运行什么、把结果写到哪里？如果这些还不清楚，就先不批准执行。
-2. 再看命令和文件边界。每条命令是否看得懂？它会不会覆盖原文件、删除内容，或者访问工作区之外的位置？
-3. 然后看代码。输入数组在哪里，统计量由哪一行算出，图片由哪一行保存？遇到看不懂的语句，让 Agent 逐行解释，不要直接接受。
-4. 检查输出是不是这一次真实运行产生的。终端数值能否从输入数组算出来，图中的柱子和平均值线是否与这些数值一致？
-5. 检查安全边界。有没有在未说明的情况下安装依赖、上传文件或暴露 Key？一旦发现，先停下来处理，不要继续尝试。
-6. 最后看记录。读图、改图、重跑和最后结论是否都能对应到具体步骤？如果只留下结果，没有留下修改过程，下次就很难判断 Agent 到底改了什么。
+### 环境与版本 {#src-appendix-appendix4-debug-environment-tools}
 
-## 参考资料 {#src-appendix-appendix4-references}
+| 工具 | 用途 | 主要结果 | 边界 |
+| --- | --- | --- | --- |
+| `ascend_probe` | 读取SoC、NPU健康/温度/内存、OS、驱动、CANN、Python、PyACL、设备节点、内核模块和基础外设事实 | 带来源和证据等级的探测报告 | 当前非特权探测不提供可信固件版本；离线不等于硬件不支持 |
+| `ascend_check` | 将实际SoC、驱动、CANN等组合与仓库记录和发布线比较 | `observed-match`、`documented-pairing`、`documented-unpaired`、`incomplete`等判定 | 版本配套通过不等于业务推理、精度或性能已经通过 |
 
-- [datawhalechina/easy-vibe](https://github.com/datawhalechina/easy-vibe)：从零开始学 AI 编程，用“先看示例 + 自己动手做”组织课程。
-- [datawhalechina/vibe-vibe](https://github.com/datawhalechina/vibe-vibe)：系统化的 Vibe Coding 教程，强调从“写代码”转向“对话式创作”。
-- [Hannibal046/Awesome-LLM](https://github.com/Hannibal046/Awesome-LLM)：持续更新的大语言模型论文、工具和教程清单。
-- [WangRongsheng/awesome-LLM-resources](https://github.com/WangRongsheng/awesome-LLM-resources)：中文友好的 LLM、Agent、多模态与训练推理资料汇总。
-- [luban-agi/Awesome-AIGC-Tutorials](https://github.com/luban-agi/Awesome-AIGC-Tutorials)：面向入门学习的 LLM 和 AIGC 教程合集。
-- [e2b-dev/awesome-ai-agents](https://github.com/e2b-dev/awesome-ai-agents)：AI Agent 框架、论文、工具和项目清单。
-- [luo-junyu/Awesome-Agent-Papers](https://github.com/luo-junyu/Awesome-Agent-Papers)：以论文为主的 LLM Agent 综述和进展。
-- [Shubhamsaboo/awesome-llm-apps](https://github.com/Shubhamsaboo/awesome-llm-apps)：Agent、RAG 和应用案例合集。
-- [DSH 官方仓库](https://github.com/deepseek-ai/deepseek-harness)
-- [DeepSeek 开放平台](https://platform.deepseek.com/)
+探测结果中的`scope.applicable`表示芯片是否属于310B范围，`transport`表示传输是否完成，`missingCore`表示哪些关键事实尚未采集。缺少事实只能写`untested`，不能写成不支持。
+
+### 分层调试与样例 {#src-appendix-appendix4-debug-plan-tools}
+
+| 工具 | 用途 | 主要结果 | 边界 |
+| --- | --- | --- | --- |
+| `ascend_debug_plan` | 根据错误文本、领域或`rawText`生成先设备、再CANN、再转换/加载/服务的分层计划 | 每步的检查动作、停止条件和下一步 | 计划不能替代当前层的实际输出 |
+| `ascend_sample_index` | 按症状、模型、案例名或调试类型查找仓库样例 | 样例ID、README、入口命令、测试命令和依赖能力 | 索引命中不等于该样例已经在当前板通过 |
+| `ascend_board_exec` | 执行一条白名单内的只读诊断命令 | stdout、stderr、退出码和等价调用 | 拒绝管道、链式命令、重定向、包安装和服务修改 |
+
+### 受控执行与资产 {#src-appendix-appendix4-debug-execution-tools}
+
+| 工具 | 用途 | 主要结果 | 边界 |
+| --- | --- | --- | --- |
+| `ascend_board_run` | 在指定环境运行教程脚本、Python、pytest、ATC或msame | 退出码、耗时、stdout、stderr和完整命令 | 必须显式`allowStateChange: true`；先`dryRun`核对target、cwd、环境和写入范围 |
+| `ascend_apt_install` | 在用户明确确认后安装允许的apt包 | 包列表、命令、退出码和日志 | 属于系统级变更，不能为了绕过一个缺失依赖自动执行 |
+| `ascend_model_download` | 从华为云、Hugging Face镜像、GitHub代理或明确HTTP来源下载资产 | 下载来源、目标、大小和可校验摘要 | 模型或数据集不应直接复制进Git；固定版本和来源边界必须记录 |
+| `ascend_ui_capture` | 用宿主机浏览器打开板端HTTP页面并保存PNG | 截图、视口、尺寸和文件摘要 | 截图只能证明页面可见，不能证明推理或业务质量通过 |
+
+`ascend_board_run`默认激活统一`ascend`环境并设置`PYTHONNOUSERSITE=1`。`environment: "base"`只用于显式非NPU系统诊断；它不能成为正式案例环境失败后的静默回退。
+
+### 摄像头与音频 {#src-appendix-appendix4-debug-peripheral-tools}
+
+| 工具 | 用途 | 主要结果 | 边界 |
+| --- | --- | --- | --- |
+| `ascend_camera_capture` | 从V4L2节点读取真实帧 | 实际分辨率、FourCC、FPS、非空帧、JPEG和校验信息 | 列出`/dev/videoN`不等于该节点能采集 |
+| `ascend_microphone_record` | 从ALSA或PulseAudio/PipeWire录音 | WAV、时长、RMS、峰值、零值和削波比例 | 声卡能枚举不等于麦克风能录到有效声音 |
+| `ascend_speaker_test` | 通过当前输出设备播放固定正弦波 | 输出路由、WAV信息和执行结果 | 命令成功不等于用户实际听到声音 |
+| `ascend_play_recording` | 回放插件固定目录中的录音 | 回放路由、文件信息和执行结果 | 回放成功仍需要人工确认听感 |
+
+### 如何阅读一次探测 {#src-appendix-appendix4-debug-read-result}
+
+一次探测的证据要分开阅读：
+
+| 证据 | 能证明 | 不能证明 |
+| --- | --- | --- |
+| SSH端口可达 | 本次网络和登录路径可达 | CANN、PyACL、外设或推理可用 |
+| `scope.applicable=true` | 当前芯片属于310B范围 | 当前模型或业务已经适配 |
+| `pairing`判定通过 | 该软件组合在仓库记录中有对应证据 | 本次新任务一定通过 |
+| 外设枚举成功 | 系统看到了设备节点 | 设备能采集、录音或播放 |
+| 单次推理或测试返回0 | 该次输入完成了一次路径 | 精度、性能和生产稳定性达标 |
+| 串口partial | 已读到部分网络事实 | SSH身份已经建立 |
+
+### 当前调试工作台 {#src-appendix-appendix4-debug-workbench}
+
+打开“昇腾310B调试”后，右侧工作台包含七个页签。它们不是七套独立工具，而是围绕同一块逻辑开发板逐步补充证据：
+
+| 页签 | 当前内容 | 什么时候使用 |
+| --- | --- | --- |
+| 概览 | SoC、档位、健康/温度、NPU 内存、CANN、驱动和分类更新时间 | 第一次判断这块板是谁、上次数据来自何时 |
+| 摄像头 | 设备名称、`/dev/videoN`、能力、FourCC、分辨率、FPS 与单帧预览 | 设备插拔后更新摄像头信息；需要真实帧时再采集 |
+| 音频接口 | ALSA、PulseAudio/PipeWire、蓝牙、麦克风录音、扬声器测试和录音回放 | 声卡能枚举不等于可录可放，应分别做实测 |
+| 串口记录 | COM/tty、阶段时间线、SSH 验证结果和脱敏 transcript | SSH 找不到板、串口占用、登录超时或网络恢复失败时 |
+| 开发板记录 | 逻辑板卡 ID、稳定 MAC 别名、IP、软件变化和显式绑定 | 多块同名板、DHCP 变化或历史记录需要分辨时 |
+| 调试 | 症状、分层计划、匹配样例和案例依赖 | 已有错误文本，需要决定下一条最小检查时 |
+| 原始输出 | 保存的 facts、版本组合与原始探测节选 | 需要核对模型结论是否真的由板端输出支持时 |
+
+面板启动时读取最近一次保存的设备信息，**不会**自动执行完整探测。顶栏三个按钮也有不同含义：
+
+- “检查在线”只检查 SSH 端口是否可达；绿色只表示本次 SSH 可达，不表示 CANN、PyACL、摄像头或推理已经通过；
+- “串口发现”从本机 COM/tty 登录，读取网络信息并尝试恢复 SSH 定位；串口可达、SSH 可达和 NPU 可用是三个不同结论；
+- “局域网扫描”只扫描当前私有网络范围，通过板端 MAC 和 SoC 确认身份，不把开放 22 端口的任意主机当成 310B。
+
+配置目标的主机名和发现记录如果实际连到同一个`IP:port`，在线状态只计一个端点。两边MAC不一致时，面板标记“身份冲突”，要求用户在开发板记录中显式绑定，不能自动合并身份。
+
+开发板按稳定物理网口 MAC 归档，不按 hostname 或临时 IP 归档。两块出厂主机名相同的板仍应是不同记录；同一块板换 DHCP 地址或切换有线/无线网络后，只有在观察到已知 MAC 别名时才归并。8T 与 20T 的环境、性能和精度证据必须分开保存。
+
+### 从“在线”到“可解释结论” {#src-appendix-appendix4-debug-order}
+
+遇到板端问题时，按下面顺序缩小范围。每一步只回答一个问题，避免一上来执行长时间整板探测：
+
+1. 点击“检查在线”。若 SSH 不可达，先检查电源、网线或 SSID；不要将离线写成硬件不支持。
+2. 没有已知地址时使用“串口发现”；没有串口时再使用“局域网扫描”。确认面板中的 MAC、IP 和逻辑板卡 ID 是否对应目标设备。
+3. 进入概览，点击“更新系统信息”，再用 `ascend_check` 判断 SoC、驱动和 CANN 的证据状态。版本配套完整不等于业务推理已经通过。
+4. 设备问题只更新相应类别：摄像头使用“更新摄像头信息”，音频使用“更新音频接口信息”。这样不会用旧外设数据伪装为刚刷新。
+5. 需要硬件证据时再执行一次明确的外设动作：摄像头必须取得非空帧；麦克风必须生成非空 PCM；扬声器播放命令完成后仍需人工确认是否听到。
+6. 有错误文本时转到调试页，或请求 `ascend_debug_plan`。先满足当前层的停止条件，再进入 ATC、OM 加载、服务、精度或性能层。
+7. 需要执行下载、ATC、测试或脚本时，先使用 `dryRun` 检查目标与命令；只有确认写入范围后才传 `allowStateChange: true`。
+
+### 用“串口记录”定位连接失败 {#src-appendix-appendix4-serial-records}
+
+开发板没有出现在 SSH 列表中时，不要反复猜 IP。先运行“串口发现”，再打开“串口记录”。每条记录列出会话时间、COM/tty、结论、耗时、hostname、IP、MAC 和阶段时间线；详情页保存已经脱敏的串口文本。
+
+记录停在不同位置，表示故障层次不同：
+
+- “打开端口”失败，通常是 PuTTY、串口监视器等程序占用了 COM，或当前用户没有权限；
+- “等待登录提示”“登录认证”或“确认用户身份”失败，应检查串口线、115200 8N1、端口选择和 `HwHiAiUser` 凭据；
+- “读取网络信息”完成而“验证 SSH”失败，说明串口链路正常，仍需检查网段、22 端口、`sshd` 和公钥认证；
+- 会话显示“已取消”，只说明本机取消了辅助进程，不等于开发板故障；
+- 会话显示 partial，通常表示串口已取得设备信息，但 SSH 身份验证尚未形成可执行 target。
+
+记录默认只保存在 DSH 本机数据目录中。密码、token、key、私钥文本和终端控制字符会被替换；hostname、IP、MAC、COM 口仍属于设备环境信息。单条 transcript 最多保留 64 KiB；默认最多 50 条、30 天、合计 20 MiB。清理记录只删除本机诊断历史，不会修改串口、网络或开发板。不要把完整记录提交到 GitHub 或直接粘贴到公开问题单。
+
+### 给 Agent 的调试提示词 {#src-appendix-appendix4-debug-prompts}
+
+Vibe Coding 不应把“帮我修好开发板”交给 Agent 直接执行。提示词要限定目标、证据、动作和停止条件。例如：
+
+```text
+只检查当前选择的昇腾 310B 是否 SSH 在线，不执行完整探测，也不要修改开发板。
+如果离线，说明下一步应使用串口发现还是局域网扫描。
+```
+
+```text
+读取最新一条串口记录。告诉我它停在打开端口、登录、身份确认、网络信息还是 SSH 验证；
+只引用脱敏 transcript 中必要的几行，不要清理任何记录，也不要执行写入操作。
+```
+
+```text
+更新当前板的摄像头信息，列出每个可采集节点的设备名、FourCC、分辨率和 FPS。
+不要采集图像；如果需要实测帧，先说明将写入哪个固定目录并等待确认。
+```
+
+写作插件产出“可交付的教材”，调试插件产出“可复核的板端证据”，两者共用同一个仓库，但**证据边界不同**：教材通过审计不等于板端跑通，板端跑通也不等于教材写对。
+
+### 可选实验：测量CPU运行频率 {#src-appendix-appendix4-cpu-frequency-method}
+
+CPU频率**不属于**默认探测。插件当前读取NPU健康、温度、NPU内存和系统版本，但不会在每次`ascend_probe`中读取CPU频率，也不会自动运行CPU压力测试。
+
+课程使用的8T和20T镜像存在以下限制：
+
+- `/sys/devices/system/cpu/cpufreq`没有注册常规CPU调频策略，不能直接读取`scaling_cur_freq`或`scaling_max_freq`；
+- `npu-smi info -t cpu-freq-up -i 0 -c 0`接口存在，但两块板都返回不支持；
+- `/proc/cpuinfo`只有`BogoMIPS`，没有`CPU MHz`；`BogoMIPS`是延时循环校准值，不能换算成CPU频率；
+- 普通用户读取`/sys/kernel/debug/clk/clk_summary`被拒绝，使用sudo读取后也只看到`refclk=150MHz`，没有CPU核心时钟；
+- 普通用户的ARM PMU周期计数被拒绝，只有显式sudo测量才能取得核心周期。
+
+需要比较香橙派AI Pro超频版和公版时，可以使用**短时PMU周期测量**：
+
+1. 将当前线程固定到一个CPU核心；
+2. 通过`perf_event_open`打开CPU周期计数器；
+3. 让该核心执行固定时长的CPU密集循环；
+4. 用CPU周期增量除以单调时钟时间增量，得到MHz估算值；
+5. 对每个核心重复测量，并记录CPU温度、重复次数和是否发生降频。
+
+可以概括为：
+
+```text
+CPU频率估算值 = CPU周期增量 / 单调时间增量
+```
+
+在课程的一块20T板上，以CPU0、300ms满载、单次测量的方式观察到约1595.2MHz。这是`observed`样本，只能说明该板在该次负载下的运行频率；8T尚未执行同样的测量，应标记为`untested`。单次结果不能直接判成超频。
+
+超频比较必须固定板型、CPU型号、OS、内核、固件、散热、负载程序、核心、时长和重复次数。至少重复3次，报告中位数、最大值和温度，并把8T与20T结果分开。
+
+这项实验需要显式sudo和明确的CPU负载确认，不应为此启用root SSH账户，也不应将它放进面板启动时的自动探测。完整的周期计数代码、失败处理和工程边界记录在调试插件的`docs/cpu-frequency-measurement.md`中。
 
 ## 验证清单 {#src-appendix-appendix4-validation}
 
@@ -546,6 +580,9 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 - [ ] 写作插件与调试插件已启用，新会话能看到对应工具。
 - [ ] 能打开调试面板的“串口记录”，识别会话时间、COM 口、结论、阶段和脱敏文本。
 - [ ] 能区分 COM 占用、登录超时和“串口成功但 SSH 失败”，不把串口记录写成 NPU 通过证据。
+- [ ] 能说出调试插件的发现与身份、环境与版本、分层调试、受控执行、摄像头与音频五类能力。
+- [ ] 能区分`ascend_board_exec`只读命令和`ascend_board_run`受控执行，不把`dryRun`当成真实运行结果。
+- [ ] 能说明CPU频率不属于默认探测；BogoMIPS不是CPU频率，超频比较需要同条件满载测量。
 - [ ] 问“你现在能用哪些 skill？”时，回答包含 `ascend310b-writing` 与 `ascend310b-debug`。
 - [ ] `pnpm run skills:check` 通过。
 - [ ] 能背出 5 条安全规则。
@@ -567,6 +604,8 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 | 串口发现提示 COM 被占用 | PuTTY、串口监视器或另一个程序仍打开该端口 | 关闭占用程序，在“串口记录”中确认失败阶段为打开端口，再重试 |
 | 串口登录超时 | 端口、波特率、线缆、登录提示或凭据不正确 | 核对 115200 8N1 和 HwHiAiUser；优先显式选择已确认的 COM 口，不连续试未知端口 |
 | 串口已读到 IP，但 SSH 仍失败 | 地址不在当前网段、22 端口不可达、`sshd` 或公钥认证未就绪 | 使用记录中的 IP/MAC 核对网络与 SSH；不要把串口成功当成 SSH、CANN 或 NPU 通过 |
+| 把`BogoMIPS`当作CPU频率 | `/proc/cpuinfo`不提供当前CPU频率，`BogoMIPS`只是延时循环校准值 | 标记CPU频率未暴露；需要比较超频时再做显式PMU满载测量 |
+| 希望每次探测都自动跑CPU满载测试 | CPU测量会影响系统负载和温度，不属于被动环境采集 | 保持默认探测只读；需要时单独确认并测量，记录温度、重复次数和核心 |
 | DSH 找不到文件 | 工作区不在本仓库 | 先问当前工作区路径，再重新选择 |
 | DSH 修改了原文件 | 文件边界不清晰 | 明确只读路径，检查计划后再批准 |
 | `numpy` 或 `matplotlib` 导入失败 | 当前 Python 环境没有该库，或选错了解释器 | 停止并报告模块名与解释器路径；不要让 Agent 自动安装，先由教师确认环境 |
@@ -588,8 +627,10 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 6. 在同一个人临时学习目录写一份 `study_minutes_record.md`，包含输入、控制机结果、8T 结果、两张图片和 NPU 边界；用 `ascend310b_writing_record_audit` 审计它，修正所有 error 后保留审计摘要。
 7. 解释 `ascend310b_writing_record_audit` 与 `ascend310b_writing_audit scope=appendix` 分别审什么文件、为什么不能混用。
 8. 把 DSH 生成的代码逐行审查一遍，指出哪一段定义输入数组、哪一段计算统计量、哪一段保存图片，以及哪一种修改可能让数值和图形不一致。
+9. 给出三个场景：“SSH不可达”“SSH可达但`import acl`失败”“摄像头节点存在但取不到帧”，分别选择调试插件中的工具，并写出第一个停止条件。
+10. 用自己的话说明为什么CPU频率测量不能放进每次环境探测，以及比较超频版和公版时必须固定哪些条件。
 
-## 评分要点
+## 评分要点 {#src-appendix-appendix4-grading}
 
 | 项目 | 要求 |
 |---|---|
@@ -598,6 +639,20 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 | 提示词 | 提示词包含目标、路径、输出位置、约束和验收标准 |
 | 代码审查 | 能逐行解释生成脚本，能指出风险和修改点 |
 | 板端边界 | 能说明 target、SSH、`base` 绘图、`ascend` 案例环境和 NPU 推理分别证明什么 |
+| 插件能力 | 能按问题选择发现、环境、分层调试、受控执行或外设工具，并说明返回证据不能证明什么 |
 | 结果验证 | 终端统计量与数组一致，PNG 存在，柱子高度与平均值线都能解释 |
 | 写作审计 | 能用记录审计检查自己的 `tmp` 实验记录，并解释它与正式附录审计的区别 |
 | AI 协作 | 保留 DSH 修改代码的记录，并说明每处修改为什么安全 |
+
+## 参考资料 {#src-appendix-appendix4-references}
+
+- [datawhalechina/easy-vibe](https://github.com/datawhalechina/easy-vibe)：从零开始学 AI 编程，用“先看示例 + 自己动手做”组织课程。
+- [datawhalechina/vibe-vibe](https://github.com/datawhalechina/vibe-vibe)：系统化的 Vibe Coding 教程，强调从“写代码”转向“对话式创作”。
+- [Hannibal046/Awesome-LLM](https://github.com/Hannibal046/Awesome-LLM)：持续更新的大语言模型论文、工具和教程清单。
+- [WangRongsheng/awesome-LLM-resources](https://github.com/WangRongsheng/awesome-LLM-resources)：中文友好的 LLM、Agent、多模态与训练推理资料汇总。
+- [luban-agi/Awesome-AIGC-Tutorials](https://github.com/luban-agi/Awesome-AIGC-Tutorials)：面向入门学习的 LLM 和 AIGC 教程合集。
+- [e2b-dev/awesome-ai-agents](https://github.com/e2b-dev/awesome-ai-agents)：AI Agent 框架、论文、工具和项目清单。
+- [luo-junyu/Awesome-Agent-Papers](https://github.com/luo-junyu/Awesome-Agent-Papers)：以论文为主的 LLM Agent 综述和进展。
+- [Shubhamsaboo/awesome-llm-apps](https://github.com/Shubhamsaboo/awesome-llm-apps)：Agent、RAG 和应用案例合集。
+- [DSH 官方仓库](https://github.com/deepseek-ai/deepseek-harness)
+- [DeepSeek 开放平台](https://platform.deepseek.com/)

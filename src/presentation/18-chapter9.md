@@ -18,7 +18,7 @@ footer: "第9章：模型量化案例教学"
 ## 从 400 张对齐样本到可回退的量化决策
 
 
-<div class="source">依据：<a href="../book/chapter9.md">src/book/chapter9.md</a>；样例：<a href="../../samples/chapter9/README.md"><code>samples/chapter9</code></a></div>
+<div class="source">依据：<a href="../book/chapter9.md">src/book/chapter9.md</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter9/README.md"><code>samples/chapter9</code></a></div>
 
 <!--
 本章不只讲怎么生成 INT8，而是讲量化前如何判断、FP16如何验证、INT8缺哪一层证据，以及失败时如何回退。
@@ -139,7 +139,7 @@ atc --model=model/resnet18_tiny_imagenet.onnx --framework=5 \
 
 FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp16`；`--output` 必须另取文件名。
 
-<div class="source">B4 命令：<a href="../../samples/chapter9/README.md"><code>samples/chapter9/README.md</code> 第2节</a>；教材：<a href="../book/chapter9.md#src-book-chapter9-h6"><code>src/book/chapter9.md</code> §9.6</a></div>
+<div class="source">B4 命令：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter9/README.md"><code>samples/chapter9/README.md</code> 第2节</a>；教材：<a href="../book/chapter9.md#src-book-chapter9-h6"><code>src/book/chapter9.md</code> §9.6</a></div>
 
 本页只给出 8T 示例。20T 后续结果没有保留 ATC 命令和 B1 专用 OM provenance，因此不能用 B4 命令推断跨 SoC 复用成立；20T 要按 `Ascend310B1` 单独转换、记录哈希并重跑。
 
@@ -189,7 +189,7 @@ FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp1
 
 两板结果来自同次工具执行记录，但仍是两个独立板卡记录。这里比较的是 FP32 OM 与 FP16 OM 的输出一致性。
 
-<div class="source">原始结果：<a href="../../docs/chapter-board-runs-20261017/tool-execution/chapter9-task-tool.txt"><code>chapter9-task-tool.txt</code> board-8t/board-20t</a></div>
+<div class="source">原始结果：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter9/docs/README.md"><code>chapter9-task-tool.txt</code> board-8t/board-20t</a></div>
 
 <!--
 三个值必须带“400张图”。100% 是模型间Top1匹配，不是验证集准确率；最大误差也不能用截图或均值替代。
@@ -210,7 +210,7 @@ FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp1
 
 这是同一模型路径的 Execute 统计，不含完整端到端业务链路。20T 的 FP16 在这次记录中高于自身 FP32，不能据此推导完整基准或硬件排名。
 
-<div class="source">原始结果：<a href="../../docs/chapter-board-runs-20261017/tool-execution/chapter9-task-tool.txt"><code>chapter9-task-tool.txt</code>；<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §3 chapter9</a></div>
+<div class="source">原始结果：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter9/docs/README.md"><code>chapter9-task-tool.txt</code>；<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §3 chapter9</a></div>
 
 <!--
 严格保留四个均值与“10个计时样本”。warmup 缺失必须明确写出。Execute 均值不是端到端，也不是完整性能基准；两板不能混算。
@@ -228,7 +228,7 @@ FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp1
 - FP16 结果不能证明 INT8 可用。
 - 当前记录未包含 INT8 OM 输出、精度或性能。
 
-<div class="source">范围：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §3、§5</a></div>
+<div class="source">范围：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §3、§5</a></div>
 
 <!--
 性能与精度都必须绑定样本数、阶段和板卡。没有这些字段，数字不可复用。
@@ -261,7 +261,7 @@ FP16 使用同一输入合同，把 `--precision_mode` 改为 `allow_fp32_to_fp1
 
 校准、输出对齐、性能测试和完整验证必须复用同一套预处理。
 
-<div class="source">样例：<a href="../../samples/chapter9/03_prepare_quantization.py"><code>samples/chapter9/03_prepare_quantization.py</code></a>、<a href="../../samples/chapter9/04_calibrate_quantization.py"><code>04_calibrate_quantization.py</code></a></div>
+<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter9/03_prepare_quantization.py"><code>samples/chapter9/03_prepare_quantization.py</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter9/04_calibrate_quantization.py"><code>04_calibrate_quantization.py</code></a></div>
 
 <!--
 PTQ不重新训练，只利用校准数据估计激活范围。校准集与验证集混用会污染精度结论。
@@ -284,7 +284,7 @@ atc --model=model/resnet18_tiny_imagenet_int8_deploy.onnx \
 
 命令存在不代表本次双板已经运行。当前执行集只完成 FP32/FP16 输出对齐与性能记录。
 
-<div class="source">命令：<a href="../../samples/chapter9/README.md"><code>samples/chapter9/README.md</code> 第4节</a>；教材：<a href="../book/chapter9.md#atc-转-int8-om"><code>src/book/chapter9.md</code> §9.9.5</a></div>
+<div class="source">命令：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter9/README.md"><code>samples/chapter9/README.md</code> 第4节</a>；教材：<a href="../book/chapter9.md#atc-转-int8-om"><code>src/book/chapter9.md</code> §9.9.5</a></div>
 
 <!--
 这页展示怎样做，不是展示已经完成。INT8没有deploy ONNX、OM、输出对齐、性能或验证集结果，不能写成板端通过。
@@ -306,7 +306,7 @@ atc --model=model/resnet18_tiny_imagenet_int8_deploy.onnx \
 
 结论只有一句：本轮完成 FP32/FP16，INT8 流程与板端结果未测试。
 
-<div class="source">官方记录范围：<a href="../../docs/ascend310b-chapter-board-comparison-20261017.md"><code>双板记录</code> §3 chapter9</a></div>
+<div class="source">官方记录范围：<a href="https://github.com/zhouxzh/Ascend310/blob/main/docs/release/environment-matrix.md"><code>双板记录</code> §3 chapter9</a></div>
 
 <!--
 这是本章最重要的边界页。不能把文档中的历史INT8数据搬进本轮双板证据，也不能把PTQ流程写成实测通过。
@@ -368,7 +368,7 @@ atc --model=model/resnet18_tiny_imagenet_int8_deploy.onnx \
 
 当前可填 FP32/FP16 的400张对齐和10次性能；INT8 五项必须保留为 `untested`。
 
-<div class="source">作业：<a href="../book/chapter9.md#src-book-chapter9-h1"><code>src/book/chapter9.md</code></a>；样例：<a href="../../samples/chapter9/README.md"><code>samples/chapter9/README.md</code></a></div>
+<div class="source">作业：<a href="../book/chapter9.md#src-book-chapter9-h1"><code>src/book/chapter9.md</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter9/README.md"><code>samples/chapter9/README.md</code></a></div>
 
 <!--
 最后逐项检查样本数和证据层级。没有INT8原始日志、工件和输出，就不能把流程页当成结果页。

@@ -10,5 +10,6 @@
 | [06_rtl_sdr_npu_demo.md](06_rtl_sdr_npu_demo.md) | RTL-SDR、FFTW、OM 和 JSONL |
 | [07_ascend310b_heterogeneous_signal_processing.md](07_ascend310b_heterogeneous_signal_processing.md) | 模型准入、数值和性能证据 |
 | [08-troubleshooting.md](08-troubleshooting.md) | 统一测试问题台账 |
+| [09-review.md](09-review.md) | 模型语义、长稳证据和计时口径审查 |
 
 快速运行和依赖安装见 [`../README.md`](../README.md)。

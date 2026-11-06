@@ -497,7 +497,7 @@ profile 的固定硬件补偿也会进入 JPEG variant/ETag，但不旋转 JPEG 
 2. 将图像居中裁剪到 800x480；
 3. 量化到 E6 六色调色板；
 4. 使用官方稀疏颜色编号：黑 0、白 1、黄 2、红 3、保留黑 4、蓝 5、绿 6；
-5. 两个像素按高半字节优先打包，输出 `800*480/2 = 192000` bytes；
+5. 两个像素按高半字节优先打包，形成与 E6 面板匹配的固定帧缓冲区；
 6. dry-run 验证初始化、刷新、BUSY 和休眠命令序列。
 
 真实硬件模式必须显式提供 SPI 设备、gpiochip 和 DC/RST/BUSY line offset。当前驱动板型号和接线尚未确认，PNG/帧 dry-run 只能证明协议编码，不能宣称微雪实屏刷新通过。PhotoPainter 六色路径同样不能由 E6 六色帧结果替代。
@@ -526,7 +526,7 @@ profile 的固定硬件补偿也会进入 JPEG variant/ETag，但不旋转 JPEG 
 - COCO-CN 检索覆盖 20 条中文和 20 条英文查询，Recall@3 门槛均为 80%；
 - 性能使用单线程、20 次预热、100 次计时、3 轮重复，报告图像/文本编码、FAISS 和 API P50/P95；
 - UI 验收覆盖 1920x1080、1280x800、1024x600 和 400x900，无横向滚动、控件重叠或文字溢出；
-- E6 dry-run 覆盖 EXIF、裁剪、六色、颜色编号、192000 bytes、BUSY 超时和无 GPIO 拒绝。
+- E6 dry-run 覆盖 EXIF、裁剪、六色、颜色编号、固定帧缓冲区、BUSY 超时和无 GPIO 拒绝。
 
 当前教程只定义验收协议，不预填具体 Recall、P50/P95、photo ID 或 hash。执行时把实际 JSON
 报告路径、板卡/运行时版本、输入数量和结果写入 `samples/case7/reports/`，并在工程验证文档中
@@ -545,7 +545,7 @@ API 成功或 ACL 数值通过不能替代真实电子纸刷新结论。
 
 ## 板端实测记录 {#src-experiment-case7-board-evidence}
 
-本节记录 8T 与 20T 两块开发板上的服务与页面结果。原始日志、接口结果与截图保存在 [`docs/case-board-runs-20261017/case7/`](https://github.com/zhouxzh/Ascend310/blob/main/docs/case-board-runs-20261017/case7/README.md)。
+本节记录 8T 与 20T 两块开发板上的服务与页面结果。完整验收结论见 [`samples/case7/docs/07-validation-and-troubleshooting.md`](https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/docs/07-validation-and-troubleshooting.md)。
 
 | 项目 | 8T | 20T |
 | --- | --- | --- |

@@ -14,6 +14,7 @@ case8 是教材中的一个实践案例：在 Ascend 310B 上使用 YOLOv10 和 
 | [04 部署与测试](04-deployment-and-testing.md) | 板端环境、部署命令和验收方法 |
 | [05 问题与版本兼容性](05-known-issues-and-version-compatibility.md) | CANN VENC 实测结果和已知限制 |
 | [测试问题台账](06-troubleshooting.md) | 统一登记 VENC/IOMMU 故障、证据和回归边界 |
+| [案例审查报告](07-review.md) | NMS、任务术语、性能证据和发布边界审查 |
 
 ## 🔗 代码入口
 

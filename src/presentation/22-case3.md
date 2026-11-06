@@ -18,7 +18,7 @@ footer: "案例 3：智能电子琴"
 ## 神经网络控制量，CPU 合成声音
 
 
-<div class="source">依据：<a href="../experiment/case3.md">src/experiment/case3.md</a>；实现：<a href="../../samples/case3/README.md"><code>samples/case3</code></a></div>
+<div class="source">依据：<a href="../experiment/case3.md">src/experiment/case3.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/README.md"><code>samples/case3</code></a></div>
 
 <!--
 本案例把实时演奏、MIDI文件渲染和麦克风音色转换分成三条链。神经网络只预测控制量，波形合成与设备路由在CPU侧完成。
@@ -385,7 +385,7 @@ MIDI-DDSP和DDSP-VST经历TFLite→ONNX→OM；Piano-DDSP是PyTorch→ONNX→OM�
 
 完成标准是能说明每条证据只证明了哪一层，不能把既有UI验收图扩展成当前8T音频或时延结论。
 
-<div class="source">作业：<a href="../experiment/case3.md#src-experiment-case3-reproduction"><code>src/experiment/case3.md</code> §10</a>；样例：<a href="../../samples/case3/docs/02-webui.md"><code>samples/case3/docs/02-webui.md</code></a></div>
+<div class="source">作业：<a href="../experiment/case3.md#src-experiment-case3-reproduction"><code>src/experiment/case3.md</code> §10</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case3/docs/02-webui.md"><code>samples/case3/docs/02-webui.md</code></a></div>
 
 <!--
 收尾再次强调“既有UI截图”标签。任何模型、音频或时延结论都需要本轮设备、命令、原始日志和对应验收协议。
