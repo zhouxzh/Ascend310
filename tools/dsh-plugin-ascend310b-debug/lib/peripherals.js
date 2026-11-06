@@ -291,8 +291,9 @@ try:
             from PIL import Image
         except Exception as pil_error:
             raise RuntimeError("已读取YUYV原始帧，但Pillow不可用，无法生成预览JPEG: " + type(pil_error).__name__ + ": " + str(pil_error)) from pil_error
-        image = Image.frombytes("YCbCr", (actual_width, actual_height), raw_frame, "raw", "YCbCr;422")
-        image.convert("RGB").save(cfg["output"], format="JPEG", quality=90)
+        rgb_frame = yuyv_to_rgb(raw_frame)
+        image = Image.frombytes("RGB", (actual_width, actual_height), rgb_frame)
+        image.save(cfg["output"], format="JPEG", quality=90)
         with open(cfg["output"], "rb") as fh:
             data = fh.read()
         if data[:2] != b"\\xff\\xd8":

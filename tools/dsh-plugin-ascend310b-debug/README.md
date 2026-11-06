@@ -203,7 +203,7 @@ cp -R "$plugin"/. "$dest"/
 | `ascend_debug_plan` | 按症状/领域生成分层调试计划 | `symptom`、`area`、`target`、`rawText`、`maxEntries` |
 | `ascend_sample_index` | 检索 `samples/` 里的样例入口与测试命令 | `query`、`archetype`、`limit`、`repoRoot` |
 | `ascend_board_exec` | 执行**单条只读**诊断命令 | `command`、`target`、`run`、`timeoutMs` |
-| `ascend_camera_capture` | 通过 `v4l2-ctl --stream-mmap`读取非空帧；MJPG直接保存相机JPEG，YUYV仅在已读取原始帧后用Pillow转为预览JPEG，不导入OpenCV、NumPy或FFmpeg | `target`、`device`、`width`、`height`、`pixelFormat`、`frameCount`、`allowStateChange`、`dryRun` |
+| `ascend_camera_capture` | 通过`v4l2-ctl --stream-mmap`读取非空帧；MJPG直接保存相机JPEG，YUYV先用标准库转换为RGB，再仅用Pillow编码预览JPEG；不导入OpenCV、NumPy或FFmpeg | `target`、`device`、`width`、`height`、`pixelFormat`、`frameCount`、`allowStateChange`、`dryRun` |
 | `ascend_microphone_record` | 从 ALSA 或 PulseAudio/PipeWire source 按请求秒数录制 PCM16 WAV，返回实际 WAV 时长、采集耗时、总耗时、RMS、峰值、全零和削波比例 | `target`、`backend`、`device`、`sampleRate`、`channels`、`durationSec`、`allowStateChange`、`dryRun` |
 | `ascend_speaker_test` | 生成低幅度正弦 WAV，通过 ALSA 或 PulseAudio/PipeWire sink 播放；人耳结论保持未确认 | `target`、`backend`、`device`、`frequency`、`durationSec`、`allowStateChange`、`dryRun` |
 | `ascend_play_recording` | 通过已确认的 ALSA/Pulse sink 回放插件刚录制的麦克风 WAV；只接受固定录音目录中的路径 | `target`、`backend`、`device`、`recording`、`allowStateChange`、`dryRun` |

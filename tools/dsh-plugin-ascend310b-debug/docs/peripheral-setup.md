@@ -89,7 +89,7 @@ case4 的 8T 在另一次运行中曾出现相反顺序：USB 在 `/dev/video2`�
 - 优先使用摄像头原生支持的 `camera-profile`，例如 `1280x720@30`。
 - USB 摄像头支持 MJPG 时优先尝试 MJPG；不是所有摄像头或 OpenCV 构建都支持。
 - 记录实际 FourCC、分辨率、帧率和首帧耗时，不只看 `VideoCapture.isOpened()`。
-- 插件固定使用`v4l2-ctl --stream-mmap`采集。MJPG帧直接保存为JPEG，不导入OpenCV、NumPy或FFmpeg；YUYV帧先按实际宽高验证原始字节数，再仅用Pillow按`YCbCr;422`转换为预览JPEG。Pillow转换失败不改变“V4L2是否读取到原始帧”的判定。
+- 插件固定使用`v4l2-ctl --stream-mmap`采集。MJPG帧直接保存为JPEG，不导入OpenCV、NumPy或FFmpeg；YUYV帧先按实际宽高验证原始字节数，再用Python标准库完成YUYV422到RGB的转换，并仅用Pillow编码预览JPEG。Pillow编码失败不改变“V4L2是否读取到原始帧”的判定。
 - 摄像头选择器同时显示 `Card type`、`/dev/videoN` 和 `Device Caps` 推导出的“视频采集 / 多平面 / 仅元数据”角色；metadata-only 节点不可选。
 - 采集成功后，前端通过受限的 `GET /ascend310b-debug/camera-preview` 显示固定目录中的 `camera-*.jpg`。接口只接受 SSH target 和严格文件模式，校验大小与 JPEG 魔数，不提供任意板端文件读取。
 - 像素格式、分辨率和 FPS 不使用猜测表，而是解析所选节点的 `v4l2-ctl -d <device> --list-formats-ext`；页面同时完整展示所有 FourCC、尺寸、离散/连续范围和帧率。
