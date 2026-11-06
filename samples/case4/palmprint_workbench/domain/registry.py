@@ -36,6 +36,8 @@ _PRODUCTION_PRECISION = "mixed_fp16"
 _PRODUCTION_BACKEND = "npu"
 _PRODUCTION_NPU_MODEL = "Ascend 310B4"
 _PRODUCTION_COMPUTE_TIER = "8T"
+_SUPPORTED_NPU_MODELS = {"Ascend 310B1", "Ascend 310B2", "Ascend 310B3", "Ascend 310B4"}
+_SUPPORTED_COMPUTE_TIERS = {"8T", "20T"}
 _NUMERIC_MIN_MEAN_COSINE = 0.999
 _NUMERIC_MIN_MIN_COSINE = 0.995
 
@@ -1331,12 +1333,12 @@ class ModelRegistry:
         require(admission.get("status") == "admitted", "production_admission.status 必须为 admitted")
         require(admission.get("precision") == _PRODUCTION_PRECISION, "生产精度必须为 mixed_fp16")
         require(
-            admission.get("npu_model") == _PRODUCTION_NPU_MODEL,
-            f"生产 NPU 必须为 {_PRODUCTION_NPU_MODEL}",
+            admission.get("npu_model") in _SUPPORTED_NPU_MODELS,
+            "生产 NPU 必须为 Ascend 310B 型号",
         )
         require(
-            admission.get("compute_tier") == _PRODUCTION_COMPUTE_TIER,
-            f"生产算力档必须为 {_PRODUCTION_COMPUTE_TIER}",
+            admission.get("compute_tier") in _SUPPORTED_COMPUTE_TIERS,
+            "生产算力档必须为 8T 或 20T",
         )
 
         assets = self._mapping(admission.get("artifacts")) or {}

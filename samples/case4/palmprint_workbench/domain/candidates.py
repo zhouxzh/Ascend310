@@ -215,10 +215,10 @@ def _validate_production_admission(
         errors.append(f"{label}.production_admission.status must be admitted")
     if admission.get("precision") != "mixed_fp16":
         errors.append(f"{label}.production_admission.precision must be mixed_fp16")
-    if admission.get("npu_model") != "Ascend 310B4":
-        errors.append(f"{label}.production_admission.npu_model must be Ascend 310B4")
-    if admission.get("compute_tier") != "8T":
-        errors.append(f"{label}.production_admission.compute_tier must be 8T")
+    if admission.get("npu_model") not in {"Ascend 310B1", "Ascend 310B2", "Ascend 310B3", "Ascend 310B4"}:
+        errors.append(f"{label}.production_admission.npu_model must be an Ascend 310B model")
+    if admission.get("compute_tier") not in {"8T", "20T"}:
+        errors.append(f"{label}.production_admission.compute_tier must be 8T or 20T")
 
     artifacts = admission.get("artifacts")
     if not isinstance(artifacts, Mapping):

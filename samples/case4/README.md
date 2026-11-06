@@ -1,6 +1,6 @@
 # 案例 4：掌纹识别
 
-这是一个运行在 Ascend 310B4 / 8T 开发板上的 React + FastAPI 掌纹识别工作台。本文只说明源码构建、手动部署、启动和日常操作；模型评测、转换、故障和验收证据从 [`docs/00-document-index.md`](docs/00-document-index.md) 开始阅读。
+这是一个运行在 Ascend 310B 系列开发板上的 React + FastAPI 掌纹识别工作台。实现按实际 SoC、算力档位和摄像头光谱建立独立运行合同；8T可见光与20T红外是两套独立证据集，其他310B型号必须先完成对应的模型、摄像头、模板和阈值验收。本文只说明源码构建、手动部署、启动和日常操作；模型评测、转换、故障和验收证据从 [`docs/00-document-index.md`](docs/00-document-index.md) 开始阅读。
 
 在线接口固定使用 NPU `mixed_fp16` 推理。CPU 和 EDCC 只用于离线研究，不会出现在正式 API 或界面中。默认 `production` profile 使用 CCNet；人工测试阶段可显式设置 `PALMPRINT_PROFILE=manual_test`，在完成资产哈希校验后测试五个 CompNet。CompNet 会显示 `manual_test_pending`，不能把人工测试前的状态当作稳定验收通过。
 
@@ -10,7 +10,7 @@
 
 本地构建机需要 Python 3.9--3.11、Node.js 18+、npm 和 Git。开发板需要：
 
-- Ascend 310B4，8T 算力档位；20T 设备必须单独建立结果集；
+- Ascend 310B系列开发板；每个实际SoC与算力档位必须单独建立结果集，不能合并8T、20T或其他型号的精度、性能和硬件结论；
 - Ubuntu 22.04/aarch64、Miniconda、与板卡匹配的 CANN 和 PyACL；
 - 已单独同步并校验的模型、数据集、模板和运行报告资产；
 - 开发板不需要 Node.js，也不在板端执行前端构建。
@@ -52,21 +52,23 @@ WSL/Git Bash 会话中执行整段同步命令。SSH 密钥、端口和远端目
 
 ```bash
 ssh USER@HOST
-cd ~/Documents/palmprint-recognition
+export TIER=<8t-or-20t>
+export RELEASE_ID=<git-commit-or-reviewed-release-id>
+export RELEASE_ROOT="/home/HwHiAiUser/Documents/Ascend310/deployments/case4/$TIER/$RELEASE_ID"
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate ascend
 export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-export PALMPRINT_ROOT="$PWD"
+cd "$RELEASE_ROOT"
+export PALMPRINT_ROOT="$RELEASE_ROOT"
 # Some CANN installations do not add PyACL's Python package automatically.
 export ACL_PYTHON_SITE=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages
 export PYTHONPATH="$PALMPRINT_ROOT:$ACL_PYTHON_SITE${PYTHONPATH:+:$PYTHONPATH}"
-python -c "import sys, acl; print(sys.executable); print(acl.__file__)"
+python -c "import sys, cv2, acl; print(sys.executable); print(cv2.__version__); print(acl.__file__)"
 python -c "import os; print('PALMPRINT_ROOT=', os.environ.get('PALMPRINT_ROOT')); print('LD_LIBRARY_PATH configured=', bool(os.environ.get('LD_LIBRARY_PATH')))"
-python -m pip install --requirement requirements/board.lock
 ```
 
-`source` 命令只负责加载已安装的 conda/CANN 环境；项目不会自动安装依赖、下载数据、构建 EDCC 或修改系统环境。当前内测版本不启用模板或图片加密，也不读取模板密钥变量。若 CANN 安装在其他位置，请把路径替换为实际 `set_env.sh`。`acl` 导入失败时不要添加 CPU 回退，应先修正当前 shell 的 Python 和 CANN 环境。
+`source`命令只负责加载已安装的conda/CANN环境；项目不会自动安装依赖、下载数据、构建EDCC或修改系统环境。首次部署前必须新建并验证用户拥有的`ascend`环境：Python为`3.9.25`、`PYTHONNOUSERSITE=1`、`cv2`、`acl`和所需框架均从该环境或CANN路径导入。旧环境只能保留为`ascend-legacy-<date>`回滚材料。当前内测版本不启用模板或图片加密，也不读取模板密钥变量。若CANN安装在其他位置，请把路径替换为实际`set_env.sh`。`acl`导入失败时不要添加CPU回退，应先修正当前shell的Python和CANN环境。
 
 `PALMPRINT_ROOT` 必须指向包含 `models/`、`data/`、`frontend/` 和
 `release_manifest.json` 的发行目录；如果从其他目录启动，改成该目录的绝对路径。
@@ -84,6 +86,9 @@ export PALMPRINT_PORT=7860
 export PALMPRINT_PROFILE=manual_test
 export PALMPRINT_NPU_DEVICE=0
 export PALMPRINT_CAMERA_DEVICE=/dev/video0
+# 8T普通摄像头使用visible；20T红外摄像头使用infrared。
+export PALMPRINT_CAMERA_MODALITY=palmprint
+export PALMPRINT_CAMERA_SPECTRUM=<visible-or-infrared>
 export PALMPRINT_CAMERA_WIDTH=1280
 export PALMPRINT_CAMERA_HEIGHT=720
 export PALMPRINT_CAMERA_FPS=30
@@ -101,10 +106,13 @@ export PALMPRINT_MAX_API_REPORT_BYTES=536870912
 
 ## 手动同步与启动
 
-在本地构建 `frontend/dist` 后，先创建板端版本目录，再用不删除远端文件的 `rsync` 同步源码和前端。以下命令只同步源码包，不触碰板端模型、数据集、模板和报告：
+在本地构建`frontend/dist`后，先用GitHub固定commit建立板端发行目录，再用不删除远端文件的`rsync`同步本次已审核的调试包。正式复现必须从固定commit检出；控制器的未提交源码只能作为明确标记的离线调试包，不能写成发布证据。8T可见光与20T红外分别使用不同的`TIER`目录、模型资产、模板、校准和报告。以下命令只同步源码包，不触碰板端模型、数据集、模板和报告：
 
 ```bash
-ssh USER@HOST 'mkdir -p ~/Documents/palmprint-recognition/releases/20260817'
+export TIER=<8t-or-20t>
+export RELEASE_ID=<git-commit-or-reviewed-debug-id>
+export RELEASE_ROOT="/home/HwHiAiUser/Documents/Ascend310/deployments/case4/$TIER/$RELEASE_ID"
+ssh USER@HOST "mkdir -p '$RELEASE_ROOT'"
 rsync -a --protect-args \
   --exclude '.git/' \
   --exclude '.env' \
@@ -125,15 +133,16 @@ rsync -a --protect-args \
   --exclude 'third_party/' \
   --exclude 'tools/offline/legacy/' \
   --exclude 'tools/offline/legacy_shell/' \
-  ./ USER@HOST:~/Documents/palmprint-recognition/releases/20260817/
+  ./ "USER@HOST:$RELEASE_ROOT/"
 ```
 
-不要加 `--delete`。同步后在板端核对 `release_manifest.json`、`models/registry.json` 和前端 bundle 的 SHA-256，再人工更新一个指向已核验版本的符号链接或目录变量。失败时只恢复上一个源码版本，不删除模型、数据集、模板或报告。
+不要加`--delete`。同步后在板端核对`release_manifest.json`、`models/registry.json`和前端bundle的SHA-256，再人工更新一个指向已核验版本的符号链接或目录变量。失败时只恢复上一个源码版本，不删除模型、数据集、模板或报告。不要向`/home/HwHiAiUser`根目录、旧`case4`目录或DSH工作区同步服务源码。
 
 在已经加载 conda/CANN 的同一 shell 中执行。资产校验只检查当前发行目录和已明确同步的模型，不会下载或转换模型：
 
 ```bash
-cd ~/Documents/palmprint-recognition/releases/20260817
+cd "$RELEASE_ROOT"
+export PALMPRINT_ROOT="$RELEASE_ROOT"
 python -m palmprint_workbench.tools.verify_assets --strict
 export PALMPRINT_PROFILE=manual_test
 unset PALMPRINT_TEMPLATE_KEY_FILE
@@ -200,7 +209,7 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 
 - **实时识别**：production profile 选择 CCNet；manual_test profile 可逐一选择五个 CompNet，上传掌纹或选择摄像头，确认 ROI 质量后执行识别。页面中的 `manual_test_pending` 只表示等待人工验收。
 - **掌纹注册**：系统在开始采集时自动分配递增的人员编号，如 `P-000001`；显示名可选。左右掌分别是 `人员编号:left`、`人员编号:right`。完成一只掌后可直接登记同一人员的另一只掌，或开始下一位人员；自助模式自动采集并保存 5 张合格样本，管理员辅助模式可审阅、剔除并自动补满 5 张。
-- **实时识别**：未完成本机可见光阈值校准时只显示 Top-K 候选与分数，不显示身份通过/未通过。校准协议、命令和运行时匹配条件见 [`docs/06-visible-light-enrollment-and-calibration.md`](docs/06-visible-light-enrollment-and-calibration.md)。
+- **实时识别**：未完成当前板卡、摄像头光谱和物理设备组合的阈值校准时，只显示Top-K候选与分数，不显示身份通过/未通过。可见光和红外必须分别校准；校准协议、命令和运行时匹配条件见 [`docs/06-visible-light-enrollment-and-calibration.md`](docs/06-visible-light-enrollment-and-calibration.md)。
 - **候选审计**：在线只读查看候选的任务类型、模态、权重、转换和 NPU 状态；候选评测仅在离线研究环境使用 `python -m tools.offline.benchmark` 执行。
 - **系统状态**：查看 API、CANN、PyACL、NPU 和摄像头状态。`Health: Alarm` 是诊断字段；具体的 ACL 崩溃、设备重置和资源释放错误仍需停止相关测试。
 
@@ -256,10 +265,10 @@ curl --fail -F candidate_id=ppnet -F image=@<anonymous-image> \
 时 smoke 通过，不代表识别准确率或正式准入。接口契约和返回字段见
 [`docs/evidence/candidate-runtime-workbench-20260911.md`](docs/evidence/candidate-runtime-workbench-20260911.md)。
 
-当前 Ascend 310B4 开发板地址为 `192.168.8.178`。板端执行实际 NPU smoke 时，先手动激活 conda/CANN，再逐候选运行并保留诊断：
+板端执行实际NPU smoke时，目标用户、地址和发行目录由操作者显式确认；先手动激活conda/CANN，再逐候选运行并保留诊断：
 
 ```bash
-ssh HwHiAiUser@192.168.8.178
+ssh USER@HOST
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate ascend
 export PYTHONNOUSERSITE=1

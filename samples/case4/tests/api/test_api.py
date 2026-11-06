@@ -233,6 +233,41 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertIn("backend=npu", response.json()["detail"])
 
+    def test_cancel_does_not_race_assisted_commit(self):
+        session_id = self.client.post(
+            "/api/enrollment-sessions",
+            json={
+                "model_id": "ccnet", "backend": "npu", "precision": "mixed_fp16",
+                "palm_side": "left", "mode": "assisted",
+            },
+        ).json()["id"]
+        session = self.api_server._SESSIONS[session_id]
+        session.phase = "saving"
+        try:
+            response = self.client.delete(f"/api/enrollment-sessions/{session_id}")
+            self.assertEqual(response.status_code, 409)
+            self.assertIn("正在保存", response.json()["detail"])
+            self.assertIn(session_id, self.api_server._SESSIONS)
+        finally:
+            with self.api_server._SESSION_LOCK:
+                self.api_server._SESSIONS.pop(session_id, None)
+
+    def test_evaluation_can_be_cancelled_before_worker_starts(self):
+        with patch.object(self.api_server, "_start_background_worker"):
+            response = self.client.post(
+                "/api/evaluations",
+                json={"model_id": "ccnet", "backend": "npu", "precision": "mixed_fp16"},
+            )
+        self.assertEqual(response.status_code, 200)
+        evaluation_id = response.json()["evaluation_id"]
+        try:
+            cancelled = self.client.post(f"/api/evaluations/{evaluation_id}/cancel")
+            self.assertEqual(cancelled.status_code, 200)
+            self.assertEqual(cancelled.json()["status"], "cancelled")
+        finally:
+            with self.api_server._EVALUATION_LOCK:
+                self.api_server._EVALUATIONS.pop(evaluation_id, None)
+
     def test_evaluation_timeout_is_bounded(self):
         from pydantic import ValidationError
 
@@ -428,6 +463,30 @@ class ApiContractTests(unittest.TestCase):
         payload, size = _preview_jpeg(frame, max_width=960, quality=72)
         self.assertTrue(payload.startswith(b"\xff\xd8"))
         self.assertEqual(size, (960, 540))
+
+    def test_decoded_upload_rejects_excessive_dimensions(self):
+        import numpy as np
+
+        from fastapi import HTTPException
+
+        decoded = np.empty((1, self.api_server.MAX_UPLOAD_WIDTH + 1, 3), dtype=np.uint8)
+        with patch.object(self.api_server.cv2, "imdecode", return_value=decoded):
+            with self.assertRaisesRegex(HTTPException, "尺寸或像素数") as caught:
+                self.api_server._decode_image_bytes(b"encoded")
+        self.assertEqual(caught.exception.status_code, 413)
+
+    def test_decoded_upload_rejects_excessive_pixel_count(self):
+        import numpy as np
+
+        from fastapi import HTTPException
+
+        side = 4096
+        decoded = np.empty((side, side, 3), dtype=np.uint8)
+        self.assertGreater(side * side, self.api_server.MAX_UPLOAD_PIXELS)
+        with patch.object(self.api_server.cv2, "imdecode", return_value=decoded):
+            with self.assertRaisesRegex(HTTPException, "尺寸或像素数") as caught:
+                self.api_server._decode_image_bytes(b"encoded")
+        self.assertEqual(caught.exception.status_code, 413)
 
     def test_auto_enrollment_handles_numpy_preview_frames(self):
         """A NumPy preview is not valid in a boolean ``or`` expression."""

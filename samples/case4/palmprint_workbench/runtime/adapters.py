@@ -336,9 +336,14 @@ class _OmRunner:
             self.input_dataset, self.input_buffer = self._allocate(True, 0)
             self.output_dataset, self.output_buffer = self._allocate(False, 0)
         except BaseException:
-            # Constructor failures are common during ATC/ACL diagnosis.  Never
-            # leave a partially loaded model or context for process shutdown.
-            self.close(suppress_errors=True)
+            # Constructor failures are common during ATC/ACL diagnosis.  A
+            # transient cleanup error must not strand the partially loaded
+            # model/context after this object becomes unreachable.  Retry while
+            # the handles are still owned by this constructor.
+            for _ in range(3):
+                self.close(suppress_errors=True)
+                if self.closed:
+                    break
             raise
 
     def _shape(self, is_input: bool, index: int) -> tuple[int, ...]:

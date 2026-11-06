@@ -74,6 +74,10 @@ PRODUCTION_PRECISION = "mixed_fp16"
 MAX_API_IDENTITIES = 100
 MAX_BACKGROUND_JOBS = 2
 MAX_COMPARISON_CANDIDATES = 16
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_UPLOAD_WIDTH = 4096
+MAX_UPLOAD_HEIGHT = 4096
+MAX_UPLOAD_PIXELS = 16 * 1024 * 1024
 JOB_TTL_SECONDS = 60 * 60
 CALIBRATION_PATH = ROOT / "data" / "calibration" / "visible_light.json"
 ROI_CALIBRATION_PATH = ROOT / "data" / "calibration" / "fixed_roi.json"
@@ -220,6 +224,7 @@ class EnrollmentState:
 class EvaluationState:
     evaluation_id: str
     request: EvaluationOptions
+    cancel_event: threading.Event = field(default_factory=threading.Event)
     status: str = "queued"
     progress: float = 0.0
     message: str = "等待执行"
@@ -373,6 +378,25 @@ class _JobTimeout(RuntimeError):
     """A bounded HTTP evaluation exceeded its caller-selected deadline."""
 
 
+class _JobCancelled(RuntimeError):
+    """A caller cancelled a queued or running evaluation."""
+
+
+@contextmanager
+def _camera_reservation(session: str | None = None):
+    """Serialize camera use with automatic enrollment reservation.
+
+    The reservation check and the blocking V4L2 operation must share one lock;
+    checking first and acquiring it later leaves a TOCTOU window.
+    """
+
+    with _AUTO_ENROLL_LOCK:
+        owner = _AUTO_ENROLL_SESSION_ID
+        if owner and owner != session:
+            raise HTTPException(status_code=409, detail="摄像头正在由自动注册会话独占")
+        yield
+
+
 @contextmanager
 def _workbench_job_lock():
     """Enter the serialized Workbench lock without a shutdown race.
@@ -509,6 +533,7 @@ def _resolved_threshold(options: RecognitionOptions) -> float:
 def _runtime_calibration(
     options: RecognitionOptions, *, camera_resolution: str | None,
     camera_physical_id: str | None = None, roi_config: dict[str, float] | None = None,
+    spectrum: str | None = None,
 ) -> dict[str, Any] | None:
     """Return a calibration only when it exactly matches runtime provenance."""
 
@@ -529,6 +554,8 @@ def _runtime_calibration(
     if not camera_resolution or str(payload.get("camera_resolution", "")) != camera_resolution:
         return None
     if not camera_physical_id or payload.get("camera_physical_id") != camera_physical_id:
+        return None
+    if spectrum and str(payload.get("spectrum", "")) != spectrum:
         return None
     if payload.get("roi_config") != roi_config:
         return None
@@ -685,11 +712,25 @@ def _validate_options(options: RecognitionOptions) -> None:
 
 
 def _decode_image_bytes(payload: bytes) -> Any:
-    if not payload or len(payload) > 25 * 1024 * 1024:
+    if not payload or len(payload) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="图像为空或超过 25 MB")
     buffer = cv2.imdecode(np.frombuffer(payload, dtype=np.uint8), cv2.IMREAD_COLOR)
     if buffer is None or buffer.size == 0:
         raise HTTPException(status_code=422, detail="无法解码上传图像")
+    height, width = buffer.shape[:2]
+    pixels = int(width) * int(height)
+    if (
+        width > MAX_UPLOAD_WIDTH
+        or height > MAX_UPLOAD_HEIGHT
+        or pixels > MAX_UPLOAD_PIXELS
+    ):
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                "解码后的图像尺寸或像素数超过限制："
+                f"最大 {MAX_UPLOAD_WIDTH}x{MAX_UPLOAD_HEIGHT}、{MAX_UPLOAD_PIXELS} 像素"
+            ),
+        )
     return cv2.cvtColor(buffer, cv2.COLOR_BGR2RGB)
 
 
@@ -743,10 +784,12 @@ def _recognition_payload(
 ) -> dict[str, Any]:
     _validate_options(options)
     threshold = _resolved_threshold(options)
+    camera_contract = _camera_contract(device) if source == "camera" else None
     calibration = _runtime_calibration(
         options, camera_resolution=camera_resolution,
-        camera_physical_id=_camera_physical_id(device) if source == "camera" else None,
+        camera_physical_id=camera_contract.physical_id if camera_contract else None,
         roi_config=roi_config,
+        spectrum=camera_contract.spectrum if camera_contract else None,
     )
     if calibration is not None:
         threshold = float(calibration["recommended_threshold"])
@@ -815,6 +858,9 @@ def _recognition_payload(
                     top_k=int(options.top_k),
                     roi_pipeline_id=ROI_PIPELINE_ID,
                     roi_config=roi_config,
+                    modality=camera_contract.modality if camera_contract else "palmprint",
+                    spectrum=camera_contract.spectrum if camera_contract else "visible",
+                    camera_physical_id=camera_contract.physical_id if camera_contract else None,
                 )
             except RuntimeError as exc:
                 raise HTTPException(status_code=503, detail=f"模板存储不可用：{exc}") from exc
@@ -1125,13 +1171,25 @@ def _records(frame: Any) -> list[dict[str, Any]]:
 _ROI_CALIBRATION_LOCK = threading.RLock()
 
 
+def _camera_contract(device: str | None):
+    if not device:
+        raise HTTPException(status_code=422, detail="摄像头设备不能为空")
+    for item in list_v4l2_devices():
+        if item.path == str(device) or str(device) in item.aliases:
+            if not item.admitted:
+                raise HTTPException(status_code=422, detail="摄像头未通过发现清单准入")
+            return item
+    raise HTTPException(status_code=422, detail="摄像头必须来自最近一次V4L2发现清单")
+
+
 def _camera_physical_id(device: str | None) -> str:
     if not device:
         return "unknown"
-    for item in list_v4l2_devices():
-        if item.path == str(device) or str(device) in item.aliases:
-            return item.physical_id or item.path
-    return str(device)
+    try:
+        item = _camera_contract(device)
+    except HTTPException:
+        return str(device)
+    return item.physical_id or item.path
 
 
 def _fixed_roi_config(device: str | None, resolution: str | None) -> dict[str, float]:
@@ -1190,6 +1248,10 @@ def _camera_payload() -> list[dict[str, Any]]:
                 "name": device.name or "V4L2 视频节点",
                 "physical_id": device.physical_id or device.path,
                 "aliases": list(device.aliases or (device.path,)),
+                "camera_physical_id": device.physical_id or device.path,
+                "modality": device.modality,
+                "spectrum": device.spectrum,
+                "admitted": bool(device.admitted),
                 "resolutions": resolutions,
                 "state": states.get(device.path, "已检测，未打开"),
                 **getattr(WORKBENCH, "camera_details", {}).get(device.path, {}),
@@ -1380,6 +1442,7 @@ def _complete_enrollment(state: EnrollmentState) -> dict[str, Any]:
     person_id, display_name, palm_side = _validate_enrollment_identity(state.options)
     if len(state.samples) != MAX_ENROLL_SAMPLES:
         raise ValueError(f"需要恰好 {MAX_ENROLL_SAMPLES} 个合格样本")
+    camera_contract = _camera_contract(state.device)
     namespace = service_layer._template_namespace(
         state.options.model_id, state.options.backend, state.options.precision
     )
@@ -1417,6 +1480,9 @@ def _complete_enrollment(state: EnrollmentState) -> dict[str, Any]:
             palm_side=palm_side,
             roi_pipeline_id=ROI_PIPELINE_ID,
             roi_config=state.roi_config or None,
+            modality=camera_contract.modality,
+            spectrum=camera_contract.spectrum,
+            camera_physical_id=camera_contract.physical_id,
         )
     for capture_id in new_capture_ids:
         try:
@@ -1914,7 +1980,12 @@ def _run_evaluation(state: EvaluationState) -> None:
 
     deadline = time.monotonic() + state.request.timeout_seconds
 
+    def check_cancelled() -> None:
+        if state.cancel_event.is_set():
+            raise _JobCancelled("评测已取消")
+
     def check_deadline() -> None:
+        check_cancelled()
         if time.monotonic() > deadline:
             raise _JobTimeout(
                 f"评测超过 timeout_seconds={state.request.timeout_seconds}，未生成报告"
@@ -1985,11 +2056,11 @@ def _run_evaluation(state: EvaluationState) -> None:
             state.status = "completed"
             state.progress = 1.0
             state.message = "评测完成"
-    except _ServiceStopping as exc:
+    except (_ServiceStopping, _JobCancelled) as exc:
         with _EVALUATION_LOCK:
             state.status = "cancelled"
             state.error = str(exc)
-            state.message = "服务正在关闭，评测未启动"
+            state.message = "评测已取消"
             state.finished_at = time.time()
     except _JobTimeout as exc:
         with _EVALUATION_LOCK:
@@ -2319,6 +2390,7 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         calibration: FixedRoiCalibration,
         resolution: str = Query(f"{CAMERA_DEFAULT_WIDTH}x{CAMERA_DEFAULT_HEIGHT}"),
     ) -> dict[str, Any]:
+        _camera_contract(device)
         width, height = _parse_resolution(resolution)
         return _save_fixed_roi_config(device, f"{width}x{height}", calibration)
 
@@ -2331,22 +2403,22 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         max_width: int = Query(960, ge=320, le=1920),
         quality: int = Query(72, ge=40, le=95),
     ) -> Response:
-        _require_camera_not_reserved(session)
+        _camera_contract(device)
         width, height = _parse_resolution(resolution)
         try:
-            # CameraCapture.read() is blocking on V4L2.  Keep it off the
-            # asyncio event loop so a slow USB frame cannot freeze the rest
-            # of the touch UI or queue browser requests behind it.
-            frame = await run_in_threadpool(
-                partial(
-                    WORKBENCH.capture_camera_frame,
-                    device,
-                    width,
-                    height,
-                    encode_jpeg=not preview,
-                    session=session,
+            # Keep reservation ownership through the blocking operation.  A
+            # check before run_in_threadpool alone is a TOCTOU race.
+            with _camera_reservation(session):
+                frame = await run_in_threadpool(
+                    partial(
+                        WORKBENCH.capture_camera_frame,
+                        device,
+                        width,
+                        height,
+                        encode_jpeg=not preview,
+                        session=session,
+                    )
                 )
-            )
         except (CameraError, ValueError) as exc:
             raise HTTPException(status_code=503, detail=f"摄像头错误: {exc}") from exc
         payload = frame.jpeg
@@ -2388,17 +2460,17 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         and close requests carrying an older token are then harmless no-ops,
         which matters when a browser abort races with a V4L2 read.
         """
-
-        _require_camera_not_reserved(session)
+        _camera_contract(device)
         width, height = _parse_resolution(resolution)
         try:
-            await run_in_threadpool(
-                WORKBENCH.open_camera_session,
-                device,
-                width,
-                height,
-                session,
-            )
+            with _camera_reservation(session):
+                await run_in_threadpool(
+                    WORKBENCH.open_camera_session,
+                    device,
+                    width,
+                    height,
+                    session,
+                )
         except (CameraError, ValueError) as exc:
             raise HTTPException(status_code=503, detail=f"摄像头错误: {exc}") from exc
         return {"ok": True, "status": "摄像头会话已打开", "session": session}
@@ -2434,18 +2506,18 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         # embedding input.
         options.assume_roi = False
         _validate_options(options)
-        _require_camera_not_reserved()
         width, height = _parse_resolution(options.resolution)
         try:
-            frame = await run_in_threadpool(
-                partial(
-                    WORKBENCH.capture_camera_frame,
-                    device,
-                    width,
-                    height,
-                    encode_jpeg=False,
+            with _camera_reservation():
+                frame = await run_in_threadpool(
+                    partial(
+                        WORKBENCH.capture_camera_frame,
+                        device,
+                        width,
+                        height,
+                        encode_jpeg=False,
+                    )
                 )
-            )
         except (CameraError, ValueError) as exc:
             raise HTTPException(status_code=503, detail=f"摄像头错误: {exc}") from exc
         try:
@@ -2475,12 +2547,12 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         # Preview cleanup carries the old resolution so an asynchronous close
         # cannot tear down a newly selected resolution.  A call without a
         # resolution still releases every handle for that device.
-        _require_camera_not_reserved(session)
-        if resolution:
-            width, height = _parse_resolution(resolution)
-            WORKBENCH.close_cameras(device=device, width=width, height=height, session=session)
-        else:
-            WORKBENCH.close_cameras(device=device, session=session)
+        with _camera_reservation(session):
+            if resolution:
+                width, height = _parse_resolution(resolution)
+                WORKBENCH.close_cameras(device=device, width=width, height=height, session=session)
+            else:
+                WORKBENCH.close_cameras(device=device, session=session)
         return {"ok": True, "status": "摄像头已关闭"}
 
     @service.delete("/api/cameras/{device:path}")
@@ -2619,15 +2691,16 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
             )
             requested_resolution = f"{width}x{height}"
             try:
-                frame = await run_in_threadpool(
-                    partial(
-                        WORKBENCH.capture_camera_frame,
-                        device,
-                        width,
-                        height,
-                        encode_jpeg=False,
+                with _camera_reservation(session.session_id):
+                    frame = await run_in_threadpool(
+                        partial(
+                            WORKBENCH.capture_camera_frame,
+                            device,
+                            width,
+                            height,
+                            encode_jpeg=False,
+                        )
                     )
-                )
                 image = frame.rgb
             except (CameraError, ValueError) as exc:
                 raise HTTPException(status_code=503, detail=f"摄像头错误: {exc}") from exc
@@ -2731,7 +2804,12 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
                 value = getattr(request, key)
                 if value and value != getattr(session.options, key):
                     raise HTTPException(status_code=422, detail="不能修改已采集会话的模型配置")
+        # Transition to saving under the same lock used by cancellation.  Once
+        # this state is visible, cancellation must not remove the session or
+        # delete captures while the template replacement is committing.
         with _SESSION_LOCK:
+            if session.phase != "reviewing":
+                raise HTTPException(status_code=409, detail="注册会话正在结束")
             session.phase = "saving"
             session.guide = "正在编码并保存掌纹模板"
         try:
@@ -2748,18 +2826,20 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
     @service.delete("/api/enrollment-sessions/{session_id}")
     async def cancel_enrollment(session_id: str) -> dict[str, Any]:
         with _SESSION_LOCK:
-            session = _SESSIONS.pop(session_id, None)
-        if session is not None:
+            session = _SESSIONS.get(session_id)
+            if session is None:
+                return {"ok": True, "cancelled": False, "id": session_id}
             if session.phase == "completed":
-                with _SESSION_LOCK:
-                    _SESSIONS[session_id] = session
                 raise HTTPException(status_code=409, detail="已完成的注册不能取消；删除模板会同步删除关联图像")
+            if session.phase == "saving":
+                raise HTTPException(status_code=409, detail="注册模板正在保存，暂不能取消")
             session.phase = "cancelled"
             session.guide = "注册已取消，已删除本次采集图像"
-            _stop_auto_capture(session)
-            _wait_for_auto_capture(session)
-            _cleanup_enrollment_captures(session)
-        return {"ok": True, "cancelled": session is not None, "id": session_id}
+            _SESSIONS.pop(session_id, None)
+        _stop_auto_capture(session)
+        _wait_for_auto_capture(session)
+        _cleanup_enrollment_captures(session)
+        return {"ok": True, "cancelled": True, "id": session_id}
 
     @service.post("/api/enrollment-sessions/{session_id}/cancel")
     async def cancel_enrollment_post(session_id: str) -> dict[str, Any]:
@@ -2918,6 +2998,28 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
     @service.get("/api/evaluation-jobs/{evaluation_id}")
     async def evaluation_alias(evaluation_id: str) -> dict[str, Any]:
         return await evaluation(evaluation_id)
+
+    async def cancel_evaluation(evaluation_id: str) -> dict[str, Any]:
+        with _EVALUATION_LOCK:
+            state = _EVALUATIONS.get(evaluation_id)
+            if state is None:
+                raise HTTPException(status_code=404, detail="评测任务不存在")
+            if state.status not in {"queued", "running"}:
+                return _evaluation_response(state)
+            state.cancel_event.set()
+            if state.status == "queued":
+                state.status = "cancelled"
+                state.message = "评测已取消"
+                state.finished_at = time.time()
+        return _evaluation_response(state)
+
+    @service.delete("/api/evaluations/{evaluation_id}")
+    async def cancel_evaluation_delete(evaluation_id: str) -> dict[str, Any]:
+        return await cancel_evaluation(evaluation_id)
+
+    @service.post("/api/evaluations/{evaluation_id}/cancel")
+    async def cancel_evaluation_post(evaluation_id: str) -> dict[str, Any]:
+        return await cancel_evaluation(evaluation_id)
 
     @service.get("/api/system-status")
     async def system_status() -> dict[str, Any]:

@@ -538,6 +538,11 @@ class TemplateStore:
         user_name: str,
         palm_side: str,
         user_id: str | None = None,
+        *,
+        modality: str = "palmprint",
+        spectrum: str = "visible",
+        camera_physical_id: str | None = None,
+        roi_config: dict[str, float] | None = None,
     ) -> str:
         if not codes:
             raise ValueError("At least one code is required")
@@ -566,6 +571,10 @@ class TemplateStore:
                         "person_id": user_name.strip(),
                         "display_name": user_name.strip(),
                         "roi_pipeline_id": ROI_PIPELINE_ID,
+                        "roi_config": roi_config,
+                        "modality": modality,
+                        "spectrum": spectrum,
+                        "camera_physical_id": camera_physical_id,
                         "enrolled_at": now,
                     }
                     for _ in codes
@@ -595,6 +604,9 @@ class TemplateStore:
         palm_side: str,
         roi_pipeline_id: str = ROI_PIPELINE_ID,
         roi_config: dict[str, float] | None = None,
+        modality: str = "palmprint",
+        spectrum: str = "visible",
+        camera_physical_id: str | None = None,
     ) -> dict[str, Any]:
         """Atomically replace one palm's samples in a model namespace.
 
@@ -644,6 +656,9 @@ class TemplateStore:
                         "user_name": normalized_display_name,
                         "roi_pipeline_id": roi_pipeline_id,
                         "roi_config": roi_config,
+                        "modality": modality,
+                        "spectrum": spectrum,
+                        "camera_physical_id": camera_physical_id,
                         "enrolled_at": now,
                     }
                     for _ in codes
@@ -670,12 +685,18 @@ class TemplateStore:
         top_k: int = TOP_K,
         roi_pipeline_id: str = ROI_PIPELINE_ID,
         roi_config: dict[str, float] | None = None,
+        modality: str = "palmprint",
+        spectrum: str = "visible",
+        camera_physical_id: str | None = None,
     ) -> dict[str, Any]:
         codes, metadata = self.load(model_id)
         compatible = [
             index
             for index, item in enumerate(metadata)
             if item.get("roi_pipeline_id") == roi_pipeline_id
+            and item.get("modality", "palmprint") == modality
+            and item.get("spectrum", "visible") == spectrum
+            and (camera_physical_id is None or item.get("camera_physical_id") == camera_physical_id)
             and (roi_config is None or item.get("roi_config") == roi_config)
         ]
         if not compatible:

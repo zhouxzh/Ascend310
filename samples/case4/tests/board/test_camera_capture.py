@@ -73,6 +73,27 @@ class CameraCaptureTests(unittest.TestCase):
             (10, str(dev / "video10"), ""),
         ])
 
+    def test_list_v4l2_devices_requires_explicit_camera_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dev = root / "dev"
+            sysfs = root / "sys"
+            dev.mkdir()
+            (dev / "video0").touch()
+            with patch.dict("os.environ", {}, clear=True):
+                unknown = list_v4l2_devices(dev, sysfs, capture_probe=lambda _path: True)
+            with patch.dict(
+                "os.environ",
+                {"PALMPRINT_CAMERA_MODALITY": "palmprint", "PALMPRINT_CAMERA_SPECTRUM": "infrared"},
+                clear=True,
+            ):
+                infrared = list_v4l2_devices(dev, sysfs, capture_probe=lambda _path: True)
+
+        self.assertFalse(unknown[0].admitted)
+        self.assertEqual((unknown[0].modality, unknown[0].spectrum), ("unknown", "unknown"))
+        self.assertTrue(infrared[0].admitted)
+        self.assertEqual((infrared[0].modality, infrared[0].spectrum), ("palmprint", "infrared"))
+
     def test_capture_probe_rejects_capture_node_with_empty_format(self):
         """The ISP media node advertises capture but reports a 0x0 format.
 

@@ -49,6 +49,21 @@ class CameraError(RuntimeError):
     """Raised when a camera cannot be opened or a usable frame is unavailable."""
 
 
+def _configured_camera_contract() -> tuple[str, str, bool]:
+    """Read the explicit board-level camera modality and spectrum contract.
+
+    Camera names and `/dev/videoN` ordering do not identify visible-light versus
+    infrared hardware. A board deployment must therefore set both variables;
+    an omitted or invalid value remains visible to the API but is not admitted
+    to recognition, template, or calibration paths.
+    """
+
+    modality = os.environ.get("PALMPRINT_CAMERA_MODALITY", "").strip().lower()
+    spectrum = os.environ.get("PALMPRINT_CAMERA_SPECTRUM", "").strip().lower()
+    admitted = modality == "palmprint" and spectrum in {"visible", "infrared"}
+    return modality or "unknown", spectrum or "unknown", admitted
+
+
 class _VideoCapture(Protocol):
     def isOpened(self) -> bool: ...
 
@@ -64,13 +79,21 @@ CaptureFactory = Callable[..., _VideoCapture]
 
 @dataclass(frozen=True)
 class CameraDevice:
-    """A discovered V4L2 device without opening it."""
+    """A discovered V4L2 device admitted by the capture capability probe.
+
+    ``modality`` and ``spectrum`` are part of the camera contract rather than
+    inferred from the USB name.  The defaults preserve the visible-light
+    palmprint workflow and keep older callers source-compatible.
+    """
 
     index: int
     path: str
     name: str = ""
     physical_id: str = ""
     aliases: tuple[str, ...] = ()
+    modality: str = "palmprint"
+    spectrum: str = "visible"
+    admitted: bool = True
 
 
 @dataclass(frozen=True)
@@ -88,6 +111,8 @@ class CameraFrame:
     device: str
     frame_format: str = "unknown"
     physical_id: str = ""
+    modality: str = "palmprint"
+    spectrum: str = "visible"
 
 
 def _is_video_capture_node(path: Path) -> bool:
@@ -172,6 +197,7 @@ def list_v4l2_devices(
         return []
 
     probe = capture_probe or _is_video_capture_node
+    modality, spectrum, admitted = _configured_camera_contract()
     grouped: dict[str, list[CameraDevice]] = {}
     for candidate in candidates:
         match = _VIDEO_NAME.fullmatch(candidate.name)
@@ -195,6 +221,9 @@ def list_v4l2_devices(
             name=name,
             physical_id=physical_id,
             aliases=(str(candidate),),
+            modality=modality,
+            spectrum=spectrum,
+            admitted=admitted,
         )
         grouped.setdefault(physical_id, []).append(item)
 
@@ -210,6 +239,9 @@ def list_v4l2_devices(
                 name=primary.name or next((item.name for item in ordered if item.name), ""),
                 physical_id=physical_id,
                 aliases=aliases,
+                modality=primary.modality,
+                spectrum=primary.spectrum,
+                admitted=primary.admitted,
             )
         )
     return sorted(devices, key=lambda item: item.index)

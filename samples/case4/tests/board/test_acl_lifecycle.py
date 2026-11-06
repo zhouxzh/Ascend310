@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import threading
 import unittest
+from unittest.mock import patch
 
 
 HAS_CV2 = importlib.util.find_spec("cv2") is not None
@@ -239,6 +240,53 @@ class AclLifecycleTests(unittest.TestCase):
         self.assertTrue(runner.closed)
         self.assertEqual(self.environment.active_runners, 0)
         self.assertIn("destroy_dataset:input_dataset", calls)
+
+    def test_constructor_retries_transient_cleanup_failure(self) -> None:
+        calls: list[str] = []
+        destroy_attempts = {"count": 0}
+
+        class Runtime:
+            def create_context(self, _device: int):
+                calls.append("create_context")
+                return "context", 0
+
+            def set_context(self, _context: object) -> int:
+                calls.append("set_context")
+                return 0
+
+            def synchronize_device(self) -> int:
+                calls.append("synchronize_device")
+                return 0
+
+            def destroy_context(self, context: object) -> int:
+                destroy_attempts["count"] += 1
+                calls.append(f"destroy_context:{context}")
+                return 7 if destroy_attempts["count"] == 1 else 0
+
+        class Model:
+            def load_from_file(self, _path: str):
+                calls.append("load_from_file")
+                raise RuntimeError("load failed")
+
+        class Acl:
+            def __init__(self) -> None:
+                self.rt = Runtime()
+                self.mdl = Model()
+
+        fake_acl = Acl()
+
+        def acquire_runner():
+            with self.environment.lock:
+                self.environment.active_runners += 1
+            return fake_acl
+
+        with patch.object(self.environment, "acquire_runner", side_effect=acquire_runner):
+            with self.assertRaisesRegex(RuntimeError, "load failed"):
+                self.backends._OmRunner("broken.om")
+
+        self.assertEqual(destroy_attempts["count"], 2)
+        self.assertEqual(self.environment.active_runners, 0)
+        self.assertIn("destroy_context:context", calls)
 
     def test_allocate_retains_partial_handles_for_constructor_cleanup(self) -> None:
         """A failed allocation must not lose local ACL handles before close()."""

@@ -148,6 +148,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, required=True, help="Write calibration JSON here")
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--camera-resolution", required=True, help="Actual runtime capture resolution, e.g. 1280x720")
+    parser.add_argument("--camera-physical-id", default="unknown", help="Stable physical camera identifier from discovery")
+    parser.add_argument("--spectrum", default="visible", choices=("visible", "B", "G", "I", "R"), help="Capture spectrum contract")
+    parser.add_argument("--roi-config", default=None, help="JSON object containing the fixed ROI configuration")
     parser.add_argument("--om", type=Path, required=True, help="Admitted mixed-FP16 OM used to create embeddings")
     parser.add_argument("--approve", action="store_true", help="Mark this report eligible for runtime threshold decisions")
     args = parser.parse_args(argv)
@@ -155,6 +158,12 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"OM does not exist: {args.om}")
     source = _read_json(args.embeddings)
     report = calibrate(source)
+    try:
+        roi_config = json.loads(args.roi_config) if args.roi_config else None
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"--roi-config must be a JSON object: {exc}") from exc
+    if roi_config is not None and not isinstance(roi_config, dict):
+        raise SystemExit("--roi-config must be a JSON object")
     report.update(
         {
             "approved": bool(args.approve),
@@ -163,6 +172,9 @@ def main(argv: list[str] | None = None) -> int:
             "precision": "mixed_fp16",
             "roi_pipeline_id": ROI_PIPELINE_ID,
             "camera_resolution": args.camera_resolution,
+            "camera_physical_id": args.camera_physical_id,
+            "spectrum": args.spectrum,
+            "roi_config": roi_config,
             "om": {
                 "path": str(args.om),
                 "bytes": args.om.stat().st_size,
