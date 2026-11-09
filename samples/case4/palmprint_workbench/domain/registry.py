@@ -18,7 +18,7 @@ import re
 import threading
 from typing import Any, Mapping
 
-from ..config import MANUAL_TEST_MODEL_IDS, REGISTRY_PATH, ROOT
+from ..config import MANUAL_TEST_MODEL_IDS, MODEL_ASSET_ROOT, REGISTRY_PATH, ROOT
 
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
@@ -123,13 +123,22 @@ def _relative_asset_path(value: Any, field: str) -> Path:
         # parent components are unsafe. A single ``.`` is unnecessary too.
         raise ValueError(f"{field} must not contain empty or traversal components")
     candidate = Path(normalized)
-    resolved = (ROOT / candidate).resolve()
-    root = ROOT.resolve()
+    resolved = (MODEL_ASSET_ROOT / candidate).resolve()
+    root = MODEL_ASSET_ROOT.resolve()
     try:
         resolved.relative_to(root)
     except ValueError as exc:
-        raise ValueError(f"{field} resolves outside the project root") from exc
+        raise ValueError(f"{field} resolves outside the model asset root") from exc
     return resolved
+
+
+def _asset_display_path(path: Path) -> str:
+    """Format an asset path without assuming it lives below the source root."""
+
+    try:
+        return str(path.relative_to(MODEL_ASSET_ROOT))
+    except ValueError:
+        return str(path)
 
 
 def _validate_optional_paths(item: Mapping[str, Any], label: str) -> None:
@@ -918,7 +927,7 @@ class ModelRegistry:
             expected_bytes = metadata.get("bytes") if metadata else None
             expected_sha = metadata.get("sha256") if metadata else None
             row: dict[str, Any] = {
-                "path": str(path.relative_to(ROOT)) if path is not None else None,
+                "path": _asset_display_path(path) if path is not None else None,
                 "expected_bytes": expected_bytes,
                 "expected_sha256": expected_sha,
                 "exists": False,
@@ -1028,7 +1037,7 @@ class ModelRegistry:
             return
         try:
             if not path.is_file():
-                self._append_unique(reasons, f"{label} 文件不存在: {path.relative_to(ROOT)}")
+                self._append_unique(reasons, f"{label} 文件不存在: {_asset_display_path(path)}")
                 return
             actual_bytes = path.stat().st_size
             if actual_bytes != expected_bytes:

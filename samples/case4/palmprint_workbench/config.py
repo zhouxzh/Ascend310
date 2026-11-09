@@ -16,7 +16,15 @@ ROOT = (
     if _CONFIGURED_ROOT
     else _PACKAGE_DIR.parent.resolve()
 )
-MODEL_DIR = ROOT / "models"
+# Model assets may be supplied by a tier-specific, hash-verified package outside
+# the source release.  Other runtime state intentionally remains in ROOT.
+_CONFIGURED_MODEL_ASSET_ROOT = os.environ.get("PALMPRINT_MODEL_ASSET_ROOT")
+MODEL_ASSET_ROOT = (
+    Path(_CONFIGURED_MODEL_ASSET_ROOT).expanduser().resolve()
+    if _CONFIGURED_MODEL_ASSET_ROOT
+    else ROOT
+)
+MODEL_DIR = MODEL_ASSET_ROOT / "models"
 DATA_DIR = ROOT / "data"
 REPORT_DIR = ROOT / "reports"
 TEMPLATE_DIR = DATA_DIR / "templates"

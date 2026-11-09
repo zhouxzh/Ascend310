@@ -554,8 +554,28 @@ function LivePage({ bootstrap, cameras, config, activeModel, setConfigValue, ope
   );
   const preview = result?.previewUrl || fileUrl;
   const selectedCamera = cameras.find((camera) => camera.device === cameraDevice);
+  const inputState = cameraActive
+    ? `${selectedCamera?.name || cameraDevice} ${captureResolution ? `· ${captureResolution}` : "· 正在取流"}`
+    : cameras.length
+      ? "等待摄像头连接"
+      : "未检测到摄像头";
+  const inputTone = cameraActive ? "ready" : cameras.length ? "waiting" : "blocked";
+  const recognitionState = busy
+    ? "正在处理"
+    : result?.outcome === "matched"
+      ? "已完成匹配"
+      : result?.outcome === "candidates_only"
+        ? "候选待复核"
+        : file
+          ? "上传图像待识别"
+          : autoRecognition.message;
   return <div className="page page--live">
     <PageHeader eyebrow="01 / 识别" title="实时识别" description="检测到摄像头后自动开启；掌心稳定进入采集框即自动完成候选检索。" action={<Button variant="secondary" icon={SlidersHorizontal} onClick={openConfig}>识别配置</Button>} />
+    <section className="live-readiness" aria-label="当前识别状态" aria-live="polite">
+      <div className="live-readiness__item" data-tone={inputTone}><Camera aria-hidden="true" /><span><small>采集输入</small><strong>{inputState}</strong></span></div>
+      <div className="live-readiness__item" data-tone={activeModel ? "ready" : "blocked"}><Fingerprint aria-hidden="true" /><span><small>运行模型</small><strong>{activeModel?.displayName || "等待服务模型"}</strong></span></div>
+      <div className="live-readiness__item" data-tone={busy ? "working" : result ? "ready" : "waiting"}><Activity aria-hidden="true" /><span><small>识别状态</small><strong>{recognitionState}</strong></span></div>
+    </section>
     <div className="live-layout">
       <section className="live-main">
         <Panel title="输入画面" eyebrow="CAPTURE" action={<span className="panel-note">支持上传与 V4L2 摄像头</span>}>
@@ -574,7 +594,7 @@ function LivePage({ bootstrap, cameras, config, activeModel, setConfigValue, ope
           {result ? <ResultSummary result={result} /> : <div className="empty-inspector"><div className="empty-inspector__icon"><CircleHelp /></div><strong>还没有识别结果</strong><p>上传图像或拍摄一帧后，结果会显示在这里。</p></div>}
           <div className="inspector-actions"><Button variant="primary" icon={ScanLine} loading={busy} onClick={() => void runUpload()} disabled={!file || !activeModel}>识别上传图像</Button><div className="inspector-meta"><span><Fingerprint aria-hidden="true" />{activeModel?.displayName || "未连接服务"}</span><span><Gauge aria-hidden="true" />阈值 {config.threshold.toFixed(2)}</span></div></div>
         </Panel>
-        <div className="quick-status"><div className="quick-status__item"><span className="quick-status__label">推理设备</span><strong>Ascend NPU</strong></div><div className="quick-status__item"><span className="quick-status__label">摄像头输入</span><strong>固定采集框</strong></div></div>
+        <div className="quick-status"><div className="quick-status__item"><span className="quick-status__label">推理设备</span><strong>NPU · mixed-FP16</strong></div><div className="quick-status__item"><span className="quick-status__label">采集区域</span><strong>固定掌纹 ROI</strong></div></div>
       </aside>
     </div>
   </div>;

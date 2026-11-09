@@ -72,6 +72,10 @@ python -c "import os; print('PALMPRINT_ROOT=', os.environ.get('PALMPRINT_ROOT'))
 
 `PALMPRINT_ROOT` 必须指向包含 `models/`、`data/`、`frontend/` 和
 `release_manifest.json` 的发行目录；如果从其他目录启动，改成该目录的绝对路径。
+当发行包通过已核验的分层模型资产运行时，设置
+`PALMPRINT_MODEL_ASSET_ROOT` 为该资产包根目录。该目录必须包含
+`models/registry.json` 和其登记的模型文件，且 SoC、算力档位、字节数和
+SHA-256 必须与当前板端发行记录一致；不能以 8T 资产替代 20T 资产。
 `PYTHONPATH` 必须包含发行目录和上面声明的 PyACL site-packages。`set_env.sh`
 应负责配置与 CANN 匹配的 `LD_LIBRARY_PATH`；若上面的检查显示为空，先修复 CANN
 shell，不要手工混用其他版本的 ACL 动态库。

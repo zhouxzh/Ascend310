@@ -54,6 +54,16 @@ test("recognition result keeps uncalibrated results in candidate-only mode and u
   assert.match(app, /timing\["total ms"\]/);
 });
 
+test("live recognition keeps input, model, and recognition readiness visible", () => {
+  assert.match(app, /当前识别状态/);
+  assert.match(app, /采集输入/);
+  assert.match(app, /运行模型/);
+  assert.match(app, /识别状态/);
+  assert.match(app, /live-readiness/);
+  assert.match(styles, /\.live-readiness\s*\{/);
+  assert.match(styles, /\.live-readiness__item\s*\{/);
+});
+
 test("enrollment assigns person IDs automatically and preserves an ID for the other palm", () => {
   assert.match(app, /P-000001/);
   assert.match(app, /开始采集后自动分配/);
