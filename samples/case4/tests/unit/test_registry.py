@@ -3,7 +3,10 @@ from __future__ import annotations
 import copy
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -13,6 +16,42 @@ from palmprint_workbench.domain.registry import ModelRegistry
 
 
 class ModelRegistryCandidateTests(unittest.TestCase):
+    def test_configured_model_asset_root_resolves_outside_source_release(self):
+        """A tier-specific asset package must not resolve through ROOT."""
+
+        payload = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as directory:
+            asset_root = Path(directory)
+            model_dir = asset_root / "models"
+            model_dir.mkdir()
+            (model_dir / "registry.json").write_text(
+                json.dumps(payload), encoding="utf-8"
+            )
+            environment = os.environ.copy()
+            environment["PALMPRINT_ROOT"] = str(ROOT)
+            environment["PALMPRINT_MODEL_ASSET_ROOT"] = str(asset_root)
+            command = (
+                "import json; from palmprint_workbench.config import REGISTRY_PATH; "
+                "from palmprint_workbench.domain.registry import ModelRegistry; "
+                "spec = ModelRegistry().get_runtime('ccnet'); "
+                "print(json.dumps({'registry': str(REGISTRY_PATH), "
+                "'om': str(spec.om_path('mixed_fp16'))}))"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", command],
+                cwd=ROOT,
+                env=environment,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            resolved = json.loads(result.stdout)
+            self.assertEqual(Path(resolved["registry"]), model_dir / "registry.json")
+            self.assertEqual(
+                Path(resolved["om"]),
+                model_dir / "om" / "palm_ccnet_mixed_fp16.om",
+            )
+
     def test_runtime_models_remain_separate_from_candidates(self):
         registry = ModelRegistry()
         # The production registry is NPU-only.  Legacy CompNet/EDCC entries
