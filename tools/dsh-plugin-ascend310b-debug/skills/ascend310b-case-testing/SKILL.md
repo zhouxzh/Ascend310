@@ -33,14 +33,15 @@ model_revision= <commit SHA，不是可变的 main>
 
 - 板端能访问 GitHub；不能访问时，明确把测试标为 `blocked`，不能改用本地副本冒充公开下载。
 - 板端能访问 `https://hf-mirror.com`；不能访问时，记录网络失败，不要悄悄切到作者私有缓存。
-- 目标目录在用户工作区或明确的发布目录；不得把模型写进仓库的 `src/`、`samples/` 跟踪文件或 Git 索引。
+- target 必须配置 `workdir: /home/HwHiAiUser/Documents/Ascend310/workspaces`；不得回退到 `$HOME`。
+- 源码、转换和测试输出放在 `/home/HwHiAiUser/Documents/Ascend310/workspaces/<case>/<task-id>/`；模型只放在 `/home/HwHiAiUser/Documents/Ascend310/assets/<case>/models/`。服务发布目录仅使用 `/home/HwHiAiUser/Documents/Ascend310/deployments/<case>/<tier>/<release-id>/`。
+- 不得把模型写进仓库的 `src/`、`samples/` 跟踪文件或 Git 索引，也不得使用任意 home、广义 `Documents`、`archives` 或普通 `/tmp`。
 - 代码和模型的目标路径分开，例如：
 
 ```text
-$HOME/Ascend310-case-run/<case>/src/
-$HOME/Ascend310-case-run/<case>/assets/models/
-$HOME/Ascend310-case-run/<case>/run/
-$HOME/Ascend310-case-run/<case>/reports/
+/home/HwHiAiUser/Documents/Ascend310/workspaces/caseN/<task-id>/src/
+/home/HwHiAiUser/Documents/Ascend310/assets/caseN/models/<model-id>/
+/home/HwHiAiUser/Documents/Ascend310/workspaces/caseN/<task-id>/reports/
 ```
 
 ## 3. 从 GitHub 获取程序
@@ -50,7 +51,7 @@ $HOME/Ascend310-case-run/<case>/reports/
 ```bash
 export CASE_REPO='https://github.com/<owner>/Ascend310.git'
 export CASE_COMMIT='<完整 commit SHA>'
-export CASE_ROOT="$HOME/Ascend310-case-run/caseN"
+export CASE_ROOT="/home/HwHiAiUser/Documents/Ascend310/workspaces/caseN/<task-id>"
 mkdir -p "$CASE_ROOT"
 if [ ! -d "$CASE_ROOT/src/.git" ]; then
   git clone "$CASE_REPO" "$CASE_ROOT/src"
@@ -76,7 +77,7 @@ git -C "$CASE_ROOT/src" status --short
 export HF_ENDPOINT='https://hf-mirror.com'
 export MODEL_REPO='<owner>/<model>'
 export MODEL_REVISION='<完整 revision SHA>'
-export MODEL_DIR="$CASE_ROOT/assets/models/<model-id>"
+export MODEL_DIR="/home/HwHiAiUser/Documents/Ascend310/assets/caseN/models/<model-id>"
 mkdir -p "$MODEL_DIR"
 hf download "$MODEL_REPO" \
   --revision "$MODEL_REVISION" \

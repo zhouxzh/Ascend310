@@ -107,6 +107,9 @@ check('camera command is fixed and valid', () => {
 	assert.match(command, /stream-mmap/u);
 	assert.match(command, /def actual_format/u);
 	assert.match(command, /def yuyv_to_rgb/u);
+	assert.equal(command.includes('b"\\\\xff\\\\xd8"'), false, 'JPEG marker must be a Python byte escape, not a literal backslash sequence');
+	assert.equal(command.includes('b"\\xff\\xd8"'), true, 'MJPG extraction must search the JPEG SOI byte marker');
+	assert.match(command, /fh\.write\(data\)/u);
 	assert.match(command, /Image\.frombytes\("RGB"/u);
 	assert.match(command, /from PIL import Image/u);
 	assert.match(command, /Pillow不可用/u);

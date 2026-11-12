@@ -199,7 +199,7 @@ ${OUTPUT_MAINTENANCE_SCRIPT}
 
 def jpeg_size(data):
     # Parse SOF markers without importing a decoder library.
-    if data[:2] != b"\\xff\\xd8":
+    if data[:2] != b"\xff\xd8":
         raise RuntimeError("采集输出不是 JPEG")
     index = 2
     while index + 9 <= len(data):
@@ -273,13 +273,15 @@ try:
     with open(raw_output, "rb") as fh:
         stream = fh.read()
     if fourcc == "MJPG":
-        end = stream.rfind(b"\\xff\\xd9")
-        start = stream.rfind(b"\\xff\\xd8", 0, end)
+        end = stream.rfind(b"\xff\xd9")
+        start = stream.rfind(b"\xff\xd8", 0, end)
         if start < 0 or end < start:
             raise RuntimeError("V4L2未返回完整MJPG帧")
         data = stream[start:end + 2]
         actual_width, actual_height = jpeg_size(data)
-        frame_ok = max(1, stream.count(b"\\xff\\xd8"))
+        with open(cfg["output"], "wb") as fh:
+            fh.write(data)
+        frame_ok = max(1, stream.count(b"\xff\xd8"))
         conversion_backend = "none"
     elif fourcc == "YUYV":
         expected_bytes = actual_width * actual_height * 2
@@ -296,7 +298,7 @@ try:
         image.save(cfg["output"], format="JPEG", quality=90)
         with open(cfg["output"], "rb") as fh:
             data = fh.read()
-        if data[:2] != b"\\xff\\xd8":
+        if data[:2] != b"\xff\xd8":
             raise RuntimeError("Pillow未生成有效JPEG")
         conversion_backend = "Pillow"
     else:

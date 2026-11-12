@@ -11,7 +11,7 @@
 
 import assert from 'node:assert/strict';
 
-import { buildSshArgs, isSafeHost, isSafeUser, runRemoteShell, validateReadOnlyCommand, validateTaskCommand } from '../lib/shell.js';
+import { buildSshArgs, execFileCapture, isSafeHost, isSafeUser, runRemoteShell, validateReadOnlyCommand, validateTaskCommand } from '../lib/shell.js';
 
 const failures = [];
 const check = (name, run) => {
@@ -220,6 +220,19 @@ try {
 	assert.ok(captured?.at(-1).includes('python sample.py'));
 } catch (error) {
 	failures.push(`task cwd construction: ${error?.message ?? error}`);
+}
+
+try {
+	const result = await execFileCapture({
+		file: process.execPath,
+		args: ['-e', 'process.stdout.write("ok")'],
+		timeoutMs: 5000,
+		signal: null
+	});
+	assert.equal(result.code, 0);
+	assert.equal(result.stdout, 'ok');
+} catch (error) {
+	failures.push(`null cancellation signal must be omitted: ${error?.message ?? error}`);
 }
 
 if (failures.length > 0) {

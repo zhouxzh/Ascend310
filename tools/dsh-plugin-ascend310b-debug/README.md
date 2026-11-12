@@ -57,14 +57,16 @@ node tools/install-dsh-plugins.mjs --profile desktop
         transport: ssh
         host: orangepiaipro.local       # 优先唯一主机名，不写固定 IP
         mac: <board-mac>                 # 可选但推荐：绑定物理板，避免同 hostname 误绑
-        user: <SSH 用户>
+        user: HwHiAiUser
+        workdir: /home/HwHiAiUser/Documents/Ascend310/workspaces
         note: 8T 证据集；结果不与 20T 合并
       - id: board-20t
         label: 开发板 2（20T / Ascend310B1）
         transport: ssh
         host: orangepiaipro-20t.local
         mac: <board-mac>
-        user: <SSH 用户>
+        user: HwHiAiUser
+        workdir: /home/HwHiAiUser/Documents/Ascend310/workspaces
         note: 20T 证据集；与 8T 分开记录
     discovery:
       cidrs: []                       # 默认每次扫描动态推导；需要时再填固定覆盖网段
@@ -83,6 +85,16 @@ node tools/install-dsh-plugins.mjs --profile desktop
       allowAutoLogin: true           # 明确允许 auto 模式向候选串口尝试登录
       timeoutMs: 60000
 ```
+
+### 板端任务路径
+
+每个 SSH target 必须配置固定的 `workdir`：
+
+```text
+/home/HwHiAiUser/Documents/Ascend310/workspaces
+```
+
+`ascend_board_run` 不会再回退到 `/home/HwHiAiUser`。其 `cwd` 只接受该工作区子目录、受控的 `/home/HwHiAiUser/Documents/Ascend310/deployments/` 发布目录，或 `/tmp/ascend310b-debug/`。`ascend_model_download` 只会写入工作区、`/home/HwHiAiUser/Documents/Ascend310/assets/` 或插件固定临时目录；不能写入任意 home、`Documents`、`archives`、普通 `/tmp` 或部署目录。路径含 `..` 一律拒绝。
 
 串口凭据只放在 profile 的本机配置中，不写进插件源码、skill、README 示例或 Git。`port: auto` 会枚举当前存在的 USB 串口；只有 profile 显式设置 `allowAutoLogin: true` 时才允许向候选串口逐个尝试登录。高安全环境应显式填写 `port: COM<N>` 或 `/dev/ttyUSB<N>`，避免密码被发送到无关适配器。`ascend_serial_probe` 会自动登录并执行只读网络探测；`ascend_serial_exec` 用于网络不可用时的单条只读诊断。串口工具只使用 `HwHiAiUser`，不提供 root 串口探测。
 
@@ -251,6 +263,7 @@ node scripts/render-panel-preview.mjs <探测记录文件> data/panel-preview.ht
 
 - 默认 `environment: "ascend"` 会激活统一环境、设置 `PYTHONNOUSERSITE=1`、加载 conda 和 CANN；环境不存在时任务直接失败，不会静默回退 `base`。显式设为 `"base"` 只用于系统诊断，`"none"` 用于裸 SSH shell；
 - 必须显式传入 `allowStateChange: true`；
+- target 必须将 `workdir` 配为 `/home/HwHiAiUser/Documents/Ascend310/workspaces`；缺失时任务被拒绝，不会回退到 home。`cwd` 仅限工作区、`deployments/` 发布树或 `/tmp/ascend310b-debug/`；
 - 默认拒绝 `sudo` 和递归/强制删除，分别在需要时传入 `allowPrivileged`、`allowDestructive`；这些开关是命令策略提示，不是 OS 沙箱，不能把任意脚本变成安全脚本；
 - `ascend_board_run` 只接受显式 `allowStateChange` 且拒绝 local target、编码后管道、`su`/`doas`/`pkexec`、重启和直接写块设备；仍应在隔离的开发板账户和已知教程脚本上使用；
 - 仍拒绝 `npu-smi set/reset/upgrade`、重启、关机和直接写块设备；

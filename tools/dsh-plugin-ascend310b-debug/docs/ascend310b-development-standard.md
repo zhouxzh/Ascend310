@@ -316,7 +316,7 @@ project/
 ### 4.11 安全边界
 
 - 只读诊断使用 `ascend_board_exec`；下载、ATC、Python、pytest、msame 和教程脚本只能通过 `ascend_board_run` 执行，且必须显式设置 `allowStateChange:true`。
-- HF 下载使用 `https://hf-mirror.com`；GitHub 下载使用网页代理；华为云 OBS 直连。下载目标限制在工作区或 `/tmp`。
+- HF 下载使用 `https://hf-mirror.com`；GitHub 下载使用网页代理；华为云 OBS 直连。target 必须配置 `workdir: /home/HwHiAiUser/Documents/Ascend310/workspaces`；下载目标仅限工作区、`/home/HwHiAiUser/Documents/Ascend310/assets/` 或 `/tmp/ascend310b-debug/`，不得使用任意 home、广义 `Documents` 或普通 `/tmp`。
 - 案例发布复现使用 GitHub 完整 commit 和 Hugging Face 固定 revision 的板端下载；不得用控制器本地模型、ONNX/OM、数据集或未提交源码的 `scp`/`rsync` 副本替代。
 - 优先使用 SSH 公钥认证；禁止在仓库、脚本参数或日志中保存密码。
 - 只读诊断和状态修改必须分开。安装、升级、重启、改权限和写设备只能由用户明确执行。

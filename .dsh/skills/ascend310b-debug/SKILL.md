@@ -17,6 +17,7 @@ description: 昇腾 310B（Ascend 310B1/310B4）程序调试工作流。当用�
 2. **证据分层标注。** 只能用 `documented`、`inferred`、`observed-pass`、`observed-fail`、`untested`。文档没写某个型号，是 `unknown`/`untested`，不是 `unsupported`。
 3. **先只读，后显式执行。** `ascend_board_exec` 只执行白名单内的只读命令；下载、ATC、Python、pytest、msame 和教程脚本使用 `ascend_board_run`，并显式设置 `allowStateChange: true`。硬件复位、`npu-smi set/upgrade`、关机和破坏性操作仍由用户手工执行。
 4. **离线目标要独立标记。** 已配置但未开机、未接入当前网段或主机名失效的板，返回 `offline/unreachable`；这说明网络/电源状态，不是 310B `unsupported`，也不能拿另一块在线板的结果替代。
+5. **任务路径必须固定。** target 配置必须把 `workdir` 设为 `/home/HwHiAiUser/Documents/Ascend310/workspaces`，缺失时 `ascend_board_run` 和 `ascend_model_download` 必须停止。任务 `cwd` 只可在该工作区、`/home/HwHiAiUser/Documents/Ascend310/deployments/` 或 `/tmp/ascend310b-debug/`；下载仅可写入工作区、`/home/HwHiAiUser/Documents/Ascend310/assets/` 或固定临时目录。不得使用 home、广义 `Documents`、`archives` 或普通 `/tmp`。
 
 ## 标准顺序
 

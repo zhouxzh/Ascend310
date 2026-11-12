@@ -46,7 +46,7 @@ Hugging Face 原始站不直接作为默认下载入口；GitHub 原始站不直
 - 文件准备：`mkdir`、`cp`、`mv`、`chmod`、`tar`、`unzip`；
 - 性能：`msprof`、案例自带 benchmark 脚本。
 
-这些命令可以在 `cwd` 指定的工作区运行，并返回退出码、耗时、stdout、stderr。运行前应先用 `dryRun:true` 检查命令。
+这些命令可以在 `cwd` 指定的受控目录运行，并返回退出码、耗时、stdout、stderr。每个 target 必须配置 `workdir: /home/HwHiAiUser/Documents/Ascend310/workspaces`，运行前应先用 `dryRun:true` 检查命令。
 
 `ascend_board_run` 默认激活统一案例环境 `ascend`，并设置
 `PYTHONNOUSERSITE=1`；环境不存在时任务直接失败，不静默回退 `base`。
@@ -93,8 +93,8 @@ apt-get install -y --no-install-recommends <validated-packages>
 
 ## 7. 证据与安全
 
-- 下载目标必须是工作区文件或 `/tmp` 文件，不能通过 `..` 跳出工作区。
-- 执行 cwd 必须在目标板工作区、用户 home 或 `/tmp` 下。
+- 下载目标必须是工作区文件、`/home/HwHiAiUser/Documents/Ascend310/assets/` 文件或 `/tmp/ascend310b-debug/` 文件，不能通过 `..` 跳出受控根目录。
+- 执行 cwd 必须在目标板工作区、`/home/HwHiAiUser/Documents/Ascend310/deployments/` 发布树或 `/tmp/ascend310b-debug/` 下；任意 home、广义 `Documents` 与普通 `/tmp` 一律拒绝。
 - 每次任务记录目标、cwd、命令、退出码、耗时和输出。
 - 截图记录 URL、viewport、字节数、耗时和浏览器。
 - 任务失败不能用只读探测结果替代；只读检查通过也不能证明任务执行成功。

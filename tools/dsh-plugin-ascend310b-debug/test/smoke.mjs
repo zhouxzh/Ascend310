@@ -150,8 +150,8 @@ const config = {
 	serialLogDir: join(pluginRoot, 'test', '.serial-sessions'),
 	defaultTarget: 'board-8t',
 	targets: [
-		{ id: 'board-8t', label: '8T 板', host: '198.51.100.10', user: 'HwHiAiUser', note: '8T/310B4' },
-		{ id: 'board-20t', label: '20T 板', host: '198.51.100.11', user: 'HwHiAiUser', note: '20T/310B1' }
+		{ id: 'board-8t', label: '8T 板', host: '198.51.100.10', user: 'HwHiAiUser', workdir: '/home/HwHiAiUser/Documents/Ascend310/workspaces', note: '8T/310B4' },
+		{ id: 'board-20t', label: '20T 板', host: '198.51.100.11', user: 'HwHiAiUser', workdir: '/home/HwHiAiUser/Documents/Ascend310/workspaces', note: '20T/310B1' }
 	]
 };
 
@@ -434,7 +434,7 @@ try {
 		{
 			target: 'board-8t',
 			command: 'python samples/chapter5/check_mindspore_env.py',
-			cwd: '/home/HwHiAiUser/Ascend310',
+			cwd: '/home/HwHiAiUser/Documents/Ascend310/workspaces/chapter5/env-check',
 			allowStateChange: true,
 			dryRun: true
 		},
@@ -457,7 +457,7 @@ try {
 			source: 'hf',
 			repoId: 'org/model',
 			filename: 'config.json',
-			destination: '/tmp/model-config.json',
+			destination: '/tmp/ascend310b-debug/downloads/model-config.json',
 			allowStateChange: true,
 			dryRun: true
 		},
@@ -485,7 +485,7 @@ try {
 			target: 'board-8t',
 			source: 'github',
 			url: 'https://github.com/example/repo/raw/main/README.md',
-			destination: '/tmp/github-readme.md',
+			destination: '/tmp/ascend310b-debug/downloads/github-readme.md',
 			allowStateChange: true,
 			dryRun: true
 		},
@@ -498,7 +498,7 @@ try {
 			target: 'board-8t',
 			source: 'huawei',
 			url: 'https://obs.example.myhuaweicloud.com/model.onnx',
-			destination: '/tmp/model.onnx',
+			destination: '/tmp/ascend310b-debug/downloads/model.onnx',
 			allowStateChange: true,
 			dryRun: true
 		},
@@ -511,7 +511,7 @@ try {
 			target: 'board-8t',
 			source: 'huawei',
 			url: 'https://example.com/model.onnx',
-			destination: '/tmp/model.onnx',
+			destination: '/tmp/ascend310b-debug/downloads/model.onnx',
 			allowStateChange: true,
 			dryRun: true
 		},
@@ -523,7 +523,7 @@ try {
 		{
 			target: 'board-8t',
 			command: 'npu-smi set -t health -i 0 -c 0',
-			cwd: '/home/HwHiAiUser/Ascend310',
+			cwd: '/home/HwHiAiUser/Documents/Ascend310/workspaces/chapter5/env-check',
 			allowStateChange: true,
 			dryRun: true
 		},

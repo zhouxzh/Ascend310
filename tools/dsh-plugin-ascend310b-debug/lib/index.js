@@ -19,7 +19,6 @@ import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { defineTool } from '@deepseek-ai/dsh-tools';
 
 import { assembleReport, indexQuery, indexSampleIndex, loadSampleIndex } from './report.js';
 import {
@@ -821,13 +820,10 @@ function sampleIndexFor(config, argument) {
 	}
 }
 
-/** Resolve the default remote workspace for a target. */
-function defaultTaskCwd(target) {
-	if (typeof target?.workdir === 'string' && target.workdir.trim() !== '') return target.workdir.trim();
-	if (target?.transport === 'local') return process.cwd();
-	if (target?.user) return `/home/${target.user}`;
-	return '/tmp';
-}
+const REMOTE_WORKSPACE_ROOT = '/home/HwHiAiUser/Documents/Ascend310/workspaces';
+const REMOTE_DEPLOYMENT_ROOT = '/home/HwHiAiUser/Documents/Ascend310/deployments';
+const REMOTE_ASSET_ROOT = '/home/HwHiAiUser/Documents/Ascend310/assets';
+const REMOTE_DEBUG_TMP_ROOT = '/tmp/ascend310b-debug';
 
 /** Check whether a POSIX path is inside an allowed remote root. */
 function isRemotePathInside(root, candidate) {
@@ -836,21 +832,31 @@ function isRemotePathInside(root, candidate) {
 	return normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(`${normalizedRoot}/`);
 }
 
-/** Resolve a task working directory without allowing escape outside the user's workspace. */
+/** Require the single configured board workspace root. */
+function configuredWorkspace(target) {
+	const workdir = typeof target?.workdir === 'string' ? target.workdir.trim().replace(/\/+$/, '') : '';
+	if (workdir === '') {
+		throw new Error(`目标必须配置 workdir=${REMOTE_WORKSPACE_ROOT}；任务不会回退到开发板 home。`);
+	}
+	if (workdir !== REMOTE_WORKSPACE_ROOT) {
+		throw new Error(`目标 workdir 必须严格为 ${REMOTE_WORKSPACE_ROOT}，收到 ${workdir}。`);
+	}
+	return workdir;
+}
+
+/** Resolve a task cwd to the configured workspace, a release, or fixed debug temporary root. */
 function resolveTaskCwd(target, requested) {
-	const defaultCwd = defaultTaskCwd(target);
-	if (typeof requested !== 'string' || requested.trim() === '') return defaultCwd;
-	const candidate = requested.trim();
-	if (target?.transport === 'local') return candidate;
+	if (target?.transport === 'local') throw new Error('板端任务不允许 local target。');
+	const workspace = configuredWorkspace(target);
+	if (typeof requested !== 'string' || requested.trim() === '') return workspace;
+	const candidate = requested.trim().replace(/\/+$/, '');
 	if (!candidate.startsWith('/') || candidate.split('/').includes('..')) {
 		throw new Error('任务 cwd 必须是开发板上的绝对 POSIX 路径，且不能包含 ..。');
 	}
-	const base = defaultTaskCwd(target);
-	const allowed =
-		isRemotePathInside(base, candidate) ||
-		isRemotePathInside('/tmp', candidate) ||
-		(target?.user ? isRemotePathInside(`/home/${target.user}`, candidate) : false);
-	if (!allowed) throw new Error(`任务 cwd 必须位于 ${base}、/home/${target?.user ?? '<user>'} 或 /tmp 下。`);
+	const allowedRoots = [workspace, REMOTE_DEPLOYMENT_ROOT, REMOTE_DEBUG_TMP_ROOT];
+	if (!allowedRoots.some((root) => isRemotePathInside(root, candidate))) {
+		throw new Error(`任务 cwd 必须位于 ${workspace}、${REMOTE_DEPLOYMENT_ROOT} 或 ${REMOTE_DEBUG_TMP_ROOT} 下。`);
+	}
 	return candidate;
 }
 
@@ -862,23 +868,13 @@ function remotePath(cwd, value) {
 	return candidate.startsWith('/') ? candidate : `${cwd.replace(/\/+$/, '')}/${candidate}`;
 }
 
-/** Restrict model downloads to an explicit workspace or the temporary directory. */
+/** Restrict downloads to the workspace, controlled assets, or plugin temporary evidence. */
 function resolveDownloadDestination(target, cwd, value) {
-	const destination = remotePath(cwd, value);
-	const roots = ['/tmp'];
-	if (target?.user) {
-		const home = `/home/${target.user}`;
-		// Only conventional case workspaces are trusted as download roots. A
-		// profile workdir must not turn an arbitrary home subdirectory into a
-		// model-write target (for example /home/user/.ssh).
-		const configuredWorkdir = typeof target.workdir === 'string' ? target.workdir.trim() : '';
-		if (configuredWorkdir === `${home}/Ascend310` || configuredWorkdir.startsWith(`${home}/Documents/`)) {
-			roots.push(configuredWorkdir);
-		}
-		roots.push(`${home}/Documents`);
-	}
-	if (!roots.some((root) => isRemotePathInside(root, destination))) {
-		throw new Error(`下载目标必须位于 /tmp、配置的工作区或 /home/${target?.user ?? 'HwHiAiUser'}/Documents 下。`);
+	const workspace = configuredWorkspace(target);
+	const destination = remotePath(cwd, value).replace(/\/+$/, '');
+	const allowedRoots = [workspace, REMOTE_ASSET_ROOT, REMOTE_DEBUG_TMP_ROOT];
+	if (!allowedRoots.some((root) => isRemotePathInside(root, destination))) {
+		throw new Error(`下载目标必须位于 ${workspace}、${REMOTE_ASSET_ROOT} 或 ${REMOTE_DEBUG_TMP_ROOT} 下。`);
 	}
 	return destination;
 }
@@ -2541,7 +2537,7 @@ export function apply(ctx, config) {
 			parameters: {
 				target: { type: 'string', description: 'Configured SSH target id or `user@host`; `local` is refused.' },
 				command: { type: 'string', required: true, description: 'Shell command to run, for example `python sample.py` or `bash run.sh`.' },
-				cwd: { type: 'string', description: 'Absolute board working directory. Defaults to the target workdir/home.' },
+				cwd: { type: 'string', description: 'Absolute board working directory. Defaults to configured workdir; only its workspace subtree, controlled deployments, and /tmp/ascend310b-debug are accepted.' },
 				timeoutMs: { type: 'integer', description: 'Execution timeout in milliseconds. Defaults to 120000.' },
 				allowStateChange: {
 					type: 'boolean',
@@ -2714,8 +2710,8 @@ export function apply(ctx, config) {
 				'Download a tutorial asset to a configured Ascend 310B board. Huawei OBS URLs download directly. ' +
 				'Hugging Face downloads use `https://hf-mirror.com` instead of huggingface.co. GitHub URLs are rewritten ' +
 				'through a web proxy (default `https://gh-proxy.com/`). Set `allowStateChange:true`; use `dryRun:true` to ' +
-				'inspect the resolved URL and command without writing. The destination must be a file path under the board ' +
-				'workspace or /tmp.',
+				'inspect the resolved URL and command without writing. The destination must be a file path under the configured ' +
+				'workspace, controlled assets directory, or /tmp/ascend310b-debug.',
 			parameters: {
 				target: { type: 'string', description: 'Configured SSH target id or `user@host`; `local` is refused.' },
 				source: {
@@ -2729,7 +2725,7 @@ export function apply(ctx, config) {
 				revision: { type: 'string', description: 'Hugging Face revision. Defaults to main.' },
 				destination: { type: 'string', description: 'Destination file path on the board.' },
 				sha256: { type: 'string', description: 'Optional expected SHA-256 (64 hex characters); verified before the final rename.' },
-				cwd: { type: 'string', description: 'Board working directory used to resolve a relative destination.' },
+				cwd: { type: 'string', description: 'Board workspace used to resolve a relative destination; requires the configured workdir.' },
 				githubProxy: { type: 'string', description: 'GitHub web proxy prefix. Defaults to https://gh-proxy.com/.' },
 				timeoutMs: { type: 'integer', description: 'Download timeout in milliseconds. Defaults to 300000.' },
 				allowStateChange: { type: 'boolean', description: 'Required true to write the destination file.' },
@@ -2741,7 +2737,6 @@ export function apply(ctx, config) {
 					const target = resolveTarget(config, args.target);
 					const workingDir = resolveTaskCwd(target, args.cwd);
 					const destination = resolveDownloadDestination(target, workingDir, args.destination);
-					resolveTaskCwd(target, destination);
 					const resolved = normalizeDownload({
 						source: args.source,
 						url: args.url,
@@ -3795,5 +3790,12 @@ export const internals = {
 	rememberSavedReport,
 	mergeSavedFacts,
 	mergeSavedCameraFacts,
+	resolveTaskCwd,
+	resolveDownloadDestination,
+	REMOTE_WORKSPACE_ROOT,
+	REMOTE_DEPLOYMENT_ROOT,
+	REMOTE_ASSET_ROOT,
+	REMOTE_DEBUG_TMP_ROOT,
 	require
 };
+import { defineTool } from '@deepseek-ai/dsh-tools';

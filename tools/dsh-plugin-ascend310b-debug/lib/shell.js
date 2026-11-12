@@ -507,9 +507,19 @@ export function buildSshArgs(target, command) {
  */
 export function execFileCapture({ file, args, cwd, timeoutMs = 30000, input = null, signal }) {
 	const { execFile, spawn } = require('node:child_process');
+	// Discovery and serial probing use null to mean "no cancellation signal".
+	// Node's child_process API accepts undefined, but rejects null outright.
+	const spawnOptions = { cwd, windowsHide: true, ...(signal == null ? {} : { signal }) };
+	const execOptions = {
+		cwd,
+		timeout: timeoutMs,
+		maxBuffer: 8 * 1024 * 1024,
+		windowsHide: true,
+		...(signal == null ? {} : { signal })
+	};
 	if (input !== null && input !== undefined) {
 		return new Promise((resolve) => {
-			const child = spawn(file, args, { cwd, windowsHide: true, signal });
+			const child = spawn(file, args, spawnOptions);
 			let stdout = '';
 			let stderr = '';
 			let timedOut = false;
@@ -547,7 +557,7 @@ export function execFileCapture({ file, args, cwd, timeoutMs = 30000, input = nu
 		execFile(
 			file,
 			args,
-			{ cwd, timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, windowsHide: true, signal },
+			execOptions,
 			(error, stdout, stderr) => {
 				resolve({
 					stdout: String(stdout ?? ''),

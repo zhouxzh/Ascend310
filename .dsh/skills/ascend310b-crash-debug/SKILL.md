@@ -64,7 +64,7 @@ dmesg 中相关设备错误（按权限）
 /var/log 下相关 CANN 日志（按权限）
 ```
 
-通过 `ascend_board_run` 运行最小复现程序，必须显式 `allowStateChange: true` 并限制工作目录。
+通过 `ascend_board_run` 运行最小复现程序，必须显式 `allowStateChange: true`。target 的 `workdir` 必须为 `/home/HwHiAiUser/Documents/Ascend310/workspaces`；`cwd` 只限该工作区、受控的 `deployments/` 发布树或 `/tmp/ascend310b-debug/`，不得使用任意 home、`Documents` 或普通 `/tmp`。
 
 ## 停止条件
 
