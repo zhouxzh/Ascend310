@@ -80,7 +80,7 @@ const orders = new Set();
 const canonicalKinds = {
   book: { label: "理论章节", expected: 10, count: 0 },
   experiment: { label: "实践案例", expected: 9, count: 0 },
-  appendix: { label: "附录", expected: 7, count: 0 },
+  appendix: { label: "附录", expected: 8, count: 0 },
 };
 
 for (const entry of presentationCatalog) {
@@ -310,7 +310,7 @@ console.log(
     .join("，")}`,
 );
 console.log(
-  `  覆盖：理论 ${canonicalKinds.book.count}/10，案例 ${canonicalKinds.experiment.count}/9，附录 ${canonicalKinds.appendix.count}/7`,
+  `  覆盖：理论 ${canonicalKinds.book.count}/${canonicalKinds.book.expected}，案例 ${canonicalKinds.experiment.count}/${canonicalKinds.experiment.expected}，附录 ${canonicalKinds.appendix.count}/${canonicalKinds.appendix.expected}`,
 );
 console.log(
   `  截图：计划 ${plan.captures?.length ?? 0}，已登记 ${manifest.captures?.length ?? 0}`,

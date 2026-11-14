@@ -524,6 +524,25 @@ export const presentationCatalog = Object.freeze([
       "回退边界和版本证据记录",
     ],
   },
+  {
+    id: "appendix-08",
+    section: "appendix",
+    order: 37,
+    slug: "37-appendix8",
+    source: "37-appendix8.md",
+    title: "附录 8：实验异常解析",
+    shortTitle: "实验异常解析",
+    sources: ["src/appendix/appendix8.md"],
+    samples: [],
+    status: "ready",
+    build: true,
+    lessonPlan: [
+      "识别六类已记录的实验异常",
+      "区分直接故障环节和底层触发原因",
+      "用对照实验检验可能原因",
+      "解释跨板互换与数值一致性的差别",
+    ],
+  },
 ]);
 
 export function presentationsById(dataset = presentationCatalog) {

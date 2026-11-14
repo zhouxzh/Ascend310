@@ -4,7 +4,7 @@ editLink: false
 
 # 教材配套演示
 
-本目录提供与《昇腾310B实战》正文一一对应的教学课件。理论教程 10 章、实践案例 9 个、附录 7 份各自拥有独立 Marp 放映文件。
+本目录提供与《昇腾310B实战》正文一一对应的教学课件。理论教程 10 章、实践案例 9 个、附录 8 份各自拥有独立 Marp 放映文件。
 
 课件的编号、冻结标题、源文件、样例路径、制作状态和构建输出只在一处维护：[catalog.mjs](./catalog.mjs)。侧栏、构建脚本和检查脚本都读取这份清单。
 
@@ -51,6 +51,7 @@ editLink: false
 | 附录 5：ROS2 基础 | 可用 | [打开放映版](https://310b.cn/presentation/34-appendix5.html) |
 | 附录 6：工具箱与 FAQ | 可用 | [打开放映版](https://310b.cn/presentation/35-appendix6.html) |
 | 附录 7：CANN 升级 | 可用 | [打开放映版](https://310b.cn/presentation/36-appendix7.html) |
+| 附录 8：实验异常解析 | 可用 | [打开放映版](https://310b.cn/presentation/37-appendix8.html) |
 <!-- END GENERATED PRESENTATION INDEX -->
 
 ## 当前制作状态
@@ -68,7 +69,7 @@ src/presentation/
 ├─ theme.css                          Marp 主题
 ├─ 10-chapter1.md ... 19-chapter10.md 理论章节课件
 ├─ 20-case1.md ... 28-case9.md        案例课件
-├─ 30-appendix1.md ... 36-appendix7.md 附录课件
+├─ 30-appendix1.md ... 37-appendix8.md 附录课件
 └─ screenshots/
    ├─ capture-plan.json               截图任务
    └─ capture-manifest.json           截图文件、哈希与证据边界

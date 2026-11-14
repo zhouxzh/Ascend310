@@ -44,6 +44,7 @@ const presentationChildren = [
         { text: "ROS2 基础教程", link: "/presentation/34-appendix5.html" },
         { text: "工具箱、FAQ 与参数模板", link: "/presentation/35-appendix6.html" },
         { text: "CANN 升级与版本配套", link: "/presentation/36-appendix7.html" },
+        { text: "实验异常解析", link: "/presentation/37-appendix8.html" },
     ],
   },
 ];
@@ -102,7 +103,8 @@ export default sidebar({
         "appendix4.md",
         "appendix5.md",
         "appendix6.md",
-        "appendix7.md"
+        "appendix7.md",
+        "appendix8.md"
       ]
     },
     {
