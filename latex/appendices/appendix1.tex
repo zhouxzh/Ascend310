@@ -457,6 +457,7 @@ SSD启动。当连接了多种存储设备时，需通过背面的拨码开关�
 
 拨码开关状态说明（ON方向为1/右，相反为0/左，具体请参考板上丝印或下表）：
 
+{ % do not increment counter
 \begin{longtable}[]{@{}ccc@{}}
 \toprule\noalign{}
 Boot1 & Boot2 & 启动设备 \\
@@ -469,6 +470,7 @@ Boot1 & Boot2 & 启动设备 \\
 左 & 右 & eMMC \\
 右 & 左 & M.2 SSD \\
 \end{longtable}
+}
 
 \textbf{注意}：切换拨码开关后，必须\textbf{完全断电}（拔掉电源线）再重新上电，新的启动配置才会生效。仅按RESET键重启无效。
 
@@ -523,7 +525,8 @@ Boot1 & Boot2 & 启动设备 \\
   \caption{登录}\label{fig:beforelogin}
   \end{figure}
 \item
-  \textbf{登录系统}：
+  \textbf{登录系统}： 这些账号密码是Orange
+  Pi公开发布的出厂默认值，不是课程私密凭据。首次登录后应立即修改。
 
   \begin{itemize}
   \tightlist
@@ -695,7 +698,7 @@ ssh HwHiAiUser@<开发板IP地址>
 ssh HwHiAiUser@192.168.1.100
 \end{lstlisting}
 
-  默认密码为：\passthrough{\lstinline!Mind@123!}
+  默认密码为：\passthrough{\lstinline!Mind@123!}。这是公开发布的出厂默认值，首次登录后必须修改。
 \end{enumerate}
 
 \subsection{Windows PowerShell 配置 SSH

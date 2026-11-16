@@ -296,6 +296,7 @@ OrangePi AIpro(8T)拥有丰富的接口资源，包括两个HDMI输出、GPIO接
    ![登录](img1/beforelogin.png){#fig:beforelogin width=70% .center}
 
 3. **登录系统**：
+   这些账号密码是Orange Pi公开发布的出厂默认值，不是课程私密凭据。首次登录后应立即修改。
    - 默认普通用户：`HwHiAiUser`，密码：`Mind@123`
    - 默认Root用户：`root`，密码：`Mind@123`
 
@@ -403,7 +404,7 @@ ifconfig
    ```bash
    ssh HwHiAiUser@192.168.1.100
    ```
-   默认密码为：`Mind@123`
+   默认密码为：`Mind@123`。这是公开发布的出厂默认值，首次登录后必须修改。
 
 ### Windows PowerShell 配置 SSH 密钥免密码登录 {#src-appendix-appendix1-h21-key-login}
 
