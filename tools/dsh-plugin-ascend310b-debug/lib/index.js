@@ -34,7 +34,7 @@ import {
 import { buildPlan, renderPlan } from './plan.js';
 import { AREAS, ENTRIES } from './knowledge.js';
 import { buildAudioProbeScript, buildCameraProbeScript, buildProbeScript, buildSystemProbeScript, parseProbeOutput } from './probe.js';
-import { inventoryPath, inventoryTargets, normalizeMac, observeBoard, readInventory, systemFromFacts, updateInventory, updateJsonFile } from './inventory.js';
+import { inventoryPath, inventoryTargets, normalizeMac, observeBoard, pruneInventory, readInventory, systemFromFacts, updateInventory, updateJsonFile } from './inventory.js';
 import { captureScreenshot, findBrowser } from './capture.js';
 import { loadCaseDependencies } from './dependencies.js';
 import { installAptPackages, validateAptPackages } from './install.js';
@@ -178,6 +178,10 @@ const CATEGORY_FACT_KEYS = Object.freeze({
 	]
 });
 
+/** Saved panel reports are a short-lived diagnostics cache. */
+const SAVED_REPORT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const SAVED_REPORT_LIMIT = 50;
+
 /** Local file holding the last successful panel report for each target. */
 function savedReportsPath(config) {
 	const configured = config?.reportStorePath;
@@ -190,7 +194,22 @@ function readSavedReports(config) {
 	if (!existsSync(path)) return {};
 	try {
 		const parsed = JSON.parse(readFileSync(path, 'utf8'));
-		return parsed?.reports !== null && typeof parsed?.reports === 'object' ? parsed.reports : {};
+		const reports = parsed?.reports !== null && typeof parsed?.reports === 'object' ? parsed.reports : {};
+		const cutoff = Date.now() - SAVED_REPORT_RETENTION_MS;
+		const retained = Object.fromEntries(
+			Object.entries(reports)
+				.filter(([, report]) => {
+					const observedAt = Date.parse(report?.generatedAt ?? report?.probedAt ?? report?.cameraUpdatedAt ?? '');
+					return !Number.isFinite(observedAt) || observedAt >= cutoff;
+				})
+				.sort((left, right) => {
+					const leftAt = Date.parse(left[1]?.generatedAt ?? left[1]?.probedAt ?? '') || 0;
+					const rightAt = Date.parse(right[1]?.generatedAt ?? right[1]?.probedAt ?? '') || 0;
+					return rightAt - leftAt;
+				})
+				.slice(0, SAVED_REPORT_LIMIT)
+		);
+		return retained;
 	} catch {
 		return {};
 	}
@@ -3914,6 +3933,7 @@ export const internals = {
 	resolveTarget,
 	targetTable,
 	publicInventory,
+	pruneInventory,
 	readSampleIndex,
 	resolveInside,
 	isSafeHost,

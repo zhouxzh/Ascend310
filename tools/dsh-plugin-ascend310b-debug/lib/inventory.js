@@ -47,6 +47,9 @@ const MAX_HISTORY = 20;
 /** Discovery addresses are executable only while the observation is fresh. */
 export const EXECUTABLE_TARGET_MAX_AGE_MS = 15 * 60 * 1000;
 
+/** Optional board history and saved discovery records expire after this period. */
+export const INVENTORY_HISTORY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
 /** Fixed workspace inherited by discovered SSH targets for controlled operations. */
 export const DISCOVERED_TARGET_WORKDIR = '/home/HwHiAiUser/Documents/Ascend310/workspaces';
 
@@ -146,6 +149,53 @@ function normalizeBindings(value, boards = {}) {
 	return bindings;
 }
 
+/**
+ * Drop records and sub-history outside the retention window. The inventory is
+ * a diagnostic cache, not an indefinite audit database; serial logs and formal
+ * reports retain their own evidence policies.
+ */
+export function pruneInventory(inventory, now = Date.now()) {
+	const cutoff = now - INVENTORY_HISTORY_RETENTION_MS;
+	const removed = [];
+	for (const [key, board] of Object.entries(inventory?.boards ?? {})) {
+		if (board === null || typeof board !== 'object') {
+			delete inventory.boards[key];
+			removed.push(key);
+			continue;
+		}
+		const history = Array.isArray(board.history) ? board.history : [];
+		const changes = Array.isArray(board.changes) ? board.changes : [];
+		const observedAt = Date.parse(board.lastSeen ?? board.firstSeen ?? history.at(-1)?.at ?? '');
+		if (Number.isFinite(observedAt) && observedAt < cutoff) {
+			delete inventory.boards[key];
+			removed.push(key);
+			continue;
+		}
+		board.history = history
+			.filter((entry) => Number.isFinite(Date.parse(entry?.at ?? '')) && Date.parse(entry.at) >= cutoff)
+			.slice(-MAX_HISTORY);
+		board.changes = changes
+			.filter((entry) => Number.isFinite(Date.parse(entry?.at ?? '')) && Date.parse(entry.at) >= cutoff)
+			.slice(-MAX_CHANGES);
+		if (board.serial !== null && typeof board.serial === 'object') {
+			const serialAt = Date.parse(board.serial.lastSeen ?? '');
+			if (!Number.isFinite(serialAt) || serialAt < cutoff) board.serial = null;
+		}
+	}
+	if (removed.length > 0 && inventory?.preferences !== null && typeof inventory?.preferences === 'object') {
+		const knownIds = new Set(
+			Object.values(inventory.boards ?? {})
+				.map((board) => (typeof board?.id === 'string' ? board.id : null))
+				.filter(Boolean)
+		);
+		const bindings = inventory.preferences.bindings ?? {};
+		inventory.preferences.bindings = Object.fromEntries(
+			Object.entries(bindings).filter(([, discoveredId]) => knownIds.has(discoveredId))
+		);
+	}
+	return { inventory, removed };
+}
+
 /** Read the inventory, falling back to the recoverable Windows backup. */
 export function readInventory(path) {
 	for (const candidate of [path, `${path}.bak`]) {
@@ -159,13 +209,15 @@ export function readInventory(path) {
 				? { ...parsed.preferences }
 				: {};
 			if ('bindings' in preferences) preferences.bindings = normalizeBindings(preferences.bindings, boards);
-			return {
+			const inventory = {
 				...parsed,
 				version: 1,
 				boards,
 				updatedAt: parsed.updatedAt ?? null,
 				preferences
 			};
+			pruneInventory(inventory);
+			return inventory;
 		} catch {
 			// Try the backup left by an interrupted Windows replacement.
 		}

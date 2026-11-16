@@ -287,6 +287,57 @@ try {
 	if (endpointAnnotated.targets[2]?.duplicateOf !== undefined) {
 		failures.push('different SSH endpoints must remain independently online');
 	}
+	const retentionNow = Date.parse('2026-11-16T00:00:00.000Z');
+	const retentionOld = new Date(retentionNow - 31 * 24 * 60 * 60 * 1000).toISOString();
+	const retentionNew = new Date(retentionNow - 24 * 60 * 60 * 1000).toISOString();
+	const retentionInventory = {
+		version: 1,
+		boards: {
+			'aa:bb:cc:dd:ee:01': {
+				id: 'old-board',
+				mac: 'aa:bb:cc:dd:ee:01',
+				firstSeen: retentionOld,
+				lastSeen: retentionOld,
+				system: {},
+				history: [{ at: retentionOld, ip: '192.0.2.1', system: {} }],
+				changes: [{ at: retentionOld, fields: [] }]
+			},
+			'aa:bb:cc:dd:ee:02': {
+				id: 'recent-board',
+				mac: 'aa:bb:cc:dd:ee:02',
+				firstSeen: retentionOld,
+				lastSeen: retentionNew,
+				system: {},
+				history: [
+					{ at: retentionOld, ip: '192.0.2.2', system: {} },
+					{ at: retentionNew, ip: '192.0.2.3', system: {} }
+				],
+				changes: [{ at: retentionNew, fields: [] }]
+			}
+		},
+		preferences: { bindings: { old: 'old-board', recent: 'recent-board' } }
+	};
+	const retention = internals.pruneInventory(retentionInventory, retentionNow);
+	if ('aa:bb:cc:dd:ee:01' in retention.inventory.boards || retention.removed.length !== 1) {
+		failures.push('inventory retention must remove boards older than 30 days');
+	}
+	if (retention.inventory.boards['aa:bb:cc:dd:ee:02'].history?.length !== 1 || retention.inventory.boards['aa:bb:cc:dd:ee:02'].history[0].at !== retentionNew) {
+		failures.push('inventory retention must prune old per-board history entries');
+	}
+	if (retention.inventory.preferences.bindings.old !== undefined || retention.inventory.preferences.bindings.recent !== 'recent-board') {
+		failures.push('inventory retention must remove bindings to expired boards');
+	}
+	const reportRetentionPath = join(directory, 'retention-reports.json');
+	writeFileSync(reportRetentionPath, JSON.stringify({
+		reports: {
+			old: { ok: true, generatedAt: retentionOld, target: { id: 'old' } },
+			recent: { ok: true, generatedAt: retentionNew, target: { id: 'recent' } }
+		}
+	}), 'utf8');
+	const reportRetentionConfig = { inventoryPath, reportStorePath: reportRetentionPath };
+	if (internals.readSavedReport(reportRetentionConfig, 'old') !== null || internals.readSavedReport(reportRetentionConfig, 'recent') === null) {
+		failures.push('saved reports older than 30 days must not be read');
+	}
 	const mismatchPath = join(directory, 'mismatch-inventory.json');
 	writeFileSync(
 		mismatchPath,

@@ -146,7 +146,7 @@ CPython 3.9 aarch64 ABI
 DSH_HOME/ascend310b-inventory.json
 ```
 
-同一块板换 IP、换有线/无线网口会归并为同一条记录；重装系统、驱动或 CANN 变化会写入 `changes`，但不会改变逻辑板卡 ID。发现到的板卡会以 target id（例如 `ascend-c0742bfddd7a`）出现在面板和 `target` 选择中，不需要手工把 IP 写进 `targets`。**多块板可以有相同 hostname**，例如两台出厂镜像都叫 `orangepiaipro`；hostname 只用于显示或回退，不能作为物理板身份。`machine-id` 也不能作为唯一身份，因为克隆镜像可能相同。资产表保留所有物理网口 MAC 别名，并用逻辑板卡 ID 区分不同板卡；资产表包含 MAC，禁止提交到 Git 或放进插件包。固件版本不进入资产指纹：当前板端没有可信、可读的版本来源。
+同一块板换 IP、换有线/无线网口会归并为同一条记录；重装系统、驱动或 CANN 变化会写入 `changes`，但不会改变逻辑板卡 ID。发现记录只有15分钟新鲜期，超过后不再作为可执行target自动探测；board记录、change、history、serial状态和保存报告最多保留30天，超期记录不会进入target、报告或摄像头选择。发现到的板卡会以 target id（例如 `ascend-c0742bfddd7a`）出现在面板和 `target` 选择中，不需要手工把 IP 写进 `targets`。**多块板可以有相同 hostname**，例如两台出厂镜像都叫 `orangepiaipro`；hostname 只用于显示或回退，不能作为物理板身份。`machine-id` 也不能作为唯一身份，因为克隆镜像可能相同。资产表保留所有物理网口 MAC 别名，并用逻辑板卡 ID 区分不同板卡；资产表包含 MAC，禁止提交到 Git 或放进插件包。固件版本不进入资产指纹：当前板端没有可信、可读的版本来源。
 
 板卡身份规则：
 
