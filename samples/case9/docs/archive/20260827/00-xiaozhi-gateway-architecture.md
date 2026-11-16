@@ -76,7 +76,7 @@ LLM:
     type: openai
     base_url: http://case9-rag-gateway:7861/v1
     model_name: case9-rag
-    api_key: replace-with-the-internal-gateway-token
+    api_key: placeholder-replace-with-the-internal-gateway-token
 ```
 
 Do not point the XiaoZhi device at this URL. Its device-facing endpoint remains
