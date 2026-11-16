@@ -453,6 +453,29 @@ check(bundleSource.includes('className: "ad-panels"'), 'tab pages must stay moun
 check(bundleSource.includes('position:absolute;inset:0'), 'tab pages must occupy one shared rectangle instead of changing the page height');
 check(!bundleSource.includes('hidden: tab !== id'), 'inactive tabs must not use hidden/display:none, which collapses the workbench');
 check(bundleSource.includes('el.style.height'), 'the panel shell must pin itself to the remaining viewport height');
+check(
+	bundleSource.includes('.ad-workbench{flex:1 1 0;min-height:0;height:0;display:grid;grid-template-columns:248px minmax(0,1fr)'),
+	'the workbench must keep a fixed navigation column independent of board content'
+);
+check(
+	bundleSource.includes('.ad-overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))'),
+	'the overview must use a fixed three-column board template'
+);
+check(!bundleSource.includes('grid-template-columns:repeat(auto-fit'), 'content must not choose its own column count through auto-fit grids');
+check(bundleSource.includes('.ad-table{width:100%;table-layout:fixed'), 'all diagnostic tables must use fixed layout');
+seeded = 0;
+seededKind = 'ready';
+seededSelected = 'board-8t';
+seededTab = 'overview';
+seededLiveness = undefined;
+const fixedTableTree = panel({});
+const fixedTables = findNode(fixedTableTree, (node) => node.type === 'table' && String(node.props?.className ?? '').includes('ad-table'));
+const fixedTableGroups = findNode(fixedTableTree, (node) => node.type === 'colgroup');
+check(
+	fixedTables.length > 0 && fixedTableGroups.length === fixedTables.length &&
+		fixedTableGroups.every((group) => findNode(group, (node) => node.type === 'col').length >= 2),
+	`every rendered table must declare an explicit column-width template (${fixedTables.length} tables, ${fixedTableGroups.length} groups, ${fixedTableGroups.map((group) => findNode(group, (node) => node.type === 'col').length).join('/')})`
+);
 check(bundleSource.includes('没有历史记录'), 'the history toggle must keep a reserved slot even when no devices are folded');
 check(!bundleSource.includes('ad-global-detail'), 'global status must not expand and push the workbench');
 seededSelected = 'board-8t';
