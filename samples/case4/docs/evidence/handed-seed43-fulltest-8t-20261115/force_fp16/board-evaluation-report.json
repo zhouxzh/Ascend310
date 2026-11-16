@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_acl_om_fulltest",
+  "started_at": "2026-11-15T16:09:23.613+08:00",
+  "execution_status": "completed",
+  "quality_gate": "metrics_pending_ace2",
+  "board": {
+    "tier": "8t",
+    "device": 0
+  },
+  "artifact": {
+    "om_path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-five-20261115/om/handed_seed43_force_fp16.om",
+    "om_sha256": "5b822a1ab1653a927912cd90c87bae2e78ae6cd57becd3590001ba6f4dd5066e",
+    "om_bytes": 6305833,
+    "precision_mode": "force_fp16"
+  },
+  "source": {
+    "onnx_sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991",
+    "annotations_path": "/home/HwHiAiUser/Documents/Ascend310/assets/case4/datasets/handed-seed43-fulltest-20261115/instances_test.json",
+    "annotations_sha256": "5db886eb40a75789b62b708445141081e2ca2c5276d445174efa3446b6b70b8a"
+  },
+  "decoder": {
+    "score_floor_for_coco": 0.05,
+    "score_threshold_for_task": 0.35,
+    "class_aware_nms_iou": 0.6,
+    "module_sha256": "2b86818c4e883ccdee8d1d6dbe9c02d892fd47b3959f506729d4d8196103db37"
+  },
+  "raw_agreement": {
+    "images": 1600,
+    "non_finite_images": 0,
+    "atol": 0.02,
+    "rtol": 0.02,
+    "allclose_images": 0,
+    "allclose_rate": 0.0,
+    "raw_max_abs_error": 6.1616411209106445,
+    "raw_mean_abs_error": 0.09015839408466148,
+    "class_max_abs_error": 0.7134786248207092,
+    "class_mean_abs_error": 0.0009426768422039116,
+    "dfl_max_abs_error": 6.1616411209106445,
+    "dfl_mean_abs_error": 0.09573437641231508
+  },
+  "om_contract": {
+    "input_shape": [
+      1,
+      3,
+      320,
+      320
+    ],
+    "output_shape": [
+      1,
+      2125,
+      34
+    ],
+    "input_dtype": "float32",
+    "output_dtype": "float32"
+  },
+  "dataset": {
+    "images": 1600,
+    "annotations": 1601,
+    "image_ids_sha256": "9a31644ffcc9aca35575d50adedb3f4d912f52777f82407bcb884aa39b875658"
+  },
+  "predictions": {
+    "path": "predictions.coco.json",
+    "sha256": "fed9a8949feff0b25bcbd6b67d24e1128125c1c5531be5c5896de53e06e7002f",
+    "count": 5138
+  },
+  "diagnostics": {
+    "path": "per-image-diagnostics.jsonl",
+    "sha256": "207057b82b5f0c8ff8647c0993380100412032a4d5603c9500875979bffab624",
+    "images": 1600
+  },
+  "reference_pack": {
+    "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/reference",
+    "manifest_sha256": "362468de972e5affdabf5adbba46f6875c71ede1b7e60c8612b460096bc9303d"
+  },
+  "performance": {
+    "scope": "H2D + ACL execute + device synchronize + D2H; excludes JPEG decode, preprocessing, DFL/NMS and metrics",
+    "warmup": 20,
+    "count": 1600,
+    "p50_ms": 8.6146135,
+    "p95_ms": 8.712169699999999,
+    "mean_ms": 8.619015751249998,
+    "min_ms": 8.449517,
+    "max_ms": 9.235655
+  },
+  "cleanup": [
+    {
+      "phase": "set_context_before_cleanup",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_output_data_buffer",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_input_data_buffer",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_output_dataset",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_input_dataset",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "free_output_buffer",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "free_input_buffer",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_model_desc",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "unload_model",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_context",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "acl_reset_device",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "acl_finalize",
+      "ok": true,
+      "return_code": 0
+    }
+  ],
+  "cleanup_ok": true,
+  "finished_at": "2026-11-15T16:10:43.873+08:00"
+}

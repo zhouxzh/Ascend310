@@ -1,6 +1,7 @@
 # Ascend OM 资产
 
-将已经通过资产校验的 `mixed_fp16` OM 文件放在此目录。当前目标设备是 Ascend 310B4（8T）。
+Palm NanoDet 的 OM 文件放在本目录根部，并通过文件名中的 `_8t` 或 `_20t` 区分算力档位。
+COCO 通用检测器的对比 OM 不在本目录；见独立仓库 [zhouxzh/ascend310b-coco-detector-benchmarks](https://huggingface.co/zhouxzh/ascend310b-coco-detector-benchmarks)。
 
 文件名、字节数、SHA-256、来源修订和再分发状态见仓库根目录的 `om_manifest.json`。复制或下载完成后，在项目根目录执行：
 

@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_acl_om_fulltest",
+  "started_at": "2026-11-15T16:06:06.640+08:00",
+  "execution_status": "completed",
+  "quality_gate": "metrics_pending_ace2",
+  "board": {
+    "tier": "8t",
+    "device": 0
+  },
+  "artifact": {
+    "om_path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-five-20261115/om/handed_seed43_force_fp32.om",
+    "om_sha256": "23e7db9776d06bcc646f4c6d3a0a44ccf6941225d6d78f743823acc1b3629ad2",
+    "om_bytes": 6546705,
+    "precision_mode": "force_fp32"
+  },
+  "source": {
+    "onnx_sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991",
+    "annotations_path": "/home/HwHiAiUser/Documents/Ascend310/assets/case4/datasets/handed-seed43-fulltest-20261115/instances_test.json",
+    "annotations_sha256": "5db886eb40a75789b62b708445141081e2ca2c5276d445174efa3446b6b70b8a"
+  },
+  "decoder": {
+    "score_floor_for_coco": 0.05,
+    "score_threshold_for_task": 0.35,
+    "class_aware_nms_iou": 0.6,
+    "module_sha256": "2b86818c4e883ccdee8d1d6dbe9c02d892fd47b3959f506729d4d8196103db37"
+  },
+  "raw_agreement": {
+    "images": 1600,
+    "non_finite_images": 0,
+    "atol": 0.02,
+    "rtol": 0.02,
+    "allclose_images": 0,
+    "allclose_rate": 0.0,
+    "raw_max_abs_error": 6.173583984375,
+    "raw_mean_abs_error": 0.09023468116854581,
+    "class_max_abs_error": 0.7142029404640198,
+    "class_mean_abs_error": 0.0009442973428110221,
+    "dfl_max_abs_error": 6.173583984375,
+    "dfl_mean_abs_error": 0.09581533015765425
+  },
+  "om_contract": {
+    "input_shape": [
+      1,
+      3,
+      320,
+      320
+    ],
+    "output_shape": [
+      1,
+      2125,
+      34
+    ],
+    "input_dtype": "float32",
+    "output_dtype": "float32"
+  },
+  "dataset": {
+    "images": 1600,
+    "annotations": 1601,
+    "image_ids_sha256": "9a31644ffcc9aca35575d50adedb3f4d912f52777f82407bcb884aa39b875658"
+  },
+  "predictions": {
+    "path": "predictions.coco.json",
+    "sha256": "9c4329353f08a3eec95e810416071866bfee2fc06543b32b38f7a2912bedf73c",
+    "count": 5154
+  },
+  "diagnostics": {
+    "path": "per-image-diagnostics.jsonl",
+    "sha256": "92c8c476cee0d9d6562e71f9d2f8e83b3553c49672fdc3ab3e3a1abfdd31d3b7",
+    "images": 1600
+  },
+  "reference_pack": {
+    "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/reference",
+    "manifest_sha256": "362468de972e5affdabf5adbba46f6875c71ede1b7e60c8612b460096bc9303d"
+  },
+  "performance": {
+    "scope": "H2D + ACL execute + device synchronize + D2H; excludes JPEG decode, preprocessing, DFL/NMS and metrics",
+    "warmup": 20,
+    "count": 1600,
+    "p50_ms": 18.230723,
+    "p95_ms": 18.3802864,
+    "mean_ms": 18.240918801875,
+    "min_ms": 18.056511,
+    "max_ms": 18.795858
+  },
+  "cleanup": [
+    {
+      "phase": "set_context_before_cleanup",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_output_data_buffer",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_input_data_buffer",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_output_dataset",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_input_dataset",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "free_output_buffer",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "free_input_buffer",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_model_desc",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "unload_model",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "destroy_context",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "acl_reset_device",
+      "ok": true,
+      "return_code": 0
+    },
+    {
+      "phase": "acl_finalize",
+      "ok": true,
+      "return_code": 0
+    }
+  ],
+  "cleanup_ok": true,
+  "finished_at": "2026-11-15T16:07:43.398+08:00"
+}

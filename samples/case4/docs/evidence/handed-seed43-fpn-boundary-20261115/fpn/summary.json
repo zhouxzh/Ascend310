@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_intermediate_probe_acl_comparison",
+  "created_at": "2026-11-15T20:21:46.296+08:00",
+  "probe": "fpn",
+  "board": {
+    "id": "8t",
+    "soc": "Ascend310B4"
+  },
+  "probe_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/fpn/seed43-fpn-probe.onnx",
+    "sha256": "76c043158f50080f9d9364f5d7c270a47f7ffb60821abca2869304b1c4ea9030",
+    "bytes": 4285510
+  },
+  "om": {
+    "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/fpn/om/seed43-fpn-force-fp32.om",
+    "sha256": "a3829ae12574f61fba9eb447b8558a8cac700ad00b83d201fcf6a6ea9d8324fc",
+    "bytes": 5476048
+  },
+  "protocol": {
+    "warmup": 1,
+    "loops": 1,
+    "repeats": 1,
+    "atol": 0.001,
+    "rtol": 0.001
+  },
+  "boundaries": [
+    {
+      "index": 0,
+      "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+      "shape": [
+        1,
+        96,
+        40,
+        40
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 1.1048741340637207,
+      "mean_abs_error": 0.029356325666109722
+    },
+    {
+      "index": 1,
+      "name": "/fpn/bottom_up_blocks.0/blocks/blocks.0/Add_output_0",
+      "shape": [
+        1,
+        96,
+        20,
+        20
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 0.7547914981842041,
+      "mean_abs_error": 0.022882404426733654
+    },
+    {
+      "index": 2,
+      "name": "/fpn/bottom_up_blocks.1/blocks/blocks.0/Add_output_0",
+      "shape": [
+        1,
+        96,
+        10,
+        10
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 0.17397481203079224,
+      "mean_abs_error": 0.007395954492191474
+    },
+    {
+      "index": 3,
+      "name": "/fpn/Add_output_0",
+      "shape": [
+        1,
+        96,
+        5,
+        5
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 0.026761043816804886,
+      "mean_abs_error": 0.0011937031716418762
+    }
+  ],
+  "samples": [
+    {
+      "image_id": 8781,
+      "reference_sha256": "a5605901688e35ae9c8dbf69b8cc5791d1167df8d7a02c3614203594e127982d",
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/fpn/reports/image-8781.json",
+        "sha256": "fa7ec167035dd0845d5210ae2085399d09273896dffe84d0e4cbe241caed1fb6"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.8905271291732788,
+          "mean_abs_error": 0.022279223427176476,
+          "max_rel_error": 21294.337890625
+        },
+        {
+          "index": 1,
+          "name": "/fpn/bottom_up_blocks.0/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.7141526341438293,
+          "mean_abs_error": 0.01802370697259903,
+          "max_rel_error": 12233.3212890625
+        },
+        {
+          "index": 2,
+          "name": "/fpn/bottom_up_blocks.1/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.14549605548381805,
+          "mean_abs_error": 0.005612868349999189,
+          "max_rel_error": 3056.0361328125
+        },
+        {
+          "index": 3,
+          "name": "/fpn/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.020412132143974304,
+          "mean_abs_error": 0.0008310905541293323,
+          "max_rel_error": 44.50238800048828
+        }
+      ]
+    },
+    {
+      "image_id": 8886,
+      "reference_sha256": "387757eabc00e016dfff7d17d4012f482589e8c0d03671cac4c99cf08bfed7b7",
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/fpn/reports/image-8886.json",
+        "sha256": "99a65c90a6ced390ca86bca574fc21bfee96527ab9f0fe898bc985ab5bea5ab0"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.9563812017440796,
+          "mean_abs_error": 0.02823651023209095,
+          "max_rel_error": 12001.7685546875
+        },
+        {
+          "index": 1,
+          "name": "/fpn/bottom_up_blocks.0/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.6493830680847168,
+          "mean_abs_error": 0.02212059311568737,
+          "max_rel_error": 5095.6708984375
+        },
+        {
+          "index": 2,
+          "name": "/fpn/bottom_up_blocks.1/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.1366703063249588,
+          "mean_abs_error": 0.007494218181818724,
+          "max_rel_error": 4992.03271484375
+        },
+        {
+          "index": 3,
+          "name": "/fpn/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.019375640898942947,
+          "mean_abs_error": 0.0012956357095390558,
+          "max_rel_error": 28.855823516845703
+        }
+      ]
+    },
+    {
+      "image_id": 9266,
+      "reference_sha256": "c6f0ec793cf6c76346ded33da5da29e51321b80cc7122c13ddaeea9e42583b08",
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/fpn/reports/image-9266.json",
+        "sha256": "e0761bd4cfb5c7be38be92f811f743f16c4965a24d61f52dc946d9814f27a6b4"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 1.1048741340637207,
+          "mean_abs_error": 0.03755324333906174,
+          "max_rel_error": 28966.533203125
+        },
+        {
+          "index": 1,
+          "name": "/fpn/bottom_up_blocks.0/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.7547914981842041,
+          "mean_abs_error": 0.02850291319191456,
+          "max_rel_error": 2048.021484375
+        },
+        {
+          "index": 2,
+          "name": "/fpn/bottom_up_blocks.1/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.17397481203079224,
+          "mean_abs_error": 0.009080776944756508,
+          "max_rel_error": 6036.95166015625
+        },
+        {
+          "index": 3,
+          "name": "/fpn/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.026761043816804886,
+          "mean_abs_error": 0.0014543832512572408,
+          "max_rel_error": 99.0737533569336
+        }
+      ]
+    }
+  ]
+}

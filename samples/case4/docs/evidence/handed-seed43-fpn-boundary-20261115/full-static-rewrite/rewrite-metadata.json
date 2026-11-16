@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_full_graph_resize_rewrite",
+  "created_at": "2026-11-15T22:54:37.624+08:00",
+  "source_resize": {
+    "name": "/fpn/upsample/Resize",
+    "input": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+    "output": "/fpn/upsample/Resize_output_0",
+    "attributes": {
+      "coordinate_transformation_mode": "half_pixel",
+      "cubic_coeff_a": -0.75,
+      "mode": "linear",
+      "nearest_mode": "floor"
+    }
+  },
+  "replacement_nodes": [
+    "rewrite_h_left/Slice",
+    "rewrite_h_right/Slice",
+    "rewrite_h_first/Slice",
+    "rewrite_h_last/Slice",
+    "/rewrite/horizontal/Mul_left_075",
+    "/rewrite/horizontal/Mul_right_025",
+    "/rewrite/horizontal/Add_first",
+    "/rewrite/horizontal/Mul_left_025",
+    "/rewrite/horizontal/Mul_right_075",
+    "/rewrite/horizontal/Add_second",
+    "/rewrite/horizontal/Unsqueeze_first",
+    "/rewrite/horizontal/Unsqueeze_second",
+    "/rewrite/horizontal/Concat_pairs",
+    "/rewrite/horizontal/Reshape_pairs",
+    "/rewrite/horizontal/Concat_output",
+    "rewrite_v_left/Slice",
+    "rewrite_v_right/Slice",
+    "rewrite_v_first/Slice",
+    "rewrite_v_last/Slice",
+    "/rewrite/vertical/Mul_left_075",
+    "/rewrite/vertical/Mul_right_025",
+    "/rewrite/vertical/Add_first",
+    "/rewrite/vertical/Mul_left_025",
+    "/rewrite/vertical/Mul_right_075",
+    "/rewrite/vertical/Add_second",
+    "/rewrite/vertical/Unsqueeze_first",
+    "/rewrite/vertical/Unsqueeze_second",
+    "/rewrite/vertical/Concat_pairs",
+    "/rewrite/vertical/Reshape_pairs",
+    "/rewrite/vertical/Concat_output"
+  ],
+  "output": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/full-resize-rewrite/seed43-resize1-static-arithmetic-full.onnx",
+    "sha256": "e30f478470a596dde95c484ea9f99d196c90a8caedfbe842493c002e982348f2",
+    "bytes": 4735999
+  }
+}

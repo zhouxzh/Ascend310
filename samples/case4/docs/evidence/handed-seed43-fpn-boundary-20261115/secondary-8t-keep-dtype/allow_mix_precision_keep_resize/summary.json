@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_fpn_resize_isolation_acl_comparison",
+  "created_at": "2026-11-15T22:31:56.221+08:00",
+  "board": {
+    "id": "8t-secondary",
+    "soc": "Ascend310B4"
+  },
+  "source_boundary": {
+    "input": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+    "output": "/fpn/upsample/Resize_output_0"
+  },
+  "resize_attributes": {
+    "coordinate_transformation_mode": "half_pixel",
+    "cubic_coeff_a": -0.75,
+    "mode": "linear",
+    "nearest_mode": "floor"
+  },
+  "isolated_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/resize1-isolation/seed43-fpn-resize1-isolation.onnx",
+    "sha256": "6a0e07fdb2e5a92776ae09a556f6845387acf84732212f9d4428bdb60959124c",
+    "bytes": 718
+  },
+  "om": {
+    "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/seed43-resize-isolation-8t108-20261115/resize1-keep-dtype/om/seed43-resize1-allow_mix_precision_keep_resize.om",
+    "sha256": "14bb59b8c2a50802e59e02654505a9ec4f1d1dbccebede9a2a5671734502ead5",
+    "bytes": 35898
+  },
+  "protocol": {
+    "atol": 0.001,
+    "rtol": 0.001,
+    "warmup": 1,
+    "loops": 1,
+    "repeats": 1
+  },
+  "summary": {
+    "samples": 3,
+    "allclose_samples": 0,
+    "max_abs_error": 0.21978488564491272,
+    "mean_abs_error": 0.007110818599661191
+  },
+  "samples_detail": [
+    {
+      "image_id": 8781,
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "passed": false,
+      "max_abs_error": 0.19134780764579773,
+      "mean_abs_error": 0.006059695966541767,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/seed43-resize-isolation-8t108-20261115/resize1-keep-dtype/reports/allow_mix_precision_keep_resize/image-8781.json",
+        "sha256": "ac48c0c3f16db3b48ec126a4d7f7fc1fd305684328c42f99dce1fcaa048de5fd"
+      }
+    },
+    {
+      "image_id": 8886,
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "passed": false,
+      "max_abs_error": 0.18726906180381775,
+      "mean_abs_error": 0.007157374173402786,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/seed43-resize-isolation-8t108-20261115/resize1-keep-dtype/reports/allow_mix_precision_keep_resize/image-8886.json",
+        "sha256": "36c6a684864213159ac466219ff7a8424c62a70fac3669361c35a958c399705a"
+      }
+    },
+    {
+      "image_id": 9266,
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "passed": false,
+      "max_abs_error": 0.21978488564491272,
+      "mean_abs_error": 0.00811538565903902,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/seed43-resize-isolation-8t108-20261115/resize1-keep-dtype/reports/allow_mix_precision_keep_resize/image-9266.json",
+        "sha256": "58366aea9fa056d692f9bf0bbb75fedebc96ca1e43baa053f0dbb53a92283edf"
+      }
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_full_graph_rewrite_cuda_equivalence",
+  "created_at": "2026-11-15T22:55:06.131+08:00",
+  "candidate": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/full-resize-rewrite/seed43-resize1-static-arithmetic-full.onnx",
+    "sha256": "e30f478470a596dde95c484ea9f99d196c90a8caedfbe842493c002e982348f2",
+    "bytes": 4735999
+  },
+  "source_onnx_sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991",
+  "reference_pack": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/reference-pack-cuda-fulltest",
+    "annotations_sha256": "5db886eb40a75789b62b708445141081e2ca2c5276d445174efa3446b6b70b8a"
+  },
+  "tolerance": {
+    "atol": 2e-06,
+    "rtol": 2e-06
+  },
+  "samples": 1600,
+  "allclose_samples": 19,
+  "allclose_rate": 0.011875,
+  "max_abs_error": 0.0065784454345703125,
+  "mean_abs_error": 1.6497907443648803e-05,
+  "worst_samples": [
+    {
+      "image_id": 9296,
+      "max_abs_error": 0.0065784454345703125,
+      "mean_abs_error": 3.4144036085135385e-05,
+      "allclose": false
+    },
+    {
+      "image_id": 8428,
+      "max_abs_error": 0.006508827209472656,
+      "mean_abs_error": 3.094715065609625e-05,
+      "allclose": false
+    },
+    {
+      "image_id": 9178,
+      "max_abs_error": 0.0051422119140625,
+      "mean_abs_error": 2.318785759816945e-05,
+      "allclose": false
+    },
+    {
+      "image_id": 9340,
+      "max_abs_error": 0.005062103271484375,
+      "mean_abs_error": 1.5816789184887103e-05,
+      "allclose": false
+    },
+    {
+      "image_id": 8276,
+      "max_abs_error": 0.005031585693359375,
+      "mean_abs_error": 2.1077873797565183e-05,
+      "allclose": false
+    },
+    {
+      "image_id": 8191,
+      "max_abs_error": 0.004652976989746094,
+      "mean_abs_error": 2.3647643290589013e-05,
+      "allclose": false
+    },
+    {
+      "image_id": 8714,
+      "max_abs_error": 0.0043621063232421875,
+      "mean_abs_error": 2.496278409726892e-05,
+      "allclose": false
+    },
+    {
+      "image_id": 8297,
+      "max_abs_error": 0.004298210144042969,
+      "mean_abs_error": 2.4887391027694756e-05,
+      "allclose": false
+    },
+    {
+      "image_id": 8524,
+      "max_abs_error": 0.0042705535888671875,
+      "mean_abs_error": 2.9152607010310084e-05,
+      "allclose": false
+    },
+    {
+      "image_id": 9079,
+      "max_abs_error": 0.004267692565917969,
+      "mean_abs_error": 2.328577586111313e-05,
+      "allclose": false
+    }
+  ],
+  "cuda_profile": {
+    "path": "onnxruntime_profile__2026-11-15_22-54-37.json",
+    "sha256": "3fd50793b3afa34dd4a48d1aff5a49714acd6217a47f250e5e916dcceb011f73",
+    "node_providers": {
+      "CUDAExecutionProvider": 540800
+    }
+  }
+}

@@ -1,0 +1,298 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_intermediate_probe_acl_comparison",
+  "created_at": "2026-11-15T20:12:15.933+08:00",
+  "probe": "backbone",
+  "board": {
+    "id": "8t",
+    "soc": "Ascend310B4"
+  },
+  "probe_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/backbone/seed43-backbone-probe.onnx",
+    "sha256": "079b570296b5a7951fea72a1861b5a2d1f2123e14600c3ddbea8f637b24a7d29",
+    "bytes": 3139564
+  },
+  "om": {
+    "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/backbone/om/seed43-backbone-force-fp32.om",
+    "sha256": "f347e89b716f9453159e97a2c1e315209815ddb0fc7e9e6d18087337a5bf07eb",
+    "bytes": 3389326
+  },
+  "protocol": {
+    "warmup": 1,
+    "loops": 1,
+    "repeats": 1,
+    "atol": 0.001,
+    "rtol": 0.001
+  },
+  "boundaries": [
+    {
+      "index": 0,
+      "name": "/backbone/conv1/conv1.0/Conv_output_0",
+      "shape": [
+        1,
+        24,
+        160,
+        160
+      ],
+      "samples": 3,
+      "allclose_samples": 3,
+      "max_abs_error": 0.0004630088806152344,
+      "mean_abs_error": 1.3308095428025505e-05
+    },
+    {
+      "index": 1,
+      "name": "/backbone/conv1/conv1.2/LeakyRelu_output_0",
+      "shape": [
+        1,
+        24,
+        160,
+        160
+      ],
+      "samples": 3,
+      "allclose_samples": 3,
+      "max_abs_error": 0.0003437735140323639,
+      "mean_abs_error": 1.1214294014886642e-05
+    },
+    {
+      "index": 2,
+      "name": "/backbone/maxpool/MaxPool_output_0",
+      "shape": [
+        1,
+        24,
+        80,
+        80
+      ],
+      "samples": 3,
+      "allclose_samples": 3,
+      "max_abs_error": 0.00031071901321411133,
+      "mean_abs_error": 2.2105858685487572e-05
+    },
+    {
+      "index": 3,
+      "name": "/backbone/stage2/stage2.3/Reshape_1_output_0",
+      "shape": [
+        1,
+        116,
+        40,
+        40
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 0.0025548338890075684,
+      "mean_abs_error": 6.572299268251906e-05
+    },
+    {
+      "index": 4,
+      "name": "/backbone/stage3/stage3.7/Reshape_1_output_0",
+      "shape": [
+        1,
+        232,
+        20,
+        20
+      ],
+      "samples": 3,
+      "allclose_samples": 1,
+      "max_abs_error": 0.0016799718141555786,
+      "mean_abs_error": 4.422567023235994e-05
+    },
+    {
+      "index": 5,
+      "name": "/backbone/stage4/stage4.3/Reshape_1_output_0",
+      "shape": [
+        1,
+        464,
+        10,
+        10
+      ],
+      "samples": 3,
+      "allclose_samples": 3,
+      "max_abs_error": 0.0010859668254852295,
+      "mean_abs_error": 1.960381966152151e-05
+    }
+  ],
+  "samples": [
+    {
+      "image_id": 8781,
+      "reference_sha256": "5915b988c23ec86de15383bc8051adccd9caa89e531cf639f881bea574451234",
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/backbone/reports/image-8781.json",
+        "sha256": "4ab4a3ef4b2349fb3d6534afef10c3129f20242cdd9fc9f5501234c8f4313744"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/backbone/conv1/conv1.0/Conv_output_0",
+          "passed": true,
+          "max_abs_error": 0.0004475116729736328,
+          "mean_abs_error": 9.723975381348282e-06,
+          "max_rel_error": 58.2776985168457
+        },
+        {
+          "index": 1,
+          "name": "/backbone/conv1/conv1.2/LeakyRelu_output_0",
+          "passed": true,
+          "max_abs_error": 0.00023511052131652832,
+          "mean_abs_error": 7.817982805136126e-06,
+          "max_rel_error": 118.22869873046875
+        },
+        {
+          "index": 2,
+          "name": "/backbone/maxpool/MaxPool_output_0",
+          "passed": true,
+          "max_abs_error": 0.0002917647361755371,
+          "mean_abs_error": 2.073806717817206e-05,
+          "max_rel_error": 14.280898094177246
+        },
+        {
+          "index": 3,
+          "name": "/backbone/stage2/stage2.3/Reshape_1_output_0",
+          "passed": false,
+          "max_abs_error": 0.0013047568500041962,
+          "mean_abs_error": 5.1009905291721225e-05,
+          "max_rel_error": 566.3947143554688
+        },
+        {
+          "index": 4,
+          "name": "/backbone/stage3/stage3.7/Reshape_1_output_0",
+          "passed": true,
+          "max_abs_error": 0.0007849782705307007,
+          "mean_abs_error": 3.40900405717548e-05,
+          "max_rel_error": 5450.5234375
+        },
+        {
+          "index": 5,
+          "name": "/backbone/stage4/stage4.3/Reshape_1_output_0",
+          "passed": true,
+          "max_abs_error": 0.0006185173988342285,
+          "mean_abs_error": 1.4060818102734629e-05,
+          "max_rel_error": 67.21862030029297
+        }
+      ]
+    },
+    {
+      "image_id": 8886,
+      "reference_sha256": "d8a33e79a145141fef93a6a207c6492bb126adaa372bb4efaa5f83f9f8d3331c",
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/backbone/reports/image-8886.json",
+        "sha256": "134261b0158f027dc57086d276ead5fa10193c176eb52a94eab54efe506dedac"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/backbone/conv1/conv1.0/Conv_output_0",
+          "passed": true,
+          "max_abs_error": 0.00040090084075927734,
+          "mean_abs_error": 1.5564954082947224e-05,
+          "max_rel_error": 50.400001525878906
+        },
+        {
+          "index": 1,
+          "name": "/backbone/conv1/conv1.2/LeakyRelu_output_0",
+          "passed": true,
+          "max_abs_error": 0.0001903437077999115,
+          "mean_abs_error": 1.3342744750843849e-05,
+          "max_rel_error": 5.940000057220459
+        },
+        {
+          "index": 2,
+          "name": "/backbone/maxpool/MaxPool_output_0",
+          "passed": true,
+          "max_abs_error": 0.00031071901321411133,
+          "mean_abs_error": 2.2315833120956086e-05,
+          "max_rel_error": 1.1868222951889038
+        },
+        {
+          "index": 3,
+          "name": "/backbone/stage2/stage2.3/Reshape_1_output_0",
+          "passed": false,
+          "max_abs_error": 0.0025548338890075684,
+          "mean_abs_error": 7.972092862473801e-05,
+          "max_rel_error": 1351.8450927734375
+        },
+        {
+          "index": 4,
+          "name": "/backbone/stage3/stage3.7/Reshape_1_output_0",
+          "passed": false,
+          "max_abs_error": 0.0016799718141555786,
+          "mean_abs_error": 5.074080763733946e-05,
+          "max_rel_error": 20.839473724365234
+        },
+        {
+          "index": 5,
+          "name": "/backbone/stage4/stage4.3/Reshape_1_output_0",
+          "passed": true,
+          "max_abs_error": 0.0010859668254852295,
+          "mean_abs_error": 2.0739480532938614e-05,
+          "max_rel_error": 635.6695556640625
+        }
+      ]
+    },
+    {
+      "image_id": 9266,
+      "reference_sha256": "e84a9279202c519524339c74308568347f941ce0a2fbf3559098cf6abf30d1e2",
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/backbone/reports/image-9266.json",
+        "sha256": "89e3befd9acf0eec1b913d78f3736b3260619e5816d5747214a66a0fb849f0fb"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/backbone/conv1/conv1.0/Conv_output_0",
+          "passed": true,
+          "max_abs_error": 0.0004630088806152344,
+          "mean_abs_error": 1.4635356819781009e-05,
+          "max_rel_error": 37.35029220581055
+        },
+        {
+          "index": 1,
+          "name": "/backbone/conv1/conv1.2/LeakyRelu_output_0",
+          "passed": true,
+          "max_abs_error": 0.0003437735140323639,
+          "mean_abs_error": 1.2482154488679953e-05,
+          "max_rel_error": 4.635029315948486
+        },
+        {
+          "index": 2,
+          "name": "/backbone/maxpool/MaxPool_output_0",
+          "passed": true,
+          "max_abs_error": 0.0002830922603607178,
+          "mean_abs_error": 2.3263675757334568e-05,
+          "max_rel_error": 0.6343207359313965
+        },
+        {
+          "index": 3,
+          "name": "/backbone/stage2/stage2.3/Reshape_1_output_0",
+          "passed": false,
+          "max_abs_error": 0.0019480660557746887,
+          "mean_abs_error": 6.643814413109794e-05,
+          "max_rel_error": 1362.8621826171875
+        },
+        {
+          "index": 4,
+          "name": "/backbone/stage3/stage3.7/Reshape_1_output_0",
+          "passed": false,
+          "max_abs_error": 0.0011934787034988403,
+          "mean_abs_error": 4.7846162487985566e-05,
+          "max_rel_error": 249.114501953125
+        },
+        {
+          "index": 5,
+          "name": "/backbone/stage4/stage4.3/Reshape_1_output_0",
+          "passed": true,
+          "max_abs_error": 0.0008887499570846558,
+          "mean_abs_error": 2.401116034889128e-05,
+          "max_rel_error": 19.444002151489258
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_onnx_cuda_fulltest_summary",
+  "run_id": "nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300",
+  "source_onnx_sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991",
+  "annotations_sha256": "5db886eb40a75789b62b708445141081e2ca2c5276d445174efa3446b6b70b8a",
+  "execution_status": "completed",
+  "providers": [
+    "CUDAExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "node_providers": {
+    "CUDAExecutionProvider": 494709
+  },
+  "dataset": {
+    "images": 1600,
+    "annotations": 1601,
+    "image_ids_sha256": "9a31644ffcc9aca35575d50adedb3f4d912f52777f82407bcb884aa39b875658"
+  },
+  "performance": {
+    "scope": "ORT session.run CUDA inference only; excludes image reading, preprocessing, decode and metric calculation",
+    "warmup": 1,
+    "count": 1600,
+    "p50_ms": 3.0015975,
+    "p95_ms": 3.1620959999999996,
+    "mean_ms": 3.059957785625,
+    "min_ms": 2.965147,
+    "max_ms": 21.410032
+  },
+  "metrics": {
+    "coco": {
+      "metrics": {
+        "mAP50_95": 0.6756978595610517,
+        "AP50": 0.9855979200456066,
+        "AP75": 0.8261999225478591,
+        "AP_small": 0.40154727226871817,
+        "AP_medium": 0.6811250861536131,
+        "AP_large": 0.7083723505293673
+      },
+      "per_class": {
+        "left_palm": {
+          "AP50": 0.9855191956547809,
+          "mAP50_95": 0.6820785781544649
+        },
+        "right_palm": {
+          "AP50": 0.9856766444364323,
+          "mAP50_95": 0.6693171409676384
+        }
+      },
+      "prediction_count": 4316
+    },
+    "task": {
+      "score_threshold": 0.35,
+      "iou_threshold": 0.5,
+      "groups": {
+        "all": {
+          "ground_truth": 1601,
+          "predictions": 1604,
+          "matched": 1578,
+          "correct_handedness": 1572,
+          "wrong_handedness": 6,
+          "missed": 23,
+          "duplicate": 4,
+          "false_positive": 22,
+          "correct_handedness_rate": 0.9961977186311787,
+          "miss_rate": 0.014366021236727046,
+          "duplicate_rate": 0.0024984384759525295,
+          "false_positive_rate": 0.01371571072319202
+        }
+      }
+    }
+  },
+  "predictions": {
+    "path": "predictions.coco.json",
+    "sha256": "0f4034675d19367989094ee70f569ec0840c865a33abfd6a15b4d170e9e603c2",
+    "count": 4316
+  },
+  "reference_pack": {
+    "manifest_path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/reference-pack-cuda-fulltest/manifest.json",
+    "manifest_sha256": "362468de972e5affdabf5adbba46f6875c71ede1b7e60c8612b460096bc9303d"
+  },
+  "privacy": "No images, input tensors, raw outputs, or prediction boxes are included."
+}

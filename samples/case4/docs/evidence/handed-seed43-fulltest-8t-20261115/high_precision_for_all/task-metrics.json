@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_fulltest_metrics",
+  "backend": {
+    "kind": "handed_nanodet_acl_om_fulltest",
+    "execution_status": "completed",
+    "artifact": {
+      "om_path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/high-precision-probe/handed_seed43_force_fp32_high_precision_for_all.om",
+      "om_sha256": "4c18232a7b367bec1a374d2f9d2e8c6fbe7d9beef99468879e33893e6de7f499",
+      "om_bytes": 6547370,
+      "precision_mode": "force_fp32_high_precision_for_all"
+    },
+    "board": {
+      "tier": "8t",
+      "device": 0
+    },
+    "source": {
+      "onnx_sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991",
+      "annotations_path": "/home/HwHiAiUser/Documents/Ascend310/assets/case4/datasets/handed-seed43-fulltest-20261115/instances_test.json",
+      "annotations_sha256": "5db886eb40a75789b62b708445141081e2ca2c5276d445174efa3446b6b70b8a"
+    }
+  },
+  "annotations": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/data/portable-hagridv2-mediapipe-hand/coco-handed-v001/annotations/instances_test.json",
+    "sha256": "5db886eb40a75789b62b708445141081e2ca2c5276d445174efa3446b6b70b8a",
+    "images": 1600,
+    "objects": 1601
+  },
+  "predictions": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/evaluations/om-8t-high-precision-fulltest/predictions.coco.json",
+    "sha256": "9c4329353f08a3eec95e810416071866bfee2fc06543b32b38f7a2912bedf73c",
+    "count": 5154
+  },
+  "task_protocol": {
+    "score_threshold": 0.35,
+    "iou_threshold": 0.5
+  },
+  "metrics": {
+    "coco": {
+      "metrics": {
+        "mAP50_95": 0.5608038717270114,
+        "AP50": 0.9802433374806645,
+        "AP75": 0.5973126532733322,
+        "AP_small": 0.2850818460814573,
+        "AP_medium": 0.5660741141777654,
+        "AP_large": 0.6138792288166762
+      },
+      "per_class": {
+        "left_palm": {
+          "AP50": 0.9809477346511796,
+          "mAP50_95": 0.5679472453711534
+        },
+        "right_palm": {
+          "AP50": 0.9795389403101495,
+          "mAP50_95": 0.5536604980828692
+        }
+      },
+      "prediction_count": 5154
+    },
+    "task": {
+      "score_threshold": 0.35,
+      "iou_threshold": 0.5,
+      "groups": {
+        "all": {
+          "ground_truth": 1601,
+          "predictions": 1616,
+          "matched": 1564,
+          "correct_handedness": 1558,
+          "wrong_handedness": 6,
+          "missed": 37,
+          "duplicate": 2,
+          "false_positive": 50,
+          "correct_handedness_rate": 0.9961636828644501,
+          "miss_rate": 0.0231105559025609,
+          "duplicate_rate": 0.0012492192379762648,
+          "false_positive_rate": 0.03094059405940594
+        }
+      }
+    }
+  }
+}

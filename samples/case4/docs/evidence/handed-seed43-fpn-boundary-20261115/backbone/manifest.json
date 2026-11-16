@@ -1,0 +1,352 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_intermediate_probe",
+  "created_at": "2026-11-15T20:01:21.459+08:00",
+  "probe": "backbone",
+  "source_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/nanodet-plus-m-320-palm.onnx",
+    "sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991"
+  },
+  "probe_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/backbone/seed43-backbone-probe.onnx",
+    "sha256": "079b570296b5a7951fea72a1861b5a2d1f2123e14600c3ddbea8f637b24a7d29",
+    "bytes": 3139564
+  },
+  "input": {
+    "name": "data",
+    "shape": [
+      1,
+      3,
+      320,
+      320
+    ],
+    "dtype": "float32"
+  },
+  "outputs": [
+    {
+      "index": 0,
+      "name": "/backbone/conv1/conv1.0/Conv_output_0",
+      "shape": [
+        1,
+        24,
+        160,
+        160
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 1,
+      "name": "/backbone/conv1/conv1.2/LeakyRelu_output_0",
+      "shape": [
+        1,
+        24,
+        160,
+        160
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 2,
+      "name": "/backbone/maxpool/MaxPool_output_0",
+      "shape": [
+        1,
+        24,
+        80,
+        80
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 3,
+      "name": "/backbone/stage2/stage2.3/Reshape_1_output_0",
+      "shape": [
+        1,
+        116,
+        40,
+        40
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 4,
+      "name": "/backbone/stage3/stage3.7/Reshape_1_output_0",
+      "shape": [
+        1,
+        232,
+        20,
+        20
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 5,
+      "name": "/backbone/stage4/stage4.3/Reshape_1_output_0",
+      "shape": [
+        1,
+        464,
+        10,
+        10
+      ],
+      "dtype": "float32"
+    }
+  ],
+  "samples": [
+    {
+      "image_id": 8781,
+      "image_sha256": "7d68a2121a1e577d48cba82d5b9a07ae819c82e219e65dba6cd6cc24ac20eca2",
+      "input_sha256": "5a67678c8749e3d9babc47cd29d9f54d919e1d0cb2f9c0662b0da96f286099fe",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/backbone/references/image-8781.npz",
+        "sha256": "5915b988c23ec86de15383bc8051adccd9caa89e531cf639f881bea574451234"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/backbone/conv1/conv1.0/Conv_output_0",
+          "shape": [
+            1,
+            24,
+            160,
+            160
+          ],
+          "dtype": "float32",
+          "sha256": "f33f28901d55fc0c787addd2822d654ea247eb881ca00a34f0cbf1529cb5b908"
+        },
+        {
+          "index": 1,
+          "name": "/backbone/conv1/conv1.2/LeakyRelu_output_0",
+          "shape": [
+            1,
+            24,
+            160,
+            160
+          ],
+          "dtype": "float32",
+          "sha256": "4c3be8e627ee3d4ad572993fccd6b5d97f1a26a9020247ef59368f5c6ac1c72a"
+        },
+        {
+          "index": 2,
+          "name": "/backbone/maxpool/MaxPool_output_0",
+          "shape": [
+            1,
+            24,
+            80,
+            80
+          ],
+          "dtype": "float32",
+          "sha256": "a54f6b238ad73028ddc7215a8029349131e65be41041fcf6aef0decb5c8ed8f8"
+        },
+        {
+          "index": 3,
+          "name": "/backbone/stage2/stage2.3/Reshape_1_output_0",
+          "shape": [
+            1,
+            116,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "0a172519f15cf350c9da91f9c5536cbdea410c43f3599f3c80a42c7428af71cc"
+        },
+        {
+          "index": 4,
+          "name": "/backbone/stage3/stage3.7/Reshape_1_output_0",
+          "shape": [
+            1,
+            232,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "6d04dca4b79e0134f07eaa1215d7183e7e8768e327b261b550fef828f2691756"
+        },
+        {
+          "index": 5,
+          "name": "/backbone/stage4/stage4.3/Reshape_1_output_0",
+          "shape": [
+            1,
+            464,
+            10,
+            10
+          ],
+          "dtype": "float32",
+          "sha256": "bc0e6473172b30c10f8cb0f2e6f2ceac0fc6ed5d36730e8f602887c3bdf02463"
+        }
+      ]
+    },
+    {
+      "image_id": 8886,
+      "image_sha256": "2a75c8adf7ae47a7fcf1989a9f79a164c645511d42aa26df782dafe5fe96231a",
+      "input_sha256": "73fa65a4300547d3536d8d346da07a0149afbd1044538911c7b5fbfd7d0ac514",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/backbone/references/image-8886.npz",
+        "sha256": "d8a33e79a145141fef93a6a207c6492bb126adaa372bb4efaa5f83f9f8d3331c"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/backbone/conv1/conv1.0/Conv_output_0",
+          "shape": [
+            1,
+            24,
+            160,
+            160
+          ],
+          "dtype": "float32",
+          "sha256": "2d0671fd5bf471ffc85843d93197e87517b366729cec90e2053f189b2e836845"
+        },
+        {
+          "index": 1,
+          "name": "/backbone/conv1/conv1.2/LeakyRelu_output_0",
+          "shape": [
+            1,
+            24,
+            160,
+            160
+          ],
+          "dtype": "float32",
+          "sha256": "fba3a1f40ed41284a89afc2d7260a124d365e3488e46b2c3e30096ec3f9c2ec6"
+        },
+        {
+          "index": 2,
+          "name": "/backbone/maxpool/MaxPool_output_0",
+          "shape": [
+            1,
+            24,
+            80,
+            80
+          ],
+          "dtype": "float32",
+          "sha256": "118d6abb85584c1d33d82de1c3aab1a0b599077d759e85eb00c4ebd817ab22e1"
+        },
+        {
+          "index": 3,
+          "name": "/backbone/stage2/stage2.3/Reshape_1_output_0",
+          "shape": [
+            1,
+            116,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "9c18f0eaf7a6ecec3b0945cda32d07adf6098bc4c08fc730edae70575f68bbf9"
+        },
+        {
+          "index": 4,
+          "name": "/backbone/stage3/stage3.7/Reshape_1_output_0",
+          "shape": [
+            1,
+            232,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "d8793dad22dc81a246dd8425000ec58f349c8ee449ecab6a998c5a2394a56323"
+        },
+        {
+          "index": 5,
+          "name": "/backbone/stage4/stage4.3/Reshape_1_output_0",
+          "shape": [
+            1,
+            464,
+            10,
+            10
+          ],
+          "dtype": "float32",
+          "sha256": "c3f5e62e3a038646d45fcd371b9f8daf9d261f49031e95d8f3d4c9fb7ce21c44"
+        }
+      ]
+    },
+    {
+      "image_id": 9266,
+      "image_sha256": "b6d54e60be0e7a19fe1a40e5024007090616f3b6051f6626b65c93db6e5a80ab",
+      "input_sha256": "f4ceba27462b64dd4ec2c9f05e2c86c041adf27c8415d622e29f064dc0454aa6",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/backbone/references/image-9266.npz",
+        "sha256": "e84a9279202c519524339c74308568347f941ce0a2fbf3559098cf6abf30d1e2"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/backbone/conv1/conv1.0/Conv_output_0",
+          "shape": [
+            1,
+            24,
+            160,
+            160
+          ],
+          "dtype": "float32",
+          "sha256": "3ee34b83042e41e1e3b7f935a9aa4cc73067a73bc2a1a797793bbbf038d52f18"
+        },
+        {
+          "index": 1,
+          "name": "/backbone/conv1/conv1.2/LeakyRelu_output_0",
+          "shape": [
+            1,
+            24,
+            160,
+            160
+          ],
+          "dtype": "float32",
+          "sha256": "21de6a08081e67e0b8e76a1188fca06d4295b865a401ad0d07496381550bf11f"
+        },
+        {
+          "index": 2,
+          "name": "/backbone/maxpool/MaxPool_output_0",
+          "shape": [
+            1,
+            24,
+            80,
+            80
+          ],
+          "dtype": "float32",
+          "sha256": "87f56d2fcb04ddafc11766c8eaf274ce726780d233f26efb2141c127b8b16c18"
+        },
+        {
+          "index": 3,
+          "name": "/backbone/stage2/stage2.3/Reshape_1_output_0",
+          "shape": [
+            1,
+            116,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "db45ae68dc77a51d29f9e4d8f7bf336e90c314c229cea637531eb96317467912"
+        },
+        {
+          "index": 4,
+          "name": "/backbone/stage3/stage3.7/Reshape_1_output_0",
+          "shape": [
+            1,
+            232,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "75bf4ef3083dfa1af9bb585067a7267d724ed6a9245961f011deb61d9b17dde7"
+        },
+        {
+          "index": 5,
+          "name": "/backbone/stage4/stage4.3/Reshape_1_output_0",
+          "shape": [
+            1,
+            464,
+            10,
+            10
+          ],
+          "dtype": "float32",
+          "sha256": "35b4b2b0d4289511ef15b1e785e5b9fc0dd7fce5a6382aaa72c5bc0f4145431f"
+        }
+      ]
+    }
+  ],
+  "cuda_profile": {
+    "path": "onnxruntime_profile__2026-11-15_20-01-20.json",
+    "sha256": "dbb1250c81d6fb4028dec4598de5ce1ba6f37011065f3387ad76ee2e099f0339",
+    "node_providers": {
+      "CUDAExecutionProvider": 546
+    }
+  },
+  "endpoint_checks_against_full_onnx": []
+}

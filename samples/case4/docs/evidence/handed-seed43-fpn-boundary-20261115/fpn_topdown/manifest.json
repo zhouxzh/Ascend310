@@ -1,0 +1,493 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_intermediate_probe",
+  "created_at": "2026-11-15T20:24:52.686+08:00",
+  "probe": "fpn_topdown",
+  "source_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/nanodet-plus-m-320-palm.onnx",
+    "sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991"
+  },
+  "probe_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/fpn_topdown/seed43-fpn_topdown-probe.onnx",
+    "sha256": "9247eb23efbd83678398fbfddef02794403c1a3e3227529ee3edacc46ffeae02",
+    "bytes": 3773383
+  },
+  "input": {
+    "name": "data",
+    "shape": [
+      1,
+      3,
+      320,
+      320
+    ],
+    "dtype": "float32"
+  },
+  "outputs": [
+    {
+      "index": 0,
+      "name": "/fpn/reduce_layers.0/act/LeakyRelu_output_0",
+      "shape": [
+        1,
+        96,
+        40,
+        40
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 1,
+      "name": "/fpn/reduce_layers.1/act/LeakyRelu_output_0",
+      "shape": [
+        1,
+        96,
+        20,
+        20
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 2,
+      "name": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+      "shape": [
+        1,
+        96,
+        10,
+        10
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 3,
+      "name": "/fpn/upsample/Resize_output_0",
+      "shape": [
+        1,
+        96,
+        20,
+        20
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 4,
+      "name": "/fpn/Concat_output_0",
+      "shape": [
+        1,
+        192,
+        20,
+        20
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 5,
+      "name": "/fpn/top_down_blocks.0/blocks/blocks.0/Add_output_0",
+      "shape": [
+        1,
+        96,
+        20,
+        20
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 6,
+      "name": "/fpn/upsample_1/Resize_output_0",
+      "shape": [
+        1,
+        96,
+        40,
+        40
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 7,
+      "name": "/fpn/Concat_1_output_0",
+      "shape": [
+        1,
+        192,
+        40,
+        40
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 8,
+      "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+      "shape": [
+        1,
+        96,
+        40,
+        40
+      ],
+      "dtype": "float32"
+    }
+  ],
+  "samples": [
+    {
+      "image_id": 8781,
+      "image_sha256": "7d68a2121a1e577d48cba82d5b9a07ae819c82e219e65dba6cd6cc24ac20eca2",
+      "input_sha256": "5a67678c8749e3d9babc47cd29d9f54d919e1d0cb2f9c0662b0da96f286099fe",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/fpn_topdown/references/image-8781.npz",
+        "sha256": "111e44649d384b3808d8e8847e57389c322d31da71768336157e07f949c85d0f"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/reduce_layers.0/act/LeakyRelu_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "0fd402470cebded8d2d9781833b511196d428e23ff1904c5f2768978b9291d1c"
+        },
+        {
+          "index": 1,
+          "name": "/fpn/reduce_layers.1/act/LeakyRelu_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "d73bb6a821a81411b9c0a447511effca3dea0f51f76a452f853e084a8b4c101b"
+        },
+        {
+          "index": 2,
+          "name": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+          "shape": [
+            1,
+            96,
+            10,
+            10
+          ],
+          "dtype": "float32",
+          "sha256": "4e70b95e527dfc7b61e4c541a2e2c484a2467440c44262cd38b9dedefa95e9f9"
+        },
+        {
+          "index": 3,
+          "name": "/fpn/upsample/Resize_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "970677f4e077e734b0410e4ae299c543dfe8aa0531aadc2fa27aa69809f4bd41"
+        },
+        {
+          "index": 4,
+          "name": "/fpn/Concat_output_0",
+          "shape": [
+            1,
+            192,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "263eca27a7ae418f3f52c0b363427d03cd342c44f3edae0e30a157c08c5d955d"
+        },
+        {
+          "index": 5,
+          "name": "/fpn/top_down_blocks.0/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "9096315713e97ca6f449f9e412f4a141fef7fd0a46f884e9fa7ed0e416c0ccc7"
+        },
+        {
+          "index": 6,
+          "name": "/fpn/upsample_1/Resize_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "03d776f1b0cb56f75de31f86ea798061342e51d5364a9dad7d44987bd1524007"
+        },
+        {
+          "index": 7,
+          "name": "/fpn/Concat_1_output_0",
+          "shape": [
+            1,
+            192,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "21701c64ec91ab54ebed2bdcb32529f5834d838c105865392b369948294e5506"
+        },
+        {
+          "index": 8,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "68ccc68a6d03e484ba5d3d5379145cd0f8da75e3df69dd99de272e7d28c0f36d"
+        }
+      ]
+    },
+    {
+      "image_id": 8886,
+      "image_sha256": "2a75c8adf7ae47a7fcf1989a9f79a164c645511d42aa26df782dafe5fe96231a",
+      "input_sha256": "73fa65a4300547d3536d8d346da07a0149afbd1044538911c7b5fbfd7d0ac514",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/fpn_topdown/references/image-8886.npz",
+        "sha256": "275238ec09742d6c8928a10950785d74bf77cc251514b1661321731c8c4e30a6"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/reduce_layers.0/act/LeakyRelu_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "71650d6756b91bbd50a7d2e3da1bb8ba8ac7aeb529e188284066191c9f957839"
+        },
+        {
+          "index": 1,
+          "name": "/fpn/reduce_layers.1/act/LeakyRelu_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "c9d1447cfab967c694553086fc0ef849186b36d1dd41fcd061cb6cb1f5e68ea2"
+        },
+        {
+          "index": 2,
+          "name": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+          "shape": [
+            1,
+            96,
+            10,
+            10
+          ],
+          "dtype": "float32",
+          "sha256": "46f6f736dd4cbe97c8b42177b0d15b3de4323604ba64b68aacb4f3d7dfc7017f"
+        },
+        {
+          "index": 3,
+          "name": "/fpn/upsample/Resize_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "53edc7a0d61bc2cf241e8a03d82ade7dcb08f82813675a7cde3e6023c69b6a85"
+        },
+        {
+          "index": 4,
+          "name": "/fpn/Concat_output_0",
+          "shape": [
+            1,
+            192,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "553edc69435162c655ccd23dacb38416242039c6acb769dcdb2d19b812b2cbff"
+        },
+        {
+          "index": 5,
+          "name": "/fpn/top_down_blocks.0/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "57618ceede61b954bb77d8cd63dd2f9f31d09485ba3daacb61bb49dbfade91b1"
+        },
+        {
+          "index": 6,
+          "name": "/fpn/upsample_1/Resize_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "8d49c1998dae2a29aef68f6119d531bb33d0fd1a41afb3b7f31ebf67e4eb1bd7"
+        },
+        {
+          "index": 7,
+          "name": "/fpn/Concat_1_output_0",
+          "shape": [
+            1,
+            192,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "0eccb3d1e9c103acdae12a369ffdf545bc30ec83ae0a7a36d164573278084d08"
+        },
+        {
+          "index": 8,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "731bcbb3bba5ad214b6b0813133731dbe59c91ad9b1fef39a95e975387f78378"
+        }
+      ]
+    },
+    {
+      "image_id": 9266,
+      "image_sha256": "b6d54e60be0e7a19fe1a40e5024007090616f3b6051f6626b65c93db6e5a80ab",
+      "input_sha256": "f4ceba27462b64dd4ec2c9f05e2c86c041adf27c8415d622e29f064dc0454aa6",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/fpn_topdown/references/image-9266.npz",
+        "sha256": "a463b2633044e3297aeaa2fe809b99b68074eb82151bd8b65f9331d6f22b6f03"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/reduce_layers.0/act/LeakyRelu_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "c50cba26836063ff892d191c41af6b1c6f8bcb13c57e4f5b7277147502d392f8"
+        },
+        {
+          "index": 1,
+          "name": "/fpn/reduce_layers.1/act/LeakyRelu_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "350596115b2950d12e3c5015f951b06b925a14f3469d8e21a7e69e78b2392482"
+        },
+        {
+          "index": 2,
+          "name": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+          "shape": [
+            1,
+            96,
+            10,
+            10
+          ],
+          "dtype": "float32",
+          "sha256": "90c556579a47584959211f0219abcf34c78bc45fa1526643c26e1a5428faf1af"
+        },
+        {
+          "index": 3,
+          "name": "/fpn/upsample/Resize_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "477e22c9a3eacf6f085a773e6433c22e247c4abff4c4ae5593966a02107e5e9c"
+        },
+        {
+          "index": 4,
+          "name": "/fpn/Concat_output_0",
+          "shape": [
+            1,
+            192,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "53084ce157435682531e4422e1d6bd3a1fb801e7fa802fbf4ab0680577c56993"
+        },
+        {
+          "index": 5,
+          "name": "/fpn/top_down_blocks.0/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "6b6972bacc41784c3d228f063e839cb6f304bbeff1c3e176dfa51be15b71b731"
+        },
+        {
+          "index": 6,
+          "name": "/fpn/upsample_1/Resize_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "75ee738c22cd30256c98d28e7dbbf86fa6d28f1bd7ac3e3a4f98a66e2cc33cb4"
+        },
+        {
+          "index": 7,
+          "name": "/fpn/Concat_1_output_0",
+          "shape": [
+            1,
+            192,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "d974c93f44360fdf67c292182641887f0961b8ee1faf01759ea2066d325fcf2a"
+        },
+        {
+          "index": 8,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "2f7ed67500515d526a7faf66298da57cc487e47b7d8da9432e5132291f3dfa7d"
+        }
+      ]
+    }
+  ],
+  "cuda_profile": {
+    "path": "onnxruntime_profile__2026-11-15_20-24-51.json",
+    "sha256": "fe11180f36afa3be7f105ea74453fe978a299051518ddff87ce02b0c0f545559",
+    "node_providers": {
+      "CUDAExecutionProvider": 642
+    }
+  },
+  "endpoint_checks_against_full_onnx": []
+}

@@ -1,0 +1,836 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_fulltest_onnx_vs_8t_om_summary",
+  "scope": "ACE2 CUDA ONNX reference and Ascend310B4/8T OM only; no 20T results",
+  "onnx_cuda": {
+    "summary_path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/evaluations/onnx-cuda-test/summary-without-images.json",
+    "summary_sha256": "8ecc6c5ae6c5666920b30b52ae18c686faa30bb7d3de81872fee1acafbcc6075",
+    "schema_version": 1,
+    "kind": "handed_nanodet_onnx_cuda_fulltest_summary",
+    "run_id": "nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300",
+    "source_onnx_sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991",
+    "annotations_sha256": "5db886eb40a75789b62b708445141081e2ca2c5276d445174efa3446b6b70b8a",
+    "execution_status": "completed",
+    "providers": [
+      "CUDAExecutionProvider",
+      "CPUExecutionProvider"
+    ],
+    "node_providers": {
+      "CUDAExecutionProvider": 494709
+    },
+    "dataset": {
+      "images": 1600,
+      "annotations": 1601,
+      "image_ids_sha256": "9a31644ffcc9aca35575d50adedb3f4d912f52777f82407bcb884aa39b875658"
+    },
+    "performance": {
+      "scope": "ORT session.run CUDA inference only; excludes image reading, preprocessing, decode and metric calculation",
+      "warmup": 1,
+      "count": 1600,
+      "p50_ms": 3.0015975,
+      "p95_ms": 3.1620959999999996,
+      "mean_ms": 3.059957785625,
+      "min_ms": 2.965147,
+      "max_ms": 21.410032
+    },
+    "metrics": {
+      "coco": {
+        "metrics": {
+          "mAP50_95": 0.6756978595610517,
+          "AP50": 0.9855979200456066,
+          "AP75": 0.8261999225478591,
+          "AP_small": 0.40154727226871817,
+          "AP_medium": 0.6811250861536131,
+          "AP_large": 0.7083723505293673
+        },
+        "per_class": {
+          "left_palm": {
+            "AP50": 0.9855191956547809,
+            "mAP50_95": 0.6820785781544649
+          },
+          "right_palm": {
+            "AP50": 0.9856766444364323,
+            "mAP50_95": 0.6693171409676384
+          }
+        },
+        "prediction_count": 4316
+      },
+      "task": {
+        "score_threshold": 0.35,
+        "iou_threshold": 0.5,
+        "groups": {
+          "all": {
+            "ground_truth": 1601,
+            "predictions": 1604,
+            "matched": 1578,
+            "correct_handedness": 1572,
+            "wrong_handedness": 6,
+            "missed": 23,
+            "duplicate": 4,
+            "false_positive": 22,
+            "correct_handedness_rate": 0.9961977186311787,
+            "miss_rate": 0.014366021236727046,
+            "duplicate_rate": 0.0024984384759525295,
+            "false_positive_rate": 0.01371571072319202
+          }
+        }
+      }
+    },
+    "predictions": {
+      "path": "predictions.coco.json",
+      "sha256": "0f4034675d19367989094ee70f569ec0840c865a33abfd6a15b4d170e9e603c2",
+      "count": 4316
+    },
+    "reference_pack": {
+      "manifest_path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/reference-pack-cuda-fulltest/manifest.json",
+      "manifest_sha256": "362468de972e5affdabf5adbba46f6875c71ede1b7e60c8612b460096bc9303d"
+    },
+    "privacy": "No images, input tensors, raw outputs, or prediction boxes are included."
+  },
+  "8t_modes": {
+    "force_fp32": {
+      "backend": {
+        "report_path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/evaluations/om-8t-fulltest/fulltest-force_fp32/board-evaluation-report.v1.json",
+        "report_sha256": "59169b999394dce16bc98b558bd43dba287ad7674e2f8ca15db76c9d78acd83e",
+        "execution_status": "completed",
+        "artifact": {
+          "om_path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-five-20261115/om/handed_seed43_force_fp32.om",
+          "om_sha256": "23e7db9776d06bcc646f4c6d3a0a44ccf6941225d6d78f743823acc1b3629ad2",
+          "om_bytes": 6546705,
+          "precision_mode": "force_fp32"
+        },
+        "board": {
+          "tier": "8t",
+          "device": 0
+        },
+        "source": {
+          "onnx_sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991",
+          "annotations_path": "/home/HwHiAiUser/Documents/Ascend310/assets/case4/datasets/handed-seed43-fulltest-20261115/instances_test.json",
+          "annotations_sha256": "5db886eb40a75789b62b708445141081e2ca2c5276d445174efa3446b6b70b8a"
+        },
+        "om_contract": {
+          "input_shape": [
+            1,
+            3,
+            320,
+            320
+          ],
+          "output_shape": [
+            1,
+            2125,
+            34
+          ],
+          "input_dtype": "float32",
+          "output_dtype": "float32"
+        },
+        "raw_agreement": {
+          "images": 1600,
+          "non_finite_images": 0,
+          "atol": 0.02,
+          "rtol": 0.02,
+          "allclose_images": 0,
+          "allclose_rate": 0.0,
+          "raw_max_abs_error": 6.173583984375,
+          "raw_mean_abs_error": 0.09023468116854581,
+          "class_max_abs_error": 0.7142029404640198,
+          "class_mean_abs_error": 0.0009442973428110221,
+          "dfl_max_abs_error": 6.173583984375,
+          "dfl_mean_abs_error": 0.09581533015765425
+        },
+        "performance": {
+          "scope": "H2D + ACL execute + device synchronize + D2H; excludes JPEG decode, preprocessing, DFL/NMS and metrics",
+          "warmup": 20,
+          "count": 1600,
+          "p50_ms": 18.230723,
+          "p95_ms": 18.3802864,
+          "mean_ms": 18.240918801875,
+          "min_ms": 18.056511,
+          "max_ms": 18.795858
+        },
+        "predictions": {
+          "path": "predictions.coco.json",
+          "sha256": "9c4329353f08a3eec95e810416071866bfee2fc06543b32b38f7a2912bedf73c",
+          "count": 5154
+        },
+        "diagnostics": {
+          "path": "per-image-diagnostics.jsonl",
+          "sha256": "92c8c476cee0d9d6562e71f9d2f8e83b3553c49672fdc3ab3e3a1abfdd31d3b7",
+          "images": 1600
+        },
+        "reference_pack": {
+          "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/reference",
+          "manifest_sha256": "362468de972e5affdabf5adbba46f6875c71ede1b7e60c8612b460096bc9303d"
+        },
+        "cleanup_ok": true,
+        "cleanup": [
+          {
+            "phase": "set_context_before_cleanup",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_output_data_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_input_data_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_output_dataset",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_input_dataset",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "free_output_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "free_input_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_model_desc",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "unload_model",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_context",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "acl_reset_device",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "acl_finalize",
+            "ok": true,
+            "return_code": 0
+          }
+        ],
+        "error": null
+      },
+      "metrics_path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/evaluations/om-8t-fulltest/fulltest-force_fp32/task-metrics.v1.json",
+      "metrics_sha256": "2fcb14bb60f30dce829a0013c9e275689b3ff826f865f3e851f3e93585f1f061",
+      "metrics": {
+        "coco": {
+          "metrics": {
+            "mAP50_95": 0.5608038717270114,
+            "AP50": 0.9802433374806645,
+            "AP75": 0.5973126532733322,
+            "AP_small": 0.2850818460814573,
+            "AP_medium": 0.5660741141777654,
+            "AP_large": 0.6138792288166762
+          },
+          "per_class": {
+            "left_palm": {
+              "AP50": 0.9809477346511796,
+              "mAP50_95": 0.5679472453711534
+            },
+            "right_palm": {
+              "AP50": 0.9795389403101495,
+              "mAP50_95": 0.5536604980828692
+            }
+          },
+          "prediction_count": 5154
+        },
+        "task": {
+          "score_threshold": 0.35,
+          "iou_threshold": 0.5,
+          "groups": {
+            "all": {
+              "ground_truth": 1601,
+              "predictions": 1616,
+              "matched": 1564,
+              "correct_handedness": 1558,
+              "wrong_handedness": 6,
+              "missed": 37,
+              "duplicate": 2,
+              "false_positive": 50,
+              "correct_handedness_rate": 0.9961636828644501,
+              "miss_rate": 0.0231105559025609,
+              "duplicate_rate": 0.0012492192379762648,
+              "false_positive_rate": 0.03094059405940594
+            }
+          }
+        }
+      }
+    },
+    "allow_fp32_to_fp16": {
+      "backend": {
+        "report_path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/evaluations/om-8t-fulltest/fulltest-allow_fp32_to_fp16/board-evaluation-report.v1.json",
+        "report_sha256": "4d4ebfdb4e48c8e5ba0d72a958613dcdd4519d1bc82fc22b3519c888cd3deba1",
+        "execution_status": "completed",
+        "artifact": {
+          "om_path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-five-20261115/om/handed_seed43_allow_fp32_to_fp16.om",
+          "om_sha256": "380c134f5d3b0c80febc6d0fa30c7b960148ca06f16763c0b6c9a3a84065a7ea",
+          "om_bytes": 6494500,
+          "precision_mode": "allow_fp32_to_fp16"
+        },
+        "board": {
+          "tier": "8t",
+          "device": 0
+        },
+        "source": {
+          "onnx_sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991",
+          "annotations_path": "/home/HwHiAiUser/Documents/Ascend310/assets/case4/datasets/handed-seed43-fulltest-20261115/instances_test.json",
+          "annotations_sha256": "5db886eb40a75789b62b708445141081e2ca2c5276d445174efa3446b6b70b8a"
+        },
+        "om_contract": {
+          "input_shape": [
+            1,
+            3,
+            320,
+            320
+          ],
+          "output_shape": [
+            1,
+            2125,
+            34
+          ],
+          "input_dtype": "float32",
+          "output_dtype": "float32"
+        },
+        "raw_agreement": {
+          "images": 1600,
+          "non_finite_images": 0,
+          "atol": 0.02,
+          "rtol": 0.02,
+          "allclose_images": 0,
+          "allclose_rate": 0.0,
+          "raw_max_abs_error": 6.1694536209106445,
+          "raw_mean_abs_error": 0.09024311867318316,
+          "class_max_abs_error": 0.7139174938201904,
+          "class_mean_abs_error": 0.0009436849579356434,
+          "dfl_max_abs_error": 6.1694536209106445,
+          "dfl_mean_abs_error": 0.0958243332803863
+        },
+        "performance": {
+          "scope": "H2D + ACL execute + device synchronize + D2H; excludes JPEG decode, preprocessing, DFL/NMS and metrics",
+          "warmup": 20,
+          "count": 1600,
+          "p50_ms": 18.152368,
+          "p95_ms": 18.2780881,
+          "mean_ms": 18.15973802,
+          "min_ms": 17.989865,
+          "max_ms": 18.940215
+        },
+        "predictions": {
+          "path": "predictions.coco.json",
+          "sha256": "34e6c8f5c597eab71078ed0be31e2b0ad8c5032be496636847ac04507f0deca5",
+          "count": 5150
+        },
+        "diagnostics": {
+          "path": "per-image-diagnostics.jsonl",
+          "sha256": "287cbbf47cd5e231d5990f66f39da3e1b4a45e5ade1e9401b5a77d5d447e8043",
+          "images": 1600
+        },
+        "reference_pack": {
+          "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/reference",
+          "manifest_sha256": "362468de972e5affdabf5adbba46f6875c71ede1b7e60c8612b460096bc9303d"
+        },
+        "cleanup_ok": true,
+        "cleanup": [
+          {
+            "phase": "set_context_before_cleanup",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_output_data_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_input_data_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_output_dataset",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_input_dataset",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "free_output_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "free_input_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_model_desc",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "unload_model",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_context",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "acl_reset_device",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "acl_finalize",
+            "ok": true,
+            "return_code": 0
+          }
+        ],
+        "error": null
+      },
+      "metrics_path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/evaluations/om-8t-fulltest/fulltest-allow_fp32_to_fp16/task-metrics.v1.json",
+      "metrics_sha256": "7f5a8fb305bd93a53b942e4647616a17267073d431f7720ffe6ffe918ca10caa",
+      "metrics": {
+        "coco": {
+          "metrics": {
+            "mAP50_95": 0.560754486850811,
+            "AP50": 0.9802322342034566,
+            "AP75": 0.5974437054268324,
+            "AP_small": 0.28513154946481967,
+            "AP_medium": 0.5659451526417923,
+            "AP_large": 0.6138792288166762
+          },
+          "per_class": {
+            "left_palm": {
+              "AP50": 0.9809416301129416,
+              "mAP50_95": 0.568002839093371
+            },
+            "right_palm": {
+              "AP50": 0.9795228382939716,
+              "mAP50_95": 0.5535061346082509
+            }
+          },
+          "prediction_count": 5150
+        },
+        "task": {
+          "score_threshold": 0.35,
+          "iou_threshold": 0.5,
+          "groups": {
+            "all": {
+              "ground_truth": 1601,
+              "predictions": 1616,
+              "matched": 1564,
+              "correct_handedness": 1558,
+              "wrong_handedness": 6,
+              "missed": 37,
+              "duplicate": 2,
+              "false_positive": 50,
+              "correct_handedness_rate": 0.9961636828644501,
+              "miss_rate": 0.0231105559025609,
+              "duplicate_rate": 0.0012492192379762648,
+              "false_positive_rate": 0.03094059405940594
+            }
+          }
+        }
+      }
+    },
+    "force_fp16": {
+      "backend": {
+        "report_path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/evaluations/om-8t-fulltest/fulltest-force_fp16/board-evaluation-report.v1.json",
+        "report_sha256": "619e0c4fd044a0d98ae88bc48fa147d0621877dbeff650cdb5832d8c52f8a0fc",
+        "execution_status": "completed",
+        "artifact": {
+          "om_path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-five-20261115/om/handed_seed43_force_fp16.om",
+          "om_sha256": "5b822a1ab1653a927912cd90c87bae2e78ae6cd57becd3590001ba6f4dd5066e",
+          "om_bytes": 6305833,
+          "precision_mode": "force_fp16"
+        },
+        "board": {
+          "tier": "8t",
+          "device": 0
+        },
+        "source": {
+          "onnx_sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991",
+          "annotations_path": "/home/HwHiAiUser/Documents/Ascend310/assets/case4/datasets/handed-seed43-fulltest-20261115/instances_test.json",
+          "annotations_sha256": "5db886eb40a75789b62b708445141081e2ca2c5276d445174efa3446b6b70b8a"
+        },
+        "om_contract": {
+          "input_shape": [
+            1,
+            3,
+            320,
+            320
+          ],
+          "output_shape": [
+            1,
+            2125,
+            34
+          ],
+          "input_dtype": "float32",
+          "output_dtype": "float32"
+        },
+        "raw_agreement": {
+          "images": 1600,
+          "non_finite_images": 0,
+          "atol": 0.02,
+          "rtol": 0.02,
+          "allclose_images": 0,
+          "allclose_rate": 0.0,
+          "raw_max_abs_error": 6.1616411209106445,
+          "raw_mean_abs_error": 0.09015839408466148,
+          "class_max_abs_error": 0.7134786248207092,
+          "class_mean_abs_error": 0.0009426768422039116,
+          "dfl_max_abs_error": 6.1616411209106445,
+          "dfl_mean_abs_error": 0.09573437641231508
+        },
+        "performance": {
+          "scope": "H2D + ACL execute + device synchronize + D2H; excludes JPEG decode, preprocessing, DFL/NMS and metrics",
+          "warmup": 20,
+          "count": 1600,
+          "p50_ms": 8.6146135,
+          "p95_ms": 8.712169699999999,
+          "mean_ms": 8.619015751249998,
+          "min_ms": 8.449517,
+          "max_ms": 9.235655
+        },
+        "predictions": {
+          "path": "predictions.coco.json",
+          "sha256": "fed9a8949feff0b25bcbd6b67d24e1128125c1c5531be5c5896de53e06e7002f",
+          "count": 5138
+        },
+        "diagnostics": {
+          "path": "per-image-diagnostics.jsonl",
+          "sha256": "207057b82b5f0c8ff8647c0993380100412032a4d5603c9500875979bffab624",
+          "images": 1600
+        },
+        "reference_pack": {
+          "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/reference",
+          "manifest_sha256": "362468de972e5affdabf5adbba46f6875c71ede1b7e60c8612b460096bc9303d"
+        },
+        "cleanup_ok": true,
+        "cleanup": [
+          {
+            "phase": "set_context_before_cleanup",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_output_data_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_input_data_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_output_dataset",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_input_dataset",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "free_output_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "free_input_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_model_desc",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "unload_model",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_context",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "acl_reset_device",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "acl_finalize",
+            "ok": true,
+            "return_code": 0
+          }
+        ],
+        "error": null
+      },
+      "metrics_path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/evaluations/om-8t-fulltest/fulltest-force_fp16/task-metrics.v1.json",
+      "metrics_sha256": "9884e93c6266e1320a0890a07dd74ccd2604a79c5eb7614c740b1af34e2f93a6",
+      "metrics": {
+        "coco": {
+          "metrics": {
+            "mAP50_95": 0.5607993693575033,
+            "AP50": 0.9802623069336318,
+            "AP75": 0.5983470483988977,
+            "AP_small": 0.2846152560050943,
+            "AP_medium": 0.5660220436227447,
+            "AP_large": 0.6138792288166762
+          },
+          "per_class": {
+            "left_palm": {
+              "AP50": 0.9809621043382647,
+              "mAP50_95": 0.567932613214094
+            },
+            "right_palm": {
+              "AP50": 0.9795625095289991,
+              "mAP50_95": 0.5536661255009124
+            }
+          },
+          "prediction_count": 5138
+        },
+        "task": {
+          "score_threshold": 0.35,
+          "iou_threshold": 0.5,
+          "groups": {
+            "all": {
+              "ground_truth": 1601,
+              "predictions": 1616,
+              "matched": 1564,
+              "correct_handedness": 1558,
+              "wrong_handedness": 6,
+              "missed": 37,
+              "duplicate": 2,
+              "false_positive": 50,
+              "correct_handedness_rate": 0.9961636828644501,
+              "miss_rate": 0.0231105559025609,
+              "duplicate_rate": 0.0012492192379762648,
+              "false_positive_rate": 0.03094059405940594
+            }
+          }
+        }
+      }
+    },
+    "allow_mix_precision": {
+      "backend": {
+        "report_path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/evaluations/om-8t-fulltest/fulltest-allow_mix_precision/board-evaluation-report.v1.json",
+        "report_sha256": "07c5dbd5c26e0eca072d72df950bb5e076e6bcd68a120567b0273ffd2e6666d7",
+        "execution_status": "completed",
+        "artifact": {
+          "om_path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-five-20261115/om/handed_seed43_allow_mix_precision.om",
+          "om_sha256": "773ae33c1dc4de078298e47234dc19a271caf4c2ec68aa888aeb2267ea8e5776",
+          "om_bytes": 6327060,
+          "precision_mode": "allow_mix_precision"
+        },
+        "board": {
+          "tier": "8t",
+          "device": 0
+        },
+        "source": {
+          "onnx_sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991",
+          "annotations_path": "/home/HwHiAiUser/Documents/Ascend310/assets/case4/datasets/handed-seed43-fulltest-20261115/instances_test.json",
+          "annotations_sha256": "5db886eb40a75789b62b708445141081e2ca2c5276d445174efa3446b6b70b8a"
+        },
+        "om_contract": {
+          "input_shape": [
+            1,
+            3,
+            320,
+            320
+          ],
+          "output_shape": [
+            1,
+            2125,
+            34
+          ],
+          "input_dtype": "float32",
+          "output_dtype": "float32"
+        },
+        "raw_agreement": {
+          "images": 1600,
+          "non_finite_images": 0,
+          "atol": 0.02,
+          "rtol": 0.02,
+          "allclose_images": 0,
+          "allclose_rate": 0.0,
+          "raw_max_abs_error": 6.1616411209106445,
+          "raw_mean_abs_error": 0.09015839408466148,
+          "class_max_abs_error": 0.7134786248207092,
+          "class_mean_abs_error": 0.0009426768422039116,
+          "dfl_max_abs_error": 6.1616411209106445,
+          "dfl_mean_abs_error": 0.09573437641231508
+        },
+        "performance": {
+          "scope": "H2D + ACL execute + device synchronize + D2H; excludes JPEG decode, preprocessing, DFL/NMS and metrics",
+          "warmup": 20,
+          "count": 1600,
+          "p50_ms": 8.7711375,
+          "p95_ms": 8.853794050000001,
+          "mean_ms": 8.77321152625,
+          "min_ms": 8.624228,
+          "max_ms": 9.770935
+        },
+        "predictions": {
+          "path": "predictions.coco.json",
+          "sha256": "fed9a8949feff0b25bcbd6b67d24e1128125c1c5531be5c5896de53e06e7002f",
+          "count": 5138
+        },
+        "diagnostics": {
+          "path": "per-image-diagnostics.jsonl",
+          "sha256": "5e7920c866a696acf3beebdb277b44da67767b8224475b397f976bfeac3bcd3a",
+          "images": 1600
+        },
+        "reference_pack": {
+          "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/reference",
+          "manifest_sha256": "362468de972e5affdabf5adbba46f6875c71ede1b7e60c8612b460096bc9303d"
+        },
+        "cleanup_ok": true,
+        "cleanup": [
+          {
+            "phase": "set_context_before_cleanup",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_output_data_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_input_data_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_output_dataset",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_input_dataset",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "free_output_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "free_input_buffer",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_model_desc",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "unload_model",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "destroy_context",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "acl_reset_device",
+            "ok": true,
+            "return_code": 0
+          },
+          {
+            "phase": "acl_finalize",
+            "ok": true,
+            "return_code": 0
+          }
+        ],
+        "error": null
+      },
+      "metrics_path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/evaluations/om-8t-fulltest/fulltest-allow_mix_precision/task-metrics.v1.json",
+      "metrics_sha256": "4cc85f780b86276f747ee3cc687bdad150182130d7cf8f37f07340654a0afd99",
+      "metrics": {
+        "coco": {
+          "metrics": {
+            "mAP50_95": 0.5607993693575033,
+            "AP50": 0.9802623069336318,
+            "AP75": 0.5983470483988977,
+            "AP_small": 0.2846152560050943,
+            "AP_medium": 0.5660220436227447,
+            "AP_large": 0.6138792288166762
+          },
+          "per_class": {
+            "left_palm": {
+              "AP50": 0.9809621043382647,
+              "mAP50_95": 0.567932613214094
+            },
+            "right_palm": {
+              "AP50": 0.9795625095289991,
+              "mAP50_95": 0.5536661255009124
+            }
+          },
+          "prediction_count": 5138
+        },
+        "task": {
+          "score_threshold": 0.35,
+          "iou_threshold": 0.5,
+          "groups": {
+            "all": {
+              "ground_truth": 1601,
+              "predictions": 1616,
+              "matched": 1564,
+              "correct_handedness": 1558,
+              "wrong_handedness": 6,
+              "missed": 37,
+              "duplicate": 2,
+              "false_positive": 50,
+              "correct_handedness_rate": 0.9961636828644501,
+              "miss_rate": 0.0231105559025609,
+              "duplicate_rate": 0.0012492192379762648,
+              "false_positive_rate": 0.03094059405940594
+            }
+          }
+        }
+      }
+    }
+  },
+  "not_run": {
+    "must_keep_origin_dtype": {
+      "atc_exit": 255,
+      "reason": "MaxPoolV3 DT_FLOAT input is unsupported for this model/CANN8/Ascend310B4 conversion path; no OM existed for full test evaluation."
+    },
+    "20t": "Excluded from this task by user request because the 20T board has its own compute task."
+  },
+  "privacy": "No images, tensors, raw outputs, or complete prediction lists are included."
+}

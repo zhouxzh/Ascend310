@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_intermediate_probe",
+  "created_at": "2026-11-15T20:13:32.315+08:00",
+  "probe": "fpn",
+  "source_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/nanodet-plus-m-320-palm.onnx",
+    "sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991"
+  },
+  "probe_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/fpn/seed43-fpn-probe.onnx",
+    "sha256": "76c043158f50080f9d9364f5d7c270a47f7ffb60821abca2869304b1c4ea9030",
+    "bytes": 4285510
+  },
+  "input": {
+    "name": "data",
+    "shape": [
+      1,
+      3,
+      320,
+      320
+    ],
+    "dtype": "float32"
+  },
+  "outputs": [
+    {
+      "index": 0,
+      "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+      "shape": [
+        1,
+        96,
+        40,
+        40
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 1,
+      "name": "/fpn/bottom_up_blocks.0/blocks/blocks.0/Add_output_0",
+      "shape": [
+        1,
+        96,
+        20,
+        20
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 2,
+      "name": "/fpn/bottom_up_blocks.1/blocks/blocks.0/Add_output_0",
+      "shape": [
+        1,
+        96,
+        10,
+        10
+      ],
+      "dtype": "float32"
+    },
+    {
+      "index": 3,
+      "name": "/fpn/Add_output_0",
+      "shape": [
+        1,
+        96,
+        5,
+        5
+      ],
+      "dtype": "float32"
+    }
+  ],
+  "samples": [
+    {
+      "image_id": 8781,
+      "image_sha256": "7d68a2121a1e577d48cba82d5b9a07ae819c82e219e65dba6cd6cc24ac20eca2",
+      "input_sha256": "5a67678c8749e3d9babc47cd29d9f54d919e1d0cb2f9c0662b0da96f286099fe",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/fpn/references/image-8781.npz",
+        "sha256": "a5605901688e35ae9c8dbf69b8cc5791d1167df8d7a02c3614203594e127982d"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "68ccc68a6d03e484ba5d3d5379145cd0f8da75e3df69dd99de272e7d28c0f36d"
+        },
+        {
+          "index": 1,
+          "name": "/fpn/bottom_up_blocks.0/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "d433c98c4d38f23da903fdb17f850c6cfdca3dd52221dfecd696d128926c3ba4"
+        },
+        {
+          "index": 2,
+          "name": "/fpn/bottom_up_blocks.1/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            10,
+            10
+          ],
+          "dtype": "float32",
+          "sha256": "10efeef3687351d68a40b6cf028bb79a69944854ee8cffe79e7700d0799ff5aa"
+        },
+        {
+          "index": 3,
+          "name": "/fpn/Add_output_0",
+          "shape": [
+            1,
+            96,
+            5,
+            5
+          ],
+          "dtype": "float32",
+          "sha256": "d3da2a76a3d133927a239d19315ef43feaee94d01a75f5d31637b66078718a89"
+        }
+      ]
+    },
+    {
+      "image_id": 8886,
+      "image_sha256": "2a75c8adf7ae47a7fcf1989a9f79a164c645511d42aa26df782dafe5fe96231a",
+      "input_sha256": "73fa65a4300547d3536d8d346da07a0149afbd1044538911c7b5fbfd7d0ac514",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/fpn/references/image-8886.npz",
+        "sha256": "387757eabc00e016dfff7d17d4012f482589e8c0d03671cac4c99cf08bfed7b7"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "731bcbb3bba5ad214b6b0813133731dbe59c91ad9b1fef39a95e975387f78378"
+        },
+        {
+          "index": 1,
+          "name": "/fpn/bottom_up_blocks.0/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "95ea835def060c7bc70a49e41d1edae1af7ce6a46633fda1d9757eb349a26f84"
+        },
+        {
+          "index": 2,
+          "name": "/fpn/bottom_up_blocks.1/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            10,
+            10
+          ],
+          "dtype": "float32",
+          "sha256": "d0f72497c11a1c34c2d0f8e64ce2b22414a6ccdcfe88423131cb49f496d9425d"
+        },
+        {
+          "index": 3,
+          "name": "/fpn/Add_output_0",
+          "shape": [
+            1,
+            96,
+            5,
+            5
+          ],
+          "dtype": "float32",
+          "sha256": "462a61438a0097650e9bcf28201d3628f0742ecbd8844214f6d8774d0c5d5a9e"
+        }
+      ]
+    },
+    {
+      "image_id": 9266,
+      "image_sha256": "b6d54e60be0e7a19fe1a40e5024007090616f3b6051f6626b65c93db6e5a80ab",
+      "input_sha256": "f4ceba27462b64dd4ec2c9f05e2c86c041adf27c8415d622e29f064dc0454aa6",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/fpn/references/image-9266.npz",
+        "sha256": "c6f0ec793cf6c76346ded33da5da29e51321b80cc7122c13ddaeea9e42583b08"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            40,
+            40
+          ],
+          "dtype": "float32",
+          "sha256": "2f7ed67500515d526a7faf66298da57cc487e47b7d8da9432e5132291f3dfa7d"
+        },
+        {
+          "index": 1,
+          "name": "/fpn/bottom_up_blocks.0/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            20,
+            20
+          ],
+          "dtype": "float32",
+          "sha256": "81415810e8303bd7779f38a522570324026a7bb031b846e1ef4d9a5d42646558"
+        },
+        {
+          "index": 2,
+          "name": "/fpn/bottom_up_blocks.1/blocks/blocks.0/Add_output_0",
+          "shape": [
+            1,
+            96,
+            10,
+            10
+          ],
+          "dtype": "float32",
+          "sha256": "9cfccb99725c31fb5170796201b58e25918dfd3f92ed51ea833ec9b90b9579d0"
+        },
+        {
+          "index": 3,
+          "name": "/fpn/Add_output_0",
+          "shape": [
+            1,
+            96,
+            5,
+            5
+          ],
+          "dtype": "float32",
+          "sha256": "04d1bbad0df4543ed33451c620e50735946a1a312b5bbf777a0330c24f7a42e1"
+        }
+      ]
+    }
+  ],
+  "cuda_profile": {
+    "path": "onnxruntime_profile__2026-11-15_20-13-30.json",
+    "sha256": "fce5d147b1e84890e4208a74037fccab50108fad09b03dcc4635ef18268af34a",
+    "node_providers": {
+      "CUDAExecutionProvider": 765
+    }
+  },
+  "endpoint_checks_against_full_onnx": []
+}

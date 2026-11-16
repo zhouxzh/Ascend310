@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_fpn_resize_isolation",
+  "created_at": "2026-11-15T21:38:02.365+08:00",
+  "source_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/nanodet-plus-m-320-palm.onnx",
+    "sha256": "35f71933a0629df4338673e1c9a3b0411e778fbc85c22b973cca33f69a267991"
+  },
+  "source_boundary": {
+    "input": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+    "output": "/fpn/upsample/Resize_output_0"
+  },
+  "resize_attributes": {
+    "coordinate_transformation_mode": "half_pixel",
+    "cubic_coeff_a": -0.75,
+    "mode": "linear",
+    "nearest_mode": "floor"
+  },
+  "isolated_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/resize1-isolation/seed43-fpn-resize1-isolation.onnx",
+    "sha256": "6a0e07fdb2e5a92776ae09a556f6845387acf84732212f9d4428bdb60959124c",
+    "bytes": 718
+  },
+  "input": {
+    "name": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+    "shape": [
+      1,
+      96,
+      10,
+      10
+    ],
+    "dtype": "float32"
+  },
+  "output": {
+    "name": "/fpn/upsample/Resize_output_0",
+    "shape": [
+      1,
+      96,
+      20,
+      20
+    ],
+    "dtype": "float32"
+  },
+  "samples": [
+    {
+      "image_id": 8781,
+      "input_sha256": "4e70b95e527dfc7b61e4c541a2e2c484a2467440c44262cd38b9dedefa95e9f9",
+      "output_sha256": "970677f4e077e734b0410e4ae299c543dfe8aa0531aadc2fa27aa69809f4bd41",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/resize1-isolation/references/image-8781.npz",
+        "sha256": "4a5273bc0ae4e40e4c37a7d01b0168e3f23d148a2354bbcdc307af0058c9eac3"
+      }
+    },
+    {
+      "image_id": 8886,
+      "input_sha256": "46f6f736dd4cbe97c8b42177b0d15b3de4323604ba64b68aacb4f3d7dfc7017f",
+      "output_sha256": "53edc7a0d61bc2cf241e8a03d82ade7dcb08f82813675a7cde3e6023c69b6a85",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/resize1-isolation/references/image-8886.npz",
+        "sha256": "da88dc82cb49bbd57e77225d5f35fbaadf911c65e0b7cdbea490596a75d23d6e"
+      }
+    },
+    {
+      "image_id": 9266,
+      "input_sha256": "90c556579a47584959211f0219abcf34c78bc45fa1526643c26e1a5428faf1af",
+      "output_sha256": "477e22c9a3eacf6f085a773e6433c22e247c4abff4c4ae5593966a02107e5e9c",
+      "reference": {
+        "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/resize1-isolation/references/image-9266.npz",
+        "sha256": "6b6bb15018ab198d1dda35ac082b8600ab0d97b8d927747c6d93e6a3e2d989c3"
+      }
+    }
+  ],
+  "cuda_profile": {
+    "path": "onnxruntime_profile__2026-11-15_21-38-02.json",
+    "sha256": "daf7b4b65d3bc80cd93ea99f2e213e6a673b2a155a4dcbebe033e71547e7d346",
+    "node_providers": {
+      "CUDAExecutionProvider": 3
+    }
+  }
+}

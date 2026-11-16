@@ -1,0 +1,412 @@
+{
+  "schema_version": 1,
+  "kind": "handed_nanodet_intermediate_probe_acl_comparison",
+  "created_at": "2026-11-15T20:32:35.473+08:00",
+  "probe": "fpn_topdown",
+  "board": {
+    "id": "8t",
+    "soc": "Ascend310B4"
+  },
+  "probe_onnx": {
+    "path": "/home/zhong/Documents/ascend310b-palm-detector/artifacts/runs/nanodet-plus-m-320-portable-handed__data-v001__seed-43__20261114-1300/diagnostics/intermediate-probes/fpn_topdown/seed43-fpn_topdown-probe.onnx",
+    "sha256": "9247eb23efbd83678398fbfddef02794403c1a3e3227529ee3edacc46ffeae02",
+    "bytes": 3773383
+  },
+  "om": {
+    "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/fpn_topdown/om/seed43-fpn-topdown-force-fp32.om",
+    "sha256": "7d8bdabc0df79367254680bba5c1daa5cba89342b496d30e31549bf86261ac22",
+    "bytes": 4348895
+  },
+  "protocol": {
+    "warmup": 1,
+    "loops": 1,
+    "repeats": 1,
+    "atol": 0.001,
+    "rtol": 0.001
+  },
+  "boundaries": [
+    {
+      "index": 0,
+      "name": "/fpn/reduce_layers.0/act/LeakyRelu_output_0",
+      "shape": [
+        1,
+        96,
+        40,
+        40
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 0.002736050635576248,
+      "mean_abs_error": 8.699270983925089e-05
+    },
+    {
+      "index": 1,
+      "name": "/fpn/reduce_layers.1/act/LeakyRelu_output_0",
+      "shape": [
+        1,
+        96,
+        20,
+        20
+      ],
+      "samples": 3,
+      "allclose_samples": 2,
+      "max_abs_error": 0.0010371115058660507,
+      "mean_abs_error": 5.334771170358484e-05
+    },
+    {
+      "index": 2,
+      "name": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+      "shape": [
+        1,
+        96,
+        10,
+        10
+      ],
+      "samples": 3,
+      "allclose_samples": 3,
+      "max_abs_error": 0.0006310641765594482,
+      "mean_abs_error": 2.680963916645851e-05
+    },
+    {
+      "index": 3,
+      "name": "/fpn/upsample/Resize_output_0",
+      "shape": [
+        1,
+        96,
+        20,
+        20
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 0.22001752257347107,
+      "mean_abs_error": 0.007111154031008482
+    },
+    {
+      "index": 4,
+      "name": "/fpn/Concat_output_0",
+      "shape": [
+        1,
+        192,
+        20,
+        20
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 0.22001752257347107,
+      "mean_abs_error": 0.0035822511029740176
+    },
+    {
+      "index": 5,
+      "name": "/fpn/top_down_blocks.0/blocks/blocks.0/Add_output_0",
+      "shape": [
+        1,
+        96,
+        20,
+        20
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 0.23876520991325378,
+      "mean_abs_error": 0.009590826152513424
+    },
+    {
+      "index": 6,
+      "name": "/fpn/upsample_1/Resize_output_0",
+      "shape": [
+        1,
+        96,
+        40,
+        40
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 0.3878939747810364,
+      "mean_abs_error": 0.018283961651225884
+    },
+    {
+      "index": 7,
+      "name": "/fpn/Concat_1_output_0",
+      "shape": [
+        1,
+        192,
+        40,
+        40
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 0.3878939747810364,
+      "mean_abs_error": 0.009185476694256067
+    },
+    {
+      "index": 8,
+      "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+      "shape": [
+        1,
+        96,
+        40,
+        40
+      ],
+      "samples": 3,
+      "allclose_samples": 0,
+      "max_abs_error": 1.1048741340637207,
+      "mean_abs_error": 0.029356325666109722
+    }
+  ],
+  "samples": [
+    {
+      "image_id": 8781,
+      "reference_sha256": "111e44649d384b3808d8e8847e57389c322d31da71768336157e07f949c85d0f",
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/fpn_topdown/reports/image-8781.json",
+        "sha256": "fe8505988d3a16ad947c3be61a3e5df94a14e8d8ddf96c3d0d90106bd5cc8767"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/reduce_layers.0/act/LeakyRelu_output_0",
+          "passed": false,
+          "max_abs_error": 0.001224428415298462,
+          "mean_abs_error": 7.121105591068044e-05,
+          "max_rel_error": 7058.8701171875
+        },
+        {
+          "index": 1,
+          "name": "/fpn/reduce_layers.1/act/LeakyRelu_output_0",
+          "passed": true,
+          "max_abs_error": 0.0007590353488922119,
+          "mean_abs_error": 4.257592081557959e-05,
+          "max_rel_error": 24.892873764038086
+        },
+        {
+          "index": 2,
+          "name": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+          "passed": true,
+          "max_abs_error": 0.00043009594082832336,
+          "mean_abs_error": 1.8530159650254063e-05,
+          "max_rel_error": 97.64920806884766
+        },
+        {
+          "index": 3,
+          "name": "/fpn/upsample/Resize_output_0",
+          "passed": false,
+          "max_abs_error": 0.1913435161113739,
+          "mean_abs_error": 0.006059643812477589,
+          "max_rel_error": 341814.78125
+        },
+        {
+          "index": 4,
+          "name": "/fpn/Concat_output_0",
+          "passed": false,
+          "max_abs_error": 0.1913435161113739,
+          "mean_abs_error": 0.003051110077649355,
+          "max_rel_error": 341814.78125
+        },
+        {
+          "index": 5,
+          "name": "/fpn/top_down_blocks.0/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.18866723775863647,
+          "mean_abs_error": 0.0077650840394198895,
+          "max_rel_error": 2168.7626953125
+        },
+        {
+          "index": 6,
+          "name": "/fpn/upsample_1/Resize_output_0",
+          "passed": false,
+          "max_abs_error": 0.3878939747810364,
+          "mean_abs_error": 0.014819507487118244,
+          "max_rel_error": 74952.9765625
+        },
+        {
+          "index": 7,
+          "name": "/fpn/Concat_1_output_0",
+          "passed": false,
+          "max_abs_error": 0.3878939747810364,
+          "mean_abs_error": 0.0074453591369092464,
+          "max_rel_error": 74952.9765625
+        },
+        {
+          "index": 8,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.8905271291732788,
+          "mean_abs_error": 0.022279223427176476,
+          "max_rel_error": 21294.337890625
+        }
+      ]
+    },
+    {
+      "image_id": 8886,
+      "reference_sha256": "275238ec09742d6c8928a10950785d74bf77cc251514b1661321731c8c4e30a6",
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/fpn_topdown/reports/image-8886.json",
+        "sha256": "4f0e62692e64a9134a8b4374b36859de42feec45e021e5af55e6bcf0ea3c1ba4"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/reduce_layers.0/act/LeakyRelu_output_0",
+          "passed": false,
+          "max_abs_error": 0.002736050635576248,
+          "mean_abs_error": 0.00010907843534369022,
+          "max_rel_error": 245.3757781982422
+        },
+        {
+          "index": 1,
+          "name": "/fpn/reduce_layers.1/act/LeakyRelu_output_0",
+          "passed": true,
+          "max_abs_error": 0.001026887446641922,
+          "mean_abs_error": 6.0830476286355406e-05,
+          "max_rel_error": 49.208126068115234
+        },
+        {
+          "index": 2,
+          "name": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+          "passed": true,
+          "max_abs_error": 0.0005389899015426636,
+          "mean_abs_error": 2.9039860237389803e-05,
+          "max_rel_error": 141.03909301757812
+        },
+        {
+          "index": 3,
+          "name": "/fpn/upsample/Resize_output_0",
+          "passed": false,
+          "max_abs_error": 0.187503844499588,
+          "mean_abs_error": 0.007156218867748976,
+          "max_rel_error": 4020.07177734375
+        },
+        {
+          "index": 4,
+          "name": "/fpn/Concat_output_0",
+          "passed": false,
+          "max_abs_error": 0.187503844499588,
+          "mean_abs_error": 0.0036085243336856365,
+          "max_rel_error": 4020.07177734375
+        },
+        {
+          "index": 5,
+          "name": "/fpn/top_down_blocks.0/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.23876520991325378,
+          "mean_abs_error": 0.009293981827795506,
+          "max_rel_error": 734.44921875
+        },
+        {
+          "index": 6,
+          "name": "/fpn/upsample_1/Resize_output_0",
+          "passed": false,
+          "max_abs_error": 0.38528743386268616,
+          "mean_abs_error": 0.018085338175296783,
+          "max_rel_error": 16856.337890625
+        },
+        {
+          "index": 7,
+          "name": "/fpn/Concat_1_output_0",
+          "passed": false,
+          "max_abs_error": 0.38528743386268616,
+          "mean_abs_error": 0.009097207337617874,
+          "max_rel_error": 16856.337890625
+        },
+        {
+          "index": 8,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.9563812017440796,
+          "mean_abs_error": 0.02823651023209095,
+          "max_rel_error": 12001.7685546875
+        }
+      ]
+    },
+    {
+      "image_id": 9266,
+      "reference_sha256": "a463b2633044e3297aeaa2fe809b99b68074eb82151bd8b65f9331d6f22b6f03",
+      "runner_returncode": 1,
+      "runner_status": "observed_fail_numerical",
+      "cleanup_ok": true,
+      "report": {
+        "path": "/home/HwHiAiUser/Documents/Ascend310/workspaces/case4/handed-seed43-fulltest-20261115/intermediate-probes/fpn_topdown/reports/image-9266.json",
+        "sha256": "3838cdb8f08464d70b9e2a8bd6dc3a4036b56fc27a1b211a781968c69836f3d0"
+      },
+      "outputs": [
+        {
+          "index": 0,
+          "name": "/fpn/reduce_layers.0/act/LeakyRelu_output_0",
+          "passed": false,
+          "max_abs_error": 0.0022997520864009857,
+          "mean_abs_error": 8.068863826338202e-05,
+          "max_rel_error": 135.80352783203125
+        },
+        {
+          "index": 1,
+          "name": "/fpn/reduce_layers.1/act/LeakyRelu_output_0",
+          "passed": false,
+          "max_abs_error": 0.0010371115058660507,
+          "mean_abs_error": 5.663673800881952e-05,
+          "max_rel_error": 77.96939849853516
+        },
+        {
+          "index": 2,
+          "name": "/fpn/reduce_layers.2/act/LeakyRelu_output_0",
+          "passed": true,
+          "max_abs_error": 0.0006310641765594482,
+          "mean_abs_error": 3.285889761173166e-05,
+          "max_rel_error": 33.96609115600586
+        },
+        {
+          "index": 3,
+          "name": "/fpn/upsample/Resize_output_0",
+          "passed": false,
+          "max_abs_error": 0.22001752257347107,
+          "mean_abs_error": 0.008117599412798882,
+          "max_rel_error": 7268.55859375
+        },
+        {
+          "index": 4,
+          "name": "/fpn/Concat_output_0",
+          "passed": false,
+          "max_abs_error": 0.22001752257347107,
+          "mean_abs_error": 0.004087118897587061,
+          "max_rel_error": 7268.55859375
+        },
+        {
+          "index": 5,
+          "name": "/fpn/top_down_blocks.0/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 0.2354091852903366,
+          "mean_abs_error": 0.011713412590324879,
+          "max_rel_error": 3981.4990234375
+        },
+        {
+          "index": 6,
+          "name": "/fpn/upsample_1/Resize_output_0",
+          "passed": false,
+          "max_abs_error": 0.3637557625770569,
+          "mean_abs_error": 0.021947039291262627,
+          "max_rel_error": 18518.033203125
+        },
+        {
+          "index": 7,
+          "name": "/fpn/Concat_1_output_0",
+          "passed": false,
+          "max_abs_error": 0.3637557625770569,
+          "mean_abs_error": 0.011013863608241081,
+          "max_rel_error": 18518.033203125
+        },
+        {
+          "index": 8,
+          "name": "/fpn/top_down_blocks.1/blocks/blocks.0/Add_output_0",
+          "passed": false,
+          "max_abs_error": 1.1048741340637207,
+          "mean_abs_error": 0.03755324333906174,
+          "max_rel_error": 28966.533203125
+        }
+      ]
+    }
+  ]
+}
