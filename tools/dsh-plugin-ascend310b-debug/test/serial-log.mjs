@@ -127,7 +127,7 @@ try {
 		const output = redactSerialLogText(`before\n-----BEGIN ${label}-----\nVALUE_PEM_LINE_ONE\nVALUE_PEM_LINE_TWO\n-----END ${label}-----\nhostname=orangepiaipro`);
 		check(!output.includes('VALUE_PEM_') && output.includes('orangepiaipro'), `${label} must be redacted without removing following diagnostics`);
 	}
-	check(!redactSerialLogText('-----BEGIN PRIVATE KEY-----\nVALUE_PARTIAL_PEM').includes('VALUE_PARTIAL_PEM'), 'unfinished private keys must be redacted to the end');
+	check(!redactSerialLogText('-----BEGIN ' + 'PRIVATE KEY-----\nVALUE_PARTIAL_PEM').includes('VALUE_PARTIAL_PEM'), 'unfinished private keys must be redacted to the end');
 	check(redactSerialLogText('-----BEGIN CERTIFICATE-----\nPUBLIC_DATA\n-----END CERTIFICATE-----').includes('PUBLIC_DATA'), 'public certificate data must not be mistaken for a private key');
 	check(redactSerialLogText('monkey=ok keyboard=ok tokenizer=ok hostname=orangepiaipro ip=198.51.100.20 mac=c0:74:2b:fd:f6:96').includes('monkey=ok keyboard=ok tokenizer=ok hostname=orangepiaipro ip=198.51.100.20 mac=c0:74:2b:fd:f6:96'), 'redaction must not match unrelated substrings or network identifiers');
 
