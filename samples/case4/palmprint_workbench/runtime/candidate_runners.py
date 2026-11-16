@@ -156,6 +156,8 @@ class _CandidateRunner:
     def run(self, values: list[np.ndarray]) -> list[np.ndarray]:
         if len(values) != self.input_count:
             raise ValueError(f"candidate expects {self.input_count} inputs, got {len(values)}")
+        # FastAPI workers may reuse this runner on another OS thread.
+        _acl_check(self.acl.rt.set_context(self.context), "acl.rt.set_context")
         for value, buffer, dtype, shape in zip(values, self.buffers[: self.input_count], self.input_dtypes, self.input_shapes):
             array = np.ascontiguousarray(value, dtype=dtype)
             if tuple(array.shape) != shape or array.nbytes != buffer["size"]:

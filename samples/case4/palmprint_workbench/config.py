@@ -33,10 +33,9 @@ DATASET_DIR = DATA_DIR / "datasets"
 REGISTRY_PATH = MODEL_DIR / "registry.json"
 
 ROI_SIZE = 128
-# Production camera input uses a deterministic guide rectangle.  It deliberately
-# does not attempt semantic hand detection or finger-valley localization.
-# Templates are isolated by this identifier and must be registered again.
-ROI_PIPELINE_ID = "fixed_guide_v1"
+# Full-frame recognition uses the detector crop. This identifier isolates its
+# templates and calibration from the former fixed-guide release.
+ROI_PIPELINE_ID = "nanodet_palm_bbox_v1"
 FIXED_ROI_SIDE_RATIO = 0.90
 FIXED_ROI_CENTER_X = 0.50
 FIXED_ROI_CENTER_Y = 0.50
@@ -67,6 +66,15 @@ def _environment(name: str, default: str) -> str:
     """Read a runtime setting using the public palmprint prefix."""
 
     return os.environ.get(name, default)
+
+
+def _boolean_environment(name: str, default: str = "0") -> bool:
+    value = _environment(name, default).strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be one of 0/1/false/true, got {value!r}")
 
 
 def _integer_environment(name: str, default: str, *, minimum: int | None = None) -> int:
@@ -146,11 +154,26 @@ CAMERA_DEFAULT_WIDTH = _integer_environment("PALMPRINT_CAMERA_WIDTH", "1280", mi
 CAMERA_DEFAULT_HEIGHT = _integer_environment("PALMPRINT_CAMERA_HEIGHT", "720", minimum=1)
 CAMERA_DEFAULT_FPS = _float_environment("PALMPRINT_CAMERA_FPS", "30", minimum=0.1)
 
+# Camera detection frames contain biometric information. Continuous capture is
+# disabled by default and can only be enabled explicitly for a bounded board-side
+# debugging session. Debug files are intentionally kept in reports/, not in
+# template/capture storage or source control.
+DETECTOR_DEBUG_CAPTURE_ENABLED = _boolean_environment(
+    "PALMPRINT_DETECTOR_DEBUG_CAPTURE", "0"
+)
+DETECTOR_DEBUG_CAPTURE_MAX_FRAMES = _integer_environment(
+    "PALMPRINT_DETECTOR_DEBUG_CAPTURE_MAX_FRAMES", "120", minimum=1
+)
+DETECTOR_DEBUG_CAPTURE_MIN_INTERVAL_SECONDS = _float_environment(
+    "PALMPRINT_DETECTOR_DEBUG_CAPTURE_MIN_INTERVAL_SECONDS", "1.0", minimum=0.0
+)
+DETECTOR_DEBUG_CAPTURE_DIR = REPORT_DIR / "debug" / "detector"
+
 # V4L2 drivers do not expose a portable, read-only mode query without opening
 # the device.  Advertise the common USB-camera modes here and let the driver
 # negotiate the requested mode when a frame is captured.  The list can be
 # narrowed/extended per board without changing the UI or API contract.
-_CAMERA_RESOLUTION_DEFAULTS = ("1280x720", "1920x1080", "640x480")
+_CAMERA_RESOLUTION_DEFAULTS = ("1280x720", "1920x1080", "640x480", "320x240")
 _CAMERA_RESOLUTION_ENV = "PALMPRINT_CAMERA_RESOLUTIONS"
 
 

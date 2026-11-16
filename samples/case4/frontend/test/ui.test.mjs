@@ -117,9 +117,48 @@ test("camera recognition opens automatically and waits for a stable palm without
   assert.match(app, /setCameraActive\(true\)/);
   assert.match(app, /useAutomaticPalmTrigger/);
   assert.match(app, /AUTO_BASELINE_FRAMES/);
-  assert.match(app, /请将掌心放入采集框/);
+  assert.match(app, /等待手掌进入画面/);
+  assert.match(app, /result\.hands\.map/);
+  assert.match(app, /boxes=\{cameraActive \? liveDetection\?\.hands : result\?\.hands\}/);
+  assert.doesNotMatch(app, /guideConfig=|guide=\{cameraActive\}/);
   assert.match(app, /识别完成，请移开掌心后继续/);
   assert.doesNotMatch(app, />拍摄并识别</);
+});
+
+test("live detector polls serially and laptop camera view preserves the full image", () => {
+  assert.match(api, /async detectCamera/);
+  assert.match(api, /\/detections/);
+  assert.match(app, /await api\.detectCamera\(cameraDevice, resolution, config\.detectorId\)/);
+  assert.match(app, /if \(!cancelled\) timer = setTimeout\(poll, 60\)/);
+  assert.match(app, /const preferredLiveResolution/);
+  assert.match(app, /const frameUrl = liveDetection\?\.previewUrl/);
+  assert.doesNotMatch(app, /useCameraPreview\(cameraActive, cameraDevice, resolution, cameraRetryToken/);
+  assert.match(app, /cameraActive \? liveDetection\?\.previewUrl \|\| frameUrl : preview/);
+  assert.match(styles, /aspect-ratio:\s*16\s*\/\s*9/);
+  assert.match(styles, /object-position:\s*center/);
+  assert.match(styles, /\.image-stage__image--contain\s*\{\s*object-fit:\s*contain/);
+  assert.match(styles, /@media \(max-width: 1500px\)/);
+  assert.match(styles, /\.page--live \.live-layout\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\)/);
+});
+
+test("registration preview hands camera ownership over and cancels on page exit", () => {
+  assert.match(app, /const previewActive = !busy && !running && !session/);
+  assert.match(app, /await api\.closeCamera\(cameraDevice, resolution\)/);
+  assert.match(app, /sessionRef\.current = session/);
+  assert.match(app, /api\.deleteEnrollmentSession\(current\.id\)/);
+  assert.doesNotMatch(app, /Local reset remains valid after a transport error/);
+  assert.match(styles, /@media \(min-width: 900px\)/);
+  assert.match(styles, /\.page, \.page--live\s*\{[^}]*overflow: hidden/);
+  assert.match(styles, /\.hand-results\s*\{[^}]*overflow-y: auto/);
+});
+
+test("device discovery and capture errors remain distinct from API connection errors", () => {
+  assert.match(app, /摄像头服务未连接/);
+  assert.match(app, /已发现节点，取流失败/);
+  assert.match(app, /模型服务未连接/);
+  assert.match(app, /cameraError \? "摄像头取流失败"/);
+  assert.match(app, /cameraError \? "取流失败"/);
+  assert.match(app, /重试摄像头/);
 });
 
 test("camera paths always use automatic ROI localization", () => {
@@ -127,4 +166,22 @@ test("camera paths always use automatic ROI localization", () => {
   assert.match(api, /async recognizeCamera[\s\S]*?assume_roi:\s*false/);
   assert.match(api, /async createEnrollmentSession[\s\S]*?assume_roi:\s*false/);
   assert.match(api, /options\.file \? options\.assumeRoi : false/);
+});
+
+test("palm detector selection is separate from the palmprint embedding model", () => {
+  assert.match(app, /手掌检测模型/);
+  assert.match(app, /掌纹特征模型/);
+  assert.match(app, /bootstrap\.detectors/);
+  assert.match(app, /config\.detectorId/);
+  assert.match(app, /直接拉伸到方形输入/);
+  assert.match(api, /form\.append\("detector_id", config\.detectorId\)/);
+  assert.match(api, /detector_id: config\.detectorId/);
+  assert.match(api, /defaults\.detector_id/);
+});
+
+test("two-class detector boxes expose left and right palm labels", () => {
+  assert.match(api, /detectedPalmSide: stringValue\(item\.detected_palm_side\)/);
+  assert.match(app, /hand\.detectedPalmSide === "right" \? "右掌"/);
+  assert.match(app, /boxes=\{session\?\.detectionBoxes \|\| enrollmentDetection\?\.hands\}/);
+  assert.match(app, /result\.detectedPalmSide \|\| result\.palmSide \|\| best\?\.palmSide/);
 });

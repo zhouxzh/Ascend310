@@ -38,6 +38,20 @@ export interface ModelOption {
   manualTestPending?: boolean;
 }
 
+export interface DetectorOption {
+  id: string;
+  displayName: string;
+  family: "nanodet" | "picodet" | string;
+  status: string;
+  available: boolean;
+  reason?: string;
+  inputShape: number[];
+  scoreThreshold?: number;
+  notice?: string;
+  taskMap?: number;
+  rawNumericalGateOk?: boolean;
+}
+
 export interface DatasetOption {
   id: string;
   displayName: string;
@@ -56,19 +70,15 @@ export interface CameraDevice {
   frameFormat?: string;
 }
 
-export interface RoiGuideConfig {
-  center_x: number;
-  center_y: number;
-  side_ratio: number;
-}
-
 export interface BootstrapData {
   appVersion?: string;
   models: ModelOption[];
+  detectors: DetectorOption[];
   datasets: DatasetOption[];
   candidates?: CandidateOption[];
   defaults: {
     modelId: string;
+    detectorId: string;
     backend: BackendId;
     precision: PrecisionId;
     threshold: number;
@@ -147,6 +157,7 @@ export interface CandidateRunResult {
 
 export interface RecognitionConfig {
   modelId: string;
+  detectorId: string;
   backend: BackendId;
   precision: PrecisionId;
   threshold: number;
@@ -164,7 +175,11 @@ export interface MatchItem {
   samples?: number;
 }
 
-export interface RecognitionResult {
+export interface RecognitionHand {
+  index: number;
+  bboxXyxy?: [number, number, number, number];
+  detectionScore?: number;
+  detectedPalmSide?: string;
   accepted?: boolean | null;
   outcome?: "roi_rejected" | "no_templates" | "candidates_only" | "below_threshold" | "matched" | string;
   score?: number;
@@ -183,6 +198,18 @@ export interface RecognitionResult {
   roiPipelineId?: string;
   templateSummary?: { palmCount: number; personCount: number; sampleCount: number; roiPipelineId?: string };
   calibrationReady?: boolean;
+}
+
+export interface RecognitionResult {
+  status: string;
+  detectorId?: string;
+  captureResolution?: string;
+  previewResolution?: string;
+  detectionCount: number;
+  hands: RecognitionHand[];
+  previewUrl?: string;
+  timing: Record<string, number>;
+  roiPipelineId?: string;
 }
 
 export interface EnrollmentSample {
@@ -205,6 +232,9 @@ export interface EnrollmentSession {
   personId?: string;
   displayName?: string;
   palmSide?: string;
+  palmSideVerification?: string;
+  countdownRemaining?: number;
+  detectionBoxes?: Array<{index: number; bboxXyxy?: [number, number, number, number]; detectedPalmSide?: string}>;
   samples: EnrollmentSample[];
   maxSamples: number;
   minSamples: number;

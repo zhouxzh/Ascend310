@@ -10,8 +10,9 @@ import shutil
 import stat
 import tempfile
 import threading
+import time
 from datetime import datetime, timezone
-from typing import Any, Iterator
+from typing import Any, Iterator, Mapping
 from uuid import uuid4
 
 import cv2
@@ -251,6 +252,28 @@ class CaptureStore:
                         return record
         raise KeyError(f"capture not found: {capture_id}")
 
+    def save_multi(
+        self, *, original: Any, rois: Mapping[int, Any], metadata: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Archive one frame and its independently indexed palm crops."""
+        encoded = {}
+        for index, roi in rois.items():
+            if not isinstance(index, int) or index < 1:
+                raise ValueError("hand index must be a positive integer")
+            encoded[index] = self._encode_image(roi, ".png")
+        record = self.save(original=original, roi=None, metadata=metadata)
+        capture_id = record["capture_id"]
+        paths = {}
+        try:
+            for index, payload in encoded.items():
+                filename = f"roi_{index:03d}.png"
+                self._atomic_write(self._record_dir(capture_id) / filename, payload)
+                paths[str(index)] = f"captures/{capture_id}/{filename}"
+            return self.update_metadata(capture_id, roi_paths=paths, roi_ok=bool(paths))
+        except Exception:
+            self.cleanup(capture_id)
+            raise
+
     def list(
         self,
         *,
@@ -277,11 +300,17 @@ class CaptureStore:
         raise KeyError(f"capture not found: {capture_id}")
 
     def path_for(self, capture_id: str, kind: str) -> Path:
+        directory = self._record_dir(capture_id)
+        if kind not in {"original", "roi"}:
+            raise ValueError("invalid capture kind")
         record = self.get(capture_id)
         relative = record.get(f"{kind}_path")
         if not relative:
             raise FileNotFoundError(f"capture has no {kind}: {capture_id}")
-        path = (self.root.parent / relative).resolve()
+        filename = "original.jpg" if kind == "original" else "roi.png"
+        if relative != f"captures/{capture_id}/{filename}":
+            raise ValueError("capture path does not match its record")
+        path = (directory / filename).resolve()
         path.relative_to(self.root)
         if not path.is_file():
             raise FileNotFoundError(str(path))
@@ -343,3 +372,152 @@ class CaptureStore:
 
     def cleanup(self, capture_id: str) -> bool:
         return bool(self.cleanup_many([capture_id]))
+
+
+class DetectorDebugCaptureStore:
+    """Bounded, opt-in archive of full frames used by the live detector.
+
+    This store is intentionally separate from enrollment/recognition captures.
+    It is disabled by default, creates a per-process run directory only after
+    its first write, and never writes images when disabled. Each saved frame has
+    an original JPEG, a box/label overlay JPEG, and a JSON sidecar so a later
+    inspection can relate a left/right decision to the raw detector output.
+    """
+
+    def __init__(
+        self,
+        root: Path,
+        *,
+        enabled: bool,
+        max_frames: int,
+        min_interval_seconds: float,
+    ) -> None:
+        if max_frames < 1:
+            raise ValueError("max_frames must be positive")
+        if min_interval_seconds < 0:
+            raise ValueError("min_interval_seconds must be non-negative")
+        self.root = Path(root).expanduser().resolve()
+        self.enabled = bool(enabled)
+        self.max_frames = int(max_frames)
+        self.min_interval_seconds = float(min_interval_seconds)
+        self._lock = threading.RLock()
+        self._run_dir: Path | None = None
+        self._stored_frames = 0
+        self._last_saved_monotonic = 0.0
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "enabled": self.enabled,
+                "stored_frames": self._stored_frames,
+                "max_frames": self.max_frames,
+                "min_interval_seconds": self.min_interval_seconds,
+                "run_id": self._run_dir.name if self._run_dir is not None else None,
+            }
+
+    def _ensure_run_dir(self) -> Path:
+        if self._run_dir is None:
+            self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+            CaptureStore._set_private_mode(self.root)
+            name = datetime.now(timezone.utc).strftime("detector-debug-%Y%m%dT%H%M%SZ")
+            run_dir = (self.root / f"{name}-{uuid4().hex[:8]}").resolve()
+            run_dir.relative_to(self.root)
+            run_dir.mkdir(mode=0o700)
+            CaptureStore._set_private_mode(run_dir)
+            self._run_dir = run_dir
+        return self._run_dir
+
+    @staticmethod
+    def _annotate(image_rgb: Any, detections: list[dict[str, Any]]) -> np.ndarray:
+        image = np.asarray(image_rgb)
+        if image.ndim != 3 or image.shape[2] < 3:
+            raise ValueError("debug image must be RGB")
+        rgb = np.ascontiguousarray(image[:, :, :3], dtype=np.uint8)
+        canvas = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+        height, width = canvas.shape[:2]
+        for item in detections:
+            box = item.get("bbox_xyxy") if isinstance(item, dict) else None
+            if not isinstance(box, (list, tuple)) or len(box) != 4:
+                continue
+            try:
+                left, top, right, bottom = (int(round(float(value))) for value in box)
+            except (TypeError, ValueError):
+                continue
+            left, right = sorted((max(0, min(left, width - 1)), max(0, min(right, width - 1))))
+            top, bottom = sorted((max(0, min(top, height - 1)), max(0, min(bottom, height - 1))))
+            if right <= left or bottom <= top:
+                continue
+            side = str(item.get("detected_palm_side", "unknown"))
+            score = float(item.get("detection_score", 0.0))
+            color = (255, 170, 0) if side == "left" else (255, 120, 90) if side == "right" else (180, 180, 180)
+            cv2.rectangle(canvas, (left, top), (right, bottom), color, 2)
+            cv2.putText(
+                canvas,
+                f"{side} {score:.3f}",
+                (left, max(16, top - 6)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                color,
+                2,
+                cv2.LINE_AA,
+            )
+        return cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
+
+    def maybe_save(
+        self,
+        *,
+        image_rgb: Any,
+        device: str,
+        requested_resolution: str,
+        detections: list[dict[str, Any]],
+        detection_ms: float,
+        detector_debug: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if not self.enabled:
+            return {**self.status(), "saved": False, "reason": "disabled"}
+        now_monotonic = time.monotonic()
+        with self._lock:
+            if self._stored_frames >= self.max_frames:
+                return {**self.status(), "saved": False, "reason": "frame_limit_reached"}
+            if now_monotonic - self._last_saved_monotonic < self.min_interval_seconds:
+                return {**self.status(), "saved": False, "reason": "interval_not_elapsed"}
+            image = np.asarray(image_rgb)
+            if image.ndim != 3 or image.shape[2] < 3:
+                raise ValueError("debug image must be RGB")
+            height, width = image.shape[:2]
+            run_dir = self._ensure_run_dir()
+            sequence = self._stored_frames + 1
+            stem = f"frame-{sequence:04d}"
+            original_path = run_dir / f"{stem}.jpg"
+            overlay_path = run_dir / f"{stem}-overlay.jpg"
+            metadata_path = run_dir / f"{stem}.json"
+            metadata = {
+                "schema_version": 1,
+                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "device": str(device),
+                "requested_resolution": str(requested_resolution),
+                "actual_resolution": f"{int(width)}x{int(height)}",
+                "detection_ms": float(detection_ms),
+                "detections": CaptureStore._jsonable(detections),
+                "detector_debug": CaptureStore._jsonable(detector_debug),
+                "original_file": original_path.name,
+                "overlay_file": overlay_path.name,
+            }
+            try:
+                CaptureStore._atomic_write(original_path, CaptureStore._encode_image(image, ".jpg", 92))
+                CaptureStore._atomic_write(
+                    overlay_path,
+                    CaptureStore._encode_image(self._annotate(image, detections), ".jpg", 92),
+                )
+                CaptureStore._atomic_write(
+                    metadata_path,
+                    json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8"),
+                )
+            except Exception:
+                original_path.unlink(missing_ok=True)
+                overlay_path.unlink(missing_ok=True)
+                metadata_path.unlink(missing_ok=True)
+                raise
+            self._stored_frames = sequence
+            self._last_saved_monotonic = now_monotonic
+            return {**self.status(), "saved": True, "reason": "saved", "sequence": sequence}

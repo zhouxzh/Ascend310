@@ -13,367 +13,349 @@ footer: "案例 4：掌纹识别"
 
 # 案例 4：掌纹识别
 
+<div class="byline">从整帧手掌检测到可解释的身份候选</div>
 <div class="byline">周贤中 · zhouxzh@gdut.edu.cn</div>
 
-## NPU-only 工作台与候选模型边界
-
-
-<div class="source">教材：<a href="../experiment/case4.md"><code>src/experiment/case4.md</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html">案例4正文</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case4">samples/case4</a></div>
 
 <!--
-本案例讲的是 8T 板上的 NPU-only 掌纹工作台，不把前端可打开、候选 smoke 或某次数值对照提升为生产验收。
+本讲围绕当前8T两阶段工作台：手掌检测、ROI、CCNet特征、模板检索。重点不是页面能打开，而是每一层的合同和证据。
 -->
 
 ---
 
 <!-- _class: center -->
 
-## 本讲目标与路线
+## 身份识别不能从“整帧分类”开始
 
-- 理解 NPU-only 运行时硬边界
-- 走通采集、注册与识别的候选语义
-- 区分候选清单与准入名单
-- 用合成图像和匿名模板保护隐私
+1. 整帧中有背景、光照和多只手候选。
+2. 检测器回答“手掌在哪里”。
+3. ROI回答“哪块区域适合提取掌纹”。
+4. CCNet回答“这块ROI的2048维特征是什么”。
+5. 模板检索回答“候选是谁”。
 
-> 本讲主线：运行时边界 → 候选 → 准入 → 证据
-
-<div class="source">教材：<a href="../experiment/case4.md"><code>src/experiment/case4.md</code></a></div>
-
-<!--
-先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
--->
----
-
-
-<!-- _class: section -->
-
-# 01
-
-## NPU-only 工作台
-
----
-
-<!-- _class: center -->
-
-## NPU-only 是运行时硬边界
-
-| 边界 | 在线工作台 | 离线研究 |
-|---|---|---|
-| 推理后端 | Ascend NPU | 可做 CPU、EDCC 等基线 |
-| 精度 | `mixed_fp16` | 按研究协议 |
-| 候选范围 | registry 中的准入模型 | 28 项候选审计 |
-| 失败策略 | 明确失败，不切 CPU | 记录 blocked/untested |
-| 部署 | Ascend310B4 / 8T 单独验证 | 结果不自动进入 registry |
-
-在线 API 和模板通道只接受已准入的 NPU embedding。
-
-<div class="source">教材：<a href="../experiment/case4.md#案例目标"><code>src/experiment/case4.md</code> §1</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-problem">这项任务解决什么问题</a></div>
 
 <!--
-先划清在线与离线边界。CPU 或 EDCC 可以出现在研究记录中，但不能被工作台 API、模板命名空间或前端模型选择器暴露。
+先让学生区分检测与识别。整帧分类把定位和身份混在一起，难以调试，也无法自然支持多手。
 -->
 
 ---
 
 <!-- _class: center -->
 
-## 工作台由四层组成
+## 本讲路线
 
-1. React 预构建前端负责识别、注册、模型状态和系统状态页面。
-2. FastAPI 提供健康、bootstrap、摄像头、候选与识别接口。
-3. 在线推理只加载 NPU `mixed_fp16` embedding。
-4. 模板、截图和报告存放在发行目录的数据与报告区域。
+- 理解两阶段链条与NPU-only边界
+- 读取NanoDet和PicoDet的不同输入输出合同
+- 完成匿名注册与掌侧核对
+- 解释实时摄像头为什么曾卡顿
+- 用分层证据判断系统是否真的可用
 
-前端服务可达不等于后端已连接；API 可达也不等于 NPU 推理已执行。
-
-<div class="source">教材：<a href="../experiment/case4.md#api-和界面"><code>src/experiment/case4.md</code> §3</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
-
-<!--
-把 UI、API、推理和存储拆开定位。页面出现空状态时，先确认是前端静态服务、API、模型还是摄像头没有连接。
--->
-
----
-
-<!-- _class: screenshot -->
-
-## 8T 板载工作台：前端-only 截图
-
-<img src="screenshots/cases/case4-palmprint-live-idle-1920x1080.png" alt="8T 开发板加载的掌纹工作台实时识别页，工作台服务未连接，摄像头和识别结果均未建立" style="max-height:355px">
-
-**仅证明预构建 React 工作台布局；服务未连接，不证明摄像头、NPU推理、候选准入、EER或Rank-1。**
-
-<div class="source">manifest id：<code>case4-palmprint-live-idle</code>；8T / <code>Ascend310B4</code>；1920×1080；192060 bytes；SHA-256：<code>0c8bea9ccdd2abf0a6154f27e049cb01bc9b126599bc0db866bbb885d1f3aae0</code></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-learning-outcomes">学习成果</a></div>
 
 <!--
-这张截图显示“无法连接工作台服务”、摄像头未连接、没有识别结果。它只证明预构建 React 静态资产在 8T 上完成布局渲染。
+把课程目标映射到可观察产出：数据流图、合同核对、一次注册、一次摄像头请求和失败分类。
 -->
 
 ---
 
 <!-- _class: center -->
 
-## 截图元数据必须与图片绑定
-
-| 字段 | 本次证据 |
-|---|---|
-| manifest id | `case4-palmprint-live-idle` |
-| 图片 | `screenshots/cases/case4-palmprint-live-idle-1920x1080.png` |
-| 板卡与视口 | 8T / `Ascend310B4`；1920×1080 |
-| 字节数 | 192060 |
-| SHA-256 | `0c8bea9ccdd2abf0a6154f27e049cb01bc9b126599bc0db866bbb885d1f3aae0` |
-| 结论边界 | 前端布局通过，服务未连接 |
-
-截图不能替代 API、摄像头、NPU 请求、模板闭环或数据集指标。
-
-<div class="source">清单：<a href="screenshots/capture-manifest.json"><code>src/presentation/screenshots/capture-manifest.json</code></a>；样例入口：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4"><code>samples/case4</code></a></div>
-
-<!--
-图片字节数、SHA-256 和 application digest 绑定静态资产。它们证明文件身份，不证明服务端已经启动或模型已经加载。
--->
-
----
-
-<!-- _class: center -->
-
-## 合成图像与匿名模板是课堂底线
-
-- 截图和课堂演示只使用合成 ROI 或匿名模板。
-- 不展示真实掌纹、姓名、人员编号或 embedding。
-- 注册数据只保存在受信发行目录，不进入 Git 或截图。
-- 原始报告含设备与人员信息时必须脱敏后再引用。
-- 删除和清理操作由操作者显式执行；截图中的空结果不是识别失败率或质量指标。
-
-<div class="source">教材：<a href="../experiment/case4.md#六模型人工测试"><code>src/experiment/case4.md</code> §4</a>；截图规范：<a href="../experiment/img4/palmprint-ui-capture-manifest.json"><code>src/experiment/img4/palmprint-ui-capture-manifest.json</code></a></div>
-
-<!--
-隐私边界要落实到截图和存储。真实掌纹、模板和报告不能作为课件素材，匿名测试结束后还要确认临时模板已清理。
--->
-
----
-
-
-<!-- _class: section -->
-
-# 02
-
-## 候选、准入与证据
-
----
-
-<!-- _class: center -->
-
-## 模型范围：一个默认模型，五个待人工测试候选
-
-| 模型 | profile | 精度 | 准入状态 |
-|---|---|---|---|
-| `ccnet` | production / manual_test | `mixed_fp16` | 默认与回滚模型 |
-| `compnet_tongji_600` | manual_test | `mixed_fp16` | `manual_test_pending` |
-| `compnet_iitd_460` | manual_test | `mixed_fp16` | `manual_test_pending` |
-| `compnet_rest_358` | manual_test | `mixed_fp16` | `manual_test_pending` |
-| `compnet_xjtu_flash_200` | manual_test | `mixed_fp16` | `manual_test_pending` |
-| `compnet_xjtu_natural_200` | manual_test | `mixed_fp16` | `manual_test_pending` |
-
-五个 CompNet 不得写成六个模型已通过，也不得自动进入 production。
-
-<div class="source">注册表：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/models/registry.json"><code>samples/case4/models/registry.json</code></a>；策略：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/docs/01-model-evaluation-and-deployment-plan.md"><code>docs/01-model-evaluation-and-deployment-plan.md</code></a></div>
-
-<!--
-CCNet 是当前默认和回滚模型；五个 CompNet 只在 manual_test profile 中等待人工测试。模型 ID、精度和状态必须一一对应。
--->
-
----
-
-<!-- _class: center -->
-
-## 候选清单不等于准入名单
-
-- `candidate_manifest.json` 保留 28 项研究审计。
-- 在线/模板通道只暴露 6 个 NPU embedding。
-- 五个 CompNet 的 `manual_test_pending=true` 必须显示。
-- 其余候选按任务类型单独测试，不共享掌纹 embedding 适配器。
-- 下载 OM 或 ACL smoke 不会自动修改 production registry；`blocked`、`untested`、`manual_test_pending` 也不得显示为已准入。
-
-<div class="source">候选：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/candidate_manifest.json"><code>samples/case4/candidate_manifest.json</code></a>；说明：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/docs/03-model-candidate-audit.md"><code>docs/03-model-candidate-audit.md</code></a></div>
-
-<!--
-候选数量、运行通道数量和准入数量是三个不同概念。不能在汇总页把“有 6 个 OM”写成“6 个模型已通过”。
--->
-
----
-
-<!-- _class: center -->
-
-## 准入证据必须逐层通过
-
-| 证据门 | 需要的记录 | 不能替代 |
-|---|---|---|
-| 资产 | OM 字节数、SHA-256、来源 revision | 一次加载成功 |
-| 契约 | 输入 shape/range、输出维度和精度 | 文件存在 |
-| 运行 | NPU smoke、退出码、设备状态 | CPU 结果 |
-| 数值 | 与参考实现的误差与样本清单 | ACL 初始化 |
-| 质量 | 合法数据集上的 EER/Rank-1 协议 | UI 截图 |
-| 生命周期 | 重复 load/run/close、无设备异常 | 单次请求 |
-
-任一门缺失，候选只能保持 blocked、untested 或 `manual_test_pending`。
-
-<div class="source">准入方案：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/docs/01-model-evaluation-and-deployment-plan.md"><code>docs/01-model-evaluation-and-deployment-plan.md</code></a>；OM 清单：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/om_manifest.json"><code>samples/case4/om_manifest.json</code></a></div>
-
-<!--
-把转换、运行、数值、质量和生命周期分成不同门。一次 ACL smoke 或一张界面截图不能填满整张准入表。
--->
-
----
-
-<!-- _class: center -->
-
-## 采集页面先区分上传与摄像头
-
-| 输入方式 | 前端动作 | 服务端动作 |
-|---|---|---|
-| 上传图像 | 选择本地合成或匿名图像 | 校验格式、生成 ROI、提交识别 |
-| V4L2 摄像头 | 打开预览、选择实际分辨率 | 串行取帧、关闭预览、释放设备 |
-
-CAMERA 预览优先 MJPG；真实分辨率必须从设备和接口返回，不使用固定猜测值。
-
-<div class="source">教材：<a href="../experiment/case4.md#摄像头测试"><code>src/experiment/case4.md</code> §5</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
-
-<!--
-上传和摄像头是两条输入路径。截图中的摄像头未连接状态不能用来判断 V4L2、首帧时间、帧率或设备释放结果。
--->
-
----
-
-<!-- _class: center -->
-
-## 注册流程固定模板命名空间
-
-1. 为同一人员分配稳定的本地编号。
-2. 左右掌分别使用独立命名空间。
-3. 采集并保存规定数量的合格样本。
-4. 核对 ROI 质量后生成 `PWST1` embedding 模板。
-5. 在 `<model_id>__npu__mixed_fp16` 命名空间中查询、识别、删除并重启验证。
-
-<div class="source">教材：<a href="../experiment/case4.md#六模型人工测试"><code>src/experiment/case4.md</code> §4</a>；运行说明：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
-
-<!--
-模板闭环是模型身份的一部分。换模型、换精度或换发行目录后继续使用旧模板，可能得到不可解释的结果。
--->
-
----
-
-<!-- _class: center -->
-
-## 识别结果要保留“候选”语义
-
-- 未完成本机阈值校准时，只显示 Top-K 候选和分数。
-- Top-K 分数不是身份通过/未通过。
-- 单次命中不能替代数据集的 EER 或 Rank-1。
-- 未识别、空模板和 API 不可用必须显示不同状态。
-- 只有同一模型、同一模板命名空间的闭环才能进入人工测试记录；`Health: Alarm` 不能单独判成败。
-
-<div class="source">教材：<a href="../experiment/case4.md#api-和界面"><code>src/experiment/case4.md</code> §3</a>；工作台说明：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a></div>
-
-<!--
-尤其要区分“没有识别结果”和“识别未命中”。截图中的空结果只是服务未连接，不是模型拒绝，也不是 EER 结果。
--->
-
----
-
-<!-- _class: screenshot -->
-
-## 历史评测界面只证明 UI 路径
-
-<img src="../experiment/img4/palmprint-ui-react-evaluation-1920x1080.png" alt="掌纹评测界面历史截图" style="max-height:380px">
-
-该图来自受控 UI 截图清单，仅展示评测页面和操作入口，不证明 EER、Rank-1、候选准入或当前服务可用。
-
-<div class="source">图片：<a href="../experiment/img4/palmprint-ui-react-evaluation-1920x1080.png"><code>src/experiment/img4/palmprint-ui-react-evaluation-1920x1080.png</code></a>；清单：<a href="../experiment/img4/palmprint-ui-capture-manifest.json"><code>palmprint-ui-capture-manifest.json</code></a></div>
-
-<!--
-这张历史截图只用于讲解评测界面的字段与操作路径。历史清单中的 UI smoke 不等于当前版本的跨域质量结论。
--->
-
----
-
-<!-- _class: center -->
-
-## 版本冻结是人工测试的前置条件
-
-| 冻结对象 | 记录方式 |
-|---|---|
-| 应用与前端 | 版本号、bundle SHA、release manifest |
-| 模型 | canonical ID、OM SHA、精度和命名空间 |
-| 运行环境 | CANN、PyACL、Python、驱动与板卡档位 |
-| 模板数据 | 当前发行目录和人工备份 |
-| 配置与策略 | profile、阈值、准入状态 |
-
-人工测试期间不升级 Python、依赖、驱动、CANN，也不修改准入策略。
-
-<div class="source">冻结规则：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/docs/01-model-evaluation-and-deployment-plan.md"><code>docs/01-model-evaluation-and-deployment-plan.md</code> §6</a>；教材：<a href="../experiment/case4.md#版本冻结"><code>src/experiment/case4.md</code> §7</a></div>
-
-<!--
-冻结是为了让失败可归因。中途升级软件或切换模型会破坏对比条件，发现问题时只记录并回退，不在同一测试窗口里修复。
--->
-
----
-
-## 板端最小启动与检查
-
-```bash
-source /usr/local/miniconda3/etc/profile.d/conda.sh
-conda activate ascend
-export PYTHONNOUSERSITE=1
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
-export PALMPRINT_PROFILE=manual_test
-python -m palmprint_workbench.tools.verify_assets --strict
-python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
+## 两阶段流水线
+
+```text
+整帧相机画面
+    ↓
+手掌检测：框、分数、left/right
+    ↓
+ROI裁剪与质量检查：128×128灰度
+    ↓
+CCNet：2048维embedding
+    ↓
+同模型、同ROI/光谱合同的模板检索
+    ↓
+Top-K候选或拒绝原因
 ```
 
-<div class="source">命令：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/README.md"><code>samples/case4/README.md</code></a>；教材：<a href="../experiment/case4.md#手动环境"><code>src/experiment/case4.md</code> §2</a></div>
-
-随后只读检查 `/api/health`、`/api/bootstrap`、`/api/candidates` 和 `/`，再执行一次合成 ROI 或匿名上传。
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-architecture">系统总体架构</a></div>
 
 <!--
-只能在已加载 conda/CANN 的板端 shell 中启动。资产校验失败时停止，不下载、不转换、不切 CPU，也不修改 registry。
+强调每层输出不同：框、ROI、embedding、模板分数。任何一层失败，都不能用下一页面的成功替代。
 -->
 
 ---
 
 <!-- _class: center -->
 
-## 失败时保留现场并回退
+## 手掌检测模型可以在界面独立选择
 
-- PyACL 不可用：确认同一 shell 的 Python 与 `acl.__file__`。
-- 资产哈希不符或模型不在列表：停止服务并核对清单、profile、registry 和 bootstrap。
-- 模板异常：保存模板目录，按版本化备份恢复。
-- ACL 异常、设备 reset、`err_ret=-512` 或清理失败：停止该候选，保留日志并回退 CCNet。
-- `Health: Alarm` 只记录诊断，不能单独判失败或通过。
+| 模型 | 输入 | 输出合同 | 状态 |
+|---|---|---|---|
+| NanoDet-Plus M-320 | `[1,3,320,320]` | `[1,2125,34]` | 默认人工测试 |
+| PicoDet XS-320 | `[1,3,320,320]` | 8输出 | 实验 |
+| PicoDet XS-416 | `[1,3,416,416]` | 8输出 | 实验 |
 
-<div class="source">排障：<a href="../experiment/case4.md#常见问题"><code>src/experiment/case4.md</code> §6</a>；验收边界：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/docs/02-device-deployment-and-acceptance-report.md"><code>docs/02-device-deployment-and-acceptance-report.md</code></a></div>
+`detector_id`控制检测模型，`model_id`控制掌纹特征模型，两者不能混用。切换检测模型必须同步切换OM和对应解码器。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-detector-catalog">可选模型</a>；清单：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/detector_manifest.json">detector_manifest.json</a></div>
 
 <!--
-回退 CCNet 是版本内恢复策略，不是把五个 CompNet 判为永久不支持。故障候选先阻断，后续用单独版本重新验收。
+强调选择器必须切换OM与解码器，不能只改显示名称。PicoDet仍是实验模型。
 -->
 
 ---
 
 <!-- _class: center -->
 
-## 课堂交付：一张候选与证据对照卡
+## 长方形画面被直接拉伸为方形模型输入
 
-| 项目 | 必须提交 |
+| 原图 | 横纵缩放到320×320 |
 |---|---|
-| 当前页面 | 预构建前端截图与 manifest id |
-| 服务链 | health、bootstrap、candidates 输出 |
-| 模型 | canonical ID、profile、OM SHA |
-| 模板 | 注册、查询、命中、删除、重启结果 |
-| 隐私 | 合成/匿名声明与清理记录 |
-| 准入 | 五层证据中已完成与仍缺失的项 |
+| 320×240 | x=1，y=4/3 |
+| 640×480 | x=1/2，y=2/3 |
+| 1280×720 | x=1/4，y=4/9 |
 
-完成标准是能解释“哪些是前端证据、哪些是运行证据”，并明确五个 CompNet 仍为 `manual_test_pending`。
+检测框会按原图宽高分别反算，因此框位置仍对应原始视频；页面显示保持原始宽高比。
 
-<div class="source">教材：<a href="../experiment/case4.md"><code>src/experiment/case4.md</code></a>；候选清单：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/candidate_manifest.json"><code>samples/case4/candidate_manifest.json</code></a>；截图清单：<a href="screenshots/capture-manifest.json"><code>capture-manifest.json</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-direct-stretch">直接拉伸合同</a></div>
 
 <!--
-最终报告不能写“六模型通过”。正确写法是默认模型可回退、五个 CompNet 等待人工测试，前端截图只覆盖布局。
+解释几何拉伸不是文件压缩。模型内部比例变化，页面框通过逆变换恢复，显示画面不拉伸。
+-->
+
+---
+
+<!-- _class: center -->
+
+## NanoDet和PicoDet不能共用解码器
+
+| 项目 | NanoDet | PicoDet |
+|---|---|---|
+| 输出 | 单张量`[1,2125,34]` | 4层分类+4层DFL |
+| 分数 | 前2通道已sigmoid | 图内已sigmoid |
+| DFL | 后32通道 | 每层32通道 |
+| 中心偏移 | 0.0 | 0.5 |
+
+`family`字段决定预处理、分类分数处理和DFL解码分支。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-nanodet-output">检测输出合同</a></div>
+
+<!--
+这是模型选择最容易出错的地方：形状相同不代表语义相同。必须依据family选择预处理和解码。
+-->
+
+---
+
+<!-- _class: center -->
+
+## CCNet把ROI转换为可比较特征
+
+- 输入：单通道`[1,1,128,128]`
+- 输出：2048维embedding
+- 比较：L2归一化后的余弦相似度
+- 模板namespace：`<model_id>__npu__mixed_fp16`
+- ROI、模态、光谱和摄像头合同也必须兼容
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-embedding-contract">掌纹特征合同</a></div>
+
+<!--
+模板不是一张图或一个名字，而是同合同embedding集合。换特征模型后不能直接比较旧模板。
+-->
+
+---
+
+<!-- _class: center -->
+
+## 注册必须同时通过“单只手”和“掌侧一致”
+
+1. 画面中只能检测到一只手。
+2. 检测标签必须是`left_palm`或`right_palm`。
+3. 检测掌侧必须与页面人工选择一致。
+4. 不一致时不裁剪ROI、不保存样本、不创建模板。
+5. 左右掌稳定ID分别以`:left`和`:right`结尾。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-side-mismatch-experiment">注册掌侧不一致实验</a></div>
+
+<!--
+这是身份数据完整性门，不是UI提示。错误掌侧不能通过自动交换标签进入模板。
+-->
+
+---
+
+<!-- _class: center -->
+
+## 最小实验先验证环境和资产
+
+```bash
+conda activate ascend
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+export PALMPRINT_ROOT=<release-root>
+export PALMPRINT_MODEL_ASSET_ROOT=<verified-assets>
+python -c "import cv2, acl; print(cv2.__version__)"
+python -m palmprint_workbench.tools.verify_assets --strict
+```
+
+只有`ok=true`且`failures=[]`才能继续。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-verify-assets">资产校验</a>；运行手册：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case4">samples/case4</a></div>
+
+<!--
+资产门同时检查检测OM、CCNet OM和registry。文件存在但哈希不符必需停止。
+-->
+
+---
+
+<!-- _class: center -->
+
+## 服务启动后再验证四层入口
+
+```bash
+python -m palmprint_workbench.api --host 0.0.0.0 --port 7861
+curl --fail http://127.0.0.1:7861/api/health
+curl --fail http://127.0.0.1:7861/api/bootstrap
+curl --fail http://127.0.0.1:7861/api/cameras
+curl --fail http://127.0.0.1:7861/
+```
+
+health正常仍不会主动加载NPU；必须再执行检测或识别。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-start-service">启动服务</a></div>
+
+<!--
+健康检查证明服务、运行时和资产状态，不证明真实摄像头、NPU推理或身份质量。
+-->
+
+---
+
+<!-- _class: center -->
+
+## 页面把检测模型与特征模型分开
+
+- “手掌检测模型”选择NanoDet或PicoDet。
+- “掌纹特征模型”选择CCNet。
+- 未知`detector_id`返回422。
+- PicoDet显示实验提示和原始数值门状态。
+- 切换检测模型后清除旧检测框。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-select-detector">选择模型并观察检测</a></div>
+
+<!--
+检查bootstrap中的detectors与models。界面显示名不是证据，响应里的detector_id才是实际选择结果。
+-->
+
+---
+
+<!-- _class: center -->
+
+## 卡顿来自重复取帧，不是NPU算不动
+
+| 方案 | 10秒检测数 | 平均请求 |
+|---|---:|---:|
+| 640×480单路 | 16 | 520ms |
+| 320×240单路 | 34–39 | 219–242ms |
+
+NPU内部约20–23ms。旧页面同时请求预览和检测，两路争用同一台C922，因此应先修采集链路。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-camera-performance">实时页面性能</a></div>
+
+<!--
+先定位瓶颈再优化。当前一次采集同时返回框和预览，独立/frame请求为0，检测后再等待60ms。
+-->
+
+---
+
+<!-- _class: center -->
+
+## 证据必须按层保留
+
+| 层 | 可以证明 | 不能证明 |
+|---|---|---|
+| 资产 | 文件身份 | 数值正确 |
+| ACL | OM可加载执行 | 任务质量 |
+| 数值 | 张量误差 | 身份准确率 |
+| 检测任务 | 框与掌侧指标 | embedding质量 |
+| 特征任务 | EER/Rank-1 | 摄像头体验 |
+| UI/摄像头 | 服务闭环 | 跨场景可靠性 |
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-evidence-layers">分层验收</a></div>
+
+<!--
+每层通过只能支持本层结论。禁止用health、截图或单次识别替代数值和任务指标。
+-->
+
+---
+
+<!-- _class: center -->
+
+## 失败先分层，再修复
+
+| 现象 | 先检查 |
+|---|---|
+| `import acl`失败 | Python、CANN、`acl.__file__` |
+| 模型不显示 | manifest、OM大小和SHA |
+| 摄像头为空 | V4L2、权限、设备占用 |
+| 注册不完成 | 手数量、掌侧、ROI质量 |
+| 检索为空 | namespace、ROI、光谱、模型ID |
+| 页面卡顿 | 是否双路取流、输入分辨率、MJPG |
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-troubleshooting">常见失败定位</a></div>
+
+<!--
+失败发生在哪一层，就在哪一层收集证据。不要用降低阈值、交换标签或CPU fallback掩盖问题。
+-->
+
+---
+
+<!-- _class: center -->
+
+## 生物特征默认不落盘
+
+- 连续预览帧默认不保存。
+- 调试模式必须显式开启并限制帧数。
+- 调试内容只留在受控发行目录。
+- 真实掌纹、姓名、embedding和原图不进入Git。
+- 课堂截图只使用合成或匿名素材。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-privacy">调试帧和隐私</a></div>
+
+<!--
+调试捕获是有限、显式、可清理的例外，不是默认日志策略。发布仓库不能包含真实生物特征。
+-->
+
+---
+
+<!-- _class: center -->
+
+## 课堂任务
+
+1. 分别调用三份检测OM并核对`detector_id`。
+2. 比较320×240、640×480、1280×720的刷新率。
+3. 注册匿名左右掌并验证模板ID隔离。
+4. 制造掌侧不一致，确认没有样本落盘。
+5. 用错误SHA制造资产失败并恢复到`ok=true`。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-guided-labs">分步实验</a></div>
+
+<!--
+课堂评价看学生能否解释每项证据的边界，而不是只看最终页面是否出现匹配结果。
+-->
+
+---
+
+<!-- _class: center -->
+
+## 总结：一次成功请求不是系统验收
+
+- 两阶段链条把定位与身份拆开。
+- 检测模型与特征模型必须分别选择、分别验证。
+- 直接拉伸合同、类别顺序和DFL解码是检测精度的前提。
+- 严格掌侧核对保护注册模板。
+- 单路取流解决摄像头争用，但不能改变模型质量。
+- 资产、ACL、数值、任务、性能、UI证据不可互相替代。
+
+<div class="source">教材：<a href="https://310b.cn/experiment/case4.html#src-experiment-case4-summary">案例小结</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/tree/main/samples/case4">samples/case4</a></div>
+
+<!--
+最后回到主线：问题分解、输入合同、身份数据完整性、摄像头性能和证据边界。
 -->

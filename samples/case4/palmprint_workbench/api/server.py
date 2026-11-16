@@ -44,6 +44,10 @@ from ..config import (
     CAMERA_DEFAULT_HEIGHT,
     CAMERA_DEFAULT_WIDTH,
     DEFAULT_THRESHOLD,
+    DETECTOR_DEBUG_CAPTURE_DIR,
+    DETECTOR_DEBUG_CAPTURE_ENABLED,
+    DETECTOR_DEBUG_CAPTURE_MAX_FRAMES,
+    DETECTOR_DEBUG_CAPTURE_MIN_INTERVAL_SECONDS,
     JOB_TIMEOUT_SECONDS,
     MAX_API_REPORT_BYTES,
     MAX_API_REPORT_FILES,
@@ -62,6 +66,7 @@ from ..config import (
     SERVER_PORT,
     camera_resolution_options,
 )
+from ..domain.captures import DetectorDebugCaptureStore
 from ..domain.datasets import audit_extracted, load_dataset_manifest, records
 from ..domain.admission import resolve_runtime_model
 from ..runtime.acl import acl_runtime_status
@@ -98,6 +103,7 @@ logger = logging.getLogger(__name__)
 
 class RecognitionOptions(BaseModel):
     model_id: str = "ccnet"
+    detector_id: Optional[str] = None
     backend: str = "npu"
     precision: str = "mixed_fp16"
     threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
@@ -111,6 +117,7 @@ class CameraRecognitionOptions(RecognitionOptions):
 
 class EnrollmentOptions(BaseModel):
     model_id: str = "ccnet"
+    detector_id: Optional[str] = None
     backend: str = "npu"
     precision: str = "mixed_fp16"
     assume_roi: bool = False
@@ -214,6 +221,8 @@ class EnrollmentState:
     last_roi_url: str | None = None
     last_quality: dict[str, Any] = field(default_factory=dict)
     last_geometry: dict[str, Any] = field(default_factory=dict)
+    detection_boxes: list[dict[str, Any]] = field(default_factory=list)
+    countdown_remaining: int = 0
     last_error: str | None = None
     last_accepted_at: float = 0.0
     roi_config: dict[str, float] = field(default_factory=dict)
@@ -250,6 +259,12 @@ class ComparisonState:
 
 
 WORKBENCH = service_layer.WORKBENCH
+DETECTOR_DEBUG_ARCHIVE = DetectorDebugCaptureStore(
+    DETECTOR_DEBUG_CAPTURE_DIR,
+    enabled=DETECTOR_DEBUG_CAPTURE_ENABLED,
+    max_frames=DETECTOR_DEBUG_CAPTURE_MAX_FRAMES,
+    min_interval_seconds=DETECTOR_DEBUG_CAPTURE_MIN_INTERVAL_SECONDS,
+)
 
 
 def _runtime_specs() -> list[Any]:
@@ -478,6 +493,10 @@ def _model_dict(value: BaseModel) -> dict[str, Any]:
     return dict(value.dict())
 
 
+def _jpeg_data_url(payload: bytes) -> str:
+    return "data:image/jpeg;base64," + base64.b64encode(payload).decode("ascii")
+
+
 def _frame_data_url(image: Any, *, image_format: str = ".jpg") -> str | None:
     if image is None:
         return None
@@ -652,12 +671,22 @@ def _preview_jpeg(frame: Any, *, max_width: int, quality: int) -> tuple[bytes, t
     return payload.tobytes(), (int(preview.shape[1]), int(preview.shape[0]))
 
 
+def _validate_detector_id(detector_id: str | None) -> str:
+    try:
+        return service_layer.resolve_detector_id(detector_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=503, detail=f"手掌检测模型配置不可用：{exc}") from exc
+
+
 def _validate_options(options: RecognitionOptions) -> None:
     if options.backend != "npu":
         raise HTTPException(
             status_code=422,
             detail="正式 API 仅支持 backend=npu；CPU 后端仅用于离线 benchmark",
         )
+    options.detector_id = _validate_detector_id(options.detector_id)
     # Keep the production boundary explicit: legacy static entries such as
     # EDCC and conversion-only CompNet live in ``offline_models`` and must not
     # be reported as merely pending candidates.
@@ -772,17 +801,24 @@ def _image_resolution(image: Any) -> str | None:
         return None
 
 
-def _recognition_payload(
+def _recognition_payload_hand(
     image: Any,
     options: RecognitionOptions,
     *,
+    roi_result_override: Any | None = None,
+    archive: bool = True,
+    validated: bool = False,
     source: str = "upload",
     device: str | None = None,
     requested_resolution: str | None = None,
     camera_resolution: str | None = None,
     roi_config: dict[str, float] | None = None,
+    detected_palm_side: str | None = None,
 ) -> dict[str, Any]:
-    _validate_options(options)
+    if detected_palm_side not in {None, "left", "right"}:
+        raise ValueError("detected_palm_side must be left, right, or None")
+    if not validated:
+        _validate_options(options)
     threshold = _resolved_threshold(options)
     camera_contract = _camera_contract(device) if source == "camera" else None
     calibration = _runtime_calibration(
@@ -794,9 +830,13 @@ def _recognition_payload(
     if calibration is not None:
         threshold = float(calibration["recommended_threshold"])
     started = time.perf_counter_ns()
-    roi_result, error = service_layer._extract(
-        image, options.assume_roi, roi_config=roi_config
-    )
+    if roi_result_override is None:
+        roi_result, error = service_layer._extract(
+            image, options.assume_roi, detector_id=options.detector_id, roi_config=roi_config
+        )
+    else:
+        roi_result = roi_result_override
+        error = roi_result.reason if not roi_result.ok or roi_result.roi is None else None
     roi_finished = time.perf_counter_ns()
     if error:
         timing = {
@@ -836,7 +876,7 @@ def _recognition_payload(
                 "status": f"recognition_failed: {error}",
                 "timing": timing,
             },
-        )
+        ) if archive else None
         if capture_id:
             payload["capture_id"] = capture_id
         return payload
@@ -865,7 +905,8 @@ def _recognition_payload(
             except RuntimeError as exc:
                 raise HTTPException(status_code=503, detail=f"模板存储不可用：{exc}") from exc
     except Exception as exc:
-        _safe_capture_save(
+        if archive:
+            _safe_capture_save(
             original=image,
             roi=roi_result.roi,
             metadata={
@@ -883,7 +924,7 @@ def _recognition_payload(
                 "status": f"recognition_error: {type(exc).__name__}: {exc}",
                 "timing": {"ROI / quality ms": (roi_finished - started) / 1e6},
             },
-        )
+            )
         raise
     finished = time.perf_counter_ns()
     if not result.get("matches"):
@@ -925,6 +966,7 @@ def _recognition_payload(
         "user_id": result.get("palm_id") or result.get("user_id"),
         "user_name": result.get("display_name") or result.get("user_name"),
         "palm_side": result.get("palm_side"),
+        "detected_palm_side": detected_palm_side,
         "status": status,
         "quality": _jsonable(roi_result.quality),
         "geometry": _jsonable(roi_result.geometry),
@@ -978,9 +1020,76 @@ def _recognition_payload(
             "palm_side": payload.get("palm_side"),
             "roi_pipeline_id": roi_result.pipeline_id,
         },
-    )
+    ) if archive else None
     if capture_id:
         payload["capture_id"] = capture_id
+    return payload
+
+
+def _recognition_payload(
+    image: Any,
+    options: RecognitionOptions,
+    *,
+    source: str = "upload",
+    device: str | None = None,
+    requested_resolution: str | None = None,
+    camera_resolution: str | None = None,
+    roi_config: dict[str, float] | None = None,
+) -> dict[str, Any]:
+    """Detect every palm and return independent identity results."""
+    del roi_config
+    _validate_options(options)
+    started = time.perf_counter_ns()
+    if options.assume_roi:
+        boxes: list[Any] = [None]
+    else:
+        boxes = service_layer.detect_palms(image, detector_id=options.detector_id)
+    detection_ms = (time.perf_counter_ns() - started) / 1e6
+    hands: list[dict[str, Any]] = []
+    rois: dict[int, Any] = {}
+    for index, box in enumerate(boxes, start=1):
+        roi_result = (
+            WORKBENCH.preprocessor.extract(image, assume_roi=True)
+            if box is None else WORKBENCH.preprocessor.extract_box(image, box.xyxy)
+        )
+        hand = _recognition_payload_hand(
+            image, options, roi_result_override=roi_result, archive=False, validated=True,
+            source=source, device=device, requested_resolution=requested_resolution,
+            camera_resolution=camera_resolution, detected_palm_side=getattr(box, "palm_side", None),
+        )
+        hand["index"] = index
+        hand["bbox_xyxy"] = list(box.xyxy) if box is not None else None
+        hand["detection_score"] = box.score if box is not None else None
+        hand["detected_palm_side"] = getattr(box, "palm_side", None)
+        hands.append(hand)
+        if roi_result.roi is not None:
+            rois[index] = roi_result.roi
+    total_ms = (time.perf_counter_ns() - started) / 1e6
+    payload = {
+        "status": f"已检测并处理 {len(hands)} 只手" if hands else "未检测到手掌",
+        "detection_count": len(hands),
+        "hands": hands,
+        "preview_url": _frame_data_url(image),
+        "timing": {"detection ms": detection_ms, "total ms": total_ms},
+        "detector_id": options.detector_id,
+        "roi_pipeline_id": ROI_PIPELINE_ID,
+    }
+    try:
+        record = WORKBENCH.captures.save_multi(
+            original=image,
+            rois=rois,
+            metadata={"purpose": "recognition", "source": source, "model_id": options.model_id,
+                      "detector_id": options.detector_id,
+                      "backend": options.backend, "precision": options.precision, "device": device,
+                      "requested_resolution": requested_resolution,
+                      "actual_resolution": _image_resolution(image),
+                      "roi_pipeline_id": ROI_PIPELINE_ID,
+                      "hands": [{key: value for key, value in hand.items() if key not in {"preview_url", "roi_url"}}
+                                for hand in hands], "timing": payload["timing"]},
+        )
+        payload["capture_id"] = record["capture_id"]
+    except Exception:
+        logger.exception("multi-palm capture archive failed; recognition result is preserved")
     return payload
 
 
@@ -1319,6 +1428,9 @@ def _session_response(state: EnrollmentState, *, status: str | None = None, **ex
         "person_id": state.options.person_id,
         "display_name": state.options.display_name,
         "palm_side": state.options.palm_side,
+        "palm_side_verification": "detector_required_match",
+        "countdown_remaining": state.countdown_remaining,
+        "detection_boxes": list(state.detection_boxes),
         "sample_count": len(state.samples),
         "capture_ids": list(state.capture_ids),
         "samples": [
@@ -1342,6 +1454,7 @@ def _session_response(state: EnrollmentState, *, status: str | None = None, **ex
         "min_samples": MAX_ENROLL_SAMPLES,
         "max_samples": MAX_ENROLL_SAMPLES,
         "model_id": state.options.model_id,
+        "detector_id": state.options.detector_id,
         "backend": state.options.backend,
         "precision": state.options.precision,
         "roi_pipeline_id": ROI_PIPELINE_ID,
@@ -1363,6 +1476,19 @@ def _validate_enrollment_identity(options: EnrollmentOptions) -> tuple[str, str,
     if options.mode not in {"self_service", "assisted"}:
         raise HTTPException(status_code=422, detail="注册模式必须为 self_service 或 assisted")
     return person_id, display_name, palm_side
+
+
+def _enrollment_side_mismatch_reason(requested_side: str, detected_side: str | None) -> str | None:
+    """Return a rejection reason when detector and operator side disagree."""
+    if requested_side not in {"left", "right"}:
+        raise ValueError("requested enrollment palm side is invalid")
+    if detected_side not in {"left", "right"}:
+        return "检测掌侧无效，无法注册"
+    if detected_side == requested_side:
+        return None
+    requested_name = "左掌" if requested_side == "left" else "右掌"
+    detected_name = "左掌" if detected_side == "left" else "右掌"
+    return f"检测到{detected_name}，与当前选择的{requested_name}不一致"
 
 
 def _cleanup_enrollment_captures(state: EnrollmentState) -> None:
@@ -1442,7 +1568,7 @@ def _complete_enrollment(state: EnrollmentState) -> dict[str, Any]:
     person_id, display_name, palm_side = _validate_enrollment_identity(state.options)
     if len(state.samples) != MAX_ENROLL_SAMPLES:
         raise ValueError(f"需要恰好 {MAX_ENROLL_SAMPLES} 个合格样本")
-    camera_contract = _camera_contract(state.device)
+    camera_contract = _camera_contract(state.device) if state.device else None
     namespace = service_layer._template_namespace(
         state.options.model_id, state.options.backend, state.options.precision
     )
@@ -1480,9 +1606,9 @@ def _complete_enrollment(state: EnrollmentState) -> dict[str, Any]:
             palm_side=palm_side,
             roi_pipeline_id=ROI_PIPELINE_ID,
             roi_config=state.roi_config or None,
-            modality=camera_contract.modality,
-            spectrum=camera_contract.spectrum,
-            camera_physical_id=camera_contract.physical_id,
+            modality=camera_contract.modality if camera_contract else "palmprint",
+            spectrum=camera_contract.spectrum if camera_contract else "visible",
+            camera_physical_id=camera_contract.physical_id if camera_contract else None,
         )
     for capture_id in new_capture_ids:
         try:
@@ -1530,7 +1656,7 @@ def _auto_capture_worker(state: EnrollmentState) -> None:
             now = time.monotonic()
             elapsed = now - started
             if elapsed > AUTO_ENROLL_COUNTDOWN_SECONDS and now - progress_at >= AUTO_ENROLL_STABILITY_TIMEOUT_SECONDS:
-                _set_enrollment_failure(state, "30 秒内没有新的合格样本，请调整采集框、距离和光照后重试")
+                _set_enrollment_failure(state, "30 秒内没有新的合格样本，请调整手掌距离和光照后重试")
                 return
             with _SESSION_LOCK:
                 if state.phase in {"cancelled", "completed", "failed", "reviewing"}:
@@ -1538,10 +1664,12 @@ def _auto_capture_worker(state: EnrollmentState) -> None:
                 if elapsed < AUTO_ENROLL_COUNTDOWN_SECONDS:
                     countdown_elapsed = elapsed
                     state.phase = "countdown"
-                    state.guide = f"请将掌心放入采集框，{max(1, int(AUTO_ENROLL_COUNTDOWN_SECONDS - countdown_elapsed + 0.99))} 秒后开始"
+                    state.countdown_remaining = max(1, int(AUTO_ENROLL_COUNTDOWN_SECONDS - countdown_elapsed + 0.99))
+                    state.guide = f"请在画面中保留一只手掌，{state.countdown_remaining} 秒后开始"
                 else:
+                    state.countdown_remaining = 0
                     state.phase = "waiting_position"
-                    state.guide = "请将掌心放入采集框并保持稳定"
+                    state.guide = "请在画面中保留一只手掌并保持稳定"
             try:
                 frame = WORKBENCH.capture_camera_frame(
                     state.device,
@@ -1561,11 +1689,37 @@ def _auto_capture_worker(state: EnrollmentState) -> None:
                     state.last_geometry = {}
                 time.sleep(AUTO_ENROLL_FRAME_INTERVAL_SECONDS)
                 continue
-            result, error = service_layer._extract(
-                frame.rgb,
-                False,
-                roi_config=state.roi_config,
+            boxes = service_layer.detect_palms(
+                frame.rgb, detector_id=state.options.detector_id
             )
+            with _SESSION_LOCK:
+                state.detection_boxes = [
+                    {"index": index, "bbox_xyxy": list(box.xyxy), "detection_score": box.score,
+                     "detected_palm_side": box.palm_side}
+                    for index, box in enumerate(boxes, start=1)
+                ]
+            detected_side: str | None = None
+            requested_side = (state.options.palm_side or "").strip().lower()
+            palm_side_match: bool | None = None
+            if len(boxes) == 1:
+                detected_side = boxes[0].palm_side
+                palm_side_match = (
+                    detected_side == requested_side
+                    if requested_side in {"left", "right"}
+                    else None
+                )
+                mismatch_reason = _enrollment_side_mismatch_reason(
+                    requested_side, detected_side
+                )
+                if mismatch_reason is not None:
+                    error = mismatch_reason
+                    result = service_layer.RoiResult(False, reason=error)
+                else:
+                    result = WORKBENCH.preprocessor.extract_box(frame.rgb, boxes[0].xyxy)
+                    error = result.reason if not result.ok or result.roi is None else None
+            else:
+                error = "未检测到手掌" if not boxes else "检测到多只手，注册时请只保留一只手"
+                result = service_layer.RoiResult(False, reason=error)
             now = time.monotonic()
             state.actual_resolution = _image_resolution(frame.rgb)
             with _SESSION_LOCK:
@@ -1573,16 +1727,21 @@ def _auto_capture_worker(state: EnrollmentState) -> None:
                 state.last_preview_url = _frame_data_url(preview)
                 state.last_roi_url = _frame_data_url(result.roi, image_format=".png")
                 state.last_quality = _jsonable(result.quality)
-                state.last_geometry = _jsonable(result.geometry)
+                state.last_geometry = {
+                    **_jsonable(result.geometry),
+                    "detected_palm_side": detected_side,
+                    "requested_palm_side": requested_side,
+                    "detector_palm_side_match": palm_side_match,
+                }
             if error or result.roi is None:
                 reason = error or "ROI 提取失败"
                 with _SESSION_LOCK:
                     state.rejection_counts[reason] = state.rejection_counts.get(reason, 0) + 1
                     state.last_error = reason
                     state.phase = "waiting_position"
-                    state.guide = "请将掌心放入采集框，调整距离和光照"
+                    state.guide = "请在画面中保留一只手掌，调整距离和光照"
                 if first_quality_at is None and now - started >= AUTO_ENROLL_WAITING_HAND_TIMEOUT_SECONDS:
-                    _set_enrollment_failure(state, "20 秒内未获得合格画面，请将掌心放入采集框后重试")
+                    _set_enrollment_failure(state, "20 秒内未获得合格画面，请在画面中保留一只手掌后重试")
                     return
                 stable_since = None
                 previous_geometry = {}
@@ -1602,7 +1761,7 @@ def _auto_capture_worker(state: EnrollmentState) -> None:
                 previous_geometry = current_geometry
                 with _SESSION_LOCK:
                     state.phase = "stabilizing"
-                    state.guide = "将掌心放入采集框，保持画面稳定"
+                    state.guide = "画面中保留一只手掌，保持画面稳定"
                 time.sleep(AUTO_ENROLL_FRAME_INTERVAL_SECONDS)
                 continue
             previous_geometry = current_geometry
@@ -1633,15 +1792,18 @@ def _auto_capture_worker(state: EnrollmentState) -> None:
                     "purpose": "enrollment",
                     "source": "camera_auto",
                     "model_id": state.options.model_id,
+                    "detector_id": state.options.detector_id,
                     "backend": state.options.backend,
                     "precision": state.options.precision,
                     "device": state.device,
                     "template_namespace": service_layer._template_namespace(state.options.model_id, state.options.backend, state.options.precision),
                     "person_id": state.options.person_id,
                     "palm_side": state.options.palm_side,
+                    "detected_palm_side": detected_side,
+                    "detector_palm_side_match": palm_side_match,
                     "requested_resolution": state.resolution,
                     "actual_resolution": _image_resolution(frame.rgb),
-                    "roi_mode": "fixed_guide",
+                    "roi_mode": "detected_bbox",
                     "camera_physical_id": _camera_physical_id(state.device),
                     "roi_ok": True,
                     "quality": {**_jsonable(result.quality), "frame_delta": frame_delta},
@@ -2216,6 +2378,7 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
                 "template_store": bool(template_store.get("ready")),
             },
             "frontend_bundle": bundle_ok,
+            "detector_debug_capture": DETECTOR_DEBUG_ARCHIVE.status(),
             "npu_runtime": npu_runtime,
             "model_assets": {
                 item["id"]: item.get("asset_status", {}) for item in model_payloads
@@ -2241,12 +2404,14 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
             "release_id": RELEASE_ID,
             "release_profile": RELEASE_PROFILE,
             "models": models,
+            "detectors": service_layer.detector_catalog(),
             "manual_test_pending_model_ids": [
                 item["id"] for item in models if item.get("manual_test_pending")
             ],
             "datasets": [_dataset_payload(item) for item in load_dataset_manifest()["datasets"]],
             "defaults": {
                 "model_id": default_model["id"] if default_model is not None else "",
+                "detector_id": service_layer.resolve_detector_id(None),
                 "backend": "npu",
                 "precision": PRODUCTION_PRECISION,
                 "threshold": default_threshold,
@@ -2371,28 +2536,12 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         return {"items": _camera_payload()}
 
     @service.get("/api/cameras/{device:path}/roi-guide")
-    async def camera_roi_guide(
-        device: str,
-        resolution: str = Query(f"{CAMERA_DEFAULT_WIDTH}x{CAMERA_DEFAULT_HEIGHT}"),
-    ) -> dict[str, Any]:
-        width, height = _parse_resolution(resolution)
-        return {
-            "roi_pipeline_id": ROI_PIPELINE_ID,
-            "resolution": f"{width}x{height}",
-            "physical_id": _camera_physical_id(device),
-            "config": _fixed_roi_config(device, f"{width}x{height}"),
-            "message": "系统不会自动寻找手掌，请将掌心放入固定采集框",
-        }
+    async def camera_roi_guide(device: str) -> dict[str, Any]:
+        raise HTTPException(status_code=410, detail="固定采集框标定已停用，请使用手掌检测流程")
 
     @service.put("/api/cameras/{device:path}/roi-guide")
-    async def save_camera_roi_guide(
-        device: str,
-        calibration: FixedRoiCalibration,
-        resolution: str = Query(f"{CAMERA_DEFAULT_WIDTH}x{CAMERA_DEFAULT_HEIGHT}"),
-    ) -> dict[str, Any]:
-        _camera_contract(device)
-        width, height = _parse_resolution(resolution)
-        return _save_fixed_roi_config(device, f"{width}x{height}", calibration)
+    async def save_camera_roi_guide(device: str) -> dict[str, Any]:
+        raise HTTPException(status_code=410, detail="固定采集框标定已停用，请使用手掌检测流程")
 
     @service.get("/api/cameras/{device:path}/frame")
     async def camera_frame(
@@ -2482,6 +2631,7 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
             model_id=str(form.get("model_id", "ccnet")),
             backend=str(form.get("backend", "npu")),
             precision=str(form.get("precision", "mixed_fp16")),
+            detector_id=str(form.get("detector_id") or "") or None,
             threshold=_form_optional_float(form.get("threshold")),
             assume_roi=_parse_bool(form.get("assume_roi")),
             top_k=_form_int(form.get("top_k"), 5),
@@ -2497,6 +2647,81 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
             raise
         except (FileNotFoundError, RuntimeError, ValueError) as exc:
             raise HTTPException(status_code=503, detail=_npu_error_detail(exc)) from exc
+
+    @service.post("/api/cameras/{device:path}/detections")
+    async def detect_camera(device: str, options: CameraRecognitionOptions) -> dict[str, Any]:
+        """Return boxes and their exact source frame.
+
+        Full-frame archival is disabled unless the explicit bounded detector
+        debugging mode is enabled at service startup.
+        """
+        _camera_contract(device)
+        options.detector_id = _validate_detector_id(options.detector_id)
+        width, height = _parse_resolution(options.resolution)
+
+        def detect_frame() -> dict[str, Any]:
+            with _camera_reservation():
+                frame = WORKBENCH.capture_camera_frame(device, width, height, encode_jpeg=False)
+            started = time.perf_counter_ns()
+            if DETECTOR_DEBUG_ARCHIVE.enabled:
+                boxes, detector_debug = service_layer.detect_palms_with_debug(
+                    frame.rgb, detector_id=options.detector_id
+                )
+            else:
+                boxes = service_layer.detect_palms(frame.rgb, detector_id=options.detector_id)
+                detector_debug = None
+            detection_ms = (time.perf_counter_ns() - started) / 1e6
+            hands = [
+                {
+                    "index": index,
+                    "bbox_xyxy": list(box.xyxy),
+                    "detection_score": box.score,
+                    "detected_palm_side": box.palm_side,
+                }
+                for index, box in enumerate(boxes, start=1)
+            ]
+            try:
+                debug_capture = DETECTOR_DEBUG_ARCHIVE.maybe_save(
+                    image_rgb=frame.rgb,
+                    device=device,
+                    requested_resolution=options.resolution,
+                    detections=hands,
+                    detection_ms=detection_ms,
+                    detector_debug=detector_debug,
+                )
+            except (OSError, ValueError) as exc:
+                # Image archiving is a debugging aid. A disk/encoder fault must
+                # not turn an otherwise valid live NPU detection into a failure.
+                logger.exception("detector debug capture failed")
+                debug_capture = {
+                    **DETECTOR_DEBUG_ARCHIVE.status(),
+                    "saved": False,
+                    "reason": "archive_error",
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+            preview_payload, (preview_width, preview_height) = _preview_jpeg(
+                frame, max_width=960, quality=72
+            )
+            capture_height, capture_width = frame.rgb.shape[:2]
+            return {
+                "status": f"检测到 {len(boxes)} 只手掌",
+                "detection_count": len(boxes),
+                "hands": hands,
+                "preview_url": _jpeg_data_url(preview_payload),
+                "capture_resolution": f"{capture_width}x{capture_height}",
+                "preview_resolution": f"{preview_width}x{preview_height}",
+                "timing": {"detection ms": detection_ms},
+                "detector_id": options.detector_id,
+                "debug_capture": debug_capture,
+                "roi_pipeline_id": ROI_PIPELINE_ID,
+            }
+
+        try:
+            return await run_in_threadpool(detect_frame)
+        except HTTPException:
+            raise
+        except (CameraError, FileNotFoundError, RuntimeError, ValueError) as exc:
+            raise HTTPException(status_code=503, detail=f"手掌检测失败：{exc}") from exc
 
     @service.post("/api/cameras/{device:path}/recognitions")
     async def recognize_camera(device: str, options: CameraRecognitionOptions) -> dict[str, Any]:
@@ -2530,7 +2755,7 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
                     device=device,
                     requested_resolution=options.resolution,
                     camera_resolution=_image_resolution(frame.rgb),
-                    roi_config=_fixed_roi_config(device, options.resolution),
+                    roi_config=None,
                 )
             )
         except HTTPException:
@@ -2571,6 +2796,7 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         options.assume_roi = False
         recognition_options = RecognitionOptions(**_model_dict(options))
         _validate_options(recognition_options)
+        options.detector_id = recognition_options.detector_id
         if options.person_id:
             raise HTTPException(status_code=422, detail="新注册不能自定义人员编号")
         if options.continue_session_id and options.reenroll_palm_id:
@@ -2640,11 +2866,11 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
                 raise HTTPException(status_code=409, detail="当前会话已失败，请创建新的注册会话")
             session.device = request.device
             session.resolution = request.resolution
-            session.roi_config = _fixed_roi_config(request.device, request.resolution)
+            session.roi_config = {}
             session.stop_event.clear()
             session.started_at = time.time()
             session.phase = "camera_opening"
-            session.guide = "正在打开摄像头并准备固定采集框"
+            session.guide = "正在打开摄像头并准备手掌检测"
             session.last_error = None
             _AUTO_ENROLL_SESSION_ID = session_id
             worker = threading.Thread(
@@ -2707,10 +2933,18 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
         result, error = service_layer._extract(
             image,
             assume_roi,
-            roi_config=_fixed_roi_config(device, requested_resolution) if device else None,
+            detector_id=session.options.detector_id,
+            roi_config=None,
         )
         if error or result.roi is None:
             raise HTTPException(status_code=422, detail=error or "ROI 提取失败")
+        if not assume_roi:
+            mismatch = _enrollment_side_mismatch_reason(
+                session.options.palm_side,
+                result.geometry.get("detected_palm_side"),
+            )
+            if mismatch:
+                raise HTTPException(status_code=422, detail=mismatch)
         capture_id = _safe_capture_save(
             original=image,
             roi=result.roi,
@@ -2718,12 +2952,13 @@ def create_app(*, static_dir: Path | None = None) -> FastAPI:
                 "purpose": "enrollment",
                 "source": source,
                 "model_id": session.options.model_id,
+                "detector_id": session.options.detector_id,
                 "backend": session.options.backend,
                 "precision": session.options.precision,
                 "device": device,
                 "requested_resolution": requested_resolution,
                 "actual_resolution": _image_resolution(image),
-                "roi_mode": "pre_cropped" if assume_roi else "fixed_guide",
+                "roi_mode": "pre_cropped" if assume_roi else "detected_bbox",
                 "camera_physical_id": _camera_physical_id(device) if device else None,
                 "roi_ok": True,
                 "quality": _jsonable(result.quality),

@@ -9,8 +9,8 @@ import {
   CircleHelp,
   Database,
   FileImage,
+  ScanSearch,
   Fingerprint,
-  Gauge,
   HardDrive,
   Images,
   Info,
@@ -37,13 +37,14 @@ import type {
   CandidateRuntimeOption,
   CandidateRunResult,
   CameraDevice,
+  DetectorOption,
   EnrollmentSession,
   HealthStatus,
   ModelOption,
   PageKey,
   RecognitionConfig,
+  RecognitionHand,
   RecognitionResult,
-  RoiGuideConfig,
   SystemItem,
   SystemStatus,
   TemplateItem,
@@ -57,7 +58,6 @@ import {
   MetricTile,
   Notice,
   Panel,
-  RangeField,
   SelectField,
   StatusPill,
   TextField,
@@ -71,9 +71,10 @@ import {
 const EMPTY_BOOTSTRAP: BootstrapData = {
   appVersion: "服务未连接",
   models: [],
+  detectors: [],
   candidates: [],
   datasets: [],
-  defaults: { modelId: "", backend: "npu", precision: "mixed_fp16", threshold: 0.75, cameraResolution: "1280x720" },
+  defaults: { modelId: "", detectorId: "", backend: "npu", precision: "mixed_fp16", threshold: 0.75, cameraResolution: "1280x720" },
 };
 
 const NAV_ITEMS: Array<{ key: PageKey; label: string; icon: typeof Activity; hint: string }> = [
@@ -108,22 +109,19 @@ const pageFromHash = (): PageKey => {
 
 const preferredCameraResolution = (camera?: CameraDevice): string => {
   if (!camera) return "1280x720";
-  return ["1280x720", "1920x1080", "640x480"].find((value) => camera.resolutions.includes(value))
+  return ["1280x720", "1920x1080", "640x480", "320x240"].find((value) => camera.resolutions.includes(value))
     || camera.resolutions[0]
     || "1280x720";
 };
 
-let cameraSessionSequence = 0;
+const preferredLiveResolution = (camera?: CameraDevice): string => {
+  if (!camera) return "320x240";
+  return ["320x240", "640x480", "1280x720"].find((value) => camera.resolutions.includes(value))
+    || camera.resolutions[0]
+    || "320x240";
+};
 
-function useRoiGuide(device: string, resolution: string) {
-  const [guide, setGuide] = useState<RoiGuideConfig>({center_x: 0.5, center_y: 0.5, side_ratio: 0.9});
-  useEffect(() => {
-    let alive = true;
-    if (device) void api.roiGuide(device, resolution).then((value) => {if (alive) setGuide(value);}).catch(() => undefined);
-    return () => {alive = false;};
-  }, [device, resolution]);
-  return [guide, setGuide] as const;
-}
+let cameraSessionSequence = 0;
 
 /**
  * Poll one camera request at a time.  A fixed interval can create overlapping
@@ -135,10 +133,12 @@ function useCameraPreview(
   active: boolean,
   device: string,
   resolution: string,
+  retryToken: number,
   announce: (message: string, tone?: "success" | "warning" | "danger" | "info") => void,
   onCaptureResolution?: (value?: string) => void,
-): string | undefined {
+): { frameUrl?: string; error?: string } {
   const [frameUrl, setFrameUrl] = useState<string>();
+  const [error, setError] = useState<string>();
   const frameRef = useRef<string | undefined>(undefined);
   const reportedError = useRef(false);
 
@@ -148,6 +148,7 @@ function useCameraPreview(
     let controller: AbortController | undefined;
     const session = `camera-${Date.now().toString(36)}-${(++cameraSessionSequence).toString(36)}`;
     reportedError.current = false;
+    setError(undefined);
 
     const releaseFrame = () => {
       if (frameRef.current) URL.revokeObjectURL(frameRef.current);
@@ -167,7 +168,9 @@ function useCameraPreview(
       } catch (error) {
         if (!stopped) {
           reportedError.current = true;
-          announce(error instanceof ApiError ? `摄像头打开失败：${error.message}` : "摄像头打开失败。", "danger");
+          const message = error instanceof ApiError ? `摄像头打开失败：${error.message}` : "摄像头打开失败。";
+          setError(message);
+          announce(message, "danger");
         }
         return;
       }
@@ -185,17 +188,21 @@ function useCameraPreview(
           onCaptureResolution?.(next.captureResolution);
           if (previous) URL.revokeObjectURL(previous);
           reportedError.current = false;
+          setError(undefined);
           // Schedule the next request only after this one completes.  This
           // keeps the displayed frame current without building a backlog when
           // V4L2 or JPEG encoding is slower than the target cadence.
           await wait(CAMERA_PREVIEW_DELAY_MS);
         } catch (error) {
           if (stopped || (error instanceof DOMException && error.name === "AbortError")) break;
+          const message = error instanceof ApiError ? `摄像头预览失败：${error.message}` : "摄像头预览失败。";
+          setError(message);
           if (!reportedError.current) {
             reportedError.current = true;
-            announce(error instanceof ApiError ? `摄像头预览失败：${error.message}` : "摄像头预览失败。", "danger");
+            announce(message, "danger");
           }
-          await wait(1000);
+          await api.closeCamera(device, resolution, session).catch(() => undefined);
+          return;
         }
       }
     };
@@ -209,17 +216,17 @@ function useCameraPreview(
       onCaptureResolution?.(undefined);
       if (active && device) void api.closeCamera(device, resolution, session).catch(() => undefined);
     };
-  }, [active, device, resolution, announce, onCaptureResolution]);
+  }, [active, device, resolution, retryToken, announce, onCaptureResolution]);
 
-  return frameUrl;
+  return { frameUrl, error };
 }
 
 type AutomaticRecognitionPhase = "inactive" | "calibrating" | "waiting_hand" | "stabilizing" | "recognizing" | "remove_hand";
 
 const automaticRecognitionMessage = (phase: AutomaticRecognitionPhase): string => ({
   inactive: "等待摄像头",
-  calibrating: "正在建立空采集框，请先移开掌心",
-  waiting_hand: "请将掌心放入采集框",
+  calibrating: "正在建立空画面参考，请先移开手掌",
+  waiting_hand: "等待手掌进入画面",
   stabilizing: "已检测到掌心，请保持稳定",
   recognizing: "正在自动识别",
   remove_hand: "识别完成，请移开掌心后继续",
@@ -232,15 +239,13 @@ const meanAbsoluteDifference = (first: Float32Array, second: Float32Array): numb
 };
 
 /**
- * The fixed guide still defines the ROI. This hook watches temporal change
- * inside that guide so an empty scene does not consume NPU inference. It does
- * not classify a hand or infer its left/right side.
+ * Watch full-frame temporal change to avoid invoking NPU on an empty scene.
+ * The board detector remains the only source of palm location.
  */
 function useAutomaticPalmTrigger(
   active: boolean,
   frameUrl: string | undefined,
   sourceKey: string,
-  guide: RoiGuideConfig,
   busy: boolean,
   onReady: () => void,
 ): { phase: AutomaticRecognitionPhase; message: string } {
@@ -252,7 +257,6 @@ function useAutomaticPalmTrigger(
   const releasedFramesRef = useRef(0);
   const triggeredRef = useRef(false);
   const onReadyRef = useRef(onReady);
-  const guideKey = `${guide.center_x}:${guide.center_y}:${guide.side_ratio}`;
 
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => {
@@ -263,7 +267,7 @@ function useAutomaticPalmTrigger(
     releasedFramesRef.current = 0;
     triggeredRef.current = false;
     setPhase(active ? "calibrating" : "inactive");
-  }, [active, guideKey, sourceKey]);
+  }, [active, sourceKey]);
 
   useEffect(() => {
     if (!active || !frameUrl) return undefined;
@@ -272,17 +276,12 @@ function useAutomaticPalmTrigger(
     image.onload = () => {
       if (cancelled || !image.naturalWidth || !image.naturalHeight) return;
       const side = 72;
-      const sourceSide = Math.min(image.naturalWidth, image.naturalHeight) * guide.side_ratio;
-      const sourceCenterX = image.naturalWidth * guide.center_x;
-      const sourceCenterY = image.naturalHeight * guide.center_y;
-      const sourceX = Math.max(0, Math.min(image.naturalWidth - sourceSide, sourceCenterX - sourceSide / 2));
-      const sourceY = Math.max(0, Math.min(image.naturalHeight - sourceSide, sourceCenterY - sourceSide / 2));
       const canvas = document.createElement("canvas");
       canvas.width = side;
       canvas.height = side;
       const context = canvas.getContext("2d", { willReadFrequently: true });
       if (!context) return;
-      context.drawImage(image, sourceX, sourceY, sourceSide, sourceSide, 0, 0, side, side);
+      context.drawImage(image, 0, 0, image.naturalWidth, image.naturalHeight, 0, 0, side, side);
       const rgba = context.getImageData(0, 0, side, side).data;
       const current = new Float32Array(side * side);
       for (let pixel = 0; pixel < current.length; pixel += 1) {
@@ -338,7 +337,7 @@ function useAutomaticPalmTrigger(
     };
     image.src = frameUrl;
     return () => { cancelled = true; image.onload = null; image.onerror = null; };
-  }, [active, busy, frameUrl, guide]);
+  }, [active, busy, frameUrl]);
 
   return { phase, message: automaticRecognitionMessage(phase) };
 }
@@ -359,14 +358,17 @@ function App() {
   const [candidateRuntimes, setCandidateRuntimes] = useState<CandidateRuntimeOption[]>([]);
   const [health, setHealth] = useState<HealthStatus>({ status: "unknown", message: "尚未连接服务" });
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
+  const [modelListReady, setModelListReady] = useState(false);
+  const [cameraListReady, setCameraListReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [drawer, setDrawer] = useState<"config" | "templates" | "system" | null>(null);
   const [config, setConfig] = useState<RecognitionConfig>({
     modelId: EMPTY_BOOTSTRAP.defaults.modelId,
+    detectorId: EMPTY_BOOTSTRAP.defaults.detectorId,
     backend: "npu",
     precision: EMPTY_BOOTSTRAP.defaults.precision,
     threshold: EMPTY_BOOTSTRAP.defaults.threshold,
-    // Full camera frames always use the fixed guide ROI. The pre-cropped
+    // Full camera frames always use palm detection. The pre-cropped
     // switch remains an opt-in only for uploaded 128 x 128 ROI.
     assumeRoi: false,
   });
@@ -375,6 +377,8 @@ function App() {
   const refresh = useCallback(async () => {
     setLoading(true);
     const [bootstrapResult, healthResult, camerasResult, candidatesResult, candidateRuntimesResult] = await Promise.allSettled([api.bootstrap(), api.health(), api.cameras(), api.candidates(), api.candidateRuntimes()]);
+    setModelListReady(bootstrapResult.status === "fulfilled");
+    setCameraListReady(camerasResult.status === "fulfilled");
     if (bootstrapResult.status === "fulfilled") {
       setBootstrap(bootstrapResult.value);
       setConfig((current) => ({
@@ -384,13 +388,18 @@ function App() {
           if (admitted.some((model) => model.id === current.modelId)) return current.modelId;
           return admitted.find((model) => model.id === bootstrapResult.value.defaults.modelId)?.id || admitted[0]?.id || "";
         })(),
+        detectorId: (() => {
+          const available = bootstrapResult.value.detectors.filter((detector) => detector.available);
+          if (available.some((detector) => detector.id === current.detectorId)) return current.detectorId;
+          return available.find((detector) => detector.id === bootstrapResult.value.defaults.detectorId)?.id || available[0]?.id || "";
+        })(),
         backend: "npu",
         precision: bootstrapResult.value.defaults.precision || current.precision,
         threshold: bootstrapResult.value.defaults.threshold || current.threshold,
       }));
     } else {
       setBootstrap(EMPTY_BOOTSTRAP);
-      setConfig((current) => ({ ...current, modelId: "", backend: "npu", precision: "mixed_fp16" }));
+      setConfig((current) => ({ ...current, modelId: "", detectorId: "", backend: "npu", precision: "mixed_fp16" }));
     }
     if (healthResult.status === "fulfilled") setHealth(healthResult.value);
     else setHealth({ status: "unknown", message: "无法连接工作台服务" });
@@ -415,6 +424,8 @@ function App() {
 
   const admittedModels = bootstrap.models.filter((model) => model.usableForRecognition !== false && model.availableBackends.includes("npu"));
   const activeModel = admittedModels.find((model) => model.id === config.modelId) || admittedModels[0];
+  const availableDetectors = bootstrap.detectors.filter((detector) => detector.available);
+  const activeDetector = availableDetectors.find((detector) => detector.id === config.detectorId) || availableDetectors[0];
   const setConfigValue = <K extends keyof RecognitionConfig>(key: K, value: RecognitionConfig[K]) => {
     setConfig((current) => ({ ...current, [key]: value }));
   };
@@ -458,14 +469,15 @@ function App() {
           <div className="mobile-nav">
             {NAV_ITEMS.map(({ key, label, icon: Icon }) => <button type="button" className={cx(page === key && "is-active")} key={key} onClick={() => openPage(key)}><Icon aria-hidden="true" /><span>{label}</span></button>)}
           </div>
-          {page === "live" ? <LivePage bootstrap={bootstrap} cameras={cameras} config={config} activeModel={activeModel} setConfigValue={setConfigValue} openConfig={() => setDrawer("config")} announce={announce} /> : null}
+          {page === "live" ? <LivePage bootstrap={bootstrap} cameras={cameras} modelListReady={modelListReady} cameraListReady={cameraListReady} config={config} activeModel={activeModel} activeDetector={activeDetector} setConfigValue={setConfigValue} openConfig={() => setDrawer("config")} announce={announce} /> : null}
           {page === "enrollment" ? <EnrollmentPage bootstrap={bootstrap} cameras={cameras} config={config} setConfigValue={setConfigValue} announce={announce} openTemplates={() => setDrawer("templates")} /> : null}
           {page === "evaluation" ? <EvaluationPage candidates={candidates} runtimeCandidates={candidateRuntimes} announce={announce} /> : null}
           {page === "system" ? <SystemPage onRefresh={refresh} loading={loading} announce={announce} /> : null}
         </main>
       </div>
       <Drawer open={drawer === "config"} title="识别配置" description="配置只影响下一次识别，不会修改已保存模板。" onClose={() => setDrawer(null)} width="regular">
-        <ConfigForm bootstrap={bootstrap} config={config} setConfigValue={setConfigValue} />
+        <ConfigForm bootstrap={bootstrap} modelListReady={modelListReady} config={config} setConfigValue={setConfigValue} />
+        {activeDetector?.notice ? <Notice tone="warning">{activeDetector.displayName}：{activeDetector.notice}</Notice> : null}
         {activeModel?.conversionOnly || activeModel?.usableForRecognition === false ? <Notice tone="warning">{activeModel.displayName} 仅用于转换验证，不能用于正式识别。</Notice> : null}
         {activeModel?.manualTestPending ? <Notice tone="warning">{activeModel.displayName} 处于人工测试阶段，尚未完成稳定性验收。</Notice> : null}
       </Drawer>
@@ -476,8 +488,10 @@ function App() {
   );
 }
 
-function ConfigForm({ bootstrap, config, setConfigValue }: { bootstrap: BootstrapData; config: RecognitionConfig; setConfigValue: <K extends keyof RecognitionConfig>(key: K, value: RecognitionConfig[K]) => void }) {
+function ConfigForm({ bootstrap, modelListReady, config, setConfigValue }: { bootstrap: BootstrapData; modelListReady: boolean; config: RecognitionConfig; setConfigValue: <K extends keyof RecognitionConfig>(key: K, value: RecognitionConfig[K]) => void }) {
   const admittedModels = bootstrap.models.filter((item) => item.usableForRecognition !== false && item.availableBackends.includes("npu"));
+  const detectors = bootstrap.detectors.filter((item) => item.available);
+  const detector = detectors.find((item) => item.id === config.detectorId) || detectors[0];
   const model = admittedModels.find((item) => item.id === config.modelId) || admittedModels[0];
   const changeModel = (modelId: string) => {
     const next = bootstrap.models.find((item) => item.id === modelId);
@@ -487,12 +501,14 @@ function ConfigForm({ bootstrap, config, setConfigValue }: { bootstrap: Bootstra
     if (next?.threshold !== undefined) setConfigValue("threshold", next.threshold);
   };
   return <div className="config-form">
-    <SelectField label="识别模型" value={model?.id || ""} onChange={(event) => changeModel(event.target.value)} options={admittedModels.length ? admittedModels.map((item) => ({ value: item.id, label: item.displayName })) : [{ value: "", label: "暂无通过 NPU 准入的模型", disabled: true }]} />
-    {!admittedModels.length ? <Notice tone="danger">当前没有通过 NPU 准入的模型。候选审计仍可在评测页查看，正式识别暂不可用。</Notice> : null}
+    <SelectField label="手掌检测模型" value={detector?.id || ""} onChange={(event) => setConfigValue("detectorId", event.target.value)} options={detectors.length ? detectors.map((item) => ({ value: item.id, label: item.displayName })) : [{ value: "", label: modelListReady ? "暂无可用检测模型" : "模型服务未连接", disabled: true }]} />
+    {detector ? <div className="detector-choice-meta"><span>{detector.family === "picodet" ? "PicoDet" : "NanoDet"} · {detector.inputShape[2] || "--"} × {detector.inputShape[3] || "--"}</span><span>直接拉伸到方形输入</span>{detector.taskMap !== undefined ? <span>离线mAP {detector.taskMap.toFixed(4)}</span> : null}{detector.rawNumericalGateOk === false ? <span className="stage-error">原始数值门未通过</span> : null}</div> : <Notice tone="danger">{modelListReady ? "当前没有可用的手掌检测模型。" : "模型服务未连接，请检查板端服务。"}</Notice>}
+    <SelectField label="掌纹特征模型" value={model?.id || ""} onChange={(event) => changeModel(event.target.value)} options={admittedModels.length ? admittedModels.map((item) => ({ value: item.id, label: item.displayName })) : [{ value: "", label: modelListReady ? "暂无可用的 NPU 模型" : "模型服务未连接", disabled: true }]} />
+    {!admittedModels.length ? <Notice tone="danger">{modelListReady ? "当前没有可用的 NPU 模型。" : "模型服务未连接，请检查板端服务。"}</Notice> : null}
+    <div className="npu-lock"><ScanSearch aria-hidden="true" /><div><strong>手掌检测</strong><span>全图检测与掌纹特征检索是两个独立模型选择。</span></div></div>
     <div className="npu-lock"><Zap aria-hidden="true" /><div><strong>Ascend NPU</strong><span>生产服务固定使用 NPU，不提供 CPU fallback。</span></div></div>
     <div className="npu-lock"><Zap aria-hidden="true" /><div><strong>混合 FP16</strong><span>生产模型固定使用 NPU mixed-FP16 OM。</span></div></div>
-    <RangeField label="接受阈值" min={0.4} max={0.98} step={0.01} value={config.threshold} onChange={(value) => setConfigValue("threshold", value)} />
-    <Toggle label="上传文件已是 ROI" description="仅对明确的 128 × 128 上传图像跳过固定采集框" checked={config.assumeRoi} onChange={(checked) => setConfigValue("assumeRoi", checked)} />
+    <Toggle label="上传文件已是 ROI" description="仅对明确的 128 × 128 上传图像跳过手掌检测" checked={config.assumeRoi} onChange={(checked) => setConfigValue("assumeRoi", checked)} />
   </div>;
 }
 
@@ -500,17 +516,21 @@ function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; 
   return <div className="page-header"><div><p className="page-header__eyebrow">{eyebrow}</p><h2>{title}</h2><p>{description}</p></div>{action ? <div className="page-header__action">{action}</div> : null}</div>;
 }
 
-function LivePage({ bootstrap, cameras, config, activeModel, setConfigValue, openConfig, announce }: { bootstrap: BootstrapData; cameras: CameraDevice[]; config: RecognitionConfig; activeModel?: ModelOption; setConfigValue: <K extends keyof RecognitionConfig>(key: K, value: RecognitionConfig[K]) => void; openConfig: () => void; announce: (message: string, tone?: "success" | "warning" | "danger" | "info") => void }) {
+function LivePage({ bootstrap, cameras, modelListReady, cameraListReady, config, activeModel, activeDetector, setConfigValue, openConfig, announce }: { bootstrap: BootstrapData; cameras: CameraDevice[]; modelListReady: boolean; cameraListReady: boolean; config: RecognitionConfig; activeModel?: ModelOption; activeDetector?: DetectorOption; setConfigValue: <K extends keyof RecognitionConfig>(key: K, value: RecognitionConfig[K]) => void; openConfig: () => void; announce: (message: string, tone?: "success" | "warning" | "danger" | "info") => void }) {
   const [file, setFile] = useState<File>();
   const [fileUrl, setFileUrl] = useState<string>();
   const [result, setResult] = useState<RecognitionResult>();
   const [busy, setBusy] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraRetryToken, setCameraRetryToken] = useState(0);
   const [cameraDevice, setCameraDevice] = useState(cameras[0]?.device || "");
-  const [resolution, setResolution] = useState(preferredCameraResolution(cameras[0]));
+  const [resolution, setResolution] = useState(preferredLiveResolution(cameras[0]));
   const [captureResolution, setCaptureResolution] = useState<string>();
-  const [roiGuide] = useRoiGuide(cameraDevice, resolution);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [liveDetection, setLiveDetection] = useState<RecognitionResult>();
+  const [detectionError, setDetectionError] = useState<string>();
+  const frameUrl = liveDetection?.previewUrl;
+  const cameraError = detectionError;
   useEffect(() => { if (!cameraDevice && cameras[0]) setCameraDevice(cameras[0].device); }, [cameraDevice, cameras]);
   useEffect(() => {
     if (cameraDevice && cameras.some((camera) => camera.device === cameraDevice)) setCameraActive(true);
@@ -518,23 +538,52 @@ function LivePage({ bootstrap, cameras, config, activeModel, setConfigValue, ope
   useEffect(() => {
     if (!cameras.length || !cameraDevice) return;
     const selected = cameras.find((camera) => camera.device === cameraDevice) || cameras[0];
-    if (!selected.resolutions.includes(resolution)) setResolution(preferredCameraResolution(selected));
+    if (!selected.resolutions.includes(resolution)) setResolution(preferredLiveResolution(selected));
   }, [cameraDevice, cameras, resolution]);
   useEffect(() => {
     if (cameraActive && (!cameras.length || !cameras.some((camera) => camera.device === cameraDevice))) {
       setCameraActive(false);
       const nextDevice = cameras[0]?.device || "";
       setCameraDevice(nextDevice);
-      if (nextDevice) setResolution(preferredCameraResolution(cameras[0]));
+      if (nextDevice) setResolution(preferredLiveResolution(cameras[0]));
       setCaptureResolution(undefined);
       announce("摄像头节点已变化，已停止旧预览；请重新打开新设备。", "warning");
     }
   }, [announce, cameraActive, cameraDevice, cameras]);
-  const frameUrl = useCameraPreview(cameraActive, cameraDevice, resolution, announce, setCaptureResolution);
+  const detectionEnabled = cameraActive && Boolean(cameraDevice) && !busy;
+  useEffect(() => {
+    setLiveDetection(undefined);
+    setDetectionError(undefined);
+  }, [cameraDevice, resolution, cameraRetryToken, config.detectorId]);
+  useEffect(() => {
+    if (!detectionEnabled) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const next = await api.detectCamera(cameraDevice, resolution, config.detectorId);
+        if (!cancelled) {
+          setLiveDetection(next);
+          setCaptureResolution(next.captureResolution);
+          setDetectionError(undefined);
+        }
+      } catch (error) {
+        if (!cancelled) setDetectionError(error instanceof Error ? error.message : "手掌检测失败");
+      } finally {
+        if (!cancelled) timer = setTimeout(poll, 60);
+      }
+    };
+    void poll();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [detectionEnabled, cameraDevice, resolution, cameraRetryToken, config.detectorId]);
+  useEffect(() => () => {
+    if (cameraDevice) void api.closeCamera(cameraDevice, resolution).catch(() => undefined);
+  }, [cameraDevice, resolution]);
   useEffect(() => () => { if (fileUrl) URL.revokeObjectURL(fileUrl); }, [fileUrl]);
   const chooseFile = (next?: File) => { if (!next) return; if (fileUrl) URL.revokeObjectURL(fileUrl); setFile(next); setFileUrl(URL.createObjectURL(next)); setResult(undefined); };
   const runUpload = async () => {
     if (!activeModel || !config.modelId) { announce("当前没有通过 NPU 准入的模型。", "danger"); return; }
+    if (!activeDetector || !config.detectorId) { announce("当前没有可用的手掌检测模型。", "danger"); return; }
     if (!file) { announce("请先选择一张掌纹图像。", "warning"); return; }
     setBusy(true); try { setResult(await api.recognize(file, config)); announce("识别完成。", "success"); } catch (error) { announce(error instanceof ApiError ? error.message : "识别失败，请检查输入。", "danger"); } finally { setBusy(false); }
   };
@@ -545,35 +594,33 @@ function LivePage({ bootstrap, cameras, config, activeModel, setConfigValue, ope
     setBusy(true); try { setResult(await api.recognizeCamera(cameraDevice, resolution, config)); announce("已完成当前帧识别。", "success"); } catch (error) { announce(error instanceof ApiError ? error.message : "摄像头识别失败。", "danger"); } finally { setBusy(false); }
   }, [activeModel, announce, busy, cameraDevice, config, resolution]);
   const autoRecognition = useAutomaticPalmTrigger(
-    cameraActive && Boolean(activeModel && config.modelId && cameraDevice),
+    cameraActive && Boolean(activeModel && activeDetector && config.modelId && config.detectorId && cameraDevice),
     frameUrl,
     `${cameraDevice}:${resolution}`,
-    roiGuide,
     busy,
     () => { void runCamera(); },
   );
   const preview = result?.previewUrl || fileUrl;
   const selectedCamera = cameras.find((camera) => camera.device === cameraDevice);
-  const inputState = cameraActive
+  const inputState = !cameraListReady
+    ? "摄像头服务未连接"
+    : cameraError
+    ? "已发现节点，取流失败"
+    : cameraActive
     ? `${selectedCamera?.name || cameraDevice} ${captureResolution ? `· ${captureResolution}` : "· 正在取流"}`
     : cameras.length
-      ? "等待摄像头连接"
-      : "未检测到摄像头";
-  const inputTone = cameraActive ? "ready" : cameras.length ? "waiting" : "blocked";
-  const recognitionState = busy
-    ? "正在处理"
-    : result?.outcome === "matched"
-      ? "已完成匹配"
-      : result?.outcome === "candidates_only"
-        ? "候选待复核"
-        : file
-          ? "上传图像待识别"
-          : autoRecognition.message;
+      ? "已发现摄像头，等待取流"
+      : "未发现可采集节点";
+  const inputTone = !cameraListReady || cameraError ? "blocked" : cameraActive ? "ready" : cameras.length ? "waiting" : "blocked";
+  const recognitionState = cameraError ? "摄像头取流失败" : busy ? "正在处理" : result
+    ? `检测到 ${result.detectionCount} 只手掌`
+    : file ? "上传图像待识别" : autoRecognition.message;
   return <div className="page page--live">
-    <PageHeader eyebrow="01 / 识别" title="实时识别" description="检测到摄像头后自动开启；掌心稳定进入采集框即自动完成候选检索。" action={<Button variant="secondary" icon={SlidersHorizontal} onClick={openConfig}>识别配置</Button>} />
+    <PageHeader eyebrow="01 / 识别" title="实时识别" description="检测到摄像头后自动开启，对画面中的每只手掌逐一检索。" action={<Button variant="secondary" icon={SlidersHorizontal} onClick={openConfig}>识别配置</Button>} />
     <section className="live-readiness" aria-label="当前识别状态" aria-live="polite">
       <div className="live-readiness__item" data-tone={inputTone}><Camera aria-hidden="true" /><span><small>采集输入</small><strong>{inputState}</strong></span></div>
-      <div className="live-readiness__item" data-tone={activeModel ? "ready" : "blocked"}><Fingerprint aria-hidden="true" /><span><small>运行模型</small><strong>{activeModel?.displayName || "等待服务模型"}</strong></span></div>
+      <div className="live-readiness__item" data-tone={activeDetector ? "ready" : "blocked"}><ScanSearch aria-hidden="true" /><span><small>手掌检测</small><strong>{activeDetector?.displayName || (modelListReady ? "暂无可用检测模型" : "模型服务未连接")}</strong></span></div>
+      <div className="live-readiness__item" data-tone={activeModel ? "ready" : "blocked"}><Fingerprint aria-hidden="true" /><span><small>掌纹特征</small><strong>{activeModel?.displayName || (modelListReady ? "暂无可用模型" : "模型服务未连接")}</strong></span></div>
       <div className="live-readiness__item" data-tone={busy ? "working" : result ? "ready" : "waiting"}><Activity aria-hidden="true" /><span><small>识别状态</small><strong>{recognitionState}</strong></span></div>
     </section>
     <div className="live-layout">
@@ -582,30 +629,58 @@ function LivePage({ bootstrap, cameras, config, activeModel, setConfigValue, ope
           <div className="capture-strip">
             <input ref={inputRef} type="file" accept="image/*" className="visually-hidden" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} />
             <Button variant="secondary" icon={Upload} onClick={() => inputRef.current?.click()}>选择图像</Button>
-            {file ? <span className="file-chip"><FileImage aria-hidden="true" />{file.name}</span> : <span className="capture-hint">摄像头已自动开启，无需手动拍照</span>}
+            {file ? <span className="file-chip"><FileImage aria-hidden="true" />{file.name}</span> : <span className="capture-hint">{cameraError ? "摄像头已发现，暂无可用画面" : cameraActive ? "摄像头已自动开启，无需手动拍照" : "可上传图像进行识别"}</span>}
           </div>
-          {cameraActive ? <div className="camera-controls"><SelectField label="摄像头" value={cameraDevice} onChange={(event) => setCameraDevice(event.target.value)} options={cameras.length ? cameras.map((camera) => ({ value: camera.device, label: `${camera.name} · ${camera.device}` })) : [{ value: "", label: "未检测到摄像头", disabled: true }]} /><SelectField label="分辨率" value={resolution} onChange={(event) => setResolution(event.target.value)} options={(selectedCamera?.resolutions || ["1280x720", "1920x1080"]).map((item) => ({ value: item, label: item }))} /><span className="camera-effective-resolution">实际输入：{captureResolution || "等待首帧"}</span><span className="auto-recognition-state" data-phase={autoRecognition.phase}><span className="live-dot" aria-hidden="true" />{autoRecognition.message}</span></div> : null}
-          <ImageStage imageUrl={cameraActive ? frameUrl : preview} title="正在连接摄像头" description="检测到摄像头后会自动打开；将掌心放入采集框即可识别。" active={cameraActive} guide={cameraActive} guideConfig={roiGuide} objectFit="contain" onUpload={() => inputRef.current?.click()} />
-          {result?.roiUrl ? <div className="roi-strip"><div><span className="section-label">定位 ROI</span><strong>已生成 128 × 128 标准区域</strong></div><img src={result.roiUrl} alt="定位后的掌纹 ROI" /></div> : null}
+          {cameraActive ? <div className="camera-controls">
+            <SelectField label="摄像头" value={cameraDevice} onChange={(event) => setCameraDevice(event.target.value)} options={cameras.length ? cameras.map((camera) => ({ value: camera.device, label: `${camera.name} · ${camera.device}` })) : [{ value: "", label: "未检测到摄像头", disabled: true }]} />
+            <SelectField label="分辨率" value={resolution} onChange={(event) => setResolution(event.target.value)} options={(selectedCamera?.resolutions || ["1280x720", "1920x1080"]).map((item) => ({ value: item, label: item }))} />
+            <span className="camera-effective-resolution">实际输入：{captureResolution || "等待首帧"}</span>
+            <span className="auto-recognition-state" data-phase={cameraError ? "inactive" : autoRecognition.phase}><span className="live-dot" aria-hidden="true" />{cameraError ? "取流失败" : detectionError || (liveDetection ? `实时检测：${liveDetection.detectionCount} 只手掌` : "正在检测手掌")}</span>
+            {cameraError ? <Button variant="secondary" icon={RefreshCw} onClick={() => setCameraRetryToken((value) => value + 1)}>重试摄像头</Button> : null}
+          </div> : null}
+          <ImageStage imageUrl={cameraActive ? liveDetection?.previewUrl || frameUrl : preview} boxes={cameraActive ? liveDetection?.hands : result?.hands} title={cameraError ? "摄像头取流失败" : "正在连接摄像头"} description={cameraError || "检测到摄像头后会自动打开。"} active={cameraActive && !cameraError} error={Boolean(cameraError)} objectFit="contain" onUpload={() => inputRef.current?.click()} />
         </Panel>
       </section>
       <aside className="live-inspector">
-        <Panel title="识别结果" eyebrow="INSPECTOR" action={<StatusPill tone={result ? toneForStatus(result.outcome === "matched" ? "accepted" : result.outcome === "roi_rejected" ? "danger" : "info") : "neutral"}>{result ? (result.outcome === "matched" ? "已校准匹配" : result.outcome === "candidates_only" ? "候选检索" : result.outcome === "roi_rejected" ? "ROI 未通过" : result.outcome === "no_templates" ? "模板库为空" : "待校准") : "等待输入"}</StatusPill>}>
-          {result ? <ResultSummary result={result} /> : <div className="empty-inspector"><div className="empty-inspector__icon"><CircleHelp /></div><strong>还没有识别结果</strong><p>上传图像或拍摄一帧后，结果会显示在这里。</p></div>}
-          <div className="inspector-actions"><Button variant="primary" icon={ScanLine} loading={busy} onClick={() => void runUpload()} disabled={!file || !activeModel}>识别上传图像</Button><div className="inspector-meta"><span><Fingerprint aria-hidden="true" />{activeModel?.displayName || "未连接服务"}</span><span><Gauge aria-hidden="true" />阈值 {config.threshold.toFixed(2)}</span></div></div>
+        <Panel title="识别结果" eyebrow="INSPECTOR" action={<StatusPill tone={result ? "info" : "neutral"}>{result ? `${result.detectionCount} 只手掌` : "等待输入"}</StatusPill>}>
+          {result ? result.hands.length ? <div className="hand-results">{result.hands.map((hand) => <section className="hand-result" key={hand.index}><div className="hand-result__heading"><strong>{hand.detectedPalmSide === "right" ? "右掌" : hand.detectedPalmSide === "left" ? "左掌" : `手掌 ${hand.index}`}</strong><span>{hand.detectionScore === undefined ? "已裁剪 ROI" : `检测分数 ${hand.detectionScore.toFixed(3)}`}</span></div>{hand.roiUrl ? <img src={hand.roiUrl} alt={`${hand.detectedPalmSide === "right" ? "右掌" : hand.detectedPalmSide === "left" ? "左掌" : `手掌 ${hand.index}`} 的 ROI`} /> : null}<ResultSummary result={hand} /></section>)}</div> : <div className="empty-inspector"><div className="empty-inspector__icon"><CircleHelp /></div><strong>未检测到手掌</strong></div> : <div className="empty-inspector"><div className="empty-inspector__icon"><CircleHelp /></div><strong>还没有识别结果</strong><p>上传图像或拍摄一帧后，结果会显示在这里。</p></div>}
+          <div className="inspector-actions"><Button variant="primary" icon={ScanLine} loading={busy} onClick={() => void runUpload()} disabled={!file || !activeModel}>识别上传图像</Button><div className="inspector-meta"><span><Fingerprint aria-hidden="true" />{activeModel?.displayName || "未连接服务"}</span></div></div>
         </Panel>
-        <div className="quick-status"><div className="quick-status__item"><span className="quick-status__label">推理设备</span><strong>NPU · mixed-FP16</strong></div><div className="quick-status__item"><span className="quick-status__label">采集区域</span><strong>固定掌纹 ROI</strong></div></div>
+        <div className="quick-status"><div className="quick-status__item"><span className="quick-status__label">推理设备</span><strong>NPU · mixed-FP16</strong></div><div className="quick-status__item"><span className="quick-status__label">采集区域</span><strong>检测手掌后逐框裁剪</strong></div></div>
       </aside>
     </div>
   </div>;
 }
 
-function ResultSummary({ result }: { result: RecognitionResult }) {
+function ResultSummary({ result }: { result: RecognitionHand }) {
   const best = result.matches[0];
-  const resultName = result.displayName || result.userName || best?.displayName || best?.userName || (result.matches.length ? "候选待复核" : "未找到模板");
+  const resultName = result.outcome === "roi_rejected" ? result.status : result.displayName || result.userName || best?.displayName || best?.userName || (result.matches.length ? "候选待复核" : "未找到模板");
   const totalMs = result.timing["total ms"];
   const isCalibrated = result.calibrationReady === true;
-  return <div className="result-summary"><div className={cx("result-banner", result.outcome === "matched" ? "result-banner--success" : "result-banner--warning")}><div><span className="result-banner__label">{result.outcome === "candidates_only" ? "候选检索" : result.outcome === "matched" ? "最佳匹配" : "需要处理"}</span><strong>{resultName}</strong>{result.palmSide || best?.palmSide ? <span>{result.palmSide || best?.palmSide}{best?.personId ? ` · ${best.personId}` : ""}</span> : null}</div><strong className="result-banner__score">{(result.score ?? best?.score ?? 0).toFixed(3)}</strong></div>{!isCalibrated && result.outcome === "candidates_only" ? <Notice tone="info">本机可见光阈值尚未校准，当前仅提供 Top-K 候选与分数，不判定身份是否通过。</Notice> : null}<div className="result-facts"><div><span>模板库</span><strong>{result.templateSummary ? `${result.templateSummary.palmCount} 掌 / ${result.templateSummary.personCount} 人` : "--"}</strong></div><div><span>候选数</span><strong>{result.matches.length}</strong></div><div><span>总耗时</span><strong>{formatMs(totalMs)}</strong></div></div><div className="match-list"><div className="section-label">TOP-K 候选</div>{result.matches.slice(0, 3).map((match, index) => <div className="match-row" key={`${match.palmId || match.userId || match.userName}-${index}`}><span className="match-rank">{index + 1}</span><span className="match-name">{match.displayName || match.userName}<small>{match.personId || "未标注编号"} · {match.palmSide || "掌侧未标注"}</small></span><strong>{match.score.toFixed(3)}</strong></div>)}</div></div>;
+  return <div className="result-summary">
+    <div className={cx("result-banner", result.outcome === "matched" ? "result-banner--success" : "result-banner--warning")}>
+      <div>
+        <span className="result-banner__label">{result.outcome === "candidates_only" ? "候选检索" : result.outcome === "matched" ? "最佳匹配" : "需要处理"}</span>
+        <strong>{resultName}</strong>
+        {result.detectedPalmSide || result.palmSide || best?.palmSide ? <span>{(result.detectedPalmSide || result.palmSide || best?.palmSide) === "right" ? "右掌" : (result.detectedPalmSide || result.palmSide || best?.palmSide) === "left" ? "左掌" : (result.detectedPalmSide || result.palmSide || best?.palmSide)}{best?.personId ? ` · ${best.personId}` : ""}</span> : null}
+      </div>
+      <strong className="result-banner__score">{result.outcome === "roi_rejected" || result.outcome === "no_templates" ? "--" : (result.score ?? best?.score ?? 0).toFixed(3)}</strong>
+    </div>
+    {!isCalibrated && result.outcome === "candidates_only" ? <Notice tone="info">本机可见光阈值尚未校准，当前仅提供 Top-K 候选与分数，不判定身份是否通过。</Notice> : null}
+    <div className="result-facts">
+      <div><span>模板库</span><strong>{result.templateSummary ? `${result.templateSummary.palmCount} 掌 / ${result.templateSummary.personCount} 人` : "--"}</strong></div>
+      <div><span>候选数</span><strong>{result.matches.length}</strong></div>
+      <div><span>总耗时</span><strong>{formatMs(totalMs)}</strong></div>
+    </div>
+    <div className="match-list">
+      <div className="section-label">TOP-K 候选</div>
+      {result.matches.map((match, index) => <div className="match-row" key={`${match.palmId || match.userId || match.userName}-${index}`}>
+        <span className="match-rank">{index + 1}</span>
+        <span className="match-name">{match.displayName || match.userName}<small>{match.personId || "未标注编号"} · {match.palmSide === "right" ? "右掌" : match.palmSide === "left" ? "左掌" : match.palmSide || "掌侧未标注"}</small></span>
+        <strong>{match.score.toFixed(3)}</strong>
+      </div>)}
+    </div>
+  </div>;
 }
 
 function EnrollmentPage({ bootstrap, cameras, config, setConfigValue, announce, openTemplates }: { bootstrap: BootstrapData; cameras: CameraDevice[]; config: RecognitionConfig; setConfigValue: <K extends keyof RecognitionConfig>(key: K, value: RecognitionConfig[K]) => void; announce: (message: string, tone?: "success" | "warning" | "danger" | "info") => void; openTemplates: () => void }) {
@@ -618,11 +693,8 @@ function EnrollmentPage({ bootstrap, cameras, config, setConfigValue, announce, 
   const [cameraDevice, setCameraDevice] = useState(cameras[0]?.device || "");
   const [resolution, setResolution] = useState(preferredCameraResolution(cameras[0]));
   const [busy, setBusy] = useState(false);
-  const [calibrating, setCalibrating] = useState(false);
   const [reviewOriginal, setReviewOriginal] = useState(false);
   const [reviewSampleId, setReviewSampleId] = useState<string>();
-  const [roiGuide, setRoiGuide] = useRoiGuide(cameraDevice, resolution);
-  const calibrationPreview = useCameraPreview(calibrating, cameraDevice, resolution, announce);
   const terminalNotice = useRef<string>();
   const running = Boolean(session && ["camera_opening", "countdown", "waiting_position", "stabilizing", "collecting", "saving"].includes(session.phase || ""));
   // Once the server creates a session, it owns the workflow mode. This keeps
@@ -632,6 +704,37 @@ function EnrollmentPage({ bootstrap, cameras, config, setConfigValue, announce, 
   const reviewActionsEnabled = isAssistedSession && session?.reviewActionsEnabled === true;
   const count = session?.samples.length || 0;
   const selectedCamera = cameras.find((camera) => camera.device === cameraDevice) || cameras[0];
+  const sessionRef = useRef<EnrollmentSession>();
+  sessionRef.current = session;
+  const previewActive = !busy && !running && !session;
+  const {frameUrl: enrollmentFrame, error: enrollmentCameraError} = useCameraPreview(
+    previewActive, cameraDevice, resolution, 0, announce,
+  );
+  const [enrollmentDetection, setEnrollmentDetection] = useState<RecognitionResult>();
+  const [enrollmentDetectionError, setEnrollmentDetectionError] = useState<string>();
+  const detectBeforeEnrollment = previewActive && Boolean(enrollmentFrame) && !enrollmentCameraError;
+  useEffect(() => {
+    setEnrollmentDetection(undefined);
+    if (!detectBeforeEnrollment || !cameraDevice) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const next = await api.detectCamera(cameraDevice, resolution, config.detectorId);
+        if (!cancelled) { setEnrollmentDetection(next); setEnrollmentDetectionError(undefined); }
+      } catch (error) {
+        if (!cancelled) setEnrollmentDetectionError(error instanceof Error ? error.message : "检测失败");
+      } finally { if (!cancelled) timer = setTimeout(poll, 350); }
+    };
+    void poll();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [detectBeforeEnrollment, cameraDevice, resolution, config.detectorId]);
+  useEffect(() => () => {
+    const current = sessionRef.current;
+    if (current && !["completed", "cancelled"].includes(current.phase || "")) {
+      void api.deleteEnrollmentSession(current.id).catch(() => undefined);
+    }
+  }, []);
 
   useEffect(() => { if (!cameraDevice && cameras[0]) setCameraDevice(cameras[0].device); }, [cameraDevice, cameras]);
   useEffect(() => {
@@ -655,8 +758,14 @@ function EnrollmentPage({ bootstrap, cameras, config, setConfigValue, announce, 
       }
     };
     void poll();
-    const timer = window.setInterval(() => { void poll(); }, 500);
-    return () => { alive = false; window.clearInterval(timer); };
+    let timer: ReturnType<typeof setTimeout>;
+    const nextPoll = async () => {
+      await poll();
+      if (alive) timer = setTimeout(nextPoll, 500);
+    };
+    // Do not overlap status requests while a board worker is busy.
+    timer = setTimeout(nextPoll, 500);
+    return () => { alive = false; window.clearTimeout(timer); };
   }, [announce, running, session?.id]);
 
   const changeEnrollmentModel = (modelId: string) => {
@@ -671,17 +780,24 @@ function EnrollmentPage({ bootstrap, cameras, config, setConfigValue, announce, 
     setBusy(true);
     try {
       terminalNotice.current = undefined;
-      setCalibrating(false);
+      await api.closeCamera(cameraDevice, resolution);
       const created = await api.createEnrollmentSession(config, { continueSessionId, displayName: displayName.trim() || undefined, palmSide, mode });
       setSession(created);
       setPersonId(created.personId || personId);
-      const started = await api.startEnrollmentAutoCapture(created.id, cameraDevice, resolution);
+      let started: EnrollmentSession;
+      try {
+        started = await api.startEnrollmentAutoCapture(created.id, cameraDevice, resolution);
+      } catch (error) {
+        await api.deleteEnrollmentSession(created.id);
+        setSession(undefined);
+        throw error;
+      }
       setMode(started.mode === "assisted" ? "assisted" : "self_service");
       setSession(started);
       announce(
         started.mode === "assisted"
           ? "已启动管理员审阅采集，采满 5 张后可剔除样本或确认保存。"
-          : "已启动自助自动采集，请将掌心放入固定采集框。",
+          : "已启动自助自动采集，请在画面中保持一只手掌。",
         "info",
       );
     } catch (error) {
@@ -690,7 +806,8 @@ function EnrollmentPage({ bootstrap, cameras, config, setConfigValue, announce, 
   };
   const cancel = async () => {
     if (session?.id) {
-      try { await api.deleteEnrollmentSession(session.id); } catch { /* Local reset remains valid after a transport error. */ }
+      try { await api.deleteEnrollmentSession(session.id); }
+      catch (error) { announce(error instanceof Error ? error.message : "取消失败，请重试", "danger"); return; }
     }
     terminalNotice.current = undefined;
     setSession(undefined);
@@ -719,7 +836,7 @@ function EnrollmentPage({ bootstrap, cameras, config, setConfigValue, announce, 
   };
   const latestSample = session?.samples.length ? session.samples[session.samples.length - 1] : undefined;
   const reviewSample = session?.samples.find((sample) => sample.id === reviewSampleId) || latestSample;
-  const previewUrl = calibrating ? calibrationPreview : session?.phase === "reviewing" ? reviewOriginal ? reviewSample?.originalUrl : reviewSample?.roiUrl : session?.previewUrl || latestSample?.previewUrl;
+  const previewUrl = session?.phase === "reviewing" ? reviewOriginal ? reviewSample?.originalUrl : reviewSample?.roiUrl : session?.previewUrl || latestSample?.previewUrl || enrollmentDetection?.previewUrl || enrollmentFrame;
   const canStart = !session || ["failed", "cancelled"].includes(session.phase || "");
   const activePersonId = session?.personId || personId;
   const continueSamePerson = () => {
@@ -738,17 +855,16 @@ function EnrollmentPage({ bootstrap, cameras, config, setConfigValue, announce, 
     setSession(undefined);
   };
   return <div className="page page--enrollment">
-    <PageHeader eyebrow="02 / 注册" title="掌纹注册" description="系统自动分配人员编号，左右掌是独立 1:N 模板。请将掌心放入固定采集框，自动采集 5 张合格样本。" action={<Button variant="secondary" icon={Images} onClick={openTemplates}>掌纹模板管理</Button>} />
+    <PageHeader eyebrow="02 / 注册" title="掌纹注册" description="系统自动分配人员编号，左右掌是独立 1:N 模板。画面中保持一只手掌，自动采集 5 张合格样本。" action={<Button variant="secondary" icon={Images} onClick={openTemplates}>掌纹模板管理</Button>} />
     <div className="enrollment-layout">
       <section className="enrollment-capture"><Panel title="自动采集画面" eyebrow="AUTO COLLECTION" action={<StatusPill tone={running ? "info" : session?.phase === "completed" ? "success" : session?.phase === "failed" ? "danger" : "neutral"}>{session?.phase || "ready"}</StatusPill>}>
         <div className="camera-controls camera-controls--compact"><SelectField label="摄像头" value={cameraDevice} onChange={(event) => setCameraDevice(event.target.value)} options={cameras.length ? cameras.map((camera) => ({ value: camera.device, label: `${camera.name} · ${camera.device}` })) : [{ value: "", label: "未检测到摄像头", disabled: true }]} /><SelectField label="分辨率" value={resolution} onChange={(event) => setResolution(event.target.value)} options={(selectedCamera?.resolutions || ["1280x720", "1920x1080"]).map((item) => ({ value: item, label: item }))} /></div>
-        {isAssistedSession && !session ? <div className="guide-calibration"><Button variant="secondary" icon={SlidersHorizontal} onClick={() => setCalibrating((value) => !value)}>{calibrating ? "关闭标定预览" : "标定采集框"}</Button>{calibrating ? <><RangeField label="框大小" min={0.4} max={1} step={0.01} value={roiGuide.side_ratio} onChange={(side_ratio) => setRoiGuide({...roiGuide, side_ratio})} /><RangeField label="水平中心" min={0.1} max={0.9} step={0.01} value={roiGuide.center_x} onChange={(center_x) => setRoiGuide({...roiGuide, center_x})} /><RangeField label="垂直中心" min={0.1} max={0.9} step={0.01} value={roiGuide.center_y} onChange={(center_y) => setRoiGuide({...roiGuide, center_y})} /><Button variant="primary" icon={Check} onClick={() => void api.saveRoiGuide(cameraDevice, resolution, roiGuide).then(() => {setCalibrating(false); announce("采集框已保存；位置变化后请重新注册和校准。", "success");}).catch((error) => announce(error.message, "danger"))}>保存采集框</Button></> : null}</div> : null}
-        <ImageStage imageUrl={previewUrl} title={session?.guide || "等待开始自动采集"} description={session?.guide || "系统不会自动寻找手掌，请将掌心放入固定采集框。"} active={running || calibrating} guide={running || calibrating} guideConfig={roiGuide} objectFit="contain" />
+        <ImageStage imageUrl={previewUrl} title={enrollmentCameraError || session?.guide || "摄像头预览"} description={enrollmentCameraError || session?.guide || ""} active={running || previewActive} error={Boolean(enrollmentCameraError)} objectFit="contain" boxes={session?.detectionBoxes || enrollmentDetection?.hands} countdown={session?.countdownRemaining} palmSideLabel={palmSide === "right" ? "右掌注册" : "左掌注册"} />
         {session?.phase === "reviewing" ? <div className="review-view"><div className="segmented"><button className={!reviewOriginal ? "is-active" : ""} onClick={() => setReviewOriginal(false)}>ROI</button><button className={reviewOriginal ? "is-active" : ""} onClick={() => setReviewOriginal(true)}>原图</button></div><SelectField label="审阅样本" value={reviewSample?.id || ""} onChange={(event) => setReviewSampleId(event.target.value)} options={session.samples.map((sample, index) => ({value: sample.id, label: `样本 ${index + 1}`}))} /></div> : null}
         <div className="enrollment-guide"><strong>{session?.guide || "自助模式采满 5 张后自动保存；管理员辅助模式支持审阅和剔除。"}</strong><small className="enrollment-mode">当前方式：{isAssistedSession ? reviewActionsEnabled ? "管理员审阅：可剔除样本或确认保存" : "管理员审阅（第 5 张后不会自动保存）" : "自助自动保存"}</small>{session?.lastError ? <span>{session.lastError}</span> : null}{session?.rejections && Object.keys(session.rejections).length ? <small>拒绝统计：{Object.entries(session.rejections).map(([reason, value]) => `${reason} ${value}`).join(" · ")}</small> : null}</div>
         <div className="sample-actions">{canStart ? <Button variant="primary" icon={Camera} loading={busy} onClick={() => void start()}>{mode === "assisted" ? "开始管理员采集" : "开始自动采集"}</Button> : null}{session?.phase === "completed" ? <><Button variant="secondary" icon={RefreshCw} disabled={busy} onClick={continueSamePerson}>登记同一人另一只掌</Button><Button variant="quiet" icon={RefreshCw} disabled={busy} onClick={startNextPerson}>登记下一位人员</Button></> : <Button variant="quiet" icon={RefreshCw} disabled={!session || busy} onClick={() => void cancel()}>{running ? "取消采集" : "清空本次注册"}</Button>}</div>
       </Panel></section>
-      <aside className="enrollment-inspector"><Panel title="注册信息" eyebrow="PALM IDENTITY"><div className="identity-form"><div className="field identity-auto-id"><span className="field__label">人员编号</span><strong>{activePersonId || "开始采集后自动分配"}</strong><small>系统按 P-000001 格式自动分配</small></div><TextField label="显示名（可选）" placeholder="例如：张三" value={displayName} disabled={running || session?.phase === "completed"} onChange={(event) => setDisplayName(event.target.value)} /><div className="field"><span className="field__label">掌侧</span><div className="segmented"><button type="button" disabled={running || session?.phase === "completed"} className={cx(palmSide === "left" && "is-active")} onClick={() => setPalmSide("left")}>左掌</button><button type="button" disabled={running || session?.phase === "completed"} className={cx(palmSide === "right" && "is-active")} onClick={() => setPalmSide("right")}>右掌</button></div></div><div className="field"><span className="field__label">注册方式</span><div className="segmented"><button type="button" disabled={running || Boolean(session)} className={cx(mode === "self_service" && "is-active")} onClick={() => setMode("self_service")}>自助自动保存</button><button type="button" disabled={running || Boolean(session)} className={cx(mode === "assisted" && "is-active")} onClick={() => setMode("assisted")}>管理员审阅</button></div></div><SelectField label="模板模型" value={config.modelId} onChange={(event) => changeEnrollmentModel(event.target.value)} options={bootstrap.models.filter((model) => model.usableForRecognition !== false && model.availableBackends.includes("npu")).map((model) => ({ value: model.id, label: model.displayName }))} /></div><div className="sample-progress"><div className="sample-progress__header"><span>样本进度</span><strong>{count} / 5</strong></div><div className="progress-track"><span style={{ width: `${count * 20}%` }} /></div><p>只保存最终入选样本；拒绝帧不会落盘。</p></div><div className="sample-gallery">{Array.from({ length: 5 }).map((_, index) => { const sample = session?.samples[index]; return <div className={cx("sample-slot", sample && "is-filled")} key={sample?.id || index}>{sample ? <><img src={sample.roiUrl || sample.previewUrl} alt={`第 ${index + 1} 个掌纹样本`} />{mode === "assisted" && session?.phase === "reviewing" ? <button type="button" className="sample-remove" title="剔除该样本" onClick={() => void discard(sample.id)}><Trash2 aria-hidden="true" /></button> : null}</> : <span>{index + 1}</span>}</div>; })}</div>{mode === "assisted" ? <Button variant="primary" icon={Check} loading={busy} disabled={session?.phase !== "reviewing" || count !== 5} onClick={() => void commit()} className="save-template-button">确认并保存 5 张样本</Button> : null}<Notice tone="info">系统为新人员自动分配编号。完成一只掌后可继续登记同一人的另一只掌；左右掌分别保存为独立模板。</Notice></Panel></aside>
+      <aside className="enrollment-inspector"><Panel title="注册信息" eyebrow="PALM IDENTITY"><div className="identity-form"><div className="field identity-auto-id"><span className="field__label">人员编号</span><strong>{activePersonId || "开始采集后自动分配"}</strong><small>系统按 P-000001 格式自动分配</small></div><TextField label="显示名（可选）" placeholder="例如：张三" value={displayName} disabled={running || session?.phase === "completed"} onChange={(event) => setDisplayName(event.target.value)} /><div className="field"><span className="field__label">掌侧</span><div className="segmented"><button type="button" disabled={running || session?.phase === "completed"} className={cx(palmSide === "left" && "is-active")} onClick={() => setPalmSide("left")}>左掌</button><button type="button" disabled={running || session?.phase === "completed"} className={cx(palmSide === "right" && "is-active")} onClick={() => setPalmSide("right")}>右掌</button></div></div><div className="field"><span className="field__label">注册方式</span><div className="segmented"><button type="button" disabled={running || Boolean(session)} className={cx(mode === "self_service" && "is-active")} onClick={() => setMode("self_service")}>自助自动保存</button><button type="button" disabled={running || Boolean(session)} className={cx(mode === "assisted" && "is-active")} onClick={() => setMode("assisted")}>管理员审阅</button></div></div><SelectField label="手掌检测模型" value={config.detectorId} onChange={(event) => setConfigValue("detectorId", event.target.value)} options={bootstrap.detectors.filter((detector) => detector.available).map((detector) => ({ value: detector.id, label: detector.displayName }))} /><SelectField label="掌纹特征模型" value={config.modelId} onChange={(event) => changeEnrollmentModel(event.target.value)} options={bootstrap.models.filter((model) => model.usableForRecognition !== false && model.availableBackends.includes("npu")).map((model) => ({ value: model.id, label: model.displayName }))} /></div><div className="sample-progress"><div className="sample-progress__header"><span>样本进度</span><strong>{count} / 5</strong></div><div className="progress-track"><span style={{ width: `${count * 20}%` }} /></div><p>只保存最终入选样本；拒绝帧不会落盘。</p></div><div className="sample-gallery">{Array.from({ length: 5 }).map((_, index) => { const sample = session?.samples[index]; return <div className={cx("sample-slot", sample && "is-filled")} key={sample?.id || index}>{sample ? <><img src={sample.roiUrl || sample.previewUrl} alt={`第 ${index + 1} 个掌纹样本`} />{mode === "assisted" && session?.phase === "reviewing" ? <button type="button" className="sample-remove" title="剔除该样本" onClick={() => void discard(sample.id)}><Trash2 aria-hidden="true" /></button> : null}</> : <span>{index + 1}</span>}</div>; })}</div>{mode === "assisted" ? <Button variant="primary" icon={Check} loading={busy} disabled={session?.phase !== "reviewing" || count !== 5} onClick={() => void commit()} className="save-template-button">确认并保存 5 张样本</Button> : null}<Notice tone="info">系统为新人员自动分配编号。完成一只掌后可继续登记同一人的另一只掌；左右掌分别保存为独立模板。</Notice></Panel></aside>
     </div>
   </div>;
 }

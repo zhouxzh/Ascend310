@@ -688,7 +688,10 @@ class TemplateStore:
         modality: str = "palmprint",
         spectrum: str = "visible",
         camera_physical_id: str | None = None,
+        palm_side: str | None = None,
     ) -> dict[str, Any]:
+        if palm_side not in {None, "left", "right"}:
+            raise ValueError("palm_side must be left, right, or None")
         codes, metadata = self.load(model_id)
         compatible = [
             index
@@ -698,6 +701,7 @@ class TemplateStore:
             and item.get("spectrum", "visible") == spectrum
             and (camera_physical_id is None or item.get("camera_physical_id") == camera_physical_id)
             and (roi_config is None or item.get("roi_config") == roi_config)
+            and (palm_side is None or item.get("palm_side") == palm_side)
         ]
         if not compatible:
             return {

@@ -48,6 +48,7 @@ class ApiContractTests(unittest.TestCase):
             "inference_smoke",
             "admitted_model_ids",
             "release_id",
+            "detector_debug_capture",
         ):
             self.assertIn(field, health.json())
 
@@ -55,6 +56,15 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(bootstrap.status_code, 200)
         payload = bootstrap.json()
         self.assertGreaterEqual(len(payload["models"]), 1)
+        self.assertEqual(payload["defaults"]["detector_id"], "nanodet-plus-m-320-handed")
+        self.assertEqual(
+            {item["id"] for item in payload["detectors"]},
+            {
+                "nanodet-plus-m-320-handed",
+                "picodet-xs-320-seed-42",
+                "picodet-xs-416-seed-42",
+            },
+        )
         self.assertEqual(payload["defaults"]["backend"], "npu")
         self.assertEqual(payload["defaults"]["precision"], "mixed_fp16")
         self.assertTrue(all("cpu" not in item.get("available_backends", []) for item in payload["models"]))
@@ -86,6 +96,14 @@ class ApiContractTests(unittest.TestCase):
         self.assertTrue(all(item.get("status", {}).get("npu_mixed_fp16") == "ready" for item in payload["models"]))
         self.assertIn("defaults", payload)
         self.assertNotIn("candidates", payload)
+
+    def test_unknown_palm_detector_is_rejected_before_camera_open(self):
+        response = self.client.post(
+            "/api/cameras/%2Fdev%2Fvideo2/detections",
+            json={"resolution": "640x480", "detector_id": "not-a-detector"},
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("未知手掌检测模型", response.json()["detail"])
 
     def test_edcc_npu_is_rejected_before_adapter_creation(self):
         response = self.client.post(
@@ -341,6 +359,14 @@ class ApiContractTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(observed["assume_roi"])
+
+    def test_fixed_roi_guide_routes_are_retired(self):
+        path = "/api/cameras/%2Fdev%2Fvideo0/roi-guide"
+        self.assertEqual(self.client.get(path).status_code, 410)
+        self.assertEqual(
+            self.client.put(path, json={"center_x": 0.5, "center_y": 0.5, "side_ratio": 0.9}).status_code,
+            410,
+        )
 
     def test_enrollment_session_forces_automatic_roi(self):
         response = self.client.post(

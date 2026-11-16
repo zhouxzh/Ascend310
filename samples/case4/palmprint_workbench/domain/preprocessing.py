@@ -67,9 +67,8 @@ class PalmPreprocessor:
                     "roi_mode": "pre_cropped",
                 },
             )
-        # ``background_rgb`` remains accepted for offline diagnostics and old
-        # callers, but production capture never uses segmentation to locate a
-        # hand.  The user places the palm inside the guide rectangle instead.
+        # Retain the old helper for offline diagnostics without admitting its
+        # fixed-guide crops into the detector pipeline's template namespace.
         del background_rgb
         crop, corners, geometry = self._fixed_crop(gray, roi_config)
         preview = rgb.copy()
@@ -81,6 +80,7 @@ class PalmPreprocessor:
                 preview=preview,
                 reason="固定采集框超出图像范围",
                 geometry=geometry,
+                pipeline_id="fixed_guide_v1",
             )
 
         roi = cv2.resize(crop, (self.roi_size, self.roi_size), interpolation=cv2.INTER_AREA)
@@ -98,14 +98,52 @@ class PalmPreprocessor:
             "clipped_high_ratio": clipped_high,
             "roi_area_ratio": float(crop.shape[0] * crop.shape[1] / gray.size),
         }
-        geometry = {**geometry, "roi_mode": "fixed_guide", "pipeline_id": ROI_PIPELINE_ID}
+        geometry = {**geometry, "roi_mode": "fixed_guide", "pipeline_id": "fixed_guide_v1"}
         if sharpness < MIN_SHARPNESS:
-            return RoiResult(False, roi=roi, preview=preview, reason=f"图像清晰度不足：{sharpness:.1f}", quality=quality, geometry=geometry)
+            return RoiResult(False, roi=roi, preview=preview, reason=f"图像清晰度不足：{sharpness:.1f}", quality=quality, geometry=geometry, pipeline_id="fixed_guide_v1")
         if brightness < MIN_ROI_BRIGHTNESS or brightness > MAX_ROI_BRIGHTNESS:
-            return RoiResult(False, roi=roi, preview=preview, reason=f"图像亮度不合适：{brightness:.1f}", quality=quality, geometry=geometry)
+            return RoiResult(False, roi=roi, preview=preview, reason=f"图像亮度不合适：{brightness:.1f}", quality=quality, geometry=geometry, pipeline_id="fixed_guide_v1")
         if clipped_low + clipped_high > MAX_CLIPPED_RATIO:
-            return RoiResult(False, roi=roi, preview=preview, reason="图像过曝或欠曝比例过高", quality=quality, geometry=geometry)
-        return RoiResult(True, roi=roi, preview=preview, quality=quality, geometry=geometry)
+            return RoiResult(False, roi=roi, preview=preview, reason="图像过曝或欠曝比例过高", quality=quality, geometry=geometry, pipeline_id="fixed_guide_v1")
+        return RoiResult(True, roi=roi, preview=preview, quality=quality, geometry=geometry, pipeline_id="fixed_guide_v1")
+
+    def extract_box(self, image_rgb: np.ndarray, xyxy: tuple[float, float, float, float]) -> RoiResult:
+        error = self._validate_image(image_rgb)
+        if error:
+            return RoiResult(False, reason=error)
+        height, width = image_rgb.shape[:2]
+        x1, y1, x2, y2 = xyxy
+        left, top = max(0, int(np.floor(x1))), max(0, int(np.floor(y1)))
+        right, bottom = min(width, int(np.ceil(x2))), min(height, int(np.ceil(y2)))
+        geometry = {
+            "bbox_xyxy": [left, top, right, bottom],
+            "center_x": (left + right) / (2 * width),
+            "center_y": (top + bottom) / (2 * height),
+            "crop_side": float(max(right - left, bottom - top)),
+            "angle_deg": 0.0,
+            "roi_mode": "detected_bbox",
+            "pipeline_id": ROI_PIPELINE_ID,
+        }
+        if right - left < 16 or bottom - top < 16:
+            return RoiResult(False, reason="手掌检测框过小", geometry=geometry)
+        gray = cv2.cvtColor(np.ascontiguousarray(image_rgb[top:bottom, left:right, :3], dtype=np.uint8), cv2.COLOR_RGB2GRAY)
+        roi = cv2.resize(gray, (self.roi_size, self.roi_size), interpolation=cv2.INTER_AREA)
+        sharpness = self._sharpness(roi)
+        brightness = float(np.mean(roi))
+        clipped_low = float(np.mean(roi <= 4))
+        clipped_high = float(np.mean(roi >= 251))
+        quality = {"sharpness": sharpness, "brightness": brightness,
+                   "contrast": float(np.std(roi)), "clipped_low_ratio": clipped_low,
+                   "clipped_high_ratio": clipped_high,
+                   "roi_area_ratio": float((right - left) * (bottom - top) / (width * height))}
+        reason = ""
+        if sharpness < MIN_SHARPNESS:
+            reason = f"图像清晰度不足：{sharpness:.1f}"
+        elif brightness < MIN_ROI_BRIGHTNESS or brightness > MAX_ROI_BRIGHTNESS:
+            reason = f"图像亮度不合适：{brightness:.1f}"
+        elif clipped_low + clipped_high > MAX_CLIPPED_RATIO:
+            reason = "图像过曝或欠曝比例过高"
+        return RoiResult(not reason, roi=roi, reason=reason, quality=quality, geometry=geometry)
 
     @staticmethod
     def _fixed_crop(

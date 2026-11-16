@@ -1,149 +1,514 @@
 # 案例 4：掌纹识别
 
-## 案例目标
+掌纹识别把一张手掌图像转换成可用于身份检索的特征。与“图像里有没有手掌”不同，身份识别还要回答三个连续问题：手掌在哪里、它是左掌还是右掌、它属于模板库中的谁。边缘设备必须在有限算力、有限内存和局域网摄像头条件下完成这条链路，同时避免把一次检测、一次HTTP成功或一张截屏误当成身份质量已经通过。
 
-本案例在 Ascend 310B4 / 8T 开发板上运行 FastAPI + React 掌纹识别工作台。生产推理固定使用 NPU `mixed_fp16`；CPU、EDCC、origin 和离线候选比较不进入在线接口。
+本案例在Ascend310B4 / 8T上构建一套可本地运行的掌纹识别工作台。系统先从整幅画面检测手掌，裁成灰度`128×128` ROI，再由掌纹特征模型生成embedding，最后在同模型、同掌侧的模板中执行余弦检索。在线推理固定使用NPU `mixed_fp16`，CPU和EDCC只作为离线研究基线，不作为服务降级路径。
 
-本版本是冻结的人工测试发布。CCNet 为默认/回滚模型；`manual_test` profile 可逐一测试五个 CompNet。五个 CompNet 的状态为 `manual_test_pending`，不能把人工测试前的状态写成稳定验收通过。
+本案例以8T可见光摄像头为验证对象。20T或其他SoC需要独立完成模型、摄像头、阈值和模板验收，不能复用这里的指标作为自己的结论。
 
-## 手动环境
+配套源码位于[Case4工程](https://github.com/zhouxzh/Ascend310/tree/main/samples/case4)。
 
-在开发板同一个 shell 中执行：
+## 这项任务解决什么问题 {#src-experiment-case4-problem}
+
+掌纹识别的输入不是一张已经对齐、裁剪好的生物特征图，而是包含背景、光照、手掌距离和多只手候选的整帧画面。如果直接把整帧缩成分类网络输入，模型既要学习定位又要学习身份，训练和解释都会更困难。两阶段流水线把问题拆开：
+
+1. 手势检测器只定位手掌并给出检测分数及左右掌类别。
+2. ROI预处理把检测框转换成统一尺寸的灰度掌纹区域。
+3. CCNet把ROI编码成2048维embedding。
+4. 模板检索用余弦相似度返回同模型、同ROI和光谱合同的Top-K候选，并显示候选模板掌侧。
+5. 只有本机阈值完成校准时，系统才显示身份是否通过；否则只显示候选与分数。
+
+这条链路还解决一个实际工程问题：检测模型可以替换。NanoDet、PicoDet的输入尺寸、输出数量和DFL解码不同，但上层ROI、特征模型、模板和前端结果可以保持一致。读者需要学会分开检查“检测合同”“特征合同”“模板合同”和“任务质量”，不能因为其中一层通过就宣布整个身份系统通过。
+
+### 最小闭环 {#src-experiment-case4-minimal-loop}
+
+最小成功不是识别出某个真实人员，而是完成一条可重复、可解释的匿名闭环：
+
+```text
+摄像头或匿名测试图
+    ↓
+手掌检测：框、分数、left/right
+    ↓
+ROI裁剪与质量检查：128×128灰度图
+    ↓
+CCNet NPU推理：2048维embedding
+    ↓
+同模型模板检索（不使用检测掌侧过滤）
+    ↓
+候选分数或明确拒绝原因
+```
+
+课堂验收应至少观察到一次模板注册、一次同模型检索、一次掌侧不一致拒绝和一次空模板结果。真实人员身份、EER和Rank-1需要独立协议，不由界面截图替代。
+
+## 你将学会什么 {#src-experiment-case4-learning-outcomes}
+
+完成本案例后，读者能够：
+
+1. 解释两阶段掌纹识别为什么要分离手掌检测与掌纹特征提取，并画出从整帧到身份候选的数据流。
+2. 读取`detector_manifest.json`，核对输入shape、类别顺序、DFL输出、阈值、模型ID、字节数和SHA-256。
+3. 在8T板端启动NPU-only工作台，分别验证health、bootstrap、摄像头和NPU推理。
+4. 在界面中独立选择手掌检测模型和掌纹特征模型，并解释两者不是同一个模型选择项。
+5. 完成同一人员左右掌模板注册，观察多手拒绝、掌侧不一致拒绝和模板隔离。
+6. 区分代码合同、ATC转换、ACL加载、数值一致性、任务质量、性能和UI验收。
+7. 根据失败层级定位问题：设备、CANN、模型资产、输入合同、摄像头、模板、前端或应用逻辑。
+
+### 本案例不承诺什么 {#src-experiment-case4-non-claims}
+
+工作台可运行不等于模型已经适合所有人群和场景。光照变化、掌心角度、遮挡、皮肤纹理、摄像头曝光和左右掌姿态都会影响检测或特征质量。PicoDet候选仍处于人工测试状态，原始八输出数值门未通过；不得把其离线mAP写成生产准入。
+
+本案例也不提供公网安全能力。服务默认监听局域网地址，没有账号、TLS、多租户隔离或反欺诈机制。部署范围应限制在本人或受信设备环境。
+
+## 先理解掌纹识别链路 {#src-experiment-case4-concepts}
+
+### 手掌检测与掌纹识别有什么区别 {#src-experiment-case4-detection-vs-recognition}
+
+手掌检测输出的是空间信息。每个框至少包含左上、右下坐标和分数，本案例还包含`left_palm`或`right_palm`类别。它回答“手掌在哪里”，不回答“这个人是谁”。
+
+掌纹特征模型输出的是身份表示。CCNet接收裁剪后的`128×128`灰度ROI，输出2048维向量。向量经过归一化后用余弦相似度比较，超过本机阈值才可能判定匹配。
+
+检测错误会传播到身份链路：框偏了，ROI会带入背景；手张得太开或旋转过大，ROI质量会下降；掌侧标签错误会影响注册拒绝或模板选择。因此定位、ROI和身份指标必须分别记录。
+
+### 为什么需要左右掌类别 {#src-experiment-case4-handedness}
+
+同一人员的左右掌是独立模板，稳定ID分别为`人员编号:left`和`人员编号:right`。系统在注册时要求画面只有一只手，而且检测掌侧必须与页面人工选择一致。不一致的帧不会裁剪ROI、不会保存样本，也不会创建模板。
+
+这条规则是身份数据完整性门。当前可见光场景中，某些姿态下检测器可能把左掌判成右掌；系统不能为了“让流程走下去”自动交换人工选择。正确做法是记录调试帧、调整姿态或改进模型，不能用错误掌侧生成模板。
+
+实时检索不使用检测标签过滤模板，避免一次掌侧误判把正确的同侧模板排除。检索结果会显示特征模型的模板掌侧；检测掌侧保留在调试信息中供分析。
+
+### embedding和模板是什么 {#src-experiment-case4-embedding-template}
+
+embedding是掌纹ROI经特征模型得到的定长数值向量。模板不是一个身份字符串，而是同一掌侧多张合格样本的向量集合及其元数据。注册时通常保存3至5个样本，检索时取考生向量与模板样本的最佳若干分数并聚合。
+
+模板命名空间包含特征模型和精度：
+
+```text
+<model_id>__npu__mixed_fp16
+```
+
+更换特征模型后，旧模型的embedding不能直接与新模型比较。模板还绑定ROI管线`nanodet_palm_bbox_v1`、可见光/红外光谱和摄像头物理设备合同。不同合同的模板必须隔离。
+
+### 为什么需要ROI质量检查 {#src-experiment-case4-roi-quality}
+
+检测框只保证“模型认为这里有手”，不保证ROI适合身份识别。预处理会检查尺寸、亮度、清晰度、边缘裁剪和多余区域。质量不合格时，该手返回`roi_rejected`，不会进入embedding检索。
+
+多手画面可以逐手处理；注册路径更严格，只允许一只手。不能用注册阶段的“多手拒绝”代替实时页的多手能力，也不能用实时页能显示两个框证明模板系统已通过。
+
+## 器件与材料清单 {#src-experiment-case4-bom}
+
+### 最小配置 {#src-experiment-case4-minimum-bom}
+
+| 器件 | 数量 | 用途 | 条件 |
+| --- | ---: | --- | --- |
+| Ascend310B4 / 8T开发板 | 1 | NPU推理、FastAPI和摄像头处理 | 设备节点、CANN与PyACL可用 |
+| 电源和启动存储 | 1套 | 稳定供电与系统启动 | 符合开发板规格 |
+| USB摄像头 | 1 | 采集可见光手掌画面 | V4L2可枚举并能输出真实帧；C922为本次验证型号 |
+| 局域网和开发电脑 | 1套 | 前端构建、文件同步和浏览器访问 | 可信局域网 |
+| 已核验模型资产 | 1套 | 检测OM、CCNet OM和registry | 字节数与SHA-256匹配 |
+
+### 本次验证配置 {#src-experiment-case4-validated-config}
+
+| 项目 | 实测值 |
+| --- | --- |
+| SoC与档位 | Ascend310B4 / 8T |
+| CANN | 8.0.0 |
+| NPU驱动 | 25.2.0 |
+| Python环境 | `ascend`，Python3.9.25 |
+| 摄像头 | Logitech C922 Pro Stream Webcam |
+| 可见光节点 | `/dev/video2`，节点编号可能随插拔变化 |
+| 前端 | React预构建bundle，由FastAPI托管 |
+| 后端 | FastAPI，NPU-only |
+
+设备健康状态中的`Alarm`不能单独作为通过或失败判据。必须继续记录ACL初始化、模型加载、推理返回码、摄像头取帧和实际输出。
+
+## 系统总体架构 {#src-experiment-case4-architecture}
+
+```text
+React浏览器
+  实时识别 / 掌纹注册 / 模型状态 / 系统状态
+        ↓ HTTP
+FastAPI
+  健康检查 / bootstrap / 摄像头 / 检测 / 注册 / 识别
+        ↓
+手掌检测runner              掌纹特征runner
+NanoDet或PicoDet OM          CCNet mixed_fp16 OM
+        ↓                           ↓
+框、分数、left/right          2048维embedding
+        ↓                           ↓
+ROI预处理与质量检查 -------> 同模型模板检索
+        ↓                           ↓
+页面框与结果                 Top-K分数或匹配结论
+```
+
+前端源码入口为[App.tsx](https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/frontend/src/App.tsx)，HTTP边界在[server.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/palmprint_workbench/api/server.py)，检测运行时在[detector.py](https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/palmprint_workbench/runtime/detector.py)。
+
+### 运行时为什么固定NPU {#src-experiment-case4-npu-only}
+
+生产API只接受`backend=npu`和`precision=mixed_fp16`。CANN缺失、PyACL导入失败或OM无法加载时，服务返回明确错误，不会悄悄切换到CPU。CPU fallback会让页面上“可用”的含义变得模糊，也会使性能和数值证据失去可比性。
+
+离线研究可以使用CPU或EDCC，但它们的输出不能进入在线模板namespace，也不能被写成8T NPU结果。
+
+## 手掌检测模型和输入合同 {#src-experiment-case4-detector-contract}
+
+### 可选模型 {#src-experiment-case4-detector-catalog}
+
+检测模型由`detector_manifest.json`登记。界面的“手掌检测模型”选择会向检测接口发送`detector_id`。
+
+| 模型ID | 系列 | 输入 | 状态 |
+| --- | --- | --- | --- |
+| `nanodet-plus-m-320-handed` | NanoDet | `[1,3,320,320]` | 默认人工测试模型 |
+| `picodet-xs-320-seed-42` | PicoDet | `[1,3,320,320]` | 实验模型 |
+| `picodet-xs-416-seed-42` | PicoDet | `[1,3,416,416]` | 实验模型 |
+
+每个模型必须核对：
+
+- 唯一模型ID和显示名。
+- OM路径、字节数和SHA-256。
+- 输入NCHW shape。
+- 输出数量和各层shape。
+- 类别顺序为`left_palm`、`right_palm`。
+- 分数阈值、NMS IoU、最多保留框数。
+- 预处理颜色顺序、插值方式、均值和标准差。
+
+### NanoDet输出 {#src-experiment-case4-nanodet-output}
+
+当前NanoDet输出为`float32[1,2125,34]`。前2个通道是已经过sigmoid的左右掌分数，后32个通道是4个方向、每个方向8个DFL logits；stride为`8,16,32,64`，anchor中心偏移为`0.0`。解码时对DFL做softmax，计算期望距离，再由prior中心生成框，两个类别分别执行NMS。
+
+### PicoDet输出 {#src-experiment-case4-picodet-output}
+
+PicoDet不是单张量输出，而是8个输出：
+
+```text
+4层分类：[1,N8,2] [1,N16,2] [1,N32,2] [1,N64,2]
+4层DFL： [1,N8,32] [1,N16,32] [1,N32,32] [1,N64,32]
+```
+
+分类分数已在图内执行对齐sigmoid，不能再次sigmoid。每层DFL按`reg_max=7`解码，anchor中心偏移为`0.5`。PicoDet预处理使用RGB、cubic插值和ImageNet归一化，与NanoDet不同。
+
+### 长方形画面如何进入方形模型 {#src-experiment-case4-direct-stretch}
+
+当前检测输入采用直接拉伸。横向和纵向分别缩放：
+
+```text
+320×240  -> 320×320：scale_x=1，scale_y=4/3
+640×480  -> 320×320：scale_x=1/2，scale_y=2/3
+1280×720 -> 320×320：scale_x=1/4，scale_y=4/9
+```
+
+手掌在模型内部会被改变宽高比例，但检测框会按原图宽高分别反算，因此页面框仍与原始视频坐标对应。
+
+直接拉伸是模型训练、ONNX导出和离线mAP采用的合同。不能因为直觉上“等比例更好”就在部署端擅自改成crop或letterbox；预处理变化后必须重新测量任务质量。实时页默认`320×240`，既能减少V4L2读取和传输负担，也保持4:3比例；更高分辨率可在界面选择。
+
+## 掌纹特征和模板合同 {#src-experiment-case4-embedding-contract}
+
+CCNet输入为单通道`[1,1,128,128]`，输出2048维向量。ROI来自检测框，但预处理还会进行灰度化、尺寸调整、亮度与清晰度检查。embedding做L2归一化后使用余弦相似度。
+
+模板检索必须同时匹配：
+
+- 同一个特征模型ID。
+- `npu`后端和`mixed_fp16`精度。
+- 同一个ROI管线。
+- 相同模态和光谱。
+- 相同摄像头物理合同或明确的兼容范围。
+- 注册路径要求检测掌侧与人工选择一致；实时检索不使用检测掌侧过滤模板。
+
+系统尚未完成当前板卡、镜头和光照组合的本机阈值校准时，结果只显示候选和分数，不显示“身份通过”。Top-K中存在模板不等于身份匹配。
+
+## 完成最小实验 {#src-experiment-case4-minimum-experiment}
+
+### 获取源码并构建前端 {#src-experiment-case4-build}
+
+在开发电脑上获取课程发行版本，并记录实际commit：
+
+```bash
+git clone https://github.com/zhouxzh/Ascend310.git
+cd Ascend310/samples/case4
+git rev-parse HEAD
+python -m compileall -q app.py palmprint_workbench tools
+cd frontend
+npm ci
+npm test
+npm run build
+cd ..
+```
+
+前端构建后确认`frontend/dist/index.html`及其资源存在。开发板不需要Node.js，板端不重新构建前端。
+
+### 准备板端环境和发行目录 {#src-experiment-case4-board-environment}
+
+以下路径是推荐布局，`<release-id>`必须替换为已审核版本：
+
+```bash
+ssh HwHiAiUser@<board-ip>
+export TIER=8t
+export RELEASE_ID=<reviewed-release-id>
+export RELEASE_ROOT=/home/HwHiAiUser/Documents/Ascend310/deployments/case4/$TIER/$RELEASE_ID
+export ASSET_ROOT=/home/HwHiAiUser/Documents/Ascend310/assets/case4/models/8t/<verified-asset-id>
+mkdir -p "$RELEASE_ROOT"
+```
+
+源码从固定commit获取。OM、ONNX、模板、数据集和真实摄像头图像不进入Git，单独存放在`ASSET_ROOT`。同步源码时不要使用`--delete`，不要覆盖板端模板和报告。
+
+激活统一环境：
 
 ```bash
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate ascend
 export PYTHONNOUSERSITE=1
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-cd <release-root>
-export PALMPRINT_ROOT="$PWD"
-export ACL_PYTHON_SITE=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages
-export PYTHONPATH="$PALMPRINT_ROOT:$ACL_PYTHON_SITE${PYTHONPATH:+:$PYTHONPATH}"
+cd "$RELEASE_ROOT"
+export PALMPRINT_ROOT="$RELEASE_ROOT"
+export PALMPRINT_MODEL_ASSET_ROOT="$ASSET_ROOT"
 export PALMPRINT_PROFILE=manual_test
-unset PALMPRINT_REQUIRE_TEMPLATE_ENCRYPTION
-unset PALMPRINT_TEMPLATE_KEY_FILE
-unset PALMPRINT_TEMPLATE_DIR
-python -c "import sys, acl; print(sys.executable); print(acl.__file__)"
+export PALMPRINT_CAMERA_MODALITY=palmprint
+export PALMPRINT_CAMERA_SPECTRUM=visible
+python -c "import sys, cv2, acl; print(sys.executable); print(cv2.__version__); print(acl.__file__)"
+```
+
+`acl`导入失败时先修复CANN/Python环境，不要增加CPU fallback。
+
+### 校验模型资产 {#src-experiment-case4-verify-assets}
+
+严格校验必须同时检查检测模型、CCNet OM和registry：
+
+```bash
 python -m palmprint_workbench.tools.verify_assets --strict
-python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 ```
 
-源码不会自动安装依赖、下载数据、构建 EDCC、转换模型或修改系统环境。OM 从固定来源取得后，必须按 `om_manifest.json` 核对字节数和 SHA-256。
+预期看到每个检测模型的`bytes`、`expected_bytes`、`sha256`和`expected_sha256`一致，最后为：
 
-## API 和界面
+```json
+{
+  "ok": true,
+  "failures": []
+}
+```
 
-启动后检查 `/api/health`、`/api/bootstrap`、`/api/candidates` 和 `/`。manual_test profile 的 bootstrap 应返回 CCNet 与五个 canonical CompNet，均为 `npu/mixed_fp16`。
+文件存在、大小相同但哈希不同仍不能使用。PicoDet原始八输出数值门未通过时，界面必须继续显示“实验”或人工测试提示。
 
-触摸屏逐页检查：系统状态、上传识别、模板注册、候选审计。测试 1280×720、1024×768 和 375×812；按钮不重叠，状态文本不溢出，API 不可用时显示空服务状态。
-
-## 六模型人工测试
-
-canonical ID 为：
-
-- `ccnet`
-- `compnet_tongji_600`
-- `compnet_iitd_460`
-- `compnet_rest_358`
-- `compnet_xjtu_flash_200`
-- `compnet_xjtu_natural_200`
-
-每个模型执行：上传合成 ROI 或匿名测试图、识别、注册三个模板、查询、命中识别、删除、重启后再查询。模板 namespace 固定为 `<model_id>__npu__mixed_fp16`。
-
-每次记录模型 ID、OM SHA、请求时间、HTTP 状态、模型耗时、模板状态和服务 PID。当前内测版本会把用户主动触发的原图、ROI 和 JSON 索引自动保存到发行目录的 `data/captures/`，把明文 `PWST1` embedding 模板保存到 `data/templates/`；连续预览帧不保存。删除模板不会删除图片证据。真实掌纹图像、姓名、embedding 和完整报告不得进入源码或截图，也不得同步到 GitHub/HF。
-
-查看和清理内测图片由操作者手动执行：
+### 启动服务 {#src-experiment-case4-start-service}
 
 ```bash
-find "$PALMPRINT_ROOT/data/captures" -type f
-rm -rf "$PALMPRINT_ROOT/data/captures"
-rm -rf "$PALMPRINT_ROOT/data/templates"
+python -m palmprint_workbench.api --host 0.0.0.0 --port 7861
 ```
 
-## 摄像头测试
+在另一终端验证：
 
-先检查 `/api/cameras`，优先选择 1280×720 MJPG。连续预览 100 帧，记录首帧时间、稳定帧间隔和实际输出尺寸；拍照识别后关闭预览，确认设备释放，再重新打开一次。若画面滞后，先降低预览分辨率并确认没有其他进程占用设备。
+```bash
+curl --fail http://127.0.0.1:7861/api/health
+curl --fail http://127.0.0.1:7861/api/bootstrap
+curl --fail http://127.0.0.1:7861/api/cameras
+curl --fail http://127.0.0.1:7861/
+```
 
-## 常见问题
+浏览器访问`http://<board-ip>:7861/`。health返回`status=ok`只表示服务、运行时和资产状态可用；`inference_smoke`不会主动加载NPU，仍需执行一次检测或识别。
 
-| 现象 | 处理 |
-| --- | --- |
-| `import acl` 失败 | 重新加载同一 shell 的 conda/CANN，确认 Python 和 `acl.__file__` 来自同一环境 |
-| 模型不在列表 | 确认 `PALMPRINT_PROFILE=manual_test`、registry、OM SHA 和 bootstrap |
-| 模板不存在 | 确认注册和识别使用同一模型、精度和当前发行目录的 `data/templates` |
-| 模板文件损坏 | 停止服务，备份 `data/templates`，再使用 `.pstore.bak`/`.previous` 恢复 |
-| 摄像头卡顿 | 检查 MJPG、实际分辨率和设备占用，先使用 960×540 或 1280×720 |
-| 服务健康但识别失败 | 执行真实上传或摄像头 smoke；health 不主动加载 NPU |
-| ACL 异常退出、设备 reset 或进程意外退出 | 停止测试，保存时间/PID/模型/摘要，重启当前版本或回退 CCNet；不要升级版本 |
-| `Health: Alarm` | 只记录设备状态，不单独判断模型或程序结果 |
+### 选择模型并观察检测 {#src-experiment-case4-select-detector}
 
-## 板端实测记录（2026-10-18 复测） {#src-experiment-case4-board-evidence}
+在“识别配置”中分别选择：
 
-本节记录 8T（Ascend310B4）上摄像头问题的定位与复测结果。完整验收结论见 [`samples/case4/docs/02-device-deployment-and-acceptance-report.md`](https://github.com/zhouxzh/Ascend310/blob/main/samples/case4/docs/02-device-deployment-and-acceptance-report.md)。
+- 手掌检测模型：NanoDet或PicoDet。
+- 掌纹特征模型：当前已准入的CCNet。
 
-### 摄像头在 8T 上失效的原因
+`/api/bootstrap`中的`defaults.detector_id`给出默认检测模型，`detectors`列出可用状态。未知`detector_id`应在打开摄像头前返回422。
 
-失效原因不是模型或 API，而是**设备编号漂移**。`/dev/videoN` 的编号会随上电与插拔顺序变化，而默认设备固定为 `/dev/video0`：
+前后端使用分离的字段：
 
-| | 2026-10-17 记录 | 2026-10-18 复测 |
+```text
+model_id     掌纹特征模型
+detector_id  手掌检测模型
+```
+
+不能把这两个ID混用。模型切换后，实时页应清除旧检测框，下一次请求使用新ID。
+
+## 完成匿名模板实验 {#src-experiment-case4-enrollment-experiment}
+
+### 注册第一只掌 {#src-experiment-case4-enroll-first-palm}
+
+进入“掌纹注册”，选择一只掌侧，保持画面中只有一只手并启动自动采集。预期状态依次经历：
+
+```text
+camera_opening -> countdown -> waiting_position -> stabilizing -> collecting -> completed
+```
+
+系统保存5个合格样本后创建模板。样本必须通过ROI质量和稳定性检查；画面出现多只手时拒绝。检测掌侧与人工选择不一致时，状态回到等待并记录拒绝原因，不能保存样本。
+
+检查模板列表中的稳定ID、掌侧、样本数和特征模型。登记同一人员的另一只掌时，人员编号应保持不变，掌侧模板独立。
+
+### 注册掌侧不一致实验 {#src-experiment-case4-side-mismatch-experiment}
+
+在页面选择左掌，让右掌进入画面。预期接口或会话返回类似：
+
+```text
+检测到右掌，与当前选择的左掌不一致
+```
+
+检查板端模板数量和`data/captures/index.json`，该帧不应新增注册样本。再让左掌进入画面，状态应恢复采集。若不一致帧仍然保存，应立即停止注册并检查会话日志。
+
+### 未知模型实验 {#src-experiment-case4-unknown-detector}
+
+直接请求不存在的检测模型：
+
+```bash
+curl -X POST http://127.0.0.1:7861/api/cameras/%2Fdev%2Fvideo2/detections \
+  -H 'Content-Type: application/json' \
+  -d '{"resolution":"320x240","detector_id":"not-a-detector"}'
+```
+
+预期HTTP422，错误指出未知手掌检测模型。请求应在打开摄像头和初始化NPU前失败。
+
+## 摄像头和实时页面 {#src-experiment-case4-camera}
+
+### 设备节点不是固定编号 {#src-experiment-case4-camera-node}
+
+先读取本机实际节点：
+
+```bash
+v4l2-ctl --list-devices
+ls -l /dev/video*
+id
+```
+
+同一块板重插摄像头后，C922可能从`/dev/video2`变为其他编号。ISP虚拟节点也可能存在，但不一定能输出非空帧。服务通过`VIDIOC_QUERYCAP`和`VIDIOC_G_FMT`筛掉不能采集的节点。
+
+### 为什么实时页面曾经卡顿 {#src-experiment-case4-camera-performance}
+
+旧实时页同时轮询`/frame`预览和`/detections`检测。两路都打开同一台C922，造成V4L2读取和JPEG编码争用。实测1280×720下预览请求约373至1476毫秒，检测请求约1660至1692毫秒，检测响应约216KB。
+
+当前页面改为每轮只采集一次：检测响应同时返回缩放后的JPEG预览和框，独立`/frame`请求为零。检测请求完成后再等待60毫秒继续。8T浏览器实测：
+
+| 输入分辨率 | 10秒检测数 | 平均耗时 | 约刷新率 |
+| --- | ---: | ---: | ---: |
+| 1280×720 | 未切单路前更慢 | 约1660ms以上 | 低于1次/秒 |
+| 640×480 | 16 | 520ms | 约1.6次/秒 |
+| 320×240 | 34至39 | 219至242ms | 约3.4至3.9次/秒 |
+
+NPU检测本身约20至23毫秒，等待主要来自C922的V4L2逐帧读取和图像处理。实时页默认使用`320×240`；需要更高清晰度时手动选择`640×480`或`1280×720`。注册页默认`1280×720`以提高ROI质量。
+
+### 单帧检测实验 {#src-experiment-case4-detection-smoke}
+
+```bash
+curl --fail -X POST \
+  http://127.0.0.1:7861/api/cameras/%2Fdev%2Fvideo2/detections \
+  -H 'Content-Type: application/json' \
+  -d '{"resolution":"320x240","detector_id":"nanodet-plus-m-320-handed"}'
+```
+
+返回应包含：
+
+```text
+detector_id
+detection_count
+hands[].bbox_xyxy
+hands[].detection_score
+hands[].detected_palm_side
+capture_resolution
+preview_resolution
+timing.detection ms
+```
+
+只看到HTTP200不够。还要检查实际分辨率、预览是否为有效图像、框是否位于画面内，以及左右掌标签是否与人工观察一致。
+
+## 结果怎样解释 {#src-experiment-case4-results}
+
+### 分层验收 {#src-experiment-case4-evidence-layers}
+
+| 层 | 观察对象 | 通过后仍不能证明 |
 | --- | --- | --- |
-| USB 摄像头 | `/dev/video2` | **`/dev/video0`**、`/dev/video1` |
-| ISP 虚拟节点 | `/dev/video0` | `/dev/video2`、`/dev/video3` |
+| 构建 | Python编译、前端测试、bundle | NPU可加载 |
+| 资产 | OM字节数、SHA-256、registry | 数值和任务质量 |
+| ACL | OM加载、执行、输出有限、资源释放 | 身份准确率 |
+| 检测任务 | 框IoU、漏检、误检、左右掌一致率 | 掌纹embedding质量 |
+| 特征任务 | EER、Rank-1、阈值 | 摄像头端到端体验 |
+| 服务/UI | HTTP、页面、摄像头 | 模型跨场景可靠性 |
+| 性能 | warmup、批量、P50/P95 | 准确率和硬件缺陷 |
 
-两个节点的能力完全不同：
+一次Python测试通过、一次`/api/health`成功或一张页面截图，只能证明对应层。
 
-| 节点 | 驱动 | 像素格式 | 能否出帧 |
-| --- | --- | --- | --- |
-| `/dev/video0` | `uvcvideo`（USB Composite Device） | MJPG 1920×1080@25fps | 是 |
-| `/dev/video2` | `vin-media`（`vin-media_mainpath`） | 宽度/高度 0×0，像素格式为空 | 否 |
+### 当前8T观察结果 {#src-experiment-case4-current-8t}
 
-上次运行时默认设备正好指向 ISP 节点，因此页面预览必然失败。
+本版本在Ascend310B4 / 8T、CANN8.0.0、驱动25.2.0、C922可见光环境完成以下观察：
 
-### 修复
+- 三份检测OM通过严格字节数和SHA-256校验。
+- NanoDet、PicoDet XS-320、PicoDet XS-416均可通过C922检测接口加载和执行。
+- 前端可在“手掌检测模型”中切换三份模型，未知ID返回422。
+- 注册路径保留严格掌侧核对，不一致帧不写入模板。
+- 实时页使用单路取流，320×240平均约219至242毫秒。
+- 8T检测/API单元测试18项、前端测试18项通过。
+- 用户已在当前8T / C922工作台场景完成人工测试，确认本次测试路径无问题，并授权发布为`user-reported`结果。
 
-设备发现原先只检查 `VIDIOC_QUERYCAP` 的能力位，而 ISP 节点也声明 `VIDEO_CAPTURE_MPLANE`，于是被误认为摄像头。现在在能力位检查之后追加 `VIDIOC_G_FMT`，要求宽度与高度都大于 0，`0×0` 的 ISP 节点不再进入候选列表。修改位于 `samples/case4/palmprint_workbench/runtime/camera.py`，并补充了对应单元测试。
+PicoDet的离线mAP接近NanoDet或更高，但原始八输出数值门未通过，因此它仍是实验模型。上述运行结果不能证明所有姿态的左右掌分类可靠，也不能替代其他人员、姿态和光照下的EER、Rank-1及长期稳定性。
 
-### 复测结果
+## 常见失败怎样定位 {#src-experiment-case4-troubleshooting}
 
-环境：Ascend310B4 / 8T，CANN 8.0.0，驱动 25.2.0，Python 3.9.2，Health Alarm（已知状态，不作为失败判据）。
+| 现象 | 优先检查 | 处理 |
+| --- | --- | --- |
+| `import acl`失败 | 当前Python、CANN环境、`acl.__file__` | 重新激活同一shell的`ascend`与CANN；不切CPU |
+| health正常但推理失败 | OM加载、ACL返回码、设备日志 | 保存PID、模型ID和原始异常，停止服务 |
+| 模型不在下拉框 | `detector_manifest.json`、检测OM、字节数和SHA | 重新校验资产，不伪造可用状态 |
+| 未知detector_id | 请求字段和后端bootstrap | 使用清单中的模型ID；422属于正确拒绝 |
+| 摄像头列表为空 | V4L2枚举、权限、设备占用 | 检查`id`、`/dev/video*`和打开进程 |
+| 页面卡顿 | 是否仍有双路轮询、输入分辨率、MJPG | 使用单路检测预览，先选320×240 |
+| 注册始终不完成 | 手数量、掌侧、ROI质量、亮度 | 只保留一只手，检查拒绝统计 |
+| 掌侧与选择不一致 | 检测类别和人工选择 | 该帧拒绝；调整姿态或更换检测模型 |
+| 模板检索为空 | namespace、ROI管线、光谱、模型ID | 注册与识别必须使用同一合同 |
+| 模板损坏 | `.pstore.bak`与`.pstore.previous` | 停止服务，备份后恢复；不要手工伪造模板 |
+| `Health: Alarm` | 设备状态与具体调用结果 | 记录温度和健康，不单独判定模型失败 |
 
-| 项目 | 结果 |
-| --- | --- |
-| `/api/health` | `status=ok`、`runtime_importable=true`、`model_ready=true`、`admitted_model_ids=["ccnet"]` |
-| 模型资产 | ONNX 与 OM 的字节数和 SHA-256 均匹配 |
-| `/dev/video0` 取帧 | HTTP 200，50 348 字节 JPEG，1280×720，0.46 s |
-| `/dev/video2` 取帧 | HTTP 503，`returned no frame` |
-| 识别链路 | ROI 29.70 ms、预处理 3.30 ms、模型 45.85 ms、检索 0.90 ms |
-| NPU 显存 | 推理前 2039 MB，推理后 3302 MB |
+## 调试帧和隐私 {#src-experiment-case4-privacy}
 
-识别请求返回 `outcome=no_templates`：模板库为空，因此链路走通但没有可匹配对象，不能记录为身份匹配成功。
-
-**证据等级**：摄像头枚举、取帧、健康检查、模型加载、ROI 与 NPU 推理计时的结果为 `observed-pass`；`/dev/video2`、`/dev/video3` 取帧失败为 `observed-fail`。
-**本轮未验证**：模板注册与身份匹配、EER/Rank-1 等识别指标、长时间稳定性、硬件触发与补光。
-
-## 版本冻结
-
-人工测试期间不升级 Python、依赖、驱动、CANN 或应用版本。发现问题时停止当前模型、记录复现步骤、回退 CCNet，并在人工测试结束后单独规划下一版本。人工测试通过后，再更新准入证据、release manifest、版本号和完整验收记录。
-
-## 全候选模型测试
-
-工作台运行通道只保留六个已有 OM 且契约可验证的 NPU embedding。候选清单仍保留完整 28 项审计记录；其余 22 个分类器、ROI、掌静脉、EDCC、SDK 或缺少可复现资产的项目已从 API/UI 候选矩阵归档，不会被服务加载，也不能被强制转换成掌纹 512 维 embedding。
-
-在源码环境中执行静态审计：
-
-```bash
-python -m tools.offline.candidate_campaign inventory --all
-python -m tools.offline.candidate_campaign local --all
-python -m tools.offline.candidate_campaign report --all
-```
-
-当前板端地址是 `192.168.8.178`。在板端激活 conda/CANN 后，对已有 OM 的候选逐一执行：
+连续摄像头画面默认不保存。确认需要排查时，可以在启动前显式开启有限调试捕获：
 
 ```bash
-python tools/board/collect_npu_trace.py --label <candidate-id> --interval 1 -- \
-  python -m tools.offline.candidate_campaign board \
-  --candidate <candidate-id> --image <roi-image>
-python tools/board/acl_lifecycle_probe.py --model <candidate-id> \
-  --image <roi-image> --cycles 10
+export PALMPRINT_DETECTOR_DEBUG_CAPTURE=1
+export PALMPRINT_DETECTOR_DEBUG_CAPTURE_MAX_FRAMES=60
+export PALMPRINT_DETECTOR_DEBUG_CAPTURE_MIN_INTERVAL_SECONDS=0.8
 ```
 
-每项记录来源 revision、许可、资产字节数/SHA、输入输出契约、实际 backend、耗时、退出码、温度、功耗、内存、大页、dmesg 和生命周期。`139`、`err_ret=-512`、设备 reset、LPM/AICore/RAS 增量或清理失败会阻断该项；缺权重、不可复现来源或闭源 SDK 则记录为 `blocked_*` 或 `not_applicable`，不是“测试通过”。完整日志留在板端私有目录，源码只提交脱敏状态和哈希。
+调试帧只保存在发行目录的`reports/debug/detector/`，每种服务进程独立运行目录，包含原始整帧、带框预览和JSON分数。达到上限后停止写入。排查结束必须关闭服务并以默认环境重启，不设置该变量。
+
+真实掌纹、姓名、embedding、模板和摄像头原图不能进入Git、课件截图或公开报告。课堂演示使用合成或匿名素材。删除模板和图片由操作者在确认服务已停止后执行，不使用通配符删除整个用户目录。
+
+## 分步实验 {#src-experiment-case4-guided-labs}
+
+### 实验一：验证模型选择确实切换了runner {#src-experiment-case4-lab-detector-selection}
+
+分别请求NanoDet和两份PicoDet。记录响应`detector_id`、输入分辨率、检测耗时和框数量。观察三个模型首次加载与后续调用的差异。预期响应中的`detector_id`与请求一致，模型之间不会共用错误解码器。
+
+### 实验二：比较多帧下的掌侧稳定性 {#src-experiment-case4-lab-handedness}
+
+保持同一只手掌，在掌心正对、轻微旋转、距离变化和边缘位置分别采集帧。记录每帧左右类最高分和最终标签。不要因为单帧正确就宣布掌侧稳定，也不要通过固定交换标签掩盖问题。注册路径必须继续拒绝不一致帧。
+
+### 实验三：验证模板隔离 {#src-experiment-case4-lab-template-isolation}
+
+为同一匿名人员注册左掌和右掌。检查稳定ID分别为`:left`和`:right`，样本不互相覆盖。再切换特征模型，确认旧模型模板不会出现在新namespace。
+
+### 实验四：比较分辨率与刷新率 {#src-experiment-case4-lab-resolution}
+
+在320×240、640×480和1280×720下各运行10秒。记录检测次数、平均耗时、预览字节和框位置。解释为什么NPU推理只有约20毫秒，端到端却需要数百毫秒。
+
+### 实验五：制造并修复一个失败 {#src-experiment-case4-lab-failure}
+
+故意使用错误SHA的检测OM，或把不存在的detector_id写入请求。记录失败层级、HTTP状态和日志。修复后重新运行同一请求，确认错误消失；不要用降低阈值或修改前端文字掩盖失败。
+
+## 迁移任务 {#src-experiment-case4-transfer}
+
+1. 增加一份新的检测模型清单项，但保持上层ROI和CCNet不变。说明需要补充哪些预处理、解码和测试。
+2. 为红外摄像头建立独立光谱合同，证明可见光模板不会被错误复用。
+3. 增加一个只读的检测模型状态页，显示资产ready、实际输入shape和最近一次检测耗时。
+4. 在不改变身份阈值的前提下，将实时检测轮询改成后台共享取流，测量页面刷新率和CPU占用。
+5. 设计一个小型匿名评价集，分别报告检测IoU、左右掌一致率、ROI拒绝率和特征EER，不合并成单一“准确率”。
+
+## 小结 {#src-experiment-case4-summary}
+
+掌纹识别不是一次分类请求，而是检测、ROI、embedding、模板和任务质量组成的链路。当前工作台把检测模型选择与特征模型选择拆开，使用NPU-only运行时，严格核对注册掌侧，并在实时页通过单路取流降低C922竞争。
+
+最重要的工程习惯是逐层保留证据：模型文件哈希、输入输出合同、ACL返回、检测框、ROI质量、模板namespace、HTTP响应和人工观察不能互相替代。只有把这些层次分开，模型替换和故障定位才不会变成“页面看起来能动就算成功”。
+
+## 进一步阅读 {#src-experiment-case4-further-reading}
+
+- [NanoDet仓库](https://github.com/RangiLyu/nanodet)
+- [PicoDet论文](https://arxiv.org/abs/2111.00902)
+- [ONNX Resize算子文档](https://onnx.ai/onnx/operators/onnx__Resize.html)
+- [OpenCV Video I/O](https://docs.opencv.org/4.x/dd/d43/tutorial_py_video_display.html)
+- [V4L2 userspace API](https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/v4l2.html)

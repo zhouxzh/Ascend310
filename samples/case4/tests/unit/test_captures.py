@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,9 +10,10 @@ import importlib.util
 import numpy as np
 
 if importlib.util.find_spec("cv2") is not None:
-    from palmprint_workbench.domain.captures import CaptureStore
+    from palmprint_workbench.domain.captures import CaptureStore, DetectorDebugCaptureStore
 else:  # pragma: no cover - local controller without OpenCV
     CaptureStore = None  # type: ignore[assignment,misc]
+    DetectorDebugCaptureStore = None  # type: ignore[assignment,misc]
 
 
 @unittest.skipUnless(CaptureStore is not None, "OpenCV is required for image archive tests")
@@ -46,6 +48,72 @@ class CaptureStoreTests(unittest.TestCase):
             self.assertTrue(store.path_for(record["capture_id"], "original").is_file())
             with self.assertRaises(FileNotFoundError):
                 store.path_for(record["capture_id"], "roi")
+
+    def test_multi_hand_capture_writes_one_original_and_indexed_rois(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = CaptureStore(Path(directory))
+            record = store.save_multi(original=self._image(), rois={1: self._image(80), 3: self._image(120)}, metadata={"purpose": "recognition"})
+            folder = Path(directory) / record["capture_id"]
+            self.assertTrue((folder / "original.jpg").is_file())
+            self.assertTrue((folder / "roi_001.png").is_file())
+            self.assertTrue((folder / "roi_003.png").is_file())
+            self.assertEqual(len(list(folder.glob("original*.jpg"))), 1)
+            self.assertEqual(set(store.get(record["capture_id"])["roi_paths"]), {"1", "3"})
+
+    def test_detector_debug_archive_is_disabled_without_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "reports" / "debug" / "detector"
+            archive = DetectorDebugCaptureStore(
+                root, enabled=False, max_frames=2, min_interval_seconds=0.0
+            )
+            result = archive.maybe_save(
+                image_rgb=self._image(),
+                device="/dev/video2",
+                requested_resolution="640x480",
+                detections=[],
+                detection_ms=20.0,
+            )
+            self.assertFalse(result["saved"])
+            self.assertEqual(result["reason"], "disabled")
+            self.assertFalse(root.exists())
+
+    def test_detector_debug_archive_writes_bounded_raw_overlay_and_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "reports" / "debug" / "detector"
+            archive = DetectorDebugCaptureStore(
+                root, enabled=True, max_frames=1, min_interval_seconds=0.0
+            )
+            result = archive.maybe_save(
+                image_rgb=self._image(),
+                device="/dev/video2",
+                requested_resolution="640x480",
+                detections=[{
+                    "index": 1,
+                    "bbox_xyxy": [2.0, 3.0, 20.0, 24.0],
+                    "detection_score": 0.87,
+                    "detected_palm_side": "left",
+                }],
+                detection_ms=20.0,
+                detector_debug={"classes": [{"palm_side": "left", "max_score": 0.87}]},
+            )
+            self.assertTrue(result["saved"])
+            self.assertEqual(result["stored_frames"], 1)
+            run_dir = root / result["run_id"]
+            self.assertTrue((run_dir / "frame-0001.jpg").is_file())
+            self.assertTrue((run_dir / "frame-0001-overlay.jpg").is_file())
+            metadata = json.loads((run_dir / "frame-0001.json").read_text(encoding="utf-8"))
+            self.assertEqual(metadata["device"], "/dev/video2")
+            self.assertEqual(metadata["detections"][0]["detected_palm_side"], "left")
+            self.assertEqual(metadata["detector_debug"]["classes"][0]["max_score"], 0.87)
+            limited = archive.maybe_save(
+                image_rgb=self._image(90),
+                device="/dev/video2",
+                requested_resolution="640x480",
+                detections=[],
+                detection_ms=21.0,
+            )
+            self.assertFalse(limited["saved"])
+            self.assertEqual(limited["reason"], "frame_limit_reached")
 
     def test_concurrent_saves_do_not_overwrite_records(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

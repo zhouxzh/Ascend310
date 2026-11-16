@@ -1,6 +1,5 @@
 import { Camera, ImagePlus, ScanLine } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { RoiGuideConfig } from "../lib/types";
 import { Button, cx } from "./ui";
 
 interface ImageStageProps {
@@ -8,12 +7,14 @@ interface ImageStageProps {
   title: string;
   description: string;
   active?: boolean;
+  error?: boolean;
   onUpload?: () => void;
   onCamera?: () => void;
   className?: string;
   objectFit?: "contain" | "cover";
-  guide?: boolean;
-  guideConfig?: RoiGuideConfig;
+  boxes?: Array<{index: number; bboxXyxy?: [number, number, number, number]; detectedPalmSide?: string; palmSide?: string}>;
+  countdown?: number;
+  palmSideLabel?: string;
 }
 
 export function ImageStage({
@@ -21,12 +22,14 @@ export function ImageStage({
   title,
   description,
   active = false,
+  error = false,
   onUpload,
   onCamera,
   className,
   objectFit = "contain",
-  guide = false,
-  guideConfig = {center_x: 0.5, center_y: 0.5, side_ratio: 0.9},
+  boxes = [],
+  countdown,
+  palmSideLabel,
 }: ImageStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({width: 0, height: 0});
@@ -38,15 +41,10 @@ export function ImageStage({
     return () => observer.disconnect();
   }, []);
   const scale = Math.min(stageSize.width / (imageSize.width || 1), stageSize.height / (imageSize.height || 1));
-  const side = Math.min(imageSize.width, imageSize.height) * guideConfig.side_ratio * scale;
-  const guideStyle = {
-    width: side,
-    height: side,
-    left: (stageSize.width - imageSize.width * scale) / 2 + imageSize.width * scale * guideConfig.center_x,
-    top: (stageSize.height - imageSize.height * scale) / 2 + imageSize.height * scale * guideConfig.center_y,
-  };
+  const imageLeft = (stageSize.width - imageSize.width * scale) / 2;
+  const imageTop = (stageSize.height - imageSize.height * scale) / 2;
   return (
-    <div ref={stageRef} className={cx("image-stage", !imageUrl && "image-stage--empty-state", active && "image-stage--active", className)}>
+    <div ref={stageRef} style={{aspectRatio: imageSize.width && imageSize.height ? `${imageSize.width} / ${imageSize.height}` : "16 / 9"}} className={cx("image-stage", !imageUrl && "image-stage--empty-state", active && "image-stage--active", className)}>
       {imageUrl ? (
         <img src={imageUrl} alt={title} onLoad={(event) => {const image = event.currentTarget; setImageSize({width: image.naturalWidth, height: image.naturalHeight});}} className={`image-stage__image image-stage__image--${objectFit}`} />
       ) : (
@@ -62,8 +60,16 @@ export function ImageStage({
           )}
         </div>
       )}
-      {guide && imageSize.width > 0 ? <div style={guideStyle} className="image-stage__guide" aria-hidden="true"><span>掌心放入此框</span></div> : null}
-      <div className="image-stage__overlay image-stage__overlay--top"><span>{active ? "实时帧" : "输入画面"}</span><span className={active ? "live-dot" : ""}>{active ? "LIVE" : "READY"}</span></div>
+      {imageSize.width > 0 && boxes.map((box) => box.bboxXyxy ? <div
+        key={box.index}
+        className={cx("image-stage__box", (box.detectedPalmSide || box.palmSide) === "right" && "image-stage__box--right")}
+        style={{left: imageLeft + box.bboxXyxy[0] * scale, top: imageTop + box.bboxXyxy[1] * scale,
+          width: (box.bboxXyxy[2] - box.bboxXyxy[0]) * scale,
+          height: (box.bboxXyxy[3] - box.bboxXyxy[1]) * scale}}
+        aria-label={`${(box.detectedPalmSide || box.palmSide) === "right" ? "右掌" : (box.detectedPalmSide || box.palmSide) === "left" ? "左掌" : "手掌"} ${box.index}`}
+      ><span>{(box.detectedPalmSide || box.palmSide) === "right" ? "右" : (box.detectedPalmSide || box.palmSide) === "left" ? "左" : box.index}</span></div> : null)}
+      {countdown !== undefined && countdown > 0 ? <div className="image-stage__countdown" role="status" aria-label={`采集倒计时 ${countdown} 秒`}>{countdown}</div> : null}
+      <div className="image-stage__overlay image-stage__overlay--top"><span>{palmSideLabel || (active ? "实时帧" : "输入画面")}</span><span className={error ? "stage-error" : active ? "live-dot" : ""}>{error ? "ERROR" : active ? "LIVE" : "READY"}</span></div>
       <div className="image-stage__overlay image-stage__overlay--bottom"><span>128 × 128 ROI</span><span>质量检查</span></div>
     </div>
   );

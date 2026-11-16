@@ -6,6 +6,7 @@ import type {
   CandidateRunResult,
   CameraDevice,
   DatasetOption,
+  DetectorOption,
   EnrollmentSession,
   EvaluationRequest,
   EvaluationTask,
@@ -141,6 +142,24 @@ const normalizeModel = (value: unknown): ModelOption => {
   };
 };
 
+const normalizeDetector = (value: unknown): DetectorOption => {
+  const item = asRecord(value);
+  return {
+    id: stringValue(item.id, "unknown"),
+    displayName: stringValue(item.display_name || item.displayName, "未命名检测模型"),
+    family: stringValue(item.family),
+    status: stringValue(item.status),
+    available: boolValue(item.available),
+    reason: stringValue(item.reason) || undefined,
+    inputShape: list(item, "input_shape").map(numberValue),
+    scoreThreshold: item.score_threshold === undefined ? undefined : numberValue(item.score_threshold),
+    notice: stringValue(item.notice) || undefined,
+    taskMap: item.task_mAP50_95 === undefined ? undefined : numberValue(item.task_mAP50_95),
+    rawNumericalGateOk: item.raw_numerical_gate_ok === undefined
+      ? undefined : boolValue(item.raw_numerical_gate_ok),
+  };
+};
+
 const normalizeCandidate = (value: unknown): CandidateOption => {
   const item = asRecord(value);
   const metrics = asRecord(item.metrics);
@@ -255,7 +274,7 @@ const normalizeCamera = (value: unknown): CameraDevice => {
   };
 };
 
-const normalizeRecognition = (value: unknown): RecognitionResult => {
+const normalizeRecognitionHand = (value: unknown): RecognitionResult["hands"][number] => {
   const item = payload(value);
   const matches = list(item, "matches", "top_k").map((entry): MatchItem => {
     const match = asRecord(entry);
@@ -286,8 +305,13 @@ const normalizeRecognition = (value: unknown): RecognitionResult => {
     status: stringValue(item.status || item.message, "等待识别"),
     previewUrl: urlForImage(item.preview_url || item.preview),
     roiUrl: urlForImage(item.roi_url || item.roi),
-    quality: qualitySource as RecognitionResult["quality"],
-    geometry: asRecord(item.geometry) as RecognitionResult["geometry"],
+    quality: qualitySource as RecognitionResult["hands"][number]["quality"],
+    geometry: asRecord(item.geometry) as RecognitionResult["hands"][number]["geometry"],
+    index: numberValue(item.index),
+    bboxXyxy: Array.isArray(item.bbox_xyxy) && item.bbox_xyxy.length === 4
+      ? item.bbox_xyxy.map(numberValue) as [number, number, number, number] : undefined,
+    detectionScore: item.detection_score === null || item.detection_score === undefined ? undefined : numberValue(item.detection_score),
+    detectedPalmSide: stringValue(item.detected_palm_side) || undefined,
     roiPipelineId: stringValue(item.roi_pipeline_id) || undefined,
     templateSummary: Object.keys(templateSummary).length ? {
       palmCount: numberValue(templateSummary.palm_count),
@@ -300,6 +324,21 @@ const normalizeRecognition = (value: unknown): RecognitionResult => {
     timing: Object.fromEntries(
       Object.entries(timingSource).map(([key, timing]) => [key, numberValue(timing)]),
     ),
+  };
+};
+
+const normalizeRecognition = (value: unknown): RecognitionResult => {
+  const item = payload(value);
+  return {
+    status: stringValue(item.status),
+    detectorId: stringValue(item.detector_id) || undefined,
+    captureResolution: stringValue(item.capture_resolution) || undefined,
+    previewResolution: stringValue(item.preview_resolution) || undefined,
+    detectionCount: numberValue(item.detection_count),
+    hands: list(item, "hands").map(normalizeRecognitionHand),
+    previewUrl: urlForImage(item.preview_url),
+    roiPipelineId: stringValue(item.roi_pipeline_id) || undefined,
+    timing: Object.fromEntries(Object.entries(asRecord(item.timing)).map(([key, timing]) => [key, numberValue(timing)])),
   };
 };
 
@@ -316,6 +355,14 @@ const normalizeSession = (value: unknown): EnrollmentSession => {
     personId: stringValue(item.person_id) || undefined,
     displayName: stringValue(item.display_name) || undefined,
     palmSide: stringValue(item.palm_side) || undefined,
+    palmSideVerification: stringValue(item.palm_side_verification) || undefined,
+    countdownRemaining: numberValue(item.countdown_remaining),
+    detectionBoxes: list(item, "detection_boxes").map((entry) => {
+      const box = asRecord(entry);
+      return {index: numberValue(box.index), bboxXyxy: Array.isArray(box.bbox_xyxy) && box.bbox_xyxy.length === 4
+        ? box.bbox_xyxy.map(numberValue) as [number, number, number, number] : undefined,
+        detectedPalmSide: stringValue(box.detected_palm_side) || undefined};
+    }),
     samples: sampleSource.map((sample, index) => {
       const record = asRecord(sample);
       return {
@@ -408,10 +455,12 @@ export const api = {
     return {
       appVersion: stringValue(item.app_version || item.version) || undefined,
       models: list(item, "models").map(normalizeModel),
+      detectors: list(item, "detectors").map(normalizeDetector),
       datasets: list(item, "datasets").map(normalizeDataset),
       candidates: list(item, "candidates").map(normalizeCandidate),
       defaults: {
         modelId: stringValue(defaults.model_id || defaults.modelId),
+        detectorId: stringValue(defaults.detector_id || defaults.detectorId),
         backend: "npu",
         precision: stringValue(defaults.precision, "mixed_fp16") as PrecisionId,
         threshold: numberValue(defaults.threshold, 0.75),
@@ -486,6 +535,7 @@ export const api = {
     const form = new FormData();
     form.append("image", file, file.name || "palm-image.png");
     form.append("model_id", config.modelId);
+    form.append("detector_id", config.detectorId);
     form.append("backend", config.backend);
     form.append("precision", config.precision);
     form.append("threshold", String(config.threshold));
@@ -493,10 +543,20 @@ export const api = {
     return normalizeRecognition(await request<unknown>("/api/recognitions", { method: "POST", body: form }));
   },
 
+  async detectCamera(device: string, resolution: string, detectorId: string): Promise<RecognitionResult> {
+    return normalizeRecognition(await json<unknown>(
+      `/api/cameras/${encodeURIComponent(device)}/detections`, "POST", {
+        resolution,
+        detector_id: detectorId,
+      },
+    ));
+  },
+
   async recognizeCamera(device: string, resolution: string, config: RecognitionConfig): Promise<RecognitionResult> {
     return normalizeRecognition(
       await json<unknown>(`/api/cameras/${encodeURIComponent(device)}/recognitions`, "POST", {
         model_id: config.modelId,
+        detector_id: config.detectorId,
         backend: config.backend,
         precision: config.precision,
         threshold: config.threshold,
@@ -528,6 +588,7 @@ export const api = {
     return normalizeSession(
       await json<unknown>("/api/enrollment-sessions", "POST", {
         model_id: config.modelId,
+        detector_id: config.detectorId,
         backend: config.backend,
         precision: config.precision,
         // Automatic enrollment always starts from full camera frames.
@@ -538,15 +599,6 @@ export const api = {
         mode: identity.mode,
       }),
     );
-  },
-
-  async roiGuide(device: string, resolution: string): Promise<{center_x: number; center_y: number; side_ratio: number}> {
-    const item = payload(await json<unknown>(`/api/cameras/${encodeURIComponent(device)}/roi-guide?resolution=${encodeURIComponent(resolution)}`));
-    return asRecord(item.config) as {center_x: number; center_y: number; side_ratio: number};
-  },
-
-  async saveRoiGuide(device: string, resolution: string, config: {center_x: number; center_y: number; side_ratio: number}): Promise<void> {
-    await json<unknown>(`/api/cameras/${encodeURIComponent(device)}/roi-guide?resolution=${encodeURIComponent(resolution)}`, "PUT", config);
   },
 
   async enrollmentSession(sessionId: string): Promise<EnrollmentSession> {

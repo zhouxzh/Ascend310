@@ -69,6 +69,38 @@ class TemplateStoreTests(unittest.TestCase):
             self.assertEqual([item["samples"] for item in users], [5, 5])
             self.assertEqual(store.summary("ccnet__npu__mixed_fp16")["person_count"], 1)
 
+    def test_search_filters_detected_palm_side(self) -> None:
+        class IdentityAdapter:
+            def compare(self, query, codes):
+                return np.asarray(codes, dtype=np.float32) @ np.asarray(query, dtype=np.float32)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = TemplateStore(Path(directory))
+            namespace = "ccnet__npu__mixed_fp16"
+            common = {
+                "roi_pipeline_id": "nanodet_palm_bbox_v1",
+                "modality": "palmprint",
+                "spectrum": "visible",
+            }
+            store.replace_palm(
+                namespace, [np.array([1.0, 0.0], dtype=np.float32)],
+                person_id="P-001", display_name="Alice", palm_side="left", **common,
+            )
+            store.replace_palm(
+                namespace, [np.array([0.0, 1.0], dtype=np.float32)],
+                person_id="P-001", display_name="Alice", palm_side="right", **common,
+            )
+            adapter = IdentityAdapter()
+            query = np.array([1.0, 0.0], dtype=np.float32)
+            left = store.search(namespace, adapter, query, threshold=0.5, palm_side="left")
+            right = store.search(namespace, adapter, query, threshold=0.5, palm_side="right")
+            self.assertEqual(left["palm_side"], "left")
+            self.assertEqual([item["palm_side"] for item in left["matches"]], ["left"])
+            self.assertEqual(right["matches"][0]["palm_side"], "right")
+            self.assertFalse(right["accepted"])
+            with self.assertRaisesRegex(ValueError, "palm_side"):
+                store.search(namespace, adapter, query, threshold=0.5, palm_side="unknown")
+
     def test_invalid_replacement_keeps_old_generation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = TemplateStore(Path(directory))

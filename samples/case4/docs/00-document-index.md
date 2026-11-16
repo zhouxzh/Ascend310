@@ -18,7 +18,10 @@
 | [14 - 左右掌NanoDet五精度比较](14-handed-nanodet-five-precision-20261115.md) | seed43双类别模型的五模式ATC、最大/平均误差、逐样本框对照、统一计时和完整结果记录 |
 | [15 - 左右掌NanoDet完整test集的CUDA与8T OM对比](15-handed-nanodet-fulltest-8t-20261115.md) | ACE2 CUDA ONNX与8T四份成功OM在1600张held-out图上的数值、框定位、AP和左右掌任务指标；20T按用户要求未运行 |
 | [16 - 左右掌NanoDet FPN边界数值定位](16-handed-nanodet-fpn-boundary-diagnosis-20261115.md) | 8T中间层探针定位到第一次FPN双线性Resize后的首个显著误差边界；独立Resize验证待板空闲后执行 |
+| [17 - 左右掌检测器接入工作台](17-handed-detector-workbench-20261116.md) | 将`plus-m-320`双类别OM接入工作台检测、注册核对和画面标注；ATC结束后再部署到有摄像头的8T板 |
+| [18 - 左右掌NanoDet批量ATC与mAP](18-nanodet-sweep-atc-map-20261116.md) | ACE2 ONNX参考、8T与20T `allow_mix_precision` OM转换及1600张test集任务指标 |
 | [19 - PicoDet XS左右掌ONNX与310B部署测试](19-picodet-xs-atc-map-20261116.md) | 两份训练PicoDet的ONNX导出、ACE2参考、8T/20T ATC、OM备份、mAP与原始数值门 |
+| [20 - 手掌检测模型前端选择](20-palm-detector-selection-20261116.md) | NanoDet与两份PicoDet OM的选择契约、精度边界和8T切换验证 |
 | `reports/candidates/`（板端/本地忽略目录） | 28 项候选的分任务测试报告和最新状态索引；运行时只暴露 6 项 active candidate |
 | [evidence/README](evidence/README.md) | 可随源码发布的脱敏证据边界 |
 | [合成 ROI API 冒烟摘要](evidence/manual-test-smoke-20260818.md) | 六模型接口/模板/重启预检；不替代触摸屏和摄像头验收 |

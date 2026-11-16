@@ -38,6 +38,7 @@ reports/system/
 reports/candidates/
 third_party/
 artifacts/
+tmp/
 data/templates/
 data/templates/*
 data/captures/

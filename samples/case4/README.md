@@ -2,7 +2,7 @@
 
 这是一个运行在 Ascend 310B 系列开发板上的 React + FastAPI 掌纹识别工作台。实现按实际 SoC、算力档位和摄像头光谱建立独立运行合同；8T可见光与20T红外是两套独立证据集，其他310B型号必须先完成对应的模型、摄像头、模板和阈值验收。本文只说明源码构建、手动部署、启动和日常操作；模型评测、转换、故障和验收证据从 [`docs/00-document-index.md`](docs/00-document-index.md) 开始阅读。
 
-在线接口固定使用 NPU `mixed_fp16` 推理。CPU 和 EDCC 只用于离线研究，不会出现在正式 API 或界面中。默认 `production` profile 使用 CCNet；人工测试阶段可显式设置 `PALMPRINT_PROFILE=manual_test`，在完成资产哈希校验后测试五个 CompNet。CompNet 会显示 `manual_test_pending`，不能把人工测试前的状态当作稳定验收通过。
+在线接口固定使用 NPU `mixed_fp16` 推理。CPU 和 EDCC 只用于离线研究，不会出现在正式 API 或界面中。整帧输入先由可在界面选择的手掌检测模型定位所有手掌，再逐框裁剪为灰度`128×128` ROI，交由CCNet逐掌检索。当前可选NanoDet-Plus M-320、PicoDet XS-320和PicoDet XS-416；检测输入固定按模型合同直接拉伸到方形输入；检测框会分别按原始宽高比例映射回画面。PicoDet标为实验模型，原始八输出数值门未通过，不能与已验收生产模型混同。检测框会标出左掌或右掌；注册时画面只能有一只手，且检测掌侧必须与人工选择的掌侧一致，否则该帧拒绝且不会写入模板。上传已裁好的ROI可显式选择单项输入。新管线的模板和阈值与旧固定框版本隔离，完成本机校准前只显示Top-K候选及分数。检测器目前属于`manual_test`，真实图像定位和完整链路未验收，不应视为生产准入。
 
 > **网络边界**：服务默认监听 `0.0.0.0`，只适用于隔离的受信局域网。项目不提供账号、TLS、模板多租户隔离或公网安全保证，禁止直接暴露到互联网。
 
@@ -23,7 +23,6 @@
 
 ```bash
 python -m compileall -q app.py palmprint_workbench tools
-python -m palmprint_workbench.tools.verify_assets --strict
 python -m pytest -ra tests
 cd frontend
 npm ci
@@ -32,7 +31,7 @@ npm run build
 cd ..
 ```
 
-`npm run build` 生成的 `frontend/dist` 由 FastAPI 直接托管。构建完成后可用下面的命令检查静态文件：
+检测 OM 不在源码包中，本地无独立资产包时将严格模型校验留给板端执行。`npm run build` 生成的 `frontend/dist` 由 FastAPI 直接托管。构建完成后可用下面的命令检查静态文件：
 
 ```bash
 python -m tools.board.verify_frontend_assets --dist frontend/dist --strict
@@ -147,7 +146,8 @@ rsync -a --protect-args \
 ```bash
 cd "$RELEASE_ROOT"
 export PALMPRINT_ROOT="$RELEASE_ROOT"
-python -m palmprint_workbench.tools.verify_assets --strict
+export PALMPRINT_MODEL_ASSET_ROOT="/home/HwHiAiUser/Documents/Ascend310/assets/case4/models/$TIER/<verified-asset-id>"
+python -m palmprint_workbench.tools.verify_assets --model ccnet --strict
 export PALMPRINT_PROFILE=manual_test
 unset PALMPRINT_TEMPLATE_KEY_FILE
 unset PALMPRINT_TEMPLATE_DIR
@@ -211,8 +211,8 @@ python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
 
 ## 工作台操作
 
-- **实时识别**：production profile 选择 CCNet；manual_test profile 可逐一选择五个 CompNet，上传掌纹或选择摄像头，确认 ROI 质量后执行识别。页面中的 `manual_test_pending` 只表示等待人工验收。
-- **掌纹注册**：系统在开始采集时自动分配递增的人员编号，如 `P-000001`；显示名可选。左右掌分别是 `人员编号:left`、`人员编号:right`。完成一只掌后可直接登记同一人员的另一只掌，或开始下一位人员；自助模式自动采集并保存 5 张合格样本，管理员辅助模式可审阅、剔除并自动补满 5 张。
+- **实时识别**：上传整图或使用摄像头时，检测所有手掌并按从左到右编号；每只手分别显示 ROI 质量、状态、Top-K 候选和耗时。检测器故障会使整次请求失败；单只手 ROI 不合格不影响其他手。显式上传预裁 ROI 时按单项输入处理。
+- **掌纹注册**：画面必须只有一只手，多手帧会被拒绝。系统在开始采集时自动分配递增的人员编号，如 `P-000001`；显示名可选。左右掌分别是 `人员编号:left`、`人员编号:right`。完成一只掌后可直接登记同一人员的另一只掌，或开始下一位人员；自助模式自动采集并保存 5 张合格样本，管理员辅助模式可审阅、剔除并自动补满 5 张。
 - **实时识别**：未完成当前板卡、摄像头光谱和物理设备组合的阈值校准时，只显示Top-K候选与分数，不显示身份通过/未通过。可见光和红外必须分别校准；校准协议、命令和运行时匹配条件见 [`docs/06-visible-light-enrollment-and-calibration.md`](docs/06-visible-light-enrollment-and-calibration.md)。
 - **候选审计**：在线只读查看候选的任务类型、模态、权重、转换和 NPU 状态；候选评测仅在离线研究环境使用 `python -m tools.offline.benchmark` 执行。
 - **系统状态**：查看 API、CANN、PyACL、NPU 和摄像头状态。`Health: Alarm` 是诊断字段；具体的 ACL 崩溃、设备重置和资源释放错误仍需停止相关测试。

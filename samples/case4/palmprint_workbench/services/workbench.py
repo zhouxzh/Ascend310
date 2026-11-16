@@ -43,7 +43,14 @@ from ..domain.registry import ModelRegistry, ModelSpec
 from ..domain.admission import resolve_runtime_model
 from ..runtime.adapters import PalmAdapter, create_adapter, shutdown_acl_runtime
 from ..domain.datasets import audit_extracted, audit_palmmatchdb_zip, load_dataset_manifest, records
-from ..domain.preprocessing import PalmPreprocessor
+from ..domain.preprocessing import PalmPreprocessor, RoiResult
+from ..runtime.detector import (
+    PalmBox,
+    PalmDetector,
+    default_detector_id,
+    detector_catalog as detector_catalog_impl,
+    detector_spec,
+)
 from ..domain.captures import CaptureStore
 from ..domain.templates import TemplateStore
 
@@ -120,9 +127,11 @@ class Workbench:
         ensure_runtime_dirs()
         self.registry = ModelRegistry()
         self.preprocessor = PalmPreprocessor()
+        self.execution_lock = threading.RLock()
+        self.detectors: dict[str, PalmDetector] = {}
+        self.detector = self.detector_for(default_detector_id())
         self.store = TemplateStore(TEMPLATE_DIR)
         self.captures = CaptureStore(CAPTURE_DIR)
-        self.execution_lock = threading.RLock()
         self.adapters: dict[tuple[str, str, str, int], PalmAdapter] = {}
         self.camera_lock = threading.RLock()
         self.cameras: dict[tuple[str, int, int], CameraCapture] = {}
@@ -134,6 +143,14 @@ class Workbench:
         self._state_lock = threading.RLock()
         self._closing = False
         self.last_close_diagnostics: dict[str, Any] | None = None
+
+    def detector_for(self, model_id: str | None = None) -> PalmDetector:
+        """Resolve one detector without loading its OM until first inference."""
+        selected = str(model_id or default_detector_id())
+        with self.execution_lock:
+            if selected not in self.detectors:
+                self.detectors[selected] = PalmDetector(selected)
+            return self.detectors[selected]
 
     def adapter(
         self,
@@ -337,6 +354,20 @@ class Workbench:
         with self._state_lock:
             self._closing = True
         with self.execution_lock:
+            diagnostics["detector_close"] = []
+            for model_id, detector in list(self.detectors.items()):
+                try:
+                    detector.close()
+                    self.detectors.pop(model_id, None)
+                    diagnostics["detector_close"].append({"model_id": model_id, "ok": True})
+                except BaseException as exc:
+                    diagnostics["detector_close"].append({
+                        "model_id": model_id,
+                        "ok": False,
+                        "error": f"{type(exc).__name__}: {exc}",
+                    })
+                    errors.append(f"detector {model_id}: {type(exc).__name__}: {exc}")
+            self.detector = None
             adapters = list(self.adapters.items())
             for key, adapter in adapters:
                 try:
@@ -413,18 +444,50 @@ def _extract(
     image: np.ndarray | None,
     assume_roi: bool,
     *,
+    detector_id: str | None = None,
     background_rgb: np.ndarray | None = None,
     roi_config: dict[str, float] | None = None,
 ) -> tuple[Any, str | None]:
-    result = WORKBENCH.preprocessor.extract(
-        image,
-        assume_roi=assume_roi,
-        background_rgb=background_rgb,
-        roi_config=roi_config,
-    )
+    if assume_roi:
+        result = WORKBENCH.preprocessor.extract(image, assume_roi=True)
+    else:
+        boxes = detect_palms(image, detector_id=detector_id)
+        if len(boxes) != 1:
+            reason = "未检测到手掌" if not boxes else "检测到多只手，注册时请只保留一只手"
+            return RoiResult(False, reason=reason), reason
+        result = WORKBENCH.preprocessor.extract_box(image, boxes[0].xyxy)
+        result = replace(
+            result,
+            geometry={**result.geometry, "detected_palm_side": boxes[0].palm_side},
+        )
     if not result.ok or result.roi is None:
         return result, result.reason
     return result, None
+
+
+def detect_palms(image: np.ndarray, *, detector_id: str | None = None) -> list[PalmBox]:
+    detector = WORKBENCH.detector_for(detector_id)
+    with WORKBENCH.execution_lock:
+        return detector.detect(image)
+
+
+def detect_palms_with_debug(
+    image: np.ndarray, *, detector_id: str | None = None
+) -> tuple[list[PalmBox], dict[str, object]]:
+    """Run one selected detector with bounded raw class-score diagnostics."""
+    detector = WORKBENCH.detector_for(detector_id)
+    with WORKBENCH.execution_lock:
+        return detector.detect_with_debug(image)
+
+
+def detector_catalog() -> list[dict[str, Any]]:
+    """Expose the selectable detector catalog to the API boundary."""
+    return detector_catalog_impl()
+
+
+def resolve_detector_id(detector_id: str | None) -> str:
+    """Validate a requested detector id and return its canonical id."""
+    return detector_spec(detector_id).id
 
 
 def capture_board_camera(

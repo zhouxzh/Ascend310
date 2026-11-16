@@ -10,7 +10,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from palmprint_workbench.config import ROOT, manual_test_enabled
+from palmprint_workbench.config import MODEL_ASSET_ROOT, ROOT, manual_test_enabled
 
 from palmprint_workbench.domain.registry import ModelRegistry, ModelSpec
 
@@ -115,6 +115,31 @@ def add_size_result(result: dict[str, Any], path: Path, expected: Any) -> None:
     result["expected_bytes"] = expected
     if actual != expected:
         raise ValueError(f"Byte-size mismatch for {path}: expected {expected}, got {actual}")
+
+
+def validate_detector() -> list[dict[str, Any]]:
+    manifest = json.loads((ROOT / "detector_manifest.json").read_text(encoding="utf-8"))
+    if manifest.get("kind") != "palm_detector_catalog":
+        raise ValueError("Unsupported detector manifest")
+    root = MODEL_ASSET_ROOT.resolve()
+    results: list[dict[str, Any]] = []
+    for model in manifest.get("models", []):
+        if not isinstance(model, dict):
+            raise ValueError("Invalid detector model entry")
+        path = (root / str(model.get("path", ""))).resolve()
+        path.relative_to(root)
+        if not path.is_file():
+            raise FileNotFoundError(f"palm detector OM is missing: {path}")
+        result: dict[str, Any] = {
+            "model_id": model.get("id"),
+            "family": model.get("family"),
+            "asset": "detector_om",
+            "path": str(path),
+        }
+        add_size_result(result, path, model.get("bytes"))
+        add_hash_result(result, path, model.get("sha256"), True)
+        results.append(result)
+    return results
 
 
 def validate_embedding(
@@ -271,6 +296,11 @@ def main(argv: list[str] | None = None) -> int:
     hashes = conversion_hashes()
     output: dict[str, Any] = {"models": [], "datasets": []}
     failures: list[str] = []
+
+    try:
+        output["models"].extend(validate_detector())
+    except Exception as exc:
+        failures.append(f"palm detector: {exc}")
 
     for model_id in selected:
         try:
