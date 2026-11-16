@@ -1,5 +1,6 @@
 /**
- * Install both Ascend310 DSH plugins into a DSH profile from packed tarballs.
+ * Install the repository-local Ascend310 debug plugin into a DSH profile from a
+ * packed tarball. The writing plugin is maintained in `dsh-writing-suite`.
  *
  * Why not `dsh plugin add <folder>`? A folder install is a pnpm `link:`; Node
  * then resolves the plugin from its real path in this repository, where the
@@ -28,7 +29,6 @@ const profileIndex = args.indexOf('--profile');
 const profile = profileIndex >= 0 && args[profileIndex + 1] ? args[profileIndex + 1] : 'desktop';
 
 const pluginDirs = [
-	join(repoRoot, 'tools', 'dsh-plugin-ascend310b-writing'),
 	join(repoRoot, 'tools', 'dsh-plugin-ascend310b-debug')
 ];
 const dshHome = process.env.DSH_HOME ?? join(homedir(), '.dsh');
@@ -84,7 +84,7 @@ function runDsh(dshArgs, options = {}) {
 			'lib',
 			'cli.js'
 		);
-		if (existsSync(exe)) {
+		if (existsSync(exe) && existsSync(cli)) {
 			return spawnSync(exe, ['--expose-internals', cli, ...dshArgs], {
 				...options,
 				env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
@@ -159,6 +159,25 @@ function installedSpecifier(name) {
 		return profileManifest.dependencies?.[name] ?? '';
 	} catch {
 		return '';
+	}
+}
+
+/** Verify the package is active in the profile, not merely present on disk. */
+function activationError(name) {
+	try {
+		const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'));
+		const bundles = manifest?.dsh?.profile?.bundles;
+		if (!Array.isArray(bundles) || !bundles.includes(name)) {
+			return `未加入 dsh.profile.bundles：${name}`;
+		}
+		const patchPath = join(profileDir, 'cordis.patch.yml');
+		const patch = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : '';
+		const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+		const row = new RegExp(`^- id:\\s*${escaped}\\s*$[\\s\\S]{0,240}^\\s+name:\\s*${escaped}\\s*$[\\s\\S]{0,120}^\\s+config:\\s*$`, 'mu');
+		if (!row.test(patch)) return `profile 缺少 ${name} 的 config 行`;
+		return null;
+	} catch (error) {
+		return `无法验证 profile 激活状态：${String(error?.message ?? error)}`;
 	}
 }
 
@@ -246,6 +265,12 @@ for (const { dir, pkg } of plugins) {
 		failed = true;
 		continue;
 	}
+	const activation = activationError(pkg.name);
+	if (activation !== null) {
+		console.error(`  ${activation}`);
+		failed = true;
+		continue;
+	}
 	const installedRoot = join(profileDir, 'node_modules', pkg.name);
 	const missing = (installed.files ?? []).filter(
 		(entry) => !existsSync(join(installedRoot, entry))
@@ -269,9 +294,9 @@ for (const { dir, pkg } of plugins) {
 
 if (checkOnly) {
 	console.log(`\nDSH profile：${profileDir}`);
-	console.log(failed ? '插件安装不完整。' : '两个插件均已按 tarball 方式安装。');
+	console.log(failed ? '插件安装不完整。' : '调试插件已按 tarball 方式安装。');
 } else if (!failed) {
-	console.log('\n安装完成。重启 DSH，并在插件页确认两个插件已启用。');
+	console.log('\n安装完成。重启 DSH，并在插件页确认调试插件已启用；写作工具从 dsh-writing-suite 安装。');
 	console.log('项目级 skill 由仓库 .dsh/skills 自动加载，无需另装。');
 }
 process.exit(failed ? 1 : 0);

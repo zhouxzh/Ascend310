@@ -26,7 +26,7 @@ description: Debug camera capture on Ascend 310B1/310B4 boards by separating V4L
 3. **格式**：驱动报告的分辨率、像素格式、帧率和实际协商值一致。
 4. **采集**：能读到至少一帧非空图像，并记录实际宽高。
 5. **连续流**：连续读取时帧数、超时、帧率和丢帧可解释。
-6. **处理链**：只有采集稳定后，才接入 OpenCV、DVPP、编码或 NPU 推理。
+6. **处理链**：只有采集稳定后，才接入DVPP、编码或NPU推理。
 
 前一层失败时不要把原因归到 CANN 或模型。
 
@@ -53,34 +53,30 @@ lsusb
 
 优先使用插件工具 `ascend_camera_capture`：格式、分辨率和 FPS 来自板端 `v4l2-ctl -d <device> --list-formats-ext` 的实际输出，不使用猜测表。先 `dryRun: true` 核对设备与参数，再显式 `allowStateChange: true` 采集。工具固定使用`v4l2-ctl --stream-mmap`读取非空帧：MJPG直接保存相机输出的JPEG，不导入OpenCV、NumPy或FFmpeg；YUYV先验证实际原始帧字节数，再用Python标准库转换为RGB，最后仅用Pillow编码预览JPEG。产物位于`/tmp/ascend310b-debug/peripherals`，并返回实际尺寸、FourCC、采集后端、JPEG和SHA-256；亮度与清晰度统计不作为这一硬件采集工具的证据。采集失败时停在采集层，不进入DVPP/NPU结论。
 
-需要手工复现时，通过 `ascend_board_run` 显式执行，不要把它当成只读命令：
+需要手工复现时，通过 `ascend_board_run` 显式执行，不要把它当成只读命令。`/dev/videoN`必须来自本次`v4l2-ctl --list-devices`，不能写死：
 
 ```bash
-v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=/tmp/camera-frame.raw
+v4l2-ctl -d /dev/videoN --stream-mmap --stream-count=1 --stream-to=/tmp/camera-frame.raw
 ```
 
-更推荐先让驱动选择 MJPG 或 YUYV 的明确格式，再采集：
+更推荐先让驱动选择MJPG，再采集为浏览器可直接显示的JPEG：
 
 ```bash
-v4l2-ctl -d /dev/video0 --set-fmt-video=width=640,height=480,pixelformat=MJPG
-v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=/tmp/camera-frame.mjpg
+v4l2-ctl -d /dev/videoN --set-fmt-video=width=640,height=480,pixelformat=MJPG
+v4l2-ctl -d /dev/videoN --stream-mmap --stream-count=1 --stream-to=/tmp/camera-frame.jpg
 ```
 
-`--set-fmt-video` 会改变设备当前格式，必须得到用户的任务授权；记录命令、实际格式和输出文件，不要只记录“命令成功”。
+`--set-fmt-video`会改变设备当前格式，必须得到用户的任务授权；记录命令、实际格式和输出文件，不要只记录“命令成功”。
 
-Python/OpenCV 验收至少检查：
+## 前端显示
 
-```python
-import cv2
-cap = cv2.VideoCapture("/dev/video0")
-assert cap.isOpened()
-ok, frame = cap.read()
-assert ok and frame is not None
-print(frame.shape)
-cap.release()
-```
+DSH前端是浏览器，不需要OpenCV。摄像头采集成功后按下面的最小链路显示：
 
-`VideoCapture.isOpened()` 只证明初始化；`read()` 返回非空帧才是采集证据。记录后端、分辨率、帧率和输入管线。
+1. 板端优先选择MJPG，让`v4l2-ctl`直接输出JPEG。
+2. 插件路由以`image/jpeg`返回受限目录中的本次`camera-*.jpg`。
+3. 前端用原生`<img>`显示该URL，不引入OpenCV、NumPy或FFmpeg。
+
+当前插件已经采用这条路径。不要为了显示图片增加OpenCV采帧依赖。若设备只能输出YUYV，才使用已有的Pillow单帧转换兜底；能用MJPG时不应加载Pillow。
 
 ## 常见失败定位
 
@@ -105,5 +101,4 @@ cap.release()
 
 - Linux V4L2 userspace API: <https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/v4l2.html>
 - `v4l2-ctl` 手册: <https://manpages.debian.org/bookworm/v4l-utils/v4l2-ctl.1.en.html>
-- OpenCV `VideoCapture`: <https://docs.opencv.org/4.x/d8/dfe/classcv_1_1VideoCapture.html>
-- GStreamer `v4l2src`: <https://gstreamer.freedesktop.org/documentation/video4linux2/v4l2src.html>
+- V4L2 streaming I/O: <https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/streaming-io.html>

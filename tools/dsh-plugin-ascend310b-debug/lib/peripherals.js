@@ -194,7 +194,7 @@ def remove_failed_output(path):
 `;
 
 const CAMERA_SCRIPT = String.raw`
-import hashlib, json, os, re, subprocess, sys
+import hashlib, json, os, re, subprocess, sys, time
 ${OUTPUT_MAINTENANCE_SCRIPT}
 
 def jpeg_size(data):
@@ -254,40 +254,90 @@ def actual_format(device):
         raise RuntimeError("V4L2未返回实际像素格式")
     return int(size.group(1)), int(size.group(2)), fourcc
 
+def negotiated_fps(device):
+    proc = subprocess.run(["v4l2-ctl", "-d", device, "--get-parm"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
+    if proc.returncode != 0:
+        raise RuntimeError("无法读取V4L2实际帧率: " + proc.stderr[-2000:])
+    patterns = [
+        r"\((\d+(?:\.\d+)?)\s*fps\)",
+        r"Frames per second\s*:\s*(\d+(?:\.\d+)?)",
+        r"Time per frame\s*:\s*\d+(?:\.\d+)?s\s*\((\d+(?:\.\d+)?)\s*fps\)"
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, proc.stdout, re.IGNORECASE)
+        if match is not None:
+            value = float(match.group(1))
+            if value > 0:
+                return round(value, 3)
+    raise RuntimeError("V4L2未返回实际帧率")
+
+def complete_mjpeg_frames(stream, expected_count):
+    starts = [match.start() for match in re.finditer(b"\xff\xd8", stream)]
+    if len(starts) != expected_count:
+        raise RuntimeError(
+            "V4L2完整MJPG帧不足: 请求 " + str(expected_count) +
+            " 帧，检测到 " + str(len(starts)) + " 个JPEG起始标记，原始 " + str(len(stream)) + " 字节"
+        )
+    frames = []
+    for index, start in enumerate(starts):
+        boundary = starts[index + 1] if index + 1 < len(starts) else len(stream)
+        end = stream.rfind(b"\xff\xd9", start + 2, boundary)
+        if end < start:
+            raise RuntimeError(
+                "V4L2第 " + str(index + 1) + " 帧缺少JPEG结束标记，拒绝部分多帧采集"
+            )
+        frames.append(stream[start:end + 2])
+    return frames
+
 cfg = CONFIG
 raw_output = cfg["output"] + ".raw"
 try:
     cleanup_outputs(cfg["output"])
+    format_cmd = [
+        "v4l2-ctl", "-d", cfg["device"],
+        "--set-fmt-video=width=" + str(cfg["width"]) + ",height=" + str(cfg["height"]) + ",pixelformat=" + cfg["pixelFormat"]
+    ]
+    format_proc = subprocess.run(format_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
+    if format_proc.returncode != 0:
+        raise RuntimeError("V4L2格式设置失败: " + format_proc.stderr[-2000:])
+    parm_cmd = ["v4l2-ctl", "-d", cfg["device"], "--set-parm=" + str(cfg["fps"])]
+    parm_proc = subprocess.run(parm_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
+    if parm_proc.returncode != 0:
+        raise RuntimeError("V4L2帧率设置失败: " + parm_proc.stderr[-2000:])
+    actual_width, actual_height, fourcc = actual_format(cfg["device"])
+    actual_fps = negotiated_fps(cfg["device"])
+    if fourcc != cfg["pixelFormat"]:
+        raise RuntimeError("V4L2实际格式不匹配: 请求 " + cfg["pixelFormat"] + "，实际 " + fourcc)
     cmd = [
         "v4l2-ctl", "-d", cfg["device"],
-        "--set-fmt-video=width=" + str(cfg["width"]) + ",height=" + str(cfg["height"]) + ",pixelformat=" + cfg["pixelFormat"],
         "--stream-mmap", "--stream-count=" + str(cfg["frameCount"]),
         "--stream-to=" + raw_output
     ]
+    capture_started = time.monotonic()
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20)
+    capture_elapsed_sec = max(time.monotonic() - capture_started, 0.000001)
     if proc.returncode != 0:
         raise RuntimeError("V4L2采集失败: " + proc.stderr[-2000:])
-    actual_width, actual_height, fourcc = actual_format(cfg["device"])
-    if fourcc != cfg["pixelFormat"]:
-        raise RuntimeError("V4L2实际格式不匹配: 请求 " + cfg["pixelFormat"] + "，实际 " + fourcc)
     with open(raw_output, "rb") as fh:
         stream = fh.read()
     if fourcc == "MJPG":
-        end = stream.rfind(b"\xff\xd9")
-        start = stream.rfind(b"\xff\xd8", 0, end)
-        if start < 0 or end < start:
-            raise RuntimeError("V4L2未返回完整MJPG帧")
-        data = stream[start:end + 2]
-        actual_width, actual_height = jpeg_size(data)
+        frames = complete_mjpeg_frames(stream, cfg["frameCount"])
+        dimensions = [jpeg_size(frame) for frame in frames]
+        if any(size != (actual_width, actual_height) for size in dimensions):
+            raise RuntimeError("V4L2多帧JPEG尺寸与驱动实际格式不一致")
+        data = frames[-1]
         with open(cfg["output"], "wb") as fh:
             fh.write(data)
-        frame_ok = max(1, stream.count(b"\xff\xd8"))
+        frame_ok = len(frames)
         conversion_backend = "none"
     elif fourcc == "YUYV":
         expected_bytes = actual_width * actual_height * 2
-        frame_ok = len(stream) // expected_bytes
-        if frame_ok < 1:
-            raise RuntimeError("V4L2未返回完整YUYV帧: 期望至少 " + str(expected_bytes) + " 字节，实际 " + str(len(stream)) + " 字节")
+        expected_total = expected_bytes * cfg["frameCount"]
+        if len(stream) != expected_total:
+            raise RuntimeError(
+                "V4L2完整YUYV帧不足: 期望 " + str(expected_total) + " 字节（" +
+                str(cfg["frameCount"]) + " 帧），实际 " + str(len(stream)) + " 字节，拒绝部分多帧采集"
+            )
         raw_frame = stream[-expected_bytes:]
         try:
             from PIL import Image
@@ -300,6 +350,7 @@ try:
             data = fh.read()
         if data[:2] != b"\xff\xd8":
             raise RuntimeError("Pillow未生成有效JPEG")
+        frame_ok = cfg["frameCount"]
         conversion_backend = "Pillow"
     else:
         raise RuntimeError("只支持MJPG或YUYV实际格式，收到 " + fourcc)
@@ -315,7 +366,9 @@ try:
         "conversionBackend": conversion_backend,
         "actualWidth": actual_width,
         "actualHeight": actual_height,
+        "negotiatedFps": actual_fps,
         "actualFps": None,
+        "captureElapsedSec": round(capture_elapsed_sec, 3),
         "fourcc": fourcc,
         "frameCount": frame_ok,
         "readFailures": max(0, cfg["frameCount"] - frame_ok),

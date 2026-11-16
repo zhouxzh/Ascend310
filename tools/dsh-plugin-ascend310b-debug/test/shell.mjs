@@ -38,6 +38,7 @@ const ALLOWED = [
 	'ls -l /dev/davinci0',
 	'readlink -f /usr/local/Ascend/ascend-toolkit/latest',
 	'cat /usr/local/Ascend/ascend-toolkit/latest/version.cfg',
+	'cat "/sys/class/version"',
 	'grep -n runtime_running_version /usr/local/Ascend/ascend-toolkit/latest/version.cfg',
 	'head -n 40 /var/log/syslog',
 	'tail -n 40 /var/log/syslog',
@@ -101,6 +102,9 @@ const BLOCKED = [
 	'/usr/local/bin/npu-smi info',
 	'rm -rf /tmp/x',
 	'echo x > /tmp/y',
+	'cat /sys/../etc/passwd',
+	'head /proc/device-tree/../../../etc/passwd',
+	'ls /dev/../../etc',
 	''
 ];
 

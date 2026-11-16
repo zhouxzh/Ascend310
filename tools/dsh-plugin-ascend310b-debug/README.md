@@ -174,7 +174,7 @@ ascend_probe target=ascend-c0742bfddd7a
 
 ### Skill 安装
 
-插件 tarball 会携带当前版本的 14 个 310B skill，完整清单见 [`tools/README.md`](../README.md)。DSH 不会从已安装插件自动复制 skill。推荐在仓库根目录运行 `npm run skills:sync`，用 `npm run skills:check` 验证 `.dsh/skills/` 与两个插件源文件一致；如果需要用户级安装，可将本插件 `skills/` 目录复制到 `$DSH_HOME/skills/`：
+插件 tarball 会携带当前版本的 14 个 310B skill，完整清单见 [`tools/README.md`](../README.md)。DSH 不会从已安装插件自动复制 skill。推荐在仓库根目录运行 `npm run skills:sync`，用 `npm run skills:check` 验证 `.dsh/skills/` 与本插件及可用的外部 `dsh-writing-suite` 源文件一致；如果需要用户级安装，可将本插件 `skills/` 目录复制到 `$DSH_HOME/skills/`：
 
 ```powershell
 $plugin = "<教材仓库根目录>\tools\dsh-plugin-ascend310b-debug"
@@ -308,7 +308,7 @@ node scripts/render-panel-preview.mjs <探测记录文件> data/panel-preview.ht
 ## 依赖与端口
 
 - 主机：Node.js ≥ 18（仅用 `node:` 内置模块与 DSH 提供的 `@deepseek-ai/dsh-tools`）。串口自动发现/登录在 Windows 使用系统 `powershell.exe`；Linux/macOS 需要安装 PowerShell 7（`pwsh`），否则网络探测和只读工具仍可用，但串口发现会明确失败。
-- 板端：只要能 SSH，且具备 `npu-smi`/CANN/驱动；探测脚本用 `bash` 执行，全部只读。
+- 板端：探测需要SSH、`bash`、`npu-smi`、CANN和驱动。普通任务执行还需要`bubblewrap`，用只读根文件系统限制写入；缺少`bwrap`时任务会失败关闭。`sudo`系统管理任务必须显式设置`allowPrivileged:true`，与本机镜像不兼容user namespace的NPU/DVPP任务必须显式设置`allowUnsandboxed:true`；这两种选择都会离开文件系统沙箱，响应中会保留原始命令供审计。
 - 本机没有 NPU：本机只能做语法、解析与规划测试。**不要在本机运行 CANN/ATC/PyACL/OM/npu-smi/DVPP。**
 
 ## 探测环境差异：`shell-environment-only`

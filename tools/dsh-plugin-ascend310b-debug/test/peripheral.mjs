@@ -39,8 +39,11 @@ check('camera accepts the documented limits', () => {
 	const low = normalizeCameraOptions({ device: '/dev/video0', width: 160, height: 120, frameCount: 1 }, now);
 	const high = normalizeCameraOptions({ device: '/dev/video9', width: 1920, height: 1080, frameCount: 10 }, now);
 	assert.equal(low.pixelFormat, 'MJPG');
+	assert.equal(low.fps, 30);
 	assert.equal(high.frameCount, 10);
 	assert.ok(low.output.startsWith(`${PERIPHERAL_OUTPUT_ROOT}/camera-`));
+	const selected = normalizeCameraOptions({ device: '/dev/video2', fps: 7 }, now);
+	assert.equal(selected.fps, 7, 'selected camera FPS must reach the fixed command config');
 });
 
 check('camera rejects unsafe device and out-of-range values', () => {
@@ -96,8 +99,8 @@ check('output paths are fixed, timestamped and collision resistant', () => {
 	assert.throws(() => peripheralOutputPath('other', now));
 });
 
-check('camera command is fixed and valid', () => {
-	const command = buildCameraCommand(normalizeCameraOptions({ device: '/dev/video1', frameCount: 3 }, now));
+check('camera command applies FPS and reports negotiated and measured values', () => {
+	const command = buildCameraCommand(normalizeCameraOptions({ device: '/dev/video1', frameCount: 3, fps: 7 }, now));
 	assert.match(command, /^python -c '/u);
 	assert.doesNotMatch(command, /numpy\.core\.multiarray/u);
 	assert.doesNotMatch(command, /setattr\(_multiarray/u);
@@ -105,6 +108,12 @@ check('camera command is fixed and valid', () => {
 	assert.doesNotMatch(command, /ffmpeg/u);
 	assert.match(command, /v4l2-ctl/u);
 	assert.match(command, /stream-mmap/u);
+	assert.match(command, /--set-parm=/u);
+	assert.match(command, /--get-parm/u);
+	assert.match(command, /capture_started = time\.monotonic\(\)/u);
+	assert.match(command, /"negotiatedFps": actual_fps/u);
+	assert.match(command, /"actualFps": None/u);
+	assert.doesNotMatch(command, /frame_ok \/ capture_elapsed_sec/u);
 	assert.match(command, /def actual_format/u);
 	assert.match(command, /def yuyv_to_rgb/u);
 	assert.equal(command.includes('b"\\\\xff\\\\xd8"'), false, 'JPEG marker must be a Python byte escape, not a literal backslash sequence');
@@ -118,6 +127,17 @@ check('camera command is fixed and valid', () => {
 	assert.match(command, /captureBackend": "v4l2-mmap/u);
 	assert.equal(command.includes('base64'), false);
 	assert.equal(validateTaskCommand(command).ok, true);
+});
+
+check('camera multi-frame capture rejects partial raw and JPEG streams', () => {
+	const command = buildCameraCommand(normalizeCameraOptions({ device: '/dev/video1', frameCount: 3 }, now));
+	assert.match(command, /def complete_mjpeg_frames\(stream, expected_count\)/u);
+	assert.match(command, /len\(starts\) != expected_count/u);
+	assert.match(command, /缺少JPEG结束标记，拒绝部分多帧采集/u);
+	assert.match(command, /complete_mjpeg_frames\(stream, cfg\["frameCount"\]\)/u);
+	assert.match(command, /expected_total = expected_bytes \* cfg\["frameCount"\]/u);
+	assert.match(command, /len\(stream\) != expected_total/u);
+	assert.match(command, /拒绝部分多帧采集/u);
 });
 
 check('camera preview paths are strictly limited to generated JPEGs', () => {

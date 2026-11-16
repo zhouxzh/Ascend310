@@ -47,7 +47,10 @@ const MAX_HISTORY = 20;
 /** Discovery addresses are executable only while the observation is fresh. */
 export const EXECUTABLE_TARGET_MAX_AGE_MS = 15 * 60 * 1000;
 
-/** A synchronous inventory write cannot legitimately hold the lock this long. */
+/** Fixed workspace inherited by discovered SSH targets for controlled operations. */
+export const DISCOVERED_TARGET_WORKDIR = '/home/HwHiAiUser/Documents/Ascend310/workspaces';
+
+/** A synchronous inventory transaction cannot legitimately hold the lock this long. */
 const STALE_LOCK_MS = 30 * 1000;
 
 /**
@@ -114,6 +117,35 @@ function matchingBoardEntries(inventory, macs) {
 	});
 }
 
+/**
+ * Keep one physical board bound to at most one configured target.
+ *
+ * This protects against manually edited inventory files and older versions that
+ * accepted several bindings to the same discovered id. The first valid binding
+ * remains authoritative so reads and writes are deterministic.
+ */
+function normalizeBindings(value, boards = {}) {
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) return {};
+	const boardValues = boards !== null && typeof boards === 'object' && !Array.isArray(boards)
+		? Object.values(boards)
+		: [];
+	const knownBoards = new Set(
+		boardValues
+			.map((board) => (typeof board?.id === 'string' ? board.id : null))
+			.filter(Boolean)
+	);
+	const bindings = Object.create(null);
+	const claimedBoards = new Set();
+	for (const [configuredId, discoveredId] of Object.entries(value)) {
+		if (typeof configuredId !== 'string' || configuredId.trim() === '') continue;
+		if (typeof discoveredId !== 'string' || discoveredId.trim() === '') continue;
+		if (!knownBoards.has(discoveredId) || claimedBoards.has(discoveredId)) continue;
+		claimedBoards.add(discoveredId);
+		bindings[configuredId] = discoveredId;
+	}
+	return bindings;
+}
+
 /** Read the inventory, falling back to the recoverable Windows backup. */
 export function readInventory(path) {
 	for (const candidate of [path, `${path}.bak`]) {
@@ -123,32 +155,33 @@ export function readInventory(path) {
 			const boards = parsed.boards !== null && typeof parsed.boards === 'object' && !Array.isArray(parsed.boards)
 				? parsed.boards
 				: {};
+			const preferences = parsed.preferences !== null && typeof parsed.preferences === 'object' && !Array.isArray(parsed.preferences)
+				? { ...parsed.preferences }
+				: {};
+			if ('bindings' in preferences) preferences.bindings = normalizeBindings(preferences.bindings, boards);
 			return {
 				...parsed,
 				version: 1,
 				boards,
 				updatedAt: parsed.updatedAt ?? null,
-				preferences: parsed.preferences !== null && typeof parsed.preferences === 'object' && !Array.isArray(parsed.preferences)
-					? parsed.preferences
-					: {}
+				preferences
 			};
 		} catch {
 			// Try the backup left by an interrupted Windows replacement.
 		}
 	}
-	return { version: 1, boards: {}, updatedAt: null };
+	return { version: 1, boards: {}, updatedAt: null, preferences: {} };
 }
 
-/** Persist the inventory atomically; the file stays local to this machine. */
-export function saveInventory(path, inventory) {
+/** Acquire the cross-process inventory lock, recovering a stale owner. */
+function acquireInventoryLock(path) {
 	mkdirSync(dirname(path), { recursive: true });
-	const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
 	const lock = `${path}.lock`;
 	const started = Date.now();
 	while (true) {
 		try {
 			mkdirSync(lock);
-			break;
+			return lock;
 		} catch (error) {
 			if (error?.code !== 'EEXIST') throw error;
 			try {
@@ -163,7 +196,12 @@ export function saveInventory(path, inventory) {
 			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
 		}
 	}
-	const body = `${JSON.stringify({ ...inventory, version: 1 }, null, 2)}\n`;
+}
+
+/** Atomically write JSON while its caller owns the cross-process lock. */
+function writeJsonLocked(path, value) {
+	const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
+	const body = `${JSON.stringify(value, null, 2)}\n`;
 	try {
 		writeFileSync(temporary, body, 'utf8');
 		try {
@@ -189,9 +227,78 @@ export function saveInventory(path, inventory) {
 		}
 	} finally {
 		rmSync(temporary, { force: true });
+	}
+}
+
+/** Normalize and write one inventory while its caller owns the lock. */
+function writeInventoryLocked(path, inventory) {
+	const preferences = inventory.preferences !== null && typeof inventory.preferences === 'object' && !Array.isArray(inventory.preferences)
+		? { ...inventory.preferences }
+		: undefined;
+	if (preferences !== undefined && 'bindings' in preferences) {
+		preferences.bindings = normalizeBindings(preferences.bindings, inventory.boards);
+	}
+	writeJsonLocked(path, {
+		...inventory,
+		version: 1,
+		...(preferences === undefined ? {} : { preferences })
+	});
+}
+
+/** Persist the inventory atomically; the file stays local to this machine. */
+export function saveInventory(path, inventory) {
+	const lock = acquireInventoryLock(path);
+	try {
+		writeInventoryLocked(path, inventory);
+	} finally {
 		rmSync(lock, { recursive: true, force: true });
 	}
 	return inventory;
+}
+
+/**
+ * Read, mutate and persist the inventory while holding one cross-process lock.
+ *
+ * Callers that need a read-modify-write flow must use this function instead of
+ * reading once and later calling {@link saveInventory}; otherwise another
+ * discovery or serial probe can overwrite the newer board record.
+ *
+ * @param {string} path - inventory file.
+ * @param {(inventory: object) => any} update - synchronous mutation callback.
+ * @returns {{inventory: object, result: any}} saved inventory and callback result.
+ */
+export function updateInventory(path, update) {
+	if (typeof update !== 'function') throw new TypeError('inventory update callback must be a function');
+	const lock = acquireInventoryLock(path);
+	try {
+		const inventory = readInventory(path);
+		const result = update(inventory);
+		writeInventoryLocked(path, inventory);
+		return { inventory, result };
+	} finally {
+		rmSync(lock, { recursive: true, force: true });
+	}
+}
+
+/** Transactional update for another local JSON store using the same lock discipline. */
+export function updateJsonFile(path, update) {
+	if (typeof update !== 'function') throw new TypeError('JSON update callback must be a function');
+	const lock = acquireInventoryLock(path);
+	try {
+		let value = {};
+		if (existsSync(path)) {
+			try {
+				value = JSON.parse(readFileSync(path, 'utf8'));
+			} catch {
+				value = {};
+			}
+		}
+		const result = update(value);
+		writeJsonLocked(path, value);
+		return { value, result };
+	} finally {
+		rmSync(lock, { recursive: true, force: true });
+	}
 }
 
 /** Normalize one observation value to a string or null. */
@@ -367,7 +474,7 @@ export function inventoryTargets(inventory, defaultUser = null, now = Date.now()
 			user: board.user ?? defaultUser,
 			port: Number.isInteger(board.port) ? board.port : null,
 			identityFile: null,
-			workdir: null,
+			workdir: DISCOVERED_TARGET_WORKDIR,
 			isConfigured: false,
 			note: `发现板；MAC 别名 ${macs.join(', ') || '未读取'}`
 		});

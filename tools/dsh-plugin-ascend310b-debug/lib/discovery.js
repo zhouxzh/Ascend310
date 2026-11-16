@@ -25,9 +25,8 @@ import {
 	inventoryPath,
 	normalizeMac,
 	observeBoard,
-	readInventory,
-	saveInventory,
-	systemFromFacts
+	systemFromFacts,
+	updateInventory
 } from './inventory.js';
 
 /** Maximum number of addresses a single discovery call may scan. */
@@ -448,10 +447,9 @@ export async function discoverNetwork({
 		for (const mac of merged.macs) byMac.set(mac, merged);
 	}
 	const inventoryFile = path ?? inventoryPath(config);
-	const inventory = readInventory(inventoryFile);
-	const found = [];
 	const errors = [];
 	const others = [];
+	const applicable = [];
 	for (const candidate of uniqueProbed) {
 		if (!candidate.ok) {
 			errors.push(`${candidate.ip}: ${candidate.error}`);
@@ -461,33 +459,43 @@ export async function discoverNetwork({
 			others.push({ ip: candidate.ip, soc: candidate.soc, reason: candidate.scope?.message ?? '不是昇腾 310B' });
 			continue;
 		}
-		const result = observeBoard(inventory, {
-			ip: candidate.ip,
-			user,
-			mac: candidate.mac,
-			macs: candidate.macs,
-			interfaceMacs: candidate.interfaceMacs,
-			hostname: candidate.hostname,
-			port: candidate.port ?? port,
-			system: candidate.system
-		});
-		found.push({
-			id: result.board.id,
-			mac: result.board.mac,
-			ip: result.board.lastIp,
-			hostname: result.board.hostname,
-			model: result.board.system.boardModel,
-			soc: result.board.system.soc,
-			tier: result.board.system.tier,
-			driver: result.board.system.driverVersion,
-			cann: result.board.system.cannVersion,
-			status: result.status,
-			changes: result.changes,
-			identity: candidate.mac === null ? 'hostname-fallback' : 'mac'
-		});
+		applicable.push(candidate);
 	}
 	throwIfDiscoveryAborted(signal);
-	if (found.length > 0) saveInventory(inventoryFile, inventory);
+	let found = [];
+	if (applicable.length > 0) {
+		const transaction = updateInventory(inventoryFile, (inventory) => {
+			const records = [];
+			for (const candidate of applicable) {
+				const result = observeBoard(inventory, {
+					ip: candidate.ip,
+					user,
+					mac: candidate.mac,
+					macs: candidate.macs,
+					interfaceMacs: candidate.interfaceMacs,
+					hostname: candidate.hostname,
+					port: candidate.port ?? port,
+					system: candidate.system
+				});
+				records.push({
+					id: result.board.id,
+					mac: result.board.mac,
+					ip: result.board.lastIp,
+					hostname: result.board.hostname,
+					model: result.board.system.boardModel,
+					soc: result.board.system.soc,
+					tier: result.board.system.tier,
+					driver: result.board.system.driverVersion,
+					cann: result.board.system.cannVersion,
+					status: result.status,
+					changes: result.changes,
+					identity: candidate.mac === null ? 'hostname-fallback' : 'mac'
+				});
+			}
+			return records;
+		});
+		found = transaction.result;
+	}
 	return { scanned: targets.length, cidrs: [...cidrs], open: open.length, found, others, errors, inventoryPath: inventoryFile };
 }
 

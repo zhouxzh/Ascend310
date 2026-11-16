@@ -23,7 +23,7 @@ const command = buildAptInstallCommand(['v4l-utils'], { update: true });
 check(command.startsWith('sudo -S '), 'command must use sudo -S');
 check(command.includes('apt-get update'), 'command must include apt-get update');
 check(command.includes('apt-get install -y --no-install-recommends v4l-utils'), 'command must install normalized packages');
-check(!command.includes('Mind@123'), 'command must never contain the password');
+check(!command.includes('test-only-password'), 'command must never contain the password');
 
 let captured = null;
 const result = await installAptPackages({

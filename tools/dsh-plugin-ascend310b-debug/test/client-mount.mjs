@@ -27,11 +27,29 @@ globalThis.window = {
 	}
 };
 
-/** Minimal style-tag stand-in used by the bundle's CSS installer. */
+/** Style-tag stand-ins used to verify in-place updates and lifecycle cleanup. */
+const styleTags = [];
 globalThis.document = {
-	querySelector: () => null,
-	createElement: () => ({ dataset: {}, textContent: '' }),
-	head: { appendChild: () => {} }
+	querySelector: () => styleTags[0] ?? null,
+	createElement: () => {
+		const tag = {
+			dataset: {},
+			textContent: '',
+			parentNode: null,
+			remove() {
+				const index = styleTags.indexOf(tag);
+				if (index >= 0) styleTags.splice(index, 1);
+				tag.parentNode = null;
+			}
+		};
+		return tag;
+	},
+	head: {
+		appendChild(tag) {
+			tag.parentNode = globalThis.document.head;
+			styleTags.push(tag);
+		}
+	}
 };
 
 /** React stand-in covering exactly the hooks and helpers the panel uses. */
@@ -67,9 +85,15 @@ check(Array.isArray(face.inject), 'exports.inject must be an array');
 check(face.inject?.includes('slots'), 'exports.inject must declare the slots service');
 check(face.PANEL_ID === 'ascend310b-debug', `unexpected PANEL_ID: ${face.PANEL_ID}`);
 
-/** Registrations the fake slot service captured. */
+/** Registrations and effects the fake context captured. */
 const registrations = [];
+const effectDisposers = [];
 const fakeCtx = {
+	effect(factory) {
+		const dispose = factory();
+		if (typeof dispose === 'function') effectDisposers.push(dispose);
+		return dispose;
+	},
 	slots: {
 		inject(name, callback) {
 			const produced = callback();
@@ -112,6 +136,22 @@ if (typeof panel === 'function') {
 	}
 	check(tree !== undefined, 'the panel should return a render tree for its loading state');
 }
+
+// HMR can apply a new browser module while the old style tag is still present.
+// The new apply must reuse that tag, and only the newest owner may remove it.
+check(styleTags.length === 1, `expected one installed style tag, got ${styleTags.length}`);
+check(styleTags[0]?.textContent?.includes('.ad-root'), 'the installed style tag must contain the panel CSS');
+check(typeof effectDisposers[0] === 'function', 'style installation must register a context-owned disposer');
+const firstStyleOwner = styleTags[0]?.dataset?.pluginOwner;
+styleTags[0].textContent = 'stale plugin CSS';
+face.apply(fakeCtx);
+check(styleTags.length === 1, 're-applying the module must update CSS in place instead of adding a tag');
+check(styleTags[0]?.textContent?.includes('.ad-root'), 're-applying the module must replace stale CSS content');
+check(styleTags[0]?.dataset?.pluginOwner !== firstStyleOwner, 'the newest module apply must own the shared style tag');
+effectDisposers[0]?.();
+check(styleTags.length === 1, 'an old HMR owner must not remove the replacement style tag');
+effectDisposers[1]?.();
+check(styleTags.length === 0, 'disposing the current module must remove its style tag');
 
 if (failures.length > 0) {
 	console.error('client mount test FAILED:');

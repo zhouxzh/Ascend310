@@ -164,6 +164,10 @@ const face = loaded[0].factory((name) => {
 
 let panel = null;
 face.apply({
+	effect: (factory) => {
+		factory();
+		return () => {};
+	},
 	slots: {
 		inject: (_name, callback) => {
 			const produced = callback();
@@ -619,6 +623,11 @@ check(cameraText.includes('30 fps') && cameraText.includes('10 fps'), 'camera fo
 check(cameraText.includes('当前节点支持的全部格式'), 'camera page must show the full reported format capability list');
 check(bundleSource.includes('CAMERA_REFRESH_URL'), 'camera refresh must use the lightweight V4L2-only endpoint');
 check(bundleSource.includes('CAMERA_PREVIEW_URL'), 'camera capture must use the restricted inline preview endpoint');
+check(bundleSource.includes('props.onField("device", selectedValue)'), 'selected camera node must be synchronized into the capture form');
+check(
+	bundleSource.includes('preferredFormat: capture ? (usb ? "MJPG" : "YUYV")'),
+	'USB capture nodes must prefer MJPG while non-USB nodes prefer YUYV'
+);
 check(bundleSource.includes('AUDIO_REFRESH_URL') && bundleSource.includes('SYSTEM_REFRESH_URL'), 'system, camera and audio refresh endpoints must stay separate');
 check(!bundleSource.includes('onClick: () => runProbe()'), 'the UI must not expose a global all-in-one device refresh');
 check(!bundleSource.includes('const runProbe'), 'the frontend must not retain a dead all-in-one probe path');
@@ -850,6 +859,427 @@ try {
 check(foreignText.includes('不是昇腾 310B1/310B4'), 'an out-of-scope board must be named as such');
 check(foreignText.includes('不适用于该芯片'), 'an out-of-scope board must say the procedures do not apply');
 payload = savedPayload;
+
+// --- stateful camera interaction tests -----------------------------------
+// The checks above render a snapshot. These tests run the panel with a small
+// hook runtime so state updates, deferred requests, and event handlers execute
+// as they do in the browser rather than being inferred from source strings.
+function deferred() {
+	let resolve;
+	let reject;
+	const promise = new Promise((resolvePromise, rejectPromise) => {
+		resolve = resolvePromise;
+		reject = rejectPromise;
+	});
+	return { promise, resolve, reject };
+}
+
+function jsonResponse(body, status = 200) {
+	return {
+		ok: status >= 200 && status < 300,
+		status,
+		async json() {
+			return body;
+		}
+	};
+}
+
+function abortable(promise, signal) {
+	if (!signal) return promise;
+	return new Promise((resolve, reject) => {
+		const abort = () => {
+			const error = new Error('aborted');
+			error.name = 'AbortError';
+			reject(error);
+		};
+		if (signal.aborted) abort();
+		else signal.addEventListener('abort', abort, { once: true });
+		promise.then(resolve, reject);
+	});
+}
+
+function createHookRuntime(initialStates) {
+	let component = null;
+	const stateSlots = new Map();
+	const refSlots = new Map();
+	const effectSlots = new Map();
+	const callbackSlots = new Map();
+	let cursor = 0;
+	let dirty = false;
+	let currentUpdates = [];
+	let queuedEffects = [];
+	let tree = null;
+	let unmounted = false;
+
+	const sameDependencies = (left, right) => left !== undefined
+		&& right !== undefined
+		&& left.length === right.length
+		&& left.every((value, index) => Object.is(value, right[index]));
+
+	const react = {
+		createElement(type, props, ...children) {
+			if (typeof type === 'function') return type({ ...(props ?? {}), children });
+			return { type, props: props ?? {}, children };
+		},
+		useState(initial) {
+			const id = cursor++;
+			if (!stateSlots.has(id)) {
+				stateSlots.set(id, {
+					value: Object.prototype.hasOwnProperty.call(initialStates, id) ? initialStates[id] : initial
+				});
+			}
+			const slot = stateSlots.get(id);
+			return [slot.value, (next) => {
+				const value = typeof next === 'function' ? next(slot.value) : next;
+				if (!Object.is(value, slot.value)) {
+					slot.value = value;
+					currentUpdates.push(id);
+					dirty = true;
+				}
+			}];
+		},
+		useEffect(effect, dependencies) {
+			const id = cursor++;
+			let slot = effectSlots.get(id);
+			if (slot === undefined) {
+				slot = { dependencies: undefined, cleanup: null };
+				effectSlots.set(id, slot);
+			}
+			if (dependencies === undefined || !sameDependencies(slot.dependencies, dependencies)) {
+				const previousCleanup = slot.cleanup;
+				slot.dependencies = dependencies === undefined ? undefined : [...dependencies];
+				queuedEffects.push(() => {
+					if (typeof previousCleanup === 'function') previousCleanup();
+					slot.cleanup = effect();
+				});
+			}
+		},
+		useCallback(callback, dependencies) {
+			const id = cursor++;
+			const slot = callbackSlots.get(id);
+			if (slot === undefined || dependencies === undefined || !sameDependencies(slot.dependencies, dependencies)) {
+				callbackSlots.set(id, {
+					callback,
+					dependencies: dependencies === undefined ? undefined : [...dependencies]
+				});
+				return callback;
+			}
+			return slot.callback;
+		},
+		useRef(initial) {
+			const id = cursor++;
+			if (!refSlots.has(id)) refSlots.set(id, { current: initial });
+			return refSlots.get(id);
+		}
+	};
+
+	const flush = () => {
+		for (let pass = 0; pass < 40; pass += 1) {
+			dirty = false;
+			currentUpdates = [];
+			cursor = 0;
+			queuedEffects = [];
+			tree = component({});
+			for (const effect of queuedEffects) effect();
+			if (!dirty) return tree;
+		}
+		throw new Error(`stateful render did not settle after 40 passes; last updates: ${currentUpdates.join(',')}`);
+	};
+
+	return {
+		react,
+		setComponent(next) {
+			component = next;
+		},
+		flush,
+		tree: () => tree,
+		state: (index) => stateSlots.get(index)?.value,
+		setState(index, value) {
+			const slot = stateSlots.get(index);
+			if (slot !== undefined && !Object.is(slot.value, value)) {
+				slot.value = value;
+				dirty = true;
+			}
+		},
+		unmount() {
+			for (const slot of effectSlots.values()) {
+				if (typeof slot.cleanup === 'function') slot.cleanup();
+				slot.cleanup = null;
+			}
+			unmounted = true;
+		}
+	};
+}
+
+async function runStatefulCameraTests() {
+	const payload8 = JSON.parse(JSON.stringify(cameraPayload));
+	payload8.ok = true;
+	payload8.target = { ...(payload8.target ?? {}), id: 'board-8t' };
+	payload8.targets = [
+		{ id: 'board-8t', label: '8T 板', host: '198.51.100.10', user: 'HwHiAiUser' },
+		{ id: 'board-20t', label: '20T 板', host: '198.51.100.11', user: 'HwHiAiUser' }
+	];
+	const videoLines = String(payload8.facts.videoDevices.value).split('\n');
+	videoLines.push('/dev/video4');
+	payload8.facts.videoDevices = { ...payload8.facts.videoDevices, value: videoLines.join('\n') };
+	const formatLines = String(payload8.facts.videoFormats.value).split('\n');
+	const mipiFormatIndex = formatLines.indexOf('DEVICE=/dev/video2');
+	if (mipiFormatIndex >= 0) {
+		formatLines.splice(
+			mipiFormatIndex + 1,
+			0,
+			"\t[1]: 'MJPG' (Motion-JPEG, compressed)",
+			'\t\tSize: Discrete 640x480',
+			'\t\t\tInterval: Discrete 0.033s (30.000 fps)'
+		);
+	}
+	payload8.facts.videoFormats = { ...payload8.facts.videoFormats, value: formatLines.join('\n') };
+
+	const pendingReports = [];
+	const pendingCameraRefreshes = [];
+	const fakeFetch = (input, options = {}) => {
+		const url = String(input);
+		if (url.startsWith('/ascend310b-debug/report.json')) {
+			const parsed = new URL(url, 'http://local');
+			if (parsed.searchParams.get('target') === 'board-20t') {
+				const request = deferred();
+				pendingReports.push(request);
+				return abortable(request.promise, options.signal);
+			}
+			return Promise.resolve(jsonResponse(payload8));
+		}
+		if (url === '/ascend310b-debug/liveness') {
+			return Promise.resolve(jsonResponse({
+				ok: true,
+				targets: [{ id: 'board-8t', online: true }],
+				checkedAt: '2026-11-16T00:00:00.000Z',
+				conflicts: []
+			}));
+		}
+		if (url === '/ascend310b-debug/camera-refresh') {
+			const request = deferred();
+			pendingCameraRefreshes.push(request);
+			return abortable(request.promise, options.signal);
+		}
+		return Promise.resolve(jsonResponse({ ok: false, error: `unexpected test route: ${url}` }, 404));
+	};
+
+	const originalFetch = globalThis.fetch;
+	const originalAddEventListener = globalThis.window.addEventListener;
+	const originalRemoveEventListener = globalThis.window.removeEventListener;
+	globalThis.fetch = fakeFetch;
+	globalThis.window.addEventListener = () => {};
+	globalThis.window.removeEventListener = () => {};
+	globalThis.window.innerHeight = 900;
+	loaded.length = 0;
+	new Function(bundleSource)();
+	const initialState = {
+		0: { kind: 'ready', payload: payload8 },
+		1: 'board-8t',
+		3: 'camera',
+		6: { kind: 'done', byTarget: { 'board-8t': true }, checkedAt: '2026-11-16T00:00:00.000Z', message: '' },
+		7: 'camera',
+		9: { phase: 'idle', action: null, inventory: null, result: null, message: '' }
+	};
+	let runtime = createHookRuntime(initialState);
+	try {
+		const hookFace = loaded[0].factory((name) => {
+			if (name === 'react') return runtime.react;
+			throw new Error(`unexpected require("${name}")`);
+		});
+		let hookPanel = null;
+		hookFace.apply({
+			effect: (factory) => factory(),
+			slots: {
+				inject: (_name, callback) => {
+					const produced = callback();
+					if (produced !== undefined && typeof produced.next === 'function') for (const _ of produced) void _;
+				},
+				register: (options, component) => {
+					if (options.name === 'main') hookPanel = component;
+					return () => {};
+				}
+			}
+		});
+		runtime.setComponent(hookPanel);
+		const settle = async () => {
+			for (let index = 0; index < 10; index += 1) {
+				runtime.flush();
+				await Promise.resolve();
+			}
+			runtime.flush();
+		};
+		const cameraSelect = () => findNode(runtime.tree(), (node) => node.type === 'select' && node.props?.id === 'ad-peripheral-camera-device')[0];
+		const formatSelect = () => findNode(runtime.tree(), (node) => node.type === 'select' && node.props?.id === 'ad-peripheral-camera-pixel')[0];
+		const captureButton = () => findNode(runtime.tree(), (node) => node.type === 'button' && draw(node).join(' ').includes('采集一帧'))[0];
+		const refreshButton = () => findNode(runtime.tree(), (node) =>
+			node.type === 'button'
+			&& node.props?.className?.includes('ad-refresh-button')
+			&& draw(node).join(' ').includes('更新摄像头信息')
+		)[0];
+
+		runtime.flush();
+		await settle();
+		check(runtime.state(8)?.camera?.device === '/dev/video0', 'camera defaults must choose the USB capture node');
+		check(runtime.state(8)?.camera?.pixelFormat === 'MJPG', 'USB capture must default to MJPG');
+		const initialCameraSelect = cameraSelect();
+		check(initialCameraSelect !== undefined, 'the stateful camera page must render the camera selector');
+		if (initialCameraSelect === undefined) {
+			const ids = findNode(runtime.tree(), (node) => node.type === 'select').map((node) => node.props?.id);
+			throw new Error(`camera selector missing; rendered select ids: ${ids.join(', ')}`);
+		}
+
+		initialCameraSelect.props.onChange({ target: { value: '/dev/video2' } });
+		runtime.flush();
+		check(runtime.state(8)?.camera?.device === '/dev/video2', 'selecting a MIPI node must update the capture device');
+		formatSelect().props.onChange({ target: { value: 'MJPG' } });
+		runtime.flush();
+		check(runtime.state(8)?.camera?.pixelFormat === 'MJPG', 'the test must start from a valid non-preferred MIPI format');
+
+		cameraSelect().props.onChange({ target: { value: '/dev/video0' } });
+		runtime.flush();
+		check(runtime.state(8)?.camera?.pixelFormat === 'MJPG', 'switching to the USB node must follow its MJPG preference');
+		cameraSelect().props.onChange({ target: { value: '/dev/video2' } });
+		runtime.flush();
+		check(
+			runtime.state(8)?.camera?.pixelFormat === 'YUYV',
+			'switching devices must apply the new MIPI preference even when the previous MJPG format is valid there'
+		);
+
+		formatSelect().props.onChange({ target: { value: 'MJPG' } });
+		runtime.flush();
+		refreshButton().props.onClick();
+		runtime.flush();
+		check(runtime.state(14)?.phase === 'running', 'camera refresh must enter a running state');
+		check(captureButton().props.disabled === true, 'capture must be disabled while camera inventory is refreshing');
+		pendingCameraRefreshes[0].resolve(jsonResponse({
+			ok: true,
+			target: payload8.target,
+			facts: payload8.facts,
+			durationMs: 800,
+			updatedAt: '2026-11-16T00:00:01.000Z'
+		}));
+		await settle();
+		check(
+			runtime.state(8)?.camera?.pixelFormat === 'MJPG',
+			`refreshing unchanged camera capabilities must preserve a manual format (got ${runtime.state(8)?.camera?.pixelFormat})`
+		);
+
+		const reducedFacts = JSON.parse(JSON.stringify(payload8.facts));
+		reducedFacts.videoFormats = JSON.parse(JSON.stringify(cameraPayload.facts.videoFormats));
+		refreshButton().props.onClick();
+		runtime.flush();
+		pendingCameraRefreshes[1].resolve(jsonResponse({
+			ok: true,
+			target: payload8.target,
+			facts: reducedFacts,
+			durationMs: 600,
+			updatedAt: '2026-11-16T00:00:02.000Z'
+		}));
+		await settle();
+		check(
+			runtime.state(8)?.camera?.pixelFormat === 'YUYV',
+			'a changed camera capability set must reset the format to the node preference'
+		);
+
+		refreshButton().props.onClick();
+		runtime.flush();
+		const staleRefresh = pendingCameraRefreshes[2];
+		const historyButton = findNode(runtime.tree(), (node) =>
+			node.type === 'button'
+			&& node.props?.className?.includes('ad-history-toggle')
+			&& draw(node).join(' ').includes('显示历史记录')
+		)[0];
+		historyButton?.props.onClick();
+		runtime.flush();
+		const board20 = findNode(runtime.tree(), (node) =>
+			node.type === 'button'
+			&& node.props?.className?.includes('ad-board-item')
+			&& draw(node).join(' ').includes('20T')
+		)[0];
+		if (board20 === undefined) {
+			const rows = findNode(runtime.tree(), (node) => node.props?.className?.includes('ad-board-item')).map((node) => draw(node).join(' '));
+			throw new Error(`20T board row missing; rendered rows: ${rows.join(' | ')}`);
+		}
+		board20.props.onClick();
+		runtime.flush();
+		check(pendingReports.length === 1, 'switching boards must issue a deferred report request');
+		const report20 = JSON.parse(JSON.stringify(payload8));
+		report20.target = { ...(report20.target ?? {}), id: 'board-20t' };
+		pendingReports[0].resolve(jsonResponse(report20));
+		await settle();
+		check(runtime.state(1) === 'board-20t', 'the deferred board switch must commit the requested board');
+		check(runtime.state(14)?.phase === 'idle', 'switching boards must reset the previous camera refresh state');
+		staleRefresh.resolve(jsonResponse({
+			ok: true,
+			target: payload8.target,
+			facts: payload8.facts,
+			durationMs: 200,
+			updatedAt: '2026-11-16T00:00:03.000Z'
+		}));
+		await settle();
+		check(runtime.state(1) === 'board-20t', 'a late camera refresh must not switch the selected board back');
+		check(runtime.state(14)?.phase === 'idle', 'a late camera refresh must not commit stale completion state');
+		check(captureButton().props.disabled === true, 'capture must stay disabled while board liveness is unknown');
+
+		runtime.setState(6, { kind: 'done', byTarget: { 'board-20t': true }, checkedAt: '2026-11-16T00:00:04.000Z', message: '' });
+		runtime.flush();
+		cameraSelect().props.onChange({ target: { value: '/dev/video4' } });
+		runtime.flush();
+		check(captureButton().props.disabled === true, 'capture must be disabled when camera capability is unconfirmed');
+		check(
+			String(captureButton().props.title).includes('采集能力尚未确认'),
+			'disabled capture must explain that the camera capability is unconfirmed'
+		);
+
+		runtime.setState(9, {
+			phase: 'done',
+			action: 'camera',
+			inventory: null,
+			result: {
+				ok: true,
+				executed: true,
+				evidence: 'observed-pass',
+				exitCode: 0,
+				output: '/tmp/ascend310b-debug/peripherals/camera-state-test.jpg',
+				data: { sha256: 'state-test', actualWidth: 640, actualHeight: 480, fourcc: 'YUYV', frameCount: 1, bytes: 42 },
+				text: '摄像头采集完成'
+			},
+			message: ''
+		});
+		runtime.flush();
+		let preview = findNode(runtime.tree(), (node) => node.type === 'img' && node.props?.alt === '摄像头本次采集画面')[0];
+		check(preview !== undefined, 'a successful stateful capture must render a preview image');
+		preview?.props.onError();
+		runtime.flush();
+		check(
+			findNode(runtime.tree(), (node) => node.props?.role === 'alert' && draw(node).join(' ').includes('画面预览加载失败')).length === 1,
+			'a preview load error must surface an accessible retry message'
+		);
+		const retry = findNode(runtime.tree(), (node) => node.type === 'button' && draw(node).join(' ').includes('重试预览'))[0];
+		check(retry !== undefined, 'a failed preview must expose a retry button');
+		retry?.props.onClick();
+		runtime.flush();
+		preview = findNode(runtime.tree(), (node) => node.type === 'img' && node.props?.alt === '摄像头本次采集画面')[0];
+		check(preview?.props?.src?.includes('retry=1'), 'retrying a preview must request the image again');
+		check(
+			findNode(runtime.tree(), (node) => node.props?.role === 'alert' && draw(node).join(' ').includes('画面预览加载失败')).length === 0,
+			'retrying a preview must clear the previous error'
+		);
+	} finally {
+		runtime?.unmount();
+		globalThis.fetch = originalFetch;
+		globalThis.window.addEventListener = originalAddEventListener;
+		globalThis.window.removeEventListener = originalRemoveEventListener;
+	}
+}
+
+try {
+	await runStatefulCameraTests();
+} catch (error) {
+	failures.push(`stateful camera interaction test threw: ${error?.stack ?? error}`);
+}
+
 rmSync(inventoryPath, { force: true });
 
 if (failures.length > 0) {

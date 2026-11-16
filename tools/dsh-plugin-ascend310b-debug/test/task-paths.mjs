@@ -52,6 +52,12 @@ try {
 		check(`allows task cwd ${allowed}`, () => assert.equal(internals.resolveTaskCwd(target, allowed), allowed));
 	}
 	mustReject('requires configured workdir', () => internals.resolveTaskCwd({ transport: 'ssh', user: 'HwHiAiUser' }));
+	check('fixed peripheral task works for a discovered target without configured workdir', () => {
+		assert.equal(
+			internals.resolveTaskCwd({ transport: 'ssh', user: 'HwHiAiUser' }, null, { requireWorkspace: false }),
+			internals.REMOTE_DEBUG_TMP_ROOT
+		);
+	});
 	mustReject('rejects a noncanonical configured workdir', () => internals.resolveTaskCwd({ ...target, workdir: '/home/HwHiAiUser/Documents' }));
 	for (const blocked of [
 		'/home/HwHiAiUser',
@@ -63,6 +69,48 @@ try {
 		'/home/HwHiAiUser/Documents/Ascend310/workspaces/../assets'
 	]) {
 		mustReject(`rejects task cwd ${blocked}`, () => internals.resolveTaskCwd(target, blocked));
+	}
+	const sandbox = internals.prepareSandboxedCommand('python sample.py', internals.REMOTE_WORKSPACE_ROOT);
+	check('sandbox uses bubblewrap with a read-only root', () => {
+		assert.match(sandbox, /bwrap/u);
+		assert.match(sandbox, /--ro-bind \/ \//u);
+		assert.match(sandbox, /--dev \/dev/u);
+		assert.match(sandbox, /--unshare-pid/u);
+		assert.doesNotMatch(sandbox, /--unshare-net/u);
+	});
+	for (const root of [
+		internals.REMOTE_WORKSPACE_ROOT,
+		internals.REMOTE_DEPLOYMENT_ROOT,
+		internals.REMOTE_ASSET_ROOT,
+		internals.REMOTE_DEBUG_TMP_ROOT
+	]) {
+		check(`sandbox exposes controlled root ${root}`, () => assert.ok(sandbox.includes(root)));
+	}
+	check('sandbox sets temporary files inside controlled debug root', () => {
+		assert.match(sandbox, /--setenv TMPDIR '\/tmp\/ascend310b-debug'/u);
+	});
+	try {
+		const dryRun = await internals.runTask({
+			config: {
+				inventoryPath: join(pluginRoot, 'tmp', 'unused-inventory.json'),
+				targets: [{
+					id: 'dry-board',
+					transport: 'ssh',
+					host: '192.0.2.10',
+					user: 'HwHiAiUser',
+					workdir: internals.REMOTE_WORKSPACE_ROOT
+				}]
+			},
+			targetSelector: 'dry-board',
+			command: 'bash run.sh',
+			allowStateChange: true,
+			dryRun: true,
+			environment: 'base'
+		});
+		assert.equal(dryRun.allowed, true, dryRun.reason);
+		assert.match(dryRun.reason, /bubblewrap/u);
+	} catch (error) {
+		failures.push(`environment preparation must not poison user-command validation: ${error?.message ?? error}`);
 	}
 
 	for (const allowed of [

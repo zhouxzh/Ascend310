@@ -1,21 +1,21 @@
 # 昇腾310B调试插件安装与源码审核
 
-审核日期：2026-10-23
+审核日期：2026-11-16
 审核对象：`tools/dsh-plugin-ascend310b-debug/`
-结论：**可以通过仓库安装器打包安装，并由 profile 配置提供板卡地址。** 本机离线门禁全部通过；真实板端结论仍只覆盖已经记录过的板卡组合，不由源码审核代替。
+结论：**可以通过仓库安装器打包安装，并由profile配置提供板卡地址。** 本机离线门禁全部通过；真实板端结论仍只覆盖已经记录过的板卡组合，不由源码审核代替。
 
 ## 交付边界
 
 | 项目 | 结论 |
 | --- | --- |
 | 包名 | `dsh-plugin-ascend310b-debug` |
-| 版本 | `1.7.0` |
+| 版本 | `1.14.9` |
 | 可见名称 | `昇腾310B调试` |
 | 适用芯片 | `Ascend310B1` / `Ascend310B4`（20T / 8T） |
 | 其他芯片 | 明确标记 `scope.applicable=false`，不返回 310B 调试程序 |
 | 安装方式 | 仓库根目录执行 `node tools/install-dsh-plugins.mjs --profile desktop`，通过带内容哈希的 tarball 安装并校验内容 |
 | 运行时依赖 | Node.js ≥ 18；主机侧只用 `node:` 内置模块与 DSH 提供的 `@deepseek-ai/dsh-tools`；串口会话在 Linux/macOS 需要 PowerShell 7 `pwsh` |
-| 板端依赖 | SSH 公钥登录、`bash`、`npu-smi`、CANN/驱动；探测只读，任务需显式 `allowStateChange` |
+| 板端依赖 | SSH公钥登录、`bash`、`bubblewrap`、`npu-smi`、CANN/驱动；探测只读，非特权任务进入只读根沙箱且需显式`allowStateChange` |
 | 发布方式 | `private: true`，面向源码分发；不作为公共 npm 包发布 |
 
 ## 本次审核修复的问题

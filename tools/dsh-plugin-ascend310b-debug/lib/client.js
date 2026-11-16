@@ -187,6 +187,7 @@ window.__ModuleLoader__.load({
 .ad-camera-preview{height:240px;margin-top:10px;padding:8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;overflow:hidden;border:.5px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-l2,#1112)}
 .ad-camera-preview a{display:flex;width:100%;height:100%;align-items:center;justify-content:center}
 .ad-camera-preview img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;image-rendering:auto}
+.ad-camera-preview-feedback{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:18px}
 .ad-recording-playback{height:150px;overflow:auto;margin-top:10px;padding:10px;border:.5px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-l1,#0000)}
 .ad-playback-button{min-width:190px}
 .ad-serial-layout{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(0,1.2fr);gap:12px;min-height:0}
@@ -221,13 +222,26 @@ window.__ModuleLoader__.load({
 @media(max-width:720px){.ad-root{padding:12px 12px 16px}.ad-head{grid-template-columns:1fr;min-height:0;align-items:stretch}.ad-current-group{order:2;width:100%;margin-left:0}.ad-current-line{width:100%;flex-wrap:wrap}.ad-current{width:100%;flex:1}.ad-head-actions-group{order:3;width:100%;margin-left:0;align-items:stretch}.ad-head-actions .ad-button{flex:1}.ad-actions .ad-select{flex:1;min-width:180px}.ad-toolbar .ad-button{flex:1}.ad-table{display:block;overflow-x:auto;white-space:nowrap}.ad-table td,.ad-table th{white-space:normal;min-width:90px}.ad-workbench{grid-template-columns:1fr;overflow:hidden}.ad-rail{height:240px;border-right:0;border-bottom:.5px solid var(--dsw-alias-border-l1);padding:0 0 10px}.ad-board-list{display:flex;flex-direction:column}.ad-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ad-peripheral-grid{grid-template-columns:1fr}.ad-audio-grid{grid-template-columns:1fr}.ad-audio-pane .ad-test-grid{grid-template-columns:1fr}.ad-serial-layout{grid-template-columns:1fr}.ad-serial-list{max-height:240px}}
 `;
 
-		/** Install this plugin's stylesheet once. */
+		const STYLE_SELECTOR = 'style[data-plugin="dsh-plugin-ascend310b-debug"]';
+
+		/** Install or refresh this plugin's stylesheet and return its disposer. */
 		function installStyles() {
-			if (document.querySelector('style[data-plugin="dsh-plugin-ascend310b-debug"]') !== null) return;
-			const tag = document.createElement("style");
+			const existing = document.querySelector(STYLE_SELECTOR);
+			const tag = existing ?? document.createElement("style");
+			const owner = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+			tag.dataset ??= {};
 			tag.dataset.plugin = "dsh-plugin-ascend310b-debug";
-			tag.textContent = CSS;
-			document.head.appendChild(tag);
+			tag.dataset.pluginOwner = owner;
+			if (tag.textContent !== CSS) tag.textContent = CSS;
+			if (existing === null) document.head.appendChild(tag);
+			return () => {
+				if (tag.dataset?.pluginOwner !== owner) return;
+				if (typeof tag.remove === "function") {
+					tag.remove();
+					return;
+				}
+				tag.parentNode?.removeChild?.(tag);
+			};
 		}
 
 		/** Wait until the panel is wide enough for two columns. */
@@ -512,6 +526,9 @@ window.__ModuleLoader__.load({
 								: match[1].startsWith("/dev/video")
 									? "采集能力未确认"
 									: "媒体控制节点";
+					const disabled = info?.metadataCapture === true && info?.videoCapture !== true && info?.videoCaptureMultiplanar !== true;
+					const capture = info?.videoCapture === true || info?.videoCaptureMultiplanar === true;
+					const usb = /^usb/i.test(info?.busInfo ?? "");
 					items.push({
 						id: match[1],
 						name,
@@ -519,7 +536,9 @@ window.__ModuleLoader__.load({
 						selectorLabel: `${name} · ${match[1]} · ${role}`,
 						detail: `${match[1]} · ${role}`,
 						role,
-						disabled: info?.metadataCapture === true && info?.videoCapture !== true && info?.videoCaptureMultiplanar !== true
+						disabled,
+						priority: disabled ? 3 : usb && capture ? 0 : capture ? 1 : 2,
+						preferredFormat: capture ? (usb ? "MJPG" : "YUYV") : null
 					});
 					continue;
 				}
@@ -528,7 +547,7 @@ window.__ModuleLoader__.load({
 				// selector identifies the physical device, not only videoN.
 				if (/:$/.test(line) && !/^crw/i.test(line)) groupName = line.replace(/:$/, "");
 			}
-			return items;
+			return items.sort((left, right) => left.priority - right.priority || left.id.localeCompare(right.id));
 		}
 
 		/** Parse ALSA/PulseAudio enumeration lines into named devices. */
@@ -656,7 +675,9 @@ window.__ModuleLoader__.load({
 					label: item.label,
 					selectorLabel: item.selectorLabel,
 					role: item.role,
-					disabled: item.disabled === true
+					disabled: item.disabled === true,
+					priority: item.priority,
+					preferredFormat: item.preferredFormat
 				}));
 			const capture = factLines(payload, "audioCapture").map(parseAlsaPcmLine).filter(Boolean);
 			const playback = factLines(payload, "audioPlayback").map(parseAlsaPcmLine).filter(Boolean);
@@ -693,6 +714,27 @@ window.__ModuleLoader__.load({
 			};
 		}
 
+		/** Stable signature for resetting a camera format only when a node or capability changed. */
+		function cameraCapabilitySignature(inventory, choices) {
+			const cameras = Array.isArray(choices) ? choices : choices ? [choices] : [];
+			if (cameras.length === 0) return "no-camera";
+			return JSON.stringify(cameras.map((choice) => {
+				const formats = inventory?.videoFormats?.get?.(choice.value)?.formats ?? [];
+				return {
+					device: choice.value,
+					disabled: choice.disabled === true,
+					preferredFormat: choice.preferredFormat ?? null,
+					formats: formats.map((format) => ({
+						fourcc: format.fourcc,
+						sizes: (format.sizes ?? []).map((size) => ({
+							value: size.value,
+							fps: size.fps ?? []
+						}))
+					}))
+				};
+			}));
+		}
+
 		/** Convert the fixed peripheral inventory into safe selector options. */
 		function peripheralChoices(inventory) {
 			const data = inventory ?? {};
@@ -704,9 +746,17 @@ window.__ModuleLoader__.load({
 					const label = typeof entry === "object"
 						? entry.selectorLabel ?? entry.label ?? text
 						: text;
-					return [{ value: match[1], label, disabled: entry?.disabled === true }];
+					return [{
+						value: match[1],
+						label,
+						disabled: entry?.disabled === true,
+						priority: Number.isInteger(entry?.priority) ? entry.priority : 2,
+						preferredFormat: entry?.preferredFormat ?? null
+					}];
 				})
-				.filter((item, index, all) => all.findIndex((candidate) => candidate.value === item.value) === index);
+				.filter((item, index, all) => all.findIndex((candidate) => candidate.value === item.value) === index)
+				.sort((left, right) => left.priority - right.priority)
+				.map(({ priority, ...item }) => item);
 			const alsa = (items) => (items ?? []).map((item) => {
 				const identity = `${item.cardId ?? ""} ${item.deviceId ?? ""}`.toLowerCase();
 				const external = /(usb|uac|camera|ugreen|webcam)/u.test(identity) && !/(ascend310b|platform-sound|built-in)/u.test(identity);
@@ -729,7 +779,7 @@ window.__ModuleLoader__.load({
 			const pulseSources = pulse(data.pulseSources).filter((item) => item.monitor !== true);
 			const pulseSinks = pulse(data.pulseSinks);
 			return {
-				cameras: cameras.length > 0 ? cameras : [{ value: "/dev/video0", label: "/dev/video0 · 默认候选" }],
+				cameras,
 				alsaCapture,
 				alsaPlayback,
 				pulseSources,
@@ -758,6 +808,8 @@ window.__ModuleLoader__.load({
 
 		/** Camera, microphone and speaker acquisition controls for one board. */
 		function PeripheralTester(props) {
+			const [previewAttempt, setPreviewAttempt] = react.useState(0);
+			const [previewError, setPreviewError] = react.useState("");
 			const mode = props.mode;
 			const modes = props.modes ?? [
 				["camera", "摄像头"],
@@ -775,14 +827,22 @@ window.__ModuleLoader__.load({
 				: mode === "microphone"
 					? choices.audioSources
 					: choices.audioSinks;
-			const selectedValue = mode === "camera" ? form.device : mode === "microphone" ? form.sourceKey : form.sinkKey;
+			const selectedValue = (
+				mode === "camera"
+					? form.device
+					: mode === "microphone"
+						? form.sourceKey
+						: form.sinkKey
+			) || options.find((option) => option.disabled !== true && option.monitor !== true)?.value || "";
 			const deviceOptions = options.some((option) => option.value === selectedValue)
 				? options
 				: selectedValue
 					? [{ value: selectedValue, label: selectedValue }, ...options]
 					: options;
-			const reportedFormats = props.inventory?.videoFormats?.get?.(form.device)?.formats ?? [];
-			const formatOptions = reportedFormats.length > 0
+			const selectedOption = options.find((option) => option.value === selectedValue) ?? null;
+			const preferredFormat = mode === "camera" ? selectedOption?.preferredFormat ?? null : null;
+			const reportedFormats = props.inventory?.videoFormats?.get?.(selectedValue)?.formats ?? [];
+			const formatOptions = (reportedFormats.length > 0
 				? reportedFormats.map((format) => ({
 						value: format.fourcc,
 						label: `${format.fourcc}${format.description ? ` · ${format.description}` : ""}`
@@ -790,10 +850,13 @@ window.__ModuleLoader__.load({
 				: [
 						{ value: "MJPG", label: "MJPG（尚未从设备采集格式列表）" },
 						{ value: "YUYV", label: "YUYV（尚未从设备采集格式列表）" }
-					];
-			const selectedFormatValue = formatOptions.some((item) => item.value === form.pixelFormat)
+					]).sort((left, right) => Number(right.value === preferredFormat) - Number(left.value === preferredFormat));
+			const formatBelongsToSelectedDevice = form.device === selectedValue;
+			const selectedFormatValue = formatBelongsToSelectedDevice && formatOptions.some((item) => item.value === form.pixelFormat)
 				? form.pixelFormat
-				: formatOptions[0]?.value ?? form.pixelFormat;
+				: formatOptions.find((item) => item.value === preferredFormat)?.value
+					?? formatOptions[0]?.value
+					?? form.pixelFormat;
 			const selectedFormat = reportedFormats.find((format) => format.fourcc === selectedFormatValue) ?? null;
 			const reportedResolutions = selectedFormat?.sizes ?? [];
 			const resolutions = reportedResolutions.length > 0
@@ -821,8 +884,17 @@ window.__ModuleLoader__.load({
 			const selectedFps = fpsOptions.some((item) => item.value === String(form.fps))
 				? String(form.fps)
 				: fpsOptions[0]?.value ?? "30";
+			const changeCameraDevice = (value) => {
+				const nextChoice = deviceOptions.find((option) => option.value === value) ?? null;
+				props.onField("device", value);
+				props.onField("pixelFormat", nextChoice?.preferredFormat ?? "");
+			};
 			react.useEffect(() => {
 				if (mode !== "camera") return;
+				if (selectedValue !== "" && form.device !== selectedValue) {
+					props.onField("device", selectedValue);
+					if (preferredFormat !== null) props.onField("pixelFormat", preferredFormat);
+				}
 				if (formatOptions.length > 0 && form.pixelFormat !== selectedFormatValue) {
 					props.onField("pixelFormat", selectedFormatValue);
 				}
@@ -830,7 +902,7 @@ window.__ModuleLoader__.load({
 					props.onResolution(selectedSize.width, selectedSize.height);
 				}
 				if (String(form.fps ?? "") !== selectedFps) props.onField("fps", selectedFps);
-			}, [form.fps, form.height, form.pixelFormat, form.width, mode, selectedFormatValue, selectedFps, selectedSize]);
+			}, [form.device, form.fps, form.height, form.pixelFormat, form.width, mode, preferredFormat, selectedFormatValue, selectedFps, selectedSize, selectedValue]);
 			const field = (id, label, control) =>
 				h(
 					"div",
@@ -871,6 +943,35 @@ window.__ModuleLoader__.load({
 			const cameraPreview = mode === "camera" && result?.ok === true && typeof result.output === "string" && result.output !== ""
 				? `${CAMERA_PREVIEW_URL}?target=${encodeURIComponent(props.targetId ?? "")}&file=${encodeURIComponent(result.output)}&v=${encodeURIComponent(result.data?.sha256 ?? "")}`
 				: null;
+			const previewSource = cameraPreview === null
+				? null
+				: `${cameraPreview}${cameraPreview.includes("?") ? "&" : "?"}retry=${previewAttempt}`;
+			const cameraCapabilityConfirmed = mode !== "camera"
+				|| (selectedValue !== "" && selectedOption?.disabled !== true && preferredFormat !== null);
+			const actionDisabled = running
+				|| selectedValue === ""
+				|| (mode === "camera"
+					? refreshing || online !== true || !cameraCapabilityConfirmed
+					: online === false);
+			react.useEffect(() => {
+				setPreviewAttempt(0);
+				setPreviewError("");
+			}, [cameraPreview]);
+			const retryPreview = () => {
+				setPreviewError("");
+				setPreviewAttempt((attempt) => attempt + 1);
+			};
+			const actionTitle = mode === "camera" && refreshing
+				? "正在更新摄像头能力，完成后才能采集"
+				: mode === "camera" && online !== true
+					? "在线状态尚未确认，完成在线检查后才能采集"
+					: mode === "camera" && !cameraCapabilityConfirmed
+						? "该节点的采集能力尚未确认，请先更新摄像头信息"
+						: online === false
+							? "当前开发板 SSH 不可达"
+							: selectedValue === ""
+								? "先刷新外设信息并选择有效设备节点"
+								: "执行一次真实外设测试";
 			const resultText = result?.text ?? "";
 			const playback = props.recordingPlayback ?? { phase: "idle", result: null, message: "" };
 			const playbackData = playback.result?.data ?? {};
@@ -890,9 +991,10 @@ window.__ModuleLoader__.load({
 						["采集后端", data.captureBackend],
 						["实际分辨率", data.actualWidth && data.actualHeight ? `${data.actualWidth}×${data.actualHeight}` : null],
 						["实际 FourCC", data.fourcc],
-						["实际帧率", data.actualFps ? `${data.actualFps} fps` : null],
+						["协商帧率", data.negotiatedFps ? `${data.negotiatedFps} fps` : null],
 						["读取帧数", data.frameCount],
 						["文件字节", data.bytes],
+						["采集阶段耗时", data.captureElapsedSec !== undefined ? `${data.captureElapsedSec} s` : null],
 						["SHA-256", data.sha256]
 					]
 				: mode === "microphone"
@@ -969,7 +1071,7 @@ window.__ModuleLoader__.load({
 					{ className: "ad-test-grid" },
 					mode === "camera"
 						? [
-								field("device", "V4L2 摄像头", select("device", form.device, (value) => props.onField("device", value), deviceOptions)),
+								field("device", "V4L2 摄像头", select("device", form.device, changeCameraDevice, deviceOptions)),
 								field(
 									"pixel",
 									"像素格式",
@@ -1032,15 +1134,27 @@ window.__ModuleLoader__.load({
 						{
 							className: "ad-button ad-primary",
 							type: "button",
-							disabled: running || online === false,
+							disabled: actionDisabled,
 							onClick: () => props.onRun(mode),
-							title: online === false ? "当前开发板 SSH 不可达" : "执行一次真实外设测试"
+							title: actionTitle
 						},
 						phase === "running"
 							? mode === "microphone" ? `录音 ${form.durationSec} 秒中…` : "测试中…"
 							: mode === "camera" ? "采集一帧" : mode === "microphone" ? `录制 ${form.durationSec} 秒` : "播放测试音"
 					),
-					h("span", { className: "ad-test-note" }, online === true ? "开发板 SSH 在线" : online === false ? "开发板 SSH 离线，测试不可用" : "在线状态尚未检测")
+					h(
+						"span",
+						{ className: "ad-test-note" },
+						online === false
+							? "开发板 SSH 离线，测试不可用"
+							: online !== true
+								? "在线状态尚未确认，采集按钮暂不可用"
+								: mode === "camera" && refreshing
+									? "正在刷新摄像头能力，采集按钮暂不可用"
+									: mode === "camera" && !cameraCapabilityConfirmed
+										? "摄像头采集能力尚未确认，请先更新摄像头信息"
+										: "开发板 SSH 在线"
+					)
 				),
 				h(
 					"div",
@@ -1105,11 +1219,35 @@ window.__ModuleLoader__.load({
 							"div",
 							{ className: "ad-camera-preview" },
 							cameraPreview
-								? h(
-										"a",
-										{ href: cameraPreview, target: "_blank", rel: "noopener noreferrer", title: "在新窗口打开原始 JPEG" },
-										h("img", { src: cameraPreview, alt: "摄像头本次采集画面", loading: "eager", decoding: "async" })
-									)
+								? previewError
+									? h(
+											"div",
+											{ className: "ad-camera-preview-feedback", role: "alert" },
+											h("span", { className: "ad-error" }, "画面预览加载失败；采集文件仍保存在板端，可重试读取。"),
+											h(
+												"button",
+												{
+													className: "ad-button ad-primary",
+													type: "button",
+													onClick: retryPreview,
+													title: "重新请求当前 JPEG 的受限预览"
+												},
+												"重试预览"
+											)
+										)
+									: h(
+											"a",
+											{ href: previewSource, target: "_blank", rel: "noopener noreferrer", title: "在新窗口打开原始 JPEG" },
+											h("img", {
+												key: previewAttempt,
+												src: previewSource,
+												alt: "摄像头本次采集画面",
+												loading: "eager",
+												decoding: "async",
+												onError: () => setPreviewError("画面预览加载失败。"),
+												onLoad: () => setPreviewError("")
+											})
+										)
 								: h("span", { className: "ad-note" }, "采集成功后会在这里显示本次 JPEG 画面。")
 						)
 					: null,
@@ -1397,7 +1535,8 @@ window.__ModuleLoader__.load({
 
 		/** Full v4l2-ctl --list-formats-ext capability report for one camera node. */
 		function CameraFormats(props) {
-			const formats = props.inventory?.videoFormats?.get?.(props.device)?.formats ?? [];
+			const formats = [...(props.inventory?.videoFormats?.get?.(props.device)?.formats ?? [])]
+				.sort((left, right) => Number(right.fourcc === props.preferredFormat) - Number(left.fourcc === props.preferredFormat));
 			if (formats.length === 0) {
 				return h("div", { className: "ad-empty" }, "尚无该节点的格式列表；设备插拔后点击「更新摄像头信息」从 v4l2-ctl 重新采集。");
 			}
@@ -2125,7 +2264,7 @@ window.__ModuleLoader__.load({
 			const [peripheralMode, setPeripheralMode] = react.useState("camera");
 			// Camera and audio pages set their own default mode when opened.
 			const [peripheralForm, setPeripheralForm] = react.useState({
-				camera: { device: "/dev/video0", width: 640, height: 480, fps: 30, pixelFormat: "MJPG" },
+				camera: { device: "", width: 640, height: 480, fps: 30, pixelFormat: "MJPG" },
 				microphone: { sourceKey: "alsa:plughw:0,0", backend: "alsa", device: "plughw:0,0", durationSec: 3, sampleRate: 16000, channels: 1 },
 				speaker: { sinkKey: "alsa:plughw:0,0", backend: "alsa", device: "plughw:0,0", durationSec: 1, sampleRate: 48000, channels: 1, frequency: 440 }
 			});
@@ -2143,6 +2282,7 @@ window.__ModuleLoader__.load({
 			const livenessGeneration = react.useRef(0);
 			const mountedRef = react.useRef(true);
 			const rootRef = react.useRef(null);
+			const cameraCapabilityRef = react.useRef("");
 			const tabRefs = react.useRef({});
 			const loadController = react.useRef(null);
 			const discoveryController = react.useRef(null);
@@ -2166,6 +2306,7 @@ window.__ModuleLoader__.load({
 			const setSelectedTarget = react.useCallback((targetId) => {
 				const next = targetId ?? "";
 				if (selectedRef.current !== next) {
+					if (selectedRef.current !== "") cameraCapabilityRef.current = "";
 					peripheralGeneration.current += 1;
 					playbackGeneration.current += 1;
 					cameraRefreshGeneration.current += 1;
@@ -2249,10 +2390,17 @@ window.__ModuleLoader__.load({
 			}, []);
 			const applyInventoryDefaults = react.useCallback((inventory) => {
 				const choices = peripheralChoices(inventory);
+				const availableCamera = choices.cameras.find((item) => item.disabled !== true) ?? null;
+				const capabilitySignature = cameraCapabilitySignature(inventory, choices.cameras);
+				const capabilityChanged = cameraCapabilityRef.current !== capabilitySignature;
+				cameraCapabilityRef.current = capabilitySignature;
 				setPeripheralForm((previous) => {
-					const cameraDevice = choices.cameras.some((item) => item.value === previous.camera.device && item.disabled !== true)
-						? previous.camera.device
-						: choices.cameras.find((item) => item.disabled !== true)?.value ?? "/dev/video0";
+					const cameraChoice = choices.cameras.some((item) => item.value === previous.camera.device && item.disabled !== true)
+						? choices.cameras.find((item) => item.value === previous.camera.device)
+						: availableCamera;
+					const cameraDevice = cameraChoice?.value ?? "";
+					const deviceChanged = previous.camera.device !== cameraDevice;
+					const resetFormat = capabilityChanged || deviceChanged;
 					const microphoneChoice = choices.audioSources.find((item) => item.value === previous.microphone.sourceKey)
 						?? choices.audioSources[0]
 						?? { value: "alsa:plughw:0,0", backend: "alsa", device: "plughw:0,0" };
@@ -2261,7 +2409,15 @@ window.__ModuleLoader__.load({
 						?? { value: "alsa:plughw:0,0", backend: "alsa", device: "plughw:0,0" };
 					return {
 						...previous,
-						camera: { ...previous.camera, device: cameraDevice },
+						camera: {
+							...previous.camera,
+							device: cameraDevice,
+							pixelFormat: cameraDevice === ""
+								? ""
+								: resetFormat
+									? cameraChoice?.preferredFormat ?? ""
+									: previous.camera.pixelFormat
+						},
 						microphone: {
 							...previous.microphone,
 							sourceKey: microphoneChoice.value,
@@ -2543,7 +2699,10 @@ window.__ModuleLoader__.load({
 						body: JSON.stringify({ target, timeoutMs: spec.timeoutMs })
 					});
 					const payload = await response.json();
-					if (!response.ok || payload.ok !== true) throw new Error(payload.error ?? `HTTP ${response.status}`);
+					if (controller.signal.aborted || !response.ok || payload.ok !== true) {
+						if (controller.signal.aborted) return null;
+						throw new Error(payload.error ?? `HTTP ${response.status}`);
+					}
 					if (!mountedRef.current || spec.generation.current !== generation || selectedRef.current !== target) return null;
 					setState((previous) => previous.payload
 						? previous.payload.target?.id && previous.payload.target.id !== target
@@ -3141,6 +3300,11 @@ window.__ModuleLoader__.load({
 					ids.map((id) => groupsById.get(id)).filter(Boolean).map((group) => h(PeripheralGroup, { key: group.id, group }))
 				);
 			const peripheralInventoryState = peripheralInventoryFromPayload(payload);
+			const cameraChoices = peripheralChoices(peripheralInventoryState).cameras;
+			const effectiveCameraDevice = peripheralForm.camera.device
+				|| cameraChoices.find((item) => item.disabled !== true)?.value
+				|| "";
+			const effectiveCameraFormat = cameraChoices.find((item) => item.value === effectiveCameraDevice)?.preferredFormat ?? null;
 			const cameraPage = h(
 				"div",
 				null,
@@ -3180,7 +3344,11 @@ window.__ModuleLoader__.load({
 					"div",
 					{ className: "ad-section" },
 					h("div", { className: "ad-asset-head" }, h("h3", null, "当前节点支持的全部格式"), h("span", { className: "ad-note" }, "直接来自 v4l2-ctl --list-formats-ext")),
-					h(CameraFormats, { inventory: peripheralInventoryState, device: peripheralForm.camera.device })
+					h(CameraFormats, {
+						inventory: peripheralInventoryState,
+						device: effectiveCameraDevice,
+						preferredFormat: effectiveCameraFormat
+					})
 				),
 				h(
 					"div",
@@ -3356,7 +3524,7 @@ window.__ModuleLoader__.load({
 		 * @param ctx - the browser plugin context.
 		 */
 		function apply(ctx) {
-			installStyles();
+			ctx.effect(() => installStyles());
 			ctx.slots.inject("main", function* () {
 				yield ctx.slots.register({ name: "main", key: PANEL_ID }, AscendPanel);
 			});

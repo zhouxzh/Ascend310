@@ -78,6 +78,38 @@ try {
 		targets: [{ id: 'board-8t', label: 'configured 8T', transport: 'ssh', host: 'orangepiaipro.local', user: 'HwHiAiUser' }]
 	});
 	if (freshTable.get('board-8t')?.host !== '10.42.8.212') failures.push('fresh discovered IP should override the configured hostname');
+	const discoveredOnly = internals.targetTable({ inventoryPath: freshPath, targets: [] }).get('ascend-c0742bfdf696');
+	if (discoveredOnly?.workdir !== internals.REMOTE_WORKSPACE_ROOT) {
+		failures.push('discovered target must inherit the fixed controlled workspace without manual configuration');
+	}
+	try {
+		const fixedCwd = internals.resolveTaskCwd(discoveredOnly, null);
+		if (fixedCwd !== internals.REMOTE_WORKSPACE_ROOT) failures.push('fixed peripheral path must resolve to the discovered target workspace');
+	} catch (error) {
+		failures.push(`discovered target fixed operation path was rejected: ${error?.message ?? error}`);
+	}
+	const duplicateBindingPath = join(directory, 'duplicate-binding-inventory.json');
+	const duplicateBindingInventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+	duplicateBindingInventory.preferences = {
+		bindings: {
+			'board-8t': 'ascend-c0742bfddf83',
+			'board-20t': 'ascend-c0742bfddf83'
+		}
+	};
+	writeFileSync(duplicateBindingPath, JSON.stringify(duplicateBindingInventory), 'utf8');
+	const duplicateBindingTable = internals.targetTable({
+		inventoryPath: duplicateBindingPath,
+		targets: [
+			{ id: 'board-8t', transport: 'ssh', host: '10.42.8.200' },
+			{ id: 'board-20t', transport: 'ssh', host: '10.42.8.201' }
+		]
+	});
+	if (duplicateBindingTable.get('board-8t')?.mac !== 'c0:74:2b:fd:df:83') {
+		failures.push('first valid configured binding should own the discovered physical board');
+	}
+	if (duplicateBindingTable.get('board-20t')?.mac !== null || duplicateBindingTable.get('board-20t')?.host !== '10.42.8.201') {
+		failures.push('a second configured board must not bind to the same discovered physical board');
+	}
 	const macBound = internals.targetTable({
 		inventoryPath,
 		targets: [{ id: 'board-8t', transport: 'ssh', host: 'orangepiaipro.local', mac: 'c0:74:2b:fd:df:83' }]
@@ -107,20 +139,58 @@ try {
 	const clearBindingInventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
 	clearBindingInventory.boards['c0:74:2b:fd:df:83'].configuredId = 'board-8t';
 	writeFileSync(clearBindingPath, JSON.stringify(clearBindingInventory), 'utf8');
+	const reboundReportsPath = join(directory, 'rebound-reports.json');
+	writeFileSync(reboundReportsPath, JSON.stringify({ reports: { 'board-8t': { ok: true, facts: { videoDevices: { value: '/dev/video0' } } } } }), 'utf8');
 	internals.rememberBinding(
 		{
 			inventoryPath: clearBindingPath,
+			reportStorePath: reboundReportsPath,
 			targets: [{ id: 'board-8t', transport: 'ssh', host: 'orangepiaipro.local' }]
 		},
 		'board-8t',
 		'ascend-c0742bfddf83'
 	);
 	const clearBindingResult = JSON.parse(readFileSync(clearBindingPath, 'utf8'));
+	if (JSON.parse(readFileSync(reboundReportsPath, 'utf8')).reports?.['board-8t'] !== undefined) {
+		failures.push('rebinding a configured target must invalidate its previous board report');
+	}
 	if (clearBindingResult.boards['c0:74:2b:fd:f6:96']?.configuredId !== null) {
 		failures.push('explicit binding must clear stale configuredId labels from other physical-board records');
 	}
 	if (clearBindingResult.boards['c0:74:2b:fd:df:83']?.configuredId !== 'board-8t') {
 		failures.push('explicit binding must retain configuredId on the selected physical-board record');
+	}
+	const categoryReportsPath = join(directory, 'category-reports.json');
+	writeFileSync(categoryReportsPath, JSON.stringify({
+		reports: {
+			'board-8t': {
+				ok: true,
+				target: { id: 'board-8t' },
+				facts: {
+					soc: { value: 'Ascend310B4' },
+					videoDevices: { value: '/dev/video0' },
+					videoFormats: { value: 'old' }
+				}
+			}
+		}
+	}), 'utf8');
+	const categoryConfig = {
+		inventoryPath,
+		reportStorePath: categoryReportsPath,
+		targets: [{ id: 'board-8t', transport: 'ssh', host: 'orangepiaipro.local' }]
+	};
+	const mergedCamera = internals.mergeSavedFacts(
+		categoryConfig,
+		{ id: 'board-8t', transport: 'ssh', host: 'orangepiaipro.local' },
+		{ usbDevices: { value: 'new' } },
+		'camera',
+		'2026-11-16T00:00:00.000Z'
+	);
+	if ('videoDevices' in mergedCamera.facts || 'videoFormats' in mergedCamera.facts) {
+		failures.push('camera refresh must remove camera facts absent from the new observation');
+	}
+	if (mergedCamera.facts.soc?.value !== 'Ascend310B4' || mergedCamera.facts.usbDevices?.value !== 'new') {
+		failures.push('camera refresh must retain unrelated facts and merge new camera facts');
 	}
 	const publicBoards = internals.publicInventory({
 		inventoryPath: clearBindingPath,
@@ -149,6 +219,18 @@ try {
 	}, { timeoutMs: 250 });
 	if (invalidLiveness.targets?.[0]?.online !== false || invalidLiveness.targets?.[0]?.state !== 'invalid') {
 		failures.push('invalid liveness targets must be reported offline, not attempted');
+	}
+	try {
+		internals.targetTable({
+			inventoryPath,
+			targets: [
+				{ id: 'duplicate', transport: 'ssh', host: '198.51.100.10' },
+				{ id: 'duplicate', transport: 'ssh', host: '198.51.100.11' }
+			]
+		});
+		failures.push('duplicate configured target ids must be rejected');
+	} catch (error) {
+		if (!String(error?.message ?? error).includes('重复')) failures.push(`duplicate target error was not actionable: ${error}`);
 	}
 	const aliasInventoryPath = join(directory, 'alias-inventory.json');
 	internals.recordEnvironment({ inventoryPath: aliasInventoryPath }, {

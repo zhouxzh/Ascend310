@@ -99,6 +99,25 @@ const SENSITIVE_PATH =
 const SAFE_READ_PATH =
 	/^(?:\/dev\/(?:davinci|devmm|hisi_hdc|video|media|snd|v4l-subdev)|\/sys\/|\/proc\/(?:asound\/cards|cpuinfo|version|meminfo|net\/|device-tree\/)|\/etc\/(?:os-release|hostname|hosts|ascend_install\.info)$|\/usr\/local\/Ascend\/|\/var\/davinci\/|\/var\/log\/(?:syslog|kern\.log|dmesg|messages)(?:\/|$))/u;
 
+/** Strip one matching shell quote pair from a path token. */
+function unquotePath(value) {
+	const text = String(value ?? '');
+	if (text.length >= 2 && ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'")))) {
+		return text.slice(1, -1);
+	}
+	return text;
+}
+
+/** Normalize a POSIX diagnostic path and reject any parent traversal. */
+function normalizeReadPath(value) {
+	const text = unquotePath(value);
+	if (!text.startsWith('/')) return null;
+	const parts = text.split('/');
+	if (parts.includes('..')) return null;
+	const normalized = `/${parts.filter((part) => part !== '' && part !== '.').join('/')}`;
+	return normalized === '/' ? '/' : normalized.replace(/\/+$/u, '');
+}
+
 /** Substrings that indicate a command intends to change state. */
 const MUTATING_TOKENS = Object.freeze([
 	'rm ',
@@ -354,10 +373,16 @@ export function validateReadOnlyCommand(command) {
 	if (SENSITIVE_PATH.test(text)) {
 		return { ok: false, reason: '命令涉及用户凭据、私钥或进程环境文件，禁止通过只读诊断读取。' };
 	}
+	const tokens = text.split(/\s+/u);
+	for (const token of tokens) {
+		const candidate = unquotePath(token);
+		if (candidate.includes('/') && candidate.split('/').includes('..')) {
+			return { ok: false, reason: '只读诊断路径不能包含 .. 父目录跳转。' };
+		}
+	}
 	for (const token of MUTATING_TOKENS) {
 		if (lower.includes(token)) return { ok: false, reason: `命令包含可能改变系统状态的操作：${token.trim()}` };
 	}
-	const tokens = text.split(/\s+/);
 	const base = tokens[0];
 	// Only a bare program name from PATH is accepted. Allowing ./npu-smi would
 	// let a repository-local executable borrow an allowlisted name.
@@ -385,8 +410,12 @@ function validateReadPaths(base, args) {
 	if (base === 'ls' && paths.length === 0) return { ok: true, reason: '允许：ls 当前目录。' };
 	if (paths.length === 0) return { ok: false, reason: `${base} 必须指定可诊断的路径。` };
 	for (const target of paths) {
-		if (SAFE_READ_PATH.test(target)) continue;
-		if (base === 'ls' && /^\/(?:dev|sys|proc)(?:\/|$)/u.test(target)) continue;
+		const normalized = normalizeReadPath(target);
+		if (normalized === null) {
+			return { ok: false, reason: `${base} 只接受不含父目录跳转的绝对POSIX路径：${target}` };
+		}
+		if (SAFE_READ_PATH.test(normalized)) continue;
+		if (base === 'ls' && /^\/(?:dev|sys|proc)(?:\/|$)/u.test(normalized)) continue;
 		return { ok: false, reason: `${base} 只允许读取设备、CANN、系统版本或日志路径：${target}` };
 	}
 	return { ok: true, reason: `允许：${base} 诊断路径。` };
@@ -615,11 +644,13 @@ export async function runRemoteScript({ script, target, timeoutMs = 60000, exec 
  * @param {function} [options.exec] - injectable executor for tests.
  * @returns {Promise<object>} execution result.
  */
-export async function runLocalScript({ script, cwd, timeoutMs = 60000, exec = execFileCapture }) {
+export async function runLocalScript({ script, cwd, timeoutMs = 60000, exec = execFileCapture, signal }) {
+	signal?.throwIfAborted();
 	const isWindows = process.platform === 'win32';
 	const file = isWindows ? 'bash' : '/bin/sh';
 	const args = ['-lc', script];
-	const result = await exec({ file, args, cwd, timeoutMs });
+	const result = await exec({ file, args, cwd, timeoutMs, signal });
+	signal?.throwIfAborted();
 	return {
 		...result,
 		ok: result.code === 0 && result.timedOut !== true,
@@ -632,15 +663,15 @@ export async function runLocalScript({ script, cwd, timeoutMs = 60000, exec = ex
 }
 
 /** Run one explicitly approved task command over SSH, optionally in a cwd. */
-export async function runRemoteShell({ script, target, cwd, timeoutMs = 60000, exec = execFileCapture, input = null }) {
+export async function runRemoteShell({ script, target, cwd, timeoutMs = 60000, exec = execFileCapture, input = null, signal }) {
 	const command = cwd ? `cd ${quote(cwd)} && { ${script}; }` : script;
-	const result = await runRemoteScript({ script: command, target, timeoutMs, exec, input });
+	const result = await runRemoteScript({ script: command, target, timeoutMs, exec, input, signal });
 	return { ...result, command };
 }
 
 /** Run one explicitly approved task command on the local host. */
-export async function runLocalShell({ script, cwd, timeoutMs = 60000, exec = execFileCapture }) {
+export async function runLocalShell({ script, cwd, timeoutMs = 60000, exec = execFileCapture, signal }) {
 	const command = cwd ? `cd ${quote(cwd)} && { ${script}; }` : script;
-	const result = await runLocalScript({ script: command, timeoutMs, exec });
+	const result = await runLocalScript({ script: command, timeoutMs, exec, signal });
 	return { ...result, command };
 }

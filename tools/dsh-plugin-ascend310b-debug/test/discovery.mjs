@@ -8,7 +8,8 @@
  * Usage: node test/discovery.mjs
  */
 
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,12 +27,14 @@ import {
 import { isIdentityMacInterface } from '../lib/probe.js';
 import {
 	boardIdForMac,
+	DISCOVERED_TARGET_WORKDIR,
 	inventoryPath,
 	inventoryTargets,
 	normalizeMac,
 	observeBoard,
 	readInventory,
-	saveInventory
+	saveInventory,
+	updateInventory
 } from '../lib/inventory.js';
 
 const failures = [];
@@ -265,6 +268,74 @@ equal(partial.board.system.cannVersion, '9.2.0', '缺失 CANN 字段应保留上
 
 const directory = mkdtempSync(join(tmpdir(), 'ascend-inventory-'));
 try {
+	const transactionPath = join(directory, 'transaction.json');
+	const goPath = join(directory, 'transaction.go');
+	writeFileSync(transactionPath, JSON.stringify({ version: 1, boards: {}, preferences: { counter: 0 } }), 'utf8');
+	const inventoryModule = new URL('../lib/inventory.js', import.meta.url).href;
+	const childSource = `
+import { existsSync } from 'node:fs';
+import { updateInventory } from ${JSON.stringify(inventoryModule)};
+const inventoryFile = process.env.INVENTORY_TRANSACTION_PATH;
+const goFile = process.env.INVENTORY_TRANSACTION_GO;
+const cell = new Int32Array(new SharedArrayBuffer(4));
+while (!existsSync(goFile)) Atomics.wait(cell, 0, 0, 5);
+updateInventory(inventoryFile, (inventory) => {
+	const previous = Number(inventory.preferences?.counter ?? 0);
+	Atomics.wait(cell, 0, 0, 60);
+	inventory.preferences = { ...(inventory.preferences ?? {}), counter: previous + 1 };
+});
+`;
+	const runTransactionChild = () => new Promise((resolve, reject) => {
+		const child = spawn(process.execPath, ['--input-type=module', '--eval', childSource], {
+			env: {
+				...process.env,
+				INVENTORY_TRANSACTION_PATH: transactionPath,
+				INVENTORY_TRANSACTION_GO: goPath
+			},
+			stdio: ['ignore', 'pipe', 'pipe']
+		});
+		let stderr = '';
+		child.stderr.setEncoding('utf8');
+		child.stderr.on('data', (chunk) => {
+			stderr += chunk;
+		});
+		child.once('error', reject);
+		child.once('exit', (code) => {
+			if (code === 0) resolve();
+			else reject(new Error(`inventory transaction child exited ${code}: ${stderr}`));
+		});
+	});
+	const transactionChildren = Array.from({ length: 4 }, runTransactionChild);
+	writeFileSync(goPath, 'go', 'utf8');
+	await Promise.all(transactionChildren);
+	const transactionResult = readInventory(transactionPath);
+	equal(transactionResult.preferences?.counter, 4, '并发 inventory 事务必须从锁内最新快照完成读改写，不能丢失更新');
+	const updateResult = updateInventory(transactionPath, (value) => {
+		value.preferences.label = 'transaction-result';
+		return 'updated';
+	});
+	equal(updateResult.result, 'updated', 'inventory 事务应返回更新回调结果');
+	equal(readInventory(transactionPath).preferences?.label, 'transaction-result', 'inventory 事务应原子持久化回调修改');
+	const duplicateBindingPath = join(directory, 'duplicate-bindings.json');
+	saveInventory(duplicateBindingPath, {
+		version: 1,
+		boards: {
+			'c0:74:2b:fd:df:83': {
+				id: 'ascend-c0742bfddf83',
+				mac: 'c0:74:2b:fd:df:83',
+				system: { soc: 'Ascend310B4' }
+			}
+		},
+		preferences: {
+			bindings: {
+				'board-8t': 'ascend-c0742bfddf83',
+				'board-20t': 'ascend-c0742bfddf83'
+			}
+		}
+	});
+	const persistedBindings = JSON.parse(readFileSync(duplicateBindingPath, 'utf8')).preferences.bindings;
+	equal(JSON.stringify(persistedBindings), JSON.stringify({ 'board-8t': 'ascend-c0742bfddf83' }), '重复配置绑定不得在同一物理板上持久化');
+
 	const path = join(directory, 'inventory.json');
 	saveInventory(path, changed.inventory);
 	const staleLock = `${path}.lock`;
@@ -283,6 +354,7 @@ try {
 	const targets = inventoryTargets(loaded, 'HwHiAiUser', Date.parse('2026-10-18T02:10:00.000Z'));
 	equal(targets[0].id, 'ascend-c0742bfddd7a', '资产表应生成稳定 target id');
 	equal(targets[0].host, '10.0.0.120', '动态 target 应使用最近一次 IP');
+	equal(targets[0].workdir, DISCOVERED_TARGET_WORKDIR, '发现 target 必须自带受控工作区，固定外设操作不能要求手工 workdir');
 	const staleTargets = inventoryTargets(loaded, 'HwHiAiUser', Date.parse('2026-10-18T03:00:01.000Z'));
 	equal(staleTargets[0]?.recent, false, '超过新鲜度窗口的记录必须显式标记为历史');
 	check(targets[0].note.includes('c0:74:2b:fd:dd:7a'), 'target 备注应保留 MAC');

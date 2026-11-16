@@ -84,6 +84,10 @@ for (const [label, text, tool] of [
 ]) {
 	if (!text.includes(tool)) failures.push(`${label} skill: must name fixed tool ${tool}`);
 }
+if (cameraSkill.includes('cv2.VideoCapture')) failures.push('camera skill: 前端显示不得要求OpenCV');
+if (!cameraSkill.includes('image/jpeg') || !cameraSkill.includes('<img>')) {
+	failures.push('camera skill: 必须说明浏览器原生JPEG显示链路');
+}
 for (const [label, text] of [
 	['camera', cameraSkill],
 	['microphone', microphoneSkill],

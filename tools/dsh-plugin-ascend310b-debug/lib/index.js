@@ -34,7 +34,7 @@ import {
 import { buildPlan, renderPlan } from './plan.js';
 import { AREAS, ENTRIES } from './knowledge.js';
 import { buildAudioProbeScript, buildCameraProbeScript, buildProbeScript, buildSystemProbeScript, parseProbeOutput } from './probe.js';
-import { inventoryPath, inventoryTargets, normalizeMac, observeBoard, readInventory, saveInventory, systemFromFacts } from './inventory.js';
+import { inventoryPath, inventoryTargets, normalizeMac, observeBoard, readInventory, systemFromFacts, updateInventory, updateJsonFile } from './inventory.js';
 import { captureScreenshot, findBrowser } from './capture.js';
 import { loadCaseDependencies } from './dependencies.js';
 import { installAptPackages, validateAptPackages } from './install.js';
@@ -162,6 +162,22 @@ const SAVED_REPORT_FIELDS = [
 	'rawExcerpt'
 ];
 
+const CATEGORY_FACT_KEYS = Object.freeze({
+	camera: ['videoDevices', 'videoDetails', 'videoFormats', 'usbDevices'],
+	audio: [
+		'soundCards',
+		'audioPlayback',
+		'audioCapture',
+		'audioSinks',
+		'audioSources',
+		'pulseCards',
+		'pulseCardDetails',
+		'bluetoothController',
+		'bluetoothDevices',
+		'bluetoothInfo'
+	]
+});
+
 /** Local file holding the last successful panel report for each target. */
 function savedReportsPath(config) {
 	const configured = config?.reportStorePath;
@@ -188,7 +204,6 @@ function readSavedReport(config, targetId) {
 function rememberSavedReport(config, value) {
 	if (value?.ok !== true || typeof value?.target?.id !== 'string') return;
 	try {
-		const reports = readSavedReports(config);
 		const saved = {};
 		for (const field of SAVED_REPORT_FIELDS) {
 			if (value[field] !== undefined) saved[field] = value[field];
@@ -200,10 +215,25 @@ function rememberSavedReport(config, value) {
 			host: value.target.host ?? '',
 			user: value.target.user ?? ''
 		};
-		reports[value.target.id] = saved;
-		saveInventory(savedReportsPath(config), { reports });
+		updateJsonFile(savedReportsPath(config), (store) => {
+			if (store.reports === null || typeof store.reports !== 'object' || Array.isArray(store.reports)) store.reports = {};
+			store.reports[value.target.id] = saved;
+		});
 	} catch {
 		// A cache-write failure must not discard a probe result already produced.
+	}
+}
+
+/** Drop stale board facts for one configured target after an identity rebind. */
+function forgetSavedReport(config, targetId) {
+	if (typeof targetId !== 'string' || targetId === '') return;
+	try {
+		updateJsonFile(savedReportsPath(config), (store) => {
+			if (store.reports === null || typeof store.reports !== 'object' || Array.isArray(store.reports)) return;
+			delete store.reports[targetId];
+		});
+	} catch {
+		// Report invalidation is best-effort; reportCache is cleared by the caller.
 	}
 }
 
@@ -255,6 +285,7 @@ function attachDiscovered(target, entry) {
 	target.hostname = target.hostname ?? entry.hostname ?? null;
 	target.port = target.port ?? entry.port ?? null;
 	target.user = target.user ?? entry.user ?? null;
+	target.workdir = target.workdir ?? entry.workdir ?? null;
 	// Discovery is a live network observation. Prefer its concrete IPv4 for
 	// execution so a stale .local or DHCP address does not outlive the scan.
 	if (entry.recent === true && typeof entry.host === 'string' && parseIPv4(entry.host) !== null) target.host = entry.host;
@@ -268,12 +299,14 @@ function targetTable(config) {
 	const configured = Array.isArray(config?.targets) ? config.targets : [];
 	for (const entry of configured) {
 		if (typeof entry?.id !== 'string' || entry.id.trim() === '') continue;
+		if (table.has(entry.id)) throw new Error(`开发板target id重复：${entry.id}`);
 		const transport = entry.transport === 'local' ? 'local' : 'ssh';
+		const host = transport === 'local' ? 'localhost' : String(entry.host ?? '');
 		table.set(entry.id, {
 			id: entry.id,
 			label: typeof entry.label === 'string' && entry.label !== '' ? entry.label : entry.id,
 			transport,
-			host: transport === 'local' ? 'localhost' : String(entry.host ?? ''),
+			host,
 			hostname: null,
 			mac: normalizeMac(entry.mac),
 			discoveredId: null,
@@ -301,7 +334,9 @@ function targetTable(config) {
 	});
 	const merged = new Set();
 	const boundEntries = new Set();
+	const boundDiscoveredIds = new Set();
 	for (const [configuredId, discoveredId] of Object.entries(bindings)) {
+		if (boundDiscoveredIds.has(discoveredId)) continue;
 		const configuredTarget = table.get(configuredId);
 		const entry = discovered.find((candidate) => candidate.id === discoveredId);
 		if (configuredTarget === undefined || entry === undefined) continue;
@@ -312,6 +347,7 @@ function targetTable(config) {
 		attachDiscovered(configuredTarget, entry);
 		merged.add(configuredId);
 		boundEntries.add(entry.id);
+		boundDiscoveredIds.add(discoveredId);
 	}
 	const hostnameCounts = new Map();
 	const configuredIdCounts = new Map();
@@ -528,7 +564,6 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 		candidates.push(value);
 	}
 	const inventoryFile = inventoryPath(config);
-	const inventory = readInventory(inventoryFile);
 	const sshPort = Number.isInteger(config?.discovery?.port) ? config.discovery.port : 22;
 	const serialObservation = {
 		status: 'reachable',
@@ -539,25 +574,40 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 	};
 	const found = [];
 	const errors = [];
-	let inventoryChanged = false;
+	let matched = null;
 	for (const ip of candidates) {
 		if (signal?.aborted === true) throw Object.assign(new Error('串口后的 SSH 验证已取消。'), { code: 'ABORT_ERR' });
 		onEvent?.({ at: new Date().toISOString(), phase: 'ssh-verify', status: 'running', detail: `trying SSH ${ip}:${sshPort}`, data: { ip, port: sshPort } });
 		try {
 			const candidate = await probeCandidate({ host: ip, user: 'HwHiAiUser', port: sshPort, timeoutMs: 20000, light: true, signal });
 			if (candidate.ok === true && candidate.scope?.applicable === true) {
+				matched = { ip, candidate };
+				break;
+			}
+			if (candidate.ok !== true) {
+				errors.push(`${ip}: ${candidate.error}`);
+				onEvent?.({ at: new Date().toISOString(), phase: 'ssh-verify', status: 'failed', detail: `${ip}: ${candidate.error}`, data: { ip, port: sshPort } });
+			}
+		} catch (error) {
+			if (error?.code === 'ABORT_ERR' || signal?.aborted === true) throw error;
+			errors.push(`${ip}: ${String(error?.message ?? error)}`);
+			onEvent?.({ at: new Date().toISOString(), phase: 'ssh-verify', status: 'failed', detail: `${ip}: ${String(error?.message ?? error)}`, data: { ip, port: sshPort } });
+		}
+	}
+	if (matched !== null || (typeof serial.macAddress === 'string' && serial.macAddress !== '')) {
+		updateInventory(inventoryFile, (inventory) => {
+			if (matched !== null) {
 				const observed = observeBoard(inventory, {
-					ip,
+					ip: matched.ip,
 					user: 'HwHiAiUser',
-					mac: candidate.mac,
-					macs: candidate.macs,
-					interfaceMacs: candidate.interfaceMacs,
-					hostname: candidate.hostname,
+					mac: matched.candidate.mac,
+					macs: matched.candidate.macs,
+					interfaceMacs: matched.candidate.interfaceMacs,
+					hostname: matched.candidate.hostname,
 					port: sshPort,
-					system: candidate.system,
+					system: matched.candidate.system,
 					serial: serialObservation
 				});
-				inventoryChanged = true;
 				found.push({
 					id: observed.board.id,
 					mac: observed.board.mac,
@@ -571,56 +621,44 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 					status: observed.status,
 					identity: 'mac'
 				});
-				break;
+				return;
 			}
-			if (candidate.ok !== true) {
-				errors.push(`${ip}: ${candidate.error}`);
-				onEvent?.({ at: new Date().toISOString(), phase: 'ssh-verify', status: 'failed', detail: `${ip}: ${candidate.error}`, data: { ip, port: sshPort } });
-			}
-		} catch (error) {
-			if (error?.code === 'ABORT_ERR' || signal?.aborted === true) throw error;
-			errors.push(`${ip}: ${String(error?.message ?? error)}`);
-			onEvent?.({ at: new Date().toISOString(), phase: 'ssh-verify', status: 'failed', detail: `${ip}: ${String(error?.message ?? error)}`, data: { ip, port: sshPort } });
-		}
-	}
-	if (found.length === 0 && typeof serial.macAddress === 'string' && serial.macAddress !== '') {
-		const serialMac = normalizeMac(serial.macAddress);
-		const existing = Object.values(inventory.boards ?? {}).find(
-			(board) => board !== null && [board.mac, ...(Array.isArray(board.macs) ? board.macs : [])].map(normalizeMac).includes(serialMac)
-		) ?? inventory.boards?.[serial.macAddress] ?? null;
-		const verifiedSoc = /^Ascend310B[14]$/iu.test(String(existing?.system?.soc ?? ''));
-		const observed = observeBoard(inventory, {
-			ip: serial.ipAddress,
-			user: 'HwHiAiUser',
-			mac: serial.macAddress,
-			macs: [serial.macAddress],
-			hostname: serial.hostname,
-			port: sshPort,
-			system: existing?.system,
-			serial: serialObservation
-		});
-		inventoryChanged = true;
-		if (verifiedSoc) {
-			found.push({
-				id: observed.board.id,
-				mac: observed.board.mac,
-				ip: observed.board.lastIp,
-				hostname: observed.board.hostname,
-				model: observed.board.system.boardModel,
-				soc: observed.board.system.soc,
-				tier: observed.board.system.tier,
-				driver: observed.board.system.driverVersion,
-				cann: observed.board.system.cannVersion,
-				status: observed.status,
-				identity: 'serial-mac'
+			const serialMac = normalizeMac(serial.macAddress);
+			const existing = Object.values(inventory.boards ?? {}).find(
+				(board) => board !== null && [board.mac, ...(Array.isArray(board.macs) ? board.macs : [])].map(normalizeMac).includes(serialMac)
+			) ?? inventory.boards?.[serial.macAddress] ?? null;
+			const verifiedSoc = /^Ascend310B[14]$/iu.test(String(existing?.system?.soc ?? ''));
+			const observed = observeBoard(inventory, {
+				ip: serial.ipAddress,
+				user: 'HwHiAiUser',
+				mac: serial.macAddress,
+				macs: [serial.macAddress],
+				hostname: serial.hostname,
+				port: sshPort,
+				system: existing?.system,
+				serial: serialObservation
 			});
-		} else {
-			errors.push(
-				`串口 ${serial.port}: 已按 MAC ${serial.macAddress} 登记，但 SSH 未确认 Ascend310B1/Ascend310B4 SoC；已保留资产记录，但不返回不可加载的 found target。`
-			);
-		}
+			if (verifiedSoc) {
+				found.push({
+					id: observed.board.id,
+					mac: observed.board.mac,
+					ip: observed.board.lastIp,
+					hostname: observed.board.hostname,
+					model: observed.board.system.boardModel,
+					soc: observed.board.system.soc,
+					tier: observed.board.system.tier,
+					driver: observed.board.system.driverVersion,
+					cann: observed.board.system.cannVersion,
+					status: observed.status,
+					identity: 'serial-mac'
+				});
+			} else {
+				errors.push(
+					`串口 ${serial.port}: 已按 MAC ${serial.macAddress} 登记，但 SSH 未确认 Ascend310B1/Ascend310B4 SoC；已保留资产记录，但不返回不可加载的 found target。`
+				);
+			}
+		});
 	}
-	if (inventoryChanged) saveInventory(inventoryFile, inventory);
 	return { found, errors, inventoryPath: inventoryFile, serial: serialObservation };
 }
 
@@ -628,11 +666,10 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 function rememberLastTarget(config, targetId) {
 	if (typeof targetId !== 'string' || targetId.trim() === '') return;
 	try {
-		const path = inventoryPath(config);
-		const inventory = readInventory(path);
-		if (inventory.preferences?.lastTarget === targetId) return;
-		inventory.preferences = { ...(inventory.preferences ?? {}), lastTarget: targetId };
-		saveInventory(path, inventory);
+		updateInventory(inventoryPath(config), (inventory) => {
+			if (inventory.preferences?.lastTarget === targetId) return;
+			inventory.preferences = { ...(inventory.preferences ?? {}), lastTarget: targetId };
+		});
 	} catch {
 		// A read-only or unavailable inventory must not break report loading.
 	}
@@ -640,22 +677,36 @@ function rememberLastTarget(config, targetId) {
 
 /** Store an explicit user binding between a configured target and a discovered board. */
 function rememberBinding(config, configuredId, discoveredId) {
-	const path = inventoryPath(config);
-	const inventory = readInventory(path);
 	const configuredTargets = Array.isArray(config?.targets) ? config.targets : [];
 	if (!configuredTargets.some((target) => target?.id === configuredId)) {
 		throw new Error(`未找到配置目标：${configuredId}`);
 	}
-	const board = Object.values(inventory.boards ?? {}).find((candidate) => candidate?.id === discoveredId);
-	if (board === undefined) throw new Error(`未找到开发板记录：${discoveredId}`);
-	for (const candidate of Object.values(inventory.boards ?? {})) {
-		if (candidate?.id !== discoveredId && candidate?.configuredId === configuredId) candidate.configuredId = null;
-	}
-	inventory.preferences = {
-		...(inventory.preferences ?? {}),
-		bindings: { ...(inventory.preferences?.bindings ?? {}), [configuredId]: discoveredId }
-	};
-	saveInventory(path, inventory);
+	const invalidatedConfiguredIds = new Set([configuredId]);
+	updateInventory(inventoryPath(config), (inventory) => {
+		const board = Object.values(inventory.boards ?? {}).find((candidate) => candidate?.id === discoveredId);
+		if (board === undefined) throw new Error(`未找到开发板记录：${discoveredId}`);
+		const bindings = { ...(inventory.preferences?.bindings ?? {}) };
+		for (const [candidateConfiguredId, candidateDiscoveredId] of Object.entries(bindings)) {
+			if (candidateDiscoveredId === discoveredId && candidateConfiguredId !== configuredId) {
+				delete bindings[candidateConfiguredId];
+				invalidatedConfiguredIds.add(candidateConfiguredId);
+			}
+		}
+		for (const candidate of Object.values(inventory.boards ?? {})) {
+			if (candidate?.id === discoveredId) continue;
+			if (candidate?.configuredId === configuredId || (candidate?.configuredId && bindings[candidate.configuredId] === undefined)) {
+				invalidatedConfiguredIds.add(candidate.configuredId);
+				candidate.configuredId = null;
+			}
+		}
+		board.configuredId = configuredId;
+		bindings[configuredId] = discoveredId;
+		inventory.preferences = {
+			...(inventory.preferences ?? {}),
+			bindings
+		};
+	});
+	for (const targetId of invalidatedConfiguredIds) forgetSavedReport(config, targetId);
 }
 
 /** Public inventory summaries for the Assets tab (never expose SSH secrets). */
@@ -845,17 +896,24 @@ function configuredWorkspace(target) {
 }
 
 /** Resolve a task cwd to the configured workspace, a release, or fixed debug temporary root. */
-function resolveTaskCwd(target, requested) {
+function resolveTaskCwd(target, requested, { requireWorkspace = true } = {}) {
 	if (target?.transport === 'local') throw new Error('板端任务不允许 local target。');
-	const workspace = configuredWorkspace(target);
-	if (typeof requested !== 'string' || requested.trim() === '') return workspace;
-	const candidate = requested.trim().replace(/\/+$/, '');
+	const configured = typeof target?.workdir === 'string' ? target.workdir.trim().replace(/\/+$/u, '') : '';
+	const workspace = requireWorkspace
+		? configuredWorkspace(target)
+		: configured === REMOTE_WORKSPACE_ROOT
+			? configured
+			: null;
+	if (typeof requested !== 'string' || requested.trim() === '') {
+		return workspace ?? REMOTE_DEBUG_TMP_ROOT;
+	}
+	const candidate = requested.trim().replace(/\/+$/u, '');
 	if (!candidate.startsWith('/') || candidate.split('/').includes('..')) {
 		throw new Error('任务 cwd 必须是开发板上的绝对 POSIX 路径，且不能包含 ..。');
 	}
-	const allowedRoots = [workspace, REMOTE_DEPLOYMENT_ROOT, REMOTE_DEBUG_TMP_ROOT];
+	const allowedRoots = [workspace, REMOTE_DEPLOYMENT_ROOT, REMOTE_DEBUG_TMP_ROOT].filter(Boolean);
 	if (!allowedRoots.some((root) => isRemotePathInside(root, candidate))) {
-		throw new Error(`任务 cwd 必须位于 ${workspace}、${REMOTE_DEPLOYMENT_ROOT} 或 ${REMOTE_DEBUG_TMP_ROOT} 下。`);
+		throw new Error(`任务 cwd 必须位于 ${workspace ?? REMOTE_DEBUG_TMP_ROOT}、${REMOTE_DEPLOYMENT_ROOT} 或 ${REMOTE_DEBUG_TMP_ROOT} 下。`);
 	}
 	return candidate;
 }
@@ -1018,11 +1076,39 @@ function prepareTaskCommand(command, environment) {
 }
 
 /**
+ * Wrap an unprivileged task in a read-only-root bubblewrap sandbox. Only the
+ * documented write roots and device nodes are mounted back into the namespace.
+ */
+function prepareSandboxedCommand(command, cwd) {
+	const roots = [
+		REMOTE_WORKSPACE_ROOT,
+		REMOTE_DEPLOYMENT_ROOT,
+		REMOTE_ASSET_ROOT,
+		REMOTE_DEBUG_TMP_ROOT
+	];
+	const rootSetup = roots.map((root) => `mkdir -p ${shellQuote(root)}`).join('; ');
+	const rootBinds = roots.map((root) => `--bind ${shellQuote(root)} ${shellQuote(root)}`).join(' ');
+	const devicePatterns =
+		'/dev/davinci* /dev/ascend_manager /dev/devmm_svm /dev/hisi_hdc /dev/hisi_bbox* ' +
+		'/dev/dvpp_cmdlist /dev/dev_mem_ctrl /dev/gdc /dev/hdmi /dev/isp_dev /dev/logmpp ' +
+		'/dev/video* /dev/media* /dev/v4l-subdev* /dev/dri /dev/snd';
+	return [
+		'set -e',
+		'command -v bwrap >/dev/null 2>&1 || { echo "bubblewrap is required for sandboxed task execution" >&2; exit 125; }',
+		rootSetup,
+		'BWRAP_ARGS=(--die-with-parent --unshare-pid --unshare-ipc --unshare-uts --ro-bind / / --dev /dev --tmpfs /dev/shm ' +
+			`${rootBinds} --setenv TMPDIR ${shellQuote(REMOTE_DEBUG_TMP_ROOT)} --chdir ${shellQuote(cwd)})`,
+		`for device in ${devicePatterns}; do [ -e "$device" ] && BWRAP_ARGS+=(--dev-bind "$device" "$device"); done`,
+		`exec bwrap "\${BWRAP_ARGS[@]}" -- /bin/bash -lc ${shellQuote(command)}`
+	].join('; ');
+}
+
+/**
  * Run an explicitly approved task command on a configured board.
  *
  * @returns {Promise<object>} normalized task result.
  */
-async function runTask({ config, targetSelector, command, cwd, timeoutMs = 120000, allowStateChange, allowPrivileged = false, allowDestructive = false, dryRun = false, environment = 'ascend' }) {
+async function runTask({ config, targetSelector, command, cwd, timeoutMs = 120000, allowStateChange, allowPrivileged = false, allowUnsandboxed = false, allowDestructive = false, dryRun = false, environment = 'ascend', requireWorkspace = true, sandbox = true, signal }) {
 	if (typeof command !== 'string' || command.trim() === '') {
 		return {
 			allowed: false,
@@ -1051,13 +1137,13 @@ async function runTask({ config, targetSelector, command, cwd, timeoutMs = 12000
 			stderr: ''
 		};
 	}
-	const taskCommand = prepareTaskCommand(command, environment);
-	const verdict = validateTaskCommand(taskCommand, { allowPrivileged, allowDestructive });
+	signal?.throwIfAborted();
+	const verdict = validateTaskCommand(command, { allowPrivileged, allowDestructive });
 	if (!verdict.ok) {
 		return {
 			allowed: false,
 			executed: false,
-			command: taskCommand,
+			command: String(command ?? ''),
 			target: '未执行',
 			cwd: '',
 			exitCode: -1,
@@ -1067,6 +1153,7 @@ async function runTask({ config, targetSelector, command, cwd, timeoutMs = 12000
 			stderr: ''
 		};
 	}
+	const taskCommand = prepareTaskCommand(command, environment);
 	const target = resolveTarget(config, targetSelector);
 	if (target.transport === 'local') {
 		return {
@@ -1082,7 +1169,9 @@ async function runTask({ config, targetSelector, command, cwd, timeoutMs = 12000
 			stderr: ''
 		};
 	}
-	const workingDir = resolveTaskCwd(target, cwd);
+	const workingDir = resolveTaskCwd(target, cwd, { requireWorkspace });
+	const sandboxed = sandbox === true && allowPrivileged !== true && allowUnsandboxed !== true;
+	const executionCommand = sandboxed ? prepareSandboxedCommand(taskCommand, workingDir) : taskCommand;
 	const started = Date.now();
 	if (dryRun) {
 		return {
@@ -1093,15 +1182,15 @@ async function runTask({ config, targetSelector, command, cwd, timeoutMs = 12000
 			cwd: workingDir,
 			exitCode: 0,
 			durationMs: 0,
-			reason: `预检通过：${verdict.reason} 未执行（dryRun）。`,
+			reason: `预检通过：${verdict.reason}${sandboxed ? ' 执行时将使用bubblewrap只读根沙箱。' : ''} 未执行（dryRun）。`,
 			stdout: '',
 			stderr: ''
 		};
 	}
 	const result =
 		target.transport === 'local'
-			? await runLocalShell({ script: taskCommand, cwd: workingDir, timeoutMs })
-			: await runRemoteShell({ script: taskCommand, target, cwd: workingDir, timeoutMs });
+			? await runLocalShell({ script: executionCommand, cwd: workingDir, timeoutMs, signal })
+			: await runRemoteShell({ script: executionCommand, target, cwd: workingDir, timeoutMs, signal });
 	const durationMs = Date.now() - started;
 	return {
 		allowed: true,
@@ -1118,15 +1207,19 @@ async function runTask({ config, targetSelector, command, cwd, timeoutMs = 12000
 }
 
 /** Run one fixed peripheral task and normalize its JSON evidence. */
-async function runPeripheralAction({ config, action, targetSelector, command, normalized, allowStateChange, dryRun, timeoutMs }) {
+async function runPeripheralAction({ config, action, targetSelector, command, normalized, allowStateChange, dryRun, timeoutMs, signal }) {
 	const task = await runTask({
 		config,
 		targetSelector,
 		command,
+		cwd: REMOTE_DEBUG_TMP_ROOT,
 		timeoutMs,
 		allowStateChange,
 		dryRun,
-		environment: 'ascend'
+		environment: 'ascend',
+		requireWorkspace: false,
+		sandbox: false,
+		signal
 	});
 	const parsed = task.executed ? parsePeripheralResult(task.stdout) : null;
 	const operationOk = task.allowed === true && task.exitCode === 0 && (task.executed === false || parsed?.ok === true);
@@ -1152,7 +1245,9 @@ async function runPeripheralAction({ config, action, targetSelector, command, no
 		text = [
 			'摄像头采集完成，已取得非空帧。',
 			`设备：${parsed.device}`,
-			`实际：${parsed.actualWidth}x${parsed.actualHeight} · ${parsed.fourcc || 'FourCC 未采集'} · ${parsed.actualFps === null || parsed.actualFps === undefined ? 'FPS 未采集' : `${parsed.actualFps} fps`}`,
+			`实际：${parsed.actualWidth}x${parsed.actualHeight} · ${parsed.fourcc || 'FourCC 未采集'} · ` +
+				`FPS 协商 ${parsed.negotiatedFps === null || parsed.negotiatedFps === undefined ? '未采集' : `${parsed.negotiatedFps} fps`}` +
+				` · 采集耗时 ${parsed.captureElapsedSec === null || parsed.captureElapsedSec === undefined ? '未采集' : `${parsed.captureElapsedSec} s`}`,
 			`转换：${parsed.conversionBackend ?? '未采集'}；平均亮度：${parsed.meanLuminance ?? '未采集'}；Laplacian 方差：${parsed.laplacianVariance ?? '未采集'}`,
 			`文件：${normalized.output}`,
 			`SHA-256：${parsed.sha256}`
@@ -1219,12 +1314,13 @@ async function runLockedPeripheralAction({ config, payload, normalized, ...optio
 	});
 	if (payload.allowStateChange !== true || payload.dryRun === true) return operation();
 	const target = resolveTarget(config, payload.target);
-	const key = peripheralLockKey(target.id, normalized);
+	const physicalIdentity = target.mac ?? target.discoveredId ?? target.id;
+	const key = peripheralLockKey(physicalIdentity, normalized);
 	return withPeripheralLock(key, () => operation(target.id));
 }
 
 /** Execute one fixed peripheral action. */
-async function executePeripheralOperation(config, action, payload = {}) {
+async function executePeripheralOperation(config, action, payload = {}, { signal } = {}) {
 	try {
 		if (action === 'camera-capture') {
 			const normalized = normalizeCameraOptions(payload);
@@ -1234,7 +1330,8 @@ async function executePeripheralOperation(config, action, payload = {}) {
 				action,
 				command: buildCameraCommand(normalized),
 				normalized,
-				timeoutMs: timeoutOrDefault(payload.timeoutMs, 60000, 180000)
+				timeoutMs: timeoutOrDefault(payload.timeoutMs, 60000, 180000),
+				signal
 			});
 		}
 		if (action === 'microphone-record') {
@@ -1245,7 +1342,8 @@ async function executePeripheralOperation(config, action, payload = {}) {
 				action,
 				command: buildMicrophoneCommand(normalized),
 				normalized,
-				timeoutMs: timeoutOrDefault(payload.timeoutMs, (normalized.durationSec + 15) * 1000, 120000)
+				timeoutMs: timeoutOrDefault(payload.timeoutMs, (normalized.durationSec + 15) * 1000, 120000),
+				signal
 			});
 		}
 		if (action === 'speaker-test') {
@@ -1256,7 +1354,8 @@ async function executePeripheralOperation(config, action, payload = {}) {
 				action,
 				command: buildSpeakerCommand(normalized),
 				normalized,
-				timeoutMs: timeoutOrDefault(payload.timeoutMs, (normalized.durationSec + 15) * 1000, 120000)
+				timeoutMs: timeoutOrDefault(payload.timeoutMs, (normalized.durationSec + 15) * 1000, 120000),
+				signal
 			});
 		}
 		if (action === 'play-recording') {
@@ -1267,7 +1366,8 @@ async function executePeripheralOperation(config, action, payload = {}) {
 				action,
 				command: buildRecordedPlaybackCommand(normalized),
 				normalized,
-				timeoutMs: 120000
+				timeoutMs: 120000,
+				signal
 			});
 		}
 		return peripheralFailure(action || 'peripheral', `未知外设动作：${action || '(empty)'}`);
@@ -1306,26 +1406,25 @@ function recordEnvironment(config, result) {
 	const configuredProbe = result.target.isConfigured === true;
 	const identityMatches = !configuredProbe || expectedMacs.length === 0 || observedMacs.some((value) => expectedMacs.includes(value));
 	const path = inventoryPath(config);
-	const inventory = readInventory(path);
 	const system = systemFromFacts(facts);
 	system.tier = system.tier ?? (facts.socTier?.value ? String(facts.socTier.value) : null);
 	const ipAddress = facts.ipAddress?.value ?? (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(result.target.host) ? result.target.host : null);
 	const identityMismatch = configuredProbe && expectedMacs.length > 0 && !identityMatches
 		? { configuredId: result.target.id, expectedMacs, observedMacs }
 		: null;
-	const observed = observeBoard(inventory, {
-		ip: ipAddress,
-		user: result.target.user,
-		mac,
-		macs: observedMacs,
-		hostname: facts.hostname?.value ?? null,
-		port: result.target.port,
-		configuredId: configuredProbe && identityMatches ? result.target.id : null,
-		clearConfiguredId: identityMismatch !== null,
-		system
-	});
+	let observed;
 	try {
-		saveInventory(path, observed.inventory);
+		observed = updateInventory(path, (inventory) => observeBoard(inventory, {
+			ip: ipAddress,
+			user: result.target.user,
+			mac,
+			macs: observedMacs,
+			hostname: facts.hostname?.value ?? null,
+			port: result.target.port,
+			configuredId: configuredProbe && identityMatches ? result.target.id : null,
+			clearConfiguredId: identityMismatch !== null,
+			system
+		})).result;
 	} catch {
 		// A read-only probe must still succeed if the local inventory path is
 		// not writable; the report indicates the probe result, not the cache.
@@ -1599,8 +1698,6 @@ async function collectCameraEnvironment(options) {
 
 /** Merge fresh camera facts into the saved panel report without losing board facts. */
 function mergeSavedFacts(config, target, facts, category, updatedAt = new Date().toISOString(), metadata = {}) {
-	const reports = readSavedReports(config);
-	const previous = reports[target.id] !== null && typeof reports[target.id] === 'object' ? reports[target.id] : {};
 	const publicTarget = publicTargets(config).find((candidate) => candidate.id === target.id) ?? {
 		id: target.id,
 		label: target.label ?? target.id,
@@ -1608,21 +1705,43 @@ function mergeSavedFacts(config, target, facts, category, updatedAt = new Date()
 		host: target.host ?? '',
 		user: target.user ?? ''
 	};
-	const categoryUpdatedAt = previous.categoryUpdatedAt !== null && typeof previous.categoryUpdatedAt === 'object'
-		? { ...previous.categoryUpdatedAt, [category]: updatedAt }
-		: { [category]: updatedAt };
-	const value = {
-		...previous,
-		...metadata,
-		ok: true,
-		generatedAt: updatedAt,
-		...(category === 'camera' ? { cameraUpdatedAt: updatedAt } : {}),
-		categoryUpdatedAt,
-		source: previous.source ?? target.transport ?? 'ssh',
-		target: publicTarget,
-		facts: { ...(previous.facts ?? {}), ...facts }
+	const buildValue = (previous) => {
+		const categoryUpdatedAt = previous.categoryUpdatedAt !== null && typeof previous.categoryUpdatedAt === 'object'
+			? { ...previous.categoryUpdatedAt, [category]: updatedAt }
+			: { [category]: updatedAt };
+		const retainedFacts = { ...(previous.facts ?? {}) };
+		for (const key of CATEGORY_FACT_KEYS[category] ?? []) delete retainedFacts[key];
+		return {
+			...previous,
+			...metadata,
+			ok: true,
+			generatedAt: updatedAt,
+			...(category === 'camera' ? { cameraUpdatedAt: updatedAt } : {}),
+			categoryUpdatedAt,
+			source: previous.source ?? target.transport ?? 'ssh',
+			target: publicTarget,
+			facts: { ...retainedFacts, ...facts }
+		};
 	};
-	rememberSavedReport(config, value);
+	let value;
+	try {
+		updateJsonFile(savedReportsPath(config), (store) => {
+			if (store.reports === null || typeof store.reports !== 'object' || Array.isArray(store.reports)) store.reports = {};
+			const previous = store.reports[target.id] !== null && typeof store.reports[target.id] === 'object'
+				? store.reports[target.id]
+				: {};
+			value = buildValue(previous);
+			const saved = {};
+			for (const field of SAVED_REPORT_FIELDS) {
+				if (value[field] !== undefined) saved[field] = value[field];
+			}
+			saved.target = publicTarget;
+			store.reports[target.id] = saved;
+		});
+	} catch {
+		const previous = readSavedReports(config)[target.id] ?? {};
+		value = buildValue(previous);
+	}
 	reportCache.delete(target.id);
 	return value;
 }
@@ -1931,16 +2050,17 @@ export function apply(ctx, config) {
 			name: 'ascend_camera_capture',
 			description:
 				'Capture one or more frames from a configured V4L2 camera on an Ascend 310B board using direct v4l2-ctl ' +
-				'mmap capture. The fixed task does not import OpenCV, NumPy, Pillow, or FFmpeg; it validates MJPG ' +
-				'JPEG frames with Python standard-library parsing and writes one JPEG under ' +
-				'/tmp/ascend310b-debug/peripherals. Returns actual dimensions, FourCC, frame count, bytes and SHA-256. ' +
-				'allowStateChange:true is required; use dryRun first.',
+				'mmap capture. MJPG frames are validated and saved as JPEG without OpenCV, NumPy, Pillow, or FFmpeg. ' +
+				'YUYV uses a standard-library YUV-to-RGB conversion and Pillow only as the JPEG encoder fallback. ' +
+				'Writes one JPEG under /tmp/ascend310b-debug/peripherals and returns actual dimensions, FourCC, ' +
+				'negotiated/measured FPS, frame count, bytes and SHA-256. allowStateChange:true is required; use dryRun first.',
 			parameters: {
 				target: { type: 'string', description: 'Configured SSH target id or `user@host`; local is refused.' },
 				device: { type: 'string', required: true, description: 'V4L2 device matching /dev/videoN.' },
 				width: { type: 'integer', description: 'Requested width, 160-1920. Defaults to 640.' },
 				height: { type: 'integer', description: 'Requested height, 120-1080. Defaults to 480.' },
 				pixelFormat: { type: 'string', enum: ['MJPG', 'YUYV'], description: 'Requested V4L2 pixel format. Defaults to MJPG.' },
+				fps: { type: 'integer', description: 'Requested V4L2 frame rate, 1-120. Defaults to 30.' },
 				frameCount: { type: 'integer', description: 'Frames to read, 1-10. Defaults to 1.' },
 				timeoutMs: { type: 'integer', description: 'Task timeout in milliseconds. Defaults to 60000.' },
 				dryRun: { type: 'boolean', description: 'Validate and show the fixed capture task without executing.' },
@@ -2532,8 +2652,10 @@ export function apply(ctx, config) {
 				'converting ONNX with ATC, running Python/pytest/msame, or executing a tutorial shell script. Unlike ' +
 				'`ascend_board_exec`, this tool changes files and may execute build/test code. It requires ' +
 				'`allowStateChange:true`; `sudo`, recursive deletion and board reset/upgrade commands require separate ' +
-				'explicit switches. Use `dryRun:true` first. The command runs in a constrained board workspace and returns ' +
-				'exit code, duration, stdout and stderr.',
+				'explicit switches. Use `dryRun:true` first. Unprivileged commands run in a bubblewrap sandbox with a ' +
+				'read-only root and only controlled workspace/deployment/asset/debug roots writable. allowPrivileged=true ' +
+				'or allowUnsandboxed=true explicitly leaves the sandbox for system administration or NPU tasks incompatible ' +
+				'with user namespaces. The tool returns exit code, duration, stdout and stderr.',
 			parameters: {
 				target: { type: 'string', description: 'Configured SSH target id or `user@host`; `local` is refused.' },
 				command: { type: 'string', required: true, description: 'Shell command to run, for example `python sample.py` or `bash run.sh`.' },
@@ -2543,7 +2665,8 @@ export function apply(ctx, config) {
 					type: 'boolean',
 					description: 'Required true to acknowledge that this task writes files or executes sample code.'
 				},
-				allowPrivileged: { type: 'boolean', description: 'Allow sudo. Defaults to false.' },
+				allowPrivileged: { type: 'boolean', description: 'Allow sudo and explicitly leave the bubblewrap sandbox. Defaults to false.' },
+				allowUnsandboxed: { type: 'boolean', description: 'Explicitly leave the bubblewrap sandbox for NPU/DVPP tasks incompatible with user namespaces. Requires allowStateChange=true.' },
 				allowDestructive: { type: 'boolean', description: 'Allow rm -r/-f. Defaults to false.' },
 				environment: {
 					type: 'string',
@@ -2562,6 +2685,7 @@ export function apply(ctx, config) {
 					timeoutMs: timeoutOrDefault(args.timeoutMs, 120000, 600000),
 					allowStateChange: args.allowStateChange === true,
 					allowPrivileged: args.allowPrivileged === true,
+					allowUnsandboxed: args.allowUnsandboxed === true,
 					allowDestructive: args.allowDestructive === true,
 					environment: args.environment === 'none' ? 'none' : args.environment === 'base' ? 'base' : 'ascend',
 					dryRun: args.dryRun === true
@@ -3534,6 +3658,13 @@ export function apply(ctx, config) {
 		};
 
 		const peripheralHandler = (action) => async (request, response) => {
+			const controller = new AbortController();
+			const abort = () => controller.abort();
+			const responseClosed = () => {
+				if (response.writableEnded !== true) abort();
+			};
+			request.once?.('aborted', abort);
+			response.once?.('close', responseClosed);
 			try {
 				const requestError = httpRequestError(request, ['POST']);
 				if (requestError !== null) {
@@ -3549,7 +3680,8 @@ export function apply(ctx, config) {
 					}
 				}
 				const payload = body.trim() === '' ? {} : JSON.parse(body);
-				const result = await executePeripheralOperation(config, action, payload);
+				const result = await executePeripheralOperation(config, action, payload, { signal: controller.signal });
+				if (controller.signal.aborted) return;
 				const status = result.ok === true ? 200 : result.data?.errorCode === 'PERIPHERAL_BUSY' ? 409 : 422;
 				json(response, status, {
 					ok: result.ok === true,
@@ -3557,7 +3689,12 @@ export function apply(ctx, config) {
 					...(result.ok === true ? {} : { error: result.text })
 				});
 			} catch (error) {
-				json(response, 400, { ok: false, error: String(error?.message ?? error) });
+				if (!controller.signal.aborted) {
+					json(response, 400, { ok: false, error: String(error?.message ?? error) });
+				}
+			} finally {
+				request.removeListener?.('aborted', abort);
+				response.removeListener?.('close', responseClosed);
 			}
 		};
 		const cameraCaptureHandler = peripheralHandler('camera-capture');
@@ -3781,6 +3918,8 @@ export const internals = {
 	resolveInside,
 	isSafeHost,
 	prepareTaskCommand,
+	prepareSandboxedCommand,
+	runTask,
 	downloadIntegrity,
 	annotateLivenessEndpoints,
 	checkTargetLiveness,
@@ -3788,6 +3927,7 @@ export const internals = {
 	rememberBinding,
 	readSavedReport,
 	rememberSavedReport,
+	forgetSavedReport,
 	mergeSavedFacts,
 	mergeSavedCameraFacts,
 	resolveTaskCwd,
