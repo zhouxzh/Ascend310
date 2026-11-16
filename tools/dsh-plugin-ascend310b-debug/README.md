@@ -208,6 +208,7 @@ cp -R "$plugin"/. "$dest"/
 | 工具 | 作用 | 关键参数 |
 | --- | --- | --- |
 | `ascend_probe` | 在目标板执行**只读**探测脚本并解析 | `target`、`rawText`（解析已有记录）、`timeoutMs` |
+| `ascend_ssh_key_setup` | 为固定`HwHiAiUser`账号生成或复用Ed25519密钥，一次性登记公钥、修正权限并以`BatchMode=yes`验证免密登录 | `target`、`identityFile`、`dryRun`、`allowStateChange` |
 | `ascend_discover` | 扫描私有网段、按逻辑板卡 ID 和多网口 MAC 别名建资产表并记录驱动/CANN/系统变化 | `cidrs`、`user`、`port`、`concurrency`、`timeoutMs`、`inventoryPath` |
 | `ascend_serial_probe` | 以 HwHiAiUser 串口登录后读取主机名、IPv4、接口、MAC 和默认路由，并自动尝试 SSH 写入设备列表 | `port`、`baudRate`、`timeoutMs` |
 | `ascend_serial_exec` | 以 HwHiAiUser 执行一条只读诊断命令 | `command`、`port`、`baudRate`、`timeoutMs` |
@@ -223,6 +224,8 @@ cp -R "$plugin"/. "$dest"/
 | `ascend_apt_install` | 通过 `HwHiAiUser + sudo` 安装受控 apt 软件包，密码仅走 SSH stdin | `target`、`packages`、`update`、`allowStateChange`、`dryRun`、`timeoutMs` |
 | `ascend_model_download` | 下载华为云、HF mirror 或 GitHub 网页代理资产，支持临时文件原子替换和可选 SHA-256 校验 | `source`、`url`/`repoId`、`filename`、`destination`、`githubProxy`、`sha256`、`allowStateChange` |
 | `ascend_ui_capture` | 用宿主机 Edge/Chrome 截取开发板前端页面 | `url`、`output`、`width`、`height`、`waitMs`、`allowStateChange` |
+
+`ascend_ssh_key_setup`只接受SSH target，且解析后的账号必须是`HwHiAiUser`。首次登记密码依次取`config.sshPassword`、target的`sshPassword`、`config.serial.password`或`config.sudoPassword`，通过临时ASKPASS程序交给OpenSSH，不接受密码参数、不写入argv或日志。板端操作只追加去重后的公钥，不覆盖已有`authorized_keys`；检测到`.ssh`或授权文件为符号链接会拒绝。验证成功后私钥路径写入本地资产表的`preferences.sshIdentityFiles`，后续SSH工具使用`BatchMode=yes`和`IdentitiesOnly=yes`。
 
 浏览器侧另有 **昇腾310B调试** 面板：顶部提供“检查在线”“串口发现”“局域网扫描”，左侧按逻辑板卡 ID 展示当前板与历史记录（同一块板的稳定网口 MAC 显示为别名），右侧按“概览 / 摄像头 / 音频接口 / 串口记录 / 开发板记录 / 调试 / 原始输出”分区。板卡名称只表达 `Orange Pi AI Pro 8T / 20T` 档位；NPU 内存与系统内存不是同一概念，因此不再把 `npu-smi` 的 Memory-Usage 总量误写进硬件名称。概览显示 SoC、健康/温度、NPU 已用/总内存、CANN、驱动和分类更新时间；“检查在线”仅表示本次 SSH 端口可达，不表示 CANN、外设或推理验收通过。摄像头页提供带有设备名称、`/dev/videoN`、Video Capture/Metadata/多平面能力标识的 V4L2 枚举与单帧采集，采集成功后在固定预览框中显示 JPEG；像素格式、分辨率和 FPS 均来自该节点 `v4l2-ctl --list-formats-ext` 的实际输出，metadata-only 节点会明确禁用。音频接口页在同一屏显示麦克风输入、扬声器输出和录音回放；输入与输出可以独立测试，录音回放使用当前输出 Sink，听到声音仍需人工确认。枚举区列出 ALSA、PulseAudio/PipeWire、蓝牙和 USB 事实；蓝牙配对/连接先在系统侧完成，插件不自动配对。串口记录页保留成功、失败和取消的阶段时间线及脱敏 transcript，用于区分 COM 占用、登录失败、网络信息读取与 SSH 验证失败；记录只保存在本机且可明确清理。开发板记录页显示当前板的身份、IP/MAC、软件变化和串口状态；调试页提供症状、样例和案例依赖；原始页保留事实、探测节选和版本组合。面板在探测之前所有版本字段显示**未采集**；探测到非 310B 芯片时，面板顶部会明确写出“不适用”。
 

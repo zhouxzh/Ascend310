@@ -532,15 +532,18 @@ export function buildSshArgs(target, command) {
  * @param {string} [options.cwd] - working directory.
  * @param {number} [options.timeoutMs] - timeout.
  * @param {string|null} [options.input] - optional stdin payload.
+ * @param {object|null} [options.env] - extra environment variables for the child.
  * @returns {Promise<object>} `{stdout, stderr, code, timedOut}`.
  */
-export function execFileCapture({ file, args, cwd, timeoutMs = 30000, input = null, signal }) {
+export function execFileCapture({ file, args, cwd, timeoutMs = 30000, input = null, env = null, signal }) {
 	const { execFile, spawn } = require('node:child_process');
 	// Discovery and serial probing use null to mean "no cancellation signal".
 	// Node's child_process API accepts undefined, but rejects null outright.
-	const spawnOptions = { cwd, windowsHide: true, ...(signal == null ? {} : { signal }) };
+	const childEnv = env === null ? process.env : { ...process.env, ...env };
+	const spawnOptions = { cwd, env: childEnv, windowsHide: true, ...(signal == null ? {} : { signal }) };
 	const execOptions = {
 		cwd,
+		env: childEnv,
 		timeout: timeoutMs,
 		maxBuffer: 8 * 1024 * 1024,
 		windowsHide: true,

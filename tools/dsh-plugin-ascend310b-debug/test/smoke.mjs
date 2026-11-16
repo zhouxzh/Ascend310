@@ -177,9 +177,16 @@ try {
 
 	host.apply(fakeCtx, config);
 
-	for (const name of ['ascend_probe', 'ascend_camera_capture', 'ascend_microphone_record', 'ascend_speaker_test', 'ascend_play_recording', 'ascend_check', 'ascend_debug_plan', 'ascend_sample_index', 'ascend_board_exec', 'ascend_board_run', 'ascend_apt_install', 'ascend_model_download', 'ascend_ui_capture', 'ascend_discover', 'ascend_serial_probe', 'ascend_serial_exec']) {
+	for (const name of ['ascend_probe', 'ascend_ssh_key_setup', 'ascend_camera_capture', 'ascend_microphone_record', 'ascend_speaker_test', 'ascend_play_recording', 'ascend_check', 'ascend_debug_plan', 'ascend_sample_index', 'ascend_board_exec', 'ascend_board_run', 'ascend_apt_install', 'ascend_model_download', 'ascend_ui_capture', 'ascend_discover', 'ascend_serial_probe', 'ascend_serial_exec']) {
 		check(registeredTools.has(name), `tool ${name} must be registered`);
 	}
+	const sshKeyDryRun = await registeredTools.get('ascend_ssh_key_setup').execute({ target: 'board-8t', dryRun: true });
+	validateOutput('ascend_ssh_key_setup', sshKeyDryRun);
+	check(sshKeyDryRun.ok === true && sshKeyDryRun.executed === false && sshKeyDryRun.dryRun === true, 'SSH key setup must have a non-mutating dry-run');
+	check(sshKeyDryRun.identityFile.endsWith('ascend310b_ed25519'), 'SSH key setup must report the default local private-key path');
+	const sshKeyRefused = await registeredTools.get('ascend_ssh_key_setup').execute({ target: 'board-8t' });
+	validateOutput('ascend_ssh_key_setup', sshKeyRefused);
+	check(sshKeyRefused.ok === false && sshKeyRefused.executed === false, 'SSH key setup must refuse writes without allowStateChange=true');
 	check(routes.length === 16, `expected sixteen panel routes, got ${routes.length}`);
 	check(routes.every((route) => route.kind === 'exact'), 'panel routes must be exact matches');
 	check(effects.length === 16, 'each route must be registered through an effect');

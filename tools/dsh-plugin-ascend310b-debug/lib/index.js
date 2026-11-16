@@ -63,7 +63,15 @@ import {
 	persistSerialSessionLog,
 	readSerialSessionLog
 } from './serial-log.js';
-import { isSafeHost, runLocalScript, runLocalShell, runRemoteScript, runRemoteShell, shellQuote, validateReadOnlyCommand, validateTaskCommand } from './shell.js';
+import { execFileCapture, isSafeHost, runLocalScript, runLocalShell, runRemoteScript, runRemoteShell, shellQuote, validateReadOnlyCommand, validateTaskCommand } from './shell.js';
+import {
+	ensureIdentityFile,
+	installPublicKey,
+	normalizeIdentityFile,
+	redactSshPassword,
+	resolveSshPassword,
+	verifyIdentity
+} from './ssh-key.js';
 
 const require = createRequire(import.meta.url);
 
@@ -343,6 +351,14 @@ function targetTable(config) {
 	const bindings = inventory.preferences?.bindings !== null && typeof inventory.preferences?.bindings === 'object'
 		? inventory.preferences.bindings
 		: {};
+	const sshIdentityFiles = inventory.preferences?.sshIdentityFiles !== null && typeof inventory.preferences?.sshIdentityFiles === 'object'
+		? inventory.preferences.sshIdentityFiles
+		: {};
+	for (const target of table.values()) {
+		if (target.identityFile !== null) continue;
+		const stored = sshIdentityFiles[target.id];
+		if (typeof stored === 'string' && stored.trim() !== '') target.identityFile = stored.trim();
+	}
 	const discovered = inventoryTargets(
 		inventory,
 		typeof config?.discovery?.user === 'string' ? config.discovery.user.trim() : null
@@ -451,6 +467,104 @@ export function resolveTarget(config, argument) {
 		'dsh-plugin-ascend310b-debug: 配置了多个开发板但没有默认值。请给工具传 target 参数，或在 profile 配置里设置 config.defaultTarget。' +
 			`候选：${[...table.keys()].join('、')}`
 	);
+}
+
+/** Persist the verified identity-file choice without editing the profile YAML. */
+function rememberSshIdentity(config, targetId, identityFile) {
+	updateInventory(inventoryPath(config), (inventory) => {
+		const preferences = inventory.preferences !== null && typeof inventory.preferences === 'object' && !Array.isArray(inventory.preferences)
+			? inventory.preferences
+			: {};
+		const identities = preferences.sshIdentityFiles !== null && typeof preferences.sshIdentityFiles === 'object' && !Array.isArray(preferences.sshIdentityFiles)
+			? preferences.sshIdentityFiles
+			: {};
+		identities[targetId] = identityFile;
+		preferences.sshIdentityFiles = identities;
+		inventory.preferences = preferences;
+	});
+}
+
+/**
+ * Generate or reuse one local key, authorize its public half for the fixed
+ * HwHiAiUser account, and prove that BatchMode authentication now works.
+ */
+async function provisionSshIdentity(config, { targetSelector, identityFile, dryRun = false, signal }) {
+	const target = resolveTarget(config, targetSelector);
+	if (target.transport !== 'ssh') throw new Error('免密登录只适用于SSH开发板target。');
+	if (target.user !== 'HwHiAiUser') {
+		throw new Error(`开发板管理员账号不是HwHiAiUser（当前为${target.user ?? '未配置'}），不能按固定账号策略配置免密登录。`);
+	}
+	const privateKey = normalizeIdentityFile(identityFile, config);
+	const publicKey = `${privateKey}.pub`;
+	const password = resolveSshPassword(config, target);
+	const keyExists = existsSync(privateKey);
+	if (dryRun) {
+		return {
+			ok: true,
+			dryRun: true,
+			executed: false,
+			target,
+			identityFile: privateKey,
+			publicKey,
+			keyExists,
+			keyGenerated: false,
+			passwordAvailable: password !== null,
+			alreadyVerified: false,
+			verified: false,
+			message: keyExists
+				? '将验证现有密钥；若未授权，则使用profile密码追加一次公钥。'
+				: '将生成Ed25519密钥，并使用profile密码追加一次公钥。'
+		};
+	}
+	if (keyExists) {
+		const existing = await verifyIdentity(target, privateKey, { signal });
+		if (existing.code === 0) {
+			rememberSshIdentity(config, target.id, privateKey);
+			return {
+				ok: true,
+				dryRun: false,
+				executed: false,
+				target,
+				identityFile: privateKey,
+				publicKey,
+				keyExists: true,
+				keyGenerated: false,
+				passwordAvailable: password !== null,
+				alreadyVerified: true,
+				verified: true,
+				message: '现有SSH密钥已经可以免密登录，无需修改开发板。'
+			};
+		}
+	}
+	if (password === null) {
+		throw new Error('profile未配置sshPassword、serial.password或sudoPassword，无法完成首次公钥登记。');
+	}
+	const key = await ensureIdentityFile(privateKey);
+	const installed = await installPublicKey(target, privateKey, password, { config, signal });
+	if (installed.code !== 0) {
+		const detail = redactSshPassword(installed.stderr || installed.stdout || installed.error || '密码认证失败', password);
+		throw new Error(`SSH公钥登记失败：${detail}`);
+	}
+	const verified = await verifyIdentity(target, privateKey, { signal });
+	if (verified.code !== 0) {
+		const detail = redactSshPassword(verified.stderr || verified.stdout || verified.error || 'BatchMode验证失败', password);
+		throw new Error(`公钥已提交但免密验证失败：${detail}`);
+	}
+	rememberSshIdentity(config, target.id, privateKey);
+	return {
+		ok: true,
+		dryRun: false,
+		executed: true,
+		target,
+		identityFile: privateKey,
+		publicKey,
+		keyExists: true,
+		keyGenerated: key.generated,
+		passwordAvailable: true,
+		alreadyVerified: false,
+		verified: true,
+		message: 'SSH公钥已登记，BatchMode免密登录验证通过。'
+	};
 }
 
 /** Targets for panel display, without secrets. */
@@ -1882,6 +1996,26 @@ const TASK_SCHEMA = {
 	}
 };
 
+const SSH_KEY_SCHEMA = {
+	type: 'object',
+	additionalProperties: false,
+	properties: {
+		text: { type: 'string', required: true },
+		ok: { type: 'boolean', required: true },
+		executed: { type: 'boolean', required: true },
+		dryRun: { type: 'boolean', required: true },
+		target: { type: 'string', required: true },
+		identityFile: { type: 'string', required: true },
+		publicKey: { type: 'string', required: true },
+		keyGenerated: { type: 'boolean', required: true },
+		passwordUsed: { type: 'boolean', required: true },
+		alreadyVerified: { type: 'boolean', required: true },
+		verified: { type: 'boolean', required: true },
+		exitCode: { type: 'integer', required: true },
+		message: { type: 'string', required: true }
+	}
+};
+
 const APT_SCHEMA = {
 	type: 'object',
 	additionalProperties: false,
@@ -2060,6 +2194,102 @@ export function apply(ctx, config) {
 				title: '昇腾310B环境探测',
 				kind: 'other',
 				rawInput: args
+			})
+		})
+	);
+
+	ctx.tools.register(
+		defineTool({
+			name: 'ascend_ssh_key_setup',
+			description:
+				'Provision passwordless SSH for one configured Ascend 310B target whose fixed administrator is ' +
+				'HwHiAiUser. Generates or reuses a local Ed25519 key, uses the profile password only for the one-time ' +
+				'public-key append through a temporary ASKPASS helper, preserves existing authorized keys, fixes SSH ' +
+				'permissions, verifies BatchMode login, and persists the private-key path in the local inventory. ' +
+				'The password is never accepted as a tool argument, placed in argv, or returned. Set allowStateChange:true ' +
+				'to execute; dryRun:true only reports the planned key path and prerequisites.',
+			parameters: {
+				target: { type: 'string', description: 'Configured SSH target. The resolved account must be HwHiAiUser.' },
+				identityFile: { type: 'string', description: 'Optional absolute private-key path. Defaults under DSH_HOME.' },
+				allowStateChange: { type: 'boolean', description: 'Required true to generate a key or modify the board authorized_keys file.' },
+				dryRun: { type: 'boolean', description: 'Inspect prerequisites without generating or modifying anything.' }
+			},
+			output: {
+				schema: SSH_KEY_SCHEMA,
+				render: (_args, value) => [{ type: 'text', text: value.text }]
+			},
+			async execute(args) {
+				const dryRun = args.dryRun === true;
+				if (!dryRun && args.allowStateChange !== true) {
+					return {
+						text: '免密登录配置被拒绝：执行时 require allowStateChange=true；先用 dryRun=true 检查。',
+						ok: false,
+						executed: false,
+						dryRun: false,
+						target: args.target ?? '未执行',
+						identityFile: '',
+						publicKey: '',
+						keyGenerated: false,
+						passwordUsed: false,
+						alreadyVerified: false,
+						verified: false,
+						exitCode: -1,
+						message: 'allowStateChange=true is required'
+					};
+				}
+				try {
+					const result = await provisionSshIdentity(config, {
+						targetSelector: args.target,
+						identityFile: args.identityFile,
+						dryRun
+					});
+					const passwordUsed = result.executed === true && result.alreadyVerified !== true;
+					return {
+						text: [
+							`SSH免密目标：${result.target.id} · ${result.target.user}@${result.target.host}`,
+							`私钥：${result.identityFile}`,
+							`公钥：${result.publicKey}`,
+							`状态：${dryRun ? 'dry-run 未执行' : result.alreadyVerified ? '已有密钥可用' : '已登记并验证'}`,
+							`密钥生成：${result.keyGenerated ? '是' : '否'} · 使用profile密码登记：${passwordUsed ? '是' : '否'} · BatchMode验证：${result.verified ? '通过' : '未执行'}`,
+							`说明：${result.message}`
+						].join('\n'),
+						ok: true,
+						executed: result.executed === true,
+						dryRun,
+						target: result.target.id,
+						identityFile: result.identityFile,
+						publicKey: result.publicKey,
+						keyGenerated: result.keyGenerated === true || (dryRun && result.keyExists === false),
+						passwordUsed,
+						alreadyVerified: result.alreadyVerified === true,
+						verified: result.verified === true,
+						exitCode: 0,
+						message: result.message
+					};
+				} catch (error) {
+					const message = String(error?.message ?? error);
+					return {
+						text: `SSH免密配置失败：${message}`,
+						ok: false,
+						executed: false,
+						dryRun,
+						target: args.target ?? '未执行',
+						identityFile: typeof args.identityFile === 'string' ? args.identityFile : '',
+						publicKey: '',
+						keyGenerated: false,
+						passwordUsed: false,
+						alreadyVerified: false,
+						verified: false,
+						exitCode: -1,
+						message
+					};
+				}
+			},
+			presentCall: (args) => ({
+				card: 'generic',
+				title: '配置SSH免密登录',
+				kind: 'other',
+				rawInput: { target: args.target, identityFile: args.identityFile, dryRun: args.dryRun }
 			})
 		})
 	);
