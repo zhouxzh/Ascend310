@@ -174,6 +174,7 @@ upgrade and version pairing; do not swap them.
 | `src/appendix/appendix5.md` | 附录 5：ROS2 基础 |
 | `src/appendix/appendix6.md` | 附录 6：工具箱与 FAQ |
 | `src/appendix/appendix7.md` | 附录 7：CANN 升级 |
+| `src/appendix/appendix8.md` | 附录 8：实验异常解析 |
 
 ## Documentation preview and push policy
 
