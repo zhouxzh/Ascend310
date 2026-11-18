@@ -438,6 +438,7 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 		port: null,
 		system: {},
 		serial: null,
+		auth: null,
 		changes: [],
 		history: []
 	};
@@ -463,6 +464,13 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 			ip: text(observation.serial.ip),
 			hostname: text(observation.serial.hostname) ?? hostname,
 			lastSeen: now
+		};
+	}
+	if (observation?.auth !== null && typeof observation?.auth === 'object') {
+		board.auth = {
+			method: text(observation.auth.method) ?? 'unknown',
+			passwordless: observation.auth.passwordless === true,
+			lastVerifiedAt: text(observation.auth.lastVerifiedAt) ?? now
 		};
 	}
 	board.system = system;
@@ -523,6 +531,9 @@ export function inventoryTargets(inventory, defaultUser = null, now = Date.now()
 			configuredId: board.configuredId ?? null,
 			lastSeen: board.lastSeen ?? null,
 			recent,
+			authMethod: board.auth?.method ?? null,
+			passwordless: board.auth?.passwordless === true,
+			authVerifiedAt: board.auth?.lastVerifiedAt ?? null,
 			user: board.user ?? defaultUser,
 			port: Number.isInteger(board.port) ? board.port : null,
 			identityFile: null,

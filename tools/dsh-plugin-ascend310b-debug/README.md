@@ -146,6 +146,8 @@ CPython 3.9 aarch64 ABI
 DSH_HOME/ascend310b-inventory.json
 ```
 
+扫描先尝试SSH公钥`BatchMode=yes`。如果失败且profile配置了密码，则只对开放22端口的候选，以固定`HwHiAiUser`账号尝试一次密码登录；密码通过临时ASKPASS程序传递，不进入argv或报告。密码登录成功仍会读取板端身份并写入资产表，但记录和面板会明确标记“密码可登录，未配置免密”，不会误报为免密通过；此时可继续对发现target运行`ascend_ssh_key_setup`。传入`passwordFallback=false`可关闭扫描阶段的密码尝试。
+
 同一块板换 IP、换有线/无线网口会归并为同一条记录；重装系统、驱动或 CANN 变化会写入 `changes`，但不会改变逻辑板卡 ID。发现记录只有15分钟新鲜期，超过后不再作为可执行target自动探测；board记录、change、history、serial状态和保存报告最多保留30天，超期记录不会进入target、报告或摄像头选择。发现到的板卡会以 target id（例如 `ascend-c0742bfddd7a`）出现在面板和 `target` 选择中，不需要手工把 IP 写进 `targets`。**多块板可以有相同 hostname**，例如两台出厂镜像都叫 `orangepiaipro`；hostname 只用于显示或回退，不能作为物理板身份。`machine-id` 也不能作为唯一身份，因为克隆镜像可能相同。资产表保留所有物理网口 MAC 别名，并用逻辑板卡 ID 区分不同板卡；资产表包含 MAC，禁止提交到 Git 或放进插件包。固件版本不进入资产指纹：当前板端没有可信、可读的版本来源。
 
 板卡身份规则：

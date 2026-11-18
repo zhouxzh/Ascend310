@@ -317,6 +317,9 @@ function attachDiscovered(target, entry) {
 	// execution so a stale .local or DHCP address does not outlive the scan.
 	if (entry.recent === true && typeof entry.host === 'string' && parseIPv4(entry.host) !== null) target.host = entry.host;
 	target.lastSeen = target.lastSeen ?? entry.lastSeen ?? null;
+	target.authMethod = target.authMethod ?? entry.authMethod ?? null;
+	target.passwordless = target.passwordless ?? entry.passwordless ?? false;
+	target.authVerifiedAt = target.authVerifiedAt ?? entry.authVerifiedAt ?? null;
 	return target;
 }
 
@@ -339,6 +342,9 @@ function targetTable(config) {
 			discoveredId: null,
 			observedIp: null,
 			lastSeen: null,
+			authMethod: null,
+			passwordless: false,
+			authVerifiedAt: null,
 			user: typeof entry.user === 'string' && entry.user.trim() !== '' ? entry.user.trim() : null,
 			port: Number.isInteger(entry.port) ? entry.port : null,
 			identityFile: typeof entry.identityFile === 'string' ? entry.identityFile : null,
@@ -584,6 +590,9 @@ function publicTargets(config) {
 		discoveredId: target.discoveredId ?? null,
 		observedIp: target.observedIp ?? null,
 		lastSeen: target.lastSeen ?? null,
+		authMethod: target.authMethod ?? null,
+		passwordless: target.passwordless === true,
+		authVerifiedAt: target.authVerifiedAt ?? null,
 		user: target.user,
 		port: target.port,
 		isDefault: target.id === defaultId,
@@ -887,6 +896,9 @@ function publicInventory(config) {
 				lastChangeAt: board.lastChangeAt ?? null,
 				configuredId: boundConfiguredId ?? staleConfiguredId,
 				serial: board.serial ?? null,
+				authMethod: board.auth?.method ?? null,
+				passwordless: board.auth?.passwordless === true,
+				authVerifiedAt: board.auth?.lastVerifiedAt ?? null,
 				changesCount: Array.isArray(board.changes) ? board.changes.length : 0,
 				latestChange: latestChange === null
 					? null

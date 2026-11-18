@@ -260,6 +260,12 @@ window.__ModuleLoader__.load({
 		}
 
 		/** Human-readable serial state for a board. */
+		function authState(board) {
+			if (board?.passwordless === true) return "免密登录已配置";
+			if (board?.authMethod === "password") return "密码可登录，未配置免密";
+			return "SSH认证未确认";
+		}
+
 		function serialState(board) {
 			const serial = board?.serial;
 			if (!serial || typeof serial !== "object") return "串口未发现";
@@ -1903,6 +1909,7 @@ window.__ModuleLoader__.load({
 						h("tr", null, h("th", null, "配置目标"), h("td", null, target ? `${target.id} · ${target.user ?? "HwHiAiUser"}@${target.host}` : "未关联配置")),
 						h("tr", null, h("th", null, "最近发现"), h("td", null, board.lastSeen ? stamp(board.lastSeen) : "未探测")),
 						h("tr", null, h("th", null, "串口"), h("td", null, serialState(board))),
+						h("tr", null, h("th", null, "SSH认证"), h("td", { className: board.passwordless ? "ad-status-ok" : board.authMethod === "password" ? "ad-change" : "ad-note" }, authState(board))),
 						h("tr", null, h("th", null, "软件"), h("td", null, `CANN ${board.cann ?? "未采集"} · 驱动 ${board.driver ?? "未采集"}`)),
 						h(
 							"tr",
@@ -1997,7 +2004,7 @@ window.__ModuleLoader__.load({
 					secondary: target ? targetName(target) : "",
 					mac: board.mac,
 					aliases: boardMacs(board).join(" "),
-					detail: `${board.lastIp ?? "无 IP"} · ${board.tier ?? "档位未知"} · ${memoryGb(board.memoryUsedMb)} / ${memoryGb(board.memoryTotalMb)} · ${boardMacs(board).length} 个网口 MAC · ${status} · ${serialState(board)}`,
+					detail: `${board.lastIp ?? "无 IP"} · ${board.tier ?? "档位未知"} · ${memoryGb(board.memoryUsedMb)} / ${memoryGb(board.memoryTotalMb)} · ${boardMacs(board).length} 个网口 MAC · ${status} · ${authState(board)} · ${serialState(board)}`,
 					seenAt: board.lastSeen ?? "",
 					changed: board.changesCount > 0,
 					online,
@@ -2021,7 +2028,7 @@ window.__ModuleLoader__.load({
 						title: `${targetName(target)}${macSuffix(target.mac)}`,
 						mac: target.mac,
 						aliases: (Array.isArray(target.macs) ? target.macs : [target.mac]).filter(Boolean).join(" "),
-						detail: `${target.host} · ${checking ? liveState === true ? "上次检测可达（正在重新检查）" : offline ? "上次检测不可达（正在重新检查）" : "正在检查 SSH 连通性" : duplicate ? `同一 SSH 端点已归入 ${duplicateOf[target.id]}，身份待绑定` : online ? "本次检测 SSH 可达" : offline ? "本次检测 SSH 不可达" : isRecent(target.lastSeen) ? "最近 15 分钟发现（尚未做本次连通性检测）" : "未建档或未探测"}`,
+						detail: `${target.host} · ${authState(target)} · ${checking ? liveState === true ? "上次检测可达（正在重新检查）" : offline ? "上次检测不可达（正在重新检查）" : "正在检查 SSH 连通性" : duplicate ? `同一 SSH 端点已归入 ${duplicateOf[target.id]}，身份待绑定` : online ? "本次检测 SSH 可达" : offline ? "本次检测 SSH 不可达" : isRecent(target.lastSeen) ? "最近 15 分钟发现（尚未做本次连通性检测）" : "未建档或未探测"}`,
 						seenAt: target.lastSeen ?? "",
 						changed: false,
 						online,

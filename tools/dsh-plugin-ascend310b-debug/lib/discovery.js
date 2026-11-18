@@ -21,6 +21,7 @@ import { resolve } from 'node:path';
 import { assessBoardScope } from './compat.js';
 import { buildIdentityProbeScript, buildProbeScript, parseProbeOutput } from './probe.js';
 import { runRemoteScript } from './shell.js';
+import { redactSshPassword, resolveSshPassword, runPasswordSshCommand } from './ssh-key.js';
 import {
 	inventoryPath,
 	normalizeMac,
@@ -325,14 +326,47 @@ async function mapLimit(items, limit, worker, signal = null) {
  * @param {object} options - probe options.
  * @returns {Promise<object>} candidate result.
  */
-export async function probeCandidate({ host, user = null, port = 22, timeoutMs = 30000, light = false, exec, signal } = {}) {
-	const result = await runRemoteScript({
-		script: light ? buildIdentityProbeScript() : buildProbeScript(),
+export async function probeCandidate({
+	host,
+	user = null,
+	port = 22,
+	timeoutMs = 30000,
+	light = false,
+	password = null,
+	config = {},
+	exec,
+	signal
+} = {}) {
+	const script = light ? buildIdentityProbeScript() : buildProbeScript();
+	let authMethod = 'key';
+	let result = await runRemoteScript({
+		script,
 		target: { host, user, port },
 		timeoutMs,
 		exec,
 		signal
 	});
+	if (result.ok !== true && typeof password === 'string' && password !== '' && user === 'HwHiAiUser') {
+		const passwordResult = await runPasswordSshCommand(
+			{ host, user, port },
+			script,
+			password,
+			{ exec, config, timeoutMs, signal }
+		);
+		if (passwordResult.ok === true) {
+			authMethod = 'password';
+			result = {
+				...passwordResult,
+				display: `ssh ${user}@${host} (password fallback)`,
+				reason: 'SSH密码登录探测完成；该板尚未配置免密登录。'
+			};
+		} else {
+			result = {
+				...result,
+				reason: redactSshPassword(result.reason ?? result.stderr ?? passwordResult.stderr ?? 'SSH 探测失败', password)
+			};
+		}
+	}
 	if (result.ok !== true) {
 		return { ip: host, ok: false, error: result.reason ?? result.stderr ?? 'SSH 探测失败' };
 	}
@@ -361,6 +395,8 @@ export async function probeCandidate({ host, user = null, port = 22, timeoutMs =
 		macs,
 		interfaceMacs,
 		port,
+		authMethod,
+		passwordless: authMethod === 'key',
 		system,
 		scope,
 		environment
@@ -392,6 +428,7 @@ export async function discoverNetwork({
 	probeConcurrency = 4,
 	scanTimeoutMs = 350,
 	probeTimeoutMs = 10000,
+	password = null,
 	path,
 	config = {},
 	exec,
@@ -409,6 +446,8 @@ export async function discoverNetwork({
 		port,
 		timeoutMs: probeTimeoutMs,
 		light: true,
+		password,
+		config,
 		exec,
 		signal
 	}), signal);
@@ -464,6 +503,7 @@ export async function discoverNetwork({
 	throwIfDiscoveryAborted(signal);
 	let found = [];
 	if (applicable.length > 0) {
+		const checkedAt = new Date().toISOString();
 		const transaction = updateInventory(inventoryFile, (inventory) => {
 			const records = [];
 			for (const candidate of applicable) {
@@ -475,7 +515,12 @@ export async function discoverNetwork({
 					interfaceMacs: candidate.interfaceMacs,
 					hostname: candidate.hostname,
 					port: candidate.port ?? port,
-					system: candidate.system
+					system: candidate.system,
+					auth: {
+						method: candidate.authMethod,
+						passwordless: candidate.passwordless,
+						lastVerifiedAt: checkedAt
+					}
 				});
 				records.push({
 					id: result.board.id,
@@ -489,6 +534,8 @@ export async function discoverNetwork({
 					cann: result.board.system.cannVersion,
 					status: result.status,
 					changes: result.changes,
+					authMethod: candidate.authMethod,
+					passwordless: candidate.passwordless,
 					identity: candidate.mac === null ? 'hostname-fallback' : 'mac'
 				});
 			}
@@ -501,7 +548,13 @@ export async function discoverNetwork({
 
 /** Remove null/undefined fields before a tool schema sees them. */
 function compactBoard(board) {
-	const output = { id: board.id, ip: board.ip, status: board.status };
+	const output = {
+		id: board.id,
+		ip: board.ip,
+		status: board.status,
+		authMethod: board.authMethod === 'password' ? 'password' : 'key',
+		passwordless: board.passwordless === true
+	};
 	for (const key of ['mac', 'hostname', 'model', 'soc', 'tier', 'driver', 'cann', 'firmware', 'identity']) {
 		if (typeof board[key] === 'string' && board[key] !== '') output[key] = board[key];
 	}
@@ -534,6 +587,7 @@ function renderDiscovery(result) {
 						board.mac ? `  - MAC：${board.mac}${Array.isArray(board.macs) && board.macs.length > 1 ? `（另有 ${board.macs.length - 1} 个网口别名）` : ''}` : null,
 						board.model || board.soc ? `  - 型号：${board.model ?? board.soc}${board.tier ? ` / ${board.tier}` : ''}` : null,
 						board.driver || board.cann ? `  - 驱动：${board.driver ?? '未采集'}；CANN：${board.cann ?? '未采集'}` : null,
+						`  - SSH：${board.passwordless ? '免密登录可用' : `密码登录可用，但尚未配置免密登录；下一步运行 ascend_ssh_key_setup target=${board.id}`}`,
 						`  - 状态：${board.status}`,
 						...(board.changes ?? []).map((change) => `  - 变更：${change.fields.map((field) => `${field.name} ${field.from ?? 'null'} -> ${field.to ?? 'null'}`).join('；')}`)
 					].filter(Boolean);
@@ -565,8 +619,10 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 		defineTool({
 			name: 'ascend_discover',
 				description:
-				'Discover Ascend 310B boards on explicitly provided private IPv4 CIDRs. It scans SSH, runs the same ' +
-				'read-only probe as ascend_probe, identifies each board by MAC address, stores a local inventory and ' +
+				'Discover Ascend 310B boards on explicitly provided private IPv4 CIDRs. It scans SSH, first tries public-key ' +
+				'BatchMode, then optionally tries the fixed HwHiAiUser account once with the profile password; a password-only ' +
+				'board is still identified and flagged as not having passwordless SSH. It runs the same read-only probe as ' +
+				'ascend_probe, identifies each board by MAC address, stores a local inventory and ' +
 				'records OS/kernel/driver/firmware/CANN/Python changes across reinstalls. Without explicit CIDRs it ' +
 				'merges discovery.cidrs with active local private interface prefixes (/22-/30, capped at /24 for broader ' +
 				'networks), including Wi-Fi hotspots. It never ' +
@@ -582,6 +638,10 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 				port: { type: 'integer', description: 'SSH port. Defaults to config.discovery.port, then 22.' },
 				concurrency: { type: 'integer', description: 'TCP scan concurrency. Defaults to config.discovery.scanConcurrency, then 64.' },
 				timeoutMs: { type: 'integer', description: 'SSH probe timeout in milliseconds. Defaults to config.discovery.probeTimeoutMs, then 10000.' },
+				passwordFallback: {
+					type: 'boolean',
+					description: 'After key authentication fails, try HwHiAiUser once with the profile password. Defaults to true when a password is configured.'
+				},
 				inventoryPath: { type: 'string', description: 'Inventory JSON path. Defaults to config location or DSH_HOME/ascend310b-inventory.json.' }
 			},
 			output: {
@@ -603,6 +663,8 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 									id: { type: 'string', required: true },
 									ip: { type: 'string', required: true },
 									status: { type: 'string', required: true },
+									authMethod: { type: 'string', required: true },
+									passwordless: { type: 'boolean', required: true },
 									mac: { type: 'string' },
 									macs: { type: 'array', items: { type: 'string' } },
 									hostname: { type: 'string' },
@@ -681,6 +743,7 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 						probeConcurrency: Number.isInteger(discovery.probeConcurrency) ? discovery.probeConcurrency : 4,
 						scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 350,
 						probeTimeoutMs: Number.isInteger(args.timeoutMs) ? args.timeoutMs : discovery.probeTimeoutMs ?? 10000,
+						password: args.passwordFallback === false ? null : resolveSshPassword(config),
 						path: configuredInventory,
 						config
 					});

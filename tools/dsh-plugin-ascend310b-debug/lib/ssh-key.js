@@ -10,6 +10,7 @@
  */
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 
@@ -20,6 +21,7 @@ const KEY_COMMENT = 'dsh-ascend310b-debug';
 
 /** Resolve the local directory that owns generated SSH material. */
 export function sshKeyDirectory(config = {}, env = process.env) {
+	if (typeof config?.sshKeyDir === 'string' && config.sshKeyDir.trim() !== '') return resolve(config.sshKeyDir.trim());
 	const home =
 		(typeof env?.DSH_HOME === 'string' && env.DSH_HOME.trim() !== '' && env.DSH_HOME) ||
 		(typeof env?.USERPROFILE === 'string' && env.USERPROFILE.trim() !== '' && env.USERPROFILE) ||
@@ -43,7 +45,7 @@ export function normalizeIdentityFile(value, config = {}, env = process.env) {
 
 /** Resolve the one-time password without exposing it in tool arguments. */
 export function resolveSshPassword(config = {}, target = {}) {
-	for (const candidate of [config?.sshPassword, target?.sshPassword, config?.serial?.password, config?.sudoPassword]) {
+	for (const candidate of [config?.sshPassword, target?.sshPassword, config?.discovery?.password, config?.serial?.password, config?.sudoPassword]) {
 		if (typeof candidate === 'string' && candidate !== '') return candidate;
 	}
 	return null;
@@ -103,7 +105,7 @@ export function buildKeySshArgs(target, identityFile, command) {
 /** Create a temporary askpass helper that reads the password from the child env. */
 export function createAskpassFile(directory, platform = process.platform) {
 	mkdirSync(directory, { recursive: true, mode: 0o700 });
-	const file = join(directory, platform === 'win32' ? 'askpass.cmd' : 'askpass.sh');
+	const file = join(directory, platform === 'win32' ? `askpass-${randomUUID()}.cmd` : `askpass-${randomUUID()}.sh`);
 	const body = platform === 'win32'
 		? `@echo off\r\npowershell.exe -NoProfile -NonInteractive -Command "[Console]::Out.WriteLine($env:${ASKPASS_ENV})"\r\n`
 		: `#!/bin/sh\nprintf '%s\\n' "$${ASKPASS_ENV}"\n`;
@@ -162,14 +164,12 @@ export async function verifyIdentity(target, identityFile, { exec = execFileCapt
 	});
 }
 
-/** Install one public key through a one-time password-authenticated session. */
-export async function installPublicKey(target, identityFile, password, { exec = execFileCapture, config = {}, signal } = {}) {
-	if (typeof password !== 'string' || password === '') throw new Error('profile未配置可用于首次密钥登记的公钥登录密码。');
-	const publicKey = readFileSync(`${identityFile}.pub`, 'utf8').trim();
-	const command = buildAuthorizeCommand(publicKey);
+/** Run one command with one password attempt through a temporary ASKPASS file. */
+export async function runPasswordSshCommand(target, command, password, { exec = execFileCapture, config = {}, timeoutMs = 45000, signal } = {}) {
+	if (typeof password !== 'string' || password === '') throw new Error('profile未配置密码。');
 	const askpass = createAskpassFile(sshKeyDirectory(config));
 	try {
-		return await exec({
+		const result = await exec({
 			file: 'ssh',
 			args: buildPasswordSshArgs(target, command),
 			env: {
@@ -178,12 +178,22 @@ export async function installPublicKey(target, identityFile, password, { exec = 
 				DISPLAY: ':0',
 				[ASKPASS_ENV]: password
 			},
-			timeoutMs: 45000,
+			timeoutMs,
 			signal
 		});
+		signal?.throwIfAborted?.();
+		return { ...result, ok: result.code === 0 && result.timedOut !== true };
 	} finally {
 		rmSync(askpass, { force: true });
 	}
+}
+
+/** Install one public key through a one-time password-authenticated session. */
+export async function installPublicKey(target, identityFile, password, { exec = execFileCapture, config = {}, signal } = {}) {
+	if (typeof password !== 'string' || password === '') throw new Error('profile未配置可用于首次密钥登记的公钥登录密码。');
+	const publicKey = readFileSync(`${identityFile}.pub`, 'utf8').trim();
+	const command = buildAuthorizeCommand(publicKey);
+	return runPasswordSshCommand(target, command, password, { exec, config, timeoutMs: 45000, signal });
 }
 
 /** Redact a one-time password from process output. */

@@ -145,7 +145,38 @@ equal(candidate.ok, true, '可解析的探测输出应成功');
 equal(candidate.mac, 'c0:74:2b:fd:dd:7a', '发现结果应记录 MAC');
 equal(candidate.system.driverVersion, '25.2.0', '发现结果应记录驱动版本');
 equal(candidate.system.cannVersion, '8.0.0', '发现结果应记录 CANN 版本');
+equal(candidate.authMethod, 'key', '免密探测成功时必须记录 key 认证');
+equal(candidate.passwordless, true, '免密探测成功时必须标记 passwordless=true');
 
+const passwordAttempts = [];
+const passwordFallbackProbe = await probeCandidate({
+	host: '192.0.2.11',
+	user: 'HwHiAiUser',
+	timeoutMs: 1000,
+	password: 'public-default-password',
+	config: { sshKeyDir: join(tmpdir(), `ascend-askpass-${process.pid}`) },
+	exec: async ({ args, env }) => {
+		const passwordAuth = args.includes('PreferredAuthentications=password');
+		passwordAttempts.push({
+			passwordAuth,
+			askpass: typeof env?.SSH_ASKPASS === 'string',
+			passwordInArgv: args.some((value) => String(value).includes('public-default-password'))
+		});
+		return passwordAuth
+			? { code: 0, stdout: probeText, stderr: '', timedOut: false }
+			: { code: 255, stdout: '', stderr: 'Permission denied (publickey,password)', timedOut: false };
+	}
+});
+equal(passwordFallbackProbe.ok, true, '免密失败后应允许固定用户密码回退完成探测');
+equal(passwordFallbackProbe.authMethod, 'password', '密码回退成功时不得误标为免密');
+equal(passwordFallbackProbe.passwordless, false, '密码回退成功时必须标记尚未配置免密');
+check(passwordAttempts.length === 2 && passwordAttempts[0].passwordAuth === false && passwordAttempts[1].passwordAuth === true, '发现探测必须先尝试免密，再按需尝试一次密码');
+check(passwordAttempts[1].askpass === true, '密码回退必须通过临时ASKPASS程序，不得把密码放进argv');
+check(passwordAttempts.every((attempt) => attempt.passwordInArgv === false), '密码绝不能出现在SSH命令行参数中');
+rmSync(join(tmpdir(), `ascend-askpass-${process.pid}`), { recursive: true, force: true });
+
+const historyNow = Date.now();
+const historyAt = (minutes) => new Date(historyNow + minutes * 60 * 1000).toISOString();
 let inventory = readInventory(join(tmpdir(), 'no-such-ascend-inventory.json'));
 const first = observeBoard(inventory, {
 	ip: '10.0.0.100',
@@ -153,12 +184,15 @@ const first = observeBoard(inventory, {
 	mac: 'c0:74:2b:fd:dd:7a',
 	hostname: 'orangepiaipro',
 	system: candidate.system,
-	serial: { status: 'reachable', port: 'COM7', user: 'HwHiAiUser', ip: '10.0.0.100', hostname: 'orangepiaipro' }
-}, '2026-10-18T01:00:00.000Z');
+	serial: { status: 'reachable', port: 'COM7', user: 'HwHiAiUser', ip: '10.0.0.100', hostname: 'orangepiaipro' },
+	auth: { method: 'password', passwordless: false, lastVerifiedAt: historyAt(0) }
+}, historyAt(0));
 inventory = first.inventory;
 equal(first.status, 'new', '第一次发现应为 new');
 equal(first.board.mac, 'c0:74:2b:fd:dd:7a', '资产表必须记录 MAC');
 equal(first.board.serial?.port, 'COM7', '串口发现状态必须写入资产表');
+equal(first.board.auth?.method, 'password', '密码回退认证方式必须写入资产表');
+equal(first.board.auth?.passwordless, false, '未配置免密的板卡必须持久化 passwordless=false');
 const switchedInterface = observeBoard(inventory, {
 	ip: '10.0.0.110',
 	user: 'HwHiAiUser',
@@ -166,7 +200,7 @@ const switchedInterface = observeBoard(inventory, {
 	macs: ['aa:bb:cc:dd:ee:ff', 'c0:74:2b:fd:dd:7a'],
 	hostname: 'orangepiaipro',
 	system: candidate.system
-}, '2026-10-18T01:03:00.000Z');
+}, historyAt(3));
 equal(switchedInterface.board.id, first.board.id, '有线切无线后应沿用同一逻辑板卡 ID');
 equal(switchedInterface.board.macs.length, 2, '资产表应保留有线与无线 MAC 别名');
 equal(switchedInterface.status, 'ip-changed', '网口切换但 MAC 别名匹配时应只记录 IP 变化');
@@ -180,7 +214,7 @@ const otherBoard = observeBoard({
 	mac: 'c0:74:2b:fd:df:83',
 	hostname: 'orangepiaipro',
 	system: candidate.system
-}, '2026-10-18T01:04:00.000Z');
+}, historyAt(4));
 check(otherBoard.board.id !== first.board.id, '不同 MAC 的板即使 machine-id/hostname 相同也必须保持独立');
 
 const legacyMerge = observeBoard({
@@ -189,7 +223,7 @@ const legacyMerge = observeBoard({
 		'c0:74:2b:fd:dd:7a': {
 			id: 'ascend-c0742bfddd7a',
 			mac: 'c0:74:2b:fd:dd:7a',
-			lastSeen: '2026-10-18T00:01:00.000Z',
+			lastSeen: historyAt(-59),
 			system: { soc: 'Ascend310B4' },
 			changes: [],
 			history: []
@@ -197,7 +231,7 @@ const legacyMerge = observeBoard({
 		'aa:bb:cc:dd:ee:ff': {
 			id: 'ascend-aabbccddeeff',
 			mac: 'aa:bb:cc:dd:ee:ff',
-			lastSeen: '2026-10-18T00:02:00.000Z',
+			lastSeen: historyAt(-58),
 			system: { soc: 'Ascend310B4' },
 			changes: [],
 			history: []
@@ -209,7 +243,7 @@ const legacyMerge = observeBoard({
 	macs: ['c0:74:2b:fd:dd:7a', 'aa:bb:cc:dd:ee:ff'],
 	hostname: 'orangepiaipro',
 	system: { soc: 'Ascend310B4' }
-}, '2026-10-18T01:05:00.000Z');
+}, historyAt(5));
 equal(Object.keys(legacyMerge.inventory.boards).length, 1, '同时观察到多个已知 MAC 时应合并旧的重复记录');
 equal(legacyMerge.board.macs.length, 2, '合并后的旧记录应保留全部 MAC 别名');
 
@@ -219,7 +253,7 @@ const moved = observeBoard(inventory, {
 	mac: 'c0:74:2b:fd:dd:7a',
 	hostname: 'orangepiaipro',
 	system: candidate.system
-}, '2026-10-18T01:05:00.000Z');
+}, historyAt(5));
 equal(moved.status, 'ip-changed', '同一 MAC 换 IP 应归并为 ip-changed');
 equal(moved.inventory.boards['c0:74:2b:fd:dd:7a'].lastIp, '10.0.0.120', '资产表应更新当前 IP');
 equal(moved.board.serial?.port, 'COM7', '后续网络发现不能清空串口状态');
@@ -229,7 +263,7 @@ const changedAfterMove = observeBoard(moved.inventory, {
 	mac: 'c0:74:2b:fd:dd:7a',
 	hostname: 'orangepiaipro',
 	system: { ...candidate.system, cannVersion: '9.0.0' }
-}, '2026-10-18T01:06:00.000Z');
+}, historyAt(6));
 equal(changedAfterMove.board.changes.at(-1)?.fromIp, '10.0.0.120', '系统变化必须记录变化前的 IP');
 equal(changedAfterMove.board.changes.at(-1)?.toIp, '10.0.0.121', '系统变化必须记录变化后的 IP');
 const hostnameProbe = observeBoard(changedAfterMove.inventory, {
@@ -238,7 +272,7 @@ const hostnameProbe = observeBoard(changedAfterMove.inventory, {
 	mac: 'c0:74:2b:fd:dd:7a',
 	hostname: 'orangepiaipro',
 	system: changedAfterMove.board.system
-}, '2026-10-18T01:07:00.000Z');
+}, historyAt(7));
 equal(hostnameProbe.inventory.boards['c0:74:2b:fd:dd:7a'].lastIp, '10.0.0.121', '主机名探测不能把当前 IP 清空');
 equal(hostnameProbe.status, 'unchanged', '没有新 IP 的主机名探测不应伪造网络变化');
 
@@ -249,7 +283,7 @@ const changed = observeBoard(moved.inventory, {
 	mac: 'c0:74:2b:fd:dd:7a',
 	hostname: 'orangepiaipro',
 	system: changedSystem
-}, '2026-10-18T02:00:00.000Z');
+}, historyAt(60));
 equal(changed.status, 'system-changed', '驱动/CANN 变化应标为 system-changed');
 check(changed.changes.some((field) => field.name === 'driverVersion'), '变更记录应包含驱动');
 check(changed.changes.some((field) => field.name === 'cannVersion'), '变更记录应包含 CANN');
@@ -261,7 +295,7 @@ const partial = observeBoard(changed.inventory, {
 	mac: 'c0:74:2b:fd:dd:7a',
 	hostname: 'orangepiaipro',
 	system: { hostname: 'orangepiaipro' }
-}, '2026-10-18T02:05:00.000Z');
+}, historyAt(65));
 equal(partial.status, 'unchanged', '缺失的系统字段不能伪造变更');
 equal(partial.board.system.driverVersion, '25.5.0', '缺失驱动字段应保留上次证据');
 equal(partial.board.system.cannVersion, '9.2.0', '缺失 CANN 字段应保留上次证据');
@@ -351,11 +385,13 @@ updateInventory(inventoryFile, (inventory) => {
 	const recovered = readInventory(recoveryPath);
 	equal(recovered.boards['c0:74:2b:fd:dd:7a'].mac, 'c0:74:2b:fd:dd:7a', '主文件损坏或替换中断时应读取可恢复备份');
 	equal(inventoryPath({}, { DSH_HOME: directory }), join(directory, 'ascend310b-inventory.json'), '默认资产表路径应位于 DSH_HOME');
-	const targets = inventoryTargets(loaded, 'HwHiAiUser', Date.parse('2026-10-18T02:10:00.000Z'));
+	const targets = inventoryTargets(loaded, 'HwHiAiUser', historyNow + 70 * 60 * 1000);
 	equal(targets[0].id, 'ascend-c0742bfddd7a', '资产表应生成稳定 target id');
 	equal(targets[0].host, '10.0.0.120', '动态 target 应使用最近一次 IP');
 	equal(targets[0].workdir, DISCOVERED_TARGET_WORKDIR, '发现 target 必须自带受控工作区，固定外设操作不能要求手工 workdir');
-	const staleTargets = inventoryTargets(loaded, 'HwHiAiUser', Date.parse('2026-10-18T03:00:01.000Z'));
+equal(targets[0].authMethod, 'password', '发现target必须保留密码认证状态');
+equal(targets[0].passwordless, false, '发现target必须提示未配置免密登录');
+	const staleTargets = inventoryTargets(loaded, 'HwHiAiUser', historyNow + 90 * 60 * 1000);
 	equal(staleTargets[0]?.recent, false, '超过新鲜度窗口的记录必须显式标记为历史');
 	check(targets[0].note.includes('c0:74:2b:fd:dd:7a'), 'target 备注应保留 MAC');
 	const dockerOnly = inventoryTargets({

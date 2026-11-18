@@ -64,6 +64,7 @@ try {
 	assert.match(readFileSync(posixAskpass, 'utf8'), /printf '%s\\n'/u);
 	assert.ok(!readFileSync(posixAskpass, 'utf8').includes('secret-password'));
 
+	assert.equal(resolveSshPassword({ discovery: { password: 'discovery-only' } }, {}), 'discovery-only');
 	assert.equal(resolveSshPassword({ serial: { password: 'serial-only' } }, {}), 'serial-only');
 	assert.equal(resolveSshPassword({ sudoPassword: 'sudo-only' }, {}), 'sudo-only');
 	assert.equal(resolveSshPassword({ sshPassword: 'ssh-only' }, { sshPassword: 'target-only' }), 'ssh-only');
