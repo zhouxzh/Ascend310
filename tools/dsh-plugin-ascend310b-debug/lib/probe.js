@@ -162,6 +162,26 @@ else
 fi
 abs_end ascend_env
 
+abs_section storage_devices
+if command -v lsblk >/dev/null 2>&1; then
+  lsblk -b -P -o NAME,TYPE,SIZE,RO,RM,MODEL,TRAN,FSTYPE,MOUNTPOINTS 2>&1 || \
+    lsblk -b -P -o NAME,TYPE,SIZE,RO,RM,MODEL,TRAN,FSTYPE,MOUNTPOINT 2>&1 || true
+else
+  echo "NOT_FOUND lsblk"
+fi
+abs_end storage_devices
+abs_section storage_usage
+if command -v df >/dev/null 2>&1; then df -PT -B1 2>&1 || true; else echo "NOT_FOUND df"; fi
+abs_end storage_usage
+abs_section storage_mmc
+for disk in /sys/block/mmcblk*; do
+  [ -e "$disk" ] || continue
+  name=$(basename "$disk")
+  type=$(cat "$disk/device/type" 2>/dev/null || true)
+  name_text=$(cat "$disk/device/name" 2>/dev/null || true)
+  echo "NAME=$name TYPE=$type DEVICE_NAME=$name_text"
+done
+abs_end storage_mmc
 abs_section devices; ls -l /dev/davinci* /dev/devmm* /dev/hisi_hdc 2>/dev/null || echo "NOT_FOUND /dev/davinci*"; abs_end devices
 abs_section sound_cards; cat /proc/asound/cards 2>/dev/null || echo "NOT_FOUND /proc/asound/cards"; abs_end sound_cards
 abs_section audio_playback; if command -v aplay >/dev/null 2>&1; then aplay -l 2>&1; else echo "NOT_FOUND aplay"; fi; abs_end audio_playback
@@ -481,6 +501,111 @@ export function parseMacSection(text) {
 	return (found.find((item) => item.iface === 'eth0') ?? found[0])?.mac ?? null;
 }
 
+/** Parse `lsblk -P` key/value records. */
+export function parseLsblkRecords(text) {
+	if (typeof text !== 'string') return [];
+	const records = [];
+	for (const line of text.split(/\r?\n/)) {
+		if (!/\bNAME="[^"]*"/u.test(line)) continue;
+		const record = {};
+		for (const match of line.matchAll(/([A-Z_]+)="((?:\\.|[^"])*)"/gu)) {
+			record[match[1]] = match[2]
+				.replace(/\\x0a/giu, '\n')
+				.replace(/\\x20/giu, ' ')
+				.replace(/\\"/gu, '"')
+				.trim();
+		}
+		if (typeof record.NAME === 'string' && record.NAME !== '') records.push(record);
+	}
+	return records;
+}
+
+/** Resolve a partition name to the parent whole-disk name. */
+export function parentDiskName(name) {
+	const value = String(name ?? '').trim();
+	const nvme = /^(nvme\d+n\d+)(?:p\d+)?$/u.exec(value);
+	if (nvme !== null) return nvme[1];
+	const mmc = /^(mmcblk\d+)(?:p\d+)?$/u.exec(value);
+	if (mmc !== null) return mmc[1];
+	const sd = /^(sd[a-z]+)\d*$/u.exec(value);
+	if (sd !== null) return sd[1];
+	const virt = /^(vd[a-z]+|xvd[a-z]+)\d*$/u.exec(value);
+	if (virt !== null) return virt[1];
+	return value.replace(/\d+$/u, '');
+}
+
+/** Classify the physical storage medium shown by `df` and `lsblk`. */
+function storageKind(source, disk, mmcType) {
+	const device = String(source ?? '').toLowerCase();
+	const transport = String(disk?.TRAN ?? '').toLowerCase();
+	const model = String(disk?.MODEL ?? '');
+	const removable = String(disk?.RM ?? '0') === '1';
+	const name = String(disk?.NAME ?? '').toLowerCase();
+	if (device.startsWith('overlay') || device === '/dev/root') return '系统根文件系统';
+	if (name.startsWith('nvme') || device.includes('/nvme')) return 'NVMe固态硬盘';
+	if (name.startsWith('mmcblk') || device.includes('/mmcblk')) {
+		return removable || /^(?:sd|sdio)$/iu.test(mmcType ?? '') ? 'SD卡' : 'eMMC';
+	}
+	if (transport === 'usb' || removable) return 'USB存储';
+	if (transport === 'sata' || name.startsWith('sd')) {
+		return /(?:ssd|solid\s*state|nvme)/iu.test(model) ? 'SATA固态硬盘' : 'SATA硬盘';
+	}
+	if (transport === 'virtio' || name.startsWith('vd')) return '虚拟磁盘';
+	if (device.startsWith('/dev/mapper/') || device.startsWith('/dev/dm-')) return '逻辑卷';
+	return '块设备';
+}
+
+/**
+ * Parse physical/root filesystems and their real capacity from `df` plus the
+ * block-device topology from `lsblk`.
+ */
+export function parseStorageFacts(devicesText, usageText, mmcText = '') {
+	const blockDevices = parseLsblkRecords(devicesText);
+	const byName = new Map(blockDevices.map((record) => [record.NAME, record]));
+	const mmcTypes = new Map();
+	for (const line of String(mmcText ?? '').split(/\r?\n/u)) {
+		const name = /\bNAME=([^\s]+)/u.exec(line)?.[1];
+		const type = /\bTYPE=([^\s]+)/u.exec(line)?.[1];
+		if (name !== undefined && type !== undefined) mmcTypes.set(name, type);
+	}
+	const ignoredFilesystems = new Set([
+		'tmpfs', 'devtmpfs', 'devfs', 'proc', 'sysfs', 'cgroup', 'cgroup2', 'pstore',
+		'securityfs', 'debugfs', 'tracefs', 'configfs', 'fusectl', 'mqueue', 'hugetlbfs',
+		'ramfs', 'autofs', 'binfmt_misc', 'squashfs'
+	]);
+	const storage = [];
+	const seen = new Set();
+	for (const line of String(usageText ?? '').split(/\r?\n/u)) {
+		const match = /^(\S+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(.+)$/u.exec(line.trim());
+		if (match === null) continue;
+		const [, source, filesystem, totalText, usedText, availableText, percentText, mount] = match;
+		if (ignoredFilesystems.has(filesystem.toLowerCase())) continue;
+		if (source.startsWith('/dev/loop') || Number(totalText) <= 0) continue;
+		const deviceName = source.replace(/^\/dev\//u, '');
+		const diskName = parentDiskName(deviceName);
+		const disk = byName.get(diskName) ?? byName.get(deviceName) ?? null;
+		const key = `${source}:${mount}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		storage.push({
+			id: key,
+			source,
+			disk: diskName || null,
+			mount,
+			filesystem,
+			kind: storageKind(source, disk, mmcTypes.get(diskName)),
+			transport: disk?.TRAN ?? null,
+			removable: String(disk?.RM ?? '0') === '1',
+			model: disk?.MODEL || null,
+			totalBytes: Number(totalText),
+			usedBytes: Number(usedText),
+			availableBytes: Number(availableText),
+			usePercent: Number(percentText)
+		});
+	}
+	return storage;
+}
+
 /** Read `key=value` from the CANN `version.cfg` content. */
 export function parseVersionCfg(text) {
 	const result = {};
@@ -794,6 +919,15 @@ export function buildEnvironmentReport(sections) {
 	if (videoDetails !== null) set('videoDetails', videoDetails, 'video_details', cleanLine(sections.video_details));
 	const videoFormats = deviceBlock('video_formats');
 	if (videoFormats !== null) set('videoFormats', videoFormats, 'video_formats', cleanLine(sections.video_formats));
+	const storage = parseStorageFacts(sections.storage_devices, sections.storage_usage, sections.storage_mmc);
+	if (storage.length > 0) {
+		set(
+			'storage',
+			storage,
+			'storage_usage',
+			storage.map((item) => `${item.kind} ${item.mount} ${item.totalBytes}/${item.availableBytes}`).join('; ')
+		);
+	}
 
 	return {
 		facts,
@@ -807,7 +941,8 @@ export function buildEnvironmentReport(sections) {
 			temperatureC: device.temperatureC,
 			powerW: device.powerW,
 			memoryUsedMb: device.memoryUsedMb,
-			memoryTotalMb: device.memoryTotalMb
+			memoryTotalMb: device.memoryTotalMb,
+			storage
 		},
 		scope: assessBoardScope({
 			facts,

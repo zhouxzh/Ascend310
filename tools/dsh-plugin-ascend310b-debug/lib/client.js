@@ -372,6 +372,9 @@ window.__ModuleLoader__.load({
 			const value = fact.value;
 			if (value === null || value === undefined || value === "") return null;
 			if (typeof value === "boolean") return value ? "是" : "否";
+			if (Array.isArray(value) && value.some((item) => item !== null && typeof item === "object" && "totalBytes" in item)) {
+				return value.map((item) => `${item.kind ?? "块设备"} ${item.source ?? ""} ${item.mount ?? ""}：总${storageBytes(item.totalBytes)}，已用${storageBytes(item.usedBytes)}，可用${storageBytes(item.availableBytes)}`).join("；");
+			}
 			return String(value);
 		}
 
@@ -1567,6 +1570,53 @@ window.__ModuleLoader__.load({
 							: h("span", { className: "ad-note" }, "该格式没有报告离散或连续尺寸")
 					)
 				))
+			);
+		}
+
+		function storageBytes(value) {
+			const bytes = Number(value);
+			if (!Number.isFinite(bytes) || bytes < 0) return "未采集";
+			const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+			let size = bytes;
+			let unit = 0;
+			while (size >= 1024 && unit < units.length - 1) {
+				size /= 1024;
+				unit += 1;
+			}
+			return `${size >= 100 ? size.toFixed(0) : size >= 10 ? size.toFixed(1) : size.toFixed(2)} ${units[unit]}`;
+		}
+
+		/** Physical/root filesystems with capacity, used and available bytes. */
+		function StorageTable(props) {
+			const items = Array.isArray(props.items) ? props.items : [];
+			if (items.length === 0) return h("div", { className: "ad-empty" }, "尚未采集存储介质容量。更新系统信息后会读取 SSD、SD 卡、eMMC 或 USB 存储。");
+			return h(
+				"table",
+				{ className: "ad-table" },
+				tableColumns(["18%", "22%", "12%", "14%", "14%", "12%", "8%"]),
+				h("thead", null, h("tr", null,
+					h("th", null, "介质类型"),
+					h("th", null, "设备 / 挂载点"),
+					h("th", null, "文件系统"),
+					h("th", null, "总容量"),
+					h("th", null, "已使用"),
+					h("th", null, "剩余可用"),
+					h("th", null, "使用率")
+				)),
+				h("tbody", null, items.map((item) => h(
+					"tr",
+					{ key: item.id ?? `${item.source}:${item.mount}` },
+					h("td", null,
+						h("strong", null, item.kind ?? "块设备"),
+						item.model ? h("div", { className: "ad-note" }, item.model) : null
+					),
+					h("td", { className: "ad-mono" }, `${item.source} · ${item.mount}`),
+					h("td", null, item.filesystem ?? "未采集"),
+					h("td", { className: "ad-mono" }, storageBytes(item.totalBytes)),
+					h("td", { className: "ad-mono" }, storageBytes(item.usedBytes)),
+					h("td", { className: "ad-mono" }, storageBytes(item.availableBytes)),
+					h("td", null, `${Number.isFinite(item.usePercent) ? item.usePercent : "?"}%`)
+				)))
 			);
 		}
 
@@ -3115,6 +3165,11 @@ window.__ModuleLoader__.load({
 						? `${memoryGb(memoryUsed)} / ${memoryGb(memoryTotal)}`
 						: `${memoryGb(memoryUsed)}（总量未采集）`
 					: null;
+			const storage = Array.isArray(board.storage)
+				? board.storage
+				: Array.isArray(facts.storage?.value)
+					? facts.storage.value
+					: [];
 			const terms = query
 				.trim()
 				.toLowerCase()
@@ -3192,6 +3247,15 @@ window.__ModuleLoader__.load({
 						h(Card, { label: "摄像头", value: peripherals.cameras.length > 0 ? `${peripherals.cameras.length} 个节点` : null, source: `V4L2 · ${categoryUpdated("camera")}` }),
 						h(Card, { label: "音频设备", value: peripherals.playback.length + peripherals.capture.length + peripherals.sinks.length > 0 ? `${peripherals.playback.length + peripherals.capture.length + peripherals.sinks.length} 项` : null, source: `ALSA/Pulse · ${categoryUpdated("audio")}` }),
 						h(Card, { label: "USB 外设", value: peripherals.usb.length > 0 ? `${peripherals.usb.length} 个` : null, source: `USB · ${categoryUpdated("camera", "audio")}` })
+					),
+					h(
+						"div",
+						{ className: "ad-section" },
+						h("div", { className: "ad-asset-head" },
+							h("h3", null, "存储介质与容量"),
+							h("span", { className: "ad-note" }, "总量、已用和剩余可用均来自板端 df/lsblk；介质类型来自设备拓扑")
+						),
+						h(StorageTable, { items: storage })
 					),
 					h(
 						"div",

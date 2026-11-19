@@ -39,6 +39,7 @@ const FACT_FIELDS = Object.freeze([
 	['powerW', '功耗 (W)'],
 	['memoryUsedMb', 'NPU 已用内存 (MB)'],
 	['memoryTotalMb', 'NPU 总内存 (MB)'],
+	['storage', '存储介质'],
 	['npuSmiVersion', 'npu-smi 版本'],
 	['cannVersion', 'CANN 运行版本'],
 	['cannPackageVersion', 'CANN 包版本'],
@@ -76,12 +77,28 @@ const FACT_FIELDS = Object.freeze([
 	['probeTime', '探测时间']
 ]);
 
+function formatBytes(value) {
+	const bytes = Number(value);
+	if (!Number.isFinite(bytes) || bytes < 0) return '未采集';
+	const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+	let size = bytes;
+	let unit = 0;
+	while (size >= 1024 && unit < units.length - 1) {
+		size /= 1024;
+		unit += 1;
+	}
+	return `${size >= 100 ? size.toFixed(0) : size >= 10 ? size.toFixed(1) : size.toFixed(2)} ${units[unit]}`;
+}
+
 /** Human-readable value for one fact. */
 function renderValue(fact) {
 	if (fact === undefined || fact === null) return null;
 	const value = fact.value;
 	if (typeof value === 'boolean') return value ? '是' : '否';
 	if (value === undefined || value === null || value === '') return null;
+	if (Array.isArray(value) && value.some((item) => item !== null && typeof item === 'object' && 'totalBytes' in item)) {
+		return value.map((item) => `${item.kind} ${item.mount}：总${formatBytes(item.totalBytes)}，已用${formatBytes(item.usedBytes)}，可用${formatBytes(item.availableBytes)}`).join('；');
+	}
 	return String(value);
 }
 

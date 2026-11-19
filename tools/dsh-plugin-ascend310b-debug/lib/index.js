@@ -922,7 +922,11 @@ function serializeEnvironment(environment) {
 	const facts = {};
 	for (const [key, fact] of Object.entries(environment.facts ?? {})) {
 		facts[key] = {
-			value: fact.value === undefined || fact.value === null ? null : String(fact.value),
+			value: fact.value === undefined || fact.value === null
+				? null
+				: typeof fact.value === 'object'
+					? fact.value
+					: String(fact.value),
 			source: fact.source ?? '',
 			evidence: fact.evidence === undefined || fact.evidence === null ? '' : String(fact.evidence),
 			evidenceLabel: fact.evidenceLabel ?? 'board-output'
@@ -2178,7 +2182,24 @@ export function apply(ctx, config) {
 								health: { type: 'string' },
 								temperatureC: { type: 'number' },
 								memoryUsedMb: { type: 'integer' },
-								memoryTotalMb: { type: 'integer' }
+								memoryTotalMb: { type: 'integer' },
+								storage: {
+									type: 'array',
+									items: {
+										type: 'object',
+										additionalProperties: true,
+										properties: {
+											kind: { type: 'string' },
+											source: { type: 'string' },
+											mount: { type: 'string' },
+											filesystem: { type: 'string' },
+											totalBytes: { type: 'integer' },
+											usedBytes: { type: 'integer' },
+											availableBytes: { type: 'integer' },
+											usePercent: { type: 'number' }
+										}
+									}
+								}
 							}
 						},
 						facts: { type: 'object', additionalProperties: true, required: true },

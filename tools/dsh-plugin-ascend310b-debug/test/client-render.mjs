@@ -463,6 +463,10 @@ check(
 );
 check(!bundleSource.includes('grid-template-columns:repeat(auto-fit'), 'content must not choose its own column count through auto-fit grids');
 check(bundleSource.includes('.ad-table{width:100%;table-layout:fixed'), 'all diagnostic tables must use fixed layout');
+check(
+	bundleSource.includes('function StorageTable') && bundleSource.includes('总容量') && bundleSource.includes('剩余可用'),
+	'the overview must render storage medium, total capacity, used bytes and free bytes'
+);
 seeded = 0;
 seededKind = 'ready';
 seededSelected = 'board-8t';

@@ -4,7 +4,7 @@
  * Usage: node test/parse.mjs
  */
 
-import { buildAudioProbeScript, buildCameraProbeScript, buildIdentityProbeScript, buildProbeScript, buildSystemProbeScript, parseIpAddress, parseMacEntries, parseMacSection, parseNpuSmiInfo, parseOsRelease, parseProbeOutput, parseVersionCfg } from '../lib/probe.js';
+import { buildAudioProbeScript, buildCameraProbeScript, buildIdentityProbeScript, buildProbeScript, buildSystemProbeScript, parseIpAddress, parseLsblkRecords, parseMacEntries, parseMacSection, parseNpuSmiInfo, parseOsRelease, parseProbeOutput, parseStorageFacts, parseVersionCfg, parentDiskName } from '../lib/probe.js';
 import { NPU_SMI_310B1, NPU_SMI_310B4, PROBE_8T_CANN80, PROBE_20T_CANN80, PROBE_ATLAS_CANN92 } from './fixtures.mjs';
 
 const failures = [];
@@ -50,6 +50,31 @@ equal(
 	'c0:74:2b:fd:dd:7a',
 	'不能用容器、bond 或虚拟网卡 MAC 作为板卡身份'
 );
+// --- storage topology and capacity ---------------------------------------
+const lsblkText = [
+	'NAME="mmcblk0" TYPE="disk" SIZE="63864569856" RO="0" RM="1" MODEL="SD64G" TRAN="mmc" FSTYPE="" MOUNTPOINTS=""',
+	'NAME="mmcblk0p1" TYPE="part" SIZE="536870912" RO="0" RM="1" MODEL="" TRAN="" FSTYPE="vfat" MOUNTPOINTS="/boot"',
+	'NAME="mmcblk0p2" TYPE="part" SIZE="63327698944" RO="0" RM="1" MODEL="" TRAN="" FSTYPE="ext4" MOUNTPOINTS="/"',
+	'NAME="nvme0n1" TYPE="disk" SIZE="1024209543168" RO="0" RM="0" MODEL="Fast NVMe SSD" TRAN="nvme" FSTYPE="" MOUNTPOINTS=""',
+	'NAME="nvme0n1p1" TYPE="part" SIZE="1024209543168" RO="0" RM="0" MODEL="" TRAN="" FSTYPE="ext4" MOUNTPOINTS="/data"'
+].join('\n');
+const dfText = [
+	'Filesystem Type 1024-blocks Used Available Capacity Mounted-on',
+	'/dev/mmcblk0p2 ext4 61831424 21345280 37377920 37% /',
+	'/dev/mmcblk0p1 vfat 523776 12000 511776 3% /boot',
+	'/dev/nvme0n1p1 ext4 1000204886 250000000 700204886 26% /data',
+	'tmpfs tmpfs 1048576 0 1048576 0% /run'
+].join('\n');
+const lsblkRecords = parseLsblkRecords(lsblkText);
+equal(lsblkRecords.length, 5, 'lsblk 应解析为五个块设备记录');
+equal(parentDiskName('mmcblk0p2'), 'mmcblk0', 'mmcblk 分区应归到父设备');
+equal(parentDiskName('nvme0n1p1'), 'nvme0n1', 'NVMe 分区应归到父设备');
+const storage = parseStorageFacts(lsblkText, dfText, 'NAME=mmcblk0 TYPE=SD DEVICE_NAME=SC64G');
+equal(storage.length, 3, '应保留 SD、NVMe 和 boot 文件系统并忽略 tmpfs');
+equal(storage.find((item) => item.mount === '/')?.kind, 'SD卡', 'RM/mmc type 应识别为 SD 卡');
+equal(storage.find((item) => item.mount === '/data')?.kind, 'NVMe固态硬盘', 'nvme 应识别为固态硬盘');
+equal(storage.find((item) => item.mount === '/')?.availableBytes, 37377920, '应保留剩余容量字节数');
+
 const identityScript = buildIdentityProbeScript();
 check(identityScript.includes('abs_section mac'), '轻量发现脚本必须读取网口 MAC');
 check(identityScript.includes('abs_section machine_id'), '轻量发现脚本必须保留 machine-id 作为历史证据');
@@ -104,6 +129,21 @@ equal(withDevices.facts.audioSinks.value.includes('alsa_output'), true, '音频 
 equal(withDevices.facts.audioSources.value.includes('alsa_input'), true, '音频 source 应保留');
 equal(withDevices.facts.usbDevices.value.includes('Webcam'), true, 'USB 摄像头应保留');
 equal(withDevices.facts.videoDevices.value.includes('/dev/video0'), true, 'V4L2 视频节点应保留');
+
+const withStorage = parseProbeOutput(`${PROBE_8T_CANN80}
+===ABS_BEGIN:storage_devices===
+${lsblkText}
+===ABS_END:storage_devices===
+===ABS_BEGIN:storage_usage===
+${dfText}
+===ABS_END:storage_usage===
+===ABS_BEGIN:storage_mmc===
+NAME=mmcblk0 TYPE=SD DEVICE_NAME=SC64G
+===ABS_END:storage_mmc===
+`);
+equal(withStorage.facts.storage.value.length, 3, '完整探测应产出结构化存储事实');
+equal(withStorage.board.storage.length, 3, '板卡摘要应携带存储容量供前端显示');
+equal(withStorage.board.storage[0].totalBytes > 0, true, '存储总量必须是板端实际字节数');
 
 const twenty = parseProbeOutput(PROBE_20T_CANN80);
 equal(twenty.board.tier, '20T', '310B1 应映射到 20T');
