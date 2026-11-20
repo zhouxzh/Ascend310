@@ -2789,13 +2789,21 @@ window.__ModuleLoader__.load({
 										target: payload.target ?? previous.payload.target,
 										probedAt: payload.probedAt,
 										source: payload.source,
-										board: payload.board,
+										board: {
+											...(previous.payload.board ?? {}),
+											...(payload.board ?? {}),
+											...(Array.isArray(payload.board?.storage) ? { storage: payload.board.storage } : {})
+										},
 										pairing: payload.pairing,
 										scope: payload.scope,
 										...(payload.missingCore !== undefined ? { missingCore: payload.missingCore } : {}),
 										transport: payload.transport
 									} : {}),
-									facts: { ...(previous.payload.facts ?? {}), ...(payload.facts ?? {}) },
+									facts: {
+										...(previous.payload.facts ?? {}),
+										...(category === "system" ? Object.fromEntries(["hostname", "ipAddress", "macAddress", "machineId", "boardModel", "os", "osVersion", "kernel", "arch", "soc", "chipName", "socTier", "health", "temperatureC", "powerW", "memoryUsedMb", "memoryTotalMb", "npuSmiPath", "npuSmiVersion", "cannVersion", "cannPackageVersion", "driverVersion", "cannLatestPath", "ascendDriverPath", "setEnvPresent", "atcOnPath", "deviceNodes", "kernelModules", "storage"].map((key) => [key, undefined])) : {}),
+										...(payload.facts ?? {})
+									},
 									categoryUpdatedAt: {
 										...(previous.payload.categoryUpdatedAt ?? {}),
 										[category]: payload.updatedAt

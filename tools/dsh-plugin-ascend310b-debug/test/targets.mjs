@@ -270,7 +270,7 @@ try {
 				macAddress: { value: 'c0:74:2b:fd:f6:96' },
 				macAddresses: { value: ['c0:74:2b:fd:f6:96', '80:9d:65:1a:08:34'] },
 				hostname: { value: 'orangepiaipro' },
-				ipAddress: { value: '198.51.100.30' },
+				ipAddress: { value: '198.51.100.99' },
 				soc: { value: 'Ascend310B4' },
 				socTier: { value: '8T' }
 			}
@@ -278,6 +278,7 @@ try {
 	});
 	const aliasInventory = JSON.parse(readFileSync(aliasInventoryPath, 'utf8'));
 	const aliasBoard = Object.values(aliasInventory.boards ?? {})[0];
+	if (aliasBoard?.lastIp !== '198.51.100.30') failures.push('dual-network probes must retain the reachable SSH endpoint rather than board default-route IP');
 	if (!aliasBoard?.macs?.includes('c0:74:2b:fd:f6:96') || !aliasBoard?.macs?.includes('80:9d:65:1a:08:34')) {
 		failures.push('full environment probes must persist every stable MAC alias');
 	}

@@ -52,7 +52,7 @@ import {
 	peripheralLockKey,
 	withPeripheralLock
 } from './peripherals.js';
-import { discoverNetwork, isLocalScanCandidate, parseIPv4, probeCandidate, registerDiscoveryTool, resolveDiscoveryCidrsForScan, tcpProbe } from './discovery.js';
+import { discoverNetwork, discoveryOptions, isLocalScanCandidate, parseIPv4, probeCandidate, registerDiscoveryTool, resolveDiscoveryCidrsForScan, tcpProbe } from './discovery.js';
 import { SERIAL_PROBE_COMMANDS, runSerialCommand, runSerialProbe, validateSerialSettings } from './serial.js';
 import {
 	appendSerialSessionPhase,
@@ -171,6 +171,12 @@ const SAVED_REPORT_FIELDS = [
 ];
 
 const CATEGORY_FACT_KEYS = Object.freeze({
+	system: [
+		'hostname', 'ipAddress', 'macAddress', 'machineId', 'boardModel', 'os', 'osVersion', 'kernel', 'arch',
+		'soc', 'chipName', 'socTier', 'health', 'temperatureC', 'powerW', 'memoryUsedMb', 'memoryTotalMb',
+		'npuSmiPath', 'npuSmiVersion', 'cannVersion', 'cannPackageVersion', 'driverVersion', 'cannLatestPath',
+		'ascendDriverPath', 'setEnvPresent', 'atcOnPath', 'deviceNodes', 'kernelModules', 'storage'
+	],
 	camera: ['videoDevices', 'videoDetails', 'videoFormats', 'usbDevices'],
 	audio: [
 		'soundCards',
@@ -313,12 +319,13 @@ function attachDiscovered(target, entry) {
 	target.port = target.port ?? entry.port ?? null;
 	target.user = target.user ?? entry.user ?? null;
 	target.workdir = target.workdir ?? entry.workdir ?? null;
+	target.identityFile = target.identityFile ?? entry.identityFile ?? null;
 	// Discovery is a live network observation. Prefer its concrete IPv4 for
 	// execution so a stale .local or DHCP address does not outlive the scan.
 	if (entry.recent === true && typeof entry.host === 'string' && parseIPv4(entry.host) !== null) target.host = entry.host;
 	target.lastSeen = target.lastSeen ?? entry.lastSeen ?? null;
 	target.authMethod = target.authMethod ?? entry.authMethod ?? null;
-	target.passwordless = target.passwordless ?? entry.passwordless ?? false;
+	if (entry.authMethod) target.passwordless = entry.passwordless === true;
 	target.authVerifiedAt = target.authVerifiedAt ?? entry.authVerifiedAt ?? null;
 	return target;
 }
@@ -360,15 +367,19 @@ function targetTable(config) {
 	const sshIdentityFiles = inventory.preferences?.sshIdentityFiles !== null && typeof inventory.preferences?.sshIdentityFiles === 'object'
 		? inventory.preferences.sshIdentityFiles
 		: {};
+	const targetPasswordless = inventory.preferences?.sshPasswordless !== null && typeof inventory.preferences?.sshPasswordless === 'object'
+		? inventory.preferences.sshPasswordless
+		: {};
 	for (const target of table.values()) {
 		if (target.identityFile !== null) continue;
 		const stored = sshIdentityFiles[target.id];
 		if (typeof stored === 'string' && stored.trim() !== '') target.identityFile = stored.trim();
+		if (targetPasswordless[target.id] === true) target.passwordless = true;
 	}
 	const discovered = inventoryTargets(
 		inventory,
 		typeof config?.discovery?.user === 'string' ? config.discovery.user.trim() : null
-	).sort((left, right) => {
+	).map((entry) => ({ ...entry, identityFile: sshIdentityFiles[entry.id] ?? entry.identityFile })).sort((left, right) => {
 		const leftAt = Date.parse(left.lastSeen ?? '') || 0;
 		const rightAt = Date.parse(right.lastSeen ?? '') || 0;
 		return rightAt - leftAt;
@@ -439,6 +450,7 @@ function targetTable(config) {
 		if (target.identityFile !== null && target.identityFile !== undefined) continue;
 		const stored = sshIdentityFiles[target.id];
 		if (typeof stored === 'string' && stored.trim() !== '') target.identityFile = stored.trim();
+		if (targetPasswordless[target.id] === true) target.passwordless = true;
 	}
 	return table;
 }
@@ -494,6 +506,11 @@ function rememberSshIdentity(config, targetId, identityFile) {
 			: {};
 		identities[targetId] = identityFile;
 		preferences.sshIdentityFiles = identities;
+		const passwordless = preferences.sshPasswordless !== null && typeof preferences.sshPasswordless === 'object' && !Array.isArray(preferences.sshPasswordless)
+			? preferences.sshPasswordless
+			: {};
+		passwordless[targetId] = true;
+		preferences.sshPasswordless = passwordless;
 		inventory.preferences = preferences;
 	});
 }
@@ -508,9 +525,9 @@ async function provisionSshIdentity(config, { targetSelector, identityFile, dryR
 	if (target.user !== 'HwHiAiUser') {
 		throw new Error(`开发板管理员账号不是HwHiAiUser（当前为${target.user ?? '未配置'}），不能按固定账号策略配置免密登录。`);
 	}
-	const privateKey = normalizeIdentityFile(identityFile, config);
+	const privateKey = normalizeIdentityFile(identityFile ?? target.identityFile, config);
 	const publicKey = `${privateKey}.pub`;
-	const password = resolveSshPassword(config, target);
+	const password = resolveSshPassword(config, (config.targets ?? []).find((entry) => entry.id === target.id) ?? target);
 	const keyExists = existsSync(privateKey);
 	if (dryRun) {
 		return {
@@ -1565,7 +1582,9 @@ function recordEnvironment(config, result) {
 	const path = inventoryPath(config);
 	const system = systemFromFacts(facts);
 	system.tier = system.tier ?? (facts.socTier?.value ? String(facts.socTier.value) : null);
-	const ipAddress = facts.ipAddress?.value ?? (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(result.target.host) ? result.target.host : null);
+	// Keep the address that this controller actually reached, not the board's
+	// default-route address, which can belong to its other network interface.
+	const ipAddress = parseIPv4(result.target.host) !== null ? result.target.host : facts.ipAddress?.value ?? null;
 	const identityMismatch = configuredProbe && expectedMacs.length > 0 && !identityMatches
 		? { configuredId: result.target.id, expectedMacs, observedMacs }
 		: null;
@@ -3774,15 +3793,8 @@ export function apply(ctx, config) {
 				const discovery = config?.discovery ?? {};
 				const cidrs = await resolveDiscoveryCidrsForScan(payload.cidrs, discovery.cidrs);
 				const result = await discoverNetwork({
+					...discoveryOptions(config, payload),
 					cidrs,
-					user: typeof payload.user === 'string' ? payload.user : discovery.user ?? config?.targets?.[0]?.user ?? null,
-					port: Number.isInteger(payload.port) ? payload.port : discovery.port ?? 22,
-					scanConcurrency: Number.isInteger(payload.concurrency) ? payload.concurrency : discovery.scanConcurrency ?? 64,
-					probeConcurrency: Number.isInteger(discovery.probeConcurrency) ? discovery.probeConcurrency : 4,
-					scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 350,
-					probeTimeoutMs: Number.isInteger(payload.timeoutMs) ? payload.timeoutMs : discovery.probeTimeoutMs ?? 10000,
-					path: inventoryPath(config),
-					config,
 					signal: controller.signal
 				});
 				if (controller.signal.aborted) return;

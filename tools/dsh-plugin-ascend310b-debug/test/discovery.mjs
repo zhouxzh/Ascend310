@@ -16,6 +16,7 @@ import { join } from 'node:path';
 
 import {
 	discoverNetwork,
+	discoveryOptions,
 	expandCidr,
 	inferLocalPrivateCidrs,
 	parseIPv4,
@@ -148,6 +149,27 @@ equal(candidate.system.cannVersion, '8.0.0', '发现结果应记录 CANN 版本'
 equal(candidate.authMethod, 'key', '免密探测成功时必须记录 key 认证');
 equal(candidate.passwordless, true, '免密探测成功时必须标记 passwordless=true');
 
+const scanConfig = { sshPassword: 'test-only-password', discovery: { user: 'HwHiAiUser' } };
+equal(discoveryOptions(scanConfig, {}).password, 'test-only-password', 'tool and HTTP default options must both enable configured password fallback');
+equal(discoveryOptions(scanConfig, { passwordFallback: false }).password, null, 'per-call opt-out must disable password fallback');
+equal(discoveryOptions({ ...scanConfig, discovery: { passwordFallback: false } }, {}).password, null, 'profile opt-out must disable fallback');
+const httpSource = readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8');
+check(httpSource.includes('...discoveryOptions(config, payload)'), 'HTTP discovery must use the same password options as the tool');
+
+const keyDirectory = mkdtempSync(join(tmpdir(), 'discovery-key-'));
+try {
+	const knownPath = join(keyDirectory, 'inventory.json');
+	writeFileSync(knownPath, JSON.stringify({ boards: { known: {
+		id: 'known-board', lastIp: '198.51.100.10', lastSeen: new Date().toISOString(), mac: 'aa:bb:cc:dd:ee:01'
+	} }, preferences: { sshIdentityFiles: { 'known-board': '/keys/test-only' } } }));
+	let usedIdentity = false;
+	await probeCandidate({ host: '198.51.100.10', user: 'HwHiAiUser', config: { inventoryPath: knownPath },
+		exec: async ({ args }) => { usedIdentity = args.includes('/keys/test-only'); return fakeExec(); }
+	});
+	check(usedIdentity, 'rescanning a known dynamic board must reuse its registered key');
+} finally {
+	rmSync(keyDirectory, { recursive: true, force: true });
+}
 const passwordAttempts = [];
 const passwordFallbackProbe = await probeCandidate({
 	host: '192.0.2.11',

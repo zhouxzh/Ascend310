@@ -26,6 +26,7 @@ import {
 	inventoryPath,
 	normalizeMac,
 	observeBoard,
+	readInventory,
 	systemFromFacts,
 	updateInventory
 } from './inventory.js';
@@ -338,10 +339,15 @@ export async function probeCandidate({
 	signal
 } = {}) {
 	const script = light ? buildIdentityProbeScript() : buildProbeScript();
+	const inventory = readInventory(inventoryPath(config));
+	const knownBoard = Object.values(inventory.boards ?? {}).find((board) => board?.lastIp === host);
+	const configured = (config.targets ?? []).find((target) => target.host === host || (knownBoard?.mac && target.mac === knownBoard.mac));
+	const identities = inventory.preferences?.sshIdentityFiles ?? {};
+	const identityFile = configured?.identityFile ?? identities[configured?.id] ?? identities[knownBoard?.id] ?? null;
 	let authMethod = 'key';
 	let result = await runRemoteScript({
 		script,
-		target: { host, user, port },
+		target: { host, user, port, identityFile },
 		timeoutMs,
 		exec,
 		signal
@@ -387,7 +393,7 @@ export async function probeCandidate({
 	system.tier = system.tier ?? (facts.socTier?.value ? String(facts.socTier.value) : null);
 	return {
 		ip: host,
-		primaryIp: facts.primaryIp?.value ?? null,
+		primaryIp: facts.ipAddress?.value ?? null,
 		ok: true,
 		soc: facts.soc?.value ?? null,
 		hostname: facts.hostname?.value ?? null,
@@ -607,6 +613,22 @@ function renderDiscovery(result) {
 	return lines.join('\n');
 }
 
+/** Shared authentication/transport options for the tool and HTTP scan entry points. */
+export function discoveryOptions(config = {}, args = {}) {
+	const discovery = config.discovery ?? {};
+	return {
+		user: typeof args.user === 'string' ? args.user : discovery.user ?? config.targets?.[0]?.user ?? 'HwHiAiUser',
+		port: Number.isInteger(args.port) ? args.port : discovery.port ?? 22,
+		scanConcurrency: Number.isInteger(args.concurrency) ? args.concurrency : discovery.scanConcurrency ?? 64,
+		probeConcurrency: Number.isInteger(discovery.probeConcurrency) ? discovery.probeConcurrency : 4,
+		scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 350,
+		probeTimeoutMs: Number.isInteger(args.timeoutMs) ? args.timeoutMs : discovery.probeTimeoutMs ?? 10000,
+		password: (args.passwordFallback ?? discovery.passwordFallback) === false ? null : resolveSshPassword(config),
+		path: inventoryPath(config),
+		config
+	};
+}
+
 /**
  * Register `ascend_discover` on the host half.
  *
@@ -735,18 +757,7 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 							throw new Error('inventoryPath 只能使用 profile 中配置的资产表路径。');
 						}
 					}
-					result = await discoverNetwork({
-						cidrs,
-						user,
-						port: Number.isInteger(args.port) ? args.port : discovery.port ?? 22,
-						scanConcurrency: Number.isInteger(args.concurrency) ? args.concurrency : discovery.scanConcurrency ?? 64,
-						probeConcurrency: Number.isInteger(discovery.probeConcurrency) ? discovery.probeConcurrency : 4,
-						scanTimeoutMs: Number.isInteger(discovery.scanTimeoutMs) ? discovery.scanTimeoutMs : 350,
-						probeTimeoutMs: Number.isInteger(args.timeoutMs) ? args.timeoutMs : discovery.probeTimeoutMs ?? 10000,
-						password: args.passwordFallback === false ? null : resolveSshPassword(config),
-						path: configuredInventory,
-						config
-					});
+					result = await discoverNetwork({ ...discoveryOptions(config, args), cidrs });
 				} catch (error) {
 					const message = String(error?.message ?? error);
 					return {

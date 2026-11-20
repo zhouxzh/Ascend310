@@ -77,6 +77,22 @@ equal(storage.find((item) => item.mount === '/')?.model, 'SD64G', 'SD 卡型号�
 equal(storage.find((item) => item.mount === '/data')?.kind, 'NVMe固态硬盘', 'nvme 应识别为固态硬盘');
 equal(storage.find((item) => item.mount === '/')?.availableBytes, 37377920, '应保留剩余容量字节数');
 
+const sataUsage = '/dev/sda1 ext4 1000 100 900 10% /data';
+const sataDisk = 'NAME="sda" TYPE="disk" RM="0" MODEL="Samsung 870 EVO" TRAN="sata"';
+equal(parseStorageFacts(`${sataDisk} ROTA="0"`, sataUsage)[0].kind, 'SATA固态硬盘', 'ROTA=0 应识别不含 SSD 关键词的 SATA 固态硬盘');
+equal(parseStorageFacts(`${sataDisk} ROTA="1"`, sataUsage)[0].kind, 'SATA硬盘', 'ROTA=1 应识别 SATA 机械硬盘');
+equal(parseStorageFacts(sataDisk, sataUsage)[0].kind, 'SATA存储（类型未知）', '缺失 ROTA 时不能由型号猜测 SATA 介质类型');
+equal(parseStorageFacts('NAME="sda" TYPE="disk" RM="0" ROTA="1" TRAN="sas"', sataUsage)[0].kind, '块设备', 'sd 设备名不应把 SAS 误报成 SATA');
+equal(parseStorageFacts('NAME="sda" TYPE="disk" RM="1" ROTA="0" TRAN=""', sataUsage)[0].kind, '块设备', '可移除标志本身不应证明 USB 传输');
+equal(parseStorageFacts('NAME="sda" TYPE="disk" RM="0" TRAN="usb"', sataUsage)[0].kind, 'USB存储', '明确 USB 传输应保留 USB 分类');
+equal(parseStorageFacts(lsblkText, dfText, 'NAME=mmcblk0 TYPE=MMC')[0].kind, 'eMMC', '明确 MMC 类型应识别为 eMMC');
+equal(parseStorageFacts(lsblkText, dfText)[0].kind, 'MMC存储（类型未知）', '缺失 MMC 类型时不能由 RM 推断 SD 或 eMMC');
+for (const [source, filesystem] of [['server:/data', 'nfs4'], ['//server/share', 'cifs'], ['user@server:/data', 'fuse.sshfs']]) {
+	const network = parseStorageFacts('', `${source} ${filesystem} 1000 100 900 10% /network`)[0];
+	equal(network.kind, '网络文件系统', `${filesystem} 应与本地块设备区分`);
+	equal(network.disk, null, `${filesystem} 不应伪造本地磁盘名称`);
+}
+
 const identityScript = buildIdentityProbeScript();
 check(identityScript.includes('abs_section mac'), '轻量发现脚本必须读取网口 MAC');
 check(identityScript.includes('abs_section machine_id'), '轻量发现脚本必须保留 machine-id 作为历史证据');
@@ -146,6 +162,15 @@ NAME=mmcblk0 TYPE=SD DEVICE_NAME=SC64G
 equal(withStorage.facts.storage.value.length, 3, '完整探测应产出结构化存储事实');
 equal(withStorage.board.storage.length, 3, '板卡摘要应携带存储容量供前端显示');
 equal(withStorage.board.storage[0].totalBytes > 0, true, '存储总量必须是板端实际字节数');
+const emptyStorage = parseProbeOutput(`${PROBE_8T_CANN80}
+===ABS_BEGIN:storage_usage===
+===ABS_END:storage_usage===
+`);
+equal(emptyStorage.facts.storage.value.length, 0, '已采集但为空的存储段必须产生显式空数组以覆盖旧事实');
+equal(emptyStorage.board.storage.length, 0, '空存储事实应与板卡摘要一致');
+equal(parseProbeOutput(PROBE_8T_CANN80).facts.storage, undefined, '未采集 storage_usage 时不得产生清除旧事实的空数组');
+const ignoredStorage = parseProbeOutput('===ABS_BEGIN:storage_usage===\ntmpfs tmpfs 1000 100 900 10% /run\n===ABS_END:storage_usage===');
+equal(ignoredStorage.facts.storage.value.length, 0, '仅含忽略文件系统的已采集结果也应显式覆盖旧事实');
 
 const twenty = parseProbeOutput(PROBE_20T_CANN80);
 equal(twenty.board.tier, '20T', '310B1 应映射到 20T');
@@ -267,6 +292,11 @@ check(!audioScript.includes('abs_section video_formats'), '音频专用刷新不
 const systemScript = buildSystemProbeScript();
 check(systemScript.includes('abs_section npu_smi_info'), '系统刷新应包含 NPU 信息');
 check(systemScript.includes('abs_section cann_version_cfg'), '系统刷新应包含 CANN 版本');
+for (const section of ['storage_devices', 'storage_usage', 'storage_mmc']) {
+	check(systemScript.includes(`abs_section ${section}`), `系统刷新必须采集 ${section}`);
+}
+check(systemScript.includes('RM,ROTA,MODEL'), '系统存储采集应读取 ROTA 以区分 SATA 介质');
+check(script.includes('RM,ROTA,MODEL'), '完整存储采集应读取 ROTA 以区分 SATA 介质');
 check(!systemScript.includes('abs_section ascend_env'), '系统刷新不应执行耗时的 Python/conda 环境导入');
 check(!systemScript.includes('abs_section audio_sources'), '系统刷新不应枚举音频');
 check(!systemScript.includes('abs_section video_formats'), '系统刷新不应枚举摄像头');

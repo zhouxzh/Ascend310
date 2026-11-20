@@ -164,8 +164,8 @@ abs_end ascend_env
 
 abs_section storage_devices
 if command -v lsblk >/dev/null 2>&1; then
-  lsblk -b -P -o NAME,TYPE,SIZE,RO,RM,MODEL,TRAN,FSTYPE,MOUNTPOINTS 2>&1 || \
-    lsblk -b -P -o NAME,TYPE,SIZE,RO,RM,MODEL,TRAN,FSTYPE,MOUNTPOINT 2>&1 || true
+  lsblk -b -P -o NAME,TYPE,SIZE,RO,RM,ROTA,MODEL,TRAN,FSTYPE,MOUNTPOINTS 2>&1 || \
+    lsblk -b -P -o NAME,TYPE,SIZE,RO,RM,ROTA,MODEL,TRAN,FSTYPE,MOUNTPOINT 2>&1 || true
 else
   echo "NOT_FOUND lsblk"
 fi
@@ -251,7 +251,8 @@ export function buildSystemProbeScript() {
 		'npu_smi_path', 'npu_smi_version', 'npu_smi_info', 'npu_smi_board',
 		'os_sp', 'dt_model', 'ascend_toolkit', 'ascend_driver',
 		'cann_version_cfg', 'cann_version_info', 'driver_version_info', 'env',
-		'atc_version', 'devices', 'mac', 'machine_id', 'modules', 'health'
+		'atc_version', 'storage_devices', 'storage_usage', 'storage_mmc',
+		'devices', 'mac', 'machine_id', 'modules', 'health'
 	], { includeNpuSmi: true });
 }
 
@@ -535,20 +536,24 @@ export function parentDiskName(name) {
 }
 
 /** Classify the physical storage medium shown by `df` and `lsblk`. */
-function storageKind(source, disk, mmcType) {
+function storageKind(source, disk, mmcType, filesystem) {
 	const device = String(source ?? '').toLowerCase();
 	const transport = String(disk?.TRAN ?? '').toLowerCase();
-	const model = String(disk?.MODEL ?? '');
-	const removable = String(disk?.RM ?? '0') === '1';
 	const name = String(disk?.NAME ?? '').toLowerCase();
+	if (/^(?:nfs\d*|cifs|smb\d*|(?:fuse\.)?sshfs|ceph|glusterfs)$/iu.test(filesystem ?? '') ||
+		(!device.startsWith('/dev/') && (device.includes(':') || device.startsWith('//')))) return '网络文件系统';
 	if (device.startsWith('overlay') || device === '/dev/root') return '系统根文件系统';
 	if (name.startsWith('nvme') || device.includes('/nvme')) return 'NVMe固态硬盘';
 	if (name.startsWith('mmcblk') || device.includes('/mmcblk')) {
-		return removable || /^(?:sd|sdio)$/iu.test(mmcType ?? '') ? 'SD卡' : 'eMMC';
+		if (/^(?:sd|sdio)$/iu.test(mmcType ?? '')) return 'SD卡';
+		if (/^mmc$/iu.test(mmcType ?? '')) return 'eMMC';
+		return 'MMC存储（类型未知）';
 	}
-	if (transport === 'usb' || removable) return 'USB存储';
-	if (transport === 'sata' || name.startsWith('sd')) {
-		return /(?:ssd|solid\s*state|nvme)/iu.test(model) ? 'SATA固态硬盘' : 'SATA硬盘';
+	if (transport === 'usb') return 'USB存储';
+	if (transport === 'sata') {
+		if (String(disk?.ROTA) === '0') return 'SATA固态硬盘';
+		if (String(disk?.ROTA) === '1') return 'SATA硬盘';
+		return 'SATA存储（类型未知）';
 	}
 	if (transport === 'virtio' || name.startsWith('vd')) return '虚拟磁盘';
 	if (device.startsWith('/dev/mapper/') || device.startsWith('/dev/dm-')) return '逻辑卷';
@@ -596,6 +601,7 @@ export function parseStorageFacts(devicesText, usageText, mmcText = '') {
 		const diskName = parentDiskName(deviceName);
 		const disk = byName.get(diskName) ?? byName.get(deviceName) ?? null;
 		const resolvedSource = mountRecord?.NAME ? `/dev/${mountRecord.NAME}` : source;
+		const kind = storageKind(resolvedSource, disk, mmcTypes.get(diskName), filesystem);
 		const key = `${resolvedSource}:${mount}`;
 		if (seen.has(key)) continue;
 		seen.add(key);
@@ -603,10 +609,10 @@ export function parseStorageFacts(devicesText, usageText, mmcText = '') {
 			id: key,
 			source: resolvedSource,
 			dfSource: source,
-			disk: diskName || null,
+			disk: kind === '网络文件系统' ? null : diskName || null,
 			mount,
 			filesystem,
-			kind: storageKind(resolvedSource, disk, mmcTypes.get(diskName)),
+			kind,
 			transport: disk?.TRAN || (diskName.startsWith('mmcblk') ? 'mmc' : null),
 			removable: String(disk?.RM ?? '0') === '1',
 			model: disk?.MODEL || mmcNames.get(diskName) || null,
@@ -933,7 +939,7 @@ export function buildEnvironmentReport(sections) {
 	const videoFormats = deviceBlock('video_formats');
 	if (videoFormats !== null) set('videoFormats', videoFormats, 'video_formats', cleanLine(sections.video_formats));
 	const storage = parseStorageFacts(sections.storage_devices, sections.storage_usage, sections.storage_mmc);
-	if (storage.length > 0) {
+	if (Object.hasOwn(sections, 'storage_usage')) {
 		set(
 			'storage',
 			storage,
