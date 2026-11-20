@@ -60,7 +60,7 @@ const lsblkText = [
 ].join('\n');
 const dfText = [
 	'Filesystem Type 1024-blocks Used Available Capacity Mounted-on',
-	'/dev/mmcblk0p2 ext4 61831424 21345280 37377920 37% /',
+	'/dev/root ext4 61831424 21345280 37377920 37% /',
 	'/dev/mmcblk0p1 vfat 523776 12000 511776 3% /boot',
 	'/dev/nvme0n1p1 ext4 1000204886 250000000 700204886 26% /data',
 	'tmpfs tmpfs 1048576 0 1048576 0% /run'
@@ -72,6 +72,8 @@ equal(parentDiskName('nvme0n1p1'), 'nvme0n1', 'NVMe 分区应归到父设备');
 const storage = parseStorageFacts(lsblkText, dfText, 'NAME=mmcblk0 TYPE=SD DEVICE_NAME=SC64G');
 equal(storage.length, 3, '应保留 SD、NVMe 和 boot 文件系统并忽略 tmpfs');
 equal(storage.find((item) => item.mount === '/')?.kind, 'SD卡', 'RM/mmc type 应识别为 SD 卡');
+equal(storage.find((item) => item.mount === '/')?.source, '/dev/mmcblk0p2', 'df 的 /dev/root 应通过 lsblk 挂载点还原真实分区');
+equal(storage.find((item) => item.mount === '/')?.model, 'SD64G', 'SD 卡型号应来自 mmc 设备名');
 equal(storage.find((item) => item.mount === '/data')?.kind, 'NVMe固态硬盘', 'nvme 应识别为固态硬盘');
 equal(storage.find((item) => item.mount === '/')?.availableBytes, 37377920, '应保留剩余容量字节数');
 

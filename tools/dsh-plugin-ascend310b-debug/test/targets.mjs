@@ -160,6 +160,36 @@ try {
 	if (clearBindingResult.boards['c0:74:2b:fd:df:83']?.configuredId !== 'board-8t') {
 		failures.push('explicit binding must retain configuredId on the selected physical-board record');
 	}
+	const discoveredIdentityPath = join(directory, 'discovered-identity.json');
+	const discoveredId = 'ascend-c0742bfdf4ee';
+	writeFileSync(discoveredIdentityPath, JSON.stringify({
+		version: 1,
+		boards: {
+			'aa:bb:cc:dd:ee:44': {
+				id: discoveredId,
+				mac: 'aa:bb:cc:dd:ee:44',
+				user: 'HwHiAiUser',
+				lastIp: '198.51.100.19',
+				hostname: 'orangepiaipro',
+				lastSeen: new Date().toISOString(),
+				system: { soc: 'Ascend310B4', tier: '8T' },
+				changes: [],
+				history: []
+			}
+		},
+		preferences: {
+			sshIdentityFiles: {
+				[discoveredId]: '/tmp/keys/ascend310b_ed25519'
+			}
+		}
+	}), 'utf8');
+	const discoveredIdentityTarget = internals.targetTable({
+		inventoryPath: discoveredIdentityPath,
+		targets: []
+	}).get(discoveredId);
+	if (discoveredIdentityTarget?.identityFile !== '/tmp/keys/ascend310b_ed25519') {
+		failures.push('discovered targets must inherit a persisted SSH identity file');
+	}
 	const categoryReportsPath = join(directory, 'category-reports.json');
 	writeFileSync(categoryReportsPath, JSON.stringify({
 		reports: {

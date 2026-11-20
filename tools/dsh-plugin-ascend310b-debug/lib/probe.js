@@ -562,11 +562,20 @@ function storageKind(source, disk, mmcType) {
 export function parseStorageFacts(devicesText, usageText, mmcText = '') {
 	const blockDevices = parseLsblkRecords(devicesText);
 	const byName = new Map(blockDevices.map((record) => [record.NAME, record]));
+	const byMount = new Map();
+	for (const record of blockDevices) {
+		for (const mount of String(record.MOUNTPOINTS ?? record.MOUNTPOINT ?? '').split(/\r?\n/u)) {
+			if (mount !== '') byMount.set(mount, record);
+		}
+	}
 	const mmcTypes = new Map();
+	const mmcNames = new Map();
 	for (const line of String(mmcText ?? '').split(/\r?\n/u)) {
 		const name = /\bNAME=([^\s]+)/u.exec(line)?.[1];
 		const type = /\bTYPE=([^\s]+)/u.exec(line)?.[1];
+		const deviceName = /\bDEVICE_NAME=(.+)$/u.exec(line)?.[1]?.trim();
 		if (name !== undefined && type !== undefined) mmcTypes.set(name, type);
+		if (name !== undefined && deviceName) mmcNames.set(name, deviceName);
 	}
 	const ignoredFilesystems = new Set([
 		'tmpfs', 'devtmpfs', 'devfs', 'proc', 'sysfs', 'cgroup', 'cgroup2', 'pstore',
@@ -581,22 +590,26 @@ export function parseStorageFacts(devicesText, usageText, mmcText = '') {
 		const [, source, filesystem, totalText, usedText, availableText, percentText, mount] = match;
 		if (ignoredFilesystems.has(filesystem.toLowerCase())) continue;
 		if (source.startsWith('/dev/loop') || Number(totalText) <= 0) continue;
-		const deviceName = source.replace(/^\/dev\//u, '');
+		const mountRecord = byMount.get(mount) ?? null;
+		const sourceName = source.replace(/^\/dev\//u, '');
+		const deviceName = mountRecord?.NAME ?? sourceName;
 		const diskName = parentDiskName(deviceName);
 		const disk = byName.get(diskName) ?? byName.get(deviceName) ?? null;
-		const key = `${source}:${mount}`;
+		const resolvedSource = mountRecord?.NAME ? `/dev/${mountRecord.NAME}` : source;
+		const key = `${resolvedSource}:${mount}`;
 		if (seen.has(key)) continue;
 		seen.add(key);
 		storage.push({
 			id: key,
-			source,
+			source: resolvedSource,
+			dfSource: source,
 			disk: diskName || null,
 			mount,
 			filesystem,
-			kind: storageKind(source, disk, mmcTypes.get(diskName)),
-			transport: disk?.TRAN ?? null,
+			kind: storageKind(resolvedSource, disk, mmcTypes.get(diskName)),
+			transport: disk?.TRAN || (diskName.startsWith('mmcblk') ? 'mmc' : null),
 			removable: String(disk?.RM ?? '0') === '1',
-			model: disk?.MODEL || null,
+			model: disk?.MODEL || mmcNames.get(diskName) || null,
 			totalBytes: Number(totalText),
 			usedBytes: Number(usedText),
 			availableBytes: Number(availableText),

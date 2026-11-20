@@ -432,6 +432,14 @@ function targetTable(config) {
 			table.set(entry.id, entry);
 		}
 	}
+	// Discovered targets are inserted after the configured entries. Apply the
+	// persisted identity preference once more so `ascend_ssh_key_setup` also
+	// makes the newly discovered board immediately usable.
+	for (const target of table.values()) {
+		if (target.identityFile !== null && target.identityFile !== undefined) continue;
+		const stored = sshIdentityFiles[target.id];
+		if (typeof stored === 'string' && stored.trim() !== '') target.identityFile = stored.trim();
+	}
 	return table;
 }
 
@@ -1789,6 +1797,7 @@ export function buildProbeOutput({ result, report, inventoryChange = null }) {
 			if (type === 'string' && typeof value !== 'string') continue;
 			board[key] = value;
 		}
+		if (Array.isArray(report.board.storage) && report.board.storage.length > 0) board.storage = report.board.storage;
 		if (Object.keys(board).length > 0) output.board = board;
 	}
 	return output;
