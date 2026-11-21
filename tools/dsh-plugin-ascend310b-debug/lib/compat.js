@@ -491,13 +491,13 @@ export function assessVersionPairing(facts) {
 export const UNIFIED_ENV_NAME = 'ascend';
 export const UNIFIED_PYTHON_VERSION = '3.9.25';
 export const UNIFIED_PYTHON_ABI_PREFIX = 'cpython-39';
-export const UNIFIED_REQUIRED_PACKAGES = Object.freeze([
+export const UNIFIED_REQUIRED_PACKAGES = Object.freeze(['numpy']);
+export const UNIFIED_OPTIONAL_PACKAGES = Object.freeze([
 	'mindspore',
 	'mindnlp',
 	'fastapi',
 	'httpx',
 	'pydantic',
-	'numpy',
 	'cv2',
 	'torch',
 	'torchvision',
@@ -523,6 +523,24 @@ export const UNIFIED_REQUIRED_PACKAGES = Object.freeze([
 	'usb',
 	'rtmidi'
 ]);
+export const CASE_PACKAGE_GROUPS = Object.freeze({
+	case1: Object.freeze(['numpy', 'fastapi', 'python_multipart', 'cv2', 'onnx']),
+	case2: Object.freeze(['numpy', 'cv2', 'onnxruntime']),
+	case3: Object.freeze(['numpy', 'fastapi', 'python_multipart', 'mido', 'sounddevice', 'onnx', 'onnxruntime']),
+	case4: Object.freeze(['numpy', 'fastapi', 'python_multipart', 'cv2', 'PIL', 'onnxruntime']),
+	case5: Object.freeze(['numpy', 'onnx', 'onnxruntime', 'PySide6', 'pyqtgraph']),
+	case6: Object.freeze(['numpy', 'gradio', 'onnx', 'cv2', 'torch', 'torchvision']),
+	case7: Object.freeze(['numpy', 'fastapi', 'python_multipart', 'cv2', 'onnx', 'onnxruntime', 'torch', 'torchvision', 'faiss', 'periphery', 'usb']),
+	case8: Object.freeze(['numpy', 'onnx', 'torch', 'aiohttp', 'aiortc', 'av']),
+	case9: Object.freeze(['numpy', 'mindspore', 'mindnlp', 'fastapi', 'pydantic', 'aiohttp', 'aiortc', 'av', 'sherpa_onnx', 'pandas', 'tokenizers', 'huggingface_hub'])
+});
+
+/** Packages required by the shared environment and one optional case. */
+export function packagesForCase(caseId = null) {
+	const key = typeof caseId === 'string' ? caseId.trim().toLowerCase() : '';
+	const casePackages = CASE_PACKAGE_GROUPS[key] ?? [];
+	return [...new Set([...UNIFIED_REQUIRED_PACKAGES, ...casePackages])];
+}
 
 /**
  * Check the shared runtime contract.
@@ -530,7 +548,7 @@ export const UNIFIED_REQUIRED_PACKAGES = Object.freeze([
  * This is separate from the CANN/driver pairing verdict: a missing env is an
  * application deployment failure, not evidence against the NPU stack.
  */
-export function assessUnifiedEnvironment(facts) {
+export function assessUnifiedEnvironment(facts, { caseId = null } = {}) {
 	const presentFact = facts?.ascendEnvPresent;
 	if (presentFact === undefined) {
 		return {
@@ -571,8 +589,12 @@ export function assessUnifiedEnvironment(facts) {
 				return [name, value === 'true'];
 			})
 	);
-	const missingPackages = UNIFIED_REQUIRED_PACKAGES.filter((name) => packageState.get(name) !== true);
-	const missingImports = importState === null ? [] : UNIFIED_REQUIRED_PACKAGES.filter((name) => importState.get(name) !== true);
+	const selectedPackages = packagesForCase(caseId);
+	const missingPackages = selectedPackages.filter((name) => packageState.get(name) !== true);
+	const missingImports = importState === null ? [] : selectedPackages.filter((name) => importState.get(name) !== true);
+	const optionalMissingPackages = UNIFIED_OPTIONAL_PACKAGES
+		.filter((name) => !selectedPackages.includes(name))
+		.filter((name) => packageState.get(name) !== true);
 	const problems = [];
 	if (version !== UNIFIED_PYTHON_VERSION) {
 		problems.push(`Python 版本为 ${version ?? '未采集'}，统一环境要求 ${UNIFIED_PYTHON_VERSION}。`);
@@ -583,12 +605,14 @@ export function assessUnifiedEnvironment(facts) {
 	if (!isolated) problems.push('ascend 环境未证明禁用了 user-site。');
 	if (acl !== 'ok') problems.push(`ascend 环境中 CANN source 后 PyACL 导入为 ${acl ?? '未采集'}。`);
 	if (aclruntime !== 'ok') problems.push(`ascend 环境中 CANN source 后 aclruntime 导入为 ${aclruntime ?? '未采集'}。`);
-	if (mindsporeContext !== 'ok') problems.push(`ascend 环境中 MindSpore Ascend context 为 ${mindsporeContext ?? '未采集'}。`);
+	if (selectedPackages.includes('mindspore') && mindsporeContext !== 'ok') {
+		problems.push(`ascend 环境中 MindSpore Ascend context 为 ${mindsporeContext ?? '未采集'}。`);
+	}
 	if (missingPackages.length > 0) {
-		problems.push(`ascend 环境缺少统一案例包：${missingPackages.join('、')}。`);
+		problems.push(`${caseId ? `案例 ${caseId} ` : '公共'}环境缺少按需包：${missingPackages.join('、')}。`);
 	}
 	if (missingImports.length > 0) {
-		problems.push(`ascend 环境关键包实际导入失败：${missingImports.join('、')}。`);
+		problems.push(`所选环境的包实际导入失败：${missingImports.join('、')}。`);
 	}
 	if (problems.length === 0) {
 		return {
@@ -596,9 +620,15 @@ export function assessUnifiedEnvironment(facts) {
 			evidence: EVIDENCE.OBSERVED_PASS,
 			reasons: [
 				`${UNIFIED_ENV_NAME} 使用 Python ${version}，ABI ${abi}，已禁用 user-site。`,
-				'CANN source 后 PyACL 与 aclruntime 可导入，MindSpore Ascend context 可设置，统一案例关键包齐全。'
+				'CANN source 后 PyACL 与 aclruntime 可导入。',
+				caseId
+					? `案例 ${caseId} 的按需包检查通过。`
+					: '公共核心包检查通过；案例专用包不纳入公共环境门。'
 			],
-			nextActions: ['继续逐个案例运行板端测试；全部通过后再生成不可变锁文件并清理旧环境。']
+			nextActions: ['继续运行目标案例；缺失的案例专用包在运行该案例前按需安装并记录版本。'],
+			caseId,
+			selectedPackages,
+			optionalMissingPackages
 		};
 	}
 	return {
@@ -606,9 +636,12 @@ export function assessUnifiedEnvironment(facts) {
 		evidence: EVIDENCE.OBSERVED_FAIL,
 		reasons: problems,
 		nextActions: [
-			'修复 ascend 环境；不要通过 base、user-site 或案例专用环境掩盖缺失依赖。',
-			'所有案例测试通过后再锁定完整依赖，并保留旧环境作为回滚直到验收结束。'
-		]
+			'先修复公共 Python、ABI、PyACL 和核心包；案例专用依赖只在运行对应案例时安装。',
+			'不要为未运行的案例预装 MindSpore、GUI、WebRTC 或语音包。'
+		],
+		caseId,
+		selectedPackages,
+		optionalMissingPackages
 	};
 }
 

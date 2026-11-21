@@ -17,7 +17,8 @@ import {
 	matchObservedStacks,
 	parseVersion,
 	releaseLineFor,
-	UNIFIED_REQUIRED_PACKAGES
+	UNIFIED_REQUIRED_PACKAGES,
+	packagesForCase
 } from '../lib/compat.js';
 import { parseProbeOutput } from '../lib/probe.js';
 import { PROBE_20T_CANN80, PROBE_8T_CANN80, PROBE_ATLAS_CANN92 } from './fixtures.mjs';
@@ -142,6 +143,23 @@ const unifiedWrongVersion = assessUnifiedEnvironment({
 	ascendEnvPackages: { value: completePackages }
 });
 equal(unifiedWrongVersion.verdict, 'failed', '统一环境不能使用未获 CANN 8.0 官方矩阵覆盖的 Python 3.11');
+check(packagesForCase('case9').includes('mindspore'), 'case9 must request MindSpore only when selected');
+check(!packagesForCase('case1').includes('mindspore'), 'case1 must not require MindSpore');
+const coreOnlyFacts = {
+	ascendEnvPresent: { value: true },
+	ascendEnvVersion: { value: '3.9.25' },
+	ascendEnvAbi: { value: 'cpython-39-aarch64-linux-gnu' },
+	ascendEnvPolicyIsolated: { value: true },
+	ascendEnvAclImport: { value: 'ok' },
+	ascendEnvAclruntime: { value: 'ok' },
+	ascendEnvPackages: { value: completePackages }
+};
+equal(assessUnifiedEnvironment(coreOnlyFacts).verdict, 'passed', 'public environment must pass without optional packages');
+equal(assessUnifiedEnvironment(coreOnlyFacts, { caseId: 'case1' }).verdict, 'failed', 'selected case1 must report its missing packages');
+check(
+	assessUnifiedEnvironment(coreOnlyFacts).optionalMissingPackages.includes('mindspore'),
+	'optional package report should mention MindSpore without failing the public environment'
+);
 
 if (failures.length > 0) {
 	console.error('compat tests FAILED:');

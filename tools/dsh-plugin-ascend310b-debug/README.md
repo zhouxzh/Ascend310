@@ -130,17 +130,19 @@ CPython 3.9 aarch64 ABI
 - 禁止案例回退到 `base`；`base` 只用于开发板系统诊断和显式排障。
 - 禁止 `pip install --user`；统一设置 `PYTHONNOUSERSITE=1`，不能依赖 `~/.local`。
 - CANN、NPU driver、固件和系统工具仍由开发板系统提供，不复制进 conda。
-- `ascend_probe` 检查环境是否存在、Python/ABI、user-site 隔离、PyACL 导入和关键包覆盖；`ascend_check` 单独输出统一环境结论。
+- 调试插件本身不执行`pip install`、`conda create`或`conda install`；它只检查并报告板端事实。
+- 公共环境门只要求最小核心包（当前为`numpy`）、Python/ABI、user-site隔离、PyACL和aclruntime。MindSpore、MindNLP、GUI、FAISS、WebRTC、语音等按案例按需安装。
+- `ascend_check case=<caseN>`只检查该案例声明的依赖；不传`case`时不把未运行的案例包判为公共环境失败。
 - 8T 和 20T 使用相同环境名，但板端验收证据仍必须分开记录。
-- 所有案例测试通过后才生成统一锁文件并清理旧环境；在此之前保留旧环境作为回滚。
+- 所有目标案例测试通过后才生成对应锁文件；不要为了初始化公共环境预装未运行案例的包。
 
-当前开发板为 CANN 8.0。CANN 8.0.RC3 官方安装文档写明支持 Python 3.7.x 至 3.10.x；本项目为保持已经过板端验证的 MindSpore/MindNLP 组合，统一锁定 Python 3.9.25，不把“本机 3.11 可运行”扩大成官方兼容结论。
+CANN 8.0.RC3 官方安装文档写明支持 Python 3.7.x 至 3.10.x；本项目为保持需要时的 MindSpore/MindNLP 案例兼容性，统一锁定 Python 3.9.25，但不在公共环境初始化时预装 MindSpore/MindNLP。
 
 官方来源：[CANN 8.0.RC3 安装依赖（Debian 系列）](https://www.hiascend.com/doc_center/source/zh/CANNCommunityEdition/80RC3alpha003/softwareinst/instg/instg_0009.html)。
 
 ### 动态 IP、发现与多板
 
-`ascend_discover` 只扫描私有 IPv4 网段，不会扫描公网。默认不配置固定 CIDR：每次扫描先根据当前默认路由确定实际联网的物理网卡，只扫描该网卡的真实 `/22`–`/30` 网段；WSL、Hyper-V、Docker 等虚拟网卡会被排除。这样换 WiFi、换实验室或换有线网络不需要改配置或重启，也不会因为同时插着 USB 网卡就扫描两个 `/24`。显式传入 `cidrs` 或配置 `discovery.cidrs` 时才固定扫描范围；单次调用参数优先级最高。发现器先探测 22 端口，再用和 `ascend_probe` 相同的只读脚本读取主机名、全部物理网口 MAC、板型、驱动、CANN 和 Python，然后按逻辑板卡 ID 写入本地资产表：
+`ascend_discover` 只扫描私有 IPv4 网段，不会扫描公网。默认不配置固定 CIDR：每次扫描先根据当前默认路由确定实际联网的物理网卡，只扫描该网卡的真实 `/22`–`/30` 网段；WSL、Hyper-V、Docker 等虚拟网卡会被排除。这样换 WiFi、换实验室或换有线网络不需要改配置或重启，也不会因为同时插着 USB 网卡就扫描两个 `/24`。显式传入 `cidrs` 或配置 `discovery.cidrs` 时才固定扫描范围；单次调用参数优先级最高。发现器先探测22端口，再用轻量只读脚本读取主机名、全部物理网口MAC、板型和SoC，然后按逻辑板卡ID写入本地资产表；轻量发现不把库存中的旧驱动/CANN当成实时值。当前CANN、驱动和存储需运行`ascend_probe`或“更新系统信息”：
 
 ```text
 DSH_HOME/ascend310b-inventory.json

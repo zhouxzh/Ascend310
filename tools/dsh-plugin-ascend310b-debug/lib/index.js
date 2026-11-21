@@ -2547,6 +2547,7 @@ export function apply(ctx, config) {
 			parameters: {
 				target: { type: 'string', description: 'Configured target id, configured `user@host`, or `local`.' },
 				rawText: { type: 'string', description: 'Probe output or saved snapshot to parse instead of probing.' },
+				case: { type: 'string', description: 'Optional case id for case-specific package checks, e.g. case9.' },
 				repoRoot: { type: 'string', description: 'Textbook repository root. Defaults to config.repoRoot.' }
 			},
 			output: {
@@ -2603,12 +2604,18 @@ export function apply(ctx, config) {
 							'samples/case8/docs/05-known-issues-and-version-compatibility.md'
 						].map((relative) => ({ path: relative, exists: existsSync(join(repoRoot, relative)) }));
 				const outOfScope = report.scope?.applicable === false;
-				const runtimeEnvironment = assessUnifiedEnvironment(result.environment.facts ?? {});
+				const runtimeEnvironment = assessUnifiedEnvironment(result.environment.facts ?? {}, { caseId: args.case ?? null });
 				const runtimeLines = [
 					'',
 					'### 统一运行环境',
 					`- 结论：${runtimeEnvironment.verdict}（证据：${runtimeEnvironment.evidence}）`,
 					...runtimeEnvironment.reasons.map((reason) => `- ${reason}`),
+					...(runtimeEnvironment.caseId
+						? [`- 按需检查案例：${runtimeEnvironment.caseId}`]
+						: ['- 当前只检查公共核心；MindSpore、GUI、FAISS、WebRTC、语音等按案例运行时安装。']),
+					...((runtimeEnvironment.optionalMissingPackages ?? []).length > 0
+						? [`- 未安装的可选包（不影响公共环境）：${runtimeEnvironment.optionalMissingPackages.join('、')}`]
+						: []),
 					...runtimeEnvironment.nextActions.map((action) => `- 下一步：${action}`)
 				];
 				const sampleLines = outOfScope
