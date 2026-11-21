@@ -467,6 +467,10 @@ check(
 	bundleSource.includes('function StorageTable') && bundleSource.includes('总容量') && bundleSource.includes('剩余可用'),
 	'the overview must render storage medium, total capacity, used bytes and free bytes'
 );
+check(
+	bundleSource.includes('未配置网络（仅串口已发现）'),
+	'serial-only boards must be visible as discovered even before a network address is configured'
+);
 seeded = 0;
 seededKind = 'ready';
 seededSelected = 'board-8t';

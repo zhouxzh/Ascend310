@@ -266,6 +266,12 @@ window.__ModuleLoader__.load({
 			return "SSH认证未确认";
 		}
 
+		function networkState(board) {
+			if (typeof board?.lastIp === "string" && board.lastIp !== "") return board.lastIp;
+			if (board?.serial?.status === "reachable") return "未配置网络（仅串口已发现）";
+			return "IP 未采集";
+		}
+
 		function serialState(board) {
 			const serial = board?.serial;
 			if (!serial || typeof serial !== "object") return "串口未发现";
@@ -1889,7 +1895,7 @@ window.__ModuleLoader__.load({
 							h(
 								"td",
 								null,
-								h("div", { className: "ad-mono" }, board.lastIp ?? "IP 未采集"),
+								h("div", { className: "ad-mono" }, networkState(board)),
 								h("div", { className: "ad-note" }, board.hostname ?? "主机名未采集")
 							),
 							h(
@@ -1954,7 +1960,7 @@ window.__ModuleLoader__.load({
 						null,
 						h("tr", null, h("th", null, "逻辑 ID"), h("td", { className: "ad-mono" }, board.id)),
 						h("tr", null, h("th", null, "硬件"), h("td", null, `${board.soc ?? "SoC 未采集"} · ${board.tier ?? "档位未采集"} · ${memoryGb(board.memoryTotalMb)}`)),
-						h("tr", null, h("th", null, "网络"), h("td", null, `${board.lastIp ?? "IP 未采集"} · ${board.hostname ?? "主机名未采集"}`)),
+						h("tr", null, h("th", null, "网络"), h("td", null, `${networkState(board)} · ${board.hostname ?? "主机名未采集"}`)),
 						h("tr", null, h("th", null, "MAC 别名"), h("td", { className: "ad-mono" }, aliases.join(", ") || "未采集")),
 						h("tr", null, h("th", null, "配置目标"), h("td", null, target ? `${target.id} · ${target.user ?? "HwHiAiUser"}@${target.host}` : "未关联配置")),
 						h("tr", null, h("th", null, "最近发现"), h("td", null, board.lastSeen ? stamp(board.lastSeen) : "未探测")),
@@ -2054,7 +2060,7 @@ window.__ModuleLoader__.load({
 					secondary: target ? targetName(target) : "",
 					mac: board.mac,
 					aliases: boardMacs(board).join(" "),
-					detail: `${board.lastIp ?? "无 IP"} · ${board.tier ?? "档位未知"} · ${memoryGb(board.memoryUsedMb)} / ${memoryGb(board.memoryTotalMb)} · ${boardMacs(board).length} 个网口 MAC · ${status} · ${authState(board)} · ${serialState(board)}`,
+					detail: `${networkState(board)} · ${board.tier ?? "档位未知"} · ${memoryGb(board.memoryUsedMb)} / ${memoryGb(board.memoryTotalMb)} · ${boardMacs(board).length} 个网口 MAC · ${status} · ${authState(board)} · ${serialState(board)}`,
 					seenAt: board.lastSeen ?? "",
 					changed: board.changesCount > 0,
 					online,
@@ -3511,7 +3517,7 @@ window.__ModuleLoader__.load({
 			}
 			if (serial.kind === "failed") globalStatusItems.push({ error: true, text: `串口探测失败：${serial.message}` });
 			if (serial.kind === "cancelled") globalStatusItems.push({ error: false, text: "串口发现已取消。" });
-			if (serial.kind === "done") globalStatusItems.push({ error: false, text: `串口：${serial.payload.port} · ${serial.payload.hostname ?? "主机名未采集"} · ${serial.payload.ipAddress ?? "IP 未采集"} · ${serial.payload.macAddress ?? "MAC 未采集"} · 已写入 ${(serial.payload.found ?? []).length} 块` });
+			if (serial.kind === "done") globalStatusItems.push({ error: false, text: `串口：${serial.payload.port} · ${serial.payload.hostname ?? "主机名未采集"} · ${serial.payload.ipAddress ?? "未配置网络（仅串口已发现）"} · ${serial.payload.macAddress ?? "MAC 未采集"} · 已写入 ${(serial.payload.found ?? []).length} 块` });
 			if (serial.kind === "done" && serial.payload.serialLogWarning) globalStatusItems.push({ error: true, text: serial.payload.serialLogWarning });
 			if (discovery.kind === "failed") globalStatusItems.push({ error: true, text: `发现失败：${discovery.message}` });
 			if (discovery.kind === "cancelled") globalStatusItems.push({ error: false, text: "局域网扫描已取消。" });
