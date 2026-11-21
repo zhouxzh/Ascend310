@@ -371,6 +371,23 @@ window.__ModuleLoader__.load({
 			return (boards ?? []).length + unmatched.length;
 		}
 
+		const SYSTEM_FACT_KEYS = [
+			"hostname", "ipAddress", "macAddress", "machineId", "boardModel", "os", "osVersion", "kernel", "arch",
+			"soc", "chipName", "socTier", "health", "temperatureC", "powerW", "memoryUsedMb", "memoryTotalMb",
+			"npuSmiPath", "npuSmiVersion", "cannVersion", "cannPackageVersion", "driverVersion", "cannLatestPath",
+			"ascendDriverPath", "setEnvPresent", "atcOnPath", "deviceNodes", "kernelModules", "storage"
+		];
+
+		function mergeCategoryFacts(previous, next, category) {
+			const merged = { ...(previous ?? {}) };
+			if (category === "system") {
+				for (const key of SYSTEM_FACT_KEYS) {
+					if (!Object.prototype.hasOwnProperty.call(next ?? {}, key)) delete merged[key];
+				}
+			}
+			return { ...merged, ...(next ?? {}) };
+		}
+
 		/** Readable text from a fact, preserving a missing value as null. */
 		function factValue(payload, key) {
 			const fact = payload?.facts?.[key];
@@ -1679,7 +1696,7 @@ window.__ModuleLoader__.load({
 							{ key },
 							h("td", { className: "ad-mono" }, key),
 							h("td", null, factValue(props, key)),
-							h("td", { className: "ad-mono" }, facts[key].source ?? "")
+							h("td", { className: "ad-mono" }, facts[key]?.source ?? "")
 						)
 					)
 				)
@@ -2807,11 +2824,7 @@ window.__ModuleLoader__.load({
 										...(payload.missingCore !== undefined ? { missingCore: payload.missingCore } : {}),
 										transport: payload.transport
 									} : {}),
-									facts: {
-										...(previous.payload.facts ?? {}),
-										...(category === "system" ? Object.fromEntries(["hostname", "ipAddress", "macAddress", "machineId", "boardModel", "os", "osVersion", "kernel", "arch", "soc", "chipName", "socTier", "health", "temperatureC", "powerW", "memoryUsedMb", "memoryTotalMb", "npuSmiPath", "npuSmiVersion", "cannVersion", "cannPackageVersion", "driverVersion", "cannLatestPath", "ascendDriverPath", "setEnvPresent", "atcOnPath", "deviceNodes", "kernelModules", "storage"].map((key) => [key, undefined])) : {}),
-										...(payload.facts ?? {})
-									},
+									facts: mergeCategoryFacts(previous.payload.facts, payload.facts, category),
 									categoryUpdatedAt: {
 										...(previous.payload.categoryUpdatedAt ?? {}),
 										[category]: payload.updatedAt

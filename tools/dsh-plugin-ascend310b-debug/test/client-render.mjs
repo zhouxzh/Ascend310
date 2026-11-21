@@ -472,6 +472,10 @@ check(
 	bundleSource.includes('未配置网络（仅串口已发现）'),
 	'serial-only boards must be visible as discovered even before a network address is configured'
 );
+check(
+	bundleSource.includes('function mergeCategoryFacts') && bundleSource.includes('facts[key]?.source'),
+	'system refresh must remove missing facts and render nullable fact rows without crashing'
+);
 seeded = 0;
 seededKind = 'ready';
 seededSelected = 'board-8t';
