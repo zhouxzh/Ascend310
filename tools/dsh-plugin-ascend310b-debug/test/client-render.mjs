@@ -139,16 +139,17 @@ const reactStub = {
 	},
 	useState: (initial) => {
 		seeded += 1;
-		// First state call is the load state; fifth is the active tab.
+		// First state call is the load state; third is a serial-only asset
+		// selection; fifth is the active tab.
 		if (seeded === 1) return [{ kind: seededKind, payload }, () => {}];
 		if (seeded === 2) return [seededSelected, () => {}];
-		if (seeded === 4) return [seededTab, () => {}];
-		if (seeded === 7 && seededLiveness !== undefined) return [seededLiveness, () => {}];
-		if (seeded === 8) return [seededPeripheralMode, () => {}];
-		if (seeded === 10 && seededPeripheralState !== null) return [seededPeripheralState, () => {}];
-		if (seeded === 12 && seededSpeakerConfirmed !== undefined) return [seededSpeakerConfirmed, () => {}];
-		if (seeded === 13 && seededRecordingPlayback !== undefined) return [seededRecordingPlayback, () => {}];
-		if (seeded === 14 && seededPlaybackConfirmed !== undefined) return [seededPlaybackConfirmed, () => {}];
+		if (seeded === 5) return [seededTab, () => {}];
+		if (seeded === 8 && seededLiveness !== undefined) return [seededLiveness, () => {}];
+		if (seeded === 9) return [seededPeripheralMode, () => {}];
+		if (seeded === 11 && seededPeripheralState !== null) return [seededPeripheralState, () => {}];
+		if (seeded === 13 && seededSpeakerConfirmed !== undefined) return [seededSpeakerConfirmed, () => {}];
+		if (seeded === 14 && seededRecordingPlayback !== undefined) return [seededRecordingPlayback, () => {}];
+		if (seeded === 15 && seededPlaybackConfirmed !== undefined) return [seededPlaybackConfirmed, () => {}];
 		return [initial, () => {}];
 	},
 	useEffect: () => {},
@@ -1107,10 +1108,10 @@ async function runStatefulCameraTests() {
 	const initialState = {
 		0: { kind: 'ready', payload: payload8 },
 		1: 'board-8t',
-		3: 'camera',
-		6: { kind: 'done', byTarget: { 'board-8t': true }, checkedAt: '2026-11-16T00:00:00.000Z', message: '' },
-		7: 'camera',
-		9: { phase: 'idle', action: null, inventory: null, result: null, message: '' }
+		4: 'camera',
+		7: { kind: 'done', byTarget: { 'board-8t': true }, checkedAt: '2026-11-16T00:00:00.000Z', message: '' },
+		8: 'camera',
+		10: { phase: 'idle', action: null, inventory: null, result: null, message: '' }
 	};
 	let runtime = createHookRuntime(initialState);
 	try {
@@ -1151,8 +1152,8 @@ async function runStatefulCameraTests() {
 
 		runtime.flush();
 		await settle();
-		check(runtime.state(8)?.camera?.device === '/dev/video0', 'camera defaults must choose the USB capture node');
-		check(runtime.state(8)?.camera?.pixelFormat === 'MJPG', 'USB capture must default to MJPG');
+		check(runtime.state(9)?.camera?.device === '/dev/video0', 'camera defaults must choose the USB capture node');
+		check(runtime.state(9)?.camera?.pixelFormat === 'MJPG', 'USB capture must default to MJPG');
 		const initialCameraSelect = cameraSelect();
 		check(initialCameraSelect !== undefined, 'the stateful camera page must render the camera selector');
 		if (initialCameraSelect === undefined) {
@@ -1162,18 +1163,18 @@ async function runStatefulCameraTests() {
 
 		initialCameraSelect.props.onChange({ target: { value: '/dev/video2' } });
 		runtime.flush();
-		check(runtime.state(8)?.camera?.device === '/dev/video2', 'selecting a MIPI node must update the capture device');
+		check(runtime.state(9)?.camera?.device === '/dev/video2', 'selecting a MIPI node must update the capture device');
 		formatSelect().props.onChange({ target: { value: 'MJPG' } });
 		runtime.flush();
-		check(runtime.state(8)?.camera?.pixelFormat === 'MJPG', 'the test must start from a valid non-preferred MIPI format');
+		check(runtime.state(9)?.camera?.pixelFormat === 'MJPG', 'the test must start from a valid non-preferred MIPI format');
 
 		cameraSelect().props.onChange({ target: { value: '/dev/video0' } });
 		runtime.flush();
-		check(runtime.state(8)?.camera?.pixelFormat === 'MJPG', 'switching to the USB node must follow its MJPG preference');
+		check(runtime.state(9)?.camera?.pixelFormat === 'MJPG', 'switching to the USB node must follow its MJPG preference');
 		cameraSelect().props.onChange({ target: { value: '/dev/video2' } });
 		runtime.flush();
 		check(
-			runtime.state(8)?.camera?.pixelFormat === 'YUYV',
+			runtime.state(9)?.camera?.pixelFormat === 'YUYV',
 			'switching devices must apply the new MIPI preference even when the previous MJPG format is valid there'
 		);
 
@@ -1181,7 +1182,7 @@ async function runStatefulCameraTests() {
 		runtime.flush();
 		refreshButton().props.onClick();
 		runtime.flush();
-		check(runtime.state(14)?.phase === 'running', 'camera refresh must enter a running state');
+		check(runtime.state(15)?.phase === 'running', 'camera refresh must enter a running state');
 		check(captureButton().props.disabled === true, 'capture must be disabled while camera inventory is refreshing');
 		pendingCameraRefreshes[0].resolve(jsonResponse({
 			ok: true,
@@ -1192,8 +1193,8 @@ async function runStatefulCameraTests() {
 		}));
 		await settle();
 		check(
-			runtime.state(8)?.camera?.pixelFormat === 'MJPG',
-			`refreshing unchanged camera capabilities must preserve a manual format (got ${runtime.state(8)?.camera?.pixelFormat})`
+			runtime.state(9)?.camera?.pixelFormat === 'MJPG',
+			`refreshing unchanged camera capabilities must preserve a manual format (got ${runtime.state(9)?.camera?.pixelFormat})`
 		);
 
 		const reducedFacts = JSON.parse(JSON.stringify(payload8.facts));
@@ -1209,7 +1210,7 @@ async function runStatefulCameraTests() {
 		}));
 		await settle();
 		check(
-			runtime.state(8)?.camera?.pixelFormat === 'YUYV',
+			runtime.state(9)?.camera?.pixelFormat === 'YUYV',
 			'a changed camera capability set must reset the format to the node preference'
 		);
 
@@ -1240,7 +1241,7 @@ async function runStatefulCameraTests() {
 		pendingReports[0].resolve(jsonResponse(report20));
 		await settle();
 		check(runtime.state(1) === 'board-20t', 'the deferred board switch must commit the requested board');
-		check(runtime.state(14)?.phase === 'idle', 'switching boards must reset the previous camera refresh state');
+		check(runtime.state(15)?.phase === 'idle', 'switching boards must reset the previous camera refresh state');
 		staleRefresh.resolve(jsonResponse({
 			ok: true,
 			target: payload8.target,
@@ -1250,10 +1251,10 @@ async function runStatefulCameraTests() {
 		}));
 		await settle();
 		check(runtime.state(1) === 'board-20t', 'a late camera refresh must not switch the selected board back');
-		check(runtime.state(14)?.phase === 'idle', 'a late camera refresh must not commit stale completion state');
+		check(runtime.state(15)?.phase === 'idle', 'a late camera refresh must not commit stale completion state');
 		check(captureButton().props.disabled === true, 'capture must stay disabled while board liveness is unknown');
 
-		runtime.setState(6, { kind: 'done', byTarget: { 'board-20t': true }, checkedAt: '2026-11-16T00:00:04.000Z', message: '' });
+		runtime.setState(7, { kind: 'done', byTarget: { 'board-20t': true }, checkedAt: '2026-11-16T00:00:04.000Z', message: '' });
 		runtime.flush();
 		cameraSelect().props.onChange({ target: { value: '/dev/video4' } });
 		runtime.flush();
@@ -1263,7 +1264,7 @@ async function runStatefulCameraTests() {
 			'disabled capture must explain that the camera capability is unconfirmed'
 		);
 
-		runtime.setState(9, {
+		runtime.setState(10, {
 			phase: 'done',
 			action: 'camera',
 			inventory: null,

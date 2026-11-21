@@ -2335,6 +2335,7 @@ window.__ModuleLoader__.load({
 		function AscendPanel() {
 			const [state, setState] = react.useState({ kind: "loading" });
 			const [selected, setSelected] = react.useState("");
+			const [serialSelection, setSerialSelection] = react.useState(null);
 			const [query, setQuery] = react.useState("");
 			const [tab, setTab] = react.useState("overview");
 			const [boardQuery, setBoardQuery] = react.useState("");
@@ -2668,6 +2669,7 @@ window.__ModuleLoader__.load({
 					.then((payload) => {
 						if (!isCurrent(generation, controller)) return;
 						setState({ kind: "ready", payload });
+						setSerialSelection(null);
 						if (payload.target?.id) setSelectedTarget(payload.target.id);
 					})
 					.catch((error) => {
@@ -2835,10 +2837,22 @@ window.__ModuleLoader__.load({
 				if (targetId === "") return;
 				setBindingConfig("");
 				setBinding({ kind: "idle" });
+				const board = (state.payload?.boards ?? []).find((candidate) => candidate.id === targetId) ?? null;
+				const target = board !== null ? liveTargetForBoard(board, state.payload?.targets ?? []) : null;
+				if (board !== null && target === null) {
+					// A serial-only board has no SSH target yet. Keep it selectable
+					// for its MAC/serial identity instead of sending an invalid
+					// target id to the report route and silently doing nothing.
+					setSerialSelection(board);
+					setSelectedTarget(board.id);
+					setTab("assets");
+					return;
+				}
+				setSerialSelection(null);
 				// Keep the current board identity and content paired until the
 				// requested saved report arrives. load() commits both together.
 				void load(true, targetId);
-			}, [load]);
+			}, [load, setSelectedTarget, state.payload]);
 
 			const [discovery, setDiscovery] = react.useState({ kind: "idle" });
 			const runDiscovery = react.useCallback(async () => {
@@ -3047,7 +3061,10 @@ window.__ModuleLoader__.load({
 									null,
 									(() => {
 										const current = payload?.targets?.find((target) => target.id === selected);
-										if (!current) return "未选择开发板";
+										if (!current) {
+											const serialBoard = (payload?.boards ?? []).find((board) => board.id === selected);
+											return serialBoard ? boardName(serialBoard) : "未选择开发板";
+										}
 										const currentBoard = boardForTarget(current, payload.boards);
 										const liveBoard = payload.board
 											? {
@@ -3064,7 +3081,8 @@ window.__ModuleLoader__.load({
 									null,
 									(() => {
 										const current = payload?.targets?.find((target) => target.id === selected);
-										return current ? `${current.user ?? "HwHiAiUser"}@${current.host ?? "未配置地址"}` : "";
+										if (current) return `${current.user ?? "HwHiAiUser"}@${current.host ?? "未配置地址"}`;
+										return selected.startsWith("ascend-") ? "串口已发现 · 等待网络配置" : "";
 									})()
 								),
 								h("span", { className: "ad-state-badge" }, dataState(payload, state.kind)),
@@ -3230,6 +3248,9 @@ window.__ModuleLoader__.load({
 					)
 				),
 				h("div", { className: "ad-inline-status", role: "status", title: systemRefresh.message ?? "" }, systemRefresh.message ?? ""),
+				serialSelection
+					? h("div", { className: "ad-system-notice" }, `串口已发现 ${boardName(serialSelection)} · ${serialSelection.mac ?? "MAC 未采集"}；未配置网络地址，当前显示串口资产信息，配置网络后再读取系统运行数据。`)
+					: null,
 				h(
 					"div",
 					{
@@ -3285,7 +3306,9 @@ window.__ModuleLoader__.load({
 
 			const assets = (() => {
 				const selectedTarget = (payload.targets ?? []).find((target) => target.id === selected);
-				const selectedBoard = boardForTarget(selectedTarget, payload.boards);
+				const selectedBoard = boardForTarget(selectedTarget, payload.boards)
+					?? (payload.boards ?? []).find((board) => board.id === selected)
+					?? serialSelection;
 				return h(
 					"div",
 					{ className: "ad-section" },
@@ -3509,6 +3532,7 @@ window.__ModuleLoader__.load({
 				onClear: () => clearSerialSessions()
 			});
 			const globalStatusItems = [];
+			if (serialSelection) globalStatusItems.push({ error: false, text: `已选择串口-only开发板：${boardName(serialSelection)} · ${serialSelection.mac ?? "MAC 未采集"}；配置网络后才能加载SSH系统信息。` });
 			if (state.staleError) globalStatusItems.push({ error: true, text: `当前显示的是最近一次成功快照：${state.staleError}` });
 			if (liveness.kind === "failed") globalStatusItems.push({ error: true, text: `在线检查失败：${liveness.message}` });
 			if ((liveness.conflicts ?? []).length > 0) {
