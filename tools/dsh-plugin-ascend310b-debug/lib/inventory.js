@@ -437,6 +437,7 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 		hostname: null,
 		port: null,
 		system: {},
+		systemObservedAt: null,
 		serial: null,
 		auth: null,
 		changes: [],
@@ -447,6 +448,9 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 	board.mac = canonicalMac;
 	board.macs = macs;
 	board.hostname = hostname;
+	if (typeof observation?.systemObservedAt === 'string' && observation.systemObservedAt !== '') {
+		board.systemObservedAt = observation.systemObservedAt;
+	}
 	board.lastIp = observation?.clearIp === true ? null : ip ?? previous?.lastIp ?? null;
 	board.port = Number.isInteger(observation?.port) ? observation.port : board.port ?? null;
 	board.user = text(observation?.user) ?? board.user;
@@ -530,6 +534,7 @@ export function inventoryTargets(inventory, defaultUser = null, now = Date.now()
 			memoryTotalMb: board.system?.memoryTotalMb ?? null,
 			configuredId: board.configuredId ?? null,
 			lastSeen: board.lastSeen ?? null,
+			systemObservedAt: board.systemObservedAt ?? null,
 			recent,
 			authMethod: board.auth?.method ?? null,
 			passwordless: board.auth?.passwordless === true,

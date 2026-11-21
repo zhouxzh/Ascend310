@@ -533,11 +533,12 @@ export async function discoverNetwork({
 					mac: result.board.mac,
 					ip: result.board.lastIp,
 					hostname: result.board.hostname,
-					model: result.board.system.boardModel,
-					soc: result.board.system.soc,
-					tier: result.board.system.tier,
-					driver: result.board.system.driverVersion,
-					cann: result.board.system.cannVersion,
+					model: candidate.system?.boardModel ?? null,
+					soc: candidate.system?.soc ?? null,
+					tier: candidate.system?.tier ?? null,
+					driver: candidate.system?.driverVersion ?? null,
+					cann: candidate.system?.cannVersion ?? null,
+					systemObservedAt: result.board.systemObservedAt ?? null,
 					status: result.status,
 					changes: result.changes,
 					authMethod: candidate.authMethod,
@@ -561,7 +562,7 @@ function compactBoard(board) {
 		authMethod: board.authMethod === 'password' ? 'password' : 'key',
 		passwordless: board.passwordless === true
 	};
-	for (const key of ['mac', 'hostname', 'model', 'soc', 'tier', 'driver', 'cann', 'firmware', 'identity']) {
+	for (const key of ['mac', 'hostname', 'model', 'soc', 'tier', 'driver', 'cann', 'firmware', 'identity', 'systemObservedAt']) {
 		if (typeof board[key] === 'string' && board[key] !== '') output[key] = board[key];
 	}
 	if (Array.isArray(board.macs) && board.macs.length > 0) output.macs = board.macs;
@@ -592,7 +593,9 @@ function renderDiscovery(result) {
 						`- ${board.id}：${board.ip}${board.hostname ? `（${board.hostname}）` : ''}`,
 						board.mac ? `  - MAC：${board.mac}${Array.isArray(board.macs) && board.macs.length > 1 ? `（另有 ${board.macs.length - 1} 个网口别名）` : ''}` : null,
 						board.model || board.soc ? `  - 型号：${board.model ?? board.soc}${board.tier ? ` / ${board.tier}` : ''}` : null,
-						board.driver || board.cann ? `  - 驱动：${board.driver ?? '未采集'}；CANN：${board.cann ?? '未采集'}` : null,
+						board.driver || board.cann
+							? `  - 上次完整探测版本：驱动 ${board.driver ?? '未采集'}；CANN ${board.cann ?? '未采集'}${board.systemObservedAt ? `（${board.systemObservedAt}）` : ''}`
+							: '  - 版本：本次轻量发现未采集；运行 ascend_probe 获取当前CANN/驱动',
 						`  - SSH：${board.passwordless ? '免密登录可用' : `密码登录可用，但尚未配置免密登录；下一步运行 ascend_ssh_key_setup target=${board.id}`}`,
 						`  - 状态：${board.status}`,
 						...(board.changes ?? []).map((change) => `  - 变更：${change.fields.map((field) => `${field.name} ${field.from ?? 'null'} -> ${field.to ?? 'null'}`).join('；')}`)
@@ -696,6 +699,7 @@ export function registerDiscoveryTool(ctx, config, defineTool) {
 									driver: { type: 'string' },
 									cann: { type: 'string' },
 									firmware: { type: 'string' },
+									systemObservedAt: { type: 'string' },
 									identity: { type: 'string' },
 									changes: {
 										type: 'array',

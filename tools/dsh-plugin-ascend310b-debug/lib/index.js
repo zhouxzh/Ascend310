@@ -70,6 +70,7 @@ import {
 	normalizeIdentityFile,
 	redactSshPassword,
 	resolveSshPassword,
+	runPasswordSshCommand,
 	verifyIdentity
 } from './ssh-key.js';
 
@@ -324,6 +325,7 @@ function attachDiscovered(target, entry) {
 	// execution so a stale .local or DHCP address does not outlive the scan.
 	if (entry.recent === true && typeof entry.host === 'string' && parseIPv4(entry.host) !== null) target.host = entry.host;
 	target.lastSeen = target.lastSeen ?? entry.lastSeen ?? null;
+	target.systemObservedAt = target.systemObservedAt ?? entry.systemObservedAt ?? null;
 	target.authMethod = target.authMethod ?? entry.authMethod ?? null;
 	if (entry.authMethod) target.passwordless = entry.passwordless === true;
 	target.authVerifiedAt = target.authVerifiedAt ?? entry.authVerifiedAt ?? null;
@@ -349,6 +351,7 @@ function targetTable(config) {
 			discoveredId: null,
 			observedIp: null,
 			lastSeen: null,
+			systemObservedAt: null,
 			authMethod: null,
 			passwordless: false,
 			authVerifiedAt: null,
@@ -615,6 +618,7 @@ function publicTargets(config) {
 		discoveredId: target.discoveredId ?? null,
 		observedIp: target.observedIp ?? null,
 		lastSeen: target.lastSeen ?? null,
+		systemObservedAt: target.systemObservedAt ?? null,
 		authMethod: target.authMethod ?? null,
 		passwordless: target.passwordless === true,
 		authVerifiedAt: target.authVerifiedAt ?? null,
@@ -732,6 +736,7 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 	}
 	const inventoryFile = inventoryPath(config);
 	const sshPort = Number.isInteger(config?.discovery?.port) ? config.discovery.port : 22;
+	const systemObservedAt = serial.system ? new Date().toISOString() : null;
 	const serialObservation = {
 		status: 'reachable',
 		port: serial.port,
@@ -774,6 +779,7 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 					hostname: matched.candidate.hostname,
 					port: sshPort,
 					system: serial.system ?? matched.candidate.system,
+					systemObservedAt,
 					serial: serialObservation
 				});
 				found.push({
@@ -805,6 +811,7 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 				hostname: serial.hostname,
 				port: sshPort,
 				system: serial.system ?? existing?.system,
+				systemObservedAt,
 				serial: serialObservation,
 				clearIp: candidates.length === 0
 			});
@@ -914,12 +921,15 @@ function publicInventory(config) {
 				model: board.system?.boardModel ?? null,
 				soc: board.system?.soc ?? null,
 				tier: board.system?.tier ?? null,
-				driver: board.system?.driverVersion ?? null,
-				cann: board.system?.cannVersion ?? null,
+				// Version fields without a recorded full-probe timestamp are
+				// inventory history, not current board evidence.
+				driver: board.systemObservedAt ? board.system?.driverVersion ?? null : null,
+				cann: board.systemObservedAt ? board.system?.cannVersion ?? null : null,
 				memoryUsedMb: board.system?.memoryUsedMb ?? null,
 				memoryTotalMb: board.system?.memoryTotalMb ?? null,
 				firstSeen: board.firstSeen ?? null,
 				lastSeen: board.lastSeen ?? null,
+				systemObservedAt: board.systemObservedAt ?? null,
 				lastChangeAt: board.lastChangeAt ?? null,
 				configuredId: boundConfiguredId ?? staleConfiguredId,
 				serial: board.serial ?? null,
@@ -1601,7 +1611,13 @@ function recordEnvironment(config, result) {
 			port: result.target.port,
 			configuredId: configuredProbe && identityMatches ? result.target.id : null,
 			clearConfiguredId: identityMismatch !== null,
-			system
+			auth: result.authMethod ? {
+				method: result.authMethod,
+				passwordless: result.authMethod === 'key',
+				lastVerifiedAt: new Date().toISOString()
+			} : null,
+			system,
+			systemObservedAt: new Date().toISOString()
 		})).result;
 	} catch {
 		// A read-only probe must still succeed if the local inventory path is
@@ -1886,12 +1902,23 @@ async function collectEnvironment({ config, targetSelector, rawText, timeoutMs, 
 	}
 	const target = resolveTarget(config, targetSelector);
 	const script = buildProbeScript();
-	const transport =
+	let transport =
 		target.transport === 'local'
 			? await runLocalScript({ script, cwd: target.workdir ?? undefined, timeoutMs, exec })
 			: await runRemoteScript({ script, target, timeoutMs, exec });
+	let authMethod = 'key';
+	if (transport.ok !== true && target.transport === 'ssh') {
+		const password = resolveSshPassword(config, (config.targets ?? []).find((entry) => entry.id === target.id) ?? target);
+		if (typeof password === 'string' && password !== '') {
+			const fallback = await runPasswordSshCommand(target, script, password, { exec, config, timeoutMs, signal: null });
+			if (fallback.ok === true) {
+				transport = { ...fallback, display: `${transport.display ?? 'ssh'} (password fallback)`, reason: 'SSH密码登录探测完成；该板尚未配置免密登录。' };
+				authMethod = 'password';
+			}
+		}
+	}
 	const environment = parseProbeOutput(transport.stdout ?? '');
-	return { target, source: target.transport, environment, rawText: transport.stdout ?? '', transport };
+	return { target, source: target.transport, environment, rawText: transport.stdout ?? '', transport, authMethod };
 }
 
 /** Collect one category without running the full environment probe. */
