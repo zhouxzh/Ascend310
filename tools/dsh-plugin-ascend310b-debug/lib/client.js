@@ -2839,7 +2839,10 @@ window.__ModuleLoader__.load({
 				setBinding({ kind: "idle" });
 				const board = (state.payload?.boards ?? []).find((candidate) => candidate.id === targetId) ?? null;
 				const target = board !== null ? liveTargetForBoard(board, state.payload?.targets ?? []) : null;
-				if (board !== null && target === null) {
+				const serialOnly = board !== null
+					&& board.serial?.status === "reachable"
+					&& (typeof board.lastIp !== "string" || board.lastIp === "" || /^172\.17\./u.test(board.lastIp));
+				if (serialOnly && target === null) {
 					// A serial-only board has no SSH target yet. Keep it selectable
 					// for its MAC/serial identity instead of sending an invalid
 					// target id to the report route and silently doing nothing.
