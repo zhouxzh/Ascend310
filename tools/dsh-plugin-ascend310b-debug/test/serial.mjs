@@ -61,6 +61,15 @@ equal(network.ipAddress, '10.0.0.101', 'default route IP must win over docker ad
 equal(network.interfaces.length, 2, 'interfaces parsed');
 equal(network.macAddress, 'c0:74:2b:fd:dd:7a', 'stable eth0 MAC should match network probe identity');
 equal(network.defaultRoute, 'default via 10.0.0.1 dev wlan0 proto dhcp metric 600', 'default route');
+const dockerOnly = parseSerialNetwork({
+	hostname: 'orangepiaipro',
+	addresses: '172.17.0.1',
+	interfaces: '3: docker0 inet 172.17.0.1/16 scope global docker0',
+	routes: '',
+	macs: 'eth0=c0:74:2b:fd:df:83\ndocker0=02:42:ac:11:00:02'
+});
+equal(dockerOnly.ipAddress, null, 'docker-only serial output must not be reported as a board LAN IPv4');
+equal(dockerOnly.hostnameIps[0], '172.17.0.1', 'docker address may remain as raw diagnostic data');
 equal(cleanSerialOutput('\u001b[32mgreen\u001b[0m\r\n'), 'green', 'ANSI/CR cleaned');
 equal(extractMarkedOutput(transcript, 'ASC_TOKEN_BEGIN_2'), '10.0.0.101 172.17.0.1', 'marked output');
 const candidates = parseSerialPortList('__SERIAL_LIST__{"ports":[{"port":"COM14","label":"CH343"},{"port":"COM23","label":"CH343"}]}');

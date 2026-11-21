@@ -68,6 +68,26 @@ function serialAbortError() {
 	return error;
 }
 
+/** Read-only system commands run in the same serial login as the network probe. */
+export const SERIAL_SYSTEM_COMMANDS = Object.freeze([
+	'hostname',
+	'uname -a',
+	'uname -m',
+	'uname -r',
+	'test -r /etc/os-release && cat /etc/os-release || echo MISSING_OS_RELEASE',
+	'NPU_SMI="$(command -v npu-smi 2>/dev/null || true)"; if [ -z "$NPU_SMI" ]; then for candidate in /usr/local/sbin/npu-smi /usr/local/bin/npu-smi /usr/sbin/npu-smi /usr/bin/npu-smi /usr/local/Ascend/driver/tools/npu-smi; do if [ -x "$candidate" ]; then NPU_SMI="$candidate"; break; fi; done; fi; if [ -n "$NPU_SMI" ]; then "$NPU_SMI" info 2>&1 || true; else echo NOT_FOUND; fi',
+	'cat /usr/local/Ascend/ascend-toolkit/latest/version.cfg 2>/dev/null || cat /usr/local/Ascend/ascend-toolkit/version.cfg 2>/dev/null || echo NOT_FOUND',
+	'cat /usr/local/Ascend/driver/version.info 2>/dev/null || echo NOT_FOUND',
+	'for p in /sys/class/net/*; do if [ -r "$p/address" ]; then printf "%s=" "$(basename "$p")"; cat "$p/address"; fi; done',
+	'ip -4 -o addr show scope global 2>/dev/null || true',
+	'ip -4 route 2>/dev/null || true',
+	'cat /etc/machine-id 2>/dev/null || echo NOT_FOUND',
+	'lsblk -b -P -o NAME,TYPE,SIZE,RO,RM,MODEL,TRAN,FSTYPE,MOUNTPOINTS 2>/dev/null || lsblk -b -P -o NAME,TYPE,SIZE,RO,RM,MODEL,TRAN,FSTYPE,MOUNTPOINT 2>/dev/null || true',
+	'df -PT -B1 2>/dev/null || true',
+	'for disk in /sys/block/mmcblk*; do [ -e "$disk" ] || continue; printf "NAME=%s TYPE=%s DEVICE_NAME=%s\\n" "$(basename "$disk")" "$(cat "$disk/device/type" 2>/dev/null || true)" "$(cat "$disk/device/name" 2>/dev/null || true)"; done',
+	'date --iso-8601=seconds 2>/dev/null || date'
+]);
+
 /** Commands used by `ascend_serial_probe`; all are read-only. */
 export const SERIAL_PROBE_COMMANDS = Object.freeze([
 	'hostname',
@@ -153,7 +173,6 @@ export function parseSerialNetwork(sections, rawText = '') {
 		ipAddress = ipv4.find((address) => /^192\.168\./u.test(address))
 			?? ipv4.find((address) => /^10\./u.test(address))
 			?? ipv4.find((address) => !/^172\.17\./u.test(address))
-			?? ipv4[0]
 			?? null;
 	}
 	return {
@@ -800,6 +819,19 @@ export async function runSerialProbe(settings, options = {}) {
 			macs: sections.command5
 		}, result.transcript);
 		return { ...network, port: concrete.port, user: concrete.user };
+	}, options);
+}
+
+/** Run the system facts probe in one serial login without shelling a multi-line script. */
+export async function runSerialSystem(settings, options = {}) {
+	return withAutoPort(settings, async (concrete) => {
+		const result = await runSerialSession({ ...options, settings: concrete, commands: SERIAL_SYSTEM_COMMANDS });
+		return {
+			port: concrete.port,
+			user: concrete.user,
+			sections: result.sections ?? {},
+			transcript: result.transcript ?? ''
+		};
 	}, options);
 }
 

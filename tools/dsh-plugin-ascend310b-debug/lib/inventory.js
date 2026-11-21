@@ -447,7 +447,7 @@ export function observeBoard(inventory, observation, now = new Date().toISOStrin
 	board.mac = canonicalMac;
 	board.macs = macs;
 	board.hostname = hostname;
-	board.lastIp = ip ?? previous?.lastIp ?? null;
+	board.lastIp = observation?.clearIp === true ? null : ip ?? previous?.lastIp ?? null;
 	board.port = Number.isInteger(observation?.port) ? observation.port : board.port ?? null;
 	board.user = text(observation?.user) ?? board.user;
 	board.label = text(observation?.label) ?? board.label;

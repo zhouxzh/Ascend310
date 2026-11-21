@@ -53,7 +53,7 @@ import {
 	withPeripheralLock
 } from './peripherals.js';
 import { discoverNetwork, discoveryOptions, isLocalScanCandidate, parseIPv4, probeCandidate, registerDiscoveryTool, resolveDiscoveryCidrsForScan, tcpProbe } from './discovery.js';
-import { SERIAL_PROBE_COMMANDS, runSerialCommand, runSerialProbe, validateSerialSettings } from './serial.js';
+import { SERIAL_PROBE_COMMANDS, runSerialCommand, runSerialProbe, runSerialSystem, validateSerialSettings } from './serial.js';
 import {
 	appendSerialSessionPhase,
 	clearSerialSessionLogs,
@@ -773,7 +773,7 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 					interfaceMacs: matched.candidate.interfaceMacs,
 					hostname: matched.candidate.hostname,
 					port: sshPort,
-					system: matched.candidate.system,
+					system: serial.system ?? matched.candidate.system,
 					serial: serialObservation
 				});
 				found.push({
@@ -804,8 +804,9 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 				macs: [serial.macAddress],
 				hostname: serial.hostname,
 				port: sshPort,
-				system: existing?.system,
-				serial: serialObservation
+				system: serial.system ?? existing?.system,
+				serial: serialObservation,
+				clearIp: candidates.length === 0
 			});
 			found.push({
 				id: observed.board.id,
@@ -1711,6 +1712,28 @@ function logSerialValidationFailure(config, operation, settings, commands, reaso
 	persistSerialSessionSafely(config, log, settings);
 }
 
+function serialSystemEnvironment(sections) {
+	const section = (index) => String(sections?.[`command${index}`] ?? '');
+	const block = (name, value) => `===ABS_BEGIN:${name}===\n${value}\n===ABS_END:${name}===`;
+	return parseProbeOutput([
+		block('hostname', section(1)),
+		block('uname', section(2)),
+		block('arch', section(3)),
+		block('kernel', section(4)),
+		block('os_release', section(5)),
+		block('npu_smi_info', section(6)),
+		block('cann_version_cfg', section(7)),
+		block('driver_version_info', section(8)),
+		block('mac', section(9)),
+		block('ip_address', section(10)),
+		block('machine_id', section(12)),
+		block('storage_devices', section(13)),
+		block('storage_usage', section(14)),
+		block('storage_mmc', section(15)),
+		block('date', section(16))
+	].join('\n'));
+}
+
 async function runSerialProbeAndDiscovery(config, settings, signal, onEvent) {
 	const result = await runSerialProbe(settings, { signal, onEvent });
 	onEvent({
@@ -1720,8 +1743,29 @@ async function runSerialProbeAndDiscovery(config, settings, signal, onEvent) {
 		detail: `hostname=${result.hostname ?? 'unknown'} ip=${result.ipAddress ?? 'unknown'} mac=${result.macAddress ?? 'unknown'}`,
 		data: { hostname: result.hostname ?? null, ipAddress: result.ipAddress ?? null, macAddress: result.macAddress ?? null }
 	});
+	let serialSystem = null;
+	let serialFacts = null;
+	let systemError = null;
+	try {
+		onEvent({ at: new Date().toISOString(), phase: 'system-facts', status: 'running', detail: 'reading system and storage facts over serial' });
+		const systemResult = await runSerialSystem(settings, { signal, onEvent });
+		const environment = serialSystemEnvironment(systemResult.sections);
+		serialFacts = serializeEnvironment(environment).facts;
+		serialSystem = systemFromFacts(serialFacts);
+		onEvent({
+			at: new Date().toISOString(),
+			phase: 'system-facts',
+			status: 'ok',
+			detail: `serial system refresh completed: hostname=${serialFacts.hostname?.value ?? result.hostname ?? 'unknown'}`,
+			data: { hostname: serialFacts.hostname?.value ?? result.hostname ?? null }
+		});
+	} catch (error) {
+		systemError = String(error?.message ?? error);
+		onEvent({ at: new Date().toISOString(), phase: 'system-facts', status: 'warning', detail: `serial system refresh skipped: ${systemError}` });
+	}
+	const serialResult = { ...result, system: serialSystem, facts: serialFacts, systemError };
 	onEvent({ at: new Date().toISOString(), phase: 'ssh-verify', status: 'running', detail: 'verifying serial-reported addresses over SSH' });
-	const discovery = await discoverSerialBoard(result, config, { signal, onEvent });
+	const discovery = await discoverSerialBoard(serialResult, config, { signal, onEvent });
 	const status = discovery.found.length > 0 ? 'ok' : discovery.errors.length > 0 ? 'warning' : 'skipped';
 	onEvent({
 		at: new Date().toISOString(),
@@ -1732,7 +1776,7 @@ async function runSerialProbeAndDiscovery(config, settings, signal, onEvent) {
 			: discovery.errors.join(' | ') || 'no SSH-verifiable address reported',
 		data: { foundCount: discovery.found.length, errors: discovery.errors }
 	});
-	return { ...result, discovery };
+	return { ...serialResult, discovery };
 }
 
 /**
@@ -3410,8 +3454,11 @@ export function apply(ctx, config) {
 						`串口：${result.port}（${settings.baudRate} 8N1）`,
 						`用户：${result.user}`,
 						`主机名：${result.hostname ?? '未采集'}`,
-						`当前 IPv4：${result.ipAddress ?? '未采集'}`,
+						`当前 IPv4：${result.ipAddress ?? '未配置网络（仅串口）'}`,
 						`MAC：${result.macAddress ?? '未采集'}`,
+						`系统：${result.facts?.os?.value ?? '未采集'} · ${result.facts?.soc?.value ?? 'SoC未采集'} · ${result.facts?.cannVersion?.value ?? 'CANN未采集'}`,
+						`存储：${(result.facts?.storage?.value ?? []).map((item) => `${item.kind} ${item.mount} ${item.availableBytes} bytes可用`).join('；') || '未采集'}`,
+						...((result.systemError ?? '') === '' ? [] : [`系统刷新提示：${result.systemError}`]),
 						`默认路由：${result.defaultRoute ?? '未采集'}`,
 						'',
 						'接口：',
