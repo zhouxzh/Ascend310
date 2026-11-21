@@ -65,4 +65,4 @@ python scripts/detection_app.py --device cpu --source demo/vtest.avi --save outp
 - CPU 检测和 NPU 检测的证据分开记录；CPU 跟踪结果不能替代 NPU 结果。
 - 当前没有跟踪 MOTA/IDF1 或检测 mAP 数据集报告。
 
-出现真实失败时按 `CASE2-ISS-YYYYMMDD-NN` 补充复现、原始输出、判定层级和回归结果，完整模板见 [troubleshooting-template.md](../../../tools/dsh-plugin-ascend310b-writing/skills/ascend310b-writing-docs/references/troubleshooting-template.md)。
+出现真实失败时按 `CASE2-ISS-YYYYMMDD-NN` 补充复现、原始输出、判定层级和回归结果，完整模板见 [troubleshooting-template.md](../../../.dsh/skills/ascend310b-writing-docs/references/troubleshooting-template.md)。

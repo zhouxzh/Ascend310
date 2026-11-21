@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="520" viewBox="0 0 1000 520" role="img" aria-labelledby="title desc">
+  <title id="title">COCO detector smoke gates</title>
+  <desc id="desc">20 models, 160 performance paths, and 160 numerical comparisons.</desc>
+  <rect width="1000" height="520" fill="#ffffff"/>
+  <text x="56" y="48" font-family="Arial, sans-serif" font-size="25" font-weight="700" fill="#172033">COCO detector smoke gates</text>
+  <text x="56" y="78" font-family="Arial, sans-serif" font-size="15" fill="#5d6878">Synthetic-input smoke only; COCO task quality is untested</text>
+  <line x1="56" y1="108" x2="944" y2="108" stroke="#d8dee8"/>
+  <text x="56" y="145" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#263449">Performance paths</text>
+  <rect x="56" y="166" width="720" height="44" rx="8" fill="#1f8a70"/>
+  <rect x="776" y="166" width="14" height="44" rx="4" fill="#d85b5b"/>
+  <text x="800" y="194" font-family="Arial, sans-serif" font-size="16" fill="#263449">157 pass / 3 fail</text>
+  <text x="56" y="239" font-family="Arial, sans-serif" font-size="13" fill="#657184">0</text>
+  <text x="750" y="239" font-family="Arial, sans-serif" font-size="13" fill="#657184">150</text>
+  <text x="896" y="239" font-family="Arial, sans-serif" font-size="13" fill="#657184">160</text>
+  <text x="56" y="280" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#263449">Numerical comparisons</text>
+  <rect x="56" y="301" width="456" height="44" rx="8" fill="#3b6fb6"/>
+  <rect x="512" y="301" width="444" height="44" rx="8" fill="#e3a33a"/>
+  <text x="800" y="329" font-family="Arial, sans-serif" font-size="16" fill="#263449">81 pass / 79 fail</text>
+  <text x="56" y="374" font-family="Arial, sans-serif" font-size="13" fill="#657184">0</text>
+  <text x="500" y="374" font-family="Arial, sans-serif" font-size="13" fill="#657184">80</text>
+  <text x="896" y="374" font-family="Arial, sans-serif" font-size="13" fill="#657184">160</text>
+  <rect x="56" y="420" width="14" height="14" rx="3" fill="#1f8a70"/>
+  <text x="80" y="432" font-family="Arial, sans-serif" font-size="14" fill="#4d596b">performance pass</text>
+  <rect x="218" y="420" width="14" height="14" rx="3" fill="#d85b5b"/>
+  <text x="242" y="432" font-family="Arial, sans-serif" font-size="14" fill="#4d596b">performance fail</text>
+  <rect x="394" y="420" width="14" height="14" rx="3" fill="#3b6fb6"/>
+  <text x="418" y="432" font-family="Arial, sans-serif" font-size="14" fill="#4d596b">numerical pass</text>
+  <rect x="560" y="420" width="14" height="14" rx="3" fill="#e3a33a"/>
+  <text x="584" y="432" font-family="Arial, sans-serif" font-size="14" fill="#4d596b">numerical fail</text>
+  <text x="56" y="478" font-family="Arial, sans-serif" font-size="13" fill="#657184">A gate pass does not imply overall model acceptance.</text>
+</svg>

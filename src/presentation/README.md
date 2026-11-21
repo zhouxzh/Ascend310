@@ -152,4 +152,4 @@ node scripts/register_presentation_screenshot.mjs \
 - 每页使用 Marp 演讲者备注说明授课重点、误区和提问点。
 - 理论课件按章节推进，案例课件必须包含真实前端截图或明确的待采集说明。
 
-详细写作规范由 `ascend310b-writing` 技能和 `tools/dsh-plugin-ascend310b-writing` 审计器执行；本目录的目录检查不替代教材写作审计。
+详细写作规范由 `ascend310b-writing` 技能和外部 `dsh-writing-suite` 审计器执行；本目录的目录检查不替代教材写作审计。

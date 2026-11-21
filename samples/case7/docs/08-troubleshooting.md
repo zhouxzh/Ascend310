@@ -22,7 +22,7 @@
 
 ## 记录规则
 
-- 上传、索引、NPU 模型、触摸屏、ESP32、PhotoFrame 或 E6 实屏出现可复现失败时，按 [问题模板](../../../tools/dsh-plugin-ascend310b-writing/skills/ascend310b-writing-docs/references/troubleshooting-template.md) 新增条目。
+- 上传、索引、NPU 模型、触摸屏、ESP32、PhotoFrame 或 E6 实屏出现可复现失败时，按 [问题模板](../../../.dsh/skills/ascend310b-writing-docs/references/troubleshooting-template.md) 新增条目。
 - 通用排查建议继续放在 [07 验证与故障排查](07-validation-and-troubleshooting.md)；实际失败、原始日志和回归结论写入本文件。
 - 不能把“E6 dry-run 通过”写成真实电子纸刷新通过，也不能把 ESP32 休眠导致的不可发现写成协议失败。
 - 8T 和 20T 的证据分开登记。

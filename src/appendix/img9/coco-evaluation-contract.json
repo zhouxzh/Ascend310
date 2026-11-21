@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "task": "coco_bbox_quality",
+  "status": "untested",
+  "dataset": {
+    "name": "COCO val2017",
+    "revision": null,
+    "annotation_file": null,
+    "image_count": null,
+    "category_mapping": null
+  },
+  "input_contract": {
+    "preprocess": null,
+    "resize_policy": null,
+    "normalization": null,
+    "input_shape": null
+  },
+  "prediction_contract": {
+    "model_outputs": null,
+    "decode_version": null,
+    "coordinate_restore": null,
+    "score_threshold": null,
+    "nms_iou_threshold": null,
+    "max_detections": null,
+    "prediction_file": null
+  },
+  "evaluation": {
+    "evaluator": "pycocotools COCOeval",
+    "iou_type": "bbox",
+    "area_ranges": ["small", "medium", "large"],
+    "max_detections": [1, 10, 100],
+    "metrics": ["AP", "AP50", "AP75", "APs", "APm", "APl"]
+  },
+  "evidence": {
+    "command": null,
+    "report": null,
+    "predictions_sha256": null,
+    "status": "blocked_until_contract_is_filled"
+  }
+}

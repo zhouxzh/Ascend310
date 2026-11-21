@@ -112,21 +112,22 @@ API Key 只保存在本地设置里，不要写进教程、代码、聊天内容
 
 ### 安装写作插件与调试插件
 
-本仓库自带两个 DSH 插件，源码分别在：
+本仓库保留程序调试插件；写作插件统一维护在外部
+[`dsh-writing-suite`](https://github.com/zhouxzh/dsh-writing-suite)：
 
 ```text
-tools/dsh-plugin-ascend310b-writing/   写作插件
-tools/dsh-plugin-ascend310b-debug/     程序调试插件
+本地调试插件：tools/dsh-plugin-ascend310b-debug/
+外部写作套件：dsh-writing-suite（教材、论文与框图审计）
 ```
 
-课程镜像已预装两个插件时，只需确认它们在侧栏可见，并在升级后重启 DSH。需要从本仓库更新插件的开发者，在仓库根目录执行下面的安装器；它会把插件打成带内容哈希的 tarball 安装到指定 profile，而不是把源码目录软链进 DSH：
+课程镜像已预装两个插件时，只需确认侧栏中的写作套件和调试插件可用，并在升级后重启 DSH。需要从本仓库更新调试插件时，在仓库根目录执行：
 
 ```powershell
 node tools/install-dsh-plugins.mjs --profile desktop
 node tools/install-dsh-plugins.mjs --profile desktop --check
 ```
 
-安装器完成后重启 DSH。板卡 IP、SSH 用户、串口密码和默认 target 只保存在本机 profile 配置中，不写入插件源码、教材正文或 Git。插件注册的是工具（tools），模型通过调用工具完成检查；它们和 Skill 是两层东西，下一节会说明。
+写作套件按 `dsh-writing-suite` 仓库的 README 安装。安装器完成后重启 DSH。板卡 IP、SSH 用户、串口密码和默认 target 只保存在本机 profile 配置中，不写入插件源码、教材正文或 Git。插件注册的是工具（tools），模型通过调用工具完成检查；它们和 Skill 是两层东西，下一节会说明。
 
 ![DSH 插件与 Skill 的协作关系](./img4/dsh-plugin-architecture.png)
 
@@ -144,25 +145,26 @@ Skill 是一份 `SKILL.md`，写清楚“什么时候用、按什么顺序做、
 
 DSH先读取仓库项目级目录`<仓库>/.dsh/skills`，因此新克隆的仓库可以立即获得本课程规则；随后才检查其他Agent工具约定的`<仓库>/.agents/skills`、DSH配置中的自定义目录和用户级`~/.dsh/skills`。项目级规则优先，避免旧用户版本覆盖课程要求。
 
-本仓库的两个 Skill 已放在项目级目录：
+本仓库的写作与调试 Skill 已放在项目级目录：
 
 ```text
 .dsh/skills/ascend310b-writing/SKILL.md
 .dsh/skills/ascend310b-debug/SKILL.md
 ```
 
-它们由插件里的版本生成，避免手抄出第三份。改了插件里的 Skill 后执行：
+调试 Skill 由本仓库调试插件生成；写作 Skill 的项目级副本由外部
+`dsh-writing-suite` 同步。本机存在该 checkout 时执行：
 
 ```bash
-pnpm run skills:sync    # 同步到 .dsh/skills
+pnpm run skills:sync    # 同步可用插件与外部写作套件到 .dsh/skills
 pnpm run skills:check   # 只核对，不一致时退出码为 1
 ```
 
-如果只想装到当前用户：
+如果只想把写作套件的 Skill 装到当前用户，在 `dsh-writing-suite` 仓库执行：
 
 ```bash
-node tools/dsh-plugin-ascend310b-writing/scripts/install-skill.mjs
-node tools/dsh-plugin-ascend310b-writing/scripts/install-skill.mjs --check
+node scripts/install-skill.mjs
+node scripts/install-skill.mjs --check
 ```
 
 **Skill 在会话启动时加载**，所以更新后要新建会话。判断是否生效，可以直接问：
@@ -443,6 +445,50 @@ plt.savefig(Path(__file__).with_name("study_minutes.png"), dpi=160)
 | `ascend_ui_capture` | 用宿主机浏览器打开板端HTTP页面并保存PNG | 截图、视口、尺寸和文件摘要 | 截图只能证明页面可见，不能证明推理或业务质量通过 |
 
 `ascend_board_run`默认激活统一`ascend`环境并设置`PYTHONNOUSERSITE=1`。`environment: "base"`只用于显式非NPU系统诊断；它不能成为正式案例环境失败后的静默回退。
+
+### 板端目录与隔离环境 {#src-appendix-appendix4-board-workspace}
+
+开发板的家目录同时保存SSH、Conda、桌面会话和缓存。把案例服务、模型和临时调试目录直接放在`/home/HwHiAiUser`下，短期看起来方便，长期会使Case4、Case9和不同Agent任务互相混杂，也无法判断一个目录是否可以删除。课程统一把项目数据放在`Documents`中的一个根目录：
+
+```text
+/home/HwHiAiUser/Documents/Ascend310/
+├── deployments/
+│   └── caseN/<tier>/<release-id>/
+├── workspaces/
+│   └── caseN/<task-id>/
+├── assets/
+│   └── caseN/{models,datasets}/
+└── archives/
+    └── caseN/<release-id-or-date>/
+```
+
+`deployments`只存放可以启动的发行版本。每次服务必须从精确的`<release-id>`目录启动，不能从用户家目录、DSH工作区或旧案例目录启动。`workspaces`只存放任务脚本、转换中间物和短期诊断输出；一个任务一个子目录，任务结束后先检查清单，再决定归档或清理。`assets`存放按来源、字节数和SHA-256核验过的模型与数据集，不能与模板、采集图、报告或源码混放。`archives`用于保留已经确认无运行服务占用的旧版本，迁移后仍要保留回滚窗口。
+
+8T、20T和其他实际档位的部署目录必须分开。掌纹案例还要把可见光和红外摄像头的模板、校准、报告和任务质量证据分开保存；即使两个设备都显示为`/dev/video0`，也不代表它们可以共享模板或阈值。插件的短期外设证据只写到`/tmp/ascend310b-debug`，不能把这里当成模型目录或服务目录。
+
+正式案例统一使用一个新建的、用户拥有的Conda环境`ascend`，Python固定为`3.9.25`。环境隔离的目标是让案例不依赖`base`或`~/.local`里碰巧存在的包。迁移时先记录旧环境和正在运行的服务；确认没有进程使用后，将旧环境重命名为带日期的`ascend-legacy-<date>`作为回滚材料，再创建新的`ascend`环境。不要为每个案例复制一个环境，也不要把CANN、驱动或固件复制到Conda环境中。
+
+服务、测试和板端脚本必须在同一个shell中完成环境激活：
+
+```bash
+source /usr/local/miniconda3/etc/profile.d/conda.sh
+conda activate ascend
+export PYTHONNOUSERSITE=1
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+python -c "import sys, cv2, acl; print(sys.executable); print(cv2.__version__); print(acl.__file__)"
+```
+
+这条导入检查只证明当前shell的Python、OpenCV和PyACL可用；它不证明模型已加载、摄像头已出帧或NPU推理正确。任何目录创建、下载、同步、归档或删除之前，先确认绝对路径位于`Documents/Ascend310`的对应层级。DSH任务的默认工作目录只能是`workspaces`；它不能因为省略`cwd`而回退到家目录。
+
+### 部署前的目录核对 {#src-appendix-appendix4-deployment-boundary}
+
+部署前按顺序完成以下核对：
+
+1. 读取目标板的SoC、档位、CANN、驱动和`ascend`环境；8T、20T分别记录。
+2. 列出旧案例目录、端口监听进程、模型、模板和报告。先归档或迁移已经确认不再运行的内容，不对`$HOME`、`Documents`或通配符路径执行递归删除。
+3. 从GitHub固定commit获取源码，并将发行版本同步到`deployments/caseN/<tier>/<release-id>`。模型从固定Hugging Face revision取得，或明确标记为离线包；不能把控制器上未提交源码和模型复制后写成可复现发布。
+4. 在新发行目录设置案例根路径，校验资产，再启动服务。启动后记录PID、工作目录、端口、健康接口、真实请求和摄像头释放结果。
+5. 浏览器人工查看目标板页面。页面能打开只证明UI可达；模型加载、NPU推理、任务质量和性能仍要分别验收。
 
 ### 摄像头与音频 {#src-appendix-appendix4-debug-peripheral-tools}
 

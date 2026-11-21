@@ -143,23 +143,23 @@ footer: "附录 4：Vibe Coding"
 <div class="source">图片：`src/appendix/img4/dsh-plugin-architecture.png`</div>
 
 <!--
-授课提示：先让学生看清"桌面版—Skill—两个插件—仓库—产物"这条链，再进入分工表。
+授课提示：先让学生看清"桌面版—Skill—写作套件/调试插件—仓库—产物"这条链，再进入分工表。
 -->
 
 ---
 
 <!-- _class: center -->
 
-## 两个插件如何分工
+## 写作套件与调试插件如何分工
 
 | 插件 | 管什么 | 典型工具 |
 | --- | --- | --- |
-| 写作插件 | 教材是否写对 | `audit` / `render` / `push_check` |
+| 写作套件 | 教材/论文是否写对 | `audit` / `render` / `push_check` |
 | 调试插件 | 板端为什么不对 | `ascend_probe` / `ascend_debug_plan` |
 
-> 写作插件检查文档与产物，调试插件读取板端事实；两类结论不能互相替代。
+> 写作套件检查文档与产物，调试插件读取板端事实；两类结论不能互相替代。
 
-<div class="source">图片：`src/appendix/img4/dsh-plugin-architecture.png`；源码：`tools/dsh-plugin-ascend310b-*`</div>
+<div class="source">图片：`src/appendix/img4/dsh-plugin-architecture.png`；写作套件源码：`dsh-writing-suite`；调试插件源码：`tools/dsh-plugin-ascend310b-debug`</div>
 
 <!--
 授课提示：强调两条产物流不同——写作插件产出可交付教材，调试插件产出可复核的板端证据。

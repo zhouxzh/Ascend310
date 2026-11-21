@@ -1,0 +1,14 @@
+{
+  "execution_tier": "20t",
+  "metric": "model execution FPS from p50 latency",
+  "models": [
+    {"model":"PicoDet-S-320","fp32":90.04,"mixed_fp16":26.54},
+    {"model":"NanoDet-Plus-M-320","fp32":59.13,"mixed_fp16":54.34},
+    {"model":"YOLOv5n","fp32":29.95,"mixed_fp16":53.03},
+    {"model":"YOLOv8n","fp32":26.69,"mixed_fp16":14.66},
+    {"model":"YOLO11n","fp32":27.60,"mixed_fp16":12.33},
+    {"model":"YOLO12n","fp32":16.44,"mixed_fp16":10.04},
+    {"model":"SSDLite320","fp32":52.27,"mixed_fp16":59.80}
+  ],
+  "note": "代表性模型，不是全量排名；不含预处理、解码、NMS和COCO评测。"
+}

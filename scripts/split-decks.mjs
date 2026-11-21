@@ -18,17 +18,52 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Use the checker's own measurement so the fixer and the gate can never
-// disagree about whether a slide fits.
-const { measureSlide } = await import(
-	new URL('../tools/dsh-plugin-ascend310b-writing/lib/deck.js', import.meta.url).href
-);
-
 const PRESENTATION_DIR = 'src/presentation';
 const BUDGET = 560;
 const MAX_CODE_LINES = 16;
 const MAX_BULLETS = 6;
 const MAX_TABLE_ROWS = 7;
+const HEIGHT = { heading: 60, bullet: 34, codeLine: 22, tableRow: 40, paragraph: 44, image: 300 };
+
+/** Estimate a slide with the same structural rules used by the writing audit. */
+function measureSlide(lines) {
+	let inFence = false;
+	let bullets = 0;
+	let codeLines = 0;
+	let tableRows = 0;
+	let images = 0;
+	let paragraphs = 0;
+	for (const line of lines) {
+		if (/^\s*(?:```|~~~)/u.test(line)) {
+			inFence = !inFence;
+			continue;
+		}
+		if (inFence) {
+			codeLines += 1;
+			continue;
+		}
+		if (/^\s*#{1,3}\s+/u.test(line)) continue;
+		if (/^\s*(?:[-*+]|\d+[.)])\s+/u.test(line)) bullets += 1;
+		if (/^\s*\|/u.test(line)) {
+			tableRows += 1;
+			continue;
+		}
+		if (/!\[[^\]]*\]\(|<img\b/iu.test(line)) images += 1;
+		const trimmed = line.trim();
+		if (trimmed !== '' && !/^<!--/u.test(trimmed) && !/^<div/iu.test(trimmed) && !/^<a\b/iu.test(trimmed)) {
+			paragraphs += 1;
+		}
+	}
+	return {
+		height:
+			HEIGHT.heading +
+			bullets * HEIGHT.bullet +
+			codeLines * HEIGHT.codeLine +
+			tableRows * HEIGHT.tableRow +
+			paragraphs * HEIGHT.paragraph +
+			Math.min(images, 1) * HEIGHT.image
+	};
+}
 
 function isFence(line) {
 	return /^\s*(?:```|~~~)/u.test(line);

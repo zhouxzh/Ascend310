@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "date": "2026-10-23",
+  "reason": "Frozen baseline for image-size violations documented in docs/case-image-audit-20261023.md. Remove entries as images are rebuilt.",
+  "entries": [
+    {
+      "rule": "image-too-wide",
+      "file": "src/appendix/img1/spidev1.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/appendix/img1/unabletoc.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img2/atc_flow.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img2/atc.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img2/CANN_Architecture.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img2/CANN_logic.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img3/alexnet.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img3/linear_network.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img3/mlp_network.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img4/interface.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img4/logic_arch.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img4/memory.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img4/stream.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img5/mindspore_ascend_stack.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img6/cann_acl_dvpp_stack.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img6/vdec_channel_model.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img6/venc_encode_flow.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img7/dsl_architecture.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img9/accuracy_compare_flow.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img9/calibration_sweep_flow.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img9/chapter9_outputs.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img9/chapter9_sample_structure.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img9/int8_ptq_pipeline.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img9/quantization_debug_order.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img9/quantization_decision_order.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/book/img9/quantization_workflow.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img1/case1_flow_simple.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img1/case1_flow.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img2/流程图.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img3/case3-backend-architecture.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img3/case3-ddsp-vst-sequence.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img3/case3-midi-ddsp-architecture.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img3/case3-model-deployment-pipeline.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img5/case5-computation-boundary.png"
+    },
+    {
+      "rule": "dot-canvas-too-large",
+      "file": "src/experiment/img5/case5-hantek-acquisition-flow.dot"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img5/case5-hantek-acquisition-flow.png"
+    },
+    {
+      "rule": "dot-canvas-too-large",
+      "file": "src/experiment/img5/case5-hantek-om-flow.dot"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img5/case5-hantek-om-flow.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img5/case5-model-admission-flow.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img5/case5-yolo-detection-decode-flow.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img7/network-architecture.png"
+    },
+    {
+      "rule": "image-too-wide",
+      "file": "src/experiment/img7/program-flow.png"
+    }
+  ]
+}

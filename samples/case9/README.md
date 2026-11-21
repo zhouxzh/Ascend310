@@ -40,10 +40,13 @@ MindSpore在两个板上仍是默认后端。公开B4 static-KV包及其锁保�
 共享8T启动路径与20T使用同一个固定MindSpore模型和启动器：
 
 ```bash
-cd /opt/ascend-edge-chat
+export TIER=8t
+export RELEASE_ID=<git-commit-or-release-id>
+export RELEASE_ROOT="/home/HwHiAiUser/Documents/Ascend310/deployments/case9/$TIER/$RELEASE_ID"
+cd "$RELEASE_ROOT"
 cp configs/release-8t.env.example .env
 # 替换网关token；保留B4目录和8T HBM阈值。
-export ASCEND_EDGE_CHAT_ENV_FILE=/opt/ascend-edge-chat/.env
+export ASCEND_EDGE_CHAT_ENV_FILE="$RELEASE_ROOT/.env"
 bash scripts/import/download-model.sh
 bash scripts/run/run-chat.sh
 ```
@@ -83,15 +86,19 @@ browser :7865 -> UI -> supervisor :7863 -> MindSpore worker :8090 + gateway :786
 在任一受支持的板上，若统一的`ascend`环境以及匹配的CANN/MindSpore/MindNLP已安装，请从GitHub固定commit获取本仓库，再通过配置的镜像从Hugging Face下载同一个锁定模型。唯一的部署选择是板级环境示例：20T使用`release.env.example`，8T使用`release-8t.env.example`。这些命令不会安装或升级驱动、CANN、MindSpore或模型框架。
 
 ```bash
-git clone https://github.com/zhouxzh/Ascend310.git /opt/ascend-edge-chat
-git -C /opt/ascend-edge-chat checkout --detach <commit-sha>
-cd /opt/ascend-edge-chat
+export TIER=<8t-or-20t>
+export RELEASE_ID=<full-git-commit>
+export RELEASE_ROOT="/home/HwHiAiUser/Documents/Ascend310/deployments/case9/$TIER/$RELEASE_ID"
+export ASSET_ROOT="/home/HwHiAiUser/Documents/Ascend310/assets/case9"
+git clone https://github.com/zhouxzh/Ascend310.git "$RELEASE_ROOT"
+git -C "$RELEASE_ROOT" checkout --detach "$RELEASE_ID"
+cd "$RELEASE_ROOT/samples/case9"
 export ASCEND_EDGE_CHAT_CONDA_ENV='ascend'
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate "$ASCEND_EDGE_CHAT_CONDA_ENV"
 export PYTHONNOUSERSITE=1
 python -m pip install --no-deps .
-export ASCEND_EDGE_CHAT_DATA_DIR=/opt/ascend-edge-chat-data
+export ASCEND_EDGE_CHAT_DATA_DIR="$ASSET_ROOT/models"
 # 8T请改用configs/release-8t.env.example。
 cp configs/release.env.example .env
 # 编辑.env并替换ASCEND_EDGE_CHAT_GATEWAY_API_KEY。

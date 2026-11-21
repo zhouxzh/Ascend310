@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="620" viewBox="0 0 1000 620" role="img" aria-labelledby="title desc">
+  <title id="title">20T representative models: FP32 versus mixed FP16</title>
+  <desc id="desc">Model execution FPS for seven representative models under a fixed p50 protocol.</desc>
+  <rect width="1000" height="620" fill="#ffffff"/>
+  <text x="56" y="44" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#172033">20T representative precision comparison</text>
+  <text x="56" y="72" font-family="Arial, sans-serif" font-size="14" fill="#5d6878">Model execution FPS; preprocessing, decode, NMS and COCO evaluation excluded</text>
+  <line x1="220" y1="100" x2="920" y2="100" stroke="#d8dee8"/>
+  <line x1="220" y1="100" x2="220" y2="532" stroke="#bfc8d6"/>
+  <line x1="220" y1="532" x2="920" y2="532" stroke="#bfc8d6"/>
+  <g font-family="Arial, sans-serif" font-size="12" fill="#657184">
+    <text x="216" y="552">0</text><text x="359" y="552">20</text><text x="502" y="552">40</text><text x="645" y="552">60</text><text x="788" y="552">80</text><text x="908" y="552">100 FPS</text>
+  </g>
+  <g stroke="#edf0f4" stroke-width="1">
+    <line x1="363" y1="100" x2="363" y2="532"/><line x1="506" y1="100" x2="506" y2="532"/><line x1="649" y1="100" x2="649" y2="532"/><line x1="792" y1="100" x2="792" y2="532"/><line x1="920" y1="100" x2="920" y2="532"/>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="14" fill="#263449">
+    <text x="56" y="137">PicoDet-S-320</text><text x="56" y="195">NanoDet-Plus-M</text><text x="56" y="253">YOLOv5n</text><text x="56" y="311">YOLOv8n</text><text x="56" y="369">YOLO11n</text><text x="56" y="427">YOLO12n</text><text x="56" y="485">SSDLite320</text>
+  </g>
+  <g fill="#3b6fb6">
+    <rect x="220" y="116" width="643" height="14" rx="4"/><rect x="220" y="174" width="422" height="14" rx="4"/><rect x="220" y="232" width="214" height="14" rx="4"/><rect x="220" y="290" width="191" height="14" rx="4"/><rect x="220" y="348" width="197" height="14" rx="4"/><rect x="220" y="406" width="118" height="14" rx="4"/><rect x="220" y="464" width="374" height="14" rx="4"/>
+  </g>
+  <g fill="#e3a33a">
+    <rect x="220" y="136" width="190" height="14" rx="4"/><rect x="220" y="194" width="388" height="14" rx="4"/><rect x="220" y="252" width="379" height="14" rx="4"/><rect x="220" y="310" width="105" height="14" rx="4"/><rect x="220" y="368" width="88" height="14" rx="4"/><rect x="220" y="426" width="72" height="14" rx="4"/><rect x="220" y="484" width="427" height="14" rx="4"/>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="12" fill="#4d596b">
+    <text x="870" y="128">90.04</text><text x="416" y="148">26.54</text><text x="649" y="186">59.13</text><text x="615" y="206">54.34</text><text x="441" y="244">29.95</text><text x="606" y="264">53.03</text><text x="418" y="302">26.69</text><text x="330" y="322">14.66</text><text x="424" y="360">27.60</text><text x="313" y="380">12.33</text><text x="345" y="418">16.44</text><text x="298" y="438">10.04</text><text x="605" y="476">52.27</text><text x="658" y="496">59.80</text>
+  </g>
+  <rect x="56" y="574" width="14" height="14" rx="3" fill="#3b6fb6"/><text x="78" y="586" font-family="Arial, sans-serif" font-size="14" fill="#4d596b">FP32</text><rect x="140" y="574" width="14" height="14" rx="3" fill="#e3a33a"/><text x="162" y="586" font-family="Arial, sans-serif" font-size="14" fill="#4d596b">mixed FP16</text>
+</svg>

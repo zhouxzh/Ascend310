@@ -1,0 +1,11 @@
+{
+  "protocol": "2026-11-14 unified detector smoke",
+  "models": 20,
+  "performance_paths": 160,
+  "performance_passed": 157,
+  "performance_failed": 3,
+  "numerical_passed": 81,
+  "numerical_failed": 79,
+  "execution_failed": 0,
+  "task_quality": "untested"
+}

@@ -2,15 +2,20 @@
 
 ## 前置条件
 
-仅在已验证的20T硬件档上使用此流程。该流程不安装驱动、固件、CANN工具包、OPP包、MindSpore或MindNLP。本流程必须使用仓库统一的Conda环境`ascend`；不得回退到`base`或用户站点包。
+仅在已验证的20T硬件档上使用此流程。8T或其他310B档位必须使用各自的`<tier>`发行目录和独立证据。该流程不安装驱动、固件、CANN工具包、OPP包、MindSpore或MindNLP。本流程必须使用新建并核验过的仓库统一Conda环境`ascend`；Python固定为`3.9.25`，必须设置`PYTHONNOUSERSITE=1`，不得回退到`base`或用户站点包。
 
 ```bash
-cd /opt/ascend-edge-chat
+export TIER=20t
+export RELEASE_ID=<full-git-commit>
+export RELEASE_ROOT="/home/HwHiAiUser/Documents/Ascend310/deployments/case9/$TIER/$RELEASE_ID"
+export ASSET_ROOT="/home/HwHiAiUser/Documents/Ascend310/assets/case9"
+cd "$RELEASE_ROOT/samples/case9"
 export ASCEND_EDGE_CHAT_CONDA_ENV='ascend'
 source /usr/local/miniconda3/etc/profile.d/conda.sh
 conda activate "$ASCEND_EDGE_CHAT_CONDA_ENV"
+export PYTHONNOUSERSITE=1
 python -m pip install --no-deps .
-export ASCEND_EDGE_CHAT_DATA_DIR=/opt/ascend-edge-chat-data
+export ASCEND_EDGE_CHAT_DATA_DIR="$ASSET_ROOT/models"
 cp configs/release.env.example .env
 chmod 600 .env
 ```

@@ -104,7 +104,8 @@ export default sidebar({
         "appendix5.md",
         "appendix6.md",
         "appendix7.md",
-        "appendix8.md"
+        "appendix8.md",
+        "appendix9.md"
       ]
     },
     {

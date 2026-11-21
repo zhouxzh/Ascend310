@@ -1,0 +1,9 @@
+{
+  "metric": "model execution FPS from p50 latency",
+  "models": [
+    {"model":"SSDLite320", "20t_fp32":52.27, "20t_mixed_fp16":59.80, "8t_fp32":51.67, "8t_mixed_fp16":67.73},
+    {"model":"NanoDet-Plus-M", "20t_fp32":59.13, "20t_mixed_fp16":54.34, "8t_fp32":55.19, "8t_mixed_fp16":55.74},
+    {"model":"YOLOv5n", "20t_fp32":29.95, "20t_mixed_fp16":53.03, "8t_fp32":19.89, "8t_mixed_fp16":38.07}
+  ],
+  "note": "Representative model-execution smoke only; no preprocessing, decode, NMS or COCOeval."
+}

@@ -14,7 +14,7 @@
 
 1440 px 视口下多数正文图片实际显示宽度约 `684 px`，所以 `1600 px` 原图约放大到 2.34× 的像素密度，仍属可接受；`2400 px` 原图已接近 3.5× 缩放。
 
-历史欠账记录在 [`image-audit-baseline.json`](../../tools/dsh-plugin-ascend310b-writing/data/image-audit-baseline.json)：只冻结本报告列出的 42 个 error，降级为 warning。未登记的新图/DOT 超限仍会使审计失败；图片修复后必须删除对应基线项，审计会报告 `image-baseline-stale`。
+历史欠账记录在 [`image-audit-baseline.json`](image-audit-baseline.json)：只冻结本报告列出的 42 个 error，降级为 warning。未登记的新图/DOT 超限仍会使审计失败；图片修复后必须删除对应基线项，审计会报告 `image-baseline-stale`。
 
 ## 逐案结果
 
