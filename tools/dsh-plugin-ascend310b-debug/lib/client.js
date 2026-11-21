@@ -2963,7 +2963,7 @@ window.__ModuleLoader__.load({
 					setSerial({ kind: "done", payload });
 					void refreshSerialSessions();
 					void checkLiveness();
-					const foundId = payload.found?.[0]?.id;
+					const foundId = payload.found?.find((item) => item.loadable !== false)?.id;
 					await load(true, foundId || selectedRef.current);
 					return payload;
 				} catch (error) {

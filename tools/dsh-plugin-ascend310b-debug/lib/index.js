@@ -736,7 +736,7 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 		status: 'reachable',
 		port: serial.port,
 		user: serial.user,
-		ip: serial.ipAddress,
+		ip: candidates[0] ?? null,
 		hostname: serial.hostname
 	};
 	const found = [];
@@ -764,6 +764,7 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 	if (matched !== null || (typeof serial.macAddress === 'string' && serial.macAddress !== '')) {
 		updateInventory(inventoryFile, (inventory) => {
 			if (matched !== null) {
+				serialObservation.ip = matched.ip;
 				const observed = observeBoard(inventory, {
 					ip: matched.ip,
 					user: 'HwHiAiUser',
@@ -786,7 +787,9 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 					driver: observed.board.system.driverVersion,
 					cann: observed.board.system.cannVersion,
 					status: observed.status,
-					identity: 'mac'
+					identity: 'mac',
+					loadable: true,
+					sshAvailable: true
 				});
 				return;
 			}
@@ -794,9 +797,8 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 			const existing = Object.values(inventory.boards ?? {}).find(
 				(board) => board !== null && [board.mac, ...(Array.isArray(board.macs) ? board.macs : [])].map(normalizeMac).includes(serialMac)
 			) ?? inventory.boards?.[serial.macAddress] ?? null;
-			const verifiedSoc = /^Ascend310B[14]$/iu.test(String(existing?.system?.soc ?? ''));
 			const observed = observeBoard(inventory, {
-				ip: serial.ipAddress,
+				ip: candidates[0] ?? null,
 				user: 'HwHiAiUser',
 				mac: serial.macAddress,
 				macs: [serial.macAddress],
@@ -805,25 +807,24 @@ export async function discoverSerialBoard(serial, config, { signal = null, onEve
 				system: existing?.system,
 				serial: serialObservation
 			});
-			if (verifiedSoc) {
-				found.push({
-					id: observed.board.id,
-					mac: observed.board.mac,
-					ip: observed.board.lastIp,
-					hostname: observed.board.hostname,
-					model: observed.board.system.boardModel,
-					soc: observed.board.system.soc,
-					tier: observed.board.system.tier,
-					driver: observed.board.system.driverVersion,
-					cann: observed.board.system.cannVersion,
-					status: observed.status,
-					identity: 'serial-mac'
-				});
-			} else {
-				errors.push(
-					`串口 ${serial.port}: 已按 MAC ${serial.macAddress} 登记，但 SSH 未确认 Ascend310B1/Ascend310B4 SoC；已保留资产记录，但不返回不可加载的 found target。`
-				);
-			}
+			found.push({
+				id: observed.board.id,
+				mac: observed.board.mac,
+				ip: serialObservation.ip,
+				hostname: observed.board.hostname,
+				model: observed.board.system.boardModel,
+				soc: observed.board.system.soc,
+				tier: observed.board.system.tier,
+				driver: observed.board.system.driverVersion,
+				cann: observed.board.system.cannVersion,
+				status: observed.status,
+				identity: 'serial-mac',
+				loadable: false,
+				sshAvailable: false
+			});
+			errors.push(
+				`串口 ${serial.port}: 已按 MAC ${serial.macAddress} 发现开发板；当前没有已确认的SSH IPv4，记录为仅串口可见，不能作为SSH target加载。`
+			);
 		});
 	}
 	return { found, errors, inventoryPath: inventoryFile, serial: serialObservation };

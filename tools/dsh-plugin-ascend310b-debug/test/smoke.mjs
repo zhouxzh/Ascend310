@@ -263,8 +263,9 @@ try {
 			hostname: 'serial-only-board',
 			macAddress: 'c0:74:2b:fd:f7:4e'
 		}, config);
-		check(serialOnly.found.length === 0, 'an unverified serial-only board must not be returned as a loadable found target');
-		check(serialOnly.errors.some((message) => message.includes('不返回不可加载')), 'serial-only discovery must explain the load boundary');
+		check(serialOnly.found.length === 1, 'a serial-only board must still be returned as a discovered board');
+		check(serialOnly.found[0]?.loadable === false && serialOnly.found[0]?.sshAvailable === false, 'serial-only discovery must mark the board as not loadable over SSH');
+		check(serialOnly.errors.some((message) => message.includes('仅串口可见')), 'serial-only discovery must explain why it is not loadable');
 		const inventory = JSON.parse(readFileSync(config.inventoryPath, 'utf8'));
 		check(Object.values(inventory.boards ?? {}).some((board) => board?.mac === 'c0:74:2b:fd:f7:4e'), 'serial-only discovery must still persist the asset record');
 	} finally {
