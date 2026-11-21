@@ -1,0 +1,141 @@
+\documentclass[
+  paper=a4,
+  fontsize=11pt,
+  DIV=12,
+  BCOR=0mm,
+  parskip=half,       % paragraphs separated by space, no first-line indent
+  numbers=noenddot,
+  headings=normal
+]{scrartcl}
+
+% Response letter for a journal revision (standalone project).
+% Compile with XeLaTeX twice. Keep all referenced figures in ./images/.
+\usepackage{newtxtext,newtxmath}
+\usepackage{amsmath}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{left=25mm,right=25mm,top=22mm,bottom=24mm}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{hyperref}
+
+% ---- Revision color semantics (do not change) ----
+\definecolor{deletedblue}{RGB}{33,94,153}   % text deleted from the original manuscript
+\definecolor{addedred}{RGB}{238,0,0}        % text revised or added in the manuscript
+\definecolor{commentgray}{RGB}{245,245,245}
+\definecolor{replygray}{RGB}{235,245,252}
+
+\newcommand{\deletedtext}[1]{\textcolor{deletedblue}{#1}}
+\newcommand{\addedtext}[1]{\textcolor{addedred}{#1}}
+% Whole-paragraph blocks. Use \deletedtext for single words/phrases instead.
+\newenvironment{deletedblock}{\par\begingroup\color{deletedblue}}{\par\endgroup}
+\newenvironment{addedblock}{\par\begingroup\color{addedred}}{\par\endgroup}
+
+\newenvironment{reviewercomment}[1]{%
+  \par\medskip
+  \noindent\colorbox{commentgray}{\parbox{0.96\linewidth}{\textbf{#1}}}%
+  \par\smallskip\noindent
+}{\par\medskip}
+
+\newenvironment{response}{%
+  \noindent\colorbox{replygray}{\parbox{0.96\linewidth}{\textbf{Response.}}}%
+  \par\smallskip\noindent
+}{\par\medskip}
+
+% ---- Manuscript metadata ----
+\newcommand{\shorttitle}{Short Title}
+\newcommand{\papertitle}{Full Manuscript Title}
+\newcommand{\journalname}{Journal Name}
+\newcommand{\manuscriptid}{MANUSCRIPT-ID}
+\newcommand{\revisiondate}{\today}
+\newcommand{\correspondingauthor}{Corresponding Author}
+\newcommand{\correspondingemail}{author@example.edu}
+\newcommand{\affiliation}{Department, University, City, Postcode, Country}
+% Display form: same address broken into fixed lines for the letterhead.
+\newcommand{\affiliationlines}{%
+  Department\\
+  University\\
+  City, Postcode, Country}
+
+% German-style manual letterhead: sender upper-right, recipient lower left.
+\newcommand{\senderblock}{%
+  \begin{minipage}[t]{0.43\textwidth}\raggedleft
+    \textbf{\correspondingauthor}\\
+    Department, University\\
+    City, Country\\[0.35em]
+    \correspondingemail
+  \end{minipage}%
+}
+\newcommand{\recipientblock}{%
+  \begin{minipage}[t]{0.43\textwidth}
+    Editor-in-Chief / Editorial Office\\
+    \journalname
+  \end{minipage}%
+}
+
+\begin{document}
+\thispagestyle{empty}
+
+\noindent\begin{minipage}[t]{0.54\textwidth}\vspace{0pt}\end{minipage}%
+\hfill\senderblock
+
+\vspace{2.6em}
+\noindent\recipientblock
+
+\vspace{1.3em}
+\noindent City, Country, \revisiondate
+
+\vspace{1.2em}
+\noindent\textbf{Subject: Response to Reviewers --- Manuscript \manuscriptid}
+
+\vspace{0.8em}
+\noindent Dear Editor and Reviewers,
+
+\medskip
+We sincerely thank the Editor and the Reviewers for the careful evaluation of
+our manuscript, ``\papertitle'' (Manuscript ID: \manuscriptid). We appreciate
+the opportunity to submit a revision to \journalname.
+
+Please find below our point-by-point response to all editorial and reviewer
+comments. In the manuscript excerpts quoted below,
+\textcolor{deletedblue}{\textbf{blue text denotes deleted manuscript text}} and
+\textcolor{addedred}{\textbf{red text denotes revised or added manuscript text}}.
+
+\vspace{1.2em}
+\noindent Sincerely,\\[1.2em]
+\noindent\correspondingauthor\\
+\noindent Corresponding Author
+
+\clearpage
+\pagestyle{plain}
+
+\section*{Response to the Editor}
+\begin{reviewercomment}{Editorial Decision and Instructions}
+% Paste the editorial letter here, verbatim.
+\end{reviewercomment}
+\begin{response}
+% Response text here.
+\end{response}
+
+\section*{Response to Reviewer 1}
+\subsection*{Comment 1-1}
+\begin{reviewercomment}{Reviewer 1, Comment 1-1}
+% Reviewer comment verbatim.
+\end{reviewercomment}
+\begin{response}
+% Response text. Example inline revision evidence:
+% The original sentence read
+% \textcolor{deletedblue}{old wording}.
+% and was revised to
+% \textcolor{addedred}{new wording}.
+\end{response}
+
+% Repeat the Comment block for every reviewer comment, then:
+% \end{document}
+\end{document}

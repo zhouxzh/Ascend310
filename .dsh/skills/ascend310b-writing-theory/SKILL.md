@@ -1,13 +1,13 @@
 ---
 name: ascend310b-writing-theory
-description: Ascend310 教材理论章节写作。用于新增、改写、重命名第1章至第10章及附录理论内容，维护 src/book、sidebar、README 、冻结名、章节结构和理论教程的 Markdown/LaTeX/PDF 证据；不用于案例运行手册、代码 docs 或课件排版。
+description: Ascend310 教材理论章节写作。用于新增、改写、重命名第1章至第10章及附录理论内容，维护 src/book、分区 README、冻结名、章节结构和理论教程的 Markdown/LaTeX/PDF 证据；sidebar 由 ascend310b-writing-vuepress 维护；不用于案例运行手册、代码 docs 或课件排版。
 ---
 
 # 理论章节写作
 
 ## 范围
 
-处理 `src/book/` 下的理论章节、`src/appendix/` 下的附录理论内容及其对应索引。章节和附录的冻结名称、编号和全角冒号来自 `AGENTS.md`，除非用户明确要求改名，否则不得改变：
+处理 `src/book/` 下的理论章节和 `src/appendix/` 下的附录理论内容。章节索引可提供导航意图；`src/.vuepress/sidebar.ts` 和生成区块由 `ascend310b-writing-vuepress` 维护。章节和附录的冻结名称、编号和全角冒号来自 `AGENTS.md`，除非用户明确要求改名，否则不得改变：
 
 ```text
 第1章：昇腾310B边缘计算基础
@@ -30,10 +30,14 @@ description: Ascend310 教材理论章节写作。用于新增、改写、重命
 
 1. 按对象运行 `ascend310b_writing_audit scope=book` 或 `scope=appendix`。
 2. 阅读对应的 `src/book/README.md` 或 `src/appendix/README.md`、`src/.vuepress/sidebar.ts` 和现有正文结构。
-3. 只修改相关 `src/book/*.md` 或 `src/appendix/*.md` 和必要的索引/sidebar；不改 `latex/chapters/`、`latex/appendices/` 或站点生成物。
+3. 只修改相关 `src/book/*.md`、`src/appendix/*.md` 和分区 README 导航；不直接编辑 `src/.vuepress/sidebar.ts`，也不改 `latex/chapters/`、`latex/appendices/` 或站点生成物。
 4. 修改标题、锚点、图片或链接后复跑对应 scope 的 `ascend310b_writing_audit`。
 5. 需要 PDF 时使用 `ascend310b_writing_build`，先预检，再显式启动构建。
 6. 推送前运行 `ascend310b_writing_push_check`。
+
+## 证据输入
+
+经验性、板端或性能主张在动笔前至少建立：`claim / evidence / scope / limit`。`scope` 要写清 8T 或 20T、CANN/驱动、模型或输入、日期；`evidence` 指向可定位报告或工具输出。没有证据的结论写 `untested` 或作为明确假设，不能写成 `observed-pass`。纯概念解释不需要实验日志，但引用外部结果时必须标成 reported result。
 
 ## 内容要求
 
@@ -52,8 +56,8 @@ description: Ascend310 教材理论章节写作。用于新增、改写、重命
 一次改全以下表面：
 
 - `src/book/chapterN.md` 或 `src/appendix/appendixN.md` 的 frontmatter/H1，附录保留 `附录 N：` 冻结编号；
-- `src/.vuepress/sidebar.ts`；
-- 对应 `src/book/README.md` 或 `src/appendix/README.md`；
+- 对应 `src/book/README.md` 或 `src/appendix/README.md` 的导航意图；
+- 将所需 sidebar 变更交给 `ascend310b-writing-vuepress`；
 - `AGENTS.md` 冻结名表（仅用户明确要求改名时）；
 - 如有配对课件，更新 `src/presentation/` 和 `src/presentation/README.md`。
 

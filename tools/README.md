@@ -1,7 +1,11 @@
 # 仓库开发工具
 
-这个目录存放与教材配套、但独立于书稿构建的 DSH 插件。每个子目录本身就是一个可复制安装的
-DSH bundle，不依赖仓库根目录的 `node_modules`。
+这个目录存放与教材配套、但独立于书稿构建的 Ascend 310B 调试插件。写作插件已
+迁移到外部 [`dsh-writing-suite`](https://github.com/zhouxzh/dsh-writing-suite)，
+本仓库只保留项目级 skill 快照，不再维护第二份写作插件源码。
+
+ChatGPT/Codex 本地插件清单位于 `.agents/plugins/marketplace.json`：
+`ascend310b-debug` 使用本目录中的只读调试实现。
 
 | 插件 | 可见名称 | 用途 | 源码与安装说明 | 审核记录 |
 | --- | --- | --- | --- | --- |
@@ -27,20 +31,20 @@ DSH bundle，不依赖仓库根目录的 `node_modules`。
 | `ascend310b-precision-debug` | golden、容差、dtype/layout 和数值门 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-precision-debug/SKILL.md) |
 | `ascend310b-sync-audit` | SetFlag/WaitFlag、EnQue/DeQue、CrossCore 和 stream 同步审计 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-sync-audit/SKILL.md) |
 | `ascend310b-code-review` | 310B 代码审查、平台边界、资源和证据检查 | [`SKILL.md`](dsh-plugin-ascend310b-debug/skills/ascend310b-code-review/SKILL.md) |
-| `ascend310b-writing` | 中文正文硬门、写作总守门和跨对象规则 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing/SKILL.md) |
-| `ascend310b-writing-theory` | 第1章至第10章理论教程 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-theory/SKILL.md) |
-| `ascend310b-writing-case` | 案例1至案例9的面向初学者实践教材：问题—概念—最小闭环—分步练习—证据解释—迁移任务 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-case/SKILL.md) |
-| `ascend310b-writing-presentation` | Marp/Presentation 课件 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-presentation/SKILL.md) |
-| `ascend310b-writing-docs` | 代码工程 README、`docs/`、API/部署/验证说明 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-docs/SKILL.md) |
-| `ascend310b-code-docs` | 源码 API、CLI、docstring 和可运行示例 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-code-docs/SKILL.md) |
-| `ascend310b-writing-academic` | 教材学术论证、引用、方法、实验和限制 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-academic/SKILL.md) |
-| `ascend310b-curriculum-planning` | 教材学习目标、先修关系、样例和评估矩阵 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-curriculum-planning/SKILL.md) |
-| `ascend310b-writing-vuepress` | VuePress 页面、sidebar、路由和站点构建 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-vuepress/SKILL.md) |
-| `ascend310b-writing-latex` | LaTeX/PDF、字体、锚点和构建日志 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-latex/SKILL.md) |
-| `ascend310b-writing-markdown` | CommonMark/GFM、Markdownlint 和正文卫生 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-markdown/SKILL.md) |
-| `ascend310b-writing-dot` | Graphviz DOT 架构图、数据流图和程序流程图 | [`SKILL.md`](dsh-plugin-ascend310b-writing/skills/ascend310b-writing-dot/SKILL.md) |
+| `ascend310b-writing` | 中文正文硬门、写作总守门和跨对象规则 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-writing) |
+| `ascend310b-writing-theory` | 第1章至第10章理论教程 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-writing-theory) |
+| `ascend310b-writing-case` | 案例1至案例9的面向初学者实践教材：问题—概念—最小闭环—分步练习—证据解释—迁移任务 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-writing-case) |
+| `ascend310b-writing-presentation` | Marp/Presentation 课件 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-writing-presentation) |
+| `ascend310b-writing-docs` | 代码工程 README、`docs/`、API/部署/验证说明 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-writing-docs) |
+| `ascend310b-code-docs` | 源码 API、CLI、docstring 和可运行示例 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-code-docs) |
+| `ascend310b-writing-academic` | 教材学术论证、引用、方法、实验和限制 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-writing-academic) |
+| `ascend310b-curriculum-planning` | 教材学习目标、先修关系、样例和评估矩阵 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-curriculum-planning) |
+| `ascend310b-writing-vuepress` | VuePress 页面、sidebar、路由和站点构建 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-writing-vuepress) |
+| `ascend310b-writing-latex` | LaTeX/PDF、字体、锚点和构建日志 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-writing-latex) |
+| `ascend310b-writing-markdown` | CommonMark/GFM、Markdownlint 和正文卫生 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-writing-markdown) |
+| `ascend310b-writing-dot` | Graphviz DOT 架构图、数据流图和程序流程图 | [dsh-writing-suite](https://github.com/zhouxzh/dsh-writing-suite/tree/main/skills/ascend310b-writing-dot) |
 
-修改源 skill 后运行 `npm run skills:sync`，再用 `npm run skills:check` 检查项目级副本。
+本机存在外部 `dsh-writing-suite` checkout 时，运行 `npm run skills:sync`，再用 `npm run skills:check` 检查项目级副本；可用 `DSH_WRITING_SUITE_ROOT` 指定 checkout。
 
 Skill 命名规范：目录名与 frontmatter `name` 必须一致，并统一使用 `ascend310b-` 前缀；专项调试使用 `ascend310b-<domain>-debug`，因此摄像头、麦克风和喇叭固定为 `ascend310b-camera-debug`、`ascend310b-microphone-debug`、`ascend310b-speaker-debug`。不要只改目录、只改 frontmatter 或只改文档引用。
 
@@ -65,7 +69,7 @@ Skill 命名规范：目录名与 frontmatter `name` 必须一致，并统一使
 
 参考来源是方法论输入，不是对第三方规则适用性的背书。实际操作仍以当前仓库规则、`ascend_probe` 和板端验证为准。
 
-写作插件还约定：已发布 Presentation 的“对应教材”链接必须使用 GitHub Pages HTML，“配套样例”必须使用 GitHub `samples/` 目录；已发布课件不得保留 `../experiment/*.md` 等本地相对教材导航。
+`dsh-writing-suite` 还约定：已发布 Presentation 的“对应教材”链接必须使用 GitHub Pages HTML，“配套样例”必须使用 GitHub `samples/` 目录；已发布课件不得保留 `../experiment/*.md` 等本地相对教材导航。
 
 所有进入 VuePress 的写作改动，完成后都必须启动或复用 `pnpm run docs:dev`，由用户在本地网页上人工查看最新内容。可用 `node scripts/check_page_layout.mjs --url <URL>` 检查 1440px/390px 横向溢出；`docs:build`、HTTP 200 和自动审计通过不能替代人工验收；最终状态保持 `human-review: pending`，用户确认后才能通过。
 

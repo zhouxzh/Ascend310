@@ -17,6 +17,10 @@ description: Ascend310 教材的课程计划与内容映射。用于规划第1�
 
 本 skill 参考教育 Agent Skills 的学习目标、能力拆解和评估有效性思想，但以本仓库冻结命名、样例入口和板端证据为准。课程计划、学习目标、练习和评估说明使用简体中文，技术标识保留原形；写入学生文档的英文主导正文由`prose-language`阻断。
 
+## 唯一计划产物
+
+教材级课程计划只维护一份：`docs/curriculum_plan.md`。首次创建时复制 [curriculum-plan-template.md](references/curriculum-plan-template.md)。`ascend310b-writing-case` 必须消费该文件中的学习目标、先修、形成性检查和最终证据，不得另建平行教学矩阵；`ascend310b-writing-academic` 只负责证据与论证，不成为第二份课程计划。
+
 ## 计划矩阵
 
 每行至少填写：
@@ -40,11 +44,11 @@ description: Ascend310 教材的课程计划与内容映射。用于规划第1�
 
 1. 运行 `ascend310b_writing_progress` 和 `ascend310b_writing_audit`，了解当前篇幅、冻结名和断链。
 2. 阅读 `src/book/README.md`、`src/experiment/README.md`、`src/presentation/README.md` 和 `samples/case-index.json`。
-3. 建立“章节—案例—代码—课件—证据”矩阵。
+3. 在 `docs/curriculum_plan.md` 建立唯一“章节—案例—代码—课件—证据”矩阵；已有文件时更新而不是另建副本。
 4. 检查先修顺序：必要理论概念是否在完整实验前讲清，案例代码是否对应真实 `samples/` 入口；`case4.md` 必须自行提供必要知识，只链接自己的源码、图片和外部来源，不链接或依赖任何其他仓库文档。
 5. 检查评估：每个案例至少有一个真实可运行证据；没有板端证据的结论标为 `untested`。
 6. 检查 8T/20T、摄像头、模型和 CANN 依赖；不要把某板结果当作全平台结果。
-7. 只修改计划/docs 或用户要求的源页面；冻结标题和 sidebar 只在明确改名时同步。
+7. 只修改唯一计划文件和用户要求的源页面；sidebar 由 `ascend310b-writing-vuepress` 维护，冻结标题改名需用户明确批准。
 8. 完成后复跑 audit/progress，推送前运行 `ascend310b_writing_push_check`。
 
 ## 评估原则

@@ -1,6 +1,6 @@
 ---
 name: nature-polishing
-description: Polish, translate, or tighten existing academic prose while preserving facts, terminology, and evidence boundaries. Use for 论文润色、学术翻译、正文精简, or manuscript LaTeX layout fixes. Use nature-writing when the main task is drafting new sections or rebuilding the manuscript argument.
+description: Polish, translate, or tighten existing evidence-frozen academic prose while preserving facts, terminology, and evidence boundaries. Use for 论文润色、学术翻译、正文精简, or manuscript LaTeX layout fixes. Use scientific-writing when new claims, sections, evidence, or the core argument must be created.
 ---
 
 # Nature-Style Academic Polishing — Router
@@ -86,10 +86,15 @@ writing guidance, not journal policy.
 
 The files under `references/` are deep references, not defaults. Open them on demand per the `references.on_demand` table in the manifest, for example when the user explicitly asks for phrasebank-style alternatives or a stricter style audit.
 
-When the target is Nature Machine Intelligence and exact limits, availability
-sections, conference-extension disclosure or production checks affect the
-revision, load
-`../nature-shared/journal-formats/nature-machine-intelligence.md`.
+When exact limits, availability sections, conference-extension disclosure or
+production checks affect the revision, load the matching shared journal file:
+
+- Nature: `../nature-shared/journal-formats/nature.md`
+- Nature Communications: `../nature-shared/journal-formats/nat-comms.md`
+- Nature Machine Intelligence: `../nature-shared/journal-formats/nature-machine-intelligence.md`
+
+For a new draft, missing evidence, or a request to rebuild the argument, route to
+`scientific-writing`; do not use polishing as a drafting substitute.
 
 For a whole-manuscript consistency audit or evidence of drift across passages, load `../nature-shared/core/consistency-sweep.md`. Local follow-up edits require checking the affected terms, numbers, and claims, not restarting a full audit solely because this is another editing round. After corrections, recheck affected occurrences and dependent claims; broaden the sweep when new discrepancies warrant it.
 

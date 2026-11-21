@@ -67,13 +67,13 @@ git diff --check
 
 ## 配套 DSH 插件
 
-[`tools/`](tools/README.md) 存放与本教材配套、可独立安装的 DeepSeek Harness 插件：
+[`tools/`](tools/README.md) 存放与本教材配套的 Ascend 310B 调试插件：
 
 - [`昇腾310B调试`](tools/dsh-plugin-ascend310b-debug/README.md)：只面向 Ascend 310B1/310B4，提供板端事实探测、版本配套判定、分层调试计划、样例索引和只读诊断命令。其他芯片会被标记为不适用。
 
-插件通过仓库根目录的 `node tools/install-dsh-plugins.mjs --profile desktop` 打包安装：安装器会生成带内容哈希的 tarball、调用 `dsh plugin add`，并核对安装版本和文件内容；不要手工复制或软链源码目录。每个插件的 README 都给出配置和自检命令；昇腾310B调试插件的源码审核记录在 [`installation-audit.md`](tools/dsh-plugin-ascend310b-debug/docs/installation-audit.md)。
+调试插件通过仓库根目录的 `node tools/install-dsh-plugins.mjs --profile desktop` 打包安装：安装器会生成带内容哈希的 tarball、调用 `dsh plugin add`，并核对安装版本和文件内容；不要手工复制或软链源码目录。源码审核记录在 [`installation-audit.md`](tools/dsh-plugin-ascend310b-debug/docs/installation-audit.md)。
 
-配套的项目级 skills 已提交在 [`.dsh/skills/`](.dsh/skills/)：`ascend310b-cann-development` 负责 310B 程序开发、CANN 合同和板端验收，`ascend310b-case-testing` 负责从 GitHub commit 与 Hugging Face revision 重建案例，`ascend310b-debug` 负责故障定位；写作侧按 `ascend310b-writing-theory`（理论章节）、`ascend310b-writing-case`（面向初学者的案例教材）、`ascend310b-writing-presentation`（Marp 课件）、`ascend310b-writing-docs`（仓库/案例 docs）、`ascend310b-code-docs`（源码 API/docstring）、`ascend310b-writing-academic`（学术论证）、`ascend310b-curriculum-planning`（教材计划）、`ascend310b-writing-vuepress`、`ascend310b-writing-latex`、`ascend310b-writing-markdown` 和 `ascend310b-writing-dot` 分工。插件内的 [`skills/`](tools/dsh-plugin-ascend310b-writing/skills/) 是源文件；修改后运行 `npm run skills:sync` 和 `npm run skills:check`。
+写作工具统一维护在外部 [`dsh-writing-suite`](https://github.com/zhouxzh/dsh-writing-suite)，不再在本仓库保留第二份插件源码。配套的项目级 skills 已提交在 [`.dsh/skills/`](.dsh/skills/)：`ascend310b-cann-development` 负责 310B 程序开发、CANN 合同和板端验收，`ascend310b-case-testing` 负责从 GitHub commit 与 Hugging Face revision 重建案例，`ascend310b-debug` 负责故障定位；写作侧按 `ascend310b-writing-theory`（理论章节）、`ascend310b-writing-case`（面向初学者的案例教材）、`ascend310b-writing-presentation`（Marp 课件）、`ascend310b-writing-docs`（仓库/案例 docs）、`ascend310b-code-docs`（源码 API/docstring）、`ascend310b-writing-academic`（学术论证）、`ascend310b-curriculum-planning`（教材计划）、`ascend310b-writing-vuepress`、`ascend310b-writing-latex`、`ascend310b-writing-markdown` 和 `ascend310b-writing-dot` 分工。当本机存在外部套件 checkout 时，运行 `npm run skills:sync` 和 `npm run skills:check` 可同步/校验写作 skill 副本。
 
 ## 案例运行原则
 

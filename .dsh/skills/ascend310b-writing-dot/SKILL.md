@@ -11,6 +11,8 @@ description: Ascend310 教材 Graphviz DOT 图写作与画布适配。用于系�
 
 本 skill 只负责辅助图像资产的制作、引用和版面验收，不决定正文结构或教学顺序。案例正文由 `ascend310b-writing-case`、理论正文由 `ascend310b-writing-theory` 组织；图服务于正文中的具体学习问题，不能用架构图替代概念解释或把正文改成部署报告。图中节点、边界、箭头和说明标签使用简体中文；端口、API、模型名等必要标识保留原形。图片所在正文仍由主内容skill负责，`prose-language`不能用图替代中文解释来规避。
 
+本 skill 是 Graphviz DOT 的权威规则。需要 Mermaid、draw.io、TikZ 或跨工具交付时叠加 `diagram-design`；神经网络 TikZ 框图的路径/模块框审计交给 `ascend310b-writing-neural-diagram`。
+
 优先使用 Graphviz `dot` 布局表达方向明确的流程图；只有确实需要力导向布局时才考虑其他布局引擎。
 
 ## 教材画布契约

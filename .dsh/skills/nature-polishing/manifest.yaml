@@ -97,5 +97,9 @@ references:
       path: references/writing-strategy.md
     - condition: needs LaTeX layout/typesetting help (排版) — loose or sparse pages, stranded section headings, figures that don't fill the page or split across pages, "Float too large", multi-panel figure arrangement, or Supplementary Information that looks empty
       path: references/latex-layout.md
+    - condition: target is flagship Nature and exact article structure, display, data/code or production requirements affect the polish
+      path: ../nature-shared/journal-formats/nature.md
+    - condition: target is Nature Communications and exact article structure, display, data/code or production requirements affect the polish
+      path: ../nature-shared/journal-formats/nat-comms.md
     - condition: target is Nature Machine Intelligence and exact content-type, word/display, data/code, initial-submission, or production requirements affect the polish
       path: ../nature-shared/journal-formats/nature-machine-intelligence.md

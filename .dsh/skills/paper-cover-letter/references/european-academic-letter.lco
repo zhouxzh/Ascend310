@@ -1,0 +1,31 @@
+\ProvidesFile{european-academic-letter.lco}
+  [2026/07/26 Formal European academic letter layout]
+
+\LoadLetterOption{DINmtext}
+
+\KOMAoptions{
+  addrfield=true,
+  backaddress=true,
+  enlargefirstpage=true,
+  firstfoot=false,
+  foldmarks=false,
+  fromalign=right,
+  fromemail=false,
+  fromphone=false,
+  fromrule=afteraddress,
+  parskip=half,
+  subject=titled
+}
+
+\setkomafont{fromname}{\normalfont\bfseries}
+\setkomafont{fromaddress}{\normalfont\small}
+\setkomafont{backaddress}{\normalfont\scriptsize}
+\setkomafont{subject}{\normalfont\bfseries}
+
+\renewcommand*{\raggedsignature}{\raggedright}
+\setlength{\parindent}{0pt}
+\clubpenalty=10000
+\widowpenalty=10000
+\displaywidowpenalty=10000
+
+\endinput

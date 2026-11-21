@@ -17,6 +17,15 @@ Do **not** use this English-language skill for repository-authored Chinese learn
 
 For Chinese Ascend310 textbooks, cases, sample docs, appendices, or slides, use the relevant `ascend310b-*` writing skill. Keep commands, API names, paths, model identifiers, citations, and quoted source text in their original language, but write the explanatory prose in Simplified Chinese.
 
+## Academic routing
+
+For an existing local paper workspace with `evidence/`, `claims_register.md`, or
+`audit/claim_evidence_map.md`, establish or verify the evidence chain with
+`paper-evidence` first. Use this skill to draft, restructure, or audit the
+scientific manuscript and reporting-guideline coverage. If the facts and claims
+are already frozen and the task is only English expression or tightening, use
+`nature-polishing` instead.
+
 ## Purpose
 
 Produce clear scientific prose without inventing evidence or concealing uncertainty.

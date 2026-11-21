@@ -20,8 +20,12 @@ documentation, generated material, or board assets.
 | `src/.vuepress/` | Site navigation and presentation configuration | TypeScript/config |
 | `latex/` | Generated LaTeX/PDF outputs | Generated; do not hand-edit |
 | `notebook/` | Auxiliary learning materials | Source notebooks/scripts |
-| `tools/dsh-plugin-ascend310b-writing/` | DSH plugin that audits this manuscript (naming, anchors, links, LaTeX artifacts, push gate) | Node ESM source; machine-local helpers stay outside this repository |
+| `tools/dsh-plugin-ascend310b-debug/` | DSH plugin for Ascend 310B board diagnosis and controlled execution | Node ESM source; machine-local helpers stay outside this repository |
 | `tmp/` | The only repository-local temporary working directory | Tracked `README.md`; generated contents ignored |
+
+The writing tools live in the separate `dsh-writing-suite` repository. This
+repository keeps project-level skill snapshots under `.dsh/skills/` but does not
+vendor the writing plugin source.
 
 ## Root docs contract
 
@@ -175,6 +179,7 @@ upgrade and version pairing; do not swap them.
 | `src/appendix/appendix6.md` | 附录 6：工具箱与 FAQ |
 | `src/appendix/appendix7.md` | 附录 7：CANN 升级 |
 | `src/appendix/appendix8.md` | 附录 8：实验异常解析 |
+| `src/appendix/appendix9.md` | 附录 9：COCO目标检测器基准与选型 |
 
 ## Documentation preview and push policy
 
@@ -402,9 +407,55 @@ python palmprint_benchmark.py evaluate --model compnet_tongji_600 \
 Run each eligible CompNet variant independently. Keep the resulting
 `reports/runs/` files on the board as evidence; they remain ignored by Git.
 
+## Board workspace and deployment layout
+
+Every Ascend 310B board uses one project root under the logged-in user's
+`Documents` directory. Do not create case, model, report, debug, download, or
+service directories directly below `/home/HwHiAiUser`.
+
+```text
+/home/HwHiAiUser/Documents/Ascend310/
+├── deployments/
+│   └── caseN/<tier>/<release-id>/
+├── workspaces/
+│   └── caseN/<task-id>/
+├── assets/
+│   └── caseN/{models,datasets}/
+└── archives/
+    └── caseN/<release-id-or-date>/
+```
+
+- `deployments/` contains only startable, versioned service releases. Start a
+  service from its exact `<release-id>` directory, not from a workspace or the
+  user's home directory.
+- `workspaces/` is the only persistent location for DSH task output, temporary
+  conversion work, test checkouts, and short-lived diagnostics. Use a
+  case/task-specific child directory; do not put loose output at its root.
+- `assets/` contains externally obtained, hash-verified models and datasets.
+  Do not mix it with source, templates, captures, or reports.
+- `archives/` is an operator-managed rollback area. Move a verified legacy
+  directory here before deletion; never delete a legacy case directory until
+  its service, assets, and retention need have been reviewed.
+- `/tmp/ascend310b-debug/` is reserved for plugin peripheral evidence. It is
+  not a deployment, model, template, report, or durable asset directory.
+- `8t`, `20t`, and any other observed tier each have separate deployment,
+  asset, template, calibration, report, performance, and task-quality evidence
+  sets. A visible-light camera and an infrared camera are separate input
+  contracts even when their nodes have the same `/dev/videoN` name.
+- Before creating a directory, downloading an asset, synchronizing a release,
+  or running a write-capable board task, resolve its absolute path and confirm
+  that it is below one of the roots above. Never use `$HOME`, `~`, a broad
+  `Documents` path, globbed paths, or an unverified computed path as a write or
+  delete target.
+- DSH target configuration must set `workdir` to
+  `/home/HwHiAiUser/Documents/Ascend310/workspaces`. The debug plugin must
+  reject task paths outside this workspace, the controlled deployment/assets
+  roots, or its fixed `/tmp` evidence root; it must not silently fall back to
+  the board home directory.
+
 ## Unified Python environment
 
-All Ascend 310B cases use one user-owned conda environment:
+All Ascend 310B cases use one freshly created, user-owned conda environment:
 
 ```text
 name: ascend
@@ -422,6 +473,11 @@ ABI: cpython-39-aarch64-linux-gnu
 - The debug plugin and `ascend310b-env-check` skill must validate the
   environment name, Python/ABI, user-site isolation, PyACL import, and full
   package coverage.
+- Before the first deployment to a board, create a fresh user-owned `ascend`
+  environment with Python `3.9.25` from a reviewed lock/requirement set. Record
+  the former environment as `ascend-legacy-<date>` only after confirming that
+  no identified service process uses it; this is rollback material, not a
+  second case environment.
 - Keep case-specific environments only as rollback material until every case
   passes on a matching NPU driver/CANN combination. After full acceptance,
   generate a lock file, remove duplicate environments, and clean user-site
@@ -436,11 +492,16 @@ ABI: cpython-39-aarch64-linux-gnu
 ## Ascend 310B board deployment
 
 - Classify results by NPU model and compute tier, not by board name or IP.
-  This project uses `Ascend 310B4 / 8T`; `20T` results are a separate evidence
-  set and must never be merged or ranked with 8T results.
-- Inspect an existing board deployment directory before synchronizing. Use the
-  deployment script's explicit `--remote-dir` option for an active legacy
-  deployment; do not move a running service or broad-copy a home directory.
+  `Ascend310B4 / 8T`, `Ascend310B1 / 20T`, and every other observed 310B
+  combination are separate evidence sets and must never be merged or ranked.
+- Deploy only to `/home/HwHiAiUser/Documents/Ascend310/deployments/caseN/<tier>/<release-id>/`.
+  Inspect an existing deployment, its listening service PID, its model/assets,
+  and its rollback directory before synchronizing. Do not move a running
+  service or broad-copy a home directory.
+- A reproducible deployment obtains source from a public GitHub fixed commit
+  and models from a fixed Hugging Face revision. A local uncommitted checkout
+  may be used only as an explicitly labelled offline/debug bundle; it is not
+  release evidence.
 - Build the frontend locally before deployment:
 
   ```bash
@@ -457,23 +518,26 @@ ABI: cpython-39-aarch64-linux-gnu
   dataset, template, and run-report assets unless an explicit inclusion option
   is supplied. Never use a broad remote path, recursive delete, or a computed
   deletion target without verifying its absolute path first.
-- On the board, activate CANN and conda in the same shell that launches the
-  service:
+- On the board, activate CANN and conda in the same shell that launches a
+  release. Use the exact tier and release directory; do not substitute a home
+  directory, a workspace, or a legacy case path:
 
   ```bash
   source /usr/local/miniconda3/etc/profile.d/conda.sh
   conda activate ascend
   export PYTHONNOUSERSITE=1
   source /usr/local/Ascend/ascend-toolkit/set_env.sh
-  cd ~/Documents/palmprint-recognition
-  bash setup.sh
-  python prepare_models.py check --model all
-  bash scripts/run_palmprint_service.sh --host 0.0.0.0 --port 7860
+  export RELEASE_ROOT=/home/HwHiAiUser/Documents/Ascend310/deployments/case4/<tier>/<release-id>
+  cd "$RELEASE_ROOT"
+  export PALMPRINT_ROOT="$RELEASE_ROOT"
+  python -c "import cv2, acl; print(cv2.__version__); print(acl.__file__)"
+  python -m palmprint_workbench.tools.verify_assets --strict
+  python -m palmprint_workbench.api --host 0.0.0.0 --port 7860
   ```
 
-- Prefer `scripts/run_palmprint_service.sh` because it runs an `import acl`
-  preflight. A service started without the CANN environment can answer HTTP
-  health checks but fail actual NPU inference.
+- A service started without the CANN environment can answer HTTP health checks
+  but fail actual NPU inference. Reject such a process rather than adding a CPU
+  fallback.
 - Restart only the identified service PID. After a restart, verify the listening
   port, `GET /api/health`, `GET /api/bootstrap`, static `/`, and the expected
   process command before interacting with camera hardware.

@@ -1,0 +1,76 @@
+\documentclass[
+  paper=a4,
+  fontsize=10pt,
+  version=last
+]{scrlttr2}
+
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{newtxtext}
+\usepackage[final]{microtype}
+
+\LoadLetterOption{european-academic-letter}
+
+% ---------- EDIT THESE METADATA ----------
+\newcommand{\LetterDate}{1 January 2026}
+\newcommand{\JournalName}{Journal of Power Electronics}
+\newcommand{\ManuscriptTitle}{Full Manuscript Title}
+\newcommand{\ManuscriptID}{MANUSCRIPT-ID}
+\newcommand{\ArticleType}{Original Article}
+
+\newcommand{\AuthorName}{Dr. Corresponding Author}
+\newcommand{\AuthorAffiliation}{School of Integrated Circuits, Guangdong University of Technology, Guangzhou 510006, China}
+% Display form: identical address, broken deliberately for the letterhead.
+\newcommand{\AuthorAffiliationLines}{%
+  School of Integrated Circuits\\
+  Guangdong University of Technology\\
+  Guangzhou 510006, China}
+\newcommand{\AuthorEmail}{author@example.edu}
+\newcommand{\AuthorShort}{Dr. Corresponding Author, Guangdong University of Technology, Guangzhou, China}
+
+\setkomavar{fromname}{\AuthorName}
+\setkomavar{fromaddress}{\AuthorAffiliation}
+\setkomavar{fromemail}{\AuthorEmail}
+\setkomavar{backaddress}{\AuthorShort}
+\setkomavar{signature}{\AuthorName\\Corresponding Author}
+% Fixed line breaks + e-mail on its own line: automatic wrapping can split
+% "No. 100 ..." across lines and make the header unreadable.
+\setkomavar{firsthead}{%
+  \raggedleft
+  {\bfseries \AuthorName}\\[-0.2ex]
+  {\scriptsize
+    \AuthorAffiliationLines\\[-0.6ex]
+    \texttt{\AuthorEmail}}}
+
+\begin{document}
+
+\setkomavar{date}{\LetterDate}
+\setkomavar{subject}{Submission of the manuscript ``\ManuscriptTitle''}
+
+% Online submission: editorial office + journal name. Add a full postal
+% address only when the journal instructions explicitly require it.
+\begin{letter}{%
+  Editorial Office\\
+  \emph{\JournalName}}
+
+\opening{Dear Editor,}
+
+On behalf of all authors, I am pleased to submit our manuscript entitled
+``\ManuscriptTitle'' for consideration as an \ArticleType{} in the
+\emph{\JournalName}.
+
+% Paragraph 2: problem, method, and 2-3 traceable quantitative results.
+The manuscript addresses <problem>. We propose <method core>. Experiments under
+<conditions> show <result 1>, <result 2>, and <result 3>, all of which are
+reported in the manuscript.
+
+We confirm that this manuscript is original, has not been published elsewhere,
+and is not under consideration by another journal. All authors have approved
+the submission and declare no conflict of interest.
+
+Thank you for your consideration. We look forward to your response.
+
+\closing{Yours sincerely,}
+
+\end{letter}
+\end{document}

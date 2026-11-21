@@ -1,6 +1,7 @@
 ---
 name: ascend310b-writing-docs
 description: Ascend310 代码工程文档与测试问题台账写作。用于 samples/caseN 的 README、docs/ 下的部署/API/配置/验证/限制文档、统一 NN-troubleshooting.md 问题记录、代码入口与测试命令说明、证据记录和跨案例工程索引；测试设备/服务/模型出问题后必须使用本 skill 登记复现、证据、根因与回归；不用于理论章节、9 个案例教材正文或 Presentation 课件。
+compatibility: 固定来源和板端验证依赖 ascend310b-case-testing、ascend310b-env-check 与可用的 Ascend 工具；外部工具缺失时不得声称 board pass。
 ---
 
 # 代码工程 Docs 写作
@@ -17,6 +18,12 @@ description: Ascend310 代码工程文档与测试问题台账写作。用于 sa
 根 `docs/` 只放面向维护者的仓库治理、发布流程、环境矩阵和跨项目审计摘要，不属于学生教材，也不进入 VuePress；不接收案例部署、API、模型、排障或原始证据文档。案例审查也放在对应 `samples/caseN/docs/`。
 
 不把理论教材、案例教学正文、Marp 课件或 VuePress 主题改写塞入本流程。源码 docstring 和 CLI 参考表走 `ascend310b-code-docs`。
+
+## README 段落所有权
+
+- `samples/caseN/README.md` 的运行、部署、配置、验证和限制段落归本 skill。
+- 同一 README 的 `API/CLI 参考` 段落归 `ascend310b-code-docs`。
+- 任一方修改共享 README 时，必须同时核对另一方的段落没有被覆盖；不重建整份 README。
 
 ## 语言要求
 
@@ -81,6 +88,8 @@ samples/caseN/docs/evidence/     用户明确要求随仓库保留时的脱敏�
 设备未开机、SSH/mDNS 不可达或网络迁移属于环境/传输问题，不得写成 310B 不支持，也不得与另一块在线板的结果合并。8T 和 20T 的问题必须分条记录。
 
 修复问题后保留原条目，把状态改为 `resolved` 或 `mitigated`，补充回归证据；不要删除失败历史。验证文档只保留结论和台账链接，避免同一问题在多处出现互相矛盾的版本。
+
+推送前 `ascend310b_writing_push_check` 会扫描 `src/`、`samples/` 和根 `docs/` 的 Markdown/TXT；发现私钥、GitHub/AWS/API Token 或高置信度密码赋值会阻断发布。模板中的脱敏检查必须由作者勾选。
 
 ## 代码文档必须说明
 

@@ -29,20 +29,20 @@ digraph architecture_textbook {
     arrowsize="0.7"
   ];
 
-  browser [label="浏览器\n可信局域网", fillcolor="#E8F5E9"];
-  ui [label="UI :7865\n保存密钥", fillcolor="#E3F2FD"];
-  gateway [label="Gateway :7861\nBearer 鉴权"];
-  worker [label="MindSpore worker\n:8090，串行", fillcolor="#E8F5E9"];
-  model [label="模型加载\n与输出", shape=note];
-  npu [label="Ascend 310B1 / 20T", fillcolor="#FFF3E0"];
+  browser [label="<客户端>\n<网络边界>", fillcolor="#E8F5E9"];
+  ui [label="<界面/服务> :<端口>\n<认证方式>", fillcolor="#E3F2FD"];
+  gateway [label="<网关/接入层> :<端口>\n<协议>"];
+  worker [label="<执行服务>\n<并发或串行>", fillcolor="#E8F5E9"];
+  model [label="<模型加载>\n<输出合同>", shape=note];
+  npu [label="<板卡型号> / <档位>", fillcolor="#FFF3E0"];
 
   { rank=same; browser; ui; }
   { rank=same; gateway; worker; }
   { rank=same; model; npu; }
 
-  browser -> ui [label="HTTP(S)"];
-  ui -> gateway [label="回环"];
-  gateway -> worker [label="固定模型名"];
-  worker -> model;
-  model -> npu [label="NPU"];
+  browser -> ui [label="<协议>"];
+  ui -> gateway [label="<路由/回环>"];
+  gateway -> worker [label="<请求合同>"];
+  worker -> model [label="<模型/版本>"];
+  model -> npu [label="<设备>"];
 }

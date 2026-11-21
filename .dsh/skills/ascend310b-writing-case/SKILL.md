@@ -1,6 +1,7 @@
 ---
 name: ascend310b-writing-case
-description: Ascend310 实践案例教材写作。用于案例1至案例9的 src/experiment 正文、案例索引、sidebar、样例入口和教学验收；要求面向初学者先讲基础知识与必要理论，再以最小示范、分步实验、证据解释和迁移任务递进，使用灵活语义标题，不把部署手册、发布报告或板端日志直接当成教材；案例发布仍必须从 GitHub 固定 commit 获取程序、从 Hugging Face 固定 revision 下载模型。
+description: Ascend310 实践案例教材写作。用于案例1至案例9的 src/experiment 正文、样例入口和教学验收；sidebar 由 ascend310b-writing-vuepress 维护；要求面向初学者先讲基础知识与必要理论，再以最小示范、分步实验、证据解释和迁移任务递进，使用灵活语义标题，不把部署手册、发布报告或板端日志直接当成教材；案例发布仍必须从 GitHub 固定 commit 获取程序、从 Hugging Face 固定 revision 下载模型。
+compatibility: 固定来源与板端复现依赖 ascend310b-case-testing 和 Ascend 板端工具；依赖缺失时经验性结果保持 untested。
 ---
 
 # 实践案例教材写作
@@ -20,7 +21,7 @@ description: Ascend310 实践案例教材写作。用于案例1至案例9的 src
 
 ## 范围与冻结规则
 
-只处理 `src/experiment/case1.md` 到 `case9.md` 及其索引。案例冻结标题来自 `AGENTS.md`，必须保持：
+只处理 `src/experiment/case1.md` 到 `case9.md` 及案例内容。`src/.vuepress/sidebar.ts` 和生成区块由 `ascend310b-writing-vuepress` 独占；案例 skill 只提供页面标题、目标路径和导航意图。案例冻结标题来自 `AGENTS.md`，必须保持：
 
 ```text
 案例 N：<纯中文任务名>
@@ -61,7 +62,7 @@ description: Ascend310 实践案例教材写作。用于案例1至案例9的 src
 
 ## 案例教学合同
 
-动笔前先写一份内部教学设计单，模板见 [references/case-teaching-plan.md](references/case-teaching-plan.md)。至少明确：
+动笔前先读取 `docs/curriculum_plan.md`（由 `ascend310b-curriculum-planning` 维护），并把对应案例行作为唯一教学目标来源。需要内部展开时使用 [references/case-teaching-plan.md](references/case-teaching-plan.md)，但不得创建与主计划冲突的第二套学习目标或评估矩阵。至少明确：
 
 | 字段 | 要回答的问题 |
 | --- | --- |

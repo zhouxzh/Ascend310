@@ -10,9 +10,9 @@
  *
  * A project-scoped skill therefore wins over the user-level copy in
  * `$DSH_HOME/skills`, which means a fresh clone gets the repository's rules
- * without a manual install. The plugin directories stay the single source of
- * truth (they are what npm publishes); this script generates the project copy
- * and `--check` fails when the two drift apart.
+ * without a manual install. The debug plugin and, when checked out, the external
+ * `dsh-writing-suite` remain the sources of truth; this script generates the
+ * project copy and `--check` fails when an available source drifts.
  *
  * Usage:
  *   node tools/sync-repo-skills.mjs          # write .dsh/skills
@@ -28,10 +28,18 @@ const repoRoot = resolve(scriptDir, '..');
 const targetRoot = join(repoRoot, '.dsh', 'skills');
 const checkOnly = process.argv.includes('--check');
 
+// The writing plugin now lives in the external dsh-writing-suite repository.
+// Use an explicit checkout when available; in a standalone clone this source is
+// simply absent and the committed project-level writing skills remain as-is.
+const externalWritingRoot = process.env.DSH_WRITING_SUITE_ROOT
+	? resolve(process.env.DSH_WRITING_SUITE_ROOT)
+	: resolve(repoRoot, '..', 'dsh-writing-suite');
 const sources = [
-	join(repoRoot, 'tools', 'dsh-plugin-ascend310b-writing', 'skills'),
 	join(repoRoot, 'tools', 'dsh-plugin-ascend310b-debug', 'skills')
 ];
+if (existsSync(join(externalWritingRoot, 'skills'))) {
+	sources.push(join(externalWritingRoot, 'skills'));
+}
 
 // These directories are support data for a sibling skill, not standalone
 // skills. They must still be copied because the sibling references them with

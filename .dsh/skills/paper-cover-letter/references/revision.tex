@@ -1,0 +1,83 @@
+\documentclass[
+  paper=a4,
+  fontsize=10pt,
+  version=last
+]{scrlttr2}
+
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{newtxtext}
+\usepackage[final]{microtype}
+\usepackage{enumitem}
+
+\LoadLetterOption{european-academic-letter}
+
+% ---------- EDIT THESE METADATA ----------
+\newcommand{\LetterDate}{1 January 2026}
+\newcommand{\JournalName}{Journal of Power Electronics}
+\newcommand{\ManuscriptTitle}{Full Manuscript Title}
+\newcommand{\ManuscriptID}{MANUSCRIPT-ID}
+\newcommand{\DecisionType}{major revision}
+
+\newcommand{\AuthorName}{Dr. Corresponding Author}
+\newcommand{\AuthorAffiliation}{School of Integrated Circuits, Guangdong University of Technology, Guangzhou 510006, China}
+% Display form: identical address, broken deliberately for the letterhead.
+\newcommand{\AuthorAffiliationLines}{%
+  School of Integrated Circuits\\
+  Guangdong University of Technology\\
+  Guangzhou 510006, China}
+\newcommand{\AuthorEmail}{author@example.edu}
+\newcommand{\AuthorShort}{Dr. Corresponding Author, Guangdong University of Technology, Guangzhou, China}
+
+\setkomavar{fromname}{\AuthorName}
+\setkomavar{fromaddress}{\AuthorAffiliation}
+\setkomavar{fromemail}{\AuthorEmail}
+\setkomavar{backaddress}{\AuthorShort}
+\setkomavar{signature}{\AuthorName\\Corresponding Author}
+% Fixed line breaks + e-mail on its own line: automatic wrapping can split
+% "No. 100 ..." across lines and make the header unreadable.
+\setkomavar{firsthead}{%
+  \raggedleft
+  {\bfseries \AuthorName}\\[-0.2ex]
+  {\scriptsize
+    \AuthorAffiliationLines\\[-0.6ex]
+    \texttt{\AuthorEmail}}}
+
+\begin{document}
+
+\setkomavar{date}{\LetterDate}
+\setkomavar{subject}{Revision of manuscript \ManuscriptID: ``\ManuscriptTitle''}
+
+% Online submission: editorial office + journal name. Add a full postal
+% address only when the journal instructions explicitly require it.
+\begin{letter}{%
+  Editorial Office\\
+  \emph{\JournalName}}
+
+\opening{Dear Editor,}
+
+On behalf of all authors, we submit the revised version of our manuscript
+``\ManuscriptTitle'' (Manuscript ID: \ManuscriptID) for consideration in the
+\emph{\JournalName}. We thank the Editor and the Reviewers for the constructive
+comments, which have helped us improve the manuscript. Our point-by-point
+response to each comment accompanies this letter.
+
+The main changes in the revised manuscript are as follows.
+
+\begin{itemize}[leftmargin=1.2em,itemsep=0.15em,topsep=0.25em]
+  \item <Change 1: what was changed and where.>
+  \item <Change 2: what was changed and where.>
+  \item <Change 3: what was changed and where.>
+  \item <Change 4: what was changed and where.>
+\end{itemize}
+
+We confirm that the authorship and affiliations are unchanged and that the
+revised manuscript is not under consideration by another journal. All authors
+have approved this revision and declare no conflict of interest.
+
+We thank the Editor and the Reviewers again for their time and effort.
+
+\closing{Yours sincerely,}
+
+\end{letter}
+\end{document}
