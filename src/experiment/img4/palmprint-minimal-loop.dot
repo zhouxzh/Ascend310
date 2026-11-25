@@ -1,0 +1,27 @@
+digraph palmprint_minimal_loop {
+  graph [rankdir=TB, fontname="Noto Sans CJK SC", fontsize=18, size="8.5,7.0", ratio="compress", dpi=144, pad="0.12", nodesep="0.28", ranksep="0.38", splines="ortho", bgcolor="white", label="掌纹识别最小闭环", labelloc=t, labeljust=l];
+  node [fontname="Noto Sans CJK SC", fontsize=16, margin="0.14,0.10", height=0.56, shape=box, style="rounded,filled", color="#607D8B", fillcolor="#F5F7FA"];
+  edge [fontname="Noto Sans CJK SC", fontsize=13, color="#546E7A", arrowsize=0.72, penwidth=1.1];
+
+  input [label="输入\n摄像头帧或匿名测试图", fillcolor="#EAF2FF", color="#3157C8"];
+  detect [label="手掌检测\n框 · 分数 · left/right", fillcolor="#EAF2FF", color="#3157C8"];
+  roi [label="ROI预处理与质量门\n灰度 · 128×128 · 清晰度/边缘检查", fillcolor="#EEF7F0", color="#2E7D4F"];
+  ccnet [label="CCNet NPU编码\n[1,1,128,128] → 2048维embedding", fillcolor="#EEF7F0", color="#2E7D4F"];
+  retrieve [label="同模型模板检索\n余弦相似度 · 不用检测掌侧筛模板", fillcolor="#FFF4E5", color="#C26A00"];
+  result [label="输出候选与分数\n阈值未校准时不显示身份通过", fillcolor="#EEF7F0", color="#2E7D4F"];
+  reject_detect [label="拒绝：no_palm", fillcolor="#FDECEA", color="#C62828"];
+  reject_roi [label="拒绝：roi_rejected", fillcolor="#FDECEA", color="#C62828"];
+  reject_template [label="拒绝：no_templates", fillcolor="#FDECEA", color="#C62828"];
+
+  input -> detect;
+  detect -> roi [xlabel="有效手掌"];
+  roi -> ccnet [xlabel="质量合格"];
+  ccnet -> retrieve;
+  retrieve -> result [xlabel="存在同模型模板"];
+  detect -> reject_detect [constraint=false, xlabel="无手掌", color="#C62828"];
+  roi -> reject_roi [constraint=false, xlabel="质量不合格", color="#C62828"];
+  retrieve -> reject_template [constraint=false, xlabel="无可用模板", color="#C62828"];
+
+  { rank=same; result; reject_detect; reject_roi; reject_template; }
+  input -> detect -> roi -> ccnet -> retrieve -> result [style=invis, weight=100];
+}
