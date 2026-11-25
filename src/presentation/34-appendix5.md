@@ -38,7 +38,7 @@ footer: "附录 5：ROS2 基础"
 
 > 本讲主线：通信模型 → 工作空间 → 工具 → 设备 → 边界
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a></div>
 
 <!--
 先给学生路线图；后续每页都对应这里的一项，最后回到小结。
@@ -62,7 +62,7 @@ footer: "附录 5：ROS2 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a> · 1. 定位、DDS、去中心化发现与教材边界</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a> · 1. 定位、DDS、去中心化发现与教材边界</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -79,7 +79,7 @@ footer: "附录 5：ROS2 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a> · 2. 工作空间、功能包与构建系统</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a> · 2. 工作空间、功能包与构建系统</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -96,7 +96,7 @@ footer: "附录 5：ROS2 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a> · 3. 节点、通信模型、接口与计算图</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a> · 3. 节点、通信模型、接口与计算图</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -113,7 +113,7 @@ footer: "附录 5：ROS2 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a> · 4. 命令行工具</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a> · 4. 命令行工具</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -130,7 +130,7 @@ footer: "附录 5：ROS2 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a> · 5. rqt、rviz2 与 ros2 bag</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a> · 5. rqt、rviz2 与 ros2 bag</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -154,7 +154,7 @@ footer: "附录 5：ROS2 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a> · 7. TF2 坐标变换与 URDF</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a> · 7. TF2 坐标变换与 URDF</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -171,7 +171,7 @@ footer: "附录 5：ROS2 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a> · 8. 相机、雷达、IMU 与串口底盘接口</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a> · 8. 相机、雷达、IMU 与串口底盘接口</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -188,7 +188,7 @@ footer: "附录 5：ROS2 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a> · 10. 多机通信与 ROS_DOMAIN_ID</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a> · 10. 多机通信与 ROS_DOMAIN_ID</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -205,7 +205,7 @@ footer: "附录 5：ROS2 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a> · 12. ROS2 与 310B 推理集成（proposed）</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a> · 12. ROS2 与 310B 推理集成（proposed）</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -222,7 +222,7 @@ footer: "附录 5：ROS2 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a> · 13. 课堂练习与验收标准</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a> · 13. 课堂练习与验收标准</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -241,7 +241,7 @@ footer: "附录 5：ROS2 基础"
 
 > 下一讲：进入工具箱与 FAQ。
 
-<div class="source">教材：<a href="../appendix/appendix5.md"><code>src/appendix/appendix5.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix5.html"><code>src/appendix/appendix5.md</code></a></div>
 
 <!--
 用三句话收束；提醒学生把未验证项写成 untested 或 blocked。

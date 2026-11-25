@@ -18,7 +18,7 @@ footer: "第6章：DVPP视频处理基础"
 ## 从 NV12 数据流到可核验的媒体链路
 
 
-<div class="source">依据：<a href="../book/chapter6.md"><code>src/book/chapter6.md</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/README.md"><code>samples/chapter6</code></a></div>
+<div class="source">依据：<a href="https://310b.cn/book/chapter6.html"><code>src/book/chapter6.md</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/README.md"><code>samples/chapter6</code></a></div>
 
 <!--
 本讲的主线是媒体数据如何经过 DVPP 通道、内存约束和异步回调，而不是背一组 API 名称。
@@ -37,7 +37,7 @@ footer: "第6章：DVPP视频处理基础"
 
 > 本讲主线：数据格式 → 硬件通道 → 证据链
 
-<div class="source">教材：<a href="../book/chapter6.md"><code>src/book/chapter6.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter6.html"><code>src/book/chapter6.md</code></a></div>
 
 <!--
 先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
@@ -66,7 +66,7 @@ DVPP 处理图像和视频的格式转换、缩放、裁剪与编解码，不承
 | VDEC | H.264/H.265 硬件解码 | 视频码流 → NV12 |
 | JPEG | JPEG 硬件编解码 | NV12 ↔ JPEG |
 
-<div class="source">教材：<a href="../book/chapter6.md#dvpp-basics"><code>src/book/chapter6.md</code>「DVPP 基础概念与编程模型」</a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter6.html#dvpp-basics"><code>src/book/chapter6.md</code>「DVPP 基础概念与编程模型」</a></div>
 
 <!--
 先让学生区分 AI Core 和媒体处理单元。DVPP 的通过不能直接证明模型推理通过，模型推理通过也不能替代媒体链路验证。
@@ -78,7 +78,7 @@ DVPP 处理图像和视频的格式转换、缩放、裁剪与编解码，不承
 
 <div class="split"><figure><img src="../book/img6/cann_acl_dvpp_stack.png" alt="Python、ACL Runtime、DVPP Driver 与 Ascend 310B 硬件层次图"><figcaption>Python 应用通过 acl.media 与 acl.rt 调用 ACL Runtime，再由 DVPP 驱动访问硬件。</figcaption></figure><div><ul><li>应用层调用 <code>acl.media</code> 和 <code>acl.rt</code>。</li><li>ACL Runtime 负责设备、上下文、通道和内存接口。</li><li>VENC、VDEC、VPC 与 JPEG 走各自的 DVPP 路径。</li><li>媒体模块的调用结果要单独记录。</li></ul></div></div>
 
-<div class="source">图片：<a href="../book/img6/cann_acl_dvpp_stack.png"><code>src/book/img6/cann_acl_dvpp_stack.png</code></a>；正文：<a href="../book/chapter6.md#src-book-chapter6-h1"><code>src/book/chapter6.md</code>「DVPP 在芯片中的位置」</a></div>
+<div class="source">图片：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/book/img6/cann_acl_dvpp_stack.png"><code>src/book/img6/cann_acl_dvpp_stack.png</code></a>；正文：<a href="https://310b.cn/book/chapter6.html#src-book-chapter6-h1"><code>src/book/chapter6.md</code>「DVPP 在芯片中的位置」</a></div>
 
 <!--
 带学生从应用层向下定位。Python 报错可能来自导入、Runtime、驱动或某个媒体模块，不能一律归因于硬件故障。
@@ -96,7 +96,7 @@ DVPP 处理图像和视频的格式转换、缩放、裁剪与编解码，不承
 4. 提交异步任务，在回调线程接收结果。
 5. 按通道、描述符、内存和 ACL 的顺序释放资源；回调线程必须绑定正确的 ACL 上下文。
 
-<div class="source">教材：<a href="../book/chapter6.md#channel-model"><code>src/book/chapter6.md</code>「通道模型」与「回调线程模型」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/venc/venc_minimal.py"><code>samples/chapter6/venc/venc_minimal.py</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter6.html#channel-model"><code>src/book/chapter6.md</code>「通道模型」与「回调线程模型」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/venc/venc_minimal.py"><code>samples/chapter6/venc/venc_minimal.py</code></a></div>
 
 <!--
 强调“创建通道”和“提交任务”是不同阶段。507018 发生在通道创建阶段，不应该被描述成编码质量或推理精度问题。
@@ -116,7 +116,7 @@ DVPP 处理图像和视频的格式转换、缩放、裁剪与编解码，不承
 | 缓冲区大小 | `stride_w × stride_h × 3 / 2` | 小算一段就可能踩坏内存 |
 | 数据搬运 | Host/Device 方向与同步必须匹配 | 提前释放或读取未完成结果 |
 
-<div class="source">教材：<a href="../book/chapter6.md#src-book-chapter6-h4"><code>src/book/chapter6.md</code>「DVPP 内存管理」与「NV12」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/vpc/vpc_minimal.py"><code>samples/chapter6/vpc/vpc_minimal.py</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter6.html#src-book-chapter6-h4"><code>src/book/chapter6.md</code>「DVPP 内存管理」与「NV12」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/vpc/vpc_minimal.py"><code>samples/chapter6/vpc/vpc_minimal.py</code></a></div>
 
 <!--
 用 640 宽举例：640 已经 16 对齐；638 要补到 640。NV12 还必须考虑 UV 平面，因此不能只分配 width×height。
@@ -132,7 +132,7 @@ DVPP 处理图像和视频的格式转换、缩放、裁剪与编解码，不承
 
 编码链路包含格式准备、通道提交和回调取流；回调成功后才得到可读取的码流。
 
-<div class="source">图片：<a href="../book/img6/venc_encode_flow.png"><code>src/book/img6/venc_encode_flow.png</code></a>；正文：<a href="../book/chapter6.md#src-book-chapter6-h14"><code>src/book/chapter6.md</code>「编码流程（端到端）」</a></div>
+<div class="source">图片：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/book/img6/venc_encode_flow.png"><code>src/book/img6/venc_encode_flow.png</code></a>；正文：<a href="https://310b.cn/book/chapter6.html#src-book-chapter6-h14"><code>src/book/chapter6.md</code>「编码流程（端到端）」</a></div>
 
 <!--
 本页只解释设计上的编码链路，不代表当前双板已经编码成功。当前运行结果在下一页，必须明确是失败。
@@ -152,7 +152,7 @@ DVPP 处理图像和视频的格式转换、缩放、裁剪与编解码，不承
 | GOP | 关键帧间隔必须在有效范围 | GOP 为 0 |
 | 像素格式 | 输入为 NV12 | 把 BGR/JPG 直接送入 VENC |
 
-<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/venc/venc_minimal.py"><code>samples/chapter6/venc/venc_minimal.py</code></a>；教材：<a href="../book/chapter6.md#src-book-chapter6-h22"><code>src/book/chapter6.md</code>「通道参数详解」</a></div>
+<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/venc/venc_minimal.py"><code>samples/chapter6/venc/venc_minimal.py</code></a>；教材：<a href="https://310b.cn/book/chapter6.html#src-book-chapter6-h22"><code>src/book/chapter6.md</code>「通道参数详解」</a></div>
 
 <!--
 逐项对照代码中的 create_venc_channel。码率单位、GOP、NV12 和 stride 是最容易在通道创建前就出错的四个对象。
@@ -190,7 +190,7 @@ H.264 Baseline venc_create_channel 失败: 507018 (0x7bc8a)
 
 码流进入 Decoder Pipeline，回调线程交付 NV12；当前双板最小记录没有执行 VDEC，不能写成已通过。
 
-<div class="source">图片：<a href="../book/img6/vdec_channel_model.png"><code>src/book/img6/vdec_channel_model.png</code></a>；正文：<a href="../book/chapter6.md#vdec"><code>src/book/chapter6.md</code>「VDEC—硬件视频解码」</a></div>
+<div class="source">图片：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/book/img6/vdec_channel_model.png"><code>src/book/img6/vdec_channel_model.png</code></a>；正文：<a href="https://310b.cn/book/chapter6.html#vdec"><code>src/book/chapter6.md</code>「VDEC—硬件视频解码」</a></div>
 
 <!--
 不要把 VENC 和 VDEC 写成同一个通道。它们方向相反，回调参数顺序、码流描述和清理顺序都不同。
@@ -236,7 +236,7 @@ VPC 通过只能证明这两条图像处理路径。教材记录的 CANN 8.3.RC1
 4. 预测解码大小，输出 NV12。
 5. 核对闭环尺寸、内容与资源释放；JPEG 结果不能替代 VENC 证据。
 
-<div class="source">教材：<a href="../book/chapter6.md#jpeg"><code>src/book/chapter6.md</code>「JPEG—硬件编解码」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/jpeg/jpeg_minimal.py"><code>samples/chapter6/jpeg/jpeg_minimal.py</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter6.html#jpeg"><code>src/book/chapter6.md</code>「JPEG—硬件编解码」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/jpeg/jpeg_minimal.py"><code>samples/chapter6/jpeg/jpeg_minimal.py</code></a></div>
 
 <!--
 JPEGE 的输出是 JPEG 字节，不是 stream_desc；JPEGD 则从 JPEG 信息推导输出 NV12 大小。两者共用 NV12，但 API 合同不同，也没有 VENC 视频编码的语义。
@@ -258,7 +258,7 @@ JPEGE 的输出是 JPEG 字节，不是 stream_desc；JPEGD 则从 JPEG 信息�
 
 `dvpp_camera` 严格要求硬件路径成立；VENC 失败时应终止该路径，不能改用软编后仍宣称硬编通过。
 
-<div class="source">实现说明：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/WebRTC/README.md"><code>samples/chapter6/WebRTC/README.md</code></a>；正文：<a href="../book/chapter6.md#src-book-chapter6-h145"><code>src/book/chapter6.md</code>「WebRTC 推流性能对比」</a></div>
+<div class="source">实现说明：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/WebRTC/README.md"><code>samples/chapter6/WebRTC/README.md</code></a>；正文：<a href="https://310b.cn/book/chapter6.html#src-book-chapter6-h145"><code>src/book/chapter6.md</code>「WebRTC 推流性能对比」</a></div>
 
 <!--
 这页把 UI、信令、采集、预处理和编码分成五层。当前 507018 阻断的是编码层，浏览器能画出来并不代表后四层通过。
@@ -295,7 +295,7 @@ JPEGE 的输出是 JPEG 字节，不是 stream_desc；JPEGD 则从 JPEG 信息�
 | SHA-256 | `7e0002ba5f7f73d9191e7b6fd044ef71ff1b62698f0186fbd3eee1f60392a69a` |
 | 证据边界 | 仅证明板载前端布局，不证明信令/媒体/VENC |
 
-<div class="source">清单：<a href="screenshots/capture-manifest.json"><code>src/presentation/screenshots/capture-manifest.json</code></a>；截图只使用 demo 数据，不含个人图像。</div>
+<div class="source">清单：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/presentation/screenshots/capture-manifest.json"><code>src/presentation/screenshots/capture-manifest.json</code></a>；截图只使用 demo 数据，不含个人图像。</div>
 
 <!--
 字节数和 SHA-256 用于绑定这张 PNG。清单中的 application digest 绑定 HTTP、client.js 与 styles.css 的组合；它们证明页面资产身份，仍不证明 WebRTC 媒体通过。
@@ -354,7 +354,7 @@ python samples/chapter6/jpeg/jpeg_minimal.py
 4. 回调无结果：查回调线程的 ACL Context、完成条件和队列。
 5. 画面异常：查 NV12 平面、stride、裁剪坐标和颜色转换路径。
 
-<div class="source">依据：<a href="../book/chapter6.md#src-book-chapter6-h8"><code>src/book/chapter6.md</code>「开发注意事项」</a>；VENC：<a href="../book/chapter6.md#src-book-chapter6-h24"><code>「开发过程与常见问题」</code></a></div>
+<div class="source">依据：<a href="https://310b.cn/book/chapter6.html#src-book-chapter6-h8"><code>src/book/chapter6.md</code>「开发注意事项」</a>；VENC：<a href="https://310b.cn/book/chapter6.html#src-book-chapter6-h24"><code>「开发过程与常见问题」</code></a></div>
 
 <!--
 507018 先停在通道创建层。不要因为日志里出现 venc 就继续分析 H.264 码流，因为通道还没有建立。
@@ -376,7 +376,7 @@ python samples/chapter6/jpeg/jpeg_minimal.py
 
 完成标准是另一位同学能复现同一路径，并说明截图、VPC、VENC 和 WebRTC 各自只证明什么。
 
-<div class="source">教材：<a href="../book/chapter6.md"><code>src/book/chapter6.md</code></a>；截图清单：<a href="screenshots/capture-manifest.json"><code>capture-manifest.json</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/README.md"><code>samples/chapter6</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter6.html"><code>src/book/chapter6.md</code></a>；截图清单：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/presentation/screenshots/capture-manifest.json"><code>capture-manifest.json</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter6/README.md"><code>samples/chapter6</code></a></div>
 
 <!--
 最后要求学生同时提交失败证据。当前正确结论是 VPC 通过、H.264 Baseline 两板 `507018`、H.265 与 WebRTC 媒体链 `untested`，而不是“VENC 通过”。

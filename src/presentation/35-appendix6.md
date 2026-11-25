@@ -37,7 +37,7 @@ footer: "附录 6：工具箱与 FAQ"
 
 > 本讲主线：报错 → 模板 → Checklist → FAQ → 版本
 
-<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix6.html"><code>src/appendix/appendix6.md</code></a></div>
 
 <!--
 先给学生路线图；后续每页都对应这里的一项，最后回到小结。
@@ -61,7 +61,7 @@ footer: "附录 6：工具箱与 FAQ"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 内容概览</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix6.html"><code>src/appendix/appendix6.md</code></a> · 内容概览</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -79,7 +79,7 @@ footer: "附录 6：工具箱与 FAQ"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 常见报错速查</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix6.html"><code>src/appendix/appendix6.md</code></a> · 常见报错速查</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -96,7 +96,7 @@ footer: "附录 6：工具箱与 FAQ"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 模型转换参数模板合集</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix6.html"><code>src/appendix/appendix6.md</code></a> · 模型转换参数模板合集</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -115,7 +115,7 @@ footer: "附录 6：工具箱与 FAQ"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 性能与质量 Checklist（执行勾项）</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix6.html"><code>src/appendix/appendix6.md</code></a> · 性能与质量 Checklist（执行勾项）</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -139,7 +139,7 @@ footer: "附录 6：工具箱与 FAQ"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 术语表（扩展）</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix6.html"><code>src/appendix/appendix6.md</code></a> · 术语表（扩展）</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -156,7 +156,7 @@ footer: "附录 6：工具箱与 FAQ"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · FAQ</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix6.html"><code>src/appendix/appendix6.md</code></a> · FAQ</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -173,7 +173,7 @@ footer: "附录 6：工具箱与 FAQ"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a> · 实践任务</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix6.html"><code>src/appendix/appendix6.md</code></a> · 实践任务</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -191,7 +191,7 @@ footer: "附录 6：工具箱与 FAQ"
 
 > 下一讲：进入 CANN 升级与版本配套。
 
-<div class="source">教材：<a href="../appendix/appendix6.md"><code>src/appendix/appendix6.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix6.html"><code>src/appendix/appendix6.md</code></a></div>
 
 <!--
 用三句话收束；提醒学生把未验证项写成 untested 或 blocked。

@@ -37,7 +37,7 @@ footer: "附录 1：开发板环境"
 
 > 本讲主线：硬件 → 系统 → 网络 → 远程 → 验证
 
-<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix1.html"><code>src/appendix/appendix1.md</code></a></div>
 
 <!--
 先给学生路线图；后续每页都对应这里的一项，最后回到小结。
@@ -61,7 +61,7 @@ footer: "附录 1：开发板环境"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 昇腾310B开发板介绍</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix1.html"><code>src/appendix/appendix1.md</code></a> · 昇腾310B开发板介绍</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -78,7 +78,7 @@ footer: "附录 1：开发板环境"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 配件准备</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix1.html"><code>src/appendix/appendix1.md</code></a> · 配件准备</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -95,7 +95,7 @@ footer: "附录 1：开发板环境"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 操作系统安装</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix1.html"><code>src/appendix/appendix1.md</code></a> · 操作系统安装</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -112,7 +112,7 @@ footer: "附录 1：开发板环境"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 启动开发板</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix1.html"><code>src/appendix/appendix1.md</code></a> · 启动开发板</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -136,7 +136,7 @@ footer: "附录 1：开发板环境"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 网络连接</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix1.html"><code>src/appendix/appendix1.md</code></a> · 网络连接</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -153,7 +153,7 @@ footer: "附录 1：开发板环境"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 远程连接 (SSH)</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix1.html"><code>src/appendix/appendix1.md</code></a> · 远程连接 (SSH)</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -170,7 +170,7 @@ footer: "附录 1：开发板环境"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a> · 验证开发环境</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix1.html"><code>src/appendix/appendix1.md</code></a> · 验证开发环境</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -188,7 +188,7 @@ footer: "附录 1：开发板环境"
 
 > 下一讲：进入 Ubuntu 与 Linux 基础操作。
 
-<div class="source">教材：<a href="../appendix/appendix1.md"><code>src/appendix/appendix1.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix1.html"><code>src/appendix/appendix1.md</code></a></div>
 
 <!--
 用三句话收束；提醒学生把未验证项写成 untested 或 blocked。

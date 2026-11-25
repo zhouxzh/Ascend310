@@ -39,7 +39,7 @@ footer: "案例 6：智能小车"
 
 > 本讲主线：硬件 → 模型 → 部署 → 界面 → 验证
 
-<div class="source">教材：<a href="../experiment/case6.md"><code>src/experiment/case6.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case6.html"><code>src/experiment/case6.md</code></a></div>
 
 <!--
 先给学生路线图；后续每页都对应这里的一项，最后回到小结。
@@ -63,7 +63,7 @@ footer: "案例 6：智能小车"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../experiment/case6.md"><code>src/experiment/case6.md</code></a> · 1. 项目简介</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case6.html"><code>src/experiment/case6.md</code></a> · 1. 项目简介</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -80,7 +80,7 @@ footer: "案例 6：智能小车"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../experiment/case6.md"><code>src/experiment/case6.md</code></a> · 2.1. 硬件准备</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case6.html"><code>src/experiment/case6.md</code></a> · 2.1. 硬件准备</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -98,7 +98,7 @@ footer: "案例 6：智能小车"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../experiment/case6.md"><code>src/experiment/case6.md</code></a> · 2.2. 软件环境</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case6.html"><code>src/experiment/case6.md</code></a> · 2.2. 软件环境</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -115,7 +115,7 @@ footer: "案例 6：智能小车"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../experiment/case6.md"><code>src/experiment/case6.md</code></a> · 2.3. 车道线检测原理</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case6.html"><code>src/experiment/case6.md</code></a> · 2.3. 车道线检测原理</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -132,7 +132,7 @@ footer: "案例 6：智能小车"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../experiment/case6.md"><code>src/experiment/case6.md</code></a> · 2.4. 驾驶场景分类</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case6.html"><code>src/experiment/case6.md</code></a> · 2.4. 驾驶场景分类</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -156,7 +156,7 @@ footer: "案例 6：智能小车"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../experiment/case6.md"><code>src/experiment/case6.md</code></a> · 2.5. 模型转换与昇腾部署</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case6.html"><code>src/experiment/case6.md</code></a> · 2.5. 模型转换与昇腾部署</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -173,7 +173,7 @@ footer: "案例 6：智能小车"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../experiment/case6.md"><code>src/experiment/case6.md</code></a> · 2.6. Web 界面</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case6.html"><code>src/experiment/case6.md</code></a> · 2.6. Web 界面</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -186,7 +186,7 @@ footer: "案例 6：智能小车"
 
 <div class="screenshot-grid"><figure><img src="../experiment/img6/case6-board-8t-ui.png" alt="8T 版智能小车 Gradio 页面"><figcaption>8T 板端界面：只证明静态页面与板端服务路径。</figcaption></figure><figure><img src="../experiment/img6/case6-board-20t-ui.png" alt="20T 版智能小车 Gradio 页面"><figcaption>20T 板端界面：与 8T 分栏保存，不合并为同一结论。</figcaption></figure></div>
 
-<div class="source">图片：<a href="../experiment/img6/case6-board-8t-ui.png"><code>src/experiment/img6/case6-board-8t-ui.png</code></a>、<a href="../experiment/img6/case6-board-20t-ui.png"><code>src/experiment/img6/case6-board-20t-ui.png</code></a>；说明：<a href="../experiment/case6.md#src-experiment-case6-board-evidence"><code>src/experiment/case6.md</code>「板端实测记录」</a></div>
+<div class="source">图片：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img6/case6-board-8t-ui.png"><code>src/experiment/img6/case6-board-8t-ui.png</code></a>、<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img6/case6-board-20t-ui.png"><code>src/experiment/img6/case6-board-20t-ui.png</code></a>；说明：<a href="https://310b.cn/experiment/case6.html#src-experiment-case6-board-evidence"><code>src/experiment/case6.md</code>「板端实测记录」</a></div>
 
 <!--
 界面截图只证明页面加载与板端服务路径，不证明车道线准确率、驾驶控制闭环或长期稳定性。8T 与 20T 的证据不能合并排队。
@@ -202,7 +202,7 @@ footer: "案例 6：智能小车"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../experiment/case6.md"><code>src/experiment/case6.md</code></a> · 板端实测记录</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case6.html"><code>src/experiment/case6.md</code></a> · 板端实测记录</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -219,7 +219,7 @@ footer: "案例 6：智能小车"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../experiment/case6.md"><code>src/experiment/case6.md</code></a> · 如何验证系统正常工作</div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case6.html"><code>src/experiment/case6.md</code></a> · 如何验证系统正常工作</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -237,7 +237,7 @@ footer: "案例 6：智能小车"
 
 > 下一讲：用同一方法补齐案例 7 的局域网协同链路。
 
-<div class="source">教材：<a href="../experiment/case6.md"><code>src/experiment/case6.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case6.html"><code>src/experiment/case6.md</code></a></div>
 
 <!--
 用三句话收束；提醒学生把未验证项写成 untested 或 blocked。

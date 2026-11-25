@@ -39,7 +39,7 @@ footer: "附录 3：Python 基础"
 
 > 本讲主线：数据 → 控制流 → 函数 → 文件 → 验证
 
-<div class="source">教材：<a href="../appendix/appendix3.md"><code>src/appendix/appendix3.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix3.html"><code>src/appendix/appendix3.md</code></a></div>
 
 <!--
 先给学生路线图；后续每页都对应这里的一项，最后回到小结。
@@ -63,7 +63,7 @@ footer: "附录 3：Python 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix3.md"><code>src/appendix/appendix3.md</code></a> · 1. 数据、类型与容器</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix3.html"><code>src/appendix/appendix3.md</code></a> · 1. 数据、类型与容器</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -80,7 +80,7 @@ footer: "附录 3：Python 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix3.md"><code>src/appendix/appendix3.md</code></a> · 1.3 列表与元组</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix3.html"><code>src/appendix/appendix3.md</code></a> · 1.3 列表与元组</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -97,7 +97,7 @@ footer: "附录 3：Python 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix3.md"><code>src/appendix/appendix3.md</code></a> · 1.4 字典</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix3.html"><code>src/appendix/appendix3.md</code></a> · 1.4 字典</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -114,7 +114,7 @@ footer: "附录 3：Python 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix3.md"><code>src/appendix/appendix3.md</code></a> · 2. 控制流</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix3.html"><code>src/appendix/appendix3.md</code></a> · 2. 控制流</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -131,7 +131,7 @@ footer: "附录 3：Python 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix3.md"><code>src/appendix/appendix3.md</code></a> · 3. 函数与模型清单</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix3.html"><code>src/appendix/appendix3.md</code></a> · 3. 函数与模型清单</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -155,7 +155,7 @@ footer: "附录 3：Python 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix3.md"><code>src/appendix/appendix3.md</code></a> · 3.7 dataclass</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix3.html"><code>src/appendix/appendix3.md</code></a> · 3.7 dataclass</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -172,7 +172,7 @@ footer: "附录 3：Python 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix3.md"><code>src/appendix/appendix3.md</code></a> · 4. 文件、JSON、命令行与异步</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix3.html"><code>src/appendix/appendix3.md</code></a> · 4. 文件、JSON、命令行与异步</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -189,7 +189,7 @@ footer: "附录 3：Python 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix3.md"><code>src/appendix/appendix3.md</code></a> · 4.3 json.loads 与 json.dumps</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix3.html"><code>src/appendix/appendix3.md</code></a> · 4.3 json.loads 与 json.dumps</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -206,7 +206,7 @@ footer: "附录 3：Python 基础"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix3.md"><code>src/appendix/appendix3.md</code></a> · 5. 调试与验证</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix3.html"><code>src/appendix/appendix3.md</code></a> · 5. 调试与验证</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -224,7 +224,7 @@ footer: "附录 3：Python 基础"
 
 > 下一讲：进入 Vibe Coding 与 DSH。
 
-<div class="source">教材：<a href="../appendix/appendix3.md"><code>src/appendix/appendix3.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix3.html"><code>src/appendix/appendix3.md</code></a></div>
 
 <!--
 用三句话收束；提醒学生把未验证项写成 untested 或 blocked。

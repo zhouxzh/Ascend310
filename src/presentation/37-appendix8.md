@@ -30,7 +30,7 @@ footer: "附录 8：实验异常解析"
 - 哪些对照能排除错误归因？
 - OM 能跨板运行时，如何检查计算结果？
 
-<div class="source">教材：<a href="../appendix/appendix8.md"><code>src/appendix/appendix8.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix8.html"><code>src/appendix/appendix8.md</code></a></div>
 
 ---
 
@@ -122,4 +122,4 @@ footer: "附录 8：实验异常解析"
 
 出现退出码 `139`、设备 reset 或整板重启，应停止当前批次并保留现场。
 
-<div class="source">教材：<a href="../appendix/appendix8.md"><code>附录 8</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix8.html"><code>附录 8</code></a></div>

@@ -269,7 +269,7 @@ completion_tokens <= 1024 - prompt_tokens
 
 ![20T 版 Ascend Edge Chat 前端页面](../experiment/img9/case9-board-20t-ui.png)
 
-<div class="source">图片：<a href="../experiment/img9/case9-board-20t-ui.png"><code>src/experiment/img9/case9-board-20t-ui.png</code></a>；接口证据见 <a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
+<div class="source">图片：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img9/case9-board-20t-ui.png"><code>src/experiment/img9/case9-board-20t-ui.png</code></a>；接口证据见 <a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
 
 <!--
 授课提示：截图只证明页面和本地服务展示路径，不证明回答质量、长上下文或性能。
@@ -283,7 +283,7 @@ completion_tokens <= 1024 - prompt_tokens
 
 ![8T 版 Ascend Edge Chat 前端页面](../experiment/img9/case9-board-8t-ui.png)
 
-<div class="source">图片：<a href="../experiment/img9/case9-board-8t-ui.png"><code>src/experiment/img9/case9-board-8t-ui.png</code></a>；接口证据见 <a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
+<div class="source">图片：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img9/case9-board-8t-ui.png"><code>src/experiment/img9/case9-board-8t-ui.png</code></a>；接口证据见 <a href="https://310b.cn/experiment/case9.html"><code>src/experiment/case9.md</code></a></div>
 
 <!--
 授课提示：页面显示模型健康、默认 64 token、仅可选 64/80 且不可切换；截图不证明中文语义质量或性能。

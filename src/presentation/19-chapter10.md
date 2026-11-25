@@ -18,7 +18,7 @@ footer: "第10章：AI项目交付闭环"
 ## 从需求契约到可回滚的交付证据
 
 
-<div class="source">教材：<a href="../book/chapter10.md"><code>src/book/chapter10.md</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html"><code>src/book/chapter10.md</code></a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD</code></a></div>
 
 <!--
 本章讲的是交付方法，不把 checklist 的存在当成项目已经验收。SSD300 只是贯穿案例，当前课件不宣称它已经完成端到端验收。
@@ -37,7 +37,7 @@ footer: "第10章：AI项目交付闭环"
 
 > 本讲主线：需求 → 指标 → 交付 → 回归
 
-<div class="source">教材：<a href="../book/chapter10.md"><code>src/book/chapter10.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html"><code>src/book/chapter10.md</code></a></div>
 
 <!--
 先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
@@ -67,7 +67,7 @@ footer: "第10章：AI项目交付闭环"
 
 这些是设计输入，不是验收结果。样例入口见 `samples/chapter4/SSD`。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h1"><code>src/book/chapter10.md</code> §10.1</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD/README.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h1"><code>src/book/chapter10.md</code> §10.1</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD/README.md</code></a></div>
 
 <!--
 先说明这是贯穿案例。实验室告警、SSD300 和指标目标用于组织方法，不代表当前仓库已经完成摄像头、模型和告警系统的联合验收。
@@ -90,7 +90,7 @@ footer: "第10章：AI项目交付闭环"
 
 输出应是版本化 `requirement.yaml`，所有变更留下审批记录。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h2"><code>src/book/chapter10.md</code> §10.2「需求澄清 Canvas」</a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h2"><code>src/book/chapter10.md</code> §10.2「需求澄清 Canvas」</a></div>
 
 <!--
 Canvas 不是填表练习。每一项都要能对应验收证据。例如“低光误报”必须对应评测样本、指标和处置策略，而不是只写在风险栏。
@@ -111,7 +111,7 @@ Canvas 不是填表练习。每一项都要能对应验收证据。例如“低�
 
 教材中的 `<80 ms`、`≥25 FPS`、`mAP≥0.6` 是示例目标，不是本课件测得的 SSD300 结果。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h3"><code>src/book/chapter10.md</code> §10.3「指标分层与优先级」</a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h3"><code>src/book/chapter10.md</code> §10.3「指标分层与优先级」</a></div>
 
 <!--
 先 A 后 B 再 C 是排序方法，不是让所有项目照抄数值。最终阈值必须由场景、硬件和风险共同决定，并绑定评测协议。
@@ -129,7 +129,7 @@ Canvas 不是填表练习。每一项都要能对应验收证据。例如“低�
 - 同时保存原始输出、指标汇总与失败日志。
 - Baseline 不是一次性能数字，而是可重放的实验条件；快照写入 `baseline/<date>-<commit>/metrics.json`。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h4"><code>src/book/chapter10.md</code> §10.4「Baseline 策略与控制变量法」</a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h4"><code>src/book/chapter10.md</code> §10.4「Baseline 策略与控制变量法」</a></div>
 
 <!--
 没有 Baseline 的优化只是故事。先问与哪个版本、在什么协议下比较，再看数字是否值得讨论。
@@ -151,7 +151,7 @@ Canvas 不是填表练习。每一项都要能对应验收证据。例如“低�
 
 评测集版本变化后，旧结果不能直接与新结果拼接。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h5"><code>src/book/chapter10.md</code> §10.5「评测集设计原则」</a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h5"><code>src/book/chapter10.md</code> §10.5「评测集设计原则」</a></div>
 
 <!--
 强调“新样本不能静默替换旧样本”。替换后必须生成新评测集版本，并明确旧版本是否继续回归。
@@ -172,7 +172,7 @@ Canvas 不是填表练习。每一项都要能对应验收证据。例如“低�
 
 看板使用 Backlog → Doing → Review → Bench → Done；未进入 Bench 并留下报告的任务不能进入 Done。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h6"><code>src/book/chapter10.md</code> §10.6「迭代计划与看板」</a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h6"><code>src/book/chapter10.md</code> §10.6「迭代计划与看板」</a></div>
 
 <!--
 Review 不是口头点头，Done 也不是代码合并。性能或精度任务要通过约定脚本并留下报告才能完成。
@@ -194,7 +194,7 @@ Review 不是口头点头，Done 也不是代码合并。性能或精度任务�
 | Changelog | 版本差异与已知问题 | 每次发布 |
 | Risk Log | 风险、概率、缓解和状态 | 持续更新 |
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h7"><code>src/book/chapter10.md</code> §10.7「资产沉淀文档体系」</a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h7"><code>src/book/chapter10.md</code> §10.7「资产沉淀文档体系」</a></div>
 
 <!--
 文档不是发布后的补作业。Model Card 和评测报告应在发布前生成，并与同一版本、同一提交关联。
@@ -226,7 +226,7 @@ Review 不是口头点头，Done 也不是代码合并。性能或精度任务�
 
 发布目录按版本冻结；修复必须生成新版本，不能静默覆盖旧产物。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h8"><code>src/book/chapter10.md</code> §10.8「交付目录与不可变产物」</a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h8"><code>src/book/chapter10.md</code> §10.8「交付目录与不可变产物」</a></div>
 
 <!--
 manifest.json 是发布包的身份证。路径存在不等于内容正确，必须用哈希、版本和契约共同绑定。
@@ -242,7 +242,7 @@ manifest.json 是发布包的身份证。路径存在不等于内容正确，必
 
 图片只帮助梳理交付对象；SSD300 是否通过，仍要由当前版本的实测证据回答。
 
-<div class="source">图片：<a href="../book/img4/inference.png"><code>src/book/img4/inference.png</code></a>；正文：<a href="../book/chapter4.md#src-book-chapter4-h21"><code>src/book/chapter4.md</code>「模型推理开发流程解析」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD"><code>samples/chapter4/SSD</code></a></div>
+<div class="source">图片：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/book/img4/inference.png"><code>src/book/img4/inference.png</code></a>；正文：<a href="https://310b.cn/book/chapter4.html#src-book-chapter4-h21"><code>src/book/chapter4.md</code>「模型推理开发流程解析」</a>；样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD"><code>samples/chapter4/SSD</code></a></div>
 
 <!--
 这张教材图描述通用推理流程，不是本章项目的验收截图。不要把架构图、示意图或样例路径当成板端执行结果。
@@ -265,7 +265,7 @@ manifest.json 是发布包的身份证。路径存在不等于内容正确，必
 | 配置 | 模型、依赖与哈希 | 与发布 manifest 一致 |
 | 回滚 | 上一版本恢复 | 按演练步骤恢复并验证 |
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h9"><code>src/book/chapter10.md</code> §10.9「上线前综合 Checklist」</a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h9"><code>src/book/chapter10.md</code> §10.9「上线前综合 Checklist」</a></div>
 
 <!--
 表格是模板，不是已经打勾的验收单。每一项都需要命令、日志、报告或截图作为证据；没有证据的项应保持未通过或未执行。
@@ -286,7 +286,7 @@ manifest.json 是发布包的身份证。路径存在不等于内容正确，必
 
 替换评测样本必须创建新版本。教材中的 `KL > 0.05` 是报警阈值示例，不是本章实测结果。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h10"><code>src/book/chapter10.md</code> §10.10「验收、回归与漂移监测」</a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h10"><code>src/book/chapter10.md</code> §10.10「验收、回归与漂移监测」</a></div>
 
 <!--
 漂移监测关注模型输出或业务分布变化，不等于单次精度测试。报警后先保留输入、版本与日志，再判断是数据变化、配置变化还是模型问题。
@@ -308,7 +308,7 @@ manifest.json 是发布包的身份证。路径存在不等于内容正确，必
 
 决策日志另记背景、备选方案、选择理由、证据和复审日期。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h11"><code>src/book/chapter10.md</code> §10.11「风险管理与决策日志」</a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h11"><code>src/book/chapter10.md</code> §10.11「风险管理与决策日志」</a></div>
 
 <!--
 风险登记不是免责声明，ADR 也不是会议纪要。两者都要有负责人、证据和复核条件，才能在版本迭代后继续使用。
@@ -329,7 +329,7 @@ manifest.json 是发布包的身份证。路径存在不等于内容正确，必
 
 SSD300 的真实验收需要当前版本的模型哈希、板端运行日志、评测报告、长稳记录和回滚演练。
 
-<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD/README.md</code></a>；教材：<a href="../book/chapter10.md#src-book-chapter10-h1"><code>src/book/chapter10.md</code> 第10章</a></div>
+<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD/README.md</code></a>；教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h1"><code>src/book/chapter10.md</code> 第10章</a></div>
 
 <!--
 这一页专门防止把“存在样例入口”写成“系统已经验收”。下载脚本、推理脚本、架构图和 Checklist 都只是资源或方法，不是实际通过证据。
@@ -347,7 +347,7 @@ SSD300 的真实验收需要当前版本的模型哈希、板端运行日志、�
 4. 生成 Model Card、评测报告和发布 manifest。
 5. 模拟一个 Checklist 未通过项，完成风险与回滚记录；评价重点是证据可复现，而不是“代码已写完”。
 
-<div class="source">教材：<a href="../book/chapter10.md#src-book-chapter10-h13"><code>src/book/chapter10.md</code> §10.13「实践任务」</a>；样例入口：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/book/chapter10.html#src-book-chapter10-h13"><code>src/book/chapter10.md</code> §10.13「实践任务」</a>；样例入口：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/chapter4/SSD/README.md"><code>samples/chapter4/SSD</code></a></div>
 
 <!--
 最终交付必须同时包含通过项和未通过项。没有版本、哈希、原始日志和回滚记录的“全部通过”不构成可审查交付。

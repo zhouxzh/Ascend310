@@ -187,7 +187,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 ![Orange Pi AIpro 8T 开发板](../appendix/img1/aipro.png)
 
-<div class="source">图片：<a href="../appendix/img1/aipro.png"><code>src/appendix/img1/aipro.png</code></a>；说明：<a href="https://310b.cn/appendix/appendix1.html#src-appendix-appendix1-h1"><code>src/appendix/appendix1.md</code></a></div>
+<div class="source">图片：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/appendix/img1/aipro.png"><code>src/appendix/img1/aipro.png</code></a>；说明：<a href="https://310b.cn/appendix/appendix1.html#src-appendix-appendix1-h1"><code>src/appendix/appendix1.md</code></a></div>
 
 <!--
 这张图只证明 OrangePi AIpro 8T 整板外观，不代表 20T 板。正文的 310B 8T 模块表列出 LPDDR4X 4GB，而画册材料写整板可配 8GB/16GB，课堂必须区分模块规格与整板配置。
@@ -202,7 +202,7 @@ footer: "第1章：昇腾310B边缘计算基础"
 
 <div class="split"><figure><img src="../appendix/img1/1.png" alt="Orange Pi AIpro 前面板接口标注图"><figcaption>真实开发板的正面接口标注，不代表其他板卡型号。</figcaption></figure><div><ul><li>显示：两路 HDMI，另有 MIPI-DSI。</li><li>视觉：两路 MIPI-CSI，可外接兼容摄像头。</li><li>调试：Micro USB 串口，不依赖图形桌面。</li><li>扩展：TF、M.2、千兆网口与 USB 3.0。</li></ul></div></div>
 
-<div class="source">图片：<a href="../appendix/img1/1.png"><code>src/appendix/img1/1.png</code></a>；接口：<a href="https://310b.cn/appendix/appendix1.html#src-appendix-appendix1-h1"><code>src/appendix/appendix1.md</code></a></div>
+<div class="source">图片：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/appendix/img1/1.png"><code>src/appendix/img1/1.png</code></a>；接口：<a href="https://310b.cn/appendix/appendix1.html#src-appendix-appendix1-h1"><code>src/appendix/appendix1.md</code></a></div>
 
 <!--
 先问实验需要哪些接口，再看板子是否具备。Type-C 的 USB 3.0 兼容边界、MIPI 摄像头型号和供电规格都要单独核对。

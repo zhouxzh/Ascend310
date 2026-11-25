@@ -18,7 +18,7 @@ footer: "案例 7：智能相册"
 ## 从照片索引到局域网设备协同
 
 
-<div class="source">依据：<a href="../experiment/case7.md">src/experiment/case7.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/README.md"><code>samples/case7</code></a></div>
+<div class="source">依据：<a href="https://310b.cn/experiment/case7.html">src/experiment/case7.md</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/README.md"><code>samples/case7</code></a></div>
 
 <!--
 案例7不是单个图像分类脚本，而是手机上传、NPU索引、语义检索、触摸屏显示和ESP32电子纸拉图的完整系统。
@@ -37,7 +37,7 @@ footer: "案例 7：智能相册"
 
 > 本讲主线：链路 → 组件 → 索引 → 协同
 
-<div class="source">教材：<a href="../experiment/case7.md"><code>src/experiment/case7.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case7.html"><code>src/experiment/case7.md</code></a></div>
 
 <!--
 先给出本讲路线图；后续每一段都对应这里的一行，最后回到路线收束。
@@ -67,7 +67,7 @@ footer: "案例 7：智能相册"
 
 生产推理只接受已准入的Ascend OM，不提供CPU或PyTorch回退。
 
-<div class="source">教材：<a href="../experiment/case7.md#案例目标与问题定义"><code>src/experiment/case7.md</code>「案例目标与问题定义」</a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case7.html#案例目标与问题定义"><code>src/experiment/case7.md</code>「案例目标与问题定义」</a></div>
 
 <!--
 先按五段建立系统全景。每段都有自己的数据和证据，不能用最终页面替代索引或设备拉图验证。
@@ -81,7 +81,7 @@ footer: "案例 7：智能相册"
 
 ![案例7局域网相册网络架构](../experiment/img7/network-architecture.png)
 
-<div class="source">图片：<a href="../experiment/img7/network-architecture.png"><code>src/experiment/img7/network-architecture.png</code></a>；出处：<a href="../experiment/case7.md#系统总体架构"><code>src/experiment/case7.md</code>「系统总体架构」</a></div>
+<div class="source">图片：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img7/network-architecture.png"><code>src/experiment/img7/network-architecture.png</code></a>；出处：<a href="https://310b.cn/experiment/case7.html#系统总体架构"><code>src/experiment/case7.md</code>「系统总体架构」</a></div>
 
 <!--
 客户端只通过HTTP访问服务。FastAPI连接SQLite、FAISS、NPU运行时和按需渲染器，设备不直接接触模型或任意文件路径。
@@ -95,7 +95,7 @@ footer: "案例 7：智能相册"
 
 ![案例7程序完整流程](../experiment/img7/program-flow.png)
 
-<div class="source">图片：<a href="../experiment/img7/program-flow.png"><code>src/experiment/img7/program-flow.png</code></a>；出处：<a href="../experiment/case7.md#pdf-版结构图"><code>src/experiment/case7.md</code>「PDF版结构图」</a></div>
+<div class="source">图片：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/experiment/img7/program-flow.png"><code>src/experiment/img7/program-flow.png</code></a>；出处：<a href="https://310b.cn/experiment/case7.html#pdf-版结构图"><code>src/experiment/case7.md</code>「PDF版结构图」</a></div>
 
 <!--
 服务启动先检查CANN、模型hash和索引，再开放上传、搜索、显示和设备接口。任何一部分未就绪都应显式暴露状态。
@@ -117,7 +117,7 @@ footer: "案例 7：智能相册"
 
 SQLite里的embedding与FAISS索引必须由同一批次、同一模型ID保持可重建关系。
 
-<div class="source">教材：<a href="../experiment/case7.md#核心数据模型"><code>src/experiment/case7.md</code>「核心数据模型」</a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case7.html#核心数据模型"><code>src/experiment/case7.md</code>「核心数据模型」</a></div>
 
 <!--
 SQLite是文件与元数据的关系索引，FAISS是可重建检索缓存。不要把FAISS当作唯一真源，也不要混用模型空间。
@@ -137,7 +137,7 @@ SQLite是文件与元数据的关系索引，FAISS是可重建检索缓存。不
 
 ResNet50没有文本编码器。三个模型的向量维度和坐标空间不同，不能相加或共用同一个FAISS索引。
 
-<div class="source">教材：<a href="../experiment/case7.md#多模型语义检索方法"><code>src/experiment/case7.md</code>「多模型语义检索方法」</a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case7.html#多模型语义检索方法"><code>src/experiment/case7.md</code>「多模型语义检索方法」</a></div>
 
 <!--
 按“图像、中文文本、英文文本、相似图”选择模型。模型ID是API和索引的硬边界。
@@ -155,7 +155,7 @@ ResNet50没有文本编码器。三个模型的向量维度和坐标空间不同
 - 用户手动选择时必须检查模型已准入且合同匹配。
 - 所有候选向量先做L2归一化，再在各自索引内检索。
 
-<div class="source">教材：<a href="../experiment/case7.md#自动路由"><code>src/experiment/case7.md</code>「自动路由」</a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case7.html#自动路由"><code>src/experiment/case7.md</code>「自动路由」</a></div>
 
 <!--
 客户端可以表达查询语言或模型ID，但真实路径由服务端注册表决定。分数只在同一模型空间内有排序意义。
@@ -182,7 +182,7 @@ ResNet50没有文本编码器。三个模型的向量维度和坐标空间不同
 - 每个模型拥有独立`IndexIDMap2`。
 - 上传任务完成三模型索引后才标记`completed`。
 
-<div class="source">教材：<a href="../experiment/case7.md#核心数据模型"><code>src/experiment/case7.md</code>「核心数据模型」</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/photo_index.py"><code>samples/case7/photo_index.py</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case7.html#核心数据模型"><code>src/experiment/case7.md</code>「核心数据模型」</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/photo_index.py"><code>samples/case7/photo_index.py</code></a></div>
 
 <!--
 FAISS是派生缓存，SQLite与受管文件才是可恢复的组合。模型变化时需要建立新索引，不能沿用旧模型向量。
@@ -204,7 +204,7 @@ FAISS是派生缓存，SQLite与受管文件才是可恢复的组合。模型变
 
 没有当前准入报告的模型不能被服务选择，也不能以CPU结果替代。
 
-<div class="source">教材：<a href="../experiment/case7.md#昇腾-310b-模型迁移方法"><code>src/experiment/case7.md</code>「昇腾310B模型迁移方法」</a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case7.html#昇腾-310b-模型迁移方法"><code>src/experiment/case7.md</code>「昇腾310B模型迁移方法」</a></div>
 
 <!--
 准入是模型、板卡、版本和查询合同的联合结论。文件存在、ATC成功或单次输出有限都只是其中一层。
@@ -222,7 +222,7 @@ FAISS是派生缓存，SQLite与受管文件才是可恢复的组合。模型变
 - 上传索引任务与即时查询串行化。
 - 模型缺失、hash错误或ACL失败直接报错，不回退CPU。
 
-<div class="source">教材：<a href="../experiment/case7.md#npu-运行时与串行资源管理"><code>src/experiment/case7.md</code>「NPU运行时与串行资源管理」</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/embedding_backend.py"><code>samples/case7/embedding_backend.py</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case7.html#npu-运行时与串行资源管理"><code>src/experiment/case7.md</code>「NPU运行时与串行资源管理」</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/embedding_backend.py"><code>samples/case7/embedding_backend.py</code></a></div>
 
 <!--
 单锁会降低吞吐，但能控制内存峰值和模型切换。生产回退会掩盖准入失败，因此必须失败关闭。
@@ -236,7 +236,7 @@ FAISS是派生缓存，SQLite与受管文件才是可恢复的组合。模型变
 
 ![案例7静态相册搜索页（8T，1920×1080，空库）](screenshots/cases/case7-album-search-1920x1080.png)
 
-<div class="source">截图：<code>case7-album-search-1920x1080.png</code>；来源：<a href="screenshots/capture-manifest.json"><code>capture-manifest.json</code></a></div>
+<div class="source">截图：<code>case7-album-search-1920x1080.png</code>；来源：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/presentation/screenshots/capture-manifest.json"><code>capture-manifest.json</code></a></div>
 
 <!--
 画面只加载了案例7的web/index.html静态前端。顶部服务异常，天气接口404，主区域没有照片，NPU状态是排队准备中。不能把空库解释成检索结果。
@@ -260,7 +260,7 @@ FAISS是派生缓存，SQLite与受管文件才是可恢复的组合。模型变
 
 > 空主区域与服务异常只能证明后端未连接，不能解释成“图库为空”或“搜索无结果”。
 
-<div class="source">清单：<a href="screenshots/capture-manifest.json"><code>capture-manifest.json</code> / case7-album-search</a></div>
+<div class="source">清单：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/presentation/screenshots/capture-manifest.json"><code>capture-manifest.json</code> / case7-album-search</a></div>
 
 <!--
 五组字段必须一起出现。空主区域、服务异常和天气404是后端未连接的证据，不是“搜索无结果”或“图库为空”的业务结论。
@@ -282,7 +282,7 @@ FAISS是派生缓存，SQLite与受管文件才是可恢复的组合。模型变
 
 因此截图不能证明上传、索引、搜索、照片选择或设备拉图成功。
 
-<div class="source">证据边界：<a href="screenshots/capture-manifest.json"><code>case7-album-search</code> evidenceBoundary</a></div>
+<div class="source">证据边界：<a href="https://github.com/zhouxzh/Ascend310/blob/main/src/presentation/screenshots/capture-manifest.json"><code>case7-album-search</code> evidenceBoundary</a></div>
 
 <!--
 这是案例7最重要的证据边界页。空页面不是搜索零命中，而是没有后端数据源；不能写任何检索成功或准确率。
@@ -300,7 +300,7 @@ FAISS是派生缓存，SQLite与受管文件才是可恢复的组合。模型变
 - 相似图使用独立ResNet50索引。
 - 上一张、下一张、暂停和轮播状态由服务端持久化。
 
-<div class="source">教材：<a href="../experiment/case7.md#触摸屏交互设计"><code>src/experiment/case7.md</code>「触摸屏交互设计」</a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case7.html#触摸屏交互设计"><code>src/experiment/case7.md</code>「触摸屏交互设计」</a></div>
 
 <!--
 当前截图只覆盖1920×1080空库页面。其他视口、照片存在状态、搜索结果和触摸操作仍需独立捕获和验收。
@@ -322,7 +322,7 @@ FAISS是派生缓存，SQLite与受管文件才是可恢复的组合。模型变
 
 E6 dry-run只证明旋转、裁剪、量化和192000字节帧协议，不证明真实屏幕刷新。
 
-<div class="source">教材：<a href="../experiment/case7.md#esp32-与-photopainter"><code>src/experiment/case7.md</code>「ESP32与PhotoPainter」</a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case7.html#esp32-与-photopainter"><code>src/experiment/case7.md</code>「ESP32与PhotoPainter」</a></div>
 
 <!--
 局域网上“发现设备”“注册成功”“设备主动拉图”和“面板实际刷新”是四个状态，不能合并。
@@ -340,7 +340,7 @@ E6 dry-run只证明旋转、裁剪、量化和192000字节帧协议，不证明�
 - 选择结果以`selection_revision`持久化。
 - 连续切图复用预选队列，避免每次重复加载模型。
 
-<div class="source">教材：<a href="../experiment/case7.md#智能选图与天气方法"><code>src/experiment/case7.md</code>「智能选图与天气方法」</a></div>
+<div class="source">教材：<a href="https://310b.cn/experiment/case7.html#智能选图与天气方法"><code>src/experiment/case7.md</code>「智能选图与天气方法」</a></div>
 
 <!--
 选图是多个信号组合后的确定性状态，不是由LLM随意生成。当前天气404和空库使这部分无法进入业务验证。
@@ -363,7 +363,7 @@ E6 dry-run只证明旋转、裁剪、量化和192000字节帧协议，不证明�
 
 页面能打开只对应第一列的一部分，不是整条相册链路通过。
 
-<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/README.md"><code>samples/case7/README.md</code> 检查与重启</a>；教材：<a href="../experiment/case7.md#测试、性能与验收方法"><code>src/experiment/case7.md</code> §测试</a></div>
+<div class="source">样例：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/README.md"><code>samples/case7/README.md</code> 检查与重启</a>；教材：<a href="https://310b.cn/experiment/case7.html#测试、性能与验收方法"><code>src/experiment/case7.md</code> §测试</a></div>
 
 <!--
 按健康、索引、搜索、显示、设备拉图的顺序验收。每一步都有独立接口和原始证据。
@@ -403,7 +403,7 @@ E6 dry-run只证明旋转、裁剪、量化和192000字节帧协议，不证明�
 
 当前只可确认静态前端加载；其余四层必须重新执行并保留原始日志。
 
-<div class="source">作业：<a href="../experiment/case7.md#测试、性能与验收方法"><code>src/experiment/case7.md</code> §测试</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/README.md"><code>samples/case7</code></a></div>
+<div class="source">作业：<a href="https://310b.cn/experiment/case7.html#测试、性能与验收方法"><code>src/experiment/case7.md</code> §测试</a>；实现：<a href="https://github.com/zhouxzh/Ascend310/blob/main/samples/case7/README.md"><code>samples/case7</code></a></div>
 
 <!--
 最终要求学生逐层勾选。空库截图不能填“搜索”或“设备”两栏，后端未连接时也不能填任何NPU证据。

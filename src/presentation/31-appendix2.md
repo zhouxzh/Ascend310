@@ -37,7 +37,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 本讲主线：命令 → 权限 → 网络 → 远程 → 排障
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a></div>
 
 <!--
 先给学生路线图；后续每页都对应这里的一项，最后回到小结。
@@ -61,7 +61,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a> · 2. Ubuntu 与 Linux 基础</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a> · 2. Ubuntu 与 Linux 基础</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -78,7 +78,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a> · 3. 文件系统、路径与常用命令</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a> · 3. 文件系统、路径与常用命令</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -95,7 +95,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a> · 4. 用户、组、权限、sudo 与安全删除</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a> · 4. 用户、组、权限、sudo 与安全删除</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -112,7 +112,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a> · 6. APT、换源、Conda、pip 与 Python 路径</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a> · 6. APT、换源、Conda、pip 与 Python 路径</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -129,7 +129,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a> · 7. 网络、静态 IP、WiFi、热点与同网段检查</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a> · 7. 网络、静态 IP、WiFi、热点与同网段检查</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -153,7 +153,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a> · 8. SSH 远程命令行控制</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a> · 8. SSH 远程命令行控制</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -170,7 +170,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a> · 10. NFS、SCP 与 rsync</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a> · 10. NFS、SCP 与 rsync</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -187,7 +187,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a> · 13. CANN、PyACL、NPU、ATC 与 OM</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a> · 13. CANN、PyACL、NPU、ATC 与 OM</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -204,7 +204,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a> · 14. 板端设备、服务、日志、测试与证据边界</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a> · 14. 板端设备、服务、日志、测试与证据边界</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -221,7 +221,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a> · 15. 故障排查与禁止命令模式</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a> · 15. 故障排查与禁止命令模式</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -239,7 +239,7 @@ footer: "附录 2：Ubuntu 教程"
 
 > 下一讲：进入 Python 编程基础。
 
-<div class="source">教材：<a href="../appendix/appendix2.md"><code>src/appendix/appendix2.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix2.html"><code>src/appendix/appendix2.md</code></a></div>
 
 <!--
 用三句话收束；提醒学生把未验证项写成 untested 或 blocked。

@@ -37,7 +37,7 @@ footer: "附录 7：CANN 升级"
 
 > 本讲主线：版本层次 → 配套查询 → 门禁 → 升级 → 验收
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a></div>
 
 <!--
 先给学生路线图；后续每页都对应这里的一项，最后回到小结。
@@ -61,7 +61,7 @@ footer: "附录 7：CANN 升级"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a> · 本附录解决的问题</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a> · 本附录解决的问题</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -78,7 +78,7 @@ footer: "附录 7：CANN 升级"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a> · 教程路线与已验证组合</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a> · 教程路线与已验证组合</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -95,7 +95,7 @@ footer: "附录 7：CANN 升级"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a> · 软件栈中的版本层次</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a> · 软件栈中的版本层次</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -111,7 +111,7 @@ footer: "附录 7：CANN 升级"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a> · 官方配套查询的使用方法</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a> · 官方配套查询的使用方法</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -128,7 +128,7 @@ footer: "附录 7：CANN 升级"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a> · 升级前的准备与门禁</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a> · 升级前的准备与门禁</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -152,7 +152,7 @@ footer: "附录 7：CANN 升级"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a> · 共用安装与升级操作</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a> · 共用安装与升级操作</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -169,7 +169,7 @@ footer: "附录 7：CANN 升级"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a> · 升级后的统一验收顺序</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a> · 升级后的统一验收顺序</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -186,7 +186,7 @@ footer: "附录 7：CANN 升级"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a> · 回退与故障处理</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a> · 回退与故障处理</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -203,7 +203,7 @@ footer: "附录 7：CANN 升级"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a> · 面向本仓库案例的升级清单</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a> · 面向本仓库案例的升级清单</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -219,7 +219,7 @@ footer: "附录 7：CANN 升级"
 
 > 本页结论要能回到教材原文、命令输出或板端记录。
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a> · 版本记录模板</div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a> · 版本记录模板</div>
 
 <!--
 授课提示：按本页要点带读；关键数字和通过结论以教材正文与板端记录为准。
@@ -237,7 +237,7 @@ footer: "附录 7：CANN 升级"
 
 > 下一讲：回到案例，按新版本重新验证关键链路。
 
-<div class="source">教材：<a href="../appendix/appendix7.md"><code>src/appendix/appendix7.md</code></a></div>
+<div class="source">教材：<a href="https://310b.cn/appendix/appendix7.html"><code>src/appendix/appendix7.md</code></a></div>
 
 <!--
 用三句话收束；提醒学生把未验证项写成 untested 或 blocked。
