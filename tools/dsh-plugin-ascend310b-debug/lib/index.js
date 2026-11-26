@@ -176,7 +176,7 @@ const CATEGORY_FACT_KEYS = Object.freeze({
 		'hostname', 'ipAddress', 'macAddress', 'machineId', 'boardModel', 'os', 'osVersion', 'kernel', 'arch',
 		'soc', 'chipName', 'socTier', 'health', 'temperatureC', 'powerW', 'memoryUsedMb', 'memoryTotalMb',
 		'npuSmiPath', 'npuSmiVersion', 'cannVersion', 'cannPackageVersion', 'driverVersion', 'cannLatestPath',
-		'ascendDriverPath', 'setEnvPresent', 'atcOnPath', 'deviceNodes', 'kernelModules', 'storage'
+		'ascendDriverPath', 'setEnvPresent', 'atcOnPath', 'aclImport', 'aclImportSourced', 'deviceNodes', 'kernelModules', 'storage'
 	],
 	camera: ['videoDevices', 'videoDetails', 'videoFormats', 'usbDevices'],
 	audio: [

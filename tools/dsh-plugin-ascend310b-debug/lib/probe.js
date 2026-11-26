@@ -251,7 +251,7 @@ export function buildSystemProbeScript() {
 		'npu_smi_path', 'npu_smi_version', 'npu_smi_info', 'npu_smi_board',
 		'os_sp', 'dt_model', 'ascend_toolkit', 'ascend_driver',
 		'cann_version_cfg', 'cann_version_info', 'driver_version_info', 'env',
-		'atc_version', 'storage_devices', 'storage_usage', 'storage_mmc',
+		'atc_version', 'acl_import', 'acl_import_sourced', 'storage_devices', 'storage_usage', 'storage_mmc',
 		'devices', 'mac', 'machine_id', 'modules', 'health'
 	], { includeNpuSmi: true });
 }

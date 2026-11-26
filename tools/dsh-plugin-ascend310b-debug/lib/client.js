@@ -375,7 +375,7 @@ window.__ModuleLoader__.load({
 			"hostname", "ipAddress", "macAddress", "machineId", "boardModel", "os", "osVersion", "kernel", "arch",
 			"soc", "chipName", "socTier", "health", "temperatureC", "powerW", "memoryUsedMb", "memoryTotalMb",
 			"npuSmiPath", "npuSmiVersion", "cannVersion", "cannPackageVersion", "driverVersion", "cannLatestPath",
-			"ascendDriverPath", "setEnvPresent", "atcOnPath", "deviceNodes", "kernelModules", "storage"
+			"ascendDriverPath", "setEnvPresent", "atcOnPath", "aclImport", "aclImportSourced", "deviceNodes", "kernelModules", "storage"
 		];
 
 		function mergeCategoryFacts(previous, next, category) {
@@ -3205,6 +3205,10 @@ window.__ModuleLoader__.load({
 					.sort();
 				return stamps.length > 0 ? stamp(stamps[stamps.length - 1]) : "更新时间未记录";
 			};
+			const categorySource = (label, ...categories) => {
+				const refreshed = categories.some((category) => typeof payload.categoryUpdatedAt?.[category] === "string");
+				return `${label} · ${refreshed ? categoryUpdated(...categories) : "未刷新（请在对应页面更新）"}`;
+			};
 			const memoryUsed = board.memoryUsedMb ?? facts.memoryUsedMb?.value;
 			const memoryTotal = board.memoryTotalMb ?? facts.memoryTotalMb?.value;
 			const memoryValue =
@@ -3295,9 +3299,9 @@ window.__ModuleLoader__.load({
 						h(Card, { label: "CANN", value: factValue(payload, "cannVersion"), source: facts.cannVersion?.source ?? "未采集" }),
 						h(Card, { label: "驱动", value: factValue(payload, "driverVersion"), source: facts.driverVersion?.source ?? "未采集" }),
 						h(Card, { label: "PyACL", value: factValue(payload, "aclImport"), source: "import acl" }),
-						h(Card, { label: "摄像头", value: peripherals.cameras.length > 0 ? `${peripherals.cameras.length} 个节点` : null, source: `V4L2 · ${categoryUpdated("camera")}` }),
-						h(Card, { label: "音频设备", value: peripherals.playback.length + peripherals.capture.length + peripherals.sinks.length > 0 ? `${peripherals.playback.length + peripherals.capture.length + peripherals.sinks.length} 项` : null, source: `ALSA/Pulse · ${categoryUpdated("audio")}` }),
-						h(Card, { label: "USB 外设", value: peripherals.usb.length > 0 ? `${peripherals.usb.length} 个` : null, source: `USB · ${categoryUpdated("camera", "audio")}` })
+						h(Card, { label: "摄像头", value: peripherals.cameras.length > 0 ? `${peripherals.cameras.length} 个节点` : null, source: categorySource("V4L2", "camera") }),
+						h(Card, { label: "音频设备", value: peripherals.playback.length + peripherals.capture.length + peripherals.sinks.length > 0 ? `${peripherals.playback.length + peripherals.capture.length + peripherals.sinks.length} 项` : null, source: categorySource("ALSA/Pulse", "audio") }),
+						h(Card, { label: "USB 外设", value: peripherals.usb.length > 0 ? `${peripherals.usb.length} 个` : null, source: categorySource("USB", "camera", "audio") })
 					),
 					h(
 						"div",

@@ -98,6 +98,7 @@ check(identityScript.includes('abs_section mac'), '轻量发现脚本必须读�
 check(identityScript.includes('abs_section machine_id'), '轻量发现脚本必须保留 machine-id 作为历史证据');
 check(!identityScript.includes('abs_section ascend_env'), '轻量发现脚本不应等待完整 CANN/Python 环境检查');
 check(!identityScript.includes('abs_section video_devices'), '轻量发现脚本不应枚举音视频设备');
+
 equal(parseIpAddress('10.0.0.100 2001:db8::1\n'), '10.0.0.100', 'IP 解析应优先使用 IPv4');
 const macProbe = parseProbeOutput(
 	'===ABS_BEGIN:mac===\neth0=c0:74:2b:fd:dd:7a\nwlan0=aa:bb:cc:dd:ee:ff\n===ABS_END:mac===\n===ABS_BEGIN:machine_id===\nabc123\n===ABS_END:machine_id===\n'
@@ -303,6 +304,7 @@ check(audioScript.includes('abs_section bluetooth_info'), '音频专用刷新应
 check(!audioScript.includes('abs_section npu_smi_info'), '音频专用刷新不应执行 NPU 探测');
 check(!audioScript.includes('abs_section video_formats'), '音频专用刷新不应枚举摄像头格式');
 const systemScript = buildSystemProbeScript();
+check(systemScript.includes('abs_section acl_import') && systemScript.includes('abs_section acl_import_sourced'), 'system refresh must refresh PyACL import evidence');
 check(systemScript.includes('abs_section npu_smi_info'), '系统刷新应包含 NPU 信息');
 check(systemScript.includes('abs_section cann_version_cfg'), '系统刷新应包含 CANN 版本');
 for (const section of ['storage_devices', 'storage_usage', 'storage_mmc']) {

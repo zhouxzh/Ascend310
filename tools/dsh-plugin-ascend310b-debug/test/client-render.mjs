@@ -476,6 +476,10 @@ check(
 	bundleSource.includes('function mergeCategoryFacts') && bundleSource.includes('facts[key]?.source'),
 	'system refresh must remove missing facts and render nullable fact rows without crashing'
 );
+check(
+	bundleSource.includes('未刷新（请在对应页面更新）'),
+	'peripheral cards must explain that camera/audio/USB use their own refresh pages'
+);
 seeded = 0;
 seededKind = 'ready';
 seededSelected = 'board-8t';
