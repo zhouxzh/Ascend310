@@ -477,8 +477,8 @@ check(
 	'system refresh must remove missing facts and render nullable fact rows without crashing'
 );
 check(
-	bundleSource.includes('未刷新（请在对应页面更新）'),
-	'peripheral cards must explain that camera/audio/USB use their own refresh pages'
+	!bundleSource.includes('categorySource("USB"'),
+	'system overview must not duplicate peripheral cards owned by dedicated camera/audio pages'
 );
 seeded = 0;
 seededKind = 'ready';
