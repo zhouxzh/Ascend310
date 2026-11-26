@@ -203,6 +203,19 @@ const atlas = parseProbeOutput(PROBE_ATLAS_CANN92);
 equal(atlas.facts.firmwareVersion.value, '7.8.0.5.216', '应从 npu-smi board 读出固件');
 equal(atlas.facts.driverVersion.value, '25.5.0', '应从 npu-smi board 读出驱动');
 equal(atlas.facts.cannVersion.value, '9.2.0-beta.2', '应读出 CANN 9.2.0-beta.2');
+const cannInfoOnly = parseProbeOutput(`${PROBE_8T_CANN80}
+===ABS_BEGIN:cann_version_cfg===
+NOT_FOUND
+===ABS_END:cann_version_cfg===
+===ABS_BEGIN:cann_version_info===
+--- /usr/local/Ascend/ascend-toolkit/latest/compiler/version.info
+Version=9.1.0
+version_dir=cann
+timestamp=20260730_231653901
+===ABS_END:cann_version_info===
+`);
+equal(cannInfoOnly.facts.cannVersion.value, '9.1.0', 'CANN version.info must be a fallback when version.cfg is absent');
+equal(cannInfoOnly.facts.cannVersion.source, 'cann_version_info', 'CANN fallback evidence source must identify compiler/version.info');
 
 // --- honest gaps ----------------------------------------------------------
 const empty = parseProbeOutput('===ABS_BEGIN:hostname===\nfoo\n===ABS_END:hostname===\n');

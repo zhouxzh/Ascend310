@@ -27,6 +27,7 @@ writeFileSync(join(stubRoot, 'index.js'), 'export const defineTool = (tool) => t
 
 const directory = mkdtempSync(join(tmpdir(), 'ascend-targets-'));
 const inventoryPath = join(directory, 'inventory.json');
+const fixtureSeen = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 writeFileSync(
 	inventoryPath,
 	JSON.stringify({
@@ -38,7 +39,7 @@ writeFileSync(
 				macs: ['c0:74:2b:fd:f6:96', 'aa:bb:cc:dd:ee:ff'],
 				hostname: 'orangepiaipro',
 				lastIp: '10.42.8.212',
-				lastSeen: '2026-10-23T03:40:24.134Z',
+				lastSeen: fixtureSeen,
 				system: { soc: 'Ascend310B4', tier: '8T' },
 				configuredId: 'board-8t'
 			},
@@ -47,7 +48,7 @@ writeFileSync(
 				mac: 'c0:74:2b:fd:df:83',
 				hostname: 'orangepiaipro',
 				lastIp: '10.42.8.249',
-				lastSeen: '2026-10-23T03:40:24.134Z',
+				lastSeen: fixtureSeen,
 				system: { soc: 'Ascend310B4', tier: '8T' },
 				configuredId: null
 			}
@@ -214,7 +215,7 @@ try {
 		{ id: 'board-8t', transport: 'ssh', host: 'orangepiaipro.local' },
 		{ usbDevices: { value: 'new' } },
 		'camera',
-		'2026-11-16T00:00:00.000Z'
+		new Date().toISOString()
 	);
 	if ('videoDevices' in mergedCamera.facts || 'videoFormats' in mergedCamera.facts) {
 		failures.push('camera refresh must remove camera facts absent from the new observation');
@@ -381,8 +382,8 @@ try {
 					macs: ['c0:74:2b:fd:f7:4e'],
 					hostname: 'orangepiaipro',
 					lastIp: '198.51.100.107',
-					firstSeen: '2026-11-01T22:00:00.000Z',
-					lastSeen: '2026-11-01T23:00:00.000Z',
+					firstSeen: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+					lastSeen: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
 					configuredId: 'board-8t',
 					system: { soc: 'Ascend310B4', tier: '8T' },
 					changes: [],
@@ -422,7 +423,7 @@ try {
 	const reportConfig = { ...config, reportStorePath };
 	const savedValue = {
 		ok: true,
-		probedAt: '2026-10-26T12:00:00.000Z',
+		probedAt: new Date(Date.now() - 60 * 1000).toISOString(),
 		source: 'ssh',
 		target: { id: 'board-8t', label: 'configured 8T', transport: 'ssh', host: '10.42.8.212', user: 'HwHiAiUser', identityFile: '/secret/key' },
 		board: { soc: 'Ascend310B4', tier: '8T' },
@@ -445,7 +446,7 @@ try {
 		reportConfig,
 		{ id: 'board-8t', label: 'configured 8T', transport: 'ssh', host: '10.42.8.212', user: 'HwHiAiUser' },
 		{ videoFormats: { value: 'DEVICE=/dev/video0', source: 'video_formats' } },
-		'2026-10-29T12:00:00.000Z'
+		new Date().toISOString()
 	);
 	const cameraMerged = internals.readSavedReport(reportConfig, 'board-8t');
 	if (cameraMerged?.facts?.cannVersion?.value !== '8.0.0' || cameraMerged?.facts?.videoFormats?.value !== 'DEVICE=/dev/video0') {
@@ -456,8 +457,8 @@ try {
 		{ id: 'board-8t', label: 'configured 8T', transport: 'ssh', host: '10.42.8.212', user: 'HwHiAiUser' },
 		{ driverVersion: { value: '25.2.0', source: 'system-refresh' } },
 		'system',
-		'2026-10-29T12:01:00.000Z',
-		{ probedAt: '2026-10-29T12:01:00.000Z', board: { soc: 'Ascend310B4' }, scope: { applicable: true }, missingCore: ['driverVersion'], pairing: { verdict: 'observed-match' }, transport: { ok: true, reason: 'SSH 探测完成。', display: 'ssh board' } }
+		new Date().toISOString(),
+		{ probedAt: new Date().toISOString(), board: { soc: 'Ascend310B4' }, scope: { applicable: true }, missingCore: ['driverVersion'], pairing: { verdict: 'observed-match' }, transport: { ok: true, reason: 'SSH 探测完成。', display: 'ssh board' } }
 	);
 	const systemMerged = internals.readSavedReport(reportConfig, 'board-8t');
 	if (systemMerged?.board?.soc !== 'Ascend310B4' || systemMerged?.facts?.videoFormats?.value !== 'DEVICE=/dev/video0') {

@@ -742,11 +742,18 @@ export function buildEnvironmentReport(sections) {
 	);
 
 	const cfg = parseVersionCfg(sections.cann_version_cfg);
+	const cannInfo = parseInfoFile(sections.cann_version_info);
+	const cannInfoVersion = firstMatchingValue(cannInfo, ['Version', 'version']);
 	const toolkitVersion =
 		cfg.runtime_running_version?.split(':').pop()?.trim() ??
 		findVersion(sections, ['cann_version_info'], /runtime_running_version[^0-9]*(\d+\.\d+(?:\.\d+)?)/i)?.value ??
-		null;
-	set('cannVersion', toolkitVersion, 'cann_version_cfg', cfg.runtime_running_version ?? null);
+		cannInfoVersion;
+	set(
+		'cannVersion',
+		toolkitVersion,
+		cfg.runtime_running_version ? 'cann_version_cfg' : 'cann_version_info',
+		cfg.runtime_running_version ?? cannInfoVersion
+	);
 	set('cannPackageVersion', cfg.version ?? null, 'cann_version_cfg', cfg.version ?? null);
 	set(
 		'cannLatestPath',
